@@ -10,6 +10,7 @@ import type {
   SessionState,
   SessionStatus,
   SyncError,
+  SessionPrincipal,
 } from '../../protocol';
 
 export type Db = DrizzleSqliteDODatabase;
@@ -144,7 +145,7 @@ export function toState(db: Db, meta: Meta): SessionState {
  */
 export function register(
   db: Db,
-  principal: Principal,
+  principal: SessionPrincipal,
   sessionID: string,
   sourceID: string,
   now: number
@@ -158,6 +159,9 @@ export function register(
     if (meta.source_id !== sourceID) {
       raise('source_conflict', 'The session is bound to another source');
     }
+    if ((meta.cloud_agent_session_id ?? null) !== (principal.host?.cloudAgentSessionId ?? null)) {
+      raise('hosting_conflict', 'The session hosting binding cannot change');
+    }
     return { created: false, state: toState(db, meta) };
   }
   const row = {
@@ -167,6 +171,7 @@ export function register(
     tenant_id: principal.tenant.id,
     creator_id: principal.userID,
     source_id: sourceID,
+    cloud_agent_session_id: principal.host?.cloudAgentSessionId ?? null,
     position: 0,
     revision: 0,
     batches: 0,
@@ -188,7 +193,16 @@ export function register(
 export function update(
   db: Db,
   values: Partial<
-    Omit<Meta, 'key' | 'session_id' | 'tenant_type' | 'tenant_id' | 'creator_id' | 'source_id'>
+    Omit<
+      Meta,
+      | 'key'
+      | 'session_id'
+      | 'tenant_type'
+      | 'tenant_id'
+      | 'creator_id'
+      | 'source_id'
+      | 'cloud_agent_session_id'
+    >
   >
 ): void {
   db.update(session).set(values).where(eq(session.key, KEY)).run();

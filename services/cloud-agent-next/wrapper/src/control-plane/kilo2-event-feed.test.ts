@@ -225,6 +225,10 @@ it.each([
   [{ type: 'provider.internal', message: 'internal', name: {} }, 'provider_unavailable'],
   [{ type: 'provider.internal', message: 'internal', name: [] }, 'provider_unavailable'],
   [{ type: 'tool.execution', message: 'failed' }, 'unknown'],
+  [
+    { type: 'provider.no-route', message: 'Kilo Gateway model catalog did not become ready' },
+    'model_catalog_unavailable',
+  ],
   [{ type: 'unknown', message: 'failed', name: 'ContextOverflowError' }, 'context_limit'],
 ] as const)('preserves native error %j when a read fails', async (error, reason) => {
   const directory = '/workspace';
@@ -660,6 +664,11 @@ const catalogFailure = (detail: string) =>
   `Failed to load the Kilo model catalog (${detail}). Check your connection and credentials.`;
 
 it.each([
+  ['Kilo Gateway model catalog did not become ready', 'model_catalog_unavailable'],
+  [
+    'SessionRunnerModel.ModelUnavailableError: Kilo Gateway model catalog did not become ready',
+    'model_catalog_unavailable',
+  ],
   [catalogFailure('HTTP 404'), 'model_catalog_unavailable'],
   [
     `SessionRunnerModel.ModelUnavailableError: ${catalogFailure('HTTP 404')}`,

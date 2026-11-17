@@ -8,6 +8,7 @@ import type { EventQueries, EventQueryFilters } from '../session/queries/index.j
 import { DEFAULT_SLASH_COMMANDS } from '../shared/default-slash-commands.generated';
 import { normalize, isChatEvent } from '../../../../packages/cloud-agent-sdk/src/normalizer';
 import { createServiceState } from '../../../../packages/cloud-agent-sdk/src/service-state';
+import { HOSTED_CLOUD_EVENT_TYPES } from '../../../../packages/cloud-agent-sdk/src/schemas';
 
 const SESSION_ID = 'sess_test' as SessionId;
 
@@ -413,6 +414,47 @@ describe('stream handler handleStreamRequest', () => {
       return [{}, serverWs];
     });
   }
+
+  it('filters replay and synthetic pending chat while retaining connected, infrastructure and independent cursors', async () => {
+    const serverWs = makeFakeWebSocket();
+    mockWebSocketPair(serverWs);
+    const pendingInteractions = {
+      questions: [{ id: 'q_current', questions: [] }],
+      permissions: [{ id: 'p_current' }],
+    };
+    const handler = createStreamHandler(
+      makeFakeState(),
+      makeFakeEventQueries([
+        { ...makeKiloEvent(1, 'question.asked', { id: 'q_old' }), mutation_cursor: 1 },
+        {
+          ...makeEvent(2, JSON.stringify(pendingInteractions)),
+          stream_event_type: 'cloud.interactions',
+          mutation_cursor: 1000,
+        },
+      ]),
+      SESSION_ID,
+      {
+        getUpdateCursor: () => 1000,
+        readPendingInteractions: () => pendingInteractions,
+        deriveQueuedMessages: async () => [
+          { messageId: 'queued', content: 'Synthetic queued prompt', timestamp: 1 },
+        ],
+      }
+    );
+    const url = new URL('https://example.test/stream');
+    url.searchParams.set('eventTypes', HOSTED_CLOUD_EVENT_TYPES.join(','));
+    await handler.handleStreamRequest(new Request(url, { headers: { Upgrade: 'websocket' } }));
+    const frames = parseSentMessages(serverWs);
+    expect(frames.map(frame => frame.streamEventType)).not.toContain('kilocode');
+    expect(frames.find(frame => frame.streamEventType === 'cloud.interactions')?.data).toEqual(
+      pendingInteractions
+    );
+    expect(
+      frames.find(frame => frame.streamEventType === 'connected')?.data.pendingInteractions
+    ).toEqual(pendingInteractions);
+    expect(frames.some(frame => frame.streamEventType === 'cloud.message.queued')).toBe(true);
+    expect(JSON.parse(serverWs.sentMessages[0] ?? '{}').cursor).toBe(1000);
+  });
 
   it('sends bare preparing cloud status in the synthetic connected event', async () => {
     const serverWs = makeFakeWebSocket();

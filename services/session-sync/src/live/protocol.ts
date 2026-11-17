@@ -63,7 +63,14 @@ export function sameTicket(a: LiveTicket, b: LiveTicket): boolean {
     a.tenant.id === b.tenant.id &&
     a.sessionID === b.sessionID &&
     a.userID === b.userID &&
-    a.role === b.role
+    a.role === b.role &&
+    a.workload === b.workload &&
+    a.host?.cloudAgentSessionId === b.host?.cloudAgentSessionId &&
+    a.native?.sessionID === b.native?.sessionID &&
+    a.native?.rootSessionID === b.native?.rootSessionID &&
+    a.native?.kind === b.native?.kind &&
+    a.liveIdentity?.allocationId === b.liveIdentity?.allocationId &&
+    a.liveIdentity?.providerInstanceId === b.liveIdentity?.providerInstanceId
   );
 }
 

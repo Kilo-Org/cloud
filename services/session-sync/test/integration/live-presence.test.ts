@@ -2,6 +2,11 @@ import { SELF, runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test
 import { eq, isNotNull } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type {
+  CloudAgentSyncLiveAuthorization,
+  CloudAgentSyncLiveRequest,
+  CloudAgentSyncLiveResult,
+} from '@kilocode/worker-utils/cloud-agent-session-sync';
 
 import {
   getPresenceStub,
@@ -15,7 +20,7 @@ import {
 } from '../../src/db/presence-sqlite-schema';
 import type { Env } from '../../src/env';
 import { LIVE_LIMITS, type LiveEnvelope } from '../../src/live/protocol';
-import { mintTicket } from '../../src/live/ticket';
+import { mintHostedTicket, mintTicket } from '../../src/live/ticket';
 import type { Principal } from '../../src/protocol';
 import { client, grant, member, newSessionID, personal, testEnv } from '../helpers';
 
@@ -26,13 +31,16 @@ type Connection = {
   closed: Promise<CloseEvent>;
 };
 const connections: Connection[] = [];
+const releaseAuthorityGates: Array<() => Promise<void>> = [];
 
 afterEach(async () => {
+  for (const release of releaseAuthorityGates.splice(0)) await release();
   for (const connection of connections) {
     if (connection.ws.readyState < WebSocket.CLOSING) connection.ws.close(1000, 'Test finished');
   }
   await Promise.all(connections.map(connection => connection.closed));
   connections.length = 0;
+  vi.restoreAllMocks();
 });
 
 async function ticket(
@@ -61,6 +69,10 @@ async function connect(
   const response = await SELF.fetch('https://session-sync.test/v1/presence', { headers });
   if (transport === 'subprotocol')
     expect(response.headers.get('sec-websocket-protocol')).toBe(protocol);
+  return openConnection(response);
+}
+
+function openConnection(response: Response): Connection {
   expect(response.status).toBe(101);
   const ws = response.webSocket;
   if (!ws) throw new Error('Missing WebSocket');
@@ -104,6 +116,148 @@ async function connect(
   };
   connections.push(connection);
   return connection;
+}
+
+async function hostedPresence(principal = personal(`synthetic-hosted-${crypto.randomUUID()}`)) {
+  const stub = getPresenceStub(testEnv, principal.userID);
+  const nativeSessionID = newSessionID();
+  const authorization: CloudAgentSyncLiveAuthorization = {
+    userID: principal.userID,
+    ...(principal.tenant.type === 'organization' ? { organizationID: principal.tenant.id } : {}),
+    workload: 'cloud-agent',
+    host: { cloudAgentSessionId: `workspace_${crypto.randomUUID()}` },
+    native: { sessionID: nativeSessionID, rootSessionID: nativeSessionID, kind: 'root' },
+    liveIdentity: {
+      allocationId: 'synthetic-current-allocation',
+      providerInstanceId: 'synthetic-current-provider',
+    },
+    expiresAt: Date.now() + 120_000,
+  };
+  let unavailable = false;
+  const decide = (input: CloudAgentSyncLiveRequest): CloudAgentSyncLiveResult => {
+    if (unavailable) return { type: 'unavailable', code: 'auth_unavailable' };
+    if (
+      input.type !== 'ticket' ||
+      input.liveIdentity.allocationId !== authorization.liveIdentity.allocationId ||
+      input.liveIdentity.providerInstanceId !== authorization.liveIdentity.providerInstanceId
+    )
+      return { type: 'denied', code: 'access_denied' };
+    return {
+      type: 'allowed',
+      authorization: { ...authorization, expiresAt: Date.now() + 120_000 },
+    };
+  };
+  const authorizeLive = vi.fn(async (input: CloudAgentSyncLiveRequest) => decide(input));
+  const points: AnalyticsEngineDataPoint[] = [];
+  const fixtureEnv: Env = {
+    ...testEnv,
+    CLOUD_AGENT_SYNC_AUTH: { authorizeUpload: async () => null, authorizeLive },
+    SESSION_SYNC_METRICS: {
+      writeDataPoint: point => {
+        if (point) points.push(point);
+      },
+    },
+  };
+  await runInDurableObject(stub, instance => {
+    Object.assign(instance, { env: fixtureEnv });
+  });
+  const mint = async (expiresAt = Date.now() + 120_000) =>
+    (await mintHostedTicket(testEnv, { ...authorization, expiresAt }, 'session-presence')).ticket;
+  const fetch = (token: string) =>
+    stub.fetch('https://session-sync.test/', {
+      headers: { upgrade: 'websocket', authorization: `Bearer ${token}` },
+    });
+  const connectRunner = async () => {
+    const connection = openConnection(await fetch(await mint()));
+    await connection.next('hello');
+    return connection;
+  };
+  const holdNext = () => {
+    const entered = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    authorizeLive.mockImplementationOnce(async input => {
+      entered.resolve();
+      await release.promise;
+      return decide(input);
+    });
+    const open = () => runInDurableObject(stub, () => release.resolve());
+    releaseAuthorityGates.push(open);
+    return {
+      entered: runInDurableObject(stub, async () => {
+        await entered.promise;
+      }),
+      release: open,
+    };
+  };
+  const holdPositiveReply = () => {
+    const entered = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    authorizeLive.mockImplementationOnce(async input => {
+      const decided = structuredClone(decide(input));
+      expect(decided.type).toBe('allowed');
+      entered.resolve();
+      await release.promise;
+      return decided;
+    });
+    const open = () => runInDurableObject(stub, () => release.resolve());
+    releaseAuthorityGates.push(open);
+    return {
+      entered: runInDurableObject(stub, async () => {
+        await entered.promise;
+      }),
+      release: open,
+    };
+  };
+  return {
+    principal,
+    stub,
+    authorization,
+    authorizeLive,
+    points,
+    fixtureEnv,
+    mint,
+    fetch,
+    connectRunner,
+    holdNext,
+    holdPositiveReply,
+    outage: () => {
+      unavailable = true;
+    },
+    recover: () => {
+      unavailable = false;
+    },
+  };
+}
+
+function sendHeartbeat(connection: Connection, instanceID: string, ad = advertisement()): void {
+  connection.ws.send(JSON.stringify({ type: 'heartbeat', instanceID, advertisement: ad }));
+}
+
+async function hostedAttachment(stub: DurableObjectStub<SessionPresenceDO>) {
+  return runInDurableObject(stub, (_instance, state) => {
+    const hosted = state
+      .getWebSockets()
+      .filter(ws => ws.deserializeAttachment()?.ticket.workload === 'cloud-agent');
+    const socket =
+      hosted.find(ws => ws.deserializeAttachment()?.instanceID !== undefined) ?? hosted[0];
+    if (!socket) throw new Error('Missing hosted socket');
+    return socket.deserializeAttachment() as {
+      ticket: { exp: number };
+      lastHeartbeatAt: number;
+      instanceID?: string;
+      closed: boolean;
+    };
+  });
+}
+
+function dispatchHostedFrame(stub: DurableObjectStub<SessionPresenceDO>, frame: unknown) {
+  return runInDurableObject(stub, async (instance, state) => {
+    const socket = state
+      .getWebSockets()
+      .find(ws => ws.deserializeAttachment()?.ticket.workload === 'cloud-agent');
+    if (!socket) throw new Error('Missing hosted socket');
+    await instance.webSocketMessage(socket, JSON.stringify(frame));
+  });
 }
 
 function advertisement(sessions: string[] = []): InstanceAdvertisement {
@@ -767,6 +921,515 @@ describe('live presence', () => {
       await restored.webSocketMessage(ws, JSON.stringify({ type: 'subscribe' }));
     });
     expect((await viewer.closed).code).toBe(1008);
+  });
+});
+
+describe('hosted presence authority', () => {
+  it('defers an already-decided stale publication reply when a new physical incumbent appeared during its await', async () => {
+    const f = await hostedPresence();
+    const stale = await f.connectRunner();
+    const original = await hostedAttachment(f.stub);
+    const gate = f.holdPositiveReply();
+    const pending = dispatchHostedFrame(f.stub, {
+      type: 'heartbeat',
+      instanceID: 'synthetic-shared-instance',
+      advertisement: { ...advertisement(), name: 'synthetic-stale-runner' },
+    });
+    await gate.entered;
+    f.authorization.liveIdentity = {
+      allocationId: 'synthetic-new-allocation',
+      providerInstanceId: 'synthetic-new-provider',
+    };
+    const incumbent = await f.connectRunner();
+    await heartbeat(incumbent, 'synthetic-shared-instance', {
+      ...advertisement(),
+      name: 'synthetic-current-runner',
+    });
+    await gate.release();
+    await pending;
+    expect(await f.stub.list()).toMatchObject([
+      {
+        instanceID: 'synthetic-shared-instance',
+        online: true,
+        advertisement: { name: 'synthetic-current-runner' },
+      },
+    ]);
+    await runInDurableObject(f.stub, (_instance, state) => {
+      const saved = state.getWebSockets().map(ws => ws.deserializeAttachment());
+      const staleState = saved.find(
+        saved => saved.ticket.liveIdentity?.allocationId === 'synthetic-current-allocation'
+      );
+      const currentState = saved.find(
+        saved => saved.ticket.liveIdentity?.allocationId === 'synthetic-new-allocation'
+      );
+      expect(staleState.instanceID).toBeUndefined();
+      expect(staleState).toMatchObject({
+        ticket: { exp: original.ticket.exp },
+        lastHeartbeatAt: original.lastHeartbeatAt,
+        closed: false,
+      });
+      expect(currentState.closed).toBe(false);
+      expect(drizzle(state.storage).select().from(presenceAdvertisements).all()).toHaveLength(1);
+    });
+    expect((await stale.next('error')).body).toEqual({ code: 'auth_unavailable' });
+    await heartbeat(incumbent, 'synthetic-shared-instance');
+  });
+
+  it('allows the current new physical candidate to replace an unchanged old incumbent', async () => {
+    const f = await hostedPresence();
+    const old = await f.connectRunner();
+    await heartbeat(old, 'synthetic-shared-instance');
+    f.authorization.liveIdentity = {
+      allocationId: 'synthetic-new-allocation',
+      providerInstanceId: 'synthetic-new-provider',
+    };
+    const current = await f.connectRunner();
+    await heartbeat(current, 'synthetic-shared-instance', {
+      ...advertisement(),
+      name: 'synthetic-current-runner',
+    });
+    expect((await old.closed).code).toBe(4009);
+    expect(await f.stub.list()).toMatchObject([
+      {
+        instanceID: 'synthetic-shared-instance',
+        advertisement: { name: 'synthetic-current-runner' },
+      },
+    ]);
+  });
+
+  it('keeps hosted discovery, watch controls, and instance commands within the creator tenant', async () => {
+    const f = await hostedPresence(
+      member(`synthetic-hosted-${crypto.randomUUID()}`, crypto.randomUUID())
+    );
+    const runner = await f.connectRunner();
+    const ad = advertisement([f.authorization.native.sessionID]);
+    await heartbeat(runner, 'synthetic-host', ad);
+    const ownerViewer = await connect(f.principal, 'viewer');
+    ownerViewer.ws.send(JSON.stringify({ type: 'subscribe' }));
+    expect((await ownerViewer.next('instances')).body).toMatchObject({
+      instances: [{ instanceID: 'synthetic-host' }],
+    });
+    const otherTenant = member(f.principal.userID, crypto.randomUUID());
+    const otherViewer = await connect(otherTenant, 'viewer');
+    otherViewer.ws.send(JSON.stringify({ type: 'subscribe' }));
+    expect((await otherViewer.next('instances')).body).toEqual({ instances: [] });
+    await f.stub.watch({
+      tenant: otherTenant.tenant,
+      sessionID: f.authorization.native.sessionID,
+      watching: true,
+    });
+    await heartbeat(runner, 'synthetic-host', ad);
+    expect(runner.received.filter(frame => frame.type === 'watch')).toEqual([]);
+    const denied = await client(otherTenant).send(
+      'POST',
+      '/v1/presence/instances/synthetic-host/commands',
+      {
+        body: JSON.stringify({ type: 'create_session', commandID: crypto.randomUUID() }),
+      }
+    );
+    expect(denied.status).toBe(409);
+    expect(await denied.json()).toMatchObject({ error: { code: 'instance_offline' } });
+    expect(runner.received.filter(frame => frame.channel === 'commands')).toEqual([]);
+    const foreign = getPresenceStub(testEnv, `synthetic-foreign-${crypto.randomUUID()}`);
+    const foreignResponse = await foreign.fetch('https://session-sync.test/', {
+      headers: { upgrade: 'websocket', authorization: `Bearer ${await f.mint()}` },
+    });
+    expect(foreignResponse.status).toBe(401);
+    await foreignResponse.text();
+    expect(f.authorizeLive).toHaveBeenCalledTimes(2);
+  });
+
+  it('delivers watch controls, renews and reconnects the same physical identity, and does not poll steady traffic', async () => {
+    const f = await hostedPresence();
+    const runner = await f.connectRunner();
+    await heartbeat(runner, 'synthetic-host', advertisement([f.authorization.native.sessionID]));
+    expect(f.authorizeLive).toHaveBeenCalledTimes(2);
+    await f.stub.watch({
+      tenant: f.principal.tenant,
+      sessionID: f.authorization.native.sessionID,
+      watching: true,
+    });
+    expect((await runner.next('watch')).body).toMatchObject({ watching: true });
+    await heartbeat(runner, 'synthetic-host');
+    expect(await f.stub.list()).toHaveLength(1);
+    expect(f.authorizeLive).toHaveBeenCalledTimes(2);
+    runner.ws.send(JSON.stringify({ type: 'reauth', ticket: await f.mint() }));
+    await runner.next('reauthorized');
+    const replacement = await f.connectRunner();
+    await heartbeat(replacement, 'synthetic-host');
+    expect((await runner.closed).code).toBe(4009);
+    expect(await f.stub.list()).toHaveLength(1);
+    expect(f.authorizeLive).toHaveBeenCalledTimes(5);
+    expect(
+      f.authorizeLive.mock.calls.every(([input]) => input.type === 'ticket' && !('handle' in input))
+    ).toBe(true);
+  });
+
+  it('refuses hosted HTTP and socket instance commands before forwarding or command-route insertion, even with kind cli', async () => {
+    const f = await hostedPresence();
+    const runner = await f.connectRunner();
+    await heartbeat(runner, 'synthetic-host', { ...advertisement(), kind: 'cli' });
+    const controller = await connect(f.principal, 'controller');
+    controller.ws.send(
+      JSON.stringify(
+        instanceCommand('synthetic-host', 'create_session', { prompt: 'synthetic payload' })
+      )
+    );
+    expect((await controller.next('error')).body).toMatchObject({ code: 'hosted_read_only' });
+    const http = await client(f.principal).send(
+      'POST',
+      '/v1/presence/instances/synthetic-host/commands',
+      {
+        body: JSON.stringify({
+          type: 'create_session',
+          commandID: crypto.randomUUID(),
+          body: { prompt: 'synthetic payload' },
+        }),
+      }
+    );
+    expect(http.status).toBe(403);
+    expect(await http.json()).toMatchObject({ error: { code: 'hosted_read_only' } });
+    await runInDurableObject(f.stub, (_instance, state) => {
+      expect(drizzle(state.storage).select().from(presenceCommandRoutes).all()).toEqual([]);
+    });
+    expect(runner.received.filter(frame => frame.channel === 'commands')).toEqual([]);
+    const human = await connect(f.principal, 'runner');
+    await heartbeat(human, 'synthetic-human', { ...advertisement(), kind: 'remote' });
+    const calls = f.authorizeLive.mock.calls.length;
+    const command = instanceCommand('synthetic-human');
+    controller.ws.send(JSON.stringify(command));
+    expect((await human.next('create_session')).body).toMatchObject({
+      commandID: command.commandID,
+    });
+    await controller.next('command_status');
+    human.ws.send(
+      JSON.stringify({ type: 'reply', commandID: command.commandID, body: { accepted: true } })
+    );
+    expect((await controller.next('reply')).body).toMatchObject({ payload: { accepted: true } });
+    expect(f.authorizeLive).toHaveBeenCalledTimes(calls);
+  });
+
+  it('records hosted counts from trusted workload on publication, removal, and expiry without raw user labels', async () => {
+    const f = await hostedPresence();
+    const counts = () =>
+      f.points.filter(point => point.indexes?.[0] === 'hosted_presence_instances');
+    const first = await f.connectRunner();
+    await heartbeat(first, 'synthetic-host', { ...advertisement(), kind: 'cli' });
+    expect(counts().at(-1)?.doubles).toEqual([1]);
+    const countPoints = counts().length;
+    await heartbeat(first, 'synthetic-host');
+    expect(counts()).toHaveLength(countPoints);
+    first.ws.close(1000, 'Synthetic removal');
+    await first.closed;
+    await f.stub.list();
+    expect(counts().at(-1)?.doubles).toEqual([0]);
+    const second = await f.connectRunner();
+    await heartbeat(second, 'synthetic-expiring-host');
+    expect(counts().at(-1)?.doubles).toEqual([1]);
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 121_000);
+    await runInDurableObject(f.stub, instance => instance.alarm());
+    expect((await second.closed).code).toBe(4001);
+    expect(counts().at(-1)?.doubles).toEqual([0]);
+    expect(JSON.stringify(counts())).not.toContain(f.principal.userID);
+    expect(counts().every(point => point.blobs?.length === 1 && point.doubles?.length === 1)).toBe(
+      true
+    );
+  });
+
+  it('skips hosted gauge emission when the existing metrics binding is absent', async () => {
+    const f = await hostedPresence();
+    await runInDurableObject(f.stub, instance => {
+      Object.assign(instance, { env: { ...f.fixtureEnv, SESSION_SYNC_METRICS: undefined } });
+    });
+    const runner = await f.connectRunner();
+    await heartbeat(runner, 'synthetic-unmetered-host');
+    runner.ws.close(1000, 'Synthetic removal');
+    await runner.closed;
+    expect(f.points.filter(point => point.indexes?.[0] === 'hosted_presence_instances')).toEqual(
+      []
+    );
+  });
+
+  it('denies stale unexpired physical authority before initial publication can evict the incumbent', async () => {
+    const f = await hostedPresence();
+    const staleTicket = await f.mint();
+    const stale = await f.connectRunner();
+    f.authorization.liveIdentity = {
+      allocationId: 'synthetic-new-allocation',
+      providerInstanceId: 'synthetic-new-provider',
+    };
+    const incumbent = await f.connectRunner();
+    await heartbeat(incumbent, 'synthetic-host');
+    sendHeartbeat(stale, 'synthetic-host');
+    expect((await stale.closed).code).toBe(4001);
+    expect(await f.stub.list()).toMatchObject([{ instanceID: 'synthetic-host', online: true }]);
+    await heartbeat(incumbent, 'synthetic-host');
+    const denied = await f.fetch(staleTicket);
+    expect(denied.status).toBe(403);
+    await denied.text();
+  });
+
+  it('keeps the incumbent and original ticket/heartbeat deadlines during connect, first-publication, and reauth outages', async () => {
+    const f = await hostedPresence();
+    const incumbent = await f.connectRunner();
+    await heartbeat(incumbent, 'synthetic-host');
+    const original = await hostedAttachment(f.stub);
+    const provisional = await f.connectRunner();
+    const provisionalDeadline = await runInDurableObject(f.stub, (_instance, state) => {
+      const saved = state
+        .getWebSockets()
+        .map(ws => ws.deserializeAttachment())
+        .find(saved => saved.ticket.workload === 'cloud-agent' && saved.instanceID === undefined);
+      return { expiresAt: saved.ticket.exp, lastHeartbeatAt: saved.lastHeartbeatAt };
+    });
+    f.outage();
+    const denied = await f.fetch(await f.mint());
+    expect(denied.status).toBe(503);
+    await denied.text();
+    sendHeartbeat(provisional, 'synthetic-host');
+    expect((await provisional.next('error')).body).toMatchObject({ code: 'auth_unavailable' });
+    incumbent.ws.send(JSON.stringify({ type: 'reauth', ticket: await f.mint() }));
+    expect((await incumbent.next('error')).body).toMatchObject({ code: 'auth_unavailable' });
+    const retained = await hostedAttachment(f.stub);
+    expect(retained.ticket.exp).toBe(original.ticket.exp);
+    expect(retained.lastHeartbeatAt).toBe(original.lastHeartbeatAt);
+    expect(retained.closed).toBe(false);
+    await runInDurableObject(f.stub, (_instance, state) => {
+      const saved = state
+        .getWebSockets()
+        .map(ws => ws.deserializeAttachment())
+        .find(saved => saved.ticket.workload === 'cloud-agent' && saved.instanceID === undefined);
+      expect(saved.ticket.exp).toBe(provisionalDeadline.expiresAt);
+      expect(saved.lastHeartbeatAt).toBe(provisionalDeadline.lastHeartbeatAt);
+    });
+    expect(await f.stub.list()).toMatchObject([{ instanceID: 'synthetic-host', online: true }]);
+    f.recover();
+    incumbent.ws.send(JSON.stringify({ type: 'reauth', ticket: await f.mint() }));
+    await incumbent.next('reauthorized');
+  });
+
+  it.each(['publication', 'reauth'] as const)(
+    'does not apply %s after its socket closes while authorization awaits',
+    async stage => {
+      const f = await hostedPresence();
+      const runner = await f.connectRunner();
+      if (stage === 'reauth') await heartbeat(runner, 'synthetic-host');
+      const gate = f.holdNext();
+      const pending = dispatchHostedFrame(
+        f.stub,
+        stage === 'publication'
+          ? { type: 'heartbeat', instanceID: 'synthetic-host', advertisement: advertisement() }
+          : { type: 'reauth', ticket: await f.mint() }
+      );
+      await gate.entered;
+      runner.ws.close(1000, 'Synthetic concurrent close');
+      await runner.closed;
+      await gate.release();
+      await pending;
+      expect(await f.stub.list()).toEqual([]);
+      await runInDurableObject(f.stub, (_instance, state) => {
+        expect(drizzle(state.storage).select().from(presenceAdvertisements).all()).toEqual([]);
+      });
+    }
+  );
+
+  it.each([
+    ['publication', 'ticket'],
+    ['publication', 'heartbeat'],
+    ['reauth', 'ticket'],
+    ['reauth', 'heartbeat'],
+  ] as const)(
+    'enforces the original %s %s deadline after authorization awaits',
+    async (stage, deadline) => {
+      const f = await hostedPresence();
+      const runner = await f.connectRunner();
+      const gate = f.holdNext();
+      const pending = dispatchHostedFrame(
+        f.stub,
+        stage === 'publication'
+          ? { type: 'heartbeat', instanceID: 'synthetic-host', advertisement: advertisement() }
+          : { type: 'reauth', ticket: await f.mint() }
+      );
+      await gate.entered;
+      const current = await hostedAttachment(f.stub);
+      vi.spyOn(Date, 'now').mockReturnValue(
+        deadline === 'ticket'
+          ? current.ticket.exp * 1000 + 1
+          : current.lastHeartbeatAt + LIVE_LIMITS.staleMs + 1
+      );
+      await gate.release();
+      await pending;
+      expect((await runner.closed).code).toBe(deadline === 'ticket' ? 4001 : 4000);
+      expect(await f.stub.list()).toEqual([]);
+    }
+  );
+
+  it('does not overwrite a newer reauthorization when an older candidate completes later', async () => {
+    const f = await hostedPresence();
+    const runner = await f.connectRunner();
+    await heartbeat(runner, 'synthetic-host');
+    const gate = f.holdNext();
+    const pending = dispatchHostedFrame(f.stub, {
+      type: 'reauth',
+      ticket: await f.mint(Date.now() + 60_000),
+    });
+    await gate.entered;
+    runner.ws.send(JSON.stringify({ type: 'reauth', ticket: await f.mint(Date.now() + 110_000) }));
+    const newer = await runner.next('reauthorized');
+    const retained = await hostedAttachment(f.stub);
+    await gate.release();
+    await pending;
+    await heartbeat(runner, 'synthetic-host');
+    expect((await hostedAttachment(f.stub)).ticket.exp).toBe(retained.ticket.exp);
+    expect(newer.body).toMatchObject({
+      expiresAt: new Date(retained.ticket.exp * 1000).toISOString(),
+    });
+    expect(runner.received.filter(frame => frame.type === 'reauthorized')).toHaveLength(1);
+  });
+
+  it('does not apply an expired reauthorization candidate to an otherwise live socket', async () => {
+    const f = await hostedPresence();
+    const runner = await f.connectRunner();
+    const gate = f.holdNext();
+    const pending = dispatchHostedFrame(f.stub, {
+      type: 'reauth',
+      ticket: await f.mint(Date.now() + 30_000),
+    });
+    await gate.entered;
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 31_000);
+    await gate.release();
+    await pending;
+    expect((await runner.closed).code).toBe(4001);
+    expect(runner.received.filter(frame => frame.type === 'reauthorized')).toEqual([]);
+  });
+
+  it('does not publish an initial heartbeat with a ticket superseded during its authority await', async () => {
+    const f = await hostedPresence();
+    const runner = await f.connectRunner();
+    const gate = f.holdNext();
+    const pending = dispatchHostedFrame(f.stub, {
+      type: 'heartbeat',
+      instanceID: 'synthetic-old-intent',
+      advertisement: advertisement(),
+    });
+    await gate.entered;
+    runner.ws.send(JSON.stringify({ type: 'reauth', ticket: await f.mint(Date.now() + 110_000) }));
+    await runner.next('reauthorized');
+    const current = await hostedAttachment(f.stub);
+    await gate.release();
+    await pending;
+    expect(await f.stub.list()).toEqual([]);
+    expect(await hostedAttachment(f.stub)).toMatchObject({
+      ticket: { exp: current.ticket.exp },
+      lastHeartbeatAt: current.lastHeartbeatAt,
+    });
+    await heartbeat(runner, 'synthetic-current-intent');
+    expect(await f.stub.list()).toMatchObject([{ instanceID: 'synthetic-current-intent' }]);
+  });
+
+  it('does not change the instance identity published by a concurrent initial heartbeat', async () => {
+    const f = await hostedPresence();
+    const runner = await f.connectRunner();
+    const gate = f.holdNext();
+    sendHeartbeat(runner, 'synthetic-old-intent');
+    await gate.entered;
+    await heartbeat(runner, 'synthetic-current-intent');
+    await gate.release();
+    expect((await runner.next('error')).body).toMatchObject({ code: 'invalid_request' });
+    expect(await f.stub.list()).toMatchObject([{ instanceID: 'synthetic-current-intent' }]);
+  });
+
+  it('rechecks replacement sets after concurrent provisional heartbeats for one instance', async () => {
+    const f = await hostedPresence();
+    const first = await f.connectRunner();
+    const second = await f.connectRunner();
+    const a = f.holdNext();
+    const b = f.holdNext();
+    sendHeartbeat(first, 'synthetic-shared-instance');
+    await a.entered;
+    sendHeartbeat(second, 'synthetic-shared-instance');
+    await b.entered;
+    await a.release();
+    await first.next('heartbeat_ack');
+    await b.release();
+    await second.next('heartbeat_ack');
+    expect((await first.closed).code).toBe(4009);
+    expect(await f.stub.list()).toHaveLength(1);
+    await runInDurableObject(f.stub, (_instance, state) => {
+      expect(drizzle(state.storage).select().from(presenceAdvertisements).all()).toHaveLength(1);
+    });
+    await heartbeat(second, 'synthetic-shared-instance');
+  });
+
+  it('rechecks the shared thirty-two-instance cap after concurrent hosted publication awaits', async () => {
+    const f = await hostedPresence();
+    for (let index = 0; index < 31; index++) {
+      const human = await connect(f.principal, 'runner');
+      await heartbeat(human, `synthetic-human-${index}`);
+    }
+    const first = await f.connectRunner();
+    const second = await f.connectRunner();
+    const a = f.holdNext();
+    const b = f.holdNext();
+    sendHeartbeat(first, 'synthetic-host-32');
+    await a.entered;
+    sendHeartbeat(second, 'synthetic-host-33');
+    await b.entered;
+    await a.release();
+    await first.next('heartbeat_ack');
+    await b.release();
+    expect((await second.closed).code).toBe(1013);
+    expect(await f.stub.list()).toHaveLength(32);
+    const replacement = await f.connectRunner();
+    await heartbeat(replacement, 'synthetic-host-32');
+    expect((await first.closed).code).toBe(4009);
+    expect(await f.stub.list()).toHaveLength(32);
+  });
+
+  it('rechecks aggregate advertisement bytes after another instance publishes during authorization', async () => {
+    const f = await hostedPresence();
+    const large = {
+      ...advertisement(Array.from({ length: 100 }, (_, index) => `ses_${'s'.repeat(38)}${index}`)),
+      name: 'n'.repeat(256),
+      projectName: 'p'.repeat(256),
+      capabilities: Array.from({ length: 32 }, () => 'c'.repeat(64)),
+    };
+    for (let index = 0; index < 7; index++) {
+      const human = await connect(f.principal, 'runner');
+      await heartbeat(human, `synthetic-large-${index}`, large);
+    }
+    const runner = await f.connectRunner();
+    const gate = f.holdNext();
+    sendHeartbeat(runner, 'synthetic-over-budget', large);
+    await gate.entered;
+    const eighth = await connect(f.principal, 'runner');
+    await heartbeat(eighth, 'synthetic-large-7', large);
+    await gate.release();
+    expect((await runner.next('error')).body).toMatchObject({ code: 'invalid_request' });
+    expect(await f.stub.list()).toHaveLength(8);
+    expect((await hostedAttachment(f.stub)).instanceID).toBeUndefined();
+  });
+
+  it('rechecks connect expiry after hosted authority and the existing awaited sweep', async () => {
+    const f = await hostedPresence();
+    const token = await f.mint(Date.now() + 10_000);
+    const entered = Promise.withResolvers<void>();
+    const released = Promise.withResolvers<void>();
+    await runInDurableObject(f.stub, instance => {
+      vi.spyOn(Object.getPrototypeOf(instance), 'sweep').mockImplementationOnce(async () => {
+        entered.resolve();
+        await released.promise;
+      });
+    });
+    const pending = f.fetch(token);
+    await runInDurableObject(f.stub, async () => {
+      await entered.promise;
+    });
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 11_000);
+    await runInDurableObject(f.stub, () => released.resolve());
+    const response = await pending;
+    expect(response.status).toBe(401);
+    await response.text();
   });
 });
 

@@ -1,3 +1,5 @@
+import { resolveSessionSyncUrl } from '@kilocode/web-shared/lib/constants';
+
 export type ContentSecurityPolicyOptions = {
   isDevelopment?: boolean;
   connectSrcUrls?: Array<string | undefined>;
@@ -38,10 +40,7 @@ function webSocketOriginFromUrl(value: string | undefined): string | null {
 export function getConfiguredConnectSrcOrigins(
   env: Record<string, string | undefined> = process.env
 ): string[] {
-  const sessionSyncUrl =
-    env.NODE_ENV === 'development'
-      ? env.NEXT_PUBLIC_SESSION_SYNC_URL || 'http://localhost:8817'
-      : undefined;
+  const sessionSyncUrl = resolveSessionSyncUrl(env.NODE_ENV, env.NEXT_PUBLIC_SESSION_SYNC_URL);
   return compactUnique([
     originFromUrl(env.NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL),
     originFromUrl(env.NEXT_PUBLIC_SESSION_INGEST_WS_URL),

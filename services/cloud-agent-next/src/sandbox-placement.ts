@@ -61,6 +61,20 @@ export async function selectControlPlaneSandbox(input: {
   /** The caller's normalized choice; the resolved default never changes the kind. */
   requestedAllocation?: SandboxAllocation;
 }): Promise<ControlPlaneSandboxDecision> {
+  return {
+    sandboxId: await hashToSandboxId(`control-isolated-v1:${input.sessionId}`, 'sbx'),
+    ...controlPlaneSandboxPlacement(input),
+  };
+}
+
+export function controlPlaneSandboxPlacement(input: {
+  env: SandboxSelectionEnv;
+  userId: string;
+  orgId?: string;
+  codeReview: boolean;
+  sandboxAllocation?: SandboxAllocation;
+  requestedAllocation?: SandboxAllocation;
+}): Omit<ControlPlaneSandboxDecision, 'sandboxId'> {
   const requestedAllocation =
     input.requestedAllocation !== undefined
       ? normalizeSandboxAllocation(input.requestedAllocation)
@@ -83,7 +97,6 @@ export async function selectControlPlaneSandbox(input: {
             isolated: sandboxKind === 'isolated',
           });
   return {
-    sandboxId: await hashToSandboxId(`control-isolated-v1:${input.sessionId}`, 'sbx'),
     provider,
     sandboxKind,
   };

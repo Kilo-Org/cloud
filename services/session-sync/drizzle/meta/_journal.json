@@ -43,6 +43,13 @@
       "when": 1794573435621,
       "tag": "0005_session_status",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1794935731623,
+      "tag": "0006_misty_marvel_zombies",
+      "breakpoints": true
     }
   ]
 }

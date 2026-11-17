@@ -352,6 +352,12 @@ export type ResolvedSession =
       capabilities?: { attachments?: boolean };
     }
   | { type: 'cloud-agent'; kiloSessionId: KiloSessionId; cloudAgentSessionId: CloudAgentSessionId }
+  | {
+      type: 'hosted-native';
+      kiloSessionId: KiloSessionId;
+      cloudAgentSessionId: CloudAgentSessionId;
+      organizationId?: string;
+    }
   | { type: 'read-only'; kiloSessionId: KiloSessionId };
 
 export type SessionSnapshot = {

@@ -1095,7 +1095,31 @@ export const cloudStatusDataSchema = z.object({
 });
 export type CloudStatusData = z.infer<typeof cloudStatusDataSchema>;
 
+export const HOSTED_CLOUD_EVENT_TYPES = [
+  'preparing',
+  'cloud.status',
+  'cloud.sandbox.status',
+  'cloud.message.queued',
+  'cloud.message.sent',
+  'cloud.message.completed',
+  'cloud.message.failed',
+  'cloud.message.canceled',
+  'autocommit_started',
+  'autocommit_completed',
+  'wrapper_finalizing',
+  'cloud.worktree.changes.ready',
+  'commands.available',
+  'connected',
+  'cloud.interactions',
+];
+
+export const cloudInteractionsDataSchema = z.object({
+  questions: z.array(z.unknown()),
+  permissions: z.array(z.unknown()),
+});
+
 export const connectedDataSchema = z.object({
+  pendingInteractions: cloudInteractionsDataSchema.optional(),
   bootstrapPending: z.boolean().optional(),
   ancillaryOmittedItemCount: mutationCursorSchema.optional().catch(undefined),
   sessionStatus: sessionStatusSchema.optional().catch(undefined),

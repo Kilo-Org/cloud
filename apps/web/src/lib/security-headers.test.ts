@@ -82,10 +82,16 @@ describe('security headers', () => {
     expect(getConfiguredConnectSrcOrigins(env)).toEqual([
       'wss://next-agent.example.com',
       'wss://ingest.example.com',
+      'https://session-sync.kiloapps.io',
+      'wss://session-sync.kiloapps.io',
     ]);
   });
 
   it('derives ws:// session-sync origins for non-HTTPS development URLs', () => {
+    expect(getConfiguredConnectSrcOrigins({ NODE_ENV: 'development' })).toEqual([
+      'http://localhost:8817',
+      'ws://localhost:8817',
+    ]);
     expect(
       getConfiguredConnectSrcOrigins({
         NODE_ENV: 'development',
@@ -95,7 +101,7 @@ describe('security headers', () => {
   });
 
   it.each(['production', 'test', undefined])(
-    'excludes preview relay permissions from CSP outside development: %s',
+    'permits the configured hosted relay in CSP outside development: %s',
     nodeEnv => {
       const origins = getConfiguredConnectSrcOrigins({
         NODE_ENV: nodeEnv,
@@ -103,7 +109,12 @@ describe('security headers', () => {
       });
       const policy = buildContentSecurityPolicy({ connectSrcUrls: origins });
 
-      expect(getPolicyDirective(policy, 'connect-src')).not.toContain('preview-relay.example.com');
+      expect(getPolicyDirective(policy, 'connect-src')).toContain(
+        'https://preview-relay.example.com'
+      );
+      expect(getPolicyDirective(policy, 'connect-src')).toContain(
+        'wss://preview-relay.example.com'
+      );
     }
   );
 

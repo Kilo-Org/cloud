@@ -965,6 +965,7 @@ export const executionStatusNextSchema = z
 export const baseGetSessionNextOutputSchema = z.object({
   // Session identifiers
   sessionId: z.string(),
+  chat: cloudSessionMetadataSchema.shape.chat,
   kiloSessionId: kiloSessionIdSchema.optional(),
   userId: z.string(),
   orgId: z.string().optional(),

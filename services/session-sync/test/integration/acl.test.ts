@@ -5,10 +5,11 @@ import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { describe, expect, it } from 'vitest';
 
 import migrations from '../../drizzle/migrations';
-import { session, sessionRoles } from '../../src/db/sqlite-schema';
+import { sessionRoles } from '../../src/db/sqlite-schema';
 import { getSessionSyncDOStub, type SessionSyncDO } from '../../src/dos/SessionSyncDO';
 import { errorBodySchema, sessionStateSchema, type Principal } from '../../src/protocol';
 import { batch, client, member, newSessionID, personal, sha256, testEnv } from '../helpers';
+import { legacySession } from '../legacy-session-schema';
 
 async function setup() {
   const organizationID = crypto.randomUUID();
@@ -254,7 +255,7 @@ describe('session creator ACL', () => {
           ...migrations,
           journal: { entries: migrations.journal.entries.filter(entry => entry.idx < 4) },
         });
-        db.insert(session)
+        db.insert(legacySession)
           .values({
             key: 1,
             session_id: id,

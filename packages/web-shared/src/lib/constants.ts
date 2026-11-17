@@ -63,6 +63,18 @@ export const CLOUD_AGENT_NEXT_WS_URL = process.env.NEXT_PUBLIC_CLOUD_AGENT_NEXT_
 // Used by the CLI live transport for real-time event streaming
 export const SESSION_INGEST_WS_URL = process.env.NEXT_PUBLIC_SESSION_INGEST_WS_URL ?? '';
 
+export function resolveSessionSyncUrl(nodeEnv: string | undefined, override?: string): string {
+  return (
+    override ||
+    (nodeEnv === 'development' ? 'http://localhost:8817' : 'https://session-sync.kiloapps.io')
+  );
+}
+
+export const SESSION_SYNC_URL = resolveSessionSyncUrl(
+  process.env.NODE_ENV,
+  process.env.NEXT_PUBLIC_SESSION_SYNC_URL
+);
+
 // Stripe publishable key (client-side, inlined at build time)
 export const STRIPE_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '';
 

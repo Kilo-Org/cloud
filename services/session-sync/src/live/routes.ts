@@ -12,7 +12,8 @@ import { ERROR_STATUS, errorBody, sessionIDSchema } from '../protocol';
 import { rateLimit } from '../rate-limit';
 import { readBoundedStream } from '@kilocode/worker-utils/bounded-stream-reader';
 import { LIVE_LIMITS, socketTicket } from './protocol';
-import { mintTicket, verifyTicket } from './ticket';
+import { mintHostedTicket, mintTicket, verifyTicket } from './ticket';
+import { authorizeCloudAgentLive } from '../cloud-agent-upload';
 import { phase } from '../metrics';
 
 type C = Context<{ Bindings: Env }>;
@@ -58,10 +59,30 @@ async function sessionAuth(c: C) {
     auth.tenant.type
   );
   if (!allowed.ok) return json(errorBody(allowed.error), ERROR_STATUS[allowed.error.code]);
-  return { principal: auth, sessionID: id.data };
+  return { principal: auth, sessionID: id.data, host: allowed.value.host };
 }
 
 live.post('/sessions/:id/live-ticket', async c => {
+  const id = sessionIDSchema.safeParse(c.req.param('id'));
+  if (!id.success) return error('invalid_request', 'Invalid session ID');
+  const hosted = await authorizeCloudAgentLive(c.req.raw, c.env, id.data);
+  if (hosted instanceof Response) return hosted;
+  if (hosted) {
+    const limited = await rateLimit(c.env.USER_REQUEST_LIMITER, hosted.principal.userID);
+    if (limited) return limited;
+    const input = await body(c, 1024);
+    if (input instanceof Response) return input;
+    if (!z.strictObject({ role: z.literal('runner') }).safeParse(input).success)
+      return error('access_denied', 'Hosted credentials permit runner tickets only', 403);
+    const allowed = await getSessionSyncDOStub(c.env, {
+      tenant: hosted.principal.tenant,
+      sessionID: id.data,
+    }).authorizeLive({ principal: hosted.principal, sessionID: id.data });
+    if (!allowed.ok) return json(errorBody(allowed.error), ERROR_STATUS[allowed.error.code]);
+    if (allowed.value.host?.cloudAgentSessionId !== hosted.authorization.host.cloudAgentSessionId)
+      return error('hosting_conflict', 'The hosted session binding does not match', 409);
+    return json(await mintHostedTicket(c.env, hosted.authorization, 'session-relay', id.data));
+  }
   const auth = await sessionAuth(c);
   if (auth instanceof Response) return auth;
   const input = await body(c, 1024);
@@ -70,6 +91,8 @@ live.post('/sessions/:id/live-ticket', async c => {
     .strictObject({ role: z.enum(['viewer', 'controller', 'runner']) })
     .safeParse(input);
   if (!parsed.success) return error('invalid_request', 'A live role is required');
+  if (parsed.data.role === 'runner' && auth.host)
+    return error('hosting_conflict', 'Hosted sessions require a hosted runner', 409);
   return json(
     await mintTicket(
       c.req.raw,
@@ -136,6 +159,17 @@ live.get('/sessions/:id/commands/:commandID', async c => {
 });
 
 live.post('/presence/ticket', async c => {
+  const hosted = await authorizeCloudAgentLive(c.req.raw, c.env);
+  if (hosted instanceof Response) return hosted;
+  if (hosted) {
+    const limited = await rateLimit(c.env.USER_REQUEST_LIMITER, hosted.principal.userID);
+    if (limited) return limited;
+    const input = await body(c, 1024);
+    if (input instanceof Response) return input;
+    if (!z.strictObject({ role: z.literal('runner') }).safeParse(input).success)
+      return error('access_denied', 'Hosted credentials permit runner tickets only', 403);
+    return json(await mintHostedTicket(c.env, hosted.authorization, 'session-presence'));
+  }
   const auth = await principal(c);
   if (auth instanceof Response) return auth;
   const input = await body(c, 1024);

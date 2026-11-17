@@ -36,6 +36,9 @@ import {
   REMOTE_SESSION_ORGANIZATION_MISMATCH,
 } from './session';
 import type { CloudAgentSession, CloudAgentSessionConfig } from './session';
+import { cloudSessionMetadataToFetched, sessionViewType } from './cloud-session-metadata';
+import type { NativeSyncClient } from './native-sync';
+import { readHostedNativePage } from './hosted-native-conversation';
 import { createChatProcessor } from './chat-processor';
 import { upsertByRequestId } from './pending-requests';
 import { replayStoredMessages } from './snapshot-page';
@@ -104,7 +107,7 @@ type WorktreeChangesRefresh = {
   revision?: number;
   connectionVersion: number;
 };
-type ActiveSessionType = ResolvedSession['type'];
+type ActiveSessionType = Exclude<ResolvedSession['type'], 'hosted-native'>;
 type ObservedModelSource = 'session' | 'message' | 'catalog';
 /**
  * A pending question together with the options it offers. `question.asked` may
@@ -348,6 +351,7 @@ type PrepareInput = {
 };
 
 type SessionManagerConfig = {
+  nativeSyncClient?: NativeSyncClient;
   store: JotaiStore;
   resolveSession: (kiloSessionId: KiloSessionId) => Promise<ResolvedSession>;
   getTicket: (
@@ -1135,6 +1139,7 @@ type OpenSessionCallbacks = Pick<
   | 'onReplayComplete'
   | 'onBranchChanged'
   | 'onError'
+  | 'onReaderError'
   | 'onChildSessionError'
   | 'onMessageFailed'
   | 'onEvent'
@@ -1650,6 +1655,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   let indicatorTimer: ReturnType<typeof setTimeout> | null = null;
   let childSessionHydrationGeneration = 0;
   let activeCloudSessionId: CloudAgentSessionId | null = null;
+  let activeResolvedSession: ResolvedSession | null = null;
   const childSessionHydrationRequests = new Map<string, Promise<void>>();
   // Pagination state for `loadOlderMessages`. Reset on every switchSession.
   let olderMessagesCursor: string | null = null;
@@ -1787,6 +1793,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     currentCapabilities = undefined;
     clearPendingInterrupt();
     activeCloudSessionId = null;
+    activeResolvedSession = null;
   }
 
   /**
@@ -1936,6 +1943,30 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
     const request = (async () => {
       try {
+        if (activeResolvedSession?.type === 'hosted-native') {
+          if (!config.nativeSyncClient) throw new Error('Hosted sessions require native sync');
+          const page = await readHostedNativePage(
+            config.nativeSyncClient,
+            childSessionId,
+            activeResolvedSession.organizationId
+          );
+          if (!isCurrentChildSessionHydration(generation, rootSessionId, storage)) return;
+          replayChildMessages(storage, page.messages);
+          if (page.executionError)
+            store.set(
+              childSessionErrorsAtom,
+              new Map(store.get(childSessionErrorsAtom)).set(childSessionId, page.executionError)
+            );
+          setChildSessionHydrationState(childSessionId, {
+            status: 'ready',
+            cursor: null,
+            hasOlder: false,
+            isLoadingOlder: false,
+            omittedItemCount: 0,
+            olderError: null,
+          });
+          return;
+        }
         if (activeCloudSessionId || config.fetchSnapshotPage) {
           let page: SessionSnapshotPageOutcome | null;
           if (activeCloudSessionId) {
@@ -2010,6 +2041,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   }
 
   async function loadOlderChildMessages(childSessionId: KiloSessionId): Promise<void> {
+    if (activeResolvedSession?.type === 'hosted-native') return;
     const cloudSessionId = activeCloudSessionId;
     if (!cloudSessionId && !config.fetchSnapshotPage) return;
     const fetchSnapshotPage = config.fetchSnapshotPage;
@@ -2482,6 +2514,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   }
 
   async function loadOlderMessages(): Promise<void> {
+    if (activeResolvedSession?.type === 'hosted-native') return;
     // Terminal failures block any further backend hits until the next
     // switchSession (which resets `olderMessagesTerminal`).
     if (olderMessagesTerminal) return;
@@ -3214,11 +3247,14 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     const { kiloSessionId, expectedGeneration } = open;
     let data: FetchedSessionData;
     try {
-      startCachedPageRead(open);
+      if (!config.nativeSyncClient) startCachedPageRead(open);
       if (config.fetchCloudSession || config.fetchCloudSnapshotPage) {
         const initialResolvedSession = await config.resolveSession(kiloSessionId);
         if (expectedGeneration !== switchGeneration) return null;
         open.initialResolvedSession = initialResolvedSession;
+        activeResolvedSession = initialResolvedSession;
+        if (config.nativeSyncClient && initialResolvedSession.type !== 'hosted-native')
+          startCachedPageRead(open);
         if (
           initialResolvedSession.type === 'cloud-agent' &&
           initialResolvedSession.cloudAgentSessionId.startsWith('workspace_')
@@ -3249,41 +3285,20 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         }
       }
 
-      if (activeCloudSessionId) {
+      const cloudMetadataId =
+        activeResolvedSession?.type === 'hosted-native'
+          ? activeResolvedSession.cloudAgentSessionId
+          : activeCloudSessionId;
+      if (cloudMetadataId) {
         if (!config.fetchCloudSession) {
           throw new Error('Cloud Agent workspace sessions require fetchCloudSession');
         }
         const metadata = cloudSessionMetadataSchema.parse(
-          await config.fetchCloudSession(activeCloudSessionId)
+          await config.fetchCloudSession(cloudMetadataId)
         );
-        if (metadata.sessionId !== activeCloudSessionId) {
-          throw new Error('Cloud Agent session mismatch');
-        }
-        data = {
-          kiloSessionId,
-          cloudAgentSessionId: activeCloudSessionId,
-          title: metadata.title ?? null,
-          organizationId: metadata.orgId ?? null,
-          gitUrl: metadata.gitUrl ?? null,
-          gitBranch: metadata.upstreamBranch ?? metadata.branchName ?? null,
-          worktreeId: metadata.worktreeId ?? null,
-          environmentId: metadata.environmentId ?? null,
-          mode: metadata.mode ?? null,
-          model: metadata.model ?? null,
-          variant: metadata.variant ?? null,
-          repository: metadata.githubRepo ?? null,
-          isInitiated: Boolean(metadata.initiatedAt),
-          isPreparingAsync: !metadata.preparedAt,
-          ...(metadata.routeReady === undefined ? {} : { routeReady: metadata.routeReady }),
-          prompt: metadata.prompt ?? null,
-          initialMessageId: metadata.initialMessageId ?? null,
-          ...(metadata.runtimeAgents ? { runtimeAgents: metadata.runtimeAgents } : {}),
-          associatedPr: metadata.associatedPr ?? null,
-          totalCostMicrodollars: metadata.totalCostMicrodollars ?? null,
-          createdOnPlatform: metadata.createdOnPlatform ?? null,
-          profileId: metadata.profileId ?? null,
-        };
+        data = cloudSessionMetadataToFetched(kiloSessionId, cloudMetadataId, metadata);
       } else {
+        if (config.nativeSyncClient && !activeResolvedSession) startCachedPageRead(open);
         data = await config.fetchSession(kiloSessionId);
       }
     } catch (err) {
@@ -3383,6 +3398,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     getSession: () => CloudAgentSession
   ): OpenSessionCallbacks {
     const expectedGeneration = open.expectedGeneration;
+    let readerIndicator: SessionStatusIndicator | null = null;
     const handlers: OpenSessionHandlers = {
       onSessionCreated: info => {
         if (info.parentID == null) {
@@ -3485,9 +3501,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         if (as?.requestId === requestId) store.set(activeSuggestionAtom, null);
       },
       onResolved: resolved => {
-        activeSessionType = resolved.type;
-        store.set(sessionTypeAtom, resolved.type);
-        store.set(activeSessionTypeAtom, resolved.type);
+        activeResolvedSession = resolved;
+        activeSessionType = sessionViewType(resolved);
+        store.set(sessionTypeAtom, activeSessionType);
+        store.set(activeSessionTypeAtom, activeSessionType);
         // Seed capabilities from the resolved session so the initial gate
         // reflects whatever the mobile-side `resolveSession` adapter had
         // to work with (e.g. the current `activeSessions.list` snapshot).
@@ -3495,7 +3512,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         // heartbeat changes arrive via `onTransportCapabilitiesChange` and
         // overwrite this, including an explicit downgrade.
         currentCapabilities = resolved.type === 'remote' ? resolved.capabilities : undefined;
-        recomputeSupportsAttachments(resolved.type);
+        recomputeSupportsAttachments(activeSessionType);
         updateCapabilityAtoms(getSession());
       },
       onRemoteModelStateChange: handleRemoteModelStateChange,
@@ -3536,6 +3553,23 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           store.set(fetchedSessionDataAtom, { ...currentFetched, gitBranch: branch });
         }
         config.onBranchChanged?.(branch);
+      },
+      onReaderError: message => {
+        const current = store.get(statusIndicatorAtom);
+        if (message === undefined) {
+          if (readerIndicator !== null && current === readerIndicator) setIndicator(null);
+          readerIndicator = null;
+          return;
+        }
+        if (
+          store.get(errorAtom) !== null ||
+          (current?.type === 'error' && current !== readerIndicator)
+        )
+          return;
+        readerIndicator = { type: 'error', message, timestamp: Date.now() };
+        store.set(isLoadingAtom, false);
+        store.set(isRefreshingCachedTranscriptAtom, false);
+        setIndicator(readerIndicator);
       },
       onError: message => {
         // Suppress the one-shot "Aborted" produced by this manager's own
@@ -3795,6 +3829,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       onReplayComplete: fence(handlers.onReplayComplete),
       onBranchChanged: fence(handlers.onBranchChanged),
       onError: fence(handlers.onError),
+      onReaderError: fence(handlers.onReaderError),
       onChildSessionError: fence(handlers.onChildSessionError),
       onMessageFailed: fence(handlers.onMessageFailed),
       onEvent: fence(handlers.onEvent),
@@ -3858,6 +3893,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         return config.resolveSession(id);
       },
       transport: {
+        nativeSyncClient: config.nativeSyncClient,
         getTicket: config.getTicket,
         api: config.api,
         fetchSnapshot: config.fetchSnapshot,
@@ -3891,7 +3927,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         // While a remote session's initial history replay is in flight,
         // onReplayComplete owns the clear; clearing here would flash the
         // empty state before replayed messages land.
-        if (!(activeSessionType === 'remote' && remoteHistoryReplaying)) {
+        if (
+          activeResolvedSession?.type !== 'hosted-native' &&
+          !(activeSessionType === 'remote' && remoteHistoryReplaying)
+        ) {
           store.set(isLoadingAtom, false);
         }
         if (activeSessionType === 'remote') {

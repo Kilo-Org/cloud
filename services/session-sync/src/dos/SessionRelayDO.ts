@@ -17,7 +17,8 @@ import {
   socketTicket,
   socketProtocol,
 } from '../live/protocol';
-import { verifyTicket, type LiveTicket } from '../live/ticket';
+import { storedTicketSchema, verifyTicket, type LiveTicket } from '../live/ticket';
+import { authorizeRelayCommand, authorizeRelayTicket } from '../live/hosted-authorization';
 import { isBoundedJson, sessionIDSchema, tenantSchema, type Tenant } from '../protocol';
 import { getPresenceStub } from './SessionPresenceDO';
 import { diagnostic, metricsEnabled, phase, syncPhase } from '../metrics';
@@ -44,16 +45,9 @@ const eventSchema = z.strictObject({
   body: z.unknown().default(null).refine(isBoundedJson),
 });
 const attachmentSchema = z.strictObject({
-  ticket: z.strictObject({
-    version: z.literal(1),
+  ticket: storedTicketSchema.safeExtend({
     aud: z.literal('session-relay'),
-    env: z.string(),
-    tenant: tenantSchema,
     sessionID: sessionIDSchema,
-    userID: z.string(),
-    role: z.enum(['runner', 'viewer', 'controller']),
-    exp: z.number(),
-    iat: z.number(),
   }),
   subscribed: z.boolean(),
   reauthNotified: z.boolean(),
@@ -120,9 +114,12 @@ export class SessionRelayDO extends DurableObject<Env> {
   override async fetch(request: Request): Promise<Response> {
     if (request.headers.get('upgrade')?.toLowerCase() !== 'websocket')
       return error(426, 'upgrade_required', 'Expected a WebSocket upgrade');
+    const incumbentBeforeAuthorization = this.runner();
     const token = socketTicket(request);
     const ticket = token ? await this.authorize(token) : undefined;
-    if (this.purged || !ticket) return error(401, 'unauthorized', 'Invalid relay ticket');
+    if (ticket instanceof Response) return ticket;
+    if (this.purged || !ticket || ticket.exp * 1000 <= Date.now())
+      return error(401, 'unauthorized', 'Invalid relay ticket');
     this.sweep();
     if (!this.takeRate(ticket))
       return error(429, 'rate_limit_exceeded', 'Relay rate limit exceeded');
@@ -131,6 +128,15 @@ export class SessionRelayDO extends DurableObject<Env> {
       const prior = sockets.find(([, state]) => state.ticket.role === 'runner');
       if (prior && prior[1].ticket.userID !== ticket.userID)
         return error(409, 'runner_connected', 'A runner is already connected');
+      if (
+        prior &&
+        prior[0] !== incumbentBeforeAuthorization &&
+        ticket.workload === 'cloud-agent' &&
+        (prior[1].ticket.liveIdentity?.allocationId !== ticket.liveIdentity?.allocationId ||
+          prior[1].ticket.liveIdentity?.providerInstanceId !==
+            ticket.liveIdentity?.providerInstanceId)
+      )
+        return error(503, 'auth_unavailable', 'Live authorization is not available');
       if (prior) this.close(prior[0], prior[1], 4009, 'Runner replaced by reconnect', true);
     }
     if (
@@ -202,8 +208,13 @@ export class SessionRelayDO extends DurableObject<Env> {
 
   async command(input: { ticket: string; command: unknown }): Promise<Response> {
     const ticket = await this.authorize(input.ticket);
+    if (ticket instanceof Response) return ticket;
     if (this.purged || !ticket || ticket.role !== 'controller')
       return error(403, 'forbidden', 'A controller ticket is required');
+    const denied = await authorizeRelayCommand(this.env, ticket);
+    if (denied) return denied;
+    if (this.purged || ticket.exp * 1000 <= Date.now())
+      return error(403, 'forbidden', 'Controller authority expired');
     this.sweep();
     if (!this.takeRate(ticket))
       return error(429, 'rate_limit_exceeded', 'Relay rate limit exceeded');
@@ -214,7 +225,8 @@ export class SessionRelayDO extends DurableObject<Env> {
 
   async commandStatus(input: { ticket: string; commandID: string }): Promise<Response> {
     const ticket = await this.authorize(input.ticket);
-    if (this.purged || !ticket || ticket.role === 'runner')
+    if (ticket instanceof Response) return ticket;
+    if (this.purged || !ticket || ticket.role === 'runner' || ticket.exp * 1000 <= Date.now())
       return error(403, 'forbidden', 'A viewer or controller ticket is required');
     this.sweep();
     if (!this.takeRate(ticket, 'status'))
@@ -275,8 +287,22 @@ export class SessionRelayDO extends DurableObject<Env> {
         const ticket = await this.authorize(frame.data.ticket);
         const current = this.attachment(ws);
         if (
+          ticket instanceof Response &&
+          ticket.status === 503 &&
+          current &&
+          !current.closed &&
+          !this.purged &&
+          current.ticket.exp * 1000 > Date.now()
+        ) {
+          this.control(ws, 'error', { code: 'auth_unavailable' });
+          await this.schedule();
+          return;
+        }
+        if (
           this.purged ||
           !ticket ||
+          ticket instanceof Response ||
+          ticket.exp * 1000 <= Date.now() ||
           !current ||
           current.closed ||
           current.ticket.exp * 1000 <= Date.now() ||
@@ -304,7 +330,11 @@ export class SessionRelayDO extends DurableObject<Env> {
       else this.control(ws, 'error', { code: 'invalid_request' });
       return;
     } else if (state.ticket.role === 'controller') {
-      const response = this.acceptCommand(state.ticket, value);
+      const denied = await authorizeRelayCommand(this.env, state.ticket);
+      const current = this.attachment(ws);
+      if (this.purged || !current || current.closed || current.ticket.exp * 1000 <= Date.now())
+        return;
+      const response = denied ?? this.acceptCommand(current.ticket, value);
       const body: unknown = await response.json();
       const failure = z
         .object({ error: z.object({ code: z.string(), message: z.string() }) })
@@ -369,14 +399,16 @@ export class SessionRelayDO extends DurableObject<Env> {
     await this.schedule();
   }
 
-  private async authorize(token: string): Promise<Attachment['ticket'] | undefined> {
+  private async authorize(token: string): Promise<Attachment['ticket'] | Response | undefined> {
     if (this.purged) return undefined;
     const ticket = await verifyTicket(token, this.env, 'session-relay');
     if (this.purged || !ticket?.sessionID) return undefined;
     const name = JSON.stringify([ticket.tenant.type, ticket.tenant.id, ticket.sessionID]);
     if (!this.env.SESSION_RELAY_DO.idFromName(name).equals(this.ctx.id)) return undefined;
     const parsed = attachmentSchema.shape.ticket.safeParse(ticket);
-    return parsed.success ? parsed.data : undefined;
+    if (!parsed.success) return undefined;
+    const denied = await authorizeRelayTicket(this.env, parsed.data);
+    return denied ?? parsed.data;
   }
 
   private attachment(ws: WebSocket): Attachment | undefined {

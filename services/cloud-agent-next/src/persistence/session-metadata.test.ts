@@ -33,6 +33,25 @@ const profile = {
 };
 
 describe('session metadata boundary', () => {
+  it.each([undefined, 'stream', 'relay'] as const)(
+    'preserves stored chat %s without enrolling legacy reads',
+    transport => {
+      const metadata = parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'workspace_fixture', userId: 'fixture-user' },
+        auth: {},
+        workspace: transport === undefined ? {} : { chat: { transport } },
+        lifecycle: { version: 1, timestamp: 1 },
+      });
+      const parsed = parseSessionMetadata(serializeSessionMetadata(metadata));
+      if (transport === undefined) {
+        expect(parsed.workspace).not.toHaveProperty('chat');
+      } else {
+        expect(parsed.workspace?.chat).toEqual({ transport });
+      }
+    }
+  );
+
   it.each(
     [
       { egressMode: undefined, egressAllowlist: undefined },

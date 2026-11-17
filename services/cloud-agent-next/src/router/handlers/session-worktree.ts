@@ -542,6 +542,7 @@ async function worktreeIntentFingerprint(
       organizationId: input.kilocodeOrganizationId ?? null,
       worktreeId: source.worktreeId,
       clientProvenance: input.clientProvenance,
+      ...(source.workspace.chat?.transport === 'relay' ? { chat: source.workspace.chat } : {}),
       // Only when proposed, so operations created before this field keep their fingerprint.
       ...(input.kiloSessionId ? { kiloSessionId: input.kiloSessionId } : {}),
       ...(source.workspace.sandboxAllocation
@@ -568,6 +569,7 @@ async function workspaceSessionIntentFingerprint(
       organizationId: input.kilocodeOrganizationId ?? null,
       clientProvenance: input.clientProvenance,
       agent: input.agent,
+      ...(source.workspace.chat?.transport === 'relay' ? { chat: source.workspace.chat } : {}),
       message: {
         id: input.message.id ?? null,
         prompt: input.message.prompt,
@@ -800,6 +802,7 @@ function assertRegisteredMetadata(
     workspace.sandboxId !== source.workspace.sandboxId ||
     workspace.sandboxProvider !== source.workspace.sandboxProvider ||
     workspace.sandboxAllocation !== source.workspace.sandboxAllocation ||
+    (workspace.chat?.transport ?? 'stream') !== (source.workspace.chat?.transport ?? 'stream') ||
     (workspace.egressMode ?? 'unrestricted') !== (source.workspace.egressMode ?? 'unrestricted') ||
     (workspace.egressAudit ?? false) !== (source.workspace.egressAudit ?? false) ||
     JSON.stringify(workspace.egressAllowlist ?? []) !==

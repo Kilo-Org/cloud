@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { workspaceChatSchema } from '../shared/workspace-chat.js';
 import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import {
   getSandboxAllocation,
@@ -630,6 +631,7 @@ const PrepareSessionSharedFields = {
     .optional()
     .describe('Platform that created this session (e.g. slack, code-review)'),
   clientProvenance: z.enum(['browser', 'mobile', 'agent-manager']).optional(),
+  chat: workspaceChatSchema.optional(),
   shallow: z
     .boolean()
     .optional()
@@ -991,6 +993,7 @@ export type ProfileInput = z.infer<typeof ProfileInputSchema>;
  */
 export const StartSessionInput = z
   .object({
+    chat: workspaceChatSchema.optional(),
     operationKey: z.string().uuid().optional(),
     message: z.object({
       prompt: z.string().min(1).max(Limits.MAX_PROMPT_LENGTH),
@@ -1272,6 +1275,7 @@ export const ExecutionStatusSchema = z
  */
 export const GetSessionOutput = z.object({
   sessionId: z.string().describe('Cloud-agent session ID'),
+  chat: workspaceChatSchema.optional(),
   kiloSessionId: z.string().optional().describe('Kilo CLI session ID'),
   title: z.string().nullable().optional(),
   associatedPr: z

@@ -433,6 +433,7 @@ export function createStreamHandler(
               afterCursor = event.mutation_cursor;
             }
             eventsRead++;
+            if (!matchesFilters(event, filters)) continue;
             if (
               !materialized &&
               options?.reconcileMaterializedEvents &&

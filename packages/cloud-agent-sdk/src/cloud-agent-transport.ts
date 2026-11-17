@@ -7,6 +7,7 @@
  */
 import type { ToolDisplayMode } from './tool-detail-marker';
 import { createBackgroundActivityReader } from './background-activity';
+import { createCloudAgentWrites } from './cloud-agent-writes';
 import { setBounded } from './bounded-map';
 import { createConnection, type Connection } from './cloud-agent-connection';
 import type { ConnectionLifecycleHooks, WebSocketHeaders } from './base-connection';
@@ -37,41 +38,10 @@ import type {
 } from './types';
 import type {
   CloudAgentApi,
-  CloudAgentSendPayload,
   CloudAgentStreamTicketResult,
   TransportFactory,
-  TransportSendPayload,
   TransportSink,
 } from './transport';
-
-function normalizeCloudAgentPayload(payload: TransportSendPayload): CloudAgentSendPayload {
-  if (payload.type === 'command') {
-    if (payload.model && payload.model.providerID !== 'kilo') {
-      throw new Error('Cloud Agent only supports Kilo models');
-    }
-    return {
-      type: 'command',
-      command: payload.command,
-      arguments: payload.arguments,
-      ...(payload.mode ? { mode: payload.mode } : {}),
-      ...(payload.model ? { model: payload.model.modelID } : {}),
-      ...(payload.variant ? { variant: payload.variant } : {}),
-    };
-  }
-  if (!payload.mode) throw new Error('Cloud Agent mode is required');
-  if (!payload.model) throw new Error('Cloud Agent model is required');
-  if (payload.model.providerID !== 'kilo') {
-    throw new Error('Cloud Agent only supports Kilo models');
-  }
-
-  return {
-    type: 'prompt',
-    prompt: payload.prompt,
-    mode: payload.mode,
-    model: payload.model.modelID,
-    ...(payload.variant ? { variant: payload.variant } : {}),
-  };
-}
 
 type CloudAgentTransportConfig = {
   sessionId: CloudAgentSessionId;
@@ -742,38 +712,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
         sessionInfoVersions.clear();
       },
 
-      send: input => {
-        if (!input.messageId) {
-          // A Cloud Agent send without a client id cannot be replayed: the
-          // server would admit a second turn for a retry of the same message.
-          throw new Error('Cloud Agent sends require a client message id');
-        }
-        const { messageId } = input;
-        return runMutation(() =>
-          config.api.send({
-            sessionId: config.sessionId,
-            payload: normalizeCloudAgentPayload(input.payload),
-            messageId,
-            ...(input.attachments ? { attachments: input.attachments } : {}),
-          })
-        );
-      },
-      interrupt: () => runMutation(() => config.api.interrupt({ sessionId: config.sessionId })),
-      dropQueuedMessage: async messageId => {
-        const cancelQueuedMessage = config.api.cancelQueuedMessage;
-        if (!cancelQueuedMessage) {
-          throw new Error('Cloud Agent cancel queued message is not configured');
-        }
-        return runMutation(() => cancelQueuedMessage({ sessionId: config.sessionId, messageId }));
-      },
-      answer: payload =>
-        runMutation(() => config.api.answer({ sessionId: config.sessionId, ...payload })),
-      reject: payload =>
-        runMutation(() => config.api.reject({ sessionId: config.sessionId, ...payload })),
-      respondToPermission: payload =>
-        runMutation(() =>
-          config.api.respondToPermission({ sessionId: config.sessionId, ...payload })
-        ),
+      ...createCloudAgentWrites(config.api, config.sessionId, runMutation),
       observeProjected: messages => sources.observeProjected(messages),
       retryBackgroundActivity: () => background?.retry(),
     };

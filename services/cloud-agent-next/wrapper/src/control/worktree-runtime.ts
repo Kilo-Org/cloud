@@ -83,7 +83,7 @@ export function buildWorktreeKiloEnvironment(
   mcp?: SessionAttachPayload['mcp'],
   runtimeConfig?: Pick<
     ControlPlaneRouteSpec,
-    'permission' | 'githubReviewTarget' | 'createdOnPlatform'
+    'permission' | 'githubReviewTarget' | 'createdOnPlatform' | 'chat'
   > & {
     cloudAgentMcp?: ControlPlaneSessionCredentialsPayload['cloudAgentMcp'];
   }
@@ -178,6 +178,7 @@ export function buildWorktreeKiloEnvironment(
     XDG_STATE_HOME: path.join(home, '.local', 'state'),
     XDG_RUNTIME_DIR: path.join(home, '.run'),
     KILO_PLATFORM: 'cloud-agent',
+    ...(runtimeConfig?.chat?.transport === 'relay' ? { KILO_REMOTE_KIND: 'remote' } : {}),
     ...(runtimeConfig?.githubReviewTarget
       ? {
           [GITHUB_REVIEW_TARGET_ENV]: serializeGitHubReviewTarget(runtimeConfig.githubReviewTarget),

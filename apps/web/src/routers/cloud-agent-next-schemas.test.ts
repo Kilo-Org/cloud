@@ -34,6 +34,29 @@ const MESSAGE_UUID = '12345678-1234-4234-9234-123456789abc';
 const ATTACHMENT_ID = '87654321-4321-4321-8321-cba987654321';
 const KILO_SESSION_ID = 'ses_12345678901234567890123456';
 
+it('keeps stored chat in web get-session metadata without accepting it as browser prepare input', () => {
+  expect(
+    baseGetSessionNextOutputSchema.parse({
+      sessionId: 'workspace_synthetic',
+      kiloSessionId: KILO_SESSION_ID,
+      userId: 'synthetic-user',
+      chat: { transport: 'relay' },
+      timestamp: 1,
+      version: 2,
+      execution: null,
+    }).chat
+  ).toEqual({ transport: 'relay' });
+  expect(
+    personalPrepareSessionNextSchema.parse({
+      prompt: 'Synthetic prompt',
+      mode: 'code',
+      model: 'synthetic/model',
+      githubRepo: 'synthetic/repository',
+      chat: { transport: 'relay' },
+    })
+  ).not.toHaveProperty('chat');
+});
+
 const sandboxSnapshot = {
   status: 'active',
   provider: 'Cloudflare',

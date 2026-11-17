@@ -18,6 +18,8 @@ import type { ServiceState } from './service-state';
 import { createCloudAgentTransport, type CloudAgentTransportConfig } from './cloud-agent-transport';
 import { createCliLiveTransport } from './cli-live-transport';
 import { createCliHistoricalTransport } from './cli-historical-transport';
+import { createHostedNativeTransport } from './hosted-native-transport';
+import type { NativeSyncClient } from './native-sync';
 import type { ConnectionLifecycleHooks, WebSocketHeaders } from './base-connection';
 import type { UserWebConnection } from './user-web-connection';
 import type {
@@ -67,6 +69,7 @@ type CloudAgentSessionConfig = {
   websocketBaseUrl?: string;
   storage?: SessionStorage;
   onError?: (message: string) => void;
+  onReaderError?: (message: string | undefined) => void;
   onChildSessionError?: (sessionId: string, message: string) => void;
   onQuestionAsked?: (requestId: string, questions?: QuestionInfo[]) => void;
   onQuestionResolved?: (requestId: string) => void;
@@ -159,6 +162,7 @@ type CloudAgentSessionDismissSuggestionInput = {
 };
 
 type CloudAgentSessionTransport = {
+  nativeSyncClient?: NativeSyncClient | undefined;
   getTicket?:
     | ((
         sessionId: CloudAgentSessionId
@@ -395,6 +399,30 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
 
   function pickTransportFactory(resolved: ResolvedSession): TransportFactory {
     switch (resolved.type) {
+      case 'hosted-native': {
+        if (
+          !config.transport.nativeSyncClient ||
+          !config.transport.getTicket ||
+          !config.transport.api ||
+          !config.websocketBaseUrl
+        )
+          throw new Error(
+            'Hosted sessions require native sync and Cloud infrastructure connections'
+          );
+        return createHostedNativeTransport({
+          nativeSyncClient: config.transport.nativeSyncClient,
+          sessionId: resolved.cloudAgentSessionId,
+          kiloSessionId: resolved.kiloSessionId,
+          organizationId: resolved.organizationId,
+          getTicket: config.transport.getTicket,
+          api: config.transport.api,
+          websocketBaseUrl: config.websocketBaseUrl,
+          lifecycleHooks: config.transport.lifecycleHooks,
+          websocketHeaders: config.transport.websocketHeaders,
+          onError: config.onError,
+          onReaderError: config.onReaderError,
+        });
+      }
       case 'remote': {
         if (!config.transport.userWebConnection) {
           throw new Error(

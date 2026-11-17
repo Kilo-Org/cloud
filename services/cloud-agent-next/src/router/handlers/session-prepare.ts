@@ -212,6 +212,7 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
 
   return {
     initialTurn,
+    ...(input.chat === undefined ? {} : { chat: input.chat }),
     agent: {
       mode: input.mode,
       model: input.model,
@@ -332,6 +333,9 @@ const prepareSessionHandler = internalApiProtectedProcedure
           ? await createSessionWithLedger(requestWithProfile, registrationContext, {
               ...billingOrigin,
               operationKey,
+              ...(requestWithProfile.chat?.transport === 'relay'
+                ? { resolveSavedAllocationBeforeAdmission: true }
+                : {}),
               startedAt: Date.now(),
             })
           : input.autoInitiate === true

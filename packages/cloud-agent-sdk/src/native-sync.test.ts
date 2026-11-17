@@ -148,6 +148,26 @@ test('tickets use the subprotocol and credential exchange, never URL credentials
   connection.close();
 });
 
+test('retains the typed bootstrap failure without changing retryable 404 behavior', async () => {
+  const error = new NativeSyncError('session_not_found', 404);
+  snapshot.mockRejectedValueOnce(error);
+  const { client } = fixture();
+  const states: NativeSessionState[] = [];
+  const connection = client.connectSession('ses_a', state => states.push(state));
+  await flush();
+  connectedSocket().frame('hello', hello(false));
+  await flush();
+  expect(states.at(-1)).toMatchObject({
+    connection: 'disconnected',
+    error: 'session_not_found',
+    failure: error,
+  });
+  jest.advanceTimersByTime(2000);
+  await flush();
+  expect(FakeSocket.sockets.length).toBe(2);
+  connection.close();
+});
+
 test('exchanges a versioned organization grant for organization sessions', async () => {
   const { client, calls } = fixture();
   const connection = client.connectSession('ses_a', () => {}, 'organization-1');

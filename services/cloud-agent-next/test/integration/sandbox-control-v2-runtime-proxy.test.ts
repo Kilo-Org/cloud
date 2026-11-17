@@ -13,8 +13,6 @@ import type {
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
 import {
-  createRuntimeProxyGrant,
-  issueRuntimeCredentialProxyHandle,
   runtimeCredentialProxyFacadeBaseUrl,
   runtimeProxyHandleGrantId,
   RUNTIME_PROXY_GRANT_KEY,
@@ -39,6 +37,7 @@ import {
   fakeOutboundContainerId,
   FAKE_SANDBOX_CONTAINERS_NAMESPACE,
   installFakeSandboxEnv,
+  FAKE_DOWNLOADED_RUNTIME_ENV,
 } from './helpers/fake-credentials.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
 import { waitFor } from './wait-for.js';
@@ -109,6 +108,7 @@ function metadata(input: {
   provider?: AgentSandboxProvider;
   worktreeId?: string;
   encryptedSecrets?: Record<string, unknown>;
+  relay?: boolean;
 }) {
   return parseSessionMetadata({
     metadataSchemaVersion: 2,
@@ -117,6 +117,7 @@ function metadata(input: {
       userId: USER_ID,
       orgId: ORG_ID,
       createdOnPlatform: 'cloud-agent-web',
+      ...(input.relay ? { billingOrigin: 'cloud-agent-web' } : {}),
     },
     auth: { kiloSessionId: input.kiloSessionIdValue, kilocodeToken: input.kiloToken },
     agent: { mode: 'code', model: 'test/model' },
@@ -129,6 +130,7 @@ function metadata(input: {
       platform: 'github',
     },
     workspace: {
+      ...(input.relay ? { chat: { transport: 'relay' } } : {}),
       ...(input.worktreeId === undefined
         ? {}
         : { worktreeId: input.worktreeId, workspacePath: `/workspace/${input.worktreeId}` }),
@@ -243,6 +245,7 @@ async function createVercelSession(input: {
   contained?: boolean;
   worktreeId?: string;
   encryptedSecrets?: Record<string, unknown>;
+  relay?: boolean;
 }): Promise<DurableObjectStub<SandboxSessionV2>> {
   const sessionStub = sessions.getByName(sessionDoName(USER_ID, input.sessionId));
   await runInDurableObject(sessionStub, instance => {
@@ -257,6 +260,7 @@ async function createVercelSession(input: {
       provider: input.provider,
       worktreeId: input.worktreeId,
       encryptedSecrets: input.encryptedSecrets,
+      relay: input.relay,
     }),
     message: promptPayload(messageId()),
     sandboxSelection: {
@@ -299,6 +303,93 @@ afterEach(async () => {
 });
 
 describe('SandboxControlV2 runtime credential proxy (R1)', () => {
+  it('authorizes a normal standalone without accepted entries through a local-only root proof', async () => {
+    const sessionId = newSessionId();
+    const sandboxId = await generateSandboxId(sessionId);
+    const provider = createProvider();
+    const sandbox = await installSandbox(sandboxId, provider);
+    await runInDurableObject(sandbox, instance => {
+      instance.env.RUNTIME_KILO2_ORG_IDS = '*';
+      instance.env.RUNTIME_RELEASE_DESCRIPTOR_KILO2 = JSON.stringify({
+        ...JSON.parse(FAKE_DOWNLOADED_RUNTIME_ENV.RUNTIME_RELEASE_DESCRIPTOR),
+        cliVersion: 'kilo2 v0.0.0-v2-13',
+        cliExecutable: 'package/bin/kilo2',
+        inventory: [
+          ['cli', 'package/bin/kilo2', 0o755, 1, 'a'.repeat(64)],
+          ['control', 'usr/local/bin/wrapper', 0o755, 1, 'b'.repeat(64)],
+        ],
+      });
+    });
+    const { seal, token } = await sealedRuntimeAuthorization(sessionId);
+    const kiloId = kiloSessionId();
+    const sessionStub = await createVercelSession({
+      sessionId,
+      kiloId,
+      sandboxId,
+      kiloToken: token,
+      seal,
+      relay: true,
+    });
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+    const { credential, allocationId } = launchIdentity(provider);
+    const wrapper = await FakeWrapper.connect({ sandboxId, credential, runtimeHarness: 'kilo2' });
+    await wrapper.hello({ wrapperId: 'synthetic-live-wrapper', allocationId });
+    const frame = await wrapper.next();
+    if (frame?.type !== 'session.prepare' || !frame.credentials.proxy?.handle)
+      throw new Error('Expected real standalone handle');
+    const handle = frame.credentials.proxy.handle;
+    await runInDurableObject(sandbox, instance => {
+      expect(instance.ctx.storage.kv.get('runtime_proxy_accepted_handles')).toBeUndefined();
+    });
+    await runInDurableObject(sessionStub, instance => {
+      instance.sandboxPeerFor = () => {
+        throw new Error('Root proof must not call Sandbox');
+      };
+    });
+    const request = {
+      authorization: { type: 'handle', handle },
+      ownerId: USER_ID,
+      organizationId: ORG_ID,
+      sessionId,
+      kiloSessionId: kiloId,
+      nativeSessionId: kiloId,
+      directory: frame.spec.directory,
+      deadlineAt: Date.now() + 4_000,
+    };
+    const minted = await sandbox.authorizeSessionSyncLive(request);
+    expect(minted).toMatchObject({
+      type: 'allowed',
+      authorization: {
+        host: { cloudAgentSessionId: sessionId },
+        native: { sessionID: kiloId, kind: 'root' },
+      },
+    });
+    await runInDurableObject(sessionStub, instance => {
+      const grant = instance.ctx.storage.kv.get<Record<string, unknown>>(RUNTIME_PROXY_GRANT_KEY);
+      instance.ctx.storage.kv.put(RUNTIME_PROXY_GRANT_KEY, { ...grant, nonce: 'z'.repeat(43) });
+    });
+    expect(
+      await sandbox.authorizeSessionSyncLive({ ...request, deadlineAt: Date.now() + 4_000 })
+    ).toMatchObject({ type: 'denied' });
+    if (minted.type !== 'allowed') throw new Error('Expected hosted ticket identity');
+    const { expiresAt: _expiresAt, ...identity } = minted.authorization;
+    const recheck = { ...request, authorization: { type: 'ticket', ...identity } };
+    expect(
+      await sandbox.authorizeSessionSyncLive({ ...recheck, deadlineAt: Date.now() + 4_000 })
+    ).toMatchObject({ type: 'allowed' });
+    await runInDurableObject(sessionStub, instance => {
+      const authorization =
+        instance.ctx.storage.kv.get<Record<string, unknown>>(RUNTIME_AUTHORIZATION_KEY);
+      instance.ctx.storage.kv.put(RUNTIME_AUTHORIZATION_KEY, {
+        ...authorization,
+        state: 'revoked',
+      });
+    });
+    expect(
+      await sandbox.authorizeSessionSyncLive({ ...recheck, deadlineAt: Date.now() + 4_000 })
+    ).toMatchObject({ type: 'denied' });
+  });
+
   it('keeps a shared modern sibling authorized after releasing the creator and denies its deleted handle', async () => {
     const creatorId = newSessionId();
     const siblingId = newSessionId();

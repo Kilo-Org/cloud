@@ -1,12 +1,13 @@
 import {
   cloudAgentSyncAuthorizationSchema,
+  cloudAgentSyncLiveResultSchema,
   cloudAgentSyncUploadSession,
   isCloudAgentSyncHandle,
   type CloudAgentSyncAuthorizationBinding,
 } from '@kilocode/worker-utils/cloud-agent-session-sync';
 import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
 import { withTimeout } from '@kilocode/worker-utils';
-import type { Principal } from './protocol';
+import type { Principal, SessionPrincipal } from './protocol';
 import { jsonResponse } from './metrics';
 
 export type CloudAgentUploadEnv = {
@@ -50,9 +51,14 @@ async function resolve(env: CloudAgentUploadEnv, handle: string, sessionID?: str
   }
 }
 
-function principal(authorization: { userID: string; organizationID?: string }): Principal {
+function principal(authorization: {
+  userID: string;
+  organizationID?: string;
+  host?: SessionPrincipal['host'];
+}): SessionPrincipal {
   return {
     userID: authorization.userID,
+    ...(authorization.host ? { host: authorization.host } : {}),
     tenant: authorization.organizationID
       ? { type: 'organization', id: authorization.organizationID }
       : { type: 'user', id: authorization.userID },
@@ -88,7 +94,7 @@ export async function exchangeCloudAgentUpload(
 export async function authorizeCloudAgentUpload(
   request: Request,
   env: CloudAgentUploadEnv
-): Promise<Principal | Response | undefined> {
+): Promise<SessionPrincipal | Response | undefined> {
   const token = extractBearerToken(request.headers.get('Authorization'));
   if (!token || !isCloudAgentSyncHandle(token)) return undefined;
   const url = new URL(request.url);
@@ -97,4 +103,43 @@ export async function authorizeCloudAgentUpload(
     return failure(403, 'upload_only', 'Cloud Agent credentials permit session uploads only');
   const authorization = await resolve(env, token, sessionID);
   return authorization instanceof Response ? authorization : principal(authorization);
+}
+
+export async function authorizeCloudAgentLive(
+  request: Request,
+  env: CloudAgentUploadEnv,
+  sessionID?: string
+) {
+  const handle = extractBearerToken(request.headers.get('Authorization'));
+  if (!handle || !isCloudAgentSyncHandle(handle)) return undefined;
+  if (!env.CLOUD_AGENT_SYNC_AUTH)
+    return failure(503, 'auth_unavailable', 'Live authorization is unavailable');
+  try {
+    const result = cloudAgentSyncLiveResultSchema.parse(
+      await withTimeout(
+        env.CLOUD_AGENT_SYNC_AUTH.authorizeLive({
+          type: 'handle',
+          handle,
+          ...(sessionID ? { sessionID } : {}),
+        }),
+        4_500,
+        'Live authorization timed out'
+      )
+    );
+    if (result.type === 'unavailable')
+      return failure(503, result.code, 'Live authorization is unavailable');
+    if (result.type === 'denied')
+      return failure(403, result.code, 'Hosted live access is not permitted');
+    if (result.authorization.expiresAt <= Date.now())
+      return failure(403, 'access_denied', 'Hosted live authority expired');
+    return {
+      authorization: result.authorization,
+      principal: principal({
+        userID: result.authorization.userID,
+        organizationID: result.authorization.organizationID,
+      }) satisfies Principal,
+    };
+  } catch {
+    return failure(503, 'auth_unavailable', 'Live authorization is unavailable');
+  }
 }

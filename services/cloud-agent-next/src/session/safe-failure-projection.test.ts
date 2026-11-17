@@ -30,6 +30,67 @@ import {
 
 const NESTED_PROVIDER_TIMEOUT_BODY = '{"type":"error","error":{"type":"timeout","code":504}}';
 
+describe('native catalog readiness failures', () => {
+  it.each([
+    'Kilo Gateway model catalog did not become ready',
+    'Kilo Gateway model catalog schema is unavailable',
+    'Kilo Gateway model catalog is unavailable',
+    'Kilo Gateway model catalog readiness failed',
+    'Kilo Gateway model scope is unavailable',
+    'Kilo Gateway model scope changed during selection',
+  ])('projects the fixed catalog failure %s', message => {
+    for (const prefix of ['', 'SessionRunnerModel.ModelUnavailableError: ']) {
+      for (const ownershipPrefix of ['', '[BYOK] ']) {
+        const text = `${ownershipPrefix}${prefix}${message}`;
+        for (const source of [
+          text,
+          nativeTurnError({ type: 'provider.no-route', message: text }),
+        ]) {
+          const failure = classifyAssistantFailure(source);
+          const safeMessage = 'The Kilo model catalog could not be loaded';
+          expect(failure).toMatchObject({ reason: 'model_catalog_unavailable', safeMessage });
+          expect(failure.providerOwnership).toBe(ownershipPrefix ? 'byok' : 'unknown');
+          expect(failure.terminalCode).toBeUndefined();
+          expect(projectSafeAssistantError(source)).toBe(`${ownershipPrefix}${safeMessage}`);
+          expect(projectSafeSessionError(source, undefined)).toBe(
+            `${ownershipPrefix}${safeMessage}`
+          );
+          expect(classifyAssistantFailure(safeMessage).reason).toBe('model_catalog_unavailable');
+        }
+      }
+    }
+  });
+
+  it.each([
+    'Kilo Gateway model catalog did not become ready\n',
+    'Kilo Gateway model catalog did not become ready: private-detail',
+    'OtherError: Kilo Gateway model catalog did not become ready',
+    'SessionRunnerModel.ModelUnavailableError: unknown selection failure',
+    'The request mentions the Kilo Gateway model catalog',
+  ])('does not classify arbitrary catalog text: %j', message => {
+    expect(classifyAssistantFailure(message).reason).toBe('unknown');
+    expect(projectSafeAssistantError(message)).toBe('Assistant request failed');
+  });
+
+  it('retains native structured error precedence', () => {
+    const message = 'Kilo Gateway model catalog did not become ready';
+    for (const [error, reason] of [
+      [{ type: 'provider.no-route', message, status: 429 }, 'rate_limited'],
+      [{ type: 'provider.auth', message }, 'provider_authentication'],
+      [{ type: 'provider.no-route', message: 'Unknown model' }, 'model_unavailable'],
+      [
+        {
+          type: 'provider.no-route',
+          message: 'Kilo Gateway authentication is unavailable for model selection',
+        },
+        'provider_authentication',
+      ],
+    ] as const) {
+      expect(classifyAssistantFailure(nativeTurnError(error)).reason).toBe(reason);
+    }
+  });
+});
+
 describe('native v2 failure attribution', () => {
   it.each([
     [

@@ -17,6 +17,8 @@ import {
   onRouteFailed,
   onRouteProgress,
   onRouteReady,
+  newPreparingRoute,
+  readRoute,
   writeRoute,
   type RouteContext,
 } from '../../src/control-plane/sandbox/routes.js';
@@ -35,6 +37,8 @@ import type { createSandboxNotificationDispatcher } from '../../src/control-plan
 import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
 import { logger } from '../../src/logger.js';
 import { encryptWithPublicKey } from '../../src/utils/encryption.js';
+import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
+import { credentialSourceFromMetadata } from '../../src/sandbox-control/session-credentials.js';
 import {
   createFakeCredentialBroker,
   installFakeSandboxEnv,
@@ -325,6 +329,52 @@ afterEach(async () => {
 });
 
 describe('SandboxControlV2 routes and forwarding', () => {
+  it.each([undefined, 'stream', 'relay'] as const)(
+    'round-trips %s chat through only the private route-source JSON',
+    async transport => {
+      const stub = sandboxNamespace.getByName('sbx__chat_source_roundtrip');
+      await stub.getAllocationState();
+      const source = credentialSourceFromMetadata(
+        parseSessionMetadata({
+          metadataSchemaVersion: 2,
+          identity: {
+            sessionId: SESSION,
+            userId: 'fixture-user',
+            billingOrigin: 'cloud-agent-web',
+          },
+          auth: { kiloSessionId: kiloSessionIdFor(SESSION), kilocodeToken: NATIVE_KILO_TOKEN },
+          workspace: transport === undefined ? {} : { chat: { transport } },
+          lifecycle: { version: 1, timestamp: 1 },
+        })
+      );
+      await runInDurableObject(stub, async (_instance, state) => {
+        const db = drizzle(state.storage);
+        writeRoute(
+          db,
+          newPreparingRoute(
+            routeSpec(SESSION),
+            'fixture-attempt',
+            Date.now() + 60_000,
+            null,
+            source,
+            null
+          )
+        );
+        const row = db.select().from(routesTable).where(eq(routesTable.session_id, SESSION)).get();
+        expect(row?.spec).not.toContain('"chat"');
+        if (transport === 'relay')
+          expect(row?.credential_source).toContain('"chat":{"transport":"relay"}');
+        else expect(row?.credential_source).not.toContain('"chat"');
+      });
+      await evictAllDurableObjects();
+      await runInDurableObject(stub, async (_instance, state) => {
+        const route = await readRoute(drizzle(state.storage), SESSION);
+        expect(route?.credentialSource).toEqual(source);
+        expect(route?.spec).toEqual(routeSpec(SESSION));
+      });
+    }
+  );
+
   it.each(['throw', 'invalid'] as const)(
     'keeps preparation and delivery healthy when runtime metadata projection is %s',
     async failure => {

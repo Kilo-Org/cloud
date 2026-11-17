@@ -9,10 +9,12 @@ import { sameTicket } from './protocol';
 import {
   LiveTicketError,
   mintTicket,
+  mintHostedTicket,
   verifyTicket,
   type LiveRole,
   type LiveTicket,
 } from './ticket';
+import type { CloudAgentSyncLiveAuthorization } from '@kilocode/worker-utils/cloud-agent-session-sync';
 
 const SECRET = 'synthetic-live-ticket-signing-key-0123456789';
 const USER = 'usr-ticket-owner';
@@ -74,6 +76,87 @@ async function verified(token: string): Promise<LiveTicket> {
 
 afterEach(() => {
   vi.restoreAllMocks();
+});
+
+describe('hosted ticket identity', () => {
+  const hosted = (): CloudAgentSyncLiveAuthorization => ({
+    userID: USER,
+    workload: 'cloud-agent',
+    host: { cloudAgentSessionId: 'workspace_synthetictickethost' },
+    native: { sessionID: SESSION, rootSessionID: SESSION, kind: 'root' },
+    liveIdentity: {
+      allocationId: 'synthetic-allocation',
+      providerInstanceId: 'synthetic-provider',
+    },
+    expiresAt: Date.now() + 30_000,
+  });
+
+  it('bounds ticket expiry to the proven authority and keeps long credentials out', async () => {
+    const authority = hosted();
+    const result = await mintHostedTicket(env, authority, 'session-relay', SESSION);
+    const ticket = await verified(result.ticket);
+    expect(ticket.exp * 1000).toBeLessThanOrEqual(authority.expiresAt);
+    expect(ticket.exp - ticket.iat).toBeLessThanOrEqual(120);
+    expect(ticket).toMatchObject({
+      workload: 'cloud-agent',
+      host: authority.host,
+      liveIdentity: authority.liveIdentity,
+    });
+    expect(Object.keys(ticket)).not.toContain('handle');
+  });
+
+  it.each(['workload', 'host', 'native', 'liveIdentity'] as const)(
+    'rejects a partial hosted claim set missing %s',
+    async field => {
+      const { expiresAt: _expiresAt, ...identity } = hosted();
+      const claims = ticketClaims({ ...identity, role: 'runner' });
+      delete claims[field];
+      expect(await verifyTicket(await sign(claims), env, 'session-relay')).toBeUndefined();
+    }
+  );
+
+  it.each(['viewer', 'controller'])('never gives hosted credentials the %s role', async role => {
+    const { expiresAt: _expiresAt, ...identity } = hosted();
+    expect(
+      await verifyTicket(await sign(ticketClaims({ ...identity, role })), env, 'session-relay')
+    ).toBeUndefined();
+  });
+
+  it('rejects inconsistent native identity and unknown transient/credential claims', async () => {
+    const { expiresAt: _expiresAt, ...identity } = hosted();
+    for (const changed of [
+      { native: { ...identity.native, sessionID: 'ses_other' } },
+      { native: { ...identity.native, kind: 'descendant' } },
+      { canonicalGrantId: 'synthetic-grant' },
+      { wrapperInstanceId: 'synthetic-wrapper' },
+      { handle: 'synthetic-handle' },
+    ])
+      expect(
+        await verifyTicket(
+          await sign(ticketClaims({ ...identity, role: 'runner', ...changed })),
+          env,
+          'session-relay'
+        )
+      ).toBeUndefined();
+  });
+
+  it('treats workload, host, native identity, and the stable physical pair as immutable', async () => {
+    const authority = hosted();
+    const base = await verified(
+      (await mintHostedTicket(env, authority, 'session-relay', SESSION)).ticket
+    );
+    expect(sameTicket(base, { ...base, exp: base.exp + 10 })).toBe(true);
+    for (const changed of [
+      { workload: undefined, host: undefined, native: undefined, liveIdentity: undefined },
+      { host: { cloudAgentSessionId: 'workspace_other' } },
+      { native: { ...authority.native, rootSessionID: 'ses_other' } },
+      { liveIdentity: { ...authority.liveIdentity, allocationId: 'synthetic-other-allocation' } },
+      {
+        liveIdentity: { ...authority.liveIdentity, providerInstanceId: 'synthetic-other-provider' },
+      },
+    ])
+      expect(sameTicket(base, { ...base, ...changed })).toBe(false);
+  });
 });
 
 describe('live tickets', () => {

@@ -30,6 +30,7 @@ const envelopeSchema = z.object({
 });
 const ticketSchema = z.object({ ticket: z.string(), expiresAt: z.iso.datetime() });
 const grantSchema = z.object({ token: z.string(), expiresAt: z.iso.datetime() });
+export type NativeSyncGrant = z.infer<typeof grantSchema>;
 const commandStatusSchema = z.enum(['queued', 'delivered', 'expired']);
 const instanceSchema = z.object({
   instanceID: z.string(),
@@ -65,6 +66,11 @@ export type NativePresenceState = {
 };
 
 export type NativeSessionState = {
+  /** Only events strictly after the latest hello, runner transition or replay gap are live. */
+  liveAfterSeq?: number | undefined;
+  /** Read-only projection of the native recovery owner, not a separate retry state. */
+  recovering?: boolean | undefined;
+  failure?: NativeSyncError | undefined;
   connection: NativeConnection;
   runnerConnected: boolean;
   /** Snapshot fields accept undefined so merged state patches can explicitly clear them. */
@@ -124,7 +130,8 @@ export type NativeSocket = {
 export type NativeSocketConstructor = new (url: string, protocols: string[]) => NativeSocket;
 export type NativeSyncOptions = {
   baseUrl: string;
-  getCredential: () => Promise<string>;
+  getCredential?: () => Promise<string>;
+  getGrant?: (organizationID?: string) => Promise<NativeSyncGrant>;
   fetch?: typeof fetch;
   WebSocket?: NativeSocketConstructor;
 };
@@ -276,6 +283,9 @@ export class NativeSyncClient {
       if (Date.parse(grant.expiresAt) > Date.now() + 30_000) return grant;
     }
     const pending = (async () => {
+      if (this.options.getGrant)
+        return grantSchema.parse(await this.options.getGrant(organizationID));
+      if (!this.options.getCredential) throw new NativeSyncError('credential_unavailable');
       const credential = await this.options.getCredential();
       return grantSchema.parse(
         await (
@@ -419,7 +429,7 @@ export class NativeSyncClient {
       epoch: SocketEpoch,
       bytes: number
     ) => Promise<void> | void,
-    onConnection: (state: NativeConnection, error?: string) => void
+    onConnection: (state: NativeConnection, error?: string, failure?: NativeSyncError) => void
   ) {
     let stopped = false;
     let socket: NativeSocket | undefined;
@@ -476,7 +486,11 @@ export class NativeSyncClient {
       clearTimeout(renewalTimer);
       socket?.close();
       socket = undefined;
-      onConnection('disconnected', error ? reason(error) : undefined);
+      onConnection(
+        'disconnected',
+        error ? reason(error) : undefined,
+        error instanceof NativeSyncError ? error : undefined
+      );
       if (isPermanent(error)) {
         stopped = true;
         return;
@@ -747,7 +761,13 @@ export class NativeSyncClient {
         integrityError && failureError && integrityError !== failureError
           ? `${integrityError} ${failureError}`
           : (integrityError ?? failureError);
-      state = { ...state, ...patch, error };
+      state = {
+        ...state,
+        ...patch,
+        ...('error' in patch ? { failure: patch.failure } : {}),
+        error,
+        recovering: recovery !== undefined,
+      };
       listener(state);
     };
     const visible = (messages: NativeSnapshotMessage[]) =>
@@ -786,7 +806,7 @@ export class NativeSyncClient {
     const markGap = () => {
       integrityGap = true;
       integrityError = 'Native transcript may be incomplete because live replay is unavailable.';
-      publish({});
+      publish({ liveAfterSeq: Math.max(state.liveAfterSeq ?? 0, lastSeq ?? 0) });
     };
     const recoverIncomplete = (epoch: SocketEpoch, force = false) => {
       if (
@@ -819,7 +839,10 @@ export class NativeSyncClient {
         for (const item of current.replay) epoch.release(item.bytes);
         current.replay.length = 0;
         current.requirements.clear();
-        if (recovery === current) recovery = undefined;
+        if (recovery === current) {
+          recovery = undefined;
+          if (epoch.current()) publish({});
+        }
       };
       epoch.signal.addEventListener('abort', current.cancel, { once: true });
       void (async () => {
@@ -944,7 +967,7 @@ export class NativeSyncClient {
         const body = record(frame.body);
         if (frame.channel === 'control') {
           if (frame.type === 'hello') {
-            publish({ runnerConnected: body['runnerConnected'] === true });
+            publish({ runnerConnected: body['runnerConnected'] === true, liveAfterSeq: frame.seq });
             if (lastSeq === undefined) {
               await snapshot(epoch);
               if (!epoch.current()) return;
@@ -954,6 +977,7 @@ export class NativeSyncClient {
             recoverIncomplete(epoch);
           }
           if (frame.type === 'reset_required') {
+            publish({ liveAfterSeq: frame.seq });
             markGap();
             recovery?.cancel();
             await snapshot(epoch);
@@ -974,7 +998,7 @@ export class NativeSyncClient {
           }
           if (frame.type === 'runner_status') {
             if (body['runnerConnected'] !== true) identity = undefined;
-            publish({ runnerConnected: body['runnerConnected'] === true });
+            publish({ runnerConnected: body['runnerConnected'] === true, liveAfterSeq: frame.seq });
           }
           if (frame.type === 'command_status' && typeof body['commandID'] === 'string') {
             const parsed = commandStatusSchema.safeParse(body['status']);
@@ -1074,7 +1098,7 @@ export class NativeSyncClient {
         )
           recoverIncomplete(epoch);
       },
-      (connection, error) => {
+      (connection, error, failure) => {
         const backlog = error === 'live_backlog_overflow' || error === 'live_frame_too_large';
         if (backlog) {
           if (lastSeq === undefined) integrityGap = true;
@@ -1089,6 +1113,7 @@ export class NativeSyncClient {
         publish({
           connection,
           error: backlog ? undefined : error,
+          failure,
           ...(connection !== 'connected' ? { runnerConnected: false } : {}),
         });
       }

@@ -1,5 +1,6 @@
 import { base64urlToBytes, bytesToBase64url } from '@kilocode/worker-utils/base64url';
 import { z } from 'zod';
+import { cloudAgentSyncHostSchema } from '@kilocode/worker-utils/cloud-agent-session-sync';
 
 /** Request and storage bounds. Oversized data fails explicitly; nothing is skipped. */
 export const LIMITS = {
@@ -199,6 +200,10 @@ export const principalSchema = z
     message: 'A personal tenant must match its user',
   });
 export type Principal = z.infer<typeof principalSchema>;
+export const sessionPrincipalSchema = principalSchema.safeExtend({
+  host: cloudAgentSyncHostSchema.optional(),
+});
+export type SessionPrincipal = z.infer<typeof sessionPrincipalSchema>;
 
 export const exchangeRequestSchema = z.strictObject({
   version: z.literal(1),
@@ -432,6 +437,7 @@ export const ERROR_STATUS = {
   session_not_found: 404,
   blob_not_found: 404,
   source_conflict: 409,
+  hosting_conflict: 409,
   batch_conflict: 409,
   batch_superseded: 409,
   position_conflict: 409,

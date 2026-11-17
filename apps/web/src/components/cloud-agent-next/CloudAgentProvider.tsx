@@ -8,6 +8,8 @@ import {
   createSessionManager,
   createBrowserLifecycleHooks,
   createUserWebConnection,
+  NativeSyncClient,
+  NativeSyncError,
   type SessionManager,
   type SessionSnapshot,
   type FetchedSessionData,
@@ -17,7 +19,12 @@ import {
   type UserWebConnection,
 } from '@kilocode/cloud-agent-sdk';
 import type { SendMessagePayload } from '@/lib/cloud-agent-next/cloud-agent-client';
-import { CLOUD_AGENT_NEXT_WS_URL, SESSION_INGEST_WS_URL } from '@kilocode/web-shared/lib/constants';
+import {
+  CLOUD_AGENT_NEXT_WS_URL,
+  SESSION_INGEST_WS_URL,
+  SESSION_SYNC_URL,
+} from '@kilocode/web-shared/lib/constants';
+import { z } from 'zod';
 import { toFetchedSessionData } from './fetched-session-data';
 import { usePostHog } from 'posthog-js/react';
 import {
@@ -164,8 +171,36 @@ export function CloudAgentProvider({ children, userId, organizationId }: CloudAg
     );
     managerRef.current = createSessionManager({
       store: storeRef.current,
+      nativeSyncClient: new NativeSyncClient({
+        baseUrl: SESSION_SYNC_URL,
+        getGrant: async organizationID => {
+          const response = await fetch('/api/session-sync/grant', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...(organizationID ? { organizationId: organizationID } : {}) }),
+            cache: 'no-store',
+            signal: AbortSignal.timeout(15_000),
+          });
+          if (!response.ok)
+            throw new NativeSyncError('session_sync_authorization_unavailable', response.status);
+          return z
+            .object({ token: z.string(), expiresAt: z.iso.datetime() })
+            .parse(await response.json());
+        },
+      }),
 
       resolveSession: createWebSessionResolver({
+        organizationId,
+        getCloudSession: sessionId =>
+          organizationId
+            ? trpcClient.organizations.cloudAgentNext.getSession.query(
+                { cloudAgentSessionId: sessionId, organizationId },
+                { context: { skipBatch: true } }
+              )
+            : trpcClient.cloudAgentNext.getSession.query(
+                { cloudAgentSessionId: sessionId },
+                { context: { skipBatch: true } }
+              ),
         readCachedCloudSessionId: kiloSessionId => {
           const cachedConfig = transcriptCache.read(kiloSessionId)?.sessionConfig;
           if (cachedConfig) return cachedConfig.sessionId;

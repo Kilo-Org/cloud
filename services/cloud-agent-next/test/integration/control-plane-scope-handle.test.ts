@@ -3,10 +3,11 @@ import {
   RUNTIME_CONTRACT_KEY,
   readRuntimeContract,
 } from '../../src/control-plane/sandbox/runtime-contract.js';
-import { createExecutionContext, runInDurableObject, env, reset } from 'cloudflare:test';
+import { runInDurableObject, env, reset } from 'cloudflare:test';
 import { sealRuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization';
 import jwt from 'jsonwebtoken';
 import { afterEach, describe, expect, it } from 'vitest';
+import { listScopeGrants, writeScopeGrant } from '../../src/control-plane/sandbox/scope-grants.js';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { routes } from '../../src/control-plane/sandbox/sqlite-schema.js';
@@ -19,8 +20,6 @@ import {
   issueRuntimeCredentialProxyHandle,
 } from '../../src/runtime-credential-proxy.js';
 import { RUNTIME_AUTHORIZATION_KEY } from '../../src/session/runtime-authorization-persistence.js';
-import worker from '../../src/server.js';
-import { markHistoryHydrated } from '../../src/control-plane/session/history-hydration.js';
 import {
   addAcceptedHandleSync,
   digestRuntimeProxyHandle,
@@ -35,6 +34,7 @@ import {
   createFakeCredentialBroker,
   FAKE_SANDBOX_CONTAINERS_NAMESPACE,
   installFakeSandboxEnv,
+  FAKE_DOWNLOADED_RUNTIME_ENV,
 } from './helpers/fake-credentials.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
 import { waitFor } from './wait-for.js';
@@ -70,6 +70,7 @@ function metadata(input: {
   sandboxId: string;
   kiloToken: string;
   worktreeId?: string;
+  relay?: boolean;
 }) {
   const directory = input.worktreeId ?? input.sessionId;
   return parseSessionMetadata({
@@ -79,6 +80,7 @@ function metadata(input: {
       userId: USER_ID,
       orgId: ORG_ID,
       createdOnPlatform: 'cloud-agent-web',
+      ...(input.relay ? { billingOrigin: 'cloud-agent-web' } : {}),
     },
     auth: { kiloSessionId: input.kiloSessionIdValue, kilocodeToken: input.kiloToken },
     agent: { mode: 'code', model: 'test/model' },
@@ -88,6 +90,7 @@ function metadata(input: {
       platform: 'github',
     },
     workspace: {
+      ...(input.relay ? { chat: { transport: 'relay' } } : {}),
       ...(input.worktreeId === undefined ? {} : { worktreeId: input.worktreeId }),
       workspacePath: `/workspace/${directory}`,
       branchName: 'kilo/test-branch',
@@ -196,6 +199,7 @@ async function createSession(input: {
   kiloToken: string;
   seal?: string;
   worktreeId?: string;
+  relay?: boolean;
 }): Promise<DurableObjectStub<SandboxSessionV2>> {
   const sessionStub = sessions.getByName(sessionDoName(USER_ID, input.sessionId));
   await runInDurableObject(sessionStub, instance => {
@@ -208,6 +212,7 @@ async function createSession(input: {
       sandboxId: input.sandboxId,
       kiloToken: input.kiloToken,
       ...(input.worktreeId === undefined ? {} : { worktreeId: input.worktreeId }),
+      relay: input.relay,
     }),
     message: {
       messageId: messageId(),
@@ -248,13 +253,26 @@ type Member = {
  */
 async function createSharedScope(
   memberCount: number,
-  options: { allocation?: 'existing'; wrapper?: 'legacy' | 'worktree' } = {}
+  options: { allocation?: 'existing'; wrapper?: 'legacy' | 'worktree'; relay?: boolean } = {}
 ) {
   const worktreeId = `worktree_${crypto.randomUUID()}`;
   const creatorId = newSessionId();
   const sandboxId = await generateSandboxId(creatorId);
   const provider = createProvider();
   const sandbox = await installSandbox(sandboxId, provider);
+  if (options.relay)
+    await runInDurableObject(sandbox, instance => {
+      instance.env.RUNTIME_KILO2_ORG_IDS = '*';
+      instance.env.RUNTIME_RELEASE_DESCRIPTOR_KILO2 = JSON.stringify({
+        ...JSON.parse(FAKE_DOWNLOADED_RUNTIME_ENV.RUNTIME_RELEASE_DESCRIPTOR),
+        cliVersion: 'kilo2 v0.0.0-v2-13',
+        cliExecutable: 'package/bin/kilo2',
+        inventory: [
+          ['cli', 'package/bin/kilo2', 0o755, 1, 'a'.repeat(64)],
+          ['control', 'usr/local/bin/wrapper', 0o755, 1, 'b'.repeat(64)],
+        ],
+      });
+    });
 
   const memberIds = [creatorId];
   for (let index = 1; index < memberCount; index += 1) memberIds.push(newSessionId());
@@ -268,6 +286,7 @@ async function createSharedScope(
     kiloToken: auths[0]!.token,
     seal: auths[0]!.seal,
     worktreeId,
+    relay: options.relay,
   });
   await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
   const { credential, allocationId } = launchIdentity(provider);
@@ -280,6 +299,7 @@ async function createSharedScope(
     sandboxId,
     credential,
     runtimeContract: options.wrapper,
+    ...(options.relay ? { runtimeHarness: 'kilo2' } : {}),
   });
   await wrapper.hello({ wrapperId: 'wr_1', allocationId });
 
@@ -297,6 +317,7 @@ async function createSharedScope(
             kiloToken: auths[index]!.token,
             seal: auths[index]!.seal,
             worktreeId,
+            relay: options.relay,
           });
     let frame = await wrapper.next();
     if (frame?.type === 'worktree.snapshot') {
@@ -395,6 +416,81 @@ afterEach(async () => {
 });
 
 describe('canonical handle adoption', () => {
+  it('admits an older accepted live handle, rechecks tickets after rotation/reconnect, and denies removed members', async () => {
+    const f = await createSharedScope(2, { relay: true });
+    const [creator, sibling] = f.members;
+    if (!creator || !sibling) throw new Error('Expected members');
+    const request = {
+      authorization: { type: 'handle', handle: creator.handle },
+      ownerId: USER_ID,
+      organizationId: ORG_ID,
+      sessionId: sibling.sessionId,
+      kiloSessionId: sibling.kiloId,
+      nativeSessionId: sibling.kiloId,
+      directory: sibling.directory,
+      deadlineAt: Date.now() + 4_000,
+    };
+    const minted = await f.sandbox.authorizeSessionSyncLive(request);
+    expect(minted).toMatchObject({
+      type: 'allowed',
+      authorization: { host: { cloudAgentSessionId: sibling.sessionId } },
+    });
+    const fence = await currentFence(f.sandbox);
+    const newer = await issueRuntimeCredentialProxyHandle(
+      env as Env,
+      createRuntimeProxyGrant({
+        ...fence,
+        sessionId: creator.sessionId,
+        kiloSessionId: creator.kiloId,
+        userId: USER_ID,
+        orgId: ORG_ID,
+        authorizationId: crypto.randomUUID(),
+        mode: 'contained',
+        state: 'active',
+        leaseExpiresAt: Date.now() + 3_600_000,
+      })
+    );
+    await seedAccepted(f.sandbox, f.scopeGrantId, newer, creator, fence);
+    await runInDurableObject(f.sandbox, (_instance, state) => {
+      const db = drizzle(state.storage);
+      const grant = listScopeGrants(db)[0];
+      if (!grant?.kilo.runtimeProxy) throw new Error('Expected runtime grant');
+      grant.kilo.runtimeProxy.members = grant.kilo.runtimeProxy.members.map(member => ({
+        ...member,
+        handle: newer,
+      }));
+      writeScopeGrant(db, grant);
+    });
+    expect(
+      await f.sandbox.authorizeSessionSyncLive({ ...request, deadlineAt: Date.now() + 4_000 })
+    ).toMatchObject({ type: 'allowed' });
+    if (minted.type !== 'allowed') throw new Error('Expected ticket identity');
+    const { expiresAt: _expiresAt, ...identity } = minted.authorization;
+    const recheck = {
+      ...request,
+      authorization: { type: 'ticket', ...identity },
+      deadlineAt: Date.now() + 4_000,
+    };
+    expect(await f.sandbox.authorizeSessionSyncLive(recheck)).toMatchObject({ type: 'allowed' });
+    const { credential, allocationId } = launchIdentity(f.provider);
+    const reconnected = await FakeWrapper.connect({
+      sandboxId: f.sandboxId,
+      credential,
+      runtimeHarness: 'kilo2',
+    });
+    await reconnected.hello({ wrapperId: 'wr_1', allocationId });
+    expect(
+      await f.sandbox.authorizeSessionSyncLive({ ...recheck, deadlineAt: Date.now() + 4_000 })
+    ).toMatchObject({ type: 'allowed' });
+    await runInDurableObject(f.sandbox, instance => {
+      instance.organizationMembershipFor = async () => false;
+    });
+    expect(
+      await f.sandbox.authorizeSessionSyncLive({ ...recheck, deadlineAt: Date.now() + 4_000 })
+    ).toMatchObject({ type: 'denied' });
+    reconnected.close();
+  });
+
   it('shares one adopted handle across siblings and the joiner carries the issuer session', async () => {
     const { members } = await createSharedScope(2);
     const [creator, sibling] = members;
@@ -550,6 +646,10 @@ describe('adopted-handle proxy scope view', () => {
       scopeId: worktreeId,
       expectedOrganizationId: ORG_ID,
       memberRootKiloSessionIds: [creator.kiloId, sibling.kiloId],
+      members: [creator, sibling].map(member => ({
+        sessionId: member.sessionId,
+        kiloSessionId: member.kiloId,
+      })),
     });
   });
 

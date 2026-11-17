@@ -36,6 +36,7 @@ export type StreamEventType =
   // DO -> /stream clients (cloud infrastructure lifecycle)
   | 'cloud.status' // Cloud infrastructure status (preparing/ready/finalizing/error)
   | 'cloud.sandbox.status'
+  | 'cloud.interactions'
   | 'cloud.worktree.changes.ready'
   // DO -> /stream clients (session message queue)
   | 'cloud.message.queued' // User message accepted into the pending queue

@@ -4,18 +4,83 @@ import { RUNTIME_CREDENTIAL_PROXY_AUDIENCE } from './internal-service-token-audi
 
 export const CLOUD_AGENT_SESSION_SYNC_ORIGIN = 'https://session-sync.kiloapps.io';
 
+export const cloudAgentSyncHostSchema = z.strictObject({
+  cloudAgentSessionId: z
+    .string()
+    .regex(/^workspace_[A-Za-z0-9_-]+$/)
+    .max(256),
+});
+const nativeSessionID = z
+  .string()
+  .regex(/^ses_[A-Za-z0-9_-]+$/)
+  .max(256);
+export const cloudAgentSyncNativeIdentitySchema = z
+  .strictObject({
+    sessionID: nativeSessionID,
+    rootSessionID: nativeSessionID,
+    kind: z.enum(['root', 'descendant']),
+  })
+  .refine(
+    identity => (identity.sessionID === identity.rootSessionID) === (identity.kind === 'root')
+  );
+export const cloudAgentSyncLiveIdentitySchema = z.strictObject({
+  allocationId: z.string().min(1).max(256),
+  providerInstanceId: z.string().min(1).max(256),
+});
+export const cloudAgentSyncHostedClaims = {
+  workload: z.literal('cloud-agent'),
+  host: cloudAgentSyncHostSchema,
+  native: cloudAgentSyncNativeIdentitySchema,
+  liveIdentity: cloudAgentSyncLiveIdentitySchema,
+};
+
 export const cloudAgentSyncAuthorizationSchema = z.strictObject({
   userID: z.string().min(1).max(256),
   organizationID: z.uuid().optional(),
   expiresAt: z.number().int().positive(),
+  host: cloudAgentSyncHostSchema.optional(),
 });
 
+export const cloudAgentSyncLiveRequestSchema = z.discriminatedUnion('type', [
+  z.strictObject({
+    type: z.literal('handle'),
+    handle: z.string().min(1).max(4096),
+    sessionID: nativeSessionID.optional(),
+  }),
+  z.strictObject({
+    type: z.literal('ticket'),
+    userID: z.string().min(1).max(256),
+    organizationID: z.uuid().optional(),
+    ...cloudAgentSyncHostedClaims,
+  }),
+]);
+export const cloudAgentSyncLiveAuthorizationSchema = z.strictObject({
+  userID: z.string().min(1).max(256),
+  organizationID: z.uuid().optional(),
+  expiresAt: z.number().int().positive(),
+  ...cloudAgentSyncHostedClaims,
+});
+export const cloudAgentSyncLiveResultSchema = z.discriminatedUnion('type', [
+  z.strictObject({
+    type: z.literal('allowed'),
+    authorization: cloudAgentSyncLiveAuthorizationSchema,
+  }),
+  z.strictObject({
+    type: z.literal('denied'),
+    code: z.enum(['invalid_credential', 'access_denied', 'hosted_live_not_enabled']),
+  }),
+  z.strictObject({ type: z.literal('unavailable'), code: z.literal('auth_unavailable') }),
+]);
+export type CloudAgentSyncLiveRequest = z.infer<typeof cloudAgentSyncLiveRequestSchema>;
+export type CloudAgentSyncLiveResult = z.infer<typeof cloudAgentSyncLiveResultSchema>;
+export type CloudAgentSyncLiveAuthorization = z.infer<typeof cloudAgentSyncLiveAuthorizationSchema>;
 export type CloudAgentSyncAuthorization = z.infer<typeof cloudAgentSyncAuthorizationSchema>;
 export type CloudAgentSyncAuthorizationBinding = {
   authorizeUpload(input: {
     handle: string;
     sessionID?: string;
   }): Promise<CloudAgentSyncAuthorization | null>;
+  authorizeLive(input: CloudAgentSyncLiveRequest): Promise<CloudAgentSyncLiveResult>;
 };
 
 /** Classification only. The Cloud Agent binding verifies the signature and current runtime fence. */

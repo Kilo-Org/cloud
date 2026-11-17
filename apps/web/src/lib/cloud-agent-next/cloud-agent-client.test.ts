@@ -919,6 +919,29 @@ describe('CloudAgentNextClient sandbox selection', () => {
       expect(mutate).toHaveBeenCalledWith(input);
     }
   );
+  it.each([undefined, 'stream', 'relay'] as const)(
+    'forwards only an explicitly supplied prepare chat choice: %s',
+    async transport => {
+      const input: PrepareSessionInput = {
+        githubRepo: 'fixture/repository',
+        prompt: 'fixture prompt',
+        mode: 'code',
+        model: 'fixture/model',
+        ...(transport === undefined ? {} : { chat: { transport } }),
+      };
+      const mutate = jest
+        .fn<CloudAgentClientModule.CloudAgentNextClient['prepareSession']>()
+        .mockResolvedValue({
+          kiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
+          cloudAgentSessionId: 'workspace_fixture',
+        });
+      mockCreateTRPCClient.mockReturnValueOnce({ prepareSession: { mutate } });
+      await new CloudAgentNextClient('fixture-control-token').prepareSession(input);
+      expect(mutate).toHaveBeenCalledWith(input);
+      if (transport === undefined) expect(mutate.mock.calls[0]?.[0]).not.toHaveProperty('chat');
+    }
+  );
+
   it.each([
     {},
     { egressMode: 'unrestricted' as const },

@@ -1,4 +1,6 @@
 import { environmentReferenceSchema } from '../../environment-build/reference.js';
+import * as sessionSyncLiveRootGrant from './session-sync-live-root-grant.js';
+import { RUNTIME_PROXY_GRANT_KEY } from '../../runtime-credential-proxy.js';
 import {
   workspaceSnapshotIdentity,
   type WorkspaceSnapshotIdentity,
@@ -1774,6 +1776,23 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return readStoredHistoryLineage(this.db, rootKiloSessionId, kiloSessionId) != null;
   }
 
+  async getSessionSyncLiveRootGrantProof(
+    input: unknown
+  ): Promise<sessionSyncLiveRootGrant.SessionSyncLiveRootGrantProof> {
+    await this.initialized;
+    return sessionSyncLiveRootGrant.getSessionSyncLiveRootGrantProof({
+      request: input,
+      env: this.env,
+      readState: async () => {
+        const [authorization, grant] = await Promise.all([
+          this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
+          this.ctx.storage.get<unknown>(RUNTIME_PROXY_GRANT_KEY),
+        ]);
+        return { metadata: this.metadata, registration: this.registration, authorization, grant };
+      },
+    });
+  }
+
   /** C1c model preflight: renew and return the backing runtime token. */
   async getRuntimeToken(): Promise<string | null> {
     const metadata = await this.getMetadata();
@@ -2421,6 +2440,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     };
     this.pendingInteractions = next;
     await this.ctx.storage.put(PENDING_INTERACTIONS_KEY, next);
+    this.emitSynthetic('cloud.interactions', this.readPendingInteractions(), 'cloud-interactions');
   }
 
   private hasPendingInteraction(collection: PendingInteractionCollection, id: string): boolean {
@@ -2439,6 +2459,11 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     if (next !== undefined && next !== this.pendingInteractions) {
       this.pendingInteractions = next;
       await this.ctx.storage.put(PENDING_INTERACTIONS_KEY, next);
+      this.emitSynthetic(
+        'cloud.interactions',
+        this.readPendingInteractions(),
+        'cloud-interactions'
+      );
     }
   }
 
@@ -2569,6 +2594,11 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         if (next !== undefined && next !== this.pendingInteractions) {
           this.pendingInteractions = next;
           await this.ctx.storage.put(PENDING_INTERACTIONS_KEY, next);
+          this.emitSynthetic(
+            'cloud.interactions',
+            this.readPendingInteractions(),
+            'cloud-interactions'
+          );
         }
         await this.recordRootStatus(event);
         // A retried batch can be partially applied; commit its receipt with the row mutation.

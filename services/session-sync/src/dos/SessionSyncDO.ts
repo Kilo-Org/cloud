@@ -21,12 +21,13 @@ import {
   hashSchema,
   isBoundedJson,
   ok,
-  principalSchema,
+  sessionPrincipalSchema,
   registerRequestSchema,
   sessionIDSchema,
   statusRequestSchema,
   utf8Bytes,
   type BlobAck,
+  type Principal,
   type ErrorCode,
   type Receipt,
   type Result,
@@ -56,7 +57,7 @@ class LeaseRequired extends Error {
   }
 }
 
-const target = { principal: principalSchema, sessionID: sessionIDSchema };
+const target = { principal: sessionPrincipalSchema, sessionID: sessionIDSchema };
 const stateInput = z.strictObject(target);
 const registerInput = z.strictObject({ ...target, request: registerRequestSchema });
 const statusInput = z.strictObject({ ...target, request: statusRequestSchema });
@@ -272,7 +273,7 @@ export class SessionSyncDO extends DurableObject<Env> {
 
   /** Rolls back an over-lease mutation before obtaining capacity outside SQLite. */
   private async leased<T>(
-    principal: z.infer<typeof principalSchema>,
+    principal: Principal,
     sessionID: string,
     operation: DiagnosticOperation,
     fn: () => T
@@ -407,10 +408,7 @@ export class SessionSyncDO extends DurableObject<Env> {
    * Removes the traces of a registration the tenant refused. The intent stays
    * when the creator index cannot be cleared, so its alarm retries the removal.
    */
-  private async discardRegistration(
-    principal: z.infer<typeof principalSchema>,
-    sessionID: string
-  ): Promise<void> {
+  private async discardRegistration(principal: Principal, sessionID: string): Promise<void> {
     const forgotten = await this.tenantCall(() =>
       getTenantStub(this.env, { type: 'user', id: principal.userID }).forgetCreatedSession({
         tenant: principal.tenant,
@@ -449,7 +447,7 @@ export class SessionSyncDO extends DurableObject<Env> {
       }
       const indexed = await this.tenantCall(() =>
         getTenantStub(this.env, { type: 'user', id: principal.userID }).trackCreatedSession({
-          principal,
+          principal: { userID: principal.userID, tenant: principal.tenant },
           sessionID,
         })
       );
@@ -506,7 +504,9 @@ export class SessionSyncDO extends DurableObject<Env> {
   }
 
   /** Live tickets can only be minted for a non-deleted, owner-authorized session. */
-  async authorizeLive(input: unknown): Promise<Result<{ role: 'owner' }>> {
+  async authorizeLive(
+    input: unknown
+  ): Promise<Result<{ role: 'owner'; host?: { cloudAgentSessionId: string } }>> {
     const parsed = parse(stateInput, input);
     if (!parsed.ok) return parsed;
     const { principal, sessionID } = parsed.value;
@@ -514,8 +514,15 @@ export class SessionSyncDO extends DurableObject<Env> {
     if (missing) return missing;
     return this.serial(async () => {
       const authorized = this.tx(() => {
-        session.live(this.db, principal, sessionID);
-        return { role: 'owner' as const };
+        const meta = session.live(this.db, principal, sessionID);
+        return {
+          role: 'owner' as const,
+          ...(meta.cloud_agent_session_id === null
+            ? {}
+            : {
+                host: { cloudAgentSessionId: meta.cloud_agent_session_id },
+              }),
+        };
       });
       if (!authorized.ok || this.relayUsed) return authorized;
       // Share the deletion gate while persisting activation: a successful ticket

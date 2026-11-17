@@ -155,6 +155,7 @@ const mockCreateCloudAgentNextClient = jest.fn((_authToken: string) => ({
 
 const mockCreateCloudAgentNextClientForModel = jest.fn(
   (_authToken: string, _eligibility: unknown) => ({
+    getSandboxSelectionOptions: mockGetSandboxSelectionOptions,
     prepareSession: mockPrepareSession,
     sendMessage: mockSendMessage,
   })
@@ -169,6 +170,9 @@ const mockComputeCloudAgentNextBalanceCheckEligibility = jest.fn<
 
 const mockIsFeatureFlagEnabledOrDevelopment =
   jest.fn<(flagName: string, distinctId: string) => Promise<boolean>>();
+const mockIsReleaseToggleEnabled = jest.fn<
+  (flagName: string, distinctId: string) => Promise<boolean>
+>(async () => false);
 const mockVerifyOrgOwnsSessionV2ByCloudAgentId =
   jest.fn<typeof verifyOrgOwnsSessionV2ByCloudAgentId>();
 const mockVerifyOrgOwnsPreviewWorktree =
@@ -262,6 +266,7 @@ jest.mock('@/lib/cloud-agent-next/balance-check-eligibility', () => ({
 
 jest.mock('@kilocode/web-shared/lib/posthog-feature-flags', () => ({
   isFeatureFlagEnabledOrDevelopment: mockIsFeatureFlagEnabledOrDevelopment,
+  isReleaseToggleEnabled: mockIsReleaseToggleEnabled,
 }));
 
 jest.mock('@/lib/cloud-agent/bitbucket-integration-helpers', () => ({
@@ -488,6 +493,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
   mockEnsureOrganizationAccess.mockReset().mockResolvedValue('member');
+  mockIsReleaseToggleEnabled.mockReset().mockResolvedValue(false);
   mockRequireActiveSubscription.mockReset();
 });
 
@@ -2254,6 +2260,83 @@ describe('organizationCloudAgentNextRouter.prepareSession', () => {
     model: 'kilo/test-model',
     githubRepo: 'acme/repo',
   };
+
+  it('keeps the strict relay flag false without an extra capability request and strips browser chat', async () => {
+    const caller = createCaller({
+      user: { id: 'synthetic-browser', is_admin: false } as User,
+      headersList: new Headers({ 'x-kilo-client': 'web' }),
+    });
+    await caller.prepareSession({ ...sandboxInput, chat: { transport: 'relay' } } as z.input<
+      typeof organizationPrepareSessionNextSchema
+    >);
+    expect(mockIsReleaseToggleEnabled).toHaveBeenCalledWith(
+      'cloud-agent-relay-chat',
+      'synthetic-browser'
+    );
+    expect(mockGetSandboxSelectionOptions).not.toHaveBeenCalled();
+    expect(mockPrepareSession.mock.calls[0]?.[0]).not.toHaveProperty('chat');
+  });
+
+  it.each([true, false, undefined])(
+    'derives relay only from strict flag and explicit capability %s',
+    async capability => {
+      mockIsReleaseToggleEnabled.mockResolvedValueOnce(true);
+      mockGetSandboxSelectionOptions.mockResolvedValueOnce({
+        enabled: false,
+        options: [],
+        ...(capability === undefined ? {} : { relayChatForBrowserPrepare: capability }),
+      });
+      const caller = createCaller({
+        user: { id: 'synthetic-browser', is_admin: false } as User,
+        headersList: new Headers({ 'x-kilo-client': 'web' }),
+      });
+      await caller.prepareSession(sandboxInput);
+      expect(mockGetSandboxSelectionOptions).toHaveBeenCalledWith({
+        kilocodeOrganizationId: ORGANIZATION_ID,
+        repositoryType: 'github',
+        repositoryFullName: sandboxInput.githubRepo,
+      });
+      if (capability === true)
+        expect(mockPrepareSession).toHaveBeenCalledWith(
+          expect.objectContaining({
+            chat: { transport: 'relay' },
+            clientProvenance: 'browser',
+            createdOnPlatform: 'cloud-agent-web',
+            kilocodeOrganizationId: ORGANIZATION_ID,
+          })
+        );
+      else expect(mockPrepareSession.mock.calls[0]?.[0]).not.toHaveProperty('chat');
+    }
+  );
+
+  it('does not enroll a mobile prepare when the strict relay flag would be true', async () => {
+    mockIsReleaseToggleEnabled.mockResolvedValueOnce(true);
+    const caller = createCaller({
+      user: { id: 'synthetic-mobile', is_admin: false } as User,
+      headersList: new Headers({
+        'x-kilo-client': 'mobile',
+        'x-kilo-app-platform': 'android',
+        'x-kilo-app-version': '1.0.0',
+      }),
+    });
+    await caller.prepareSession(sandboxInput);
+    expect(mockIsReleaseToggleEnabled).not.toHaveBeenCalled();
+    expect(mockGetSandboxSelectionOptions).not.toHaveBeenCalled();
+    expect(mockPrepareSession.mock.calls[0]?.[0]).not.toHaveProperty('chat');
+  });
+
+  it('propagates capability authorization failure without dispatching a stream prepare', async () => {
+    mockIsReleaseToggleEnabled.mockResolvedValueOnce(true);
+    mockGetSandboxSelectionOptions.mockRejectedValueOnce(
+      new TRPCError({ code: 'FORBIDDEN', message: 'Synthetic capability denied' })
+    );
+    const caller = createCaller({
+      user: { id: 'synthetic-browser', is_admin: false } as User,
+      headersList: new Headers({ 'x-kilo-client': 'web' }),
+    });
+    await expect(caller.prepareSession(sandboxInput)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(mockPrepareSession).not.toHaveBeenCalled();
+  });
 
   it('forwards the GitHub connection that owns the selected repository', async () => {
     const integrationId = '123e4567-e89b-12d3-a456-426614174030';

@@ -48,6 +48,7 @@ import {
   autocommitCompletedDataSchema,
   cloudStatusDataSchema,
   connectedDataSchema,
+  cloudInteractionsDataSchema,
   commandsAvailableDataSchema,
   cloudMessageQueuedDataSchema,
   cloudMessageSentDataSchema,
@@ -205,8 +206,10 @@ export type ServiceEvent =
     }
   | { type: 'cloud.status'; cloudStatus: CloudStatus }
   | { type: 'bootstrap.complete' }
+  | { type: 'cloud.interactions'; pendingInteractions: z.infer<typeof cloudInteractionsDataSchema> }
   | {
       type: 'connected';
+      pendingInteractions?: z.infer<typeof cloudInteractionsDataSchema> | undefined;
       bootstrapPending?: boolean | undefined;
       ancillaryOmittedItemCount?: number | undefined;
       cloudSessionId?: string;
@@ -609,11 +612,19 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
       return { type: 'cloud.status', cloudStatus: r.data.cloudStatus };
     }
 
+    case 'cloud.interactions': {
+      const r = cloudInteractionsDataSchema.safeParse(data);
+      return r.success ? { type: 'cloud.interactions', pendingInteractions: r.data } : null;
+    }
+
     case 'connected': {
       const r = connectedServiceDataSchema.safeParse(data);
       if (!r.success) return null;
       return {
         type: 'connected',
+        ...(r.data.pendingInteractions !== undefined && {
+          pendingInteractions: r.data.pendingInteractions,
+        }),
         ...(r.data.bootstrapPending !== undefined && { bootstrapPending: r.data.bootstrapPending }),
         ...(r.data.ancillaryOmittedItemCount !== undefined && {
           ancillaryOmittedItemCount: r.data.ancillaryOmittedItemCount,

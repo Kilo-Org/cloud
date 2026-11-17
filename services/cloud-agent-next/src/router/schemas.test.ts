@@ -24,6 +24,20 @@ import { parseCanonicalBitbucketCloneUrl } from '../types.js';
 const validMessageId = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
 const validSessionId = 'workspace_12345678-1234-1234-1234-123456789012';
 const validKiloSessionId = 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa';
+
+it('keeps persisted workspace chat in getSession output', () => {
+  expect(
+    GetSessionOutput.parse({
+      sessionId: validSessionId,
+      kiloSessionId: validKiloSessionId,
+      userId: 'synthetic-user',
+      chat: { transport: 'relay' },
+      timestamp: 1,
+      version: 2,
+      execution: null,
+    }).chat
+  ).toEqual({ transport: 'relay' });
+});
 const validAttachments = {
   path: '123e4567-e89b-12d3-a456-426614174000',
   files: ['123e4567-e89b-12d3-a456-426614174001.csv'],

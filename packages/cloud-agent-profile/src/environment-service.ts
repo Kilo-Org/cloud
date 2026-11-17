@@ -737,6 +737,19 @@ export type EnvironmentSessionResolution =
   | { status: 'match'; environment: EnvironmentForSession }
   | Exclude<EnvironmentSelection, { status: 'match' }>;
 
+export async function readEnvironmentAllocationForSession(
+  db: Pick<WorkerDb, 'select'>,
+  input: Parameters<typeof selectEnvironmentForSession>[1]
+): Promise<
+  | { status: 'match'; sandboxAllocation: string | null }
+  | Exclude<EnvironmentSelection, { status: 'match' }>
+> {
+  const selection = await selectEnvironmentForSession(db, input);
+  return selection.status === 'match'
+    ? { status: 'match', sandboxAllocation: selection.environment.sandbox_allocation }
+    : selection;
+}
+
 /**
  * Load the environment of a session's launch repository: the primitives the
  * session merges, the authorized reference that travels beside them, and the saved

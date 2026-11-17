@@ -16,10 +16,22 @@ import {
   relayWatches,
 } from '../../src/db/relay-sqlite-schema';
 import { getPresenceStub } from '../../src/dos/SessionPresenceDO';
+import { getSessionSyncDOStub } from '../../src/dos/SessionSyncDO';
 import { getRelayStub, SessionRelayDO } from '../../src/dos/SessionRelayDO';
 import type { Env } from '../../src/env';
 import { LIVE_LIMITS } from '../../src/live/protocol';
-import { mintTicket, type LiveRole, type LiveTicket } from '../../src/live/ticket';
+import {
+  mintHostedTicket,
+  mintTicket,
+  type LiveRole,
+  type LiveTicket,
+} from '../../src/live/ticket';
+import type {
+  CloudAgentSyncLiveAuthorization,
+  CloudAgentSyncLiveRequest,
+  CloudAgentSyncLiveResult,
+} from '@kilocode/worker-utils/cloud-agent-session-sync';
+import { app } from '../../src/app';
 import type { Principal } from '../../src/protocol';
 import { grant, newSessionID, personal, testEnv } from '../helpers';
 
@@ -35,8 +47,10 @@ const envelopeSchema = z.object({
 type Envelope = z.infer<typeof envelopeSchema>;
 const sockets = new Map<WebSocket, Promise<CloseEvent>>();
 const drainDeferred: Array<() => Promise<void>> = [];
+const releaseAuthorityReplies: Array<() => Promise<void>> = [];
 
 afterEach(async () => {
+  for (const release of releaseAuthorityReplies.splice(0)) await release();
   for (const ws of sockets.keys()) ws.close(1000, 'Test completed');
   await Promise.all(sockets.values());
   for (const drain of drainDeferred) await drain();
@@ -130,9 +144,18 @@ function captureRelaySend(server: WebSocket, frames: string[]): void {
   });
 }
 
-async function setup() {
+async function setup(options: { host?: { cloudAgentSessionId: string } } = {}) {
   const principal = personal(`relay-${crypto.randomUUID()}`);
   const sessionID = newSessionID();
+  const registered = await getSessionSyncDOStub(testEnv, {
+    tenant: principal.tenant,
+    sessionID,
+  }).register({
+    principal: { ...principal, ...(options.host ? { host: options.host } : {}) },
+    sessionID,
+    request: { version: 1, sourceID: crypto.randomUUID() },
+  });
+  expect(registered.ok).toBe(true);
   const stub = getRelayStub(testEnv, principal.tenant, sessionID);
   await runInDurableObject(stub, (_instance, state) => {
     const deferred = createExecutionContext();
@@ -173,6 +196,300 @@ async function setup() {
   ) => ({ channel: 'commands', type: 'send_message', commandID, body, ...options });
   return { principal, sessionID, stub, ticket, connect, command };
 }
+
+async function hostedSetup(rootSessionID?: string) {
+  const host = { cloudAgentSessionId: `workspace_${crypto.randomUUID()}` };
+  const f = await setup({ host });
+  const authorization: CloudAgentSyncLiveAuthorization = {
+    userID: f.principal.userID,
+    workload: 'cloud-agent',
+    host,
+    native: {
+      sessionID: f.sessionID,
+      rootSessionID: rootSessionID ?? f.sessionID,
+      kind: rootSessionID ? 'descendant' : 'root',
+    },
+    liveIdentity: {
+      allocationId: 'synthetic-current-allocation',
+      providerInstanceId: 'synthetic-current-provider',
+    },
+    expiresAt: Date.now() + 120_000,
+  };
+  let unavailable = false;
+  const checked: CloudAgentSyncLiveRequest[] = [];
+  const decide = async (input: CloudAgentSyncLiveRequest): Promise<CloudAgentSyncLiveResult> => {
+    checked.push(input);
+    if (unavailable) throw new Error('Synthetic authority dependency unavailable');
+    if (
+      input.type !== 'ticket' ||
+      input.liveIdentity.allocationId !== authorization.liveIdentity.allocationId ||
+      input.liveIdentity.providerInstanceId !== authorization.liveIdentity.providerInstanceId
+    )
+      return { type: 'denied', code: 'access_denied' };
+    return {
+      type: 'allowed',
+      authorization: { ...authorization, expiresAt: Date.now() + 120_000 },
+    };
+  };
+  const authorizeLive = vi.fn(decide);
+  await runInDurableObject(f.stub, instance => {
+    Object.assign(instance, {
+      env: {
+        ...testEnv,
+        CLOUD_AGENT_SYNC_AUTH: {
+          authorizeUpload: async () => null,
+          authorizeLive,
+        },
+      },
+    });
+  });
+  const runnerTicket = async (identity = authorization) =>
+    (await mintHostedTicket(testEnv, identity, 'session-relay', f.sessionID)).ticket;
+  const connectRunner = async () => {
+    const response = await f.stub.fetch(
+      new Request('https://relay.test/', {
+        headers: { upgrade: 'websocket', authorization: `Bearer ${await runnerTicket()}` },
+      })
+    );
+    expect(response.status).toBe(101);
+    if (!response.webSocket) throw new Error('Missing hosted socket');
+    const stream = inbox(response.webSocket);
+    await stream.next('hello');
+    return stream;
+  };
+  const holdPositiveReply = () => {
+    const entered = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    authorizeLive.mockImplementationOnce(async input => {
+      const decided = structuredClone(await decide(input));
+      expect(decided.type).toBe('allowed');
+      entered.resolve();
+      await release.promise;
+      return decided;
+    });
+    const open = () => runInDurableObject(f.stub, () => release.resolve());
+    releaseAuthorityReplies.push(open);
+    return {
+      entered: runInDurableObject(f.stub, async () => {
+        await entered.promise;
+      }),
+      release: open,
+    };
+  };
+  return {
+    ...f,
+    authorization,
+    runnerTicket,
+    connectRunner,
+    checked,
+    holdPositiveReply,
+    outage: () => {
+      unavailable = true;
+    },
+    recover: () => {
+      unavailable = false;
+    },
+  };
+}
+
+it('defers an already-decided stale relay upgrade reply instead of evicting a new physical incumbent', async () => {
+  const f = await hostedSetup();
+  const gate = f.holdPositiveReply();
+  const pending = f.stub.fetch(
+    new Request('https://relay.test/', {
+      headers: { upgrade: 'websocket', authorization: `Bearer ${await f.runnerTicket()}` },
+    })
+  );
+  await gate.entered;
+  f.authorization.liveIdentity = {
+    allocationId: 'synthetic-new-allocation',
+    providerInstanceId: 'synthetic-new-provider',
+  };
+  const incumbent = await f.connectRunner();
+  await gate.release();
+  const response = await pending;
+  if (response.webSocket) await inbox(response.webSocket).next('hello');
+  expect(response.status).toBe(503);
+  expect(await response.json()).toMatchObject({ error: { code: 'auth_unavailable' } });
+  await runInDurableObject(f.stub, (_instance, state) => {
+    const current = state
+      .getWebSockets()
+      .map(ws => ws.deserializeAttachment())
+      .find(saved => saved.ticket.liveIdentity?.allocationId === 'synthetic-new-allocation');
+    expect(current.closed).toBe(false);
+  });
+  const viewer = await f.connect('viewer');
+  viewer.ws.send(JSON.stringify({ type: 'subscribe', afterSeq: 0 }));
+  await viewer.next('subscribed');
+  incumbent.ws.send(
+    JSON.stringify({ channel: 'events', type: 'synthetic.current', body: { healthy: true } })
+  );
+  expect((await viewer.next('synthetic.current')).body).toEqual({ healthy: true });
+});
+
+it('keeps concurrent same-physical relay reconnects valid after an already-decided reply waits', async () => {
+  const f = await hostedSetup();
+  const gate = f.holdPositiveReply();
+  const pending = f.stub.fetch(
+    new Request('https://relay.test/', {
+      headers: { upgrade: 'websocket', authorization: `Bearer ${await f.runnerTicket()}` },
+    })
+  );
+  await gate.entered;
+  const incumbent = await f.connectRunner();
+  const closed = whenClosed(incumbent.ws);
+  await gate.release();
+  const response = await pending;
+  expect(response.status).toBe(101);
+  if (!response.webSocket) throw new Error('Missing reconnect socket');
+  await inbox(response.webSocket).next('hello');
+  expect((await closed).code).toBe(4009);
+});
+
+it('allows a current new physical relay runner to replace an unchanged old incumbent', async () => {
+  const f = await hostedSetup();
+  const old = await f.connectRunner();
+  const closed = whenClosed(old.ws);
+  f.authorization.liveIdentity = {
+    allocationId: 'synthetic-new-allocation',
+    providerInstanceId: 'synthetic-new-provider',
+  };
+  await f.connectRunner();
+  expect((await closed).code).toBe(4009);
+  await runInDurableObject(f.stub, (_instance, state) => {
+    const server = relaySocket(
+      state,
+      attachment => attachment.ticket.role === 'runner' && attachment.closed !== true
+    );
+    expect(server.deserializeAttachment().ticket.liveIdentity.allocationId).toBe(
+      'synthetic-new-allocation'
+    );
+  });
+});
+
+it.each([undefined, 'ses_syntheticdescendantroot'])(
+  'admits a hosted runner with its root/descendant identity: %s',
+  async root => {
+    const f = await hostedSetup(root);
+    const runner = await f.connectRunner();
+    const viewer = await f.connect('viewer');
+    viewer.ws.send(JSON.stringify({ type: 'subscribe', afterSeq: 0 }));
+    await viewer.next('subscribed');
+    runner.ws.send(
+      JSON.stringify({ channel: 'events', type: 'synthetic.native', body: { complete: true } })
+    );
+    expect((await viewer.next('synthetic.native')).body).toEqual({ complete: true });
+    expect(f.checked[0]).toMatchObject({
+      type: 'ticket',
+      native: { kind: root ? 'descendant' : 'root' },
+    });
+    expect(Object.keys(f.checked[0])).not.toContain('handle');
+  }
+);
+
+it('refuses human runners with 409 and hosted commands before storing rows or payloads', async () => {
+  const f = await hostedSetup();
+  const rejected = await f.stub.fetch(
+    new Request('https://relay.test/', {
+      headers: { upgrade: 'websocket', authorization: `Bearer ${await f.ticket('runner')}` },
+    })
+  );
+  expect(rejected.status).toBe(409);
+  await rejected.text();
+  const controller = await f.connect('controller');
+  const http = await rpcResponse(
+    f.stub.command({
+      ticket: await f.ticket('controller'),
+      command: f.command('synthetic-http-command'),
+    })
+  );
+  expect(http.status).toBe(403);
+  expect(await http.json()).toMatchObject({ error: { code: 'hosted_read_only' } });
+  controller.ws.send(JSON.stringify(f.command('synthetic-socket-command')));
+  expect((await controller.next('error')).body).toMatchObject({ code: 'hosted_read_only' });
+  const mint = await app.fetch(
+    new Request(`https://session-sync.test/v1/sessions/${f.sessionID}/live-ticket`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${await grant(f.principal)}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ role: 'runner' }),
+    }),
+    testEnv
+  );
+  expect(mint.status).toBe(409);
+  await runInDurableObject(f.stub, (_instance, state) => {
+    expect(drizzle(state.storage).select().from(relayCommands).all()).toEqual([]);
+  });
+});
+
+it('rejects a stale issued physical identity before it can replace the healthy hosted runner', async () => {
+  const f = await hostedSetup();
+  await f.connectRunner();
+  const stale = await f.runnerTicket({
+    ...f.authorization,
+    liveIdentity: { ...f.authorization.liveIdentity, allocationId: 'synthetic-old-allocation' },
+  });
+  const response = await f.stub.fetch(
+    new Request('https://relay.test/', {
+      headers: { upgrade: 'websocket', authorization: `Bearer ${stale}` },
+    })
+  );
+  expect(response.status).toBe(403);
+  await response.text();
+  await runInDurableObject(f.stub, (_instance, state) => {
+    const server = relaySocket(state, attachment => attachment.ticket.role === 'runner');
+    expect(server.deserializeAttachment().closed).toBe(false);
+    expect(state.getWebSockets()).toHaveLength(1);
+  });
+});
+
+it('keeps the incumbent and its original expiry when hosted connect or reauth dependencies fail', async () => {
+  const f = await hostedSetup();
+  const runner = await f.connectRunner();
+  let originalExpiry = 0;
+  await runInDurableObject(f.stub, (_instance, state) => {
+    setSocketExpiry(_instance, state, Math.floor(Date.now() / 1000) + 10);
+    originalExpiry = relaySocket(
+      state,
+      attachment => attachment.ticket.role === 'runner'
+    ).deserializeAttachment().ticket.exp;
+  });
+  f.outage();
+  const response = await f.stub.fetch(
+    new Request('https://relay.test/', {
+      headers: { upgrade: 'websocket', authorization: `Bearer ${await f.runnerTicket()}` },
+    })
+  );
+  expect(response.status).toBe(503);
+  await response.text();
+  runner.ws.send(JSON.stringify({ type: 'reauth', ticket: await f.runnerTicket() }));
+  expect((await runner.next('error')).body).toEqual({ code: 'auth_unavailable' });
+  await runInDurableObject(f.stub, (_instance, state) => {
+    const attachment = relaySocket(
+      state,
+      item => item.ticket.role === 'runner'
+    ).deserializeAttachment();
+    expect(attachment.closed).toBe(false);
+    expect(attachment.ticket.exp).toBe(originalExpiry);
+  });
+  f.recover();
+  runner.ws.send(JSON.stringify({ type: 'reauth', ticket: await f.runnerTicket() }));
+  await runner.next('reauthorized');
+});
+
+it('preserves immutable hosted claims during reauth and attachment reconstruction', async () => {
+  const f = await hostedSetup();
+  const runner = await f.connectRunner();
+  const changed = await f.runnerTicket({
+    ...f.authorization,
+    host: { cloudAgentSessionId: `workspace_${crypto.randomUUID()}` },
+  });
+  const closed = whenClosed(runner.ws);
+  runner.ws.send(JSON.stringify({ type: 'reauth', ticket: changed }));
+  expect((await closed).code).toBe(1008);
+});
 
 type RelayStub = DurableObjectStub<SessionRelayDO>;
 

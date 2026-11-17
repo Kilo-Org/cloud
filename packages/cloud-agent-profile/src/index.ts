@@ -306,6 +306,7 @@ export {
   listEnvironments,
   listEnvironmentsForOwner,
   loadEnvironmentForSession,
+  readEnvironmentAllocationForSession,
   loadEnvironmentBuildInput,
   readEnvironmentReference,
   lockActiveOrganization,

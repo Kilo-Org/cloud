@@ -144,6 +144,7 @@ export type AgentMode = string;
 
 /** Shared fields for prepareSession, present on both the non-clone and clone variants. */
 type PrepareSessionSharedFields = {
+  chat?: { transport: 'stream' | 'relay' };
   githubAccessPurpose?: 'workflow' | 'agent';
   mode: AgentMode;
   model: string;
@@ -436,6 +437,7 @@ export type ExecutionStatus = {
 /** Output from getSession procedure (sanitized, no secrets) */
 export type GetSessionOutput = {
   sessionId: string;
+  chat?: CloudSessionMetadata['chat'];
   kiloSessionId?: string;
   userId: string;
   orgId?: string;

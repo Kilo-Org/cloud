@@ -1,5 +1,9 @@
 import { drizzle } from 'drizzle-orm/durable-sqlite';
+import { eq } from 'drizzle-orm';
 import { readRoute } from '../../src/control-plane/sandbox/routes.js';
+import { scopeGrants } from '../../src/control-plane/sandbox/sqlite-schema.js';
+import { scopeGrantId } from '../../src/control-plane/sandbox/scope-grants.js';
+import type { WorkspaceChat } from '../../src/shared/workspace-chat.js';
 import { resolveControlPlaneTimers } from '../../src/shared/control-plane-timers.js';
 import {
   env,
@@ -204,31 +208,39 @@ async function setup(
   return { id, stub, peer, provider };
 }
 type PrepareOptions = {
+  chat?: WorkspaceChat;
+  sessionId?: string;
+  workspaceId?: `worktree_${string}`;
   orgId?: string;
   billingOrigin?: string;
   createdOnPlatform?: string;
   sandboxKind?: 'isolated' | 'isolated-standard' | 'code-review' | 'shared';
 };
 async function requestPrepare(h: Harness, options: PrepareOptions = {}) {
+  const sessionId = options.sessionId ?? SESSION;
+  const kiloSessionId =
+    sessionId === SESSION ? 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa' : 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb';
   await h.stub.prepare({
     spec: {
-      sessionId: SESSION,
-      kiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
+      sessionId,
+      kiloSessionId,
       attemptId: 'requested',
       directory: '/workspace/app',
       git: { url: 'https://github.com/acme/widgets.git' },
     },
     credentials: {
       userId: 'user_123',
-      kiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
+      kiloSessionId,
       kiloToken: FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
       orgId: options.orgId,
       ...(options.createdOnPlatform === undefined
         ? {}
         : { createdOnPlatform: options.createdOnPlatform }),
       ...(options.billingOrigin === undefined ? {} : { billingOrigin: options.billingOrigin }),
+      ...(options.chat === undefined ? {} : { chat: options.chat }),
+      ...(options.workspaceId === undefined ? {} : { workspaceId: options.workspaceId }),
       repository: { type: 'github', repo: 'acme/widgets' },
-      scopeId: SESSION,
+      scopeId: options.workspaceId ?? sessionId,
     },
     sandboxSelection: {
       provider: 'cloudflare-containers',
@@ -455,6 +467,116 @@ describe('downloaded startup in the allocation owner', () => {
       sandboxKind: 'isolated',
       createdOnPlatform: 'cloud-agent-web',
     } as const;
+    it.each(['cohort_changed', 'stored_v1', 'legacy_v1'] as const)(
+      'fails relay closed before provider work and a new harness pin for %s',
+      async reason => {
+        const h = await setup(
+          KILO2_SANDBOX,
+          {},
+          {
+            ...kilo2Env,
+            ...(reason === 'cohort_changed' ? { RUNTIME_KILO2_ORG_IDS: OTHER_ORG } : {}),
+          }
+        );
+        if (reason !== 'cohort_changed') {
+          await runInDurableObject(h.stub, async (_instance, state) => {
+            if (reason === 'stored_v1') await state.storage.put('runtime_harness', 'kilo');
+            else await state.storage.put('wrapper_credential_hash', 'synthetic-legacy-hash');
+          });
+        }
+        await requestPrepare(h, { ...isolatedTarget, chat: { transport: 'relay' } });
+        await waitFor(() =>
+          expect(h.peer.routeUpdatesFor(SESSION)).toContainEqual(
+            expect.objectContaining({ state: 'failed', reason: 'invalid_configuration' })
+          )
+        );
+        expect(h.provider.calls.create).toBe(0);
+        expect(h.provider.launches).toHaveLength(0);
+        expect(await record(h)).toBeUndefined();
+        await runInDurableObject(h.stub, async (_instance, state) => {
+          expect(await state.storage.get('runtime_harness')).toBe(
+            reason === 'stored_v1' ? 'kilo' : undefined
+          );
+          expect(await state.storage.get('wrapper_credential_hash')).toBe(
+            reason === 'legacy_v1' ? 'synthetic-legacy-hash' : undefined
+          );
+        });
+      }
+    );
+
+    it('keeps relay siblings on the stored v2 harness after the cohort changes', async () => {
+      const h = await setup(KILO2_SANDBOX, {}, kilo2Env);
+      const workspaceId = 'worktree_00000000-0000-4000-8000-000000000001';
+      const options = { ...isolatedTarget, workspaceId, chat: { transport: 'relay' } } as const;
+      await prepare(h, options);
+      expect(harnessOf(h, 0)).toBe('kilo2');
+      await runInDurableObject(h.stub, instance => {
+        instance.env.RUNTIME_KILO2_ORG_IDS = '';
+      });
+      const sibling = 'workspace_22222222-2222-4222-8222-222222222222';
+      await requestPrepare(h, { ...options, sessionId: sibling });
+      await recreate(h, { RUNTIME_KILO2_ORG_IDS: '' });
+      expect(harnessOf(h, 1)).toBe('kilo2');
+      await runInDurableObject(h.stub, async (_instance, state) => {
+        const route = await readRoute(drizzle(state.storage), sibling);
+        expect(route?.credentialSource).toMatchObject({
+          workspaceId,
+          chat: { transport: 'relay' },
+        });
+        expect(route?.state).toBe('preparing');
+        expect(await state.storage.get('runtime_harness')).toBe('kilo2');
+      });
+    });
+
+    it('keeps relay transport out of actual wrapper prepare and credential-refresh frames', async () => {
+      const h = await setup(KILO2_SANDBOX, {}, kilo2Env);
+      await prepare(h, { ...isolatedTarget, chat: { transport: 'relay' } });
+      const startup = h.provider.launches[0];
+      if (!startup) throw new Error('Missing launch');
+      const wrapper = await FakeWrapper.connect({
+        sandboxId: h.id,
+        credential: startup.env.SANDBOX_CONTROL_CREDENTIAL,
+        runtimeHarness: 'kilo2',
+      });
+      await wrapper.hello({
+        wrapperId: 'relay-fixture',
+        allocationId: startup.env.CONTROL_PLANE_ALLOCATION_ID,
+      });
+      const frame = await wrapper.next();
+      expect(frame?.type).toBe('session.prepare');
+      expect(JSON.stringify(frame)).not.toContain('"chat"');
+      expect(JSON.stringify(frame)).not.toContain('"relay"');
+      wrapper.send({ type: 'session.ready', sessionId: SESSION });
+      await waitFor(async () =>
+        expect((await h.stub.status({ sessionId: SESSION })).view.state).toBe('ready')
+      );
+      await runInDurableObject(h.stub, async (_instance, state) => {
+        const db = drizzle(state.storage);
+        const route = await readRoute(db, SESSION);
+        if (!route?.grant) throw new Error('Missing grant');
+        expect(route.credentialSource?.chat).toEqual({ transport: 'relay' });
+        await db
+          .update(scopeGrants)
+          .set({ grant: JSON.stringify({ ...route.grant, expiresAt: Date.now() + 1000 }) })
+          .where(eq(scopeGrants.id, scopeGrantId(route.grant)));
+      });
+      expect(
+        await h.stub.deliver({
+          sessionId: SESSION,
+          messages: [
+            {
+              messageId: 'relay-fixture-refresh',
+              turn: { type: 'prompt', prompt: 'fixture prompt' },
+              agent: { mode: 'code', model: 'fixture/model' },
+            },
+          ],
+        })
+      ).toBe('sent');
+      const credentials = await wrapper.next();
+      expect(credentials?.type).toBe('session.credentials');
+      expect(JSON.stringify(credentials)).not.toContain('"chat"');
+      expect(JSON.stringify(credentials)).not.toContain('"relay"');
+    });
     async function recreate(h: Harness, envChange: Record<string, string>) {
       await waitFor(async () => expect((await h.stub.getAllocationState()).kind).toBe('starting'));
       await runInDurableObject(h.stub, instance => {

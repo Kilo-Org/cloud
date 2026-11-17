@@ -1,4 +1,5 @@
 import 'server-only';
+import { browserPrepareChat } from '@/lib/cloud-agent-next/browser-relay-enrollment';
 import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { sandboxSelectionCapabilitiesSchema } from '@kilocode/worker-utils/sandbox-allocation';
 import {
@@ -576,6 +577,13 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         ...(stackedParent ? { parent: stackedParent } : {}),
       });
 
+      const chat = await browserPrepareChat({
+        userId: ctx.user.id,
+        headers: ctx.headersList,
+        client,
+        repository: gitParams,
+        organizationId,
+      });
       let linkedObjectKeys: string[] = [];
       try {
         // New-session flows call prepareSession without a follow-up
@@ -592,6 +600,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
           ...restInput,
           ...gitParams,
           ...stackedFields,
+          ...(chat ? { chat } : {}),
           attachments,
           createdOnPlatform: 'cloud-agent-web',
           githubAccessPurpose: 'agent',

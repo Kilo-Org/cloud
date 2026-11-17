@@ -41,6 +41,7 @@ export function isValidCloudAgentEvent(event: unknown): event is CloudAgentEvent
 
 export const cloudSessionMetadataSchema = z.object({
   sessionId: z.string().min(1),
+  chat: z.object({ transport: z.enum(['stream', 'relay']) }).optional(),
   kiloSessionId: z.string().optional(),
   orgId: z.string().optional(),
   title: z.string().nullable().optional(),

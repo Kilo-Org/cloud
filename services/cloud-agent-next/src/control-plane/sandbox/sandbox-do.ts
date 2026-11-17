@@ -1,4 +1,9 @@
 import { assertContainerAccountAvailable } from '../../container-account-admission.js';
+import * as sessionSyncLiveAuthority from './session-sync-live-authority.js';
+import type {
+  SessionSyncLiveRootGrantRequest,
+  SessionSyncLiveRootGrantProof,
+} from '../session/session-sync-live-root-grant.js';
 import { billingFailureFromAdmission } from '../../billing-failure.js';
 import {
   parseRuntimeHarness,
@@ -675,6 +680,9 @@ function materializationStage(error: unknown): PrepareFrameMaterializationStage 
  * binding exists; tests inject a fake peer instead.
  */
 export type ControlPlaneSessionPeer = HistoryPageSession & {
+  getSessionSyncLiveRootGrantProof(
+    input: SessionSyncLiveRootGrantRequest
+  ): Promise<SessionSyncLiveRootGrantProof>;
   issueCloudAgentMcpGrant?(
     workspace?: WorkspaceMcpBinding
   ): Promise<{ url: string; token: string; expiresAt: number } | undefined>;
@@ -2360,6 +2368,28 @@ export class SandboxControlV2 extends DurableObject<Env> {
         .filter(route => route.state !== 'failed')
         .map(route => route.sessionId),
     };
+  }
+
+  async authorizeSessionSyncLive(input: unknown) {
+    await this.initialized;
+    return sessionSyncLiveAuthority.authorizeSessionSyncLive(input, {
+      env: this.env,
+      sandboxId: this.sandboxId,
+      storage: this.ctx.storage,
+      read: () =>
+        this.enqueue(async () => {
+          const allocation = await this.readAllocation();
+          return {
+            ownerId: await this.requireOwner(),
+            fence: this.runtimeProxyFenceFor(allocation),
+            harness: await this.allocationRuntimeHarness(allocation),
+            routes: await listRoutes(this.db),
+            grants: listScopeGrants(this.db),
+          };
+        }),
+      peer: (ownerId, sessionId) => this.sessionPeerFor(ownerId, sessionId),
+      requireMembership: source => this.requireOrganizationMembership(source),
+    });
   }
 
   /**
@@ -5358,11 +5388,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
             .map(route => ({
               orgId: route.credentialSource?.orgId,
               billingOrigin: route.credentialSource?.billingOrigin,
+              chat: route.credentialSource?.chat,
             })),
           sandboxKind: pin.sandboxKind,
           sandboxId: this.sandboxId,
         };
         const harness = await this.runtimeHarness(pin.provider, cohort);
+        if (
+          harness === 'kilo' &&
+          cohort.preparingRoutes.some(route => route.chat?.transport === 'relay')
+        ) {
+          throw new ProviderCreationError('invalid_configuration');
+        }
         const credential = generateSandboxCredential();
         const selection = selectStartup(this.env, pin.provider, cohort, harness);
         const createDeadline =

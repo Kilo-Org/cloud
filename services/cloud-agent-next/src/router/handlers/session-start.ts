@@ -79,6 +79,7 @@ function startInputToSessionCreateRequest(
       attachments: input.message.attachments,
     },
     agent: input.agent,
+    ...(input.chat === undefined ? {} : { chat: input.chat }),
     repository,
     ...(input.parentWorktreeId === undefined ? {} : { parentWorktreeId: input.parentWorktreeId }),
     ...(input.runtime ? { runtime: input.runtime } : {}),

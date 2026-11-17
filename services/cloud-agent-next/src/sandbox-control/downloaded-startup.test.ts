@@ -7,7 +7,11 @@ import { selectedRuntimeCli } from '../shared/runtime-distribution.js';
 import { classifyControlPlaneFailure } from '../telemetry/control-plane-failure.js';
 import { loadRuntimeRelease } from './runtime-release-loader.js';
 import { downloadedStartup } from './downloaded-startup.js';
-import { newSandboxHarness, selectStartup } from './startup-selection.js';
+import {
+  newSandboxHarness,
+  newSandboxHarnessFromFacts,
+  selectStartup,
+} from './startup-selection.js';
 import { RetiredSandboxProviderError } from './retired-cloudflare-provider.js';
 import {
   mintRuntimeArtifactGrant,
@@ -499,6 +503,38 @@ describe('runtime harness selection', () => {
         sandboxKind: 'shared',
       })
     ).toBe('kilo');
+  });
+  it('keeps known-placement projections equivalent to runtime origin, tenant, provider, and isolation decisions', () => {
+    for (const provider of ['cloudflare-containers', 'vercel'] as const) {
+      for (const sandboxKind of [
+        'isolated',
+        'isolated-standard',
+        'code-review',
+        'shared',
+      ] as const) {
+        for (const billingOrigin of ['cloud-agent-web', 'cloud-agent', undefined]) {
+          for (const orgId of [interactiveOrgId, otherOrgId, undefined]) {
+            for (const ids of [undefined, '', '*', interactiveOrgId]) {
+              const env = { ...kilo2Env, RUNTIME_KILO2_ORG_IDS: ids };
+              const preparingRoutes = [{ billingOrigin, orgId }];
+              expect(
+                newSandboxHarnessFromFacts(env, provider, {
+                  preparingRoutes,
+                  isolatedNativeSandbox:
+                    sandboxKind === 'isolated' || sandboxKind === 'isolated-standard',
+                })
+              ).toBe(
+                newSandboxHarness(env, provider, {
+                  preparingRoutes,
+                  sandboxKind,
+                  sandboxId: isolatedSandboxId,
+                })
+              );
+            }
+          }
+        }
+      }
+    }
   });
   it.each([undefined, '', otherOrgId])(
     'selects v2 for web accounts with organization %s when the scope is all accounts',

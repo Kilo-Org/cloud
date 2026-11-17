@@ -406,6 +406,15 @@ function readGatewayErrorType(source: unknown): string | undefined {
   return typeof errorType === 'string' ? errorType : undefined;
 }
 
+const NATIVE_CATALOG_FAILURE_MESSAGES = new Set([
+  'kilo gateway model catalog did not become ready',
+  'kilo gateway model catalog schema is unavailable',
+  'kilo gateway model catalog is unavailable',
+  'kilo gateway model catalog readiness failed',
+  'kilo gateway model scope is unavailable',
+  'kilo gateway model scope changed during selection',
+]);
+
 function classifyAssistantFailureText(message: string): CloudAgentAssistantFailureReason {
   const canonicalMessage = message.replace(/^\[byok\] /, '');
   if (canonicalMessage === BYOK_INVALID_REQUEST_MESSAGE.toLocaleLowerCase()) {
@@ -415,6 +424,13 @@ function classifyAssistantFailureText(message: string): CloudAgentAssistantFailu
     reason => ASSISTANT_FAILURE_MESSAGES[reason].toLocaleLowerCase() === canonicalMessage
   );
   if (canonicalReason !== undefined) return canonicalReason;
+  if (
+    NATIVE_CATALOG_FAILURE_MESSAGES.has(
+      canonicalMessage.replace(/^sessionrunnermodel\.modelunavailableerror: /, '')
+    )
+  ) {
+    return 'model_catalog_unavailable';
+  }
   // Kilo v2 reports a catalog load failure as `provider.no-route`. Only a 404
   // is claimed: it means the catalog path is missing on the Kilo side (for
   // example, refused by the runtime credential proxy). Other statuses keep

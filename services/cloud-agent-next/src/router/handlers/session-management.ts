@@ -489,6 +489,7 @@ export function createSessionManagementHandlers() {
           const repositoryFields = publicRepositoryFields(sessionMetadata);
           return {
             sessionId: sessionMetadata.identity.sessionId,
+            chat: sessionMetadata.workspace?.chat,
             kiloSessionId: sessionMetadata.auth.kiloSessionId,
             userId: sessionMetadata.identity.userId,
             orgId: sessionMetadata.identity.orgId,

@@ -49,6 +49,7 @@ export type GroupedRegisterSessionInput = {
   workspace?: Pick<
     NonNullable<SessionMetadata['workspace']>,
     | 'sandboxId'
+    | 'chat'
     | 'sandboxKind'
     | 'parentWorktreeId'
     | 'sandboxProvider'
@@ -270,6 +271,7 @@ export async function buildSessionMetadataFromRegistration(
     callback: input.callback,
     workspace: {
       ...input.workspace,
+      chat: input.workspace?.chat ?? { transport: 'stream' },
       ...(input.parentWorktreeId === undefined ? {} : { parentWorktreeId: input.parentWorktreeId }),
       sandboxProvider: input.workspace?.sandboxProvider ?? 'cloudflare',
       branchName,

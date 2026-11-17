@@ -91,6 +91,20 @@ describe('unified start handler', () => {
     ).resolves.toEqual({ ...ids, replayed: true, delivery: 'sent' });
   });
 
+  it('passes relay creation intent without allowing a client web claim to change billing origin', async () => {
+    await startRouter.createCaller(context).start({
+      ...input,
+      chat: { transport: 'relay' },
+      options: { createdOnPlatform: 'cloud-agent-web' },
+      operationKey,
+    });
+    expect(createSessionWithLedger).toHaveBeenCalledWith(
+      expect.objectContaining({ chat: { transport: 'relay' } }),
+      expect.anything(),
+      expect.objectContaining({ billingOrigin: 'cloud-agent' })
+    );
+  });
+
   it('propagates changed-intent conflicts without falling back to a new session', async () => {
     createSessionWithLedger.mockRejectedValueOnce(
       new TRPCError({ code: 'CONFLICT', message: 'session_create_intent_conflict' })

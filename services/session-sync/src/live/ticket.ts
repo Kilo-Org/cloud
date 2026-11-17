@@ -1,6 +1,10 @@
 import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
 import { jwtVerify, SignJWT } from 'jose';
 import { z } from 'zod';
+import {
+  cloudAgentSyncHostedClaims,
+  type CloudAgentSyncLiveAuthorization,
+} from '@kilocode/worker-utils/cloud-agent-session-sync';
 
 import { AUTH_CLOCK_SKEW_SECONDS, syncSigningKey, verifyGrant, type Principal } from '../auth';
 import type { Env } from '../env';
@@ -11,7 +15,7 @@ type LiveAudience = 'session-relay' | 'session-presence' | 'session-notification
 
 const MAX_TICKET_SECONDS = 120;
 const numericDate = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
-export const ticketSchema = z
+export const storedTicketSchema = z
   .strictObject({
     version: z.literal(1),
     aud: z.enum(['session-relay', 'session-presence', 'session-notifications']),
@@ -20,9 +24,27 @@ export const ticketSchema = z
     sessionID: sessionIDSchema.optional(),
     userID: userIDSchema,
     role: z.enum(['runner', 'viewer', 'controller']),
+    workload: cloudAgentSyncHostedClaims.workload.optional(),
+    host: cloudAgentSyncHostedClaims.host.optional(),
+    native: cloudAgentSyncHostedClaims.native.optional(),
+    liveIdentity: cloudAgentSyncHostedClaims.liveIdentity.optional(),
     exp: numericDate,
     iat: numericDate,
   })
+  .refine(ticket =>
+    ticket.workload === undefined
+      ? ticket.host === undefined &&
+        ticket.native === undefined &&
+        ticket.liveIdentity === undefined
+      : ticket.role === 'runner' &&
+        ticket.aud !== 'session-notifications' &&
+        ticket.host !== undefined &&
+        ticket.native !== undefined &&
+        ticket.liveIdentity !== undefined &&
+        (ticket.aud !== 'session-relay' || ticket.native.sessionID === ticket.sessionID)
+  );
+
+export const ticketSchema = storedTicketSchema
   .refine(ticket => ticket.exp > ticket.iat && ticket.exp - ticket.iat <= MAX_TICKET_SECONDS)
   .refine(
     ticket => principalSchema.safeParse({ userID: ticket.userID, tenant: ticket.tenant }).success
@@ -43,6 +65,41 @@ export class LiveTicketError extends Error {
     super(message);
     this.name = 'LiveTicketError';
   }
+}
+
+export async function mintHostedTicket(
+  env: Env,
+  authorization: CloudAgentSyncLiveAuthorization,
+  audience: 'session-relay' | 'session-presence',
+  sessionID?: string
+): Promise<{ ticket: string; expiresAt: string }> {
+  if (!env.ENVIRONMENT)
+    throw new LiveTicketError(503, 'auth_unavailable', 'Authentication is temporarily unavailable');
+  const now = Math.floor(Date.now() / 1000);
+  const exp = Math.min(now + MAX_TICKET_SECONDS, Math.floor(authorization.expiresAt / 1000));
+  const claims = ticketSchema.safeParse({
+    version: 1,
+    aud: audience,
+    env: env.ENVIRONMENT,
+    userID: authorization.userID,
+    tenant: authorization.organizationID
+      ? { type: 'organization', id: authorization.organizationID }
+      : { type: 'user', id: authorization.userID },
+    role: 'runner',
+    workload: authorization.workload,
+    host: authorization.host,
+    native: authorization.native,
+    liveIdentity: authorization.liveIdentity,
+    ...(sessionID === undefined ? {} : { sessionID }),
+    iat: now,
+    exp,
+  });
+  if (!claims.success)
+    throw new LiveTicketError(403, 'access_denied', 'Hosted live authority is invalid or expired');
+  const ticket = await new SignJWT(claims.data)
+    .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+    .sign(await syncSigningKey(env));
+  return { ticket, expiresAt: new Date(exp * 1000).toISOString() };
 }
 
 /** Exchanges the same, freshly verified grant that authorized the route. ACL checks precede this. */

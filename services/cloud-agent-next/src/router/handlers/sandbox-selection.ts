@@ -12,6 +12,8 @@ import {
 import { resolveSavedSandboxAllocation } from '../../session/sandbox-allocation-resolution.js';
 import { protectedProcedure } from '../auth.js';
 import { assertOrganizationMembership } from './organization-membership.js';
+import { readEnvironmentAllocationForSession } from '@kilocode/cloud-agent-profile';
+import { relayChatForBrowserPrepare } from '../../session/browser-relay-capability.js';
 
 export const getSandboxSelectionOptions = protectedProcedure
   .input(
@@ -39,7 +41,25 @@ export const getSandboxSelectionOptions = protectedProcedure
       ...(input.repositoryType ? { repositoryType: input.repositoryType } : {}),
       ...readiness,
     });
-    if (!capabilities.enabled || !input.repositoryType) return capabilities;
+    const environment =
+      input.repositoryType === 'github' && input.repositoryFullName
+        ? await readEnvironmentAllocationForSession(getPgDb(ctx.env), {
+            owner: owner.orgId
+              ? { type: 'organization', id: owner.orgId }
+              : { type: 'user', id: owner.userId },
+            repository: { platform: 'github', repoFullName: input.repositoryFullName },
+          })
+        : { status: 'unknown' };
+    if (!capabilities.enabled || !input.repositoryType)
+      return {
+        ...capabilities,
+        relayChatForBrowserPrepare: relayChatForBrowserPrepare(
+          ctx.env,
+          owner,
+          capabilities,
+          environment
+        ),
+      };
 
     const { repositoryType, repositoryFullName } = input;
     const saved = await resolveSavedSandboxAllocation({
@@ -57,5 +77,9 @@ export const getSandboxSelectionOptions = protectedProcedure
     const effectiveDestination: SandboxSelectionCapabilities['effectiveDestination'] = saved
       ? getSandboxAllocationRequest(saved)
       : capabilities.defaultDestination;
-    return { ...capabilities, effectiveDestination };
+    const result = { ...capabilities, effectiveDestination };
+    return {
+      ...result,
+      relayChatForBrowserPrepare: relayChatForBrowserPrepare(ctx.env, owner, result, environment),
+    };
   });

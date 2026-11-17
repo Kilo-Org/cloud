@@ -20,15 +20,10 @@ import {
   socketTicket,
   socketProtocol,
 } from '../live/protocol';
-import { verifyTicket, type LiveTicket } from '../live/ticket';
-import {
-  isBoundedJson,
-  sessionIDSchema,
-  tenantSchema,
-  userIDSchema,
-  type Tenant,
-} from '../protocol';
-import { diagnostic, phase } from '../metrics';
+import { storedTicketSchema, verifyTicket, type LiveTicket } from '../live/ticket';
+import { authorizeHostedTicket } from '../live/hosted-authorization';
+import { isBoundedJson, sessionIDSchema, tenantSchema, type Tenant } from '../protocol';
+import { diagnostic, hostedPresenceInstances, metricsEnabled, phase } from '../metrics';
 
 const WATCH_LEASE_MS = 5 * 60_000;
 const WATCH_LIMIT = 128;
@@ -60,15 +55,8 @@ export type Instance = {
   lastHeartbeatAt: number;
 };
 
-const ticketSchema = z.strictObject({
-  version: z.literal(1),
+const ticketSchema = storedTicketSchema.safeExtend({
   aud: z.literal('session-presence'),
-  env: z.string(),
-  tenant: tenantSchema,
-  userID: userIDSchema,
-  role: z.enum(['runner', 'viewer', 'controller']),
-  exp: z.number().int(),
-  iat: z.number().int(),
 });
 const attachmentSchema = z.strictObject({
   connectionID: z.uuid(),
@@ -237,7 +225,13 @@ export class SessionPresenceDO extends DurableObject<Env> {
     ) {
       return new Response('Invalid presence ticket', { status: 401 });
     }
+    if (ticket.workload === 'cloud-agent') {
+      const denied = await authorizeHostedTicket(this.env, ticket);
+      if (denied) return denied;
+    }
     await this.sweep();
+    if (ticket.exp * 1000 <= Date.now())
+      return new Response('Invalid presence ticket', { status: 401 });
     const connections = this.connections();
     const limit = ticket.role === 'runner' ? PROVISIONAL_RUNNER_LIMIT : LIVE_LIMITS.viewers;
     const competing = connections.filter(([, state]) =>
@@ -290,17 +284,9 @@ export class SessionPresenceDO extends DurableObject<Env> {
   }
 
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
-    let state = this.attachment(ws);
-    if (!state || state.closed) return;
+    let state = this.liveAttachment(ws);
+    if (!state) return;
     const now = Date.now();
-    if (state.ticket.exp * 1000 <= now) {
-      this.closeAndBroadcast(ws, state, 4001, 'Ticket expired', 'ticket_expired');
-      return;
-    }
-    if (state.ticket.role === 'runner' && state.lastHeartbeatAt + LIVE_LIMITS.staleMs <= now) {
-      this.closeAndBroadcast(ws, state, 4000, 'Heartbeat stale', 'heartbeat_stale');
-      return;
-    }
     const bytes =
       typeof message === 'string' ? encoder.encode(message).byteLength : message.byteLength;
     if (bytes > LIVE_LIMITS.messageBytes) {
@@ -360,9 +346,10 @@ export class SessionPresenceDO extends DurableObject<Env> {
     }
     const frame = parsed.data;
     if (frame.type === 'reauth') {
+      const originalTicket = state.ticket;
       const ticket = await verifyTicket(frame.ticket, this.env, 'session-presence');
-      state = this.attachment(ws);
-      if (!state || state.closed) return;
+      state = this.liveAttachment(ws);
+      if (!state || state.ticket !== originalTicket) return;
       if (
         !ticket ||
         !sameTicket(state.ticket, ticket) ||
@@ -389,6 +376,25 @@ export class SessionPresenceDO extends DurableObject<Env> {
         );
         return;
       }
+      if (ticket.workload === 'cloud-agent') {
+        const denied = await authorizeHostedTicket(this.env, ticket);
+        state = this.liveAttachment(ws);
+        if (!state || state.ticket !== originalTicket) return;
+        if (denied?.status === 503) {
+          this.emit(ws, state, 'error', { code: 'auth_unavailable' });
+          return;
+        }
+        if (denied || ticket.exp * 1000 <= Date.now()) {
+          this.closeAndBroadcast(
+            ws,
+            state,
+            4001,
+            'Invalid reauthorization',
+            'reauthorization_failed'
+          );
+          return;
+        }
+      }
       state.ticket = fresh.data;
       this.emit(ws, state, 'reauthorized', {
         expiresAt: new Date(ticket.exp * 1000).toISOString(),
@@ -404,6 +410,30 @@ export class SessionPresenceDO extends DurableObject<Env> {
       this.acceptReply(ws, state, frame.commandID, frame.body);
       await this.schedule();
     } else if (frame.type === 'heartbeat' && state.ticket.role === 'runner') {
+      let incumbentsBeforeAuthorization: Set<string> | undefined;
+      if (state.instanceID === undefined && state.ticket.workload === 'cloud-agent') {
+        const originalTicket = state.ticket;
+        incumbentsBeforeAuthorization = new Set(
+          this.connections()
+            .filter(
+              ([other, saved]) =>
+                other !== ws &&
+                saved.instanceID === frame.instanceID &&
+                sameTenant(saved.ticket.tenant, originalTicket.tenant)
+            )
+            .map(([, saved]) => saved.connectionID)
+        );
+        const denied = await authorizeHostedTicket(this.env, originalTicket);
+        state = this.liveAttachment(ws);
+        if (!state || state.ticket !== originalTicket) return;
+        if (denied) {
+          if (denied.status === 503) this.emit(ws, state, 'error', { code: 'auth_unavailable' });
+          else this.close(ws, state, 4001, 'Invalid hosted authority');
+          return;
+        }
+      }
+      const publishedAt = Date.now();
+      const initialPublication = state.instanceID === undefined;
       if (state.instanceID !== undefined && state.instanceID !== frame.instanceID) {
         this.emit(ws, state, 'error', {
           code: 'invalid_request',
@@ -411,7 +441,7 @@ export class SessionPresenceDO extends DurableObject<Env> {
         });
         return;
       }
-      const tenant = state.ticket.tenant;
+      const { tenant, liveIdentity } = state.ticket;
       const connections = this.connections();
       const replaced = connections.filter(
         ([other, attachment]) =>
@@ -419,6 +449,18 @@ export class SessionPresenceDO extends DurableObject<Env> {
           attachment.instanceID === frame.instanceID &&
           sameTenant(attachment.ticket.tenant, tenant)
       );
+      if (
+        incumbentsBeforeAuthorization &&
+        replaced.some(
+          ([, saved]) =>
+            !incumbentsBeforeAuthorization.has(saved.connectionID) &&
+            (saved.ticket.liveIdentity?.allocationId !== liveIdentity?.allocationId ||
+              saved.ticket.liveIdentity?.providerInstanceId !== liveIdentity?.providerInstanceId)
+        )
+      ) {
+        this.emit(ws, state, 'error', { code: 'auth_unavailable' });
+        return;
+      }
       if (
         state.instanceID === undefined &&
         replaced.length === 0 &&
@@ -432,7 +474,7 @@ export class SessionPresenceDO extends DurableObject<Env> {
       const next: Attachment = {
         ...state,
         instanceID: frame.instanceID,
-        lastHeartbeatAt: now,
+        lastHeartbeatAt: publishedAt,
       };
       const candidate = this.instances(state.ticket.tenant).filter(
         instance => instance.instanceID !== frame.instanceID
@@ -442,7 +484,7 @@ export class SessionPresenceDO extends DurableObject<Env> {
         tenant: state.ticket.tenant,
         advertisement: frame.advertisement,
         online: true,
-        lastHeartbeatAt: now,
+        lastHeartbeatAt: publishedAt,
       });
       if (
         byteLength(next) > ATTACHMENT_BYTES ||
@@ -477,10 +519,12 @@ export class SessionPresenceDO extends DurableObject<Env> {
         this.close(oldSocket, oldState, 4009, 'Instance reconnected');
       }
       this.saveAttachment(ws, next);
-      this.emit(ws, next, 'heartbeat_ack', { lastHeartbeatAt: now });
+      if (initialPublication && next.ticket.workload === 'cloud-agent')
+        this.reportHostedInstances();
+      this.emit(ws, next, 'heartbeat_ack', { lastHeartbeatAt: publishedAt });
       for (const watch of this.watches) {
         if (
-          watch.expiresAt > now &&
+          watch.expiresAt > publishedAt &&
           sameTenant(watch.tenant, next.ticket.tenant) &&
           frame.advertisement.sessions.includes(watch.sessionID)
         ) {
@@ -648,6 +692,13 @@ export class SessionPresenceDO extends DurableObject<Env> {
         status: 409,
         code: 'instance_offline',
         message: 'The instance is not online',
+      };
+    if (runner[1].ticket.workload === 'cloud-agent')
+      return {
+        ok: false,
+        status: 403,
+        code: 'hosted_read_only',
+        message: 'Hosted instance commands are not permitted',
       };
     if (
       this.db
@@ -894,6 +945,27 @@ export class SessionPresenceDO extends DurableObject<Env> {
     return this.attachments.get(ws);
   }
 
+  private liveAttachment(ws: WebSocket): Attachment | undefined {
+    const state = this.attachment(ws);
+    if (!state || state.closed) return undefined;
+    const now = Date.now();
+    if (state.ticket.exp * 1000 <= now)
+      this.closeAndBroadcast(ws, state, 4001, 'Ticket expired', 'ticket_expired');
+    else if (state.ticket.role === 'runner' && state.lastHeartbeatAt + LIVE_LIMITS.staleMs <= now)
+      this.closeAndBroadcast(ws, state, 4000, 'Heartbeat stale', 'heartbeat_stale');
+    else return state;
+    return undefined;
+  }
+
+  private reportHostedInstances(): void {
+    if (!metricsEnabled(this.env)) return;
+    const now = Date.now();
+    const instances = [...this.advertisedInstances()].filter(
+      ({ state }) => state.ticket.workload === 'cloud-agent' && this.online(state, now)
+    ).length;
+    hostedPresenceInstances(this.env, instances);
+  }
+
   private saveAttachment(ws: WebSocket, state: Attachment): void {
     ws.serializeAttachment(state);
     this.attachments.set(ws, state);
@@ -998,6 +1070,7 @@ export class SessionPresenceDO extends DurableObject<Env> {
   }
 
   private close(ws: WebSocket, state: Attachment, code: number, reason: string): void {
+    const hosted = state.ticket.workload === 'cloud-agent' && this.contributesToInstances(state);
     state.closed = true;
     this.saveAttachment(ws, state);
     this.attachments.delete(ws);
@@ -1006,6 +1079,7 @@ export class SessionPresenceDO extends DurableObject<Env> {
       .where(eq(presenceAdvertisements.connection_id, state.connectionID))
       .run();
     this.advertisements.delete(state.connectionID);
+    if (hosted) this.reportHostedInstances();
     for (const route of this.db
       .select()
       .from(presenceCommandRoutes)

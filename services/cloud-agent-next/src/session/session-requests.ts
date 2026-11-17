@@ -9,6 +9,7 @@ import type {
 } from '../execution/types.js';
 import type { SessionProfileBundle } from '../session-profile.js';
 import type { EnvironmentScope } from '../environment-build/reference.js';
+import type { WorkspaceChat } from '../shared/workspace-chat.js';
 
 export type ProfileOverrides = {
   envVars?: Record<string, string>;
@@ -66,6 +67,7 @@ export type SessionRuntimeIntent = {
 };
 
 export type SessionCreateRequest = {
+  chat?: WorkspaceChat;
   parentCloudAgentSessionId?: string;
   /** Parent worktree for a stacked workspace; persisted on the session's workspace. */
   parentWorktreeId?: CloudAgentWorktreeId;

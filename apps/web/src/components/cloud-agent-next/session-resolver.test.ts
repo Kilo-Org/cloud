@@ -25,6 +25,63 @@ function fixture() {
 }
 
 describe('web session resolution', () => {
+  it.each(['relay', 'stream', undefined] as const)(
+    'uses stored chat %s instead of a rollout flag or presence',
+    async transport => {
+      const getCloudSession = jest.fn(async () => ({
+        sessionId: cloudAgentSessionId,
+        kiloSessionId,
+        ...(transport ? { chat: { transport } } : {}),
+      }));
+      const listActiveSessions = jest.fn(async () => ({ sessions: [{ id: kiloSessionId }] }));
+      const resolve = createWebSessionResolver({
+        readCachedCloudSessionId: () => cloudAgentSessionId,
+        readCachedActiveSessions: () => [{ id: kiloSessionId }],
+        getSession: jest.fn(),
+        listActiveSessions,
+        getCloudSession,
+      });
+      expect(await resolve(kiloSessionId)).toEqual({
+        type: transport === 'relay' ? 'hosted-native' : 'cloud-agent',
+        kiloSessionId,
+        cloudAgentSessionId,
+      });
+      expect(listActiveSessions).not.toHaveBeenCalled();
+    }
+  );
+  it('does not turn a known Cloud metadata denial into remote or stored history', async () => {
+    const listActiveSessions = jest.fn();
+    const denial = new Error('FORBIDDEN');
+    const resolve = createWebSessionResolver({
+      readCachedCloudSessionId: () => cloudAgentSessionId,
+      readCachedActiveSessions: () => [{ id: kiloSessionId }],
+      getSession: jest.fn(),
+      listActiveSessions,
+      getCloudSession: async () => {
+        throw denial;
+      },
+    });
+    await expect(resolve(kiloSessionId)).rejects.toBe(denial);
+    expect(listActiveSessions).not.toHaveBeenCalled();
+  });
+  it('resolves stored hosted identity before stale cached CLI presence', async () => {
+    const resolve = createWebSessionResolver({
+      readCachedCloudSessionId: () => undefined,
+      readCachedActiveSessions: () => [{ id: kiloSessionId }],
+      getSession: async () => ({ cloud_agent_session_id: cloudAgentSessionId }),
+      listActiveSessions: jest.fn(),
+      getCloudSession: async () => ({
+        sessionId: cloudAgentSessionId,
+        kiloSessionId,
+        chat: { transport: 'relay' },
+      }),
+    });
+    await expect(resolve(kiloSessionId)).resolves.toEqual({
+      type: 'hosted-native',
+      kiloSessionId,
+      cloudAgentSessionId,
+    });
+  });
   it('opens a known Cloud chat without redundant identity or CLI-presence requests', async () => {
     const f = fixture();
     f.readCachedCloudSessionId.mockReturnValue(cloudAgentSessionId);

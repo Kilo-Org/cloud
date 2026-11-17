@@ -54,13 +54,13 @@ function isIsolatedNativeSandbox(cohort: StartupCohortContext | undefined): bool
 
 function inOrgScope(
   provider: AgentSandboxProvider,
-  cohort: StartupCohortContext | undefined,
+  facts: StartupSelectionFacts,
   orgIds: '*' | readonly string[]
 ): boolean {
-  if (provider === 'cloudflare-containers' && !isIsolatedNativeSandbox(cohort)) return false;
+  if (provider === 'cloudflare-containers' && !facts.isolatedNativeSandbox) return false;
   if (orgIds === '*') return true;
   if (orgIds.length === 0) return false;
-  const routes = cohort?.preparingRoutes ?? [];
+  const routes = facts.preparingRoutes ?? [];
   if (routes.length === 0) return false;
   let orgId: string | undefined;
   for (const route of routes) {
@@ -109,11 +109,27 @@ export function newSandboxHarness(
   provider: AgentSandboxProvider,
   cohort?: StartupCohortContext
 ): RuntimeHarness {
+  return newSandboxHarnessFromFacts(env, provider, {
+    preparingRoutes: cohort?.preparingRoutes,
+    isolatedNativeSandbox: isIsolatedNativeSandbox(cohort),
+  });
+}
+
+export type StartupSelectionFacts = {
+  preparingRoutes?: readonly StartupRouteIdentity[];
+  isolatedNativeSandbox: boolean;
+};
+
+export function newSandboxHarnessFromFacts(
+  env: StartupEnv,
+  provider: AgentSandboxProvider,
+  facts: StartupSelectionFacts
+): RuntimeHarness {
   startupTarget(env, provider);
   const orgIds = configuredOrgIds(env.RUNTIME_KILO2_ORG_IDS);
-  const routes = cohort?.preparingRoutes ?? [];
+  const routes = facts.preparingRoutes ?? [];
   return orgIds !== undefined &&
-    inOrgScope(provider, cohort, orgIds) &&
+    inOrgScope(provider, facts, orgIds) &&
     routes.length > 0 &&
     routes.every(route => route.billingOrigin === 'cloud-agent-web')
     ? 'kilo2'

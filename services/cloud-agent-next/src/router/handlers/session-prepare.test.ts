@@ -304,6 +304,37 @@ describe('prepareSession operation-ledger admission gate', () => {
     expect(parsed).not.toHaveProperty('allowSubagentSessions');
   });
 
+  it.each([undefined, 'stream', 'relay'] as const)(
+    'threads chat %s without changing the retained ledger gate',
+    async transport => {
+      const caller = router.createCaller(createContext());
+      const request = {
+        prompt: 'fixture prompt',
+        mode: 'code',
+        model: 'kilo/test-model',
+        githubRepo: 'acme/repo',
+        operationKey: OPERATION_KEY,
+        createdOnPlatform: 'cloud-agent-web',
+        ...(transport === undefined ? {} : { chat: { transport } }),
+      };
+      await caller.prepareSession({ ...request, autoInitiate: true });
+      const [mapped, , options] = createSessionWithLedgerMock.mock.calls[0];
+      expect(mapped.chat).toEqual(request.chat);
+      expect(options.billingOrigin).toBe('cloud-agent-web');
+      expect(options.resolveSavedAllocationBeforeAdmission).toBe(
+        transport === 'relay' ? true : undefined
+      );
+      createSessionWithLedgerMock.mockClear();
+      await caller.prepareSession({ ...request, autoInitiate: false });
+      expect(createSessionWithLedgerMock).not.toHaveBeenCalled();
+      expect(registerNewSessionMock).toHaveBeenCalledWith(
+        expect.objectContaining(transport === undefined ? {} : { chat: { transport } }),
+        expect.anything(),
+        { billingOrigin: 'cloud-agent-web' }
+      );
+    }
+  );
+
   it.each(['workspace:new-chat'])(
     'derives child lineage from authority and requires a ledger operation key for %s',
     async url => {

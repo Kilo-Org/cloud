@@ -3,8 +3,8 @@ import type { ScopeHandleRoute } from './scope-handle-resolution.js';
 
 /**
  * The authorization view the Session DO returns with a resolved adopted handle.
- * `memberRootKiloSessionIds` are the canonical grant's member roots whose route
- * currently exists and has not failed; `expectedOrganizationId` is explicit null
+ * `members` and `memberRootKiloSessionIds` select current non-failed routes;
+ * `expectedOrganizationId` is explicit null
  * for a personal scope. The facade reads it to choose the membership-checked
  * public path or the child v2 path.
  */
@@ -12,6 +12,7 @@ export type ScopeGrantView = {
   scopeId: string;
   expectedOrganizationId: string | null;
   memberRootKiloSessionIds: string[];
+  members: { sessionId: string; kiloSessionId: string }[];
 };
 
 /** A member still backed by a live (non-failed) route at the grant's directory. */
@@ -33,14 +34,18 @@ export function buildScopeGrantView(
   routes: readonly ScopeHandleRoute[]
 ): ScopeGrantView {
   const memberRootKiloSessionIds: string[] = [];
+  const members: ScopeGrantView['members'] = [];
   for (const member of grant.members) {
     const route = routes.find(candidate => candidate.sessionId === member.sessionId);
-    if (isActiveScopeMember(member, route, grant))
+    if (isActiveScopeMember(member, route, grant)) {
       memberRootKiloSessionIds.push(member.kiloSessionId);
+      members.push({ sessionId: member.sessionId, kiloSessionId: member.kiloSessionId });
+    }
   }
   return {
     scopeId: grant.scopeId,
     expectedOrganizationId: grant.orgId ?? null,
     memberRootKiloSessionIds,
+    members,
   };
 }

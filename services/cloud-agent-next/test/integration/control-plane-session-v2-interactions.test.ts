@@ -27,6 +27,10 @@ import {
 import { FakeSandboxPeer } from './helpers/fake-sandbox-peer.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
 import { waitFor } from './wait-for.js';
+import { drizzle } from 'drizzle-orm/durable-sqlite';
+import { eq } from 'drizzle-orm';
+import { events as storedEvents } from '../../src/control-plane/session/sqlite-schema.js';
+import { HOSTED_CLOUD_EVENT_TYPES } from '../../../../packages/cloud-agent-sdk/src/schemas';
 
 type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
 type SessionNamespace = DurableObjectNamespace<SandboxSessionV2>;
@@ -303,6 +307,71 @@ afterEach(async () => {
 });
 
 describe('SandboxSessionV2 Stop, answers and permissions', () => {
+  it('replays and broadcasts infrastructure-only interaction updates through the actual SQLite stream', async () => {
+    const { stub } = await registerOnlySession();
+    const question = { id: 'synthetic-question', questions: [] };
+    await stub.onEvents({ events: [{ type: 'question.asked', properties: question }] });
+    const url = new URL('https://session.internal/stream');
+    url.searchParams.set('eventTypes', HOSTED_CLOUD_EVENT_TYPES.join(','));
+    url.searchParams.set('bootstrap', 'true');
+    type Frame = {
+      streamEventType: string;
+      cursor?: number;
+      data: { questions?: unknown[]; pendingInteractions?: unknown };
+    };
+    const open = async () => {
+      const response = await stub.fetch(new Request(url, { headers: { Upgrade: 'websocket' } }));
+      const socket = response.webSocket;
+      if (!socket) throw new Error('The stream did not upgrade');
+      const frames: Frame[] = [];
+      socket.addEventListener('message', event => {
+        frames.push(JSON.parse(String(event.data)));
+      });
+      socket.accept();
+      await waitFor(() =>
+        expect(frames.some(frame => frame.streamEventType === 'bootstrap.complete')).toBe(true)
+      );
+      return { socket, frames };
+    };
+    const first = await open();
+    try {
+      expect(first.frames.some(frame => frame.streamEventType === 'kilocode')).toBe(false);
+      expect(
+        first.frames.find(frame => frame.streamEventType === 'connected')?.data.pendingInteractions
+      ).toEqual({ questions: [question], permissions: [] });
+      const cursor = first.frames.find(
+        frame => frame.streamEventType === 'cloud.interactions'
+      )?.cursor;
+      expect(cursor).toBeTypeOf('number');
+      await stub.onEvents({
+        events: [{ type: 'question.replied', properties: { requestID: question.id } }],
+      });
+      await waitFor(() =>
+        expect(
+          first.frames.filter(frame => frame.streamEventType === 'cloud.interactions').at(-1)?.data
+            .questions
+        ).toEqual([])
+      );
+      expect(first.frames.some(frame => frame.streamEventType === 'kilocode')).toBe(false);
+      first.socket.close();
+      url.searchParams.set('afterCursor', String(cursor));
+      const reconnect = await open();
+      try {
+        expect(
+          reconnect.frames.find(frame => frame.streamEventType === 'cloud.interactions')?.data
+            .questions
+        ).toEqual([]);
+        expect(
+          reconnect.frames.find(frame => frame.streamEventType === 'cloud.interactions')?.cursor
+        ).toBeGreaterThan(cursor ?? 0);
+        expect(reconnect.frames.some(frame => frame.streamEventType === 'kilocode')).toBe(false);
+      } finally {
+        reconnect.socket.close();
+      }
+    } finally {
+      first.socket.close();
+    }
+  });
   it('retains an autonomous deadline error for replay without changing an earlier completed message', async () => {
     const pair = await setupSiblingPair();
     try {
@@ -688,6 +757,18 @@ describe('SandboxSessionV2 Stop, answers and permissions', () => {
       questions: [{ id: 'q_1' }],
       permissions: [{ id: 'p_1' }],
     });
+    const openProjection = await runInDurableObject(stub, (_instance, state) =>
+      drizzle(state.storage)
+        .select()
+        .from(storedEvents)
+        .where(eq(storedEvents.stream_event_type, 'cloud.interactions'))
+        .all()
+    );
+    expect(openProjection).toHaveLength(1);
+    expect(JSON.parse(openProjection[0]?.payload ?? '{}')).toEqual({
+      questions: [{ id: 'q_1' }],
+      permissions: [{ id: 'p_1' }],
+    });
 
     await stub.onEvents({
       events: [
@@ -699,6 +780,21 @@ describe('SandboxSessionV2 Stop, answers and permissions', () => {
       questions: [],
       permissions: [],
     });
+    const closedProjection = await runInDurableObject(stub, (_instance, state) =>
+      drizzle(state.storage)
+        .select()
+        .from(storedEvents)
+        .where(eq(storedEvents.stream_event_type, 'cloud.interactions'))
+        .all()
+    );
+    expect(closedProjection).toHaveLength(1);
+    expect(JSON.parse(closedProjection[0]?.payload ?? '{}')).toEqual({
+      questions: [],
+      permissions: [],
+    });
+    expect(closedProjection[0]?.mutation_cursor).toBeGreaterThan(
+      openProjection[0]?.mutation_cursor ?? 0
+    );
   });
 
   it('uses the metadata model when the settled turn is a model-less command', async () => {

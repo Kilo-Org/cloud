@@ -9,6 +9,10 @@ import {
 import { getSandboxSessionStub } from '../../src/sandbox-session/session-stub.js';
 import type { Env } from '../../src/types.js';
 import type { ScopeGrantView } from '../../src/control-plane/sandbox/scope-view.js';
+import { getSandboxControlStub } from '../../src/sandbox-control/stub.js';
+import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
+import { sandboxSessionSyncLiveRequestSchema } from '../../src/control-plane/sandbox/session-sync-live-authority.js';
+import { cloudAgentSyncLiveResultSchema } from '@kilocode/worker-utils/cloud-agent-session-sync';
 
 const { getPgDb } = vi.hoisted(() => ({ getPgDb: vi.fn() }));
 vi.mock('../../src/db/pg.js', () => ({ getPgDb }));
@@ -73,6 +77,7 @@ async function fixture(scopeView?: ScopeGrantView) {
     handle,
     stub,
     userId,
+    sessionId,
     kiloSessionId,
     service: new SessionSyncAuthorization(createExecutionContext(), bindings),
   };
@@ -106,6 +111,159 @@ describe('Session Sync binding-only authorization', () => {
   });
 });
 
+describe('binding-only hosted live identity and persisted cohort', () => {
+  async function liveFixture() {
+    const member = {
+      sessionId: `workspace_${crypto.randomUUID()}`,
+      kiloSessionId: `ses_${'b'.repeat(26)}`,
+    };
+    const f = await fixture({
+      scopeId: 'synthetic-live-scope',
+      expectedOrganizationId: null,
+      memberRootKiloSessionIds: [member.kiloSessionId],
+      members: [member],
+    });
+    const sandboxId = `ses-${'a'.repeat(48)}`;
+    const memberStub = getSandboxSessionStub(f.bindings, f.userId, member.sessionId);
+    const metadata = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: { userId: f.userId, sessionId: member.sessionId },
+      auth: { kiloSessionId: member.kiloSessionId, kilocodeToken: 'synthetic-hidden-token' },
+      agent: { mode: 'code', model: 'synthetic/model' },
+      workspace: { sandboxId, workspacePath: '/workspace/synthetic', chat: { transport: 'relay' } },
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+    await runInDurableObject(memberStub, instance => {
+      Object.assign(instance, { metadata });
+      vi.spyOn(Object.getPrototypeOf(instance), 'hasSessionSyncDescendant').mockImplementation(
+        async (root, child) => root === member.kiloSessionId && child === 'ses_syntheticchild'
+      );
+    });
+    const sandbox = getSandboxControlStub(f.bindings, sandboxId);
+    const requests: unknown[] = [];
+    await runInDurableObject(sandbox, instance => {
+      vi.spyOn(Object.getPrototypeOf(instance), 'authorizeSessionSyncLive').mockImplementation(
+        async input => {
+          requests.push(input);
+          const request = sandboxSessionSyncLiveRequestSchema.parse(input);
+          return cloudAgentSyncLiveResultSchema.parse({
+            type: 'allowed',
+            authorization: {
+              userID: request.ownerId,
+              workload: 'cloud-agent',
+              host: { cloudAgentSessionId: request.sessionId },
+              native: {
+                sessionID: request.nativeSessionId,
+                rootSessionID: request.kiloSessionId,
+                kind: request.nativeSessionId === request.kiloSessionId ? 'root' : 'descendant',
+              },
+              liveIdentity: {
+                allocationId: 'synthetic-allocation',
+                providerInstanceId: 'synthetic-provider',
+              },
+              expiresAt: Date.now() + 60_000,
+            },
+          });
+        }
+      );
+    });
+    return { ...f, member, memberStub, metadata, sandbox, requests };
+  }
+
+  it('maps each requested root to its actual Cloud member rather than the handle issuer', async () => {
+    const f = await liveFixture();
+    expect(
+      await f.service.authorizeLive({
+        type: 'handle',
+        handle: f.handle,
+        sessionID: f.member.kiloSessionId,
+      })
+    ).toMatchObject({
+      type: 'allowed',
+      authorization: {
+        host: { cloudAgentSessionId: f.member.sessionId },
+        native: { kind: 'root' },
+      },
+    });
+    expect(f.member.sessionId).not.toBe(f.sessionId);
+    expect(JSON.stringify(f.requests)).not.toContain('synthetic-hidden-token');
+    expect(
+      await f.service.authorizeUpload({ handle: f.handle, sessionID: f.member.kiloSessionId })
+    ).toMatchObject({ userID: f.userId, host: { cloudAgentSessionId: f.member.sessionId } });
+  });
+
+  it('maps a stored descendant to its own root host and never identifies it as a root', async () => {
+    const f = await liveFixture();
+    postgres({ owner: f.userId });
+    expect(
+      await f.service.authorizeLive({
+        type: 'handle',
+        handle: f.handle,
+        sessionID: 'ses_syntheticchild',
+      })
+    ).toMatchObject({
+      type: 'allowed',
+      authorization: {
+        host: { cloudAgentSessionId: f.member.sessionId },
+        native: {
+          kind: 'descendant',
+          sessionID: 'ses_syntheticchild',
+          rootSessionID: f.member.kiloSessionId,
+        },
+      },
+    });
+  });
+
+  it('uses a current scope member for session-less presence and cannot bypass a stream choice', async () => {
+    const f = await liveFixture();
+    expect(await f.service.authorizeLive({ type: 'handle', handle: f.handle })).toMatchObject({
+      type: 'allowed',
+    });
+    await runInDurableObject(f.memberStub, instance => {
+      Object.assign(instance, {
+        metadata: {
+          ...f.metadata,
+          workspace: { ...f.metadata.workspace, chat: { transport: 'stream' } },
+        },
+      });
+    });
+    expect(await f.service.authorizeLive({ type: 'handle', handle: f.handle })).toEqual({
+      type: 'denied',
+      code: 'hosted_live_not_enabled',
+    });
+    expect(
+      await f.service.authorizeLive({
+        type: 'handle',
+        handle: f.handle,
+        chat: { transport: 'relay' },
+      })
+    ).toEqual({ type: 'denied', code: 'invalid_credential' });
+  });
+
+  it('rechecks only verified ticket identity and propagates a bounded adoption outage', async () => {
+    const f = await liveFixture();
+    const minted = await f.service.authorizeLive({ type: 'handle', handle: f.handle });
+    if (minted.type !== 'allowed') throw new Error('Expected hosted identity');
+    const { expiresAt: _expiresAt, ...identity } = minted.authorization;
+    const input = { type: 'ticket', ...identity };
+    expect(await f.service.authorizeLive(input)).toMatchObject({ type: 'allowed' });
+    expect(await f.service.authorizeLive({ ...input, handle: f.handle })).toEqual({
+      type: 'denied',
+      code: 'invalid_credential',
+    });
+    await runInDurableObject(f.sandbox, instance => {
+      vi.spyOn(Object.getPrototypeOf(instance), 'authorizeSessionSyncLive').mockResolvedValue({
+        type: 'unavailable',
+        code: 'auth_unavailable',
+      });
+    });
+    expect(await f.service.authorizeLive(input)).toEqual({
+      type: 'unavailable',
+      code: 'auth_unavailable',
+    });
+  });
+});
+
 describe('Session Sync descendant authorization', () => {
   const childId = 'ses_syntheticchild';
   const memberRoot = 'ses_syntheticmember';
@@ -129,6 +287,7 @@ describe('Session Sync descendant authorization', () => {
       scopeId: 'synthetic-scope',
       expectedOrganizationId: null,
       memberRootKiloSessionIds: [],
+      members: [],
     });
     expect(
       await f.service.authorizeUpload({ handle: f.handle, sessionID: f.kiloSessionId })
@@ -140,6 +299,7 @@ describe('Session Sync descendant authorization', () => {
       scopeId: 'synthetic-scope',
       expectedOrganizationId: null,
       memberRootKiloSessionIds: [memberRoot],
+      members: [{ sessionId: memberCloudSessionId, kiloSessionId: memberRoot }],
     });
     const statements = postgres({ roots: [[memberCloudSessionId, memberRoot]] });
     const calls = await spyDescendant(f, true);

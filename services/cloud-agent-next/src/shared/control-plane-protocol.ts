@@ -12,6 +12,7 @@ import type {
   WorkspaceFailureSubtype,
 } from '@kilocode/worker-utils/cloud-agent-failure';
 import { z } from 'zod';
+import { workspaceChatSchema } from './workspace-chat.js';
 import { customerBillingFailureSchema } from './cloud-agent-billing.js';
 import type { CloudAgentRunContainer } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import { RUNTIME_HARNESSES } from './control-plane-runtime-contract.js';
@@ -402,6 +403,7 @@ export type ControlPlaneWorkspaceRoot = z.infer<typeof controlPlaneWorkspaceRoot
 
 const routeSpecObjectSchema = z
   .object({
+    chat: workspaceChatSchema.optional(),
     sessionId: z.string().min(1),
     kiloSessionId: z.string().min(1),
     directory: z.string().min(1).max(1024),
@@ -647,6 +649,7 @@ export const controlPlaneCredentialSourceSchema = z
     createdOnPlatform: z.string().max(100).optional(),
     /** Worker-owned origin; client platform claims do not select runtime harnesses. */
     billingOrigin: z.string().max(100).optional(),
+    chat: workspaceChatSchema.optional(),
     repository: controlPlaneCredentialRepositorySchema.optional(),
     /**
      * Worker-encrypted `profile.mcpServers` snapshot. Persisted only inside this

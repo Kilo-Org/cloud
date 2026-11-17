@@ -288,6 +288,7 @@ export function buildControlPlaneSessionRegistration(
   };
   const spec = controlPlaneRouteSpecSchema.parse({
     ...runtimeProfile,
+    ...(metadata.workspace?.chat?.transport === 'relay' ? { chat: metadata.workspace.chat } : {}),
     ...(metadata.continuation ? { continuation: true } : {}),
     ...(Object.keys(permission).length > 0 ? { permission } : {}),
     ...(roots === undefined ? {} : { roots }),

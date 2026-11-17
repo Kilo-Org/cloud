@@ -1,4 +1,8 @@
 import { byocVercelOwnerFields } from '../byoc/vercel-owner.js';
+import {
+  isRelayRuntimeEligible,
+  relayRuntimeIneligibleError,
+} from './relay-runtime-eligibility.js';
 /**
  * Session creation helpers for the grouped `start` path and retained split
  * `prepareSession` path.
@@ -42,6 +46,7 @@ import {
   markReconcilePending,
   recordOperationProgress,
   settleOperation,
+  type AdmitOperationInput,
   type OutboxEventInput,
   type SettleOperationInput,
 } from '@kilocode/db/operation-ledger';
@@ -1520,6 +1525,7 @@ function buildSessionRegistrationCommand(
     callback: input.options?.callbackTarget ? { target: input.options.callbackTarget } : undefined,
     workspace: {
       sandboxId: allocation.sandboxId,
+      ...(input.chat === undefined ? {} : { chat: input.chat }),
       sandboxProvider: allocation.sandboxProvider,
       ...(input.runtime?.egressMode === undefined ? {} : { egressMode: input.runtime.egressMode }),
       ...(input.runtime?.egressAudit === undefined
@@ -1594,6 +1600,7 @@ export async function registerNewSession(
 ): Promise<SessionRegistrationResult> {
   assertSupportedSandboxAllocation(rawInput, options);
   const input = rawInput;
+  if (!isRelayRuntimeEligible(input, ctx, options)) throw relayRuntimeIneligibleError();
   const allocation = await allocateNewSession(input, ctx, options);
   let registerResult: { success: boolean; error?: string };
   try {
@@ -1899,6 +1906,9 @@ export async function startNewSession(
   assertSupportedSandboxAllocation(rawInput, options);
   // A ledger create has resolved the saved allocation already; this is a no-op then.
   const input = await withSavedSandboxAllocation(rawInput, savedAllocationArgs(ctx, options));
+  if (ledger === undefined && !isRelayRuntimeEligible(input, ctx, options)) {
+    throw relayRuntimeIneligibleError();
+  }
   const allocation = await allocateSessionForCreate(input, ctx, options, ledger);
   return registerAndAdmitInitialTurn(input, ctx, options, allocation, ledger);
 }
@@ -2093,6 +2103,7 @@ export async function sessionCreateIntentFingerprint(
           };
   return sha256Hex(
     canonicalJson({
+      ...(input.chat?.transport === 'relay' ? { chat: input.chat } : {}),
       parentCloudAgentSessionId: input.parentCloudAgentSessionId,
       ...stackedOwnershipFields(input),
       initialTurn,
@@ -2172,7 +2183,7 @@ function isExplicitSandboxAllocationChoice(
 /**
  * Rejects a same-key retry whose create intent differs from the admitted
  * fingerprint. Rows admitted before the fingerprint contract carry no
- * comparison data and keep the legacy replay/reconcile behavior.
+ * comparison data and keep the legacy default-stream replay/reconcile behavior.
  */
 async function assertCreateIntentUnchanged(
   input: SessionRegistrationInput,
@@ -2180,8 +2191,15 @@ async function assertCreateIntentUnchanged(
   ctx: SessionRegistrationContext,
   options?: { billingOrigin?: string; freshAdmission?: boolean }
 ): Promise<void> {
-  if (row.canonical_result === null) return;
   const stored = row.canonical_result?.[SESSION_CREATE_INTENT_FINGERPRINT_KEY];
+  if (
+    input.chat?.transport === 'relay' &&
+    !options?.freshAdmission &&
+    (typeof stored !== 'string' || stored.length === 0)
+  ) {
+    throw new TRPCError({ code: 'CONFLICT', message: 'session_create_intent_conflict' });
+  }
+  if (row.canonical_result === null) return;
   const selectable = isExplicitSandboxAllocationChoice(input.runtime?.sandboxAllocation)
     ? input.runtime?.sandboxAllocation
     : undefined;
@@ -2252,29 +2270,33 @@ export async function createSessionWithLedger(
     ? await withSavedSandboxAllocation(rawInput, savedAllocationArgs(ctx, options))
     : rawInput;
   const allocation = input.runtime?.sandboxAllocation;
-  if (allocation !== undefined) {
-    const owner = { userId: ctx.userId, orgId: input.options?.kilocodeOrganizationId };
-    const capability = allocationCapabilityFor(input, options.billingOrigin);
-    const available = isSandboxAllocationAvailable(
+  const owner = { userId: ctx.userId, orgId: input.options?.kilocodeOrganizationId };
+  const capability = allocationCapabilityFor(input, options.billingOrigin);
+  const available =
+    allocation === undefined ||
+    isSandboxAllocationAvailable(
       await getSandboxSelectionCapabilities(ctx.env, owner, {
         repositoryType: input.repository.type,
         ...(capability ? { capability } : {}),
       }),
       allocation
     );
-    if (!available) {
-      const [existing] = await db
-        .select()
-        .from(operation_ledgers)
-        .where(
-          and(
-            eq(operation_ledgers.kilo_user_id, ctx.userId),
-            eq(operation_ledgers.domain, 'session'),
-            eq(operation_ledgers.operation_key, options.operationKey)
-          )
+  const relayRuntimeEligible = isRelayRuntimeEligible(input, ctx, options);
+  if (!available || !relayRuntimeEligible) {
+    const [existing] = await db
+      .select()
+      .from(operation_ledgers)
+      .where(
+        and(
+          eq(operation_ledgers.kilo_user_id, ctx.userId),
+          eq(operation_ledgers.domain, 'session'),
+          eq(operation_ledgers.operation_key, options.operationKey)
         )
-        .limit(1);
-      if (!existing || new Date(existing.expires_at).getTime() <= Date.now()) {
+      )
+      .limit(1);
+    if (!existing || new Date(existing.expires_at).getTime() <= Date.now()) {
+      if (!relayRuntimeEligible) throw relayRuntimeIneligibleError();
+      if (allocation !== undefined) {
         await assertSandboxAllocationAvailable(
           ctx.env,
           owner,
@@ -2282,24 +2304,25 @@ export async function createSessionWithLedger(
           input.repository.type,
           capability
         );
-      } else {
-        assertSessionOperationIdentity(existing, {
-          userId: ctx.userId,
-          intent: 'create_cloud',
-          organizationId: input.options?.kilocodeOrganizationId,
-          resourceKey: null,
-        });
-        await assertCreateIntentUnchanged(
-          effectiveSessionRegistrationInput(
-            input,
-            worktreeEnabledForCreate(input, ctx, existing),
-            finalizationVersionForCreate(existing)
-          ),
-          existing,
-          ctx,
-          options
-        );
       }
+    } else {
+      assertSessionOperationIdentity(existing, {
+        userId: ctx.userId,
+        intent: 'create_cloud',
+        organizationId: input.options?.kilocodeOrganizationId,
+        resourceKey: null,
+      });
+      const resolvedInput = await withLedgerSavedAllocation(input, ctx, existing, options, false);
+      await assertCreateIntentUnchanged(
+        effectiveSessionRegistrationInput(
+          resolvedInput,
+          worktreeEnabledForCreate(resolvedInput, ctx, existing),
+          finalizationVersionForCreate(existing)
+        ),
+        existing,
+        ctx,
+        options
+      );
     }
   }
   // A V2 environment that no allocation can serve fails before the ledger admits
@@ -2315,7 +2338,7 @@ export async function createSessionWithLedger(
   // the fingerprint: a freshly admitted row must satisfy the same replay check
   // that a recorded row does.
   const requestedSandboxAllocationChoice = input.runtime?.sandboxAllocation;
-  const admission = await admitOperation(db, {
+  const admissionInput: AdmitOperationInput = {
     userId: ctx.userId,
     orgId: input.options?.kilocodeOrganizationId,
     domain: 'session',
@@ -2340,7 +2363,14 @@ export async function createSessionWithLedger(
         ? { [SESSION_CREATE_SAVED_ALLOCATION_KEY]: savedSandboxAllocation }
         : {}),
     },
-  });
+  };
+  const admission = relayRuntimeEligible
+    ? await admitOperation(db, admissionInput)
+    : await db.transaction(async tx => {
+        const result = await admitOperation(tx, admissionInput);
+        if (result.admission === 'admitted') throw relayRuntimeIneligibleError();
+        return result;
+      });
   // A row admitted in another organization scope belongs to a different
   // operation, so it is refused before any stored state is honored.
   if (admission.admission === 'organization_mismatch') {

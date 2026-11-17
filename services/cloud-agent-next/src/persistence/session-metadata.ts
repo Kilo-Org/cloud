@@ -1,4 +1,5 @@
 import { environmentReferenceSchema } from '../environment-build/reference.js';
+import { workspaceChatSchema } from '../shared/workspace-chat.js';
 import * as z from 'zod';
 import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import {
@@ -322,6 +323,7 @@ function isIsolatedProviderWorkspace(workspace: {
 
 const MetadataWorkspaceSchema = egressPolicySchema
   .safeExtend({
+    chat: workspaceChatSchema.optional(),
     sandboxId: SandboxIdSchema.optional(),
     sandboxRoute: MetadataSharedSandboxRouteSchema.optional(),
     sandboxKind: sandboxKindSchema.optional(),

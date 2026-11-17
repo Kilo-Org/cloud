@@ -1434,6 +1434,7 @@ export function credentialSourceFromMetadata(
     ...(metadata.identity.billingOrigin === undefined
       ? {}
       : { billingOrigin: metadata.identity.billingOrigin }),
+    ...(metadata.workspace?.chat?.transport === 'relay' ? { chat: metadata.workspace.chat } : {}),
     ...(repository === undefined ? {} : { repository }),
   };
 }

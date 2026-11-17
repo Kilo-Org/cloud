@@ -21,6 +21,21 @@ export function metricsEnabled(env: Pick<Env, 'SESSION_SYNC_METRICS'>): boolean 
   }
 }
 
+export function hostedPresenceInstances(
+  env: Pick<Env, 'SESSION_SYNC_METRICS'>,
+  instances: number
+): void {
+  try {
+    env.SESSION_SYNC_METRICS?.writeDataPoint({
+      indexes: ['hosted_presence_instances'],
+      blobs: ['hosted_presence_instances'],
+      doubles: [instances],
+    });
+  } catch {
+    console.error('Session sync hosted presence metrics failed');
+  }
+}
+
 /** Known byte lengths avoid counting streams for in-memory JSON responses. */
 export function jsonResponse(body: unknown, init?: ResponseInit): Response {
   const text = JSON.stringify(body);

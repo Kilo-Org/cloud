@@ -36,6 +36,12 @@ export type StreamEventType =
   | 'commands.available' // catalog of kilo slash commands
   | 'preparing' // lazy workspace preparation step progress
   | 'cloud.status' // cloud infrastructure status
+  | 'cloud.sandbox.status'
+  | 'cloud.interactions'
+  | 'connected'
+  | 'bootstrap.complete'
+  | 'autocommit_started'
+  | 'autocommit_completed'
   | 'cloud.worktree.changes.ready'
   | 'cloud.message.queued' // user message accepted into pending queue
   | 'cloud.message.sent' // queued user message delivered to Kilo

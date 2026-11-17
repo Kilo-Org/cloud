@@ -61,6 +61,23 @@ const GITHUB_REPOSITORY = {
 const GENERATED_BRANCH = 'kilo/eager-hub-j9o';
 
 describe('session registration repository metadata', () => {
+  it.each([undefined, 'stream', 'relay'] as const)(
+    'normalizes new workspace chat %s once',
+    async transport => {
+      const result = await buildSessionMetadataFromRegistration({
+        generatedBranch: GENERATED_BRANCH,
+        identity: { sessionId: 'workspace_fixture', userId: 'user_fixture' },
+        auth: {},
+        agent: { mode: 'code', model: 'kilo/test-model' },
+        workspace: transport === undefined ? {} : { chat: { transport } },
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error(result.error);
+      expect(result.metadata.metadataSchemaVersion).toBe(2);
+      expect(result.metadata.workspace?.chat).toEqual({ transport: transport ?? 'stream' });
+    }
+  );
+
   it.each(['webhook', 'scheduled'])(
     'preserves a repository agent without runtimeAgents for %s',
     async createdOnPlatform => {

@@ -18,6 +18,7 @@ import {
 } from '@kilocode/worker-utils/runtime-authorization';
 import { assertKiloModelAvailable } from '../model-validation.js';
 import type { WorkerDb } from '@kilocode/db/client';
+import type * as OperationLedgerModule from '@kilocode/db/operation-ledger';
 import {
   SELECTABLE_SANDBOX_ALLOCATIONS,
   getSandboxAllocationProvider,
@@ -43,6 +44,7 @@ import {
   assertSessionOperationIdentity,
   createSessionWithLedger,
   registerNewSession,
+  startNewSession,
   sessionCreateIntentFingerprint,
   SESSION_CREATE_ABANDON_AFTER_SECONDS,
   SESSION_CREATE_ABANDONED_OUTCOME_CODE,
@@ -248,7 +250,12 @@ function makeDb(limitResults: (unknown[] | Error)[]): WorkerDb {
       where: vi.fn(() => ({ limit })),
     })),
   }));
-  return { select } as unknown as WorkerDb;
+  return {
+    select,
+    transaction: vi.fn(async (work: (tx: { select: typeof select }) => Promise<unknown>) =>
+      work({ select })
+    ),
+  } as unknown as WorkerDb;
 }
 
 type DoStubOverrides = {
@@ -2680,6 +2687,18 @@ describe('explicit sandbox session creation', () => {
 });
 
 describe('sessionCreateIntentFingerprint', () => {
+  it('preserves the legacy default-stream fingerprint', async () => {
+    const input = makeRequest({ options: { operationKey: OPERATION_KEY } });
+    const legacyHash = '6d54e2987c50f0dd84f7d57c642d93f7aa3a0a562080ef5d10eeebb252ad0a9f';
+    expect(await sessionCreateIntentFingerprint(input)).toBe(legacyHash);
+    expect(await sessionCreateIntentFingerprint({ ...input, chat: { transport: 'stream' } })).toBe(
+      legacyHash
+    );
+    expect(
+      await sessionCreateIntentFingerprint({ ...input, chat: { transport: 'relay' } })
+    ).not.toBe(legacyHash);
+  });
+
   it('distinguishes the stack parent, base branch, and resolved base commit', async () => {
     const repository = {
       type: 'github' as const,
@@ -2709,6 +2728,485 @@ describe('sessionCreateIntentFingerprint', () => {
     expect(await sessionCreateIntentFingerprint(base)).not.toBe(
       await sessionCreateIntentFingerprint(changed)
     );
+  });
+});
+
+describe('relay creation runtime boundary', () => {
+  const browserOptions = { ...CREATE_OPTIONS, billingOrigin: 'cloud-agent-web' };
+  const ineligibleError = {
+    code: 'PRECONDITION_FAILED',
+    message: 'RELAY_RUNTIME_INELIGIBLE',
+    cause: { error: 'RELAY_RUNTIME_INELIGIBLE', retryable: false },
+  };
+  const relayRequest = () =>
+    makeRequest({
+      chat: { transport: 'relay' },
+      options: { operationKey: OPERATION_KEY, createdOnPlatform: 'cloud-agent-web' },
+    });
+  const relayContext = (stub = makeDoStub()) => {
+    const ctx = makeContext(stub);
+    ctx.env.RUNTIME_KILO2_ORG_IDS = '*';
+    ctx.env.RUNTIME_RELEASE_DESCRIPTOR_KILO2 = 'synthetic-kilo2-release';
+    return ctx;
+  };
+  async function recordedRelayRow(overrides: Partial<OperationLedgerRow> = {}) {
+    return makeLedgerRow({
+      canonical_result: {
+        [SESSION_CREATE_INTENT_FINGERPRINT_KEY]:
+          await sessionCreateIntentFingerprint(relayRequest()),
+        [SESSION_CREATE_WORKTREE_ENABLED_KEY]: false,
+        [SESSION_CREATE_FINALIZATION_VERSION_KEY]: 2,
+        [SESSION_CREATE_SAVED_ALLOCATION_KEY]: null,
+      },
+      ...overrides,
+    });
+  }
+  function expectNoCreate(stub: ReturnType<typeof makeDoStub>) {
+    expect(createCliSessionMock).not.toHaveBeenCalled();
+    expect(generateSessionIdMock).not.toHaveBeenCalled();
+    expect(createSessionReportMock).not.toHaveBeenCalled();
+    expect(stub.registerSessionFromMetadata).not.toHaveBeenCalled();
+    expect(stub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+  }
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    admitOperationMock.mockReset();
+    createCliSessionMock.mockResolvedValue(undefined);
+    getSandboxAllocationCandidatesMock.mockResolvedValue({});
+    const actual = await vi.importActual<typeof SandboxPlacementModule>('../sandbox-placement.js');
+    selectControlPlaneSandboxMock.mockImplementation(actual.selectControlPlaneSandbox);
+    getPgDbMock.mockReturnValue(makeDb([[{ email: 'fixture@example.test' }]]));
+    generateSessionIdMock.mockReturnValue(SANDBOX_SESSION_ID);
+    generateKiloSessionIdMock.mockReturnValue(KILO_SESSION_ID);
+    settleOperationMock.mockResolvedValue({ settled: true });
+  });
+
+  it.each([false, true])(
+    'refuses fresh grouped relay with ledger=%s despite a client web claim',
+    async keyed => {
+      const stub = makeDoStub();
+      const ctx = relayContext(stub);
+      getPgDbMock.mockReturnValue(makeDb([[]]));
+      const result = keyed
+        ? createSessionWithLedger(relayRequest(), ctx, {
+            ...CREATE_OPTIONS,
+            billingOrigin: 'cloud-agent',
+            resolveSavedAllocationBeforeAdmission: true,
+          })
+        : startNewSession(relayRequest(), ctx, { billingOrigin: 'cloud-agent' });
+      await expect(result).rejects.toMatchObject(ineligibleError);
+      expect(admitOperationMock).not.toHaveBeenCalled();
+      expectNoCreate(stub);
+    }
+  );
+
+  it.each([undefined, { transport: 'stream' as const }])(
+    'preserves grouped creation for %j',
+    async chat => {
+      const stub = makeDoStub();
+      await startNewSession(makeRequest({ chat }), relayContext(stub), {
+        billingOrigin: 'cloud-agent',
+      });
+      expect(createdMetadata(stub)?.workspace?.chat).toEqual({ transport: 'stream' });
+      expect(createdMetadata(stub)?.identity.billingOrigin).toBe('cloud-agent');
+    }
+  );
+
+  it('accepts browser prepare-only relay without reading saved placement or the ledger', async () => {
+    const stub = makeDoStub();
+    await registerNewSession(relayRequest(), relayContext(stub), browserOptions);
+    expect(createdMetadata(stub)?.workspace?.chat).toEqual({ transport: 'relay' });
+    expect(createdMetadata(stub)?.identity.billingOrigin).toBe('cloud-agent-web');
+    expect(getSandboxAllocationCandidatesMock).not.toHaveBeenCalled();
+    expect(admitOperationMock).not.toHaveBeenCalled();
+  });
+
+  it('accepts browser relay with the retained small-sandbox alias and registers its native placement', async () => {
+    const stub = makeDoStub();
+    const ctx = relayContext(stub);
+    ctx.env.SANDBOX_SELECTION_IDS = '*';
+    await registerNewSession(
+      { ...relayRequest(), runtime: { sandboxAllocation: 'cloudflare-single' } },
+      ctx,
+      browserOptions
+    );
+    expect(createdMetadata(stub)?.workspace).toMatchObject({
+      chat: { transport: 'relay' },
+      sandboxProvider: 'cloudflare-containers',
+      sandboxAllocation: 'cloudflare-containers-standard-3',
+      sandboxKind: 'isolated',
+    });
+  });
+
+  it('resolves browser relay placement once before keyed admission', async () => {
+    const stub = makeDoStub();
+    admitOperationMock.mockResolvedValue({ admission: 'admitted', row: makeLedgerRow() });
+    await createSessionWithLedger(relayRequest(), relayContext(stub), {
+      ...browserOptions,
+      resolveSavedAllocationBeforeAdmission: true,
+    });
+    expect(getSandboxAllocationCandidatesMock).toHaveBeenCalledTimes(1);
+    expect(createdMetadata(stub)?.workspace?.chat).toEqual({ transport: 'relay' });
+    expect(admitOperationMock.mock.calls[0]?.[1].initialCanonicalResult).toMatchObject({
+      [SESSION_CREATE_SAVED_ALLOCATION_KEY]: null,
+    });
+  });
+
+  it('refuses a browser tenant outside the unchanged runtime cohort before allocation', async () => {
+    const stub = makeDoStub();
+    const ctx = relayContext(stub);
+    ctx.env.RUNTIME_KILO2_ORG_IDS = '11111111-1111-4111-8111-111111111111';
+    await expect(registerNewSession(relayRequest(), ctx, browserOptions)).rejects.toMatchObject(
+      ineligibleError
+    );
+    expect(getSandboxAllocationCandidatesMock).not.toHaveBeenCalled();
+    expectNoCreate(stub);
+  });
+
+  it.each(['missing', 'expired'] as const)(
+    'refuses an ineligible %s operation without admission',
+    async state => {
+      const stub = makeDoStub();
+      const ctx = relayContext(stub);
+      ctx.env.RUNTIME_KILO2_ORG_IDS = '';
+      const row = await recordedRelayRow({ expires_at: new Date(Date.now() - 1).toISOString() });
+      getPgDbMock.mockReturnValue(makeDb([state === 'missing' ? [] : [row]]));
+      await expect(
+        createSessionWithLedger(relayRequest(), ctx, browserOptions)
+      ).rejects.toMatchObject(ineligibleError);
+      expect(admitOperationMock).not.toHaveBeenCalled();
+      expectNoCreate(stub);
+    }
+  );
+
+  it('rolls back actual fresh ledger admission when an ineligible relay row expires after the preliminary read', async () => {
+    const { admitOperation } = await vi.importActual<typeof OperationLedgerModule>(
+      '@kilocode/db/operation-ledger'
+    );
+    const now = Date.parse('2026-01-01T00:00:00.000Z');
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(now);
+    const row = await recordedRelayRow({
+      expires_at: new Date(now + 1000).toISOString(),
+      status: 'completed',
+    });
+    let committedRow = row;
+    const attemptedWrites: string[] = [];
+    const commits = vi.fn();
+    const rollbacks = vi.fn();
+    const transaction = vi.fn(async (work: (tx: object) => Promise<unknown>) => {
+      let pendingRow: OperationLedgerRow | undefined = committedRow;
+      const tx = {
+        select: () => ({
+          from: () => ({
+            where: () => ({
+              for: () => ({ limit: async () => (pendingRow === undefined ? [] : [pendingRow]) }),
+            }),
+          }),
+        }),
+        delete: () => ({
+          where: async () => {
+            attemptedWrites.push('delete');
+            pendingRow = undefined;
+          },
+        }),
+        insert: () => ({
+          values: (values: Partial<OperationLedgerRow>) => ({
+            returning: async () => {
+              attemptedWrites.push('insert');
+              pendingRow = { ...row, ...values, id: '11111111-1111-4111-8111-111111111111' };
+              return [pendingRow];
+            },
+          }),
+        }),
+      };
+      try {
+        const result = await work(tx);
+        if (!pendingRow) throw new Error('Missing committed ledger row');
+        committedRow = pendingRow;
+        commits();
+        return result;
+      } catch (error) {
+        rollbacks();
+        throw error;
+      }
+    });
+    const db = { ...makeDb([[row]]), $client: {}, transaction } as unknown as WorkerDb;
+    getPgDbMock.mockReturnValue(db);
+    admitOperationMock.mockImplementationOnce((database, input) => {
+      vi.setSystemTime(now + 2000);
+      return admitOperation(database, input);
+    });
+    const stub = makeDoStub();
+    const ctx = relayContext(stub);
+    ctx.env.RUNTIME_KILO2_ORG_IDS = '';
+
+    await expect(
+      createSessionWithLedger(relayRequest(), ctx, browserOptions)
+    ).rejects.toMatchObject(ineligibleError);
+
+    expect(attemptedWrites).toEqual(['delete', 'insert']);
+    expect(committedRow).toEqual(row);
+    expect(transaction).toHaveBeenCalledOnce();
+    expect(commits).not.toHaveBeenCalled();
+    expect(rollbacks).toHaveBeenCalledOnce();
+    expectNoCreate(stub);
+    expect(settleOperationMock).not.toHaveBeenCalled();
+    expect(recordOperationProgressMock).not.toHaveBeenCalled();
+  });
+
+  it.each(['duplicate_settled', 'duplicate_in_flight', 'duplicate_reconcile_in_progress'] as const)(
+    'preserves %s after runtime eligibility changes',
+    async admission => {
+      const stub = makeDoStub();
+      const ctx = relayContext(stub);
+      ctx.env.RUNTIME_KILO2_ORG_IDS = '';
+      const base = await recordedRelayRow();
+      const row = {
+        ...base,
+        status: 'completed',
+        canonical_result: {
+          ...base.canonical_result,
+          cloudAgentSessionId: SANDBOX_SESSION_ID,
+          kiloSessionId: KILO_SESSION_ID,
+        },
+      };
+      getPgDbMock.mockReturnValue(makeDb([[row]]));
+      admitOperationMock.mockResolvedValue({ admission, row });
+      const result = createSessionWithLedger(relayRequest(), ctx, browserOptions);
+      if (admission === 'duplicate_settled') {
+        await expect(result).resolves.toMatchObject({
+          cloudAgentSessionId: SANDBOX_SESSION_ID,
+          replayed: true,
+        });
+      } else {
+        await expect(result).rejects.toMatchObject({
+          code: 'CONFLICT',
+          message: 'creation_in_progress',
+        });
+      }
+      expect(admitOperationMock).toHaveBeenCalledOnce();
+      expectNoCreate(stub);
+    }
+  );
+
+  it.each([
+    { domain: 'other' },
+    { kilo_user_id: 'other-fixture-owner' },
+    { intent: 'create_worktree_chat' },
+    { organization_id: '11111111-1111-4111-8111-111111111111' },
+    { resource_key: 'worktree_other' },
+  ])('checks recorded identity before honoring ineligible replay: %j', async mismatch => {
+    const stub = makeDoStub();
+    const ctx = relayContext(stub);
+    ctx.env.RUNTIME_KILO2_ORG_IDS = '';
+    getPgDbMock.mockReturnValue(makeDb([[await recordedRelayRow(mismatch)]]));
+    await expect(
+      createSessionWithLedger(relayRequest(), ctx, browserOptions)
+    ).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'operation_key_reuse_mismatch',
+    });
+    expect(admitOperationMock).not.toHaveBeenCalled();
+    expectNoCreate(stub);
+  });
+
+  it.each(['duplicate_settled', 'takeover', 'duplicate_reconcile_pending'] as const)(
+    'restores the implicit Vercel pin before checking %s relay intent after settings and cohort changes',
+    async admission => {
+      const stub = makeDoStub();
+      const ctx = relayContext(stub);
+      ctx.env.SANDBOX_SELECTION_IDS = '*';
+      ctx.env.RUNTIME_KILO2_ORG_IDS = '';
+      getSandboxAllocationCandidatesMock.mockResolvedValue({
+        contextAllocation: 'cloudflare-containers-standard-3',
+      });
+      const base = await recordedRelayRow();
+      const row = {
+        ...base,
+        status: admission === 'duplicate_settled' ? 'completed' : 'reconcile_pending',
+        canonical_result: {
+          ...base.canonical_result,
+          cloudAgentSessionId: SANDBOX_SESSION_ID,
+          kiloSessionId: KILO_SESSION_ID,
+          initialMessageId: INITIAL_MESSAGE_ID,
+          sandboxAllocation: 'vercel-small',
+          [SESSION_CREATE_SAVED_ALLOCATION_KEY]: 'vercel-small',
+        },
+      };
+      getPgDbMock.mockReturnValue(
+        makeDb([[row], [{ sessionId: KILO_SESSION_ID }], [{ email: 'fixture@example.test' }]])
+      );
+      admitOperationMock.mockResolvedValue({ admission, row });
+
+      await expect(
+        createSessionWithLedger(relayRequest(), ctx, {
+          ...browserOptions,
+          resolveSavedAllocationBeforeAdmission: true,
+        })
+      ).resolves.toMatchObject({ cloudAgentSessionId: SANDBOX_SESSION_ID, replayed: true });
+
+      expect(getSandboxAllocationCandidatesMock).toHaveBeenCalledOnce();
+      expect(admitOperationMock.mock.calls[0]?.[1].initialCanonicalResult).toMatchObject({
+        [SESSION_CREATE_SAVED_ALLOCATION_KEY]: 'cloudflare-containers-standard-3',
+      });
+      expectNoCreate(stub);
+      if (admission !== 'duplicate_settled') {
+        expect(stub.getMessageResult).toHaveBeenCalledWith(INITIAL_MESSAGE_ID);
+      }
+    }
+  );
+
+  it.each(['stream', 'relay'] as const)(
+    'rejects same-key transport changes from %s',
+    async transport => {
+      const stub = makeDoStub();
+      const ctx = relayContext(stub);
+      ctx.env.RUNTIME_KILO2_ORG_IDS = '';
+      const stored = { ...relayRequest(), chat: { transport } };
+      const row = await recordedRelayRow({
+        canonical_result: {
+          [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint(stored),
+          [SESSION_CREATE_SAVED_ALLOCATION_KEY]: null,
+        },
+      });
+      getPgDbMock.mockReturnValue(makeDb([[row]]));
+      admitOperationMock.mockResolvedValue({ admission: 'duplicate_settled', row });
+      const request = {
+        ...relayRequest(),
+        chat: { transport: transport === 'stream' ? 'relay' : 'stream' },
+      } satisfies SessionCreateRequest;
+      await expect(createSessionWithLedger(request, ctx, browserOptions)).rejects.toMatchObject({
+        code: 'CONFLICT',
+        message: 'session_create_intent_conflict',
+      });
+      expectNoCreate(stub);
+    }
+  );
+
+  it.each(['takeover', 'duplicate_reconcile_pending'] as const)(
+    'continues %s through the real creation primitive after eligibility changes',
+    async admission => {
+      const stub = makeDoStub();
+      const ctx = relayContext(stub);
+      ctx.env.RUNTIME_KILO2_ORG_IDS = '';
+      const row = await recordedRelayRow();
+      getPgDbMock.mockReturnValue(makeDb([[row], [{ email: 'fixture@example.test' }]]));
+      admitOperationMock.mockResolvedValue({ admission, row });
+      await expect(
+        createSessionWithLedger(relayRequest(), ctx, browserOptions)
+      ).resolves.toMatchObject({
+        cloudAgentSessionId: SANDBOX_SESSION_ID,
+      });
+      expect(createdMetadata(stub)?.workspace?.chat).toEqual({ transport: 'relay' });
+      expect(stub.createSessionWithInitialAdmission).toHaveBeenCalledOnce();
+    }
+  );
+
+  it('shares one ledger lookup when allocation and relay eligibility both fail', async () => {
+    const stub = makeDoStub();
+    const db = makeDb([[]]);
+    getPgDbMock.mockReturnValue(db);
+    await expect(
+      createSessionWithLedger(
+        {
+          ...relayRequest(),
+          runtime: { sandboxAllocation: 'vercel-large' },
+        },
+        relayContext(stub),
+        { ...browserOptions, billingOrigin: 'cloud-agent' }
+      )
+    ).rejects.toMatchObject(ineligibleError);
+    expect(db.select).toHaveBeenCalledOnce();
+    expect(admitOperationMock).not.toHaveBeenCalled();
+    expectNoCreate(stub);
+  });
+
+  it.each([undefined, { transport: 'stream' as const }])(
+    'replays the pre-change default-stream ledger hash for %j',
+    async chat => {
+      const stub = makeDoStub();
+      const row = makeLedgerRow({
+        status: 'completed',
+        canonical_result: {
+          cloudAgentSessionId: SANDBOX_SESSION_ID,
+          kiloSessionId: KILO_SESSION_ID,
+          [SESSION_CREATE_INTENT_FINGERPRINT_KEY]:
+            '6d54e2987c50f0dd84f7d57c642d93f7aa3a0a562080ef5d10eeebb252ad0a9f',
+          [SESSION_CREATE_SAVED_ALLOCATION_KEY]: null,
+        },
+      });
+      admitOperationMock.mockResolvedValue({ admission: 'duplicate_settled', row });
+      await expect(
+        runCreate(
+          relayContext(stub),
+          makeRequest({ chat, options: { operationKey: OPERATION_KEY } })
+        )
+      ).resolves.toMatchObject({
+        cloudAgentSessionId: SANDBOX_SESSION_ID,
+        replayed: true,
+      });
+      expectNoCreate(stub);
+    }
+  );
+
+  it('does not enroll a legacy ledger row without a relay fingerprint', async () => {
+    const stub = makeDoStub();
+    const ctx = relayContext(stub);
+    ctx.env.RUNTIME_KILO2_ORG_IDS = '';
+    getPgDbMock.mockReturnValue(makeDb([[makeLedgerRow()]]));
+    await expect(
+      createSessionWithLedger(relayRequest(), ctx, browserOptions)
+    ).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'session_create_intent_conflict',
+    });
+    expect(admitOperationMock).not.toHaveBeenCalled();
+    expectNoCreate(stub);
+  });
+
+  it('checks relay intent using the recorded worktree and finalization context', async () => {
+    const stub = makeDoStub();
+    const ctx = relayContext(stub);
+    ctx.env.RUNTIME_KILO2_ORG_IDS = '';
+    const request = { ...relayRequest(), finalization: { autoCommit: true } };
+    const row = await recordedRelayRow({
+      status: 'completed',
+      canonical_result: {
+        cloudAgentSessionId: SANDBOX_SESSION_ID,
+        kiloSessionId: KILO_SESSION_ID,
+        [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint({
+          ...request,
+          finalization: { autoCommit: false },
+        }),
+        [SESSION_CREATE_WORKTREE_ENABLED_KEY]: true,
+        [SESSION_CREATE_FINALIZATION_VERSION_KEY]: 1,
+        [SESSION_CREATE_SAVED_ALLOCATION_KEY]: null,
+      },
+    });
+    getPgDbMock.mockReturnValue(makeDb([[row]]));
+    admitOperationMock.mockResolvedValue({ admission: 'duplicate_settled', row });
+    await expect(createSessionWithLedger(request, ctx, browserOptions)).resolves.toMatchObject({
+      replayed: true,
+    });
+    expectNoCreate(stub);
+  });
+
+  it('replays a recorded terminal failure instead of reporting current runtime ineligibility', async () => {
+    const stub = makeDoStub();
+    const ctx = relayContext(stub);
+    ctx.env.RUNTIME_KILO2_ORG_IDS = '';
+    const row = await recordedRelayRow({ status: 'failed' });
+    getPgDbMock.mockReturnValue(makeDb([[row]]));
+    admitOperationMock.mockResolvedValue({ admission: 'duplicate_settled', row });
+    await expect(
+      createSessionWithLedger(relayRequest(), ctx, browserOptions)
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'session_creation_failed',
+    });
+    expectNoCreate(stub);
   });
 });
 
@@ -4514,6 +5012,7 @@ describe('createSessionWithLedger admission ladder', () => {
       workspace: expect.objectContaining({
         worktreeId: expectedWorktreeId,
         workspacePath: expect.stringContaining(expectedWorktreeId),
+        chat: { transport: 'stream' },
       }),
     });
     expect(doStub.recordCloudAgentChildSession).toHaveBeenCalledWith(
@@ -6319,7 +6818,10 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
         title: 'Local session',
       })
     );
-    expect(createdMetadata(doStub)).toMatchObject({ continuation: true });
+    expect(createdMetadata(doStub)).toMatchObject({
+      continuation: true,
+      workspace: expect.objectContaining({ chat: { transport: 'stream' } }),
+    });
   });
 
   it('registers a continuation clone resume without an initial turn and without re-cloning', async () => {

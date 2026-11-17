@@ -13,6 +13,7 @@ export const session = sqliteTable('session', {
   tenant_id: text('tenant_id').notNull(),
   creator_id: text('creator_id').notNull(),
   source_id: text('source_id').notNull(),
+  cloud_agent_session_id: text('cloud_agent_session_id'),
   position: integer('position').notNull(),
   revision: integer('revision').notNull(),
   batches: integer('batches').notNull(),

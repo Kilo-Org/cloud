@@ -13,6 +13,7 @@ import { encryptWithPublicKey } from '../../utils/encryption.js';
 import { getSessionWorkspacePath, getWorktreeWorkspacePath } from '../../workspace.js';
 import { buildControlPlaneSessionRegistration } from './registration.js';
 import { controlPlaneSandboxSelectionSchema } from './sandbox-selection.js';
+import { z } from 'zod';
 
 function generateKeyPair() {
   return generateKeyPairSync('rsa', {
@@ -58,6 +59,43 @@ function metadata(overrides: Record<string, unknown> = {}) {
 const selection = { provider: 'cloudflare' as const };
 
 describe('trusted runtime origin', () => {
+  it.each([undefined, 'stream', 'relay'] as const)(
+    'projects relay chat %s into the private source and optional wrapper contract',
+    transport => {
+      const registration = buildControlPlaneSessionRegistration(
+        metadata({
+          workspace: {
+            sandboxId: 'ses-0123456789abcdef',
+            sandboxProvider: 'cloudflare',
+            ...(transport === undefined ? {} : { chat: { transport } }),
+          },
+        }),
+        selection
+      );
+      const source = controlPlaneCredentialSourceSchema.parse(
+        JSON.parse(JSON.stringify(registration.credentials))
+      );
+      const legacySource = controlPlaneCredentialSourceSchema.omit({ chat: true }).strict();
+      if (transport === 'relay') {
+        expect(source.chat).toEqual({ transport: 'relay' });
+        expect(legacySource.safeParse(source).success).toBe(false);
+      } else {
+        expect(source).not.toHaveProperty('chat');
+        expect(legacySource.parse(source)).toEqual(source);
+      }
+      const wrapper = JSON.parse(JSON.stringify(registration.spec));
+      const legacyWrapper = z.strictObject(controlPlaneRouteSpecSchema.shape).omit({ chat: true });
+      expect(controlPlaneRouteSpecSchema.safeParse(wrapper).success).toBe(true);
+      if (transport === 'relay') {
+        expect(wrapper.chat).toEqual({ transport: 'relay' });
+        expect(legacyWrapper.safeParse(wrapper).success).toBe(false);
+      } else {
+        expect(wrapper).not.toHaveProperty('chat');
+        expect(legacyWrapper.parse(wrapper)).toEqual(wrapper);
+      }
+    }
+  );
+
   it.each(['cloud-agent-web', 'cloud-agent', 'code-review', 'agent-manager', undefined])(
     'preserves the worker origin %s separately from a client web claim',
     billingOrigin => {

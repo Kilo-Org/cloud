@@ -1,5 +1,6 @@
 import type { KiloSessionId, ResolvedSession } from '@kilocode/cloud-agent-sdk';
 import { cloudAgentSessionIdSchema } from '@kilocode/cloud-agent-sdk/schemas';
+import { cloudSessionMetadataSchema } from '@kilocode/cloud-agent-sdk/cloud-conversation-schemas';
 
 type SessionIdentity = { cloud_agent_session_id: string | null };
 
@@ -9,33 +10,59 @@ export function createWebSessionResolver({
   readCachedActiveSessions,
   getSession,
   listActiveSessions,
+  getCloudSession,
+  organizationId,
 }: {
   readCachedCloudSessionId: (id: KiloSessionId) => string | null | undefined;
   readCachedActiveSessions: () => readonly { id: string }[];
   getSession: (id: KiloSessionId) => Promise<SessionIdentity>;
   listActiveSessions: () => Promise<{ sessions: readonly { id: string }[] }>;
+  getCloudSession?: (id: string) => Promise<unknown>;
+  organizationId?: string;
 }): (id: KiloSessionId) => Promise<ResolvedSession> {
   return async kiloSessionId => {
-    const cloudSession = (id: string | null | undefined): ResolvedSession | null => {
+    const cloudSession = async (id: string | null | undefined): Promise<ResolvedSession | null> => {
       const parsed = cloudAgentSessionIdSchema.safeParse(id);
-      return parsed.success
-        ? { type: 'cloud-agent', kiloSessionId, cloudAgentSessionId: parsed.data }
-        : null;
+      if (!parsed.success) return null;
+      if (getCloudSession) {
+        const metadata = cloudSessionMetadataSchema.parse(await getCloudSession(parsed.data));
+        if (metadata.sessionId !== parsed.data || metadata.orgId !== organizationId)
+          throw new Error('Cloud Agent session scope mismatch');
+        if (metadata.chat?.transport === 'relay') {
+          if (metadata.kiloSessionId !== kiloSessionId)
+            throw new Error('Cloud Agent native session mismatch');
+          return {
+            type: 'hosted-native',
+            kiloSessionId,
+            cloudAgentSessionId: parsed.data,
+            ...(organizationId ? { organizationId } : {}),
+          };
+        }
+      }
+      return { type: 'cloud-agent', kiloSessionId, cloudAgentSessionId: parsed.data };
     };
-    const cached = cloudSession(readCachedCloudSessionId(kiloSessionId));
+    const cached = await cloudSession(readCachedCloudSessionId(kiloSessionId));
     if (cached) return cached;
-    if (readCachedActiveSessions().some(session => session.id === kiloSessionId)) {
+    if (
+      !getCloudSession &&
+      readCachedActiveSessions().some(session => session.id === kiloSessionId)
+    ) {
       return { type: 'remote', kiloSessionId };
     }
 
     // Cloud chats do not need a round trip through the unrelated CLI presence service.
+    let identity: SessionIdentity | undefined;
     try {
-      const session = await getSession(kiloSessionId);
-      const resolved = cloudSession(session.cloud_agent_session_id);
-      if (resolved) return resolved;
+      identity = await getSession(kiloSessionId);
     } catch {
       // The authoritative metadata read still surfaces missing/denied sessions.
     }
+    if (identity) {
+      const resolved = await cloudSession(identity.cloud_agent_session_id);
+      if (resolved) return resolved;
+    }
+    if (readCachedActiveSessions().some(session => session.id === kiloSessionId))
+      return { type: 'remote', kiloSessionId };
     try {
       const active = await listActiveSessions();
       if (active.sessions.some(session => session.id === kiloSessionId)) {

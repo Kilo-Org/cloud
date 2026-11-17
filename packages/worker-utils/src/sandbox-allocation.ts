@@ -244,6 +244,7 @@ export function getSandboxAllocationResources(
 export const sandboxSelectionCapabilitiesSchema = z
   .object({
     enabled: z.boolean(),
+    relayChatForBrowserPrepare: z.boolean().optional(),
     /** Where a session runs when nothing is saved or chosen. Reported even when selection is disabled. */
     defaultDestination: sandboxDestinationSchema.optional(),
     /**

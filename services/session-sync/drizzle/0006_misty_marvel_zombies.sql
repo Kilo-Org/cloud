@@ -1,0 +1,1 @@
+ALTER TABLE `session` ADD `cloud_agent_session_id` text;

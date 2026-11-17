@@ -560,6 +560,36 @@ describe('createWorktreeChat request validation and authorization', () => {
     expect(admitOperationMock).not.toHaveBeenCalled();
   });
 
+  it.each([undefined, 'stream', 'relay'] as const)(
+    'inherits stored workspace chat %s without a new selection',
+    async transport => {
+      const metadata = sourceMetadata();
+      if (transport !== undefined && metadata.workspace) metadata.workspace.chat = { transport };
+      const { caller, input, destinationStub } = fixture({ metadata });
+      await caller.createWorktreeChat(input);
+      expect(
+        destinationStub.registerSessionFromMetadata.mock.calls[0]?.[0]?.metadata.workspace.chat
+      ).toEqual(transport === undefined ? undefined : { transport });
+    }
+  );
+
+  it('rejects a same-key sibling replay whose inherited workspace transport changed', async () => {
+    const metadata = sourceMetadata();
+    const source = ownershipRow();
+    const { caller, input } = fixture({ metadata, ownershipResults: [[source], [source]] });
+    await caller.createWorktreeChat(input);
+    const progress = recordOperationProgressMock.mock.calls[0]?.[2] as Record<string, unknown>;
+    metadata.workspace = { ...metadata.workspace, chat: { transport: 'relay' } };
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_settled',
+      row: ledgerRow({ status: 'completed', canonical_result: progress }),
+    });
+    await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'operation_key_reuse_mismatch',
+    });
+  });
+
   it.each([
     ['missing group', (row: OwnershipFixture) => ({ ...row, worktreeId: null })],
     ['malformed group', (row: OwnershipFixture) => ({ ...row, worktreeId: 'worktree_../../bad' })],

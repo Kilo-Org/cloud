@@ -70,7 +70,7 @@ type AgentFormSheetProps = Readonly<{
     slug: string;
     name: string;
     config: Record<string, unknown>;
-  }) => void | Promise<void>;
+  }) => Promise<void>;
   /** The last save refusal, each arm rendered where it belongs in the sheet. */
   saveFailure?: AgentSaveFailure | null;
 }>;

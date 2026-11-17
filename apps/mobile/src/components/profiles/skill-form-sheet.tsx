@@ -43,7 +43,7 @@ type SkillFormSheetProps = Readonly<{
    * Persist the validated fields. The caller owns create-vs-update and closes
    * the sheet on success; on failure it returns with the sheet still open.
    */
-  onSave: (submission: SkillFormSubmission) => void | Promise<void>;
+  onSave: (submission: SkillFormSubmission) => Promise<void>;
   /** A refused save, shown inside the sheet instead of only a toast it covers. */
   saveFailure?: string | null;
   /**

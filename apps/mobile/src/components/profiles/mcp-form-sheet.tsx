@@ -91,7 +91,7 @@ type McpFormSheetProps = Readonly<{
    * Persist the validated payload. The caller owns create-vs-update and closes
    * the sheet on success; on failure it returns with the sheet still open.
    */
-  onSave: (payload: McpServerPayload) => void | Promise<void>;
+  onSave: (payload: McpServerPayload) => Promise<void>;
   /** The last save refusal, each arm rendered where it belongs in the sheet. */
   saveFailure?: McpSaveFailure | null;
 }>;

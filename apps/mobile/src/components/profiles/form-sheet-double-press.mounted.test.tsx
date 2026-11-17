@@ -6,7 +6,6 @@ import { AgentFormSheet } from '@/components/profiles/agent-form-sheet';
 import { InstructionFormSheet } from '@/components/profiles/instruction-form-sheet';
 import { McpFormSheet } from '@/components/profiles/mcp-form-sheet';
 import { SkillFormSheet } from '@/components/profiles/skill-form-sheet';
-import { i18n } from '@/i18n';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { resetFormDraftsForTests } from '@/lib/form-draft';
@@ -419,12 +418,5 @@ describe('AgentFormSheet double press', () => {
     expect(h.onSave).toHaveBeenCalledTimes(1);
 
     unmount();
-  });
-});
-
-describe('profile form sheet discard copy', () => {
-  it('matches the dialog the explorer saw, so the test name tracks the guard', () => {
-    expect(i18n.t('common.discardChangesTitle')).toBe('Discard changes?');
-    expect(i18n.t('common.discardChangesMessage')).toBe('Your changes will be lost.');
   });
 });

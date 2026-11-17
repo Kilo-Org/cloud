@@ -43,10 +43,10 @@ type InstructionFormSheetProps = Readonly<{
   /**
    * Persist the validated fields. The caller owns create-vs-update and closes
    * the sheet on success; on failure it returns with the sheet still open.
-   * May return a promise: the sheet holds its one-save admission until the
-   * save settles, then releases it, so a failed save can be retried.
+   * Returns the save's promise: the sheet holds its one-save admission until
+   * the save settles, then releases it, so a failed save can be retried.
    */
-  onSave: (submission: InstructionFormSubmission) => void | Promise<void>;
+  onSave: (submission: InstructionFormSubmission) => Promise<void>;
   /** A refused save, shown inside the sheet instead of only a toast it covers. */
   saveFailure?: string | null;
   /** Whether that failure is an error or an expected limit. */

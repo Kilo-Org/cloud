@@ -7,7 +7,7 @@ import {
   organization_memberships,
   organizations,
 } from '@kilocode/db/schema';
-import { and, count, eq, inArray } from 'drizzle-orm';
+import { and, count, desc, eq, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   createOrganization,
@@ -976,14 +976,16 @@ describe('organizations trpc router', () => {
             eq(organization_audit_logs.organization_id, testOrganization.id),
             eq(organization_audit_logs.action, 'organization.settings.change')
           )
-        );
+        )
+        .orderBy(desc(organization_audit_logs.created_at));
 
+      const expectedMessage = `Renamed organization from "${oldName}" to "${newName}"`;
+      const renameRow = rows.find(row => row.message === expectedMessage);
       expect(rows).toHaveLength(rowsBefore + 1);
-      const renameRow = rows[rows.length - 1];
-      expect(renameRow.message).toBe(`Renamed organization from "${oldName}" to "${newName}"`);
-      expect(renameRow.actor_id).toBe(regularUser.id);
-      expect(renameRow.actor_email).toBe(regularUser.google_user_email);
-      expect(renameRow.actor_name).toBe(regularUser.google_user_name);
+      expect(renameRow).toBeDefined();
+      expect(renameRow?.actor_id).toBe(regularUser.id);
+      expect(renameRow?.actor_email).toBe(regularUser.google_user_email);
+      expect(renameRow?.actor_name).toBe(regularUser.google_user_name);
 
       // Reset the name for other tests
       await db

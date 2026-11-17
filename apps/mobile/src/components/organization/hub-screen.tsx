@@ -37,10 +37,14 @@ import { RenameModal } from '@/components/rename-modal';
 import { ScreenHeader } from '@/components/screen-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { IconButton } from '@/components/ui/icon-button';
+import { IconTile } from '@/components/ui/icon-tile';
 import { KvRow } from '@/components/ui/kv-row';
+import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { i18n } from '@/i18n';
 import { NEUTRAL_TINT, type Tint, toneColor } from '@/lib/agent-color';
 import { openAppShellHandoff } from '@/lib/app-shell-handoff';
@@ -63,7 +67,6 @@ import { useOrganization } from '@/lib/organization-context';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { organizationErrorMessage } from '@/lib/server-error-copy';
 import { HIDDEN_BALANCE } from '@/lib/storage-keys';
-import { cn } from '@/lib/utils';
 
 type OrganizationHubScreenProps = Readonly<{
   /** Explicit org id from a deep link (e.g. /organizations/<id>/overview). */
@@ -288,7 +291,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
       />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="px-6 gap-6 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
       >
         {/* A lapsed plan blocks every new session for every member of this
@@ -316,8 +319,9 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
             }
           />
         ) : null}
-        <Animated.View entering={FadeIn.duration(200)} className="rounded-lg bg-secondary px-3">
-          {showMoney && (
+        <Animated.View entering={FadeIn.duration(200)}>
+          <RowGroup>
+            {showMoney && (
             <KvRow
               label={t('organization.hub.balance')}
               value={hideOrgBalance ? HIDDEN_BALANCE : balanceAmount}
@@ -371,6 +375,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
             }
             valueFace="text"
           />
+          </RowGroup>
         </Animated.View>
 
         <OrgUsageStats
@@ -380,7 +385,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
           }}
         />
 
-        <View className="rounded-lg bg-secondary px-3">
+        <RowGroup leadingTile>
           <ConfigureRow
             icon={Users}
             title={t('organization.members.title')}
@@ -482,7 +487,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
               }}
             />
           ))}
-        </View>
+        </RowGroup>
 
         {/* The areas this app does not reimplement. Each row opens the page
             that already owns the setting, and the row set follows the web
@@ -490,11 +495,8 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
             the gates leave with no destination paints no heading: the group is
             the only place they were listed, so an empty one would name nothing. */}
         {settingsRows == null || settingsRows.length === 0 ? null : (
-          <View className="gap-2">
-            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-              {t('organization.settingsOnWeb.title')}
-            </Text>
-            <View className="rounded-lg bg-secondary px-3">
+          <Section label={t('organization.settingsOnWeb.title')}>
+            <RowGroup leadingTile>
               {settingsRows.map(row => (
                 <ConfigureRow
                   key={row.area}
@@ -509,8 +511,8 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
                   }}
                 />
               ))}
-            </View>
-          </View>
+            </RowGroup>
+          </Section>
         )}
       </TabScreenScrollView>
 
@@ -570,17 +572,12 @@ function OrgKiloPassRow({ state, onRetry }: OrgKiloPassRowProps) {
     : `${t('kiloPass.title')}. ${state.subtitle}`;
 
   const inner = (
-    <View className="flex-row items-center gap-3 border-b-[0.5px] border-hair-soft py-3">
-      <View
-        className={cn(
-          'h-[30px] w-[30px] items-center justify-center rounded-lg border',
-          tint.tileBgClass,
-          tint.tileBorderClass
-        )}
-      >
-        <KiloPassIcon size={16} color={colors[tint.hueThemeKey]} />
-      </View>
-      <View className="flex-1">
+    <View className="min-h-[48px] flex-row items-center gap-3 px-4 py-3">
+      <IconTile
+        tint={tint}
+        content={<KiloPassIcon size={16} color={colors[tint.hueThemeKey]} />}
+      />
+      <View className="min-w-0 flex-1">
         <Text className="text-sm font-medium text-foreground">{t('kiloPass.title')}</Text>
         {/* `h-4` is the `text-xs` line box (1 rem; native rem is 14), so the row
             keeps its height and this title its place while the status loads; a

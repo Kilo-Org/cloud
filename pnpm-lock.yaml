@@ -63,6 +63,9 @@ catalogs:
     aws4fetch:
       specifier: 1.0.20
       version: 1.0.20
+    dotenv:
+      specifier: 18.0.10
+      version: 18.0.10
     drizzle-kit:
       specifier: 0.31.11
       version: 0.31.11
@@ -108,6 +111,8 @@ catalogs:
       version: 5.1.0
 
 overrides:
+  '@smithy/core': 3.40.0
+  '@smithy/smithy-client': 4.15.2
   pg: 8.23.1
   '@babel/plugin-transform-modules-systemjs': 7.29.7
   '@babel/core': 7.29.7
@@ -150,7 +155,7 @@ overrides:
   ip-address: 10.7.1
   image-size@^1: npm:image-size-next@1.2.2
   image-size@^2: npm:image-size-next@2.1.1
-  drizzle-orm: 0.45.2
+  drizzle-orm: 0.45.4
   lodash-es: 4.18.1
   '@xmldom/xmldom': 0.8.15
   qs: 6.16.1
@@ -256,8 +261,8 @@ importers:
         specifier: 'catalog:'
         version: 1.0.20
       drizzle-orm:
-        specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        specifier: 0.45.4
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       eslint-plugin-zod-utils:
         specifier: 1.0.11
         version: 1.0.11(eslint@9.39.4(jiti@2.7.0))(typescript@7.0.2)
@@ -274,17 +279,17 @@ importers:
         specifier: 0.157.0
         version: 0.157.0
       oxfmt:
-        specifier: 0.73.0
-        version: 0.73.0
+        specifier: 0.78.0
+        version: 0.78.0
       oxlint:
         specifier: 1.88.0
-        version: 1.88.0(oxlint-tsgolint@7.0.2004)
+        version: 1.88.0(oxlint-tsgolint@7.0.2006)
       oxlint-plugin-react-native:
         specifier: 0.2.38
-        version: 0.2.38(oxlint@1.88.0(oxlint-tsgolint@7.0.2004))
+        version: 0.2.38(oxlint@1.88.0(oxlint-tsgolint@7.0.2006))
       oxlint-tsgolint:
-        specifier: 7.0.2004
-        version: 7.0.2004
+        specifier: 7.0.2006
+        version: 7.0.2006
       proper-lockfile:
         specifier: 4.1.2
         version: 4.1.2
@@ -517,26 +522,26 @@ importers:
         specifier: 58.0.17
         version: 58.0.17(patch_hash=26c40c3395b22f61322a5dc90aac41c92702076ab0fd3ce0da78a58583dd384e)(@babel/core@7.29.7)(expo@58.0.10)(react-dom@19.2.6(react@19.3.0))(react-native-worklets@0.13.0(@babel/core@7.29.7)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
       '@formatjs/intl-durationformat':
-        specifier: ^0.11.1
-        version: 0.11.1
+        specifier: ^0.12.4
+        version: 0.12.4
       '@formatjs/intl-listformat':
-        specifier: ^8.3.15
-        version: 8.3.15
+        specifier: ^9.0.3
+        version: 9.0.3
       '@formatjs/intl-locale':
-        specifier: ^5.3.12
-        version: 5.3.12
+        specifier: ^5.4.3
+        version: 5.4.3
       '@formatjs/intl-numberformat':
-        specifier: ^9.4.3
-        version: 9.4.3
+        specifier: ^10.0.4
+        version: 10.0.4
       '@formatjs/intl-pluralrules':
-        specifier: ^6.3.15
-        version: 6.3.15
+        specifier: ^7.0.4
+        version: 7.0.4
       '@formatjs/intl-relativetimeformat':
-        specifier: ^12.3.15
-        version: 12.3.15
+        specifier: ^13.0.3
+        version: 13.0.3
       '@formatjs/intl-segmenter':
-        specifier: ^12.2.15
-        version: 12.2.15
+        specifier: ^12.3.2
+        version: 12.3.2
       '@kilocode/app-shared':
         specifier: workspace:*
         version: link:../../packages/app-shared
@@ -578,7 +583,7 @@ importers:
         version: 1.5.2(@types/react@19.3.0)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
       '@sentry/react-native':
         specifier: ~8.31.0
-        version: 8.31.0(@babel/core@7.29.7)(@expo/config-types@58.0.3)(@expo/config@58.0.6(typescript@7.0.2))(@expo/env@2.5.2)(bufferutil@4.1.0)(dotenv@18.0.8)(expo-router@58.0.19)(expo@58.0.10)(metro-config@0.87.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(metro-resolver@0.87.1)(open@11.0.0)(promise@8.3.0)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(rollup@4.68.2)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))(esbuild@0.28.2))
+        version: 8.31.0(@babel/core@7.29.7)(@expo/config-types@58.0.3)(@expo/config@58.0.6(typescript@7.0.2))(@expo/env@2.5.2)(bufferutil@4.1.0)(dotenv@18.0.10)(expo-router@58.0.19)(expo@58.0.10)(metro-config@0.87.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(metro-resolver@0.87.1)(open@11.0.0)(promise@8.3.0)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(rollup@4.68.2)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))(esbuild@0.28.2))
       '@shopify/flash-list':
         specifier: 2.3.3
         version: 2.3.3(patch_hash=0788a743245aad9c9a54369df351e79faacc757717d0d3d87f1954e2e61bec65)(@babel/runtime@7.29.7)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
@@ -610,8 +615,8 @@ importers:
         specifier: 2.1.1
         version: 2.1.1
       drizzle-orm:
-        specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(kysely@0.29.2)(pg@8.23.1)
+        specifier: 0.45.4
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(kysely@0.29.2)(pg@8.23.1)
       effect:
         specifier: 4.0.5
         version: 4.0.5
@@ -954,8 +959,8 @@ importers:
         specifier: 17.5.0
         version: 17.5.0(@chromatic-com/playwright@0.12.8(@playwright/test@1.58.2)(@types/react@19.2.14)(bufferutil@4.1.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@7.0.2)(utf-8-validate@6.0.6))
       dotenv:
-        specifier: 18.0.8
-        version: 18.0.8
+        specifier: 'catalog:'
+        version: 18.0.10
       dotenv-expand:
         specifier: 12.0.3
         version: 12.0.3
@@ -1305,8 +1310,8 @@ importers:
         specifier: 14.25.1
         version: 14.25.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       drizzle-orm:
-        specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        specifier: 0.45.4
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       emoji-mart:
         specifier: 5.6.0
         version: 5.6.0
@@ -1489,8 +1494,8 @@ importers:
         specifier: 17.3.10
         version: 17.3.10
       dotenv:
-        specifier: 18.0.8
-        version: 18.0.8
+        specifier: 'catalog:'
+        version: 18.0.10
       graphql:
         specifier: 16.14.2
         version: 16.14.2
@@ -1588,8 +1593,8 @@ importers:
         specifier: workspace:*
         version: link:../worker-utils
       drizzle-orm:
-        specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        specifier: 0.45.4
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       fflate:
         specifier: 0.8.3
         version: 0.8.3
@@ -1690,8 +1695,8 @@ importers:
         specifier: workspace:*
         version: link:../usage-contracts
       drizzle-orm:
-        specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        specifier: 0.45.4
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       pg:
         specifier: 8.23.1
         version: 8.23.1
@@ -1712,8 +1717,8 @@ importers:
         specifier: 'catalog:'
         version: 7.0.0-dev.20260707.2
       dotenv:
-        specifier: 18.0.8
-        version: 18.0.8
+        specifier: 'catalog:'
+        version: 18.0.10
       drizzle-kit:
         specifier: 'catalog:'
         version: 0.31.11
@@ -1757,15 +1762,21 @@ importers:
 
   packages/harness-sdk:
     dependencies:
+      '@modelcontextprotocol/client':
+        specifier: 2.4.0
+        version: 2.4.0
+      '@modelcontextprotocol/core':
+        specifier: 2.4.0
+        version: 2.4.0
       '@modelcontextprotocol/ext-apps':
-        specifier: 1.7.5
-        version: 1.7.5(@modelcontextprotocol/sdk@1.32.2(@cfworker/json-schema@4.1.1)(zod@4.6.7))(react-dom@19.2.6(react@19.3.0))(react@19.3.0)(zod@4.6.7)
+        specifier: 2.1.0
+        version: 2.1.0(@modelcontextprotocol/client@2.4.0)(@modelcontextprotocol/core@2.4.0)(react-dom@19.2.6(react@19.3.0))(react@19.3.0)(zod@4.6.7)
       '@modelcontextprotocol/sdk':
         specifier: 1.32.2
         version: 1.32.2(@cfworker/json-schema@4.1.1)(zod@4.6.7)
       drizzle-orm:
-        specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(kysely@0.29.2)(pg@8.23.1)
+        specifier: 0.45.4
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(kysely@0.29.2)(pg@8.23.1)
       effect:
         specifier: 4.0.5
         version: 4.0.5
@@ -1777,8 +1788,8 @@ importers:
         version: 15.3.1(ttsc@0.36.4(typescript@7.0.2))
     devDependencies:
       '@anthropic-ai/sdk':
-        specifier: 0.137.0
-        version: 0.137.0(zod@4.6.7)
+        specifier: 1.8.0
+        version: 1.8.0(zod@4.6.7)
       '@ttsc/unplugin':
         specifier: 0.36.4
         version: 0.36.4(ttsc@0.36.4(typescript@7.0.2))
@@ -1976,8 +1987,8 @@ importers:
         specifier: 'catalog:'
         version: 11.0.0
       drizzle-orm:
-        specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        specifier: 0.45.4
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       stripe:
         specifier: 'catalog:'
         version: 23.0.0(patch_hash=24ec61befefef8ca01f7210393a805eeb572ef1b3dd66b4e2188e3aa4c8a9cae)(@types/node@24.12.4)
@@ -2165,8 +2176,8 @@ importers:
         specifier: 1.11.20
         version: 1.11.20
       drizzle-orm:
-        specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        specifier: 0.45.4
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       eventsource-parser:
         specifier: 3.0.8
         version: 3.0.8
@@ -2283,8 +2294,8 @@ importers:
         specifier: 'catalog:'
         version: 1.0.20
       drizzle-orm:
-        specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        specifier: 0.45.4
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -2317,8 +2328,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/worker-utils
       drizzle-orm:
-        specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        specifier: 0.45.4
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -2369,8 +2380,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/worker-utils
       drizzle-orm:
-        specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        specifier: 0.45.4
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -2412,8 +2423,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/worker-utils
       drizzle-orm:
-        specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        specifier: 0.45.4
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -2488,8 +2499,8 @@ importers:
         specifier: 'catalog:'
         version: 11.19.0(typescript@7.0.2)
       drizzle-orm:
-        specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        specifier: 0.45.4
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -2641,8 +2652,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/worker-utils
       drizzle-orm:
-        specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        specifier: 0.45.4
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
     devDependencies:
       '@cloudflare/workers-types':
         specifier: 'catalog:'
@@ -2678,8 +2689,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/worker-utils
       drizzle-orm:
-        specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        specifier: 0.45.4
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -2730,8 +2741,8 @@ importers:
         specifier: 22.0.1
         version: 22.0.1
       drizzle-orm:
-        specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        specifier: 0.45.4
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       graphql:
         specifier: 16.14.2
         version: 16.14.2
@@ -2810,8 +2821,8 @@ importers:
         specifier: 0.5.4
         version: 0.5.4
       drizzle-orm:
-        specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        specifier: 0.45.4
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -2865,8 +2876,8 @@ importers:
         specifier: 'catalog:'
         version: 0.10.3
       drizzle-orm:
-        specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        specifier: 0.45.4
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -2948,8 +2959,8 @@ importers:
         specifier: 0.9.5
         version: 0.9.5
       drizzle-orm:
-        specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        specifier: 0.45.4
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -2997,8 +3008,8 @@ importers:
         specifier: 4.1.0
         version: 4.1.0
       drizzle-orm:
-        specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        specifier: 0.45.4
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       jose:
         specifier: 'catalog:'
         version: 6.2.12
@@ -3031,8 +3042,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/db
       drizzle-orm:
-        specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        specifier: 0.45.4
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       node-html-markdown:
         specifier: 2.0.0
         version: 2.0.0
@@ -3161,8 +3172,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/worker-utils
       drizzle-orm:
-        specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        specifier: 0.45.4
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -3204,8 +3215,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/worker-utils
       drizzle-orm:
-        specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        specifier: 0.45.4
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       expo-server-sdk:
         specifier: 6.1.0
         version: 6.1.0(patch_hash=7850520582b5b394397b35d1ea195192fe78589d8a6a748fe15177b818c4ed0b)
@@ -3247,8 +3258,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/worker-utils
       drizzle-orm:
-        specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        specifier: 0.45.4
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -3299,8 +3310,8 @@ importers:
         specifier: 'catalog:'
         version: 11.0.0
       drizzle-orm:
-        specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        specifier: 0.45.4
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       workers-tagged-logger:
         specifier: 'catalog:'
         version: 1.0.0
@@ -3345,8 +3356,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/worker-utils
       drizzle-orm:
-        specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        specifier: 0.45.4
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       workers-tagged-logger:
         specifier: 'catalog:'
         version: 1.0.0
@@ -3382,8 +3393,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/worker-utils
       drizzle-orm:
-        specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        specifier: 0.45.4
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -3431,8 +3442,8 @@ importers:
         specifier: 0.0.22
         version: 0.0.22
       drizzle-orm:
-        specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        specifier: 0.45.4
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -3477,8 +3488,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/worker-utils
       drizzle-orm:
-        specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        specifier: 0.45.4
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -3563,8 +3574,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/worker-utils
       drizzle-orm:
-        specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        specifier: 0.45.4
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -3609,8 +3620,8 @@ importers:
         specifier: 10.0.1
         version: 10.0.1
       drizzle-orm:
-        specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        specifier: 0.45.4
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -3749,8 +3760,8 @@ packages:
       zod:
         optional: true
 
-  '@anthropic-ai/sdk@0.137.0':
-    resolution: {integrity: sha512-YpEnbPz8kWF1BWthwUCnRhci7OvDLSUO8NFKoevoPkjNkK9CJeibZITgxr9vhqOP8Le61e5tNDHFTxw1dc6Png==}
+  '@anthropic-ai/sdk@1.8.0':
+    resolution: {integrity: sha512-yDOArk2+Qpd/djEKmZjrv7JZ+pn5iBHARJ9PAdvfhGf4H5wNqTgY/2K0/yDKdQdm8G8hrNQchMlBAHpPK7yBfg==}
     hasBin: true
     peerDependencies:
       zod: 4.6.7
@@ -5984,41 +5995,41 @@ packages:
   '@fontsource-variable/roboto-mono@5.3.0':
     resolution: {integrity: sha512-h5r+KY/6qy8JEOj33JgcrFO81YAnvrc1EAwMpl/EPJLb2OIvOy0/jmB5M7qs7x/uXk5JUP5Ux4LrkeOK7faHkQ==}
 
-  '@formatjs/bigdecimal@0.2.7':
-    resolution: {integrity: sha512-B4+XY/e4u5v261r3a37Kq2ax91gPZSKGyVpx8X5dygAggLlUz+6MeBpmAhaBFGB8WQ4JB1qD+QtKHk9aJkEb9Q==}
+  '@formatjs/bigdecimal@0.2.10':
+    resolution: {integrity: sha512-npIs6UARNOg5amJY5UOVsd6HUQQfzYjet0sa0SWIqzsnVhxLSpaIx2DjoIVrr/vqmjURjvroeW6dItjfy3Uf8A==}
 
   '@formatjs/fast-memoize@3.1.7':
     resolution: {integrity: sha512-zXfhLpvA6T7+efdt9JLbBwZ00tT7NsBMDVnDu8rpHeNNv8KfRZAMo2gkG0k9lK/Nzc//3kJ9pImsfuJxk3KhUA==}
 
-  '@formatjs/intl-durationformat@0.11.1':
-    resolution: {integrity: sha512-Mkuc+Q8/96Hb0w4Pwa9sqkKVQVl75TCaqaXIXHgsVsLDko+FKQhw9n/7BnbonueqPxkQkGYvn8/G2IKzT970og==}
+  '@formatjs/intl-durationformat@0.12.4':
+    resolution: {integrity: sha512-EjUHL8isAQOqXuLxGllgsfIQdLrLNo8iCOQHMqUNY4Fvl52hw6TEP0n9tPnOmQWb5wTUa92NeqyGmwhjQ2lvHA==}
 
-  '@formatjs/intl-getcanonicallocales@3.2.12':
-    resolution: {integrity: sha512-THqQLTJUH2z2A7oE1guW8VzpGpsGFxwWZ+l8cI8Bk75xUU8DxtJoLfKl+5a6fYK26GeDWDWE0UbDhE5SwcLoFg==}
+  '@formatjs/intl-getcanonicallocales@3.3.1':
+    resolution: {integrity: sha512-GkXdVwb/4Y9qJaZ19BguPv2i9Vr+z5MrlmFa/9HR7WK2tMcCWZathuGhn7W/V3sFqUdAVB3uvmGuOxXwc61DJQ==}
 
-  '@formatjs/intl-listformat@8.3.15':
-    resolution: {integrity: sha512-dZEUYngBoAWLgYXvoBX3P6jIk5cg2rva7p5ZJTTn4lsCx/9abUKoPI2Wf59twxl5jgw1SDQMR1MBzJ7oiHwffw==}
+  '@formatjs/intl-listformat@9.0.3':
+    resolution: {integrity: sha512-XamK+7ie16gbBp51AH+K97NfwCoECk36jEbBO9m7HaInoLbG1F3P8M22enKtkifsi/cH9gjp4igFaYtY23h0uA==}
 
-  '@formatjs/intl-locale@5.3.12':
-    resolution: {integrity: sha512-bI5CrvuC6A5PMOIiHX+6ETTHXzUofHw1U/fkI59sQJ+BFbkglxIVVncFPxHf4IHmAqAs/Rlp2bdzTEcLaq2tQw==}
+  '@formatjs/intl-locale@5.4.3':
+    resolution: {integrity: sha512-YdxSbfDifRIew7mukcwITPlhkomfHCcSzzbjEJqOGbod4wrfdUN7SmiZQU2Lr8zs/q/15ntZsthJ8NsW3P30mA==}
 
-  '@formatjs/intl-localematcher@0.9.0':
-    resolution: {integrity: sha512-Z7TD3ssNry1Av1dVDoq/mzpxGyxqWwU0ClWEo+BB3k0JQTeQvUGmeK9WZGYvlqStS0UqkaKXk3dfjsb6NaHAxw==}
+  '@formatjs/intl-localematcher@0.10.1':
+    resolution: {integrity: sha512-gBqglQK9rXuHsLmM8wzTMBy4Xo4d0jamirIVKuEL8F1rwbskWdpMA1kZarSkny+uvr5q/K6GSzE0Rcq1wZLl3g==}
 
-  '@formatjs/intl-numberformat@9.4.3':
-    resolution: {integrity: sha512-absVu2I7FlWl+Buictw2PL8Fl385uab3bEA3TCCTu+0DBHHFE+RTbmPmj0nUVO82U1b2Qw3/OA2I7KKLI48EpQ==}
+  '@formatjs/intl-numberformat@10.0.4':
+    resolution: {integrity: sha512-rQzbAgJcG/RPMR4xbFxMA33HnvXJtStYR0gGY1vcb/6JGmhZcauGE7g5Vch+EOtZkiitloSkHgU5JXmQpTTggg==}
 
-  '@formatjs/intl-pluralrules@6.3.15':
-    resolution: {integrity: sha512-/K6Up6SrvLcTP5mWVHp58A9Uk7I4jYbDYqtYdgKDeSY1HG0bhBMS4eVtqK2nFx8mWWdcHbt9ZqHBcCto573PNg==}
+  '@formatjs/intl-pluralrules@7.0.4':
+    resolution: {integrity: sha512-EeQ8YUs1QOpYLUiNHkHfR1rsOMtQUBQXEQwR9WmJRWfzvVXeYZ7vBeMARtlb2KuHUgdmfXjoin5oNn68hjyrEQ==}
 
-  '@formatjs/intl-relativetimeformat@12.3.15':
-    resolution: {integrity: sha512-AUn+GJmU4z0098f4K8VYTxrOl0hfoTzXVeO0MmunJbn9fP5u0hSK2i8LntLQnediQ1oJDL8pyqZMWCBBSAhPDA==}
+  '@formatjs/intl-relativetimeformat@13.0.3':
+    resolution: {integrity: sha512-5nyIp4F/59A5hcfU6lZphSslpildVSirqudWfygBENGdGSHmggZVjhoad458XWEgtUd6d0JoiwsiUBFLfbqJ9Q==}
 
-  '@formatjs/intl-segmenter@12.2.15':
-    resolution: {integrity: sha512-1AEewdf+fVMgmYdzwHKX1cNLQZ42coRWAiboAtSVlAEM7n23U/DkHxKQ32+AUGDNZY1WsmRtXZkFhiMGxAhbww==}
+  '@formatjs/intl-segmenter@12.3.2':
+    resolution: {integrity: sha512-4y3AXMmlWlTE1anxnZ4mtKnJTyZeA9h3tt+cQKWbv9jV+k10/ILbxnjfFYG6ciuOrKCZ821FI0h+fnPYW6natw==}
 
-  '@formatjs/intl-supportedvaluesof@2.3.11':
-    resolution: {integrity: sha512-oRzzAbJA08psr6AO0jgXAdx4HZ2vGNeja1fgaio2R2ne8DLtGPV+fa3gxI/t8J2dNPOndrwVAZVVfbH6GDFDwA==}
+  '@formatjs/intl-supportedvaluesof@3.0.1':
+    resolution: {integrity: sha512-+9TU+8tqsUqobFzQJEvfQ8Yukt1PYgL5WxYi/yW+hWVNx422wEo/TlVRLvIfdYqlVS048jfyu8piNagfhOV+2A==}
 
   '@fregante/relaxed-json@2.0.0':
     resolution: {integrity: sha512-PyUXQWB42s4jBli435TDiYuVsadwRHnMc27YaLouINktvTWsL3FcKrRMGawTayFk46X+n5bE23RjUTWQwrukWw==}
@@ -6904,15 +6915,27 @@ packages:
       '@opentelemetry/api':
         optional: true
 
-  '@modelcontextprotocol/ext-apps@1.7.5':
-    resolution: {integrity: sha512-TjPH2S2y5UEGKhmI6+XGFuqfqOV4ppe1x6DA3txnUaEWkgtA4G5vo14jGKFZmegdkZ1H4QMLyujLvoU1BEdnAg==}
+  '@modelcontextprotocol/client@2.4.0':
+    resolution: {integrity: sha512-LgrD2OphHuG12vfKFKz6SOnq7bKHQmhGJIAYdD+MZBn2npHEyry6uD8zvktodtl5CQM85MO0anUyD9JwmUmxww==}
+    engines: {node: '>=20'}
+
+  '@modelcontextprotocol/core@2.4.0':
+    resolution: {integrity: sha512-z8QBKqdfXLPzkLQuG4xp8hrVEMm1PZ1IgxMN2sMbJiFiAKOWXnAzogXn2W4aqIBlP1ea6U5yiqVquvUNM1Cj6Q==}
+    engines: {node: '>=20'}
+
+  '@modelcontextprotocol/ext-apps@2.1.0':
+    resolution: {integrity: sha512-clOFd1i/9GfSacMDrmLZDWcFnQpIgUutCqwOx14j5dWq/UpaeIPrctHfG3rDBpSsuB6+1X0oszMG1/0Sc0GccA==}
     engines: {node: '>=20'}
     peerDependencies:
-      '@modelcontextprotocol/sdk': 1.32.2
+      '@modelcontextprotocol/client': ^2.0.0
+      '@modelcontextprotocol/core': ^2.0.0
+      '@modelcontextprotocol/server': ^2.0.0
       react: ^17.0.0 || ^18.0.0 || ^19.0.0
       react-dom: ^17.0.0 || ^18.0.0 || ^19.0.0
       zod: 4.6.7
     peerDependenciesMeta:
+      '@modelcontextprotocol/server':
+        optional: true
       react:
         optional: true
       react-dom:
@@ -8308,155 +8331,155 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@oxfmt/binding-android-arm-eabi@0.73.0':
-    resolution: {integrity: sha512-dhunAdMbi/4o0Y66/+Wl6rpsNqpvE4i26Qw6bB77A97L2lJoktWg6m+X9QOon8iOEEqzD9rEZqFi5uZ4oIzhCA==}
+  '@oxfmt/binding-android-arm-eabi@0.78.0':
+    resolution: {integrity: sha512-1x9NPGQG5WMOOT8spRP4hPbeqwB/P9ayxFo4EUDSle6mLmtYRqE6suXgHr93/S2nnszy77LlIa8klkKdWtHbMw==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [arm]
     os: [android]
 
-  '@oxfmt/binding-android-arm64@0.73.0':
-    resolution: {integrity: sha512-dBoypjC2/xeyKyIhN2waX0/XeoccH9k0lVVe+sGRc4X8HSJVRtqyZDoXdr7bGY9A75c51dX0z0dLDpGQKwCdCg==}
+  '@oxfmt/binding-android-arm64@0.78.0':
+    resolution: {integrity: sha512-1muYaW9SiPEq8NIPGX0B20oUwCx6HWiCsZem/2jU7UsOzoXLT4YxWq6ybdhwKSKl0PyAfvyMyPF7FsI1To7AdA==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [arm64]
     os: [android]
 
-  '@oxfmt/binding-darwin-arm64@0.73.0':
-    resolution: {integrity: sha512-Tn7Y+qWIpCQK+qdYwBcn6YvqeBuPiuG3tcNlYg16a5QL2o3rSmrgBB1nCyYqo0uvc1LNrfQW9/CK2tzFuID/Fg==}
+  '@oxfmt/binding-darwin-arm64@0.78.0':
+    resolution: {integrity: sha512-jl4KJdo8HrVpLmcSYS/7oDXPH8Hzd6VrzgUFRAbY0j6cSRjcDkUnpuAStuNLoqvMtZEi7Rdy68BBriCgWJcy2g==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [arm64]
     os: [darwin]
 
-  '@oxfmt/binding-darwin-x64@0.73.0':
-    resolution: {integrity: sha512-yVb0E0tg/+9Xc9YJCBq66qF1DC/aN5mhb5nnHz0k4ikwkMANtSul2VPDSwjYdXR6/DFimc+pPUgLBqkIa5Ctuw==}
+  '@oxfmt/binding-darwin-x64@0.78.0':
+    resolution: {integrity: sha512-RwOhQgAQi1qV3TeuTfrgGkCWEL3eDFIql/lo4rt2xpGHqyolKa+W5cFbb+M9IvwMwQbplii5Gbv1ZQQPTJlNug==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [x64]
     os: [darwin]
 
-  '@oxfmt/binding-freebsd-x64@0.73.0':
-    resolution: {integrity: sha512-IKR4lFnBkYNL9Uqdxa5GMTQLvnLj+3sDwTvh2atHCzah0xeo+1xR5bigRU8uyXlOsA4VpXUn0UAimq4E4RBGmQ==}
+  '@oxfmt/binding-freebsd-x64@0.78.0':
+    resolution: {integrity: sha512-MAXydj01mLjMUlnmo7sYVm+7kdBdU9Nwaux2Q1f9oLNqt3CCdego1oMoZ30qDyZQGQXfVJZEU1yRV7mSzwKDVA==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [x64]
     os: [freebsd]
 
-  '@oxfmt/binding-linux-arm-gnueabihf@0.73.0':
-    resolution: {integrity: sha512-7qnZ4g0ZCO3aZevOOQpZIABYwwXJW1lLDo2elviGdPQ0i11255xKEMFsi97fC1/nauQFseCJfELUy/k2JoOP+g==}
+  '@oxfmt/binding-linux-arm-gnueabihf@0.78.0':
+    resolution: {integrity: sha512-rz6FVZRiWsq3O2YQgCoqZRwaQQaPQ70NBks4+KINjjPJOjBTd8g/iq6ynS97ode+qKGlhXtpc/xCl8LHzfOjyQ==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [arm]
     os: [linux]
 
-  '@oxfmt/binding-linux-arm-musleabihf@0.73.0':
-    resolution: {integrity: sha512-36eBico2j/WPB84gb4FYd/jjqGCKOwU4M+TWLBUIqlnzTozQueLy0joA5BwsSp2OZFVkOlpCwvA3ndPamdiyLw==}
+  '@oxfmt/binding-linux-arm-musleabihf@0.78.0':
+    resolution: {integrity: sha512-lIK0XJi4JP1FnhuLjR/JWhQHGghZc+ghFNnbZTQC8kxsmrkW3ex8CeF7fp0FT+rEP0Nm6voCYkasL8poVWA9sQ==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [arm]
     os: [linux]
 
-  '@oxfmt/binding-linux-arm64-gnu@0.73.0':
-    resolution: {integrity: sha512-VZ3cSgCAT18knKo52DcACmAuIoqG6qVEyeZRFbJd0xmYQ8GyYjuBc6IAh6MZHijT6q7p4/HPI+6ZWsCuhdV6iw==}
+  '@oxfmt/binding-linux-arm64-gnu@0.78.0':
+    resolution: {integrity: sha512-o2LJIHfW3ZADOjDVk5c7MM1M8CiAG43GTc4mlJAK23fOHgru4CvnqWedCoCXpIsKokoRdEa7XdQywPGZv1BAiA==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [arm64]
     os: [linux]
     libc: [glibc]
 
-  '@oxfmt/binding-linux-arm64-musl@0.73.0':
-    resolution: {integrity: sha512-8YVzH59XSHcqwXNgc5qK851zCqwpmBgOifARXEPPe5/xTsIbHceYoPZAyqfpYV0CfKmzSaEDBgYHFza4rhx+Zw==}
+  '@oxfmt/binding-linux-arm64-musl@0.78.0':
+    resolution: {integrity: sha512-G+lUaQk94Vo+4byyd8X2+pPXtd7wObpdbvBC8xyozZD0ROSVBI3XpNNR6HECkJq4Q51AwLuJG81f4x+4eqvSrw==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [arm64]
     os: [linux]
     libc: [musl]
 
-  '@oxfmt/binding-linux-ppc64-gnu@0.73.0':
-    resolution: {integrity: sha512-MqRJnmCys0rwOgpWyEidSA7v/bvOqfNDJhPkQoR9mPVYrvSmMaW2Xhdpl28cbTA+brOM1is62GjIvJplVlUVpw==}
+  '@oxfmt/binding-linux-ppc64-gnu@0.78.0':
+    resolution: {integrity: sha512-r76PAZf9/ZgF/iDRaIf8nLsr4x6ZHe/j2QLmWUjoQ46Sa11qMO68a5u5iux3y8vLzqYTS/xtKO9PjjMfyk5png==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [ppc64]
     os: [linux]
     libc: [glibc]
 
-  '@oxfmt/binding-linux-riscv64-gnu@0.73.0':
-    resolution: {integrity: sha512-4t2F3SWJSK/O/kRRFnL0elJzn75fJGGu71gs1HtiWcS80SmJOpkHiwwLnTp9suGdns8VHEPxYS0GTcyVwHKWBA==}
+  '@oxfmt/binding-linux-riscv64-gnu@0.78.0':
+    resolution: {integrity: sha512-SQiXTt/c4aVoRXkJvhf4Y/sA1XYe3XjSMDbdX5PiAssBuHERoGtncQXz0KKWkXPejWTKlAL4mZSQZdHOCiw7TA==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [riscv64]
     os: [linux]
     libc: [glibc]
 
-  '@oxfmt/binding-linux-riscv64-musl@0.73.0':
-    resolution: {integrity: sha512-D8b4I8I1kLdJQFwdFXNV+cwh3xWSiNKofjdGUk0nDpc0AHOds8T+poGbP9RWQMvgsvMb9OMgp/aV7ahBR37TbQ==}
+  '@oxfmt/binding-linux-riscv64-musl@0.78.0':
+    resolution: {integrity: sha512-VNB3wFUx/rAqwVNW+uyXxb+c0HUrmcS51UPkFMDWJY95c6Tck6u6HOyVLsqiYoC8kh2mGlwanYmjb/R2McvN0A==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [riscv64]
     os: [linux]
     libc: [musl]
 
-  '@oxfmt/binding-linux-s390x-gnu@0.73.0':
-    resolution: {integrity: sha512-QrC1S5VL1+N5rvorB15jH7CPvjVHA7GyUI5oVEd8Bd9m5605RDBQYTxDQ920DuylRoZOh2V7/xXpfCtFUrojUQ==}
+  '@oxfmt/binding-linux-s390x-gnu@0.78.0':
+    resolution: {integrity: sha512-1nbI0Y7SXwx2f4mJmKt58MaDdjAcoaYM90pBMGdcZCsTW2taFW1/MUi3uQGRPAN2n+3PldCdO9m+D6x+gU/heg==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [s390x]
     os: [linux]
     libc: [glibc]
 
-  '@oxfmt/binding-linux-x64-gnu@0.73.0':
-    resolution: {integrity: sha512-dFcUKQPltCEPa+YlkF3zqufn6nJPZdG73LpnjBvZFFsU3laCMssDXSYB99mVaj43FqdEgjpz5TO6gbYXcczd9g==}
+  '@oxfmt/binding-linux-x64-gnu@0.78.0':
+    resolution: {integrity: sha512-I2z2ISPjrl3CSRF5fmQkNnoh46UVU1GjM1V0+COJyNZcj0SDNM4DrPP2/gXCX38YJ1P2BL6sF2VdsJ+pEYEbJQ==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [x64]
     os: [linux]
     libc: [glibc]
 
-  '@oxfmt/binding-linux-x64-musl@0.73.0':
-    resolution: {integrity: sha512-LmQe+nV8e+eUwfPNCxDF+owbsg88toBiR/8rZRgVOeKQP3MaGefXZRvBoc1UG37iWEQ/9JlCXG9Mc4nf4N3agw==}
+  '@oxfmt/binding-linux-x64-musl@0.78.0':
+    resolution: {integrity: sha512-YHt5nKKFxT4SruI57FHnEhGRSDuoFqNoAM3moYCClg70mjjS39gBBbdzaZv+N0otdzvQVuHTPu3jFu5tpqC3XQ==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [x64]
     os: [linux]
     libc: [musl]
 
-  '@oxfmt/binding-openharmony-arm64@0.73.0':
-    resolution: {integrity: sha512-8weOr1OKknE0G2DbR6ejJUT9AOsoBU6cXlsetmbihHv1K+bK7qP61T6lJxY0k/aAO7GyOJiRGNlL+04r4eH8Xg==}
+  '@oxfmt/binding-openharmony-arm64@0.78.0':
+    resolution: {integrity: sha512-WH21lBMU+LYzF7aMeozTZlyc44oa2F+I5OtQ7RwuidCDoAxgTyN1s34rx0PBYrio56+2G88U9VOnYJsyV7VMHQ==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [arm64]
     os: [openharmony]
 
-  '@oxfmt/binding-win32-arm64-msvc@0.73.0':
-    resolution: {integrity: sha512-mZV+QxXYgb8E18gzAFItb937VIsE4dqWdStrD3tRRC52UubOYEuU+e7NaIqUsGdB5YsJqNeuck3Ue/af2r9wyA==}
+  '@oxfmt/binding-win32-arm64-msvc@0.78.0':
+    resolution: {integrity: sha512-uNQqHJrtHIiSl8pMbhDktmGpA1hqwldWNO8kbNpNFhVt+BYk4C3Ge8nlJgkRtGjtMam0+542G5UQJJG6lLePbg==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [arm64]
     os: [win32]
 
-  '@oxfmt/binding-win32-ia32-msvc@0.73.0':
-    resolution: {integrity: sha512-QJPUsbgUb97ZPPMkFUq6VQq0fLhC4Np19KL9aB/qKVwXnpKE6MIiILXqzhKnQ/UbnEDjKJ7Xv1d6zH4bYPCUdQ==}
+  '@oxfmt/binding-win32-ia32-msvc@0.78.0':
+    resolution: {integrity: sha512-W6omURRT39EHBPH4Z8sUPIOzWVjMbhCCCWcfT0sa6aeC+vOXNyBAJmpQRh5//KfPDX96jJlNith9i4N65wxB+Q==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [ia32]
     os: [win32]
 
-  '@oxfmt/binding-win32-x64-msvc@0.73.0':
-    resolution: {integrity: sha512-cGcze2fu+ykIaFtkEvZlkZ3HvnCLk+WISthtq99zWTWn0x13t5L9TxvGdLZMUMvtfYR+ICkiCwKnguVubdcw0w==}
+  '@oxfmt/binding-win32-x64-msvc@0.78.0':
+    resolution: {integrity: sha512-r9rWKeDVc7lIrj0Us9kP08W7FudYAoWyEdO40qnKk20bHiTbW/z2v4LoIxxUENQyFfApbeV2Gl9XsEgY/tY1dA==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [x64]
     os: [win32]
 
-  '@oxlint-tsgolint/darwin-arm64@7.0.2004':
-    resolution: {integrity: sha512-uJk3ttju7Lz+Nv8WG4CsLyewoL1qf/Ny8S8OksJ7Bm/F14Tc9gMfW6arM1PCc57IzH/X/I79YsCWTgxX1FKibQ==}
+  '@oxlint-tsgolint/darwin-arm64@7.0.2006':
+    resolution: {integrity: sha512-uc0MEHXZUDW23Zmo5X28eSNeSnP17jKnh9GiehpVZqhfy99ks8spyXT5Llar3tjDN7ppnQN0Qd9FK6WNkdD+fQ==}
     cpu: [arm64]
     os: [darwin]
 
-  '@oxlint-tsgolint/darwin-x64@7.0.2004':
-    resolution: {integrity: sha512-0BFfHTzDxNDFPcu0UZAXT6CyCJHAXM0dZveyDb4KEHa2qF/DSnOKOrmvK/wFuFol9kvijbGM9JfuOsor+zWXRw==}
+  '@oxlint-tsgolint/darwin-x64@7.0.2006':
+    resolution: {integrity: sha512-+x1/pa3S3VMC9cif8XKTOCQUuqRT+wu1Ix+FK5svXa2xbXCuE7+4S0SfmuSnK/mk9AI5+xBxZFhILxmCPUZ1hA==}
     cpu: [x64]
     os: [darwin]
 
-  '@oxlint-tsgolint/linux-arm64@7.0.2004':
-    resolution: {integrity: sha512-TAehQc+qdRXyDN3nl/r/3/oPrBVrbtrDeGMkFyG6mf+XphpoJ2lAMVFLclyvrVZCw02RbKROjyw8h72XwQQHcw==}
+  '@oxlint-tsgolint/linux-arm64@7.0.2006':
+    resolution: {integrity: sha512-90v7HX8m54kHXn5DpjNEN18Fb7xwJMREe/wji3USyAf9pTMv7a3qZ3cPoLViIcIzxPLmkcYZIs1j1H3Z2gbVLA==}
     cpu: [arm64]
     os: [linux]
 
-  '@oxlint-tsgolint/linux-x64@7.0.2004':
-    resolution: {integrity: sha512-LPunZvm6ZbWPfHMAyfZf9ci3HHvNEzLejO8zdqO3GoVGoSEHqqufHUD7+OgeatVSaJP7uXDJ2HaNOHIoH7go4Q==}
+  '@oxlint-tsgolint/linux-x64@7.0.2006':
+    resolution: {integrity: sha512-/k0wsEqHiA5dWBJYuld3Vecv6bIhKCasxpho/aFkvh870Qox33MuTkKUGWIVm/njAxw7W4pu1a/Xfa3jwuKuPQ==}
     cpu: [x64]
     os: [linux]
 
-  '@oxlint-tsgolint/win32-arm64@7.0.2004':
-    resolution: {integrity: sha512-FVWplzDImWhiuawnIZVETaQecv4GWom6Jv4Fx2xj7hhXXDZ5okEgiw1gTCImHTIQsi2ycC5oSxVwrn69bMh7iw==}
+  '@oxlint-tsgolint/win32-arm64@7.0.2006':
+    resolution: {integrity: sha512-CQT5sqcLZLNZSWLzUUEjQmp74UX8h1agp3ZJ8pfRktHbx6gfBa8a7CjrnRrZ9VXlwnXVkpw7m5KBO6y+S5MQRA==}
     cpu: [arm64]
     os: [win32]
 
-  '@oxlint-tsgolint/win32-x64@7.0.2004':
-    resolution: {integrity: sha512-7PsxuUx11Ry9DYTWcljTzRbmZY9B6O9fFFfZV+aodQEMy6pfRT3fhoQRv9PtGN/89z1pPz3nFKrsFm6WqNtX7w==}
+  '@oxlint-tsgolint/win32-x64@7.0.2006':
+    resolution: {integrity: sha512-VZsGowXcp3vQNkjoGeVCOTf4aGrRpRk6bBJWhefnJVPr6z+dX+LKqqHfwaqnFvg66Q2iJpXqklRW38YO21ee+Q==}
     cpu: [x64]
     os: [win32]
 
@@ -11255,16 +11278,9 @@ packages:
     resolution: {integrity: sha512-YxFiiG4YDAtX7WMN7RuhHZLeTmRRAOyCbr+zB8e3AQzHPnUhS8zXjB1+cniPVQI3xbWsQPM0X2aaIkO/ME0ymw==}
     engines: {node: '>=18.0.0'}
 
-  '@smithy/core@3.23.11':
-    resolution: {integrity: sha512-952rGf7hBRnhUIaeLp6q4MptKW8sPFe5VvkoZ5qIzFAtx6c/QZ/54FS3yootsyUSf9gJX/NBqEBNdNR7jMIlpQ==}
+  '@smithy/core@3.40.0':
+    resolution: {integrity: sha512-DssGno52pzZ5m6RlDtyKuBIpZNPg9pqgs0CnNDKz9IatxCsmvNmJNn5Zn6rf77MthZo9wf89OvZFhTY/RwxhxQ==}
     engines: {node: '>=18.0.0'}
-
-  '@smithy/core@3.24.4':
-    resolution: {integrity: sha512-3UNRKEyQyAgVgM0LGlerCLm+ChZWZ1GPfde+jBEW6bm6bSBGU1p0EbblaUV3unbhwvidjLA5Zs3sOs7mnZwvAw==}
-    engines: {node: '>=18.0.0'}
-    deprecated: |-
-      Deprecated due to a bug in custom logger data redaction. Upgrade to the latest version. If you used a custom logger with this
-        version, review your logs and rotate any credentials or other secrets. See https://github.com/aws/aws-sdk-js-v3/issues/8393.
 
   '@smithy/credential-provider-imds@4.2.12':
     resolution: {integrity: sha512-cr2lR792vNZcYMriSIj+Um3x9KWrjcu98kn234xA6reOAFMmbRpQMOv8KPgEmLLtx3eldU6c5wALKFqNOhugmg==}
@@ -11382,12 +11398,9 @@ packages:
     resolution: {integrity: sha512-B/FBwO3MVOL00DaRSXfXfa/TRXRheagt/q5A2NM13u7q+sHS59EOVGQNfG7DkmVtdQm5m3vOosoKAXSqn/OEgw==}
     engines: {node: '>=18.0.0'}
 
-  '@smithy/smithy-client@4.12.5':
-    resolution: {integrity: sha512-UqwYawyqSr/aog8mnLnfbPurS0gi4G7IYDcD28cUIBhsvWs1+rQcL2IwkUQ+QZ7dibaoRzhNF99fAQ9AUcO00w==}
+  '@smithy/smithy-client@4.15.2':
+    resolution: {integrity: sha512-qweA7dHwcWmq8IN2mIGo7nAfeji1nwWBra+P3nz4R8W8yoQYE6Iy2bN33I0W3d50MN/V5EiDY/nElr4EHITsrg==}
     engines: {node: '>=18.0.0'}
-    deprecated: |-
-      Deprecated due to a bug in custom logger data redaction. Upgrade to the latest version. If you used a custom logger with
-        this version, review your logs and rotate any credentials or other secrets. See https://github.com/aws/aws-sdk-js-v3/issues/8393.
 
   '@smithy/types@4.13.1':
     resolution: {integrity: sha512-787F3yzE2UiJIQ+wYW1CVg2odHjmaWLGksnKQHUrK/lYZSEcy1msuLVvxaR/sI2/aDe9U+TBuLsXnr3vod1g0g==}
@@ -11395,6 +11408,10 @@ packages:
 
   '@smithy/types@4.14.2':
     resolution: {integrity: sha512-P+otAxbV4CqBybp7EkcJCrig63yE2E7PuNVOmilVMRcx/O+QDzGULTrKsq4DV13gSfak9ObPrWaHl/9bL5YcWw==}
+    engines: {node: '>=18.0.0'}
+
+  '@smithy/types@4.20.0':
+    resolution: {integrity: sha512-lCA6QG22dPk9ecHbv91jDQZsmtPUjdS1aE2Il6NNPqe7DrYc0dZQi6DhcESk2KYXH2sp5xbAcGdYMZDFnuzA2A==}
     engines: {node: '>=18.0.0'}
 
   '@smithy/url-parser@4.2.12':
@@ -15131,8 +15148,8 @@ packages:
     resolution: {integrity: sha512-nI4U3TottKAcAD9LLud4Cb7b2QztQMUEfHbvhTH09bqXTxnSie8WnjPALV/WMCrJZ6UV/qHJ6L03OqO3LcdYZw==}
     engines: {node: '>=12'}
 
-  dotenv@18.0.8:
-    resolution: {integrity: sha512-2KDeoFoK/zRtcnbunCDlLG5VWVMcyqeQc6iK65o231nfNAcuGrKoqUQfJFUtBI+QlShk5HKIHxwebBtUl3rEfA==}
+  dotenv@18.0.10:
+    resolution: {integrity: sha512-89FAA1xchzK2mxVWdr5F/0rldwiueXs6zJM86rO66EzekR1iBdiXRthyG+m5GvkJaFH3C2LESzamTkgndmLT2A==}
     engines: {node: '>=12'}
     hasBin: true
 
@@ -15149,8 +15166,8 @@ packages:
     resolution: {integrity: sha512-YCYqxTLIB2OCqf6w9/Vef13baBVbwQIPcbT4Y56AfO6B9ajZhDhD8Jkveg/hJvT/iuMloKD/IYYkyMMNhr7Kqg==}
     hasBin: true
 
-  drizzle-orm@0.45.2:
-    resolution: {integrity: sha512-kY0BSaTNYWnoDMVoyY8uxmyHjpJW1geOmBMdSSicKo9CIIWkSxMIj2rkeSR51b8KAPB7m+qysjuHme5nKP+E5Q==}
+  drizzle-orm@0.45.4:
+    resolution: {integrity: sha512-NiM1YZpJ2UxyeE67DpDDZ+Tsw4YLX3trSlkNT7Tm9eKoUNb1LvaAaQzXgYQsWs+AQ9TUmmwMmBOCXuqqxUWKKQ==}
     peerDependencies:
       '@aws-sdk/client-rds-data': '>=3'
       '@cloudflare/workers-types': '>=4'
@@ -15158,6 +15175,7 @@ packages:
       '@libsql/client': '>=0.10.0'
       '@libsql/client-wasm': '>=0.10.0'
       '@neondatabase/serverless': '>=0.10.0'
+      '@netlify/db': '>=0.4.0'
       '@op-engineering/op-sqlite': '>=2'
       '@opentelemetry/api': ^1.4.1
       '@planetscale/database': '>=1.13'
@@ -15193,6 +15211,8 @@ packages:
       '@libsql/client-wasm':
         optional: true
       '@neondatabase/serverless':
+        optional: true
+      '@netlify/db':
         optional: true
       '@op-engineering/op-sqlite':
         optional: true
@@ -19248,12 +19268,12 @@ packages:
     resolution: {integrity: sha512-oa5KKSDNLHZGaiqIGAbCWXeN9IJUAz9MElWcQX90epDxdKc9Hrt/BsLj3K4gDqfAYa5dwdH+ZCFJG9hR74fiGg==}
     engines: {node: ^20.19.0 || >=22.12.0}
 
-  oxfmt@0.73.0:
-    resolution: {integrity: sha512-Ke4xbpuzqIBP4bkd48q815RhqWNJqOBzxVA9199M4qcF0y0LtpUv7UTg1dJ5ea6jw0RBUDZvX3qOUMNmmxfxbw==}
+  oxfmt@0.78.0:
+    resolution: {integrity: sha512-uagX+70mKqh/YqxB6ON/lkxVPH6E1Z7pfP2x6XVRPPyiDCZtX6o1xIEeXAIXJ/2wA5ViX4RFuW+IAQn85yJdWg==}
     engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
     peerDependencies:
-      '@astrojs/compiler-rs': ^0.4.0 || ^0.5.0
+      '@astrojs/compiler-rs': ^0.5.0
       svelte: ^5.0.0
       vite-plus: '*'
     peerDependenciesMeta:
@@ -19269,8 +19289,8 @@ packages:
     peerDependencies:
       oxlint: '>=1.0.0'
 
-  oxlint-tsgolint@7.0.2004:
-    resolution: {integrity: sha512-vQ9WDF3fiZJvRdSDosNOflerOCOpwol6vWzVDxW76RcU19cjTh7engvkHLvmv+tzedR8fAiJUVUGr6IVZdkzXQ==}
+  oxlint-tsgolint@7.0.2006:
+    resolution: {integrity: sha512-5B3UtH71kycPHUC1kFEIffivEAs49SUmkJuHZOZnTY0NPj4legp0bcsCQucuLVNCoJzDucS68P2C4WIhP+LypQ==}
     hasBin: true
 
   oxlint@1.88.0:
@@ -22873,7 +22893,7 @@ snapshots:
     optionalDependencies:
       zod: 4.6.7
 
-  '@anthropic-ai/sdk@0.137.0(zod@4.6.7)':
+  '@anthropic-ai/sdk@1.8.0(zod@4.6.7)':
     dependencies:
       '@opentelemetry/api': 1.9.1
       json-schema-to-ts: 3.1.1
@@ -23068,7 +23088,7 @@ snapshots:
       '@aws-sdk/util-user-agent-browser': 3.972.8
       '@aws-sdk/util-user-agent-node': 3.973.7
       '@smithy/config-resolver': 4.4.11
-      '@smithy/core': 3.23.11
+      '@smithy/core': 3.40.0
       '@smithy/eventstream-serde-browser': 4.2.12
       '@smithy/eventstream-serde-config-resolver': 4.3.12
       '@smithy/eventstream-serde-node': 4.2.12
@@ -23086,7 +23106,7 @@ snapshots:
       '@smithy/node-config-provider': 4.3.12
       '@smithy/node-http-handler': 4.4.16
       '@smithy/protocol-http': 5.3.12
-      '@smithy/smithy-client': 4.12.5
+      '@smithy/smithy-client': 4.15.2
       '@smithy/types': 4.13.1
       '@smithy/url-parser': 4.2.12
       '@smithy/util-base64': 4.3.2
@@ -23108,12 +23128,12 @@ snapshots:
     dependencies:
       '@aws-sdk/types': 3.973.6
       '@aws-sdk/xml-builder': 3.972.11
-      '@smithy/core': 3.23.11
+      '@smithy/core': 3.40.0
       '@smithy/node-config-provider': 4.3.12
       '@smithy/property-provider': 4.2.12
       '@smithy/protocol-http': 5.3.12
       '@smithy/signature-v4': 5.3.12
-      '@smithy/smithy-client': 4.12.5
+      '@smithy/smithy-client': 4.15.2
       '@smithy/types': 4.13.1
       '@smithy/util-base64': 4.3.2
       '@smithy/util-middleware': 4.2.12
@@ -23122,7 +23142,7 @@ snapshots:
 
   '@aws-sdk/crc64-nvme@3.972.5':
     dependencies:
-      '@smithy/types': 4.13.1
+      '@smithy/types': 4.14.2
       tslib: 2.8.1
 
   '@aws-sdk/credential-provider-env@3.972.18':
@@ -23130,7 +23150,7 @@ snapshots:
       '@aws-sdk/core': 3.973.20
       '@aws-sdk/types': 3.973.6
       '@smithy/property-provider': 4.2.12
-      '@smithy/types': 4.13.1
+      '@smithy/types': 4.14.2
       tslib: 2.8.1
 
   '@aws-sdk/credential-provider-http@3.972.20':
@@ -23141,8 +23161,8 @@ snapshots:
       '@smithy/node-http-handler': 4.4.16
       '@smithy/property-provider': 4.2.12
       '@smithy/protocol-http': 5.3.12
-      '@smithy/smithy-client': 4.12.5
-      '@smithy/types': 4.13.1
+      '@smithy/smithy-client': 4.15.2
+      '@smithy/types': 4.14.2
       '@smithy/util-stream': 4.5.19
       tslib: 2.8.1
 
@@ -23160,7 +23180,7 @@ snapshots:
       '@smithy/credential-provider-imds': 4.2.12
       '@smithy/property-provider': 4.2.12
       '@smithy/shared-ini-file-loader': 4.4.7
-      '@smithy/types': 4.13.1
+      '@smithy/types': 4.14.2
       tslib: 2.8.1
     transitivePeerDependencies:
       - aws-crt
@@ -23173,7 +23193,7 @@ snapshots:
       '@smithy/property-provider': 4.2.12
       '@smithy/protocol-http': 5.3.12
       '@smithy/shared-ini-file-loader': 4.4.7
-      '@smithy/types': 4.13.1
+      '@smithy/types': 4.14.2
       tslib: 2.8.1
     transitivePeerDependencies:
       - aws-crt
@@ -23201,7 +23221,7 @@ snapshots:
       '@aws-sdk/types': 3.973.6
       '@smithy/property-provider': 4.2.12
       '@smithy/shared-ini-file-loader': 4.4.7
-      '@smithy/types': 4.13.1
+      '@smithy/types': 4.14.2
       tslib: 2.8.1
 
   '@aws-sdk/credential-provider-sso@3.972.20':
@@ -23212,7 +23232,7 @@ snapshots:
       '@aws-sdk/types': 3.973.6
       '@smithy/property-provider': 4.2.12
       '@smithy/shared-ini-file-loader': 4.4.7
-      '@smithy/types': 4.13.1
+      '@smithy/types': 4.14.2
       tslib: 2.8.1
     transitivePeerDependencies:
       - aws-crt
@@ -23224,7 +23244,7 @@ snapshots:
       '@aws-sdk/types': 3.973.6
       '@smithy/property-provider': 4.2.12
       '@smithy/shared-ini-file-loader': 4.4.7
-      '@smithy/types': 4.13.1
+      '@smithy/types': 4.14.2
       tslib: 2.8.1
     transitivePeerDependencies:
       - aws-crt
@@ -23295,11 +23315,11 @@ snapshots:
       '@aws-sdk/core': 3.973.20
       '@aws-sdk/types': 3.973.6
       '@aws-sdk/util-arn-parser': 3.972.3
-      '@smithy/core': 3.23.11
+      '@smithy/core': 3.40.0
       '@smithy/node-config-provider': 4.3.12
       '@smithy/protocol-http': 5.3.12
       '@smithy/signature-v4': 5.3.12
-      '@smithy/smithy-client': 4.12.5
+      '@smithy/smithy-client': 4.15.2
       '@smithy/types': 4.13.1
       '@smithy/util-config-provider': 4.2.2
       '@smithy/util-middleware': 4.2.12
@@ -23318,7 +23338,7 @@ snapshots:
       '@aws-sdk/core': 3.973.20
       '@aws-sdk/types': 3.973.6
       '@aws-sdk/util-endpoints': 3.996.5
-      '@smithy/core': 3.23.11
+      '@smithy/core': 3.40.0
       '@smithy/protocol-http': 5.3.12
       '@smithy/types': 4.13.1
       '@smithy/util-retry': 4.2.12
@@ -23339,7 +23359,7 @@ snapshots:
       '@aws-sdk/util-user-agent-browser': 3.972.8
       '@aws-sdk/util-user-agent-node': 3.973.7
       '@smithy/config-resolver': 4.4.11
-      '@smithy/core': 3.23.11
+      '@smithy/core': 3.40.0
       '@smithy/fetch-http-handler': 5.3.15
       '@smithy/hash-node': 4.2.12
       '@smithy/invalid-dependency': 4.2.12
@@ -23351,8 +23371,8 @@ snapshots:
       '@smithy/node-config-provider': 4.3.12
       '@smithy/node-http-handler': 4.7.4
       '@smithy/protocol-http': 5.3.12
-      '@smithy/smithy-client': 4.12.5
-      '@smithy/types': 4.13.1
+      '@smithy/smithy-client': 4.15.2
+      '@smithy/types': 4.14.2
       '@smithy/url-parser': 4.2.12
       '@smithy/util-base64': 4.3.2
       '@smithy/util-body-length-browser': 4.2.2
@@ -23382,7 +23402,7 @@ snapshots:
       '@aws-sdk/util-format-url': 3.972.8
       '@smithy/middleware-endpoint': 4.4.25
       '@smithy/protocol-http': 5.3.12
-      '@smithy/smithy-client': 4.12.5
+      '@smithy/smithy-client': 4.15.2
       '@smithy/types': 4.13.1
       tslib: 2.8.1
 
@@ -23402,7 +23422,7 @@ snapshots:
       '@aws-sdk/types': 3.973.6
       '@smithy/property-provider': 4.2.12
       '@smithy/shared-ini-file-loader': 4.4.7
-      '@smithy/types': 4.13.1
+      '@smithy/types': 4.14.2
       tslib: 2.8.1
     transitivePeerDependencies:
       - aws-crt
@@ -26451,49 +26471,49 @@ snapshots:
 
   '@fontsource-variable/roboto-mono@5.3.0': {}
 
-  '@formatjs/bigdecimal@0.2.7': {}
+  '@formatjs/bigdecimal@0.2.10': {}
 
   '@formatjs/fast-memoize@3.1.7': {}
 
-  '@formatjs/intl-durationformat@0.11.1':
+  '@formatjs/intl-durationformat@0.12.4':
     dependencies:
-      '@formatjs/bigdecimal': 0.2.7
-      '@formatjs/intl-localematcher': 0.9.0
+      '@formatjs/bigdecimal': 0.2.10
+      '@formatjs/intl-localematcher': 0.10.1
 
-  '@formatjs/intl-getcanonicallocales@3.2.12': {}
+  '@formatjs/intl-getcanonicallocales@3.3.1': {}
 
-  '@formatjs/intl-listformat@8.3.15':
+  '@formatjs/intl-listformat@9.0.3':
     dependencies:
-      '@formatjs/intl-localematcher': 0.9.0
+      '@formatjs/intl-localematcher': 0.10.1
 
-  '@formatjs/intl-locale@5.3.12':
+  '@formatjs/intl-locale@5.4.3':
     dependencies:
-      '@formatjs/intl-getcanonicallocales': 3.2.12
-      '@formatjs/intl-supportedvaluesof': 2.3.11
+      '@formatjs/intl-getcanonicallocales': 3.3.1
+      '@formatjs/intl-supportedvaluesof': 3.0.1
 
-  '@formatjs/intl-localematcher@0.9.0':
+  '@formatjs/intl-localematcher@0.10.1':
     dependencies:
       '@formatjs/fast-memoize': 3.1.7
 
-  '@formatjs/intl-numberformat@9.4.3':
+  '@formatjs/intl-numberformat@10.0.4':
     dependencies:
-      '@formatjs/bigdecimal': 0.2.7
-      '@formatjs/intl-localematcher': 0.9.0
+      '@formatjs/bigdecimal': 0.2.10
+      '@formatjs/intl-localematcher': 0.10.1
 
-  '@formatjs/intl-pluralrules@6.3.15':
+  '@formatjs/intl-pluralrules@7.0.4':
     dependencies:
-      '@formatjs/bigdecimal': 0.2.7
-      '@formatjs/intl-localematcher': 0.9.0
+      '@formatjs/bigdecimal': 0.2.10
+      '@formatjs/intl-localematcher': 0.10.1
 
-  '@formatjs/intl-relativetimeformat@12.3.15':
+  '@formatjs/intl-relativetimeformat@13.0.3':
     dependencies:
-      '@formatjs/intl-localematcher': 0.9.0
+      '@formatjs/intl-localematcher': 0.10.1
 
-  '@formatjs/intl-segmenter@12.2.15':
+  '@formatjs/intl-segmenter@12.3.2':
     dependencies:
-      '@formatjs/intl-localematcher': 0.9.0
+      '@formatjs/intl-localematcher': 0.10.1
 
-  '@formatjs/intl-supportedvaluesof@2.3.11':
+  '@formatjs/intl-supportedvaluesof@3.0.1':
     dependencies:
       '@formatjs/fast-memoize': 3.1.7
 
@@ -27851,9 +27871,24 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@modelcontextprotocol/ext-apps@1.7.5(@modelcontextprotocol/sdk@1.32.2(@cfworker/json-schema@4.1.1)(zod@4.6.7))(react-dom@19.2.6(react@19.3.0))(react@19.3.0)(zod@4.6.7)':
+  '@modelcontextprotocol/client@2.4.0':
     dependencies:
-      '@modelcontextprotocol/sdk': 1.32.2(@cfworker/json-schema@4.1.1)(zod@4.6.7)
+      '@modelcontextprotocol/core': 2.4.0
+      cross-spawn: 7.0.6
+      eventsource: 3.0.7
+      eventsource-parser: 3.0.8
+      jose: 6.2.12
+      pkce-challenge: 5.0.1
+      zod: 4.6.7
+
+  '@modelcontextprotocol/core@2.4.0':
+    dependencies:
+      zod: 4.6.7
+
+  '@modelcontextprotocol/ext-apps@2.1.0(@modelcontextprotocol/client@2.4.0)(@modelcontextprotocol/core@2.4.0)(react-dom@19.2.6(react@19.3.0))(react@19.3.0)(zod@4.6.7)':
+    dependencies:
+      '@modelcontextprotocol/client': 2.4.0
+      '@modelcontextprotocol/core': 2.4.0
       '@standard-schema/spec': 1.1.0
       zod: 4.6.7
     optionalDependencies:
@@ -28905,79 +28940,79 @@ snapshots:
   '@oxc-transform/binding-win32-x64-msvc@0.111.0':
     optional: true
 
-  '@oxfmt/binding-android-arm-eabi@0.73.0':
+  '@oxfmt/binding-android-arm-eabi@0.78.0':
     optional: true
 
-  '@oxfmt/binding-android-arm64@0.73.0':
+  '@oxfmt/binding-android-arm64@0.78.0':
     optional: true
 
-  '@oxfmt/binding-darwin-arm64@0.73.0':
+  '@oxfmt/binding-darwin-arm64@0.78.0':
     optional: true
 
-  '@oxfmt/binding-darwin-x64@0.73.0':
+  '@oxfmt/binding-darwin-x64@0.78.0':
     optional: true
 
-  '@oxfmt/binding-freebsd-x64@0.73.0':
+  '@oxfmt/binding-freebsd-x64@0.78.0':
     optional: true
 
-  '@oxfmt/binding-linux-arm-gnueabihf@0.73.0':
+  '@oxfmt/binding-linux-arm-gnueabihf@0.78.0':
     optional: true
 
-  '@oxfmt/binding-linux-arm-musleabihf@0.73.0':
+  '@oxfmt/binding-linux-arm-musleabihf@0.78.0':
     optional: true
 
-  '@oxfmt/binding-linux-arm64-gnu@0.73.0':
+  '@oxfmt/binding-linux-arm64-gnu@0.78.0':
     optional: true
 
-  '@oxfmt/binding-linux-arm64-musl@0.73.0':
+  '@oxfmt/binding-linux-arm64-musl@0.78.0':
     optional: true
 
-  '@oxfmt/binding-linux-ppc64-gnu@0.73.0':
+  '@oxfmt/binding-linux-ppc64-gnu@0.78.0':
     optional: true
 
-  '@oxfmt/binding-linux-riscv64-gnu@0.73.0':
+  '@oxfmt/binding-linux-riscv64-gnu@0.78.0':
     optional: true
 
-  '@oxfmt/binding-linux-riscv64-musl@0.73.0':
+  '@oxfmt/binding-linux-riscv64-musl@0.78.0':
     optional: true
 
-  '@oxfmt/binding-linux-s390x-gnu@0.73.0':
+  '@oxfmt/binding-linux-s390x-gnu@0.78.0':
     optional: true
 
-  '@oxfmt/binding-linux-x64-gnu@0.73.0':
+  '@oxfmt/binding-linux-x64-gnu@0.78.0':
     optional: true
 
-  '@oxfmt/binding-linux-x64-musl@0.73.0':
+  '@oxfmt/binding-linux-x64-musl@0.78.0':
     optional: true
 
-  '@oxfmt/binding-openharmony-arm64@0.73.0':
+  '@oxfmt/binding-openharmony-arm64@0.78.0':
     optional: true
 
-  '@oxfmt/binding-win32-arm64-msvc@0.73.0':
+  '@oxfmt/binding-win32-arm64-msvc@0.78.0':
     optional: true
 
-  '@oxfmt/binding-win32-ia32-msvc@0.73.0':
+  '@oxfmt/binding-win32-ia32-msvc@0.78.0':
     optional: true
 
-  '@oxfmt/binding-win32-x64-msvc@0.73.0':
+  '@oxfmt/binding-win32-x64-msvc@0.78.0':
     optional: true
 
-  '@oxlint-tsgolint/darwin-arm64@7.0.2004':
+  '@oxlint-tsgolint/darwin-arm64@7.0.2006':
     optional: true
 
-  '@oxlint-tsgolint/darwin-x64@7.0.2004':
+  '@oxlint-tsgolint/darwin-x64@7.0.2006':
     optional: true
 
-  '@oxlint-tsgolint/linux-arm64@7.0.2004':
+  '@oxlint-tsgolint/linux-arm64@7.0.2006':
     optional: true
 
-  '@oxlint-tsgolint/linux-x64@7.0.2004':
+  '@oxlint-tsgolint/linux-x64@7.0.2006':
     optional: true
 
-  '@oxlint-tsgolint/win32-arm64@7.0.2004':
+  '@oxlint-tsgolint/win32-arm64@7.0.2006':
     optional: true
 
-  '@oxlint-tsgolint/win32-x64@7.0.2004':
+  '@oxlint-tsgolint/win32-x64@7.0.2006':
     optional: true
 
   '@oxlint/binding-android-arm-eabi@1.88.0':
@@ -31722,12 +31757,12 @@ snapshots:
       '@sentry/types': 7.77.0
       '@sentry/utils': 7.77.0
 
-  '@sentry/expo-upload-sourcemaps@8.31.0(@expo/env@2.5.2)(dotenv@18.0.8)':
+  '@sentry/expo-upload-sourcemaps@8.31.0(@expo/env@2.5.2)(dotenv@18.0.10)':
     dependencies:
       '@sentry/cli': 3.8.0
     optionalDependencies:
       '@expo/env': 2.5.2
-      dotenv: 18.0.8
+      dotenv: 18.0.10
 
   '@sentry/feedback@10.76.2':
     dependencies:
@@ -31867,14 +31902,14 @@ snapshots:
       '@sentry/conventions': 0.32.0
       '@sentry/core': 11.12.0
 
-  '@sentry/react-native@8.31.0(@babel/core@7.29.7)(@expo/config-types@58.0.3)(@expo/config@58.0.6(typescript@7.0.2))(@expo/env@2.5.2)(bufferutil@4.1.0)(dotenv@18.0.8)(expo-router@58.0.19)(expo@58.0.10)(metro-config@0.87.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(metro-resolver@0.87.1)(open@11.0.0)(promise@8.3.0)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(rollup@4.68.2)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))(esbuild@0.28.2))':
+  '@sentry/react-native@8.31.0(@babel/core@7.29.7)(@expo/config-types@58.0.3)(@expo/config@58.0.6(typescript@7.0.2))(@expo/env@2.5.2)(bufferutil@4.1.0)(dotenv@18.0.10)(expo-router@58.0.19)(expo@58.0.10)(metro-config@0.87.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(metro-resolver@0.87.1)(open@11.0.0)(promise@8.3.0)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(rollup@4.68.2)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))(esbuild@0.28.2))':
     dependencies:
       '@expo/config-plugins': 58.0.9(typescript@7.0.2)
       '@sentry/browser': 10.76.2
       '@sentry/bundler-plugins': 10.76.2(rollup@4.68.2)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))(esbuild@0.28.2))
       '@sentry/cli': 3.8.0
       '@sentry/core': 10.76.2
-      '@sentry/expo-upload-sourcemaps': 8.31.0(@expo/env@2.5.2)(dotenv@18.0.8)
+      '@sentry/expo-upload-sourcemaps': 8.31.0(@expo/env@2.5.2)(dotenv@18.0.10)
       '@sentry/react': 10.76.2(react@19.3.0)
       metro: 0.87.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       react: 19.3.0
@@ -31884,7 +31919,7 @@ snapshots:
       '@expo/config': 58.0.6(typescript@7.0.2)
       '@expo/config-types': 58.0.3
       '@expo/env': 2.5.2
-      dotenv: 18.0.8
+      dotenv: 18.0.10
       expo: 58.0.10(@babel/core@7.29.7)(@expo/metro-runtime@58.0.14)(bufferutil@4.1.0)(expo-router@58.0.19)(expo-widgets@58.0.17)(react-dom@19.2.6(react@19.3.0))(react-native-webview@14.0.1(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(react-native-worklets@0.13.0(@babel/core@7.29.7)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(typescript@7.0.2)(utf-8-validate@6.0.6)
       expo-router: 58.0.19(patch_hash=b02d51c91eb65aad388c7558622a89e10160d0ff948f765790a665a68d93d5dd)(e1785eaf3ba8f0e6ea6f52250c29f619)
       metro-config: 0.87.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
@@ -32111,7 +32146,7 @@ snapshots:
 
   '@smithy/abort-controller@4.2.12':
     dependencies:
-      '@smithy/types': 4.13.1
+      '@smithy/types': 4.14.2
       tslib: 2.8.1
 
   '@smithy/chunked-blob-reader-native@4.2.3':
@@ -32132,37 +32167,23 @@ snapshots:
       '@smithy/util-middleware': 4.2.12
       tslib: 2.8.1
 
-  '@smithy/core@3.23.11':
+  '@smithy/core@3.40.0':
     dependencies:
-      '@smithy/protocol-http': 5.3.12
-      '@smithy/types': 4.13.1
-      '@smithy/url-parser': 4.2.12
-      '@smithy/util-base64': 4.3.2
-      '@smithy/util-body-length-browser': 4.2.2
-      '@smithy/util-middleware': 4.2.12
-      '@smithy/util-stream': 4.5.19
-      '@smithy/util-utf8': 4.2.2
-      '@smithy/uuid': 1.1.2
-      tslib: 2.8.1
-
-  '@smithy/core@3.24.4':
-    dependencies:
-      '@aws-crypto/crc32': 5.2.0
-      '@smithy/types': 4.14.2
+      '@smithy/types': 4.20.0
       tslib: 2.8.1
 
   '@smithy/credential-provider-imds@4.2.12':
     dependencies:
       '@smithy/node-config-provider': 4.3.12
       '@smithy/property-provider': 4.2.12
-      '@smithy/types': 4.13.1
+      '@smithy/types': 4.14.2
       '@smithy/url-parser': 4.2.12
       tslib: 2.8.1
 
   '@smithy/eventstream-codec@4.2.12':
     dependencies:
       '@aws-crypto/crc32': 5.2.0
-      '@smithy/types': 4.13.1
+      '@smithy/types': 4.14.2
       '@smithy/util-hex-encoding': 4.2.2
       tslib: 2.8.1
 
@@ -32186,7 +32207,7 @@ snapshots:
   '@smithy/eventstream-serde-universal@4.2.12':
     dependencies:
       '@smithy/eventstream-codec': 4.2.12
-      '@smithy/types': 4.13.1
+      '@smithy/types': 4.14.2
       tslib: 2.8.1
 
   '@smithy/fetch-http-handler@5.3.15':
@@ -32244,7 +32265,7 @@ snapshots:
 
   '@smithy/middleware-endpoint@4.4.25':
     dependencies:
-      '@smithy/core': 3.23.11
+      '@smithy/core': 3.40.0
       '@smithy/middleware-serde': 4.2.14
       '@smithy/node-config-provider': 4.3.12
       '@smithy/shared-ini-file-loader': 4.4.7
@@ -32258,7 +32279,7 @@ snapshots:
       '@smithy/node-config-provider': 4.3.12
       '@smithy/protocol-http': 5.3.12
       '@smithy/service-error-classification': 4.2.12
-      '@smithy/smithy-client': 4.12.5
+      '@smithy/smithy-client': 4.15.2
       '@smithy/types': 4.13.1
       '@smithy/util-middleware': 4.2.12
       '@smithy/util-retry': 4.2.12
@@ -32267,7 +32288,7 @@ snapshots:
 
   '@smithy/middleware-serde@4.2.14':
     dependencies:
-      '@smithy/core': 3.23.11
+      '@smithy/core': 3.40.0
       '@smithy/protocol-http': 5.3.12
       '@smithy/types': 4.13.1
       tslib: 2.8.1
@@ -32294,7 +32315,7 @@ snapshots:
 
   '@smithy/node-http-handler@4.7.4':
     dependencies:
-      '@smithy/core': 3.24.4
+      '@smithy/core': 3.40.0
       '@smithy/types': 4.14.2
       tslib: 2.8.1
 
@@ -32310,7 +32331,7 @@ snapshots:
 
   '@smithy/querystring-builder@4.2.12':
     dependencies:
-      '@smithy/types': 4.13.1
+      '@smithy/types': 4.14.2
       '@smithy/util-uri-escape': 4.2.2
       tslib: 2.8.1
 
@@ -32325,7 +32346,7 @@ snapshots:
 
   '@smithy/shared-ini-file-loader@4.4.7':
     dependencies:
-      '@smithy/types': 4.13.1
+      '@smithy/types': 4.14.2
       tslib: 2.8.1
 
   '@smithy/signature-v4@5.3.12':
@@ -32339,14 +32360,10 @@ snapshots:
       '@smithy/util-utf8': 4.2.2
       tslib: 2.8.1
 
-  '@smithy/smithy-client@4.12.5':
+  '@smithy/smithy-client@4.15.2':
     dependencies:
-      '@smithy/core': 3.23.11
-      '@smithy/middleware-endpoint': 4.4.25
-      '@smithy/middleware-stack': 4.2.12
-      '@smithy/protocol-http': 5.3.12
-      '@smithy/types': 4.13.1
-      '@smithy/util-stream': 4.5.19
+      '@smithy/core': 3.40.0
+      '@smithy/types': 4.20.0
       tslib: 2.8.1
 
   '@smithy/types@4.13.1':
@@ -32354,6 +32371,10 @@ snapshots:
       tslib: 2.8.1
 
   '@smithy/types@4.14.2':
+    dependencies:
+      tslib: 2.8.1
+
+  '@smithy/types@4.20.0':
     dependencies:
       tslib: 2.8.1
 
@@ -32394,7 +32415,7 @@ snapshots:
   '@smithy/util-defaults-mode-browser@4.3.41':
     dependencies:
       '@smithy/property-provider': 4.2.12
-      '@smithy/smithy-client': 4.12.5
+      '@smithy/smithy-client': 4.15.2
       '@smithy/types': 4.13.1
       tslib: 2.8.1
 
@@ -32404,7 +32425,7 @@ snapshots:
       '@smithy/credential-provider-imds': 4.2.12
       '@smithy/node-config-provider': 4.3.12
       '@smithy/property-provider': 4.2.12
-      '@smithy/smithy-client': 4.12.5
+      '@smithy/smithy-client': 4.15.2
       '@smithy/types': 4.13.1
       tslib: 2.8.1
 
@@ -36510,7 +36531,7 @@ snapshots:
 
   dotenv@17.4.2: {}
 
-  dotenv@18.0.8: {}
+  dotenv@18.0.10: {}
 
   downshift@7.6.2(react@19.2.6):
     dependencies:
@@ -36530,7 +36551,7 @@ snapshots:
       esbuild: 0.28.2
       tsx: 4.23.15
 
-  drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1):
+  drizzle-orm@0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1):
     optionalDependencies:
       '@cloudflare/workers-types': 4.20260605.1
       '@opentelemetry/api': 1.9.1
@@ -36541,7 +36562,7 @@ snapshots:
       kysely: 0.29.2
       pg: 8.23.1
 
-  drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1):
+  drizzle-orm@0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1):
     optionalDependencies:
       '@cloudflare/workers-types': 4.20260605.1
       '@opentelemetry/api': 1.9.1
@@ -36552,7 +36573,7 @@ snapshots:
       kysely: 0.29.2
       pg: 8.23.1
 
-  drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(kysely@0.29.2)(pg@8.23.1):
+  drizzle-orm@0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(kysely@0.29.2)(pg@8.23.1):
     optionalDependencies:
       '@cloudflare/workers-types': 4.20260605.1
       '@opentelemetry/api': 1.9.1
@@ -42526,45 +42547,45 @@ snapshots:
       - '@emnapi/core'
       - '@emnapi/runtime'
 
-  oxfmt@0.73.0:
+  oxfmt@0.78.0:
     dependencies:
       tinypool: 2.1.2
     optionalDependencies:
-      '@oxfmt/binding-android-arm-eabi': 0.73.0
-      '@oxfmt/binding-android-arm64': 0.73.0
-      '@oxfmt/binding-darwin-arm64': 0.73.0
-      '@oxfmt/binding-darwin-x64': 0.73.0
-      '@oxfmt/binding-freebsd-x64': 0.73.0
-      '@oxfmt/binding-linux-arm-gnueabihf': 0.73.0
-      '@oxfmt/binding-linux-arm-musleabihf': 0.73.0
-      '@oxfmt/binding-linux-arm64-gnu': 0.73.0
-      '@oxfmt/binding-linux-arm64-musl': 0.73.0
-      '@oxfmt/binding-linux-ppc64-gnu': 0.73.0
-      '@oxfmt/binding-linux-riscv64-gnu': 0.73.0
-      '@oxfmt/binding-linux-riscv64-musl': 0.73.0
-      '@oxfmt/binding-linux-s390x-gnu': 0.73.0
-      '@oxfmt/binding-linux-x64-gnu': 0.73.0
-      '@oxfmt/binding-linux-x64-musl': 0.73.0
-      '@oxfmt/binding-openharmony-arm64': 0.73.0
-      '@oxfmt/binding-win32-arm64-msvc': 0.73.0
-      '@oxfmt/binding-win32-ia32-msvc': 0.73.0
-      '@oxfmt/binding-win32-x64-msvc': 0.73.0
+      '@oxfmt/binding-android-arm-eabi': 0.78.0
+      '@oxfmt/binding-android-arm64': 0.78.0
+      '@oxfmt/binding-darwin-arm64': 0.78.0
+      '@oxfmt/binding-darwin-x64': 0.78.0
+      '@oxfmt/binding-freebsd-x64': 0.78.0
+      '@oxfmt/binding-linux-arm-gnueabihf': 0.78.0
+      '@oxfmt/binding-linux-arm-musleabihf': 0.78.0
+      '@oxfmt/binding-linux-arm64-gnu': 0.78.0
+      '@oxfmt/binding-linux-arm64-musl': 0.78.0
+      '@oxfmt/binding-linux-ppc64-gnu': 0.78.0
+      '@oxfmt/binding-linux-riscv64-gnu': 0.78.0
+      '@oxfmt/binding-linux-riscv64-musl': 0.78.0
+      '@oxfmt/binding-linux-s390x-gnu': 0.78.0
+      '@oxfmt/binding-linux-x64-gnu': 0.78.0
+      '@oxfmt/binding-linux-x64-musl': 0.78.0
+      '@oxfmt/binding-openharmony-arm64': 0.78.0
+      '@oxfmt/binding-win32-arm64-msvc': 0.78.0
+      '@oxfmt/binding-win32-ia32-msvc': 0.78.0
+      '@oxfmt/binding-win32-x64-msvc': 0.78.0
 
-  oxlint-plugin-react-native@0.2.38(oxlint@1.88.0(oxlint-tsgolint@7.0.2004)):
+  oxlint-plugin-react-native@0.2.38(oxlint@1.88.0(oxlint-tsgolint@7.0.2006)):
     dependencies:
       '@oxlint/plugins': 1.87.0
-      oxlint: 1.88.0(oxlint-tsgolint@7.0.2004)
+      oxlint: 1.88.0(oxlint-tsgolint@7.0.2006)
 
-  oxlint-tsgolint@7.0.2004:
+  oxlint-tsgolint@7.0.2006:
     optionalDependencies:
-      '@oxlint-tsgolint/darwin-arm64': 7.0.2004
-      '@oxlint-tsgolint/darwin-x64': 7.0.2004
-      '@oxlint-tsgolint/linux-arm64': 7.0.2004
-      '@oxlint-tsgolint/linux-x64': 7.0.2004
-      '@oxlint-tsgolint/win32-arm64': 7.0.2004
-      '@oxlint-tsgolint/win32-x64': 7.0.2004
+      '@oxlint-tsgolint/darwin-arm64': 7.0.2006
+      '@oxlint-tsgolint/darwin-x64': 7.0.2006
+      '@oxlint-tsgolint/linux-arm64': 7.0.2006
+      '@oxlint-tsgolint/linux-x64': 7.0.2006
+      '@oxlint-tsgolint/win32-arm64': 7.0.2006
+      '@oxlint-tsgolint/win32-x64': 7.0.2006
 
-  oxlint@1.88.0(oxlint-tsgolint@7.0.2004):
+  oxlint@1.88.0(oxlint-tsgolint@7.0.2006):
     optionalDependencies:
       '@oxlint/binding-android-arm-eabi': 1.88.0
       '@oxlint/binding-android-arm64': 1.88.0
@@ -42585,7 +42606,7 @@ snapshots:
       '@oxlint/binding-win32-arm64-msvc': 1.88.0
       '@oxlint/binding-win32-ia32-msvc': 1.88.0
       '@oxlint/binding-win32-x64-msvc': 1.88.0
-      oxlint-tsgolint: 7.0.2004
+      oxlint-tsgolint: 7.0.2006
 
   p-finally@1.0.0: {}
 

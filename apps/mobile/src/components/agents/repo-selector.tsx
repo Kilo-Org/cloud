@@ -3,6 +3,7 @@ import { ChevronDown } from '@/components/ui/icons';
 import { Keyboard, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
+import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { FIELD_TRIGGER_BODY_CLASS, FIELD_TRIGGER_FRAME_CLASS } from '@/lib/a11y/tap-target';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
@@ -127,10 +128,36 @@ export function RepoSelector({
       ? rawPlatform
       : repositories.find(repo => repo.fullName === value)?.platform;
   const displayValue = colonIndex !== -1 ? value.slice(colonIndex + 1) : value;
+
+  // The list owns the placeholder, so an empty field is loading until it
+  // settles. A chosen repository keeps its name while a refetch runs, and stays
+  // disabled: the picker would open on the same rows.
+  if (isLoading && displayValue === '') {
+    return (
+      <View
+        accessible
+        accessibilityLabel={t('agentChat.repoPicker.accessibility', {
+          label: t('agentChat.repoPicker.loading'),
+        })}
+        accessibilityState={{ busy: true }}
+        className={FIELD_TRIGGER_FRAME_CLASS}
+      >
+        <View className={cn(FIELD_TRIGGER_BODY_CLASS, 'justify-between')}>
+          {/* The branch row's loading bar: a name-width line, so the field
+              reads as the row it becomes. `bg-muted-soft` because the default
+              `bg-skeleton-fill` equals this frame's `bg-secondary` in the light
+              palette, where the bar would paint nothing. */}
+          <Skeleton className="h-4 w-1/3 bg-muted-soft" />
+          <ChevronDown size={14} color={colors.mutedForeground} />
+        </View>
+      </View>
+    );
+  }
+
   const platformName = selectedPlatform ? t(REPO_PLATFORM_LABEL_KEYS[selectedPlatform]) : undefined;
   let label = displayValue;
   if (!label) {
-    label = isLoading ? t('agentChat.repoPicker.loading') : t('agentChat.repoPicker.title');
+    label = t('agentChat.repoPicker.title');
   } else if (platformName) {
     label = `${platformName} · ${displayValue}`;
   }
@@ -155,10 +182,11 @@ export function RepoSelector({
 
   // With nothing chosen the trigger shows its own placeholder, which already names
   // the field and says the choice is open: prefixing it would announce the field
-  // name twice ("Repository: Select repository"). A loading or chosen trigger keeps
-  // the field prefix, so the value is never mistaken for the field.
+  // name twice ("Repository: Select repository"). A chosen trigger keeps the field
+  // prefix, so the value is never mistaken for the field. (The loading field is
+  // the skeleton above, which names the field itself.)
   const accessibilityLabel =
-    displayValue === '' && !isLoading ? label : t('agentChat.repoPicker.accessibility', { label });
+    displayValue === '' ? label : t('agentChat.repoPicker.accessibility', { label });
 
   return (
     <Pressable

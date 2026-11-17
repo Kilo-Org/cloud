@@ -25,6 +25,9 @@ const WORDING_EXCEPTIONS = readFileSync(
   new URL('./wording-exceptions.json', import.meta.url),
   'utf8'
 );
+// The checker the command fixtures run, read once so a case can hand over a
+// patched copy of the same text.
+const CHECKER_SOURCE = readFileSync(new URL('./check-catalogs.mjs', import.meta.url), 'utf8');
 
 const ENGLISH = {
   agents: {
@@ -102,15 +105,13 @@ function run({
 /**
  * A fixture tree that can run the checker as CI does: a copy of the checker,
  * its shared modules and its wording exceptions, and the repository's
- * dependency tree linked at the root the command resolves from.
+ * dependency tree linked at the root the command resolves from. `checker`
+ * replaces the checker's source text, for a case that runs a patched copy.
  */
-function cliFixture(files) {
+function cliFixture(files, checker = CHECKER_SOURCE) {
   const root = fixture({
     ...files,
-    'tools/i18n/check-catalogs.mjs': readFileSync(
-      new URL('./check-catalogs.mjs', import.meta.url),
-      'utf8'
-    ),
+    'tools/i18n/check-catalogs.mjs': checker,
     'tools/i18n/wording-exceptions.json': WORDING_EXCEPTIONS,
   });
   mkdirSync(join(root, 'tools/lib'), { recursive: true });
@@ -1866,6 +1867,58 @@ test('reports a broken catalog through the command and exits non-zero', () => {
   assert.match(result.stderr, /mobile\/ru: missing key "agents\.title"/);
   assert.match(result.stderr, /check-catalogs: \d+ problem\(s\)/);
 });
+
+// The descriptor policy guard keeps a misconfigured catalog from throwing: the
+// copy rules and the base-key reader are used after the catalogs' value
+// problems are collected, so a throw there would hide them. Each case patches
+// the notifications descriptor away from the checker source and leaves a mobile
+// problem in the tree, so the run must still print what it collected.
+const POLICY_PUSH_FILES = {
+  'packages/notifications/src/locales/en.json': JSON.stringify({
+    internal: { securityFindingNew: { title: 'New finding', body: 'Body' } },
+  }),
+  'packages/notifications/src/locales/ru.json': JSON.stringify({
+    internal: { securityFindingNew: { title: 'Новая находка', body: 'Текст' } },
+  }),
+  'packages/notifications/src/push-copy.ts': '',
+};
+
+for (const { label, field, from, to } of [
+  {
+    label: 'without a base-key reader',
+    field: 'baseKeyOf',
+    from: '      baseKeyOf: pushBaseKey,\n',
+    to: '',
+  },
+  {
+    label: 'with an empty copy-rule list',
+    field: 'englishCopyRules',
+    from: 'englishCopyRules: [checkPushEnglishCopy],',
+    to: 'englishCopyRules: [],',
+  },
+  {
+    label: 'with a non-callable entry in its copy-rule list',
+    field: 'englishCopyRules',
+    from: 'englishCopyRules: [checkPushEnglishCopy],',
+    to: "englishCopyRules: [checkPushEnglishCopy, 'not a rule'],",
+  },
+]) {
+  test(`reports a descriptor ${label} through the command`, () => {
+    const patched = CHECKER_SOURCE.replace(from, to);
+    assert.notEqual(patched, CHECKER_SOURCE, 'the case must change the checker source');
+    const translated = { agents: { ...TRANSLATED.agents } };
+    delete translated.agents.title;
+    const root = cliFixture({ ...standardFiles({ translated }), ...POLICY_PUSH_FILES }, patched);
+    const result = cli(root);
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(
+      result.stderr,
+      new RegExp(`notifications: the catalog descriptor declares no usable ${field}`)
+    );
+    assert.doesNotMatch(result.stderr, /TypeError/);
+    assert.match(result.stderr, /mobile\/ru: missing key "agents\.title"/);
+  });
+}
 
 // A confirmation's safe button falls back to the catalog's own Cancel label
 // (`cancelLabel ?? t('common.cancel')`), so a destructive label translated with

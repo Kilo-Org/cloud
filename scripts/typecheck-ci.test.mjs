@@ -1903,8 +1903,10 @@ const appClosureInstall =
   "pnpm install --frozen-lockfile --filter 'kilo-app...' --filter kilocode-monorepo";
 
 test('the kilo-app CI consumers install the app closure', () => {
-  // The producer jobs install their own build closure; every other install in
-  // this workflow is the app's, including the typecheck job's: its only program
+  // The producer jobs install their own build closure, and the catalog audit
+  // job installs the root project alone because its only readers are JSON
+  // catalogs and the oxc parser. Every other install in this workflow is the
+  // app's, including the typecheck job's: its only program
   // resolves the app's sources and its workspace dependencies' declarations,
   // and the two built trees it reads arrive as artifacts.
   const consumerJobs = Object.entries(kiloAppJobs)
@@ -1926,6 +1928,14 @@ test('the kilo-app CI consumers install the app closure', () => {
     consumerJobs,
     ['mobile-typecheck', 'mobile-lint', 'check-unused', 'mobile-test'],
     'the app closure covers the measured consumer installs and leaves the others alone'
+  );
+  const catalogInstall = kiloAppJobs['i18n-catalogs'].steps.find(
+    step => step.name === 'Install dependencies'
+  );
+  assert.equal(
+    catalogInstall?.run,
+    'pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts',
+    'the catalog job installs the root project only: the audit reads JSON catalogs and the oxc parser, no app dependency'
   );
 });
 

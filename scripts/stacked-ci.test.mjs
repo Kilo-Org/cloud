@@ -35,6 +35,12 @@ const mobilePathFragments = [
   /stacked-ci\\?\.test\\?\.mjs/,
 ];
 
+// Path families the notifications catalog audit reads that no mobile family
+// selects: the audit scans the services tree beside the push package, and the
+// checker itself lives in the second family. A dropped family would publish
+// `catalogs=false` and let an undefined push key pass CI.
+const catalogPathFragments = [/services\//, /tools\/i18n\//];
+
 function readWorkflows() {
   return [rootPath, mobilePath].map(path =>
     load(readFileSync(new URL(`../${path}`, import.meta.url), 'utf8'))
@@ -110,6 +116,13 @@ function validateMobileDetect(mobile) {
       detect.run ?? '',
       fragment,
       `mobile change-detection step must recognise ${fragment}`
+    );
+  }
+  for (const fragment of catalogPathFragments) {
+    assert.match(
+      detect.run ?? '',
+      fragment,
+      `catalog path detection must recognise ${fragment}`
     );
   }
 }
@@ -352,29 +365,57 @@ for (const [name, files, expected] of [
   [
     'a lint plugin alone',
     ['tools/oxlint/anti-slop/index.ts'],
-    { mobile: 'true', lint_only: 'true' },
+    { mobile: 'true', lint_only: 'true', catalogs: 'false' },
   ],
   [
     'several lint plugins',
     ['tools/oxlint/anti-slop/index.ts', 'tools/oxlint/anti-slop/index.test.ts'],
-    { mobile: 'true', lint_only: 'true' },
+    { mobile: 'true', lint_only: 'true', catalogs: 'false' },
   ],
   [
     'a lint plugin with an app path',
     ['tools/oxlint/anti-slop/index.ts', 'apps/mobile/vitest.config.ts'],
-    { mobile: 'true', lint_only: 'false' },
+    { mobile: 'true', lint_only: 'false', catalogs: 'false' },
   ],
-  ['an app path alone', ['apps/mobile/vitest.config.ts'], { mobile: 'true', lint_only: 'false' }],
+  [
+    'an app path alone',
+    ['apps/mobile/vitest.config.ts'],
+    { mobile: 'true', lint_only: 'false', catalogs: 'false' },
+  ],
   // The plugin branch writes `mobile=true` before the workspace selection runs,
   // so a plugin change that carries no app path still runs the app's lint.
   [
     'a lint plugin with an unrelated path',
     ['tools/oxlint/anti-slop/index.ts', 'README.md'],
-    { mobile: 'true', lint_only: 'false' },
+    { mobile: 'true', lint_only: 'false', catalogs: 'false' },
   ],
-  ['this workflow alone', [mobilePath], { mobile: 'true', lint_only: 'false' }],
-  ['an unrelated path alone', ['README.md'], { mobile: 'false', lint_only: 'false' }],
-  ['no changed path', [], { mobile: 'false', lint_only: 'false' }],
+  ['this workflow alone', [mobilePath], { mobile: 'true', lint_only: 'false', catalogs: 'false' }],
+  [
+    'an unrelated path alone',
+    ['README.md'],
+    { mobile: 'false', lint_only: 'false', catalogs: 'false' },
+  ],
+  ['no changed path', [], { mobile: 'false', lint_only: 'false', catalogs: 'false' }],
+  // The audit reads both trees without a mobile family selecting them, so each
+  // alone must still turn the catalog job on.
+  [
+    'a services path alone',
+    ['services/notifications/src/handler.ts'],
+    { mobile: 'false', lint_only: 'false', catalogs: 'true' },
+  ],
+  [
+    'a catalog checker path alone',
+    ['tools/i18n/check-catalogs.mjs'],
+    { mobile: 'false', lint_only: 'false', catalogs: 'true' },
+  ],
+  // A services change beside an app path runs the whole suite, which includes
+  // the audit, so the output stays true and the job stands down through its
+  // `if` instead.
+  [
+    'a services path with an app path',
+    ['services/notifications/src/handler.ts', 'apps/mobile/vitest.config.ts'],
+    { mobile: 'true', lint_only: 'false', catalogs: 'true' },
+  ],
 ]) {
   test(`mobile change detection publishes ${JSON.stringify(expected)} for ${name}`, () => {
     assert.deepEqual(runDetect(files), expected);
@@ -385,6 +426,7 @@ test('mobile change detection runs the suite when the base commit is unknown', (
   assert.deepEqual(runDetect(['tools/oxlint/anti-slop/index.ts'], { base: 'absent' }), {
     mobile: 'true',
     lint_only: 'false',
+    catalogs: 'false',
   });
 });
 
@@ -397,7 +439,7 @@ test('mobile change detection keeps a move out of an app path out of lint-only',
     runDetectInRepo(['apps/mobile/src/gone.ts', 'tools/oxlint/plugin/index.ts'], ({ git }) => {
       git(['mv', 'apps/mobile/src/gone.ts', 'tools/oxlint/plugin/moved.ts']);
     }),
-    { mobile: 'true', lint_only: 'false' }
+    { mobile: 'true', lint_only: 'false', catalogs: 'false' }
   );
 });
 
@@ -406,7 +448,47 @@ test('mobile change detection stays lint-only for a rename inside tools/oxlint',
     runDetectInRepo(['tools/oxlint/plugin/index.ts'], ({ git }) => {
       git(['mv', 'tools/oxlint/plugin/index.ts', 'tools/oxlint/plugin/entry.ts']);
     }),
-    { mobile: 'true', lint_only: 'true' }
+    { mobile: 'true', lint_only: 'true', catalogs: 'false' }
+  );
+});
+
+// The catalog job is the only gate for paths no mobile family selects, so its
+// wiring cannot drift silently: a looser `if` runs the audit on every mobile
+// change beside `i18n-leftover`, a different install costs every run the
+// closure it does not need, and a lost fan-in would report a failed audit as
+// skipped. The catalog families stay unselected here so this list cannot pass
+// by accident.
+test('the catalog job owns exactly the paths no mobile family selects', () => {
+  const mobile = readWorkflows()[1];
+  const job = mobile.jobs['i18n-catalogs'];
+  assert.ok(job, 'the catalog job must exist');
+  assert.equal(
+    job.if,
+    "needs.mobile-changes.outputs.catalogs == 'true' && needs.mobile-changes.outputs.mobile != 'true'",
+    'the catalog job must run exactly when a catalog family changed and no mobile family did'
+  );
+  const steps = job.steps;
+  const install = steps.find(step => step.name === 'Install dependencies');
+  assert.equal(
+    install?.run,
+    'pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts',
+    'the catalog job installs only the root project the audit reads'
+  );
+  assert.deepEqual(
+    steps.map(step => step.name).filter(Boolean),
+    [
+      'Setup pnpm',
+      'Mount pnpm store',
+      'Setup Node',
+      'Install dependencies',
+      'Check i18n catalogs',
+      'Test the i18n catalog checker',
+    ],
+    'the catalog job runs the audit and its test after the shared setup'
+  );
+  assert.ok(
+    [mobile.jobs['mobile-test-result'].needs ?? []].flat().includes('i18n-catalogs'),
+    'a failed catalog audit must fail the required check'
   );
 });
 
@@ -416,6 +498,11 @@ test('only the shards and the typecheck skip a lint-only change', () => {
     mobile.jobs['mobile-changes'].outputs.lint_only,
     '${{ steps.detect.outputs.lint_only }}',
     'the detection job must publish lint_only, or the gates below silently stop applying'
+  );
+  assert.equal(
+    mobile.jobs['mobile-changes'].outputs.catalogs,
+    '${{ steps.detect.outputs.catalogs }}',
+    'the detection job must publish catalogs, or the i18n-catalogs job silently stops applying'
   );
   for (const name of ['mobile-test', 'mobile-typecheck']) {
     assert.equal(

@@ -7,7 +7,9 @@
 import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { Section } from '@/components/ui/section';
 import { i18n } from '@/i18n';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { act, TestRenderer } from '@/test/renderer';
 
 import { NotificationSettingsScreen } from './notification-settings-screen';
@@ -34,7 +36,7 @@ vi.mock('expo-router', () => ({
   useFocusEffect: () => undefined,
 }));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
-vi.mock('@/components/ui/icons', () => ({ Check: 'Check' }));
+vi.mock('@/components/ui/icons', () => ({ Bell: 'Bell', Check: 'Check', Clock3: 'Clock3' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useMutedDisabledInk: () => '#fff',
   useThemeColors: () => ({
@@ -157,12 +159,20 @@ describe('personal scope', () => {
     expect(sectionHeadings(screen)).toEqual([]);
   });
 
-  it('separates the two switch groups by a break wider than the steps inside one', () => {
+  it('separates the two switch groups by the section gap', () => {
     const screen = mount(PERSONAL_SCOPE);
 
+    // One contract body for every scope: the 21pt section gap separates the two
+    // switch groups, while the blocks inside one section sit 10.5pt apart.
     expect(screen.root.findByType('TabScreenScrollView').props.contentContainerClassName).toBe(
-      'px-6 pt-4 gap-7'
+      SCREEN_BODY_CLASS
     );
+    // Each switch is its own `Section`; the severity pickers add their own, so
+    // only the sections that hold a switch count here.
+    const switchSections = screen.root
+      .findAllByType(Section)
+      .filter(section => section.findAllByType('Switch').length > 0);
+    expect(switchSections).toHaveLength(2);
   });
 });
 
@@ -184,8 +194,10 @@ describe('organization scope', () => {
   it('keeps the standard group gap, next to its headings', () => {
     const screen = mount(ORGANIZATION_SCOPE);
 
+    // The same contract body the personal scope uses: a labelled section adds
+    // its eyebrow, not a different inset or gap.
     expect(screen.root.findByType('TabScreenScrollView').props.contentContainerClassName).toBe(
-      'px-6 pt-4 gap-6'
+      SCREEN_BODY_CLASS
     );
   });
 });

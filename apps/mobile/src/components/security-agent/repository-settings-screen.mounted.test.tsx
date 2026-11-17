@@ -268,14 +268,15 @@ describe('RepositorySettingsScreen repository picker', () => {
     );
     const keyExtractor = (list.props as { keyExtractor: (item: RepoRow) => string }).keyExtractor;
     expect(keyExtractor(THREE_REPOS[0])).toBe('1');
-    // The old ScrollView content inset (`px-6 pt-4` plus the tab-bar band) is
-    // now the list's content container, so the last row still clears the bar.
+    // The page gutter now lives on the rows and the header, so the list's
+    // content container carries only the top pad, the tab-bar band and the
+    // safe-area side insets.
     expect(list.props as { contentContainerStyle: unknown }).toMatchObject({
       contentContainerStyle: {
-        paddingTop: 16,
+        paddingTop: 12,
         paddingBottom: 12,
-        paddingLeft: 24,
-        paddingRight: 24,
+        paddingLeft: 0,
+        paddingRight: 0,
       },
     });
     expect((list.props as { style: unknown }).style).toEqual({ flex: 1 });
@@ -286,9 +287,9 @@ describe('RepositorySettingsScreen repository picker', () => {
     sideInsets.right = 59;
     const { renderer } = await mount();
     expect(listOf(renderer).props.contentContainerStyle).toEqual({
-      paddingTop: 16,
-      paddingLeft: 71,
-      paddingRight: 83,
+      paddingTop: 12,
+      paddingLeft: 47,
+      paddingRight: 59,
       paddingBottom: 12,
     });
   });
@@ -316,7 +317,9 @@ describe('RepositorySettingsScreen repository picker', () => {
     repositories.data = undefined;
     const { renderer } = await mount();
 
-    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(2);
+    // Two `RowSkeleton`s at the loaded repository-row geometry, each painting a
+    // title and a subtitle bar.
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(4);
     expect(repoRows(renderer)).toHaveLength(0);
     expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
   });
@@ -448,7 +451,7 @@ describe('RepositorySettingsScreen repository picker', () => {
 
     expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
     expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
-    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(2);
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(4);
   });
 
   it('shows the selectAtLeastOne validation only with an empty selection', async () => {

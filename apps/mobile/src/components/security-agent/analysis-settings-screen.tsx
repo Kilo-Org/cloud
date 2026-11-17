@@ -21,7 +21,6 @@ import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { modelLabelFromCatalogue } from '@/lib/auto-model-name';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
@@ -48,9 +47,9 @@ const ANALYSIS_MODES = [
 
 /**
  * The loaded screen's frames, so the placeholder reserves the same shape the
- * content replaces: the `Section` label above a segment at the shared row
- * target height, and a `RowGroup` of `RowSkeleton` rows at the `ConfigureRow`
- * geometry the model rows paint.
+ * content replaces: the `Section` label above the segmented control, and a
+ * `RowGroup` of `RowSkeleton` rows at the `ConfigureRow` geometry the model
+ * rows paint.
  */
 const ROW_COUNT = 3;
 
@@ -64,7 +63,10 @@ function AnalysisSettingsSkeleton() {
           skeleton's own frames stay out of that check. */}
       <View className={cn('flex-1', SCREEN_BODY_CLASS)}>
         <Section label={t('securityAgent.analysisSettings.depth')}>
-          <Skeleton className={cn(ROW_TARGET_CLASS, 'w-full rounded-md')} />
+          {/* The loaded `SegmentedControl` frame is 55pt — the group's `p-1`
+              inset around a segment on the 48pt row floor. `h-16` (56pt) is the
+              closest spacing step; the control exports no frame of its own. */}
+          <Skeleton className="h-16 w-full rounded-md" />
         </Section>
         <RowGroup>
           {Array.from({ length: ROW_COUNT }, (_, index) => (

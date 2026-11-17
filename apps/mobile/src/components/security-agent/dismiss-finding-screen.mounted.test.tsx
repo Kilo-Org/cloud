@@ -82,6 +82,8 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   TextInput: 'TextInput',
   ActivityIndicator: 'ActivityIndicator',
+  Platform: { OS: 'android' },
+  I18nManager: { isRTL: false },
 }));
 vi.mock('@/components/ui/icons', () => ({ ShieldOff: 'ShieldOff' }));
 vi.mock('expo-router', () => ({

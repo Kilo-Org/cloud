@@ -62,7 +62,7 @@ function statusMessage(renderer: TestRenderer.ReactTestRenderer): string | null 
 /** The line's pinned wrapper — rendered only while a refusal is parked. */
 function pinnedLine(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance {
   const wrappers = renderer.root.findAll(
-    node => (node.type as string) === 'View' && node.props.className === 'px-6'
+    node => (node.type as string) === 'View' && node.props.className === 'px-4'
   );
   expect(wrappers).toHaveLength(1);
   const [only] = wrappers;

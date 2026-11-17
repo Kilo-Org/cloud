@@ -77,7 +77,7 @@ export function BackendSettingsControl(selection: ProviderSelection) {
       >
         <Server size={22} color={colors.foreground} />
       </Pressable>
-      {mounted ? (
+      {mounted && (
         <BackendSettingsContent
           visible={visible}
           onClose={close}
@@ -85,7 +85,7 @@ export function BackendSettingsControl(selection: ProviderSelection) {
           onDismiss={dismissed}
           {...selection}
         />
-      ) : null}
+      )}
     </>
   );
 }
@@ -115,16 +115,17 @@ function BackendSettingsContent({
   const [target, setTarget] = useState<FormTarget | null>(null);
   const [formError, setError] = useState<string | null>(null);
   const backendDirtyRef = useRef(false);
+  const discardDraft = () => {
+    backendDirtyRef.current = false;
+    setTarget(null);
+  };
   const {
     requestClose,
     requestDismiss,
     dialog: discardDialog,
   } = useSheetDismissGuard({
     isDirty: () => backendDirtyRef.current,
-    onDiscard: () => {
-      backendDirtyRef.current = false;
-      setTarget(null);
-    },
+    onDiscard: discardDraft,
   });
   const epoch = useRef(currentAuthEpoch());
   useEffect(() => {
@@ -267,14 +268,7 @@ function BackendSettingsContent({
         </View>
       </ScrollView>
       {target !== null && (
-        <SessionPageSheet
-          visible
-          onClose={() => {
-            backendDirtyRef.current = false;
-            setTarget(null);
-          }}
-          onRequestDismiss={requestDismiss}
-        >
+        <SessionPageSheet visible onClose={discardDraft} onRequestDismiss={requestDismiss}>
           <SheetHeader
             title={t(target.kind === 'add' ? 'modelChat.backends.add' : 'modelChat.backends.edit')}
             onDone={requestClose}

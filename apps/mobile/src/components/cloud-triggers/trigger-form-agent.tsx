@@ -91,9 +91,7 @@ export function TriggerFormAgent({
           }}
           error={triggerProblemText(shownProblem('agent'))}
         />
-        <Text variant="muted" className="text-xs">
-          {t('cloudAgent.triggers.agentHelp')}
-        </Text>
+        <Text variant="caption">{t('cloudAgent.triggers.agentHelp')}</Text>
       </View>
       {isCustomAgent && (
         <FormField
@@ -153,9 +151,7 @@ export function TriggerFormAgent({
             onOpenSheetChange('profile');
           }}
         />
-        <Text variant="muted" className="text-xs">
-          {t('cloudAgent.triggers.profileHelp')}
-        </Text>
+        <Text variant="caption">{t('cloudAgent.triggers.profileHelp')}</Text>
       </View>
 
       <TriggerChoiceSheet

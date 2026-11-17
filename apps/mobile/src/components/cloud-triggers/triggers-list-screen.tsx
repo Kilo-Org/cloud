@@ -10,7 +10,7 @@
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { type ReactNode } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
@@ -18,9 +18,12 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
+import { ConfigureRow } from '@/components/ui/configure-row';
 import { Copy, Plus, Workflow } from '@/components/ui/icons';
 import { IconButton } from '@/components/ui/icon-button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { Section } from '@/components/ui/section';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
@@ -28,14 +31,12 @@ import { copyWebhookUrl } from '@/lib/cloud-triggers/copy-webhook-url';
 import { useCloudTriggers, useTriggerMutations } from '@/lib/cloud-triggers/use-cloud-triggers';
 import { type CloudTriggerListRow } from '@/lib/cloud-triggers/trigger-draft';
 import { triggerCreateHref, triggerDetailHref } from '@/lib/cloud-triggers/trigger-routes';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 
 const SKELETON_ROWS = [0, 1];
-
-/** The height two rows occupy, held by every state so the New action never moves. */
-const BODY_BAND_CLASS = 'min-h-[220px]';
 
 type TriggersListScreenProps = Readonly<{
   /** Organization scope from the route; absent is the caller's own triggers. */
@@ -67,28 +68,26 @@ function TriggerRow({
   const showsInboundUrl = trigger.activationMode === 'webhook';
   const canToggle = trigger.canEdit === true;
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={trigger.triggerId}
-      onPress={onOpen}
-      className="gap-2 rounded-lg bg-secondary p-3 active:opacity-70"
-    >
-      <View className="flex-row items-center gap-2">
-        <Text className="min-w-0 flex-1 text-sm font-medium text-foreground" numberOfLines={1}>
-          {trigger.triggerId}
-        </Text>
-        <Switch
-          accessibilityLabel={t('cloudAgent.triggers.activeTitle')}
-          value={trigger.isActive}
-          onValueChange={onToggle}
-          disabled={busy || !canToggle}
-        />
-      </View>
-      <Text variant="muted" className="text-xs" numberOfLines={1}>
-        {details}
-      </Text>
+    <View>
+      <ConfigureRow
+        icon={Workflow}
+        title={trigger.triggerId}
+        subtitle={details}
+        accessibilityLabel={trigger.triggerId}
+        onPress={onOpen}
+        trailing={
+          <Switch
+            accessibilityLabel={t('cloudAgent.triggers.activeTitle')}
+            value={trigger.isActive}
+            onValueChange={onToggle}
+            disabled={busy || !canToggle}
+          />
+        }
+      />
       {showsInboundUrl ? (
-        <View className="flex-row items-center gap-2">
+        // The inbound URL is a value of its own rather than the row's subtitle:
+        // it is copied, and a subtitle truncates it past the first line.
+        <View className="flex-row items-center gap-2 px-4 pb-3">
           <Text variant="mono" className="min-w-0 flex-1 text-xs" numberOfLines={1}>
             {trigger.inboundUrl}
           </Text>
@@ -103,7 +102,7 @@ function TriggerRow({
           </IconButton>
         </View>
       ) : null}
-    </Pressable>
+    </View>
   );
 }
 
@@ -133,11 +132,11 @@ export function TriggersListScreen({ organizationId }: TriggersListScreenProps) 
   let body: ReactNode = null;
   if (list.isPending) {
     body = (
-      <View className="gap-3">
+      <RowGroup leadingTile>
         {SKELETON_ROWS.map(row => (
-          <Skeleton key={row} className="h-[104px] rounded-lg" />
+          <RowSkeleton key={row} tile subtitle />
         ))}
-      </View>
+      </RowGroup>
     );
   } else if (list.isError) {
     body = (
@@ -161,7 +160,7 @@ export function TriggersListScreen({ organizationId }: TriggersListScreenProps) 
     );
   } else {
     body = (
-      <View className="gap-3">
+      <RowGroup leadingTile>
         {list.data.map(trigger => (
           <TriggerRow
             key={trigger.id}
@@ -179,7 +178,7 @@ export function TriggersListScreen({ organizationId }: TriggersListScreenProps) 
             }}
           />
         ))}
-      </View>
+      </RowGroup>
     );
   }
 
@@ -200,23 +199,23 @@ export function TriggersListScreen({ organizationId }: TriggersListScreenProps) 
       />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-3 px-4 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
       >
-        <Text variant="muted" className="text-xs">
-          {t('cloudAgent.triggers.subtitle')}
-        </Text>
-        <View className={BODY_BAND_CLASS}>{body}</View>
-        <Button
-          variant="outline"
-          className={STATE_ACTION_CLASS}
-          onPress={() => {
-            router.push(triggerCreateHref(organizationId) as Href);
-          }}
-        >
-          <Plus size={16} color={colors.foreground} />
-          <Text>{t('cloudAgent.triggers.new')}</Text>
-        </Button>
+        <Section>
+          <Text variant="caption">{t('cloudAgent.triggers.subtitle')}</Text>
+          {body}
+          <Button
+            variant="outline"
+            className={STATE_ACTION_CLASS}
+            onPress={() => {
+              router.push(triggerCreateHref(organizationId) as Href);
+            }}
+          >
+            <Plus size={16} color={colors.foreground} />
+            <Text>{t('cloudAgent.triggers.new')}</Text>
+          </Button>
+        </Section>
       </TabScreenScrollView>
     </View>
   );

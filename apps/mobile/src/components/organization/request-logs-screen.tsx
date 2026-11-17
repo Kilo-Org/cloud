@@ -12,10 +12,7 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
-import {
-  DirectionalChevronLeft,
-  DirectionalChevronRight,
-} from '@/components/ui/directional-icons';
+import { DirectionalChevronLeft, DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { FileText } from '@/components/ui/icons';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -102,7 +99,9 @@ function requestLogsBody(
     return { kind: 'loading' };
   }
   const variant = trpcErrorVariant(error);
-  return isRetryableTrpcError(error) ? { kind: 'retryable', variant } : { kind: 'refused', variant };
+  return isRetryableTrpcError(error)
+    ? { kind: 'retryable', variant }
+    : { kind: 'refused', variant };
 }
 
 /** The name the web table prints for a request's user, with its own fallbacks. */
@@ -112,7 +111,9 @@ const RequestLogRow = memo(function RequestLogRow({
   const { t } = useTranslation();
   const locale = i18n.language;
   const created = parseTimestamp(entry.created_at);
-  const time = Number.isNaN(created.getTime()) ? UNMEASURED_VALUE : formatClockTime(created, locale);
+  const time = Number.isNaN(created.getTime())
+    ? UNMEASURED_VALUE
+    : formatClockTime(created, locale);
   // Six fraction digits, as the web table prints a request's cost: a gateway
   // request can cost less than a cent, and two digits would round it to zero.
   const cost = formatPrefixedUsd(fromMicrodollars(entry.cost_microdollars), locale, {
@@ -183,11 +184,7 @@ export function OrganizationRequestLogsScreen() {
   const [anchorMs] = useState(() => Date.now());
   const [windowEndMs, setWindowEndMs] = useState(anchorMs);
   const allowed = canManageOrganizationBilling(role);
-  const logs = useOrgRequestLogs(
-    organizationId,
-    new Date(windowEndMs).toISOString(),
-    allowed
-  );
+  const logs = useOrgRequestLogs(organizationId, new Date(windowEndMs).toISOString(), allowed);
   const paddingBottom = useTabBarBottomPadding();
   const body = requestLogsBody(logs.data, logs.error);
 

@@ -50,11 +50,7 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
 }));
 
 vi.mock('@/lib/hooks/use-org-billing-queries', () => ({
-  useOrgRequestLogs: (
-    _organizationId: string | null,
-    startTime: string,
-    enabled: boolean
-  ) => {
+  useOrgRequestLogs: (_organizationId: string | null, startTime: string, enabled: boolean) => {
     logsQuery.startTimes.push(startTime);
     logsQuery.enabled.push(enabled);
     return {

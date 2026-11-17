@@ -97,9 +97,9 @@ describe('visibleOrgSettingsRows', () => {
       }
     }
     const byArea = new Map(visibleOrgSettingsRows(gate(), 'org_1').map(row => [row.area, row.url]));
-    expect(byArea.get('providersAndModels')?.endsWith('/organizations/org_1/providers-and-models')).toBe(
-      true
-    );
+    expect(
+      byArea.get('providersAndModels')?.endsWith('/organizations/org_1/providers-and-models')
+    ).toBe(true);
     expect(byArea.get('guardrails')?.endsWith('/organizations/org_1/guardrails')).toBe(true);
   });
 

@@ -83,10 +83,9 @@ vi.mock('@/lib/trpc', () => ({
     },
   }),
 }));
-vi.mock('@/components/ui/icons', () => ({ Ban: 'Ban' }));
+vi.mock('@/components/ui/icons', () => ({ Ban: 'Ban', BellOff: 'BellOff' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));

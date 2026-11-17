@@ -6,10 +6,15 @@ import { useQuery } from '@tanstack/react-query';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { type LucideIcon } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { KiloPassIcon } from '@/components/kilo-pass/kilo-pass-icon';
 import { getKiloPassCardContentState } from '@/lib/kilo-pass/state';
 import { useTRPC } from '@/lib/trpc';
+
+// The wrapper forwards the crown's props, but a plain function does not carry
+// the forward-ref brand `LucideIcon` names; the row only needs the icon value.
+const ROW_ICON = KiloPassIcon as unknown as LucideIcon;
 
 export function KiloPassSubscriptionCard({
   hideLoadingSkeleton = false,
@@ -52,7 +57,7 @@ export function KiloPassSubscriptionCard({
       {contentState.kind === 'error' ? (
         <RowGroup leadingTile>
           <ConfigureRow
-            icon={KiloPassIcon}
+            icon={ROW_ICON}
             title={contentState.title}
             subtitle={contentState.description}
             accessibilityLabel={t('kiloPass.cardAccessibility', {
@@ -74,7 +79,7 @@ export function KiloPassSubscriptionCard({
       {contentState.kind === 'card' ? (
         <RowGroup leadingTile>
           <ConfigureRow
-            icon={KiloPassIcon}
+            icon={ROW_ICON}
             title={contentState.title}
             subtitle={contentState.description}
             hue="honey"

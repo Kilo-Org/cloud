@@ -44,7 +44,8 @@ const METRIC_OPTIONS = [
  *
  * The detail holds a two-line floor, never a cap, so a detail that needs more
  * lines still grows the tile, and every locale whose detail fits two lines
- * loads at one height that its loading skeleton matches.
+ * loads at one height that its loading skeleton matches. A one-line detail sits
+ * centred in that floor, so the air above and below it stays equal.
  *
  * The tile sizes to its own content and its row partner stretches to the shared
  * row height with `justify-center`, so the partner's value and caption are
@@ -65,7 +66,7 @@ function StatTile({
       <Text className="text-lg font-bold text-foreground">{value}</Text>
       <Text className="text-xs text-muted-foreground">{label}</Text>
       {subtext !== undefined && (
-        <View className="min-h-[28px]">
+        <View className="min-h-[28px] justify-center">
           <Text className="text-xs text-muted-foreground">{subtext}</Text>
         </View>
       )}

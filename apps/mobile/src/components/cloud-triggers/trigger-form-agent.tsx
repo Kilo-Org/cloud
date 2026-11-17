@@ -21,7 +21,11 @@ import { ModelSelector } from '@/components/agents/model-selector';
 import { cn } from '@/lib/utils';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
-import { COMPACT_CONTROL_HIT_SLOP_DP, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import {
+  LINE_ACTION_BOX_CLASS,
+  LINE_ACTION_HIT_SLOP,
+  STATE_ACTION_CLASS,
+} from '@/lib/a11y/tap-target';
 import { triggerProblemText } from '@/lib/cloud-triggers/trigger-problem-copy';
 import { type TriggerDraft, type TriggerDraftProblems } from '@/lib/cloud-triggers/trigger-draft';
 import { TRIGGER_FIELD_EXAMPLES } from '@/lib/cloud-triggers/trigger-field-examples';
@@ -161,9 +165,9 @@ export function TriggerFormAgent({
               accessibilityLabel={t('common.retry')}
               accessibilityRole="button"
               accessibilityState={{ disabled: models.isFetching }}
-              className={cn(STATE_ACTION_CLASS, 'active:opacity-70')}
+              className={cn(LINE_ACTION_BOX_CLASS, STATE_ACTION_CLASS, 'active:opacity-70')}
               disabled={models.isFetching}
-              hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
+              hitSlop={LINE_ACTION_HIT_SLOP}
               onPress={handleRetryModels}
             >
               <Text className="text-xs font-medium text-destructive">

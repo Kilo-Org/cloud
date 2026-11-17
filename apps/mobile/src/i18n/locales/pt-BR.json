@@ -360,7 +360,8 @@
     "providerKeys": {
       "title": "Chaves de provedor",
       "rowSubtitle": "Use o faturamento do seu próprio provedor",
-      "manageOnWebReason": "Esses provedores precisam de credenciais estruturadas.",
+      "orgDescription": "Essas chaves são compartilhadas com todos na organização e cobradas nas contas de provedor da organização.",
+      "viewOnly": "Somente um proprietário, administrador ou gerente de faturamento da organização pode alterar as chaves dela.",
       "description": "As solicitações feitas com essas chaves são cobradas na sua conta do provedor, e não no seu saldo Kilo.",
       "managedByPlan": "Gerenciada pelo seu plano de programação",
       "enableKey": "Ativar a chave do {{provider}}",
@@ -370,6 +371,7 @@
       "removeMessage": "As solicitações que usavam esta chave deixarão de usar o faturamento do seu provedor.",
       "add": "Adicionar chave",
       "added": "Chave adicionada",
+      "updated": "Chave atualizada",
       "emptyTitle": "Nenhuma chave de provedor",
       "emptyDescription": "Adicione uma chave para começar.",
       "chooseProvider": "Escolha um provedor",
@@ -378,9 +380,34 @@
       "noProvidersDescription": "Nenhum provedor corresponde a essa pesquisa.",
       "newKeyTitle": "Nova chave",
       "newKeyDescription": "A chave é armazenada criptografada e não poderá ser exibida novamente.",
+      "edit": "Editar chave",
+      "editKeyTitle": "Substituir chave",
+      "editKeyDescription": "O valor armazenado não pode ser exibido. Insira um novo para substituí-lo.",
+      "editKeyMappingsWarning": "Substituir a chave também substitui os mapeamentos de modelos armazenados: insira novamente cada mapeamento de que ainda precisar.",
+      "saveFailed": "Não foi possível salvar a chave.",
+      "invalidCredentials": "Verifique as credenciais e tente novamente.",
+      "fieldRequired": "O campo {{field}} é obrigatório.",
+      "incompleteMapping": "O mapeamento {{number}} precisa de um slug do modelo do gateway e de um nome da implantação.",
       "apiKeyLabel": "Chave de API",
       "apiKeyPlaceholder": "Cole a chave",
-      "apiKeyRequired": "Insira a chave."
+      "apiKeyRequired": "Insira a chave.",
+      "authMethod": "Método de autenticação",
+      "authMethodAccessKeys": "Chaves de acesso",
+      "resourceName": "Nome do recurso do Azure",
+      "region": "Região da AWS",
+      "accessKeyId": "ID da chave de acesso",
+      "secretAccessKey": "Chave de acesso secreta",
+      "project": "Projeto do Google Cloud",
+      "location": "Local do Vertex",
+      "clientEmail": "E-mail da conta de serviço",
+      "privateKey": "Chave privada da conta de serviço",
+      "modelMappings": "Mapeamentos de modelos",
+      "modelMappingsDescription": "Encaminhe um modelo do gateway para um nome de implantação personalizado.",
+      "mappingTitle": "Mapeamento {{number}}",
+      "mappingGatewayModel": "Slug do modelo do gateway",
+      "mappingCustomModel": "Nome da implantação",
+      "addMapping": "Adicionar mapeamento",
+      "removeMapping": "Remover mapeamento {{number}}"
     },
     "dataExport": {
       "title": "Seus dados",
@@ -453,7 +480,8 @@
       "nextStepFinal": "A decisão do recurso é definitiva. Não é possível enviar outro recurso.",
       "viewReceipt": "Ver comprovante"
     },
-    "changelog": "Novidades"
+    "changelog": "Novidades",
+    "changelogVersionPending": "As notas desta versão vêm na próxima atualização do app."
   },
   "notifications": {
     "channel": {

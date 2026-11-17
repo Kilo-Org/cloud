@@ -360,7 +360,8 @@
     "providerKeys": {
       "title": "Klíče poskytovatelů",
       "rowSubtitle": "Používat vlastní fakturaci u poskytovatele",
-      "manageOnWebReason": "Tito poskytovatelé vyžadují strukturované přihlašovací údaje.",
+      "orgDescription": "Tyto klíče jsou sdíleny se všemi v organizaci a účtují se na její účty u poskytovatelů.",
+      "viewOnly": "Klíče organizace může měnit pouze její vlastník, administrátor nebo správce fakturace.",
       "description": "Požadavky přes tyto klíče se účtují na váš účet u poskytovatele, ne z vašeho zůstatku v Kilo.",
       "managedByPlan": "Spravuje váš programovací tarif",
       "enableKey": "Povolit klíč pro {{provider}}",
@@ -370,6 +371,7 @@
       "removeMessage": "Požadavky, které tento klíč používaly, přestanou využívat fakturaci u vašeho poskytovatele.",
       "add": "Přidat klíč",
       "added": "Klíč byl přidán",
+      "updated": "Klíč byl aktualizován",
       "emptyTitle": "Žádné klíče poskytovatelů",
       "emptyDescription": "Začněte přidáním klíče.",
       "chooseProvider": "Vyberte poskytovatele",
@@ -378,9 +380,34 @@
       "noProvidersDescription": "Hledání neodpovídá žádný poskytovatel.",
       "newKeyTitle": "Nový klíč",
       "newKeyDescription": "Klíč je uložen šifrovaně a znovu ho nebude možné zobrazit.",
+      "edit": "Upravit klíč",
+      "editKeyTitle": "Nahradit klíč",
+      "editKeyDescription": "Uloženou hodnotu nelze zobrazit. Zadejte novou, která ji nahradí.",
+      "editKeyMappingsWarning": "Nahrazením klíče se nahradí i uložená mapování modelů: znovu zadejte každé mapování, které ještě potřebujete.",
+      "saveFailed": "Klíč se nepodařilo uložit.",
+      "invalidCredentials": "Zkontrolujte přihlašovací údaje a zkuste to znovu.",
+      "fieldRequired": "Pole {{field}} je povinné.",
+      "incompleteMapping": "Mapování {{number}} vyžaduje slug modelu brány i název nasazení.",
       "apiKeyLabel": "Klíč API",
       "apiKeyPlaceholder": "Vložte klíč",
-      "apiKeyRequired": "Zadejte klíč."
+      "apiKeyRequired": "Zadejte klíč.",
+      "authMethod": "Způsob ověření",
+      "authMethodAccessKeys": "Přístupové klíče",
+      "resourceName": "Název prostředku Azure",
+      "region": "Oblast AWS",
+      "accessKeyId": "ID přístupového klíče",
+      "secretAccessKey": "Tajný přístupový klíč",
+      "project": "Projekt Google Cloud",
+      "location": "Umístění Vertex",
+      "clientEmail": "E-mail účtu služby",
+      "privateKey": "Soukromý klíč účtu služby",
+      "modelMappings": "Mapování modelů",
+      "modelMappingsDescription": "Přesměrujte model brány na vlastní název nasazení.",
+      "mappingTitle": "Mapování {{number}}",
+      "mappingGatewayModel": "Slug modelu brány",
+      "mappingCustomModel": "Název nasazení",
+      "addMapping": "Přidat mapování",
+      "removeMapping": "Odebrat mapování {{number}}"
     },
     "dataExport": {
       "title": "Vaše data",
@@ -453,7 +480,8 @@
       "nextStepFinal": "Rozhodnutí o odvolání je konečné. Další odvolání již nelze podat.",
       "viewReceipt": "Zobrazit potvrzení"
     },
-    "changelog": "Co je nového"
+    "changelog": "Co je nového",
+    "changelogVersionPending": "Poznámky k této verzi přijdou s další aktualizací aplikace."
   },
   "preferences": {
     "general": "Obecné",

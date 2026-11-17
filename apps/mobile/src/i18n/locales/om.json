@@ -360,7 +360,8 @@
     "providerKeys": {
       "title": "Furtuuwwan dhiyeessaa",
       "rowSubtitle": "Kaffaltii dhiyeessaa kee fayyadami",
-      "manageOnWebReason": "Dhiyeessitoonni kunneen ragaalee eenyummaa caaseffamoo barbaadu.",
+      "orgDescription": "Furtuuwwan kunneen namoota dhaabbata keessa jiran hundaaf qoodamanii herrega dhiyeessaa dhaabbatichaatti kaffalamu.",
+      "viewOnly": "Abbaa dhaabbatichaa, bulchaa ykn hogganaa kaffaltii qofatu furtuuwwan isaa jijjiiruu danda'a.",
       "description": "Gaaffiiwwan furtuuwwan kanaan ergaman haftee Kilo kee irraa osoo hin taane herrega dhiyeessaa keetti kaffalamu.",
       "managedByPlan": "Karoora koodii keetiin bulfama",
       "enableKey": "Furtuu {{provider}} dandeessisi",
@@ -370,6 +371,7 @@
       "removeMessage": "Gaaffiiwwan furtuu kana fayyadaman kaffaltii dhiyeessaa kee fayyadamuu ni dhiisu.",
       "add": "Furtuu dabaladhu",
       "added": "Furtuun dabalameera",
+      "updated": "Furtuun haaromfameera",
       "emptyTitle": "Furtuun dhiyeessaa hin jiru",
       "emptyDescription": "Jalqabuuf furtuu dabaladhu.",
       "chooseProvider": "Dhiyeessaa filadhu",
@@ -378,9 +380,34 @@
       "noProvidersDescription": "Dhiyeessaan barbaacha sana wajjin walsimu hin jiru.",
       "newKeyTitle": "Furtuu haaraa",
       "newKeyDescription": "Furtuun icciteeffamee kuufama, irra deebi'ees agarsiifamuu hin danda'u.",
+      "edit": "Furtuu gulaali",
+      "editKeyTitle": "Furtuu bakka buusi",
+      "editKeyDescription": "Gatiin kuufame agarsiifamuu hin danda'u. Bakka buusuuf haaraa galchi.",
+      "editKeyMappingsWarning": "Furtuu bakka buusuun walqabsiisa moodeelaa kuufamees ni bakka buusa: walqabsiisa amma illee barbaachisu hunda irra deebi'ii galchi.",
+      "saveFailed": "Furtuu olkaa'uun hin danda'amne.",
+      "invalidCredentials": "Ragaalee eenyummaa mirkaneessiitii irra deebi'ii yaali.",
+      "fieldRequired": "{{field}} barbaachisaadha.",
+      "incompleteMapping": "Walqabsiisa {{number}} slug moodeela gateway fi maqaa deployment lachuu qabaachuu qaba.",
       "apiKeyLabel": "Furtuu API",
       "apiKeyPlaceholder": "Furtuu maxxansi",
-      "apiKeyRequired": "Furtuu galchi."
+      "apiKeyRequired": "Furtuu galchi.",
+      "authMethod": "Mala mirkaneessaa",
+      "authMethodAccessKeys": "Furtuuwwan seensaa",
+      "resourceName": "Maqaa qabeenya Azure",
+      "region": "Naannoo AWS",
+      "accessKeyId": "ID furtuu seensaa",
+      "secretAccessKey": "Furtuu seensaa iccitii",
+      "project": "Pirojektii Google Cloud",
+      "location": "Bakka Vertex",
+      "clientEmail": "Imeelii herrega tajaajilaa",
+      "privateKey": "Furtuu dhuunfaa herrega tajaajilaa",
+      "modelMappings": "Walqabsiisa moodeelaa",
+      "modelMappingsDescription": "Moodeela gateway gara maqaa deployment addaatti ergi.",
+      "mappingTitle": "Walqabsiisa {{number}}",
+      "mappingGatewayModel": "Slug moodeela gateway",
+      "mappingCustomModel": "Maqaa deployment",
+      "addMapping": "Walqabsiisa dabaladhu",
+      "removeMapping": "Walqabsiisa {{number}} haqi"
     },
     "dataExport": {
       "title": "Daataa kee",
@@ -453,7 +480,8 @@
       "nextStepFinal": "Murteen ol'iyyannoo kan dhumaa dha. Ol'iyyannoon biraa ergamuu hin danda'u.",
       "viewReceipt": "Ragaa ilaali"
     },
-    "changelog": "Waan haaraa"
+    "changelog": "Waan haaraa",
+    "changelogVersionPending": "Yaadannoon gulaala kanaa haaromsa appii itti aanu waliin dhufa."
   },
   "preferences": {
     "general": "Waliigalaa",

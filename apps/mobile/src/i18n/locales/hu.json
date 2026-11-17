@@ -360,7 +360,8 @@
     "providerKeys": {
       "title": "Szolgáltatói kulcsok",
       "rowSubtitle": "Saját szolgáltatói számlázás használata",
-      "manageOnWebReason": "Ezekhez a szolgáltatókhoz strukturált hitelesítő adatok szükségesek.",
+      "orgDescription": "Ezek a kulcsok a szervezet minden tagja számára közösek, és a költségek a szervezet szolgáltatói fiókjait terhelik.",
+      "viewOnly": "Csak a szervezet tulajdonosa, adminisztrátora vagy számlázási kezelője módosíthatja a szervezet kulcsait.",
       "description": "Az ezekkel a kulcsokkal küldött kérések a szolgáltatói fiókodat terhelik a Kilo-egyenleged helyett.",
       "managedByPlan": "A kódolási csomagod kezeli",
       "enableKey": "A(z) {{provider}} kulcs engedélyezése",
@@ -370,6 +371,7 @@
       "removeMessage": "Az ezt a kulcsot használó kérések többé nem a szolgáltatói számlázásodat fogják használni.",
       "add": "Kulcs hozzáadása",
       "added": "Kulcs hozzáadva",
+      "updated": "Kulcs frissítve",
       "emptyTitle": "Nincsenek szolgáltatói kulcsok",
       "emptyDescription": "Kulcs hozzáadása a kezdéshez.",
       "chooseProvider": "Válassz szolgáltatót",
@@ -378,9 +380,34 @@
       "noProvidersDescription": "Egyetlen szolgáltató sem felel meg a keresésnek.",
       "newKeyTitle": "Új kulcs",
       "newKeyDescription": "A kulcsot titkosítva tároljuk, és később nem jeleníthető meg újra.",
+      "edit": "Kulcs szerkesztése",
+      "editKeyTitle": "Kulcs cseréje",
+      "editKeyDescription": "A tárolt érték nem jeleníthető meg. Adj meg egy újat a cseréjéhez.",
+      "editKeyMappingsWarning": "A kulcs cseréje a mentett modell-megfeleltetéseket is lecseréli: add meg újra az összes még szükséges megfeleltetést.",
+      "saveFailed": "Nem sikerült menteni a kulcsot.",
+      "invalidCredentials": "Ellenőrizd a hitelesítő adatokat, és próbáld újra.",
+      "fieldRequired": "A(z) {{field}} mező kitöltése kötelező.",
+      "incompleteMapping": "A(z) {{number}}. megfeleltetéshez a gateway-modell slug és a deployment neve is szükséges.",
       "apiKeyLabel": "API-kulcs",
       "apiKeyPlaceholder": "Illeszd be a kulcsot",
-      "apiKeyRequired": "Add meg a kulcsot."
+      "apiKeyRequired": "Add meg a kulcsot.",
+      "authMethod": "Hitelesítési mód",
+      "authMethodAccessKeys": "Hozzáférési kulcsok",
+      "resourceName": "Azure-erőforrás neve",
+      "region": "AWS-régió",
+      "accessKeyId": "Hozzáférési kulcs azonosítója",
+      "secretAccessKey": "Titkos hozzáférési kulcs",
+      "project": "Google Cloud-projekt",
+      "location": "Vertex-helyszín",
+      "clientEmail": "Szolgáltatásfiók e-mail-címe",
+      "privateKey": "Szolgáltatásfiók privát kulcsa",
+      "modelMappings": "Modell-megfeleltetések",
+      "modelMappingsDescription": "Gateway-modell átirányítása egyéni deployment névre.",
+      "mappingTitle": "{{number}}. megfeleltetés",
+      "mappingGatewayModel": "Gateway-modell slug",
+      "mappingCustomModel": "Deployment neve",
+      "addMapping": "Megfeleltetés hozzáadása",
+      "removeMapping": "{{number}}. megfeleltetés eltávolítása"
     },
     "dataExport": {
       "title": "Az adataid",
@@ -453,7 +480,8 @@
       "nextStepFinal": "A fellebbezési döntés végleges. További fellebbezés nem nyújtható be.",
       "viewReceipt": "Visszaigazolás megtekintése"
     },
-    "changelog": "Újdonságok"
+    "changelog": "Újdonságok",
+    "changelogVersionPending": "E verzió újdonságai a következő frissítéssel érkeznek."
   },
   "preferences": {
     "general": "Általános",

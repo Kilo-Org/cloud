@@ -360,7 +360,8 @@
     "providerKeys": {
       "title": "Kle founisè",
       "rowSubtitle": "Sèvi ak pwòp faktirasyon founisè w",
-      "manageOnWebReason": "Founisè sa yo bezwen idantifyan ki estriktire.",
+      "orgDescription": "Kle sa yo pataje ak tout moun nan òganizasyon an, epi yo faktire sou kont founisè òganizasyon an.",
+      "viewOnly": "Se sèlman yon pwopriyetè, yon administratè oswa yon jesyonè faktirasyon òganizasyon an ki ka chanje kle li yo.",
       "description": "Demann ki pase nan kle sa yo ap faktire sou kont founisè w la olye de balans Kilo w la.",
       "managedByPlan": "Plan kodaj ou a jere l",
       "enableKey": "Aktive kle {{provider}} an",
@@ -370,6 +371,7 @@
       "removeMessage": "Demann ki te itilize kle sa a p ap sèvi ak faktirasyon founisè w la ankò.",
       "add": "Ajoute kle",
       "added": "Kle ajoute",
+      "updated": "Kle mete ajou",
       "emptyTitle": "Pa gen kle founisè",
       "emptyDescription": "Ajoute yon kle pou kòmanse.",
       "chooseProvider": "Chwazi yon founisè",
@@ -378,9 +380,34 @@
       "noProvidersDescription": "Pa gen okenn founisè ki koresponn ak rechèch sa a.",
       "newKeyTitle": "Nouvo kle",
       "newKeyDescription": "Kle a anrejistre ankripte epi li pa ka parèt ankò.",
+      "edit": "Modifye kle",
+      "editKeyTitle": "Ranplase kle",
+      "editKeyDescription": "Valè ki anrejistre a pa ka parèt. Antre yon nouvo pou ranplase l.",
+      "editKeyMappingsWarning": "Ranplase kle a ranplase tou korespondans modèl ki anrejistre yo: reyantre chak korespondans ou toujou bezwen.",
+      "saveFailed": "Nou pa t ka anrejistre kle a.",
+      "invalidCredentials": "Verifye idantifyan yo epi eseye ankò.",
+      "fieldRequired": "{{field}} obligatwa.",
+      "incompleteMapping": "Korespondans {{number}} bezwen yon slug modèl gateway ak yon non deplwaman.",
       "apiKeyLabel": "Kle API",
       "apiKeyPlaceholder": "Kole kle a",
-      "apiKeyRequired": "Antre kle a."
+      "apiKeyRequired": "Antre kle a.",
+      "authMethod": "Metòd otantifikasyon",
+      "authMethodAccessKeys": "Kle aksè",
+      "resourceName": "Non resous Azure",
+      "region": "Rejyon AWS",
+      "accessKeyId": "ID kle aksè",
+      "secretAccessKey": "Kle aksè sekrè",
+      "project": "Pwojè Google Cloud",
+      "location": "Lokasyon Vertex",
+      "clientEmail": "Imèl kont sèvis",
+      "privateKey": "Kle prive kont sèvis",
+      "modelMappings": "Korespondans modèl",
+      "modelMappingsDescription": "Voye yon modèl gateway bay yon non deplwaman pèsonalize.",
+      "mappingTitle": "Korespondans {{number}}",
+      "mappingGatewayModel": "Slug modèl gateway",
+      "mappingCustomModel": "Non deplwaman",
+      "addMapping": "Ajoute korespondans",
+      "removeMapping": "Retire korespondans {{number}}"
     },
     "dataExport": {
       "title": "Done ou yo",
@@ -453,7 +480,8 @@
       "nextStepFinal": "Desizyon apèl la final. Ou pa ka soumèt okenn lòt apèl.",
       "viewReceipt": "Wè resi a"
     },
-    "changelog": "Sa ki nouvo"
+    "changelog": "Sa ki nouvo",
+    "changelogVersionPending": "Nòt vèsyon sa a ap vini ak pwochen mizajou aplikasyon an."
   },
   "preferences": {
     "general": "Jeneral",

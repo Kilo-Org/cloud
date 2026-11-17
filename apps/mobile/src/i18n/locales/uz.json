@@ -360,7 +360,8 @@
     "providerKeys": {
       "title": "Provayder kalitlari",
       "rowSubtitle": "O'z provayderingiz orqali to'lash",
-      "manageOnWebReason": "Bu provayderlar tuzilgan hisob ma'lumotlarini talab qiladi.",
+      "orgDescription": "Bu kalitlar tashkilotdagi barcha a'zolar bilan ulashiladi va to'lov tashkilotning provayder hisoblaridan olinadi.",
+      "viewOnly": "Tashkilot kalitlarini faqat uning egasi, administratori yoki to'lovlar menejeri o'zgartira oladi.",
       "description": "Bu kalitlar orqali yuborilgan so'rovlar uchun to'lov Kilo balansingizdan emas, provayder hisobingizdan olinadi.",
       "managedByPlan": "Kodlash tarifingiz orqali boshqariladi",
       "enableKey": "{{provider}} kalitini yoqish",
@@ -370,6 +371,7 @@
       "removeMessage": "Bu kalitdan foydalangan so'rovlar uchun endi provayderingiz orqali to'lov olinmaydi.",
       "add": "Kalit qo'shish",
       "added": "Kalit qo'shildi",
+      "updated": "Kalit yangilandi",
       "emptyTitle": "Provayder kalitlari yo'q",
       "emptyDescription": "Boshlash uchun kalit qo'shing.",
       "chooseProvider": "Provayderni tanlang",
@@ -378,9 +380,34 @@
       "noProvidersDescription": "Bu qidiruvga mos provayder yo'q.",
       "newKeyTitle": "Yangi kalit",
       "newKeyDescription": "Kalit shifrlangan holda saqlanadi va uni qayta ko'rsatib bo'lmaydi.",
+      "edit": "Kalitni tahrirlash",
+      "editKeyTitle": "Kalitni almashtirish",
+      "editKeyDescription": "Saqlangan qiymatni ko'rsatib bo'lmaydi. Uni almashtirish uchun yangisini kiriting.",
+      "editKeyMappingsWarning": "Kalitni almashtirish saqlangan model moslashuvlarini ham almashtiradi: sizga hali kerak bo'lgan har bir moslashuvni qayta kiriting.",
+      "saveFailed": "Kalitni saqlab bo'lmadi.",
+      "invalidCredentials": "Hisob ma'lumotlarini tekshirib, qaytadan urinib ko'ring.",
+      "fieldRequired": "{{field}} kiritilishi shart.",
+      "incompleteMapping": "Moslashuv {{number}} uchun gateway modeli slugi ham, deployment nomi ham kiritilishi shart.",
       "apiKeyLabel": "API kaliti",
       "apiKeyPlaceholder": "Kalitni joylang",
-      "apiKeyRequired": "Kalitni kiriting."
+      "apiKeyRequired": "Kalitni kiriting.",
+      "authMethod": "Autentifikatsiya usuli",
+      "authMethodAccessKeys": "Kirish kalitlari",
+      "resourceName": "Azure resurs nomi",
+      "region": "AWS mintaqasi",
+      "accessKeyId": "Kirish kaliti identifikatori",
+      "secretAccessKey": "Maxfiy kirish kaliti",
+      "project": "Google Cloud loyihasi",
+      "location": "Vertex joylashuvi",
+      "clientEmail": "Xizmat hisobi e-pochtasi",
+      "privateKey": "Xizmat hisobi shaxsiy kaliti",
+      "modelMappings": "Model moslashuvlari",
+      "modelMappingsDescription": "Gateway modelini maxsus deployment nomiga yo'naltiring.",
+      "mappingTitle": "Moslashuv {{number}}",
+      "mappingGatewayModel": "Gateway modeli slugi",
+      "mappingCustomModel": "Deployment nomi",
+      "addMapping": "Moslashuv qo'shish",
+      "removeMapping": "{{number}}-moslashuvni olib tashlash"
     },
     "dataExport": {
       "title": "Ma'lumotlaringiz",
@@ -453,7 +480,8 @@
       "nextStepFinal": "Apellyatsiya bo'yicha qaror yakuniy. Boshqa apellyatsiya berish mumkin emas.",
       "viewReceipt": "Kvitansiyani ko'rish"
     },
-    "changelog": "Yangiliklar"
+    "changelog": "Yangiliklar",
+    "changelogVersionPending": "Bu versiya yangiliklari ilovaning keyingi yangilanishi bilan keladi."
   },
   "preferences": {
     "general": "Umumiy",

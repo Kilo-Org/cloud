@@ -360,7 +360,8 @@
     "providerKeys": {
       "title": "فراہم کنندہ کی کلیدیں",
       "rowSubtitle": "اپنے فراہم کنندہ کی بلنگ استعمال کریں",
-      "manageOnWebReason": "ان فراہم کنندگان کو منظم اسناد درکار ہیں۔",
+      "orgDescription": "یہ کلیدیں تنظیم کے ہر فرد کے ساتھ شیئر کی جاتی ہیں اور ان کا بل تنظیم کے فراہم کنندہ اکاؤنٹس پر آتا ہے۔",
+      "viewOnly": "صرف تنظیم کا مالک، ایڈمن یا بلنگ مینیجر اس کی کلیدیں تبدیل کر سکتا ہے۔",
       "description": "ان کلیدوں کے ذریعے کی گئی درخواستوں کا بل آپ کے Kilo بیلنس کے بجائے آپ کے فراہم کنندہ اکاؤنٹ پر آتا ہے۔",
       "managedByPlan": "آپ کے کوڈنگ پلان کے زیر انتظام",
       "enableKey": "{{provider}} کلید فعال کریں",
@@ -370,6 +371,7 @@
       "removeMessage": "جن درخواستوں میں یہ کلید استعمال ہوتی تھی وہ اب آپ کے فراہم کنندہ کی بلنگ استعمال نہیں کریں گی۔",
       "add": "کلید شامل کریں",
       "added": "کلید شامل کر دی گئی",
+      "updated": "کلید اپ ڈیٹ کر دی گئی",
       "emptyTitle": "فراہم کنندہ کی کوئی کلید نہیں",
       "emptyDescription": "شروع کرنے کے لیے کلید شامل کریں۔",
       "chooseProvider": "فراہم کنندہ منتخب کریں",
@@ -378,9 +380,34 @@
       "noProvidersDescription": "کوئی فراہم کنندہ اس تلاش سے مماثل نہیں۔",
       "newKeyTitle": "نئی کلید",
       "newKeyDescription": "کلید خفیہ کاری کے ساتھ محفوظ کی جاتی ہے اور دوبارہ نہیں دکھائی جا سکتی۔",
+      "edit": "کلید میں ترمیم کریں",
+      "editKeyTitle": "کلید تبدیل کریں",
+      "editKeyDescription": "محفوظ شدہ قدر دکھائی نہیں جا سکتی۔ اسے تبدیل کرنے کے لیے نئی قدر درج کریں۔",
+      "editKeyMappingsWarning": "کلید تبدیل کرنے سے محفوظ شدہ ماڈل میپنگز بھی تبدیل ہو جائیں گی: ہر وہ میپنگ دوبارہ درج کریں جس کی آپ کو اب بھی ضرورت ہو۔",
+      "saveFailed": "کلید محفوظ نہیں کی جا سکی۔",
+      "invalidCredentials": "اسناد چیک کریں اور دوبارہ کوشش کریں۔",
+      "fieldRequired": "{{field}} درکار ہے۔",
+      "incompleteMapping": "میپنگ {{number}} کے لیے گیٹ وے ماڈل slug اور ڈیپلائمنٹ کا نام دونوں درکار ہیں۔",
       "apiKeyLabel": "API کلید",
       "apiKeyPlaceholder": "کلید پیسٹ کریں",
-      "apiKeyRequired": "کلید درج کریں۔"
+      "apiKeyRequired": "کلید درج کریں۔",
+      "authMethod": "تصدیق کا طریقہ",
+      "authMethodAccessKeys": "رسائی کی کلیدیں",
+      "resourceName": "Azure ریسورس کا نام",
+      "region": "AWS ریجن",
+      "accessKeyId": "رسائی کلید کی ID",
+      "secretAccessKey": "خفیہ رسائی کلید",
+      "project": "Google Cloud پروجیکٹ",
+      "location": "Vertex مقام",
+      "clientEmail": "سروس اکاؤنٹ ای میل",
+      "privateKey": "سروس اکاؤنٹ کی نجی کلید",
+      "modelMappings": "ماڈل میپنگز",
+      "modelMappingsDescription": "گیٹ وے ماڈل کو حسب ضرورت ڈیپلائمنٹ نام پر بھیجیں۔",
+      "mappingTitle": "میپنگ {{number}}",
+      "mappingGatewayModel": "گیٹ وے ماڈل slug",
+      "mappingCustomModel": "ڈیپلائمنٹ کا نام",
+      "addMapping": "میپنگ شامل کریں",
+      "removeMapping": "میپنگ {{number}} ہٹائیں"
     },
     "dataExport": {
       "title": "آپ کا ڈیٹا",
@@ -453,7 +480,8 @@
       "nextStepFinal": "اپیل کا فیصلہ حتمی ہے۔ مزید کوئی اپیل جمع نہیں کرائی جا سکتی۔",
       "viewReceipt": "رسید دیکھیں"
     },
-    "changelog": "نیا کیا ہے"
+    "changelog": "نیا کیا ہے",
+    "changelogVersionPending": "اس ورژن کے نوٹس ایپ کی اگلی اپ ڈیٹ کے ساتھ آئیں گے۔"
   },
   "preferences": {
     "general": "عمومی",

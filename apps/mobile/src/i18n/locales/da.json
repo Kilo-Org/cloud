@@ -360,7 +360,8 @@
     "providerKeys": {
       "title": "Udbydernøgler",
       "rowSubtitle": "Brug din egen udbyderfakturering",
-      "manageOnWebReason": "Disse udbydere kræver strukturerede legitimationsoplysninger.",
+      "orgDescription": "Disse nøgler deles med alle i organisationen og faktureres til organisationens udbyderkonti.",
+      "viewOnly": "Kun en ejer, administrator eller faktureringsansvarlig i organisationen kan ændre dens nøgler.",
       "description": "Anmodninger via disse nøgler faktureres til din udbyderkonto i stedet for din Kilo-saldo.",
       "managedByPlan": "Administreres af dit kodningsabonnement",
       "enableKey": "Aktivér {{provider}}-nøglen",
@@ -370,6 +371,7 @@
       "removeMessage": "Anmodninger, der brugte denne nøgle, vil ikke længere bruge din udbyderfakturering.",
       "add": "Tilføj nøgle",
       "added": "Nøglen er tilføjet",
+      "updated": "Nøglen er opdateret",
       "emptyTitle": "Ingen udbydernøgler",
       "emptyDescription": "Tilføj en nøgle for at komme i gang.",
       "chooseProvider": "Vælg en udbyder",
@@ -378,9 +380,34 @@
       "noProvidersDescription": "Ingen udbydere matcher søgningen.",
       "newKeyTitle": "Ny nøgle",
       "newKeyDescription": "Nøglen gemmes krypteret og kan ikke vises igen.",
+      "edit": "Rediger nøgle",
+      "editKeyTitle": "Erstat nøgle",
+      "editKeyDescription": "Den gemte værdi kan ikke vises. Angiv en ny for at erstatte den.",
+      "editKeyMappingsWarning": "Når nøglen erstattes, erstattes de gemte modeltilknytninger også: angiv derfor alle de tilknytninger, du stadig har brug for.",
+      "saveFailed": "Nøglen kunne ikke gemmes.",
+      "invalidCredentials": "Kontrollér legitimationsoplysningerne, og prøv igen.",
+      "fieldRequired": "{{field}} er påkrævet.",
+      "incompleteMapping": "Tilknytning {{number}} kræver både et slug for gateway-model og et deployment-navn.",
       "apiKeyLabel": "API-nøgle",
       "apiKeyPlaceholder": "Indsæt nøglen",
-      "apiKeyRequired": "Angiv nøglen."
+      "apiKeyRequired": "Angiv nøglen.",
+      "authMethod": "Godkendelsesmetode",
+      "authMethodAccessKeys": "Adgangsnøgler",
+      "resourceName": "Azure-ressourcenavn",
+      "region": "AWS-region",
+      "accessKeyId": "Adgangsnøgle-id",
+      "secretAccessKey": "Hemmelig adgangsnøgle",
+      "project": "Google Cloud-projekt",
+      "location": "Vertex-placering",
+      "clientEmail": "Tjenestekontoens e-mailadresse",
+      "privateKey": "Tjenestekontoens private nøgle",
+      "modelMappings": "Modeltilknytninger",
+      "modelMappingsDescription": "Send en gateway-model til et brugerdefineret deployment-navn.",
+      "mappingTitle": "Tilknytning {{number}}",
+      "mappingGatewayModel": "Slug for gateway-model",
+      "mappingCustomModel": "Deployment-navn",
+      "addMapping": "Tilføj tilknytning",
+      "removeMapping": "Fjern tilknytning {{number}}"
     },
     "dataExport": {
       "title": "Dine data",
@@ -453,7 +480,8 @@
       "nextStepFinal": "Afgørelsen om klagen er endelig. Der kan ikke indsendes flere klager.",
       "viewReceipt": "Se kvittering"
     },
-    "changelog": "Nyheder"
+    "changelog": "Nyheder",
+    "changelogVersionPending": "Noterne til denne version kommer med næste appopdatering."
   },
   "preferences": {
     "general": "Generelt",

@@ -2441,7 +2441,7 @@ describe('CloudAgentTransport snapshot read recovery', () => {
     }
   });
 
-  it('keeps a rejected initial read from replaying its retry page over a cursor reconnect', async () => {
+  it('replaces an armed initial retry with a record-only seed on a cursor reconnect', async () => {
     jest.useFakeTimers();
     try {
       const retryPage = {
@@ -2468,23 +2468,27 @@ describe('CloudAgentTransport snapshot read recovery', () => {
       expect(fetchSnapshotPage).toHaveBeenCalledTimes(1);
 
       // A wire event with a real id advances the cursor. reconnectWithoutCursor
-      // advances 2000ms, past the first 500ms backoff, so the pre-reconnect
-      // state must not have applied any page yet.
+      // advances 2000ms, past the first 500ms backoff: the armed retry fires
+      // and drops its page (nothing recorded yet), then the reconnect notices
+      // the cancelled chain and dispatches its own record-only read.
       sendRaw({ ...sentinel, eventId: 55 });
       await reconnectWithoutCursor();
 
       expect(String(webSocketConstructor.mock.calls.at(-1)?.[0])).toContain('fromId=55');
-      expect(fetchSnapshotPage).toHaveBeenCalledTimes(2);
 
-      // Nothing further may fire: the reconnect cancelled the armed retry
-      // chain, so the retry page never replays over the socket's catch-up,
-      // initialPageRecorded stays false, and no chain keeps retrying.
+      // The reconnect's own best-effort read fired.
+      expect(fetchSnapshotPage).toHaveBeenCalledTimes(3);
+
+      // Its page seeds the manager without replaying rows: session.created
+      // stays at 0, onInitialPageLoaded fires once with the fresh page.
       jest.advanceTimersByTime(10000);
       await flushMicrotasks();
 
-      expect(fetchSnapshotPage).toHaveBeenCalledTimes(2);
+      expect(fetchSnapshotPage).toHaveBeenCalledTimes(3);
       expect(serviceEvents.filter(event => event.type === 'session.created')).toHaveLength(0);
-      expect(onInitialPageLoaded).not.toHaveBeenCalled();
+      expect(onInitialPageLoaded).toHaveBeenCalledTimes(1);
+      expect(onInitialPageLoaded).toHaveBeenCalledWith(retryPage);
+      expect(errors).toEqual(['Connection lost. Please retry in a moment.']);
 
       transport.destroy();
     } finally {

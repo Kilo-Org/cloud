@@ -704,10 +704,10 @@ describe('SessionContextSheet copy row values', () => {
       testID: 'session-context-sheet-copy-link',
       value: sessionResumeUrl({ sessionId: 'ses-123', anchorMessageId: null }),
     },
-  ])('paints the $testID value in the mono face with a middle ellipsis', async ({ testID, value }) => {
-    // Both values are identifiers a reader scans by their tail — a session id's
-    // suffix and a URL's target — so the line singles out with a middle
-    // ellipsis and keeps the mono face that marks it as a copied token.
+  ])('paints the $testID value in the mono face, wrapping over its lines', async ({ testID, value }) => {
+    // The row is the only place either value is readable in full — an id's tail
+    // and a link's target — so the line keeps the mono face and wraps instead
+    // of clamping to one ellipsized line.
     const renderer = await mountSheet();
     const target = findByType(renderer.root, 'Pressable').find(
       node => node.props.testID === testID
@@ -715,8 +715,8 @@ describe('SessionContextSheet copy row values', () => {
     const valueLine = target
       ?.findAll(node => node.props.variant === 'mono')
       .find(node => node.props.children === value);
-    expect(valueLine?.props.numberOfLines).toBe(1);
-    expect(valueLine?.props.ellipsizeMode).toBe('middle');
+    expect(valueLine?.props.numberOfLines).toBeUndefined();
+    expect(valueLine?.props.className).toContain('text-foreground');
     await unmount(renderer);
   });
 });

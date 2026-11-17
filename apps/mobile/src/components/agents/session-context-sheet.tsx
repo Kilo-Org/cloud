@@ -629,23 +629,19 @@ function CopyRow({
   // renders beside it, so one capture of the sheet shows both the row the
   // scenario names and the feedback it demands.
   //
-  // The value is an identifier or a resume URL, so it keeps the mono face and
-  // ellipsizes in the middle: the tail of a session id and the tail of a URL
-  // are what identify it, and a tail ellipsis would hide both. `ConfigureRow`
-  // types its subtitle as a plain string painted in the caption face, so the
-  // value line fills the row's subtitle slot as a node instead.
+  // The value is an identifier or a resume URL: it keeps the mono face and
+  // wraps over as many lines as it needs, because the row is the only place
+  // the whole value is readable — an ellipsis would hide the tail that
+  // identifies a session id or a link, and the copies are the row's action.
+  // `ConfigureRow` types its subtitle as a plain string painted in the caption
+  // face, so the value line fills the row's subtitle node slot instead.
   return (
     <ConfigureRow
       testID={testID}
       icon={Copy}
       title={label}
       subtitlePlaceholder={
-        <Text
-          variant="mono"
-          className="mt-0.5 text-xs text-foreground"
-          numberOfLines={1}
-          ellipsizeMode="middle"
-        >
+        <Text variant="mono" className="mt-0.5 text-xs text-foreground">
           {value}
         </Text>
       }

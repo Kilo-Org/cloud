@@ -4662,7 +4662,7 @@
       "fieldCron": "Cron izteiksme",
       "fieldCronHelp": "Pieci lauki: minūte, stunda, diena, mēnesis un nedēļas diena. Īsākais intervāls ir viena minūte.",
       "fieldTimezone": "Laika josla",
-      "nameLocked": "Nosaukums ir daļa no tīmekļa āķa URL, un to nevar mainīt.",
+      "nameLocked": "Nosaukumu nevar mainīt pēc trigera izveides.",
       "repositoryLocked": "Repozitoriju nevar mainīt pēc trigera izveides.",
       "environmentAutomatic": "Automātiski pēc repozitorija",
       "notSelected": "Nav atlasīts",

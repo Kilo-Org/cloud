@@ -4592,7 +4592,7 @@
       "fieldCron": "Cron-uttrykk",
       "fieldCronHelp": "Fem felt: minutt, time, dag, måned og ukedag. Det korteste intervallet er ett minutt.",
       "fieldTimezone": "Tidssone",
-      "nameLocked": "Navnet er en del av webhook-URL-en og kan ikke endres.",
+      "nameLocked": "Navnet kan ikke endres etter at triggeren er opprettet.",
       "repositoryLocked": "Repositoriet kan ikke endres etter at triggeren er opprettet.",
       "environmentAutomatic": "Automatisk basert på repositoriet",
       "notSelected": "Ikke valgt",

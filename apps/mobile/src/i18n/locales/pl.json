@@ -4732,7 +4732,7 @@
       "fieldCron": "Wyrażenie cron",
       "fieldCronHelp": "Pięć pól: minuta, godzina, dzień, miesiąc i dzień tygodnia. Najkrótszy interwał to jedna minuta.",
       "fieldTimezone": "Strefa czasowa",
-      "nameLocked": "Nazwa jest częścią adresu URL webhooka i nie można jej zmienić.",
+      "nameLocked": "Nie można zmienić nazwy po utworzeniu wyzwalacza.",
       "repositoryLocked": "Nie można zmienić repozytorium po utworzeniu wyzwalacza.",
       "environmentAutomatic": "Automatycznie według repozytorium",
       "notSelected": "Nie wybrano",

@@ -4592,7 +4592,7 @@
       "fieldCron": "Croni avaldis",
       "fieldCronHelp": "Viis välja: minut, tund, päev, kuu ja nädalapäev. Lühim intervall on üks minut.",
       "fieldTimezone": "Ajavöönd",
-      "nameLocked": "Nimi on osa veebihaagi URL-ist ja seda ei saa muuta.",
+      "nameLocked": "Nime ei saa pärast päästiku loomist muuta.",
       "repositoryLocked": "Hoidlat ei saa pärast päästiku loomist muuta.",
       "environmentAutomatic": "Automaatne hoidla järgi",
       "notSelected": "Pole valitud",

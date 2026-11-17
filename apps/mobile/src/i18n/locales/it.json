@@ -4662,7 +4662,7 @@
       "fieldCron": "Espressione cron",
       "fieldCronHelp": "Cinque campi: minuto, ora, giorno, mese e giorno della settimana. L'intervallo minimo è di un minuto.",
       "fieldTimezone": "Fuso orario",
-      "nameLocked": "Il nome fa parte dell'URL webhook e non può essere modificato.",
+      "nameLocked": "Il nome non può essere modificato dopo la creazione dell'attivatore.",
       "repositoryLocked": "Il repository non può essere modificato dopo la creazione dell'attivatore.",
       "environmentAutomatic": "Automatico per repository",
       "notSelected": "Non selezionato",

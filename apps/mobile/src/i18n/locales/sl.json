@@ -4732,7 +4732,7 @@
       "fieldCron": "Izraz cron",
       "fieldCronHelp": "Pet polj: minuta, ura, dan, mesec in dan v tednu. Najkrajši interval je ena minuta.",
       "fieldTimezone": "Časovni pas",
-      "nameLocked": "Ime je del URL spletnega kavlja in se ne more spremeniti.",
+      "nameLocked": "Ime se po ustvaritvi sprožilca ne more spremeniti.",
       "repositoryLocked": "Repozitorij se po ustvaritvi sprožilca ne more spremeniti.",
       "environmentAutomatic": "Samodejno glede na repozitorij",
       "notSelected": "Ni izbrano",

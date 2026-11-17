@@ -4592,7 +4592,7 @@
       "fieldCron": "Isisho se-Cron",
       "fieldCronHelp": "Izinkambu ezinhlanu: umzuzu, ihora, usuku, inyanga nosuku lweviki. Isikhathi esifushane kakhulu umzuzu owodwa.",
       "fieldTimezone": "Isikhathi sendawo",
-      "nameLocked": "Igama liyingxenye ye-URL ye-webhook futhi alikwazi ukushintshwa.",
+      "nameLocked": "Igama alikwazi ukushintsha ngemva kokudalwa kwesibangeli.",
       "repositoryLocked": "Irejithori ayikwazi ukushintsha ngemva kokudalwa kwesibangeli.",
       "environmentAutomatic": "Kuzenzekela ngokwerejithori",
       "notSelected": "Akukhethiwe",

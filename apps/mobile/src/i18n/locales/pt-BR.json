@@ -4668,7 +4668,7 @@
       "fieldCron": "Expressão cron",
       "fieldCronHelp": "Cinco campos: minuto, hora, dia, mês e dia da semana. O menor intervalo é de um minuto.",
       "fieldTimezone": "Fuso horário",
-      "nameLocked": "O nome faz parte da URL do webhook e não pode ser alterado.",
+      "nameLocked": "O nome não pode ser alterado após a criação do gatilho.",
       "repositoryLocked": "O repositório não pode ser alterado após a criação do gatilho.",
       "environmentAutomatic": "Automático por repositório",
       "notSelected": "Não selecionado",

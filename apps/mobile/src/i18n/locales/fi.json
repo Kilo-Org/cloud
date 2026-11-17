@@ -4592,7 +4592,7 @@
       "fieldCron": "Cron-lauseke",
       "fieldCronHelp": "Viisi kenttää: minuutti, tunti, päivä, kuukausi ja viikonpäivä. Lyhin väli on yksi minuutti.",
       "fieldTimezone": "Aikavyöhyke",
-      "nameLocked": "Nimi on osa verkkokoukun URL-osoitetta, eikä sitä voi muuttaa.",
+      "nameLocked": "Nimeä ei voi muuttaa, kun liipaisin on luotu.",
       "repositoryLocked": "Tietovarastoa ei voi muuttaa, kun liipaisin on luotu.",
       "environmentAutomatic": "Automaattinen tietovaraston mukaan",
       "notSelected": "Ei valittu",

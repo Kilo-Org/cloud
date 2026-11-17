@@ -4592,7 +4592,7 @@
       "fieldCron": "Cron-Ausdruck",
       "fieldCronHelp": "Fünf Felder: Minute, Stunde, Tag, Monat und Wochentag. Das kürzeste Intervall ist eine Minute.",
       "fieldTimezone": "Zeitzone",
-      "nameLocked": "Der Name ist Teil der Webhook-URL und kann nicht geändert werden.",
+      "nameLocked": "Der Name kann nach dem Erstellen des Auslösers nicht geändert werden.",
       "repositoryLocked": "Das Repository kann nach dem Erstellen des Auslösers nicht geändert werden.",
       "environmentAutomatic": "Automatisch je Repository",
       "notSelected": "Nicht ausgewählt",

@@ -4872,7 +4872,7 @@
       "fieldCron": "Mynegiad cron",
       "fieldCronHelp": "Pum maes: munud, awr, diwrnod, mis a diwrnod yr wythnos. Yr egwyl fyrraf yw un munud.",
       "fieldTimezone": "Parth amser",
-      "nameLocked": "Mae’r enw’n rhan o URL y bachyn gwe ac ni ellir ei newid.",
+      "nameLocked": "Ni all yr enw newid ar ôl creu’r sbardun.",
       "repositoryLocked": "Ni all y storfa newid ar ôl creu’r sbardun.",
       "environmentAutomatic": "Awtomatig yn ôl y storfa",
       "notSelected": "Heb ei ddewis",

@@ -4662,7 +4662,7 @@
       "fieldCron": "Expression cron",
       "fieldCronHelp": "Cinq champs : minute, heure, jour, mois et jour de la semaine. L’intervalle le plus court est d’une minute.",
       "fieldTimezone": "Fuseau horaire",
-      "nameLocked": "Le nom fait partie de l’URL du webhook et ne peut pas être modifié.",
+      "nameLocked": "Le nom ne peut pas être modifié après la création du déclencheur.",
       "repositoryLocked": "Le dépôt ne peut pas être modifié après la création du déclencheur.",
       "environmentAutomatic": "Automatique selon le dépôt",
       "notSelected": "Non sélectionné",

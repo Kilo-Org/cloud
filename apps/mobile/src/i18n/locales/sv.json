@@ -4592,7 +4592,7 @@
       "fieldCron": "Cron-uttryck",
       "fieldCronHelp": "Fem fält: minut, timme, dag, månad och veckodag. Det kortaste intervallet är en minut.",
       "fieldTimezone": "Tidszon",
-      "nameLocked": "Namnet är en del av webhook-URL:en och kan inte ändras.",
+      "nameLocked": "Namnet kan inte ändras efter att utlösaren har skapats.",
       "repositoryLocked": "Kodförrådet kan inte ändras efter att utlösaren har skapats.",
       "environmentAutomatic": "Automatiskt per kodförråd",
       "notSelected": "Inte valt",

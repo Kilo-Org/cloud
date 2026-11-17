@@ -4592,7 +4592,7 @@
       "fieldCron": "Cron-expressie",
       "fieldCronHelp": "Vijf velden: minuut, uur, dag, maand en weekdag. Het kortste interval is één minuut.",
       "fieldTimezone": "Tijdzone",
-      "nameLocked": "De naam maakt deel uit van de webhook-URL en kan niet worden gewijzigd.",
+      "nameLocked": "De naam kan niet worden gewijzigd nadat de trigger is aangemaakt.",
       "repositoryLocked": "De repository kan niet worden gewijzigd nadat de trigger is aangemaakt.",
       "environmentAutomatic": "Automatisch per repository",
       "notSelected": "Niet geselecteerd",

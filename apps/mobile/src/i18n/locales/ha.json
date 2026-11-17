@@ -4592,7 +4592,7 @@
       "fieldCron": "Furcin cron",
       "fieldCronHelp": "Fannoni biyar: minti, awa, rana, wata da ranar mako. Mafi ƙanƙanin tazara minti ɗaya ne.",
       "fieldTimezone": "Yankin lokaci",
-      "nameLocked": "Sunan yana cikin URL ɗin kiran yanar gizo kuma ba zai iya canzawa ba.",
+      "nameLocked": "Ba za a iya canza sunan ba bayan an ƙirƙiri mai jawowa.",
       "repositoryLocked": "Ba za a iya canza rumbun ajiya ba bayan an ƙirƙiri mai jawowa.",
       "environmentAutomatic": "Atomatik ta rumbun ajiya",
       "notSelected": "Ba a zaɓa ba",

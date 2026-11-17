@@ -4592,7 +4592,7 @@
       "fieldCron": "Cron-tjáning",
       "fieldCronHelp": "Fimm svæði: mínúta, klukkustund, dagur, mánuður og vikudagur. Stysta bilið er ein mínúta.",
       "fieldTimezone": "Tímabelti",
-      "nameLocked": "Heitið er hluti vefkrókarslóðarinnar og getur ekki breyst.",
+      "nameLocked": "Heitið getur ekki breyst eftir að kveikjan er búin til.",
       "repositoryLocked": "Geymslan getur ekki breyst eftir að kveikjan er búin til.",
       "environmentAutomatic": "Sjálfvirkt eftir geymslu",
       "notSelected": "Ekki valið",

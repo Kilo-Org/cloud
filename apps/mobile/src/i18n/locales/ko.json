@@ -4592,7 +4592,7 @@
       "fieldCron": "크론 표현식",
       "fieldCronHelp": "5개 필드: 분, 시, 일, 월, 요일. 최단 간격은 1분입니다.",
       "fieldTimezone": "시간대",
-      "nameLocked": "이름은 웹훅 URL의 일부이므로 변경할 수 없습니다.",
+      "nameLocked": "트리거를 만든 후에는 이름을 변경할 수 없습니다.",
       "repositoryLocked": "트리거를 만든 후에는 저장소를 변경할 수 없습니다.",
       "environmentAutomatic": "저장소별 자동",
       "notSelected": "선택 안 됨",

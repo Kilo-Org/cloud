@@ -4592,7 +4592,7 @@
       "fieldCron": "Expresión cron",
       "fieldCronHelp": "Cinco campos: minuto, hora, día, mes e día da semana. O intervalo máis curto é dun minuto.",
       "fieldTimezone": "Fuso horario",
-      "nameLocked": "O nome forma parte da URL do webhook e non se pode cambiar.",
+      "nameLocked": "O nome non se pode cambiar despois de crear o disparador.",
       "repositoryLocked": "O repositorio non se pode cambiar despois de crear o disparador.",
       "environmentAutomatic": "Automático segundo o repositorio",
       "notSelected": "Non seleccionado",

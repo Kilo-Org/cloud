@@ -4592,7 +4592,7 @@
       "fieldCron": "Cron式",
       "fieldCronHelp": "5つのフィールド：分、時、日、月、曜日。最短間隔は1分です。",
       "fieldTimezone": "タイムゾーン",
-      "nameLocked": "名前はウェブフックURLの一部であるため、変更できません。",
+      "nameLocked": "名前はトリガーの作成後に変更できません。",
       "repositoryLocked": "リポジトリはトリガーの作成後に変更できません。",
       "environmentAutomatic": "リポジトリに応じて自動",
       "notSelected": "未選択",

@@ -4732,7 +4732,7 @@
       "fieldCron": "Cron výraz",
       "fieldCronHelp": "Pět polí: minuta, hodina, den, měsíc a den v týdnu. Nejkratší interval je jedna minuta.",
       "fieldTimezone": "Časové pásmo",
-      "nameLocked": "Název je součástí webhook URL a nelze jej změnit.",
+      "nameLocked": "Název nelze po vytvoření spouštěče změnit.",
       "repositoryLocked": "Repozitář nelze po vytvoření spouštěče změnit.",
       "environmentAutomatic": "Automaticky podle repozitáře",
       "notSelected": "Nevybráno",

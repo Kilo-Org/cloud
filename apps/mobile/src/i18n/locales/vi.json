@@ -4592,7 +4592,7 @@
       "fieldCron": "Biểu thức cron",
       "fieldCronHelp": "Năm trường: phút, giờ, ngày, tháng và thứ trong tuần. Khoảng thời gian ngắn nhất là một phút.",
       "fieldTimezone": "Múi giờ",
-      "nameLocked": "Tên là một phần của URL webhook và không thể thay đổi.",
+      "nameLocked": "Tên không thể thay đổi sau khi tạo trình kích hoạt.",
       "repositoryLocked": "Kho lưu trữ không thể thay đổi sau khi tạo trình kích hoạt.",
       "environmentAutomatic": "Tự động theo kho lưu trữ",
       "notSelected": "Chưa chọn",

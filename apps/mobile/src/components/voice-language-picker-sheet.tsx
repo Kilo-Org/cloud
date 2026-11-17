@@ -1,6 +1,6 @@
-import { FlashList } from '@shopify/flash-list';
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { type TFunction } from 'i18next';
-import { type ReactNode, useCallback, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
@@ -111,6 +111,7 @@ function VoiceLanguageList({
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
+  const listRef = useRef<FlashListRef<VoiceLanguageOption>>(null);
   // `matchesQuery` folds the label, the description and every search term of
   // every option, so the filter only reruns when the option array or the query
   // changes. An unrelated parent re-render then hands the list the same `data`
@@ -119,6 +120,12 @@ function VoiceLanguageList({
     () => options.filter(option => matchesQuery(option, query)),
     [options, query]
   );
+  // A query change draws a shorter list under the current offset, so a deep
+  // scroll would leave the matching rows above the viewport.
+  // `repository-rows-list` carries the same reset.
+  useEffect(() => {
+    listRef.current?.scrollToOffset({ offset: 0, animated: false });
+  }, [query]);
 
   if (filtered.length === 0) {
     return (
@@ -133,6 +140,7 @@ function VoiceLanguageList({
   return (
     <FlashList<VoiceLanguageOption>
       nestedScrollEnabled
+      ref={listRef}
       style={[listStyle, { backgroundColor: colors.background }]}
       contentContainerStyle={listContentContainerStyle}
       data={filtered}
@@ -145,17 +153,21 @@ function VoiceLanguageList({
       maintainVisibleContentPosition={{ disabled: true }}
       {...SEARCHABLE_PICKER_LIST_PROPS}
       ListFooterComponent={<View style={{ height: insets.bottom }} pointerEvents="none" />}
-      renderItem={({ item, index }) => (
-        <ChoiceRow
-          label={item.label}
-          description={item.description}
-          className={index < filtered.length - 1 ? 'border-b-[0.5px] border-hair-soft' : undefined}
-          selected={chosen === item.tag}
-          onPress={() => {
-            onSelect(item.tag);
-          }}
-        />
-      )}
+      renderItem={({ item, index }: { item: VoiceLanguageOption | undefined; index: number }) =>
+        // A stale index past the end of the rows (the model picker's
+        // renderItem carries the same guard for the same reason).
+        item ? (
+          <ChoiceRow
+            label={item.label}
+            description={item.description}
+            className={index < filtered.length - 1 ? 'border-b-[0.5px] border-hair-soft' : undefined}
+            selected={chosen === item.tag}
+            onPress={() => {
+              onSelect(item.tag);
+            }}
+          />
+        ) : null
+      }
     />
   );
 }

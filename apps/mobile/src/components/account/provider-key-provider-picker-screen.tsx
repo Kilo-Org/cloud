@@ -1,6 +1,6 @@
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { useQuery } from '@tanstack/react-query';
-import { FlashList, type FlashListRef, type ListRenderItemInfo } from '@shopify/flash-list';
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -116,7 +116,12 @@ export function ProviderKeyProviderPickerScreen({
   }, [query]);
 
   const renderItem = useCallback(
-    ({ item }: ListRenderItemInfo<ProviderOption>) => <ProviderRow provider={item} scope={scope} />,
+    ({ item }: { item: ProviderOption | undefined }) =>
+      // A stale index past the end of the rows (the model picker's renderItem
+      // carries the same guard for the same reason).
+      item ? (
+        <ProviderRow provider={item} scope={scope} />
+      ) : null,
     [scope]
   );
 

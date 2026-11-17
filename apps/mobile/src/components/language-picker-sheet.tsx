@@ -174,22 +174,25 @@ export function LanguagePickerSheet({
   // the busy state change, and memoized `LanguagePickerRow`s re-render only
   // when their own flag moved.
   const renderItem = useCallback(
-    ({ item, index }: { item: LanguagePickerItem; index: number }) => (
-      <LanguagePickerRow
-        item={item}
-        first={index === 0}
-        showDivider={items[index + 1]?.kind !== 'section'}
-        selected={
-          item.kind === 'device'
-            ? selected === 'device'
-            : item.kind === 'language' && selected === item.row.tag
-        }
-        disabled={busy}
-        deviceEndonym={deviceEndonym}
-        isRtl={isRtl}
-        onSelect={handleSelectRow}
-      />
-    ),
+    ({ item, index }: { item: LanguagePickerItem | undefined; index: number }) =>
+      // A stale index past the end of the rows (the model picker's renderItem
+      // carries the same guard for the same reason).
+      item ? (
+        <LanguagePickerRow
+          item={item}
+          first={index === 0}
+          showDivider={items[index + 1]?.kind !== 'section'}
+          selected={
+            item.kind === 'device'
+              ? selected === 'device'
+              : item.kind === 'language' && selected === item.row.tag
+          }
+          disabled={busy}
+          deviceEndonym={deviceEndonym}
+          isRtl={isRtl}
+          onSelect={handleSelectRow}
+        />
+      ) : null,
     [items, selected, busy, deviceEndonym, isRtl, handleSelectRow]
   );
 

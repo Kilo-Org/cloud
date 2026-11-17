@@ -14,6 +14,7 @@ const state = vi.hoisted(() => ({
   providers: [] as Provider[],
   error: false,
   push: vi.fn(),
+  scrollToOffset: vi.fn(),
 }));
 
 vi.mock('react-native', () => ({ View: 'View', Pressable: 'Pressable', TextInput: 'TextInput' }));
@@ -22,21 +23,34 @@ vi.mock('@shopify/flash-list', async () => {
   // be loaded from inside the factory rather than at the top of the module.
   const React = await import('react');
   return {
-    FlashList: (props: {
-      data: unknown[];
-      renderItem: (info: { item: unknown }) => React.ReactNode;
-      maintainVisibleContentPosition?: unknown;
-      ListEmptyComponent?: React.ReactNode;
-    }) =>
-      React.createElement(
-        'FlashList',
-        { itemCount: props.data.length, mvc: props.maintainVisibleContentPosition },
-        props.data.length === 0
-          ? props.ListEmptyComponent
-          : props.data.map((item, index) =>
-              React.createElement(React.Fragment, { key: index }, props.renderItem({ item }))
-            )
-      ),
+    FlashList: React.forwardRef(
+      (
+        props: {
+          data: unknown[];
+          renderItem: (info: { item: unknown }) => React.ReactNode;
+          maintainVisibleContentPosition?: unknown;
+          ListEmptyComponent?: React.ReactNode;
+        },
+        ref
+      ) => {
+        // The screen's effect calls `listRef.current?.scrollToOffset(...)`;
+        // the real FlashList exposes the method through its forwarded ref.
+        React.useImperativeHandle(ref, () => ({
+          scrollToOffset: (params: { offset: number; animated: boolean }) =>
+            state.scrollToOffset(params),
+          props: {},
+        }));
+        return React.createElement(
+          'FlashList',
+          { itemCount: props.data.length, mvc: props.maintainVisibleContentPosition },
+          props.data.length === 0
+            ? props.ListEmptyComponent
+            : props.data.map((item, index) =>
+                React.createElement(React.Fragment, { key: index }, props.renderItem({ item }))
+              )
+        );
+      }
+    ),
   };
 });
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: state.push }) }));
@@ -122,6 +136,7 @@ beforeEach(() => {
   ];
   state.error = false;
   state.push.mockClear();
+  state.scrollToOffset.mockClear();
 });
 
 afterEach(() => {
@@ -187,15 +202,28 @@ describe('ProviderKeyProviderPickerScreen', () => {
     });
 
     // The no-match state replaced the list; clearing the query brings the rows
-    // back with the first provider where the reader left the list.
+    // back with the first provider where the reader left the list, and the
+    // list re-anchors at its top so the first provider is what shows.
     expect(rowLabels(root).map(node => node.props.accessibilityLabel)).toEqual([
       'Anthropic',
       'OpenAI',
     ]);
+    expect(state.scrollToOffset).toHaveBeenCalledWith({ offset: 0, animated: false });
     expect(root.findAll(node => Object.is(node.type, 'FlashList')).at(0)?.props.itemCount).toBe(2);
     expect(root.findAll(node => Object.is(node.type, 'FlashList')).at(0)?.props.mvc).toEqual({
       disabled: true,
     });
+  });
+
+  it('re-anchors the list at the top when a query change shortens it', async () => {
+    const root = await mount();
+
+    act(() => {
+      (searchInput(root).props.onChangeText as (value: string) => void)('openai');
+    });
+
+    expect(state.scrollToOffset).toHaveBeenCalledWith({ offset: 0, animated: false });
+    expect(rowLabels(root).map(node => node.props.accessibilityLabel)).toEqual(['OpenAI']);
   });
 
   it('shows the matching rows after a no-match search finds a provider again', async () => {

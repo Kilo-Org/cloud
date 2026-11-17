@@ -596,9 +596,7 @@ describe('Recent review bodies', () => {
       const rows = renderer.root.findAll(node => String(node.type) === 'ReviewRow');
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        const pressable = row.find(
-          node => typeof node.type === 'string' && node.type === 'Pressable'
-        );
+        const pressable = row.find(node => Object.is(node.type, 'Pressable'));
         const classes = String(pressable.props.className ?? '').split(' ');
         expect(classes).toContain('px-4');
         expect(classes).toContain('py-3');
@@ -746,7 +744,8 @@ describe('Recent review bodies', () => {
       node => String(node.type) === 'RowSkeleton'
     );
     expect(placeholders).toHaveLength(1);
-    expect(placeholders[0].props.subtitle).toBe(true);
+    const [placeholder] = placeholders;
+    expect(placeholder?.props.subtitle).toBe(true);
     footerRender.unmount();
   });
 

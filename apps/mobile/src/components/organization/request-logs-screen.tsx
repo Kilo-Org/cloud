@@ -12,13 +12,16 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
-import { DirectionalChevronLeft, DirectionalChevronRight } from '@/components/ui/directional-icons';
-import { Logs } from '@/components/ui/icons';
+import {
+  DirectionalChevronLeft,
+  DirectionalChevronRight,
+  DirectionalLogs,
+} from '@/components/ui/directional-icons';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { isolateLtrBidiText } from '@/lib/bidi';
+import { isolateBidiText } from '@/lib/bidi';
 import {
   formatClockTime,
   formatDate,
@@ -154,15 +157,13 @@ const RequestLogRow = memo(function RequestLogRow({
         </Text>
       </View>
       <View className="flex-row items-center gap-2">
-        {/* The time carries the same ` · ` the token pair uses, so the line
-            reads as one series instead of a gap and a lone `in · out` dot. The
-            dot trails the isolated time, which puts it on the side the row
-            continues in either direction. */}
-        <Text className="shrink-0 text-xs tabular-nums text-muted-foreground">
-          {`${isolateLtrBidiText(time)} ·`}
-        </Text>
+        {/* One run, so the time and the token pair keep the catalog's own
+            separators: a `gap` between two `Text`s spaced the first dot
+            differently from the dot inside `in · out`. The time is isolated on
+            its own so the AM/PM marker stays beside its clock in either
+            direction. */}
         <Text className="flex-1 text-xs tabular-nums text-muted-foreground" numberOfLines={1}>
-          {tokens}
+          {`${isolateBidiText(time)} · ${tokens}`}
         </Text>
         {entry.is_user_byok ? (
           // Muted text with no box: `bg-muted` is the card's own `bg-secondary`
@@ -279,7 +280,7 @@ export function OrganizationRequestLogsScreen() {
       case 'empty': {
         return (
           <EmptyState
-            icon={Logs}
+            icon={DirectionalLogs}
             title={t('organization.requestLogs.emptyTitle')}
             refreshControl={refreshControl}
           />
@@ -336,8 +337,8 @@ export function OrganizationRequestLogsScreen() {
               instead of one reversed run. */}
           <Text className="text-xs tabular-nums text-muted-foreground">
             {t('common.timeRange', {
-              start: isolateLtrBidiText(formatClockTime(windowStart, i18n.language)),
-              end: isolateLtrBidiText(formatClockTime(windowEnd, i18n.language)),
+              start: isolateBidiText(formatClockTime(windowStart, i18n.language)),
+              end: isolateBidiText(formatClockTime(windowEnd, i18n.language)),
             })}
           </Text>
         </View>

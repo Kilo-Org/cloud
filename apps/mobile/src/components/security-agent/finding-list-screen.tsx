@@ -186,7 +186,6 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        className="px-6"
         title={t('common.findings')}
         // One 48dp icon target from IconButton; declaring its width keeps the
         // one-line title's readable minimum when the row is narrow.

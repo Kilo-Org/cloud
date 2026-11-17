@@ -41,11 +41,12 @@ describe('TourStepHeader', () => {
       'step body',
     ]);
 
-    // The title takes a Text variant, not a one-off heading level: the tour has
-    // no screen title for it to rank under, so the step copy carries no role.
+    // The title keeps the heading role: an assistive reader navigates by
+    // headings, and the tour's title lives in the content, not a screen header.
+    // Its type is still a Text variant, not a one-off heading level.
     const [eyebrow, title] = texts;
-    expect(title?.props.role).toBeUndefined();
-    expect(eyebrow?.props.role).toBeUndefined();
+    expect(title?.props.accessibilityRole).toBe('header');
+    expect(eyebrow?.props.accessibilityRole).toBeUndefined();
     expect(title?.props.className).toContain('text-lg');
 
     // The icon precedes the copy block, and the text above is all that block

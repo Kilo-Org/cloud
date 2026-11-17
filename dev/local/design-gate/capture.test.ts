@@ -5,10 +5,14 @@ import path from 'node:path';
 import test from 'node:test';
 
 import {
+  IN_APP_SAMPLE_INTERVAL_MS,
   InfraError,
+  inAppSampleInterval,
+  joinPasses,
   linkPath,
   loadingPlaceholder,
   runMatrix,
+  sampleInterval,
   sampleUntilSettled,
   screenFindings,
   screenIdentity,
@@ -17,8 +21,10 @@ import {
   type CaptureContext,
   type Clock,
   type Device,
+  type RunOutcome,
 } from './capture';
-import type { ProbeClient } from './cdp';
+import { CAPTURE_ALIGNMENT_BUDGET_MS } from './capture-evidence';
+import type { ProbeClient, ProbeSample } from './cdp';
 import { matrixCells } from './matrix';
 import { normalize, type ProbeDump } from './tree';
 
@@ -932,7 +938,9 @@ test('capture brackets the screenshot with the latest tree and persists alignmen
   const dump: ProbeDump = JSON.parse(fs.readFileSync(path.join(ctx.out, screen.dump), 'utf8'));
   const alignment = JSON.parse(fs.readFileSync(path.join(ctx.out, screen.capture), 'utf8'));
   assert.equal(dump.nodes[1]?.text, 'Latest before capture');
-  assert.ok(outcome.findings.some(finding => finding.rule === 'unsettled'));
+  // The change landed after sampling stopped; the bracket's quiet wait absorbed it,
+  // so the capture is settled and the two bracket reads see the same screen.
+  assert.ok(!outcome.findings.some(finding => finding.rule === 'unsettled'));
   assert.equal(alignment.status, 'bracketed');
   assert.equal(alignment.before.dump.nodes[1].text, 'Latest before capture');
   assert.equal(alignment.after.dump.nodes[1].text, 'Latest before capture');
@@ -1060,4 +1068,377 @@ test('a focused-screen transition is retained when route, text and geometry stay
   assert.ok(!outcome.findings.some(finding => finding.rule === 'env-mismatch'));
   const screen = outcome.cells[0]?.screens[0];
   assert.equal(screen?.env.screen, '(app)/(tabs)/settings');
+});
+
+test('the in-app sampling cadence follows the cost of one measured dump', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const probe = fakeProbe(state);
+  const ctx = context(fakeDevice(calls, state), probe);
+  // The in-app sampler walks and serializes the whole document on the app's own
+  // JS thread, so one dump is what a tick costs the screen it measures.
+  const dumpMs = 600;
+  const originalDump = probe.dump;
+  probe.dump = async () => {
+    await ctx.clock.sleep(dumpMs);
+    return originalDump();
+  };
+  const intervals: number[] = [];
+  probe.startSampling = async intervalMs => {
+    intervals.push(intervalMs);
+  };
+  const logs: string[] = [];
+  ctx.log = line => logs.push(line);
+  await runMatrix(ctx, matrixCells('android', 'base'), HOME);
+  assert.deepEqual(intervals, [inAppSampleInterval(dumpMs)]);
+  assert.ok((intervals[0] ?? 0) > IN_APP_SAMPLE_INTERVAL_MS);
+  assert.deepEqual(
+    logs.filter(line => line.includes('in-app dump')),
+    ['design-gate: home one in-app dump costs 600ms; sampling every 1200ms']
+  );
+});
+
+test('a dump that costs less than the floor keeps the default sampling cadence', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const probe = fakeProbe(state);
+  const ctx = context(fakeDevice(calls, state), probe);
+  const originalDump = probe.dump;
+  probe.dump = async () => {
+    await ctx.clock.sleep(40);
+    return originalDump();
+  };
+  const intervals: number[] = [];
+  probe.startSampling = async intervalMs => {
+    intervals.push(intervalMs);
+  };
+  const logs: string[] = [];
+  ctx.log = line => logs.push(line);
+  await runMatrix(ctx, matrixCells('android', 'base'), HOME);
+  assert.deepEqual(intervals, [IN_APP_SAMPLE_INTERVAL_MS]);
+  assert.deepEqual(
+    logs.filter(line => line.includes('in-app dump')),
+    []
+  );
+});
+
+function sampleAt(t: number, dump: ProbeDump = dumpWith()): ProbeSample {
+  return { t, repeat: 1, dump };
+}
+
+test('sampleInterval reads the spacing the retained samples carry', () => {
+  // Fewer than two samples carry no spacing of their own.
+  assert.equal(sampleInterval([]), IN_APP_SAMPLE_INTERVAL_MS);
+  assert.equal(sampleInterval([sampleAt(0)]), IN_APP_SAMPLE_INTERVAL_MS);
+  assert.equal(sampleInterval([sampleAt(0), sampleAt(850), sampleAt(1_700)]), 850);
+  // The span is divided by the ticks that span it, so an uneven capture is timed
+  // with the weighted average of its spacings rather than with its middle one.
+  assert.equal(sampleInterval([sampleAt(0), sampleAt(300), sampleAt(1_200), sampleAt(2_100)]), 700);
+});
+
+test('sampleInterval counts the repeats of a collapsed run as spacings', () => {
+  // A repeated state keeps the stamp of its first tick, so the second sample's
+  // repeats happen after its own stamp and only the first sample spans the gap.
+  assert.equal(
+    sampleInterval([
+      { t: 0, repeat: 1, dump: sampleAt(0).dump },
+      { t: 1_000, repeat: 5, dump: sampleAt(0).dump },
+    ]),
+    1_000
+  );
+  // Three ticks of one state and then three of the next: the span covers both
+  // runs of the first state at its own two spacings.
+  assert.equal(
+    sampleInterval([
+      { t: 0, repeat: 2, dump: sampleAt(0).dump },
+      { t: 750, repeat: 3, dump: sampleAt(0).dump },
+    ]),
+    375
+  );
+  // The timestamps are read in their own order, whatever order they arrive in.
+  assert.equal(sampleInterval([sampleAt(1_700), sampleAt(0), sampleAt(850)]), 850);
+});
+
+test('joinPasses counts the unsampled stretch as repeats of the first pass last state', () => {
+  const early = dumpWith({ y: 50 });
+  const late = dumpWith({ y: 80 });
+  const first = [
+    { t: 0, repeat: 1, dump: early },
+    { t: 250, repeat: 2, dump: early },
+  ];
+  const second = [{ t: 2_000, repeat: 1, dump: late }];
+  const joined = joinPasses(first, second, 250);
+  // The 1750 ms gap is seven spacings, and the tail's own two ticks already cover
+  // two of them, so five ticks are added and the tail spans seven.
+  assert.deepEqual(
+    joined.map(sample => [sample.t, sample.repeat]),
+    [
+      [0, 1],
+      [250, 7],
+      [2_000, 1],
+    ]
+  );
+  assert.equal(joined[1]?.dump, early);
+  // The capped stretch keeps a long quiet wait bounded.
+  const capped = joinPasses(first, [{ t: 250 + 250 * 500, repeat: 1, dump: late }], 250);
+  assert.equal(capped[1]?.repeat, 2 + 64);
+  // A pass that retained nothing falls back to the concatenation.
+  assert.deepEqual(joinPasses([], second, 250), second);
+  assert.deepEqual(joinPasses(first, [], 250), first);
+  // Without a spacing there is no tick to count.
+  assert.equal(joinPasses(first, second, 0)[1]?.repeat, 2);
+});
+
+test('a late arrival is timed with the spacing its samples report', () => {
+  const early = dumpWith({ y: 50 });
+  const late = dumpWith({ y: 80 });
+  const shifts = (intervalMs?: number) =>
+    screenFindings({
+      cell: 'base',
+      target: 'home',
+      dump: late,
+      tree: normalize(late),
+      sampled: {
+        dump: late,
+        timeline: [early, early, late, late],
+        settled: true,
+        elapsedMs: 2_000,
+        ...(intervalMs === undefined ? {} : { intervalMs }),
+      },
+    }).filter(finding => finding.rule === 'layout-shift');
+  // Two samples after the rest is two sample spacings, whatever they measured.
+  const measured = shifts(850)[0];
+  assert.equal(measured?.severity, 'error');
+  assert.match(measured?.message ?? '', /within 1700 ms after settling/u);
+  // Without a spacing of its own, the rule still falls back to the constant.
+  assert.match(shifts(undefined)[0]?.message ?? '', /within 500 ms after settling/u);
+});
+
+/** A probe whose reads the test can hold at a fixed cost per read. */
+function costingProbe(dumpMs: number) {
+  const calls: string[] = [];
+  const state = probeState();
+  const probe = fakeProbe(state);
+  const ctx = context(fakeDevice(calls, state), probe);
+  const originalDump = probe.dump;
+  probe.dump = async () => {
+    await ctx.clock.sleep(dumpMs);
+    return originalDump();
+  };
+  const logs: string[] = [];
+  ctx.log = line => logs.push(line);
+  return { ctx, logs, probe, state };
+}
+
+function captureEvidence(ctx: CaptureContext, outcome: { cells: RunOutcome['cells'] }) {
+  const capture = outcome.cells[0]?.screens[0]?.capture;
+  assert.ok(capture);
+  return JSON.parse(fs.readFileSync(path.join(ctx.out, capture), 'utf8'));
+}
+
+test('the alignment window follows the measured dump cost and keeps the constant when cheap', async () => {
+  const slow = costingProbe(600);
+  const slowRun = await runMatrix(slow.ctx, matrixCells('android', 'base'), HOME);
+  // Two bracket reads of a 600 ms dump alone outlast the 2 s window, so the
+  // caller widens it by the same measurement the sampling cadence uses.
+  assert.equal(captureEvidence(slow.ctx, slowRun).budgetMs, 2_200);
+  assert.deepEqual(
+    slow.logs.filter(line => line.includes('alignment window')),
+    ['design-gate: home one dump costs 600ms; alignment window 2200ms']
+  );
+  const cheap = costingProbe(40);
+  const cheapRun = await runMatrix(cheap.ctx, matrixCells('android', 'base'), HOME);
+  assert.equal(captureEvidence(cheap.ctx, cheapRun).budgetMs, CAPTURE_ALIGNMENT_BUDGET_MS);
+  assert.deepEqual(
+    cheap.logs.filter(line => line.includes('alignment window')),
+    []
+  );
+});
+
+test('the bracket waits for a screen that changes once after sampling stops', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const probe = fakeProbe(state);
+  const ctx = context(fakeDevice(calls, state), probe);
+  const samplingPasses: number[] = [];
+  probe.startSampling = async intervalMs => {
+    samplingPasses.push(intervalMs);
+  };
+  const originalStop = probe.stopSampling;
+  let samplingStopped = false;
+  probe.stopSampling = async () => {
+    const sampled = await originalStop();
+    samplingStopped = true;
+    return sampled;
+  };
+  const originalDump = probe.dump;
+  let readsAfterStop = 0;
+  probe.dump = async () => {
+    if (samplingStopped) {
+      readsAfterStop += 1;
+      // The late navigation lands while the bracket waits for the screen to hold.
+      if (readsAfterStop === 2) {
+        state.route = '/late';
+        state.text = screenTextFor('/late');
+      }
+    }
+    return originalDump();
+  };
+  const logs: string[] = [];
+  ctx.log = line => logs.push(line);
+  const outcome = await runMatrix(ctx, matrixCells('android', 'base'), HOME);
+  // The bracket opens on the screen the late push produced, so both reads agree.
+  assert.equal(captureEvidence(ctx, outcome).status, 'bracketed');
+  const screen = outcome.cells[0]?.screens[0];
+  assert.ok(screen?.dump);
+  const captured = JSON.parse(fs.readFileSync(path.join(ctx.out, screen.dump), 'utf8'));
+  assert.equal(captured.env.route, '/late');
+  assert.ok(!outcome.findings.some(finding => finding.rule === 'unsettled'));
+  assert.ok(
+    logs.some(line => line.includes('late change after sampling stopped')),
+    `expected a late-change line, saw ${JSON.stringify(logs)}`
+  );
+  // The late change is real work, so the sampled window follows the screen: one
+  // more pass samples it and the timeline the shift rule reads ends on it.
+  assert.equal(samplingPasses.length, 2);
+  assert.equal(samplingPasses[1], samplingPasses[0]);
+  assert.ok(logs.some(line => line.includes('sampling once more')));
+  const timeline = JSON.parse(
+    fs.readFileSync(path.join(ctx.out, 'cells/base/home.timeline.json'), 'utf8')
+  ) as { samples: { dump: ProbeDump }[] };
+  assert.equal(timeline.samples.at(-1)?.dump.env.route, '/late');
+});
+
+test('a late layout change on the same route is reported as a shift, not absorbed', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const probe = fakeProbe(state);
+  const ctx = context(fakeDevice(calls, state), probe);
+  // The screen keeps its route and moves one node, so the shift rule reads one
+  // comparison context across both passes.
+  let moved = false;
+  const current = () =>
+    dumpWith({ y: moved ? 80 : 50, route: state.route, text: state.text, screen: state.screen });
+  let passes = 0;
+  probe.stopSampling = async () => {
+    passes += 1;
+    // Each pass stamps its own window, and the second pass samples the late layout.
+    return {
+      truncated: false,
+      samples: [{ t: passes === 1 ? 0 : 1_000, repeat: 3, dump: current() }],
+    };
+  };
+  let readsAfterStop = 0;
+  probe.dump = async () => {
+    if (passes > 0) {
+      readsAfterStop += 1;
+      // The late layout lands while the bracket waits for the screen to hold.
+      if (readsAfterStop === 2) moved = true;
+    }
+    return current();
+  };
+  const logs: string[] = [];
+  ctx.log = line => logs.push(line);
+  const outcome = await runMatrix(ctx, matrixCells('android', 'base'), HOME);
+  assert.equal(captureEvidence(ctx, outcome).status, 'bracketed');
+  // The two passes are one timeline: the late layout is the arrival the shift rule
+  // reads, not the rest state it starts from.
+  const shifts = outcome.findings.filter(finding => finding.rule === 'layout-shift');
+  assert.deepEqual(
+    shifts.map(finding => [finding.severity, finding.measured]),
+    [['error', 30]]
+  );
+  // The bridge adds only the ticks the tail does not cover, so the shift is timed
+  // at the four spacings it really spans, not at the two the tail double-counted.
+  assert.match(shifts[0]?.message ?? '', /within 1000 ms/u);
+  assert.ok(
+    logs.some(line => line.includes('sampling once more')),
+    `expected a retry line, saw ${JSON.stringify(logs)}`
+  );
+  // The screen held still and the bracket agrees, so the capture stays settled and
+  // the late change is reported instead of being hidden as an unsettled read.
+  assert.ok(!outcome.findings.some(finding => finding.rule === 'unsettled'));
+  const timeline = JSON.parse(
+    fs.readFileSync(path.join(ctx.out, 'cells/base/home.timeline.json'), 'utf8')
+  ) as { samples: { t: number; repeat: number; dump: ProbeDump }[] };
+  // The first pass keeps its state and gains the ticks of the unsampled stretch
+  // that its own three-tick tail does not already cover.
+  assert.deepEqual(
+    timeline.samples.map(sample => [sample.t, sample.repeat, sample.dump.nodes[1]?.rect[1]]),
+    [
+      [0, 4, 50],
+      [1_000, 3, 80],
+    ]
+  );
+  // The route is the one the link opened, and both passes share it.
+  assert.equal(timeline.samples.at(-1)?.dump.env.route, '/home');
+});
+
+test('a late change is sampled at most once more', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const probe = fakeProbe(state);
+  const ctx = context(fakeDevice(calls, state), probe);
+  const samplingPasses: number[] = [];
+  let readsThisPass = 0;
+  probe.startSampling = async intervalMs => {
+    samplingPasses.push(intervalMs);
+    readsThisPass = 0;
+  };
+  const originalStop = probe.stopSampling;
+  let passes = 0;
+  probe.stopSampling = async () => {
+    passes += 1;
+    readsThisPass = 0;
+    return originalStop();
+  };
+  const originalDump = probe.dump;
+  let changes = 0;
+  probe.dump = async () => {
+    readsThisPass += 1;
+    // The screen changes late in both passes; the second must not start a third.
+    if (passes >= 1 && readsThisPass === 2 && changes < 2) {
+      changes += 1;
+      state.route = `/late-${changes}`;
+      state.text = screenTextFor(state.route);
+    }
+    return originalDump();
+  };
+  const logs: string[] = [];
+  ctx.log = line => logs.push(line);
+  await runMatrix(ctx, matrixCells('android', 'base'), HOME);
+  assert.equal(changes, 2);
+  assert.equal(samplingPasses.length, 2);
+  assert.equal(logs.filter(line => line.includes('sampling once more')).length, 1);
+});
+
+test('a screen that keeps changing keeps the bracket a mismatch and says so', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const probe = fakeProbe(state);
+  const ctx = context(fakeDevice(calls, state), probe);
+  const originalStop = probe.stopSampling;
+  let samplingStopped = false;
+  probe.stopSampling = async () => {
+    const sampled = await originalStop();
+    samplingStopped = true;
+    return sampled;
+  };
+  const originalDump = probe.dump;
+  let readsAfterStop = 0;
+  probe.dump = async () => {
+    if (samplingStopped) {
+      readsAfterStop += 1;
+      state.text = readsAfterStop % 2 === 0 ? screenTextFor('/') : 'Still moving';
+    }
+    return originalDump();
+  };
+  const logs: string[] = [];
+  ctx.log = line => logs.push(line);
+  const outcome = await runMatrix(ctx, matrixCells('android', 'base'), HOME);
+  // A screen that never holds still is never certified: the two bracket reads
+  // differ, and the wait reports that it timed out rather than a settle.
+  assert.equal(captureEvidence(ctx, outcome).status, 'mismatch');
+  assert.ok(logs.some(line => line.includes('screen still changing before the screenshot')));
+  assert.ok(outcome.findings.some(finding => finding.rule === 'unsettled'));
 });

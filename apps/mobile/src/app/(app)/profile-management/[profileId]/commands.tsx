@@ -32,5 +32,11 @@ export default function AppStackProfileCommandsRoute() {
   if (staleScope) {
     return null;
   }
-  return <ProfileCommandsScreen profileId={profileId} organizationId={organizationId} />;
+  return (
+    <ProfileCommandsScreen
+      profileId={profileId}
+      organizationId={organizationId}
+      backFallback={getProfilesPath('app')}
+    />
+  );
 }

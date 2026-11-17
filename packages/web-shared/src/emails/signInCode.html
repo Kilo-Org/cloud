@@ -6,16 +6,16 @@
     <title>Sign in to Kilo Code</title>
   </head>
   <body
+    class="kc-page kc-strong"
     style="
       margin: 0;
       padding: 0;
       font-family:
         -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      background-color: #ffffff;
       color: #1a1a1a;
     "
   >
-    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #ffffff">
+    <table width="100%" cellpadding="0" cellspacing="0" class="kc-page">
       <tr>
         <td align="center" style="padding: 40px 20px">
           <table width="520" cellpadding="0" cellspacing="0">
@@ -32,6 +32,7 @@
                       -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
                       sans-serif;
                   "
+                  class="kc-strong"
                 >
                   Sign in to Kilo Code
                 </h1>
@@ -51,6 +52,7 @@
                       -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
                       sans-serif;
                   "
+                  class="kc-text"
                 >
                   Enter this code in the app to sign in to your Kilo Code account:
                 </p>
@@ -73,6 +75,7 @@
                           letter-spacing: 8px;
                           color: #1a1a1a;
                         "
+                        class="kc-box kc-strong"
                       >
                         {{ code }}
                       </span>
@@ -92,6 +95,7 @@
                     padding: 14px 16px;
                     border-radius: 10px;
                   "
+                  class="kc-box"
                 >
                   <p
                     style="
@@ -103,9 +107,10 @@
                         -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
                         sans-serif;
                     "
+                    class="kc-muted"
                   >
-                    <strong style="color: #1a1a1a">Security Notice:</strong> This code expires in {{
-                    expires_in }} and can only be used once.
+                    <strong class="kc-strong" style="color: #1a1a1a">Security Notice:</strong> This
+                    code expires in {{ expires_in }} and can only be used once.
                   </p>
                 </div>
               </td>
@@ -113,7 +118,7 @@
 
             <!-- Footer -->
             <tr>
-              <td style="padding: 20px 40px 40px; border-top: 1px solid #ebebea">
+              <td class="kc-divider" style="padding: 20px 40px 40px; border-top: 1px solid #ebebea">
                 <p
                   style="
                     margin: 0;
@@ -124,6 +129,7 @@
                       -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
                       sans-serif;
                   "
+                  class="kc-muted"
                 >
                   If you didn't request this email, you can safely ignore it.
                 </p>
@@ -137,6 +143,7 @@
                       -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
                       sans-serif;
                   "
+                  class="kc-muted"
                 >
                   This email was sent to {{ email }}
                 </p>
@@ -147,7 +154,11 @@
           <!-- Branding Footer -->
           <table width="520" cellpadding="0" cellspacing="0">
             <tr>
-              <td align="center" style="padding: 30px 20px; border-top: 1px solid #eee">
+              <td
+                align="center"
+                class="kc-divider"
+                style="padding: 30px 20px; border-top: 1px solid #eee"
+              >
                 <p
                   style="
                     margin: 0;
@@ -157,6 +168,7 @@
                       -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
                       sans-serif;
                   "
+                  class="kc-faint"
                 >
                   © {{ year }} Kilo Code, Inc<br />455 Market St, Ste 1940 PMB 993504<br />San
                   Francisco, CA 94105, USA

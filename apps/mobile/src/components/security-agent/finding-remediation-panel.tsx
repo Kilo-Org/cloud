@@ -16,12 +16,16 @@ import { storedText } from '@/components/security-agent/stored-text';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { KvRow } from '@/components/ui/kv-row';
+import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
+import { SCREEN_BODY_CLASS, SCREEN_GUTTER_CLASS } from '@/lib/layout';
 import {
   useCancelSecurityRemediation,
   useRetrySecurityRemediation,
@@ -186,9 +190,9 @@ export function FindingRemediationPanel({
 
   if (isLoading && !analysis) {
     return (
-      <View className="gap-3 px-6 pt-2">
-        <Skeleton className="h-16 w-full rounded-lg" />
-        <Skeleton className="h-32 w-full rounded-lg" />
+      <View className={SCREEN_BODY_CLASS}>
+        <Skeleton className="h-16 w-full rounded-xl" />
+        <Skeleton className="h-32 w-full rounded-xl" />
         {dialog}
       </View>
     );
@@ -250,11 +254,10 @@ export function FindingRemediationPanel({
 
   const hasContent =
     Boolean(remediationSummary) || remediationAttempts.length > 0 || remediationTimeline.length > 0;
-  const Body = hasContent ? TabScreenScrollView : CenteredState;
 
   const content = (
-    <View className="gap-4 px-6 py-2">
-      <View className="gap-1 rounded-lg bg-secondary p-3">
+    <View className="gap-6">
+      <Card>
         <FindingStatusBadge
           icon={presentation.icon}
           label={statusLabel}
@@ -276,8 +279,9 @@ export function FindingRemediationPanel({
             {t(retryBlockerKey)}
           </Text>
         ) : null}
-      </View>
+      </Card>
 
+      <View className="gap-3">
       {needsAnalysisRefresh ? <AnalysisRerunAction scope={scope} findingId={findingId} /> : null}
 
       {remediationCapability.canStart ? (
@@ -353,17 +357,18 @@ export function FindingRemediationPanel({
           </Text>
         </Button>
       ) : null}
+      </View>
 
       {remediationTimeline.length > 0 ? (
-        <View className="gap-1.5 rounded-lg bg-card p-3">
-          <Text className="text-xs font-medium">{t('securityAgent.remediation.progress')}</Text>
+        <Card>
+          <Text variant="heading">{t('securityAgent.remediation.progress')}</Text>
           <View className="gap-1">
             {remediationTimeline.map((event, index) => {
               const labelKey = lookup(REMEDIATION_TIMELINE_LABELS, event.action);
               return (
                 <View
                   key={`${event.action}-${event.occurredAt}-${index}`}
-                  className="flex-row items-center justify-between"
+                  className="flex-row items-center justify-between gap-3"
                 >
                   <Text className="text-xs">{labelKey ? t(labelKey) : event.action}</Text>
                   <Text variant="muted" className="text-xs">
@@ -373,7 +378,7 @@ export function FindingRemediationPanel({
               );
             })}
           </View>
-        </View>
+        </Card>
       ) : null}
 
       {remediationAttempts.length > 0 ? (
@@ -383,55 +388,48 @@ export function FindingRemediationPanel({
             displayCount: formatNumber(remediationAttempts.length, i18n.language),
           })}
           defaultExpanded={remediationAttempts.length <= 2}
-          // Attempt rows below are already their own card surface — a second
-          // bg-secondary card wrapping them read as a card nested in a card.
-          // Transparent wrapper: one visible surface per attempt, not two.
-          className="bg-transparent"
         >
-          <View className="gap-3">
-            {remediationAttempts.map(attempt => {
-              const attemptStatusOptions = {
-                cancellationRequestedAt: attempt.cancellationRequestedAt,
-                prDraft: attempt.prDraft,
-              };
-              const attemptPresentation = getRemediationStatusPresentation(
-                attempt.status,
-                attemptStatusOptions
-              );
-              const attemptStatusKey = getRemediationStatusKey(
-                attempt.status,
-                attemptStatusOptions
-              );
-              const attemptStatusLabel = attemptStatusKey
-                ? t(attemptStatusKey)
-                : attemptPresentation.label;
-              const originKey = lookup(REMEDIATION_ORIGIN_KEYS, attempt.origin);
-              const validation =
-                attempt.validationEvidence?.map((record, index) =>
-                  formatValidationEvidence(record, index, t)
-                ) ?? [];
-              const note = firstNonEmpty(attempt.riskNotes, attempt.draftReason);
-              const outcome = firstNonEmpty(attempt.blockedReason, attempt.lastErrorRedacted);
-              const attemptUrl = attempt.prUrl;
+          {remediationAttempts.map(attempt => {
+            const attemptStatusOptions = {
+              cancellationRequestedAt: attempt.cancellationRequestedAt,
+              prDraft: attempt.prDraft,
+            };
+            const attemptPresentation = getRemediationStatusPresentation(
+              attempt.status,
+              attemptStatusOptions
+            );
+            const attemptStatusKey = getRemediationStatusKey(attempt.status, attemptStatusOptions);
+            const attemptStatusLabel = attemptStatusKey
+              ? t(attemptStatusKey)
+              : attemptPresentation.label;
+            const originKey = lookup(REMEDIATION_ORIGIN_KEYS, attempt.origin);
+            const validation =
+              attempt.validationEvidence?.map((record, index) =>
+                formatValidationEvidence(record, index, t)
+              ) ?? [];
+            const note = firstNonEmpty(attempt.riskNotes, attempt.draftReason);
+            const outcome = firstNonEmpty(attempt.blockedReason, attempt.lastErrorRedacted);
+            const attemptUrl = attempt.prUrl;
 
-              return (
-                <View key={attempt.id} className="gap-1.5 rounded-lg bg-card p-3">
-                  <View className="flex-row items-center justify-between">
-                    <Text className="text-xs font-medium">
-                      {t('securityAgent.remediation.attemptNumber', {
-                        number: attempt.attemptNumber,
-                      })}
-                    </Text>
-                    <Text variant="muted" className="text-xs">
-                      {timeAgo(parseTimestamp(attempt.updatedAt), undefined, now)}
-                    </Text>
-                  </View>
-                  <FindingStatusBadge
-                    icon={attemptPresentation.icon}
-                    label={attemptStatusLabel}
-                    tone={attemptPresentation.tone}
-                    spinning={attemptPresentation.spinning}
-                  />
+            return (
+              <Section
+                key={attempt.id}
+                label={t('securityAgent.remediation.attemptNumber', {
+                  number: attempt.attemptNumber,
+                })}
+                notice={
+                  <Text variant="mono" className="text-xs">
+                    {timeAgo(parseTimestamp(attempt.updatedAt), undefined, now)}
+                  </Text>
+                }
+              >
+                <FindingStatusBadge
+                  icon={attemptPresentation.icon}
+                  label={attemptStatusLabel}
+                  tone={attemptPresentation.tone}
+                  spinning={attemptPresentation.spinning}
+                />
+                <RowGroup>
                   <KvRow
                     label={t('securityAgent.remediation.startedBy')}
                     value={
@@ -453,44 +451,44 @@ export function FindingRemediationPanel({
                     valueDirection="ltr"
                     selectable
                   />
-                  {outcome ? (
-                    <Text variant="muted" className="text-xs" selectable>
-                      {outcome}
-                    </Text>
-                  ) : null}
-                  {validation.length > 0 ? (
-                    <View className="gap-0.5">
-                      {validation.map(item => (
-                        <Text key={item} variant="muted" className="text-xs" selectable>
-                          {item}
-                        </Text>
-                      ))}
-                    </View>
-                  ) : null}
-                  {note ? (
-                    <Text variant="muted" className="text-xs" selectable>
-                      {note}
-                    </Text>
-                  ) : null}
-                  {attemptUrl ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onPress={() => {
-                        openPullRequest(attemptUrl);
-                      }}
-                    >
-                      <Text>
-                        {t('securityAgent.remediation.openPullRequest', {
-                          number: attempt.prNumber ? ` #${attempt.prNumber}` : '',
-                        })}
+                </RowGroup>
+                {outcome ? (
+                  <Text variant="muted" className="text-xs" selectable>
+                    {outcome}
+                  </Text>
+                ) : null}
+                {validation.length > 0 ? (
+                  <View className="gap-0.5">
+                    {validation.map(item => (
+                      <Text key={item} variant="muted" className="text-xs" selectable>
+                        {item}
                       </Text>
-                    </Button>
-                  ) : null}
-                </View>
-              );
-            })}
-          </View>
+                    ))}
+                  </View>
+                ) : null}
+                {note ? (
+                  <Text variant="muted" className="text-xs" selectable>
+                    {note}
+                  </Text>
+                ) : null}
+                {attemptUrl ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onPress={() => {
+                      openPullRequest(attemptUrl);
+                    }}
+                  >
+                    <Text>
+                      {t('securityAgent.remediation.openPullRequest', {
+                        number: attempt.prNumber ? ` #${attempt.prNumber}` : '',
+                      })}
+                    </Text>
+                  </Button>
+                ) : null}
+              </Section>
+            );
+          })}
         </CollapsibleSection>
       ) : null}
     </View>
@@ -498,7 +496,13 @@ export function FindingRemediationPanel({
 
   return (
     <>
-      <Body className="flex-1">{content}</Body>
+      {hasContent ? (
+        <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
+          {content}
+        </TabScreenScrollView>
+      ) : (
+        <CenteredState contentContainerClassName={SCREEN_GUTTER_CLASS}>{content}</CenteredState>
+      )}
       {dialog}
     </>
   );

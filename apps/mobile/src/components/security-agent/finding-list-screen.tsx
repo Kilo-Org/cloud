@@ -56,7 +56,7 @@ function FindingsListFooter({
 }: Readonly<{ loading: boolean; error: boolean; onRetry: () => void }>) {
   const { t } = useTranslation();
   if (loading) {
-    return <FindingRowSkeleton index={0} />;
+    return <FindingRowSkeleton />;
   }
   if (error) {
     return (
@@ -70,22 +70,14 @@ function FindingsListFooter({
   return null;
 }
 
-// FlashList takes `contentContainerStyle` (no className), so the FlatList's
-// `grow gap-3 px-6 pt-4` content classes map to their pixel values. FlashList v2
-// positions every cell absolutely and has no `gap` handling (2.3.2 ships zero
-// `gap` references), so the 12px inter-row gap rides on the measured item
-// separator instead of `contentContainerStyle.gap`. The old container `gap` also
-// sat between the header and the first row and between the last row and the
-// footer; FlashList's separator only spans items, so those two boundaries carry
-// the same 12px as a pad on the header (`pb-3`) and on the footer (`pt-3`).
+// FlashList takes `contentContainerStyle` (no className), so the body keeps
+// only the top pad: the 14pt page gutter lives on the rows, their hairlines and
+// the header/footer bands, never on the scroller.
 const listStyle = { flex: 1 } satisfies ViewStyle;
 const listContentContainerStyle = {
   flexGrow: 1,
-  paddingHorizontal: 24,
-  paddingTop: 16,
+  paddingTop: 12,
 } satisfies ViewStyle;
-
-const FindingRowSeparator = () => <View className="h-3" />;
 
 export function FindingListScreen({ scope, routeParams }: Readonly<FindingListScreenProps>) {
   const router = useRouter();
@@ -143,15 +135,16 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
   // renders (refresh, filter sheet). FlashList's memoized ViewHolder compares
   // `renderItem` and `extraData` by identity before re-rendering a row.
   const renderItem = useCallback(
-    ({ item }: { item: SecurityFinding }) => (
+    ({ item, index }: { item: SecurityFinding; index: number }) => (
       <FindingRow
         finding={item}
         scope={scope}
         slaEnabled={slaEnabled}
         capacityState={capacity.state}
+        last={index === items.length - 1}
       />
     ),
-    [scope, slaEnabled, capacity.state]
+    [scope, slaEnabled, capacity.state, items.length]
   );
   const rowExtraData = useMemo(
     () => ({ scope, slaEnabled, capacityState: capacity.state }),
@@ -183,7 +176,6 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        className="px-6"
         title={t('common.findings')}
         // One 48dp icon target from IconButton; declaring its width keeps the
         // one-line title's readable minimum when the row is narrow.
@@ -218,9 +210,9 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
       {body.status === 'loading' && (
         <View style={listStyle}>
           <View style={listContentContainerStyle}>
-            {/* The loaded list's `ListHeaderComponent` band, so the first card
+            {/* The loaded list's `ListHeaderComponent` band, so the first row
                 lands where the first placeholder row stood. */}
-            <View className="pb-3" />
+            <View className="h-3" />
             <FindingListSkeletonRows />
           </View>
         </View>
@@ -273,17 +265,15 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
           keyExtractor={item => item.id}
           renderItem={renderItem}
           getItemType={() => 'finding'}
-          ItemSeparatorComponent={FindingRowSeparator}
           extraData={rowExtraData}
           contentContainerStyle={listContentContainerStyle}
           ListHeaderComponent={
-            // The former container gap also separated the header from the first
-            // row, which the item separator does not cover.
-            <View className="pb-3">
+            // The header band carries the page gutter itself: the rows own
+            // theirs, so the scroller must not inset them twice.
+            <View className="px-4 pb-3">
               <RefreshProgress refreshControl={refreshControl} />
               {hasAnalyzableRow ? (
                 <AnalysisCapacityNotice
-                  className="pt-2"
                   state={capacity.state}
                   onRetry={() => void capacity.refetch()}
                 />
@@ -298,16 +288,14 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
           }}
           onEndReachedThreshold={0.5}
           ListFooterComponent={
-            // The former container gap also separated the last row from the
-            // footer (skeleton / error / bottom spacer).
-            <View className="pt-3">
+            <>
               <FindingsListFooter
                 loading={findings.isFetchingNextPage}
                 error={findings.isFetchNextPageError}
                 onRetry={() => void findings.fetchNextPage()}
               />
               <View style={{ height: paddingBottom }} pointerEvents="none" />
-            </View>
+            </>
           }
         />
       )}

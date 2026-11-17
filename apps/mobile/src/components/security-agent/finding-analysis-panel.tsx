@@ -22,13 +22,17 @@ import { FindingStatusBadge } from '@/components/security-agent/finding-status-b
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { KvRow } from '@/components/ui/kv-row';
+import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { AnalysisCapacityNotice } from '@/components/security-agent/analysis-capacity-notice';
 import { AnalysisRerunAction } from '@/components/security-agent/analysis-rerun-action';
 import { formatNumber } from '@/lib/format';
+import { SCREEN_BODY_CLASS, SCREEN_GUTTER_CLASS } from '@/lib/layout';
 import { useSecurityAnalysisCapacity } from '@/lib/hooks/use-security-agent';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useStartSecurityAnalysis } from '@/lib/hooks/use-security-findings';
@@ -72,9 +76,9 @@ export function FindingAnalysisPanel({
 
   if (isLoading && !analysis) {
     return (
-      <View className="gap-3 px-6 pt-2">
-        <Skeleton className="h-16 w-full rounded-lg" />
-        <Skeleton className="h-32 w-full rounded-lg" />
+      <View className={SCREEN_BODY_CLASS}>
+        <Skeleton className="h-16 w-full rounded-xl" />
+        <Skeleton className="h-32 w-full rounded-xl" />
         {dialog}
       </View>
     );
@@ -179,11 +183,10 @@ export function FindingAnalysisPanel({
     (triageState && Boolean(triage)) ||
     (sandboxState && Boolean(sandbox)) ||
     Boolean(technicalMarkdown);
-  const Body = hasContent ? TabScreenScrollView : CenteredState;
 
   const content = (
-    <View className="gap-4 px-6 py-2">
-      <View className="gap-1 rounded-lg bg-secondary p-3">
+    <View className="gap-6">
+      <Card>
         <FindingStatusBadge
           icon={presentation.icon}
           label={presentationTitle}
@@ -193,10 +196,10 @@ export function FindingAnalysisPanel({
         <Text variant="muted" className="text-sm" selectable>
           {presentationDescription}
         </Text>
-      </View>
+      </Card>
 
       {canStartAnalysis || canRestartAnalysis || needsAnalysisRefresh ? (
-        <View className="gap-2">
+        <View className="gap-3">
           {canStartAnalysis ? (
             <Button
               disabled={startAnalysis.isPending || !hasCapacity}
@@ -214,10 +217,7 @@ export function FindingAnalysisPanel({
             </Button>
           ) : null}
           {canStartAnalysis ? (
-            <AnalysisCapacityNotice
-              state={capacity.state}
-              onRetry={() => void capacity.refetch()}
-            />
+            <AnalysisCapacityNotice state={capacity.state} onRetry={() => void capacity.refetch()} />
           ) : null}
           {canRestartAnalysis ? (
             <Button
@@ -239,7 +239,7 @@ export function FindingAnalysisPanel({
 
       {sessionHref ? (
         <Pressable
-          className="flex-row items-center justify-center gap-2 rounded-lg bg-secondary p-3 active:opacity-70"
+          className="min-h-[48px] flex-row items-center gap-3 active:opacity-70"
           onPress={() => {
             pushOnce(sessionHref);
           }}
@@ -252,101 +252,98 @@ export function FindingAnalysisPanel({
       ) : null}
 
       {triageState && triage ? (
-        <View className="gap-2">
-          <View className="rounded-lg bg-secondary px-3">
-            <KvRow
-              label={t('securityAgent.analysis.triageConfidence')}
-              value={formatConfidence(triage.confidence)}
-              valueFace="text"
-            />
-            <KvRow
-              label={t('securityAgent.analysis.suggestedAction')}
-              value={formatSuggestedAction(triage.suggestedAction)}
-              valueFace="text"
-            />
-          </View>
-          {triage.needsSandboxReasoning ? (
-            <View className="rounded-lg bg-secondary p-3">
-              <Text variant="muted" className="text-xs uppercase tracking-wide">
-                {t('securityAgent.analysis.triageReasoning')}
-              </Text>
-              <Text className="mt-1 text-sm" selectable>
-                {triage.needsSandboxReasoning}
-              </Text>
-            </View>
-          ) : null}
-        </View>
+        <RowGroup>
+          <KvRow
+            label={t('securityAgent.analysis.triageConfidence')}
+            value={formatConfidence(triage.confidence)}
+            valueFace="text"
+          />
+          <KvRow
+            label={t('securityAgent.analysis.suggestedAction')}
+            value={formatSuggestedAction(triage.suggestedAction)}
+            valueFace="text"
+          />
+        </RowGroup>
+      ) : null}
+
+      {triageState && triage?.needsSandboxReasoning ? (
+        <Section label={t('securityAgent.analysis.triageReasoning')}>
+          <Card>
+            <Text className="text-sm" selectable>
+              {triage.needsSandboxReasoning}
+            </Text>
+          </Card>
+        </Section>
       ) : null}
 
       {sandboxState && sandbox ? (
-        <View className="gap-2">
-          <View className="rounded-lg bg-secondary px-3">
-            <KvRow
-              label={t('securityAgent.analysis.exploitable')}
-              value={formatExploitable(sandbox.isExploitable)}
-              valueFace="text"
-            />
-            <KvRow
-              label={t('securityAgent.analysis.suggestedAction')}
-              value={formatSuggestedAction(sandbox.suggestedAction)}
-              valueFace="text"
-            />
-            <KvRow
-              label={t('common.model')}
-              value={firstNonEmpty(analysisModel, t('securityAgent.analysis.notRecorded'))}
-              valueFace={analysisModel === '' ? 'text' : 'mono'}
-              valueDirection={analysisModel === '' ? undefined : 'ltr'}
+        <RowGroup>
+          <KvRow
+            label={t('securityAgent.analysis.exploitable')}
+            value={formatExploitable(sandbox.isExploitable)}
+            valueFace="text"
+          />
+          <KvRow
+            label={t('securityAgent.analysis.suggestedAction')}
+            value={formatSuggestedAction(sandbox.suggestedAction)}
+            valueFace="text"
+          />
+          <KvRow
+            label={t('common.model')}
+            value={firstNonEmpty(analysisModel, t('securityAgent.analysis.notRecorded'))}
+            valueFace={analysisModel === '' ? 'text' : 'mono'}
+            valueDirection={analysisModel === '' ? undefined : 'ltr'}
+            selectable
+          />
+          <KvRow
+            label={t('securityAgent.analysis.analyzed')}
+            value={analyzedLabel}
+            valueFace="text"
+            selectable
+          />
+        </RowGroup>
+      ) : null}
+
+      {sandboxState && sandbox && exploitabilityReasoning ? (
+        <Section label={t('securityAgent.analysis.exploitabilityReasoning')}>
+          <Card>
+            <Text className="text-sm" selectable>
+              {exploitabilityReasoning}
+            </Text>
+          </Card>
+        </Section>
+      ) : null}
+
+      {sandboxState && sandbox?.suggestedFix ? (
+        <Section label={t('securityAgent.analysis.suggestedFix')}>
+          <Card>
+            <Text className="text-sm" selectable>
+              {sandbox.suggestedFix}
+            </Text>
+          </Card>
+        </Section>
+      ) : null}
+
+      {sandboxState && sandbox && uniqueLocations.length > 0 ? (
+        <CollapsibleSection
+          title={t('securityAgent.analysis.whereFound', {
+            count: uniqueLocations.length,
+            displayCount: formatNumber(uniqueLocations.length, i18n.language),
+          })}
+          defaultExpanded={uniqueLocations.length <= 2}
+        >
+          {uniqueLocations.map(location => (
+            <Text
+              key={location}
+              variant="mono"
+              className="text-xs"
               selectable
-            />
-            <KvRow
-              label={t('securityAgent.analysis.analyzed')}
-              value={analyzedLabel}
-              valueFace="text"
-              selectable
-            />
-          </View>
-          {exploitabilityReasoning ? (
-            <View className="rounded-lg bg-secondary p-3">
-              <Text variant="muted" className="text-xs uppercase tracking-wide">
-                {t('securityAgent.analysis.exploitabilityReasoning')}
-              </Text>
-              <Text className="mt-1 text-sm" selectable>
-                {exploitabilityReasoning}
-              </Text>
-            </View>
-          ) : null}
-          {sandbox.suggestedFix ? (
-            <View className="rounded-lg bg-secondary p-3">
-              <Text variant="muted" className="text-xs uppercase tracking-wide">
-                {t('securityAgent.analysis.suggestedFix')}
-              </Text>
-              <Text className="mt-1 text-sm" selectable>
-                {sandbox.suggestedFix}
-              </Text>
-            </View>
-          ) : null}
-          {uniqueLocations.length > 0 ? (
-            <CollapsibleSection
-              title={t('securityAgent.analysis.whereFound', {
-                count: uniqueLocations.length,
-                displayCount: formatNumber(uniqueLocations.length, i18n.language),
-              })}
-              defaultExpanded={uniqueLocations.length <= 2}
+              style={LTR_TEXT_DIRECTION}
             >
-              {uniqueLocations.map(location => (
-                <Text
-                  key={location}
-                  variant="mono"
-                  className="text-xs"
-                  selectable
-                  style={LTR_TEXT_DIRECTION}
-                >
-                  {location}
-                </Text>
-              ))}
-            </CollapsibleSection>
-          ) : null}
-        </View>
+              {location}
+            </Text>
+          ))}
+        </CollapsibleSection>
       ) : null}
 
       {technicalMarkdown ? (
@@ -359,7 +356,13 @@ export function FindingAnalysisPanel({
 
   return (
     <>
-      <Body className="flex-1">{content}</Body>
+      {hasContent ? (
+        <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
+          {content}
+        </TabScreenScrollView>
+      ) : (
+        <CenteredState contentContainerClassName={SCREEN_GUTTER_CLASS}>{content}</CenteredState>
+      )}
       {dialog}
     </>
   );

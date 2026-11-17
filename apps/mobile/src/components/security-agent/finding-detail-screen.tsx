@@ -32,6 +32,7 @@ import { findingDetailBackTarget, findingDetailHasLocalHistory } from '@/lib/fin
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { tabEntryA11y } from '@/lib/a11y/tab-entry';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { cn } from '@/lib/utils';
 
 type FindingTab = 'details' | 'analysis' | 'remediation';
@@ -160,7 +161,6 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   // above a gap no label ever fills.
   const pendingHeader = (
     <ScreenHeader
-      className="px-6"
       title={t('securityAgent.findingDetail.title')}
       showBackButton
       onBack={handleBack}
@@ -175,7 +175,6 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   // still from the first paint instead of being pushed down later.
   const loadingHeader = (
     <ScreenHeader
-      className="px-6"
       title={t('securityAgent.findingDetail.title')}
       reserveEyebrow
       showBackButton
@@ -213,11 +212,11 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
     return (
       <View className="flex-1 bg-background">
         {loadingHeader}
-        <View className="flex-1 gap-3 px-6 pt-4">
+        <View className={cn('flex-1', SCREEN_BODY_CLASS)}>
           <Skeleton className="h-6 w-2/3 rounded" />
           <Skeleton className="h-4 w-1/3 rounded" />
-          <Skeleton className="h-10 w-full rounded-lg" />
-          <Skeleton className="h-40 w-full rounded-lg" />
+          <Skeleton className="h-10 w-full rounded-xl" />
+          <Skeleton className="h-40 w-full rounded-xl" />
         </View>
       </View>
     );
@@ -234,7 +233,6 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        className="px-6"
         title={t('securityAgent.findingDetail.title')}
         eyebrow={finding.repo_full_name}
         showBackButton
@@ -252,7 +250,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
               // the way the settings Save button does: the label shrinks inside
               // the cap instead of taking the title's room (see the trailing
               // cluster note in screen-header.tsx).
-              className="min-w-0 max-w-[140px] shrink"
+              className="min-w-0 max-w-40 shrink"
             >
               <Ban size={16} color={colors.secondaryForeground} />
               <Text className="shrink text-center">
@@ -263,7 +261,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
         }
       />
       {findingQuery.isError ? (
-        <View className="px-6 pb-2">
+        <View className="px-4 pb-2">
           <SettingsRecoveryStatus
             message={t('securityAgent.dismiss.couldNotLoad')}
             isRetrying={findingQuery.isFetching}
@@ -272,7 +270,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
         </View>
       ) : null}
       {dismissFailure !== null && dismissDraft.draft ? (
-        <View className="px-6 pb-2">
+        <View className="px-4 pb-2">
           <SecurityCommandRetryCard
             lastError={dismissFailure}
             retryable={dismissDraft.draft.retryable === true}
@@ -285,7 +283,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
           />
         </View>
       ) : null}
-      <View accessibilityRole="tablist" className="flex-row gap-2 px-6 pb-2 pt-1">
+      <View accessibilityRole="tablist" className="flex-row gap-2 px-4 pb-2 pt-1">
         {TABS.map(({ key, labelKey }) => {
           const selected = tab === key;
           return (
@@ -296,7 +294,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
                 // row floor on its own node so a tap anywhere in the tab's
                 // height lands, not just the label line.
                 ROW_TARGET_CLASS,
-                'flex-1 items-center justify-center rounded-lg py-2 active:opacity-80',
+                'flex-1 items-center justify-center rounded-md py-2 active:opacity-80',
                 selected ? 'bg-selection' : 'bg-secondary'
               )}
               onPress={() => {
@@ -317,7 +315,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
         })}
       </View>
       {tab === 'details' && (
-        <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 gap-4 pt-2">
+        <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
           <FindingDetailsPanel finding={finding} scope={scope} />
         </TabScreenScrollView>
       )}

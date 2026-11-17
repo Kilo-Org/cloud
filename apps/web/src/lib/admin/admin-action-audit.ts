@@ -13,7 +13,6 @@ import {
   adminTierFor,
   authViaTokenFromHeaders,
   clientIpFromHeaders,
-  methodFromHeaders,
   routeFromHeaders,
   type AdminAccessAttribution,
   type AdminAuditContext,
@@ -296,6 +295,5 @@ export function adminActionContextFromHeaders(
     tokenSource: null,
     ip: clientIpFromHeaders(headersList),
     auditRoute: routeFromHeaders(headersList) ?? undefined,
-    auditMethod: methodFromHeaders(headersList) ?? undefined,
   };
 }

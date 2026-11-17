@@ -180,16 +180,23 @@ export const NO_GLANCEABLE_WORK: Omit<GlanceableAgentsSnapshot, GlanceableFrameF
   scheduledAt: null,
 };
 
-/** One session row, as both producers read it from the active-sessions list. */
+/**
+ * One session row, as every producer reads it from the active-sessions list.
+ * The two timestamps share one absence policy: a row that does not carry the
+ * fact omits it, and a producer that serializes an absent value may carry an
+ * explicit `null` — the readers (`timestampMs`, the helpers below) treat
+ * `null`, absent and unparseable exactly the same, so a shape may widen in
+ * either direction without a branch at the read site.
+ */
 export type GlanceableSessionRow = {
   status: string;
   /** Backend timestamp; when this session's status last changed. Absent on old rows. */
-  statusUpdatedAt?: string;
+  statusUpdatedAt?: string | null;
   /**
    * Backend wake time. Only a `scheduled` row carries one, and even then the
    * CLI may omit it — `scheduled` with no time is representable.
    */
-  scheduledAt?: string;
+  scheduledAt?: string | null;
 };
 
 /**
@@ -285,7 +292,7 @@ export function countGlanceableApprovals(sessions: readonly GlanceableSessionRow
  * `extremeTimestampRow` applies when it picks one winner.
  */
 export function compareSessionInstant<T extends GlanceableSessionRow>(
-  read: (row: T) => string | undefined,
+  read: (row: T) => string | null | undefined,
   extreme: 'earliest' | 'latest'
 ): (a: T, b: T) => number {
   return (a, b) => {
@@ -312,7 +319,7 @@ export function compareSessionInstant<T extends GlanceableSessionRow>(
 function extremeTimestampRow(
   sessions: readonly GlanceableSessionRow[],
   qualifies: (session: GlanceableSessionRow) => boolean,
-  readTimestamp: (session: GlanceableSessionRow) => string | undefined,
+  readTimestamp: (session: GlanceableSessionRow) => string | null | undefined,
   extreme: 'earliest' | 'latest'
 ): { at: number; session: GlanceableSessionRow } | null {
   let winner: { at: number; session: GlanceableSessionRow } | null = null;

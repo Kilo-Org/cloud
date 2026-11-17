@@ -360,6 +360,21 @@ describe('buildSessionLiveActivityContentState', () => {
     ).toMatchObject({ statusKind: 'running', scheduledAt: null });
   });
 
+  it('reads a serialized absent fact like an omitted one', () => {
+    // The shared row type accepts an explicit null where a producer
+    // serializes an absent value; the shared reader treats null, absent and
+    // unparseable as one outcome, so both shapes build the same card state.
+    const omitted = buildSessionLiveActivityContentState(
+      { id: 's', status: 'scheduled' },
+      options
+    );
+    const serialized = buildSessionLiveActivityContentState(
+      { id: 's', status: 'scheduled', statusUpdatedAt: null, scheduledAt: null, title: null },
+      options
+    );
+    expect(serialized).toEqual(omitted);
+  });
+
   it('reads a stored time like the Home widget, even where Date.parse cannot', () => {
     const stored = '2026-03-16 15:21:40.957+00';
     const buildCard = () =>

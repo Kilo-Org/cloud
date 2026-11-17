@@ -538,6 +538,11 @@ describe('oldestNeedsInputSince', () => {
         { status: 'question', statusUpdatedAt: at(300_000) },
       ])
     ).toBe(at(300_000));
+    // A producer that serializes an absent value reads the same as one that
+    // omits it: null, absent and unparseable are one outcome for the reader.
+    expect(
+      oldestNeedsInputSince([{ status: 'question', statusUpdatedAt: null }])
+    ).toBeNull();
   });
 
   it('returns null when nothing needs input', () => {
@@ -658,6 +663,8 @@ describe('session timestamp parsing', () => {
         { status: 'scheduled', scheduledAt: 'garbage' },
       ])
     ).toBeNull();
+    // A serialized absent wake reads the same as an omitted one.
+    expect(soonestScheduledAt([{ status: 'scheduled', scheduledAt: null }])).toBeNull();
   });
 
   it('reports the newest change from a PostgreSQL timestamp as ISO', () => {

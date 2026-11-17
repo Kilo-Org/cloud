@@ -40,7 +40,7 @@ export function rankApprovableSessions<T extends FrontApprovableRow>(rows: reado
   for (const [index, row] of rows.entries()) {
     if (row.status === 'permission') {
       const parsed =
-        row.statusUpdatedAt === undefined ? Number.NaN : Date.parse(row.statusUpdatedAt);
+        row.statusUpdatedAt == null ? Number.NaN : Date.parse(row.statusUpdatedAt);
       ranked.push({ row, at: Number.isNaN(parsed) ? Number.POSITIVE_INFINITY : parsed, index });
     }
   }

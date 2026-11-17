@@ -38,6 +38,25 @@ export type AndroidNotificationChannelId = (typeof ANDROID_NOTIFICATION_CHANNELS
 export const LEGACY_AGENT_ANDROID_CHANNEL_ID = 'agent';
 
 /**
+ * The channel every Android build before the agent-channel split addressed the
+ * glanceable active-agents pushes with. It is not in
+ * `ANDROID_NOTIFICATION_CHANNELS`: current builds only create the split
+ * channels, and this id exists solely so a server push can still reach a token
+ * registered by an older build (see `androidChannelIdForPushDataToAppVersion`).
+ */
+export const LEGACY_ACTIVE_AGENTS_ANDROID_CHANNEL_ID = 'active-agents';
+
+/**
+ * The channel `androidChannelIdForPushDataToAppVersion` keeps an agent briefing
+ * on for a token that predates the split. The id itself is current — every
+ * split build creates `agent-progress` (see `AGENT_CHANNEL_SPLIT_APP_VERSION`)
+ * — so this is not legacy vocabulary: it names the fallback role the resolver
+ * gives the channel, the one place a briefing goes to a channel the version
+ * gate, not the payload, chose.
+ */
+export const BRIEFING_FALLBACK_CHANNEL_ID: AndroidNotificationChannelId = 'agent-progress';
+
+/**
  * The first mobile version that creates both split agent channels. `app_version`
  * on a push token is the build that created that device's channels, so a lower
  * version only has `LEGACY_AGENT_ANDROID_CHANNEL_ID`.
@@ -102,7 +121,7 @@ export function isPushAppVersionAtLeast(current: string | null | undefined, min:
 export type AndroidPushChannelId =
   | AndroidNotificationChannelId
   | typeof LEGACY_AGENT_ANDROID_CHANNEL_ID
-  | 'active-agents';
+  | typeof LEGACY_ACTIVE_AGENTS_ANDROID_CHANNEL_ID;
 
 /**
  * Resolve the channel a *server push* addresses for a token registered by
@@ -123,9 +142,9 @@ export function androidChannelIdForPushDataToAppVersion(
     case 'cloud_agent_session':
       return LEGACY_AGENT_ANDROID_CHANNEL_ID;
     case 'active_agents_glanceable':
-      return 'active-agents';
+      return LEGACY_ACTIVE_AGENTS_ANDROID_CHANNEL_ID;
     case 'agent_briefing':
-      return androidChannelIdForRegisteredClient('agent-progress', appVersion);
+      return androidChannelIdForRegisteredClient(BRIEFING_FALLBACK_CHANNEL_ID, appVersion);
     default:
       return undefined;
   }
@@ -272,6 +291,30 @@ export const LIVE_ACTIVITY_RELEVANCE = {
   aggregate: 40,
   sessionIdle: 20,
 } as const;
+
+/**
+ * The smallest gap between adjacent relevance bands, derived from the table so
+ * retuning it cannot widen a band into its neighbor's range unnoticed.
+ */
+const LIVE_ACTIVITY_BAND_STEP = ((): number => {
+  const bands = [...Object.values(LIVE_ACTIVITY_RELEVANCE)].sort((a, b) => a - b);
+  let smallest = Number.POSITIVE_INFINITY;
+  for (let index = 1; index < bands.length; index += 1) {
+    // Both operands exist by the loop bounds; the fallbacks only satisfy the
+    // index checker and are guarded below by the positive-gap test.
+    const gap = (bands[index] ?? 0) - (bands[index - 1] ?? 0);
+    if (gap > 0 && gap < smallest) smallest = gap;
+  }
+  return smallest;
+})();
+
+/**
+ * The bound of the recency tie-break term (`recencyTerm` in
+ * `session-live-activity.ts`), one below the band step: a tie-break that
+ * stays under the smallest gap can never promote a score into the next band.
+ * Derive the tie-break from the band table, never hardcode 19.
+ */
+export const LIVE_ACTIVITY_TIE_BREAK_LIMIT = LIVE_ACTIVITY_BAND_STEP - 1;
 
 /** Map a push payload to the Android channel that should carry it. */
 export function androidChannelIdForPushData(data: PushData): AndroidNotificationChannelId {

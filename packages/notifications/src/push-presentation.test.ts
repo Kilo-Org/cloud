@@ -13,7 +13,11 @@ import {
   androidChannelIdForAgentKind,
   androidChannelIdForPushData,
   androidChannelIdForPushDataToAppVersion,
+  BRIEFING_FALLBACK_CHANNEL_ID,
   LEGACY_AGENT_ANDROID_CHANNEL_ID,
+  LEGACY_ACTIVE_AGENTS_ANDROID_CHANNEL_ID,
+  LIVE_ACTIVITY_RELEVANCE,
+  LIVE_ACTIVITY_TIE_BREAK_LIMIT,
   androidChannelIdForRegisteredClient,
   iosInterruptionLevelForPushData,
   iosMutableContentForPushData,
@@ -393,9 +397,20 @@ describe('androidChannelIdForPushDataToAppVersion', () => {
 
   it('shares the channel gate and preserves the legacy glanceable route', () => {
     expect(ANDROID_AGENT_KIND_CHANNELS_MIN_APP_VERSION).toBe(AGENT_CHANNEL_SPLIT_APP_VERSION);
-    expect(androidChannelIdForPushDataToAppVersion(glanceable(2), '1.0.11')).toBe('active-agents');
+    expect(androidChannelIdForPushDataToAppVersion(glanceable(2), '1.0.11')).toBe(
+      LEGACY_ACTIVE_AGENTS_ANDROID_CHANNEL_ID
+    );
+    expect(LEGACY_ACTIVE_AGENTS_ANDROID_CHANNEL_ID).toBe('active-agents');
     expect(androidChannelIdForPushDataToAppVersion(glanceable(2), '1.0.12')).toBe('needs-input');
     expect(androidChannelIdForPushDataToAppVersion(glanceable(0), '1.0.12')).toBe('agent-progress');
+  });
+
+  it('keeps the briefing fallback on the channel the version gate names', () => {
+    const brief = { type: 'agent_briefing', url: '/agent-briefing' } as const;
+    expect(androidChannelIdForPushDataToAppVersion(brief, '1.0.15')).toBe(
+      BRIEFING_FALLBACK_CHANNEL_ID
+    );
+    expect(BRIEFING_FALLBACK_CHANNEL_ID).toBe('agent-progress');
   });
 
   it('routes an agent push through its kind', () => {
@@ -522,5 +537,17 @@ describe('androidChannelIdForRegisteredClient', () => {
       expect(androidChannelIdForRegisteredClient(channelId, splitVersion)).toBe(channelId);
       expect(androidChannelIdForRegisteredClient(channelId, null)).toBeUndefined();
     }
+  });
+});
+
+describe('LIVE_ACTIVITY_TIE_BREAK_LIMIT', () => {
+  it('stays one below the smallest gap between adjacent relevance bands', () => {
+    const bands = [...Object.values(LIVE_ACTIVITY_RELEVANCE)].sort((a, b) => a - b);
+    for (let index = 1; index < bands.length; index += 1) {
+      // A tie-break term is capped at the limit, so every adjacent pair of
+      // bands must be at least one wider than it can cover.
+      expect(bands[index] - bands[index - 1]).toBeGreaterThan(LIVE_ACTIVITY_TIE_BREAK_LIMIT);
+    }
+    expect(LIVE_ACTIVITY_TIE_BREAK_LIMIT).toBeGreaterThan(0);
   });
 });

@@ -44,16 +44,28 @@ export function resolveCustomPricingAliases(
   return { models: [...entries, ...aliasEntries] };
 }
 
-/** The stored custom pricing with {@link resolveCustomPricingAliases} applied. */
-export const getCustomPricingConfig = createCachedFetch(
-  async () => {
-    const [config, models] = await Promise.all([
-      readCustomPricingConfig(),
-      getOpenRouterModelsMetadataFromDatabase(),
-    ]);
-    return resolveCustomPricingAliases(config, models);
-  },
+const getStoredCustomPricingConfig = createCachedFetch(
+  readCustomPricingConfig,
   60_000,
   EMPTY_CUSTOM_PRICING_CONFIG,
   { name: 'customPricingConfig' }
 );
+
+let resolved:
+  | { config: CustomPricingConfig; models: GatewayModelMap; value: CustomPricingConfig }
+  | undefined;
+
+/**
+ * The stored custom pricing with {@link resolveCustomPricingAliases} applied against the metadata
+ * routing resolves aliases with, recomputed only when either cached input changes.
+ */
+export async function getCustomPricingConfig(): Promise<CustomPricingConfig> {
+  const [config, models] = await Promise.all([
+    getStoredCustomPricingConfig(),
+    getOpenRouterModelsMetadataFromDatabase(),
+  ]);
+  if (resolved?.config !== config || resolved.models !== models) {
+    resolved = { config, models, value: resolveCustomPricingAliases(config, models) };
+  }
+  return resolved.value;
+}

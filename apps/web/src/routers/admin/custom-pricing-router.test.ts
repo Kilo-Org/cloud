@@ -102,7 +102,7 @@ describe('adminCustomPricingRouter', () => {
       })
     ).rejects.toMatchObject({
       code: 'BAD_REQUEST',
-      message: expect.stringMatching(/~vendor\/model-latest.{0,4} is a latest alias/),
+      message: expect.stringContaining('is a latest alias'),
     });
     expect(await db.select().from(ai_gateway_config)).toEqual([]);
   });

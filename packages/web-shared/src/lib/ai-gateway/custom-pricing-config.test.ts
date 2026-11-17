@@ -197,6 +197,11 @@ describe('getCustomPricingConfig', () => {
 
     expect(aliasUsage.cost_mUsd).toBe(1_000_000 * 1 + 100_000 * 2);
     expect(aliasUsage).toEqual(targetUsage);
+
+    // A retargeted alias follows the routing metadata without waiting for the stored config to
+    // refresh.
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue(metadata());
+    expect(await getCustomPricingConfig()).toEqual({ models: [targetEntry] });
   });
 });
 

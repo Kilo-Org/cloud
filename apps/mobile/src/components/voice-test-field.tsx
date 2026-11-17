@@ -1,9 +1,11 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, type TextInput, View } from 'react-native';
+import { type TextInput, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { VoiceInputButton, VoiceInputStatus } from '@/components/voice-input-control';
 import { applyVoiceDraftToInput } from '@/lib/voice-input/voice-input-draft';
@@ -71,8 +73,8 @@ export function VoiceTestField(): React.ReactElement {
       : null;
 
   return (
-    <View className="gap-2 rounded-lg bg-secondary px-3 py-3">
-      <Text className="text-sm font-medium text-foreground">{t('voiceInput.testTitle')}</Text>
+    <Card>
+      <Text variant="heading">{t('voiceInput.testTitle')}</Text>
       <Input
         ref={inputRef}
         // The visible title above is a separate `Text`, so the multiline field
@@ -102,21 +104,17 @@ export function VoiceTestField(): React.ReactElement {
             tone="error"
           />
         ) : null}
-        <Pressable
+        <Button
+          variant="ghost"
+          size="sm"
+          className="ml-auto"
           accessibilityLabel={t('voiceInput.testClear')}
-          accessibilityRole="button"
-          // 44pt effective target (DESIGN.md): the compact text label sits in a
-          // min-h-[44px]/min-w-[44px] centered box. Arbitrary px is required —
-          // rem-scaled min-h-11/min-w-11 renders ~38.5pt tall on device because
-          // NativeWind's rem is ~14px here (e14, 2026-09-12).
-          // disabled:opacity-50 separates the inert state from the live one.
-          className="ml-auto min-h-[44px] min-w-[44px] items-center justify-center px-2 active:opacity-70 disabled:opacity-50"
           disabled={clearDisabled}
           onPress={handleClear}
         >
           <Text className="text-sm text-muted-foreground">{t('voiceInput.testClear')}</Text>
-        </Pressable>
+        </Button>
       </View>
-    </View>
+    </Card>
   );
 }

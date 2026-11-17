@@ -17,7 +17,9 @@ import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { PreferenceRow } from '@/components/ui/preference-row';
 import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 import { useAppUnlock } from '@/lib/app-unlock-context';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useCondenseToolCallsPreference } from '@/lib/hooks/use-condense-tool-calls-preference';
 import { useHideThinkingPreference } from '@/lib/hooks/use-hide-thinking-preference';
 import { useKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
@@ -80,10 +82,10 @@ export function GeneralSettingsScreen() {
       <ScreenHeader title={t('preferences.general')} backFallback={PROFILE_TAB_HREF} />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="px-4 gap-3 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
       >
-        <View className="gap-2">
+        <Section>
           <RowGroup>
             <PreferenceRow
               icon={Shield}
@@ -96,7 +98,7 @@ export function GeneralSettingsScreen() {
             />
           </RowGroup>
           <AppUnlockFeedback outcome={unlock.purpose === 'setting' ? unlock.outcome : null} />
-        </View>
+        </Section>
         <RowGroup>
           <PreferenceRow
             icon={Brain}

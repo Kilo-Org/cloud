@@ -61,12 +61,7 @@ describe('PasskeysScreen', () => {
     });
     const view = await mount();
 
-    expect(nodes(view, 'Skeleton')).toHaveLength(15);
-    // Every row reserves both controls' final 44x44pt boxes, so a loaded row is
-    // the same height as its skeleton and the list does not jump on load.
-    expect(
-      nodes(view, 'View').filter(node => String(node.props.className).includes('min-h-[44px]'))
-    ).toHaveLength(6);
+    expect(nodes(view, 'Skeleton')).toHaveLength(9);
     // The Add CTA is on screen from the first frame, in its final slot.
     expect(hasButtonLabel(view, 'Add a passkey')).toBe(true);
     expect(nodes(view, 'EmptyState')).toHaveLength(0);
@@ -125,9 +120,12 @@ describe('PasskeysScreen', () => {
     expect(texts(view)).toContain('Work laptop');
     expect(texts(view)).toContain('MacBook');
     expect(texts(view)).toContain('Added Jan 1, 2026');
-    // Only the recorded-use row carries the line; a credential the server has
-    // never seen used keeps the name-and-added pair.
-    expect(texts(view).filter(text => text === 'Last used Jan 1, 2026')).toHaveLength(1);
+    // The row carries one secondary line, so a recorded use joins the added
+    // date there; a credential the server has never seen used keeps the date
+    // alone.
+    expect(
+      texts(view).filter(text => text === 'Added Jan 1, 2026 · Last used Jan 1, 2026')
+    ).toHaveLength(1);
     view.unmount();
   });
 

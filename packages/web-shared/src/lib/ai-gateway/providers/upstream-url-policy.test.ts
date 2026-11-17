@@ -514,7 +514,7 @@ describe('rejectDisallowedUpstreamUrls', () => {
     jest.mocked(captureMessage).mockReset();
   });
 
-  it('returns the allowed URLs with their checked addresses in order', async () => {
+  it('returns the dialled URL with its checked addresses', async () => {
     lookupMock.mockImplementation(async hostname => [
       { address: hostname === 'second.example.com' ? '104.18.3.5' : '104.18.2.115', family: 4 },
     ]);
@@ -533,13 +533,6 @@ describe('rejectDisallowedUpstreamUrls', () => {
         hostname: 'first.example.com',
         addresses: ['104.18.2.115'],
       },
-      relayed: [
-        {
-          url: 'https://second.example.com/v1',
-          hostname: 'second.example.com',
-          addresses: ['104.18.3.5'],
-        },
-      ],
     });
   });
 

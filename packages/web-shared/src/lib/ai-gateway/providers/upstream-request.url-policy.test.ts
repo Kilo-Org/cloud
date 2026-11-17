@@ -142,9 +142,12 @@ describe('upstreamRequest upstream URL policy', () => {
 
     it('reports a refused connection apart from an upstream failure', async () => {
       lookupMock.mockResolvedValue([{ address: '104.18.2.115', family: 4 }]);
-      const refusal = new UpstreamAddressUnverifiedError('llm.example.com', 'no live pin');
       // A refused pin reaches the request as a fetch error whose cause is the
       // refusal, which `upstream-connection.test.ts` shows on this runtime.
+      const refusal = new UpstreamAddressUnverifiedError(
+        'llm.example.com',
+        'the refreshed check could not verify the host'
+      );
       mockFetch().mockRejectedValue(
         Object.assign(new TypeError('fetch failed'), { cause: refusal })
       );
@@ -197,6 +200,49 @@ describe('upstreamRequest upstream URL policy', () => {
 
       expect(lookupMock).toHaveBeenCalledTimes(1);
       expect(pinnedAddressOf('llm.example.com')).toEqual([[null, '104.18.2.115', 4]]);
+    });
+
+    it('re-checks the host when the request dials after the pin expired', async () => {
+      lookupMock
+        .mockResolvedValueOnce([{ address: '104.18.2.115', family: 4 }])
+        .mockResolvedValue([{ address: '104.18.9.9', family: 4 }]);
+      const fetchMock = mockFetch();
+
+      await send(directProvider('https://llm.example.com/v1'));
+      expect(lookupMock).toHaveBeenCalledTimes(1);
+
+      // The pin outlives a connection but not the request budget, so a request
+      // that dials after the TTL asks the URL policy for a fresh check and
+      // dials what that check approved.
+      jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 60_001);
+      await send(directProvider('https://llm.example.com/v1'));
+
+      expect(lookupMock).toHaveBeenCalledTimes(2);
+      expect(pinnedAddressOf('llm.example.com')).toEqual([[null, '104.18.9.9', 4]]);
+      const [, init] = fetchMock.mock.calls[1];
+      expect(
+        (init as (RequestInit & { dispatcher?: Dispatcher }) | undefined)?.dispatcher
+      ).toBe(upstreamDispatcherFor('llm.example.com', ['104.18.9.9']));
+      jest.restoreAllMocks();
+    });
+
+    it('reports the second request when the fresh check fails during the connect', async () => {
+      lookupMock
+        .mockResolvedValueOnce([{ address: '104.18.2.115', family: 4 }])
+        .mockRejectedValue(new Error('getaddrinfo ENOTFOUND'));
+      const fetchMock = mockFetch();
+
+      await send(directProvider('https://llm.example.com/v1'));
+      jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 60_001);
+      const result = await send(directProvider('https://llm.example.com/v1'));
+
+      // The refresh answers the connection's callback with the refusal, so the
+      // fetch never ran and the answer stays the generic upstream failure.
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      if (result.type !== 'error') throw new Error('expected an error result');
+      expect(result.response.status).toBe(503);
+      expect((await result.response.json()).error_type).toBe('temporarily_unavailable');
+      jest.restoreAllMocks();
     });
 
     it.each([

@@ -290,6 +290,34 @@ async function resolveWithRetry(
   return null;
 }
 
+/** What one resolution of an upstream host produced for the public check. */
+type UpstreamHostCheck =
+  | { checked: string[] }
+  | { violation: 'dns_lookup_failed' | 'non_public_address' };
+
+/**
+ * Resolves `hostname`, requires every answer to be public, and stores the
+ * checked list on success. It never answers from the checked-address cache,
+ * because a caller states by running it that the cached list may no longer be
+ * trusted. It shares the resolution already in flight for the host. The
+ * violation is report-visible only: a non-public answer and a failed lookup
+ * leave no checked entry and are answered with different messages. Rejects with
+ * the abort reason when `signal` aborts during the lookup.
+ */
+async function resolveAndCheckUpstreamHost(
+  hostname: string,
+  resolveHostAddresses: ResolveHostAddresses,
+  signal: AbortSignal | undefined
+): Promise<UpstreamHostCheck> {
+  const addresses = await resolveWithRetry(hostname, resolveHostAddresses, signal);
+  if (!addresses) return { violation: 'dns_lookup_failed' };
+  if (addresses.some(address => !isPublicIp(address))) {
+    return { violation: 'non_public_address' };
+  }
+  cacheUpstreamAddresses(hostname, addresses, Date.now());
+  return { checked: addresses };
+}
+
 /**
  * Test hook. Also resets the outstanding-lookup accounting, which a resolver
  * that a test leaves pending keeps.
@@ -305,7 +333,9 @@ export function clearUpstreamUrlPolicyCache(): void {
  * its host and every address it resolves to must be publicly routable.
  *
  * An allowed decision carries the checked address list for that host, and the
- * caller connects to those addresses instead of resolving the name again.
+ * caller connects to those addresses instead of resolving the name again. The
+ * check stores that list for the host's cache TTL, so a caller that no longer
+ * trusts its own copy asks `refreshUpstreamHostAddresses` for a fresh one.
  *
  * Rejects with the abort reason when `signal` aborts during the DNS lookup.
  */
@@ -346,14 +376,32 @@ export async function findUpstreamUrlViolation(
 
   // A public-looking name can still point at a private address, for example
   // `metadata.attacker.example` with an A record of 169.254.169.254.
-  const addresses = await resolveWithRetry(hostname, resolveHostAddresses, signal);
-  if (!addresses) return { allowed: false, violation: 'dns_lookup_failed' };
-  if (addresses.some(address => !isPublicIp(address))) {
-    return { allowed: false, violation: 'non_public_address' };
-  }
+  const check = await resolveAndCheckUpstreamHost(hostname, resolveHostAddresses, signal);
+  if ('violation' in check) return { allowed: false, violation: check.violation };
+  return { allowed: true, hostname, addresses: check.checked };
+}
 
-  cacheUpstreamAddresses(hostname, addresses, now);
-  return { allowed: true, hostname, addresses };
+/**
+ * The checked address list for `hostname` after a fresh check. A caller states
+ * by running this that the stored list for the host may no longer be trusted,
+ * for example a connection pool that found its pin expired. It never answers
+ * from the checked-address cache, and it stores a list it found public, so a
+ * later expiry resolves the same list without another lookup.
+ *
+ * Resolves null when the check fails or answers an address that is not public,
+ * so the caller refuses the connection. It rejects with the abort reason when
+ * `signal` aborts during the lookup.
+ */
+export async function refreshUpstreamHostAddresses(
+  hostname: string,
+  signal: AbortSignal | undefined
+): Promise<string[] | null> {
+  const check = await resolveAndCheckUpstreamHost(
+    normalizeUpstreamHostname(hostname),
+    resolveWithSystemResolver,
+    signal
+  );
+  return 'checked' in check ? check.checked : null;
 }
 
 function rejectionResponse({
@@ -409,19 +457,16 @@ export type UpstreamUrlPolicyResult =
   | { rejected: NextResponse }
   | {
       rejected: null;
-      /** The checked entry for `urls[0]`, the hop the caller dials itself. */
+      /** The checked entry for the URL the caller opens the connection to. */
       dialed: AllowedUpstreamUrl;
-      /** The checked entries for the remaining URLs, which a relay dials. */
-      relayed: AllowedUpstreamUrl[];
     };
 
 /**
  * Returns the error response for the first URL that violates the policy, or the
- * checked entry of every URL with its addresses. Position, not the URL string,
- * names each entry: `dialed` is the first URL the caller passed and `relayed`
- * holds the rest in order. Rejects with the abort reason when `signal` aborts,
- * exactly like the upstream fetch would, so the caller's fetch-failure handling
- * applies.
+ * checked entry of the hop the caller dials. The secure-proxy relay dials its
+ * own hop and runs its own check there, so no further address travels back.
+ * Rejects with the abort reason when `signal` aborts, exactly like the upstream
+ * fetch would, so the caller's fetch-failure handling applies.
  */
 export async function rejectDisallowedUpstreamUrls({
   urls,
@@ -436,7 +481,6 @@ export async function rejectDisallowedUpstreamUrls({
   signal: AbortSignal;
 }): Promise<UpstreamUrlPolicyResult> {
   const decisions = await Promise.all(urls.map(url => findUpstreamUrlViolation(url, { signal })));
-  const checked: AllowedUpstreamUrl[] = [];
   for (const [index, decision] of decisions.entries()) {
     if (!decision.allowed) {
       return {
@@ -448,12 +492,19 @@ export async function rejectDisallowedUpstreamUrls({
         }),
       };
     }
-    checked.push({ url: urls[index], hostname: decision.hostname, addresses: decision.addresses });
   }
-  // `urls` always holds at least the dialled hop, so every decision above was
-  // allowed and the first checked entry exists.
-  const [dialed, ...relayed] = checked;
-  return { rejected: null, dialed, relayed };
+  // The loop above returned when a decision was not allowed, and `urls` always
+  // holds the dialled hop, so the first decision is an allowed one.
+  const dialledDecision = decisions[0];
+  if (!dialledDecision.allowed) throw new Error('unreachable: every decision above was allowed');
+  return {
+    rejected: null,
+    dialed: {
+      url: urls[0],
+      hostname: dialledDecision.hostname,
+      addresses: dialledDecision.addresses,
+    },
+  };
 }
 
 /**

@@ -2,6 +2,7 @@ import { Agent, fetch as undiciFetch } from 'undici';
 import type { Dispatcher } from 'undici';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { lookup } from 'node:dns/promises';
 import type { LookupOptions } from 'node:dns';
 import {
   clearUpstreamConnectionCache,
@@ -10,6 +11,16 @@ import {
   UpstreamAddressUnverifiedError,
   upstreamDispatcherFor,
 } from './upstream-connection';
+
+jest.mock('node:dns/promises', () => ({ lookup: jest.fn() }));
+
+/** The `{ all: true }` overload the policy awaits. */
+const lookupMock = jest.mocked(
+  lookup as unknown as (
+    hostname: string,
+    options: { all: true; verbatim: true }
+  ) => Promise<Array<{ address: string; family: number }>>
+);
 
 const PUBLIC_IPV4 = '104.18.2.115';
 const PUBLIC_IPV6 = '2606:4700::6812:273';
@@ -35,6 +46,18 @@ function refusalOf(calls: LookupCall[]): UpstreamAddressUnverifiedError {
   }
   expect(address).toBe('');
   return error;
+}
+
+/**
+ * The lookup can answer later: a stale-pin refresh resolves a fresh check
+ * before it calls back. This collects the first answer, whenever it lands.
+ */
+function runLookupAsync(hostname: string, options: LookupOptions): Promise<LookupCall[]> {
+  const { promise, resolve } = Promise.withResolvers<LookupCall[]>();
+  lookupPinnedUpstreamAddress(hostname, options, (error, address, family) => {
+    resolve([[error, address, family]]);
+  });
+  return promise;
 }
 
 function causeOf(error: unknown): unknown {
@@ -82,30 +105,65 @@ describe('lookupPinnedUpstreamAddress', () => {
     ]);
   });
 
-  it('refuses a host with no pin instead of resolving it', () => {
-    const calls = runLookup('unpinned.example', { all: false });
+  it('re-checks and answers a host with no pin, instead of resolving it itself', async () => {
+    lookupMock.mockResolvedValue([{ address: PUBLIC_IPV4, family: 4 }]);
 
-    const error = refusalOf(calls);
-    expect(error.code).toBe('ERR_UPSTREAM_ADDRESS_UNVERIFIED');
-    expect(error.name).toBe('UpstreamAddressUnverifiedError');
-    expect(error.message).toContain('unpinned.example');
-    expect(calls).toHaveLength(1);
+    const calls = await runLookupAsync('unpinned.example', { all: false });
+
+    expect(calls).toEqual([[null, PUBLIC_IPV4, 4]]);
+    expect(calls[0][1]).toBe(PUBLIC_IPV4);
   });
 
-  it('refuses once the pin expires', () => {
+  it('refreshes an expired pin from a fresh check instead of refusing', async () => {
     upstreamDispatcherFor('pinned.example', [PUBLIC_IPV4]);
     const now = Date.now();
     jest.spyOn(Date, 'now').mockReturnValue(now + 60_001);
+    lookupMock.mockResolvedValue([{ address: PUBLIC_IPV4, family: 4 }]);
 
-    const calls = runLookup('pinned.example', { all: false });
+    // The refresh runs a fresh DNS check of the host and answers the fresh list.
+    expect(await runLookupAsync('pinned.example', { all: false })).toEqual([
+      [null, PUBLIC_IPV4, 4],
+    ]);
+    expect(lookupMock).toHaveBeenCalledWith('pinned.example', { all: true, verbatim: true });
 
-    expect(refusalOf(calls).message).toContain('no live pin');
-
-    // The expired pin is gone, so a later lookup inside the old TTL still fails.
+    // The refreshed check stored a fresh list for the policy cache, so a new
+    // dispatcher call re-pins the host from that list without another lookup.
+    jest.clearAllMocks();
+    lookupMock.mockResolvedValue([{ address: PUBLIC_IPV4, family: 4 }]);
+    upstreamDispatcherFor('pinned.example', [PUBLIC_IPV4]);
     jest.restoreAllMocks();
-    expect(refusalOf(runLookup('pinned.example', { all: false })).code).toBe(
-      'ERR_UPSTREAM_ADDRESS_UNVERIFIED'
-    );
+    expect(runLookup('pinned.example', { all: false })).toEqual([[null, PUBLIC_IPV4, 4]]);
+  });
+
+  it('refuses a stale pin whose fresh check answers a non-public address', async () => {
+    upstreamDispatcherFor('pinned.example', [PUBLIC_IPV4]);
+    jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 60_001);
+    lookupMock.mockResolvedValue([{ address: '10.1.2.3', family: 4 }]);
+
+    const calls = await runLookupAsync('pinned.example', { all: false });
+
+    const error = refusalOf(calls);
+    expect(error.message).toContain('the refreshed check found no address');
+  });
+
+  it('refuses a stale pin whose fresh check cannot resolve the host', async () => {
+    upstreamDispatcherFor('pinned.example', [PUBLIC_IPV4]);
+    jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 60_001);
+    lookupMock.mockRejectedValue(new Error('getaddrinfo ENOTFOUND'));
+
+    const calls = await runLookupAsync('pinned.example', { all: false });
+
+    const error = refusalOf(calls);
+    expect(error.message).toContain('the refreshed check found no address');
+  });
+
+  it('refuses an unpinned host whose fresh check answers a non-public address', async () => {
+    lookupMock.mockResolvedValue([{ address: '10.1.2.3', family: 4 }]);
+
+    const calls = await runLookupAsync('unpinned.example', { all: false });
+
+    const error = refusalOf(calls);
+    expect(error.message).toContain('the refreshed check found no address');
   });
 });
 
@@ -194,10 +252,10 @@ describe('pinned connections and fetch', () => {
     jest.restoreAllMocks();
   });
 
-  it('fails the fetch with the unverified code when the pin is gone', async () => {
+  it('fails the fetch with the unverified code when the refresh cannot verify the host', async () => {
     const dispatcher = upstreamDispatcherFor('pinned.example', [PUBLIC_IPV4]);
-    const now = Date.now();
-    jest.spyOn(Date, 'now').mockReturnValue(now + 60_001);
+    jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 60_001);
+    lookupMock.mockRejectedValue(new Error('getaddrinfo ENOTFOUND'));
 
     // The package's fetch, not the global one: both live in this module realm,
     // so the rejection's cause keeps the error object the lookup threw.

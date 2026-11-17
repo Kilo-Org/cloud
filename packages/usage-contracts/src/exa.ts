@@ -30,9 +30,11 @@ export const EXA_USAGE_TYPE_MAX_LENGTH = 128;
 /**
  * One call returns at most 100 requested pages (`ids`, or `numResults` for a search), each with up
  * to 100 crawled subpages, and bills every returned page once per content type the request asked
- * for. At the published rates that is about $30 for the largest real call, so this is a plausible
- * per-call maximum rather than a price list: a larger value is not one Exa call's cost and must not
- * reach the ledger or a balance. A real Exa request never produces a record this schema rejects.
+ * for. At the published rates that is about $30 for the largest real call. The constant is $100,
+ * a deliberate 3x headroom over that worst case so a pricing change or an unexpected page count
+ * cannot reject a real record; it stays a plausible per-call maximum rather than a price list: a
+ * larger value is not one Exa call's cost and must not reach the ledger or a balance. A real Exa
+ * request never produces a record this schema rejects.
  */
 export const EXA_MAX_COST_MICRODOLLARS_PER_CALL = 100_000_000;
 

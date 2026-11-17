@@ -15,7 +15,7 @@ import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { captureException } from '@sentry/nextjs';
 import { describeDatabaseError } from '@kilocode/web-shared/lib/ai-gateway/usage-record-diagnostics';
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
-import { buildExaUsageRecord } from '@/lib/exa-usage-record';
+import { buildExaUsageRecord, ExaCostAbovePerCallMaximumError } from '@/lib/exa-usage-record';
 import {
   isExaUsageQueueFallbackAvailable,
   queueExaUsageAfterFailedWrite,
@@ -235,11 +235,13 @@ export async function POST(request: NextRequest) {
       const code =
         described.code !== null && /^[0-9A-Z]{5}$/.test(described.code) ? described.code : null;
       const stage =
-        record === undefined
-          ? 'cost_parse'
-          : error instanceof ExaUsageWriteSkippedError
-            ? 'write_skipped'
-            : 'record_write';
+        error instanceof ExaCostAbovePerCallMaximumError
+          ? 'cost_above_max'
+          : record === undefined
+            ? 'cost_parse'
+            : error instanceof ExaUsageWriteSkippedError
+              ? 'write_skipped'
+              : 'record_write';
       console.error('[exa] usage record failed; charge may be unrecorded', {
         exa_path: exaPath,
         payer_kind: organizationId ? 'organization' : 'personal',

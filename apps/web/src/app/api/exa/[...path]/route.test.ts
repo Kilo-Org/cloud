@@ -579,6 +579,7 @@ describe('POST /api/exa/[...path]', () => {
           costDollars: { total: (EXA_MAX_COST_MICRODOLLARS_PER_CALL + 1) / 1_000_000 },
         })
       );
+      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
 
       const { POST } = await import('./route');
       await POST(makeRequest('/search') as never);
@@ -590,6 +591,7 @@ describe('POST /api/exa/[...path]', () => {
         ExaCostAbovePerCallMaximumError
       );
       expect(mockedFetch).toHaveBeenCalledTimes(1);
+      expect(consoleError.mock.calls[0][1]).toMatchObject({ stage: 'cost_above_max' });
     });
 
     it('passes featureId from header and type from body to recordExaUsage', async () => {

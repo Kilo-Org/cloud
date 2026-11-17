@@ -57,8 +57,12 @@ const state = vi.hoisted((): ScreenState => ({
 vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
+  useColorScheme: () => 'light',
   Alert: { alert: state.alert },
 }));
+// RowSkeleton renders through RowFrame, whose trailing renderer calls the
+// selection haptic; the real module loads expo-haptics' runtime (`__DEV__`).
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
 vi.mock('expo-router', () => ({ useLocalSearchParams: () => state.params }));
 vi.mock('@tanstack/react-query', async importOriginal => {
   // The provider and client stay real so renderWithProviders works; only the
@@ -102,7 +106,7 @@ vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'Invalid
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
-vi.mock('@/components/ui/icons', () => ({ Copy: 'Copy' }));
+vi.mock('@/components/ui/icons', () => ({ Check: 'Check', Copy: 'Copy' }));
 vi.mock('@/components/agents/use-message-copy', () => ({ performCopy: state.performCopy }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#666666' }),
@@ -178,14 +182,15 @@ describe('ReportReceiptScreen', () => {
       throw new Error('missing copy control');
     }
 
-    // Every value row cuts at the middle, so both ends of a truncated value
-    // stay visible, and the copy control carries the id whole.
+    // The id cuts at the middle, so both ends of a truncated identifier stay
+    // visible; the status values are prose and cut at the tail, where the word
+    // that carries the meaning sits.
     expect(textNode(root, RECEIPT_ID).props.numberOfLines).toBe(1);
     expect(textNode(root, RECEIPT_ID).props.ellipsizeMode).toBe('middle');
     expect(textNode(root, 'Received').props.numberOfLines).toBe(1);
-    expect(textNode(root, 'Received').props.ellipsizeMode).toBe('middle');
+    expect(textNode(root, 'Received').props.ellipsizeMode).toBe('tail');
     expect(textNode(root, 'None submitted').props.numberOfLines).toBe(1);
-    expect(textNode(root, 'None submitted').props.ellipsizeMode).toBe('middle');
+    expect(textNode(root, 'None submitted').props.ellipsizeMode).toBe('tail');
 
     act(() => {
       (copyControl.props.onPress as () => void)();

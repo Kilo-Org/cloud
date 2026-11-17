@@ -74,10 +74,14 @@ vi.mock('expo-notifications', () => ({
 }));
 vi.mock('expo-application', () => ({ nativeApplicationVersion: '1.0.4' }));
 vi.mock('sonner-native', () => ({ toast: { error: toastError, success: vi.fn() } }));
+// RowFrame's trailing renderer calls the selection haptic; the real module loads
+// expo-haptics' runtime, which reads `__DEV__`.
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
 vi.mock('@/components/ui/icons', () => ({
   Bell: 'Bell',
   BellOff: 'BellOff',
   Bot: 'Bot',
+  Check: 'Check',
   CircleCheck: 'CircleCheck',
   KeyRound: 'KeyRound',
   ListTodo: 'ListTodo',

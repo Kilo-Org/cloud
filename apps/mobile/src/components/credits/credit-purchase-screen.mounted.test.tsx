@@ -7,6 +7,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { i18n } from '@/i18n';
 import { DetailScreenScrollView } from '@/components/detail-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { ROW_FRAME_CLASS, ROW_FRAME_STACK_CLASS } from '@/components/ui/row-frame';
+import { ScreenFooter } from '@/components/ui/screen-footer';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { type BackendStoreCreditProduct } from '@/lib/credits/store-products';
 import {
   BALANCE_RETRY_FRAME_DP,
@@ -98,6 +101,7 @@ vi.mock('react-native', () => ({
   Platform: mockedPlatform,
   Pressable: 'Pressable',
   View: 'View',
+  useColorScheme: () => 'light',
   useWindowDimensions: () => ({
     width: 411,
     height: 914,
@@ -126,6 +130,10 @@ vi.mock('@/components/detail-screen', () => ({
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+// The row's leading icon and the row-check the frame can draw. The real barrel
+// loads lucide's NativeWind-processed modules, which this project's transform
+// cannot parse; the tests read structure, not icon internals.
+vi.mock('@/components/ui/icons', () => ({ Check: 'Check', Wallet: 'Wallet' }));
 vi.mock('@/lib/a11y/status-announcement', () => ({
   useStatusAnnouncement: statusAnnouncement.useStatusAnnouncement,
 }));
@@ -247,6 +255,21 @@ function packRows(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactT
       typeof (node.props as { accessibilityLabel?: unknown }).accessibilityLabel === 'string' &&
       (node.props as { accessibilityLabel: string }).accessibilityLabel.includes('of credits')
   );
+}
+
+/**
+ * The row primitive's own frame among a tree's nodes. The loaded row
+ * (`ConfigureRow`) and its placeholder (`RowSkeleton`) render the same frame
+ * class, so a reservation matches the row it stands in for by construction
+ * rather than by a copied height.
+ */
+function frameClasses(renderer: TestRenderer.ReactTestRenderer): string[] {
+  return renderer.root
+    .findAll(node => {
+      const className: unknown = (node.props as { className?: unknown }).className;
+      return className === ROW_FRAME_CLASS || className === ROW_FRAME_STACK_CLASS;
+    })
+    .map(node => String(node.props.className));
 }
 
 function legalLinkNodes(scope: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
@@ -905,7 +928,9 @@ describe('CreditPurchaseScreen', () => {
 
   it('grows the error clearance with the text it clears', async () => {
     // The card is text, so the room reserved beneath it must grow with the same
-    // scale; a fixed clearance would let a raised scale cover the content.
+    // scale; a fixed clearance would let a raised scale cover the content. The
+    // room exists only while the card does, so the state sets its message.
+    owner.errorMessageKey = 'credits.purchaseOwnedByAnotherAccount';
     const contentHeights = async (): Promise<number[]> => {
       const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
       await waitFor(() => packRows(renderer).length === 4);
@@ -968,7 +993,7 @@ describe('CreditPurchaseScreen', () => {
     // which would take the content gap and gutter with it.
     expect(scroller.props.contentContainerStyle).toBeUndefined();
     const contentStyle: unknown = scroller.props.contentContainerClassName;
-    expect(String(contentStyle)).toContain('gap-3');
+    expect(String(contentStyle)).toContain(SCREEN_BODY_CLASS);
 
     const spacers = renderer.root.findAll(node => {
       const style: unknown = node.props.style;
@@ -992,16 +1017,25 @@ describe('CreditPurchaseScreen', () => {
     expect(spacerHeight).toBeGreaterThanOrEqual(cardText);
 
     const [status] = renderer.root.findAllByType(AccessibleStatus);
-    const inner = status?.parent;
-    const outer = inner?.parent;
+    // The status sits inside the floating `Card`; the gutter wrapper is the
+    // first ancestor that owns the page gutter, and the insets sit on the
+    // wrapper outside it.
+    const ancestors: TestRenderer.ReactTestInstance[] = [];
+    for (let node = status?.parent ?? null; node !== null; node = node.parent) {
+      ancestors.push(node);
+    }
+    const gutter = ancestors.find(candidate =>
+      String(candidate.props.className).includes('px-4')
+    );
+    const outer = gutter?.parent;
     // The insets and the gutter sit on separate wrappers: an inline padding on
     // one node would replace its className padding.
-    expect(String(inner?.props.className)).toContain('px-4');
+    expect(gutter).toBeDefined();
     expect(String(outer?.props.className)).toContain('bottom-0');
-    // The card keeps only its 8 dp gap to the footer, which owns the
-    // home-indicator band, so the gap is a theme length rather than the inset.
-    const cardBottomGap = await compiledLengthDp(String(inner?.props.className), 'paddingBottom');
-    expect(cardBottomGap).toBe(8);
+    // The card keeps only its half-step gap to the footer, which owns the
+    // home-indicator band; `pb-2` compiles to 7pt at the app's 14pt rem.
+    const cardBottomGap = await compiledLengthDp(String(gutter?.props.className), 'paddingBottom');
+    expect(cardBottomGap).toBe(7);
     unmount();
   });
 
@@ -1157,8 +1191,9 @@ describe('CreditPurchaseScreen', () => {
         legalInScroller: legalLinkNodes(scroller).length,
         descriptionInFooter: footer ? descriptionsIn(footer) : 0,
         legalInFooter: footer ? legalLinkNodes(footer).length : 0,
-        footerIsScreenRootLastChild:
-          footer !== undefined && String(footer.props.className).includes('border-t'),
+        // The footer is the screen's last child and renders `ScreenFooter`,
+        // which owns the hairline the old inline View carried.
+        footerIsScreenRootLastChild: footer?.type === ScreenFooter,
         footerUnderScrollArea:
           screenChildren.at(-2)?.findAllByType(DetailScreenScrollView).length === 1,
       });
@@ -1208,10 +1243,10 @@ describe('CreditPurchaseScreen', () => {
       const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
       await waitFor(() => packRows(renderer).length === 4);
       const screenRoot = renderer.root.findByProps({ testID: 'credit-purchase-screen' });
-      const footer = screenRoot.children.findLast(
-        (child): child is TestRenderer.ReactTestInstance => typeof child !== 'string'
-      );
-      const style: unknown = footer?.props.style;
+      // The reserved band is on the footer's own bar: `ScreenFooter` is a
+      // component, so its host View carries the style the test reads.
+      const bar = screenRoot.findByType(ScreenFooter).findByType('View');
+      const style: unknown = bar.props.style;
       const padding =
         typeof style === 'object' && style !== null && 'paddingBottom' in style
           ? style.paddingBottom
@@ -1227,6 +1262,40 @@ describe('CreditPurchaseScreen', () => {
     safeAreaInsets.bottom = 0;
   });
 
+  it('reserves a pack row height with its placeholder at the default and stacked scales', async () => {
+    // A row and its placeholder render the same row primitive, so the loading
+    // reservation is the loaded row's geometry at both the default scale and
+    // the scale where the row stacks its tile above the copy.
+    dimensions.fontScale = 1;
+    const framesOfLoaded = async (): Promise<string[]> => {
+      owner.connected = true;
+      const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+      await waitFor(() => packRows(renderer).length === 4);
+      const classes = frameClasses(renderer);
+      unmount();
+      return classes;
+    };
+    const framesOfPlaceholders = async (): Promise<string[]> => {
+      owner.connected = false;
+      const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+      await waitFor(() => placeholderShells(renderer).length === 4);
+      const classes = frameClasses(renderer);
+      unmount();
+      return classes;
+    };
+
+    for (const fontScale of [1, 1.8]) {
+      dimensions.fontScale = fontScale;
+      const loaded = await framesOfLoaded();
+      vi.clearAllMocks();
+      const placeholders = await framesOfPlaceholders();
+      expect(loaded, `font scale ${fontScale}`).toHaveLength(4);
+      expect(placeholders, `font scale ${fontScale}`).toHaveLength(4);
+      expect(new Set([...loaded, ...placeholders]).size, `font scale ${fontScale}`).toBe(1);
+    }
+    dimensions.fontScale = 1;
+  });
+
   it('caps every text block a pack row sizes', async () => {
     // The row's height is its capped text plus its spacing, so an uncapped line
     // would grow the row past the height it reserves.
@@ -1235,10 +1304,10 @@ describe('CreditPurchaseScreen', () => {
     const caps = renderer.root
       .findAll(node => typeof node.props.numberOfLines === 'number')
       .map(node => Number(node.props.numberOfLines));
-    // Every row caps its title to one line; the store price holds its own
-    // `shrink-0` line and the state line holds one short phrase instead of a
-    // separate capped line.
-    expect(caps.filter(cap => cap === 1)).toHaveLength(4);
+    // Every row caps its title and its one state line to a line each, so the
+    // store price's own `shrink-0` line stays the only unclamped one and no row
+    // grows when the copy changes.
+    expect(caps.filter(cap => cap === 1)).toHaveLength(8);
     unmount();
   });
 
@@ -1488,20 +1557,18 @@ describe('CreditPurchaseScreen', () => {
         (row.props as { accessibilityState?: { busy?: boolean } }).accessibilityState?.busy === true
     );
     const busyTexts = busyRow?.findAll(node => String(node.type) === 'Text') ?? [];
+    // The row's text block comes before its trailing price, and the state takes
+    // the subtitle line in place of the note.
     expect(busyTexts.map(node => node.props.children)).toEqual([
       `Add ${packAmount('$10.00')} of credits`,
-      '$10.99',
       'Completing purchase',
+      '$10.99',
     ]);
-    // The label takes the row's last line in place of the expiry note, and that
-    // line keeps one height for both, so the row does not change height.
-    const busyLine = busyRow?.findAll(
-      node =>
-        String(node.type) === 'View' &&
-        String((node.props as { className?: string }).className).includes('min-h-5')
-    );
+    // The label takes the row's subtitle, capped to the one line the note keeps,
+    // so the row does not change height.
+    const busyLine = busyTexts.filter(node => node.props.children === 'Completing purchase');
     expect(busyLine).toHaveLength(1);
-    expect(busyLine?.[0]?.findAll(node => String(node.type) === 'Text')).toHaveLength(1);
+    expect(busyLine[0]?.props.numberOfLines).toBe(1);
     expect(busyTexts).toHaveLength(3);
     expect(
       (busyRow?.props as { accessibilityLabel?: string } | undefined)?.accessibilityLabel
@@ -1639,6 +1706,11 @@ describe('CreditPurchaseScreen unresolved purchase card', () => {
 
   function cards(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance[] {
     return renderer.root.findAll(node => {
+      // The host element only: a `Card` renders one View that carries the
+      // testID, so counting the composite as well would count it twice.
+      if (typeof node.type !== 'string') {
+        return false;
+      }
       const testID = (node.props as { testID?: string }).testID;
       return testID === cardId || testID === waitCardId || testID === 'credit-pack-placeholder';
     });

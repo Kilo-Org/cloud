@@ -14,16 +14,18 @@ index 6c175e0bf9af15c8fd9d87cdefda7363e41fbf9d..db30688ad03e0aa25b70833ac4b8b314
  }
  export declare namespace Checkout {
 diff --git a/cjs/resources/Checkout/Sessions.js b/cjs/resources/Checkout/Sessions.js
-index 4d894ef842b16b2c3fd8cb03df5730e7971d297d..73d2bb1a6ab78308721f27cc0024e759560f3091 100644
+index 4d894ef842b16b2c3fd8cb03df5730e7971d297d..12ee2dafdd965e466aa65880c0d1fb97f25a7b97 100644
 --- a/cjs/resources/Checkout/Sessions.js
 +++ b/cjs/resources/Checkout/Sessions.js
-@@ -407,6 +407,10 @@ class SessionResource extends StripeResource_js_1.StripeResource {
+@@ -407,6 +407,12 @@ class SessionResource extends StripeResource_js_1.StripeResource {
       * After it expires, a customer can't complete a Checkout Session and customers loading the Checkout Session see a message saying the Checkout Session is expired.
       */
      expire(id, params, options) {
-+        if (options === undefined && params != null && typeof params === 'object' && Object.keys(params).length === 1 && typeof params.timeout === 'number') {
++        if (options === undefined && params != null && typeof params === 'object' && typeof params.timeout === 'number') {
 +            options = { timeout: params.timeout };
-+            params = {};
++            const rest = { ...params };
++            delete rest.timeout;
++            params = rest;
 +        }
          return this._makeRequest('POST', `/v1/checkout/sessions/${encodeURIComponent(id)}/expire`, params, options, {
              responseSchema: {
@@ -70,16 +72,18 @@ index 6c175e0bf9af15c8fd9d87cdefda7363e41fbf9d..db30688ad03e0aa25b70833ac4b8b314
  }
  export declare namespace Checkout {
 diff --git a/esm/resources/Checkout/Sessions.js b/esm/resources/Checkout/Sessions.js
-index 549ed237d1d8a566468a5d8827cf3d6a98958494..ce8c2d1cf2ae876ccdd972d0834d77e9dd534bcf 100644
+index 549ed237d1d8a566468a5d8827cf3d6a98958494..a85c9964ef0cc9937beea9cdfeda36caed4ad403 100644
 --- a/esm/resources/Checkout/Sessions.js
 +++ b/esm/resources/Checkout/Sessions.js
-@@ -404,6 +404,10 @@ export class SessionResource extends StripeResource {
+@@ -404,6 +404,12 @@ export class SessionResource extends StripeResource {
       * After it expires, a customer can't complete a Checkout Session and customers loading the Checkout Session see a message saying the Checkout Session is expired.
       */
      expire(id, params, options) {
-+        if (options === undefined && params != null && typeof params === 'object' && Object.keys(params).length === 1 && typeof params.timeout === 'number') {
++        if (options === undefined && params != null && typeof params === 'object' && typeof params.timeout === 'number') {
 +            options = { timeout: params.timeout };
-+            params = {};
++            const rest = { ...params };
++            delete rest.timeout;
++            params = rest;
 +        }
          return this._makeRequest('POST', `/v1/checkout/sessions/${encodeURIComponent(id)}/expire`, params, options, {
              responseSchema: {

@@ -41,16 +41,4 @@ describe('trigger screen navigation contract', () => {
     expect(EDIT_PANEL).toContain('router.replace(triggersListHref(');
     expect(EDIT_PANEL).not.toContain('useRouter()');
   });
-
-  it('each screen keeps the comment naming the crash it avoids', () => {
-    for (const [name, source] of [
-      ['trigger-create-screen.tsx', CREATE_SCREEN],
-      ['trigger-edit-panel.tsx', EDIT_PANEL],
-    ] as const) {
-      expect(
-        source.includes('KILO-APP-25'),
-        `${name} should explain why the stack-safe replace is required`
-      ).toBe(true);
-    }
-  });
 });

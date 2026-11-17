@@ -107,6 +107,15 @@ describe('maxEndpointPricing', () => {
     ).toEqual({ prompt: '0.000001', completion: '0.000003' });
   });
 
+  it('does not add zero prices the first side lacks', () => {
+    expect(
+      maxEndpointPricing(
+        { prompt: '0.000001', completion: '0.000002' },
+        { prompt: '0.000001', completion: '0.000002', image: '0', web_search: '0' }
+      )
+    ).toEqual({ prompt: '0.000001', completion: '0.000002' });
+  });
+
   it('does not modify its arguments', () => {
     const a = { prompt: '0.000001', completion: '0.000002' };
     const b = { prompt: '0.000002', completion: '0.000001' };

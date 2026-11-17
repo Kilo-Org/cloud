@@ -2975,6 +2975,7 @@
     "signOutThisDevice": "Jáde lórí ẹ̀rọ yìí",
     "signOutSessionLabel": "Jáde lórí {{device}}, wọlé {{signedIn}}, a rí i gbẹ̀yìn {{lastSeen}}",
     "sessionSignedOut": "A ti jáde kúrò nínú ìgbà ìwọlé náà.",
+    "sessionSignOutFailed": "A kò lè jáde kúrò nínú ìgbà ìwọlé yìí. Tún gbìyànjú.",
     "signOutThisDeviceTitle": "Jáde lórí ẹ̀rọ yìí?",
     "signOutThisSessionTitle": "Jáde kúrò nínú ìgbà ìwọlé yìí?",
     "signOutThisSessionMessage": "A ó mú {{device}} jáde. A rí i gbẹ̀yìn {{lastSeen}}. Ẹ̀rọ náà ṣì lè lo API fún àkókò tó tó wákàtí kan.",

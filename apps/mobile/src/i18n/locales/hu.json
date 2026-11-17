@@ -2974,6 +2974,7 @@
     "signOutThisDevice": "Kijelentkezés erről az eszközről",
     "signOutSessionLabel": "Kijelentkezés innen: {{device}}, bejelentkezés: {{signedIn}}, utolsó aktivitás: {{lastSeen}}",
     "sessionSignedOut": "Sikeres kijelentkezés a munkamenetből.",
+    "sessionSignOutFailed": "Nem sikerült kijelentkezni ebből a munkamenetből. Próbáld újra.",
     "signOutThisDeviceTitle": "Kijelentkezel erről az eszközről?",
     "signOutThisSessionTitle": "Kijelentkezel ebből a munkamenetből?",
     "signOutThisSessionMessage": "{{device}} ki lesz jelentkeztetve. Utolsó aktivitás: {{lastSeen}}. Az API-hozzáférése még legfeljebb egy óráig megmaradhat.",

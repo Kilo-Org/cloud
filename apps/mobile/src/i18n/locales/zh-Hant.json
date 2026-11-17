@@ -2432,6 +2432,7 @@
     "signOutThisDevice": "登出此裝置",
     "signOutSessionLabel": "登出 {{device}}，登入時間：{{signedIn}}，最後上線：{{lastSeen}}",
     "sessionSignedOut": "工作階段已登出。",
+    "sessionSignOutFailed": "無法登出此工作階段。請再試一次。",
     "signOutThisDeviceTitle": "登出此裝置？",
     "signOutThisSessionTitle": "登出此工作階段？",
     "signOutThisSessionMessage": "{{device}} 將登出，最後上線：{{lastSeen}}。最長仍可存取 API 一小時。",

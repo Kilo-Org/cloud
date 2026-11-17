@@ -2974,6 +2974,7 @@
     "signOutThisDevice": "ออกจากระบบบนอุปกรณ์นี้",
     "signOutSessionLabel": "ออกจากระบบบน{{device}}, เข้าสู่ระบบเมื่อ {{signedIn}}, ใช้งานล่าสุด {{lastSeen}}",
     "sessionSignedOut": "ออกจากระบบสำหรับเซสชันนี้แล้ว",
+    "sessionSignOutFailed": "ไม่สามารถออกจากระบบสำหรับเซสชันนี้ได้ ลองอีกครั้ง",
     "signOutThisDeviceTitle": "ออกจากระบบบนอุปกรณ์นี้หรือไม่?",
     "signOutThisSessionTitle": "ออกจากระบบสำหรับเซสชันนี้หรือไม่?",
     "signOutThisSessionMessage": "ระบบจะให้ {{device}} ออกจากระบบ ใช้งานล่าสุด {{lastSeen}} แต่อุปกรณ์นั้นยังเข้าถึง API ได้อีกไม่เกินหนึ่งชั่วโมง",

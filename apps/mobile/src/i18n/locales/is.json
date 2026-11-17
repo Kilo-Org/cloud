@@ -2974,6 +2974,7 @@
     "signOutThisDevice": "Skrá þetta tæki út",
     "signOutSessionLabel": "Skrá {{device}} út, innskráning {{signedIn}}, síðast virkt {{lastSeen}}",
     "sessionSignedOut": "Skráð var út úr lotunni.",
+    "sessionSignOutFailed": "Ekki tókst að skrá þessa lotu út. Reyndu aftur.",
     "signOutThisDeviceTitle": "Skrá þetta tæki út?",
     "signOutThisSessionTitle": "Skrá þessa lotu út?",
     "signOutThisSessionMessage": "{{device}} verður skráð út. Síðast virkt {{lastSeen}}. Það getur haldið API-aðgangi í allt að klukkustund.",

@@ -2974,6 +2974,7 @@
     "signOutThisDevice": "Դուրս գալ այս սարքից",
     "signOutSessionLabel": "Դուրս գալ {{device}} սարքից, մուտք՝ {{signedIn}}, վերջին ակտիվություն՝ {{lastSeen}}",
     "sessionSignedOut": "Նստաշրջանից դուրս եկաք։",
+    "sessionSignOutFailed": "Չհաջողվեց դուրս գալ այս նստաշրջանից։ Փորձեք կրկին։",
     "signOutThisDeviceTitle": "Դո՞ւրս գալ այս սարքի հաշվից",
     "signOutThisSessionTitle": "Դո՞ւրս գալ այս նստաշրջանից",
     "signOutThisSessionMessage": "{{device}} դուրս կգա հաշվից։ Վերջին ակտիվությունը՝ {{lastSeen}}։ Այն կարող է պահպանել API-ի հասանելիությունը մինչև մեկ ժամ։",

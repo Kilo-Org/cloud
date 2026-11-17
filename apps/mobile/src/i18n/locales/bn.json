@@ -2975,6 +2975,7 @@
     "signOutThisDevice": "এই ডিভাইস থেকে সাইন আউট করুন",
     "signOutSessionLabel": "সাইন আউট করুন {{device}}, সাইন ইন {{signedIn}}, সর্বশেষ দেখা {{lastSeen}}",
     "sessionSignedOut": "সেশন সাইন আউট হয়েছে।",
+    "sessionSignOutFailed": "এই সেশন থেকে সাইন আউট করা যায়নি। আবার চেষ্টা করুন।",
     "signOutThisDeviceTitle": "এই ডিভাইস থেকে সাইন আউট করবেন?",
     "signOutThisSessionTitle": "এই সেশন থেকে সাইন আউট করবেন?",
     "signOutThisSessionMessage": "{{device}} থেকে সাইন আউট করা হবে। সর্বশেষ দেখা {{lastSeen}}। এরপরও ডিভাইসটি সর্বোচ্চ এক ঘণ্টা API অ্যাক্সেস করতে পারবে।",

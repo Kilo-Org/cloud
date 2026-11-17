@@ -2974,6 +2974,7 @@
     "signOutThisDevice": "ఈ పరికరం నుండి సైన్ అవుట్ చేయండి",
     "signOutSessionLabel": "{{device}} నుండి సైన్ అవుట్ చేయండి, సైన్ ఇన్ చేసిన సమయం: {{signedIn}}, చివరిగా కనిపించిన సమయం: {{lastSeen}}",
     "sessionSignedOut": "సెషన్ సైన్ అవుట్ చేయబడింది.",
+    "sessionSignOutFailed": "ఈ సెషన్ నుండి సైన్ అవుట్ చేయలేకపోయాము. మళ్లీ ప్రయత్నించండి.",
     "signOutThisDeviceTitle": "ఈ పరికరం నుండి సైన్ అవుట్ చేయాలా?",
     "signOutThisSessionTitle": "ఈ సెషన్ నుండి సైన్ అవుట్ చేయాలా?",
     "signOutThisSessionMessage": "{{device}} నుండి సైన్ అవుట్ చేస్తాము. చివరిగా కనిపించిన సమయం: {{lastSeen}}. అయినా మరో గంట వరకు దానికి API యాక్సెస్ ఉండవచ్చు.",

@@ -2975,6 +2975,7 @@
     "signOutThisDevice": "Takiputa i tēnei pūrere",
     "signOutSessionLabel": "Takiputa i a {{device}}, i takiuru i te {{signedIn}}, i kitea whakamutungatia i te {{lastSeen}}",
     "sessionSignedOut": "Kua takiputaina te wātū.",
+    "sessionSignOutFailed": "Kāore i taea te takiputa i tēnei wātū. Whakamātau anō.",
     "signOutThisDeviceTitle": "Takiputa i tēnei pūrere?",
     "signOutThisSessionTitle": "Takiputa i tēnei wātū?",
     "signOutThisSessionMessage": "Ka takiputaina a {{device}}. I kitea whakamutungatia i te {{lastSeen}}. Ka taea tonu e taua pūrere te uru ki te API mō te kotahi hāora te mōrahi.",

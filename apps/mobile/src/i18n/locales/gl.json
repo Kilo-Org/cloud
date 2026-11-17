@@ -2974,6 +2974,7 @@
     "signOutThisDevice": "Pechar a sesión deste dispositivo",
     "signOutSessionLabel": "Pechar a sesión de {{device}}, inicio de sesión: {{signedIn}}, última actividade: {{lastSeen}}",
     "sessionSignedOut": "Sesión pechada.",
+    "sessionSignOutFailed": "Non se puido pechar esta sesión. Téntao de novo.",
     "signOutThisDeviceTitle": "Pechar a sesión deste dispositivo?",
     "signOutThisSessionTitle": "Pechar esta sesión?",
     "signOutThisSessionMessage": "Pecharase a sesión en {{device}}. Última actividade: {{lastSeen}}. O dispositivo pode conservar o acceso á API durante unha hora como máximo.",

@@ -2975,6 +2975,7 @@
     "signOutThisDevice": "Teken hierdie toestel uit",
     "signOutSessionLabel": "Teken {{device}} uit, ingeteken {{signedIn}}, laas gesien {{lastSeen}}",
     "sessionSignedOut": "Sessie uitgeteken.",
+    "sessionSignOutFailed": "Kon nie hierdie sessie uitteken nie. Probeer weer.",
     "signOutThisDeviceTitle": "Hierdie toestel uitteken?",
     "signOutThisSessionTitle": "Hierdie sessie uitteken?",
     "signOutThisSessionMessage": "{{device}} sal uitgeteken word. Laas gesien {{lastSeen}}. Dit kan nog tot 'n uur lank API-toegang behou.",

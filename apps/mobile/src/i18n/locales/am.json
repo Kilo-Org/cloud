@@ -2975,6 +2975,7 @@
     "signOutThisDevice": "ከዚህ መሣሪያ ይውጡ",
     "signOutSessionLabel": "ከ{{device}} ይውጡ፣ የገቡበት ጊዜ፦ {{signedIn}}፣ ለመጨረሻ ጊዜ የታየበት፦ {{lastSeen}}",
     "sessionSignedOut": "ከክፍለ ጊዜው ወጥተዋል።",
+    "sessionSignOutFailed": "ከዚህ ክፍለ ጊዜ መውጣት አልተቻለም። እንደገና ይሞክሩ።",
     "signOutThisDeviceTitle": "ከዚህ መሣሪያ መውጣት ይፈልጋሉ?",
     "signOutThisSessionTitle": "ከዚህ ክፍለ ጊዜ መውጣት ይፈልጋሉ?",
     "signOutThisSessionMessage": "{{device}} ከመለያዎ ይወጣል። ለመጨረሻ ጊዜ የታየበት፦ {{lastSeen}}። እስከ አንድ ሰዓት ድረስ APIን መጠቀም ሊቀጥል ይችላል።",

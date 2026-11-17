@@ -3035,6 +3035,7 @@
     "signOutThisDevice": "Terminar sessão neste dispositivo",
     "signOutSessionLabel": "Terminar sessão em {{device}}, início de sessão: {{signedIn}}, última atividade: {{lastSeen}}",
     "sessionSignedOut": "Sessão terminada.",
+    "sessionSignOutFailed": "Não foi possível terminar esta sessão. Tente novamente.",
     "signOutThisDeviceTitle": "Terminar sessão neste dispositivo?",
     "signOutThisSessionTitle": "Terminar esta sessão?",
     "signOutThisSessionMessage": "A sessão em {{device}} será terminada. Última atividade: {{lastSeen}}. O dispositivo pode manter o acesso à API durante até uma hora.",

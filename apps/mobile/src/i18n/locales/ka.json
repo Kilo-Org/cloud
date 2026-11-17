@@ -2974,6 +2974,7 @@
     "signOutThisDevice": "ამ მოწყობილობიდან გასვლა",
     "signOutSessionLabel": "{{device}}-დან გასვლა, შესვლა: {{signedIn}}, ბოლო აქტივობა: {{lastSeen}}",
     "sessionSignedOut": "სესია დაიხურა.",
+    "sessionSignOutFailed": "ამ სესიიდან გასვლა ვერ მოხერხდა. სცადეთ ხელახლა.",
     "signOutThisDeviceTitle": "გავიდეთ ამ მოწყობილობიდან?",
     "signOutThisSessionTitle": "გავიდეთ ამ სესიიდან?",
     "signOutThisSessionMessage": "{{device}} ანგარიშიდან გახვალთ. ბოლო აქტივობა: {{lastSeen}}. მოწყობილობას API-ზე წვდომა კიდევ ერთ საათამდე შეიძლება შეუნარჩუნდეს.",

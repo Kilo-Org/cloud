@@ -2974,6 +2974,7 @@
     "signOutThisDevice": "Log ud af denne enhed",
     "signOutSessionLabel": "Log ud af {{device}}, logget ind {{signedIn}}, sidst set {{lastSeen}}",
     "sessionSignedOut": "Sessionen er logget ud.",
+    "sessionSignOutFailed": "Kunne ikke logge ud af denne session. Prøv igen.",
     "signOutThisDeviceTitle": "Log ud af denne enhed?",
     "signOutThisSessionTitle": "Log ud af denne session?",
     "signOutThisSessionMessage": "{{device}} bliver logget ud. Sidst set {{lastSeen}}. Enheden kan stadig have API-adgang i op til en time.",

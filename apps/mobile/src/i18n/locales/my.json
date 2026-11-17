@@ -2975,6 +2975,7 @@
     "signOutThisDevice": "ဤစက်မှ အကောင့်ထွက်ပါ",
     "signOutSessionLabel": "{{device}} မှ အကောင့်ထွက်ပါ၊ အကောင့်ဝင်ချိန် {{signedIn}}၊ နောက်ဆုံးအသုံးပြုချိန် {{lastSeen}}",
     "sessionSignedOut": "စက်ရှင်မှ အကောင့်ထွက်ပြီးပါပြီ။",
+    "sessionSignOutFailed": "ဤစက်ရှင်မှ အကောင့်ထွက်၍ မရပါ။ ထပ်မံကြိုးစားပါ။",
     "signOutThisDeviceTitle": "ဤစက်မှ အကောင့်ထွက်မလား။",
     "signOutThisSessionTitle": "ဤစက်ရှင်မှ အကောင့်ထွက်မလား။",
     "signOutThisSessionMessage": "{{device}} မှ အကောင့်ထွက်ပါမည်။ နောက်ဆုံးအသုံးပြုချိန် {{lastSeen}}။ ထိုစက်တွင် API ဝင်ရောက်ခွင့် တစ်နာရီအထိ ဆက်ရှိနိုင်ပါသည်။",

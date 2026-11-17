@@ -3029,6 +3029,7 @@
     "signOutThisDevice": "Odjavi ovaj uređaj",
     "signOutSessionLabel": "Odjavi uređaj {{device}}, prijava: {{signedIn}}, poslednja aktivnost: {{lastSeen}}",
     "sessionSignedOut": "Sesija je odjavljena.",
+    "sessionSignOutFailed": "Nije moguće odjaviti ovu sesiju. Pokušaj ponovo.",
     "signOutThisDeviceTitle": "Odjaviti ovaj uređaj?",
     "signOutThisSessionTitle": "Odjaviti ovu sesiju?",
     "signOutThisSessionMessage": "Uređaj {{device}} će biti odjavljen. Poslednja aktivnost: {{lastSeen}}. Pristup API-ju može da ostane aktivan još najviše sat vremena.",

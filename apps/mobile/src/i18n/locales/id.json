@@ -2431,6 +2431,7 @@
     "signOutThisDevice": "Keluar dari perangkat ini",
     "signOutSessionLabel": "Keluar dari {{device}}, masuk {{signedIn}}, terakhir aktif {{lastSeen}}",
     "sessionSignedOut": "Sesi masuk telah diakhiri.",
+    "sessionSignOutFailed": "Tidak dapat keluar dari sesi ini. Coba lagi.",
     "signOutThisDeviceTitle": "Keluar dari perangkat ini?",
     "signOutThisSessionTitle": "Keluar dari sesi ini?",
     "signOutThisSessionMessage": "Sesi masuk di {{device}} akan diakhiri. Terakhir aktif {{lastSeen}}. Perangkat tersebut masih dapat mengakses API hingga satu jam.",

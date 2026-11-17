@@ -2975,6 +2975,7 @@
     "signOutThisDevice": "ഈ ഉപകരണത്തിൽ നിന്ന് സൈൻ ഔട്ട് ചെയ്യുക",
     "signOutSessionLabel": "{{device}}-ൽ നിന്ന് സൈൻ ഔട്ട് ചെയ്യുക, സൈൻ ഇൻ ചെയ്തത് {{signedIn}}, അവസാനം സജീവമായത് {{lastSeen}}",
     "sessionSignedOut": "സെഷൻ സൈൻ ഔട്ട് ചെയ്തു.",
+    "sessionSignOutFailed": "ഈ സെഷനിൽ നിന്ന് സൈൻ ഔട്ട് ചെയ്യാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക.",
     "signOutThisDeviceTitle": "ഈ ഉപകരണത്തിൽ നിന്ന് സൈൻ ഔട്ട് ചെയ്യണോ?",
     "signOutThisSessionTitle": "ഈ സെഷനിൽ നിന്ന് സൈൻ ഔട്ട് ചെയ്യണോ?",
     "signOutThisSessionMessage": "{{device}} സൈൻ ഔട്ട് ആകും. അവസാനം സജീവമായത് {{lastSeen}}. അതിൽ നിന്ന് ഒരു മണിക്കൂർ വരെ API ഉപയോഗിക്കാൻ കഴിഞ്ഞേക്കാം.",

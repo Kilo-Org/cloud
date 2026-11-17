@@ -2463,6 +2463,7 @@
     "signOutThisDevice": "Disconnetti questo dispositivo",
     "signOutSessionLabel": "Disconnetti {{device}}, accesso effettuato {{signedIn}}, ultima attività {{lastSeen}}",
     "sessionSignedOut": "Sessione disconnessa.",
+    "sessionSignOutFailed": "Impossibile disconnettere questa sessione. Riprovi.",
     "signOutThisDeviceTitle": "Disconnettere questo dispositivo?",
     "signOutThisSessionTitle": "Disconnettere questa sessione?",
     "signOutThisSessionMessage": "{{device}} verrà disconnesso. Ultima attività {{lastSeen}}. Potrà mantenere l'accesso alle API per un massimo di un'ora.",

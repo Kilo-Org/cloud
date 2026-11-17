@@ -2974,6 +2974,7 @@
     "signOutThisDevice": "I-sign out ang device na ito",
     "signOutSessionLabel": "I-sign out ang {{device}}, nag-sign in: {{signedIn}}, huling nakita: {{lastSeen}}",
     "sessionSignedOut": "Na-sign out ang sesyon.",
+    "sessionSignOutFailed": "Hindi ma-sign out ang sesyong ito. Subukan muli.",
     "signOutThisDeviceTitle": "I-sign out ang device na ito?",
     "signOutThisSessionTitle": "I-sign out ang sesyong ito?",
     "signOutThisSessionMessage": "Masa-sign out ang {{device}}. Huling nakita: {{lastSeen}}. Maaari pa rin nitong ma-access ang API nang hanggang isang oras.",

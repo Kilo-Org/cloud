@@ -2974,6 +2974,7 @@
     "signOutThisDevice": "له دې وسیلې ووځئ",
     "signOutSessionLabel": "له {{device}} ووځئ، د ننوتلو وخت: {{signedIn}}، وروستی لیدل شوی وخت: {{lastSeen}}",
     "sessionSignedOut": "له ناستې ووتل شو.",
+    "sessionSignOutFailed": "له دې ناستې ووتل ونه شول، بیا هڅه وکړئ.",
     "signOutThisDeviceTitle": "له دې وسیلې حساب وباسم؟",
     "signOutThisSessionTitle": "له دې ناستې ووځم؟",
     "signOutThisSessionMessage": "حساب به له {{device}} څخه وایستل شي. وروستی لیدل شوی وخت: {{lastSeen}}. وسیله تر یوه ساعت پورې API ته لاسرسی ساتلی شي.",

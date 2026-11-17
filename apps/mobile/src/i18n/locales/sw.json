@@ -2974,6 +2974,7 @@
     "signOutThisDevice": "Toka kwenye akaunti kwenye kifaa hiki",
     "signOutSessionLabel": "Toka kwenye akaunti kwenye {{device}}, Kuingia: {{signedIn}}, Kuonekana mara ya mwisho: {{lastSeen}}",
     "sessionSignedOut": "Kikao kimeondolewa kwenye akaunti.",
+    "sessionSignOutFailed": "Imeshindikana kuondoka kwenye kikao hiki. Jaribu tena.",
     "signOutThisDeviceTitle": "Ungependa kutoka kwenye akaunti kwenye kifaa hiki?",
     "signOutThisSessionTitle": "Ungependa kuondoka kwenye kikao hiki?",
     "signOutThisSessionMessage": "{{device}} kitaondolewa kwenye akaunti. Kuonekana mara ya mwisho: {{lastSeen}}. Kinaweza kuendelea kufikia API kwa hadi saa moja.",

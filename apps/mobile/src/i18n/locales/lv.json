@@ -3030,6 +3030,7 @@
     "signOutThisDevice": "Izrakstīties šajā ierīcē",
     "signOutSessionLabel": "Izrakstīties no „{{device}}”, pierakstīšanās: {{signedIn}}, pēdējā aktivitāte: {{lastSeen}}",
     "sessionSignedOut": "Sesija ir beigta.",
+    "sessionSignOutFailed": "Neizdevās beigt šo sesiju. Mēģiniet vēlreiz.",
     "signOutThisDeviceTitle": "Izrakstīties šajā ierīcē?",
     "signOutThisSessionTitle": "Beigt šo sesiju?",
     "signOutThisSessionMessage": "Tiks veikta izrakstīšanās no „{{device}}”. Pēdējā aktivitāte: {{lastSeen}}. Piekļuve API tai vēl līdz stundai var saglabāties.",

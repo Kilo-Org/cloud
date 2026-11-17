@@ -40,17 +40,19 @@ const METRIC_OPTIONS = [
 
 /**
  * One tile of the totals grid: a value, its caption directly under it, then the
- * optional detail below the caption.
+ * optional detail below the caption, each pair one small gap apart.
+ *
+ * The content is top-aligned, so every tile of a row starts its value at the
+ * same padding as the row above, and spare height falls below the content
+ * instead of pushing the value and caption down.
  *
  * The detail holds a two-line floor, never a cap, so a detail that needs more
  * lines still grows the tile, and every locale whose detail fits two lines
- * loads at one height that its loading skeleton matches. A one-line detail sits
- * centred in that floor, so the air above and below it stays equal.
+ * loads at one height that its loading skeleton matches. A one-line detail
+ * starts at the top of that floor, so the caption keeps the same small gap
+ * whether the detail is short or long, and its spare line falls below.
  *
- * The tile sizes to its own content and its row partner stretches to the shared
- * row height with `justify-center`, so the partner's value and caption are
- * vertically centred, and the two captions of a row do not share one baseline
- * once the detail wraps. A larger font scale grows the tile with its text.
+ * A larger font scale grows the tile with its text.
  */
 function StatTile({
   label,
@@ -62,11 +64,11 @@ function StatTile({
   subtext?: string;
 }>) {
   return (
-    <View className="flex-1 justify-center gap-1 rounded-lg bg-secondary px-3 py-3">
+    <View className="flex-1 gap-1 rounded-lg bg-secondary px-3 py-3">
       <Text className="text-lg font-bold text-foreground">{value}</Text>
       <Text className="text-xs text-muted-foreground">{label}</Text>
       {subtext !== undefined && (
-        <View className="min-h-[28px] justify-center">
+        <View className="min-h-[28px]">
           <Text className="text-xs text-muted-foreground">{subtext}</Text>
         </View>
       )}

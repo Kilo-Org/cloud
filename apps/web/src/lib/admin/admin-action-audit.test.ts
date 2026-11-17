@@ -193,7 +193,10 @@ describe('adminActionContextFromHeaders', () => {
 
   test('keeps a caller-supplied path over the request headers', async () => {
     const ctx = {
-      ...adminActionContextFromHeaders(defineTestUser({ is_admin: true }), new Headers()),
+      ...adminActionContextFromHeaders(
+        defineTestUser({ is_admin: true }),
+        new Headers({ 'x-pathname': '/api/organizations/org_1/user-tokens' })
+      ),
       trpcPath: '/admin/api/api-request-log/download',
     };
 

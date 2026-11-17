@@ -90,6 +90,3 @@ export function CouncilRefusalScreen({
     </CenteredState>
   );
 }
-
-// Keep the tree-shaken default export the route's lazy loader expects.
-export default CouncilRefusalScreen;

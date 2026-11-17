@@ -104,9 +104,9 @@ export function useContextPicker(
       // route lives on the `(app)` stack, several navigators above the tab
       // stack that hosts this control, so the walk reads every level's state;
       // the nearest navigator's own state still shows the tab row on top.
-      let navigator: PickerGuardNavigator | undefined = navigation;
+      let navigator: PickerGuardNavigator = navigation;
       let pickerPresented = false;
-      for (let depth = 0; navigator !== undefined && depth < NAVIGATOR_CHAIN_LIMIT; depth += 1) {
+      for (let depth = 0; depth < NAVIGATOR_CHAIN_LIMIT; depth += 1) {
         if (pickerRouteOnTop(navigator.getState())) {
           pickerPresented = true;
           break;

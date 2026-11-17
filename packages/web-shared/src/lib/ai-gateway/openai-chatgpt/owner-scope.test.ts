@@ -149,7 +149,6 @@ describe('openai-chatgpt owner scope (real database)', () => {
     ).resolves.toBeNull();
   });
 
-
   it('routes an organization request to the member connection for that organization', async () => {
     await expect(
       checkOpenAiChatGptByok({

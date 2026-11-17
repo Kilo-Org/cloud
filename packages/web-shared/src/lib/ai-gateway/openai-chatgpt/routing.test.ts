@@ -815,9 +815,9 @@ describe('checkOpenAiChatGptByok', () => {
   });
 
   it('reads the organization connection for an organization request and never the personal one', async () => {
-    await expect(checkOpenAiChatGptByok(routingInput({ organizationId: ORG_ID }))).resolves.toMatchObject(
-      { kind: 'provider' }
-    );
+    await expect(
+      checkOpenAiChatGptByok(routingInput({ organizationId: ORG_ID }))
+    ).resolves.toMatchObject({ kind: 'provider' });
     expect(getOpenAiChatGptStoredConnection).toHaveBeenCalledWith(ORG_OWNER);
     expect(getOpenAiChatGptStoredConnection).not.toHaveBeenCalledWith(USER_OWNER);
   });

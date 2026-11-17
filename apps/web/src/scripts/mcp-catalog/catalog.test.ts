@@ -149,6 +149,9 @@ describe('mcp-catalog catalog', () => {
       expect(isDenylistedPath('organizations.cloudAgentNext.getWorkspaceArtifactDownloadUrl')).toBe(
         false
       );
+      // Org admins set browser control in the app only: an agent must not widen its own access.
+      expect(isDenylistedPath('organizations.settings.updateBrowserControl')).toBe(true);
+      expect(isDenylistedPath('organizations.settings.updateAllowLists')).toBe(false);
     });
 
     it('withholds Vercel secrets and resource mutations while retaining status reads', () => {

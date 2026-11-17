@@ -112,6 +112,42 @@ applies, when it is parked, or when `WORKOS_EVENT_CURSOR` resets the stream.
 `/status` reports it, which is the thing to look at when the cursor stops
 moving.
 
+### Retention
+
+A parked row is kept for **30 days from its `parked_at`**, the window the owner
+approved. The window follows the **most recent** park: when a cursor rewind makes
+the loop park the same event again, the new park replaces the row's contents and
+restarts its window, so the row names the current failure and gets the full 30
+days. The alarm expires rows on every tick: before the poll, it deletes the
+rows parked **strictly** earlier than that cutoff, so a row exactly 30 days old
+is kept by this tick and goes on the next one. `/status` counts with that same
+cutoff. A row past its window is not counted, even before a tick deletes it.
+The next tick removes that row from storage, so the count reports the window,
+not the table. Expiry rides on the existing alarm rather than a second cron or
+timer, so it cannot delay or replace the reschedule, and a poll that never runs
+is already visible as a stopped cursor.
+
+The policy covers the rows written before it: every row carries the `parked_at`
+its window is measured from, so an older row expires on the first tick whose
+cutoff is past it. An empty table and a repeated prune delete nothing, and the
+table has an index on `parked_at` so the delete is a range query.
+
+Only the local recovery record goes. The cursor, `event_failures`,
+`directory_conflicts`, `parked_activations`, and every directory, group, user
+and account row at WorkOS are untouched: nothing in this service holds
+directory data, so expiry cannot drop something the loop applied.
+
+WorkOS keeps its own event history, and an `after` cursor is bounded by that
+history's retention — the same 90-day window that decides when recovery needs
+`range_start` (see "Cursor"). So an expired row is **not** a replay promise: it
+records what this service skipped. Recovering an event whose row has expired
+depends on whether WorkOS still returns that event, which is outside this
+service's control.
+
+A prune that fails is logged as `SCIM sync parked-event prune failed` and
+nothing else: the alarm still polls, still persists the last poll and still
+arms the next tick, which retries the delete with a later cutoff.
+
 ### Per-directory budget
 
 A conflict is retried within two budgets, because the namespace holds one
@@ -130,10 +166,15 @@ shared cursor for about one budget in aggregate however many of them conflict.
 The window closes only when **the event that opened it applies**, which is what
 says the directory's conflicts are over. Another event of the same directory
 applying leaves it open, because the window belongs to the one event that opened
-it. An applied `dsync.activated` clears both the window and the
-parked-activation record, because binding the organization makes them stale.
-`WORKOS_EVENT_CURSOR` clears both as well, so a replay is measured from the new
-position.
+it. An applied `dsync.activated` clears only the parked-activation record, which
+the binding does make stale; it leaves the window alone, because the window
+records stream time that directory has already spent and belongs to the event
+that spent it. The window is therefore removed by two things only: the event
+that opened it applying, or an operator `WORKOS_EVENT_CURSOR` reset. That reset
+clears the parked-activation record too, so a replay is measured from the new
+position. A window whose opening event parks is never removed automatically, so
+every later conflict of that directory parks at once until the operator resets
+the stream; the reset is the directory's recovery path.
 
 `parked_activations` records a directory whose `dsync.activated` the loop
 parked. No organization is bound for such a directory and no later event binds
@@ -147,7 +188,7 @@ acts on.
 | Route | Purpose |
 |---|---|
 | `GET /health` | Worker liveness. Does not touch the Durable Object. |
-| `GET /status` | Environment, interval, cursor and its source, the held failure, the parked count, next alarm time, and the last poll result. |
+| `GET /status` | Environment, interval, cursor and its source, the held failure, the parked count — rows still inside the retention window at read time — next alarm time, and the last poll result. |
 
 Both routes are unauthenticated, so the Worker has no *HTTP* ingress: no
 `workers_dev` hostname, no `routes`, and no service binding. Neither route is

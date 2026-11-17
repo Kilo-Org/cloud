@@ -8,11 +8,6 @@ version = '1.0.0'
 
 android {
   namespace 'expo.modules.kilosystemsearch'
-
-  defaultConfig {
-    versionCode 1
-    versionName '1.0.0'
-  }
 }
 
 dependencies {

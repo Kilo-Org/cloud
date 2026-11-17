@@ -5,13 +5,14 @@ import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 /**
  * Header Save action shared by Security Agent settings screens: disabled
  * until the screen is dirty and valid, shows a spinner while the save
- * mutation is pending, then pops the screen on success. Errors are already
- * toasted by the mutation's centralized onError, so this just stays put.
+ * mutation is pending, then pops the screen on success. A refused save is
+ * announced by the calling screen's own refusal line (these screens turn the
+ * mutation's failure toast off), so this just stays put.
  *
  * Callers still decide whether to render it at all — pass `undefined` for
  * `headerRight` when `!canManage`, same as before this was extracted.
@@ -34,6 +35,7 @@ export function SettingsSaveButton({
 }>) {
   const router = useRouter();
   const colors = useThemeColors();
+  const mutedDisabledInk = useMutedDisabledInk();
   const { t } = useTranslation();
   // A settings header holds this one action, and a filled primary is the
   // loudest thing on the screen. It should not outshout the content's own way
@@ -42,11 +44,13 @@ export function SettingsSaveButton({
   // pending change. Before that the action is a quiet text control: still
   // present and still disabled, so its place in the header never moves.
   const actionable = dirty && valid;
-  // The spinner has to follow the surface it sits in. The filled variant's ink
-  // is `primaryForeground`, the quiet variant's is the body foreground; a
-  // hard-coded primary ink vanished when the draft turned invalid while a save
-  // was in flight and the header fell back to the quiet style.
-  const spinnerColor = actionable ? colors.primaryForeground : colors.foreground;
+  // The spinner has to follow the surface it sits in. While a save is in
+  // flight the filled variant is disabled, so the button paints the muted
+  // disabled fill and the spinner takes the ink that fill is paired with; the
+  // quiet variant keeps the body foreground. A hard-coded primary ink vanished
+  // when the draft turned invalid while a save was in flight and the header
+  // fell back to the quiet style.
+  const spinnerColor = actionable ? mutedDisabledInk : colors.foreground;
 
   return (
     <Button
@@ -60,7 +64,7 @@ export function SettingsSaveButton({
             skipNextGuardRef.current = true;
             router.back();
           } catch {
-            // Centralized onError already toasted; stay on screen.
+            // The screen's refusal line reports the failure; stay on screen.
           }
         })();
       }}

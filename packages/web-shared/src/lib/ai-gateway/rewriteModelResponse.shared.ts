@@ -7,6 +7,8 @@ import {
   computeVercelCostFields,
   extractVercelIsByok,
   getUpstreamBodyTermination,
+  parseJson,
+  type ReadResponseBody,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import type {
   JustTheCostsUsageStats,
@@ -28,6 +30,8 @@ import { NextResponse } from 'next/server';
  * logging and once for rewriting.
  */
 export type RequestLogCapture = {
+  /** Only the first generation ID is kept. */
+  setGenerationId(id: string): void;
   setBody(text: string): void;
   setReadError(error: unknown, partialBody?: string): void;
 };
@@ -194,26 +198,103 @@ export async function readResponseText(
   try {
     return { text: await response.text() };
   } catch (error) {
-    const responseReadError = getResponseReadError(error, vercelRequestId, reasoningEffort);
-    if (!responseReadError) {
+    const errorResponse = responseReadErrorResponse(
+      error,
+      headers,
+      vercelRequestId,
+      reasoningEffort
+    );
+    if (!errorResponse) {
       // Settle the capture so the after() callback awaiting it does not hang
       // and the request is still logged (without a response body).
       capture?.setReadError(error);
       throw error;
     }
-
-    return {
-      error,
-      errorResponse: NextResponse.json(
-        {
-          error: responseReadError.message,
-          error_type: responseReadError.errorType,
-          message: responseReadError.message,
-        },
-        { status: 503, headers }
-      ),
-    };
+    return { error, errorResponse };
   }
+}
+
+/**
+ * The response for a body read that failed because the upstream disconnected or timed out, or
+ * null for any other read error.
+ */
+export function responseReadErrorResponse(
+  error: unknown,
+  headers: Headers,
+  vercelRequestId: string | null | undefined,
+  reasoningEffort: string | null
+): NextResponse | null {
+  const responseReadError = getResponseReadError(error, vercelRequestId, reasoningEffort);
+  if (!responseReadError) return null;
+  return NextResponse.json(
+    {
+      error: responseReadError.message,
+      error_type: responseReadError.errorType,
+      message: responseReadError.message,
+    },
+    { status: 503, headers }
+  );
+}
+
+/**
+ * Rewrites a non-streamed JSON body that was already read and parsed, in place with `mutate`. A
+ * body that is not valid JSON, or whose JSON is not an object, passes through unchanged.
+ */
+export function rewriteJsonBody<Body extends object>(
+  { text, json }: ReadResponseBody,
+  init: ResponseInit,
+  mutate: (body: Body) => void
+): NextResponse {
+  // Upstream returned invalid/empty JSON body — pass through as-is
+  if (!('value' in json)) return new NextResponse(text, init);
+  const body = json.value;
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+    return new NextResponse(text, init);
+  }
+  mutate(body as Body);
+  return NextResponse.json(body, init);
+}
+
+/**
+ * Rewrites a non-streamed JSON response body in place with `mutate`. A body that is not valid
+ * JSON, or whose JSON is not an object, passes through unchanged. A body that cannot be read
+ * returns the read-error response.
+ */
+export async function rewriteJsonResponse<Body extends object>({
+  response,
+  headers,
+  vercelRequestId,
+  capture,
+  reasoningEffort,
+  mutate,
+}: {
+  response: Response;
+  headers: Headers;
+  vercelRequestId: string | null | undefined;
+  capture: RequestLogCapture | null;
+  reasoningEffort: string | null;
+  mutate: (body: Body) => void;
+}): Promise<NextResponse> {
+  // Read the body text once to avoid "Response body object should not be
+  // disturbed or locked" errors that occur when `.clone().json()` fails.
+  const textResult = await readResponseText(
+    response,
+    headers,
+    vercelRequestId,
+    capture,
+    reasoningEffort
+  );
+  if ('errorResponse' in textResult) {
+    capture?.setReadError(textResult.error);
+    return textResult.errorResponse;
+  }
+  const { text } = textResult;
+  capture?.setBody(text);
+  return rewriteJsonBody(
+    { text, json: parseJson(text) },
+    { status: response.status, statusText: response.statusText, headers },
+    mutate
+  );
 }
 
 export function partialCapturedBody(capturedChunks: string[] | null): string | undefined {
@@ -297,6 +378,88 @@ export async function rewriteSseStream(
   }
 }
 
+/**
+ * Replaces the upstream's cost fields with what Kilo bills, `costs` after `applyUsagePricing`:
+ * custom pricing applied, and free, BYOK and subscription-funded requests at zero. Shared by every
+ * endpoint whose response carries an OpenRouter-style `usage` object.
+ */
+function rewriteUsageCost(
+  usage: ResponseUsage,
+  costs: Pick<JustTheCostsUsageStats, 'cost_mUsd'>,
+  context: ResponseUsageContext,
+  gateway: NonNullable<VercelProviderMetaData['gateway']> | undefined,
+  vercelCosts: ReturnType<typeof computeVercelCostFields> | undefined
+) {
+  usage.cost = costs.cost_mUsd / 1_000_000;
+  usage.is_byok =
+    context.user_byok ||
+    context.provider === OPENAI_CHATGPT_PROVIDER_ID ||
+    context.provider === CLAUDE_BILLING_PROVIDER_ID;
+  if (
+    usage.cost_details?.upstream_inference_cost == null &&
+    gateway &&
+    (gateway.marketCost != null || gateway.cost != null)
+  ) {
+    usage.cost_details = {
+      ...usage.cost_details,
+      upstream_inference_cost:
+        ((vercelCosts?.cost_mUsd ?? 0) - (vercelCosts?.nonInferenceCost_mUsd ?? 0)) / 1_000_000,
+    };
+  }
+  delete usage.market_cost;
+  delete usage.gateway_cost;
+}
+
+/**
+ * Prices `usage` from its token counts and replaces its cost fields with what Kilo bills.
+ * Vercel reports its cost in the provider metadata, which `preferVercelCost` allows when the usage
+ * carries no cost of its own. Returns the computed costs.
+ */
+export function rewriteUsageFromTokens({
+  usage,
+  context,
+  providerMetadata,
+  tokens,
+  preferVercelCost,
+}: {
+  usage: ResponseUsage;
+  context: ResponseUsageContext;
+  providerMetadata: VercelProviderMetaData | undefined;
+  tokens: Pick<
+    JustTheCostsUsageStats,
+    'inputTokens' | 'outputTokens' | 'cacheHitTokens' | 'cacheWriteTokens'
+  >;
+  preferVercelCost: boolean;
+}): JustTheCostsUsageStats {
+  const gateway = providerMetadata?.gateway;
+  const vercelCosts = gateway && computeVercelCostFields(gateway, extractVercelIsByok(gateway));
+  const costs: JustTheCostsUsageStats = {
+    ...(preferVercelCost && usage.cost == null && usage.is_byok == null && vercelCosts
+      ? vercelCosts
+      : computeOpenRouterCosts(usage, context.provider)),
+    ...tokens,
+    is_byok: usage.is_byok ?? null,
+  };
+  applyUsagePricing(costs, context, context.custom_pricing_config);
+  rewriteUsageCost(usage, costs, context, gateway, vercelCosts);
+  return costs;
+}
+
+/**
+ * Replaces the cost fields of `usage` with the cost the ledger already billed for it, so the
+ * response and the ledger row cannot disagree.
+ */
+export function rewriteBilledUsage(
+  usage: ResponseUsage,
+  billed: Pick<JustTheCostsUsageStats, 'cost_mUsd'>,
+  context: ResponseUsageContext,
+  providerMetadata: VercelProviderMetaData | undefined
+) {
+  const gateway = providerMetadata?.gateway;
+  const vercelCosts = gateway && computeVercelCostFields(gateway, extractVercelIsByok(gateway));
+  rewriteUsageCost(usage, billed, context, gateway, vercelCosts);
+}
+
 export function rewriteUsage(
   usage: ResponseUsage,
   context: ResponseUsageContext,
@@ -317,41 +480,24 @@ export function rewriteUsage(
     : isMessages
       ? (usage.cache_creation_input_tokens ?? startUsage?.cache_creation_input_tokens ?? 0)
       : (usage.input_tokens_details?.cache_write_tokens ?? 0);
-  const gateway = providerMetadata?.gateway;
-  const vercelCosts = gateway && computeVercelCostFields(gateway, extractVercelIsByok(gateway));
-  const costs: JustTheCostsUsageStats = {
-    ...(!isChat && usage.cost == null && usage.is_byok == null && vercelCosts
-      ? vercelCosts
-      : computeOpenRouterCosts(usage, context.provider)),
-    inputTokens: isChat
-      ? (usage.prompt_tokens ?? 0)
-      : isMessages
-        ? (usage.input_tokens ?? startUsage?.input_tokens ?? 0) + cacheHitTokens + cacheWriteTokens
-        : (usage.input_tokens ?? 0),
-    outputTokens: isChat ? (usage.completion_tokens ?? 0) : (usage.output_tokens ?? 0),
-    cacheHitTokens,
-    cacheWriteTokens,
-    is_byok: usage.is_byok ?? null,
-  };
-  applyUsagePricing(costs, context, context.custom_pricing_config);
-  usage.cost = costs.cost_mUsd / 1_000_000;
-  usage.is_byok =
-    context.user_byok ||
-    context.provider === OPENAI_CHATGPT_PROVIDER_ID ||
-    context.provider === CLAUDE_BILLING_PROVIDER_ID;
-  if (
-    usage.cost_details?.upstream_inference_cost == null &&
-    gateway &&
-    (gateway.marketCost != null || gateway.cost != null)
-  ) {
-    usage.cost_details = {
-      ...usage.cost_details,
-      upstream_inference_cost:
-        ((vercelCosts?.cost_mUsd ?? 0) - (vercelCosts?.nonInferenceCost_mUsd ?? 0)) / 1_000_000,
-    };
-  }
-  delete usage.market_cost;
-  delete usage.gateway_cost;
+  rewriteUsageFromTokens({
+    usage,
+    context,
+    providerMetadata,
+    tokens: {
+      inputTokens: isChat
+        ? (usage.prompt_tokens ?? 0)
+        : isMessages
+          ? (usage.input_tokens ?? startUsage?.input_tokens ?? 0) +
+            cacheHitTokens +
+            cacheWriteTokens
+          : (usage.input_tokens ?? 0),
+      outputTokens: isChat ? (usage.completion_tokens ?? 0) : (usage.output_tokens ?? 0),
+      cacheHitTokens,
+      cacheWriteTokens,
+    },
+    preferVercelCost: !isChat,
+  });
   if (usage.prompt_tokens_details) {
     if (usage.prompt_tokens_details.cached_tokens === undefined) {
       usage.prompt_tokens_details.cached_tokens = 0; // OpenCode crashes if this is absent

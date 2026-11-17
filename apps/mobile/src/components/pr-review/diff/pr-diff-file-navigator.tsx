@@ -142,12 +142,18 @@ export function PrDiffFileNavigator({
       hasActiveSearch &&
       !query.isFetching &&
       query.hasNextPage &&
-      !fetchAll.isRunning &&
-      !fetchAll.error
+      fetchAll.feedback.status !== 'pending' &&
+      fetchAll.failure === null
     ) {
       void runRef.current();
     }
-  }, [hasActiveSearch, query.isFetching, query.hasNextPage, fetchAll.isRunning, fetchAll.error]);
+  }, [
+    hasActiveSearch,
+    query.isFetching,
+    query.hasNextPage,
+    fetchAll.feedback.status,
+    fetchAll.failure,
+  ]);
 
   const filtered = useMemo(
     () => filterNavigatorFiles(files, searchRef.current),
@@ -339,10 +345,11 @@ export function PrDiffFileNavigator({
     );
   }
 
-  const showLoadAllRetry = Boolean(fetchAll.error) && !fetchAll.isRunning && query.hasNextPage;
+  const showLoadAllRetry =
+    fetchAll.failure !== null && fetchAll.feedback.status !== 'pending' && query.hasNextPage;
   // A scroll-triggered later-page failure (no search) retries just that page.
-  // `!fetchAll.error` keeps it mutually exclusive with the load-all banner.
-  const showLaterPageRetry = laterPageError && !hasActiveSearch && !fetchAll.error;
+  // `fetchAll.failure === null` keeps it mutually exclusive with the load-all banner.
+  const showLaterPageRetry = laterPageError && !hasActiveSearch && fetchAll.failure === null;
   const showRetry = showLoadAllRetry || showLaterPageRetry;
   const retryMessage = showLoadAllRetry
     ? t('prReview.fileNavigator.failedToLoadAllFiles')
@@ -353,7 +360,7 @@ export function PrDiffFileNavigator({
   const retryAction = showLoadAllRetry ? fetchAll.run : query.fetchNextPage;
   // Truncated when pagination hasn't finished, errored, or GitHub's 3,000-file
   // listing cap left fewer listed files than the overview's changed-file count.
-  const isTruncated = query.hasNextPage || Boolean(fetchAll.error) || changedFiles > files.length;
+  const isTruncated = query.hasNextPage || fetchAll.failure !== null || changedFiles > files.length;
 
   return (
     <>
@@ -400,7 +407,7 @@ export function PrDiffFileNavigator({
                     total: formatNumber(files.length, i18n.language),
                   })}
             </Text>
-            {fetchAll.isRunning ? (
+            {fetchAll.feedback.status === 'pending' ? (
               <View className="flex-row items-center gap-1.5">
                 <ActivityIndicator size="small" color={colors.mutedForeground} />
                 <Text variant="muted" className="text-xs">

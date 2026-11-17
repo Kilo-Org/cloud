@@ -43,7 +43,7 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
   const router = useRouter();
   const { t } = useTranslation();
   const mutations = useOrganizationMutations(organizationId ?? '', {
-    silenceUpdateMemberToast: true,
+    silenceMemberToast: true,
   });
   const currentLimit = member.dailyUsageLimitUsd;
   const hasCurrentLimit = currentLimit != null;
@@ -131,9 +131,7 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
         loading={mutations.updateMember.isPending}
         onPress={onSave}
       >
-        <Text
-          className={cn('text-primary-foreground', canSave && 'dark:text-selection-foreground')}
-        >
+        <Text className={cn(canSave && 'text-primary-foreground dark:text-selection-foreground')}>
           {t('common.save')}
         </Text>
       </Button>

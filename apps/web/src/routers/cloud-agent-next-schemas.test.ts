@@ -299,6 +299,24 @@ describe('baseGetSessionNextOutputSchema', () => {
     ).toEqual(runtimeAgents);
   });
 
+  it('preserves repository identity and the event-log watermark, and strips updateCursor', () => {
+    const identity = {
+      githubIntegrationId: 'integration_123',
+      bitbucketWorkspaceUuid: 'bb-workspace-uuid',
+      bitbucketRepositoryUuid: 'bb-repository-uuid',
+      latestEventId: 42,
+    };
+
+    expect(baseGetSessionNextOutputSchema.parse({ ...baseSession, ...identity })).toEqual({
+      ...baseSession,
+      ...identity,
+    });
+
+    expect(
+      baseGetSessionNextOutputSchema.parse({ ...baseSession, updateCursor: 7 })
+    ).not.toHaveProperty('updateCursor');
+  });
+
   it('preserves safe DO-native metadata fields used by session detail UIs', () => {
     const metadata = {
       title: 'DO title',

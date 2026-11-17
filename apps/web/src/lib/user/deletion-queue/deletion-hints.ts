@@ -1,3 +1,5 @@
+import { humanizeToken } from '@/lib/admin/queue-format';
+
 export type DeletionAttentionHint = {
   title: string;
   action: string;
@@ -407,13 +409,9 @@ export function deletionAttentionHint(
     };
   }
   return {
-    title: humanizeCode(code),
+    title: humanizeToken(code),
     action: UNKNOWN_ACTION,
   };
-}
-
-function humanizeCode(code: string): string {
-  return code.replaceAll(/[_-]+/g, ' ').replace(/^./, char => char.toUpperCase());
 }
 
 export function deletionManualSearchHref(params: {

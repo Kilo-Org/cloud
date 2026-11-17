@@ -70,13 +70,25 @@ export class ScimSyncDO extends DurableObject<Env> {
       cursor,
       cursorSource: source,
       eventFailure: state.currentFailure(this.db),
-      parkedCount: state.parkedCount(this.db),
+      parkedCount: state.parkedCount(this.db, Date.now()),
       nextAlarmAt: await this.ctx.storage.getAlarm(),
       lastPoll: (await this.ctx.storage.get<PollResult>(LAST_POLL_KEY)) ?? null,
     };
   }
 
   override async alarm(): Promise<void> {
+    // Retention rides on the poll loop rather than a second schedule: the alarm
+    // already ticks here, so expiry needs no cron entry and no extra timer, and
+    // running it before the poll means it cannot delay or replace the
+    // reschedule below. A failed prune is logged and retried on the next tick,
+    // whose cutoff is later.
+    try {
+      this.pruneParkedEvents();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error('SCIM sync parked-event prune failed', { error: message });
+    }
+
     // `poll` reports failures rather than throwing, so the chain survives a
     // WorkOS outage: Cloudflare retries a failed alarm a bounded number of
     // times and then stops, which would strand the loop until the next cron.
@@ -183,12 +195,15 @@ export class ScimSyncDO extends DurableObject<Env> {
             state.commitCursor(this.db, event.id, seed);
             state.clearFailure(this.db, event.id);
             if (directoryId !== null) {
-              // The window belongs to this event: it closes when the event
-              // that opened it applies, and an activation that applies binds the
-              // directory's organization, so both records are stale.
+              // The window belongs to the event that opened it, so only that
+              // event's success closes it. Every other event of the directory
+              // applying leaves it open, because the window records stream time
+              // the directory has already spent.
               state.closeConflictWindow(this.db, directoryId, event.id);
               if (event.event === 'dsync.activated') {
-                state.clearDirectoryLimits(this.db, directoryId);
+                // The binding makes the parked-activation marker stale, so it
+                // goes. The conflict window is unrelated to the binding.
+                state.clearParkedActivation(this.db, directoryId);
               }
             }
             cursor = event.id;
@@ -283,6 +298,19 @@ export class ScimSyncDO extends DurableObject<Env> {
         error: message,
       };
     }
+  }
+
+  /**
+   * Expires the parked rows past `PARKED_EVENT_RETENTION_MS`.
+   *
+   * The helper counts and then deletes, both inside this synchronous turn, so
+   * nothing can park a row between them. A throw during either leaves the rows
+   * in place for the next tick, which retries with a later cutoff; the alarm's
+   * guard owns the logging.
+   */
+  private pruneParkedEvents(): void {
+    const removed = state.pruneParkedEvents(this.db, Date.now());
+    if (removed > 0) logger.info('SCIM sync expired parked events', { removed });
   }
 
   /**

@@ -1228,7 +1228,7 @@ export function ChatComposer({
       return;
     }
     if (upload.hasFailedAttachments) {
-      toast.error(i18n.t('agentChat.composer.removeOrRetryFailed'));
+      toast.error(i18n.t('agentChat.composer.removeFailedAttachments'));
       return;
     }
     // The model changed after the images were attached, to one that reads none.

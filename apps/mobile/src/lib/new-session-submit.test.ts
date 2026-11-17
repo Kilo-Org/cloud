@@ -555,7 +555,44 @@ describe('resolveNewSessionStartBlockedReason', () => {
     ).toBe('enter-prompt');
   });
 
-  it('stays silent for Cloud Agent when the prompt is missing beside another blocker', () => {
+  it('names the uploading attachment once the repository and prompt are set', () => {
+    // The bug build's own state: the chip reads uploaded but the flag is still
+    // true, so Start stays disabled with a prompt and a repository in place.
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          selectedRepo: 'org/repo',
+          gate: newSessionGate({ attachmentsIsUploading: true }),
+        })
+      )
+    ).toBe('attachment-uploading');
+  });
+
+  it('names the failed attachment, which outranks the upload flag it also sets', () => {
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          selectedRepo: 'org/repo',
+          gate: newSessionGate({ attachmentsHasFailed: true, attachmentsIsUploading: true }),
+        })
+      )
+    ).toBe('attachment-failed');
+  });
+
+  it('names the still-loading profile once the repository and prompt are set', () => {
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          selectedRepo: 'org/repo',
+          gate: newSessionGate({ isProfileLoading: true }),
+        })
+      )
+    ).toBe('profile-loading');
+  });
+
+  it('names the still-loading profile even while the prompt is also missing', () => {
+    // Typing a prompt would not enable Start while the profile query is in
+    // flight, so the prompt is not what the user has to wait for.
     expect(
       resolveNewSessionStartBlockedReason(
         newSessionReasonInput({
@@ -563,7 +600,7 @@ describe('resolveNewSessionStartBlockedReason', () => {
           gate: newSessionGate({ hasPrompt: false, isProfileLoading: true }),
         })
       )
-    ).toBeNull();
+    ).toBe('profile-loading');
     expect(
       resolveNewSessionStartBlockedReason(
         newSessionReasonInput({
@@ -571,12 +608,13 @@ describe('resolveNewSessionStartBlockedReason', () => {
           gate: newSessionGate({ hasPrompt: false, model: '' }),
         })
       )
-    ).toBeNull();
+    ).toBe('model-missing');
   });
 
-  it('never blames the prompt for a selected repository that no longer resolves', () => {
+  it('names the stale selection instead of the prompt for a repository that no longer resolves', () => {
     // A stale picker key blocks Start on its own; the repository section asks
     // for a new pick, so naming the empty composer would hide the real blocker.
+    // The stale selection is named whether or not the user has typed a prompt.
     expect(
       resolveNewSessionStartBlockedReason(
         newSessionReasonInput({
@@ -585,7 +623,7 @@ describe('resolveNewSessionStartBlockedReason', () => {
           gate: newSessionGate({ hasPrompt: false }),
         })
       )
-    ).toBeNull();
+    ).toBe('stale-selection');
     expect(
       resolveNewSessionStartBlockedReason(
         newSessionReasonInput({
@@ -594,7 +632,7 @@ describe('resolveNewSessionStartBlockedReason', () => {
           gate: newSessionGate({ hasPrompt: true }),
         })
       )
-    ).toBeNull();
+    ).toBe('stale-selection');
   });
 
   it('returns null while the repository list is still loading and no rows exist yet', () => {
@@ -646,36 +684,119 @@ describe('resolveNewSessionStartBlockedReason', () => {
     ).toBe('select-repository');
   });
 
-  it('returns null when another precondition blocks Start', () => {
-    expect(
-      resolveNewSessionStartBlockedReason(
-        newSessionReasonInput({ gate: newSessionGate({ model: '' }) })
-      )
-    ).toBeNull();
+  it('names a composer blocker before any repository is chosen, and stays silent for the rest', () => {
+    // The repository step is not the cause here: each of these disables Start
+    // with a repository supplied, so the footer names the wait or the fix.
     expect(
       resolveNewSessionStartBlockedReason(
         newSessionReasonInput({ gate: newSessionGate({ isProfileLoading: true }) })
       )
-    ).toBeNull();
-    expect(
-      resolveNewSessionStartBlockedReason(
-        newSessionReasonInput({ gate: newSessionGate({ isSubmitting: true }) })
-      )
-    ).toBeNull();
+    ).toBe('profile-loading');
     expect(
       resolveNewSessionStartBlockedReason(
         newSessionReasonInput({
           gate: newSessionGate({ hasPrompt: false, attachmentsIsUploading: true }),
         })
       )
-    ).toBeNull();
+    ).toBe('attachment-uploading');
     expect(
       resolveNewSessionStartBlockedReason(
         newSessionReasonInput({
           gate: newSessionGate({ hasPrompt: false, attachmentsHasFailed: true }),
         })
       )
+    ).toBe('attachment-failed');
+    // No copy can tell the user what to do about an in-flight create or submit,
+    // so those stay unnamed; a missing model is named, because picking one is
+    // the action the model row offers.
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({ gate: newSessionGate({ model: '' }) })
+      )
+    ).toBe('model-missing');
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({ gate: newSessionGate({ isSubmitting: true }) })
+      )
     ).toBeNull();
+  });
+
+  it('names the loading profile ahead of a missing model', () => {
+    // The profile settles on its own and the model the screen shows may arrive
+    // with it, so the wait is named rather than the pick.
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          selectedRepo: 'org/repo',
+          gate: newSessionGate({ isProfileLoading: true, model: '' }),
+        })
+      )
+    ).toBe('profile-loading');
+  });
+
+  it('names the stale selection ahead of every composer blocker', () => {
+    // The repository section is where the fix is, so the attachment wait and the
+    // loading profile it also carries are not what the footer names.
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          selectedRepo: 'org/repo',
+          selectedRepositoryResolved: false,
+          gate: newSessionGate({ attachmentsIsUploading: true }),
+        })
+      )
+    ).toBe('stale-selection');
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          selectedRepo: 'org/repo',
+          selectedRepositoryResolved: false,
+          gate: newSessionGate({ attachmentsIsUploading: true, isProfileLoading: true }),
+        })
+      )
+    ).toBe('stale-selection');
+  });
+
+  it('names the missing model with a repository selected and a prompt typed, and before any repository', () => {
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          selectedRepo: 'org/repo',
+          gate: newSessionGate({ model: '' }),
+        })
+      )
+    ).toBe('model-missing');
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({ gate: newSessionGate({ model: '' }) })
+      )
+    ).toBe('model-missing');
+  });
+
+  it('keeps the Continue clone entry silent for a stale selection', () => {
+    // The clone entry has its own footer and its own gate, so it names nothing
+    // here even though the gate itself stays disabled.
+    expect(
+      resolveNewSessionStartBlockedReason(
+        continueReasonInput({ selectedRepo: 'org/repo', selectedRepositoryResolved: false })
+      )
+    ).toBeNull();
+  });
+
+  it('names nothing and disables nothing when every precondition is satisfied', () => {
+    // The reason and the gate read the same predicate, so a named reason and an
+    // enabled Start can never disagree.
+    const gate = newSessionGate();
+    expect(
+      resolveNewSessionStartBlockedReason(newSessionReasonInput({ selectedRepo: 'org/repo', gate }))
+    ).toBeNull();
+    expect(
+      resolveNewSessionStartDisabled({
+        ...gate,
+        selectedRepo: 'org/repo',
+        selectedRepositoryResolved: true,
+      })
+    ).toBe(false);
   });
 
   it('re-evaluates the Continue clone gate and names the connect step there too', () => {

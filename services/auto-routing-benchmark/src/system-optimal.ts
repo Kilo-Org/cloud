@@ -384,7 +384,7 @@ async function optimizeRegistryThresholds(
   const current = {
     router,
     engineIdentity: computeEngineIdentity('decider', router),
-    repetitions: config.deciderRepetitions,
+    repetitions: resolveEffectivePolicy(config).deciderRepetitions,
   };
   const catalog = await fetchBenchmarkModelCatalog(env);
   const desired = snapshotPairs(

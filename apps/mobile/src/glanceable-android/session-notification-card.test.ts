@@ -160,15 +160,15 @@ describe('buildSessionNotificationCard', () => {
       NOW
     );
 
-    expect(card.expandedText).toBe('$0.84');
+    expect(card.expandedText).toBe('\u2066$0.84\u2069');
     expect(card.subText).toBe(i18n.t('glanceable.planProgress', { done: '3', total: '7' }));
     expect([card.subText, card.text, card.compactText].join(' ')).not.toContain('0.84');
   });
 
   it.each([
-    [3100, '$0.0031'],
-    [4999, '$0.0050'],
-    [5000, '$0.01'],
+    [3100, '\u2066$0.0031\u2069'],
+    [4999, '\u2066$0.0050\u2069'],
+    [5000, '\u2066$0.01\u2069'],
     [49, null],
     [1, null],
   ])('draws a small cost of %i microdollars truthfully, or not at all', (micros, expected) => {
@@ -204,6 +204,6 @@ describe('buildSessionNotificationCard', () => {
     );
 
     expect(card.subText).toBeNull();
-    expect(card.expandedText).toBe('$0.84');
+    expect(card.expandedText).toBe('\u2066$0.84\u2069');
   });
 });

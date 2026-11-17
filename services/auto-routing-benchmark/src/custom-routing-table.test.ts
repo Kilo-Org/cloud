@@ -249,11 +249,10 @@ describe('buildCustomRoutingTable', () => {
 
 describe('assembleCustomRoutingTable', () => {
   const config = {
-    deciderRepetitions: 1,
     minAccuracy: 0.7,
-    switchCostFactor: 3,
-    bestAccuracySwitchThreshold: 0.05,
-    lowConfidenceThreshold: 0.8,
+    accuracyNoiseBand: 0.05,
+    productionTokenProfile: null,
+    switchHorizonTurns: null,
   };
 
   beforeEach(() => {
@@ -305,7 +304,9 @@ describe('assembleCustomRoutingTable', () => {
       { entry: { model: 'vendor/m', variant: 'xhigh' }, runId: 'run-x' },
       { entry: { model: 'vendor/m', variant: 'max' }, runId: 'run-m' },
     ]);
-    expect(result.table?.lowConfidenceThreshold).toBe(0.8);
+    // lowConfidenceThreshold is a fixed policy setting (null): the resolved
+    // policy value overrides no stored knob.
+    expect(result.table?.lowConfidenceThreshold).toBeNull();
     expect(result.table!.routes['implementation/code_generation']).toHaveLength(2);
   });
 });

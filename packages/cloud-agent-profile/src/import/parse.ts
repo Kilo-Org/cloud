@@ -23,7 +23,11 @@ import {
   registerIdentity,
   type ParseState,
 } from './parse-state';
-import { RUNTIME_BUILTIN_AGENT_SLUGS } from './runtime-contract';
+import {
+  RUNTIME_AGENT_CONFIG_KEYS,
+  RUNTIME_BUILTIN_AGENT_SLUGS,
+  RUNTIME_KILO_COMMAND_KEYS,
+} from './runtime-contract';
 import type { ImportIssue, ImportPreview, ParsedLocalConfig } from './types';
 
 /**
@@ -43,24 +47,21 @@ const CLI_BUILTIN_AGENT_SLUGS = new Set([
 /** Global config globs name the config directory itself, which is the archive root. */
 const GLOBAL_CONFIG_DIRECTORY_PREFIX = '~/.config/kilo/';
 
-const MARKDOWN_AGENT_FIELDS = new Set([
-  'description',
-  'mode',
-  'hidden',
-  'model',
-  'variant',
-  'temperature',
-  'top_p',
-  'steps',
-  'color',
-  'permission',
-  'disable',
-  'options',
-]);
-const CONFIG_AGENT_FIELDS = new Set([...MARKDOWN_AGENT_FIELDS, 'prompt']);
-/** Command markdown takes its template from the body, so frontmatter `template` is not a source. */
-const MARKDOWN_COMMAND_FIELDS = new Set(['description', 'agent', 'model', 'subtask']);
-const CONFIG_COMMAND_FIELDS = new Set([...MARKDOWN_COMMAND_FIELDS, 'template']);
+/**
+ * Agent config fields, taken from the runtime contract. Markdown agents take
+ * `prompt` from the body, so frontmatter `prompt` is not a source.
+ */
+const MARKDOWN_AGENT_FIELDS = new Set(RUNTIME_AGENT_CONFIG_KEYS.filter(key => key !== 'prompt'));
+const CONFIG_AGENT_FIELDS = new Set(RUNTIME_AGENT_CONFIG_KEYS);
+/**
+ * Kilo command fields, taken from the runtime contract. A command's name is its
+ * file or config key, and command markdown takes `template` from the body, so
+ * neither is a frontmatter source.
+ */
+const MARKDOWN_COMMAND_FIELDS = new Set(
+  RUNTIME_KILO_COMMAND_KEYS.filter(key => key !== 'name' && key !== 'template')
+);
+const CONFIG_COMMAND_FIELDS = new Set(RUNTIME_KILO_COMMAND_KEYS.filter(key => key !== 'name'));
 
 const REMOTE_INSTRUCTION_PATTERN = /^[a-z][a-z0-9+.-]*:\/\//i;
 
@@ -80,7 +81,11 @@ function emptyConfig(): ParsedLocalConfig {
 type MarkdownDefinitionFamily = {
   category: 'agents' | 'commands';
   noun: 'Agent' | 'Command';
+  /** Top-level archive directories this family reads. */
+  directoryNames: Set<string>;
   fields: Set<string>;
+  /** Parse one two-segment `.md` entry of this family. */
+  parseEntry: (entry: ArchiveEntry, state: ParseState) => void;
   /** Agents only: a local entry for a CLI built-in tunes the built-in instead of defining an agent. */
   skipSlugs?: Set<string>;
 };
@@ -88,14 +93,18 @@ type MarkdownDefinitionFamily = {
 const AGENT_MARKDOWN_FAMILY: MarkdownDefinitionFamily = {
   category: 'agents',
   noun: 'Agent',
+  directoryNames: AGENT_DIRECTORY_NAMES,
   fields: MARKDOWN_AGENT_FIELDS,
+  parseEntry: parseAgentMarkdown,
   skipSlugs: CLI_BUILTIN_AGENT_SLUGS,
 };
 
 const COMMAND_MARKDOWN_FAMILY: MarkdownDefinitionFamily = {
   category: 'commands',
   noun: 'Command',
+  directoryNames: COMMAND_DIRECTORY_NAMES,
   fields: MARKDOWN_COMMAND_FIELDS,
+  parseEntry: parseCommandMarkdown,
 };
 
 /**
@@ -151,17 +160,15 @@ function parseCommandMarkdown(entry: ArchiveEntry, state: ParseState): void {
 
 function parseDefinitionDirectories(
   entries: ArchiveEntry[],
-  directoryNames: Set<string>,
-  category: 'agents' | 'commands',
+  family: MarkdownDefinitionFamily,
   state: ParseState
 ): void {
   for (const entry of entries) {
     const segments = entry.path.split('/');
     if (segments.length < 2) continue;
-    if (!directoryNames.has(segments[0].toLowerCase())) continue;
+    if (!family.directoryNames.has(segments[0].toLowerCase())) continue;
     if (segments.length !== 2 || !entry.path.toLowerCase().endsWith('.md')) continue;
-    if (category === 'agents') parseAgentMarkdown(entry, state);
-    else parseCommandMarkdown(entry, state);
+    family.parseEntry(entry, state);
   }
 }
 
@@ -278,15 +285,23 @@ function parseSkillDirectories(
   }
 }
 
+/**
+ * Register one archived instruction: derive its name, claim its path so a file
+ * reached twice is imported once, and add it.
+ */
+function importInstructionEntry(entry: ArchiveEntry, state: ParseState): void {
+  const name = instructionNameForPath(entry.path);
+  if (!claimPath(state, entry.path, 'instructions', name)) return;
+  addInstruction(state, name, entry.content, entry.path);
+}
+
 function parseInstructionDirectories(entries: ArchiveEntry[], state: ParseState): void {
   for (const entry of entries) {
     const segments = entry.path.split('/');
     if (segments.length < 2) continue;
     if (segments[0].toLowerCase() !== INSTRUCTIONS_DIRECTORY_NAME) continue;
     if (!entry.path.toLowerCase().endsWith('.md')) continue;
-    const name = instructionNameForPath(entry.path);
-    if (!claimPath(state, entry.path, 'instructions', name)) continue;
-    addInstruction(state, name, entry.content, entry.path);
+    importInstructionEntry(entry, state);
   }
 }
 
@@ -347,9 +362,7 @@ function parseInstructionGlobs(
   for (const matchesGlob of matchers) {
     for (const entry of entries) {
       if (!entry.path.toLowerCase().endsWith('.md') || !matchesGlob(entry.path)) continue;
-      const name = instructionNameForPath(entry.path);
-      if (!claimPath(state, entry.path, 'instructions', name)) continue;
-      addInstruction(state, name, entry.content, entry.path);
+      importInstructionEntry(entry, state);
     }
   }
 }
@@ -442,8 +455,8 @@ export function parseLocalConfigArchive(zipBytes: Uint8Array): ImportPreview {
   );
   const incompleteSkills = routeEntryIssues(decoded.issues, instructionMatchers, state);
 
-  parseDefinitionDirectories(decoded.entries, AGENT_DIRECTORY_NAMES, 'agents', state);
-  parseDefinitionDirectories(decoded.entries, COMMAND_DIRECTORY_NAMES, 'commands', state);
+  parseDefinitionDirectories(decoded.entries, AGENT_MARKDOWN_FAMILY, state);
+  parseDefinitionDirectories(decoded.entries, COMMAND_MARKDOWN_FAMILY, state);
   parseSkillDirectories(decoded.entries, incompleteSkills, state);
   parseInstructionDirectories(decoded.entries, state);
 

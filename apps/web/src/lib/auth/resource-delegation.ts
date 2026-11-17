@@ -1,12 +1,8 @@
 import 'server-only';
 
 import type { User } from '@kilocode/db/schema';
-import {
-  device_sessions,
-  kilocode_users,
-  organization_memberships,
-  organizations,
-} from '@kilocode/db/schema';
+import { kilocode_users, organization_memberships, organizations } from '@kilocode/db/schema';
+import { liveDeviceSessionCondition } from '@kilocode/db/device-session-condition';
 import { and, eq, isNull } from 'drizzle-orm';
 import jwt from 'jsonwebtoken';
 import { TRPCError } from '@trpc/server';
@@ -197,11 +193,7 @@ async function currentUser(expectedUser: User): Promise<User> {
 
 async function assertActiveDeviceSession(id: string, userId: string): Promise<void> {
   const session = await db.query.device_sessions.findFirst({
-    where: and(
-      eq(device_sessions.id, id),
-      eq(device_sessions.kilo_user_id, userId),
-      isNull(device_sessions.revoked_at)
-    ),
+    where: liveDeviceSessionCondition({ deviceSessionId: id, userId }),
   });
   if (!session) unauthorized();
 }

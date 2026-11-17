@@ -94,3 +94,23 @@ export function countActiveSessionFilters(filters: AgentSessionFilters): number 
   const platformCount = normalisePlatformSelection(filters.platformFilter).length;
   return platformCount + projectCount;
 }
+
+/**
+ * Whether two filter sets say the same thing, element by element.
+ *
+ * The arrays are the whole of it: a record read back from storage and the one on
+ * screen are the same filters when every entry matches, which is what lets a
+ * loaded page skip writing back what it just read.
+ */
+export function sameAgentSessionFilters(a: AgentSessionFilters, b: AgentSessionFilters): boolean {
+  if (a.platformFilter.length !== b.platformFilter.length) {
+    return false;
+  }
+  if (a.platformFilter.some((value, index) => value !== b.platformFilter[index])) {
+    return false;
+  }
+  if (a.projectFilter.length !== b.projectFilter.length) {
+    return false;
+  }
+  return a.projectFilter.every((value, index) => value === b.projectFilter[index]);
+}

@@ -50,13 +50,13 @@ function formatCvssScore(score: string | number | null): string | null {
 function metadataLink(label: string, href: string | null): string {
   const safeLabel = escapeHtml(label);
   if (!href) return safeLabel;
-  return `<a href="${escapeHtml(href)}" style="color: #1a1a1a; text-decoration: underline">${safeLabel}</a>`;
+  return `<a class="kc-strong" href="${escapeHtml(href)}" style="color: #1a1a1a; text-decoration: underline">${safeLabel}</a>`;
 }
 
 function metadataRow(label: string, value: string): string {
   return `<tr>
-    <td style="padding: 8px 0; color: #777; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; vertical-align: top; width: 112px">${escapeHtml(label)}</td>
-    <td style="padding: 8px 0; color: #333; font-size: 13px; line-height: 1.5; vertical-align: top">${value}</td>
+    <td class="kc-muted" style="padding: 8px 0; color: #777; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; vertical-align: top; width: 112px">${escapeHtml(label)}</td>
+    <td class="kc-text" style="padding: 8px 0; color: #333; font-size: 13px; line-height: 1.5; vertical-align: top">${value}</td>
   </tr>`;
 }
 

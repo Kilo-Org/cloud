@@ -120,7 +120,19 @@ export function useConfirmDialog() {
         message={request.message}
         confirmLabel={request.confirmLabel}
         cancelLabel={request.cancelLabel}
-        extraAction={request.extraAction}
+        extraAction={
+          // Cleared like `onConfirm` and `onCancel`: the dialog runs this after
+          // the sheet finished dismissing, and a request left behind would keep
+          // a dismissed sheet mounted, so the next `confirm` would reuse that
+          // instance and start it already closed.
+          request.extraAction && {
+            label: request.extraAction.label,
+            onPress: () => {
+              setRequest(null);
+              request.extraAction?.onPress();
+            },
+          }
+        }
         onConfirm={() => {
           setRequest(null);
           request.onConfirm();

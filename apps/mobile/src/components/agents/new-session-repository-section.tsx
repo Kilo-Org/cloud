@@ -239,7 +239,9 @@ export function NewSessionRepositorySection({
         }}
       >
         <View className="gap-1">
-          <Text variant="muted">{t(copy.connectDescription)}</Text>
+          {copy.connectDescription ? (
+            <Text variant="muted">{t(copy.connectDescription)}</Text>
+          ) : null}
           {noteKey ? <Text variant="muted">{t(noteKey)}</Text> : null}
         </View>
         {renderConnectActions(platform)}

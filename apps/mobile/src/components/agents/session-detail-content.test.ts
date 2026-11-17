@@ -686,7 +686,10 @@ const computePolling = vi.hoisted(() => ({ focusedAndActive: true }));
 vi.mock('@/lib/hooks/use-app-active-and-focused', () => ({
   useAppActiveAndFocused: () => computePolling.focusedAndActive,
 }));
-vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#fff',
+  useThemeColors: () => ({}),
+}));
 vi.mock('@/lib/persist/drafts', () => ({ agentComposerDraftKey: (id: string) => id }));
 vi.mock('@/lib/persist/use-draft-load', () => ({
   useFencedDraftLoad: () => ({ settled: true, value: null }),
@@ -6248,6 +6251,52 @@ describe('session detail duplicate failure state', () => {
     const text = renderedText(view.renderer.root);
     expect(text).toContain('Response failed');
     expect(text).not.toContain('The response failed.');
+    expect(indicatorNodes(view)).toHaveLength(0);
+  });
+
+  it('states a generation the person stopped as one neutral status line', async () => {
+    // The runtime writes `MessageAbortedError` when the person stops a
+    // generation (`kilo2-source-messages.ts`), so the row that follows a Stop is
+    // this message.
+    const stopped = rootFailedAssistantMessage('');
+    stopped.parts = [];
+    const info = stopped.info;
+    if (info.role !== 'assistant') {
+      throw new Error('fixture must be an assistant message');
+    }
+    stopped.info = {
+      ...info,
+      error: { name: 'MessageAbortedError', data: { message: 'Interrupted' } },
+    };
+
+    const view = await mountDetails([rootUserMessage('please refactor'), stopped]);
+    const text = renderedText(view.renderer.root);
+    const neutral = i18n.t('agentChat.messageFailure.assistantStopped');
+    // The stop is stated once and only as a status: no error heading, no
+    // second line repeating it, and nothing to retry because the person's own
+    // action ended the run.
+    expect(text).toContain(neutral);
+    expect(text).not.toContain(i18n.t('agentChat.messageFailure.assistantTitle'));
+    expect(text).not.toContain(i18n.t('agentChat.messageFailure.assistantFailed'));
+    const buttons = view.renderer.root
+      .findAll(node => Object.is(node.type, 'Button'))
+      .map(node => node.props.accessibilityLabel);
+    expect(buttons).not.toContain(i18n.t('common.retry'));
+
+    const status = view.renderer.root.find(
+      node => Object.is(node.type, 'Text') && node.children.some(child => child === neutral)
+    );
+    expect(status.props.className).toContain('text-muted-foreground');
+    expect(status.props.className).not.toContain('text-destructive');
+    expect(status.props.accessibilityLabel).toBe(neutral);
+
+    // The row carries no destructive marker: the footer is the only surface a
+    // failure marker is drawn on, and it draws none.
+    const footers = view.renderer.root.findAll(
+      node => Object.is(node.type, 'View') && String(node.props.className).includes('pb-[24px]')
+    );
+    expect(footers).toHaveLength(1);
+    expect(footers[0]?.findAllByType('AlertCircle')).toHaveLength(0);
     expect(indicatorNodes(view)).toHaveLength(0);
   });
 

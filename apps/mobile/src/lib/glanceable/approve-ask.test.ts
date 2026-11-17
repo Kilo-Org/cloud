@@ -470,7 +470,7 @@ describe('runGlanceableApprove', () => {
     getSessionQuery.mockResolvedValue({ cloud_agent_session_id: 'agent_1' });
     fetchCloudAgentStreamTicket.mockImplementation(resolveTicket);
     createConnection.mockImplementation(fakeStream([connectedFrame(['perm_1'])]).open);
-    performRefresh.mockResolvedValue({ ok: false, refused: false });
+    performRefresh.mockResolvedValue({ kind: 'transient' });
   });
 
   it('is none when no ask is recorded', async () => {
@@ -671,7 +671,7 @@ describe('runGlanceableApprove', () => {
     readWaitingAsk.mockResolvedValue(PERMISSION_ASK);
     fetchCloudAgentStreamTicket.mockRejectedValue(new StreamTicketHttpError(401, 'Unauthorized'));
     performRefresh.mockResolvedValue({
-      ok: true,
+      kind: 'ok',
       token: 't',
       refreshToken: 'r',
       expiresIn: 60,
@@ -696,7 +696,7 @@ describe('runGlanceableApprove', () => {
     readWaitingAsk.mockResolvedValue(PERMISSION_ASK);
     getSessionQuery.mockRejectedValue(withCode('UNAUTHORIZED'));
     performRefresh.mockResolvedValue({
-      ok: true,
+      kind: 'ok',
       token: 't',
       refreshToken: 'r',
       expiresIn: 60,
@@ -710,7 +710,7 @@ describe('runGlanceableApprove', () => {
   it('is retryable when the refresh itself is only transiently unavailable', async () => {
     readWaitingAsk.mockResolvedValue(PERMISSION_ASK);
     getSessionQuery.mockRejectedValue(withCode('UNAUTHORIZED'));
-    performRefresh.mockResolvedValue({ ok: false, refused: false, superseded: true });
+    performRefresh.mockResolvedValue({ kind: 'superseded' });
     await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'retryable' });
   });
 
@@ -720,7 +720,7 @@ describe('runGlanceableApprove', () => {
     // pending permission from the shade and leave no way to answer it.
     readWaitingAsk.mockResolvedValue(PERMISSION_ASK);
     getSessionQuery.mockRejectedValue(withCode('UNAUTHORIZED'));
-    performRefresh.mockResolvedValue({ ok: false, refused: true });
+    performRefresh.mockResolvedValue({ kind: 'refused', sessionVersion: 1 });
     await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'retryable' });
     expect(recordWaitingAsk).not.toHaveBeenCalled();
   });

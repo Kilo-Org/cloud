@@ -44,7 +44,13 @@ type UseNewSessionReposResult = {
   /** True once every provider query has settled without error and at least one repo is visible. */
   reposSettled: boolean;
   /**
-   * True once every provider query has finished its first load.
+   * True once every provider query has finished its first load, or has outlived
+   * `PROVIDER_QUERY_SETTLE_BOUND_MS` while still loading. Every consumer reads
+   * this bounded value: the form's rows and the route-prefill seed gate alike,
+   * so a list that never answers withholds nothing. A prefill still unanswered
+   * at the bound is given up rather than deferred (`shouldAbandonRepoSeed`), so
+   * a late answer cannot mount a repository the region was declared final
+   * without.
    *
    * `isLoading` is false for a query that is paused or disabled, so a screen
    * that is offline (or a personal scope, where the Bitbucket query is
@@ -80,6 +86,22 @@ type UseNewSessionReposResult = {
  * `openAuthorizationAndWaitForReturn`).
  */
 const NEW_SESSION_REPOS_STALE_TIME_MS = 5 * 60 * 1000;
+
+/**
+ * How long the three provider lists may stay in their first load before the
+ * repository region stops waiting for them.
+ *
+ * Matches the client control-plane deadline (`CONTROL_PLANE_DEADLINE_MS`):
+ * the three lists travel in one batched request, the transport abandons an
+ * attempt after that deadline, and the query retries it, so a throttled link
+ * can keep the whole set pending for minutes. In a scope with no provider
+ * connected every list answers "not connected", which never changes the
+ * region's shape, so a list that cannot complete must not withhold the form's
+ * rows — the Ambiente row, the only entry to the profile picker — behind it.
+ * After the bound the section renders what it has, exactly as it does for a
+ * provider that reports nothing.
+ */
+export const PROVIDER_QUERY_SETTLE_BOUND_MS = 15_000;
 
 export function useNewSessionRepos({
   organizationId,
@@ -425,8 +447,42 @@ export function useNewSessionRepos({
     isRefreshingGitHub ||
     isRefreshingProviders;
 
-  const providerQueriesResolved =
+  // A provider list can stay pending forever — a throttled link, a paused query,
+  // a provider that never answers. Waiting for it is therefore a bounded state:
+  // after `PROVIDER_QUERY_SETTLE_BOUND_MS` the region stops withholding its rows
+  // for a list that may never land.
+  //
+  // The bound belongs to the SCOPE, not to one request. These queries retry, and
+  // a retry changes the request while the question — what can this scope's
+  // providers list? — stays the same. Re-arming on each request would withhold
+  // the rows for the whole retry chain, and clearing the timer between attempts
+  // would never fire it at all; an expiry tied to a counter that changes with the
+  // request was valid for a single render, so the rows entered and left again.
+  // One scope therefore arms the timer once and then stays settled, and a
+  // different scope arms its own. A retry of the same list can no longer unseat
+  // a row that is already on screen.
+  //
+  // The cost is the one the bound accepts: a list that answers just after the
+  // bound mounts its card then, which can push these rows once. A row that never
+  // appears is the worse failure, because the profile picker has no other entry
+  // from Home.
+  const providerScopeKey = organizationId ?? 'personal';
+  const [settledScopeKey, setSettledScopeKey] = useState<string | null>(null);
+  useEffect(() => {
+    if (settledScopeKey === providerScopeKey) {
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      setSettledScopeKey(providerScopeKey);
+    }, PROVIDER_QUERY_SETTLE_BOUND_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [providerScopeKey, settledScopeKey]);
+  const answersResolved =
     !githubQuery.isLoading && !gitlabQuery.isLoading && !bitbucketQuery.isLoading;
+
+  const providerQueriesResolved = answersResolved || settledScopeKey === providerScopeKey;
 
   const reposSettled =
     !githubQuery.isLoading &&

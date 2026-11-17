@@ -359,11 +359,11 @@ describe('ProfileCommandsScreen', () => {
       // be clipped by the row the control fills.
       expect(control.props.hitSlop).toEqual(LABELLED_LINE_ACTION_HIT_SLOP);
     }
-    // The label row must lay itself out one target tall so the control fits,
-    // and the label's copy stays at its top: the card's own padding above the
-    // label is unchanged and the extra height falls between the label and the
-    // field instead of above the label. The field owns that row, so the screen
-    // asks it for it.
+    // The target has to fit inside the row it sits in, and this suite renders
+    // no layout engine, so what it can hold is the contract at the screen's
+    // boundary: the field is asked to lay out a target-tall row with the copy
+    // at its top. The row's measured height and the copy's offset inside it are
+    // proved by the design-gate cells, which read the real frames.
     const fields = findAll(renderer.root, 'FormField');
     expect(fields).toHaveLength(3);
     for (const field of fields) {

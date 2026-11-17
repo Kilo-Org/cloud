@@ -15,26 +15,21 @@ import {
   readTrpcErrorField,
   trpcErrorVariant,
 } from '@/lib/trpc-error';
-import { type QueryErrorVariant } from '@/components/query-error';
 
 /**
  * Every state the usage screen's error surface can show. The first four take
  * their copy from `QueryError`'s variant; `unavailable` carries its own
  * title and message because "retrying won't help" is not one variant's copy.
+ * The screen renders `variant` through `QueryError` and offers a retry only
+ * when `showRetry` is true, so a terminal state is terminal everywhere the
+ * selector's result is used.
  */
-export type UsageErrorState =
+export type UsageErrorView =
   | { name: 'server'; variant: 'server'; showRetry: true }
   | { name: 'timeout'; variant: 'timeout'; showRetry: true }
   | { name: 'permission'; variant: 'permission'; showRetry: false }
   | { name: 'not-found'; variant: 'not-found'; showRetry: false }
   | { name: 'unavailable'; variant: 'server'; showRetry: false };
-
-/**
- * The screen renders `variant` through `QueryError` and offers a retry only
- * when `showRetry` is true, so a terminal state is terminal everywhere the
- * selector's result is used.
- */
-export type UsageErrorView = UsageErrorState;
 
 export function selectUsageErrorView(error: unknown): UsageErrorView {
   if (isUsageSourceUnavailable(error)) {

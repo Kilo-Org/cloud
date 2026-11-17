@@ -1,7 +1,4 @@
-import {
-  isUsageSourceNotConfigured,
-  USAGE_SOURCE_NOT_CONFIGURED_MESSAGE,
-} from '@kilocode/app-shared/usage-source';
+import { isUsageSourceNotConfigured } from '@kilocode/app-shared/usage-source';
 
 export type UsageQueryOutcome = 'loading' | 'error' | 'success';
 

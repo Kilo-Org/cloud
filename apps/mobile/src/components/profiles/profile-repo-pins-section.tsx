@@ -129,7 +129,11 @@ export function ProfileRepoPinsSection({
           <Pressable
             className={cn(
               SECTION_ACTION_BOX_CLASS,
-              'shrink-0 flex-row items-center justify-center gap-1 active:opacity-70',
+              // The outlined secondary chrome the action carried before, at the
+              // compact frame: the box holds the height, so no vertical padding,
+              // and the label is the body font the card's own rows read in.
+              'shrink-0 flex-row items-center justify-center gap-1.5 rounded-md border border-border px-2.5 active:opacity-80 dark:border-neutral-700 dark:bg-secondary',
+              'bg-card shadow-sm shadow-[#0000000D]',
               bind.isPending && 'opacity-50'
             )}
             hitSlop={SECTION_ACTION_HIT_SLOP}
@@ -141,8 +145,8 @@ export function ProfileRepoPinsSection({
               setPickerOpen(true);
             }}
           >
-            <Plus size={12} color={colors.primary} />
-            <Text variant="eyebrow" className="shrink text-[11px] text-primary">
+            <Plus size={14} color={colors.foreground} />
+            <Text className="shrink text-sm font-semibold text-foreground">
               {t('profiles.repoBindings.pinRepo')}
             </Text>
           </Pressable>

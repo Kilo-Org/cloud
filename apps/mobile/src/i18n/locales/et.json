@@ -4603,6 +4603,7 @@
       "authHeaderLabel": "Päise nimi",
       "authSecretLabel": "Jagatud saladus",
       "authSecretKeep": "Jäta tühjaks, et salvestatud saladus alles jääks.",
+      "authSecretSet": "Nõutav. Vali tugev juhuslik string.",
       "authSecretCreator": "Kui päästik käivitub selle loojana, kasuta vähemalt 16 tähemärki.",
       "autoCommit": "Kinnita muudatused, kui käivitus lõpeb",
       "condenseOnComplete": "Tihenda kontekst, kui käivitus lõpeb",

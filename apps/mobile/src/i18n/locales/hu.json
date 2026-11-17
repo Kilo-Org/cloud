@@ -4603,6 +4603,7 @@
       "authHeaderLabel": "Fejléc neve",
       "authSecretLabel": "Megosztott titok",
       "authSecretKeep": "Hagyja üresen a mentett titok megtartásához.",
+      "authSecretSet": "Kötelező. Válasszon egy erős véletlen karakterláncot.",
       "authSecretCreator": "Használjon legalább 16 karaktert, ha a trigger a létrehozójaként fut.",
       "autoCommit": "A módosítások véglegesítése a futás befejezésekor",
       "condenseOnComplete": "A kontextus tömörítése a futás befejezésekor",

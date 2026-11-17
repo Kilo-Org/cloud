@@ -4743,6 +4743,7 @@
       "authHeaderLabel": "Antraštės pavadinimas",
       "authSecretLabel": "Bendrasis slaptasis raktas",
       "authSecretKeep": "Palikite tuščią, kad išliktų išsaugotas slaptasis raktas.",
+      "authSecretSet": "Privaloma. Pasirinkite stiprią atsitiktinę eilutę.",
       "authSecretCreator": "Naudokite bent 16 simbolių, kai trigeris veikia kaip jo kūrėjas.",
       "autoCommit": "Įtraukti pakeitimus pasibaigus paleidimui",
       "condenseOnComplete": "Sutrumpinti kontekstą pasibaigus paleidimui",

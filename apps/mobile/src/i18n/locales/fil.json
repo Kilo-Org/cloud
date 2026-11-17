@@ -4603,6 +4603,7 @@
       "authHeaderLabel": "Pangalan ng header",
       "authSecretLabel": "Pinagsasaluhang sekreto",
       "authSecretKeep": "Iwanang blangko para mapanatili ang nakaimbak na sekreto.",
+      "authSecretSet": "Kinakailangan. Pumili ng malakas at random na string.",
       "authSecretCreator": "Gumamit ng hindi bababa sa 16 na karakter kapag tumakbo ang pampapagana bilang tagalikha nito.",
       "autoCommit": "I-commit ang mga pagbabago kapag natapos ang pagtakbo",
       "condenseOnComplete": "Paikliin ang konteksto kapag natapos ang pagtakbo",

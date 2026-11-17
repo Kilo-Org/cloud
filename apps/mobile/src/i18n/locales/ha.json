@@ -4603,6 +4603,7 @@
       "authHeaderLabel": "Sunan kanun",
       "authSecretLabel": "Sirrin da aka raba",
       "authSecretKeep": "Bar shi fanko don kiyaye sirrin da aka ajiye.",
+      "authSecretSet": "Ana buƙata. Zaɓi kirtani bazuwar mai ƙarfi.",
       "authSecretCreator": "Yi amfani da aƙalla haruffa 16 lokacin da mai jawowa ya gudana a matsayin wanda ya ƙirƙira shi.",
       "autoCommit": "Tabbatar da canje-canje idan gudanarwa ta ƙare",
       "condenseOnComplete": "Taƙaita mahallin idan gudanarwa ta ƙare",

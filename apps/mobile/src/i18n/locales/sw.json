@@ -4603,6 +4603,7 @@
       "authHeaderLabel": "Jina la kichwa",
       "authSecretLabel": "Siri inayoshirikiwa",
       "authSecretKeep": "Acha tupu ili kubaki na siri iliyohifadhiwa.",
+      "authSecretSet": "Inahitajika. Chagua mfuatano wa nasibu ulio imara.",
       "authSecretCreator": "Tumia angalau herufi 16 kichocheo kinapotekelezwa kama muundaji wake.",
       "autoCommit": "Hifadhi mabadiliko utekelezaji unapokamilika",
       "condenseOnComplete": "Fupisha muktadha utekelezaji unapokamilika",

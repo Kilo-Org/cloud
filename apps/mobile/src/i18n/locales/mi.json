@@ -4603,6 +4603,7 @@
       "authHeaderLabel": "Ingoa pane",
       "authSecretLabel": "Muna tiritahi",
       "authSecretKeep": "Waiho wātea hei pupuri i te muna kua tiakina.",
+      "authSecretSet": "E hiahiatia ana. Kōwhiria he aho matapōkere kaha.",
       "authSecretCreator": "Whakamahia kia 16 ngā pūāhua neke atu ina rere te kaiwhakaara hei tōna kaihanga.",
       "autoCommit": "Whakapūmau i ngā huringa ina mutu te rerenga",
       "condenseOnComplete": "Whakarāpopoto i te horopaki ina mutu te rerenga",

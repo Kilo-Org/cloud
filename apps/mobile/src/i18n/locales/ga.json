@@ -4813,6 +4813,7 @@
       "authHeaderLabel": "Ainm an cheanntáisc",
       "authSecretLabel": "Rún comhroinnte",
       "authSecretKeep": "Fág bán é chun an rún sábháilte a choinneáil.",
+      "authSecretSet": "Riachtanach. Roghnaigh teaghrán randamach láidir.",
       "authSecretCreator": "Úsáid 16 charachtar ar a laghad nuair a ritheann an truicear mar a chruthaitheoir.",
       "autoCommit": "Tiomantaigh athruithe nuair a chríochnaíonn an rith",
       "condenseOnComplete": "Dlúthaigh an comhthéacs nuair a chríochnaíonn an rith",

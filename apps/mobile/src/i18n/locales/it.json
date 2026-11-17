@@ -4673,6 +4673,7 @@
       "authHeaderLabel": "Nome intestazione",
       "authSecretLabel": "Segreto condiviso",
       "authSecretKeep": "Lascia vuoto per mantenere il segreto salvato.",
+      "authSecretSet": "Obbligatorio. Scegli una stringa casuale robusta.",
       "authSecretCreator": "Usa almeno 16 caratteri quando l'attivatore viene eseguito come il suo creatore.",
       "autoCommit": "Esegui il commit delle modifiche al termine dell'esecuzione",
       "condenseOnComplete": "Condensa il contesto al termine dell'esecuzione",

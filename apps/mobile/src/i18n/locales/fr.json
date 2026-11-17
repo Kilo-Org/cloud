@@ -4673,6 +4673,7 @@
       "authHeaderLabel": "Nom de l’en-tête",
       "authSecretLabel": "Secret partagé",
       "authSecretKeep": "Laissez vide pour conserver le secret enregistré.",
+      "authSecretSet": "Obligatoire. Choisissez une chaîne aléatoire robuste.",
       "authSecretCreator": "Utilisez au moins 16 caractères lorsque le déclencheur s’exécute en tant que son créateur.",
       "autoCommit": "Valider les modifications à la fin de l’exécution",
       "condenseOnComplete": "Condenser le contexte à la fin de l’exécution",

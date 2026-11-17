@@ -4603,6 +4603,7 @@
       "authHeaderLabel": "Opskrifnaam",
       "authSecretLabel": "Gedeelde geheim",
       "authSecretKeep": "Laat leeg om die gestoorde geheim te behou.",
+      "authSecretSet": "Verpligtend. Kies ’n sterk ewekansige string.",
       "authSecretCreator": "Gebruik minstens 16 karakters wanneer die sneller as sy skepper loop.",
       "autoCommit": "Pleeg veranderinge wanneer die lopie klaar is",
       "condenseOnComplete": "Verdig die konteks wanneer die lopie klaar is",

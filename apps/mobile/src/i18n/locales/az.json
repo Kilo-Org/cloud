@@ -4603,6 +4603,7 @@
       "authHeaderLabel": "Başlıq adı",
       "authSecretLabel": "Ortaq sirr",
       "authSecretKeep": "Yadda saxlanmış sirri saxlamaq üçün boş buraxın.",
+      "authSecretSet": "Məcburi. Güclü təsadüfi sətir seçin.",
       "authSecretCreator": "Tətikləyici yaradıcısı kimi işləyərkən ən azı 16 simvol istifadə edin.",
       "autoCommit": "İcra bitdikdə dəyişiklikləri qeyd edin",
       "condenseOnComplete": "İcra bitdikdə konteksti yığcamlaşdırın",

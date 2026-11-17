@@ -4603,6 +4603,7 @@
       "authHeaderLabel": "ヘッダー名",
       "authSecretLabel": "共有シークレット",
       "authSecretKeep": "保存されているシークレットを保持するには空欄にします。",
+      "authSecretSet": "必須。強力なランダムな文字列を選択してください。",
       "authSecretCreator": "トリガーが作成者として実行される場合は、16文字以上を使用してください。",
       "autoCommit": "実行完了時に変更をコミットする",
       "condenseOnComplete": "実行完了時にコンテキストを圧縮する",

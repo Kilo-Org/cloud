@@ -4679,6 +4679,7 @@
       "authHeaderLabel": "Nome do cabeçalho",
       "authSecretLabel": "Segredo partilhado",
       "authSecretKeep": "Deixe em branco para manter o segredo guardado.",
+      "authSecretSet": "Obrigatório. Escolha uma cadeia de caracteres aleatória robusta.",
       "authSecretCreator": "Use pelo menos 16 caracteres quando o acionador é executado como o respetivo criador.",
       "autoCommit": "Consolidar alterações quando a execução terminar",
       "condenseOnComplete": "Condensar o contexto quando a execução terminar",

@@ -4673,6 +4673,7 @@
       "authHeaderLabel": "Nom de la capçalera",
       "authSecretLabel": "Secret compartit",
       "authSecretKeep": "Deixa-ho en blanc per conservar el secret desat.",
+      "authSecretSet": "Obligatori. Tria una cadena aleatòria robusta.",
       "authSecretCreator": "Utilitza almenys 16 caràcters quan el disparador s'executi com a creador.",
       "autoCommit": "Confirma els canvis quan acabi l'execució",
       "condenseOnComplete": "Condensa el context quan acabi l'execució",

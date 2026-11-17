@@ -4603,6 +4603,7 @@
       "authHeaderLabel": "Heiti hauss",
       "authSecretLabel": "Sameiginlegt leyndarmál",
       "authSecretKeep": "Skildu autt til að halda vistuðu leyndarmáli.",
+      "authSecretSet": "Áskilið. Veldu sterkan handahófskenndan streng.",
       "authSecretCreator": "Notaðu að minnsta kosti 16 stafi þegar kveikjan keyrir sem höfundur hennar.",
       "autoCommit": "Vista breytingar þegar keyrslu lýkur",
       "condenseOnComplete": "Þjappa samhenginu þegar keyrslu lýkur",

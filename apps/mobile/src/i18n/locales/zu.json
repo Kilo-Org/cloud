@@ -4603,6 +4603,7 @@
       "authHeaderLabel": "Igama leheda",
       "authSecretLabel": "Imfihlo eyabiwe",
       "authSecretKeep": "Shiya kungenalutho ukuze ugcine imfihlo egciniwe.",
+      "authSecretSet": "Kuyadingeka. Khetha iyunithi yezinhlamvu engahleliwe eqinile.",
       "authSecretCreator": "Sebenzisa okungenani izinhlamvu eziyi-16 lapho isibangeli sisebenza njengomdali waso.",
       "autoCommit": "Gcina izinguquko lapho ukusebenza kuphela",
       "condenseOnComplete": "Fingqa umongo lapho ukusebenza kuphela",

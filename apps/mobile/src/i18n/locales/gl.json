@@ -4603,6 +4603,7 @@
       "authHeaderLabel": "Nome da cabeceira",
       "authSecretLabel": "Segredo compartido",
       "authSecretKeep": "Déixao en branco para conservar o segredo gardado.",
+      "authSecretSet": "Obrigatorio. Escolle unha cadea aleatoria robusta.",
       "authSecretCreator": "Usa polo menos 16 caracteres cando o disparador se executa como o seu creador.",
       "autoCommit": "Fai commit dos cambios cando remate a execución",
       "condenseOnComplete": "Condensa o contexto cando remate a execución",

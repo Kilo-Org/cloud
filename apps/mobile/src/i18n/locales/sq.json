@@ -4603,6 +4603,7 @@
       "authHeaderLabel": "Emri i kokës",
       "authSecretLabel": "Sekret i përbashkët",
       "authSecretKeep": "Lëre bosh për të mbajtur sekretin e ruajtur.",
+      "authSecretSet": "E detyrueshme. Zgjidh një varg të rastësishëm të fortë.",
       "authSecretCreator": "Përdor të paktën 16 karaktere kur shkaktari ekzekutohet si krijuesi i tij.",
       "autoCommit": "Regjistro ndryshimet kur përfundon ekzekutimi",
       "condenseOnComplete": "Përmblidh kontekstin kur përfundon ekzekutimi",

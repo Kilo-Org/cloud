@@ -4603,6 +4603,7 @@
       "authHeaderLabel": "Headernavn",
       "authSecretLabel": "Delt hemmelighed",
       "authSecretKeep": "Lad feltet være tomt for at beholde den gemte hemmelighed.",
+      "authSecretSet": "Påkrævet. Vælg en stærk tilfældig streng.",
       "authSecretCreator": "Brug mindst 16 tegn, når udløseren kører som sin opretter.",
       "autoCommit": "Registrér ændringerne, når kørslen slutter",
       "condenseOnComplete": "Komprimér konteksten, når kørslen slutter",

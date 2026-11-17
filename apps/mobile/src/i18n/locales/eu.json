@@ -4603,6 +4603,7 @@
       "authHeaderLabel": "Goiburuaren izena",
       "authSecretLabel": "Sekretu partekatua",
       "authSecretKeep": "Utzi hutsik gordetako sekretua mantentzeko.",
+      "authSecretSet": "Beharrezkoa. Aukeratu ausazko kate sendo bat.",
       "authSecretCreator": "Erabili gutxienez 16 karaktere abiarazlea bere sortzaile gisa exekutatzen denean.",
       "autoCommit": "Erregistratu aldaketak exekuzioa amaitzean",
       "condenseOnComplete": "Laburtu testuingurua exekuzioa amaitzean",

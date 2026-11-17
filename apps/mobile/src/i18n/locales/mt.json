@@ -4813,6 +4813,7 @@
       "authHeaderLabel": "Isem l-intestatura",
       "authSecretLabel": "Sigriet kondiviż",
       "authSecretKeep": "Ħalli vojt biex iżżomm is-sigriet salvat.",
+      "authSecretSet": "Meħtieġ. Agħżel string każwali qawwi.",
       "authSecretCreator": "Uża mill-inqas 16-il karattru meta l-iskattatur jaħdem bħala l-kreatur tiegħu.",
       "autoCommit": "Ikkommetti l-bidliet meta tintemm l-eżekuzzjoni",
       "condenseOnComplete": "Ikkondensa l-kuntest meta tintemm l-eżekuzzjoni",

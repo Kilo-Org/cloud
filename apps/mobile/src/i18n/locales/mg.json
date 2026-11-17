@@ -4603,6 +4603,7 @@
       "authHeaderLabel": "Anaran'ny lohateny",
       "authSecretLabel": "Tsiambaratelo zaraina",
       "authSecretKeep": "Avelao foana raha te hitahiry ny tsiambaratelo voatahiry.",
+      "authSecretSet": "Ilaina. Safidio ny tady kisendrasendra matanjaka.",
       "authSecretCreator": "Mampiasà farafahakeliny 16 tarehintsoratra rehefa mihazakazaka amin'ny maha-mpamorona azy ny fanentanana.",
       "autoCommit": "Ataovy voatahiry ny fanovana rehefa vita ny fanatanterahana.",
       "condenseOnComplete": "Ahena ny tontolon-kevitra rehefa vita ny fanatanterahana.",

@@ -4603,6 +4603,7 @@
       "authHeaderLabel": "Nama pengepala",
       "authSecretLabel": "Rahsia dikongsi",
       "authSecretKeep": "Biarkan kosong untuk mengekalkan rahsia yang disimpan.",
+      "authSecretSet": "Diperlukan. Pilih rentetan rawak yang kukuh.",
       "authSecretCreator": "Gunakan sekurang-kurangnya 16 aksara apabila pencetus berjalan sebagai penciptanya.",
       "autoCommit": "Komit perubahan apabila larian selesai",
       "condenseOnComplete": "Ringkaskan konteks apabila larian selesai",

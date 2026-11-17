@@ -4603,6 +4603,7 @@
       "authHeaderLabel": "Headernaam",
       "authSecretLabel": "Gedeeld geheim",
       "authSecretKeep": "Laat leeg om het opgeslagen geheim te behouden.",
+      "authSecretSet": "Verplicht. Kies een sterke willekeurige tekenreeks.",
       "authSecretCreator": "Gebruik minstens 16 tekens wanneer de trigger als de maker wordt uitgevoerd.",
       "autoCommit": "Wijzigingen committen wanneer de uitvoering eindigt",
       "condenseOnComplete": "De context inkorten wanneer de uitvoering eindigt",

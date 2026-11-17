@@ -4673,6 +4673,7 @@
       "authHeaderLabel": "Naziv zaglavlja",
       "authSecretLabel": "Dijeljena tajna",
       "authSecretKeep": "Ostavite prazno da zadržite sačuvanu tajnu.",
+      "authSecretSet": "Obavezno. Odaberite jaku slučajnu nizu.",
       "authSecretCreator": "Koristite najmanje 16 znakova kada se okidač pokreće kao njegov kreator.",
       "autoCommit": "Commitaj promjene kada se pokretanje završi",
       "condenseOnComplete": "Sažmi kontekst kada se pokretanje završi",

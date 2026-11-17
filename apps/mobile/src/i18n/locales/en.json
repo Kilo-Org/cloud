@@ -4603,6 +4603,7 @@
       "authHeaderLabel": "Header name",
       "authSecretLabel": "Shared secret",
       "authSecretKeep": "Leave blank to keep the saved secret.",
+      "authSecretSet": "Required. Choose a strong random string.",
       "authSecretCreator": "Use at least 16 characters when the trigger runs as its creator.",
       "autoCommit": "Commit changes when the run finishes",
       "condenseOnComplete": "Condense the context when the run finishes",

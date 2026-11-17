@@ -4603,6 +4603,7 @@
       "authHeaderLabel": "Başlık adı",
       "authSecretLabel": "Paylaşılan gizli anahtar",
       "authSecretKeep": "Kaydedilmiş gizli anahtarı korumak için boş bırakın.",
+      "authSecretSet": "Zorunlu. Güçlü rastgele bir dize seçin.",
       "authSecretCreator": "Tetikleyici oluşturucusu olarak çalıştığında en az 16 karakter kullanın.",
       "autoCommit": "Çalıştırma bittiğinde değişiklikleri işle",
       "condenseOnComplete": "Çalıştırma bittiğinde bağlamı sıkıştır",

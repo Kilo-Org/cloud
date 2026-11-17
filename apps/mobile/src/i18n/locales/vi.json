@@ -4603,6 +4603,7 @@
       "authHeaderLabel": "Tên tiêu đề",
       "authSecretLabel": "Bí mật chia sẻ",
       "authSecretKeep": "Để trống để giữ bí mật đã lưu.",
+      "authSecretSet": "Bắt buộc. Chọn một chuỗi ngẫu nhiên mạnh.",
       "authSecretCreator": "Dùng ít nhất 16 ký tự khi trình kích hoạt chạy dưới danh nghĩa người tạo.",
       "autoCommit": "Commit thay đổi khi lần chạy kết thúc",
       "condenseOnComplete": "Cô đọng ngữ cảnh khi lần chạy kết thúc",

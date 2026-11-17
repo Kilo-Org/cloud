@@ -486,14 +486,8 @@
     "changelogFixesIn": "إصلاحات وتحسينات في {{areas}}.",
     "changelogFixesAcrossApp": "إصلاحات وتحسينات في جميع أنحاء التطبيق.",
     "changelogAreas": {
-      "chat": "الدردشة",
-      "cloudAgent": "الوكيل السحابي",
-      "securityAgent": "وكيل الأمان",
-      "codeReviewer": "مراجع التعليمات البرمجية",
       "signIn": "تسجيل الدخول",
-      "profileOrganizations": "الملف الشخصي والمؤسسات",
-      "notifications": "الإشعارات",
-      "integrations": "التكاملات"
+      "profileOrganizations": "الملف الشخصي والمؤسسات"
     }
   },
   "preferences": {

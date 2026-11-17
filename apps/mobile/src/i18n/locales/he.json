@@ -486,14 +486,8 @@
     "changelogFixesIn": "תיקונים ושיפורים בתחומים הבאים: {{areas}}.",
     "changelogFixesAcrossApp": "תיקונים ושיפורים בכל האפליקציה.",
     "changelogAreas": {
-      "chat": "צ'אט",
-      "cloudAgent": "סוכן ענן",
-      "securityAgent": "סוכן אבטחה",
-      "codeReviewer": "סוקר קוד",
       "signIn": "התחברות",
-      "profileOrganizations": "פרופיל וארגונים",
-      "notifications": "התראות",
-      "integrations": "שילובים"
+      "profileOrganizations": "פרופיל וארגונים"
     }
   },
   "preferences": {

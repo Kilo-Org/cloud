@@ -486,14 +486,8 @@
     "changelogFixesIn": "Дараах хэсгүүдэд засвар, сайжруулалт хийгдсэн: {{areas}}.",
     "changelogFixesAcrossApp": "Апп даяар засвар, сайжруулалт хийгдсэн.",
     "changelogAreas": {
-      "chat": "Чат",
-      "cloudAgent": "Үүлэн агент",
-      "securityAgent": "Аюулгүй байдлын агент",
-      "codeReviewer": "Код хянагч",
       "signIn": "Нэвтрэх",
-      "profileOrganizations": "Профайл ба байгууллагууд",
-      "notifications": "Мэдэгдэл",
-      "integrations": "Интеграци"
+      "profileOrganizations": "Профайл ба байгууллагууд"
     }
   },
   "preferences": {

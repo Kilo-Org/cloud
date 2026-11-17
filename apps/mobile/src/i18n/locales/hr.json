@@ -486,14 +486,8 @@
     "changelogFixesIn": "Ispravci i poboljšanja u područjima: {{areas}}.",
     "changelogFixesAcrossApp": "Ispravci i poboljšanja u cijeloj aplikaciji.",
     "changelogAreas": {
-      "chat": "Razgovor",
-      "cloudAgent": "Agent u oblaku",
-      "securityAgent": "Sigurnosni agent",
-      "codeReviewer": "Pregledavač koda",
       "signIn": "Prijava",
-      "profileOrganizations": "Profil i organizacije",
-      "notifications": "Obavijesti",
-      "integrations": "Integracije"
+      "profileOrganizations": "Profil i organizacije"
     }
   },
   "preferences": {

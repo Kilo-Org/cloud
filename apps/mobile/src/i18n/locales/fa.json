@@ -486,14 +486,8 @@
     "changelogFixesIn": "رفع اشکالات و بهبودها در {{areas}}.",
     "changelogFixesAcrossApp": "رفع اشکالات و بهبودها در سراسر برنامه.",
     "changelogAreas": {
-      "chat": "گفتگو",
-      "cloudAgent": "عامل ابری",
-      "securityAgent": "عامل امنیتی",
-      "codeReviewer": "بازبین کد",
       "signIn": "ورود",
-      "profileOrganizations": "نمایه و سازمان‌ها",
-      "notifications": "اعلان‌ها",
-      "integrations": "یکپارچه‌سازی‌ها"
+      "profileOrganizations": "نمایه و سازمان‌ها"
     }
   },
   "preferences": {

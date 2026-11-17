@@ -486,14 +486,8 @@
     "changelogFixesIn": "Javítások és fejlesztések a következő területeken: {{areas}}.",
     "changelogFixesAcrossApp": "Javítások és fejlesztések az egész alkalmazásban.",
     "changelogAreas": {
-      "chat": "Csevegés",
-      "cloudAgent": "Felhőügynök",
-      "securityAgent": "Biztonsági ügynök",
-      "codeReviewer": "Kódellenőrző",
       "signIn": "Bejelentkezés",
-      "profileOrganizations": "Profil és szervezetek",
-      "notifications": "Értesítések",
-      "integrations": "Integrációk"
+      "profileOrganizations": "Profil és szervezetek"
     }
   },
   "preferences": {

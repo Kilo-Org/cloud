@@ -486,14 +486,8 @@
     "changelogFixesIn": "چاککردن و باشترکردن لەم بەشانەدا: {{areas}}.",
     "changelogFixesAcrossApp": "چاککردن و باشترکردن لە سەرتاسەری ئەپەکەدا.",
     "changelogAreas": {
-      "chat": "چات",
-      "cloudAgent": "بریکاری هەور",
-      "securityAgent": "بریکاری ئاسایش",
-      "codeReviewer": "پێداچووەرەوەی کۆد",
       "signIn": "چوونەژوورەوە",
-      "profileOrganizations": "پرۆفایل و ڕێکخراوەکان",
-      "notifications": "ئاگادارکردنەوەکان",
-      "integrations": "یەکخستنەکان"
+      "profileOrganizations": "پرۆفایل و ڕێکخراوەکان"
     }
   },
   "preferences": {

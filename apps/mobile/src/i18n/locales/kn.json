@@ -486,14 +486,8 @@
     "changelogFixesIn": "ಈ ವಿಭಾಗಗಳಲ್ಲಿ ದೋಷ ಪರಿಹಾರಗಳು ಮತ್ತು ಸುಧಾರಣೆಗಳು: {{areas}}.",
     "changelogFixesAcrossApp": "ಆ್ಯಪ್‌ನಾದ್ಯಂತ ದೋಷ ಪರಿಹಾರಗಳು ಮತ್ತು ಸುಧಾರಣೆಗಳು.",
     "changelogAreas": {
-      "chat": "ಚಾಟ್",
-      "cloudAgent": "ಕ್ಲೌಡ್ ಏಜೆಂಟ್",
-      "securityAgent": "ಭದ್ರತಾ ಏಜೆಂಟ್",
-      "codeReviewer": "ಕೋಡ್ ಪರಿಶೀಲಕ",
       "signIn": "ಸೈನ್ ಇನ್",
-      "profileOrganizations": "ಪ್ರೊಫೈಲ್ ಮತ್ತು ಸಂಸ್ಥೆಗಳು",
-      "notifications": "ಅಧಿಸೂಚನೆಗಳು",
-      "integrations": "ಏಕೀಕರಣಗಳು"
+      "profileOrganizations": "ಪ್ರೊಫೈಲ್ ಮತ್ತು ಸಂಸ್ಥೆಗಳು"
     }
   },
   "preferences": {

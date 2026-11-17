@@ -486,14 +486,8 @@
     "changelogFixesIn": "ການແກ້ໄຂ ແລະ ການປັບປຸງໃນ {{areas}}.",
     "changelogFixesAcrossApp": "ການແກ້ໄຂ ແລະ ການປັບປຸງທົ່ວທັງແອັບ.",
     "changelogAreas": {
-      "chat": "ແຊັດ",
-      "cloudAgent": "ຕົວແທນຄລາວ",
-      "securityAgent": "ຕົວແທນຄວາມປອດໄພ",
-      "codeReviewer": "ຜູ້ກວດສອບໂຄດ",
       "signIn": "ການເຂົ້າສູ່ລະບົບ",
-      "profileOrganizations": "ໂປຣໄຟລ໌ ແລະ ອົງກອນ",
-      "notifications": "ການແຈ້ງເຕືອນ",
-      "integrations": "ການເຊື່ອມຕໍ່"
+      "profileOrganizations": "ໂປຣໄຟລ໌ ແລະ ອົງກອນ"
     }
   },
   "preferences": {

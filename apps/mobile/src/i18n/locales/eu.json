@@ -486,14 +486,8 @@
     "changelogFixesIn": "Zuzenketak eta hobekuntzak atal hauetan: {{areas}}.",
     "changelogFixesAcrossApp": "Zuzenketak eta hobekuntzak aplikazio osoan.",
     "changelogAreas": {
-      "chat": "Txata",
-      "cloudAgent": "Hodeiko agentea",
-      "securityAgent": "Segurtasun-agentea",
-      "codeReviewer": "Kode-berrikuslea",
       "signIn": "Saioa hastea",
-      "profileOrganizations": "Profila eta erakundeak",
-      "notifications": "Jakinarazpenak",
-      "integrations": "Integrazioak"
+      "profileOrganizations": "Profila eta erakundeak"
     }
   },
   "preferences": {

@@ -486,14 +486,8 @@
     "changelogFixesIn": "{{areas}}方面的修复与改进。",
     "changelogFixesAcrossApp": "全应用范围的修复与改进。",
     "changelogAreas": {
-      "chat": "聊天",
-      "cloudAgent": "云端代理",
-      "securityAgent": "安全代理",
-      "codeReviewer": "代码审查员",
       "signIn": "登录",
-      "profileOrganizations": "个人资料和组织",
-      "notifications": "通知",
-      "integrations": "集成"
+      "profileOrganizations": "个人资料和组织"
     }
   },
   "preferences": {

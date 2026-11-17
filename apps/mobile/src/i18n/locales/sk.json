@@ -486,14 +486,8 @@
     "changelogFixesIn": "Opravy a vylepšenia v oblastiach: {{areas}}.",
     "changelogFixesAcrossApp": "Opravy a vylepšenia v celej aplikácii.",
     "changelogAreas": {
-      "chat": "Čet",
-      "cloudAgent": "Cloudový agent",
-      "securityAgent": "Bezpečnostný agent",
-      "codeReviewer": "Kontrolór kódu",
       "signIn": "Prihlásenie",
-      "profileOrganizations": "Profil a organizácie",
-      "notifications": "Upozornenia",
-      "integrations": "Integrácie"
+      "profileOrganizations": "Profil a organizácie"
     }
   },
   "preferences": {

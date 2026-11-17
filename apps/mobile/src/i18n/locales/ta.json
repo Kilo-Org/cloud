@@ -486,14 +486,8 @@
     "changelogFixesIn": "இந்தப் பகுதிகளில் திருத்தங்களும் மேம்பாடுகளும்: {{areas}}.",
     "changelogFixesAcrossApp": "செயலி முழுவதும் திருத்தங்களும் மேம்பாடுகளும்.",
     "changelogAreas": {
-      "chat": "அரட்டை",
-      "cloudAgent": "மேகக்கணி முகவர்",
-      "securityAgent": "பாதுகாப்பு முகவர்",
-      "codeReviewer": "குறியீடு மதிப்பாய்வாளர்",
       "signIn": "உள்நுழைவு",
-      "profileOrganizations": "சுயவிவரம் மற்றும் நிறுவனங்கள்",
-      "notifications": "அறிவிப்புகள்",
-      "integrations": "ஒருங்கிணைப்புகள்"
+      "profileOrganizations": "சுயவிவரம் மற்றும் நிறுவனங்கள்"
     }
   },
   "preferences": {

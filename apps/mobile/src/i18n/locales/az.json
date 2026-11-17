@@ -486,14 +486,8 @@
     "changelogFixesIn": "{{areas}} bölmələrində düzəlişlər və təkmilləşdirmələr.",
     "changelogFixesAcrossApp": "Bütün tətbiqdə düzəlişlər və təkmilləşdirmələr.",
     "changelogAreas": {
-      "chat": "Söhbət",
-      "cloudAgent": "Bulud agenti",
-      "securityAgent": "Təhlükəsizlik agenti",
-      "codeReviewer": "Kod rəyçisi",
       "signIn": "Giriş",
-      "profileOrganizations": "Profil və təşkilatlar",
-      "notifications": "Bildirişlər",
-      "integrations": "İnteqrasiyalar"
+      "profileOrganizations": "Profil və təşkilatlar"
     }
   },
   "preferences": {

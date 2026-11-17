@@ -486,14 +486,8 @@
     "changelogFixesIn": "ఈ విభాగాల్లో పరిష్కారాలు మరియు మెరుగుదలలు: {{areas}}.",
     "changelogFixesAcrossApp": "యాప్ అంతటా పరిష్కారాలు మరియు మెరుగుదలలు.",
     "changelogAreas": {
-      "chat": "చాట్",
-      "cloudAgent": "క్లౌడ్ ఏజెంట్",
-      "securityAgent": "భద్రతా ఏజెంట్",
-      "codeReviewer": "కోడ్ సమీక్షకుడు",
       "signIn": "సైన్ ఇన్",
-      "profileOrganizations": "ప్రొఫైల్ మరియు సంస్థలు",
-      "notifications": "నోటిఫికేషన్‌లు",
-      "integrations": "ఇంటిగ్రేషన్‌లు"
+      "profileOrganizations": "ప్రొఫైల్ మరియు సంస్థలు"
     }
   },
   "preferences": {

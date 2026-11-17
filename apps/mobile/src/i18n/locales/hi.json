@@ -486,14 +486,8 @@
     "changelogFixesIn": "{{areas}} में त्रुटि-सुधार और बेहतरी।",
     "changelogFixesAcrossApp": "पूरे ऐप में त्रुटि-सुधार और बेहतरी।",
     "changelogAreas": {
-      "chat": "चैट",
-      "cloudAgent": "क्लाउड एजेंट",
-      "securityAgent": "सुरक्षा एजेंट",
-      "codeReviewer": "कोड समीक्षक",
       "signIn": "साइन-इन",
-      "profileOrganizations": "प्रोफ़ाइल और संगठन",
-      "notifications": "सूचनाएँ",
-      "integrations": "इंटीग्रेशन"
+      "profileOrganizations": "प्रोफ़ाइल और संगठन"
     }
   },
   "preferences": {

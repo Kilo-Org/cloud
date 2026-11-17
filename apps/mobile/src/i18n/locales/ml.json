@@ -486,14 +486,8 @@
     "changelogFixesIn": "{{areas}} എന്നിവയിൽ പരിഹാരങ്ങളും മെച്ചപ്പെടുത്തലുകളും.",
     "changelogFixesAcrossApp": "ആപ്പിലുടനീളം പരിഹാരങ്ങളും മെച്ചപ്പെടുത്തലുകളും.",
     "changelogAreas": {
-      "chat": "ചാറ്റ്",
-      "cloudAgent": "ക്ലൗഡ് ഏജന്റ്",
-      "securityAgent": "സുരക്ഷാ ഏജന്റ്",
-      "codeReviewer": "കോഡ് അവലോകകൻ",
       "signIn": "സൈൻ ഇൻ",
-      "profileOrganizations": "പ്രൊഫൈലും സ്ഥാപനങ്ങളും",
-      "notifications": "അറിയിപ്പുകൾ",
-      "integrations": "സംയോജനങ്ങൾ"
+      "profileOrganizations": "പ്രൊഫൈലും സ്ഥാപനങ്ങളും"
     }
   },
   "preferences": {

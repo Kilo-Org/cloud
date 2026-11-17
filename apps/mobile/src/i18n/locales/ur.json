@@ -486,14 +486,8 @@
     "changelogFixesIn": "ان حصوں میں اصلاحات اور بہتریاں: {{areas}}۔",
     "changelogFixesAcrossApp": "پوری ایپ میں اصلاحات اور بہتریاں۔",
     "changelogAreas": {
-      "chat": "چیٹ",
-      "cloudAgent": "کلاؤڈ ایجنٹ",
-      "securityAgent": "سیکیورٹی ایجنٹ",
-      "codeReviewer": "کوڈ جائزہ کار",
       "signIn": "سائن ان",
-      "profileOrganizations": "پروفائل اور تنظیمیں",
-      "notifications": "اطلاعات",
-      "integrations": "انٹیگریشنز"
+      "profileOrganizations": "پروفائل اور تنظیمیں"
     }
   },
   "preferences": {

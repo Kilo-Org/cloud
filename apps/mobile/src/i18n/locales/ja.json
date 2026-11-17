@@ -486,14 +486,8 @@
     "changelogFixesIn": "{{areas}}に関する修正と改善を行いました。",
     "changelogFixesAcrossApp": "アプリ全体の修正と改善を行いました。",
     "changelogAreas": {
-      "chat": "チャット",
-      "cloudAgent": "クラウドエージェント",
-      "securityAgent": "セキュリティエージェント",
-      "codeReviewer": "コードレビュアー",
       "signIn": "サインイン",
-      "profileOrganizations": "プロフィールと組織",
-      "notifications": "通知",
-      "integrations": "連携"
+      "profileOrganizations": "プロフィールと組織"
     }
   },
   "preferences": {

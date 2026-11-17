@@ -11,6 +11,7 @@ import { useSideInsetStyle } from '@/lib/screen-insets';
 
 import changelog from '../../CHANGELOG.md';
 import {
+  type ChangelogArea,
   changelogNotesArePending,
   type ChangelogSection,
   changelogSections,
@@ -53,6 +54,23 @@ const keyExtractor = (section: ChangelogSection) => section.version;
 
 const groupLabelClass = 'uppercase tracking-wide text-muted-foreground';
 
+/**
+ * The catalog key that names each area. Six of the areas already carry a label
+ * the app paints elsewhere, so the changelog reuses those keys instead of
+ * wording the same product name a second time; only sign-in and the profile
+ * have no existing label of their own.
+ */
+const AREA_LABEL_KEYS = {
+  chat: 'common.chat',
+  cloudAgent: 'agentChat.instancePicker.cloudAgent',
+  securityAgent: 'common.securityAgent',
+  codeReviewer: 'common.codeReviewer',
+  signIn: 'profile.changelogAreas.signIn',
+  profileOrganizations: 'profile.changelogAreas.profileOrganizations',
+  notifications: 'common.notifications',
+  integrations: 'integrations.title',
+} as const satisfies Record<ChangelogArea, string>;
+
 function NoteRow({ text }: Readonly<{ text: string }>) {
   return (
     <View className="flex-row gap-2">
@@ -69,7 +87,7 @@ function NoteRow({ text }: Readonly<{ text: string }>) {
  */
 function ReleaseSection({ section }: Readonly<{ section: ChangelogSection }>) {
   const { t, i18n } = useTranslation();
-  const areas = section.fixesAreas.map(area => t(`profile.changelogAreas.${area}`));
+  const areas = section.fixesAreas.map(area => t(AREA_LABEL_KEYS[area]));
   const fixesLabel =
     areas.length === 0
       ? t('profile.changelogFixesAcrossApp')

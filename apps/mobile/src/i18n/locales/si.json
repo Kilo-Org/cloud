@@ -486,14 +486,8 @@
     "changelogFixesIn": "{{areas}} හි නිවැරදි කිරීම් සහ වැඩිදියුණු කිරීම්.",
     "changelogFixesAcrossApp": "සම්පූර්ණ යෙදුම පුරා නිවැරදි කිරීම් සහ වැඩිදියුණු කිරීම්.",
     "changelogAreas": {
-      "chat": "කතාබස්",
-      "cloudAgent": "වලාකුළු නියෝජිත",
-      "securityAgent": "ආරක්ෂක නියෝජිත",
-      "codeReviewer": "කේත සමාලෝචක",
       "signIn": "පුරනය වීම",
-      "profileOrganizations": "පැතිකඩ සහ සංවිධාන",
-      "notifications": "දැනුම්දීම්",
-      "integrations": "ඒකාබද්ධ කිරීම්"
+      "profileOrganizations": "පැතිකඩ සහ සංවිධාන"
     }
   },
   "preferences": {

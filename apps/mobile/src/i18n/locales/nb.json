@@ -486,14 +486,8 @@
     "changelogFixesIn": "Feilrettinger og forbedringer i {{areas}}.",
     "changelogFixesAcrossApp": "Feilrettinger og forbedringer i hele appen.",
     "changelogAreas": {
-      "chat": "Samtaler",
-      "cloudAgent": "Skyagent",
-      "securityAgent": "Sikkerhetsagent",
-      "codeReviewer": "Kodegransker",
       "signIn": "Innlogging",
-      "profileOrganizations": "Profil og organisasjoner",
-      "notifications": "Varsler",
-      "integrations": "Integrasjoner"
+      "profileOrganizations": "Profil og organisasjoner"
     }
   },
   "preferences": {

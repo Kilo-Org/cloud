@@ -21,7 +21,7 @@
 import areas from './changelog-areas.json';
 
 /** A product area a fix touched: a key of `changelog-areas.json`'s `areas`. */
-type ChangelogArea = keyof typeof areas.areas;
+export type ChangelogArea = keyof typeof areas.areas;
 
 /**
  * One version's notes. They are what the reader is shown, not the file:

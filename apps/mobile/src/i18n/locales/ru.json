@@ -486,14 +486,8 @@
     "changelogFixesIn": "Исправления и улучшения в разделах: {{areas}}.",
     "changelogFixesAcrossApp": "Исправления и улучшения во всём приложении.",
     "changelogAreas": {
-      "chat": "Чат",
-      "cloudAgent": "Облачный агент",
-      "securityAgent": "Агент безопасности",
-      "codeReviewer": "Ревьюер кода",
       "signIn": "Вход",
-      "profileOrganizations": "Профиль и организации",
-      "notifications": "Уведомления",
-      "integrations": "Интеграции"
+      "profileOrganizations": "Профиль и организации"
     }
   },
   "preferences": {

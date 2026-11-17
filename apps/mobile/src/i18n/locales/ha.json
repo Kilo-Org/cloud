@@ -486,14 +486,8 @@
     "changelogFixesIn": "Gyare-gyare da ingantawa a {{areas}}.",
     "changelogFixesAcrossApp": "Gyare-gyare da ingantawa a duk faɗin manhajar.",
     "changelogAreas": {
-      "chat": "Hira",
-      "cloudAgent": "Wakilin gajimare",
-      "securityAgent": "Wakilin tsaro",
-      "codeReviewer": "Mai bitar lambar shiri",
       "signIn": "Shiga",
-      "profileOrganizations": "Bayanan martaba da ƙungiyoyi",
-      "notifications": "Sanarwa",
-      "integrations": "Haɗe-haɗe"
+      "profileOrganizations": "Bayanan martaba da ƙungiyoyi"
     }
   },
   "preferences": {

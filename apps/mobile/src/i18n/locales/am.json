@@ -486,14 +486,8 @@
     "changelogFixesIn": "በእነዚህ ክፍሎች ጥገናዎች እና ማሻሻያዎች ተደርገዋል፦ {{areas}}።",
     "changelogFixesAcrossApp": "በመተግበሪያው ውስጥ በሙሉ ጥገናዎች እና ማሻሻያዎች ተደርገዋል።",
     "changelogAreas": {
-      "chat": "ውይይት",
-      "cloudAgent": "የደመና ወኪል",
-      "securityAgent": "የደህንነት ወኪል",
-      "codeReviewer": "የኮድ ገምጋሚ",
       "signIn": "መግቢያ",
-      "profileOrganizations": "መገለጫ እና ድርጅቶች",
-      "notifications": "ማሳወቂያዎች",
-      "integrations": "ውህደቶች"
+      "profileOrganizations": "መገለጫ እና ድርጅቶች"
     }
   },
   "preferences": {

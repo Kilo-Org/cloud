@@ -486,14 +486,8 @@
     "changelogFixesIn": "Fanitsiana sy fanatsarana amin'ireto sehatra ireto: {{areas}}.",
     "changelogFixesAcrossApp": "Fanitsiana sy fanatsarana manerana ny fampiharana.",
     "changelogAreas": {
-      "chat": "Resaka",
-      "cloudAgent": "Solontena an-drahona",
-      "securityAgent": "Solontena fiarovana",
-      "codeReviewer": "Mpandinika kaody",
       "signIn": "Fidirana",
-      "profileOrganizations": "Mombamomba sy fikambanana",
-      "notifications": "Fampandrenesana",
-      "integrations": "Fampifandraisana"
+      "profileOrganizations": "Mombamomba sy fikambanana"
     }
   },
   "preferences": {

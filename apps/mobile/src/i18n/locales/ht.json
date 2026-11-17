@@ -486,14 +486,8 @@
     "changelogFixesIn": "Koreksyon ak amelyorasyon nan {{areas}}.",
     "changelogFixesAcrossApp": "Koreksyon ak amelyorasyon nan tout aplikasyon an.",
     "changelogAreas": {
-      "chat": "Konvèsasyon",
-      "cloudAgent": "Ajan nan nwaj",
-      "securityAgent": "Ajan sekirite",
-      "codeReviewer": "Revizè kòd",
       "signIn": "Koneksyon",
-      "profileOrganizations": "Pwofil ak òganizasyon",
-      "notifications": "Notifikasyon",
-      "integrations": "Entegrasyon"
+      "profileOrganizations": "Pwofil ak òganizasyon"
     }
   },
   "preferences": {

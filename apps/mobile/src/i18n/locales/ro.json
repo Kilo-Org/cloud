@@ -486,14 +486,8 @@
     "changelogFixesIn": "Remedieri și îmbunătățiri în {{areas}}.",
     "changelogFixesAcrossApp": "Remedieri și îmbunătățiri în întreaga aplicație.",
     "changelogAreas": {
-      "chat": "Conversații",
-      "cloudAgent": "Agent cloud",
-      "securityAgent": "Agent de securitate",
-      "codeReviewer": "Revizor de cod",
       "signIn": "Autentificare",
-      "profileOrganizations": "Profil și organizații",
-      "notifications": "Notificări",
-      "integrations": "Integrări"
+      "profileOrganizations": "Profil și organizații"
     }
   },
   "preferences": {

@@ -552,14 +552,8 @@
     "changelogFixesIn": "Fixes and improvements in {{areas}}.",
     "changelogFixesAcrossApp": "Fixes and improvements across the app.",
     "changelogAreas": {
-      "chat": "Chat",
-      "cloudAgent": "Cloud Agent",
-      "securityAgent": "Security Agent",
-      "codeReviewer": "Code Reviewer",
       "signIn": "Sign-in",
-      "profileOrganizations": "Profile and organizations",
-      "notifications": "Notifications",
-      "integrations": "Integrations"
+      "profileOrganizations": "Profile and organizations"
     },
     "changelogVersionPending": "The notes for {{version}} arrive with the next app update."
   },

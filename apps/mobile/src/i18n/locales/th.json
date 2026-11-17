@@ -486,14 +486,8 @@
     "changelogFixesIn": "การแก้ไขและปรับปรุงใน {{areas}}",
     "changelogFixesAcrossApp": "การแก้ไขและปรับปรุงทั่วทั้งแอป",
     "changelogAreas": {
-      "chat": "แชท",
-      "cloudAgent": "เอเจนต์บนคลาวด์",
-      "securityAgent": "เอเจนต์ความปลอดภัย",
-      "codeReviewer": "ผู้ตรวจสอบโค้ด",
       "signIn": "การลงชื่อเข้าใช้",
-      "profileOrganizations": "โปรไฟล์และองค์กร",
-      "notifications": "การแจ้งเตือน",
-      "integrations": "การผสานรวม"
+      "profileOrganizations": "โปรไฟล์และองค์กร"
     }
   },
   "preferences": {

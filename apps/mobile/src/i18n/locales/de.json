@@ -486,14 +486,8 @@
     "changelogFixesIn": "Fehlerbehebungen und Verbesserungen in den Bereichen {{areas}}.",
     "changelogFixesAcrossApp": "Fehlerbehebungen und Verbesserungen in der gesamten App.",
     "changelogAreas": {
-      "chat": "Chat",
-      "cloudAgent": "Cloud-Agent",
-      "securityAgent": "Sicherheits-Agent",
-      "codeReviewer": "Code-Prüfer",
       "signIn": "Anmeldung",
-      "profileOrganizations": "Profil und Organisationen",
-      "notifications": "Benachrichtigungen",
-      "integrations": "Integrationen"
+      "profileOrganizations": "Profil und Organisationen"
     }
   },
   "preferences": {

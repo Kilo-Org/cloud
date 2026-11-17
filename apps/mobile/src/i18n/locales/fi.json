@@ -486,14 +486,8 @@
     "changelogFixesIn": "Korjauksia ja parannuksia seuraaviin osioihin: {{areas}}.",
     "changelogFixesAcrossApp": "Korjauksia ja parannuksia koko sovellukseen.",
     "changelogAreas": {
-      "chat": "Keskustelu",
-      "cloudAgent": "Pilviagentti",
-      "securityAgent": "Tietoturva-agentti",
-      "codeReviewer": "Koodin tarkastaja",
       "signIn": "Kirjautuminen",
-      "profileOrganizations": "Profiili ja organisaatiot",
-      "notifications": "Ilmoitukset",
-      "integrations": "Integraatiot"
+      "profileOrganizations": "Profiili ja organisaatiot"
     }
   },
   "preferences": {

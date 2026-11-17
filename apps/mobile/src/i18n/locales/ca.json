@@ -486,14 +486,8 @@
     "changelogFixesIn": "Correccions i millores a {{areas}}.",
     "changelogFixesAcrossApp": "Correccions i millores a tota l'aplicació.",
     "changelogAreas": {
-      "chat": "Xat",
-      "cloudAgent": "Agent al núvol",
-      "securityAgent": "Agent de seguretat",
-      "codeReviewer": "Revisor de codi",
       "signIn": "Inici de sessió",
-      "profileOrganizations": "Perfil i organitzacions",
-      "notifications": "Notificacions",
-      "integrations": "Integracions"
+      "profileOrganizations": "Perfil i organitzacions"
     }
   },
   "preferences": {

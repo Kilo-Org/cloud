@@ -486,14 +486,8 @@
     "changelogFixesIn": "Parandused ja täiustused järgmistes osades: {{areas}}.",
     "changelogFixesAcrossApp": "Parandused ja täiustused kogu rakenduses.",
     "changelogAreas": {
-      "chat": "Vestlus",
-      "cloudAgent": "Pilveagent",
-      "securityAgent": "Turvaagent",
-      "codeReviewer": "Koodiülevaataja",
       "signIn": "Sisselogimine",
-      "profileOrganizations": "Profiil ja organisatsioonid",
-      "notifications": "Teavitused",
-      "integrations": "Integratsioonid"
+      "profileOrganizations": "Profiil ja organisatsioonid"
     }
   },
   "preferences": {

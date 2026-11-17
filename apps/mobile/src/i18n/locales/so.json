@@ -486,14 +486,8 @@
     "changelogFixesIn": "Hagaajinno iyo horumarin lagu sameeyay {{areas}}.",
     "changelogFixesAcrossApp": "Hagaajinno iyo horumarin lagu sameeyay barnaamijka oo dhan.",
     "changelogAreas": {
-      "chat": "Sheekaysi",
-      "cloudAgent": "Wakiilka daruuraha",
-      "securityAgent": "Wakiilka amniga",
-      "codeReviewer": "Dib-u-eegaha koodhka",
       "signIn": "Gelitaanka",
-      "profileOrganizations": "Xogta shakhsiga iyo ururada",
-      "notifications": "Ogeysiisyada",
-      "integrations": "Isku-xidhka"
+      "profileOrganizations": "Xogta shakhsiga iyo ururada"
     }
   },
   "preferences": {

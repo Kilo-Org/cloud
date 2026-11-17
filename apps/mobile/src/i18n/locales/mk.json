@@ -486,14 +486,8 @@
     "changelogFixesIn": "Поправки и подобрувања во следниве области: {{areas}}.",
     "changelogFixesAcrossApp": "Поправки и подобрувања низ целата апликација.",
     "changelogAreas": {
-      "chat": "Разговор",
-      "cloudAgent": "Агент во облак",
-      "securityAgent": "Безбедносен агент",
-      "codeReviewer": "Прегледувач на код",
       "signIn": "Најава",
-      "profileOrganizations": "Профил и организации",
-      "notifications": "Известувања",
-      "integrations": "Интеграции"
+      "profileOrganizations": "Профил и организации"
     }
   },
   "preferences": {

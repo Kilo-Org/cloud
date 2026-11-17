@@ -486,14 +486,8 @@
     "changelogFixesIn": "Tiswijiet u titjib f'dawn l-oqsma: {{areas}}.",
     "changelogFixesAcrossApp": "Tiswijiet u titjib fl-applikazzjoni kollha.",
     "changelogAreas": {
-      "chat": "Konversazzjoni",
-      "cloudAgent": "Aġent tas-sħab",
-      "securityAgent": "Aġent tas-sigurtà",
-      "codeReviewer": "Reviżur tal-kodiċi",
       "signIn": "Dħul",
-      "profileOrganizations": "Profil u organizzazzjonijiet",
-      "notifications": "Notifiki",
-      "integrations": "Integrazzjonijiet"
+      "profileOrganizations": "Profil u organizzazzjonijiet"
     }
   },
   "preferences": {

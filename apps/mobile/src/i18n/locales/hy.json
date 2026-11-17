@@ -486,14 +486,8 @@
     "changelogFixesIn": "Ուղղումներ և բարելավումներ հետևյալ բաժիններում՝ {{areas}}։",
     "changelogFixesAcrossApp": "Ուղղումներ և բարելավումներ ամբողջ հավելվածում։",
     "changelogAreas": {
-      "chat": "Զրույց",
-      "cloudAgent": "Ամպային գործակալ",
-      "securityAgent": "Անվտանգության գործակալ",
-      "codeReviewer": "Կոդի վերանայող",
       "signIn": "Մուտք",
-      "profileOrganizations": "Պրոֆիլ և կազմակերպություններ",
-      "notifications": "Ծանուցումներ",
-      "integrations": "Ինտեգրումներ"
+      "profileOrganizations": "Պրոֆիլ և կազմակերպություններ"
     }
   },
   "preferences": {

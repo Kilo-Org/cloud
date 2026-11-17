@@ -486,14 +486,8 @@
     "changelogFixesIn": "Korrigeringar och förbättringar i {{areas}}.",
     "changelogFixesAcrossApp": "Korrigeringar och förbättringar i hela appen.",
     "changelogAreas": {
-      "chat": "Chatt",
-      "cloudAgent": "Molnagent",
-      "securityAgent": "Säkerhetsagent",
-      "codeReviewer": "Kodgranskare",
       "signIn": "Inloggning",
-      "profileOrganizations": "Profil och organisationer",
-      "notifications": "Aviseringar",
-      "integrations": "Integrationer"
+      "profileOrganizations": "Profil och organisationer"
     }
   },
   "preferences": {

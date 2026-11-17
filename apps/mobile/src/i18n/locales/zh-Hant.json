@@ -486,14 +486,8 @@
     "changelogFixesIn": "{{areas}}的修正與改進。",
     "changelogFixesAcrossApp": "整個應用程式的修正與改進。",
     "changelogAreas": {
-      "chat": "聊天",
-      "cloudAgent": "雲端代理",
-      "securityAgent": "安全代理",
-      "codeReviewer": "程式碼審查",
       "signIn": "登入",
-      "profileOrganizations": "個人資料與組織",
-      "notifications": "通知",
-      "integrations": "整合"
+      "profileOrganizations": "個人資料與組織"
     }
   },
   "preferences": {

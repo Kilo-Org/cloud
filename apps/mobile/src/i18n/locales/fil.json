@@ -486,14 +486,8 @@
     "changelogFixesIn": "Mga pag-aayos at pagpapahusay sa {{areas}}.",
     "changelogFixesAcrossApp": "Mga pag-aayos at pagpapahusay sa buong aplikasyon.",
     "changelogAreas": {
-      "chat": "Usapan",
-      "cloudAgent": "Ahente sa ulap",
-      "securityAgent": "Ahente ng seguridad",
-      "codeReviewer": "Tagasuri ng kodigo",
       "signIn": "Pagpasok",
-      "profileOrganizations": "Propayl at mga organisasyon",
-      "notifications": "Mga abiso",
-      "integrations": "Mga integrasyon"
+      "profileOrganizations": "Propayl at mga organisasyon"
     }
   },
   "preferences": {

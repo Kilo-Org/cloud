@@ -486,14 +486,8 @@
     "changelogFixesIn": "Oplossingen en verbeteringen in {{areas}}.",
     "changelogFixesAcrossApp": "Oplossingen en verbeteringen in de hele app.",
     "changelogAreas": {
-      "chat": "Chat",
-      "cloudAgent": "Cloudagent",
-      "securityAgent": "Beveiligingsagent",
-      "codeReviewer": "Codebeoordelaar",
       "signIn": "Inloggen",
-      "profileOrganizations": "Profiel en organisaties",
-      "notifications": "Meldingen",
-      "integrations": "Integraties"
+      "profileOrganizations": "Profiel en organisaties"
     }
   },
   "preferences": {

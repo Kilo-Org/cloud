@@ -486,14 +486,8 @@
     "changelogFixesIn": "{{areas}} ਵਿੱਚ ਫਿਕਸ ਅਤੇ ਸੁਧਾਰ।",
     "changelogFixesAcrossApp": "ਪੂਰੀ ਐਪ ਵਿੱਚ ਫਿਕਸ ਅਤੇ ਸੁਧਾਰ।",
     "changelogAreas": {
-      "chat": "ਚੈਟ",
-      "cloudAgent": "ਕਲਾਊਡ ਏਜੰਟ",
-      "securityAgent": "ਸੁਰੱਖਿਆ ਏਜੰਟ",
-      "codeReviewer": "ਕੋਡ ਸਮੀਖਿਅਕ",
       "signIn": "ਸਾਈਨ ਇਨ",
-      "profileOrganizations": "ਪ੍ਰੋਫਾਈਲ ਅਤੇ ਸੰਸਥਾਵਾਂ",
-      "notifications": "ਸੂਚਨਾਵਾਂ",
-      "integrations": "ਏਕੀਕਰਨ"
+      "profileOrganizations": "ਪ੍ਰੋਫਾਈਲ ਅਤੇ ਸੰਸਥਾਵਾਂ"
     }
   },
   "preferences": {

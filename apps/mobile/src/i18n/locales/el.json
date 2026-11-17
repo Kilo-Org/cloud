@@ -486,14 +486,8 @@
     "changelogFixesIn": "Διορθώσεις και βελτιώσεις στα εξής: {{areas}}.",
     "changelogFixesAcrossApp": "Διορθώσεις και βελτιώσεις σε όλη την εφαρμογή.",
     "changelogAreas": {
-      "chat": "Συνομιλία",
-      "cloudAgent": "Πράκτορας νέφους",
-      "securityAgent": "Πράκτορας ασφαλείας",
-      "codeReviewer": "Ελεγκτής κώδικα",
       "signIn": "Σύνδεση",
-      "profileOrganizations": "Προφίλ και οργανισμοί",
-      "notifications": "Ειδοποιήσεις",
-      "integrations": "Ενσωματώσεις"
+      "profileOrganizations": "Προφίλ και οργανισμοί"
     }
   },
   "preferences": {

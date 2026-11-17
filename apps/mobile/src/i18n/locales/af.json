@@ -486,14 +486,8 @@
     "changelogFixesIn": "Regstellings en verbeterings in {{areas}}.",
     "changelogFixesAcrossApp": "Regstellings en verbeterings regdeur die app.",
     "changelogAreas": {
-      "chat": "Klets",
-      "cloudAgent": "Wolkagent",
-      "securityAgent": "Sekuriteitsagent",
-      "codeReviewer": "Kodehersiener",
       "signIn": "Aanmelding",
-      "profileOrganizations": "Profiel en organisasies",
-      "notifications": "Kennisgewings",
-      "integrations": "Integrasies"
+      "profileOrganizations": "Profiel en organisasies"
     }
   },
   "preferences": {

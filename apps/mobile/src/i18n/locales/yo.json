@@ -486,14 +486,8 @@
     "changelogFixesIn": "Àtúnṣe àti ìlọsíwájú nínú {{areas}}.",
     "changelogFixesAcrossApp": "Àtúnṣe àti ìlọsíwájú jákèjádò áàpù.",
     "changelogAreas": {
-      "chat": "Ìfọ̀rọ̀wérọ̀",
-      "cloudAgent": "Aṣojú ìkùukùu",
-      "securityAgent": "Aṣojú ààbò",
-      "codeReviewer": "Olùṣàyẹ̀wò kóòdù",
       "signIn": "Wíwọlé",
-      "profileOrganizations": "Àkọsílẹ̀ ara ẹni àti àwọn àjọ",
-      "notifications": "Ìfitónilétí",
-      "integrations": "Ìsopọ̀"
+      "profileOrganizations": "Àkọsílẹ̀ ara ẹni àti àwọn àjọ"
     }
   },
   "preferences": {

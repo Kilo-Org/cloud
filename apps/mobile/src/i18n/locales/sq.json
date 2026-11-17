@@ -486,14 +486,8 @@
     "changelogFixesIn": "Rregullime dhe përmirësime në {{areas}}.",
     "changelogFixesAcrossApp": "Rregullime dhe përmirësime në të gjithë aplikacionin.",
     "changelogAreas": {
-      "chat": "Biseda",
-      "cloudAgent": "Agjenti në re",
-      "securityAgent": "Agjenti i sigurisë",
-      "codeReviewer": "Rishikuesi i kodit",
       "signIn": "Hyrja",
-      "profileOrganizations": "Profili dhe organizatat",
-      "notifications": "Njoftimet",
-      "integrations": "Integrimet"
+      "profileOrganizations": "Profili dhe organizatat"
     }
   },
   "preferences": {

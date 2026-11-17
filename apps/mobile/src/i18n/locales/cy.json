@@ -486,14 +486,8 @@
     "changelogFixesIn": "Atgyweiriadau a gwelliannau i'r canlynol: {{areas}}.",
     "changelogFixesAcrossApp": "Atgyweiriadau a gwelliannau ar draws yr ap.",
     "changelogAreas": {
-      "chat": "Sgwrs",
-      "cloudAgent": "Asiant cwmwl",
-      "securityAgent": "Asiant diogelwch",
-      "codeReviewer": "Adolygydd cod",
       "signIn": "Mewngofnodi",
-      "profileOrganizations": "Proffil a sefydliadau",
-      "notifications": "Hysbysiadau",
-      "integrations": "Integreiddiadau"
+      "profileOrganizations": "Proffil a sefydliadau"
     }
   },
   "preferences": {

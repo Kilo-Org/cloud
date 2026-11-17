@@ -486,14 +486,8 @@
     "changelogFixesIn": "په {{areas}} کې سمونې او ښه والی.",
     "changelogFixesAcrossApp": "په ټول اپ کې سمونې او ښه والی.",
     "changelogAreas": {
-      "chat": "چیټ",
-      "cloudAgent": "د کلاوډ اجنټ",
-      "securityAgent": "امنیتي اجنټ",
-      "codeReviewer": "د کوډ بیاکتونکی",
       "signIn": "ننوتل",
-      "profileOrganizations": "پروفایل او سازمانونه",
-      "notifications": "خبرتیاوې",
-      "integrations": "ادغامونه"
+      "profileOrganizations": "پروفایل او سازمانونه"
     }
   },
   "preferences": {

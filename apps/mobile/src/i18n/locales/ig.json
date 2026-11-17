@@ -486,14 +486,8 @@
     "changelogFixesIn": "Ndozi na mmezi na {{areas}}.",
     "changelogFixesAcrossApp": "Ndozi na mmezi n'ebe niile n'ime ngwa ahụ.",
     "changelogAreas": {
-      "chat": "Mkparịta ụka",
-      "cloudAgent": "Onye nnọchite n'igwe ojii",
-      "securityAgent": "Onye nnọchite nchekwa",
-      "codeReviewer": "Onye nyocha koodu",
       "signIn": "Ịbanye",
-      "profileOrganizations": "Profaịlụ na òtù",
-      "notifications": "Ọkwa",
-      "integrations": "Njikọ"
+      "profileOrganizations": "Profaịlụ na òtù"
     }
   },
   "preferences": {

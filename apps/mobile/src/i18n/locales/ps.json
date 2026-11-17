@@ -480,7 +480,8 @@
       "nextStepFinal": "د استیناف پرېکړه قطعي ده. نور استیناف نه شي سپارل کېدای.",
       "viewReceipt": "رسید وګورئ"
     },
-    "changelog": "نوي بدلونونه"
+    "changelog": "نوي بدلونونه",
+    "changelogVersionPending": "د دې نسخې یادښتونه د اپ له راتلونکي تازه کېدو سره راځي."
   },
   "preferences": {
     "general": "عمومي",

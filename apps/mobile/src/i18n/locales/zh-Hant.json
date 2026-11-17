@@ -480,7 +480,8 @@
       "nextStepFinal": "申訴決定為最終決定，無法再次申訴。",
       "viewReceipt": "檢視回執"
     },
-    "changelog": "最新消息"
+    "changelog": "最新消息",
+    "changelogVersionPending": "此版本的說明將隨下次應用程式更新提供。"
   },
   "preferences": {
     "general": "一般",

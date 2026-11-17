@@ -480,7 +480,8 @@
       "nextStepFinal": "Helegitearen erabakia behin betikoa da. Ezin da helegite gehiago aurkeztu.",
       "viewReceipt": "Ikusi agiria"
     },
-    "changelog": "Berritasunak"
+    "changelog": "Berritasunak",
+    "changelogVersionPending": "Bertsio honen oharrak aplikazioaren hurrengo eguneratzearekin iritsiko dira."
   },
   "preferences": {
     "general": "Orokorra",

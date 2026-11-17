@@ -547,7 +547,8 @@
       "nextStepFinal": "The appeal decision is final. No further appeal can be filed.",
       "viewReceipt": "View receipt"
     },
-    "changelog": "What's New"
+    "changelog": "What's New",
+    "changelogVersionPending": "The notes for this version arrive with the next app update."
   },
   "preferences": {
     "biometricUnlock": "Unlock with biometrics",

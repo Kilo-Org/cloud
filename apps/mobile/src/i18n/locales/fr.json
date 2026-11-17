@@ -480,7 +480,8 @@
       "nextStepFinal": "La décision sur le recours est définitive. Aucun autre recours ne peut être déposé.",
       "viewReceipt": "Voir l'accusé de réception"
     },
-    "changelog": "Nouveautés"
+    "changelog": "Nouveautés",
+    "changelogVersionPending": "Les notes de cette version arriveront avec la prochaine mise à jour."
   },
   "notifications": {
     "channel": {

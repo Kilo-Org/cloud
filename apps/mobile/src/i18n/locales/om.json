@@ -480,7 +480,8 @@
       "nextStepFinal": "Murteen ol'iyyannoo kan dhumaa dha. Ol'iyyannoon biraa ergamuu hin danda'u.",
       "viewReceipt": "Ragaa ilaali"
     },
-    "changelog": "Waan haaraa"
+    "changelog": "Waan haaraa",
+    "changelogVersionPending": "Yaadannoon gulaala kanaa haaromsa appii itti aanu waliin dhufa."
   },
   "preferences": {
     "general": "Waliigalaa",

@@ -480,7 +480,8 @@
       "nextStepFinal": "La decisione sul ricorso è definitiva. Non è possibile presentare altri ricorsi.",
       "viewReceipt": "Visualizza ricevuta"
     },
-    "changelog": "Novità"
+    "changelog": "Novità",
+    "changelogVersionPending": "Le note di questa versione arriveranno con il prossimo aggiornamento dell'app."
   },
   "notifications": {
     "channel": {

@@ -480,7 +480,8 @@
       "nextStepFinal": "قرار الطعن نهائي. لا يمكن تقديم طعن آخر.",
       "viewReceipt": "عرض الإيصال"
     },
-    "changelog": "ما الجديد"
+    "changelog": "ما الجديد",
+    "changelogVersionPending": "ستصل ملاحظات هذا الإصدار مع التحديث القادم للتطبيق."
   },
   "preferences": {
     "general": "عام",

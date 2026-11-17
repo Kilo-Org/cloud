@@ -480,7 +480,8 @@
       "nextStepFinal": "اپیل کا فیصلہ حتمی ہے۔ مزید کوئی اپیل جمع نہیں کرائی جا سکتی۔",
       "viewReceipt": "رسید دیکھیں"
     },
-    "changelog": "نیا کیا ہے"
+    "changelog": "نیا کیا ہے",
+    "changelogVersionPending": "اس ورژن کے نوٹس ایپ کی اگلی اپ ڈیٹ کے ساتھ آئیں گے۔"
   },
   "preferences": {
     "general": "عمومی",

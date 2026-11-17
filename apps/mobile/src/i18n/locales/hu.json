@@ -480,7 +480,8 @@
       "nextStepFinal": "A fellebbezési döntés végleges. További fellebbezés nem nyújtható be.",
       "viewReceipt": "Visszaigazolás megtekintése"
     },
-    "changelog": "Újdonságok"
+    "changelog": "Újdonságok",
+    "changelogVersionPending": "E verzió újdonságai a következő frissítéssel érkeznek."
   },
   "preferences": {
     "general": "Általános",

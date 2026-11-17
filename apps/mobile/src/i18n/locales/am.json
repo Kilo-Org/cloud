@@ -480,7 +480,8 @@
       "nextStepFinal": "የይግባኙ ውሳኔ የመጨረሻ ነው። ተጨማሪ ይግባኝ ማቅረብ አይቻልም።",
       "viewReceipt": "ደረሰኙን ይመልከቱ"
     },
-    "changelog": "አዲስ ነገር"
+    "changelog": "አዲስ ነገር",
+    "changelogVersionPending": "የዚህ ስሪት ማስታወሻዎች ከሚቀጥለው የመተግበሪያ ዝማኔ ጋር ይመጣሉ።"
   },
   "preferences": {
     "general": "አጠቃላይ",

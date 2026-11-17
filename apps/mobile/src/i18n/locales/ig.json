@@ -480,7 +480,8 @@
       "nextStepFinal": "Mkpebi mkpegharị a bụ nke ikpeazụ. Enweghị ike iziga mkpegharị ọzọ.",
       "viewReceipt": "Lee akwụkwọ nnata"
     },
-    "changelog": "Ihe ọhụrụ"
+    "changelog": "Ihe ọhụrụ",
+    "changelogVersionPending": "Ndetu maka ụdị a ga-abịa na mmelite ngwa na-esote."
   },
   "preferences": {
     "general": "Izugbe",

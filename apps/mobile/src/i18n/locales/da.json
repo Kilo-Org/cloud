@@ -480,7 +480,8 @@
       "nextStepFinal": "Afgørelsen om klagen er endelig. Der kan ikke indsendes flere klager.",
       "viewReceipt": "Se kvittering"
     },
-    "changelog": "Nyheder"
+    "changelog": "Nyheder",
+    "changelogVersionPending": "Noterne til denne version kommer med næste appopdatering."
   },
   "preferences": {
     "general": "Generelt",

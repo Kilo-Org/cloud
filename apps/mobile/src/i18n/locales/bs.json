@@ -480,7 +480,8 @@
       "nextStepFinal": "Odluka o žalbi je konačna. Žalba se više ne može podnijeti.",
       "viewReceipt": "Prikaži potvrdu"
     },
-    "changelog": "Šta je novo"
+    "changelog": "Šta je novo",
+    "changelogVersionPending": "Bilješke za ovu verziju stižu uz sljedeće ažuriranje aplikacije."
   },
   "preferences": {
     "general": "Općenito",

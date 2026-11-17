@@ -480,7 +480,8 @@
       "nextStepFinal": "Het besluit op je bezwaar is definitief. Er kan geen bezwaar meer worden ingediend.",
       "viewReceipt": "Ontvangstbewijs bekijken"
     },
-    "changelog": "Nieuw in deze versie"
+    "changelog": "Nieuw in deze versie",
+    "changelogVersionPending": "Notities voor deze versie komen met de volgende app-update."
   },
   "preferences": {
     "general": "Algemeen",

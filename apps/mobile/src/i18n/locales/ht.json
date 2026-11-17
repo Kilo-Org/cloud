@@ -480,7 +480,8 @@
       "nextStepFinal": "Desizyon apèl la final. Ou pa ka soumèt okenn lòt apèl.",
       "viewReceipt": "Wè resi a"
     },
-    "changelog": "Sa ki nouvo"
+    "changelog": "Sa ki nouvo",
+    "changelogVersionPending": "Nòt vèsyon sa a ap vini ak pwochen mizajou aplikasyon an."
   },
   "preferences": {
     "general": "Jeneral",

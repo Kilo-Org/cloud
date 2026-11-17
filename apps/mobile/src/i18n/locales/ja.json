@@ -480,7 +480,8 @@
       "nextStepFinal": "異議申し立ての決定は確定しました。これ以上異議を申し立てることはできません。",
       "viewReceipt": "受付確認を表示"
     },
-    "changelog": "新着情報"
+    "changelog": "新着情報",
+    "changelogVersionPending": "このバージョンのリリースノートは、次回のアプリアップデートで届きます。"
   },
   "preferences": {
     "general": "一般",

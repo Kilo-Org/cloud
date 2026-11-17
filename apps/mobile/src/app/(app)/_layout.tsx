@@ -275,6 +275,8 @@ export default function AppLayout() {
                 headerShown: false,
               }}
             />
+            <Stack.Screen name="legal/[document]" options={{ headerShown: false }} />
+            <Stack.Screen name="changelog" options={{ headerShown: false }} />
           </Stack>
         </TabBarLabelContext>
       </EventServiceProvider>

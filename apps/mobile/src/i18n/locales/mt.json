@@ -480,7 +480,8 @@
       "nextStepFinal": "Id-deċiżjoni tal-appell hija finali. Ma jistax jiġi ppreżentat appell ieħor.",
       "viewReceipt": "Ara l-irċevuta"
     },
-    "changelog": "X'hemm ġdid"
+    "changelog": "X'hemm ġdid",
+    "changelogVersionPending": "In-noti ta' din il-verżjoni jaslu mal-aġġornament li jmiss tal-app."
   },
   "preferences": {
     "general": "Ġenerali",

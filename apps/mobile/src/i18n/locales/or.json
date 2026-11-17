@@ -480,7 +480,8 @@
       "nextStepFinal": "ଅପିଲ୍ ନିଷ୍ପତ୍ତି ଅନ୍ତିମ। ଆଉ କୌଣସି ଅପିଲ୍ ଦାଖଲ କରାଯାଇପାରିବ ନାହିଁ।",
       "viewReceipt": "ରସିଦ ଦେଖନ୍ତୁ"
     },
-    "changelog": "ନୂଆ କ'ଣ"
+    "changelog": "ନୂଆ କ'ଣ",
+    "changelogVersionPending": "ଏହି ସଂସ୍କରଣର ନୋଟ୍ସ ପରବର୍ତ୍ତୀ ଆପ୍ ଅପଡେଟ୍ ସହିତ ଆସିବ।"
   },
   "preferences": {
     "general": "ସାଧାରଣ",

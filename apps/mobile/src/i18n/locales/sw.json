@@ -480,7 +480,8 @@
       "nextStepFinal": "Uamuzi wa rufaa ni wa mwisho. Hakuna rufaa nyingine inayoweza kuwasilishwa.",
       "viewReceipt": "Angalia risiti"
     },
-    "changelog": "Mapya"
+    "changelog": "Mapya",
+    "changelogVersionPending": "Maelezo ya toleo hili yatakuja na sasisho lijalo."
   },
   "preferences": {
     "general": "Jumla",

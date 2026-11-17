@@ -480,7 +480,8 @@
       "nextStepFinal": "અપીલનો નિર્ણય અંતિમ છે. હવે વધુ અપીલ કરી શકાતી નથી.",
       "viewReceipt": "રસીદ જુઓ"
     },
-    "changelog": "નવું શું છે"
+    "changelog": "નવું શું છે",
+    "changelogVersionPending": "આ સંસ્કરણની નોંધો આગામી ઍપ અપડેટ સાથે આવશે."
   },
   "preferences": {
     "general": "સામાન્ય",

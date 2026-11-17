@@ -480,7 +480,8 @@
       "nextStepFinal": "আপিলের সিদ্ধান্ত চূড়ান্ত। আর কোনো আপিল করা যাবে না।",
       "viewReceipt": "রসিদ দেখুন"
     },
-    "changelog": "নতুন কী"
+    "changelog": "নতুন কী",
+    "changelogVersionPending": "এই সংস্করণের নোটগুলো অ্যাপের পরবর্তী আপডেটের সাথে আসবে।"
   },
   "preferences": {
     "general": "সাধারণ",

@@ -480,7 +480,8 @@
       "nextStepFinal": "Go'aanka rafcaanku waa kama dambays. Rafcaan kale lama gudbin karo.",
       "viewReceipt": "Eeg rasiidka"
     },
-    "changelog": "Waxyaabaha cusub"
+    "changelog": "Waxyaabaha cusub",
+    "changelogVersionPending": "Qoraallada noocan waxay la yimaadaan cusboonaysiinta xigta."
   },
   "preferences": {
     "general": "Guud",

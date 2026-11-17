@@ -11,24 +11,22 @@ import {
   FileText,
   KeyRound,
   LineChart,
-  Lock,
   type LucideIcon,
-  Mail,
   Plug,
   ScrollText,
-  Server,
   Shield,
   SlidersHorizontal,
   Users,
   Wallet,
 } from '@/components/ui/icons';
 import { i18n } from '@/i18n';
+import { providerKeysHref } from '@/lib/byok/provider-key-scope';
 import { WEB_BASE_URL } from '@/lib/config';
 
 /**
  * The organization destinations the hub lists, in the two shapes it opens
  * them: the web pages this app does not reimplement, and the areas the app
- * reads itself.
+ * reads and writes itself.
  *
  * Every web row opens the page that already owns the setting. The list, its
  * role and plan gates, and its destinations follow
@@ -44,28 +42,23 @@ import { WEB_BASE_URL } from '@/lib/config';
  *   child organization (`parent_organization_id !== null`);
  * - `guardrails` requires `owner`/`admin` and the organization's Kilo Encrypt
  *   setting;
- * - `providers-and-models`, `custom-modes`, `byok` and `integrations` render
- *   for every member;
- * - `data-collection` is the dashboard card a teams plan shows where an
- *   enterprise plan shows providers and models;
+ * - `providers-and-models`, `byok` and `integrations` render for every member;
  * - `sso-and-domain`, `email-preferences` and `data-collection` are cards on
- *   the organization dashboard rather than pages of their own, so they open
- *   `/organizations/<id>`.
+ *   the organization dashboard rather than pages of their own, and the
+ *   dashboard links to the seats purchase, so the hub lists none of them.
  *
- * Usage and the audit log are the areas the app reads itself, so their rows
- * open the app's own screens instead of a page. Usage is visible to every
- * member, as on the web sidebar; the audit log's gate is the one its procedure
- * applies (billing role and the enterprise plan).
+ * Usage, the audit log, custom modes, groups and BYOK are the areas the app
+ * reads and writes itself, so their rows open the app's own screens instead of
+ * a page. Usage is visible to every member, as on the web sidebar; the audit
+ * log's gate is the one its procedure applies (billing role and the enterprise
+ * plan); groups the enterprise plan it is sold with; custom modes no gate,
+ * which is the gate its page has; and BYOK opens the app's own provider-keys
+ * screen with the organization's scope, behind the web sidebar's billing-role
+ * gate.
  */
 type OrgSettingsArea =
   | 'providersAndModels'
-  | 'customModes'
-  | 'groups'
   | 'guardrails'
-  | 'byok'
-  | 'ssoAndDomain'
-  | 'emailPreferences'
-  | 'dataCollection'
   | 'requestLogs'
   | 'integrations'
   | 'subOrganizations'
@@ -88,8 +81,11 @@ export type OrgSettingsRow = Readonly<{
   url: string;
 }>;
 
-/** The areas the app reads itself instead of opening their web page. */
-type OrgInAppSettingsArea = 'usageDetails' | 'auditLogs';
+/**
+ * The areas the app reads and writes itself, each opening its own screen
+ * instead of a web page.
+ */
+type OrgInAppSettingsArea = 'customModes' | 'groups' | 'usageDetails' | 'auditLogs' | 'byok';
 
 export type OrgInAppSettingsRow = Readonly<{
   area: OrgInAppSettingsArea;
@@ -107,7 +103,7 @@ export type OrgInAppSettingsGate = Readonly<{
 type OrgSettingsRowSpec = Readonly<{
   area: OrgSettingsArea;
   icon: LucideIcon;
-  /** The page's path after `/organizations/<id>`. Empty for a dashboard card. */
+  /** The page's path after `/organizations/<id>`. */
   suffix: string;
   visible: (gate: OrgSettingsGate) => boolean;
 }>;
@@ -120,10 +116,6 @@ const ROW_SPECS: readonly OrgSettingsRowSpec[] = [
     suffix: '/providers-and-models',
     visible: gate => canManageOrganizationBilling(gate.role) && gate.plan === 'enterprise',
   },
-  // "Custom Modes": no gate in the sidebar or on the page.
-  { area: 'customModes', icon: SlidersHorizontal, suffix: '/custom-modes', visible: () => true },
-  // "Groups": enterprise only; the page redirects every other plan.
-  { area: 'groups', icon: Users, suffix: '/groups', visible: gate => gate.plan === 'enterprise' },
   // Guardrails page: owner/admin and Kilo Encrypt.
   {
     area: 'guardrails',
@@ -131,31 +123,10 @@ const ROW_SPECS: readonly OrgSettingsRowSpec[] = [
     suffix: '/guardrails',
     visible: gate => canManageOrganization(gate.role) && gate.guardrailsEnabled,
   },
-  // "Bring Your Own Key (BYOK)": billing role. The ChatGPT connection the
-  // sidebar also counts is personal, so it does not make this row apply.
-  {
-    area: 'byok',
-    icon: KeyRound,
-    suffix: '/byok',
-    visible: gate => canManageOrganizationBilling(gate.role),
-  },
-  // The SSO card renders only on an enterprise dashboard.
-  {
-    area: 'ssoAndDomain',
-    icon: Lock,
-    suffix: '',
-    visible: gate => gate.plan === 'enterprise',
-  },
-  // Email preferences card: owner/admin.
-  {
-    area: 'emailPreferences',
-    icon: Mail,
-    suffix: '',
-    visible: gate => canManageOrganization(gate.role),
-  },
-  // Data collection card: the teams dashboard shows it in place of providers
-  // and models.
-  { area: 'dataCollection', icon: Server, suffix: '', visible: gate => gate.plan === 'teams' },
+  // The SSO card, the email preferences card and the data collection card live
+  // on the organization dashboard itself, and that page links to the seats
+  // purchase. The hub does not list a row that lands there: no suffix means a
+  // dashboard card, and the dashboard is never a settings destination here.
   // "Request Logs": billing role.
   {
     area: 'requestLogs',
@@ -184,13 +155,7 @@ const ROW_SPECS: readonly OrgSettingsRowSpec[] = [
 
 const TITLE_KEYS = {
   providersAndModels: 'organization.settingsOnWeb.providersAndModels',
-  customModes: 'agentChat.modePicker.customModes',
-  groups: 'organization.settingsOnWeb.groups',
   guardrails: 'organization.settingsOnWeb.guardrails',
-  byok: 'organization.settingsOnWeb.byok',
-  ssoAndDomain: 'organization.settingsOnWeb.ssoAndDomain',
-  emailPreferences: 'organization.settingsOnWeb.emailPreferences',
-  dataCollection: 'organization.settingsOnWeb.dataCollection',
   requestLogs: 'organization.settingsOnWeb.requestLogs',
   // The in-app organization Integrations row opens the app's own screen; this
   // one opens the web page, so it names the web instead of repeating that title.
@@ -214,18 +179,34 @@ export function canViewOrgAuditLog(
 type OrgInAppSettingsRowSpec = Readonly<{
   area: OrgInAppSettingsArea;
   icon: LucideIcon;
-  href: Href;
+  /** The screen that owns the area, scoped to the organization it was opened for. */
+  href: (organizationId: string) => Href;
   visible: (gate: OrgInAppSettingsGate) => boolean;
 }>;
 
 const IN_APP_ROW_SPECS: readonly OrgInAppSettingsRowSpec[] = [
+  // "Custom modes": no gate in the sidebar or on the page, so every member
+  // reaches the native list and the server decides whether a write lands.
+  {
+    area: 'customModes',
+    icon: SlidersHorizontal,
+    href: () => '/(app)/(tabs)/(3_profile)/organization/modes',
+    visible: () => true,
+  },
+  // "Groups": enterprise only, which is the plan its page redirects away from.
+  {
+    area: 'groups',
+    icon: Users,
+    href: () => '/(app)/(tabs)/(3_profile)/organization/groups',
+    visible: gate => gate.plan === 'enterprise',
+  },
   // "Usage": the app's own usage screen reads the same summary, series and
   // breakdown the web page charts, so the row opens the screen. Every member
   // sees it, as on the web sidebar, and nothing in its gate needs a payload.
   {
     area: 'usageDetails',
     icon: LineChart,
-    href: '/(app)/(tabs)/(3_profile)/organization/usage',
+    href: () => '/(app)/(tabs)/(3_profile)/organization/usage',
     visible: () => true,
   },
   // "Audit logs": the gate its procedure applies, which the screen repeats to
@@ -233,16 +214,27 @@ const IN_APP_ROW_SPECS: readonly OrgInAppSettingsRowSpec[] = [
   {
     area: 'auditLogs',
     icon: ScrollText,
-    href: '/(app)/(tabs)/(3_profile)/organization/audit-log',
+    href: () => '/(app)/(tabs)/(3_profile)/organization/audit-log',
     visible: gate => canViewOrgAuditLog(gate.role, gate.plan),
+  },
+  // BYOK: the sidebar's billing-role gate, and the app's own provider-keys
+  // screen with this organization's scope.
+  {
+    area: 'byok',
+    icon: KeyRound,
+    href: organizationId => providerKeysHref({ kind: 'organization', organizationId }),
+    visible: gate => canManageOrganizationBilling(gate.role),
   },
 ];
 
 const IN_APP_TITLE_KEYS = {
+  customModes: 'agentChat.modePicker.customModes',
+  groups: 'organization.settingsOnWeb.groups',
   // The copy's own name keeps its group prefix: the web sidebar lists the same
   // area under Dashboard, and check:i18n refuses a second key with this copy.
   usageDetails: 'organization.settingsOnWeb.usageDetails',
   auditLogs: 'organization.settingsOnWeb.auditLogs',
+  byok: 'organization.settingsOnWeb.byok',
 } satisfies Record<OrgInAppSettingsArea, string>;
 
 /**
@@ -264,7 +256,7 @@ export function visibleOrgSettingsRows(
 
 /**
  * The in-app rows this role and plan may open, in the order the card shows
- * them.
+ * them, each already carrying the organization it was opened for.
  *
  * The gate reads only the role and the plan, both of which arrive on the
  * organization row that decides whether the hub renders at all. So the hub
@@ -273,12 +265,13 @@ export function visibleOrgSettingsRows(
  * under it, which the design gate's layout-shift rule refuses.
  */
 export function visibleInAppSettingsRows(
-  gate: OrgInAppSettingsGate
+  gate: OrgInAppSettingsGate,
+  organizationId: string
 ): readonly OrgInAppSettingsRow[] {
   return IN_APP_ROW_SPECS.filter(spec => spec.visible(gate)).map(spec => ({
     area: spec.area,
     title: i18n.t(IN_APP_TITLE_KEYS[spec.area]),
     icon: spec.icon,
-    href: spec.href,
+    href: spec.href(organizationId),
   }));
 }

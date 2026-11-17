@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   assertProtectedDataAvailable,
@@ -6,6 +6,7 @@ import {
   ProtectedDataUnavailableError,
   setProtectedDataAvailable,
   whenProtectedDataAvailable,
+  whenProtectedDataAvailableWithin,
 } from '@/lib/protected-data';
 
 afterEach(() => {
@@ -51,5 +52,36 @@ describe('protected data gate', () => {
     setProtectedDataAvailable(true);
     await Promise.all([first, second]);
     expect(released).toEqual([1, 2]);
+  });
+
+  it('resolves a bounded wait on unlock before its deadline and leaves no timer', async () => {
+    vi.useFakeTimers();
+    try {
+      setProtectedDataAvailable(false);
+      const wait = whenProtectedDataAvailableWithin(60_000);
+      await vi.advanceTimersByTimeAsync(1_000);
+      setProtectedDataAvailable(true);
+      await expect(wait).resolves.toBeUndefined();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('resolves a bounded wait at its deadline and leaves no timer or waiter behind', async () => {
+    vi.useFakeTimers();
+    try {
+      setProtectedDataAvailable(false);
+      const wait = whenProtectedDataAvailableWithin(5_000);
+      await vi.advanceTimersByTimeAsync(5_000);
+      await expect(wait).resolves.toBeUndefined();
+      expect(vi.getTimerCount()).toBe(0);
+      // A later unlock has nothing left to release: the deadline already
+      // removed this wait from the waiter set.
+      setProtectedDataAvailable(true);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

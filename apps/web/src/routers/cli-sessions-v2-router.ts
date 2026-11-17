@@ -2989,8 +2989,19 @@ export const cliSessionsV2Router = createTRPCRouter({
     }
 
     // Delegate DB deletion (including child sessions) and ingest DO/cache cleanup
-    // to the session-ingest worker.
-    await deleteSessionIngest(session_id, ctx.user.id);
+    // to the session-ingest worker. The call is mapped like every other
+    // session-ingest call: a budget expiry is a retryable upstream answer, not
+    // an internal defect.
+    try {
+      await deleteSessionIngest(session_id, ctx.user.id);
+    } catch (err) {
+      // `deleteSession` raises its own `TRPCError` for the worker's workspace
+      // conflicts (409). The client reads that code and message to cascade into
+      // deleting the workspace, so forward it unchanged; only a transport
+      // failure is mapped.
+      if (err instanceof TRPCError) throw err;
+      throw sessionIngestTrpcError('Failed to delete session', err);
+    }
 
     return { success: true, session_id, cleanup };
   }),

@@ -6,7 +6,6 @@ import { type PushData } from './push-data';
  * exactly the category whose switch governs that push.
  */
 export const NOTIFICATION_HISTORY_CATEGORIES = [
-  'chatMessages',
   'agentAttention',
   'sessionStatus',
   'balanceAlerts',
@@ -58,7 +57,6 @@ type PushHistoryDecisions = Record<PushData['type'], PushHistoryDecision>;
  * resolver both derive from it, so adding a kind here is the whole change.
  */
 const PUSH_HISTORY_DECISIONS = {
-  'chat.message': () => 'chatMessages',
   // A needs-input raise is gated by `agentAttention`; a status/ready push by
   // `sessionStatus`, and an omitted tag is a status push (the rolling-deploy
   // default the dispatch gate applies).
@@ -72,11 +70,18 @@ const PUSH_HISTORY_DECISIONS = {
   security_lifecycle: () => 'securityFindings',
   // Briefings have no settings category; they appear under All only.
   agent_briefing: () => null,
-  'instance-lifecycle': NOT_RECORDED,
-  'scheduled-action': NOT_RECORDED,
   active_agents_glanceable: NOT_RECORDED,
   session_live_update: NOT_RECORDED,
 } satisfies PushHistoryDecisions;
+
+/**
+ * The same table read by an arbitrary string. A payload reaches the worker
+ * unparsed, so its kind may be one this build does not hold; the open map
+ * answers `undefined` for it. The sentinel keys are present in the table, so a
+ * key check alone would call them recorded: the value test answers both.
+ */
+const PUSH_HISTORY_DECISION_BY_TYPE: Readonly<Record<string, PushHistoryDecision | undefined>> =
+  PUSH_HISTORY_DECISIONS;
 
 /** The kind when its decision is a rule, never otherwise. */
 type RecordedPushKind<Kind extends PushData['type']> =
@@ -91,17 +96,18 @@ export type RecordedNotificationPushType = {
  * True for the push kinds that become a history row.
  *
  * The map is total over `PushData['type']`, but a payload reaches the worker
- * unparsed, so a kind outside the union must answer "not recorded" instead of
- * falling through to a rule call that does not exist.
+ * unparsed, so the kind need not be one of them. The own-key check admits any
+ * string and rejects a name the table does not own (an inherited
+ * `Object.prototype` property, for one); the value test then rejects both a
+ * kind this build does not hold and the `NOT_RECORDED` sentinel keys.
  */
-function isRecordedNotificationPush(type: PushData['type']): type is RecordedNotificationPushType {
-  return typeof PUSH_HISTORY_DECISIONS[type] === 'function';
+function isRecordedNotificationPush(type: string): type is RecordedNotificationPushType {
+  if (!Object.hasOwn(PUSH_HISTORY_DECISIONS, type)) return false;
+  return typeof PUSH_HISTORY_DECISION_BY_TYPE[type] === 'function';
 }
 
 export const RECORDED_NOTIFICATION_PUSH_TYPES: readonly RecordedNotificationPushType[] =
-  // `Object.keys` is typed `string[]`; the total record above proves the keys
-  // are exactly `PushData['type']`. The guard then drops the sentinel keys.
-  (Object.keys(PUSH_HISTORY_DECISIONS) as PushData['type'][]).filter(isRecordedNotificationPush);
+  Object.keys(PUSH_HISTORY_DECISIONS).filter(isRecordedNotificationPush);
 
 /** One history row's content, derived from the push it came from. */
 export type NotificationHistoryEntry = {

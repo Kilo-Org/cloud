@@ -1,4 +1,5 @@
 diff --git a/android/src/main/java/expo/modules/taskmanager/TaskService.java b/android/src/main/java/expo/modules/taskmanager/TaskService.java
+
 --- a/android/src/main/java/expo/modules/taskmanager/TaskService.java
 +++ b/android/src/main/java/expo/modules/taskmanager/TaskService.java
 @@ -427,7 +427,15 @@
@@ -31,3 +32,36 @@ diff --git a/android/src/main/java/expo/modules/taskmanager/TaskService.java b/a
      } else {
        return null;
      }
+diff --git a/ios/EXTaskManager/EXTaskService.m b/ios/EXTaskManager/EXTaskService.m
+index 1fc73e88d18529a38156452fff6b358f8716a8dd..e7b8d802186ff1b5e228ec12b88bf04b760a2c1d 100644
+--- a/ios/EXTaskManager/EXTaskService.m
++++ b/ios/EXTaskManager/EXTaskService.m
+@@ -585,18 +585,24 @@
+     request = nil;
+   }];
+ 
++  // A task can finish on another thread while this method is still running (for
++  // example a background task whose JavaScript completes on the JS thread). Its
++  // callback then clears `request`, which releases the request. Keep it alive
++  // until this method returns.
++  EXTaskExecutionRequest *strongRequest = request;
++
+   @synchronized (_lockTarget) {
+-    [_requests addObject:request];
++    [_requests addObject:strongRequest];
+   }
+ 
+   [self _iterateTasksUsingBlock:^(id<EXTaskInterface> task) {
+     if ([task.consumer.class respondsToSelector:@selector(supportsLaunchReason:)] && [task.consumer.class supportsLaunchReason:launchReason]) {
+-      [self _addTask:task toRequest:request withInfo:userInfo];
++      [self _addTask:task toRequest:strongRequest withInfo:userInfo];
+     }
+   }];
+-  
++
+   // Evaluate request immediately if no tasks were added.
+-  [request maybeEvaluate];
++  [strongRequest maybeEvaluate];
+ }
+ 
+ - (void)_loadAppWithId:(nonnull NSString *)appId

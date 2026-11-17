@@ -336,6 +336,53 @@ describe('NewSessionRepositorySection Bitbucket connect authority', () => {
       i18n.t('prReview.connect.bitbucketAdminOnlyDescription')
     );
   });
+
+  it('asks a member to reconnect a connected workspace instead of connecting it', () => {
+    // `not_connected`, `workspace_selection_required`, `reconnect_required` and
+    // `insufficient_permissions` all map to `connect`, but only the first is a
+    // first connect: the other three are a connected workspace whose answer
+    // still needs a selection or fresh credentials, which `rowsUnlisted`
+    // reports. The note must ask for the reconnect the sheet itself offers.
+    orgState.role = 'member';
+    const renderer = mountSection({
+      organizationId: 'org-1',
+      groups: [
+        group('github', 'repos'),
+        { key: 'bitbucket', status: 'connect', rowsUnlisted: true, repositories: [] },
+      ],
+    });
+
+    const text = renderedText(renderer);
+    expect(text).toContain(i18n.t('prReview.connect.gitlabReconnectAdminOnlyDescription'));
+    expect(text).not.toContain(i18n.t('prReview.connect.bitbucketAdminOnlyDescription'));
+    // No action the server would refuse, and no first-connect copy either.
+    expect(textNode(renderer, i18n.t('common.connectBitbucket'))).toBeUndefined();
+    expect(renderer.root.findAllByType('Button' as never)).toHaveLength(1);
+    expect(
+      renderer.root.findByProps({
+        accessibilityLabel: i18n.t('agentChat.newSession.refreshRepositories'),
+      })
+    ).toBeDefined();
+  });
+
+  it('keeps the organizations-only note and action for an admin in that state', () => {
+    // A billing role can reconnect it, so the card keeps its action and the
+    // note that explains why Bitbucket connects for an organization, exactly as
+    // in the first-connect state.
+    orgState.role = 'admin';
+    const renderer = mountSection({
+      organizationId: 'org-1',
+      groups: [
+        group('github', 'repos'),
+        { key: 'bitbucket', status: 'connect', rowsUnlisted: true, repositories: [] },
+      ],
+    });
+
+    const text = renderedText(renderer);
+    expect(text).toContain(i18n.t('agentChat.newSession.bitbucketOrganizationsOnly'));
+    expect(textNode(renderer, i18n.t('common.connectBitbucket'))).toBeDefined();
+    expect(renderer.root.findAllByType('Button' as never)).toHaveLength(2);
+  });
 });
 
 describe('NewSessionRepositorySection connect card open action', () => {

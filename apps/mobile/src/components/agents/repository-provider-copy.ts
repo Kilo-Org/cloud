@@ -54,8 +54,8 @@ export type ConnectCardOffer = {
   noteKey: string | undefined;
   /**
    * The same restriction for the compact row after a repository is selected.
-   * That row has no title, so its copy names the provider itself where the card
-   * leans on its header for that.
+   * That row has no title, so its first-connect copy names the provider itself
+   * where the card leans on its header for that.
    */
   compactNoteKey: string | undefined;
 };
@@ -75,10 +75,18 @@ export type ConnectCardOffer = {
  * the same one the new-session shell already reads, so this is a retry path and
  * not the first frame; when it does answer late, the card's note and action
  * settle in one change instead of the card appearing inert first.
+ *
+ * `needsReconnect` is the Bitbucket answer naming a connected workspace that
+ * still needs a selection or fresh credentials, which `bitbucketRowsUnlisted`
+ * reports. Those states map to the same `connect` status as "not connected",
+ * but the step left is a reconnect, not a first connect, so the note asks for
+ * the former instead of claiming the provider was never connected. The sheet
+ * the card opens says the same thing.
  */
 export function connectCardOffer(
   platform: RepositoryPlatform,
-  role: string | undefined
+  role: string | undefined,
+  needsReconnect = false
 ): ConnectCardOffer {
   if (platform !== 'bitbucket') {
     return { offersAction: true, noteKey: undefined, compactNoteKey: undefined };
@@ -86,6 +94,17 @@ export function connectCardOffer(
   if (role !== undefined && !canManageOrganizationBilling(role)) {
     // The member cannot connect it, so the note names the roles that can and the
     // step left to them instead of an action that can only end in a refusal.
+    if (needsReconnect) {
+      // The workspace is connected but cannot list: the step is a fresh
+      // selection or credentials, so the provider-neutral reconnect sentence
+      // applies. Both notes carry it because neither has a header to explain
+      // which connect step is left.
+      return {
+        offersAction: false,
+        noteKey: 'prReview.connect.gitlabReconnectAdminOnlyDescription',
+        compactNoteKey: 'prReview.connect.gitlabReconnectAdminOnlyDescription',
+      };
+    }
     return {
       offersAction: false,
       noteKey: 'prReview.connect.bitbucketAdminOnlyDescription',

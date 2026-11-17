@@ -151,25 +151,26 @@ export function NewSessionRepositorySection({
                   isRetrying={isRetrying}
                 />
               ) : null}
-              {renderGroupCard(group.key, group.status)}
+              {renderGroupCard(group)}
             </Fragment>
           ))
         : null}
     </View>
   );
 
-  function renderGroupCard(
-    platform: RepositoryPlatform,
-    status: RepositoryGroup['status']
-  ): ReactElement | null {
-    switch (status) {
+  function renderGroupCard(group: RepositoryGroup): ReactElement | null {
+    const platform = group.key;
+    switch (group.status) {
       case 'connect': {
-        const offer = connectCardOffer(platform, role);
+        // `rowsUnlisted` separates a first connect from a connected workspace
+        // whose answer still asks for a selection or fresh credentials.
+        const needsReconnect = group.rowsUnlisted === true;
+        const offer = connectCardOffer(platform, role, needsReconnect);
         return selectedRepository === null ? (
-          renderConnectCard(platform)
+          renderConnectCard(platform, needsReconnect)
         ) : (
           <View className="mt-3 gap-2">
-            {/* This row has no header, so its note names the provider itself. */}
+            {/* This row has no header, so its first-connect note names the provider itself. */}
             {offer.compactNoteKey ? <Text variant="muted">{t(offer.compactNoteKey)}</Text> : null}
             {offer.offersAction ? renderConnectActions(platform) : renderRefreshOnly()}
           </View>
@@ -219,9 +220,12 @@ export function NewSessionRepositorySection({
     }
   }
 
-  function renderConnectCard(platform: RepositoryPlatform): ReactElement | null {
+  function renderConnectCard(
+    platform: RepositoryPlatform,
+    needsReconnect: boolean
+  ): ReactElement | null {
     const copy = PROVIDER_COPY[platform];
-    const offer = connectCardOffer(platform, role);
+    const offer = connectCardOffer(platform, role, needsReconnect);
     return (
       <CollapsibleSection
         className="mt-3 rounded-lg border border-border bg-card"

@@ -7,9 +7,13 @@ import { cn } from '@/lib/utils';
 type SectionProps = {
   /** The 10pt mono eyebrow that names the section. */
   label?: string;
+  /** Optional glyph before the label, on the label's own line. */
+  icon?: ReactNode;
   actionLabel?: string;
   onActionPress?: () => void;
   actionHidden?: boolean;
+  /** Keeps the action visible and inert, with the disabled read and state. */
+  actionDisabled?: boolean;
   notice?: ReactNode;
   reserveLabelAir?: boolean;
   /** The section sits in a full-bleed list, so its label draws the page gutter. */
@@ -21,9 +25,11 @@ type SectionProps = {
 /** A labelled block: the eyebrow header and its content, 10.5pt apart. */
 export function Section({
   label,
+  icon,
   actionLabel,
   onActionPress,
   actionHidden,
+  actionDisabled,
   notice,
   reserveLabelAir,
   inset,
@@ -35,9 +41,11 @@ export function Section({
       {label === undefined ? null : (
         <SectionHeader
           label={label}
+          icon={icon}
           actionLabel={actionLabel}
           onActionPress={onActionPress}
           actionHidden={actionHidden}
+          actionDisabled={actionDisabled}
           notice={notice}
           reserveLabelAir={reserveLabelAir}
           inset={inset}

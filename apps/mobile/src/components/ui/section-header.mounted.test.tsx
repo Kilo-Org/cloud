@@ -3,7 +3,12 @@ import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Text } from '@/components/ui/text';
-import { SectionHeader } from './section-header';
+import {
+  SECTION_ACTION_BOX_CLASS,
+  SECTION_HEADER_ROW_PADDING_CLASS,
+  textActionTargetClass,
+} from '@/lib/a11y/tap-target';
+import { SectionHeader, SectionHeaderSkeleton } from './section-header';
 
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
 const platform = vi.hoisted(() => ({ OS: 'ios' as string }));
@@ -15,6 +20,9 @@ vi.mock('react-native', () => ({
   View: 'View',
 }));
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
+// The skeleton owns no geometry of its own; the header's row classes are what
+// this suite compares, so the loading fill is a plain host node here.
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
 const ACTION_BOX_CLASSES = ['shrink-0', 'max-w-full', 'flex-row'];
 const ACTION_TEXT_CLASSES = ['shrink', 'font-mono-medium', 'text-[11px]', 'text-primary'];
@@ -366,5 +374,123 @@ describe('SectionHeader mounted layout', () => {
       node => Object.is(node.type, 'View') && String(node.props.className).includes('w-px')
     );
     expect((divider.props.className as string).split(' ')).toContain('self-center');
+  });
+
+  it('announces the section label as a heading', () => {
+    // A section label is one of the few headings a long settings screen has; a
+    // reader navigates by jumping between them, so every one of them carries the
+    // role without the caller opting in.
+    const root = mount(createElement(SectionHeader, { label: 'Explore' }));
+    const label = root.find(
+      node => Object.is(node.type, 'Text') && node.children.includes('Explore')
+    );
+    expect(label.props.accessibilityRole).toBe('header');
+  });
+
+  it('leads the label with an optional icon on the label line', () => {
+    const root = mount(
+      createElement(SectionHeader, {
+        label: 'Inbox',
+        icon: createElement('Icon', { size: 16 }),
+      })
+    );
+    const icon = root.findByType('Icon');
+    const label = root.find(node => Object.is(node.type, 'Text') && node.children.includes('Inbox'));
+    // The icon shares the label's flex line, so it cannot push the label onto a
+    // second row, and the label's own width gives way to it.
+    expect(label.parent).toBe(icon.parent);
+    const lineClasses = String(label.parent?.props.className).split(' ');
+    expect(lineClasses).toEqual(expect.arrayContaining(['flex-row', 'items-center']));
+    expect(lineClasses).toContain('grow');
+    expect((label.props.className as string).split(' ')).toContain('shrink');
+    expect((label.props.className as string).split(' ')).not.toContain('grow');
+  });
+
+  it('keeps the action box but makes it inert and announces the disabled state', () => {
+    const props = {
+      label: 'Repositories',
+      actionLabel: 'Manage',
+      onActionPress: () => undefined,
+    };
+    const enabled = mount(createElement(SectionHeader, props)).findByProps({
+      accessibilityRole: 'button',
+    });
+    const enabledClasses = enabled.props.className;
+    act(() => renderer?.unmount());
+    renderer = undefined;
+
+    const root = mount(createElement(SectionHeader, { ...props, actionDisabled: true }));
+    const disabled = root.findByProps({ accessibilityRole: 'button' });
+    const ink = String(disabled.find(node => Object.is(node.type, 'Text')).props.className).split(
+      ' '
+    );
+
+    expect(disabled.props.disabled).toBe(true);
+    expect(disabled.props.accessibilityState).toEqual({ disabled: true });
+    // The name stays readable, so the reader hears why the action is inert.
+    expect(disabled.props.accessibilityLabel).toBe('Manage');
+    // Same frame: a write that ends cannot resize the header.
+    expect(disabled.props.className).toBe(enabledClasses);
+    expect(ink).toContain('text-muted-foreground');
+    expect(ink).not.toContain('text-primary');
+  });
+
+  it('holds the header row, with and without an action, while it loads', () => {
+    const shape = (element: ReactElement) => {
+      const root = mount(element);
+      const row = root.find(node => Object.is(node.type, 'View'));
+      const views = root
+        .findAll(node => Object.is(node.type, 'View'))
+        .map(node => String(node.props.className).split(' '));
+      const result = {
+        row: String(row.props.className).split(' '),
+        views,
+        bars: root.findAll(node => Object.is(node.type, 'Skeleton')),
+      };
+      act(() => renderer?.unmount());
+      renderer = undefined;
+      return result;
+    };
+
+    const plainHeader = shape(createElement(SectionHeader, { label: 'Explore' }));
+    const plainSkeleton = shape(createElement(SectionHeaderSkeleton));
+    expect(plainSkeleton.row).toEqual(plainHeader.row);
+    expect(plainSkeleton.bars).toHaveLength(1);
+
+    const withActionHeader = shape(
+      createElement(SectionHeader, {
+        label: 'Live now',
+        actionLabel: 'See all',
+        onActionPress: () => undefined,
+      })
+    );
+    const withActionSkeleton = shape(createElement(SectionHeaderSkeleton, { action: true }));
+    expect(withActionSkeleton.row).toEqual(withActionHeader.row);
+    expect(withActionSkeleton.bars).toHaveLength(2);
+    // The action bar reserves the same frame the real action renders, so the
+    // action cannot grow the header when it arrives.
+    const actionBar = withActionSkeleton.bars[1];
+    expect(String(actionBar?.props.className).split(' ')).toEqual(
+      expect.arrayContaining(textActionTargetClass().split(' '))
+    );
+
+    const airHeader = shape(createElement(SectionHeader, { label: 'Explore', reserveLabelAir: true }));
+    const airSkeleton = shape(createElement(SectionHeaderSkeleton, { reserveLabelAir: true }));
+    expect(airSkeleton.row).toEqual(airHeader.row);
+    expect(airSkeleton.row).toContain(SECTION_HEADER_ROW_PADDING_CLASS);
+    // The label air box is the header's own height on both sides of the swap.
+    for (const shapeWithoutAction of [airHeader, airSkeleton]) {
+      expect(shapeWithoutAction.views.some(classes => classes.includes('min-h-[28px]'))).toBe(true);
+    }
+
+    const actionAirSkeleton = shape(
+      createElement(SectionHeaderSkeleton, { action: true, reserveLabelAir: true })
+    );
+    expect(String(actionAirSkeleton.bars[1]?.props.className).split(' ')).toEqual(
+      expect.arrayContaining(SECTION_ACTION_BOX_CLASS.split(' '))
+    );
+
+    const insetSkeleton = shape(createElement(SectionHeaderSkeleton, { inset: true }));
+    expect(insetSkeleton.row).toContain('px-4');
   });
 });

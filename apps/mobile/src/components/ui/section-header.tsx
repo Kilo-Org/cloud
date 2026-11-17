@@ -1,6 +1,7 @@
 import { type ReactNode } from 'react';
 import { I18nManager, Pressable, View } from 'react-native';
 
+import { Skeleton } from '@/components/ui/skeleton';
 import { EYEBROW_LATIN_DISPLAY, Text } from '@/components/ui/text';
 import {
   SECTION_ACTION_BOX_CLASS,
@@ -18,8 +19,19 @@ import { cn } from '@/lib/utils';
  */
 const LABEL_AIR_CLASS = 'min-h-[28px]';
 
+/** The label's line, held by the loading twin so the swap to the real label cannot move the block. */
+const SKELETON_LABEL_BAR_CLASS = 'h-3.5 w-16 max-w-full shrink rounded bg-muted-soft';
+/** The action's box, at the frame the text action itself renders. */
+const SKELETON_ACTION_BAR_CLASS = 'w-12 shrink-0 rounded bg-muted-soft';
+
 type SectionHeaderProps = {
   label: string;
+  /**
+   * Optional glyph before the label, on the label's own line — the Inbox and
+   * Recent marks a full-bleed list leads each of its eyebrows with. It carries
+   * no label of its own: the `label` names the section.
+   */
+  icon?: ReactNode;
   /**
    * Optional link at the row's outer edge (physical right in LTR, physical left
    * in RTL), e.g. "SEE ALL".
@@ -33,6 +45,14 @@ type SectionHeaderProps = {
    * row edge, over empty space.
    */
   actionHidden?: boolean;
+  /**
+   * Keeps the action visible and its box unchanged, but makes it inert, dims
+   * its ink to the muted role and announces it disabled — the look a write in
+   * flight leaves on the control it will enable. Unlike `actionHidden` it stays
+   * in the accessibility tree, so the reader hears why the action does not
+   * respond.
+   */
+  actionDisabled?: boolean;
   /**
    * Optional status between the label and the action. It takes only the free
    * space on the label's line (zero basis), so it never pushes the action off
@@ -59,9 +79,11 @@ type SectionHeaderProps = {
 
 export function SectionHeader({
   label,
+  icon,
   actionLabel,
   onActionPress,
   actionHidden = false,
+  actionDisabled = false,
   notice,
   reserveLabelAir = false,
   inset = false,
@@ -70,9 +92,33 @@ export function SectionHeader({
   // With a notice the label keeps its own width, so the notice takes all the
   // free space on the line instead of an equal share of it.
   const labelText = (
-    <Text variant="eyebrow" className={cn('max-w-full', !reserveLabelAir && !notice && 'grow')}>
+    <Text
+      variant="eyebrow"
+      // A section label is a heading: a reader navigates a long settings screen
+      // by jumping between them, and the role is what makes them jump targets.
+      // With an icon the wrapper grows, so the label shrinks and truncates.
+      accessibilityRole="header"
+      className={cn(
+        'max-w-full',
+        !reserveLabelAir && !notice && !icon && 'grow',
+        icon && 'shrink'
+      )}
+    >
       {label}
     </Text>
+  );
+  const labelNode = icon ? (
+    <View
+      className={cn(
+        'min-w-0 flex-row items-center gap-2',
+        !reserveLabelAir && !notice && 'grow'
+      )}
+    >
+      {icon}
+      {labelText}
+    </View>
+  ) : (
+    labelText
   );
   return (
     // The label sits on the row's content bottom edge (`items-end`), not on its
@@ -98,10 +144,10 @@ export function SectionHeader({
           the free space on the line instead of an equal share of it. */}
       {reserveLabelAir ? (
         <View className={cn('flex-col justify-end', !notice && 'grow', LABEL_AIR_CLASS)}>
-          {labelText}
+          {labelNode}
         </View>
       ) : (
-        labelText
+        labelNode
       )}
       {notice ? (
         <View className="min-w-0 shrink grow basis-0 flex-row items-center justify-end gap-2">
@@ -112,9 +158,10 @@ export function SectionHeader({
       {hasAction ? (
         <Pressable
           onPress={onActionPress}
-          disabled={actionHidden}
+          disabled={actionHidden || actionDisabled}
           accessibilityRole={actionHidden ? undefined : 'button'}
           accessibilityLabel={actionHidden ? undefined : actionLabel}
+          accessibilityState={actionDisabled ? { disabled: true } : undefined}
           accessibilityElementsHidden={actionHidden}
           importantForAccessibility={actionHidden ? 'no-hide-descendants' : undefined}
           // The row packs each flex line to its end (`justify-end`) and only the
@@ -151,7 +198,10 @@ export function SectionHeader({
         >
           <Text
             className={cn(
-              'shrink font-mono-medium text-[11px] text-primary',
+              'shrink font-mono-medium text-[11px]',
+              // The muted ink is the disabled read; the enabled action keeps the
+              // accent at full strength, so only it reads ready.
+              actionDisabled ? 'text-muted-foreground' : 'text-primary',
               // LTR-only: the letterspaced capitals break a cursive script's
               // joins, so an RTL action label drops them (home-ar-loading).
               // The class string is the eyebrow variant's, so the two labels
@@ -163,6 +213,56 @@ export function SectionHeader({
           </Text>
         </Pressable>
       ) : null}
+    </View>
+  );
+}
+
+type SectionHeaderSkeletonProps = {
+  /**
+   * Reserve the trailing action's box, so a section that loads its action later
+   * does not grow by the action's frame when the real header paints.
+   */
+  action?: boolean;
+  /** Mirror a header that reserves its label air (`reserveLabelAir`). */
+  reserveLabelAir?: boolean;
+  /** Mirror a header that draws the page gutter (`inset`). */
+  inset?: boolean;
+};
+
+/**
+ * The loading shape of a section header: the label's line, and the action's box
+ * when the header will carry one. It renders on the header's own row classes,
+ * so it holds exactly the height the real header takes with or without an
+ * action and the swap cannot move the block below it.
+ */
+export function SectionHeaderSkeleton({
+  action = false,
+  reserveLabelAir = false,
+  inset = false,
+}: Readonly<SectionHeaderSkeletonProps>) {
+  const labelBar = <Skeleton className={SKELETON_LABEL_BAR_CLASS} />;
+  const actionBar = action ? (
+    <Skeleton
+      className={cn(
+        reserveLabelAir ? SECTION_ACTION_BOX_CLASS : textActionTargetClass(),
+        SKELETON_ACTION_BAR_CLASS
+      )}
+    />
+  ) : null;
+  return (
+    <View
+      className={cn(
+        'flex-row flex-wrap items-end justify-end gap-2',
+        inset && SCREEN_GUTTER_CLASS,
+        reserveLabelAir ? SECTION_HEADER_ROW_PADDING_CLASS : 'py-2'
+      )}
+    >
+      {reserveLabelAir ? (
+        <View className={cn('grow flex-col justify-end', LABEL_AIR_CLASS)}>{labelBar}</View>
+      ) : (
+        <View className="min-w-0 grow">{labelBar}</View>
+      )}
+      {actionBar}
     </View>
   );
 }

@@ -18,16 +18,20 @@ describe('SectionHeader gutter', () => {
   // full-bleed list passes `inset` so the label lines up with its rows.
   it('draws the page gutter only for a full-bleed list', () => {
     const rowClasses = (inset: boolean) => {
-      let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+      // The renderer lives in a holder: the assignment happens inside the `act`
+      // callback, which control-flow analysis does not follow, so a bare `let`
+      // reads as never-assigned.
+      const mounted: { renderer?: TestRenderer.ReactTestRenderer } = {};
       act(() => {
-        renderer = TestRenderer.create(createElement(SectionHeader, { label: 'Explore', inset }));
+        mounted.renderer = TestRenderer.create(createElement(SectionHeader, { label: 'Explore', inset }));
       });
+      const renderer = mounted.renderer;
       if (!renderer) {
         throw new Error('Missing SectionHeader renderer');
       }
       const row = renderer.root.find(node => Object.is(node.type, 'View'));
       const classes = String(row.props.className).split(' ');
-      act(() => renderer?.unmount());
+      act(() => renderer.unmount());
       return classes;
     };
 

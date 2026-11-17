@@ -4273,8 +4273,7 @@
       "repoValue": "Wurin ajiya: {{name}}",
       "profileValue": "Bayanin martaba: {{name}}",
       "profileUnavailable": "Wannan bayanin martaba ba ya samuwa kuma. Zaɓi wani.",
-      "pickerEmptyDescriptionOrganization": "Ƙirƙirar bayanin martaban ƙungiya don sake amfani da masu canjin yanayi, umarnin saitin, da ƙwarewa a cikin zaman.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Ma'abucin ƙungiya ko mai gudanarwa na iya ƙirƙirar bayanin martaban ƙungiya."
+      "pickerEmptyDescriptionOrganization": "Ƙirƙirar bayanin martaban ƙungiya don sake amfani da masu canjin yanayi, umarnin saitin, da ƙwarewa a cikin zaman."
     },
     "variablesDeleteFailed": "An kasa share canji",
     "deleteVariable": "Share canji {{key}}",

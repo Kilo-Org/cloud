@@ -4273,8 +4273,7 @@
       "repoValue": "Kodarkiv: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Den här profilen är inte längre tillgänglig. Välj en annan.",
-      "pickerEmptyDescriptionOrganization": "Skapa en organisationsprofil för att återanvända miljövariabler, installationskommandon och färdigheter över sessioner.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "En organisationsägare eller administratör kan skapa en organisationsprofil."
+      "pickerEmptyDescriptionOrganization": "Skapa en organisationsprofil för att återanvända miljövariabler, installationskommandon och färdigheter över sessioner."
     },
     "variablesDeleteFailed": "Det gick inte att ta bort variabeln",
     "deleteVariable": "Ta bort variabel {{key}}",

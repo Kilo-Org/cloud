@@ -4339,8 +4339,7 @@
       "repoValue": "Spremište: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Ovaj profil više nije dostupan. Izaberi drugi.",
-      "pickerEmptyDescriptionOrganization": "Napravite profil organizacije da biste ponovo koristili promenljive okruženja, komande za podešavanje i veštine u svim sesijama.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Vlasnik ili administrator organizacije može da napravi profil organizacije."
+      "pickerEmptyDescriptionOrganization": "Napravite profil organizacije da biste ponovo koristili promenljive okruženja, komande za podešavanje i veštine u svim sesijama."
     },
     "variablesDeleteFailed": "Nije moguće izbrisati promenljivu",
     "deleteVariable": "Obriši promenljivu {{key}}",

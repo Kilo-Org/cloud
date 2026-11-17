@@ -4345,8 +4345,7 @@
       "repoValue": "Repositório: {{name}}",
       "profileValue": "Perfil: {{name}}",
       "profileUnavailable": "Este perfil já não está disponível. Escolha outro.",
-      "pickerEmptyDescriptionOrganization": "Crie um perfil de organização para reutilizar variáveis de ambiente, comandos de configuração e competências entre sessões.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Um proprietário ou administrador da organização pode criar um perfil de organização."
+      "pickerEmptyDescriptionOrganization": "Crie um perfil de organização para reutilizar variáveis de ambiente, comandos de configuração e competências entre sessões."
     },
     "variablesDeleteFailed": "Não foi possível eliminar a variável",
     "deleteVariable": "Eliminar a variável {{key}}",

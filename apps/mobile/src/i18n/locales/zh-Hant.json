@@ -4273,8 +4273,7 @@
       "repoValue": "存儲庫: {{name}}",
       "profileValue": "個人資料: {{name}}",
       "profileUnavailable": "此個人資料已無法使用。請選擇其他個人資料。",
-      "pickerEmptyDescriptionOrganization": "建立組織設定檔以跨會話重複使用環境變數、設定命令和技能。",
-      "pickerEmptyDescriptionOrganizationReadOnly": "組織擁有者或管理員可以建立組織設定檔。"
+      "pickerEmptyDescriptionOrganization": "建立組織設定檔以跨會話重複使用環境變數、設定命令和技能。"
     },
     "variablesDeleteFailed": "無法刪除變數",
     "deleteVariable": "刪除變數 {{key}}",

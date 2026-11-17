@@ -4273,8 +4273,7 @@
       "repoValue": "リポジトリ: {{name}}",
       "profileValue": "プロフィール: {{name}}",
       "profileUnavailable": "このプロフィールは使用できなくなりました。別のプロフィールを選択してください。",
-      "pickerEmptyDescriptionOrganization": "組織プロフィールを作成して、セッション間で環境変数、セットアップコマンド、スキルを再利用します。",
-      "pickerEmptyDescriptionOrganizationReadOnly": "組織のオーナーまたは管理者が組織プロフィールを作成できます。"
+      "pickerEmptyDescriptionOrganization": "組織プロフィールを作成して、セッション間で環境変数、セットアップコマンド、スキルを再利用します。"
     },
     "variablesDeleteFailed": "変数を削除できませんでした",
     "deleteVariable": "変数{{key}}を削除",

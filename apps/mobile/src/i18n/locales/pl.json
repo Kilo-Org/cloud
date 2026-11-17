@@ -4405,8 +4405,7 @@
       "repoValue": "Repozytorium: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Ten profil nie jest już dostępny. Wybierz inny.",
-      "pickerEmptyDescriptionOrganization": "Utwórz profil organizacji, aby ponownie używać zmiennych środowiskowych, poleceń konfiguracyjnych i umiejętności w różnych sesjach.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Właściciel lub administrator organizacji może utworzyć profil organizacji."
+      "pickerEmptyDescriptionOrganization": "Utwórz profil organizacji, aby ponownie używać zmiennych środowiskowych, poleceń konfiguracyjnych i umiejętności w różnych sesjach."
     },
     "variablesDeleteFailed": "Nie udało się usunąć zmiennej",
     "deleteVariable": "Usuń zmienną {{key}}",

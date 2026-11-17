@@ -4339,8 +4339,7 @@
       "repoValue": "Dépôt : {{name}}",
       "profileValue": "Profil : {{name}}",
       "profileUnavailable": "Ce profil n'est plus disponible. Choisissez-en un autre.",
-      "pickerEmptyDescriptionOrganization": "Créez un profil d'organisation pour réutiliser les variables d'environnement, les commandes de configuration et les compétences au fil des sessions.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Un propriétaire ou un administrateur d'organisation peut créer un profil d'organisation."
+      "pickerEmptyDescriptionOrganization": "Créez un profil d'organisation pour réutiliser les variables d'environnement, les commandes de configuration et les compétences au fil des sessions."
     },
     "variablesDeleteFailed": "Impossible de supprimer la variable",
     "deleteVariable": "Supprimer la variable {{key}}",

@@ -4273,8 +4273,7 @@
       "repoValue": "ບ່ອນເກັບມ້ຽນ: {{name}}",
       "profileValue": "ໂປຣໄຟລ໌: {{name}}",
       "profileUnavailable": "ໂປຣໄຟລ໌ນີ້ບໍ່ມີໃຫ້ໃຊ້ອີກແລ້ວ. ເລືອກໂປຣໄຟລ໌ອື່ນ.",
-      "pickerEmptyDescriptionOrganization": "ສ້າງໂປຣໄຟລ໌ຂອງອົງກອນເພື່ອນຳໃຊ້ຕົວແປສະພາບແວດລ້ອມຄືນໃໝ່, ຕັ້ງຄ່າຄຳສັ່ງ ແລະທັກສະຕ່າງໆໃນທົ່ວເຊດຊັນ.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "ເຈົ້າຂອງອົງກອນ ຫຼືຜູ້ບໍລິຫານສາມາດສ້າງໂປຣໄຟລ໌ຂອງອົງກອນໄດ້."
+      "pickerEmptyDescriptionOrganization": "ສ້າງໂປຣໄຟລ໌ຂອງອົງກອນເພື່ອນຳໃຊ້ຕົວແປສະພາບແວດລ້ອມຄືນໃໝ່, ຕັ້ງຄ່າຄຳສັ່ງ ແລະທັກສະຕ່າງໆໃນທົ່ວເຊດຊັນ."
     },
     "variablesDeleteFailed": "ບໍ່ສາມາດລຶບຕົວແປໄດ້",
     "deleteVariable": "ລຶບຕົວແປ {{key}}",

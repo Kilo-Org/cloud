@@ -4273,8 +4273,7 @@
       "repoValue": "ማከማቻ: {{name}}",
       "profileValue": "መገለጫ: {{name}}",
       "profileUnavailable": "ይህ መገለጫ ከእንግዲህ ወዲህ አይገኝም። ሌላ ይምረጡ።",
-      "pickerEmptyDescriptionOrganization": "የአካባቢ ተለዋዋጮችን፣ የማዋቀር ትዕዛዞችን እና በክፍለ-ጊዜዎች ያሉ ክህሎቶችን እንደገና ለመጠቀም የድርጅት መገለጫ ይፍጠሩ።",
-      "pickerEmptyDescriptionOrganizationReadOnly": "የድርጅት ባለቤት ወይም አስተዳዳሪ የድርጅት መገለጫ መፍጠር ይችላል።"
+      "pickerEmptyDescriptionOrganization": "የአካባቢ ተለዋዋጮችን፣ የማዋቀር ትዕዛዞችን እና በክፍለ-ጊዜዎች ያሉ ክህሎቶችን እንደገና ለመጠቀም የድርጅት መገለጫ ይፍጠሩ።"
     },
     "variablesDeleteFailed": "ተለዋዋጭ ማጥፋት አልተቻለም",
     "deleteVariable": "ተለዋዋጭ {{key}} ሰርዝ",

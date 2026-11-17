@@ -96,9 +96,10 @@ export function RepoBindingsScreen({
     selectedRepo === null ? { kind: 'none' } : { kind: 'chosen', repo: selectedRepo };
   const chosenProfile = chosenProfileOf(selectedProfileId, profileChoices);
   const canAdd = chosenRepo.kind === 'chosen' && chosenProfile.kind === 'chosen' && !bind.isPending;
-  // The picker lists this context's own profiles, so its empty state names the
-  // profile that would appear there.
-  const pickerEmptyDescription = t(pickerEmptyDescriptionKey(organizationId, profilePermission));
+  // The picker opens only from the Add control, which the slot withholds
+  // without the manage role, so its empty state names the profile this
+  // context lists and never who may create one.
+  const pickerEmptyDescription = t(pickerEmptyDescriptionKey(organizationId));
   // The create form starts on the owner whose profiles this context lists.
   const createOwner: ProfileOwnerChoice =
     organizationId === undefined ? 'personal' : 'organization';

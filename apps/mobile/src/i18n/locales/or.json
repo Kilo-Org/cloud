@@ -4273,8 +4273,7 @@
       "repoValue": "ସଂଗ୍ରହାଳୟ: {{name}}",
       "profileValue": "ପ୍ରୋଫାଇଲ୍: {{name}}",
       "profileUnavailable": "ଏହି ପ୍ରୋଫାଇଲ୍ ଆଉ ଉପଲବ୍ଧ ନାହିଁ। ଅନ୍ୟ ଏକ ପ୍ରୋଫାଇଲ୍ ବାଛନ୍ତୁ।",
-      "pickerEmptyDescriptionOrganization": "ପରିବେଶ ଭେରିଏବଲ୍, ସେଟଅପ୍ କମାଣ୍ଡ, ଏବଂ ଅଧିବେଶନରେ କୌଶଳ ପୁନଃ ବ୍ୟବହାର କରିବାକୁ ଏକ ସଂଗଠନ ପ୍ରୋଫାଇଲ୍ ସୃଷ୍ଟି କରନ୍ତୁ।",
-      "pickerEmptyDescriptionOrganizationReadOnly": "ଏକ ସଂଗଠନ ମାଲିକ କିମ୍ବା ଆଡମିନ୍ ଏକ ସଂଗଠନ ପ୍ରୋଫାଇଲ୍ ସୃଷ୍ଟି କରିପାରିବେ।"
+      "pickerEmptyDescriptionOrganization": "ପରିବେଶ ଭେରିଏବଲ୍, ସେଟଅପ୍ କମାଣ୍ଡ, ଏବଂ ଅଧିବେଶନରେ କୌଶଳ ପୁନଃ ବ୍ୟବହାର କରିବାକୁ ଏକ ସଂଗଠନ ପ୍ରୋଫାଇଲ୍ ସୃଷ୍ଟି କରନ୍ତୁ।"
     },
     "variablesDeleteFailed": "ଭେରିଏବଲ୍ ଡିଲିଟ୍ କରିପାରିଲା ନାହିଁ।",
     "deleteVariable": "ଭେରିଏବଲ୍ {{key}} ବିଲୋପ କରନ୍ତୁ",

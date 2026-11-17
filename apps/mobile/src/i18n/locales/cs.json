@@ -4405,8 +4405,7 @@
       "repoValue": "Úložiště: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Tento profil už není dostupný. Vyberte jiný.",
-      "pickerEmptyDescriptionOrganization": "Vytvořte profil organizace pro opětovné použití proměnných prostředí, instalačních příkazů a dovedností napříč relacemi.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Profil organizace může vytvořit vlastník organizace nebo správce."
+      "pickerEmptyDescriptionOrganization": "Vytvořte profil organizace pro opětovné použití proměnných prostředí, instalačních příkazů a dovedností napříč relacemi."
     },
     "variablesDeleteFailed": "Proměnnou se nepodařilo smazat",
     "deleteVariable": "Smazat proměnnou {{key}}",

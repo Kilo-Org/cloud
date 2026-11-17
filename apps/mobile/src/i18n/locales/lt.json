@@ -4405,8 +4405,7 @@
       "repoValue": "Saugykla: {{name}}",
       "profileValue": "Profilis: {{name}}",
       "profileUnavailable": "Šis profilis nebepasiekiamas. Pasirinkite kitą.",
-      "pickerEmptyDescriptionOrganization": "Sukurkite organizacijos profilį, kad seansų metu pakartotinai naudotumėte aplinkos kintamuosius, sąrankos komandas ir įgūdžius.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Organizacijos savininkas arba administratorius gali sukurti organizacijos profilį."
+      "pickerEmptyDescriptionOrganization": "Sukurkite organizacijos profilį, kad seansų metu pakartotinai naudotumėte aplinkos kintamuosius, sąrankos komandas ir įgūdžius."
     },
     "variablesDeleteFailed": "Nepavyko ištrinti kintamojo",
     "deleteVariable": "Ištrinti kintamąjį {{key}}",

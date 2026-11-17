@@ -4471,8 +4471,7 @@
       "repoValue": "Repożitorju: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Dan il-profil m'għadux disponibbli. Agħżel ieħor.",
-      "pickerEmptyDescriptionOrganization": "Oħloq profil ta' organizzazzjoni biex tuża mill-ġdid il-varjabbli ambjentali, il-kmandi tas-setup, u l-ħiliet matul is-sessjonijiet.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Sid jew amministratur ta' organizzazzjoni jista' joħloq profil ta' organizzazzjoni."
+      "pickerEmptyDescriptionOrganization": "Oħloq profil ta' organizzazzjoni biex tuża mill-ġdid il-varjabbli ambjentali, il-kmandi tas-setup, u l-ħiliet matul is-sessjonijiet."
     },
     "variablesDeleteFailed": "Ma setax jħassar il-varjabbli",
     "deleteVariable": "Ħassar il-varjabbli {{key}}",

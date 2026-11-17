@@ -117,10 +117,7 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
   return (
     <>
       <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
-        <Text
-          {...HIDDEN_LABEL_PROPS}
-          className="text-sm font-medium"
-        >
+        <Text {...HIDDEN_LABEL_PROPS} className="min-w-0 flex-1 text-sm font-medium">
           {t('organization.lowBalanceAlert.enableA11y')}
         </Text>
         <Switch

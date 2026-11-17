@@ -1,12 +1,13 @@
 /**
- * The bundled changelog split at its `## ` release headings, in file order.
+ * The bundled changelog's release sections, in file order. Only the chunks that
+ * start at a `## ` release heading are returned: everything above the first
+ * one (the `#` document title and the maintainer note) is not rendered.
  * The screen renders one chunk per list item so the markdown renderer parses
  * only the chunks in the list's window: `CHANGELOG.md` grows with every release
  * and the whole history parsed synchronously on open is work nobody sees.
- * Concatenating the chunks returns the source bytes unchanged.
  */
 export function splitChangelogSections(markdown: string): string[] {
-  return markdown.split(/^(?=## )/m);
+  return markdown.split(/^(?=## )/m).filter(chunk => chunk.startsWith('## '));
 }
 
 /** `1.0.16` in `## 1.0.16 (build 720 iOS, 721 Android)`; anything else is null. */

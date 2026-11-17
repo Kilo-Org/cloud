@@ -355,6 +355,7 @@ function buildDimensionConditions(where: WhereBuilder, filters: UsageAnalyticsFi
   addInIfNonEmpty('auto_model', filters.autoModels);
   addInIfNonEmpty('mode', filters.modes);
   addInIfNonEmpty('provider', filters.providers);
+  addInIfNonEmpty('inference_provider', filters.inferenceProviders);
   addInIfNonEmpty('project_id', filters.projects);
   addNotInIfNonEmpty('feature', filters.excludedFeatures);
   addNotInIfNonEmpty('model', filters.excludedModels);
@@ -364,6 +365,11 @@ function buildDimensionConditions(where: WhereBuilder, filters: UsageAnalyticsFi
   }
   addNotInIfNonEmpty('mode', filters.excludedModes);
   addNotInIfNonEmpty('provider', filters.excludedProviders);
+  // Excluding named serving providers must retain usage with no inference
+  // provider, mirroring the settled alias exclusion semantics above.
+  if (filters.excludedInferenceProviders && filters.excludedInferenceProviders.length > 0) {
+    where.addNotInOrNull('inference_provider', filters.excludedInferenceProviders);
+  }
   addNotInIfNonEmpty('project_id', filters.excludedProjects);
 }
 
@@ -489,6 +495,8 @@ export function dimensionColumn(dimension: BreakdownDimension): string {
       return 'kilo_user_id';
     case 'provider':
       return 'provider';
+    case 'inferenceProvider':
+      return 'inference_provider';
     case 'project':
       return 'project_id';
     case 'organization':
@@ -936,10 +944,6 @@ export const usageAnalyticsRouter = createTRPCRouter({
       const costSumExpr = costSumExprSql(input.costSource);
 
       const requestedDims = input.groupBy;
-      // Append opt-in dimensions after the legacy metrics to preserve default SQL and offsets.
-      const autoModelSelect = requestedDims.includes('autoModel')
-        ? ', auto_model AS dim_auto_model'
-        : '';
 
       // For dimensions not in groupBy, emit an empty string constant so the
       // row shape stays stable regardless of which dimensions were requested.
@@ -949,6 +953,21 @@ export const usageAnalyticsRouter = createTRPCRouter({
       const userExpr = requestedDims.includes('user') ? 'kilo_user_id' : "''";
       const providerExpr = requestedDims.includes('provider') ? 'provider' : "''";
       const projectExpr = requestedDims.includes('project') ? 'project_id' : "''";
+
+      // `autoModel` and `inferenceProvider` are opt-in trailing dimensions.
+      // They are appended after the legacy metrics only when requested, so
+      // default queries keep the existing column positions (and metric offsets)
+      // byte-for-byte. Their 0-indexed positions depend on which opt-in dims
+      // are present: first trailing column = 14 (datetime + 6 dims + 7 metrics),
+      // each additional one increments. This ordered list is the source of both
+      // the SELECT suffix and the row offset map, so the two cannot drift.
+      const TRAILING_DIMS = [
+        { dim: 'autoModel', sql: 'auto_model', alias: 'dim_auto_model' },
+        { dim: 'inferenceProvider', sql: 'inference_provider', alias: 'dim_inference_provider' },
+      ] as const;
+
+      const presentTrailing = TRAILING_DIMS.filter(t => requestedDims.includes(t.dim));
+      const trailingSelect = presentTrailing.map(t => `, ${t.sql} AS ${t.alias}`).join('');
 
       // GROUP BY columns: bucket (pos 1) + each requested dimension column
       // SAFETY: dimensionColumn() returns only hardcoded string literals from
@@ -971,7 +990,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
           COALESCE(SUM(total_output_tokens), 0),
           COALESCE(SUM(total_cache_write_tokens), 0),
           COALESCE(SUM(total_cache_hit_tokens), 0),
-          COALESCE(SUM(error_count), 0)${autoModelSelect}
+          COALESCE(SUM(error_count), 0)${trailingSelect}
         FROM ${table}
         WHERE ${where.sql()}
         GROUP BY ${groupByClause}
@@ -998,6 +1017,11 @@ export const usageAnalyticsRouter = createTRPCRouter({
           })
       );
 
+      // Base dimensions keep fixed positions 1..6; opt-in trailing dimensions
+      // start at 14 and increment in the TRAILING_DIMS order above. A trailing
+      // dim is only read when requested, so its position is valid whenever used.
+      const trailingOffset = (dim: (typeof TRAILING_DIMS)[number]['dim']): number =>
+        14 + presentTrailing.findIndex(t => t.dim === dim);
       const dimIndexMap: Record<Dimension, number> = {
         feature: 1,
         model: 2,
@@ -1005,7 +1029,8 @@ export const usageAnalyticsRouter = createTRPCRouter({
         user: 4,
         provider: 5,
         project: 6,
-        autoModel: 14,
+        autoModel: trailingOffset('autoModel'),
+        inferenceProvider: trailingOffset('inferenceProvider'),
       };
 
       return {

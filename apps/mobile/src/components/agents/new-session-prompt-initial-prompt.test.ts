@@ -6,6 +6,7 @@ import { type AgentMode } from '@/components/agents/mode-selector';
 import { ComposerPasteButton } from '@/components/agents/composer-paste-button';
 import { NewSessionPromptControls as renderPromptControls } from '@/components/agents/new-session-prompt-controls';
 import { Text as renderText } from '@/components/ui/text';
+import { RemainingCharactersCounter as renderCounter } from '@/components/ui/remaining-characters-counter';
 import { VoiceInputButton, VoiceInputStatus } from '@/components/voice-input-control';
 import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 
@@ -230,6 +231,13 @@ function findElementByType(
       accessibilityLabel
     );
   }
+  if (nodeType === renderCounter) {
+    return findElementByType(
+      renderCounter(props as React.ComponentProps<typeof renderCounter>),
+      target,
+      accessibilityLabel
+    );
+  }
   if (nodeType === renderPromptControls) {
     return findElementByType(
       renderPromptControls(props as React.ComponentProps<typeof renderPromptControls>),
@@ -244,6 +252,36 @@ function findElementByType(
     }
   }
   return null;
+}
+
+/**
+ * The remaining-characters row's `Text` props, or null when the row is absent.
+ * The row carries its phrase as its visible text, so it is found by that text,
+ * through the same descent as `findElementByType`.
+ */
+function findCounterText(node: Node): Record<string, unknown> | null {
+  if (node === null || typeof node !== 'object') {
+    return null;
+  }
+  const props = node.props ?? {};
+  const nodeType = (node as { type?: unknown }).type;
+  if (nodeType === renderCounter) {
+    return findCounterText(renderCounter(props as React.ComponentProps<typeof renderCounter>));
+  }
+  if (nodeType === renderText) {
+    return findCounterText(renderText(props as React.ComponentProps<typeof renderText>));
+  }
+  if (typeof props.children !== 'string' || !props.children.endsWith('characters remaining')) {
+    const children = props.children;
+    for (const child of Array.isArray(children) ? children : [children]) {
+      const found = findCounterText(child as Node);
+      if (found) {
+        return found;
+      }
+    }
+    return null;
+  }
+  return props;
 }
 
 /**
@@ -269,6 +307,9 @@ function findFirstIndexByType(node: Node, target: ElementType): number | null {
     }
     if (nodeType === renderText) {
       return visit(renderText(props as React.ComponentProps<typeof renderText>));
+    }
+    if (nodeType === renderCounter) {
+      return visit(renderCounter(props as React.ComponentProps<typeof renderCounter>));
     }
     if (nodeType === renderPromptControls) {
       return visit(
@@ -361,19 +402,19 @@ describe('NewSessionPrompt initialPrompt seed', () => {
   });
 
   it.each(TEXT_DIRECTIONS)(
-    'shows the seeded counter and its accessible label only near the limit in $direction',
+    'shows the seeded counter phrase only near the limit in $direction',
     async ({ isRTL, style }) => {
       const { NewSessionPrompt: renderPrompt } = await import('./new-session-prompt');
       layoutDirection.isRTL = isRTL;
       const shortSeed = renderPrompt({ ...defaultProps(), initialPrompt: 'hello' });
-      expect(findElementByType(shortSeed, 'Text', '99995 characters remaining')).toBeNull();
+      expect(findCounterText(shortSeed)).toBeNull();
 
       const element = renderPrompt({
         ...defaultProps(),
         initialPrompt: 'x'.repeat(100_000 - 5),
       });
-      expect(findElementByType(element, 'Text', '5 characters remaining')).toMatchObject({
-        children: 5,
+      expect(findCounterText(element)).toMatchObject({
+        children: '5 characters remaining',
         className: 'text-xs font-normal text-muted-foreground',
         style,
       });

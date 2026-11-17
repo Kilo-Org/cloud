@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one mounted suite covers the device list, its revoke flow and every data state over one tRPC mock. */
 import { act } from '@/test/renderer';
 import type * as ReactQuery from '@tanstack/react-query';
 import { createElement, type ReactNode } from 'react';

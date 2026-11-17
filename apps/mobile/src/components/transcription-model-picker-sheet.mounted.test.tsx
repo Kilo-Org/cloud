@@ -229,7 +229,12 @@ describe('TranscriptionModelPickerSheet', () => {
         node.props.className.includes('py-3')
     );
     expect(skeletonRows).toHaveLength(6);
-    expect(skeletonRows[0]?.props.className).toContain('items-center justify-between');
+    // The shared skeleton row mirrors the row primitive it stands in for: the
+    // row floor, the gutter and one trailing-free line column.
+    expect(String(skeletonRows[0]?.props.className).split(' ')).toEqual(
+      expect.arrayContaining(['flex-row', 'items-center', 'px-4', 'py-3'])
+    );
+    expect(String(skeletonRows[0]?.props.className)).toContain(ROW_TARGET_CLASS);
     expect(findByType(renderer.root, 'ChoiceRow')).toHaveLength(0);
     expect(findByType(renderer.root, 'EmptyState')).toHaveLength(0);
 

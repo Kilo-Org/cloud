@@ -647,49 +647,44 @@ export function NotificationsScreen() {
   const previewTerminal = previewErrorCode === 'UNAUTHORIZED';
   const previewDisabled = !notificationsEnabled || isPreviewPending || previewTerminal;
 
-  let masterSubtitle: string | undefined;
-  if (masterLeading === 'on') {
-    masterSubtitle = t('notifications.onDescription');
-  } else if (masterLeading === 'off') {
-    masterSubtitle = t('notifications.offDescription');
-  }
+  const masterSubtitle =
+    masterLeading === 'on'
+      ? t('notifications.onDescription')
+      : masterLeading === 'off'
+        ? t('notifications.offDescription')
+        : undefined;
 
   // Master trailing slot — first match wins: a settling permission read or a
   // token query still in flight shows its skeleton, a permission read that
   // failed offers the retry, and only a settled gate draws the real switch.
-  let masterTrailing: ReactNode;
-  if (permissionLoading) {
-    masterTrailing = <Skeleton className="h-8 w-14 rounded-full" />;
-  } else if (permissionError) {
-    masterTrailing = (
-      <InlineRetry
-        label={t('notifications.retryPermission')}
-        color={colors.destructive}
-        onPress={() => void refetchPermission()}
+  const masterTrailing: ReactNode = permissionLoading ? (
+    <Skeleton className="h-8 w-14 rounded-full" />
+  ) : permissionError ? (
+    <InlineRetry
+      label={t('notifications.retryPermission')}
+      color={colors.destructive}
+      onPress={() => void refetchPermission()}
+    />
+  ) : !gateSettled ? (
+    <Skeleton className="h-8 w-14 rounded-full" />
+  ) : (
+    <View className="flex-row items-center gap-2">
+      {isMasterBusy && <ActivityIndicator size="small" color={colors.mutedForeground} />}
+      <Switch
+        value={notificationsEnabled}
+        disabled={isMasterBusy}
+        accessibilityLabel={t('notifications.deviceTitle')}
+        accessibilityState={{ disabled: isMasterBusy, busy: isMasterBusy }}
+        onValueChange={value => {
+          if (value) {
+            void handleEnableNotifications();
+          } else {
+            handleDisableNotifications();
+          }
+        }}
       />
-    );
-  } else if (!gateSettled) {
-    masterTrailing = <Skeleton className="h-8 w-14 rounded-full" />;
-  } else {
-    masterTrailing = (
-      <View className="flex-row items-center gap-2">
-        {isMasterBusy && <ActivityIndicator size="small" color={colors.mutedForeground} />}
-        <Switch
-          value={notificationsEnabled}
-          disabled={isMasterBusy}
-          accessibilityLabel={t('notifications.deviceTitle')}
-          accessibilityState={{ disabled: isMasterBusy, busy: isMasterBusy }}
-          onValueChange={value => {
-            if (value) {
-              void handleEnableNotifications();
-            } else {
-              handleDisableNotifications();
-            }
-          }}
-        />
-      </View>
-    );
-  }
+    </View>
+  );
 
   return (
     <View className="flex-1 bg-background">

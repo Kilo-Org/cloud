@@ -44,6 +44,11 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: '#F2F0EB' }),
 }));
 vi.mock('@/lib/navigation/route-focus', () => ({ useRouteFocused: () => true }));
+// The choice row haptics and the shared i18n instance are native/bundle-time
+// concerns this row-level harness does not exercise: the selection feedback is
+// asserted by the row primitive's own mounted test.
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
+vi.mock('@/i18n', () => ({ i18n: { language: 'en' } }));
 
 const Pressable = 'Pressable' as ElementType;
 const Check = 'Check' as ElementType;
@@ -98,7 +103,9 @@ function rows(renderer: ReactTestRenderer) {
     selected: checkedState(node) === true,
     divider:
       typeof node.props.className === 'string' && node.props.className.includes('border-hair-soft'),
-    check: node.findAll(child => child.type === Check).length > 0,
+    // The mark holds its slot in every row: the check paints only for the
+    // selected row and stays transparent otherwise.
+    check: node.findAll(child => child.type === Check && child.props.color !== 'transparent').length > 0,
   }));
 }
 
@@ -195,8 +202,12 @@ describe('ContextPickerSheet', () => {
   it('checks exactly one row', async () => {
     const renderer = await mount();
 
-    const check = renderer.root.findAll(node => node.type === Check);
+    // Both rows hold the mark's slot; only the checked one paints it.
+    const check = renderer.root.findAll(
+      node => node.type === Check && node.props.color !== 'transparent'
+    );
     expect(check).toHaveLength(1);
+    expect(renderer.root.findAll(node => node.type === Check)).toHaveLength(2);
   });
 
   it('leaves the list at its top when the checked row fits inside the fold', async () => {

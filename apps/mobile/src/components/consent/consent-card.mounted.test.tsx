@@ -461,7 +461,13 @@ describe('ConsentCard', () => {
         n.props.title === 'Help improve Kilo'
     );
     expect(placeholderRows).toHaveLength(1);
-    expect(String(placeholderRows[0]?.props.trailing?.type)).toBe('Skeleton');
+    // The trailing slot holds the loading bar until the consent record lands.
+    const trailing: unknown = (placeholderRows[0]?.props as { trailing?: unknown }).trailing;
+    expect(
+      typeof trailing === 'object' && trailing !== null && 'type' in trailing
+        ? trailing.type
+        : undefined
+    ).toBe('Skeleton');
 
     await act(() => {
       resolveLoad?.({ mandatory: true, optional: true });

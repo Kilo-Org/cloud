@@ -6,12 +6,15 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { ProviderKeyCredentialForm } from '@/components/account/provider-key-credential-form';
+import {
+  ProviderKeySaveFailure,
+  type SaveFailure,
+} from '@/components/account/provider-key-save-failure';
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
-import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -38,7 +41,6 @@ import {
 } from '@/lib/byok/provider-key-scope';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
-import { assertSurfaceFailureHandled } from '@/lib/surface-feedback';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { normalizeOrgQueryParam } from '@/lib/org-deep-link';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
@@ -46,10 +48,6 @@ import { isRetryableTrpcError, readTrpcErrorField } from '@/lib/trpc-error';
 import { useTRPC } from '@/lib/trpc';
 
 type ProviderOption = inferRouterOutputs<MobileRouter>['byok']['listProviders'][number];
-
-type SaveFailure =
-  | { readonly kind: 'retryable'; readonly message: string }
-  | { readonly kind: 'refused'; readonly message: string };
 
 /**
  * The empty field-error state. One shared object, not a fresh `{}`, so an edit
@@ -259,35 +257,13 @@ export function ProviderKeyNewScreen() {
     router.dismissTo(backHref);
   };
 
-  const failure = save.failure;
-  let saveFailure: ReactNode = null;
-  if (failure) {
-    switch (failure.kind) {
-      case 'retryable': {
-        saveFailure = (
-          <View className="gap-2">
-            <AccessibleStatus message={failure.message} className="text-sm" />
-            <Button
-              variant="outline"
-              size="sm"
-              className={STATE_ACTION_CLASS}
-              onPress={() => void submit()}
-            >
-              <Text>{t('common.retry')}</Text>
-            </Button>
-          </View>
-        );
-        break;
-      }
-      case 'refused': {
-        saveFailure = <AccessibleStatus message={failure.message} className="text-sm" />;
-        break;
-      }
-      default: {
-        saveFailure = assertSurfaceFailureHandled(failure);
-      }
-    }
-  }
+  const saveFailure = (
+    <ProviderKeySaveFailure
+      failure={save.failure}
+      onRetry={() => void submit()}
+      retryLabel={t('common.retry')}
+    />
+  );
 
   const pending = save.feedback.status === 'pending';
 

@@ -93,7 +93,10 @@ vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 // assertions drive: the row text, the control a row carries in its trailing
 // slot, and a skeleton bar for the loading geometry.
 vi.mock('@/components/ui/section', () => ({
-  Section: ({ children }: { children?: ReactNode }): ReactNode => children,
+  // The real `Section` draws its label through `SectionHeader`; the mock keeps
+  // the label in the tree so the assertions can read the section names.
+  Section: ({ label, children }: { label?: string; children?: ReactNode }): ReactNode =>
+    createElement('View', null, label === undefined ? null : createElement('Text', null, label), children),
 }));
 vi.mock('@/components/ui/row-group', () => ({
   RowGroup: ({ children }: { children?: ReactNode }): ReactNode => children,

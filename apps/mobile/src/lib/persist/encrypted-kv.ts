@@ -460,6 +460,17 @@ async function openEncryptedDatabase(): Promise<KVDatabase> {
 
 let openPromise: Promise<KVDatabase> | null = null;
 
+// After a busy failure the open retries on the next caller, but not
+// immediately: a cooldown keeps a lock that outlives `BUSY_TIMEOUT_MS` from
+// turning every store call into a full open that blocks the JS thread for
+// the busy timeout and files one Sentry event per call. Inside the window
+// the memoized rejection fails fast; once the window passes, `openDatabase`
+// drops that memo and the next caller reopens. The flag marks a memo that
+// holds a busy rejection, so only that memo is ever dropped.
+const BUSY_RETRY_COOLDOWN_MS = 10_000;
+let busyRetryNotBefore = 0;
+let busyMemoRejected = false;
+
 /**
  * The key lives in the keychain, which refuses every call while the device is
  * locked. A background run waits for unlock instead of failing the open, and
@@ -468,7 +479,9 @@ let openPromise: Promise<KVDatabase> | null = null;
 async function openWhenProtectedDataAvailable(): Promise<KVDatabase> {
   await whenProtectedDataAvailable();
   try {
-    return await openEncryptedDatabase();
+    const db = await openEncryptedDatabase();
+    busyMemoRejected = false;
+    return db;
   } catch (error) {
     // The key read and write sit outside the open's own lock check, and the
     // keychain refuses them with a raw native error, not the typed one. Any
@@ -476,10 +489,16 @@ async function openWhenProtectedDataAvailable(): Promise<KVDatabase> {
     if (error instanceof ProtectedDataUnavailableError || !isProtectedDataAvailable()) {
       openPromise = null;
     }
-    // A busy failure is transient: the lock clears, so the next caller must
-    // retry the open instead of rejecting for the rest of the process.
+    // A busy failure is transient: the lock clears, so the open must retry
+    // instead of rejecting for the rest of the process. The cooldown bounds
+    // the retry: inside the window the memoized rejection fails fast, and a
+    // longer lock costs one open per window instead of one per store call.
     if (isBusySignal(error)) {
-      openPromise = null;
+      busyMemoRejected = true;
+      if (Date.now() >= busyRetryNotBefore) {
+        openPromise = null;
+        busyRetryNotBefore = Date.now() + BUSY_RETRY_COOLDOWN_MS;
+      }
     }
     throw error;
   }
@@ -496,6 +515,12 @@ async function openDatabase(): Promise<KVDatabase> {
   // all need a relaunch or a rebuild. Two exceptions drop the memo and retry
   // on the next call: a locked device (see `openWhenProtectedDataAvailable`)
   // and a busy or locked engine failure, which the same function clears.
+  // The busy retry is bounded by a cooldown: inside the window the memoized
+  // busy rejection fails fast, and once the window passes the memo is
+  // dropped, so the next caller reopens after the lock cleared.
+  if (openPromise && busyMemoRejected && Date.now() >= busyRetryNotBefore) {
+    openPromise = null;
+  }
   openPromise ??= openWhenProtectedDataAvailable();
   return openPromise;
 }
@@ -504,6 +529,8 @@ async function openDatabase(): Promise<KVDatabase> {
 // (the same pattern as `inFlightSaveCount` in save-chain.ts).
 export function resetEncryptedKvOpenForTests(): void {
   openPromise = null;
+  busyRetryNotBefore = 0;
+  busyMemoRejected = false;
 }
 
 /**

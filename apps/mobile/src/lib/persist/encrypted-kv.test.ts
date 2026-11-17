@@ -158,7 +158,7 @@ function createFakeStatement(source: string): FakeStatement {
         throw new Error(nextProbeMessage);
       }
       if (failEveryProbe) {
-        throw new Error('file is not a database');
+        throw new Error(nextProbeMessage);
       }
       return [{ 'count(*)': 0 }];
     });
@@ -940,10 +940,51 @@ describe('busy open failure keeps the database', () => {
     await expect(getItem('draft:u1', 'k')).rejects.toThrow('database is locked');
 
     // The very next caller retries the open and succeeds once the seam's
-    // one-shot probe failure is spent.
+    // one-shot probe failure is spent. The cooldown starts on the failure,
+    // so this first retry still runs.
     await expect(getItem('draft:u1', 'k')).resolves.toBe('v');
     expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(3);
     expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+  });
+
+  it('a_second_busy_failure_inside_the_cooldown_fails_fast_and_reopens_after_the_window', async () => {
+    await setItem('draft:u1', 'k', 'v');
+
+    // First busy failure: the memo drops, the cooldown window starts.
+    failEveryProbe = true;
+    nextProbeMessage = 'database is locked';
+    resetEncryptedKvOpenForTests();
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('database is locked');
+
+    // The owed retry runs and fails busy again: the memo now holds this
+    // rejection and the cooldown covers it.
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('database is locked');
+    expect(Sentry.captureException).toHaveBeenCalledTimes(2);
+    const opensAfterSecondFailure = vi.mocked(SQLite.openDatabaseSync).mock.calls.length;
+
+    // A caller inside the window gets the memoized rejection: no further open
+    // attempt blocks the JS thread for the busy timeout, and no further event
+    // files.
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('database is locked');
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(opensAfterSecondFailure);
+    expect(Sentry.captureException).toHaveBeenCalledTimes(2);
+
+    // The window passes with the lock held: one open per window. The attempt
+    // fails busy again and restarts the window.
+    vi.setSystemTime(Date.now() + 11_000);
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('database is locked');
+    expect(vi.mocked(SQLite.openDatabaseSync).mock.calls.length).toBeGreaterThan(
+      opensAfterSecondFailure
+    );
+    expect(Sentry.captureException).toHaveBeenCalledTimes(3);
+
+    // The lock clears and a caller arrives after the new window: the store
+    // reopens the same file, and nothing was deleted or rekeyed.
+    failEveryProbe = false;
+    vi.setSystemTime(Date.now() + 11_000);
+    await expect(getItem('draft:u1', 'k')).resolves.toBe('v');
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    vi.useRealTimers();
   });
 
   it('the_stored_value_survives_a_locked_probe_to_a_later_launch', async () => {

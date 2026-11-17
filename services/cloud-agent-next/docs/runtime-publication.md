@@ -9,6 +9,8 @@ The publisher is `pnpm runtime:publish`. Local packaging and CI use the same com
 Without `--cli` or `--cli-version`, an invocation packages two releases with one control payload:
 the pinned Kilo v1 CLI and the pinned Kilo v2 CLI (`PINNED_CLIS` in `scripts/runtime-cli-artifact.ts`).
 The handoff records both descriptors. `--cli` or `--cli-version` selects one explicit release instead.
+`--local` also accepts `--local-cli-build <directory>`, which replaces only the Kilo v2 release with
+a local development build; it cannot be combined with the explicit CLI flags.
 Use `--cli-executable` with either flag to override that release's executable path.
 
 Every invocation rebuilds wrapper output. Payload hashes identify the output bytes. The publisher

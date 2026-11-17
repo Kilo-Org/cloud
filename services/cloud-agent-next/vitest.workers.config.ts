@@ -3,6 +3,33 @@ import { cloudflareTest } from '@cloudflare/vitest-plugin';
 import { defineConfig } from 'vitest/config';
 import { FAKE_DOWNLOADED_RUNTIME_ENV } from './test/integration/helpers/fake-credentials.js';
 
+// Minimal Session Sync double: it reports the upgrade headers the binding
+// delivered and echoes frames so the test observes both directions.
+const SESSION_SYNC_TEST_WORKER = `
+export default {
+  async fetch(request) {
+    if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket')
+      return new Response('Expected WebSocket upgrade', { status: 426 });
+    const protocol = request.headers.get('Sec-WebSocket-Protocol');
+    const pair = new WebSocketPair();
+    const [client, server] = Object.values(pair);
+    server.accept();
+    server.send(JSON.stringify({
+      path: new URL(request.url).pathname,
+      upgrade: request.headers.get('Upgrade'),
+      protocol,
+      authorization: request.headers.get('Authorization'),
+    }));
+    server.addEventListener('message', event => server.send('echo:' + event.data));
+    return new Response(null, {
+      status: 101,
+      webSocket: client,
+      ...(protocol === null ? {} : { headers: { 'Sec-WebSocket-Protocol': protocol } }),
+    });
+  },
+};
+`;
+
 // Integration tests - run in Cloudflare Workers runtime via Miniflare
 // Use cloudflare:test utilities: env, runInDurableObject, createMessageBatch, etc.
 export default defineConfig({
@@ -26,6 +53,14 @@ export default defineConfig({
         configPath: './wrangler.test.jsonc',
       },
       miniflare: {
+        workers: [
+          {
+            name: 'session-sync-test',
+            compatibilityDate: '2026-10-01',
+            modules: true,
+            script: SESSION_SYNC_TEST_WORKER,
+          },
+        ],
         bindings: {
           RUNTIME_STARTUP_MODE: 'downloaded',
           RUNTIME_RELEASE_DESCRIPTOR: FAKE_DOWNLOADED_RUNTIME_ENV.RUNTIME_RELEASE_DESCRIPTOR,

@@ -41,6 +41,21 @@ const port = (name: string) => {
   assert(item && item.port > 0, `Missing local service ${name}`);
   return item.port;
 };
+// The local publisher records the CLI version of the release it published.
+// A local build replaces only the Kilo v2 tarball, so the assertion still
+// checks the exact runtime the Worker selected, not a moving npm channel.
+const publishedKilo2Version = await readFile(
+  path.join(serviceRoot, '.wrangler/runtime-local-vars.json'),
+  'utf8'
+).then(
+  text =>
+    z.object({ KILO2_CLI_VERSION: z.string().min(1).optional() }).parse(JSON.parse(text))
+      .KILO2_CLI_VERSION ?? PINNED_CLIS.kilo2.reportedVersion,
+  (error: NodeJS.ErrnoException) => {
+    if (error.code === 'ENOENT') return PINNED_CLIS.kilo2.reportedVersion;
+    throw error;
+  }
+);
 loadRepoEnvFiles(serviceRoot);
 const database = new URL(process.env.POSTGRES_URL ?? process.env.DATABASE_URL ?? '');
 assert(
@@ -84,8 +99,15 @@ let stream: StreamConnection | undefined;
 try {
   const health = await fetch(`${config.workerUrl}/health`, { signal: AbortSignal.timeout(10_000) });
   assert(health.ok, `Local Worker health returned ${health.status}`);
-  const session = await startSession(config, { prompt: `__fake__:echo:${tag}-cold`, signal });
-  await record('admitted', session);
+  // The v2 cohort needs the trusted cloud-agent-web origin from the legacy
+  // prepare/initiate start; unified start stamps cloud-agent and stays v1.
+  const sessionApi = 'legacy' as const;
+  const session = await startSession(
+    config,
+    { prompt: `__fake__:echo:${tag}-cold`, signal },
+    sessionApi
+  );
+  await record('admitted', { api: sessionApi, session });
   stream = await openConnectedStream(config, session.cloudAgentSessionId, true, undefined, signal);
   const cold = await stream.waitForTerminal(240_000, session.messageId);
   assert(isMessageCompleted(cold, session.messageId), `Cold turn failed: ${JSON.stringify(cold)}`);
@@ -167,7 +189,11 @@ try {
     '/opt/kilo-cloud/active/cli/package/bin/kilo2',
     '--version'
   );
-  assert.equal(version, PINNED_CLIS.kilo2.reportedVersion, 'Running Kilo v2 differs from the pin');
+  assert.equal(
+    version,
+    publishedKilo2Version,
+    'Running Kilo v2 differs from the published runtime'
+  );
   const hash = (
     await docker(
       'exec',
@@ -183,6 +209,7 @@ try {
     processId: native.processId,
     directory: native.directory,
     version,
+    publishedVersion: publishedKilo2Version,
     wrapperHash: hash,
   });
 

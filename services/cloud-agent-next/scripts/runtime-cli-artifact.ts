@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { z } from 'zod';
 import { readBoundedStream } from '@kilocode/worker-utils/bounded-stream-reader';
 import type { ArtifactObjectStore } from '../src/sandbox-control/runtime-artifact-keys.js';
@@ -45,6 +47,68 @@ export const PINNED_CLIS = {
   RuntimeHarness,
   { version: string; sha256: string; executable: string; reportedVersion: string }
 >;
+
+const localCliPackageSchema = z.object({
+  name: z.string().min(1).max(128),
+  version: z
+    .string()
+    .min(1)
+    .max(57)
+    .regex(/^[0-9A-Za-z][0-9A-Za-z.+-]*$/),
+  os: z.array(z.string()).optional(),
+  cpu: z.array(z.string()).optional(),
+});
+
+/** The package name is the build's only statement of its AVX2 tier. */
+const LOCAL_CLI_CPU = new Map<string, 'baseline' | 'modern'>([
+  ['@kilocode/cli-linux-x64-baseline', 'baseline'],
+  ['@kilocode/cli-linux-x64', 'modern'],
+]);
+
+export type LocalCliBuild = {
+  directory: string;
+  version: string;
+  reportedVersion: string;
+  executable: string;
+  cpu: 'baseline' | 'modern';
+};
+
+/**
+ * Read the metadata a local `kilo2` platform build must provide before local
+ * packaging. Publication still scans the resulting archive and applies the
+ * installer caps, so this validates the source layout rather than duplicating
+ * the archive checks.
+ */
+export async function readLocalCliBuild(directory: string): Promise<LocalCliBuild> {
+  const root = await fs.realpath(path.resolve(directory)).catch(() => {
+    throw new Error(`Local CLI build directory does not exist: ${directory}`);
+  });
+  if (!(await fs.stat(root)).isDirectory())
+    throw new Error(`Local CLI build path is not a directory: ${directory}`);
+  const manifest = localCliPackageSchema.parse(
+    JSON.parse(await fs.readFile(path.join(root, 'package.json'), 'utf8'))
+  );
+  const cpu = LOCAL_CLI_CPU.get(manifest.name);
+  if (cpu === undefined)
+    throw new Error(
+      `Local CLI build package is not a supported linux x64 distribution: ${manifest.name}`
+    );
+  if (manifest.os !== undefined && !manifest.os.includes('linux'))
+    throw new Error('Local CLI build does not target linux');
+  if (manifest.cpu !== undefined && !manifest.cpu.includes('x64'))
+    throw new Error('Local CLI build does not target x64');
+  const executable = 'package/bin/kilo2';
+  const cli = await fs.lstat(path.join(root, 'bin', 'kilo2')).catch(() => undefined);
+  if (!cli?.isFile()) throw new Error('Local CLI build is missing bin/kilo2');
+  if ((cli.mode & 0o111) === 0) throw new Error('Local CLI build bin/kilo2 is not executable');
+  return {
+    directory: root,
+    version: manifest.version,
+    reportedVersion: `kilo2 v${manifest.version}`,
+    executable,
+    cpu,
+  };
+}
 
 const registryMetadataSchema = z.object({
   dist: z.object({

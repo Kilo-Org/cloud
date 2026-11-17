@@ -1,11 +1,15 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { zstdDecompressSync } from 'node:zlib';
-import { describe, expect, it } from 'vitest';
+import { gunzipSync, zstdDecompressSync } from 'node:zlib';
+import { afterEach, describe, expect, it } from 'vitest';
 import { fixtureRuntime } from '../test/runtime-installer/fixtures.js';
 import {
+  inventoryFromCliTarball,
+  localCliTarball,
   localDirectoryArtifactStore,
+  main,
+  packageRuntimeRelease,
   publishRuntimeRelease,
   scanTar,
   sha256,
@@ -16,7 +20,13 @@ import {
   runtimeArtifactReleaseKey,
   type ArtifactObjectStore,
 } from '../src/sandbox-control/runtime-artifact-keys.js';
-import { serializeRuntimeRelease } from '../src/sandbox-control/runtime-release.js';
+import {
+  RUNTIME_BASE_ABI,
+  RUNTIME_HARD_MAX_EXPANDED_BYTES,
+  RUNTIME_HARD_MAX_FILE_COUNT,
+  RUNTIME_HARD_MAX_TRANSFER_BYTES,
+  serializeRuntimeRelease,
+} from '../src/sandbox-control/runtime-release.js';
 
 function memoryStore() {
   const objects = new Map<string, Uint8Array>();
@@ -150,4 +160,106 @@ it('rejects tar field overflow instead of truncating names or numbers', () => {
   expect(() =>
     writeTarEntries([{ path: 'file', mode: Number.MAX_SAFE_INTEGER, bytes: Buffer.from('x') }])
   ).toThrow('numeric');
+});
+
+const localBuildDirectories: string[] = [];
+
+afterEach(async () => {
+  await Promise.all(
+    localBuildDirectories
+      .splice(0)
+      .map(directory => fs.rm(directory, { recursive: true, force: true }))
+  );
+});
+
+async function localCliBuildFixture(name = '@kilocode/cli-linux-x64'): Promise<string> {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'kilo2-local-tarball-'));
+  localBuildDirectories.push(directory);
+  await fs.writeFile(
+    path.join(directory, 'package.json'),
+    JSON.stringify({
+      name,
+      version: '0.0.0-v2-local.fixture',
+      os: ['linux'],
+      cpu: ['x64'],
+    })
+  );
+  await fs.mkdir(path.join(directory, 'bin'));
+  await fs.writeFile(path.join(directory, 'bin/kilo2'), '#!/bin/sh\n');
+  await fs.chmod(path.join(directory, 'bin/kilo2'), 0o755);
+  await fs.writeFile(path.join(directory, 'bin/helper.js'), 'export {};\n');
+  await fs.chmod(path.join(directory, 'bin/helper.js'), 0o644);
+  return directory;
+}
+
+describe('local CLI packaging', () => {
+  it('packages a local platform build with the installer archive shape', async () => {
+    const result = await localCliTarball(await localCliBuildFixture());
+    expect(result.version).toBe('kilo2 v0.0.0-v2-local.fixture');
+    expect(result.executable).toBe('package/bin/kilo2');
+    expect(result.cpu).toBe('modern');
+    const archive = scanTar(gunzipSync(result.tarball));
+    expect(archive.files.map(entry => entry.path)).toEqual([
+      'package/bin/helper.js',
+      'package/bin/kilo2',
+      'package/package.json',
+    ]);
+    const modes = Object.fromEntries(archive.files.map(entry => [entry.path, entry.mode & 0o777]));
+    expect(modes['package/bin/kilo2']).toBe(0o755);
+    expect(modes['package/bin/helper.js']).toBe(0o644);
+    expect(inventoryFromCliTarball(result.tarball).map(([role, file]) => [role, file])).toEqual([
+      ['cli', 'package/bin/helper.js'],
+      ['cli', 'package/bin/kilo2'],
+      ['cli', 'package/package.json'],
+    ]);
+  });
+
+  it('rejects a symbolic link inside the local build instead of following it', async () => {
+    const directory = await localCliBuildFixture();
+    await fs.symlink('kilo2', path.join(directory, 'bin/link'));
+    await expect(localCliTarball(directory)).rejects.toThrow('symbolic link');
+  });
+
+  it.each([
+    ['@kilocode/cli-linux-x64', 'modern'],
+    ['@kilocode/cli-linux-x64-baseline', 'baseline'],
+  ] as const)('passes a %s build CPU tier into its descriptor', async (name, cpu) => {
+    const result = await localCliTarball(await localCliBuildFixture(name));
+    expect(result.cpu).toBe(cpu);
+    const packaged = await packageRuntimeRelease({
+      cliTarball: result.tarball,
+      cliVersion: result.version,
+      cliExecutable: result.executable,
+      wrapperSdkVersion: '7.8.1',
+      protocol: '1',
+      abi: RUNTIME_BASE_ABI,
+      platform: { os: 'linux', arch: 'x64', libc: 'glibc', cpu: result.cpu },
+      caps: {
+        maxTransferBytes: RUNTIME_HARD_MAX_TRANSFER_BYTES,
+        maxExpandedBytes: RUNTIME_HARD_MAX_EXPANDED_BYTES,
+        maxFileCount: RUNTIME_HARD_MAX_FILE_COUNT,
+      },
+      controlEntries: [
+        {
+          path: 'usr/local/bin/kilocode-control-plane-supervisor.sh',
+          mode: 0o100755,
+          bytes: Buffer.from('#!/bin/sh\n'),
+        },
+      ],
+    });
+    expect(packaged.descriptor.platform.cpu).toBe(cpu);
+  });
+
+  it('rejects local packaging for a non-local publication target', async () => {
+    const directory = await localCliBuildFixture();
+    await expect(main(['--out', directory, '--local-cli-build', directory])).rejects.toThrow(
+      'local publication'
+    );
+  });
+
+  it('rejects combining the local build with an explicit CLI source', async () => {
+    await expect(
+      main(['--local', '--local-cli-build', '/tmp/cli', '--cli-version', '1.0.0'])
+    ).rejects.toThrow('cannot be combined');
+  });
 });

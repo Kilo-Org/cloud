@@ -3,13 +3,13 @@ export { sha256, publishImmutableObject, type PublishedArtifact } from './runtim
 import { z } from 'zod';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { zstdCompressSync, zstdDecompressSync, gunzipSync } from 'node:zlib';
+import { zstdCompressSync, zstdDecompressSync, gunzipSync, gzipSync } from 'node:zlib';
 import { spawnSync } from 'node:child_process';
 import { KILO_CLI_VERSION } from '../src/shared/kilo-cli-version.js';
 import { CONTROL_PLANE_PROTOCOL_VERSION } from '../src/shared/control-plane-protocol.js';
 import { localR2ArtifactStore, remoteArtifactStore } from './runtime-publish-store.js';
 import { verifyRuntimeSourceCheckout } from './runtime-source.js';
-import { PINNED_CLIS, downloadVerified } from './runtime-cli-artifact.js';
+import { PINNED_CLIS, downloadVerified, readLocalCliBuild } from './runtime-cli-artifact.js';
 import type { RuntimeHarness } from '../src/shared/control-plane-runtime-contract.js';
 import { fileURLToPath } from 'node:url';
 import {
@@ -48,6 +48,9 @@ const archiveFactory = new Function(
 ) as () => (tar: Uint8Array) => RuntimeArchiveScan;
 const scanRuntimeArchive = archiveFactory();
 export const scanTar = scanRuntimeArchive;
+
+/** Pinned and explicit tarballs keep the baseline tier. */
+const PINNED_CLI_CPU = 'baseline' as const;
 
 /** Local directory adapter for the create-only object store (no production creds). */
 export function localDirectoryArtifactStore(root: string): ArtifactObjectStore {
@@ -163,6 +166,50 @@ export function writeTarEntries(entries: readonly TarEntry[]): Uint8Array {
 
 function normalizeBundlePath(absolute: string): string {
   return absolute.replace(/^\/+/, '');
+}
+
+/**
+ * Package an existing local `kilo2` platform build as the CLI tarball shape the
+ * runtime installer already expects. The archive is built once here and then
+ * scanned and capped by `packageRuntimeRelease`, like a downloaded tarball.
+ */
+export async function localCliTarball(directory: string): Promise<{
+  tarball: Uint8Array;
+  version: string;
+  executable: string;
+  cpu: 'baseline' | 'modern';
+}> {
+  const build = await readLocalCliBuild(directory);
+  const entries: TarEntry[] = [];
+  let expandedBytes = 0;
+  const walk = async (relative: string): Promise<void> => {
+    const names = (await fs.readdir(path.join(build.directory, relative))).sort();
+    for (const name of names) {
+      const child = relative === '' ? name : `${relative}/${name}`;
+      const absolute = path.join(build.directory, child);
+      const stat = await fs.lstat(absolute);
+      if (stat.isSymbolicLink())
+        throw new Error(`Local CLI build contains a symbolic link: ${child}`);
+      if (stat.isDirectory()) {
+        await walk(child);
+        continue;
+      }
+      if (!stat.isFile()) throw new Error(`Local CLI build contains a non-file entry: ${child}`);
+      expandedBytes += stat.size;
+      if (expandedBytes > RUNTIME_HARD_MAX_EXPANDED_BYTES)
+        throw new Error('Local CLI build expanded bytes exceed the cap');
+      if (entries.length >= RUNTIME_HARD_MAX_FILE_COUNT)
+        throw new Error('Local CLI build file count exceeds the cap');
+      entries.push({
+        path: `package/${child}`,
+        mode: (stat.mode & 0o111) === 0 ? 0o100644 : 0o100755,
+        bytes: new Uint8Array(await fs.readFile(absolute)),
+      });
+    }
+  };
+  await walk('');
+  const tarball = gzipSync(writeTarEntries(entries));
+  return { tarball, version: build.reportedVersion, executable: build.executable, cpu: build.cpu };
 }
 
 /** Control-bundle source files (plan §6 "Runtime And User Data"). */
@@ -311,6 +358,10 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   const bucket = argValue(argv, '--bucket');
   const local = argv.includes('--local');
   const sourceSha = argValue(argv, '--source-sha');
+  const file = argValue(argv, '--cli');
+  const customVersion = argValue(argv, '--cli-version');
+  const customExecutable = argValue(argv, '--cli-executable');
+  const localCliBuild = argValue(argv, '--local-cli-build');
   if (sourceSha) {
     z.string()
       .regex(/^[a-f0-9]{40}$/)
@@ -323,6 +374,17 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   }
   if (Number(out !== undefined) + Number(bucket !== undefined) + Number(local) !== 1)
     throw new Error('Specify exactly one target: --out <directory>, --bucket <name>, or --local');
+  if (localCliBuild !== undefined && !local)
+    throw new Error(
+      '--local-cli-build only packages a development build into local publication; use --cli for another target'
+    );
+  if (
+    localCliBuild !== undefined &&
+    (file !== undefined || customVersion !== undefined || customExecutable !== undefined)
+  )
+    throw new Error(
+      '--local-cli-build cannot be combined with --cli, --cli-version or --cli-executable'
+    );
   const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
   const build = spawnSync('bun', ['run', 'build:wrapper'], { cwd: packageRoot, stdio: 'inherit' });
   if (build.status !== 0) throw new Error('Wrapper build failed');
@@ -344,27 +406,36 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   if (!store) throw new Error('Runtime publisher target is invalid');
   try {
     const cache = out === undefined ? store : undefined;
-    // An explicit CLI publishes one release; otherwise each harness publishes its pinned CLI.
-    const file = argValue(argv, '--cli');
-    const customVersion = argValue(argv, '--cli-version');
     const clis =
-      file !== undefined || customVersion !== undefined
+      localCliBuild !== undefined
         ? [
             {
-              tarball: file
-                ? new Uint8Array(await fs.readFile(file))
-                : await downloadVerified(customVersion ?? KILO_CLI_VERSION, { cache }),
-              version: customVersion ?? KILO_CLI_VERSION,
-              executable: argValue(argv, '--cli-executable') ?? PINNED_CLIS.kilo.executable,
+              tarball: await downloadVerified(PINNED_CLIS.kilo.version, { cache }),
+              version: PINNED_CLIS.kilo.reportedVersion,
+              executable: PINNED_CLIS.kilo.executable,
+              cpu: PINNED_CLI_CPU,
             },
+            await localCliTarball(localCliBuild),
           ]
-        : await Promise.all(
-            Object.values(PINNED_CLIS).map(async pinned => ({
-              tarball: await downloadVerified(pinned.version, { cache }),
-              version: pinned.reportedVersion,
-              executable: pinned.executable,
-            }))
-          );
+        : file !== undefined || customVersion !== undefined
+          ? [
+              {
+                tarball: file
+                  ? new Uint8Array(await fs.readFile(file))
+                  : await downloadVerified(customVersion ?? KILO_CLI_VERSION, { cache }),
+                version: customVersion ?? KILO_CLI_VERSION,
+                executable: customExecutable ?? PINNED_CLIS.kilo.executable,
+                cpu: PINNED_CLI_CPU,
+              },
+            ]
+          : await Promise.all(
+              Object.values(PINNED_CLIS).map(async pinned => ({
+                tarball: await downloadVerified(pinned.version, { cache }),
+                version: pinned.reportedVersion,
+                executable: pinned.executable,
+                cpu: PINNED_CLI_CPU,
+              }))
+            );
     const wrapperManifest = z
       .object({ dependencies: z.object({ '@kilocode/sdk': z.string().min(1) }) })
       .parse(JSON.parse(await fs.readFile(path.join(packageRoot, 'wrapper/package.json'), 'utf8')));
@@ -378,7 +449,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
           wrapperSdkVersion: wrapperManifest.dependencies['@kilocode/sdk'],
           protocol: String(CONTROL_PLANE_PROTOCOL_VERSION),
           abi: RUNTIME_BASE_ABI,
-          platform: { os: 'linux', arch: 'x64', libc: 'glibc', cpu: 'baseline' },
+          platform: { os: 'linux', arch: 'x64', libc: 'glibc', cpu: cli.cpu },
           caps: {
             maxTransferBytes: RUNTIME_HARD_MAX_TRANSFER_BYTES,
             maxExpandedBytes: RUNTIME_HARD_MAX_EXPANDED_BYTES,
@@ -397,6 +468,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
       kilo: await publishRuntimeRelease(store, packaged),
       ...(kilo2 ? { kilo2: await publishRuntimeRelease(store, kilo2) } : {}),
     };
+    const publishedKilo2 = published.kilo2;
     if (local) {
       await fs.mkdir(path.join(packageRoot, '.wrangler'), { recursive: true });
       await fs.writeFile(
@@ -405,8 +477,11 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
           RUNTIME_STARTUP_MODE: 'downloaded',
           NATIVE_RUNTIME_IMAGE: 'runtime-free',
           RUNTIME_RELEASE_DESCRIPTOR: published.kilo.descriptor.sha256,
-          ...(published.kilo2
-            ? { RUNTIME_RELEASE_DESCRIPTOR_KILO2: published.kilo2.descriptor.sha256 }
+          ...(publishedKilo2 && kilo2
+            ? {
+                RUNTIME_RELEASE_DESCRIPTOR_KILO2: publishedKilo2.descriptor.sha256,
+                KILO2_CLI_VERSION: kilo2.descriptor.cliVersion,
+              }
             : {}),
         })
       );

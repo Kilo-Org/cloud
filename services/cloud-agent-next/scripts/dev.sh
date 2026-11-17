@@ -60,11 +60,17 @@ fi
 if [ "$has_environment" = 0 ]; then
   set -- "$@" --env dev
 fi
+use_kilo2_local=0
 if [ "$has_config" = 0 ] && [ -f "$service_dir/wrangler.kilo2-local.json" ]; then
   node -e 'const config = require(process.argv[1]); if (!config.env?.dev?.vars?.RUNTIME_KILO2_ORG_IDS) { console.error("Obsolete baked Kilo v2 configuration. Run node scripts/prepare-kilo2-local.mjs <organization-uuid> to select the downloaded runtime, or remove wrangler.kilo2-local.json for v1."); process.exit(1); }' "$service_dir/wrangler.kilo2-local.json"
   set -- "$@" --config "$service_dir/wrangler.kilo2-local.json"
+  use_kilo2_local=1
 fi
-pnpm exec tsx "$script_dir/publish-runtime.ts" --local
+if [ "$use_kilo2_local" = 1 ] && [ -f "$service_dir/.wrangler/kilo2-local-cli-build" ]; then
+  pnpm exec tsx "$script_dir/publish-runtime.ts" --local --local-cli-build "$(cat "$service_dir/.wrangler/kilo2-local-cli-build")"
+else
+  pnpm exec tsx "$script_dir/publish-runtime.ts" --local
+fi
 runtime_descriptor="$(node -p "require('$service_dir/.wrangler/runtime-local-vars.json').RUNTIME_RELEASE_DESCRIPTOR")"
 kilo2_descriptor="$(node -p "require('$service_dir/.wrangler/runtime-local-vars.json').RUNTIME_RELEASE_DESCRIPTOR_KILO2")"
 set -- "$@" --persist-to "$service_dir/.wrangler/state" \

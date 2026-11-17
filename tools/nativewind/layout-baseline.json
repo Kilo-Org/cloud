@@ -1,8 +1,19 @@
 {
-  "apps/mobile/src/components/home/adaptive-home-card-frame.tsx": {
-    "L1": 2
-  },
-  "apps/mobile/src/components/pr-review/diff/pr-diff-file-rows.tsx": {
-    "L7": 1
-  }
+  "apps/mobile/src/app/(app)/agent-chat/repo-picker.tsx": { "L6": 1 },
+  "apps/mobile/src/components/agents/new-session-prompt.tsx": { "L9": 2 },
+  "apps/mobile/src/components/agents/preparation-step-details.tsx": { "L9": 1 },
+  "apps/mobile/src/components/agents/remote-session-exit-failure.tsx": { "L9": 1 },
+  "apps/mobile/src/components/agents/session-compute-section.tsx": { "L9": 2 },
+  "apps/mobile/src/components/destination-option-row.tsx": { "L9": 1 },
+  "apps/mobile/src/components/home/adaptive-home-card-frame.tsx": { "L1": 2 },
+  "apps/mobile/src/components/native-remote/native-remote-transcript.tsx": { "L9": 1 },
+  "apps/mobile/src/components/organization/members-screen.tsx": { "L4": 2 },
+  "apps/mobile/src/components/picker-sheet.tsx": { "L6": 1 },
+  "apps/mobile/src/components/pr-review/diff/pr-diff-file-rows.tsx": { "L7": 1 },
+  "apps/mobile/src/components/pr-review/discussion/discussion-thread.tsx": { "L9": 1 },
+  "apps/mobile/src/components/todos/save-draft-as-todo-sheet.tsx": { "L6": 1 },
+  "apps/mobile/src/components/todos/session-todo-link.tsx": { "L6": 1 },
+  "apps/mobile/src/components/todos/todo-detail-screen.tsx": { "L6": 1 },
+  "apps/mobile/src/components/todos/todo-link-session-sheet.tsx": { "L6": 1 },
+  "apps/mobile/src/components/todos/todo-list-screen.tsx": { "L6": 1 }
 }

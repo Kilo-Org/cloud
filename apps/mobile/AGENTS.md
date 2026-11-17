@@ -269,17 +269,20 @@ One contract, enforced by `pnpm check:classes` (baseline in `tools/nativewind/la
 | States | Loading, empty, error and happy states for every data screen. Every loading placeholder owns the loaded geometry — a row reserves through `RowSkeleton`, a section label through `SectionHeaderSkeleton`, a control through its own frame constant — so the swap to real content cannot move the screen. | `RowSkeleton` (`variant="session"` for a flat list; `lines`, `tile`, `trailingControl`, `trailing="switch"`, `stack`), `SectionHeaderSkeleton`, `Skeleton`, `EmptyState`, `QueryError`, `CenteredState` |
 | Primary action | One per screen. A pinned footer is the shared bar, outside the scroll body; an inline action ends its section. | `ScreenFooter` from `@/components/ui/screen-footer` (`clearance` for the bottom band, `keyboard` for who lifts it) |
 | FAB | One 56pt round primary button, gutter-aligned above the tab bar. | `Fab` from `@/components/ui/fab` |
-| Arbitrary values | No spacing, font-size, line-height, tracking or radius in `[..]`, and none of the eight bans L1–L8 below the table, outside `components/ui`, the two header components, `@/lib/layout` and `@/lib/a11y/tap-target`. | `pnpm check:classes` enforces it |
+| Arbitrary values | No spacing, font-size, line-height, tracking or radius in `[..]`, and none of the bans L1–L11 below the table, outside `components/ui`, the two header components, `@/lib/layout` and `@/lib/a11y/tap-target`. | `pnpm check:classes` enforces it |
 
-`pnpm check:classes` reads every class string (and the `style` objects) against `LAYOUT_RULES` in
+`pnpm check:classes` reads every class string (and every `style`/`*Style` object) against `LAYOUT_RULES` in
 `tools/nativewind/check-classes.mjs`, which is the only description of the rules: **L1** an arbitrary spacing,
-type-size, line-height, tracking or radius value; **L2** a page inset written on a scroll body, or any padding on a
-`ScreenHeader`/`SheetHeader`; **L3** `uppercase` or `tracking-*` outside a section label; **L4** a card surface
-built by hand (a card fill plus a card radius); **L5** `text-xl` or larger; **L6** a layout number in a `style`
+type-size, line-height, tracking or radius value; **L2** a page inset written on a scroll body or a `CenteredState`
+content container, or any padding on a `ScreenHeader`/`SheetHeader`; **L3** `uppercase` or `tracking-*` outside a
+section label; **L4** a card surface built by hand (a card fill plus a card radius, even when the two sit in
+different branches of one className); **L5** `text-xl` or larger; **L6** a layout number in a `style` or `*Style`
 object (an inset or a measurement passes); **L7** a chevron imported straight from the icon modules instead of
-`RowChevron`; **L8** an arbitrary height, width or size that pins one box. A violation the migration has not
-reached is admitted by `tools/nativewind/layout-baseline.json`, which only shrinks: fix the call site and lower
-its line, never regenerate the baseline over a new violation.
+`RowChevron`; **L8** an arbitrary height, width or size that pins one box; **L9** a row divider drawn as
+`border-b`/`border-t` in `border-border` instead of `border-hair-soft`; **L10** `ScreenHeader` `titleContent`
+outside the three screens that own a title line; **L11** a `Sheet` without a `SheetHeader`. A violation the
+migration has not reached is admitted by `tools/nativewind/layout-baseline.json`, which only shrinks: fix the call
+site and lower its line, never regenerate the baseline over a new violation.
 
 After you change anything in `components/ui`, run the design gate on
 `kiloapp:///(auth)/design-system-fixture` and on one migrated screen per changed primitive.

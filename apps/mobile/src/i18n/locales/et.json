@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Halda veebis",
     "creditHistory": "Krediitide ajalugu",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Tühista",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Ostud, kviitungid ja krediiditegevus",
     "invoicesSubtitle": "Laadi alla oma ostude arved",
-    "manageBilling": "Halda arveldust saidil kilo.ai",
-    "manageBillingIosNote": "Makseviise, automaatset täiendamist ja arveldusandmeid hallatakse saidil kilo.ai.",
     "codeReviewerSubtitle": "Automaatsed PR-ülevaatused",
     "securityAgentSubtitle": "Leia ja kõrvalda turvanõrkused",
     "reviews": "Ülevaatused",
@@ -3109,10 +3105,7 @@
       "cancelScheduled": "Tühistatakse {{date}}",
       "cancelScheduledChange": "Tühista ajastatud muudatus",
       "cancelled": "Tellimus tühistati",
-      "changePlan": "Muuda paketti saidil kilo.ai",
-      "changePlanIosNote": "Tasulisi pakette saab muuta saidil kilo.ai.",
       "creditHistoryEmpty": "Kilo Passi krediite veel pole.",
-      "manageInStore": "Halda poes {{store}}",
       "resume": "Jätka tellimust",
       "resumeCancelledDescription": "Sinu Kilo Pass hakkab taas automaatselt uuenema.",
       "resumePausedDescription": "Sinu Kilo Pass jätkub kohe, enne kavandatud jätkamise kuupäeva.",
@@ -3149,9 +3142,6 @@
     "bonusFree": "Tasuta boonus",
     "bonusReferral": "Viitamisboonus",
     "bonusAvailable": "Saadaolev tasuta boonus",
-    "kiloPassManagement": "Kilo Passi haldamine",
-    "kiloPassSetup": "Kilo Passi seadistamine",
-    "opensManagementOnWeb": "Avab veebis Kilo Passi halduse.",
     "loadFailedRetry": "Kontrolli ühendust ja proovi seejärel uuesti.",
     "legalTermsOfUse": "Kasutustingimused (EULA)",
     "purchaseDifferentAccount": "See App Store'i ost pole sinu Kilo kontoga seotud. Logi sisse ostuks kasutatud Apple Accountiga ja proovi uuesti.",
@@ -3337,7 +3327,6 @@
       "buySeats": "Osta kasutajakohti",
       "setupAutoTopUp": "Seadista automaatne täiendamine",
       "manageAutoTopUp": "Halda automaatset täiendamist",
-      "webAddress": "Veebiaadress {{url}}",
       "opensOnWeb": "Avaneb veebis"
     },
     "boundary": {
@@ -3479,9 +3468,6 @@
       "groups": "Grupid",
       "guardrails": "Kaitsepiirangud",
       "byok": "Kasuta oma võtit",
-      "ssoAndDomain": "SSO ja domeen",
-      "emailPreferences": "E-posti eelistused",
-      "dataCollection": "Andmete kogumine",
       "auditLogs": "Auditilogid",
       "requestLogs": "Päringulogid",
       "subOrganizations": "Alamorganisatsioonid",
@@ -3521,8 +3507,7 @@
       "paymentPending": "Makse ootel",
       "processingBlocked": "Töötlemine blokeeritud",
       "processingNeedsReview": "Töötlemine vajab ülevaatamist",
-      "retryHint": "Proovib Kilo Passi oleku laadimist uuesti.",
-      "setupHint": "Avab veebis Kilo Passi seadistuse."
+      "retryHint": "Proovib Kilo Passi oleku laadimist uuesti."
     }
   },
   "authErrors": {

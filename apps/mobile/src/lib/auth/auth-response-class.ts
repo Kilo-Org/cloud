@@ -8,9 +8,11 @@
  * same request reported over and over. A terminal answer must stop the loop,
  * clear the credential it proves dead, and put the person back on sign-in.
  *
- * Pure and dependency-free apart from the telemetry sink, so both the fetch
- * boundary and the node test environment can import it.
+ * Pure apart from the telemetry sink and the zod schema that reads one refusal
+ * body, so both the fetch boundary and the node test environment can import it.
  */
+
+import * as z from 'zod';
 
 import { captureTelemetry } from '@/lib/telemetry/error-sink';
 
@@ -27,6 +29,26 @@ import { captureTelemetry } from '@/lib/telemetry/error-sink';
  * and clearing one on a mistyped code would sign out a healthy device.
  */
 const STORED_CREDENTIAL_ROUTE = '/api/auth/native/refresh';
+
+/**
+ * The refusal bodies the frozen native refresh contract lets that route write
+ * beside a refusal of the *stored* credential:
+ * `401 { error: 'INVALID_REFRESH_TOKEN' | 'SESSION_REVOKED' | 'USER_BLOCKED' }`.
+ * The route's fourth body, `400 { error: 'INVALID_REQUEST' }`, is its
+ * unreadable-body answer: it says nothing about a stored pair, and a 400 is
+ * already terminal here, so it has no place in a 403 discriminator — a gateway
+ * that answers 403 with the same generic word would otherwise end a session the
+ * route never refused. The route has no other status, so a body outside this
+ * schema did not come from it.
+ */
+const RefreshRefusalBodySchema = z.object({
+  error: z.enum(['INVALID_REFRESH_TOKEN', 'SESSION_REVOKED', 'USER_BLOCKED']),
+});
+
+/** True when a response body is one the native refresh route writes for a refusal. */
+function isRefreshRefusalBody(body: unknown): boolean {
+  return RefreshRefusalBodySchema.safeParse(body).success;
+}
 
 /**
  * Every route whose terminal refusal {@link reportAuthTerminalFailure} reports:
@@ -93,14 +115,22 @@ export function parseRetryAfterMs(
 /**
  * Classify a sign-in response. A 401 is terminal (and clears the stored
  * credential on a credential route). A 408, 429 or 5xx is retryable and carries
- * the server's `Retry-After` when it sent one. Every other 4xx — and the
- * 1xx/3xx a sign-in route never returns — is terminal: retrying it cannot
- * change it.
+ * the server's `Retry-After` when it sent one. A 403 on the refresh route is
+ * retryable too unless its body is one the route itself writes: the route has
+ * no 403 branch, so the answer came from an intermediary in front of it. Every
+ * other 4xx — and the 1xx/3xx a sign-in route never returns — is terminal:
+ * retrying it cannot change it.
  */
 export function classifyAuthResponse(args: {
   path: string;
   status: number;
   retryAfterHeader?: string | null;
+  /**
+   * The parsed response body, when the caller read it. Only the refresh route
+   * consults it: an intermediary's 403 is told apart from the route's own
+   * refusal by the body the route writes.
+   */
+  body?: unknown;
   now?: number;
 }): AuthResponseClass {
   const { path, status } = args;
@@ -111,6 +141,17 @@ export function classifyAuthResponse(args: {
     return { kind: 'terminal', status, clearCredential: path === STORED_CREDENTIAL_ROUTE };
   }
   if (status === 408 || status === 429 || status >= 500) {
+    return {
+      kind: 'retry',
+      status,
+      retryAfterMs: parseRetryAfterMs(args.retryAfterHeader, args.now),
+    };
+  }
+  // A 403 on the refresh route without the route's refusal body is an edge or
+  // proxy refusal (a WAF blocks a region, a VPN exit, or a network that answers
+  // every request): it proves nothing about the stored pair, so the session
+  // stays and the rotation retries later instead of signing the person out.
+  if (status === 403 && path === STORED_CREDENTIAL_ROUTE && !isRefreshRefusalBody(args.body)) {
     return {
       kind: 'retry',
       status,

@@ -30,6 +30,7 @@ import {
   providerLabelKey,
   providerRowBlocked,
 } from '@/lib/integrations/provider-catalog';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { isPermissionDeniedError, trpcErrorVariant } from '@/lib/trpc-error';
 
 type IntegrationsScreenProps = Readonly<{
@@ -79,6 +80,7 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
     return (
       <OrganizationBoundary
         title={t('integrations.title')}
+        backFallback={PROFILE_TAB_HREF}
         organizationIdOverride={organizationId}
       />
     );
@@ -96,7 +98,11 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
     }
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('integrations.title')} subtitle={organizationName} />
+        <ScreenHeader
+          title={t('integrations.title')}
+          subtitle={organizationName}
+          backFallback={PROFILE_TAB_HREF}
+        />
         <QueryError
           className="bg-background"
           variant={trpcErrorVariant(statuses.error)}
@@ -154,7 +160,11 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('integrations.title')} subtitle={organizationName} />
+      <ScreenHeader
+        title={t('integrations.title')}
+        subtitle={organizationName}
+        backFallback={PROFILE_TAB_HREF}
+      />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="px-4 pt-4"
@@ -205,7 +215,11 @@ function IntegrationsSkeleton({ organizationName }: Readonly<{ organizationName?
   const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('integrations.title')} subtitle={organizationName} />
+      <ScreenHeader
+        title={t('integrations.title')}
+        subtitle={organizationName}
+        backFallback={PROFILE_TAB_HREF}
+      />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="px-4 pt-4"

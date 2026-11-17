@@ -28,6 +28,7 @@ import {
 } from '@/lib/byok/provider-key-scope';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { isRetryableTrpcError, trpcErrorVariant } from '@/lib/trpc-error';
 import { useTRPC } from '@/lib/trpc';
 
@@ -300,7 +301,7 @@ export function ProviderKeysScreen({ organizationId }: Readonly<{ organizationId
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('profile.providerKeys.title')} />
+      <ScreenHeader title={t('profile.providerKeys.title')} backFallback={PROFILE_TAB_HREF} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-3 px-4 pt-4"

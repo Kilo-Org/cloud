@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Dhibiti kwenye wavuti",
     "creditHistory": "Historia ya salio",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Ghairi",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Ununuzi, risiti na shughuli za salio",
     "invoicesSubtitle": "Pakua ankara za ununuzi wako",
-    "manageBilling": "Dhibiti malipo kwenye kilo.ai",
-    "manageBillingIosNote": "Njia za malipo, kujaza salio kiotomatiki na maelezo ya malipo hudhibitiwa kwenye kilo.ai.",
     "codeReviewerSubtitle": "Ukaguzi wa kiotomatiki wa PR",
     "securityAgentSubtitle": "Tafuta na urekebishe udhaifu wa usalama",
     "reviews": "Ukaguzi",
@@ -3109,10 +3105,7 @@
       "cancelScheduled": "Itaghairiwa tarehe {{date}}",
       "cancelScheduledChange": "Ghairi mabadiliko yaliyoratibiwa",
       "cancelled": "Usajili umeghairiwa",
-      "changePlan": "Badilisha mpango kwenye kilo.ai",
-      "changePlanIosNote": "Mabadiliko ya mipango ya kulipia yanapatikana kwenye kilo.ai.",
       "creditHistoryEmpty": "Bado hakuna salio la Kilo Pass.",
-      "manageInStore": "Dhibiti kwenye {{store}}",
       "resume": "Endeleza usajili",
       "resumeCancelledDescription": "Kilo Pass yako itaanza tena kusasishwa kiotomatiki.",
       "resumePausedDescription": "Kilo Pass yako inaendelea sasa, kabla ya tarehe iliyoratibiwa ya kuendelea.",
@@ -3149,9 +3142,6 @@
     "bonusFree": "Bonasi ya bure",
     "bonusReferral": "Bonasi ya rufaa",
     "bonusAvailable": "Bonasi ya bure inayopatikana",
-    "kiloPassManagement": "Usimamizi wa Kilo Pass",
-    "kiloPassSetup": "Usanidi wa Kilo Pass",
-    "opensManagementOnWeb": "Hufungua usimamizi wa Kilo Pass kwenye wavuti.",
     "loadFailedRetry": "Angalia muunganisho wako, kisha ujaribu tena.",
     "legalTermsOfUse": "Masharti ya matumizi (EULA)",
     "purchaseDifferentAccount": "Ununuzi huu wa App Store haujaunganishwa na akaunti yako ya Kilo. Ingia kwenye Apple Account iliyotumika kufanya ununuzi, kisha ujaribu tena.",
@@ -3337,7 +3327,6 @@
       "buySeats": "Nunua nafasi",
       "setupAutoTopUp": "Weka uongezaji salio kiotomatiki",
       "manageAutoTopUp": "Dhibiti uongezaji salio kiotomatiki",
-      "webAddress": "Anwani ya wavuti {{url}}",
       "opensOnWeb": "Hufunguka kwenye wavuti"
     },
     "boundary": {
@@ -3479,9 +3468,6 @@
       "groups": "Vikundi",
       "guardrails": "Mipaka ya usalama",
       "byok": "Tumia ufunguo wako mwenyewe",
-      "ssoAndDomain": "SSO na kikoa",
-      "emailPreferences": "Mapendeleo ya barua pepe",
-      "dataCollection": "Ukusanyaji wa data",
       "auditLogs": "Kumbukumbu za ukaguzi",
       "requestLogs": "Kumbukumbu za maombi",
       "subOrganizations": "Mashirika tanzu",
@@ -3521,8 +3507,7 @@
       "paymentPending": "Malipo yanasubiri",
       "processingBlocked": "Uchakataji umezuiliwa",
       "processingNeedsReview": "Uchakataji unahitaji ukaguzi",
-      "retryHint": "Hujaribu tena kupakia hali ya Kilo Pass.",
-      "setupHint": "Hufungua usanidi wa Kilo Pass kwenye wavuti."
+      "retryHint": "Hujaribu tena kupakia hali ya Kilo Pass."
     }
   },
   "authErrors": {

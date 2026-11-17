@@ -4,6 +4,7 @@ import { InvoiceListScreen } from '@/components/invoice-list-screen';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useOrgBoundary, useOrgInvoicesPage } from '@/lib/hooks/use-organization-queries';
+import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
 
 export function OrganizationInvoicesScreen() {
   const { t } = useTranslation();
@@ -12,12 +13,18 @@ export function OrganizationInvoicesScreen() {
   useRouteForegroundRefresh([[['organizations']]]);
 
   if (isResolving || organizationId == null || org == null) {
-    return <OrganizationBoundary title={t('organization.invoices.title')} />;
+    return (
+      <OrganizationBoundary
+        title={t('organization.invoices.title')}
+        backFallback={ORGANIZATION_HUB_PATH}
+      />
+    );
   }
 
   return (
     <InvoiceListScreen
       title={t('organization.invoices.title')}
+      backFallback={ORGANIZATION_HUB_PATH}
       query={query}
       entries={entries}
       hasMore={hasMore}

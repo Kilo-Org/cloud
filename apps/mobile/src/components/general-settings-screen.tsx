@@ -23,6 +23,7 @@ import { useKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-prefer
 import { usePrReviewFooterPreference } from '@/lib/hooks/use-pr-review-footer-preference';
 import { useReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import { useReturnSendsMessagePreference } from '@/lib/hooks/use-return-sends-message-preference';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 
 /**
  * General settings subpage. Rows are moved verbatim from the former
@@ -75,7 +76,7 @@ export function GeneralSettingsScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('preferences.general')} />
+      <ScreenHeader title={t('preferences.general')} backFallback={PROFILE_TAB_HREF} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="px-4 gap-3 pt-4"

@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Vebdə idarə et",
     "creditHistory": "Kredit tarixçəsi",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Ləğv et",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Alışlar, qəbzlər və kredit fəaliyyəti",
     "invoicesSubtitle": "Alışlarınız üçün fakturaları endirin",
-    "manageBilling": "Ödənişləri kilo.ai saytında idarə edin",
-    "manageBillingIosNote": "Ödəniş üsulları, avtomatik balans artırma və ödəniş məlumatları kilo.ai saytında idarə olunur.",
     "codeReviewerSubtitle": "Avtomatik PR yoxlamaları",
     "securityAgentSubtitle": "Təhlükəsizlik boşluqlarını tap və aradan qaldır",
     "reviews": "Yoxlamalar",
@@ -3109,10 +3105,7 @@
       "cancelScheduled": "{{date}} tarixində ləğv olunur",
       "cancelScheduledChange": "Planlaşdırılmış dəyişikliyi ləğv et",
       "cancelled": "Abunəlik ləğv edildi",
-      "changePlan": "Planı kilo.ai saytında dəyişin",
-      "changePlanIosNote": "Ödənişli plan dəyişiklikləri kilo.ai saytında mövcuddur.",
       "creditHistoryEmpty": "Hələ Kilo Pass krediti yoxdur.",
-      "manageInStore": "{{store}} daxilində idarə et",
       "resume": "Abunəliyi bərpa et",
       "resumeCancelledDescription": "Kilo Pass yenidən avtomatik yenilənməyə başlayacaq.",
       "resumePausedDescription": "Kilo Pass planlaşdırılmış bərpa tarixindən əvvəl, indi bərpa olunacaq.",
@@ -3149,9 +3142,6 @@
     "bonusFree": "Pulsuz bonus",
     "bonusReferral": "Referal bonusu",
     "bonusAvailable": "Əlçatan pulsuz bonus",
-    "kiloPassManagement": "Kilo Pass-ın idarə edilməsi",
-    "kiloPassSetup": "Kilo Pass-ın qurulması",
-    "opensManagementOnWeb": "Kilo Pass idarəetmə səhifəsini saytda açır.",
     "loadFailedRetry": "Bağlantını yoxla, sonra yenidən cəhd et.",
     "legalTermsOfUse": "İstifadə şərtləri (EULA)",
     "purchaseDifferentAccount": "Bu App Store alışı Kilo hesabına bağlı deyil. Alış üçün istifadə etdiyin Apple Account hesabına daxil ol, sonra yenidən cəhd et.",
@@ -3337,7 +3327,6 @@
       "buySeats": "İstifadəçi yerləri al",
       "setupAutoTopUp": "Avtomatik artırmanı qur",
       "manageAutoTopUp": "Avtomatik artırmanı idarə et",
-      "webAddress": "Veb ünvan {{url}}",
       "opensOnWeb": "Vebdə açılır"
     },
     "boundary": {
@@ -3479,9 +3468,6 @@
       "groups": "Qruplar",
       "guardrails": "Qoruyucu qaydalar",
       "byok": "Öz açarınızdan istifadə edin",
-      "ssoAndDomain": "SSO və domen",
-      "emailPreferences": "E-poçt tərcihləri",
-      "dataCollection": "Məlumat toplanması",
       "auditLogs": "Audit jurnalları",
       "requestLogs": "Sorğu jurnalları",
       "subOrganizations": "Alt təşkilatlar",
@@ -3521,8 +3507,7 @@
       "paymentPending": "Ödəniş gözlənilir",
       "processingBlocked": "Emal bloklanıb",
       "processingNeedsReview": "Emalı yoxlamaq lazımdır",
-      "retryHint": "Kilo Pass statusunun yüklənməsinə yenidən cəhd edir.",
-      "setupHint": "Kilo Pass quraşdırma səhifəsini brauzerdə açır."
+      "retryHint": "Kilo Pass statusunun yüklənməsinə yenidən cəhd edir."
     }
   },
   "authErrors": {

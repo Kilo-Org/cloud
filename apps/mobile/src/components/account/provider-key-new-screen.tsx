@@ -40,6 +40,7 @@ import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { assertSurfaceFailureHandled } from '@/lib/surface-feedback';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { normalizeOrgQueryParam } from '@/lib/org-deep-link';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { isRetryableTrpcError, readTrpcErrorField } from '@/lib/trpc-error';
 import { useTRPC } from '@/lib/trpc';
 
@@ -111,7 +112,7 @@ export function ProviderKeyNewScreen() {
     // who reads them cannot open this form at all.
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={title} />
+        <ScreenHeader title={title} backFallback={PROFILE_TAB_HREF} />
         <QueryError variant="permission" />
       </View>
     );
@@ -120,7 +121,7 @@ export function ProviderKeyNewScreen() {
   if (providers.isPending || providers.isError) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={title} />
+        <ScreenHeader title={title} backFallback={PROFILE_TAB_HREF} />
         {providers.isError ? (
           <QueryError onRetry={() => void providers.refetch()} isRetrying={providers.isFetching} />
         ) : (
@@ -276,7 +277,7 @@ export function ProviderKeyNewScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={title} />
+      <ScreenHeader title={title} backFallback={PROFILE_TAB_HREF} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-6 px-4 pt-4"

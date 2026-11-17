@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Pārvaldi tīmeklī",
     "creditHistory": "Kredītu vēsture",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Atcelt",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Pirkumi, kvītis un kredītu darbības",
     "invoicesSubtitle": "Lejupielādējiet rēķinus par saviem pirkumiem",
-    "manageBilling": "Pārvaldīt norēķinus vietnē kilo.ai",
-    "manageBillingIosNote": "Maksājumu veidi, automātiskā papildināšana un norēķinu informācija tiek pārvaldīta vietnē kilo.ai.",
     "codeReviewerSubtitle": "Automātiskas PR pārbaudes",
     "securityAgentSubtitle": "Atrast un novērst ievainojamības",
     "reviews": "Koda pārbaudes",
@@ -3166,10 +3162,7 @@
       "cancelScheduled": "Tiks atcelts {{date}}",
       "cancelScheduledChange": "Atcelt ieplānotās izmaiņas",
       "cancelled": "Abonements atcelts",
-      "changePlan": "Mainīt plānu vietnē kilo.ai",
-      "changePlanIosNote": "Maksas plānu maiņa ir pieejama vietnē kilo.ai.",
       "creditHistoryEmpty": "Kilo Pass kredītu vēl nav.",
-      "manageInStore": "Pārvaldīt veikalā {{store}}",
       "resume": "Atsākt abonementu",
       "resumeCancelledDescription": "Jūsu Kilo Pass atkal tiks automātiski atjaunots.",
       "resumePausedDescription": "Jūsu Kilo Pass darbība atsāksies tūlīt, pirms ieplānotā atsākšanas datuma.",
@@ -3206,9 +3199,6 @@
     "bonusFree": "Bezmaksas bonuss",
     "bonusReferral": "Ieteikuma bonuss",
     "bonusAvailable": "Pieejamais bezmaksas bonuss",
-    "kiloPassManagement": "Kilo Pass pārvaldība",
-    "kiloPassSetup": "Kilo Pass iestatīšana",
-    "opensManagementOnWeb": "Atver Kilo Pass pārvaldību tīmeklī.",
     "loadFailedRetry": "Pārbaudi savienojumu, tad mēģini vēlreiz.",
     "legalTermsOfUse": "Lietošanas noteikumiem (EULA)",
     "purchaseDifferentAccount": "Šis App Store pirkums nav saistīts ar tavu Kilo kontu. Pieraksties Apple Account kontā, ko izmantoji pirkumam, un mēģini vēlreiz.",
@@ -3394,7 +3384,6 @@
       "buySeats": "Pirkt vietas",
       "setupAutoTopUp": "Iestatīt automātisko papildināšanu",
       "manageAutoTopUp": "Pārvaldi automātisko papildināšanu",
-      "webAddress": "Tīmekļa adrese {{url}}",
       "opensOnWeb": "Tiek atvērts tīmeklī"
     },
     "boundary": {
@@ -3536,9 +3525,6 @@
       "groups": "Grupas",
       "guardrails": "Drošības ierobežojumi",
       "byok": "Izmantot savu atslēgu",
-      "ssoAndDomain": "SSO un domēns",
-      "emailPreferences": "E-pasta preferences",
-      "dataCollection": "Datu vākšana",
       "auditLogs": "Audita žurnāli",
       "requestLogs": "Pieprasījumu žurnāli",
       "subOrganizations": "Apakšorganizācijas",
@@ -3579,7 +3565,6 @@
       "processingBlocked": "Apstrāde bloķēta",
       "processingNeedsReview": "Apstrāde jāpārbauda",
       "retryHint": "Atkārtoti mēģina ielādēt Kilo Pass statusu.",
-      "setupHint": "Atver Kilo Pass iestatīšanu tīmeklī.",
       "paidSeat_zero": "{{displayCount}} apmaksātu vietu"
     }
   },

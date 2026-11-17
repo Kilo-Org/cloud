@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "वेब पर प्रबंधित करें",
     "creditHistory": "क्रेडिट इतिहास",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": "। ",
     "listJoiner": ", ",
     "cancel": "रद्द करें",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "खरीदारी, रसीदें और क्रेडिट गतिविधि",
     "invoicesSubtitle": "अपनी खरीदारी के इनवॉइस डाउनलोड करें",
-    "manageBilling": "kilo.ai पर बिलिंग मैनेज करें",
-    "manageBillingIosNote": "पेमेंट के तरीके, ऑटो टॉप-अप और बिलिंग की जानकारी kilo.ai पर मैनेज की जाती है।",
     "codeReviewerSubtitle": "स्वचालित PR समीक्षाएँ",
     "securityAgentSubtitle": "सुरक्षा की कमियाँ खोजें और ठीक करें",
     "reviews": "समीक्षाएँ",
@@ -2566,10 +2562,7 @@
       "cancelScheduled": "{{date}} को रद्द होगा",
       "cancelScheduledChange": "शेड्यूल किया गया बदलाव रद्द करें",
       "cancelled": "सब्सक्रिप्शन रद्द हो गया",
-      "changePlan": "kilo.ai पर प्लान बदलें",
-      "changePlanIosNote": "पेड प्लान में बदलाव kilo.ai पर किए जा सकते हैं।",
       "creditHistoryEmpty": "अभी कोई Kilo Pass क्रेडिट नहीं है।",
-      "manageInStore": "{{store}} में मैनेज करें",
       "resume": "सब्सक्रिप्शन फिर से शुरू करें",
       "resumeCancelledDescription": "आपका Kilo Pass फिर से अपने-आप रिन्यू होने लगेगा।",
       "resumePausedDescription": "आपका Kilo Pass अपनी तय तारीख से पहले, अभी फिर से शुरू हो जाएगा।",
@@ -2606,9 +2599,6 @@
     "bonusFree": "मुफ़्त बोनस",
     "bonusReferral": "रेफ़रल बोनस",
     "bonusAvailable": "उपलब्ध मुफ़्त बोनस",
-    "kiloPassManagement": "Kilo Pass का प्रबंधन",
-    "kiloPassSetup": "Kilo Pass का सेटअप",
-    "opensManagementOnWeb": "वेब पर Kilo Pass के प्रबंधन का पेज खुलता है।",
     "loadFailedRetry": "अपना कनेक्शन जाँचें, फिर से कोशिश करें।",
     "legalTermsOfUse": "उपयोग की शर्तें (EULA)",
     "purchaseDifferentAccount": "App Store की यह खरीदारी आपके Kilo खाते से जुड़ी नहीं है। खरीदारी के लिए इस्तेमाल किए गए Apple Account में साइन इन करें, फिर से कोशिश करें।",
@@ -3329,7 +3319,6 @@
       "buySeats": "सीटें खरीदें",
       "setupAutoTopUp": "ऑटो टॉप-अप सेट करें",
       "manageAutoTopUp": "ऑटो टॉप-अप प्रबंधित करें",
-      "webAddress": "वेब पता {{url}}",
       "opensOnWeb": "वेब पर खुलता है"
     },
     "boundary": {
@@ -3484,9 +3473,6 @@
       "groups": "ग्रुप",
       "guardrails": "गार्डरेल",
       "byok": "अपनी खुद की की (key) इस्तेमाल करें",
-      "ssoAndDomain": "SSO और डोमेन",
-      "emailPreferences": "ईमेल प्राथमिकताएँ",
-      "dataCollection": "डेटा कलेक्शन",
       "auditLogs": "ऑडिट लॉग",
       "requestLogs": "रिक्वेस्ट लॉग",
       "subOrganizations": "सब-संगठन",
@@ -3513,8 +3499,7 @@
       "paymentPending": "भुगतान लंबित",
       "processingBlocked": "प्रोसेसिंग अवरुद्ध",
       "processingNeedsReview": "प्रोसेसिंग की समीक्षा आवश्यक है",
-      "retryHint": "Kilo Pass की स्थिति फिर से लोड करने की कोशिश करता है।",
-      "setupHint": "वेब पर Kilo Pass सेटअप खोलता है।"
+      "retryHint": "Kilo Pass की स्थिति फिर से लोड करने की कोशिश करता है।"
     }
   },
   "feedback": {

@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Quản lý trên web",
     "creditHistory": "Lịch sử tín dụng",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Hủy",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Giao dịch mua, biên lai và hoạt động tín dụng",
     "invoicesSubtitle": "Tải xuống hóa đơn cho các giao dịch mua của bạn",
-    "manageBilling": "Quản lý thanh toán trên kilo.ai",
-    "manageBillingIosNote": "Phương thức thanh toán, tự động nạp tiền và thông tin thanh toán được quản lý trên kilo.ai.",
     "codeReviewerSubtitle": "Rà soát PR tự động",
     "securityAgentSubtitle": "Tìm và khắc phục lỗ hổng",
     "reviews": "Rà soát mã",
@@ -2566,10 +2562,7 @@
       "cancelScheduled": "Sẽ hủy vào {{date}}",
       "cancelScheduledChange": "Hủy thay đổi đã lên lịch",
       "cancelled": "Đã hủy gói đăng ký",
-      "changePlan": "Đổi gói trên kilo.ai",
-      "changePlanIosNote": "Bạn có thể thay đổi gói trả phí trên kilo.ai.",
       "creditHistoryEmpty": "Chưa có tín dụng Kilo Pass nào.",
-      "manageInStore": "Quản lý trong {{store}}",
       "resume": "Tiếp tục gói đăng ký",
       "resumeCancelledDescription": "Kilo Pass của bạn sẽ lại được tự động gia hạn.",
       "resumePausedDescription": "Kilo Pass của bạn sẽ tiếp tục ngay bây giờ, trước ngày tiếp tục đã lên lịch.",
@@ -2606,9 +2599,6 @@
     "bonusFree": "Thưởng miễn phí",
     "bonusReferral": "Thưởng giới thiệu",
     "bonusAvailable": "Thưởng miễn phí có sẵn",
-    "kiloPassManagement": "Quản lý Kilo Pass",
-    "kiloPassSetup": "Thiết lập Kilo Pass",
-    "opensManagementOnWeb": "Mở trang quản lý Kilo Pass trên web.",
     "loadFailedRetry": "Kiểm tra kết nối của bạn, sau đó thử lại.",
     "legalTermsOfUse": "Điều khoản sử dụng (EULA)",
     "purchaseDifferentAccount": "Giao dịch mua trên App Store này không liên kết với tài khoản Kilo của bạn. Hãy đăng nhập vào Apple Account đã dùng để mua rồi thử lại.",
@@ -3329,7 +3319,6 @@
       "buySeats": "Mua suất sử dụng",
       "setupAutoTopUp": "Thiết lập tự động nạp tiền",
       "manageAutoTopUp": "Quản lý tự động nạp tiền",
-      "webAddress": "Địa chỉ web {{url}}",
       "opensOnWeb": "Mở trên web"
     },
     "boundary": {
@@ -3484,9 +3473,6 @@
       "groups": "Nhóm",
       "guardrails": "Rào chắn an toàn",
       "byok": "Dùng khóa riêng của bạn",
-      "ssoAndDomain": "SSO và tên miền",
-      "emailPreferences": "Tùy chọn email",
-      "dataCollection": "Thu thập dữ liệu",
       "auditLogs": "Nhật ký kiểm tra",
       "requestLogs": "Nhật ký yêu cầu",
       "subOrganizations": "Tổ chức con",
@@ -3513,8 +3499,7 @@
       "paymentPending": "Đang chờ xử lý thanh toán",
       "processingBlocked": "Không thể tiếp tục xử lý",
       "processingNeedsReview": "Cần kiểm tra quá trình xử lý",
-      "retryHint": "Thử tải lại trạng thái Kilo Pass.",
-      "setupHint": "Mở trang thiết lập Kilo Pass trên web."
+      "retryHint": "Thử tải lại trạng thái Kilo Pass."
     }
   },
   "feedback": {

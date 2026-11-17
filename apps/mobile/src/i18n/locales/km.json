@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "គ្រប់គ្រងនៅលើគេហទំព័រ",
     "creditHistory": "ប្រវត្តិក្រេឌីត",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": "។ ",
     "listJoiner": ", ",
     "cancel": "បោះបង់",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "ការទិញ បង្កាន់ដៃ និងសកម្មភាពក្រេឌីត",
     "invoicesSubtitle": "ទាញយកវិក្កយបត្រសម្រាប់ការទិញរបស់អ្នក",
-    "manageBilling": "គ្រប់គ្រងការទូទាត់នៅលើ kilo.ai",
-    "manageBillingIosNote": "វិធីសាស្ត្រទូទាត់ ការបញ្ចូលក្រេឌីតស្វ័យប្រវត្តិ និងព័ត៌មានលម្អិតអំពីការទូទាត់ ត្រូវបានគ្រប់គ្រងនៅលើ kilo.ai។",
     "codeReviewerSubtitle": "ការពិនិត្យ PR ដោយស្វ័យប្រវត្តិ",
     "securityAgentSubtitle": "ស្វែងរក និងដោះស្រាយចំណុចខ្សោយផ្នែកសុវត្ថិភាព",
     "reviews": "ការពិនិត្យ",
@@ -3109,10 +3105,7 @@
       "cancelScheduled": "នឹងបោះបង់នៅថ្ងៃ {{date}}",
       "cancelScheduledChange": "បោះបង់ការផ្លាស់ប្តូរដែលបានកំណត់ពេល",
       "cancelled": "បានបោះបង់ការជាវ",
-      "changePlan": "ប្តូរគម្រោងនៅលើ kilo.ai",
-      "changePlanIosNote": "ការប្តូរគម្រោងបង់ប្រាក់អាចធ្វើបាននៅលើ kilo.ai។",
       "creditHistoryEmpty": "មិនទាន់មានក្រេឌីត Kilo Pass នៅឡើយទេ។",
-      "manageInStore": "គ្រប់គ្រងនៅក្នុង {{store}}",
       "resume": "បន្តការជាវឡើងវិញ",
       "resumeCancelledDescription": "Kilo Pass របស់អ្នកនឹងចាប់ផ្តើមបន្តដោយស្វ័យប្រវត្តិម្តងទៀត។",
       "resumePausedDescription": "Kilo Pass របស់អ្នកនឹងបន្តឡើងវិញឥឡូវនេះ មុនកាលបរិច្ឆេទបន្តដែលបានកំណត់។",
@@ -3149,9 +3142,6 @@
     "bonusFree": "រង្វាន់ឥតគិតថ្លៃ",
     "bonusReferral": "រង្វាន់ណែនាំ",
     "bonusAvailable": "រង្វាន់ឥតគិតថ្លៃដែលអាចប្រើបាន",
-    "kiloPassManagement": "ការគ្រប់គ្រង Kilo Pass",
-    "kiloPassSetup": "ការរៀបចំ Kilo Pass",
-    "opensManagementOnWeb": "បើកការគ្រប់គ្រង Kilo Pass នៅលើគេហទំព័រ។",
     "loadFailedRetry": "ពិនិត្យការតភ្ជាប់របស់អ្នក បន្ទាប់មកព្យាយាមម្តងទៀត។",
     "legalTermsOfUse": "លក្ខខណ្ឌនៃការប្រើប្រាស់ (EULA)",
     "purchaseDifferentAccount": "ការទិញ App Store នេះមិនត្រូវបានភ្ជាប់ទៅគណនី Kilo របស់អ្នកទេ។ ចូលជាមួយ Apple Account ដែលបានប្រើសម្រាប់ការទិញ បន្ទាប់មកព្យាយាមម្តងទៀត។",
@@ -3337,7 +3327,6 @@
       "buySeats": "ទិញកន្លែងសមាជិក",
       "setupAutoTopUp": "រៀបចំការបញ្ចូលទឹកប្រាក់ស្វ័យប្រវត្តិ",
       "manageAutoTopUp": "គ្រប់គ្រងការបញ្ចូលទឹកប្រាក់ស្វ័យប្រវត្តិ",
-      "webAddress": "អាសយដ្ឋានគេហទំព័រ {{url}}",
       "opensOnWeb": "បើកនៅលើគេហទំព័រ"
     },
     "boundary": {
@@ -3479,9 +3468,6 @@
       "groups": "ក្រុម",
       "guardrails": "របាំងការពារ",
       "byok": "ប្រើសោផ្ទាល់ខ្លួន",
-      "ssoAndDomain": "SSO និងដែន",
-      "emailPreferences": "ចំណូលចិត្តអ៊ីមែល",
-      "dataCollection": "ការប្រមូលទិន្នន័យ",
       "auditLogs": "កំណត់ហេតុសវនកម្ម",
       "requestLogs": "កំណត់ហេតុសំណើ",
       "subOrganizations": "អង្គការរង",
@@ -3521,8 +3507,7 @@
       "paymentPending": "កំពុងរង់ចាំការទូទាត់",
       "processingBlocked": "ការដំណើរការត្រូវបានរារាំង",
       "processingNeedsReview": "ការដំណើរការត្រូវការការពិនិត្យ",
-      "retryHint": "ព្យាយាមផ្ទុកស្ថានភាព Kilo Pass ម្តងទៀត។",
-      "setupHint": "បើកការរៀបចំ Kilo Pass នៅលើគេហទំព័រ។"
+      "retryHint": "ព្យាយាមផ្ទុកស្ថានភាព Kilo Pass ម្តងទៀត។"
     }
   },
   "authErrors": {

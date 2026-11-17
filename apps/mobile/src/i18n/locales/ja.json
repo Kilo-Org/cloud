@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Webで管理",
     "creditHistory": "クレジット履歴",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": "。",
     "listJoiner": "、",
     "cancel": "キャンセル",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "購入、領収書、クレジットのアクティビティ",
     "invoicesSubtitle": "購入の請求書をダウンロード",
-    "manageBilling": "kilo.ai で支払いを管理",
-    "manageBillingIosNote": "支払い方法、自動チャージ、請求情報は kilo.ai で管理されます。",
     "codeReviewerSubtitle": "PRの自動レビュー",
     "securityAgentSubtitle": "脆弱性を検出して修正",
     "reviews": "レビュー",
@@ -2566,10 +2562,7 @@
       "cancelScheduled": "{{date}} に解約予定",
       "cancelScheduledChange": "予定された変更を取り消す",
       "cancelled": "サブスクリプションを解約しました",
-      "changePlan": "kilo.ai でプランを変更",
-      "changePlanIosNote": "有料プランの変更は kilo.ai で行えます。",
       "creditHistoryEmpty": "Kilo Pass のクレジットはまだありません。",
-      "manageInStore": "{{store}} で管理",
       "resume": "サブスクリプションを再開",
       "resumeCancelledDescription": "Kilo Pass の自動更新が再び有効になります。",
       "resumePausedDescription": "Kilo Pass は予定の再開日を待たずに今すぐ再開されます。",
@@ -2606,9 +2599,6 @@
     "bonusFree": "無料ボーナス",
     "bonusReferral": "紹介ボーナス",
     "bonusAvailable": "利用可能な無料ボーナス",
-    "kiloPassManagement": "Kilo Passの管理",
-    "kiloPassSetup": "Kilo Passのセットアップ",
-    "opensManagementOnWeb": "ウェブでKilo Passの管理画面を開きます。",
     "loadFailedRetry": "接続を確認してから、もう一度お試しください。",
     "legalTermsOfUse": "利用規約（EULA）",
     "purchaseDifferentAccount": "このApp Storeでの購入は、現在のKiloアカウントに紐付いていません。購入に使用したApple Accountにサインインしてから、もう一度お試しください。",
@@ -3329,7 +3319,6 @@
       "buySeats": "シートを購入",
       "setupAutoTopUp": "自動チャージを設定",
       "manageAutoTopUp": "自動チャージを管理",
-      "webAddress": "Webアドレス {{url}}",
       "opensOnWeb": "Webで開きます"
     },
     "boundary": {
@@ -3484,9 +3473,6 @@
       "groups": "グループ",
       "guardrails": "ガードレール",
       "byok": "独自のキーを使用",
-      "ssoAndDomain": "SSOとドメイン",
-      "emailPreferences": "メール設定",
-      "dataCollection": "データ収集",
       "auditLogs": "監査ログ",
       "requestLogs": "リクエストログ",
       "subOrganizations": "サブ組織",
@@ -3513,8 +3499,7 @@
       "paymentPending": "お支払い保留中",
       "processingBlocked": "処理がブロックされています",
       "processingNeedsReview": "処理内容の確認が必要",
-      "retryHint": "Kilo Passのステータスの読み込みを再試行します。",
-      "setupHint": "ブラウザーでKilo Passの設定画面を開きます。"
+      "retryHint": "Kilo Passのステータスの読み込みを再試行します。"
     }
   },
   "feedback": {

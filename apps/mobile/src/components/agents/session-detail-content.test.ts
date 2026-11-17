@@ -6296,7 +6296,7 @@ describe('session detail duplicate failure state', () => {
     // The row carries no destructive marker: the footer is the only surface a
     // failure marker is drawn on, and it draws none.
     const footers = view.renderer.root.findAll(
-      node => Object.is(node.type, 'View') && String(node.props.className).includes('pb-[24px]')
+      node => Object.is(node.type, 'View') && String(node.props.className).includes('pb-7')
     );
     expect(footers).toHaveLength(1);
     expect(footers[0]?.findAllByType('AlertCircle')).toHaveLength(0);

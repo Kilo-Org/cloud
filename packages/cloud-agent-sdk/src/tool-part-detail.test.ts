@@ -190,7 +190,13 @@ describe('readToolPartDetail', () => {
           metadata: {},
           time: { start: 1, end: 2 },
         },
-        cloudDetail: { version: 1, revision: 12, omitted: ['output'], omittedCount: 1, omittedBytes: 10 },
+        cloudDetail: {
+          version: 1,
+          revision: 12,
+          omitted: ['output'],
+          omittedCount: 1,
+          omittedBytes: 10,
+        },
       } as Part)
     ).toEqual({ kind: 'not_found' });
   });

@@ -69,6 +69,9 @@ function fixture(drain: NonNullable<Harness['drainSession']>) {
     quietDrainMs: 20 * 60_000,
     reserveDelivery() {},
     submitPublication: async () => {},
+    interruptAndFinalize() {
+      throw new Error('Unexpected quiet drain interruption');
+    },
     autoCommit: async () => {},
     condense: async () => {},
     finalizing() {

@@ -533,6 +533,9 @@ export function createTurnManager(deps: TurnManagerDeps) {
           turn.submitting = turn.submitting.then(() => barrier);
         },
         submitPublication,
+        interruptAndFinalize: client => {
+          void finalizeInterruptedTurn(turn, abortKilo(route, client));
+        },
         autoCommit: (client, signal) => runAutoCommitStep(turn, client, signal),
         condense: (client, signal) => runCondenseStep(turn, client, signal),
         finalizing: () =>
@@ -824,17 +827,18 @@ export function createTurnManager(deps: TurnManagerDeps) {
     for (const pending of queued) chainSubmit(turn, pending);
   }
 
-  async function abortKilo(route: TurnRoute): Promise<void> {
-    const runtime = deps.runtimes.get(route.runtimeKey);
-    if (runtime === undefined) return;
+  async function abortKilo(route: TurnRoute, client?: Harness): Promise<boolean> {
     try {
-      await runtime.client.interrupt({
+      const target = client ?? deps.runtimes.get(route.runtimeKey)?.client;
+      if (!target) return false;
+      return await target.interrupt({
         sessionId: route.kiloSessionId,
         directory: route.directory,
         signal: AbortSignal.timeout(10_000),
       });
     } catch {
       log(`turn: Kilo abort failed session=${route.kiloSessionId}`);
+      return false;
     }
   }
 

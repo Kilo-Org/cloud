@@ -74,6 +74,7 @@ type CompletionInput = {
   quietDrainMs: number;
   reserveDelivery(barrier: Promise<void>): void;
   submitPublication(client: Harness, signal: AbortSignal): Promise<void>;
+  interruptAndFinalize(client: Harness): void;
   autoCommit: (client: Harness, signal: AbortSignal) => Promise<void>;
   condense: (client: Harness, signal: AbortSignal) => Promise<void>;
   finalizing(): void;
@@ -191,7 +192,7 @@ export function createTurnCompletion(input: CompletionInput) {
             () =>
               finish(
                 new DrainSessionError(
-                  'anomalous',
+                  'quiet_drain',
                   'native drain stayed pending without foreground work'
                 )
               ),
@@ -364,7 +365,10 @@ export function createTurnCompletion(input: CompletionInput) {
           if (!isCurrent(turn, request) || !ownsNativeClient(turn, request)) continue;
           if (drained.state === 'failed') {
             input.warn(`Session completion was not confirmed: ${drained.reason}`);
-            input.outcome('failed', 'completion_unconfirmed');
+            if (drained.kind === 'quiet_drain') {
+              input.interruptAndFinalize(request.client);
+              input.outcome('failed', 'completion_quiet_drain');
+            } else input.outcome('failed', 'completion_unconfirmed');
             return;
           }
           if (drained.state !== 'drained') continue;

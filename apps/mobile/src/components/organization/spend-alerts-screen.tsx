@@ -38,7 +38,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { DENSE_ROW_H11_APPEND_HIT_SLOP } from '@/lib/a11y/tap-target';
+import { DENSE_ROW_H11_APPEND_HIT_SLOP, DENSE_ROW_H11_TOUCH_SLOP_DP } from '@/lib/a11y/tap-target';
 import { formatList, formatNumber, formatPrefixedMoney } from '@/lib/format';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
@@ -669,10 +669,16 @@ function RuleCard({
 
       {children}
 
-      {/* The pad matches the push row's bottom slop band exactly, so the
-          delivered reach stays inside the card (Android clips touches outside
-          a parent's bounds) without padding the row below the reach. */}
-      <View className="rounded-lg bg-secondary px-3 pb-[5.5px]">
+      {/* The pad matches the push row's bottom slop band exactly: it renders
+          the same `DENSE_ROW_H11_TOUCH_SLOP_DP` value the row's `hitSlop`
+          adds, so the delivered reach stays inside the card (Android clips
+          touches outside a parent's bounds) without padding the row below the
+          reach. The compiled pad is pinned to the constant in
+          spend-alerts-screen.mounted.test.tsx, so it cannot drift. */}
+      <View
+        className="rounded-lg bg-secondary px-3"
+        style={{ paddingBottom: DENSE_ROW_H11_TOUCH_SLOP_DP }}
+      >
         <View className="min-h-11 flex-row items-center justify-between border-b-[0.5px] border-hair-soft">
           <Text className="text-sm">{t('common.email')}</Text>
           {/* The row's own label names the channel; the card's kind is composed

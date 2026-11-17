@@ -117,9 +117,15 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
   return (
     <>
       <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
-        <Text {...HIDDEN_LABEL_PROPS} className="min-w-0 flex-1 text-sm font-medium">
-          {t('organization.lowBalanceAlert.enableA11y')}
-        </Text>
+        {/* The slot wraps the label and carries the gutter (`pe-3`) instead of
+            the label, so a wrapped catalog line stays clear of the switch's
+            own 44 dp box — the shape sibling toggle rows use. The label keeps
+            the hidden-label props: the switch below already names the row. */}
+        <View {...HIDDEN_LABEL_PROPS} className="min-w-0 flex-1 pe-3">
+          <Text className="text-sm font-medium">
+            {t('organization.lowBalanceAlert.enableA11y')}
+          </Text>
+        </View>
         <Switch
           accessibilityLabel={t('organization.lowBalanceAlert.enableA11y')}
           value={enabled}

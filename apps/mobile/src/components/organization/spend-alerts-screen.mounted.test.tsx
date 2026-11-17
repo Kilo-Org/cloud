@@ -767,7 +767,7 @@ describe('SpendAlertsScreen push agreement', () => {
     // Pressable aimed at Notifications — the only Pressables on the screen.
     const rows = byType(renderer, 'Pressable');
     expect(rows).toHaveLength(2);
-    const cards: ReactTestInstance[] = [];
+    const cards: { paddingBottom: number }[] = [];
 
     for (const row of rows) {
       // The reach joins the row on its bottom side only. A top slop would
@@ -781,8 +781,9 @@ describe('SpendAlertsScreen push agreement', () => {
       });
 
       // Android clips touches outside a parent's bounds, so the card that
-      // wraps the row keeps the delivered reach inside itself: its compiled
-      // bottom padding must cover the row's bottom slop band.
+      // wraps the row keeps the delivered reach inside itself: its bottom
+      // padding must cover the row's bottom slop band. The pad renders the
+      // shared constant, so the reach stays pinned if the slop value moves.
       const card = findAncestorViewNode(
         row,
         viewHolder =>
@@ -792,7 +793,7 @@ describe('SpendAlertsScreen push agreement', () => {
       if (!card) {
         throw new Error('secondary card wrapping the push row not found');
       }
-      cards.push(card);
+      cards.push(card.props.style as { paddingBottom: number });
     }
 
     // The audit reads the control's laid-out node and `hitSlop` never
@@ -814,10 +815,9 @@ describe('SpendAlertsScreen push agreement', () => {
       expect(frame + slop.top + slop.bottom).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
     }
 
-    expect(
-      await Promise.all(
-        cards.map(card => compiledLengthDp(card.props.className as string, 'paddingBottom'))
-      )
-    ).toEqual(expect.arrayContaining([DENSE_ROW_H11_TOUCH_SLOP_DP, DENSE_ROW_H11_TOUCH_SLOP_DP]));
+    expect(cards.map(card => card.paddingBottom)).toEqual([
+      DENSE_ROW_H11_TOUCH_SLOP_DP,
+      DENSE_ROW_H11_TOUCH_SLOP_DP,
+    ]);
   });
 });

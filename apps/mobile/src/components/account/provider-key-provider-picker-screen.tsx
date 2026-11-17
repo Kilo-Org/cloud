@@ -119,9 +119,7 @@ export function ProviderKeyProviderPickerScreen({
     ({ item }: { item: ProviderOption | undefined }) =>
       // A stale index past the end of the rows (the model picker's renderItem
       // carries the same guard for the same reason).
-      item ? (
-        <ProviderRow provider={item} scope={scope} />
-      ) : null,
+      item ? <ProviderRow provider={item} scope={scope} /> : null,
     [scope]
   );
 

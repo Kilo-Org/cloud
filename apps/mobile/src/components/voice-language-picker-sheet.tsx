@@ -160,7 +160,9 @@ function VoiceLanguageList({
           <ChoiceRow
             label={item.label}
             description={item.description}
-            className={index < filtered.length - 1 ? 'border-b-[0.5px] border-hair-soft' : undefined}
+            className={
+              index < filtered.length - 1 ? 'border-b-[0.5px] border-hair-soft' : undefined
+            }
             selected={chosen === item.tag}
             onPress={() => {
               onSelect(item.tag);

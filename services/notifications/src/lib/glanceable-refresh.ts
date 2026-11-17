@@ -237,8 +237,7 @@ export async function refreshGlanceableSnapshot(
     const storedAttempts = stored?.attempts;
     const keepStoredDeadline = storedDueAt !== undefined && storedDueAt <= dueAt;
     const effectiveDueAt = keepStoredDeadline ? storedDueAt : dueAt;
-    const approvalChanged =
-      options.approvalChanged === true || stored?.approvalChanged === true;
+    const approvalChanged = options.approvalChanged === true || stored?.approvalChanged === true;
     await storage.put<PendingGlanceableRefresh>(pendingKey(scope), {
       userId: scope.userId,
       organizationId: scope.organizationId,

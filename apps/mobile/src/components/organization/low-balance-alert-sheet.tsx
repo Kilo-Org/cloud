@@ -121,7 +121,9 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
   return (
     <>
       <RowGroup>
-        <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center justify-between gap-3 px-4 py-3')}>
+        <View
+          className={cn(ROW_TARGET_CLASS, 'flex-row items-center justify-between gap-3 px-4 py-3')}
+        >
           <Text className="text-sm font-medium text-foreground">
             {t('organization.lowBalanceAlert.title')}
           </Text>
@@ -173,9 +175,7 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
                 clearSaveError();
               }}
             />
-            <Text variant="caption">
-              {t('organization.lowBalanceAlert.separateEmailsHint')}
-            </Text>
+            <Text variant="caption">{t('organization.lowBalanceAlert.separateEmailsHint')}</Text>
             <AccessibleStatus
               message={saveError?.field === 'emails' ? saveError.message : null}
               className="text-sm"

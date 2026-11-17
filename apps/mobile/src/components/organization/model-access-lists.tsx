@@ -42,7 +42,7 @@ function ListHeader({
   bulk: ReactNode;
 }>) {
   return (
-    <View className="gap-3 pb-3">
+    <View className="gap-3 px-4 pt-3 pb-3">
       <Text variant="caption">{description}</Text>
       <Input
         defaultValue={search}
@@ -83,19 +83,21 @@ export function ProviderAllowList({
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const paddingBottom = useTabBarBottomPadding();
-  const contentContainerStyle = { paddingHorizontal: 14, paddingBottom };
+  const contentContainerStyle = { paddingBottom };
   const shown = providers.filter(provider => matchesSearch([provider], search));
 
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<string>) => (
-      <SettingsSwitchRow
-        label={item}
-        value={draft.providerAllowList.includes(item)}
-        disabled={disabled}
-        onValueChange={next => {
-          onChange(toggleProvider(draft, item, next));
-        }}
-      />
+      <View className="px-4">
+        <SettingsSwitchRow
+          label={item}
+          value={draft.providerAllowList.includes(item)}
+          disabled={disabled}
+          onValueChange={next => {
+            onChange(toggleProvider(draft, item, next));
+          }}
+        />
+      </View>
     ),
     [draft, disabled, onChange]
   );
@@ -168,7 +170,7 @@ export function ModelDenyList({
   const [search, setSearch] = useState('');
   const [deniedOnly, setDeniedOnly] = useState(false);
   const paddingBottom = useTabBarBottomPadding();
-  const contentContainerStyle = { paddingHorizontal: 14, paddingBottom };
+  const contentContainerStyle = { paddingBottom };
   const shown = models.filter(
     model =>
       matchesSearch([model.name, model.id], search) &&
@@ -178,15 +180,17 @@ export function ModelDenyList({
 
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<DenyListModel>) => (
-      <SettingsSwitchRow
-        label={item.name}
-        description={item.id}
-        value={!draft.modelDenyList.includes(item.id)}
-        disabled={disabled}
-        onValueChange={next => {
-          onChange(toggleModel(draft, item.id, next));
-        }}
-      />
+      <View className="px-4">
+        <SettingsSwitchRow
+          label={item.name}
+          description={item.id}
+          value={!draft.modelDenyList.includes(item.id)}
+          disabled={disabled}
+          onValueChange={next => {
+            onChange(toggleModel(draft, item.id, next));
+          }}
+        />
+      </View>
     ),
     [draft, disabled, onChange]
   );

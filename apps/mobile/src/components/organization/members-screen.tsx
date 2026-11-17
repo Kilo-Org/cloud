@@ -21,6 +21,7 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
+import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { SectionHeader } from '@/components/ui/section-header';
 import { Text } from '@/components/ui/text';
@@ -68,16 +69,9 @@ function sortInvitedMembers(invites: InvitedOrgMember[]): InvitedOrgMember[] {
   });
 }
 
-function MemberRowSkeleton({ last }: Readonly<{ last?: boolean }>) {
-  return (
-    <View className={!last ? 'border-b-[0.5px] border-hair-soft' : undefined}>
-      <RowSkeleton subtitle />
-    </View>
-  );
-}
+const ListTopPad = () => <View className="pt-3" />;
 
 const listStyle = { flex: 1 } satisfies ViewStyle;
-const listContentContainerStyle = { paddingTop: 16, flexGrow: 1 } satisfies ViewStyle;
 
 /** The refused removal this row must state, read from the screen-level store. */
 function readRemovalFailure(snapshot: MemberRemovalStore['snapshot'], memberId: string) {
@@ -287,16 +281,16 @@ export function OrganizationMembersScreen() {
             }
           }}
           getItemType={item => item.kind}
+          ListHeaderComponent={<ListTopPad />}
           ListEmptyComponent={
-            <View className="mx-4 rounded-xl bg-secondary">
-              <MemberRowSkeleton />
-              <MemberRowSkeleton />
-              <MemberRowSkeleton last />
-            </View>
+            <RowGroup className="mx-4">
+              <RowSkeleton subtitle />
+              <RowSkeleton subtitle />
+              <RowSkeleton subtitle />
+            </RowGroup>
           }
           ListFooterComponent={<View style={{ height: paddingBottom }} pointerEvents="none" />}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={listContentContainerStyle}
         />
       )}
     </View>

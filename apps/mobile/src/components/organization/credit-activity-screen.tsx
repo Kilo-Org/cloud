@@ -34,18 +34,17 @@ import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
 import { trpcErrorVariant } from '@/lib/trpc-error';
 import { cn, firstNonEmpty, parseTimestamp } from '@/lib/utils';
 
-// FlashList takes `contentContainerStyle` (no className), so the top pad maps
-// to its pixel value; the cards carry the page gutter themselves. FlashList v2
-// positions every cell absolutely and has no `gap` handling (2.3.2 ships zero
-// `gap` references), so the inter-row gap rides on the measured item separator
-// instead of `contentContainerStyle.gap`. The former container `gap` also sat
-// between the last row and the pagination footer; FlashList's separator only
-// spans items, so that boundary carries the same gap as `pt-3` on the footer.
+// The cards carry the page gutter themselves. FlashList v2 positions every
+// cell absolutely and has no `gap` handling (2.3.2 ships zero `gap`
+// references), so the inter-row gap rides on the measured item separator
+// instead of a container `gap`. The former container `gap` also sat between the
+// last row and the pagination footer; FlashList's separator only spans items,
+// so that boundary carries the same gap as `pt-3` on the footer. The body's top
+// pad sits on a header component: FlashList takes no class on its content
+// container.
 const listStyle = { flex: 1 } satisfies ViewStyle;
-const listContentContainerStyle = {
-  flexGrow: 1,
-  paddingTop: 10.5,
-} satisfies ViewStyle;
+
+const ListTopPad = () => <View className="pt-3" />;
 
 const CreditRowSeparator = () => <View className="h-3" />;
 
@@ -283,7 +282,7 @@ export function OrganizationCreditActivityScreen() {
           renderItem={renderItem}
           getItemType={() => 'transaction'}
           ItemSeparatorComponent={CreditRowSeparator}
-          contentContainerStyle={listContentContainerStyle}
+          ListHeaderComponent={<ListTopPad />}
           ListEmptyComponent={
             <EmptyState
               placement="top"

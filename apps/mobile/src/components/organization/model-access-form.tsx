@@ -269,9 +269,7 @@ export function ModelAccessForm({
           onChange={setTab}
           accessibilityLabel={t('organization.settingsOnWeb.providersAndModels')}
         />
-        {canEdit ? null : (
-          <Text variant="caption">{t('organizationModelAccess.readOnly')}</Text>
-        )}
+        {canEdit ? null : <Text variant="caption">{t('organizationModelAccess.readOnly')}</Text>}
         {/* The buttons keep their place while the draft is clean, so a save
             that settles never moves the list below them. */}
         <View className="flex-row items-center gap-2">

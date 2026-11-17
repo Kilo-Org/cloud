@@ -1,5 +1,4 @@
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
 
 import { type OrgGroupMemberPickerState } from '@/components/organization/org-group-form-model';
 import { selectOrgListErrorView } from '@/components/organization/org-list-error-view';
@@ -65,9 +64,7 @@ export function GroupMemberPicker({
     );
   }
   if (picker.kind === 'empty') {
-    return (
-      <Text variant="muted">{t('organization.groups.membersEmpty')}</Text>
-    );
+    return <Text variant="muted">{t('organization.groups.membersEmpty')}</Text>;
   }
   return (
     <RowGroup>

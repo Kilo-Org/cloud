@@ -122,12 +122,8 @@ export function GatewaySettingsSection({
             setRegionPickerOpen(true);
           }}
         />
-        <Text variant="caption">
-          {t('organizationModelAccess.inferenceRegionDescription')}
-        </Text>
-        <Text variant="caption">
-          {t('organizationModelAccess.disableOpenrouterNote')}
-        </Text>
+        <Text variant="caption">{t('organizationModelAccess.inferenceRegionDescription')}</Text>
+        <Text variant="caption">{t('organizationModelAccess.disableOpenrouterNote')}</Text>
       </SettingsSection>
       <MenuSheet
         visible={regionPickerOpen}

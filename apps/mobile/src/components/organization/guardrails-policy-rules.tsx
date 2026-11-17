@@ -90,9 +90,7 @@ export function PolicyRulesEditor({
   return (
     <View className="gap-3">
       {rules.length === 0 ? (
-        <Text variant="caption">
-          {t('organizationGuardrails.rulesEmpty')}
-        </Text>
+        <Text variant="caption">{t('organizationGuardrails.rulesEmpty')}</Text>
       ) : (
         rules.map((rule, index) => (
           <View key={ruleKeys[index] ?? index} className="gap-3 rounded-lg bg-background p-3">

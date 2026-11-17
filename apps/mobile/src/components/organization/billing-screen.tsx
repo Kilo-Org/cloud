@@ -276,9 +276,7 @@ export function OrganizationBillingScreen() {
           </RowGroup>
         </Section>
 
-        <Section label={t('organization.billing.autoTopUp')}>
-          {renderAutoTopUpState()}
-        </Section>
+        <Section label={t('organization.billing.autoTopUp')}>{renderAutoTopUpState()}</Section>
 
         {kiloPassRowState == null ? null : (
           <Section label={t('kiloPass.title')}>

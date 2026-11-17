@@ -1,13 +1,13 @@
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import * as Application from 'expo-application';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
 
 import { MarkdownText } from '@/components/agents/markdown-text';
 import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
-import { useSideInsetStyle } from '@/lib/screen-insets';
+import { useDetailScreenBottomPadding, useSideInsetStyle } from '@/lib/screen-insets';
 
 import changelog from '../../CHANGELOG.md';
 import { changelogNotesArePending, splitChangelogSections } from './changelog-sections';
@@ -28,38 +28,49 @@ const CHANGELOG_SECTIONS = splitChangelogSections(changelog);
  */
 const NOTES_PENDING = changelogNotesArePending(changelog, Application.nativeApplicationVersion);
 
+/** The body's 10.5pt top pad, as the pixel value FlashList's style takes. */
+const LIST_TOP_PAD = 12;
+
 const listStyle = { flex: 1 } satisfies ViewStyle;
-const listContentContainerStyle = {
-  paddingHorizontal: 20,
-  paddingTop: 16,
-  paddingBottom: 40,
-} satisfies ViewStyle;
 
 const keyExtractor = (_section: string, index: number) => String(index);
 
 export function ChangelogScreen() {
   const { t } = useTranslation();
   const sideInsetStyle = useSideInsetStyle();
+  const bottomPadding = useDetailScreenBottomPadding();
   const renderItem = useCallback(
-    ({ item }: ListRenderItemInfo<string>) => <MarkdownText value={item} />,
+    ({ item }: ListRenderItemInfo<string>) => (
+      // The list is full-bleed, so each release block draws the 14pt page gutter
+      // itself and keeps one section gap under it.
+      <View className="px-4 pb-6">
+        <MarkdownText value={item} />
+      </View>
+    ),
     []
+  );
+  const contentContainerStyle = useMemo(
+    () => ({ paddingTop: LIST_TOP_PAD, paddingBottom: bottomPadding }),
+    [bottomPadding]
   );
 
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('profile.changelog')} />
       <View style={sideInsetStyle} className="flex-1">
-        {NOTES_PENDING ? (
-          <Text variant="muted" className="px-5 pt-4">
-            {t('profile.changelogVersionPending')}
-          </Text>
-        ) : null}
         <FlashList
           style={listStyle}
           data={CHANGELOG_SECTIONS}
           keyExtractor={keyExtractor}
           renderItem={renderItem}
-          contentContainerStyle={listContentContainerStyle}
+          contentContainerStyle={contentContainerStyle}
+          ListHeaderComponent={
+            NOTES_PENDING ? (
+              <Text variant="muted" className="px-4 pb-3">
+                {t('profile.changelogVersionPending')}
+              </Text>
+            ) : null
+          }
           showsVerticalScrollIndicator={false}
         />
       </View>

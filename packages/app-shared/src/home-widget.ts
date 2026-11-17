@@ -62,9 +62,10 @@ export type HomeWidgetDetails = z.infer<typeof homeWidgetDetailsSchema>;
 /**
  * Details with no private work to describe, as a record the caller owns. A
  * payload that shared one instance's arrays would let a caller's write change
- * what every later empty payload reports.
+ * what every later empty payload reports. A caller that needs to change a field
+ * spreads this record into a new one.
  */
-function emptyHomeWidgetDetails(): HomeWidgetDetails {
+export function emptyHomeWidgetDetails(): HomeWidgetDetails {
   return {
     approvalKey: null,
     primaryKind: null,
@@ -73,8 +74,6 @@ function emptyHomeWidgetDetails(): HomeWidgetDetails {
     scheduledAgents: [],
   };
 }
-
-export const EMPTY_HOME_WIDGET_DETAILS: HomeWidgetDetails = emptyHomeWidgetDetails();
 
 export const homeWidgetDataSchema = z.object({
   snapshot: glanceableAgentsSnapshotSchema,

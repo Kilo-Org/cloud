@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- one cohesive headless widget-task suite; comments carry the layout reasoning */
 // Dynamic imports deliberately exercise fresh JS process/module-loading boundaries.
 import { type GlanceableAgentsSnapshot } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { EMPTY_HOME_WIDGET_DETAILS } from '@kilocode/app-shared/home-widget';
+import { emptyHomeWidgetDetails } from '@kilocode/app-shared/home-widget';
 import { type JSX } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -93,7 +93,7 @@ async function registerAfterRestart(snapshot: GlanceableAgentsSnapshot | null) {
     persist.persistGlanceableSink.publish(snapshot);
     home.rememberHomeWidgetData({
       snapshot,
-      details: { ...EMPTY_HOME_WIDGET_DETAILS, approvalKey: 'a'.repeat(64) },
+      details: { ...emptyHomeWidgetDetails(), approvalKey: 'a'.repeat(64) },
     });
     await Promise.resolve();
   }
@@ -262,7 +262,7 @@ describe('WorkManager Home-only refresh', () => {
   it('awaits each actual widget draw without starting an ongoing notification', async () => {
     const { handleHomeWidgetRefresh } = await registerAfterRestart(snapshotFor());
     const home = await import('@/lib/glanceable/home-widget-data');
-    home.rememberHomeWidgetData({ snapshot: snapshotFor(), details: EMPTY_HOME_WIDGET_DETAILS });
+    home.rememberHomeWidgetData({ snapshot: snapshotFor(), details: emptyHomeWidgetDetails() });
     mocks.applyResponse.mockResolvedValue(true);
     mocks.getWidgetInfo.mockResolvedValue([WIDGET, { ...WIDGET, widgetId: 2 }]);
     const drawn: unknown[] = [];
@@ -281,7 +281,7 @@ describe('WorkManager Home-only refresh', () => {
   it('checks the native generation again after widget enumeration', async () => {
     const { handleHomeWidgetRefresh } = await registerAfterRestart(snapshotFor());
     const home = await import('@/lib/glanceable/home-widget-data');
-    home.rememberHomeWidgetData({ snapshot: snapshotFor(), details: EMPTY_HOME_WIDGET_DETAILS });
+    home.rememberHomeWidgetData({ snapshot: snapshotFor(), details: emptyHomeWidgetDetails() });
     mocks.applyResponse.mockResolvedValue(true);
     mocks.getWidgetInfo.mockResolvedValue([WIDGET]);
     mocks.refresh.isCurrent.mockResolvedValue(false);
@@ -292,7 +292,7 @@ describe('WorkManager Home-only refresh', () => {
   it('cancels native scheduling when no widget remains', async () => {
     const { handleHomeWidgetRefresh } = await registerAfterRestart(snapshotFor());
     const home = await import('@/lib/glanceable/home-widget-data');
-    home.rememberHomeWidgetData({ snapshot: snapshotFor(), details: EMPTY_HOME_WIDGET_DETAILS });
+    home.rememberHomeWidgetData({ snapshot: snapshotFor(), details: emptyHomeWidgetDetails() });
     mocks.applyResponse.mockResolvedValue(true);
     await handleHomeWidgetRefresh({ response: {}, ...CONTEXT });
     expect(mocks.refresh.widgetsChanged).toHaveBeenCalledOnce();
@@ -326,7 +326,7 @@ it('renders an authorized native/Home-only record even without any activity snap
   const home = await import('@/lib/glanceable/home-widget-data');
   home.rememberHomeWidgetData({
     snapshot: snapshotFor([{ status: 'busy' }]),
-    details: EMPTY_HOME_WIDGET_DETAILS,
+    details: emptyHomeWidgetDetails(),
   });
   const rendered = await runWidgetTask(handleWidgetTask, 172);
   expect(collectText(rendered.light)).toEqual(expect.arrayContaining(['1', 'Working']));
@@ -337,7 +337,7 @@ it('renders an authorized native/Home-only record even without any activity snap
 it('aborts an obsolete generation inside the final draw callback without an unhandled task failure', async () => {
   const { handleHomeWidgetRefresh } = await registerAfterRestart(null);
   const home = await import('@/lib/glanceable/home-widget-data');
-  home.rememberHomeWidgetData({ snapshot: snapshotFor(), details: EMPTY_HOME_WIDGET_DETAILS });
+  home.rememberHomeWidgetData({ snapshot: snapshotFor(), details: emptyHomeWidgetDetails() });
   mocks.applyResponse.mockResolvedValue(true);
   mocks.getWidgetInfo.mockResolvedValue([WIDGET]);
   mocks.refresh.isCurrent.mockResolvedValueOnce(true).mockResolvedValueOnce(false);

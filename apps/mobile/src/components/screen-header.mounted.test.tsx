@@ -1222,6 +1222,30 @@ describe('ScreenHeader mounted', () => {
     expect(eyebrow.props.ellipsizeMode).toBe('middle');
     expect(eyebrow.children).toEqual(['\u00A0']);
   });
+
+  it('hands the title node to the caller that drives reading order', () => {
+    const titleRef = vi.fn(() => undefined);
+    const renderer = renderHeader({ title: 'Sessions', titleRef });
+
+    expect(titleRef).toHaveBeenCalled();
+    expect(titleRef.mock.calls[0]?.[0]).not.toBeNull();
+    renderer.unmount();
+    expect(titleRef).toHaveBeenLastCalledWith(null);
+  });
+
+  it('leaves titleRef unwired when titleContent replaces the title node', () => {
+    const titleRef = vi.fn(() => undefined);
+    const renderer = renderHeader({
+      title: 'Sessions',
+      titleContent: createElement('Text', null, 'Sessions'),
+      titleRef,
+    });
+
+    // A replaced title is the caller's own node, so the header has no title
+    // Text to hand over; the caller refs its content instead.
+    expect(titleRef).not.toHaveBeenCalled();
+    renderer.unmount();
+  });
 });
 
 describe('header actions row', () => {

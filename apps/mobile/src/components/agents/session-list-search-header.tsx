@@ -109,17 +109,18 @@ export function SessionListSearchHeader({
             accessibilityLabel={t('common.clearSearch')}
             accessibilityRole="button"
             // The frame, not the 16pt glyph, is what the size audit measures.
-            // One size, spelled as whole pixels the mounted test compiles: the
-            // 38pt box clears the 28dp floor, and the shared 8pt slop carries the
-            // reach past the 44pt target rather than onto it, because
-            // `@/lib/a11y/tap-target` records a 44dp target measuring 43.81dp at
-            // density 420. The row's `min-h-[51px]` already holds this box plus
-            // the field's 10.5pt padding and 2pt border. A second `h-*`/`w-*`
-            // pair here would set the same properties and leave the real size to
-            // Tailwind's emit order. `-mr-2` keeps the glyph near its old inset
-            // and the frame's left edge inside the field's right padding.
+            // One size, spelled as the spacing scale the mounted test compiles:
+            // the 40pt box clears the 28dp floor, and the shared 8pt slop
+            // carries the reach past the 44pt target rather than onto it,
+            // because `@/lib/a11y/tap-target` records a 44dp target measuring
+            // 43.81dp at density 420. The shared field's `min-h-[44px]` floor
+            // already holds this box plus the input's border, so the control
+            // never grows the row. A second `h-*`/`w-*` pair here would set the
+            // same properties and leave the real size to Tailwind's emit order.
+            // `-mr-2` keeps the glyph near its old inset and the frame's left
+            // edge inside the field's right padding.
             hitSlop={CLEAR_HIT_SLOP}
-            className="-mr-2 size-10 items-center justify-center active:opacity-70"
+            className="-mr-2 h-10 w-10 items-center justify-center active:opacity-70"
           >
             <X size={16} color={colors.mutedForeground} />
           </Pressable>

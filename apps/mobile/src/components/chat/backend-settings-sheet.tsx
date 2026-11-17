@@ -6,6 +6,7 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
 import { SheetHeader } from '@/components/sheet-header';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
@@ -45,11 +46,9 @@ export function BackendSettingsControl(selection: ProviderSelection) {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const [visible, setVisible] = useState(false);
-  // The sheet stays mounted until its native dismissal reports, so it never
-  // loses its content mid-animation and paints an empty card.
+  // Stay mounted until the native dismissal reports: an early unmount paints an empty card.
   const [mounted, setMounted] = useState(false);
-  // A navigation waits for that report: pushing while the sheet is still on
-  // its way down presents the new screen under an empty, closing sheet.
+  // A navigation waits for that report: pushing mid-dismissal clears the screen underneath.
   const afterDismiss = useRef<(() => void) | null>(null);
   const close = useCallback(() => {
     setVisible(false);
@@ -249,7 +248,7 @@ function BackendSettingsContent({
                   >
                     <Text>{t('common.delete')}</Text>
                   </Button>
-                </View>
+                </Card>
               ))}
             </>
           )}

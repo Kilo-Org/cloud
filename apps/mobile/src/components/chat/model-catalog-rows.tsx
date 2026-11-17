@@ -19,7 +19,6 @@ import { useGgufModels } from '@/lib/chat/gguf-models';
 import { type HfListedModel, hfModelName } from '@/lib/chat/hf-catalog';
 import { useHfSmallestDownload } from '@/lib/chat/use-hf-catalog';
 import { formatFileSize } from '@/lib/format';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 import { GgufDownloadControls } from './gguf-model-section';
 import {
@@ -106,7 +105,6 @@ export function ModelRow({
 }: Readonly<{ model: HfListedModel; budget: DeviceBudget; fitsOnly: boolean }>) {
   const { t, i18n } = useTranslation();
   const router = useRouter();
-  const colors = useThemeColors();
   const smallest = useHfSmallestDownload(model.id, model.parameters);
   const sizeBytes = smallest.data ?? undefined;
   const fit = sizeBytes === undefined ? undefined : deviceFit(sizeBytes, budget);

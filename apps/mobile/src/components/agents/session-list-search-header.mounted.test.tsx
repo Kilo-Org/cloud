@@ -1,6 +1,6 @@
 import { createRef, type ElementType, type ReactElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
-import { compiledDimensions, compiledLengthDp } from '@/test/native-dimensions';
+import { compiledLengthDp } from '@/test/native-dimensions';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type TextInput } from 'react-native';
@@ -195,13 +195,15 @@ describe('SessionListSearchHeader clear control', () => {
         node.type === ('Pressable' as ElementType) &&
         node.props.accessibilityLabel === 'Clear search'
     );
-    const declarations = (await compiledDimensions(clear.props.className as string)) as {
-      height?: number;
-      width?: number;
-    }[];
+    // `h-10 w-10` are theme lengths (`calc(var(--spacing) * 10)`), so the dp
+    // follows the compiler's baked-in 14pt rem rather than a literal.
+    const box = {
+      height: await compiledLengthDp(clear.props.className as string, 'height'),
+      width: await compiledLengthDp(clear.props.className as string, 'width'),
+    };
     return {
       renderer,
-      box: Object.assign({}, ...declarations) as { height: number; width: number },
+      box,
       slop: clear.props.hitSlop as { top: number; right: number; bottom: number; left: number },
       rowClassName: fieldRow(renderer).props.className as string,
     };
@@ -227,43 +229,15 @@ describe('SessionListSearchHeader clear control', () => {
     expect(slop.left).toBeLessThanOrEqual(7);
   });
 
-  it('reserves the box height on the field, so typing cannot shift the list', async () => {
+  it('keeps the clear control inside the shared field floor', async () => {
     const { renderer, box } = await mountWithClear();
-    const rowClassName = fieldRow(renderer).props.className as string;
-    const declarations = (await compiledDimensions(rowClassName)) as { minHeight?: number }[];
-    const field = Object.assign({}, ...declarations) as { minHeight?: number };
+    const rowClasses = String(fieldRow(renderer).props.className).split(' ');
 
-    // The row carries no vertical padding of its own (the shared field's floor
-    // is the box height), and its `border` adds 1pt per side, 2pt vertically.
-    // React Native lays the row out as a border box, so the field's floor must
-    // already hold the control's box plus the border.
-    const rowVerticalPaddingDp = 2 * (await compiledLengthDp(rowClassName, 'paddingBlock'));
-    const rowVerticalBorderDp = 2 * (await compiledLengthDp(rowClassName, 'borderWidth'));
-    expect(rowVerticalPaddingDp).toBe(0);
-    expect(rowVerticalBorderDp).toBe(2);
-    expect(field.minHeight).toBeGreaterThanOrEqual(box.height + rowVerticalBorderDp);
-  });
-
-  it('takes the row height from the shared field floor, not the row floor', async () => {
-    const renderer = await mount(<SessionListSearchHeader {...baseProps} hasText />);
-    const rowClassName = fieldRow(renderer).props.className as string;
-    const rowDeclarations = (await compiledDimensions(rowClassName)) as { minHeight?: number }[];
-    const row = Object.assign({}, ...rowDeclarations) as { minHeight?: number };
-    const inputDeclarations = (await compiledDimensions(
-      searchInput(renderer).props.className as string
-    )) as { minHeight?: number }[];
-    const input = Object.assign({}, ...inputDeclarations) as { minHeight?: number };
-
-    const rowVerticalPaddingDp = 2 * (await compiledLengthDp(rowClassName, 'paddingBlock'));
-    const rowVerticalBorderDp = 2 * (await compiledLengthDp(rowClassName, 'borderWidth'));
-
-    // The shared field's 44pt floor is taller than the clear control and the
-    // row no longer states a floor of its own, so the field's floor lays the
-    // row out: 44 + 2pt of border = 46pt.
-    const fieldFloorDp = input.minHeight ?? 0;
-    expect(fieldFloorDp).toBe(44);
-    const laidOutHeightDp = fieldFloorDp + rowVerticalPaddingDp + rowVerticalBorderDp;
-    expect(laidOutHeightDp).toBe(46);
-    expect(row.minHeight ?? 0).toBeLessThan(laidOutHeightDp);
+    // The row carries no vertical padding or floor of its own: the shared
+    // input box's 44pt `min-h` lays it out, and the clear control stays under
+    // that floor, so typing cannot shift the list.
+    expect(rowClasses.some(name => /^(?:py|p)-/.test(name))).toBe(false);
+    expect(rowClasses.some(name => name.startsWith('min-h-'))).toBe(false);
+    expect(box.height).toBeLessThanOrEqual(44);
   });
 });

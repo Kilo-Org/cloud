@@ -19,6 +19,7 @@ import { useStatusAnnouncement } from '@/lib/a11y/status-announcement';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useUserWebConnectionHealth } from '@/lib/hooks/use-user-web-connection-state';
+import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
 import { createSubmitLock } from '@/lib/submit-lock';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 import { cn } from '@/lib/utils';
@@ -256,7 +257,7 @@ export function LiveSessionFeedback({
   );
 
   const feedback = (
-    <View className={cn(compactSpacing ? 'gap-0' : 'gap-2', centered && 'px-6')}>
+    <View className={cn(compactSpacing ? 'gap-0' : 'gap-2', centered && SCREEN_GUTTER_CLASS)}>
       {connectionRow ? (
         <View className="flex-row items-center gap-2">
           {/* The app-wide OfflineBanner owns the offline announcement. */}

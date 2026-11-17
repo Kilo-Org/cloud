@@ -1,5 +1,5 @@
 import { type Ref } from 'react';
-import { Pressable, View, type ViewInstance } from 'react-native';
+import { Pressable, type ViewInstance } from 'react-native';
 
 import { RowGroup } from '@/components/ui/row-group';
 import { Text } from '@/components/ui/text';

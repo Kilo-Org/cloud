@@ -94,7 +94,7 @@ export function TodoLinkSessionSheet({
           }}
           accessibilityRole="button"
           accessibilityLabel={title}
-          className="min-h-14 justify-center gap-0.5 border-b border-hair-soft px-5 py-2 active:opacity-70"
+          className="min-h-14 justify-center gap-0.5 border-b-[0.5px] border-hair-soft px-4 py-3 active:opacity-70"
         >
           <Text className="text-base text-foreground" numberOfLines={1}>
             {title}

@@ -13,19 +13,26 @@ import {
   getBalanceAndOrgSettings,
   type BalanceAndOrgSettings,
 } from '@kilocode/web-shared/lib/organizations/organization-usage';
-import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import {
+  hasBestEffortGuessDataCollectionRequirement,
+  isFreeModel,
+} from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import type {
   OrganizationPlan,
   OrganizationSettings,
 } from '@kilocode/web-shared/lib/organizations/organization-types';
 import type { EffectiveModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
-import type { OpenRouterProviderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import {
+  isDataCollectionExplicitlyDisallowed,
+  type OpenRouterProviderConfig,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
 import {
   accountFreeModelLimitResponse,
   anonymousFreeModelLimitResponse,
   creditsBlockedResponse,
+  dataCollectionRequiredResponse,
   extractFraudAndProjectHeaders,
   extractHeaderAndLimitLength,
   gatewayAccountRateLimitResponse,
@@ -71,6 +78,7 @@ export type GatewayCaller = SignedInGatewayCaller | AnonymousGatewayCaller | Rej
  * Caps one account's inference request rate across every source address. Routes
  * call this before authentication: the key comes from the signed token, so a
  * flooded request costs no database query. See `isGatewayAccountRateLimited`.
+ * Autocomplete routes skip it; see `packages/web-shared/AGENTS.md`.
  */
 export async function gatewayAccountRateLimitRejection(
   request: NextRequest,
@@ -258,6 +266,20 @@ export function organizationProviderPreferences(params: {
       ...(only && { only }),
     },
   };
+}
+
+/** Rejects a model that requires data collection under the effective provider privacy policy. */
+export async function dataCollectionPolicyRejection(
+  model: string,
+  effectiveProviderPolicy: OpenRouterProviderConfig | undefined
+): Promise<NextResponse | null> {
+  if (
+    (await hasBestEffortGuessDataCollectionRequirement(model)) &&
+    isDataCollectionExplicitlyDisallowed(effectiveProviderPolicy)
+  ) {
+    return dataCollectionRequiredResponse();
+  }
+  return null;
 }
 
 /**

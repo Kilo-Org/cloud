@@ -104,6 +104,12 @@ Deliberate limitations, kept until end users ask otherwise:
 - Transcriptions run only on OpenRouter, so a disabled OpenRouter or a region leaves them
   working only through a user's OpenRouter key.
 
+## Autocomplete routes
+
+The edit and FIM (autocomplete) handlers intentionally skip the account rate
+limit and Enkrypt guardrails: their small models are not attack targets in
+practice, and the added latency makes no sense for autocomplete.
+
 ## Data collection versus ZDR
 
 `provider.data_collection: 'deny'` only excludes providers that store prompts

@@ -2163,12 +2163,7 @@ export const CouncilSpecialistSchema = z.object({
   // model; unset falls back to the review's default model. Bounded to the downstream
   // runtime-agent model limit so a valid council request can't fail at session prep.
   model_slug: z.string().max(MAX_RUNTIME_AGENT_MODEL_LENGTH).optional(),
-  thinking_effort: z
-    .string()
-    .max(50)
-    .regex(/^[a-zA-Z]+$/)
-    .nullable()
-    .optional(),
+  thinking_effort: z.string().min(1).max(50).nullable().optional(),
 });
 export type CouncilSpecialist = z.infer<typeof CouncilSpecialistSchema>;
 
@@ -2296,14 +2291,34 @@ export const RepositoryModelOverrideSchema = z.object({
   model_slug: z.string().max(512),
   // Thinking effort variant name (e.g. "high", "max") — null means model default,
   // matching the global `thinking_effort` field below.
-  thinking_effort: z
-    .string()
-    .max(50)
-    .regex(/^[a-zA-Z]+$/)
-    .nullable()
-    .optional(),
+  thinking_effort: z.string().min(1).max(50).nullable().optional(),
 });
 export type RepositoryModelOverride = z.infer<typeof RepositoryModelOverrideSchema>;
+
+export const ReviewGuidelineSourceRepositoriesSchema = z
+  .array(
+    z
+      .string()
+      .max(140)
+      .regex(/^[A-Za-z0-9-]+\/[A-Za-z0-9_.-]+$/)
+  )
+  .max(100);
+
+export type ReviewGuidelineImport = {
+  source: string;
+  sha: string | null;
+  status:
+    | 'imported'
+    | 'invalid'
+    | 'not_allowed'
+    | 'not_accessible'
+    | 'not_found'
+    | 'self_import'
+    | 'entry_limit'
+    | 'unsupported_platform'
+    | 'fetch_error'
+    | 'dropped_budget';
+};
 
 export const CodeReviewAgentConfigSchema = z.object({
   review_style: z.enum(REVIEW_STYLES),
@@ -2314,12 +2329,7 @@ export const CodeReviewAgentConfigSchema = z.object({
   custom_instructions: z.string().nullable().optional(),
   model_slug: z.string(),
   // Thinking effort variant name (e.g. "high", "max", "thinking") — null means model default
-  thinking_effort: z
-    .string()
-    .max(50)
-    .regex(/^[a-zA-Z]+$/)
-    .nullable()
-    .optional(),
+  thinking_effort: z.string().min(1).max(50).nullable().optional(),
   repository_selection_mode: z.enum(['all', 'selected']).optional(),
   selected_repository_ids: z.array(z.union([z.number(), z.string()])).optional(),
   // Manually added repositories (for GitLab where pagination limits results)
@@ -2340,6 +2350,7 @@ export const CodeReviewAgentConfigSchema = z.object({
   // effect there yet.
   skip_bot_pull_requests: z.boolean().optional(),
   disable_review_md: z.boolean().optional(),
+  review_guideline_source_repositories: ReviewGuidelineSourceRepositoriesSchema.optional(),
   // Controls when the PR gate check (GitHub Check Run / GitLab commit status)
   // reports a failure based on review findings.
   //   'off'      — gate only fails on system errors (timeout, crash)
@@ -3290,6 +3301,14 @@ export const CustomPricingConfigSchema = z.object({
           ctx.addIssue({
             code: 'custom',
             message: `Duplicate model "${model}"`,
+            path: [index, 'model'],
+          });
+        }
+        // A latest alias is billed at the custom pricing of the model it resolves to.
+        if (model.startsWith('~')) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `"${model}" is a latest alias. Aliases are billed at their target model's custom pricing, so add an entry for the target model instead.`,
             path: [index, 'model'],
           });
         }

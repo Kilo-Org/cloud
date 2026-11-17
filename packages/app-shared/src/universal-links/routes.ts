@@ -31,9 +31,9 @@ export type UniversalLinkRoute = {
    * associate, and everything below them falls through to the exclusion.
    * Android needs no counterpart here: the row below states its own
    * one-segment `androidPathPattern`, and the runtime matcher compares
-   * segments. An Android `pathPattern` cannot express exclusions at all, so the
-   * literal pages under the row still reach the app and the mobile deep-link
-   * handler opens them in the browser (`browserHandoffUrl`).
+   * segments. An Android `pathPattern` cannot express exclusions at all, so a
+   * literal page under the row reaches the app only through its own row above
+   * (the organization create pages do).
    */
   readonly excludeDeeperAasaPaths?: boolean;
   /**
@@ -125,18 +125,25 @@ export const UNIVERSAL_LINK_ROUTES: readonly UniversalLinkRoute[] = [
     webPath: '/organizations/*/usage-details',
     appPath: '/(app)/(tabs)/(3_profile)/organization/usage?org=<1>',
   },
+  // The organization create form. The app has its own screen for it (it asks
+  // the same name and plan), so the two web paths that mean "create one" open
+  // it instead of a page. They are literal rows ahead of the bare organization
+  // row: the bare row's wildcard would otherwise read `new` as an organization
+  // id. Android's `pathPattern` cannot exclude segments, so before these rows
+  // the org root's filter delivered both paths to the app and the handler had
+  // to hand them to the browser.
+  { webPath: '/organizations/new', appPath: '/(app)/(tabs)/(3_profile)/organization/create' },
+  { webPath: '/organizations/create', appPath: '/(app)/(tabs)/(3_profile)/organization/create' },
   // The bare organization route: the web dashboard, and where an accepted
   // invitation lands (`apps/web` redirects to `/organizations/<id>`). Exactly
   // one segment — every deeper `/organizations/<id>/…` page without a row of
   // its own above (SSO, guardrails, request logs, payment details, …) is
-  // web-only, so those links stay in the browser. The two
-  // literal pages under the same shape are not ids either: the create form
-  // must open where the account is asked. On iOS `*` crosses `/`, hence
+  // web-only, so those links stay in the browser. On iOS `*` crosses `/`, hence
   // `excludeDeeperAasaPaths`; on Android the explicit `[^/]+` override keeps
-  // the filter to one segment without touching any other row's pattern. Android
-  // `pathPattern` cannot exclude, so `/organizations/new` and
-  // `/organizations/create` still arrive in the app — the mobile deep-link
-  // handler opens those two in the browser instead of navigating.
+  // the filter to one segment without touching any other row's pattern. The
+  // create rows above claim their two literal paths first; the exclusions stay
+  // so a deeper `/organizations/new/…` page still falls through to the browser
+  // instead of opening an organization screen for the id `new`.
   {
     webPath: '/organizations/*',
     appPath: '/(app)/(tabs)/(3_profile)/organization/<1>',

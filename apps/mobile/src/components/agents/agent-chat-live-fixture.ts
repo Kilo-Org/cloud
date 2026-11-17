@@ -30,6 +30,7 @@ import {
   type StoredMessage,
   type SuggestionState,
   type UnreadablePermissionState,
+  type WorkspaceArtifactsRefresh,
   type WorktreeChangesRefresh,
 } from '@kilocode/cloud-agent-sdk';
 import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-command-catalog';
@@ -310,6 +311,7 @@ export function createAgentChatFixtureManager(
       availableCommands: fixed<SlashCommandInfo[]>([]),
       availableCommandsCatalogStatus: fixed<SlashCommandCatalogStatus | null>(null),
       worktreeChangesRefresh: fixed(noWorktreeRefresh),
+      workspaceArtifactsRefresh: fixed<WorkspaceArtifactsRefresh | null>(null),
       messagesList: atom(messages),
       staticMessages: atom(messages),
       dynamicMessages: atom<StoredMessage[]>([]),

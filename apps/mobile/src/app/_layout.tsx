@@ -96,6 +96,7 @@ import {
   runLanguageStartupDirectionGuardedAsync,
 } from '@/i18n/startup-direction-run';
 import { type LanguageReturnTarget, readLanguageReturnTarget } from '@/i18n/return-target';
+import { languageReturnNavigation } from '@/i18n/language-return-navigation';
 import {
   getResolvedLanguage,
   preloadLanguagePreference,
@@ -450,16 +451,13 @@ function RootLayoutNav({
       return;
     }
     languageReturnTargetRef.current = null;
-    if (target === 'login') {
-      routerRef.current.replace('/(auth)/login');
-    } else if (target === 'profile') {
-      routerRef.current.replace('/(app)/(tabs)/(3_profile)' as Href);
+    const navigation = languageReturnNavigation(target);
+    // One navigation per target: `withAnchor` rebuilds the navigators between
+    // the shell and the reopened screen from the relaunch's empty state.
+    if (navigation.method === 'navigate') {
+      routerRef.current.navigate(navigation.href, { withAnchor: navigation.withAnchor });
     } else {
-      // Two steps, not one `replace`: the relaunched stack has no entry
-      // below the reopened screen, so a lone `replace` leaves the header's
-      // back control with nothing to pop.
-      routerRef.current.replace('/(app)/(tabs)/(3_profile)' as Href);
-      routerRef.current.push('/(app)/(tabs)/(3_profile)/preferences' as Href);
+      routerRef.current.replace(navigation.href);
     }
   };
   const runLanguageReturnNavigation = () => {
@@ -583,6 +581,9 @@ function RootLayoutNav({
   const inAuthGroup = segments[0] === '(auth)';
   const inForceUpdate = segments[0] === 'force-update';
   const onConsentRoute = pathname === '/consent' || pathname === '/consent-details';
+  // Groups are not part of `pathname`, so both the (app) and the (auth)
+  // legal screen answer to `/legal/<document>`.
+  const onLegalRoute = pathname.startsWith('/legal/');
   const onConsentReviewRoute = onConsentRoute && consentModeForSearchParam(mode) === 'review';
   const onGateRoute = (segments as readonly string[]).includes('share-gate');
   const {
@@ -856,6 +857,7 @@ function RootLayoutNav({
         needsConsent,
         onConsentRoute,
         onConsentReviewRoute,
+        onLegalRoute,
         languageReloadFailed,
         restoreFailed,
       }),
@@ -872,6 +874,7 @@ function RootLayoutNav({
       needsConsent,
       onConsentRoute,
       onConsentReviewRoute,
+      onLegalRoute,
       languageReloadFailed,
       restoreFailed,
     ]
@@ -1151,6 +1154,7 @@ function RootLayoutNav({
     needsConsent,
     onConsentRoute,
     onConsentReviewRoute,
+    onLegalRoute,
     languageReloadFailed,
     restoreFailed,
   });

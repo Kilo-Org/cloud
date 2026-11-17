@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { ChevronDown } from '@/components/ui/icons';
 import { Keyboard, Pressable, View } from 'react-native';
 
+import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { FIELD_TRIGGER_BODY_CLASS, FIELD_TRIGGER_FRAME_CLASS } from '@/lib/a11y/tap-target';
 import { i18n } from '@/i18n';
@@ -44,18 +45,13 @@ type InstanceSelectorProps = {
 
 function selectorValue({
   value,
-  isLoading,
   pendingComputer = false,
 }: {
   value: InstancePickerInstance | null;
-  isLoading: boolean;
   pendingComputer?: boolean;
 }): string {
   if (value) {
     return formatInstanceValue(value);
-  }
-  if (isLoading) {
-    return i18n.t('common.loading');
   }
   if (pendingComputer) {
     return i18n.t('agentChat.instancePicker.noCliInstances');
@@ -75,18 +71,43 @@ export function InstanceSelector({
   const colors = useThemeColors();
   const { t } = useTranslation();
 
+  // The list decides what "Run on" says, so an empty field is loading until it
+  // settles. A bound target keeps its name while a refetch runs: the same
+  // instance list opens the picker either way.
+  if (isLoading && value === null) {
+    return (
+      <View
+        accessible
+        accessibilityLabel={t('agentChat.instancePicker.runOnAccessibility', {
+          label: t('common.loading'),
+        })}
+        accessibilityState={{ busy: true }}
+        className={FIELD_TRIGGER_FRAME_CLASS}
+      >
+        <View className={cn(FIELD_TRIGGER_BODY_CLASS, 'justify-between')}>
+          {/* The branch row's loading bar: a name-width line, so the field
+              reads as the row it becomes. `bg-muted-soft` because the default
+              `bg-skeleton-fill` equals this frame's `bg-secondary` in the light
+              palette, where the bar would paint nothing. */}
+          <Skeleton className="h-4 w-1/3 bg-muted-soft" />
+          <ChevronDown size={14} color={colors.mutedForeground} />
+        </View>
+      </View>
+    );
+  }
+
   // The Cloud Agent default is always selectable, even when the list is
-  // loading or empty — only the "open the picker" path is gated.
+  // empty — only the "open the picker" path is gated.
   const canOpenPicker = !disabled;
-  const label = selectorValue({ value, isLoading, pendingComputer });
+  const label = selectorValue({ value, pendingComputer });
   // The value line names the computer alone, but a screen reader hears the
   // whole target: the project is where the session will run.
   const accessibleTarget = value === null ? label : formatInstanceTarget(value);
-  // A target is selected in every state but the loading copy and the unbound
-  // computer: the Cloud Agent default is a real value, not a placeholder, so it
-  // takes the same foreground ink as a bound instance. Placeholder ink would
-  // read as "nothing chosen yet" beside the account value above it.
-  const isPlaceholder = value === null && (isLoading || pendingComputer);
+  // A target is selected in every state but the unbound computer: the Cloud
+  // Agent default is a real value, not a placeholder, so it takes the same
+  // foreground ink as a bound instance. Placeholder ink would read as "nothing
+  // chosen yet" beside the account value above it.
+  const isPlaceholder = value === null && pendingComputer;
 
   function handlePress() {
     if (!canOpenPicker) {

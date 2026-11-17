@@ -7,6 +7,7 @@ import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { createAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import {
+  dataCollectionPolicyRejection,
   freeModelRateLimitRejection,
   gatewayAccountRateLimitRejection,
   gatewayUsageContextBase,
@@ -17,6 +18,8 @@ import {
   resolveGatewayCaller,
   resolveOrganizationGatewaySettings,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
+import { hasBestEffortGuessDataCollectionRequirement } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import type { OpenRouterProviderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
   gatewayRateLimitKey,
   isGatewayAccountRateLimited,
@@ -32,6 +35,12 @@ import { DEFAULT_BENCHMARK_USER_ID } from '@kilocode/auto-routing-contracts';
 
 jest.mock('@kilocode/web-shared/lib/organizations/organization-usage', () => ({
   getBalanceAndOrgSettings: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
+  ...jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/ai-gateway/is-free-model'
+  ),
+  hasBestEffortGuessDataCollectionRequirement: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit', () => ({
   gatewayRateLimitKey: jest.fn(),
@@ -286,6 +295,46 @@ describe('organizationProviderPreferences', () => {
           requestProvider: { data_collection: request },
         })
       ).toEqual({ kind: 'allowed', provider: { data_collection: 'deny' } });
+    }
+  );
+});
+
+describe('dataCollectionPolicyRejection', () => {
+  const model = 'vendor/model';
+
+  it.each<OpenRouterProviderConfig>([
+    { data_collection: 'deny' },
+    { zdr: true },
+    { data_collection: 'allow', zdr: true },
+  ])('rejects a model requiring data collection under %j', async provider => {
+    jest.mocked(hasBestEffortGuessDataCollectionRequirement).mockResolvedValue(true);
+
+    const response = await dataCollectionPolicyRejection(model, provider);
+
+    expect(hasBestEffortGuessDataCollectionRequirement).toHaveBeenCalledWith(model);
+    expect(response?.status).toBe(400);
+    await expect(response?.json()).resolves.toMatchObject({
+      error_type: ProxyErrorType.data_collection_required,
+    });
+  });
+
+  it.each<OpenRouterProviderConfig | undefined>([
+    undefined,
+    {},
+    { data_collection: 'allow' },
+    { zdr: false },
+  ])('admits a model requiring data collection under %j', async provider => {
+    jest.mocked(hasBestEffortGuessDataCollectionRequirement).mockResolvedValue(true);
+
+    await expect(dataCollectionPolicyRejection(model, provider)).resolves.toBeNull();
+  });
+
+  it.each<OpenRouterProviderConfig>([{ data_collection: 'deny' }, { zdr: true }])(
+    'admits a model without a data collection requirement under %j',
+    async provider => {
+      jest.mocked(hasBestEffortGuessDataCollectionRequirement).mockResolvedValue(false);
+
+      await expect(dataCollectionPolicyRejection(model, provider)).resolves.toBeNull();
     }
   );
 });

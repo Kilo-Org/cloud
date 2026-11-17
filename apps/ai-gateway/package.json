@@ -13,14 +13,14 @@
     "@kilocode/usage-queue": "workspace:*",
     "@kilocode/web-shared": "workspace:*",
     "@opentelemetry/api": "1.9.1",
-    "@sentry/nextjs": "11.7.0",
+    "@sentry/nextjs": "11.12.0",
     "next": "16.4.2",
     "react": "19.2.6",
     "react-dom": "19.2.6"
   },
   "devDependencies": {
     "@jest/globals": "30.3.0",
-    "@playwright/test": "1.58.2",
+    "@playwright/test": "1.65.0",
     "@swc/core": "1.15.18",
     "@types/jest": "30.0.0",
     "@types/node": "catalog:",

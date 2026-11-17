@@ -50,6 +50,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import {
   getOpenRouterModelsFromDatabase,
+  getOpenRouterModelsMetadataFromDatabase,
   getVercelModelsFromDatabase,
   isValidOpenRouterModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
@@ -361,6 +362,7 @@ const everyVercelModel = { has: () => true } as unknown as ReadonlySet<string>;
 
 beforeEach(() => {
   mockedGetVercelModels.mockResolvedValue(everyVercelModel);
+  jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({});
 });
 const mockedEmitApiMetricsForResponse = jest.mocked(emitApiMetricsForResponse);
 const mockedAccountForMicrodollarUsage = jest.mocked(accountForMicrodollarUsage);

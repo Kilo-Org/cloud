@@ -18,6 +18,51 @@ on:
         required: true
         type: string
         default: 'https://api.kilo.ai'
+      only:
+        description: 'Comma-separated scenario names to run; empty runs every scenario'
+        required: false
+        type: string
+        default: ''
+      parallel:
+        description: 'Scenario concurrency'
+        required: false
+        type: string
+        default: '4'
+  # The nightly workflow calls this after it deploys the e2e stack.
+  workflow_call:
+    inputs:
+      worker_url:
+        description: 'HTTPS URL of the deployed cloud-agent-next Worker'
+        required: false
+        type: string
+        default: 'https://cloud-agent-e2e-test.engineering-e11.workers.dev'
+      fake_llm_url:
+        description: 'HTTPS URL of the deployed fake-LLM Worker'
+        required: false
+        type: string
+        default: 'https://fake-llm.engineering-e11.workers.dev'
+      backend_url:
+        description: 'HTTPS URL of the Kilo backend that issues stream tickets'
+        required: false
+        type: string
+        default: 'https://api.kilo.ai'
+      only:
+        description: 'Comma-separated scenario names to run; empty runs every scenario'
+        required: false
+        type: string
+        default: ''
+      parallel:
+        description: 'Scenario concurrency'
+        required: false
+        type: string
+        default: '4'
+    outputs:
+      failed:
+        description: 'Number of failed scenarios, or unknown'
+        value: ${{ jobs.e2e.outputs.failed }}
+      summary:
+        description: 'The harness summary line without its prefix'
+        value: ${{ jobs.e2e.outputs.summary }}
 
 permissions:
   contents: read
@@ -48,7 +93,8 @@ jobs:
       FAKE_LLM_ADMIN_TOKEN: ${{ secrets.FAKE_LLM_ADMIN_TOKEN }}
       E2E_INTERNAL_API_SECRET: ${{ secrets.E2E_INTERNAL_API_SECRET }}
       # The harness's existing DEFAULT_PARALLEL; the runner owns concurrency.
-      E2E_PARALLEL: 4
+      E2E_PARALLEL: ${{ inputs.parallel || '4' }}
+      E2E_ONLY: ${{ inputs.only }}
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
@@ -69,7 +115,9 @@ jobs:
       - name: Run deployed e2e
         run: |
           set -o pipefail
-          pnpm --filter cloud-agent-next run e2e:parallel 2>&1 | tee e2e.log
+          only_args=()
+          if [ -n "$E2E_ONLY" ]; then only_args=(--only "$E2E_ONLY"); fi
+          pnpm --filter cloud-agent-next run e2e:parallel "${only_args[@]}" 2>&1 | tee e2e.log
 
       - name: Summarize results
         id: summarize
@@ -92,60 +140,3 @@ jobs:
           name: e2e-log
           path: e2e.log
           retention-days: 7
-
-  notify-failure:
-    needs: e2e
-    # Guard: this workflow_dispatch is reachable from a fork, and the job posts
-    # to Slack using a repo secret. Only the canonical repo may run it.
-    if: always() && github.repository == 'Kilo-Org/cloud' && github.ref == 'refs/heads/main' && contains(join(needs.*.result, ','), 'failure')
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Notify Slack
-        continue-on-error: true
-        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
-        with:
-          webhook: ${{ secrets.DEPLOY_NOTIFY_SLACK_WEBHOOK_URL }}
-          webhook-type: incoming-webhook
-          payload: |
-            {
-              "blocks": [
-                {
-                  "type": "header",
-                  "text": {
-                    "type": "plain_text",
-                    "text": ":red_circle: Cloud Agent E2E failed on main"
-                  }
-                },
-                {
-                  "type": "section",
-                  "fields": [
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Commit:*\n<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|`${{ github.sha }}`>"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Author:*\n${{ github.actor }}"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Failed tests:*\n${{ needs.e2e.outputs.failed || 'n/a' }}"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Summary:*\n${{ needs.e2e.outputs.summary || 'summary unavailable' }}"
-                    }
-                  ]
-                },
-                {
-                  "type": "context",
-                  "elements": [
-                    {
-                      "type": "mrkdwn",
-                      "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View workflow run>"
-                    }
-                  ]
-                }
-              ]
-            }

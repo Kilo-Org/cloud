@@ -76,7 +76,9 @@ export function projectBackgroundResult(
         state: {
           input: {},
           metadata: {
-            ...z.record(z.string(), z.unknown()).parse(message['metadata']),
+            ...(message['metadata'] == null
+              ? {}
+              : z.record(z.string(), z.unknown()).parse(message['metadata'])),
             backgroundResult: result,
           },
           content: [{ type: 'text', text: result.output }],

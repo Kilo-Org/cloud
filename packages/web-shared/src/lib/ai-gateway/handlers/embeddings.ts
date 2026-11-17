@@ -5,10 +5,12 @@ import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
 import {
   countAndStoreEmbeddingUsage,
   extractEmbeddingPromptInfo,
+  inferenceProvidersNotAllowedResponse,
   invalidRequestResponse,
   makeErrorReadable,
   malformedJsonResponse,
   modelDoesNotExistResponse,
+  providerOptionsNotSupportedResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import {
   getEffectiveProviderPrivacy,
@@ -58,6 +60,10 @@ const embeddingsEndpoint: UsageEndpoint<EmbeddingProxyRequest> = {
 
     if (body.input == null) {
       return { kind: 'rejected', response: invalidRequestResponse() };
+    }
+
+    if (body.providerOptions !== undefined) {
+      return { kind: 'rejected', response: providerOptionsNotSupportedResponse() };
     }
 
     const requestPrivacy = providerPreferencesSchema.optional().safeParse(body.provider);
@@ -137,19 +143,21 @@ const embeddingsEndpoint: UsageEndpoint<EmbeddingProxyRequest> = {
       { ...body, provider: undefined },
       input.requestedModelLowerCased
     );
-    upstreamBody.providerOptions = {
-      gateway: await getNonChatGatewayOptions({
-        vercelModelId: body.model,
-        userByok,
-        provider: {
-          only: routingPreferences?.only ?? undefined,
-          ignore: routingPreferences?.ignore ?? undefined,
-          order: routingPreferences?.order ?? undefined,
-          ...effectivePrivacy,
-        },
-        dataRegion,
-      }),
-    };
+    const gatewayOptions = await getNonChatGatewayOptions({
+      vercelModelId: body.model,
+      userByok,
+      provider: {
+        only: routingPreferences?.only ?? undefined,
+        ignore: routingPreferences?.ignore ?? undefined,
+        order: routingPreferences?.order ?? undefined,
+        ...effectivePrivacy,
+      },
+      dataRegion,
+    });
+    if (gatewayOptions.kind === 'no-eligible-provider') {
+      return { rejection: inferenceProvidersNotAllowedResponse(gatewayOptions.providers) };
+    }
+    upstreamBody.providerOptions = { gateway: gatewayOptions.gateway };
     return { body: upstreamBody, inferenceRegion: dataRegion };
   },
 

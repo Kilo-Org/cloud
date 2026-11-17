@@ -4676,6 +4676,8 @@
     "topModels": "Nejpoužívanější modely",
     "topFeatures": "Nejpoužívanější funkce",
     "emptyTitle": "V tomto období žádné využití",
+    "unavailableTitle": "Využití není k dispozici",
+    "unavailableDescription": "Tento pracovní prostor nevykazuje využití. Opakování nepomůže.",
     "orgSelfNotice": "Vidíte své vlastní využití v této organizaci.",
     "viewDetails": "Zobrazit podrobnosti o využití"
   },

@@ -4536,6 +4536,8 @@
     "topModels": "Amamodeli aphezulu",
     "topFeatures": "Izici eziphezulu",
     "emptyTitle": "Akukho ukusetshenziswa kulesi sikhathi",
+    "unavailableTitle": "Ukusetshenziswa akutholakali",
+    "unavailableDescription": "Le ndawo yokusebenza ayibiki ukusetshenziswa. Ukuphinda uzame ngeke kusize.",
     "orgSelfNotice": "Ubona ukusetshenziswa kwakho kule nhlangano.",
     "viewDetails": "Buka imininingwane yokusetshenziswa"
   },

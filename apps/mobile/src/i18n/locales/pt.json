@@ -4612,6 +4612,8 @@
     "topModels": "Modelos mais usados",
     "topFeatures": "Funcionalidades mais usadas",
     "emptyTitle": "Sem utilização neste período",
+    "unavailableTitle": "Utilização indisponível",
+    "unavailableDescription": "Esta área de trabalho não está a comunicar utilização. Tentar novamente não vai ajudar.",
     "orgSelfNotice": "Está a ver a sua própria utilização nesta organização.",
     "viewDetails": "Ver detalhes de utilização"
   },

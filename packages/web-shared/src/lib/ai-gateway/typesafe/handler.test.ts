@@ -42,6 +42,7 @@ import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/provider
 import type { BYOKResult, Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import {
+  getCachedVercelInferenceProviderIdsForModel,
   getOpenRouterModelsMetadataFromDatabase,
   getOpenRouterSystemOneModelsFromDatabase,
   resolveOpenRouterModelAlias,
@@ -94,6 +95,7 @@ jest.mock(
   })
 );
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
+  getCachedVercelInferenceProviderIdsForModel: jest.fn(),
   getOpenRouterModelsMetadataFromDatabase: jest.fn(),
   getOpenRouterSystemOneModelsFromDatabase: jest.fn(),
   resolveOpenRouterModelAlias: jest.fn(),
@@ -258,6 +260,10 @@ const userOpenRouterKey: BYOKResult = {
   providerId: 'openrouter',
   decryptedAPIKey: 'test-user-openrouter-key',
 };
+const userVercelGatewayKey: BYOKResult = {
+  providerId: 'vercel-ai-gateway',
+  decryptedAPIKey: 'test-user-vercel-key',
+};
 const userAnthropicKey: BYOKResult = {
   providerId: 'anthropic',
   decryptedAPIKey: 'test-user-anthropic-key',
@@ -392,6 +398,7 @@ describe('handleSystemOneRequest', () => {
       .mocked(getOpenRouterSystemOneModelsFromDatabase)
       .mockResolvedValue(new Set([TYPESAFE_MODEL, OTHER_SYSTEM_ONE_MODEL, SYSTEM_ONE_ALIAS]));
     jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue(pricedSystemOneModels);
+    jest.mocked(getCachedVercelInferenceProviderIdsForModel).mockResolvedValue(null);
     jest
       .mocked(resolveOpenRouterModelAlias)
       .mockImplementation(async modelId =>
@@ -2116,6 +2123,61 @@ describe('handleSystemOneRequest', () => {
       const { gateway } = upstreamRequest(VERCEL_TYPESAFE_URL).body.providerOptions;
       expect(gateway.zeroDataRetention).toBe(true);
       expect(gateway.only).toEqual(['typesafe-ai']);
+    });
+
+    it.each([
+      { label: "Kilo's Vercel account", userByok: null },
+      { label: "the owner's Vercel AI Gateway key", userByok: [userVercelGatewayKey] },
+    ])(
+      'rejects a provider allow-list that names no Vercel provider of the model on $label',
+      async ({ userByok }) => {
+        setAuth('org-123');
+        jest.mocked(resolveOrganizationMemberModelDecision).mockResolvedValue({
+          ...memberDecision,
+          decision: { allowed: true, eligibleProviderRoutes: new Set(['openai']) },
+        });
+        jest
+          .mocked(getCachedVercelInferenceProviderIdsForModel)
+          .mockResolvedValue(['typesafe-ai', 'digitalocean']);
+        jest
+          .mocked(resolveEmbeddingOrDecisionRoute)
+          .mockResolvedValue({ provider: kiloVercelProvider, userByok });
+
+        const response = await handleSystemOneRequest(makeRequest());
+
+        expect(response.status).toBe(403);
+        await expect(response.json()).resolves.toMatchObject({
+          error:
+            'No eligible provider can serve the selected model. Please enable provider: typesafe-ai, digitalocean',
+          error_type: 'provider_not_allowed',
+        });
+        expect(getCachedVercelInferenceProviderIdsForModel).toHaveBeenCalledWith(
+          VERCEL_SYSTEM_ONE_MODEL
+        );
+        expect(mockedFetch).not.toHaveBeenCalled();
+        expect(startBouncerDecide).not.toHaveBeenCalled();
+        expect(after).not.toHaveBeenCalled();
+        expect(logMicrodollarUsageAndReportToBouncer).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each([
+      { label: 'OpenRouter', provider: OPENROUTER },
+      { label: "Kilo's Vercel AI Gateway", provider: kiloVercelProvider },
+    ])('rejects client providerOptions on the $label route', async ({ provider }) => {
+      jest.mocked(resolveEmbeddingOrDecisionRoute).mockResolvedValue({ provider, userByok: null });
+
+      const response = await handleSystemOneRequest(
+        makeRequest({ ...requestBody, providerOptions: { gateway: { only: ['typesafe-ai'] } } })
+      );
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toMatchObject({
+        error: 'The providerOptions field is not supported. Use provider instead.',
+        error_type: 'unsupported_field',
+      });
+      expect(mockedFetch).not.toHaveBeenCalled();
+      expect(logMicrodollarUsageAndReportToBouncer).not.toHaveBeenCalled();
     });
 
     it('normalizes a Vercel response to the OpenRouter-compatible shape and bills its cost', async () => {

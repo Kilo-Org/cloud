@@ -4676,6 +4676,8 @@
     "topModels": "Najczęściej używane modele",
     "topFeatures": "Najczęściej używane funkcje",
     "emptyTitle": "Brak użycia w tym okresie",
+    "unavailableTitle": "Użycie niedostępne",
+    "unavailableDescription": "Ta przestrzeń robocza nie raportuje użycia. Ponowna próba nie pomoże.",
     "orgSelfNotice": "Widzisz własne użycie w tej organizacji.",
     "viewDetails": "Wyświetl szczegóły użycia"
   },

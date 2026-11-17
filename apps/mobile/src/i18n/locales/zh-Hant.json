@@ -4536,6 +4536,8 @@
     "topModels": "最常用模型",
     "topFeatures": "最常用功能",
     "emptyTitle": "此期間沒有用量",
+    "unavailableTitle": "用量無法使用",
+    "unavailableDescription": "此工作區未回報用量。重試不會有幫助。",
     "orgSelfNotice": "你看到的是你自己在此組織中的用量。",
     "viewDetails": "查看用量詳情"
   },

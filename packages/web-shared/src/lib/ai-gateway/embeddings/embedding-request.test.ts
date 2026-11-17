@@ -50,6 +50,21 @@ describe('buildUpstreamBody', () => {
     });
   });
 
+  it('should strip client providerOptions', () => {
+    expect(
+      buildUpstreamBody({
+        model: 'openai/text-embedding-3-small',
+        input: 'hello',
+        provider: { ignore: ['azure'] },
+        providerOptions: { gateway: { only: ['azure'] } },
+      })
+    ).toEqual({
+      model: 'openai/text-embedding-3-small',
+      input: 'hello',
+      provider: { ignore: ['azure'] },
+    });
+  });
+
   it.each([
     ['cohere/embed-5-fast', 2048],
     ['amazon/titan-embed-text-v2', 1024],

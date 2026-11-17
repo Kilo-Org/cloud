@@ -103,7 +103,9 @@ describe('PickerSheet expired shell', () => {
   it('leaves Done as the only exit while an expired shell has no Cancel', async () => {
     const renderer = await mountSheet(true, { expired: true });
     const [header] = renderer.root.findAllByType(SheetHeader);
-    if (!header) throw new Error('the expired shell rendered no header');
+    if (!header) {
+      throw new Error('the expired shell rendered no header');
+    }
 
     // Done is the one way out of a shell with no Cancel, so it must stay
     // pressable even though there is nothing to commit.
@@ -115,10 +117,12 @@ describe('PickerSheet expired shell', () => {
   });
 
   it('disables Done while an expired shell offers Cancel', async () => {
-    const onCancel = vi.fn();
+    const onCancel = vi.fn<() => void>();
     const renderer = await mountSheet(true, { expired: true, onCancel });
     const [header] = renderer.root.findAllByType(SheetHeader);
-    if (!header) throw new Error('the expired shell rendered no header');
+    if (!header) {
+      throw new Error('the expired shell rendered no header');
+    }
 
     // Two controls that both only close the sheet leave Done promising a
     // selection that cannot exist: Cancel is the single exit instead.
@@ -135,9 +139,11 @@ describe('PickerSheet expired shell', () => {
   });
 
   it('keeps Done pressable on a live picker that offers Cancel', async () => {
-    const renderer = await mountSheet(true, { expired: false, onCancel: vi.fn() });
+    const renderer = await mountSheet(true, { expired: false, onCancel: () => undefined });
     const [header] = renderer.root.findAllByType(SheetHeader);
-    if (!header) throw new Error('the picker rendered no header');
+    if (!header) {
+      throw new Error('the picker rendered no header');
+    }
 
     // A live sheet commits a choice through Done, so its Cancel must not
     // withdraw that action.

@@ -82,13 +82,11 @@ path, enrols that traffic automatically, so such a change needs the same review
 as this contract. The [root `AGENTS.md`](../../AGENTS.md) remains the source of
 truth for which function regions actually run those deployments.
 
-## Autocomplete routes and the account rate limit
+## Autocomplete routes
 
-The edit and FIM completion handlers (`handlers/edit-completions.ts` and
-`handlers/fim-completions.ts`) serve autocomplete and intentionally skip the
-account inference rate limit (`gatewayAccountRateLimitRejection`). Their small
-autocomplete models are not a target for attack in practice. Do not add the
-limit to these routes as an abuse or consistency fix.
+The edit and FIM (autocomplete) handlers intentionally skip the account rate
+limit and Enkrypt guardrails: their small models are not attack targets in
+practice, and the added latency makes no sense for autocomplete.
 
 ## Data collection versus ZDR
 

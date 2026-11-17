@@ -45,7 +45,10 @@ import { kv } from './schema';
  * so the failure is reported under the migration operation and rethrown
  * without deleting anything — unless the rejection carries a corruption
  * signal, which means the file is unreadable after all, and the same
- * delete-and-recreate recovery runs.
+ * delete-and-recreate recovery runs. A busy or locked failure is the third
+ * case. A lock is evidence about another connection, not about the file, so
+ * it is reported under the open operation and rethrown with the file and the
+ * key intact.
  */
 
 const DATABASE_NAME = 'kilo-persist.db';
@@ -277,6 +280,31 @@ function isCorruptionSignal(error: unknown): boolean {
   return false;
 }
 
+// A lock is transient evidence about another connection, not about the file.
+// The engine reports it from the `sqlite_master` probe and from `PRAGMA key`
+// alike, and neither says anything about the key or the file's contents, so
+// the open must not read them as an unreadable file.
+const BUSY_SIGNALS = [
+  'SQLITE_BUSY',
+  'SQLITE_LOCKED',
+  'database is locked',
+  'database table is locked',
+];
+
+function isBusySignal(error: unknown): boolean {
+  // Same walk as `isCorruptionSignal`: the driver keeps the engine error in
+  // `cause`, so the signal can sit one level down.
+  let current = error;
+  for (let depth = 0; current instanceof Error && depth < 4; depth += 1) {
+    const candidate = current;
+    if (BUSY_SIGNALS.some(signal => candidate.message.includes(signal))) {
+      return true;
+    }
+    current = current.cause;
+  }
+  return false;
+}
+
 function probeSchema(db: KVDatabase): void {
   // A wrong key or a corrupt file makes this throw (DEC-01 step 3).
   db.get(sql`SELECT count(*) FROM sqlite_master`);
@@ -358,6 +386,22 @@ async function openEncryptedDatabase(): Promise<KVDatabase> {
       // capture would file the same unreadable file twice. The close stays
       // with the shared reset block, which closes the handle exactly once.
       resetCause = openError.cause;
+    }
+    // A lock proves another connection held the file, not that the file or the
+    // key is bad. Report it and rethrow with the store intact: deleting it
+    // would discard readable data the lock never touched, and the next launch
+    // opens the same file again.
+    if (isBusySignal(resetCause)) {
+      // A handle that will not close is a leaked connection, which the
+      // relaunch clears; the failure itself is still the busy one.
+      if (db) {
+        await closeQuietly(db.$client);
+      }
+      Sentry.captureException(resetCause, {
+        level: 'warning',
+        tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'open' },
+      });
+      throw resetCause;
     }
     // Wrong key, corrupt file, or a tampered key: cache and drafts are
     // recoverable losses. Close, delete the file, regenerate the key, and
@@ -455,7 +499,9 @@ export function resetEncryptedKvOpenForTests(): void {
  * means one key, one SQLCipher probe, and one delete-and-recreate recovery
  * rather than a second copy of all three. The delete runs on a failed probe,
  * or on a migration rejection that carries a corruption signal; every other
- * failed migration reports and rethrows, and the file stays.
+ * failed migration reports and rethrows, and the file stays. A busy or locked
+ * failure reports and rethrows the same way: a lock says nothing about the
+ * file or the key.
  */
 export async function encryptedDatabase(): Promise<SQLite.SQLiteDatabase> {
   const db = await openDatabase();

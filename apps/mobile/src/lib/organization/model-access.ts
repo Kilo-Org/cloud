@@ -245,6 +245,12 @@ export type ModelAccessSave =
  * Providers tab omits the list and leaves it unset. The rows behind an edit
  * include every saved slug (`providerRows`), so an explicit write keeps them.
  *
+ * The rows also need the whole gateway catalog: without it they are only the
+ * organization's own policy-filtered models plus the saved slugs, so a write
+ * would drop every provider that serves a denied model. A save made while the
+ * catalog is unavailable therefore leaves the provider list alone whatever the
+ * draft holds, exactly like an untouched Providers tab.
+ *
  * An empty provider list is refused unless the organization's saved list was
  * already empty: it stops every Kilo route, which no toggle on this form should
  * do by accident. A deny list that covers every model is refused the same way:
@@ -255,6 +261,11 @@ export function modelAccessSave(params: {
   baseline: ModelAccessDraft;
   draft: ModelAccessDraft;
   /**
+   * Whether the gateway catalog loaded. While it has not, the provider rows
+   * are a policy-filtered subset, so no save may write them.
+   */
+  providerCatalogLoaded: boolean;
+  /**
    * Every model the form knows: the gateway catalog plus the organization's own
    * list. Empty while the catalog is unavailable, which leaves the model guard
    * inert instead of refusing a save it cannot judge.
@@ -264,7 +275,7 @@ export function modelAccessSave(params: {
   const providersChanged =
     params.draft.providerAllowList.join('\n') !== params.baseline.providerAllowList.join('\n');
   const providerAllowList =
-    params.savedAllowList === undefined && !providersChanged
+    !params.providerCatalogLoaded || (params.savedAllowList === undefined && !providersChanged)
       ? undefined
       : [...params.draft.providerAllowList];
   if (providerAllowList?.length === 0 && params.baseline.providerAllowList.length > 0) {

@@ -4891,6 +4891,7 @@
     "modelsDeniedOnly": "Tikai liegtie",
     "modelsEmpty": "Neviens modelis neatbilst šim meklējumam.",
     "providersDescription": "Izslēdziet nodrošinātāju, lai Kilo pārtrauktu maršrutēšanu uz to šai organizācijai.",
+    "providersNeedCatalog": "Nodrošinātāju slēdži paliek tikai lasāmi, līdz tiek ielādēts pilns modeļu katalogs. Lai tos rediģētu, augstāk nospiediet Mēģināt vēlreiz.",
     "providersEmpty": "Neviens nodrošinātājs neatbilst šim meklējumam.",
     "allowAllShown": "Atļaut visus redzamos",
     "denyAllShown": "Liegt visus redzamos",

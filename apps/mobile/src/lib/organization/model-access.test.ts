@@ -192,6 +192,7 @@ describe('modelAccessSave', () => {
         savedAllowList: [],
         baseline: { providerAllowList: [], modelDenyList: [] },
         draft: { providerAllowList: [], modelDenyList: ['openai/gpt'] },
+        providerCatalogLoaded: true,
         models: MODELS,
       })
     ).toEqual({ kind: 'ready', providerAllowList: [], modelDenyList: ['openai/gpt'] });
@@ -203,6 +204,7 @@ describe('modelAccessSave', () => {
         savedAllowList: undefined,
         baseline: { providerAllowList: everyProvider, modelDenyList: [] },
         draft: { providerAllowList: everyProvider, modelDenyList: everyModelDenied },
+        providerCatalogLoaded: true,
         models: MODELS,
       })
     ).toEqual({ kind: 'empty-model-list' });
@@ -214,6 +216,7 @@ describe('modelAccessSave', () => {
         savedAllowList: undefined,
         baseline: { providerAllowList: everyProvider, modelDenyList: everyModelDenied },
         draft: { providerAllowList: everyProvider, modelDenyList: everyModelDenied },
+        providerCatalogLoaded: true,
         models: MODELS,
       })
     ).toEqual({ kind: 'ready', providerAllowList: undefined, modelDenyList: everyModelDenied });
@@ -225,6 +228,7 @@ describe('modelAccessSave', () => {
         savedAllowList: undefined,
         baseline: { providerAllowList: ['anthropic'], modelDenyList: [] },
         draft: { providerAllowList: ['anthropic'], modelDenyList: ['anthropic/claude'] },
+        providerCatalogLoaded: true,
         models: [],
       })
     ).toEqual({
@@ -232,6 +236,18 @@ describe('modelAccessSave', () => {
       providerAllowList: undefined,
       modelDenyList: ['anthropic/claude'],
     });
+  });
+
+  it('leaves the provider list alone while the catalog is unavailable, even after a provider change', () => {
+    expect(
+      modelAccessSave({
+        savedAllowList: undefined,
+        baseline: { providerAllowList: ['anthropic'], modelDenyList: [] },
+        draft: { providerAllowList: ['openai'], modelDenyList: [] },
+        providerCatalogLoaded: false,
+        models: MODELS,
+      })
+    ).toEqual({ kind: 'ready', providerAllowList: undefined, modelDenyList: [] });
   });
 });
 

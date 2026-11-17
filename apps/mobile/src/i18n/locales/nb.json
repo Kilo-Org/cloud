@@ -4821,6 +4821,7 @@
     "modelsDeniedOnly": "Kun nektet",
     "modelsEmpty": "Ingen modeller samsvarer med dette søket.",
     "providersDescription": "Slå av en leverandør for å hindre at Kilo ruter til den for denne organisasjonen.",
+    "providersNeedCatalog": "Leverandørbryterne er skrivebeskyttet til hele modellkatalogen er lastet inn. Trykk på Prøv igjen ovenfor for å endre dem.",
     "providersEmpty": "Ingen leverandører samsvarer med dette søket.",
     "allowAllShown": "Tillat alle viste",
     "denyAllShown": "Nekt alle viste",

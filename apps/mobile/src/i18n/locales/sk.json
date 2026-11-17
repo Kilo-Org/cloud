@@ -4961,6 +4961,7 @@
     "modelsDeniedOnly": "Iba zamietnuté",
     "modelsEmpty": "Tomuto hľadaniu nezodpovedajú žiadne modely.",
     "providersDescription": "Vypnutím poskytovateľa zastavíte smerovanie Kilo naň pre túto organizáciu.",
+    "providersNeedCatalog": "Prepínače poskytovateľov zostanú iba na čítanie, kým sa nenačíta celý katalóg modelov. Ak ich chcete upraviť, ťuknite vyššie na Skúsiť znova.",
     "providersEmpty": "Tomuto hľadaniu nezodpovedajú žiadni poskytovatelia.",
     "allowAllShown": "Povoliť všetky zobrazené",
     "denyAllShown": "Zamietnuť všetky zobrazené",

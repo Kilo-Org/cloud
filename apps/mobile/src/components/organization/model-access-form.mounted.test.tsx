@@ -60,33 +60,52 @@ const CATALOG = [model('anthropic/claude', ['anthropic']), model('openai/gpt', [
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
+function element(
+  providerAllowList: readonly string[] | undefined,
+  overrides: { catalogUnavailable?: boolean; onRetryCatalog?: () => void } = {}
+) {
+  return createElement(ModelAccessForm, {
+    organizationId: 'org-1',
+    canEdit: true,
+    models: [],
+    catalog: overrides.catalogUnavailable === true ? [] : CATALOG,
+    catalogUnavailable: overrides.catalogUnavailable === true,
+    catalogIsFetching: false,
+    onRetryCatalog: overrides.onRetryCatalog ?? (() => undefined),
+    providerAllowList,
+    modelDenyList: [],
+    gateway: undefined,
+    gatewayIsError: false,
+    gatewayIsFetching: false,
+    onRetryGateway: () => undefined,
+  });
+}
+
 function render(
   providerAllowList: readonly string[] | undefined,
   overrides: { catalogUnavailable?: boolean; onRetryCatalog?: () => void } = {}
 ) {
   saved.mutateAsync.mockResolvedValue(undefined);
   act(() => {
-    renderer = TestRenderer.create(
-      createElement(ModelAccessForm, {
-        organizationId: 'org-1',
-        canEdit: true,
-        models: [],
-        catalog: overrides.catalogUnavailable === true ? [] : CATALOG,
-        catalogUnavailable: overrides.catalogUnavailable === true,
-        catalogIsFetching: false,
-        onRetryCatalog: overrides.onRetryCatalog ?? (() => undefined),
-        providerAllowList,
-        modelDenyList: [],
-        gateway: undefined,
-        gatewayIsError: false,
-        gatewayIsFetching: false,
-        onRetryGateway: () => undefined,
-      })
-    );
+    renderer = TestRenderer.create(element(providerAllowList, overrides));
   });
   if (!renderer) {
     throw new Error('Missing form renderer');
   }
+  return renderer.root;
+}
+
+/** Render the same form again with the catalog now loaded. */
+function renderWithCatalog(
+  providerAllowList: readonly string[] | undefined,
+  overrides: { catalogUnavailable?: boolean } = {}
+) {
+  if (!renderer) {
+    throw new Error('Missing form renderer');
+  }
+  act(() => {
+    renderer?.update(element(providerAllowList, overrides));
+  });
   return renderer.root;
 }
 
@@ -236,5 +255,63 @@ describe('ModelAccessForm without the catalog', () => {
       await Promise.resolve();
     });
     expect(onRetryCatalog).toHaveBeenCalledTimes(1);
+  });
+
+  it('locks the Providers tab and saves no provider list while the catalog is unavailable', async () => {
+    const root = render(undefined, { catalogUnavailable: true });
+
+    selectTab(root, 'providers');
+    expect(list(root, 'ProviderAllowList').props.disabled).toBe(true);
+    const notice = root
+      .findAllByType('Text' as never)
+      .map(node => node.props.children)
+      .find(value => typeof value === 'string' && value.includes('read-only until'));
+    expect(notice).toBeDefined();
+
+    selectTab(root, 'models');
+    const draft = list(root, 'ModelDenyList').props.draft as ModelAccessDraft;
+    changeDraft(root, toggleModel(draft, 'anthropic/claude', false));
+    await pressSave(root);
+
+    expect(saved.mutateAsync.mock.calls[0]?.[0]).toEqual({
+      organizationId: 'org-1',
+      model_deny_list: ['anthropic/claude'],
+    });
+  });
+
+  it('leaves a saved provider list alone while the catalog is unavailable', async () => {
+    const root = render(['anthropic'], { catalogUnavailable: true });
+    const draft = list(root, 'ModelDenyList').props.draft as ModelAccessDraft;
+
+    changeDraft(root, toggleModel(draft, 'openai/gpt', false));
+    await pressSave(root);
+
+    expect(saved.mutateAsync.mock.calls[0]?.[0]).toEqual({
+      organizationId: 'org-1',
+      model_deny_list: ['openai/gpt'],
+    });
+  });
+
+  it('rebases the provider rows on the whole catalog once it loads', async () => {
+    render(undefined, { catalogUnavailable: true });
+    const root = renderWithCatalog(undefined);
+
+    selectTab(root, 'providers');
+    const providers = root.findByType('ProviderAllowList' as never);
+    expect(providers.props.providers).toEqual(['anthropic', 'openai']);
+    expect(providers.props.disabled).toBe(false);
+
+    act(() => {
+      (providers.props.onChange as (draft: ModelAccessDraft) => void)(
+        toggleProvider(providers.props.draft as ModelAccessDraft, 'openai', false)
+      );
+    });
+    await pressSave(root);
+
+    expect(saved.mutateAsync.mock.calls[0]?.[0]).toEqual({
+      organizationId: 'org-1',
+      provider_allow_list: ['anthropic'],
+      model_deny_list: [],
+    });
   });
 });

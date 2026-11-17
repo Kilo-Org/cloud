@@ -4821,6 +4821,7 @@
     "modelsDeniedOnly": "仅显示已拒绝",
     "modelsEmpty": "没有匹配此搜索的模型。",
     "providersDescription": "关闭某个提供商即可阻止 Kilo 为此组织路由到该提供商。",
+    "providersNeedCatalog": "在完整模型目录加载完成前，提供商开关为只读状态。点按上方的重试即可编辑。",
     "providersEmpty": "没有匹配此搜索的提供商。",
     "allowAllShown": "允许所有显示的项",
     "denyAllShown": "拒绝所有显示的项",

@@ -108,12 +108,34 @@ export function ModelAccessForm({
     }
   }
 
+  // The provider rows are provisional while the catalog is unavailable: they
+  // hold only the providers the organization's own models name. No provider edit
+  // is possible in that state (the tab is read-only), so when the catalog
+  // arrives they rebase to the whole gateway catalog and keep only the edits the
+  // deny list holds. Without this the first toggle after a retry would write the
+  // provisional rows as the organization's whole allow list.
+  const [providerRowsProvisional, setProviderRowsProvisional] = useState(catalogUnavailable);
+  if (providerRowsProvisional !== catalogUnavailable) {
+    setProviderRowsProvisional(catalogUnavailable);
+    if (!catalogUnavailable) {
+      setBaseline({
+        providerAllowList: serverDraft.providerAllowList,
+        modelDenyList: baseline.modelDenyList,
+      });
+      setDraft({
+        providerAllowList: serverDraft.providerAllowList,
+        modelDenyList: draft.modelDenyList,
+      });
+    }
+  }
+
   const dirty = !draftsEqual(draft, baseline);
   const saving = feedback.status === 'pending';
   const savePayload = modelAccessSave({
     savedAllowList: providerAllowList,
     baseline,
     draft,
+    providerCatalogLoaded: !catalogUnavailable,
     models: [...catalog, ...models],
   });
   const blockingIssue =
@@ -239,12 +261,19 @@ export function ModelAccessForm({
         />
       ) : null}
       {tab === 'providers' ? (
-        <ProviderAllowList
-          providers={providers}
-          draft={draft}
-          onChange={onDraftChange}
-          disabled={!canEdit || saving}
-        />
+        <View className="flex-1">
+          {catalogUnavailable ? (
+            <Text className="px-4 pb-2 text-xs text-muted-foreground">
+              {t('organizationModelAccess.providersNeedCatalog')}
+            </Text>
+          ) : null}
+          <ProviderAllowList
+            providers={providers}
+            draft={draft}
+            onChange={onDraftChange}
+            disabled={!canEdit || saving || catalogUnavailable}
+          />
+        </View>
       ) : null}
       {tab === 'gateways' ? (
         <GatewaySettingsSection

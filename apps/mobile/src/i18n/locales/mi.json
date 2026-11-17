@@ -4821,6 +4821,7 @@
     "modelsDeniedOnly": "Kua whakakāhore anake",
     "modelsEmpty": "Kāore he tauira e hāngai ana ki tēnei rapunga.",
     "providersDescription": "Whakawetohia tētahi kaiwhakarato kia kore ai a Kilo e arataki tono ki a ia mō tēnei whakahaere.",
+    "providersNeedCatalog": "Ka noho pānui-anake ngā pana kaiwhakarato kia uta katoa rā anō te rārangi tauira. Pēhia te Whakamātau anō i runga ake nei kia taea ai te whakatika.",
     "providersEmpty": "Kāore he kaiwhakarato e hāngai ana ki tēnei rapunga.",
     "allowAllShown": "Whakaaetia ngā mea katoa e whakaatuhia ana",
     "denyAllShown": "Whakakāhoretia ngā mea katoa e whakaatuhia ana",

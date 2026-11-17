@@ -4821,6 +4821,7 @@
     "modelsDeniedOnly": "僅顯示已拒絕",
     "modelsEmpty": "沒有符合此搜尋的模型。",
     "providersDescription": "關閉供應商即可停止 Kilo 為此組織將請求路由至該供應商。",
+    "providersNeedCatalog": "在完整模型目錄載入完成前，供應商開關為唯讀狀態。點一下上方的再試一次即可編輯。",
     "providersEmpty": "沒有符合此搜尋的供應商。",
     "allowAllShown": "允許所有顯示項目",
     "denyAllShown": "拒絕所有顯示項目",

@@ -4821,6 +4821,7 @@
     "modelsDeniedOnly": "Denied only",
     "modelsEmpty": "No models match this search.",
     "providersDescription": "Turn a provider off to stop Kilo routing to it for this organization.",
+    "providersNeedCatalog": "Provider switches stay read-only until the full model catalog loads. Retry above to edit them.",
     "providersEmpty": "No providers match this search.",
     "allowAllShown": "Allow all shown",
     "denyAllShown": "Deny all shown",

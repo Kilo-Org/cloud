@@ -3305,10 +3305,10 @@
       "membershipLostNotice": "Kāore ō whakaaetanga uru ki tēnei rōpū anō. I whakawhiti ki {{target}}.",
       "noOrganization": "Kāore he rōpū",
       "noOrganizationDescription": "Ehara tēnei kaute i te wāhanga o tētahi rōpū. Waihangatia tētahi hei whakamahi i ngā āhuatanga rōpū pērā i ngā pōwhiri mema me ngā matohi toenga iti, huakina rānei te ipurangi kia uru atu ki tētahi i pōwhiritia ai koe.",
-      "organizationUnavailable": "Kāore e wātea ana te rōpū.",
+      "organizationUnavailable": "Kāore e wātea ana te rōpū",
       "selectDescriptionWithOrganizations": "Kei roto koe i tētahi rōpū, neke atu rānei. Kōwhiria te pūkete e tika ana mā tēnei mata.",
       "selectOrganization": "Kōwhiria tētahi rōpū",
-      "unavailableDescription": "Kāore tēnei rōpū e wātea ana ināianei. Kōwhiria tētahi mai i tō kōtaha kia haere tonu.",
+      "unavailableDescription": "Kāore tēnei rōpū e wātea ana ināianei. Kōwhiria tētahi atu pūkete mai i te kaikokoti kia haere tonu.",
       "unavailableSessionsDescription": "Kāore tēnei rōpū e wātea ana ināianei. Kāore e taea ana te uta i ngā sesiona a tēnei rōpū.",
       "accessDeniedDescription": "Kāore ō whakaaetanga uru ki tēnei rōpū."
     },
@@ -3339,19 +3339,19 @@
       "truncated": "E wātea ana ngā tauwhitinga moni tōmua o mua."
     },
     "inviteMember": {
-      "emailError": "Whakaurua he wāhitau īmēra tika.",
+      "emailError": "Whakaurua he wāhitau īmēra tika",
       "emailPlaceholder": "ingoa@kamupene.com",
       "permissionDenied": "Kāore ō whakaaetanga ki te pōwhiri mema.",
-      "roleMember": "Tūranga: mema.",
+      "roleMember": "Tūranga: mema",
       "sendInvite": "Tukuna te pōwhiri",
       "title": "Pōwhiritia he mema",
       "alreadyInvited": "Kua pōwhiritia kē, kua mema kē rānei.",
       "sendError": "Kāore i taea te tuku i te pōwhiri.",
       "pendingInvitation": "Kua whai kē tēnei īmēra i tētahi pōwhiri e tatari ana.",
-      "alreadyMember": "He mema kē tēnei tangata o tēnei whakahaerenga.",
-      "seatsFull": "Kei te whakamahia ngā tūru katoa ({{used}}/{{total}}). Tonoa tētahi rangatira o te whakahaerenga kia tāpiri tūru anō i mua i te pōwhiri i ētahi atu mema.",
+      "alreadyMember": "He mema kē tēnei tangata o tēnei rōpū.",
+      "seatsFull": "Kei te whakamahia ngā tūru katoa ({{used}}/{{total}}). Tonoa tētahi rangatira o te rōpū kia tāpiri tūru anō i mua i te pōwhiri i ētahi atu mema.",
       "seatsFullCanInviteBilling": "Kei te whakamahia ngā tūru katoa ({{used}}/{{total}}). Ka taea tonu e koe te pōwhiri i ngā kaiwhakahaere pire, i te mea kāore rātou e whakapau i tētahi tūru.",
-      "noSeatsAvailable": "Kei te whakamahia ngā tūru katoa. Tonoa tētahi rangatira o te whakahaerenga kia tāpiri tūru anō i mua i te pōwhiri i ētahi atu mema."
+      "noSeatsAvailable": "Kei te whakamahia ngā tūru katoa. Tonoa tētahi rangatira o te rōpū kia tāpiri tūru anō i mua i te pōwhiri i ētahi atu mema."
     },
     "invoices": {
       "downloadA11y": "Tīkina ake te nama {{number}}",
@@ -3392,7 +3392,7 @@
       "title": "Te tepe whakamahinga ā-rā",
       "blankError": "Whakaurua he moni, tangohia rānei te tepe mā te pātene i raro nei.",
       "blankWithoutLimitError": "Whakaurua he tepe ā-rā i waenga i te 0 me te {{max}}.",
-      "rangeError": "Whakaurua he moni i waenga i te 0 me te {{max}}."
+      "rangeError": "Whakaurua he moni i waenga i te 0 me te {{max}}"
     },
     "members": {
       "changeRole": "Hurihia te tūranga",
@@ -3423,7 +3423,7 @@
       "shareInviteLink": "Tuaritia te hononga pōwhiri",
       "resendInviteError": "Kāore i taea te tuku anō i te pōwhiri.",
       "inviteNotResendable": "Kua kore e taea tēnei pōwhiri te tuku anō.",
-      "ownerAuthority": "Mā te rangatira anake o te whakahaere e taea te whakahaere i ngā rangatira.",
+      "ownerAuthority": "Mā te rangatira anake o te rōpū e taea te whakahaere i ngā rangatira.",
       "ownRoleChange": "Kāore e taea e koe te huri i tō ake tūranga.",
       "inviteExpired": "Kua pau te wā o tēnei pōwhiri.",
       "inviteAccepted": "Kua whakaaetia kētia tēnei pōwhiri."
@@ -3452,11 +3452,11 @@
       "renamePlaceholder": "Te ingoa o te rōpū",
       "balance": "Te toenga",
       "organizationSeats": "Ngā raihana kaiwhakamahi o te rōpū",
-      "plan": "Mahere whakahaerenga",
+      "plan": "Mahere o te rōpū",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Kua mutu",
-      "planEnded": "Kua mutu te whakamātautau o te whakahaerenga, ā, kāore ōna mahere kaha.",
+      "planEnded": "Kua mutu te whakamātautau o te rōpū, ā, kāore ōna mahere kaha.",
       "manageBilling": "Whakahaere utu",
       "lowBalanceBelow": "I raro i te {{amount}}"
     },
@@ -3469,8 +3469,8 @@
       "notSubscribed": "Kāore i ohauru",
       "overallocated": "He nui ake ngā tohanga Kilo Pass i ngā raihana kaiwhakamahi kua utua",
       "paidSeat_one": "{{displayCount}} raihana kaiwhakamahi kua utua",
-      "paidSeat": "{{displayCount}} tūranga mema kua utua",
-      "paidSeat_other": "{{displayCount}} tūranga mema kua utua",
+      "paidSeat": "{{displayCount}} raihana kaiwhakamahi kua utua",
+      "paidSeat_other": "{{displayCount}} raihana kaiwhakamahi kua utua",
       "paymentNeedsAttention": "Me aro ki te utu",
       "paymentPending": "Kei te tatari kia utua",
       "processingBlocked": "Kua āraitia te tukatuka",

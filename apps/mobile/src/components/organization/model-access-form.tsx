@@ -34,6 +34,77 @@ const BLOCKING_ISSUE_KEYS = {
 } as const;
 
 /**
+ * The form's own state: the saved lists it is synced to, the baseline a cancel
+ * returns to, the draft on screen, and whether the provider rows came from the
+ * policy-filtered list while the catalog was unavailable. It is one object
+ * because one render can move both the saved lists and the provider rows, and
+ * two setters rebasing from that render's values would let the second write back
+ * the deny list the first had just synced.
+ */
+type FormState = Readonly<{
+  /** The `serverKey` the form's baseline was last synced to. */
+  syncedKey: string;
+  baseline: ModelAccessDraft;
+  draft: ModelAccessDraft;
+  providerRowsProvisional: boolean;
+}>;
+
+/**
+ * Rebases the form onto the lists the server answered.
+ *
+ * A refetch that moved the saved lists rebases the baseline, and the draft too
+ * unless the admin holds edits of its own: those win, and the next save replaces
+ * the newer policy.
+ *
+ * The provider rows are provisional while the catalog is unavailable: they hold
+ * only the providers the organization's own models name, and no provider edit is
+ * possible in that state (the tab is read-only). When the catalog arrives they
+ * rebase to the whole gateway catalog and keep only the edits the deny list
+ * holds. Without this the first toggle after a retry would write the provisional
+ * rows as the organization's whole allow list.
+ *
+ * Both rebases compose here, so a catalog that arrives in the same render as a
+ * newer deny list keeps that deny list instead of restoring the values the
+ * render started from.
+ */
+function syncedFormState(params: {
+  state: FormState;
+  serverKey: string;
+  serverDraft: ModelAccessDraft;
+  catalogUnavailable: boolean;
+}): FormState {
+  const { state } = params;
+  const savedListsMoved = params.serverKey !== state.syncedKey;
+  const catalogArrived = state.providerRowsProvisional && !params.catalogUnavailable;
+  if (
+    !savedListsMoved &&
+    !catalogArrived &&
+    state.providerRowsProvisional === params.catalogUnavailable
+  ) {
+    return state;
+  }
+  const clean = draftsEqual(state.draft, state.baseline);
+  let baseline = savedListsMoved ? params.serverDraft : state.baseline;
+  let draft = savedListsMoved && clean ? params.serverDraft : state.draft;
+  if (catalogArrived) {
+    baseline = {
+      providerAllowList: params.serverDraft.providerAllowList,
+      modelDenyList: baseline.modelDenyList,
+    };
+    draft = {
+      providerAllowList: params.serverDraft.providerAllowList,
+      modelDenyList: draft.modelDenyList,
+    };
+  }
+  return {
+    syncedKey: savedListsMoved ? params.serverKey : state.syncedKey,
+    baseline,
+    draft,
+    providerRowsProvisional: params.catalogUnavailable,
+  };
+}
+
+/**
  * The two lists the organization's routing policy is: which providers may
  * serve it, and which models it denies. Both save together, because the server
  * stores them as one policy.
@@ -92,42 +163,17 @@ export function ModelAccessForm({
     providers
   );
   const serverKey = `${serverDraft.providerAllowList.join(',')}|${serverDraft.modelDenyList.join(',')}`;
-  const [syncedKey, setSyncedKey] = useState(serverKey);
-  const [baseline, setBaseline] = useState<ModelAccessDraft>(serverDraft);
-  const [draft, setDraft] = useState<ModelAccessDraft>(serverDraft);
-
-  // A refetch that moved the saved lists rebases the form, unless the form
-  // holds edits of its own: those win, and the next save replaces the newer
-  // policy.
-  if (serverKey !== syncedKey) {
-    setSyncedKey(serverKey);
-    const clean = draftsEqual(draft, baseline);
-    setBaseline(serverDraft);
-    if (clean) {
-      setDraft(serverDraft);
-    }
+  const [form, setForm] = useState<FormState>(() => ({
+    syncedKey: serverKey,
+    baseline: serverDraft,
+    draft: serverDraft,
+    providerRowsProvisional: catalogUnavailable,
+  }));
+  const synced = syncedFormState({ state: form, serverKey, serverDraft, catalogUnavailable });
+  if (synced !== form) {
+    setForm(synced);
   }
-
-  // The provider rows are provisional while the catalog is unavailable: they
-  // hold only the providers the organization's own models name. No provider edit
-  // is possible in that state (the tab is read-only), so when the catalog
-  // arrives they rebase to the whole gateway catalog and keep only the edits the
-  // deny list holds. Without this the first toggle after a retry would write the
-  // provisional rows as the organization's whole allow list.
-  const [providerRowsProvisional, setProviderRowsProvisional] = useState(catalogUnavailable);
-  if (providerRowsProvisional !== catalogUnavailable) {
-    setProviderRowsProvisional(catalogUnavailable);
-    if (!catalogUnavailable) {
-      setBaseline({
-        providerAllowList: serverDraft.providerAllowList,
-        modelDenyList: baseline.modelDenyList,
-      });
-      setDraft({
-        providerAllowList: serverDraft.providerAllowList,
-        modelDenyList: draft.modelDenyList,
-      });
-    }
-  }
+  const { baseline, draft } = form;
 
   const dirty = !draftsEqual(draft, baseline);
   const saving = feedback.status === 'pending';
@@ -143,7 +189,7 @@ export function ModelAccessForm({
   const cannotSave = !dirty || saving || savePayload.kind !== 'ready';
   const onDraftChange = (next: ModelAccessDraft) => {
     clearWhere(() => true);
-    setDraft(next);
+    setForm(previous => ({ ...previous, draft: next }));
   };
 
   const onSave = async () => {
@@ -165,8 +211,11 @@ export function ModelAccessForm({
       if (!attempt.owns()) {
         return;
       }
-      setSyncedKey(serverKey);
-      setBaseline(draft);
+      setForm(previous => ({
+        ...previous,
+        syncedKey: serverKey,
+        baseline: previous.draft,
+      }));
       attempt.succeed();
     } catch (error) {
       attempt.fail({
@@ -241,7 +290,7 @@ export function ModelAccessForm({
             disabled={!dirty || saving}
             onPress={() => {
               clearWhere(() => true);
-              setDraft(baseline);
+              setForm(previous => ({ ...previous, draft: previous.baseline }));
             }}
           >
             <Text>{t('common.cancel')}</Text>

@@ -58,22 +58,30 @@ function model(id: string, providers: readonly string[]): CatalogModel {
 
 const CATALOG = [model('anthropic/claude', ['anthropic']), model('openai/gpt', ['openai'])];
 
+/** The catalog plus a model no saved deny list names, so an edit stays valid. */
+const WIDE_CATALOG = [...CATALOG, model('google/gemini', ['google'])];
+
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
 function element(
   providerAllowList: readonly string[] | undefined,
-  overrides: { catalogUnavailable?: boolean; onRetryCatalog?: () => void } = {}
+  overrides: {
+    catalogUnavailable?: boolean;
+    onRetryCatalog?: () => void;
+    modelDenyList?: readonly string[];
+    catalog?: readonly CatalogModel[];
+  } = {}
 ) {
   return createElement(ModelAccessForm, {
     organizationId: 'org-1',
     canEdit: true,
     models: [],
-    catalog: overrides.catalogUnavailable === true ? [] : CATALOG,
+    catalog: overrides.catalogUnavailable === true ? [] : (overrides.catalog ?? CATALOG),
     catalogUnavailable: overrides.catalogUnavailable === true,
     catalogIsFetching: false,
     onRetryCatalog: overrides.onRetryCatalog ?? (() => undefined),
     providerAllowList,
-    modelDenyList: [],
+    modelDenyList: overrides.modelDenyList ?? [],
     gateway: undefined,
     gatewayIsError: false,
     gatewayIsFetching: false,
@@ -83,7 +91,12 @@ function element(
 
 function render(
   providerAllowList: readonly string[] | undefined,
-  overrides: { catalogUnavailable?: boolean; onRetryCatalog?: () => void } = {}
+  overrides: {
+    catalogUnavailable?: boolean;
+    onRetryCatalog?: () => void;
+    modelDenyList?: readonly string[];
+    catalog?: readonly CatalogModel[];
+  } = {}
 ) {
   saved.mutateAsync.mockResolvedValue(undefined);
   act(() => {
@@ -98,7 +111,11 @@ function render(
 /** Render the same form again with the catalog now loaded. */
 function renderWithCatalog(
   providerAllowList: readonly string[] | undefined,
-  overrides: { catalogUnavailable?: boolean } = {}
+  overrides: {
+    catalogUnavailable?: boolean;
+    modelDenyList?: readonly string[];
+    catalog?: readonly CatalogModel[];
+  } = {}
 ) {
   if (!renderer) {
     throw new Error('Missing form renderer');
@@ -312,6 +329,39 @@ describe('ModelAccessForm without the catalog', () => {
       organizationId: 'org-1',
       provider_allow_list: ['anthropic'],
       model_deny_list: [],
+    });
+  });
+});
+
+describe('ModelAccessForm with both rebases in one render', () => {
+  it('keeps the deny list a refetch brought when the catalog arrives with it', async () => {
+    // The catalog can arrive in the same payload update as a newer saved deny
+    // list, so both rebases land in one render.
+    render(undefined, { catalogUnavailable: true, catalog: WIDE_CATALOG });
+    const root = renderWithCatalog(undefined, {
+      modelDenyList: ['openai/gpt'],
+      catalog: WIDE_CATALOG,
+    });
+
+    selectTab(root, 'providers');
+    const providerRowsShown = list(root, 'ProviderAllowList').props.providers;
+    expect(providerRowsShown).toEqual(['anthropic', 'google', 'openai']);
+    selectTab(root, 'models');
+    const draft = list(root, 'ModelDenyList').props.draft as ModelAccessDraft;
+    expect(draft.modelDenyList).toEqual(['openai/gpt']);
+
+    // The form is clean on what the server answered, so save is off.
+    const cleanSave = root.findAllByType('Button' as never).at(-1);
+    expect(cleanSave?.props.disabled).toBe(true);
+
+    // An edit writes the deny list the refetch brought, not the empty one the
+    // form started from.
+    changeDraft(root, toggleModel(draft, 'anthropic/claude', false));
+    await pressSave(root);
+
+    expect(saved.mutateAsync.mock.calls[0]?.[0]).toEqual({
+      organizationId: 'org-1',
+      model_deny_list: ['anthropic/claude', 'openai/gpt'],
     });
   });
 });

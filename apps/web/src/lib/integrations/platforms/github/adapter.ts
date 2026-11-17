@@ -441,10 +441,10 @@ export async function hasPRCommentWithMarker(
 /**
  * Returns the permission string ('admin' | 'maintain' | 'write' | 'read' | 'none') or null
  * when GitHub gives a definitive non-answer: the collaborator is unknown (404), GitHub
- * reports a permission outside the known set, or the App cannot query collaborators
- * (for example a disconnected installation, whose token mint fails here).
- * Rate limits, server errors and network failures are thrown so callers can decide
- * whether to retry rather than treating a temporary failure as a denial.
+ * reports a permission outside the known set, or the installation is gone (the token mint
+ * answers 404). Rate limits, server errors and network failures — from the token mint or
+ * the lookup itself — are thrown so callers can decide whether to retry rather than
+ * treating a temporary failure as a denial.
  */
 export type CollaboratorPermission = 'admin' | 'maintain' | 'write' | 'read' | 'none';
 
@@ -466,15 +466,18 @@ export async function getCollaboratorPermissionLevel(
       expectedIntegrationId
     );
   } catch (error) {
-    // The mint fails for a locally unavailable installation, so this App cannot
-    // query collaborators at all: a definitive null, not a temporary failure.
+    // GitHub answers the token mint for an installation it no longer exposes
+    // (removed or suspended) with a 404; without a token this App cannot query
+    // collaborators at all, so that is a definitive null. Everything else is a
+    // temporary failure and propagates like a lookup failure.
+    if (isHttpError(error) && error.status === 404) return null;
     warnExceptInTest('[getCollaboratorPermissionLevel] Installation token mint failed', {
       installationId,
       owner,
       repo,
       error: error instanceof Error ? error.message : String(error),
     });
-    return null;
+    throw toGitHubRateLimitError(error) ?? error;
   }
   const octokit = new Octokit({ auth: tokenData.token });
 

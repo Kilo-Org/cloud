@@ -91,7 +91,7 @@ describe('GitHub installation authorization', () => {
         'standard',
         'pi_1'
       )
-    ).resolves.toBeNull();
+    ).rejects.toThrow('GitHub installation is unavailable for runtime use');
 
     expect(mockAuth).not.toHaveBeenCalled();
     expect(mockPermission).not.toHaveBeenCalled();
@@ -124,5 +124,47 @@ describe('GitHub installation authorization', () => {
     await expect(
       getCollaboratorPermissionLevel('installation-1', 'acme', 'widgets', 'octocat')
     ).rejects.toBe(serverError);
+  });
+
+  it('returns no answer when the token mint answers 404 for the installation', async () => {
+    mockAuth.mockRejectedValueOnce({ status: 404, message: 'Not Found' });
+
+    await expect(
+      getCollaboratorPermissionLevel('installation-1', 'acme', 'widgets', 'octocat')
+    ).resolves.toBeNull();
+    expect(mockPermission).not.toHaveBeenCalled();
+  });
+
+  it('throws a rate-limited token mint instead of reporting no answer', async () => {
+    mockAuth.mockRejectedValueOnce({
+      status: 429,
+      message: 'rate limit exceeded',
+      response: { headers: {} },
+    });
+
+    await expect(
+      getCollaboratorPermissionLevel('installation-1', 'acme', 'widgets', 'octocat')
+    ).rejects.toBeInstanceOf(GitHubRateLimitError);
+    expect(mockPermission).not.toHaveBeenCalled();
+  });
+
+  it('throws a server-failed token mint instead of reporting no answer', async () => {
+    const mintError = { status: 502, message: 'Bad gateway' };
+    mockAuth.mockRejectedValueOnce(mintError);
+
+    await expect(
+      getCollaboratorPermissionLevel('installation-1', 'acme', 'widgets', 'octocat')
+    ).rejects.toBe(mintError);
+    expect(mockPermission).not.toHaveBeenCalled();
+  });
+
+  it('throws a network-failed token mint instead of reporting no answer', async () => {
+    const mintError = new Error('getaddrinfo EAI_AGAIN api.github.com');
+    mockAuth.mockRejectedValueOnce(mintError);
+
+    await expect(
+      getCollaboratorPermissionLevel('installation-1', 'acme', 'widgets', 'octocat')
+    ).rejects.toBe(mintError);
+    expect(mockPermission).not.toHaveBeenCalled();
   });
 });

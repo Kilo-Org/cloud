@@ -1366,7 +1366,8 @@
       "noReviews": "Сè уште нема прегледи",
       "noReviewsDescription": "Прегледите ќе се појават тука откако прегледувачот на код ќе обработи барање за спојување.",
       "startManualReview": "Започни рачен преглед",
-      "configureProvider": "Постави ја платформата"
+      "configureProvider": "Постави ја платформата",
+      "connectOwnerOnly": "Побарајте од сопственик или администратор на организацијата да ја поврзат платформата."
     },
     "platformList": {
       "checking": "Се проверува…",
@@ -2974,6 +2975,7 @@
     "signOutThisDevice": "Одјави го овој уред",
     "signOutSessionLabel": "Одјави го {{device}}, најава: {{signedIn}}, последна активност: {{lastSeen}}",
     "sessionSignedOut": "Сесијата е одјавена.",
+    "sessionSignOutFailed": "Не можеше да се одјави оваа сесија. Обидете се повторно.",
     "signOutThisDeviceTitle": "Да се одјави овој уред?",
     "signOutThisSessionTitle": "Да се одјави оваа сесија?",
     "signOutThisSessionMessage": "Уредот {{device}} ќе се одјави. Последна активност: {{lastSeen}}. Може да го задржи пристапот до API уште најмногу еден час.",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "Историја на плаќања",
       "billingHistoryEmpty": "Сè уште нема историја на плаќања.",
+      "billingHistoryError": "Не успеа да се вчита историја на плаќања",
       "cancel": "Откажи претплата",
       "cancelDescription": "Вашиот Kilo Pass останува активен до крајот на периодот на наплата и нема да се обнови.",
       "cancelScheduled": "Се откажува на {{date}}",
       "cancelScheduledChange": "Откажи ја закажаната промена",
       "cancelled": "Претплатата е откажана",
       "creditHistoryEmpty": "Сè уште нема кредити од Kilo Pass.",
+      "creditHistoryError": "Не успеа да се вчита историја на кредити",
       "resume": "Продолжи ја претплатата",
       "resumeCancelledDescription": "Вашиот Kilo Pass повторно ќе се обновува автоматски.",
       "resumePausedDescription": "Вашиот Kilo Pass продолжува сега, пред закажаниот датум за продолжување.",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "Избор на организација",
       "unavailableDescription": "Оваа организација веќе не е достапна. Избери друга од твојот профил за да продолжиш.",
       "unavailableSessionsDescription": "Оваа организација веќе не е достапна. Нејзините сесии не можат да се вчитаат.",
-      "accessDeniedDescription": "Немаш пристап до оваа организација."
+      "accessDeniedDescription": "Замоли сопственик или администратор на организација да ти дозволи пристап."
     },
     "create": {
       "title": "Создај организација",
@@ -3464,6 +3468,8 @@
       "groups": "Групи",
       "guardrails": "Заштитни ограничувања",
       "byok": "Сопствен клуч (BYOK)",
+      "ssoAndDomain": "SSO и домен",
+      "dataCollection": "Собирање податоци",
       "auditLogs": "Дневници за ревизија",
       "requestLogs": "Дневници на барања",
       "subOrganizations": "Подорганизации",

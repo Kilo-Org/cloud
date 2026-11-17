@@ -1366,7 +1366,8 @@
       "noReviews": "હજી કોઈ સમીક્ષા નથી",
       "noReviewsDescription": "કોડ સમીક્ષક પુલ રિક્વેસ્ટની સમીક્ષા કરે પછી તે અહીં દેખાશે.",
       "startManualReview": "સમીક્ષા જાતે શરૂ કરો",
-      "configureProvider": "સેવા પ્રદાતા ગોઠવો"
+      "configureProvider": "સેવા પ્રદાતા ગોઠવો",
+      "connectOwnerOnly": "સંસ્થાના માલિક અથવા એડમિનને સેવા પ્રદાતા જોડવા માટે વિનંતી કરો."
     },
     "platformList": {
       "checking": "તપાસ થઈ રહી છે…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "આ ઉપકરણમાંથી સાઇન આઉટ કરો",
     "signOutSessionLabel": "{{device}}માંથી સાઇન આઉટ કરો, સાઇન ઇન: {{signedIn}}, છેલ્લે સક્રિય: {{lastSeen}}",
     "sessionSignedOut": "સત્રમાંથી સાઇન આઉટ થયું.",
+    "sessionSignOutFailed": "આ સત્રમાંથી સાઇન આઉટ કરી શકાયું નહીં. ફરી પ્રયાસ કરો.",
     "signOutThisDeviceTitle": "આ ઉપકરણમાંથી સાઇન આઉટ કરવું છે?",
     "signOutThisSessionTitle": "આ સત્રમાંથી સાઇન આઉટ કરવું છે?",
     "signOutThisSessionMessage": "{{device}}માંથી સાઇન આઉટ થશે. છેલ્લે સક્રિય: {{lastSeen}}. તેનો API ઍક્સેસ એક કલાક સુધી ચાલુ રહી શકે છે.",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "બિલિંગ ઇતિહાસ",
       "billingHistoryEmpty": "હજી સુધી કોઈ બિલિંગ ઇતિહાસ નથી.",
+      "billingHistoryError": "બિલિંગ ઇતિહાસ લોડ કરી શકાયું નથી",
       "cancel": "સબ્સ્ક્રિપ્શન રદ કરો",
       "cancelDescription": "તમારો Kilo Pass બિલિંગ સમયગાળાના અંત સુધી સક્રિય રહેશે અને રિન્યૂ થશે નહીં.",
       "cancelScheduled": "{{date}}ના રોજ રદ થશે",
       "cancelScheduledChange": "શેડ્યૂલ કરેલો ફેરફાર રદ કરો",
       "cancelled": "સબ્સ્ક્રિપ્શન રદ કર્યું",
       "creditHistoryEmpty": "હજી સુધી કોઈ Kilo Pass ક્રેડિટ નથી.",
+      "creditHistoryError": "ક્રેડિટ ઇતિહાસ લોડ કરી શકાયું નથી",
       "resume": "સબ્સ્ક્રિપ્શન ફરી શરૂ કરો",
       "resumeCancelledDescription": "તમારો Kilo Pass ફરીથી ઑટોમેટિક રીતે રિન્યૂ થવા લાગશે.",
       "resumePausedDescription": "તમારો Kilo Pass તેની શેડ્યૂલ કરેલી ફરી શરૂ થવાની તારીખ પહેલાં, હમણાં જ ફરી શરૂ થશે.",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "સંસ્થા પસંદ કરો",
       "unavailableDescription": "આ સંસ્થા હવે ઉપલબ્ધ નથી. આગળ વધવા માટે તમારી પ્રોફાઇલમાંથી બીજી સંસ્થા પસંદ કરો.",
       "unavailableSessionsDescription": "આ સંસ્થા હવે ઉપલબ્ધ નથી. તેના સત્રો લોડ કરી શકાતા નથી.",
-      "accessDeniedDescription": "તમારી પાસે આ સંસ્થાનો ઍક્સેસ નથી."
+      "accessDeniedDescription": "તમને ઍક્સેસ આપવા માટે સંસ્થાના માલિક અથવા એડમિનને વિનંતી કરો."
     },
     "create": {
       "title": "સંસ્થા બનાવો",
@@ -3464,6 +3468,8 @@
       "groups": "ગ્રુપ",
       "guardrails": "ગાર્ડરેલ્સ",
       "byok": "તમારી પોતાની કી વાપરો",
+      "ssoAndDomain": "SSO અને ડોમેન",
+      "dataCollection": "ડેટા સંગ્રહ",
       "auditLogs": "ઑડિટ લૉગ",
       "requestLogs": "રિક્વેસ્ટ લૉગ",
       "subOrganizations": "પેટા-સંસ્થાઓ",

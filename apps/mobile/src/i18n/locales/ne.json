@@ -1366,7 +1366,8 @@
       "noReviews": "अहिलेसम्म कुनै समीक्षा छैन",
       "noReviewsDescription": "कोड समीक्षकले पुल रिक्वेस्टको समीक्षा गरेपछि समीक्षाहरू यहाँ देखिनेछन्।",
       "startManualReview": "म्यानुअल समीक्षा सुरु गर्नुहोस्",
-      "configureProvider": "प्रदायकका सेटिङहरू मिलाउनुहोस्"
+      "configureProvider": "प्रदायकका सेटिङहरू मिलाउनुहोस्",
+      "connectOwnerOnly": "प्रदायक जडान गर्न संस्थाको मालिक वा प्रशासकलाई अनुरोध गर्नुहोस्।"
     },
     "platformList": {
       "checking": "जाँच गर्दै…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "यो यन्त्रबाट साइन आउट गर्नुहोस्",
     "signOutSessionLabel": "{{device}} बाट साइन आउट गर्नुहोस्, साइन इन: {{signedIn}}, अन्तिम पटक देखिएको: {{lastSeen}}",
     "sessionSignedOut": "सत्रबाट साइन आउट गरियो।",
+    "sessionSignOutFailed": "यो सत्रबाट साइन आउट गर्न सकिएन, फेरि प्रयास गर्नुहोस्।",
     "signOutThisDeviceTitle": "यो यन्त्रबाट साइन आउट गर्ने?",
     "signOutThisSessionTitle": "यो सत्रबाट साइन आउट गर्ने?",
     "signOutThisSessionMessage": "{{device}} बाट साइन आउट गरिनेछ। अन्तिम पटक देखिएको: {{lastSeen}}। त्यसपछि पनि यो यन्त्रसँग एक घण्टासम्म API पहुँच रहन सक्छ।",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "बिलिङ इतिहास",
       "billingHistoryEmpty": "अहिलेसम्म कुनै बिलिङ इतिहास छैन।",
+      "billingHistoryError": "बिलिङ इतिहास लोड गर्न सकिएन",
       "cancel": "सदस्यता रद्द गर्नुहोस्",
       "cancelDescription": "तपाईंको Kilo Pass बिलिङ अवधिको अन्त्यसम्म सक्रिय रहन्छ र नवीकरण हुने छैन।",
       "cancelScheduled": "{{date}} मा रद्द हुन्छ",
       "cancelScheduledChange": "तय गरिएको परिवर्तन रद्द गर्नुहोस्",
       "cancelled": "सदस्यता रद्द गरियो",
       "creditHistoryEmpty": "अहिलेसम्म कुनै Kilo Pass क्रेडिट छैन।",
+      "creditHistoryError": "क्रेडिट इतिहास लोड गर्न सकिएन",
       "resume": "सदस्यता पुनः सुरु गर्नुहोस्",
       "resumeCancelledDescription": "तपाईंको Kilo Pass फेरि स्वतः नवीकरण हुन थाल्छ।",
       "resumePausedDescription": "तपाईंको Kilo Pass तय गरिएको पुनः सुरु मितिभन्दा पहिले, अहिले नै पुनः सुरु हुन्छ।",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "संस्था चयन गर्नुहोस्",
       "unavailableDescription": "यो संस्था अब उपलब्ध छैन। जारी राख्न आफ्नो प्रोफाइलबाट अर्को संस्था छान्नुहोस्।",
       "unavailableSessionsDescription": "यो संस्था अब उपलब्ध छैन। यसका सत्रहरू लोड गर्न सकिँदैन।",
-      "accessDeniedDescription": "तपाईंसँग यो संस्थामा पहुँच छैन।"
+      "accessDeniedDescription": "तपाईंलाई पहुँच दिन कुनै संस्थाको मालिक वा प्रशासकलाई अनुरोध गर्नुहोस्।"
     },
     "create": {
       "title": "संस्था बनाउनुहोस्",
@@ -3464,6 +3468,8 @@
       "groups": "समूहहरू",
       "guardrails": "गार्डरेलहरू",
       "byok": "आफ्नै की प्रयोग गर्नुहोस्",
+      "ssoAndDomain": "SSO र डोमेन",
+      "dataCollection": "डेटा सङ्कलन",
       "auditLogs": "अडिट लगहरू",
       "requestLogs": "अनुरोध लगहरू",
       "subOrganizations": "उप-संस्थाहरू",

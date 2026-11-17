@@ -777,6 +777,7 @@
     },
     "reviewList": {
       "configureProvider": "הגדרת ספק",
+      "connectOwnerOnly": "בקש מבעלים של הארגון או מנהל לחבר ספק.",
       "couldNotLoad": "לא ניתן לטעון את הסקירות.",
       "noReviews": "אין עדיין סקירות",
       "noReviewsDescription": "סקירות יופיעו כאן לאחר שסוקר הקוד יסקור בקשת משיכה.",
@@ -2462,6 +2463,7 @@
     "signOutThisDevice": "ניתוק המכשיר הזה מהחשבון",
     "signOutSessionLabel": "ניתוק {{device}} מהחשבון, מועד הכניסה: {{signedIn}}, פעילות אחרונה: {{lastSeen}}",
     "sessionSignedOut": "החיבור נותק.",
+    "sessionSignOutFailed": "לא ניתן לנתק את החיבור הזה. נסו שוב.",
     "signOutThisDeviceTitle": "להתנתק מהמכשיר הזה?",
     "signOutThisSessionTitle": "לנתק את החיבור הזה?",
     "signOutThisSessionMessage": "{{device}} ינותק מהחשבון. פעילות אחרונה: {{lastSeen}}. הגישה שלו ל-API יכולה להישאר פעילה למשך עד שעה.",
@@ -2587,12 +2589,14 @@
     "manage": {
       "billingHistory": "היסטוריית חיובים",
       "billingHistoryEmpty": "אין עדיין היסטוריית חיובים.",
+      "billingHistoryError": "לא ניתן לטעון את היסטוריית החיובים",
       "cancel": "ביטול המינוי",
       "cancelDescription": "ה-Kilo Pass שלך יישאר פעיל עד סוף תקופת החיוב ולא יתחדש.",
       "cancelScheduled": "יבוטל בתאריך {{date}}",
       "cancelScheduledChange": "ביטול השינוי המתוזמן",
       "cancelled": "המינוי בוטל",
       "creditHistoryEmpty": "עדיין אין קרדיטים מ-Kilo Pass.",
+      "creditHistoryError": "לא ניתן לטעון את היסטוריית הקרדיטים",
       "resume": "חידוש המינוי",
       "resumeCancelledDescription": "ה-Kilo Pass שלך יתחיל שוב להתחדש אוטומטית.",
       "resumePausedDescription": "ה-Kilo Pass שלך יחודש עכשיו, לפני מועד החידוש המתוזמן.",
@@ -3387,7 +3391,7 @@
       "selectOrganization": "בחירת ארגון",
       "unavailableDescription": "הארגון הזה כבר אינו זמין. בחר ארגון אחר מהפרופיל שלך כדי להמשיך.",
       "unavailableSessionsDescription": "הארגון הזה כבר אינו זמין. לא ניתן לטעון את הסשנים שלו.",
-      "accessDeniedDescription": "אין לך גישה לארגון זה."
+      "accessDeniedDescription": "בקש מבעלים או מנהל של הארגון להעניק לך גישה."
     },
     "create": {
       "title": "יצירת ארגון",
@@ -3526,6 +3530,8 @@
       "groups": "קבוצות",
       "guardrails": "מעקות בטיחות",
       "byok": "שימוש במפתח משלך",
+      "ssoAndDomain": "SSO ודומיין",
+      "dataCollection": "איסוף נתונים",
       "auditLogs": "יומני ביקורת",
       "requestLogs": "יומני בקשות",
       "subOrganizations": "ארגוני משנה",

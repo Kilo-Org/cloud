@@ -1412,7 +1412,8 @@
       "noReviews": "Пакуль няма праверак",
       "noReviewsDescription": "Праверкі з'явяцца тут пасля таго, як агент праверкі кода праверыць запыт на зліццё.",
       "startManualReview": "Пачаць ручную праверку",
-      "configureProvider": "Наладзіць платформу"
+      "configureProvider": "Наладзіць платформу",
+      "connectOwnerOnly": "Папрасіце ўладальніка арганізацыі або адміністратара падключыць платформу."
     },
     "platformList": {
       "checking": "Праверка…",
@@ -3084,6 +3085,7 @@
     "signOutThisDevice": "Выйсці з уліковага запісу на гэтай прыладзе",
     "signOutSessionLabel": "Выйсці з прылады {{device}}, Уваход: {{signedIn}}, Апошняя актыўнасць: {{lastSeen}}",
     "sessionSignedOut": "Сеанс завершаны.",
+    "sessionSignOutFailed": "Не ўдалося завяршыць гэты сеанс. Паспрабуйце яшчэ раз.",
     "signOutThisDeviceTitle": "Выйсці з уліковага запісу на гэтай прыладзе?",
     "signOutThisSessionTitle": "Завяршыць гэты сеанс?",
     "signOutThisSessionMessage": "Сеанс на прыладзе {{device}} будзе завершаны. Апошняя актыўнасць: {{lastSeen}}. Доступ да API можа захоўвацца яшчэ да гадзіны.",
@@ -3210,12 +3212,14 @@
     "manage": {
       "billingHistory": "Гісторыя плацяжоў",
       "billingHistoryEmpty": "Гісторыі плацяжоў пакуль няма.",
+      "billingHistoryError": "Не ўдалося загрузіць гісторыю плацяжоў",
       "cancel": "Скасаваць падпіску",
       "cancelDescription": "Kilo Pass застанецца актыўным да канца плацёжнага перыяду і не будзе падоўжаны.",
       "cancelScheduled": "Будзе скасавана {{date}}",
       "cancelScheduledChange": "Скасаваць запланаваную змену",
       "cancelled": "Падпіска скасавана",
       "creditHistoryEmpty": "Крэдытаў Kilo Pass пакуль няма.",
+      "creditHistoryError": "Не ўдалося загрузіць гісторыю крэдытаў",
       "resume": "Аднавіць падпіску",
       "resumeCancelledDescription": "Kilo Pass зноў будзе падаўжацца аўтаматычна.",
       "resumePausedDescription": "Kilo Pass адновіцца зараз, раней за запланаваную дату аднаўлення.",
@@ -3452,7 +3456,7 @@
       "selectOrganization": "Выберыце арганізацыю",
       "unavailableDescription": "Гэтая арганізацыя больш недаступная. Каб працягнуць, выберыце іншую ў сваім профілі.",
       "unavailableSessionsDescription": "Гэтая арганізацыя больш недаступная. Загрузіць сесіі для яе немагчыма.",
-      "accessDeniedDescription": "У вас няма доступу да гэтай арганізацыі."
+      "accessDeniedDescription": "Папрасіце ўладальніка або адміністратара арганізацыі прадаставіць вам доступ."
     },
     "create": {
       "title": "Стварыць арганізацыю",
@@ -3578,6 +3582,8 @@
       "groups": "Групы",
       "guardrails": "Абмежаванні бяспекі",
       "byok": "Уласны ключ",
+      "ssoAndDomain": "SSO і дамен",
+      "dataCollection": "Збор даных",
       "auditLogs": "Журналы аўдыту",
       "requestLogs": "Журналы запытаў",
       "subOrganizations": "Падарганізацыі",

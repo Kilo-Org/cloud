@@ -1366,7 +1366,8 @@
       "noReviews": "Inga granskningar ännu",
       "noReviewsDescription": "Granskningar visas här när Code Reviewer har granskat en pull-begäran.",
       "startManualReview": "Starta en manuell granskning",
-      "configureProvider": "Konfigurera leverantör"
+      "configureProvider": "Konfigurera leverantör",
+      "connectOwnerOnly": "Be en organisationsägare eller administratör att ansluta en leverantör."
     },
     "platformList": {
       "checking": "Kontrollerar…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "Logga ut från den här enheten",
     "signOutSessionLabel": "Logga ut från {{device}}, inloggad {{signedIn}}, senast aktiv {{lastSeen}}",
     "sessionSignedOut": "Sessionen är utloggad.",
+    "sessionSignOutFailed": "Det gick inte att logga ut den här sessionen. Försök igen.",
     "signOutThisDeviceTitle": "Logga ut från den här enheten?",
     "signOutThisSessionTitle": "Logga ut den här sessionen?",
     "signOutThisSessionMessage": "{{device}} loggas ut. Senast aktiv {{lastSeen}}. Den kan behålla API-åtkomst i upp till en timme.",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "Faktureringshistorik",
       "billingHistoryEmpty": "Ingen faktureringshistorik än.",
+      "billingHistoryError": "Kunde inte läsa in faktureringshistoriken",
       "cancel": "Avsluta prenumeration",
       "cancelDescription": "Ditt Kilo Pass är aktivt till slutet av faktureringsperioden och förnyas inte.",
       "cancelScheduled": "Avslutas {{date}}",
       "cancelScheduledChange": "Avbryt schemalagd ändring",
       "cancelled": "Prenumerationen har avslutats",
       "creditHistoryEmpty": "Inga Kilo Pass-krediter än.",
+      "creditHistoryError": "Kunde inte läsa in kredithistoriken",
       "resume": "Återuppta prenumeration",
       "resumeCancelledDescription": "Ditt Kilo Pass börjar förnyas automatiskt igen.",
       "resumePausedDescription": "Ditt Kilo Pass återupptas nu, före det schemalagda återupptagningsdatumet.",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "Välj en organisation",
       "unavailableDescription": "Den här organisationen är inte längre tillgänglig. Välj en annan i din profil för att fortsätta.",
       "unavailableSessionsDescription": "Den här organisationen är inte längre tillgänglig. Det går inte att läsa in sessioner för den.",
-      "accessDeniedDescription": "Du har inte åtkomst till den här organisationen."
+      "accessDeniedDescription": "Be en ägare eller administratör i organisationen om att ge dig åtkomst."
     },
     "create": {
       "title": "Skapa organisation",
@@ -3464,6 +3468,8 @@
       "groups": "Grupper",
       "guardrails": "Skyddsräcken",
       "byok": "Använd egen nyckel",
+      "ssoAndDomain": "SSO och domän",
+      "dataCollection": "Datainsamling",
       "auditLogs": "Granskningsloggar",
       "requestLogs": "Förfrågningsloggar",
       "subOrganizations": "Underorganisationer",

@@ -136,7 +136,9 @@ function formatWorkedDuration(durationMs: number): string {
 }
 
 export function summarizeAgentWork(parts: Part[], working = false): string {
-  const tools = parts.filter(isToolPart);
+  const tools = parts.filter(
+    (part): part is ToolPart => isToolPart(part) && readBackgroundResult(part)?.kind !== 'notice'
+  );
   const reasoning = parts.filter(shouldRenderReasoningPart);
   const subtasks = parts.filter(isSubtaskPart);
 
@@ -192,13 +194,15 @@ export function groupAssistantParts(
       continue;
     }
 
+    const backgroundResult = isToolPart(part) ? readBackgroundResult(part) : undefined;
+    // Shell and subagent results need attention; passive notices stay in the work group.
     const standaloneTool =
       mode === 'live' &&
       isToolPart(part) &&
       (part.tool === 'question' ||
         part.tool === 'task' ||
         part.tool === 'suggest' ||
-        readBackgroundResult(part) !== undefined);
+        (backgroundResult !== undefined && backgroundResult.kind !== 'notice'));
     const toolId = producingToolPartId(part);
     // A tool's returned files stay beside that tool instead of ending its group.
     const type =

@@ -58,6 +58,7 @@ import { generateBranchSlugFromSeed } from '@kilocode/worker-utils/deployment-sl
 import type { CloudAgentAuthority } from '@kilocode/worker-utils/cloud-agent-authority';
 import {
   createRuntimeAuthorization,
+  RuntimeAuthorizationRevokedError,
   sealRuntimeAuthorization,
 } from '@kilocode/worker-utils/runtime-authorization';
 
@@ -118,6 +119,7 @@ import {
 import { createMessageId } from './message-id.js';
 import { canonicalRequestedEnvironment } from './requested-environment-intent.js';
 import { isPolicyBearingAuthToken } from './policy-bearing-token.js';
+import { logRuntimeAuthorizationDiagnostic } from './runtime-authorization-diagnostics.js';
 import type { MessageResultRPCResponse } from './message-result.js';
 import { classifyStoredInitialTurn, initialTurnTerminalFailure } from './initial-turn-outcome.js';
 import type {
@@ -934,6 +936,13 @@ async function issueSessionRuntimeAuthorization(
       resourceKind: 'cloud-agent-next',
       resourceId: cloudAgentSessionId,
       ...(orgId ? { organizationId: orgId } : {}),
+      onBindingRejected: reason =>
+        logRuntimeAuthorizationDiagnostic(cloudAgentSessionId, 'binding_check', reason),
+    }).catch((error: unknown) => {
+      if (error instanceof RuntimeAuthorizationRevokedError) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Runtime authorization denied' });
+      }
+      throw error;
     });
     runtimeAuthorization = {
       token: created.token,

@@ -1366,7 +1366,8 @@
       "noReviews": "ابھی کوئی جائزہ نہیں",
       "noReviewsDescription": "جب کوڈ ریویور کسی پل ریکویسٹ کا جائزہ لے گا تو وہ یہاں ظاہر ہو گا۔",
       "startManualReview": "دستی جائزہ شروع کریں",
-      "configureProvider": "فراہم کنندہ کی ترتیبات طے کریں"
+      "configureProvider": "فراہم کنندہ کی ترتیبات طے کریں",
+      "connectOwnerOnly": "ادارے کے کسی مالک یا منتظم سے فراہم کنندہ کو منسلک کرنے کی درخواست کریں۔"
     },
     "platformList": {
       "checking": "جانچ ہو رہی ہے…",
@@ -2974,6 +2975,7 @@
     "signOutThisDevice": "اس ڈیوائس سے سائن آؤٹ کریں",
     "signOutSessionLabel": "{{device}} سے سائن آؤٹ کریں، سائن ان: {{signedIn}}، آخری سرگرمی: {{lastSeen}}",
     "sessionSignedOut": "سیشن سائن آؤٹ ہو گیا۔",
+    "sessionSignOutFailed": "اس سیشن سے سائن آؤٹ نہیں ہو سکا۔ دوبارہ کوشش کریں۔",
     "signOutThisDeviceTitle": "اس ڈیوائس سے سائن آؤٹ کریں؟",
     "signOutThisSessionTitle": "اس سیشن سے سائن آؤٹ کریں؟",
     "signOutThisSessionMessage": "{{device}} سے سائن آؤٹ ہو جائے گا۔ آخری سرگرمی: {{lastSeen}}۔ اس کی API تک رسائی مزید ایک گھنٹے تک برقرار رہ سکتی ہے۔",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "بلنگ کی تاریخچہ",
       "billingHistoryEmpty": "ابھی تک بلنگ کی کوئی تاریخچہ نہیں۔",
+      "billingHistoryError": "بلنگ کی تاریخچہ لوڈ نہیں ہو سکا",
       "cancel": "سبسکرپشن منسوخ کریں",
       "cancelDescription": "آپ کا Kilo Pass بلنگ کی مدت کے اختتام تک فعال رہے گا اور اس کی تجدید نہیں ہوگی۔",
       "cancelScheduled": "{{date}} کو منسوخ ہو جائے گی",
       "cancelScheduledChange": "طے شدہ تبدیلی منسوخ کریں",
       "cancelled": "سبسکرپشن منسوخ ہو گئی",
       "creditHistoryEmpty": "ابھی تک کوئی Kilo Pass کریڈٹس نہیں۔",
+      "creditHistoryError": "کریڈٹ کی تاریخچہ لوڈ نہیں ہو سکا",
       "resume": "سبسکرپشن دوبارہ شروع کریں",
       "resumeCancelledDescription": "آپ کے Kilo Pass کی تجدید دوبارہ خودکار طور پر ہونے لگے گی۔",
       "resumePausedDescription": "آپ کا Kilo Pass اپنی طے شدہ تاریخ سے پہلے، ابھی دوبارہ شروع ہو جائے گا۔",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "ایک تنظیم منتخب کریں",
       "unavailableDescription": "یہ تنظیم اب دستیاب نہیں ہے۔ جاری رکھنے کے لیے اپنے پروفائل سے کوئی اور تنظیم منتخب کریں۔",
       "unavailableSessionsDescription": "یہ تنظیم اب دستیاب نہیں ہے۔ اس کے سیشنز لوڈ نہیں ہو سکتے۔",
-      "accessDeniedDescription": "آپ کو اس تنظیم تک رسائی حاصل نہیں ہے۔"
+      "accessDeniedDescription": "کسی تنظیم کے مالک یا منتظم سے کہیں کہ وہ آپ کو رسائی دیں۔"
     },
     "create": {
       "title": "تنظیم بنائیں",
@@ -3464,6 +3468,8 @@
       "groups": "گروپس",
       "guardrails": "گارڈ ریلز",
       "byok": "اپنی کلید خود لائیں",
+      "ssoAndDomain": "SSO اور ڈومین",
+      "dataCollection": "ڈیٹا کا حصول",
       "auditLogs": "آڈٹ لاگز",
       "requestLogs": "درخواست لاگز",
       "subOrganizations": "ذیلی تنظیمیں",

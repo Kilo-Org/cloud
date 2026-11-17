@@ -33,7 +33,7 @@ catalog:
   '@typescript/native-preview': 7.0.0-dev.20260707.2
   '@vitest/coverage-v8': 4.1.12
   '@vitest/ui': 4.1.12
-  '@workos-inc/node': 11.0.0
+  '@workos-inc/node': 12.2.0
   aws4fetch: 1.0.20
   dotenv: 18.0.10
   drizzle-kit: 0.31.11

@@ -744,6 +744,7 @@
     },
     "reviewList": {
       "configureProvider": "Configura la piattaforma",
+      "connectOwnerOnly": "Chiedi a un proprietario o a un amministratore dell'organizzazione di connettere una piattaforma.",
       "couldNotLoad": "Impossibile caricare le revisioni.",
       "noReviews": "Ancora nessuna revisione",
       "noReviewsDescription": "Le revisioni compaiono qui quando il Code Reviewer viene eseguito su una pull request.",
@@ -2462,6 +2463,7 @@
     "signOutThisDevice": "Disconnetti questo dispositivo",
     "signOutSessionLabel": "Disconnetti {{device}}, accesso effettuato {{signedIn}}, ultima attività {{lastSeen}}",
     "sessionSignedOut": "Sessione disconnessa.",
+    "sessionSignOutFailed": "Impossibile disconnettere questa sessione. Riprovi.",
     "signOutThisDeviceTitle": "Disconnettere questo dispositivo?",
     "signOutThisSessionTitle": "Disconnettere questa sessione?",
     "signOutThisSessionMessage": "{{device}} verrà disconnesso. Ultima attività {{lastSeen}}. Potrà mantenere l'accesso alle API per un massimo di un'ora.",
@@ -2587,12 +2589,14 @@
     "manage": {
       "billingHistory": "Cronologia fatturazione",
       "billingHistoryEmpty": "Nessuna cronologia di fatturazione.",
+      "billingHistoryError": "Impossibile caricare la cronologia di fatturazione",
       "cancel": "Annulla abbonamento",
       "cancelDescription": "Il tuo Kilo Pass resta attivo fino alla fine del periodo di fatturazione e non verrà rinnovato.",
       "cancelScheduled": "Si annulla il {{date}}",
       "cancelScheduledChange": "Annulla modifica programmata",
       "cancelled": "Abbonamento annullato",
       "creditHistoryEmpty": "Nessun credito Kilo Pass per ora.",
+      "creditHistoryError": "Impossibile caricare la cronologia dei crediti",
       "resume": "Riprendi abbonamento",
       "resumeCancelledDescription": "Il tuo Kilo Pass tornerà a rinnovarsi automaticamente.",
       "resumePausedDescription": "Il tuo Kilo Pass riprende ora, prima della data di ripresa programmata.",
@@ -3387,7 +3391,7 @@
       "selectOrganization": "Seleziona un'organizzazione",
       "unavailableDescription": "Questa organizzazione non è più disponibile. Scegline una dal tuo profilo per continuare.",
       "unavailableSessionsDescription": "Questa organizzazione non è più disponibile. Non è possibile caricare le sue sessioni.",
-      "accessDeniedDescription": "Non hai accesso a questa organizzazione."
+      "accessDeniedDescription": "Chiedi a un proprietario o a un amministratore dell'organizzazione di concederti l'accesso."
     },
     "create": {
       "title": "Crea organizzazione",
@@ -3526,6 +3530,8 @@
       "groups": "Gruppi",
       "guardrails": "Guardrail",
       "byok": "Usa la tua chiave",
+      "ssoAndDomain": "SSO e dominio",
+      "dataCollection": "Raccolta dati",
       "auditLogs": "Registri di controllo",
       "requestLogs": "Registri delle richieste",
       "subOrganizations": "Sotto-organizzazioni",

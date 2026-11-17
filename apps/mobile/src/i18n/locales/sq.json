@@ -1366,7 +1366,8 @@
       "noReviews": "Ende pa shqyrtime",
       "noReviewsDescription": "Shqyrtimet shfaqen këtu pasi shqyrtuesi i kodit të ketë shqyrtuar një PR.",
       "startManualReview": "Fillo një shqyrtim manual",
-      "configureProvider": "Konfiguro ofruesin"
+      "configureProvider": "Konfiguro ofruesin",
+      "connectOwnerOnly": "Kërkoni nga një pronar ose administrator i organizatës të lidhë një ofrues."
     },
     "platformList": {
       "checking": "Duke kontrolluar…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "Dil nga kjo pajisje",
     "signOutSessionLabel": "Dil nga {{device}}, hyrja: {{signedIn}}, aktiviteti i fundit: {{lastSeen}}",
     "sessionSignedOut": "Seanca u mbyll.",
+    "sessionSignOutFailed": "Nuk mund të mbyllej kjo seancë. Provo përsëri.",
     "signOutThisDeviceTitle": "Do të dalësh nga kjo pajisje?",
     "signOutThisSessionTitle": "Të mbyllet kjo seancë?",
     "signOutThisSessionMessage": "Seanca në {{device}} do të mbyllet. Aktiviteti i fundit: {{lastSeen}}. Pajisja mund të ruajë qasjen në API deri në një orë.",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "Historiku i faturimit",
       "billingHistoryEmpty": "Ende nuk ka historik faturimi.",
+      "billingHistoryError": "Nuk mundi të ngarkohet historiku i faturimit",
       "cancel": "Anulo abonimin",
       "cancelDescription": "Kilo Pass mbetet aktiv deri në fund të periudhës së faturimit dhe nuk do të rinovohet.",
       "cancelScheduled": "Anulohet më {{date}}",
       "cancelScheduledChange": "Anulo ndryshimin e planifikuar",
       "cancelled": "Abonimi u anulua",
       "creditHistoryEmpty": "Ende nuk ka kredite nga Kilo Pass.",
+      "creditHistoryError": "Nuk mundi të ngarkohet historiku i krediteve",
       "resume": "Rifillo abonimin",
       "resumeCancelledDescription": "Kilo Pass fillon sërish të rinovohet automatikisht.",
       "resumePausedDescription": "Kilo Pass rifillon tani, përpara datës së planifikuar të rifillimit.",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "Zgjidh një organizatë",
       "unavailableDescription": "Kjo organizatë nuk është më e disponueshme. Zgjidh një tjetër nga profili yt për të vazhduar.",
       "unavailableSessionsDescription": "Kjo organizatë nuk është më e disponueshme. Sesionet e saj nuk mund të ngarkohen.",
-      "accessDeniedDescription": "Nuk ke qasje në këtë organizatë."
+      "accessDeniedDescription": "Kërko nga një pronar ose administrator i organizatës të të japë qasje."
     },
     "create": {
       "title": "Krijo organizatë",
@@ -3464,6 +3468,8 @@
       "groups": "Grupet",
       "guardrails": "Masat mbrojtëse",
       "byok": "Përdor çelësin tënd",
+      "ssoAndDomain": "SSO dhe domeni",
+      "dataCollection": "Mbledhja e të dhënave",
       "auditLogs": "Regjistrat e auditimit",
       "requestLogs": "Regjistrat e kërkesave",
       "subOrganizations": "Nënorganizatat",

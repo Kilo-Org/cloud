@@ -1366,7 +1366,8 @@
       "noReviews": "Aínda non hai revisións",
       "noReviewsDescription": "As revisións aparecerán aquí cando o revisor de código analice unha solicitude de cambios.",
       "startManualReview": "Iniciar unha revisión manual",
-      "configureProvider": "Configurar o provedor"
+      "configureProvider": "Configurar o provedor",
+      "connectOwnerOnly": "Pídelle ao propietario ou ao administrador da organización que conecte un provedor."
     },
     "platformList": {
       "checking": "Comprobando…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "Pechar a sesión deste dispositivo",
     "signOutSessionLabel": "Pechar a sesión de {{device}}, inicio de sesión: {{signedIn}}, última actividade: {{lastSeen}}",
     "sessionSignedOut": "Sesión pechada.",
+    "sessionSignOutFailed": "Non se puido pechar esta sesión. Téntao de novo.",
     "signOutThisDeviceTitle": "Pechar a sesión deste dispositivo?",
     "signOutThisSessionTitle": "Pechar esta sesión?",
     "signOutThisSessionMessage": "Pecharase a sesión en {{device}}. Última actividade: {{lastSeen}}. O dispositivo pode conservar o acceso á API durante unha hora como máximo.",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "Historial de facturación",
       "billingHistoryEmpty": "Aínda non hai historial de facturación.",
+      "billingHistoryError": "Non se puido cargar o historial de facturación",
       "cancel": "Cancelar subscrición",
       "cancelDescription": "O teu Kilo Pass seguirá activo ata o final do período de facturación e non se renovará.",
       "cancelScheduled": "Cancélase o {{date}}",
       "cancelScheduledChange": "Cancelar cambio programado",
       "cancelled": "Subscrición cancelada",
       "creditHistoryEmpty": "Aínda non hai créditos de Kilo Pass.",
+      "creditHistoryError": "Non se puido cargar o historial de créditos",
       "resume": "Retomar subscrición",
       "resumeCancelledDescription": "O teu Kilo Pass volverá renovarse automaticamente.",
       "resumePausedDescription": "O teu Kilo Pass retómase agora, antes da data de reactivación programada.",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "Seleccionar unha organización",
       "unavailableDescription": "Esta organización xa non está dispoñible. Escolle unha desde o teu perfil para continuar.",
       "unavailableSessionsDescription": "Esta organización xa non está dispoñible. Non se poden cargar as súas sesións.",
-      "accessDeniedDescription": "Non tes acceso a esta organización."
+      "accessDeniedDescription": "Pide a un propietario ou administrador da organización que che conceda o acceso."
     },
     "create": {
       "title": "Crear organización",
@@ -3464,6 +3468,8 @@
       "groups": "Grupos",
       "guardrails": "Barreiras de protección",
       "byok": "Usa a túa propia clave",
+      "ssoAndDomain": "SSO e dominio",
+      "dataCollection": "Recollida de datos",
       "auditLogs": "Rexistros de auditoría",
       "requestLogs": "Rexistros de solicitudes",
       "subOrganizations": "Suborganizacións",

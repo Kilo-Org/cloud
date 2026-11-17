@@ -90,8 +90,11 @@ vi.mock('@/lib/hooks/use-agent-sessions', () => ({
 }));
 
 vi.mock('@/lib/integration-urls', () => ({
-  getGitLabIntegrationUrl: vi.fn(() => 'gitlab-url'),
   getBitbucketIntegrationUrl: vi.fn(() => 'bitbucket-url'),
+}));
+
+vi.mock('@/lib/app-shell-handoff', () => ({
+  appShellHandoffUrl: vi.fn(() => Promise.resolve('gitlab-handoff-url')),
 }));
 
 vi.mock('@/lib/pr-review/connect-gate-platform', () => ({
@@ -485,7 +488,7 @@ describe('useNewSessionRepos connect busy state', () => {
     expect(requireResult(resultRef).connectingProvider).toBeNull();
   });
 
-  it('reports a GitLab flow, which opens the browser without a mint first', async () => {
+  it('reports a GitLab flow, which mints the shell hand-off before opening the browser', async () => {
     const pending = deferred();
     mocks.openAuthorization.mockImplementation(async () => pending.promise);
     const resultRef = mountRepos('org-1');
@@ -494,12 +497,12 @@ describe('useNewSessionRepos connect busy state', () => {
       requireResult(resultRef).openIntegration('gitlab');
     });
     expect(requireResult(resultRef).connectingProvider).toBe('gitlab');
-    expect(mocks.openAuthorization).toHaveBeenCalledWith('gitlab-url');
 
     await act(async () => {
       pending.resolve();
       await pending.promise;
     });
+    expect(mocks.openAuthorization).toHaveBeenCalledWith('gitlab-handoff-url');
     expect(requireResult(resultRef).connectingProvider).toBeNull();
   });
 

@@ -1366,7 +1366,8 @@
       "noReviews": "Wali ma jiraan dib-u-eegisyo",
       "noReviewsDescription": "Dib-u-eegisyadu halkan ayay ka soo muuqanayaan marka Dib-u-eegaha koodhku ka shaqeeyo codsi isku dar ah.",
       "startManualReview": "Bilow dib-u-eegis gacmeed",
-      "configureProvider": "Deji bixiyaha"
+      "configureProvider": "Deji bixiyaha",
+      "connectOwnerOnly": "Weydii mulkiile ama maamule ururka si uu ugu xidho bixiyaha."
     },
     "platformList": {
       "checking": "Waa la hubinayaa...",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "Akoonka ka saar aaladdan",
     "signOutSessionLabel": "Akoonka ka saar {{device}}, la soo galay {{signedIn}}, ugu dambayn la arkay {{lastSeen}}",
     "sessionSignedOut": "Kalfadhiga waa laga baxay.",
+    "sessionSignOutFailed": "Kalfadhigan lama bixin karin. Isku day mar kale.",
     "signOutThisDeviceTitle": "Ma ka saaraysaa aaladdan akoonka?",
     "signOutThisSessionTitle": "Ma ka baxaysaa kalfadhigan?",
     "signOutThisSessionMessage": "{{device}} waa laga saarayaa akoonka. Ugu dambayn la arkay {{lastSeen}}. Gelitaanka API wuxuu sii shaqayn karaa ilaa saacad.",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "Taariikhda biilasha",
       "billingHistoryEmpty": "Weli ma jirto taariikh biil.",
+      "billingHistoryError": "Taariikh biil lama shubin",
       "cancel": "Jooji rukummada",
       "cancelDescription": "Kilo Pass-kaagu wuu shaqaynayaa ilaa dhammaadka muddada biilka mana cusboonaysiin doono.",
       "cancelScheduled": "Wuu joogsanayaa {{date}}",
       "cancelScheduledChange": "Jooji isbeddelka la qorsheeyay",
       "cancelled": "Rukummada waa la joojiyay",
       "creditHistoryEmpty": "Weli ma jiraan kiredit Kilo Pass ah.",
+      "creditHistoryError": "Taariikh kiredit lama shubin",
       "resume": "Sii wad rukummada",
       "resumeCancelledDescription": "Kilo Pass-kaagu mar kale si toos ah ayuu u cusboonaysiinayaa.",
       "resumePausedDescription": "Kilo Pass-kaagu hadda ayuu dib u bilaabanayaa, ka hor taariikhdii loo qorsheeyay.",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "Dooro urur",
       "unavailableDescription": "Ururkan mar dambe lama heli karo. Boggaaga shakhsiga ka dooro urur si aad u sii socoto.",
       "unavailableSessionsDescription": "Ururkan mar dambe lama heli karo. Lama soo dejin karo munaasabadahiisa.",
-      "accessDeniedDescription": "Ma lihid oggolaansho aad ku gasho ururkan."
+      "accessDeniedDescription": "Ka codso mulkiilaha ama maamulaha ururka inay ku siiyaan gelitaanka."
     },
     "create": {
       "title": "Samee urur",
@@ -3464,6 +3468,8 @@
       "groups": "Kooxaha",
       "guardrails": "Xayndaabyada",
       "byok": "Keen furahaaga",
+      "ssoAndDomain": "SSO iyo domain",
+      "dataCollection": "Ururinta xogta",
       "auditLogs": "Diiwaannada hubinta",
       "requestLogs": "Diiwaannada codsiyada",
       "subOrganizations": "Ururrada hoose",

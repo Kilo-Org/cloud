@@ -1458,7 +1458,8 @@
       "noReviews": "Dim adolygiadau eto",
       "noReviewsDescription": "Bydd adolygiadau'n ymddangos yma ar ôl i'r Adolygydd cod adolygu cais tynnu.",
       "startManualReview": "Dechrau adolygiad â llaw",
-      "configureProvider": "Ffurfweddu darparwr"
+      "configureProvider": "Ffurfweddu darparwr",
+      "connectOwnerOnly": "Gofynnwch i berchennog sefydliad neu weinyddwr gysylltu darparwr."
     },
     "platformList": {
       "checking": "Yn gwirio…",
@@ -3193,6 +3194,7 @@
     "signOutThisDevice": "Allgofnodi'r ddyfais hon",
     "signOutSessionLabel": "Allgofnodi {{device}}, wedi mewngofnodi {{signedIn}}, gwelwyd ddiwethaf {{lastSeen}}",
     "sessionSignedOut": "Allgofnodwyd y sesiwn.",
+    "sessionSignOutFailed": "Methu ag allgofnodi'r sesiwn hon. Rhowch gynnig arall.",
     "signOutThisDeviceTitle": "Allgofnodi'r ddyfais hon?",
     "signOutThisSessionTitle": "Allgofnodi'r sesiwn hon?",
     "signOutThisSessionMessage": "Bydd {{device}} yn cael ei allgofnodi. Gwelwyd ddiwethaf {{lastSeen}}. Gall gadw mynediad at yr API am hyd at awr.",
@@ -3324,12 +3326,14 @@
     "manage": {
       "billingHistory": "Hanes bilio",
       "billingHistoryEmpty": "Dim hanes bilio eto.",
+      "billingHistoryError": "Methwyd â llwytho hanes bilio",
       "cancel": "Canslo tanysgrifiad",
       "cancelDescription": "Bydd eich Kilo Pass yn parhau'n weithredol tan ddiwedd y cyfnod bilio ac ni fydd yn adnewyddu.",
       "cancelScheduled": "Yn cael ei ganslo ar {{date}}",
       "cancelScheduledChange": "Canslo'r newid a drefnwyd",
       "cancelled": "Tanysgrifiad wedi'i ganslo",
       "creditHistoryEmpty": "Dim credydau Kilo Pass eto.",
+      "creditHistoryError": "Methwyd â llwytho hanes y credydau",
       "resume": "Ailddechrau tanysgrifiad",
       "resumeCancelledDescription": "Bydd eich Kilo Pass yn dechrau adnewyddu'n awtomatig eto.",
       "resumePausedDescription": "Bydd eich Kilo Pass yn ailddechrau nawr, cyn y dyddiad ailddechrau a drefnwyd.",
@@ -3566,7 +3570,7 @@
       "selectOrganization": "Dewis sefydliad",
       "unavailableDescription": "Nid yw'r sefydliad hwn ar gael mwyach. Dewiswch un o'ch proffil i barhau.",
       "unavailableSessionsDescription": "Nid yw'r sefydliad hwn ar gael mwyach. Ni ellir llwytho ei sesiynau.",
-      "accessDeniedDescription": "Nid oes gennych fynediad i'r sefydliad hwn."
+      "accessDeniedDescription": "Gofynnwch i berchennog neu weinyddwr sefydliad roi mynediad i chi."
     },
     "create": {
       "title": "Creu sefydliad",
@@ -3692,6 +3696,8 @@
       "groups": "Grwpiau",
       "guardrails": "Mesurau diogelu",
       "byok": "Dewch â'ch allwedd eich hun",
+      "ssoAndDomain": "SSO a pharth",
+      "dataCollection": "Casglu data",
       "auditLogs": "Logiau archwilio",
       "requestLogs": "Logiau ceisiadau",
       "subOrganizations": "Is-sefydliadau",

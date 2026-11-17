@@ -777,6 +777,7 @@
     },
     "reviewList": {
       "configureProvider": "Налаштувати сервіс",
+      "connectOwnerOnly": "Попросіть власника організації або адміністратора підключити сервіс.",
       "couldNotLoad": "Не вдалося завантажити перевірки.",
       "noReviews": "Перевірок ще немає",
       "noReviewsDescription": "Перевірки з'являться тут після запуску перевірки коду для запиту на злиття.",
@@ -2495,6 +2496,7 @@
     "signOutThisDevice": "Вийти на цьому пристрої",
     "signOutSessionLabel": "Вийти на пристрої {{device}}, вхід: {{signedIn}}, остання активність: {{lastSeen}}",
     "sessionSignedOut": "Сеанс завершено.",
+    "sessionSignOutFailed": "Не вдалося завершити цей сеанс. Спробуйте ще раз.",
     "signOutThisDeviceTitle": "Вийти на цьому пристрої?",
     "signOutThisSessionTitle": "Завершити цей сеанс?",
     "signOutThisSessionMessage": "Сеанс входу на пристрої {{device}} завершиться. Остання активність: {{lastSeen}}. Доступ до API може зберігатися ще протягом години.",
@@ -2621,12 +2623,14 @@
     "manage": {
       "billingHistory": "Історія платежів",
       "billingHistoryEmpty": "Історії платежів ще немає.",
+      "billingHistoryError": "Не вдалося завантажити історію платежів",
       "cancel": "Скасувати підписку",
       "cancelDescription": "Ваш Kilo Pass залишиться активним до кінця розрахункового періоду й не буде поновлений.",
       "cancelScheduled": "Скасовується {{date}}",
       "cancelScheduledChange": "Скасувати заплановану зміну",
       "cancelled": "Підписку скасовано",
       "creditHistoryEmpty": "Кредитів Kilo Pass ще немає.",
+      "creditHistoryError": "Не вдалося завантажити кредити Kilo Pass",
       "resume": "Відновити підписку",
       "resumeCancelledDescription": "Ваш Kilo Pass знову поновлюватиметься автоматично.",
       "resumePausedDescription": "Ваш Kilo Pass відновиться зараз, раніше запланованої дати відновлення.",
@@ -3444,7 +3448,7 @@
       "selectOrganization": "Виберіть організацію",
       "unavailableDescription": "Ця організація більше недоступна. Виберіть іншу у своєму профілі, щоб продовжити.",
       "unavailableSessionsDescription": "Ця організація більше недоступна. Завантажити її сесії неможливо.",
-      "accessDeniedDescription": "У вас немає доступу до цієї організації."
+      "accessDeniedDescription": "Попросіть власника організації або адміністратора надати вам доступ."
     },
     "create": {
       "title": "Створити організацію",
@@ -3583,6 +3587,8 @@
       "groups": "Групи",
       "guardrails": "Запобіжники",
       "byok": "Власний ключ",
+      "ssoAndDomain": "SSO і домен",
+      "dataCollection": "Збір даних",
       "auditLogs": "Журнали аудиту",
       "requestLogs": "Журнали запитів",
       "subOrganizations": "Дочірні організації",

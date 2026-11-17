@@ -1435,7 +1435,8 @@
       "noReviews": "S'issa l-ebda reviżjoni",
       "noReviewsDescription": "Ir-reviżjonijiet jidhru hawn wara li r-reviżur tal-kodiċi jirrevedi PR.",
       "startManualReview": "Ibda reviżjoni manwali",
-      "configureProvider": "Ikkonfigura l-fornitur"
+      "configureProvider": "Ikkonfigura l-fornitur",
+      "connectOwnerOnly": "Itlob lis-sid ta' organizzazzjoni jew lill-amministratur biex jikkonnettja fornitur."
     },
     "platformList": {
       "checking": "Qed jiġi ċċekkjat…",
@@ -3139,6 +3140,7 @@
     "signOutThisDevice": "Oħroġ mill-kont fuq dan l-apparat",
     "signOutSessionLabel": "Oħroġ mill-kont fuq {{device}}, dħul: {{signedIn}}, l-aħħar attività: {{lastSeen}}",
     "sessionSignedOut": "Il-ħruġ mill-kont f'din is-sessjoni tlesta.",
+    "sessionSignOutFailed": "Il-ħruġ mill-kont f'din is-sessjoni ma rnexxiex. Erġa' pprova.",
     "signOutThisDeviceTitle": "Toħroġ mill-kont fuq dan l-apparat?",
     "signOutThisSessionTitle": "Toħroġ mill-kont f'din is-sessjoni?",
     "signOutThisSessionMessage": "Se toħroġ mill-kont fuq {{device}}. L-aħħar attività: {{lastSeen}}. L-apparat jista' jibqa' jaċċessa l-API sa siegħa.",
@@ -3267,12 +3269,14 @@
     "manage": {
       "billingHistory": "Storja tal-ħlasijiet",
       "billingHistoryEmpty": "Għad m'hemm l-ebda storja tal-ħlasijiet.",
+      "billingHistoryError": "Ma setgħetx tintbagħad il-ħlasijiet",
       "cancel": "Ikkanċella l-abbonament",
       "cancelDescription": "Il-Kilo Pass tiegħek jibqa' attiv sal-aħħar tal-perjodu tal-ħlas u ma jiġġeddidx.",
       "cancelScheduled": "Jiġi kkanċellat nhar {{date}}",
       "cancelScheduledChange": "Ikkanċella l-bidla skedata",
       "cancelled": "Abbonament ikkanċellat",
       "creditHistoryEmpty": "Għad m'hemm l-ebda krediti tal-Kilo Pass.",
+      "creditHistoryError": "Ma setgħetx tintbagħad il-krediti tal-Kilo Pass",
       "resume": "Kompli l-abbonament",
       "resumeCancelledDescription": "Il-Kilo Pass tiegħek jerġa' jibda jiġġedded awtomatikament.",
       "resumePausedDescription": "Il-Kilo Pass tiegħek ikompli issa, qabel id-data skedata biex jerġa' jibda.",
@@ -3509,7 +3513,7 @@
       "selectOrganization": "Agħżel organizzazzjoni",
       "unavailableDescription": "Din l-organizzazzjoni m'għadhiex disponibbli. Agħżel waħda mill-profil tiegħek biex tkompli.",
       "unavailableSessionsDescription": "Din l-organizzazzjoni m'għadhiex disponibbli. Is-sessjonijiet tagħha ma jistgħux jitgħabbew.",
-      "accessDeniedDescription": "M'għandekx aċċess għal din l-organizzazzjoni."
+      "accessDeniedDescription": "Itlob lil sid jew amministratur tal-organizzazzjoni biex jagħtuk aċċess."
     },
     "create": {
       "title": "Oħloq organizzazzjoni",
@@ -3635,6 +3639,8 @@
       "groups": "Gruppi",
       "guardrails": "Salvagwardji",
       "byok": "Uża ċ-ċavetta tiegħek",
+      "ssoAndDomain": "SSO u dominju",
+      "dataCollection": "Ġbir tad-data",
       "auditLogs": "Reġistri tal-awditjar",
       "requestLogs": "Reġistri tat-talbiet",
       "subOrganizations": "Sotto-organizzazzjonijiet",

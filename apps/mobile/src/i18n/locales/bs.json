@@ -1389,7 +1389,8 @@
       "noReviews": "Još nema pregleda",
       "noReviewsDescription": "Pregledi se pojavljuju ovdje nakon što agent za pregled koda obradi zahtjev za spajanje.",
       "startManualReview": "Započni ručni pregled",
-      "configureProvider": "Podesi platformu"
+      "configureProvider": "Podesi platformu",
+      "connectOwnerOnly": "Zamolite vlasnika organizacije ili administratora da je poveže."
     },
     "platformList": {
       "checking": "Provjera…",
@@ -3029,6 +3030,7 @@
     "signOutThisDevice": "Odjavi ovaj uređaj",
     "signOutSessionLabel": "Odjavi uređaj {{device}}, prijava: {{signedIn}}, posljednja aktivnost: {{lastSeen}}",
     "sessionSignedOut": "Sesija odjavljena.",
+    "sessionSignOutFailed": "Nije moguće odjaviti ovu sesiju. Pokušajte ponovo.",
     "signOutThisDeviceTitle": "Odjaviti ovaj uređaj?",
     "signOutThisSessionTitle": "Odjaviti ovu sesiju?",
     "signOutThisSessionMessage": "Uređaj {{device}} bit će odjavljen. Posljednja aktivnost: {{lastSeen}}. Može zadržati pristup API-ju još najviše sat vremena.",
@@ -3153,12 +3155,14 @@
     "manage": {
       "billingHistory": "Historija naplate",
       "billingHistoryEmpty": "Još nema historije naplate.",
+      "billingHistoryError": "Nije moguće učitati historiju naplate",
       "cancel": "Otkaži pretplatu",
       "cancelDescription": "Vaš Kilo Pass ostaje aktivan do kraja obračunskog perioda i neće se obnoviti.",
       "cancelScheduled": "Otkazuje se {{date}}",
       "cancelScheduledChange": "Otkaži zakazanu promjenu",
       "cancelled": "Pretplata je otkazana",
       "creditHistoryEmpty": "Još nema Kilo Pass kredita.",
+      "creditHistoryError": "Nije moguće učitati historiju kredita",
       "resume": "Nastavi pretplatu",
       "resumeCancelledDescription": "Vaš Kilo Pass će se ponovo automatski obnavljati.",
       "resumePausedDescription": "Vaš Kilo Pass se nastavlja odmah, prije zakazanog datuma nastavka.",
@@ -3395,7 +3399,7 @@
       "selectOrganization": "Odaberi organizaciju",
       "unavailableDescription": "Ova organizacija više nije dostupna. Odaberi drugu na svom profilu za nastavak.",
       "unavailableSessionsDescription": "Ova organizacija više nije dostupna. Njezine sesije nije moguće učitati.",
-      "accessDeniedDescription": "Nemaš pristup ovoj organizaciji."
+      "accessDeniedDescription": "Zamoli vlasnika organizacije ili administratora da ti odobri pristup."
     },
     "create": {
       "title": "Kreiraj organizaciju",
@@ -3521,6 +3525,8 @@
       "groups": "Grupe",
       "guardrails": "Zaštitna ograničenja",
       "byok": "Vlastiti ključ",
+      "ssoAndDomain": "SSO i domena",
+      "dataCollection": "Prikupljanje podataka",
       "auditLogs": "Revizijski zapisnici",
       "requestLogs": "Zapisnici zahtjeva",
       "subOrganizations": "Podorganizacije",

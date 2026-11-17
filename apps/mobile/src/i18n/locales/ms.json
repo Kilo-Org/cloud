@@ -1366,7 +1366,8 @@
       "noReviews": "Belum ada semakan",
       "noReviewsDescription": "Semakan muncul di sini selepas Penyemak Kod menyemak permintaan penarikan.",
       "startManualReview": "Mulakan semakan manual",
-      "configureProvider": "Konfigurasikan penyedia"
+      "configureProvider": "Konfigurasikan penyedia",
+      "connectOwnerOnly": "Minta pemilik organisasi atau pentadbir untuk menyambungkan penyedia."
     },
     "platformList": {
       "checking": "Menyemak…",
@@ -2974,6 +2975,7 @@
     "signOutThisDevice": "Log keluar daripada peranti ini",
     "signOutSessionLabel": "Log keluar daripada {{device}}, log masuk {{signedIn}}, terakhir dilihat {{lastSeen}}",
     "sessionSignedOut": "Sesi dilog keluar.",
+    "sessionSignOutFailed": "Tidak dapat log keluar daripada sesi ini. Cuba lagi.",
     "signOutThisDeviceTitle": "Log keluar daripada peranti ini?",
     "signOutThisSessionTitle": "Log keluar daripada sesi ini?",
     "signOutThisSessionMessage": "{{device}} akan dilog keluar. Terakhir dilihat {{lastSeen}}. Ia boleh mengekalkan akses API sehingga satu jam.",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "Sejarah pengebilan",
       "billingHistoryEmpty": "Belum ada sejarah pengebilan.",
+      "billingHistoryError": "Tidak dapat memuatkan sejarah pengebilan",
       "cancel": "Batalkan langganan",
       "cancelDescription": "Kilo Pass anda kekal aktif sehingga akhir tempoh pengebilan dan tidak akan diperbaharui.",
       "cancelScheduled": "Dibatalkan pada {{date}}",
       "cancelScheduledChange": "Batalkan perubahan berjadual",
       "cancelled": "Langganan dibatalkan",
       "creditHistoryEmpty": "Belum ada kredit Kilo Pass.",
+      "creditHistoryError": "Tidak dapat memuatkan sejarah kredit",
       "resume": "Sambung semula langganan",
       "resumeCancelledDescription": "Kilo Pass anda akan mula diperbaharui secara automatik semula.",
       "resumePausedDescription": "Kilo Pass anda disambung semula sekarang, sebelum tarikh sambung semula yang dijadualkan.",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "Pilih organisasi",
       "unavailableDescription": "Organisasi ini tidak lagi tersedia. Pilih satu daripada profil anda untuk meneruskan.",
       "unavailableSessionsDescription": "Organisasi ini tidak lagi tersedia. Sesi untuk organisasi ini tidak dapat dimuatkan.",
-      "accessDeniedDescription": "Anda tidak mempunyai akses kepada organisasi ini."
+      "accessDeniedDescription": "Minta pemilik atau pentadbir organisasi memberikan anda akses."
     },
     "create": {
       "title": "Cipta organisasi",
@@ -3464,6 +3468,8 @@
       "groups": "Kumpulan",
       "guardrails": "Kawalan keselamatan",
       "byok": "Bawa kunci anda sendiri",
+      "ssoAndDomain": "SSO dan domain",
+      "dataCollection": "Pengumpulan data",
       "auditLogs": "Log audit",
       "requestLogs": "Log permintaan",
       "subOrganizations": "Suborganisasi",

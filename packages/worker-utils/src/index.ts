@@ -260,8 +260,10 @@ export type {
 export {
   activeOrganizationAccessSql,
   activeOrganizationJoinCondition,
-  hasInheritedOrganizationAccess,
+  findEffectiveOrganizationMemberRole,
+  hasEffectiveOrganizationAccess,
   hasOrganizationAccess,
+  inheritedParentMembershipJoinCondition,
   organizationMembershipJoinCondition,
   parentOrganizationJoinCondition,
   parentOrganizationMembershipJoinCondition,
@@ -269,6 +271,10 @@ export {
   parentOrganizationMembershipsTable,
   personalOrActiveOrganizationCondition,
   personalOrInheritedOrganizationCondition,
+} from './organization-membership.js';
+export type {
+  OrganizationColumns,
+  OrganizationMembershipColumns,
 } from './organization-membership.js';
 
 export {

@@ -1389,7 +1389,8 @@
       "noReviews": "Încă nu există revizuiri",
       "noReviewsDescription": "Revizuirile apar aici după ce agentul de revizuire a codului analizează un PR.",
       "startManualReview": "Începe o revizuire manuală",
-      "configureProvider": "Configurează furnizorul"
+      "configureProvider": "Configurează furnizorul",
+      "connectOwnerOnly": "Cere unui proprietar de organizație sau unui administrator să conecteze un furnizor."
     },
     "platformList": {
       "checking": "Se verifică…",
@@ -3028,6 +3029,7 @@
     "signOutThisDevice": "Deconectează acest dispozitiv",
     "signOutSessionLabel": "Deconectează {{device}}, autentificare: {{signedIn}}, ultima activitate: {{lastSeen}}",
     "sessionSignedOut": "Sesiune deconectată.",
+    "sessionSignOutFailed": "Nu s-a putut deconecta această sesiune. Încearcă din nou.",
     "signOutThisDeviceTitle": "Deconectezi acest dispozitiv?",
     "signOutThisSessionTitle": "Deconectezi această sesiune?",
     "signOutThisSessionMessage": "{{device}} va fi deconectat. Ultima activitate: {{lastSeen}}. Accesul la API poate rămâne activ încă cel mult o oră.",
@@ -3153,12 +3155,14 @@
     "manage": {
       "billingHistory": "Istoric facturare",
       "billingHistoryEmpty": "Nu există încă un istoric de facturare.",
+      "billingHistoryError": "Nu s-a putut încărca istoricul de facturare",
       "cancel": "Anulează abonamentul",
       "cancelDescription": "Kilo Pass rămâne activ până la sfârșitul perioadei de facturare și nu se va reînnoi.",
       "cancelScheduled": "Se anulează pe {{date}}",
       "cancelScheduledChange": "Anulează modificarea programată",
       "cancelled": "Abonament anulat",
       "creditHistoryEmpty": "Nu există încă credite Kilo Pass.",
+      "creditHistoryError": "Nu s-a putut încărca istoricul de credite",
       "resume": "Reia abonamentul",
       "resumeCancelledDescription": "Kilo Pass va începe din nou să se reînnoiască automat.",
       "resumePausedDescription": "Kilo Pass se reia acum, înainte de data programată pentru reluare.",
@@ -3395,7 +3399,7 @@
       "selectOrganization": "Selectează o organizație",
       "unavailableDescription": "Această organizație nu mai este disponibilă. Alege una din profilul tău pentru a continua.",
       "unavailableSessionsDescription": "Această organizație nu mai este disponibilă. Sesiunile ei nu pot fi încărcate.",
-      "accessDeniedDescription": "Nu ai acces la această organizație."
+      "accessDeniedDescription": "Solicită unui proprietar sau administrator al organizației să îți acorde acces."
     },
     "create": {
       "title": "Creează o organizație",
@@ -3521,6 +3525,8 @@
       "groups": "Grupuri",
       "guardrails": "Măsuri de protecție",
       "byok": "Folosește propria cheie",
+      "ssoAndDomain": "SSO și domeniu",
+      "dataCollection": "Colectarea datelor",
       "auditLogs": "Jurnale de audit",
       "requestLogs": "Jurnale de cereri",
       "subOrganizations": "Suborganizații",

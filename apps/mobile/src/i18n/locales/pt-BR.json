@@ -744,6 +744,7 @@
     },
     "reviewList": {
       "configureProvider": "Configurar provedor",
+      "connectOwnerOnly": "Peça a um proprietário ou administrador da organização para conectar um provedor.",
       "couldNotLoad": "Não foi possível carregar as revisões.",
       "noReviews": "Ainda não há revisões",
       "noReviewsDescription": "As revisões aparecem aqui quando o revisor de código analisa um PR.",
@@ -2468,6 +2469,7 @@
     "signOutThisDevice": "Sair deste dispositivo",
     "signOutSessionLabel": "Sair de {{device}}, entrada: {{signedIn}}, último acesso: {{lastSeen}}",
     "sessionSignedOut": "Sessão encerrada.",
+    "sessionSignOutFailed": "Não foi possível encerrar esta sessão. Tente novamente.",
     "signOutThisDeviceTitle": "Sair deste dispositivo?",
     "signOutThisSessionTitle": "Encerrar esta sessão?",
     "signOutThisSessionMessage": "{{device}} será desconectado. Último acesso: {{lastSeen}}. Ele pode manter o acesso à API por até uma hora.",
@@ -2593,12 +2595,14 @@
     "manage": {
       "billingHistory": "Histórico de cobrança",
       "billingHistoryEmpty": "Nenhum histórico de cobrança ainda.",
+      "billingHistoryError": "Não foi possível carregar o histórico de cobrança",
       "cancel": "Cancelar assinatura",
       "cancelDescription": "Seu Kilo Pass continua ativo até o fim do período de cobrança e não será renovado.",
       "cancelScheduled": "Será cancelada em {{date}}",
       "cancelScheduledChange": "Cancelar alteração agendada",
       "cancelled": "Assinatura cancelada",
       "creditHistoryEmpty": "Nenhum crédito do Kilo Pass ainda.",
+      "creditHistoryError": "Não foi possível carregar o histórico de créditos",
       "resume": "Retomar assinatura",
       "resumeCancelledDescription": "Seu Kilo Pass voltará a ser renovado automaticamente.",
       "resumePausedDescription": "Seu Kilo Pass será retomado agora, antes da data de retomada agendada.",
@@ -3393,7 +3397,7 @@
       "selectOrganization": "Selecione uma organização",
       "unavailableDescription": "Esta organização não está mais disponível. Escolha outra no seu perfil para continuar.",
       "unavailableSessionsDescription": "Esta organização não está mais disponível. Não é possível carregar as sessões dela.",
-      "accessDeniedDescription": "Você não tem acesso a esta organização."
+      "accessDeniedDescription": "Peça a um proprietário ou administrador da organização que lhe conceda acesso."
     },
     "create": {
       "title": "Criar organização",
@@ -3532,6 +3536,8 @@
       "groups": "Grupos",
       "guardrails": "Proteções",
       "byok": "Use sua própria chave",
+      "ssoAndDomain": "SSO e domínio",
+      "dataCollection": "Coleta de dados",
       "auditLogs": "Registros de auditoria",
       "requestLogs": "Registros de solicitações",
       "subOrganizations": "Suborganizações",

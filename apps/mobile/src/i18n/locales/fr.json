@@ -744,6 +744,7 @@
     },
     "reviewList": {
       "configureProvider": "Configurer le fournisseur",
+      "connectOwnerOnly": "Demandez à un propriétaire ou à un administrateur de l'organisation de connecter un fournisseur.",
       "couldNotLoad": "Impossible de charger les revues",
       "noReviews": "Aucune revue pour le moment",
       "noReviewsDescription": "Les revues apparaissent ici après l'examen d'une pull request par l'agent de revue de code.",
@@ -2391,6 +2392,7 @@
     "signOutThisDevice": "Déconnecter cet appareil",
     "signOutSessionLabel": "Déconnecter {{device}}, connexion : {{signedIn}}, dernière activité : {{lastSeen}}",
     "sessionSignedOut": "Session déconnectée.",
+    "sessionSignOutFailed": "Impossible de déconnecter cette session. Réessayez.",
     "signOutThisDeviceTitle": "Déconnecter cet appareil ?",
     "signOutThisSessionTitle": "Déconnecter cette session ?",
     "signOutThisSessionMessage": "{{device}} sera déconnecté. Dernière activité : {{lastSeen}}. L'accès à l'API peut rester actif pendant une heure au maximum.",
@@ -2512,12 +2514,14 @@
     "manage": {
       "billingHistory": "Historique de facturation",
       "billingHistoryEmpty": "Aucun historique de facturation pour le moment.",
+      "billingHistoryError": "Impossible de charger l'historique de facturation",
       "cancel": "Résilier l'abonnement",
       "cancelDescription": "Votre Kilo Pass reste actif jusqu'à la fin de la période de facturation et ne sera pas renouvelé.",
       "cancelScheduled": "Prend fin le {{date}}",
       "cancelScheduledChange": "Annuler le changement prévu",
       "cancelled": "Abonnement résilié",
       "creditHistoryEmpty": "Aucun crédit Kilo Pass pour le moment.",
+      "creditHistoryError": "Impossible de charger l'historique des crédits",
       "resume": "Réactiver l'abonnement",
       "resumeCancelledDescription": "Votre Kilo Pass sera de nouveau renouvelé automatiquement.",
       "resumePausedDescription": "Votre Kilo Pass reprend dès maintenant, avant la date de reprise prévue.",
@@ -3387,7 +3391,7 @@
       "selectOrganization": "Choix d'une organisation",
       "unavailableDescription": "Cette organisation n'est plus disponible. Choisissez un autre compte dans le sélecteur de comptes pour continuer.",
       "unavailableSessionsDescription": "Cette organisation n'est plus disponible. Ses sessions ne peuvent pas être chargées.",
-      "accessDeniedDescription": "Vous n'avez pas accès à cette organisation."
+      "accessDeniedDescription": "Demandez à un propriétaire ou à un administrateur de l'organisation de vous accorder l'accès."
     },
     "create": {
       "title": "Créer une organisation",
@@ -3526,6 +3530,8 @@
       "groups": "Groupes",
       "guardrails": "Garde-fous",
       "byok": "Utiliser votre propre clé",
+      "ssoAndDomain": "SSO et domaine",
+      "dataCollection": "Collecte de données",
       "auditLogs": "Journaux d'audit",
       "requestLogs": "Journaux des requêtes",
       "subOrganizations": "Sous-organisations",

@@ -1366,7 +1366,8 @@
       "noReviews": "Har yanzu babu bita",
       "noReviewsDescription": "Bitoci suna bayyana a nan da zarar Mai bitar lamba ya duba buƙatar haɗa canje-canje.",
       "startManualReview": "Fara bita da hannu",
-      "configureProvider": "Saita mai ba da sabis"
+      "configureProvider": "Saita mai ba da sabis",
+      "connectOwnerOnly": "Nemi Mai ƙungiya ko Mai gudanarwa ya haɗa mai ba da sabis."
     },
     "platformList": {
       "checking": "Ana duba…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "Fita daga wannan na'urar",
     "signOutSessionLabel": "Fita daga {{device}}, an shiga {{signedIn}}, an gani na ƙarshe {{lastSeen}}",
     "sessionSignedOut": "An fita daga zaman.",
+    "sessionSignOutFailed": "An kasa fitar da wannan zaman. Sake gwadawa.",
     "signOutThisDeviceTitle": "Fita daga wannan na'urar?",
     "signOutThisSessionTitle": "Fita daga wannan zaman?",
     "signOutThisSessionMessage": "Za a fitar da {{device}}. An gani na ƙarshe {{lastSeen}}. Za ta iya ci gaba da samun damar amfani da API har na awa ɗaya.",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "Tarihin biyan kuɗi",
       "billingHistoryEmpty": "Babu tarihin biyan kuɗi tukuna.",
+      "billingHistoryError": "Ba a iya ɗora tarihin biyan kuɗi ba",
       "cancel": "Soke rajista",
       "cancelDescription": "Kilo Pass ɗinka zai ci gaba da aiki har zuwa ƙarshen lokacin biyan kuɗi kuma ba zai sabunta ba.",
       "cancelScheduled": "Za a soke a ranar {{date}}",
       "cancelScheduledChange": "Soke canjin da aka tsara",
       "cancelled": "An soke rajista",
       "creditHistoryEmpty": "Babu kiredit na Kilo Pass tukuna.",
+      "creditHistoryError": "Ba a iya ɗora tarihin kiredit ba",
       "resume": "Ci gaba da rajista",
       "resumeCancelledDescription": "Kilo Pass ɗinka zai sake fara sabuntawa kai tsaye.",
       "resumePausedDescription": "Kilo Pass ɗinka zai ci gaba yanzu, kafin ranar da aka tsara zai ci gaba.",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "Zaɓi ƙungiya",
       "unavailableDescription": "An daina samun wannan ƙungiyar. Zaɓi wata daga bayanan martabarka don ci gaba.",
       "unavailableSessionsDescription": "An daina samun wannan ƙungiyar. Ba za a iya loda zamanta ba.",
-      "accessDeniedDescription": "Ba ka da izinin shiga wannan ƙungiyar."
+      "accessDeniedDescription": "Ka nemi mai ƙungiya ko mai gudanarwa ya ba ka izinin shiga."
     },
     "create": {
       "title": "Ƙirƙiri ƙungiya",
@@ -3464,6 +3468,8 @@
       "groups": "Rukunoni",
       "guardrails": "Matakan kariya",
       "byok": "Kawo maɓallinka na kanka",
+      "ssoAndDomain": "SSO da yanki",
+      "dataCollection": "Tattara bayanai",
       "auditLogs": "Rajistun bincike",
       "requestLogs": "Rajistun buƙatu",
       "subOrganizations": "Ƙananan ƙungiyoyi",

@@ -1366,7 +1366,8 @@
       "noReviews": "هێشتا هیچ پێداچوونەوەیەک نییە",
       "noReviewsDescription": "کاتێک پێداچوونەوەکاری کۆد لەسەر داواکارییەکی تێکەڵکردن کار بکات، پێداچوونەوەکان لێرە دەردەکەون.",
       "startManualReview": "دەست بە پێداچوونەوەیەکی دەستی بکە",
-      "configureProvider": "دابینکەر ڕێک بخە"
+      "configureProvider": "دابینکەر ڕێک بخە",
+      "connectOwnerOnly": "داوای لە خاوەنێکی ڕێکخراو یان بەڕێوەبەرێک بکە کە دابینکەرێک ببەستێت."
     },
     "platformList": {
       "checking": "لە پشکنیندایە…",
@@ -2974,6 +2975,7 @@
     "signOutThisDevice": "دەرچوون لەم ئامێرە",
     "signOutSessionLabel": "دەرچوون لە {{device}}، چوونەژوورەوە: {{signedIn}}، دوایین بینین: {{lastSeen}}",
     "sessionSignedOut": "دەرچوون لە سێشنەکە تەواو بوو.",
+    "sessionSignOutFailed": "نەتوانرا لەم سێشنە دەربچێت. دووبارە هەوڵ بدە.",
     "signOutThisDeviceTitle": "دەرچوون لەم ئامێرە؟",
     "signOutThisSessionTitle": "دەرچوون لەم سێشنە؟",
     "signOutThisSessionMessage": "{{device}} لە هەژمارەکە دەردەچێت. دوایین بینین: {{lastSeen}}. دەستگەیشتنی بە API دەتوانێت تا یەک کاتژمێر بەردەوام بێت.",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "مێژووی پارەدان",
       "billingHistoryEmpty": "هێشتا هیچ مێژوویەکی پارەدان نییە.",
+      "billingHistoryError": "نەتوانرا مێژوویەکی پارەدان بار بکرێت",
       "cancel": "هەڵوەشاندنەوەی بەشداریکردن",
       "cancelDescription": "Kilo Passەکەت تا کۆتایی ماوەی پارەدان چالاک دەمێنێتەوە و نوێ ناکرێتەوە.",
       "cancelScheduled": "لە {{date}} هەڵدەوەشێتەوە",
       "cancelScheduledChange": "هەڵوەشاندنەوەی گۆڕانکاریی خشتەکراو",
       "cancelled": "بەشداریکردن هەڵوەشێنرایەوە",
       "creditHistoryEmpty": "هێشتا هیچ کرێدیتێکی Kilo Pass نییە.",
+      "creditHistoryError": "نەتوانرا مێژوویەکی کرێدیت بار بکرێت",
       "resume": "دەستپێکردنەوەی بەشداریکردن",
       "resumeCancelledDescription": "Kilo Passەکەت دیسان بە شێوەی خۆکار نوێ دەکرێتەوە.",
       "resumePausedDescription": "Kilo Passەکەت ئێستا دەست پێدەکاتەوە، پێش بەرواری خشتەکراوی دەستپێکردنەوەی.",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "هەڵبژاردنی ڕێکخراوێک",
       "unavailableDescription": "ئەم ڕێکخراوە چیتر بەردەست نییە. لە پڕۆفایلەکەتەوە یەکێک هەڵبژێرە بۆ بەردەوامبوون.",
       "unavailableSessionsDescription": "ئەم ڕێکخراوە چیتر بەردەست نییە. دانیشتنەکانی ناتوانرێت بەردەست بکرێت.",
-      "accessDeniedDescription": "مۆڵەتی دەستگەیشتن بەم ڕێکخراوەت نییە."
+      "accessDeniedDescription": "داوای لە خاوەن یان بەڕێوەبەری ڕێکخراو بکە کە مۆڵەتی دەستگەیشتنت پێبدات."
     },
     "create": {
       "title": "دروستکردنی ڕێکخراوە",
@@ -3464,6 +3468,8 @@
       "groups": "گرووپەکان",
       "guardrails": "سنوورە پارێزەرەکان",
       "byok": "کلیلی خۆت بەکاربهێنە",
+      "ssoAndDomain": "SSO و دۆمەین",
+      "dataCollection": "کۆکردنەوەی داتا",
       "auditLogs": "تۆمارەکانی وردبینی",
       "requestLogs": "تۆمارەکانی داواکاری",
       "subOrganizations": "ژێرڕێکخراوەکان",

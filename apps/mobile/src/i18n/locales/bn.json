@@ -1366,7 +1366,8 @@
       "noReviews": "এখনো কোনো পর্যালোচনা নেই",
       "noReviewsDescription": "কোড রিভিউয়ার কোনো পুল রিকোয়েস্ট পর্যালোচনা করলে তা এখানে দেখা যাবে।",
       "startManualReview": "একটি ম্যানুয়াল পর্যালোচনা শুরু করুন",
-      "configureProvider": "প্রোভাইডার কনফিগার করুন"
+      "configureProvider": "প্রোভাইডার কনফিগার করুন",
+      "connectOwnerOnly": "প্রোভাইডার সংযুক্ত করতে একজন সংস্থার মালিক বা অ্যাডমিনকে অনুরোধ করুন।"
     },
     "platformList": {
       "checking": "পরীক্ষা করা হচ্ছে…",
@@ -2974,6 +2975,7 @@
     "signOutThisDevice": "এই ডিভাইস থেকে সাইন আউট করুন",
     "signOutSessionLabel": "সাইন আউট করুন {{device}}, সাইন ইন {{signedIn}}, সর্বশেষ দেখা {{lastSeen}}",
     "sessionSignedOut": "সেশন সাইন আউট হয়েছে।",
+    "sessionSignOutFailed": "এই সেশন থেকে সাইন আউট করা যায়নি। আবার চেষ্টা করুন।",
     "signOutThisDeviceTitle": "এই ডিভাইস থেকে সাইন আউট করবেন?",
     "signOutThisSessionTitle": "এই সেশন থেকে সাইন আউট করবেন?",
     "signOutThisSessionMessage": "{{device}} থেকে সাইন আউট করা হবে। সর্বশেষ দেখা {{lastSeen}}। এরপরও ডিভাইসটি সর্বোচ্চ এক ঘণ্টা API অ্যাক্সেস করতে পারবে।",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "বিলিং ইতিহাস",
       "billingHistoryEmpty": "এখনও কোনো বিলিং ইতিহাস নেই।",
+      "billingHistoryError": "বিলিং ইতিহাস লোড করা যায়নি",
       "cancel": "সাবস্ক্রিপশন বাতিল করুন",
       "cancelDescription": "আপনার Kilo Pass বিলিং পর্বের শেষ পর্যন্ত সক্রিয় থাকবে এবং আর নবায়ন হবে না।",
       "cancelScheduled": "{{date}} তারিখে বাতিল হবে",
       "cancelScheduledChange": "নির্ধারিত পরিবর্তন বাতিল করুন",
       "cancelled": "সাবস্ক্রিপশন বাতিল হয়েছে",
       "creditHistoryEmpty": "এখনও কোনো Kilo Pass ক্রেডিট নেই।",
+      "creditHistoryError": "ক্রেডিট ইতিহাস লোড করা যায়নি",
       "resume": "সাবস্ক্রিপশন আবার চালু করুন",
       "resumeCancelledDescription": "আপনার Kilo Pass আবার স্বয়ংক্রিয়ভাবে নবায়ন হতে শুরু করবে।",
       "resumePausedDescription": "আপনার Kilo Pass নির্ধারিত পুনরায় চালুর তারিখের আগেই এখন আবার চালু হবে।",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "একটি সংস্থা নির্বাচন করুন",
       "unavailableDescription": "এই সংস্থাটি আর পাওয়া যাচ্ছে না। চালিয়ে যেতে আপনার প্রোফাইল থেকে অন্য একটি সংস্থা বেছে নিন।",
       "unavailableSessionsDescription": "এই সংস্থাটি আর পাওয়া যাচ্ছে না। এর সেশনগুলো লোড করা যাবে না।",
-      "accessDeniedDescription": "এই সংস্থায় আপনার অ্যাক্সেস নেই।"
+      "accessDeniedDescription": "আপনাকে অ্যাক্সেস দিতে সংস্থার একজন মালিক বা অ্যাডমিনকে অনুরোধ করুন।"
     },
     "create": {
       "title": "সংস্থা তৈরি করুন",
@@ -3464,6 +3468,8 @@
       "groups": "গ্রুপ",
       "guardrails": "গার্ডরেল",
       "byok": "নিজের কী ব্যবহার করুন",
+      "ssoAndDomain": "SSO ও ডোমেইন",
+      "dataCollection": "ডেটা সংগ্রহ",
       "auditLogs": "অডিট লগ",
       "requestLogs": "রিকোয়েস্ট লগ",
       "subOrganizations": "উপ-সংস্থা",

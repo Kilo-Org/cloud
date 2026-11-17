@@ -777,6 +777,7 @@
     },
     "reviewList": {
       "configureProvider": "Anbieter konfigurieren",
+      "connectOwnerOnly": "Bitte einen Organisationsinhaber oder Admin, einen Anbieter zu verbinden.",
       "couldNotLoad": "Die Reviews konnten nicht geladen werden.",
       "noReviews": "Noch keine Reviews",
       "noReviewsDescription": "Hier erscheinen Reviews, sobald Code Reviewer einen Pull-Request prüft.",
@@ -2430,6 +2431,7 @@
     "signOutThisDevice": "Dieses Gerät abmelden",
     "signOutSessionLabel": "{{device}} abmelden, angemeldet: {{signedIn}}, zuletzt aktiv: {{lastSeen}}",
     "sessionSignedOut": "Sitzung abgemeldet.",
+    "sessionSignOutFailed": "Diese Sitzung konnte nicht abgemeldet werden. Erneut versuchen.",
     "signOutThisDeviceTitle": "Dieses Gerät abmelden?",
     "signOutThisSessionTitle": "Diese Sitzung abmelden?",
     "signOutThisSessionMessage": "{{device}} wird abgemeldet. Zuletzt aktiv: {{lastSeen}}. Der API-Zugriff kann danach noch bis zu einer Stunde bestehen bleiben.",
@@ -2553,12 +2555,14 @@
     "manage": {
       "billingHistory": "Abrechnungsverlauf",
       "billingHistoryEmpty": "Noch kein Abrechnungsverlauf.",
+      "billingHistoryError": "Abrechnungsverlauf konnte nicht geladen werden",
       "cancel": "Abo kündigen",
       "cancelDescription": "Dein Kilo Pass bleibt bis zum Ende des Abrechnungszeitraums aktiv und wird nicht verlängert.",
       "cancelScheduled": "Endet am {{date}}",
       "cancelScheduledChange": "Geplante Änderung abbrechen",
       "cancelled": "Abo gekündigt",
       "creditHistoryEmpty": "Noch keine Credits aus Kilo Pass.",
+      "creditHistoryError": "Credit-Verlauf konnte nicht geladen werden",
       "resume": "Abo fortsetzen",
       "resumeCancelledDescription": "Dein Kilo Pass wird wieder automatisch verlängert.",
       "resumePausedDescription": "Dein Kilo Pass wird ab sofort fortgesetzt, noch vor dem geplanten Datum.",
@@ -3330,7 +3334,7 @@
       "selectOrganization": "Organisation auswählen",
       "unavailableDescription": "Diese Organisation ist nicht mehr verfügbar. Wähle in deinem Profil eine andere Organisation aus, um fortzufahren.",
       "unavailableSessionsDescription": "Diese Organisation ist nicht mehr verfügbar. Deren Sitzungen können nicht geladen werden.",
-      "accessDeniedDescription": "Du hast keinen Zugriff auf diese Organisation."
+      "accessDeniedDescription": "Bitte einen Inhaber oder Admin der Organisation darum, dir Zugriff zu gewähren."
     },
     "create": {
       "title": "Organisation erstellen",
@@ -3469,6 +3473,8 @@
       "groups": "Gruppen",
       "guardrails": "Guardrails",
       "byok": "Eigenen Schlüssel verwenden",
+      "ssoAndDomain": "SSO und Domain",
+      "dataCollection": "Datenerfassung",
       "auditLogs": "Audit-Logs",
       "requestLogs": "Anfrage-Logs",
       "subOrganizations": "Unterorganisationen",

@@ -442,8 +442,10 @@ async function main(
   const url = env.SANDBOX_CONTROL_URL;
   const credential = env.SANDBOX_CONTROL_CREDENTIAL;
   const allocationId = env[CONTROL_PLANE_ALLOCATION_ID_ENV];
-  const transferUrl = env.SANDBOX_TRANSFER_URL;
-  const transferGrant = env.SANDBOX_TRANSFER_GRANT;
+  // The runtime bootstrap exports inherited names as empty strings when the
+  // launch did not set them, so an empty transfer configuration is absent.
+  const transferUrl = env.SANDBOX_TRANSFER_URL || undefined;
+  const transferGrant = env.SANDBOX_TRANSFER_GRANT || undefined;
   // The launch identity is reused by the supervisor for every restart, so the
   // process identity must be generated here and used for both `hello` and the
   // transfer path and grant. The launch-time identity stays only in the path

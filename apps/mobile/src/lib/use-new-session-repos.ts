@@ -19,10 +19,9 @@ import {
 } from '@/components/agents/new-session-repository-state';
 import { formatGitUrlProject } from '@/components/agents/session-list-helpers';
 import { i18n } from '@/i18n';
-import { WEB_BASE_URL } from '@/lib/config';
+import { appShellHandoffUrl } from '@/lib/app-shell-handoff';
 import { useRecentAgentRepositories } from '@/lib/hooks/use-agent-sessions';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
-import { getGitLabIntegrationUrl } from '@/lib/integration-urls';
 import { bitbucketConnectHref } from '@/lib/bitbucket-connect-navigation';
 import {
   openAuthorizationAndWaitForReturn,
@@ -387,9 +386,12 @@ export function useNewSessionRepos({
 
   const openGitLabIntegration = useCallback(async () => {
     try {
-      const wait = await openAuthorizationAndWaitForReturn(
-        getGitLabIntegrationUrl(WEB_BASE_URL, organizationId)
-      );
+      const url = await appShellHandoffUrl({
+        page: 'integration',
+        platform: 'gitlab',
+        ...(organizationId ? { organizationId } : {}),
+      });
+      const wait = await openAuthorizationAndWaitForReturn(url);
       reportLateLaunchFailure(wait, {
         onFailure: () => {
           toast.error(i18n.t('codeReviewer.providerConnect.gitlabError'));

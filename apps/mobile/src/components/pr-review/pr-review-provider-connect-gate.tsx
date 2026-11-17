@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- The gate renders the connect, wrong-instance and org-only states, each with its own copy, for two providers with different browser hand-offs. */
 import { useQuery } from '@tanstack/react-query';
 import { PlugZap, RefreshCcw, ShieldAlert } from '@/components/ui/icons';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
@@ -17,13 +18,12 @@ import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { appShellHandoffUrl } from '@/lib/app-shell-handoff';
 import { PERSONAL_SCOPE } from '@/lib/code-reviewer-config';
-import { WEB_BASE_URL } from '@/lib/config';
 import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { useReviewerPermission } from '@/lib/hooks/use-reviewer-permission';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { getGitLabIntegrationUrl } from '@/lib/integration-urls';
 import { bitbucketConnectHref } from '@/lib/bitbucket-connect-navigation';
 import { useOrganization } from '@/lib/organization-context';
 import { launchConnectGateBrowser } from '@/lib/pr-review/connect-gate-platform';
@@ -165,11 +165,14 @@ export function ProviderConnectGate({
     setConnecting(true);
     try {
       // GitLab's OAuth callback lands on the web, so its connection stays a
-      // hand-off: open the integration page and re-check the status when the
-      // app returns (pattern: `launchConnectGateBrowser`). Bitbucket's
-      // workspace access token is pasted in the app's own connect sheet.
+      // hand-off: mint the shell integration page's single-use URL and re-check
+      // the status on return. Bitbucket's token is pasted in the app's sheet.
       await launchConnectGateBrowser(
-        getGitLabIntegrationUrl(WEB_BASE_URL, organizationId ?? undefined),
+        await appShellHandoffUrl({
+          page: 'integration',
+          platform: 'gitlab',
+          ...(organizationId ? { organizationId } : {}),
+        }),
         {
           signal: controller.signal,
           onOpenFailure: () => void toast.error(t('authErrors.couldNotOpenBrowser')),
@@ -186,10 +189,12 @@ export function ProviderConnectGate({
         }
       );
     } catch {
-      // `launchConnectGateBrowser` reports a failed launch through
-      // `onOpenFailure`; this keeps `void handleConnect()` from rejecting if the
-      // refresh helper throws before that. The status read's own error state
-      // renders the retryable QueryError.
+      // A mint that failed never reached the browser, so nothing else reported
+      // it. `launchConnectGateBrowser` reports a failed launch through
+      // `onOpenFailure`; the status read's own states carry the rest.
+      if (!controller.signal.aborted) {
+        void toast.error(t('authErrors.couldNotOpenBrowser'));
+      }
     } finally {
       if (!controller.signal.aborted) {
         setConnecting(false);

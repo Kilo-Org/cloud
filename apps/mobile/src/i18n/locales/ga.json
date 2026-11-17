@@ -1435,7 +1435,8 @@
       "noReviews": "Níl aon athbhreithniú ann fós",
       "noReviewsDescription": "Beidh athbhreithnithe le feiceáil anseo nuair a dhéanfaidh an tAthbhreithneoir cóid athbhreithniú ar iarratas tarraingthe.",
       "startManualReview": "Tosaigh athbhreithniú de láimh",
-      "configureProvider": "Cumraigh soláthraí"
+      "configureProvider": "Cumraigh soláthraí",
+      "connectOwnerOnly": "Iarr ar Úinéir eagraíochta nó Riarthóir soláthraí a cheangal."
     },
     "platformList": {
       "checking": "Ag seiceáil…",
@@ -3138,6 +3139,7 @@
     "signOutThisDevice": "Sínigh amach ón ngléas seo",
     "signOutSessionLabel": "Sínigh amach ó {{device}}, síniú isteach: {{signedIn}}, feicthe go deireanach: {{lastSeen}}",
     "sessionSignedOut": "Seisiún sínithe amach.",
+    "sessionSignOutFailed": "Níorbh fhéidir síniú amach ón seisiún seo. Bain triail eile as.",
     "signOutThisDeviceTitle": "An bhfuil tú ag iarraidh síniú amach ón ngléas seo?",
     "signOutThisSessionTitle": "An bhfuil tú ag iarraidh síniú amach ón seisiún seo?",
     "signOutThisSessionMessage": "Síneofar {{device}} amach. Feicthe go deireanach: {{lastSeen}}. Is féidir leis rochtain API a choinneáil ar feadh uair an chloig ar a mhéad.",
@@ -3267,12 +3269,14 @@
     "manage": {
       "billingHistory": "Stair bhilleála",
       "billingHistoryEmpty": "Níl aon stair bhilleála ann fós.",
+      "billingHistoryError": "Níorbh fhéidir stair bhilleála a lódáil",
       "cancel": "Cealaigh an síntiús",
       "cancelDescription": "Fanfaidh do Kilo Pass gníomhach go dtí deireadh na tréimhse billeála agus ní athnuafar é.",
       "cancelScheduled": "Cealófar ar {{date}}",
       "cancelScheduledChange": "Cealaigh an t-athrú sceidealaithe",
       "cancelled": "Cealaíodh an síntiús",
       "creditHistoryEmpty": "Níl aon chreidmheas Kilo Pass ann fós.",
+      "creditHistoryError": "Níorbh fhéidir stair chreidmheasa a lódáil",
       "resume": "Atosaigh an síntiús",
       "resumeCancelledDescription": "Tosóidh do Kilo Pass ag athnuachan go huathoibríoch arís.",
       "resumePausedDescription": "Atosóidh do Kilo Pass anois, roimh an dáta atosaithe sceidealaithe.",
@@ -3509,7 +3513,7 @@
       "selectOrganization": "Roghnaigh eagraíocht",
       "unavailableDescription": "Níl an eagraíocht seo ar fáil a thuilleadh. Roghnaigh ceann ó do phróifíl le leanúint ar aghaidh.",
       "unavailableSessionsDescription": "Níl an eagraíocht seo ar fáil a thuilleadh. Ní féidir a seisiúin a luchtú.",
-      "accessDeniedDescription": "Níl rochtain agat ar an eagraíocht seo."
+      "accessDeniedDescription": "Iarr ar úinéir nó ar riarthóir eagraíochta rochtain a thabhairt duit."
     },
     "create": {
       "title": "Cruthaigh eagraíocht",
@@ -3635,6 +3639,8 @@
       "groups": "Grúpaí",
       "guardrails": "Ráillí cosanta",
       "byok": "D'eochair féin",
+      "ssoAndDomain": "SSO agus fearann",
+      "dataCollection": "Bailiú sonraí",
       "auditLogs": "Logaí iniúchta",
       "requestLogs": "Logaí iarratas",
       "subOrganizations": "Fo-eagraíochtaí",
@@ -4802,7 +4808,7 @@
       "fieldCron": "Sloinneadh cron",
       "fieldCronHelp": "Cúig réimse: nóiméad, uair, lá, mí agus lá den tseachtain. Is é an t-eatramh is giorra ná nóiméad amháin.",
       "fieldTimezone": "Crios ama",
-      "nameLocked": "Tá an t-ainm mar chuid d’URL an chrúca ghréasáin agus ní féidir é a athrú.",
+      "nameLocked": "Ní féidir an t-ainm a athrú tar éis an truicir a chruthú.",
       "repositoryLocked": "Ní féidir an stór a athrú tar éis an truicir a chruthú.",
       "environmentAutomatic": "Uathoibríoch de réir an stóir",
       "notSelected": "Gan roghnú",
@@ -4817,6 +4823,7 @@
       "authHeaderLabel": "Ainm an cheanntáisc",
       "authSecretLabel": "Rún comhroinnte",
       "authSecretKeep": "Fág bán é chun an rún sábháilte a choinneáil.",
+      "authSecretSet": "Riachtanach. Roghnaigh teaghrán randamach láidir.",
       "authSecretCreator": "Úsáid 16 charachtar ar a laghad nuair a ritheann an truicear mar a chruthaitheoir.",
       "autoCommit": "Tiomantaigh athruithe nuair a chríochnaíonn an rith",
       "condenseOnComplete": "Dlúthaigh an comhthéacs nuair a chríochnaíonn an rith",
@@ -4827,6 +4834,7 @@
       "saveFailedTitle": "Níorbh fhéidir an truicear a shábháil",
       "deleteTitle": "Scrios an truicear seo?",
       "deleteMessage": "Teipfidh glaonna chuig {{name}}. Ní féidir é seo a chealú.",
+      "deleteMessageScheduled": "Stopfaidh ritheanna sceidealaithe an truicir {{name}}. Ní féidir é seo a chealú.",
       "runNow": "Rith anois",
       "runStarted": "Tosaíodh an rith",
       "created": "Cruthaíodh an truicear",

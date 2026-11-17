@@ -1412,7 +1412,8 @@
       "noReviews": "Peržiūrų dar nėra",
       "noReviewsDescription": "Peržiūros bus rodomos čia, kai kodo peržiūros agentas peržiūrės PR.",
       "startManualReview": "Pradėti rankinę peržiūrą",
-      "configureProvider": "Konfigūruoti paslaugų teikėją"
+      "configureProvider": "Konfigūruoti paslaugų teikėją",
+      "connectOwnerOnly": "Paprašykite organizacijos savininko ar administratoriaus prijungti paslaugų teikėją."
     },
     "platformList": {
       "checking": "Tikrinama…",
@@ -3083,6 +3084,7 @@
     "signOutThisDevice": "Atsijungti šiame įrenginyje",
     "signOutSessionLabel": "Atsijungti „{{device}}“, prisijungta {{signedIn}}, paskutinė veikla {{lastSeen}}",
     "sessionSignedOut": "Sesija baigta.",
+    "sessionSignOutFailed": "Nepavyko baigti šios sesijos. Bandykite dar kartą.",
     "signOutThisDeviceTitle": "Atsijungti šiame įrenginyje?",
     "signOutThisSessionTitle": "Baigti šią sesiją?",
     "signOutThisSessionMessage": "Nuo paskyros bus atsijungta: {{device}}. Paskutinė veikla {{lastSeen}}. Prieiga prie API gali galioti dar iki valandos.",
@@ -3210,12 +3212,14 @@
     "manage": {
       "billingHistory": "Atsiskaitymų istorija",
       "billingHistoryEmpty": "Atsiskaitymų istorijos dar nėra.",
+      "billingHistoryError": "Nepavyko įkelti atsiskaitymų istorijos",
       "cancel": "Atšaukti prenumeratą",
       "cancelDescription": "Jūsų Kilo Pass liks aktyvus iki atsiskaitymo laikotarpio pabaigos ir nebus atnaujintas.",
       "cancelScheduled": "Bus atšaukta {{date}}",
       "cancelScheduledChange": "Atšaukti suplanuotą pakeitimą",
       "cancelled": "Prenumerata atšaukta",
       "creditHistoryEmpty": "Kilo Pass kreditų dar nėra.",
+      "creditHistoryError": "Nepavyko įkelti kreditų istorijos",
       "resume": "Tęsti prenumeratą",
       "resumeCancelledDescription": "Jūsų Kilo Pass vėl bus atnaujinamas automatiškai.",
       "resumePausedDescription": "Jūsų Kilo Pass bus tęsiamas dabar, anksčiau nei suplanuota.",
@@ -3452,7 +3456,7 @@
       "selectOrganization": "Pasirinkite organizaciją",
       "unavailableDescription": "Ši organizacija nebepasiekiama. Norėdami tęsti, savo profilyje pasirinkite kitą organizaciją.",
       "unavailableSessionsDescription": "Ši organizacija nebepasiekiama. Jos seansų įkelti negalima.",
-      "accessDeniedDescription": "Neturite prieigos prie šios organizacijos."
+      "accessDeniedDescription": "Paprašykite organizacijos savininko arba administratoriaus suteikti jums prieigą."
     },
     "create": {
       "title": "Sukurti organizaciją",
@@ -3578,6 +3582,8 @@
       "groups": "Grupės",
       "guardrails": "Apsaugos ribos",
       "byok": "Naudoti savo raktą",
+      "ssoAndDomain": "SSO ir domenas",
+      "dataCollection": "Duomenų rinkimas",
       "auditLogs": "Audito žurnalai",
       "requestLogs": "Užklausų žurnalai",
       "subOrganizations": "Antrinės organizacijos",
@@ -4732,7 +4738,7 @@
       "fieldCron": "Cron išraiška",
       "fieldCronHelp": "Penki laukai: minutė, valanda, diena, mėnuo ir savaitės diena. Trumpiausias intervalas yra viena minutė.",
       "fieldTimezone": "Laiko juosta",
-      "nameLocked": "Pavadinimas yra žiniatinklio kabliuko adreso dalis ir jo pakeisti negalima.",
+      "nameLocked": "Pavadinimo negalima pakeisti po trigerio sukūrimo.",
       "repositoryLocked": "Saugyklos negalima pakeisti po trigerio sukūrimo.",
       "environmentAutomatic": "Automatiškai pagal saugyklą",
       "notSelected": "Nepasirinkta",
@@ -4747,6 +4753,7 @@
       "authHeaderLabel": "Antraštės pavadinimas",
       "authSecretLabel": "Bendrasis slaptasis raktas",
       "authSecretKeep": "Palikite tuščią, kad išliktų išsaugotas slaptasis raktas.",
+      "authSecretSet": "Privaloma. Pasirinkite stiprią atsitiktinę eilutę.",
       "authSecretCreator": "Naudokite bent 16 simbolių, kai trigeris veikia kaip jo kūrėjas.",
       "autoCommit": "Įtraukti pakeitimus pasibaigus paleidimui",
       "condenseOnComplete": "Sutrumpinti kontekstą pasibaigus paleidimui",
@@ -4757,6 +4764,7 @@
       "saveFailedTitle": "Nepavyko išsaugoti trigerio",
       "deleteTitle": "Ištrinti šį trigerį?",
       "deleteMessage": "Iškvietimai į {{name}} bus nesėkmingi. To atšaukti negalima.",
+      "deleteMessageScheduled": "Suplanuoti trigerio {{name}} paleidimai sustos. To atšaukti negalima.",
       "runNow": "Paleisti dabar",
       "runStarted": "Paleidimas pradėtas",
       "created": "Trigeris sukurtas",

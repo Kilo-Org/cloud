@@ -1322,6 +1322,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
             }
           );
         } catch {
+          pendingCredentials = true;
           log('control-plane MCP credential refresh failed; retaining pending credential restart');
         }
       }

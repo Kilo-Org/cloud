@@ -18,9 +18,16 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { canConnectAnyProvider } from '@/lib/code-reviewer-status';
+import { isPersonal } from '@/lib/code-reviewer-config';
 import { useReviewerScopeTitle } from '@/lib/hooks/use-reviewer-scope-title';
-import { useGitHubStatus, useGitLabStatus } from '@/lib/hooks/use-code-reviewer';
+import {
+  useBitbucketReadiness,
+  useGitHubStatus,
+  useGitLabStatus,
+} from '@/lib/hooks/use-code-reviewer';
 import { useReviewList } from '@/lib/hooks/use-code-reviews';
+import { useReviewerPermission } from '@/lib/hooks/use-reviewer-permission';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { dedupeById } from '@/lib/query/dedupe-by-id';
@@ -132,8 +139,47 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
   useRouteForegroundRefresh([[['codeReviews']]]);
   const githubStatus = useGitHubStatus(scope);
   const gitlabStatus = useGitLabStatus(scope);
+  // The manual-review action exists only for the platforms whose review it can
+  // start, so the connected check behind that action stays GitHub and GitLab.
   const hasConnectedProvider =
     githubStatus.data?.connected === true || gitlabStatus.data?.connected === true;
+  const bitbucketReadiness = useBitbucketReadiness(scope);
+  // Any connected reviewer platform changes what the empty list says: Bitbucket
+  // runs automatic reviews without offering a manual one, so a scope connected
+  // only to Bitbucket is still a configured scope and must not read as though
+  // nothing were connected.
+  const hasAnyConnectedProvider =
+    hasConnectedProvider || bitbucketReadiness.data?.connected === true;
+  const permission = useReviewerPermission(scope);
+  // The Configure button opens the platform list, where each platform's connect
+  // card is per-role: GitHub's needs an organization-manage role and GitLab's a
+  // billing-level edit role, so a plain member would land on a screen whose
+  // actions all refuse them. An unresolved permission keeps the button — the
+  // provider procedures stay server-authorized.
+  const canConnect = permission.status !== 'ready' || canConnectAnyProvider(permission);
+  // A deep link arrives with no cached role or provider answer, and the empty
+  // state must paint its final form once: a button that appears and then leaves
+  // moves the centered stack by its own height. Keep the loading body until all
+  // inputs settle, as the manual-review screen does for the same reason.
+  // A query with no data and no error has not answered yet: it is paused
+  // (offline, unknown connectivity) or still fetching, so the empty state must
+  // not paint a state it may replace. The classifiers treat that case as
+  // loading; a failed read is settled, because the role and connection answers
+  // are then both final for this visit.
+  const providerUnresolved = (status: { data?: unknown; isError?: boolean }) =>
+    status.data === undefined && status.isError !== true;
+  const emptyStateSettled =
+    permission.status !== 'loading' &&
+    !providerUnresolved(githubStatus) &&
+    !providerUnresolved(gitlabStatus) &&
+    // The Bitbucket readiness query is disabled for a personal scope, so its
+    // empty cache there is a final answer, not a pending one.
+    (isPersonal(scope) || !providerUnresolved(bitbucketReadiness));
+  // A read failed only when it failed before it answered. `isError` also turns
+  // true when a background refetch fails over the top of cached data, and that
+  // cached answer still says what the connection is.
+  const providerReadFailed = (status: { data?: unknown; isError?: boolean }) =>
+    status.isError === true && status.data === undefined;
 
   const pages = data?.pages;
   const firstPage = pages?.[0];
@@ -152,31 +198,61 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
   const errorVariant = trpcErrorVariant(error);
 
   let body: ReactNode = null;
+  const reviewsLoadingBody = (
+    <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
+      <Animated.View exiting={FadeOut.duration(150)} className="gap-3">
+        <Skeleton className="h-20 w-full rounded-lg" />
+        <Skeleton className="h-20 w-full rounded-lg" />
+        <Skeleton className="h-20 w-full rounded-lg" />
+      </Animated.View>
+    </TabScreenScrollView>
+  );
   if (!isLoading && firstPage?.success && reviews.length === 0) {
-    body = (
+    const offersAction = hasConnectedProvider || canConnect;
+    // The role notice must be true: it appears only when no reviewer platform is
+    // connected at all. A scope connected to Bitbucket keeps the neutral
+    // explanation, because an owner would find it already set up. A provider
+    // read that failed before it answered is unknown, not proof of no
+    // connection, so it keeps the neutral explanation too — while a read that
+    // failed with a cached answer still lets that answer decide the notice.
+    const showsRoleNotice =
+      !hasAnyConnectedProvider &&
+      !canConnect &&
+      !providerReadFailed(githubStatus) &&
+      !providerReadFailed(gitlabStatus) &&
+      !providerReadFailed(bitbucketReadiness);
+    body = emptyStateSettled ? (
       <EmptyState
         icon={GitPullRequest}
         title={t('codeReviewer.reviewList.noReviews')}
-        description={t('codeReviewer.reviewList.noReviewsDescription')}
+        description={
+          showsRoleNotice
+            ? t('codeReviewer.reviewList.connectOwnerOnly')
+            : t('codeReviewer.reviewList.noReviewsDescription')
+        }
         action={
-          <Button
-            className={STATE_ACTION_CLASS}
-            onPress={() => {
-              pushOnce(
-                (hasConnectedProvider
-                  ? `/(app)/code-reviewer/${scope}/manual-review`
-                  : `/(app)/code-reviewer/${scope}`) as Href
-              );
-            }}
-          >
-            <Text>
-              {hasConnectedProvider
-                ? t('codeReviewer.reviewList.startManualReview')
-                : t('codeReviewer.reviewList.configureProvider')}
-            </Text>
-          </Button>
+          offersAction ? (
+            <Button
+              className={STATE_ACTION_CLASS}
+              onPress={() => {
+                pushOnce(
+                  (hasConnectedProvider
+                    ? `/(app)/code-reviewer/${scope}/manual-review`
+                    : `/(app)/code-reviewer/${scope}`) as Href
+                );
+              }}
+            >
+              <Text>
+                {hasConnectedProvider
+                  ? t('codeReviewer.reviewList.startManualReview')
+                  : t('codeReviewer.reviewList.configureProvider')}
+              </Text>
+            </Button>
+          ) : undefined
         }
       />
+    ) : (
+      reviewsLoadingBody
     );
   } else if (!isLoading && ((isError && !data) || (firstPage && !firstPage.success))) {
     body = (
@@ -188,15 +264,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
       />
     );
   } else if (isLoading) {
-    body = (
-      <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
-        <Animated.View exiting={FadeOut.duration(150)} className="gap-3">
-          <Skeleton className="h-20 w-full rounded-lg" />
-          <Skeleton className="h-20 w-full rounded-lg" />
-          <Skeleton className="h-20 w-full rounded-lg" />
-        </Animated.View>
-      </TabScreenScrollView>
-    );
+    body = reviewsLoadingBody;
   } else {
     body = (
       <FlashList

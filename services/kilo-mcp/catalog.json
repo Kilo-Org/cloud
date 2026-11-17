@@ -16836,6 +16836,37 @@
     ],
     "searchBlob": "models.preferred Return the ordered list of preferred AI models for the app, including free/auto models and top paid models. Use it to populate model pickers or determine default model selection order. models preferred"
   },
+  "models.selectorList": {
+    "path": "models.selectorList",
+    "kind": "query",
+    "summary": "List the models available for a model selector: returns the personal model list for a user, or the models available to a specific organization filtered by audience (member or shared services). Use when an agent needs to populate a model picker or check which models a user or organization can access.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "audience": {
+          "default": "member",
+          "type": "string",
+          "enum": [
+            "member",
+            "shared_services"
+          ]
+        }
+      }
+    },
+    "tags": [
+      "models",
+      "selectorlist",
+      "organizationid",
+      "audience"
+    ],
+    "searchBlob": "models.selectorList List the models available for a model selector: returns the personal model list for a user, or the models available to a specific organization filtered by audience (member or shared services). Use when an agent needs to populate a model picker or check which models a user or organization can access. models selectorlist organizationid audience organizationId audience"
+  },
   "moderation.acceptTerms": {
     "path": "moderation.acceptTerms",
     "kind": "mutation",
@@ -35308,18 +35339,6 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 200
-        },
-        "organizationId": {
-          "anyOf": [
-            {
-              "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-            },
-            {
-              "type": "null"
-            }
-          ]
         }
       },
       "required": [
@@ -35330,10 +35349,9 @@
       "todos",
       "items",
       "candidatesforsession",
-      "sessionid",
-      "organizationid"
+      "sessionid"
     ],
-    "searchBlob": "todos.items.candidatesForSession List open to-do items that could be linked to a session, prioritizing ones in the same repository. todos items candidatesforsession sessionid organizationid sessionId organizationId"
+    "searchBlob": "todos.items.candidatesForSession List open to-do items that could be linked to a session, prioritizing ones in the same repository. todos items candidatesforsession sessionid sessionId"
   },
   "todos.items.create": {
     "path": "todos.items.create",
@@ -37872,7 +37890,7 @@
         "sessionId": {
           "type": "string",
           "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$"
         }
       },
       "required": [

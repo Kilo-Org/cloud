@@ -213,43 +213,76 @@ describe('workspace session attachment', () => {
 });
 
 describe('control-plane wrapper startup process', () => {
-  it('preserves the original startup diagnostic and stack without a DSN and exits 1', async () => {
+  async function startWrapper(env: Record<string, string>) {
     const directory = await mkdtemp(join(tmpdir(), 'control-plane-startup-'));
-    const sentinel = 'wrapper-startup-diagnostic-sentinel';
     const child = Bun.spawn([process.execPath, 'run', join(import.meta.dir, 'main.ts')], {
       env: {
         ...process.env,
         HOME: directory,
         CLOUD_AGENT_SENTRY_DSN: '',
         CLOUD_AGENT_SENTRY_ENVIRONMENT: '',
-        SANDBOX_INTERCEPT_HTTPS: '',
-        CONTROL_PLANE_NATIVE_LOGS: '',
-        CONTROL_LOG_UPLOAD_URL: '',
-        CONTROL_LOG_UPLOAD_GRANT: '',
-        CONTROL_WORKLOAD_LIMIT_MB: '1',
-        CONTROL_WORKLOAD_RESERVE_MB: '1024',
-        SANDBOX_CONTROL_URL: sentinel,
-        SANDBOX_CONTROL_CREDENTIAL: 'startup-test-credential',
-        [CONTROL_PLANE_ALLOCATION_ID_ENV]: 'allocation_startup',
         WRAPPER_LOG_PATH: join(directory, 'wrapper.log'),
+        ...env,
       },
       stdout: 'ignore',
       stderr: 'pipe',
       timeout: 5_000,
     });
-    const stderr = new Response(child.stderr).text();
+    return {
+      exited: child.exited,
+      stderr: new Response(child.stderr).text(),
+      cleanup: async () => {
+        if (child.exitCode === null) child.kill();
+        await child.exited;
+        await rm(directory, { recursive: true, force: true });
+      },
+    };
+  }
+
+  const reachingTerminalRuntime = {
+    SANDBOX_INTERCEPT_HTTPS: '',
+    CONTROL_PLANE_NATIVE_LOGS: '',
+    CONTROL_LOG_UPLOAD_URL: '',
+    CONTROL_LOG_UPLOAD_GRANT: '',
+    CONTROL_WORKLOAD_LIMIT_MB: '1',
+    CONTROL_WORKLOAD_RESERVE_MB: '1024',
+    SANDBOX_CONTROL_CREDENTIAL: 'startup-test-credential',
+    [CONTROL_PLANE_ALLOCATION_ID_ENV]: 'allocation_startup',
+  };
+
+  it('preserves the original startup diagnostic and stack without a DSN and exits 1', async () => {
+    const sentinel = 'wrapper-startup-diagnostic-sentinel';
+    const wrapper = await startWrapper({
+      ...reachingTerminalRuntime,
+      SANDBOX_CONTROL_URL: sentinel,
+    });
     try {
-      expect(await child.exited).toBe(1);
-      const diagnostic = await stderr;
+      expect(await wrapper.exited).toBe(1);
+      const diagnostic = await wrapper.stderr;
       expect(diagnostic).toContain('TypeError:');
       expect(diagnostic).toContain(sentinel);
       expect(diagnostic).toContain('at createControlTerminalRuntime');
       expect(diagnostic).toContain('terminal-runtime.ts:');
       expect(diagnostic).not.toContain('wrapper Sentry eventId=');
     } finally {
-      if (child.exitCode === null) child.kill();
-      await child.exited;
-      await rm(directory, { recursive: true, force: true });
+      await wrapper.cleanup();
+    }
+  }, 10_000);
+
+  it('treats empty launch values for the sandbox transfer as absent', async () => {
+    const wrapper = await startWrapper({
+      ...reachingTerminalRuntime,
+      SANDBOX_CONTROL_URL: 'wrapper-startup-diagnostic-sentinel',
+      SANDBOX_TRANSFER_URL: '',
+      SANDBOX_TRANSFER_GRANT: '',
+    });
+    try {
+      expect(await wrapper.exited).toBe(1);
+      const diagnostic = await wrapper.stderr;
+      expect(diagnostic).not.toContain('wrapper-identity.ts');
+      expect(diagnostic).toContain('at createControlTerminalRuntime');
+    } finally {
+      await wrapper.cleanup();
     }
   }, 10_000);
 });

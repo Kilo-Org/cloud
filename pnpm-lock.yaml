@@ -58,8 +58,8 @@ catalogs:
       specifier: 4.1.12
       version: 4.1.12
     '@workos-inc/node':
-      specifier: 11.0.0
-      version: 11.0.0
+      specifier: 12.2.0
+      version: 12.2.0
     aws4fetch:
       specifier: 1.0.20
       version: 1.0.20
@@ -216,7 +216,7 @@ patchedDependencies:
   expo-notifications@58.1.4: 687bb2bde9480b90d31b004373e3edb3fb699a99eac3b65d2e85aa5e76572e9e
   expo-router@58.0.19: b02d51c91eb65aad388c7558622a89e10160d0ff948f765790a665a68d93d5dd
   expo-server-sdk@6.1.0: 7850520582b5b394397b35d1ea195192fe78589d8a6a748fe15177b818c4ed0b
-  expo-speech-recognition@57.1.1: a2fc2568603b981e0b9bf1133deef50012a0b2d18b52f445a9868b1770005b99
+  expo-speech-recognition@58.0.1: 1a2e356801d98a4955ba1840994bcc9f2838aad151396fa3a0d6e4ec09883e79
   expo-task-manager@58.0.12: 144af9f4a50fa0b0afafdace6a7334fd444f0facbfdbf1790aecabbc9baeacdb
   expo-widgets@58.0.17: 460b9294721505a0314d95a86cbf0063074e50259180af2d686cad950ef6ab42
   llama.rn@0.12.9: 62dce8190ea1c3bfe58fe2ab460927672af84bea3a32dcf566e92015ad13bd67
@@ -510,8 +510,8 @@ importers:
   apps/mobile:
     dependencies:
       '@bsky.app/react-native-uitextview':
-        specifier: 2.7.1
-        version: 2.7.1(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
+        specifier: 2.7.2
+        version: 2.7.2(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
       '@expo-google-fonts/jetbrains-mono':
         specifier: 0.4.1
         version: 0.4.1
@@ -567,14 +567,14 @@ importers:
         specifier: workspace:*
         version: link:../../packages/trpc
       '@native-html/render':
-        specifier: 1.0.3
-        version: 1.0.3(@types/react@19.3.0)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
+        specifier: 1.0.4
+        version: 1.0.4(@types/react@19.3.0)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
       '@react-native-community/netinfo':
         specifier: 12.0.1
         version: 12.0.1(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
       '@react-native-google-signin/google-signin':
-        specifier: 16.1.5
-        version: 16.1.5(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
+        specifier: 17.0.0
+        version: 17.0.0(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
       '@rn-primitives/dialog':
         specifier: 1.5.2
         version: 1.5.2(@rn-primitives/portal@1.5.3(@types/react@19.3.0)(immer@11.1.4)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(use-sync-external-store@1.7.0(react@19.3.0)))(@types/react-dom@19.2.3(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.2.6(react@19.3.0))(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
@@ -585,14 +585,14 @@ importers:
         specifier: 1.5.2
         version: 1.5.2(@types/react@19.3.0)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
       '@sentry/react-native':
-        specifier: ~8.31.0
-        version: 8.31.0(@babel/core@7.29.7)(@expo/config-types@58.0.3)(@expo/config@58.0.6(typescript@7.0.2))(@expo/env@2.5.2)(bufferutil@4.1.0)(dotenv@18.0.10)(expo-router@58.0.19)(expo@58.0.10)(metro-config@0.87.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(metro-resolver@0.87.1)(open@11.0.0)(promise@8.3.0)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(rollup@4.68.2)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))(esbuild@0.28.2))
+        specifier: ~8.34.0
+        version: 8.34.0(@babel/core@7.29.7)(@expo/config-types@58.0.3)(@expo/config@58.0.6(typescript@7.0.2))(@expo/env@2.5.2)(bufferutil@4.1.0)(dotenv@18.0.10)(expo-router@58.0.19)(expo@58.0.10)(metro-config@0.87.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(metro-resolver@0.87.1)(open@11.0.0)(promise@8.3.0)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(rollup@4.68.2)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))(esbuild@0.28.2))
       '@shopify/flash-list':
         specifier: 2.3.3
         version: 2.3.3(patch_hash=0788a743245aad9c9a54369df351e79faacc757717d0d3d87f1954e2e61bec65)(@babel/runtime@7.29.7)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
       '@tailwindcss/postcss':
-        specifier: 4.3.3
-        version: 4.3.3
+        specifier: 4.3.5
+        version: 4.3.5
       '@tanstack/query-async-storage-persister':
         specifier: 'catalog:'
         version: 5.104.3
@@ -720,8 +720,8 @@ importers:
         specifier: ~58.0.18
         version: 58.0.18(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(typescript@7.0.2)
       expo-speech-recognition:
-        specifier: 57.1.1
-        version: 57.1.1(patch_hash=a2fc2568603b981e0b9bf1133deef50012a0b2d18b52f445a9868b1770005b99)(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
+        specifier: ~58.0.1
+        version: 58.0.1(patch_hash=1a2e356801d98a4955ba1840994bcc9f2838aad151396fa3a0d6e4ec09883e79)(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
       expo-splash-screen:
         specifier: ~58.0.9
         version: 58.0.9(expo@58.0.10)(typescript@7.0.2)
@@ -774,8 +774,8 @@ importers:
         specifier: 18.1.1
         version: 18.1.1
       nativewind:
-        specifier: 5.0.0-rc.0
-        version: 5.0.0-rc.0(react-native-css@3.1.0-rc.0(@expo/metro-config@58.0.13(bufferutil@4.1.0)(expo@58.0.10)(typescript@7.0.2)(utf-8-validate@6.0.6))(lightningcss@1.30.1)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(tailwindcss@4.3.3)
+        specifier: 5.0.0-rc.1
+        version: 5.0.0-rc.1(react-native-css@3.1.0-rc.1(@expo/metro-config@58.0.13(bufferutil@4.1.0)(expo@58.0.10)(typescript@7.0.2)(utf-8-validate@6.0.6))(lightningcss@1.30.1)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(tailwindcss@4.3.5)
       posthog-react-native:
         specifier: 4.81.2
         version: 4.81.2(expo-application@58.1.1(expo@58.0.10))(expo-device@58.0.5(expo@58.0.10))(expo-file-system@58.0.9(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6)))(expo-localization@58.0.4(patch_hash=790ed1623bb21bc6af1bfe44cacd8f383a128e62d0572669c5568fb8f3676b73)(expo@58.0.10)(react@19.3.0))(react-native-safe-area-context@5.10.1(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(react-native-svg@15.15.5(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))
@@ -795,8 +795,8 @@ importers:
         specifier: 7.0.2-v2
         version: 7.0.2-v2(patch_hash=7affcf3da23038fe6874ab68124824cb9e56d5ea8336611869b97d30fb1716b7)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(typescript@7.0.2)
       react-native-css:
-        specifier: 3.1.0-rc.0
-        version: 3.1.0-rc.0(@expo/metro-config@58.0.13(bufferutil@4.1.0)(expo@58.0.10)(typescript@7.0.2)(utf-8-validate@6.0.6))(lightningcss@1.30.1)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
+        specifier: 3.1.0-rc.1
+        version: 3.1.0-rc.1(@expo/metro-config@58.0.13(bufferutil@4.1.0)(expo@58.0.10)(typescript@7.0.2)(utf-8-validate@6.0.6))(lightningcss@1.30.1)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
       react-native-enriched-markdown:
         specifier: 1.1.1
         version: 1.1.1(patch_hash=697d3f3512bb0fb136fa84b26368e62333ed972d6a4182864206c4c6713c343a)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
@@ -840,8 +840,8 @@ importers:
         specifier: 3.7.0
         version: 3.7.0
       tailwindcss:
-        specifier: 4.3.3
-        version: 4.3.3
+        specifier: 4.3.5
+        version: 4.3.5
       ulid:
         specifier: 'catalog:'
         version: 3.0.2
@@ -1251,7 +1251,7 @@ importers:
         version: 2.1.2(@opentelemetry/api-logs@0.208.0)(@opentelemetry/api@1.9.1)(@opentelemetry/instrumentation@0.220.0(@opentelemetry/api@1.9.1))(@opentelemetry/resources@2.12.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-logs@0.212.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-metrics@2.6.1(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.12.0(@opentelemetry/api@1.9.1))
       '@workos-inc/node':
         specifier: 'catalog:'
-        version: 11.0.0
+        version: 12.2.0
       '@xterm/addon-clipboard':
         specifier: 0.2.0
         version: 0.2.0
@@ -1985,7 +1985,7 @@ importers:
         version: 11.19.0(typescript@7.0.2)
       '@workos-inc/node':
         specifier: 'catalog:'
-        version: 11.0.0
+        version: 12.2.0
       drizzle-orm:
         specifier: 0.45.4
         version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
@@ -3308,7 +3308,7 @@ importers:
         version: link:../../packages/worker-utils
       '@workos-inc/node':
         specifier: 'catalog:'
-        version: 11.0.0
+        version: 12.2.0
       drizzle-orm:
         specifier: 0.45.4
         version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
@@ -4760,8 +4760,8 @@ packages:
     resolution: {integrity: sha512-ctxtJ/eA+t+6q2++vj5j7FYX3nRu311q1wfYH3xjlLOsczhlhxAg2FWNUXhpGvAw3BWo1xBcvOV6/YLc2r5FJw==}
     hasBin: true
 
-  '@bsky.app/react-native-uitextview@2.7.1':
-    resolution: {integrity: sha512-hy1UCDFwBJc+GAzezaLx5Xl++lqRoN4/Y38VbUQ27htYfGXSSUl9UAc1hmaiFxKwRD4KZjclo6JQuB5cRWbVPg==}
+  '@bsky.app/react-native-uitextview@2.7.2':
+    resolution: {integrity: sha512-VTgGOho7+EBy+Ehd1aQAhr2Vq7mjAOyA/LOKhWgFiPJHhkjULC4RZya84+XUTQ0wGlbqvwM4jwKQhKvRQzi8Pw==}
     peerDependencies:
       react: '*'
       react-native: '>=0.81.5'
@@ -6739,19 +6739,19 @@ packages:
       '@emnapi/core': ^1.7.1 || 2.0.0-beta.2 || 2.0.0-beta.3
       '@emnapi/runtime': ^1.7.1 || 2.0.0-beta.2 || 2.0.0-beta.3
 
-  '@native-html/css-processor@2.0.1':
-    resolution: {integrity: sha512-NN0TKGjnu8eSWsKP4EQVIPCb5YoYlCQE9MnZnzN93euu0hkwZ89TBKqEnQ3FJE/hjZ1NFwciPqbenqn6RcgIag==}
+  '@native-html/css-processor@2.0.2':
+    resolution: {integrity: sha512-NLkuYcsPEo9rkWz21VgfVwCVqYlczezoMeGhl7fmEs3wczCDAhf7w3Bfe40buzY4oxPEFskjgMLquLW2esswvQ==}
     peerDependencies:
       '@types/react': '*'
 
-  '@native-html/render@1.0.3':
-    resolution: {integrity: sha512-C6nThaZf+rOcNpZHqbZoSrsNU6SUyHFCQqz+0ixGcOEyvypYiA1KowBNc9AkWKiVcoHpISioKbQlrQ7l+rlqEw==}
+  '@native-html/render@1.0.4':
+    resolution: {integrity: sha512-cWO1zCLwO3HT503OCQvTqWcQ7PWN+r1EQAegMf9PN1n9/qd0PaYXTW7XqeRssWcKllCDfGrnc778Ct3I2yqwsg==}
     peerDependencies:
       react: '*'
       react-native: '*'
 
-  '@native-html/transient-render-engine@12.0.1':
-    resolution: {integrity: sha512-DiaVMJbW75k08aWJXYTftg/JULaEFUv3+GF/9xW3Cb12+S0vmwbu1+c33wKBc7TomZABD9hEYk9Y7kyQp6BgOg==}
+  '@native-html/transient-render-engine@12.0.2':
+    resolution: {integrity: sha512-UF53OIjD+ILx/l6N5+srcwtXsJy7i2LUNzGGN/Abyq8vYhNsgQIoLvcGy+F9gc5jS0HN+BiSZt6fSZU4QsM14w==}
     peerDependencies:
       react-native: '*'
 
@@ -9595,8 +9595,8 @@ packages:
       react: '*'
       react-native: '>=0.59'
 
-  '@react-native-google-signin/google-signin@16.1.5':
-    resolution: {integrity: sha512-9rmMwACzHK9Cbd0Yp7efg5uWgiYoLwmNAJh4gRCuMcSQH+qplpK7E4d1Q4tbsD8M9jvvVtRX2Z0AP9wwBKmPrQ==}
+  '@react-native-google-signin/google-signin@17.0.0':
+    resolution: {integrity: sha512-FAnq5tkoq01np7jCzGjBYK1QPS61hJxjLJHJyJjQN3gaTwAZiGll18Xn3nygITMsZ/WoJ0jmskuHSG/oknUskQ==}
     peerDependencies:
       expo: '>=52.0.40'
       react: '*'
@@ -10197,16 +10197,16 @@ packages:
     resolution: {integrity: sha512-8HRF1rdqWwtINqGEdx8Iqs9UOP/n8E0vXUu3Nmbqj4p5sQPA7vvCfq+4Y4rTqZFc7sNdFpDsRION5iQEh8zfZw==}
     engines: {node: '>=8'}
 
-  '@sentry/browser-utils@10.76.2':
-    resolution: {integrity: sha512-onALxAdvLWyK+0erbrv7LVzh1zX9sErOM21eCz1dpNUIQadrR9tmd5J1kL9a2Wagq1RyIWRmy/YtpwOK4myZaQ==}
+  '@sentry/browser-utils@10.78.0':
+    resolution: {integrity: sha512-zlIrDub15KsHb0CacqDSnXevV0Z67IvfhB/5zb6I/DavIfMHJC4urvIXMkLzSktfAbLB3m7cQpMoqQBhhoB1kQ==}
     engines: {node: '>=18'}
 
   '@sentry/browser-utils@11.12.0':
     resolution: {integrity: sha512-OttAHqf557R1gfLQRqb/dpGUK1UQd21qkeeN0KA/ThuymYXTNY+qTpJIOqmzgpk6fOmE922mTT6xmnMEiGYZBQ==}
     engines: {node: '>=20.19.0 <22.0.0 || >=22.12.0 <23.0.0 || >=23.2.0'}
 
-  '@sentry/browser@10.76.2':
-    resolution: {integrity: sha512-dFyuWYjDs0/LetQZqK5IHj0/wIC8sBYADyMjU5Fo0nt2vzT11CPPG2AKeITIQcoRRs9IZ8ahtDMqWMvBPfDs1w==}
+  '@sentry/browser@10.78.0':
+    resolution: {integrity: sha512-azZBJHq5XxOhQAKdMpkBR7ERR0fSaTS+aQzfayicFk/xMepmFjWgAm2Vph1od2ULyY0OCadIfipCpu/cbsIJMA==}
     engines: {node: '>=18'}
 
   '@sentry/browser@11.12.0':
@@ -10217,8 +10217,8 @@ packages:
     resolution: {integrity: sha512-SBTCDYx+yaeLX/M6ukP8oQXBv+DZVsTQi1kivkcOWx3FcJCuESzeiJxy/FKAT/Sixq0UaPFRdnAGobty6rZmOg==}
     engines: {node: '>=18'}
 
-  '@sentry/bundler-plugins@10.76.2':
-    resolution: {integrity: sha512-5ovSYkHaTTDwe6p9vq0AzE+W9likkINBpzCv7VychGqYUfBGNzr+0YVkAt9//saJI9BKs+lWud5qX5iASf6wkw==}
+  '@sentry/bundler-plugins@10.78.0':
+    resolution: {integrity: sha512-vI52/j8xjDewXfbfdL0V/wKPMUUAp6e5rf5Xww8lJB9cNhCT5nQ71c78GE48wFuDEn7PuD9e9t6gvYujrESZkA==}
     engines: {node: '>= 18'}
     peerDependencies:
       rollup: '>=3.2.0'
@@ -10251,6 +10251,11 @@ packages:
     engines: {node: '>=18'}
     os: [darwin]
 
+  '@sentry/cli-darwin@3.8.2':
+    resolution: {integrity: sha512-S9xIhtpPk5uU0J0dMLz5VCtlBn+OHjG7En8HkZNGYsleNACQOwcG5wcfAnGuq+7x643KrEOubtd1VPtGfrBHsQ==}
+    engines: {node: '>=18'}
+    os: [darwin]
+
   '@sentry/cli-linux-arm64@2.58.6':
     resolution: {integrity: sha512-q8mEcNNmeXMy5i+jWT30TVpH7LcP4HD21CD5XRSPAd/a912HF6EpK0ybf/1USO14WOhoXbAGi9txwaWabSe33g==}
     engines: {node: '>=10'}
@@ -10259,6 +10264,12 @@ packages:
 
   '@sentry/cli-linux-arm64@3.8.0':
     resolution: {integrity: sha512-CS43j4vbLJBoB4c5MRZS7/nCf62yCnPIMQj7N+ZC50ze6EM8efEy4jq1ZZjz4G9u6AKuo6sntuaOlOGdZL5l6g==}
+    engines: {node: '>=18'}
+    cpu: [arm64]
+    os: [linux, freebsd, android]
+
+  '@sentry/cli-linux-arm64@3.8.2':
+    resolution: {integrity: sha512-sWKkGTSOqRmGW8d2Q6ir1gBEkvfXWNbDxcf/dF0MJt8q9p594k+04GOm5mZ/VAePKGzs9W8fXE1xfmZ/UNCLcQ==}
     engines: {node: '>=18'}
     cpu: [arm64]
     os: [linux, freebsd, android]
@@ -10275,6 +10286,12 @@ packages:
     cpu: [arm]
     os: [linux, freebsd, android]
 
+  '@sentry/cli-linux-arm@3.8.2':
+    resolution: {integrity: sha512-maj9TXsnyWqNKs+UTHc+/gpsvXPVlCbheH+QHaBx8FD9u0B56REVDfxKUSCzeC9eTGDf0eKAFxbxWiMXKG4B5Q==}
+    engines: {node: '>=18'}
+    cpu: [arm]
+    os: [linux, freebsd, android]
+
   '@sentry/cli-linux-i686@2.58.6':
     resolution: {integrity: sha512-q8vNJi1eOV/4vxAFWBsEwLHoSYapaZHIf4j76KJGJXFKTkEbsjCOOsKbwUIBTQQhRgV4DFWh3ryfsPS/que4Kg==}
     engines: {node: '>=10'}
@@ -10283,6 +10300,12 @@ packages:
 
   '@sentry/cli-linux-i686@3.8.0':
     resolution: {integrity: sha512-ckQ5XeY+D5ISyFKrGnmYt5xarqQ1VHPMBJQnwnG0Hb1V116efAIusK5NqoHMP0o5Bu17BRlaxYA1l81HmvKqFQ==}
+    engines: {node: '>=18'}
+    cpu: [x86, ia32]
+    os: [linux, freebsd, android]
+
+  '@sentry/cli-linux-i686@3.8.2':
+    resolution: {integrity: sha512-6aOKjTWGl5XEYCOOha4GO3aq5C7ISmYB8QECec8mFLWx0L3QoXdKtaNQoLUYslsSN0jEmFeOgA0U27Tp5OEBww==}
     engines: {node: '>=18'}
     cpu: [x86, ia32]
     os: [linux, freebsd, android]
@@ -10299,6 +10322,12 @@ packages:
     cpu: [x64]
     os: [linux, freebsd, android]
 
+  '@sentry/cli-linux-x64@3.8.2':
+    resolution: {integrity: sha512-icx2NoqaxuE4H5khIoRCB/MDX76/kKbDZFvJe/UYloGp9aucxi6c7mk8oDxFvskMFqLfbprQ6RzKH7iILmODQg==}
+    engines: {node: '>=18'}
+    cpu: [x64]
+    os: [linux, freebsd, android]
+
   '@sentry/cli-win32-arm64@2.58.6':
     resolution: {integrity: sha512-nj0Ff/kmAB73EPDhR8B4O9r+NUHK5GkPCkGWC+kXVemqAJWL5jcJ5KdxG0l/S0z6RoEoltID8/43/B+TaMlT7A==}
     engines: {node: '>=10'}
@@ -10307,6 +10336,12 @@ packages:
 
   '@sentry/cli-win32-arm64@3.8.0':
     resolution: {integrity: sha512-AtfvaIZ9hK/l2Q2It6PLTtLlQTRe7179kZVi++qd98iE7Ix4ysdgshhozW5uUu4gI9kauJC/fhe21p9lr0uwlA==}
+    engines: {node: '>=18'}
+    cpu: [arm64]
+    os: [win32]
+
+  '@sentry/cli-win32-arm64@3.8.2':
+    resolution: {integrity: sha512-lSzj1ywih1madjyMrTHSjJKPhvErozSsSrG7QF6yIt7dMLYX4Qh9X3puVReh1YB5mOPCX8MJPtur67YJmR1S+w==}
     engines: {node: '>=18'}
     cpu: [arm64]
     os: [win32]
@@ -10323,6 +10358,12 @@ packages:
     cpu: [x86, ia32]
     os: [win32]
 
+  '@sentry/cli-win32-i686@3.8.2':
+    resolution: {integrity: sha512-k4dPGNNliNY46G/4hSeJygHlMoyMoL292IO+YP3MasBqyqPEy9hz6Py3FjUVW/Ckso52eoAVtGgb6DntFBjIWA==}
+    engines: {node: '>=18'}
+    cpu: [x86, ia32]
+    os: [win32]
+
   '@sentry/cli-win32-x64@2.58.6':
     resolution: {integrity: sha512-R35WJ17oF4D2eqI1DR2sQQqr0fjRTt5xoP16WrTu91XM2lndRMFsnjh+/GttbxapLCBNlrjzia99MJ0PZHZpgA==}
     engines: {node: '>=10'}
@@ -10335,6 +10376,12 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  '@sentry/cli-win32-x64@3.8.2':
+    resolution: {integrity: sha512-IBX5W2M3Zckpg3zOXfnNoayWTKhVlZN/b7ifO7dRArkOsNRzVa2lNB5M7L28O0/ZYu/8V+SnzCoHVGN9bxRdwg==}
+    engines: {node: '>=18'}
+    cpu: [x64]
+    os: [win32]
+
   '@sentry/cli@2.58.6':
     resolution: {integrity: sha512-baBcNPLLfUi9WuL+Tpri9BFaAdvugZIKelC5X0tt0Zdy+K0K+PCVSrnNmwMWU/HyaF/SEv6b6UHnXIdqanBlcg==}
     engines: {node: '>= 10'}
@@ -10342,6 +10389,11 @@ packages:
 
   '@sentry/cli@3.8.0':
     resolution: {integrity: sha512-P/Zq0QEXnBbNX8oxd1maHKD06oAH5fxHsxt8QjEzi2J14w4hvwUi6FcMDf7eyuUkdQs8+OvOKeq/9pLuZxVVxQ==}
+    engines: {node: '>= 18'}
+    hasBin: true
+
+  '@sentry/cli@3.8.2':
+    resolution: {integrity: sha512-JbB/UTBPRQREkI6CaxD8Cs0ppNc3YT8CROgRV7WeaqPn7mZOAgTYqtcxiW/OF7OquOIHUd0u6gu2vL+g5ITdHQ==}
     engines: {node: '>= 18'}
     hasBin: true
 
@@ -10384,8 +10436,8 @@ packages:
     resolution: {integrity: sha512-+uuqVEeiDzYuAKjZLqsROKXvRTbl/QeH0gfGRtpYib1cud4rAFWRIkFmcR7Jb7JGFYwmReyQotiTj/hcDszTZg==}
     engines: {node: '>=18'}
 
-  '@sentry/core@10.76.2':
-    resolution: {integrity: sha512-vndrQalRiwYatTkjlLWvyf69KocXIb9TKJ4A9oiyWguL8PJYtqIRTlRe4OpkpjLrxS18fvRdV0jEm29c/9p3hQ==}
+  '@sentry/core@10.78.0':
+    resolution: {integrity: sha512-MMR4ME+agrjbvQ0DtTYJJypm+QlCoz9UJgWN8gjcXqlyDjYk69LwPjnaocYN1JyQMy2dx5Hk4S/Rt12gTQ5cGw==}
     engines: {node: '>=18'}
 
   '@sentry/core@11.12.0':
@@ -10396,8 +10448,8 @@ packages:
     resolution: {integrity: sha512-Tj8oTYFZ/ZD+xW8IGIsU6gcFXD/gfE+FUxUaeSosd9KHwBQNOLhZSsYo/tTVf/rnQI/dQnsd4onPZLiL+27aTg==}
     engines: {node: '>=8'}
 
-  '@sentry/expo-upload-sourcemaps@8.31.0':
-    resolution: {integrity: sha512-LKW90lYuU4Vcu+wLylb5Awf2fILdMXlYSv9p72aTwdoaON7qxcRNp3eXrYVCIfhIbe7kbDDN+CzgEFdLWj96Wg==}
+  '@sentry/expo-upload-sourcemaps@8.34.0':
+    resolution: {integrity: sha512-SazqRC4NWWw19DFxITGmrJ5eDNuZeLqvSt4s9goQgzBQJ0bYE6L9TW+vfmcqSF40FTNOh0oC9qLoOpdTCjaqiA==}
     engines: {node: '>=18'}
     hasBin: true
     peerDependencies:
@@ -10409,8 +10461,8 @@ packages:
       dotenv:
         optional: true
 
-  '@sentry/feedback@10.76.2':
-    resolution: {integrity: sha512-w8T7+LfAXjPPg/CpIcXHzPfeMHXR+61WhfYCwKNFK4mUQknYK4m0Kbt28dte9fSsijo4hKvHZ+tJc591SaD4ig==}
+  '@sentry/feedback@10.78.0':
+    resolution: {integrity: sha512-sFcZ/TowGAIlbijurWmtO35RtwYwtwv74yKO3x0yxlre5gsmocdbJxi/zYyuuwypCClTFb1cSBtOrRVb7e7yjA==}
     engines: {node: '>=18'}
 
   '@sentry/feedback@11.12.0':
@@ -10470,8 +10522,8 @@ packages:
     peerDependencies:
       '@opentelemetry/api': ^1.9.0
 
-  '@sentry/react-native@8.31.0':
-    resolution: {integrity: sha512-z2vEmO7g6Uo1x3XAOpkt+pm1Qhs/r0wM/n3nkgRJwy9DdhPQuVDDwmEATqn2glzEFFRRfyIWs1za7H/0dw6qKA==}
+  '@sentry/react-native@8.34.0':
+    resolution: {integrity: sha512-BqBRS7qbg7qUlVwQqGoIfIy1vrU2J27uUSmhLhA7pYgMThx8+3mla2EKmUABtLo7nLYxQpp/kg5DQ+hWKVwO+A==}
     hasBin: true
     peerDependencies:
       '@babel/core': 7.29.7
@@ -10517,8 +10569,8 @@ packages:
       promise:
         optional: true
 
-  '@sentry/react@10.76.2':
-    resolution: {integrity: sha512-ylW0pGg6LA8iPEPjoLXi/6IxzPSTo92pqwVMPAGRhS04he904jsIV4oMt97irDfyGEUUdZFdm/tpWO40Xuu4RQ==}
+  '@sentry/react@10.78.0':
+    resolution: {integrity: sha512-FJGxL7YSWFnxswrmm/Du0O9tgLoU1H0Bjs2DOgu2vYhn259eD0q11ARRAa653ExuwxQlMvNZhTqfTdLV9K0nqw==}
     engines: {node: '>=18'}
     peerDependencies:
       react: ^16.14.0 || 17.x || 18.x || 19.x
@@ -10533,16 +10585,16 @@ packages:
       react-router:
         optional: true
 
-  '@sentry/replay-canvas@10.76.2':
-    resolution: {integrity: sha512-mx7/pXIS7CpuduN5TFI36pBoe62CeTQ4IMQJ+MEJXAhxMmYFZQunc24dNltcs6hjzrhtZqGBYSAV1J+iCKFwdg==}
+  '@sentry/replay-canvas@10.78.0':
+    resolution: {integrity: sha512-opwqU4kZFKxIaOcpHy237bvNzcc4wSGYOv76al7iwktHlnw7h1ggf048bHF9pIPOGxMEA9N/X+vHar6z8nCAtw==}
     engines: {node: '>=18'}
 
   '@sentry/replay-canvas@11.12.0':
     resolution: {integrity: sha512-kx9Q3TY8pMp0b12fpcR0tziGoEW7Z8PpFKncmzD9XYWE3YzMt//B+cjkR+vmmZSUVxOuQATYDFp9c1jRTnbrug==}
     engines: {node: '>=20.19.0 <22.0.0 || >=22.12.0 <23.0.0 || >=23.2.0'}
 
-  '@sentry/replay@10.76.2':
-    resolution: {integrity: sha512-xMNFEZ7KuEvfj9j1cKmcH+p6u5t3NZs1vcrj+sBW5+S9C327ASOAvcR23ZoM0UhTXr9j7j+Dozs/NYHW2EYjpw==}
+  '@sentry/replay@10.78.0':
+    resolution: {integrity: sha512-W2TEKRmoZFvEK01u9+F6GKxQsH8xYFOF+A/+OaDoYqpBAj2zJ1oosLFvwbOS74eg3rDkmkEyWCm+p7M8JNk2oA==}
     engines: {node: '>=18'}
 
   '@sentry/replay@11.12.0':
@@ -11273,8 +11325,8 @@ packages:
   '@tailwindcss/node@4.3.1':
     resolution: {integrity: sha512-6NDaqRoAMSXD1mr/RXu0HBvNE9a2n5tHPsxu9XHLws8o4Twes5rBM2205SUUiJ9goAtadrN6xTGX0UDEwp/N4A==}
 
-  '@tailwindcss/node@4.3.3':
-    resolution: {integrity: sha512-/T8IKEsf9VTU6tLjgC7+sv2mOPtQxzE2jMw7u4Tt40Tx+QSZxpzh95/H6cMKoja9XuW7iMdLJYBB0o9G1CaAgg==}
+  '@tailwindcss/node@4.3.5':
+    resolution: {integrity: sha512-yT53FzV4ke0cr/BguDxhWMpm5MJu1O2muzk+tKw6lKHjODAsYArBbWwFbJiaksfzFv1tpkO9QHGzmfs1hJT66g==}
 
   '@tailwindcss/oxide-android-arm64@4.2.4':
     resolution: {integrity: sha512-e7MOr1SAn9U8KlZzPi1ZXGZHeC5anY36qjNwmZv9pOJ8E4Q6jmD1vyEHkQFmNOIN7twGPEMXRHmitN4zCMN03g==}
@@ -11288,8 +11340,8 @@ packages:
     cpu: [arm64]
     os: [android]
 
-  '@tailwindcss/oxide-android-arm64@4.3.3':
-    resolution: {integrity: sha512-Y85A2gmPSkl5Ve5qR86GL4HT509cFqQh1aes9p3sSkyTPwt0Pppf3GkwGe4JPACcRYjgJIEhQgM6dBClnr0NYw==}
+  '@tailwindcss/oxide-android-arm64@4.3.5':
+    resolution: {integrity: sha512-Se0z5xMqcSQanJD1IYmO0cGpK3iv0fp3ZsIT7xRJZ1Da5PghvNoc46zz4jIQn+aan3dV9T8AermFNN9QPmsh0Q==}
     engines: {node: '>= 20'}
     cpu: [arm64]
     os: [android]
@@ -11306,8 +11358,8 @@ packages:
     cpu: [arm64]
     os: [darwin]
 
-  '@tailwindcss/oxide-darwin-arm64@4.3.3':
-    resolution: {integrity: sha512-BiaWatpBcERQFDlOjRDpIVXuFK5PJez5SA4JMg6VYZdBYU+qKfV/vqjcIs+IYmtitf1xYQZTwXvU/8y4lfZUGw==}
+  '@tailwindcss/oxide-darwin-arm64@4.3.5':
+    resolution: {integrity: sha512-UPrgTDuUbvmqGMZuCnmI3FKee/tYKzKdp00/kuB4oSGB213VYg8QTdF7lVhnPoBXq/mIfJ+ILoBFqNOboWcMwQ==}
     engines: {node: '>= 20'}
     cpu: [arm64]
     os: [darwin]
@@ -11324,8 +11376,8 @@ packages:
     cpu: [x64]
     os: [darwin]
 
-  '@tailwindcss/oxide-darwin-x64@4.3.3':
-    resolution: {integrity: sha512-fAeUqfV5ndhxRwai8cXGzdLvul9utWOmeTkv69unv4ZXixjn61Z+p9lCWdwOwA3TYboG3BwdVuN/RDjhBRl0mw==}
+  '@tailwindcss/oxide-darwin-x64@4.3.5':
+    resolution: {integrity: sha512-E+p7HEtjI0b8D7kbbWxH067cGui6d4c79COGko9fAPVE3rwc1E7ld2HFCbaG86AOGWS5VKQYqZOaf38ya4uxTQ==}
     engines: {node: '>= 20'}
     cpu: [x64]
     os: [darwin]
@@ -11342,8 +11394,8 @@ packages:
     cpu: [x64]
     os: [freebsd]
 
-  '@tailwindcss/oxide-freebsd-x64@4.3.3':
-    resolution: {integrity: sha512-iyf5bV6+wnAlflVeEy7R25dupxTNECZN5QMI0qNT6eT+EgaGdZcKhGkr5SdoaWiLJ3spLqIY9VCeSGrwmtg4kw==}
+  '@tailwindcss/oxide-freebsd-x64@4.3.5':
+    resolution: {integrity: sha512-yWEWcWyAG7rWOcTpJTjdhQ3pcaFY2h+0bqTRfgU3G2fz87ZU3AKdvdZKhslD+kyHnjBUWKvNdRYwIYC5dI1tIg==}
     engines: {node: '>= 20'}
     cpu: [x64]
     os: [freebsd]
@@ -11360,8 +11412,8 @@ packages:
     cpu: [arm]
     os: [linux]
 
-  '@tailwindcss/oxide-linux-arm-gnueabihf@4.3.3':
-    resolution: {integrity: sha512-aAYUprJAJQWWbRrPvtjdroZ56Md+JM8pMiopS6xGEwDfLhqj+2ver2p4nU4Mb3CRqcMmNBjo8KkUgcxhkzVQGQ==}
+  '@tailwindcss/oxide-linux-arm-gnueabihf@4.3.5':
+    resolution: {integrity: sha512-WmeVjtJhZlr+smpqcdR2kQkkn6arHIJnUIBxTO2EJcTLGY1ecVXNo2hbSn8xc0IH2aEtys936iMWKGyj0GaKnA==}
     engines: {node: '>= 20'}
     cpu: [arm]
     os: [linux]
@@ -11380,8 +11432,8 @@ packages:
     os: [linux]
     libc: [glibc]
 
-  '@tailwindcss/oxide-linux-arm64-gnu@4.3.3':
-    resolution: {integrity: sha512-nDxldcEENOxZRzC2uu9jrutZdAAQtb+8WWDCSnWL1zvBk1+FN+x6MtDViPB5AJMfttVCUhehGWus3XBPgatM/w==}
+  '@tailwindcss/oxide-linux-arm64-gnu@4.3.5':
+    resolution: {integrity: sha512-DTCSyucc6ShMp1QMqV5R94Z7xlgNgUzkGmFF1rL5HH2Qjy4eSmEqy+YLGkqqYvWa4sILtgrBt1JjRKbneQtiFQ==}
     engines: {node: '>= 20'}
     cpu: [arm64]
     os: [linux]
@@ -11401,8 +11453,8 @@ packages:
     os: [linux]
     libc: [musl]
 
-  '@tailwindcss/oxide-linux-arm64-musl@4.3.3':
-    resolution: {integrity: sha512-Md44bD6veX/PC5iyF8cDVnw4HBIANZepRZZ7a8DQOvkfo5WUBwcp6iAuCUz23u+4SUkhJlD3eL7hNdW8ezd/kA==}
+  '@tailwindcss/oxide-linux-arm64-musl@4.3.5':
+    resolution: {integrity: sha512-H9lsvO4x9E4nE4Hi8h7NHHw0O/kcVSu+iOyFHNGdYzazGgDjFHZbE6S3hQ8kMcbNXSBlMdNi67LV5EVqtpaJtw==}
     engines: {node: '>= 20'}
     cpu: [arm64]
     os: [linux]
@@ -11422,8 +11474,8 @@ packages:
     os: [linux]
     libc: [glibc]
 
-  '@tailwindcss/oxide-linux-x64-gnu@4.3.3':
-    resolution: {integrity: sha512-tx7us1muwOKAKWao2v/GaafFeQboE6aj88vC6ziN2NCGcRm8gWUhwjzg+YdVB1e4boAtdtma4L43onunI6NS4w==}
+  '@tailwindcss/oxide-linux-x64-gnu@4.3.5':
+    resolution: {integrity: sha512-4uxQvtBvPuIdl13WfUBj9xMZHH14PtHZ8OZdtLmdyDtG66sCa1t599NZT+jagkUzRtWhuul1qRZQ1nAJscXN5g==}
     engines: {node: '>= 20'}
     cpu: [x64]
     os: [linux]
@@ -11443,8 +11495,8 @@ packages:
     os: [linux]
     libc: [musl]
 
-  '@tailwindcss/oxide-linux-x64-musl@4.3.3':
-    resolution: {integrity: sha512-SJxX60smvHgasZoBy11dX6YRjXJFovwWBoedhbQPOBzgFWBHGB+TVPWB9BxzR7TTxU8FQZAI2AyiNCMzFm8Img==}
+  '@tailwindcss/oxide-linux-x64-musl@4.3.5':
+    resolution: {integrity: sha512-0JQAzs7jwbA7O6+z/adU+Jk3AXwsu3npAhtr5escXS7TqEqWcaDV7qHuI+0Vy/KQRuVGnLQREcSJWYauyV3oqg==}
     engines: {node: '>= 20'}
     cpu: [x64]
     os: [linux]
@@ -11474,10 +11526,9 @@ packages:
       - '@emnapi/wasi-threads'
       - tslib
 
-  '@tailwindcss/oxide-wasm32-wasi@4.3.3':
-    resolution: {integrity: sha512-jx1+rPhY/5Ympkktd656HBWEBLxP7dH06losBLjjf5vgCODXvi9KhtftWcMIwTFIDqBr7cRnQkdLnAG+IOlGvQ==}
-    engines: {node: '>=14.0.0'}
-    cpu: [wasm32]
+  '@tailwindcss/oxide-wasm32-wasi@4.3.5':
+    resolution: {integrity: sha512-OJhFmlEfdzMr+avACdi40RPtnkW0B6hXyxL/8r+tnEHBWZji36CYRjEXrrvgBmaYsD3oEOBqwYFRKsYvzFe7Bw==}
+    engines: {node: ^20.19.0 || ^22.13.0 || >=23.5.0}
     bundledDependencies:
       - '@napi-rs/wasm-runtime'
       - '@emnapi/core'
@@ -11498,8 +11549,8 @@ packages:
     cpu: [arm64]
     os: [win32]
 
-  '@tailwindcss/oxide-win32-arm64-msvc@4.3.3':
-    resolution: {integrity: sha512-3rc292Ca2ceK6Ulcc/bAVnTs/3nDtoPhyEKlgPv+yQJQi/JS/AMJlqzxvlDacL1nekbrcf6bTqp/jV4qgnPxNQ==}
+  '@tailwindcss/oxide-win32-arm64-msvc@4.3.5':
+    resolution: {integrity: sha512-9o8jgthi+QE5eandnboiJT64VQfnIArfZzSTdgbhEK5aafdiu2jTW9Honi/mwYHxBZuH1vAC57IFyrh+0iK5Gg==}
     engines: {node: '>= 20'}
     cpu: [arm64]
     os: [win32]
@@ -11516,8 +11567,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@tailwindcss/oxide-win32-x64-msvc@4.3.3':
-    resolution: {integrity: sha512-yJ0pwIVc/nYeGoV02WtsN8KYyLQv7kyI2wDnkezyJlGGjkd4QLwDGAwl47YpPJeuI0M0ObaXGSPjvWDPeTPggw==}
+  '@tailwindcss/oxide-win32-x64-msvc@4.3.5':
+    resolution: {integrity: sha512-XiKFfIy1RWe7qK4WqByxNW7Oz1/nkOy8o/BWhHminyV1PmpUd8Eedj5v2A8h2kpqeVlz6xRnwk9Fr/ZXNLcZfg==}
     engines: {node: '>= 20'}
     cpu: [x64]
     os: [win32]
@@ -11530,15 +11581,15 @@ packages:
     resolution: {integrity: sha512-yVPyo8RNkabVr3O2EhHEE0Rewu7YKzc1DhIqfL46LKveFrmu9XbDazNOJY7/GRuvw1h6u3utWnR29H/p5JPlgA==}
     engines: {node: '>= 20'}
 
-  '@tailwindcss/oxide@4.3.3':
-    resolution: {integrity: sha512-krXjAikiaFSPaK/FkAQT5UTx3VormQaiZ5hBFlJZ9UFQGB/rwg1MZIhHAG9smMQRTdyJxP6Qt5MwMtdyU5FWrA==}
+  '@tailwindcss/oxide@4.3.5':
+    resolution: {integrity: sha512-PynqGLZsZvwM9tqD/CUxkOIfyd6K5elZ2MooauzJryP/UqXYgi3yYbtt3N0Xe+MHV/eFKPFQCEfIKAqlAS1CBg==}
     engines: {node: '>= 20'}
 
   '@tailwindcss/postcss@4.2.4':
     resolution: {integrity: sha512-wgAVj6nUWAolAu8YFvzT2cTBIElWHkjZwFYovF+xsqKsW2ADxM/X2opxj5NsF/qVccAOjRNe8X2IdPzMsWyHTg==}
 
-  '@tailwindcss/postcss@4.3.3':
-    resolution: {integrity: sha512-JTSZZGQi1AyKirbLN3azmjVzef92tcX7h+iSqPdaeStyFpGpDlKvvpxeOE8njhbUanbRwr3z8DyzhICWnMtQeg==}
+  '@tailwindcss/postcss@4.3.5':
+    resolution: {integrity: sha512-FAV37Tlx9wBiT/hkfgVD0Q6CWsP2oUX3lf28nrfjW8+ksILjnpuFulUqWDfNR4/ZiEHHDRBX8DUTzD1Rys687A==}
 
   '@tailwindcss/typography@0.5.19':
     resolution: {integrity: sha512-w31dd8HOx3k9vPtcQh5QHP9GwKcgbMp87j58qi6xgiBnFFtKEAgCWnDw4qUT8aHwkCp8bKvb/KGKWWHedP0AAg==}
@@ -12722,8 +12773,8 @@ packages:
   '@workflow/serde@4.1.0-beta.2':
     resolution: {integrity: sha512-8kkeoQKLDaKXefjV5dbhBj2aErfKp1Mc4pb6tj8144cF+Em5SPbyMbyLCHp+BVrFfFVCBluCtMx+jjvaFVZGww==}
 
-  '@workos-inc/node@11.0.0':
-    resolution: {integrity: sha512-swUT6CbkuVQXMOtUpI70LZ8usjSg8OXcKMjKdoYLeqCApRI0Oo97l+nZ0lKzZ5GxjxgcVZGGVK025h7z9WyCJg==}
+  '@workos-inc/node@12.2.0':
+    resolution: {integrity: sha512-uWzWtPieLqn+juXcIm8YQxh0qokZg0dnjzGm5AHeemiG6VeqzGYc6nlqQ2zw/OI80aYuaPo/ZOURACyQuqYgnA==}
     engines: {node: '>=22.11.0'}
 
   '@wxt-dev/browser@0.1.43':
@@ -13589,8 +13640,14 @@ packages:
     resolution: {integrity: sha512-kWWXztvZ5SBQV+eRgKFeh8q5sLuZY2+8WUIzlxWVTg+oGwY14qylx1KbKzHd8P6ZYkAg0xyIDU9JMHhyJMZ1jw==}
     engines: {node: '>=10'}
 
+  character-entities-html4@1.1.4:
+    resolution: {integrity: sha512-HRcDxZuZqMx3/a+qrzxdBKBPUpxWEq9xw2OPZ3a/174ihfrQKVsFhqtthBInFy1zZ9GgZyFXOatNujm8M+El3g==}
+
   character-entities-html4@2.1.0:
     resolution: {integrity: sha512-1v7fgQRj6hnSwFpq1Eu0ynr/CDEw0rXo2B61qXrLNdHZmPKgb7fqS1a2JwF0rISo9q77jDI8VMEHoApn8qDoZA==}
+
+  character-entities-legacy@1.1.4:
+    resolution: {integrity: sha512-3Xnr+7ZFS1uxeiUDvV02wQ+QDbc55o97tIV5zHScSPJpcLm/r0DFPcoY3tYRp+VZukxuMeKgXYmsXQHO05zQeA==}
 
   character-entities-legacy@3.0.0:
     resolution: {integrity: sha512-RpPp0asT/6ufRm//AJVwpViZbGM/MkjQFxJccQRHmISF/22NBtsHqAWmL+/pmkPWoIUJdWyeVleTl1wydHATVQ==}
@@ -14742,6 +14799,10 @@ packages:
     resolution: {integrity: sha512-PwKooW9JUzh5chmYfHM3IQl5OkK2u2Nm011MgeZrss3JmFraUx/fqrf78kk8GUMYoibx/14MdwTl/1WKkG7TpQ==}
     engines: {node: '>=10.13.0'}
 
+  enhanced-resolve@5.26.2:
+    resolution: {integrity: sha512-sQeK9D5kN5T+O0Hh+Cn8t39FZ0VJVARcoacJ7x1I0N+3/WqlckcS8D4NUKjMyTh4P5ly1SMgJQstou2aL3rmZQ==}
+    engines: {node: '>=10.13.0'}
+
   entities@1.1.2:
     resolution: {integrity: sha512-f2LZMYl1Fzu7YSBKg+RoROelpOaNrcGmE9AZubeDfrCEia483oW4MI4VyFd5VNHIgQ/7qm1I0wUHK1eJnn2y2w==}
 
@@ -15372,8 +15433,8 @@ packages:
       react: '*'
       react-native: '*'
 
-  expo-speech-recognition@57.1.1:
-    resolution: {integrity: sha512-e1RalFEvc7yui9Jnf1NiEYHT0jSPeH4hbMTafj1yjvcKN7HhZ7VrQigGUhBDB9AnDNjtPugbyPuCIjwHBBOCyw==}
+  expo-speech-recognition@58.0.1:
+    resolution: {integrity: sha512-ycDe1BxXblqFGsXxedjBKn3tVQO8Vnj/BtBIycdMjXkXueTYto1LaenkjeBGycJmnS/6mOWC8oQcyBSbZsueFg==}
     peerDependencies:
       expo: '*'
       react: '*'
@@ -18118,11 +18179,11 @@ packages:
     engines: {node: ^12.20.0 || ^14.18.0 || >=16.0.0}
     hasBin: true
 
-  nativewind@5.0.0-rc.0:
-    resolution: {integrity: sha512-CrESAPb428+EVNvGhUaMfbNllyk6lOnX1ZlVlNktCeae/4mIbb6x4SxN62Rg3cLHNRrRLYZEPYGmqkZ8fVIRZQ==}
+  nativewind@5.0.0-rc.1:
+    resolution: {integrity: sha512-mqFulM0aJajUwWPO1CXdTMHpOnxQGgCABFSbQ1GuxaOs0nk8GqmiQ2N1N5Lm7GbDvgBwVl7uzjCM6EyPzlNWKw==}
     engines: {node: '>=20'}
     peerDependencies:
-      react-native-css: 3.1.0-rc.0
+      react-native-css: 3.1.0-rc.1
       tailwindcss: '>4.1.11'
 
   natural-compare@1.4.0:
@@ -19424,8 +19485,8 @@ packages:
     peerDependencies:
       react-native: '>=0.76.0'
 
-  react-native-css@3.1.0-rc.0:
-    resolution: {integrity: sha512-/wfPJ8pXiPxvHUs0QcocN3ViV4QJdnXpKukNirZJcJ/MeZKrStSEHm2rBq+KuZm8/2XDl4GfeuaVvJctYGtdgA==}
+  react-native-css@3.1.0-rc.1:
+    resolution: {integrity: sha512-TT5NnkSK1TRlzbZWeJCyjYwEj7IWOZkGR+e42+PU5X6TQM/wW3CPplI44EbWyNz8QN0WeFzrkQTh3EvhO4cEWA==}
     peerDependencies:
       '@expo/metro-config': '>=54'
       lightningcss: 1.30.1
@@ -20478,6 +20539,9 @@ packages:
   string_decoder@1.3.0:
     resolution: {integrity: sha512-hkRX8U1WjJFd8LsDJ2yQ/wWWxaopEsABU1XfkM8A+j0+85JAGppt16cr1Whg6KIbb4okU6Mql6BOj+uup/wKeA==}
 
+  stringify-entities@3.1.0:
+    resolution: {integrity: sha512-3FP+jGMmMV/ffZs86MoghGqAoqXAdxLrJP4GUdrDN1aIScYih5tuIO3eF4To5AJZ79KDZ8Fpdy7QJnK8SsL1Vg==}
+
   stringify-entities@4.0.4:
     resolution: {integrity: sha512-IwfBptatlO+QCJUo19AqvrPNqlVMpW9YEL2LIVY+Rpv2qsjCGxaDLNRgeGsQWJhfItebuJhsGSLjaBbNSQ+ieg==}
 
@@ -20678,8 +20742,8 @@ packages:
   tailwindcss@4.3.1:
     resolution: {integrity: sha512-hk+TB1m+K8CYNrP6rjQaq/Y+4Zylwpa87mLYBKCunwnnQ9p+fHb7kmSfGqyEJoxF/O6CDyABWVFEafNSYKll+Q==}
 
-  tailwindcss@4.3.3:
-    resolution: {integrity: sha512-gOhV3P7ufE62QDGg1zVaTgCR+EtPv92k2nIhVcVKcLmxT1sUBsQGhnZj175j+MqRt4zLF7ic+sCYjfhxMxj7YQ==}
+  tailwindcss@4.3.5:
+    resolution: {integrity: sha512-FcQk9BuffmEHJP2G0XmB2SplU1aLTI7j07Kunk+U74Ny+XiWOtzXz9aujFZ/avntw1e2cOv/3PkgzflQ7gX2vQ==}
 
   tapable@2.3.0:
     resolution: {integrity: sha512-g9ljZiwki/LfxmQADO3dEY1CbpmXT5Hm2fJ+QaGKwSXUylMybePR7/67YW7jOrrvjEgL1Fmz5kzyAjWVWLlucg==}
@@ -23688,7 +23752,7 @@ snapshots:
     dependencies:
       css-tree: 3.2.1
 
-  '@bsky.app/react-native-uitextview@2.7.1(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)':
+  '@bsky.app/react-native-uitextview@2.7.2(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)':
     dependencies:
       react: 19.3.0
       react-native: 0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6)
@@ -24731,7 +24795,7 @@ snapshots:
       debug: 4.4.3(supports-color@8.1.1)
       getenv: 2.0.0
       glob: 13.0.6
-      semver: 7.8.5
+      semver: 7.7.4
       slugify: 1.6.8
       xcode: 3.0.1
       xml2js: 0.6.0
@@ -25238,7 +25302,7 @@ snapshots:
       debug: 4.4.3(supports-color@8.1.1)
       expo-modules-autolinking: 58.0.13(patch_hash=89b56c788c823c6759fade3e7de679ca1d92e5120ccfe007a47ea2ce2d4caea6)(typescript@7.0.2)
       resolve-from: 5.0.0
-      semver: 7.8.5
+      semver: 7.7.4
     transitivePeerDependencies:
       - supports-color
       - typescript
@@ -26470,7 +26534,7 @@ snapshots:
       https-proxy-agent: 7.0.6
       node-fetch: 2.7.0
       nopt: 8.1.0
-      semver: 7.8.5
+      semver: 7.7.4
       tar: 7.5.21
     transitivePeerDependencies:
       - encoding
@@ -26660,31 +26724,31 @@ snapshots:
       '@tybys/wasm-util': 0.10.4
     optional: true
 
-  '@native-html/css-processor@2.0.1(@types/react@19.3.0)':
+  '@native-html/css-processor@2.0.2(@types/react@19.3.0)':
     dependencies:
       '@types/react': 19.3.0
       css-to-react-native: 3.2.0
       csstype: 3.2.3
 
-  '@native-html/render@1.0.3(@types/react@19.3.0)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)':
+  '@native-html/render@1.0.4(@types/react@19.3.0)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)':
     dependencies:
       '@jsamr/counter-style': 2.0.2
       '@jsamr/react-native-li': 2.3.1(@jsamr/counter-style@2.0.2)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
-      '@native-html/transient-render-engine': 12.0.1(@types/react@19.3.0)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))
+      '@native-html/transient-render-engine': 12.0.2(@types/react@19.3.0)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))
       '@types/ramda': 0.31.1
       '@types/urijs': 1.19.26
       prop-types: 15.8.1
       ramda: 0.32.0
       react: 19.3.0
       react-native: 0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6)
-      stringify-entities: 4.0.4
+      stringify-entities: 3.1.0
       urijs: 1.19.11
     transitivePeerDependencies:
       - '@types/react'
 
-  '@native-html/transient-render-engine@12.0.1(@types/react@19.3.0)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))':
+  '@native-html/transient-render-engine@12.0.2(@types/react@19.3.0)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))':
     dependencies:
-      '@native-html/css-processor': 2.0.1(@types/react@19.3.0)
+      '@native-html/css-processor': 2.0.2(@types/react@19.3.0)
       csstype: 3.2.3
       domelementtype: 2.3.0
       domhandler: 5.0.3
@@ -29304,7 +29368,7 @@ snapshots:
       react: 19.3.0
       react-native: 0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6)
 
-  '@react-native-google-signin/google-signin@16.1.5(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)':
+  '@react-native-google-signin/google-signin@17.0.0(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)':
     dependencies:
       react: 19.3.0
       react-native: 0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6)
@@ -29802,10 +29866,10 @@ snapshots:
       '@sentry/types': 7.77.0
       '@sentry/utils': 7.77.0
 
-  '@sentry/browser-utils@10.76.2':
+  '@sentry/browser-utils@10.78.0':
     dependencies:
       '@sentry/conventions': 0.16.0
-      '@sentry/core': 10.76.2
+      '@sentry/core': 10.78.0
 
   '@sentry/browser-utils@11.12.0':
     dependencies:
@@ -29813,14 +29877,14 @@ snapshots:
       '@sentry/core': 11.12.0
       web-vitals: 6.2.3
 
-  '@sentry/browser@10.76.2':
+  '@sentry/browser@10.78.0':
     dependencies:
-      '@sentry/browser-utils': 10.76.2
+      '@sentry/browser-utils': 10.78.0
       '@sentry/conventions': 0.16.0
-      '@sentry/core': 10.76.2
-      '@sentry/feedback': 10.76.2
-      '@sentry/replay': 10.76.2
-      '@sentry/replay-canvas': 10.76.2
+      '@sentry/core': 10.78.0
+      '@sentry/feedback': 10.78.0
+      '@sentry/replay': 10.78.0
+      '@sentry/replay-canvas': 10.78.0
 
   '@sentry/browser@11.12.0':
     dependencies:
@@ -29843,11 +29907,11 @@ snapshots:
       - '@opentelemetry/exporter-trace-otlp-http'
       - supports-color
 
-  '@sentry/bundler-plugins@10.76.2(rollup@4.68.2)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))(esbuild@0.28.2))':
+  '@sentry/bundler-plugins@10.78.0(rollup@4.68.2)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))(esbuild@0.28.2))':
     dependencies:
       '@babel/core': 7.29.7
       '@sentry/cli': 2.58.6
-      '@sentry/core': 10.76.2
+      '@sentry/core': 10.78.0
       dotenv: 17.4.2
       find-up: 5.0.0
       glob: 13.0.6
@@ -29889,10 +29953,16 @@ snapshots:
   '@sentry/cli-darwin@3.8.0':
     optional: true
 
+  '@sentry/cli-darwin@3.8.2':
+    optional: true
+
   '@sentry/cli-linux-arm64@2.58.6':
     optional: true
 
   '@sentry/cli-linux-arm64@3.8.0':
+    optional: true
+
+  '@sentry/cli-linux-arm64@3.8.2':
     optional: true
 
   '@sentry/cli-linux-arm@2.58.6':
@@ -29901,10 +29971,16 @@ snapshots:
   '@sentry/cli-linux-arm@3.8.0':
     optional: true
 
+  '@sentry/cli-linux-arm@3.8.2':
+    optional: true
+
   '@sentry/cli-linux-i686@2.58.6':
     optional: true
 
   '@sentry/cli-linux-i686@3.8.0':
+    optional: true
+
+  '@sentry/cli-linux-i686@3.8.2':
     optional: true
 
   '@sentry/cli-linux-x64@2.58.6':
@@ -29913,10 +29989,16 @@ snapshots:
   '@sentry/cli-linux-x64@3.8.0':
     optional: true
 
+  '@sentry/cli-linux-x64@3.8.2':
+    optional: true
+
   '@sentry/cli-win32-arm64@2.58.6':
     optional: true
 
   '@sentry/cli-win32-arm64@3.8.0':
+    optional: true
+
+  '@sentry/cli-win32-arm64@3.8.2':
     optional: true
 
   '@sentry/cli-win32-i686@2.58.6':
@@ -29925,10 +30007,16 @@ snapshots:
   '@sentry/cli-win32-i686@3.8.0':
     optional: true
 
+  '@sentry/cli-win32-i686@3.8.2':
+    optional: true
+
   '@sentry/cli-win32-x64@2.58.6':
     optional: true
 
   '@sentry/cli-win32-x64@3.8.0':
+    optional: true
+
+  '@sentry/cli-win32-x64@3.8.2':
     optional: true
 
   '@sentry/cli@2.58.6':
@@ -29967,6 +30055,22 @@ snapshots:
       '@sentry/cli-win32-i686': 3.8.0
       '@sentry/cli-win32-x64': 3.8.0
 
+  '@sentry/cli@3.8.2':
+    dependencies:
+      progress: 2.0.3
+      proxy-from-env: 1.1.0
+      undici: 6.29.1
+      which: 2.0.2
+    optionalDependencies:
+      '@sentry/cli-darwin': 3.8.2
+      '@sentry/cli-linux-arm': 3.8.2
+      '@sentry/cli-linux-arm64': 3.8.2
+      '@sentry/cli-linux-i686': 3.8.2
+      '@sentry/cli-linux-x64': 3.8.2
+      '@sentry/cli-win32-arm64': 3.8.2
+      '@sentry/cli-win32-i686': 3.8.2
+      '@sentry/cli-win32-x64': 3.8.2
+
   '@sentry/cloudflare@10.69.0(patch_hash=8b0dd1b1c534b6ac3e13b1a85cbf1d5ab5b7ad5dda6c74a65d3b7b3f6a975802)(@cloudflare/workers-types@4.20260605.1)(wrangler@4.158.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
     dependencies:
       '@opentelemetry/api': 1.9.1
@@ -30000,7 +30104,7 @@ snapshots:
     dependencies:
       '@sentry/conventions': 0.16.0
 
-  '@sentry/core@10.76.2':
+  '@sentry/core@10.78.0':
     dependencies:
       '@sentry/conventions': 0.16.0
 
@@ -30013,16 +30117,16 @@ snapshots:
       '@sentry/types': 7.77.0
       '@sentry/utils': 7.77.0
 
-  '@sentry/expo-upload-sourcemaps@8.31.0(@expo/env@2.5.2)(dotenv@18.0.10)':
+  '@sentry/expo-upload-sourcemaps@8.34.0(@expo/env@2.5.2)(dotenv@18.0.10)':
     dependencies:
-      '@sentry/cli': 3.8.0
+      '@sentry/cli': 3.8.2
     optionalDependencies:
       '@expo/env': 2.5.2
       dotenv: 18.0.10
 
-  '@sentry/feedback@10.76.2':
+  '@sentry/feedback@10.78.0':
     dependencies:
-      '@sentry/core': 10.76.2
+      '@sentry/core': 10.78.0
 
   '@sentry/feedback@11.12.0':
     dependencies:
@@ -30158,15 +30262,15 @@ snapshots:
       '@sentry/conventions': 0.32.0
       '@sentry/core': 11.12.0
 
-  '@sentry/react-native@8.31.0(@babel/core@7.29.7)(@expo/config-types@58.0.3)(@expo/config@58.0.6(typescript@7.0.2))(@expo/env@2.5.2)(bufferutil@4.1.0)(dotenv@18.0.10)(expo-router@58.0.19)(expo@58.0.10)(metro-config@0.87.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(metro-resolver@0.87.1)(open@11.0.0)(promise@8.3.0)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(rollup@4.68.2)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))(esbuild@0.28.2))':
+  '@sentry/react-native@8.34.0(@babel/core@7.29.7)(@expo/config-types@58.0.3)(@expo/config@58.0.6(typescript@7.0.2))(@expo/env@2.5.2)(bufferutil@4.1.0)(dotenv@18.0.10)(expo-router@58.0.19)(expo@58.0.10)(metro-config@0.87.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(metro-resolver@0.87.1)(open@11.0.0)(promise@8.3.0)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(rollup@4.68.2)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))(esbuild@0.28.2))':
     dependencies:
       '@expo/config-plugins': 58.0.9(typescript@7.0.2)
-      '@sentry/browser': 10.76.2
-      '@sentry/bundler-plugins': 10.76.2(rollup@4.68.2)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))(esbuild@0.28.2))
-      '@sentry/cli': 3.8.0
-      '@sentry/core': 10.76.2
-      '@sentry/expo-upload-sourcemaps': 8.31.0(@expo/env@2.5.2)(dotenv@18.0.10)
-      '@sentry/react': 10.76.2(react@19.3.0)
+      '@sentry/browser': 10.78.0
+      '@sentry/bundler-plugins': 10.78.0(rollup@4.68.2)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))(esbuild@0.28.2))
+      '@sentry/cli': 3.8.2
+      '@sentry/core': 10.78.0
+      '@sentry/expo-upload-sourcemaps': 8.34.0(@expo/env@2.5.2)(dotenv@18.0.10)
+      '@sentry/react': 10.78.0(react@19.3.0)
       metro: 0.87.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       react: 19.3.0
       react-native: 0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6)
@@ -30191,11 +30295,11 @@ snapshots:
       - utf-8-validate
       - webpack
 
-  '@sentry/react@10.76.2(react@19.3.0)':
+  '@sentry/react@10.78.0(react@19.3.0)':
     dependencies:
-      '@sentry/browser': 10.76.2
+      '@sentry/browser': 10.78.0
       '@sentry/conventions': 0.16.0
-      '@sentry/core': 10.76.2
+      '@sentry/core': 10.78.0
       react: 19.3.0
 
   '@sentry/react@11.12.0(react@19.2.6)':
@@ -30205,20 +30309,20 @@ snapshots:
       '@sentry/core': 11.12.0
       react: 19.2.6
 
-  '@sentry/replay-canvas@10.76.2':
+  '@sentry/replay-canvas@10.78.0':
     dependencies:
-      '@sentry/core': 10.76.2
-      '@sentry/replay': 10.76.2
+      '@sentry/core': 10.78.0
+      '@sentry/replay': 10.78.0
 
   '@sentry/replay-canvas@11.12.0':
     dependencies:
       '@sentry/core': 11.12.0
       '@sentry/replay': 11.12.0
 
-  '@sentry/replay@10.76.2':
+  '@sentry/replay@10.78.0':
     dependencies:
-      '@sentry/browser-utils': 10.76.2
-      '@sentry/core': 10.76.2
+      '@sentry/browser-utils': 10.78.0
+      '@sentry/core': 10.78.0
 
   '@sentry/replay@11.12.0':
     dependencies:
@@ -30897,7 +31001,7 @@ snapshots:
       magic-string: 0.30.21
       path-browserify: 1.0.1
       process: 0.11.10
-      semver: 7.8.5
+      semver: 7.7.4
       storybook: 10.6.2(@types/react@19.2.14)(bufferutil@4.1.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(utf-8-validate@6.0.6)
       style-loader: 3.3.4(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))(esbuild@0.28.2))
       terser-webpack-plugin: 5.4.0(@swc/core@1.15.18(@swc/helpers@0.5.23))(esbuild@0.28.2)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))(esbuild@0.28.2))
@@ -30933,7 +31037,7 @@ snapshots:
       magic-string: 0.30.21
       path-browserify: 1.0.1
       process: 0.11.10
-      semver: 7.8.5
+      semver: 7.7.4
       storybook: 10.6.2(@types/react@19.2.14)(bufferutil@4.1.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(utf-8-validate@6.0.6)
       style-loader: 3.3.4(webpack@5.105.4)
       terser-webpack-plugin: 5.4.0(webpack@5.105.4)
@@ -31323,15 +31427,15 @@ snapshots:
       source-map-js: 1.2.2
       tailwindcss: 4.3.1
 
-  '@tailwindcss/node@4.3.3':
+  '@tailwindcss/node@4.3.5':
     dependencies:
       '@jridgewell/remapping': 2.3.5
-      enhanced-resolve: 5.24.3
+      enhanced-resolve: 5.26.2
       jiti: 2.7.0
       lightningcss: 1.30.1
-      magic-string: 0.30.21
+      magic-string: 1.4.3
       source-map-js: 1.2.2
-      tailwindcss: 4.3.3
+      tailwindcss: 4.3.5
 
   '@tailwindcss/oxide-android-arm64@4.2.4':
     optional: true
@@ -31339,7 +31443,7 @@ snapshots:
   '@tailwindcss/oxide-android-arm64@4.3.1':
     optional: true
 
-  '@tailwindcss/oxide-android-arm64@4.3.3':
+  '@tailwindcss/oxide-android-arm64@4.3.5':
     optional: true
 
   '@tailwindcss/oxide-darwin-arm64@4.2.4':
@@ -31348,7 +31452,7 @@ snapshots:
   '@tailwindcss/oxide-darwin-arm64@4.3.1':
     optional: true
 
-  '@tailwindcss/oxide-darwin-arm64@4.3.3':
+  '@tailwindcss/oxide-darwin-arm64@4.3.5':
     optional: true
 
   '@tailwindcss/oxide-darwin-x64@4.2.4':
@@ -31357,7 +31461,7 @@ snapshots:
   '@tailwindcss/oxide-darwin-x64@4.3.1':
     optional: true
 
-  '@tailwindcss/oxide-darwin-x64@4.3.3':
+  '@tailwindcss/oxide-darwin-x64@4.3.5':
     optional: true
 
   '@tailwindcss/oxide-freebsd-x64@4.2.4':
@@ -31366,7 +31470,7 @@ snapshots:
   '@tailwindcss/oxide-freebsd-x64@4.3.1':
     optional: true
 
-  '@tailwindcss/oxide-freebsd-x64@4.3.3':
+  '@tailwindcss/oxide-freebsd-x64@4.3.5':
     optional: true
 
   '@tailwindcss/oxide-linux-arm-gnueabihf@4.2.4':
@@ -31375,7 +31479,7 @@ snapshots:
   '@tailwindcss/oxide-linux-arm-gnueabihf@4.3.1':
     optional: true
 
-  '@tailwindcss/oxide-linux-arm-gnueabihf@4.3.3':
+  '@tailwindcss/oxide-linux-arm-gnueabihf@4.3.5':
     optional: true
 
   '@tailwindcss/oxide-linux-arm64-gnu@4.2.4':
@@ -31384,7 +31488,7 @@ snapshots:
   '@tailwindcss/oxide-linux-arm64-gnu@4.3.1':
     optional: true
 
-  '@tailwindcss/oxide-linux-arm64-gnu@4.3.3':
+  '@tailwindcss/oxide-linux-arm64-gnu@4.3.5':
     optional: true
 
   '@tailwindcss/oxide-linux-arm64-musl@4.2.4':
@@ -31393,7 +31497,7 @@ snapshots:
   '@tailwindcss/oxide-linux-arm64-musl@4.3.1':
     optional: true
 
-  '@tailwindcss/oxide-linux-arm64-musl@4.3.3':
+  '@tailwindcss/oxide-linux-arm64-musl@4.3.5':
     optional: true
 
   '@tailwindcss/oxide-linux-x64-gnu@4.2.4':
@@ -31402,7 +31506,7 @@ snapshots:
   '@tailwindcss/oxide-linux-x64-gnu@4.3.1':
     optional: true
 
-  '@tailwindcss/oxide-linux-x64-gnu@4.3.3':
+  '@tailwindcss/oxide-linux-x64-gnu@4.3.5':
     optional: true
 
   '@tailwindcss/oxide-linux-x64-musl@4.2.4':
@@ -31411,7 +31515,7 @@ snapshots:
   '@tailwindcss/oxide-linux-x64-musl@4.3.1':
     optional: true
 
-  '@tailwindcss/oxide-linux-x64-musl@4.3.3':
+  '@tailwindcss/oxide-linux-x64-musl@4.3.5':
     optional: true
 
   '@tailwindcss/oxide-wasm32-wasi@4.2.4':
@@ -31420,7 +31524,7 @@ snapshots:
   '@tailwindcss/oxide-wasm32-wasi@4.3.1':
     optional: true
 
-  '@tailwindcss/oxide-wasm32-wasi@4.3.3':
+  '@tailwindcss/oxide-wasm32-wasi@4.3.5':
     optional: true
 
   '@tailwindcss/oxide-win32-arm64-msvc@4.2.4':
@@ -31429,7 +31533,7 @@ snapshots:
   '@tailwindcss/oxide-win32-arm64-msvc@4.3.1':
     optional: true
 
-  '@tailwindcss/oxide-win32-arm64-msvc@4.3.3':
+  '@tailwindcss/oxide-win32-arm64-msvc@4.3.5':
     optional: true
 
   '@tailwindcss/oxide-win32-x64-msvc@4.2.4':
@@ -31438,7 +31542,7 @@ snapshots:
   '@tailwindcss/oxide-win32-x64-msvc@4.3.1':
     optional: true
 
-  '@tailwindcss/oxide-win32-x64-msvc@4.3.3':
+  '@tailwindcss/oxide-win32-x64-msvc@4.3.5':
     optional: true
 
   '@tailwindcss/oxide@4.2.4':
@@ -31471,20 +31575,20 @@ snapshots:
       '@tailwindcss/oxide-win32-arm64-msvc': 4.3.1
       '@tailwindcss/oxide-win32-x64-msvc': 4.3.1
 
-  '@tailwindcss/oxide@4.3.3':
+  '@tailwindcss/oxide@4.3.5':
     optionalDependencies:
-      '@tailwindcss/oxide-android-arm64': 4.3.3
-      '@tailwindcss/oxide-darwin-arm64': 4.3.3
-      '@tailwindcss/oxide-darwin-x64': 4.3.3
-      '@tailwindcss/oxide-freebsd-x64': 4.3.3
-      '@tailwindcss/oxide-linux-arm-gnueabihf': 4.3.3
-      '@tailwindcss/oxide-linux-arm64-gnu': 4.3.3
-      '@tailwindcss/oxide-linux-arm64-musl': 4.3.3
-      '@tailwindcss/oxide-linux-x64-gnu': 4.3.3
-      '@tailwindcss/oxide-linux-x64-musl': 4.3.3
-      '@tailwindcss/oxide-wasm32-wasi': 4.3.3
-      '@tailwindcss/oxide-win32-arm64-msvc': 4.3.3
-      '@tailwindcss/oxide-win32-x64-msvc': 4.3.3
+      '@tailwindcss/oxide-android-arm64': 4.3.5
+      '@tailwindcss/oxide-darwin-arm64': 4.3.5
+      '@tailwindcss/oxide-darwin-x64': 4.3.5
+      '@tailwindcss/oxide-freebsd-x64': 4.3.5
+      '@tailwindcss/oxide-linux-arm-gnueabihf': 4.3.5
+      '@tailwindcss/oxide-linux-arm64-gnu': 4.3.5
+      '@tailwindcss/oxide-linux-arm64-musl': 4.3.5
+      '@tailwindcss/oxide-linux-x64-gnu': 4.3.5
+      '@tailwindcss/oxide-linux-x64-musl': 4.3.5
+      '@tailwindcss/oxide-wasm32-wasi': 4.3.5
+      '@tailwindcss/oxide-win32-arm64-msvc': 4.3.5
+      '@tailwindcss/oxide-win32-x64-msvc': 4.3.5
 
   '@tailwindcss/postcss@4.2.4':
     dependencies:
@@ -31494,13 +31598,13 @@ snapshots:
       postcss: 8.5.30
       tailwindcss: 4.2.4
 
-  '@tailwindcss/postcss@4.3.3':
+  '@tailwindcss/postcss@4.3.5':
     dependencies:
       '@alloc/quick-lru': 5.2.0
-      '@tailwindcss/node': 4.3.3
-      '@tailwindcss/oxide': 4.3.3
+      '@tailwindcss/node': 4.3.5
+      '@tailwindcss/oxide': 4.3.5
       postcss: 8.5.30
-      tailwindcss: 4.3.3
+      tailwindcss: 4.3.5
 
   '@tailwindcss/typography@0.5.19(tailwindcss@4.2.4)':
     dependencies:
@@ -32830,7 +32934,7 @@ snapshots:
 
   '@workflow/serde@4.1.0-beta.2': {}
 
-  '@workos-inc/node@11.0.0': {}
+  '@workos-inc/node@12.2.0': {}
 
   '@wxt-dev/browser@0.1.43':
     dependencies:
@@ -33824,7 +33928,11 @@ snapshots:
 
   char-regex@1.0.2: {}
 
+  character-entities-html4@1.1.4: {}
+
   character-entities-html4@2.1.0: {}
+
+  character-entities-legacy@1.1.4: {}
 
   character-entities-legacy@3.0.0: {}
 
@@ -34344,7 +34452,7 @@ snapshots:
       postcss-modules-scope: 3.2.1(postcss@8.5.30)
       postcss-modules-values: 4.0.0(postcss@8.5.30)
       postcss-value-parser: 4.2.0
-      semver: 7.8.5
+      semver: 7.7.4
     optionalDependencies:
       webpack: 5.105.4
 
@@ -35001,6 +35109,11 @@ snapshots:
       tapable: 2.3.3
 
   enhanced-resolve@5.24.3:
+    dependencies:
+      graceful-fs: 4.2.11
+      tapable: 2.3.3
+
+  enhanced-resolve@5.26.2:
     dependencies:
       graceful-fs: 4.2.11
       tapable: 2.3.3
@@ -35950,7 +36063,7 @@ snapshots:
       - supports-color
       - typescript
 
-  expo-speech-recognition@57.1.1(patch_hash=a2fc2568603b981e0b9bf1133deef50012a0b2d18b52f445a9868b1770005b99)(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0):
+  expo-speech-recognition@58.0.1(patch_hash=1a2e356801d98a4955ba1840994bcc9f2838aad151396fa3a0d6e4ec09883e79)(expo@58.0.10)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0):
     dependencies:
       expo: 58.0.10(@babel/core@7.29.7)(@expo/metro-runtime@58.0.14)(bufferutil@4.1.0)(expo-router@58.0.19)(expo-widgets@58.0.17)(react-dom@19.2.6(react@19.3.0))(react-native-webview@14.0.1(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(react-native-worklets@0.13.0(@babel/core@7.29.7)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(typescript@7.0.2)(utf-8-validate@6.0.6)
       react: 19.3.0
@@ -36482,7 +36595,7 @@ snapshots:
       minimatch: 3.1.5
       node-abort-controller: 3.1.1
       schema-utils: 3.3.0
-      semver: 7.8.5
+      semver: 7.7.4
       tapable: 2.3.3
       typescript: 7.0.2
       webpack: 5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))(esbuild@0.28.2)
@@ -36499,7 +36612,7 @@ snapshots:
       minimatch: 3.1.5
       node-abort-controller: 3.1.1
       schema-utils: 3.3.0
-      semver: 7.8.5
+      semver: 7.7.4
       tapable: 2.3.3
       typescript: 7.0.2
       webpack: 5.105.4
@@ -36517,7 +36630,7 @@ snapshots:
       minimatch: 3.1.5
       node-abort-controller: 3.1.1
       schema-utils: 3.3.0
-      semver: 7.8.5
+      semver: 7.7.4
       tapable: 2.3.3
       typescript: 7.0.2
       webpack: 5.105.4
@@ -37437,7 +37550,7 @@ snapshots:
       '@babel/parser': 7.29.7
       '@istanbuljs/schema': 0.1.3
       istanbul-lib-coverage: 3.2.2
-      semver: 7.8.5
+      semver: 7.7.4
     transitivePeerDependencies:
       - supports-color
 
@@ -38275,7 +38388,7 @@ snapshots:
       jest-util: 29.7.0
       natural-compare: 1.4.0
       pretty-format: 29.7.0
-      semver: 7.8.5
+      semver: 7.7.4
     transitivePeerDependencies:
       - supports-color
 
@@ -38326,7 +38439,7 @@ snapshots:
       jest-message-util: 30.5.1
       jest-util: 30.5.1
       pretty-format: 30.5.1
-      semver: 7.8.5
+      semver: 7.7.4
       synckit: 0.11.12
     transitivePeerDependencies:
       - supports-color
@@ -39040,7 +39153,7 @@ snapshots:
 
   make-dir@4.0.0:
     dependencies:
-      semver: 7.8.5
+      semver: 7.7.4
 
   make-error@1.3.6: {}
 
@@ -39941,11 +40054,11 @@ snapshots:
 
   napi-postinstall@0.3.4: {}
 
-  nativewind@5.0.0-rc.0(react-native-css@3.1.0-rc.0(@expo/metro-config@58.0.13(bufferutil@4.1.0)(expo@58.0.10)(typescript@7.0.2)(utf-8-validate@6.0.6))(lightningcss@1.30.1)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(tailwindcss@4.3.3):
+  nativewind@5.0.0-rc.1(react-native-css@3.1.0-rc.1(@expo/metro-config@58.0.13(bufferutil@4.1.0)(expo@58.0.10)(typescript@7.0.2)(utf-8-validate@6.0.6))(lightningcss@1.30.1)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(tailwindcss@4.3.5):
     dependencies:
-      react-native-css: 3.1.0-rc.0(@expo/metro-config@58.0.13(bufferutil@4.1.0)(expo@58.0.10)(typescript@7.0.2)(utf-8-validate@6.0.6))(lightningcss@1.30.1)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
-      tailwindcss: 4.3.3
-      tailwindcss-safe-area: 1.3.0(tailwindcss@4.3.3)
+      react-native-css: 3.1.0-rc.1(@expo/metro-config@58.0.13(bufferutil@4.1.0)(expo@58.0.10)(typescript@7.0.2)(utf-8-validate@6.0.6))(lightningcss@1.30.1)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
+      tailwindcss: 4.3.5
+      tailwindcss-safe-area: 1.3.0(tailwindcss@4.3.5)
 
   natural-compare@1.4.0: {}
 
@@ -40084,7 +40197,7 @@ snapshots:
     dependencies:
       growly: 1.3.0
       is-wsl: 2.2.0
-      semver: 7.8.5
+      semver: 7.7.4
       shellwords: 0.1.1
       uuid: 11.1.1
       which: 2.0.2
@@ -40794,7 +40907,7 @@ snapshots:
       ky: 1.14.3
       registry-auth-token: 5.1.1
       registry-url: 6.0.1
-      semver: 7.8.5
+      semver: 7.7.4
 
   package-manager-detector@1.8.0: {}
 
@@ -41610,7 +41723,7 @@ snapshots:
       - supports-color
       - typescript
 
-  react-native-css@3.1.0-rc.0(@expo/metro-config@58.0.13(bufferutil@4.1.0)(expo@58.0.10)(typescript@7.0.2)(utf-8-validate@6.0.6))(lightningcss@1.30.1)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0):
+  react-native-css@3.1.0-rc.1(@expo/metro-config@58.0.13(bufferutil@4.1.0)(expo@58.0.10)(typescript@7.0.2)(utf-8-validate@6.0.6))(lightningcss@1.30.1)(react-native@0.88.0(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0):
     dependencies:
       '@expo/metro-config': 58.0.13(bufferutil@4.1.0)(expo@58.0.10)(typescript@7.0.2)(utf-8-validate@6.0.6)
       '@types/debug': 4.1.13
@@ -43214,6 +43327,12 @@ snapshots:
     dependencies:
       safe-buffer: 5.2.1
 
+  stringify-entities@3.1.0:
+    dependencies:
+      character-entities-html4: 1.1.4
+      character-entities-legacy: 1.1.4
+      xtend: 4.0.2
+
   stringify-entities@4.0.4:
     dependencies:
       character-entities-html4: 2.1.0
@@ -43370,15 +43489,15 @@ snapshots:
 
   tailwind-merge@3.7.0: {}
 
-  tailwindcss-safe-area@1.3.0(tailwindcss@4.3.3):
+  tailwindcss-safe-area@1.3.0(tailwindcss@4.3.5):
     dependencies:
-      tailwindcss: 4.3.3
+      tailwindcss: 4.3.5
 
   tailwindcss@4.2.4: {}
 
   tailwindcss@4.3.1: {}
 
-  tailwindcss@4.3.3: {}
+  tailwindcss@4.3.5: {}
 
   tapable@2.3.0: {}
 

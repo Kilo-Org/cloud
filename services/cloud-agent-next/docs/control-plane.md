@@ -373,7 +373,7 @@ so a later report changes nothing.
 `preparing` → `ready` → `failed`. Each preparation attempt has a deadline that outlasts its
 own steps in sequence (sandbox create, wrapper first connect and hello, snapshot restore with
 the clone fallback, Kilo runtime start, session import), including one create retry, one
-snapshot launch retry (a confirmed stop and its own launch bound) and one retry each of the last
+snapshot launch retry (a stop confirmed within 4 minutes, then its own launch bound) and one retry each of the last
 two steps. Environment snapshot builds run separately. An attempt starts when a route enters
 `preparing`: the first `prepare`, a `prepare` after `failed`, or a
 re-prepare after a wrapper restart. A repeated `prepare`, a reconnect or a new allocation inside the
@@ -655,7 +655,10 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
   same snapshot once. The retry moves the allocation's create deadline to a new 5-minute bound,
   renders a new startup command and artifact grant for that bound, and reports "Retrying the
   snapshot start" on the snapshot step. A slow first attempt therefore never uses up the retry. A
-  stop that does not confirm fails at once. A permanent reason (expired, missing, image mismatch,
+  container wedged in a snapshot start can take minutes to destroy, so the stop repeats with the
+  stop ladder's pauses for up to 4 minutes (`snapshotRetryStopMs`). After the first unconfirmed
+  stop, the snapshot step reports "Waiting for the failed sandbox to stop". A stop that is not
+  confirmed in that bound fails the start. A permanent reason (expired, missing, image mismatch,
   provenance, or a provider that started the image instead) fails at once and asks to rebuild the
   environment.
   A repeated transient failure asks to send the message again, and to rebuild only if the failure
@@ -1326,7 +1329,7 @@ them through one development-only override.
 | Bootstrap | Install | Until the first-connect deadline, rendered by the Worker | Report `deadline_exceeded` and exit |
 | Sandbox DO | Provider stop | Existing ladder | Log unconfirmed stop; routing state `stopped` |
 | Sandbox DO | Environment snapshot lookup | 15 s, capped by the launch deadline | Start from the image |
-| Sandbox DO | Snapshot launch attempt (workspace or environment) | 5 min per attempt, 2 attempts with a confirmed stop (up to 30 s) between; the retry moves the create deadline | Route `failed` (`workspace_snapshot_start_failed` or `environment_snapshot_required`) |
+| Sandbox DO | Snapshot launch attempt (workspace or environment) | 5 min per attempt, 2 attempts with a confirmed stop (repeated 30-s stops, up to 4 min) between; the retry moves the create deadline | Route `failed` (`workspace_snapshot_start_failed` or `environment_snapshot_required`) |
 | Wrapper | Preparation steps | Section 7 | Route `failed` with the step reason |
 | Wrapper | Adopt an environment snapshot | 2 min | Preserve the workspace and fail preparation |
 | Environment build DO | One build | 30 min including capture | Build `failed` (`deadline`); stop the builder |

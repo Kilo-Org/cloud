@@ -1366,7 +1366,8 @@
       "noReviews": "Ingen gjennomganger ennå",
       "noReviewsDescription": "Gjennomganger vises her når kodegranskeren har gjennomgått en PR.",
       "startManualReview": "Start en manuell gjennomgang",
-      "configureProvider": "Konfigurer leverandør"
+      "configureProvider": "Konfigurer leverandør",
+      "connectOwnerOnly": "Be en eier eller administrator i organisasjonen om å koble til en leverandør."
     },
     "platformList": {
       "checking": "Sjekker…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "Logg ut denne enheten",
     "signOutSessionLabel": "Logg ut {{device}}, logget inn {{signedIn}}, sist sett {{lastSeen}}",
     "sessionSignedOut": "Økten er logget ut.",
+    "sessionSignOutFailed": "Kunne ikke logge ut denne økten. Prøv igjen.",
     "signOutThisDeviceTitle": "Logge ut denne enheten?",
     "signOutThisSessionTitle": "Logge ut denne økten?",
     "signOutThisSessionMessage": "{{device}} vil bli logget ut. Sist sett {{lastSeen}}. Den kan beholde API-tilgang i opptil en time.",
@@ -3096,12 +3098,14 @@
     "manage": {
       "billingHistory": "Faktureringshistorikk",
       "billingHistoryEmpty": "Ingen faktureringshistorikk ennå.",
+      "billingHistoryError": "Kunne ikke laste inn faktureringshistorikken",
       "cancel": "Si opp abonnement",
       "cancelDescription": "Kilo Pass forblir aktiv til slutten av faktureringsperioden og fornyes ikke.",
       "cancelScheduled": "Avsluttes {{date}}",
       "cancelScheduledChange": "Avbryt planlagt endring",
       "cancelled": "Abonnementet er sagt opp",
       "creditHistoryEmpty": "Ingen Kilo Pass-kreditter ennå.",
+      "creditHistoryError": "Kunne ikke laste inn kredithistorikken",
       "resume": "Gjenoppta abonnement",
       "resumeCancelledDescription": "Kilo Pass fornyes automatisk igjen.",
       "resumePausedDescription": "Kilo Pass gjenopptas nå, før den planlagte datoen for gjenopptakelse.",
@@ -3338,7 +3342,7 @@
       "selectOrganization": "Velg en organisasjon",
       "unavailableDescription": "Denne organisasjonen er ikke lenger tilgjengelig. Velg en fra profilen din for å fortsette.",
       "unavailableSessionsDescription": "Denne organisasjonen er ikke lenger tilgjengelig. Øktene dens kan ikke lastes inn.",
-      "accessDeniedDescription": "Du har ikke tilgang til denne organisasjonen."
+      "accessDeniedDescription": "Be en eier eller administrator i en organisasjon om å gi deg tilgang."
     },
     "create": {
       "title": "Opprett organisasjon",
@@ -3464,6 +3468,8 @@
       "groups": "Grupper",
       "guardrails": "Sikkerhetsrammer",
       "byok": "Bruk din egen nøkkel",
+      "ssoAndDomain": "SSO og domene",
+      "dataCollection": "Datainnsamling",
       "auditLogs": "Revisjonslogger",
       "requestLogs": "Forespørselslogger",
       "subOrganizations": "Underorganisasjoner",
@@ -4592,7 +4598,7 @@
       "fieldCron": "Cron-uttrykk",
       "fieldCronHelp": "Fem felt: minutt, time, dag, måned og ukedag. Det korteste intervallet er ett minutt.",
       "fieldTimezone": "Tidssone",
-      "nameLocked": "Navnet er en del av webhook-URL-en og kan ikke endres.",
+      "nameLocked": "Navnet kan ikke endres etter at triggeren er opprettet.",
       "repositoryLocked": "Repositoriet kan ikke endres etter at triggeren er opprettet.",
       "environmentAutomatic": "Automatisk basert på repositoriet",
       "notSelected": "Ikke valgt",
@@ -4607,6 +4613,7 @@
       "authHeaderLabel": "Headernavn",
       "authSecretLabel": "Delt hemmelighet",
       "authSecretKeep": "La det stå tomt for å beholde den lagrede hemmeligheten.",
+      "authSecretSet": "Påkrevd. Velg en sterk tilfeldig streng.",
       "authSecretCreator": "Bruk minst 16 tegn når triggeren kjøres som oppretteren.",
       "autoCommit": "Sjekk inn endringer når kjøringen er ferdig",
       "condenseOnComplete": "Komprimer konteksten når kjøringen er ferdig",
@@ -4617,6 +4624,7 @@
       "saveFailedTitle": "Kunne ikke lagre triggeren",
       "deleteTitle": "Slette denne triggeren?",
       "deleteMessage": "Kall til {{name}} vil mislykkes. Dette kan ikke angres.",
+      "deleteMessageScheduled": "Planlagte kjøringer av {{name}} stopper. Dette kan ikke angres.",
       "runNow": "Kjør nå",
       "runStarted": "Kjøring startet",
       "created": "Trigger opprettet",

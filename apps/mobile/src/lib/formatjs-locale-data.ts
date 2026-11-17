@@ -32,7 +32,9 @@ const NUMBER_FORMAT_LOCALE_LOADERS = {
   de: () => void require('@formatjs/intl-numberformat/locale-data/de.js'),
   el: () => void require('@formatjs/intl-numberformat/locale-data/el.js'),
   gu: () => void require('@formatjs/intl-numberformat/locale-data/gu.js'),
-  ht: () => void require('@formatjs/intl-numberformat/locale-data/ht.js'),
+  // The released packages carry no `ht` file, and `ht` inherits the French
+  // number data it used to ship, so Haitian Creole keeps French-style grouping.
+  ht: () => void require('@formatjs/intl-numberformat/locale-data/fr.js'),
   ha: () => void require('@formatjs/intl-numberformat/locale-data/ha.js'),
   he: () => void require('@formatjs/intl-numberformat/locale-data/he.js'),
   hi: () => void require('@formatjs/intl-numberformat/locale-data/hi.js'),
@@ -122,7 +124,9 @@ const LIST_FORMAT_LOCALE_LOADERS = {
   de: () => void require('@formatjs/intl-listformat/locale-data/de.js'),
   el: () => void require('@formatjs/intl-listformat/locale-data/el.js'),
   gu: () => void require('@formatjs/intl-listformat/locale-data/gu.js'),
-  ht: () => void require('@formatjs/intl-listformat/locale-data/ht.js'),
+  // See the number-format note: everything the released packages carry for
+  // `ht` is the French data.
+  ht: () => void require('@formatjs/intl-listformat/locale-data/fr.js'),
   ha: () => void require('@formatjs/intl-listformat/locale-data/ha.js'),
   he: () => void require('@formatjs/intl-listformat/locale-data/he.js'),
   hi: () => void require('@formatjs/intl-listformat/locale-data/hi.js'),

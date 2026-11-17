@@ -11,7 +11,6 @@ export const ANDROID_NOTIFICATION_CHANNELS = [
   { id: 'needs-input', name: 'Needs input', importance: 'high', bypassDnd: true },
   { id: 'agent-progress', name: 'Agent progress', importance: 'default', bypassDnd: false },
   { id: 'agent-briefing', name: 'Agent brief', importance: 'default', bypassDnd: false },
-  { id: 'kiloclaw', name: 'KiloClaw activity', importance: 'default', bypassDnd: false },
   { id: 'balance', name: 'Balance alerts', importance: 'default', bypassDnd: false },
   { id: 'security', name: 'Security findings', importance: 'high', bypassDnd: false },
   // Importance is immutable after channel creation. A new ID replaces the
@@ -103,7 +102,6 @@ export function isPushAppVersionAtLeast(current: string | null | undefined, min:
 export type AndroidPushChannelId =
   | AndroidNotificationChannelId
   | typeof LEGACY_AGENT_ANDROID_CHANNEL_ID
-  | 'chat'
   | 'active-agents';
 
 /**
@@ -124,8 +122,6 @@ export function androidChannelIdForPushDataToAppVersion(
   switch (data.type) {
     case 'cloud_agent_session':
       return LEGACY_AGENT_ANDROID_CHANNEL_ID;
-    case 'chat.message':
-      return 'chat';
     case 'active_agents_glanceable':
       return 'active-agents';
     case 'agent_briefing':
@@ -168,16 +164,12 @@ export type AgentNotificationKind = (typeof AGENT_NOTIFICATION_KINDS)[number];
 
 type AgentPushData = Extract<
   PushData,
-  { type: 'cloud_agent_session' | 'chat.message' | 'active_agents_glanceable' }
+  { type: 'cloud_agent_session' | 'active_agents_glanceable' }
 >;
 
 /** True for the push variants that are agent notifications and carry a kind. */
 function isAgentPushData(data: PushData): data is AgentPushData {
-  return (
-    data.type === 'cloud_agent_session' ||
-    data.type === 'chat.message' ||
-    data.type === 'active_agents_glanceable'
-  );
+  return data.type === 'cloud_agent_session' || data.type === 'active_agents_glanceable';
 }
 
 /**
@@ -198,9 +190,6 @@ function agentKindForAgentPush(data: AgentPushData): AgentNotificationKind {
       // The schema default is 'status', applied at the producer's enforcement
       // read site; an omitted category is a status update, not a question.
       return data.category === 'attention' ? 'needs-input' : 'progress';
-    case 'chat.message':
-      // A reply in the user's conversation is what the user answers.
-      return 'needs-input';
     case 'active_agents_glanceable':
       return agentNotificationKindForGlanceableSnapshot(data);
     default: {
@@ -278,9 +267,6 @@ export function androidChannelIdForPushData(data: PushData): AndroidNotification
     return androidChannelIdForAgentKind(agentKindForAgentPush(data));
   }
   switch (data.type) {
-    case 'instance-lifecycle':
-    case 'scheduled-action':
-      return 'kiloclaw';
     case 'low_balance':
     case 'spend_alert':
       return 'balance';

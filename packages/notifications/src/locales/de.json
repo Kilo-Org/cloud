@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Ihre Agentensitzung hat ein Update",
-      "chatMessage": "Sie haben eine neue Nachricht",
-      "instanceLifecycle": "Ihre Instanz hat ein Update",
-      "scheduledAction": "Eine geplante Aktion hat ein Update",
       "lowBalance": "Ihr Guthaben benötigt Aufmerksamkeit",
       "spendAlert": "Ihre Ausgaben benötigen Aufmerksamkeit",
       "securityFinding": "Ein Sicherheitsbefund benötigt Aufmerksamkeit",
@@ -17,12 +14,6 @@
     "notification": {
       "title": "{{sessionTitle}}",
       "body": "{{message}}"
-    }
-  },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · Ohne Titel",
-      "body": "{{bodyPreview}}"
     }
   },
   "internal": {
@@ -49,35 +40,6 @@
     "securityLifecycle": {
       "title": "Kilo",
       "body": "Eine Sicherheitsprüfung hat ein Update"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} ist bereit",
-      "body": "Tippen, um zu chatten."
-    },
-    "startFailed": {
-      "title": "{{instanceName}} konnte nicht gestartet werden",
-      "body": "Start fehlgeschlagen."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} wird bald neu gestartet",
-      "body": "Neustart geplant um {{when}}."
-    },
-    "restartCancelled": {
-      "title": "Neustart von {{instanceName}} abgebrochen",
-      "body": "Der zuvor geplante Neustart wurde abgebrochen."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} wird bald aktualisiert",
-      "bodyWithTag": "Aktualisierung auf {{targetImageTag}} um {{when}}.",
-      "bodyWithoutTag": "Geplante Aktualisierung um {{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "Aktualisierung von {{instanceName}} abgebrochen",
-      "body": "Die zuvor geplante Aktualisierung wurde abgebrochen."
     }
   },
   "sessionReady": {

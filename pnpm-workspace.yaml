@@ -35,8 +35,9 @@ catalog:
   '@vitest/ui': 4.1.12
   '@workos-inc/node': 11.0.0
   aws4fetch: 1.0.20
+  dotenv: 18.0.10
   drizzle-kit: 0.31.11
-  drizzle-orm: 0.45.2
+  drizzle-orm: 0.45.4
   hono: 4.13.13
   jose: 6.2.12
   jsonwebtoken: 9.0.3
@@ -111,6 +112,15 @@ minimumReleaseAgeExclude:
   - '@types/bun@1.4.4'
   - bun-types@1.4.4
 overrides:
+  # The AWS SDK v3 graph resolves these two smithy packages through caret ranges
+  # from every one of its parents (^3.24.4 and ^4.12.5), and the versions it
+  # picked, @smithy/core 3.24.4 and @smithy/smithy-client 4.12.5, are deprecated
+  # upstream for a custom-logger redaction bug. Pinning the fixed releases keeps
+  # the whole graph on one copy each and off the deprecated snapshots, including
+  # after a later re-resolution; move them through a reviewed change here and in
+  # the lockfile, as the note further down requires.
+  '@smithy/core': 3.40.0
+  '@smithy/smithy-client': 4.15.2
   # One pg client in the tree: drizzle-orm's optional peers include pg, so two
   # pg versions split drizzle-orm into two packages and their SQL types stop
   # being assignable to each other across workspace imports.

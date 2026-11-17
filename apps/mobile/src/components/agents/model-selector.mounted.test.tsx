@@ -456,11 +456,24 @@ describe('ModelSelector picker effort availability', () => {
 });
 
 describe('ModelSelector loading chip', () => {
-  it('labels the chip while the catalog loads instead of rendering a blank skeleton', () => {
+  it('reserves the name slot with a skeleton bar while the catalog loads', () => {
     const renderer = renderSelector({ isLoading: true });
 
-    expect(textStrings(renderer.root)).toContain('Model');
-    expect(renderer.root.findAllByType('Skeleton')).toHaveLength(0);
+    // A text label reads as a resolved value before the catalogue lands (the
+    // chip looks unset), and the pill would resize when the default model's
+    // name arrives. The bar holds the slot instead; the wrapper's busy label
+    // is what assistive tech gets.
+    expect(textStrings(renderer.root)).not.toContain('Model');
+    const skeletons = renderer.root.findAllByType('Skeleton');
+    expect(skeletons).toHaveLength(1);
+    // The bar takes the label line's own `text-sm` box and the default model's
+    // measured label width, so the pill is the size it will have once that model
+    // arrives; a shorter bar grew it by 3.4 dp on the emulator.
+    expect(skeletons[0]?.props.className).toContain('h-[17.5px]');
+    expect(skeletons[0]?.props.className).toContain('w-[75.5px]');
+    // `bg-muted-soft`, not the default fill: that one equals the pill's own
+    // `bg-secondary` in the light palette, so the bar would paint nothing.
+    expect(skeletons[0]?.props.className).toContain('bg-muted-soft');
     expect(renderer.root.findAllByType('ChevronDown')).toHaveLength(1);
   });
 

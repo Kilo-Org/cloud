@@ -85,18 +85,14 @@ export function EmailOtpForm({
   return (
     // Keyboard avoidance is owned by the login shell in login-screen.tsx.
     <View className="gap-3">
-      <Text variant="muted" className="text-center text-sm">
+      <Text variant="muted" className="text-center">
         {destination}
       </Text>
-      <Text variant="muted" className="text-center text-xs">
+      <Text variant="caption" className="text-center">
         {t('login.codeArrivalHint')}
       </Text>
       <Input
-        // The shared box supplies the Android center gravity and the
-        // single-line line box; `min-h-[48px]` keeps the one-time-code
-        // field's `h-12`-scale look as a floor (never a fixed height), so
-        // Dynamic Type can still grow it.
-        className="min-h-[48px] rounded-md border border-input bg-background pl-3 pr-3 text-lg leading-[normal] tracking-widest text-foreground"
+        className="text-center text-lg"
         // textAlign is applied inline, not via a `text-center` class: NativeWind maps
         // textAlign to a native prop for TextInput and crashes on it in this version.
         // eslint-disable-next-line react-native/no-inline-styles -- see comment above
@@ -128,13 +124,12 @@ export function EmailOtpForm({
         }}
       >
         {error ? (
-          <Text className="text-center text-sm text-destructive" accessibilityLiveRegion="polite">
+          <Text variant="muted" className="text-center text-destructive" accessibilityLiveRegion="polite">
             {error}
           </Text>
         ) : null}
         <Button
           size="lg"
-          className="flex-row gap-2"
           disabled={!hasCompleteCode || authBusy}
           loading={busy === 'otp-verify'}
           onPress={() => {
@@ -144,14 +139,11 @@ export function EmailOtpForm({
           }}
           accessibilityLabel={t('login.verifyCode')}
         >
-          <Text className="flex-1 text-center" numberOfLines={1} adjustsFontSizeToFit>
-            {t('login.verifyCode')}
-          </Text>
+          <Text numberOfLines={1}>{t('login.verifyCode')}</Text>
         </Button>
       </View>
       <Button
         variant="outline"
-        className="flex-row gap-2"
         disabled={authBusy}
         loading={busy === 'otp-send'}
         onPress={onResend}
@@ -162,9 +154,7 @@ export function EmailOtpForm({
             full-width button, so the copy did not fit its control (2026-09-19
             device finding). Longer locales ellipsize instead of growing a
             second row; the full label stays the control's accessible name. */}
-        <Text className="flex-1 text-center" numberOfLines={1} adjustsFontSizeToFit>
-          {t('login.resendCode')}
-        </Text>
+        <Text numberOfLines={1}>{t('login.resendCode')}</Text>
       </Button>
       <Button
         variant="ghost"

@@ -14,13 +14,15 @@ import { useTranslation } from 'react-i18next';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { ConfigureRow } from '@/components/ui/configure-row';
+import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 import { SegmentedControl } from '@/components/ui/segmented-control';
-import { Text } from '@/components/ui/text';
 import {
   setThemePreference,
   type ThemePreference,
   useThemePreference,
 } from '@/lib/hooks/use-theme-preference';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 
 /**
@@ -38,41 +40,36 @@ export function PreferencesScreen() {
       <ScreenHeader title={t('common.preferences')} backFallback={PROFILE_TAB_HREF} />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="px-4 gap-3 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
       >
-        <ConfigureRow
-          icon={SlidersHorizontal}
-          title={t('preferences.general')}
-          className="rounded-lg bg-secondary px-3"
-          onPress={() => {
-            router.push('/(app)/(tabs)/(3_profile)/general' as Href);
-          }}
-        />
-        <ConfigureRow
-          icon={Mic}
-          title={t('preferences.voiceInput')}
-          subtitle={t('preferences.gatewayTranscriptionSubtitle')}
-          className="rounded-lg bg-secondary px-3"
-          onPress={() => {
-            router.push('/(app)/(tabs)/(3_profile)/voice-input' as Href);
-          }}
-        />
-        <ConfigureRow
-          icon={WandSparkles}
-          title={t('preferences.toolSummaryTranslation')}
-          subtitle={t('preferences.toolSummaryTranslationSubtitle')}
-          className="rounded-lg bg-secondary px-3"
-          onPress={() => {
-            router.push('/(app)/(tabs)/(3_profile)/tool-summary-translation' as Href);
-          }}
-        />
+        <RowGroup leadingTile>
+          <ConfigureRow
+            icon={SlidersHorizontal}
+            title={t('preferences.general')}
+            onPress={() => {
+              router.push('/(app)/(tabs)/(3_profile)/general' as Href);
+            }}
+          />
+          <ConfigureRow
+            icon={Mic}
+            title={t('preferences.voiceInput')}
+            subtitle={t('preferences.gatewayTranscriptionSubtitle')}
+            onPress={() => {
+              router.push('/(app)/(tabs)/(3_profile)/voice-input' as Href);
+            }}
+          />
+          <ConfigureRow
+            icon={WandSparkles}
+            title={t('preferences.toolSummaryTranslation')}
+            subtitle={t('preferences.toolSummaryTranslationSubtitle')}
+            onPress={() => {
+              router.push('/(app)/(tabs)/(3_profile)/tool-summary-translation' as Href);
+            }}
+          />
+        </RowGroup>
 
-        {/* Appearance */}
-        <View className="mt-3 gap-3">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('preferences.appearance')}
-          </Text>
+        <Section label={t('preferences.appearance')}>
           <SegmentedControl<ThemePreference>
             accessibilityLabel={t('preferences.appearance')}
             options={[
@@ -83,43 +80,41 @@ export function PreferencesScreen() {
             value={themePreference}
             onChange={setThemePreference}
           />
-        </View>
+        </Section>
 
-        <ConfigureRow
-          icon={Globe}
-          title={t('preferences.account')}
-          subtitle={t('preferences.accountSubtitle')}
-          className="rounded-lg bg-secondary px-3"
-          onPress={() => {
-            router.push('/(app)/(tabs)/(3_profile)/account' as Href);
-          }}
-        />
-        <ConfigureRow
-          icon={Bell}
-          title={t('common.notifications')}
-          subtitle={t('preferences.notificationsSubtitle')}
-          className="rounded-lg bg-secondary px-3"
-          onPress={() => {
-            router.push('/(app)/notifications' as Href);
-          }}
-        />
-        <ConfigureRow
-          icon={History}
-          title={t('notifications.history.title')}
-          subtitle={t('notifications.history.subtitle')}
-          className="rounded-lg bg-secondary px-3"
-          onPress={() => {
-            router.push('/(app)/(tabs)/(3_profile)/notification-history' as Href);
-          }}
-        />
-        <ConfigureRow
-          icon={Wallet}
-          title={t('notifications.channel.spend')}
-          className="rounded-lg bg-secondary px-3"
-          onPress={() => {
-            router.push('/(app)/(tabs)/(3_profile)/spend-alerts' as Href);
-          }}
-        />
+        <RowGroup leadingTile>
+          <ConfigureRow
+            icon={Globe}
+            title={t('preferences.account')}
+            subtitle={t('preferences.accountSubtitle')}
+            onPress={() => {
+              router.push('/(app)/(tabs)/(3_profile)/account' as Href);
+            }}
+          />
+          <ConfigureRow
+            icon={Bell}
+            title={t('common.notifications')}
+            subtitle={t('preferences.notificationsSubtitle')}
+            onPress={() => {
+              router.push('/(app)/notifications' as Href);
+            }}
+          />
+          <ConfigureRow
+            icon={History}
+            title={t('notifications.history.title')}
+            subtitle={t('notifications.history.subtitle')}
+            onPress={() => {
+              router.push('/(app)/(tabs)/(3_profile)/notification-history' as Href);
+            }}
+          />
+          <ConfigureRow
+            icon={Wallet}
+            title={t('notifications.channel.spend')}
+            onPress={() => {
+              router.push('/(app)/(tabs)/(3_profile)/spend-alerts' as Href);
+            }}
+          />
+        </RowGroup>
       </TabScreenScrollView>
     </View>
   );

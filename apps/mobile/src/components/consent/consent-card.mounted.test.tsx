@@ -55,7 +55,7 @@ vi.mock('@/components/ui/icons', () => ({
   Sparkles: 'Sparkles',
   User: 'User',
 }));
-vi.mock('@/components/consent/consent-row', () => ({ ConsentRow: 'ConsentRow' }));
+vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -223,11 +223,11 @@ describe('ConsentCard', () => {
     // The feature-rollout disclosure belongs to the required group, so it is
     // visible before the user has to open the full details.
     const rows = renderer.root.findAll(
-      node => typeof node.type === 'string' && (node.type as string) === 'ConsentRow'
+      node => typeof node.type === 'string' && (node.type as string) === 'ConfigureRow'
     );
     const featureRow = rows.find(node => (node.props.title as string) === 'Feature rollout');
     expect(featureRow).toBeDefined();
-    expect(featureRow?.props.description as string).toContain('PostHog');
+    expect(featureRow?.props.subtitle as string).toContain('PostHog');
   });
 
   it('names the brand with the header mark instead of repeating it as text', () => {
@@ -553,7 +553,7 @@ describe('ConsentCard', () => {
     const rows = renderer.root.findAll(
       n =>
         typeof n.type === 'string' &&
-        (n.type as string) === 'ConsentRow' &&
+        (n.type as string) === 'ConfigureRow' &&
         (n.props.title as string).includes('usage data')
     );
     expect(rows.length).toBe(1);

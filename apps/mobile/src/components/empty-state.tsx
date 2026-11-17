@@ -8,7 +8,7 @@ import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
-const DEFAULT_ICON_CONTAINER_CLASS = 'h-14 w-14 rounded-2xl border border-border bg-card';
+const DEFAULT_ICON_CONTAINER_CLASS = 'h-14 w-14 rounded-full border border-border bg-card';
 
 type EmptyStateProps = {
   icon: LucideIcon;
@@ -103,7 +103,7 @@ function EmptyStateBody({
   const content = (
     <View
       className={cn(
-        'items-center px-6',
+        'items-center px-4',
         compact ? 'gap-2' : 'gap-4',
         placement === 'top' && !compact && 'pt-16',
         className

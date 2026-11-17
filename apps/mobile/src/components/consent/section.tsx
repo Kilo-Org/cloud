@@ -2,6 +2,7 @@ import { type ReactNode } from 'react';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
+import { Card } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
 
 type SectionProps = {
@@ -19,8 +20,8 @@ type FieldProps = {
 
 function Field({ label, value }: FieldProps) {
   return (
-    <Text className="mt-1 text-sm text-muted-foreground">
-      <Text className="text-sm font-semibold text-foreground">{label}: </Text>
+    <Text variant="muted">
+      <Text variant="small">{label}: </Text>
       {value}
     </Text>
   );
@@ -29,12 +30,14 @@ function Field({ label, value }: FieldProps) {
 export function Section({ title, what, why, who, footer }: SectionProps) {
   const { t } = useTranslation();
   return (
-    <View className="border-t border-border py-4">
-      <Text className="text-base font-semibold text-foreground">{title}</Text>
-      <Field label={t('consent.what')} value={what} />
-      <Field label={t('consent.why')} value={why} />
-      <Field label={t('consent.who')} value={who} />
+    <Card>
+      <Text variant="heading">{title}</Text>
+      <View className="gap-1">
+        <Field label={t('consent.what')} value={what} />
+        <Field label={t('consent.why')} value={why} />
+        <Field label={t('consent.who')} value={who} />
+      </View>
       {footer}
-    </View>
+    </Card>
   );
 }

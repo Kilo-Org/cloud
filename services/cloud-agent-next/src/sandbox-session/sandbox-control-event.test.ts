@@ -96,36 +96,55 @@ describe('session event public projection', () => {
     expect(JSON.stringify(projected)).not.toContain('private-provider');
   });
 
-  it('names a native model catalog 404 on the public execution failure event', () => {
-    const projected = publicEventProperties({
-      type: 'conversation.event',
-      properties: {
-        sessionID: 'ses_native',
-        event: {
-          id: 'evt_native',
-          type: 'session.execution.failed',
-          data: {
-            sessionID: 'ses_native',
-            error: {
-              type: 'provider.no-route',
-              message:
-                'Failed to load the Kilo model catalog (HTTP 404). Check your connection and credentials.',
+  it.each([
+    [
+      'Failed to load the Kilo model catalog (HTTP 404). Check your connection and credentials.',
+      'The Kilo model catalog could not be loaded',
+    ],
+    [
+      'Failed to load the Kilo model catalog (HTTP 503). Check your connection and credentials.',
+      'Assistant service is unavailable',
+    ],
+    [
+      'Model unavailable: kilo/nvidia/nemotron-3-ultra-550b-a55b:free',
+      'Assistant request failed: model not found',
+    ],
+    [
+      'Variant unavailable for kilo/nvidia/nemotron-3.5-super-vl:free: instant',
+      'Assistant request was invalid',
+    ],
+  ])(
+    'sanitizes the native no-route error %s on the public execution failure event',
+    (message, expected) => {
+      const projected = publicEventProperties({
+        type: 'conversation.event',
+        properties: {
+          sessionID: 'ses_native',
+          event: {
+            id: 'evt_native',
+            type: 'session.execution.failed',
+            data: {
+              sessionID: 'ses_native',
+              error: {
+                type: 'provider.no-route',
+                message,
+              },
             },
           },
         },
-      },
-    });
-    expect(projected).toMatchObject({
-      event: {
-        data: {
-          error: {
-            type: 'provider.no-route',
-            message: 'The Kilo model catalog could not be loaded',
+      });
+      expect(projected).toMatchObject({
+        event: {
+          data: {
+            error: {
+              type: 'provider.no-route',
+              message: expected,
+            },
           },
         },
-      },
-    });
-  });
+      });
+    }
+  );
 
   describe.each(carriers)('$type', carrier => {
     it.each([

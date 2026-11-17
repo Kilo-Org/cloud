@@ -666,6 +666,8 @@ it.each([
     'model_catalog_unavailable',
   ],
   [catalogFailure('HTTP 503'), 'provider_unavailable'],
+  ['Model unavailable: kilo/nvidia/nemotron-3-ultra-550b-a55b:free', 'model_unavailable'],
+  ['Variant unavailable for kilo/nvidia/nemotron-3.5-super-vl:free: instant', 'invalid_request'],
   [catalogFailure('HTTP 401'), 'provider_authentication'],
   [catalogFailure('network'), 'unknown'],
   ['No model is selected', 'unknown'],

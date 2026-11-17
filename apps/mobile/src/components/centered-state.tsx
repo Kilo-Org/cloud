@@ -216,6 +216,7 @@ export function CenteredState({
     bottomInset,
     contentHeight,
     frame,
+
     measuredViewport,
     nativeViewportFillsSurface,
     topInset,
@@ -231,7 +232,20 @@ export function CenteredState({
   // for the scroller's frame instead of painting a position the measurement
   // would correct. The estimate still lands whenever a measurement cannot place
   // the state, so a state never stays hidden.
-  const estimateFits = topInset === 0 && !nativeViewportFillsSurface;
+  //
+  // A surface whose own geometry is still arriving (`source: 'pending'`) is
+  // such a band too: its resolved insets are 0/0 until the native probe
+  // reports, and the probe's safe-area answer moves the band bottom on any
+  // device with a home bar, so the estimate provably disagrees with the
+  // measured placement there. The measured review-list empty state centered
+  // below its final position on the push and jumped up when the probe answered
+  // (explorer:android layout-jump). The scroller's own frame cannot rescue it
+  // — the state reads the surface's insets, not the scroller's — so a pending
+  // native surface waits for its frame exactly like a moved band, while
+  // `unplaceable` still paints the estimate so a state that can never measure
+  // is never hidden.
+  const estimateFits =
+    topInset === 0 && !nativeViewportFillsSurface && !(surface?.source === 'pending');
   const placement = useMemo(() => {
     if (layout) {
       return layout;

@@ -128,6 +128,7 @@ async function mount(props: Partial<ComponentPropsWithRef<typeof CenteredState>>
   return {
     ...mounted,
     content,
+    contentNode,
     scroll,
     rerender: () => {
       act(() => {
@@ -552,5 +553,60 @@ describe('CenteredState first-frame paint', () => {
     });
     expect(mounted.scroll().style).toBeUndefined();
     mounted.unmount();
+  });
+
+  it('holds the state until a pending native surface reports, then paints it placed', async () => {
+    // A pushed stack screen paints its surface insets 0/0 while the native
+    // geometry probe is still arriving; the probe's safe-area bottom then
+    // raises the band bottom and a state painted from the estimate jumped up
+    // half the band change after it first appeared (explorer:android
+    // layout-jump, Recent Reviews). A pending native surface is a band the
+    // estimate cannot place, so the state waits for the surface's frame — and
+    // its first painted placement already carries the reported insets.
+    native.surface.frame = null;
+    native.surface.bounds = null;
+    native.surface.source = 'pending';
+    native.surface.topInset = 0;
+    native.surface.bottomInset = 0;
+    const held = await mount();
+    // No content box while the surface is pending: the scroller stays empty
+    // rather than painting a position the measurement would correct.
+    expect(held.contentNode()).toBeUndefined();
+    expect(held.scroll().contentContainerStyle).toBeUndefined();
+
+    // The probe reports with the device's insets. The surface's resolved
+    // insets land with the frame, so the first painted placement is the final
+    // one: no 0-inset band style paints in between.
+    native.surface.source = 'native';
+    native.surface.frame = { top: 0, bottom: 914 };
+    native.surface.bounds = { top: 0, bottom: 914 };
+    native.surface.safeAreaBottom = 24;
+    native.surface.topInset = 52;
+    native.surface.bottomInset = 24;
+    held.rerender();
+    held.settle();
+    expectPainted(held);
+    // First paint: the band style built from the reported insets. The content
+    // height lands a frame later and centers at the same point (the docstring's
+    // equality), so no later frame moves it.
+    expect(held.scroll().contentContainerStyle).toEqual({
+      flexGrow: 1,
+      minHeight: 340,
+      justifyContent: 'center',
+      paddingTop: 16,
+      paddingBottom: 16,
+    });
+    // The measured layout keeps the same content-box paddings once the height
+    // is known.
+    act(() => {
+      held.contentNode()?.props.onLayout?.(contentLayout as LayoutChangeEvent);
+    });
+    expect(held.scroll().contentContainerStyle).toEqual({
+      flexGrow: 1,
+      minHeight: 340,
+      paddingTop: 16,
+      paddingBottom: 16,
+    });
+    held.unmount();
   });
 });

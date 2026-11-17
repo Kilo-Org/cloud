@@ -83,6 +83,20 @@ export async function POST(
       }
     }
   }
+  const requested_expiry_hours = requestData.expiry_hours ?? requestData.creditExpiryHours;
+  // A negative hour count would store an expiry before the current instant,
+  // and the ledger must not show an expiry in the past. A debit does not store
+  // the supplied expiry, so its supplied hours have no effect here.
+  if (
+    creditKind === 'promotional' &&
+    requested_expiry_hours != null &&
+    (amount_usd == null || amount_usd > 0)
+  ) {
+    const hours: unknown = requested_expiry_hours;
+    if (typeof hours !== 'number' || !Number.isFinite(hours) || hours < 0) {
+      return warnAndCreateErrorResponse('Expiry hours must not be negative');
+    }
+  }
   const options = {
     amount_usd: requestData.amount_usd ?? requestData.creditAmount ?? undefined,
     creditKind,

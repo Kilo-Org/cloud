@@ -244,6 +244,126 @@ describe('POST /admin/api/users/add-credit', () => {
     ).toHaveLength(0);
   });
 
+  it('rejects a positive promotional grant whose expiry_hours is negative', async () => {
+    const admin = await insertTestUser({ is_admin: true, can_manage_credits: true });
+    const recipient = await insertTestUser();
+    mockedGetUserFromAuth.mockResolvedValue({ user: admin, authFailedResponse: null });
+
+    const response = await POST(
+      request({
+        email: recipient.google_user_email,
+        credit_category: 'expiry-hours-negative',
+        amount_usd: 10,
+        creditKind: 'promotional',
+        expiry_hours: -5,
+      })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Expiry hours must not be negative',
+    });
+    expect(
+      await db
+        .select({ id: credit_transactions.id })
+        .from(credit_transactions)
+        .where(eq(credit_transactions.kilo_user_id, recipient.id))
+    ).toHaveLength(0);
+  });
+
+  it('rejects a negative expiry_hours even when a future credit_expiry_date is supplied', async () => {
+    const admin = await insertTestUser({ is_admin: true, can_manage_credits: true });
+    const recipient = await insertTestUser();
+    mockedGetUserFromAuth.mockResolvedValue({ user: admin, authFailedResponse: null });
+
+    const response = await POST(
+      request({
+        email: recipient.google_user_email,
+        credit_category: 'expiry-hours-negative-with-date',
+        amount_usd: 10,
+        creditKind: 'promotional',
+        credit_expiry_date: '2030-01-01T00:00:00.000Z',
+        expiry_hours: -5,
+      })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Expiry hours must not be negative',
+    });
+    expect(
+      await db
+        .select({ id: credit_transactions.id })
+        .from(credit_transactions)
+        .where(eq(credit_transactions.kilo_user_id, recipient.id))
+    ).toHaveLength(0);
+  });
+
+  it('stores a future expiry for a positive promotional grant with positive expiry_hours', async () => {
+    const admin = await insertTestUser({ is_admin: true, can_manage_credits: true });
+    const recipient = await insertTestUser();
+    mockedGetUserFromAuth.mockResolvedValue({ user: admin, authFailedResponse: null });
+
+    const response = await POST(
+      request({
+        email: recipient.google_user_email,
+        credit_category: 'custom',
+        amount_usd: 10,
+        creditKind: 'promotional',
+        expiry_hours: 24,
+      })
+    );
+
+    expect(response.status).toBe(200);
+    const [credit] = await db
+      .select({ expiry_date: credit_transactions.expiry_date })
+      .from(credit_transactions)
+      .where(eq(credit_transactions.kilo_user_id, recipient.id));
+    expect(credit.expiry_date).not.toBeNull();
+    expect(new Date(credit.expiry_date!).getTime()).toBeGreaterThan(Date.now());
+  });
+
+  it('allows an expiry_hours of zero, which means no hours-based expiry', async () => {
+    const categoryKey = `expiry-hours-zero-${crypto.randomUUID()}`;
+    const lookup = promoCreditCategoriesByKey.get.bind(promoCreditCategoriesByKey);
+    const template = lookup('custom');
+    const spy = jest
+      .spyOn(promoCreditCategoriesByKey, 'get')
+      .mockImplementation(key =>
+        key === categoryKey && template
+          ? { ...template, credit_category: categoryKey }
+          : lookup(key)
+      );
+    try {
+      const admin = await insertTestUser({ is_admin: true, can_manage_credits: true });
+      const recipient = await insertTestUser();
+      mockedGetUserFromAuth.mockResolvedValue({ user: admin, authFailedResponse: null });
+
+      const response = await POST(
+        request({
+          email: recipient.google_user_email,
+          credit_category: categoryKey,
+          amount_usd: 10,
+          creditKind: 'promotional',
+          credit_expiry_date: '2030-01-01T00:00:00.000Z',
+          expiry_hours: 0,
+        })
+      );
+
+      expect(response.status).toBe(200);
+      const [credit] = await db
+        .select({ expiry_date: credit_transactions.expiry_date })
+        .from(credit_transactions)
+        .where(eq(credit_transactions.kilo_user_id, recipient.id));
+      expect(new Date(credit.expiry_date!).getTime()).toBe(
+        new Date('2030-01-01T00:00:00.000Z').getTime()
+      );
+      expect(new Date(credit.expiry_date!).getTime()).toBeGreaterThan(Date.now());
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('allows a past credit_expiry_date on a debit, which stores no expiry', async () => {
     const admin = await insertTestUser({ is_admin: true, can_manage_credits: true });
     const recipient = await insertTestUser();
@@ -257,6 +377,33 @@ describe('POST /admin/api/users/add-credit', () => {
         description: 'Correction',
         creditKind: 'promotional',
         credit_expiry_date: '2024-06-01T00:00:00.000Z',
+      })
+    );
+
+    expect(response.status).toBe(200);
+    const debitsRows = (
+      await db
+        .select()
+        .from(credit_transactions)
+        .where(eq(credit_transactions.kilo_user_id, recipient.id))
+    ).filter(credit => credit.amount_microdollars < 0);
+    expect(debitsRows).toHaveLength(1);
+    expect(debitsRows[0].expiry_date).toBeNull();
+  });
+
+  it('allows a negative expiry_hours on a debit, which stores no expiry', async () => {
+    const admin = await insertTestUser({ is_admin: true, can_manage_credits: true });
+    const recipient = await insertTestUser();
+    mockedGetUserFromAuth.mockResolvedValue({ user: admin, authFailedResponse: null });
+
+    const response = await POST(
+      request({
+        email: recipient.google_user_email,
+        credit_category: 'manual_decrement',
+        amount_usd: -2,
+        description: 'Correction',
+        creditKind: 'promotional',
+        expiry_hours: -5,
       })
     );
 

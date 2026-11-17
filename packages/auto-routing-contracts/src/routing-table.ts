@@ -1,5 +1,10 @@
 import * as z from 'zod';
-import { ReasoningEffortSchema, refineVariantExclusivity } from './reasoning';
+import {
+  ReasoningComplexitySchema,
+  ReasoningEffortSchema,
+  VariantSchema,
+  refineVariantExclusivity,
+} from './reasoning';
 import { TaxonomyRouteKeySchema } from './taxonomy';
 import { DEFAULT_AUTO_ROUTER, type AutoRouter } from './router';
 import { addDuplicateKeyIssues } from './duplicate-keys';
@@ -140,7 +145,7 @@ export const RankedCandidateSchema = z
     p50LatencyMs: z.number().nonnegative().nullable().optional(),
     // Canonical catalog variant key the model was benchmarked with.
     // Optional so tables published before this field existed stay valid.
-    variant: z.string().trim().min(1).nullable().optional(),
+    variant: VariantSchema.optional(),
     // Legacy effort the model was benchmarked with; retained for rolling
     // deploy reads of old published tables. Prefer `variant` when present.
     reasoningEffort: ReasoningEffortSchema.nullable().optional(),
@@ -151,8 +156,7 @@ export const RankedCandidateSchema = z
   .superRefine((candidate, ctx) => refineVariantExclusivity(candidate, ctx, 'Candidate'));
 export type RankedCandidate = z.infer<typeof RankedCandidateSchema>;
 
-export const ReasoningComplexitySchema = z.enum(['low', 'medium', 'high']);
-export type ReasoningComplexity = z.infer<typeof ReasoningComplexitySchema>;
+export { ReasoningComplexitySchema, type ReasoningComplexity } from './reasoning';
 export const ComplexityLabelsSchema = z.record(z.string().min(1), ReasoningComplexitySchema);
 export type ComplexityLabels = z.infer<typeof ComplexityLabelsSchema>;
 

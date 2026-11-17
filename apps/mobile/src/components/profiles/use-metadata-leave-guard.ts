@@ -176,7 +176,19 @@ export function useMetadataLeaveGuard({
     // state update alongside the navigator's own subscription re-renders in a
     // loop.
     setLeaveAllowed(false);
-  }, [leaveCount]);
+    // The removal handler's ref follows the committed state (the effect above
+    // it). A Discard that the navigator granted popped the route, so the sync
+    // already ran with `false` before any later render; a Discard the navigator
+    // kept — the surviving hand-off case — commits this effect with `dirty`
+    // still true from the edit, so re-syncing here re-arms the handler and the
+    // next Back asks again. The render-phase recompute writes state only; the
+    // ref it leaves behind stays the discarded render's `false`, so without
+    // this write a kept screen's Back takes the silent-leave branch.
+    if (isDirty !== undefined && !leavingRef.current) {
+      dirtyRef.current = isDirty();
+      setDirty(dirtyRef.current);
+    }
+  }, [leaveCount, isDirty]);
 
   return { handleDirtyChange, leaveWithoutAsking, dialog };
 }

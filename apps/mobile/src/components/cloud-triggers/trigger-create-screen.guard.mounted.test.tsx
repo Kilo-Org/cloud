@@ -244,8 +244,11 @@ describe('TriggerCreateScreen leave guard', () => {
     await waitFor(() => h.guard.enabled);
     expect(h.guard.enabled).toBe(true);
 
+    // The second Back runs on a re-armed guard whose draft still differs from
+    // the baseline, so it raises the Discard prompt again: one call from the
+    // first press, one from this one.
     pressBack();
-    expect(h.confirm).toHaveBeenCalledTimes(1);
+    expect(h.confirm).toHaveBeenCalledTimes(2);
   });
 
   it('a create that succeeded leaves without asking about the saved draft', async () => {

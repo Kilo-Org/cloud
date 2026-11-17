@@ -395,7 +395,6 @@ export function createSessionManagementHandlers() {
           const { userId, env } = ctx;
 
           logger.setTags({ userId, sessionId });
-          logger.info('Fetching session metadata');
           const sessionAccess = await requireCurrentSessionAccess({
             env,
             kiloUserId: userId,
@@ -480,7 +479,6 @@ export function createSessionManagementHandlers() {
             }));
 
           logger.setTags({ sandboxId, orgId: sessionMetadata.identity.orgId ?? '(personal)' });
-          logger.info('Session metadata retrieved successfully');
 
           // Worktree ownership lives on the external ownership row, not in DO metadata.
           const worktreeId = sessionMetadata.workspace?.worktreeId;
@@ -617,7 +615,6 @@ export function createSessionManagementHandlers() {
           const { userId, env } = ctx;
 
           logger.setTags({ userId, sessionId });
-          logger.info('Fetching session health');
           await requireCurrentSessionAccess({
             env,
             kiloUserId: userId,
@@ -689,13 +686,6 @@ export function createSessionManagementHandlers() {
                 return 'unknown';
               }
             })();
-
-          logger.info('Session health retrieved successfully', {
-            sandboxStatus,
-            executionHealth,
-            activeExecutionId: activeExecutionId ?? undefined,
-            activeExecutionStatus,
-          });
 
           return {
             cloudAgentSessionId: sessionId,

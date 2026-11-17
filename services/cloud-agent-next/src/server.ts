@@ -252,7 +252,6 @@ app.use('*', async (c: Context<HonoContext>, next: Next) => {
   await withLogTags({ source: 'worker-entry' }, async () => {
     const url = new URL(c.req.url);
     logger.setTags({ method: c.req.method, path: url.pathname });
-    logger.info('Handling request');
     await next();
   });
 });

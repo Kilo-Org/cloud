@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "에이전트 세션에 업데이트가 있습니다",
-      "chatMessage": "새 메시지가 있습니다",
-      "instanceLifecycle": "인스턴스에 업데이트가 있습니다",
-      "scheduledAction": "예약된 작업에 업데이트가 있습니다",
       "lowBalance": "잔액 확인이 필요합니다",
       "spendAlert": "지출 확인이 필요합니다",
       "securityFinding": "보안 발견 사항 확인이 필요합니다",
@@ -19,12 +16,6 @@
       "body": "{{message}}"
     }
   },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · 제목 없음",
-      "body": "{{bodyPreview}}"
-    }
-  },
   "internal": {
     "lowBalance": {
       "title": "잔액 부족 알림",
@@ -34,50 +25,21 @@
       "title": "지출 알림",
       "body": "{{scopeName}} 지출이 ${{amountUsd}}를 초과했습니다"
     },
-    "securityFindingNew": {
-      "title": "새 보안 발견 사항 ({{severity}})",
+    "securityFinding": {
       "body": "{{repoFullName}}의 {{findingTitle}}"
+    },
+    "securityFindingNew": {
+      "title": "새 보안 발견 사항 ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA 경고",
-      "body": "{{repoFullName}}의 {{findingTitle}}"
+      "title": "SLA 경고"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA 위반",
-      "body": "{{repoFullName}}의 {{findingTitle}}"
+      "title": "SLA 위반"
     },
     "securityLifecycle": {
       "title": "Kilo",
       "body": "보안 검사에 업데이트가 있습니다"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} 준비됨",
-      "body": "탭하여 채팅을 시작하세요."
-    },
-    "startFailed": {
-      "title": "{{instanceName}} 시작 실패",
-      "body": "시작에 실패했습니다."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} 곧 재시작됩니다",
-      "body": "{{when}}에 재시작 예정입니다."
-    },
-    "restartCancelled": {
-      "title": "{{instanceName}} 재시작 취소됨",
-      "body": "이전에 예약된 재시작이 취소되었습니다."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} 곧 업그레이드됩니다",
-      "bodyWithTag": "{{when}}에 {{targetImageTag}}(으)로 업그레이드합니다.",
-      "bodyWithoutTag": "{{when}}에 업그레이드 예정입니다."
-    },
-    "versionChangeCancelled": {
-      "title": "{{instanceName}} 업그레이드 취소됨",
-      "body": "이전에 예약된 업그레이드가 취소되었습니다."
     }
   },
   "sessionReady": {

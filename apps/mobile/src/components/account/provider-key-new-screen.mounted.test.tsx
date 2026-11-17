@@ -20,7 +20,6 @@ type ScreenState = {
   mutations: MutationOptions[];
   mutate: Mock;
   dismissTo: Mock;
-  toastError: Mock;
 };
 
 const state = vi.hoisted((): ScreenState => ({
@@ -30,7 +29,6 @@ const state = vi.hoisted((): ScreenState => ({
   mutations: [] as MutationOptions[],
   mutate: vi.fn(),
   dismissTo: vi.fn(),
-  toastError: vi.fn(),
 }));
 
 vi.mock('react-native', () => ({ View: 'View' }));
@@ -58,9 +56,6 @@ vi.mock('@tanstack/react-query', async importOriginal => {
     useQueryClient: () => ({ invalidateQueries: vi.fn() }),
   };
 });
-vi.mock('sonner-native', () => ({
-  toast: { error: state.toastError, success: vi.fn() },
-}));
 vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: { success: vi.fn(), error: vi.fn() },
 }));
@@ -128,7 +123,6 @@ beforeEach(() => {
   state.mutations = [];
   state.mutate.mockClear();
   state.dismissTo.mockClear();
-  state.toastError.mockClear();
 });
 
 afterEach(() => {
@@ -163,7 +157,9 @@ describe('ProviderKeyNewScreen', () => {
     submit(root, '   ');
 
     expect(state.mutate).not.toHaveBeenCalled();
-    expect(state.toastError).toHaveBeenCalledWith('Enter the key.');
+    expect(
+      root.findAll(node => Object.is(node.type, 'AccessibleStatus')).map(node => node.props.message)
+    ).toEqual(['Enter the key.']);
   });
 
   it('reports a refused key in place and stays on the form', async () => {
@@ -192,7 +188,9 @@ describe('ProviderKeyNewScreen', () => {
     });
 
     expect(state.mutate).toHaveBeenCalledTimes(1);
-    expect(state.toastError).toHaveBeenCalledWith('Enter the key.');
+    expect(
+      root.findAll(node => Object.is(node.type, 'AccessibleStatus')).map(node => node.props.message)
+    ).toEqual(['Enter the key.']);
   });
 
   it('returns to the list after the key is added', async () => {

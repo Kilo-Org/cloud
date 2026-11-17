@@ -21,7 +21,6 @@ import {
   serial,
   vector,
   type AnyPgColumn,
-  bigserial,
 } from 'drizzle-orm/pg-core';
 import { isNotNull, isNull, sql } from 'drizzle-orm';
 import * as z from 'zod';
@@ -172,6 +171,7 @@ import type {
   CodeReviewType,
   CodeReviewTriggerSource,
   CodeReviewCouncilResult,
+  ReviewGuidelineImport,
   CodeReviewPlatform,
   ReviewMemoryEvidenceItem,
   ReviewMemoryPlatform,
@@ -2921,30 +2921,38 @@ export const microdollar_usage_metadata = pgTable(
   ]
 );
 
-export const api_request_log = pgTable(
-  'api_request_log',
+/**
+ * The request and response bodies are stored in R2 under a key derived from `created_at` and `id`;
+ * see `apiRequestLogBlobKey`.
+ */
+export const api_request_log_2 = pgTable(
+  'api_request_log_2',
   {
-    id: bigserial({ mode: 'bigint' }).notNull().primaryKey(),
+    /** The `microdollar_usage` id of the request. */
+    id: uuid().notNull().primaryKey(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    kilo_user_id: text(),
+    generation_id: text(),
+    kilo_user_id: text().notNull(),
     organization_id: text(),
     session_id: text(),
-    vercel_request_id: text(),
-    provider: text(),
-    model: text(),
-    status_code: integer(),
-    /** Unused and always empty; the request body is stored in R2 under `request_r2_key`. */
-    request: jsonb(),
-    /** Unused and always empty; the response body is stored in R2 under `response_r2_key`. */
-    response: text(),
-    error: jsonb(),
-    request_r2_key: text(),
-    response_r2_key: text(),
+    requested_model: text().notNull(),
   },
-  table => [index('idx_api_request_log_created_at').on(table.created_at)]
+  table => [
+    index('idx_api_request_log_2_created_at').on(table.created_at),
+    index('idx_api_request_log_2_generation_id')
+      .on(table.generation_id)
+      .where(isNotNull(table.generation_id)),
+    index('idx_api_request_log_2_session_id')
+      .on(table.session_id)
+      .where(isNotNull(table.session_id)),
+    index('idx_api_request_log_2_kilo_user_id_created_at').on(table.kilo_user_id, table.created_at),
+    index('idx_api_request_log_2_organization_id_created_at')
+      .on(table.organization_id, table.created_at)
+      .where(isNotNull(table.organization_id)),
+  ]
 );
 
-export type ApiRequestLog = typeof api_request_log.$inferSelect;
+export type ApiRequestLog2 = typeof api_request_log_2.$inferSelect;
 
 export const http_user_agent = pgTable(
   'http_user_agent',
@@ -6131,6 +6139,7 @@ export const cloud_agent_code_reviews = pgTable(
     repository_review_instructions_used: boolean().notNull().default(false),
     repository_review_instructions_ref: text(),
     repository_review_instructions_truncated: boolean().notNull().default(false),
+    repository_review_instructions_imports: jsonb().$type<ReviewGuidelineImport[]>(),
 
     // Previous summary captured before the agent updates the platform comment
     previous_summary_body: text(),

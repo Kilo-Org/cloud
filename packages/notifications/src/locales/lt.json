@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Jūsų agento sesija turi atnaujinimą",
-      "chatMessage": "Turite naują žinutę",
-      "instanceLifecycle": "Jūsų egzempliorius turi atnaujinimą",
-      "scheduledAction": "Suplanuotas veiksmas turi atnaujinimą",
       "lowBalance": "Jūsų balansui reikia dėmesio",
       "spendAlert": "Jūsų išlaidoms reikia dėmesio",
       "securityFinding": "Saugumo radiniui reikia dėmesio",
@@ -19,12 +16,6 @@
       "body": "{{message}}"
     }
   },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · Be pavadinimo",
-      "body": "{{bodyPreview}}"
-    }
-  },
   "internal": {
     "lowBalance": {
       "title": "Mažo balanso pranešimas",
@@ -34,50 +25,21 @@
       "title": "Išlaidų pranešimas",
       "body": "{{scopeName}} išlaidos viršijo ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Naujas saugumo radinys ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} ({{repoFullName}})"
+    },
+    "securityFindingNew": {
+      "title": "Naujas saugumo radinys ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA įspėjimas",
-      "body": "{{findingTitle}} ({{repoFullName}})"
+      "title": "SLA įspėjimas"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA pažeidimas",
-      "body": "{{findingTitle}} ({{repoFullName}})"
+      "title": "SLA pažeidimas"
     },
     "securityLifecycle": {
       "title": "Kilo",
       "body": "Saugumo patikra turi atnaujinimą"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} paruoštas",
-      "body": "Bakstelėkite, kad pradėtumėte pokalbį."
-    },
-    "startFailed": {
-      "title": "{{instanceName}} nepavyko paleisti",
-      "body": "Paleisti nepavyko."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} netrukus bus iš naujo paleistas",
-      "body": "Suplanuota paleisti iš naujo {{when}}."
-    },
-    "restartCancelled": {
-      "title": "{{instanceName}} perkrovimas atšauktas",
-      "body": "Anksčiau suplanuotas perkrovimas atšauktas."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} netrukus bus atnaujintas",
-      "bodyWithTag": "Atnaujinti į {{targetImageTag}} {{when}}.",
-      "bodyWithoutTag": "Suplanuotas atnaujinimas {{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "{{instanceName}} atnaujinimas atšauktas",
-      "body": "Anksčiau suplanuotas atnaujinimas atšauktas."
     }
   },
   "sessionReady": {

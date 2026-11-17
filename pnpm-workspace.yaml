@@ -64,9 +64,9 @@ catalogs:
   # ones that test through `@cloudflare/vitest-pool-workers` (it peers only
   # `^4.1.0`, so vitest 5 breaks its pool) and the excluded features.
   vitest5:
-    '@vitest/coverage-v8': 5.0.5
-    '@vitest/ui': 5.0.5
-    vitest: 5.0.5
+    '@vitest/coverage-v8': 5.1.0
+    '@vitest/ui': 5.1.0
+    vitest: 5.1.0
 
 minimumReleaseAge: 6842
 minimumReleaseAgeExclude:
@@ -111,6 +111,15 @@ minimumReleaseAgeExclude:
   - '@types/bun@1.4.4'
   - bun-types@1.4.4
 overrides:
+  # The AWS SDK v3 graph resolves these two smithy packages through caret ranges
+  # from every one of its parents (^3.24.4 and ^4.12.5), and the versions it
+  # picked, @smithy/core 3.24.4 and @smithy/smithy-client 4.12.5, are deprecated
+  # upstream for a custom-logger redaction bug. Pinning the fixed releases keeps
+  # the whole graph on one copy each and off the deprecated snapshots, including
+  # after a later re-resolution; move them through a reviewed change here and in
+  # the lockfile, as the note further down requires.
+  '@smithy/core': 3.40.0
+  '@smithy/smithy-client': 4.15.2
   # One pg client in the tree: drizzle-orm's optional peers include pg, so two
   # pg versions split drizzle-orm into two packages and their SQL types stop
   # being assignable to each other across workspace imports.
@@ -192,8 +201,8 @@ overrides:
   # future dependent, bounded to the reviewed major.
   serialize-javascript: '>=7.0.3 <8'
   hono: 'catalog:'
-  '@modelcontextprotocol/sdk@1.29.0': 1.32.1
-  '@modelcontextprotocol/sdk@1.32.1>@hono/node-server': 2.0.10
+  '@modelcontextprotocol/sdk@1.29.0': 1.32.2
+  '@modelcontextprotocol/sdk@1.32.2>@hono/node-server': 2.0.10
   # @simplewebauthn/server's ASN.1 parser must come from the same
   # @peculiar/asn1-schema copy its asn1-ecc/asn1-rsa decorators register their
   # schemas into. apps/web pins asn1-schema/-x509 to 2.8.0 for its Apple App
@@ -280,6 +289,8 @@ packageExtensions:
     peerDependencies:
       '@types/react': '*'
 patchedDependencies:
+  # Reinitializing Sentry's async context at each cold DO loses in-flight scopes.
+  '@sentry/cloudflare@10.69.0': patches/@sentry+cloudflare@10.69.0.patch
   # Text date styles for the glanceable widgets and Live Activity: `elapsed`
   # ("31 minutes", no seconds) and `ago` ("3 minutes ago"). Also separates a
   # bottom sheet's drag gesture from its back/scrim dismissal and lets a caller
@@ -334,6 +345,10 @@ patchedDependencies:
   # Null-guard the headless app loader in TaskService.executeTask. Without it a
   # data-only FCM wake during cold start dereferences a null loader and fatally
   # crashes the app (KILO-APP-9V; expo/expo#41663, expo/expo#46449).
+  # iOS: hold the execution request for the length of a launch. A task that
+  # finishes on another thread releases it mid-launch, and the launch then sends
+  # `maybeEvaluate` to a freed object, which is the background-task launch crash
+  # (expo/expo#51789, expo/expo#47316).
   expo-task-manager@58.0.12: patches/expo-task-manager@58.0.12.patch
   expo-widgets@58.0.17: patches/expo-widgets@58.0.17.patch
   # PurchaseConnector.create returns the native promise, so a create failure
@@ -387,7 +402,12 @@ patchedDependencies:
   # past the rows that arrived. The patch bounds the engaged-index passes and
   # answers an out-of-range key and type without calling the list's callbacks,
   # so those are never handed an undefined row that keyExtractor would
-  # dereference. Remove once an upstream release carries both guards.
+  # dereference. It also reads a row layout through the bounds-safe accessor, so
+  # a stale onLayout or render-stack entry past a shrink draws nothing instead of
+  # throwing, and it drops the forced child re-render whose rows the collection
+  # already drew, so the parent's layout effect and the collection's commit no
+  # longer re-enter each other until React's nested update limit. Remove once an
+  # upstream release carries every guard.
   '@shopify/flash-list@2.3.3': patches/@shopify+flash-list@2.3.3.patch
 publicHoistPattern:
   - '@types/*'

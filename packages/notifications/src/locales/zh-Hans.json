@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "您的代理会话有更新",
-      "chatMessage": "您有一条新消息",
-      "instanceLifecycle": "您的实例有更新",
-      "scheduledAction": "计划的操作有更新",
       "lowBalance": "您的余额需要关注",
       "spendAlert": "您的支出需要关注",
       "securityFinding": "安全发现需要关注",
@@ -19,12 +16,6 @@
       "body": "{{message}}"
     }
   },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · 无标题",
-      "body": "{{bodyPreview}}"
-    }
-  },
   "internal": {
     "lowBalance": {
       "title": "余额不足提醒",
@@ -34,50 +25,21 @@
       "title": "支出提醒",
       "body": "{{scopeName}} 的支出已超过 ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "新的安全发现 ({{severity}})",
+    "securityFinding": {
       "body": "{{repoFullName}} 中的 {{findingTitle}}"
+    },
+    "securityFindingNew": {
+      "title": "新的安全发现 ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA 警告",
-      "body": "{{repoFullName}} 中的 {{findingTitle}}"
+      "title": "SLA 警告"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA 违约",
-      "body": "{{repoFullName}} 中的 {{findingTitle}}"
+      "title": "SLA 违约"
     },
     "securityLifecycle": {
       "title": "Kilo",
       "body": "安全检查有更新"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} 已就绪",
-      "body": "点击开始聊天。"
-    },
-    "startFailed": {
-      "title": "{{instanceName}} 启动失败",
-      "body": "启动失败。"
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} 即将重启",
-      "body": "计划于 {{when}} 重启。"
-    },
-    "restartCancelled": {
-      "title": "{{instanceName}} 重启已取消",
-      "body": "之前计划的重启已取消。"
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} 即将升级",
-      "bodyWithTag": "于 {{when}} 升级到 {{targetImageTag}}。",
-      "bodyWithoutTag": "计划于 {{when}} 升级。"
-    },
-    "versionChangeCancelled": {
-      "title": "{{instanceName}} 升级已取消",
-      "body": "之前计划的升级已取消。"
     }
   },
   "sessionReady": {

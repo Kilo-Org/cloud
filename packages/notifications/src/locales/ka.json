@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "თქვენს აგენტის სესიას განახლება აქვს",
-      "chatMessage": "თქვენ გაქვთ ახალი შეტყობინება",
-      "instanceLifecycle": "თქვენს ინსტანსს განახლება აქვს",
-      "scheduledAction": "დაგეგმილ მოქმედებას განახლება აქვს",
       "lowBalance": "თქვენი ბალანსი ყურადღებას საჭიროებს",
       "spendAlert": "თქვენი ხარჯი ყურადღებას საჭიროებს",
       "securityFinding": "უსაფრთხოების დასკვნა ყურადღებას საჭიროებს",
@@ -19,12 +16,6 @@
       "body": "{{message}}"
     }
   },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · უსათაურო",
-      "body": "{{bodyPreview}}"
-    }
-  },
   "internal": {
     "lowBalance": {
       "title": "დაბალი ბალანსის შეტყობინება",
@@ -34,50 +25,21 @@
       "title": "ხარჯის შეტყობინება",
       "body": "{{scopeName}}-ის ხარჯმა გადააჭარბა ${{amountUsd}}-ს"
     },
-    "securityFindingNew": {
-      "title": "ახალი უსაფრთხოების დასკვნა ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} {{repoFullName}}-ში"
+    },
+    "securityFindingNew": {
+      "title": "ახალი უსაფრთხოების დასკვნა ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA გაფრთხილება",
-      "body": "{{findingTitle}} {{repoFullName}}-ში"
+      "title": "SLA გაფრთხილება"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA დარღვევა",
-      "body": "{{findingTitle}} {{repoFullName}}-ში"
+      "title": "SLA დარღვევა"
     },
     "securityLifecycle": {
       "title": "Kilo",
       "body": "უსაფრთხოების შემოწმებას განახლება აქვს"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} მზადაა",
-      "body": "შეეხეთ ჩატის დასაწყებად."
-    },
-    "startFailed": {
-      "title": "{{instanceName}} გაშვება ვერ მოხერხდა",
-      "body": "გაშვება ვერ მოხერხდა."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} მალე გადაიტვირთება",
-      "body": "დაგეგმილია გადატვირთვა {{when}}."
-    },
-    "restartCancelled": {
-      "title": "{{instanceName}} გადატვირთვა გაუქმდა",
-      "body": "ადრე დაგეგმილი გადატვირთვა გაუქმდა."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} მალე განახლდება",
-      "bodyWithTag": "განახლება {{targetImageTag}}-ზე {{when}}.",
-      "bodyWithoutTag": "დაგეგმილი განახლება {{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "{{instanceName}} განახლება გაუქმდა",
-      "body": "ადრე დაგეგმილი განახლება გაუქმდა."
     }
   },
   "sessionReady": {

@@ -526,6 +526,29 @@ describe('codeReviewRouter.listForOrganization role-gated ids', () => {
   });
 });
 
+describe('codeReviewRouter.listForUser budget', () => {
+  it('answers a spent mobile budget retryably instead of an empty list', async () => {
+    const user = await insertTestUser({
+      google_user_email: 'list-for-user-budget@example.com',
+      google_user_name: 'List For User Budget',
+      is_admin: false,
+    });
+
+    try {
+      const caller = await createCallerForUser(user.id, {
+        controlPlaneStartedAt: performance.now() - 9_900,
+      });
+
+      await expect(caller.codeReviews.listForUser({})).rejects.toMatchObject({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Your code reviews took too long to load. Try again.',
+      });
+    } finally {
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, user.id));
+    }
+  });
+});
+
 describe('codeReviewRouter.get role-gated ids', () => {
   let ownerUser: User;
   let memberUser: User;
@@ -2172,6 +2195,69 @@ describe('review agent config REVIEW.md setting', () => {
     expect(refetched.disableReviewMd).toBe(true);
     expect(refetched).not.toHaveProperty('maxReviewTimeMinutes');
   });
+
+  it.each(['personal', 'organization'] as const)(
+    'persists, patches, preserves, and clears the %s guideline allowlist',
+    async scope => {
+      const caller = await createCallerForUser(testUser.id);
+      const input = {
+        platform: 'github' as const,
+        reviewStyle: 'balanced' as const,
+        focusAreas: [],
+        modelSlug: 'test-model',
+        reviewGuidelineSourceRepositories: ['acme/guidelines'],
+      };
+      if (scope === 'personal') await caller.personalReviewAgent.saveReviewConfig(input);
+      else
+        await caller.organizations.reviewAgent.saveReviewConfig({
+          ...input,
+          organizationId: organization.id,
+        });
+      const get = () =>
+        scope === 'personal'
+          ? caller.personalReviewAgent.getReviewConfig({ platform: 'github' })
+          : caller.organizations.reviewAgent.getReviewConfig({
+              platform: 'github',
+              organizationId: organization.id,
+            });
+      const patch = (value: {
+        reviewStyle?: 'strict';
+        reviewGuidelineSourceRepositories?: string[];
+      }) =>
+        scope === 'personal'
+          ? caller.personalReviewAgent.patchReviewConfig({ platform: 'github', ...value })
+          : caller.organizations.reviewAgent.patchReviewConfig({
+              platform: 'github',
+              organizationId: organization.id,
+              ...value,
+            });
+      expect((await get()).reviewGuidelineSourceRepositories).toEqual(['acme/guidelines']);
+      await patch({ reviewStyle: 'strict' });
+      expect((await get()).reviewGuidelineSourceRepositories).toEqual(['acme/guidelines']);
+      await patch({ reviewGuidelineSourceRepositories: ['acme/other'] });
+      expect((await get()).reviewGuidelineSourceRepositories).toEqual(['acme/other']);
+      const saved = await db.query.agent_configs.findFirst({
+        where: and(
+          eq(agent_configs.agent_type, 'code_review'),
+          eq(agent_configs.platform, 'github'),
+          scope === 'personal'
+            ? eq(agent_configs.owned_by_user_id, testUser.id)
+            : eq(agent_configs.owned_by_organization_id, organization.id)
+        ),
+      });
+      expect(saved?.config).toEqual(
+        expect.objectContaining({ review_guideline_source_repositories: ['acme/other'] })
+      );
+      await patch({ reviewGuidelineSourceRepositories: [] });
+      expect((await get()).reviewGuidelineSourceRepositories).toEqual([]);
+      await expect(
+        patch({ reviewGuidelineSourceRepositories: ['https://example.com/policy'] })
+      ).rejects.toThrow();
+      await expect(
+        patch({ reviewGuidelineSourceRepositories: Array(101).fill('acme/guidelines') })
+      ).rejects.toThrow();
+    }
+  );
 
   it('persists organization disableReviewMd true as disable_review_md true', async () => {
     const caller = await createCallerForUser(testUser.id);

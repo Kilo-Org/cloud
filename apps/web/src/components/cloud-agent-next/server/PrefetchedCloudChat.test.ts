@@ -115,7 +115,7 @@ describe('chat server prefetch', () => {
     expect(mockCloudPage).toHaveBeenCalledWith({
       sessionId: cloudAgentSessionId,
       toolDisplay: 'preview',
-      limit: 20,
+      limit: 100,
     });
     expect(mockIngestPage).not.toHaveBeenCalled();
     expect(page?.messages).toHaveLength(1);
@@ -129,7 +129,7 @@ describe('chat server prefetch', () => {
     expect(mockOrgCloudPage).toHaveBeenCalledWith({
       sessionId: cloudAgentSessionId,
       toolDisplay: 'preview',
-      limit: 20,
+      limit: 100,
       organizationId,
     });
     expect(mockCloudPage).not.toHaveBeenCalled();

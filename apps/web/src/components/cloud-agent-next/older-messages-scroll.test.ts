@@ -265,6 +265,7 @@ function PaginationHarness({
   isProgrammaticScrollRef,
   lastScrollTopRef,
   autoloadOnMount,
+  overflowCheckKey = resetKey,
   initialPositionedRef,
   olderMessagesError = null,
   hasOlderMessages = true,
@@ -279,6 +280,7 @@ function PaginationHarness({
   isProgrammaticScrollRef: RefObject<boolean>;
   lastScrollTopRef: RefObject<number>;
   autoloadOnMount?: boolean;
+  overflowCheckKey?: unknown;
   initialPositionedRef?: RefObject<boolean>;
   olderMessagesError?: OlderMessagesError | null;
   hasOlderMessages?: boolean;
@@ -293,7 +295,7 @@ function PaginationHarness({
     isProgrammaticScrollRef,
     lastScrollTopRef,
     resetKey,
-    overflowCheckKey: resetKey,
+    overflowCheckKey,
     ready,
     autoloadOnMount,
     initialPositionedRef,
@@ -505,6 +507,50 @@ describe('useOlderMessagesPagination readiness', () => {
     expect(lastScrollTopRef.current).toBe(170);
     expect(onLoad).toHaveBeenCalledTimes(2);
   });
+
+  it.each([false, true])(
+    'continues through collapsed pages without height growth (messages commit later: %s)',
+    async messagesCommitLater => {
+      const { element, content } = scrollingElement(() => 50);
+      const onLoad = jest.fn();
+      const render = (loading: boolean, messageCount: number) =>
+        renderPagination({
+          ready: true,
+          isLoadingOlderMessages: loading,
+          resetKey: 'collapsed-pages',
+          overflowCheckKey: messageCount,
+          onLoad,
+          onApi: () => undefined,
+          scrollElementRef: { current: element },
+          scrollContentRef: { current: content },
+          isProgrammaticScrollRef: { current: false },
+          lastScrollTopRef: { current: 0 },
+        });
+
+      render(false, 100);
+      dom.flushFrame();
+      expect(onLoad).toHaveBeenCalledTimes(1);
+      for (let count = 150; count <= 350; count += 50) {
+        await act(async () => undefined);
+        render(true, count - 50);
+        render(false, messagesCommitLater ? count - 50 : count);
+        dom.flushFrame();
+        if (messagesCommitLater) {
+          render(false, count);
+          dom.flushFrame();
+        }
+      }
+      expect(onLoad).toHaveBeenCalledTimes(6);
+
+      await act(async () => undefined);
+      render(true, 350);
+      render(false, 350);
+      dom.flushFrame();
+      dom.resize();
+      dom.flushFrame();
+      expect(onLoad).toHaveBeenCalledTimes(6);
+    }
+  );
 
   it.each([50, 40])(
     'stops autoloading when a page does not grow the height (%s)',

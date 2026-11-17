@@ -1,3 +1,4 @@
+import { type Href } from 'expo-router';
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -6,6 +7,9 @@ import { ProfileInstructionsScreen } from '@/components/profiles/profile-instruc
 import { isolateLtrBidiText } from '@/lib/bidi';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
+
+/** The default destination the Profile tab's routes pass: their own Profiles list. */
+const PROFILES_LIST_HREF = '/(app)/(tabs)/(3_profile)/profiles' as Href;
 
 const h = vi.hoisted(() => ({
   confirm: vi.fn(),
@@ -154,7 +158,12 @@ function confirmRequest(): ConfirmRequest {
 
 // eslint-disable-next-line typescript-eslint/promise-function-async -- returning the harness promise unchanged
 function mountScreen() {
-  return renderWithProviders(createElement(ProfileInstructionsScreen, { profileId: 'profile-1' }));
+  return renderWithProviders(
+    createElement(ProfileInstructionsScreen, {
+      profileId: 'profile-1',
+      backFallback: PROFILES_LIST_HREF,
+    })
+  );
 }
 
 /**

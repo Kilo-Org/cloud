@@ -13,9 +13,37 @@ import { baselineGit, containedProofSource } from './baseline-preflight';
 
 const Sha = z.string().regex(/^[0-9a-f]{40}$/);
 const Id = z.string().regex(/^[a-z][a-z0-9-]{0,63}$/);
+/**
+ * A default export the diagnostic may render, named from the mobile app root.
+ *
+ * A shared component is the obvious case. A screen file is the necessary one:
+ * when a change only alters the props a route passes to an unchanged component,
+ * the component renders the same on both revisions and a component target
+ * cannot show the difference. Route files carry their group and parameter
+ * segments; the tree below `src/app/` grows whichever screens the revision has,
+ * so a dotted segment is allowed there and still refused below `components/`.
+ */
+const COMPONENT_SOURCE =
+  /^apps\/mobile\/src\/components\/(?:[a-zA-Z0-9_-]+\/)*[a-zA-Z0-9_-]+\.tsx$/;
+const ROUTE_SOURCE =
+  /^apps\/mobile\/src\/app\/(?:[a-zA-Z0-9_()[\]$.-]+\/)*[a-zA-Z0-9_()[\]$.-]+\.tsx$/;
+function isRouteScreen(value: string): boolean {
+  if (!ROUTE_SOURCE.test(value)) return false;
+  const segments = value.slice('apps/mobile/src/app/'.length).split('/');
+  const file = segments.pop();
+  if (file === undefined) return false;
+  // A `.` or `..` segment leaves the app tree, and a hidden segment names no route.
+  if (segments.some(segment => segment.startsWith('.'))) return false;
+  // The router owns its own files: a layout is not a screen, and a `+` file is
+  // reserved for the not-found, HTML and native-intent hooks.
+  return !/^_layout\.tsx$/.test(file) && !file.startsWith('+');
+}
 const SourcePath = z
   .string()
-  .regex(/^apps\/mobile\/src\/components\/(?:[a-zA-Z0-9_-]+\/)*[a-zA-Z0-9_-]+\.tsx$/);
+  .refine(value => COMPONENT_SOURCE.test(value) || isRouteScreen(value), {
+    message:
+      'must name a component below apps/mobile/src/components or a screen below apps/mobile/src/app, not a layout and not a + file',
+  });
 const TargetSchema = z
   .object({
     id: Id,
@@ -94,6 +122,12 @@ export type Revision = 'base' | 'head';
 const INTENT = 'apps/mobile/src/app/+native-intent.tsx';
 const MARKER = '__kiloDesignProofSource';
 const LIMIT = 1024 * 1024;
+// A capture dump walks and serializes the whole screen, so a screen of a couple
+// of thousand nodes writes about 1.3 MB. The document bound above is sized for the
+// manifest and the preparation receipt, and applying it to a dump aborts a run
+// whose measurement is legitimate; the two reads that only ever open a capture
+// dump take their own bound instead.
+const DUMP_LIMIT = 8 * 1024 * 1024;
 
 const digest = (text: string | Buffer): string => createHash('sha256').update(text).digest('hex');
 function git(repo: string, args: string[]): string {
@@ -104,8 +138,8 @@ function git(repo: string, args: string[]): string {
     env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
   });
 }
-function readJson(file: string): unknown {
-  if (fs.statSync(file).size > LIMIT) throw new Error('Proof JSON exceeds 1 MiB');
+function readJson(file: string, limit = LIMIT): unknown {
+  if (fs.statSync(file).size > limit) throw new Error(`Proof JSON exceeds ${limit} bytes`);
   return JSON.parse(fs.readFileSync(file, 'utf8'));
 }
 export function readProofManifest(file: string): ProofManifest {
@@ -440,7 +474,7 @@ export function targetReadiness(
         );
         continue;
       }
-      const dump = parseDump(readJson(artifactPath(out, screen.dump)));
+      const dump = parseDump(readJson(artifactPath(out, screen.dump), DUMP_LIMIT));
       if (
         cell.screens.filter(candidate => candidate.target === target.id).length !== 1 ||
         screen.link !== target.link
@@ -680,7 +714,7 @@ export async function compareProof(
   const environments = (run: typeof base, dir: string): unknown[] =>
     run.cells.flatMap(cell =>
       cell.screens.map(screen => {
-        const env = parseDump(readJson(artifactPath(dir, screen.dump))).env;
+        const env = parseDump(readJson(artifactPath(dir, screen.dump), DUMP_LIMIT)).env;
         return [
           cell.id,
           screen.target,

@@ -262,7 +262,7 @@ describe('DataExportScreen', () => {
 
     expect(
       root.findAll(node => Object.is(node.type, 'EmptyState')).map(node => node.props.title)
-    ).toEqual(["Your data isn't available yet"]);
+    ).toEqual([i18n.t('profile.dataExport.unavailableTitle')]);
     expect(root.findAll(node => Object.is(node.type, BUTTON))).toHaveLength(0);
   });
 

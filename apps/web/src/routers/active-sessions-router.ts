@@ -130,6 +130,16 @@ async function mintWebTicket(userId: string): Promise<{ token: string; expiresAt
   }
 
   if (!response.ok) {
+    // The mint reports a retryable condition with 503: the Durable Object hop
+    // was unavailable or outlived its budget inside the worker, so a retry can
+    // still mint. Keep that retryability instead of flattening it into a
+    // gateway error the client would treat as final.
+    if (response.status === 503 || response.status === 504) {
+      throw new TRPCError({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Session ingest is unavailable',
+      });
+    }
     throw new TRPCError({
       code: 'BAD_GATEWAY',
       message: `Session ingest failed to mint a ticket (status ${response.status})`,

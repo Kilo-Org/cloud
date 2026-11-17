@@ -96,20 +96,12 @@ export function isVercelRoutingOptOut(requestedModel: string, optOutModels: Read
 export type VercelRoutingInput = {
   requestedModel: string;
   boundedSpending: boolean;
-  organizationDisabledVercelAiGateway: boolean;
 };
 
 export async function shouldRouteToVercel(
-  { requestedModel, boundedSpending, organizationDisabledVercelAiGateway }: VercelRoutingInput,
+  { requestedModel, boundedSpending }: VercelRoutingInput,
   getRoutingProviderConfig: () => Promise<OpenRouterProviderConfig | undefined>
 ) {
-  if (organizationDisabledVercelAiGateway) {
-    console.debug(
-      `[shouldRouteToVercel] not routing model ${requestedModel} to Vercel because the organization disabled it`
-    );
-    return false;
-  }
-
   if (boundedSpending) {
     console.debug(
       `[shouldRouteToVercel] not routing model ${requestedModel} to Vercel because a spend ceiling is set`
@@ -124,16 +116,9 @@ export async function shouldRouteToVercel(
   return await canRouteToVercel(requestedModel, getRoutingProviderConfig);
 }
 
-/**
- * Whether Kilo's routing config sends the model to Vercel: Vercel routing is on and the model is
- * not opted out. Vercel must still serve the model.
- */
+/** Whether Kilo's routing config sends the model to Vercel: the model is not opted out. Vercel must still serve the model. */
 export async function isVercelRoutingEnabledForModel(requestedModel: string) {
   const routingConfig = await getRuntimeGatewayRoutingConfig();
-  if (!routingConfig.vercelEnabled) {
-    return false;
-  }
-
   if (isVercelRoutingOptOut(requestedModel, routingConfig.vercelOptOutModels)) {
     console.debug(`[shouldRouteToVercel] model ${requestedModel} opted out of Vercel routing`);
     return false;

@@ -12,6 +12,7 @@ import {
   prepareProof,
   ProofManifestSchema,
   readPreparation,
+  readProofManifest,
   sourceMarker,
   targetReadiness,
   validatePreparedSource,
@@ -124,6 +125,10 @@ test('preparation rejects symbolic refs, unrelated histories and unsafe executab
   for (const component of [
     '../card.tsx',
     'apps/mobile/src/app/_layout.tsx',
+    'apps/mobile/src/app/(app)/_layout.tsx',
+    'apps/mobile/src/app/(app)/agent-chat/+not-found.tsx',
+    'apps/mobile/src/app/../components/card.tsx',
+    'apps/mobile/src/app/(app)/agent-chat/repo-picker.ts',
     'apps/mobile/src/components/../auth.tsx',
   ]) {
     assert.equal(
@@ -132,6 +137,21 @@ test('preparation rejects symbolic refs, unrelated histories and unsafe executab
         targets: [{ ...TARGET, diagnostic: { component } }],
       }).success,
       false
+    );
+  }
+  // A screen file is a valid diagnostic source: a change that only alters the
+  // props a route passes to a shared component is invisible to a component
+  // target, because that component renders the same on both revisions.
+  for (const component of [
+    'apps/mobile/src/app/(app)/agent-chat/repo-picker.tsx',
+    'apps/mobile/src/app/(app)/(tabs)/(3_profile)/profiles/[profileId]/index.tsx',
+  ]) {
+    assert.equal(
+      ProofManifestSchema.safeParse({
+        version: 1,
+        targets: [{ ...TARGET, diagnostic: { component } }],
+      }).success,
+      true
     );
   }
   assert.equal(
@@ -1364,3 +1384,51 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     );
   }
 }
+
+// Two thousand nodes of real text are what a busy screen serializes to; the
+// document bound exists for the manifest and the receipt, not for a measurement.
+const BIG_TEXT = 'x'.repeat(1_200_000);
+
+function bigDump(): ProbeDump {
+  return probeDump({
+    nodes: [
+      { parent: -1, tag: 'View', rect: [0, 0, 400, 800], testID: TARGET.readyTestID },
+      { parent: 0, tag: 'Text', rect: [0, 0, 400, 20], text: BIG_TEXT },
+    ],
+  });
+}
+
+test('readiness accepts a capture dump above the document bound', t => {
+  const run = readinessRun(t, TARGET, bigDump());
+  const size = fs.statSync(path.join(run.out, 'screen.json')).size;
+  assert.ok(size > 1024 * 1024 && size < 8 * 1024 * 1024, `capture dump is ${size} bytes`);
+  assert.deepEqual(targetReadiness(run.outcome, manifest, run.out), []);
+});
+
+test('comparison accepts an expensive capture dump instead of aborting on the document bound', async t => {
+  const fixture = syntheticRepo(t);
+  const preparation = await prepareProof(fixture);
+  const baseRun = path.join(fixture.root, 'big-base');
+  const headRun = path.join(fixture.root, 'big-head');
+  const nodes = bigDump().nodes;
+  capture(preparation, 'base', baseRun, { nodes });
+  capture(preparation, 'head', headRun, { nodes });
+  const size = fs.statSync(path.join(baseRun, 'screen.json')).size;
+  assert.ok(size > 1024 * 1024, `capture dump is ${size} bytes`);
+  const result = await compareProof(
+    preparation,
+    baseRun,
+    headRun,
+    path.join(fixture.root, 'big-comparison')
+  );
+  assert.equal(result.status, 'comparable');
+  assert.deepEqual(result.reasons, []);
+});
+
+test('a manifest above the document bound is still refused', t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'design-gate-manifest-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const file = path.join(dir, 'proof-manifest.json');
+  fs.writeFileSync(file, JSON.stringify({ version: 1, padding: BIG_TEXT }));
+  assert.throws(() => readProofManifest(file), /Proof JSON exceeds 1048576 bytes/u);
+});

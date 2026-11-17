@@ -75,27 +75,30 @@ describe('Authoritative Claude payer state', () => {
     });
   });
 
-  it("answers an organization query with the shared-services row and a person's with theirs", async () => {
+  it("answers an organization query with the organization's row and a person's with theirs", async () => {
     const user = await insertTestUser();
     const organization = await createTestOrganization('Claude payer state', user.id, 0);
     await db.insert(claude_billing_connections).values([
       {
         kilo_user_id: user.id,
-        organization_id: organization.id,
-        user_profile_id: `uprof_member_${user.id}`,
+        organization_id: null,
+        user_profile_id: `uprof_personal_${user.id}`,
         created_by: user.id,
       },
       {
         organization_id: organization.id,
-        user_profile_id: `uprof_shared_${user.id}`,
+        user_profile_id: `uprof_org_${user.id}`,
         created_by: user.id,
       },
     ]);
     const responseSchema = z.object({ connection: z.object({ user_profile_id: z.string() }) });
     const profileFor = async (owner: object) =>
       responseSchema.parse(await (await POST(request(owner))).json()).connection.user_profile_id;
+    expect(await profileFor({ kind: 'personal', kiloUserId: user.id })).toBe(
+      `uprof_personal_${user.id}`
+    );
     expect(await profileFor({ kind: 'organization', organizationId: organization.id })).toBe(
-      `uprof_shared_${user.id}`
+      `uprof_org_${user.id}`
     );
     expect(
       await profileFor({
@@ -103,7 +106,7 @@ describe('Authoritative Claude payer state', () => {
         organizationId: organization.id,
         kiloUserId: user.id,
       })
-    ).toBe(`uprof_member_${user.id}`);
+    ).toBe(`uprof_org_${user.id}`);
   });
 
   it('rejects invalid ownership before querying another account', async () => {

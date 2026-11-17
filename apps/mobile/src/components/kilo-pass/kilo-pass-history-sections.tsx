@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
-import { formatDate, formatMoneyFromCents, formatPrefixedMoney } from '@/lib/format';
+import { formatDate, formatPrefixedMoney } from '@/lib/format';
 import {
   type KiloPassBillingHistory,
   type KiloPassCreditHistory,
@@ -130,7 +130,7 @@ function BillingHistoryLine({ entry }: Readonly<{ entry: KiloPassBillingEntry }>
       : entry.description;
   const amount =
     entry.kind === 'stripe'
-      ? formatMoneyFromCents(entry.amountCents, i18n.language)
+      ? formatPrefixedMoney(entry.amountCents / 100, i18n.language)
       : formatPrefixedMoney(Math.abs(fromMicrodollars(entry.amountMicrodollars)), i18n.language);
   return <HistoryLine title={title} date={historyDate(entry.date)} amount={amount} />;
 }

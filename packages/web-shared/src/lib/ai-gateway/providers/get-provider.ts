@@ -146,9 +146,9 @@ export type GetProviderResult =
    */
   | { kind: 'claude-billing-unavailable'; message: string; retryable?: boolean }
   /**
-   * The organization's shared-services Claude connection was linked by a person
-   * who is gone. Only an organization owner reconnecting it changes the
-   * outcome, so the request fails readably instead of on another billing path.
+   * The organization's Claude connection was linked by a person who is gone.
+   * Only an organization owner reconnecting it changes the outcome, so the
+   * request fails readably instead of on another billing path.
    */
   | { kind: 'claude-billing-reconnect'; message: string }
   /** The id is a custom LLM the caller may not use, or its stored credentials are unusable. */
@@ -379,9 +379,6 @@ export type GetProviderInput = {
    * the provider it names (see `getDirectByokPolicyProviderId` and
    * `isModelAllowedForProviderKey`). Keys it rejects are skipped. */
   isDirectByokProviderAllowed: (policyProviderId: string) => Promise<boolean>;
-  /** Kilo's own route falls back to OpenRouter, like the global Vercel routing switch. BYOK routes
-   * are unaffected; the caller rejects a route through a disabled gateway. */
-  organizationDisabledVercelAiGateway: boolean;
   /** The caller's Vercel IP country, for custom LLM country deny lists. */
   countryCode?: string | null;
   /** Receives the steps and BYOK candidates behind the result, when the call returns. */
@@ -468,7 +465,6 @@ async function selectProvider(
     userId: isAnonymousContext(user) ? null : user.id,
     requesterEmail: isAnonymousContext(user) ? null : user.google_user_email,
     organizationId,
-    botId,
   });
   if (claudeBilling?.kind === 'reconnect') {
     decision.step({ step: 'claude-billing', outcome: 'rejected', reason: 'reconnect' });
@@ -641,9 +637,8 @@ async function selectProvider(
       case 'kilo': {
         recordNoKeyServed();
         const { kiloIgnoredProviders = [], boundedSpending = false } = input;
-        const { organizationDisabledVercelAiGateway } = input;
         const routesToVercel = await shouldRouteToVercel(
-          { requestedModel, boundedSpending, organizationDisabledVercelAiGateway },
+          { requestedModel, boundedSpending },
           async () =>
             withIgnoredProviders(await input.getRoutingProviderConfig(), kiloIgnoredProviders)
         );
@@ -652,7 +647,6 @@ async function selectProvider(
           outcome: 'selected',
           gateway: routesToVercel ? 'vercel' : 'openrouter',
           bounded_spending: boundedSpending,
-          organization_disabled_vercel_ai_gateway: organizationDisabledVercelAiGateway,
           kilo_ignored_providers: kiloIgnoredProviders,
         });
         return servedBy({
@@ -783,7 +777,7 @@ async function previewStep(
           outcome: 'used',
           // The preview explains the unrestricted route, so no request can carry a spend ceiling here.
           gateway: (await shouldRouteToVercel(
-            { requestedModel, boundedSpending: false, organizationDisabledVercelAiGateway: false },
+            { requestedModel, boundedSpending: false },
             async () => undefined
           ))
             ? 'vercel'

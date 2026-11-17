@@ -42,6 +42,7 @@ import { formatList, formatNumber, formatPrefixedMoney } from '@/lib/format';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useTRPC } from '@/lib/trpc';
 
 /** The Notifications screen owns the push gate the channel rows point at. */
@@ -131,6 +132,7 @@ export function SpendAlertsScreen({ organizationId }: SpendAlertsScreenProps) {
     return (
       <OrganizationBoundary
         title={t('notifications.channel.spend')}
+        backFallback={PROFILE_TAB_HREF}
         organizationIdOverride={organizationId}
       />
     );
@@ -145,7 +147,7 @@ export function SpendAlertsScreen({ organizationId }: SpendAlertsScreenProps) {
   if (query.isError && query.data == null) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('notifications.channel.spend')} />
+        <ScreenHeader title={t('notifications.channel.spend')} backFallback={PROFILE_TAB_HREF} />
         <QueryError
           className="bg-background"
           message={t('spendAlerts.loadError')}
@@ -162,7 +164,7 @@ export function SpendAlertsScreen({ organizationId }: SpendAlertsScreenProps) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('notifications.channel.spend')} />
+      <ScreenHeader title={t('notifications.channel.spend')} backFallback={PROFILE_TAB_HREF} />
       <TabScreenScrollView
         // iOS IME inset and focused-field auto-reveal (AGENTS.md: input screens).
         automaticallyAdjustKeyboardInsets
@@ -720,7 +722,7 @@ function SpendAlertsSkeleton() {
   const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('notifications.channel.spend')} />
+      <ScreenHeader title={t('notifications.channel.spend')} backFallback={PROFILE_TAB_HREF} />
       <ScrollView className="flex-1" contentContainerClassName="px-4 gap-6 pb-8 pt-4">
         <Skeleton className="h-4 w-64 rounded" />
         {/* The scope group holds two KvRows now (the scope owner and the 24 h

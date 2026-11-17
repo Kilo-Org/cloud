@@ -139,6 +139,29 @@ it('renders the published Kilo v2 release for its organization scope', () => {
     })
   ).toThrow('configuration drift');
 });
+it('enables Kilo v2 for all web accounts through the checked-in default target', () => {
+  const catalog = JSON.parse(
+    readFileSync(new URL('../runtime-targets.json', import.meta.url), 'utf8')
+  );
+  expect(selectRuntimeTarget(catalog, 'dev').kilo2).toEqual({ orgIds: '*' });
+  for (const environment of ['production', 'isolated']) {
+    const selected = selectRuntimeTarget(catalog, environment);
+    expect(selected.kilo2).toEqual({ orgIds: '*' });
+    const output = renderRuntimeTarget({
+      config: baseline(),
+      environment,
+      startup: selected,
+      release: { ...release, kilo2DescriptorSha256: 'f'.repeat(64) },
+    });
+    const target = environment === 'production' ? output : output.env?.isolated;
+    expect(target).toMatchObject({
+      vars: {
+        RUNTIME_KILO2_ORG_IDS: '*',
+        RUNTIME_RELEASE_DESCRIPTOR_KILO2: 'f'.repeat(64),
+      },
+    });
+  }
+});
 it('rejects manual cohort settings and secondary image drift', () => {
   const scopedVars = { ...baseline(), vars: { RUNTIME_INTERACTIVE_ORG_IDS: '*' } };
   expect(() =>

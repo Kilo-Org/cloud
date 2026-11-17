@@ -13,6 +13,8 @@ import {
   adminTierFor,
   authViaTokenFromHeaders,
   clientIpFromHeaders,
+  methodFromHeaders,
+  routeFromHeaders,
   type AdminAccessAttribution,
   type AdminAuditContext,
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
@@ -137,7 +139,9 @@ export async function recordAdminActions(
       adminTier: adminTierFor(ctx.user),
       authVia: ctx.authViaToken ? 'token' : 'session',
       tokenSource: ctx.tokenSource ?? null,
-      route: ctx.trpcPath ?? null,
+      // A caller that names its own path (a tRPC procedure, or a route handler
+      // that sets one) wins over the best-effort route from the request headers.
+      route: ctx.trpcPath ?? ctx.auditRoute ?? null,
       ip: ctx.ip ?? null,
       targetType: entry.target?.type ?? null,
       targetId: entry.target?.id ?? null,
@@ -291,5 +295,7 @@ export function adminActionContextFromHeaders(
     authViaToken: authViaTokenFromHeaders(headersList),
     tokenSource: null,
     ip: clientIpFromHeaders(headersList),
+    auditRoute: routeFromHeaders(headersList) ?? undefined,
+    auditMethod: methodFromHeaders(headersList) ?? undefined,
   };
 }

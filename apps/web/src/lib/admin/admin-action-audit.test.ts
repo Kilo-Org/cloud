@@ -8,6 +8,7 @@ import {
   createOrganization,
 } from '@kilocode/web-shared/lib/organizations/organizations';
 import {
+  adminActionContextFromHeaders,
   organizationActionTarget,
   recordAdminAction,
   recordElevatedOrganizationAdminAction,
@@ -155,6 +156,55 @@ describe('recordAdminAction', () => {
 
     expect(await db.select().from(admin_action_audit_logs)).toHaveLength(0);
     expect(events).toHaveLength(0);
+  });
+});
+
+describe('adminActionContextFromHeaders', () => {
+  let events: AdminActionEvent[];
+
+  beforeEach(() => {
+    events = [];
+    setAdminActionSinkForTest(event => events.push(event));
+  });
+
+  afterEach(async () => {
+    setAdminActionSinkForTest(null);
+    await cleanupDbForTest();
+  });
+
+  test('attributes the REST route and method from the request headers', async () => {
+    const ctx = adminActionContextFromHeaders(
+      defineTestUser({ is_admin: true }),
+      new Headers({
+        'x-pathname': '/api/organizations/org_1/user-tokens',
+        'x-http-method': 'post',
+      })
+    );
+
+    await recordAdminAction(ctx, {
+      action: 'organization.token.mint',
+      target: organizationActionTarget('org_1'),
+      message: 'Minted token from REST route',
+    });
+
+    expect(events).toHaveLength(1);
+    expect(events[0].route).toBe('/api/organizations/org_1/user-tokens');
+  });
+
+  test('keeps a caller-supplied path over the request headers', async () => {
+    const ctx = {
+      ...adminActionContextFromHeaders(defineTestUser({ is_admin: true }), new Headers()),
+      trpcPath: '/admin/api/api-request-log/download',
+    };
+
+    await recordAdminAction(ctx, {
+      action: 'organization.token.mint',
+      target: organizationActionTarget('org_1'),
+      message: 'Downloaded request log',
+    });
+
+    expect(events).toHaveLength(1);
+    expect(events[0].route).toBe('/admin/api/api-request-log/download');
   });
 });
 

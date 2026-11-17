@@ -56,6 +56,12 @@ vi.mock('@/components/ui/icons', () => ({
   User: 'User',
 }));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'ChevronRight' }));
+vi.mock('@/components/tab-screen', () => ({ useTabBarBottomPadding: () => 0 }));
+vi.mock('react-native-keyboard-controller', () => ({
+  useKeyboardState: (select: (state: { height: number }) => unknown) => select({ height: 0 }),
+}));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));

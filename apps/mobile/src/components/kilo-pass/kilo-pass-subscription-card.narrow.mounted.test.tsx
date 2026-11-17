@@ -106,33 +106,41 @@ describe('KiloPassSubscriptionCard mounted layout', () => {
 });
 
 describe('KiloPassSubscriptionCard loading layout', () => {
-  it('clamps both loading bars to the narrow card', () => {
+  it('clamps the loading bars to the narrow card', () => {
     cardState.content = { kind: 'loading' };
     windowDims.width = 160;
     const root = renderCard(false);
     const bars = root
       .findAll(
-        node => Object.is(node.type, 'Skeleton') && /w-(28|48)/.test(String(node.props.className))
+        node =>
+          Object.is(node.type, 'Skeleton') &&
+          String(node.props.className).includes('max-w-full')
       )
       .map(node => String(node.props.className));
+    // The skeleton row is the shared row primitive: its title and subtitle bars
+    // are the loading shape of the row the card settles into.
     expect(bars).toHaveLength(2);
-    for (const className of bars) {
-      expect(className).toContain('max-w-full');
+  });
+
+  it('keeps the loading row in the flow while the balance skeleton owns the section', () => {
+    // The credits section shows its one loading indicator (the balance
+    // skeleton), so the card paints no shimmer of its own; its row keeps the
+    // space in the flow, invisible, so the sections below do not move when the
+    // pass answer arrives.
+    for (const width of [160, 390]) {
+      cardState.content = { kind: 'loading' };
+      windowDims.width = width;
+      const root = renderCard(true);
+      const hidden = root.findAll(
+        node =>
+          typeof node.props.className === 'string' &&
+          node.props.className.includes('opacity-0')
+      );
+      expect(hidden).toHaveLength(1);
+      expect(hidden[0]?.findAll(node => Object.is(node.type, 'Skeleton')).length).toBeGreaterThan(
+        0
+      );
+      expect(root.findAllByProps({ accessibilityRole: 'button' })).toHaveLength(0);
     }
-  });
-
-  it('reserves the stacked card height while the balance skeleton owns the section', () => {
-    cardState.content = { kind: 'loading' };
-    windowDims.width = 160;
-    const root = renderCard(true);
-    expect(String(root.findByProps({ className: 'h-[114px]' }).props.className)).toBe('h-[114px]');
-  });
-
-  it('reserves the single-row card height at phone widths', () => {
-    cardState.content = { kind: 'loading' };
-    const root = renderCard(true);
-    // The card's rem is 14 pt: p-3 (21) + the h-10 icon row (35) + the two
-    // 1 px borders, matching the loaded card the reserve stands in for.
-    expect(String(root.findByProps({ className: 'h-[58px]' }).props.className)).toBe('h-[58px]');
   });
 });

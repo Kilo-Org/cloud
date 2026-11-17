@@ -25,7 +25,12 @@ const state = vi.hoisted(() => ({
   invalidateQueries: vi.fn(),
 }));
 
-vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('react-native', () => ({
+  Pressable: 'Pressable',
+  View: 'View',
+  useColorScheme: () => 'light',
+  useWindowDimensions: () => ({ width: 390, height: 844, scale: 2, fontScale: 1 }),
+}));
 vi.mock('@tanstack/react-query', async importOriginal => {
   // The provider and client stay real so renderWithProviders works; only the
   // hooks the screen calls are replaced.
@@ -72,7 +77,7 @@ vi.mock('@/lib/trpc', () => ({
 vi.mock('@/components/ui/icons', () => ({ KeyRound: 'KeyRound', Plus: 'Plus' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
-vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
+vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'ChevronRight' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));

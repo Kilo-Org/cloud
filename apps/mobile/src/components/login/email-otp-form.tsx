@@ -92,7 +92,7 @@ export function EmailOtpForm({
         {t('login.codeArrivalHint')}
       </Text>
       <Input
-        className="text-center text-lg"
+        className="text-lg"
         // textAlign is applied inline, not via a `text-center` class: NativeWind maps
         // textAlign to a native prop for TextInput and crashes on it in this version.
         // eslint-disable-next-line react-native/no-inline-styles -- see comment above

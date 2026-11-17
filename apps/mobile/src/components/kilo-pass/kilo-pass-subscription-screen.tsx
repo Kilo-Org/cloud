@@ -14,8 +14,8 @@ import {
   KiloPassManagementSections,
   type KiloPassScheduledChange,
 } from '@/components/kilo-pass/kilo-pass-management';
-import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Crown } from '@/components/ui/icons';
 import { KvRow } from '@/components/ui/kv-row';
@@ -94,9 +94,26 @@ function KiloPassLoadingScreen() {
 }
 
 function KiloPassErrorScreen({ onRetry }: { onRetry: () => void }) {
+  const { t } = useTranslation();
   return (
     <KiloPassFrame>
-      <QueryError onRetry={onRetry} />
+      <CenteredState>
+        <View className="items-center gap-3 px-4">
+          <Text className="text-center font-semibold text-foreground">
+            {t('kiloPass.unavailable')}
+          </Text>
+          <Text variant="muted" className="text-center text-sm">
+            {t('kiloPass.couldNotLoad')}
+          </Text>
+          <Button
+            accessibilityLabel={t('kiloPass.retryLoading')}
+            onPress={onRetry}
+            variant="outline"
+          >
+            <Text>{t('common.retry')}</Text>
+          </Button>
+        </View>
+      </CenteredState>
     </KiloPassFrame>
   );
 }

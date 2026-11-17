@@ -9,12 +9,14 @@ import { ConsentRequiredRows } from '@/components/consent/consent-required-rows'
 import { type ConsentMode, getConsentActions } from '@/components/consent/consent-mode';
 import { ConsentPolicySentence } from '@/components/consent/consent-policy-sentence';
 import { Button } from '@/components/ui/button';
+import { ConfigureRow } from '@/components/ui/configure-row';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { PreferenceRow } from '@/components/ui/preference-row';
 import { RowChevron } from '@/components/ui/row-chevron';
 import { RowGroup } from '@/components/ui/row-group';
 import { ScreenFooter } from '@/components/ui/screen-footer';
 import { Section } from '@/components/ui/section';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
@@ -263,15 +265,27 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
           }
         >
           <RowGroup leadingTile>
-            <PreferenceRow
-              icon={LineChart}
-              title={t('consent.helpImprove')}
-              subtitle={t('consent.helpImproveDescription')}
-              value={optionalToggle}
-              disabled={mode === 'review' && savingOptional}
-              busy={optionalControlPending}
-              onValueChange={handleToggleOptional}
-            />
+            {/* Until the stored choice loads the row shows no switch: a switch
+                would present a value the user has not chosen and a tap could
+                flip the wrong way, so the slot holds a control-sized
+                placeholder in the same row shape instead. */}
+            {optionalControlPending ? (
+              <ConfigureRow
+                icon={LineChart}
+                title={t('consent.helpImprove')}
+                subtitle={t('consent.helpImproveDescription')}
+                trailing={<Skeleton className="h-8 w-14 rounded-full" />}
+              />
+            ) : (
+              <PreferenceRow
+                icon={LineChart}
+                title={t('consent.helpImprove')}
+                subtitle={t('consent.helpImproveDescription')}
+                value={optionalToggle}
+                disabled={mode === 'review' && savingOptional}
+                onValueChange={handleToggleOptional}
+              />
+            )}
           </RowGroup>
         </Section>
 
@@ -314,7 +328,9 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
           maxFontSizeMultiplier={CONSENT_DISCLOSURE_MAX_FONT_SCALE}
           onOpenPolicy={handleOpenPrivacy}
         />
-        <AccessibleStatus message={error ? t(error) : null} />
+        <View className="min-h-5 justify-center">
+          <AccessibleStatus message={error ? t(error) : null} />
+        </View>
         <Button
           onPress={() => {
             void handlePrimaryAction();

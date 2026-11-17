@@ -38,6 +38,14 @@ type ProviderKey = inferRouterOutputs<MobileRouter>['byok']['list'][number];
 
 const SKELETON_ROWS = [0, 1];
 
+/**
+ * The height the pending band already occupies: two key cards and the gap
+ * between them. Every state that is not the key list keeps it, so the Add key
+ * action below never moves when the skeletons are replaced by the settled
+ * state.
+ */
+const BODY_BAND_CLASS = 'min-h-64';
+
 function ProviderKeyRow({
   providerKey,
   testing,
@@ -317,7 +325,7 @@ export function ProviderKeysScreen({ organizationId }: Readonly<{ organizationId
         {scope.kind === 'organization' && !permissions.canEdit ? (
           <Text variant="muted">{t('profile.providerKeys.viewOnly')}</Text>
         ) : null}
-        {body}
+        <View className={BODY_BAND_CLASS}>{body}</View>
         {permissions.canEdit ? (
           <Button
             variant="outline"

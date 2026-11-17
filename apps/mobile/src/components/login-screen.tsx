@@ -200,7 +200,7 @@ export function LoginScreen() {
     if (persistFailed) {
       return (
         <CenteredState className="bg-background">
-          <View className="items-center gap-3 px-6">
+          <View className="items-center gap-3 px-4">
             <Text className="text-center text-sm text-destructive">
               {t('login.couldNotCompleteSignIn')}
             </Text>

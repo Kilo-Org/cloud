@@ -34,7 +34,6 @@ type ProviderOption = inferRouterOutputs<MobileRouter>['byok']['listProviders'][
 const ID_FOLD_LOCALE = 'en';
 
 const listStyle = { flex: 1 } satisfies ViewStyle;
-const listContentContainerStyle = { flexGrow: 1 } satisfies ViewStyle;
 
 const SKELETON_ROWS = [0, 1, 2, 3, 4, 5];
 

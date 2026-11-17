@@ -15,6 +15,7 @@ import { FormField } from '@/components/ui/form-field';
 import { Archive, FileText, Share } from '@/components/ui/icons';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
@@ -133,11 +134,15 @@ export function DataExportScreen() {
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('profile.dataExport.title')} backFallback={PROFILE_TAB_HREF} />
         <View className={SCREEN_BODY_CLASS}>
+          {/* The description line, the request action and the list keep their
+              settled heights, so the page does not move when the release check
+              answers and the real content arrives. */}
           <RowGroup>
             {SKELETON_ROWS.map(row => (
               <RowSkeleton key={row} tile subtitle />
             ))}
           </RowGroup>
+          <Skeleton className="h-11 rounded-md" />
         </View>
       </View>
     );

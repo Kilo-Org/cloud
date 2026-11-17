@@ -36,6 +36,7 @@ import { useStoreCreditProducts } from '@/lib/credits/use-store-credit-products'
 import { getCreditStorefront } from '@/lib/credits/storefront';
 import { useInlinePurchaseErrorOwnership } from '@/lib/credits/use-store-credit-purchase';
 import { formatPrefixedMoney } from '@/lib/format';
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { useSideInsetStyle } from '@/lib/screen-insets';
 import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
@@ -49,18 +50,37 @@ import { CreditUnresolvedPurchaseNotice } from './credit-unresolved-purchase-not
 import { CreditExpiryNote } from './credit-expiry-note';
 
 /**
- * The room the scroller keeps at its end for the floating purchase error, so
- * the last content can always scroll clear of the card the footer does not own.
+ * The room the scroller keeps at its end for the floating purchase error.
+ *
+ * Only the card's text scales, so only the text is multiplied: three capped
+ * `text-sm` lines, then the card's own padding, then the 8 dp gap its wrapper
+ * keeps above the footer. Multiplying the whole sum would under-reserve at a
+ * scale below 1 and leave the content under the card. The home-indicator band
+ * is not part of the sum: the footer below the scroller owns it.
  */
-const PURCHASE_ERROR_CLEARANCE_CLASS = 'h-24';
+const PURCHASE_ERROR_TEXT_HEIGHT = 63;
+const PURCHASE_ERROR_CHROME = 28;
+const purchaseErrorClearance = (fontScale: number): number =>
+  PURCHASE_ERROR_TEXT_HEIGHT * fontScale + PURCHASE_ERROR_CHROME + 8;
 
 /**
- * The balance card holds both of its data slots in every state, and each slot
- * is the primitive's own line box: the amount is one `figure` line (the value,
- * its skeleton or the failed read's retry target), and the expiry caption is a
- * `caption` that wraps by design. Nothing is pinned by a hand-measured floor, so
- * a longer locale grows the card instead of truncating.
+ * The balance card's data slots, at the default font scale.
+ *
+ * The card is the one block above the pack area whose content arrives late, so
+ * it holds one height in every state of its two reads and the packs below never
+ * move. Both floors are the text's own line box rather than extra space: the
+ * amount's `figure` line (the value, its skeleton or the failed read's retry
+ * target) and the expiry caption's two lines. The reservation is a floor, not a
+ * cap, and it scales with the system font size.
  */
+const BALANCE_AMOUNT_LINE_HEIGHT = 28.2;
+const EXPIRY_LINE_HEIGHT = 14.1;
+const EXPIRY_CAPTION_LINES = 2;
+
+/** The caption's floor at a font scale: a raised scale fits fewer characters per line. */
+function expiryCaptionFloor(fontScale: number): number {
+  return Math.ceil(EXPIRY_CAPTION_LINES * fontScale) * EXPIRY_LINE_HEIGHT * fontScale;
+}
 
 /** Reserved pack-row space while the store connects, so rows never jump in. */
 const PACK_SKELETON_ROWS = 4;
@@ -85,6 +105,7 @@ export function CreditPurchaseScreen() {
   // The footer and the error overlay sit outside the scroller, so they take the
   // side insets the scroller applies to its own content.
   const sideInsetStyle = useSideInsetStyle();
+  const fontScale = useLiveFontScale();
   const trpc = useTRPC();
   const {
     connected,
@@ -301,10 +322,21 @@ export function CreditPurchaseScreen() {
               the failed read's retry target), and the caption wraps by design. */}
           <Section label={t('profile.credits')}>
             <Card>
-              <View className="justify-center" testID="credit-balance-slot">
+              {/* Each slot keeps its line-height floor in every state, so the
+                  card's height is the same whether the read is pending, failed
+                  or settled and the packs below never move when it answers. */}
+              <View
+                className="justify-center"
+                style={{ minHeight: BALANCE_AMOUNT_LINE_HEIGHT * fontScale }}
+                testID="credit-balance-slot"
+              >
                 {renderBalanceValue()}
               </View>
-              <View className="justify-center" testID="credit-expiry-slot">
+              <View
+                className="justify-center"
+                style={{ minHeight: expiryCaptionFloor(fontScale) }}
+                testID="credit-expiry-slot"
+              >
                 {renderExpirySlot()}
               </View>
             </Card>
@@ -443,12 +475,23 @@ export function CreditPurchaseScreen() {
                     .join(', ');
 
                   return (
-                    <View key={pack.backend.appleProductId} testID="credit-pack-row">
+                    <Pressable
+                      key={pack.backend.appleProductId}
+                      accessibilityLabel={rowAccessibilityLabel}
+                      accessibilityRole="button"
+                      accessibilityState={{ busy: rowCompleting, disabled }}
+                      className={!disabled ? 'active:opacity-70' : undefined}
+                      disabled={disabled}
+                      onPress={() => {
+                        handlePackPress(pack);
+                      }}
+                      testID="credit-pack-row"
+                    >
                       <ConfigureRow
                         icon={Wallet}
                         title={packLabel}
                         subtitle={stateLabel ?? expiryMessage}
-                        accessibilityLabel={rowAccessibilityLabel}
+                        variant="action"
                         disabled={disabled}
                         trailing={
                           storePrice === null ? null : (
@@ -457,11 +500,8 @@ export function CreditPurchaseScreen() {
                             </Text>
                           )
                         }
-                        onPress={() => {
-                          handlePackPress(pack);
-                        }}
                       />
-                    </View>
+                    </Pressable>
                   );
                 })}
               </RowGroup>
@@ -501,7 +541,7 @@ export function CreditPurchaseScreen() {
           {/* The room the floating purchase error needs at the end of the
               content, as a child of the content rather than a container style
               (see the scroller's comment). */}
-          <View className={PURCHASE_ERROR_CLEARANCE_CLASS} />
+          <View style={{ height: purchaseErrorClearance(fontScale) }} />
         </DetailScreenScrollView>
         {/* The purchase error floats above the bottom of the scroll area. It
             is not one of the four pack states, so it takes no layout height,

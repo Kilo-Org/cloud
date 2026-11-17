@@ -767,8 +767,9 @@ test.skip('Agents session transcript opens pinned to the bottom', async () => {
 /*
  * The pill's grace is `OFFLINE_PILL_GRACE_MS` in agents-session-list.tsx and is a page timer, so
  * the test drives it with the page clock and advances to the deadline that component records when
- * it schedules the timer: nothing here assumes when the effect starts.
+ * it schedules the timer: nothing here assumes when the effect starts, and the duration is pinned.
  */
+const OFFLINE_PILL_GRACE_MS = 5000;
 const OFFLINE_PILL_DUE_AT_ATTRIBUTE = 'data-offline-due-at';
 
 test('Agents offline pill waits out the connect grace period', async () => {
@@ -777,49 +778,40 @@ test('Agents offline pill waits out the connect grace period', async () => {
     const sidePanel = await getSidePanel();
 
     /*
-     * Install the clock before the Agents view exists: its grace `setTimeout` is created when the
-     * view mounts, so a clock installed before the click owns that timer. Wall-clock sampling
-     * measured the window from an arbitrary point after navigation and could not tell an early
-     * pill from a slow one; the fake clock decides when the timer fires instead.
+     * Install the clock before the Agents view exists, because its grace `setTimeout` is created
+     * when the view mounts. Then pause it at a known instant: with time frozen nothing can pass
+     * between the view's `Date.now()` and its `setTimeout`, so the recorded deadline is exactly
+     * `T0 + grace` and no part of setup can eat into it.
      */
     await sidePanel.clock.install();
+    const t0 = (await sidePanel.evaluate(() => Date.now())) + 1;
+    await sidePanel.clock.pauseAt(t0);
+
     await sidePanel.getByRole('tab', { name: 'Agents' }).click();
 
-    /*
-     * Wait for the deadline the component recorded when it scheduled the timer. Real async work
-     * can delay that effect indefinitely, and the deadline cannot be wrong by construction; no
-     * flush budget is assumed anywhere.
-     */
+    /* The effect that schedules the timer runs after real async work, so wait for the deadline it
+       recorded rather than for a fixed flush; under the paused clock its value cannot drift. */
     const dueAtMarker = sidePanel.locator(`[${OFFLINE_PILL_DUE_AT_ATTRIBUTE}]`);
     await expect(dueAtMarker).toHaveCount(1, { timeout: 15_000 });
 
-    const readDeadline = (): Promise<{ dueAt: number; now: number }> =>
-      sidePanel.evaluate(attribute => {
-        const dueAtText = document.querySelector(`[${attribute}]`)?.getAttribute(attribute);
-
-        return { dueAt: Number(dueAtText), now: Date.now() };
-      }, OFFLINE_PILL_DUE_AT_ATTRIBUTE);
-
-    /*
-     * Jump to `offsetMs` past the deadline with `pauseAt`, which sets the page clock to an exact
-     * instant and fires only the timers due by then. `runFor` is paced by real time and can
-     * overshoot by more than a millisecond, which would break the one-millisecond margin.
-     */
-    const advanceToDeadline = async (offsetMs: number): Promise<void> => {
-      const { dueAt } = await readDeadline();
-
-      await sidePanel.clock.pauseAt(dueAt + offsetMs);
-    };
+    const dueAt = t0 + OFFLINE_PILL_GRACE_MS;
+    // The grace duration itself: the deadline is the paused instant plus exactly five seconds.
+    await expect(dueAtMarker).toHaveAttribute(OFFLINE_PILL_DUE_AT_ATTRIBUTE, String(dueAt));
 
     const offlinePill = sidePanel.getByText('Offline');
     await expect(offlinePill).toBeHidden();
 
-    // One millisecond before the recorded deadline the pill must still be absent.
-    await advanceToDeadline(-1);
+    /*
+     * Jump with `pauseAt`, which sets the page clock to an exact instant and fires only the timers
+     * due by then. `runFor` is paced by real time and measured an overshoot of ~14 ms on a
+     * millisecond-precision window.
+     */
+    // One millisecond before the deadline the pill must still be absent.
+    await sidePanel.clock.pauseAt(dueAt - 1);
     await expect(offlinePill).toBeHidden();
 
-    // Two milliseconds later the timer has fired and the pill is rendered.
-    await advanceToDeadline(1);
+    // One millisecond past it the timer has fired and the pill is rendered.
+    await sidePanel.clock.pauseAt(dueAt + 1);
     await expect(offlinePill).toBeVisible();
   } finally {
     await cleanup();

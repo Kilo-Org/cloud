@@ -275,15 +275,9 @@ export function NewSessionPrompt({
   // lines past the third and the caret were hidden. The iOS field always scrolls:
   // a text view whose content fits does not take a vertical drag, so the form
   // still gets it.
-  //
-  // The gate measures the shorter of the two heights: a short window keeps the
-  // keyboard-closed field one line tall while the open field reserves three, so
-  // a two-line draft already overflows the closed field and must scroll before
-  // the keyboard lands.
   const [contentHeight, setContentHeight] = useState(0);
-  const promptScrollHeight = Math.min(promptHeight, closedPromptHeight);
   const promptScrolls =
-    Platform.OS === 'ios' || shouldEnableComposerInputScroll(contentHeight, promptScrollHeight);
+    Platform.OS === 'ios' || shouldEnableComposerInputScroll(contentHeight, promptHeight);
   // The fade band over the clipped top line, driven from the field's scroll
   // offset. It lives in a shared value, not React state: a drag reports a frame
   // per few pixels, and this card's toolbar, attachment strip and controls are
@@ -610,7 +604,7 @@ export function NewSessionPrompt({
             onContentSizeChange={event => {
               const next = Math.round(event.nativeEvent.contentSize.height * 100) / 100;
               setContentHeight(current => (current === next ? current : next));
-              if (!shouldEnableComposerInputScroll(next, promptScrollHeight)) {
+              if (!shouldEnableComposerInputScroll(next, promptHeight)) {
                 // The draft fits again: the field is back at its top, where the
                 // first line is whole.
                 promptScrollOffset.value = 0;

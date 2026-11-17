@@ -263,40 +263,6 @@ describe('NewSessionPrompt input scroll gate', () => {
 
     renderer.unmount();
   });
-
-  it('scrolls an Android draft taller than the keyboard-closed field', async () => {
-    platform.OS = 'android';
-    // A short window keeps the keyboard-closed field at one line while the open
-    // field reserves three lines.
-    keyboardMotion.value = 0;
-    const closedHeight = resolveNewSessionPromptHeight(NEW_SESSION_PROMPT_LINE_HEIGHT, 1);
-    const renderer = await mountPrompt({
-      frameHeight: 640,
-      keyboardClosedFrameHeight: 640,
-      keyboardClosedLineCount: 1,
-      lineCount: 3,
-    });
-
-    // The field renders at its closed height while the keyboard is down.
-    const [, heightStyle] = findPromptInput(renderer).props.style as [
-      Record<string, unknown>,
-      { height: number },
-    ];
-    expect(heightStyle.height).toBe(closedHeight);
-    expect(findPromptInput(renderer).props.scrollEnabled).toBe(false);
-
-    // A two-line draft overflows the closed field, so a drag over it scrolls the
-    // draft; gating on the three-line open height left the second line
-    // unreachable until the keyboard landed.
-    reportContentHeight(renderer, resolveNewSessionPromptHeight(NEW_SESSION_PROMPT_LINE_HEIGHT, 2));
-    expect(findPromptInput(renderer).props.scrollEnabled).toBe(true);
-
-    // The draft fits the closed field again: the field goes back to its top.
-    reportContentHeight(renderer, closedHeight - 1);
-    expect(findPromptInput(renderer).props.scrollEnabled).toBe(false);
-
-    renderer.unmount();
-  });
 });
 
 /** The input's `py-2` in dp: NativeWind's native rem is 14, so the utility is 7. */

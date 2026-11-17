@@ -127,6 +127,8 @@ function credentialForm(root: ReactTestRenderer['root']) {
     form: form.props.form as { kind: string },
     mappings: form.props.mappings as { current: Map<number, Partial<ModelMapping>> },
     onModeChange: form.props.onModeChange as (mode: string) => void,
+    onEdit: form.props.onEdit as () => void,
+    errors: form.props.errors as Record<string, string | undefined>,
   };
 }
 
@@ -332,6 +334,32 @@ describe('ProviderKeyNewScreen', () => {
 
     expect(state.mutateAsync).not.toHaveBeenCalled();
     expect(statusMessages(root)).toEqual(['Check the credentials and try again.']);
+  });
+
+  it('retires the structured field error and the refusal once the form is edited', async () => {
+    state.params = { provider: 'azure' };
+    state.providers = [{ id: 'azure', name: 'Azure Foundry' }];
+    const root = await mount();
+
+    act(() => {
+      credentialForm(root).values.current = { apiKey: 'azure-key', resourceName: '   ' };
+    });
+    await act(() => {
+      (addButton(root).props.onPress as () => void)();
+    });
+    expect(credentialForm(root).errors).toEqual({
+      resourceName: 'Azure resource name is required.',
+    });
+    expect(statusMessages(root)).toEqual(['Check the credentials and try again.']);
+
+    act(() => {
+      credentialForm(root).onEdit();
+    });
+
+    // An edit with nothing left to clear must not stop the previous one from
+    // clearing: the refusal and the field error both go.
+    expect(credentialForm(root).errors).toEqual({});
+    expect(statusMessages(root)).toEqual([]);
   });
 
   it('refuses the form to a role that cannot change an organization’s keys', async () => {

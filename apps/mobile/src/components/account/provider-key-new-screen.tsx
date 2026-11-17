@@ -51,6 +51,12 @@ type SaveFailure =
   | { readonly kind: 'refused'; readonly message: string };
 
 /**
+ * The empty field-error state. One shared object, not a fresh `{}`, so an edit
+ * with nothing to clear leaves the state identical and React skips the render.
+ */
+const NO_FIELD_ERRORS: Partial<Record<CredentialFieldId, string>> = {};
+
+/**
  * The form for one provider's credential, entered from the provider picker or
  * from a key row that replaces its value. The value lives in a ref, is sent
  * once, and is never readable after saving. A structured provider gets the
@@ -72,7 +78,8 @@ export function ProviderKeyNewScreen() {
   const valuesRef = useRef<CredentialDraft>({});
   const mappingsRef = useRef(new Map<number, Partial<ModelMapping>>());
   const [authMode, setAuthMode] = useState<BedrockAuthMode>('apiKey');
-  const [fieldErrors, setFieldErrors] = useState<Partial<Record<CredentialFieldId, string>>>({});
+  const [fieldErrors, setFieldErrors] =
+    useState<Partial<Record<CredentialFieldId, string>>>(NO_FIELD_ERRORS);
   const save = useSurfaceFeedback<SaveFailure>();
   const scope = providerKeyScope(parsedParam.success ? parsedParam.data.org : undefined);
   const scopeInput = providerKeyScopeInput(scope);
@@ -149,11 +156,12 @@ export function ProviderKeyNewScreen() {
 
   /**
    * The credential changed: a refusal shown beside the old value is about a
-   * value the reader has already replaced.
+   * value the reader has already replaced. A clear with nothing to clear must
+   * leave state identical, so the form does not render per keystroke.
    */
   const clearFailureOnEdit = () => {
     save.clearWhere(() => true);
-    setFieldErrors({});
+    setFieldErrors(previous => (previous === NO_FIELD_ERRORS ? previous : NO_FIELD_ERRORS));
   };
 
   /** Switching methods drops the values the next one does not show. */
@@ -185,7 +193,7 @@ export function ProviderKeyNewScreen() {
     if (!attempt) {
       return;
     }
-    setFieldErrors({});
+    setFieldErrors(NO_FIELD_ERRORS);
     const credential = readCredential();
     if (credential.tag === 'missing') {
       if (form) {

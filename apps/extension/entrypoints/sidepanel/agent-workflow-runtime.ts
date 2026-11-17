@@ -5,7 +5,11 @@ import {
   WORKFLOW_PAGE_EVAL_TIMEOUT_MS,
 } from '@/src/shared/agent-workflows';
 import type { BrowserCaller } from '@/src/shared/browser-caller';
-import { EVAL_TAB_MESSAGE, isTabDebuggerResponse } from '@/src/shared/tab-debugger';
+import {
+  CLAIM_TAB_MESSAGE,
+  EVAL_TAB_MESSAGE,
+  isTabDebuggerResponse,
+} from '@/src/shared/tab-debugger';
 import type { EvalTabResult } from '@/src/shared/tab-debugger';
 
 /**
@@ -28,18 +32,53 @@ const urlMatches = (left: string, right: string): boolean => {
 };
 
 /**
+ * Take the run's tab lease before its first command. A workflow run navigates
+ * to its start URL before it evaluates anything, so the lease has to be held
+ * from the start: a run started while another caller holds the tab must not
+ * rewrite the page and invalidate that holder's refs. The panel hands over its
+ * own conversation's lease in the same message, so the run does not queue
+ * behind the turn that is waiting for it.
+ */
+export const claimTab = async (
+  tabId: number,
+  caller: BrowserCaller,
+  from?: BrowserCaller
+): Promise<boolean> => {
+  try {
+    const response: unknown = await browser.runtime.sendMessage({
+      caller,
+      ...(from === undefined ? {} : { from }),
+      tabId,
+      type: CLAIM_TAB_MESSAGE,
+    });
+
+    if (!isTabDebuggerResponse(response) || !response.ok) {
+      return false;
+    }
+
+    return response.type === CLAIM_TAB_MESSAGE && response.granted;
+  } catch {
+    return false;
+  }
+};
+
+/**
  * Evaluate workflow page code in a tab through the background transport.
  * Always sends WORKFLOW_PAGE_EVAL_TIMEOUT_MS (30 s); the default 5 s
  * timeout is too short for multi-action page scripts.
+ *
+ * The caller is required: every page of one run must use the run's own caller,
+ * because the tab lease is held by that caller across the run's pages. A fresh
+ * caller per page would queue behind the first page's lease forever.
  */
 export const evalInTab = async (
   tabId: number,
   code: string,
-  caller?: BrowserCaller
+  caller: BrowserCaller
 ): Promise<EvalTabResult> => {
   try {
     const response: unknown = await browser.runtime.sendMessage({
-      caller: caller ?? { kind: 'workflow', runId: crypto.randomUUID() },
+      caller,
       code,
       tabId,
       timeoutMs: WORKFLOW_PAGE_EVAL_TIMEOUT_MS,

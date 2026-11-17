@@ -110,9 +110,25 @@ export interface BrowserRuntimeDeps {
   readonly tabsApi: BrowserTabsApi & BrowserToolTabsApi;
 }
 
+export interface BrowserTabClaimInput {
+  readonly caller: BrowserCaller;
+  /**
+   * The caller handing its lease over — a conversation's panel lease, so a run
+   * can take the tab its own conversation holds instead of queueing behind the
+   * turn that is waiting for it.
+   */
+  readonly from?: BrowserCaller;
+  readonly tabId: number;
+}
+
 export interface BrowserRuntime {
   /** Gives a session its tab group back after it ended (`/browser adopt`). */
   readonly adoptEnded: (input: BrowserSessionRef) => Promise<BrowserTabGroupOpenResult>;
+  /**
+   * Takes the tab's lease before the caller's first command, so a workflow run
+   * navigates under the lease rather than rewriting the page under its holder.
+   */
+  readonly claimTab: (input: BrowserTabClaimInput) => Promise<boolean>;
   /** Ends a session: its group collapses, turns grey and becomes `Kilo · ended`. */
   readonly closeSession: (input: BrowserSessionRef) => Promise<void>;
   /** Drops the caller's ref registries for good; the tab sessions and leases stay alive for others. */
@@ -281,6 +297,19 @@ export const createBrowserRuntime = ({
     ...(stepToken === undefined ? {} : { stepToken }),
   });
 
+  const claimTab = async ({ caller, from, tabId }: BrowserTabClaimInput): Promise<boolean> => {
+    // The handover runs before the acquire, in one message.
+    // The run's caller takes the panel lease its own turn holds.
+    // A caller already queued for the tab still gets it first (FIFO).
+    if (from !== undefined) {
+      leases.release(tabId, from);
+    }
+
+    const lease = await leases.acquire(tabId, caller);
+
+    return lease.kind === 'granted';
+  };
+
   const runTool = async ({
     agent,
     arguments: toolArguments,
@@ -330,13 +359,18 @@ export const createBrowserRuntime = ({
         return { kind: 'result', result: unreachable };
       }
 
-      const session = sessionFor(tabId).bindCaller(browserCallerKey(caller));
       const { promise: takenAway, resolve: markTaken } = Promise.withResolvers<void>();
       let taken = false;
 
       inFlight.set(tabId, () => {
         taken = true;
         markTaken();
+      });
+
+      // A taken call stops issuing commands instead of interleaving them with the panel's.
+      // The guard is read before every command this call sends.
+      const session = sessionFor(tabId).bindCaller(browserCallerKey(caller), {
+        cancelled: () => taken,
       });
 
       try {
@@ -508,6 +542,7 @@ export const createBrowserRuntime = ({
   return {
     adoptEnded: input =>
       tabGroups === undefined ? Promise.resolve({}) : tabGroups.adoptEnded(input),
+    claimTab,
     closeSession: async input => {
       if (tabGroups !== undefined) {
         await tabGroups.closeSession(input);

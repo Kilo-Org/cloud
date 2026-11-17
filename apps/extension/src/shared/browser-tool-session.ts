@@ -1,6 +1,7 @@
 /* eslint-disable max-lines */
 import { z } from 'zod';
 import { buildWorkflowPageCode } from './agent-workflow-runner';
+import { TAB_TAKEN_ERROR } from './browser-caller';
 import { KILO_BROWSER_TOOL_PREFIX, toKiloBrowserToolName } from './browser-tool-contract';
 import {
   redactSensitiveBody,
@@ -222,6 +223,15 @@ export interface BrowserToolViewportState {
   readonly tabId: number;
 }
 
+/**
+ * A live call's cancellation state: the side panel took the tab over, so the
+ * call still unwinding must stop issuing commands instead of interleaving them
+ * with the panel's. Read before every command the caller view sends.
+ */
+export interface BrowserToolCallGuard {
+  readonly cancelled: () => boolean;
+}
+
 export interface BrowserToolSession {
   /**
    * Attaches the debugger and enables the CDP domains, once. Idempotent, and
@@ -235,9 +245,10 @@ export interface BrowserToolSession {
    * A caller-scoped view of this tab session. It shares the tab's one
    * attachment, console/network buffers and dialogs, but its ref registry is
    * private: a full snapshot from one caller never invalidates another
-   * caller's refs.
+   * caller's refs. A `guard` ends this view's commands as soon as it reports
+   * cancelled.
    */
-  readonly bindCaller: (callerKey: string) => BrowserToolSession;
+  readonly bindCaller: (callerKey: string, guard?: BrowserToolCallGuard) => BrowserToolSession;
   /**
    * Which platform the session drives. `scripting` means `chrome.debugger` is
    * unavailable (Firefox) and the page is driven through
@@ -2868,38 +2879,56 @@ export const createBrowserToolSession = ({
 
   const createCallerView = (
     callerKey: string,
-    refs: Map<string, BrowserToolRefEntry>
-  ): BrowserToolSession => ({
-    attach,
-    backend,
-    bindCaller: nextKey => createCallerView(nextKey, callerRefs(nextKey)),
-    callTool: (toolName, args) => runCallTool(toolName, args ?? {}, refs),
-    consoleMessages: () => [...consoleBuffer],
-    // A caller view owns only its ref registry: disposing it must not detach the tab's shared attachment.
-    dispose: () => {
-      refs.clear();
-      refsByCaller.delete(callerKey);
-      return Promise.resolve();
-    },
-    disposeCaller: key => {
-      refsByCaller.get(key)?.clear();
-      refsByCaller.delete(key);
-    },
-    downloads: () => [...downloadBuffer],
-    evaluateInTab,
-    getToolUnavailableError,
-    isAttached: () => attached,
-    networkRequests: () => [...networkById.values()],
-    networkRequestsSinceLoad,
-    registerRefs: (entries, options) => {
-      registerRefs(refs, entries, options);
-    },
-    resolveTarget: targetText => resolveTarget(targetText, refs),
-    send,
-    takeDialog,
-    takeDownloads,
-    viewportState,
-  });
+    refs: Map<string, BrowserToolRefEntry>,
+    guard?: BrowserToolCallGuard
+  ): BrowserToolSession => {
+    const throwIfCancelled = (): void => {
+      if (guard?.cancelled() === true) {
+        throw new Error(TAB_TAKEN_ERROR);
+      }
+    };
+
+    return {
+      attach,
+      backend,
+      bindCaller: nextKey => createCallerView(nextKey, callerRefs(nextKey), guard),
+      callTool: (toolName, args) => {
+        throwIfCancelled();
+        return runCallTool(toolName, args ?? {}, refs);
+      },
+      consoleMessages: () => [...consoleBuffer],
+      // A caller view owns only its ref registry: disposing it must not detach the tab's shared attachment.
+      dispose: () => {
+        refs.clear();
+        refsByCaller.delete(callerKey);
+        return Promise.resolve();
+      },
+      disposeCaller: key => {
+        refsByCaller.get(key)?.clear();
+        refsByCaller.delete(key);
+      },
+      downloads: () => [...downloadBuffer],
+      evaluateInTab,
+      getToolUnavailableError,
+      isAttached: () => attached,
+      networkRequests: () => [...networkById.values()],
+      networkRequestsSinceLoad,
+      registerRefs: (entries, options) => {
+        registerRefs(refs, entries, options);
+      },
+      resolveTarget: targetText => {
+        throwIfCancelled();
+        return resolveTarget(targetText, refs);
+      },
+      send: (method, params) => {
+        throwIfCancelled();
+        return send(method, params);
+      },
+      takeDialog,
+      takeDownloads,
+      viewportState,
+    };
+  };
 
   // Subscribe before any attach so a detach that lands during attach is not missed.
   debuggerApi?.onDetach.addListener(handleDetach);
@@ -2909,7 +2938,7 @@ export const createBrowserToolSession = ({
   return {
     attach,
     backend,
-    bindCaller: callerKey => createCallerView(callerKey, callerRefs(callerKey)),
+    bindCaller: (callerKey, guard) => createCallerView(callerKey, callerRefs(callerKey), guard),
     callTool: (toolName, args) => runCallTool(toolName, args ?? {}, defaultRefs),
     consoleMessages: () => [...consoleBuffer],
     dispose,

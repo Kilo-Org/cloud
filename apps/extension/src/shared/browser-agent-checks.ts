@@ -379,11 +379,12 @@ export const hashBrowserToolArguments = (args: unknown): string => {
   };
   const text = canonical(args);
   // FNV-1a, kept in one 32-bit lane on purpose: the hash guards a local token, not a signature.
-  let hash = 0x81_1c_9d_c5;
+  // Decimal 2_166_136_261 and 16_777_619 are the standard 0x811C9DC5 offset basis and 0x01000193 prime.
+  let hash = 2_166_136_261;
 
   for (let index = 0; index < text.length; index += 1) {
     hash ^= text.codePointAt(index) ?? 0;
-    hash = Math.imul(hash, 0x01_00_01_93) >>> 0;
+    hash = Math.imul(hash, 16_777_619) >>> 0;
   }
 
   return `${hash.toString(16)}:${String(text.length)}`;

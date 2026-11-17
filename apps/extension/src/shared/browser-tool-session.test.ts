@@ -9,6 +9,7 @@ import {
   getFirefoxUnsupportedToolError,
 } from './browser-tool-session';
 import { TAB_NOT_INSPECTABLE_ERROR } from './tab-debugger';
+import { TAB_TAKEN_ERROR } from './browser-caller';
 import type {
   BrowserScriptingApi,
   BrowserScriptingInjectionResult,
@@ -528,6 +529,26 @@ describe('browser tool session', () => {
       kind: 'ref',
       ref: 'e77',
     });
+  });
+
+  it('stops a cancelled caller view from sending its remaining commands', async () => {
+    const { debuggerApi, session } = createSession();
+    let cancelled = false;
+    const view = session.bindCaller('panel:panel-1:conversation-1', {
+      cancelled: () => cancelled,
+    });
+
+    await view.send('Runtime.evaluate', { expression: '1' });
+    const sentBeforeTakeOver = debuggerApi.commands.length;
+
+    cancelled = true;
+
+    // The guard ends the call at its next command, so nothing reaches the page.
+    expect(() => view.send('Runtime.evaluate', { expression: '2' })).toThrow(TAB_TAKEN_ERROR);
+    expect(() => view.callTool('browser_evaluate', { function: '() => 1' })).toThrow(
+      TAB_TAKEN_ERROR
+    );
+    expect(debuggerApi.commands).toHaveLength(sentBeforeTakeOver);
   });
 
   it('keeps refs across turns and drops every registry on navigation', async () => {

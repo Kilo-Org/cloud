@@ -71,7 +71,7 @@ import type { AgentWorkflow } from '@/src/shared/agent-workflows';
 import { loadWorkflowSettings } from '@/src/shared/agent-workflows-storage';
 import { loadWebMcpSettings } from '@/src/shared/web-mcp-settings';
 import { executeWorkflowToolCall } from './agent-workflow-tool-runtime';
-import { evalInTab, getTabUrl, navigateTab } from './agent-workflow-runtime';
+import { claimTab, evalInTab, getTabUrl, navigateTab } from './agent-workflow-runtime';
 import { disposeBrowserCaller, releaseBrowserCaller } from './browser-tool-runtime';
 import { BrowserTabTakeOverCard } from './browser-tab-takeover-card';
 import type { BrowserCaller } from '@/src/shared/browser-caller';
@@ -221,6 +221,21 @@ export const formatSelectedTabSystemEnvironment = ({
   readonly url: string;
 }): string =>
   formatSystemEnvironment({ memories: [], selectedTab: { title, url }, workflows: [] }) ?? '';
+
+/**
+ * Whether a finished turn still owes its tab lease. It does when the run is
+ * still the conversation's current one, or when the conversation has no run at
+ * all — it was closed, deleted or stopped, and that path drops the run state
+ * before this turn unwinds. A newer run of the same conversation keeps the
+ * lease instead: it holds the same caller key and releases it at its own end.
+ */
+export const runOwesTabLease = ({
+  currentRunToken,
+  runToken,
+}: {
+  readonly currentRunToken: number | undefined;
+  readonly runToken: number;
+}): boolean => currentRunToken === undefined || currentRunToken === runToken;
 
 const getSendBlockedReason = ({
   isCompacting,
@@ -844,6 +859,7 @@ export const AgentChatPanel = ({
         updateThinkingBlock: runState.updateRunThinkingBlock,
         workflowToolContext: {
           allowWorkflowsInSafeMode,
+          claimTab: (tabId, caller) => claimTab(tabId, caller, browserCaller),
           disposeBrowserCaller,
           evalInTab,
           getTabUrl,
@@ -860,13 +876,26 @@ export const AgentChatPanel = ({
         workflowTools,
       });
     } finally {
+      /*
+       * A closed, deleted or stopped run drops its state before this finally
+       * runs (abortConversationRun), so isCurrentRun is false and the lease would
+       * never be released: another conversation then queues on the tab with no
+       * timeout. Only a newer run of the same conversation keeps the lease.
+       */
+      if (
+        runOwesTabLease({
+          currentRunToken: runStatesRef.current.get(conversationId)?.token,
+          runToken: runState.runToken,
+        })
+      ) {
+        // The turn's tab lease ends with it, so the next conversation or a queued CLI agent can take the tab.
+        await releaseBrowserCaller(browserCaller);
+      }
+
       if (runState.isCurrentRun()) {
         const latest = store.get(contextUsageAtomFamily(conversationId))?.promptTokens ?? 0;
         const runContextLength = modelOptions.find(option => option.id === runModel)?.contextLength;
         const ratio = getContextRatio(latest, runContextLength);
-
-        // The turn's tab lease ends with it, so the next conversation or a queued CLI agent can take the tab.
-        await releaseBrowserCaller(browserCaller);
 
         // Clean up the run state first so compactConversation's running-conversation check passes.
         cleanupRun();
@@ -1106,10 +1135,12 @@ export const AgentChatPanel = ({
       try {
         const settings = await loadWorkflowSettings(storage);
         const runMode = conversation.mode ?? defaultMode;
+        const runPanelCaller: BrowserCaller = { conversationId, kind: 'panel', panelId };
         result = await executeWorkflowToolCall(toolCall, {
           allowWorkflowsInSafeMode: settings.allowWorkflowsInSafeMode,
+          claimTab: (tabId, caller) => claimTab(tabId, caller, runPanelCaller),
           disposeBrowserCaller,
-          evalInTab: (tabId, code) => evalInTab(tabId, code),
+          evalInTab,
           getTabUrl: tabId => getTabUrl(tabId),
           mode: runMode,
           navigateTab: (tabId, url) => navigateTab(tabId, url),
@@ -1290,6 +1321,10 @@ export const AgentChatPanel = ({
     (conversationId: string): void => {
       runStatesRef.current.get(conversationId)?.abort.abort();
       runStatesRef.current.delete(conversationId);
+      // The aborted run's finally cannot tell it still owes the tab lease (its state is gone).
+      // A stopped turn must not keep the tab until its last command unwinds.
+      // Another conversation would queue on it with no timeout.
+      void releaseBrowserCaller({ conversationId, kind: 'panel', panelId });
       // Required: deleting run-state makes the run's later finally see isCurrentRun() === false
       // And skip cleanup; without this, close/delete mid-stream leaks a stale streaming id.
       store.set(streamingMessageIdAtomFamily(conversationId), undefined);

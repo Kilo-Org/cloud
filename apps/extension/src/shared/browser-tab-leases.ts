@@ -3,7 +3,11 @@ import { z } from 'zod';
 import { browserCallerKey, browserCallerSchema } from './browser-caller';
 import type { BrowserCaller } from './browser-caller';
 
-/** How long an agent caller waits for a tab held by someone else before `tab_busy`. */
+/**
+ * How long a caller that may not take a tab over — an agent or a workflow run —
+ * waits for a tab someone else holds before `tab_busy`. Panels never wait: they
+ * ask the user for a take-over instead.
+ */
 export const AGENT_TAB_WAIT_MS = 30_000;
 
 export const TAB_LEASES_STORAGE_KEY = 'session:kiloBrowserTabLeases';
@@ -72,13 +76,15 @@ interface QueuedWaiter {
   readonly key: string;
   readonly title?: string;
   readonly resolve: (result: TabLeaseResult) => void;
+  detachAbort?: (() => void) | undefined;
   timer?: ReturnType<typeof setTimeout>;
 }
 
-const waitForAgentTimeout = (waiter: QueuedWaiter): void => {
-  waiter.timer = setTimeout(() => {
-    waiter.resolve({ kind: 'busy' });
-  }, AGENT_TAB_WAIT_MS);
+/** A settled waiter fires nothing again: its timeout is cancelled and its abort listener detached. */
+const settleWaiter = (waiter: QueuedWaiter): void => {
+  clearTimeout(waiter.timer);
+  waiter.detachAbort?.();
+  waiter.detachAbort = undefined;
 };
 
 /**
@@ -97,6 +103,13 @@ export const createTabLeaseRegistry = ({
   const holders = new Map<number, TabLeaseHolder>();
   const queues = new Map<number, QueuedWaiter[]>();
   let loadPromise: Promise<void> | undefined = undefined;
+  /*
+   * Releases that land while the initial storage read is in flight. They see an
+   * empty holders map, so the stored copy must not be re-inserted afterwards:
+   * a closed tab or a disposed caller would come back as a phantom owner.
+   */
+  const releasedWhileLoading = { callers: new Set<string>(), tabs: new Set<number>() };
+  let loading = false;
   // The newest snapshot not yet written; a burst of lease changes writes only the last one.
   let pendingSnapshot: PersistedTabLease[] | undefined = undefined;
   let writeChain: Promise<void> = Promise.resolve();
@@ -175,8 +188,13 @@ export const createTabLeaseRegistry = ({
     }
 
     for (const lease of stored) {
+      const releasedWhileReading =
+        releasedWhileLoading.tabs.has(lease.tabId) ||
+        releasedWhileLoading.callers.has(browserCallerKey(lease.caller));
+
       // A live waiter already claimed the tab in this service worker; the persisted copy is stale.
-      if (!holders.has(lease.tabId)) {
+      // So is a lease a close or a dispose released while this read was in flight.
+      if (!holders.has(lease.tabId) && !releasedWhileReading) {
         holders.set(lease.tabId, {
           caller: lease.caller,
           key: browserCallerKey(lease.caller),
@@ -192,8 +210,34 @@ export const createTabLeaseRegistry = ({
       return undefined;
     }
 
-    loadPromise ??= load(persistence);
+    loadPromise ??= (async () => {
+      loading = true;
+
+      try {
+        await load(persistence);
+      } finally {
+        loading = false;
+        releasedWhileLoading.callers.clear();
+        releasedWhileLoading.tabs.clear();
+      }
+    })();
+
     return loadPromise;
+  };
+
+  /** Remembers a release that arrived before the persisted leases were read (see `releasedWhileLoading`). */
+  const noteReleased = ({ key, tabId }: { key?: string; tabId?: number }): void => {
+    if (!loading) {
+      return;
+    }
+
+    if (key !== undefined) {
+      releasedWhileLoading.callers.add(key);
+    }
+
+    if (tabId !== undefined) {
+      releasedWhileLoading.tabs.add(tabId);
+    }
   };
 
   const queueFor = (tabId: number): QueuedWaiter[] => {
@@ -222,7 +266,7 @@ export const createTabLeaseRegistry = ({
       return;
     }
 
-    clearTimeout(waiter.timer);
+    settleWaiter(waiter);
 
     holders.set(tabId, {
       caller: waiter.caller,
@@ -254,7 +298,7 @@ export const createTabLeaseRegistry = ({
 
       if (waiter !== undefined && predicate(waiter)) {
         queue.splice(index, 1);
-        clearTimeout(waiter.timer);
+        settleWaiter(waiter);
         waiter.resolve({ kind: 'busy' });
       }
     }
@@ -264,10 +308,25 @@ export const createTabLeaseRegistry = ({
     }
   };
 
+  /**
+   * A caller that may not take a tab over waits a bounded window. The timed-out
+   * waiter leaves the queue like every other settle path: a later release must
+   * not hand the tab to a caller that already got `tab_busy`, which no one would
+   * ever release.
+   */
+  const waitForCallerTimeout = (tabId: number, waiter: QueuedWaiter): void => {
+    waiter.timer = setTimeout(() => {
+      removeQueued(tabId, candidate => candidate === waiter);
+    }, AGENT_TAB_WAIT_MS);
+  };
+
   const release = (tabId: number, caller: BrowserCaller): void => {
     const holder = holders.get(tabId);
+    const key = browserCallerKey(caller);
 
-    if (holder === undefined || holder.key !== browserCallerKey(caller)) {
+    noteReleased({ key, tabId });
+
+    if (holder === undefined || holder.key !== key) {
       return;
     }
 
@@ -332,17 +391,22 @@ export const createTabLeaseRegistry = ({
 
     queueFor(tabId).push(waiter);
 
-    if (caller.kind === 'agent') {
-      waitForAgentTimeout(waiter);
+    // Only a panel may take a tab over, so only a panel may wait without a bound (for the user's confirmation answer).
+    if (caller.kind !== 'panel') {
+      waitForCallerTimeout(tabId, waiter);
     }
 
-    options?.signal?.addEventListener(
-      'abort',
-      () => {
+    if (signal !== undefined) {
+      const onAbort = (): void => {
         removeQueued(tabId, candidate => candidate === waiter);
-      },
-      { once: true }
-    );
+      };
+
+      // Detached when the waiter settles: a long-lived turn controller must not accumulate listeners.
+      waiter.detachAbort = () => {
+        signal.removeEventListener('abort', onAbort);
+      };
+      signal.addEventListener('abort', onAbort);
+    }
 
     return promise;
   };
@@ -350,6 +414,8 @@ export const createTabLeaseRegistry = ({
   const releaseCaller = (caller: BrowserCaller): number => {
     const key = browserCallerKey(caller);
     let released = 0;
+
+    noteReleased({ key });
 
     for (const [tabId, holder] of holders) {
       if (holder.key === key) {
@@ -369,6 +435,8 @@ export const createTabLeaseRegistry = ({
 
   const releaseTab = (tabId: number): void => {
     const holder = holders.get(tabId);
+
+    noteReleased({ tabId });
 
     if (holder !== undefined) {
       holders.delete(tabId);

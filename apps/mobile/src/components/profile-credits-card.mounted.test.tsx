@@ -1350,7 +1350,7 @@ describe('CreditsCard credits header', () => {
       TOUCH_TARGET_DP
     );
     // A short account or org name must not shrink the target below 44pt.
-    expect(String(picker.props.className)).toContain('min-w-[44px]');
+    expect(String(picker.props.className)).toContain('min-w-11');
     unmount();
   });
 });

@@ -39,8 +39,8 @@ import { ConfigureRow } from '@/components/ui/configure-row';
 import { DirectionalLogOut } from '@/components/ui/directional-icons';
 import { FormField } from '@/components/ui/form-field';
 import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Section } from '@/components/ui/section';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useDeleteAccount } from '@/components/use-delete-account';
 import { useFeedbackPrompt } from '@/components/use-feedback-prompt';
@@ -463,21 +463,10 @@ export function ProfileScreen() {
           <Section label={t('profile.linkedAccounts')}>
             {linkedAccounts.kind === 'skeleton' ? (
               <Animated.View exiting={FadeOut.duration(150)}>
-                {/* Content-shaped skeleton in the group's own row shape: a
-                    plain block read as an empty box in the e5 spot check
-                    (2026-09-07). Its bars sit where the row's title and
-                    subtitle settle, so the swap to real rows does not shift the
-                    sections below. Bars are bg-muted-soft: the theme's bg-muted
-                    equals bg-secondary, so default-tone bars were invisible
-                    here (b911 e2 spot check). */}
+                {/* The group's own row shape, so the swap to the loaded rows
+                    does not shift the sections below. */}
                 <RowGroup>
-                  <View className="min-h-[48px] flex-row items-center gap-3 px-4 py-3">
-                    <Skeleton className="h-[30px] w-[30px] shrink-0 rounded-lg bg-muted-soft" />
-                    <View className="flex-1 gap-0.5">
-                      <Skeleton className="h-4 w-32 rounded bg-muted-soft" />
-                      <Skeleton className="h-3 w-48 rounded bg-muted-soft" />
-                    </View>
-                  </View>
+                  <RowSkeleton tile subtitle />
                 </RowGroup>
               </Animated.View>
             ) : null}

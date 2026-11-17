@@ -13,7 +13,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Fab, FAB_GUTTER, FAB_MARGIN, FAB_SIZE } from '@/components/ui/fab';
 import { MessageCircle } from '@/components/ui/icons';
-import { Skeleton } from '@/components/ui/skeleton';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -223,14 +223,12 @@ function ScopedChatListScreen() {
       return (
         <View className="pt-1">
           {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (
-            <View key={index} className="flex-row items-center gap-3 px-4 py-3">
-              <Skeleton className="h-[30px] w-[3px] rounded-full" />
-              <View className="flex-1 gap-1">
-                <Skeleton className="h-3 w-24" />
-                <Skeleton className="h-4 w-48" />
-                <Skeleton className="h-3 w-32" />
-              </View>
-            </View>
+            <RowSkeleton
+              key={index}
+              variant="session"
+              subtitle
+              last={index === SKELETON_ROW_COUNT - 1}
+            />
           ))}
         </View>
       );

@@ -205,7 +205,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const amountLine = (
     <ScrollView horizontal className="min-w-0 shrink-0 grow-0">
       <Text
-        className="text-2xl font-bold tabular-nums"
+        variant="figure"
         // A reader compares the amount digit by digit, and its symbol is
         // neutral to the line's direction, so the run keeps its own
         // left-to-right order whatever the interface language.
@@ -307,7 +307,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
               className={cn(
                 LINE_ACTION_BOX_CLASS,
                 // A short account or org name must still carry the 44pt reach.
-                'min-w-[44px] flex-row items-center gap-1 active:opacity-70',
+                'min-w-11 flex-row items-center gap-1 active:opacity-70',
                 narrow ? 'max-w-full justify-start' : 'max-w-[65%] shrink justify-end'
               )}
               hitSlop={LINE_ACTION_HIT_SLOP}

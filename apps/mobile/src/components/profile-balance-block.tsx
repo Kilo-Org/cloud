@@ -65,7 +65,7 @@ export function BalanceBlock({
   } else if (state === 'failed') {
     value = (
       <Pressable
-        className="min-h-[28px] min-w-0 flex-row items-center gap-2 active:opacity-70"
+        className="min-h-7 min-w-0 flex-row items-center gap-2 active:opacity-70"
         hitSlop={LINE_ACTION_HIT_SLOP}
         onPress={onRetry}
         accessibilityRole="button"
@@ -87,7 +87,7 @@ export function BalanceBlock({
   let visibilityControl = toggle;
   if (state !== 'ready') {
     visibilityControl =
-      stacked && state === 'failed' ? null : <View className="h-[48px] w-[48px]" />;
+      stacked && state === 'failed' ? null : <View className="h-12 w-12" />;
   }
   // The noninteractive caption must not intercept the retry target's hit slop.
   const expiryNote = state === 'failed' ? <View pointerEvents="none">{note}</View> : note;
@@ -95,7 +95,7 @@ export function BalanceBlock({
     <View className={amountRowClass}>
       <View className={valueWrapperClass}>{value}</View>
       {stacked && state !== 'failed' && (
-        <View className="shrink-0 -my-[10px]">{visibilityControl}</View>
+        <View className="shrink-0 -my-2.5">{visibilityControl}</View>
       )}
     </View>
   );

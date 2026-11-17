@@ -173,6 +173,47 @@ test('preparation rejects symbolic refs, unrelated histories and unsafe executab
       .success,
     false
   );
+  // A presentation the app does not have must be refused, not silently ignored:
+  // the capture would then measure a sheet header at the window origin.
+  assert.equal(
+    ProofManifestSchema.safeParse({
+      version: 1,
+      targets: [{ ...TARGET, diagnostic: { component: PRODUCT, presentation: 'dialog' } }],
+    }).success,
+    false
+  );
+});
+
+test('a picker-sheet diagnostic presents the screen the way the app presents that route', async t => {
+  const fixture = syntheticRepo(
+    t,
+    ProofManifestSchema.parse({
+      version: 1,
+      targets: [
+        {
+          ...TARGET,
+          screen: '(app)/design-proof-card',
+          diagnostic: { component: PRODUCT, presentation: 'picker-sheet' },
+        },
+      ],
+    })
+  );
+  const preparation = await prepareProof(fixture);
+  // The route lives in the signed-in shell, where the picker routes live and
+  // where the sheet is pushed over the tabs.
+  const route = fs.readFileSync(
+    path.join(preparation.base.directory, 'apps/mobile/src/app/(app)/design-proof-card.tsx'),
+    'utf8'
+  );
+  // The screen registers its own sheet options and only opens warm.
+  assert.match(route, /import \{ useFormSheetScreenOptions \} from '@\/lib\/form-sheet'/);
+  assert.match(route, /React\.createElement\(Stack\.Screen, \{ options \}\)/);
+  assert.match(route, /sheetAllowedDetents: \[0\.5\]/);
+  const intent = fs.readFileSync(
+    path.join(preparation.base.directory, 'apps/mobile/src/app/+native-intent.tsx'),
+    'utf8'
+  );
+  assert.match(intent, /!initial &&/);
 });
 
 test('diagnostic prerequisite must exist on base, never copied from head', async t => {
@@ -1069,11 +1110,14 @@ test('prepared source validation rejects symlink ancestors even when the externa
   const fixture = syntheticRepo(t);
   const preparation = await prepareProof(fixture);
   const base = preparation.base.directory;
-  const auth = path.join(base, 'apps/mobile/src/app/(auth)');
+  const generated = path.join(base, 'apps/mobile/src/app/(auth)/design-proof-card.tsx');
   const outside = path.join(fixture.root, 'external-matching-fixture');
   fs.mkdirSync(outside);
-  const text = fs.readFileSync(path.join(auth, 'design-proof-card.tsx'), 'utf8');
+  const text = fs.readFileSync(generated, 'utf8');
   fs.writeFileSync(path.join(outside, 'design-proof-card.tsx'), text);
+  // A symlinked ancestor hides where the generated leaf really lives; the leaf
+  // alone would match, so the ancestor is what the containment check must catch.
+  const auth = path.join(base, 'apps/mobile/src/app/(auth)');
   fs.renameSync(auth, `${auth}-original`);
   fs.symlinkSync(outside, auth);
   assert.throws(

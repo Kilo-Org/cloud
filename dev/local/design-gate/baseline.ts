@@ -65,6 +65,24 @@ const TargetSchema = z
           .regex(/^(?:default|[A-Z][a-zA-Z0-9]*)$/)
           .default('default'),
         props: z.record(z.string(), z.json()).default({}),
+        /**
+         * Where the generated route lives, and how it presents the screen.
+         *
+         * 'card' is a bare route in the auth group: the screen paints straight
+         * onto the window, which is right for a component and for a screen the
+         * app shows that way.
+         *
+         * 'picker-sheet' is a route file in the signed-in shell, registering the
+         * composer picker's own sheet options — the same ones
+         * `apps/mobile/src/app/(app)/_layout.tsx` registers for those routes: a
+         * half detent on Android, the app's own `formSheet` options elsewhere.
+         * The fixture link only opens warm (`!initial`): a cold replay would
+         * present the sheet as its stack's first route at the window top and
+         * race the native re-presentation. A bare auth route is refused while
+         * signed in, and it would measure the sheet header at the window top
+         * instead of inside the sheet.
+         */
+        presentation: z.enum(['card', 'picker-sheet']).default('card'),
       })
       .strict()
       .optional(),
@@ -83,14 +101,18 @@ export const ProofManifestSchema = z
       ids.add(target.id);
       if (target.diagnostic !== undefined) {
         const route = `/design-proof-${target.id}`;
+        const screen =
+          target.diagnostic.presentation === 'picker-sheet'
+            ? `(app)/${route.slice(1)}`
+            : `(auth)/${route.slice(1)}`;
         if (
           target.route !== route ||
-          target.screen !== `(auth)/${route.slice(1)}` ||
+          target.screen !== screen ||
           target.link !== `kiloapp://${route}`
         ) {
           ctx.addIssue({
             code: 'custom',
-            message: `Diagnostic ${target.id} must use kiloapp://${route}, route ${route} and screen (auth)/${route.slice(1)}`,
+            message: `Diagnostic ${target.id} must use kiloapp://${route}, route ${route} and screen ${screen}`,
           });
         }
       }
@@ -193,22 +215,49 @@ function generatedFiles(
     // The manifest describes data and a product component, never executable source,
     // auth replacement, environment files, or an arbitrary head-to-base copy.
     trackedFile(repo, commit, diagnostic.component);
-    const file = `apps/mobile/src/app/(auth)/design-proof-${target.id}.tsx`;
-    if (git(repo, ['ls-tree', commit, '--', file]).trim() !== '') {
-      throw new Error(`Diagnostic would overwrite existing product source: ${file}`);
-    }
+    // A picker-sheet diagnostic lives in the signed-in shell: its route file is
+    // a screen of the app's own (app) stack, the stack the real picker routes
+    // are pushed onto, and it registers the composer picker's sheet options on
+    // itself. A route anywhere else paints bare or presents inside a nested
+    // stack that never presents a native sheet.
+    const isSheet = diagnostic.presentation === 'picker-sheet';
+    const file = isSheet
+      ? `apps/mobile/src/app/(app)/design-proof-${target.id}.tsx`
+      : `apps/mobile/src/app/(auth)/design-proof-${target.id}.tsx`;
     const componentImport = `@/${diagnostic.component.slice('apps/mobile/src/'.length, -4)}`;
     let binding = 'Component';
     if (diagnostic.exportName !== 'default') binding = `{ ${diagnostic.exportName} as Component }`;
+    // A picker-sheet diagnostic presents the screen the way the app presents the
+    // picker routes: a half detent on Android, its own formSheet options
+    // elsewhere. The presentation is registered by the generated group layout
+    // BEFORE the screen mounts, so the native screen never re-presents: an
+    // options update after the first mount remounts the sheet fragment, which
+    // tears the stack down on a later route change. Without the presentation the
+    // screen paints onto the window and its sheet header is measured at the
+    // window top, an overlap the product never paints.
+    // A picker-sheet diagnostic presents the screen the way the app presents the
+    // picker routes: a half detent on Android, its own formSheet options
+    // elsewhere. Without it the screen paints onto the window and its sheet
+    // header is measured at the window top, an overlap the product never paints.
+    const presents = diagnostic.presentation === 'picker-sheet';
+    const imports = presents
+      ? `import React from 'react';\nimport { Redirect, Stack } from 'expo-router';\nimport { Platform } from 'react-native';\nimport { useFormSheetScreenOptions } from '@/lib/form-sheet';\n`
+      : `import React from 'react';\nimport { Redirect } from 'expo-router';\n`;
+    const presentation = presents
+      ? `  const sheetOptions = useFormSheetScreenOptions();\n  const options =\n    Platform.OS === 'android'\n      ? { ...sheetOptions, sheetAllowedDetents: [0.5] }\n      : sheetOptions;\n`
+      : '';
+    const screen = presents
+      ? `React.createElement(\n      React.Fragment,\n      null,\n      React.createElement(Stack.Screen, { options }),\n      React.createElement(Component, JSON.parse(${JSON.stringify(JSON.stringify(diagnostic.props))}))\n    )`
+      : `React.createElement(Component, JSON.parse(${JSON.stringify(JSON.stringify(diagnostic.props))}))`;
     files.set(
       file,
-      `// Temporary generated design-proof diagnostic, not product source.\nimport React from 'react';\nimport { Redirect } from 'expo-router';\nimport ComponentBinding from ${JSON.stringify(componentImport)};\nexport default function DesignProofFixture() {\n  if (!__DEV__) return React.createElement(Redirect, { href: '/(auth)/login' });\n  return React.createElement(Component, JSON.parse(${JSON.stringify(JSON.stringify(diagnostic.props))}));\n}\n`.replace(
+      `// Temporary generated design-proof diagnostic, not product source.\n${imports}import ComponentBinding from ${JSON.stringify(componentImport)};\nexport default function DesignProofFixture() {\n${presentation}  if (!__DEV__) return React.createElement(Redirect, { href: '/(auth)/login' });\n  return ${screen};\n}\n`.replace(
         'ComponentBinding',
         binding
       )
     );
     branches.push(
-      `  if (__DEV__ && ${JSON.stringify([target.link, target.route, target.route.slice(1)])}.includes(path)) return ${JSON.stringify(`/${target.screen}`)};`
+      `  if (__DEV__ && !initial && ${JSON.stringify([target.link, target.route, target.route.slice(1)])}.includes(path)) return ${JSON.stringify(`/${target.screen}`)};`
     );
   }
   const declaration =

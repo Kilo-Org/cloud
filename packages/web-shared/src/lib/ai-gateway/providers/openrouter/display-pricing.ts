@@ -43,7 +43,7 @@ export function maxEndpointPricing(a: EndpointPricing, b: EndpointPricing): Endp
   const result: EndpointPricing = { ...a };
   for (const key of PRICE_KEYS) {
     const price = b[key];
-    if (price === undefined) continue;
+    if (price === undefined || !Number.isFinite(Number.parseFloat(price))) continue;
     const current = result[key];
     if (current === undefined || Number.parseFloat(price) > Number.parseFloat(current)) {
       result[key] = price;

@@ -102,7 +102,7 @@ describe('maxEndpointPricing', () => {
     expect(
       maxEndpointPricing(
         { prompt: '0.000001', completion: '0.000002' },
-        { prompt: 'n/a', completion: '0.000003' }
+        { prompt: 'n/a', completion: '0.000003', input_cache_read: 'n/a' }
       )
     ).toEqual({ prompt: '0.000001', completion: '0.000003' });
   });

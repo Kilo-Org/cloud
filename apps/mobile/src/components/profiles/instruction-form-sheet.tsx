@@ -23,6 +23,7 @@ import {
   validateInstructionInput,
 } from '@/lib/agent-profile-forms';
 import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
+import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { useFormDraftRef } from '@/lib/form-draft';
 
 /** The validated fields a saved instruction is built from. */
@@ -41,8 +42,10 @@ type InstructionFormSheetProps = Readonly<{
   /**
    * Persist the validated fields. The caller owns create-vs-update and closes
    * the sheet on success; on failure it returns with the sheet still open.
+   * May return a promise: the sheet holds its one-save admission until the
+   * save settles, then releases it, so a failed save can be retried.
    */
-  onSave: (submission: InstructionFormSubmission) => void;
+  onSave: (submission: InstructionFormSubmission) => void | Promise<void>;
   /** A refused save, shown inside the sheet instead of only a toast it covers. */
   saveFailure?: string | null;
   /** Whether that failure is an error or an expected limit. */
@@ -79,6 +82,12 @@ export function InstructionFormSheet({
   const { scrollRef, fieldLayout, scrollToField } = useFormFieldScroll<
     'status' | 'name' | 'content'
   >();
+  // One save per Save press burst. The admission is taken before validation
+  // publishes anything and before `onSave` runs, so a double press in the
+  // render window before `isSaving` reaches the Done control starts one save.
+  // It rides the save promise: released when the save settles, whatever its
+  // outcome, so a refused save can be retried with Save.
+  const { feedback, begin } = useSurfaceFeedback<never>();
 
   const nameError =
     error !== null && instructionNameErrorShown(error)
@@ -92,15 +101,26 @@ export function InstructionFormSheet({
     isDirty: () =>
       nameRef.current !== (instruction?.name ?? '') ||
       contentRef.current !== (instruction?.content ?? ''),
+    // `isSaving` alone lags one render, so the burst window reads as idle; the
+    // pending admission closes that window at once.
+    isRunning: () => isSaving || feedback.status === 'pending',
     onDiscard: onClose,
   });
 
   const submit = () => {
+    // One save per Save press burst: `doneDisabled={isSaving}` only disables
+    // Done on the next render, so a second fast press must be refused here
+    // instead of starting a second save (see `trigger-create-screen`).
+    const attempt = begin();
+    if (attempt === null) {
+      return;
+    }
     const result = validateInstructionInput({
       name: nameRef.current,
       content: contentRef.current,
     });
     if (result !== null) {
+      attempt.abandon();
       setError(result);
       scrollToField(instructionNameErrorShown(result) ? 'name' : 'content');
       return;
@@ -111,7 +131,17 @@ export function InstructionFormSheet({
     if (saveFailure !== null) {
       scrollToField('status');
     }
-    onSave({ name: cleanInstructionName(nameRef.current), content: contentRef.current });
+    // The admission rides the save: released the moment the save settles,
+    // whatever its outcome, so a refused save can be retried with Save. The
+    // catch keeps a parent's rejection from surfacing as unhandled: the parent
+    // owns the failure copy the sheet renders.
+    Promise.resolve(
+      onSave({ name: cleanInstructionName(nameRef.current), content: contentRef.current })
+    )
+      .finally(() => {
+        attempt.abandon();
+      })
+      .catch(() => {});
   };
 
   return (

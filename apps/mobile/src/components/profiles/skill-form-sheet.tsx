@@ -17,6 +17,7 @@ import {
   validateSkillInput,
 } from '@/lib/agent-profile-forms';
 import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
+import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { useFormDraftRef, useFormDraftState } from '@/lib/form-draft';
 
 /** The validated fields a saved skill is built from. */
@@ -41,7 +42,7 @@ type SkillFormSheetProps = Readonly<{
    * Persist the validated fields. The caller owns create-vs-update and closes
    * the sheet on success; on failure it returns with the sheet still open.
    */
-  onSave: (submission: SkillFormSubmission) => void;
+  onSave: (submission: SkillFormSubmission) => void | Promise<void>;
   /** A refused save, shown inside the sheet instead of only a toast it covers. */
   saveFailure?: string | null;
   /**
@@ -93,15 +94,26 @@ export function SkillFormSheet({
     : undefined;
   const contentError = error === 'no-content' ? t(skillErrorKey(error)) : undefined;
 
+  // One save per Save press burst; see `instruction-form-sheet.tsx`. Its
+  // pending admission closes the burst window the lagging `isSaving` leaves
+  // open, so the dismissal guard reads it too.
+  const { feedback, begin } = useSurfaceFeedback<never>();
+
   const { requestClose, requestDismiss, dialog } = useSheetDismissGuard({
     isDirty: () =>
       nameRef.current !== (skill?.name ?? '') || contentRef.current !== (skill?.rawMarkdown ?? ''),
+    isRunning: () => isSaving || feedback.status === 'pending',
     onDiscard: onClose,
   });
 
   const submit = () => {
+    const attempt = begin();
+    if (attempt === null) {
+      return;
+    }
     const result = validateSkillInput({ name: nameRef.current, content: contentRef.current });
     if (result.error !== null) {
+      attempt.abandon();
       setError(result.error);
       scrollToField(result.error === 'no-content' ? 'content' : 'name');
       return;
@@ -112,11 +124,18 @@ export function SkillFormSheet({
     if (saveFailure !== null) {
       scrollToField('status');
     }
-    onSave({
-      name: nameRef.current.trim(),
-      rawMarkdown: contentRef.current,
-      ...(result.description === undefined ? {} : { description: result.description }),
-    });
+    // The admission rides the save; see `instruction-form-sheet.tsx`.
+    Promise.resolve(
+      onSave({
+        name: nameRef.current.trim(),
+        rawMarkdown: contentRef.current,
+        ...(result.description === undefined ? {} : { description: result.description }),
+      })
+    )
+      .finally(() => {
+        attempt.abandon();
+      })
+      .catch(() => {});
   };
 
   return (

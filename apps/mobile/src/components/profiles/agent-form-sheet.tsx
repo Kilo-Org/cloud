@@ -30,6 +30,7 @@ import { selectableRowA11y } from '@/lib/a11y/selectable-row';
 import { MAX_PROFILE_AGENTS } from '@/lib/agent-profile-forms';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
+import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { useFormDraftRef, useFormDraftState } from '@/lib/form-draft';
 import { cn } from '@/lib/utils';
 
@@ -64,7 +65,11 @@ type AgentFormSheetProps = Readonly<{
   organizationId?: string;
   isSaving: boolean;
   onClose: () => void;
-  onSave: (payload: { slug: string; name: string; config: Record<string, unknown> }) => void;
+  onSave: (payload: {
+    slug: string;
+    name: string;
+    config: Record<string, unknown>;
+  }) => void | Promise<void>;
   /** The last save refusal, each arm rendered where it belongs in the sheet. */
   saveFailure?: AgentSaveFailure | null;
 }>;
@@ -154,12 +159,22 @@ export function AgentFormSheet({
     variant !== initial.variant ||
     disabledTools.length !== initial.disabledTools.length ||
     disabledTools.some(tool => !initial.disabledTools.includes(tool));
+  // One save per Save press burst; see `instruction-form-sheet.tsx`. Its
+  // pending admission closes the burst window the lagging `isSaving` leaves
+  // open, so the dismissal guard reads it too.
+  const { feedback, begin } = useSurfaceFeedback<never>();
+
   const { requestClose, requestDismiss, dialog } = useSheetDismissGuard({
     isDirty: hasUnsavedEdits,
+    isRunning: () => isSaving || feedback.status === 'pending',
     onDiscard: onClose,
   });
 
   const submit = () => {
+    const attempt = begin();
+    if (attempt === null) {
+      return;
+    }
     const state: AgentFormState = {
       slug: slugRef.current,
       name: nameRef.current,
@@ -175,12 +190,18 @@ export function AgentFormSheet({
     };
     const problem = validateAgentForm(state, existingSlugs);
     if (problem !== null) {
+      attempt.abandon();
       setError(problem);
       scrollToField(ERROR_FIELDS[problem]);
       return;
     }
     setError(null);
-    onSave(buildAgentPayload(state, agent?.config));
+    // The admission rides the save; see `instruction-form-sheet.tsx`.
+    Promise.resolve(onSave(buildAgentPayload(state, agent?.config)))
+      .finally(() => {
+        attempt.abandon();
+      })
+      .catch(() => {});
   };
 
   // The one refusal line: a create past the cap names the cap as a warning, and

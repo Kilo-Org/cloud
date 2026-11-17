@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Sua sessão de agente tem uma atualização",
-      "chatMessage": "Você tem uma nova mensagem",
-      "instanceLifecycle": "Sua instância tem uma atualização",
-      "scheduledAction": "Uma ação agendada tem uma atualização",
       "lowBalance": "Seu saldo precisa de atenção",
       "spendAlert": "Seu gasto precisa de atenção",
       "securityFinding": "Um achado de segurança precisa de atenção",
@@ -15,14 +12,7 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
-    }
-  },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · Sem título",
-      "body": "{{bodyPreview}}"
     }
   },
   "internal": {
@@ -45,43 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "Violação de SLA"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "Uma verificação de segurança tem uma atualização"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} está pronta",
-      "body": "Toque para começar a conversar."
-    },
-    "startFailed": {
-      "title": "{{instanceName}} falhou ao iniciar",
-      "body": "Falha ao iniciar."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} será reiniciada em breve",
-      "body": "Reinício agendado para {{when}}."
-    },
-    "restartCancelled": {
-      "title": "Reinício de {{instanceName}} cancelado",
-      "body": "O reinício agendado anteriormente foi cancelado."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} será atualizada em breve",
-      "bodyWithTag": "Atualização para {{targetImageTag}} em {{when}}.",
-      "bodyWithoutTag": "Atualização agendada em {{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "Atualização de {{instanceName}} cancelada",
-      "body": "A atualização agendada anteriormente foi cancelada."
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "Sua sessão do Kilo está pronta para controlar pelo seu telefone"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

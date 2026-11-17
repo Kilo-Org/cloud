@@ -48,6 +48,9 @@ type IntegrationProviderRowProps = Readonly<{
   onConnect: () => void;
   onDisconnect: () => void;
   onManageOnWeb: () => void;
+  /** Runs the read that names a connected row's connection again. */
+  onRetryConnection: () => void;
+  retryingConnection: boolean;
   last?: boolean;
 }>;
 
@@ -66,6 +69,8 @@ export function IntegrationProviderRow({
   onConnect,
   onDisconnect,
   onManageOnWeb,
+  onRetryConnection,
+  retryingConnection,
   last,
 }: IntegrationProviderRowProps) {
   const { t } = useTranslation();
@@ -100,7 +105,9 @@ export function IntegrationProviderRow({
 
   // The page behind "Manage on the web" is the same manager-only surface as
   // Disconnect, so it follows the disconnect roles; Connect follows the
-  // connect flow's own rule, which for GitLab admits any member.
+  // connect flow's own rule, which for GitLab admits any member. Retrying the
+  // read that names a connection only repairs the Disconnect it would show, so
+  // it follows the same roles.
   let action: ReactNode = null;
   if (row.actionPending) {
     // The connections read that decides between Disconnect and the web page has
@@ -117,7 +124,7 @@ export function IntegrationProviderRow({
         <Text>{t('common.manageOnWeb')}</Text>
       </Button>
     ) : null;
-  } else if (row.installed) {
+  } else if (row.installed && row.canDisconnectNatively) {
     action = canDisconnect ? (
       <Button
         size="sm"
@@ -127,6 +134,21 @@ export function IntegrationProviderRow({
         accessibilityLabel={namedAction(t('integrations.disconnect'))}
       >
         <Text>{t('integrations.disconnect')}</Text>
+      </Button>
+    ) : null;
+  } else if (row.installed) {
+    // An installed row is never inert: the app cannot name the connection it
+    // would remove because the read that names it failed, so the row offers
+    // that read again instead of a management action it cannot perform.
+    action = canDisconnect ? (
+      <Button
+        size="sm"
+        variant="outline"
+        loading={retryingConnection}
+        onPress={onRetryConnection}
+        accessibilityLabel={namedAction(t('common.retry'))}
+      >
+        <Text>{t('common.retry')}</Text>
       </Button>
     ) : null;
   } else {

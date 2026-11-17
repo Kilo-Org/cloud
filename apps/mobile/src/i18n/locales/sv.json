@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Hantera på webben",
     "creditHistory": "Kredithistorik",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Avbryt",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Köp, kvitton och kreditaktivitet",
     "invoicesSubtitle": "Ladda ned fakturor för dina köp",
-    "manageBilling": "Hantera fakturering på kilo.ai",
-    "manageBillingIosNote": "Betalningsmetoder, automatisk påfyllning och faktureringsuppgifter hanteras på kilo.ai.",
     "codeReviewerSubtitle": "Automatiska PR-granskningar",
     "securityAgentSubtitle": "Hitta och åtgärda sårbarheter",
     "reviews": "Granskningar",
@@ -364,7 +360,8 @@
     "providerKeys": {
       "title": "Leverantörsnycklar",
       "rowSubtitle": "Använd din egen leverantörsfakturering",
-      "manageOnWebReason": "Dessa leverantörer kräver strukturerade autentiseringsuppgifter.",
+      "orgDescription": "Dessa nycklar delas med alla i organisationen och faktureras organisationens leverantörskonton.",
+      "viewOnly": "Endast organisationens ägare, administratörer eller faktureringsansvariga kan ändra nycklarna.",
       "description": "Förfrågningar via dessa nycklar faktureras ditt leverantörskonto i stället för ditt Kilo-saldo.",
       "managedByPlan": "Hanteras av din kodningsplan",
       "enableKey": "Aktivera nyckeln för {{provider}}",
@@ -374,6 +371,7 @@
       "removeMessage": "Förfrågningar som använde den här nyckeln slutar att använda din leverantörsfakturering.",
       "add": "Lägg till nyckel",
       "added": "Nyckeln har lagts till",
+      "updated": "Nyckeln har uppdaterats",
       "emptyTitle": "Inga leverantörsnycklar",
       "emptyDescription": "Lägg till en nyckel för att komma igång.",
       "chooseProvider": "Välj en leverantör",
@@ -382,9 +380,34 @@
       "noProvidersDescription": "Ingen leverantör matchar sökningen.",
       "newKeyTitle": "Ny nyckel",
       "newKeyDescription": "Nyckeln lagras krypterad och kan inte visas igen.",
+      "edit": "Redigera nyckel",
+      "editKeyTitle": "Ersätt nyckel",
+      "editKeyDescription": "Det lagrade värdet kan inte visas. Ange ett nytt för att ersätta det.",
+      "editKeyMappingsWarning": "Att ersätta nyckeln ersätter även de sparade modellmappningarna: ange alla mappningar du fortfarande behöver på nytt.",
+      "saveFailed": "Det gick inte att spara nyckeln.",
+      "invalidCredentials": "Kontrollera autentiseringsuppgifterna och försök igen.",
+      "fieldRequired": "{{field}} måste anges.",
+      "incompleteMapping": "Mappning {{number}} måste ha både gatewaymodellens slug och ett distributionsnamn.",
       "apiKeyLabel": "API-nyckel",
       "apiKeyPlaceholder": "Klistra in nyckeln",
-      "apiKeyRequired": "Ange nyckeln."
+      "apiKeyRequired": "Ange nyckeln.",
+      "authMethod": "Autentiseringsmetod",
+      "authMethodAccessKeys": "Åtkomstnycklar",
+      "resourceName": "Azure-resursnamn",
+      "region": "AWS-region",
+      "accessKeyId": "Åtkomstnyckel-ID",
+      "secretAccessKey": "Hemlig åtkomstnyckel",
+      "project": "Google Cloud-projekt",
+      "location": "Vertex-plats",
+      "clientEmail": "E-postadress för tjänstkonto",
+      "privateKey": "Privat nyckel för tjänstkonto",
+      "modelMappings": "Modellmappningar",
+      "modelMappingsDescription": "Dirigera en gatewaymodell till ett anpassat distributionsnamn.",
+      "mappingTitle": "Mappning {{number}}",
+      "mappingGatewayModel": "Gatewaymodellens slug",
+      "mappingCustomModel": "Distributionsnamn",
+      "addMapping": "Lägg till mappning",
+      "removeMapping": "Ta bort mappning {{number}}"
     },
     "dataExport": {
       "title": "Dina data",
@@ -457,7 +480,8 @@
       "nextStepFinal": "Överklagandebeslutet är slutgiltigt. Det går inte att överklaga igen.",
       "viewReceipt": "Visa kvitto"
     },
-    "changelog": "Nyheter"
+    "changelog": "Nyheter",
+    "changelogVersionPending": "Nyheter för denna version kommer med nästa appuppdatering."
   },
   "preferences": {
     "general": "Allmänt",
@@ -1170,8 +1194,6 @@
       "clearMessage": "Om du sparar ett tomt fält tas de anpassade instruktioner som sparats för den här granskaren bort."
     },
     "repos": {
-      "unavailable": "Kodarkiven är inte tillgängliga. Slutför konfigurationen av Bitbucket på kilo.ai.",
-      "finishSetup": "Slutför konfigurationen",
       "manageAccess": "Hantera åtkomst",
       "bitbucketNoRepositoriesDescription": "Inga kodarkiv är tillgängliga i den här Bitbucket-arbetsytan.",
       "gitlabNoRepositoriesDescription": "Du kan behöva bevilja åtkomst till fler grupper eller projekt på GitLab.",
@@ -1326,11 +1348,10 @@
     "followReviewMd": "Följ REVIEW.md",
     "followReviewMdSubtitle": "Följ instruktionerna i varje kodarkivs REVIEW.md-fil",
     "bitbucket": {
-      "notConnectedReadOnly": "Det finns ingen anslutning till Bitbucket. Endast organisationsägare, administratörer och faktureringsansvariga kan skapa anslutningen.",
-      "setupIncomplete": "Konfigurationen är inte klar. Slutför den på kilo.ai",
-      "setup": "Konfiguration av Bitbucket"
+      "notConnectedReadOnly": "Det finns ingen anslutning till Bitbucket. Endast organisationsägare, administratörer och faktureringsansvariga kan skapa anslutningen."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Organisationens Bitbucket-anslutning hanteras på webben från en dator.",
       "description": "Skapa en åtkomsttoken för arbetsytan med de behörigheter som krävs och klistra in den nedan.",
       "scopes": "Behörigheter som krävs: läsa kontouppgifter, läsa och skriva i kodarkiv, läsa pull-begäranden samt läsa och skriva webbhookar.",
       "tokenPlaceholder": "Åtkomsttoken för arbetsytan"
@@ -1345,7 +1366,8 @@
       "noReviews": "Inga granskningar ännu",
       "noReviewsDescription": "Granskningar visas här när Code Reviewer har granskat en pull-begäran.",
       "startManualReview": "Starta en manuell granskning",
-      "configureProvider": "Konfigurera leverantör"
+      "configureProvider": "Konfigurera leverantör",
+      "connectOwnerOnly": "Be en organisationsägare eller administratör att ansluta en leverantör."
     },
     "platformList": {
       "checking": "Kontrollerar…",
@@ -1358,8 +1380,7 @@
       "githubError": "Kunde inte öppna konfigurationen för GitHub. Försök igen.",
       "gitlabAccount": "GitLab-konto",
       "gitlabError": "Kunde inte öppna konfigurationen för GitLab. Försök igen.",
-      "description": "Anslut Kilos {{label}} för att granska pull-begäranden automatiskt.",
-      "bitbucketError": "Kunde inte öppna konfigurationen för Bitbucket. Försök igen."
+      "description": "Anslut Kilos {{label}} för att granska pull-begäranden automatiskt."
     },
     "overview": {
       "allAreas": "Alla områden",
@@ -2152,10 +2173,8 @@
       "couldNotLoadBitbucketRepositories": "Det gick inte att läsa in kodarkiven från Bitbucket.",
       "connectGithubDescription": "Logga in i webbläsaren och kom sedan tillbaka hit för att välja ett GitHub-kodarkiv.",
       "connectGitlabDescription": "Logga in i webbläsaren och kom sedan tillbaka hit för att välja ett GitLab-kodarkiv.",
-      "connectBitbucketDescription": "Logga in i webbläsaren och kom sedan tillbaka hit för att välja ett Bitbucket-kodarkiv.",
       "openGithub": "Öppna GitHub",
       "openGitlab": "Öppna GitLab",
-      "openBitbucket": "Öppna Bitbucket",
       "refreshRepositories": "Uppdatera kodarkiven",
       "githubConnected": "GitHub anslutet",
       "gitlabConnected": "GitLab anslutet",
@@ -2955,6 +2974,7 @@
     "signOutThisDevice": "Logga ut från den här enheten",
     "signOutSessionLabel": "Logga ut från {{device}}, inloggad {{signedIn}}, senast aktiv {{lastSeen}}",
     "sessionSignedOut": "Sessionen är utloggad.",
+    "sessionSignOutFailed": "Det gick inte att logga ut den här sessionen. Försök igen.",
     "signOutThisDeviceTitle": "Logga ut från den här enheten?",
     "signOutThisSessionTitle": "Logga ut den här sessionen?",
     "signOutThisSessionMessage": "{{device}} loggas ut. Senast aktiv {{lastSeen}}. Den kan behålla API-åtkomst i upp till en timme.",
@@ -3078,15 +3098,14 @@
     "manage": {
       "billingHistory": "Faktureringshistorik",
       "billingHistoryEmpty": "Ingen faktureringshistorik än.",
+      "billingHistoryError": "Kunde inte läsa in faktureringshistoriken",
       "cancel": "Avsluta prenumeration",
       "cancelDescription": "Ditt Kilo Pass är aktivt till slutet av faktureringsperioden och förnyas inte.",
       "cancelScheduled": "Avslutas {{date}}",
       "cancelScheduledChange": "Avbryt schemalagd ändring",
       "cancelled": "Prenumerationen har avslutats",
-      "changePlan": "Byt plan på kilo.ai",
-      "changePlanIosNote": "Byten av betalplan görs på kilo.ai.",
       "creditHistoryEmpty": "Inga Kilo Pass-krediter än.",
-      "manageInStore": "Hantera i {{store}}",
+      "creditHistoryError": "Kunde inte läsa in kredithistoriken",
       "resume": "Återuppta prenumeration",
       "resumeCancelledDescription": "Ditt Kilo Pass börjar förnyas automatiskt igen.",
       "resumePausedDescription": "Ditt Kilo Pass återupptas nu, före det schemalagda återupptagningsdatumet.",
@@ -3123,9 +3142,6 @@
     "bonusFree": "Gratisbonus",
     "bonusReferral": "Värvningsbonus",
     "bonusAvailable": "Tillgänglig gratisbonus",
-    "kiloPassManagement": "Hantering av Kilo Pass",
-    "kiloPassSetup": "Konfiguration av Kilo Pass",
-    "opensManagementOnWeb": "Öppnar Kilo Pass-hanteringen på webben.",
     "loadFailedRetry": "Kontrollera din anslutning och försök igen.",
     "legalTermsOfUse": "Användarvillkor (EULA)",
     "purchaseDifferentAccount": "Det här App Store-köpet är inte kopplat till ditt Kilo-konto. Logga in på det Apple-konto som användes för köpet och försök sedan igen.",
@@ -3311,7 +3327,6 @@
       "buySeats": "Köp platser",
       "setupAutoTopUp": "Konfigurera automatisk påfyllning",
       "manageAutoTopUp": "Hantera automatisk påfyllning",
-      "webAddress": "Webbadress {{url}}",
       "opensOnWeb": "Öppnas på webben"
     },
     "boundary": {
@@ -3327,7 +3342,7 @@
       "selectOrganization": "Välj en organisation",
       "unavailableDescription": "Den här organisationen är inte längre tillgänglig. Välj en annan i din profil för att fortsätta.",
       "unavailableSessionsDescription": "Den här organisationen är inte längre tillgänglig. Det går inte att läsa in sessioner för den.",
-      "accessDeniedDescription": "Du har inte åtkomst till den här organisationen."
+      "accessDeniedDescription": "Be en ägare eller administratör i organisationen om att ge dig åtkomst."
     },
     "create": {
       "title": "Skapa organisation",
@@ -3447,25 +3462,88 @@
     },
     "settingsOnWeb": {
       "title": "Organisationsinställningar på webben",
-      "integrations": "Integrationer på webben",
       "usageDetails": "Användningsdetaljer",
       "providersAndModels": "Leverantörer och modeller",
       "groups": "Grupper",
       "guardrails": "Skyddsräcken",
       "byok": "Använd egen nyckel",
       "ssoAndDomain": "SSO och domän",
-      "emailPreferences": "E-postinställningar",
       "dataCollection": "Datainsamling",
       "auditLogs": "Granskningsloggar",
-      "requestLogs": "Förfrågningsloggar",
-      "subOrganizations": "Underorganisationer",
-      "distributeFunds": "Fördela medel"
+      "requestLogs": "Förfrågningsloggar"
+    },
+    "requestLogs": {
+      "hint": "Förfrågningar från timmen före fönstrets sluttid, nyaste först.",
+      "older": "Tidigare timme",
+      "newer": "Senare timme",
+      "truncated": "Den här timmen har fler förfrågningar än listan visar.",
+      "emptyTitle": "Inga förfrågningar",
+      "emptyDescription": "Den här timmen har inga gateway-förfrågningar.",
+      "loadError": "Det gick inte att läsa in förfrågningsloggarna.",
+      "permissionDenied": "Endast en ägare, administratör eller faktureringsansvarig i organisationen kan läsa dess förfrågningsloggar.",
+      "tokens": "{{input}} in · {{output}} ut",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Inmatade token",
       "orgLast30Days": "Alla medlemmar · Senaste 30 dagarna",
       "outputTokens": "Utmatade token",
       "requests": "Begäranden"
+    },
+    "modes": {
+      "create": "Nytt läge",
+      "deleteAction": "Ta bort läge",
+      "deleteMessage": "Läget tas bort för alla i den här organisationen. Ett läge som ersätter ett inbyggt läge återgår till de inbyggda inställningarna.",
+      "deleteTitle": "Ta bort det här läget?",
+      "descriptionLabel": "Lägesbeskrivning",
+      "emptyDescription": "Lägen som läggs till här är tillgängliga för alla i den här organisationen.",
+      "emptyTitle": "Inga anpassade lägen ännu",
+      "identifierHint": "Gemener, siffror och bindestreck.",
+      "identifierInvalid": "Använd endast gemener, siffror och bindestreck.",
+      "identifierLabel": "Identifierare",
+      "identifierRequired": "Ange en identifierare.",
+      "identifierTaken": "Ett annat läge använder redan den här identifieraren.",
+      "nameLabel": "Lägesnamn",
+      "nameRequired": "Ange ett lägesnamn.",
+      "notFound": "Det här läget finns inte längre.",
+      "restrictionHint": "Endast filer som matchar det här mönstret kan redigeras. Lämna det tomt för att tillåta alla filer.",
+      "restrictionInvalid": "Ange ett giltigt mönster.",
+      "restrictionLabel": "Begränsningsetikett",
+      "restrictionPattern": "Filmönster",
+      "roleLabel": "Rolldefinition",
+      "roleRequired": "Beskriv vad det här läget gör.",
+      "tool": {
+        "browser": "Använd webbläsare",
+        "command": "Kör kommandon",
+        "edit": "Redigera filer",
+        "mcp": "Använd MCP",
+        "read": "Läs filer"
+      },
+      "whenToUseLabel": "När läget ska användas"
+    },
+    "groups": {
+      "create": "Ny grupp",
+      "deleteAction": "Ta bort grupp",
+      "deleteMessage": "Gruppen, dess policyer och dess medlemstilldelningar tas bort.",
+      "deleteTitle": "Ta bort den här gruppen?",
+      "descriptionLabel": "Gruppbeskrivning",
+      "emptyDescription": "En grupp samlar medlemmar så att en policy kan gälla för alla.",
+      "emptyTitle": "Inga grupper ännu",
+      "enterpriseOnly": "Grupper är tillgängliga på Enterprise-planen.",
+      "memberCount": "{{displayCount}} medlemmar",
+      "memberCount_one": "{{displayCount}} medlem",
+      "memberCount_other": "{{displayCount}} medlemmar",
+      "memberViewEmpty": "Du är inte med i någon grupp i den här organisationen.",
+      "memberViewTitle": "Dina grupper",
+      "membersEmpty": "Ingen aktiv medlem matchar sökningen.",
+      "membersLabel": "Gruppmedlemmar",
+      "nameLabel": "Gruppnamn",
+      "nameRequired": "Ange ett gruppnamn.",
+      "nameTooLong": "Namnet får innehålla högst 80 tecken.",
+      "notFound": "Den här gruppen finns inte längre.",
+      "permissionDenied": "Endast en ägare eller administratör för organisationen kan ändra dess grupper.",
+      "searchMembers": "Sök medlemmar",
+      "selectAllVisible": "Välj alla som visas"
     },
     "hub": {
       "renameTitle": "Byt namn på organisation",
@@ -3495,8 +3573,7 @@
       "paymentPending": "Väntar på betalning",
       "processingBlocked": "Bearbetningen blockerad",
       "processingNeedsReview": "Bearbetningen kräver granskning",
-      "retryHint": "Försöker läsa in Kilo Pass-status igen.",
-      "setupHint": "Öppnar konfigureringen av Kilo Pass i webbläsaren."
+      "retryHint": "Försöker läsa in Kilo Pass-status igen."
     }
   },
   "authErrors": {
@@ -4021,6 +4098,7 @@
     "commandAtLimit": "Kommandot är begränsat till {{max}} tecken",
     "commandsEmpty": "Inga installationskommandon ännu",
     "commandsSaveFailed": "Det gick inte att spara installationskommandon",
+    "commandLimitReached": "En profil kan innehålla upp till {{max}} installationskommandon. Ta bort ett för att lägga till ett till.",
     "moveCommandUp": "Flytta kommando {{position}} uppåt",
     "moveCommandDown": "Flytta kommando {{position}} nedåt",
     "skillsTitle": "Färdigheter",
@@ -4107,6 +4185,7 @@
       "deleteMessage": "Nya sessioner som använder den här profilen når inte längre den här serverns verktyg. Det går inte att ångra.",
       "deleteConfirm": "Ta bort MCP-server",
       "saveFailed": "Det gick inte att spara MCP-servern",
+      "limitReached": "En profil kan innehålla upp till {{max}} MCP-servrar. Ta bort en för att lägga till en till.",
       "deleteFailed": "Det gick inte att ta bort MCP-servern",
       "updateFailed": "Det gick inte att uppdatera MCP-servern"
     },
@@ -4139,6 +4218,7 @@
       "modeSubagent": "Endast subagent",
       "modeAll": "Alla lägen",
       "saveFailed": "Det gick inte att spara agenten",
+      "limitReached": "En profil kan innehålla upp till {{max}} agenter. Ta bort en för att lägga till en till.",
       "deleteFailed": "Det gick inte att ta bort agenten",
       "nameRequired": "Ange ett agentnamn",
       "slugRequired": "Ange agentens slug",
@@ -4169,6 +4249,7 @@
       "moveUp": "Flytta kommando {{name}} uppåt",
       "moveDown": "Flytta kommando {{name}} nedåt",
       "saveFailed": "Det gick inte att spara kommandot",
+      "limitReached": "En profil kan innehålla upp till {{max}} snedstreckskommandon. Ta bort ett för att lägga till ett till.",
       "deleteFailed": "Det gick inte att ta bort kommandot",
       "nameRequired": "Ange ett kommandonamn",
       "nameInvalid": "Namnet måste börja med en liten bokstav och endast använda små bokstäver, siffror och bindestreck",
@@ -4249,7 +4330,7 @@
       },
       "purchaseFallback": "Kreditköp",
       "receipt": "Kvitto",
-      "receiptA11y": "Öppna kvittot för {{description}}",
+      "receiptA11y": "Öppna kvittot för {{description}}, {{amount}}, från {{date}}",
       "receiptUnavailable": "Det finns inget kvitto för det här köpet."
     },
     "title": "Köp krediter",
@@ -4503,7 +4584,78 @@
     },
     "triggers": {
       "title": "Utlösare och webhooks",
-      "subtitle": "Hantera webhook-utlösare och schemalagda utlösare på webben."
+      "subtitle": "Automatisera Cloud Agent-körningar från ett webhookanrop eller enligt ett schema.",
+      "new": "Ny utlösare",
+      "emptyTitle": "Inga utlösare än",
+      "emptyDescription": "Skapa en utlösare för att starta en Cloud Agent-körning från ett webhookanrop eller enligt ett schema.",
+      "loadFailedTitle": "Det gick inte att läsa in utlösare",
+      "loadFailedDescription": "Försök igen när du har en anslutning.",
+      "detailLoadFailedTitle": "Det gick inte att läsa in den här utlösaren",
+      "detailNotFoundTitle": "Utlösaren hittades inte",
+      "cannotEditCreator": "Den här utlösaren körs som sin skapare, så bara skaparen kan ändra den.",
+      "permissionDenied": "Din roll kan inte hantera dessa utlösare.",
+      "webhookUrl": "Webhook-URL",
+      "urlCopied": "Webhook-URL kopierad",
+      "deliveries": "Leveranser",
+      "deliveriesEmptyTitle": "Inga leveranser än",
+      "deliveriesEmptyDescription": "Ett webhookanrop eller en schemalagd körning visas här när den har kommit in.",
+      "deliveriesLoadFailedTitle": "Det gick inte att läsa in leveranser",
+      "openSession": "Visa session",
+      "activationWebhook": "Webhookanrop",
+      "fieldName": "Utlösarens namn",
+      "fieldActivation": "Körs vid",
+      "fieldCron": "Cron-uttryck",
+      "fieldCronHelp": "Fem fält: minut, timme, dag, månad och veckodag. Det kortaste intervallet är en minut.",
+      "fieldTimezone": "Tidszon",
+      "nameLocked": "Namnet kan inte ändras efter att utlösaren har skapats.",
+      "repositoryLocked": "Kodförrådet kan inte ändras efter att utlösaren har skapats.",
+      "environmentAutomatic": "Automatiskt per kodförråd",
+      "notSelected": "Inte valt",
+      "profileDefaults": "Använd standardvärden",
+      "profileHelp": "Profilens inställningar gäller när utlösaren körs. Dess hemligheter hämtas då.",
+      "customAgent": "Anpassad agent",
+      "agentHelp": "En agent i kodförrådets katalog .kilo/agent, eller ett av de inbyggda lägena.",
+      "fieldBodySchema": "Innehållsschema",
+      "bodySchemaHelp": "Valfritt JSON Schema. En begäran vars innehåll inte matchar det avvisas.",
+      "authTitle": "Hemligt sidhuvud",
+      "authDescription": "Begäranden måste skicka det här sidhuvudet med den delade hemligheten.",
+      "authHeaderLabel": "Sidhuvudets namn",
+      "authSecretLabel": "Delad hemlighet",
+      "authSecretKeep": "Lämna tomt för att behålla den sparade hemligheten.",
+      "authSecretSet": "Obligatorisk. Välj en stark slumpmässig sträng.",
+      "authSecretCreator": "Använd minst 16 tecken när utlösaren körs som sin skapare.",
+      "autoCommit": "Checka in ändringar när körningen är klar",
+      "condenseOnComplete": "Komprimera kontexten när körningen är klar",
+      "activeTitle": "Utlösare aktiv",
+      "activeDescription": "Pausade webhooks svarar med 404.",
+      "runAsCreator": "Kör som jag",
+      "runAsCreatorDescription": "Varje körning använder ditt konto, så det hemliga sidhuvudet krävs.",
+      "saveFailedTitle": "Det gick inte att spara utlösaren",
+      "deleteTitle": "Ta bort den här utlösaren?",
+      "deleteMessage": "Anrop till {{name}} kommer att misslyckas. Detta kan inte ångras.",
+      "deleteMessageScheduled": "Schemalagda körningar av {{name}} stoppas. Detta kan inte ångras.",
+      "runNow": "Kör nu",
+      "runStarted": "Körning startad",
+      "created": "Utlösare skapad",
+      "saved": "Utlösare sparad",
+      "statusArrived": "Anlänt",
+      "problems": {
+        "nameRequired": "Ange ett namn.",
+        "nameTooShort": "Använd minst 8 tecken.",
+        "nameTooLong": "Använd högst 64 tecken.",
+        "nameCharacters": "Använd gemener, siffror och bindestreck.",
+        "nameReserved": "Det här namnet är reserverat.",
+        "cronRequired": "Ange ett cron-uttryck.",
+        "repositoryRequired": "Välj ett kodarkiv",
+        "agentRequired": "Välj en agent.",
+        "agentInvalid": "Använd gemener, siffror och bindestreck, och börja med en bokstav.",
+        "modelRequired": "Välj en modell",
+        "promptRequired": "Ange en prompt.",
+        "bodySchemaInvalid": "Ange ett JSON-objekt eller lämna detta tomt.",
+        "authHeaderRequired": "Ange sidhuvudets namn.",
+        "authSecretRequired": "Ange den delade hemligheten.",
+        "authSecretTooShort": "Använd minst 16 tecken."
+      }
     }
   },
   "sessionShare": {
@@ -4521,8 +4673,9 @@
     "create": "Skapa länk",
     "createFailed": "Det gick inte att skapa länken.",
     "existingTitle": "Befintlig länk",
-    "existingDescription": "Den här sessionen har redan en delningslänk. Om du skapar en ny ersätts den och den gamla länken slutar fungera.",
+    "existingDescription": "Den här sessionen har redan en delningslänk. Om du skapar en ny länk med de här inställningarna ersätts den och den gamla länken slutar fungera.",
     "rotate": "Skapa en ny länk",
+    "replacementSettings": "De här inställningarna gäller för den nya länken.",
     "revoke": "Återkalla länk",
     "revokeTitle": "Återkalla länk?",
     "revokeMessage": "Den nuvarande länken slutar fungera omedelbart.",
@@ -4541,5 +4694,175 @@
     "unavailableDescription": "Den här delningslänken har gått ut eller återkallats.",
     "transcriptUnavailableTitle": "Det gick inte att läsa in det här transkriptet",
     "transcriptUnavailableDescription": "Länken fungerar fortfarande. Försök igen om en stund."
+  },
+  "organizationGuardrails": {
+    "title": "AI-skyddsräcken",
+    "permissionDenied": "Endast organisationsägare och administratörer kan hantera AI-skyddsräcken.",
+    "unavailable": "AI-skyddsräcken är inte tillgängliga för den här organisationen.",
+    "loadError": "AI-skyddsräcken kunde inte läsas in",
+    "statusSaving": "Sparar…",
+    "statusSaved": "Sparat",
+    "statusFailed": "Det gick inte att spara.",
+    "inputTitle": "Skyddsräcken för indata",
+    "inputDescription": "Skannar varje indata med Enkrypt AI, inklusive verktygsresultat. En blockerande detektor avvisar en begäran när Enkrypt AI inte är tillgängligt.",
+    "outputTitle": "Skyddsräcken för utdata",
+    "outputDescription": "Skannar svar med Enkrypt AI innan medlemmar får dem. Avstängt om du inte aktiverar det.",
+    "detectorsHint": "Blockera avvisar en flaggad begäran. Endast logga registrerar den utan att fördröja begäran.",
+    "detectorsHintOutput": "Blockera underkänner ett flaggat svar. Endast logga registrerar det utan att fördröja svaret.",
+    "choiceLog": "Endast logga",
+    "applyTo": "Tillämpa på",
+    "applyToAllMembers": "Alla medlemmar",
+    "applyKiloDefault": "Tillämpa Kilo-standard",
+    "invalidSavedTitle": "Sparade inställningar för indatadetektorer kan inte läsas",
+    "invalidSavedBody": "Begäranden blockeras tills indatadetektorerna har sparats igen. Detektorerna nedan utgår från Kilo-standard.",
+    "invalidSavedOutputTitle": "Sparade inställningar för utdatadetektorer kan inte läsas",
+    "invalidSavedOutputBody": "Svar hålls tillbaka tills utdatadetektorerna har sparats igen. Välj utdatadetektorer nedan.",
+    "blockingOutputNote": "En blockerande utdatadetektor håller kvar ett svar tills Enkrypt AI har kontrollerat allt i det. Använd Endast logga för att undvika fördröjningen.",
+    "inputDetectorRequired": "Aktivera minst en indatadetektor.",
+    "outputDetectorRequired": "Aktivera minst en utdatadetektor.",
+    "rulesTooMany": "Lägg till upp till {{max}} regler.",
+    "ruleIdRequired": "Ange ett regel-ID.",
+    "ruleIdInvalid": "Ett regel-ID får endast använda bokstäver, siffror, punkter, bindestreck och understreck.",
+    "ruleTextRequired": "Beskriv vad regeln förbjuder eller kräver.",
+    "keywordTooLong": "Varje nyckelord får vara högst {{max}} tecken.",
+    "topicTooLong": "Varje ämne får vara högst {{max}} tecken.",
+    "keywordsTooMany": "Lägg till upp till {{max}} nyckelord.",
+    "topicsTooMany": "Lägg till upp till {{max}} ämnen.",
+    "piiEntityRequired": "Välj minst en typ av data att identifiera.",
+    "keywordRequired": "Lägg till minst ett nyckelord.",
+    "topicRequired": "Lägg till minst ett ämne.",
+    "policyTextRequired": "Ange policytexten.",
+    "ruleRequired": "Lägg till minst en regel.",
+    "ruleIdDuplicate": "Varje regel behöver ett eget regel-ID.",
+    "piiEntities": "Data att identifiera",
+    "keywordsLabel": "Nyckelord",
+    "keywordsHint": "Ett nyckelord per rad.",
+    "topicsHint": "Ett ämne per rad.",
+    "policyFormat": "Policyformat",
+    "policyFormatRules": "Strukturerade regler",
+    "policyFormatRulesDescription": "En regel per krav, med en kategori och allvarlighetsgrad. Rekommenderas.",
+    "policyFormatText": "Policytext",
+    "policyFormatTextDescription": "Klistra in en befintlig policy som oformaterad text.",
+    "rulesEmpty": "Inga regler ännu. Varje regel beskriver en sak som indata inte får innehålla eller fråga efter.",
+    "addRule": "Lägg till regel",
+    "ruleNumber": "Regel {{number}}",
+    "ruleRemove": "Ta bort regel {{number}}",
+    "ruleIdLabel": "Regel-ID",
+    "ruleNameLabel": "Namn (valfritt)",
+    "ruleTextLabel": "Regel",
+    "ruleRiskCategory": "Riskkategori",
+    "ruleApplicability": "Omfattning",
+    "ruleFrameworks": "Ramverk",
+    "detector": {
+      "promptInjection": {
+        "label": "Promptinjektion",
+        "description": "Upptäcker försök att åsidosätta instruktioner eller kringgå modellens säkerhetsspärrar."
+      },
+      "policyViolation": {
+        "label": "Policyöverträdelse",
+        "description": "Flaggar indata som bryter mot organisationens policy, skriven som text eller regler.",
+        "descriptionOutput": "Flaggar svar som bryter mot organisationens policy, skriven som text eller regler."
+      },
+      "pii": {
+        "label": "PII och hemligheter",
+        "description": "Upptäcker personuppgifter, autentiseringsuppgifter, IP-adresser och URL:er."
+      },
+      "keywords": {
+        "label": "Förbjudna nyckelord",
+        "descriptionOutput": "Upptäcker svar som innehåller något av nyckelorden du listar."
+      },
+      "topics": {
+        "label": "Ämnen",
+        "descriptionOutput": "Flaggar svar om något av ämnena du listar."
+      },
+      "toxicity": {
+        "label": "Toxicitet",
+        "description": "Upptäcker toxiskt, förolämpande, hotfullt eller hatiskt språk."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Upptäcker sexuellt eller på annat sätt olämpligt innehåll för arbetsplatsen."
+      },
+      "bias": {
+        "label": "Partiskhet",
+        "description": "Upptäcker partiskt eller diskriminerande språk."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Personuppgifter",
+        "description": "Namn, e-postadresser, telefonnummer."
+      },
+      "secrets": {
+        "label": "Hemligheter",
+        "description": "API-nycklar, åtkomsttoken, lösenord."
+      },
+      "ipAddress": {
+        "label": "IP-adresser",
+        "description": "IPv4- och IPv6-adresser."
+      },
+      "url": {
+        "label": "URL:er",
+        "description": "Webbadresser."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Säkerhet och bedrägeri",
+      "safetyHarm": "Trygghet och skada",
+      "privacyDataProtection": "Integritet och dataskydd",
+      "brandReputationTrust": "Varumärke och anseende",
+      "biasFairnessEthical": "Partiskhet och rättvisa",
+      "legalIpLiability": "Rättsligt och immaterialrättsligt ansvar",
+      "productMisuse": "Missbruk av produkten",
+      "performanceQuality": "Prestanda och kvalitet"
+    },
+    "applicability": {
+      "user": "Användarindata",
+      "userAssistant": "Användarindata och svar"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Topp 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "EU:s AI-förordning",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Företagsfunktion",
+    "enterpriseOnly": "Det här är en funktion som endast är tillgänglig för företag.",
+    "readOnly": "Endast organisationsägare och administratörer kan ändra dessa inställningar.",
+    "loadError": "Leverantörer och modeller kunde inte läsas in",
+    "tabModels": "Modeller",
+    "tabProviders": "Leverantörer",
+    "tabGateways": "Nätbryggor",
+    "modelsDescription": "Stäng av en modell för att blockera den för alla medlemmar. Modeller från tillåtna leverantörer är på från början.",
+    "modelsDeniedOnly": "Endast nekade",
+    "modelsEmpty": "Inga modeller matchar den här sökningen.",
+    "providersDescription": "Stäng av en leverantör för att stoppa Kilo från att dirigera till den för den här organisationen.",
+    "providersNeedCatalog": "Leverantörsreglagen är skrivskyddade tills hela modellkatalogen har lästs in. Tryck på Försök igen ovan för att ändra dem.",
+    "providersEmpty": "Inga leverantörer matchar den här sökningen.",
+    "allowAllShown": "Tillåt alla som visas",
+    "denyAllShown": "Neka alla som visas",
+    "gatewaysDescription": "Kilo dirigerar modellbegäranden via Vercel AI Gateway eller OpenRouter. En inaktiverad nätbrygga gör att dessa begäranden misslyckas.",
+    "emptyProviderList": "Tillåt minst en leverantör. En tom lista blockerar alla Kilos modellvägar.",
+    "gatewaysUnavailable": "Inställningar för nätbryggor är inte tillgängliga för den här organisationen.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "OpenRouter-begäranden är inte låsta till en region.",
+    "inferenceRegion": "Inferensregion",
+    "inferenceRegionDescription": "Låser Vercel AI Gateway-begäranden till den här regionen. En modell som inte är tillgänglig där misslyckas.",
+    "disableOpenrouterNote": "Om OpenRouter inaktiveras blockeras även BYOK-nycklar som dirigerar begäranden genom det.",
+    "emptyModelList": "Låt minst en modell vara på. Om du nekar alla modeller har medlemmarna inget att använda.",
+    "catalogUnavailable": "Hela modellkatalogen kunde inte läsas in, så bara dina sparade listor visas. Försök igen för att läsa in alla modeller.",
+    "region": {
+      "global": "Globalt",
+      "us": "USA",
+      "eu": "Europeiska unionen",
+      "au": "Australien",
+      "jp": "Japan"
+    }
   }
 }

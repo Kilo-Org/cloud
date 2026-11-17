@@ -191,7 +191,7 @@ const NoticeConfigSchema = z.object({
   noticeChannels: z
     .array(z.enum(['email', 'webapp', 'mobile_push']))
     .min(1)
-    .default(['email', 'webapp', 'mobile_push']),
+    .default(['email', 'webapp']),
 });
 
 const ImageTagSchema = z
@@ -2245,7 +2245,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           noticeChannels: z
             .array(z.enum(['email', 'webapp', 'mobile_push']))
             .min(1)
-            .default(['email', 'webapp', 'mobile_push']),
+            .default(['email', 'webapp']),
         }),
         z.object({
           actionType: z.literal('version_change'),
@@ -2271,7 +2271,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           noticeChannels: z
             .array(z.enum(['email', 'webapp', 'mobile_push']))
             .min(1)
-            .default(['email', 'webapp', 'mobile_push']),
+            .default(['email', 'webapp']),
         }),
       ])
     )

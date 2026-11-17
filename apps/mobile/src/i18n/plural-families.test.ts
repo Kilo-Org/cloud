@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   auditCountedCalls,
+  checkDynamicCountedKeySources,
   collectCountedKeys,
   collectDynamicCountedCalls,
   DYNAMIC_COUNTED_KEYS,
@@ -246,7 +247,16 @@ describe('plural families', () => {
     for (const [expression, listed] of DYNAMIC_COUNTED_KEYS) {
       expect(listed.keys.length, expression).toBeGreaterThan(0);
       expect(listed.reason.length, expression).toBeGreaterThan(0);
+      // The declaration each list mirrors is named so the audit can read it.
+      expect(listed.source.length, expression).toBeGreaterThan(0);
+      expect(listed.declaration.length, expression).toBeGreaterThan(0);
     }
+  });
+
+  it('checks every dynamic key list against its app declaration', () => {
+    // The lists are hand-written, so a member added to a union or a map, or a
+    // key a declaration dropped, drifts from the reviewed set silently.
+    expect(checkDynamicCountedKeySources()).toEqual([]);
   });
 
   it('selects the singular form of a dynamic family at count 1', () => {

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { buildHomeWidgetDetails, HOME_WIDGET_TITLE_LIMIT } from '@kilocode/app-shared/home-widget';
 
-import { LIVE_ACTIVITY_RELEVANCE } from './push-data';
+import { LIVE_ACTIVITY_RELEVANCE } from './push-presentation';
 import {
   aggregateLiveActivityRelevance,
   buildSessionLiveActivityContentState,

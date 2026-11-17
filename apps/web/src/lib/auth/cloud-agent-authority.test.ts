@@ -56,12 +56,9 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   },
   readDb: {},
 }));
-jest.mock('@kilocode/worker-utils/account-access', () => ({
-  ...jest.requireActual('@kilocode/worker-utils/account-access'),
-  isOrganizationMember: (...args: unknown[]) => mockMembership(...args),
-}));
-jest.mock('@kilocode/web-shared/lib/organizations/organizations', () => ({
-  isOrganizationMember: (...args: unknown[]) => mockMembership(...args),
+jest.mock('@kilocode/worker-utils/organization-membership', () => ({
+  ...jest.requireActual<object>('@kilocode/worker-utils/organization-membership'),
+  hasEffectiveOrganizationAccess: (...args: unknown[]) => mockMembership(...args),
 }));
 jest.mock('@/lib/organizations/organization-auth', () => ({ getAuthorizedOrgContext: jest.fn() }));
 jest.mock('@kilocode/web-shared/lib/constants', () => ({

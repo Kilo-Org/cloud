@@ -18,6 +18,8 @@ import type { Span } from '@sentry/nextjs';
 import { debugSaveProxyResponseStream } from '@kilocode/web-shared/lib/debugUtils';
 import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
 import type { ManagedGatewayId } from '@kilocode/web-shared/lib/ai-gateway/providers/organization-gateway-settings';
+import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
+import { ORGANIZATION_DATA_REGION_NAMES } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 import type {
   OpenRouterChatCompletionRequest,
   OpenRouterProviderConfig,
@@ -29,7 +31,6 @@ import { normalizeProjectId } from '@kilocode/web-shared/lib/normalizeProjectId'
 import { getXKiloCodeVersionNumber } from '@kilocode/web-shared/lib/userAgent';
 import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import type { EventSourceMessage } from 'eventsource-parser';
-import { sentryRootSpan } from '../getRootSpan';
 import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
@@ -277,13 +278,28 @@ const MANAGED_GATEWAY_NAMES = {
   openrouter: 'OpenRouter',
 } as const satisfies Record<ManagedGatewayId, string>;
 
+const ADVANCED_POLICIES_HINT =
+  'Select a model the Vercel AI Gateway offers, add your own key (BYOK), or ask an organization admin to review the Advanced policies on the Providers & Models page.';
+
 export function managedGatewayDisabledResponse(gateway: ManagedGatewayId) {
   const error = `This request would be routed through ${MANAGED_GATEWAY_NAMES[gateway]}, which your organization has disabled.`;
   return NextResponse.json(
     {
       error,
       error_type: ProxyErrorType.provider_not_allowed,
-      message: `${error} Select another model or ask an organization admin to update the gateway settings on the Providers & Models page.`,
+      message: `${error} ${ADVANCED_POLICIES_HINT}`,
+    },
+    { status: 403 }
+  );
+}
+
+export function inferenceRegionRefusedResponse(region: OrganizationDataRegion) {
+  const error = `Your organization requires inference in the ${ORGANIZATION_DATA_REGION_NAMES[region]} region, which this request cannot use.`;
+  return NextResponse.json(
+    {
+      error,
+      error_type: ProxyErrorType.provider_not_allowed,
+      message: `${error} In that region, requests paid with Kilo credits run only through the Vercel AI Gateway. ${ADVANCED_POLICIES_HINT}`,
     },
     { status: 403 }
   );
@@ -804,13 +820,48 @@ function describeRequestFields(request: unknown): Record<string, string> {
     return {};
   }
   const fields: Record<string, string> = {
-    requestFields: Object.keys(request).sort().join(','),
+    requestFields: Object.keys(request).sort().join(',').slice(0, 512),
   };
   if (Array.isArray(request.messages)) {
     const messageFields = new Set(
       request.messages.filter(isRecord).flatMap(message => Object.keys(message))
     );
-    fields.messageFields = [...messageFields].sort().join(',');
+    fields.messageFields = [...messageFields].sort().join(',').slice(0, 512);
+  }
+  if (Array.isArray(request.input)) {
+    const itemFields = new Map<string, Set<string>>();
+    const contentPartTypes = new Set<string>();
+    for (const item of request.input) {
+      const type =
+        typeof item === 'string'
+          ? 'string'
+          : isRecord(item) && typeof item.type === 'string'
+            ? item.type
+            : isRecord(item) && 'role' in item
+              ? 'message'
+              : 'unknown';
+      let keys = itemFields.get(type);
+      if (!keys) {
+        keys = new Set<string>();
+        itemFields.set(type, keys);
+      }
+      if (!isRecord(item)) continue;
+      for (const key of Object.keys(item)) keys.add(key);
+      if (type === 'message' && Array.isArray(item.content)) {
+        for (const part of item.content) {
+          if (isRecord(part) && typeof part.type === 'string') {
+            contentPartTypes.add(part.type);
+          }
+        }
+      }
+    }
+    const itemTypes = [...itemFields.keys()].sort().slice(0, 12);
+    fields.inputItemTypes = itemTypes.join(',').slice(0, 512);
+    fields.inputItemFields = itemTypes
+      .map(type => `${type}:${[...(itemFields.get(type) ?? [])].sort().join(',')}`)
+      .join(';')
+      .slice(0, 512);
+    fields.inputContentPartTypes = [...contentPartTypes].sort().join(',').slice(0, 512);
   }
   return fields;
 }
@@ -855,7 +906,14 @@ export async function captureProxyError(params: {
 
       const clonedReponse = response.clone();
       try {
-        extraErrorData.first4kOfResponse = (await clonedReponse.text()).slice(0, 4096);
+        const responseText = await clonedReponse.text();
+        extraErrorData.first4kOfResponse = responseText.slice(0, 4096);
+        const parsed = parseJson(responseText.slice(0, 16 * 1024));
+        if ('value' in parsed && isRecord(parsed.value) && isRecord(parsed.value.error)) {
+          const { param, code } = parsed.value.error;
+          if (typeof param === 'string') extraErrorData.upstreamErrorParam = param.slice(0, 512);
+          if (typeof code === 'string') extraErrorData.upstreamErrorCode = code.slice(0, 512);
+        }
       } catch {
         // ignore errors when already handling errors...
       }
@@ -1160,28 +1218,15 @@ async function parseMistralFimUsageFromStream(
     name: 'fim-stream-processing',
     op: 'performance',
   });
-  const timeToFirstTokenSpan = startInactiveSpan({
-    name: 'time-to-first-token',
-    op: 'performance',
-  });
-
   let messageId: string | null = null;
   let model: string | null = null;
   let responseContent = '';
   let reportedError = statusCode >= 400;
   let effectiveStatusCode = statusCode;
-  const startedAt = performance.now();
-  let firstTokenReceived = false;
   let usage: z.infer<typeof fimUsageSchema> | undefined;
 
   const onEvent = (event: EventSourceMessage) => {
-    if (!firstTokenReceived) {
-      sentryRootSpan()?.setAttribute('fim.time_to_first_token_ms', performance.now() - startedAt);
-      firstTokenReceived = true;
-      timeToFirstTokenSpan.end();
-    }
-
-    if (event.data === '[DONE]') return;
+    if (event.data === '[DONE]') return false;
 
     const json = fimResponseSchema.parse(JSON.parse(event.data));
 
@@ -1207,6 +1252,7 @@ async function parseMistralFimUsageFromStream(
     if (contentDelta) {
       responseContent += contentDelta;
     }
+    return !!contentDelta;
   };
 
   const { wasAborted, malformedEventCount, timing } = await drainSseStream(
@@ -1214,9 +1260,9 @@ async function parseMistralFimUsageFromStream(
     onEvent,
     streamProcessingSpan,
     requestStartedAt,
+    'fim.time_to_first_token_ms',
     () => ({ messageId, model })
   );
-  if (!firstTokenReceived) timeToFirstTokenSpan.end();
 
   if (!usage && !reportedError && !wasAborted && malformedEventCount === 0) {
     captureMessage('SUSPICIOUS: No usage info in FIM stream', {

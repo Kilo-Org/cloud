@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "在網頁上管理",
     "creditHistory": "點數紀錄",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": "。",
     "listJoiner": "、",
     "cancel": "取消",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "購買、收據與點數活動",
     "invoicesSubtitle": "下載你的購買發票",
-    "manageBilling": "在 kilo.ai 管理帳單",
-    "manageBillingIosNote": "付款方式、自動儲值與帳單詳細資料皆在 kilo.ai 上管理。",
     "codeReviewerSubtitle": "自動 PR 審查",
     "securityAgentSubtitle": "尋找並修復漏洞",
     "reviews": "審查",
@@ -364,7 +360,8 @@
     "providerKeys": {
       "title": "供應商金鑰",
       "rowSubtitle": "使用你自己的供應商計費",
-      "manageOnWebReason": "這些供應商需要結構化憑證",
+      "orgDescription": "這些金鑰由組織內所有成員共用，並會向組織的供應商帳戶計費。",
+      "viewOnly": "只有組織擁有者、管理員或帳單管理員可以變更組織的金鑰。",
       "description": "透過這些金鑰發出的請求會向你的供應商帳戶計費，而不會從你的 Kilo 餘額扣除。",
       "managedByPlan": "由你的程式設計方案管理",
       "enableKey": "啟用 {{provider}} 金鑰",
@@ -374,6 +371,7 @@
       "removeMessage": "原本使用此金鑰的請求將不再透過你的供應商計費。",
       "add": "新增金鑰",
       "added": "金鑰已新增",
+      "updated": "金鑰已更新",
       "emptyTitle": "沒有供應商金鑰",
       "emptyDescription": "新增金鑰即可開始使用。",
       "chooseProvider": "選擇供應商",
@@ -382,9 +380,34 @@
       "noProvidersDescription": "沒有符合搜尋條件的供應商。",
       "newKeyTitle": "新金鑰",
       "newKeyDescription": "金鑰會加密儲存，之後無法再次顯示。",
+      "edit": "編輯金鑰",
+      "editKeyTitle": "更換金鑰",
+      "editKeyDescription": "已儲存的值無法顯示。請輸入新的值來取代。",
+      "editKeyMappingsWarning": "更換金鑰也會一併取代已儲存的模型對應：請重新輸入您仍需要的所有對應。",
+      "saveFailed": "無法儲存金鑰。",
+      "invalidCredentials": "請檢查憑證後再試一次。",
+      "fieldRequired": "{{field}} 為必填。",
+      "incompleteMapping": "對應 {{number}} 需同時填寫閘道模型 slug 和部署名稱。",
       "apiKeyLabel": "API 金鑰",
       "apiKeyPlaceholder": "貼上金鑰",
-      "apiKeyRequired": "請輸入金鑰。"
+      "apiKeyRequired": "請輸入金鑰。",
+      "authMethod": "驗證方式",
+      "authMethodAccessKeys": "存取金鑰",
+      "resourceName": "Azure 資源名稱",
+      "region": "AWS 區域",
+      "accessKeyId": "存取金鑰 ID",
+      "secretAccessKey": "秘密存取金鑰",
+      "project": "Google Cloud 專案",
+      "location": "Vertex 位置",
+      "clientEmail": "服務帳戶電子郵件",
+      "privateKey": "服務帳戶私密金鑰",
+      "modelMappings": "模型對應",
+      "modelMappingsDescription": "將閘道模型對應到自訂的部署名稱。",
+      "mappingTitle": "對應 {{number}}",
+      "mappingGatewayModel": "閘道模型 slug",
+      "mappingCustomModel": "部署名稱",
+      "addMapping": "新增對應",
+      "removeMapping": "移除對應 {{number}}"
     },
     "dataExport": {
       "title": "你的資料",
@@ -457,7 +480,8 @@
       "nextStepFinal": "申訴決定為最終決定，無法再次申訴。",
       "viewReceipt": "檢視回執"
     },
-    "changelog": "最新消息"
+    "changelog": "最新消息",
+    "changelogVersionPending": "此版本的說明將隨下次應用程式更新提供。"
   },
   "preferences": {
     "general": "一般",
@@ -627,8 +651,6 @@
       "clearMessage": "儲存空白欄位將刪除此檢閱者所儲存的自訂指示。"
     },
     "repos": {
-      "unavailable": "目前無法存取存放庫。請在 kilo.ai 上完成 Bitbucket 設定。",
-      "finishSetup": "完成設定",
       "manageAccess": "管理存取權限",
       "bitbucketNoRepositoriesDescription": "此 Bitbucket 工作區中沒有可用的存放庫。",
       "gitlabNoRepositoriesDescription": "你可能需要授權存取 GitLab 上的更多群組或專案。",
@@ -648,11 +670,10 @@
     },
     "autoReviews": "自動審查",
     "bitbucket": {
-      "notConnectedReadOnly": "尚未連結 Bitbucket。只有組織擁有者、管理員和帳單管理員可以設定連結。",
-      "setupIncomplete": "設定尚未完成。請在 kilo.ai 上完成設定。",
-      "setup": "Bitbucket 設定"
+      "notConnectedReadOnly": "尚未連結 Bitbucket。只有組織擁有者、管理員和帳單管理員可以設定連結。"
     },
     "bitbucketConnect": {
+      "managedOnWeb": "此組織的 Bitbucket 連線需在電腦上透過網頁版管理。",
       "description": "請建立具有所需權限範圍的工作區存取權杖，並貼到下方。",
       "scopes": "帳戶：讀取 · 存放庫：讀取／寫入 · PR：讀取 · Webhook：讀取／寫入",
       "tokenPlaceholder": "工作區存取權杖"
@@ -696,8 +717,7 @@
       "githubApp": "GitHub App",
       "githubError": "無法開啟 GitHub 設定。請再試一次。",
       "gitlabAccount": "GitLab 帳戶",
-      "gitlabError": "無法開啟 GitLab 設定。請再試一次。",
-      "bitbucketError": "無法開啟 Bitbucket 設定。請再試一次。"
+      "gitlabError": "無法開啟 GitLab 設定。請再試一次。"
     },
     "reviewDetail": {
       "byline": "#{{number}}，作者 {{author}}",
@@ -757,6 +777,7 @@
     },
     "reviewList": {
       "configureProvider": "設定平台",
+      "connectOwnerOnly": "請要求組織擁有者或管理員連結平台。",
       "couldNotLoad": "無法載入審查。",
       "noReviews": "尚無審查",
       "noReviewsDescription": "程式碼審查員審查 PR 後，這裡就會顯示審查記錄。",
@@ -1609,10 +1630,8 @@
       "couldNotLoadBitbucketRepositories": "無法載入 Bitbucket 儲存庫。",
       "connectGithubDescription": "請在瀏覽器中登入，再回到這裡選取 GitHub 儲存庫。",
       "connectGitlabDescription": "請在瀏覽器中登入，再回到這裡選取 GitLab 儲存庫。",
-      "connectBitbucketDescription": "請在瀏覽器中登入，再回到這裡選取 Bitbucket 儲存庫。",
       "openGithub": "開啟 GitHub",
       "openGitlab": "開啟 GitLab",
-      "openBitbucket": "開啟 Bitbucket",
       "refreshRepositories": "重新整理儲存庫",
       "githubConnected": "已連結 GitHub",
       "gitlabConnected": "已連結 GitLab",
@@ -2413,6 +2432,7 @@
     "signOutThisDevice": "登出此裝置",
     "signOutSessionLabel": "登出 {{device}}，登入時間：{{signedIn}}，最後上線：{{lastSeen}}",
     "sessionSignedOut": "工作階段已登出。",
+    "sessionSignOutFailed": "無法登出此工作階段。請再試一次。",
     "signOutThisDeviceTitle": "登出此裝置？",
     "signOutThisSessionTitle": "登出此工作階段？",
     "signOutThisSessionMessage": "{{device}} 將登出，最後上線：{{lastSeen}}。最長仍可存取 API 一小時。",
@@ -2535,15 +2555,14 @@
     "manage": {
       "billingHistory": "帳單紀錄",
       "billingHistoryEmpty": "尚無帳單紀錄。",
+      "billingHistoryError": "無法載入帳單紀錄",
       "cancel": "取消訂閱",
       "cancelDescription": "你的 Kilo Pass 會維持有效至本計費週期結束，且不會續訂。",
       "cancelScheduled": "將於 {{date}} 取消",
       "cancelScheduledChange": "取消排定的變更",
       "cancelled": "已取消訂閱",
-      "changePlan": "在 kilo.ai 變更方案",
-      "changePlanIosNote": "付費方案變更請至 kilo.ai 進行。",
       "creditHistoryEmpty": "尚無 Kilo Pass 點數。",
-      "manageInStore": "在 {{store}} 管理",
+      "creditHistoryError": "無法載入點數紀錄",
       "resume": "恢復訂閱",
       "resumeCancelledDescription": "你的 Kilo Pass 將重新開始自動續訂。",
       "resumePausedDescription": "你的 Kilo Pass 將立即恢復，不必等到排定的恢復日期。",
@@ -2580,9 +2599,6 @@
     "bonusFree": "免費獎勵",
     "bonusReferral": "推薦獎勵",
     "bonusAvailable": "可用免費獎勵",
-    "kiloPassManagement": "Kilo Pass 管理",
-    "kiloPassSetup": "Kilo Pass 設定",
-    "opensManagementOnWeb": "開啟 Kilo Pass 網頁版管理頁面。",
     "loadFailedRetry": "請檢查您的網路連線，然後再試一次。",
     "legalTermsOfUse": "使用條款（EULA）",
     "purchaseDifferentAccount": "此 App Store 購買項目未連結至你的 Kilo 帳戶。請登入購買時使用的 Apple 帳戶後再試一次。",
@@ -3303,7 +3319,6 @@
       "buySeats": "購買席次",
       "setupAutoTopUp": "設定自動儲值",
       "manageAutoTopUp": "管理自動儲值",
-      "webAddress": "網址 {{url}}",
       "opensOnWeb": "在網頁上開啟"
     },
     "boundary": {
@@ -3319,7 +3334,7 @@
       "selectOrganization": "選取組織",
       "unavailableDescription": "此組織已無法存取。請到個人資料頁面選取其他組織，即可繼續。",
       "unavailableSessionsDescription": "此組織已無法存取。無法載入其工作階段。",
-      "accessDeniedDescription": "你沒有存取此組織的權限。"
+      "accessDeniedDescription": "請要求組織擁有者或管理員授予你存取權。"
     },
     "create": {
       "title": "建立組織",
@@ -3452,25 +3467,88 @@
     },
     "settingsOnWeb": {
       "title": "網頁版組織設定",
-      "integrations": "網頁版整合",
       "usageDetails": "使用詳情",
       "providersAndModels": "供應商與模型",
       "groups": "群組",
       "guardrails": "防護機制",
       "byok": "自備金鑰",
       "ssoAndDomain": "SSO 與網域",
-      "emailPreferences": "電子郵件偏好設定",
       "dataCollection": "資料收集",
       "auditLogs": "稽核記錄",
-      "requestLogs": "請求記錄",
-      "subOrganizations": "子組織",
-      "distributeFunds": "分配資金"
+      "requestLogs": "請求記錄"
+    },
+    "requestLogs": {
+      "hint": "顯示時段結束前一小時內的請求，由新到舊排列。",
+      "older": "較早一小時",
+      "newer": "較晚一小時",
+      "truncated": "這一小時的請求多於清單顯示的數量。",
+      "emptyTitle": "沒有請求",
+      "emptyDescription": "這一小時沒有閘道請求。",
+      "loadError": "無法載入請求記錄。",
+      "permissionDenied": "只有組織的擁有者、管理員或帳務管理員可以查看其請求記錄。",
+      "tokens": "輸入 {{input}} · 輸出 {{output}}",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "輸入詞元",
       "orgLast30Days": "全體成員 · 最近 30 天",
       "outputTokens": "輸出詞元",
       "requests": "請求"
+    },
+    "modes": {
+      "create": "新增模式",
+      "deleteAction": "刪除模式",
+      "deleteMessage": "此模式會為此組織中的所有成員移除。若此模式取代內建模式，會還原為內建設定。",
+      "deleteTitle": "要刪除此模式嗎？",
+      "descriptionLabel": "模式說明",
+      "emptyDescription": "在此新增的模式可供此組織中的所有成員使用。",
+      "emptyTitle": "尚無自訂模式",
+      "identifierHint": "小寫字母、數字和連字號。",
+      "identifierInvalid": "只能使用小寫字母、數字和連字號。",
+      "identifierLabel": "識別碼",
+      "identifierRequired": "請輸入識別碼。",
+      "identifierTaken": "已有其他模式使用此識別碼。",
+      "nameLabel": "模式名稱",
+      "nameRequired": "請輸入模式名稱。",
+      "notFound": "此模式已不存在。",
+      "restrictionHint": "僅能編輯符合此樣式的檔案。留空則允許所有檔案。",
+      "restrictionInvalid": "請輸入有效的樣式。",
+      "restrictionLabel": "限制標籤",
+      "restrictionPattern": "檔案樣式",
+      "roleLabel": "角色定義",
+      "roleRequired": "請描述此模式的用途。",
+      "tool": {
+        "browser": "使用瀏覽器",
+        "command": "執行命令",
+        "edit": "編輯檔案",
+        "mcp": "使用 MCP",
+        "read": "讀取檔案"
+      },
+      "whenToUseLabel": "何時使用此模式"
+    },
+    "groups": {
+      "create": "新增群組",
+      "deleteAction": "刪除群組",
+      "deleteMessage": "此群組、其政策及成員指派都會被移除。",
+      "deleteTitle": "要刪除此群組嗎？",
+      "descriptionLabel": "群組說明",
+      "emptyDescription": "群組會彙整成員，讓同一項政策套用至所有成員。",
+      "emptyTitle": "尚無群組",
+      "enterpriseOnly": "群組僅適用於 Enterprise 方案。",
+      "memberCount": "{{displayCount}} 位成員",
+      "memberCount_one": "{{displayCount}} 位成員",
+      "memberCount_other": "{{displayCount}} 位成員",
+      "memberViewEmpty": "你不在此組織的任何群組中。",
+      "memberViewTitle": "你的群組",
+      "membersEmpty": "沒有符合搜尋的有效成員。",
+      "membersLabel": "群組成員",
+      "nameLabel": "群組名稱",
+      "nameRequired": "請輸入群組名稱。",
+      "nameTooLong": "名稱請保持在 80 個字元以內。",
+      "notFound": "此群組已不存在。",
+      "permissionDenied": "只有組織擁有者或管理員可以變更此組織的群組。",
+      "searchMembers": "搜尋成員",
+      "selectAllVisible": "選取所有顯示的成員"
     },
     "kiloPass": {
       "activating": "啟用中",
@@ -3487,8 +3565,7 @@
       "paymentPending": "付款待處理",
       "processingBlocked": "處理受阻",
       "processingNeedsReview": "處理程序待審查",
-      "retryHint": "重新載入 Kilo Pass 狀態。",
-      "setupHint": "在瀏覽器中開啟 Kilo Pass 設定。"
+      "retryHint": "重新載入 Kilo Pass 狀態。"
     }
   },
   "feedback": {
@@ -4021,6 +4098,7 @@
     "commandAtLimit": "命令最多為 {{max}} 個字元",
     "commandsEmpty": "還沒有設定命令",
     "commandsSaveFailed": "無法儲存設定命令",
+    "commandLimitReached": "一個設定檔最多可容納 {{max}} 個設定命令。刪除一個才能新增另一個。",
     "moveCommandUp": "上移命令 {{position}}",
     "moveCommandDown": "下移命令 {{position}}",
     "skillsTitle": "技能",
@@ -4107,6 +4185,7 @@
       "deleteMessage": "使用此設定檔的新工作階段將無法再存取此伺服器的工具。此動作無法復原。",
       "deleteConfirm": "刪除 MCP 伺服器",
       "saveFailed": "無法保存 MCP 伺服器",
+      "limitReached": "一個設定檔最多可容納 {{max}} 個MCP伺服器。刪除一個才能新增另一個。",
       "deleteFailed": "無法刪除 MCP 伺服器",
       "updateFailed": "無法更新 MCP 伺服器"
     },
@@ -4139,6 +4218,7 @@
       "modeSubagent": "僅子代理程式",
       "modeAll": "全部模式",
       "saveFailed": "無法保存代理",
+      "limitReached": "一個設定檔最多可容納 {{max}} 個設定檔代理。刪除一個才能新增另一個。",
       "deleteFailed": "無法刪除代理",
       "nameRequired": "輸入代理名稱",
       "slugRequired": "輸入代理 slug",
@@ -4169,6 +4249,7 @@
       "moveUp": "上移命令 {{name}}",
       "moveDown": "下移命令 {{name}}",
       "saveFailed": "無法保存命令",
+      "limitReached": "一個設定檔最多可容納 {{max}} 個斜槓命令。刪除一個才能新增另一個。",
       "deleteFailed": "無法刪除命令",
       "nameRequired": "輸入命令名稱",
       "nameInvalid": "名稱必須以小寫字母開頭，且只能使用小寫字母、數字和連字符",
@@ -4249,7 +4330,7 @@
       },
       "purchaseFallback": "點數購買",
       "receipt": "收據",
-      "receiptA11y": "開啟「{{description}}」的收據",
+      "receiptA11y": "開啟「{{description}}」，{{amount}}，{{date}} 的收據",
       "receiptUnavailable": "此筆購買沒有可用的收據。"
     },
     "title": "購買點數",
@@ -4502,8 +4583,79 @@
       "portLabel": "localhost:{{port}}"
     },
     "triggers": {
-      "title": "觸發條件與 Webhook",
-      "subtitle": "在網頁上管理 Webhook 與排程觸發條件。"
+      "title": "觸發器與網路鉤子",
+      "subtitle": "透過網路鉤子呼叫或排程自動執行 Cloud Agent。",
+      "new": "新增觸發器",
+      "emptyTitle": "尚無觸發器",
+      "emptyDescription": "建立觸發器，以透過網路鉤子呼叫或排程啟動 Cloud Agent 執行。",
+      "loadFailedTitle": "無法載入觸發器",
+      "loadFailedDescription": "有連線時請再試一次。",
+      "detailLoadFailedTitle": "無法載入此觸發器",
+      "detailNotFoundTitle": "找不到觸發器",
+      "cannotEditCreator": "此觸發器會以建立者身分執行，因此只有建立者可以變更。",
+      "permissionDenied": "你的角色無法管理這些觸發器。",
+      "webhookUrl": "網路鉤子網址",
+      "urlCopied": "已複製網路鉤子網址",
+      "deliveries": "傳遞紀錄",
+      "deliveriesEmptyTitle": "尚無傳遞紀錄",
+      "deliveriesEmptyDescription": "網路鉤子呼叫或排程執行送達後會顯示在這裡。",
+      "deliveriesLoadFailedTitle": "無法載入傳遞紀錄",
+      "openSession": "檢視工作階段",
+      "activationWebhook": "網路鉤子呼叫",
+      "fieldName": "觸發器名稱",
+      "fieldActivation": "觸發方式",
+      "fieldCron": "排程運算式",
+      "fieldCronHelp": "五個欄位：分鐘、小時、日、月與星期幾。最短間隔為一分鐘。",
+      "fieldTimezone": "時區",
+      "nameLocked": "建立觸發器後即無法變更名稱。",
+      "repositoryLocked": "建立觸發器後即無法變更儲存庫。",
+      "environmentAutomatic": "依儲存庫自動",
+      "notSelected": "未選取",
+      "profileDefaults": "使用預設值",
+      "profileHelp": "觸發器執行時會套用設定檔的設定，其密鑰會在此時解析。",
+      "customAgent": "自訂代理程式",
+      "agentHelp": "儲存庫 .kilo/agent 目錄中的代理程式，或內建模式之一。",
+      "fieldBodySchema": "內文結構定義",
+      "bodySchemaHelp": "選用的 JSON Schema。內文不符合的請求會遭到拒絕。",
+      "authTitle": "密鑰標頭",
+      "authDescription": "請求必須傳送此標頭，並附上共用密鑰。",
+      "authHeaderLabel": "標頭名稱",
+      "authSecretLabel": "共用密鑰",
+      "authSecretKeep": "留空即可保留已儲存的密鑰。",
+      "authSecretSet": "必填。請選擇足夠強的隨機字串。",
+      "authSecretCreator": "觸發器以建立者身分執行時，請使用至少 16 個字元。",
+      "autoCommit": "執行完成時提交變更",
+      "condenseOnComplete": "執行完成時精簡內容脈絡",
+      "activeTitle": "觸發器已啟用",
+      "activeDescription": "暫停的網路鉤子會回應 404。",
+      "runAsCreator": "以我的身分執行",
+      "runAsCreatorDescription": "每次執行都會使用你的帳戶，因此必須提供密鑰標頭。",
+      "saveFailedTitle": "無法儲存觸發器",
+      "deleteTitle": "要刪除此觸發器嗎？",
+      "deleteMessage": "對 {{name}} 的呼叫將會失敗。此動作無法復原。",
+      "deleteMessageScheduled": "{{name}} 觸發器的已排程執行將會停止。此動作無法復原。",
+      "runNow": "立即執行",
+      "runStarted": "已開始執行",
+      "created": "已建立觸發器",
+      "saved": "已儲存觸發器",
+      "statusArrived": "已送達",
+      "problems": {
+        "nameRequired": "請輸入名稱。",
+        "nameTooShort": "請使用至少 8 個字元。",
+        "nameTooLong": "請使用 64 個字元以內。",
+        "nameCharacters": "請使用小寫字母、數字與連字號。",
+        "nameReserved": "此名稱為保留名稱。",
+        "cronRequired": "請輸入排程運算式。",
+        "repositoryRequired": "選擇存放庫",
+        "agentRequired": "請選擇代理程式。",
+        "agentInvalid": "請使用小寫字母、數字與連字號，且開頭須為字母。",
+        "modelRequired": "選擇模型",
+        "promptRequired": "請輸入提示。",
+        "bodySchemaInvalid": "請輸入 JSON 物件，或將此欄位留空。",
+        "authHeaderRequired": "請輸入標頭名稱。",
+        "authSecretRequired": "請輸入共用密鑰。",
+        "authSecretTooShort": "請使用至少 16 個字元。"
+      }
     }
   },
   "sessionShare": {
@@ -4521,8 +4673,9 @@
     "create": "建立連結",
     "createFailed": "無法建立連結。",
     "existingTitle": "現有連結",
-    "existingDescription": "這個工作階段已有分享連結。建立新連結會取代它，且舊連結將無法再使用。",
+    "existingDescription": "這個工作階段已有分享連結。使用這些設定建立新連結會取代它，且舊連結將無法再使用。",
     "rotate": "建立新連結",
+    "replacementSettings": "這些設定將套用於新連結。",
     "revoke": "撤銷連結",
     "revokeTitle": "要撤銷連結嗎？",
     "revokeMessage": "目前的連結將立即失效。",
@@ -4541,5 +4694,175 @@
     "unavailableDescription": "此分享連結已過期或已被撤銷。",
     "transcriptUnavailableTitle": "無法載入此對話記錄",
     "transcriptUnavailableDescription": "連結仍然有效，請稍後再試一次。"
+  },
+  "organizationGuardrails": {
+    "title": "AI 護欄",
+    "permissionDenied": "只有組織擁有者與管理員可以管理 AI 護欄。",
+    "unavailable": "此組織無法使用 AI 護欄。",
+    "loadError": "無法載入 AI 護欄",
+    "statusSaving": "儲存中…",
+    "statusSaved": "已儲存",
+    "statusFailed": "無法儲存。",
+    "inputTitle": "輸入護欄",
+    "inputDescription": "使用 Enkrypt AI 掃描每個輸入，包括工具結果。當 Enkrypt 無法使用時，封鎖型偵測器會拒絕請求。",
+    "outputTitle": "輸出護欄",
+    "outputDescription": "在成員收到回應前，使用 Enkrypt AI 掃描回應。除非您開啟，否則為關閉狀態。",
+    "detectorsHint": "封鎖會拒絕被標記的請求。僅記錄只會記錄該請求，不會延遲請求。",
+    "detectorsHintOutput": "封鎖會讓被標記的回應失敗。僅記錄只會記錄該回應，不會延遲回應。",
+    "choiceLog": "僅記錄",
+    "applyTo": "套用至",
+    "applyToAllMembers": "所有成員",
+    "applyKiloDefault": "套用 Kilo 預設值",
+    "invalidSavedTitle": "無法讀取已儲存的輸入偵測器設定",
+    "invalidSavedBody": "在重新儲存輸入偵測器之前，請求會遭到封鎖。下方偵測器會從 Kilo 預設值開始。",
+    "invalidSavedOutputTitle": "無法讀取已儲存的輸出偵測器設定",
+    "invalidSavedOutputBody": "在重新儲存輸出偵測器之前，回應會暫不傳送。請在下方選擇輸出偵測器。",
+    "blockingOutputNote": "封鎖型輸出偵測器會保留回應，直到 Enkrypt 檢查完所有內容。使用「僅記錄」可避免延遲。",
+    "inputDetectorRequired": "請至少開啟一個輸入偵測器。",
+    "outputDetectorRequired": "請至少開啟一個輸出偵測器。",
+    "rulesTooMany": "最多可新增 {{max}} 條規則。",
+    "ruleIdRequired": "請輸入規則 ID。",
+    "ruleIdInvalid": "規則 ID 只能使用字母、數字、點、連字號與底線。",
+    "ruleTextRequired": "描述此規則禁止或要求的事項。",
+    "keywordTooLong": "每個關鍵字最多可有 {{max}} 個字元。",
+    "topicTooLong": "每個主題最多可有 {{max}} 個字元。",
+    "keywordsTooMany": "最多可新增 {{max}} 個關鍵字。",
+    "topicsTooMany": "最多可新增 {{max}} 個主題。",
+    "piiEntityRequired": "請至少選取一種要偵測的資料。",
+    "keywordRequired": "請至少新增一個關鍵字。",
+    "topicRequired": "請至少新增一個主題。",
+    "policyTextRequired": "請輸入政策文字。",
+    "ruleRequired": "請至少新增一條規則。",
+    "ruleIdDuplicate": "每條規則都需要有自己的規則 ID。",
+    "piiEntities": "要偵測的資料",
+    "keywordsLabel": "關鍵字",
+    "keywordsHint": "每行一個關鍵字。",
+    "topicsHint": "每行一個主題。",
+    "policyFormat": "政策格式",
+    "policyFormatRules": "結構化規則",
+    "policyFormatRulesDescription": "每個要求一條規則，並包含類別與嚴重性。建議使用。",
+    "policyFormatText": "政策文字",
+    "policyFormatTextDescription": "將現有政策貼上為純文字。",
+    "rulesEmpty": "尚無規則。每條規則描述輸入不得包含或要求的一件事項。",
+    "addRule": "新增規則",
+    "ruleNumber": "規則 {{number}}",
+    "ruleRemove": "移除規則 {{number}}",
+    "ruleIdLabel": "規則 ID",
+    "ruleNameLabel": "名稱（選填）",
+    "ruleTextLabel": "規則",
+    "ruleRiskCategory": "風險類別",
+    "ruleApplicability": "範圍",
+    "ruleFrameworks": "框架",
+    "detector": {
+      "promptInjection": {
+        "label": "提示注入",
+        "description": "偵測嘗試覆寫指示或越獄模型的行為。"
+      },
+      "policyViolation": {
+        "label": "政策違規",
+        "description": "標記違反您組織政策的輸入，政策以文字或規則撰寫。",
+        "descriptionOutput": "標記違反您組織政策的回應，政策以文字或規則撰寫。"
+      },
+      "pii": {
+        "label": "PII 與機密",
+        "description": "偵測個人資料、憑證、IP 位址與 URL。"
+      },
+      "keywords": {
+        "label": "禁用關鍵字",
+        "descriptionOutput": "偵測包含您所列任何關鍵字的回應。"
+      },
+      "topics": {
+        "label": "主題",
+        "descriptionOutput": "標記涉及您所列任何主題的回應。"
+      },
+      "toxicity": {
+        "label": "毒性",
+        "description": "偵測有毒、侮辱、威脅或仇恨性語言。"
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "偵測色情或其他不宜在工作場所觀看的內容。"
+      },
+      "bias": {
+        "label": "偏見",
+        "description": "偵測帶有偏見或歧視性的語言。"
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "個人資料",
+        "description": "姓名、電子郵件地址、電話號碼。"
+      },
+      "secrets": {
+        "label": "機密",
+        "description": "API 金鑰、權杖、密碼。"
+      },
+      "ipAddress": {
+        "label": "IP 位址",
+        "description": "IPv4 與 IPv6 位址。"
+      },
+      "url": {
+        "label": "URL",
+        "description": "網址。"
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "安全與詐欺",
+      "safetyHarm": "安全與危害",
+      "privacyDataProtection": "隱私與資料保護",
+      "brandReputationTrust": "品牌與聲譽",
+      "biasFairnessEthical": "偏見與公平性",
+      "legalIpLiability": "法律與 IP 責任",
+      "productMisuse": "產品濫用",
+      "performanceQuality": "效能與品質"
+    },
+    "applicability": {
+      "user": "使用者輸入",
+      "userAssistant": "使用者輸入與回應"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM 十大風險（2025）",
+      "nist": "NIST AI RMF",
+      "euAiAct": "歐盟 AI 法案",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "企業版功能",
+    "enterpriseOnly": "這是僅限企業版的功能。",
+    "readOnly": "只有組織擁有者與管理員可以變更這些設定。",
+    "loadError": "無法載入供應商與模型",
+    "tabModels": "模型",
+    "tabProviders": "供應商",
+    "tabGateways": "閘道",
+    "modelsDescription": "關閉模型即可對所有成員封鎖該模型。來自允許供應商的模型預設為開啟。",
+    "modelsDeniedOnly": "僅顯示已拒絕",
+    "modelsEmpty": "沒有符合此搜尋的模型。",
+    "providersDescription": "關閉供應商即可停止 Kilo 為此組織將請求路由至該供應商。",
+    "providersNeedCatalog": "在完整模型目錄載入完成前，供應商開關為唯讀狀態。點一下上方的再試一次即可編輯。",
+    "providersEmpty": "沒有符合此搜尋的供應商。",
+    "allowAllShown": "允許所有顯示項目",
+    "denyAllShown": "拒絕所有顯示項目",
+    "gatewaysDescription": "Kilo 會透過 Vercel AI Gateway 或 OpenRouter 路由模型請求。停用的閘道會使這些請求失敗。",
+    "emptyProviderList": "請至少允許一個供應商。清單為空會封鎖所有 Kilo 模型路由。",
+    "gatewaysUnavailable": "此組織無法使用閘道設定。",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "OpenRouter 請求不會固定到特定區域。",
+    "inferenceRegion": "推論區域",
+    "inferenceRegionDescription": "將 Vercel AI Gateway 請求固定到此區域。在該區域無法使用的模型會失敗。",
+    "disableOpenrouterNote": "停用 OpenRouter 也會封鎖透過其路由請求的 BYOK 金鑰。",
+    "emptyModelList": "請至少保留一個已啟用的模型。拒絕所有模型會導致成員沒有可用的模型。",
+    "catalogUnavailable": "未能載入完整的模型目錄，因此僅顯示已儲存的清單。請重試以載入所有模型。",
+    "region": {
+      "global": "全球",
+      "us": "美國",
+      "eu": "歐盟",
+      "au": "澳洲",
+      "jp": "日本"
+    }
   }
 }

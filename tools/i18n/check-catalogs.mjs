@@ -46,7 +46,11 @@ const ROOT = fileURLToPath(new URL('../../', import.meta.url));
  * Each entry also carries the catalog's own policy. `baseKeyOf` names how a
  * consumer appends its part to a key. `englishCopyRules` lists the checks the
  * catalog's English copy must pass. `localeRegistry` names a hand-written
- * module the push runtime reads its catalogs from.
+ * module the push runtime reads its catalogs from. `calledKeyOf` reads the key
+ * one translate call names, `keyPrefixOf` the static head of a key built as a
+ * template literal (null when the catalog builds none), and
+ * `collectsDestructiveKeys` whether the scan gathers the keys object literals
+ * paint on destructive buttons.
  */
 function catalogsOf(root) {
   return [
@@ -56,6 +60,9 @@ function catalogsOf(root) {
       sourceRoots: [join(root, 'apps/mobile/src')],
       baseKeyOf: pluralBaseKey,
       englishCopyRules: [checkEnglishCopies, checkMobileEnglishIdentical],
+      calledKeyOf: mobileCalledKey,
+      keyPrefixOf: null,
+      collectsDestructiveKeys: true,
     },
     {
       name: 'notifications',
@@ -63,7 +70,10 @@ function catalogsOf(root) {
       localeRegistry: join(root, 'packages/notifications/src/i18n.ts'),
       sourceRoots: [join(root, 'packages/notifications/src'), join(root, 'services')],
       baseKeyOf: pushBaseKey,
-      englishCopyRules: [checkPushEnglishCopy],
+      englishCopyRules: [checkEnglishCopies, checkPushEnglishCopy],
+      calledKeyOf: pushCalledKeyOf,
+      keyPrefixOf: pushKeyPrefix,
+      collectsDestructiveKeys: false,
     },
   ];
 }
@@ -165,6 +175,7 @@ const WORDED_COUNTS = new Set([
   'securityAgent.automation.queued:two:ar',
   'securityAgent.settingsOverview.repositoriesCount:one:ar',
   'securityAgent.settingsOverview.repositoriesCount:two:ar',
+  'agentChat.composer.charactersRemaining:one:mi',
   'agentChat.partRenderer.updatedFileCount:one:ar',
   'agentChat.partRenderer.updatedFileCount:two:ar',
   'agentChat.olderMessages.omitted:two:ar',
@@ -263,6 +274,15 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   // The CLI's product name, a title for a device-sessions row. A product name
   // has nothing to translate, so every catalog keeps the published spelling.
   'deviceSessions.kiloCli',
+  // The request-logs row's marker for a request that spent the reader's own
+  // provider key. `BYOK` is the acronym the provider-key screens and the
+  // gateway's own copy use, so every catalog keeps it rather than transliterating
+  // an initialism.
+  'organization.requestLogs.byok',
+  // The gateway's product name, the label of the switch that routes through it.
+  // A product name has nothing to translate, so every catalog keeps the spelling
+  // the gateway and its documentation publish.
+  'organizationModelAccess.openrouter',
 ]);
 
 /**
@@ -814,7 +834,7 @@ function scanSource(catalog, root) {
   const referenced = new Set();
   const keyPrefixes = new Set();
   const destructiveKeys = new Set();
-  const mobile = catalog.name === 'mobile';
+  const { calledKeyOf, keyPrefixOf, collectsDestructiveKeys } = catalog;
   for (const sourceRoot of catalog.sourceRoots) {
     // A fixture tree holds only the parts a test gives it; a root the tree does
     // not have has nothing to scan.
@@ -840,7 +860,7 @@ function scanSource(catalog, root) {
           return;
         }
         if (node.type === 'ObjectExpression') {
-          if (mobile) {
+          if (collectsDestructiveKeys) {
             for (const key of destructiveLabels(node)) {
               destructiveKeys.add(key);
             }
@@ -850,19 +870,12 @@ function scanSource(catalog, root) {
         if (node.type !== 'CallExpression') {
           return;
         }
-        if (mobile) {
-          const found = mobileCalledKey(node, file);
-          problems.push(...found.problems);
-          if (found.key !== null) {
-            called.add(found.key);
-          }
-          return;
+        const found = calledKeyOf(node, file);
+        problems.push(...found.problems);
+        if (found.key !== null) {
+          called.add(found.key);
         }
-        const key = pushCalledKey(node);
-        if (key !== null) {
-          called.add(key);
-        }
-        const prefix = pushKeyPrefix(node);
+        const prefix = keyPrefixOf === null ? null : keyPrefixOf(node);
         if (prefix !== null) {
           keyPrefixes.add(prefix);
         }
@@ -907,6 +920,17 @@ function mobileCalledKey(call, file) {
         : null,
     problems,
   };
+}
+
+/**
+ * The push side of the uniform reader every catalog's scan calls: the key one
+ * `translatePush(locale, key, …)` call names, wrapped in the
+ * `{ key, problems }` shape `mobileCalledKey` writes. A push key is never a
+ * template literal — the prefix below serves that form — so this reader has no
+ * problem to report.
+ */
+function pushCalledKeyOf(call) {
+  return { key: pushCalledKey(call), problems: [] };
 }
 
 /**
@@ -1000,9 +1024,6 @@ function foldDestructiveLabel(value) {
  */
 function destructiveConfirmKeys(source, english) {
   const checks = new Map();
-  if (source === null) {
-    return checks;
-  }
   const englishCancel = foldDestructiveLabel(english.get('common.cancel') ?? '');
   for (const key of source.destructiveKeys) {
     const englishValue = english.get(key);
@@ -1940,6 +1961,33 @@ function checkPushEnglishCopy({ catalogName, english, localeValues }) {
   return problems;
 }
 
+/**
+ * The policy fields a scan reads on one catalog descriptor. Every catalog
+ * needs a called-key reader; `keyPrefixOf` stays null when the catalog builds
+ * no key from a template head; the destructive collection is a real decision,
+ * because an entry that leaves the field out reads as one that chose not to
+ * collect. A misconfigured entry is reported as a named problem and the audit
+ * skips its scan entirely, instead of dying on the missing reader partway
+ * through the tree — the problems the run collected before the scan would
+ * never be printed.
+ */
+function checkScanPolicy(catalog) {
+  const missing = [];
+  if (typeof catalog.calledKeyOf !== 'function') {
+    missing.push('calledKeyOf');
+  }
+  if (typeof catalog.keyPrefixOf !== 'function' && catalog.keyPrefixOf !== null) {
+    missing.push('keyPrefixOf');
+  }
+  if (typeof catalog.collectsDestructiveKeys !== 'boolean') {
+    missing.push('collectsDestructiveKeys');
+  }
+  return missing.map(
+    field =>
+      `${catalog.name}: the catalog descriptor declares no ${field}; every entry of catalogsOf declares its scan policy`
+  );
+}
+
 /** Every key the source names exists, and every English key is used. */
 function checkSourceUsage({ catalogName, english, source, baseKeyOf, englishFamilies }) {
   const problems = [];
@@ -1957,6 +2005,41 @@ function checkSourceUsage({ catalogName, english, source, baseKeyOf, englishFami
 }
 
 /**
+ * The English strings each catalog may render more than one way, and the
+ * problem that stopped the audit from reading them. A file that is missing,
+ * does not parse, or does not map each tag to a list of strings reports the
+ * same one line: the callers below read every tag's entry as a set, so a value
+ * of another shape must not reach them, and a fixture tree still gets the rest
+ * of the findings.
+ */
+function readWordingExceptions(root) {
+  const problems = [];
+  try {
+    const parsed = JSON.parse(
+      readFileSync(join(root, 'tools/i18n/wording-exceptions.json'), 'utf8')
+    );
+    if (
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      !Array.isArray(parsed) &&
+      Object.values(parsed).every(
+        entries => Array.isArray(entries) && entries.every(entry => typeof entry === 'string')
+      )
+    ) {
+      return { wordingExceptions: parsed, problems };
+    }
+    problems.push(
+      'check-catalogs: cannot read tools/i18n/wording-exceptions.json: ' +
+        'expected an object that maps each tag to a list of English strings'
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    problems.push(`check-catalogs: cannot read tools/i18n/wording-exceptions.json: ${message}`);
+  }
+  return { wordingExceptions: {}, problems };
+}
+
+/**
  * Every problem the catalogs under `root` have, and how many languages were
  * checked. The repository root is the default, so the CLI below and a test that
  * points at a fixture tree run the same audit. The findings are returned, not
@@ -1970,20 +2053,33 @@ export function checkCatalogs(root = ROOT) {
    * where English reuses the noun. Everything else must read the same way
    * everywhere in one catalog.
    */
-  const WORDING_EXCEPTIONS = JSON.parse(
-    readFileSync(join(root, 'tools/i18n/wording-exceptions.json'), 'utf8')
-  );
+  const wordingExceptionsRead = readWordingExceptions(root);
+  problems.push(...wordingExceptionsRead.problems);
+  const { wordingExceptions } = wordingExceptionsRead;
   const { tags, problems: languageProblems } = supportedLanguages(root);
   problems.push(...languageProblems);
 
   const catalogs = catalogsOf(root);
+  const unscannable = new Set();
   for (const catalog of catalogs) {
+    const policyProblems = checkScanPolicy(catalog);
+    problems.push(...policyProblems);
+    if (policyProblems.length > 0) {
+      // A descriptor without its policy cannot be scanned: scanSource would
+      // call the missing reader and die partway through the tree, so the
+      // named problems above would never be printed. Skipping the catalog
+      // keeps the diagnostic what the developer sees.
+      unscannable.add(catalog);
+    }
+  }
+  const scannable = catalogs.filter(catalog => !unscannable.has(catalog));
+  for (const catalog of scannable) {
     if (catalog.localeRegistry) {
       problems.push(...checkPushLocaleRegistry({ root, catalog }));
     }
   }
 
-  for (const catalog of catalogs) {
+  for (const catalog of scannable) {
     const catalogName = catalog.name;
     const present = new Set(catalogTags(catalog.dir));
 
@@ -2039,7 +2135,7 @@ export function checkCatalogs(root = ROOT) {
       mustTranslateKeys,
       destructiveChecks,
       sharedWordings,
-      wordingExceptions: WORDING_EXCEPTIONS,
+      wordingExceptions,
     });
     problems.push(...locales.problems);
     const { localeValues } = locales;

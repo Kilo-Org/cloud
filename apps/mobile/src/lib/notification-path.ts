@@ -57,11 +57,6 @@ export function notificationPathForData(data: PushData): string | null {
       const base = getSecurityAgentPath(data.scope, `findings/${data.findingId}`) as string;
       return `${base}?via=push`;
     }
-    case 'chat.message':
-    case 'instance-lifecycle':
-    case 'scheduled-action': {
-      return null;
-    }
     case 'active_agents_glanceable':
     case 'session_live_update': {
       // Neither glanceable payload opens a session chat by itself: the

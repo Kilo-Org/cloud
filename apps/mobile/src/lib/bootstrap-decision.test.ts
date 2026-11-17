@@ -17,6 +17,7 @@ const ready = {
   needsConsent: false,
   onConsentRoute: false,
   onConsentReviewRoute: false,
+  onLegalRoute: false,
   languageReloadFailed: false,
   restoreFailed: false,
 } as const;
@@ -84,6 +85,18 @@ describe('resolveBootstrapDecision tag', () => {
 
   it('redirects to consent when needed off the consent route', () => {
     expect(resolveBootstrapDecision({ ...ready, needsConsent: true }).tag).toBe('redirect-consent');
+  });
+
+  it('settles consent on a legal document opened from the consent card', () => {
+    expect(resolveBootstrapDecision({ ...ready, needsConsent: true, onLegalRoute: true }).tag).toBe(
+      'settle-consent'
+    );
+  });
+
+  it('keeps the tree visible on a legal document while consent is needed', () => {
+    expect(
+      resolveBootstrapDecision({ ...ready, needsConsent: true, onLegalRoute: true }).hidden
+    ).toBe(false);
   });
 
   it('redirects to the app on a non-review consent route', () => {

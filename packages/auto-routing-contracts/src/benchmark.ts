@@ -21,9 +21,6 @@ import {
   PolicySettingsStateSchema,
 } from './policy-settings';
 
-export { ReasoningEffortSchema } from './reasoning';
-export type { ReasoningEffort } from './reasoning';
-
 export const BenchmarkKindSchema = z.enum(['classifier', 'decider']);
 export type BenchmarkKind = z.infer<typeof BenchmarkKindSchema>;
 

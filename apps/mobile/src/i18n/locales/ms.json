@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Urus di web",
     "creditHistory": "Sejarah kredit",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Batal",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Pembelian, resit dan aktiviti kredit",
     "invoicesSubtitle": "Muat turun invois untuk pembelian anda",
-    "manageBilling": "Urus pengebilan di kilo.ai",
-    "manageBillingIosNote": "Kaedah pembayaran, tambah nilai automatik dan butiran pengebilan diuruskan di kilo.ai.",
     "codeReviewerSubtitle": "Semakan PR automatik",
     "securityAgentSubtitle": "Cari dan baiki kelemahan",
     "reviews": "Semakan",
@@ -364,7 +360,8 @@
     "providerKeys": {
       "title": "Kunci pembekal",
       "rowSubtitle": "Gunakan pengebilan pembekal anda sendiri",
-      "manageOnWebReason": "Pembekal ini memerlukan kelayakan berstruktur.",
+      "orgDescription": "Kunci ini dikongsi dengan semua orang dalam organisasi dan dibilkan kepada akaun pembekal organisasi tersebut.",
+      "viewOnly": "Hanya pemilik, pentadbir atau pengurus pengebilan organisasi boleh menukar kuncinya.",
       "description": "Permintaan melalui kunci ini dibilkan kepada akaun pembekal anda dan bukannya baki Kilo anda.",
       "managedByPlan": "Diurus oleh pelan pengekodan anda",
       "enableKey": "Dayakan kunci {{provider}}",
@@ -374,6 +371,7 @@
       "removeMessage": "Permintaan yang menggunakan kunci ini tidak lagi akan menggunakan pengebilan pembekal anda.",
       "add": "Tambah kunci",
       "added": "Kunci ditambah",
+      "updated": "Kunci dikemas kini",
       "emptyTitle": "Tiada kunci pembekal",
       "emptyDescription": "Tambah kunci untuk bermula.",
       "chooseProvider": "Pilih pembekal",
@@ -382,9 +380,34 @@
       "noProvidersDescription": "Tiada pembekal yang sepadan dengan carian itu.",
       "newKeyTitle": "Kunci baharu",
       "newKeyDescription": "Kunci disimpan secara tersulit dan tidak boleh ditunjukkan lagi.",
+      "edit": "Edit kunci",
+      "editKeyTitle": "Gantikan kunci",
+      "editKeyDescription": "Nilai yang disimpan tidak boleh ditunjukkan. Masukkan nilai baharu untuk menggantikannya.",
+      "editKeyMappingsWarning": "Menggantikan kunci turut menggantikan pemetaan model yang disimpan: masukkan semula setiap pemetaan yang masih anda perlukan.",
+      "saveFailed": "Tidak dapat menyimpan kunci.",
+      "invalidCredentials": "Semak kelayakan dan cuba lagi.",
+      "fieldRequired": "{{field}} diperlukan.",
+      "incompleteMapping": "Pemetaan {{number}} memerlukan kedua-dua slug model gateway dan nama deployment.",
       "apiKeyLabel": "Kunci API",
       "apiKeyPlaceholder": "Tampal kunci",
-      "apiKeyRequired": "Masukkan kunci."
+      "apiKeyRequired": "Masukkan kunci.",
+      "authMethod": "Kaedah pengesahan",
+      "authMethodAccessKeys": "Kunci akses",
+      "resourceName": "Nama sumber Azure",
+      "region": "Rantau AWS",
+      "accessKeyId": "ID kunci akses",
+      "secretAccessKey": "Kunci akses rahsia",
+      "project": "Projek Google Cloud",
+      "location": "Lokasi Vertex",
+      "clientEmail": "E-mel akaun perkhidmatan",
+      "privateKey": "Kunci peribadi akaun perkhidmatan",
+      "modelMappings": "Pemetaan model",
+      "modelMappingsDescription": "Halakan model gateway kepada nama deployment tersuai.",
+      "mappingTitle": "Pemetaan {{number}}",
+      "mappingGatewayModel": "Slug model gateway",
+      "mappingCustomModel": "Nama deployment",
+      "addMapping": "Tambah pemetaan",
+      "removeMapping": "Alih keluar pemetaan {{number}}"
     },
     "dataExport": {
       "title": "Data anda",
@@ -457,7 +480,8 @@
       "nextStepFinal": "Keputusan rayuan adalah muktamad. Tiada rayuan selanjutnya boleh diserahkan.",
       "viewReceipt": "Lihat resit"
     },
-    "changelog": "Yang baharu"
+    "changelog": "Yang baharu",
+    "changelogVersionPending": "Nota versi ini akan tiba bersama kemas kini apl seterusnya."
   },
   "preferences": {
     "general": "Umum",
@@ -1170,8 +1194,6 @@
       "clearMessage": "Menyimpan medan kosong akan memadamkan arahan tersuai yang disimpan untuk pengulas ini."
     },
     "repos": {
-      "unavailable": "Repositori tidak tersedia — selesaikan persediaan Bitbucket di kilo.ai.",
-      "finishSetup": "Selesaikan persediaan",
       "manageAccess": "Urus akses",
       "bitbucketNoRepositoriesDescription": "Tiada repositori tersedia dalam ruang kerja Bitbucket ini.",
       "gitlabNoRepositoriesDescription": "Anda mungkin perlu memberikan akses kepada lebih banyak kumpulan atau projek di GitLab.",
@@ -1326,11 +1348,10 @@
     "followReviewMd": "Ikuti REVIEW.md",
     "followReviewMdSubtitle": "Patuhi fail arahan REVIEW.md dalam setiap repositori",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket tidak disambungkan. Hanya pemilik organisasi, pentadbir dan pengurus pengebilan boleh menyambungkannya.",
-      "setupIncomplete": "Persediaan belum lengkap. Selesaikan konfigurasi di kilo.ai.",
-      "setup": "Persediaan Bitbucket"
+      "notConnectedReadOnly": "Bitbucket tidak disambungkan. Hanya pemilik organisasi, pentadbir dan pengurus pengebilan boleh menyambungkannya."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Sambungan Bitbucket organisasi ini diurus di web melalui komputer.",
       "description": "Cipta token akses ruang kerja dengan skop yang diperlukan dan tampalkannya di bawah.",
       "scopes": "Akaun: baca · Repositori: baca/tulis · Permintaan penarikan: baca · Webhook: baca/tulis",
       "tokenPlaceholder": "Token akses ruang kerja"
@@ -1345,7 +1366,8 @@
       "noReviews": "Belum ada semakan",
       "noReviewsDescription": "Semakan muncul di sini selepas Penyemak Kod menyemak permintaan penarikan.",
       "startManualReview": "Mulakan semakan manual",
-      "configureProvider": "Konfigurasikan penyedia"
+      "configureProvider": "Konfigurasikan penyedia",
+      "connectOwnerOnly": "Minta pemilik organisasi atau pentadbir untuk menyambungkan penyedia."
     },
     "platformList": {
       "checking": "Menyemak…",
@@ -1358,8 +1380,7 @@
       "githubError": "Tidak dapat membuka persediaan GitHub. Sila cuba lagi.",
       "gitlabAccount": "Akaun GitLab",
       "gitlabError": "Tidak dapat membuka persediaan GitLab. Sila cuba lagi.",
-      "description": "Sambungkan {{label}} Kilo untuk menyemak permintaan penarikan secara automatik.",
-      "bitbucketError": "Tidak dapat membuka persediaan Bitbucket. Sila cuba lagi."
+      "description": "Sambungkan {{label}} Kilo untuk menyemak permintaan penarikan secara automatik."
     },
     "overview": {
       "allAreas": "Semua bidang",
@@ -2152,10 +2173,8 @@
       "couldNotLoadBitbucketRepositories": "Tidak dapat memuatkan repositori Bitbucket.",
       "connectGithubDescription": "Log masuk melalui pelayar anda, kemudian kembali ke sini untuk memilih repositori GitHub.",
       "connectGitlabDescription": "Log masuk melalui pelayar anda, kemudian kembali ke sini untuk memilih repositori GitLab.",
-      "connectBitbucketDescription": "Log masuk melalui pelayar anda, kemudian kembali ke sini untuk memilih repositori Bitbucket.",
       "openGithub": "Buka GitHub",
       "openGitlab": "Buka GitLab",
-      "openBitbucket": "Buka Bitbucket",
       "refreshRepositories": "Muat semula repositori",
       "githubConnected": "GitHub disambungkan",
       "gitlabConnected": "GitLab disambungkan",
@@ -2956,6 +2975,7 @@
     "signOutThisDevice": "Log keluar daripada peranti ini",
     "signOutSessionLabel": "Log keluar daripada {{device}}, log masuk {{signedIn}}, terakhir dilihat {{lastSeen}}",
     "sessionSignedOut": "Sesi dilog keluar.",
+    "sessionSignOutFailed": "Tidak dapat log keluar daripada sesi ini. Cuba lagi.",
     "signOutThisDeviceTitle": "Log keluar daripada peranti ini?",
     "signOutThisSessionTitle": "Log keluar daripada sesi ini?",
     "signOutThisSessionMessage": "{{device}} akan dilog keluar. Terakhir dilihat {{lastSeen}}. Ia boleh mengekalkan akses API sehingga satu jam.",
@@ -3078,15 +3098,14 @@
     "manage": {
       "billingHistory": "Sejarah pengebilan",
       "billingHistoryEmpty": "Belum ada sejarah pengebilan.",
+      "billingHistoryError": "Tidak dapat memuatkan sejarah pengebilan",
       "cancel": "Batalkan langganan",
       "cancelDescription": "Kilo Pass anda kekal aktif sehingga akhir tempoh pengebilan dan tidak akan diperbaharui.",
       "cancelScheduled": "Dibatalkan pada {{date}}",
       "cancelScheduledChange": "Batalkan perubahan berjadual",
       "cancelled": "Langganan dibatalkan",
-      "changePlan": "Tukar pelan di kilo.ai",
-      "changePlanIosNote": "Perubahan pelan berbayar tersedia di kilo.ai.",
       "creditHistoryEmpty": "Belum ada kredit Kilo Pass.",
-      "manageInStore": "Urus di {{store}}",
+      "creditHistoryError": "Tidak dapat memuatkan sejarah kredit",
       "resume": "Sambung semula langganan",
       "resumeCancelledDescription": "Kilo Pass anda akan mula diperbaharui secara automatik semula.",
       "resumePausedDescription": "Kilo Pass anda disambung semula sekarang, sebelum tarikh sambung semula yang dijadualkan.",
@@ -3123,9 +3142,6 @@
     "bonusFree": "Bonus percuma",
     "bonusReferral": "Bonus rujukan",
     "bonusAvailable": "Bonus percuma tersedia",
-    "kiloPassManagement": "Pengurusan Kilo Pass",
-    "kiloPassSetup": "Persediaan Kilo Pass",
-    "opensManagementOnWeb": "Membuka halaman pengurusan Kilo Pass di laman web.",
     "loadFailedRetry": "Semak sambungan anda, kemudian cuba lagi.",
     "legalTermsOfUse": "Terma penggunaan (EULA)",
     "purchaseDifferentAccount": "Pembelian App Store ini tidak dipautkan ke akaun Kilo anda. Log masuk ke Apple Account yang digunakan untuk pembelian, kemudian cuba lagi.",
@@ -3311,7 +3327,6 @@
       "buySeats": "Beli slot pengguna",
       "setupAutoTopUp": "Sediakan tambah nilai automatik",
       "manageAutoTopUp": "Urus tambah nilai automatik",
-      "webAddress": "Alamat web {{url}}",
       "opensOnWeb": "Dibuka di web"
     },
     "boundary": {
@@ -3327,7 +3342,7 @@
       "selectOrganization": "Pilih organisasi",
       "unavailableDescription": "Organisasi ini tidak lagi tersedia. Pilih satu daripada profil anda untuk meneruskan.",
       "unavailableSessionsDescription": "Organisasi ini tidak lagi tersedia. Sesi untuk organisasi ini tidak dapat dimuatkan.",
-      "accessDeniedDescription": "Anda tidak mempunyai akses kepada organisasi ini."
+      "accessDeniedDescription": "Minta pemilik atau pentadbir organisasi memberikan anda akses."
     },
     "create": {
       "title": "Cipta organisasi",
@@ -3447,25 +3462,88 @@
     },
     "settingsOnWeb": {
       "title": "Tetapan organisasi di web",
-      "integrations": "Integrasi di web",
       "usageDetails": "Butiran penggunaan",
       "providersAndModels": "Penyedia dan model",
       "groups": "Kumpulan",
       "guardrails": "Kawalan keselamatan",
       "byok": "Bawa kunci anda sendiri",
       "ssoAndDomain": "SSO dan domain",
-      "emailPreferences": "Keutamaan e-mel",
       "dataCollection": "Pengumpulan data",
       "auditLogs": "Log audit",
-      "requestLogs": "Log permintaan",
-      "subOrganizations": "Suborganisasi",
-      "distributeFunds": "Agihkan dana"
+      "requestLogs": "Log permintaan"
+    },
+    "requestLogs": {
+      "hint": "Permintaan dalam sejam sebelum julat masa berakhir, terkini dahulu.",
+      "older": "Jam sebelumnya",
+      "newer": "Jam berikutnya",
+      "truncated": "Jam ini ada lebih banyak permintaan daripada yang dipaparkan.",
+      "emptyTitle": "Tiada permintaan",
+      "emptyDescription": "Tiada permintaan get laluan dalam jam ini.",
+      "loadError": "Tidak dapat memuatkan log permintaan.",
+      "permissionDenied": "Hanya pemilik, pentadbir atau pengurus pengebilan organisasi boleh membaca log permintaannya.",
+      "tokens": "{{input}} masuk · {{output}} keluar",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Token masukan",
       "orgLast30Days": "Semua ahli · 30 Hari terakhir",
       "outputTokens": "Token keluaran",
       "requests": "Permintaan"
+    },
+    "modes": {
+      "create": "Mod baharu",
+      "deleteAction": "Padam mod",
+      "deleteMessage": "Mod ini dialih keluar untuk semua orang dalam organisasi ini. Mod yang menggantikan mod terbina dalam akan kembali kepada tetapan terbina dalam.",
+      "deleteTitle": "Padam mod ini?",
+      "descriptionLabel": "Penerangan mod",
+      "emptyDescription": "Mod yang ditambah di sini tersedia untuk semua orang dalam organisasi ini.",
+      "emptyTitle": "Belum ada mod tersuai",
+      "identifierHint": "Huruf kecil, nombor dan sengkang.",
+      "identifierInvalid": "Gunakan huruf kecil, nombor dan sengkang sahaja.",
+      "identifierLabel": "Pengecam",
+      "identifierRequired": "Masukkan pengecam.",
+      "identifierTaken": "Mod lain sudah menggunakan pengecam ini.",
+      "nameLabel": "Nama mod",
+      "nameRequired": "Masukkan nama mod.",
+      "notFound": "Mod ini tidak lagi wujud.",
+      "restrictionHint": "Hanya fail yang sepadan dengan corak ini boleh disunting. Biarkan kosong untuk membenarkan semua fail.",
+      "restrictionInvalid": "Masukkan corak yang sah.",
+      "restrictionLabel": "Label sekatan",
+      "restrictionPattern": "Corak fail",
+      "roleLabel": "Definisi peranan",
+      "roleRequired": "Terangkan fungsi mod ini.",
+      "tool": {
+        "browser": "Gunakan pelayar",
+        "command": "Jalankan arahan",
+        "edit": "Sunting fail",
+        "mcp": "Gunakan MCP",
+        "read": "Baca fail"
+      },
+      "whenToUseLabel": "Bila hendak menggunakan mod ini"
+    },
+    "groups": {
+      "create": "Kumpulan baharu",
+      "deleteAction": "Padam kumpulan",
+      "deleteMessage": "Kumpulan, dasar-dasarnya dan penetapan ahlinya dialih keluar.",
+      "deleteTitle": "Padam kumpulan ini?",
+      "descriptionLabel": "Penerangan kumpulan",
+      "emptyDescription": "Kumpulan menghimpunkan ahli supaya satu dasar boleh digunakan kepada semua ahli.",
+      "emptyTitle": "Belum ada kumpulan",
+      "enterpriseOnly": "Kumpulan tersedia pada pelan Enterprise.",
+      "memberCount": "{{displayCount}} ahli",
+      "memberCount_one": "{{displayCount}} ahli",
+      "memberCount_other": "{{displayCount}} ahli",
+      "memberViewEmpty": "Anda tidak berada dalam mana-mana kumpulan organisasi ini.",
+      "memberViewTitle": "Kumpulan anda",
+      "membersEmpty": "Tiada ahli aktif yang sepadan dengan carian anda.",
+      "membersLabel": "Ahli kumpulan",
+      "nameLabel": "Nama kumpulan",
+      "nameRequired": "Masukkan nama kumpulan.",
+      "nameTooLong": "Hadkan nama kepada 80 aksara atau kurang.",
+      "notFound": "Kumpulan ini tidak lagi wujud.",
+      "permissionDenied": "Hanya pemilik atau pentadbir organisasi boleh mengubah kumpulannya.",
+      "searchMembers": "Cari ahli",
+      "selectAllVisible": "Pilih semua yang dipaparkan"
     },
     "hub": {
       "renameTitle": "Namakan semula organisasi",
@@ -3495,8 +3573,7 @@
       "paymentPending": "Pembayaran belum selesai",
       "processingBlocked": "Pemprosesan disekat",
       "processingNeedsReview": "Pemprosesan memerlukan semakan",
-      "retryHint": "Mencuba untuk memuatkan semula status Kilo Pass.",
-      "setupHint": "Membuka halaman penyediaan Kilo Pass di web."
+      "retryHint": "Mencuba untuk memuatkan semula status Kilo Pass."
     }
   },
   "authErrors": {
@@ -4021,6 +4098,7 @@
     "commandAtLimit": "Arahan dihadkan kepada {{max}} aksara",
     "commandsEmpty": "Tiada arahan persediaan lagi",
     "commandsSaveFailed": "Tidak dapat menyimpan arahan persediaan",
+    "commandLimitReached": "Profil boleh memuatkan sehingga {{max}} arahan persediaan. Padam satu untuk menambah yang lain.",
     "moveCommandUp": "Alihkan arahan {{position}} ke atas",
     "moveCommandDown": "Alihkan arahan {{position}} ke bawah",
     "skillsTitle": "Kemahiran",
@@ -4107,6 +4185,7 @@
       "deleteMessage": "Sesi baharu yang menggunakan profil ini tidak lagi dapat mengakses alat pelayan ini. Tindakan ini tidak boleh dibatalkan.",
       "deleteConfirm": "Padam pelayan MCP",
       "saveFailed": "Tidak dapat menyimpan pelayan MCP",
+      "limitReached": "Satu profil boleh menyimpan sehingga {{max}} pelayan MCP. Padam satu untuk menambah yang lain.",
       "deleteFailed": "Tidak dapat memadam pelayan MCP",
       "updateFailed": "Tidak dapat mengemas kini pelayan MCP"
     },
@@ -4139,6 +4218,7 @@
       "modeSubagent": "Subagen sahaja",
       "modeAll": "Semua mod",
       "saveFailed": "Tidak dapat menyelamatkan ejen",
+      "limitReached": "Satu profil boleh menyimpan sehingga {{max}} ejen. Padam satu untuk menambah yang lain.",
       "deleteFailed": "Tidak dapat memadam ejen",
       "nameRequired": "Masukkan nama ejen",
       "slugRequired": "Masukkan slug ejen",
@@ -4169,6 +4249,7 @@
       "moveUp": "Alihkan arahan {{name}} ke atas",
       "moveDown": "Alihkan arahan {{name}} ke bawah",
       "saveFailed": "Tidak dapat menyimpan arahan",
+      "limitReached": "Profil boleh memuatkan sehingga {{max}} arahan tebas. Padam satu untuk menambah yang lain.",
       "deleteFailed": "Tidak dapat memadam arahan",
       "nameRequired": "Masukkan nama arahan",
       "nameInvalid": "Nama mesti bermula dengan huruf kecil dan hanya menggunakan huruf kecil, angka dan sempang",
@@ -4249,7 +4330,7 @@
       },
       "purchaseFallback": "Pembelian kredit",
       "receipt": "Resit",
-      "receiptA11y": "Buka resit untuk {{description}}",
+      "receiptA11y": "Buka resit untuk {{description}}, {{amount}}, dari {{date}}",
       "receiptUnavailable": "Resit tidak tersedia untuk pembelian ini."
     },
     "title": "Beli kredit",
@@ -4503,7 +4584,78 @@
     },
     "triggers": {
       "title": "Pencetus & webhook",
-      "subtitle": "Urus pencetus webhook dan berjadual di web."
+      "subtitle": "Automatkan larian Cloud Agent daripada panggilan webhook atau jadual.",
+      "new": "Pencetus baharu",
+      "emptyTitle": "Belum ada pencetus",
+      "emptyDescription": "Cipta pencetus untuk memulakan larian Cloud Agent daripada panggilan webhook atau pada jadual.",
+      "loadFailedTitle": "Tidak dapat memuatkan pencetus",
+      "loadFailedDescription": "Cuba lagi apabila anda mempunyai sambungan.",
+      "detailLoadFailedTitle": "Tidak dapat memuatkan pencetus ini",
+      "detailNotFoundTitle": "Pencetus tidak ditemui",
+      "cannotEditCreator": "Pencetus ini berjalan sebagai penciptanya, jadi hanya pencipta boleh mengubahnya.",
+      "permissionDenied": "Peranan anda tidak boleh mengurus pencetus ini.",
+      "webhookUrl": "URL webhook",
+      "urlCopied": "URL webhook disalin",
+      "deliveries": "Penghantaran",
+      "deliveriesEmptyTitle": "Belum ada penghantaran",
+      "deliveriesEmptyDescription": "Panggilan webhook atau larian berjadual akan dipaparkan di sini sebaik sahaja ia tiba.",
+      "deliveriesLoadFailedTitle": "Tidak dapat memuatkan penghantaran",
+      "openSession": "Lihat sesi",
+      "activationWebhook": "Panggilan webhook",
+      "fieldName": "Nama pencetus",
+      "fieldActivation": "Berjalan pada",
+      "fieldCron": "Ungkapan cron",
+      "fieldCronHelp": "Lima medan: minit, jam, hari, bulan dan hari dalam minggu. Selang terpendek ialah satu minit.",
+      "fieldTimezone": "Zon waktu",
+      "nameLocked": "Nama tidak boleh berubah selepas pencetus dicipta.",
+      "repositoryLocked": "Repositori tidak boleh berubah selepas pencetus dicipta.",
+      "environmentAutomatic": "Automatik mengikut repositori",
+      "notSelected": "Tidak dipilih",
+      "profileDefaults": "Gunakan lalai",
+      "profileHelp": "Tetapan profil digunakan apabila pencetus berjalan. Rahasianya diselesaikan ketika itu.",
+      "customAgent": "Ejen tersuai",
+      "agentHelp": "Ejen dalam direktori .kilo/agent repositori, atau salah satu mod terbina dalam.",
+      "fieldBodySchema": "Skema badan",
+      "bodySchemaHelp": "JSON Schema pilihan. Permintaan yang badannya tidak sepadan dengannya akan ditolak.",
+      "authTitle": "Pengepala rahsia",
+      "authDescription": "Permintaan mesti menghantar pengepala ini dengan rahsia dikongsi.",
+      "authHeaderLabel": "Nama pengepala",
+      "authSecretLabel": "Rahsia dikongsi",
+      "authSecretKeep": "Biarkan kosong untuk mengekalkan rahsia yang disimpan.",
+      "authSecretSet": "Diperlukan. Pilih rentetan rawak yang kukuh.",
+      "authSecretCreator": "Gunakan sekurang-kurangnya 16 aksara apabila pencetus berjalan sebagai penciptanya.",
+      "autoCommit": "Komit perubahan apabila larian selesai",
+      "condenseOnComplete": "Ringkaskan konteks apabila larian selesai",
+      "activeTitle": "Pencetus aktif",
+      "activeDescription": "Webhook yang dijeda menjawab dengan 404.",
+      "runAsCreator": "Jalankan sebagai saya",
+      "runAsCreatorDescription": "Setiap larian menggunakan akaun anda, jadi pengepala rahsia diperlukan.",
+      "saveFailedTitle": "Tidak dapat menyimpan pencetus",
+      "deleteTitle": "Padamkan pencetus ini?",
+      "deleteMessage": "Panggilan ke {{name}} akan gagal. Tindakan ini tidak boleh dibatalkan.",
+      "deleteMessageScheduled": "Larian yang dijadualkan bagi pencetus {{name}} akan berhenti. Tindakan ini tidak boleh dibatalkan.",
+      "runNow": "Jalankan sekarang",
+      "runStarted": "Larian dimulakan",
+      "created": "Pencetus dicipta",
+      "saved": "Pencetus disimpan",
+      "statusArrived": "Tiba",
+      "problems": {
+        "nameRequired": "Masukkan nama.",
+        "nameTooShort": "Gunakan sekurang-kurangnya 8 aksara.",
+        "nameTooLong": "Gunakan 64 aksara atau kurang.",
+        "nameCharacters": "Gunakan huruf kecil, nombor dan tanda sempang.",
+        "nameReserved": "Nama ini dikhaskan.",
+        "cronRequired": "Masukkan ungkapan cron.",
+        "repositoryRequired": "Pilih repositori",
+        "agentRequired": "Pilih ejen.",
+        "agentInvalid": "Gunakan huruf kecil, nombor dan tanda sempang, bermula dengan huruf.",
+        "modelRequired": "Pilih model",
+        "promptRequired": "Masukkan gesaan.",
+        "bodySchemaInvalid": "Masukkan objek JSON, atau biarkan kosong.",
+        "authHeaderRequired": "Masukkan nama pengepala.",
+        "authSecretRequired": "Masukkan rahsia dikongsi.",
+        "authSecretTooShort": "Gunakan sekurang-kurangnya 16 aksara."
+      }
     }
   },
   "sessionShare": {
@@ -4521,8 +4673,9 @@
     "create": "Cipta pautan",
     "createFailed": "Tidak dapat mencipta pautan.",
     "existingTitle": "Pautan sedia ada",
-    "existingDescription": "Sesi ini sudah mempunyai pautan kongsi. Mencipta pautan baharu akan menggantikannya dan pautan lama tidak akan berfungsi lagi.",
+    "existingDescription": "Sesi ini sudah mempunyai pautan kongsi. Mencipta pautan baharu dengan tetapan ini akan menggantikannya dan pautan lama tidak akan berfungsi lagi.",
     "rotate": "Cipta pautan baharu",
+    "replacementSettings": "Tetapan ini terpakai untuk pautan baharu.",
     "revoke": "Buang pautan",
     "revokeTitle": "Batalkan pautan?",
     "revokeMessage": "Pautan semasa akan berhenti berfungsi serta-merta.",
@@ -4541,5 +4694,175 @@
     "unavailableDescription": "Pautan kongsi ini telah tamat tempoh atau dibatalkan.",
     "transcriptUnavailableTitle": "Tidak dapat memuatkan transkrip ini",
     "transcriptUnavailableDescription": "Pautan ini masih berfungsi. Cuba lagi sebentar lagi."
+  },
+  "organizationGuardrails": {
+    "title": "Pagar Keselamatan AI",
+    "permissionDenied": "Hanya pemilik dan pentadbir organisasi boleh mengurus Pagar Keselamatan AI.",
+    "unavailable": "Pagar Keselamatan AI tidak tersedia untuk organisasi ini.",
+    "loadError": "Pagar Keselamatan AI gagal dimuatkan",
+    "statusSaving": "Menyimpan…",
+    "statusSaved": "Disimpan",
+    "statusFailed": "Tidak dapat menyimpan.",
+    "inputTitle": "Pagar keselamatan input",
+    "inputDescription": "Mengimbas setiap input dengan Enkrypt AI, termasuk hasil alat. Pengesan yang menyekat menolak permintaan apabila Enkrypt tidak tersedia.",
+    "outputTitle": "Pagar keselamatan output",
+    "outputDescription": "Mengimbas respons dengan Enkrypt AI sebelum ahli menerimanya. Dimatikan kecuali anda menghidupkannya.",
+    "detectorsHint": "Sekat menolak permintaan yang ditandakan. Rekod sahaja merekodkannya tanpa melengahkan permintaan.",
+    "detectorsHintOutput": "Sekat menggagalkan respons yang ditandakan. Rekod sahaja merekodkannya tanpa melengahkan respons.",
+    "choiceLog": "Rekod sahaja",
+    "applyTo": "Gunakan pada",
+    "applyToAllMembers": "Semua ahli",
+    "applyKiloDefault": "Gunakan Lalai Kilo",
+    "invalidSavedTitle": "Tetapan pengesan input yang disimpan tidak dapat dibaca",
+    "invalidSavedBody": "Permintaan disekat sehingga pengesan input disimpan semula. Pengesan di bawah bermula daripada Lalai Kilo.",
+    "invalidSavedOutputTitle": "Tetapan pengesan output yang disimpan tidak dapat dibaca",
+    "invalidSavedOutputBody": "Respons ditahan sehingga pengesan output disimpan semula. Pilih pengesan output di bawah.",
+    "blockingOutputNote": "Pengesan output yang menyekat menahan respons sehingga Enkrypt telah menyemak keseluruhannya. Gunakan Rekod sahaja untuk mengelakkan kelewatan.",
+    "inputDetectorRequired": "Hidupkan sekurang-kurangnya satu pengesan input.",
+    "outputDetectorRequired": "Hidupkan sekurang-kurangnya satu pengesan output.",
+    "rulesTooMany": "Tambah sehingga {{max}} peraturan.",
+    "ruleIdRequired": "Masukkan ID peraturan.",
+    "ruleIdInvalid": "ID peraturan hanya boleh menggunakan huruf, nombor, titik, sengkang, dan garis bawah.",
+    "ruleTextRequired": "Terangkan perkara yang dilarang atau diwajibkan oleh peraturan.",
+    "keywordTooLong": "Setiap kata kunci boleh sehingga {{max}} aksara.",
+    "topicTooLong": "Setiap topik boleh sehingga {{max}} aksara.",
+    "keywordsTooMany": "Tambah sehingga {{max}} kata kunci.",
+    "topicsTooMany": "Tambah sehingga {{max}} topik.",
+    "piiEntityRequired": "Pilih sekurang-kurangnya satu jenis data untuk dikesan.",
+    "keywordRequired": "Tambah sekurang-kurangnya satu kata kunci.",
+    "topicRequired": "Tambah sekurang-kurangnya satu topik.",
+    "policyTextRequired": "Masukkan teks dasar.",
+    "ruleRequired": "Tambah sekurang-kurangnya satu peraturan.",
+    "ruleIdDuplicate": "Setiap peraturan memerlukan ID peraturan tersendiri.",
+    "piiEntities": "Data untuk dikesan",
+    "keywordsLabel": "Kata kunci",
+    "keywordsHint": "Satu kata kunci setiap baris.",
+    "topicsHint": "Satu topik setiap baris.",
+    "policyFormat": "Format dasar",
+    "policyFormatRules": "Peraturan berstruktur",
+    "policyFormatRulesDescription": "Satu peraturan bagi setiap keperluan, dengan kategori dan keterukan. Disyorkan.",
+    "policyFormatText": "Teks dasar",
+    "policyFormatTextDescription": "Tampal dasar sedia ada sebagai teks biasa.",
+    "rulesEmpty": "Tiada peraturan lagi. Setiap peraturan menerangkan satu perkara yang input tidak boleh mengandungi atau meminta.",
+    "addRule": "Tambah peraturan",
+    "ruleNumber": "Peraturan {{number}}",
+    "ruleRemove": "Buang peraturan {{number}}",
+    "ruleIdLabel": "ID peraturan",
+    "ruleNameLabel": "Nama (pilihan)",
+    "ruleTextLabel": "Peraturan",
+    "ruleRiskCategory": "Kategori risiko",
+    "ruleApplicability": "Skop",
+    "ruleFrameworks": "Rangka kerja",
+    "detector": {
+      "promptInjection": {
+        "label": "Suntikan gesaan",
+        "description": "Mengesan percubaan untuk mengatasi arahan atau membebaskan model daripada kekangan."
+      },
+      "policyViolation": {
+        "label": "Pelanggaran dasar",
+        "description": "Menandakan input yang melanggar dasar organisasi anda, yang ditulis sebagai teks atau peraturan.",
+        "descriptionOutput": "Menandakan respons yang melanggar dasar organisasi anda, yang ditulis sebagai teks atau peraturan."
+      },
+      "pii": {
+        "label": "PII dan rahsia",
+        "description": "Mengesan data peribadi, kelayakan, alamat IP, dan URL."
+      },
+      "keywords": {
+        "label": "Kata kunci terlarang",
+        "descriptionOutput": "Mengesan respons yang mengandungi mana-mana kata kunci yang anda senaraikan."
+      },
+      "topics": {
+        "label": "Topik",
+        "descriptionOutput": "Menandakan respons tentang mana-mana topik yang anda senaraikan."
+      },
+      "toxicity": {
+        "label": "Ketoksikan",
+        "description": "Mengesan bahasa toksik, menghina, mengancam, atau penuh kebencian."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Mengesan kandungan seksual atau kandungan lain yang tidak selamat untuk tempat kerja."
+      },
+      "bias": {
+        "label": "Kecenderungan",
+        "description": "Mengesan bahasa yang berat sebelah atau mendiskriminasi."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Data peribadi",
+        "description": "Nama, alamat e-mel, nombor telefon."
+      },
+      "secrets": {
+        "label": "Rahsia",
+        "description": "Kunci API, token, kata laluan."
+      },
+      "ipAddress": {
+        "label": "Alamat IP",
+        "description": "Alamat IPv4 dan IPv6."
+      },
+      "url": {
+        "label": "URL",
+        "description": "Alamat sesawang."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Keselamatan dan penipuan",
+      "safetyHarm": "Keselamatan dan kemudaratan",
+      "privacyDataProtection": "Privasi dan perlindungan data",
+      "brandReputationTrust": "Jenama dan reputasi",
+      "biasFairnessEthical": "Kecenderungan dan keadilan",
+      "legalIpLiability": "Liabiliti perundangan dan harta intelek",
+      "productMisuse": "Penyalahgunaan produk",
+      "performanceQuality": "Prestasi dan kualiti"
+    },
+    "applicability": {
+      "user": "Input pengguna",
+      "userAssistant": "Input pengguna dan respons"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM 10 Teratas (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "Akta AI EU",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Ciri perusahaan",
+    "enterpriseOnly": "Ini ialah ciri khusus perusahaan.",
+    "readOnly": "Hanya pemilik dan pentadbir organisasi boleh mengubah tetapan ini.",
+    "loadError": "Pembekal dan model tidak dapat dimuatkan",
+    "tabModels": "Model",
+    "tabProviders": "Pembekal",
+    "tabGateways": "Gerbang",
+    "modelsDescription": "Matikan model untuk menyekatnya bagi setiap ahli. Model daripada pembekal yang dibenarkan dihidupkan secara lalai.",
+    "modelsDeniedOnly": "Ditolak sahaja",
+    "modelsEmpty": "Tiada model sepadan dengan carian ini.",
+    "providersDescription": "Matikan pembekal untuk menghentikan Kilo daripada menghalakan permintaan kepadanya bagi organisasi ini.",
+    "providersNeedCatalog": "Suis pembekal kekal baca sahaja sehingga katalog model penuh dimuatkan. Ketik Cuba lagi di atas untuk mengeditnya.",
+    "providersEmpty": "Tiada pembekal sepadan dengan carian ini.",
+    "allowAllShown": "Benarkan semua yang dipaparkan",
+    "denyAllShown": "Tolak semua yang dipaparkan",
+    "gatewaysDescription": "Kilo menghalakan permintaan model melalui Vercel AI Gateway atau OpenRouter. Gerbang yang dimatikan menggagalkan permintaan tersebut.",
+    "emptyProviderList": "Benarkan sekurang-kurangnya satu pembekal. Senarai kosong menyekat semua laluan model Kilo.",
+    "gatewaysUnavailable": "Tetapan gerbang tidak tersedia untuk organisasi ini.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "Permintaan OpenRouter tidak ditetapkan kepada wilayah tertentu.",
+    "inferenceRegion": "Wilayah inferens",
+    "inferenceRegionDescription": "Menetapkan permintaan Vercel AI Gateway kepada wilayah ini. Model yang tidak tersedia di sana akan gagal.",
+    "disableOpenrouterNote": "Mematikan OpenRouter juga menyekat kunci BYOK yang menghalakan permintaan melaluinya.",
+    "emptyModelList": "Biarkan sekurang-kurangnya satu model dihidupkan. Menolak semua model menyebabkan ahli tiada apa-apa untuk digunakan.",
+    "catalogUnavailable": "Katalog model penuh tidak dimuatkan, jadi hanya senarai yang anda simpan ditunjukkan. Cuba semula untuk memuatkan semua model.",
+    "region": {
+      "global": "Sejagat",
+      "us": "Amerika Syarikat",
+      "eu": "Kesatuan Eropah",
+      "au": "Australia",
+      "jp": "Jepun"
+    }
   }
 }

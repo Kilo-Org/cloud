@@ -1,9 +1,11 @@
+// @ts-check
 /** Config key → environment variable name. Single source of truth for both
  *  build-time validation (app.config.ts) and runtime access (config.ts).
  *  Required keys only: app.config.ts's missing-value check enumerates this map
  *  and the `extra` spread bakes every entry, so an optional key must not be one
  *  of them. A URL key may be either kind, so the build-time URL contract reads
- *  both maps (see app.config.ts). */
+ *  both maps (see app.config.ts).
+ *  Checked by the mobile typecheck through tsconfig include — keep the entry. */
 export const ENV_KEYS = {
   apiBaseUrl: 'API_BASE_URL',
   webBaseUrl: 'WEB_BASE_URL',

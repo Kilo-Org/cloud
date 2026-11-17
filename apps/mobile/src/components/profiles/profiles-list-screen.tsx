@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -73,9 +73,12 @@ function ProfileListSkeleton() {
 
 export function ProfilesListScreen({
   stack,
+  backFallback,
 }: Readonly<{
   /** The Stack this screen is mounted in; the rows it opens stay in it. */
   stack: ProfileManagementStack;
+  /** Where the header's Back lands when the list opens with no history to pop. */
+  backFallback?: Href;
 }>) {
   const router = useRouter();
   const { t } = useTranslation();
@@ -137,6 +140,7 @@ export function ProfilesListScreen({
     <View className="flex-1 bg-background">
       <ScreenHeader
         title={t('profiles.title')}
+        backFallback={backFallback}
         headerRight={
           <IconButton onPress={openNewProfile} accessibilityLabel={t('profiles.newProfile')}>
             <Plus size={22} color={colors.foreground} />

@@ -137,6 +137,16 @@ function searchInput(root: ReactTestRenderer['root']) {
   return input;
 }
 
+function clearControl(root: ReactTestRenderer['root']) {
+  const [control] = root.findAll(
+    node => Object.is(node.type, 'Pressable') && node.props.accessibilityLabel === 'Clear search'
+  );
+  if (!control) {
+    throw new Error('missing clear control');
+  }
+  return control;
+}
+
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   state.providers = [
@@ -198,6 +208,30 @@ describe('ProviderKeyProviderPickerScreen', () => {
     expect(
       root.findAll(node => Object.is(node.type, 'EmptyState')).map(node => node.props.title)
     ).toEqual(['No matching providers']);
+  });
+
+  it('clears the query from its own control and returns the full list', async () => {
+    const root = await mount();
+
+    act(() => {
+      (searchInput(root).props.onChangeText as (value: string) => void)('gpt');
+    });
+    expect(rowLabels(root)).toHaveLength(0);
+
+    act(() => {
+      (clearControl(root).props.onPress as () => void)();
+    });
+
+    expect(rowLabels(root).map(node => node.props.accessibilityLabel)).toEqual([
+      'Anthropic',
+      'OpenAI',
+    ]);
+    expect(
+      root.findAll(
+        node =>
+          Object.is(node.type, 'Pressable') && node.props.accessibilityLabel === 'Clear search'
+      )
+    ).toHaveLength(0);
   });
 
   it('returns the full list from its first provider when the search clears', async () => {

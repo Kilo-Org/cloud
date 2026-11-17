@@ -472,19 +472,24 @@ test('removal restores the value the last wire displaced, rotation included', as
     fs.writeFileSync(caAPath, 'CA A\n');
     fs.writeFileSync(caBPath, 'CA B\n');
 
-    // Wire 1 displaced ca-a; wire 2 displaced the bundle line with ca-b (a new
-    // recorded source); wire 3 displaced ca-b with the bundle again. The
-    // newest record is exactly ca-b — the last value this line displaced —
-    // not the oldest (ca-a).
+    // Wire 1 displaced ca-a (the line sits above where the section goes);
+    // wire 2 displaced the bundle line with ca-b; wire 3 displaced ca-b with
+    // ca-a again. The newest record is exactly ca-a — the last value this
+    // line displaced — not the first one it ever displaced, and not ca-b.
+    fs.writeFileSync(fixture.envLocalPath, `NODE_EXTRA_CA_CERTS=${caAPath}\n`);
     await fixture.wire();
-    fs.writeFileSync(fixture.envLocalPath, `NODE_EXTRA_CA_CERTS=${caBPath}\n`);
+    const content1 = fs.readFileSync(fixture.envLocalPath, 'utf8');
+    fs.writeFileSync(
+      fixture.envLocalPath,
+      `NODE_EXTRA_CA_CERTS=${caBPath}\n${content1.slice(content1.indexOf(SECTION_START))}`
+    );
     await fixture.wire();
-
-    // Wire 3: rebuild the pre-section layout — the line names ca-b, the
-    // section follows.
-    const content3 = fs.readFileSync(fixture.envLocalPath, 'utf8');
-    const sectionLayout = content3.slice(content3.indexOf(SECTION_START));
-    fs.writeFileSync(fixture.envLocalPath, `NODE_EXTRA_CA_CERTS=${caBPath}\n${sectionLayout}`);
+    fs.writeFileSync(fixture.envLocalPath, `NODE_EXTRA_CA_CERTS=${caAPath}\n`);
+    const content2 = fs.readFileSync(fixture.envLocalPath, 'utf8');
+    fs.writeFileSync(
+      fixture.envLocalPath,
+      `NODE_EXTRA_CA_CERTS=${caAPath}\n${content2.slice(content2.indexOf(SECTION_START))}`
+    );
     await fixture.wire();
     assert.ok(
       fs
@@ -492,7 +497,7 @@ test('removal restores the value the last wire displaced, rotation included', as
         .startsWith(`NODE_EXTRA_CA_CERTS=${fixture.caBundlePath}\n`)
     );
 
-    // A real warehouse: the line's displaced value ca-b comes back, whatever
+    // A real warehouse: the line's displaced value ca-a comes back, whatever
     // older records for the same line said.
     fs.writeFileSync(
       fixture.envLocalPath,
@@ -500,7 +505,7 @@ test('removal restores the value the last wire displaced, rotation included', as
     );
     assert.deepEqual(await fixture.wire(), { status: 'keptRealWarehouse', removedSection: true });
     const content = fs.readFileSync(fixture.envLocalPath, 'utf8');
-    assert.ok(content.startsWith(`NODE_EXTRA_CA_CERTS=${caBPath}\n`));
+    assert.ok(content.startsWith(`NODE_EXTRA_CA_CERTS=${caAPath}\n`));
     assert.equal(content.includes(fixture.caBundlePath), false);
     assert.equal(content.includes(SECTION_START), false);
   } finally {

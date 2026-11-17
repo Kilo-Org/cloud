@@ -255,11 +255,23 @@ function pointShadowingCaLineAtBundle(
  * kept as a record but names no file). A source that no longer exists is
  * dropped, so the section does not keep claiming a CA the bundle cannot load;
  * the empty record needs no file, so it always stays.
+ *
+ * The order is the displacement order: a folded value the records already hold
+ * moves to the end, because the newest record is the value the CA line last
+ * displaced and `removeManagedSection` restores exactly that record. A record
+ * whose file is gone loses its place: it cannot be folded again, so keeping it
+ * in front would make the next fold of the same path restore the wrong value.
  */
 function mergeCaSources(recorded: readonly string[], folded: string | undefined): string[] {
   const merged: string[] = [];
   const seen = new Set<string>();
-  for (const source of folded === undefined ? recorded : [...recorded, folded]) {
+  const withoutFolded =
+    folded === undefined
+      ? recorded
+      : recorded.filter(source =>
+          source === '' ? false : path.resolve(source) !== path.resolve(folded)
+        );
+  for (const source of folded === undefined ? withoutFolded : [...withoutFolded, folded]) {
     if (source === '') {
       if (!seen.has('')) {
         seen.add('');

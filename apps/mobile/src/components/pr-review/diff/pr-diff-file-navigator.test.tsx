@@ -66,7 +66,11 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({ canGoBack: () => false, back: vi.fn() }),
 }));
 
-vi.mock('@/components/ui/icons', () => ({ Search: 'Search' }));
+vi.mock('@/components/ui/icons', () => ({
+  ChevronLeft: 'ChevronLeft',
+  ChevronRight: 'ChevronRight',
+  Search: 'Search',
+}));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));

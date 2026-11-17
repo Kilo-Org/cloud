@@ -231,7 +231,11 @@ vi.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
 
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 
-vi.mock('@/components/ui/icons', () => ({ Brain: 'Brain' }));
+vi.mock('@/components/ui/icons', () => ({
+  Brain: 'Brain',
+  ChevronLeft: 'ChevronLeft',
+  ChevronRight: 'ChevronRight',
+}));
 
 function renderScreen(): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };

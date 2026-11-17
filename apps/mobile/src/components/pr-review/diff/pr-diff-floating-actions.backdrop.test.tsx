@@ -88,9 +88,10 @@ describe('PrDiffFloatingActions opaque backdrop (spot check e2)', () => {
     // screen background for its whole ring, and no `pointerEvents="box-none"`
     // is left on it, so a tap in the padding ring can never reach a diff row
     // hidden behind it.
-    const bar: React.ReactElement<{ edge?: string }> = renderBar();
+    const bar = renderBar();
     expect(bar.type).toBe('ScreenFooter');
-    expect(bar.props.edge).toBe('background');
+    const props = bar.props as { edge?: string };
+    expect(props.edge).toBe('background');
   });
 
   it('keeps the action card on the same background inside the bar', () => {

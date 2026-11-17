@@ -27,6 +27,14 @@ type ToggleProps = {
   onValueChange?: (value: boolean) => void;
 };
 
+type ChoiceProps = {
+  label: string;
+  selected: boolean;
+  disabled?: boolean;
+  multi?: boolean;
+  onPress?: () => void;
+};
+
 type SaveMutation = { mutate: Mock; isPending: boolean };
 
 type SavedPatch = {
@@ -50,6 +58,7 @@ const state = vi.hoisted(() => {
     save,
     toastErrors: [] as string[],
     toggleProps: [] as ToggleProps[],
+    choiceProps: [] as ChoiceProps[],
     patches: [] as SavedPatch[],
   };
 });
@@ -137,8 +146,10 @@ vi.mock('@/components/ui/preference-row', () => ({
 }));
 vi.mock('@/components/ui/icons', () => ({ Users: 'Users', ShieldCheck: 'ShieldCheck' }));
 vi.mock('@/components/ui/choice-row', () => ({
-  ChoiceRow: (props: { label: string; selected: boolean; onPress?: () => void }) =>
-    createElement('ChoiceRow', props),
+  ChoiceRow: (props: ChoiceProps) => {
+    state.choiceProps.push(props);
+    return createElement('ChoiceRow', props);
+  },
 }));
 vi.mock('@/components/ui/radio-group', () => ({
   RadioGroup: (props: { children?: ReactNode }) =>
@@ -241,8 +252,12 @@ describe('council route gate', () => {
     expect(renderedTexts(renderer)).not.toContain(
       'Council review is not available for this organization.'
     );
-    expect(renderer.root.findAll(node => String(node.type) === 'RowSkeleton').length).toBeGreaterThan(
-      0
+    // The placeholder reserves the row primitive's own shape — a leading tile
+    // and a subtitle line — so it cannot drift into a hand-sized box.
+    const placeholders = renderer.root.findAll(node => String(node.type) === 'RowSkeleton');
+    expect(placeholders.length).toBeGreaterThan(0);
+    expect(placeholders.every(row => row.props.tile === true && row.props.subtitle === true)).toBe(
+      true
     );
 
     mounted.unmount();
@@ -316,9 +331,10 @@ describe('council unit of write', () => {
     await act(() => undefined);
 
     expect(specialistToggle('Council review')?.value).toBe(false);
-    // An opt-in only runs against a stored council, so the row stays closed
-    // until the switch stores one.
-    expect(specialistToggle('kilo/app')?.disabled).toBe(true);
+    // A repository opt-in is a multi-select choice row, and one only runs
+    // against a stored council, so the row stays closed until the switch
+    // stores one.
+    expect(state.choiceProps.findLast(props => props.label === 'kilo/app')?.disabled).toBe(true);
 
     mounted.unmount();
   });

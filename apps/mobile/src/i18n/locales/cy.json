@@ -26,6 +26,7 @@
     "creditHistory": "Hanes credydau",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Canslo",
     "done": "Gorffen",
     "retry": "Rhoi cynnig eto",
@@ -3701,12 +3702,10 @@
       "requestLogs": "Logiau ceisiadau"
     },
     "requestLogs": {
-      "hint": "Ceisiadau o'r awr cyn i'r ffenestr ddod i ben, y diweddaraf yn gyntaf.",
       "older": "Awr gynharach",
       "newer": "Awr ddiweddarach",
       "truncated": "Mae gan yr awr hon fwy o geisiadau nag y mae'r rhestr yn eu dangos.",
       "emptyTitle": "Dim ceisiadau",
-      "emptyDescription": "Does dim ceisiadau porth yn yr awr hon.",
       "loadError": "Methu llwytho logiau ceisiadau.",
       "permissionDenied": "Dim ond perchennog, gweinyddwr neu reolwr bilio sefydliad all ddarllen ei logiau ceisiadau.",
       "tokens": "{{input}} i mewn · {{output}} allan",
@@ -4749,7 +4748,6 @@
     "dismiss": "Diystyru'r briff",
     "offline": "All-lein · briff wedi'i gadw",
     "cached": "Adroddiad wedi'i gadw · methu adnewyddu",
-    "window": "{{start}} – {{end}}",
     "summary": "Crynodeb AI",
     "summaryPending": "Mae'r crynodeb AI ar y gweill. Bydd yn ymddangos yma pan fydd yn barod.",
     "summaryUnavailable": "Crynodeb AI ddim ar gael. Mae eich adroddiad strwythuredig yn dal ar gael.",

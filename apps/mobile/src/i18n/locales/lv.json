@@ -26,6 +26,7 @@
     "creditHistory": "Kredītu vēsture",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Atcelt",
     "done": "Gatavs",
     "retry": "Mēģināt vēlreiz",
@@ -3530,12 +3531,10 @@
       "requestLogs": "Pieprasījumu žurnāli"
     },
     "requestLogs": {
-      "hint": "Pieprasījumi stundā līdz laika loga beigām, jaunākie vispirms.",
       "older": "Iepriekšējā stunda",
       "newer": "Nākamā stunda",
       "truncated": "Šajā stundā ir vairāk pieprasījumu, nekā parādīts sarakstā.",
       "emptyTitle": "Nav pieprasījumu",
-      "emptyDescription": "Šajā stundā nav vārtejas pieprasījumu.",
       "loadError": "Neizdevās ielādēt pieprasījumu žurnālus.",
       "permissionDenied": "Organizācijas pieprasījumu žurnālus var skatīt tikai tās īpašnieks, administrators vai norēķinu pārvaldnieks.",
       "tokens": "{{input}} ievade · {{output}} izvade",
@@ -4539,7 +4538,6 @@
     "dismiss": "Noraidīt atskaiti",
     "offline": "Bezsaistē · saglabāta atskaite",
     "cached": "Saglabāta atskaite · atsvaidzināšana nav pieejama",
-    "window": "{{start}} – {{end}}",
     "summary": "AI kopsavilkums",
     "summaryPending": "AI kopsavilkums tiek veidots. Tas parādīsies šeit, kad būs gatavs.",
     "summaryUnavailable": "AI kopsavilkums nav pieejams. Jūsu strukturētā atskaite joprojām ir pieejama.",

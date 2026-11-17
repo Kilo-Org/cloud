@@ -26,6 +26,7 @@
     "creditHistory": "Historia ya salio",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Ghairi",
     "done": "Nimemaliza",
     "retry": "Jaribu tena",
@@ -3473,12 +3474,10 @@
       "requestLogs": "Kumbukumbu za maombi"
     },
     "requestLogs": {
-      "hint": "Maombi ya saa moja kabla ya mwisho wa kipindi, mapya kwanza.",
       "older": "Saa iliyotangulia",
       "newer": "Saa inayofuata",
       "truncated": "Saa hii ina maombi mengi kuliko yanayoonyeshwa kwenye orodha.",
       "emptyTitle": "Hakuna maombi",
-      "emptyDescription": "Hakuna maombi ya lango katika saa hii.",
       "loadError": "Imeshindwa kupakia kumbukumbu za maombi.",
       "permissionDenied": "Ni mmiliki, msimamizi au meneja wa malipo wa shirika pekee anayeweza kusoma kumbukumbu zake za maombi.",
       "tokens": "{{input}} ndani · {{output}} nje",
@@ -4469,7 +4468,6 @@
     "dismiss": "Puuza ripoti",
     "offline": "Nje ya mtandao · ripoti iliyohifadhiwa",
     "cached": "Ripoti iliyohifadhiwa · haiwezi kuonyeshwa upya",
-    "window": "{{start}} – {{end}}",
     "summary": "Muhtasari wa AI",
     "summaryPending": "Muhtasari wa AI unaandaliwa. Utaambatishwa hapa ukiwa tayari.",
     "summaryUnavailable": "Muhtasari wa AI haupatikani. Ripoti yako iliyopangwa bado inapatikana.",

@@ -12,15 +12,15 @@ import {
 // native icon package, and the icons are not what this suite asserts.
 vi.mock('@/components/ui/icons', () => ({
   Cpu: 'Cpu',
-  FileText: 'FileText',
   KeyRound: 'KeyRound',
   LineChart: 'LineChart',
   Lock: 'Lock',
+  Logs: 'Logs',
   ScrollText: 'ScrollText',
   Server: 'Server',
   Shield: 'Shield',
   SlidersHorizontal: 'SlidersHorizontal',
-  Users: 'Users',
+  UsersRound: 'UsersRound',
 }));
 
 // Every row is an absolute web URL, so the suite needs the base the app bakes

@@ -26,6 +26,7 @@
     "creditHistory": "Kreditlar tarixi",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Bekor qilish",
     "done": "Tayyor",
     "retry": "Qayta urinish",
@@ -3473,12 +3474,10 @@
       "requestLogs": "So'rovlar jurnallari"
     },
     "requestLogs": {
-      "hint": "Oraliq oxiridan oldingi bir soatdagi so'rovlar, eng yangilari tepada.",
       "older": "Oldingi soat",
       "newer": "Keyingi soat",
       "truncated": "Bu soatda ro'yxatda ko'rsatilganidan ko'proq so'rov bor.",
       "emptyTitle": "So'rovlar yo'q",
-      "emptyDescription": "Bu soatda shlyuz so'rovlari yo'q.",
       "loadError": "So'rovlar jurnallarini yuklab bo'lmadi.",
       "permissionDenied": "So'rovlar jurnallarini faqat tashkilot egasi, administratori yoki to'lovlar menejeri ko'ra oladi.",
       "tokens": "{{input}} kirish · {{output}} chiqish",
@@ -4469,7 +4468,6 @@
     "dismiss": "Brifingni e’tiborsiz qoldirish",
     "offline": "Oflayn · saqlangan brifing",
     "cached": "Saqlangan hisobot · yangilab bo‘lmaydi",
-    "window": "{{start}} – {{end}}",
     "summary": "AI xulosasi",
     "summaryPending": "AI xulosasi tayyorlanmoqda. Tayyor bo‘lgach shu yerga qo‘shiladi.",
     "summaryUnavailable": "AI xulosasi mavjud emas. Tuzilgan hisobotingiz baribir mavjud.",

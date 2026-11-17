@@ -26,6 +26,7 @@
     "creditHistory": "Istorija kredita",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Otkaži",
     "done": "Gotovo",
     "retry": "Pokušaj ponovo",
@@ -3530,12 +3531,10 @@
       "requestLogs": "Dnevnici zahteva"
     },
     "requestLogs": {
-      "hint": "Zahtevi iz sata pre kraja intervala, počev od najnovijih.",
       "older": "Prethodni sat",
       "newer": "Sledeći sat",
       "truncated": "U ovom satu ima više zahteva nego što lista prikazuje.",
       "emptyTitle": "Nema zahteva",
-      "emptyDescription": "U ovom satu nema zahteva preko gateway-a.",
       "loadError": "Učitavanje dnevnika zahteva nije uspelo.",
       "permissionDenied": "Dnevnike zahteva organizacije mogu da čitaju samo njen vlasnik, administrator ili menadžer za naplatu.",
       "tokens": "{{input}} ulaz · {{output}} izlaz",
@@ -4539,7 +4538,6 @@
     "dismiss": "Odbaci izveštaj",
     "offline": "Van mreže · sačuvan izveštaj",
     "cached": "Sačuvan izveštaj · osvežavanje nije dostupno",
-    "window": "{{start}} – {{end}}",
     "summary": "AI rezime",
     "summaryPending": "AI rezime je u izradi. Pojaviće se ovde kada bude spreman.",
     "summaryUnavailable": "AI rezime nije dostupan. Strukturisan izveštaj je i dalje dostupan.",

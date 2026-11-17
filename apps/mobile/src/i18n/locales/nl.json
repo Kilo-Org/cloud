@@ -26,6 +26,7 @@
     "creditHistory": "Tegoedgeschiedenis",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Annuleren",
     "done": "Klaar",
     "retry": "Opnieuw proberen",
@@ -3478,12 +3479,10 @@
       "requestLogs": "Verzoeklogboeken"
     },
     "requestLogs": {
-      "hint": "Verzoeken uit het uur vóór het einde van het venster, nieuwste eerst.",
       "older": "Eerder uur",
       "newer": "Later uur",
       "truncated": "Dit uur bevat meer verzoeken dan de lijst toont.",
       "emptyTitle": "Geen verzoeken",
-      "emptyDescription": "Er zijn geen gatewayverzoeken in dit uur.",
       "loadError": "Kan verzoeklogboeken niet laden.",
       "permissionDenied": "Alleen een eigenaar, beheerder of factureringsbeheerder van de organisatie kan de verzoeklogboeken bekijken.",
       "tokens": "{{input}} in · {{output}} uit",
@@ -4469,7 +4468,6 @@
     "dismiss": "Briefing negeren",
     "offline": "Offline · opgeslagen briefing",
     "cached": "Opgeslagen rapport · vernieuwen niet beschikbaar",
-    "window": "{{start}} – {{end}}",
     "summary": "AI-samenvatting",
     "summaryPending": "AI-samenvatting wordt gemaakt. Deze verschijnt hier zodra hij klaar is.",
     "summaryUnavailable": "AI-samenvatting niet beschikbaar. Je gestructureerde rapport is nog steeds beschikbaar.",

@@ -26,6 +26,7 @@
     "creditHistory": "Riwayat kredit",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Batal",
     "done": "Selesai",
     "retry": "Coba lagi",
@@ -3478,12 +3479,10 @@
       "requestLogs": "Log permintaan"
     },
     "requestLogs": {
-      "hint": "Permintaan dalam satu jam sebelum akhir rentang waktu, terbaru di atas.",
       "older": "Jam sebelumnya",
       "newer": "Jam berikutnya",
       "truncated": "Jam ini memiliki lebih banyak permintaan daripada yang ditampilkan.",
       "emptyTitle": "Tidak ada permintaan",
-      "emptyDescription": "Tidak ada permintaan gateway dalam jam ini.",
       "loadError": "Tidak dapat memuat log permintaan.",
       "permissionDenied": "Hanya pemilik, admin, atau pengelola penagihan organisasi yang dapat membaca log permintaannya.",
       "tokens": "{{input}} masuk · {{output}} keluar",
@@ -4469,7 +4468,6 @@
     "dismiss": "Abaikan laporan",
     "offline": "Offline · laporan tersimpan",
     "cached": "Laporan tersimpan · tidak dapat diperbarui",
-    "window": "{{start}} – {{end}}",
     "summary": "Ringkasan AI",
     "summaryPending": "Ringkasan AI sedang diproses. Ringkasan akan muncul di sini setelah siap.",
     "summaryUnavailable": "Ringkasan AI tidak tersedia. Laporan terstruktur Anda tetap tersedia.",

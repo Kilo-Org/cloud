@@ -26,6 +26,7 @@
     "creditHistory": "היסטוריית קרדיטים",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "ביטול",
     "done": "סיום",
     "retry": "ניסיון חוזר",
@@ -3535,12 +3536,10 @@
       "requestLogs": "יומני בקשות"
     },
     "requestLogs": {
-      "hint": "בקשות מהשעה שלפני סוף החלון, מהחדשות לישנות.",
       "older": "שעה קודמת",
       "newer": "שעה הבאה",
       "truncated": "בשעה הזו יש יותר בקשות ממה שמוצג ברשימה.",
       "emptyTitle": "אין בקשות",
-      "emptyDescription": "בשעה הזו אין בקשות ל-Gateway.",
       "loadError": "לא ניתן לטעון את יומני הבקשות.",
       "permissionDenied": "רק בעלים, אדמין או מנהל חיובים של הארגון יכולים לצפות ביומני הבקשות שלו.",
       "tokens": "קלט {{input}} · פלט {{output}}",
@@ -4539,7 +4538,6 @@
     "dismiss": "התעלמות מהדוח",
     "offline": "לא מקוון · דוח שמור",
     "cached": "דוח שמור · רענון לא זמין",
-    "window": "{{start}} – {{end}}",
     "summary": "סיכום AI",
     "summaryPending": "סיכום ה-AI בהכנה. הוא יצורף כאן כשיהיה מוכן.",
     "summaryUnavailable": "סיכום ה-AI אינו זמין. הדוח המובנה עדיין זמין.",

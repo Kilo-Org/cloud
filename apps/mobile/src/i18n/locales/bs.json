@@ -26,6 +26,7 @@
     "creditHistory": "Historija kredita",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Otkaži",
     "done": "Gotovo",
     "retry": "Pokušaj ponovo",
@@ -3530,12 +3531,10 @@
       "requestLogs": "Zapisnici zahtjeva"
     },
     "requestLogs": {
-      "hint": "Zahtjevi iz sata prije kraja vremenskog prozora, najnoviji prvi.",
       "older": "Raniji sat",
       "newer": "Kasniji sat",
       "truncated": "U ovom satu ima više zahtjeva nego što lista prikazuje.",
       "emptyTitle": "Nema zahtjeva",
-      "emptyDescription": "U ovom satu nema zahtjeva preko gatewaya.",
       "loadError": "Učitavanje zapisnika zahtjeva nije uspjelo.",
       "permissionDenied": "Zapisnike zahtjeva organizacije mogu čitati samo njen vlasnik, administrator ili menadžer naplate.",
       "tokens": "Ulaz: {{input}} · Izlaz: {{output}}",
@@ -4539,7 +4538,6 @@
     "dismiss": "Odbaci izvještaj",
     "offline": "Van mreže · sačuvani izvještaj",
     "cached": "Sačuvani izvještaj · osvježavanje nedostupno",
-    "window": "{{start}} – {{end}}",
     "summary": "AI sažetak",
     "summaryPending": "AI sažetak je u izradi. Bit će priložen ovdje kada bude spreman.",
     "summaryUnavailable": "AI sažetak nije dostupan. Vaš strukturirani izvještaj je i dalje dostupan.",

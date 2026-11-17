@@ -26,6 +26,7 @@
     "creditHistory": "Krediitide ajalugu",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Tühista",
     "done": "Valmis",
     "retry": "Proovi uuesti",
@@ -3473,12 +3474,10 @@
       "requestLogs": "Päringulogid"
     },
     "requestLogs": {
-      "hint": "Akna lõpule eelnenud tunni päringud, uusimad eespool.",
       "older": "Varasem tund",
       "newer": "Hilisem tund",
       "truncated": "Selles tunnis on rohkem päringuid, kui loendis kuvatakse.",
       "emptyTitle": "Päringuid pole",
-      "emptyDescription": "Selles tunnis pole lüüsipäringuid.",
       "loadError": "Päringulogide laadimine ebaõnnestus.",
       "permissionDenied": "Päringulogisid saavad lugeda ainult organisatsiooni omanik, administraator või arvelduse haldur.",
       "tokens": "{{input}} sisse · {{output}} välja",
@@ -4469,7 +4468,6 @@
     "dismiss": "Jäta ülevaade kõrvale",
     "offline": "Võrguühenduseta · salvestatud ülevaade",
     "cached": "Salvestatud ülevaade · värskendamine pole saadaval",
-    "window": "{{start}} – {{end}}",
     "summary": "AI kokkuvõte",
     "summaryPending": "AI kokkuvõtet koostatakse. See lisatakse siia, kui on valmis.",
     "summaryUnavailable": "AI kokkuvõte pole saadaval. Struktureeritud ülevaade on endiselt saadaval.",

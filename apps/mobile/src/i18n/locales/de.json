@@ -26,6 +26,7 @@
     "creditHistory": "Credit-Verlauf",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Abbrechen",
     "done": "Fertig",
     "retry": "Erneut versuchen",
@@ -3478,12 +3479,10 @@
       "requestLogs": "Anfrage-Logs"
     },
     "requestLogs": {
-      "hint": "Anfragen aus der Stunde vor Ende des Zeitfensters, neueste zuerst.",
       "older": "Frühere Stunde",
       "newer": "Spätere Stunde",
       "truncated": "Diese Stunde enthält mehr Anfragen, als die Liste anzeigt.",
       "emptyTitle": "Keine Anfragen",
-      "emptyDescription": "In dieser Stunde gab es keine Gateway-Anfragen.",
       "loadError": "Anfrage-Logs konnten nicht geladen werden.",
       "permissionDenied": "Nur Inhaber, Admins oder Abrechnungsverantwortliche einer Organisation können deren Anfrage-Logs einsehen.",
       "tokens": "{{input}} ein · {{output}} aus",
@@ -4469,7 +4468,6 @@
     "dismiss": "Briefing ausblenden",
     "offline": "Offline · gespeichertes Briefing",
     "cached": "Gespeicherter Bericht · Aktualisierung nicht verfügbar",
-    "window": "{{start}} – {{end}}",
     "summary": "AI-Zusammenfassung",
     "summaryPending": "AI-Zusammenfassung wird erstellt. Sie erscheint hier, sobald sie fertig ist.",
     "summaryUnavailable": "AI-Zusammenfassung nicht verfügbar. Dein strukturierter Bericht ist weiterhin verfügbar.",

@@ -7,16 +7,16 @@ import { type Href } from 'expo-router';
 
 import {
   Cpu,
-  FileText,
   KeyRound,
   LineChart,
   Lock,
   type LucideIcon,
+  Logs,
   ScrollText,
   Server,
   Shield,
   SlidersHorizontal,
-  Users,
+  UsersRound,
 } from '@/components/ui/icons';
 import { i18n } from '@/i18n';
 import { type AppShellTarget } from '@/lib/app-shell-handoff';
@@ -191,9 +191,10 @@ const IN_APP_ROW_SPECS: readonly OrgInAppSettingsRowSpec[] = [
     visible: () => true,
   },
   // "Groups": enterprise only, which is the plan its page redirects away from.
+  // Its own icon, so the row is not read as the Members row above it.
   {
     area: 'groups',
-    icon: Users,
+    icon: UsersRound,
     href: () => '/(app)/(tabs)/(3_profile)/organization/groups',
     visible: gate => gate.plan === 'enterprise',
   },
@@ -216,9 +217,11 @@ const IN_APP_ROW_SPECS: readonly OrgInAppSettingsRowSpec[] = [
   },
   // "Request logs": the sidebar's billing-role gate, and the procedure behind
   // the page answers only that role, so the row and the screen read one gate.
+  // Not `FileText`, which is the Invoices row in the same card, and not Audit
+  // logs' `ScrollText`.
   {
     area: 'requestLogs',
-    icon: FileText,
+    icon: Logs,
     href: () => '/(app)/(tabs)/(3_profile)/organization/request-logs',
     visible: gate => canManageOrganizationBilling(gate.role),
   },

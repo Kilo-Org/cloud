@@ -92,7 +92,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: 'black' }),
 }));
 
-vi.mock('@/components/ui/icons', () => ({ FileText: 'FileText' }));
+vi.mock('@/components/ui/icons', () => ({ Logs: 'Logs' }));
 
 vi.mock('@/components/ui/directional-icons', () => ({
   DirectionalChevronLeft: 'DirectionalChevronLeft',
@@ -262,7 +262,9 @@ describe('OrganizationRequestLogsScreen', () => {
 
     const [empty] = renderer.root.findAllByType('EmptyState');
     expect(empty?.props.title).toBe('No requests');
-    expect(empty?.props.description).toBe('This hour has no gateway requests.');
+    // The window line above already names the hour, so a description here would
+    // only restate the title.
+    expect(empty?.props.description).toBeUndefined();
     unmount();
   });
 
@@ -277,6 +279,9 @@ describe('OrganizationRequestLogsScreen', () => {
     expect(painted).toContain('$1.00');
     expect(painted.some(text => text.includes('1,234 in'))).toBe(true);
     expect(painted.some(text => text.includes('567 out'))).toBe(true);
+    // The time carries the same separator the token pair uses, so the line
+    // reads as one series instead of a gap and a lone in/out dot.
+    expect(painted.some(text => text.endsWith('·'))).toBe(true);
     expect(painted).toContain('BYOK');
     unmount();
   });

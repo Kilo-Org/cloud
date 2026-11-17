@@ -26,6 +26,7 @@
     "creditHistory": "Tarihin kiredit",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Soke",
     "done": "An gama",
     "retry": "Sake gwadawa",
@@ -3473,12 +3474,10 @@
       "requestLogs": "Rajistun buƙatu"
     },
     "requestLogs": {
-      "hint": "Buƙatun awa ɗaya kafin ƙarshen wannan lokaci, sababbi a farko.",
       "older": "Awa ta baya",
       "newer": "Awa ta gaba",
       "truncated": "Wannan awa tana da buƙatu fiye da waɗanda jerin ke nunawa.",
       "emptyTitle": "Babu buƙatu",
-      "emptyDescription": "Babu buƙatun gateway a wannan awa.",
       "loadError": "An kasa loda rajistun buƙatu.",
       "permissionDenied": "Mai ƙungiya, mai gudanarwa ko manajan biyan kuɗi ne kaɗai zai iya karanta rajistun buƙatun ƙungiyar.",
       "tokens": "{{input}} shigarwa · {{output}} fitarwa",
@@ -4469,7 +4468,6 @@
     "dismiss": "Yi watsi da rahoto",
     "offline": "Ba intanet · rahoton da aka adana",
     "cached": "Rahoton da aka adana · ba za a iya sabuntawa ba",
-    "window": "{{start}} – {{end}}",
     "summary": "Taƙaitawar AI",
     "summaryPending": "Ana shirya taƙaitawar AI. Za ta bayyana a nan idan ta kammala.",
     "summaryUnavailable": "Babu taƙaitawar AI. Rahotonka mai tsari yana nan har yanzu.",

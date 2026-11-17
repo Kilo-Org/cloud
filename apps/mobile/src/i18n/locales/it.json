@@ -26,6 +26,7 @@
     "creditHistory": "Cronologia crediti",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Annulla",
     "done": "Fatto",
     "retry": "Riprova",
@@ -3535,12 +3536,10 @@
       "requestLogs": "Registri delle richieste"
     },
     "requestLogs": {
-      "hint": "Richieste dell'ora precedente la fine dell'intervallo, dalle più recenti.",
       "older": "Ora precedente",
       "newer": "Ora successiva",
       "truncated": "In quest'ora ci sono più richieste di quelle mostrate.",
       "emptyTitle": "Nessuna richiesta",
-      "emptyDescription": "Nessuna richiesta al gateway in quest'ora.",
       "loadError": "Impossibile caricare i registri delle richieste.",
       "permissionDenied": "Solo un proprietario, un amministratore o un responsabile della fatturazione dell'organizzazione può consultare i registri delle richieste.",
       "tokens": "{{input}} input · {{output}} output",
@@ -4539,7 +4538,6 @@
     "dismiss": "Ignora il briefing",
     "offline": "Offline · briefing salvato",
     "cached": "Report salvato · aggiornamento non disponibile",
-    "window": "{{start}} – {{end}}",
     "summary": "Riepilogo AI",
     "summaryPending": "Riepilogo AI in corso. Verrà allegato qui quando pronto.",
     "summaryUnavailable": "Riepilogo AI non disponibile. Il report strutturato è comunque disponibile.",

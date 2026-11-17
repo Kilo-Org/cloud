@@ -26,6 +26,7 @@
     "creditHistory": "Inneignarferill",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Hætta við",
     "done": "Lokið",
     "retry": "Reyna aftur",
@@ -3473,12 +3474,10 @@
       "requestLogs": "Beiðnaskrár"
     },
     "requestLogs": {
-      "hint": "Beiðnir frá klukkustundinni fyrir lok tímabilsins, nýjustu fyrst.",
       "older": "Fyrri klukkustund",
       "newer": "Næsta klukkustund",
       "truncated": "Fleiri beiðnir eru á þessari klukkustund en listinn sýnir.",
       "emptyTitle": "Engar beiðnir",
-      "emptyDescription": "Engar gáttarbeiðnir voru á þessari klukkustund.",
       "loadError": "Ekki tókst að sækja beiðnaskrár.",
       "permissionDenied": "Aðeins eigandi, stjórnandi eða greiðslustjóri félags getur lesið beiðnaskrár þess.",
       "tokens": "{{input}} inn · {{output}} út",
@@ -4469,7 +4468,6 @@
     "dismiss": "Vísa yfirliti frá",
     "offline": "Ótengt · vistað yfirlit",
     "cached": "Vistað yfirlit · ekki hægt að uppfæra",
-    "window": "{{start}} – {{end}}",
     "summary": "AI samantekt",
     "summaryPending": "AI samantekt er í vinnslu. Hún birtist hér þegar hún er tilbúin.",
     "summaryUnavailable": "AI samantekt er ekki tiltæk. Skipulagt yfirlit þitt er enn tiltækt.",

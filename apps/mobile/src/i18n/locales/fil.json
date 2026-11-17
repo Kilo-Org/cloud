@@ -26,6 +26,7 @@
     "creditHistory": "Kasaysayan ng credit",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Kanselahin",
     "done": "Tapos",
     "retry": "Subukan muli",
@@ -3473,12 +3474,10 @@
       "requestLogs": "Mga request log"
     },
     "requestLogs": {
-      "hint": "Mga request sa loob ng isang oras bago magtapos ang window, pinakabago muna.",
       "older": "Mas lumang oras",
       "newer": "Mas bagong oras",
       "truncated": "Mas marami ang request sa oras na ito kaysa sa ipinapakita ng listahan.",
       "emptyTitle": "Walang request",
-      "emptyDescription": "Walang gateway request sa oras na ito.",
       "loadError": "Hindi ma-load ang mga request log.",
       "permissionDenied": "Ang may-ari, admin o billing manager lang ng organisasyon ang puwedeng magbasa ng mga request log nito.",
       "tokens": "{{input}} input · {{output}} output",
@@ -4469,7 +4468,6 @@
     "dismiss": "Balewalain ang briefing",
     "offline": "Offline · naka-save na briefing",
     "cached": "Naka-save na ulat · hindi ma-refresh",
-    "window": "{{start}} – {{end}}",
     "summary": "Buod ng AI",
     "summaryPending": "Ginagawa pa ang buod ng AI. Ilalakip ito rito kapag handa na.",
     "summaryUnavailable": "Hindi available ang buod ng AI. Available pa rin ang iyong nakaayos na ulat.",

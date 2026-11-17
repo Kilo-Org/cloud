@@ -26,6 +26,7 @@
     "creditHistory": "Historial de crèdits",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Cancel·la",
     "done": "Fet",
     "retry": "Torna-ho a provar",
@@ -3530,12 +3531,10 @@
       "requestLogs": "Registres de sol·licituds"
     },
     "requestLogs": {
-      "hint": "Sol·licituds de l'hora que acaba al final de la finestra, les més recents primer.",
       "older": "Hora anterior",
       "newer": "Hora següent",
       "truncated": "Aquesta hora té més sol·licituds de les que mostra la llista.",
       "emptyTitle": "No hi ha sol·licituds",
-      "emptyDescription": "En aquesta hora no hi ha cap sol·licitud a la passarel·la.",
       "loadError": "No s'han pogut carregar els registres de sol·licituds.",
       "permissionDenied": "Només un propietari, administrador o gestor de facturació d'una organització pot consultar-ne els registres de sol·licituds.",
       "tokens": "{{input}} d'entrada · {{output}} de sortida",
@@ -4539,7 +4538,6 @@
     "dismiss": "Descarta l'informe",
     "offline": "Sense connexió · informe desat",
     "cached": "Informe desat · no es pot actualitzar",
-    "window": "{{start}} – {{end}}",
     "summary": "Resum d'IA",
     "summaryPending": "El resum d'IA està en curs. S'adjuntarà aquí quan estigui llest.",
     "summaryUnavailable": "El resum d'IA no està disponible. L'informe estructurat continua disponible.",

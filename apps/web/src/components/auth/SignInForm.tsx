@@ -93,6 +93,7 @@ export function SignInForm({
     <AuthErrorNotification
       error={flow.error}
       stepUpMethods={searchParams[SIGNUP_STEP_UP_METHODS_PARAM]}
+      shell={shell}
     />
   ) : null;
 

@@ -95,10 +95,14 @@ jobs:
       # such a plugin, so the shards and the typecheck stand down while the
       # lint, i18n and unused-export checks still run.
       # The notifications catalog audit also scans the services tree beside the
-      # push package, and the checker test changes with the audit. A change in
-      # either never matches a mobile family, so the step publishes
-      # `catalogs`: true for those paths and the `i18n-catalogs` job runs the
-      # audit without the suites.
+      # push package, and the checker test changes with the audit. No mobile
+      # path family covers a services change, so the step publishes `catalogs`:
+      # true for either family — the audit's own tree under tools/i18n is the
+      # app's in the workspace selection (`OWNED` in
+      # scripts/affected-workspaces.mjs), but the families above decide the
+      # suite jobs, and real attribution still reports `mobile: true` for many
+      # such diffs, which holds the `i18n-catalogs` job down while
+      # `i18n-leftover` runs the audit.
       # A lockfile change matches the patterns first, so the detector below
       # never parses the lockfile and needs no installed dependencies.
       - name: Detect mobile-relevant changes
@@ -401,10 +405,14 @@ jobs:
         run: node --test tools/i18n/check-catalogs.test.mjs
 
   # `i18n-leftover` runs the same catalog audit for a mobile change; this job
-  # covers the paths that no mobile family selects, so the audit cannot stay
-  # silent when a push `translatePush` key appears under services/ or the
-  # checker test changes. It installs only the root project, because the audit
-  # reads JSON catalogs and the oxc parser and no app dependency.
+  # covers the services half of the push catalog's scan, which no mobile family
+  # selects, so a push `translatePush` key that appears only under services/
+  # still cannot slip past CI. The workspace selection usually reports
+  # `mobile: true` for a tools/i18n change (OWNED in
+  # scripts/affected-workspaces.mjs), so the second term keeps this job from
+  # paying for the audit twice on one change. It installs only the root
+  # project, because the audit reads JSON catalogs and the oxc parser and no
+  # app dependency.
   i18n-catalogs:
     needs: mobile-changes
     if: needs.mobile-changes.outputs.catalogs == 'true' && needs.mobile-changes.outputs.mobile != 'true'

@@ -1934,28 +1934,54 @@ const POLICY_PUSH_FILES = {
   'packages/notifications/src/push-copy.ts': '',
 };
 
-for (const { label, field, from, to } of [
+// A descriptor-editing patch rewrites the notifications descriptor however the
+// upstream source words it: a rule list of one entry or two, a four-space tab,
+// or a line the merge moved. A literal replace would pass while patching
+// nothing when any of that drifts.
+const NOTIFICATIONS_DESCRIPTOR = /name: 'notifications',[\s\S]*?collectsDestructiveKeys: false,\n/;
+const editDescriptor = (source, edit) => {
+  const descriptor = source.match(NOTIFICATIONS_DESCRIPTOR)?.[0];
+  assert.ok(descriptor, 'the checker must declare the notifications descriptor');
+  const edited = edit(descriptor);
+  assert.notEqual(edited, descriptor, 'the edit must change the descriptor');
+  assert.equal(
+    source.match(NOTIFICATIONS_DESCRIPTOR)?.length,
+    1,
+    'the notifications descriptor must be unique in the checker source'
+  );
+  return source.replace(descriptor, edited);
+};
+const WITHOUT_BASE_KEY_DESCRIPTOR = descriptor =>
+  descriptor.replace(/^(\s*)baseKeyOf:[^\n]*\n/m, '');
+
+for (const { label, field, patch } of [
   {
     label: 'without a base-key reader',
     field: 'baseKeyOf',
-    from: '      baseKeyOf: pushBaseKey,\n',
-    to: '',
+    patch: source => editDescriptor(source, WITHOUT_BASE_KEY_DESCRIPTOR),
   },
   {
     label: 'with an empty copy-rule list',
     field: 'englishCopyRules',
-    from: 'englishCopyRules: [checkPushEnglishCopy],',
-    to: 'englishCopyRules: [],',
+    patch: source =>
+      editDescriptor(source, descriptor =>
+        descriptor.replace(/(\s*)englishCopyRules:\s*\[[^\]]*\],/, '$1englishCopyRules: [],')
+      ),
   },
   {
     label: 'with a non-callable entry in its copy-rule list',
     field: 'englishCopyRules',
-    from: 'englishCopyRules: [checkPushEnglishCopy],',
-    to: "englishCopyRules: [checkPushEnglishCopy, 'not a rule'],",
+    patch: source =>
+      editDescriptor(source, descriptor =>
+        descriptor.replace(
+          /(\s*)englishCopyRules:\s*\[[^\]]*\],/,
+          "$1englishCopyRules: [checkPushEnglishCopy, 'not a rule'],"
+        )
+      ),
   },
 ]) {
   test(`reports a descriptor ${label} through the command`, () => {
-    const patched = CHECKER_SOURCE.replace(from, to);
+    const patched = patch(CHECKER_SOURCE);
     assert.notEqual(patched, CHECKER_SOURCE, 'the case must change the checker source');
     const translated = { agents: { ...TRANSLATED.agents } };
     delete translated.agents.title;

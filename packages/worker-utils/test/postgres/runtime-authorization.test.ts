@@ -69,6 +69,7 @@ async function admission(options: {
     audience: 'cloud-agent-next',
     tokenPurpose: options.deviceSessionId === undefined ? 'human-api' : 'device-access',
     credentialExchange: false,
+    env: 'production',
     extra: {
       ...(options.deviceSessionId === undefined
         ? {}

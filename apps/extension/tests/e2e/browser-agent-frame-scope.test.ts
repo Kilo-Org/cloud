@@ -220,7 +220,9 @@ test.describe('agent frame scoping', () => {
         tool: 'browser_find',
       });
 
-      expect(resultTextOf(found)).not.toContain(MARKER);
+      // The withheld frame's text never becomes a match; only the echoed query names the marker.
+      expect(resultTextOf(found)).toContain('No matches for');
+      expect(resultTextOf(found)).not.toContain('Path:');
 
       const shot = screenshotValue(
         await callAgentTool(extensionPage, {
@@ -270,6 +272,7 @@ test.describe('agent frame scoping', () => {
       });
 
       expect(resultTextOf(grantedFind)).toContain(MARKER);
+      expect(resultTextOf(grantedFind)).toContain('Path:');
     } finally {
       await context.close();
       await inner.close();

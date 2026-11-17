@@ -15,6 +15,7 @@ import {
   readAgentFrameTree,
   withheldFramesOf,
 } from './browser-agent-frames';
+import { createBrowserTabGroupController } from './browser-tab-groups';
 import type {
   BrowserOpenSessionInput,
   BrowserSessionRef,
@@ -102,9 +103,10 @@ export interface BrowserRuntimeDeps {
   /** The session's sensitive approvals; one store per background runtime. */
   readonly stepTokens?: StepTokenStore | undefined;
   /**
-   * The tab groups agent sessions live in. The background always passes one;
-   * it is optional so the tests of the tool paths can skip group bookkeeping.
-   * When present, an agent call may only target a tab of its own session.
+   * The tab groups agent sessions live in. Optional so a test can inject its
+   * own; the runtime otherwise builds one from `tabsApi`, so the D9 boundary
+   * and the session lifecycle are wired for every caller. Group titles still
+   * need the transport that opens sessions and shares tabs (C3 item).
    */
   readonly tabGroups?: BrowserTabGroupController | undefined;
   readonly tabsApi: BrowserTabsApi & BrowserToolTabsApi;
@@ -181,6 +183,19 @@ export const createBrowserRuntime = ({
   tabsApi,
 }: BrowserRuntimeDeps): BrowserRuntime => {
   const tokens = stepTokens ?? createStepTokenStore(now === undefined ? {} : { now });
+  const groups =
+    tabGroups ??
+    createBrowserTabGroupController({
+      api: {
+        tabQuery: async query => {
+          const tabs = await tabsApi.query(query);
+
+          return tabs.map(tab =>
+            tab.active === undefined ? { id: tab.id } : { active: tab.active, id: tab.id }
+          );
+        },
+      },
+    });
   const sessions = new Map<number, BrowserToolSession>();
   // One tail promise per tab: calls run in the order they were admitted.
   const chains = new Map<number, Promise<void>>();
@@ -204,7 +219,7 @@ export const createBrowserRuntime = ({
     chains.delete(tabId);
     inFlight.delete(tabId);
     autoAttachedTabs.delete(tabId);
-    tabGroups?.noteTabRemoved(tabId);
+    groups.noteTabRemoved(tabId);
     leases.releaseTab(tabId);
     await disposeBrowserToolSession(sessions, tabId);
   };
@@ -323,8 +338,9 @@ export const createBrowserRuntime = ({
     // An agent reaches only its own session's tabs; the group is the boundary (D9).
     if (
       caller.kind === 'agent' &&
-      tabGroups !== undefined &&
-      !tabGroups.isTabAllowed(caller.sessionHandle, tabId)
+      // Until a transport opens its first session no group exists to compare against, so the D9 boundary applies as soon as one is known.
+      groups.listSessions().length > 0 &&
+      !groups.isTabAllowed(caller.sessionHandle, tabId)
     ) {
       return {
         kind: 'result',
@@ -387,6 +403,8 @@ export const createBrowserRuntime = ({
           });
 
         if (agentContext !== undefined) {
+          // Only downloads this call starts may be reported: events left by an earlier call are stale.
+          takeStartedDownloads(session);
           await ensureFrameAutoAttach(session, tabId);
         }
 
@@ -540,26 +558,19 @@ export const createBrowserRuntime = ({
   };
 
   return {
-    adoptEnded: input =>
-      tabGroups === undefined ? Promise.resolve({}) : tabGroups.adoptEnded(input),
+    adoptEnded: input => groups.adoptEnded(input),
     claimTab,
     closeSession: async input => {
-      if (tabGroups !== undefined) {
-        await tabGroups.closeSession(input);
-      }
+      await groups.closeSession(input);
     },
     disposeCaller,
     disposeTab,
     evalInTab,
-    listSessions: () => (tabGroups === undefined ? [] : tabGroups.listSessions()),
-    openSession: input =>
-      tabGroups === undefined ? Promise.resolve({}) : tabGroups.openSession(input),
+    listSessions: () => groups.listSessions(),
+    openSession: input => groups.openSession(input),
     // Turn end: the lease goes, the caller's refs stay. Playwright-like, a ref from an earlier snapshot keeps resolving for as long as the caller and the tab session live.
     releaseCaller: caller => leases.releaseCaller(caller),
     runTool,
-    shareActiveTab: input =>
-      tabGroups === undefined
-        ? Promise.resolve({ tabId: input.tabId ?? -1 })
-        : tabGroups.shareActiveTab(input),
+    shareActiveTab: input => groups.shareActiveTab(input),
   };
 };

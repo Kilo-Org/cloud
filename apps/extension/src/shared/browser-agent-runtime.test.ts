@@ -155,6 +155,9 @@ const createFakeCdp = (): FakeCdp => {
       case 'DOM.getBoxModel': {
         return { model: { content: [10, 10, 110, 10, 110, 60, 10, 60], height: 50, width: 100 } };
       }
+      case 'DOM.describeNode': {
+        return { node: { frameId: 'main' } };
+      }
       case 'DOM.getContentQuads': {
         return { quads: [[10, 10, 110, 10, 110, 60, 10, 60]] };
       }
@@ -498,6 +501,43 @@ describe('agent browser calls', () => {
     // The download was denied for the call's duration and the browser's default restored afterwards.
     expect(cdp.downloadsDenied()).toBe(1);
     expect(cdp.downloadsRestored()).toBe(1);
+  });
+
+  it('does not refuse an act call for a download an earlier call started', async () => {
+    const { cdp, runtime } = createHarness();
+
+    cdp.setHandlers({
+      'Page.navigate': () => {
+        cdp.emit('Browser.downloadWillBegin', {
+          guid: 'download-8',
+          suggestedFilename: 'old.pdf',
+          url: `${MAIN_ORIGIN}/old.pdf`,
+        });
+
+        return { frameId: 'main' };
+      },
+    });
+
+    const navigate = await runtime.runTool({
+      agent: { authorized: [{ class: 'navigate', origin: MAIN_ORIGIN }] },
+      arguments: { url: `${MAIN_ORIGIN}/next` },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_navigate',
+    });
+
+    expect(navigate.kind).toBe('result');
+
+    // The navigate left a download event behind; this call started none of its own.
+    const click = await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant] },
+      arguments: { target: '#pay' },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_click',
+    });
+
+    expect(click.kind).toBe('result');
   });
 
   it('keeps a session to its own tab group', async () => {

@@ -31,6 +31,11 @@ import {
   withheldFramesOf,
 } from './browser-agent-frames';
 import { maskScreenshotDataUrl } from './browser-screenshot-masking';
+import type {
+  ScreenshotBox,
+  ScreenshotMaskInput,
+  ScreenshotMaskResult,
+} from './browser-screenshot-masking';
 import {
   redactSensitiveBody,
   redactSensitiveHeaders,
@@ -72,6 +77,8 @@ export interface BrowserReadToolOptions {
    * A panel or workflow caller has no scope and keeps today's behaviour.
    */
   readonly agentScope?: AgentReadScope | undefined;
+  /** The masker used on agent screenshots; tests inject one instead of an OffscreenCanvas. */
+  readonly maskScreenshot?: (input: ScreenshotMaskInput) => Promise<ScreenshotMaskResult>;
   readonly now?: () => number;
   readonly pollIntervalMs?: number;
   readonly sleep?: (milliseconds: number) => Promise<void>;
@@ -594,9 +601,49 @@ const withheldFramesFor = async (
   return withheldFramesOf(frames, deps.agentScope.readableOrigins);
 };
 
+/** The captured region of an element screenshot, in CSS pixels in page coordinates. */
+interface ScreenshotClip {
+  readonly height: number;
+  readonly left: number;
+  readonly top: number;
+  readonly width: number;
+}
+
+/**
+ * Moves page-space mask boxes into an element capture, whose pixel (0,0) is the
+ * clip's top-left. A box outside the clip is dropped: it paints no pixel of this
+ * image, and withholding it is what the clip already does.
+ */
+const translateBoxesIntoClip = (
+  boxes: readonly ScreenshotBox[],
+  clip: ScreenshotClip
+): readonly ScreenshotBox[] =>
+  boxes.flatMap(box => {
+    const left = Math.max(box.left, clip.left);
+    const top = Math.max(box.top, clip.top);
+    const right = Math.min(box.left + box.width, clip.left + clip.width);
+    const bottom = Math.min(box.top + box.height, clip.top + clip.height);
+
+    return right <= left || bottom <= top
+      ? []
+      : [
+          {
+            height: bottom - top,
+            left: left - clip.left,
+            top: top - clip.top,
+            width: right - left,
+          },
+        ];
+  });
+
 const maskAgentScreenshot = async (
   deps: BrowserReadActionDeps,
-  input: { readonly dataUrl: string; readonly fullPage: boolean; readonly mediaType: string }
+  input: {
+    readonly clip?: ScreenshotClip | undefined;
+    readonly dataUrl: string;
+    readonly fullPage: boolean;
+    readonly mediaType: string;
+  }
 ): Promise<{ readonly dataUrl: string } | { readonly error: string }> => {
   if (deps.agentScope === undefined) {
     return { dataUrl: input.dataUrl };
@@ -624,17 +671,21 @@ const maskAgentScreenshot = async (
     return { error: fields.error };
   }
 
-  const boxes = [...maskedRegions.boxes, ...fields.boxes];
+  const pageBoxes = [...maskedRegions.boxes, ...fields.boxes];
+  const boxes =
+    input.clip === undefined ? pageBoxes : translateBoxesIntoClip(pageBoxes, input.clip);
 
   if (boxes.length === 0) {
     return { dataUrl: input.dataUrl };
   }
 
-  const masked = await maskScreenshotDataUrl({
+  const mask = deps.maskScreenshot ?? maskScreenshotDataUrl;
+  const masked = await mask({
     boxes,
     dataUrl: input.dataUrl,
     mediaType: input.mediaType,
-    scale: geometry.scale,
+    // An element capture is clipped at scale 1; a viewport or full-page capture keeps the device pixel ratio the image carries.
+    scale: input.clip === undefined ? geometry.scale : 1,
   });
 
   return masked.ok ? { dataUrl: masked.dataUrl } : { error: masked.error };
@@ -793,6 +844,9 @@ const browserTakeScreenshotHandler: BrowserReadActionHandler = async (arguments_
 
   const mediaType = screenshotMediaType(type);
   const masked = await maskAgentScreenshot(deps, {
+    ...(clip === undefined
+      ? {}
+      : { clip: { height: clip.height, left: clip.x, top: clip.y, width: clip.width } }),
     dataUrl: `data:${mediaType};base64,${shot.data.data}`,
     fullPage: fullPage === true,
     mediaType,

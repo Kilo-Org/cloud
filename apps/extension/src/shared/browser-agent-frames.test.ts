@@ -346,6 +346,7 @@ describe('sensitive field masking', () => {
 describe('console and network filtering', () => {
   const messages: readonly BrowserConsoleMessage[] = [
     { level: 'error', text: 'from frame', url: 'https://pay.example.com/widget.js' },
+    { frameId: 'f1', level: 'log', text: 'attributed to frame', url: 'about:blank' },
     { level: 'log', text: 'from page', url: 'https://app.example.com/app.js' },
     { level: 'log', text: 'no source' },
   ];
@@ -355,7 +356,7 @@ describe('console and network filtering', () => {
       filterAgentConsoleMessages(messages, [
         { frameId: 'f1', origin: 'https://pay.example.com' },
       ]).map(message => message.text)
-    ).toStrictEqual(['from page', 'no source']);
+    ).toStrictEqual(['from page']);
     expect(filterAgentConsoleMessages(messages, [])).toBe(messages);
   });
 

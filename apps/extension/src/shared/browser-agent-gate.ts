@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- The gate owns grant matching, frame target resolution, sensitive classification and the post-navigate check; splitting it would scatter the pre-action contract. */
 import { z } from 'zod';
 import {
   hashBrowserToolArguments,
@@ -18,6 +19,7 @@ import type {
   StepTokenBinding,
 } from './browser-agent-checks';
 import { mainFrameOf, readAgentFrameTree } from './browser-agent-frames';
+import type { BrowserAgentFrame } from './browser-agent-frames';
 import { readSensitiveProbeForTarget, sensitiveTargetsOf } from './browser-agent-probes';
 import type { BrowserToolPageSession } from './browser-tool-snapshot';
 import type { BrowserToolSession } from './browser-tool-session';
@@ -62,38 +64,64 @@ const describeNodeSchema = z.object({
 
 const argumentTextSchema = z.string().min(1);
 
+const formFieldTargetsSchema = z.array(
+  z.object({ ref: z.string().optional(), selector: z.string().optional() })
+);
+
 const argumentString = (args: Record<string, unknown>, key: string): string | undefined => {
   const parsed = argumentTextSchema.safeParse(args[key]);
 
   return parsed.success ? parsed.data : undefined;
 };
 
-const targetOfArguments = (args: Record<string, unknown>): string | undefined =>
-  argumentString(args, 'element') ??
-  argumentString(args, 'target') ??
-  argumentString(args, 'ref') ??
-  argumentString(args, 'selector');
+/** A resolved target whose frame cannot be established: no grant can cover it. */
+const OPAQUE_ORIGIN = 'opaque:null';
 
-/** The origin a navigate is headed for; a `browser_navigate_back` has no URL to read. */
-const navigationOrigin = (args: Record<string, unknown>): string | undefined => {
-  const url = argumentString(args, 'url');
+interface TargetFrame {
+  /** The target sits in a child frame, not the tab's top-level document. */
+  readonly frame: boolean;
+  readonly origin: string;
+}
 
-  return url === undefined ? undefined : toBrowserOrigin(url);
+/**
+ * Every element target an act tool accepts: the single-target keys, one target
+ * per `browser_fill_form` field, and both ends of a `browser_drag`.
+ */
+const targetTextsOf = (args: Record<string, unknown>): readonly string[] => {
+  const texts: string[] = [];
+
+  for (const key of ['element', 'target', 'ref', 'selector', 'startTarget', 'endTarget']) {
+    const text = argumentString(args, key);
+
+    if (text !== undefined) {
+      texts.push(text);
+    }
+  }
+
+  const fields = formFieldTargetsSchema.safeParse(args['fields']);
+
+  for (const field of fields.success ? fields.data : []) {
+    const text = argumentString(field, 'ref') ?? argumentString(field, 'selector');
+
+    if (text !== undefined) {
+      texts.push(text);
+    }
+  }
+
+  return [...new Set(texts)];
 };
 
 /**
- * The frame the target element lives in (`DOM.Node.frameId`), or `undefined`
- * when the target does not resolve — the tool then reports its own
- * missing-element error, which is the accurate outcome.
+ * The frame one target lives in (`DOM.Node.frameId`). An unresolvable target
+ * yields nothing — the tool reports its own missing-element error, which is the
+ * accurate outcome; a resolved target whose frame is unknown yields the opaque
+ * origin so the call is refused instead of falling back to the tab's origin.
  */
-const targetFrameOrigin = async (
+const targetFrameOf = async (
   session: GateSession,
-  target: string | undefined
-): Promise<{ readonly frame: boolean; readonly origin: string } | undefined> => {
-  if (target === undefined) {
-    return undefined;
-  }
-
+  frames: readonly BrowserAgentFrame[],
+  target: string
+): Promise<TargetFrame | undefined> => {
   const resolved = await session.resolveTarget(target);
 
   if (resolved === undefined) {
@@ -115,15 +143,21 @@ const targetFrameOrigin = async (
   const frameId = parsed.success ? parsed.data.node?.frameId : undefined;
 
   if (frameId === undefined) {
-    return undefined;
+    return { frame: true, origin: OPAQUE_ORIGIN };
   }
 
-  const frames = await readAgentFrameTree(session);
   const frame = frames.find(candidate => candidate.id === frameId);
 
   return frame === undefined
-    ? undefined
+    ? { frame: true, origin: OPAQUE_ORIGIN }
     : { frame: frame.parentId !== undefined, origin: frame.origin };
+};
+
+/** The origin a navigate is headed for; a `browser_navigate_back` has no URL to read. */
+const navigationOrigin = (args: Record<string, unknown>): string | undefined => {
+  const url = argumentString(args, 'url');
+
+  return url === undefined ? undefined : toBrowserOrigin(url);
 };
 
 const firstReasonOf = (probe: BrowserSensitiveProbe): string | undefined => {
@@ -210,17 +244,46 @@ export interface AgentPreflightInput {
 export const preflightAgentCall = async (input: AgentPreflightInput): Promise<AgentPreflight> => {
   const grantClass = toolGrantClass(input.toolName);
   const frames = await readAgentFrameTree(input.session);
-  const mainOrigin = mainFrameOf(frames)?.origin ?? 'opaque:null';
-  const target = targetOfArguments(input.args);
-  const targetFrame = await targetFrameOrigin(input.session, target);
+  const mainOrigin = mainFrameOf(frames)?.origin ?? OPAQUE_ORIGIN;
+  const targetTexts = grantClass === 'navigate' ? [] : targetTextsOf(input.args);
+  const targetFrames: TargetFrame[] = [];
+
+  for (const text of targetTexts) {
+    // eslint-disable-next-line no-await-in-loop -- one target's frame per round trip, in argument order
+    const targetFrame = await targetFrameOf(input.session, frames, text);
+
+    if (targetFrame !== undefined) {
+      targetFrames.push(targetFrame);
+    }
+  }
+
   const destination = grantClass === 'navigate' ? navigationOrigin(input.args) : undefined;
+  const [target] = targetTexts;
+  const [primaryTargetFrame] = targetFrames;
+  const targetFrame =
+    primaryTargetFrame === undefined
+      ? undefined
+      : { frame: primaryTargetFrame.frame, origin: primaryTargetFrame.origin };
   const origin = destination ?? targetFrame?.origin ?? mainOrigin;
   const targetOriginFrame = grantClass !== 'navigate' && targetFrame?.frame === true;
+  // Every named target's frame needs the grant, not only the tab's top-level origin.
+  const requiredOrigins = new Set<string>(targetFrames.map(frame => frame.origin));
+  const frameByOrigin = new Map(targetFrames.map(frame => [frame.origin, frame.frame]));
 
-  if (!isOriginGranted(input.authorized, grantClass, origin)) {
-    const items: BrowserPermissionItem[] = [
-      { class: grantClass, origin, ...(targetOriginFrame ? { frame: true } : {}) },
-    ];
+  if (requiredOrigins.size === 0) {
+    requiredOrigins.add(origin);
+  }
+
+  const missing = [...requiredOrigins].filter(
+    required => !isOriginGranted(input.authorized, grantClass, required)
+  );
+
+  if (missing.length > 0) {
+    const items: BrowserPermissionItem[] = missing.map(required =>
+      frameByOrigin.get(required) === true
+        ? { class: grantClass, frame: true, origin: required }
+        : { class: grantClass, origin: required }
+    );
 
     return { failure: { items, kind: 'needs_permission' }, ok: false };
   }

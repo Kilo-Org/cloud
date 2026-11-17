@@ -8,6 +8,7 @@ import {
 } from './browser-tool-read-actions';
 import type { BrowserAriaNode, BrowserToolPageSession } from './browser-tool-snapshot';
 import type { BrowserConsoleMessage, BrowserNetworkRequest } from './browser-tool-session';
+import type { ScreenshotMaskInput, ScreenshotMaskResult } from './browser-screenshot-masking';
 
 interface RecordedCommand {
   readonly method: string;
@@ -39,6 +40,7 @@ const createSession = ({
   axNodes = SAMPLE_TREE,
   boxes = {},
   consoleMessages = [],
+  frameTree,
   requestsSinceLoad = [],
   pageText = () => '',
   responseBody,
@@ -50,6 +52,7 @@ const createSession = ({
   axNodes?: BrowserAriaNode[];
   boxes?: Record<number, { content: number[]; height: number; width: number }>;
   consoleMessages?: BrowserConsoleMessage[];
+  frameTree?: Record<string, unknown>;
   requestsSinceLoad?: BrowserNetworkRequest[];
   pageText?: () => string;
   responseBody?: { base64Encoded?: boolean; body?: string };
@@ -92,6 +95,14 @@ const createSession = ({
 
       if (method === 'Page.captureScreenshot') {
         return { data: screenshot };
+      }
+
+      if (method === 'Page.getFrameTree') {
+        return frameTree ?? {};
+      }
+
+      if (method === 'DOM.getFrameOwner') {
+        return { backendNodeId: 99 };
       }
 
       if (method === 'Network.getResponseBody') {
@@ -245,6 +256,82 @@ describe('browser_find', () => {
 });
 
 describe('browser_take_screenshot', () => {
+  const FRAME_TREE_WITH_PAY = {
+    frameTree: {
+      childFrames: [
+        {
+          frame: {
+            id: 'f1',
+            parentId: 'main',
+            securityOrigin: 'https://pay.example.com',
+            url: 'https://pay.example.com/widget',
+          },
+        },
+      ],
+      frame: {
+        id: 'main',
+        securityOrigin: 'https://app.example.com',
+        url: 'https://app.example.com/dashboard',
+      },
+    },
+  };
+
+  const recordMask = (): {
+    readonly inputs: ScreenshotMaskInput[];
+    readonly mask: (input: ScreenshotMaskInput) => Promise<ScreenshotMaskResult>;
+  } => {
+    const inputs: ScreenshotMaskInput[] = [];
+
+    return {
+      inputs,
+      mask: input => {
+        inputs.push(input);
+
+        return Promise.resolve({ dataUrl: 'data:image/png;base64,TUFTS0VE', ok: true });
+      },
+    };
+  };
+
+  it('masks a withheld frame inside an element capture in the clip coordinate space', async () => {
+    // The clip is the iframe's own rect, so its page-space box lands at the image origin.
+    const iframeRect = { content: [40, 120, 440, 120, 440, 320, 40, 320], height: 200, width: 400 };
+    const { session } = createSession({
+      boxes: { 12: iframeRect, 99: iframeRect },
+      frameTree: FRAME_TREE_WITH_PAY,
+    });
+    const { inputs, mask } = recordMask();
+
+    const result = await runReadBrowserTool('browser_take_screenshot', { target: 'e12' }, session, {
+      agentScope: { readableOrigins: ['https://app.example.com'] },
+      maskScreenshot: mask,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(inputs).toHaveLength(1);
+    expect(inputs[0]?.boxes).toStrictEqual([{ height: 200, left: 0, top: 0, width: 400 }]);
+    expect(inputs[0]?.scale).toBe(1);
+  });
+
+  it('drops a withheld frame that the element clip does not overlap', async () => {
+    const { session } = createSession({
+      boxes: {
+        12: { content: [0, 0, 200, 0, 200, 100, 0, 100], height: 100, width: 200 },
+        99: { content: [300, 400, 500, 400, 500, 500, 300, 500], height: 100, width: 200 },
+      },
+      frameTree: FRAME_TREE_WITH_PAY,
+    });
+    const { inputs, mask } = recordMask();
+
+    const result = await runReadBrowserTool('browser_take_screenshot', { target: 'e12' }, session, {
+      agentScope: { readableOrigins: ['https://app.example.com'] },
+      maskScreenshot: mask,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(inputs).toHaveLength(0);
+    expect(result).toMatchObject({ value: { dataUrl: 'data:image/png;base64,QUJD' } });
+  });
+
   it('returns the image and a text line', async () => {
     const { commands, session } = createSession();
     const result = await runReadBrowserTool('browser_take_screenshot', { type: 'png' }, session);

@@ -21,6 +21,10 @@ const sensitiveOf = (result: AgentPreflight) => (result.ok ? undefined : result.
 
 const sensitiveReasonOf = (result: AgentPreflight) => sensitiveOf(result)?.reason;
 
+/** Node 12 is the pay frame's field; every other node lives in the main frame. */
+const frameIdForTestNode = (backendNodeId: number): string =>
+  backendNodeId === 12 ? 'f1' : 'main';
+
 const MAIN_URL = 'https://app.example.com/dashboard';
 const FRAME_URL = 'https://pay.example.com/widget';
 
@@ -51,13 +55,22 @@ const frameTree = (mainUrl: string): Record<string, unknown> => ({
 
 const createSession = (
   options: {
+    readonly frameIdForBackendNode?: (backendNodeId: number) => string;
     readonly mainUrl?: string;
     readonly probe?: Record<string, unknown>;
     readonly targetFrameId?: string;
   } = {}
 ): FakeGateSession => {
   const handlers: Record<string, CdpHandler> = {
-    'DOM.describeNode': () => ({ node: { frameId: options.targetFrameId ?? 'main' } }),
+    'DOM.describeNode': params => {
+      const backendNodeId = params?.['backendNodeId'];
+      const frameId =
+        typeof backendNodeId === 'number'
+          ? (options.frameIdForBackendNode?.(backendNodeId) ?? options.targetFrameId ?? 'main')
+          : (options.targetFrameId ?? 'main');
+
+      return { node: { frameId } };
+    },
     'DOM.resolveNode': () => ({ object: { objectId: 'obj-1' } }),
     'Page.getFrameTree': () => frameTree(options.mainUrl ?? MAIN_URL),
     'Runtime.callFunctionOn': () => ({
@@ -69,7 +82,9 @@ const createSession = (
 
   return {
     resolveTarget: async (target: string) =>
-      target.startsWith('e') ? { backendNodeId: 12, kind: 'ref', ref: target } : undefined,
+      target.startsWith('e') && Number.isInteger(Number(target.slice(1)))
+        ? { backendNodeId: Number(target.slice(1)), kind: 'ref', ref: target }
+        : undefined,
     send: async (method, params) => {
       const handler = handlers[method];
 
@@ -166,6 +181,37 @@ describe('origin grants', () => {
       ok: true,
       origin: 'https://pay.example.com',
       targetOriginFrame: true,
+    });
+  });
+
+  it('requires act for every fill_form field frame, not only the tab origin', async () => {
+    const result = await run({
+      args: { fields: [{ ref: 'e12' }, { ref: 'e13' }] },
+      authorized: [
+        { class: 'act', origin: 'https://app.example.com' },
+        { class: 'read', origin: 'https://pay.example.com' },
+      ],
+      session: createSession({ frameIdForBackendNode: frameIdForTestNode }),
+      toolName: 'browser_fill_form',
+    });
+
+    expect(failureOf(result)).toStrictEqual({
+      items: [{ class: 'act', frame: true, origin: 'https://pay.example.com' }],
+      kind: 'needs_permission',
+    });
+  });
+
+  it('requires act for both ends of a drag', async () => {
+    const result = await run({
+      args: { endTarget: 'e12', startTarget: 'e13' },
+      authorized: [{ class: 'act', origin: 'https://app.example.com' }],
+      session: createSession({ frameIdForBackendNode: frameIdForTestNode }),
+      toolName: 'browser_drag',
+    });
+
+    expect(failureOf(result)).toStrictEqual({
+      items: [{ class: 'act', frame: true, origin: 'https://pay.example.com' }],
+      kind: 'needs_permission',
     });
   });
 

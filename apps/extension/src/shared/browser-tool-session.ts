@@ -124,6 +124,8 @@ const visibilityStateSchema = z.object({
 });
 
 export interface BrowserConsoleMessage {
+  /** The frame that produced it, when the debugger reported one. */
+  readonly frameId?: string;
   readonly level: string;
   readonly text: string;
   readonly timestamp?: number;
@@ -340,8 +342,18 @@ const remoteObjectSchema = z.object({
 });
 const consoleApiCalledParamsSchema = z.object({
   args: z.array(z.unknown()).optional(),
+  executionContextId: z.number().optional(),
   timestamp: z.number().optional(),
   type: z.string().optional(),
+});
+const executionContextCreatedParamsSchema = z.object({
+  context: z.object({
+    auxData: z.object({ frameId: z.string().optional() }).optional(),
+    id: z.number(),
+  }),
+});
+const executionContextDestroyedParamsSchema = z.object({
+  executionContextId: z.number(),
 });
 const logEntryAddedParamsSchema = z.object({
   entry: z.object({
@@ -1382,6 +1394,8 @@ export const createBrowserToolSession = ({
   let scriptingRefCount = 0;
   // Console messages pushed since the last main-frame navigation, for `all: false`.
   let consoleMessagesSinceNavigation = 0;
+  // `Runtime.executionContextId` → frame id, so a console entry can be attributed to its frame.
+  const frameIdByExecutionContext = new Map<number, string>();
   // The tab's main frame id, learned from `Page.frameNavigated`. A `Document` request in this frame is a page load.
   let mainFrameId: string | undefined = undefined;
   let webMcpDiscovery: { documentId: string; tools: readonly WebMcpToolDescriptor[] } | undefined =
@@ -1442,13 +1456,40 @@ export const createBrowserToolSession = ({
       return;
     }
 
-    const { args, timestamp, type } = parsed.data;
+    const { args, executionContextId, timestamp, type } = parsed.data;
+    const frameId =
+      executionContextId === undefined
+        ? undefined
+        : frameIdByExecutionContext.get(executionContextId);
 
     pushConsoleMessage({
+      ...(frameId === undefined ? {} : { frameId }),
       level: type ?? 'log',
       text: truncateText((args ?? []).map(argument => remoteObjectText(argument)).join(' ')),
       ...(timestamp === undefined ? {} : { timestamp }),
     });
+  };
+
+  const handleExecutionContextCreated = (params: Record<string, unknown> | undefined): void => {
+    const parsed = executionContextCreatedParamsSchema.safeParse(params);
+
+    if (!parsed.success) {
+      return;
+    }
+
+    const frameId = parsed.data.context.auxData?.frameId;
+
+    if (frameId !== undefined) {
+      frameIdByExecutionContext.set(parsed.data.context.id, frameId);
+    }
+  };
+
+  const handleExecutionContextDestroyed = (params: Record<string, unknown> | undefined): void => {
+    const parsed = executionContextDestroyedParamsSchema.safeParse(params);
+
+    if (parsed.success) {
+      frameIdByExecutionContext.delete(parsed.data.executionContextId);
+    }
   };
 
   const handleLogEntryAdded = (params: Record<string, unknown> | undefined): void => {
@@ -1652,6 +1693,16 @@ export const createBrowserToolSession = ({
 
     if (method === 'Runtime.consoleAPICalled') {
       handleConsoleApiCalled(params);
+      return;
+    }
+
+    if (method === 'Runtime.executionContextCreated') {
+      handleExecutionContextCreated(params);
+      return;
+    }
+
+    if (method === 'Runtime.executionContextDestroyed') {
+      handleExecutionContextDestroyed(params);
       return;
     }
 

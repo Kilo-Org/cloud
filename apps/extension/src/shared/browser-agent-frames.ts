@@ -691,9 +691,10 @@ export const screenshotScale = (input: {
 /* ------------------------------------------------------------------ */
 
 /**
- * Drops console messages a withheld frame produced. A console entry carries
- * its source URL rather than a frame id, so the withheld origins decide; an
- * entry without a URL (the main frame, or an opaque source) stays.
+ * Drops console messages a withheld frame produced. A `Runtime.consoleAPICalled`
+ * entry is attributed to the frame of its execution context; a `Log.entryAdded`
+ * entry carries its source URL. An entry with neither is dropped while any frame
+ * is withheld, because its producer cannot be established.
  */
 export const filterAgentConsoleMessages = (
   messages: readonly BrowserConsoleMessage[],
@@ -704,11 +705,16 @@ export const filterAgentConsoleMessages = (
   }
 
   const withheldOrigins = new Set(withheld.map(frame => frame.origin));
+  const withheldIds = new Set(withheld.map(frame => frame.frameId));
 
   return messages.filter(message => {
+    if (message.frameId !== undefined) {
+      return !withheldIds.has(message.frameId);
+    }
+
     const origin = toBrowserOrigin(message.url);
 
-    return origin === undefined || !withheldOrigins.has(origin);
+    return origin === undefined ? false : !withheldOrigins.has(origin);
   });
 };
 

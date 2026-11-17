@@ -289,11 +289,13 @@ export function MemberRow({
         }}
         accessibilityRole="button"
         // Names can repeat; the email is the row's unique fact, so a reader
-        // hears it too instead of two identical rows.
-        accessibilityLabel={[
-          t('organization.members.manageA11y', { name: displayName }),
-          member.email,
-        ].join(', ')}
+        // hears it too instead of two identical rows. A member with no name
+        // already reads by the email, so nothing is appended then.
+        accessibilityLabel={
+          displayName === member.email
+            ? t('organization.members.manageA11y', { name: displayName })
+            : [t('organization.members.manageA11y', { name: displayName }), member.email].join(', ')
+        }
         className="px-3 active:opacity-70"
       >
         {inner}

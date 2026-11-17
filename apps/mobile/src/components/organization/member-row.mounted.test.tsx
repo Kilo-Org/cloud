@@ -194,6 +194,19 @@ describe('MemberRow menu', () => {
     );
   });
 
+  it('does not repeat the email for a member with no name', async () => {
+    // The nameless row already reads by its email; appending it again would
+    // say the address twice.
+    const nameless = { ...member, name: '' } as unknown as Parameters<
+      typeof MemberRow
+    >[0]['member'];
+    const renderer = await renderRow({ member: nameless });
+
+    expect(renderer.root.findByType('Pressable').props.accessibilityLabel).toBe(
+      i18n.t('organization.members.manageA11y', { name: 'member@example.com' })
+    );
+  });
+
   it('offers an admin the daily limit alone on an owner row', async () => {
     const owner = { ...member, role: 'owner' } as unknown as Parameters<
       typeof MemberRow

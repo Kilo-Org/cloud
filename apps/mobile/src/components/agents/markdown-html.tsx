@@ -274,6 +274,38 @@ export type MarkdownHtmlSplit = {
   snapshot: MarkdownHtmlSnapshot;
 };
 
+/**
+ * The source text the splitter should segment, plus how it connects to the
+ * previous publish. Without `snapshot` or `previous` the whole `value` is
+ * segmented. With `snapshot` the value is the same source shape as that
+ * snapshot's value. With `previous` and `appended` the value extends exactly
+ * the previous publish's raw value by `appended`, so only that appended
+ * region is folded through `previous.convert`.
+ *
+ * The intersection keeps the discriminant open for call sites that build the
+ * object in one expression; the function narrows with `'previous' in input`.
+ */
+export type MarkdownHtmlIncrementalInput = {
+  value: string;
+} & Partial<{
+  previous: MarkdownHtmlIncrementalConverted;
+  appended: string;
+  snapshot: MarkdownHtmlSnapshot;
+}>;
+
+/**
+ * What the previous publish turned into segments, kept so the next publish can
+ * reuse it: `tail` is that publish's snapshot, and `convert` folds the raw
+ * source a publish saw into the markdown the splitter segments. A longer value
+ * that starts with `tail.value` only appends, so `convert` runs on the
+ * appended region alone and the split segments the previous converted source
+ * joined with the appended region's conversion.
+ */
+export type MarkdownHtmlIncrementalConverted = {
+  tail: MarkdownHtmlSnapshot;
+  convert: (suffix: string, previous: string) => string;
+};
+
 // Block types that absorb a following block across a blank line: a list takes
 // the next item and a blockquote keeps a quoted paragraph, so one of these must
 // stay in the tail while only a blank line separates it from text the next
@@ -400,18 +432,37 @@ function appendTokens(
 }
 
 /**
- * Streaming-aware `splitMarkdownHtml`: when `value` keeps the previous
+ * Streaming-aware `splitMarkdownHtml`: when the input keeps the previous
  * snapshot's head it re-lexes only the text from that snapshot's tail boundary
  * — the last block run and any list or blockquote that can still absorb it (see
  * `tailBoundaryIndex`) — and reuses the head segments unchanged, so a message
  * that grows one publish at a time stays proportional to the last block instead
  * of the whole value. The result is identical to `splitMarkdownHtml(value)` for
  * every value that keeps the head.
+ *
+ * The three input shapes make the same reuse available to a source that is
+ * produced, not stored, as HTML: the converted markdown of an HTML message is
+ * rebuilt on every publish, so a publish whose value extends the previous
+ * publish's converted source passes that source back through `previous` and
+ * only its appended region is converted again before this function sees a
+ * whole string that extends `previous.tail.value`.
  */
-export function splitMarkdownHtmlIncremental(
-  value: string,
-  previous?: MarkdownHtmlSnapshot
-): MarkdownHtmlSplit {
+export function splitMarkdownHtmlIncremental(input: MarkdownHtmlIncrementalInput): MarkdownHtmlSplit {
+  // The three forms reuse the same body over one string. A plain value and a
+  // snapshot value segment as stored; the previous form folds only the
+  // appended region through the previous publish's conversion and joins the
+  // result after that publish's source, so the body sees one string whose
+  // head is still the previous publish's exact value.
+  const previous = input.previous;
+  if (previous !== undefined) {
+    const effective = `${previous.tail.value}${previous.convert(input.appended ?? '', previous.tail.value)}`;
+    return splitFromSnapshot(effective, previous.tail);
+  }
+  return splitFromSnapshot(input.value, input.snapshot);
+}
+
+/** The snapshot-path body of `splitMarkdownHtmlIncremental`, over one string. */
+function splitFromSnapshot(value: string, previous?: MarkdownHtmlSnapshot): MarkdownHtmlSplit {
   // Fast path: `hasDirectHtml` and `routesNestedHtml` both need a `<` in the
   // raw token text, so a `<`-free value can never produce an html segment and
   // needs no lex at all. Keeping the whole value as the head means the next

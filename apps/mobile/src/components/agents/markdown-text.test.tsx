@@ -20,10 +20,13 @@ import {
   splitMarkdownHtml,
   splitMarkdownHtmlIncremental,
 } from './markdown-html';
+
 import { isMarkdownImageLoadAllowed, requestMarkdownImageTrust } from './markdown-image-confirm';
 import { confirmAndOpenMarkdownLink } from './markdown-link-confirm';
 import { clearMarkdownParseCachesForTests } from './markdown-parse-cache';
 import { MarkdownText } from './markdown-text';
+
+const EMPTY_SNAPSHOT: MarkdownHtmlSnapshot = { value: '', tailStart: 0, headSegments: [], hasDefinition: false };
 
 const rnStub = vi.hoisted(() => {
   const stub = {
@@ -169,6 +172,33 @@ function markdownSources(renderer: TestRenderer.ReactTestRenderer): string[] {
 
 function enrichedProps(renderer: TestRenderer.ReactTestRenderer): EnrichedHostProps {
   return renderer.root.findByType(EnrichedType).props as EnrichedHostProps;
+}
+
+/**
+ * Asserts one mounted publish rendered the segments a whole-value conversion
+ * of the same value produces. The check stays outside the streaming loop so
+ * the loop holds only the publish and its per-step expectation.
+ */
+function expectWholeValueRender(
+  renderer: TestRenderer.ReactTestRenderer,
+  value: string,
+  publish: string
+) {
+  const wholeSegments = splitMarkdownHtml(convertHtmlToMarkdown(value));
+  expect(
+    renderer.root.findAllByType(RenderHTMLType).map(node => node.props.source),
+    publish
+  ).toEqual(
+    wholeSegments.filter(segment => segment.type === 'html').map(segment => ({ html: segment.raw }))
+  );
+  expect(
+    renderer.root.findAllByType(EnrichedType).map(node => node.props.markdown),
+    `${publish} markdown`
+  ).toEqual(
+    wholeSegments
+      .filter(segment => segment.type === 'markdown')
+      .map(segment => segment.raw)
+  );
 }
 
 async function mount(element: ReactElement): Promise<TestRenderer.ReactTestRenderer> {
@@ -936,7 +966,7 @@ function firstDivergence(value: string): string {
   let snapshot: MarkdownHtmlSnapshot | undefined = undefined;
   for (let index = 1; index <= value.length; index += 1) {
     const prefix = value.slice(0, index);
-    const incremental = splitMarkdownHtmlIncremental(prefix, snapshot);
+    const incremental = splitMarkdownHtmlIncremental({ value: prefix, snapshot: snapshot ?? EMPTY_SNAPSHOT });
     snapshot = incremental.snapshot;
     const whole = splitMarkdownHtml(prefix);
     if (JSON.stringify(incremental.segments) !== JSON.stringify(whole)) {
@@ -951,7 +981,7 @@ describe('splitMarkdownHtmlIncremental', () => {
     let snapshot: MarkdownHtmlSnapshot | undefined = undefined;
     for (let index = 1; index <= INCREMENTAL_CORPUS.length; index += 1) {
       const value = INCREMENTAL_CORPUS.slice(0, index);
-      const incremental = splitMarkdownHtmlIncremental(value, snapshot);
+      const incremental = splitMarkdownHtmlIncremental({ value, snapshot: snapshot ?? EMPTY_SNAPSHOT });
       snapshot = incremental.snapshot;
       expect(incremental.segments, `prefix ${index} (${JSON.stringify(value.slice(-20))})`).toEqual(
         splitMarkdownHtml(value)
@@ -965,7 +995,7 @@ describe('splitMarkdownHtmlIncremental', () => {
     let snapshot: MarkdownHtmlSnapshot | undefined = undefined;
     for (let index = 1; index <= INCREMENTAL_CORPUS.length; index += 1) {
       const value = convertHtmlToMarkdown(INCREMENTAL_CORPUS.slice(0, index));
-      const incremental = splitMarkdownHtmlIncremental(value, snapshot);
+      const incremental = splitMarkdownHtmlIncremental({ value, snapshot: snapshot ?? EMPTY_SNAPSHOT });
       snapshot = incremental.snapshot;
       expect(incremental.segments, `prefix ${index} (${JSON.stringify(value.slice(-20))})`).toEqual(
         splitMarkdownHtml(value)
@@ -977,7 +1007,7 @@ describe('splitMarkdownHtmlIncremental', () => {
     // The snapshot is the only cross-publish state, so every field must be read
     // by the next call. `headHasHtml` was written on every snapshot but never
     // read; the snapshot must not carry a dead field again.
-    const { snapshot } = splitMarkdownHtmlIncremental('<b>bold</b> and text\n\nnext\n\n');
+    const { snapshot } = splitMarkdownHtmlIncremental({ value: '<b>bold</b> and text\n\nnext\n\n', snapshot: EMPTY_SNAPSHOT });
 
     expect(Object.keys(snapshot).toSorted()).toEqual([
       'hasDefinition',
@@ -993,8 +1023,8 @@ describe('splitMarkdownHtmlIncremental', () => {
     const opening = '- <a href="https://example.com/page">inline HTML link</a>\n\n';
     const completed = `${opening}- a plain second item`;
 
-    const first = splitMarkdownHtmlIncremental(opening);
-    const second = splitMarkdownHtmlIncremental(completed, first.snapshot);
+    const first = splitMarkdownHtmlIncremental({ value: opening, snapshot: EMPTY_SNAPSHOT });
+    const second = splitMarkdownHtmlIncremental({ value: completed, snapshot: first.snapshot });
 
     expect(second.segments).toEqual(splitMarkdownHtml(completed));
     expect(second.segments).toHaveLength(1);
@@ -1014,7 +1044,7 @@ describe('splitMarkdownHtmlIncremental', () => {
     const opening = '1. Click <b>Save</b>\n\n';
     let snapshot: MarkdownHtmlSnapshot | undefined = undefined;
     for (const value of [opening, `${opening}2.`, `${opening}2. Restart the app`]) {
-      const result = splitMarkdownHtmlIncremental(value, snapshot);
+      const result = splitMarkdownHtmlIncremental({ value, snapshot: snapshot ?? EMPTY_SNAPSHOT });
       snapshot = result.snapshot;
       expect(result.segments, value).toEqual(splitMarkdownHtml(value));
     }
@@ -1037,7 +1067,7 @@ describe('splitMarkdownHtmlIncremental', () => {
     let snapshot: MarkdownHtmlSnapshot | undefined = undefined;
     for (let index = 1; index <= value.length; index += 1) {
       const prefix = value.slice(0, index);
-      const incremental = splitMarkdownHtmlIncremental(prefix, snapshot);
+      const incremental = splitMarkdownHtmlIncremental({ value: prefix, snapshot: snapshot ?? EMPTY_SNAPSHOT });
       snapshot = incremental.snapshot;
       expect(incremental.segments, `prefix ${index} (${JSON.stringify(prefix)})`).toEqual(
         splitMarkdownHtml(prefix)
@@ -1057,7 +1087,7 @@ describe('splitMarkdownHtmlIncremental', () => {
     let fullPrefixCharacters = 0;
     for (let index = 1; index <= STREAM_STEPS; index += 1) {
       value += `## Heading ${index}\n\nParagraph body ${index} with a few words.\n\n- item ${index}\n- item ${index} again\n\n`;
-      snapshot = splitMarkdownHtmlIncremental(value, snapshot).snapshot;
+      snapshot = splitMarkdownHtmlIncremental({ value, snapshot: snapshot ?? EMPTY_SNAPSHOT }).snapshot;
       fullPrefixCharacters += value.length;
     }
     const lexedCharacters = lexedCharacterCount();
@@ -1075,7 +1105,7 @@ describe('splitMarkdownHtmlIncremental', () => {
     let fullPrefixCharacters = 0;
     for (let index = 1; index <= STREAM_STEPS; index += 1) {
       value += `Paragraph ${index} with a few words.\n\n`;
-      snapshot = splitMarkdownHtmlIncremental(value, snapshot).snapshot;
+      snapshot = splitMarkdownHtmlIncremental({ value, snapshot: snapshot ?? EMPTY_SNAPSHOT }).snapshot;
       fullPrefixCharacters += value.length;
     }
 
@@ -1143,6 +1173,28 @@ describe('splitMarkdownHtmlIncremental', () => {
       expect(firstDivergence(document), document).toBe('');
     }
   });
+
+  it('reads a `<b>` stream past the tree depth bound as text content in its parent', () => {
+    // 200 nested `<b>` opens: levels at and past the tree reader's depth
+    // bound fold into the parent's children as text, so the converted value
+    // is one unbroken markdown run instead of a stack exhaustion.
+    const deep = `${'<b>'.repeat(200)}core${'</b>'.repeat(200)}`;
+    const converted = convertHtmlToMarkdown(deep);
+    expect(converted.startsWith('*'.repeat(64))).toBe(true);
+    expect(converted).toContain('core');
+  });
+
+  it('matches the depth-bound segment between a whole and a 200-deep render', () => {
+    // The depth bound is a property of the tag walk, not of where the value
+    // ends, so a whole 200-deep value and the same body streamed as an
+    // append segment identically: a `<b>` opened at the bound renders as the
+    // text it wraps either way.
+    const deep = '<b>'.repeat(200);
+    const whole = splitMarkdownHtml(convertHtmlToMarkdown(`${deep}core`));
+    const streamed = splitMarkdownHtmlIncremental({ value: convertHtmlToMarkdown(`${deep}core`), snapshot: EMPTY_SNAPSHOT });
+    expect(whole.length).toBeGreaterThan(0);
+    expect(JSON.stringify(streamed.segments)).toBe(JSON.stringify(whole));
+  });
 });
 
 describe('MarkdownText body line height', () => {
@@ -1162,5 +1214,28 @@ describe('MarkdownText body line height', () => {
 
     expect(paragraph.lineHeight).toBe(24);
     expect(list.lineHeight).toBe(24);
+  });
+});
+
+describe('MarkdownText streaming conversion tail', () => {
+  it('converts only the appended tail after a streaming append', async () => {
+    // One inline-HTML chunk per publish over 24 steps: every publish's
+    // segments must match segmenting that publish's whole value (and the
+    // appended region's markdown must equal converting the full value), so an
+    // append that extends the converted source reads exactly like a whole
+    // conversion of the same value.
+    const step = '<span>chunk</span> and <b>more</b> text\n\n';
+    let running = '';
+    const renderer = await mount(<MarkdownText value="" />);
+    for (let index = 1; index <= 24; index += 1) {
+      const value = running + step;
+      running = value;
+      // eslint-disable-next-line no-await-in-loop -- each step settles one publish before the next arrives
+      await act(async () => {
+        await Promise.resolve();
+        renderer.update(<MarkdownText value={value} />);
+      });
+      expectWholeValueRender(renderer, value, `publish ${index}`);
+    }
   });
 });

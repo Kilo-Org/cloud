@@ -8,14 +8,17 @@ export type ConvertContext = { value: string; masks: readonly MaskRange[] };
 
 /**
  * Where inline content lands: whether a `<br>` may become a line break, whether
- * it is already inside link text, and the output characters around it, which
- * decide whether markdown reads a `**` there as emphasis (undefined: an edge).
+ * it is already inside link text, the output characters around it, which
+ * decide whether markdown reads a `**` there as emphasis (undefined: an edge),
+ * and how many elements the walk has entered, so nesting past the bound keeps
+ * its HTML form instead of recursing (only element enters increment it).
  */
 export type InlineOptions = {
   allowBreak: boolean;
   inLink: boolean;
   before?: string;
   after?: string;
+  depth?: number;
 };
 
 /**
@@ -104,8 +107,9 @@ function renderText(context: ConvertContext, start: number, end: number): string
   }
   let rendered = '';
   let cursor = start;
-  for (const mask of masks.slice(low)) {
-    if (mask.start >= end) {
+  for (let maskIndex = low; maskIndex < masks.length; maskIndex += 1) {
+    const mask = masks[maskIndex];
+    if (mask === undefined || mask.start >= end) {
       break;
     }
     const maskStart = Math.max(mask.start, cursor);
@@ -133,6 +137,10 @@ export function decodeEntities(source: string): string | null {
     return codePoint > 0 && codePoint <= MAX_CODE_POINT ? String.fromCodePoint(codePoint) : entity;
   });
 }
+
+// An element nested this deep keeps its HTML form: its parent holds the tags
+// as text content instead of the conversion walking the subtree recursively.
+const MAX_INLINE_DEPTH = 128;
 
 // CommonMark's flanking rules: `**x**` is emphasis only when the opening run is
 // left-flanking and the closing run right-flanking, judged from the characters
@@ -263,6 +271,7 @@ function elementPiece(
   element: HtmlElement,
   options: InlineOptions
 ): InlinePiece | null {
+  const depth = options.depth ?? 0;
   const delimiter = EMPHASIS_DELIMITERS.get(element.name);
   if (delimiter !== undefined) {
     const neighbour = delimiter[0];
@@ -270,6 +279,7 @@ function elementPiece(
       ...options,
       before: neighbour,
       after: neighbour,
+      depth: depth + 1,
     });
     const [, lead = '', core = '', trail = ''] = EDGE_WHITESPACE.exec(inner ?? '') ?? [];
     if (inner === null) {
@@ -312,6 +322,7 @@ function elementPiece(
     inLink: true,
     before: '[',
     after: ']',
+    depth: depth + 1,
   });
   if (destination === null || title === null || label === null || !bracketsBalanced(label)) {
     return null;
@@ -341,8 +352,12 @@ export function inlineContent(
   nodes: readonly HtmlNode[],
   options: InlineOptions
 ): string | null {
+  const depth = options.depth ?? 0;
   const pieces: InlinePiece[] = [];
   for (const node of nodes) {
+    if (node.kind !== 'text' && depth >= MAX_INLINE_DEPTH) {
+      return null;
+    }
     const piece = inlinePiece(context, node, options);
     if (piece === null) {
       return null;

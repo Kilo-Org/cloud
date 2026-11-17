@@ -267,6 +267,30 @@ describe('MarkdownHtml details', () => {
     expect(allText(renderer)).toContain('common.details');
     expect(allText(renderer)).toContain('Visible body');
   });
+
+  it('re-syncs the expanded state when the node\u2019s open attribute arrives in a streaming publish', async () => {
+    const renderer = await mountHtml('<details><summary>More</summary><p>Hidden body</p></details>');
+    const row = renderer.root.findByType('Pressable' as never);
+
+    expect(row.props.accessibilityState).toEqual({ expanded: false });
+    expect(allText(renderer)).not.toContain('Hidden body');
+
+    await act(async () => {
+      await Promise.resolve();
+      renderer.update(
+        createElement(MarkdownHtml, {
+          html: '<details open><summary>More</summary><p>Hidden body</p></details>',
+          palette,
+          selectable: true,
+        })
+      );
+    });
+
+    expect(
+      renderer.root.findByType('Pressable' as never).props.accessibilityState
+    ).toEqual({ expanded: true });
+    expect(allText(renderer)).toContain('Hidden body');
+  });
 });
 
 describe('MarkdownHtml unknown tags', () => {

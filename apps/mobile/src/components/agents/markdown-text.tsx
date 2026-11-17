@@ -14,7 +14,8 @@ import {
 import { convertHtmlToMarkdown } from './markdown-html-convert';
 import {
   MarkdownHtml,
-  type MarkdownHtmlSnapshot,
+  type MarkdownHtmlIncrementalConverted,
+  type MarkdownHtmlIncrementalInput,
   splitMarkdownHtmlIncremental,
 } from './markdown-html';
 import { MarkdownMermaid } from './markdown-mermaid';
@@ -68,24 +69,37 @@ export function MarkdownText({
   // only change that region, so the head segments (and the elements keyed by
   // index) stay stable while the message grows. The memo keeps an unrelated
   // re-render from re-lexing an unchanged value; the ref survives it so the
-  // next value still extends the snapshot.
-  const snapshotRef = useRef<MarkdownHtmlSnapshot | undefined>(undefined);
-  const { segments, snapshot } = useMemo(() => {
+  // next value still extends the snapshot. The split inherits the previous
+  // split's converted markdown and converts only the appended region, so the
+  // conversion step is tail-bounded like the lexing step.
+  const previousRef = useRef<MarkdownHtmlIncrementalConverted | undefined>(undefined);
+  const { segments } = useMemo(() => {
     // A remount (a FlashList row re-entering the window) starts without a
-    // snapshot, so the incremental parser can only rebuild the whole value.
+    // previous publish, so the parser can only rebuild the whole value.
     // Completed values were cached on the previous mount — including the last
     // streaming publish, which is the value a remount sees — so reuse that
     // parse instead of lexing and segmenting the same source again.
-    const cached =
-      snapshotRef.current === undefined ? markdownHtmlSplitCache.get(value) : undefined;
-    // HTML that markdown can express becomes markdown first, so it renders
-    // natively; only the rest reaches the HTML engine.
-    const result =
-      cached ?? splitMarkdownHtmlIncremental(convertHtmlToMarkdown(value), snapshotRef.current);
+    const cached = previousRef.current === undefined ? markdownHtmlSplitCache.get(value) : undefined;
+    if (cached !== undefined) {
+      return cached;
+    }
+    const prior = previousRef.current;
+    // The split inherits the previous converted markdown only when the value
+    // extends exactly what the previous publish saw; a rewritten tail (or a
+    // remount) re-converts the whole value instead.
+    const extendsPrior =
+      prior !== undefined && value.length > prior.tail.value.length && value.startsWith(prior.tail.value);
+    const input: MarkdownHtmlIncrementalInput = extendsPrior
+      ? { value, previous: prior, appended: value.slice(prior.tail.value.length) }
+      : { value: convertHtmlToMarkdown(value) };
+    const result = splitMarkdownHtmlIncremental(input);
     markdownHtmlSplitCache.set(value, result);
+    previousRef.current = {
+      tail: result.snapshot,
+      convert: (suffix, previous) => previous + convertHtmlToMarkdown(suffix),
+    };
     return result;
   }, [value]);
-  snapshotRef.current = snapshot;
 
   // Always render through the same wrapping View with index keys: switching to
   // a bare markdown element when no HTML token exists would change the root

@@ -1,5 +1,5 @@
 import { i18n } from '@/i18n';
-import { formatDate, formatMoneyFromCents, formatNumber } from '@/lib/format';
+import { formatDate, formatNumber, formatPrefixedMoney } from '@/lib/format';
 import { parseTimestamp } from '@/lib/utils';
 
 /**
@@ -220,8 +220,8 @@ export function getAutoTopUpReadout(config: OrgAutoTopUpConfig) {
   return {
     enabled: config.enabled,
     status: config.enabled ? i18n.t('common.enabled') : i18n.t('common.disabled'),
-    amount: formatMoneyFromCents(config.amountCents, i18n.language),
-    threshold: formatMoneyFromCents(config.thresholdCents, i18n.language),
+    amount: formatPrefixedMoney(config.amountCents / 100, i18n.language),
+    threshold: formatPrefixedMoney(config.thresholdCents / 100, i18n.language),
   };
 }
 

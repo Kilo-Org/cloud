@@ -15,6 +15,7 @@ import { Keyboard, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { i18n } from '@/i18n';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { CHIP_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { autoModelLabel } from '@/lib/auto-model-name';
@@ -46,6 +47,8 @@ type ModelSelectorProps = {
   /** Whether this chip's `onSelect` stores the picked thinking effort. */
   acceptsVariant: boolean;
   onSelect: (modelId: string, variant: string, pickerSelection?: ModelPickerSelection) => void;
+  /** Called as the chip opens the picker, so a caller can mark the field as visited. */
+  onOpen?: () => void;
   disabled?: boolean;
   isLoading?: boolean;
   /** Agent name that pins the model; when set with `disabled`, the chip is locked. */
@@ -145,6 +148,7 @@ export function ModelSelector({
   options,
   acceptsVariant,
   onSelect,
+  onOpen,
   disabled = false,
   isLoading = false,
   lockLabel,
@@ -163,10 +167,18 @@ export function ModelSelector({
         accessibilityLabel={t('common.model')}
         className="min-w-0 shrink flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5"
       >
-        <Text className="shrink text-sm font-medium text-foreground" numberOfLines={1}>
-          {t('common.model')}
-        </Text>
-        <ChevronDown size={14} color={colors.mutedForeground} />
+        {/* The bar stands in for the label line and takes that line's own box:
+            `text-sm` sets 17.5 dp of height, and the default model's label
+            measured 75.81 dp on the composer, so the pill is the size it will
+            have once that model arrives. `bg-muted-soft` for the reason recorded
+            on the repository loading row: the default `bg-skeleton-fill` equals
+            this pill's `bg-secondary` in the light palette and would paint
+            nothing. The wrapper keeps the busy label for assistive tech without a
+            text node that reads as a resolved value. */}
+        <Skeleton className="h-[17.5px] w-[75.5px] bg-muted-soft" />
+        <View className="opacity-50">
+          <ChevronDown size={14} color={colors.mutedForeground} />
+        </View>
       </View>
     );
   }
@@ -210,6 +222,7 @@ export function ModelSelector({
     if (effectivelyDisabled) {
       return;
     }
+    onOpen?.();
     openModelPicker(pushOnce, {
       options: pickerOptions,
       value,

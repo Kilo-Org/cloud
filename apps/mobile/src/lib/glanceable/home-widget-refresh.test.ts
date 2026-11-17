@@ -8,6 +8,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
+import { setProtectedDataAvailable } from '@/lib/protected-data';
 
 import { _resetHomeWidgetRefreshForTests, syncHomeWidgetRefresh } from './home-widget-refresh';
 
@@ -143,6 +144,64 @@ describe('syncHomeWidgetRefresh', () => {
     await syncHomeWidgetRefresh(CONTEXT);
 
     expect(mocks.widgetCredential).toHaveBeenCalledTimes(2);
+    expect(mocks.configure).toHaveBeenCalledTimes(1);
+  });
+
+  it('files nothing and latches nothing while the keychain is locked', async () => {
+    // A locked device refuses every credential read, so the request went out
+    // without a bearer and the server answered for a session, not for the
+    // widget credential. That is the documented lock state: nothing is dropped,
+    // latched or reported, and the next unlocked sync asks again.
+    mocks.widgetCredential.mockRejectedValue(
+      trpcError('UNAUTHORIZED', 'User not authenticated - no user to set on context')
+    );
+    setProtectedDataAvailable(false);
+    try {
+      await syncHomeWidgetRefresh(CONTEXT);
+    } finally {
+      setProtectedDataAvailable(true);
+    }
+
+    expect(mocks.captureException).not.toHaveBeenCalled();
+    expect(mocks.clear).not.toHaveBeenCalled();
+    expect(mocks.configure).not.toHaveBeenCalled();
+
+    mocks.widgetCredential.mockResolvedValue({
+      token: 'unlocked-token',
+      expiresAt: Date.now() + 30 * 86_400_000,
+    });
+    await syncHomeWidgetRefresh(CONTEXT);
+
+    expect(mocks.widgetCredential).toHaveBeenCalledTimes(2);
+    expect(mocks.configure).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the widget credential when the server refuses the session credential', async () => {
+    // `authRequired` marks the context-level refusal: the request's session
+    // bearer was missing or invalid, which the auth layer refreshes or ends.
+    // The widget credential itself was never reached, so it is not revoked.
+    const sessionRefusal = trpcError(
+      'UNAUTHORIZED',
+      'User not authenticated - no user to set on context'
+    );
+    Object.assign(sessionRefusal, {
+      data: { code: 'UNAUTHORIZED', httpStatus: 401, authRequired: true },
+    });
+    mocks.widgetCredential.mockRejectedValue(sessionRefusal);
+
+    await syncHomeWidgetRefresh(CONTEXT);
+    await syncHomeWidgetRefresh(CONTEXT);
+
+    expect(mocks.widgetCredential).toHaveBeenCalledTimes(2);
+    expect(mocks.captureException).not.toHaveBeenCalled();
+    expect(mocks.clear).not.toHaveBeenCalled();
+
+    mocks.widgetCredential.mockResolvedValue({
+      token: 'resumed-token',
+      expiresAt: Date.now() + 30 * 86_400_000,
+    });
+    await syncHomeWidgetRefresh(CONTEXT);
+
     expect(mocks.configure).toHaveBeenCalledTimes(1);
   });
 

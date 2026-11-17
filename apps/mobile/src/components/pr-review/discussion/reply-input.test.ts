@@ -46,9 +46,9 @@ vi.mock('react-native', () => ({
   View: 'View',
 }));
 
-vi.mock('expo-web-browser', () => ({
-  WebBrowser: { openBrowserAsync: vi.fn() },
-}));
+const legalNavigation = vi.hoisted(() => ({ push: vi.fn() }));
+
+vi.mock('expo-router', () => ({ router: { push: legalNavigation.push } }));
 
 vi.mock('@/lib/trpc', () => ({
   trpcClient: {
@@ -57,10 +57,6 @@ vi.mock('@/lib/trpc', () => ({
       acceptTerms: { mutate: (input: unknown) => acceptTermsMock(input) },
     },
   },
-}));
-
-vi.mock('@/lib/config', () => ({
-  WEB_BASE_URL: 'https://example.com',
 }));
 
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
@@ -126,6 +122,7 @@ function staleVersionError(): Error {
 describe('ensureTermsAcceptedOutcome', () => {
   beforeEach(() => {
     alertCalls.length = 0;
+    legalNavigation.push.mockClear();
     getTermsStatusMock.mockReset();
     acceptTermsMock.mockReset();
   });
@@ -201,6 +198,25 @@ describe('ensureTermsAcceptedOutcome', () => {
     pressButton('Cancel');
     await flush();
 
+    await expect(promise).resolves.toEqual({ kind: 'dismissed' });
+    expect(acceptTermsMock).not.toHaveBeenCalled();
+  });
+
+  it('opens the terms in the native screen instead of a browser', async () => {
+    getTermsStatusMock.mockResolvedValue({ accepted: false, currentVersion: 'v1' });
+
+    const promise = ensureTermsAcceptedOutcome();
+    await flush();
+    pressButton('View terms');
+    await flush();
+
+    expect(legalNavigation.push).toHaveBeenCalledWith({
+      pathname: '/(app)/legal/[document]',
+      params: { document: 'terms' },
+    });
+    // The dialog closes into the document rather than re-opening over it, and
+    // the gate settles so the submit that awaited it stops loading.
+    expect(alertCalls).toHaveLength(1);
     await expect(promise).resolves.toEqual({ kind: 'dismissed' });
     expect(acceptTermsMock).not.toHaveBeenCalled();
   });

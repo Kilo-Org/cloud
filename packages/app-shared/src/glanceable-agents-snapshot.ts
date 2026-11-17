@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { timestampMs } from './utils';
+import { epochMsToIso, timestampMs } from './utils';
 
 /**
  * One durable, privacy-minimal, versioned snapshot for every glanceable
@@ -276,14 +276,38 @@ export function countGlanceableApprovals(sessions: readonly GlanceableSessionRow
 }
 
 /**
+ * Order two rows by one of their timestamps. `extreme` uses the vocabulary the
+ * package owns for its extreme-row selector: 'earliest' is oldest first,
+ * 'latest' is newest first. A missing or unparseable time ranks after every
+ * known time in both directions, so the rule is stated once here and not
+ * restated per sort; a tie compares 0, so the caller's stable sort keeps source
+ * order. This is the sort-facing view of the ordering that
+ * `extremeTimestampRow` applies when it picks one winner.
+ */
+export function compareSessionInstant<T extends GlanceableSessionRow>(
+  read: (row: T) => string | undefined,
+  extreme: 'earliest' | 'latest'
+): (a: T, b: T) => number {
+  return (a, b) => {
+    const left = timestampMs(read(a));
+    const right = timestampMs(read(b));
+    if (left === null || right === null) {
+      return Number(left === null) - Number(right === null);
+    }
+    return extreme === 'earliest' ? left - right : right - left;
+  };
+}
+
+/**
  * The row whose chosen timestamp is the earliest or the latest among the rows
  * that `qualifies` admits, or null when no admitted row carries a parseable
  * time.
  *
  * A row with a missing or unparseable timestamp is skipped rather than read as
- * now, which would understate a wait or overstate how new a change is. Only a
- * strictly earlier or strictly later value replaces the winner, so the first
- * row of a tie stays the winner.
+ * now, which would understate a wait or overstate how new a change is — the
+ * selector skips what the sort-facing `compareSessionInstant` would rank last.
+ * Only a strictly earlier or strictly later value replaces the winner, so the
+ * first row of a tie stays the winner.
  */
 function extremeTimestampRow(
   sessions: readonly GlanceableSessionRow[],
@@ -292,6 +316,7 @@ function extremeTimestampRow(
   extreme: 'earliest' | 'latest'
 ): { at: number; session: GlanceableSessionRow } | null {
   let winner: { at: number; session: GlanceableSessionRow } | null = null;
+  const compare = compareSessionInstant(readTimestamp, extreme);
   for (const session of sessions) {
     if (!qualifies(session)) {
       continue;
@@ -300,11 +325,8 @@ function extremeTimestampRow(
     if (at === null) {
       continue;
     }
-    if (winner !== null) {
-      const loses = extreme === 'earliest' ? at >= winner.at : at <= winner.at;
-      if (loses) {
-        continue;
-      }
+    if (winner !== null && compare(session, winner.session) >= 0) {
+      continue;
     }
     winner = { at, session };
   }
@@ -326,7 +348,7 @@ export function oldestNeedsInputSince(sessions: readonly GlanceableSessionRow[])
     session => session.statusUpdatedAt,
     'earliest'
   );
-  return oldest === null ? null : new Date(oldest.at).toISOString();
+  return oldest === null ? null : epochMsToIso(oldest.at);
 }
 
 /**
@@ -342,7 +364,7 @@ export function soonestScheduledAt(sessions: readonly GlanceableSessionRow[]): s
     session => session.scheduledAt,
     'earliest'
   );
-  return soonest === null ? null : new Date(soonest.at).toISOString();
+  return soonest === null ? null : epochMsToIso(soonest.at);
 }
 
 /**
@@ -364,7 +386,7 @@ export function newestGlanceableResult(
   );
   return newest === null
     ? null
-    : { kind: glanceableStatusKind(newest.session.status), at: new Date(newest.at).toISOString() };
+    : { kind: glanceableStatusKind(newest.session.status), at: epochMsToIso(newest.at) };
 }
 
 // FNV-1a 32-bit over UTF-16 code units (two bytes each). Deterministic across
@@ -422,14 +444,14 @@ export function buildGlanceableSnapshot(
   // will wake later, is still something the user wants on the Lock Screen.
   const eligible = isEligibleGlanceableWork(counts);
   const now = input.now;
-  const updatedAt = new Date(now).toISOString();
+  const updatedAt = epochMsToIso(now);
   const newest = newestGlanceableResult(input.sessions);
 
   return {
     schemaVersion: GLANCEABLE_SNAPSHOT_SCHEMA_VERSION,
     revision: (input.previousRevision ?? 0) + 1,
     updatedAt,
-    expiresAt: new Date(now + GLANCEABLE_SNAPSHOT_EXPIRY_MS).toISOString(),
+    expiresAt: epochMsToIso(now + GLANCEABLE_SNAPSHOT_EXPIRY_MS),
     scopeKey: buildOpaqueScopeKey({ userId: input.userId, organizationId: input.organizationId }),
     ...(input.accountEpoch === undefined ? {} : { accountEpoch: input.accountEpoch }),
     organizationBound: typeof input.organizationId === 'string',
@@ -478,8 +500,8 @@ export function isIdleOnlyGlanceableWork(snapshot: GlanceableAgentsSnapshot): bo
 
 /**
  * True when `incoming` must be discarded in favour of `current`: a strictly
- * lower revision, or the same revision with an older `updatedAt`. ISO strings
- * from `toISOString()` compare correctly as strings.
+ * lower revision, or the same revision with an older `updatedAt`. ISO 8601
+ * strings from `epochMsToIso` compare correctly as strings.
  */
 export function shouldDiscardGlanceableRevision(
   incoming: GlanceableAgentsSnapshot,

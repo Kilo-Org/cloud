@@ -12,6 +12,7 @@ import { Toaster } from 'sonner-native';
 import { useTranslation } from 'react-i18next';
 
 import { AppUnlockAnnouncements } from '@/components/app-unlock-screen';
+import { DeviceLanguageFollow } from '@/components/device-language-follow';
 import { OfflineBanner } from '@/components/offline-banner';
 import { SheetTouchGuard } from '@/components/sheet-touch-guard';
 import { KeyboardMotionProvider } from '@/components/keyboard-motion-provider';
@@ -72,6 +73,7 @@ export function AppRootProviders({
           <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
             <QueryClientProvider client={queryClient}>
               <QueryClientNativeLifecycle />
+              <DeviceLanguageFollow enabled={languageReady} />
               <AuthProvider>
                 <AppUnlockProvider
                   promptMessage={languageReady ? t('preferences.biometricUnlock') : null}

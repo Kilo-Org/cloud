@@ -54,8 +54,8 @@ const boundary = vi.hoisted(() => ({
   trialEndsAt: null as string | null,
 }));
 
-/** The platform's answer for the billing destination: a link, or plain text. */
-const platform = vi.hoisted(() => ({ billingActionKind: 'link' as 'link' | 'text' }));
+/** Whether the storefront rule lets this surface link to the web page. */
+const platform = vi.hoisted(() => ({ linkAllowed: true }));
 
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
   isMoneyRole: () => true,
@@ -91,8 +91,8 @@ vi.mock('@/lib/credits/add-credits-destination', () => ({
   organizationBillingUrl: (organizationId: string) => `http://localhost:3000/${organizationId}`,
 }));
 
-vi.mock('@/lib/external-billing-action', () => ({
-  externalBillingAction: (url: string) => ({ kind: platform.billingActionKind, url }),
+vi.mock('@/lib/billing/external-purchase-link', () => ({
+  useCanLinkExternalPurchase: () => platform.linkAllowed,
 }));
 
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
@@ -101,7 +101,11 @@ vi.mock('@/lib/a11y/tap-target', () => ({ STATE_ACTION_CLASS: 'state-action' }))
 
 vi.mock('@/components/organization/external-billing-link', async () => {
   const { createElement: h } = await import('react');
-  return { ExternalBillingLink: (props: { label?: string }) => h('ExternalBillingLink', props) };
+  return {
+    // The component's own gate picks the link or the plain line.
+    ExternalBillingLink: (props: { label?: string }) =>
+      h(platform.linkAllowed ? 'ExternalBillingLink' : 'BillingDestinationText', props),
+  };
 });
 
 vi.mock('@/components/organization/organization-boundary', async () => {
@@ -233,7 +237,7 @@ beforeEach(() => {
   boundary.isTrialExpiredForEnforcement = false;
   boundary.trialStatus = null;
   boundary.trialEndsAt = null;
-  platform.billingActionKind = 'link';
+  platform.linkAllowed = true;
   queries.seats.data = { usedSeats: 3, totalSeats: 3 };
   queries.autoTopUp.data = { enabled: true, amountCents: 5000, thresholdCents: 1000 };
 });
@@ -419,15 +423,14 @@ describe('OrganizationBillingScreen change plan placement', () => {
     unmount();
   });
 
-  it('keeps the card copy for a lapsed plan when the platform offers text only', async () => {
-    // iOS may not link to the billing page, so its banner has no action and
-    // the card is the only place the destination appears.
+  it('keeps the card copy and prints it as plain text when the storefront rule refuses the link', async () => {
+    // Outside the US storefront nothing links, so the banner has no action.
     boundary.isTrialExpiredForEnforcement = true;
-    platform.billingActionKind = 'text';
+    platform.linkAllowed = false;
     const { renderer, unmount } = await mount();
 
     expect(bannerAction(renderer)).toBeUndefined();
-    expect(manageOnWebLink(renderer, SUBSCRIPTIONS_URL)?.props.label).toBe('Change plan');
+    expect(renderer.root.findAllByType('BillingDestinationText' as never)).toHaveLength(3);
     unmount();
   });
 

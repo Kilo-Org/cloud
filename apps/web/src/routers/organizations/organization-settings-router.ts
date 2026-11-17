@@ -3,7 +3,10 @@ import {
   mutateOrganizationSettings,
   setOrganizationRecommendationsDigestEnabled,
 } from '@kilocode/web-shared/lib/organizations/organizations';
-import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type {
+  OrganizationPlan,
+  OrganizationSettings,
+} from '@kilocode/web-shared/lib/organizations/organization-types';
 import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import {
   OrganizationIdInputSchema,
@@ -29,7 +32,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
 import { ORGANIZATION_DATA_REGION_NAMES } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 import { ORG_AUTO_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
-import { getModelGatewayAvailability } from '@kilocode/web-shared/lib/ai-gateway/providers/model-gateway-availability';
+import { getModelGateways } from '@kilocode/web-shared/lib/ai-gateway/providers/model-gateway-availability';
 import {
   DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS,
   MAX_ORGANIZATION_AUTO_ROUTES,
@@ -343,11 +346,15 @@ const GatewaySettingsResponseSchema = z.object({
 });
 
 const ModelGatewayAvailabilityResponseSchema = z.object({
-  vercel: z.object({ available: z.boolean(), regions: z.array(OrganizationDataRegionSchema) }),
-  openrouter: z.object({ available: z.boolean() }),
+  gateways: z.array(z.enum(['vercel', 'openrouter'])),
 });
 
-async function isGatewaySettingsAvailable(organizationId: string) {
+/**
+ * The advanced gateway policies are an enterprise feature, rolled out per organization through the
+ * `gateway_settings` organization feature. The gateway ignores them on any other plan.
+ */
+async function isGatewaySettingsAvailable(organizationId: string, plan: OrganizationPlan) {
+  if (plan !== 'enterprise') return false;
   return isOrganizationFeatureEnabled(
     await readOrganizationFeatures(db),
     'gateway_settings',
@@ -365,12 +372,12 @@ function createGatewaySettingsDiffMessage(
   }
   if ((oldSettings.data_region ?? null) !== (newSettings.data_region ?? null)) {
     changes.push(
-      `Data region: ${newSettings.data_region ? ORGANIZATION_DATA_REGION_NAMES[newSettings.data_region] : 'Global'}`
+      `Inference region: ${newSettings.data_region ? ORGANIZATION_DATA_REGION_NAMES[newSettings.data_region] : 'Global'}`
     );
   }
   return changes.length > 0
-    ? `Updated gateway settings: ${changes.join('; ')}`
-    : 'Updated gateway settings: no changes';
+    ? `Updated advanced policies: ${changes.join('; ')}`
+    : 'Updated advanced policies: no changes';
 }
 
 export const organizationsSettingsRouter = createTRPCRouter({
@@ -384,7 +391,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
       }
       return {
-        available: await isGatewaySettingsAvailable(input.organizationId),
+        available: await isGatewaySettingsAvailable(input.organizationId, organization.plan),
         disable_openrouter: organization.settings.disable_openrouter ?? false,
         data_region: organization.settings.data_region ?? null,
       };
@@ -394,13 +401,17 @@ export const organizationsSettingsRouter = createTRPCRouter({
     .input(OrganizationIdInputSchema.extend({ modelId: z.string().min(1) }))
     .output(ModelGatewayAvailabilityResponseSchema)
     .query(async ({ input }) => {
-      if (!(await isGatewaySettingsAvailable(input.organizationId))) {
+      const organization = await getOrganizationById(input.organizationId);
+      if (!organization) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+      }
+      if (!(await isGatewaySettingsAvailable(input.organizationId, organization.plan))) {
         throw new TRPCError({
           code: 'FORBIDDEN',
-          message: 'Gateway settings are not available for this organization.',
+          message: 'Advanced policies are not available for this organization.',
         });
       }
-      return getModelGatewayAvailability(input.modelId);
+      return { gateways: await getModelGateways(input.modelId) };
     }),
 
   updateGatewaySettings: organizationAdminMutationProcedure
@@ -408,10 +419,14 @@ export const organizationsSettingsRouter = createTRPCRouter({
     .output(SettingsResponseSchema)
     .mutation(async ({ input, ctx }) => {
       const { organizationId, disable_openrouter, data_region } = input;
-      if (!(await isGatewaySettingsAvailable(organizationId))) {
+      const organization = await getOrganizationById(organizationId);
+      if (!organization) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+      }
+      if (!(await isGatewaySettingsAvailable(organizationId, organization.plan))) {
         throw new TRPCError({
           code: 'FORBIDDEN',
-          message: 'Gateway settings are not available for this organization.',
+          message: 'Advanced policies are not available for this organization.',
         });
       }
 

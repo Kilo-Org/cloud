@@ -1,25 +1,21 @@
+import { type Href } from 'expo-router';
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
-import { AgentFormSheet } from '@/components/profiles/agent-form-sheet';
-import {
-  AGENT_VISIBILITY_LABEL_KEYS,
-  agentRows,
-  type AgentSource,
-  type AgentVisibility,
-} from '@/components/profiles/profile-agents-model';
+import { AgentFormSheet, type AgentSaveFailure } from '@/components/profiles/agent-form-sheet';
+import { AgentRowView, AgentsSkeleton } from '@/components/profiles/profile-agents-row';
+import { agentRows, type AgentSource } from '@/components/profiles/profile-agents-model';
 import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
-import { ProfileRowIdentity, profileRowLabel } from '@/components/profiles/profile-row-identity';
 import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import { QueryError } from '@/components/query-error';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
-import { Bot, Pencil, Trash2 } from '@/components/ui/icons';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Bot } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import {
   type AgentProfileDetail,
@@ -27,12 +23,12 @@ import {
   useAgentProfileSectionMutations,
 } from '@/lib/hooks/use-agent-profiles';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
-import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { MAX_PROFILE_AGENTS } from '@/lib/agent-profile-forms';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { isolateBidiText } from '@/lib/bidi';
 import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
-import { cn } from '@/lib/utils';
+import { readTrpcErrorField } from '@/lib/trpc-error';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_AGENTS: AgentProfileDetail['agents'] = [];
@@ -42,103 +38,15 @@ function hasUsableMessage(error: unknown): boolean {
   return error instanceof Error && error.message.trim().length > 0;
 }
 
-/** A tRPC CONFLICT from the agent mutations is the per-profile slug unique index. */
-function isSlugConflict(error: unknown): boolean {
-  const code = (error as { data?: { code?: unknown } } | null | undefined)?.data?.code;
-  return code === 'CONFLICT';
-}
-
-type AgentRowViewProps = Readonly<{
-  name: string;
-  visibility: AgentVisibility;
-  description: string;
-  model: string;
-  onEdit?: () => void;
-  onDelete?: () => void;
-}>;
-
-/**
- * One agent row: name, visibility, optional model and description, edit/delete.
- * The name and what qualifies it are one identity element declared first, so a
- * screen reader hears what the row is before the controls that change it.
- */
-function AgentRowView({
-  name,
-  visibility,
-  description,
-  model,
-  onEdit,
-  onDelete,
-}: AgentRowViewProps) {
-  const { t } = useTranslation();
-  const colors = useThemeColors();
-  const visibilityLabel = t(AGENT_VISIBILITY_LABEL_KEYS[visibility]);
-  // The name owns its row, so an agent name is ellipsized only when it alone is
-  // wider than the card; the mode label never takes the room a short name needs.
-  // The label is metadata, so it leads the column under the name at the same
-  // 2 dp gap the card uses between its meta lines.
-  return (
-    <View className="min-h-16 flex-row items-start gap-1 rounded-lg bg-secondary px-3 py-2">
-      <ProfileRowIdentity label={profileRowLabel(name, visibilityLabel, model, description)}>
-        <View className="flex-row items-center gap-2">
-          <Bot size={16} color={colors.mutedForeground} />
-          <Text className="min-w-0 shrink text-sm font-medium text-foreground" numberOfLines={1}>
-            {name}
-          </Text>
-        </View>
-        <Text className="text-xs uppercase tracking-wide text-muted-foreground">
-          {visibilityLabel}
-        </Text>
-        {model.length > 0 ? (
-          <Text variant="mono" className="text-xs text-muted-foreground" numberOfLines={1}>
-            {model}
-          </Text>
-        ) : null}
-        {description.length > 0 ? (
-          <Text className="text-xs text-muted-foreground" numberOfLines={2}>
-            {description}
-          </Text>
-        ) : null}
-      </ProfileRowIdentity>
-      {onEdit !== undefined ? (
-        <Pressable
-          className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
-          accessibilityRole="button"
-          accessibilityLabel={t('profiles.agents.edit', { name })}
-          onPress={onEdit}
-        >
-          <Pencil size={18} color={colors.mutedForeground} />
-        </Pressable>
-      ) : null}
-      {onDelete !== undefined ? (
-        <Pressable
-          className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
-          accessibilityRole="button"
-          accessibilityLabel={t('profiles.agents.delete', { name })}
-          onPress={onDelete}
-        >
-          <Trash2 size={18} color={colors.mutedForeground} />
-        </Pressable>
-      ) : null}
-    </View>
-  );
-}
-
-/** Content-shaped rows in the same slots as a loaded agent row. */
-function AgentsSkeleton() {
-  return (
-    <View className="gap-3">
-      {[0, 1, 2].map(index => (
-        <Skeleton key={index} className="h-16 w-full rounded-lg bg-muted-soft" />
-      ))}
-    </View>
-  );
-}
-
 export function ProfileAgentsScreen({
   profileId,
   organizationId,
-}: Readonly<{ profileId: string; organizationId?: string }>) {
+  backFallback,
+}: Readonly<{
+  profileId: string;
+  organizationId?: string;
+  backFallback: Href;
+}>) {
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const profileQuery = useAgentProfileAgents(profileId, organizationId);
@@ -148,15 +56,18 @@ export function ProfileAgentsScreen({
 
   const agents = profileQuery.data ?? NO_AGENTS;
   const rows = agentRows(agents);
+  // The server counts every row this profile holds and the list returns every
+  // row unfiltered, so the loaded length is the count the cap compares.
+  const atAgentCap = agents.length >= MAX_PROFILE_AGENTS;
   // `null` = closed, the add form, or the agent being edited. The form and the
   // fields it holds are a draft (`lib/form-draft`), so a remount reopens it on
   // what was typed instead of dropping it.
   const draftScope = `profiles:agents:${profileId}`;
-  // A save the server rejected on the slug shows the inline conflict message
-  // instead of only a toast: the sheet stays open on the typed values, so the
-  // user can rename without retyping the form. The flag is the form's note, so
-  // opening or closing the form resets it with the rest of the draft.
-  const form = useProfileFormDraft(draftScope, agents, { slugConflict: false });
+  // A save the server refused leaves one note the sheet renders: a slug the
+  // profile already uses shows under the slug field, a create past the cap
+  // names the cap, and any other refusal is one line in the sheet. The note is
+  // the form's own, so opening or closing the form resets it with the draft.
+  const form = useProfileFormDraft<AgentSource, AgentSaveFailure | null>(draftScope, agents, null);
   // The list sits underneath the sheet, and a sheet dismisses natively, so the
   // second tap of a Save double tap would land on the row just saved.
   const { markClosed: markSheetClosed, guard: guardRowPress } = useSheetRowTapGuard();
@@ -174,6 +85,7 @@ export function ProfileAgentsScreen({
     // The form this save belongs to. A remount keeps it alive; a later open or
     // close replaces it, and this attempt must then leave the new form alone.
     const generation = form.generation();
+    form.setNotes(null);
     try {
       await (target === null
         ? createAgent.mutateAsync({ profileId, ...payload })
@@ -182,13 +94,18 @@ export function ProfileAgentsScreen({
       if (!form.isCurrent(generation)) {
         return;
       }
-      if (isSlugConflict(error)) {
-        form.setNotes({ slugConflict: true });
+      // A CONFLICT from the agent mutations is the per-profile slug index.
+      if (readTrpcErrorField(error, 'code') === 'CONFLICT') {
+        form.setNotes({ kind: 'slug-conflict' });
         return;
       }
-      if (!hasUsableMessage(error)) {
-        toast.error(t('profiles.agents.saveFailed'));
+      // Only a create can pass the per-profile cap, and its service refuses it
+      // with this code and no other meaning on that path.
+      if (target === null && readTrpcErrorField(error, 'code') === 'PRECONDITION_FAILED') {
+        form.setNotes({ kind: 'limit' });
+        return;
       }
+      form.setNotes({ kind: 'refused' });
       return;
     }
     if (form.isCurrent(generation)) {
@@ -280,7 +197,14 @@ export function ProfileAgentsScreen({
           );
         })}
         <ProfileManageSlot permission={permission}>
-          <Button onPress={handleStartAdd}>
+          {atAgentCap ? (
+            <AccessibleStatus
+              message={t('profiles.agents.limitReached', { max: MAX_PROFILE_AGENTS })}
+              tone="warn"
+              className="text-sm"
+            />
+          ) : null}
+          <Button disabled={atAgentCap} onPress={handleStartAdd}>
             <Text>{t('profiles.agents.add')}</Text>
           </Button>
         </ProfileManageSlot>
@@ -294,6 +218,7 @@ export function ProfileAgentsScreen({
         profileId={profileId}
         organizationId={organizationId}
         title={t('profiles.agents.title')}
+        backFallback={backFallback}
       />
       <TabScreenScrollView
         className="flex-1"
@@ -314,7 +239,7 @@ export function ProfileAgentsScreen({
             .map(candidate => candidate.slug)}
           organizationId={organizationId}
           isSaving={createAgent.isPending || updateAgent.isPending}
-          slugConflictFromServer={form.notes.slugConflict}
+          saveFailure={form.notes}
           onClose={handleClose}
           onSave={payload => {
             void saveAgent(form.editing, payload);

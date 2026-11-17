@@ -7,7 +7,7 @@ export { act } from './renderer-act';
 // Rendering and scheduling belong to the maintained renderer used by RNTL 14.
 // The existing contract tests also inspect provider/component props and identity.
 // Keep those assertions via its documented Fiber escape hatch, not a second
-// reconciler or the deprecated react-test-renderer package.
+// reconciler or the deprecated renderer package this module replaces.
 type FindOptions = { deep?: boolean };
 type Predicate = (node: Instance) => boolean;
 
@@ -255,7 +255,7 @@ function createTree(root: Root): FiberTree {
   };
 }
 
-// react-test-renderer's default `createNodeMock` handed `null` to a ref on a
+// The previous renderer's default `createNodeMock` handed `null` to a ref on a
 // host element, so an imperative call made through a host ref (a component that
 // keeps a ref to a host `TextInput` and calls `clear()` on it) was a no-op. The
 // maintained renderer exposes its host node to the ref instead. Keep the old

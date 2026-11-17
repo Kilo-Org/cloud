@@ -58,7 +58,7 @@ const SCOPE_COPY: Record<
       'Pay Anthropic directly for your Claude usage in Kilo through your Claude API organization. No API key needed.',
     coverageNote: null,
     removeNote:
-      'Removing the link from Kilo restores normal BYOK or Kilo-credit routing. Remove it first to switch to another Claude organization.',
+      "Removing the link from Kilo ends Kilo's link at Anthropic unless another Kilo scope still uses it, then restores normal BYOK or Kilo-credit routing. Remove it first to switch to another Claude organization.",
   },
   organization: {
     description:
@@ -66,7 +66,7 @@ const SCOPE_COPY: Record<
     coverageNote:
       "Covers every member's Claude requests in this organization and Kilo services such as code review.",
     removeNote:
-      'Removing the link from Kilo stops every Claude request in this organization from billing it and restores normal BYOK or Kilo-credit routing. Remove it first to switch to another Claude organization.',
+      "Removing the link from Kilo ends Kilo's link at Anthropic unless another Kilo scope still uses it, stops every Claude request in this organization from billing it, and restores normal BYOK or Kilo-credit routing. Remove it first to switch to another Claude organization.",
   },
 };
 
@@ -95,7 +95,7 @@ function outcomeMessage(outcome: string, scope: ClaudeBillingScope, connected: b
         ? 'Linking did not complete. An owner, admin, or billing admin of that Claude organization must approve it, or remove the current link first to link a different Claude organization.'
         : 'Linking did not complete. An owner, admin, or billing admin of your Claude organization must approve it.';
     case 'already_linked':
-      return 'This Claude organization is already linked in Kilo. Use an existing link below if you control it, or ask its owner to share it. To move the link, unlink Kilo under Linked platforms in Claude Console first, then link again.';
+      return 'This Claude organization already has a link. Use an existing link below if you control it, or ask its owner to share it. If neither applies, unlink Kilo under Linked platforms in Claude Console, then link again.';
     case 'forbidden':
       return scope === 'organization'
         ? 'Only a Kilo organization owner or admin with access to this feature can link it.'
@@ -381,8 +381,8 @@ function ClaudeBillingCardContent({
     })
   );
   const shareFailureCode = shareMutation.error?.data?.code;
-  const failureCode =
-    statusQuery.error?.data?.code ?? shareFailureCode ?? removeMutation.error?.data?.code;
+  const removeFailureCode = removeMutation.error?.data?.code;
+  const failureCode = statusQuery.error?.data?.code ?? shareFailureCode ?? removeFailureCode;
   const needsSignIn = failureCode === 'UNAUTHORIZED';
   const needsAdmin = failureCode === 'FORBIDDEN';
   const nonRetryableShareError =
@@ -422,7 +422,11 @@ function ClaudeBillingCardContent({
                   : shareMutation.isError
                     ? 'We could not share that Claude link. Try again.'
                     : removeMutation.isError
-                      ? 'We could not remove your Claude link. Try again.'
+                      ? removeFailureCode === 'PRECONDITION_FAILED'
+                        ? 'Kilo kept this Claude link. Unlink Kilo under Linked platforms in Claude Console, then remove it here again.'
+                        : removeFailureCode === 'SERVICE_UNAVAILABLE'
+                          ? 'Anthropic did not confirm the unlink, so Kilo kept this Claude link. Try again.'
+                          : 'We could not remove your Claude link. Try again.'
                       : null
       }
       onRetry={

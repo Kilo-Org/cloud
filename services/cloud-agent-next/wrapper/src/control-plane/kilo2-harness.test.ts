@@ -50,9 +50,12 @@ function createHarness(serverUrl: string) {
 }
 
 function statusResponse(status: string, error?: string) {
-  return Response.json([
-    { name: 'kilo-cloud-agent', status: { status, ...(error === undefined ? {} : { error }) } },
-  ]);
+  return Response.json({
+    location: { directory },
+    data: [
+      { name: 'kilo-cloud-agent', status: { status, ...(error === undefined ? {} : { error }) } },
+    ],
+  });
 }
 
 const credential = {

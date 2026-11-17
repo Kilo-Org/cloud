@@ -1,5 +1,5 @@
 import { CancelledError } from '@tanstack/react-query';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { isAlreadyReportedNetworkError, reportAppError } from '@/lib/telemetry/app-error-reporting';
 import {
@@ -7,6 +7,7 @@ import {
   TELEMETRY_DESCRIPTION_KEY,
   type TelemetryEvent,
 } from '@/lib/telemetry/error-sink';
+import { createNetworkErrorFetch } from '@/lib/telemetry/network-errors';
 import { FINGERPRINT_MESSAGE_LIMIT } from '@/lib/telemetry/sentry-scrub';
 
 let events: TelemetryEvent[] = [];
@@ -74,9 +75,37 @@ describe('isAlreadyReportedNetworkError', () => {
     expect(isAlreadyReportedNetworkError(null)).toBe(false);
     expect(isAlreadyReportedNetworkError(undefined)).toBe(false);
   });
+
+  it('skips a rejection the fetch wrapper recorded as a transport failure', async () => {
+    const rejection = new Error('fetch failed: The network connection was lost.');
+    const wrapped = createNetworkErrorFetch(
+      vi.fn().mockRejectedValue(rejection) as unknown as typeof fetch
+    );
+
+    const rethrown = await wrapped('https://api.kilo.ai/api/openrouter/models').catch(
+      (error: unknown) => error
+    );
+
+    expect(rethrown).toBe(rejection);
+    expect(isAlreadyReportedNetworkError(rethrown)).toBe(true);
+  });
 });
 
 describe('reportAppError', () => {
+  it('files no event for a transport failure the fetch wrapper recorded', async () => {
+    const rejection = new Error('fetch failed: Unable to resolve host "api.kilo.ai"');
+    const wrapped = createNetworkErrorFetch(
+      vi.fn().mockRejectedValue(rejection) as unknown as typeof fetch
+    );
+    const rethrown = await wrapped('https://api.kilo.ai/api/openrouter/models').catch(
+      (error: unknown) => error
+    );
+
+    reportAppError(rethrown, { source: 'query', queryKey: ['models'] });
+
+    expect(events).toHaveLength(0);
+  });
+
   it('reports a plain Error at error level with tags and a stable fingerprint', () => {
     const error = new Error('boom');
     const queryKey: unknown[] = [['session', 'list'], { type: 'query' }];

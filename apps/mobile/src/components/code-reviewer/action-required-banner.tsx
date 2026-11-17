@@ -8,20 +8,19 @@ import { toast } from 'sonner-native';
 import { ACTION_REQUIRED_KEYS } from '@/components/code-reviewer/action-required-keys';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
+import { appShellHandoffUrl } from '@/lib/app-shell-handoff';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
 import { PERSONAL_SCOPE } from '@/lib/hooks/use-code-reviewer';
-import { getByokUrl, getGitLabIntegrationUrl } from '@/lib/integration-urls';
+import { getByokUrl } from '@/lib/integration-urls';
 import {
   openAuthorizationAndWaitForReturn,
   reportLateLaunchFailure,
 } from '@/lib/pr-review/connect-gate-platform';
-import { trpcClient } from '@/lib/trpc';
 
 // Where each reason's recovery label takes the user. Every destination exists:
-// the two GitHub App reasons and the GitLab reason reuse the integration pages
-// the reviewer and integrations screens already open, BYOK has only a web
+// the two GitHub App reasons and the GitLab reason open the integration shell
+// pages the reviewer and integrations screens already open, BYOK has only a web
 // settings page, and the reviewer's model is edited in place on this screen.
 type RecoveryKind = 'github-app' | 'gitlab-integration' | 'byok' | 'model' | 'support';
 
@@ -60,27 +59,22 @@ export function ActionRequiredBanner({
   const recoveryLabel = t(keys.recoveryLabel);
   const organizationId = scope === PERSONAL_SCOPE ? undefined : scope;
 
-  const recoveryUrl = async () => {
+  const recoveryUrl = (): Promise<string> => {
     const kind = RECOVERY_KIND[reason];
     if (kind === 'github-app') {
-      try {
-        const { token } = await trpcClient.githubApps.mintInstallState.mutate({
-          organizationId,
-          returnTo: '/cloud/sessions',
-        });
-        return getGitHubIntegrationUrl(WEB_BASE_URL, organizationId, token);
-      } catch {
-        // Minting needs owner/admin rights, which are narrower than the edit
-        // permission that shows this control, and an organization that already
-        // has an installation refuses a second one. The integration page still
-        // opens the install/manage flow, so the label never becomes a dead end.
-        return getGitHubIntegrationUrl(WEB_BASE_URL, organizationId);
-      }
+      return appShellHandoffUrl({
+        page: 'github-app',
+        ...(organizationId ? { organizationId } : {}),
+      });
     }
     if (kind === 'byok') {
-      return getByokUrl(WEB_BASE_URL, organizationId);
+      return Promise.resolve(getByokUrl(WEB_BASE_URL, organizationId));
     }
-    return getGitLabIntegrationUrl(WEB_BASE_URL, organizationId);
+    return appShellHandoffUrl({
+      page: 'integration',
+      platform: 'gitlab',
+      ...(organizationId ? { organizationId } : {}),
+    });
   };
 
   const openBrowser = async () => {

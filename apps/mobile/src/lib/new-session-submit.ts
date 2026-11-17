@@ -258,10 +258,13 @@ function resolveComposerBlockedReason(
  *
  * The empty composer never hides that blocker, because the form opens empty:
  * with nothing typed and no repository selected the footer names the
- * repository/provider step, with its action. Once a repository is selected, an
- * empty composer is named instead, because a disabled Start with no
- * explanation is a dead end: Cloud Agent needs prompt text, and a remote CLI
- * needs a prompt or a file.
+ * repository step. Once a repository is selected, an empty composer is named
+ * instead, because a disabled Start with no explanation is a dead end: Cloud
+ * Agent needs prompt text, and a remote CLI needs a prompt or a file.
+ *
+ * `connect-provider` is the state where the repository section's connect card
+ * owns the step: that card names the connect prompt and carries its own
+ * button, so the footer does not render the reason and opens no connect flow.
  *
  * The other preconditions that block Start are named too, wherever they own
  * the blocker: a failed or in-flight attachment, a still-loading profile, an
@@ -358,12 +361,12 @@ export function resolveNewSessionStartBlockedReason(
 }
 
 /**
- * The provider the footer's connect action opens for the `connect-provider`
- * reason: the first group still in the `connect` state, in the repository
- * section's fixed github/gitlab/bitbucket order, or `null` when no provider is
- * left to connect. Kept pure so the target choice is pinnable without
- * rendering; the screen only ever reads it when the reason is
- * `connect-provider`, which itself requires a connectable group.
+ * The provider still available to connect: the first group in the `connect`
+ * state, in the repository section's fixed github/gitlab/bitbucket order, or
+ * `null` when no provider is left to connect. Kept pure so the connect state
+ * is pinnable without rendering; the screen reads it only to tell whether the
+ * `connect-provider` state applies, which the repository section's connect
+ * card then carries.
  */
 export function resolveNewSessionConnectProvider<K extends string>(
   groups: readonly { key: K; status: string }[]

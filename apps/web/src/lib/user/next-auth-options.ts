@@ -1,5 +1,5 @@
 import 'server-only';
-import { JWT_TOKEN_VERSION } from '@kilocode/web-shared/lib/tokens';
+import { KILO_TOKEN_VERSION } from '@kilocode/worker-utils/kilo-token';
 import { cookies, headers } from 'next/headers';
 
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
@@ -122,9 +122,9 @@ import { z } from 'zod';
 import {
   getUserFromSession,
   getUserFromSessionForCredentialIssuance,
-  isBlockedTLD,
   sessionAuthOptions,
 } from '@kilocode/web-shared/lib/user/server';
+import { isBlockedTLD } from '@kilocode/web-shared/lib/user/domain-gates';
 import { isEmailBlacklisted } from '@kilocode/web-shared/lib/blacklist-domains-config';
 
 export type TurnstileJwtPayload = {
@@ -1595,7 +1595,7 @@ export const authOptions: NextAuthOptions = {
           await persistOpenAiChatGptConnection(existingUser.id, account, profile);
         }
 
-        token.version = JWT_TOKEN_VERSION;
+        token.version = KILO_TOKEN_VERSION;
         token.exp = Math.floor(Date.now() / 1000) + secondsInDay * 30;
         token.iat = Math.floor(Date.now() / 1000);
         token.isNewUser = (profile as ExtendedProfile)?.isNewUser || false;

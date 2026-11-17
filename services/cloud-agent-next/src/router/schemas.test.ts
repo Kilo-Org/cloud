@@ -850,13 +850,27 @@ describe('sendMessageV2 input compatibility', () => {
     });
   });
 
-  it('rejects custom mode on a command payload without appendSystemPrompt', () => {
+  it('accepts custom mode on a command payload', () => {
+    // Whether the session has the appended system prompt `custom` runs is
+    // decided against the session's stored metadata, not by this input schema:
+    // a client resuming a custom-mode session sends the mode it stored.
     expect(
       SendMessageV2Input.safeParse({
         cloudAgentSessionId: validSessionId,
         payload: { type: 'command', command: 'compact', arguments: '', mode: 'custom' },
       }).success
-    ).toBe(false);
+    ).toBe(true);
+  });
+
+  it('accepts a variant key the model catalog may define', () => {
+    for (const variant of ['thinking', 'high-2', 'xhigh_1']) {
+      expect(
+        SendMessageV2Input.safeParse({
+          cloudAgentSessionId: validSessionId,
+          payload: { type: 'prompt', prompt: 'Try again', mode: 'code', model: 'm', variant },
+        }).success
+      ).toBe(true);
+    }
   });
 
   it('rejects attachment descriptors on nested command payloads', () => {

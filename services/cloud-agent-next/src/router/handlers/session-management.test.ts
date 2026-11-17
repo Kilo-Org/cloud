@@ -143,15 +143,25 @@ describe('background activity authorization', () => {
       } as never)
     ).rejects.toThrow();
   });
-  it('does not present an unavailable runtime as an empty inventory', async () => {
+  it('does not present an offline sandbox as an empty inventory', async () => {
     const harness = setup();
     harness.stub.kiloRequest.mockResolvedValueOnce({
       ok: false,
-      error: { code: 'not_ready', message: 'No runtime', retryable: true },
+      error: { code: 'runtime_offline', message: 'Live runtime is not ready', retryable: true },
     });
     await expect(
       harness.caller.getBackgroundActivity({ cloudAgentSessionId: sessionId })
-    ).rejects.toThrow('unavailable');
+    ).resolves.toBeNull();
+  });
+  it('still reports a live sandbox whose wrapper read failed as unavailable', async () => {
+    const harness = setup();
+    harness.stub.kiloRequest.mockResolvedValueOnce({
+      ok: false,
+      error: { code: 'not_ready', message: 'Wrapper request timed out', retryable: true },
+    });
+    await expect(
+      harness.caller.getBackgroundActivity({ cloudAgentSessionId: sessionId })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
   });
   it('reports an invalid native inventory as unavailable rather than an internal error', async () => {
     const harness = setup();

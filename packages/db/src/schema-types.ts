@@ -829,8 +829,9 @@ export type ImpactAdvocateRewardRedemptionState =
 /**
  * - `pending`: the owner's Anthropic user profile exists; no approval completed yet.
  * - `connected`: Anthropic issued a connection; Claude requests bill the customer.
- * - `billing_unavailable`: Anthropic answered `user_profile_not_billable`; requests
- *   fail without an upstream call until an admin reconnects or removes it.
+ * - `billing_unavailable`: Anthropic answered `user_profile_not_billable` or
+ *   `user_profile_billing_not_authorized`; requests fail without an upstream
+ *   call until an admin reconnects or removes it.
  * - `removed`: removed in Kilo; the profile is kept so a reconnect reuses it.
  */
 export const ClaudeBillingConnectionStatus = {
@@ -1571,7 +1572,58 @@ export type OrganizationMcpConnectTarget =
 export const OrganizationDataRegionSchema = z.enum(['us', 'eu', 'au', 'jp']);
 export type OrganizationDataRegion = z.infer<typeof OrganizationDataRegionSchema>;
 
+// How Kilo clients may drive a browser for this organization's members: anything the
+// member configured, the bundled Playwright browser only, or no browser tools at all.
+export const ORGANIZATION_BROWSER_CONTROL_MODES = ['allow', 'playwright_only', 'off'] as const;
+export const OrganizationBrowserControlSchema = z.enum(ORGANIZATION_BROWSER_CONTROL_MODES);
+export type OrganizationBrowserControl = z.infer<typeof OrganizationBrowserControlSchema>;
+
+export const MAX_ORGANIZATION_BROWSER_ALLOWED_ORIGINS = 200;
+export const MAX_ORGANIZATION_BROWSER_ORIGIN_LENGTH = 2048;
+
+function parseHttpOrigin(value: string): URL | null {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+    return null;
+  }
+  if (url.username !== '' || url.password !== '' || url.search !== '' || url.hash !== '') {
+    return null;
+  }
+  if (url.pathname !== '/') {
+    return null;
+  }
+  return url;
+}
+
+/**
+ * The canonical origin for an allow-list entry, or null when the value is not a
+ * bare http(s) origin. Clients grant `<class>:<origin>`, so a path or query in a
+ * stored value would silently grant nothing usable.
+ */
+export function normalizeOrganizationBrowserOrigin(value: string): string | null {
+  return parseHttpOrigin(value.trim())?.origin ?? null;
+}
+
+export const OrganizationBrowserAllowedOriginSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(MAX_ORGANIZATION_BROWSER_ORIGIN_LENGTH)
+  .refine(
+    value => normalizeOrganizationBrowserOrigin(value) !== null,
+    'Expected an http or https origin such as https://example.com'
+  );
+
 const OrganizationSettingsSchema = z.object({
+  // The default model and provider access for organization members. Group
+  // policies set the access of their own members. Organization admins manage
+  // both. See `evaluateEffectiveModelAccessPolicy` in
+  // `packages/web-shared/src/lib/organizations/group-policies/model-access/model-access.server.ts`.
   provider_allow_list: z.array(z.string()).optional(),
 
   model_deny_list: z.array(z.string()).optional(),
@@ -1615,8 +1667,17 @@ const OrganizationSettingsSchema = z.object({
   kilo_encrypt: z.boolean().optional(),
   enkrypt: OrganizationEnkryptSettingsSchema.optional(),
   guardrails: OrganizationGuardrailsSettingsSchema.optional(),
-  // These apply only while the `gateway_settings` organization feature is enabled in the gateway
-  // configuration. A null or absent data_region routes Vercel AI Gateway requests globally.
+  // Browser automation policy. Absent means `allow`, which leaves the choice of
+  // backend and origins to each member's client.
+  browserControl: OrganizationBrowserControlSchema.optional(),
+  // Origins every member's client treats as granted for browser read, act, and navigate.
+  browserAllowedOrigins: z
+    .array(OrganizationBrowserAllowedOriginSchema)
+    .max(MAX_ORGANIZATION_BROWSER_ALLOWED_ORIGINS)
+    .optional(),
+  // Advanced policies. These apply only to an enterprise organization while the `gateway_settings`
+  // organization feature is enabled in the gateway configuration. A null or absent data_region
+  // routes Vercel AI Gateway requests globally; a set one also disables OpenRouter.
   disable_openrouter: z.boolean().optional(),
   data_region: OrganizationDataRegionSchema.nullable().optional(),
 });
@@ -2157,12 +2218,7 @@ export const CouncilSpecialistSchema = z.object({
   // model; unset falls back to the review's default model. Bounded to the downstream
   // runtime-agent model limit so a valid council request can't fail at session prep.
   model_slug: z.string().max(MAX_RUNTIME_AGENT_MODEL_LENGTH).optional(),
-  thinking_effort: z
-    .string()
-    .max(50)
-    .regex(/^[a-zA-Z]+$/)
-    .nullable()
-    .optional(),
+  thinking_effort: z.string().min(1).max(50).nullable().optional(),
 });
 export type CouncilSpecialist = z.infer<typeof CouncilSpecialistSchema>;
 
@@ -2290,14 +2346,34 @@ export const RepositoryModelOverrideSchema = z.object({
   model_slug: z.string().max(512),
   // Thinking effort variant name (e.g. "high", "max") — null means model default,
   // matching the global `thinking_effort` field below.
-  thinking_effort: z
-    .string()
-    .max(50)
-    .regex(/^[a-zA-Z]+$/)
-    .nullable()
-    .optional(),
+  thinking_effort: z.string().min(1).max(50).nullable().optional(),
 });
 export type RepositoryModelOverride = z.infer<typeof RepositoryModelOverrideSchema>;
+
+export const ReviewGuidelineSourceRepositoriesSchema = z
+  .array(
+    z
+      .string()
+      .max(140)
+      .regex(/^[A-Za-z0-9-]+\/[A-Za-z0-9_.-]+$/)
+  )
+  .max(100);
+
+export type ReviewGuidelineImport = {
+  source: string;
+  sha: string | null;
+  status:
+    | 'imported'
+    | 'invalid'
+    | 'not_allowed'
+    | 'not_accessible'
+    | 'not_found'
+    | 'self_import'
+    | 'entry_limit'
+    | 'unsupported_platform'
+    | 'fetch_error'
+    | 'dropped_budget';
+};
 
 export const CodeReviewAgentConfigSchema = z.object({
   review_style: z.enum(REVIEW_STYLES),
@@ -2308,12 +2384,7 @@ export const CodeReviewAgentConfigSchema = z.object({
   custom_instructions: z.string().nullable().optional(),
   model_slug: z.string(),
   // Thinking effort variant name (e.g. "high", "max", "thinking") — null means model default
-  thinking_effort: z
-    .string()
-    .max(50)
-    .regex(/^[a-zA-Z]+$/)
-    .nullable()
-    .optional(),
+  thinking_effort: z.string().min(1).max(50).nullable().optional(),
   repository_selection_mode: z.enum(['all', 'selected']).optional(),
   selected_repository_ids: z.array(z.union([z.number(), z.string()])).optional(),
   // Manually added repositories (for GitLab where pagination limits results)
@@ -2334,6 +2405,7 @@ export const CodeReviewAgentConfigSchema = z.object({
   // effect there yet.
   skip_bot_pull_requests: z.boolean().optional(),
   disable_review_md: z.boolean().optional(),
+  review_guideline_source_repositories: ReviewGuidelineSourceRepositoriesSchema.optional(),
   // Controls when the PR gate check (GitHub Check Run / GitLab commit status)
   // reports a failure based on review findings.
   //   'off'      — gate only fails on system errors (timeout, crash)
@@ -2512,11 +2584,30 @@ export type SecurityFindingAnalysis = {
 
 // --- OpenRouter types ---
 
+/**
+ * Time-of-day prices. OpenRouter lists the prices of each UTC window in `overrides`; Vercel AI
+ * Gateway multiplies its token prices by `peak_pricing.multiplier` during peak windows.
+ */
+export const PriceOverrideSchema = z.looseObject({
+  prompt: z.string().optional().catch(undefined),
+  completion: z.string().optional().catch(undefined),
+  input_cache_read: z.string().optional().catch(undefined),
+  input_cache_write: z.string().optional().catch(undefined),
+});
+
+export const PeakPricingSchema = z.looseObject({ multiplier: z.number() });
+
+const TimeOfDayPricingFields = {
+  overrides: z.array(PriceOverrideSchema).optional().catch(undefined),
+  peak_pricing: PeakPricingSchema.optional().catch(undefined),
+};
+
 export type OpenRouterPricing = z.infer<typeof OpenRouterPricing>;
 export const OpenRouterPricing = z.object({
   prompt: z.string(),
   completion: z.string(),
   discount: z.number().optional(),
+  ...TimeOfDayPricingFields,
 });
 
 export type OpenRouterBaseModel = z.infer<typeof OpenRouterBaseModel>;
@@ -2544,6 +2635,12 @@ export const OpenRouterEndpoint = z.object({
       retainsPrompts: z.boolean().optional(),
     })
     .nullish(),
+  /**
+   * The inference regions Vercel AI Gateway can pin the model to at this provider, in a fixed
+   * order. Absent when Vercel does not serve the model through the provider or has no regional
+   * inference for it there.
+   */
+  vercel_inference_regions: z.array(OrganizationDataRegionSchema).optional().catch(undefined),
 });
 
 export type OpenRouterModel = z.infer<typeof OpenRouterModel>;
@@ -3281,6 +3378,14 @@ export const CustomPricingConfigSchema = z.object({
             path: [index, 'model'],
           });
         }
+        // A latest alias is billed at the custom pricing of the model it resolves to.
+        if (model.startsWith('~')) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `"${model}" is a latest alias. Aliases are billed at their target model's custom pricing, so add an entry for the target model instead.`,
+            path: [index, 'model'],
+          });
+        }
         seen.add(model);
       }
     }),
@@ -3391,6 +3496,11 @@ export const EndpointPricingSchema = z.object({
   web_search: z.string().optional(),
   internal_reasoning: z.string().optional(),
   discount: z.number().optional(),
+  ...TimeOfDayPricingFields,
+});
+
+export const EndpointInferenceRegionSchema = z.object({
+  geo_region: z.string().optional().catch(undefined),
 });
 
 export const EndpointSchema = z.object({
@@ -3401,6 +3511,8 @@ export const EndpointSchema = z.object({
   // Vercel AI Gateway endpoint data policy flags; OpenRouter does not set them.
   has_zdr: z.boolean().optional().catch(undefined),
   has_no_training: z.boolean().optional().catch(undefined),
+  /** Vercel AI Gateway: the regions the endpoint can be pinned to; OpenRouter does not set it. */
+  inference_regions: z.array(EndpointInferenceRegionSchema).optional().catch(undefined),
 });
 
 export type Endpoint = z.infer<typeof EndpointSchema>;

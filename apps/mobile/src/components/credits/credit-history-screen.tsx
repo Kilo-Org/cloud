@@ -22,6 +22,7 @@ import {
   useCreditPurchaseHistory,
   usePersonalCreditBlocks,
 } from '@/lib/hooks/use-personal-credits';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { trpcErrorVariant } from '@/lib/trpc-error';
 import { useTRPC } from '@/lib/trpc';
 
@@ -240,7 +241,7 @@ export function PersonalCreditHistoryScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('common.creditHistory')} />
+      <ScreenHeader title={t('common.creditHistory')} backFallback={PROFILE_TAB_HREF} />
       {body}
     </View>
   );

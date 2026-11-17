@@ -15,7 +15,6 @@ jest.mock('next/server', () => ({
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   ...jest.requireActual<object>('@kilocode/web-shared/lib/config.server'),
   EXA_API_KEY: 'synthetic-exa-key',
-  EXA_USAGE_QUEUE_FALLBACK_ENABLED: true,
   USAGE_INGEST_URL: 'https://ingest.synthetic.invalid/usage',
   USAGE_INGEST_PUBLISH_SECRET: 'synthetic-publish-secret',
 }));

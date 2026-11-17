@@ -570,7 +570,7 @@ describe('processTopupForOrganization', () => {
     expect(topUpEmail.to).toBe(testUser.google_user_email);
     expect(topUpEmail.subject).toBe('Your Kilo org credit top-up');
     expect(topUpEmail.html).toContain('Team credits added');
-    expect(topUpEmail.html).toContain('Amount:</strong>');
+    expect(topUpEmail.html).toMatch(/Amount:<\/strong\s*>/);
     expect(topUpEmail.html).toContain('Credits:</strong> $50.00 USD');
     expect(topUpEmail.html).toContain('$50.00 USD');
     expect(topUpEmail.html).toContain(
@@ -612,7 +612,7 @@ describe('processTopupForOrganization', () => {
     expect(topUpEmail.subject).toBe('Kilo team auto top-up successful');
     expect(topUpEmail.html).toContain('Team auto top-up was successful');
     expect(topUpEmail.html).toContain('$25.00 USD');
-    expect(topUpEmail.html).toContain('Amount:</strong>');
+    expect(topUpEmail.html).toMatch(/Amount:<\/strong\s*>/);
     expect(topUpEmail.html).not.toContain('Service fee (5%)');
     expect(topUpEmail.html).toContain(
       'Test Organization was automatically topped up so your team can keep using Kilo without interruption. The new credits are available now.'
@@ -643,13 +643,13 @@ describe('processTopupForOrganization', () => {
 
     expect(sendViaMailgunMock).toHaveBeenCalledTimes(1);
     const [topUpEmail] = sendViaMailgunMock.mock.calls[0];
-    expect(topUpEmail.html).toContain('Credits added:</strong>');
+    expect(topUpEmail.html).toMatch(/Credits added:<\/strong\s*>/);
     expect(topUpEmail.html).toContain('$50.00 USD');
     expect(topUpEmail.html).toContain('Service fee (5%):</strong> $2.50 USD');
     expect(topUpEmail.html).toContain('Total paid:</strong> $52.50 USD');
     expect(topUpEmail.html).not.toContain('Credits:</strong> $50.00 USD');
     expect(topUpEmail.html).not.toContain('Credit principal');
-    expect(topUpEmail.html).not.toContain('Amount:</strong> $50.00 USD');
+    expect(topUpEmail.html).not.toMatch(/Amount:<\/strong\s*>\s*\$50\.00 USD/);
 
     const emailMarkers = await getOrganizationTopUpEmailMarkers(stripePaymentId);
     expect(emailMarkers).toHaveLength(1);

@@ -9,7 +9,6 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/claude-billing/operator', () => (
 }));
 jest.mock('./access', () => ({
   canManageClaudeBillingOrganization: jest.fn(),
-  isClaudeBillingOrganizationMember: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/auth/claude/feature-flag.server', () => ({
   isClaudePlatformOAuthEnabled: jest.fn(async () => true),
@@ -37,7 +36,7 @@ import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import type { FailureResult } from '@kilocode/web-shared/lib/maybe-result';
 import type { ClaudeBillingOwner } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import { consumeClaudeBillingPending, saveClaudeBillingPending } from './pending';
-import { canManageClaudeBillingOrganization, isClaudeBillingOrganizationMember } from './access';
+import { canManageClaudeBillingOrganization } from './access';
 import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 import {
   exchangeClaudeBillingCode,
@@ -62,11 +61,10 @@ beforeEach(() => {
   jest.mocked(pushClaudeAuthorizationRequest).mockClear();
   jest.mocked(isClaudePlatformOAuthEnabled).mockReset().mockResolvedValue(true);
   jest.mocked(canManageClaudeBillingOrganization).mockReset().mockResolvedValue(true);
-  jest.mocked(isClaudeBillingOrganizationMember).mockReset().mockResolvedValue(true);
   jest.mocked(exchangeClaudeBillingCode).mockReset().mockResolvedValue('ocon_new');
 });
 
-type Scope = 'personal' | 'member' | 'shared_services';
+type Scope = 'personal' | 'organization';
 
 /** A session the standard authorized path accepts. */
 function signedIn(user: User) {
@@ -104,13 +102,11 @@ async function seed(scope: Scope = 'personal') {
   const owner: ClaudeBillingOwner =
     scope === 'personal'
       ? { kind: 'personal', kiloUserId: user.id }
-      : scope === 'member'
-        ? { kind: 'member', kiloUserId: user.id, organizationId: org?.id ?? '' }
-        : { kind: 'shared_services', organizationId: org?.id ?? '' };
+      : { kind: 'organization', organizationId: org?.id ?? '' };
   const [row] = await db
     .insert(claude_billing_connections)
     .values({
-      kilo_user_id: scope === 'shared_services' ? null : user.id,
+      kilo_user_id: scope === 'personal' ? user.id : null,
       organization_id: org?.id ?? null,
       user_profile_id: `uprof_${user.id}`,
       created_by: user.id,
@@ -166,13 +162,15 @@ async function anthropicKeys(userId: string) {
 }
 
 describe('Claude billing callback', () => {
-  it.each(['personal', 'member', 'shared_services'] as const)(
+  it.each(['personal', 'organization'] as const)(
     'connects the authorized %s owner and deletes only a personal pasted key',
     async scope => {
       const fixture = await seed(scope);
       const response = await callback();
       expect(response.headers.get('location')).toContain(
-        scope === 'shared_services' ? 'claude_billing_shared=connected' : 'claude_billing=connected'
+        scope === 'organization'
+          ? 'claude_billing_organization=connected'
+          : 'claude_billing=connected'
       );
       expect(isClaudePlatformOAuthEnabled).toHaveBeenCalledWith(fixture.user.google_user_email);
       expect(await state(fixture.row.id)).toMatchObject({
@@ -202,16 +200,18 @@ describe('Claude billing callback', () => {
     expect(exchangeClaudeBillingCode).not.toHaveBeenCalled();
   });
 
-  it('rechecks the shared-services role after approval', async () => {
-    const { row } = await seed('shared_services');
+  it('rechecks the organization role after approval', async () => {
+    const { row } = await seed('organization');
     jest.mocked(canManageClaudeBillingOrganization).mockResolvedValue(false);
-    expect((await callback()).headers.get('location')).toContain('claude_billing_shared=forbidden');
+    expect((await callback()).headers.get('location')).toContain(
+      'claude_billing_organization=forbidden'
+    );
     expect(await state(row.id)).toMatchObject({ status: 'pending' });
     expect(exchangeClaudeBillingCode).not.toHaveBeenCalled();
   });
 
-  it('records the admin who links shared services again as its connector', async () => {
-    const { row } = await seed('shared_services');
+  it('records the admin who links the organization again as its connector', async () => {
+    const { row } = await seed('organization');
     const nextAdmin = await insertTestUser();
     const pending = await consumeClaudeBillingPending();
     if (!pending) throw new Error('Missing pending fixture');
@@ -220,16 +220,10 @@ describe('Claude billing callback', () => {
       ...pending,
       kiloUserId: nextAdmin.id,
     });
-    expect((await callback()).headers.get('location')).toContain('claude_billing_shared=connected');
+    expect((await callback()).headers.get('location')).toContain(
+      'claude_billing_organization=connected'
+    );
     expect(await state(row.id)).toMatchObject({ status: 'connected', created_by: nextAdmin.id });
-  });
-
-  it('rechecks membership for a member connection after approval', async () => {
-    const { row } = await seed('member');
-    jest.mocked(isClaudeBillingOrganizationMember).mockResolvedValue(false);
-    expect((await callback()).headers.get('location')).toContain('claude_billing=forbidden');
-    expect(await state(row.id)).toMatchObject({ status: 'pending' });
-    expect(exchangeClaudeBillingCode).not.toHaveBeenCalled();
   });
 
   it('does not complete a connection while the Claude platform OAuth flag is off', async () => {
@@ -304,14 +298,16 @@ describe('Claude billing callback', () => {
     expect(await state(row.id)).toMatchObject({ status: 'pending', connection_id: null });
   });
 
-  it('reports a refused shared-services callback under the shared-services query', async () => {
-    const { row } = await seed('shared_services');
+  it('reports a refused organization callback under the organization query', async () => {
+    const { row } = await seed('organization');
     refusedAccount();
 
     const response = await callback();
 
     expect(
-      new URL(response.headers.get('location') ?? '').searchParams.get('claude_billing_shared')
+      new URL(response.headers.get('location') ?? '').searchParams.get(
+        'claude_billing_organization'
+      )
     ).toBe('forbidden');
     expect(exchangeClaudeBillingCode).not.toHaveBeenCalled();
     expect(await state(row.id)).toMatchObject({ status: 'pending' });
@@ -422,12 +418,11 @@ describe('Claude billing callback', () => {
       .returning();
     if (!payer) throw new Error('Missing payer fixture');
     const personal: ClaudeBillingOwner = { kind: 'personal', kiloUserId: user.id };
-    const member: ClaudeBillingOwner = {
-      kind: 'member',
-      kiloUserId: user.id,
+    const organizationOwner: ClaudeBillingOwner = {
+      kind: 'organization',
       organizationId: org.id,
     };
-    await shareClaudeBillingConnection(personal, member, user.id);
+    await shareClaudeBillingConnection(personal, organizationOwner, user.id);
     signedIn(user);
 
     await connect(
@@ -442,7 +437,7 @@ describe('Claude billing callback', () => {
 
     expect(response.headers.get('location')).toContain('claude_billing=failed');
     await expect(getGrantedClaudeBillingConnection(personal)).resolves.toBeNull();
-    await expect(getGrantedClaudeBillingConnection(member)).resolves.toMatchObject({
+    await expect(getGrantedClaudeBillingConnection(organizationOwner)).resolves.toMatchObject({
       id: payer.id,
       status: 'connected',
     });
@@ -464,12 +459,11 @@ describe('Claude billing callback', () => {
       .returning();
     if (!payer) throw new Error('Missing payer fixture');
     const personal: ClaudeBillingOwner = { kind: 'personal', kiloUserId: user.id };
-    const member: ClaudeBillingOwner = {
-      kind: 'member',
-      kiloUserId: user.id,
+    const organizationOwner: ClaudeBillingOwner = {
+      kind: 'organization',
       organizationId: org.id,
     };
-    await shareClaudeBillingConnection(personal, member, user.id);
+    await shareClaudeBillingConnection(personal, organizationOwner, user.id);
     await removeClaudeBillingGrant(personal);
     signedIn(user);
 
@@ -496,34 +490,16 @@ describe('Claude billing callback', () => {
       status: 'connected',
       connection_id: 'ocon_new',
     });
-    await expect(getGrantedClaudeBillingConnection(member)).resolves.toMatchObject({
+    await expect(getGrantedClaudeBillingConnection(organizationOwner)).resolves.toMatchObject({
       id: payer.id,
       user_profile_id: payer.user_profile_id,
       status: 'connected',
     });
   });
 
-  it('starts only a shared-services link for an organization manager', async () => {
+  it('starts an organization link for an organization owner or admin', async () => {
     const user = await insertTestUser();
     const org = await createTestOrganization('Claude connect', user.id, 0);
-    signedIn(user);
-    jest.mocked(consumeClaudeBillingPending).mockResolvedValue(null);
-
-    await connect(
-      new NextRequest(
-        `http://localhost/claude/billing/connect?owner=${org.id}&scope=shared_services&return=%2Fbyok`
-      )
-    );
-    const [row] = await db
-      .select()
-      .from(claude_billing_connections)
-      .where(eq(claude_billing_connections.organization_id, org.id));
-    expect(row).toMatchObject({ kilo_user_id: null, created_by: user.id, status: 'pending' });
-  });
-
-  it('starts a member link for an organization member', async () => {
-    const user = await insertTestUser();
-    const org = await createTestOrganization('Claude member', user.id, 0);
     signedIn(user);
     jest.mocked(consumeClaudeBillingPending).mockResolvedValue(null);
 
@@ -534,21 +510,24 @@ describe('Claude billing callback', () => {
       .select()
       .from(claude_billing_connections)
       .where(eq(claude_billing_connections.organization_id, org.id));
-    expect(row).toMatchObject({ kilo_user_id: user.id, created_by: user.id, status: 'pending' });
+    expect(row).toMatchObject({ kilo_user_id: null, created_by: user.id, status: 'pending' });
+    expect(saveClaudeBillingPending).toHaveBeenCalledWith(
+      expect.objectContaining({
+        owner: { kind: 'organization', organizationId: org.id },
+      })
+    );
   });
 
-  it('refuses a shared-services link from a person who does not manage the organization', async () => {
+  it('refuses an organization link from a person who does not manage the organization', async () => {
     const user = await insertTestUser();
     const org = await createTestOrganization('Claude refused', user.id, 0);
     signedIn(user);
     jest.mocked(canManageClaudeBillingOrganization).mockResolvedValue(false);
 
     const response = await connect(
-      new NextRequest(
-        `http://localhost/claude/billing/connect?owner=${org.id}&scope=shared_services&return=%2Fbyok`
-      )
+      new NextRequest(`http://localhost/claude/billing/connect?owner=${org.id}&return=%2Fbyok`)
     );
-    expect(response.headers.get('location')).toContain('claude_billing_shared=forbidden');
+    expect(response.headers.get('location')).toContain('claude_billing_organization=forbidden');
     const rows = await db
       .select()
       .from(claude_billing_connections)

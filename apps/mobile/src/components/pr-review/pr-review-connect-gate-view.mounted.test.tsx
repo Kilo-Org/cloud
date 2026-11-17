@@ -24,6 +24,9 @@ const appState = vi.hoisted(() => ({
   addEventListener: vi.fn(),
 }));
 const providers: ProviderPrPlatform[] = ['github', 'gitlab', 'bitbucket'];
+// The providers whose connect is a browser hand-off. Bitbucket's token is
+// pasted in the app's own sheet, so the launch/return cases do not apply to it.
+const browserProviders: ProviderPrPlatform[] = ['github', 'gitlab'];
 type MockStatusData = {
   connected: boolean;
   revoked?: boolean;
@@ -82,7 +85,12 @@ vi.mock('@/lib/trpc', () => ({
   }),
 }));
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://web.example' }));
-const router = vi.hoisted(() => ({ dismissTo: vi.fn() }));
+// The gate mints its GitLab hand-off through this helper; a fixed URL keeps the
+// assertion on what the browser is asked to open.
+vi.mock('@/lib/app-shell-handoff', () => ({
+  appShellHandoffUrl: () => Promise.resolve('https://web.example/app-shell/handoff?token=gate'),
+}));
+const router = vi.hoisted(() => ({ dismissTo: vi.fn(), push: vi.fn() }));
 vi.mock('expo-router', () => ({
   usePathname: () => '/pr-review/github/owner/repo/1',
   useRouter: () => router,
@@ -259,28 +267,31 @@ afterEach(() => {
 });
 
 describe('Android connect gate unmount', () => {
-  it.each(providers)('%s drops its foreground listener and pending callbacks', async provider => {
-    platform.OS = 'android';
-    vi.mocked(WebBrowser.openBrowserAsync).mockResolvedValue({
-      type: WebBrowser.WebBrowserResultType.OPENED,
-    });
-    const renderer = mount(provider);
-    await pressConnect(renderer);
-    expect(appState.subscriptions).toHaveLength(1);
+  it.each(browserProviders)(
+    '%s drops its foreground listener and pending callbacks',
+    async provider => {
+      platform.OS = 'android';
+      vi.mocked(WebBrowser.openBrowserAsync).mockResolvedValue({
+        type: WebBrowser.WebBrowserResultType.OPENED,
+      });
+      const renderer = mount(provider);
+      await pressConnect(renderer);
+      expect(appState.subscriptions).toHaveLength(1);
 
-    await act(async () => {
-      renderer.unmount();
-      await Promise.resolve();
-    });
-    mounted = undefined;
-    expect(appState.subscriptions[0]?.remove).toHaveBeenCalledOnce();
-    await act(async () => {
-      emitForeground();
-      await Promise.resolve();
-    });
-    expect(queryResult.refetch).not.toHaveBeenCalled();
-    expect(toast.error).not.toHaveBeenCalled();
-  });
+      await act(async () => {
+        renderer.unmount();
+        await Promise.resolve();
+      });
+      mounted = undefined;
+      expect(appState.subscriptions[0]?.remove).toHaveBeenCalledOnce();
+      await act(async () => {
+        emitForeground();
+        await Promise.resolve();
+      });
+      expect(queryResult.refetch).not.toHaveBeenCalled();
+      expect(toast.error).not.toHaveBeenCalled();
+    }
+  );
 });
 
 describe.each(['ios', 'android'])('PR-review connect gate on %s', os => {
@@ -288,21 +299,24 @@ describe.each(['ios', 'android'])('PR-review connect gate on %s', os => {
     platform.OS = os;
   });
 
-  it.each(providers)('%s waits for the launch to finish before refreshing', async provider => {
-    const pending = beginPendingLaunch();
-    const renderer = mount(provider);
-    const button = await pressConnect(renderer);
-    expect(button.props.disabled).toBe(true);
-    expect(renderer.root.findAllByType('ActivityIndicator')).toHaveLength(1);
-    expect(queryResult.refetch).not.toHaveBeenCalled();
+  it.each(browserProviders)(
+    '%s waits for the launch to finish before refreshing',
+    async provider => {
+      const pending = beginPendingLaunch();
+      const renderer = mount(provider);
+      const button = await pressConnect(renderer);
+      expect(button.props.disabled).toBe(true);
+      expect(renderer.root.findAllByType('ActivityIndicator')).toHaveLength(1);
+      expect(queryResult.refetch).not.toHaveBeenCalled();
 
-    await settleLaunch(pending);
-    expect(queryResult.refetch).toHaveBeenCalledOnce();
-    expect(button.props.disabled).toBe(false);
-    expect(toast.error).not.toHaveBeenCalled();
-  });
+      await settleLaunch(pending);
+      expect(queryResult.refetch).toHaveBeenCalledOnce();
+      expect(button.props.disabled).toBe(false);
+      expect(toast.error).not.toHaveBeenCalled();
+    }
+  );
 
-  it.each(providers)(
+  it.each(browserProviders)(
     '%s reports a failed launch, re-enables Connect, and refreshes',
     async provider => {
       failLaunch(new Error('no browser'));
@@ -360,7 +374,7 @@ describe.each(['ios', 'android'])('PR-review connect gate on %s', os => {
     expect(queryResult.refetch).toHaveBeenCalledOnce();
   });
 
-  it.each(providers)(
+  it.each(browserProviders)(
     '%s handles a rejected return refetch without a browser error',
     async provider => {
       queryResult.refetch.mockRejectedValue(new Error('status refetch failed'));
@@ -374,7 +388,7 @@ describe.each(['ios', 'android'])('PR-review connect gate on %s', os => {
     }
   );
 
-  it.each(providers)(
+  it.each(browserProviders)(
     '%s returns Connect to idle when the return refetch never settles',
     async provider => {
       // Default `networkMode: 'online'`: while the online manager reports
@@ -395,6 +409,26 @@ describe.each(['ios', 'android'])('PR-review connect gate on %s', os => {
       expect(toast.error).not.toHaveBeenCalled();
     }
   );
+
+  it('opens the app connect sheet for an organization Bitbucket workspace', async () => {
+    const renderer = mount('bitbucket');
+    const button = await pressConnect(renderer);
+
+    // The workspace access token is pasted in the app's own sheet, so the tap
+    // pushes a route instead of opening a browser: no launch to wait on, no
+    // foreground listener to remove, and no return edge to refetch from.
+    expect(router.push).toHaveBeenCalledExactlyOnceWith({
+      pathname: '/(app)/bitbucket-connect',
+      params: { scope: 'org-1' },
+    });
+    expect(WebBrowser.openBrowserAsync).not.toHaveBeenCalled();
+    expect(WebBrowser.openAuthSessionAsync).not.toHaveBeenCalled();
+    expect(appState.subscriptions).toHaveLength(0);
+    expect(queryResult.refetch).not.toHaveBeenCalled();
+    expect(button.props.disabled).toBe(false);
+    expect(renderer.root.findAllByType('ActivityIndicator')).toHaveLength(0);
+    expect(toast.error).not.toHaveBeenCalled();
+  });
 
   it('explains the personal Bitbucket restriction without a Connect CTA', () => {
     const renderer = mount('bitbucket', null);
@@ -446,7 +480,7 @@ describe.each(['ios', 'android'])('PR-review connect gate on %s', os => {
     const renderer = mount('gitlab', null);
     await pressConnect(renderer);
     expect(WebBrowser.openBrowserAsync).toHaveBeenCalledExactlyOnceWith(
-      'https://web.example/integrations/gitlab'
+      'https://web.example/app-shell/handoff?token=gate'
     );
     expect(queryResult.refetch).not.toHaveBeenCalled();
 
@@ -647,7 +681,7 @@ describe('PR-review connect gate — GitLab instance mismatch', () => {
     const renderer = mountInScope(SELF_MANAGED, 'org-1');
     await pressConnect(renderer);
     expect(WebBrowser.openBrowserAsync).toHaveBeenCalledExactlyOnceWith(
-      'https://web.example/organizations/org-1/integrations/gitlab'
+      'https://web.example/app-shell/handoff?token=gate'
     );
     await settleLaunch(pending);
   });

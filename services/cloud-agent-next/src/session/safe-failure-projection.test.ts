@@ -7,6 +7,8 @@ import {
   classifyCloudAgentFailure,
 } from '@kilocode/worker-utils/cloud-agent-failure';
 import { describe, expect, it } from 'vitest';
+import { nativeTurnError } from '../../wrapper/src/control-plane/kilo2-native-error.js';
+import { publicEventProperties } from '../sandbox-session/sandbox-control-event.js';
 import { assistantErrorDetail, missingAgentSlug } from '../shared/assistant-failure.js';
 import type { AssistantMessage } from '@kilocode/sdk/v2';
 import { sdkAssistantErrorSchema } from '@kilocode/session-ingest-contracts';
@@ -27,6 +29,150 @@ import {
 } from './safe-failure-projection.js';
 
 const NESTED_PROVIDER_TIMEOUT_BODY = '{"type":"error","error":{"type":"timeout","code":504}}';
+
+describe('native v2 failure attribution', () => {
+  it.each([
+    [
+      { type: 'provider.internal', message: 'internal' },
+      'provider_unavailable',
+      'provider',
+      'managed_provider_unavailable',
+    ],
+    [
+      { type: 'provider.timeout', message: 'Request failed' },
+      'timeout',
+      'provider',
+      'request_timeout',
+    ],
+    [
+      {
+        type: 'output-limit',
+        message: 'Response still truncated after two output token limit continuations',
+      },
+      'output_limit',
+      'provider',
+      'assistant_output_limit',
+    ],
+    [
+      { type: 'tool.result-missing', message: 'Provider did not return a tool result' },
+      'provider_unavailable',
+      'provider',
+      'managed_provider_unavailable',
+    ],
+    [
+      { type: 'unknown', message: 'Request failed', name: 'ContextOverflowError' },
+      'context_limit',
+      'provider',
+      'assistant_context_limit',
+    ],
+    [
+      { type: 'unknown', message: 'Request failed', name: 'MessageOutputLengthError' },
+      'output_limit',
+      'provider',
+      'assistant_output_limit',
+    ],
+    [
+      { type: 'unknown', message: 'Prompt is too long' },
+      'context_limit',
+      'provider',
+      'assistant_context_limit',
+    ],
+    [
+      { type: 'unknown', message: 'Tool calls cutoff by max_tokens' },
+      'output_limit',
+      'provider',
+      'assistant_output_limit',
+    ],
+    [
+      { type: 'provider.invalid-request', message: 'Prompt is too long' },
+      'context_limit',
+      'provider',
+      'assistant_context_limit',
+    ],
+    [
+      { type: 'provider.invalid-request', message: 'Prompt is too long', status: 400 },
+      'context_limit',
+      'provider',
+      'assistant_context_limit',
+    ],
+    [
+      { type: 'provider.invalid-request', message: 'Prompt is too long', status: 413 },
+      'context_limit',
+      'provider',
+      'assistant_context_limit',
+    ],
+    [
+      { type: 'provider.invalid-request', message: 'Tool calls cutoff by max_tokens' },
+      'output_limit',
+      'provider',
+      'assistant_output_limit',
+    ],
+    [
+      { type: 'provider.invalid-request', message: 'Tool calls cutoff by max_tokens', status: 400 },
+      'output_limit',
+      'provider',
+      'assistant_output_limit',
+    ],
+    [
+      { type: 'provider.invalid-request', message: 'Tool calls cutoff by max_tokens', status: 413 },
+      'output_limit',
+      'provider',
+      'assistant_output_limit',
+    ],
+    [
+      { type: 'provider.invalid-request', message: 'Prompt is too long', status: 429 },
+      'rate_limited',
+      'provider',
+      'rate_limited',
+    ],
+    [{ type: 'tool.execution', message: 'failed' }, 'unknown', 'unknown', 'assistant_unknown'],
+    [
+      { type: 'provider.rate-limit', message: 'timeout', status: 503 },
+      'provider_unavailable',
+      'provider',
+      'managed_provider_unavailable',
+    ],
+    [
+      { type: 'provider.auth', message: 'Rate limit reached' },
+      'provider_authentication',
+      'platform',
+      'managed_provider_authentication',
+    ],
+    [
+      { type: 'unknown', message: '[BYOK] Rate limit reached', name: 'ProviderAuthError' },
+      'provider_authentication',
+      'user',
+      'provider_authentication',
+    ],
+  ] as const)('attributes native %j', (error, assistantReason, responsibility, reason) => {
+    const failure = classifyAssistantFailure(nativeTurnError(error), 'managed');
+    expect(failure.reason).toBe(assistantReason);
+    expect(
+      classifyCloudAgentFailure({
+        source: 'run',
+        stage: 'agent_activity',
+        code: 'assistant_error',
+        assistantReason: failure.reason,
+        providerOwnership: failure.providerOwnership,
+      })
+    ).toEqual({ responsibility, reason });
+  });
+
+  it('keeps v1 message precedence and the existing raw native type diagnostic', () => {
+    expect(
+      classifyAssistantFailure({ name: 'APIError', data: { statusCode: 503, message: 'timeout' } })
+        .reason
+    ).toBe('timeout');
+    const error = { type: 'tool.execution', message: 'failed' };
+    expect(
+      publicEventProperties({
+        type: 'conversation.event',
+        properties: { event: { type: 'session.execution.failed', data: { error } } },
+      })
+    ).toMatchObject({ event: { data: { error: { type: 'tool.execution' } } } });
+    expect(classifyAssistantFailure(nativeTurnError(error)).reason).toBe('unknown');
+  });
+});
 
 describe('projectSafeAssistantError', () => {
   it('preserves a specific missing-agent failure without exposing the CLI agent list', () => {

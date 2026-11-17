@@ -16,28 +16,13 @@ describe('notificationHistoryEntryForPushData', () => {
       kind => !(RECORDED_NOTIFICATION_PUSH_TYPES as readonly string[]).includes(kind)
     );
 
-    // Exactly the surfaces with nothing to reopen from a list: the aggregate
-    // glanceable, the followed-session live update, and the two lifecycle
-    // kinds of an end-of-life product.
-    expect(unrecorded.sort()).toEqual([
-      'active_agents_glanceable',
-      'instance-lifecycle',
-      'scheduled-action',
-      'session_live_update',
-    ]);
+    // Exactly the OS-only surfaces with nothing to reopen from a list: the
+    // aggregate glanceable and the followed-session live update.
+    expect(unrecorded.sort()).toEqual(['active_agents_glanceable', 'session_live_update']);
   });
 
   it('maps each recorded kind to its settings category', () => {
     const cases: { data: PushData; category: string | null }[] = [
-      {
-        data: {
-          type: 'chat.message',
-          sandboxId: 'sb',
-          conversationId: 'conv',
-          messageId: 'msg',
-        },
-        category: 'chatMessages',
-      },
       {
         data: { type: 'cloud_agent_session', cliSessionId: 'session', category: 'attention' },
         category: 'agentAttention',
@@ -92,5 +77,9 @@ describe('notificationHistoryEntryForPushData', () => {
     // cast builds that unreachable-in-types payload on purpose.
     const payload = { type: 'future_kind' } as unknown as PushData;
     expect(notificationHistoryEntryForPushData(payload)).toBeNull();
+    // A name the table only inherits from `Object.prototype` is not a kind.
+    expect(
+      notificationHistoryEntryForPushData({ type: 'toString' } as unknown as PushData)
+    ).toBeNull();
   });
 });

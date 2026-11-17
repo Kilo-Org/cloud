@@ -376,6 +376,7 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
     data: summary,
     isLoading: summaryLoading,
     isError: summaryError,
+    error: summaryFailure,
     refetch: refetchSummary,
   } = useUsageSummary({
     ...commonArgs,
@@ -450,6 +451,7 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
     data: tableData,
     isLoading: tableLoading,
     isError: tableError,
+    error: tableFailure,
     refetch: refetchTable,
   } = useUsageTable({
     ...commonArgs,
@@ -525,6 +527,10 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
     hasActiveFilters: activeFilters.length > 0,
     summary,
     tableRowCount: tableData?.rows.length,
+    // The two queries a workspace cannot show usage without decide whether a
+    // failure is the terminal "no usage source" state or an ordinary one.
+    summaryError: summaryFailure,
+    tableError: tableFailure,
     queries: [
       usageQueryOutcome({
         isLoading: summaryLoading,
@@ -870,6 +876,8 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
 
                 {usageDashboardState === 'error' ? (
                   <UsageDataErrorState onRetry={retryUsageQueries} />
+                ) : usageDashboardState === 'unavailable' ? (
+                  <UsageDataErrorState variant="unavailable" />
                 ) : usageDashboardState === 'pending' ? (
                   <UsageDataPendingState />
                 ) : (

@@ -10,6 +10,7 @@ import {
 import {
   createNetworkErrorFetch,
   isAbortError,
+  isTransportFailure,
   type NetworkErrorContext,
   normalizeUrlPath,
   readTrpcErrorContext,
@@ -182,6 +183,82 @@ describe('readTrpcErrorContext', () => {
       path: undefined,
     });
   });
+
+  it('reads the failing field paths of a validation failure and not its messages', () => {
+    // The server's formatter sends `z.flattenError` under `data.zodError`. The
+    // messages beside each path are dropped: a Zod message can quote the input.
+    const error = {
+      data: {
+        code: 'BAD_REQUEST',
+        httpStatus: 400,
+        path: 'organizations.cloudAgentNext.getSession',
+        zodError: {
+          formErrors: ['Unrecognized key: "extra"'],
+          fieldErrors: {
+            organizationId: ['Invalid UUID at "alice@example.com"'],
+            cloudAgentSessionId: ['Invalid input: expected string, received undefined'],
+          },
+        },
+      },
+    };
+
+    expect(readTrpcErrorContext(error)).toEqual({
+      code: 'BAD_REQUEST',
+      httpStatus: 400,
+      path: 'organizations.cloudAgentNext.getSession',
+      invalidFields: 'organizationId,cloudAgentSessionId',
+      formErrorCount: 1,
+    });
+  });
+
+  it('reads a whole-input failure with no field paths', () => {
+    const error = {
+      shape: {
+        data: {
+          code: 'BAD_REQUEST',
+          httpStatus: 400,
+          zodError: { formErrors: ['Prompt cannot be blank'], fieldErrors: {} },
+        },
+      },
+    };
+
+    expect(readTrpcErrorContext(error)).toEqual({
+      code: 'BAD_REQUEST',
+      httpStatus: 400,
+      path: undefined,
+      formErrorCount: 1,
+    });
+  });
+
+  it('caps the field paths and the length of each one', () => {
+    const longPath = `payload.${'a'.repeat(200)}`;
+    const fieldErrors: Record<string, string[]> = {};
+    for (let index = 0; index < 20; index += 1) {
+      fieldErrors[index === 5 ? longPath : `payload.parts.${index}`] = ['invalid'];
+    }
+
+    const context = readTrpcErrorContext({
+      data: { code: 'BAD_REQUEST', zodError: { fieldErrors } },
+    });
+    const fields = context.invalidFields?.split(',') ?? [];
+
+    expect(fields).toHaveLength(12);
+    expect(fields).toContain(`payload.${'a'.repeat(56)}`);
+    expect(fields.every(field => field.length <= 64)).toBe(true);
+  });
+
+  it('ignores a zodError that is not the flattened form', () => {
+    expect(
+      readTrpcErrorContext({
+        data: { code: 'BAD_REQUEST', httpStatus: 400, zodError: null },
+      })
+    ).toEqual({ code: 'BAD_REQUEST', httpStatus: 400, path: undefined });
+    expect(
+      readTrpcErrorContext({
+        data: { code: 'BAD_REQUEST', zodError: 'issues' },
+      })
+    ).toEqual({ code: 'BAD_REQUEST', httpStatus: undefined, path: undefined });
+  });
 });
 
 describe('readTrpcResponseError', () => {
@@ -312,6 +389,10 @@ describe('createNetworkErrorFetch', () => {
         original
       );
 
+      // The rejection carries the marker a query catch-all reads, so the same
+      // failure is not filed a second time as an app error.
+      expect(isTransportFailure(original)).toBe(true);
+      expect(isTransportFailure({ message: message })).toBe(false);
       expect(events).toHaveLength(0);
       expect(breadcrumbs).toEqual([
         {
@@ -336,6 +417,9 @@ describe('createNetworkErrorFetch', () => {
 
     await expect(wrapped('https://example.com/api/trpc/session.list')).rejects.toBe(abort);
 
+    // An abort is the caller cancelling, not a transport failure: nothing was
+    // recorded for it, so it carries no marker.
+    expect(isTransportFailure(abort)).toBe(false);
     expect(events).toHaveLength(0);
     expect(breadcrumbs).toHaveLength(0);
   });
@@ -575,6 +659,56 @@ describe('createNetworkErrorFetch', () => {
     // The inner status names the defect; the 207 envelope only says the body
     // is a batch, so keying on it would merge a 400 and a 500 of one procedure.
     expect(event?.fingerprint).toEqual(['network-error', 'trpc', 'session.list', 'http.400']);
+  });
+
+  it('(j) reports the failing field paths of a validation failure and no message', async () => {
+    const value = 'alice@example.com';
+    const batchError = {
+      message: 'bad request',
+      code: -32_600,
+      data: {
+        code: 'BAD_REQUEST',
+        httpStatus: 400,
+        path: 'organizations.cloudAgentNext.getSession',
+        zodError: {
+          formErrors: [],
+          fieldErrors: {
+            organizationId: [`Invalid UUID at "${value}"`],
+            cloudAgentSessionId: ['Invalid input: expected string, received undefined'],
+          },
+        },
+      },
+    };
+    const response = Response.json([{ error: batchError }], {
+      status: 207,
+      statusText: 'Multi-Status',
+    });
+    const wrapped = createNetworkErrorFetch(resolvingFetch(response), {
+      source: 'trpc',
+      isResponseError: status => status >= 400 || status === 207,
+      readResponseError: readTrpcResponseError,
+    });
+
+    await wrapped('https://example.com/api/trpc/organizations.cloudAgentNext.getSession?batch=1');
+
+    const event = reportedEvent();
+    expect(event?.contexts?.[NETWORK_BODY_CONTEXT]).toEqual({
+      code: 'BAD_REQUEST',
+      httpStatus: 400,
+      path: 'organizations.cloudAgentNext.getSession',
+      invalidFields: 'organizationId,cloudAgentSessionId',
+    });
+    // The path names the defect; the Zod message beside it can quote the input.
+    const serialized = JSON.stringify(event);
+    expect(serialized).not.toContain(value);
+    expect(serialized).not.toContain('Invalid UUID');
+    // The scrubbed event the transport sends keeps the paths.
+    expect(scrubEvent(event)?.contexts?.[NETWORK_BODY_CONTEXT]).toEqual({
+      code: 'BAD_REQUEST',
+      httpStatus: 400,
+      path: 'organizations.cloudAgentNext.getSession',
+      invalidFields: 'organizationId,cloudAgentSessionId',
+    });
   });
 
   it('(i2) keys a 207 batch on the parsed inner status, not the envelope', async () => {
@@ -915,6 +1049,58 @@ describe('createNetworkErrorFetch status policy', () => {
       ['network-error', 'trpc', 'user.getMe', 'http.403'],
     ]);
     expect(breadcrumbs).toHaveLength(0);
+  });
+
+  it('records the repository-refused FORBIDDEN on the personal branch listing as a breadcrumb', async () => {
+    // The provider installation no longer grants the repository. The screen
+    // names that answer and offers no retry, so it is the app's expected
+    // outcome, not a defect to file.
+    const procedure = 'cloudAgentNext.listRepositoryBranches';
+    await respond(
+      `https://example.com/api/trpc/${procedure}`,
+      Response.json(
+        {
+          error: {
+            message: 'denied',
+            code: -32_003,
+            data: { code: 'FORBIDDEN', httpStatus: 403, path: procedure },
+          },
+        },
+        { status: 403 }
+      )
+    );
+
+    expect(events).toHaveLength(0);
+    expect(breadcrumbs.map(breadcrumb => breadcrumb.message)).toEqual([
+      `POST /api/trpc/${procedure} -> 403`,
+    ]);
+  });
+
+  it.each([
+    'organizations.cloudAgentNext.getAttachmentUploadUrl',
+    'organizations.cloudAgentNext.listRepositoryBranches',
+  ])('still reports an organization FORBIDDEN on %s in a batch', async procedure => {
+    // Organization access middleware also answers FORBIDDEN for a transient
+    // support-access lookup failure, so these refusals stay reportable.
+    await respond(
+      `https://example.com/api/trpc/${procedure},user.getMe?batch=1`,
+      Response.json(
+        [
+          {
+            error: {
+              message: 'denied',
+              code: -32_003,
+              data: { code: 'FORBIDDEN', httpStatus: 403, path: procedure },
+            },
+          },
+        ],
+        { status: 207 }
+      )
+    );
+
+    expect(events.map(event => event.fingerprint)).toEqual([
+      ['network-error', 'trpc', procedure, 'http.403'],
+    ]);
   });
 
   it.each([400, 500])('still reports a %i exactly once', async status => {

@@ -1,10 +1,10 @@
 /* eslint-disable max-lines -- the idle login screen owns every provider control, the SSO recovery block, the pending-link switch, and the email/OTP switch in one surface */
 import { isAvailableAsync as isAppleAuthAvailableAsync } from 'expo-apple-authentication';
+import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
-import * as WebBrowser from 'expo-web-browser';
 
 import { EmailOtpForm } from '@/components/login/email-otp-form';
 import { PendingLinkAuth } from '@/components/login/pending-link-auth';
@@ -22,20 +22,24 @@ import { type PendingLinkOffer } from '@/lib/auth/native-auth-contract';
 import { pendingLinkOptions } from '@/lib/auth/pending-link';
 import { useNativeAuth } from '@/lib/auth/use-native-auth';
 import { passkeysSupported } from '@/lib/auth/passkey-client';
-import { PRIVACY_URL, TERMS_URL } from '@/lib/config';
 import {
   beginLoginEmail,
   holdLoginEmail,
   holdSsoRecovery,
   type SsoRecoveryDraft,
 } from '@/lib/login-draft';
+import { type LegalDocument } from '@/lib/legal-document';
 import { cn } from '@/lib/utils';
 
 /** The two links the legal sentence exposes as custom accessibility actions. */
-const LEGAL_LINK_ACTIONS = [
-  { name: 'openTerms', labelKey: 'login.terms', url: TERMS_URL },
-  { name: 'openPrivacy', labelKey: 'common.privacyPolicy', url: PRIVACY_URL },
-] as const;
+const LEGAL_LINK_ACTIONS: readonly {
+  name: string;
+  labelKey: 'login.terms' | 'common.privacyPolicy';
+  document: LegalDocument;
+}[] = [
+  { name: 'openTerms', labelKey: 'login.terms', document: 'terms' },
+  { name: 'openPrivacy', labelKey: 'common.privacyPolicy', document: 'privacy' },
+];
 
 export function IdleAuth({
   start,
@@ -95,6 +99,12 @@ export function IdleAuth({
       : undefined
   );
   const { t } = useTranslation();
+  const router = useRouter();
+  // The legal documents render in their own native screen, so a reader stays in
+  // the app and no store reviewer lands on the marketing site from sign-in.
+  const openLegalDocument = (document: LegalDocument) => {
+    router.push({ pathname: '/(auth)/legal/[document]', params: { document } });
+  };
   // The wrapper's label: the translated parts joined the way the row renders
   // them, so the catalog owns every space in the sentence. `termsPrefix` ends
   // with whatever separator the locale puts before the Terms link — a space
@@ -511,7 +521,7 @@ export function IdleAuth({
             item => item.name === event.nativeEvent.actionName
           );
           if (action) {
-            void WebBrowser.openBrowserAsync(action.url);
+            openLegalDocument(action.document);
           }
         }}
         className={cn('flex-row flex-wrap items-center justify-center', INLINE_LINK_ROW_CLASS)}
@@ -547,7 +557,9 @@ export function IdleAuth({
           hitSlop={inlineLinkHitSlop('start')}
           accessibilityRole="link"
           accessibilityLabel={t('login.termsInSentence')}
-          onPress={() => void WebBrowser.openBrowserAsync(TERMS_URL)}
+          onPress={() => {
+            openLegalDocument('terms');
+          }}
         >
           <Text className="text-sm text-primary underline">{t('login.termsInSentence')}</Text>
         </Pressable>
@@ -565,7 +577,9 @@ export function IdleAuth({
           hitSlop={inlineLinkHitSlop('end')}
           accessibilityRole="link"
           accessibilityLabel={t('common.privacyPolicy')}
-          onPress={() => void WebBrowser.openBrowserAsync(PRIVACY_URL)}
+          onPress={() => {
+            openLegalDocument('privacy');
+          }}
         >
           <Text className="text-sm text-primary underline">{t('common.privacyPolicy')}</Text>
         </Pressable>

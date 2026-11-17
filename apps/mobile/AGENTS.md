@@ -66,7 +66,8 @@ reason.
 
 ## Unified Elements
 
-One element per concern. `no-restricted-imports` in `.oxlintrc.json` enforces the "Use instead" column.
+One element per concern. `no-restricted-imports` in `.oxlintrc.json` is the
+authoritative list; this table summarizes the main concerns.
 
 | Concern | Element | Use instead of |
 |---|---|---|
@@ -74,14 +75,18 @@ One element per concern. `no-restricted-imports` in `.oxlintrc.json` enforces th
 | Bottom sheet, route | expo-router `formSheet` via `useFormSheetScreenOptions()` | a JS bottom-sheet library |
 | Confirm that needs the red affordance | `useConfirmDialog()` from `@/components/ui/dialog` (a native sheet) | `Alert.alert` for a destructive confirm; a direct `@rn-primitives/dialog` import |
 | Dialog form (a field, a form) | `DialogCard` from `@/components/ui/dialog` | a direct `@rn-primitives/dialog` import |
+| Form fields | `FormField` from `@/components/ui/form-field` | `react-hook-form`, `@tanstack/react-form` |
 | System confirm, non-destructive | `Alert.alert` | — |
 | Keyboard avoidance | `react-native-keyboard-controller` | `KeyboardAvoidingView` from `react-native` |
+| Keep awake | `useKeepAwake` from `@/lib/keep-awake` | `expo-keep-awake` |
 | Lists | `@shopify/flash-list` | `FlatList`, `VirtualizedList`, `SectionList`, `@legendapp/list` |
+| Skeleton | `Skeleton` from `@/components/ui/skeleton` | `moti`, `react-native-reanimated-skeleton`, `react-native-skeleton-placeholder` |
 | Image viewer | `@/components/ui/image-viewer` | `react-native-image-viewing`, `react-native-awesome-gallery` |
 | Video | `expo-video` | `react-native-video`, `expo-av` |
 | Blur | `expo-blur` | `expo-glass-effect`, `@callstack/liquid-glass` (no Liquid Glass) |
 | Toast | `sonner-native` | `react-native-toast-message`, `burnt` |
 | Images | `Image` from `@/components/ui/image` | `Image` from `react-native`, `expo-image` |
+| Segmented control | `SegmentedControl` from `@/components/ui/segmented-control` | `@react-native-segmented-control/segmented-control` |
 | Icons | `@/components/ui/icons` | `lucide-react-native` |
 | Markdown | `MarkdownText` from `@/components/agents/markdown-text`, rendered by `react-native-enriched-markdown` | `react-native-marked`, `react-native-markdown-display` |
 | HTML in markdown | `MarkdownText`: `markdown-html-convert` turns HTML markdown can express into markdown; the rest renders through `MarkdownHtml` (`@native-html/render`) | `react-native-render-html` |

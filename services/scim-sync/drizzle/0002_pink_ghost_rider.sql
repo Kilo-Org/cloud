@@ -1,0 +1,1 @@
+CREATE INDEX `parked_events_parked_at_idx` ON `parked_events` (`parked_at`);

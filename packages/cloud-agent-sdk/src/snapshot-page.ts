@@ -68,10 +68,17 @@ export function replaySnapshot(sink: TransportSink, snapshot: SessionSnapshot): 
   replaySnapshotPage(sink, snapshotPageFromSnapshot(snapshot));
 }
 
+/**
+ * The one message for a session-history read that can be retried. Both the
+ * `retryable_failure` outcome and a rejected read that carries no message of
+ * its own report it.
+ */
+export const SESSION_HISTORY_UNAVAILABLE_MESSAGE = 'Session history temporarily unavailable';
+
 export function sessionSnapshotFailureMessage(kind: SessionSnapshotFailureKind): string {
   switch (kind) {
     case 'retryable_failure':
-      return 'Session history temporarily unavailable';
+      return SESSION_HISTORY_UNAVAILABLE_MESSAGE;
     case 'too_large':
       return 'Session history too large to load';
     case 'invalid_data':

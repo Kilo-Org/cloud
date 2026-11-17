@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Gerir na web",
     "creditHistory": "Histórico de créditos",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Cancelar",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Compras, recibos e atividade de créditos",
     "invoicesSubtitle": "Baixe as faturas das suas compras",
-    "manageBilling": "Gerenciar cobrança em kilo.ai",
-    "manageBillingIosNote": "Métodos de pagamento, recarga automática e dados de cobrança são gerenciados em kilo.ai.",
     "codeReviewerSubtitle": "Revisões automáticas de PR",
     "securityAgentSubtitle": "Detetar e corrigir vulnerabilidades",
     "reviews": "Revisões",
@@ -364,7 +360,8 @@
     "providerKeys": {
       "title": "Chaves de fornecedor",
       "rowSubtitle": "Usa a faturação do teu próprio fornecedor",
-      "manageOnWebReason": "Estes fornecedores precisam de credenciais estruturadas.",
+      "orgDescription": "Estas chaves são partilhadas com todos os membros da organização e faturadas nas contas de fornecedor da organização.",
+      "viewOnly": "Só um proprietário, administrador ou gestor de faturação da organização pode alterar as respetivas chaves.",
       "description": "Os pedidos feitos com estas chaves são faturados na tua conta do fornecedor em vez de no teu saldo Kilo.",
       "managedByPlan": "Gerida pelo teu plano de programação",
       "enableKey": "Ativar a chave de {{provider}}",
@@ -374,6 +371,7 @@
       "removeMessage": "Os pedidos que usavam esta chave deixarão de usar a faturação do teu fornecedor.",
       "add": "Adicionar chave",
       "added": "Chave adicionada",
+      "updated": "Chave atualizada",
       "emptyTitle": "Sem chaves de fornecedor",
       "emptyDescription": "Adiciona uma chave para começar.",
       "chooseProvider": "Escolher um fornecedor",
@@ -382,9 +380,34 @@
       "noProvidersDescription": "Nenhum fornecedor corresponde a essa pesquisa.",
       "newKeyTitle": "Nova chave",
       "newKeyDescription": "A chave é guardada encriptada e não pode ser mostrada novamente.",
+      "edit": "Editar chave",
+      "editKeyTitle": "Substituir chave",
+      "editKeyDescription": "O valor guardado não pode ser mostrado. Introduz um novo para o substituir.",
+      "editKeyMappingsWarning": "Substituir a chave também substitui os mapeamentos de modelos guardados: introduz novamente todos os mapeamentos de que ainda precisas.",
+      "saveFailed": "Não foi possível guardar a chave.",
+      "invalidCredentials": "Verifica as credenciais e tenta novamente.",
+      "fieldRequired": "O campo {{field}} é obrigatório.",
+      "incompleteMapping": "O Mapeamento {{number}} precisa de um slug do modelo do gateway e de um nome da implementação.",
       "apiKeyLabel": "Chave de API",
       "apiKeyPlaceholder": "Cola a chave",
-      "apiKeyRequired": "Introduz a chave."
+      "apiKeyRequired": "Introduz a chave.",
+      "authMethod": "Método de autenticação",
+      "authMethodAccessKeys": "Chaves de acesso",
+      "resourceName": "Nome do recurso Azure",
+      "region": "Região AWS",
+      "accessKeyId": "ID da chave de acesso",
+      "secretAccessKey": "Chave de acesso secreta",
+      "project": "Projeto Google Cloud",
+      "location": "Localização Vertex",
+      "clientEmail": "Email da conta de serviço",
+      "privateKey": "Chave privada da conta de serviço",
+      "modelMappings": "Mapeamentos de modelos",
+      "modelMappingsDescription": "Envia um modelo do gateway para um nome de implementação personalizado.",
+      "mappingTitle": "Mapeamento {{number}}",
+      "mappingGatewayModel": "Slug do modelo do gateway",
+      "mappingCustomModel": "Nome da implementação",
+      "addMapping": "Adicionar mapeamento",
+      "removeMapping": "Remover mapeamento {{number}}"
     },
     "dataExport": {
       "title": "Os teus dados",
@@ -407,7 +430,7 @@
       "codeRequired": "Introduz o código do email.",
       "download": "Transferir ficheiro",
       "downloadFailed": "Não foi possível transferir a exportação. Verifica a ligação e tenta novamente.",
-      "unavailableTitle": "Os teus dados ainda não estão disponíveis",
+      "unavailableTitle": "A exportação de dados ainda não está disponível",
       "unavailableDescription": "A exportação de dados está a ser disponibilizada gradualmente. Volta a verificar em breve."
     },
     "blockedPeople": {
@@ -457,7 +480,8 @@
       "nextStepFinal": "A decisão do recurso é final. Não é possível apresentar novo recurso.",
       "viewReceipt": "Ver comprovativo"
     },
-    "changelog": "Novidades"
+    "changelog": "Novidades",
+    "changelogVersionPending": "As notas desta versão vêm na próxima atualização da app."
   },
   "preferences": {
     "general": "Geral",
@@ -1193,8 +1217,6 @@
       "clearMessage": "Ao guardares um campo vazio, eliminas as instruções personalizadas armazenadas para este revisor."
     },
     "repos": {
-      "unavailable": "Os repositórios não estão disponíveis. Conclui a configuração do Bitbucket em kilo.ai.",
-      "finishSetup": "Concluir configuração",
       "manageAccess": "Gerir acesso",
       "bitbucketNoRepositoriesDescription": "Não há repositórios disponíveis neste espaço de trabalho do Bitbucket.",
       "gitlabNoRepositoriesDescription": "Podes precisar de conceder acesso a mais grupos ou projetos no GitLab.",
@@ -1349,14 +1371,14 @@
     "followReviewMd": "Seguir REVIEW.md",
     "followReviewMdSubtitle": "Respeitar as instruções do ficheiro REVIEW.md de cada repositório",
     "bitbucket": {
-      "notConnectedReadOnly": "O Bitbucket não está ligado. Apenas os proprietários da organização, os administradores e os gestores de faturação o podem ligar.",
-      "setupIncomplete": "A configuração está incompleta. Conclui-a em kilo.ai.",
-      "setup": "Configuração do Bitbucket"
+      "notConnectedReadOnly": "O Bitbucket não está ligado. Apenas os proprietários da organização, os administradores e os gestores de faturação o podem ligar."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "A ligação ao Bitbucket desta organização é gerida na Web, a partir de um computador.",
       "description": "Cria um token de acesso ao espaço de trabalho com as permissões necessárias e cola-o abaixo.",
       "scopes": "Conta: leitura · Repositórios: leitura/escrita · Pedidos de integração: leitura · Webhooks: leitura/escrita",
-      "tokenPlaceholder": "Token de acesso ao espaço de trabalho"
+      "tokenPlaceholder": "Token de acesso ao espaço de trabalho",
+      "tokenRefused": "O Bitbucket não aceitou este token de acesso ao espaço de trabalho. Verifica se tem as permissões acima e tenta novamente."
     },
     "scopeList": {
       "personalStillAvailable": "Os repositórios pessoais ainda estão disponíveis abaixo.",
@@ -1368,7 +1390,8 @@
       "noReviews": "Ainda sem revisões",
       "noReviewsDescription": "As revisões aparecem aqui depois de o revisor de código analisar um pedido de integração.",
       "startManualReview": "Iniciar uma revisão manual",
-      "configureProvider": "Configurar fornecedor"
+      "configureProvider": "Configurar fornecedor",
+      "connectOwnerOnly": "Peça a um proprietário ou administrador da organização que ligue um fornecedor."
     },
     "platformList": {
       "checking": "A verificar…",
@@ -1381,8 +1404,7 @@
       "githubError": "Não foi possível abrir a configuração do GitHub. Tenta novamente.",
       "gitlabAccount": "Conta do GitLab",
       "gitlabError": "Não foi possível abrir a configuração do GitLab. Tenta novamente.",
-      "description": "Liga a {{label}} ao Kilo para rever pedidos de integração automaticamente.",
-      "bitbucketError": "Não foi possível abrir a configuração do Bitbucket. Tenta novamente."
+      "description": "Liga a {{label}} ao Kilo para rever pedidos de integração automaticamente."
     },
     "overview": {
       "allAreas": "Todas as áreas",
@@ -2061,6 +2083,10 @@
       "completedWillAppear": "As sessões concluídas aparecerão aqui.",
       "noPastSessions": "Sem sessões anteriores",
       "pastSessions": "Sessões anteriores",
+      "sectionAccessibility_one": "{{title}}: {{displayCount}} sessão",
+      "sectionAccessibility_many": "{{title}}: {{displayCount}} sessões",
+      "sectionAccessibility_other": "{{title}}: {{displayCount}} sessões",
+      "sectionAccessibility": "{{title}}: {{displayCount}} sessões",
       "live": "EM TEMPO REAL",
       "updating": "A atualizar"
     },
@@ -2197,10 +2223,8 @@
       "couldNotLoadBitbucketRepositories": "Não foi possível carregar os repositórios do Bitbucket.",
       "connectGithubDescription": "Inicie sessão no navegador e volte aqui para escolher um repositório do GitHub.",
       "connectGitlabDescription": "Inicie sessão no navegador e volte aqui para escolher um repositório do GitLab.",
-      "connectBitbucketDescription": "Inicie sessão no navegador e volte aqui para escolher um repositório do Bitbucket.",
       "openGithub": "Abrir o GitHub",
       "openGitlab": "Abrir o GitLab",
-      "openBitbucket": "Abrir o Bitbucket",
       "refreshRepositories": "Atualizar repositórios",
       "githubConnected": "GitHub ligado",
       "gitlabConnected": "GitLab ligado",
@@ -2238,7 +2262,6 @@
       "attachmentUploadingToStart": "Um anexo ainda está a carregar. Remove-o para começares sem ele.",
       "modelMissingToStart": "Seleciona um modelo para começar.",
       "staleRepositoryToStart": "O repositório selecionado já não está disponível. Seleciona novamente um repositório para começar.",
-      "connectProviderToStart": "Os repositórios vêm de uma conta do GitHub, GitLab ou Bitbucket que esteja ligada.",
       "promptPlaceholder": "Em que quer trabalhar?",
       "couldNotLoadModels": "Não foi possível carregar os modelos.",
       "prefillRepoAndModelUnavailable": "O repositório e o modelo da sessão original já não estão disponíveis. Escolha outros abaixo.",
@@ -3006,13 +3029,14 @@
     "kiloCli": "Kilo CLI",
     "noSessions": "Sem sessões ativas",
     "noSessionsDescription": "Inicie sessão na aplicação Kilo noutro dispositivo. A sessão aparecerá aqui.",
-    "signInScopeNote": "Aqui aparecem os inícios de sessão na aplicação Kilo e na Kilo CLI. Os inícios de sessão no editor não são listados.",
+    "signInScopeNote": "Aqui aparecem os inícios de sessão na aplicação Kilo, na Kilo CLI e num navegador web. Os inícios de sessão no editor não são listados.",
     "signedIn": "Início de sessão: {{signedIn}} · Última atividade: {{lastSeen}}",
     "thisDevice": "Este dispositivo",
     "viewProfile": "Ver perfil",
     "signOutThisDevice": "Terminar sessão neste dispositivo",
     "signOutSessionLabel": "Terminar sessão em {{device}}, início de sessão: {{signedIn}}, última atividade: {{lastSeen}}",
     "sessionSignedOut": "Sessão terminada.",
+    "sessionSignOutFailed": "Não foi possível terminar esta sessão. Tente novamente.",
     "signOutThisDeviceTitle": "Terminar sessão neste dispositivo?",
     "signOutThisSessionTitle": "Terminar esta sessão?",
     "signOutThisSessionMessage": "A sessão em {{device}} será terminada. Última atividade: {{lastSeen}}. O dispositivo pode manter o acesso à API durante até uma hora.",
@@ -3113,6 +3137,10 @@
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
     "searchPlaceholder": "Pesquisar sessões recentes",
     "connectedCli": "Numa CLI ligada",
+    "connectedCliAccessibility_one": "{{title}}: {{displayCount}} instância",
+    "connectedCliAccessibility_many": "{{title}}: {{displayCount}} instâncias",
+    "connectedCliAccessibility_other": "{{title}}: {{displayCount}} instâncias",
+    "connectedCliAccessibility": "{{title}}: {{displayCount}} instâncias",
     "newSessionOn": "Nova sessão em {{name}}",
     "noMatchingSessions": "Não foram encontradas sessões.",
     "onlyFirstFilesAttached": "Apenas os primeiros {{displayCount}} ficheiros serão anexados.",
@@ -3134,15 +3162,14 @@
     "manage": {
       "billingHistory": "Histórico de cobranças",
       "billingHistoryEmpty": "Ainda não há histórico de cobranças.",
+      "billingHistoryError": "Não foi possível carregar o histórico de cobranças",
       "cancel": "Cancelar assinatura",
       "cancelDescription": "Seu Kilo Pass continua ativo até o fim do período de cobrança e não será renovado.",
       "cancelScheduled": "Será cancelada em {{date}}",
       "cancelScheduledChange": "Cancelar alteração agendada",
       "cancelled": "Assinatura cancelada",
-      "changePlan": "Alterar plano em kilo.ai",
-      "changePlanIosNote": "Alterações de planos pagos estão disponíveis em kilo.ai.",
       "creditHistoryEmpty": "Ainda não há créditos do Kilo Pass.",
-      "manageInStore": "Gerenciar em {{store}}",
+      "creditHistoryError": "Não foi possível carregar o histórico de créditos do Kilo Pass",
       "resume": "Retomar assinatura",
       "resumeCancelledDescription": "Seu Kilo Pass voltará a ser renovado automaticamente.",
       "resumePausedDescription": "Seu Kilo Pass será retomado agora, antes da data de retomada agendada.",
@@ -3179,9 +3206,6 @@
     "bonusFree": "Bónus gratuito",
     "bonusReferral": "Bónus de indicação",
     "bonusAvailable": "Bónus gratuito disponível",
-    "kiloPassManagement": "Gestão do Kilo Pass",
-    "kiloPassSetup": "Configuração do Kilo Pass",
-    "opensManagementOnWeb": "Abre a gestão do Kilo Pass na web.",
     "loadFailedRetry": "Verifica a tua ligação e tenta novamente.",
     "legalTermsOfUse": "Termos de utilização (EULA)",
     "purchaseDifferentAccount": "Esta compra da App Store não está associada à tua conta Kilo. Inicia sessão na Apple Account utilizada na compra e tenta novamente.",
@@ -3358,15 +3382,15 @@
       "stateRenewsOn": "Renova a {{date}}",
       "seatsDropTo": "Desce para {{seats}} lugares a {{date}}",
       "seats": "Lugares",
+      "seatsInUse": "Em uso",
       "autoTopUp": "Carregamento automático",
       "autoTopUpAmount": "Valor do carregamento",
       "autoTopUpThreshold": "Quando o saldo for inferior a",
-      "manageOnWeb": "As alterações são feitas na web",
+      "manageOnWeb": "Definições de faturação na Web",
       "changePlan": "Alterar plano",
       "buySeats": "Comprar lugares",
       "setupAutoTopUp": "Configurar carregamento automático",
       "manageAutoTopUp": "Gerir carregamento automático",
-      "webAddress": "Endereço web {{url}}",
       "opensOnWeb": "Abre na web"
     },
     "boundary": {
@@ -3382,7 +3406,7 @@
       "selectOrganization": "Selecionar uma organização",
       "unavailableDescription": "Esta organização já não está disponível. Escolha outra no seu perfil para continuar.",
       "unavailableSessionsDescription": "Esta organização já não está disponível. Não é possível carregar as suas sessões.",
-      "accessDeniedDescription": "Não tem acesso a esta organização."
+      "accessDeniedDescription": "Peça a um proprietário ou administrador da organização que lhe conceda acesso."
     },
     "create": {
       "title": "Criar organização",
@@ -3502,25 +3526,89 @@
     },
     "settingsOnWeb": {
       "title": "Definições da organização na Web",
-      "integrations": "Integrações na Web",
       "usageDetails": "Detalhes de utilização",
       "providersAndModels": "Fornecedores e modelos",
       "groups": "Grupos",
       "guardrails": "Salvaguardas",
       "byok": "Utilize a sua própria chave",
       "ssoAndDomain": "SSO e domínio",
-      "emailPreferences": "Preferências de e-mail",
       "dataCollection": "Recolha de dados",
       "auditLogs": "Registos de auditoria",
-      "requestLogs": "Registos de pedidos",
-      "subOrganizations": "Suborganizações",
-      "distributeFunds": "Distribuir fundos"
+      "requestLogs": "Registos de pedidos"
+    },
+    "requestLogs": {
+      "hint": "Pedidos da hora anterior ao fim do intervalo, mais recentes primeiro.",
+      "older": "Hora anterior",
+      "newer": "Hora seguinte",
+      "truncated": "Esta hora tem mais pedidos do que os apresentados na lista.",
+      "emptyTitle": "Sem pedidos",
+      "emptyDescription": "Não há pedidos ao gateway nesta hora.",
+      "loadError": "Não foi possível carregar os registos de pedidos.",
+      "permissionDenied": "Só um proprietário, administrador ou gestor de faturação de uma organização pode consultar os respetivos registos de pedidos.",
+      "tokens": "{{input}} de entrada · {{output}} de saída",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Tokens de entrada",
       "orgLast30Days": "Todos os membros · Últimos 30 dias",
       "outputTokens": "Tokens de saída",
       "requests": "Pedidos"
+    },
+    "modes": {
+      "create": "Novo modo",
+      "deleteAction": "Eliminar modo",
+      "deleteMessage": "O modo é removido para todos nesta organização. Um modo que substitui um modo incorporado volta às configurações incorporadas.",
+      "deleteTitle": "Eliminar este modo?",
+      "descriptionLabel": "Descrição do modo",
+      "emptyDescription": "Os modos adicionados aqui ficam disponíveis para todos nesta organização.",
+      "emptyTitle": "Ainda não há modos personalizados",
+      "identifierHint": "Letras minúsculas, números e hífenes.",
+      "identifierInvalid": "Utilize apenas letras minúsculas, números e hífenes.",
+      "identifierLabel": "Identificador",
+      "identifierRequired": "Introduza um identificador.",
+      "identifierTaken": "Outro modo já utiliza este identificador.",
+      "nameLabel": "Nome do modo",
+      "nameRequired": "Introduza um nome de modo.",
+      "notFound": "Este modo já não existe.",
+      "restrictionHint": "Só os ficheiros que correspondem a este padrão podem ser editados. Deixe vazio para permitir todos os ficheiros.",
+      "restrictionInvalid": "Introduza um padrão válido.",
+      "restrictionLabel": "Etiqueta de restrição",
+      "restrictionPattern": "Padrão de ficheiro",
+      "roleLabel": "Definição da função",
+      "roleRequired": "Descreva o que este modo faz.",
+      "tool": {
+        "browser": "Utilizar navegador",
+        "command": "Executar comandos",
+        "edit": "Editar ficheiros",
+        "mcp": "Utilizar MCP",
+        "read": "Ler ficheiros"
+      },
+      "whenToUseLabel": "Quando utilizar este modo"
+    },
+    "groups": {
+      "create": "Novo grupo",
+      "deleteAction": "Eliminar grupo",
+      "deleteMessage": "O grupo, as suas políticas e as atribuições de membros são removidos.",
+      "deleteTitle": "Eliminar este grupo?",
+      "descriptionLabel": "Descrição do grupo",
+      "emptyDescription": "Um grupo reúne membros para que uma política se aplique a todos eles.",
+      "emptyTitle": "Ainda não há grupos",
+      "enterpriseOnly": "Os grupos estão disponíveis no plano Enterprise.",
+      "memberCount": "Membros: {{displayCount}}",
+      "memberCount_many": "{{displayCount}} membros",
+      "memberCount_one": "{{displayCount}} membro",
+      "memberCount_other": "{{displayCount}} membros",
+      "memberViewEmpty": "Não pertence a nenhum grupo desta organização.",
+      "memberViewTitle": "Os seus grupos",
+      "membersEmpty": "Nenhum membro ativo corresponde à sua pesquisa.",
+      "membersLabel": "Membros do grupo",
+      "nameLabel": "Nome do grupo",
+      "nameRequired": "Introduza um nome de grupo.",
+      "nameTooLong": "Mantenha o nome com 80 caracteres ou menos.",
+      "notFound": "Este grupo já não existe.",
+      "permissionDenied": "Apenas um proprietário ou administrador da organização pode alterar os grupos.",
+      "searchMembers": "Pesquisar membros",
+      "selectAllVisible": "Selecionar todos os visíveis"
     },
     "hub": {
       "renameTitle": "Renomear organização",
@@ -3551,7 +3639,6 @@
       "processingBlocked": "Processamento bloqueado",
       "processingNeedsReview": "O processamento requer revisão",
       "retryHint": "Volta a tentar carregar o estado do Kilo Pass.",
-      "setupHint": "Abre a configuração do Kilo Pass na web.",
       "paidSeat_many": "{{displayCount}} lugares pagos"
     }
   },
@@ -4083,6 +4170,7 @@
     "commandAtLimit": "O comando está limitado a {{max}} caracteres",
     "commandsEmpty": "Ainda não há comandos de configuração",
     "commandsSaveFailed": "Não foi possível guardar os comandos de configuração",
+    "commandLimitReached": "Um perfil pode conter até {{max}} comandos de configuração. Elimine um para adicionar outro.",
     "moveCommandUp": "Mover o comando {{position}} para cima",
     "moveCommandDown": "Mover o comando {{position}} para baixo",
     "skillsTitle": "Competências",
@@ -4170,6 +4258,7 @@
       "deleteMessage": "As novas sessões que utilizam este perfil deixam de ter acesso às ferramentas deste servidor. Esta ação não pode ser anulada.",
       "deleteConfirm": "Eliminar servidor MCP",
       "saveFailed": "Não foi possível guardar o servidor MCP",
+      "limitReached": "Um perfil pode conter até {{max}} servidores MCP. Elimine um para adicionar outro.",
       "deleteFailed": "Não foi possível eliminar o servidor MCP",
       "updateFailed": "Não foi possível atualizar o servidor MCP"
     },
@@ -4202,6 +4291,7 @@
       "modeSubagent": "Apenas subagente",
       "modeAll": "Todos os modos",
       "saveFailed": "Não foi possível guardar o agente",
+      "limitReached": "Um perfil pode conter até {{max}} agentes. Elimine um para adicionar outro.",
       "deleteFailed": "Não foi possível eliminar o agente",
       "nameRequired": "Introduza um nome de agente",
       "slugRequired": "Introduza um slug de agente",
@@ -4232,6 +4322,7 @@
       "moveUp": "Mover o comando de barra {{name}} para cima",
       "moveDown": "Mover o comando de barra {{name}} para baixo",
       "saveFailed": "Não foi possível guardar o comando",
+      "limitReached": "Um perfil pode conter até {{max}} comandos de barra. Elimine um para adicionar outro.",
       "deleteFailed": "Não foi possível eliminar o comando",
       "nameRequired": "Introduza um nome de comando",
       "nameInvalid": "O nome deve começar por uma letra minúscula e usar apenas letras minúsculas, dígitos e hífenes",
@@ -4312,7 +4403,7 @@
       },
       "purchaseFallback": "Compra de créditos",
       "receipt": "Recibo",
-      "receiptA11y": "Abrir o recibo de {{description}}",
+      "receiptA11y": "Abrir o recibo de {{description}}, {{amount}}, de {{date}}",
       "receiptUnavailable": "Não há recibo disponível para esta compra."
     },
     "title": "Comprar créditos",
@@ -4522,6 +4613,8 @@
     "topModels": "Modelos mais usados",
     "topFeatures": "Funcionalidades mais usadas",
     "emptyTitle": "Sem utilização neste período",
+    "unavailableTitle": "Utilização indisponível",
+    "unavailableDescription": "Esta área de trabalho não está a comunicar utilização. Tentar novamente não vai ajudar.",
     "orgSelfNotice": "Está a ver a sua própria utilização nesta organização.",
     "viewDetails": "Ver detalhes de utilização"
   },
@@ -4570,7 +4663,78 @@
     },
     "triggers": {
       "title": "Acionadores e webhooks",
-      "subtitle": "Faça a gestão dos acionadores de webhook e agendados na web."
+      "subtitle": "Automatize execuções do Cloud Agent a partir de uma chamada de webhook ou de uma programação.",
+      "new": "Novo acionador",
+      "emptyTitle": "Ainda não há acionadores",
+      "emptyDescription": "Crie um acionador para iniciar uma execução do Cloud Agent a partir de uma chamada de webhook ou segundo uma programação.",
+      "loadFailedTitle": "Não foi possível carregar os acionadores",
+      "loadFailedDescription": "Tente novamente quando tiver ligação.",
+      "detailLoadFailedTitle": "Não foi possível carregar este acionador",
+      "detailNotFoundTitle": "Acionador não encontrado",
+      "cannotEditCreator": "Este acionador é executado como o seu criador, por isso só o criador o pode alterar.",
+      "permissionDenied": "A sua função não permite gerir estes acionadores.",
+      "webhookUrl": "URL do webhook",
+      "urlCopied": "URL do webhook copiado",
+      "deliveries": "Entregas",
+      "deliveriesEmptyTitle": "Ainda não há entregas",
+      "deliveriesEmptyDescription": "Uma chamada de webhook ou uma execução agendada aparece aqui assim que chegar.",
+      "deliveriesLoadFailedTitle": "Não foi possível carregar as entregas",
+      "openSession": "Ver sessão",
+      "activationWebhook": "Chamada de webhook",
+      "fieldName": "Nome do acionador",
+      "fieldActivation": "Acionado por",
+      "fieldCron": "Expressão cron",
+      "fieldCronHelp": "Cinco campos: minuto, hora, dia, mês e dia da semana. O intervalo mais curto é de um minuto.",
+      "fieldTimezone": "Fuso horário",
+      "nameLocked": "O nome não pode ser alterado depois de o acionador ser criado.",
+      "repositoryLocked": "O repositório não pode ser alterado depois de o acionador ser criado.",
+      "environmentAutomatic": "Automático por repositório",
+      "notSelected": "Não selecionado",
+      "profileDefaults": "Utilizar predefinições",
+      "profileHelp": "As definições do perfil aplicam-se quando o acionador é executado. Os respetivos segredos são resolvidos nessa altura.",
+      "customAgent": "Agente personalizado",
+      "agentHelp": "Um agente no diretório .kilo/agent do repositório, ou um dos modos incorporados.",
+      "fieldBodySchema": "Esquema do corpo",
+      "bodySchemaHelp": "JSON Schema opcional. Um pedido cujo corpo não corresponda ao esquema é rejeitado.",
+      "authTitle": "Cabeçalho secreto",
+      "authDescription": "Os pedidos têm de enviar este cabeçalho com o segredo partilhado.",
+      "authHeaderLabel": "Nome do cabeçalho",
+      "authSecretLabel": "Segredo partilhado",
+      "authSecretKeep": "Deixe em branco para manter o segredo guardado.",
+      "authSecretSet": "Obrigatório. Escolha uma cadeia de caracteres aleatória robusta.",
+      "authSecretCreator": "Use pelo menos 16 caracteres quando o acionador é executado como o respetivo criador.",
+      "autoCommit": "Consolidar alterações quando a execução terminar",
+      "condenseOnComplete": "Condensar o contexto quando a execução terminar",
+      "activeTitle": "Acionador ativo",
+      "activeDescription": "Os webhooks em pausa respondem com 404.",
+      "runAsCreator": "Executar como eu",
+      "runAsCreatorDescription": "Todas as execuções usam a sua conta, por isso o cabeçalho secreto é obrigatório.",
+      "saveFailedTitle": "Não foi possível guardar o acionador",
+      "deleteTitle": "Eliminar este acionador?",
+      "deleteMessage": "As chamadas para {{name}} vão falhar. Esta ação não pode ser anulada.",
+      "deleteMessageScheduled": "As execuções agendadas de {{name}} param. Esta ação não pode ser anulada.",
+      "runNow": "Executar agora",
+      "runStarted": "Execução iniciada",
+      "created": "Acionador criado",
+      "saved": "Acionador guardado",
+      "statusArrived": "Recebido",
+      "problems": {
+        "nameRequired": "Introduza um nome.",
+        "nameTooShort": "Utilize pelo menos 8 caracteres.",
+        "nameTooLong": "Utilize 64 caracteres ou menos.",
+        "nameCharacters": "Utilize letras minúsculas, números e hífenes.",
+        "nameReserved": "Este nome está reservado.",
+        "cronRequired": "Introduza uma expressão cron.",
+        "repositoryRequired": "Escolher um repositório",
+        "agentRequired": "Escolha um agente.",
+        "agentInvalid": "Utilize letras minúsculas, números e hífenes, começando por uma letra.",
+        "modelRequired": "Escolher um modelo",
+        "promptRequired": "Introduza uma instrução.",
+        "bodySchemaInvalid": "Introduza um objeto JSON ou deixe este campo vazio.",
+        "authHeaderRequired": "Introduza o nome do cabeçalho.",
+        "authSecretRequired": "Introduza o segredo partilhado.",
+        "authSecretTooShort": "Utilize pelo menos 16 caracteres."
+      }
     }
   },
   "sessionShare": {
@@ -4588,8 +4752,9 @@
     "create": "Criar link",
     "createFailed": "Não foi possível criar o link.",
     "existingTitle": "Link existente",
-    "existingDescription": "Esta sessão já tem um link de partilha. Criar um novo substitui-o e faz com que o link antigo deixe de funcionar.",
+    "existingDescription": "Esta sessão já tem um link de partilha. Criar um novo link com estas definições substitui-o e faz com que o link antigo deixe de funcionar.",
     "rotate": "Criar um novo link",
+    "replacementSettings": "Estas definições aplicam-se ao novo link.",
     "revoke": "Revogar link",
     "revokeTitle": "Revogar link?",
     "revokeMessage": "O link atual deixa de funcionar imediatamente.",
@@ -4608,5 +4773,175 @@
     "unavailableDescription": "Este link de partilha expirou ou foi revogado.",
     "transcriptUnavailableTitle": "Não foi possível carregar esta transcrição",
     "transcriptUnavailableDescription": "O link continua a funcionar. Tente novamente dentro de momentos."
+  },
+  "organizationGuardrails": {
+    "title": "Proteções de IA",
+    "permissionDenied": "Apenas os proprietários e administradores da organização podem gerir as Proteções de IA.",
+    "unavailable": "As Proteções de IA não estão disponíveis para esta organização.",
+    "loadError": "Não foi possível carregar as Proteções de IA",
+    "statusSaving": "A guardar…",
+    "statusSaved": "Guardado",
+    "statusFailed": "Não foi possível guardar.",
+    "inputTitle": "Proteções de entrada",
+    "inputDescription": "Analisa cada entrada com a Enkrypt AI, incluindo os resultados das ferramentas. Um detetor bloqueante rejeita um pedido quando a Enkrypt AI não está disponível.",
+    "outputTitle": "Proteções de saída",
+    "outputDescription": "Analisa as respostas com a Enkrypt AI antes de os membros as receberem. Desativadas, a menos que as ative.",
+    "detectorsHint": "Bloquear rejeita um pedido sinalizado. A opção Registar apenas regista-o sem atrasar o pedido.",
+    "detectorsHintOutput": "Bloquear faz falhar uma resposta sinalizada. A opção Registar apenas regista-a sem atrasar a resposta.",
+    "choiceLog": "Registar apenas",
+    "applyTo": "Aplicar a",
+    "applyToAllMembers": "Todos os membros",
+    "applyKiloDefault": "Aplicar predefinição do Kilo",
+    "invalidSavedTitle": "Não é possível ler as definições guardadas dos detetores de entrada",
+    "invalidSavedBody": "Os pedidos são bloqueados até que os detetores de entrada sejam guardados novamente. Os detetores abaixo partem da predefinição do Kilo.",
+    "invalidSavedOutputTitle": "Não é possível ler as definições guardadas dos detetores de saída",
+    "invalidSavedOutputBody": "As respostas são retidas até que os detetores de saída sejam guardados novamente. Escolha os detetores de saída abaixo.",
+    "blockingOutputNote": "Um detetor de saída bloqueante retém uma resposta até que a Enkrypt AI a tenha verificado por completo. Utilize a opção Registar apenas para evitar o atraso.",
+    "inputDetectorRequired": "Ative pelo menos um detetor de entrada.",
+    "outputDetectorRequired": "Ative pelo menos um detetor de saída.",
+    "rulesTooMany": "Adicione até {{max}} regras.",
+    "ruleIdRequired": "Introduza um ID de regra.",
+    "ruleIdInvalid": "Um ID de regra só pode usar letras, números, pontos, hífenes e sublinhados.",
+    "ruleTextRequired": "Descreva o que a regra proíbe ou exige.",
+    "keywordTooLong": "Cada palavra-chave pode ter até {{max}} caracteres.",
+    "topicTooLong": "Cada tópico pode ter até {{max}} caracteres.",
+    "keywordsTooMany": "Adicione até {{max}} palavras-chave.",
+    "topicsTooMany": "Adicione até {{max}} tópicos.",
+    "piiEntityRequired": "Selecione pelo menos um tipo de dados a detetar.",
+    "keywordRequired": "Adicione pelo menos uma palavra-chave.",
+    "topicRequired": "Adicione pelo menos um tópico.",
+    "policyTextRequired": "Introduza o texto da política.",
+    "ruleRequired": "Adicione pelo menos uma regra.",
+    "ruleIdDuplicate": "Cada regra tem de ter o seu próprio ID de regra.",
+    "piiEntities": "Dados a detetar",
+    "keywordsLabel": "Palavras-chave",
+    "keywordsHint": "Uma palavra-chave por linha.",
+    "topicsHint": "Um tópico por linha.",
+    "policyFormat": "Formato da política",
+    "policyFormatRules": "Regras estruturadas",
+    "policyFormatRulesDescription": "Uma regra por requisito, com uma categoria e uma gravidade. Recomendado.",
+    "policyFormatText": "Texto da política",
+    "policyFormatTextDescription": "Cole uma política existente como texto simples.",
+    "rulesEmpty": "Ainda não existem regras. Cada regra descreve uma coisa que as entradas não podem conter nem solicitar.",
+    "addRule": "Adicionar regra",
+    "ruleNumber": "Regra {{number}}",
+    "ruleRemove": "Remover regra {{number}}",
+    "ruleIdLabel": "ID da regra",
+    "ruleNameLabel": "Nome (opcional)",
+    "ruleTextLabel": "Regra",
+    "ruleRiskCategory": "Categoria de risco",
+    "ruleApplicability": "Âmbito",
+    "ruleFrameworks": "Referenciais",
+    "detector": {
+      "promptInjection": {
+        "label": "Injeção de prompt",
+        "description": "Deteta tentativas de substituir instruções ou de contornar as restrições do modelo."
+      },
+      "policyViolation": {
+        "label": "Violação da política",
+        "description": "Sinaliza entradas que violam a política da sua organização, escrita como texto ou regras.",
+        "descriptionOutput": "Sinaliza respostas que violam a política da sua organização, escrita como texto ou regras."
+      },
+      "pii": {
+        "label": "PII e segredos",
+        "description": "Deteta dados pessoais, credenciais, endereços IP e URLs."
+      },
+      "keywords": {
+        "label": "Palavras-chave proibidas",
+        "descriptionOutput": "Deteta respostas que contenham qualquer uma das palavras-chave que listar."
+      },
+      "topics": {
+        "label": "Tópicos",
+        "descriptionOutput": "Sinaliza respostas sobre qualquer tópico que liste."
+      },
+      "toxicity": {
+        "label": "Toxicidade",
+        "description": "Deteta linguagem tóxica, insultuosa, ameaçadora ou de ódio."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Deteta conteúdo sexual ou outro conteúdo impróprio para o trabalho."
+      },
+      "bias": {
+        "label": "Enviesamento",
+        "description": "Deteta linguagem enviesada ou discriminatória."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Dados pessoais",
+        "description": "Nomes, endereços de email e números de telefone."
+      },
+      "secrets": {
+        "label": "Segredos",
+        "description": "Chaves de API, tokens e palavras-passe."
+      },
+      "ipAddress": {
+        "label": "Endereços IP",
+        "description": "Endereços IPv4 e IPv6."
+      },
+      "url": {
+        "label": "URLs",
+        "description": "Endereços Web."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Segurança e fraude",
+      "safetyHarm": "Segurança e danos",
+      "privacyDataProtection": "Privacidade e proteção de dados",
+      "brandReputationTrust": "Marca e reputação",
+      "biasFairnessEthical": "Enviesamento e equidade",
+      "legalIpLiability": "Responsabilidade legal e de propriedade intelectual",
+      "productMisuse": "Utilização indevida do produto",
+      "performanceQuality": "Desempenho e qualidade"
+    },
+    "applicability": {
+      "user": "Entrada do utilizador",
+      "userAssistant": "Entrada do utilizador e respostas"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "RGPD",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Top 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "Regulamento Europeu de Inteligência Artificial",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Funcionalidade empresarial",
+    "enterpriseOnly": "Esta é uma funcionalidade exclusiva para empresas.",
+    "readOnly": "Apenas os proprietários e administradores da organização podem alterar estas definições.",
+    "loadError": "Não foi possível carregar os fornecedores e os modelos",
+    "tabModels": "Modelos",
+    "tabProviders": "Fornecedores",
+    "tabGateways": "Passarelas",
+    "modelsDescription": "Desative um modelo para o bloquear para todos os membros. Os modelos de fornecedores permitidos começam ativados.",
+    "modelsDeniedOnly": "Apenas negados",
+    "modelsEmpty": "Nenhum modelo corresponde a esta pesquisa.",
+    "providersDescription": "Desative um fornecedor para impedir o Kilo de encaminhar pedidos para ele nesta organização.",
+    "providersNeedCatalog": "Os interruptores dos fornecedores ficam só de leitura até o catálogo completo de modelos ser carregado. Toque em Tentar novamente acima para os editar.",
+    "providersEmpty": "Nenhum fornecedor corresponde a esta pesquisa.",
+    "allowAllShown": "Permitir todos os apresentados",
+    "denyAllShown": "Negar todos os apresentados",
+    "gatewaysDescription": "O Kilo encaminha os pedidos de modelos através do Vercel AI Gateway ou do OpenRouter. Uma passarela desativada faz falhar esses pedidos.",
+    "emptyProviderList": "Permita pelo menos um fornecedor. Uma lista vazia bloqueia todas as rotas de modelos do Kilo.",
+    "gatewaysUnavailable": "As definições de passarelas não estão disponíveis para esta organização.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "Os pedidos ao OpenRouter não estão fixados a uma região.",
+    "inferenceRegion": "Região de inferência",
+    "inferenceRegionDescription": "Fixa os pedidos do Vercel AI Gateway a esta região. Um modelo que não esteja disponível nessa região falha.",
+    "disableOpenrouterNote": "Desativar o OpenRouter também bloqueia as chaves BYOK que encaminham pedidos através dele.",
+    "emptyModelList": "Deixe pelo menos um modelo ativado. Negar todos os modelos deixa os membros sem nada para utilizar.",
+    "catalogUnavailable": "Não foi possível carregar o catálogo completo de modelos, por isso apenas as suas listas guardadas são apresentadas. Tente novamente para carregar todos os modelos.",
+    "region": {
+      "global": "Global",
+      "us": "Estados Unidos",
+      "eu": "União Europeia",
+      "au": "Austrália",
+      "jp": "Japão"
+    }
   }
 }

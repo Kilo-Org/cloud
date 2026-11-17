@@ -25,6 +25,9 @@ const WORDING_EXCEPTIONS = readFileSync(
   new URL('./wording-exceptions.json', import.meta.url),
   'utf8'
 );
+// The checker the command fixtures run, read once so a case can hand over a
+// patched copy of the same text.
+const CHECKER_SOURCE = readFileSync(new URL('./check-catalogs.mjs', import.meta.url), 'utf8');
 
 const ENGLISH = {
   agents: {
@@ -73,6 +76,7 @@ function run({
   pushEnglish = {},
   pushTranslated = {},
   pushSource = '',
+  wordingExceptions = WORDING_EXCEPTIONS,
   extraFiles = {},
 } = {}) {
   const root = fixture({
@@ -90,7 +94,9 @@ function run({
       `import ${language.replaceAll('-', '_')} from './locales/${language}.json';`,
       `const pushCatalogs = { 'en': en, '${language}': ${language.replaceAll('-', '_')} };`,
     ].join('\n'),
-    'tools/i18n/wording-exceptions.json': WORDING_EXCEPTIONS,
+    ...(wordingExceptions === null
+      ? {}
+      : { 'tools/i18n/wording-exceptions.json': wordingExceptions }),
     ...extraFiles,
   });
   return checkCatalogs(root).problems;
@@ -99,15 +105,13 @@ function run({
 /**
  * A fixture tree that can run the checker as CI does: a copy of the checker,
  * its shared modules and its wording exceptions, and the repository's
- * dependency tree linked at the root the command resolves from.
+ * dependency tree linked at the root the command resolves from. `checker`
+ * replaces the checker's source text, for a case that runs a patched copy.
  */
-function cliFixture(files) {
+function cliFixture(files, checker = CHECKER_SOURCE) {
   const root = fixture({
     ...files,
-    'tools/i18n/check-catalogs.mjs': readFileSync(
-      new URL('./check-catalogs.mjs', import.meta.url),
-      'utf8'
-    ),
+    'tools/i18n/check-catalogs.mjs': checker,
     'tools/i18n/wording-exceptions.json': WORDING_EXCEPTIONS,
   });
   mkdirSync(join(root, 'tools/lib'), { recursive: true });
@@ -366,6 +370,62 @@ test('reports an unreadable locale catalog without inventing missing keys', () =
     found[0],
     /^mobile\/ru: cannot audit catalog: its strings and braces do not balance/
   );
+});
+
+test('reports a missing wording-exceptions file instead of throwing', () => {
+  // The exception map is read before the language registry, so a tree without
+  // one reports it once and still audits everything else: the copy that reads
+  // the same in every locale is reported alongside the read failure.
+  const found = run({
+    wordingExceptions: null,
+    english: { agents: { title: 'Agents' } },
+    translated: { agents: { title: 'Agents' } },
+    source: "t('agents.title');",
+  });
+  assert.ok(found.length > 0, 'expected problems');
+  assert.match(
+    found.join('\n'),
+    /check-catalogs: cannot read tools\/i18n\/wording-exceptions\.json: /
+  );
+  assert.match(found.join('\n'), /mobile: "agents\.title" equals English in every locale/);
+});
+
+test('reports a malformed wording-exceptions file instead of throwing', () => {
+  const found = run({ wordingExceptions: '{' });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(
+    found.join('\n'),
+    /check-catalogs: cannot read tools\/i18n\/wording-exceptions\.json: ./
+  );
+});
+
+test('reports a valid JSON wording-exceptions value of the wrong shape', () => {
+  // JSON.parse accepts every one of these, so the shape of the parsed value is
+  // the only thing between the file and the callers that index it by tag.
+  for (const shape of ['null', '[]', '0', '"text"']) {
+    const found = run({ wordingExceptions: shape });
+    assert.match(
+      found.join('\n'),
+      /check-catalogs: cannot read tools\/i18n\/wording-exceptions\.json: expected an object that maps each tag to a list of English strings/
+    );
+  }
+});
+
+test('reports a wording-exceptions entry that is not a list of strings', () => {
+  // A number is not iterable, a null entry is not a set of strings, and a bare
+  // string iterates character by character in the callers.
+  for (const entry of [5, null, 'Agents']) {
+    const found = run({ wordingExceptions: JSON.stringify({ ru: entry }) });
+    assert.match(
+      found.join('\n'),
+      /check-catalogs: cannot read tools\/i18n\/wording-exceptions\.json: expected an object that maps each tag to a list of English strings/
+    );
+  }
+});
+
+test('accepts a wording-exceptions map of tag to string list', () => {
+  const found = run({ wordingExceptions: JSON.stringify({ ru: [] }) });
+  assert.ok(!found.join('\n').includes('cannot read'), found.join('\n'));
 });
 
 test('ignores a mounted-harness helper while a source file still reports its keys', () => {
@@ -1612,6 +1672,56 @@ test('accepts a push source that builds its key from the payload', () => {
   assert.deepEqual(found, []);
 });
 
+test('accepts a leaf table whose built key the source names at runtime', () => {
+  // The catalog leaf lives in a table and the key is built from it. The leaf
+  // literal beside the built head is the only place the key is named, so the
+  // dead-key rule must read both together.
+  const found = run({
+    pushEnglish: PUSH_ENGLISH,
+    pushTranslated: PUSH_TRANSLATED,
+    pushSource: [
+      "translatePush(locale, 'generic.title', undefined, 'Kilo');",
+      "const LEAF_BY_TYPE = { 'chat.message': 'chatMessage' };",
+      'const leaf = LEAF_BY_TYPE[type];',
+      'translatePush(locale, `generic.body.${leaf}`, undefined, en.generic.body[leaf]);',
+    ].join('\n'),
+  });
+  assert.deepEqual(found, []);
+});
+
+test('rejects a push key under a built head that no leaf names', () => {
+  const found = run({
+    pushEnglish: {
+      generic: {
+        title: 'Kilo',
+        body: {
+          chatMessage: 'You have a new message',
+          scheduledAction: 'A scheduled action has an update',
+        },
+      },
+    },
+    pushTranslated: {
+      generic: {
+        title: 'Kilo',
+        body: {
+          chatMessage: 'Tienes un mensaje nuevo',
+          scheduledAction: 'Una acción programada tiene una actualización',
+        },
+      },
+    },
+    pushSource: [
+      "const LEAF_BY_TYPE = { 'chat.message': 'chatMessage' };",
+      'const leaf = LEAF_BY_TYPE[type];',
+      'translatePush(locale, `generic.body.${leaf}`, undefined, en.generic.body[leaf]);',
+    ].join('\n'),
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(
+    found.join('\n'),
+    /notifications: en\.json defines "generic\.body\.scheduledAction", which no source file uses/
+  );
+});
+
 test('rejects a push value left in English in one locale', () => {
   // The mobile rule only fires when a value is English in every locale, which a
   // single untranslated locale never is.
@@ -1649,6 +1759,57 @@ test('accepts a one-token push value that reads the same in every language', () 
     pushSource: [
       "translatePush(locale, 'generic.title', undefined, 'Kilo');",
       "const push = { i18nKey: 'sessionReady' };",
+    ].join('\n'),
+  });
+  assert.deepEqual(found, []);
+});
+
+// One key per piece of copy holds for the push catalog too: two producers that
+// state the same thing read one entry, or a translator can drift them apart.
+const DUPLICATE_PUSH_ENGLISH = {
+  generic: { title: 'Kilo', body: { securityUpdate: 'A security check has an update' } },
+  internal: { securityLifecycle: { title: 'Kilo', body: 'A security check has an update' } },
+};
+const DUPLICATE_PUSH_SOURCE = [
+  "translatePush(locale, 'generic.title', undefined, 'Kilo');",
+  "translatePush(locale, 'generic.body.securityUpdate', undefined, 'A security check has an update');",
+  "const push = { i18nKey: 'internal.securityLifecycle' };",
+].join('\n');
+
+test('rejects two push keys that hold one piece of copy', () => {
+  const found = run({
+    pushEnglish: DUPLICATE_PUSH_ENGLISH,
+    pushTranslated: {
+      generic: { title: 'Kilo', body: { securityUpdate: 'Проверка безопасности обновилась' } },
+      internal: { securityLifecycle: { title: 'Kilo', body: 'Обновление проверки безопасности' } },
+    },
+    pushSource: DUPLICATE_PUSH_SOURCE,
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(
+    found.join('\n'),
+    /notifications\/en: 2 keys hold the copy "A security check has an update"/
+  );
+});
+
+test('accepts push producers that read one shared key', () => {
+  // Both session producers state the session title, so one entry carries it and
+  // each payload names its own base.
+  const found = run({
+    pushEnglish: {
+      session: { title: '{{sessionTitle}}' },
+      agentSession: { notification: { body: '{{message}}' } },
+      sessionReady: { body: 'Your Kilo session is ready to control from your phone' },
+    },
+    pushTranslated: {
+      session: { title: '{{sessionTitle}}' },
+      agentSession: { notification: { body: '{{message}}' } },
+      sessionReady: { body: 'Сессия Kilo готова к управлению с телефона' },
+    },
+    pushSource: [
+      "const sessionPush = { i18nKey: 'agentSession.notification' };",
+      "const readyPush = { i18nKey: 'sessionReady' };",
+      "translatePush(locale, 'session.title', undefined, '{{sessionTitle}}');",
     ].join('\n'),
   });
   assert.deepEqual(found, []);
@@ -1757,6 +1918,83 @@ test('reports a broken catalog through the command and exits non-zero', () => {
   assert.match(result.stderr, /mobile\/ru: missing key "agents\.title"/);
   assert.match(result.stderr, /check-catalogs: \d+ problem\(s\)/);
 });
+
+// The descriptor policy guard keeps a misconfigured catalog from throwing: the
+// copy rules and the base-key reader are used after the catalogs' value
+// problems are collected, so a throw there would hide them. Each case patches
+// the notifications descriptor away from the checker source and leaves a mobile
+// problem in the tree, so the run must still print what it collected.
+const POLICY_PUSH_FILES = {
+  'packages/notifications/src/locales/en.json': JSON.stringify({
+    internal: { securityFindingNew: { title: 'New finding', body: 'Body' } },
+  }),
+  'packages/notifications/src/locales/ru.json': JSON.stringify({
+    internal: { securityFindingNew: { title: 'Новая находка', body: 'Текст' } },
+  }),
+  'packages/notifications/src/push-copy.ts': '',
+};
+
+// A descriptor-editing patch rewrites the notifications descriptor however the
+// upstream source words it: a rule list of one entry or two, a four-space tab,
+// or a line the merge moved. A literal replace would pass while patching
+// nothing when any of that drifts.
+const NOTIFICATIONS_DESCRIPTOR = /name: 'notifications',[\s\S]*?collectsDestructiveKeys: false,\n/;
+const editDescriptor = (source, edit) => {
+  const descriptors = source.match(new RegExp(NOTIFICATIONS_DESCRIPTOR.source, 'g')) ?? [];
+  assert.equal(
+    descriptors.length,
+    1,
+    'the notifications descriptor must be unique in the checker source'
+  );
+  const edited = edit(descriptors[0]);
+  assert.notEqual(edited, descriptors[0], 'the edit must change the descriptor');
+  return source.replace(descriptors[0], edited);
+};
+const WITHOUT_BASE_KEY_DESCRIPTOR = descriptor =>
+  descriptor.replace(/^(\s*)baseKeyOf:[^\n]*\n/m, '');
+
+for (const { label, field, patch } of [
+  {
+    label: 'without a base-key reader',
+    field: 'baseKeyOf',
+    patch: source => editDescriptor(source, WITHOUT_BASE_KEY_DESCRIPTOR),
+  },
+  {
+    label: 'with an empty copy-rule list',
+    field: 'englishCopyRules',
+    patch: source =>
+      editDescriptor(source, descriptor =>
+        descriptor.replace(/(\s*)englishCopyRules:\s*\[[^\]]*\],/, '$1englishCopyRules: [],')
+      ),
+  },
+  {
+    label: 'with a non-callable entry in its copy-rule list',
+    field: 'englishCopyRules',
+    patch: source =>
+      editDescriptor(source, descriptor =>
+        descriptor.replace(
+          /(\s*)englishCopyRules:\s*\[[^\]]*\],/,
+          "$1englishCopyRules: [checkPushEnglishCopy, 'not a rule'],"
+        )
+      ),
+  },
+]) {
+  test(`reports a descriptor ${label} through the command`, () => {
+    const patched = patch(CHECKER_SOURCE);
+    assert.notEqual(patched, CHECKER_SOURCE, 'the case must change the checker source');
+    const translated = { agents: { ...TRANSLATED.agents } };
+    delete translated.agents.title;
+    const root = cliFixture({ ...standardFiles({ translated }), ...POLICY_PUSH_FILES }, patched);
+    const result = cli(root);
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(
+      result.stderr,
+      new RegExp(`notifications: the catalog descriptor declares no usable ${field}`)
+    );
+    assert.doesNotMatch(result.stderr, /TypeError/);
+    assert.match(result.stderr, /mobile\/ru: missing key "agents\.title"/);
+  });
+}
 
 // A confirmation's safe button falls back to the catalog's own Cancel label
 // (`cancelLabel ?? t('common.cancel')`), so a destructive label translated with

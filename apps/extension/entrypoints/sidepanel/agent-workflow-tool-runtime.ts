@@ -44,7 +44,7 @@ export interface WorkflowToolContext {
     code: string,
     caller?: BrowserCaller
   ) => Promise<EvalTabResult>;
-  readonly releaseBrowserCaller: (caller: BrowserCaller) => Promise<void>;
+  readonly disposeBrowserCaller: (caller: BrowserCaller) => Promise<void>;
   readonly navigateTab: (tabId: number, url: string) => Promise<void>;
   readonly getTabUrl: (tabId: number) => Promise<string>;
 }
@@ -498,8 +498,8 @@ const executeRunWorkflow = async (
 
     return runResultToToolResult(result, dryRun, workflow.name);
   } finally {
-    // The run's lease ends here so a waiting caller (another conversation, or a CLI agent) can take the tab.
-    await ctx.releaseBrowserCaller(caller);
+    // The run is over for good: its lease and its refs go, so a waiting caller (another conversation, or a CLI agent) can take the tab.
+    await ctx.disposeBrowserCaller(caller);
   }
 };
 

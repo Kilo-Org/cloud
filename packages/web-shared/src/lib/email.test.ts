@@ -18,7 +18,15 @@ import {
   sendSpendAlertEmail,
   subjects,
   sendCreditsTopUpEmail,
+  buildCreditsSection,
+  buildCreditsTopUpCreditsRowSection,
+  buildCreditsTopUpExpirySection,
+  buildCreditsTopUpInfoRow,
+  buildCreditsTopUpReceiptSection,
+  buildCreditsTopUpServiceFeeSection,
 } from '@kilocode/web-shared/lib/email';
+import fs from 'fs';
+import path from 'path';
 import { captureException } from '@sentry/nextjs';
 import { sendViaMailgun } from '@kilocode/web-shared/lib/email-mailgun';
 import { NEXTAUTH_URL } from '@kilocode/web-shared/lib/config.server';
@@ -104,6 +112,154 @@ describe('template loading', () => {
         tags: { source: 'email_template', email_template: 'doesNotExist' },
       })
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Dark mode: every inline palette declaration maps to a kc-* class so the
+// stylesheet injected by renderTemplate can override it in dark mode.
+// ---------------------------------------------------------------------------
+
+const EMAILS_DIR = path.join(process.cwd(), '..', '..', 'packages', 'web-shared', 'src', 'emails');
+
+type ClassRule = { className: string; declarations: RegExp };
+
+const CLASS_RULES: ClassRule[] = [
+  { className: 'kc-page', declarations: /background(?:-color)?:\s*#(?:ffffff|fff)\b/i },
+  { className: 'kc-strong', declarations: /(?:^|;)\s*color:\s*#1a1a1a\b/i },
+  { className: 'kc-text', declarations: /(?:^|;)\s*color:\s*#333\b/i },
+  { className: 'kc-muted', declarations: /(?:^|;)\s*color:\s*#555\b/i },
+  { className: 'kc-faint', declarations: /(?:^|;)\s*color:\s*#ccc\b/i },
+  {
+    className: 'kc-box',
+    declarations: /(?:background(?:-color)?:\s*#f6f6f4\b|border:\s*1px solid #ebebea\b)/i,
+  },
+  { className: 'kc-divider', declarations: /border-top:\s*1px solid #(?:ebebea|eee)\b/i },
+  { className: 'kc-btn', declarations: /background(?:-color)?:\s*#1a1a1a\b/i },
+];
+
+function readAttribute(tag: string, name: string): string | undefined {
+  const match = tag.match(new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)')`, 'i'));
+  return match ? (match[1] ?? match[2]) : undefined;
+}
+
+// Returns one actionable line per violation: file, tag, declaration, class.
+function findClassViolations(html: string, source: string): string[] {
+  const violations: string[] = [];
+  for (const match of html.matchAll(/<[a-zA-Z][^>]*>/g)) {
+    const tag = match[0];
+    const style = readAttribute(tag, 'style');
+    if (!style) continue;
+    const normalized = style.replace(/\s+/g, ' ').trim();
+    const classes = new Set((readAttribute(tag, 'class') ?? '').split(/\s+/).filter(Boolean));
+    for (const rule of CLASS_RULES) {
+      const declaration = normalized.match(rule.declarations)?.[0];
+      // background-color: #1a1a1a is the CTA surface, not strong text.
+      if (
+        rule.className === 'kc-strong' &&
+        /background(?:-color)?:\s*#1a1a1a\b/i.test(normalized)
+      ) {
+        continue;
+      }
+      if (!declaration || classes.has(rule.className)) continue;
+      violations.push(
+        `${source}: ${tag.slice(0, 160)} → "${declaration}" needs class="${rule.className}"`
+      );
+    }
+  }
+  return violations;
+}
+
+function dummyTemplateVars(raw: string): Record<string, string> {
+  const vars: Record<string, string> = {};
+  for (const match of raw.matchAll(/\{\{\s*(\w+)\s*\}\}/g)) {
+    vars[match[1]] = 'Sample value';
+  }
+  return vars;
+}
+
+describe('dark mode support', () => {
+  const templateFiles = fs
+    .readdirSync(EMAILS_DIR)
+    .filter(file => file.endsWith('.html'))
+    .sort();
+
+  it('finds the transactional templates', () => {
+    expect(templateFiles.length).toBeGreaterThan(40);
+  });
+
+  it.each(templateFiles)('%s declares dark mode and classes its palette', file => {
+    const name = file.replace(/\.html$/, '');
+    const raw = fs.readFileSync(path.join(EMAILS_DIR, file), 'utf-8');
+    const html = renderTemplate(name, dummyTemplateVars(raw));
+
+    const head = html.match(/<head\b[^>]*>([\s\S]*?)<\/head>/i)?.[1];
+    expect(html).toContain('prefers-color-scheme: dark');
+    if (head !== undefined) {
+      expect(head).toContain('prefers-color-scheme: dark');
+      expect(head).toContain('name="color-scheme" content="light dark"');
+    }
+    const bodyIndex = html.search(/<body\b/i);
+    if (bodyIndex !== -1) {
+      expect(html.indexOf('prefers-color-scheme: dark')).toBeLessThan(bodyIndex);
+    }
+
+    // Proton Mail iOS leaves explicit white surfaces white while lightening
+    // text; page backgrounds must stay unset so the client's own shows through.
+    expect(html).not.toMatch(/background(?:-color)?:\s*#(?:ffffff|fff)\b/i);
+
+    const bodies = [...html.matchAll(/<body\b[^>]*>/gi)].map(match => match[0]);
+    if (bodies.length === 0) {
+      // Bare fragment templates (e.g. securityFinding*) carry kc-page on their
+      // outer table instead of a body element. The injected stylesheet also
+      // mentions .kc-page, so inspect the root table tag rather than the text.
+      const rootTable = html.match(/<table\b[^>]*>/i)?.[0] ?? '';
+      expect(rootTable).not.toBe('');
+      expect(readAttribute(rootTable, 'class') ?? '').toContain('kc-page');
+    }
+    for (const body of bodies) {
+      expect(readAttribute(body, 'class') ?? '').toContain('kc-page');
+    }
+
+    expect(findClassViolations(html, file)).toEqual([]);
+  });
+
+  it('classes the inline-styled fragment builders', () => {
+    const fragments: Record<string, string> = {
+      buildCreditsSection: buildCreditsSection(10).html,
+      buildCreditsTopUpInfoRow: buildCreditsTopUpInfoRow('Label', '$10.00 USD'),
+      buildCreditsTopUpReceiptSection: buildCreditsTopUpReceiptSection(
+        'https://billing.example/receipt'
+      ).html,
+      buildCreditsTopUpServiceFeeSection: buildCreditsTopUpServiceFeeSection({
+        serviceFeeCents: 100,
+        grossPaidCents: 2100,
+      }).html,
+      buildCreditsTopUpCreditsRowSection: buildCreditsTopUpCreditsRowSection({
+        creditsCents: 2000,
+        hasServiceFee: false,
+      }).html,
+      buildCreditsTopUpExpirySection: buildCreditsTopUpExpirySection(
+        new Date('2027-01-02T00:00:00.000Z')
+      ).html,
+    };
+
+    expect(buildCreditsSection(0).html).toBe('');
+    for (const [builder, html] of Object.entries(fragments)) {
+      expect(html).not.toBe('');
+      expect(findClassViolations(html, builder)).toEqual([]);
+    }
+  });
+
+  it('leaves marketing templates without the dark mode block', () => {
+    const html = renderTemplate(
+      'storeCreditWebTip',
+      { credits_url: 'https://app.example/credits', year: '2026' },
+      'marketing-emails'
+    );
+
+    expect(html).not.toContain('prefers-color-scheme: dark');
+    expect(html).not.toContain('color-scheme');
   });
 });
 

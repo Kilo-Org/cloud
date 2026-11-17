@@ -127,6 +127,7 @@ export default function RepoPickerScreen() {
       <PickerSheet
         title={t('agentChat.repoPicker.title')}
         onDone={closePicker}
+        onCancel={closePicker}
         scrollable={false}
         expired
       />
@@ -137,6 +138,7 @@ export default function RepoPickerScreen() {
     <PickerSheet
       title={t('agentChat.repoPicker.title')}
       onDone={closePicker}
+      onCancel={closePicker}
       scrollable={false}
       headerContent={
         <View className="flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2 mx-4 mb-3 mt-3">

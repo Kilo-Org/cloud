@@ -41,7 +41,10 @@ import {
   isFreeNemotronModel,
   NVIDIA_TRIAL_TOS,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/nvidia';
-import { applyCustomPricingToModel } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
+import {
+  applyCustomPricingToModel,
+  applyCustomPricingToPricing,
+} from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
 import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
 import {
   getCustomLlmsById,
@@ -225,7 +228,7 @@ async function enhancedModelList(models: OpenRouterModel[], countryCode: string 
     }),
     getTerminalBenchSummaries(),
   ]);
-  const catalogModels = listedModels
+  const gatewayModels = listedModels
     .map((model): OpenRouterModel => {
       const pricing = pickerModelPricing(model, endpointsMetadata, preferredProviderOrderConfig);
       const terminalBench = terminalBenchFor(summaries, model.id);
@@ -240,8 +243,26 @@ async function enhancedModelList(models: OpenRouterModel[], countryCode: string 
       };
     })
     .concat(vercelOnlyCatalogModels.filter(model => isListableGatewayModelId(model.id)))
-    .concat(autoModels)
-    .map(model => applyCustomPricingToModel(customPricingConfig, model))
+    .concat(autoModels);
+  const displayPricingById = new Map(
+    gatewayModels.map(model => [
+      model.id,
+      applyCustomPricingToModel(customPricingConfig, model).pricing,
+    ])
+  );
+  const catalogModels = gatewayModels
+    .map(model => {
+      if (!model.alias_target) return applyCustomPricingToModel(customPricingConfig, model);
+      // An alias keeps its own name and shows the price its listed target shows. An alias whose
+      // target is not listed shows its own price, replaced by its target's custom pricing as
+      // billing replaces it.
+      return {
+        ...model,
+        pricing:
+          displayPricingById.get(model.alias_target) ??
+          applyCustomPricingToPricing(customPricingConfig, model.id, model.pricing),
+      };
+    })
     // Public custom LLMs are complete as defined; id-based pricing, PDF, and
     // protocol guesses below would describe a model routing does not serve.
     .concat(publicCustomLlmModels);

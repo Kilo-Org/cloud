@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Halda veebis",
     "creditHistory": "Krediitide ajalugu",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Tühista",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Ostud, kviitungid ja krediiditegevus",
     "invoicesSubtitle": "Laadi alla oma ostude arved",
-    "manageBilling": "Halda arveldust saidil kilo.ai",
-    "manageBillingIosNote": "Makseviise, automaatset täiendamist ja arveldusandmeid hallatakse saidil kilo.ai.",
     "codeReviewerSubtitle": "Automaatsed PR-ülevaatused",
     "securityAgentSubtitle": "Leia ja kõrvalda turvanõrkused",
     "reviews": "Ülevaatused",
@@ -364,7 +360,8 @@
     "providerKeys": {
       "title": "Teenusepakkuja võtmed",
       "rowSubtitle": "Kasuta oma teenusepakkuja arveldust",
-      "manageOnWebReason": "Need teenusepakkujad vajavad struktureeritud mandaate.",
+      "orgDescription": "Neid võtmeid jagatakse kõigi organisatsiooni liikmetega ja kulud arveldatakse organisatsiooni teenusepakkuja kontodelt.",
+      "viewOnly": "Organisatsiooni võtmeid saavad muuta ainult selle omanik, administraator või arvelduse haldur.",
       "description": "Nende võtmetega tehtud päringud arveldatakse sinu teenusepakkuja kontolt, mitte Kilo saldolt.",
       "managedByPlan": "Haldab sinu kodeerimispakett",
       "enableKey": "Luba teenusepakkuja {{provider}} võti",
@@ -374,6 +371,7 @@
       "removeMessage": "Seda võtit kasutanud päringud ei kasuta enam sinu teenusepakkuja arveldust.",
       "add": "Lisa võti",
       "added": "Võti lisatud",
+      "updated": "Võti uuendatud",
       "emptyTitle": "Teenusepakkuja võtmeid pole",
       "emptyDescription": "Alustamiseks lisa võti.",
       "chooseProvider": "Vali teenusepakkuja",
@@ -382,9 +380,34 @@
       "noProvidersDescription": "Ükski teenusepakkuja ei vasta otsingule.",
       "newKeyTitle": "Uus võti",
       "newKeyDescription": "Võti salvestatakse krüpteeritult ja seda ei saa uuesti kuvada.",
+      "edit": "Muuda võtit",
+      "editKeyTitle": "Asenda võti",
+      "editKeyDescription": "Salvestatud väärtust ei saa kuvada. Selle asendamiseks sisesta uus.",
+      "editKeyMappingsWarning": "Võtme asendamisel asenduvad ka salvestatud mudelite vastendused: sisesta uuesti kõik vastendused, mida veel vajad.",
+      "saveFailed": "Võtme salvestamine ebaõnnestus.",
+      "invalidCredentials": "Kontrolli mandaate ja proovi uuesti.",
+      "fieldRequired": "{{field}} on kohustuslik.",
+      "incompleteMapping": "Vastendus {{number}} vajab nii lüüsi mudeli slugi kui ka juurutuse nime.",
       "apiKeyLabel": "API-võti",
       "apiKeyPlaceholder": "Kleebi võti",
-      "apiKeyRequired": "Sisesta võti."
+      "apiKeyRequired": "Sisesta võti.",
+      "authMethod": "Autentimismeetod",
+      "authMethodAccessKeys": "Juurdepääsuvõtmed",
+      "resourceName": "Azure'i ressursi nimi",
+      "region": "AWS-i piirkond",
+      "accessKeyId": "Juurdepääsuvõtme ID",
+      "secretAccessKey": "Salajane juurdepääsuvõti",
+      "project": "Google Cloudi projekt",
+      "location": "Vertexi asukoht",
+      "clientEmail": "Teenusekonto e-posti aadress",
+      "privateKey": "Teenusekonto privaatvõti",
+      "modelMappings": "Mudelite vastendused",
+      "modelMappingsDescription": "Suuna lüüsi mudel kohandatud juurutuse nimele.",
+      "mappingTitle": "Vastendus {{number}}",
+      "mappingGatewayModel": "Lüüsi mudeli slug",
+      "mappingCustomModel": "Juurutuse nimi",
+      "addMapping": "Lisa vastendus",
+      "removeMapping": "Eemalda vastendus {{number}}"
     },
     "dataExport": {
       "title": "Sinu andmed",
@@ -457,7 +480,8 @@
       "nextStepFinal": "Vaidlustuse otsus on lõplik. Edasist vaidlustust esitada ei saa.",
       "viewReceipt": "Vaata kinnitust"
     },
-    "changelog": "Mis on uut"
+    "changelog": "Mis on uut",
+    "changelogVersionPending": "Selle versiooni märkmed saabuvad rakenduse järgmise uuendusega."
   },
   "preferences": {
     "general": "Üldine",
@@ -1170,8 +1194,6 @@
       "clearMessage": "Tühja välja salvestamine kustutab sellele retsensendile salvestatud kohandatud juhised."
     },
     "repos": {
-      "unavailable": "Hoidlad pole saadaval. Lõpeta Bitbucketi seadistamine saidil kilo.ai.",
-      "finishSetup": "Lõpeta seadistamine",
       "manageAccess": "Halda juurdepääsu",
       "bitbucketNoRepositoriesDescription": "Selles Bitbucketi tööruumis pole hoidlaid saadaval.",
       "gitlabNoRepositoriesDescription": "Võimalik, et pead GitLabis andma juurdepääsu veel mõnele rühmale või projektile.",
@@ -1326,11 +1348,10 @@
     "followReviewMd": "Järgi faili REVIEW.md juhiseid",
     "followReviewMdSubtitle": "Järgi iga hoidla failis REVIEW.md olevaid juhiseid",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket pole ühendatud. Selle saavad ühendada ainult organisatsiooni omanikud, administraatorid ja arveldushaldurid.",
-      "setupIncomplete": "Seadistamine pole lõpetatud. Lõpeta see saidil kilo.ai.",
-      "setup": "Bitbucketi seadistamine"
+      "notConnectedReadOnly": "Bitbucket pole ühendatud. Selle saavad ühendada ainult organisatsiooni omanikud, administraatorid ja arveldushaldurid."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Selle organisatsiooni Bitbucketi ühendust hallatakse arvutis veebi kaudu.",
       "description": "Loo nõutavate õigustega tööruumi juurdepääsutunnus ja kleebi see allolevale väljale.",
       "scopes": "Konto: lugemine · Hoidlad: lugemine/kirjutamine · Tõmbetaotlused: lugemine · Veebihaagid: lugemine/kirjutamine",
       "tokenPlaceholder": "Tööruumi juurdepääsutunnus"
@@ -1345,7 +1366,8 @@
       "noReviews": "Ülevaatusi pole veel",
       "noReviewsDescription": "Ülevaatused ilmuvad siia pärast seda, kui koodiülevaataja on tõmbetaotluse üle vaadanud.",
       "startManualReview": "Käivita ülevaatus käsitsi",
-      "configureProvider": "Seadista teenusepakkuja"
+      "configureProvider": "Seadista teenusepakkuja",
+      "connectOwnerOnly": "Palu organisatsiooni omanikul või administraatoril teenusepakkuja ühendada."
     },
     "platformList": {
       "checking": "Kontrollimine…",
@@ -1358,8 +1380,7 @@
       "githubError": "GitHubi seadistamist ei õnnestunud avada. Proovi uuesti.",
       "gitlabAccount": "GitLabi konto",
       "gitlabError": "GitLabi seadistamist ei õnnestunud avada. Proovi uuesti.",
-      "description": "Ühenda Kilo {{label}}, et tõmbetaotlusi automaatselt üle vaadata.",
-      "bitbucketError": "Bitbucketi seadistamist ei õnnestunud avada. Proovi uuesti."
+      "description": "Ühenda Kilo {{label}}, et tõmbetaotlusi automaatselt üle vaadata."
     },
     "overview": {
       "allAreas": "Kõik valdkonnad",
@@ -2015,6 +2036,9 @@
       "completedWillAppear": "Lõpetatud seansid ilmuvad siia.",
       "noPastSessions": "Varasemaid seansse pole",
       "pastSessions": "Varasemad seansid",
+      "sectionAccessibility_one": "{{title}}: {{displayCount}} seanss",
+      "sectionAccessibility_other": "{{title}}: {{displayCount}} seanssi",
+      "sectionAccessibility": "{{title}}: {{displayCount}} seanssi",
       "live": "REAALAJAS",
       "updating": "Uuendamine"
     },
@@ -2149,10 +2173,8 @@
       "couldNotLoadBitbucketRepositories": "Bitbucketi hoidlate laadimine ebaõnnestus.",
       "connectGithubDescription": "Logi sisse brauseris ja naase siia, et valida hoidla GitHubist.",
       "connectGitlabDescription": "Logi sisse brauseris ja naase siia, et valida hoidla GitLabist.",
-      "connectBitbucketDescription": "Logi sisse brauseris ja naase siia, et valida hoidla Bitbucketist.",
       "openGithub": "Ava GitHub",
       "openGitlab": "Ava GitLab",
-      "openBitbucket": "Ava Bitbucket",
       "refreshRepositories": "Värskenda hoidlaid",
       "githubConnected": "GitHub on ühendatud",
       "gitlabConnected": "GitLab on ühendatud",
@@ -2952,6 +2974,7 @@
     "signOutThisDevice": "Logi sellest seadmest välja",
     "signOutSessionLabel": "Logi seadmest {{device}} välja, sisse logitud {{signedIn}}, viimati nähtud {{lastSeen}}",
     "sessionSignedOut": "Seansist on välja logitud.",
+    "sessionSignOutFailed": "Sellest seansist ei saanud välja logida. Proovi uuesti.",
     "signOutThisDeviceTitle": "Kas logida sellest seadmest välja?",
     "signOutThisSessionTitle": "Kas logida sellest seansist välja?",
     "signOutThisSessionMessage": "{{device}} logitakse välja. Viimati nähtud {{lastSeen}}. Seadme juurdepääs API-le võib säilida veel kuni tund aega.",
@@ -3052,6 +3075,9 @@
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
     "searchPlaceholder": "Hiljutiste seansside otsing",
     "connectedCli": "Ühendatud CLI-s",
+    "connectedCliAccessibility_one": "{{title}}: {{displayCount}} eksemplar",
+    "connectedCliAccessibility_other": "{{title}}: {{displayCount}} eksemplari",
+    "connectedCliAccessibility": "{{title}}: {{displayCount}} eksemplari",
     "newSessionOn": "Uus seanss eksemplaris {{name}}",
     "noMatchingSessions": "Sobivaid seansse pole.",
     "onlyFirstFilesAttached": "Lisatakse ainult esimesed {{displayCount}} faili.",
@@ -3072,15 +3098,14 @@
     "manage": {
       "billingHistory": "Arveldusajalugu",
       "billingHistoryEmpty": "Arveldusajalugu veel puudub.",
+      "billingHistoryError": "Arveldusajalugu ei saanud laadida",
       "cancel": "Tühista tellimus",
       "cancelDescription": "Sinu Kilo Pass jääb aktiivseks arveldusperioodi lõpuni ega uuene.",
       "cancelScheduled": "Tühistatakse {{date}}",
       "cancelScheduledChange": "Tühista ajastatud muudatus",
       "cancelled": "Tellimus tühistati",
-      "changePlan": "Muuda paketti saidil kilo.ai",
-      "changePlanIosNote": "Tasulisi pakette saab muuta saidil kilo.ai.",
       "creditHistoryEmpty": "Kilo Passi krediite veel pole.",
-      "manageInStore": "Halda poes {{store}}",
+      "creditHistoryError": "Krediitide ajalugu ei saanud laadida",
       "resume": "Jätka tellimust",
       "resumeCancelledDescription": "Sinu Kilo Pass hakkab taas automaatselt uuenema.",
       "resumePausedDescription": "Sinu Kilo Pass jätkub kohe, enne kavandatud jätkamise kuupäeva.",
@@ -3117,9 +3142,6 @@
     "bonusFree": "Tasuta boonus",
     "bonusReferral": "Viitamisboonus",
     "bonusAvailable": "Saadaolev tasuta boonus",
-    "kiloPassManagement": "Kilo Passi haldamine",
-    "kiloPassSetup": "Kilo Passi seadistamine",
-    "opensManagementOnWeb": "Avab veebis Kilo Passi halduse.",
     "loadFailedRetry": "Kontrolli ühendust ja proovi seejärel uuesti.",
     "legalTermsOfUse": "Kasutustingimused (EULA)",
     "purchaseDifferentAccount": "See App Store'i ost pole sinu Kilo kontoga seotud. Logi sisse ostuks kasutatud Apple Accountiga ja proovi uuesti.",
@@ -3305,7 +3327,6 @@
       "buySeats": "Osta kasutajakohti",
       "setupAutoTopUp": "Seadista automaatne täiendamine",
       "manageAutoTopUp": "Halda automaatset täiendamist",
-      "webAddress": "Veebiaadress {{url}}",
       "opensOnWeb": "Avaneb veebis"
     },
     "boundary": {
@@ -3321,7 +3342,7 @@
       "selectOrganization": "Vali organisatsioon",
       "unavailableDescription": "See organisatsioon pole enam saadaval. Jätkamiseks vali kontovalijast teine konto.",
       "unavailableSessionsDescription": "See organisatsioon pole enam saadaval. Selle seansse ei saa laadida.",
-      "accessDeniedDescription": "Sul puudub juurdepääs sellele organisatsioonile."
+      "accessDeniedDescription": "Palu organisatsiooni omanikul või administraatoril anda sulle juurdepääsu."
     },
     "create": {
       "title": "Loo organisatsioon",
@@ -3441,25 +3462,88 @@
     },
     "settingsOnWeb": {
       "title": "Organisatsiooni seaded veebis",
-      "integrations": "Integratsioonid veebis",
       "usageDetails": "Kasutuse üksikasjad",
       "providersAndModels": "Teenusepakkujad ja mudelid",
       "groups": "Grupid",
       "guardrails": "Kaitsepiirangud",
       "byok": "Kasuta oma võtit",
       "ssoAndDomain": "SSO ja domeen",
-      "emailPreferences": "E-posti eelistused",
       "dataCollection": "Andmete kogumine",
       "auditLogs": "Auditilogid",
-      "requestLogs": "Päringulogid",
-      "subOrganizations": "Alamorganisatsioonid",
-      "distributeFunds": "Jaota vahendeid"
+      "requestLogs": "Päringulogid"
+    },
+    "requestLogs": {
+      "hint": "Akna lõpule eelnenud tunni päringud, uusimad eespool.",
+      "older": "Varasem tund",
+      "newer": "Hilisem tund",
+      "truncated": "Selles tunnis on rohkem päringuid, kui loendis kuvatakse.",
+      "emptyTitle": "Päringuid pole",
+      "emptyDescription": "Selles tunnis pole lüüsipäringuid.",
+      "loadError": "Päringulogide laadimine ebaõnnestus.",
+      "permissionDenied": "Päringulogisid saavad lugeda ainult organisatsiooni omanik, administraator või arvelduse haldur.",
+      "tokens": "{{input}} sisse · {{output}} välja",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Sisendtokenid",
       "orgLast30Days": "Kõik liikmed · Viimased 30 päeva",
       "outputTokens": "Väljundtokenid",
       "requests": "Päringud"
+    },
+    "modes": {
+      "create": "Uus režiim",
+      "deleteAction": "Kustuta režiim",
+      "deleteMessage": "Režiim eemaldatakse kõigilt selle organisatsiooni liikmetelt. Sisseehitatud režiimi asendav režiim naaseb sisseehitatud seadete juurde.",
+      "deleteTitle": "Kas kustutada see režiim?",
+      "descriptionLabel": "Režiimi kirjeldus",
+      "emptyDescription": "Siia lisatud režiimid on saadaval kõigile selle organisatsiooni liikmetele.",
+      "emptyTitle": "Kohandatud režiime veel pole",
+      "identifierHint": "Väiketähed, numbrid ja sidekriipsud.",
+      "identifierInvalid": "Kasuta ainult väiketähti, numbreid ja sidekriipse.",
+      "identifierLabel": "Identifikaator",
+      "identifierRequired": "Sisesta identifikaator.",
+      "identifierTaken": "Seda identifikaatorit kasutab juba teine režiim.",
+      "nameLabel": "Režiimi nimi",
+      "nameRequired": "Sisesta režiimi nimi.",
+      "notFound": "Seda režiimi enam ei ole.",
+      "restrictionHint": "Muuta saab ainult faile, mis vastavad sellele mustrile. Jäta väli tühjaks, et lubada kõiki faile.",
+      "restrictionInvalid": "Sisesta kehtiv muster.",
+      "restrictionLabel": "Piirangu silt",
+      "restrictionPattern": "Faili muster",
+      "roleLabel": "Rolli määratlus",
+      "roleRequired": "Kirjelda, mida see režiim teeb.",
+      "tool": {
+        "browser": "Kasuta brauserit",
+        "command": "Käivita käsud",
+        "edit": "Muuda faile",
+        "mcp": "Kasuta MCP-d",
+        "read": "Loe faile"
+      },
+      "whenToUseLabel": "Millal seda režiimi kasutada"
+    },
+    "groups": {
+      "create": "Uus grupp",
+      "deleteAction": "Kustuta grupp",
+      "deleteMessage": "Grupp, selle poliitikad ja liikmete määramised eemaldatakse.",
+      "deleteTitle": "Kas kustutada see grupp?",
+      "descriptionLabel": "Grupi kirjeldus",
+      "emptyDescription": "Grupp koondab liikmed, et üks poliitika kehtiks neile kõigile.",
+      "emptyTitle": "Gruppe veel pole",
+      "enterpriseOnly": "Grupid on saadaval Enterprise'i paketis.",
+      "memberCount": "Liikmeid: {{displayCount}}",
+      "memberCount_one": "{{displayCount}} liige",
+      "memberCount_other": "{{displayCount}} liiget",
+      "memberViewEmpty": "Sa ei kuulu selle organisatsiooni ühtegi gruppi.",
+      "memberViewTitle": "Sinu grupid",
+      "membersEmpty": "Ükski aktiivne liige ei vasta sinu otsingule.",
+      "membersLabel": "Grupi liikmed",
+      "nameLabel": "Grupi nimi",
+      "nameRequired": "Sisesta grupi nimi.",
+      "nameTooLong": "Hoia nimi 80 tähemärgi piires.",
+      "notFound": "Seda gruppi enam ei ole.",
+      "permissionDenied": "Ainult organisatsiooni omanik või administraator saab gruppe muuta.",
+      "searchMembers": "Otsi liikmeid",
+      "selectAllVisible": "Vali kõik kuvatud liikmed"
     },
     "hub": {
       "renameTitle": "Nimeta organisatsioon ümber",
@@ -3489,8 +3573,7 @@
       "paymentPending": "Makse ootel",
       "processingBlocked": "Töötlemine blokeeritud",
       "processingNeedsReview": "Töötlemine vajab ülevaatamist",
-      "retryHint": "Proovib Kilo Passi oleku laadimist uuesti.",
-      "setupHint": "Avab veebis Kilo Passi seadistuse."
+      "retryHint": "Proovib Kilo Passi oleku laadimist uuesti."
     }
   },
   "authErrors": {
@@ -4015,6 +4098,7 @@
     "commandAtLimit": "Käsu pikkus on piiratud {{max}} tähemärgiga",
     "commandsEmpty": "Seadistuskäske pole veel",
     "commandsSaveFailed": "Seadistuskäske ei saanud salvestada",
+    "commandLimitReached": "Profiil mahutab kuni {{max}} seadistuskäsku. Teise lisamiseks kustuta üks.",
     "moveCommandUp": "Liiguta käsku {{position}} üles",
     "moveCommandDown": "Liiguta käsku {{position}} alla",
     "skillsTitle": "Oskused",
@@ -4101,6 +4185,7 @@
       "deleteMessage": "Uued sessioonid, mis seda profiili kasutavad, ei pääse enam selle serveri tööriistadele ligi. Seda ei saa tagasi võtta.",
       "deleteConfirm": "Kustuta MCP-server",
       "saveFailed": "MCP-serverit ei saanud salvestada",
+      "limitReached": "Profiil mahutab kuni {{max}} MCP-serverit. Teise lisamiseks kustuta üks.",
       "deleteFailed": "MCP-serverit ei õnnestunud kustutada",
       "updateFailed": "MCP-serverit ei õnnestunud värskendada"
     },
@@ -4133,6 +4218,7 @@
       "modeSubagent": "Ainult subagent",
       "modeAll": "Kõik",
       "saveFailed": "Agenti ei õnnestunud salvestada",
+      "limitReached": "Profiil mahutab kuni {{max}} agenti. Teise lisamiseks kustuta üks.",
       "deleteFailed": "Agenti ei õnnestunud kustutada",
       "nameRequired": "Sisesta agendi nimi",
       "slugRequired": "Sisesta agendi slug",
@@ -4163,6 +4249,7 @@
       "moveUp": "Liiguta käsku {{name}} üles",
       "moveDown": "Liiguta käsku {{name}} alla",
       "saveFailed": "Käsku ei saanud salvestada",
+      "limitReached": "Profiil mahutab kuni {{max}} kaldkriipsukäsku. Teise lisamiseks kustuta üks.",
       "deleteFailed": "Käsku ei õnnestunud kustutada",
       "nameRequired": "Sisesta käsu nimi",
       "nameInvalid": "Nimi peab algama väiketähtedega ja kasutama ainult väiketähti, numbreid ja sidekriipse",
@@ -4243,7 +4330,7 @@
       },
       "purchaseFallback": "Krediidiost",
       "receipt": "Kviitung",
-      "receiptA11y": "Ava kviitung: {{description}}",
+      "receiptA11y": "Ava kviitung: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Selle ostu kohta kviitung puudub."
     },
     "title": "Osta krediiti",
@@ -4449,6 +4536,8 @@
     "topModels": "Enimkasutatud mudelid",
     "topFeatures": "Enimkasutatud funktsioonid",
     "emptyTitle": "Sel perioodil kasutust pole",
+    "unavailableTitle": "Kasutus pole saadaval",
+    "unavailableDescription": "See tööruum ei edasta kasutust. Uuesti proovimine ei aita.",
     "orgSelfNotice": "Näed oma kasutust selles organisatsioonis.",
     "viewDetails": "Vaata kasutuse üksikasju"
   },
@@ -4497,7 +4586,78 @@
     },
     "triggers": {
       "title": "Päästikud ja veebihaagid",
-      "subtitle": "Halda veebihaagi- ja ajastatud päästikuid veebis."
+      "subtitle": "Automatiseeri Cloud Agent käivitused veebihaagi kutse või ajakava kaudu.",
+      "new": "Uus päästik",
+      "emptyTitle": "Päästikuid veel pole",
+      "emptyDescription": "Loo päästik, et alustada Cloud Agent käivitust veebihaagi kutse või ajakava alusel.",
+      "loadFailedTitle": "Päästikute laadimine ebaõnnestus",
+      "loadFailedDescription": "Proovi uuesti, kui ühendus on olemas.",
+      "detailLoadFailedTitle": "Selle päästiku laadimine ebaõnnestus",
+      "detailNotFoundTitle": "Päästikut ei leitud",
+      "cannotEditCreator": "See päästik käivitub selle loojana, seega saab seda muuta ainult looja.",
+      "permissionDenied": "Sinu roll ei luba neid päästikuid hallata.",
+      "webhookUrl": "Veebihaagi URL",
+      "urlCopied": "Veebihaagi URL kopeeritud",
+      "deliveries": "Tarned",
+      "deliveriesEmptyTitle": "Tarneid veel pole",
+      "deliveriesEmptyDescription": "Veebihaagi kutse või ajakavaline käivitus ilmub siin, kui see saabub.",
+      "deliveriesLoadFailedTitle": "Tarnete laadimine ebaõnnestus",
+      "openSession": "Vaata sessiooni",
+      "activationWebhook": "Veebihaagi kutse",
+      "fieldName": "Päästiku nimi",
+      "fieldActivation": "Käivitub",
+      "fieldCron": "Croni avaldis",
+      "fieldCronHelp": "Viis välja: minut, tund, päev, kuu ja nädalapäev. Lühim intervall on üks minut.",
+      "fieldTimezone": "Ajavöönd",
+      "nameLocked": "Nime ei saa pärast päästiku loomist muuta.",
+      "repositoryLocked": "Hoidlat ei saa pärast päästiku loomist muuta.",
+      "environmentAutomatic": "Automaatne hoidla järgi",
+      "notSelected": "Pole valitud",
+      "profileDefaults": "Kasuta vaikeväärtusi",
+      "profileHelp": "Profiili seaded rakenduvad päästiku käivitamisel. Selle saladused lahendatakse sel hetkel.",
+      "customAgent": "Kohandatud agent",
+      "agentHelp": "Agent hoidla .kilo/agent kataloogis või üks sisseehitatud režiimidest.",
+      "fieldBodySchema": "Keha skeem",
+      "bodySchemaHelp": "Valikuline JSON Schema. Päring, mille keha sellele ei vasta, lükatakse tagasi.",
+      "authTitle": "Salajane päis",
+      "authDescription": "Päringud peavad saatma selle päise koos jagatud saladusega.",
+      "authHeaderLabel": "Päise nimi",
+      "authSecretLabel": "Jagatud saladus",
+      "authSecretKeep": "Jäta tühjaks, et salvestatud saladus alles jääks.",
+      "authSecretSet": "Nõutav. Vali tugev juhuslik string.",
+      "authSecretCreator": "Kui päästik käivitub selle loojana, kasuta vähemalt 16 tähemärki.",
+      "autoCommit": "Kinnita muudatused, kui käivitus lõpeb",
+      "condenseOnComplete": "Tihenda kontekst, kui käivitus lõpeb",
+      "activeTitle": "Päästik aktiivne",
+      "activeDescription": "Peatatud veebihaagid vastavad 404-ga.",
+      "runAsCreator": "Käivita minuna",
+      "runAsCreatorDescription": "Iga käivitus kasutab sinu kontot, seega on salajane päis nõutav.",
+      "saveFailedTitle": "Päästiku salvestamine ebaõnnestus",
+      "deleteTitle": "Kustutada see päästik?",
+      "deleteMessage": "Kutsed nimele {{name}} nurjuvad. Seda ei saa tagasi võtta.",
+      "deleteMessageScheduled": "Päästiku nimega {{name}} ajastatud käivitused lõppevad. Seda ei saa tagasi võtta.",
+      "runNow": "Käivita kohe",
+      "runStarted": "Käivitus alustatud",
+      "created": "Päästik loodud",
+      "saved": "Päästik salvestatud",
+      "statusArrived": "Saabunud",
+      "problems": {
+        "nameRequired": "Sisesta nimi.",
+        "nameTooShort": "Kasuta vähemalt 8 tähemärki.",
+        "nameTooLong": "Kasuta 64 tähemärki või vähem.",
+        "nameCharacters": "Kasuta väiketähti, numbreid ja sidekriipse.",
+        "nameReserved": "See nimi on reserveeritud.",
+        "cronRequired": "Sisesta croni avaldis.",
+        "repositoryRequired": "Vali hoidla",
+        "agentRequired": "Vali agent.",
+        "agentInvalid": "Kasuta väiketähti, numbreid ja sidekriipse, alustades tähega.",
+        "modelRequired": "Vali mudel",
+        "promptRequired": "Sisesta viip.",
+        "bodySchemaInvalid": "Sisesta JSON-objekt või jäta see väli tühjaks.",
+        "authHeaderRequired": "Sisesta päise nimi.",
+        "authSecretRequired": "Sisesta jagatud saladus.",
+        "authSecretTooShort": "Kasuta vähemalt 16 tähemärki."
+      }
     }
   },
   "sessionShare": {
@@ -4515,8 +4675,9 @@
     "create": "Loo link",
     "createFailed": "Linki ei õnnestunud luua.",
     "existingTitle": "Olemasolev link",
-    "existingDescription": "Sellel seansil on juba jagamislink. Uue lingi loomine asendab selle ja vana link lakkab töötamast.",
+    "existingDescription": "Sellel seansil on juba jagamislink. Uue lingi loomine nende seadetega asendab selle ja vana link lakkab töötamast.",
     "rotate": "Loo uus link",
+    "replacementSettings": "Need seaded rakenduvad uuele lingile.",
     "revoke": "Eemalda link",
     "revokeTitle": "Kas tühistada link?",
     "revokeMessage": "Praegune link lakkab kohe töötamast.",
@@ -4535,5 +4696,175 @@
     "unavailableDescription": "See jagamislink on aegunud või tühistatud.",
     "transcriptUnavailableTitle": "Seda transkripti ei õnnestunud laadida",
     "transcriptUnavailableDescription": "Link töötab endiselt. Proovi hetke pärast uuesti."
+  },
+  "organizationGuardrails": {
+    "title": "AI kaitsepiirangud",
+    "permissionDenied": "AI kaitsepiiranguid saavad hallata ainult organisatsiooni omanikud ja administraatorid.",
+    "unavailable": "AI kaitsepiirangud pole selle organisatsiooni jaoks saadaval.",
+    "loadError": "AI kaitsepiiranguid ei õnnestunud laadida",
+    "statusSaving": "Salvestamine…",
+    "statusSaved": "Salvestatud",
+    "statusFailed": "Salvestamine ebaõnnestus.",
+    "inputTitle": "Sisendi kaitsepiirangud",
+    "inputDescription": "Kontrollib Enkrypt AI abil iga sisendit, sh tööriistade tulemusi. Kui Enkrypt pole saadaval, lükkab blokeeriv detektor päringu tagasi.",
+    "outputTitle": "Väljundi kaitsepiirangud",
+    "outputDescription": "Kontrollib vastuseid Enkrypt AI abil enne, kui liikmed need kätte saavad. On välja lülitatud, kuni selle sisse lülitad.",
+    "detectorsHint": "„Blokeeri” lükkab märgitud päringu tagasi. „Ainult logi” salvestab selle logisse päringut viivitamata.",
+    "detectorsHintOutput": "„Blokeeri” nurjab märgitud vastuse. „Ainult logi” salvestab selle logisse vastust viivitamata.",
+    "choiceLog": "Ainult logi",
+    "applyTo": "Kehtib",
+    "applyToAllMembers": "Kõigile liikmetele",
+    "applyKiloDefault": "Rakenda Kilo vaikesätted",
+    "invalidSavedTitle": "Salvestatud sisendidetektorite sätteid ei saa lugeda",
+    "invalidSavedBody": "Päringud on blokeeritud, kuni sisendidetektorid uuesti salvestatakse. Allolevad detektorid lähtuvad Kilo vaikesätetest.",
+    "invalidSavedOutputTitle": "Salvestatud väljunddetektorite sätteid ei saa lugeda",
+    "invalidSavedOutputBody": "Vastuseid hoitakse kinni, kuni väljunddetektorid uuesti salvestatakse. Vali allpool väljunddetektorid.",
+    "blockingOutputNote": "Blokeeriv väljunddetektor hoiab vastust kinni, kuni Enkrypt on selle täielikult kontrollinud. Viivituse vältimiseks kasuta valikut „Ainult logi”.",
+    "inputDetectorRequired": "Lülita sisse vähemalt üks sisendidetektor.",
+    "outputDetectorRequired": "Lülita sisse vähemalt üks väljunddetektor.",
+    "rulesTooMany": "Lisada saab kuni {{max}} reeglit.",
+    "ruleIdRequired": "Sisesta reegli ID.",
+    "ruleIdInvalid": "Reegli ID võib sisaldada ainult tähti, numbreid, punkte, sidekriipse ja alakriipse.",
+    "ruleTextRequired": "Kirjelda, mida reegel keelab või nõuab.",
+    "keywordTooLong": "Iga märksõna võib olla kuni {{max}} märki pikk.",
+    "topicTooLong": "Iga teema võib olla kuni {{max}} märki pikk.",
+    "keywordsTooMany": "Lisa kuni {{max}} märksõna.",
+    "topicsTooMany": "Lisa kuni {{max}} teemat.",
+    "piiEntityRequired": "Vali vähemalt üks tuvastatav andmetüüp.",
+    "keywordRequired": "Lisa vähemalt üks märksõna.",
+    "topicRequired": "Lisa vähemalt üks teema.",
+    "policyTextRequired": "Sisesta poliitika tekst.",
+    "ruleRequired": "Lisa vähemalt üks reegel.",
+    "ruleIdDuplicate": "Igal reeglil peab olema oma reegli ID.",
+    "piiEntities": "Tuvastatavad andmed",
+    "keywordsLabel": "Märksõnad",
+    "keywordsHint": "Üks märksõna rea kohta.",
+    "topicsHint": "Üks teema rea kohta.",
+    "policyFormat": "Poliitika vorming",
+    "policyFormatRules": "Struktureeritud reeglid",
+    "policyFormatRulesDescription": "Iga nõude kohta üks reegel koos kategooria ja raskusastmega. Soovitatav.",
+    "policyFormatText": "Poliitika tekst",
+    "policyFormatTextDescription": "Kleebi olemasolev poliitika lihttekstina.",
+    "rulesEmpty": "Reegleid veel pole. Iga reegel kirjeldab üht asja, mida sisendid ei tohi sisaldada ega küsida.",
+    "addRule": "Lisa reegel",
+    "ruleNumber": "Reegel {{number}}",
+    "ruleRemove": "Eemalda reegel {{number}}",
+    "ruleIdLabel": "Reegli ID",
+    "ruleNameLabel": "Nimi (valikuline)",
+    "ruleTextLabel": "Reegel",
+    "ruleRiskCategory": "Riskikategooria",
+    "ruleApplicability": "Ulatus",
+    "ruleFrameworks": "Raamistikud",
+    "detector": {
+      "promptInjection": {
+        "label": "Viibasüst",
+        "description": "Tuvastab katseid juhiseid üle kirjutada või mudeli piiranguid murda."
+      },
+      "policyViolation": {
+        "label": "Poliitika rikkumine",
+        "description": "Märgib sisendid, mis rikuvad sinu organisatsiooni tekstina või reeglitena kirja pandud poliitikat.",
+        "descriptionOutput": "Märgib vastused, mis rikuvad sinu organisatsiooni tekstina või reeglitena kirja pandud poliitikat."
+      },
+      "pii": {
+        "label": "Isikuandmed ja saladused",
+        "description": "Tuvastab isikuandmeid, mandaate, IP-aadresse ja URL-e."
+      },
+      "keywords": {
+        "label": "Keelatud märksõnad",
+        "descriptionOutput": "Tuvastab vastused, mis sisaldavad mõnda sinu loetletud märksõna."
+      },
+      "topics": {
+        "label": "Teemad",
+        "descriptionOutput": "Märgib vastused, mis käsitlevad mõnda sinu loetletud teemat."
+      },
+      "toxicity": {
+        "label": "Toksilisus",
+        "description": "Tuvastab toksilist, solvavat, ähvardavat või vaenulikku keelekasutust."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Tuvastab seksuaalset või muul viisil tööks sobimatut sisu."
+      },
+      "bias": {
+        "label": "Kallutatus",
+        "description": "Tuvastab kallutatud või diskrimineerivat keelekasutust."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Isikuandmed",
+        "description": "Nimed, e-posti aadressid, telefoninumbrid."
+      },
+      "secrets": {
+        "label": "Saladused",
+        "description": "API-võtmed, tokenid, paroolid."
+      },
+      "ipAddress": {
+        "label": "IP-aadressid",
+        "description": "IPv4- ja IPv6-aadressid."
+      },
+      "url": {
+        "label": "URL-id",
+        "description": "Veebiaadressid."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Turvalisus ja pettused",
+      "safetyHarm": "Ohutus ja kahju",
+      "privacyDataProtection": "Privaatsus ja andmekaitse",
+      "brandReputationTrust": "Bränd ja maine",
+      "biasFairnessEthical": "Kallutatus ja õiglus",
+      "legalIpLiability": "Õiguslik ja intellektuaalomandi vastutus",
+      "productMisuse": "Toote väärkasutus",
+      "performanceQuality": "Jõudlus ja kvaliteet"
+    },
+    "applicability": {
+      "user": "Kasutaja sisend",
+      "userAssistant": "Kasutaja sisend ja vastused"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Top 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "ELi tehisintellekti määrus",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Enterprise-funktsioon",
+    "enterpriseOnly": "See funktsioon on saadaval ainult Enterprise-paketiga.",
+    "readOnly": "Neid sätteid saavad muuta ainult organisatsiooni omanikud ja administraatorid.",
+    "loadError": "Teenusepakkujaid ja mudeleid ei õnnestunud laadida",
+    "tabModels": "Mudelid",
+    "tabProviders": "Teenusepakkujad",
+    "tabGateways": "Lüüsid",
+    "modelsDescription": "Lülita mudel välja, et blokeerida see kõigi liikmete jaoks. Lubatud teenusepakkujate mudelid on algselt sisse lülitatud.",
+    "modelsDeniedOnly": "Ainult keelatud",
+    "modelsEmpty": "Sellele otsingule ei vasta ükski mudel.",
+    "providersDescription": "Lülita teenusepakkuja välja, et Kilo ei suunaks selle organisatsiooni päringuid sellele.",
+    "providersNeedCatalog": "Teenusepakkujate lülitid on kirjutuskaitstud, kuni kogu mudelikataloog on laaditud. Nende muutmiseks puuduta ülal nuppu Proovi uuesti.",
+    "providersEmpty": "Sellele otsingule ei vasta ükski teenusepakkuja.",
+    "allowAllShown": "Luba kõik kuvatud",
+    "denyAllShown": "Keela kõik kuvatud",
+    "gatewaysDescription": "Kilo suunab mudelipäringud läbi Vercel AI Gateway või OpenRouteri. Kui lüüs on välja lülitatud, need päringud nurjuvad.",
+    "emptyProviderList": "Luba vähemalt üks teenusepakkuja. Tühi loend blokeerib kõik Kilo mudelimarsruudid.",
+    "gatewaysUnavailable": "Lüüside seaded pole selle organisatsiooni jaoks saadaval.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "OpenRouteri päringud pole seotud kindla piirkonnaga.",
+    "inferenceRegion": "Järeldusepiirkond",
+    "inferenceRegionDescription": "Seob Vercel AI Gateway päringud selle piirkonnaga. Kui mudel pole seal saadaval, päring nurjub.",
+    "disableOpenrouterNote": "OpenRouteri väljalülitamine blokeerib ka BYOK-võtmed, mis suunavad päringuid selle kaudu.",
+    "emptyModelList": "Jäta vähemalt üks mudel sisse lülitatuks. Kui keelad kõik mudelid, pole liikmetel midagi kasutada.",
+    "catalogUnavailable": "Täielikku mudelikataloogi ei laaditud, seega kuvatakse ainult sinu salvestatud loendid. Kõigi mudelite laadimiseks proovi uuesti.",
+    "region": {
+      "global": "Globaalne",
+      "us": "Ameerika Ühendriigid",
+      "eu": "Euroopa Liit",
+      "au": "Austraalia",
+      "jp": "Jaapan"
+    }
   }
 }

@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Kudeatu webean",
     "creditHistory": "Kredituen historia",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Utzi",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Erosketak, ordainagiriak eta kredituen jarduera",
     "invoicesSubtitle": "Deskargatu zure erosketen fakturak",
-    "manageBilling": "Kudeatu fakturazioa kilo.ai-n",
-    "manageBillingIosNote": "Ordainketa-metodoak, saldoaren birkarga automatikoa eta fakturazio-xehetasunak kilo.ai-n kudeatzen dira.",
     "codeReviewerSubtitle": "PR-ak automatikoki berrikustea",
     "securityAgentSubtitle": "Aurkitu eta konpondu ahultasunak",
     "reviews": "Berrikuspenak",
@@ -364,7 +360,8 @@
     "providerKeys": {
       "title": "Hornitzaileen gakoak",
       "rowSubtitle": "Erabili zure hornitzailearen fakturazioa",
-      "manageOnWebReason": "Hornitzaile hauek egiturazko kredentzialak behar dituzte.",
+      "orgDescription": "Gako hauek erakundeko guztiekin partekatzen dira, eta erakundearen hornitzaile-kontuetan fakturatzen dira.",
+      "viewOnly": "Erakundeko jabeak, administratzaileak edo fakturazio-kudeatzaileak soilik alda ditzake erakundearen gakoak.",
       "description": "Gako hauen bidezko eskaerak zure hornitzaile-kontuan fakturatzen dira, ez zure Kilo saldoan.",
       "managedByPlan": "Zure kodetze-planak kudeatzen du",
       "enableKey": "Gaitu {{provider}} gakoa",
@@ -374,6 +371,7 @@
       "removeMessage": "Gako hau erabiltzen zuten eskaerek ez dute aurrerantzean zure hornitzailearen fakturazioa erabiliko.",
       "add": "Gehitu gakoa",
       "added": "Gakoa gehitu da",
+      "updated": "Gakoa eguneratu da",
       "emptyTitle": "Ez dago hornitzaile-gakorik",
       "emptyDescription": "Gehitu gakoa hasteko.",
       "chooseProvider": "Aukeratu hornitzaile bat",
@@ -382,9 +380,34 @@
       "noProvidersDescription": "Ez dago bilaketa horrekin bat datorren hornitzailerik.",
       "newKeyTitle": "Gako berria",
       "newKeyDescription": "Gakoa zifratuta gordetzen da, eta ezin da berriro erakutsi.",
+      "edit": "Editatu gakoa",
+      "editKeyTitle": "Ordeztu gakoa",
+      "editKeyDescription": "Gordetako balioa ezin da erakutsi. Idatzi berri bat hura ordezteko.",
+      "editKeyMappingsWarning": "Gakoa ordezteak gordetako eredu-esleipenak ere ordezten ditu: sartu berriro oraindik behar dituzun esleipen guztiak.",
+      "saveFailed": "Ezin izan da gakoa gorde.",
+      "invalidCredentials": "Egiaztatu kredentzialak eta saiatu berriro.",
+      "fieldRequired": "{{field}} derrigorrezkoa da.",
+      "incompleteMapping": "{{number}}. esleipenak bai atebideko ereduaren slug-a bai inplementazio-izena behar ditu.",
       "apiKeyLabel": "API gakoa",
       "apiKeyPlaceholder": "Itsatsi gakoa",
-      "apiKeyRequired": "Idatzi gakoa."
+      "apiKeyRequired": "Idatzi gakoa.",
+      "authMethod": "Autentifikazio-metodoa",
+      "authMethodAccessKeys": "Sarbide-gakoak",
+      "resourceName": "Azure baliabidearen izena",
+      "region": "AWS eskualdea",
+      "accessKeyId": "Sarbide-gakoaren IDa",
+      "secretAccessKey": "Sarbide-gako sekretua",
+      "project": "Google Cloud proiektua",
+      "location": "Vertex kokapena",
+      "clientEmail": "Zerbitzu-kontuaren helbide elektronikoa",
+      "privateKey": "Zerbitzu-kontuaren gako pribatua",
+      "modelMappings": "Eredu-esleipenak",
+      "modelMappingsDescription": "Bideratu atebideko eredu bat inplementazio-izen pertsonalizatu batera.",
+      "mappingTitle": "{{number}}. esleipena",
+      "mappingGatewayModel": "Atebideko ereduaren slug-a",
+      "mappingCustomModel": "Inplementazio-izena",
+      "addMapping": "Gehitu esleipena",
+      "removeMapping": "Kendu {{number}}. esleipena"
     },
     "dataExport": {
       "title": "Zure datuak",
@@ -457,7 +480,8 @@
       "nextStepFinal": "Helegitearen erabakia behin betikoa da. Ezin da helegite gehiago aurkeztu.",
       "viewReceipt": "Ikusi agiria"
     },
-    "changelog": "Berritasunak"
+    "changelog": "Berritasunak",
+    "changelogVersionPending": "Bertsio honen oharrak aplikazioaren hurrengo eguneratzearekin iritsiko dira."
   },
   "preferences": {
     "general": "Orokorra",
@@ -1170,8 +1194,6 @@
       "clearMessage": "Eremu huts bat gordetzen baduzu, berrikusle honentzat gordetako argibide pertsonalizatuak ezabatzen dira."
     },
     "repos": {
-      "unavailable": "Biltegiak ez daude erabilgarri. Amaitu Bitbucket-en konfigurazioa kilo.ai-n.",
-      "finishSetup": "Amaitu konfigurazioa",
       "manageAccess": "Kudeatu sarbidea",
       "bitbucketNoRepositoriesDescription": "Ez dago biltegirik erabilgarri Bitbucket-eko lan-eremu honetan.",
       "gitlabNoRepositoriesDescription": "Baliteke GitLab-eko talde edo proiektu gehiagorako sarbidea eman behar izatea.",
@@ -1326,11 +1348,10 @@
     "followReviewMd": "Bete REVIEW.md fitxategiko jarraibideak",
     "followReviewMdSubtitle": "Bete biltegi bakoitzeko REVIEW.md fitxategiko jarraibideak",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ez dago konektatuta. Erakundeko jabeek, administratzaileek eta fakturazio-kudeatzaileek soilik konekta dezakete.",
-      "setupIncomplete": "Konfigurazioa osatu gabe dago. Amaitu kilo.ai-n.",
-      "setup": "Bitbucket-en konfigurazioa"
+      "notConnectedReadOnly": "Bitbucket ez dago konektatuta. Erakundeko jabeek, administratzaileek eta fakturazio-kudeatzaileek soilik konekta dezakete."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Erakunde honen Bitbucket konexioa webean kudeatzen da, ordenagailu batetik.",
       "description": "Sortu lan-eremurako sarbide-token bat beharrezko baimenekin eta itsatsi behean.",
       "scopes": "Kontua: irakurtzea · Biltegiak: irakurtzea/idaztea · Bateratze-eskaerak: irakurtzea · Webhook-ak: irakurtzea/idaztea",
       "tokenPlaceholder": "Lan-eremurako sarbide-tokena"
@@ -1345,7 +1366,8 @@
       "noReviews": "Ez dago berrikuspenik oraindik",
       "noReviewsDescription": "Kode-berrikusleak bateratze-eskaera bat berrikusi ondoren agertuko dira berrikuspenak hemen.",
       "startManualReview": "Hasi eskuzko berrikuspena",
-      "configureProvider": "Konfiguratu hornitzailea"
+      "configureProvider": "Konfiguratu hornitzailea",
+      "connectOwnerOnly": "Eskatu erakunde bateko jabeari edo administratzaileari hornitzaile bat konekta dezan."
     },
     "platformList": {
       "checking": "Egiaztatzen…",
@@ -1358,8 +1380,7 @@
       "githubError": "Ezin izan da GitHub-en konfigurazioa ireki. Saiatu berriro.",
       "gitlabAccount": "GitLab-eko kontua",
       "gitlabError": "Ezin izan da GitLab-en konfigurazioa ireki. Saiatu berriro.",
-      "description": "Konektatu Kiloren {{label}} bateratze-eskaerak automatikoki berrikusteko.",
-      "bitbucketError": "Ezin izan da Bitbucket-en konfigurazioa ireki. Saiatu berriro."
+      "description": "Konektatu Kiloren {{label}} bateratze-eskaerak automatikoki berrikusteko."
     },
     "overview": {
       "allAreas": "Eremu guztiak",
@@ -2015,6 +2036,9 @@
       "completedWillAppear": "Amaitutako saioak hemen agertuko dira.",
       "noPastSessions": "Ez dago aurreko saiorik",
       "pastSessions": "Aurreko saioak",
+      "sectionAccessibility_one": "{{title}}: {{displayCount}} saio",
+      "sectionAccessibility_other": "{{title}}: {{displayCount}} saio",
+      "sectionAccessibility": "{{title}}: {{displayCount}} saio",
       "live": "ZUZENEAN",
       "updating": "Eguneratzen"
     },
@@ -2149,10 +2173,8 @@
       "couldNotLoadBitbucketRepositories": "Ezin izan dira Bitbucket-eko biltegiak kargatu.",
       "connectGithubDescription": "Hasi saioa zure nabigatzailean, eta gero itzuli hona GitHub biltegi bat aukeratzeko.",
       "connectGitlabDescription": "Hasi saioa zure nabigatzailean, eta gero itzuli hona GitLab biltegi bat aukeratzeko.",
-      "connectBitbucketDescription": "Hasi saioa zure nabigatzailean, eta gero itzuli hona Bitbucket biltegi bat aukeratzeko.",
       "openGithub": "Ireki GitHub",
       "openGitlab": "Ireki GitLab",
-      "openBitbucket": "Ireki Bitbucket",
       "refreshRepositories": "Freskatu biltegien zerrenda",
       "githubConnected": "GitHub konektatuta",
       "gitlabConnected": "GitLab konektatuta",
@@ -2952,6 +2974,7 @@
     "signOutThisDevice": "Itxi saioa gailu honetan",
     "signOutSessionLabel": "Itxi saioa: {{device}}, saio-hasiera: {{signedIn}}, azken jarduera: {{lastSeen}}",
     "sessionSignedOut": "Saioa itxi da.",
+    "sessionSignOutFailed": "Ezin izan da saio hau itxi. Saiatu berriro.",
     "signOutThisDeviceTitle": "Itxi saioa gailu honetan?",
     "signOutThisSessionTitle": "Itxi saio hau?",
     "signOutThisSessionMessage": "{{device}} gailuaren saioa itxiko da. Azken jarduera: {{lastSeen}}. Gailuak APIrako sarbidea mantendu dezake, gehienez ordubetez.",
@@ -3052,6 +3075,9 @@
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
     "searchPlaceholder": "Azkenaldiko saioen bilaketa",
     "connectedCli": "Konektatutako CLI batean",
+    "connectedCliAccessibility_one": "{{title}}: {{displayCount}} instantzia",
+    "connectedCliAccessibility_other": "{{title}}: {{displayCount}} instantzia",
+    "connectedCliAccessibility": "{{title}}: {{displayCount}} instantzia",
     "newSessionOn": "Saio berria {{name}} izeneko instantzian",
     "noMatchingSessions": "Ez dago bat datorren saiorik.",
     "onlyFirstFilesAttached": "Lehenengo {{displayCount}} fitxategiak bakarrik erantsiko dira.",
@@ -3072,15 +3098,14 @@
     "manage": {
       "billingHistory": "Fakturazio-historia",
       "billingHistoryEmpty": "Oraindik ez dago fakturazio-historiarik.",
+      "billingHistoryError": "Ezin izan da fakturazio-historia kargatu",
       "cancel": "Ezeztatu harpidetza",
       "cancelDescription": "Zure Kilo Pass-ak aktibo jarraituko du fakturazio-aldia amaitu arte, eta ez da berrituko.",
       "cancelScheduled": "Ezeztatze-data: {{date}}",
       "cancelScheduledChange": "Ezeztatu programatutako aldaketa",
       "cancelled": "Harpidetza ezeztatu da",
-      "changePlan": "Aldatu plana kilo.ai-n",
-      "changePlanIosNote": "Ordainpeko planen aldaketak kilo.ai-n egin daitezke.",
       "creditHistoryEmpty": "Oraindik ez dago Kilo Pass krediturik.",
-      "manageInStore": "Kudeatu hemen: {{store}}",
+      "creditHistoryError": "Ezin izan da kreditu-historia kargatu",
       "resume": "Berraktibatu harpidetza",
       "resumeCancelledDescription": "Zure Kilo Pass-a berriro automatikoki berrituko da.",
       "resumePausedDescription": "Zure Kilo Pass-a orain berraktibatuko da, programatutako berrabiatze-data baino lehen.",
@@ -3117,9 +3142,6 @@
     "bonusFree": "Doako bonusa",
     "bonusReferral": "Erreferentzia-bonusa",
     "bonusAvailable": "Eskura dagoen doako bonusa",
-    "kiloPassManagement": "Kilo Pass-en kudeaketa",
-    "kiloPassSetup": "Kilo Pass-en konfigurazioa",
-    "opensManagementOnWeb": "Kilo Pass kudeatzeko orria irekitzen du webgunean.",
     "loadFailedRetry": "Egiaztatu zure konexioa, eta gero saiatu berriro.",
     "legalTermsOfUse": "Erabilera-baldintzak (EULA)",
     "purchaseDifferentAccount": "App Store-ko erosketa hau ez dago zure Kilo kontuarekin lotuta. Hasi saioa erosketa egiteko erabili zenuen Apple Account kontuan, eta saiatu berriro.",
@@ -3305,7 +3327,6 @@
       "buySeats": "Erosi lizentziak",
       "setupAutoTopUp": "Konfiguratu birkarga automatikoa",
       "manageAutoTopUp": "Kudeatu birkarga automatikoa",
-      "webAddress": "Web-helbidea {{url}}",
       "opensOnWeb": "Webean irekitzen da"
     },
     "boundary": {
@@ -3321,7 +3342,7 @@
       "selectOrganization": "Hautatu erakunde bat",
       "unavailableDescription": "Erakunde hau jada ez dago erabilgarri. Aukeratu bat zure profiletik jarraitzeko.",
       "unavailableSessionsDescription": "Erakunde hau jada ez dago erabilgarri. Ezin dira kargatu haren saioak.",
-      "accessDeniedDescription": "Ez duzu erakunde honetarako sarbiderik."
+      "accessDeniedDescription": "Eskatu erakunde baten jabe edo administratzaile bati zuretzako sarbidea emateko."
     },
     "create": {
       "title": "Sortu erakundea",
@@ -3441,25 +3462,88 @@
     },
     "settingsOnWeb": {
       "title": "Erakundearen ezarpenak webean",
-      "integrations": "Integrazioak webean",
       "usageDetails": "Erabileraren xehetasunak",
       "providersAndModels": "Hornitzaileak eta ereduak",
       "groups": "Taldeak",
       "guardrails": "Babes-mugak",
       "byok": "Erabili zure gakoa",
       "ssoAndDomain": "SSO eta domeinua",
-      "emailPreferences": "Posta elektronikoaren hobespenak",
       "dataCollection": "Datu-bilketa",
       "auditLogs": "Ikuskaritza-erregistroak",
-      "requestLogs": "Eskaeren erregistroak",
-      "subOrganizations": "Azpierakundeak",
-      "distributeFunds": "Banatu funtsak"
+      "requestLogs": "Eskaeren erregistroak"
+    },
+    "requestLogs": {
+      "hint": "Leihoa amaitu aurreko orduko eskaerak, berrienak lehenik.",
+      "older": "Aurreko ordua",
+      "newer": "Hurrengo ordua",
+      "truncated": "Ordu honetan zerrendak erakusten dituenak baino eskaera gehiago daude.",
+      "emptyTitle": "Ez dago eskaerarik",
+      "emptyDescription": "Ordu honetan ez dago atebideko eskaerarik.",
+      "loadError": "Ezin izan dira eskaeren erregistroak kargatu.",
+      "permissionDenied": "Erakunde baten jabeak, administratzaileak edo fakturazio-kudeatzaileak soilik irakur ditzake haren eskaeren erregistroak.",
+      "tokens": "{{input}} sarrera · {{output}} irteera",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Sarrerako tokenak",
       "orgLast30Days": "Kide guztiak · Azken 30 egunak",
       "outputTokens": "Irteerako tokenak",
       "requests": "Eskaerak"
+    },
+    "modes": {
+      "create": "Modu berria",
+      "deleteAction": "Modua ezabatu",
+      "deleteMessage": "Modua erakunde honetako guztientzat kenduko da. Barneko modu bat ordezkatzen duen modua barneko ezarpenetara itzuliko da.",
+      "deleteTitle": "Modu hau ezabatu?",
+      "descriptionLabel": "Moduaren deskribapena",
+      "emptyDescription": "Hemen gehitutako moduak erakunde honetako guztientzat daude erabilgarri.",
+      "emptyTitle": "Oraindik ez dago modu pertsonalizaturik",
+      "identifierHint": "Letra xeheak, zenbakiak eta gidoiak.",
+      "identifierInvalid": "Erabili soilik letra xeheak, zenbakiak eta gidoiak.",
+      "identifierLabel": "Identifikatzailea",
+      "identifierRequired": "Sartu identifikatzaile bat.",
+      "identifierTaken": "Beste modu batek dagoeneko identifikatzaile hau erabiltzen du.",
+      "nameLabel": "Moduaren izena",
+      "nameRequired": "Sartu moduaren izena.",
+      "notFound": "Modu hau ez da jada existitzen.",
+      "restrictionHint": "Eredu honekin bat datozen fitxategiak soilik editatu daitezke. Utzi hutsik fitxategi guztiak onartzeko.",
+      "restrictionInvalid": "Sartu baliozko eredu bat.",
+      "restrictionLabel": "Murrizketaren etiketa",
+      "restrictionPattern": "Fitxategi-eredua",
+      "roleLabel": "Rolaren definizioa",
+      "roleRequired": "Deskribatu modu honek zer egiten duen.",
+      "tool": {
+        "browser": "Nabigatzailea erabili",
+        "command": "Komandoak exekutatu",
+        "edit": "Fitxategiak editatu",
+        "mcp": "MCP erabili",
+        "read": "Fitxategiak irakurri"
+      },
+      "whenToUseLabel": "Noiz erabili modu hau"
+    },
+    "groups": {
+      "create": "Talde berria",
+      "deleteAction": "Taldea ezabatu",
+      "deleteMessage": "Taldea, bere politikak eta kideen esleipenak kenduko dira.",
+      "deleteTitle": "Talde hau ezabatu?",
+      "descriptionLabel": "Taldearen deskribapena",
+      "emptyDescription": "Talde batek kideak biltzen ditu, politika bat guztiei aplika dakien.",
+      "emptyTitle": "Oraindik ez dago talderik",
+      "enterpriseOnly": "Taldeak Enterprise planean daude erabilgarri.",
+      "memberCount": "{{displayCount}} kide",
+      "memberCount_one": "{{displayCount}} kide",
+      "memberCount_other": "{{displayCount}} kide",
+      "memberViewEmpty": "Ez zaude erakunde honetako inolako taldetan.",
+      "memberViewTitle": "Zure taldeak",
+      "membersEmpty": "Ez dago bilaketarekin bat datorren kide aktiborik.",
+      "membersLabel": "Taldeko kideak",
+      "nameLabel": "Taldearen izena",
+      "nameRequired": "Sartu taldearen izena.",
+      "nameTooLong": "Izenak 80 karaktere edo gutxiago izan behar ditu.",
+      "notFound": "Talde hau ez da jada existitzen.",
+      "permissionDenied": "Erakundearen jabeak edo administratzaileak soilik alda ditzake erakundearen taldeak.",
+      "searchMembers": "Kideak bilatu",
+      "selectAllVisible": "Hautatu erakutsitako guztiak"
     },
     "hub": {
       "renameTitle": "Berrizendatu erakundea",
@@ -3489,8 +3573,7 @@
       "paymentPending": "Ordainketa egiteko zain",
       "processingBlocked": "Prozesamendua blokeatuta",
       "processingNeedsReview": "Prozesamenduak berrikuspena behar du",
-      "retryHint": "Kilo Pass-en egoera kargatzen saiatzen da berriro.",
-      "setupHint": "Kilo Pass-en konfigurazioa webean irekitzen du."
+      "retryHint": "Kilo Pass-en egoera kargatzen saiatzen da berriro."
     }
   },
   "authErrors": {
@@ -4015,6 +4098,7 @@
     "commandAtLimit": "Komandoa {{max}} karakteretara mugatuta dago",
     "commandsEmpty": "Oraindik ez dago konfigurazio komandorik",
     "commandsSaveFailed": "Ezin izan dira gorde konfigurazio komandoak",
+    "commandLimitReached": "Profil batek gehienez {{max}} komando izan ditzake. Ezabatu bat beste bat gehitzeko.",
     "moveCommandUp": "Mugitu {{position}}. komandoa gora",
     "moveCommandDown": "Mugitu {{position}}. komandoa behera",
     "skillsTitle": "Trebetasunak",
@@ -4101,6 +4185,7 @@
       "deleteMessage": "Profil hau erabiltzen duten saio berriek jada ez dute zerbitzari honen tresnetara iritsiko. Ezin da desegin.",
       "deleteConfirm": "Ezabatu MCP zerbitzaria",
       "saveFailed": "Ezin izan da MCP zerbitzaria gorde",
+      "limitReached": "Profil batek gehienez {{max}} MCP zerbitzari izan ditzake. Ezabatu bat beste bat gehitzeko.",
       "deleteFailed": "Ezin izan da MCP zerbitzaria ezabatu",
       "updateFailed": "Ezin izan da MCP zerbitzaria eguneratu"
     },
@@ -4133,6 +4218,7 @@
       "modeSubagent": "Azpi-agentea soilik",
       "modeAll": "Guztiak",
       "saveFailed": "Ezin izan da agentea gorde",
+      "limitReached": "Profil batek gehienez {{max}} agente izan ditzake. Ezabatu bat beste bat gehitzeko.",
       "deleteFailed": "Ezin izan da agentea ezabatu",
       "nameRequired": "Sartu agentearen izena",
       "slugRequired": "Sartu agentearen slug-a",
@@ -4163,6 +4249,7 @@
       "moveUp": "Mugitu {{name}} komandoa gora",
       "moveDown": "Mugitu {{name}} komandoa behera",
       "saveFailed": "Ezin izan da gorde komandoa",
+      "limitReached": "Profil batek gehienez {{max}} barra komando izan ditzake. Ezabatu bat beste bat gehitzeko.",
       "deleteFailed": "Ezin izan da komandoa ezabatu",
       "nameRequired": "Sartu komando-izen bat",
       "nameInvalid": "Izenak letra xehe batekin hasi behar du eta letra xeheak, zifrak eta marra baino ez ditu erabili",
@@ -4243,7 +4330,7 @@
       },
       "purchaseFallback": "Kreditu-erosketa",
       "receipt": "Ordainagiria",
-      "receiptA11y": "Ireki honen ordainagiria: {{description}}",
+      "receiptA11y": "Ireki honen ordainagiria: {{description}}, {{amount}}, {{date}}tik",
       "receiptUnavailable": "Ez dago ordainagiririk erosketa honetarako."
     },
     "title": "Erosi kredituak",
@@ -4449,6 +4536,8 @@
     "topModels": "Eredu erabilienak",
     "topFeatures": "Funtzio erabilienak",
     "emptyTitle": "Ez dago erabilerarik aldi honetan",
+    "unavailableTitle": "Erabilera ez dago erabilgarri",
+    "unavailableDescription": "Lan-eremu honek ez du erabilerarik jakinarazten. Berriro saiatzeak ez du lagunduko.",
     "orgSelfNotice": "Erakunde honetan zure erabilera ikusten ari zara.",
     "viewDetails": "Ikusi erabileraren xehetasunak"
   },
@@ -4497,7 +4586,78 @@
     },
     "triggers": {
       "title": "Abiarazleak eta webhookak",
-      "subtitle": "Kudeatu webhook-abiarazleak eta programatutako abiarazleak webean."
+      "subtitle": "Automatizatu Cloud Agent exekuzioak webhook dei batetik edo ordutegi baten arabera.",
+      "new": "Abiarazle berria",
+      "emptyTitle": "Oraindik ez dago abiarazlerik",
+      "emptyDescription": "Sortu abiarazle bat Cloud Agent exekuzio bat hasteko webhook dei batetik edo ordutegi baten arabera.",
+      "loadFailedTitle": "Ezin izan dira abiarazleak kargatu",
+      "loadFailedDescription": "Saiatu berriro konexioa duzunean.",
+      "detailLoadFailedTitle": "Ezin izan da abiarazle hau kargatu",
+      "detailNotFoundTitle": "Ez da abiarazlea aurkitu",
+      "cannotEditCreator": "Abiarazle hau bere sortzaile gisa exekutatzen da, beraz, sortzaileak soilik alda dezake.",
+      "permissionDenied": "Zure rolak ezin ditu abiarazle hauek kudeatu.",
+      "webhookUrl": "Webhook URLa",
+      "urlCopied": "Webhook URLa kopiatu da",
+      "deliveries": "Entregak",
+      "deliveriesEmptyTitle": "Oraindik ez dago entregarik",
+      "deliveriesEmptyDescription": "Webhook dei bat edo programatutako exekuzio bat iritsitakoan agertuko da hemen.",
+      "deliveriesLoadFailedTitle": "Ezin izan dira entregak kargatu",
+      "openSession": "Ikusi saioa",
+      "activationWebhook": "Webhook deia",
+      "fieldName": "Abiarazlearen izena",
+      "fieldActivation": "Exekuzio mota",
+      "fieldCron": "Cron adierazpena",
+      "fieldCronHelp": "Bost eremu: minutua, ordua, eguna, hilabetea eta asteguna. Tarte laburrena minutu bat da.",
+      "fieldTimezone": "Ordu-zona",
+      "nameLocked": "Izena ezin da aldatu abiarazlea sortu ondoren.",
+      "repositoryLocked": "Biltegia ezin da aldatu abiarazlea sortu ondoren.",
+      "environmentAutomatic": "Automatikoa biltegiaren arabera",
+      "notSelected": "Ez dago hautatuta",
+      "profileDefaults": "Erabili lehenetsiak",
+      "profileHelp": "Profilaren ezarpenak abiarazlea exekutatzen denean aplikatzen dira. Bere sekretuak orduan ebazten dira.",
+      "customAgent": "Agente pertsonalizatua",
+      "agentHelp": "Biltegiko .kilo/agent direktorioan dagoen agente bat, edo modu integratuetako bat.",
+      "fieldBodySchema": "Gorputzaren eskema",
+      "bodySchemaHelp": "JSON Schema aukerakoa. Gorputza harekin bat ez datorren eskaera baztertu egiten da.",
+      "authTitle": "Goiburu sekretua",
+      "authDescription": "Eskaerek goiburu hau bidali behar dute sekretu partekatuarekin.",
+      "authHeaderLabel": "Goiburuaren izena",
+      "authSecretLabel": "Sekretu partekatua",
+      "authSecretKeep": "Utzi hutsik gordetako sekretua mantentzeko.",
+      "authSecretSet": "Beharrezkoa. Aukeratu ausazko kate sendo bat.",
+      "authSecretCreator": "Erabili gutxienez 16 karaktere abiarazlea bere sortzaile gisa exekutatzen denean.",
+      "autoCommit": "Erregistratu aldaketak exekuzioa amaitzean",
+      "condenseOnComplete": "Laburtu testuingurua exekuzioa amaitzean",
+      "activeTitle": "Abiarazlea aktibo",
+      "activeDescription": "Pausatutako webhookek 404 erantzuten dute.",
+      "runAsCreator": "Exekutatu nire izenean",
+      "runAsCreatorDescription": "Exekuzio bakoitzak zure kontua erabiltzen du, beraz, goiburu sekretua derrigorrezkoa da.",
+      "saveFailedTitle": "Ezin izan da abiarazlea gorde",
+      "deleteTitle": "Abiarazle hau ezabatu?",
+      "deleteMessage": "{{name}}(e)rako deiak huts egingo dute. Hau ezin da desegin.",
+      "deleteMessageScheduled": "{{name}}(r)en exekuzio programatuak geldituko dira. Hau ezin da desegin.",
+      "runNow": "Exekutatu orain",
+      "runStarted": "Exekuzioa hasi da",
+      "created": "Abiarazlea sortu da",
+      "saved": "Abiarazlea gorde da",
+      "statusArrived": "Iritsi da",
+      "problems": {
+        "nameRequired": "Sartu izen bat.",
+        "nameTooShort": "Erabili gutxienez 8 karaktere.",
+        "nameTooLong": "Erabili 64 karaktere edo gutxiago.",
+        "nameCharacters": "Erabili letra minuskulak, zenbakiak eta gidoiak.",
+        "nameReserved": "Izen hau erreserbatuta dago.",
+        "cronRequired": "Sartu cron adierazpen bat.",
+        "repositoryRequired": "Aukeratu biltegi bat",
+        "agentRequired": "Aukeratu agente bat.",
+        "agentInvalid": "Erabili letra minuskulak, zenbakiak eta gidoiak, letra batekin hasita.",
+        "modelRequired": "Hautatu eredu bat",
+        "promptRequired": "Sartu jarraibide bat.",
+        "bodySchemaInvalid": "Sartu JSON objektu bat, edo utzi hau hutsik.",
+        "authHeaderRequired": "Sartu goiburuaren izena.",
+        "authSecretRequired": "Sartu sekretu partekatua.",
+        "authSecretTooShort": "Erabili gutxienez 16 karaktere."
+      }
     }
   },
   "sessionShare": {
@@ -4515,8 +4675,9 @@
     "create": "Sortu esteka",
     "createFailed": "Ezin izan da esteka sortu.",
     "existingTitle": "Lehendik dagoen esteka",
-    "existingDescription": "Saio honek partekatze-esteka bat du dagoeneko. Berri bat sortzen baduzu, hura ordeztuko du eta esteka zaharrak funtzionatzeari utziko dio.",
+    "existingDescription": "Saio honek partekatze-esteka bat du dagoeneko. Ezarpen hauekin esteka berri bat sortzen baduzu, hura ordeztuko du eta esteka zaharrak funtzionatzeari utziko dio.",
     "rotate": "Sortu esteka berri bat",
+    "replacementSettings": "Ezarpen hauek esteka berriari aplikatzen zaizkio.",
     "revoke": "Baliogabetu esteka",
     "revokeTitle": "Esteka baliogabetu?",
     "revokeMessage": "Uneko estekak berehala utziko dio funtzionatzeari.",
@@ -4535,5 +4696,175 @@
     "unavailableDescription": "Partekatze-esteka hau iraungita dago edo baliogabetu egin da.",
     "transcriptUnavailableTitle": "Ezin izan da transkripzio hau kargatu",
     "transcriptUnavailableDescription": "Estekak funtzionatzen du oraindik. Saiatu berriro geroxeago."
+  },
+  "organizationGuardrails": {
+    "title": "AA babes-mugak",
+    "permissionDenied": "Erakundearen jabeek eta administratzaileek soilik kudea ditzakete AA babes-mugak.",
+    "unavailable": "AA babes-mugak ez daude erabilgarri erakunde honetan.",
+    "loadError": "Ezin izan dira kargatu AA babes-mugak",
+    "statusSaving": "Gordetzen…",
+    "statusSaved": "Gordeta",
+    "statusFailed": "Ezin izan da gorde.",
+    "inputTitle": "Sarrerako babes-mugak",
+    "inputDescription": "Sarrera guztiak Enkrypt AI-rekin eskaneatzen ditu, tresnen emaitzak barne. Enkrypt erabilgarri ez dagoenean, detektatzaile blokeatzaile batek eskaera baztertzen du.",
+    "outputTitle": "Irteerako babes-mugak",
+    "outputDescription": "Erantzunak Enkrypt AI-rekin eskaneatzen ditu kideek jaso aurretik. Desaktibatuta dago zuk aktibatu arte.",
+    "detectorsHint": "Blokeatu aukerak markatutako eskaera baztertzen du. Erregistratu soilik aukerak erregistratu egiten du, eskaera atzeratu gabe.",
+    "detectorsHintOutput": "Blokeatu aukerarekin, markatutako erantzunak huts egiten du. Erregistratu soilik aukerak erregistratu egiten du, erantzuna atzeratu gabe.",
+    "choiceLog": "Erregistratu soilik",
+    "applyTo": "Aplikatu hauei",
+    "applyToAllMembers": "Kide guztiak",
+    "applyKiloDefault": "Aplikatu Kiloren balio lehenetsiak",
+    "invalidSavedTitle": "Ezin dira irakurri gordetako sarrera-detektatzaileen ezarpenak",
+    "invalidSavedBody": "Eskaerak blokeatuta daude sarrera-detektatzaileak berriro gorde arte. Beheko detektatzaileak Kiloren balio lehenetsietatik abiatzen dira.",
+    "invalidSavedOutputTitle": "Ezin dira irakurri gordetako irteera-detektatzaileen ezarpenak",
+    "invalidSavedOutputBody": "Erantzunak atxikita daude irteera-detektatzaileak berriro gorde arte. Aukeratu irteera-detektatzaileak behean.",
+    "blockingOutputNote": "Irteera-detektatzaile blokeatzaile batek erantzuna atxikitzen du Enkrypt-ek osorik egiaztatu arte. Erabili Erregistratu soilik atzerapena saihesteko.",
+    "inputDetectorRequired": "Aktibatu gutxienez sarrera-detektatzaile bat.",
+    "outputDetectorRequired": "Aktibatu gutxienez irteera-detektatzaile bat.",
+    "rulesTooMany": "Gehienez {{max}} arau gehi ditzakezu.",
+    "ruleIdRequired": "Idatzi arau-IDa.",
+    "ruleIdInvalid": "Arau-IDak letrak, zenbakiak, puntuak, marratxoak eta azpimarrak soilik izan ditzake.",
+    "ruleTextRequired": "Deskribatu arauak zer debekatzen edo eskatzen duen.",
+    "keywordTooLong": "Gako-hitz bakoitzak gehienez {{max}} karaktere izan ditzake.",
+    "topicTooLong": "Gai bakoitzak gehienez {{max}} karaktere izan ditzake.",
+    "keywordsTooMany": "Gehienez {{max}} gako-hitz gehi ditzakezu.",
+    "topicsTooMany": "Gehienez {{max}} gai gehi ditzakezu.",
+    "piiEntityRequired": "Hautatu gutxienez detektatu beharreko datu-mota bat.",
+    "keywordRequired": "Gehitu gutxienez gako-hitz bat.",
+    "topicRequired": "Gehitu gutxienez gai bat.",
+    "policyTextRequired": "Sartu politikaren testua.",
+    "ruleRequired": "Gehitu gutxienez arau bat.",
+    "ruleIdDuplicate": "Arau bakoitzak bere arau-IDa behar du.",
+    "piiEntities": "Detektatu beharreko datuak",
+    "keywordsLabel": "Gako-hitzak",
+    "keywordsHint": "Gako-hitz bat lerro bakoitzeko.",
+    "topicsHint": "Gai bat lerro bakoitzeko.",
+    "policyFormat": "Politikaren formatua",
+    "policyFormatRules": "Arau egituratuak",
+    "policyFormatRulesDescription": "Arau bat eskakizun bakoitzeko, kategoria eta larritasunarekin. Gomendatua.",
+    "policyFormatText": "Politikaren testua",
+    "policyFormatTextDescription": "Itsatsi lehendik dagoen politika bat testu arrunt gisa.",
+    "rulesEmpty": "Ez dago araurik oraindik. Arau bakoitzak sarrerek eduki edo eskatu behar ez duten gauza bat deskribatzen du.",
+    "addRule": "Gehitu araua",
+    "ruleNumber": "{{number}}. araua",
+    "ruleRemove": "Kendu {{number}}. araua",
+    "ruleIdLabel": "Arau-IDa",
+    "ruleNameLabel": "Izena (aukerakoa)",
+    "ruleTextLabel": "Araua",
+    "ruleRiskCategory": "Arrisku-kategoria",
+    "ruleApplicability": "Esparrua",
+    "ruleFrameworks": "Markoak",
+    "detector": {
+      "promptInjection": {
+        "label": "Prompt-injekzioa",
+        "description": "Argibideak gainidazteko edo ereduaren mugak saihesteko (jailbreak) saiakerak detektatzen ditu."
+      },
+      "policyViolation": {
+        "label": "Politika-urraketa",
+        "description": "Erakundearen politika (testu edo arau gisa idatzia) urratzen duten sarrerak markatzen ditu.",
+        "descriptionOutput": "Erakundearen politika (testu edo arau gisa idatzia) urratzen duten erantzunak markatzen ditu."
+      },
+      "pii": {
+        "label": "Datu pertsonalak eta sekretuak",
+        "description": "Datu pertsonalak, kredentzialak, IP helbideak eta URLak detektatzen ditu."
+      },
+      "keywords": {
+        "label": "Debekatutako gako-hitzak",
+        "descriptionOutput": "Zerrendatutako gako-hitzen bat duten erantzunak detektatzen ditu."
+      },
+      "topics": {
+        "label": "Gaiak",
+        "descriptionOutput": "Zerrendatutako gaien bati buruzko erantzunak markatzen ditu."
+      },
+      "toxicity": {
+        "label": "Toxikotasuna",
+        "description": "Hizkera toxikoa, iraingarria, mehatxatzailea edo gorrotozkoa detektatzen du."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Eduki sexuala edo lanerako egokia ez den bestelako edukia detektatzen du."
+      },
+      "bias": {
+        "label": "Alborapena",
+        "description": "Hizkera alboratua edo diskriminatzailea detektatzen du."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Datu pertsonalak",
+        "description": "Izenak, helbide elektronikoak, telefono-zenbakiak."
+      },
+      "secrets": {
+        "label": "Sekretuak",
+        "description": "API gakoak, tokenak, pasahitzak."
+      },
+      "ipAddress": {
+        "label": "IP helbideak",
+        "description": "IPv4 eta IPv6 helbideak."
+      },
+      "url": {
+        "label": "URLak",
+        "description": "Web-helbideak."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Segurtasuna eta iruzurra",
+      "safetyHarm": "Kalteak eta arriskuak",
+      "privacyDataProtection": "Pribatutasuna eta datuen babesa",
+      "brandReputationTrust": "Marka eta ospea",
+      "biasFairnessEthical": "Alborapena eta ekitatea",
+      "legalIpLiability": "Lege-erantzukizuna eta jabetza intelektuala",
+      "productMisuse": "Produktuaren erabilera okerra",
+      "performanceQuality": "Errendimendua eta kalitatea"
+    },
+    "applicability": {
+      "user": "Erabiltzailearen sarrera",
+      "userAssistant": "Erabiltzailearen sarrera eta erantzunak"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Top 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "EBko AA Legea",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Enterprise eginbidea",
+    "enterpriseOnly": "Enterprise planerako soilik den eginbidea da hau.",
+    "readOnly": "Erakundearen jabeek eta administratzaileek soilik alda ditzakete ezarpen hauek.",
+    "loadError": "Ezin izan dira kargatu hornitzaileak eta ereduak",
+    "tabModels": "Ereduak",
+    "tabProviders": "Hornitzaileak",
+    "tabGateways": "Atebideak",
+    "modelsDescription": "Desaktibatu eredu bat kide guztientzat blokeatzeko. Baimendutako hornitzaileen ereduak aktibatuta daude hasieran.",
+    "modelsDeniedOnly": "Ukatutakoak soilik",
+    "modelsEmpty": "Ez dago bilaketa honekin bat datorren eredurik.",
+    "providersDescription": "Desaktibatu hornitzaile bat, Kilok erakunde honen eskaerak harengana bidera ez ditzan.",
+    "providersNeedCatalog": "Hornitzaileen etengailuak irakurtzeko soilik egongo dira ereduen katalogo osoa kargatu arte. Editatzeko, sakatu goiko Saiatu berriro.",
+    "providersEmpty": "Ez dago bilaketa honekin bat datorren hornitzailerik.",
+    "allowAllShown": "Baimendu erakutsitako guztiak",
+    "denyAllShown": "Ukatu erakutsitako guztiak",
+    "gatewaysDescription": "Kilok ereduen eskaerak Vercel AI Gateway edo OpenRouter bidez bideratzen ditu. Atebide bat desgaituta badago, eskaera horiek huts egiten dute.",
+    "emptyProviderList": "Baimendu gutxienez hornitzaile bat. Zerrenda hutsak Kiloren eredu-bide guztiak blokeatzen ditu.",
+    "gatewaysUnavailable": "Atebideen ezarpenak ez daude erabilgarri erakunde honetan.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "OpenRouter eskaerak ez daude eskualde bati lotuta.",
+    "inferenceRegion": "Inferentzia-eskualdea",
+    "inferenceRegionDescription": "Vercel AI Gateway eskaerak eskualde honi lotzen dizkio. Bertan erabilgarri ez dagoen ereduak huts egiten du.",
+    "disableOpenrouterNote": "OpenRouter desgaitzen baduzu, haren bidez eskaerak bideratzen dituzten BYOK gakoak ere blokeatzen dira.",
+    "emptyModelList": "Utzi gutxienez eredu bat aktibatuta. Eredu guztiak ukatzen badituzu, kideek ez dute ezer izango erabiltzeko.",
+    "catalogUnavailable": "Ereduen katalogo osoa ez da kargatu; beraz, gordetako zerrendak soilik erakusten dira. Saiatu berriro eredu guztiak kargatzeko.",
+    "region": {
+      "global": "Globala",
+      "us": "Ameriketako Estatu Batuak",
+      "eu": "Europar Batasuna",
+      "au": "Australia",
+      "jp": "Japonia"
+    }
   }
 }

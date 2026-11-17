@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "ຈັດການໃນເວັບ",
     "creditHistory": "ປະຫວັດເຄຣດິດ",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "ຍົກເລີກ",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "ການຊື້, ໃບຮັບເງິນ ແລະ ການເຄື່ອນໄຫວເຄຣດິດ",
     "invoicesSubtitle": "ດາວໂຫຼດໃບແຈ້ງໜີ້ສຳລັບການຊື້ຂອງທ່ານ",
-    "manageBilling": "ຈັດການການຮຽກເກັບເງິນໃນ kilo.ai",
-    "manageBillingIosNote": "ວິທີຊຳລະເງິນ, ການເຕີມເງິນອັດຕະໂນມັດ ແລະ ລາຍລະອຽດການຮຽກເກັບເງິນແມ່ນຈັດການໃນ kilo.ai.",
     "codeReviewerSubtitle": "ການກວດສອບ PR ອັດຕະໂນມັດ",
     "securityAgentSubtitle": "ຊອກຫາ ແລະ ແກ້ໄຂຈຸດອ່ອນດ້ານຄວາມປອດໄພ",
     "reviews": "ການກວດສອບ",
@@ -364,7 +360,8 @@
     "providerKeys": {
       "title": "ຄີຂອງຜູ້ໃຫ້ບໍລິການ",
       "rowSubtitle": "ໃຊ້ການຮຽກເກັບເງິນຂອງຜູ້ໃຫ້ບໍລິການຂອງທ່ານເອງ",
-      "manageOnWebReason": "ຜູ້ໃຫ້ບໍລິການເຫຼົ່ານີ້ຕ້ອງການຂໍ້ມູນຮັບຮອງແບບມີໂຄງສ້າງ",
+      "orgDescription": "ຄີເຫຼົ່ານີ້ຖືກແບ່ງປັນໃຫ້ທຸກຄົນໃນອົງກອນ ແລະ ຖືກຮຽກເກັບເງິນຈາກບັນຊີຜູ້ໃຫ້ບໍລິການຂອງອົງກອນ.",
+      "viewOnly": "ມີພຽງເຈົ້າຂອງອົງກອນ, ຜູ້ເບິ່ງແຍງລະບົບ ຫຼື ຜູ້ຈັດການການຮຽກເກັບເງິນເທົ່ານັ້ນທີ່ສາມາດປ່ຽນຄີຂອງອົງກອນໄດ້.",
       "description": "ຄຳຂໍທີ່ສົ່ງຜ່ານຄີເຫຼົ່ານີ້ຈະຖືກຮຽກເກັບເງິນຈາກບັນຊີຜູ້ໃຫ້ບໍລິການຂອງທ່ານ ແທນຍອດເງິນ Kilo ຂອງທ່ານ.",
       "managedByPlan": "ຈັດການໂດຍແຜນການຂຽນໂຄດຂອງທ່ານ",
       "enableKey": "ເປີດໃຊ້ຄີ {{provider}}",
@@ -374,6 +371,7 @@
       "removeMessage": "ຄຳຂໍທີ່ເຄີຍໃຊ້ຄີນີ້ຈະບໍ່ໃຊ້ການຮຽກເກັບເງິນຂອງຜູ້ໃຫ້ບໍລິການຂອງທ່ານອີກ.",
       "add": "ເພີ່ມຄີ",
       "added": "ເພີ່ມຄີແລ້ວ",
+      "updated": "ອັບເດດຄີແລ້ວ",
       "emptyTitle": "ບໍ່ມີຄີຂອງຜູ້ໃຫ້ບໍລິການ",
       "emptyDescription": "ເພີ່ມຄີ ເພື່ອເລີ່ມຕົ້ນ.",
       "chooseProvider": "ເລືອກຜູ້ໃຫ້ບໍລິການ",
@@ -382,9 +380,34 @@
       "noProvidersDescription": "ບໍ່ມີຜູ້ໃຫ້ບໍລິການທີ່ກົງກັບການຊອກຫານັ້ນ.",
       "newKeyTitle": "ຄີໃໝ່",
       "newKeyDescription": "ຄີຈະຖືກເກັບໄວ້ແບບເຂົ້າລະຫັດ ແລະ ບໍ່ສາມາດສະແດງໄດ້ອີກ.",
+      "edit": "ແກ້ໄຂຄີ",
+      "editKeyTitle": "ແທນທີ່ຄີ",
+      "editKeyDescription": "ບໍ່ສາມາດສະແດງຄ່າທີ່ເກັບໄວ້ໄດ້. ປ້ອນຄ່າໃໝ່ເພື່ອແທນທີ່.",
+      "editKeyMappingsWarning": "ການແທນທີ່ຄີຍັງແທນທີ່ການຈັບຄູ່ໂມເດວທີ່ເກັບໄວ້ນຳ: ປ້ອນຄືນທຸກການຈັບຄູ່ທີ່ຍັງຕ້ອງການ.",
+      "saveFailed": "ບໍ່ສາມາດບັນທຶກຄີໄດ້.",
+      "invalidCredentials": "ກວດສອບຂໍ້ມູນຮັບຮອງ ແລ້ວລອງໃໝ່.",
+      "fieldRequired": "ຕ້ອງລະບຸ {{field}}.",
+      "incompleteMapping": "ການຈັບຄູ່ {{number}} ຕ້ອງມີທັງ slug ໂມເດວ gateway ແລະ ຊື່ deployment.",
       "apiKeyLabel": "ຄີ API",
       "apiKeyPlaceholder": "ວາງຄີ",
-      "apiKeyRequired": "ປ້ອນຄີ."
+      "apiKeyRequired": "ປ້ອນຄີ.",
+      "authMethod": "ວິທີການຢືນຢັນຕົວຕົນ",
+      "authMethodAccessKeys": "ຄີການເຂົ້າເຖິງ",
+      "resourceName": "ຊື່ຣີຊອດ Azure",
+      "region": "ພາກພື້ນ AWS",
+      "accessKeyId": "ID ຄີການເຂົ້າເຖິງ",
+      "secretAccessKey": "ຄີການເຂົ້າເຖິງລັບ",
+      "project": "ໂປຣເຈັກ Google Cloud",
+      "location": "ສະຖານທີ່ Vertex",
+      "clientEmail": "ອີເມວບັນຊີບໍລິການ",
+      "privateKey": "ຄີສ່ວນຕົວຂອງບັນຊີບໍລິການ",
+      "modelMappings": "ການຈັບຄູ່ໂມເດວ",
+      "modelMappingsDescription": "ສົ່ງໂມເດວ gateway ໄປຫາຊື່ deployment ທີ່ກຳນົດເອງ.",
+      "mappingTitle": "ການຈັບຄູ່ {{number}}",
+      "mappingGatewayModel": "Slug ໂມເດວ gateway",
+      "mappingCustomModel": "ຊື່ deployment",
+      "addMapping": "ເພີ່ມການຈັບຄູ່",
+      "removeMapping": "ລຶບການຈັບຄູ່ {{number}}"
     },
     "dataExport": {
       "title": "ຂໍ້ມູນຂອງທ່ານ",
@@ -457,7 +480,8 @@
       "nextStepFinal": "ຄຳຕັດສິນການອຸທອນເປັນຂັ້ນສຸດທ້າຍ. ບໍ່ສາມາດຍື່ນອຸທອນໄດ້ອີກ.",
       "viewReceipt": "ເບິ່ງໃບຮັບ"
     },
-    "changelog": "ມີຫຍັງໃໝ່"
+    "changelog": "ມີຫຍັງໃໝ່",
+    "changelogVersionPending": "ບັນທຶກສຳລັບເວີຊັນນີ້ຈະມາພ້ອມກັບການອັບເດດແອັບຄັ້ງຕໍ່ໄປ"
   },
   "preferences": {
     "general": "ທົ່ວໄປ",
@@ -1170,8 +1194,6 @@
       "clearMessage": "ການບັນທຶກຊ່ອງຫວ່າງເປົ່າຈະລຶບຄຳສັ່ງທີ່ກຳນົດເອງທີ່ເກັບໄວ້ສຳລັບຜູ້ກວດສອບນີ້ອອກ."
     },
     "repos": {
-      "unavailable": "ບໍ່ສາມາດເຂົ້າເຖິງຄັງໂຄ້ດໄດ້ — ຕັ້ງຄ່າ Bitbucket ໃຫ້ສຳເລັດໃນ kilo.ai.",
-      "finishSetup": "ຕັ້ງຄ່າໃຫ້ສຳເລັດ",
       "manageAccess": "ຈັດການສິດເຂົ້າເຖິງ",
       "bitbucketNoRepositoriesDescription": "ບໍ່ມີຄັງໂຄ້ດທີ່ໃຊ້ໄດ້ໃນພື້ນທີ່ເຮັດວຽກ Bitbucket ນີ້.",
       "gitlabNoRepositoriesDescription": "ເຈົ້າອາດຕ້ອງໃຫ້ສິດເຂົ້າເຖິງກຸ່ມ ຫຼື ໂຄງການເພີ່ມໃນ GitLab.",
@@ -1326,11 +1348,10 @@
     "followReviewMd": "ປະຕິບັດຕາມ REVIEW.md",
     "followReviewMdSubtitle": "ປະຕິບັດຕາມຄຳແນະນຳໃນໄຟລ໌ REVIEW.md ຂອງແຕ່ລະຄັງໂຄ້ດ",
     "bitbucket": {
-      "notConnectedReadOnly": "ຍັງບໍ່ໄດ້ເຊື່ອມຕໍ່ Bitbucket. ມີພຽງເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ແລະ ຜູ້ຈັດການການຮຽກເກັບເງິນທີ່ສາມາດເຊື່ອມຕໍ່ໄດ້.",
-      "setupIncomplete": "ຍັງຕັ້ງຄ່າບໍ່ສຳເລັດ — ໄປຕັ້ງຄ່າໃຫ້ຄົບຢູ່ kilo.ai.",
-      "setup": "ການຕັ້ງຄ່າ Bitbucket"
+      "notConnectedReadOnly": "ຍັງບໍ່ໄດ້ເຊື່ອມຕໍ່ Bitbucket. ມີພຽງເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ແລະ ຜູ້ຈັດການການຮຽກເກັບເງິນທີ່ສາມາດເຊື່ອມຕໍ່ໄດ້."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "ການເຊື່ອມຕໍ່ Bitbucket ຂອງອົງກອນນີ້ຖືກຈັດການຢູ່ໃນເວັບຈາກຄອມພິວເຕີ.",
       "description": "ສ້າງໂທເຄັນເຂົ້າເຖິງພື້ນທີ່ເຮັດວຽກທີ່ມີສິດຕາມທີ່ກຳນົດ ແລ້ວວາງລົງດ້ານລຸ່ມ.",
       "scopes": "ບັນຊີ: ອ່ານ · ຄັງໂຄ້ດ: ອ່ານ/ຂຽນ · ຄຳຂໍລວມໂຄ້ດ: ອ່ານ · ເວັບຮຸກ: ອ່ານ/ຂຽນ",
       "tokenPlaceholder": "ໂທເຄັນເຂົ້າເຖິງພື້ນທີ່ເຮັດວຽກ"
@@ -1345,7 +1366,8 @@
       "noReviews": "ຍັງບໍ່ມີການກວດສອບ",
       "noReviewsDescription": "ຜົນການກວດສອບຈະປາກົດຢູ່ບ່ອນນີ້ ເມື່ອເຄື່ອງມືກວດສອບໂຄ້ດກວດສອບຄຳຂໍລວມໂຄ້ດ.",
       "startManualReview": "ເລີ່ມການກວດສອບດ້ວຍຕົນເອງ",
-      "configureProvider": "ຕັ້ງຄ່າຜູ້ໃຫ້ບໍລິການ"
+      "configureProvider": "ຕັ້ງຄ່າຜູ້ໃຫ້ບໍລິການ",
+      "connectOwnerOnly": "ຂໍໃຫ້ເຈົ້າຂອງອົງກອນ ຫຼື ຜູ້ດູແລລະບົບເຊື່ອມຕໍ່ຜູ້ໃຫ້ບໍລິການ."
     },
     "platformList": {
       "checking": "ກຳລັງກວດສອບ…",
@@ -1358,8 +1380,7 @@
       "githubError": "ບໍ່ສາມາດເປີດໜ້າຕັ້ງຄ່າ GitHub ໄດ້. ກະລຸນາລອງອີກຄັ້ງ.",
       "gitlabAccount": "ບັນຊີ GitLab",
       "gitlabError": "ບໍ່ສາມາດເປີດໜ້າຕັ້ງຄ່າ GitLab ໄດ້. ກະລຸນາລອງອີກຄັ້ງ.",
-      "description": "ເຊື່ອມຕໍ່ {{label}} ຂອງ Kilo ເພື່ອກວດສອບຄຳຂໍລວມໂຄ້ດອັດຕະໂນມັດ.",
-      "bitbucketError": "ບໍ່ສາມາດເປີດໜ້າຕັ້ງຄ່າ Bitbucket ໄດ້. ກະລຸນາລອງອີກຄັ້ງ."
+      "description": "ເຊື່ອມຕໍ່ {{label}} ຂອງ Kilo ເພື່ອກວດສອບຄຳຂໍລວມໂຄ້ດອັດຕະໂນມັດ."
     },
     "overview": {
       "allAreas": "ທຸກດ້ານ",
@@ -2015,6 +2036,9 @@
       "completedWillAppear": "ເຊດຊັນທີ່ສຳເລັດແລ້ວຈະປາກົດຢູ່ນີ້.",
       "noPastSessions": "ບໍ່ມີເຊດຊັນທີ່ຜ່ານມາ",
       "pastSessions": "ເຊດຊັນທີ່ຜ່ານມາ",
+      "sectionAccessibility_one": "{{title}}: {{displayCount}} ເຊດຊັນ",
+      "sectionAccessibility_other": "{{title}}: {{displayCount}} ເຊດຊັນ",
+      "sectionAccessibility": "{{title}}: {{displayCount}} ເຊດຊັນ",
       "live": "ສົດ",
       "updating": "ກຳລັງອັບເດດ"
     },
@@ -2149,10 +2173,8 @@
       "couldNotLoadBitbucketRepositories": "ບໍ່ສາມາດໂຫຼດຄັງໂຄດຈາກ Bitbucket ໄດ້.",
       "connectGithubDescription": "ເຂົ້າສູ່ລະບົບຈາກບຣາວເຊີຂອງທ່ານ ແລ້ວກັບມາທີ່ນີ້ເພື່ອເລືອກຄັງໂຄດ GitHub.",
       "connectGitlabDescription": "ເຂົ້າສູ່ລະບົບຈາກບຣາວເຊີຂອງທ່ານ ແລ້ວກັບມາທີ່ນີ້ເພື່ອເລືອກຄັງໂຄດ GitLab.",
-      "connectBitbucketDescription": "ເຂົ້າສູ່ລະບົບຈາກບຣາວເຊີຂອງທ່ານ ແລ້ວກັບມາທີ່ນີ້ເພື່ອເລືອກຄັງໂຄດ Bitbucket.",
       "openGithub": "ເປີດ GitHub",
       "openGitlab": "ເປີດ GitLab",
-      "openBitbucket": "ເປີດ Bitbucket",
       "refreshRepositories": "ໂຫຼດລາຍການຄັງໂຄດໃໝ່",
       "githubConnected": "ເຊື່ອມຕໍ່ GitHub ແລ້ວ",
       "gitlabConnected": "ເຊື່ອມຕໍ່ GitLab ແລ້ວ",
@@ -2952,6 +2974,7 @@
     "signOutThisDevice": "ອອກຈາກລະບົບໃນອຸປະກອນນີ້",
     "signOutSessionLabel": "ອອກຈາກລະບົບໃນ {{device}}, ເຂົ້າສູ່ລະບົບ {{signedIn}}, ໃຊ້ງານຫຼ້າສຸດ {{lastSeen}}",
     "sessionSignedOut": "ອອກຈາກລະບົບໃນເຊສຊັນແລ້ວ.",
+    "sessionSignOutFailed": "ບໍ່ສາມາດອອກຈາກລະບົບໃນເຊສຊັນນີ້ໄດ້. ລອງອີກຄັ້ງ.",
     "signOutThisDeviceTitle": "ອອກຈາກລະບົບໃນອຸປະກອນນີ້ບໍ?",
     "signOutThisSessionTitle": "ອອກຈາກລະບົບໃນເຊສຊັນນີ້ບໍ?",
     "signOutThisSessionMessage": "ລະບົບຈະອອກຈາກບັນຊີໃນ {{device}}. ໃຊ້ງານຫຼ້າສຸດເມື່ອ {{lastSeen}}. ອຸປະກອນນີ້ອາດຍັງເຂົ້າເຖິງ API ໄດ້ອີກສູງສຸດໜຶ່ງຊົ່ວໂມງ.",
@@ -3052,6 +3075,9 @@
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
     "searchPlaceholder": "ຄົ້ນຫາເຊດຊັນລ່າສຸດ",
     "connectedCli": "ໃນ CLI ທີ່ເຊື່ອມຕໍ່ຢູ່",
+    "connectedCliAccessibility_one": "{{title}}: {{displayCount}} CLI",
+    "connectedCliAccessibility_other": "{{title}}: {{displayCount}} CLI",
+    "connectedCliAccessibility": "{{title}}: {{displayCount}} CLI",
     "newSessionOn": "ເຊດຊັນໃໝ່ໃນ {{name}}",
     "noMatchingSessions": "ບໍ່ພົບເຊດຊັນທີ່ກົງກັບເງື່ອນໄຂ.",
     "onlyFirstFilesAttached": "ຈະແນບສະເພາະໄຟລ໌ {{displayCount}} ໄຟລ໌ທຳອິດເທົ່ານັ້ນ.",
@@ -3072,15 +3098,14 @@
     "manage": {
       "billingHistory": "ປະຫວັດການຮຽກເກັບເງິນ",
       "billingHistoryEmpty": "ຍັງບໍ່ມີປະຫວັດການຮຽກເກັບເງິນ.",
+      "billingHistoryError": "ບໍ່ສາມາດໂຫລດປະຫວັດການຮຽກເກັບເງິນ",
       "cancel": "ຍົກເລີກການສະໝັກສະມາຊິກ",
       "cancelDescription": "Kilo Pass ຂອງທ່ານຈະຍັງໃຊ້ງານໄດ້ຈົນຮອດທ້າຍຮອບການຮຽກເກັບເງິນ ແລະ ຈະບໍ່ຕໍ່ອາຍຸ.",
       "cancelScheduled": "ຈະຍົກເລີກໃນວັນທີ {{date}}",
       "cancelScheduledChange": "ຍົກເລີກການປ່ຽນແປງທີ່ກຳນົດໄວ້",
       "cancelled": "ຍົກເລີກການສະໝັກສະມາຊິກແລ້ວ",
-      "changePlan": "ປ່ຽນແຜນໃນ kilo.ai",
-      "changePlanIosNote": "ການປ່ຽນແຜນແບບເສຍເງິນສາມາດເຮັດໄດ້ໃນ kilo.ai.",
       "creditHistoryEmpty": "ຍັງບໍ່ມີເຄຣດິດ Kilo Pass.",
-      "manageInStore": "ຈັດການໃນ {{store}}",
+      "creditHistoryError": "ບໍ່ສາມາດໂຫລດປະຫວັດເຄຣດິດ",
       "resume": "ສືບຕໍ່ການສະໝັກສະມາຊິກ",
       "resumeCancelledDescription": "Kilo Pass ຂອງທ່ານຈະເລີ່ມຕໍ່ອາຍຸອັດຕະໂນມັດອີກຄັ້ງ.",
       "resumePausedDescription": "Kilo Pass ຂອງທ່ານຈະສືບຕໍ່ດຽວນີ້ ກ່ອນວັນທີສືບຕໍ່ທີ່ກຳນົດໄວ້.",
@@ -3117,9 +3142,6 @@
     "bonusFree": "ໂບນັດຟຣີ",
     "bonusReferral": "ໂບນັດແນະນຳ",
     "bonusAvailable": "ໂບນັດຟຣີທີ່ມີໃຫ້",
-    "kiloPassManagement": "ການຈັດການ Kilo Pass",
-    "kiloPassSetup": "ການຕັ້ງຄ່າ Kilo Pass",
-    "opensManagementOnWeb": "ເປີດໜ້າຈັດການ Kilo Pass ໃນເວັບ.",
     "loadFailedRetry": "ກວດເບິ່ງການເຊື່ອມຕໍ່ຂອງທ່ານ, ແລ້ວລອງໃໝ່.",
     "legalTermsOfUse": "ຂໍ້ກຳນົດການນຳໃຊ້ (EULA)",
     "purchaseDifferentAccount": "ການຊື້ App Store ນີ້ບໍ່ໄດ້ເຊື່ອມໂຍງກັບບັນຊີ Kilo ຂອງທ່ານ. ເຂົ້າສູ່ລະບົບ Apple Account ທີ່ໃຊ້ສຳລັບການຊື້, ແລ້ວລອງອີກຄັ້ງ.",
@@ -3305,7 +3327,6 @@
       "buySeats": "ຊື້ສິດຜູ້ໃຊ້",
       "setupAutoTopUp": "ຕັ້ງຄ່າການເຕີມເງິນອັດຕະໂນມັດ",
       "manageAutoTopUp": "ຈັດການການເຕີມເງິນອັດຕະໂນມັດ",
-      "webAddress": "ທີ່ຢູ່ເວັບ {{url}}",
       "opensOnWeb": "ເປີດໃນເວັບ"
     },
     "boundary": {
@@ -3321,7 +3342,7 @@
       "selectOrganization": "ເລືອກອົງກອນ",
       "unavailableDescription": "ບໍ່ສາມາດໃຊ້ງານອົງກອນນີ້ໄດ້ອີກແລ້ວ. ເລືອກອົງກອນອື່ນຈາກໂປຣໄຟລ໌ຂອງທ່ານເພື່ອສືບຕໍ່.",
       "unavailableSessionsDescription": "ບໍ່ສາມາດໃຊ້ງານອົງກອນນີ້ໄດ້ອີກແລ້ວ. ບໍ່ສາມາດໂຫຼດເຊດຊັນຂອງອົງກອນນີ້ໄດ້.",
-      "accessDeniedDescription": "ທ່ານບໍ່ມີສິດເຂົ້າເຖິງອົງກອນນີ້."
+      "accessDeniedDescription": "ຂໍໃຫ້ເຈົ້າຂອງອົງກອນ ຫຼື ຜູ້ດູແລລະບົບໃຫ້ສິດເຂົ້າເຖິງແກ່ທ່ານ."
     },
     "create": {
       "title": "ສ້າງອົງກອນ",
@@ -3441,25 +3462,88 @@
     },
     "settingsOnWeb": {
       "title": "ການຕັ້ງຄ່າອົງກອນໃນເວັບ",
-      "integrations": "ການເຊື່ອມໂຍງໃນເວັບ",
       "usageDetails": "ລາຍລະອຽດການນຳໃຊ້",
       "providersAndModels": "ຜູ້ໃຫ້ບໍລິການ ແລະ ໂມເດວ",
       "groups": "ກຸ່ມ",
       "guardrails": "ມາດຕະການປ້ອງກັນ",
       "byok": "ໃຊ້ກະແຈຂອງທ່ານເອງ",
       "ssoAndDomain": "SSO ແລະ ໂດເມນ",
-      "emailPreferences": "ການຕັ້ງຄ່າອີເມວ",
       "dataCollection": "ການເກັບກຳຂໍ້ມູນ",
       "auditLogs": "ບັນທຶກການກວດສອບ",
-      "requestLogs": "ບັນທຶກຄຳຮ້ອງຂໍ",
-      "subOrganizations": "ອົງກອນຍ່ອຍ",
-      "distributeFunds": "ແຈກຢາຍເງິນທຶນ"
+      "requestLogs": "ບັນທຶກຄຳຮ້ອງຂໍ"
+    },
+    "requestLogs": {
+      "hint": "ຄຳຮ້ອງຂໍໃນໜຶ່ງຊົ່ວໂມງກ່ອນເວລາສິ້ນສຸດຂອງຊ່ວງເວລາ, ລ່າສຸດຢູ່ກ່ອນ.",
+      "older": "ຊົ່ວໂມງກ່ອນໜ້າ",
+      "newer": "ຊົ່ວໂມງຖັດໄປ",
+      "truncated": "ຊົ່ວໂມງນີ້ມີຄຳຮ້ອງຂໍຫຼາຍກວ່າທີ່ລາຍການສະແດງ.",
+      "emptyTitle": "ບໍ່ມີຄຳຮ້ອງຂໍ",
+      "emptyDescription": "ຊົ່ວໂມງນີ້ບໍ່ມີຄຳຮ້ອງຂໍຜ່ານ gateway.",
+      "loadError": "ບໍ່ສາມາດໂຫຼດບັນທຶກຄຳຮ້ອງຂໍໄດ້.",
+      "permissionDenied": "ມີແຕ່ເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ຫຼື ຜູ້ຈັດການການເອີ້ນເກັບເງິນເທົ່ານັ້ນທີ່ສາມາດອ່ານບັນທຶກຄຳຮ້ອງຂໍຂອງອົງກອນໄດ້.",
+      "tokens": "ເຂົ້າ {{input}} · ອອກ {{output}}",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "ໂທເຄັນຂາເຂົ້າ",
       "orgLast30Days": "ສະມາຊິກທັງໝົດ · 30 ວັນທີ່ຜ່ານມາ",
       "outputTokens": "ໂທເຄັນຂາອອກ",
       "requests": "ຄຳຂໍ"
+    },
+    "modes": {
+      "create": "ໂໝດໃໝ່",
+      "deleteAction": "ລຶບໂໝດ",
+      "deleteMessage": "ໂໝດຈະຖືກລຶບສຳລັບທຸກຄົນໃນອົງກອນນີ້. ໂໝດທີ່ແທນໂໝດມາພ້ອມລະບົບຈະກັບໄປໃຊ້ການຕັ້ງຄ່າມາພ້ອມລະບົບ.",
+      "deleteTitle": "ລຶບໂໝດນີ້ບໍ?",
+      "descriptionLabel": "ຄຳອະທິບາຍໂໝດ",
+      "emptyDescription": "ໂໝດທີ່ເພີ່ມຢູ່ນີ້ມີໃຫ້ທຸກຄົນໃນອົງກອນນີ້ໃຊ້.",
+      "emptyTitle": "ຍັງບໍ່ມີໂໝດທີ່ກຳນົດເອງ",
+      "identifierHint": "ຕົວອັກສອນພິມນ້ອຍ, ຕົວເລກ, ແລະ ເຄື່ອງໝາຍຂີດ.",
+      "identifierInvalid": "ໃຊ້ພຽງຕົວອັກສອນພິມນ້ອຍ, ຕົວເລກ, ແລະ ເຄື່ອງໝາຍຂີດເທົ່ານັ້ນ.",
+      "identifierLabel": "ຕົວລະບຸ",
+      "identifierRequired": "ປ້ອນຕົວລະບຸ.",
+      "identifierTaken": "ໂໝດອື່ນໃຊ້ຕົວລະບຸນີ້ແລ້ວ.",
+      "nameLabel": "ຊື່ໂໝດ",
+      "nameRequired": "ປ້ອນຊື່ໂໝດ.",
+      "notFound": "ບໍ່ມີໂໝດນີ້ອີກແລ້ວ.",
+      "restrictionHint": "ແກ້ໄຂໄດ້ສະເພາະໄຟລ໌ທີ່ກົງກັບຮູບແບບນີ້. ປະໄວ້ຫວ່າງເພື່ອໃຫ້ແກ້ໄຂໄດ້ທຸກໄຟລ໌.",
+      "restrictionInvalid": "ປ້ອນຮູບແບບທີ່ຖືກຕ້ອງ.",
+      "restrictionLabel": "ປ້າຍການຈຳກັດ",
+      "restrictionPattern": "ຮູບແບບໄຟລ໌",
+      "roleLabel": "ຄຳນິຍາມບົດບາດ",
+      "roleRequired": "ອະທິບາຍວ່າໂໝດນີ້ເຮັດຫຍັງ.",
+      "tool": {
+        "browser": "ໃຊ້ບຣາວເຊີ",
+        "command": "ປະຕິບັດຄຳສັ່ງ",
+        "edit": "ແກ້ໄຂໄຟລ໌",
+        "mcp": "ໃຊ້ MCP",
+        "read": "ອ່ານໄຟລ໌"
+      },
+      "whenToUseLabel": "ເມື່ອໃດຄວນໃຊ້ໂໝດນີ້"
+    },
+    "groups": {
+      "create": "ກຸ່ມໃໝ່",
+      "deleteAction": "ລຶບກຸ່ມ",
+      "deleteMessage": "ກຸ່ມ, ນະໂຍບາຍຂອງກຸ່ມ, ແລະ ການມອບໝາຍສະມາຊິກຈະຖືກລຶບ.",
+      "deleteTitle": "ລຶບກຸ່ມນີ້ບໍ?",
+      "descriptionLabel": "ຄຳອະທິບາຍກຸ່ມ",
+      "emptyDescription": "ກຸ່ມລວບລວມສະມາຊິກເພື່ອໃຫ້ນະໂຍບາຍດຽວມີຜົນກັບທຸກຄົນ.",
+      "emptyTitle": "ຍັງບໍ່ມີກຸ່ມ",
+      "enterpriseOnly": "ກຸ່ມມີໃຫ້ໃຊ້ໃນແຜນ Enterprise.",
+      "memberCount": "{{displayCount}} ສະມາຊິກ",
+      "memberCount_one": "{{displayCount}} ສະມາຊິກ",
+      "memberCount_other": "{{displayCount}} ສະມາຊິກ",
+      "memberViewEmpty": "ທ່ານບໍ່ໄດ້ຢູ່ໃນກຸ່ມໃດຂອງອົງກອນນີ້.",
+      "memberViewTitle": "ກຸ່ມຂອງທ່ານ",
+      "membersEmpty": "ບໍ່ມີສະມາຊິກທີ່ໃຊ້ງານຢູ່ທີ່ກົງກັບການຄົ້ນຫາຂອງທ່ານ.",
+      "membersLabel": "ສະມາຊິກກຸ່ມ",
+      "nameLabel": "ຊື່ກຸ່ມ",
+      "nameRequired": "ປ້ອນຊື່ກຸ່ມ.",
+      "nameTooLong": "ໃຫ້ຊື່ມີບໍ່ເກີນ 80 ຕົວອັກສອນ.",
+      "notFound": "ບໍ່ມີກຸ່ມນີ້ອີກແລ້ວ.",
+      "permissionDenied": "ພຽງເຈົ້າຂອງອົງກອນ ຫຼື ຜູ້ດູແລລະບົບເທົ່ານັ້ນທີ່ປ່ຽນກຸ່ມຂອງອົງກອນໄດ້.",
+      "searchMembers": "ຄົ້ນຫາສະມາຊິກ",
+      "selectAllVisible": "ເລືອກທຸກຄົນທີ່ສະແດງຢູ່"
     },
     "hub": {
       "renameTitle": "ປ່ຽນຊື່ອົງກອນ",
@@ -3489,8 +3573,7 @@
       "paymentPending": "ລໍຖ້າການຊຳລະເງິນ",
       "processingBlocked": "ບໍ່ສາມາດປະມວນຜົນຕໍ່ໄດ້",
       "processingNeedsReview": "ຕ້ອງກວດສອບການປະມວນຜົນ",
-      "retryHint": "ລອງໂຫຼດສະຖານະ Kilo Pass ອີກຄັ້ງ.",
-      "setupHint": "ເປີດໜ້າຕັ້ງຄ່າ Kilo Pass ໃນເວັບ."
+      "retryHint": "ລອງໂຫຼດສະຖານະ Kilo Pass ອີກຄັ້ງ."
     }
   },
   "authErrors": {
@@ -4015,6 +4098,7 @@
     "commandAtLimit": "ຄຳສັ່ງຈຳກັດບໍ່ເກີນ {{max}} ຕົວອັກສອນ",
     "commandsEmpty": "ບໍ່ມີຄຳສັ່ງຕັ້ງຄ່າເທື່ອ",
     "commandsSaveFailed": "ບໍ່ສາມາດບັນທຶກຄຳສັ່ງຕັ້ງຄ່າໄດ້",
+    "commandLimitReached": "ໂປຣໄຟລ໌ສາມາດມີຄຳສັ່ງຕັ້ງຄ່າໄດ້ສູງສຸດ {{max}} ຄຳສັ່ງຕັ້ງຄ່າ. ລຶບໜຶ່ງອັນເພື່ອເພີ່ມອັນອື່ນ.",
     "moveCommandUp": "ຍ້າຍຄຳສັ່ງ {{position}} ຂຶ້ນ",
     "moveCommandDown": "ຍ້າຍຄຳສັ່ງ {{position}} ລົງ",
     "skillsTitle": "ທັກສະ",
@@ -4101,6 +4185,7 @@
       "deleteMessage": "ເຊສຊັນໃໝ່ທີ່ໃຊ້ໂປຣໄຟລ໌ນີ້ຈະບໍ່ສາມາດເຂົ້າເຖິງເຄື່ອງມືຂອງເຊີບເວີນີ້ໄດ້ອີກ. ບໍ່ສາມາດຍ້ອນກັບໄດ້.",
       "deleteConfirm": "ລຶບເຊີບເວີ MCP",
       "saveFailed": "ບໍ່ສາມາດບັນທຶກເຊີບເວີ MCP ໄດ້",
+      "limitReached": "ໂປຣໄຟລ໌ສາມາດມີເຊີບເວີ MCP ໄດ້ສູງສຸດ {{max}} ເຊີບເວີ MCP. ລຶບໜຶ່ງອັນເພື່ອເພີ່ມອັນອື່ນ.",
       "deleteFailed": "ບໍ່ສາມາດລຶບເຊີບເວີ MCP ໄດ້",
       "updateFailed": "ບໍ່ສາມາດອັບເດດເຊີບເວີ MCP ໄດ້"
     },
@@ -4133,6 +4218,7 @@
       "modeSubagent": "ພຽງແຕ່ຕົວແທນຮອງ",
       "modeAll": "ທັງໝົດ",
       "saveFailed": "ບໍ່ສາມາດບັນທຶກຕົວແທນໄດ້",
+      "limitReached": "ໂປຣໄຟລ໌ສາມາດມີຕົວແທນໄດ້ສູງສຸດ {{max}} ຕົວແທນ. ລຶບໜຶ່ງອັນເພື່ອເພີ່ມອັນອື່ນ.",
       "deleteFailed": "ບໍ່ສາມາດລຶບຕົວແທນໄດ້",
       "nameRequired": "ໃສ່ຊື່ຕົວແທນ",
       "slugRequired": "ໃສ່ຕົວແທນ slug",
@@ -4163,6 +4249,7 @@
       "moveUp": "ຍ້າຍຄຳສັ່ງ Slash {{name}} ຂຶ້ນ",
       "moveDown": "ຍ້າຍຄຳສັ່ງ Slash {{name}} ລົງ",
       "saveFailed": "ບໍ່ສາມາດບັນທຶກຄຳສັ່ງໄດ້",
+      "limitReached": "ໂປຣໄຟລ໌ສາມາດມີຄຳສັ່ງ slash ໄດ້ສູງສຸດ {{max}} ຄຳສັ່ງ slash. ລຶບໜຶ່ງອັນເພື່ອເພີ່ມອັນອື່ນ.",
       "deleteFailed": "ບໍ່ສາມາດລຶບຄຳສັ່ງໄດ້",
       "nameRequired": "ໃສ່ຊື່ຄໍາສັ່ງ",
       "nameInvalid": "ຊື່ຕ້ອງຂຶ້ນຕົ້ນດ້ວຍຕົວພິມນ້ອຍ ແລະ ໃຊ້ແຕ່ຕົວພິມນ້ອຍ, ຕົວເລກ ແລະ ຂີດ",
@@ -4243,7 +4330,7 @@
       },
       "purchaseFallback": "ການຊື້ເຄຣດິດ",
       "receipt": "ໃບຮັບເງິນ",
-      "receiptA11y": "ເປີດໃບຮັບເງິນສຳລັບ {{description}}",
+      "receiptA11y": "ເປີດໃບຮັບເງິນສຳລັບ {{description}}, {{amount}}, ຈາກ {{date}}",
       "receiptUnavailable": "ບໍ່ມີໃບຮັບເງິນສຳລັບການຊື້ນີ້."
     },
     "title": "ຊື້ເຄຣດິດ",
@@ -4449,6 +4536,8 @@
     "topModels": "ໂມເດວທີ່ໃຊ້ຫຼາຍສຸດ",
     "topFeatures": "ຄຸນສົມບັດທີ່ໃຊ້ຫຼາຍສຸດ",
     "emptyTitle": "ບໍ່ມີການນຳໃຊ້ໃນຊ່ວງເວລານີ້",
+    "unavailableTitle": "ການນຳໃຊ້ບໍ່ສາມາດໃຊ້ໄດ້",
+    "unavailableDescription": "Workspace ນີ້ບໍ່ລາຍງານການນຳໃຊ້. ການລອງໃໝ່ຈະບໍ່ຊ່ວຍໄດ້.",
     "orgSelfNotice": "ທ່ານກຳລັງເບິ່ງການນຳໃຊ້ຂອງທ່ານເອງໃນອົງກອນນີ້.",
     "viewDetails": "ເບິ່ງລາຍລະອຽດການນຳໃຊ້"
   },
@@ -4496,8 +4585,79 @@
       "portLabel": "localhost:{{port}}"
     },
     "triggers": {
-      "title": "ທຣິກເກີ ແລະ webhook",
-      "subtitle": "ຈັດການທຣິກເກີ webhook ແລະ ທຣິກເກີຕາມກຳນົດເວລາໃນເວັບ."
+      "title": "ຕົວກະຕຸ້ນ ແລະ ເວັບຮຸກ",
+      "subtitle": "ອັດຕະໂນມັດການຣັນ Cloud Agent ຈາກການເອີ້ນເວັບຮຸກ ຫຼື ຕາຕະລາງເວລາ.",
+      "new": "ຕົວກະຕຸ້ນໃໝ່",
+      "emptyTitle": "ຍັງບໍ່ມີຕົວກະຕຸ້ນ",
+      "emptyDescription": "ສ້າງຕົວກະຕຸ້ນເພື່ອເລີ່ມການຣັນ Cloud Agent ຈາກການເອີ້ນເວັບຮຸກ ຫຼື ຕາມຕາຕະລາງເວລາ.",
+      "loadFailedTitle": "ໂຫຼດຕົວກະຕຸ້ນບໍ່ໄດ້",
+      "loadFailedDescription": "ລອງອີກຄັ້ງເມື່ອມີການເຊື່ອມຕໍ່.",
+      "detailLoadFailedTitle": "ໂຫຼດຕົວກະຕຸ້ນນີ້ບໍ່ໄດ້",
+      "detailNotFoundTitle": "ບໍ່ພົບຕົວກະຕຸ້ນ",
+      "cannotEditCreator": "ຕົວກະຕຸ້ນນີ້ຣັນໃນນາມຜູ້ສ້າງ ດັ່ງນັ້ນມີພຽງຜູ້ສ້າງເທົ່ານັ້ນທີ່ປ່ຽນໄດ້.",
+      "permissionDenied": "ບົດບາດຂອງທ່ານບໍ່ສາມາດຈັດການຕົວກະຕຸ້ນເຫຼົ່ານີ້ໄດ້.",
+      "webhookUrl": "URL ເວັບຮຸກ",
+      "urlCopied": "ຄັດລອກ URL ເວັບຮຸກແລ້ວ",
+      "deliveries": "ການຈັດສົ່ງ",
+      "deliveriesEmptyTitle": "ຍັງບໍ່ມີການຈັດສົ່ງ",
+      "deliveriesEmptyDescription": "ການເອີ້ນເວັບຮຸກ ຫຼື ການຣັນຕາມຕາຕະລາງຈະປາກົດຢູ່ນີ້ເມື່ອມາຮອດ.",
+      "deliveriesLoadFailedTitle": "ໂຫຼດການຈັດສົ່ງບໍ່ໄດ້",
+      "openSession": "ເບິ່ງເຊສຊັນ",
+      "activationWebhook": "ການເອີ້ນເວັບຮຸກ",
+      "fieldName": "ຊື່ຕົວກະຕຸ້ນ",
+      "fieldActivation": "ຣັນເມື່ອ",
+      "fieldCron": "ນິພານ Cron",
+      "fieldCronHelp": "ຫ້າຊ່ອງ: ນາທີ, ຊົ່ວໂມງ, ວັນ, ເດືອນ ແລະ ວັນໃນອາທິດ. ໄລຍະຫ່າງທີ່ສັ້ນທີ່ສຸດແມ່ນໜຶ່ງນາທີ.",
+      "fieldTimezone": "ເຂດເວລາ",
+      "nameLocked": "ບໍ່ສາມາດປ່ຽນຊື່ໄດ້ຫຼັງສ້າງຕົວກະຕຸ້ນ.",
+      "repositoryLocked": "ບໍ່ສາມາດປ່ຽນຄັງເກັບໄດ້ຫຼັງສ້າງຕົວກະຕຸ້ນ.",
+      "environmentAutomatic": "ອັດຕະໂນມັດຕາມຄັງເກັບ",
+      "notSelected": "ບໍ່ໄດ້ເລືອກ",
+      "profileDefaults": "ໃຊ້ຄ່າເລີ່ມຕົ້ນ",
+      "profileHelp": "ການຕັ້ງຄ່າຂອງໂປຣໄຟລ໌ຈະນຳໃຊ້ເມື່ອຕົວກະຕຸ້ນຣັນ. ຄວາມລັບຂອງມັນຈະຖືກດຶງມາໃຊ້ໃນຕອນນັ້ນ.",
+      "customAgent": "ເອເຈນກຳນົດເອງ",
+      "agentHelp": "ເອເຈນໃນໄດເຣັກທໍຣີ .kilo/agent ຂອງຄັງເກັບ ຫຼື ໜຶ່ງໃນໂໝດທີ່ມີໃນຕົວ.",
+      "fieldBodySchema": "ສະຄີມາຂອງເນື້ອຄວາມ",
+      "bodySchemaHelp": "JSON Schema ບໍ່ບັງຄັບ. ຄຳຮ້ອງທີ່ເນື້ອຄວາມບໍ່ກົງກັບມັນຈະຖືກປະຕິເສດ.",
+      "authTitle": "ຫົວຂໍ້ຄວາມລັບ",
+      "authDescription": "ຄຳຮ້ອງຕ້ອງສົ່ງຫົວຂໍ້ນີ້ພ້ອມກັບຄວາມລັບທີ່ແບ່ງປັນ.",
+      "authHeaderLabel": "ຊື່ຫົວຂໍ້",
+      "authSecretLabel": "ຄວາມລັບທີ່ແບ່ງປັນ",
+      "authSecretKeep": "ປະໄວ້ຫວ່າງເພື່ອຮັກສາຄວາມລັບທີ່ບັນທຶກໄວ້.",
+      "authSecretSet": "ຈຳເປັນ. ເລືອກສະຕຣິງສຸ່ມທີ່ແຂງແກ່ນ.",
+      "authSecretCreator": "ໃຊ້ຢ່າງໜ້ອຍ 16 ຕົວອັກສອນ ເມື່ອຕົວກະຕຸ້ນຣັນໃນນາມຜູ້ສ້າງ.",
+      "autoCommit": "ຄອມມິດການປ່ຽນແປງເມື່ອການຣັນສິ້ນສຸດ",
+      "condenseOnComplete": "ຫຍໍ້ບໍລິບົດເມື່ອການຣັນສິ້ນສຸດ",
+      "activeTitle": "ຕົວກະຕຸ້ນເປີດໃຊ້ງານ",
+      "activeDescription": "ເວັບຮຸກທີ່ຢຸດຊົ່ວຄາວຈະຕອບດ້ວຍ 404.",
+      "runAsCreator": "ຣັນໃນນາມຂ້ອຍ",
+      "runAsCreatorDescription": "ທຸກການຣັນໃຊ້ບັນຊີຂອງທ່ານ ດັ່ງນັ້ນຈຶ່ງຕ້ອງມີຫົວຂໍ້ຄວາມລັບ.",
+      "saveFailedTitle": "ບັນທຶກຕົວກະຕຸ້ນບໍ່ໄດ້",
+      "deleteTitle": "ລຶບຕົວກະຕຸ້ນນີ້ບໍ?",
+      "deleteMessage": "ການເອີ້ນຫາ {{name}} ຈະລົ້ມເຫຼວ. ບໍ່ສາມາດຍົກເລີກໄດ້.",
+      "deleteMessageScheduled": "ການຣັນຕາມກຳນົດເວລາຂອງຕົວກະຕຸ້ນ {{name}} ຈະຢຸດ. ບໍ່ສາມາດຍົກເລີກໄດ້.",
+      "runNow": "ຣັນຕອນນີ້",
+      "runStarted": "ເລີ່ມການຣັນແລ້ວ",
+      "created": "ສ້າງຕົວກະຕຸ້ນແລ້ວ",
+      "saved": "ບັນທຶກຕົວກະຕຸ້ນແລ້ວ",
+      "statusArrived": "ມາຮອດແລ້ວ",
+      "problems": {
+        "nameRequired": "ປ້ອນຊື່.",
+        "nameTooShort": "ໃຊ້ຢ່າງໜ້ອຍ 8 ຕົວອັກສອນ.",
+        "nameTooLong": "ໃຊ້ 64 ຕົວອັກສອນ ຫຼື ໜ້ອຍກວ່າ.",
+        "nameCharacters": "ໃຊ້ຕົວອັກສອນພິມນ້ອຍ, ຕົວເລກ ແລະ ເຄື່ອງໝາຍຂີດ.",
+        "nameReserved": "ຊື່ນີ້ຖືກສະຫງວນໄວ້.",
+        "cronRequired": "ປ້ອນນິພານ Cron.",
+        "repositoryRequired": "ເລືອກຄັງໂຄ້ດ",
+        "agentRequired": "ເລືອກເອເຈນ.",
+        "agentInvalid": "ໃຊ້ຕົວອັກສອນພິມນ້ອຍ, ຕົວເລກ ແລະ ເຄື່ອງໝາຍຂີດ ໂດຍເລີ່ມຈາກຕົວອັກສອນ.",
+        "modelRequired": "ເລືອກໂມເດວ",
+        "promptRequired": "ປ້ອນຄຳສັ່ງ.",
+        "bodySchemaInvalid": "ປ້ອນອັອບເຈັກ JSON ຫຼື ປະໄວ້ຫວ່າງ.",
+        "authHeaderRequired": "ປ້ອນຊື່ຫົວຂໍ້.",
+        "authSecretRequired": "ປ້ອນຄວາມລັບທີ່ແບ່ງປັນ.",
+        "authSecretTooShort": "ໃຊ້ຢ່າງໜ້ອຍ 16 ຕົວອັກສອນ."
+      }
     }
   },
   "sessionShare": {
@@ -4515,8 +4675,9 @@
     "create": "ສ້າງລິ້ງ",
     "createFailed": "ບໍ່ສາມາດສ້າງລິ້ງໄດ້.",
     "existingTitle": "ລິ້ງທີ່ມີຢູ່ແລ້ວ",
-    "existingDescription": "ເຊດຊັນນີ້ມີລິ້ງແບ່ງປັນແລ້ວ. ການສ້າງລິ້ງໃໝ່ຈະແທນທີ່ລິ້ງເກົ່າ ແລະ ເຮັດໃຫ້ລິ້ງເກົ່າໃຊ້ບໍ່ໄດ້ອີກ.",
+    "existingDescription": "ເຊດຊັນນີ້ມີລິ້ງແບ່ງປັນແລ້ວ. ການສ້າງລິ້ງໃໝ່ດ້ວຍການຕັ້ງຄ່າເຫຼົ່ານີ້ຈະແທນທີ່ລິ້ງເກົ່າ ແລະ ເຮັດໃຫ້ລິ້ງເກົ່າໃຊ້ບໍ່ໄດ້ອີກ.",
     "rotate": "ສ້າງລິ້ງໃໝ່",
+    "replacementSettings": "ການຕັ້ງຄ່າເຫຼົ່ານີ້ໃຊ້ກັບລິ້ງໃໝ່.",
     "revoke": "ເອົາອອກລິ້ງ",
     "revokeTitle": "ຍົກເລີກລິ້ງບໍ?",
     "revokeMessage": "ລິ້ງປັດຈຸບັນຈະໃຊ້ບໍ່ໄດ້ທັນທີ.",
@@ -4535,5 +4696,175 @@
     "unavailableDescription": "ລິ້ງແບ່ງປັນນີ້ໝົດອາຍຸ ຫຼື ຖືກຍົກເລີກແລ້ວ.",
     "transcriptUnavailableTitle": "ບໍ່ສາມາດໂຫຼດບົດບັນທຶກນີ້ໄດ້",
     "transcriptUnavailableDescription": "ລິ້ງຍັງໃຊ້ໄດ້ຢູ່. ລອງໃໝ່ອີກຄັ້ງໃນອີກຈັກໜ່ອຍ."
+  },
+  "organizationGuardrails": {
+    "title": "ລະບົບປ້ອງກັນ AI",
+    "permissionDenied": "ພຽງແຕ່ເຈົ້າຂອງອົງກອນ ແລະ ຜູ້ບໍລິຫານເທົ່ານັ້ນທີ່ສາມາດຈັດການລະບົບປ້ອງກັນ AI ໄດ້.",
+    "unavailable": "ລະບົບປ້ອງກັນ AI ບໍ່ມີໃຫ້ສຳລັບອົງກອນນີ້.",
+    "loadError": "ລະບົບປ້ອງກັນ AI ບໍ່ສາມາດໂຫລດໄດ້",
+    "statusSaving": "ກຳລັງບັນທຶກ…",
+    "statusSaved": "ບັນທຶກແລ້ວ",
+    "statusFailed": "ບໍ່ສາມາດບັນທຶກໄດ້.",
+    "inputTitle": "ລະບົບປ້ອງກັນຂາເຂົ້າ",
+    "inputDescription": "ສະແກນທຸກຂາເຂົ້າດ້ວຍ Enkrypt AI ລວມທັງຜົນຂອງເຄື່ອງມື. ຕົວກວດຈັບແບບບລັອກຈະປະຕິເສດຄຳຮ້ອງຂໍເມື່ອ Enkrypt ບໍ່ພ້ອມໃຊ້.",
+    "outputTitle": "ລະບົບປ້ອງກັນຂາອອກ",
+    "outputDescription": "ສະແກນການຕອບສະໜອງດ້ວຍ Enkrypt AI ກ່ອນສະມາຊິກຈະໄດ້ຮັບ. ປິດຢູ່ເວັ້ນແຕ່ທ່ານເປີດໃຊ້ງານ.",
+    "detectorsHint": "ບລັອກຈະປະຕິເສດຄຳຮ້ອງຂໍທີ່ຖືກກວດພົບ. ບັນທຶກເທົ່ານັ້ນຈະບັນທຶກໄວ້ໂດຍບໍ່ຊັກຊ້າຄຳຮ້ອງຂໍ.",
+    "detectorsHintOutput": "ບລັອກຈະເຮັດໃຫ້ການຕອບສະໜອງທີ່ຖືກກວດພົບລົ້ມເຫຼວ. ບັນທຶກເທົ່ານັ້ນຈະບັນທຶກໄວ້ໂດຍບໍ່ຊັກຊ້າການຕອບສະໜອງ.",
+    "choiceLog": "ບັນທຶກເທົ່ານັ້ນ",
+    "applyTo": "ນຳໃຊ້ກັບ",
+    "applyToAllMembers": "ສະມາຊິກທັງໝົດ",
+    "applyKiloDefault": "ນຳໃຊ້ຄ່າເລີ່ມຕົ້ນຂອງ Kilo",
+    "invalidSavedTitle": "ບໍ່ສາມາດອ່ານການຕັ້ງຄ່າຕົວກວດຈັບຂາເຂົ້າທີ່ບັນທຶກໄວ້ໄດ້",
+    "invalidSavedBody": "ຄຳຮ້ອງຂໍຈະຖືກບລັອກຈົນກວ່າຕົວກວດຈັບຂາເຂົ້າຈະຖືກບັນທຶກອີກຄັ້ງ. ຕົວກວດຈັບຂ້າງລຸ່ມເລີ່ມຈາກຄ່າເລີ່ມຕົ້ນຂອງ Kilo.",
+    "invalidSavedOutputTitle": "ບໍ່ສາມາດອ່ານການຕັ້ງຄ່າຕົວກວດຈັບຂາອອກທີ່ບັນທຶກໄວ້ໄດ້",
+    "invalidSavedOutputBody": "ການຕອບສະໜອງຈະຖືກກັກໄວ້ຈົນກວ່າຕົວກວດຈັບຂາອອກຈະຖືກບັນທຶກອີກຄັ້ງ. ເລືອກຕົວກວດຈັບຂາອອກຂ້າງລຸ່ມ.",
+    "blockingOutputNote": "ຕົວກວດຈັບຂາອອກແບບບລັອກຈະກັກການຕອບສະໜອງໄວ້ຈົນກວ່າ Enkrypt ຈະກວດຄົບທັງໝົດ. ໃຊ້ ບັນທຶກເທົ່ານັ້ນ ເພື່ອຫຼີກລ້ຽງຄວາມຊັກຊ້າ.",
+    "inputDetectorRequired": "ເປີດຕົວກວດຈັບຂາເຂົ້າຢ່າງໜ້ອຍໜຶ່ງຕົວ.",
+    "outputDetectorRequired": "ເປີດຕົວກວດຈັບຂາອອກຢ່າງໜ້ອຍໜຶ່ງຕົວ.",
+    "rulesTooMany": "ເພີ່ມໄດ້ສູງສຸດ {{max}} ກົດ.",
+    "ruleIdRequired": "ປ້ອນລະຫັດກົດ.",
+    "ruleIdInvalid": "ລະຫັດກົດໃຊ້ໄດ້ພຽງແຕ່ຕົວອັກສອນ, ຕົວເລກ, ຈຸດ, ເສັ້ນຂີດ, ແລະ ເສັ້ນລຸ່ມ.",
+    "ruleTextRequired": "ອະທິບາຍສິ່ງທີ່ກົດຫ້າມ ຫຼື ກຳນົດໄວ້.",
+    "keywordTooLong": "ແຕ່ລະຄຳສຳຄັນມີໄດ້ສູງສຸດ {{max}} ຕົວອັກສອນ.",
+    "topicTooLong": "ແຕ່ລະຫົວຂໍ້ມີໄດ້ສູງສຸດ {{max}} ຕົວອັກສອນ.",
+    "keywordsTooMany": "ເພີ່ມໄດ້ສູງສຸດ {{max}} ຄຳສຳຄັນ.",
+    "topicsTooMany": "ເພີ່ມໄດ້ສູງສຸດ {{max}} ຫົວຂໍ້.",
+    "piiEntityRequired": "ເລືອກປະເພດຂໍ້ມູນທີ່ຈະກວດຈັບຢ່າງໜ້ອຍໜຶ່ງປະເພດ.",
+    "keywordRequired": "ເພີ່ມຄຳສຳຄັນຢ່າງໜ້ອຍໜຶ່ງຄຳ.",
+    "topicRequired": "ເພີ່ມຫົວຂໍ້ຢ່າງໜ້ອຍໜຶ່ງອັນ.",
+    "policyTextRequired": "ປ້ອນຂໍ້ຄວາມນະໂຍບາຍ.",
+    "ruleRequired": "ເພີ່ມກົດຢ່າງໜ້ອຍໜຶ່ງກົດ.",
+    "ruleIdDuplicate": "ແຕ່ລະກົດຕ້ອງມີ ID ຂອງກົດເອງ.",
+    "piiEntities": "ຂໍ້ມູນທີ່ຈະກວດຈັບ",
+    "keywordsLabel": "ຄຳສຳຄັນ",
+    "keywordsHint": "ໜຶ່ງຄຳສຳຄັນຕໍ່ໜຶ່ງແຖວ.",
+    "topicsHint": "ໜຶ່ງຫົວຂໍ້ຕໍ່ໜຶ່ງແຖວ.",
+    "policyFormat": "ຮູບແບບນະໂຍບາຍ",
+    "policyFormatRules": "ກົດແບບມີໂຄງສ້າງ",
+    "policyFormatRulesDescription": "ໜຶ່ງກົດຕໍ່ໜຶ່ງຂໍ້ກຳນົດ ພ້ອມໝວດ ແລະ ລະດັບຄວາມຮ້າຍແຮງ. ແນະນຳ.",
+    "policyFormatText": "ຂໍ້ຄວາມນະໂຍບາຍ",
+    "policyFormatTextDescription": "ວາງນະໂຍບາຍທີ່ມີຢູ່ແລ້ວເປັນຂໍ້ຄວາມທຳມະດາ.",
+    "rulesEmpty": "ຍັງບໍ່ມີກົດ. ແຕ່ລະກົດອະທິບາຍສິ່ງໜຶ່ງທີ່ຂາເຂົ້າຕ້ອງບໍ່ມີ ຫຼື ບໍ່ຖາມຫາ.",
+    "addRule": "ເພີ່ມກົດ",
+    "ruleNumber": "ກົດ {{number}}",
+    "ruleRemove": "ລຶບກົດ {{number}}",
+    "ruleIdLabel": "ລະຫັດກົດ",
+    "ruleNameLabel": "ຊື່ (ບໍ່ບັງຄັບ)",
+    "ruleTextLabel": "ກົດ",
+    "ruleRiskCategory": "ໝວດຄວາມສ່ຽງ",
+    "ruleApplicability": "ຂອບເຂດ",
+    "ruleFrameworks": "ກອບມາດຕະຖານ",
+    "detector": {
+      "promptInjection": {
+        "label": "ການແຊກຄຳສັ່ງ",
+        "description": "ກວດຈັບຄວາມພະຍາຍາມທີ່ຈະຂຽນທັບຄຳແນະນຳ ຫຼື ຫຼອກລັດຕົວແບບ."
+      },
+      "policyViolation": {
+        "label": "ການລະເມີດນະໂຍບາຍ",
+        "description": "ກວດພົບຂາເຂົ້າທີ່ລະເມີດນະໂຍບາຍອົງກອນຂອງທ່ານ ທີ່ຂຽນເປັນຂໍ້ຄວາມ ຫຼື ກົດ.",
+        "descriptionOutput": "ກວດພົບການຕອບສະໜອງທີ່ລະເມີດນະໂຍບາຍອົງກອນຂອງທ່ານ ທີ່ຂຽນເປັນຂໍ້ຄວາມ ຫຼື ກົດ."
+      },
+      "pii": {
+        "label": "PII ແລະ ຄວາມລັບ",
+        "description": "ກວດຈັບຂໍ້ມູນສ່ວນຕົວ, ຂໍ້ມູນປະກອບການເຂົ້າ, ທີ່ຢູ່ IP, ແລະ URL."
+      },
+      "keywords": {
+        "label": "ຄຳສຳຄັນທີ່ຫ້າມ",
+        "descriptionOutput": "ກວດຈັບການຕອບສະໜອງທີ່ມີຄຳສຳຄັນໃດໆທີ່ທ່ານລະບຸ."
+      },
+      "topics": {
+        "label": "ຫົວຂໍ້",
+        "descriptionOutput": "ກວດພົບການຕອບສະໜອງກ່ຽວກັບຫົວຂໍ້ໃດໆທີ່ທ່ານລະບຸ."
+      },
+      "toxicity": {
+        "label": "ຄວາມເປັນພິດ",
+        "description": "ກວດຈັບພາສາທີ່ເປັນພິດ, ດູຖູກ, ຂົ່ມຂູ່, ຫຼື ກຽດຊັງ."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "ກວດຈັບເນື້ອຫາທາງເພດ ຫຼື ເນື້ອຫາທີ່ບໍ່ປອດໄພຕໍ່ການເຮັດວຽກ."
+      },
+      "bias": {
+        "label": "ອະຄະຕິ",
+        "description": "ກວດຈັບພາສາທີ່ມີອະຄະຕິ ຫຼື ແບ່ງແຍກ."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "ຂໍ້ມູນສ່ວນຕົວ",
+        "description": "ຊື່, ທີ່ຢູ່ອີເມວ, ເບີໂທລະສັບ."
+      },
+      "secrets": {
+        "label": "ຄວາມລັບ",
+        "description": "ກະແຈ API, ໂທເຄັນ, ລະຫັດຜ່ານ."
+      },
+      "ipAddress": {
+        "label": "ທີ່ຢູ່ IP",
+        "description": "ທີ່ຢູ່ IPv4 ແລະ IPv6."
+      },
+      "url": {
+        "label": "URL",
+        "description": "ທີ່ຢູ່ເວັບ."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "ຄວາມປອດໄພ ແລະ ການສໍ້ໂກງ",
+      "safetyHarm": "ຄວາມປອດໄພ ແລະ ຄວາມເສຍຫາຍ",
+      "privacyDataProtection": "ຄວາມເປັນສ່ວນຕົວ ແລະ ການປົກປ້ອງຂໍ້ມູນ",
+      "brandReputationTrust": "ຍີ່ຫໍ້ ແລະ ຊື່ສຽງ",
+      "biasFairnessEthical": "ອະຄະຕິ ແລະ ຄວາມເປັນທຳ",
+      "legalIpLiability": "ຄວາມຮັບຜິດຊອບທາງກົດໝາຍ ແລະ ຊັບສິນທາງປັນຍາ",
+      "productMisuse": "ການໃຊ້ຜະລິດຕະພັນຜິດວິທີ",
+      "performanceQuality": "ປະສິດທິພາບ ແລະ ຄຸນນະພາບ"
+    },
+    "applicability": {
+      "user": "ຂາເຂົ້າຂອງຜູ້ໃຊ້",
+      "userAssistant": "ຂາເຂົ້າຂອງຜູ້ໃຊ້ ແລະ ການຕອບສະໜອງ"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM 10 ອັນດັບຕົ້ນ (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "ກົດໝາຍວ່າດ້ວຍ AI ຂອງ EU",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "ຄຸນສົມບັດສຳລັບອົງກອນຂະໜາດໃຫຍ່",
+    "enterpriseOnly": "ນີ້ເປັນຄຸນສົມບັດສຳລັບອົງກອນຂະໜາດໃຫຍ່ເທົ່ານັ້ນ.",
+    "readOnly": "ພຽງແຕ່ເຈົ້າຂອງອົງກອນ ແລະ ຜູ້ບໍລິຫານເທົ່ານັ້ນທີ່ສາມາດປ່ຽນການຕັ້ງຄ່າເຫຼົ່ານີ້ໄດ້.",
+    "loadError": "ຜູ້ໃຫ້ບໍລິການ ແລະ ຕົວແບບບໍ່ສາມາດໂຫລດໄດ້",
+    "tabModels": "ຕົວແບບ",
+    "tabProviders": "ຜູ້ໃຫ້ບໍລິການ",
+    "tabGateways": "ປະຕູເຊື່ອມຕໍ່",
+    "modelsDescription": "ປິດຕົວແບບເພື່ອບລັອກສຳລັບສະມາຊິກທຸກຄົນ. ຕົວແບບຈາກຜູ້ໃຫ້ບໍລິການທີ່ອະນຸຍາດຈະເປີດໃຊ້ງານເລີ່ມຕົ້ນ.",
+    "modelsDeniedOnly": "ສະເພາະທີ່ຖືກປະຕິເສດ",
+    "modelsEmpty": "ບໍ່ມີຕົວແບບທີ່ກົງກັບການຄົ້ນຫານີ້.",
+    "providersDescription": "ປິດຜູ້ໃຫ້ບໍລິການເພື່ອຢຸດການກຳນົດເສັ້ນທາງຂອງ Kilo ໄປຫາຜູ້ນັ້ນສຳລັບອົງກອນນີ້.",
+    "providersNeedCatalog": "ສະວິດຜູ້ໃຫ້ບໍລິການຈະອ່ານໄດ້ຢ່າງດຽວຈົນກວ່າລາຍການໂມເດວທັງໝົດຈະໂຫຼດແລ້ວ. ກົດ ລອງໃໝ່ ຂ້າງເທິງເພື່ອແກ້ໄຂ.",
+    "providersEmpty": "ບໍ່ມີຜູ້ໃຫ້ບໍລິການທີ່ກົງກັບການຄົ້ນຫານີ້.",
+    "allowAllShown": "ອະນຸຍາດທັງໝົດທີ່ສະແດງ",
+    "denyAllShown": "ປະຕິເສດທັງໝົດທີ່ສະແດງ",
+    "gatewaysDescription": "Kilo ກຳນົດເສັ້ນທາງຄຳຮ້ອງຂໍຕົວແບບຜ່ານ Vercel AI Gateway ຫຼື OpenRouter. ປະຕູເຊື່ອມຕໍ່ທີ່ປິດຈະເຮັດໃຫ້ຄຳຮ້ອງຂໍເຫຼົ່ານັ້ນລົ້ມເຫຼວ.",
+    "emptyProviderList": "ອະນຸຍາດຜູ້ໃຫ້ບໍລິການຢ່າງໜ້ອຍໜຶ່ງລາຍ. ລາຍການທີ່ຫວ່າງເປົ່າຈະປິດກັ້ນການກຳນົດເສັ້ນທາງຕົວແບບທັງໝົດຂອງ Kilo.",
+    "gatewaysUnavailable": "ການຕັ້ງຄ່າປະຕູເຊື່ອມຕໍ່ບໍ່ມີໃຫ້ໃຊ້ສຳລັບອົງກອນນີ້.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "ຄຳຮ້ອງຂໍຂອງ OpenRouter ບໍ່ໄດ້ຖືກກຳນົດໃຫ້ຢູ່ໃນພູມິພາກໃດໜຶ່ງ.",
+    "inferenceRegion": "ພູມິພາກການອະນຸມານ",
+    "inferenceRegionDescription": "ກຳນົດຄຳຮ້ອງຂໍຂອງ Vercel AI Gateway ໃຫ້ຢູ່ໃນພູມິພາກນີ້. ຕົວແບບທີ່ບໍ່ພ້ອມໃຊ້ໃນພູມິພາກນັ້ນຈະລົ້ມເຫຼວ.",
+    "disableOpenrouterNote": "ການປິດ OpenRouter ຍັງຈະບລັອກກະແຈ BYOK ທີ່ກຳນົດເສັ້ນທາງຄຳຮ້ອງຂໍຜ່ານມັນ.",
+    "emptyModelList": "ເປີດຕົວແບບໄວ້ຢ່າງໜ້ອຍໜຶ່ງລາຍການ. ການປະຕິເສດຕົວແບບທັງໝົດຈະເຮັດໃຫ້ສະມາຊິກບໍ່ມີຫຍັງໃຫ້ໃຊ້.",
+    "catalogUnavailable": "ບໍ່ສາມາດໂຫຼດລາຍການຕົວແບບທັງໝົດໄດ້, ສະນັ້ນຈຶ່ງສະແດງສະເພາະລາຍການທີ່ທ່ານບັນທຶກໄວ້ເທົ່ານັ້ນ. ລອງໃໝ່ເພື່ອໂຫຼດຕົວແບບທັງໝົດ.",
+    "region": {
+      "global": "ທົ່ວໂລກ",
+      "us": "ສະຫະລັດອາເມລິກາ",
+      "eu": "ສະຫະພາບເອີຣົບ",
+      "au": "ອອສເຕຣເລຍ",
+      "jp": "ຍີ່ປຸ່ນ"
+    }
   }
 }

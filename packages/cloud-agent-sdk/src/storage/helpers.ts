@@ -192,10 +192,12 @@ function isStaleToolLifecycleUpdate(
   }
 
   if (incomingRank < storedRank) {
-    if (incomingRank === 1 && storedRank === 2 && !runningReopensTerminal(stored, incoming)) {
-      return true;
+    // Running (1) over terminal (2): the run reopens the settled run only when
+    // its start postdates the settle time. Every other lower-ranked update is
+    // stale.
+    if (incomingRank === 1 && storedRank === 2) {
+      return !runningReopensTerminal(stored, incoming);
     }
-    if (incomingRank === 1 && storedRank === 2) return false;
     return true;
   }
 

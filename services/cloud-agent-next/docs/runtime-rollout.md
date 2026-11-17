@@ -66,16 +66,20 @@ is rejected, not a path back to preinstalled startup. The renderer emits only th
 
 ### Kilo v2 harness
 
-A downloaded target can also name `kilo2: { orgIds }`. Without it, new sandboxes select v1.
-The checked-in default uses `kilo2: { orgIds: "*" }` for all organizations and personal accounts.
+A downloaded target can also name `kilo2: { orgIds, allSessionOrgIds? }`. Without it, new sandboxes
+select v1. The checked-in default uses `kilo2: { orgIds: "*" }` for all organizations and personal
+accounts, plus `allSessionOrgIds: ["9d278969-5453-4ae3-a51f-a8d2274a7b56"]` for the Kilo
+organization.
 A sandbox's first allocation selects v2 only when every preparing route has the
 worker-owned `billingOrigin: cloud-agent-web`. Its downloaded start must also pass the organization
 rule for `kilo2.orgIds`: `"*"` admits every account; a UUID list requires one listed organization
-across all preparing routes. Native allocations must be isolated. Code reviews, desktop,
-Agent Manager and other origins stay on v1, including
-routes with a missing origin and sandboxes with mixed origins. This origin restriction applies only
-to v2 selection; downloaded v1 startup is available to every account. A client-supplied
-`createdOnPlatform` cannot select v2. Existing routes without a stored `billingOrigin` select v1.
+across all preparing routes. Native allocations must be isolated. Code reviews, desktop, Agent
+Manager and other origins stay on v1, including routes with a missing origin and sandboxes with mixed
+origins. `kilo2.allSessionOrgIds` admits every origin and native sandbox class for its own accounts,
+and each listed organization must also be inside `kilo2.orgIds` (`"*"` requires `orgIds: "*"`). This
+origin restriction applies only to v2 selection; downloaded v1 startup is available to every account.
+A client-supplied `createdOnPlatform` cannot select v2. Existing routes without a stored
+`billingOrigin` select v1.
 The Sandbox DO stores that harness, and every later allocation of the
 sandbox uses it, because native history does not move between v1 and v2. A sandbox that allocated
 before this record existed stays on v1. The harness is stored after startup preflight and capacity
@@ -88,9 +92,10 @@ Changing the organization scope only affects new sandbox harness selection.
 
 Each publication packages the pinned v1 and v2 CLIs (`PINNED_CLIS` in
 `scripts/runtime-cli-artifact.ts`) with the same control payload. It verifies both on the base and
-records the v2 descriptor in the exact-SHA handoff. Deployment renders `RUNTIME_KILO2_ORG_IDS` and
-`RUNTIME_RELEASE_DESCRIPTOR_KILO2` from the catalog and that handoff, and fails when a `kilo2` target
-has no v2 release. The release names its harness through its CLI executable (`package/bin/kilo2`).
+records the v2 descriptor in the exact-SHA handoff. Deployment renders `RUNTIME_KILO2_ORG_IDS`,
+`RUNTIME_KILO2_ALL_SESSION_ORG_IDS` and `RUNTIME_RELEASE_DESCRIPTOR_KILO2` from the catalog and that
+handoff, and fails when a `kilo2` target has no v2 release. The release names its harness through its
+CLI executable (`package/bin/kilo2`).
 A start whose release harness differs from the sandbox's stored harness fails as
 `invalid_configuration`. Session snapshots are keyed by the selected descriptor, and environment
 snapshots do not depend on the runtime release, so neither needs a harness namespace.

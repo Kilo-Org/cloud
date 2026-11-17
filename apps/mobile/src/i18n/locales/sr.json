@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Upravljaj na vebu",
     "creditHistory": "Istorija kredita",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Otkaži",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Kupovine, računi i aktivnost kredita",
     "invoicesSubtitle": "Preuzmite fakture za svoje kupovine",
-    "manageBilling": "Upravljajte naplatom na kilo.ai",
-    "manageBillingIosNote": "Načinima plaćanja, automatskom dopunom i podacima za naplatu upravlja se na kilo.ai.",
     "codeReviewerSubtitle": "Automatski pregledi PR-ova",
     "securityAgentSubtitle": "Pronađi i otkloni ranjivosti",
     "reviews": "Pregledi",
@@ -364,7 +360,8 @@
     "providerKeys": {
       "title": "Ključevi provajdera",
       "rowSubtitle": "Koristi naplatu preko svog provajdera",
-      "manageOnWebReason": "Ovim provajderima su potrebni strukturirani akreditivi.",
+      "orgDescription": "Ovi ključevi se dele sa svima u organizaciji i naplaćuju se na njenim nalozima kod provajdera.",
+      "viewOnly": "Samo vlasnik organizacije, administrator ili menadžer za naplatu može da menja njene ključeve.",
       "description": "Zahtevi poslati preko ovih ključeva naplaćuju se na tvom nalogu kod provajdera umesto sa tvog Kilo salda.",
       "managedByPlan": "Upravlja se kroz tvoj plan za kodiranje",
       "enableKey": "Omogući ključ za {{provider}}",
@@ -374,6 +371,7 @@
       "removeMessage": "Zahtevi koji su koristili ovaj ključ više neće koristiti naplatu preko tvog provajdera.",
       "add": "Dodaj ključ",
       "added": "Ključ je dodat",
+      "updated": "Ključ je ažuriran",
       "emptyTitle": "Nema ključeva provajdera",
       "emptyDescription": "Dodaj ključ za početak.",
       "chooseProvider": "Izaberi provajdera",
@@ -382,9 +380,34 @@
       "noProvidersDescription": "Nijedan provajder ne odgovara toj pretrazi.",
       "newKeyTitle": "Novi ključ",
       "newKeyDescription": "Ključ se čuva šifrovan i ne može ponovo da se prikaže.",
+      "edit": "Izmeni ključ",
+      "editKeyTitle": "Zameni ključ",
+      "editKeyDescription": "Sačuvana vrednost ne može da se prikaže. Unesi novu da je zameniš.",
+      "editKeyMappingsWarning": "Zamena ključa zamenjuje i sačuvana mapiranja modela: ponovo unesi svako mapiranje koje ti još treba.",
+      "saveFailed": "Čuvanje ključa nije uspelo.",
+      "invalidCredentials": "Proveri akreditive i pokušaj ponovo.",
+      "fieldRequired": "Polje {{field}} je obavezno.",
+      "incompleteMapping": "Mapiranje {{number}} mora imati i slug gateway modela i naziv deploymenta.",
       "apiKeyLabel": "API ključ",
       "apiKeyPlaceholder": "Nalepi ključ",
-      "apiKeyRequired": "Unesi ključ."
+      "apiKeyRequired": "Unesi ključ.",
+      "authMethod": "Metod autentifikacije",
+      "authMethodAccessKeys": "Pristupni ključevi",
+      "resourceName": "Naziv Azure resursa",
+      "region": "AWS region",
+      "accessKeyId": "ID pristupnog ključa",
+      "secretAccessKey": "Tajni pristupni ključ",
+      "project": "Google Cloud projekat",
+      "location": "Vertex lokacija",
+      "clientEmail": "Imejl servisnog naloga",
+      "privateKey": "Privatni ključ servisnog naloga",
+      "modelMappings": "Mapiranja modela",
+      "modelMappingsDescription": "Usmeri gateway model na prilagođeni naziv deploymenta.",
+      "mappingTitle": "Mapiranje {{number}}",
+      "mappingGatewayModel": "Slug gateway modela",
+      "mappingCustomModel": "Naziv deploymenta",
+      "addMapping": "Dodaj mapiranje",
+      "removeMapping": "Ukloni mapiranje {{number}}"
     },
     "dataExport": {
       "title": "Tvoji podaci",
@@ -457,7 +480,8 @@
       "nextStepFinal": "Odluka po žalbi je konačna. Žalba se više ne može podneti.",
       "viewReceipt": "Prikaži potvrdu"
     },
-    "changelog": "Šta je novo"
+    "changelog": "Šta je novo",
+    "changelogVersionPending": "Beleške za ovu verziju stižu sa sledećim ažuriranjem."
   },
   "preferences": {
     "general": "Opšte",
@@ -1193,8 +1217,6 @@
       "clearMessage": "Čuvanjem praznog polja brišu se prilagođena uputstva sačuvana za ovog recenzenta."
     },
     "repos": {
-      "unavailable": "Repozitorijumi nisu dostupni. Završi podešavanje za Bitbucket na kilo.ai.",
-      "finishSetup": "Završi podešavanje",
       "manageAccess": "Upravljaj pristupom",
       "bitbucketNoRepositoriesDescription": "Nema dostupnih repozitorijuma u ovom Bitbucket radnom prostoru.",
       "gitlabNoRepositoriesDescription": "Možda treba da odobriš pristup za više grupa ili projekata na GitLab-u.",
@@ -1349,11 +1371,10 @@
     "followReviewMd": "Sledi uputstva iz REVIEW.md",
     "followReviewMdSubtitle": "Poštuj uputstva iz datoteke REVIEW.md u svakom repozitorijumu",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket nije povezan. Samo vlasnici organizacije, administratori i menadžeri naplate mogu da ga povežu.",
-      "setupIncomplete": "Podešavanje nije završeno. Završi ga na kilo.ai.",
-      "setup": "Podešavanje za Bitbucket"
+      "notConnectedReadOnly": "Bitbucket nije povezan. Samo vlasnici organizacije, administratori i menadžeri naplate mogu da ga povežu."
     },
     "bitbucketConnect": {
+      "managedOnWeb": "Bitbucket vezom ove organizacije upravlja se na vebu, sa računara.",
       "description": "Kreiraj token za pristup radnom prostoru sa potrebnim dozvolama i nalepi ga ispod.",
       "scopes": "Nalog: čitanje · Repozitorijumi: čitanje/pisanje · PR-ovi: čitanje · Veb-dojavnici: čitanje/pisanje",
       "tokenPlaceholder": "Token za pristup radnom prostoru"
@@ -1368,7 +1389,8 @@
       "noReviews": "Još nema pregleda",
       "noReviewsDescription": "Pregledi se prikazuju ovde kada agent za pregled koda pregleda neki PR.",
       "startManualReview": "Pokreni ručni pregled",
-      "configureProvider": "Podesi platformu"
+      "configureProvider": "Podesi platformu",
+      "connectOwnerOnly": "Zamoli vlasnika organizacije ili administratora da poveže platformu."
     },
     "platformList": {
       "checking": "Provera…",
@@ -1381,8 +1403,7 @@
       "githubError": "Nije moguće otvoriti podešavanje za GitHub. Pokušaj ponovo.",
       "gitlabAccount": "GitLab nalog",
       "gitlabError": "Nije moguće otvoriti podešavanje za GitLab. Pokušaj ponovo.",
-      "description": "Poveži Kilo integraciju ({{label}}) za automatski pregled PR-ova.",
-      "bitbucketError": "Nije moguće otvoriti podešavanje za Bitbucket. Pokušaj ponovo."
+      "description": "Poveži Kilo integraciju ({{label}}) za automatski pregled PR-ova."
     },
     "overview": {
       "allAreas": "Sve oblasti",
@@ -2055,6 +2076,10 @@
       "completedWillAppear": "Završene sesije će se pojaviti ovde.",
       "noPastSessions": "Nema prethodnih sesija",
       "pastSessions": "Prethodne sesije",
+      "sectionAccessibility_one": "{{title}}: {{displayCount}} sesija",
+      "sectionAccessibility_few": "{{title}}: {{displayCount}} sesije",
+      "sectionAccessibility_other": "{{title}}: {{displayCount}} sesija",
+      "sectionAccessibility": "{{title}}: {{displayCount}} sesija",
       "live": "UŽIVO",
       "updating": "Ažuriranje"
     },
@@ -2191,10 +2216,8 @@
       "couldNotLoadBitbucketRepositories": "Učitavanje Bitbucket repozitorijuma nije uspelo.",
       "connectGithubDescription": "Prijavi se u pregledaču, a zatim se vrati ovde da izabereš GitHub repozitorijum.",
       "connectGitlabDescription": "Prijavi se u pregledaču, a zatim se vrati ovde da izabereš GitLab repozitorijum.",
-      "connectBitbucketDescription": "Prijavi se u pregledaču, a zatim se vrati ovde da izabereš Bitbucket repozitorijum.",
       "openGithub": "Otvori GitHub",
       "openGitlab": "Otvori GitLab",
-      "openBitbucket": "Otvori Bitbucket",
       "refreshRepositories": "Osveži repozitorijume",
       "githubConnected": "GitHub povezan",
       "gitlabConnected": "GitLab povezan",
@@ -3006,6 +3029,7 @@
     "signOutThisDevice": "Odjavi ovaj uređaj",
     "signOutSessionLabel": "Odjavi uređaj {{device}}, prijava: {{signedIn}}, poslednja aktivnost: {{lastSeen}}",
     "sessionSignedOut": "Sesija je odjavljena.",
+    "sessionSignOutFailed": "Nije moguće odjaviti ovu sesiju. Pokušaj ponovo.",
     "signOutThisDeviceTitle": "Odjaviti ovaj uređaj?",
     "signOutThisSessionTitle": "Odjaviti ovu sesiju?",
     "signOutThisSessionMessage": "Uređaj {{device}} će biti odjavljen. Poslednja aktivnost: {{lastSeen}}. Pristup API-ju može da ostane aktivan još najviše sat vremena.",
@@ -3106,6 +3130,10 @@
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
     "searchPlaceholder": "Pretraga nedavnih sesija",
     "connectedCli": "Na povezanom CLI-ju",
+    "connectedCliAccessibility_one": "{{title}}: {{displayCount}} instanca",
+    "connectedCliAccessibility_few": "{{title}}: {{displayCount}} instance",
+    "connectedCliAccessibility_other": "{{title}}: {{displayCount}} instanci",
+    "connectedCliAccessibility": "{{title}}: {{displayCount}} instanci",
     "newSessionOn": "Nova sesija na {{name}}",
     "noMatchingSessions": "Nema odgovarajućih sesija.",
     "onlyFirstFilesAttached": "Biće priloženo samo prvih {{displayCount}} datoteka.",
@@ -3127,15 +3155,14 @@
     "manage": {
       "billingHistory": "Istorija naplate",
       "billingHistoryEmpty": "Još nema istorije naplate.",
+      "billingHistoryError": "Nije moguće učitati istoriju naplate",
       "cancel": "Otkaži pretplatu",
       "cancelDescription": "Vaš Kilo Pass ostaje aktivan do kraja obračunskog perioda i neće se obnoviti.",
       "cancelScheduled": "Otkazuje se {{date}}",
       "cancelScheduledChange": "Otkaži zakazanu promenu",
       "cancelled": "Pretplata je otkazana",
-      "changePlan": "Promenite plan na kilo.ai",
-      "changePlanIosNote": "Promene plaćenog plana dostupne su na kilo.ai.",
       "creditHistoryEmpty": "Još nema Kilo Pass kredita.",
-      "manageInStore": "Upravljajte u prodavnici {{store}}",
+      "creditHistoryError": "Nije moguće učitati istoriju kredita",
       "resume": "Nastavi pretplatu",
       "resumeCancelledDescription": "Vaš Kilo Pass će ponovo početi automatski da se obnavlja.",
       "resumePausedDescription": "Vaš Kilo Pass se nastavlja odmah, pre zakazanog datuma nastavka.",
@@ -3172,9 +3199,6 @@
     "bonusFree": "Besplatan bonus",
     "bonusReferral": "Bonus za preporuku",
     "bonusAvailable": "Dostupan besplatan bonus",
-    "kiloPassManagement": "Upravljanje pretplatom na Kilo Pass",
-    "kiloPassSetup": "Podešavanje pretplate na Kilo Pass",
-    "opensManagementOnWeb": "Otvara upravljanje Kilo Pass-om na vebu.",
     "loadFailedRetry": "Proveri vezu, pa pokušaj ponovo.",
     "legalTermsOfUse": "Uslovi korišćenja (EULA)",
     "purchaseDifferentAccount": "Ova kupovina u prodavnici App Store nije povezana sa tvojim Kilo nalogom. Prijavi se na nalog Apple Account koji je korišćen za kupovinu, pa pokušaj ponovo.",
@@ -3360,7 +3384,6 @@
       "buySeats": "Kupi mesta",
       "setupAutoTopUp": "Podesi automatsku dopunu",
       "manageAutoTopUp": "Upravljaj automatskom dopunom",
-      "webAddress": "Veb adresa {{url}}",
       "opensOnWeb": "Otvara se na vebu"
     },
     "boundary": {
@@ -3376,7 +3399,7 @@
       "selectOrganization": "Izaberi organizaciju",
       "unavailableDescription": "Ova organizacija više nije dostupna. Izaberi drugu na svom profilu da nastaviš.",
       "unavailableSessionsDescription": "Ova organizacija više nije dostupna. Njene sesije nije moguće učitati.",
-      "accessDeniedDescription": "Nemaš pristup ovoj organizaciji."
+      "accessDeniedDescription": "Zatraži od vlasnika ili administratora organizacije da ti odobri pristup."
     },
     "create": {
       "title": "Kreiraj organizaciju",
@@ -3496,25 +3519,89 @@
     },
     "settingsOnWeb": {
       "title": "Podešavanja organizacije na vebu",
-      "integrations": "Integracije na vebu",
       "usageDetails": "Detalji potrošnje",
       "providersAndModels": "Provajderi i modeli",
       "groups": "Grupe",
       "guardrails": "Zaštitna ograničenja",
       "byok": "Sopstveni ključ",
       "ssoAndDomain": "SSO i domen",
-      "emailPreferences": "Podešavanja e-pošte",
       "dataCollection": "Prikupljanje podataka",
       "auditLogs": "Dnevnici revizije",
-      "requestLogs": "Dnevnici zahteva",
-      "subOrganizations": "Podorganizacije",
-      "distributeFunds": "Raspodela sredstava"
+      "requestLogs": "Dnevnici zahteva"
+    },
+    "requestLogs": {
+      "hint": "Zahtevi iz sata pre kraja intervala, počev od najnovijih.",
+      "older": "Prethodni sat",
+      "newer": "Sledeći sat",
+      "truncated": "U ovom satu ima više zahteva nego što lista prikazuje.",
+      "emptyTitle": "Nema zahteva",
+      "emptyDescription": "U ovom satu nema zahteva preko gateway-a.",
+      "loadError": "Učitavanje dnevnika zahteva nije uspelo.",
+      "permissionDenied": "Dnevnike zahteva organizacije mogu da čitaju samo njen vlasnik, administrator ili menadžer za naplatu.",
+      "tokens": "{{input}} ulaz · {{output}} izlaz",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Ulazni tokeni",
       "orgLast30Days": "Svi članovi · Poslednjih 30 dana",
       "outputTokens": "Izlazni tokeni",
       "requests": "Zahtevi"
+    },
+    "modes": {
+      "create": "Novi režim",
+      "deleteAction": "Obriši režim",
+      "deleteMessage": "Režim se uklanja za sve u ovoj organizaciji. Režim koji zamenjuje ugrađeni vraća se na ugrađena podešavanja.",
+      "deleteTitle": "Obrisati ovaj režim?",
+      "descriptionLabel": "Opis režima",
+      "emptyDescription": "Režimi koji se ovde dodaju dostupni su svima u ovoj organizaciji.",
+      "emptyTitle": "Još nema prilagođenih režima",
+      "identifierHint": "Mala slova, brojevi i crtice.",
+      "identifierInvalid": "Koristi samo mala slova, brojeve i crtice.",
+      "identifierLabel": "Identifikator",
+      "identifierRequired": "Unesi identifikator.",
+      "identifierTaken": "Drugi režim već koristi ovaj identifikator.",
+      "nameLabel": "Naziv režima",
+      "nameRequired": "Unesi naziv režima.",
+      "notFound": "Ovaj režim više ne postoji.",
+      "restrictionHint": "Mogu se uređivati samo datoteke koje odgovaraju ovom obrascu. Ostavi prazno da dozvoliš sve datoteke.",
+      "restrictionInvalid": "Unesi ispravan obrazac.",
+      "restrictionLabel": "Oznaka ograničenja",
+      "restrictionPattern": "Obrazac datoteke",
+      "roleLabel": "Definicija uloge",
+      "roleRequired": "Opiši šta ovaj režim radi.",
+      "tool": {
+        "browser": "Koristi pregledač",
+        "command": "Pokreni komande",
+        "edit": "Uredi datoteke",
+        "mcp": "Koristi MCP",
+        "read": "Čitaj datoteke"
+      },
+      "whenToUseLabel": "Kada koristiti ovaj režim"
+    },
+    "groups": {
+      "create": "Nova grupa",
+      "deleteAction": "Obriši grupu",
+      "deleteMessage": "Grupa, njene politike i dodele članova se uklanjaju.",
+      "deleteTitle": "Obrisati ovu grupu?",
+      "descriptionLabel": "Opis grupe",
+      "emptyDescription": "Grupa okuplja članove da bi jedna politika važila za sve njih.",
+      "emptyTitle": "Još nema grupa",
+      "enterpriseOnly": "Grupe su dostupne na planu Enterprise.",
+      "memberCount": "Članova: {{displayCount}}",
+      "memberCount_few": "{{displayCount}} člana",
+      "memberCount_one": "{{displayCount}} član",
+      "memberCount_other": "{{displayCount}} članova",
+      "memberViewEmpty": "Nisi ni u jednoj grupi ove organizacije.",
+      "memberViewTitle": "Tvoje grupe",
+      "membersEmpty": "Nijedan aktivni član ne odgovara pretrazi.",
+      "membersLabel": "Članovi grupe",
+      "nameLabel": "Naziv grupe",
+      "nameRequired": "Unesi naziv grupe.",
+      "nameTooLong": "Skrati naziv na najviše 80 znakova.",
+      "notFound": "Ova grupa više ne postoji.",
+      "permissionDenied": "Samo vlasnik ili administrator organizacije može da menja njene grupe.",
+      "searchMembers": "Pretraži članove",
+      "selectAllVisible": "Izaberi sve prikazane članove"
     },
     "hub": {
       "renameTitle": "Preimenuj organizaciju",
@@ -3545,7 +3632,6 @@
       "processingBlocked": "Obrada blokirana",
       "processingNeedsReview": "Potrebna je provera obrade",
       "retryHint": "Pokušava ponovo da učita status pretplate Kilo Pass.",
-      "setupHint": "Otvara podešavanja pretplate Kilo Pass na vebu.",
       "paidSeat_few": "{{displayCount}} plaćena mesta"
     }
   },
@@ -4077,6 +4163,7 @@
     "commandAtLimit": "Komanda je ograničena na {{max}} znakova",
     "commandsEmpty": "Još nema komandi za podešavanje",
     "commandsSaveFailed": "Nije moguće sačuvati komande za podešavanje",
+    "commandLimitReached": "Profil može da sadrži najviše {{max}} komandi za podešavanje. Obrišite jednu da biste dodali drugu.",
     "moveCommandUp": "Premesti komandu {{position}} gore",
     "moveCommandDown": "Premesti komandu {{position}} dole",
     "skillsTitle": "Veštine",
@@ -4164,6 +4251,7 @@
       "deleteMessage": "Nove sesije koje koriste ovaj profil više ne mogu da pristupe alatima ovog servera. Ovo se ne može poništiti.",
       "deleteConfirm": "Obriši MCP server",
       "saveFailed": "Nije moguće sačuvati MCP server",
+      "limitReached": "Profil može da sadrži najviše {{max}} MCP servera. Obrišite jedan da biste dodali drugi.",
       "deleteFailed": "Nije moguće izbrisati MCP server",
       "updateFailed": "Nije moguće ažurirati MCP server"
     },
@@ -4196,6 +4284,7 @@
       "modeSubagent": "Samo subagent",
       "modeAll": "Svi režimi",
       "saveFailed": "Nije moguće sačuvati agenta",
+      "limitReached": "Profil može da sadrži najviše {{max}} agenata. Obrišite jednog da biste dodali drugog.",
       "deleteFailed": "Nije moguće izbrisati agenta",
       "nameRequired": "Unesite ime agenta",
       "slugRequired": "Unesite slug agenta",
@@ -4226,6 +4315,7 @@
       "moveUp": "Premesti slash komandu {{name}} gore",
       "moveDown": "Premesti slash komandu {{name}} dole",
       "saveFailed": "Nije moguće sačuvati komandu",
+      "limitReached": "Profil može da sadrži najviše {{max}} slash komandi. Obrišite jednu da biste dodali drugu.",
       "deleteFailed": "Nije moguće izbrisati komandu",
       "nameRequired": "Unesite ime komande",
       "nameInvalid": "Ime mora da počinje malim slovom i da koristi samo mala slova, cifre i crtice",
@@ -4299,7 +4389,7 @@
       "googlePlayReceipt": "Račun iz prodavnice Google Play",
       "purchaseFallback": "Kupovina kredita",
       "receipt": "Račun",
-      "receiptA11y": "Otvori račun za {{description}}",
+      "receiptA11y": "Otvori račun za {{description}}, {{amount}}, od {{date}}",
       "receiptUnavailable": "Račun nije dostupan za ovu kupovinu.",
       "kind": {
         "adjustment": "Korekcija",
@@ -4516,6 +4606,8 @@
     "topModels": "Najčešći modeli",
     "topFeatures": "Najčešće funkcije",
     "emptyTitle": "Nema korišćenja u ovom periodu",
+    "unavailableTitle": "Korišćenje nije dostupno",
+    "unavailableDescription": "Ovaj radni prostor ne prijavljuje korišćenje. Ponovni pokušaj neće pomoći.",
     "orgSelfNotice": "Vidite sopstveno korišćenje u ovoj organizaciji.",
     "viewDetails": "Prikaži detalje korišćenja"
   },
@@ -4563,8 +4655,79 @@
       "portLabel": "localhost:{{port}}"
     },
     "triggers": {
-      "title": "Okidači i webhook-ovi",
-      "subtitle": "Upravljaj webhook i zakazanim okidačima na vebu."
+      "title": "Okidači i vebhukovi",
+      "subtitle": "Automatizujte pokretanja Cloud Agent-a pomoću vebhuk poziva ili po rasporedu.",
+      "new": "Novi okidač",
+      "emptyTitle": "Još nema okidača",
+      "emptyDescription": "Napravite okidač da biste započeli pokretanje Cloud Agent-a preko vebhuk poziva ili po rasporedu.",
+      "loadFailedTitle": "Učitavanje okidača nije uspelo",
+      "loadFailedDescription": "Pokušajte ponovo kada se povežete.",
+      "detailLoadFailedTitle": "Učitavanje ovog okidača nije uspelo",
+      "detailNotFoundTitle": "Okidač nije pronađen",
+      "cannotEditCreator": "Ovaj okidač se pokreće kao njegov kreator, pa samo kreator može da ga menja.",
+      "permissionDenied": "Vaša uloga ne može da upravlja ovim okidačima.",
+      "webhookUrl": "URL vebhuka",
+      "urlCopied": "URL vebhuka je kopiran",
+      "deliveries": "Isporuke",
+      "deliveriesEmptyTitle": "Još nema isporuka",
+      "deliveriesEmptyDescription": "Vebhuk poziv ili zakazano pokretanje pojaviće se ovde kada stigne.",
+      "deliveriesLoadFailedTitle": "Učitavanje isporuka nije uspelo",
+      "openSession": "Prikaži sesiju",
+      "activationWebhook": "Vebhuk poziv",
+      "fieldName": "Naziv okidača",
+      "fieldActivation": "Pokreće se",
+      "fieldCron": "Cron izraz",
+      "fieldCronHelp": "Pet polja: minut, sat, dan, mesec i dan nedelje. Najkraći interval je jedan minut.",
+      "fieldTimezone": "Vremenska zona",
+      "nameLocked": "Naziv se ne može promeniti nakon što se okidač napravi.",
+      "repositoryLocked": "Repozitorijum se ne može promeniti nakon što se okidač napravi.",
+      "environmentAutomatic": "Automatski prema repozitorijumu",
+      "notSelected": "Nije izabrano",
+      "profileDefaults": "Koristi podrazumevano",
+      "profileHelp": "Podešavanja profila primenjuju se kada se okidač pokrene. Njegove tajne se tada razrešavaju.",
+      "customAgent": "Prilagođeni agent",
+      "agentHelp": "Agent u direktorijumu .kilo/agent repozitorijuma ili jedan od ugrađenih režima.",
+      "fieldBodySchema": "Šema tela",
+      "bodySchemaHelp": "Opciona JSON Schema. Zahtev čije telo se ne poklapa sa njom odbija se.",
+      "authTitle": "Tajno zaglavlje",
+      "authDescription": "Zahtevi moraju da pošalju ovo zaglavlje sa zajedničkom tajnom.",
+      "authHeaderLabel": "Naziv zaglavlja",
+      "authSecretLabel": "Zajednička tajna",
+      "authSecretKeep": "Ostavite prazno da zadržite sačuvanu tajnu.",
+      "authSecretSet": "Obavezno. Odaberite jak slučajan string.",
+      "authSecretCreator": "Koristite najmanje 16 znakova kada se okidač pokreće kao njegov kreator.",
+      "autoCommit": "Potvrdi izmene kada se pokretanje završi",
+      "condenseOnComplete": "Sažmi kontekst kada se pokretanje završi",
+      "activeTitle": "Okidač aktivan",
+      "activeDescription": "Pauzirani vebhukovi vraćaju 404.",
+      "runAsCreator": "Pokreni u moje ime",
+      "runAsCreatorDescription": "Svako pokretanje koristi vaš nalog, pa je tajno zaglavlje obavezno.",
+      "saveFailedTitle": "Čuvanje okidača nije uspelo",
+      "deleteTitle": "Obrisati ovaj okidač?",
+      "deleteMessage": "Pozivi na {{name}} neće uspeti. Ovo se ne može poništiti.",
+      "deleteMessageScheduled": "Zakazana pokretanja okidača {{name}} se zaustavljaju. Ovo se ne može poništiti.",
+      "runNow": "Pokreni sada",
+      "runStarted": "Pokretanje je započeto",
+      "created": "Okidač je napravljen",
+      "saved": "Okidač je sačuvan",
+      "statusArrived": "Stiglo",
+      "problems": {
+        "nameRequired": "Unesite naziv.",
+        "nameTooShort": "Koristite najmanje 8 znakova.",
+        "nameTooLong": "Koristite 64 znaka ili manje.",
+        "nameCharacters": "Koristite mala slova, brojeve i crtice.",
+        "nameReserved": "Ovaj naziv je rezervisan.",
+        "cronRequired": "Unesite Cron izraz.",
+        "repositoryRequired": "Izaberi repozitorijum",
+        "agentRequired": "Izaberite agenta.",
+        "agentInvalid": "Koristite mala slova, brojeve i crtice, počevši od slova.",
+        "modelRequired": "Izaberi model",
+        "promptRequired": "Unesite uputstvo.",
+        "bodySchemaInvalid": "Unesite JSON objekat ili ostavite ovo prazno.",
+        "authHeaderRequired": "Unesite naziv zaglavlja.",
+        "authSecretRequired": "Unesite zajedničku tajnu.",
+        "authSecretTooShort": "Koristite najmanje 16 znakova."
+      }
     }
   },
   "sessionShare": {
@@ -4582,8 +4745,9 @@
     "create": "Napravi link",
     "createFailed": "Nije moguće napraviti link.",
     "existingTitle": "Postojeći link",
-    "existingDescription": "Ova sesija već ima link za deljenje. Pravljenjem novog linka zamenjuje se postojeći, a stari link prestaje da radi.",
+    "existingDescription": "Ova sesija već ima link za deljenje. Pravljenjem novog linka sa ovim podešavanjima zamenjuje se postojeći, a stari link prestaje da radi.",
     "rotate": "Napravi novi link",
+    "replacementSettings": "Ova podešavanja važe za novi link.",
     "revoke": "Opozovi link",
     "revokeTitle": "Opozvati link?",
     "revokeMessage": "Trenutni link odmah prestaje da radi.",
@@ -4602,5 +4766,175 @@
     "unavailableDescription": "Ovaj link za deljenje je istekao ili je opozvan.",
     "transcriptUnavailableTitle": "Nije moguće učitati ovaj transkript",
     "transcriptUnavailableDescription": "Link i dalje radi. Pokušajte ponovo za trenutak."
+  },
+  "organizationGuardrails": {
+    "title": "VI zaštitne mere",
+    "permissionDenied": "Samo vlasnici i administratori organizacije mogu da upravljaju VI zaštitnim merama.",
+    "unavailable": "VI zaštitne mere nisu dostupne za ovu organizaciju.",
+    "loadError": "VI zaštitne mere nisu mogle da se učitaju",
+    "statusSaving": "Čuvanje…",
+    "statusSaved": "Sačuvano",
+    "statusFailed": "Čuvanje nije uspelo.",
+    "inputTitle": "Zaštitne mere za ulaz",
+    "inputDescription": "Skenira svaki ulaz pomoću Enkrypt AI, uključujući rezultate alata. Detektor koji blokira odbija zahtev kada Enkrypt nije dostupan.",
+    "outputTitle": "Zaštitne mere za izlaz",
+    "outputDescription": "Skenira odgovore pomoću Enkrypt AI pre nego što ih članovi prime. Isključene su osim ako ih uključite.",
+    "detectorsHint": "Režim Blokiraj odbija označeni zahtev. Režim Samo evidentiraj beleži ga bez odlaganja zahteva.",
+    "detectorsHintOutput": "Režim Blokiraj proglašava označeni odgovor neuspešnim. Režim Samo evidentiraj beleži ga bez odlaganja odgovora.",
+    "choiceLog": "Samo evidentiraj",
+    "applyTo": "Primeni na",
+    "applyToAllMembers": "Svi članovi",
+    "applyKiloDefault": "Primeni Kilo podrazumevane vrednosti",
+    "invalidSavedTitle": "Sačuvana podešavanja ulaznih detektora ne mogu da se pročitaju",
+    "invalidSavedBody": "Zahtevi su blokirani dok se ulazni detektori ponovo ne sačuvaju. Detektori ispod počinju od Kilo podrazumevanih vrednosti.",
+    "invalidSavedOutputTitle": "Sačuvana podešavanja izlaznih detektora ne mogu da se pročitaju",
+    "invalidSavedOutputBody": "Odgovori se zadržavaju dok se izlazni detektori ponovo ne sačuvaju. Izaberite izlazne detektore ispod.",
+    "blockingOutputNote": "Izlazni detektor koji blokira zadržava odgovor dok Enkrypt ne proveri ceo odgovor. Koristite Samo evidentiraj da biste izbegli odlaganje.",
+    "inputDetectorRequired": "Uključite najmanje jedan ulazni detektor.",
+    "outputDetectorRequired": "Uključite najmanje jedan izlazni detektor.",
+    "rulesTooMany": "Dodajte najviše {{max}} pravila.",
+    "ruleIdRequired": "Unesite identifikator pravila.",
+    "ruleIdInvalid": "Identifikator pravila može da sadrži samo slova, brojeve, tačke, crtice i donje crte.",
+    "ruleTextRequired": "Opišite šta pravilo zabranjuje ili zahteva.",
+    "keywordTooLong": "Svaka ključna reč može da ima najviše {{max}} znakova.",
+    "topicTooLong": "Svaka tema može da ima najviše {{max}} znakova.",
+    "keywordsTooMany": "Dodajte najviše {{max}} ključnih reči.",
+    "topicsTooMany": "Dodajte najviše {{max}} tema.",
+    "piiEntityRequired": "Izaberite najmanje jednu vrstu podataka za otkrivanje.",
+    "keywordRequired": "Dodajte najmanje jednu ključnu reč.",
+    "topicRequired": "Dodajte najmanje jednu temu.",
+    "policyTextRequired": "Unesite tekst politike.",
+    "ruleRequired": "Dodajte najmanje jedno pravilo.",
+    "ruleIdDuplicate": "Svako pravilo mora da ima sopstveni ID pravila.",
+    "piiEntities": "Podaci za otkrivanje",
+    "keywordsLabel": "Ključne reči",
+    "keywordsHint": "Jedna ključna reč po redu.",
+    "topicsHint": "Jedna tema po redu.",
+    "policyFormat": "Format politike",
+    "policyFormatRules": "Strukturirana pravila",
+    "policyFormatRulesDescription": "Jedno pravilo po zahtevu, sa kategorijom i ozbiljnošću. Preporučeno.",
+    "policyFormatText": "Tekst politike",
+    "policyFormatTextDescription": "Nalepite postojeću politiku kao običan tekst.",
+    "rulesEmpty": "Još nema pravila. Svako pravilo opisuje jednu stvar koju ulazi ne smeju da sadrže ili traže.",
+    "addRule": "Dodaj pravilo",
+    "ruleNumber": "Pravilo {{number}}",
+    "ruleRemove": "Ukloni pravilo {{number}}",
+    "ruleIdLabel": "Identifikator pravila",
+    "ruleNameLabel": "Naziv (opciono)",
+    "ruleTextLabel": "Pravilo",
+    "ruleRiskCategory": "Kategorija rizika",
+    "ruleApplicability": "Obim",
+    "ruleFrameworks": "Okviri",
+    "detector": {
+      "promptInjection": {
+        "label": "Ubacivanje upita",
+        "description": "Otkriva pokušaje da se prepišu instrukcije ili zaobiđu zaštite modela."
+      },
+      "policyViolation": {
+        "label": "Kršenje politike",
+        "description": "Označava ulaze koji krše politiku vaše organizacije, napisanu kao tekst ili pravila.",
+        "descriptionOutput": "Označava odgovore koji krše politiku vaše organizacije, napisanu kao tekst ili pravila."
+      },
+      "pii": {
+        "label": "PII i tajne",
+        "description": "Otkriva lične podatke, podatke za pristup, IP adrese i URL adrese."
+      },
+      "keywords": {
+        "label": "Zabranjene ključne reči",
+        "descriptionOutput": "Otkriva odgovore koji sadrže bilo koju ključnu reč koju navedete."
+      },
+      "topics": {
+        "label": "Teme",
+        "descriptionOutput": "Označava odgovore o bilo kojoj temi koju navedete."
+      },
+      "toxicity": {
+        "label": "Toksičnost",
+        "description": "Otkriva toksičan, uvredljiv, preteći ili mrzilački jezik."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Otkriva seksualni ili drugi sadržaj neprikladan za radno okruženje."
+      },
+      "bias": {
+        "label": "Pristrasnost",
+        "description": "Otkriva pristrasan ili diskriminatorski jezik."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Lični podaci",
+        "description": "Imena, adrese e-pošte, brojevi telefona."
+      },
+      "secrets": {
+        "label": "Tajne",
+        "description": "API ključevi, tokeni, lozinke."
+      },
+      "ipAddress": {
+        "label": "IP adrese",
+        "description": "IPv4 i IPv6 adrese."
+      },
+      "url": {
+        "label": "URL adrese",
+        "description": "Veb adrese."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Bezbednost i prevara",
+      "safetyHarm": "Sigurnost i šteta",
+      "privacyDataProtection": "Privatnost i zaštita podataka",
+      "brandReputationTrust": "Brend i reputacija",
+      "biasFairnessEthical": "Pristrasnost i pravičnost",
+      "legalIpLiability": "Pravna odgovornost i odgovornost za intelektualnu svojinu",
+      "productMisuse": "Zloupotreba proizvoda",
+      "performanceQuality": "Performanse i kvalitet"
+    },
+    "applicability": {
+      "user": "Korisnički unos",
+      "userAssistant": "Korisnički unos i odgovori"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM 10 najvećih rizika (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "Akt EU o veštačkoj inteligenciji",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Funkcija za preduzeća",
+    "enterpriseOnly": "Ovo je funkcija samo za preduzeća.",
+    "readOnly": "Samo vlasnici i administratori organizacije mogu da menjaju ova podešavanja.",
+    "loadError": "Pružaoci i modeli nisu mogli da se učitaju",
+    "tabModels": "Modeli",
+    "tabProviders": "Pružaoci",
+    "tabGateways": "Prolazi",
+    "modelsDescription": "Isključite model da biste ga blokirali za svakog člana. Modeli dozvoljenih pružalaca su na početku uključeni.",
+    "modelsDeniedOnly": "Samo zabranjeni",
+    "modelsEmpty": "Nijedan model ne odgovara ovoj pretrazi.",
+    "providersDescription": "Isključite pružaoca da Kilo za ovu organizaciju prestane da usmerava na njega.",
+    "providersNeedCatalog": "Prekidači pružalaca ostaju samo za čitanje dok se ne učita ceo katalog modela. Da biste ih menjali, dodirnite Pokušaj ponovo iznad.",
+    "providersEmpty": "Nijedan pružalac ne odgovara ovoj pretrazi.",
+    "allowAllShown": "Dozvoli sve prikazano",
+    "denyAllShown": "Zabrani sve prikazano",
+    "gatewaysDescription": "Kilo usmerava zahteve upućene modelima kroz Vercel AI Gateway ili OpenRouter. Onemogućen prolaz odbija te zahteve.",
+    "emptyProviderList": "Dozvolite bar jednog pružaoca. Prazna lista blokira sve rute Kilo modela.",
+    "gatewaysUnavailable": "Podešavanja prolaza nisu dostupna za ovu organizaciju.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "Zahtevi za OpenRouter nisu vezani za region.",
+    "inferenceRegion": "Region izvršavanja",
+    "inferenceRegionDescription": "Vezuje zahteve za Vercel AI Gateway za ovaj region. Model koji tamo nije dostupan neće uspeti.",
+    "disableOpenrouterNote": "Ako onemogućite OpenRouter, to takođe blokira BYOK ključeve koji kroz njega usmeravaju zahteve.",
+    "emptyModelList": "Ostavite uključen bar jedan model. Ako odbijete sve modele, članovima neće ostati ništa za korišćenje.",
+    "catalogUnavailable": "Kompletan katalog modela nije učitan, pa su prikazane samo vaše sačuvane liste. Pokušajte ponovo da biste učitali sve modele.",
+    "region": {
+      "global": "Globalno",
+      "us": "Sjedinjene Američke Države",
+      "eu": "Evropska unija",
+      "au": "Australija",
+      "jp": "Japan"
+    }
   }
 }

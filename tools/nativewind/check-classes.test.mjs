@@ -41,9 +41,16 @@ function checkAll(files) {
   return Object.entries(files).flatMap(([relative, text]) => check(relative, text));
 }
 
-/** A root mirroring the repository layout, for the probes and the CLI case. */
+/**
+ * A root mirroring the repository layout, for the probes and the CLI case.
+ *
+ * `mkdtempSync` returns a path under the platform's symlinked temporary
+ * directory on macOS (`/var` → `/private/var`), and the entry-point check
+ * compares the script's real path with `process.argv[1]`, so the root is
+ * canonicalised: a spawned audit then recognises itself and runs.
+ */
 function makeFixture(context, files) {
-  const root = mkdtempSync(join(tmpdir(), 'check-classes-'));
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'check-classes-')));
   context.after(() => rmSync(root, { recursive: true, force: true }));
 
   // Both SOURCE_DIRS entries must exist, or readdirSync throws ENOENT.
@@ -250,7 +257,7 @@ test('accepts padding on a contentContainerClassName expression', () => {
   assert.deepEqual(
     check(
       'apps/mobile/src/screen.tsx',
-      "export const a = <ScrollView className=\"flex-1\" contentContainerClassName={cn('px-6', 'pt-4')} />;\n"
+      "export const a = <ScrollView className=\"flex-1\" contentContainerClassName={cn('px-4', 'pt-4')} />;\n"
     ),
     []
   );
@@ -590,4 +597,249 @@ test('names every file from its root, inside the repository or a temporary tree'
   // The widget-process exemption reads the same normalised path as every check.
   const widgetSource = "export const a = Intl.DateTimeFormat('en-US');\n";
   assert.deepEqual(check(widget, widgetSource), [], 'the widget layout keeps its exemption');
+});
+
+// The layout contract's rules read a className value, a cn() argument and a
+// *_CLASS constant, and stand down inside the modules that own the scale.
+
+const ALLOWLISTED = 'apps/mobile/src/components/ui/panel.tsx';
+const SCREEN_FILE = 'apps/mobile/src/screen.tsx';
+
+function layoutProblems(relative, text) {
+  return check(relative, text).filter(problem => /\[L\d\]/.test(problem));
+}
+
+test('flags arbitrary spacing outside the allowlist and passes it inside', () => {
+  const found = layoutProblems(SCREEN_FILE, screen('<View className="mt-[6px]" />'));
+  assert.equal(found.length, 1);
+  assert.match(found[0], /screen\.tsx:3: \[L1\] "mt-\[6px\]"/);
+  assert.match(found[0], /@\/lib\/layout/);
+  assert.deepEqual(layoutProblems(ALLOWLISTED, screen('<View className="mt-[6px]" />')), []);
+});
+
+test('flags an arbitrary text size but not an arbitrary text colour', () => {
+  assert.match(
+    layoutProblems(SCREEN_FILE, screen('<Text className="text-[13px]" />')).join('\n'),
+    /\[L1\] "text-\[13px\]"/
+  );
+  assert.deepEqual(layoutProblems(SCREEN_FILE, screen('<Text className="text-[#ffffff]" />')), []);
+});
+
+test('flags a scroll body whose content container is not the px-4 gutter', () => {
+  for (const classes of ['px-6', 'ps-3', 'p-3', 'px-[22px]']) {
+    const found = layoutProblems(
+      SCREEN_FILE,
+      screen(`<DetailScreenScrollView contentContainerClassName="${classes}" />`)
+    );
+    assert.match(
+      found.join('\n'),
+      new RegExp(`\\[L2\\] ".+ on <DetailScreenScrollView> contentContainerClassName"`)
+    );
+    assert.match(found.join('\n'), /SCREEN_BODY_CLASS/);
+  }
+});
+
+test('accepts px-4 and vertical padding on a scroll body', () => {
+  assert.deepEqual(
+    layoutProblems(
+      SCREEN_FILE,
+      screen('<FlashList contentContainerClassName="gap-6 px-4 pt-3" />')
+    ),
+    []
+  );
+});
+
+test('flags a header className that writes the page gutter', () => {
+  const found = layoutProblems(SCREEN_FILE, screen('<ScreenHeader className="px-[22px]" />'));
+  assert.match(found.join('\n'), /\[L2\] "px-\[22px\] on <ScreenHeader> className"/);
+  assert.deepEqual(
+    layoutProblems(ALLOWLISTED, screen('<ScreenHeader className="px-[22px]" />')),
+    []
+  );
+});
+
+test('flags a section label written as a class outside the allowlist', () => {
+  const found = layoutProblems(SCREEN_FILE, screen('<Text className="uppercase tracking-wide" />'));
+  assert.equal(found.length, 2);
+  assert.match(found.join('\n'), /\[L3\] "uppercase"/);
+  assert.match(found.join('\n'), /\[L3\] "tracking-wide"/);
+  assert.deepEqual(layoutProblems(ALLOWLISTED, screen('<Text className="uppercase" />')), []);
+});
+
+test('flags a card surface built by hand, including across one cn() call', () => {
+  const found = layoutProblems(
+    SCREEN_FILE,
+    screen("<View className={cn('bg-secondary', 'rounded-lg')} />")
+  );
+  assert.equal(found.length, 1);
+  assert.match(found[0], /screen\.tsx:3: \[L4\] "bg-secondary rounded-lg"/);
+  assert.deepEqual(
+    layoutProblems(ALLOWLISTED, screen('<View className="bg-secondary rounded-lg" />')),
+    []
+  );
+});
+
+test('flags text-xl and larger outside the allowlist', () => {
+  const found = layoutProblems(SCREEN_FILE, screen('<Text className="text-2xl" />'));
+  assert.equal(found.length, 1);
+  assert.match(found[0], /\[L5\] "text-2xl"/);
+  assert.match(found[0], /ScreenHeader/);
+  assert.deepEqual(layoutProblems(SCREEN_FILE, screen('<Text className="text-lg" />')), []);
+  assert.deepEqual(layoutProblems(ALLOWLISTED, screen('<Text className="text-2xl" />')), []);
+});
+
+test('flags a numeric layout value in a style object, in a value and an array', () => {
+  const found = layoutProblems(
+    SCREEN_FILE,
+    screen(
+      '<>',
+      '<View style={{ paddingHorizontal: 16 }} />',
+      '<View style={[{ marginTop: x + 8 }]} />',
+      '</>'
+    )
+  );
+  assert.equal(found.length, 2);
+  assert.match(found.join('\n'), /screen\.tsx:4: \[L6\] "paddingHorizontal: 16"/);
+  assert.match(found.join('\n'), /screen\.tsx:5: \[L6\] "marginTop: x \+ 8"/);
+  assert.deepEqual(layoutProblems(ALLOWLISTED, screen('<View style={{ padding: 8 }} />')), []);
+});
+
+test('accepts layout read from an inset, the keyboard or a measurement', () => {
+  assert.deepEqual(
+    layoutProblems(
+      SCREEN_FILE,
+      screen(
+        '<View style={{ paddingTop: insets.top, gap: Math.max(0, measured), marginTop: 0 }} />'
+      )
+    ),
+    []
+  );
+});
+
+test('flags a chevron imported from the icon modules outside the allowlist', () => {
+  const found = layoutProblems(
+    SCREEN_FILE,
+    "import { ChevronRight } from '@/components/ui/icons';\n" +
+      "import { DirectionalChevronRight } from '@/components/ui/directional-icons';\n" +
+      'export const a = 1;\n'
+  );
+  assert.equal(found.length, 2);
+  assert.match(found.join('\n'), /screen\.tsx:1: \[L7\] "ChevronRight"/);
+  assert.match(found.join('\n'), /screen\.tsx:2: \[L7\] "DirectionalChevronRight"/);
+  assert.match(found.join('\n'), /RowChevron/);
+  assert.deepEqual(
+    layoutProblems(ALLOWLISTED, "import { ChevronRight } from '@/components/ui/icons';\n"),
+    []
+  );
+});
+
+test('flags an arbitrary box size outside the allowlist and passes it inside', () => {
+  const found = layoutProblems(SCREEN_FILE, screen('<View className="h-[46px]" />'));
+  assert.equal(found.length, 1);
+  assert.match(found[0], /screen\.tsx:3: \[L8\] "h-\[46px\]"/);
+  assert.match(found[0], /tap-target/);
+  assert.deepEqual(layoutProblems(ALLOWLISTED, screen('<View className="h-[46px]" />')), []);
+});
+
+test('flags an arbitrary minimum height outside the allowlist', () => {
+  assert.match(
+    layoutProblems(SCREEN_FILE, screen('<View className="min-h-[44px]" />')).join('\n'),
+    /\[L8\] "min-h-\[44px\]"/
+  );
+});
+
+test('passes percentage sizes and hairline arbitrary sizes', () => {
+  assert.deepEqual(
+    layoutProblems(SCREEN_FILE, screen('<View className="w-[50%] h-[0.5px] min-h-[1px]" />')),
+    []
+  );
+});
+
+test('flags an arbitrary size written as calc()', () => {
+  assert.match(
+    layoutProblems(SCREEN_FILE, screen('<View className="h-[calc(100%-4px)]" />')).join('\n'),
+    /\[L8\] "h-\[calc\(100%-4px\)\]"/
+  );
+});
+
+/**
+ * Run the checker's entry point over a fixture root whose sources carry one
+ * layout violation, with `baseline` written beside it.
+ */
+function runLayoutFixture(context, sources, baseline) {
+  const files = { ...sources };
+  if (baseline !== undefined) {
+    files['tools/nativewind/layout-baseline.json'] = `${JSON.stringify(baseline, null, 2)}\n`;
+  }
+  const root = makeFixture(context, files);
+  const result = spawnSync(process.execPath, [join(root, 'tools/nativewind/check-classes.mjs')], {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: 30_000,
+  });
+  assert.ifError(result.error);
+  return result;
+}
+
+test('passes a layout violation the baseline admits exactly', context => {
+  const result = runLayoutFixture(
+    context,
+    { 'apps/mobile/src/screen.tsx': screen('<View className="mt-[6px]" />') },
+    { 'apps/mobile/src/screen.tsx': { L1: 1 } }
+  );
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+  assert.match(result.stdout, /1 layout violation\(s\) admitted/);
+});
+
+test('fails a file that exceeds its baseline for a rule', context => {
+  const result = runLayoutFixture(
+    context,
+    {
+      'apps/mobile/src/screen.tsx': screen(
+        '<>',
+        '<View className="mt-[6px]" />',
+        '<View className="gap-[9px]" />',
+        '</>'
+      ),
+    },
+    { 'apps/mobile/src/screen.tsx': { L1: 1 } }
+  );
+  assert.equal(result.status, 1, result.stdout);
+  assert.match(result.stderr, /\[L1\] "gap-\[9px\]"/);
+  assert.match(result.stderr, /screen\.tsx: L1 now has 2 violation\(s\) and the baseline admits 1/);
+});
+
+test('fails a baseline entry the file is now below', context => {
+  const result = runLayoutFixture(
+    context,
+    { 'apps/mobile/src/screen.tsx': screen('<View className="mt-[6px]" />') },
+    { 'apps/mobile/src/screen.tsx': { L1: 2 } }
+  );
+  assert.equal(result.status, 1, result.stdout);
+  assert.match(
+    result.stderr,
+    /layout-baseline\.json: apps\/mobile\/src\/screen\.tsx L1 baseline is 2 but the file now has 1; lower it to 1/
+  );
+});
+
+test('writes the baseline with --write-layout-baseline', context => {
+  const root = makeFixture(context, {
+    'apps/mobile/src/screen.tsx': screen(
+      '<View className="mt-[6px] uppercase bg-secondary rounded-lg" />'
+    ),
+  });
+  const result = spawnSync(
+    process.execPath,
+    [join(root, 'tools/nativewind/check-classes.mjs'), '--write-layout-baseline'],
+    { cwd: root, encoding: 'utf8', timeout: 30_000 }
+  );
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(
+    JSON.parse(readFileSync(join(root, 'tools/nativewind/layout-baseline.json'), 'utf8')),
+    {
+      'apps/mobile/src/screen.tsx': { L1: 1, L3: 1, L4: 1 },
+    }
+  );
 });

@@ -20,14 +20,28 @@
  * string, a type annotation, a nested template — is a node of its own, so it
  * can no longer desynchronise a rule or hide the call sites after it.
  *
- * Usage: node tools/nativewind/check-classes.mjs
+ * The mobile layout contract's rules are the table below: `LAYOUT_RULES` holds
+ * each rule's id (the id a diagnostic and the baseline key carry), what it
+ * bans, and the primitive that replaces it; `LAYOUT_ALLOWLIST` names the
+ * modules that own the scale and may write those values. Those two constants
+ * are the only description of the layout rules — retarget, rename or relax a
+ * rule there, not in the checks that read it.
+ *
+ * A violation that already existed when the rules landed stays admitted by
+ * `tools/nativewind/layout-baseline.json` (file path → count per rule). A file
+ * may never exceed its baseline count, and an entry the file is now below is
+ * reported with the line to lower or delete, so the baseline only shrinks and
+ * at the end of the migration it is empty. Regenerate it with
+ * `--write-layout-baseline` only after the violations themselves are gone.
+ *
+ * Usage: node tools/nativewind/check-classes.mjs [--write-layout-baseline]
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { walk } from '../lib/ast.mjs';
+import { propertyName, unwrap, walk } from '../lib/ast.mjs';
 import { runIfMain } from '../lib/entry-point.mjs';
 import { isTestArtifact, parseSourceTree } from '../lib/source-files.mjs';
 
@@ -35,6 +49,105 @@ import { isTestArtifact, parseSourceTree } from '../lib/source-files.mjs';
 const require = createRequire(new URL('../../apps/mobile/package.json', import.meta.url));
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const SOURCE_DIRS = [join(ROOT, 'apps/mobile/src'), join(ROOT, 'packages/app-shared/src')];
+
+/**
+ * The modules that own the layout scale, relative to `apps/mobile`: the UI
+ * primitives, the two headers, and the two constant modules a screen reads its
+ * geometry from. Everything else states layout with the scale.
+ */
+const LAYOUT_ALLOWLIST = [
+  'src/components/ui/',
+  'src/components/screen-header.tsx',
+  'src/components/sheet-header.tsx',
+  'src/lib/layout.ts',
+  'src/lib/a11y/tap-target.ts',
+];
+
+/**
+ * Trees the layout rules never read: the glanceable widgets and Live Activities
+ * are stringified into the home-screen and lock-screen renderers, not React
+ * Native views, so a layout class or a UI primitive has no meaning there.
+ */
+const LAYOUT_EXEMPT_TREES = ['src/glanceable-ios/', 'src/glanceable-android/'];
+
+/**
+ * The layout contract's rules. `patterns` read one class string (a `className`,
+ * a `cn()` argument, a `*_CLASS` constant) and carry the offending class in the
+ * diagnostic; a rule without `patterns` reads markup and names what it found.
+ * `advice` is the primitive the contract names for the concern, so every
+ * diagnostic points at the replacement instead of restating the ban.
+ */
+const LAYOUT_RULES = [
+  {
+    id: 'L1',
+    patterns: [
+      // A spacing, type-size, line-height, tracking or radius value written as
+      // an arbitrary value re-decides one contract decision at one call site.
+      /(?<![\w-])-?(?:p|px|py|pt|pb|ps|pe|pl|pr|m|mx|my|mt|mb|ms|me|ml|mr|gap|gap-x|gap-y|space-x|space-y)-\[[^\]\s]+\]/g,
+      // A numeric inner value is a size; a colour (`text-[#fff]`) or a variable
+      // (`text-[var(--x)]`) is a different decision this rule does not own.
+      /(?<![\w-])text-\[\d[^\]\s]*\]/g,
+      /(?<![\w-])leading-\[[^\]\s]*px\]/g,
+      /(?<![\w-])tracking-\[[^\]\s]+\]/g,
+      /(?<![\w-])rounded-\[[^\]\s]+\]/g,
+    ],
+    advice:
+      'use the spacing scale (px-4 gutter, gap-6 section gap), a Text variant, or the constants in @/lib/layout',
+  },
+  {
+    id: 'L2',
+    advice:
+      'use SCREEN_BODY_CLASS from @/lib/layout (gutter px-4) for the scroll body, and leave ScreenHeader/SheetHeader their own gutter',
+  },
+  {
+    id: 'L3',
+    patterns: [/(?<![\w-])uppercase(?![\w-])/g, /(?<![\w-])tracking-(?:[a-z0-9-]+|\[[^\]\s]+\])/g],
+    advice: 'use SectionHeader or Eyebrow for a section label',
+  },
+  {
+    id: 'L4',
+    advice: 'use Card, RowGroup or a row primitive for the surface',
+  },
+  {
+    id: 'L5',
+    patterns: [/(?<![\w-])text-(?:xl|2xl|3xl|4xl|5xl|6xl)(?![\w-])/g],
+    advice: 'use ScreenHeader for page titles or a Text variant',
+  },
+  {
+    id: 'L6',
+    advice: 'use the layout classes or the constants in @/lib/layout',
+  },
+  {
+    id: 'L7',
+    advice: 'use RowChevron or a row primitive',
+  },
+  {
+    id: 'L8',
+    patterns: [
+      // An arbitrary length pins one element's box instead of using the scale.
+      // A percentage is a share of a measured frame (the only way to fill one),
+      // and 0.5px/1px are the hairlines the contract names, so those pass;
+      // calc()/var()/theme() re-implement the spacing scale, so they do not.
+      /(?<![\w-])(?:min-h|min-w|max-h|max-w|size|h|w)-\[(?!0\.5px\]|1px\])(?:\d+(?:\.\d+)?(?:px|rem|pt)?|(?:calc|var|theme)\([^\]]*)\]/g,
+    ],
+    advice:
+      "use the spacing scale (h-12, w-8…) or a constant from @/lib/a11y/tap-target (touch targets) / the row primitive's exported skeleton size",
+  },
+];
+
+/** One rule from the table above, by id. */
+function layoutRule(id) {
+  const rule = LAYOUT_RULES.find(candidate => candidate.id === id);
+  if (rule === undefined) {
+    throw new Error(`check-classes: layout rule ${id} is missing from LAYOUT_RULES`);
+  }
+  return rule;
+}
+
+/** One diagnostic for one rule, naming the class or prop it read. */
+function layoutProblem(relative, line, id, offending) {
+  return `${relative}:${line}: [${id}] "${offending}": ${layoutRule(id).advice}`;
+}
 
 /** Utilities that take a colour, so `<utility>-black/<alpha>` can appear. */
 const COLOR_UTILITIES = [
@@ -354,6 +467,326 @@ export function checkDirectIntl(relative, absolute, program, lineOf) {
 }
 
 /**
+ * The string literals and template chunks inside one expression, with the
+ * offset each starts at. The raw source is what the class patterns read, so a
+ * match maps straight back to the file's line, escapes included.
+ */
+function stringChunks(value, text) {
+  const chunks = [];
+  walk(value, node => {
+    if (node.type === 'Literal' && typeof node.value === 'string') {
+      chunks.push({ start: node.start, source: text.slice(node.start, node.end) });
+    } else if (node.type === 'TemplateElement') {
+      // The node spans its delimiters; the chunk itself starts just inside.
+      chunks.push({ start: node.start + 1, source: node.value.raw });
+    }
+  });
+  return chunks;
+}
+
+/** The string a class name can be written in on a JSX element. */
+const CLASS_ATTRIBUTES = new Set(['className', 'contentContainerClassName']);
+
+/** `SCREEN_BODY_CLASS`, `LINE_ACTION_BOX_CLASS`: a module constant of classes. */
+function isClassConstant(node) {
+  return node.type === 'Identifier' && /(?:^|_)CLASS$/.test(node.name);
+}
+
+/**
+ * Every class string the layout rules read, grouped the way a class string is
+ * written: one `cn(...)` call is one group (its arguments are one surface), and
+ * each `className`/`contentContainerClassName` value and each `*_CLASS`
+ * constant contributes its own chunks. A chunk inside a `cn()` belongs to that
+ * call, so a surface built through `cn()` is judged once.
+ */
+function layoutGroups(program, text) {
+  const groups = [];
+  const covered = new Set();
+  walk(program, node => {
+    if (
+      node.type !== 'CallExpression' ||
+      node.callee.type !== 'Identifier' ||
+      node.callee.name !== 'cn'
+    ) {
+      return;
+    }
+    const chunks = node.arguments.flatMap(argument => stringChunks(argument, text));
+    // A nested `cn()` is already part of the outer call's surface.
+    if (chunks.length === 0 || chunks.every(chunk => covered.has(chunk.start))) {
+      return;
+    }
+    for (const chunk of chunks) {
+      covered.add(chunk.start);
+    }
+    groups.push({ start: node.start, chunks });
+  });
+  const collect = (value, start) => {
+    const chunks = stringChunks(value, text).filter(chunk => !covered.has(chunk.start));
+    if (chunks.length > 0) {
+      groups.push({ start, chunks });
+    }
+  };
+  walk(program, node => {
+    if (
+      node.type === 'JSXAttribute' &&
+      node.name.type === 'JSXIdentifier' &&
+      CLASS_ATTRIBUTES.has(node.name.name)
+    ) {
+      collect(node.value, node.start);
+    } else if (
+      node.type === 'VariableDeclarator' &&
+      isClassConstant(node.id) &&
+      node.init !== null
+    ) {
+      collect(node.init, node.start);
+    }
+  });
+  return groups;
+}
+
+/**
+ * A page gutter written on a scroll body other than `px-4`, and any horizontal
+ * padding on a `ScreenHeader`/`SheetHeader` `className`: both move the page
+ * inset the contract fixed, and the header's own gutter is what the next screen
+ * lines up against.
+ */
+const SCROLL_BODIES = new Set([
+  'ScrollView',
+  'TabScreenScrollView',
+  'DetailScreenScrollView',
+  'SheetScrollView',
+  'FlashList',
+  'KeyboardAwareScrollView',
+]);
+const HEADER_TAGS = new Set(['ScreenHeader', 'SheetHeader']);
+
+/** True when one class token writes a horizontal page inset other than `px-4`. */
+function wrongGutter(token) {
+  const match = /^-?(p|px|ps|pe|pl|pr)-(.+)$/.exec(token);
+  if (match === null) {
+    return false;
+  }
+  return !((match[1] === 'px' || match[1] === 'p') && match[2] === '4');
+}
+
+/** True when a class token writes an all-side or horizontal padding at all. */
+function anyPadding(token) {
+  return /^-?(?:p|px|ps|pe|pl|pr)-/.test(token);
+}
+
+function checkScrollGutters(relative, program, text, lineOf) {
+  const problems = [];
+  walk(program, node => {
+    if (node.type !== 'JSXOpeningElement') {
+      return;
+    }
+    const name = tagName(node, text).replace(/^Animated\./, '');
+    const gutter = SCROLL_BODIES.has(name)
+      ? 'contentContainerClassName'
+      : HEADER_TAGS.has(name)
+        ? 'className'
+        : null;
+    if (gutter === null) {
+      return;
+    }
+    const attribute = node.attributes.find(
+      candidate =>
+        candidate.type === 'JSXAttribute' &&
+        candidate.name.type === 'JSXIdentifier' &&
+        candidate.name.name === gutter
+    );
+    const tokens = [
+      ...new Set(
+        classStrings(attribute?.value)
+          .flatMap(classes => classes.split(/\s+/))
+          .filter(classes => (gutter === 'className' ? anyPadding(classes) : wrongGutter(classes)))
+      ),
+    ].sort();
+    for (const token of tokens) {
+      problems.push(
+        layoutProblem(
+          relative,
+          lineOf(attribute.start),
+          'L2',
+          `${token} on <${tagName(node, text)}> ${gutter}`
+        )
+      );
+    }
+  });
+  return problems;
+}
+
+/**
+ * A card surface built by hand: one class string (or one `cn()` call) that
+ * pairs a card fill with a card radius. The row and card primitives own that
+ * pairing, so every surface they replace can only drift from it.
+ */
+const CARD_SURFACE = /(?<![\w-])bg-(?:secondary|card)(?![\w-])/;
+const CARD_RADIUS = /(?<![\w-])rounded-(?:md|lg|xl|2xl|3xl)(?![\w-])/;
+
+function cardSurfaceProblem(relative, group, lineOf) {
+  const classes = group.chunks.map(chunk => chunk.source).join(' ');
+  const surface = CARD_SURFACE.exec(classes);
+  const radius = CARD_RADIUS.exec(classes);
+  if (surface === null || radius === null) {
+    return null;
+  }
+  return layoutProblem(relative, lineOf(group.start), 'L4', `${surface[0]} ${radius[0]}`);
+}
+
+/**
+ * Layout written as numbers in a `style` object: the spacing, type, tracking
+ * and radius decisions the classes own, re-decided per element. A value read
+ * from an inset, the keyboard or a measurement (an identifier or a call, with
+ * no numeric literal but `0`) is measured geometry, not a decision, and passes.
+ */
+const LAYOUT_STYLE_PROPERTY =
+  /^(?:(?:padding|margin)(?:Top|Bottom|Left|Right|Start|End|Horizontal|Vertical)?|gap|rowGap|columnGap|fontSize|lineHeight|letterSpacing|border(?:Top|Bottom|Start|End)?(?:Left|Right|Start|End)?Radius)$/;
+
+/** True when the expression holds a numeric literal other than `0`. */
+function hasNumericLiteral(node) {
+  let found = false;
+  walk(node, child => {
+    if (
+      !found &&
+      child.type === 'Literal' &&
+      typeof child.value === 'number' &&
+      child.value !== 0
+    ) {
+      found = true;
+    }
+  });
+  return found;
+}
+
+/** The object literals a `style` prop holds: the value, or the array entries. */
+function styleObjects(value) {
+  const expression = value.type === 'JSXExpressionContainer' ? value.expression : value;
+  const target = unwrap(expression);
+  if (target.type === 'ObjectExpression') {
+    return [target];
+  }
+  if (target.type !== 'ArrayExpression') {
+    return [];
+  }
+  return target.elements
+    .filter(element => element !== null)
+    .map(element => unwrap(element))
+    .filter(element => element.type === 'ObjectExpression');
+}
+
+function checkInlineStyles(relative, program, text, lineOf) {
+  const problems = [];
+  walk(program, node => {
+    if (node.type !== 'JSXOpeningElement') {
+      return;
+    }
+    const attribute = node.attributes.find(
+      candidate =>
+        candidate.type === 'JSXAttribute' &&
+        candidate.name.type === 'JSXIdentifier' &&
+        candidate.name.name === 'style'
+    );
+    if (attribute?.value === undefined || attribute.value === null) {
+      return;
+    }
+    for (const object of styleObjects(attribute.value)) {
+      for (const property of object.properties) {
+        const name = propertyName(property);
+        if (name === null || !LAYOUT_STYLE_PROPERTY.test(name)) {
+          continue;
+        }
+        if (!hasNumericLiteral(unwrap(property.value))) {
+          continue;
+        }
+        const written = text.slice(property.key.start, property.value.end).replace(/\s+/g, ' ');
+        problems.push(layoutProblem(relative, lineOf(property.start), 'L6', written));
+      }
+    }
+  });
+  return problems;
+}
+
+/**
+ * A chevron placed straight from the icon modules instead of through
+ * `RowChevron`, which is what mirrors it in RTL and keeps it to the row's
+ * trailing size. The row primitives and `RowChevron` own that placement.
+ */
+const ROW_CHEVRON_MODULES = new Set(['@/components/ui/directional-icons', '@/components/ui/icons']);
+const ROW_CHEVRON_NAMES = new Set(['ChevronRight', 'DirectionalChevronRight']);
+
+function checkRowChevrons(relative, program, lineOf) {
+  const problems = [];
+  walk(program, node => {
+    if (node.type !== 'ImportDeclaration' || node.importKind === 'type') {
+      return;
+    }
+    if (!ROW_CHEVRON_MODULES.has(node.source.value)) {
+      return;
+    }
+    for (const specifier of node.specifiers) {
+      if (specifier.type !== 'ImportSpecifier' || specifier.importKind === 'type') {
+        continue;
+      }
+      const name = importedName(specifier.imported);
+      if (ROW_CHEVRON_NAMES.has(name)) {
+        problems.push(layoutProblem(relative, lineOf(specifier.start), 'L7', name));
+      }
+    }
+  });
+  return problems;
+}
+
+/** Whether a file is one the layout contract exempts. */
+function layoutExempt(path) {
+  if (!path.startsWith('apps/mobile/src/')) {
+    return true;
+  }
+  // The allowlist is written relative to `apps/mobile`, so it reads `src/…`.
+  const appPath = path.slice('apps/mobile/'.length);
+  if (LAYOUT_EXEMPT_TREES.some(tree => appPath.startsWith(tree))) {
+    return true;
+  }
+  return LAYOUT_ALLOWLIST.some(
+    entry => appPath === entry || (entry.endsWith('/') && appPath.startsWith(entry))
+  );
+}
+
+/** Every layout problem one file has, from the table's rules. */
+export function checkLayout(relative, program, text, lineOf) {
+  if (layoutExempt(relative)) {
+    return [];
+  }
+  const problems = [];
+  const seen = new Set();
+  for (const group of layoutGroups(program, text)) {
+    for (const chunk of group.chunks) {
+      if (seen.has(chunk.start)) {
+        continue;
+      }
+      seen.add(chunk.start);
+      for (const rule of LAYOUT_RULES) {
+        for (const pattern of rule.patterns ?? []) {
+          for (const match of chunk.source.matchAll(pattern)) {
+            problems.push(
+              layoutProblem(relative, lineOf(chunk.start + match.index), rule.id, match[0])
+            );
+          }
+        }
+      }
+    }
+    const surface = cardSurfaceProblem(relative, group, lineOf);
+    if (surface !== null) {
+      problems.push(surface);
+    }
+  }
+  problems.push(...checkScrollGutters(relative, program, text, lineOf));
+  problems.push(...checkInlineStyles(relative, program, text, lineOf));
+  problems.push(...checkRowChevrons(relative, program, lineOf));
+  return problems;
+}
+
+/**
  * The raw source of every string literal and template chunk in one file, with
  * the offset it starts at. These are the only places a class name can be
  * written: a comment, a regular expression and an identifier are nodes of
@@ -501,7 +934,116 @@ export function checkParsedFile({ file, path, text, program, lineOf, problems })
     ...checkRawText(path, program, lineOf),
     ...checkDirectIntl(path, file, program, lineOf),
     ...checkRules(path, program, text, lineOf),
+    ...checkLayout(path, program, text, lineOf),
   ];
+}
+
+/**
+ * The checked-in baseline: `apps/mobile/src/…` file → the number of layout
+ * violations of each rule the migration has not reached yet. It is written one
+ * file per line so two independent deletions edit different lines.
+ */
+const LAYOUT_BASELINE_PATH = 'tools/nativewind/layout-baseline.json';
+const LAYOUT_PROBLEM = /^(\S+):\d+: \[(L\d)\] /;
+
+/** The layout problems of one run, grouped by file and then by rule. */
+function layoutFindings(problems) {
+  const byFile = new Map();
+  for (const problem of problems) {
+    const match = LAYOUT_PROBLEM.exec(problem);
+    if (match === null) {
+      continue;
+    }
+    const [, path, id] = match;
+    const byRule = byFile.get(path) ?? new Map();
+    byFile.set(path, byRule);
+    const findings = byRule.get(id) ?? [];
+    byRule.set(id, findings);
+    findings.push(problem);
+  }
+  return byFile;
+}
+
+/** The baseline as written, or an empty one when the file is absent. */
+function readLayoutBaseline() {
+  try {
+    return JSON.parse(readFileSync(join(ROOT, LAYOUT_BASELINE_PATH), 'utf8'));
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      return {};
+    }
+    throw error;
+  }
+}
+
+/** Rewrite the baseline from this run's own counts: the migration's new floor. */
+function writeLayoutBaseline(findings) {
+  const entries = [...findings]
+    .map(([path, byRule]) => [
+      path,
+      [...byRule]
+        .map(([id, problems]) => [id, problems.length])
+        .sort(([left], [right]) => (left < right ? -1 : 1)),
+    ])
+    .filter(([, rules]) => rules.length > 0)
+    .sort(([left], [right]) => (left < right ? -1 : 1));
+  const body = entries
+    .map(
+      ([path, rules]) =>
+        `  ${JSON.stringify(path)}: { ${rules.map(([id, count]) => `${JSON.stringify(id)}: ${count}`).join(', ')} }`
+    )
+    .join(',\n');
+  writeFileSync(
+    join(ROOT, LAYOUT_BASELINE_PATH),
+    entries.length === 0 ? '{}\n' : `{\n${body}\n}\n`
+  );
+  console.log(`check-classes: wrote ${entries.length} file(s) to ${LAYOUT_BASELINE_PATH}`);
+}
+
+/**
+ * Split the layout findings into the ones the baseline admits and the lines
+ * that fail this run. A file may not exceed its count for a rule, and a file
+ * below its count is a stale entry: printing the line to lower or delete keeps
+ * the baseline shrinking instead of outliving the migration.
+ */
+function compareLayoutBaseline(findings, baseline) {
+  const exceeded = new Set();
+  const stale = [];
+  for (const [path, byRule] of findings) {
+    for (const [id, problems] of byRule) {
+      const admitted = baseline[path]?.[id] ?? 0;
+      if (problems.length > admitted) {
+        exceeded.add(`${path} ${id}`);
+      }
+    }
+  }
+  for (const [path, rules] of Object.entries(baseline)) {
+    for (const [id, admitted] of Object.entries(rules)) {
+      const actual = findings.get(path)?.get(id)?.length ?? 0;
+      if (actual > admitted) {
+        continue;
+      }
+      if (actual < admitted) {
+        stale.push(
+          `${LAYOUT_BASELINE_PATH}: ${path} ${id} baseline is ${admitted} but the file now has ${actual}; ${actual === 0 ? 'delete the entry' : `lower it to ${actual}`}`
+        );
+      }
+    }
+  }
+
+  const reported = [];
+  const overCount = [];
+  for (const [path, byRule] of findings) {
+    for (const [id, problems] of byRule) {
+      if (exceeded.has(`${path} ${id}`)) {
+        reported.push(...problems);
+        overCount.push(
+          `${path}: ${id} now has ${problems.length} violation(s) and the baseline admits ${baseline[path]?.[id] ?? 0}; remove the new one(s)`
+        );
+      }
+    }
+  }
+  return [...reported, ...overCount, ...stale];
 }
 
 /** The whole audit: every source file, then the compiler pins, then the report. */
@@ -512,17 +1054,36 @@ function run() {
       problems.push(...checkParsedFile(entry));
     }
   }
+  const findings = layoutFindings(problems);
+
+  if (process.argv.includes('--write-layout-baseline')) {
+    writeLayoutBaseline(findings);
+    return;
+  }
+
   problems.push(...checkCompilerStillDropsThese());
 
-  if (problems.length > 0) {
-    for (const problem of problems) {
+  const layoutProblems = compareLayoutBaseline(findings, readLayoutBaseline());
+  const others = problems.filter(problem => !LAYOUT_PROBLEM.test(problem));
+
+  if (others.length > 0 || layoutProblems.length > 0) {
+    for (const problem of others) {
       console.error(problem);
     }
-    console.error(`\ncheck-classes: ${problems.length} problem(s)`);
+    for (const problem of layoutProblems) {
+      console.error(problem);
+    }
+    console.error(`\ncheck-classes: ${others.length + layoutProblems.length} problem(s)`);
     process.exit(1);
   }
 
-  console.log('check-classes: no dropped classes, stray raw Text or hand-built formatters');
+  const admitted = [...findings.values()].reduce(
+    (total, byRule) => total + [...byRule.values()].reduce((sum, group) => sum + group.length, 0),
+    0
+  );
+  console.log(
+    `check-classes: no dropped classes, stray raw Text or hand-built formatters; ${admitted} layout violation(s) admitted by ${LAYOUT_BASELINE_PATH}`
+  );
 }
 
 runIfMain(run, import.meta.url);

@@ -379,7 +379,7 @@ export const hashBrowserToolArguments = (args: unknown): string => {
   };
   const text = canonical(args);
   // FNV-1a, kept in one 32-bit lane on purpose: the hash guards a local token, not a signature.
-  let hash = 0x81_1C_9D_C5;
+  let hash = 0x81_1c_9d_c5;
 
   for (let index = 0; index < text.length; index += 1) {
     hash ^= text.codePointAt(index) ?? 0;

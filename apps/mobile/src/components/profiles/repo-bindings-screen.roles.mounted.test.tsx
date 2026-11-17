@@ -5,15 +5,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { emptyStateProps } from '@/components/profiles/repo-bindings-screen.add-form.test-helpers';
 import {
   findAll,
   findOne,
   mountScreen,
   pressButton,
+  pressPressable,
+  rerenderScreen,
   testBinding,
   type TestBinding,
 } from '@/components/profiles/repo-bindings-screen.test-helpers';
-import { type ReactTestInstance } from '@/test/renderer';
+import { act, type ReactTestInstance } from '@/test/renderer';
 
 type TestRepoOption = { platform: 'github' | 'gitlab'; fullName: string; private: boolean };
 type TestProfile = { id: string; name: string; isDefault: boolean };
@@ -219,6 +222,59 @@ describe('RepoBindingsScreen roles', () => {
 
     expect(buttonLabels(renderer.root)).toContain(ADD_LABEL);
     expect(pressableLabels(renderer.root)).toContain('Unbind acme/api');
+
+    unmount();
+  });
+
+  it('closes the add form with the permission that opened it', async () => {
+    const { renderer, queryClient, unmount } = await mountScreen('org-1');
+
+    pressButton(renderer.root, ADD_LABEL);
+    expect(pressableLabels(renderer.root)).toContain('Select repository…');
+
+    permissionState.permission = 'read-only';
+    act(() => {
+      rerenderScreen(renderer, queryClient, 'org-1');
+    });
+
+    expect(pressableLabels(renderer.root)).not.toContain('Select repository…');
+    expect(textContents(renderer.root).filter(text => text === ROLE_SENTENCE)).toHaveLength(1);
+    expect(buttonLabels(renderer.root)).not.toContain(ADD_LABEL);
+
+    permissionState.permission = 'allowed';
+    act(() => {
+      rerenderScreen(renderer, queryClient, 'org-1');
+    });
+
+    // A permission that allows the flow again opens it from the start.
+    expect(buttonLabels(renderer.root)).toContain(ADD_LABEL);
+    expect(pressableLabels(renderer.root)).not.toContain('Select repository…');
+
+    unmount();
+  });
+
+  it('closes the profile picker with the permission that opened it', async () => {
+    h.profileList.orgProfiles = [];
+
+    const { renderer, queryClient, unmount } = await mountScreen('org-1');
+    pressButton(renderer.root, ADD_LABEL);
+    pressPressable(renderer.root, 'Select profile');
+
+    expect(findAll(renderer.root, 'SessionPageSheet')).toHaveLength(1);
+    const empty = emptyStateProps(renderer.root, 'No profiles yet');
+    expect(empty.action?.props.children.props.children).toBe('Create profile');
+
+    permissionState.permission = 'read-only';
+    act(() => {
+      rerenderScreen(renderer, queryClient, 'org-1');
+    });
+
+    // The sheet is part of the same flow, so it closes with it.
+    expect(findAll(renderer.root, 'SessionPageSheet')).toHaveLength(0);
+    expect(buttonLabels(renderer.root)).not.toContain('Create profile');
+    expect(pressableLabels(renderer.root)).not.toContain('Create profile');
+    expect(textContents(renderer.root)).not.toContain('Create profile');
+    expect(textContents(renderer.root).filter(text => text === ROLE_SENTENCE)).toHaveLength(1);
 
     unmount();
   });

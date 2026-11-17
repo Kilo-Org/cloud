@@ -1,5 +1,5 @@
 import { type Href, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
@@ -87,6 +87,23 @@ export function RepoBindingsScreen({
   const [selectedProfileId, setSelectedProfileId] = useState('');
   const [repoPickerOpen, setRepoPickerOpen] = useState(false);
   const [profilePickerOpen, setProfilePickerOpen] = useState(false);
+
+  // The Add flow belongs to the permission it opened under, and the screen can
+  // learn a new permission while that flow is on screen: the sheets are native
+  // sheets over this route, so the route keeps focus and nothing else closes
+  // them. The flow therefore lasts only as long as the permission that allows
+  // it, and closing it here keeps every control it presents in step with the
+  // slot that decides whether Add is offered.
+  useEffect(() => {
+    if (canManage) {
+      return;
+    }
+    setSelectedRepo(null);
+    setSelectedProfileId('');
+    setIsAdding(false);
+    setRepoPickerOpen(false);
+    setProfilePickerOpen(false);
+  }, [canManage]);
 
   const repoOptions = useRepoOptions(organizationId, isAdding);
   const profileChoices =
@@ -278,7 +295,7 @@ export function RepoBindingsScreen({
           isRefetching={profileList.isRefetching}
           selectedProfileId={selectedProfileId}
           emptyDescription={pickerEmptyDescription}
-          onCreateProfile={openProfileCreator}
+          onCreateProfile={canManage ? openProfileCreator : undefined}
           onRetry={() => {
             void profileList.refetch();
           }}

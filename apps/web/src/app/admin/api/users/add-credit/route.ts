@@ -59,7 +59,9 @@ export async function POST(
     // Negative grants (debits) never store an expiry, so their supplied date has no effect.
     if (amount_usd == null || amount_usd > 0) {
       if (expiryTime <= Date.now()) {
-        // A replay of an idempotent category writes nothing, so the expiry rule does not apply to it.
+        // A replay of an idempotent category writes nothing, so the expiry rule
+        // does not apply to it. These are the terms of the partial unique index
+        // that makes the grant insert conflict.
         const category = promoCreditCategoriesByKey.get(credit_category);
         if (category?.is_idempotent) {
           const [existing] = await db
@@ -68,8 +70,8 @@ export async function POST(
             .where(
               and(
                 eq(credit_transactions.kilo_user_id, user.id),
-                isNull(credit_transactions.organization_id),
-                eq(credit_transactions.credit_category, credit_category)
+                eq(credit_transactions.credit_category, credit_category),
+                eq(credit_transactions.check_category_uniqueness, true)
               )
             )
             .limit(1);

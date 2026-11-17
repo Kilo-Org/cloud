@@ -217,6 +217,61 @@ describe('POST /admin/api/users/add-credit', () => {
     }
   });
 
+  it('treats a category row that cannot conflict on insert as not yet applied', async () => {
+    const categoryKey = `expiry-replay-stale-${crypto.randomUUID()}`;
+    const lookup = promoCreditCategoriesByKey.get.bind(promoCreditCategoriesByKey);
+    const template = lookup('custom');
+    const spy = jest.spyOn(promoCreditCategoriesByKey, 'get').mockImplementation(key =>
+      key === categoryKey && template
+        ? {
+            ...template,
+            credit_category: categoryKey,
+            adminUI_label: 'Expiry replay stale grant',
+            expect_negative_amount: false,
+            is_idempotent: true,
+          }
+        : lookup(key)
+    );
+    try {
+      const admin = await insertTestUser({ is_admin: true, can_manage_credits: true });
+      const recipient = await insertTestUser();
+      mockedGetUserFromAuth.mockResolvedValue({ user: admin, authFailedResponse: null });
+      // A row written while the category was not idempotent stays outside the
+      // partial unique index, so the grant insert does not conflict with it.
+      await db.insert(credit_transactions).values({
+        kilo_user_id: recipient.id,
+        created_by_kilo_user_id: admin.id,
+        credit_category: categoryKey,
+        amount_microdollars: 1_000_000,
+        is_free: true,
+        check_category_uniqueness: false,
+      });
+
+      const response = await POST(
+        request({
+          email: recipient.google_user_email,
+          credit_category: categoryKey,
+          amount_usd: 10,
+          creditKind: 'promotional',
+          credit_expiry_date: '2024-06-01T00:00:00.000Z',
+        })
+      );
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toMatchObject({
+        error: 'Credit expiry date must be in the future',
+      });
+      expect(
+        await db
+          .select({ id: credit_transactions.id })
+          .from(credit_transactions)
+          .where(eq(credit_transactions.kilo_user_id, recipient.id))
+      ).toHaveLength(1);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('rejects a malformed credit_expiry_date instead of writing an invalid transaction', async () => {
     const admin = await insertTestUser({ is_admin: true, can_manage_credits: true });
     const recipient = await insertTestUser();

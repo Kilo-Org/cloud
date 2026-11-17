@@ -220,6 +220,29 @@ test('runs the AI gateway app with the core services', () => {
   assert.ok(resolveGroups(getAlwaysOnGroupIds()).includes('ai-gateway'));
 });
 
+test('starts the Snowflake mock before the web app on the offset port', () => {
+  const service = getService('mock-snowflake');
+
+  assert.equal(service.group, 'core');
+  assert.equal(service.type, 'process');
+  assert.equal(service.dir, 'dev/mock-snowflake');
+  assert.equal(service.port, 4792 + portOffset);
+  assert.deepEqual(service.command, [
+    'env',
+    `MOCK_SNOWFLAKE_PORT=${4792 + portOffset}`,
+    'pnpm',
+    'exec',
+    'tsx',
+    'stack-service.ts',
+  ]);
+  assert.deepEqual(service.dependsOn, []);
+  assert.ok(getService('nextjs').dependsOn.includes('mock-snowflake'));
+
+  const appTargets = resolveTargets(['app']);
+  assert.ok(appTargets.includes('mock-snowflake'));
+  assert.ok(appTargets.indexOf('mock-snowflake') < appTargets.indexOf('nextjs'));
+});
+
 test('starts the BYOK KMS service on its own port before the web app', () => {
   const kms = getService('local-kms');
   const service = getService('byok-kms');
@@ -291,6 +314,7 @@ test('registers user data export with worktree-aware ports and dependencies', ()
   // SCIM endpoints, so it declares `postgres` and `nextjs` and the topological
   // order places it accordingly.
   assert.deepEqual(resolveTargets(['data-export']), [
+    'mock-snowflake',
     'local-kms',
     'postgres',
     'redis',

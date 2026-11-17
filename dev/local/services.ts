@@ -108,6 +108,7 @@ const serviceMeta: Record<string, ServiceMeta> = {
       'ai-gateway',
       'cloudflare-git-token-service',
       'byok-kms',
+      'mock-snowflake',
     ],
   },
   postgres: { group: 'core', dependsOn: [] },
@@ -308,6 +309,17 @@ const serviceMeta: Record<string, ServiceMeta> = {
     group: 'deletion-mock',
     dependsOn: [],
     dir: 'dev/local/scripts',
+  },
+  // Dev-only Snowflake stand-in for the usage screens (dev/mock-snowflake/
+  // README.md). Its entry wires the SNOWFLAKE_* block and the mock's
+  // self-signed CA into .env.local before the web app starts — scripts/dev.sh
+  // exports NODE_EXTRA_CA_CERTS from that file before next dev — so the web
+  // app depends on it. A real SNOWFLAKE_ACCOUNT_HOST in .env.local is never
+  // replaced; run without it with `pnpm dev:start app --without=mock-snowflake`.
+  'mock-snowflake': {
+    group: 'core',
+    dependsOn: [],
+    dir: 'dev/mock-snowflake',
   },
 };
 
@@ -588,6 +600,11 @@ const INFRA_PORTS: Record<string, number> = {
 
 const BYOK_KMS_SERVICE_BASE_PORT = 8901;
 
+// Base host port of dev/mock-snowflake; must agree with the fallback in
+// dev/mock-snowflake/tls-env.ts. An offset worktree runs its own mock so the
+// SNOWFLAKE_ACCOUNT_HOST its entry wires into .env.local matches its stack.
+const MOCK_SNOWFLAKE_BASE_PORT = 4792;
+
 export function byokKmsServicePort(offset: number = portOffset): number {
   return BYOK_KMS_SERVICE_BASE_PORT + offset;
 }
@@ -834,6 +851,27 @@ function buildServiceDefs(): ServiceDef[] {
       continue;
     }
 
+    if (name === 'mock-snowflake') {
+      const mockSnowflakePort = MOCK_SNOWFLAKE_BASE_PORT + portOffset;
+      defs.push({
+        name,
+        type: 'process',
+        dir: meta.dir ?? name,
+        port: mockSnowflakePort,
+        dependsOn: meta.dependsOn,
+        command: [
+          'env',
+          `MOCK_SNOWFLAKE_PORT=${mockSnowflakePort}`,
+          'pnpm',
+          'exec',
+          'tsx',
+          'stack-service.ts',
+        ],
+        group: meta.group,
+      });
+      continue;
+    }
+
     if (name in INFRA_PORTS) {
       defs.push({
         name,
@@ -1057,6 +1095,13 @@ export function resolveTransitiveDeps(targets: string[]): string[] {
     if (!svc) throw new Error(`Unknown service: ${name}`);
     result.add(name);
     for (const dep of svc.dependsOn) {
+      // The Snowflake mock exists for the web app's usage screens; other
+      // dependents (e.g. a workers-only start that names nextjs for its
+      // internal endpoints) never call a warehouse, so drop it there. A real
+      // SNOWFLAKE_ACCOUNT_HOST keeps its wiring either way.
+      if (dep === 'mock-snowflake' && name !== 'nextjs' && !targets.includes('nextjs')) {
+        continue;
+      }
       if (!result.has(dep)) {
         stack.push(dep);
       }

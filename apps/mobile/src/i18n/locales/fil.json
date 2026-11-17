@@ -1355,7 +1355,8 @@
       "managedOnWeb": "Pinamamahalaan sa web gamit ang computer ang koneksyon sa Bitbucket ng organisasyong ito.",
       "description": "Gumawa ng token para sa access sa workspace na may mga kinakailangang saklaw ng pahintulot at i-paste ito sa ibaba.",
       "scopes": "Account: pagbasa · Mga repository: pagbasa/pagsulat · Mga pull request: pagbasa · Mga webhook: pagbasa/pagsulat",
-      "tokenPlaceholder": "Token para sa access sa workspace"
+      "tokenPlaceholder": "Token para sa access sa workspace",
+      "tokenRefused": "Hindi tinanggap ng Bitbucket ang token para sa access sa workspace na ito. Tiyakin na taglay nito ang mga saklaw ng pahintulot sa itaas, pagkatapos ay subukan muli."
     },
     "scopeList": {
       "personalStillAvailable": "Magagamit pa rin sa ibaba ang mga personal na repository.",

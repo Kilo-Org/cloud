@@ -10,9 +10,6 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/claude-billing/operator', () => (
 jest.mock('./access', () => ({
   canManageClaudeBillingOrganization: jest.fn(),
 }));
-jest.mock('@kilocode/web-shared/lib/auth/claude/feature-flag.server', () => ({
-  isClaudePlatformOAuthEnabled: jest.fn(async () => true),
-}));
 jest.mock('./protocol', () => {
   class ClaudeBillingExchangeError extends Error {
     constructor(readonly oauthError: string | null) {
@@ -37,7 +34,6 @@ import type { FailureResult } from '@kilocode/web-shared/lib/maybe-result';
 import type { ClaudeBillingOwner } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import { consumeClaudeBillingPending, saveClaudeBillingPending } from './pending';
 import { canManageClaudeBillingOrganization } from './access';
-import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 import {
   exchangeClaudeBillingCode,
   pushClaudeAuthorizationRequest,
@@ -59,7 +55,6 @@ beforeEach(() => {
   jest.mocked(getUserFromAuth).mockReset();
   jest.mocked(saveClaudeBillingPending).mockClear();
   jest.mocked(pushClaudeAuthorizationRequest).mockClear();
-  jest.mocked(isClaudePlatformOAuthEnabled).mockReset().mockResolvedValue(true);
   jest.mocked(canManageClaudeBillingOrganization).mockReset().mockResolvedValue(true);
   jest.mocked(exchangeClaudeBillingCode).mockReset().mockResolvedValue('ocon_new');
 });
@@ -172,7 +167,6 @@ describe('Claude billing callback', () => {
           ? 'claude_billing_organization=connected'
           : 'claude_billing=connected'
       );
-      expect(isClaudePlatformOAuthEnabled).toHaveBeenCalledWith(fixture.user.google_user_email);
       expect(await state(fixture.row.id)).toMatchObject({
         status: 'connected',
         connection_id: 'ocon_new',
@@ -224,24 +218,6 @@ describe('Claude billing callback', () => {
       'claude_billing_organization=connected'
     );
     expect(await state(row.id)).toMatchObject({ status: 'connected', created_by: nextAdmin.id });
-  });
-
-  it('does not complete a connection while the Claude platform OAuth flag is off', async () => {
-    const { row } = await seed();
-    jest.mocked(isClaudePlatformOAuthEnabled).mockResolvedValue(false);
-    expect((await callback()).headers.get('location')).toContain('claude_billing=forbidden');
-    expect(await state(row.id)).toMatchObject({ status: 'pending', connection_id: null });
-    expect(exchangeClaudeBillingCode).not.toHaveBeenCalled();
-  });
-
-  it('does not start a connection while the Claude platform OAuth flag is off', async () => {
-    const { user } = await seed();
-    jest.mocked(isClaudePlatformOAuthEnabled).mockResolvedValue(false);
-    const response = await connect(
-      new NextRequest('http://localhost/claude/billing/connect?return=%2Fbyok')
-    );
-    expect(response.headers.get('location')).toContain('claude_billing=forbidden');
-    expect(isClaudePlatformOAuthEnabled).toHaveBeenCalledWith(user.google_user_email);
   });
 
   it.each(['connect', 'callback'])(
@@ -355,12 +331,12 @@ describe('Claude billing callback', () => {
     const end = new URL((await callback('state=wrong')).headers.get('location') ?? '');
     expect(end.origin).toBe(new URL(APP_URL).origin);
     expect(end.pathname).toBe('/byok');
-    jest.mocked(isClaudePlatformOAuthEnabled).mockResolvedValue(false);
+    jest.mocked(canManageClaudeBillingOrganization).mockResolvedValue(false);
     const start = new URL(
       (
         await connect(
           new NextRequest(
-            'http://localhost/claude/billing/connect?return=%2F..%2F%2Fexternal.invalid%2Fpath'
+            'http://localhost/claude/billing/connect?owner=00000000-0000-4000-8000-000000000001&return=%2F..%2F%2Fexternal.invalid%2Fpath'
           )
         )
       ).headers.get('location') ?? ''

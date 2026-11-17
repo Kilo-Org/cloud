@@ -1378,7 +1378,8 @@
       "managedOnWeb": "La connexió de Bitbucket d'aquesta organització es gestiona al web des d'un ordinador.",
       "description": "Crea un testimoni d'accés a l'espai de treball amb els permisos necessaris i enganxa'l a continuació.",
       "scopes": "Compte: lectura · Repositoris: lectura/escriptura · Sol·licituds d'integració: lectura · Webhooks: lectura/escriptura.",
-      "tokenPlaceholder": "Testimoni d'accés a l'espai de treball"
+      "tokenPlaceholder": "Testimoni d'accés a l'espai de treball",
+      "tokenRefused": "Bitbucket no ha acceptat aquest testimoni d'accés a l'espai de treball. Comprova que tingui els permisos indicats a dalt i torna-ho a provar."
     },
     "scopeList": {
       "personalStillAvailable": "Els repositoris personals encara estan disponibles a continuació.",

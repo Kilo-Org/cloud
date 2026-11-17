@@ -677,7 +677,8 @@
       "managedOnWeb": "Die Bitbucket-Verbindung dieser Organisation wird im Web über einen Computer verwaltet.",
       "description": "Erstelle ein Workspace-Zugriffstoken mit den erforderlichen Berechtigungen und füge es unten ein.",
       "scopes": "Konto: Lesen · Repositories: Lesen/Schreiben · Pull-Requests: Lesen · Webhooks: Lesen/Schreiben",
-      "tokenPlaceholder": "Workspace-Zugriffstoken"
+      "tokenPlaceholder": "Workspace-Zugriffstoken",
+      "tokenRefused": "Bitbucket hat dieses Workspace-Zugriffstoken nicht akzeptiert. Prüfe, ob es die oben genannten Berechtigungen enthält, und versuche es dann erneut."
     },
     "followReviewMd": "REVIEW.md befolgen",
     "followReviewMdSubtitle": "Anweisungen aus der REVIEW.md-Datei des jeweiligen Repositorys beachten",

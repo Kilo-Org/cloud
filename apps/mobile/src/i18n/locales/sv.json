@@ -1355,7 +1355,8 @@
       "managedOnWeb": "Organisationens Bitbucket-anslutning hanteras på webben från en dator.",
       "description": "Skapa en åtkomsttoken för arbetsytan med de behörigheter som krävs och klistra in den nedan.",
       "scopes": "Behörigheter som krävs: läsa kontouppgifter, läsa och skriva i kodarkiv, läsa pull-begäranden samt läsa och skriva webbhookar.",
-      "tokenPlaceholder": "Åtkomsttoken för arbetsytan"
+      "tokenPlaceholder": "Åtkomsttoken för arbetsytan",
+      "tokenRefused": "Bitbucket accepterade inte den här åtkomsttoken för arbetsytan. Kontrollera att den har behörigheterna ovan och försök igen."
     },
     "scopeList": {
       "personalStillAvailable": "Personliga kodarkiv är fortfarande tillgängliga nedan.",

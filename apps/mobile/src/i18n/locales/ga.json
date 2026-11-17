@@ -1424,7 +1424,8 @@
       "managedOnWeb": "Bainistítear nasc Bitbucket na heagraíochta seo ar an ngréasán ó ríomhaire.",
       "description": "Cruthaigh comhartha rochtana don spás oibre leis na scóip riachtanacha agus greamaigh thíos é.",
       "scopes": "Cuntas: léamh · Stórtha: léamh/scríobh · Iarratais tarraingthe: léamh · Crúcaí gréasáin: léamh/scríobh",
-      "tokenPlaceholder": "Comhartha rochtana don spás oibre"
+      "tokenPlaceholder": "Comhartha rochtana don spás oibre",
+      "tokenRefused": "Níor ghlac Bitbucket leis an gcomhartha rochtana spáis oibre seo. Seiceáil go bhfuil na scóip thuas aige, ansin triail arís."
     },
     "scopeList": {
       "personalStillAvailable": "Tá stórtha pearsanta ar fáil fós thíos.",

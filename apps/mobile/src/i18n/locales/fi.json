@@ -1355,7 +1355,8 @@
       "managedOnWeb": "Tämän organisaation Bitbucket-yhteyttä hallitaan verkossa tietokoneella.",
       "description": "Luo työtilan käyttöoikeustunnus vaadituilla oikeuksilla ja liitä se alla olevaan kenttään.",
       "scopes": "Tili: luku · Koodivarastot: luku/kirjoitus · Muutospyynnöt: luku · Webhookit: luku/kirjoitus",
-      "tokenPlaceholder": "Työtilan käyttöoikeustunnus"
+      "tokenPlaceholder": "Työtilan käyttöoikeustunnus",
+      "tokenRefused": "Bitbucket ei hyväksynyt tätä työtilan käyttöoikeustunnusta. Tarkista, että siinä on yllä olevat oikeudet, ja yritä sitten uudelleen."
     },
     "scopeList": {
       "personalStillAvailable": "Omat koodivarastosi ovat edelleen käytettävissä alla.",

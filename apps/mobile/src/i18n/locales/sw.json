@@ -1355,7 +1355,8 @@
       "managedOnWeb": "Muunganisho wa Bitbucket wa shirika hili unasimamiwa kwenye wavuti kutoka kwenye kompyuta.",
       "description": "Unda tokeni ya kufikia nafasi ya kazi yenye ruhusa zinazohitajika kisha uibandike hapa chini.",
       "scopes": "Akaunti: kusoma · Hazina: kusoma/kuandika · Maombi ya kuunganisha: kusoma · Arifa za wavuti: kusoma/kuandika",
-      "tokenPlaceholder": "Tokeni ya kufikia nafasi ya kazi"
+      "tokenPlaceholder": "Tokeni ya kufikia nafasi ya kazi",
+      "tokenRefused": "Bitbucket haikukubali tokeni hii ya kufikia nafasi ya kazi. Hakikisha kuwa ina ruhusa zilizo hapo juu, kisha ujaribu tena."
     },
     "scopeList": {
       "personalStillAvailable": "Hazina zako binafsi bado zinapatikana hapa chini.",

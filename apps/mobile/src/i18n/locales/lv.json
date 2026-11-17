@@ -1378,7 +1378,8 @@
       "managedOnWeb": "Šīs organizācijas Bitbucket savienojums tiek pārvaldīts tīmeklī no datora.",
       "description": "Izveido darbvietas piekļuves pilnvaru ar vajadzīgajām atļaujām un ielīmē to zemāk.",
       "scopes": "Konts: lasīšana · Repozitoriji: lasīšana/rakstīšana · Izmaiņu pieprasījumi: lasīšana · Tīmekļa aizķeres: lasīšana/rakstīšana",
-      "tokenPlaceholder": "Darbvietas piekļuves pilnvara"
+      "tokenPlaceholder": "Darbvietas piekļuves pilnvara",
+      "tokenRefused": "Bitbucket nepieņēma šo darbvietas piekļuves pilnvaru. Pārbaudi, vai tai ir iepriekš norādītās atļaujas, un pēc tam mēģini vēlreiz."
     },
     "scopeList": {
       "personalStillAvailable": "Personīgie repozitoriji joprojām ir pieejami zemāk.",

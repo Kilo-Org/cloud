@@ -1401,7 +1401,8 @@
       "managedOnWeb": "Šios organizacijos Bitbucket ryšys valdomas žiniatinklyje naudojant kompiuterį.",
       "description": "Sukurk darbo srities prieigos raktą su reikiamomis teisėmis ir įklijuok jį žemiau.",
       "scopes": "Paskyra: skaityti · Saugyklos: skaityti / rašyti · Pakeitimų užklausos: skaityti · Webhook: skaityti / rašyti",
-      "tokenPlaceholder": "Darbo srities prieigos raktas"
+      "tokenPlaceholder": "Darbo srities prieigos raktas",
+      "tokenRefused": "Bitbucket nepriėmė šio darbo srities prieigos rakto. Patikrink, ar jis turi aukščiau nurodytas teises, tada bandyk dar kartą."
     },
     "scopeList": {
       "personalStillAvailable": "Asmenines saugyklas vis dar gali pasiekti žemiau.",

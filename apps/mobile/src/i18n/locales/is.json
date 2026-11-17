@@ -1355,7 +1355,8 @@
       "managedOnWeb": "Bitbucket-tengingu þessarar stofnunar er stjórnað á vefnum í tölvu.",
       "description": "Búðu til aðgangstóka fyrir vinnusvæðið með tilskildum heimildum og límdu hann hér fyrir neðan.",
       "scopes": "Reikningur: lestur · Geymslur: lestur/skrift · Samrunabeiðnir: lestur · Vefkrækjur: lestur/skrift",
-      "tokenPlaceholder": "Aðgangstóki vinnusvæðis"
+      "tokenPlaceholder": "Aðgangstóki vinnusvæðis",
+      "tokenRefused": "Bitbucket tók ekki við þessum aðgangstóka vinnusvæðis. Athugaðu að hann hafi heimildirnar hér fyrir ofan og reyndu svo aftur."
     },
     "scopeList": {
       "personalStillAvailable": "Persónulegar geymslur eru enn tiltækar hér fyrir neðan.",

@@ -1355,7 +1355,8 @@
       "managedOnWeb": "A conexión de Bitbucket desta organización xestiónase na web desde un ordenador.",
       "description": "Crea un token de acceso ao espazo de traballo cos ámbitos requiridos e pégao aquí embaixo.",
       "scopes": "Conta: lectura · Repositorios: lectura/escritura · Solicitudes de cambios: lectura · Webhooks: lectura/escritura",
-      "tokenPlaceholder": "Token de acceso ao espazo de traballo"
+      "tokenPlaceholder": "Token de acceso ao espazo de traballo",
+      "tokenRefused": "Bitbucket non aceptou este token do espazo de traballo. Comproba que ten os ámbitos indicados arriba e téntao de novo."
     },
     "scopeList": {
       "personalStillAvailable": "Os repositorios persoais seguen dispoñibles máis abaixo.",

@@ -356,6 +356,22 @@ describe('Organization hub card', () => {
     unmount();
   });
 
+  it('holds a brand-new seat-enforcing organization at the used count, without a total', async () => {
+    // A new organization is created with the enforcement switch on and no
+    // seats bought, so its total is 0 and the pair would read `1 / 0` —
+    // a row that reads as over capacity on creation day.
+    boundary.requireSeats = true;
+    boundary.seatCount = { used: 1, total: 0 };
+
+    const { renderer, unmount } = await renderHub();
+
+    const seats = renderer.root
+      .findAllByType('KvRow')
+      .find(node => node.props.label === i18n.t('organization.hub.organizationSeats'));
+    expect(seats?.props.value).toBe('1');
+    unmount();
+  });
+
   it('offers the top-up on the balance line of an empty balance', async () => {
     boundary.balance = 0;
 

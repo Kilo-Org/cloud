@@ -1355,7 +1355,8 @@
       "managedOnWeb": "Ny fifandraisana Bitbucket an'ity fikambanana ity dia tantanana amin'ny tranonkala, avy amin'ny solosaina.",
       "description": "Mamoròna mari-pidirana ho an'ny sehatra fiasana, miaraka amin'ny alalana ilaina, ary apetaho eto ambany.",
       "scopes": "Kaonty: mamaky · Tahirin-kaody: mamaky/manoratra · PR: mamaky · Rohy fampandrenesana: mamaky/manoratra",
-      "tokenPlaceholder": "Mari-pidirana ho an'ny sehatra fiasana"
+      "tokenPlaceholder": "Mari-pidirana ho an'ny sehatra fiasana",
+      "tokenRefused": "Tsy nanaiky io mari-pidirana ho an'ny sehatra fiasana io i Bitbucket. Hamarinio fa manana ny alalana etsy ambony izy, dia andramo indray."
     },
     "scopeList": {
       "personalStillAvailable": "Mbola azo ampiasaina eto ambany ny tahirin-kaody manokana.",

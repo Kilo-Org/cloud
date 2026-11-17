@@ -1355,7 +1355,8 @@
       "managedOnWeb": "Walqunnamtiin Bitbucket dhaabbata kanaa weebii irratti kompiitara irraa bulfama.",
       "description": "Tokanii hayyama iddoo hojii kan hayyamoota barbaachisan qabu uumiitii armaan gaditti maxxansi.",
       "scopes": "Herrega: dubbisuu · Kuusaawwan koodii: dubbisuu/barreessuu · Gaaffii makuu: dubbisuu · Weebhuukii: dubbisuu/barreessuu",
-      "tokenPlaceholder": "Tokanii hayyama iddoo hojii"
+      "tokenPlaceholder": "Tokanii hayyama iddoo hojii",
+      "tokenRefused": "Bitbucket tokanii hayyama iddoo hojii kana hin fudhanne. Hayyamoonni armaan olii isa keessa jiraachuu mirkaneessi, sana booda ammas yaali."
     },
     "scopeList": {
       "personalStillAvailable": "Kuusaawwan koodii dhuunfaa ammallee armaan gaditti ni argamu.",

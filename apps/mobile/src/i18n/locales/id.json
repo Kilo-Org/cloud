@@ -677,7 +677,8 @@
       "managedOnWeb": "Koneksi Bitbucket organisasi ini dikelola di web melalui komputer.",
       "description": "Buat token akses ruang kerja dengan cakupan izin yang diperlukan, lalu tempelkan di bawah.",
       "scopes": "Akun: baca · Repositori: baca/tulis · PR: baca · Webhook: baca/tulis",
-      "tokenPlaceholder": "Token akses ruang kerja"
+      "tokenPlaceholder": "Token akses ruang kerja",
+      "tokenRefused": "Bitbucket tidak menerima token akses ruang kerja ini. Periksa bahwa token tersebut memiliki cakupan izin di atas, lalu coba lagi."
     },
     "followReviewMd": "Ikuti REVIEW.md",
     "followReviewMdSubtitle": "Ikuti instruksi dalam berkas REVIEW.md di setiap repositori",

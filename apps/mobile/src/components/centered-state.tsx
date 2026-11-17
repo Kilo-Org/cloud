@@ -51,24 +51,32 @@ type MeasuredViewport = { frame: StateFrame; surface: StateFrame };
  * Centered data state (empty, status, error) inside the band a screen surface
  * reserves.
  *
- * The state paints from its first frame: a hidden data state is a blank body,
- * which reads as a broken screen. That first frame and the measured one use one
- * placement — centered in the band the scroller shows, above the surface's
- * bottom reserve — so a state never moves after it is first painted. The layout
- * engine produces the pending placement from the caller's reserve alone, and
- * `getCenteredStateLayout` produces the same numbers once the surface, the
- * scroller and the content have reported their sizes.
+ * The state paints from its first frame wherever the band it will occupy can be
+ * known at once: a hidden data state is a blank body, which reads as a broken
+ * screen. The first frame and the measured one use one placement — centered in
+ * the band the scroller shows, above the surface's bottom reserve — so a state
+ * never moves after it is first painted. The layout engine produces the pending
+ * placement from the caller's reserve alone, and `getCenteredStateLayout`
+ * produces the same numbers once the surface, the scroller and the content have
+ * reported their sizes.
  *
  * The pending placement is the band placement for a band that starts at the
  * scroller's top and ends at the scroller's bottom, which is every band a screen
  * paints. A reserved top inset moves the band's top below the scroller's top and
  * a native-filled viewport moves its bottom below the scroller's bottom; the
  * estimate has no scroller frame to follow either of them, so those bands keep
- * the content back until the scroller reports its own frame. The measurement
- * answers inside the commit that mounts the scroller, so the state paints placed
- * rather than at a position the measurement then corrects. It also paints at the
+ * the content back until the scroller reports its own frame. A surface whose
+ * native geometry is still arriving is such a band too, for the same reason: any
+ * placement built before the probe reports moves when the safe-area answer
+ * lands, so the content waits one commit for the frame. The measurement answers
+ * inside the commit that mounts the scroller, so the state paints placed rather
+ * than at a position the measurement then corrects. It also paints at the
  * estimate whenever a measurement cannot place it at all, because a state that
- * never appears is worse than one placed by the estimate.
+ * never appears is worse than one placed by the estimate — except on a surface
+ * whose native geometry never reports at all, where the content stays back
+ * rather than paint a position the probe would contradict the moment it
+ * answers; the probe failing is reported and visible, a silently misplaced
+ * state is not.
  */
 export function CenteredState({
   children,
@@ -229,7 +237,6 @@ export function CenteredState({
     bottomInset,
     contentHeight,
     frame,
-
     measuredViewport,
     nativeViewportFillsSurface,
     topInset,
@@ -256,8 +263,9 @@ export function CenteredState({
   // reachable in both directions — the scroller can measure before the probe
   // (`NativeStateSurface` installs its capture only on focus) or after — so
   // the hold applies to the measured placement as well, not only to the
-  // estimate. `unplaceable` still paints the estimate so a state whose
-  // surface can never report is never hidden.
+  // estimate. `unplaceable` still paints the estimate when the scroller itself
+  // cannot measure; a surface whose native geometry never reports keeps the
+  // content back instead, per the class docstring above.
   const surfacePending = surface?.source === 'pending';
   const estimateFits = topInset === 0 && !nativeViewportFillsSurface && !surfacePending;
   // The hold covers only a surface that has never placed anything: once a

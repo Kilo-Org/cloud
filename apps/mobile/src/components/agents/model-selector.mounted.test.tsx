@@ -461,11 +461,11 @@ describe('ModelSelector loading chip', () => {
     expect(textStrings(renderer.root)).not.toContain('Model');
     const skeletons = renderer.root.findAllByType('Skeleton');
     expect(skeletons).toHaveLength(1);
-    // The bar takes the label line's own `text-sm` box, so the pill is the
-    // height it will have once a model arrives; a shorter bar grew it by
-    // 3.4 dp on the emulator.
+    // The bar takes the label line's own `text-sm` box and the default model's
+    // measured label width, so the pill is the size it will have once that model
+    // arrives; a shorter bar grew it by 3.4 dp on the emulator.
     expect(skeletons[0]?.props.className).toContain('h-[17.5px]');
-    expect(skeletons[0]?.props.className).toContain('w-[105px]');
+    expect(skeletons[0]?.props.className).toContain('w-[75.5px]');
     // `bg-muted-soft`, not the default fill: that one equals the pill's own
     // `bg-secondary` in the light palette, so the bar would paint nothing.
     expect(skeletons[0]?.props.className).toContain('bg-muted-soft');

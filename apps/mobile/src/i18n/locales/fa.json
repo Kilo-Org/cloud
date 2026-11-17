@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "تغییرات",
     "organizationTrialEnded": "دوره آزمایشی سازمان به پایان رسیده است و هیچ طرح فعالی ندارد. مالک سازمان می‌تواند صورتحساب را در kilo.ai به‌روزرسانی کند و سپس دوباره تلاش کند.",
-    "privateRepositoryA11y": "{{name}}، مخزن خصوصی"
+    "privateRepositoryA11y": "{{name}}، مخزن خصوصی",
+    "legalDocumentEnglishOnly": "این سند تنها به زبان انگلیسی در دسترس است."
   },
   "language": {
     "restarting": "در حال راه‌اندازی مجدد برای تغییر زبان",

@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Ngā huringa",
     "organizationTrialEnded": "Kua mutu te whakamātautau o te rōpū, ā, kāore ōna mahere kaha. Ka taea e te rangatira o te rōpū te whakahou i te nama i kilo.ai, kātahi ka whakamātau anō.",
-    "privateRepositoryA11y": "{{name}}, tahua tūmataiti"
+    "privateRepositoryA11y": "{{name}}, tahua tūmataiti",
+    "legalDocumentEnglishOnly": "E wātea ana tēnei tuhinga i te reo Ingarihi anake."
   },
   "language": {
     "restarting": "Kei te tīmata anō hei whakamahi i te reo",

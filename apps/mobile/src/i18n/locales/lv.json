@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Izmaiņas",
     "organizationTrialEnded": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna. Organizācijas īpašnieks var atjaunināt norēķinu informāciju vietnē kilo.ai un pēc tam mēģināt vēlreiz.",
-    "privateRepositoryA11y": "{{name}}, privāts repozitorijs"
+    "privateRepositoryA11y": "{{name}}, privāts repozitorijs",
+    "legalDocumentEnglishOnly": "Šis dokuments ir pieejams tikai angļu valodā."
   },
   "language": {
     "restarting": "Notiek restartēšana, lai lietotu izvēlēto valodu",

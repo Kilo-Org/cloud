@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Izmene",
     "organizationTrialEnded": "Probni period organizacije je završen i ona nema aktivan plan. Vlasnik organizacije može da ažurira naplatu na kilo.ai, a zatim pokuša ponovo.",
-    "privateRepositoryA11y": "{{name}}, privatno spremište"
+    "privateRepositoryA11y": "{{name}}, privatno spremište",
+    "legalDocumentEnglishOnly": "Ovaj dokument je dostupan samo na engleskom jeziku."
   },
   "language": {
     "restarting": "Ponovno pokretanje radi promene jezika",

@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Dəyişikliklər",
     "organizationTrialEnded": "Təşkilatın sınaq müddəti başa çatıb və aktiv planı yoxdur. Təşkilat sahibi kilo.ai ünvanında billinqi yeniləyə və sonra yenidən cəhd edə bilər.",
-    "privateRepositoryA11y": "{{name}}, şəxsi repozitoriya"
+    "privateRepositoryA11y": "{{name}}, şəxsi repozitoriya",
+    "legalDocumentEnglishOnly": "Bu sənəd yalnız ingilis dilində mövcuddur."
   },
   "language": {
     "restarting": "Dil dəyişikliyini tətbiq etmək üçün yenidən başladılır",

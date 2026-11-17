@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "ପରିବର୍ତ୍ତନ",
     "organizationTrialEnded": "ସଂଗଠନର ଟ୍ରାଏଲ୍ ଅବଧି ଶେଷ ହୋଇଛି ଏବଂ ଏହାର କୌଣସି ସକ୍ରିୟ ପ୍ଲାନ୍ ନାହିଁ। ଜଣେ ସଂଗଠନ ମାଲିକ kilo.ai ରେ ବିଲିଂ ଅପଡେଟ୍ କରିପାରିବେ, ତାପରେ ପୁନର୍ବାର ଚେଷ୍ଟା କରନ୍ତୁ।",
-    "privateRepositoryA11y": "{{name}}, ବ୍ୟକ୍ତିଗତ ରିପୋଜିଟୋରୀ"
+    "privateRepositoryA11y": "{{name}}, ବ୍ୟକ୍ତିଗତ ରିପୋଜିଟୋରୀ",
+    "legalDocumentEnglishOnly": "ଏହି ଦସ୍ତାବେଜଟି କେବଳ ଇଂରାଜୀରେ ଉପଲବ୍ଧ।"
   },
   "language": {
     "restarting": "ଭାଷା ବଦଳାଇବାକୁ ଆପ୍ ପୁଣି ଆରମ୍ଭ ହେଉଛି",

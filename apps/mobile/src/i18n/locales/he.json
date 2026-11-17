@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "שינויים",
     "organizationTrialEnded": "הסתיימה תקופת הניסיון של הארגון ואין לו תוכנית פעילה. בעל הארגון יכול לעדכן את החיוב ב-kilo.ai, ואז לנסות שוב.",
-    "privateRepositoryA11y": "{{name}}, מאגר פרטי"
+    "privateRepositoryA11y": "{{name}}, מאגר פרטי",
+    "legalDocumentEnglishOnly": "מסמך זה זמין באנגלית בלבד."
   },
   "language": {
     "restarting": "האפליקציה מופעלת מחדש לשינוי השפה",

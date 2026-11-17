@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Perubahan",
     "organizationTrialEnded": "Percubaan organisasi telah tamat dan ia tidak mempunyai pelan aktif. Pemilik organisasi boleh mengemas kini bil di kilo.ai, kemudian cuba lagi.",
-    "privateRepositoryA11y": "{{name}}, repositori persendirian"
+    "privateRepositoryA11y": "{{name}}, repositori persendirian",
+    "legalDocumentEnglishOnly": "Dokumen ini hanya tersedia dalam bahasa Inggeris."
   },
   "language": {
     "restarting": "Memulakan semula apl untuk menukar bahasa",

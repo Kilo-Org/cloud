@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Өзгерістер",
     "organizationTrialEnded": "Ұйымның сынақ мерзімі аяқталды және оның белсенді жоспары жоқ. Ұйым иесі kilo.ai сайтында төлем ақпаратын жаңартып, содан кейін қайталап көре алады.",
-    "privateRepositoryA11y": "{{name}}, жеке репозиторий"
+    "privateRepositoryA11y": "{{name}}, жеке репозиторий",
+    "legalDocumentEnglishOnly": "Бұл құжат тек ағылшын тілінде қолжетімді."
   },
   "language": {
     "restarting": "Тілді қолдану үшін қайта іске қосылуда",

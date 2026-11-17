@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "بدلونونه",
     "organizationTrialEnded": "د سازمان آزموینه پای ته رسېدلې ده او هغه هیچ فعال پلان نه لري. د سازمان مالک کولی شي په kilo.ai کې بیلنګ تازه کړي، بیا یو ځل بیا هڅه وکړي.",
-    "privateRepositoryA11y": "{{name}}، شخصي زېرمتون"
+    "privateRepositoryA11y": "{{name}}، شخصي زېرمتون",
+    "legalDocumentEnglishOnly": "دا سند یوازې په انګلیسي ژبه کې د لاسرسي وړ دی."
   },
   "language": {
     "restarting": "د ژبې د پلي کولو لپاره بیا پیلېږي",

@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "گۆڕانکارییەکان",
     "organizationTrialEnded": "تاقیکردنەوەی ڕێکخراوەکە کۆتایی هاتووە و هیچ پلانێکی چالاکی نییە. خاوەنێکی ڕێکخراو دەتوانێت لە kilo.ai پارەدان نوێ بکاتەوە، پاشان دووبارە هەوڵ بداتەوە.",
-    "privateRepositoryA11y": "{{name}}، کۆگای تایبەت"
+    "privateRepositoryA11y": "{{name}}، کۆگای تایبەت",
+    "legalDocumentEnglishOnly": "ئەم بەڵگەنامەیە تەنها بە زمانی ئینگلیزی بەردەستە."
   },
   "language": {
     "restarting": "بۆ جێبەجێکردنی گۆڕینی زمان، دووبارە دەست پێ دەکاتەوە",

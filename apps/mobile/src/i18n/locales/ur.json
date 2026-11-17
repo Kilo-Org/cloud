@@ -175,7 +175,8 @@
     "durationHourShort": "گھنٹہ",
     "changes": "تبدیلیاں",
     "organizationTrialEnded": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔ تنظیم کا مالک kilo.ai پر بلنگ اپ ڈیٹ کر سکتا ہے، پھر دوبارہ کوشش کریں۔",
-    "privateRepositoryA11y": "{{name}}، نجی ریپوزٹری"
+    "privateRepositoryA11y": "{{name}}، نجی ریپوزٹری",
+    "legalDocumentEnglishOnly": "یہ دستاویز صرف انگریزی میں دستیاب ہے۔"
   },
   "language": {
     "restarting": "منتخب زبان لاگو کرنے کے لیے ایپ دوبارہ شروع ہو رہی ہے",

@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Wysigings",
     "organizationTrialEnded": "Die organisasie se proeftydperk het geëindig en dit het geen aktiewe plan nie. 'n Organisasie-eienaar kan die fakturering by kilo.ai opdateer en dan weer probeer.",
-    "privateRepositoryA11y": "{{name}}, privaat bewaarplek"
+    "privateRepositoryA11y": "{{name}}, privaat bewaarplek",
+    "legalDocumentEnglishOnly": "Hierdie dokument is slegs in Engels beskikbaar."
   },
   "language": {
     "restarting": "Herbegin om die taal toe te pas",

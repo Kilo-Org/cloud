@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Wijzigingen",
     "organizationTrialEnded": "De proefperiode van de organisatie is afgelopen en er is geen actief abonnement. Een eigenaar van de organisatie kan de facturering bijwerken op kilo.ai en het daarna opnieuw proberen.",
-    "privateRepositoryA11y": "{{name}}, privé repository"
+    "privateRepositoryA11y": "{{name}}, privé repository",
+    "legalDocumentEnglishOnly": "Dit document is alleen beschikbaar in het Engels."
   },
   "language": {
     "restarting": "Opnieuw starten om de taal in te stellen",

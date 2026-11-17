@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "മാറ്റങ്ങൾ",
     "organizationTrialEnded": "സ്ഥാപനത്തിന്റെ ട്രയൽ അവസാനിച്ചു, അതിന് സജീവമായ പ്ലാൻ ഇല്ല. ഒരു സ്ഥാപന ഉടമക്ക് kilo.ai-ൽ ബില്ലിംഗ് അപ്ഡേറ്റ് ചെയ്യാനും തുടർന്ന് വീണ്ടും ശ്രമിക്കാനും കഴിയും.",
-    "privateRepositoryA11y": "{{name}}, സ്വകാര്യം റിപ്പോസിറ്ററി"
+    "privateRepositoryA11y": "{{name}}, സ്വകാര്യം റിപ്പോസിറ്ററി",
+    "legalDocumentEnglishOnly": "ഈ രേഖ ഇംഗ്ലീഷിൽ മാത്രം ലഭ്യമാണ്."
   },
   "language": {
     "restarting": "ഭാഷ മാറ്റാൻ പുനരാരംഭിക്കുന്നു",

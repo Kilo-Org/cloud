@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "পরিবর্তন",
     "organizationTrialEnded": "সংস্থার ট্রায়াল শেষ হয়েছে এবং এর কোনো সক্রিয় প্ল্যান নেই। একজন সংস্থা মালিক kilo.ai-এ বিলিং আপডেট করতে পারেন, তারপর আবার চেষ্টা করুন।",
-    "privateRepositoryA11y": "{{name}}, ব্যক্তিগত রিপোজিটরি"
+    "privateRepositoryA11y": "{{name}}, ব্যক্তিগত রিপোজিটরি",
+    "legalDocumentEnglishOnly": "এই নথিটি কেবল ইংরেজিতে উপলব্ধ।"
   },
   "language": {
     "restarting": "নির্বাচিত ভাষা চালু করতে অ্যাপ আবার চালু হচ্ছে",

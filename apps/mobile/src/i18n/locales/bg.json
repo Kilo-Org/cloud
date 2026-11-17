@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Промени",
     "organizationTrialEnded": "Пробният период на организацията е приключил и тя няма активен план. Собственик на организацията може да актуализира фактурирането на kilo.ai и след това да опита отново.",
-    "privateRepositoryA11y": "{{name}}, частно хранилище"
+    "privateRepositoryA11y": "{{name}}, частно хранилище",
+    "legalDocumentEnglishOnly": "Този документ е достъпен само на английски."
   },
   "language": {
     "restarting": "Рестартиране за смяна на езика",

@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "التغييرات",
     "organizationTrialEnded": "انتهت الفترة التجريبية للمؤسسة ولم تعد لديها خطة نشطة. يمكن لمالك المؤسسة تحديث الفوترة على kilo.ai، ثم المحاولة مرة أخرى.",
-    "privateRepositoryA11y": "{{name}}، مستودع خاص"
+    "privateRepositoryA11y": "{{name}}، مستودع خاص",
+    "legalDocumentEnglishOnly": "هذا المستند متوفر باللغة الإنجليزية فقط."
   },
   "language": {
     "restarting": "جارٍ إعادة التشغيل لتطبيق اللغة",

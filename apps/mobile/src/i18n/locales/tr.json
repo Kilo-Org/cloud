@@ -175,7 +175,8 @@
     "durationHourShort": "sa",
     "changes": "Değişiklikler",
     "organizationTrialEnded": "Kuruluşun deneme süresi sona erdi ve etkin bir planı yok. Kuruluş sahibi kilo.ai adresinden faturalandırmayı güncelleyip ardından tekrar deneyebilir.",
-    "privateRepositoryA11y": "{{name}}, özel depo"
+    "privateRepositoryA11y": "{{name}}, özel depo",
+    "legalDocumentEnglishOnly": "Bu belge yalnızca İngilizce olarak mevcuttur."
   },
   "language": {
     "restarting": "Dil değişikliğini uygulamak için yeniden başlatılıyor",

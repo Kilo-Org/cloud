@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Canje-canje",
     "organizationTrialEnded": "Gwajin ƙungiyar ya ƙare kuma ba ta da wani shiri mai aiki. Mai mallakar ƙungiyar zai iya sabunta lissafin kuɗi a kilo.ai, sannan ya sake gwadawa.",
-    "privateRepositoryA11y": "{{name}}, ma'ajiya na sirri"
+    "privateRepositoryA11y": "{{name}}, ma'ajiya na sirri",
+    "legalDocumentEnglishOnly": "Wannan takarda tana samuwa cikin Turanci kawai."
   },
   "language": {
     "restarting": "Ana sake kunnawa don amfani da harshen da aka zaɓa",

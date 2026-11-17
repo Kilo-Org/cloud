@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Cambios",
     "organizationTrialEnded": "La prueba de la organización ha finalizado y no tiene ningún plan activo. El propietario de la organización puede actualizar la facturación en kilo.ai y, después, volver a intentarlo.",
-    "privateRepositoryA11y": "{{name}}, repositorio privado"
+    "privateRepositoryA11y": "{{name}}, repositorio privado",
+    "legalDocumentEnglishOnly": "Este documento solo está disponible en inglés."
   },
   "language": {
     "restarting": "Reiniciando para aplicar el idioma",

@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Breytingar",
     "organizationTrialEnded": "Próftímabili fyrirtækisins er lokið og það er ekki með virka áætlun. Eigandi fyrirtækis getur uppfært greiðsluupplýsingar á kilo.ai og reynir síðan aftur.",
-    "privateRepositoryA11y": "{{name}}, einkakóðasafn"
+    "privateRepositoryA11y": "{{name}}, einkakóðasafn",
+    "legalDocumentEnglishOnly": "Þetta skjal er aðeins tiltækt á ensku."
   },
   "language": {
     "restarting": "Endurræsi til að virkja valið tungumál",

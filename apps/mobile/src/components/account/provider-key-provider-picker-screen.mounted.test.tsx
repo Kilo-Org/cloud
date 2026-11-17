@@ -14,8 +14,6 @@ const state = vi.hoisted(() => ({
   providers: [] as Provider[],
   error: false,
   push: vi.fn(),
-  clear: vi.fn(),
-  openExternalUrl: vi.fn(),
 }));
 
 vi.mock('react-native', () => ({ View: 'View', Pressable: 'Pressable', TextInput: 'TextInput' }));
@@ -59,8 +57,6 @@ vi.mock('@tanstack/react-query', async importOriginal => {
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({ byok: { listProviders: { queryOptions: () => ({}), queryKey: () => [] } } }),
 }));
-vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://app.example.test' }));
-vi.mock('@/lib/external-link', () => ({ openExternalUrl: state.openExternalUrl }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#888888' }),
 }));
@@ -83,19 +79,21 @@ vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 
 let renderer: ReactTestRenderer | undefined = undefined;
 
-async function mount() {
-  const view = await renderWithProviders(createElement(ProviderKeyProviderPickerScreen));
+async function mount(organizationId?: string) {
+  const view = await renderWithProviders(
+    createElement(
+      ProviderKeyProviderPickerScreen,
+      organizationId === undefined ? {} : { organizationId }
+    )
+  );
   renderer = view.renderer;
   return view.renderer.root;
 }
 
-/** The provider rows: the web row is a pressable with its own label. */
+/** The provider rows: one pressable per provider, labelled with its name. */
 function rowLabels(root: ReactTestRenderer['root']) {
   return root.findAll(
-    node =>
-      Object.is(node.type, 'Pressable') &&
-      typeof node.props.accessibilityLabel === 'string' &&
-      node.props.accessibilityLabel !== 'Manage on the web'
+    node => Object.is(node.type, 'Pressable') && typeof node.props.accessibilityLabel === 'string'
   );
 }
 
@@ -151,6 +149,19 @@ describe('ProviderKeyProviderPickerScreen', () => {
     });
   });
 
+  it('keeps the organization’s scope on the form it opens', async () => {
+    const root = await mount('org_1');
+
+    act(() => {
+      (row(root, 0).props.onPress as () => void)();
+    });
+
+    expect(state.push).toHaveBeenCalledWith({
+      pathname: '/(app)/(tabs)/(3_profile)/provider-key-new',
+      params: { provider: 'anthropic', org: 'org_1' },
+    });
+  });
+
   it('filters by name and explains when nothing matches', async () => {
     const root = await mount();
 
@@ -192,7 +203,7 @@ describe('ProviderKeyProviderPickerScreen', () => {
     }
   });
 
-  it('offers the structured-credential providers on the web instead', async () => {
+  it('offers the structured-credential providers its own form', async () => {
     state.providers = [
       { id: 'anthropic', name: 'Anthropic' },
       { id: 'azure', name: 'Azure Foundry' },
@@ -203,24 +214,24 @@ describe('ProviderKeyProviderPickerScreen', () => {
     ];
     const root = await mount();
 
-    expect(rowLabels(root).map(node => node.props.accessibilityLabel)).toEqual(['Anthropic']);
-
-    const webRow = root.findAll(
-      node =>
-        Object.is(node.type, 'Pressable') && node.props.accessibilityLabel === 'Manage on the web'
-    );
-    const [onlyWebRow] = webRow;
-    if (!onlyWebRow) {
-      throw new Error('missing the web row');
-    }
+    // The app holds no provider back: each one opens the form for its own
+    // credential, and nothing is sent to the web.
+    expect(rowLabels(root).map(node => node.props.accessibilityLabel)).toEqual([
+      'Anthropic',
+      'Azure Foundry',
+      'Amazon Bedrock',
+      'AWS Bedrock (direct)',
+      'Google Vertex AI',
+      'Google Vertex AI (direct)',
+    ]);
 
     act(() => {
-      (onlyWebRow.props.onPress as () => void)();
+      (row(root, 1).props.onPress as () => void)();
     });
-    expect(state.openExternalUrl).toHaveBeenCalledWith(
-      'https://app.example.test/byok',
-      expect.objectContaining({ label: 'Provider keys' })
-    );
+    expect(state.push).toHaveBeenCalledWith({
+      pathname: '/(app)/(tabs)/(3_profile)/provider-key-new',
+      params: { provider: 'azure' },
+    });
   });
 
   it('keeps a retry when the provider list cannot be read', async () => {

@@ -225,6 +225,11 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
 vi.mock('@/lib/hooks/use-code-reviewer-repo-selection', () => ({
   useRepoSelectionToggle: () => state.toggleRepo,
 }));
+vi.mock('@/lib/hooks/use-bitbucket', () => ({
+  // The Bitbucket setup recovery card reads this only for its own repair
+  // action; these surface states never press it.
+  useRefreshBitbucketRepositories: () => ({ mutateAsync: vi.fn(), isPending: false }),
+}));
 vi.mock('@/lib/hooks/use-code-reviewer-repo-sync', () => ({
   useReviewerRepositoriesResync: () => ({ resync: state.resync, resyncing: false }),
 }));

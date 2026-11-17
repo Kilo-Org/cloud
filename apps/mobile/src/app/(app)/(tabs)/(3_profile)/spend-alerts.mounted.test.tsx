@@ -1,6 +1,6 @@
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import SpendAlertsRoute from './spend-alerts';
 
@@ -14,6 +14,8 @@ vi.mock('@/components/organization/spend-alerts-screen', () => ({
   SpendAlertsScreen: 'SpendAlertsScreen',
 }));
 
+let mounted: TestRenderer.ReactTestRenderer | undefined = undefined;
+
 function mountRoute(): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
@@ -22,6 +24,7 @@ function mountRoute(): TestRenderer.ReactTestRenderer {
   if (!ref.current) {
     throw new Error('route did not render');
   }
+  mounted = ref.current;
   return ref.current;
 }
 
@@ -42,6 +45,19 @@ function screenScope(): unknown {
 
 beforeEach(() => {
   useLocalSearchParamsMock.mockReset();
+});
+
+// The renderer's unmount is what releases the tree it holds, as the sibling
+// route suites do.
+afterEach(() => {
+  const renderer = mounted;
+  mounted = undefined;
+  if (renderer === undefined) {
+    return;
+  }
+  act(() => {
+    renderer.unmount();
+  });
 });
 
 describe('SpendAlertsRoute organization scope', () => {

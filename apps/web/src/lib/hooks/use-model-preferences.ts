@@ -114,6 +114,8 @@ export function useModelFavorites(options: { enabled?: boolean } = {}) {
 
   return {
     favorites: query.data?.favorites ?? EMPTY_FAVORITES,
+    favoritesError: query.isError ? query.error.message || 'Could not load favorites' : null,
+    refetchFavorites: query.refetch,
     addFavorite: addFavorite.mutate,
     removeFavorite: removeFavorite.mutate,
   };

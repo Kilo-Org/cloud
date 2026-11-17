@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -106,8 +106,10 @@ export function ModelCombobox({
   favorites,
 }: ModelComboboxProps) {
   const [open, setOpen] = useState(false);
+  const pendingStarFocusRef = useRef<string | null>(null);
   const handleOpenChange = (value: boolean) => {
     if (value) onLoadModels?.();
+    else pendingStarFocusRef.current = null;
     setOpen(value);
   };
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -120,6 +122,8 @@ export function ModelCombobox({
   const preferredModels = usePreferredModels();
   const {
     favorites: favoriteModels,
+    favoritesError,
+    refetchFavorites,
     addFavorite,
     removeFavorite,
   } = useModelFavorites({ enabled: favorites === true });
@@ -134,8 +138,25 @@ export function ModelCombobox({
     [models, preferredModels, favoriteIds]
   );
 
+  // Toggling remounts the row into another group and drops focus to the body;
+  // restore it to the same model's star, or the search input when the star is
+  // gone (an unavailable model that was just un-favorited).
+  useEffect(() => {
+    const modelId = pendingStarFocusRef.current;
+    if (!modelId) return;
+    pendingStarFocusRef.current = null;
+    const list = listRef.current;
+    if (!list) return;
+    const star = list.querySelector<HTMLButtonElement>(
+      `button[data-model-id="${CSS.escape(modelId)}"]`
+    );
+    if (star) star.focus();
+    else list.parentElement?.querySelector<HTMLInputElement>('[cmdk-input]')?.focus();
+  }, [favoriteIds]);
+
   const handleToggleFavorite = useCallback(
     (model: ModelOption) => {
+      pendingStarFocusRef.current = model.id;
       const action = favoriteToggleAction(model, favoriteModels);
       if (action.type === 'remove') {
         for (const id of action.models) removeFavorite({ model: id });
@@ -267,6 +288,9 @@ export function ModelCombobox({
         <PopoverContent className="w-[min(24rem,calc(100vw-2rem))] p-0" align="start">
           <Command>
             <CommandInput placeholder={searchPlaceholder} onValueChange={handleSearchChange} />
+            {favorites && favoritesError && (
+              <FavoritesReadError message={favoritesError} onRetry={refetchFavorites} />
+            )}
             <CommandEmpty>{noResultsText}</CommandEmpty>
             <CommandList ref={listRef} className="max-h-64 overflow-auto">
               {pinnedModel && (
@@ -338,6 +362,9 @@ export function ModelCombobox({
         >
           <Command>
             <CommandInput placeholder={searchPlaceholder} onValueChange={handleSearchChange} />
+            {favorites && favoritesError && (
+              <FavoritesReadError message={favoritesError} onRetry={refetchFavorites} />
+            )}
             <CommandEmpty>{noResultsText}</CommandEmpty>
             <CommandList ref={listRef} className="max-h-64 overflow-auto">
               {pinnedModel && (
@@ -365,6 +392,21 @@ export function ModelCombobox({
         </PopoverContent>
       </Popover>
       {!isCompact && helperText && <p className="text-muted-foreground text-xs">{helperText}</p>}
+    </div>
+  );
+}
+
+function FavoritesReadError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div className="text-destructive flex items-center justify-between gap-2 border-b px-3 py-2 text-xs">
+      <span className="min-w-0">{message}</span>
+      <button
+        type="button"
+        onClick={() => onRetry()}
+        className="hover:text-foreground shrink-0 underline underline-offset-2"
+      >
+        Try Again
+      </button>
     </div>
   );
 }
@@ -456,7 +498,7 @@ function ModelOptionGroups({
                 model.id === value ? 'opacity-100' : 'opacity-0'
               )}
             />
-            {onToggleFavorite && !model.unavailable && (
+            {onToggleFavorite && (!model.unavailable || isFavoriteOption(model, favoriteIds)) && (
               <FavoriteStar
                 model={model}
                 isFavorite={isFavoriteOption(model, favoriteIds)}
@@ -485,6 +527,7 @@ function FavoriteStar({
   return (
     <button
       type="button"
+      data-model-id={model.id}
       aria-label={label}
       aria-pressed={isFavorite}
       title={label}
@@ -500,7 +543,9 @@ function FavoriteStar({
         if (event.key === 'Enter' || event.key === ' ') event.stopPropagation();
       }}
       className={cn(
-        'focus-visible:ring-ring relative inline-flex shrink-0 items-center rounded-sm p-0.5 outline-none before:absolute before:-inset-2 focus-visible:ring-2 [@media(any-pointer:coarse)]:before:-inset-3',
+        // pointer-events-auto keeps the star tappable on unavailable rows,
+        // which cmdk renders with pointer-events-none.
+        'focus-visible:ring-ring pointer-events-auto relative inline-flex shrink-0 items-center rounded-sm p-0.5 outline-none before:absolute before:-inset-2 focus-visible:ring-2 [@media(any-pointer:coarse)]:before:-inset-3',
         isFavorite ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
       )}
     >

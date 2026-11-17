@@ -184,6 +184,28 @@ describe('useModelFavorites', () => {
     await renderProbe();
     expect(mockQueryOptions).toHaveBeenCalledWith(undefined);
     expect(api().favorites).toEqual(SERVER_FAVORITES);
+    expect(api().favoritesError).toBeNull();
+  });
+
+  it('surfaces a failed read and recovers through refetch', async () => {
+    mockGet.mockRejectedValueOnce(new Error('favorites read failed'));
+    await renderProbe();
+    await flushUntil(() => api().favoritesError !== null);
+    expect(api().favorites).toEqual([]);
+    expect(api().favoritesError).toBe('favorites read failed');
+
+    await act(async () => {
+      await api().refetchFavorites();
+    });
+    await flushUntil(() => api().favoritesError === null);
+    expect(api().favorites).toEqual(SERVER_FAVORITES);
+  });
+
+  it('falls back to a generic message when the read error has none', async () => {
+    mockGet.mockRejectedValueOnce(new Error(''));
+    await renderProbe();
+    await flushUntil(() => api().favoritesError !== null);
+    expect(api().favoritesError).toBe('Could not load favorites');
   });
 
   it('adds optimistically while the request is pending, then refetches on success', async () => {

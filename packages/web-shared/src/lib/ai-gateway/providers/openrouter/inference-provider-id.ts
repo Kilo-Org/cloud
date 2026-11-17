@@ -288,6 +288,15 @@ export function openRouterToVercelInferenceProviderId(providerId: string): strin
   return openRouterToVercelInferenceProviderMapping[normalizedProviderId] ?? normalizedProviderId;
 }
 
+/** The OpenRouter slug of a Vercel provider id, the name the provider settings use. */
+export function vercelToOpenRouterInferenceProviderId(providerId: string): string {
+  return (
+    Object.entries(openRouterToVercelInferenceProviderMapping).find(
+      ([, vercelProviderId]) => vercelProviderId === providerId
+    )?.[0] ?? providerId
+  );
+}
+
 /** The Vercel provider a user BYOK key is sent to. Vercel serves Codestral keys as Mistral keys. */
 export function getVercelProviderIdForUserByok(providerId: string): string {
   return providerId === DirectUserByokInferenceProviderIdSchema.enum.codestral

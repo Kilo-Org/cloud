@@ -22,6 +22,7 @@ import {
   insertCustomLlmForTest,
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import { getCachedVercelInferenceProviderIdsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { getKiloEmbeddingModelCatalogFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/embeddings/openrouter-embedding-models';
 import { countAndStoreEmbeddingUsage } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import {
@@ -76,6 +77,12 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/get-provider', () => ({
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel', () => ({
   mapModelIdToVercel: jest.fn(),
 }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
+  ...jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache'
+  ),
+  getCachedVercelInferenceProviderIdsForModel: jest.fn(),
+}));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/embeddings/openrouter-embedding-models', () => ({
   getKiloEmbeddingModelCatalogFromDatabase: jest.fn(),
 }));
@@ -117,6 +124,7 @@ const mockedGetBalanceAndOrgSettings = jest.mocked(getBalanceAndOrgSettings);
 const mockedResolveModelDecision = jest.mocked(resolveOrganizationMemberModelDecision);
 const mockedGetEmbeddingProvider = jest.mocked(getEmbeddingProvider);
 const mockedMapModelIdToVercel = jest.mocked(mapModelIdToVercel);
+const mockedGetVercelInferenceProviders = jest.mocked(getCachedVercelInferenceProviderIdsForModel);
 const mockedGetKiloEmbeddingModelCatalogFromDatabase = jest.mocked(
   getKiloEmbeddingModelCatalogFromDatabase
 );
@@ -203,6 +211,7 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
       isFree: false,
     });
     mockedMapModelIdToVercel.mockResolvedValue(model);
+    mockedGetVercelInferenceProviders.mockResolvedValue(null);
     jest.mocked(getRuntimeOrganizationFeatures).mockResolvedValue(DEFAULT_ORGANIZATION_FEATURES);
     mockedGetKiloEmbeddingModelCatalogFromDatabase.mockResolvedValue(null);
     jest
@@ -1081,6 +1090,95 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
       expect(getUpstreamBody().providerOptions).toEqual({
         gateway: { only: ['azure'], order: ['azure'] },
       });
+    });
+
+    describe('provider settings that leave no Vercel provider', () => {
+      const kiloVercel = { provider: VERCEL_AI_GATEWAY, userByok: null, isFree: false };
+      const ownerVercelKey = {
+        provider: createUserVercelAiGatewayProvider('vck-owner'),
+        userByok: [{ providerId: 'vercel-ai-gateway' as const, decryptedAPIKey: 'vck-owner' }],
+        isFree: false,
+      };
+
+      beforeEach(() => {
+        setUserAuth({ disable_openrouter: true });
+        enableGatewaySettings();
+        mockedGetVercelInferenceProviders.mockResolvedValue(['azure', 'openai']);
+      });
+
+      it.each([
+        {
+          label: 'an ignore list of every provider',
+          route: kiloVercel,
+          ignore: ['openai', 'azure'],
+        },
+        { label: 'an allow-list without a match', route: kiloVercel, only: ['mistral'] },
+        {
+          label: 'an ignore list of every provider on the owner’s Vercel key',
+          route: ownerVercelKey,
+          ignore: ['openai', 'azure'],
+        },
+        {
+          label: 'an allow-list without a match on the owner’s Vercel key',
+          route: ownerVercelKey,
+          only: ['mistral'],
+          ignore: ['azure'],
+        },
+      ])('rejects $label without calling the provider', async ({ route, only, ignore }) => {
+        mockedGetEmbeddingProvider.mockResolvedValue(route);
+
+        const { handleEmbeddingsRequest } = await import('./embeddings');
+        const response = await handleEmbeddingsRequest(makeRequest({ provider: { only, ignore } }));
+
+        expect(response.status).toBe(403);
+        await expect(response.json()).resolves.toMatchObject({
+          error:
+            'No eligible provider can serve the selected model. Please enable provider: azure, openai',
+          error_type: ProxyErrorType.provider_not_allowed,
+        });
+        expect(mockedFetch).not.toHaveBeenCalled();
+        expect(jest.mocked(decide)).not.toHaveBeenCalled();
+        expect(countAndStoreEmbeddingUsage).not.toHaveBeenCalled();
+        expect(logMicrodollarUsageAndReportToBouncer).not.toHaveBeenCalled();
+      });
+
+      it('keeps the last provider key when the ignore list names every provider', async () => {
+        mockedGetEmbeddingProvider.mockResolvedValue(vercelByok);
+
+        const { handleEmbeddingsRequest } = await import('./embeddings');
+        const response = await handleEmbeddingsRequest(
+          makeRequest({ provider: { ignore: ['openai', 'azure'] } })
+        );
+
+        expect(response.status).toBe(200);
+        expect(getUpstreamBody().providerOptions).toEqual({
+          gateway: { only: ['openai'], byok: { openai: [{ apiKey: 'test-byok-key' }] } },
+        });
+      });
+    });
+  });
+
+  describe('client providerOptions', () => {
+    it.each([
+      { label: 'OpenRouter', route: { provider: OPENROUTER, userByok: null, isFree: false } },
+      {
+        label: 'Kilo’s Vercel AI Gateway',
+        route: { provider: VERCEL_AI_GATEWAY, userByok: null, isFree: false },
+      },
+    ])('rejects providerOptions on the $label route', async ({ route }) => {
+      mockedGetEmbeddingProvider.mockResolvedValue(route);
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(
+        makeRequest({ providerOptions: { gateway: { only: ['openai'], byok: {} } } })
+      );
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toMatchObject({
+        error: 'The providerOptions field is not supported. Use provider instead.',
+        error_type: ProxyErrorType.unsupported_field,
+      });
+      expect(mockedFetch).not.toHaveBeenCalled();
     });
   });
 

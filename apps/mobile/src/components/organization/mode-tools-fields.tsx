@@ -11,6 +11,8 @@ import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { RowGroup } from '@/components/ui/row-group';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 
 const TOOL_LABEL_KEYS = {
   read: 'organization.modes.tool.read',
@@ -55,7 +57,10 @@ export function ModeToolsFields({
         <FormFieldLabel label={t('profiles.agents.tools')} />
         <RowGroup>
           {MODE_TOOL_GROUPS.map(group => (
-            <View key={group} className="min-h-[48px] flex-row items-center gap-3 px-4 py-3">
+            <View
+              key={group}
+              className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 px-4 py-3')}
+            >
               <Text className="flex-1 text-sm font-medium text-foreground">
                 {t(TOOL_LABEL_KEYS[group])}
               </Text>

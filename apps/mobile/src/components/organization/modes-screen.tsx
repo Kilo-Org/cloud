@@ -119,7 +119,7 @@ export function OrganizationModesScreen() {
             }}
           />
         ))}
-      </View>
+      </RowGroup>
     );
   }
 

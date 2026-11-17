@@ -281,7 +281,7 @@ export function InviteMemberSheet() {
                     key={value}
                     className={cn(
                       ROW_TARGET_CLASS,
-                      'min-h-[48px] flex-row items-center justify-between gap-3 px-4 py-3 active:opacity-70',
+                      'flex-row items-center justify-between gap-3 px-4 py-3 active:opacity-70',
                       index < roles.length - 1 && 'border-b-[0.5px] border-hair-soft'
                     )}
                     onPress={() => {

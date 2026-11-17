@@ -51,80 +51,84 @@ export function UpNextSection({
     <Section label={t('todos.upNext')} reserveLabelAir>
       <RowGroup leadingTile>
         {items.map(item => {
-        const list = lists.data?.find(candidate => candidate.id === item.listId);
-        const newestSession = item.sessions[0] ?? null;
-        const canPress = !isStarting(item.id) && (newestSession !== null || list !== undefined);
-        const actionLabel = newestSession
-          ? t('notifications.action.openSession')
-          : t('agentChat.newSession.startSession');
-        const actionHint = newestSession
-          ? t('todos.item.startNewSessionHint')
-          : t('todos.item.startNowHint');
-        return (
-          <View key={item.id} className="min-h-14 flex-row items-center gap-3 px-4 py-2">
-            <Pressable
-              onPress={() => {
-                router.push(todoItemPath(item.id));
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={item.title}
-              className="min-w-0 flex-1 flex-row items-center gap-3 active:opacity-70"
-            >
-              <IconTile
-                tint={NEUTRAL_TINT}
-                icon={item.listEmoji ? undefined : ListTodo}
-                content={item.listEmoji ? <Text className="text-base">{item.listEmoji}</Text> : undefined}
-              />
-              <View className="min-w-0 flex-1">
-                <Text className="text-base text-foreground" numberOfLines={1}>
-                  {item.title}
-                </Text>
-                <Text className="text-xs text-muted-foreground" numberOfLines={1}>
-                  {item.listName}
-                </Text>
-              </View>
-            </Pressable>
-            <Pressable
-              disabled={!canPress}
-              onPress={() => {
-                if (newestSession) {
-                  navigateToSession(newestSession.sessionId, organizationId);
-                  return;
-                }
-                if (list) {
-                  review(item, list);
-                }
-              }}
-              onLongPress={() => {
-                if (list) {
-                  void startNow(item, list);
-                }
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={actionLabel}
-              accessibilityHint={actionHint}
-              accessibilityActions={[{ name: 'longpress', label: t('todos.item.startNewSession') }]}
-              onAccessibilityAction={event => {
-                if (event.nativeEvent.actionName === 'longpress' && list) {
-                  void startNow(item, list);
-                }
-              }}
-              accessibilityState={{ disabled: !canPress }}
-              className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
-            >
-              {/* The visible circle keeps its 35pt size inside the frame:
+          const list = lists.data?.find(candidate => candidate.id === item.listId);
+          const newestSession = item.sessions[0] ?? null;
+          const canPress = !isStarting(item.id) && (newestSession !== null || list !== undefined);
+          const actionLabel = newestSession
+            ? t('notifications.action.openSession')
+            : t('agentChat.newSession.startSession');
+          const actionHint = newestSession
+            ? t('todos.item.startNewSessionHint')
+            : t('todos.item.startNowHint');
+          return (
+            <View key={item.id} className="min-h-14 flex-row items-center gap-3 px-4 py-2">
+              <Pressable
+                onPress={() => {
+                  router.push(todoItemPath(item.id));
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={item.title}
+                className="min-w-0 flex-1 flex-row items-center gap-3 active:opacity-70"
+              >
+                <IconTile
+                  tint={NEUTRAL_TINT}
+                  icon={item.listEmoji ? undefined : ListTodo}
+                  content={
+                    item.listEmoji ? <Text className="text-base">{item.listEmoji}</Text> : undefined
+                  }
+                />
+                <View className="min-w-0 flex-1">
+                  <Text className="text-base text-foreground" numberOfLines={1}>
+                    {item.title}
+                  </Text>
+                  <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+                    {item.listName}
+                  </Text>
+                </View>
+              </Pressable>
+              <Pressable
+                disabled={!canPress}
+                onPress={() => {
+                  if (newestSession) {
+                    navigateToSession(newestSession.sessionId, organizationId);
+                    return;
+                  }
+                  if (list) {
+                    review(item, list);
+                  }
+                }}
+                onLongPress={() => {
+                  if (list) {
+                    void startNow(item, list);
+                  }
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={actionLabel}
+                accessibilityHint={actionHint}
+                accessibilityActions={[
+                  { name: 'longpress', label: t('todos.item.startNewSession') },
+                ]}
+                onAccessibilityAction={event => {
+                  if (event.nativeEvent.actionName === 'longpress' && list) {
+                    void startNow(item, list);
+                  }
+                }}
+                accessibilityState={{ disabled: !canPress }}
+                className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
+              >
+                {/* The visible circle keeps its 35pt size inside the frame:
                   DESIGN.md keeps the target, not the visual, at 44pt. */}
-              <View className="size-10 items-center justify-center rounded-full bg-secondary">
-                {isStarting(item.id) ? (
-                  <ActivityIndicator color={colors.foreground} />
-                ) : (
-                  <UpNextGlyph hasSession={newestSession !== null} color={colors.foreground} />
-                )}
-              </View>
-            </Pressable>
-          </View>
-        );
-      })}
+                <View className="size-10 items-center justify-center rounded-full bg-secondary">
+                  {isStarting(item.id) ? (
+                    <ActivityIndicator color={colors.foreground} />
+                  ) : (
+                    <UpNextGlyph hasSession={newestSession !== null} color={colors.foreground} />
+                  )}
+                </View>
+              </Pressable>
+            </View>
+          );
+        })}
       </RowGroup>
     </Section>
   );

@@ -130,12 +130,8 @@ export function GgufDownloadControls({
     <>
       {record !== undefined && (
         <>
-          <Text>
-            {t('modelChat.gguf.downloaded', { size: size(record.sizeBytes) })}
-          </Text>
-          <Text variant="muted">
-            {t(modelCapabilityKey(record.tools, record.vision))}
-          </Text>
+          <Text>{t('modelChat.gguf.downloaded', { size: size(record.sizeBytes) })}</Text>
+          <Text variant="muted">{t(modelCapabilityKey(record.tools, record.vision))}</Text>
           <Button
             variant="ghost"
             accessibilityLabel={namedWithDetail(deleteText, detail)}

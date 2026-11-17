@@ -8,9 +8,7 @@ export function BetaPill() {
   const { t } = useTranslation();
   return (
     <View className="rounded-full border border-border bg-secondary px-2 py-0.5">
-      <Text variant="eyebrow">
-        {t('modelChat.beta')}
-      </Text>
+      <Text variant="eyebrow">{t('modelChat.beta')}</Text>
     </View>
   );
 }

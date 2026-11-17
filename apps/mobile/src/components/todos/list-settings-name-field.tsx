@@ -39,7 +39,10 @@ export function NameField(
         onPress={() => {
           setEditing(true);
         }}
-        className={cn(ROW_TARGET_CLASS, 'justify-center rounded-md border border-input bg-background px-2')}
+        className={cn(
+          ROW_TARGET_CLASS,
+          'justify-center rounded-md border border-input bg-background px-2'
+        )}
       >
         <Text className="text-base text-foreground" numberOfLines={1}>
           {text}

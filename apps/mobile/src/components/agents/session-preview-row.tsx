@@ -68,7 +68,10 @@ export function SessionPreviewRow({
         }}
         accessibilityRole="button"
         accessibilityLabel={label}
-        className={cn(ROW_TARGET_CLASS, 'flex-row items-center justify-between gap-3 active:opacity-70')}
+        className={cn(
+          ROW_TARGET_CLASS,
+          'flex-row items-center justify-between gap-3 active:opacity-70'
+        )}
         testID="session-context-sheet-preview"
       >
         <Text className="text-base font-medium text-foreground">{label}</Text>
@@ -222,11 +225,7 @@ function SessionPreviewSheet({
                 {t('cloudAgent.preview.portLabel', { port: service.port })}
               </Text>
             </View>
-            {openingPort === service.port ? (
-              <ActivityIndicator />
-            ) : (
-              <RowChevron />
-            )}
+            {openingPort === service.port ? <ActivityIndicator /> : <RowChevron />}
           </Pressable>
         ))}
       </View>

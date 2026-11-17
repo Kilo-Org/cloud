@@ -19,8 +19,8 @@ import { formatNumber } from '@/lib/format';
 import { useCodeReviewerAnalyticsFilters } from '@/lib/hooks/use-code-reviewer-analytics-filters';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { PERSONAL_SCOPE, PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
+import { reviewConfigFailure, useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
 import { useTRPC } from '@/lib/trpc';
-import { isRetryableTrpcError, trpcErrorVariant } from '@/lib/trpc-error';
 
 const PERIOD_OPTIONS = [
   { value: '7', label: '7' },
@@ -93,21 +93,39 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
 
   const number = (value: number) => formatNumber(value, i18n.language);
 
-  let body: ReactNode = null;
-  if (dashboard.isPending) {
-    body = <AnalyticsSkeleton />;
-  } else if (dashboard.isError && !dashboard.data) {
-    body = (
-      <QueryError
-        variant={trpcErrorVariant(dashboard.error)}
-        title={t('codeReviewer.analytics.couldNotLoad')}
-        onRetry={isRetryableTrpcError(dashboard.error) ? () => void dashboard.refetch() : undefined}
-        isRetrying={dashboard.isFetching}
-      />
-    );
-  } else {
+  // The dashboard read settles only when it can send: on the default online
+  // network mode, an offline device keeps it `pending` with `fetchStatus:
+  // 'paused'`, which the old branch map reported as the skeleton forever —
+  // no error, no Retry (finding: blank analytics offline). The config
+  // classifier owns this split for the reviewer screens: a pause whose
+  // connectivity the app has confirmed names itself as the offline state with
+  // Retry, and a pause while connectivity is still unsettled stays the
+  // skeleton. A cached dashboard with a refetch that is now paused or failed
+  // keeps the metrics and gains the stale-notice line, so stale rows never
+  // pose as current without a way out.
+  const body = useReviewConfigBody({
+    data: dashboard.data,
+    isError: dashboard.isError,
+    isFetching: dashboard.isFetching,
+    fetchStatus: dashboard.fetchStatus,
+    refetch: () => {
+      void dashboard.refetch();
+    },
+  });
+  const failure = reviewConfigFailure(body, dashboard.isFetching);
+  // Cached metrics with a refresh that cannot run: the classifier reports
+  // `ready` the moment data exists, so the notice comes from the read itself —
+  // paused (connectivity lost) or failed (the refetch errored). The brief for
+  // this finding names both: rows stay, the reader learns they are stale.
+  const stale =
+    dashboard.data != null &&
+    !dashboard.isFetching &&
+    (dashboard.isError || dashboard.fetchStatus === 'paused');
+
+  let content: ReactNode = null;
+  if (!failure && body.body.status === 'ready' && dashboard.data) {
     const { summary, repositories, settings } = dashboard.data;
-    body = (
+    content = (
       <View className="gap-6 px-6 pt-4">
         {!settings.enabled ? (
           <Text variant="muted" className="text-xs">
@@ -177,6 +195,32 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
     );
   }
 
+  let readState: ReactNode = null;
+  if (failure) {
+    const failureTitle =
+      failure.variant === 'offline'
+        ? t('queryError.offlineTitle')
+        : t('codeReviewer.analytics.couldNotLoad');
+    readState = (
+      <QueryError
+        variant={failure.variant}
+        placement="top"
+        className="px-0 pt-0"
+        title={failureTitle}
+        onRetry={() => void dashboard.refetch()}
+        isRetrying={failure.isRetrying}
+      />
+    );
+  } else if (body.body.status === 'loading') {
+    readState = <AnalyticsSkeleton />;
+  } else if (stale) {
+    readState = (
+      <Text accessibilityRole="alert" variant="muted" className="text-xs">
+        {dashboard.isError ? t('common.somethingWentWrong') : t('queryError.offlineTitle')}
+      </Text>
+    );
+  }
+
   return (
     <View className="flex-1 bg-background">
       <ReviewerHeader
@@ -203,7 +247,13 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
             }}
           />
         </View>
-        {body}
+        {/* One body surface below the filters: a paused or failed first load
+            paints the classifier's offline/server state with Retry instead of
+            the skeleton that would never settle; cached metrics keep their
+            content and report a refresh that is paused or failed with the
+            same stale-notice line the organization usage grid shows. */}
+        {readState}
+        {content}
       </TabScreenScrollView>
     </View>
   );

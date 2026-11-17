@@ -1,11 +1,11 @@
-import { type ReviewConfigData } from '@/lib/code-reviewer-config';
 import { classifyConfigBody, type ConfigBodyState } from '@/lib/code-reviewer-status';
 import { useIdleLoadRetry } from '@/lib/hooks/use-idle-load-retry';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 
-/** The parts of the reviewer config read that decide its body surface. */
+/** The parts of any read that decide its body surface. */
 type ReviewConfigRead = {
-  data: ReviewConfigData | undefined | null;
+  /** Only null-ness is read; any settled payload shape works. */
+  data: unknown;
   isError: boolean;
   isFetching: boolean;
   fetchStatus: 'fetching' | 'paused' | 'idle';

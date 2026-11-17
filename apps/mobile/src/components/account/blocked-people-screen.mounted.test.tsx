@@ -18,22 +18,34 @@ type ScreenState = {
   blockedLogins: string[];
   mutedLogins: string[];
   error: boolean;
+  hasData: boolean;
+  fetchStatus: 'fetching' | 'paused' | 'idle';
+  isRefetching: boolean;
+  connectivity: 'online' | 'offline' | 'unknown';
+  errorCode: string | undefined;
   mutations: Record<string, MutationOptions>;
   pending: string | null;
   pendingVariables: { githubLogin: string } | null;
   calls: { name: string; input: unknown }[];
   toastError: Mock;
+  lastRefreshControl: { props: { refreshing: boolean; onRefresh: unknown } } | null;
 };
 
 const state = vi.hoisted((): ScreenState => ({
   blockedLogins: [],
   mutedLogins: [],
   error: false,
+  hasData: true,
+  fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
+  isRefetching: false,
+  connectivity: 'online' as 'online' | 'offline' | 'unknown',
+  errorCode: undefined as string | undefined,
   mutations: {},
   pending: null,
   pendingVariables: null,
   calls: [],
   toastError: vi.fn(),
+  lastRefreshControl: null as { props: { refreshing: boolean; onRefresh: unknown } } | null,
 }));
 
 vi.mock('react-native', () => ({ View: 'View' }));
@@ -44,10 +56,17 @@ vi.mock('@tanstack/react-query', async importOriginal => {
   return {
     ...actual,
     useQuery: () => ({
-      data: { blockedLogins: state.blockedLogins, mutedLogins: state.mutedLogins },
-      isPending: false,
+      data: state.hasData
+        ? { blockedLogins: state.blockedLogins, mutedLogins: state.mutedLogins }
+        : null,
+      isPending: !state.hasData && !state.error,
       isError: state.error,
       isFetching: false,
+      isRefetching: state.isRefetching,
+      fetchStatus: state.fetchStatus,
+      error: state.error
+        ? Object.assign(new Error('refetch failed'), { data: { code: state.errorCode } })
+        : null,
       refetch: vi.fn(),
     }),
     useMutation: (options: { kind: string } & MutationOptions) => {
@@ -90,7 +109,20 @@ vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
-vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
+vi.mock('@/components/tab-screen', () => ({
+  TabScreenScrollView: (props: { children?: unknown; refreshControl?: unknown }) => {
+    if (props.refreshControl) {
+      state.lastRefreshControl = props.refreshControl as {
+        props: { refreshing: boolean; onRefresh: unknown };
+      };
+    }
+    return props.children;
+  },
+}));
+vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => state.connectivity,
+}));
 
 const BUTTON = 'Button' as ElementType;
 
@@ -122,11 +154,17 @@ beforeEach(() => {
   state.blockedLogins = ['spammer'];
   state.mutedLogins = ['loudmouth'];
   state.error = false;
+  state.hasData = true;
+  state.fetchStatus = 'idle';
+  state.isRefetching = false;
+  state.connectivity = 'online';
+  state.errorCode = undefined;
   state.mutations = {};
   state.calls = [];
   state.pending = null;
   state.pendingVariables = null;
   state.toastError.mockClear();
+  state.lastRefreshControl = null;
 });
 
 afterEach(() => {
@@ -216,10 +254,74 @@ describe('BlockedPeopleScreen', () => {
     expect(root.findAll(node => Object.is(node.type, BUTTON))).toHaveLength(0);
   });
 
-  it('keeps a retry when the lists cannot be read', async () => {
+  it('keeps a full retry state when the lists cannot be read at all', async () => {
+    state.hasData = false;
     state.error = true;
     const root = await mount();
 
     expect(root.findAll(node => Object.is(node.type, 'QueryError'))).toHaveLength(1);
+    expect(texts(root)).not.toContain('spammer');
+  });
+
+  it('keeps rows and adds an error notice when a refetch fails with cache', async () => {
+    state.error = true;
+    const root = await mount();
+
+    expect(texts(root)).toEqual(expect.arrayContaining(['spammer', 'loudmouth']));
+    const notices = root.findAll(node => Object.is(node.type, 'QueryError'));
+    expect(notices).toHaveLength(1);
+    expect(notices[0]?.props.onRetry).toBeTypeOf('function');
+  });
+
+  it('names an offline pause in the refreshed notice', async () => {
+    state.error = true;
+    state.connectivity = 'offline';
+    const root = await mount();
+
+    const notice = root.find(node => Object.is(node.type, 'QueryError'));
+    expect(notice.props.variant).toBe('offline');
+  });
+
+  it('names an online failure by its tRPC code in the refreshed notice', async () => {
+    state.error = true;
+    state.errorCode = 'INTERNAL_SERVER_ERROR';
+    const root = await mount();
+
+    const notice = root.find(node => Object.is(node.type, 'QueryError'));
+    expect(notice.props.variant).toBe('server');
+  });
+
+  it('shows the stale notice while a paused refresh is not running', async () => {
+    state.fetchStatus = 'paused';
+    state.connectivity = 'offline';
+    const root = await mount();
+
+    const notice = root.find(node => Object.is(node.type, 'QueryError'));
+    expect(notice.props.variant).toBe('offline');
+    expect(notice.props.isRetrying).toBe(false);
+  });
+
+  it('keeps the generic pause copy while connectivity is unsettled', async () => {
+    state.fetchStatus = 'paused';
+    state.connectivity = 'unknown';
+    const root = await mount();
+
+    const notice = root.find(node => Object.is(node.type, 'QueryError'));
+    expect(notice.props.variant).toBe('neutral');
+  });
+
+  it('offers pull to refresh wired to the read refetch', async () => {
+    await mount();
+    expect(state.lastRefreshControl).toBeTruthy();
+    const control = state.lastRefreshControl;
+    if (!control) {
+      throw new Error('refresh control missing');
+    }
+    expect(control.props.refreshing).toBe(false);
+    expect(control.props.onRefresh).toBeTypeOf('function');
+    state.isRefetching = true;
+    const refreshing = await mount();
+    expect(state.lastRefreshControl?.props.refreshing).toBe(true);
+    expect(refreshing.findAll(node => Object.is(node.type, 'QueryError'))).toHaveLength(0);
   });
 });

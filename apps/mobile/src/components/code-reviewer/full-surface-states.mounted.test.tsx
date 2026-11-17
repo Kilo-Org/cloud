@@ -61,6 +61,8 @@ const state = vi.hoisted(() => ({
     isLoading: false,
     isError: false,
     isFetching: false,
+    isPaused: false,
+    fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
     isFetchingNextPage: false,
     isFetchNextPageError: false,
     hasNextPage: false,
@@ -74,6 +76,7 @@ const state = vi.hoisted(() => ({
   toastError: vi.fn(),
   resync: vi.fn(() => Promise.resolve()),
   toggleRepo: vi.fn(),
+  connectivity: 'online' as 'online' | 'offline' | 'unknown',
 }));
 
 vi.mock('expo-router', () => ({
@@ -207,7 +210,7 @@ vi.mock('@/lib/trpc', () => ({
   },
 }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
-  useCommittedConnectivityStatus: () => 'online',
+  useCommittedConnectivityStatus: () => state.connectivity,
 }));
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   isPersonal: (scope: string) => scope === 'personal',
@@ -259,6 +262,7 @@ beforeEach(() => {
   state.connected = false;
   state.scope = 'personal';
   state.organizations = [];
+  state.connectivity = 'online';
   state.repositories.data = { repositories: [] };
   state.repositories.isError = false;
   state.bitbucket.data = { repositoryCache: { status: 'available', repositories: [] } };
@@ -606,6 +610,59 @@ describe('Recent review bodies', () => {
     const list = firstList(renderer);
     expect(list.props.data).toEqual([review('r1', 'Saved review')]);
     expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
+    unmount();
+  });
+
+  it('shows the retryable offline state instead of an empty list when the first read is paused', async () => {
+    // A paused read settles into no branch of the old map (`isLoading` false,
+    // `isError` false, no data): the screen painted an empty FlashList forever
+    // (finding). Connectivity confirmed names the pause offline with Retry.
+    state.reviews.data = undefined;
+    state.reviews.isPaused = true;
+    state.reviews.fetchStatus = 'paused';
+    state.connectivity = 'offline';
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: 'personal' })
+    );
+    const error = renderer.root.find(node => String(node.type) === 'QueryError');
+    expect(error.props.variant).toBe('offline');
+    expect(error.props.onRetry).toBeTypeOf('function');
+    expect(renderer.root.findAll(node => String(node.type) === 'FlashList')).toHaveLength(0);
+    unmount();
+  });
+
+  it('keeps the empty-list branch while a pause is not a confirmed offline state', async () => {
+    state.reviews.data = undefined;
+    state.reviews.isPaused = true;
+    state.reviews.fetchStatus = 'paused';
+    state.connectivity = 'unknown';
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: 'personal' })
+    );
+    expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
+    unmount();
+  });
+
+  it('keeps cached rows and adds the offline stale notice when the refresh pauses', async () => {
+    state.reviews.data = {
+      pages: [{ success: true, reviews: [review('r1', 'Saved review')] }],
+      pageParams: [0],
+    };
+    state.reviews.fetchStatus = 'paused';
+    state.connectivity = 'offline';
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: 'personal' })
+    );
+    const list = firstList(renderer);
+    expect(list.props.data).toEqual([review('r1', 'Saved review')]);
+    expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
+    const header = list.props.ListHeaderComponent as ReactNode;
+    const mounted = await renderWithProviders(createElement('Header', null, header));
+    const alerts = mounted.renderer.root
+      .findAll(node => String(node.type) === 'Text')
+      .filter(node => node.props.accessibilityRole === 'alert');
+    expect(alerts).toHaveLength(1);
+    mounted.unmount();
     unmount();
   });
 

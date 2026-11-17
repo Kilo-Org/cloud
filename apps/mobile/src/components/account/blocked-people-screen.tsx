@@ -10,11 +10,14 @@ import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { Ban } from '@/components/ui/icons';
+import { RefreshControl } from '@/components/ui/refresh-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
+import { isRetryableTrpcError, trpcErrorVariant, type TrpcErrorVariant } from '@/lib/trpc-error';
 import { useTRPC } from '@/lib/trpc';
 
 const SKELETON_ROWS = [0, 1];
@@ -116,6 +119,8 @@ export function BlockedPeopleScreen() {
   const queryClient = useQueryClient();
   const listKey = trpc.moderation.listHiddenUsers.queryKey();
   const hidden = useQuery(trpc.moderation.listHiddenUsers.queryOptions());
+  // Reactive: a connectivity commit re-picks the failure notice's variant.
+  const committedConnectivity = useCommittedConnectivityStatus();
 
   const refresh = () => void queryClient.invalidateQueries({ queryKey: listKey });
 
@@ -139,6 +144,40 @@ export function BlockedPeopleScreen() {
     })
   );
 
+  const hasHiddenPeople =
+    hidden.data != null &&
+    (hidden.data.blockedLogins.length > 0 || hidden.data.mutedLogins.length > 0);
+  // A re-read the reader started that settled badly while rows are shown must
+  // not silently confirm them as current. The old branch replaced the rows
+  // with the error state on any failure; the profiles-list pattern keeps the
+  // rows and paints the notice above them instead (finding). A confirmed
+  // offline connectivity names the pause or the failure offline, like the
+  // profiles list does; any other failure reports its tRPC code, and a pause
+  // while connectivity is still unsettled keeps the generic copy.
+  const stale =
+    hidden.data != null &&
+    !hidden.isFetching &&
+    (hidden.isError || hidden.fetchStatus === 'paused');
+  let staleVariant: 'offline' | 'neutral' | TrpcErrorVariant = 'neutral';
+  if (committedConnectivity === 'offline') {
+    staleVariant = 'offline';
+  } else if (hidden.isError) {
+    staleVariant = trpcErrorVariant(hidden.error);
+  }
+  const staleNotice = stale ? (
+    <QueryError
+      variant={staleVariant}
+      placement="top"
+      className="px-0 pt-0"
+      onRetry={
+        hidden.isError && !isRetryableTrpcError(hidden.error)
+          ? undefined
+          : () => void hidden.refetch()
+      }
+      isRetrying={hidden.isFetching}
+    />
+  ) : null;
+
   let body: ReactNode = null;
   if (hidden.isPending) {
     body = (
@@ -148,9 +187,9 @@ export function BlockedPeopleScreen() {
         ))}
       </View>
     );
-  } else if (hidden.isError) {
+  } else if (hidden.isError && hidden.data == null) {
     body = <QueryError onRetry={() => void hidden.refetch()} isRetrying={hidden.isFetching} />;
-  } else if (hidden.data.blockedLogins.length === 0 && hidden.data.mutedLogins.length === 0) {
+  } else if (!hasHiddenPeople) {
     body = (
       <EmptyState
         placement="top"
@@ -195,10 +234,17 @@ export function BlockedPeopleScreen() {
         className="flex-1"
         contentContainerClassName="gap-6 px-4 pt-4"
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={hidden.isRefetching}
+            onRefresh={() => void hidden.refetch()}
+          />
+        }
       >
         <Text variant="muted" className="text-xs">
           {t('profile.blockedPeople.description')}
         </Text>
+        {staleNotice}
         {body}
       </TabScreenScrollView>
     </View>

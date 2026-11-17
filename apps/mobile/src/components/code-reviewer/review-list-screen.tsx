@@ -21,6 +21,7 @@ import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useReviewerScopeTitle } from '@/lib/hooks/use-reviewer-scope-title';
 import { useGitHubStatus, useGitLabStatus } from '@/lib/hooks/use-code-reviewer';
 import { useReviewList } from '@/lib/hooks/use-code-reviews';
+import { reviewConfigFailure, useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { dedupeById } from '@/lib/query/dedupe-by-id';
@@ -122,6 +123,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
     isLoading,
     isError,
     isFetching,
+    fetchStatus,
     hasNextPage,
     isFetchingNextPage,
     isFetchNextPageError,
@@ -151,8 +153,64 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
     errorCode === 'NOT_FOUND' || errorCode === 'FORBIDDEN' || errorCode === 'UNAUTHORIZED';
   const errorVariant = trpcErrorVariant(error);
 
+  // A paused first read (`fetchStatus: 'paused'`, the online manager holding
+  // queries while the device is offline) settles into none of the branches the
+  // old map tested: `isLoading` is false, `isError` is false, `data` is
+  // undefined — the screen painted an empty FlashList forever (finding).
+  // The shared config classifier names a confirmed pause as the offline state
+  // with Retry, and keeps a pause while connectivity is unsettled inside
+  // loading. Cached pages with a refresh that is now paused or failed keep
+  // their rows and gain a stale-notice line.
+  const classifiedBody = useReviewConfigBody({
+    data: data ?? null,
+    isError,
+    isFetching,
+    fetchStatus,
+    refetch: () => {
+      void refetch();
+    },
+  });
+  const failure = reviewConfigFailure(classifiedBody, isFetching);
+  // Cached pages with a refresh that is paused or failed keep their rows and
+  // gain a stale-notice line: rows must not pose as current without a way out.
+  const stale = data != null && !isFetching && (isError || fetchStatus === 'paused');
+  const staleNotice = stale ? (
+    <Text accessibilityRole="alert" variant="muted" className="pb-2 text-xs">
+      {isError ? t('common.somethingWentWrong') : t('queryError.offlineTitle')}
+    </Text>
+  ) : null;
+
   let body: ReactNode = null;
-  if (!isLoading && firstPage?.success && reviews.length === 0) {
+  if (!isLoading && ((isError && !data) || (firstPage && !firstPage.success))) {
+    // A thrown permanent code keeps its no-retry state, ahead of the paused
+    // classifier: a paused read with cached failure rows should still dry the
+    // permanent state when nothing is cached to keep.
+    body = (
+      <QueryError
+        variant={!data ? errorVariant : 'server'}
+        title={!data && isPermanentError ? undefined : t('codeReviewer.reviewList.couldNotLoad')}
+        onRetry={!data && isPermanentError ? undefined : () => void refetch()}
+        isRetrying={isFetching}
+      />
+    );
+  } else if (failure) {
+    // A paused or failed first read: the classifier's offline/server state
+    // with Retry, instead of the empty FlashList or the skeleton that never
+    // settles. A cached page shape (`success: false`) keeps its own branch
+    // above; the classifier folds it into `error` only when uncached.
+    const failureTitle =
+      failure.variant === 'offline'
+        ? t('queryError.offlineTitle')
+        : t('codeReviewer.reviewList.couldNotLoad');
+    body = (
+      <QueryError
+        variant={failure.variant}
+        title={failureTitle}
+        onRetry={() => void refetch()}
+        isRetrying={failure.isRetrying}
+      />
+    );
+  } else if (!isLoading && firstPage?.success && reviews.length === 0) {
     body = (
       <EmptyState
         icon={GitPullRequest}
@@ -176,15 +234,6 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
             </Text>
           </Button>
         }
-      />
-    );
-  } else if (!isLoading && ((isError && !data) || (firstPage && !firstPage.success))) {
-    body = (
-      <QueryError
-        variant={!data ? errorVariant : 'server'}
-        title={!data && isPermanentError ? undefined : t('codeReviewer.reviewList.couldNotLoad')}
-        onRetry={!data && isPermanentError ? undefined : () => void refetch()}
-        isRetrying={isFetching}
       />
     );
   } else if (isLoading) {
@@ -243,6 +292,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
           }
         }}
         onEndReachedThreshold={0.5}
+        ListHeaderComponent={staleNotice}
         ListFooterComponent={
           <>
             <ReviewListFooter

@@ -438,7 +438,7 @@ export function ScreenHeader({
         {title}
       </Text>
     );
-    let titleText: React.ReactNode;
+    let titleText: React.ReactNode = titleLabel;
     if (titleContent) {
       titleText = (
         <View
@@ -450,9 +450,7 @@ export function ScreenHeader({
           {titleContent}
         </View>
       );
-    } else if (titleAccessory == null) {
-      titleText = titleLabel;
-    } else {
+    } else if (titleAccessory != null) {
       titleText = (
         <View className={cn('flex-row items-center gap-2', centerTitle && 'justify-center')}>
           {titleLabel}

@@ -25,9 +25,9 @@ type RowGroupProps = {
  * divider.
  */
 export function RowGroup({ leadingTile = false, className, children }: Readonly<RowGroupProps>) {
-  const rows = (Array.isArray(children) ? children : [children]).filter(
-    row => row !== null && row !== undefined && typeof row !== 'boolean'
-  );
+  const rows = (Array.isArray(children) ? children : [children])
+    .flat(Infinity)
+    .filter((row): row is ReactNode => row !== null && row !== undefined && row !== false);
   return (
     <View className={cn('overflow-hidden rounded-xl bg-secondary', className)}>
       {rows.map((row, index) => (

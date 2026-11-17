@@ -1,12 +1,16 @@
 // What a released Pages package must look like before its files reach `dist/`.
 //
 // nteract publishes Pages as a release asset: a gzipped ustar archive holding
-// the Worker modules, the browser assets, a build receipt and a
-// deployment-neutral `wrangler.json`. That file carries only what the code
+// the Worker modules, the browser assets, the output shell, a build receipt
+// and a deployment-neutral `wrangler.json`. That file carries only what the code
 // fixes (Durable Object classes, migrations, cron triggers, asset handling).
 // `wrangler.jsonc` in this folder adds what this deployment decides (name,
 // account, route, databases, bucket, variables) and is what deploys.
 // `configProblems` reports every structural field where the two disagree.
+//
+// `output/` holds the output shell, a second Worker that
+// `services/pages-output` deploys from the same pin: exactly
+// `output/worker.js` and its own structural `output/wrangler.json`.
 import { lstatSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
@@ -14,7 +18,9 @@ import { gunzipSync } from 'node:zlib';
 
 // Where `pnpm run build` puts the package, relative to `wrangler.jsonc`.
 export const OUTPUT = 'dist';
-const PACKAGE_ENTRIES = ['build-receipt.json', 'public', 'worker', 'wrangler.json'];
+const PACKAGE_ENTRIES = ['build-receipt.json', 'output', 'public', 'worker', 'wrangler.json'];
+/** Every file under `output/`, all of them required. */
+export const OUTPUT_FILES = ['worker.js', 'wrangler.json'];
 
 export const TAG = /^pages-([0-9a-f]{12})$/;
 export const SHA256 = /^[0-9a-f]{64}$/;
@@ -31,7 +37,7 @@ export function archiveName(tag) {
 // components, is refused before a file is written.
 const SEGMENT = '[A-Za-z0-9_-][A-Za-z0-9._-]*';
 const MEMBER = new RegExp(
-  `^(build-receipt\\.json|wrangler\\.json|worker/${SEGMENT}|public/(${SEGMENT}/)*${SEGMENT})$`
+  `^(build-receipt\\.json|wrangler\\.json|output/(worker\\.js|wrangler\\.json)|worker/${SEGMENT}|public/(${SEGMENT}/)*${SEGMENT})$`
 );
 
 // Under `public/`, Workers static assets read names starting with `_` (such as
@@ -177,5 +183,16 @@ export function packageFileProblems(directory) {
   walk('public');
   if (!readdirSync(path.join(directory, 'worker')).includes('index.js'))
     problems.push('The package has no worker/index.js');
+
+  // `output/` is deployed as a Worker of its own, so it holds exactly its two
+  // files and nothing a build could pick up by accident.
+  const output = readdirSync(path.join(directory, 'output')).sort();
+  for (const name of output)
+    if (!OUTPUT_FILES.includes(name))
+      problems.push(`output/${name} is not part of a Pages package`);
+  for (const name of OUTPUT_FILES)
+    if (!output.includes(name)) problems.push(`The package has no output/${name}`);
+    else if (kind(path.join(directory, 'output', name)) !== 'file')
+      problems.push(`output/${name} must be a regular file`);
   return problems;
 }

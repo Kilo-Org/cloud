@@ -97,7 +97,7 @@ vi.mock('@/components/ui/skeleton', () => ({
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://app.example.test' }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
-vi.mock('@/lib/integration-urls', () => ({ getBitbucketIntegrationUrl: () => 'https://x.test' }));
+
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   classifyProviderState: () => ({ status: 'connected' }),
   useBitbucketReadiness: () => ({

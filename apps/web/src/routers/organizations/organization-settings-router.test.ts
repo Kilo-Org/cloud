@@ -1736,4 +1736,101 @@ describe('organizations settings trpc router', () => {
       }
     });
   });
+
+  describe('browser control', () => {
+    async function resetBrowserControl() {
+      await updateOrganizationSettings(testOrganization.id, {});
+      await db
+        .delete(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, testOrganization.id));
+    }
+
+    it('saves the control mode and normalizes the allowed origins', async () => {
+      await resetBrowserControl();
+      const caller = await createCallerForUser(owner.id);
+
+      const result = await caller.organizations.settings.updateBrowserControl({
+        organizationId: testOrganization.id,
+        browserControl: 'playwright_only',
+        browserAllowedOrigins: [
+          'https://example.com/',
+          'https://EXAMPLE.com',
+          'http://localhost:3000',
+        ],
+      });
+
+      expect(result).toEqual({
+        browserControl: 'playwright_only',
+        browserAllowedOrigins: ['https://example.com', 'http://localhost:3000'],
+      });
+
+      const stored = await getOrganizationById(testOrganization.id);
+      expect(stored?.settings.browserControl).toBe('playwright_only');
+      expect(stored?.settings.browserAllowedOrigins).toEqual([
+        'https://example.com',
+        'http://localhost:3000',
+      ]);
+    });
+
+    it('rejects a stored origin with a path', async () => {
+      await resetBrowserControl();
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.organizations.settings.updateBrowserControl({
+          organizationId: testOrganization.id,
+          browserControl: 'allow',
+          browserAllowedOrigins: ['https://example.com/checkout'],
+        })
+      ).rejects.toThrow();
+    });
+
+    it('rejects changes by members and billing managers', async () => {
+      await resetBrowserControl();
+
+      for (const user of [member, billingManager]) {
+        const caller = await createCallerForUser(user.id);
+        await expect(
+          caller.organizations.settings.updateBrowserControl({
+            organizationId: testOrganization.id,
+            browserControl: 'off',
+            browserAllowedOrigins: [],
+          })
+        ).rejects.toThrow();
+      }
+
+      const stored = await getOrganizationById(testOrganization.id);
+      expect(stored?.settings.browserControl).toBeUndefined();
+    });
+
+    it('records one audit log entry per change', async () => {
+      await resetBrowserControl();
+      const caller = await createCallerForUser(owner.id);
+      const save = (browserControl: 'allow' | 'playwright_only' | 'off') =>
+        caller.organizations.settings.updateBrowserControl({
+          organizationId: testOrganization.id,
+          browserControl,
+          browserAllowedOrigins: ['https://example.com'],
+        });
+
+      await save('off');
+      await save('off');
+      await save('allow');
+
+      const auditLogs = await db
+        .select()
+        .from(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, testOrganization.id))
+        .orderBy(organization_audit_logs.created_at, organization_audit_logs.id);
+
+      expect(auditLogs.map(log => log.message)).toEqual([
+        'Browser control: off (allowed origins: https://example.com)',
+        'Browser control: allow (allowed origins: https://example.com)',
+      ]);
+      for (const log of auditLogs) {
+        expect(log.action).toBe('organization.settings.change');
+        expect(log.actor_id).toBe(owner.id);
+      }
+    });
+  });
 });

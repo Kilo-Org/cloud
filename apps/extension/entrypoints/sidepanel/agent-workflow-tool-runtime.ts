@@ -493,7 +493,7 @@ const executeRunWorkflow = async (
      * that already used a browser tool does not queue behind its own turn.
      */
     if (!(await ctx.claimTab(ctx.selectedTabId, caller))) {
-      return { error: TAB_BUSY_ERROR, ok: false };
+      return { error: ctx.signal.aborted ? 'Run stopped.' : TAB_BUSY_ERROR, ok: false };
     }
 
     const result = await runWorkflow(

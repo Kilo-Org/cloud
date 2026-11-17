@@ -12,7 +12,6 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
     }
   },
@@ -36,14 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA 違反"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "セキュリティチェックに更新があります"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "Kilo セッションを電話から操作する準備ができました"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

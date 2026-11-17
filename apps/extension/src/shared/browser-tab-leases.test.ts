@@ -145,6 +145,37 @@ describe('tab leases', () => {
     vi.useRealTimers();
   });
 
+  it('does not resurrect a lease a release dropped before the first acquire', async () => {
+    const persistence = createPersistence([
+      { caller: panel('conversation-1'), tabId: 7, title: 'Panel' },
+    ]);
+    const leases = createTabLeaseRegistry({ persistence });
+
+    // A fresh worker's first lease operation is the turn-end release, before any acquire starts the read.
+    expect(leases.releaseCaller(panel('conversation-1'))).toBe(0);
+
+    await expect(leases.acquire(7, panel('conversation-2'))).resolves.toStrictEqual({
+      kind: 'granted',
+    });
+    expect(leases.holder(7)?.caller).toStrictEqual(panel('conversation-2'));
+  });
+
+  it("keeps another caller's stored lease when a caller that does not hold the tab releases it", async () => {
+    const persistence = createPersistence([
+      { caller: panel('conversation-1'), tabId: 7, title: 'Panel' },
+    ]);
+    const leases = createTabLeaseRegistry({ persistence });
+
+    // A handover release names a panel that never held this tab, e.g. the settings-run path.
+    leases.release(7, panel('conversation-9'));
+
+    // The stored lease belongs to conversation-1 and must survive the read.
+    await expect(leases.acquire(8, panel('conversation-2'))).resolves.toStrictEqual({
+      kind: 'granted',
+    });
+    expect(leases.holder(7)?.caller).toStrictEqual(panel('conversation-1'));
+  });
+
   it('does not resurrect a lease a dispose released while the initial read was in flight', async () => {
     const { promise: readLeases, resolve: resolveRead } = Promise.withResolvers<
       PersistedTabLease[] | undefined

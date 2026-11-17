@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "שינויים",
     "organizationTrialEnded": "הסתיימה תקופת הניסיון של הארגון ואין לו תוכנית פעילה. בעל הארגון יכול לעדכן את החיוב ב-kilo.ai, ואז לנסות שוב.",
-    "privateRepositoryA11y": "{{name}}, מאגר פרטי"
+    "privateRepositoryA11y": "{{name}}, מאגר פרטי",
+    "legalDocumentEnglishOnly": "מסמך זה זמין באנגלית בלבד."
   },
   "language": {
     "restarting": "האפליקציה מופעלת מחדש לשינוי השפה",
@@ -676,7 +677,8 @@
       "managedOnWeb": "החיבור של הארגון הזה ל-Bitbucket מנוהל באתר דרך מחשב.",
       "description": "צור אסימון גישה לסביבת העבודה עם ההרשאות הנדרשות והדבק אותו למטה.",
       "scopes": "חשבון: קריאה · מאגרים: קריאה/כתיבה · בקשות משיכה: קריאה · התראות אוטומטיות: קריאה/כתיבה",
-      "tokenPlaceholder": "אסימון גישה לסביבת העבודה"
+      "tokenPlaceholder": "אסימון גישה לסביבת העבודה",
+      "tokenRefused": "Bitbucket לא קיבל את אסימון הגישה לסביבת העבודה הזה. בדוק שיש לו את ההרשאות שלמעלה, ולאחר מכן נסה שוב."
     },
     "followReviewMd": "פעולה לפי REVIEW.md",
     "followReviewMdSubtitle": "שימוש בהוראות שבקובץ REVIEW.md בכל מאגר",
@@ -923,7 +925,8 @@
       "repositoryLine": "סקירות: {{reviews}} · ממצאים: {{findings}}",
       "empty": "עדיין אין סקירות עם נתוני אנליטיקה",
       "emptyDescription": "האנליטיקה מתעדת סקירות שהושלמו כל עוד היא מופעלת עבור הארגון.",
-      "off": "האנליטיקה כבויה עבור הארגון הזה.",
+      "offTitle": "האנליטיקה כבויה עבור {{platform}}",
+      "offDescription": "הפעל אותה בהגדרות הארגון באתר כדי לתעד סקירות שהושלמו.",
       "couldNotLoad": "לא ניתן לטעון את האנליטיקה"
     },
     "council": {
@@ -3524,7 +3527,6 @@
     },
     "settingsOnWeb": {
       "title": "הגדרות הארגון באתר",
-      "integrations": "אינטגרציות באתר",
       "usageDetails": "פרטי שימוש",
       "providersAndModels": "ספקים ומודלים",
       "groups": "קבוצות",
@@ -3533,9 +3535,19 @@
       "ssoAndDomain": "SSO ודומיין",
       "dataCollection": "איסוף נתונים",
       "auditLogs": "יומני ביקורת",
-      "requestLogs": "יומני בקשות",
-      "subOrganizations": "ארגוני משנה",
-      "distributeFunds": "חלוקת כספים"
+      "requestLogs": "יומני בקשות"
+    },
+    "requestLogs": {
+      "hint": "בקשות מהשעה שלפני סוף החלון, מהחדשות לישנות.",
+      "older": "שעה קודמת",
+      "newer": "שעה הבאה",
+      "truncated": "בשעה הזו יש יותר בקשות ממה שמוצג ברשימה.",
+      "emptyTitle": "אין בקשות",
+      "emptyDescription": "בשעה הזו אין בקשות ל-Gateway.",
+      "loadError": "לא ניתן לטעון את יומני הבקשות.",
+      "permissionDenied": "רק בעלים, אדמין או מנהל חיובים של הארגון יכולים לצפות ביומני הבקשות שלו.",
+      "tokens": "קלט {{input}} · פלט {{output}}",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "טוקני קלט",
@@ -4597,6 +4609,8 @@
     "topModels": "מודלים מובילים",
     "topFeatures": "תכונות מובילות",
     "emptyTitle": "אין שימוש בתקופה זו",
+    "unavailableTitle": "השימוש אינו זמין",
+    "unavailableDescription": "סביבת העבודה הזו אינה מדווחת על שימוש. ניסיון חוזר לא יעזור.",
     "orgSelfNotice": "מוצג השימוש שלך בארגון זה.",
     "viewDetails": "הצגת פרטי השימוש"
   },
@@ -4755,5 +4769,175 @@
     "unavailableDescription": "תוקפו של קישור השיתוף הזה פג או שהוא בוטל.",
     "transcriptUnavailableTitle": "לא ניתן היה לטעון את התמליל",
     "transcriptUnavailableDescription": "הקישור עדיין פעיל. אפשר לנסות שוב בעוד רגע."
+  },
+  "organizationGuardrails": {
+    "title": "מעקות בטיחות לבינה מלאכותית",
+    "permissionDenied": "רק בעלי הארגון והמנהלים יכולים לנהל מעקות בטיחות לבינה מלאכותית.",
+    "unavailable": "מעקות בטיחות לבינה מלאכותית אינם זמינים עבור הארגון הזה.",
+    "loadError": "לא ניתן היה לטעון את מעקות הבטיחות לבינה מלאכותית",
+    "statusSaving": "שומר…",
+    "statusSaved": "נשמר",
+    "statusFailed": "לא ניתן היה לשמור.",
+    "inputTitle": "מעקות בטיחות לקלט",
+    "inputDescription": "סורק כל קלט עם Enkrypt AI, כולל תוצאות כלים. גלאי חוסם דוחה בקשה כאשר Enkrypt אינו זמין.",
+    "outputTitle": "מעקות בטיחות לפלט",
+    "outputDescription": "סורק תגובות עם Enkrypt AI לפני שחברי הארגון מקבלים אותן. כבוי אלא אם תפעיל אותו.",
+    "detectorsHint": "חסימה דוחה בקשה שסומנה. רישום בלבד מתעד אותה בלי לעכב את הבקשה.",
+    "detectorsHintOutput": "חסימה מכשילה תגובה שסומנה. רישום בלבד מתעד אותה בלי לעכב את התגובה.",
+    "choiceLog": "רישום בלבד",
+    "applyTo": "החל על",
+    "applyToAllMembers": "כל החברים",
+    "applyKiloDefault": "החל את ברירת המחדל של Kilo",
+    "invalidSavedTitle": "לא ניתן לקרוא את הגדרות גלאי הקלט השמורות",
+    "invalidSavedBody": "בקשות חסומות עד שגלאי הקלט יישמרו מחדש. הגלאים שלמטה מתחילים מברירת המחדל של Kilo.",
+    "invalidSavedOutputTitle": "לא ניתן לקרוא את הגדרות גלאי הפלט השמורות",
+    "invalidSavedOutputBody": "תגובות נחסמות עד שגלאי הפלט יישמרו מחדש. בחר גלאי פלט למטה.",
+    "blockingOutputNote": "גלאי פלט חוסם מעכב תגובה עד ש-Enkrypt יבדוק את כולה. השתמש ברישום בלבד כדי להימנע מהעיכוב.",
+    "inputDetectorRequired": "הפעל לפחות גלאי קלט אחד.",
+    "outputDetectorRequired": "הפעל לפחות גלאי פלט אחד.",
+    "rulesTooMany": "הוסף עד {{max}} כללים.",
+    "ruleIdRequired": "הזן מזהה כלל.",
+    "ruleIdInvalid": "מזהה כלל יכול להשתמש רק באותיות, מספרים, נקודות, מקפים וקווים תחתונים.",
+    "ruleTextRequired": "תאר מה הכלל אוסר או מחייב.",
+    "keywordTooLong": "כל מילת מפתח יכולה להיות באורך של עד {{max}} תווים.",
+    "topicTooLong": "כל נושא יכול להיות באורך של עד {{max}} תווים.",
+    "keywordsTooMany": "הוסף עד {{max}} מילות מפתח.",
+    "topicsTooMany": "הוסף עד {{max}} נושאים.",
+    "piiEntityRequired": "בחר לפחות סוג נתונים אחד לזיהוי.",
+    "keywordRequired": "הוסף לפחות מילת מפתח אחת.",
+    "topicRequired": "הוסף לפחות נושא אחד.",
+    "policyTextRequired": "הזן את טקסט המדיניות.",
+    "ruleRequired": "הוסף לפחות כלל אחד.",
+    "ruleIdDuplicate": "כל כלל צריך מזהה כלל משלו.",
+    "piiEntities": "נתונים לזיהוי",
+    "keywordsLabel": "מילות מפתח",
+    "keywordsHint": "מילת מפתח אחת בכל שורה.",
+    "topicsHint": "נושא אחד בכל שורה.",
+    "policyFormat": "פורמט מדיניות",
+    "policyFormatRules": "כללים מובנים",
+    "policyFormatRulesDescription": "כלל אחד לכל דרישה, עם קטגוריה וחומרה. מומלץ.",
+    "policyFormatText": "טקסט מדיניות",
+    "policyFormatTextDescription": "הדבק מדיניות קיימת כטקסט פשוט.",
+    "rulesEmpty": "אין כללים עדיין. כל כלל מתאר דבר אחד שאסור שקלטים יכילו או יבקשו.",
+    "addRule": "הוסף כלל",
+    "ruleNumber": "כלל {{number}}",
+    "ruleRemove": "הסר כלל {{number}}",
+    "ruleIdLabel": "מזהה כלל",
+    "ruleNameLabel": "שם (אופציונלי)",
+    "ruleTextLabel": "כלל",
+    "ruleRiskCategory": "קטגוריית סיכון",
+    "ruleApplicability": "היקף",
+    "ruleFrameworks": "מסגרות",
+    "detector": {
+      "promptInjection": {
+        "label": "הזרקת פרומפט",
+        "description": "מזהה ניסיונות לעקוף הוראות או לפרוץ את המודל."
+      },
+      "policyViolation": {
+        "label": "הפרת מדיניות",
+        "description": "מסמן קלטים שמפרים את מדיניות הארגון שלך, שנכתבה כטקסט או ככללים.",
+        "descriptionOutput": "מסמן תגובות שמפרות את מדיניות הארגון שלך, שנכתבה כטקסט או ככללים."
+      },
+      "pii": {
+        "label": "PII וסודות",
+        "description": "מזהה נתונים אישיים, אישורי גישה, כתובות IP וכתובות URL."
+      },
+      "keywords": {
+        "label": "מילות מפתח אסורות",
+        "descriptionOutput": "מזהה תגובות שמכילות מילת מפתח כלשהי שתפרט."
+      },
+      "topics": {
+        "label": "נושאים",
+        "descriptionOutput": "מסמן תגובות בנושא כלשהו שתפרט."
+      },
+      "toxicity": {
+        "label": "רעילות",
+        "description": "מזהה שפה רעילה, מעליבה, מאיימת או שנאתית."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "מזהה תוכן מיני או תוכן שאינו בטוח לעבודה."
+      },
+      "bias": {
+        "label": "הטיה",
+        "description": "מזהה שפה מוטה או מפלה."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "נתונים אישיים",
+        "description": "שמות, כתובות דואר אלקטרוני ומספרי טלפון."
+      },
+      "secrets": {
+        "label": "סודות",
+        "description": "מפתחות API, אסימונים וסיסמאות."
+      },
+      "ipAddress": {
+        "label": "כתובות IP",
+        "description": "כתובות IPv4 ו-IPv6."
+      },
+      "url": {
+        "label": "כתובות URL",
+        "description": "כתובות אינטרנט."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "אבטחה והונאה",
+      "safetyHarm": "בטיחות ונזק",
+      "privacyDataProtection": "פרטיות והגנת מידע",
+      "brandReputationTrust": "מותג ומוניטין",
+      "biasFairnessEthical": "הטיה והגינות",
+      "legalIpLiability": "אחריות משפטית וקניין רוחני",
+      "productMisuse": "שימוש לרעה במוצר",
+      "performanceQuality": "ביצועים ואיכות"
+    },
+    "applicability": {
+      "user": "קלט משתמש",
+      "userAssistant": "קלט משתמש ותגובות"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "עשרת המובילים של OWASP LLM (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "חוק הבינה המלאכותית של האיחוד האירופי",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "תכונת ארגונים",
+    "enterpriseOnly": "זוהי תכונה לארגונים בלבד.",
+    "readOnly": "רק בעלי הארגון והמנהלים יכולים לשנות הגדרות אלה.",
+    "loadError": "לא ניתן היה לטעון ספקים ומודלים",
+    "tabModels": "מודלים",
+    "tabProviders": "ספקים",
+    "tabGateways": "שערים",
+    "modelsDescription": "כבה מודל כדי לחסום אותו עבור כל חבר. מודלים מספקים מורשים מופעלים כברירת מחדל.",
+    "modelsDeniedOnly": "רק חסומים",
+    "modelsEmpty": "אין מודלים שמתאימים לחיפוש הזה.",
+    "providersDescription": "כבה ספק כדי למנוע מ-Kilo לנתב אליו בקשות עבור הארגון הזה.",
+    "providersNeedCatalog": "מתגי הספקים יישארו לקריאה בלבד עד שקטלוג המודלים המלא ייטען. לחץ על ניסיון חוזר למעלה כדי לערוך אותם.",
+    "providersEmpty": "אין ספקים שמתאימים לחיפוש הזה.",
+    "allowAllShown": "אשר את כל המוצגים",
+    "denyAllShown": "חסום את כל המוצגים",
+    "gatewaysDescription": "Kilo מנתב בקשות מודל דרך Vercel AI Gateway או OpenRouter. שער מושבת מכשיל את הבקשות האלה.",
+    "emptyProviderList": "יש לאפשר לפחות ספק אחד. רשימה ריקה חוסמת את כל נתיבי המודלים של Kilo.",
+    "gatewaysUnavailable": "הגדרות השערים אינן זמינות עבור הארגון הזה.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "בקשות OpenRouter אינן מוצמדות לאזור.",
+    "inferenceRegion": "אזור הסקה",
+    "inferenceRegionDescription": "מצמיד בקשות של Vercel AI Gateway לאזור הזה. מודל שאינו זמין שם ייכשל.",
+    "disableOpenrouterNote": "השבתת OpenRouter חוסמת גם מפתחות BYOK שמנתבים בקשות דרכו.",
+    "emptyModelList": "יש להשאיר לפחות מודל אחד מופעל. חסימת כל המודלים משאירה את החברים ללא שום דבר לשימוש.",
+    "catalogUnavailable": "קטלוג המודלים המלא לא נטען, ולכן מוצגות רק הרשימות השמורות שלך. יש לנסות שוב כדי לטעון את כל המודלים.",
+    "region": {
+      "global": "עולמי",
+      "us": "ארצות הברית",
+      "eu": "האיחוד האירופי",
+      "au": "אוסטרליה",
+      "jp": "יפן"
+    }
   }
 }

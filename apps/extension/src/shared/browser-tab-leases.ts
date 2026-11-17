@@ -104,12 +104,13 @@ export const createTabLeaseRegistry = ({
   const queues = new Map<number, QueuedWaiter[]>();
   let loadPromise: Promise<void> | undefined = undefined;
   /*
-   * Releases that land while the initial storage read is in flight. They see an
-   * empty holders map, so the stored copy must not be re-inserted afterwards:
-   * a closed tab or a disposed caller would come back as a phantom owner.
+   * Releases that land before the initial storage read finishes. They can see an
+   * empty holders map — the read has not started yet, or is in flight — so the
+   * stored copy must not be re-inserted afterwards: a closed tab or a disposed
+   * caller would come back as a phantom owner.
    */
   const releasedWhileLoading = { callers: new Set<string>(), tabs: new Set<number>() };
-  let loading = false;
+  let leasesLoaded = false;
   // The newest snapshot not yet written; a burst of lease changes writes only the last one.
   let pendingSnapshot: PersistedTabLease[] | undefined = undefined;
   let writeChain: Promise<void> = Promise.resolve();
@@ -211,12 +212,10 @@ export const createTabLeaseRegistry = ({
     }
 
     loadPromise ??= (async () => {
-      loading = true;
-
       try {
         await load(persistence);
       } finally {
-        loading = false;
+        leasesLoaded = true;
         releasedWhileLoading.callers.clear();
         releasedWhileLoading.tabs.clear();
       }
@@ -225,9 +224,14 @@ export const createTabLeaseRegistry = ({
     return loadPromise;
   };
 
-  /** Remembers a release that arrived before the persisted leases were read (see `releasedWhileLoading`). */
+  /**
+   * Remembers a release that arrived before the persisted leases were read (see
+   * `releasedWhileLoading`). Both the caller key and the tab are remembered until
+   * the read finishes, so a release that is a fresh worker's first lease operation
+   * is not undone by the stored copy.
+   */
   const noteReleased = ({ key, tabId }: { key?: string; tabId?: number }): void => {
-    if (!loading) {
+    if (leasesLoaded || persistence === undefined) {
       return;
     }
 
@@ -324,7 +328,13 @@ export const createTabLeaseRegistry = ({
     const holder = holders.get(tabId);
     const key = browserCallerKey(caller);
 
-    noteReleased({ key, tabId });
+    /*
+     * The caller's stored leases must not come back either way: a handover asks this
+     * caller to drop the tab, and after a restart the stored copy is the only record
+     * of it. The tab itself is only free when this caller really held it — otherwise
+     * the stored lease belongs to another caller and must survive the read.
+     */
+    noteReleased({ key, ...(holder?.key === key ? { tabId } : {}) });
 
     if (holder === undefined || holder.key !== key) {
       return;

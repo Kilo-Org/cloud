@@ -859,7 +859,8 @@ export const AgentChatPanel = ({
         updateThinkingBlock: runState.updateRunThinkingBlock,
         workflowToolContext: {
           allowWorkflowsInSafeMode,
-          claimTab: (tabId, caller) => claimTab(tabId, caller, browserCaller),
+          claimTab: (tabId, caller) =>
+            claimTab(tabId, caller, { from: browserCaller, signal: runState.abort.signal }),
           disposeBrowserCaller,
           evalInTab,
           getTabUrl,
@@ -1138,7 +1139,8 @@ export const AgentChatPanel = ({
         const runPanelCaller: BrowserCaller = { conversationId, kind: 'panel', panelId };
         result = await executeWorkflowToolCall(toolCall, {
           allowWorkflowsInSafeMode: settings.allowWorkflowsInSafeMode,
-          claimTab: (tabId, caller) => claimTab(tabId, caller, runPanelCaller),
+          claimTab: (tabId, caller) =>
+            claimTab(tabId, caller, { from: runPanelCaller, signal: runState.abort.signal }),
           disposeBrowserCaller,
           evalInTab,
           getTabUrl: tabId => getTabUrl(tabId),

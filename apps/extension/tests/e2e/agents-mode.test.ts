@@ -764,37 +764,49 @@ test.skip('Agents session transcript opens pinned to the bottom', async () => {
   }
 });
 
+/*
+ * `OFFLINE_PILL_GRACE_MS` in agents-session-list.tsx. The pill's grace is a page timer, so the
+ * test drives that timer with the page clock: hidden one tick before it fires, visible after.
+ */
+const OFFLINE_PILL_GRACE_MS = 5000;
+/*
+ * The most fake time the mount flush below can consume from the grace. The effect that schedules
+ * the grace timer runs somewhere inside it, so the remaining grace after the flush is in
+ * [GRACE_MS - 100, GRACE_MS].
+ */
+const MOUNT_FLUSH_MS = 100;
+
 test('Agents offline pill waits out the connect grace period', async () => {
   const { cleanup, getSidePanel } = await setupAgentsTest({ ingestSilent: true });
   try {
     const sidePanel = await getSidePanel();
 
     /*
-     * The 5 s grace timer starts when this view mounts, which is the Agents tab click inside
-     * navigateToAgentsMode — and that helper waits another 500 ms before returning. Measuring
-     * from after it therefore undercounts the window by the whole navigation latency, so the
-     * old bound sat exactly on the grace and any slower click flipped it. Start the clock at the
-     * navigation instead: the mount is always later, so this window is never shorter than the real one.
+     * Install the clock before the Agents view exists: its grace `setTimeout` is created when the
+     * view mounts, so a clock installed before the click owns that timer. Wall-clock sampling
+     * measured the window from an arbitrary point after navigation and could not tell an early
+     * pill from a slow one; the fake clock decides when the timer fires instead.
      */
-    const startedAt = Date.now();
-    await navigateToAgentsMode(sidePanel);
+    await sidePanel.clock.install();
+    await sidePanel.getByRole('tab', { name: 'Agents' }).click();
+    // Mount effects, and any zero-delay scheduling they do, run in this tick.
+    await sidePanel.clock.runFor(MOUNT_FLUSH_MS);
+    await expect(sidePanel.getByRole('button', { exact: true, name: 'New session' })).toBeVisible({
+      timeout: 15_000,
+    });
 
-    // The mocked ingest socket never completes the connected handshake. The
-    // Pill must stay hidden for the whole grace period, then appear.
+    // The mocked ingest socket never completes the connected handshake.
+    // The pill is due only when the grace timer fires.
+    // One millisecond short of the latest possible firing time it is still hidden.
+    // Whether the timer started early or late in the mount flush, it is not due yet.
     const offlinePill = sidePanel.getByText('Offline');
     await expect(offlinePill).toBeHidden();
-    // Sample up to 4 s after the navigation: the mount is later than this clock, so every
-    // Sample stays inside the grace period — one check could miss an immediate render.
-    const samples = await Promise.all(
-      [0, 500, 1000, 1500, 2000, 2500, 3000, 4000].map(async delayMs => {
-        await sidePanel.waitForTimeout(delayMs);
-        return offlinePill.isVisible().catch(() => false);
-      })
-    );
-    expect(samples).not.toContain(true);
-    await expect(offlinePill).toBeVisible({ timeout: 15_000 });
-    // It appeared only after the grace period, never before.
-    expect(Date.now() - startedAt).toBeGreaterThanOrEqual(4500);
+    await sidePanel.clock.runFor(OFFLINE_PILL_GRACE_MS - MOUNT_FLUSH_MS - 1);
+    await expect(offlinePill).toBeHidden();
+
+    // Past the earliest possible firing time: the timer has fired and the pill is shown.
+    await sidePanel.clock.runFor(MOUNT_FLUSH_MS + 2);
+    await expect(offlinePill).toBeVisible();
   } finally {
     await cleanup();
   }

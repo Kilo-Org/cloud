@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { VoiceInputButton, VoiceInputStatus } from '@/components/voice-input-control';
+import { textActionTargetClass } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 import { applyVoiceDraftToInput } from '@/lib/voice-input/voice-input-draft';
 import { resolveVoiceInputFeedbackPresentation } from '@/lib/voice-input/voice-input-feedback';
 import { useVoiceInput } from '@/lib/voice-input/use-voice-input';
@@ -107,7 +109,7 @@ export function VoiceTestField(): React.ReactElement {
         <Button
           variant="ghost"
           size="sm"
-          className="ml-auto"
+          className={cn('ml-auto', textActionTargetClass())}
           accessibilityLabel={t('voiceInput.testClear')}
           disabled={clearDisabled}
           onPress={handleClear}

@@ -2,16 +2,25 @@ import { type Href, useRouter } from 'expo-router';
 import { selectionHaptic } from '@/lib/haptics';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Pressable, View } from 'react-native';
+import { Pressable, useWindowDimensions, View } from 'react-native';
 
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
 import { KiloPassIcon } from '@/components/kilo-pass/kilo-pass-icon';
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { getKiloPassCardContentState } from '@/lib/kilo-pass/state';
+import { isNarrowLayout } from '@/lib/narrow-layout';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
+
+/**
+ * The scale at which `ConfigureRow` stacks its tile above the copy, shared with
+ * the loading row here so the reservation and the row it stands in for take the
+ * same shape. `configure-row.tsx` keeps the number itself.
+ */
+const CONFIGURE_ROW_STACK_FONT_SCALE = 1.8;
 
 export function KiloPassSubscriptionCard({
   hideLoadingSkeleton = false,
@@ -27,6 +36,12 @@ export function KiloPassSubscriptionCard({
   const router = useRouter();
   const trpc = useTRPC();
   const { t } = useTranslation();
+  const { width } = useWindowDimensions();
+  const fontScale = useLiveFontScale();
+  // The same presentation `ConfigureRow` picks: a narrow window or a large
+  // Dynamic Type scale hands the copy the row's full width, so the loading row
+  // and the description's line cap follow it.
+  const stack = fontScale >= CONFIGURE_ROW_STACK_FONT_SCALE || isNarrowLayout(width);
   const stateQuery = useQuery(trpc.kiloPass.getState.queryOptions());
   const contentState = getKiloPassCardContentState({
     subscription: stateQuery.data?.subscription,
@@ -57,7 +72,7 @@ export function KiloPassSubscriptionCard({
           className={cn(hideLoadingSkeleton && 'opacity-0')}
         >
           <RowGroup>
-            <RowSkeleton tile subtitle />
+            <RowSkeleton stack={stack} tile subtitle />
           </RowGroup>
         </View>
       ) : null}
@@ -82,6 +97,9 @@ export function KiloPassSubscriptionCard({
               icon={KiloPassIcon}
               title={contentState.title}
               subtitle={contentState.description}
+              // The row's height is its capped copy: a stacked row has the full
+              // width for two lines, the side-by-side one holds a single line.
+              subtitleNumberOfLines={stack ? 2 : 1}
               variant="action"
               trailing={
                 <Text variant="small" className="text-primary">
@@ -99,6 +117,7 @@ export function KiloPassSubscriptionCard({
             icon={KiloPassIcon}
             title={contentState.title}
             subtitle={contentState.description}
+            subtitleNumberOfLines={stack ? 2 : 1}
             hue="honey"
             accessibilityLabel={contentState.accessibilityLabel}
             onPress={handlePress}

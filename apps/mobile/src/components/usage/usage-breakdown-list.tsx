@@ -47,10 +47,13 @@ export function UsageBreakdownList({
           <KvRow
             key={entry.key}
             label={humanize ? humanizeDimension(entry.label, i18n.language) : entry.label}
+            // A model id can be long; the cost and the share are the columns a
+            // reader compares, so the name yields its width to them.
+            labelShrink
             value={formatUsageCost(entry.value, i18n.language)}
-            valueFace="text"
+            valueFace="numeric"
             trailing={
-              <Text variant="caption" className="tabular-nums">
+              <Text variant="caption" className="w-12 shrink-0 text-right tabular-nums">
                 {formatPercent(entry.percentage, i18n.language)}
               </Text>
             }

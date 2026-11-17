@@ -172,9 +172,6 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 vi.mock('@/lib/format', () => ({
   formatDate: () => 'Jan 1, 2026',
-  // The passkey row joins the added date and a recorded last use into its one
-  // secondary line, so the row primitive's own list formatting runs here too.
-  formatList: (parts: string[]) => parts.join(' \u00b7 '),
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/tab-screen', () => ({ useTabBarBottomPadding: () => 0 }));
@@ -205,7 +202,8 @@ vi.mock('@/components/ui/row-group', () => ({
 }));
 vi.mock('@/components/ui/card', () => ({ Card: 'Card' }));
 vi.mock('@/components/ui/screen-footer', () => ({
-  ScreenFooter: (props: { children?: ReactNode }) => createElement('ScreenFooter', null, props.children),
+  ScreenFooter: (props: { children?: ReactNode }) =>
+    createElement('ScreenFooter', null, props.children),
 }));
 vi.mock('@/components/ui/row-skeleton', () => ({
   RowSkeleton: (props: { tile?: boolean; subtitle?: boolean }) =>
@@ -233,8 +231,34 @@ vi.mock('@/components/ui/configure-row', () => ({
       props.trailing ?? null
     ),
 }));
+// The passkey row keeps each fact on its own line, so it composes the frame
+// directly: the title, the added date and the optional last-used line.
+vi.mock('@/components/ui/row-frame', () => ({
+  RowFrame: (props: {
+    icon?: ElementType;
+    title?: string;
+    subtitle?: { text: string };
+    secondSubtitle?: { text: string };
+    trailing?: { kind: 'node'; node: ReactNode };
+  }) =>
+    createElement(
+      'View',
+      null,
+      props.icon === undefined ? null : createElement(props.icon),
+      props.title === undefined ? null : createElement('Text', { numberOfLines: 1 }, props.title),
+      props.subtitle === undefined ? null : createElement('Text', null, props.subtitle.text),
+      props.secondSubtitle === undefined
+        ? null
+        : createElement('Text', null, props.secondSubtitle.text),
+      props.trailing === undefined ? null : props.trailing.node
+    ),
+}));
 vi.mock('@/components/ui/icon-button', () => ({
-  IconButton: (props: { children?: ReactNode; accessibilityLabel?: string; onPress?: () => void }) =>
+  IconButton: (props: {
+    children?: ReactNode;
+    accessibilityLabel?: string;
+    onPress?: () => void;
+  }) =>
     createElement(
       'Pressable',
       { ...props, className: 'h-[48px] w-[48px] items-center justify-center' },

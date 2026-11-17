@@ -199,11 +199,15 @@ export function ReportReceiptScreen() {
               label={t('common.status')}
               value={statusLabel(TRIAGE_KEYS, receipt.data.triageStatus)}
               valueFace="text"
+              // A status is a phrase, not an identifier: cutting its middle
+              // would drop the words that say what happened.
+              valueEllipsizeMode="tail"
             />
             <KvRow
               label={t('profile.reportReceipt.appealLabel')}
               value={statusLabel(APPEAL_KEYS, receipt.data.appealStatus)}
               valueFace="text"
+              valueEllipsizeMode="tail"
             />
           </RowGroup>
           {nextStep === null ? null : <Text variant="caption">{t(nextStep)}</Text>}

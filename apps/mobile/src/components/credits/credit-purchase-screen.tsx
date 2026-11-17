@@ -491,6 +491,12 @@ export function CreditPurchaseScreen() {
                         icon={Wallet}
                         title={packLabel}
                         subtitle={stateLabel ?? expiryMessage}
+                        // One line under the title, capped by the row frame:
+                        // the state phrase or expiry note never wraps into a
+                        // second line, so no row changes height when a purchase
+                        // or the store state changes. The full note stays in the
+                        // row's accessibility label.
+                        subtitleNumberOfLines={1}
                         variant="action"
                         disabled={disabled}
                         trailing={
@@ -540,8 +546,11 @@ export function CreditPurchaseScreen() {
 
           {/* The room the floating purchase error needs at the end of the
               content, as a child of the content rather than a container style
-              (see the scroller's comment). */}
-          <View style={{ height: purchaseErrorClearance(fontScale) }} />
+              (see the scroller's comment). It exists only while that card does,
+              so the last content reaches the end of the scroller otherwise. */}
+          {purchaseErrorMessageKey !== null && (
+            <View style={{ height: purchaseErrorClearance(fontScale) }} />
+          )}
         </DetailScreenScrollView>
         {/* The purchase error floats above the bottom of the scroll area. It
             is not one of the four pack states, so it takes no layout height,
@@ -549,16 +558,15 @@ export function CreditPurchaseScreen() {
             leaves available. The scroller keeps a trailing clearance so the
             last content can scroll clear of the card, and the footer below
             this area clears the home indicator. */}
-        <View className="pointer-events-none absolute inset-x-0 bottom-0" style={sideInsetStyle}>
-          <View className="px-4 pb-2">
-            <Card>
-              <AccessibleStatus
-                message={purchaseErrorMessageKey ? t(purchaseErrorMessageKey) : null}
-                numberOfLines={3}
-              />
-            </Card>
+        {purchaseErrorMessageKey !== null && (
+          <View className="pointer-events-none absolute inset-x-0 bottom-0" style={sideInsetStyle}>
+            <View className="px-4 pb-2">
+              <Card>
+                <AccessibleStatus message={t(purchaseErrorMessageKey)} numberOfLines={3} />
+              </Card>
+            </View>
           </View>
-        </View>
+        )}
       </View>
       {/* The description and the store's legal links are the screen's pinned
           footer, outside the scroll view and below the scroll area. The pack

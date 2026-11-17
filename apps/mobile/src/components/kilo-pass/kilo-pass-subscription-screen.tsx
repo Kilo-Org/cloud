@@ -21,6 +21,7 @@ import { Crown } from '@/components/ui/icons';
 import { KvRow } from '@/components/ui/kv-row';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { SectionHeaderSkeleton } from '@/components/ui/section-header-skeleton';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useSheetHeaderTopClearance } from '@/lib/form-sheet';
@@ -88,6 +89,17 @@ function KiloPassLoadingScreen() {
         <Card>
           <Skeleton className="h-24 w-full rounded-lg" />
         </Card>
+        {/* Both ledgers: a labelled section over its own row group, each row a
+            KvRow (title and value on one line). */}
+        {[0, 1].map(section => (
+          <View key={section} className="gap-3">
+            <SectionHeaderSkeleton />
+            <RowGroup>
+              <RowSkeleton />
+              <RowSkeleton />
+            </RowGroup>
+          </View>
+        ))}
       </DetailScreenScrollView>
     </KiloPassFrame>
   );

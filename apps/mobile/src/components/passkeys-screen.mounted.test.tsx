@@ -120,12 +120,10 @@ describe('PasskeysScreen', () => {
     expect(texts(view)).toContain('Work laptop');
     expect(texts(view)).toContain('MacBook');
     expect(texts(view)).toContain('Added Jan 1, 2026');
-    // The row carries one secondary line, so a recorded use joins the added
-    // date there; a credential the server has never seen used keeps the date
-    // alone.
-    expect(
-      texts(view).filter(text => text === 'Added Jan 1, 2026 · Last used Jan 1, 2026')
-    ).toHaveLength(1);
+    // Each fact keeps its own line: a recorded use prints under the added date,
+    // and a credential the server has never seen used keeps the date alone.
+    expect(texts(view)).toContain('Last used Jan 1, 2026');
+    expect(texts(view).filter(text => text === 'Last used Jan 1, 2026')).toHaveLength(1);
     view.unmount();
   });
 

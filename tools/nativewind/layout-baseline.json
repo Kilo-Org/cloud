@@ -1,5 +1,8 @@
 {
   "apps/mobile/src/components/home/adaptive-home-card-frame.tsx": {
     "L1": 2
+  },
+  "apps/mobile/src/components/login/email-otp-form.tsx": {
+    "L3": 1
   }
 }

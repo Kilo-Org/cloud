@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { formFieldA11y } from '@/components/ui/form-field-a11y';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { type BusyAction } from '@/lib/auth/use-native-auth';
 import { foldDecimalDigits } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -92,7 +93,11 @@ export function EmailOtpForm({
         {t('login.codeArrivalHint')}
       </Text>
       <Input
-        className="text-lg"
+        // The shared box supplies the Android center gravity and the single
+        // line box; the call site keeps its chrome — border, fill and radius —
+        // the way every single-line field does. `ROW_TARGET_CLASS` is the 48pt
+        // floor (never a fixed height), so Dynamic Type can still grow it.
+        className={`${ROW_TARGET_CLASS} rounded-md border border-input bg-background pl-3 pr-3 text-lg tracking-widest text-foreground`}
         // textAlign is applied inline, not via a `text-center` class: NativeWind maps
         // textAlign to a native prop for TextInput and crashes on it in this version.
         // eslint-disable-next-line react-native/no-inline-styles -- see comment above
@@ -124,7 +129,11 @@ export function EmailOtpForm({
         }}
       >
         {error ? (
-          <Text variant="muted" className="text-center text-destructive" accessibilityLiveRegion="polite">
+          <Text
+            variant="muted"
+            className="text-center text-destructive"
+            accessibilityLiveRegion="polite"
+          >
             {error}
           </Text>
         ) : null}
@@ -139,7 +148,9 @@ export function EmailOtpForm({
           }}
           accessibilityLabel={t('login.verifyCode')}
         >
-          <Text numberOfLines={1}>{t('login.verifyCode')}</Text>
+          <Text className="flex-1 text-center" numberOfLines={1} adjustsFontSizeToFit>
+            {t('login.verifyCode')}
+          </Text>
         </Button>
       </View>
       <Button
@@ -152,9 +163,12 @@ export function EmailOtpForm({
         {/* One line, like every other label in this stack: the Arabic secondary
             label ("إعادة إرسال الرمز") wrapped onto two lines inside the
             full-width button, so the copy did not fit its control (2026-09-19
-            device finding). Longer locales ellipsize instead of growing a
-            second row; the full label stays the control's accessible name. */}
-        <Text numberOfLines={1}>{t('login.resendCode')}</Text>
+            device finding). The label shrinks to fit that one line and then
+            ellipsizes instead of growing a second row; the full label stays the
+            control's accessible name. */}
+        <Text className="flex-1 text-center" numberOfLines={1} adjustsFontSizeToFit>
+          {t('login.resendCode')}
+        </Text>
       </Button>
       <Button
         variant="ghost"

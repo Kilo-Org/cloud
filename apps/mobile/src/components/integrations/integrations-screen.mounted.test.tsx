@@ -169,6 +169,13 @@ vi.mock('@/components/screen-header', () => ({
 
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrollView' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+// The row primitives notify a selection through the haptic bridge, which loads
+// the expo runtime; the suite asserts structure, not feedback.
+vi.mock('@/lib/haptics', () => ({
+  impactHaptic: () => undefined,
+  notificationHaptic: () => undefined,
+  selectionHaptic: () => undefined,
+}));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({
   Text: (props: { children?: ReactNode }) => createElement('TextMock', null, props.children),

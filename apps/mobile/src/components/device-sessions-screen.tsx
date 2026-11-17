@@ -194,7 +194,7 @@ export function DeviceSessionsScreen() {
         {state === 'loading' ? (
           <RowGroup leadingTile>
             {[0, 1, 2].map(index => (
-              <RowSkeleton key={index} tile subtitle />
+              <RowSkeleton key={index} tile subtitle trailingControl />
             ))}
           </RowGroup>
         ) : (

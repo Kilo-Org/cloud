@@ -5,16 +5,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { act, TestRenderer } from '@/test/renderer';
 
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
+
 import { DestructiveConfirmDialog } from './destructive-confirm-dialog';
 
 vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
+  StatusBar: { currentHeight: 0 },
   Text: 'Text',
+  useWindowDimensions: () => ({ fontScale: 1, height: 844, scale: 3, width: 390 }),
   View: 'View',
 }));
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
+// The sheet header draws its own close control and reads the window insets.
+vi.mock('@/components/ui/icons', () => ({ Share: 'Share', X: 'X' }));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ bottom: 0, left: 0, right: 0, top: 0 }),
+}));
 vi.mock('@/components/ui/activity-indicator', () => ({
   ActivityIndicator: 'ActivityIndicator',
 }));
@@ -114,6 +123,20 @@ describe('DestructiveConfirmDialog', () => {
       root.findAll(
         node => isType(node, 'Pressable') && classNameOf(node).includes('bg-destructive')
       )
+    ).toHaveLength(1);
+  });
+
+  it('draws the title in the sheet header over a gutted body', () => {
+    const root = mount();
+
+    // The title is the sheet header's, not a hand-built heading inside the
+    // card, so it sits on the header row with the close control.
+    expect(
+      root.findAll(node => isType(node, 'Text') && node.children.includes('Sign out?'))
+    ).toHaveLength(1);
+    // The body keeps the page gutter and the sheet's own section gap.
+    expect(
+      root.findAll(node => isType(node, 'View') && classNameOf(node) === SCREEN_BODY_CLASS)
     ).toHaveLength(1);
   });
 

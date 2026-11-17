@@ -326,10 +326,9 @@ describe('LanguagePickerSheet apply', () => {
     const listHeader = renderer.root.findByType(flashListMock).props
       .ListHeaderComponent as TestRenderer.ReactTestInstance | null;
     expect(String(listHeader?.props.className)).toContain('rounded-full');
-    // The list's content padding replaces the pinned side margin, so the field
-    // keeps its width and lines up with the rows it now scrolls with.
-    expect(String(listHeader?.props.className)).not.toContain('mx-4');
-    expect(String(listHeader?.props.className)).toContain('mx-0');
+    // The field keeps the page gutter as the list header too, so the rows it
+    // scrolls with and the field itself share one inset.
+    expect(String(listHeader?.props.className)).toContain('mx-4');
     // One field on screen: the list header, not a second copy in the chrome.
     expect(findByType(renderer.root, 'TextInput')).toHaveLength(1);
 

@@ -44,7 +44,7 @@ const SKELETON_ROWS = [0, 1];
  * action below never moves when the skeletons are replaced by the settled
  * state.
  */
-const BODY_BAND_CLASS = 'min-h-64';
+const BODY_BAND_CLASS = 'min-h-64 gap-3';
 
 function ProviderKeyRow({
   providerKey,

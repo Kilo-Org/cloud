@@ -4,6 +4,7 @@ import { Pressable, View } from 'react-native';
 
 import { RowChevron } from '@/components/ui/row-chevron';
 import { Text } from '@/components/ui/text';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { notificationHistoryCopy } from '@/lib/notification-history';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
@@ -34,6 +35,7 @@ export function HistoryRowView({
   return (
     <Pressable
       className={cn(
+        ROW_TARGET_CLASS,
         'gap-1 px-4 py-3 active:opacity-70',
         !last && 'border-b-[0.5px] border-hair-soft'
       )}

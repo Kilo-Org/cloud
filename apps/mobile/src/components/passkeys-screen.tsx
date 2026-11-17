@@ -209,7 +209,7 @@ export function PasskeysScreen() {
     body = (
       <RowGroup leadingTile>
         {SKELETON_ROWS.map(index => (
-          <RowSkeleton key={index} tile subtitle />
+          <RowSkeleton key={index} tile subtitle trailingControl />
         ))}
       </RowGroup>
     );

@@ -55,20 +55,15 @@ export const LanguagePickerRow = memo(function LanguagePickerRow({
   const alignClass = isRtl ? undefined : 'text-left';
 
   if (item.kind === 'section') {
-    const sectionLabel = t(item.section === 'current' ? 'language.current' : 'language.allLanguages');
+    const sectionLabel = t(
+      item.section === 'current' ? 'language.current' : 'language.allLanguages'
+    );
     return (
       // A picker group's title is a heading: the rows below are independent
-      // radio choices with no grouping container, so this role is how a screen
-      // reader reaches the group. `SectionHeader` owns the label anatomy, and
-      // the wrapper is the element that carries the role — a role alone does not
-      // make a View an accessibility element, so the wrapper is `accessible` and
-      // names itself with the label it holds.
-      <View
-        accessible
-        accessibilityRole="header"
-        accessibilityLabel={sectionLabel}
-        className={first ? undefined : 'pt-4'}
-      >
+      // radio choices with no grouping container, so that role is how a screen
+      // reader reaches the group. `SectionHeader` puts the role on its label
+      // itself; this row keeps only the group's leading gap.
+      <View className={first ? undefined : 'pt-4'}>
         <SectionHeader inset label={sectionLabel} />
       </View>
     );

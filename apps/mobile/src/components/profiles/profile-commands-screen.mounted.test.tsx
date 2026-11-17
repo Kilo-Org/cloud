@@ -20,6 +20,13 @@ import {
 import { act } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
 import { resetFormDraftsForTests } from '@/lib/form-draft';
+import {
+  LINE_ACTION_BOX_CLASS,
+  LINE_ACTION_HIT_SLOP,
+  MIN_TAP_TARGET_DP,
+  tapTargetReachDp,
+  TOUCH_TARGET_DP,
+} from '@/lib/a11y/tap-target';
 
 const h = vi.hoisted(() => ({
   error: vi.fn(),
@@ -323,6 +330,54 @@ describe('ProfileCommandsScreen', () => {
         .filter(node => String(node.props.accessibilityLabel).startsWith('Delete'))
         .map(node => node.props.accessibilityHint)
     ).toEqual(['1 / 3', '2 / 3', '3 / 3']);
+
+    unmount();
+  });
+
+  it('floats each row control on the label line and reaches the touch target with slop', async () => {
+    h.query.data = testCommands(['a', 'b', 'c']);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    const labels = ['Move command 1 up', 'Move command 1 down', 'Delete command 1'];
+    const controls = findAll(renderer.root, 'Pressable').filter(node =>
+      labels.includes(String(node.props.accessibilityLabel))
+    );
+    // The first card's reorder and delete controls, in the order the labels
+    // name them; the two cards below it keep their own.
+    expect(controls.map(node => node.props.accessibilityLabel)).toEqual(labels);
+
+    for (const control of controls) {
+      // The box floats over the label's line instead of setting the row's
+      // height, so the card's top padding stays the screen's own gap.
+      for (const token of LINE_ACTION_BOX_CLASS.split(' ')) {
+        expect(String(control.props.className)).toContain(token);
+      }
+      expect(control.props.hitSlop).toBe(LINE_ACTION_HIT_SLOP);
+      // A `min-h-[28px]` box measures 27.8dp on Android: the slop carries the
+      // reach the shortened box gives up on its own node.
+      expect(
+        tapTargetReachDp(MIN_TAP_TARGET_DP - 0.2, LINE_ACTION_HIT_SLOP.top)
+      ).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+      // The icon is 20dp, below the audit floor, so the rect keeps a 36dp
+      // width, which measures 35.81dp on Android and still reaches 44dp across
+      // with its 5dp side slop.
+      expect(String(control.props.className)).toContain('min-w-[36px]');
+      expect(tapTargetReachDp(35.81, LINE_ACTION_HIT_SLOP.left)).toBeGreaterThanOrEqual(
+        TOUCH_TARGET_DP
+      );
+    }
+    // The row keeps its 10.5dp gap, so the two neighbouring 5dp bands sit
+    // 10.5dp apart and a tap just outside one control cannot land on the
+    // destructive control beside it. One such row per card, three controls each.
+    const rows = findAll(renderer.root, 'View').filter(
+      node => node.props.className === 'flex-row items-center gap-3'
+    );
+    expect(rows).toHaveLength(3);
+    for (const row of rows) {
+      expect(findAll(row, 'Pressable')).toHaveLength(3);
+    }
 
     unmount();
   });

@@ -49,7 +49,14 @@ export function TriggerSelectRow({
         onPress={onPress}
         className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 active:opacity-70')}
       >
-        <Text className="shrink-0 text-sm font-medium text-foreground">{label}</Text>
+        <Text
+          className={cn(
+            'shrink-0 text-sm font-medium',
+            disabled ? 'text-muted-foreground' : 'text-foreground'
+          )}
+        >
+          {label}
+        </Text>
         <Text
           numberOfLines={1}
           className={cn(

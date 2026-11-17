@@ -34,6 +34,9 @@ import type { LoopbackSocketConnect } from './loopback-transport';
 import { createNativeDial } from './native-transport';
 import type { NativeMessagingRuntime } from './native-transport';
 import { parsePairingUrl } from './pairing';
+import { savePairingNotice } from './pairing-notice';
+import { redeemPairingKey } from './redeem';
+import type { LocalAgentFetch } from './redeem';
 import { createPairingConsumption } from './pairing-consumption';
 import type { LocalAgentPairingConsumption } from './pairing-consumption';
 import type { LocalAgentPairingEndpoint } from './pairing';
@@ -102,6 +105,7 @@ export type LocalAgentsHostApis = {
   commands?: LocalAgentCommandsApi;
   createId?: () => string;
   createSocket?: LoopbackSocketConnect;
+  fetch?: LocalAgentFetch;
   now?: () => number;
   runtime?: LocalAgentRuntimeApi;
   storage: LocalAgentStorageArea;
@@ -218,6 +222,7 @@ export const startLocalAgentsHost = (
   const createId = options.createId ?? (() => crypto.randomUUID());
   const timers = options.timers ?? localAgentTimers;
   const connectSocket = options.createSocket ?? connectLoopbackSocket;
+  const fetchImpl: LocalAgentFetch = options.fetch ?? ((url, init) => globalThis.fetch(url, init));
   const registry = createLocalAgentControllerRegistry({ createHandle: createId, now, storage });
   const dispatcher = createLocalAgentDispatcher({
     registry,
@@ -509,7 +514,7 @@ export const startLocalAgentsHost = (
   };
 
   const pairingKey = (endpoint: LocalAgentPairingEndpoint): string =>
-    `${endpoint.hubId}|${endpoint.key}|${endpoint.ws}`;
+    `${endpoint.hubId}|${endpoint.token}|${endpoint.ws}`;
 
   /**
    * Marks a fragment used once the connection whose key came from that fragment
@@ -531,28 +536,35 @@ export const startLocalAgentsHost = (
   const acceptPairing = async (
     endpoint: LocalAgentPairingEndpoint,
     tabId: number,
-    key: string
+    fragmentKey: string
   ): Promise<void> => {
     try {
-      const stored = await loadLocalAgentEndpoints(storage);
-      const alreadyStored = stored.some(
-        candidate =>
-          candidate.hubId === endpoint.hubId &&
-          candidate.key === endpoint.key &&
-          candidate.ws === endpoint.ws
-      );
-
-      if (!alreadyStored) {
-        await saveLocalAgentEndpoint(storage, endpoint);
-      }
-
-      // Pairing tabs are single-use; closing the tab clears the key from the address bar.
+      // The fragment is single-use: close the tab before redeeming.
+      // The token then never lingers in the address bar.
       try {
         await tabs?.remove(tabId);
       } catch {
         // Already gone (the user closed it) — nothing to do.
       }
 
+      await savePairingNotice(storage, null);
+
+      const redeemed = await redeemPairingKey({
+        fetchImpl,
+        hubId: endpoint.hubId,
+        token: endpoint.token,
+        ws: endpoint.ws,
+      });
+
+      if (!redeemed.ok) {
+        if (redeemed.reason !== 'invalid') {
+          await savePairingNotice(storage, redeemed.reason);
+        }
+
+        return;
+      }
+
+      await saveLocalAgentEndpoint(storage, redeemed.endpoint);
       await reconcile();
 
       const connection = connections.get(endpoint.hubId);
@@ -562,14 +574,14 @@ export const startLocalAgentsHost = (
       if (
         connection !== undefined &&
         connection.endpoint.transport === 'loopback' &&
-        connection.endpoint.key === endpoint.key &&
-        connection.endpoint.ws === endpoint.ws
+        connection.endpoint.key === redeemed.endpoint.key &&
+        connection.endpoint.ws === redeemed.endpoint.ws
       ) {
-        pairingKeysByConnection.set(connection, key);
+        pairingKeysByConnection.set(connection, fragmentKey);
         consumeIfConnected(connection);
       }
     } finally {
-      inFlightPairings.delete(key);
+      inFlightPairings.delete(fragmentKey);
     }
   };
 

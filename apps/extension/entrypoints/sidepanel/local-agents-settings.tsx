@@ -1,3 +1,4 @@
+/* eslint-disable import/max-dependencies -- the section reads settings, controllers, status, the pairing notice, and the command channel */
 import { browser, storage } from '#imports';
 import type { JSX } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -7,6 +8,11 @@ import {
   loadLocalAgentConnectedAgents,
 } from '@/src/shared/local-agents/registry';
 import type { LocalAgentConnectedAgent } from '@/src/shared/local-agents/registry';
+import {
+  LOCAL_AGENT_PAIRING_NOTICE_STORAGE_KEY,
+  loadPairingNotice,
+} from '@/src/shared/local-agents/pairing-notice';
+import type { LocalAgentPairingNotice } from '@/src/shared/local-agents/pairing-notice';
 import {
   LOCAL_AGENT_SETTINGS_STORAGE_KEY,
   loadLocalAgentSettings,
@@ -27,6 +33,11 @@ const SWITCH_DESCRIPTION =
 const HOST_MISSING_HINT = 'Kilo CLI not found. Run any Kilo CLI command once.';
 const HOST_MISSING_PERMISSION_HINT =
   'Native messaging is blocked. Turn the switch off and on, then allow the permission prompt.';
+const PAIRING_NOTICE_HINTS = {
+  expired: 'Pairing link expired. Run pairing again.',
+  not_allowed:
+    'The CLI did not allow this browser. Run any Kilo CLI command once, then pair again.',
+} satisfies Record<LocalAgentPairingNotice, string>;
 const WAITING_HINT = 'Waiting for a Kilo CLI…';
 const IDLE_HINT = 'No agents connected.';
 const LOAD_ERROR_MESSAGE = "Couldn't load local agents. Try again.";
@@ -37,16 +48,27 @@ const DISCONNECT_LABEL = 'Disconnect';
 const secondaryButtonClass =
   'type-label h-8 rounded-md border border-border bg-surface-overlay px-3 text-foreground-on-secondary transition hover:bg-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background';
 
+/* Chrome can leave the permission prompt unanswered, so the switch must not wait on it forever. */
+const PERMISSION_WAIT_MS = 2000;
+
 /**
  * Requests the optional nativeMessaging permission from the toggle's own user
- * gesture. A refusal is not an error: the native endpoint reports
- * `host_missing` and the loopback endpoint still works.
+ * gesture. A refusal or a prompt nobody answers is not an error: the native
+ * endpoint reports `host_missing` and the loopback endpoint still works.
  */
 const requestNativeMessagingPermission = async (): Promise<void> => {
+  const settled = Promise.withResolvers<void>();
+  const timer = setTimeout(settled.resolve, PERMISSION_WAIT_MS);
+
   try {
-    await browser.permissions.request({ permissions: ['nativeMessaging'] });
+    await Promise.race([
+      browser.permissions.request({ permissions: ['nativeMessaging'] }),
+      settled.promise,
+    ]);
   } catch {
     // Denied or unsupported; the transport reports the state.
+  } finally {
+    clearTimeout(timer);
   }
 };
 
@@ -60,21 +82,24 @@ export const LocalAgentsSettings = (): JSX.Element => {
   const [enabled, setEnabled] = useState<boolean | undefined>();
   const [agents, setAgents] = useState<LocalAgentConnectedAgent[]>([]);
   const [status, setStatus] = useState<LocalAgentEndpointStatus[]>([]);
+  const [pairingNotice, setPairingNotice] = useState<LocalAgentPairingNotice | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const saveChainRef = useRef(createSerialAsyncChain());
 
   const refresh = useCallback(async () => {
     try {
-      const [settings, nextAgents, nextStatus] = await Promise.all([
+      const [settings, nextAgents, nextStatus, nextNotice] = await Promise.all([
         loadLocalAgentSettings(storage),
         loadLocalAgentConnectedAgents(storage),
         loadLocalAgentStatus(storage),
+        loadPairingNotice(storage),
       ]);
 
       setEnabled(settings.enabled);
       setAgents(nextAgents);
       setStatus(nextStatus);
+      setPairingNotice(nextNotice);
       setLoadError(false);
     } catch {
       setLoadError(true);
@@ -93,11 +118,15 @@ export const LocalAgentsSettings = (): JSX.Element => {
     const unwatchStatus = storage.watch(LOCAL_AGENT_STATUS_STORAGE_KEY, () => {
       void refresh();
     });
+    const unwatchNotice = storage.watch(LOCAL_AGENT_PAIRING_NOTICE_STORAGE_KEY, () => {
+      void refresh();
+    });
 
     return () => {
       unwatchSettings();
       unwatchControllers();
       unwatchStatus();
+      unwatchNotice();
     };
   }, [refresh]);
 
@@ -162,6 +191,12 @@ export const LocalAgentsSettings = (): JSX.Element => {
       {loadError ? (
         <p className="type-body mt-2 text-status-red-400">{LOAD_ERROR_MESSAGE}</p>
       ) : null}
+
+      {pairingNotice === null ? null : (
+        <p className="type-body mt-2 text-foreground-muted">
+          {PAIRING_NOTICE_HINTS[pairingNotice]}
+        </p>
+      )}
 
       {view.emptyState === 'host_missing_not_installed' ? (
         <p className="type-body mt-2 text-foreground-muted">{HOST_MISSING_HINT}</p>

@@ -1,7 +1,7 @@
 /* eslint-disable typescript-eslint/consistent-type-definitions -- AGENTS.md prefers type over interface */
 import { z } from 'zod';
-import { isUsablePairingEndpoint } from './pairing';
-import type { LocalAgentPairingEndpoint } from './pairing';
+import { isUsableStoredEndpoint } from './pairing';
+import type { LocalAgentStoredEndpoint } from './pairing';
 import { createSerialTaskQueue } from './storage';
 import type { LocalAgentStorageArea } from './storage';
 
@@ -26,7 +26,7 @@ const storedEndpointsSchema = z
   })
   .strip();
 
-export type LocalAgentStoredEndpoint = z.infer<typeof storedEndpointSchema>;
+export type { LocalAgentStoredEndpoint } from './pairing';
 
 /* Two pairing navigations can land in the same tick; one queue keeps every
    read-modify-write on the endpoints key ordered. */
@@ -46,7 +46,7 @@ const readEndpoints = async (
   const byHub = new Map<string, LocalAgentStoredEndpoint>();
 
   for (const endpoint of parsed.data.endpoints) {
-    if (isUsablePairingEndpoint(endpoint)) {
+    if (isUsableStoredEndpoint(endpoint)) {
       byHub.set(endpoint.hubId, endpoint);
     }
   }
@@ -68,12 +68,12 @@ export const loadLocalAgentEndpoints = (
 /** Stores (or replaces by hubId) one endpoint; unusable endpoints are dropped. */
 export const saveLocalAgentEndpoint = (
   storage: LocalAgentStorageArea,
-  endpoint: LocalAgentPairingEndpoint
+  endpoint: LocalAgentStoredEndpoint
 ): Promise<LocalAgentStoredEndpoint[]> =>
   endpointWrites(async () => {
     const current = await readEndpoints(storage);
 
-    if (!isUsablePairingEndpoint(endpoint)) {
+    if (!isUsableStoredEndpoint(endpoint)) {
       return current;
     }
 

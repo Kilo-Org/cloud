@@ -1,10 +1,11 @@
-/* eslint-disable import/max-dependencies, max-expects, max-lines, promise/prefer-await-to-callbacks, vitest/no-conditional-in-test, typescript-eslint/consistent-type-definitions -- one integration harness asserts each protocol step of the flow and supplies the storage watcher fakes */
+/* eslint-disable eslint/id-length, import/max-dependencies, max-expects, max-lines, promise/prefer-await-to-callbacks, vitest/no-conditional-in-test, typescript-eslint/consistent-type-definitions -- one integration harness asserts each protocol step of the flow, and its fetch fake names the wire field `v` */
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { base64UrlEncode, computeHubMac, decodePairingKey } from './encoding';
 import { LOCAL_AGENT_ENDPOINTS_STORAGE_KEY } from './endpoints';
 import type { LoopbackSocketConnect, LoopbackSocketHandlers } from './loopback-transport';
 import { LOCAL_AGENT_CONTROLLERS_STORAGE_KEY, loadLocalAgentConnectedAgents } from './registry';
+import { loadPairingNotice } from './pairing-notice';
 import { LOCAL_AGENT_SETTINGS_STORAGE_KEY } from './settings';
 import type {
   LocalAgentStorageArea,
@@ -20,10 +21,12 @@ const KEY = 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8';
 const WS = 'ws://127.0.0.1:47917/__kilo_browser';
 const EXTENSION_ID = 'kilo-test-extension-id';
 const CONTROLLER_ID = '11111111-2222-4333-8444-555555555555';
-const PAIRING_URL = `http://127.0.0.1:47917/__kilo_browser_pair#v=1&hub=${HUB_ID}&k=${KEY}&ws=${encodeURIComponent(WS)}`;
 const NEW_KEY = 'ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8';
+const TOKEN = 'EBESExQVFhcYGRobHB0eHw';
+const NEW_TOKEN = 'MDEyMzQ1Njc4OWFiY2RlZg';
 const NEW_WS = 'ws://127.0.0.1:48100/__kilo_browser';
-const REPAIRING_URL = `http://127.0.0.1:48100/__kilo_browser_pair#v=1&hub=${HUB_ID}&k=${NEW_KEY}&ws=${encodeURIComponent(NEW_WS)}`;
+const PAIRING_URL = `http://127.0.0.1:47917/__kilo_browser_pair#v=1&hub=${HUB_ID}&t=${TOKEN}&ws=${encodeURIComponent(WS)}`;
+const REPAIRING_URL = `http://127.0.0.1:48100/__kilo_browser_pair#v=1&hub=${HUB_ID}&t=${NEW_TOKEN}&ws=${encodeURIComponent(NEW_WS)}`;
 
 const recordSchema = z.record(z.string(), z.unknown());
 const stringRecordSchema = z.record(z.string(), z.string());
@@ -113,6 +116,10 @@ const createHarness = () => {
     ) => void;
   } = {};
   const removeTab = vi.fn((): Promise<void> => Promise.resolve());
+  const pairingResults = new Map<string, { key: string; ws: string } | { status: number }>([
+    [TOKEN, { key: KEY, ws: WS }],
+    [NEW_TOKEN, { key: NEW_KEY, ws: NEW_WS }],
+  ]);
   const createSocket: LoopbackSocketConnect = (url, handlers) => {
     const socket: FakeSocket = { closed: 0, handlers, sent: [], url };
     sockets.push(socket);
@@ -179,6 +186,23 @@ const createHarness = () => {
       hasWebRequest: false,
     },
     createSocket,
+    fetch: (url: string) => {
+      const token = new URL(url).searchParams.get('t') ?? '';
+      const result = pairingResults.get(token);
+
+      if (result === undefined) {
+        return Promise.resolve({ json: () => Promise.resolve({}), status: 404 });
+      }
+
+      if ('status' in result) {
+        return Promise.resolve({ json: () => Promise.resolve({}), status: result.status });
+      }
+
+      return Promise.resolve({
+        json: () => Promise.resolve({ key: result.key, v: 1, ws: result.ws }),
+        status: 200,
+      });
+    },
     now: () => 1000,
     storage,
     timers: {
@@ -196,6 +220,7 @@ const createHarness = () => {
     commands,
     hostOptions,
     listeners,
+    pairingResults,
     removeTab,
     runtime,
     sockets,
@@ -668,6 +693,58 @@ describe('pairing admission', () => {
     });
     expect(harness.sockets[2]?.url).toBe(WS);
     expect(harness.removeTab).toHaveBeenCalledWith(63);
+    host.stop();
+  });
+
+  it('shows the install-host hint when the CLI refuses this browser', async () => {
+    const harness = createHarness();
+    harness.storage.items.set(LOCAL_AGENT_SETTINGS_STORAGE_KEY, { enabled: true });
+    harness.pairingResults.set(TOKEN, { status: 403 });
+    const host = startHost(harness);
+    await host.ready;
+
+    harness.listeners.tabUpdated?.(80, { url: PAIRING_URL }, { url: PAIRING_URL });
+
+    await vi.waitFor(async () => {
+      await expect(loadPairingNotice(harness.storage)).resolves.toBe('not_allowed');
+    });
+    expect(harness.storage.items.get(LOCAL_AGENT_ENDPOINTS_STORAGE_KEY)).toBeUndefined();
+    expect(harness.sockets).toHaveLength(0);
+    host.stop();
+  });
+
+  it('reports an expired pairing link instead of dialing', async () => {
+    const harness = createHarness();
+    harness.storage.items.set(LOCAL_AGENT_SETTINGS_STORAGE_KEY, { enabled: true });
+    harness.pairingResults.set(TOKEN, { status: 404 });
+    const host = startHost(harness);
+    await host.ready;
+
+    harness.listeners.tabUpdated?.(81, { url: PAIRING_URL }, { url: PAIRING_URL });
+
+    await vi.waitFor(async () => {
+      await expect(loadPairingNotice(harness.storage)).resolves.toBe('expired');
+    });
+    expect(harness.storage.items.get(LOCAL_AGENT_ENDPOINTS_STORAGE_KEY)).toBeUndefined();
+    expect(harness.sockets).toHaveLength(0);
+    host.stop();
+  });
+
+  it('refuses a redeemed socket that is not loopback', async () => {
+    const harness = createHarness();
+    harness.storage.items.set(LOCAL_AGENT_SETTINGS_STORAGE_KEY, { enabled: true });
+    harness.pairingResults.set(TOKEN, { key: KEY, ws: 'ws://hub.kilo.ai/__kilo_browser' });
+    const host = startHost(harness);
+    await host.ready;
+
+    harness.listeners.tabUpdated?.(82, { url: PAIRING_URL }, { url: PAIRING_URL });
+
+    await vi.waitFor(() => {
+      expect(harness.removeTab).toHaveBeenCalledWith(82);
+    });
+    await expect(loadPairingNotice(harness.storage)).resolves.toBeNull();
+    expect(harness.storage.items.get(LOCAL_AGENT_ENDPOINTS_STORAGE_KEY)).toBeUndefined();
+    expect(harness.sockets).toHaveLength(0);
     host.stop();
   });
 

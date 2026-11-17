@@ -1,13 +1,14 @@
-/* eslint-disable eslint/id-length -- fragment keys are the wire names `k` and `v` */
+/* eslint-disable eslint/id-length -- fragment keys are the wire names `t` and `v` */
 import { describe, expect, it } from 'vitest';
-import { isUsablePairingEndpoint, parseLoopbackSocketUrl, parsePairingUrl } from './pairing';
+import { isUsableStoredEndpoint, parseLoopbackSocketUrl, parsePairingUrl } from './pairing';
 
 const HUB_ID = '6f1c2d3e-4a5b-4c6d-8e9f-0a1b2c3d4e5f';
+const TOKEN = 'EBESExQVFhcYGRobHB0eHw';
 const KEY = 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8';
 const WS = 'ws://127.0.0.1:47917/__kilo_browser';
 
 const pairingUrl = (overrides: Record<string, string> = {}, base = 'http://127.0.0.1:47917') => {
-  const fields = { hub: HUB_ID, k: KEY, v: '1', ws: WS, ...overrides };
+  const fields = { hub: HUB_ID, t: TOKEN, v: '1', ws: WS, ...overrides };
 
   return `${base}/__kilo_browser_pair#${Object.entries(fields)
     .map(([name, value]) => `${name}=${encodeURIComponent(value)}`)
@@ -15,10 +16,10 @@ const pairingUrl = (overrides: Record<string, string> = {}, base = 'http://127.0
 };
 
 describe('pairing fragment parsing', () => {
-  it('accepts the documented loopback pairing URL', () => {
+  it('accepts the documented loopback pairing URL and carries no key', () => {
     expect(parsePairingUrl(pairingUrl())).toStrictEqual({
       hubId: HUB_ID,
-      key: KEY,
+      token: TOKEN,
       ws: WS,
     });
   });
@@ -47,17 +48,18 @@ describe('pairing fragment parsing', () => {
     expect(parsePairingUrl(pairingUrl({ hub: 'hub-1' }))).toBeNull();
   });
 
-  it('rejects a key that is not 32 bytes', () => {
-    expect(parsePairingUrl(pairingUrl({ k: 'AAECAwQFBgcICQoLDA0ODw' }))).toBeNull();
-    expect(parsePairingUrl(pairingUrl({ k: `${KEY}AA` }))).toBeNull();
-    expect(parsePairingUrl(pairingUrl({ k: 'not!base64url' }))).toBeNull();
+  it('rejects a token that is not 16 bytes', () => {
+    expect(parsePairingUrl(pairingUrl({ t: 'EBESExQVFhcYGRobHB0eH' }))).toBeNull();
+    expect(parsePairingUrl(pairingUrl({ t: `${TOKEN}AA` }))).toBeNull();
+    expect(parsePairingUrl(pairingUrl({ t: 'not!base64url' }))).toBeNull();
   });
 
-  it('rejects duplicate fragment parameters', () => {
-    expect(parsePairingUrl(`${pairingUrl()}&hub=${HUB_ID}`)).toBeNull();
+  it('rejects the retired key-bearing fragment', () => {
+    expect(parsePairingUrl(pairingUrl({ k: KEY, t: '' }))).toBeNull();
   });
 
-  it('rejects an empty fragment', () => {
+  it('rejects duplicate fragment parameters and an empty fragment', () => {
+    expect(parsePairingUrl(`${pairingUrl()}&t=${TOKEN}`)).toBeNull();
     expect(parsePairingUrl('http://127.0.0.1:47917/__kilo_browser_pair')).toBeNull();
     expect(parsePairingUrl('http://127.0.0.1:47917/__kilo_browser_pair#')).toBeNull();
   });
@@ -96,11 +98,11 @@ describe('loopback-only socket validation', () => {
   });
 
   it('refuses stored endpoints that fail the loopback rules', () => {
-    expect(isUsablePairingEndpoint({ hubId: HUB_ID, key: KEY, ws: WS })).toBe(true);
+    expect(isUsableStoredEndpoint({ hubId: HUB_ID, key: KEY, ws: WS })).toBe(true);
     expect(
-      isUsablePairingEndpoint({ hubId: HUB_ID, key: KEY, ws: 'ws://hub.kilo.ai/__kilo_browser' })
+      isUsableStoredEndpoint({ hubId: HUB_ID, key: KEY, ws: 'ws://hub.kilo.ai/__kilo_browser' })
     ).toBe(false);
-    expect(isUsablePairingEndpoint({ hubId: 'nope', key: KEY, ws: WS })).toBe(false);
-    expect(isUsablePairingEndpoint({ hubId: HUB_ID, key: 'short', ws: WS })).toBe(false);
+    expect(isUsableStoredEndpoint({ hubId: 'nope', key: KEY, ws: WS })).toBe(false);
+    expect(isUsableStoredEndpoint({ hubId: HUB_ID, key: 'short', ws: WS })).toBe(false);
   });
 });

@@ -58,6 +58,7 @@
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@types/selenium-webdriver": "^4.35.6",
+    "@types/ws": "^8.18.1",
     "@vitest/coverage-v8": "catalog:vitest5",
     "@wxt-dev/module-react": "1.2.2",
     "geckodriver": "^6.1.0",
@@ -67,6 +68,7 @@
     "typescript": "catalog:",
     "vitest": "catalog:vitest5",
     "web-ext": "10.4.0",
+    "ws": "8.21.0",
     "wxt": "0.20.26"
   }
 }

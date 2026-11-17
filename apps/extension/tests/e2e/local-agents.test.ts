@@ -7,6 +7,7 @@ import {
   readExtensionLocalStorage,
   seedExtensionAuth,
 } from './extension-context-fixture';
+import { mockKiloApi } from './kilo-api-fixture';
 import { FAKE_HUB_ID, fakeHubMac, fakeHubNonce, startFakeHub } from './local-agents-hub-fixture';
 
 /*
@@ -17,6 +18,7 @@ import { FAKE_HUB_ID, fakeHubMac, fakeHubNonce, startFakeHub } from './local-age
  */
 
 const PAIRING_KEY = 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8';
+const PAIRING_TOKEN = 'ICEiIyQlJicoKSorLC0uLw';
 
 const rpcMessageSchema = z.object({
   id: z.number().optional(),
@@ -41,10 +43,18 @@ const rpcMessage = (frame: Record<string, unknown>) => {
 };
 
 test('local agents pair over loopback, list the session, and Stop all revokes it', async () => {
-  // The flow spans a pairing navigation, the handshake, and two panel updates.
   test.setTimeout(60_000);
   const hub = await startFakeHub();
   const { context, extensionId, userDataDir } = await launchExtensionContext();
+  await mockKiloApi(context, {});
+  // A real user answers the optional-permission prompt; automation cannot.
+  // The page grants it the way an accepted prompt would, keeping the flow deterministic.
+  await context.addInitScript({
+    content:
+      "Object.defineProperty(chrome.permissions, 'request', { value: () => Promise.resolve(true) });",
+  });
+  hub.setAllowedOrigin(`chrome-extension://${extensionId}`);
+  hub.setPairing({ key: PAIRING_KEY, token: PAIRING_TOKEN });
 
   try {
     const sidePanel = await context.newPage();
@@ -59,10 +69,12 @@ test('local agents pair over loopback, list the session, and Stop all revokes it
     await toggle.click();
     await expect(toggle).toHaveAttribute('aria-checked', 'true');
 
-    const pairingPage = await context.newPage();
-    // The extension closes the pairing tab as soon as it reads the fragment.
-    await pairingPage.goto(hub.pairingUrl(FAKE_HUB_ID, PAIRING_KEY)).catch(() => {
-      /* Expected: the extension closed the tab mid-navigation. */
+    // The CLI opens the pairing page in a tab with no opener.
+    // Playwright's newPage() always records one, so create the tab through CDP.
+    const cdp = await context.newCDPSession(sidePanel);
+    await cdp.send('Target.createTarget', {
+      newWindow: true,
+      url: hub.pairingUrl(FAKE_HUB_ID, PAIRING_TOKEN),
     });
 
     await expect.poll(() => hub.connected, { timeout: 15_000 }).toBe(true);
@@ -90,11 +102,20 @@ test('local agents pair over loopback, list the session, and Stop all revokes it
     expect(hello.protocol).toStrictEqual([1]);
     expect(hello.contractSha).toHaveLength(64);
 
-    const storedEndpoints = await readExtensionLocalStorage(sidePanel, 'kiloLocalAgentEndpoints');
-    expect(storedEndpoints).toStrictEqual({
+    expect(await readExtensionLocalStorage(sidePanel, 'kiloLocalAgentEndpoints')).toStrictEqual({
       endpoints: [{ hubId: FAKE_HUB_ID, key: PAIRING_KEY, ws: hub.wsUrl }],
     });
-    await expect.poll(() => pairingPage.isClosed()).toBe(true);
+    await expect
+      .poll(async () =>
+        z
+          .boolean()
+          .parse(
+            await sidePanel.evaluate(
+              "new Promise(resolve => chrome.tabs.query({}, tabs => resolve(tabs.some(tab => (tab.url || '').includes('/__kilo_browser_pair/')))))"
+            )
+          )
+      )
+      .toBe(false);
 
     const controllerId = crypto.randomUUID();
     const sessionTitle = 'Local agent E2E session';

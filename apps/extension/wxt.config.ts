@@ -25,7 +25,8 @@ export default defineConfig({
     },
     commands: {
       'stop-all-local-agents': {
-        // Stop every local agent without hunting for the side panel.
+        // Chrome refuses to start the background worker when a command has no description.
+        description: 'Stop all local agents',
         suggested_key: { default: 'Alt+Shift+K' },
       },
     },

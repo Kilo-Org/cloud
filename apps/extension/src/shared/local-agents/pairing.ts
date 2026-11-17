@@ -1,30 +1,39 @@
-/* eslint-disable eslint/id-length, typescript-eslint/consistent-type-definitions -- fragment keys `k` and `v` are wire names; AGENTS.md prefers type over interface */
+/* eslint-disable eslint/id-length, typescript-eslint/consistent-type-definitions -- fragment keys `t` and `v` are wire names; AGENTS.md prefers type over interface */
 import { z } from 'zod';
-import { decodePairingKey } from './encoding';
+import { decodePairingKey, decodePairingNonce } from './encoding';
 
 /*
  * Loopback pairing boundary (SPEC "Loopback pairing"). The CLI opens
- * `http://127.0.0.1:<port>/__kilo_browser_pair#v=1&hub=<hubId>&k=<key>&ws=<ws url>`;
- * the extension watches tab navigations for that path, keeps only loopback
- * socket URLs with a 32-byte key, and never stores or logs anything else.
+ * `http://127.0.0.1:<port>/__kilo_browser_pair#v=1&hub=<hubId>&t=<token>&ws=<ws url>`;
+ * the extension reads the fragment, closes the tab, and redeems the single-use
+ * token for the 32-byte key. Only loopback socket URLs are ever accepted.
  */
 
 export const PAIRING_PATH = '/__kilo_browser_pair';
+export const PAIRING_KEY_PATH = '/__kilo_browser_pair/key';
 export const HUB_WS_PATH = '/__kilo_browser';
 const MAX_PAIRING_URL_LENGTH = 4096;
 const LOOPBACK_HOSTNAMES = new Set(['127.0.0.1', 'localhost', '[::1]']);
 
+/** What a pairing fragment carries: no key, only a single-use token. */
 export type LocalAgentPairingEndpoint = {
   hubId: string;
+  token: string;
   ws: string;
+};
+
+/** What storage keeps after a successful redemption. */
+export type LocalAgentStoredEndpoint = {
+  hubId: string;
   key: string;
+  ws: string;
 };
 
 const uuidSchema = z.uuid();
 
 const pairingFieldsSchema = z.object({
   hub: z.uuid(),
-  k: z.string().min(1),
+  t: z.string().min(1),
   v: z.literal('1'),
   ws: z.string().min(1),
 });
@@ -71,6 +80,22 @@ export const parseLoopbackSocketUrl = (value: string): string | null => {
   return `ws://${url.hostname}:${url.port}${HUB_WS_PATH}`;
 };
 
+/** The HTTP origin a redeem request may target: the socket's own loopback origin. */
+export const pairingKeyUrl = (ws: string, token: string): string | null => {
+  const canonical = parseLoopbackSocketUrl(ws);
+
+  if (canonical === null) {
+    return null;
+  }
+
+  const socket = new URL(canonical);
+  const redeem = new URL(`http://${socket.host}${PAIRING_KEY_PATH}`);
+
+  redeem.searchParams.set('t', token);
+
+  return redeem.toString();
+};
+
 const parseFragment = (hash: string): Record<string, string> | null => {
   if (hash.length < 2) {
     return null;
@@ -111,7 +136,7 @@ export const parsePairingUrl = (rawUrl: string): LocalAgentPairingEndpoint | nul
 
   const parsed = pairingFieldsSchema.safeParse(fields);
 
-  if (!parsed.success || decodePairingKey(parsed.data.k) === null) {
+  if (!parsed.success || decodePairingNonce(parsed.data.t) === null) {
     return null;
   }
 
@@ -121,14 +146,14 @@ export const parsePairingUrl = (rawUrl: string): LocalAgentPairingEndpoint | nul
     return null;
   }
 
-  return { hubId: parsed.data.hub, key: parsed.data.k, ws };
+  return { hubId: parsed.data.hub, token: parsed.data.t, ws };
 };
 
 /**
  * Defense in depth for values read back from storage: an endpoint is only
  * usable when its socket URL and key still satisfy the loopback rules.
  */
-export const isUsablePairingEndpoint = (endpoint: LocalAgentPairingEndpoint): boolean =>
+export const isUsableStoredEndpoint = (endpoint: LocalAgentStoredEndpoint): boolean =>
   parseLoopbackSocketUrl(endpoint.ws) === endpoint.ws &&
   decodePairingKey(endpoint.key) !== null &&
   uuidSchema.safeParse(endpoint.hubId).success;

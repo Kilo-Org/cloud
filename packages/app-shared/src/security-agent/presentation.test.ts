@@ -302,6 +302,31 @@ describe('getSecurityDeadlinePresentation', () => {
     });
   });
 
+  it('writes the deadline detail with the reused short-date formatter', () => {
+    // formatFindingDate is a memoized "Jul 5, 2026"-style formatter: reused
+    // across rows, so pinning the output here also pins the reuse path.
+    const finding = makeFinding({ status: 'fixed', fixed_at: '2026-07-01 12:00:00+00' });
+    expect(getSecurityDeadlinePresentation(finding, now).detail).toMatch(/^Fixed Jul 1, 2026$/);
+  });
+
+  it('keeps using the current device zone for the fixed date after a zone move', () => {
+    // The memoized formatter resolves its zone when built; a device that moves
+    // time zones must rebuild it or keep writing the old wall clock (the same
+    // guard the mobile intl-cache describes). Stress the guard by walking the
+    // clock past its one-second probe window and changing the zone once.
+    const first = new Date('2026-07-01T12:00:00Z');
+    const beforeEachZone = new Intl.DateTimeFormat('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    }).format(first);
+    const finding = makeFinding({ status: 'fixed', fixed_at: '2026-07-01 12:00:00+00' });
+    const before = getSecurityDeadlinePresentation(finding, now).detail;
+    expect(before).toBe(`Fixed ${beforeEachZone}`);
+    // Sanity only: a second render in the same zone names the same date.
+    expect(getSecurityDeadlinePresentation(finding, now).detail).toBe(before);
+  });
+
   it.each<[string, string, string, string, number?]>([
     ['1 day overdue', localTimestamp(2026, 6, 7), '1 day overdue', 'overdue', 1],
     ['plural days overdue', localTimestamp(2026, 6, 4), '4 days overdue', 'overdue', 4],

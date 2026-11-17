@@ -278,15 +278,32 @@ function isSupersededFinding(finding: SecurityFinding): boolean {
 // helpers run once per finding row, so a full page is N constructions per
 // render. Construction is deferred to first use — mobile imports this module
 // before its Intl polyfill warm-up, and the native Intl that exists at import
-// time must not own the cached formatter.
+// time must not own the cached formatter. The zone guard keeps the reused
+// formatter honest: a formatter resolves its zone when built, so a device that
+// moves time zones must rebuild it or keep writing the old wall clock.
+const FINDING_DATE_OPTIONS: Intl.DateTimeFormatOptions = {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+};
 let findingDateFormatValue: Intl.DateTimeFormat | null = null;
+let findingDateDeviceZone: string | null = null;
+let findingDateZoneCheckedAt = 0;
 
 function formatFindingDate(date: Date): string {
-  findingDateFormatValue ??= new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
+  // One Intl read per second, matching the mobile intl-cache convention
+  // (dropDateFormattersForNewDeviceZone) so a row render cannot re-probe Intl
+  // on every keystroke.
+  const zoneProbeAt = Date.now();
+  if (findingDateDeviceZone === null || zoneProbeAt - findingDateZoneCheckedAt >= 1000) {
+    findingDateZoneCheckedAt = zoneProbeAt;
+    const deviceZone = new Intl.DateTimeFormat(undefined, {}).resolvedOptions().timeZone;
+    if (deviceZone !== findingDateDeviceZone) {
+      findingDateDeviceZone = deviceZone;
+      findingDateFormatValue = null;
+    }
+  }
+  findingDateFormatValue ??= new Intl.DateTimeFormat('en-US', FINDING_DATE_OPTIONS);
   return findingDateFormatValue.format(date);
 }
 

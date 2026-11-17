@@ -41,3 +41,15 @@ if (typeof globalThis.getComputedStyle === 'undefined') {
     writable: true,
   });
 }
+
+/**
+ * Next's server runtime reads `globalThis.AsyncLocalStorage` when it builds
+ * the request async stores and caches the store on `globalThis` under a
+ * versioned symbol. A store module that loads before this global is set
+ * caches a fake store whose `run` throws, and a later assignment cannot
+ * repair the cached fake. The node runtime has the real class, so install
+ * it here, before any test module's import chain reaches `next/server`.
+ */
+if (typeof globalThis.AsyncLocalStorage === 'undefined') {
+  globalThis.AsyncLocalStorage = require('node:async_hooks').AsyncLocalStorage;
+}

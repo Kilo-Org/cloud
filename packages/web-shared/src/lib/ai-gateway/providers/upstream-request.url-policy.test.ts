@@ -220,9 +220,9 @@ describe('upstreamRequest upstream URL policy', () => {
       expect(lookupMock).toHaveBeenCalledTimes(2);
       expect(pinnedAddressOf('llm.example.com')).toEqual([[null, '104.18.9.9', 4]]);
       const [, init] = fetchMock.mock.calls[1];
-      expect(
-        (init as (RequestInit & { dispatcher?: Dispatcher }) | undefined)?.dispatcher
-      ).toBe(upstreamDispatcherFor('llm.example.com', ['104.18.9.9']));
+      expect((init as (RequestInit & { dispatcher?: Dispatcher }) | undefined)?.dispatcher).toBe(
+        upstreamDispatcherFor('llm.example.com', ['104.18.9.9'])
+      );
       jest.restoreAllMocks();
     });
 

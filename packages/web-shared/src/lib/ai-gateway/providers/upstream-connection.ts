@@ -146,7 +146,10 @@ export const lookupPinnedUpstreamAddress: LookupFunction = (hostname, options, c
   const answer = (addresses: readonly string[]) => {
     const nonPublic = addresses.find(address => !isPublicIp(address));
     if (nonPublic !== undefined) {
-      callback(new UpstreamAddressUnverifiedError(hostname, `${nonPublic} is not a public address`), '');
+      callback(
+        new UpstreamAddressUnverifiedError(hostname, `${nonPublic} is not a public address`),
+        ''
+      );
       return;
     }
     if (options.all === true) {

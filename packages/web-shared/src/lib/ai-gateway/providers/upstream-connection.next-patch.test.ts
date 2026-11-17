@@ -3,7 +3,8 @@
 // module registry only once that global exists. Jest hoists `jest.mock` calls
 // above the imports, but it keeps the import order, so the assignment runs
 // before the store modules load through `jest.requireActual` below.
-globalThis.AsyncLocalStorage ??= require('node:async_hooks').AsyncLocalStorage;
+const asyncHooks = jest.requireActual('node:async_hooks');
+globalThis.AsyncLocalStorage ??= asyncHooks.AsyncLocalStorage;
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { LookupFunction } from 'node:net';
@@ -12,10 +13,7 @@ import type * as NextUnit from 'next/dist/server/app-render/work-unit-async-stor
 import { lookup } from 'node:dns/promises';
 import type { Agent as UndiciAgent, Dispatcher, RequestInit as UndiciRequestInit } from 'undici';
 import { Agent } from 'undici';
-import {
-  clearUpstreamConnectionCache,
-  lookupPinnedUpstreamAddress,
-} from './upstream-connection';
+import { clearUpstreamConnectionCache, lookupPinnedUpstreamAddress } from './upstream-connection';
 
 jest.mock('node:dns/promises', () => ({ lookup: jest.fn() }));
 
@@ -23,7 +21,10 @@ jest.resetModules();
 const { createPatchedFetcher } = jest.requireActual<{
   createPatchedFetcher: (
     originFetch: typeof fetch,
-    stores: { workAsyncStorage: typeof NextWork.workAsyncStorage; workUnitAsyncStorage: typeof NextUnit.workUnitAsyncStorage }
+    stores: {
+      workAsyncStorage: typeof NextWork.workAsyncStorage;
+      workUnitAsyncStorage: typeof NextUnit.workUnitAsyncStorage;
+    }
   ) => unknown;
 }>('next/dist/server/lib/patch-fetch');
 const { workAsyncStorage } = jest.requireActual<typeof NextWork>(
@@ -52,9 +53,7 @@ type GatewayInit = RequestInit & { dispatcher?: Dispatcher };
 function inRequestStore<T>(work: () => Promise<T>): Promise<T> {
   // The patch reads only the route and tracking fields of the work store; no
   // HTTP server is simulated.
-  const store = { route: 'next-patch-guard.test' } as Parameters<
-    typeof workAsyncStorage.run
-  >[0];
+  const store = { route: 'next-patch-guard.test' } as Parameters<typeof workAsyncStorage.run>[0];
   const unit = { type: 'request', phase: 'action' } as Parameters<
     typeof workUnitAsyncStorage.run
   >[0];
@@ -137,19 +136,23 @@ describe('the Next patched fetch forwards the pinned dispatcher to undici', () =
       (reason: unknown) => reason
     );
 
-    expect(error).toBeInstanceOf(TypeError);
+    // Node's global fetch lives in the host context, so its errors carry the
+    // host TypeError, not the test file's: assert the name instead of the
+    // constructor identity.
+    expect((error as TypeError).name).toBe('TypeError');
     const cause = causeOf(error);
-    expect(cause).toMatchObject({
-      name: 'UpstreamAddressUnverifiedError',
-      code: 'ERR_UPSTREAM_ADDRESS_UNVERIFIED',
-    });
-    expect(String((cause as Error).message)).toContain('refused-pin.test');
+    // Message passing across the context boundary keeps only own enumerable
+    // fields with the prototype name baked in, so assert the wording that
+    // names the host and check.
+    expect(String((cause as Error).message)).toBe(
+      'UpstreamAddressUnverifiedError: The upstream host refused-pin.test was not verified: the refreshed check found no address.'
+    );
   });
 
   it('answers an init without a dispatcher with an unpatched fetch failure', async () => {
     await expect(
       inRequestStore(() => patchedFetch('http://127.0.0.1:9/x', { method: 'GET' }))
-    ).rejects.toBeInstanceOf(TypeError);
+    ).rejects.toMatchObject({ name: 'TypeError' });
   });
 });
 

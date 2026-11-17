@@ -724,7 +724,11 @@ describe('fetchNativeSnapshot', () => {
     );
     const snapshot = await fetchNativeSnapshot(request, sessionID, undefined, readAsset);
     const keptKey = kilo2AssetKey(kilo2PartId(message.id, 1), `media:${keptHash}`, 'image/png');
-    const failingKey = kilo2AssetKey(kilo2PartId(message.id, 2), `media:${failingHash}`, 'image/png');
+    const failingKey = kilo2AssetKey(
+      kilo2PartId(message.id, 2),
+      `media:${failingHash}`,
+      'image/png'
+    );
     expect(snapshot.assetURLs?.[keptKey]).toBe('data:image/png;base64,AQID');
     expect(snapshot.assetURLs?.[failingKey]).toBe('data:image/png;base64,AQID');
     // The settled kept read in attempt 1 was not repeated after the restart.

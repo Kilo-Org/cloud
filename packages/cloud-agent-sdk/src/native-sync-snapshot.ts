@@ -580,7 +580,13 @@ export async function fetchNativeSnapshot(
   try {
     for (let attempt = 0; ; attempt++) {
       try {
-        return await readSnapshot(cancellable, sessionID, cancellableAsset, resolvedEntities, resolvedBlobs);
+        return await readSnapshot(
+          cancellable,
+          sessionID,
+          cancellableAsset,
+          resolvedEntities,
+          resolvedBlobs
+        );
       } catch (error) {
         if (
           controller.signal.aborted ||

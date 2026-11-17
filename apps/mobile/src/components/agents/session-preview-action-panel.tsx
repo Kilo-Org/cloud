@@ -47,7 +47,7 @@ export function SessionPreviewActionPanel({
             onPress={() => {
               onSelect(item);
             }}
-            className={cn(ROW_TARGET_CLASS, 'justify-center px-4 py-3 active:bg-muted')}
+            className={cn(ROW_TARGET_CLASS, 'justify-center px-4 py-3 active:opacity-70')}
           >
             <Text className={cn('text-base', item.destructive && 'text-destructive')}>
               {item.label}
@@ -59,7 +59,7 @@ export function SessionPreviewActionPanel({
           accessibilityRole="button"
           accessibilityLabel={menu.cancelLabel}
           onPress={onCancel}
-          className={cn(ROW_TARGET_CLASS, 'justify-center px-4 py-3 active:bg-muted')}
+          className={cn(ROW_TARGET_CLASS, 'justify-center px-4 py-3 active:opacity-70')}
         >
           <Text className="text-base">{menu.cancelLabel}</Text>
         </Pressable>,

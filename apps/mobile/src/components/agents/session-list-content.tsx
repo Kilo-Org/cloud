@@ -384,7 +384,7 @@ export function AgentSessionListContent({
         return <SessionSectionHeaderSkeleton />;
       }
       if (item.kind === 'skeleton') {
-        return <SessionRowSkeleton subtitle={false} />;
+        return <SessionRowSkeleton />;
       }
       if (item.kind === 'section-header') {
         return (

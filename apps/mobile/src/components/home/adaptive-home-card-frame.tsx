@@ -1,6 +1,7 @@
 import { createContext, type ReactNode, useContext } from 'react';
 import { Pressable, View } from 'react-native';
 
+import { Card } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
 import { DENSE_ROW_FRAME_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
@@ -88,11 +89,9 @@ export function AdaptiveHomeCardFrame({
   showBriefing,
 }: Readonly<AdaptiveHomeCardFrameProps>) {
   return (
-    // One card surface that holds two full-height layers: the frame needs a
-    // padless card (the layers own their rows' padding), which `Card` does not
-    // offer yet, so the surface stays spelled here and the layout rules admit
-    // it through the baseline.
-    <View className="flex-row items-stretch overflow-hidden rounded-xl bg-secondary">
+    // One padless card surface that holds two full-height layers: the layers
+    // own their rows' padding, so the surface carries none of its own.
+    <Card padding="none" className="flex-row items-stretch" testID="home-card-frame">
       <CardLayer reserved={showBriefing} className="w-full shrink-0">
         {live}
       </CardLayer>
@@ -118,6 +117,6 @@ export function AdaptiveHomeCardFrame({
           <Text className="text-sm">{'\u200B\n\u200B'}</Text>
         </View>
       </View>
-    </View>
+    </Card>
   );
 }

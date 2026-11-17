@@ -168,7 +168,7 @@ function SessionPreviewSheet({
   let body: ReactNode = null;
   if (state.kind === 'loading') {
     body = (
-      <View className="min-h-32 flex-row items-center justify-center gap-2">
+      <View className="min-h-36 flex-row items-center justify-center gap-2">
         <ActivityIndicator />
         <Text className="text-sm text-muted-foreground">{t('common.loading')}</Text>
       </View>
@@ -245,7 +245,10 @@ function SessionPreviewSheet({
             label={t('cloudAgent.preview.listeningServices')}
             actionLabel={t('common.refresh')}
             onActionPress={refetch}
-            actionHidden={openingPort !== null}
+            // A port being opened keeps the action in place and inert instead
+            // of removing it, so the label row never reflows mid-open.
+            actionDisabled={openingPort !== null}
+            actionTestID="session-preview-refresh"
             reserveLabelAir
           />
           <View className="pt-2">{body}</View>

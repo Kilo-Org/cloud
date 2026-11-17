@@ -8,15 +8,14 @@ const SKELETON_ROW_COUNT = 8;
 /**
  * One flat-list row placeholder: the shared session skeleton, which owns the
  * flat row's strip, eyebrow, title and divider geometry, so the loaded rows
- * land exactly where the placeholders stood.
+ * land exactly where the placeholders stood. The bars reserve the two text
+ * lines a session row draws under its eyebrow — a title that wraps to its
+ * second line, or a title and its subtitle — at the same line heights.
  */
-export function SessionRowSkeleton({
-  subtitle,
-  last = false,
-}: Readonly<{ subtitle: boolean; last?: boolean }>) {
+export function SessionRowSkeleton({ last = false }: Readonly<{ last?: boolean }>) {
   return (
     <View testID="session-row-skeleton">
-      <RowSkeleton variant="session" subtitle={subtitle} last={last} />
+      <RowSkeleton variant="session" lines={2} last={last} />
     </View>
   );
 }
@@ -46,7 +45,7 @@ export function SessionListSkeletonRows({
   return (
     <View style={{ paddingLeft: insets.left, paddingRight: insets.right }}>
       {Array.from({ length: SKELETON_ROW_COUNT }, (_, i) => (
-        <SessionRowSkeleton key={i} subtitle last={i === SKELETON_ROW_COUNT - 1} />
+        <SessionRowSkeleton key={i} last={i === SKELETON_ROW_COUNT - 1} />
       ))}
     </View>
   );

@@ -77,7 +77,8 @@ export function ChatTitle({ title, initialValue, canRename, onRename }: Readonly
         )}
       >
         <Text
-          className="shrink text-lg font-semibold text-foreground"
+          variant="large"
+          className="shrink"
           numberOfLines={1}
           onLayout={measure(setTitleWidth)}
         >

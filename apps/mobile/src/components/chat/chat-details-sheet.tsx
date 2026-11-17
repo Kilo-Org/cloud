@@ -145,7 +145,7 @@ export function ChatDetailsSheet({
           </View>
         </View>
 
-        <View className="mt-6 gap-4">
+        <View className="gap-4">
           <Row label={t('agentChat.contextUsage.used')}>
             <Text className="text-base font-medium text-foreground tabular-nums">
               {content.usedTokens ?? '-'}
@@ -215,7 +215,7 @@ export function ChatDetailsSheet({
           </Text>
         </View>
 
-        <View className="mt-8 gap-4">
+        <View className="gap-4">
           <Text className="text-sm font-semibold text-foreground">
             {t('agentChat.contextUsage.tokenUsage')}
           </Text>
@@ -269,7 +269,7 @@ export function ChatDetailsSheet({
 
         <ToolsSection model={model} imagesSupported={imagesSupported} mcp={mcp} />
 
-        <View className="mt-8 gap-4">
+        <View className="gap-4">
           {record.createdAt === null ? null : (
             <Row label={t('codeReviewer.reviewDetail.created')}>
               <Text className="text-base font-medium text-foreground">

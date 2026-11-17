@@ -14,11 +14,7 @@ export function DismissFindingSkeleton() {
   const modalTopInset = useFormSheetHeaderTopInset();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader
-        title={t('securityAgent.dismiss.title')}
-        modal
-        modalTopInset={modalTopInset}
-      />
+      <ScreenHeader title={t('securityAgent.dismiss.title')} modal modalTopInset={modalTopInset} />
       <View className={SCREEN_BODY_CLASS}>
         {/* The identity card, the reason choice group and the comment field. */}
         <Skeleton className="h-24 w-full rounded-xl" />

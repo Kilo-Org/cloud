@@ -222,9 +222,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
             {t('securityAgent.sla.permissionNote')}
           </Text>
         )}
-        <Section
-          label={personal ? undefined : t('securityAgent.notifications.newFindingSection')}
-        >
+        <Section label={personal ? undefined : t('securityAgent.notifications.newFindingSection')}>
           <RowGroup>
             <ToggleRow
               icon={Bell}

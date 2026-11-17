@@ -25,6 +25,7 @@ import { KvRow } from '@/components/ui/kv-row';
 import { RowGroup } from '@/components/ui/row-group';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { formatDate } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
@@ -332,7 +333,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
 
       {advisoryUrl ? (
         <Pressable
-          className="min-h-[48px] flex-row items-center gap-3 px-4 py-3 active:opacity-70"
+          className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 active:opacity-70')}
           onPress={() => {
             openFindingLink(router, advisoryUrl, t('securityAgent.findingDetails.viewAdvisory'));
           }}

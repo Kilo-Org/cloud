@@ -9,9 +9,9 @@ import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { PillGroup } from '@/components/security-agent/settings-pill-group';
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
 import { useSettingsSaveFeedback } from '@/components/security-agent/settings-save-feedback';
+import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
-import { PreferenceRow } from '@/components/ui/preference-row';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Section } from '@/components/ui/section';
@@ -320,7 +320,9 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
                     [t('securityAgent.automation.includeExistingFindings'), remediationSection],
                     i18n.language
                   )}
-                  subtitle={t('securityAgent.automation.includeExistingFindingsRemediationSubtitle')}
+                  subtitle={t(
+                    'securityAgent.automation.includeExistingFindingsRemediationSubtitle'
+                  )}
                   value={autoRemediationIncludeExisting}
                   disabled={!canManage}
                   onValueChange={setAutoRemediationIncludeExisting}

@@ -241,12 +241,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader
-        
-        title={t('securityAgent.dismiss.title')}
-        modal
-        modalTopInset={modalTopInset}
-      />
+      <ScreenHeader title={t('securityAgent.dismiss.title')} modal modalTopInset={modalTopInset} />
       <ScrollView
         className="flex-1"
         contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-8')}
@@ -301,7 +296,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
           textAlignVertical="top"
           placeholder={t('securityAgent.dismiss.commentPlaceholder')}
           defaultValue={dismissDraft.draft?.comment ?? ''}
-          className="h-24 leading-5"
+          className="h-24 leading-[1.25rem]"
           onChangeText={value => {
             commentRef.current = value;
             persistOnType(reason, value);

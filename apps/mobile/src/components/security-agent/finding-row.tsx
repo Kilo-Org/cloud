@@ -44,8 +44,7 @@ import { cn } from '@/lib/utils';
  * a repository caption, a state line and its own inline action — so it keeps
  * the contract's geometry rather than a card of its own.
  */
-const FINDING_ROW_CLASS =
-  'flex-row items-start gap-3 px-4 py-3 border-b-[0.5px] border-hair-soft';
+const FINDING_ROW_CLASS = 'flex-row items-start gap-3 px-4 py-3 border-b-[0.5px] border-hair-soft';
 
 const SEVERITY_KEYS = {
   critical: 'common.critical',

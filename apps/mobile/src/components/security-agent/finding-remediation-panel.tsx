@@ -282,81 +282,81 @@ export function FindingRemediationPanel({
       </Card>
 
       <View className="gap-3">
-      {needsAnalysisRefresh ? <AnalysisRerunAction scope={scope} findingId={findingId} /> : null}
+        {needsAnalysisRefresh ? <AnalysisRerunAction scope={scope} findingId={findingId} /> : null}
 
-      {remediationCapability.canStart ? (
-        <Button
-          disabled={startRemediation.isPending}
-          onPress={() => {
-            startRemediation.mutate({ findingId });
-          }}
-        >
-          {startRemediation.isPending ? (
-            <ActivityIndicator size="small" color={mutedDisabledInk} />
-          ) : null}
-          <Text>{t('securityAgent.remediation.start')}</Text>
-        </Button>
-      ) : null}
+        {remediationCapability.canStart ? (
+          <Button
+            disabled={startRemediation.isPending}
+            onPress={() => {
+              startRemediation.mutate({ findingId });
+            }}
+          >
+            {startRemediation.isPending ? (
+              <ActivityIndicator size="small" color={mutedDisabledInk} />
+            ) : null}
+            <Text>{t('securityAgent.remediation.start')}</Text>
+          </Button>
+        ) : null}
 
-      {remediationCapability.canRetry ? (
-        <Button
-          variant="outline"
-          disabled={retryRemediation.isPending}
-          onPress={() => {
-            retryRemediation.mutate({ findingId });
-          }}
-        >
-          {retryRemediation.isPending ? (
-            <ActivityIndicator size="small" color={colors.foreground} />
-          ) : null}
-          <Text>{t('securityAgent.remediation.retry')}</Text>
-        </Button>
-      ) : null}
+        {remediationCapability.canRetry ? (
+          <Button
+            variant="outline"
+            disabled={retryRemediation.isPending}
+            onPress={() => {
+              retryRemediation.mutate({ findingId });
+            }}
+          >
+            {retryRemediation.isPending ? (
+              <ActivityIndicator size="small" color={colors.foreground} />
+            ) : null}
+            <Text>{t('securityAgent.remediation.retry')}</Text>
+          </Button>
+        ) : null}
 
-      {remediationCapability.canCancel && remediationCapability.cancelAttemptId ? (
-        <Button
-          variant="destructive"
-          disabled={cancelRemediation.isPending}
-          onPress={() => {
-            const attemptId = remediationCapability.cancelAttemptId;
-            if (!attemptId) {
-              return;
-            }
-            confirm({
-              title: t('securityAgent.remediation.cancelTitle'),
-              message: t('securityAgent.remediation.cancelMessage'),
-              confirmLabel: t('securityAgent.remediation.cancelRemediation'),
-              cancelLabel: t('common.keepRunning'),
-              onConfirm: () => {
-                cancelRemediation.mutate({ attemptId, findingId });
-              },
-            });
-          }}
-        >
-          {cancelRemediation.isPending ? (
-            <ActivityIndicator size="small" color={colors.primaryForeground} />
-          ) : null}
-          <Text>{t('securityAgent.remediation.cancelRemediation')}</Text>
-        </Button>
-      ) : null}
+        {remediationCapability.canCancel && remediationCapability.cancelAttemptId ? (
+          <Button
+            variant="destructive"
+            disabled={cancelRemediation.isPending}
+            onPress={() => {
+              const attemptId = remediationCapability.cancelAttemptId;
+              if (!attemptId) {
+                return;
+              }
+              confirm({
+                title: t('securityAgent.remediation.cancelTitle'),
+                message: t('securityAgent.remediation.cancelMessage'),
+                confirmLabel: t('securityAgent.remediation.cancelRemediation'),
+                cancelLabel: t('common.keepRunning'),
+                onConfirm: () => {
+                  cancelRemediation.mutate({ attemptId, findingId });
+                },
+              });
+            }}
+          >
+            {cancelRemediation.isPending ? (
+              <ActivityIndicator size="small" color={colors.primaryForeground} />
+            ) : null}
+            <Text>{t('securityAgent.remediation.cancelRemediation')}</Text>
+          </Button>
+        ) : null}
 
-      {summaryPrUrl ? (
-        <Button
-          variant="outline"
-          onPress={() => {
-            openPullRequest(summaryPrUrl);
-          }}
-        >
-          <Text>
-            {t(
-              remediationSummary.prDraft
-                ? 'securityAgent.remediation.openDraftPullRequest'
-                : 'securityAgent.remediation.openPullRequest',
-              { number: remediationSummary.prNumber ? ` #${remediationSummary.prNumber}` : '' }
-            )}
-          </Text>
-        </Button>
-      ) : null}
+        {summaryPrUrl ? (
+          <Button
+            variant="outline"
+            onPress={() => {
+              openPullRequest(summaryPrUrl);
+            }}
+          >
+            <Text>
+              {t(
+                remediationSummary.prDraft
+                  ? 'securityAgent.remediation.openDraftPullRequest'
+                  : 'securityAgent.remediation.openPullRequest',
+                { number: remediationSummary.prNumber ? ` #${remediationSummary.prNumber}` : '' }
+              )}
+            </Text>
+          </Button>
+        ) : null}
       </View>
 
       {remediationTimeline.length > 0 ? (

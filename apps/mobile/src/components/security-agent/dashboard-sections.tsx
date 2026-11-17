@@ -178,10 +178,7 @@ function PriorityFindingSection({ scope, data, slaEnabled, neverSynced }: Sectio
     <SectionCard title={t('securityAgent.dashboard.actFirst')}>
       <RowGroup>
         <Pressable
-          className={cn(
-            ROW_TARGET_CLASS,
-            'gap-1 px-4 py-3 active:opacity-70'
-          )}
+          className={cn(ROW_TARGET_CLASS, 'gap-1 px-4 py-3 active:opacity-70')}
           onPress={() => {
             pushOnce(getSecurityAgentPath(scope, `findings/${finding.id}`));
           }}
@@ -229,33 +226,33 @@ function PostureSection({ data, slaEnabled, neverSynced }: SectionProps) {
     <SectionCard title={t('securityAgent.dashboard.actionPosture')}>
       <RowGroup>
         <KvRow
-        label={t('securityAgent.dashboard.confirmedExploitable')}
-        value={rowValue(neverSynced, formatNumber(data.analysis.exploitable, i18n.language))}
-        valueTone="muted"
-        valueFace="numeric"
-        dotTone={rowTone(neverSynced, data.analysis.exploitable > 0 ? 'danger' : 'muted')}
-      />
-      <KvRow
-        label={t('securityAgent.dashboard.needsEvidenceReview')}
-        value={rowValue(neverSynced, formatNumber(data.analysis.needsReview, i18n.language))}
-        valueTone="muted"
-        valueFace="numeric"
-        dotTone={rowTone(neverSynced, data.analysis.needsReview > 0 ? 'warn' : 'muted')}
-      />
-      <KvRow
-        label={t('securityAgent.dashboard.analysisNotComplete')}
-        value={rowValue(neverSynced, formatNumber(analysisIncomplete, i18n.language))}
-        valueTone="muted"
-        valueFace="numeric"
-        dotTone="muted"
-      />
-      <KvRow
-        label={t('securityAgent.dashboard.noImmediateAction')}
-        value={rowValue(neverSynced, formatNumber(noImmediateAction, i18n.language))}
-        valueTone="muted"
-        valueFace="numeric"
-        dotTone={rowTone(neverSynced, noImmediateAction > 0 ? 'good' : 'muted')}
-      />
+          label={t('securityAgent.dashboard.confirmedExploitable')}
+          value={rowValue(neverSynced, formatNumber(data.analysis.exploitable, i18n.language))}
+          valueTone="muted"
+          valueFace="numeric"
+          dotTone={rowTone(neverSynced, data.analysis.exploitable > 0 ? 'danger' : 'muted')}
+        />
+        <KvRow
+          label={t('securityAgent.dashboard.needsEvidenceReview')}
+          value={rowValue(neverSynced, formatNumber(data.analysis.needsReview, i18n.language))}
+          valueTone="muted"
+          valueFace="numeric"
+          dotTone={rowTone(neverSynced, data.analysis.needsReview > 0 ? 'warn' : 'muted')}
+        />
+        <KvRow
+          label={t('securityAgent.dashboard.analysisNotComplete')}
+          value={rowValue(neverSynced, formatNumber(analysisIncomplete, i18n.language))}
+          valueTone="muted"
+          valueFace="numeric"
+          dotTone="muted"
+        />
+        <KvRow
+          label={t('securityAgent.dashboard.noImmediateAction')}
+          value={rowValue(neverSynced, formatNumber(noImmediateAction, i18n.language))}
+          valueTone="muted"
+          valueFace="numeric"
+          dotTone={rowTone(neverSynced, noImmediateAction > 0 ? 'good' : 'muted')}
+        />
       </RowGroup>
     </SectionCard>
   );
@@ -438,7 +435,7 @@ type SkeletonRow = 1 | 2;
  */
 function SectionCardSkeleton({ rows }: Readonly<{ rows: readonly SkeletonRow[] }>) {
   return (
-    <Section label={PLACEHOLDER_LABEL}>
+    <Section label={placeholderLabel}>
       <RowGroup>
         {rows.map((lines, index) => (
           <RowSkeleton key={index} subtitle={lines === 2} />
@@ -453,7 +450,7 @@ function SectionCardSkeleton({ rows }: Readonly<{ rows: readonly SkeletonRow[] }
  * space, at the eyebrow's own height, so the header holds its line without
  * naming a section that has not loaded.
  */
-const PLACEHOLDER_LABEL = '\u00A0';
+const placeholderLabel = '\u00A0';
 
 /**
  * What the sections look like while the dashboard reads: one placeholder per

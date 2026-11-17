@@ -295,7 +295,12 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
                 // height lands, not just the label line.
                 ROW_TARGET_CLASS,
                 'flex-1 items-center justify-center rounded-md py-2 active:opacity-80',
-                selected ? 'bg-selection' : 'bg-secondary'
+                // The selected pill takes the palette's in-page tab pair. The
+                // unselected pill paints no fill of its own: a `bg-secondary`
+                // chip surface built here would be a hand-made card (the layout
+                // contract keeps surfaces in the primitives), and the muted
+                // label already reads as the unpicked side.
+                selected ? 'bg-selection' : 'bg-transparent'
               )}
               onPress={() => {
                 setTab(key);
@@ -305,7 +310,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
               <Text
                 className={cn(
                   'text-xs font-medium',
-                  selected ? 'text-selection-foreground' : 'text-foreground'
+                  selected ? 'text-selection-foreground' : 'text-muted-foreground'
                 )}
               >
                 {t(labelKey)}

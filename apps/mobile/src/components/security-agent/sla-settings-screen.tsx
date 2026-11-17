@@ -16,6 +16,7 @@ import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { formatNumber, parseLocalizedNumber } from '@/lib/format';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import {
@@ -102,7 +103,7 @@ function SlaDayRow({
   const [days, setDays] = useState(initialValue);
 
   return (
-    <View className="min-h-[48px] flex-row items-center justify-between gap-3 px-4 py-3">
+    <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center justify-between gap-3 px-4 py-3')}>
       <View className="min-w-0 flex-1">
         <Text className={cn('text-sm font-medium', disabled && 'text-muted-foreground')}>
           {label}

@@ -31,6 +31,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { AnalysisCapacityNotice } from '@/components/security-agent/analysis-capacity-notice';
 import { AnalysisRerunAction } from '@/components/security-agent/analysis-rerun-action';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { formatNumber } from '@/lib/format';
 import { SCREEN_BODY_CLASS, SCREEN_GUTTER_CLASS } from '@/lib/layout';
 import { useSecurityAnalysisCapacity } from '@/lib/hooks/use-security-agent';
@@ -45,7 +46,7 @@ import {
   getSecurityAnalysisDetailDescription,
   getSecurityAnalysisDetailTitle,
 } from '@/lib/security-agent-copy';
-import { firstNonEmpty, parseTimestamp, timeAgo } from '@/lib/utils';
+import { cn, firstNonEmpty, parseTimestamp, timeAgo } from '@/lib/utils';
 
 type FindingAnalysisPanelProps = {
   scope: string;
@@ -217,7 +218,10 @@ export function FindingAnalysisPanel({
             </Button>
           ) : null}
           {canStartAnalysis ? (
-            <AnalysisCapacityNotice state={capacity.state} onRetry={() => void capacity.refetch()} />
+            <AnalysisCapacityNotice
+              state={capacity.state}
+              onRetry={() => void capacity.refetch()}
+            />
           ) : null}
           {canRestartAnalysis ? (
             <Button
@@ -239,7 +243,7 @@ export function FindingAnalysisPanel({
 
       {sessionHref ? (
         <Pressable
-          className="min-h-[48px] flex-row items-center gap-3 active:opacity-70"
+          className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 active:opacity-70')}
           onPress={() => {
             pushOnce(sessionHref);
           }}

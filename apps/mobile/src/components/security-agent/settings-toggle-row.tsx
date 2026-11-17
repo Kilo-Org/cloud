@@ -71,7 +71,7 @@ export function ToggleRow({
   };
 
   return (
-    <View className="min-h-[48px] flex-row items-center gap-2 px-4 py-3">
+    <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-2 px-4 py-3')}>
       <Pressable
         accessible={false}
         accessibilityElementsHidden

@@ -257,11 +257,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
       {showRepositorySection && (
         // The empty state's own title already says "No repositories", so a
         // section label above it only repeats the screen title.
-        <Section
-          label={
-            repositoriesBody.status === 'empty' ? undefined : t('common.repositories')
-          }
-        >
+        <Section label={repositoriesBody.status === 'empty' ? undefined : t('common.repositories')}>
           {repositoriesBody.status === 'loading' && (
             <RowGroup>
               <RowSkeleton subtitle />

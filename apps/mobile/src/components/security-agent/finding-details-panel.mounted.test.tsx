@@ -3,7 +3,7 @@
 // finding surfaces: a supported review link navigates in-app, everything else
 // goes through the shared external-link helper.
 
-import { createElement } from 'react';
+import { createElement, isValidElement } from 'react';
 import { FindingStatusBadge } from '@/components/security-agent/finding-status-badge';
 import { Text } from '@/components/ui/text';
 import { act, TestRenderer } from '@/test/renderer';
@@ -65,6 +65,7 @@ vi.mock('@/components/ui/kv-row', () => ({
     return null;
   },
 }));
+vi.mock('@/components/ui/row-group', () => ({ RowGroup: 'RowGroup' }));
 vi.mock('@/components/security-agent/collapsible-section', () => ({
   CollapsibleSection: (props: { children?: unknown }) => props.children ?? null,
 }));
@@ -149,6 +150,19 @@ function pressAdvisory(r: R): void {
   act(() => {
     (control.props.onPress as () => void)();
   });
+}
+
+/** The label a group child carries, when it is a row element. */
+function rowLabel(child: unknown): string | undefined {
+  return isValidElement<{ label?: string }>(child) ? child.props.label : undefined;
+}
+
+/** The labels a `RowGroup` renders, from its own children in order. */
+function rowLabels(group: TestRenderer.ReactTestInstance): (string | undefined)[] {
+  const children: unknown[] = Array.isArray(group.props.children)
+    ? group.props.children
+    : [group.props.children];
+  return children.map(rowLabel);
 }
 
 describe('FindingDetailsPanel advisory link routing', () => {
@@ -412,24 +426,22 @@ describe('FindingDetailsPanel identifier values', () => {
   });
 });
 
-describe('FindingDetailsPanel facts card divider', () => {
-  // The card's rows decide which one suppresses the hairline under it. Without
-  // the manifest, or without an advisory id, the card still has to end cleanly
-  // on whatever row it draws last.
-  const FACT_LABELS: Record<string, true> = {
-    'securityAgent.findingDetails.package': true,
-    'securityAgent.findingDetails.vulnerableVersions': true,
-    'securityAgent.findingDetails.patchedVersion': true,
-    'securityAgent.findingDetails.cve': true,
-    'securityAgent.findingDetails.ghsa': true,
-    'securityAgent.findingDetails.manifest': true,
-  };
+describe('FindingDetailsPanel facts card', () => {
+  // The facts live in one `RowGroup`: rows draw no divider of their own, so the
+  // group owns the hairlines and whatever row it draws last ends the card.
+  const PACKAGE_LABEL = 'securityAgent.findingDetails.package';
 
   beforeEach(() => {
     mocks.kvRows.length = 0;
     mocks.deadlineState = { kind: 'no-deadline' };
     mocks.supersedingFindingId = null;
   });
+
+  /** The row labels of the one group that starts with the package row. */
+  function factLabels(r: R): (string | undefined)[] {
+    const groups: TestRenderer.ReactTestInstance[] = r.root.findAllByType('RowGroup');
+    return groups.map(rowLabels).find(labels => labels[0] === PACKAGE_LABEL) ?? [];
+  }
 
   it.each([
     { name: 'manifest row', overrides: {}, lastLabel: 'securityAgent.findingDetails.manifest' },
@@ -448,12 +460,27 @@ describe('FindingDetailsPanel facts card divider', () => {
       overrides: { manifest_path: null, ghsa_id: null, cve_id: null },
       lastLabel: 'securityAgent.findingDetails.patchedVersion',
     },
-  ])('ends the card on the $name', ({ overrides, lastLabel }) => {
-    renderPanel(findingFixture(overrides));
+  ])('ends the group on the $name', ({ overrides, lastLabel }) => {
+    const labels = factLabels(renderPanel(findingFixture(overrides)));
 
-    const rows = mocks.kvRows.filter(row => FACT_LABELS[row.label as string]);
-    expect(rows.at(-1)?.label).toBe(lastLabel);
-    expect(rows.filter(row => row.last === true)).toHaveLength(1);
-    expect(rows.at(-1)?.last).toBe(true);
+    expect(labels.length).toBeGreaterThan(0);
+    expect(labels.at(-1)).toBe(lastLabel);
+  });
+
+  it('keeps every fact row in that one group', () => {
+    const r = renderPanel(findingFixture());
+    const factGroups: TestRenderer.ReactTestInstance[] = r.root
+      .findAllByType('RowGroup')
+      .filter(group => rowLabels(group)[0] === PACKAGE_LABEL);
+
+    expect(factGroups).toHaveLength(1);
+    expect(factLabels(r)).toEqual([
+      PACKAGE_LABEL,
+      'securityAgent.findingDetails.vulnerableVersions',
+      'securityAgent.findingDetails.patchedVersion',
+      'securityAgent.findingDetails.cve',
+      'securityAgent.findingDetails.ghsa',
+      'securityAgent.findingDetails.manifest',
+    ]);
   });
 });

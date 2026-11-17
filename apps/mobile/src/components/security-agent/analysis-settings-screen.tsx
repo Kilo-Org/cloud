@@ -21,6 +21,7 @@ import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { modelLabelFromCatalogue } from '@/lib/auto-model-name';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
@@ -47,12 +48,10 @@ const ANALYSIS_MODES = [
 
 /**
  * The loaded screen's frames, so the placeholder reserves the same shape the
- * content replaces: the `Section` label above the segmented control's own
- * `p-1` frame around a 48pt segment, and a `RowGroup` of `RowSkeleton` rows at
- * the `ConfigureRow` geometry the model rows paint.
+ * content replaces: the `Section` label above a segment at the shared row
+ * target height, and a `RowGroup` of `RowSkeleton` rows at the `ConfigureRow`
+ * geometry the model rows paint.
  */
-const SEGMENTED_FRAME_CLASS = 'rounded-lg bg-secondary p-1';
-const SEGMENTED_SEGMENT_CLASS = 'h-[48px] w-full rounded-md';
 const ROW_COUNT = 3;
 
 function AnalysisSettingsSkeleton() {
@@ -65,9 +64,7 @@ function AnalysisSettingsSkeleton() {
           skeleton's own frames stay out of that check. */}
       <View className={cn('flex-1', SCREEN_BODY_CLASS)}>
         <Section label={t('securityAgent.analysisSettings.depth')}>
-          <View className={SEGMENTED_FRAME_CLASS}>
-            <Skeleton className={SEGMENTED_SEGMENT_CLASS} />
-          </View>
+          <Skeleton className={cn(ROW_TARGET_CLASS, 'w-full rounded-md')} />
         </Section>
         <RowGroup>
           {Array.from({ length: ROW_COUNT }, (_, index) => (

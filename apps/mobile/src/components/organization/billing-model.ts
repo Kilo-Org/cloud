@@ -1,4 +1,5 @@
 import { i18n } from '@/i18n';
+import { isolateLtrBidiText } from '@/lib/bidi';
 import { formatDate, formatNumber, formatPrefixedMoney } from '@/lib/format';
 import { parseTimestamp } from '@/lib/utils';
 
@@ -153,6 +154,30 @@ export function getScheduledSeatChange(input: OrgSeatSubscription): string | nul
 /** The used/total seat count, written once so both billing surfaces agree. */
 export function formatSeatCount(used: number, total: number): string {
   return `${formatNumber(used, i18n.language)} / ${formatNumber(total, i18n.language)}`;
+}
+
+/** What the seats row paints: the fraction only for seats its org bought. */
+export type SeatCountReadoutInput = Readonly<{
+  /** The enforcement switch; a row with no seats bought prints the used count. */
+  seatsEnforced: boolean;
+  used: number;
+  total: number;
+}>;
+
+/**
+ * The seats row's value, shared by every seat count's fallout rate. A total is
+ * printed only when the organization enforces seats and actually bought some:
+ * `getOrganizationSeatUsage` answers `seat_count || 0`, so a legacy
+ * organization would read `3 / 0` — a row that reads as over capacity on the
+ * day it was created. Otherwise the row states the used count alone, and the
+ * row keeps its shape on the frame the seats read lands. The fraction runs
+ * in a left-to-right isolate, so an interface direction cannot mirror either
+ * number.
+ */
+export function seatCountReadout({ seatsEnforced, used, total }: SeatCountReadoutInput): string {
+  return seatsEnforced && total > 0
+    ? isolateLtrBidiText(formatSeatCount(used, total))
+    : formatNumber(used, i18n.language);
 }
 
 /** The auto top-up readout: whether it is on, and the two amounts it uses. */

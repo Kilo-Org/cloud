@@ -1446,7 +1446,10 @@
     "council": {
       "title": "Bitar majalisa",
       "subtitle": "Ƙwararru da dama suna bitar kowace buƙatar haɗawa, kuma ƙuri'unsu suna haɗuwa su zama shawara ɗaya.",
-      "unavailable": "Bitar majalisa ba ta samuwa ga wannan ƙungiyar.",
+      "unavailablePersonally": "Bitar majalisa ba wani ɓangare na asusun sirri ba. Tana buƙatar ƙungiya ta Enterprise.",
+      "unavailablePersonallyAction": "Ƙirƙiri ƙungiya",
+      "unavailableForOrganization": "Bitar majalisa na buƙatar shirin Enterprise mai biyan kuɗi mai aiki ko lokacin gwaji. Shirin wannan ƙungiyar ba ya haɗa da ita.",
+      "unavailableOnBitbucket": "Bitar majalisa ba ta samuwa ga ma'ajiyoyin Bitbucket.",
       "noRepositories": "Ba a zaɓi ma'ajiyoyi ba tukuna. Zaɓi ma'ajiyoyi a saitunan ma'ajiya da farko.",
       "specialists": "Ƙwararru",
       "labels": "Lakabobin da ke kunna bitar majalisa",

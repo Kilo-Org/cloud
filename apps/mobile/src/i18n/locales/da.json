@@ -1446,7 +1446,10 @@
     "council": {
       "title": "Rådsgennemgang",
       "subtitle": "Flere specialister gennemgår hver pull request, og deres stemmer samles til én beslutning.",
-      "unavailable": "Rådsgennemgang er ikke tilgængelig for denne organisation.",
+      "unavailablePersonally": "Rådsgennemgang er ikke en del af en personlig konto. Den kræver en Enterprise-organisation.",
+      "unavailablePersonallyAction": "Opret organisation",
+      "unavailableForOrganization": "Rådsgennemgang kræver Enterprise-planen med et aktivt abonnement eller en prøveperiode. Denne organisations plan omfatter det ikke.",
+      "unavailableOnBitbucket": "Rådsgennemgang er ikke tilgængelig for Bitbucket-kodelagre.",
       "noRepositories": "Der er endnu ikke valgt nogen kodelagre. Vælg først kodelagre i indstillingerne for kodelagre.",
       "specialists": "Specialister",
       "labels": "Etiketter, der udløser rådsgennemgang",

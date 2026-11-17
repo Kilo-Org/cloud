@@ -1446,7 +1446,10 @@
     "council": {
       "title": "Kontseilu-berrikuspena",
       "subtitle": "Hainbat espezialistak berrikusten dute bateratze-eskaera bakoitza, eta haien botoak erabaki bakarrean batzen dira.",
-      "unavailable": "Kontseilu-berrikuspena ez dago erabilgarri erakunde honetan.",
+      "unavailablePersonally": "Kontseilu-berrikuspena ez da kontu pertsonal baten parte. Enterprise erakunde bat behar du.",
+      "unavailablePersonallyAction": "Sortu erakundea",
+      "unavailableForOrganization": "Kontseilu-berrikuspenak Enterprise plana behar du, harpidetza edo probaldi aktibo batekin. Erakunde honen planak ez du hura barne hartzen.",
+      "unavailableOnBitbucket": "Kontseilu-berrikuspena ez dago erabilgarri Bitbucket biltegietarako.",
       "noRepositories": "Oraindik ez da biltegirik hautatu. Lehenik, aukeratu biltegiak biltegien ezarpenetan.",
       "specialists": "Espezialistak",
       "labels": "Kontseilu-berrikuspena abiarazten duten etiketak",

@@ -1518,7 +1518,10 @@
     "council": {
       "title": "Athbhreithniú comhairle",
       "subtitle": "Déanann roinnt speisialtóirí athbhreithniú ar gach iarratas tarraingthe, agus cuirtear a vótaí le chéile in aon chinneadh amháin.",
-      "unavailable": "Níl athbhreithniú comhairle ar fáil don eagraíocht seo.",
+      "unavailablePersonally": "Níl athbhreithniú comhairle mar chuid de chuntas pearsanta. Teastaíonn eagraíocht Enterprise uait.",
+      "unavailablePersonallyAction": "Cruthaigh eagraíocht",
+      "unavailableForOrganization": "Teastaíonn an phlean Enterprise ó athbhreithniú comhairle le síntiús gníomhach nó le triail. Níl sí san áireamh i bplean na heagraíochta seo.",
+      "unavailableOnBitbucket": "Níl athbhreithniú comhairle ar fáil do stóir Bitbucket.",
       "noRepositories": "Níl aon stór roghnaithe fós. Roghnaigh stóir i socruithe na stór ar dtús.",
       "specialists": "Speisialtóirí",
       "labels": "Lipéid a spreagann athbhreithniú comhairle",

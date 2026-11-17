@@ -1446,7 +1446,10 @@
     "council": {
       "title": "Nõukogu ülevaatus",
       "subtitle": "Iga tõmbetaotluse vaatavad üle mitu spetsialisti ja nende hääled liidetakse üheks otsuseks.",
-      "unavailable": "Nõukogu ülevaatus pole selles organisatsioonis saadaval.",
+      "unavailablePersonally": "Nõukogu ülevaatus ei kuulu isikliku konto juurde. Selleks on vaja Enterprise'i organisatsiooni.",
+      "unavailablePersonallyAction": "Loo organisatsioon",
+      "unavailableForOrganization": "Nõukogu ülevaatuseks on vaja Enterprise'i paketti koos aktiivse tellimuse või prooviperioodiga. Selle organisatsiooni pakett seda ei hõlma.",
+      "unavailableOnBitbucket": "Nõukogu ülevaatus ei ole saadaval Bitbucketi hoidlate jaoks.",
       "noRepositories": "Hoidlaid pole veel valitud. Vali esmalt hoidlad hoidla seadetes.",
       "specialists": "Spetsialistid",
       "labels": "Nõukogu ülevaatuse käivitavad sildid",

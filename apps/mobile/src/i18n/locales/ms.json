@@ -1446,7 +1446,10 @@
     "council": {
       "title": "Semakan panel",
       "subtitle": "Beberapa pakar menyemak setiap permintaan penarikan, dan undian mereka digabungkan menjadi satu keputusan.",
-      "unavailable": "Semakan panel tidak tersedia untuk organisasi ini.",
+      "unavailablePersonally": "Semakan panel bukan sebahagian daripada akaunan peribadi. Ia memerlukan organisasi Enterprise.",
+      "unavailablePersonallyAction": "Cipta organisasi",
+      "unavailableForOrganization": "Semakan panel memerlukan pelan Enterprise dengan langganan atau percubaan yang aktif. Pelan organisasi ini tidak merangkuminya.",
+      "unavailableOnBitbucket": "Semakan panel tidak tersedia untuk repositori Bitbucket.",
       "noRepositories": "Belum ada repositori dipilih. Pilih repositori dalam tetapan repositori dahulu.",
       "specialists": "Pakar",
       "labels": "Label yang mencetuskan semakan panel",

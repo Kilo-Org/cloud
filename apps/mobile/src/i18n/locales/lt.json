@@ -1494,7 +1494,10 @@
     "council": {
       "title": "Tarybos peržiūra",
       "subtitle": "Kiekvieną PR peržiūri keli specialistai, o jų balsai sujungiami į vieną sprendimą.",
-      "unavailable": "Tarybos peržiūra šiai organizacijai nepasiekiama.",
+      "unavailablePersonally": "Tarybos peržiūra neįeina į asmeninę paskyrą. Jai reikia Enterprise organizacijos.",
+      "unavailablePersonallyAction": "Sukurti organizaciją",
+      "unavailableForOrganization": "Tarybos peržiūrai reikia Enterprise plano su aktyviu prenumerata ar bandomuoju laikotarpiu. Šios organizacijos planas jo neapima.",
+      "unavailableOnBitbucket": "Tarybos peržiūra nepasiekiama Bitbucket saugykloms.",
       "noRepositories": "Dar nepasirinkta nė viena saugykla. Pirmiausia pasirink saugyklas saugyklų nustatymuose.",
       "specialists": "Specialistai",
       "labels": "Žymos, kurios įjungia tarybos peržiūrą",

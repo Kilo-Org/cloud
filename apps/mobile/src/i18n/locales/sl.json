@@ -1494,7 +1494,10 @@
     "council": {
       "title": "Kolegijski pregled",
       "subtitle": "Vsak zahtevek za združitev pregleda več strokovnjakov, njihovi glasovi pa se združijo v eno odločitev.",
-      "unavailable": "Kolegijski pregled za to organizacijo ni na voljo.",
+      "unavailablePersonally": "Kolegijski pregled ni del osebnega računa. Potrebuje Enterprise organizacijo.",
+      "unavailablePersonallyAction": "Ustvari organizacijo",
+      "unavailableForOrganization": "Kolegijski pregled zahteva paket Enterprise z aktivno naročnino ali preizkusnim obdobjem. Paket te organizacije ga ne vključuje.",
+      "unavailableOnBitbucket": "Kolegijski pregled ni na voljo za skladišča Bitbucket.",
       "noRepositories": "Nobeno skladišče še ni izbrano. Najprej izberi skladišča v nastavitvah skladišč.",
       "specialists": "Strokovnjaki",
       "labels": "Oznake, ki sprožijo kolegijski pregled",

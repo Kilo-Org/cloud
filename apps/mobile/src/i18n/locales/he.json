@@ -904,7 +904,10 @@
     "council": {
       "title": "סקירת מועצה",
       "subtitle": "כמה מומחים סוקרים כל בקשת משיכה, והקולות שלהם מצטרפים להחלטה אחת.",
-      "unavailable": "סקירת מועצה אינה זמינה עבור הארגון הזה.",
+      "unavailablePersonally": "סקירת מועצה אינה חלק מחשבון אישי. היא דורשת ארגון Enterprise.",
+      "unavailablePersonallyAction": "יצירת ארגון",
+      "unavailableForOrganization": "סקירת מועצה דורשת את תוכנית Enterprise עם מינוי פעיל או תקופת ניסיון. התוכנית של הארגון הזה אינה כוללת אותה.",
+      "unavailableOnBitbucket": "סקירת מועצה אינה זמינה עבור מאגרי Bitbucket.",
       "noRepositories": "עדיין לא נבחרו מאגרים. בחר קודם מאגרים בהגדרות המאגרים.",
       "specialists": "מומחים",
       "labels": "תוויות שמפעילות סקירת מועצה",

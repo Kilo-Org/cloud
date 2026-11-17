@@ -1446,7 +1446,10 @@
     "council": {
       "title": "Fandinihan'ny filankevitra",
       "subtitle": "Manam-pahaizana maro no mandinika ny PR tsirairay, ary mitambatra ho fanapahan-kevitra iray ny latsa-batony.",
-      "unavailable": "Tsy misy ny fandinihan'ny filankevitra ho an'ity fikambanana ity.",
+      "unavailablePersonally": "Tsy tafiditra ao amin'ny kaonty manokana ny fandinihan'ny filankevitra. Mila fikambanana Enterprise izy io.",
+      "unavailablePersonallyAction": "Hamorona fikambanana",
+      "unavailableForOrganization": "Mila drafitra Enterprise misy famandrihana na andrana miasa ny fandinihan'ny filankevitra. Tsy tafiditra ao amin'ny drafitra ity fikambanana ity izany.",
+      "unavailableOnBitbucket": "Tsy misy ny fandinihan'ny filankevitra ho an'ny tahirin-kaody Bitbucket.",
       "noRepositories": "Tsy mbola misy tahirin-kaody voafidy. Misafidiana tahirin-kaody ao amin'ny fikirana tahirin-kaody aloha.",
       "specialists": "Manam-pahaizana",
       "labels": "Marika mampandeha ny fandinihan'ny filankevitra",

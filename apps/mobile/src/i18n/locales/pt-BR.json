@@ -871,7 +871,10 @@
     "council": {
       "title": "Revisão do conselho",
       "subtitle": "Vários especialistas revisam cada PR e os votos deles se combinam em uma única decisão.",
-      "unavailable": "A revisão do conselho não está disponível para esta organização.",
+      "unavailablePersonally": "A revisão do conselho não faz parte de uma conta pessoal. Ela precisa de uma organização Enterprise.",
+      "unavailablePersonallyAction": "Criar organização",
+      "unavailableForOrganization": "A revisão do conselho precisa do plano Enterprise com uma assinatura ou um período de teste ativos. O plano desta organização não a inclui.",
+      "unavailableOnBitbucket": "A revisão do conselho não está disponível para repositórios Bitbucket.",
       "noRepositories": "Nenhum repositório selecionado ainda. Escolha repositórios nas configurações de repositórios primeiro.",
       "specialists": "Especialistas",
       "labels": "Etiquetas que acionam a revisão do conselho",

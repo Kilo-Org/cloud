@@ -1446,7 +1446,10 @@
     "council": {
       "title": "Neuvostokatselmointi",
       "subtitle": "Useampi asiantuntija katselmoi jokaisen vetopyynnön, ja heidän äänensä yhdistetään yhdeksi päätökseksi.",
-      "unavailable": "Neuvostokatselmointi ei ole käytettävissä tässä organisaatiossa.",
+      "unavailablePersonally": "Neuvostokatselmointi ei sisälly henkilökohtaiseen tiliin. Se vaatii Enterprise-organisaation.",
+      "unavailablePersonallyAction": "Luo organisaatio",
+      "unavailableForOrganization": "Neuvostokatselmointi vaatii Enterprise-tilauksen, jossa on aktiivinen tilaus tai kokeilujakso. Tämän organisaation tilaus ei sisällä sitä.",
+      "unavailableOnBitbucket": "Neuvostokatselmointi ei ole käytettävissä Bitbucket-koodivarastoille.",
       "noRepositories": "Koodivarastoja ei ole vielä valittu. Valitse ensin koodivarastot koodivarastoasetuksista.",
       "specialists": "Asiantuntijat",
       "labels": "Neuvostokatselmoinnin käynnistävät tunnisteet",

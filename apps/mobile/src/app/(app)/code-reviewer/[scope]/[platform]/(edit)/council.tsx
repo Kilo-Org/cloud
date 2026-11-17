@@ -4,10 +4,10 @@ import {
   COUNCIL_MIN_SPECIALISTS,
   COUNCIL_REQUIRED_LABEL_MAX_LENGTH,
 } from '@kilocode/app-shared/code-review';
-import { type Href } from 'expo-router';
+import { type Href, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { CenteredState } from '@/components/centered-state';
 import { CouncilSpecialistsSection } from '@/components/code-reviewer/council-specialists-section';
@@ -23,6 +23,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
+import { UNDER_COPY_ACTION_BOX_CLASS, UNDER_COPY_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { formatNumber } from '@/lib/format';
 import {
   type CouncilConfig,
@@ -35,7 +36,9 @@ import {
   STRATEGY_DESCRIPTION_KEYS,
   STRATEGY_LABEL_KEYS,
 } from '@/lib/code-reviewer-council';
+import { CREATE_ORGANIZATION_HREF } from '@/lib/organization-navigation';
 import {
+  isPersonal,
   useGitHubRepositories,
   useGitLabRepositories,
   useReviewConfig,
@@ -48,6 +51,7 @@ import {
   useCouncilGate,
 } from '@/lib/hooks/use-reviewer-council';
 import { useReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
+import { cn } from '@/lib/utils';
 
 export default function CouncilRoute() {
   const params = useReviewerRouteParams();
@@ -62,6 +66,7 @@ function CouncilScreen({
   platform,
 }: Readonly<{ scope: string; platform: ReviewerPlatform }>) {
   const { t } = useTranslation();
+  const router = useRouter();
   // The same gate as the web page: an entitled organization behind the rollout
   // flag. A personal scope, an unentitled org, or a build older than the flag
   // never reaches the rows below. Bitbucket has no council on either client.
@@ -112,8 +117,17 @@ function CouncilScreen({
 
   if (surface !== 'editor') {
     // An in-flight entitlement read keeps the surface blank rather than telling
-    // an entitled organization that council is unavailable while it resolves;
-    // a settled refusal, or a platform without council, shows that message.
+    // an entitled organization that council is unavailable while it resolves.
+    // A settled refusal names the reason the reader can act on: a personal
+    // account never carries council, an organization's plan can lack it, and
+    // Bitbucket has no council on either client. The personal scope offers the
+    // one step that changes the answer: creating the organization.
+    const personal = isPersonal(scope);
+    const unavailableCopy = personal
+      ? 'codeReviewer.council.unavailablePersonally'
+      : capabilities.council
+        ? 'codeReviewer.council.unavailableForOrganization'
+        : 'codeReviewer.council.unavailableOnBitbucket';
     return (
       <View className="flex-1 bg-background">
         <ReviewerHeader
@@ -122,9 +136,29 @@ function CouncilScreen({
         />
         {surface === 'unavailable' ? (
           <CenteredState contentContainerClassName="px-6">
-            <Text className="text-center text-xs text-muted-foreground">
-              {t('codeReviewer.council.unavailable')}
-            </Text>
+            <View className="items-center gap-2">
+              <Text className="text-center text-xs text-muted-foreground">
+                {t(unavailableCopy)}
+              </Text>
+              {personal ? (
+                <Pressable
+                  onPress={() => {
+                    router.push(CREATE_ORGANIZATION_HREF);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('codeReviewer.council.unavailablePersonallyAction')}
+                  hitSlop={UNDER_COPY_ACTION_HIT_SLOP}
+                  className={cn(
+                    'justify-center self-center rounded-md active:opacity-70',
+                    UNDER_COPY_ACTION_BOX_CLASS
+                  )}
+                >
+                  <Text className="text-xs font-semibold text-muted-foreground underline">
+                    {t('codeReviewer.council.unavailablePersonallyAction')}
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
           </CenteredState>
         ) : (
           <View className="gap-3 px-6 pt-4">

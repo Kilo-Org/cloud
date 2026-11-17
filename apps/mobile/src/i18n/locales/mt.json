@@ -1518,7 +1518,10 @@
     "council": {
       "title": "Reviżjoni tal-kunsill",
       "subtitle": "Diversi speċjalisti jirrevedu kull PR, u l-voti tagħhom jingħaqdu f'deċiżjoni waħda.",
-      "unavailable": "Ir-reviżjoni tal-kunsill mhijiex disponibbli għal din l-organizzazzjoni.",
+      "unavailablePersonally": "Ir-reviżjoni tal-kunsill m'hijiex parti minn kont personali. Tirrikiedi organizazzjoni Enterprise.",
+      "unavailablePersonallyAction": "Oħloq organizazzjoni",
+      "unavailableForOrganization": "Ir-reviżjoni tal-kunsill tirrikiedi l-pjan Enterprise b'sottoskrizzjoni jew perjodu ta' prova attiv. Il-pjan ta' din l-organizzazzjoni ma jinkludhiex.",
+      "unavailableOnBitbucket": "Ir-reviżjoni tal-kunsill mhijiex disponibbli għal repożitorji Bitbucket.",
       "noRepositories": "Għad m'hemm l-ebda repożitorju magħżul. Agħżel repożitorji fl-issettjar tar-repożitorji l-ewwel.",
       "specialists": "Speċjalisti",
       "labels": "Tikketti li jattivaw ir-reviżjoni tal-kunsill",

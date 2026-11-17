@@ -905,7 +905,10 @@
     "council": {
       "title": "Przegląd rady",
       "subtitle": "Każdy pull request przegląda kilku specjalistów, a ich głosy łączą się w jedną decyzję.",
-      "unavailable": "Przegląd rady nie jest dostępny dla tej organizacji.",
+      "unavailablePersonally": "Przegląd rady nie jest częścią konta osobistego. Wymaga organizacji Enterprise.",
+      "unavailablePersonallyAction": "Utwórz organizację",
+      "unavailableForOrganization": "Przegląd rady wymaga planu Enterprise z aktywną subskrypcją lub okresem próbnym. Plan tej organizacji go nie obejmuje.",
+      "unavailableOnBitbucket": "Przegląd rady nie jest dostępny dla repozytoriów Bitbucket.",
       "noRepositories": "Nie wybrano jeszcze żadnego repozytorium. Najpierw wybierz repozytoria w ustawieniach repozytoriów.",
       "specialists": "Specjaliści",
       "labels": "Etykiety uruchamiające przegląd rady",

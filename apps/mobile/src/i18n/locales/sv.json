@@ -1446,7 +1446,10 @@
     "council": {
       "title": "Rådsgranskning",
       "subtitle": "Flera experter granskar varje pull-begäran och deras röster kombineras till ett beslut.",
-      "unavailable": "Rådsgranskning är inte tillgänglig för denna organisation.",
+      "unavailablePersonally": "Rådsgranskning ingår inte i ett personligt konto. Den kräver en Enterprise-organisation.",
+      "unavailablePersonallyAction": "Skapa organisation",
+      "unavailableForOrganization": "Rådsgranskning kräver Enterprise-planen med ett aktivt abonnemang eller en provperiod. Denna organisations plan omfattar den inte.",
+      "unavailableOnBitbucket": "Rådsgranskning är inte tillgänglig för Bitbucket-kodarkiv.",
       "noRepositories": "Inga kodarkiv har valts än. Välj kodarkiv i inställningarna för kodarkiv först.",
       "specialists": "Experter",
       "labels": "Etiketter som utlöser rådsgranskning",

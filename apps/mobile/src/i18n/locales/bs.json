@@ -1470,7 +1470,10 @@
     "council": {
       "title": "Pregled vijeća",
       "subtitle": "Više specijalista pregleda svaki zahtjev za spajanje, a njihovi glasovi se objedinjuju u jednu odluku.",
-      "unavailable": "Pregled vijeća nije dostupan za ovu organizaciju.",
+      "unavailablePersonally": "Pregled vijeća nije dio ličnog računa. Potrebna je Enterprise organizacija.",
+      "unavailablePersonallyAction": "Kreiraj organizaciju",
+      "unavailableForOrganization": "Pregled vijeća zahtijeva Enterprise plan koji ima aktivnu pretplatu ili probni period. Plan ove organizacije ga ne uključuje.",
+      "unavailableOnBitbucket": "Pregled vijeća nije dostupan za Bitbucket repozitorije.",
       "noRepositories": "Još nije odabran nijedan repozitorij. Prvo odaberi repozitorije u postavkama repozitorija.",
       "specialists": "Specijalisti",
       "labels": "Oznake koje pokreću pregled vijeća",

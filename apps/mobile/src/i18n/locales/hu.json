@@ -1446,7 +1446,10 @@
     "council": {
       "title": "Tanácsellenőrzés",
       "subtitle": "Több szakértő ellenőrzi az egyes PR-eket, és szavazataik egyetlen döntéssé állnak össze.",
-      "unavailable": "A tanácsellenőrzés nem érhető el ennél a szervezetnél.",
+      "unavailablePersonally": "A tanácsellenőrzés nem része a személyes fióknak. Enterprise szervezetet igényel.",
+      "unavailablePersonallyAction": "Szervezet létrehozása",
+      "unavailableForOrganization": "A tanácsellenőrzéshez aktív előfizetéssel vagy próbaidőszakkal rendelkező Enterprise csomag szükséges. Ennek a szervezetnek a csomagja nem tartalmazza.",
+      "unavailableOnBitbucket": "A tanácsellenőrzés nem érhető el Bitbucket-adattárakhoz.",
       "noRepositories": "Még nincs kiválasztott adattár. Először válassz adattárakat az adattárbeállításokban.",
       "specialists": "Szakértők",
       "labels": "A tanácsellenőrzést kiváltó címkék",

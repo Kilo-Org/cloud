@@ -903,7 +903,10 @@
     "council": {
       "title": "评审团审查",
       "subtitle": "多位专家分别审查每个拉取请求，他们的投票汇总为一个决定。",
-      "unavailable": "此组织无法使用评审团审查。",
+      "unavailablePersonally": "评审团审查不包含在个人账户中。它需要 Enterprise 组织。",
+      "unavailablePersonallyAction": "创建组织",
+      "unavailableForOrganization": "评审团审查需要具备生效订阅或试用期的企业套餐。此组织的套餐不包含此项。",
+      "unavailableOnBitbucket": "评审团审查不适用于 Bitbucket 仓库。",
       "noRepositories": "尚未选择任何仓库。请先在仓库设置中选择仓库。",
       "specialists": "专家",
       "labels": "触发评审团审查的标签",

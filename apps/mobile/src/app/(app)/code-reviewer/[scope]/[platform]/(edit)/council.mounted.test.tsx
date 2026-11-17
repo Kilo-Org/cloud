@@ -15,6 +15,7 @@ import { createElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import '@/i18n';
+import { CREATE_ORGANIZATION_HREF } from '@/lib/organization-navigation';
 import { act } from '@/test/renderer';
 import { renderWithProviders, type RenderWithProvidersResult } from '@/test/render-with-providers';
 
@@ -51,6 +52,7 @@ const state = vi.hoisted(() => {
     toastErrors: [] as string[],
     toggleProps: [] as ToggleProps[],
     patches: [] as SavedPatch[],
+    routerPush: vi.fn(),
   };
 });
 
@@ -77,10 +79,14 @@ const specialists = vi.hoisted(() => [
 vi.mock('react-native', () => ({
   View: 'View',
   Text: 'Text',
+  Pressable: 'Pressable',
   Platform: { OS: 'android' },
   useColorScheme: () => 'light',
 }));
-vi.mock('expo-router', () => ({ useNavigation: () => ({ isFocused: () => true }) }));
+vi.mock('expo-router', () => ({
+  useNavigation: () => ({ isFocused: () => true }),
+  useRouter: () => ({ push: state.routerPush }),
+}));
 vi.mock('@/lib/hooks/use-reviewer-route-params', () => ({
   useReviewerRouteParams: () => ({ scope: state.scope, platform: state.platform }),
 }));
@@ -95,6 +101,7 @@ vi.mock('@/lib/hooks/use-reviewer-council', () => ({
     council.specialists.filter(entry => entry.enabled).length,
 }));
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
+  isPersonal: (scope: string) => scope === 'personal',
   useReviewConfig: (_scope: string, _platform: string, options?: { enabled?: boolean }) => {
     state.configEnabled.push(options?.enabled ?? true);
     return state.config;
@@ -187,6 +194,8 @@ beforeEach(() => {
   });
   state.patches.length = 0;
   state.save.isPending = false;
+  state.routerPush.mockReset();
+
   state.config.data = {
     council: {
       enabled: true,
@@ -207,11 +216,59 @@ describe('council route gate', () => {
     await act(() => undefined);
 
     expect(renderedTexts(renderer)).toContain(
-      'Council review is not available for this organization.'
+      'Council review is not available for Bitbucket repositories.'
     );
     expect(renderer.root.findAll(node => String(node.type) === 'ToggleRow')).toHaveLength(0);
     // The config read is what the editor needs; a refused platform never asks.
     expect(state.configEnabled).toEqual([false]);
+
+    mounted.unmount();
+  });
+
+  it('explains a personal scope and offers the create-organization step', async () => {
+    state.scope = 'personal';
+    // A personal scope can never be entitled, so the gate reads refused there.
+    state.gate.allowed = false;
+
+    const mounted = await renderWithProviders(createElement(CouncilRoute));
+    const { renderer } = mounted;
+    await act(() => undefined);
+
+    const texts = renderedTexts(renderer);
+    expect(texts).toContain(
+      'Council review is not part of a personal account. It needs an Enterprise organization.'
+    );
+    expect(texts).not.toContain(
+      "Council review needs the Enterprise plan with an active subscription or trial. This organization's plan does not include it."
+    );
+    expect(texts).not.toContain('Council review is not available for Bitbucket repositories.');
+    const action = renderer.root
+      .findAll(node => String(node.type) === 'Pressable')
+      .find(node => node.props.accessibilityLabel === 'Create an organization');
+    expect(action).toBeDefined();
+    await act(() => {
+      action?.props.onPress();
+    });
+    expect(state.routerPush).toHaveBeenCalledWith(CREATE_ORGANIZATION_HREF);
+
+    mounted.unmount();
+  });
+
+  it('explains the plan to an unentitled organisation', async () => {
+    state.gate.allowed = false;
+
+    const mounted = await renderWithProviders(createElement(CouncilRoute));
+    const { renderer } = mounted;
+    await act(() => undefined);
+
+    const texts = renderedTexts(renderer);
+    expect(texts).toContain(
+      "Council review needs the Enterprise plan with an active subscription or trial. This organization's plan does not include it."
+    );
+    expect(texts).not.toContain(
+      'Council review is not part of a personal account. It needs an Enterprise organization.'
+    );
+    expect(renderer.root.findAll(node => String(node.type) === 'Pressable')).toHaveLength(0);
 
     mounted.unmount();
   });
@@ -222,7 +279,7 @@ describe('council route gate', () => {
     await act(() => undefined);
 
     expect(renderedTexts(renderer)).not.toContain(
-      'Council review is not available for this organization.'
+      "Council review needs the Enterprise plan with an active subscription or trial. This organization's plan does not include it."
     );
     expect(state.configEnabled).toContain(true);
 
@@ -238,7 +295,7 @@ describe('council route gate', () => {
     await act(() => undefined);
 
     expect(renderedTexts(renderer)).not.toContain(
-      'Council review is not available for this organization.'
+      "Council review needs the Enterprise plan with an active subscription or trial. This organization's plan does not include it."
     );
     expect(renderer.root.findAll(node => String(node.type) === 'Skeleton').length).toBeGreaterThan(
       0

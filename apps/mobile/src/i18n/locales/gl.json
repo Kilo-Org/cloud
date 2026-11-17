@@ -1446,7 +1446,10 @@
     "council": {
       "title": "Revisión en consello",
       "subtitle": "Varios especialistas revisan cada pull request e os seus votos combínanse nunha única decisión.",
-      "unavailable": "A revisión en consello non está dispoñible para esta organización.",
+      "unavailablePersonally": "A revisión en consello non forma parte dunha conta persoal. Precisa dunha organización Enterprise.",
+      "unavailablePersonallyAction": "Crear unha organización",
+      "unavailableForOrganization": "A revisión en consello precisa do plan Enterprise cunha subscrición ou un período de proba activos. O plan desta organización non o inclúe.",
+      "unavailableOnBitbucket": "A revisión en consello non está dispoñible para repositorios de Bitbucket.",
       "noRepositories": "Aínda non hai repositorios seleccionados. Primeiro escolle repositorios na configuración de repositorios.",
       "specialists": "Especialistas",
       "labels": "Etiquetas que activan a revisión en consello",

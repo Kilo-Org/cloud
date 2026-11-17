@@ -1446,7 +1446,10 @@
     "council": {
       "title": "Shqyrtimi nga këshilli",
       "subtitle": "Disa ekspertë shqyrtojnë çdo PR dhe votat e tyre bashkohen në një vendim të vetëm.",
-      "unavailable": "Shqyrtimi nga këshilli nuk është i disponueshëm për këtë organizatë.",
+      "unavailablePersonally": "Shqyrtimi nga këshilli nuk është pjesë e një llogarie personale. Ai kërkon një organizatë Enterprise.",
+      "unavailablePersonallyAction": "Krijo një organizatë",
+      "unavailableForOrganization": "Shqyrtimi nga këshilli kërkon planin Enterprise me një pajtim ose një periudhë provë aktive. Plani i kësaj organizate nuk e përfshin atë.",
+      "unavailableOnBitbucket": "Shqyrtimi nga këshilli nuk është i disponueshëm për depot e Bitbucket.",
       "noRepositories": "Ende nuk është zgjedhur asnjë depo. Zgjidh fillimisht depot te cilësimet e depove.",
       "specialists": "Ekspertë",
       "labels": "Etiketa që aktivizojnë shqyrtimin nga këshilli",

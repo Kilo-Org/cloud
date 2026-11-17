@@ -1446,7 +1446,10 @@
     "council": {
       "title": "Arotake kaunihera",
       "subtitle": "Ka arotakehia ia tono kume e ētahi mātanga maha, ā, ka whakakotahitia ō rātou pōti hei whakatau kotahi.",
-      "unavailable": "Kāore te arotake kaunihera e wātea ana mō tēnei rōpū.",
+      "unavailablePersonally": "Kāore te arotake kaunihera i roto i tētahi pūkete takitahi. Me whai rōpū Enterprise.",
+      "unavailablePersonallyAction": "Waihanga rōpū",
+      "unavailableForOrganization": "Me whai rāhui Enterprise te arotake kaunihera, me tētahi kaupapa here, whakamātautau rānei. Kāore te rāhui o tēnei rōpū i whakauru ki te arotake kaunihera.",
+      "unavailableOnBitbucket": "Kāore te arotake kaunihera e wātea ana mō ngā pūranga waehere Bitbucket.",
       "noRepositories": "Kāore anō he pūranga waehere kia kōwhiria. Kōwhiria ngā pūranga waehere i ngā tautuhinga pūranga waehere i te tuatahi.",
       "specialists": "Ngā mātanga",
       "labels": "Ngā tapanga e whakaoho ana i te arotake kaunihera",

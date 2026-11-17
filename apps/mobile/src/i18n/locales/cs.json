@@ -1494,7 +1494,10 @@
     "council": {
       "title": "Kontrola radou",
       "subtitle": "Každý pull request zkontroluje několik specialistů a jejich hlasy se spojí do jednoho rozhodnutí.",
-      "unavailable": "Kontrola radou není pro tuto organizaci dostupná.",
+      "unavailablePersonally": "Kontrola radou není součástí osobního účtu. Vyžaduje organizaci Enterprise.",
+      "unavailablePersonallyAction": "Vytvořit organizaci",
+      "unavailableForOrganization": "Kontrola radou vyžaduje plán Enterprise s aktivním předplatným nebo zkušebním obdobím. Plán této organizace jej nezahrnuje.",
+      "unavailableOnBitbucket": "Kontrola radou není dostupná pro repozitáře Bitbucket.",
       "noRepositories": "Zatím nejsou vybrány žádné repozitáře. Nejprve je vyberte v nastavení repozitářů.",
       "specialists": "Specialisté",
       "labels": "Štítky spouštějící kontrolu radou",

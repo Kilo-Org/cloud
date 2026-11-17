@@ -903,7 +903,10 @@
     "council": {
       "title": "Panelbeoordeling",
       "subtitle": "Meerdere deskundigen beoordelen elke PR en hun stemmen komen samen tot één beslissing.",
-      "unavailable": "Panelbeoordeling is niet beschikbaar voor deze organisatie.",
+      "unavailablePersonally": "Panelbeoordeling maakt geen deel uit van een persoonlijk account. Hiervoor is een Enterprise-organisatie nodig.",
+      "unavailablePersonallyAction": "Organisatie maken",
+      "unavailableForOrganization": "Panelbeoordeling vereist het Enterprise-plan met een actief abonnement of proefperiode. Het plan van deze organisatie omvat het niet.",
+      "unavailableOnBitbucket": "Panelbeoordeling is niet beschikbaar voor Bitbucket-repositories.",
       "noRepositories": "Nog geen repositories geselecteerd. Kies eerst repositories in de repository-instellingen.",
       "specialists": "Deskundigen",
       "labels": "Tags die panelbeoordeling activeren",

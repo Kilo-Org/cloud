@@ -1446,7 +1446,10 @@
     "council": {
       "title": "Şura yoxlaması",
       "subtitle": "Hər pull request-i bir neçə mütəxəssis yoxlayır və onların səsləri vahid qərarda birləşir.",
-      "unavailable": "Şura yoxlaması bu təşkilat üçün əlçatan deyil.",
+      "unavailablePersonally": "Şura yoxlaması şəxsi hesabın bir hissəsi deyil. Ona Enterprise təşkilatı lazımdır.",
+      "unavailablePersonallyAction": "Təşkilat yarat",
+      "unavailableForOrganization": "Şura yoxlaması aktiv abunəlik və ya sınaq dövrü olan Enterprise plan tələb edir. Bu təşkilatın planı onu əhatə etmir.",
+      "unavailableOnBitbucket": "Şura yoxlaması Bitbucket repozitoriyaları üçün əlçatan deyil.",
       "noRepositories": "Hələ heç bir repozitoriya seçilməyib. Əvvəlcə repozitoriya ayarlarında repozitoriyaları seç.",
       "specialists": "Mütəxəssislər",
       "labels": "Şura yoxlamasını işə salan etiketlər",

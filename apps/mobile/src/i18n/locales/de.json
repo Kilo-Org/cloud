@@ -903,7 +903,10 @@
     "council": {
       "title": "Gremium-Review",
       "subtitle": "Mehrere Spezialisten prüfen jeden Pull-Request, und ihre Stimmen ergeben eine gemeinsame Entscheidung.",
-      "unavailable": "Gremium-Review ist für diese Organisation nicht verfügbar.",
+      "unavailablePersonally": "Gremium-Review ist nicht Teil eines persönlichen Kontos. Es wird eine Enterprise-Organisation benötigt.",
+      "unavailablePersonallyAction": "Organisation erstellen",
+      "unavailableForOrganization": "Gremium-Review benötigt den Enterprise-Plan mit einem aktiven Abo oder einer Testphase. Der Plan dieser Organisation enthält es nicht.",
+      "unavailableOnBitbucket": "Gremium-Review ist für Bitbucket-Repositories nicht verfügbar.",
       "noRepositories": "Noch keine Code-Repositories ausgewählt. Wähle zuerst Code-Repositories in den Repository-Einstellungen aus.",
       "specialists": "Spezialisten",
       "labels": "Labels, die ein Gremium-Review auslösen",

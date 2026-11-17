@@ -1446,7 +1446,10 @@
     "council": {
       "title": "Revizyon konsèy",
       "subtitle": "Plizyè espesyalis revize chak demann fizyon, epi vòt yo mete ansanm pou fè yon sèl desizyon.",
-      "unavailable": "Revizyon konsèy pa disponib pou òganizasyon sa a.",
+      "unavailablePersonally": "Revizyon konsèy se pa yon kont pèsonèl. Li bezwen yon òganizasyon Enterprise.",
+      "unavailablePersonallyAction": "Kreye yon òganizasyon",
+      "unavailableForOrganization": "Revizyon konsèy bezwen plan Enterprise a ak yon abònman oswa yon peryòd esè aktif. Plan òganizasyon sa a pa gen l ladan l.",
+      "unavailableOnBitbucket": "Revizyon konsèy pa disponib pou depo Bitbucket.",
       "noRepositories": "Poko gen depo ki chwazi. Chwazi depo nan paramèt depo yo anvan.",
       "specialists": "Espesyalis",
       "labels": "Etikèt ki deklanche revizyon konsèy",

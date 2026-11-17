@@ -1446,7 +1446,10 @@
     "council": {
       "title": "የጉባኤ ግምገማ",
       "subtitle": "በርካታ ባለሙያዎች እያንዳንዱን የመሳብ ጥያቄ ይገመግማሉ፤ ድምፆቻቸውም ወደ አንድ ውሳኔ ይጣመራሉ።",
-      "unavailable": "የጉባኤ ግምገማ ለዚህ ድርጅት አይገኝም።",
+      "unavailablePersonally": "የጉባኤ ግምገማ የግል መለያ አካል አይደለም። የEnterprise ድርጅት ያስፈልገዋል።",
+      "unavailablePersonallyAction": "ድርጅት ፍጠር",
+      "unavailableForOrganization": "የጉባኤ ግምገማ ንቁ የደንበኝነት ምዝገባ ወይም የሙከራ ጊዜ ያለው የEnterprise ዕቅድ ይፈልጋል። የዚህ ድርጅት ዕቅድ አያካትትም።",
+      "unavailableOnBitbucket": "የጉባኤ ግምገማ ለBitbucket ማከማቻዎች አይገኝም።",
       "noRepositories": "እስካሁን ምንም ማከማቻ አልተመረጠም። መጀመሪያ በማከማቻ ቅንብሮች ውስጥ ማከማቻዎችን ይምረጡ።",
       "specialists": "ባለሙያዎች",
       "labels": "የጉባኤ ግምገማን የሚያስጀምሩ መለያዎች",

@@ -1513,7 +1513,10 @@
     "council": {
       "title": "Council review",
       "subtitle": "Several specialists review each pull request, and their votes combine into one decision.",
-      "unavailable": "Council review is not available for this organization.",
+      "unavailablePersonally": "Council review is not part of a personal account. It needs an Enterprise organization.",
+      "unavailablePersonallyAction": "Create an organization",
+      "unavailableForOrganization": "Council review needs the Enterprise plan with an active subscription or trial. This organization's plan does not include it.",
+      "unavailableOnBitbucket": "Council review is not available for Bitbucket repositories.",
       "noRepositories": "No repositories selected yet. Choose repositories in the repository settings first.",
       "specialists": "Specialists",
       "labels": "Labels that trigger council review",

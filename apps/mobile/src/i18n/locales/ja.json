@@ -903,7 +903,10 @@
     "council": {
       "title": "合議レビュー",
       "subtitle": "複数のスペシャリストが各プルリクエストをレビューし、その投票が1つの判定にまとめられます。",
-      "unavailable": "この組織では合議レビューを利用できません。",
+      "unavailablePersonally": "合議レビューは個人アカウントには含まれません。エンタープライズ組織が必要です。",
+      "unavailablePersonallyAction": "組織を作成",
+      "unavailableForOrganization": "合議レビューには、有効なサブスクリプションまたはトライアル付きのエンタープライズプランが必要です。この組織のプランには含まれていません。",
+      "unavailableOnBitbucket": "合議レビューは Bitbucket リポジトリでは利用できません。",
       "noRepositories": "リポジトリがまだ選択されていません。先にリポジトリ設定で選択してください。",
       "specialists": "スペシャリスト",
       "labels": "合議レビューを開始するラベル",

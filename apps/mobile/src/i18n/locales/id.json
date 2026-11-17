@@ -903,7 +903,10 @@
     "council": {
       "title": "Tinjauan dewan",
       "subtitle": "Beberapa spesialis meninjau setiap PR, dan suara mereka digabungkan menjadi satu keputusan.",
-      "unavailable": "Tinjauan dewan tidak tersedia untuk organisasi ini.",
+      "unavailablePersonally": "Tinjauan dewan bukan bagian dari akun pribadi. Ini membutuhkan organisasi Enterprise.",
+      "unavailablePersonallyAction": "Buat organisasi",
+      "unavailableForOrganization": "Tinjauan dewan membutuhkan paket Enterprise dengan langganan aktif atau masa uji coba. Paket organisasi ini tidak menyertakannya.",
+      "unavailableOnBitbucket": "Tinjauan dewan tidak tersedia untuk repositori Bitbucket.",
       "noRepositories": "Belum ada repositori yang dipilih. Pilih repositori di setelan repositori terlebih dahulu.",
       "specialists": "Spesialis",
       "labels": "Label yang memicu tinjauan dewan",

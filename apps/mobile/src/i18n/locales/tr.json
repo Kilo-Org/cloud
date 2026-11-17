@@ -903,7 +903,10 @@
     "council": {
       "title": "Konsey incelemesi",
       "subtitle": "Birkaç uzman her çekme isteğini inceler ve oyları tek bir kararda birleşir.",
-      "unavailable": "Konsey incelemesi bu kuruluş için kullanılamıyor.",
+      "unavailablePersonally": "Konsey incelemesi kişisel hesabın bir parçası değildir. Bunun için bir Enterprise kuruluşu gerekir.",
+      "unavailablePersonallyAction": "Kuruluş oluştur",
+      "unavailableForOrganization": "Konsey incelemesi, etkin bir abonelik veya deneme süresi olan Enterprise planını gerektirir. Bu kuruluşun planı bunu içermiyor.",
+      "unavailableOnBitbucket": "Konsey incelemesi Bitbucket depoları için kullanılamıyor.",
       "noRepositories": "Henüz depo seçilmedi. Önce depo ayarlarından depo seç.",
       "specialists": "Uzmanlar",
       "labels": "Konsey incelemesini tetikleyen etiketler",

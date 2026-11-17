@@ -871,7 +871,10 @@
     "council": {
       "title": "Revisione del gruppo di revisori",
       "subtitle": "Diversi specialisti revisionano ogni pull request e i loro voti si combinano in un'unica decisione.",
-      "unavailable": "La revisione del gruppo di revisori non è disponibile per questa organizzazione.",
+      "unavailablePersonally": "La revisione del gruppo di revisori non fa parte di un account personale. Richiede un'organizzazione Enterprise.",
+      "unavailablePersonallyAction": "Crea organizzazione",
+      "unavailableForOrganization": "La revisione del gruppo di revisori richiede il piano Enterprise con un abbonamento attivo o un periodo di prova. Il piano di questa organizzazione non la include.",
+      "unavailableOnBitbucket": "La revisione del gruppo di revisori non è disponibile per i repository Bitbucket.",
       "noRepositories": "Nessun repository selezionato. Scegli prima i repository nelle impostazioni dei repository.",
       "specialists": "Specialisti",
       "labels": "Etichette che attivano la revisione del gruppo di revisori",

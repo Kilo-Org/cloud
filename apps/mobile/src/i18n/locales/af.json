@@ -1446,7 +1446,10 @@
     "council": {
       "title": "Raadhersiening",
       "subtitle": "Verskeie spesialiste hersien elke trekversoek, en hul stemme word tot een besluit saamgevoeg.",
-      "unavailable": "Raadhersiening is nie vir hierdie organisasie beskikbaar nie.",
+      "unavailablePersonally": "Raadhersiening is nie deel van 'n persoonlike rekening nie. Dit verg 'n Enterprise-organisasie.",
+      "unavailablePersonallyAction": "Skep organisasie",
+      "unavailableForOrganization": "Raadhersiening verg die Enterprise-plan met 'n aktiewe intekening of proefperiode. Die plan van hierdie organisasie sluit dit nie in nie.",
+      "unavailableOnBitbucket": "Raadhersiening is nie beskikbaar vir Bitbucket-bewaarplekke nie.",
       "noRepositories": "Nog geen bewaarplekke gekies nie. Kies eers bewaarplekke in die bewaarplekinstellings.",
       "specialists": "Spesialiste",
       "labels": "Etikette wat raadhersiening aktiveer",

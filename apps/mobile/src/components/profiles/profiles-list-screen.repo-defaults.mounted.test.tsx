@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import { ProfilesListScreen } from '@/components/profiles/profiles-list-screen';
 import {
+  findAll,
   findOne,
   groupChildren,
   groupTexts,

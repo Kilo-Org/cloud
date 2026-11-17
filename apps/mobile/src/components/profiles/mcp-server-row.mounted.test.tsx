@@ -22,6 +22,7 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
   Lock: 'Lock',
   Pencil: 'Pencil',
+  Server: 'Server',
   Trash2: 'Trash2',
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({

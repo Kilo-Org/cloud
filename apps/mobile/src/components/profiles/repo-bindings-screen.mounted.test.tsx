@@ -68,8 +68,14 @@ vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileList: () => h.profileList,
 }));
 vi.mock('sonner-native', () => ({ toast: { success: h.success, error: h.error } }));
+vi.mock('expo-haptics', () => ({
+  selectionAsync: vi.fn(),
+  impactAsync: vi.fn(),
+  notificationAsync: vi.fn(),
+}));
 vi.mock('react-native', () => ({
   Keyboard: { dismiss: () => undefined },
+  Platform: { OS: 'ios' },
   View: 'View',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',

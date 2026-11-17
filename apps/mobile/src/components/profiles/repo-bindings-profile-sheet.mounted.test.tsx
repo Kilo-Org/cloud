@@ -7,7 +7,17 @@ import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { type AgentProfileListItem } from '@/lib/hooks/agent-profile-types';
 
-vi.mock('react-native', () => ({ View: 'View', ScrollView: 'ScrollView', Pressable: 'Pressable' }));
+vi.mock('expo-haptics', () => ({
+  selectionAsync: vi.fn(),
+  impactAsync: vi.fn(),
+  notificationAsync: vi.fn(),
+}));
+vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
+  View: 'View',
+  ScrollView: 'ScrollView',
+  Pressable: 'Pressable',
+}));
 vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 0 }) }));
 vi.mock('@/components/agents/session-page-sheet', () => ({ SessionPageSheet: 'SessionPageSheet' }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));

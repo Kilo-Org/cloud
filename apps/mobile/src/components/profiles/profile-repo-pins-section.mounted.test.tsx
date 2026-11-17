@@ -43,8 +43,14 @@ vi.mock('@/lib/hooks/use-repo-bindings', () => ({
   useRepoOptions: () => h.repoOptions,
 }));
 vi.mock('sonner-native', () => ({ toast: { success: h.success, error: h.error } }));
+vi.mock('expo-haptics', () => ({
+  selectionAsync: vi.fn(),
+  impactAsync: vi.fn(),
+  notificationAsync: vi.fn(),
+}));
 vi.mock('react-native', () => ({
   Keyboard: { dismiss: () => undefined },
+  Platform: { OS: 'ios' },
   View: 'View',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
@@ -209,7 +215,7 @@ describe('ProfileRepoPinsSection', () => {
 
     const { renderer, unmount } = await mountSection();
     expect(findAll(renderer.root, 'SessionPageSheet')).toHaveLength(0);
-    pressButton(renderer.root, 'Pin a repo');
+    pressPressable(renderer.root, 'Pin a repo');
     expect(findAll(renderer.root, 'SessionPageSheet')).toHaveLength(1);
     pressPressable(renderer.root, 'acme/infra');
 
@@ -250,7 +256,7 @@ describe('ProfileRepoPinsSection', () => {
     ).toEqual(['acme/api, GitHub', 'acme/infra, GitLab']);
     expect(
       findAll(renderer.root, 'Pressable')
-        .filter(node => node.props.accessibilityRole === 'button')
+        .filter(node => String(node.props.accessibilityLabel).startsWith('Unbind '))
         .map(node => node.props.accessibilityLabel)
     ).toEqual(['Unbind acme/api', 'Unbind acme/infra']);
 

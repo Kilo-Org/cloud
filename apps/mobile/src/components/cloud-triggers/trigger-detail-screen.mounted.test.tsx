@@ -16,6 +16,8 @@ import { renderWithProviders } from '@/test/render-with-providers';
 
 import { TriggerDetailScreen } from './trigger-detail-screen';
 
+const dismissTo = vi.fn();
+
 const detail = {
   triggerId: 'claw-trigger',
   namespace: 'user/user-1',
@@ -38,9 +40,16 @@ const detail = {
 };
 
 vi.mock('react-native', () => ({ View: 'View' }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn(), dismissTo }) }));
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
-  useOrgBoundary: () => ({ organizationId: null, role: null, org: null, isResolving: false }),
+  // An organization-scoped mount resolves the boundary, so the screen renders
+  // its content (and the header with it) instead of the boundary fallback.
+  useOrgBoundary: (organizationId?: string) => ({
+    organizationId: organizationId ?? null,
+    role: null,
+    org: organizationId === undefined ? null : { id: organizationId },
+    isResolving: false,
+  }),
 }));
 vi.mock('@/lib/cloud-triggers/use-cloud-triggers', () => ({
   useCloudTrigger: () => ({
@@ -55,7 +64,12 @@ vi.mock('@/components/organization/organization-boundary', () => ({
   OrganizationBoundary: 'OrganizationBoundary',
 }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/screen-header', async () => {
+  const { createElement } = await import('react');
+  return {
+    ScreenHeader: (props: Record<string, unknown>) => createElement('ScreenHeader', props),
+  };
+});
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/ui/kv-row', () => ({ KvRow: 'KvRow' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
@@ -69,8 +83,10 @@ const TEXT = 'Text' as ElementType;
 
 let renderer: ReactTestRenderer | undefined = undefined;
 
-async function mount(): Promise<ReactTestRenderer['root']> {
-  const view = await renderWithProviders(createElement(TriggerDetailScreen, { triggerId: 'x' }));
+async function mount(
+  props: { triggerId: string; organizationId?: string } = { triggerId: 'x' }
+): Promise<ReactTestRenderer['root']> {
+  const view = await renderWithProviders(createElement(TriggerDetailScreen, props));
   renderer = view.renderer;
   return view.renderer.root;
 }
@@ -87,5 +103,17 @@ describe('TriggerDetailScreen target type', () => {
     expect(root.findAll(node => Object.is(node.type, EDIT_PANEL))).toHaveLength(0);
     const texts = root.findAll(node => Object.is(node.type, TEXT));
     expect(texts.map(node => node.props.children)).toContain('Manage on the web');
+  });
+
+  it('sends the header Back control to the scoped triggers list', async () => {
+    const root = await mount({ triggerId: 'x', organizationId: 'org-1' });
+
+    act(() => {
+      root.findByProps({ title: 'x' }).props.onBack();
+    });
+
+    expect(dismissTo).toHaveBeenCalledWith(
+      '/(app)/(tabs)/(3_profile)/triggers?org=org-1'
+    );
   });
 });

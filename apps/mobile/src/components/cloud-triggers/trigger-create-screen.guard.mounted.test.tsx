@@ -275,8 +275,11 @@ describe('TriggerCreateScreen leave guard', () => {
     });
 
     expect(h.confirm).not.toHaveBeenCalled();
+    // The leave waits one task behind the disarm render (`useMetadataLeaveGuard`),
+    // so the replace lands in a macrotask the `Promise.resolve()` above does not
+    // flush.
+    await waitFor(() => h.replace.mock.calls.length === 1);
     expect(h.replace).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/triggers/trigger-new');
-    // The leave waits one task behind the disarm render (`useMetadataLeaveGuard`).
     await waitFor(() => !h.guard.enabled);
     expect(h.guard.enabled).toBe(false);
   });

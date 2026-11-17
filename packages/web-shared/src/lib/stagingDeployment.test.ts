@@ -38,7 +38,7 @@ afterEach(() => {
 });
 
 describe('staging deployment detection', () => {
-  test('treats a production build on a staging target as production', () => {
+  test('reports a deployment outside staging when the build environment is production', () => {
     env.VERCEL_ENV = 'production';
     env.VERCEL_TARGET_ENV = 'staging';
 

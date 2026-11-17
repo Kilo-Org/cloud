@@ -6,7 +6,9 @@ export const PROMO_CREDIT_EXPIRY_HRS = 60 * 24; // 60 days in hours
 export const WELCOME_CREDIT_EXPIRY_HRS = 30 * 24; // 30 days in hours
 export const OPENCLAW_SECURITY_ADVISOR_BONUS_EXPIRY_HRS = 48; // 2 days in hours
 
-// Staging deployments do not report VERCEL_ENV=production, while a production build can never carry VERCEL_TARGET_ENV=staging.
+// A deployment is staging when the target environment is staging and the
+// build environment is not production. Staging deployments do not report
+// VERCEL_ENV=production, so the flag stays enabled there.
 export function isStagingDeployment(): boolean {
   return process.env.VERCEL_TARGET_ENV === 'staging' && process.env.VERCEL_ENV !== 'production';
 }

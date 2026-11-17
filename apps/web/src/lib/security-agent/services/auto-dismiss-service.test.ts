@@ -64,13 +64,40 @@ const mockBulkFindingsPages: Array<
   Array<{ id: string; analysis: SecurityFindingAnalysis | null }>
 > = [];
 const mockWhereCallCount = { value: 0 };
+// Keyset bound of every bulk read, in read order: lets tests assert each read
+// advances past the previous page's last id.
+const mockKeysetCursors: Array<string | undefined> = [];
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
     select: jest.fn(() => ({
       from: jest.fn(() => ({
-        where: jest.fn(() => {
+        where: jest.fn((condition: unknown) => {
           mockWhereCallCount.value += 1;
+          // gt(id, cursor) renders as SQL whose chunk tree carries the bound
+          // cursor string; under and() it nests several SQL objects deep.
+          // Visit every own property except decoder/usedTables metadata.
+          const findCursors = (node: unknown, depth = 0): string | undefined => {
+            if (depth > 8) return undefined;
+            if (typeof node === 'string') return /^finding-/.test(node) ? node : undefined;
+            if (Array.isArray(node)) {
+              for (const child of node) {
+                const hit = findCursors(child, depth + 1);
+                if (hit) return hit;
+              }
+              return undefined;
+            }
+            if (node && typeof node === 'object') {
+              for (const [key, value] of Object.entries(node)) {
+                if (key === 'decoder' || key === 'usedTables') continue;
+                const hit = findCursors(value, depth + 1);
+                if (hit) return hit;
+              }
+            }
+            return undefined;
+          };
+          const cursor = findCursors(condition);
+          mockKeysetCursors.push(cursor);
           return {
             orderBy: jest.fn(() => ({
               limit: jest.fn(
@@ -195,6 +222,7 @@ beforeEach(() => {
   mockBulkFindings.length = 0;
   mockBulkFindingsPages.length = 0;
   mockWhereCallCount.value = 0;
+  mockKeysetCursors.length = 0;
 });
 
 describe('writebackDependabotDismissal', () => {
@@ -697,6 +725,10 @@ describe('maybeAutoDismissAnalysis', () => {
       // Two full pages keep the cursor advancing; the three-row tail page stops
       // the loop, so the bulk read runs exactly three times.
       expect(mockWhereCallCount.value).toBe(3);
+      // The second read must carry the first page's last id as the keyset
+      // bound, and the third the second page's: dropping the cursor would
+      // re-read still-open candidates forever.
+      expect(mockKeysetCursors).toEqual([undefined, 'finding-0099', 'finding-0199']);
       expect(mockDismissDependabotAlert).toHaveBeenCalledTimes(total);
     });
   });

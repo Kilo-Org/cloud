@@ -26,11 +26,12 @@ import {
   isDeviceSessionActive,
   resetDeviceSessionCacheForTest,
 } from '@kilocode/web-shared/lib/auth/device-session-cache';
-import { isBlockedTLD } from '@kilocode/web-shared/lib/user/server';
+import { isBlockedTLD } from '@kilocode/web-shared/lib/user/domain-gates';
 import { isEmailBlacklisted } from '@kilocode/web-shared/lib/blacklist-domains-config';
 import { getWorkOSOrganization } from '@/lib/user';
 
-jest.mock('@kilocode/web-shared/lib/user/server', () => ({
+jest.mock('@kilocode/web-shared/lib/user/domain-gates', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/user/domain-gates'),
   isBlockedTLD: jest.fn(),
 }));
 

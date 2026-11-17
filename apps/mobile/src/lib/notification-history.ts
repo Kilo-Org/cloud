@@ -1,13 +1,15 @@
 import {
+  GENERIC_PUSH_TITLE_KEY,
   NOTIFICATION_HISTORY_CATEGORIES,
   type NotificationHistoryCategory,
   pushBodyCatalogKey,
   type PushData,
   pushDataSchema,
+  pushTitleCatalogKey,
   translatePush,
 } from '@kilocode/notifications';
 
-import { type NotificationDestination, notificationDestinationForData } from './notification-path';
+import { notificationPathForData } from './notification-path';
 
 /**
  * Pure logic for the Notification history screen: how a recorded row is read
@@ -38,9 +40,6 @@ export type NotificationHistoryCopy = Readonly<{
   detail: string | null;
 }>;
 
-/** The catalog entry whose title is the product name alone, in every locale. */
-const APP_NAME_TITLE_KEY = 'generic.title';
-
 /** One stored field, translated through its catalog entry when the row has a key. */
 function translatedPart(
   row: NotificationHistoryCopyFields,
@@ -51,7 +50,7 @@ function translatedPart(
   if (row.i18nKey === null) {
     return stored;
   }
-  const key = part === 'body' ? pushBodyCatalogKey(row.i18nKey) : `${row.i18nKey}.title`;
+  const key = part === 'body' ? pushBodyCatalogKey(row.i18nKey) : pushTitleCatalogKey(row.i18nKey);
   return translatePush(locale, key, row.i18nParams ?? undefined, stored);
 }
 
@@ -63,12 +62,12 @@ function translatedPart(
  *
  * A title that is only the app name adds nothing to a screen the app draws, so
  * the message leads that row alone; a title naming the event (a session, a
- * conversation, an alert) keeps the headline it had. The push catalog writes
- * the former as the bare product name (`generic`, the security lifecycle
- * notice), so the test is a comparison with the same catalog's spelling in
- * `locale` — `I-Kilo` in Zulu, `Kilo` elsewhere — taken from the title template
- * with its params left out: a session the user named "Kilo" keeps its title,
- * because its template is the session name.
+ * conversation, an alert) keeps the headline it had. The security lifecycle
+ * notice reads the product name entry (`GENERIC_PUSH_TITLE_KEY`), so the test
+ * is a comparison with the same catalog's spelling in `locale` — `I-Kilo` in
+ * Zulu, `Kilo` elsewhere — taken from the title template with its params left
+ * out: a session the user named "Kilo" keeps its title, because its template is
+ * the session name.
  */
 export function notificationHistoryCopy(
   row: NotificationHistoryCopyFields,
@@ -77,14 +76,15 @@ export function notificationHistoryCopy(
   const title = translatedPart(row, locale, 'title');
   const body = translatedPart(row, locale, 'body');
   const titleTemplate = translatedPart({ ...row, i18nParams: null }, locale, 'title');
-  return titleTemplate.trim() === translatePush(locale, APP_NAME_TITLE_KEY).trim()
+  return titleTemplate.trim() === translatePush(locale, GENERIC_PUSH_TITLE_KEY).trim()
     ? { headline: body, detail: null }
     : { headline: title, detail: body };
 }
 
 export type NotificationHistoryTarget = Readonly<{
   data: PushData;
-  destination: NotificationDestination;
+  /** The app route the row opens, with the push origin marker already dropped. */
+  href: string;
 }>;
 
 /**
@@ -109,30 +109,21 @@ function withoutPushOrigin(href: string): string {
 
 /**
  * Where a row's tap goes, or null when the stored payload no longer resolves to
- * a destination or belongs to a retired product.
- *
- * `webBaseUrl` is the Kilo web origin a row that opens a web page — a KiloClaw
- * conversation, which has no mobile screen — uses. An app route ignores it.
+ * a destination — a kind this build does not route, or a payload this build
+ * cannot parse.
  */
 export function notificationHistoryTarget(
-  payload: Record<string, unknown>,
-  webBaseUrl: string
+  payload: Record<string, unknown>
 ): NotificationHistoryTarget | null {
   const parsed = pushDataSchema.safeParse(payload);
   if (!parsed.success) {
     return null;
   }
-  const destination = notificationDestinationForData(parsed.data, webBaseUrl);
-  if (destination === null) {
+  const href = notificationPathForData(parsed.data);
+  if (href === null) {
     return null;
   }
-  return {
-    data: parsed.data,
-    destination:
-      destination.kind === 'app'
-        ? { kind: 'app', href: withoutPushOrigin(destination.href) }
-        : destination,
-  };
+  return { data: parsed.data, href: withoutPushOrigin(href) };
 }
 
 export type NotificationHistoryFilter = Readonly<{
@@ -152,15 +143,25 @@ const CATEGORY_LABEL_KEYS = {
   balanceAlerts: 'notifications.channel.balance',
   spendAlerts: 'notifications.channel.spend',
   securityFindings: 'notifications.channel.security',
-} satisfies Record<Exclude<NotificationHistoryCategory, 'chatMessages'>, string>;
+} as const;
+
+/** A recorded category this build has copy for, so it can draw a chip. */
+type LabeledHistoryCategory = keyof typeof CATEGORY_LABEL_KEYS;
+
+/** The shared list can name a category this build has no chip copy for. */
+function isLabeledCategory(
+  category: NotificationHistoryCategory
+): category is LabeledHistoryCategory {
+  return category in CATEGORY_LABEL_KEYS;
+}
 
 /**
- * Every supported recorded category behind the "All" chip, in settings order.
- * Retired product categories have no filter.
+ * Every labelled recorded category behind the "All" chip, in settings order. A
+ * category this build has no copy for gets no filter.
  */
 export const NOTIFICATION_HISTORY_FILTERS: readonly NotificationHistoryFilter[] = [
   { category: null, labelKey: 'common.all' },
-  ...NOTIFICATION_HISTORY_CATEGORIES.filter(category => category !== 'chatMessages').map(
+  ...NOTIFICATION_HISTORY_CATEGORIES.filter(category => isLabeledCategory(category)).map(
     category => ({
       category,
       labelKey: CATEGORY_LABEL_KEYS[category],

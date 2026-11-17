@@ -143,12 +143,7 @@ internal object SessionNotifications {
     if (quietAt <= nowMs || card.quietText == null) {
       return
     }
-    if (Build.VERSION.SDK_INT >= 31) {
-      // No exact-alarm permission: Android can defer delivery while idle.
-      alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, quietAt, operation)
-    } else {
-      alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, quietAt, operation)
-    }
+    alarmWhileIdle(alarmManager, quietAt, operation)
   }
 
   /**

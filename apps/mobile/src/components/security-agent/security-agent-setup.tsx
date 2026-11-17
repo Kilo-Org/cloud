@@ -28,10 +28,10 @@ type SecurityAgentSetupProps<T> = {
    */
   readOnlyNotice?: string;
   /**
-   * The URL to open. Undefined while the install-state token is still being
-   * minted or after a failed mint: pressing the button then mints again and
-   * only opens once a URL exists, so a transient mint failure never replaces
-   * this screen with an error-only page.
+   * The URL to open. Undefined while the hand-off token is still being minted
+   * or after a failed mint: pressing the button then mints again and only opens
+   * once a URL exists, so a transient mint failure never replaces this screen
+   * with an error-only page.
    */
   url?: string;
   /** Resolves the current URL (mints when the screen has none) before opening. */

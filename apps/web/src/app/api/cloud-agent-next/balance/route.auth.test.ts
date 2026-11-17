@@ -29,9 +29,9 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => {
   };
   return { db: { query }, readDb: { query } };
 });
-jest.mock('@kilocode/worker-utils/account-access', () => ({
-  ...jest.requireActual('@kilocode/worker-utils/account-access'),
-  isOrganizationMember: (...args: unknown[]) => mockMembership(...args),
+jest.mock('@kilocode/worker-utils/organization-membership', () => ({
+  ...jest.requireActual<object>('@kilocode/worker-utils/organization-membership'),
+  hasEffectiveOrganizationAccess: (...args: unknown[]) => mockMembership(...args),
 }));
 jest.mock('@kilocode/web-shared/lib/organizations/organization-usage', () => ({
   getBalanceAndOrgSettings: (...args: unknown[]) => mockBalance(...args),
@@ -128,7 +128,10 @@ it.each(['human-api', 'device-access'])(
       })
     );
     expect((await GET()).status).toBe(200);
-    expect(mockMembership).toHaveBeenCalledWith(expect.anything(), organizationId, user.id);
+    expect(mockMembership).toHaveBeenCalledWith(expect.anything(), {
+      kiloUserId: user.id,
+      organizationId,
+    });
     expect(mockBalance).toHaveBeenCalledWith(organizationId, user);
     mockBalance.mockClear();
     expect((await getGenericBalance()).status).toBe(401);

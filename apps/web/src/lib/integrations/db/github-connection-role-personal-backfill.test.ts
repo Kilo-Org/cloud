@@ -14,7 +14,7 @@ import { assertGitHubInstallationRuntimeAuthorized } from '@/lib/integrations/gi
 const userId = 'oauth/github-personal-role-backfill';
 const otherUserId = 'oauth/github-personal-role-backfill-other';
 
-const BACKFILL_MIGRATION = '0361_github_connection_role_personal_backfill.sql';
+const BACKFILL_MIGRATION = '0363_github_connection_role_personal_backfill.sql';
 
 async function applyConnectionRoleBackfill() {
   const migration = readFileSync(

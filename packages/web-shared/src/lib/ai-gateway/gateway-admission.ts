@@ -13,21 +13,54 @@ import {
   getBalanceAndOrgSettings,
   type BalanceAndOrgSettings,
 } from '@kilocode/web-shared/lib/organizations/organization-usage';
-import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
-import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
+import {
+  hasBestEffortGuessDataCollectionRequirement,
+  isFreeModel,
+} from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import type {
+  OrganizationPlan,
+  OrganizationSettings,
+} from '@kilocode/web-shared/lib/organizations/organization-types';
 import type { EffectiveModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
-import type { OpenRouterProviderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import {
+  isDataCollectionExplicitlyDisallowed,
+  type OpenRouterProviderConfig,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
 import {
+  accountFreeModelLimitResponse,
+  anonymousFreeModelLimitResponse,
   creditsBlockedResponse,
+  dataCollectionRequiredResponse,
   extractFraudAndProjectHeaders,
   extractHeaderAndLimitLength,
+  gatewayAccountRateLimitResponse,
   getOrganizationProviderPrivacy,
+  inferenceRegionRefusedResponse,
   invalidTokenResponse,
+  managedGatewayDisabledResponse,
   modelNotAllowedResponse,
   paidModelAuthRequiredResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import {
+  gatewayRateLimitKey,
+  isGatewayAccountRateLimited,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
+import {
+  freeModelRateLimitKey,
+  isFreeModelRateLimited,
+  type FreeModelRateLimitSubject,
+} from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
+import { DEFAULT_BENCHMARK_USER_ID } from '@kilocode/auto-routing-contracts';
+import {
+  getGatewaySettingsRefusal,
+  getOrganizationGatewaySettings,
+  NO_ORGANIZATION_GATEWAY_SETTINGS,
+  type GatewayPolicyRoute,
+  type OrganizationGatewaySettings,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/organization-gateway-settings';
+import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
 
 type GatewayAuthResult = Awaited<ReturnType<typeof getUserFromAuth>>;
 
@@ -40,6 +73,85 @@ export type SignedInGatewayCaller = {
 export type AnonymousGatewayCaller = { kind: 'anonymous'; user: AnonymousUserContext };
 export type RejectedGatewayCaller = { kind: 'rejected'; response: NextResponse };
 export type GatewayCaller = SignedInGatewayCaller | AnonymousGatewayCaller | RejectedGatewayCaller;
+
+/**
+ * Caps one account's inference request rate across every source address. Routes
+ * call this before authentication: the key comes from the signed token, so a
+ * flooded request costs no database query. See `isGatewayAccountRateLimited`.
+ * Autocomplete routes skip it; see `packages/web-shared/AGENTS.md`.
+ */
+export async function gatewayAccountRateLimitRejection(
+  request: NextRequest,
+  ipAddress: string | undefined
+): Promise<NextResponse | null> {
+  const accountKey = gatewayRateLimitKey(request.headers, ipAddress);
+  if (!(await isGatewayAccountRateLimited(request, accountKey))) return null;
+  console.warn(`Gateway account rate limit exceeded, user: ${accountKey}`);
+  return gatewayAccountRateLimitResponse();
+}
+
+/**
+ * The anti-abuse limit for free models. Signed-in callers count per account,
+ * anonymous callers per IP. Takes the resolved caller rather than the token's
+ * claims, so a revoked token cannot spend its account's allowance.
+ */
+export async function freeModelRateLimitRejection(params: {
+  request: NextRequest;
+  caller: SignedInGatewayCaller | AnonymousGatewayCaller;
+  model: string;
+  feature: string | null;
+}): Promise<NextResponse | null> {
+  const { caller } = params;
+  const subject: FreeModelRateLimitSubject =
+    caller.kind === 'signed-in'
+      ? { kind: 'account', kiloUserId: caller.user.id }
+      : { kind: 'ip', ipAddress: caller.user.ipAddress };
+
+  // The default internal benchmark user is exempt: a run sends every case of
+  // every free model it measures, and the anti-abuse limit would otherwise
+  // throttle the measurement itself. A benchmark user override is not exempt.
+  const isExempt = subject.kind === 'account' && subject.kiloUserId === DEFAULT_BENCHMARK_USER_ID;
+  if (isExempt || !(await isFreeModelRateLimited(params.request, subject))) return null;
+  console.warn(
+    `Model rate limit exceeded, ${freeModelRateLimitKey(subject)}, model: ${params.model}, feature: ${params.feature ?? 'none'}`
+  );
+  return subject.kind === 'account'
+    ? accountFreeModelLimitResponse()
+    : anonymousFreeModelLimitResponse();
+}
+
+/**
+ * Null when the organization's gateway settings admit the route, otherwise the response that
+ * explains which setting refuses it. See `getGatewaySettingsRefusal`.
+ */
+export function gatewaySettingsRejection(
+  settings: OrganizationGatewaySettings,
+  route: GatewayPolicyRoute
+): NextResponse | null {
+  const refusal = getGatewaySettingsRefusal(settings, route);
+  if (!refusal) return null;
+  return refusal.kind === 'inference-region'
+    ? inferenceRegionRefusedResponse(refusal.region)
+    : managedGatewayDisabledResponse(refusal.kind);
+}
+
+/**
+ * The gateway settings that apply to a request: the organization's, when its plan and the
+ * organization feature let them take effect, and none outside an organization.
+ */
+export async function resolveOrganizationGatewaySettings(params: {
+  organizationId: string | undefined;
+  plan: OrganizationPlan | undefined;
+  settings: OrganizationSettings | undefined;
+}): Promise<OrganizationGatewaySettings> {
+  const { organizationId, plan, settings } = params;
+  if (!organizationId || !settings) return NO_ORGANIZATION_GATEWAY_SETTINGS;
+  return getOrganizationGatewaySettings(await getRuntimeOrganizationFeatures(), {
+    id: organizationId,
+    plan,
+    settings,
+  });
+}
 
 /**
  * Who an inference request runs as. A presented credential that failed
@@ -154,6 +266,20 @@ export function organizationProviderPreferences(params: {
       ...(only && { only }),
     },
   };
+}
+
+/** Rejects a model that requires data collection under the effective provider privacy policy. */
+export async function dataCollectionPolicyRejection(
+  model: string,
+  effectiveProviderPolicy: OpenRouterProviderConfig | undefined
+): Promise<NextResponse | null> {
+  if (
+    (await hasBestEffortGuessDataCollectionRequirement(model)) &&
+    isDataCollectionExplicitlyDisallowed(effectiveProviderPolicy)
+  ) {
+    return dataCollectionRequiredResponse();
+  }
+  return null;
 }
 
 /**

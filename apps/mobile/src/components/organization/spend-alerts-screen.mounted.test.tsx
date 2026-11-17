@@ -99,7 +99,7 @@ vi.mock('@/lib/format', () => {
   };
   return {
     formatPrefixedMoney: (amount: number) => `$${amount}`,
-    formatCurrency: (amount: number) => `$${amount}`,
+    formatPrefixedUsd: (amount: number) => `$${amount}`,
     formatNumber: String,
     formatList: (values: readonly string[]) => values.join(' and '),
     normalizeLocalizedNumber,

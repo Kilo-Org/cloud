@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Twoja sesja agenta ma aktualizację",
-      "chatMessage": "Masz nową wiadomość",
-      "instanceLifecycle": "Twoja instancja ma aktualizację",
-      "scheduledAction": "Zaplanowana akcja ma aktualizację",
       "lowBalance": "Twoje saldo wymaga uwagi",
       "spendAlert": "Twoje wydatki wymagają uwagi",
       "securityFinding": "Wynik bezpieczeństwa wymaga uwagi",
@@ -15,14 +12,7 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
-    }
-  },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · Bez tytułu",
-      "body": "{{bodyPreview}}"
     }
   },
   "internal": {
@@ -45,43 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "Naruszenie SLA"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "Kontrola bezpieczeństwa ma aktualizację"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} jest gotowa",
-      "body": "Dotknij, aby rozpocząć czat."
-    },
-    "startFailed": {
-      "title": "Nie udało się uruchomić {{instanceName}}",
-      "body": "Uruchomienie nie powiodło się."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} wkrótce uruchomi się ponownie",
-      "body": "Ponowne uruchomienie zaplanowano na {{when}}."
-    },
-    "restartCancelled": {
-      "title": "Ponowne uruchomienie {{instanceName}} anulowane",
-      "body": "Wcześniej zaplanowane ponowne uruchomienie zostało anulowane."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} wkrótce zostanie zaktualizowana",
-      "bodyWithTag": "Aktualizacja do {{targetImageTag}} o {{when}}.",
-      "bodyWithoutTag": "Zaplanowana aktualizacja o {{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "Aktualizacja {{instanceName}} anulowana",
-      "body": "Wcześniej zaplanowana aktualizacja została anulowana."
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "Twoja sesja Kilo jest gotowa do sterowania z telefonu"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

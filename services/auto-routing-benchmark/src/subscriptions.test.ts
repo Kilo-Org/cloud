@@ -25,7 +25,10 @@ import { listReadyCurrentProfilesForEntries } from './db';
 
 const config = {
   router: 'efficient',
-  deciderRepetitions: 1,
+  minAccuracy: 0.7,
+  accuracyNoiseBand: 0.05,
+  productionTokenProfile: null,
+  switchHorizonTurns: null,
   deciderModels: [],
 } as unknown as BenchmarkConfig;
 const owner = { ownerType: 'user' as const, ownerId: 'test-owner' };

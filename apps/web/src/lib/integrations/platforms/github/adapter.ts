@@ -899,6 +899,7 @@ export async function fetchGitHubRootTextFileAtRef(params: {
       repo,
       path,
       ref,
+      request: { signal: AbortSignal.timeout(10_000) },
     });
 
     if (Array.isArray(data)) return null;
@@ -924,8 +925,28 @@ export async function fetchGitHubRepositoryDefaultBranch(params: {
 }): Promise<string> {
   const { token, owner, repo } = params;
   const octokit = new Octokit({ auth: token });
-  const { data } = await octokit.repos.get({ owner, repo });
+  const { data } = await octokit.repos.get({
+    owner,
+    repo,
+    request: { signal: AbortSignal.timeout(10_000) },
+  });
   return data.default_branch;
+}
+
+export async function fetchGitHubRepositoryDefaultBranchSha(params: {
+  token: string;
+  owner: string;
+  repo: string;
+}): Promise<string> {
+  const branch = await fetchGitHubRepositoryDefaultBranch(params);
+  const octokit = new Octokit({ auth: params.token });
+  const { data } = await octokit.git.getRef({
+    owner: params.owner,
+    repo: params.repo,
+    ref: `heads/${branch}`,
+    request: { signal: AbortSignal.timeout(10_000) },
+  });
+  return data.object.sha;
 }
 
 export async function fetchGitHubRepositorySize(params: {
@@ -1049,6 +1070,10 @@ export async function getGitHubReviewComment(
   id: number;
   body: string;
   userLogin: string | null;
+  /** GitHub account type of the comment author: 'User' | 'Bot' | 'Organization'. */
+  userType: string | null;
+  /** Numeric GitHub user id of the comment author; survives an App rename. */
+  userId: number | null;
   inReplyToId: number | null;
 } | null> {
   const tokenData = await generateGitHubInstallationToken(installationId, appType);
@@ -1064,6 +1089,8 @@ export async function getGitHubReviewComment(
       id: data.id,
       body: data.body,
       userLogin: data.user?.login ?? null,
+      userType: data.user?.type ?? null,
+      userId: data.user?.id ?? null,
       inReplyToId: data.in_reply_to_id ?? null,
     };
   } catch (error) {

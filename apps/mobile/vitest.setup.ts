@@ -9,6 +9,16 @@ vi.mock('@/lib/font-scale/native-font-scale', () => ({
   subscribeToFontScale: () => null,
 }));
 
+// `expo-localization` imports the `expo` runtime, so the Node test projects
+// cannot load it either. The app's root provider tree reads the device locale
+// list to follow a device language change, so an English device answers the
+// default and nothing else is needed. A suite that needs another locale
+// registers its own mock, which wins.
+vi.mock('expo-localization', () => ({
+  getLocales: () => [{ languageTag: 'en-US' }],
+  useLocales: () => [{ languageTag: 'en-US' }],
+}));
+
 /** The subset of keyboard state the app reads through `useKeyboardState`. */
 type KeyboardStateSnapshot = {
   height: number;

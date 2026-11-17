@@ -338,7 +338,6 @@ function coseKeyToPublicKey(coseKeyBuf: Buffer) {
  * enforce a strictly increasing counter.
  */
 export async function verifyAppleAssertion(
-  keyId: string,
   clientDataHash: Buffer,
   assertionBase64: string,
   publicKeySpkiBase64: string

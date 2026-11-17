@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
+import { parseCloudAgentSessionId, parseOrganizationScope } from '@/lib/cloud-agent-scope';
 import { sessionDiffFileToPrReviewFile } from '@/lib/session-changes';
 import { type SessionChangesSnapshot } from '@/lib/session-changes-review';
 import { trpcClient, useTRPC } from '@/lib/trpc';
@@ -25,8 +26,8 @@ export function useSessionChangesData(sessionId: string) {
   const { t } = useTranslation();
 
   const sessionQuery = useQuery(trpc.cliSessionsV2.get.queryOptions({ session_id: sessionId }));
-  const cloudAgentSessionId = sessionQuery.data?.cloud_agent_session_id ?? null;
-  const organizationId = sessionQuery.data?.organization_id ?? undefined;
+  const cloudAgentSessionId = parseCloudAgentSessionId(sessionQuery.data?.cloud_agent_session_id);
+  const organizationId = parseOrganizationScope(sessionQuery.data?.organization_id);
   const readOnly = sessionQuery.isSuccess && cloudAgentSessionId === null;
 
   const cloudSessionKey = [

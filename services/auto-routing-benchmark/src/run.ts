@@ -449,7 +449,7 @@ export async function syncPlatformRegistry(
     {
       router,
       engineIdentity: computeEngineIdentity('decider', router),
-      repetitions: config.deciderRepetitions,
+      repetitions: resolveEffectivePolicy(config).deciderRepetitions,
     },
     desired
   );
@@ -485,7 +485,7 @@ export async function publishPlatformRoutingTable(
   const current = {
     router,
     engineIdentity: computeEngineIdentity('decider', router),
-    repetitions: config.deciderRepetitions,
+    repetitions: resolveEffectivePolicy(config).deciderRepetitions,
   };
   const catalog = await fetchBenchmarkModelCatalog(env, fetchImpl);
   const snapshot = await servingSubscriptionSnapshot(
@@ -782,6 +782,7 @@ export async function startRun(
     throw new Error('benchmark config not set: save it in the admin panel before starting a run');
   }
   const benchmarkIdentity = resolveRunIdentity(config);
+  const policy = resolveEffectivePolicy(config);
 
   // One active run per (kind, purpose). The unique partial index is the atomic
   // backstop; this pre-check turns the common case (a run already going) into a
@@ -792,7 +793,7 @@ export async function startRun(
     throw new RunAlreadyActiveError(kind, activeRun.id);
   }
   const repetitions =
-    kind === 'classifier' ? config.classifierRepetitions : config.deciderRepetitions;
+    kind === 'classifier' ? policy.classifierRepetitions : policy.deciderRepetitions;
 
   // Decider entries always come from the registry queue snapshot (which may
   // include two variants of one model). Classifier still measures its own list.
@@ -899,19 +900,19 @@ export async function startRun(
       {
         id: runId,
         router,
-        accuracy_noise_band: config.accuracyNoiseBand,
-        frontier_min_accuracy_delta: config.frontierMinAccuracyDelta,
+        accuracy_noise_band: policy.accuracyNoiseBand,
+        frontier_min_accuracy_delta: policy.frontierMinAccuracyDelta,
         kind,
         startedAt,
-        min_accuracy: config.minAccuracy,
-        switch_cost_factor: config.switchCostFactor,
-        best_accuracy_switch_threshold: config.bestAccuracySwitchThreshold,
+        min_accuracy: policy.minAccuracy,
+        switch_cost_factor: policy.switchCostFactor,
+        best_accuracy_switch_threshold: policy.bestAccuracySwitchThreshold,
         max_concurrency: laneBudget,
         benchmark_user_id: benchmarkIdentity.benchmarkUserId,
         benchmark_org_id: benchmarkIdentity.benchmarkOrgId,
         repetitions,
         classifier_max_p95_latency_ms:
-          kind === 'classifier' ? config.classifierMaxP95LatencyMs : null,
+          kind === 'classifier' ? policy.classifierMaxP95LatencyMs : null,
         engine_identity: engineIdentity,
         purpose,
       },
@@ -985,14 +986,14 @@ export async function startRun(
     await finalizeRunIfComplete(env, runId, kind, {
       router,
       status: 'running',
-      minAccuracy: config.minAccuracy,
-      switchCostFactor: config.switchCostFactor,
-      bestAccuracySwitchThreshold: config.bestAccuracySwitchThreshold,
+      minAccuracy: policy.minAccuracy,
+      switchCostFactor: policy.switchCostFactor,
+      bestAccuracySwitchThreshold: policy.bestAccuracySwitchThreshold,
       benchmarkUserId: benchmarkIdentity.benchmarkUserId,
       benchmarkOrgId: benchmarkIdentity.benchmarkOrgId,
       models: runModelRows,
       repetitions,
-      classifierMaxP95LatencyMs: kind === 'classifier' ? config.classifierMaxP95LatencyMs : null,
+      classifierMaxP95LatencyMs: kind === 'classifier' ? policy.classifierMaxP95LatencyMs : null,
       startedAt,
       purpose,
       engineIdentity,
@@ -1044,7 +1045,7 @@ export async function drainQueue(
   if (queue === 'platform') await syncPlatformRegistry(env, fetch, router);
 
   const engineIdentity = computeEngineIdentity('decider', router);
-  const repetitions = config.deciderRepetitions;
+  const repetitions = resolveEffectivePolicy(config).deciderRepetitions;
   const maxEntries = 100;
 
   const current = { router, engineIdentity, repetitions };

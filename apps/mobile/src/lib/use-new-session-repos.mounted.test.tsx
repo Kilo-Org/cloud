@@ -44,6 +44,12 @@ const world = vi.hoisted(() => {
 
 vi.mock('react-native', () => ({ Platform: { OS: 'ios' } }));
 
+// The hook reads `useRouter` to open the Bitbucket connect sheet; the real
+// module's expo-runtime import cannot load in the mounted project.
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 
 vi.mock('@tanstack/react-query', () => ({
@@ -71,8 +77,11 @@ vi.mock('@/lib/hooks/use-agent-sessions', () => ({
 }));
 
 vi.mock('@/lib/integration-urls', () => ({
-  getGitLabIntegrationUrl: vi.fn(() => 'gitlab-url'),
   getBitbucketIntegrationUrl: vi.fn(() => 'bitbucket-url'),
+}));
+
+vi.mock('@/lib/app-shell-handoff', () => ({
+  appShellHandoffUrl: vi.fn(() => Promise.resolve('gitlab-handoff-url')),
 }));
 
 vi.mock('@/lib/pr-review/connect-gate-platform', () => ({

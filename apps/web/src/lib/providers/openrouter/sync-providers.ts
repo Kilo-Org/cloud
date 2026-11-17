@@ -312,7 +312,7 @@ async function syncProviders(params: {
   }
 
   // Sort providers by name
-  const sortedProviders = (await injectDirectByokProviders(allProviders)).sort((a, b) =>
+  const sortedProviders = (await injectDirectByokProviders(allProviders, openRouterModels)).sort((a, b) =>
     a.name.localeCompare(b.name)
   );
 

@@ -141,6 +141,21 @@ function texts(root: I): string[] {
     .map(n => n.props.children as string);
 }
 
+/**
+ * The titles the shared row primitives render. Their rows are host elements in
+ * this suite, so a title lives in the row's props rather than in a Text child.
+ */
+function rowTitles(root: I): string[] {
+  return root
+    .findAll(
+      n =>
+        typeof n.type === 'string' &&
+        ((n.type as string) === 'ConfigureRow' || (n.type as string) === 'PreferenceRow') &&
+        typeof n.props.title === 'string'
+    )
+    .map(n => n.props.title as string);
+}
+
 function disclosureTexts(root: I): I[] {
   return root.findAll(
     n =>
@@ -216,7 +231,7 @@ describe('ConsentCard', () => {
 
   it('renders required rows grouped under "Required to use Kilo"', () => {
     const renderer = mountCard('onboarding');
-    const t = texts(renderer.root);
+    const t = [...texts(renderer.root), ...rowTitles(renderer.root)];
     expect(t).toContain('Required to use Kilo');
     expect(t).toContain('Before we get started');
     expect(t).toContain('Optional — on unless you turn it off');
@@ -439,13 +454,20 @@ describe('ConsentCard', () => {
     // The pre-load state must not claim "off": an e3 revoke check mistook the
     // pre-load off for a completed revoke (b911 vr5, e3-toggled-off.png).
     expect(countByType(renderer.root, 'Switch')).toBe(0);
-    expect(countByType(renderer.root, 'Skeleton')).toBe(1);
+    const placeholderRows = renderer.root.findAll(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'ConfigureRow' &&
+        n.props.title === 'Help improve Kilo'
+    );
+    expect(placeholderRows).toHaveLength(1);
+    expect(String(placeholderRows[0]?.props.trailing?.type)).toBe('Skeleton');
 
     await act(() => {
       resolveLoad?.({ mandatory: true, optional: true });
     });
     await act(flush);
-    expect(countByType(renderer.root, 'Skeleton')).toBe(0);
+    expect(countByType(renderer.root, 'Switch')).toBe(1);
     expect(singleSwitch(renderer.root).props.value).toBe(true);
   });
 

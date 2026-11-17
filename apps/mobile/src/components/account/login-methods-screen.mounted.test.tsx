@@ -308,7 +308,9 @@ describe('LoginMethodsScreen', () => {
   it('opens the connected accounts page to link another provider', async () => {
     const root = await mount();
     const linkRow = root.findAll(
-      node => Object.is(node.type, 'ConfigureRow') && node.props.title === 'Link another provider'
+      node =>
+        Object.is(node.type, 'Pressable') &&
+        node.findAll(child => child.props.children === 'Link another provider').length > 0
     );
 
     const [firstRow] = linkRow;

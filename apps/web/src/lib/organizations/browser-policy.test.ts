@@ -1,14 +1,13 @@
 import { describe, expect, test } from '@jest/globals';
-import type { Organization } from '@kilocode/db/schema';
+import { MAX_ORGANIZATION_BROWSER_ALLOWED_ORIGINS } from '@kilocode/db/schema-types';
 import {
   DEFAULT_ORGANIZATION_BROWSER_POLICY,
+  inspectOrganizationBrowserPolicy,
   resolveOrganizationBrowserPolicy,
 } from './browser-policy';
 
-type Settings = Organization['settings'];
-
 function organizationWith(settings: unknown) {
-  return { settings } as Pick<Organization, 'settings'>;
+  return { settings };
 }
 
 describe('resolveOrganizationBrowserPolicy', () => {
@@ -111,7 +110,7 @@ describe('resolveOrganizationBrowserPolicy', () => {
   });
 
   test('ignores unrelated settings', () => {
-    const settings: Settings = {
+    const settings = {
       default_model: 'anthropic/claude-sonnet-4',
       browserControl: 'off',
     };
@@ -119,5 +118,55 @@ describe('resolveOrganizationBrowserPolicy', () => {
       browserControl: 'off',
       browserAllowedOrigins: [],
     });
+  });
+
+  test('stops accepting origins once the list reaches the stored maximum', () => {
+    const stored = Array.from(
+      { length: MAX_ORGANIZATION_BROWSER_ALLOWED_ORIGINS + 5 },
+      (_, index) => `https://site-${index}.example`
+    );
+
+    const policy = resolveOrganizationBrowserPolicy(
+      organizationWith({ browserControl: 'playwright_only', browserAllowedOrigins: stored })
+    );
+
+    expect(policy.browserControl).toBe('playwright_only');
+    expect(policy.browserAllowedOrigins).toHaveLength(MAX_ORGANIZATION_BROWSER_ALLOWED_ORIGINS);
+    expect(policy.browserAllowedOrigins[0]).toBe('https://site-0.example');
+    expect(policy.browserAllowedOrigins.at(-1)).toBe(
+      `https://site-${MAX_ORGANIZATION_BROWSER_ALLOWED_ORIGINS - 1}.example`
+    );
+  });
+});
+
+describe('inspectOrganizationBrowserPolicy', () => {
+  test('reports an absent control mode without flagging the stored value', () => {
+    expect(inspectOrganizationBrowserPolicy(organizationWith({}))).toEqual({
+      policy: { browserControl: 'allow', browserAllowedOrigins: [] },
+      storedControl: 'absent',
+    });
+  });
+
+  test('reports a readable stored control mode', () => {
+    expect(
+      inspectOrganizationBrowserPolicy(organizationWith({ browserControl: 'off' })).storedControl
+    ).toBe('readable');
+  });
+
+  test('reports an unreadable stored control mode next to the enforced off policy', () => {
+    expect(inspectOrganizationBrowserPolicy(organizationWith({ browserControl: 'ask' }))).toEqual({
+      policy: { browserControl: 'off', browserAllowedOrigins: [] },
+      storedControl: 'unreadable',
+    });
+  });
+
+  test('agrees with the resolver it backs', () => {
+    const settings = {
+      browserControl: 'playwright_only',
+      browserAllowedOrigins: ['https://example.com/checkout', 'https://ok.example'],
+    };
+    expect(inspectOrganizationBrowserPolicy(organizationWith(settings)).policy).toEqual(
+      resolveOrganizationBrowserPolicy(organizationWith(settings))
+    );
   });
 });

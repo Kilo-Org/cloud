@@ -50,12 +50,18 @@ export async function POST(
     return warnAndCreateErrorResponse('Invalid credit kind');
   }
   const credit_expiry_date = requestData.credit_expiry_date ?? requestData.creditExpiryDate;
-  if (
-    creditKind === 'promotional' &&
-    credit_expiry_date &&
-    new Date(credit_expiry_date).getTime() <= Date.now()
-  ) {
-    return warnAndCreateErrorResponse('Credit expiry date must be in the future');
+  const amount_usd = requestData.amount_usd ?? requestData.creditAmount;
+  if (creditKind === 'promotional' && credit_expiry_date) {
+    const expiryTime = new Date(credit_expiry_date).getTime();
+    if (Number.isNaN(expiryTime)) {
+      return warnAndCreateErrorResponse('Credit expiry date is not a valid date');
+    }
+    // Negative grants (debits) never store an expiry, so their supplied date has no effect.
+    if (amount_usd == null || amount_usd > 0) {
+      if (expiryTime <= Date.now()) {
+        return warnAndCreateErrorResponse('Credit expiry date must be in the future');
+      }
+    }
   }
   const options = {
     amount_usd: requestData.amount_usd ?? requestData.creditAmount ?? undefined,

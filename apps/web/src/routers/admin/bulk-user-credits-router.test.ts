@@ -73,4 +73,32 @@ describe('bulk user credits router', () => {
       )
     );
   });
+
+  it('distinguishes an invalid expiration date from a past one', async () => {
+    const admin = await insertTestUser({ is_admin: true, can_manage_credits: true });
+    const recipient = await insertTestUser();
+    const caller = await createCallerForUser(admin.id);
+
+    await expect(
+      caller.admin.bulkUserCredits.grantBulkCredits({
+        emails: [recipient.google_user_email],
+        amountUsd: 5,
+        expirationDate: '2026-13-01',
+      })
+    ).rejects.toThrow('Invalid date');
+
+    await expect(
+      caller.admin.bulkUserCredits.grantBulkCredits({
+        emails: [recipient.google_user_email],
+        amountUsd: 5,
+        expirationDate: '2024-01-01',
+      })
+    ).rejects.toThrow('Expiration date must be in the future');
+
+    const transactions = await db
+      .select({ id: credit_transactions.id })
+      .from(credit_transactions)
+      .where(eq(credit_transactions.kilo_user_id, recipient.id));
+    expect(transactions).toHaveLength(0);
+  });
 });

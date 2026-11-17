@@ -143,6 +143,87 @@ describe('POST /admin/api/users/add-credit', () => {
     }
   });
 
+  it('rejects a positive grant whose credit_expiry_date is in the past', async () => {
+    const admin = await insertTestUser({ is_admin: true, can_manage_credits: true });
+    const recipient = await insertTestUser();
+    mockedGetUserFromAuth.mockResolvedValue({ user: admin, authFailedResponse: null });
+
+    const response = await POST(
+      request({
+        email: recipient.google_user_email,
+        credit_category: 'custom',
+        amount_usd: 10,
+        creditKind: 'promotional',
+        credit_expiry_date: '2024-06-01T00:00:00.000Z',
+      })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Credit expiry date must be in the future',
+    });
+    expect(
+      await db
+        .select({ id: credit_transactions.id })
+        .from(credit_transactions)
+        .where(eq(credit_transactions.kilo_user_id, recipient.id))
+    ).toHaveLength(0);
+  });
+
+  it('rejects a malformed credit_expiry_date instead of writing an invalid transaction', async () => {
+    const admin = await insertTestUser({ is_admin: true, can_manage_credits: true });
+    const recipient = await insertTestUser();
+    mockedGetUserFromAuth.mockResolvedValue({ user: admin, authFailedResponse: null });
+
+    const response = await POST(
+      request({
+        email: recipient.google_user_email,
+        credit_category: 'custom',
+        amount_usd: 10,
+        creditKind: 'promotional',
+        credit_expiry_date: 'not-a-date',
+      })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Credit expiry date is not a valid date',
+    });
+    expect(
+      await db
+        .select({ id: credit_transactions.id })
+        .from(credit_transactions)
+        .where(eq(credit_transactions.kilo_user_id, recipient.id))
+    ).toHaveLength(0);
+  });
+
+  it('allows a past credit_expiry_date on a debit, which stores no expiry', async () => {
+    const admin = await insertTestUser({ is_admin: true, can_manage_credits: true });
+    const recipient = await insertTestUser();
+    mockedGetUserFromAuth.mockResolvedValue({ user: admin, authFailedResponse: null });
+
+    const response = await POST(
+      request({
+        email: recipient.google_user_email,
+        credit_category: 'manual_decrement',
+        amount_usd: -2,
+        description: 'Correction',
+        creditKind: 'promotional',
+        credit_expiry_date: '2024-06-01T00:00:00.000Z',
+      })
+    );
+
+    expect(response.status).toBe(200);
+    const debitsRows = (
+      await db
+        .select()
+        .from(credit_transactions)
+        .where(eq(credit_transactions.kilo_user_id, recipient.id))
+    ).filter(credit => credit.amount_microdollars < 0);
+    expect(debitsRows).toHaveLength(1);
+    expect(debitsRows[0].expiry_date).toBeNull();
+  });
+
   it('returns 403 without credit management access even when force-200 is requested', async () => {
     const admin = await insertTestUser({ is_admin: true });
     const recipient = await insertTestUser();

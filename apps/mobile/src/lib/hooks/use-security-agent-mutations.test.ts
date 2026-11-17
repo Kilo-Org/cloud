@@ -871,6 +871,20 @@ describe('ledger marker copy per surface', () => {
     expect(isSecuritySyncRetryable(mapped)).toBe(false);
   });
 
+  it('maps the remediation service rejection onto its copy, still non-retryable', () => {
+    const rejection = Object.assign(
+      new Error('Security remediation service request was rejected'),
+      {
+        data: { code: 'PRECONDITION_FAILED' },
+      }
+    );
+    const mapped = mapSecuritySyncOperationError(rejection);
+    expect(mapped.message).toBe(
+      'Could not complete this action. The problem needs fixing before you can retry.'
+    );
+    expect(isSecuritySyncRetryable(mapped)).toBe(false);
+  });
+
   it('maps a server sync precondition onto the copy that names its fix', () => {
     const PRECONDITION_BY_CODE = {
       security_sync_no_repositories: 'noRepositories',

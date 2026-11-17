@@ -206,6 +206,12 @@ function markerKeyFor(error: Error): string | null {
     case SECURITY_SERVICE_UNAVAILABLE_MESSAGE: {
       return 'securityAgent.mutations.serviceUnavailable';
     }
+    // The remediation client's definitive non-5xx rejection: a stable server
+    // sentence (see manual-remediation-client.ts), mapped so a non-English
+    // device does not render it verbatim.
+    case 'Security remediation service request was rejected': {
+      return 'securityAgent.mutations.actionBlocked';
+    }
     default: {
       // The subscription gate and the organization procedures refuse a write
       // with their own sentence and no ledger marker: a lapsed trial is the

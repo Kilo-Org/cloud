@@ -203,6 +203,7 @@ describe('remediation Worker call sites', () => {
       status: 400,
       json: () => Promise.resolve({ error: 'Invalid request' }),
     });
+    const logged = jest.spyOn(console, 'error').mockImplementation(() => {});
 
     const error: TRPCError = await submit().then(
       () => {
@@ -216,6 +217,13 @@ describe('remediation Worker call sites', () => {
     // error text never reaches the device.
     expect(error.message).toBe('Security remediation service request was rejected');
     expect(error.message).not.toContain('Invalid request');
+    // The status and a bounded body note stay server-side, so a credential
+    // mismatch (401) is separable from a policy rejection (409) in the logs.
+    expect(logged).toHaveBeenCalledWith(
+      'Security remediation Worker rejected the request',
+      expect.objectContaining({ status: 400, notes: expect.stringContaining('Invalid request') })
+    );
+    logged.mockRestore();
   });
 });
 

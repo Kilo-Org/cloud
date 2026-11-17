@@ -80,9 +80,31 @@ type ApplyAutoRemediationResponse = {
 // code, not the generic 500 the classifier treats as retryable transport.
 const CONFIG_ERROR_MESSAGE = 'Security service is not configured';
 
-// Stable sentence for a definitive Worker rejection the device cannot map: it
-// never echoes the Worker's error body and never varies with the status.
+// Stable sentence for a definitive Worker rejection: it never echoes the
+// Worker's error body and never varies with the status, which is what lets the
+// mobile ledger map it onto localized copy (security-agent-ledger.ts).
 const REMEDIATION_REJECTED_MESSAGE = 'Security remediation service request was rejected';
+
+/**
+ * Logs a definitive non-5xx Worker rejection before it becomes the stable
+ * client error: the status is what separates an internal-secret mismatch (401)
+ * or a request-schema drift (400) from a policy rejection (409) once the body
+ * is no longer echoed. The Worker's `error` body is notes-only and length-capped.
+ */
+function logDefinitiveRejection(route: string, status: number, body: unknown): void {
+  let notes: string | null = null;
+  if (body !== null && typeof body === 'object' && 'error' in body) {
+    const raw = body.error;
+    if (typeof raw === 'string') {
+      notes = raw.slice(0, 200);
+    }
+  }
+  console.error('Security remediation Worker rejected the request', {
+    route,
+    status,
+    ...(notes !== null ? { notes } : {}),
+  });
+}
 
 function requireWorkerConfig() {
   if (!SECURITY_AUTO_ANALYSIS_WORKER_URL || !INTERNAL_API_SECRET) {
@@ -127,6 +149,7 @@ export async function submitManualRemediationStart(
     if (response.status >= 500) {
       throw ambiguousTransportError(`Remediation request failed with ${response.status}`);
     }
+    logDefinitiveRejection('remediation/start', response.status, body);
     throw new TRPCError({ code: 'PRECONDITION_FAILED', message: REMEDIATION_REJECTED_MESSAGE });
   }
   if (!parsedBody.success || !parsedBody.data.admitted) {
@@ -162,6 +185,7 @@ export async function submitRemediationCancellation(
     if (response.status >= 500) {
       throw ambiguousTransportError(`Remediation cancellation failed with ${response.status}`);
     }
+    logDefinitiveRejection('remediation/cancel', response.status, body);
     throw new TRPCError({ code: 'PRECONDITION_FAILED', message: REMEDIATION_REJECTED_MESSAGE });
   }
   if (workerBody?.success !== true || !workerBody.status) {
@@ -190,6 +214,7 @@ export async function submitApplyAutoRemediation(
     if (response.status >= 500) {
       throw ambiguousTransportError(`Apply auto-remediation failed with ${response.status}`);
     }
+    logDefinitiveRejection('apply-auto-remediation', response.status, body);
     throw new TRPCError({ code: 'PRECONDITION_FAILED', message: REMEDIATION_REJECTED_MESSAGE });
   }
   if (

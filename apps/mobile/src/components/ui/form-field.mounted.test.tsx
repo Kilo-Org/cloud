@@ -96,20 +96,19 @@ describe('FormField reserved validation space', () => {
         catalog.authErrors.invalidEmail,
       ];
       const props = { label: catalog.login.emailAddress, reserveErrorMessages };
-      act(() => {
-        renderer = TestRenderer.create(createElement(FormField, props));
-      });
-      if (!renderer) {
-        throw new Error('renderer was not created');
-      }
-      const mounted = renderer;
+      const mounted = mountField(props);
 
       // The slot exists only while the field is edited or in error, so the
       // announce-through-recovery walk below runs with the field focused.
       focusInput(mounted);
-      const reserved = slot(mounted)[0];
-      expect(reserved.props.pointerEvents).toBe('none');
-      expect(reserved.props.accessibilityElementsHidden).toBe(true);
+      const reserved = slot(mounted);
+      expect(reserved).toHaveLength(1);
+      const reservedNode = reserved[0];
+      if (!reservedNode) {
+        throw new Error('the focused field reserved no slot');
+      }
+      expect(reservedNode.props.pointerEvents).toBe('none');
+      expect(reservedNode.props.accessibilityElementsHidden).toBe(true);
       expect(mounted.root.findByType(AccessibleStatus).findAllByType('Text')).toHaveLength(0);
 
       for (const error of [...reserveErrorMessages, undefined]) {

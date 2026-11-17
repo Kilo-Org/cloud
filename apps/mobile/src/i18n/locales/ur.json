@@ -3368,7 +3368,7 @@
     },
     "inviteMember": {
       "emailError": "درست ای میل پتہ درج کریں۔",
-      "emailPlaceholder": "ای میل پتہ",
+      "emailPlaceholder": "نام@company.com",
       "permissionDenied": "آپ کو اراکین کو دعوت دینے کی اجازت نہیں ہے۔",
       "roleMember": "کردار: رکن",
       "sendInvite": "دعوت بھیجیں",

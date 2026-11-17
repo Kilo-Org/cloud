@@ -3368,7 +3368,7 @@
     },
     "inviteMember": {
       "emailError": "වලංගු ඊමේල් ලිපිනයක් ඇතුළත් කරන්න.",
-      "emailPlaceholder": "ඔබේ ඊමේල් ලිපිනය",
+      "emailPlaceholder": "නම@company.com",
       "permissionDenied": "සාමාජිකයන්ට ආරාධනා කිරීමට ඔබට අවසර නොමැත.",
       "roleMember": "භූමිකාව: සාමාජිකයා",
       "sendInvite": "ආරාධනය යවන්න",

@@ -3368,7 +3368,7 @@
     },
     "inviteMember": {
       "emailError": "സാധുവായ ഒരു ഇമെയിൽ വിലാസം നൽകുക.",
-      "emailPlaceholder": "ഇമെയിൽ വിലാസം",
+      "emailPlaceholder": "പേര്@company.com",
       "permissionDenied": "അംഗങ്ങളെ ക്ഷണിക്കാൻ നിങ്ങൾക്ക് അനുമതിയില്ല.",
       "roleMember": "റോൾ: അംഗം",
       "sendInvite": "ക്ഷണം അയയ്ക്കുക",

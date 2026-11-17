@@ -4315,7 +4315,7 @@
       },
       "purchaseFallback": "Hoko kiredita",
       "receipt": "Rihīti",
-      "receiptA11y": "Huakina te rihīti mō {{description}}",
+      "receiptA11y": "Huakina te rihīti mō {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Kāore he rihīti mō tēnei hoko."
     },
     "title": "Hoko whiwhinga",

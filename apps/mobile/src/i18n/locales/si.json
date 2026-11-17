@@ -4315,7 +4315,7 @@
       },
       "purchaseFallback": "ක්‍රෙඩිට් මිලදී ගැනීම",
       "receipt": "රිසිට්පත",
-      "receiptA11y": "{{description}} සඳහා රිසිට්පත විවෘත කරන්න",
+      "receiptA11y": "{{description}}, {{amount}}, {{date}} සඳහා රිසිට්පත විවෘත කරන්න",
       "receiptUnavailable": "මෙම මිලදී ගැනීම සඳහා රිසිට්පතක් නොමැත."
     },
     "title": "ක්‍රෙඩිට් මිලදී ගන්න",

@@ -4315,7 +4315,7 @@
       },
       "purchaseFallback": "Kredietaankoop",
       "receipt": "Kwitansie",
-      "receiptA11y": "Maak die kwitansie vir {{description}} oop",
+      "receiptA11y": "Maak die kwitansie vir {{description}}, {{amount}}, vanaf {{date}} oop",
       "receiptUnavailable": "Geen kwitansie is vir hierdie aankoop beskikbaar nie."
     },
     "title": "Koop krediete",

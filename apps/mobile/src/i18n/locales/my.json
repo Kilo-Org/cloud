@@ -4315,7 +4315,7 @@
       },
       "purchaseFallback": "ခရက်ဒစ် ဝယ်ယူမှု",
       "receipt": "ပြေစာ",
-      "receiptA11y": "{{description}} အတွက် ပြေစာကို ဖွင့်ရန်",
+      "receiptA11y": "{{description}}၊ {{amount}}၊ {{date}} အတွက် ပြေစာကို ဖွင့်ရန်",
       "receiptUnavailable": "ဤဝယ်ယူမှုအတွက် ပြေစာ မရရှိနိုင်ပါ။"
     },
     "title": "ခရက်ဒစ်များ ဝယ်ယူပါ",

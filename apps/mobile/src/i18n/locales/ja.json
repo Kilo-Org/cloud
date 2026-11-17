@@ -4315,7 +4315,7 @@
       },
       "purchaseFallback": "クレジットの購入",
       "receipt": "領収書",
-      "receiptA11y": "{{description}}の領収書を開く",
+      "receiptA11y": "{{description}}、{{amount}}、{{date}}の領収書を開く",
       "receiptUnavailable": "この購入の領収書はありません。"
     },
     "title": "クレジットを購入",

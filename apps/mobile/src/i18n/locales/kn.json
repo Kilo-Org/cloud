@@ -4315,7 +4315,7 @@
       },
       "purchaseFallback": "ಕ್ರೆಡಿಟ್ ಖರೀದಿ",
       "receipt": "ರಸೀದಿ",
-      "receiptA11y": "{{description}} ಗಾಗಿ ರಸೀದಿ ತೆರೆಯಿರಿ",
+      "receiptA11y": "{{description}}, {{amount}}, {{date}} ಗಾಗಿ ರಸೀದಿ ತೆರೆಯಿರಿ",
       "receiptUnavailable": "ಈ ಖರೀದಿಗೆ ರಸೀದಿ ಲಭ್ಯವಿಲ್ಲ."
     },
     "title": "ಕ್ರೆಡಿಟ್ ಖರೀದಿಸಿ",

@@ -4315,7 +4315,7 @@
       },
       "purchaseFallback": "Кредит сатып алу",
       "receipt": "Түбіртек",
-      "receiptA11y": "Түбіртекті ашу: {{description}}",
+      "receiptA11y": "Түбіртекті ашу: {{description}}, {{amount}}, {{date}} күні",
       "receiptUnavailable": "Бұл сатып алу үшін түбіртек қолжетімді емес."
     },
     "title": "Кредит сатып алу",

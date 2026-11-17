@@ -4315,7 +4315,7 @@
       },
       "purchaseFallback": "Credit-Kauf",
       "receipt": "Beleg",
-      "receiptA11y": "Beleg für {{description}} öffnen",
+      "receiptA11y": "Beleg für {{description}}, {{amount}}, vom {{date}} öffnen",
       "receiptUnavailable": "Für diesen Kauf ist kein Beleg verfügbar."
     },
     "title": "Guthaben kaufen",

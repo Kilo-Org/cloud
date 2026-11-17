@@ -4315,7 +4315,7 @@
       },
       "purchaseFallback": "የክሬዲት ግዢ",
       "receipt": "ደረሰኝ",
-      "receiptA11y": "የ{{description}} ደረሰኝን ክፈት",
+      "receiptA11y": "የ{{description}}፣ {{amount}}፣ ከ{{date}} ደረሰኝን ክፈት",
       "receiptUnavailable": "ለዚህ ግዢ ደረሰኝ አይገኝም።"
     },
     "title": "ክሬዲት ይግዙ",

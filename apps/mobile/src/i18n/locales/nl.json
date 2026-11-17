@@ -4315,7 +4315,7 @@
       },
       "purchaseFallback": "Tegoedaankoop",
       "receipt": "Bon",
-      "receiptA11y": "Open de bon voor {{description}}",
+      "receiptA11y": "Open de bon voor {{description}}, {{amount}}, van {{date}}",
       "receiptUnavailable": "Er is geen bon beschikbaar voor deze aankoop."
     },
     "title": "Credits kopen",

@@ -4381,7 +4381,7 @@
       },
       "purchaseFallback": "Achat de crédits",
       "receipt": "Reçu",
-      "receiptA11y": "Ouvrir le reçu pour {{description}}",
+      "receiptA11y": "Ouvrir le reçu pour {{description}}, {{amount}}, du {{date}}",
       "receiptUnavailable": "Aucun reçu n'est disponible pour cet achat."
     },
     "title": "Acheter des crédits",

@@ -4315,7 +4315,7 @@
       },
       "purchaseFallback": "ການຊື້ເຄຣດິດ",
       "receipt": "ໃບຮັບເງິນ",
-      "receiptA11y": "ເປີດໃບຮັບເງິນສຳລັບ {{description}}",
+      "receiptA11y": "ເປີດໃບຮັບເງິນສຳລັບ {{description}}, {{amount}}, ຈາກ {{date}}",
       "receiptUnavailable": "ບໍ່ມີໃບຮັບເງິນສຳລັບການຊື້ນີ້."
     },
     "title": "ຊື້ເຄຣດິດ",

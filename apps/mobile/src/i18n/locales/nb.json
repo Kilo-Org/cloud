@@ -4315,7 +4315,7 @@
       },
       "purchaseFallback": "Kjøp av kreditter",
       "receipt": "Kvittering",
-      "receiptA11y": "Åpne kvitteringen for {{description}}",
+      "receiptA11y": "Åpne kvitteringen for {{description}}, {{amount}}, fra {{date}}",
       "receiptUnavailable": "Det finnes ingen kvittering for dette kjøpet."
     },
     "title": "Kjøp kreditter",

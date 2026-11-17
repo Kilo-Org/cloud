@@ -6,11 +6,16 @@ export const PROMO_CREDIT_EXPIRY_HRS = 60 * 24; // 60 days in hours
 export const WELCOME_CREDIT_EXPIRY_HRS = 30 * 24; // 30 days in hours
 export const OPENCLAW_SECURITY_ADVISOR_BONUS_EXPIRY_HRS = 48; // 2 days in hours
 
+// Staging deployments do not report VERCEL_ENV=production, while a production build can never carry VERCEL_TARGET_ENV=staging.
+export function isStagingDeployment(): boolean {
+  return process.env.VERCEL_TARGET_ENV === 'staging' && process.env.VERCEL_ENV !== 'production';
+}
+
 export const allow_fake_login =
   (!!process.env.DEBUG_SHOW_DEV_UI &&
     process.env.NODE_ENV !== 'production' &&
     !process.env.VERCEL_ENV) ||
-  process.env.VERCEL_TARGET_ENV === 'staging';
+  isStagingDeployment();
 
 export const MINIMUM_TOP_UP_AMOUNT = 10;
 export const MAXIMUM_TOP_UP_AMOUNT = 10_000;

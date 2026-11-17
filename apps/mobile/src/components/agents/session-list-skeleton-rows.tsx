@@ -46,11 +46,7 @@ export function SessionListSkeletonRows({
   return (
     <View style={{ paddingLeft: insets.left, paddingRight: insets.right }}>
       {Array.from({ length: SKELETON_ROW_COUNT }, (_, i) => (
-        <SessionRowSkeleton
-          key={i}
-          subtitle
-          last={i === SKELETON_ROW_COUNT - 1}
-        />
+        <SessionRowSkeleton key={i} subtitle last={i === SKELETON_ROW_COUNT - 1} />
       ))}
     </View>
   );

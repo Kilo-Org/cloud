@@ -5,6 +5,7 @@ import { act, type TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { CollapsibleSection } from '@/components/security-agent/collapsible-section';
 import {
   branchSelectorProps,
   githubRow,
@@ -384,8 +385,10 @@ describe('NewSessionRepositorySection connect card layout stability', () => {
 
     // The section opts out of the layout transition at its own disclosure; the
     // shared section owns the surface, so the caller only passes the flag.
-    const section = renderer.root.findAll(node => node.props.animateLayout === false);
-    expect(section).toHaveLength(1);
+    const sections = renderer.root.findAll(
+      node => node.type === CollapsibleSection && node.props.animateLayout === false
+    );
+    expect(sections).toHaveLength(1);
 
     const transitionViews = renderer.root.findAll(node => node.type === ('Animated.View' as never));
     expect(transitionViews.length).toBeGreaterThan(0);

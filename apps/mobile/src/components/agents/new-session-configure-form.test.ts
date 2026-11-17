@@ -14,6 +14,7 @@ import { resolveNewSessionStartBlockedReason } from '@/lib/new-session-submit';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
 
 import { OrganizationPlanRefusal } from '@/components/organization/plan-refusal';
+import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { NewSessionProfileRow } from './new-session-environment-row';
 
 import { i18n as appI18n } from '@/i18n';
@@ -959,7 +960,7 @@ describe('NewSessionConfigureForm', () => {
 
     // The label stays mounted (as the shared field label) and skeletons hold
     // the row's height, so the rows below never move when the query settles.
-    expect(findElementByType(element, 'FormFieldLabel')?.label).toBe('Environment');
+    expect(findElementByComponent(element, FormFieldLabel)?.label).toBe('Environment');
     expect(findElementByType(element, 'Skeleton')).not.toBeNull();
     expect(findTextContent(element, t => t === 'Default environment')).toBe(false);
     expect(findTextContent(element, t => t === 'Production')).toBe(false);
@@ -998,11 +999,14 @@ describe('NewSessionConfigureForm', () => {
       // The label and the trigger frame are the row's fixed anatomy: every
       // state paints on the same frame, so the state swap cannot move the rows
       // below it.
-      expect(findElementByType(row, 'FormFieldLabel')?.label).toBe('Environment');
+      expect(findElementByComponent(row, FormFieldLabel)?.label).toBe('Environment');
       const frames = [
         ...collectElementsByType(row, 'View'),
         ...collectElementsByType(row, 'Pressable'),
-      ].filter(element => String(element.className ?? '').includes(FIELD_TRIGGER_FRAME_CLASS));
+      ].filter(
+        element =>
+          typeof element.className === 'string' && element.className.includes(FIELD_TRIGGER_FRAME_CLASS)
+      );
       expect(frames).toHaveLength(1);
     }
   });
@@ -1034,7 +1038,7 @@ describe('NewSessionConfigureForm', () => {
     const row = findElementByComponent(element, NewSessionProfileRow);
     expect(row?.isProfileLoading).toBe(true);
     const loadingRow = renderRow({ isProfileLoading: true });
-    expect(findElementByType(loadingRow, 'FormFieldLabel')?.label).toBe('Environment');
+    expect(findElementByComponent(loadingRow, FormFieldLabel)?.label).toBe('Environment');
     expect(findTextContent(loadingRow, t => t === 'Loading…')).toBe(true);
     expect(findTextContent(loadingRow, t => t === 'Default environment')).toBe(false);
     expect(findElementByType(loadingRow, 'Skeleton')).not.toBeNull();

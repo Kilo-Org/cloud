@@ -6,6 +6,7 @@ import { toast } from 'sonner-native';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { ConfigureRow } from '@/components/ui/configure-row';
 import { Newspaper } from '@/components/ui/icons';
 import { PreferenceRow } from '@/components/ui/preference-row';
 import { Switch } from '@/components/ui/switch';
@@ -130,7 +131,11 @@ export function BriefingNotificationCategoryRow({ disabled }: Readonly<{ disable
           void preferences.refetch();
         }}
         accessibilityLabel={`${t('agentBriefing.title')}. ${t('common.retry')}`}
-        trailing={<Text variant="caption" className="text-destructive">{t('common.retry')}</Text>}
+        trailing={
+          <Text variant="caption" className="text-destructive">
+            {t('common.retry')}
+          </Text>
+        }
       />
     );
   }

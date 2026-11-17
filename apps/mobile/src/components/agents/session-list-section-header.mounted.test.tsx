@@ -40,7 +40,11 @@ describe('SessionListSectionHeader mounted', () => {
       throw new Error('renderer was not created');
     }
 
-    const headings = renderer.root.findAll(node => node.props.accessibilityRole === 'header');
+    // SectionHeader draws the contract's header role itself, so the row's own
+    // spoken heading is the accessible element that carries the combined label.
+    const headings = renderer.root.findAll(
+      node => node.props.accessibilityRole === 'header' && node.props.accessible === true
+    );
     expect(headings).toHaveLength(1);
     const heading = headings[0];
     expect(heading?.props.accessible).toBe(true);

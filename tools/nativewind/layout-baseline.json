@@ -3,9 +3,6 @@
     "L1": 2,
     "L4": 1
   },
-  "apps/mobile/src/components/media/image-picker-actions.tsx": {
-    "L4": 1
-  },
   "apps/mobile/src/components/pr-review/diff/pr-diff-file-rows.tsx": {
     "L7": 1
   }

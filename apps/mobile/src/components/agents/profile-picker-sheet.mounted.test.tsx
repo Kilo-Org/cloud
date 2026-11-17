@@ -114,7 +114,12 @@ function mount(props: Partial<ProfilePickerSheetProps> = {}) {
 }
 
 function radios(renderer: TestRenderer.ReactTestRenderer) {
-  return renderer.root.findAll(node => node.props.accessibilityRole === 'radio');
+  // A row primitive that takes the a11y props carries them on both its own
+  // composite node and the host control it renders; only the host is a control
+  // the platform sees, so the helper counts string-typed nodes.
+  return renderer.root.findAll(
+    node => typeof node.type === 'string' && node.props.accessibilityRole === 'radio'
+  );
 }
 
 function radio(renderer: TestRenderer.ReactTestRenderer, label: string) {

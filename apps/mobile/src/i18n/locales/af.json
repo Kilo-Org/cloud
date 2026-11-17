@@ -910,7 +910,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Hierdie rekening het nog geen organisasies nie. Bitbucket-trekversoeke kan hersien word sodra jy 'n organisasie skep of by een aansluit.",
       "gitlabReconnectAdminOnlyDescription": "Vra 'n organisasie-eienaar, administrateur of faktureringsbestuurder om dit weer te koppel.",
       "bitbucketNotConnectedTitle": "Bitbucket is nie gekoppel nie",
-      "bitbucketAdminOnlyDescription": "Slegs organisasie-eienaars, administrateurs en faktureringsbestuurders kan dit koppel.",
+      "bitbucketAdminOnlyDescription": "Vra 'n organisasie-Eienaar, Administrateur of Faktureringsbestuurder om dit te koppel.",
       "contextLine": "Vir {{organization}}",
       "contextLinePersonal": "Vir jou persoonlike rekening"
     },
@@ -1348,7 +1348,7 @@
     "followReviewMd": "Volg REVIEW.md",
     "followReviewMdSubtitle": "Volg die REVIEW.md-instruksielêer in elke bewaarplek",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket is nie gekoppel nie. Slegs organisasie-eienaars, administrateurs en faktureringsbestuurders kan dit koppel."
+      "notConnectedReadOnly": "Bitbucket is nie gekoppel nie. Vra 'n organisasie-Eienaar, Administrateur of Faktureringsbestuurder om dit te koppel."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Hierdie organisasie se Bitbucket-verbinding word op die web vanaf 'n rekenaar bestuur.",

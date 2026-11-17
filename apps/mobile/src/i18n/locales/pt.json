@@ -927,7 +927,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Esta conta ainda não tem organizações. Os PRs do Bitbucket podem ser revistos depois de criares ou aderires a uma organização.",
       "gitlabReconnectAdminOnlyDescription": "Peça a um proprietário, administrador ou gestor de faturação da organização que a volte a ligar.",
       "bitbucketNotConnectedTitle": "O Bitbucket não está ligado",
-      "bitbucketAdminOnlyDescription": "Apenas os proprietários da organização, os administradores e os gestores de faturação o podem ligar.",
+      "bitbucketAdminOnlyDescription": "Peça a um proprietário, administrador ou gestor de faturação da organização que o ligue.",
       "contextLine": "Para {{organization}}",
       "contextLinePersonal": "Para a sua conta pessoal"
     },
@@ -1371,7 +1371,7 @@
     "followReviewMd": "Seguir REVIEW.md",
     "followReviewMdSubtitle": "Respeitar as instruções do ficheiro REVIEW.md de cada repositório",
     "bitbucket": {
-      "notConnectedReadOnly": "O Bitbucket não está ligado. Apenas os proprietários da organização, os administradores e os gestores de faturação o podem ligar."
+      "notConnectedReadOnly": "O Bitbucket não está ligado. Peça a um proprietário, administrador ou gestor de faturação da organização que o ligue."
     },
     "bitbucketConnect": {
       "managedOnWeb": "A ligação ao Bitbucket desta organização é gerida na Web, a partir de um computador.",

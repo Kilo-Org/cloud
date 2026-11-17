@@ -944,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Tento účet zatím nemá žádnou organizaci. PR na Bitbucketu půjde kontrolovat, jakmile nějakou vytvoříš nebo se k ní přidáš.",
       "gitlabReconnectAdminOnlyDescription": "Požádejte vlastníka organizace, správce nebo správce fakturace, aby ho znovu připojil.",
       "bitbucketNotConnectedTitle": "Bitbucket není připojen",
-      "bitbucketAdminOnlyDescription": "Připojit ho mohou pouze vlastníci organizace, správci a správci fakturace.",
+      "bitbucketAdminOnlyDescription": "Požádejte vlastníka organizace, správce nebo správce fakturace, aby ji připojil.",
       "contextLine": "Pro {{organization}}",
       "contextLinePersonal": "Pro osobní účet"
     },
@@ -1394,7 +1394,7 @@
     "followReviewMd": "Řídit se pokyny v REVIEW.md",
     "followReviewMdSubtitle": "Dodržovat pokyny ze souboru REVIEW.md v každém repozitáři",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket není připojen. Připojit ho mohou pouze vlastníci organizace, správci a správci fakturace."
+      "notConnectedReadOnly": "Služba Bitbucket není připojená. Požádejte vlastníka organizace, správce nebo správce fakturace, aby ji připojil."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Připojení Bitbucket této organizace se spravuje na webu z počítače.",

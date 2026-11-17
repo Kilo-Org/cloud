@@ -910,7 +910,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Akaunti hii haina shirika lolote kwa sasa. Unaweza kukagua maombi ya kuunganisha kwenye Bitbucket mara tu unapounda au kujiunga na shirika.",
       "gitlabReconnectAdminOnlyDescription": "Omba mmiliki wa shirika, msimamizi, au msimamizi wa bili aiunganishe upya.",
       "bitbucketNotConnectedTitle": "Bitbucket haijaunganishwa",
-      "bitbucketAdminOnlyDescription": "Wamiliki, wasimamizi, na wasimamizi wa bili wa shirika pekee wanaweza kuiunganisha.",
+      "bitbucketAdminOnlyDescription": "Omba mmiliki wa shirika, msimamizi, au msimamizi wa bili aiunganishe.",
       "contextLine": "Kwa {{organization}}",
       "contextLinePersonal": "Kwa akaunti yako binafsi"
     },
@@ -1348,7 +1348,7 @@
     "followReviewMd": "Fuata REVIEW.md",
     "followReviewMdSubtitle": "Fuata maagizo katika faili ya REVIEW.md ya kila hazina",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket haijaunganishwa. Wamiliki, wasimamizi, na wasimamizi wa bili wa shirika pekee wanaweza kuiunganisha."
+      "notConnectedReadOnly": "Bitbucket haijaunganishwa. Omba mmiliki wa shirika, msimamizi, au msimamizi wa bili aiunganishe."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Muunganisho wa Bitbucket wa shirika hili unasimamiwa kwenye wavuti kutoka kwenye kompyuta.",

@@ -670,7 +670,7 @@
     },
     "autoReviews": "Автоматичні перевірки",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket не підключено. Підключити його можуть лише власники організації, адміністратори та менеджери з оплати."
+      "notConnectedReadOnly": "Bitbucket не підключено. Попросіть власника організації, адміністратора або менеджера з оплати підключити його."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Підключенням Bitbucket цієї організації можна керувати лише у вебверсії з комп'ютера.",
@@ -2836,7 +2836,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Цей обліковий запис ще не має організацій. Запити на злиття Bitbucket можна переглядати після того, як ви створите організацію або приєднаєтеся до неї.",
       "gitlabReconnectAdminOnlyDescription": "Попросіть власника організації, адміністратора або менеджера з оплати підключити його.",
       "bitbucketNotConnectedTitle": "Bitbucket не підключено",
-      "bitbucketAdminOnlyDescription": "Підключити його можуть лише власники організації, адміністратори та менеджери з оплати.",
+      "bitbucketAdminOnlyDescription": "Попросіть власника організації, адміністратора або менеджера з оплати підключити його.",
       "contextLine": "Для {{organization}}",
       "contextLinePersonal": "Для особистого простору"
     },

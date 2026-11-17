@@ -910,7 +910,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "या खात्याशी अजून कोणतीही संस्था जोडलेली नाही. संस्था तयार केल्यानंतर किंवा त्यात सामील झाल्यानंतर तुम्ही Bitbucket पुल रिक्वेस्ट तपासू शकता.",
       "gitlabReconnectAdminOnlyDescription": "संस्थेच्या मालक, प्रशासक किंवा बिलिंग व्यवस्थापकाला ते पुन्हा जोडण्यास सांगा.",
       "bitbucketNotConnectedTitle": "Bitbucket जोडलेले नाही",
-      "bitbucketAdminOnlyDescription": "केवळ संस्थेचे मालक, प्रशासक आणि बिलिंग व्यवस्थापक ते जोडू शकतात.",
+      "bitbucketAdminOnlyDescription": "संस्थेच्या मालक, प्रशासक किंवा बिलिंग व्यवस्थापकाला ते जोडण्यास सांगा.",
       "contextLine": "{{organization}} साठी",
       "contextLinePersonal": "तुमच्या वैयक्तिक खात्यासाठी"
     },
@@ -1348,7 +1348,7 @@
     "followReviewMd": "REVIEW.md मधील सूचना पाळा",
     "followReviewMdSubtitle": "प्रत्येक रिपॉझिटरीतील REVIEW.md फाइलमधील सूचना पाळा",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket जोडलेले नाही. केवळ संस्थेचे मालक, प्रशासक आणि बिलिंग व्यवस्थापक ते जोडू शकतात."
+      "notConnectedReadOnly": "Bitbucket जोडलेले नाही. संस्थेच्या मालक, प्रशासक किंवा बिलिंग व्यवस्थापकाला ते जोडण्यास सांगा."
     },
     "bitbucketConnect": {
       "managedOnWeb": "या संस्थेचे Bitbucket कनेक्शन संगणकावरून वेबवर व्यवस्थापित केले जाते.",

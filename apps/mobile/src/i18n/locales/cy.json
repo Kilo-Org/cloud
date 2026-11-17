@@ -978,7 +978,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Nid oes unrhyw sefydliadau gyda'r cyfrif hwn eto. Gallwch adolygu ceisiadau tynnu Bitbucket unwaith y byddwch yn creu sefydliad neu'n ymuno ag un.",
       "gitlabReconnectAdminOnlyDescription": "Gofynnwch i berchennog sefydliad, gweinyddwr neu reolwr bilio ei ailgysylltu.",
       "bitbucketNotConnectedTitle": "Nid yw Bitbucket wedi'i gysylltu",
-      "bitbucketAdminOnlyDescription": "Dim ond perchnogion, gweinyddwyr a rheolwyr bilio'r sefydliad sy'n gallu ei gysylltu.",
+      "bitbucketAdminOnlyDescription": "Gofynnwch i berchennog sefydliad, gweinyddwr neu reolwr bilio ei gysylltu.",
       "contextLine": "Ar gyfer {{organization}}",
       "contextLinePersonal": "Ar gyfer eich cyfrif personol"
     },
@@ -1440,7 +1440,7 @@
     "followReviewMd": "Dilyn REVIEW.md",
     "followReviewMdSubtitle": "Dilyn y cyfarwyddiadau yn ffeil REVIEW.md pob ystorfa",
     "bitbucket": {
-      "notConnectedReadOnly": "Nid yw Bitbucket wedi'i gysylltu. Dim ond perchnogion, gweinyddwyr a rheolwyr bilio'r sefydliad sy'n gallu ei gysylltu."
+      "notConnectedReadOnly": "Nid yw Bitbucket wedi'i gysylltu. Gofynnwch i berchennog sefydliad, gweinyddwr neu reolwr bilio ei gysylltu."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Caiff cysylltiad Bitbucket y sefydliad hwn ei reoli ar y we o gyfrifiadur.",

@@ -670,7 +670,7 @@
     },
     "autoReviews": "स्वचालित समीक्षाएँ",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket कनेक्ट नहीं है। केवल संगठन के मालिक, एडमिन और बिलिंग प्रबंधक ही इसे कनेक्ट कर सकते हैं।"
+      "notConnectedReadOnly": "Bitbucket कनेक्ट नहीं है। इसे कनेक्ट करने के लिए संगठन के मालिक, एडमिन या बिलिंग प्रबंधक से अनुरोध करें।"
     },
     "bitbucketConnect": {
       "managedOnWeb": "इस संगठन का Bitbucket कनेक्शन कंप्यूटर से वेब पर प्रबंधित किया जाता है.",
@@ -2760,7 +2760,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "इस खाते में अभी तक कोई संगठन नहीं है। संगठन बनाने या किसी संगठन में शामिल होने के बाद ही Bitbucket पुल रिक्वेस्ट समीक्षित किए जा सकते हैं।",
       "gitlabReconnectAdminOnlyDescription": "इसे फिर से कनेक्ट करने के लिए संगठन के मालिक, एडमिन या बिलिंग प्रबंधक से अनुरोध करें।",
       "bitbucketNotConnectedTitle": "Bitbucket कनेक्ट नहीं है",
-      "bitbucketAdminOnlyDescription": "केवल संगठन के मालिक, एडमिन और बिलिंग प्रबंधक ही इसे कनेक्ट कर सकते हैं।",
+      "bitbucketAdminOnlyDescription": "इसे कनेक्ट करने के लिए संगठन के मालिक, एडमिन या बिलिंग प्रबंधक से अनुरोध करें।",
       "contextLine": "{{organization}} के लिए",
       "contextLinePersonal": "आपके व्यक्तिगत खाते के लिए"
     },

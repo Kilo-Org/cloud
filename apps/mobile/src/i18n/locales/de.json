@@ -670,7 +670,7 @@
     },
     "autoReviews": "Automatische Reviews",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ist nicht verbunden. Nur Organisationsinhaber, Admins und Abrechnungsmanager können die Verbindung herstellen."
+      "notConnectedReadOnly": "Bitbucket ist nicht verbunden. Bitte einen Inhaber, Admin oder Abrechnungsmanager, es zu verbinden."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Die Bitbucket-Verbindung dieser Organisation wird im Web über einen Computer verwaltet.",
@@ -2760,7 +2760,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Diesem Konto ist noch keine Organisation zugeordnet. Du kannst Bitbucket-Pull-Requests prüfen, sobald du eine Organisation erstellst oder einer beitrittst.",
       "gitlabReconnectAdminOnlyDescription": "Bitte einen Inhaber, Admin oder Abrechnungsmanager, sie wiederherzustellen.",
       "bitbucketNotConnectedTitle": "Bitbucket ist nicht verbunden",
-      "bitbucketAdminOnlyDescription": "Nur Organisationsinhaber, Admins und Abrechnungsmanager können die Verbindung herstellen.",
+      "bitbucketAdminOnlyDescription": "Bitte einen Inhaber, Admin oder Abrechnungsmanager, es zu verbinden.",
       "contextLine": "Für {{organization}}",
       "contextLinePersonal": "Für den persönlichen Bereich"
     },

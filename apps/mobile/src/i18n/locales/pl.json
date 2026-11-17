@@ -670,7 +670,7 @@
     },
     "autoReviews": "Automatyczne przeglądy",
     "bitbucket": {
-      "notConnectedReadOnly": "Brak połączenia z Bitbucket. Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą je skonfigurować."
+      "notConnectedReadOnly": "Brak połączenia z Bitbucket. Poproś Właściciela, Administratora lub Osobę zarządzającą rozliczeniami w organizacji, aby ją połączyć."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Połączeniem tej organizacji z Bitbucket zarządza się w przeglądarce na komputerze.",
@@ -2836,7 +2836,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "To konto nie ma jeszcze żadnych organizacji. PR-y na Bitbucketu będzie można przeglądać po utworzeniu organizacji lub dołączeniu do niej.",
       "gitlabReconnectAdminOnlyDescription": "Poproś Właściciela, Administratora lub Osobę zarządzającą rozliczeniami w organizacji, aby je ponownie połączyć.",
       "bitbucketNotConnectedTitle": "Brak połączenia z Bitbucket",
-      "bitbucketAdminOnlyDescription": "Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą je połączyć.",
+      "bitbucketAdminOnlyDescription": "Poproś Właściciela, Administratora lub Osobę zarządzającą rozliczeniami w organizacji, aby ją połączyć.",
       "contextLine": "Dla {{organization}}",
       "contextLinePersonal": "Dla konta osobistego"
     },

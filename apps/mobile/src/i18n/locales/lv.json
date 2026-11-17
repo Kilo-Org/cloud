@@ -927,7 +927,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Šim kontam vēl nav organizāciju. Bitbucket izmaiņu pieprasījumus varēs pārskatīt, kad izveidosi organizāciju vai tai pievienosies.",
       "gitlabReconnectAdminOnlyDescription": "Lūdziet organizācijas īpašniekam, administratoram vai norēķinu pārvaldniekam to pievienot no jauna.",
       "bitbucketNotConnectedTitle": "Bitbucket nav pievienots",
-      "bitbucketAdminOnlyDescription": "To var pievienot tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki.",
+      "bitbucketAdminOnlyDescription": "Lūdziet īpašniekam, administratoram vai norēķinu pārvaldniekam to pievienot.",
       "contextLine": "Priekš {{organization}}",
       "contextLinePersonal": "Priekš personīgā konta"
     },
@@ -1371,7 +1371,7 @@
     "followReviewMd": "Ievērot REVIEW.md norādījumus",
     "followReviewMdSubtitle": "Ievērot katra repozitorija REVIEW.md failā sniegtos norādījumus",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket nav pievienots. To var pievienot tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki."
+      "notConnectedReadOnly": "Bitbucket nav pievienots. Lūdziet īpašniekam, administratoram vai norēķinu pārvaldniekam to pievienot."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Šīs organizācijas Bitbucket savienojums tiek pārvaldīts tīmeklī no datora.",

@@ -910,7 +910,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Kāore anō he whakahaere ō tēnei pūkete. Ka arotakehia ngā tono kume Bitbucket inā waihanga rānei koe i tētahi whakahaere, inā uru rānei koe ki tētahi.",
       "gitlabReconnectAdminOnlyDescription": "Tonoa tētahi rangatira, kaiwhakahaere, kaiwhakahaere utu rānei o te whakahaere kia honoa anō ia.",
       "bitbucketNotConnectedTitle": "Kāore anō kia honoa a Bitbucket",
-      "bitbucketAdminOnlyDescription": "Ko ngā rangatira o te rōpū, ngā kaiwhakahaere me ngā kaiwhakahaere utu anake ka āhei ki te hono.",
+      "bitbucketAdminOnlyDescription": "Tonoa tētahi rangatira, kaiwhakahaere, kaiwhakahaere utu rānei o te whakahaere kia honoa ia.",
       "contextLine": "Mō {{organization}}",
       "contextLinePersonal": "Mō tō whaiaro"
     },
@@ -1348,7 +1348,7 @@
     "followReviewMd": "Whaia a REVIEW.md",
     "followReviewMdSubtitle": "Whaia ngā kōnae tohutohu REVIEW.md o ia pūranga",
     "bitbucket": {
-      "notConnectedReadOnly": "Kāore anō kia honoa a Bitbucket. Ko ngā rangatira o te rōpū, ngā kaiwhakahaere me ngā kaiwhakahaere utu anake ka āhei ki te hono."
+      "notConnectedReadOnly": "Kāore anō kia honoa a Bitbucket. Tonoa tētahi rangatira, kaiwhakahaere, kaiwhakahaere utu rānei o te whakahaere kia honoa ia."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Ka whakahaerehia te hononga Bitbucket o tēnei rōpū i runga ipurangi, mā tētahi rorohiko.",

@@ -910,7 +910,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "اس اکاؤنٹ کی ابھی تک کوئی تنظیم نہیں ہے۔ ایک تنظیم بنانے یا اس میں شامل ہونے پر آپ Bitbucket پل ریکویسٹس کا جائزہ لے سکتے ہیں۔",
       "gitlabReconnectAdminOnlyDescription": "ادارے کے کسی مالک، منتظم، یا بلنگ مینیجر سے اسے دوبارہ منسلک کرنے کی درخواست کریں۔",
       "bitbucketNotConnectedTitle": "Bitbucket منسلک نہیں ہے",
-      "bitbucketAdminOnlyDescription": "صرف تنظیم کے مالک، منتظم اور بلنگ مینیجر اسے منسلک کر سکتے ہیں۔",
+      "bitbucketAdminOnlyDescription": "ادارے کے کسی مالک، منتظم، یا بلنگ مینیجر سے اسے منسلک کرنے کی درخواست کریں۔",
       "contextLine": "{{organization}} کے لیے",
       "contextLinePersonal": "ذاتی اکاؤنٹ کے لیے"
     },
@@ -1348,7 +1348,7 @@
     "followReviewMd": "REVIEW.md کی پیروی کریں",
     "followReviewMdSubtitle": "ہر ریپوزٹری کی REVIEW.md فائل میں دی گئی ہدایات پر عمل کریں",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket منسلک نہیں ہے۔ صرف تنظیم کے مالک، منتظم اور بلنگ مینیجر اسے منسلک کر سکتے ہیں۔"
+      "notConnectedReadOnly": "Bitbucket منسلک نہیں ہے۔ ادارے کے کسی مالک، منتظم، یا بلنگ مینیجر سے اسے منسلک کرنے کی درخواست کریں۔"
     },
     "bitbucketConnect": {
       "managedOnWeb": "اس تنظیم کا Bitbucket کنکشن کمپیوٹر سے ویب پر منظم کیا جاتا ہے۔",

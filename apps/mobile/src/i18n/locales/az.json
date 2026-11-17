@@ -910,7 +910,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Bu hesabda hələ ki, heç bir təşkilat yoxdur. Təşkilat yaratdıqdan və ya ona qoşulduqdan sonra Bitbucket birləşdirmə sorğularına baxış keçirə bilərsən.",
       "gitlabReconnectAdminOnlyDescription": "Onu yenidən qoşmaq üçün təşkilat sahibindən, inzibatçıdan və ya ödəniş menecerindən xahiş edin.",
       "bitbucketNotConnectedTitle": "Bitbucket qoşulmayıb",
-      "bitbucketAdminOnlyDescription": "Onu yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri qoşa bilər.",
+      "bitbucketAdminOnlyDescription": "Onu qoşmaq üçün təşkilat sahibindən, inzibatçıdan və ya ödəniş menecerindən xahiş edin.",
       "contextLine": "{{organization}} üçün",
       "contextLinePersonal": "Şəxsi hesabınız üçün"
     },
@@ -1348,7 +1348,7 @@
     "followReviewMd": "REVIEW.md təlimatlarına əməl et",
     "followReviewMdSubtitle": "Hər repozitoriyanın REVIEW.md faylındakı təlimatlara əməl et",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket qoşulmayıb. Onu yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri qoşa bilər."
+      "notConnectedReadOnly": "Bitbucket qoşulmayıb. Onu qoşmaq üçün təşkilat sahibindən, inzibatçıdan və ya ödəniş menecerindən xahiş edin."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bu təşkilatın Bitbucket bağlantısı kompüterdən vebdə idarə olunur.",

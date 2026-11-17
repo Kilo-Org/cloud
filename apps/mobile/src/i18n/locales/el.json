@@ -910,7 +910,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Αυτός ο λογαριασμός δεν ανήκει ακόμα σε κανέναν οργανισμό. Μόλις δημιουργήσεις ή ενταχθείς σε οργανισμό, θα μπορείς να αξιολογείς αιτήματα ενσωμάτωσης στο Bitbucket.",
       "gitlabReconnectAdminOnlyDescription": "Ζήτησε από έναν κάτοχο, διαχειριστή ή διαχειριστή χρέωσης του οργανισμού να το συνδέσει ξανά.",
       "bitbucketNotConnectedTitle": "Το Bitbucket δεν είναι συνδεδεμένο",
-      "bitbucketAdminOnlyDescription": "Μόνο οι κάτοχοι του οργανισμού, οι διαχειριστές και οι διαχειριστές χρέωσης μπορούν να το συνδέσουν.",
+      "bitbucketAdminOnlyDescription": "Ζήτησε από έναν κάτοχο, διαχειριστή ή διαχειριστή χρέωσης του οργανισμού να το συνδέσει.",
       "contextLine": "Για {{organization}}",
       "contextLinePersonal": "Για τον προσωπικό σου χώρο"
     },
@@ -1348,7 +1348,7 @@
     "followReviewMd": "Τήρηση του REVIEW.md",
     "followReviewMdSubtitle": "Ακολουθεί τις οδηγίες του αρχείου REVIEW.md σε κάθε αποθετήριο",
     "bitbucket": {
-      "notConnectedReadOnly": "Το Bitbucket δεν είναι συνδεδεμένο. Μόνο οι κάτοχοι του οργανισμού, οι διαχειριστές και οι διαχειριστές χρέωσης μπορούν να το συνδέσουν."
+      "notConnectedReadOnly": "Το Bitbucket δεν είναι συνδεδεμένο. Ζήτησε από έναν κάτοχο, διαχειριστή ή διαχειριστή χρέωσης του οργανισμού να το συνδέσει."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Η σύνδεση του Bitbucket για αυτόν τον οργανισμό γίνεται από τον ιστότοπο, σε υπολογιστή.",

@@ -670,7 +670,7 @@
     },
     "autoReviews": "Revisiones automáticas",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket no está conectado. Solo los propietarios de la organización, los administradores y los gestores de facturación pueden conectarlo."
+      "notConnectedReadOnly": "Bitbucket no está conectado. Pídele a un Propietario, un Administrador o un Gestor de facturación de la organización que lo conecte."
     },
     "bitbucketConnect": {
       "managedOnWeb": "La conexión de Bitbucket de esta organización se gestiona en la web desde un ordenador.",
@@ -2798,7 +2798,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Esta cuenta todavía no tiene organizaciones. Podrás revisar los PR de Bitbucket cuando crees una organización o te unas a una.",
       "gitlabReconnectAdminOnlyDescription": "Pídele a un Propietario, un Administrador o un Gestor de facturación de la organización que la vuelva a conectar.",
       "bitbucketNotConnectedTitle": "Bitbucket no está conectado",
-      "bitbucketAdminOnlyDescription": "Solo los propietarios de la organización, los administradores y los gestores de facturación pueden conectarlo.",
+      "bitbucketAdminOnlyDescription": "Pídele a un Propietario, un Administrador o un Gestor de facturación de la organización que lo conecte.",
       "contextLine": "Para {{organization}}",
       "contextLinePersonal": "Para tu cuenta personal"
     },

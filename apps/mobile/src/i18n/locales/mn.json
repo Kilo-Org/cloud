@@ -910,7 +910,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Энэ бүртгэлд одоогоор ямар ч байгууллага алга. Байгууллага үүсгэсэн эсвэл нэгэнд нэгдсэний дараа Bitbucket татах хүсэлтийг шалгах боломжтой болно.",
       "gitlabReconnectAdminOnlyDescription": "Дахин холбуулахын тулд байгууллагын эзэмшигч, админ эсвэл төлбөрийн менежерт хандана уу.",
       "bitbucketNotConnectedTitle": "Bitbucket холбогдоогүй байна",
-      "bitbucketAdminOnlyDescription": "Зөвхөн байгууллагын эзэмшигч, админ болон төлбөрийн менежер үүнийг холбох эрхтэй.",
+      "bitbucketAdminOnlyDescription": "Үүнийг холбуулахын тулд байгууллагын Эзэмшигч, Админ эсвэл Төлбөрийн менежерт хандана уу.",
       "contextLine": "{{organization}}-ийн хувьд",
       "contextLinePersonal": "Хувийн дансны хувьд"
     },
@@ -1348,7 +1348,7 @@
     "followReviewMd": "REVIEW.md зааврыг дагах",
     "followReviewMdSubtitle": "Репозитори бүрийн REVIEW.md файл дахь зааврыг дагах",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket холбогдоогүй байна. Зөвхөн байгууллагын эзэмшигч, админ болон төлбөрийн менежер үүнийг холбох эрхтэй."
+      "notConnectedReadOnly": "Bitbucket холбогдоогүй байна. Үүнийг холбуулахын тулд байгууллагын Эзэмшигч, Админ эсвэл Төлбөрийн менежерт хандана уу."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Энэ байгууллагын Bitbucket холболтыг компьютерээс вэб дээр удирддаг.",

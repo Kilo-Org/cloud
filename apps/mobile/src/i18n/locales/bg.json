@@ -910,7 +910,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Този акаунт все още няма организации. Заявките за сливане в Bitbucket могат да се преглеждат, след като създадете организация или се присъедините към такава.",
       "gitlabReconnectAdminOnlyDescription": "Поискайте от собственик, администратор или отговорник за плащанията на организацията да я свържат.",
       "bitbucketNotConnectedTitle": "Няма връзка с Bitbucket",
-      "bitbucketAdminOnlyDescription": "Само собствениците на организацията, администраторите и отговорниците за плащанията могат да я установят.",
+      "bitbucketAdminOnlyDescription": "Поискайте от собственик, администратор или отговорник за плащанията на организацията да я свържат.",
       "contextLine": "За {{organization}}",
       "contextLinePersonal": "За личния профил"
     },
@@ -1348,7 +1348,7 @@
     "followReviewMd": "Следвай REVIEW.md",
     "followReviewMdSubtitle": "Спазвай инструкциите във файла REVIEW.md на всяко хранилище",
     "bitbucket": {
-      "notConnectedReadOnly": "Няма връзка с Bitbucket. Само собствениците на организацията, администраторите и отговорниците за плащанията могат да я установят."
+      "notConnectedReadOnly": "Няма връзка с Bitbucket. Поискайте от собственик, администратор или отговорник за плащанията на организацията да я свържат."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Връзката на тази организация с Bitbucket се управлява в уеб версията от компютър.",

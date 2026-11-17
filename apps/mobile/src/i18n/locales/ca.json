@@ -927,7 +927,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Aquest compte encara no té cap organització. Les sol·licituds d'integració de Bitbucket es poden revisar quan creeu o us uniu a una organització.",
       "gitlabReconnectAdminOnlyDescription": "Demana a un Propietari, Administrador o Gestor de facturació de l'organització que la reconnecti.",
       "bitbucketNotConnectedTitle": "Bitbucket no està connectat",
-      "bitbucketAdminOnlyDescription": "Només els propietaris, els administradors i els gestors de facturació de l'organització poden connectar-lo.",
+      "bitbucketAdminOnlyDescription": "Demana a un Propietari, Administrador o Gestor de facturació de l'organització que el connecti.",
       "contextLine": "Per a {{organization}}",
       "contextLinePersonal": "Per a ús personal"
     },
@@ -1371,7 +1371,7 @@
     "followReviewMd": "Segueix REVIEW.md",
     "followReviewMdSubtitle": "Respecta els fitxers d'instruccions REVIEW.md de cada repositori",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket no està connectat. Només els propietaris, els administradors i els gestors de facturació de l'organització poden connectar-lo."
+      "notConnectedReadOnly": "Bitbucket no està connectat. Demana a un Propietari, Administrador o Gestor de facturació de l'organització que el connecti."
     },
     "bitbucketConnect": {
       "managedOnWeb": "La connexió de Bitbucket d'aquesta organització es gestiona al web des d'un ordinador.",

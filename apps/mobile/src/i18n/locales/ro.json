@@ -927,7 +927,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Acest cont nu are încă nicio organizație. PR-urile Bitbucket pot fi revizuite după ce creezi o organizație sau te alături uneia.",
       "gitlabReconnectAdminOnlyDescription": "Cere unui proprietar de organizație, unui administrator sau unui manager de facturare să o reconecteze.",
       "bitbucketNotConnectedTitle": "Bitbucket nu este conectat",
-      "bitbucketAdminOnlyDescription": "Doar proprietarii, administratorii și managerii de facturare ai organizației îl pot conecta.",
+      "bitbucketAdminOnlyDescription": "Cere unui proprietar de organizație, unui administrator sau unui manager de facturare să îl conecteze.",
       "contextLine": "Pentru {{organization}}",
       "contextLinePersonal": "Pentru contul personal"
     },
@@ -1371,7 +1371,7 @@
     "followReviewMd": "Respectă REVIEW.md",
     "followReviewMdSubtitle": "Respectă instrucțiunile din fișierul REVIEW.md al fiecărui depozit",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket nu este conectat. Doar proprietarii, administratorii și managerii de facturare ai organizației îl pot conecta."
+      "notConnectedReadOnly": "Bitbucket nu este conectat. Cere unui proprietar de organizație, unui administrator sau unui manager de facturare să îl conecteze."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Conexiunea Bitbucket a acestei organizații se gestionează pe web, de pe un computer.",

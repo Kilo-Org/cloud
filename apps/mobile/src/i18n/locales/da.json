@@ -910,7 +910,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Denne konto har endnu ingen organisationer. Bitbucket pull requests kan gennemgås, når du opretter eller tilslutter dig en organisation.",
       "gitlabReconnectAdminOnlyDescription": "Bed en organisationsejer, administrator eller faktureringsansvarlig om at tilslutte den.",
       "bitbucketNotConnectedTitle": "Bitbucket er ikke tilsluttet",
-      "bitbucketAdminOnlyDescription": "Kun organisationsejere, administratorer og faktureringsansvarlige kan oprette forbindelsen.",
+      "bitbucketAdminOnlyDescription": "Bed en organisationsejer, administrator eller faktureringsansvarlig om at tilslutte den.",
       "contextLine": "Til {{organization}}",
       "contextLinePersonal": "Til din personlige konto"
     },
@@ -1348,7 +1348,7 @@
     "followReviewMd": "Følg REVIEW.md",
     "followReviewMdSubtitle": "Følg instruktionerne i hvert kodelagers REVIEW.md-fil",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket er ikke tilsluttet. Kun organisationsejere, administratorer og faktureringsansvarlige kan oprette forbindelsen."
+      "notConnectedReadOnly": "Bitbucket er ikke tilsluttet. Bed en organisationsejer, administrator eller faktureringsansvarlig om at tilslutte den."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Organisationens Bitbucket-forbindelse administreres på nettet fra en computer.",

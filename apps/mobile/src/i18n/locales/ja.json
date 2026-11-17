@@ -670,7 +670,7 @@
     },
     "autoReviews": "自動レビュー",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucketが接続されていません。接続できるのは組織のオーナー、管理者、請求管理者のみです。"
+      "notConnectedReadOnly": "Bitbucketが接続されていません。組織のオーナー、管理者、または請求管理者に接続を依頼してください。"
     },
     "bitbucketConnect": {
       "managedOnWeb": "この組織のBitbucket接続は、パソコンからWebで管理されています。",
@@ -2760,7 +2760,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "このアカウントにはまだ組織がありません。組織を作成または参加すると、Bitbucketのプルリクエストをレビューできるようになります。",
       "gitlabReconnectAdminOnlyDescription": "組織のオーナー、管理者、または請求管理者に再接続を依頼してください。",
       "bitbucketNotConnectedTitle": "Bitbucketが接続されていません",
-      "bitbucketAdminOnlyDescription": "接続できるのは組織のオーナー、管理者、請求管理者のみです。",
+      "bitbucketAdminOnlyDescription": "組織のオーナー、管理者、または請求管理者に接続を依頼してください。",
       "contextLine": "{{organization}}用",
       "contextLinePersonal": "個人用"
     },

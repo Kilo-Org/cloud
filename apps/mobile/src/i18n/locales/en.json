@@ -977,7 +977,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "This account has no organizations yet. Bitbucket pull requests can be reviewed once you create or join an organization.",
       "gitlabReconnectAdminOnlyDescription": "Ask an organization owner, admin, or billing manager to reconnect it.",
       "bitbucketNotConnectedTitle": "Bitbucket not connected",
-      "bitbucketAdminOnlyDescription": "Only organization owners, admins, and billing managers can connect it.",
+      "bitbucketAdminOnlyDescription": "Ask an organization owner, admin, or billing manager to connect it.",
       "contextLine": "For {{organization}}",
       "contextLinePersonal": "For your personal account"
     },
@@ -1415,7 +1415,7 @@
     "followReviewMd": "Follow REVIEW.md",
     "followReviewMdSubtitle": "Honor per-repo REVIEW.md instruction files",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket isn't connected. Only organization owners, admins, and billing managers can connect it."
+      "notConnectedReadOnly": "Bitbucket isn't connected. Ask an organization owner, admin, or billing manager to connect it."
     },
     "bitbucketConnect": {
       "managedOnWeb": "This organization's Bitbucket connection is managed on the web from a computer.",

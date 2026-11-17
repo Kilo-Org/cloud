@@ -910,7 +910,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Akaun ini belum mempunyai sebarang organisasi. Permintaan tarik Bitbucket boleh disemak setelah anda mencipta atau menyertai sebuah organisasi.",
       "gitlabReconnectAdminOnlyDescription": "Minta pemilik organisasi, pentadbir atau pengurus pengebilan untuk menyambungkannya.",
       "bitbucketNotConnectedTitle": "Bitbucket tidak disambungkan",
-      "bitbucketAdminOnlyDescription": "Hanya pemilik organisasi, pentadbir dan pengurus pengebilan boleh menyambungkannya.",
+      "bitbucketAdminOnlyDescription": "Minta pemilik organisasi, pentadbir atau pengurus pengebilan untuk menyambungkannya.",
       "contextLine": "Untuk {{organization}}",
       "contextLinePersonal": "Untuk akaun peribadi anda"
     },
@@ -1348,7 +1348,7 @@
     "followReviewMd": "Ikuti REVIEW.md",
     "followReviewMdSubtitle": "Patuhi fail arahan REVIEW.md dalam setiap repositori",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket tidak disambungkan. Hanya pemilik organisasi, pentadbir dan pengurus pengebilan boleh menyambungkannya."
+      "notConnectedReadOnly": "Bitbucket tidak disambungkan. Minta pemilik organisasi, pentadbir atau pengurus pengebilan untuk menyambungkannya."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Sambungan Bitbucket organisasi ini diurus di web melalui komputer.",

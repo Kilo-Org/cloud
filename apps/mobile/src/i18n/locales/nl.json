@@ -670,7 +670,7 @@
     },
     "autoReviews": "Automatische reviews",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket is niet gekoppeld. Alleen organisatie-eigenaren, beheerders en factuurbeheerders kunnen de koppeling instellen."
+      "notConnectedReadOnly": "Bitbucket is niet gekoppeld. Vraag een eigenaar, beheerder of factuurbeheerder van de organisatie om het te koppelen."
     },
     "bitbucketConnect": {
       "managedOnWeb": "De Bitbucket-verbinding van deze organisatie wordt via het web op een computer beheerd.",
@@ -2760,7 +2760,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Dit account heeft nog geen organisaties. Je kunt Bitbucket-PR's beoordelen zodra je een organisatie aanmaakt of er lid van wordt.",
       "gitlabReconnectAdminOnlyDescription": "Vraag een eigenaar, beheerder of factuurbeheerder van de organisatie om het opnieuw te koppelen.",
       "bitbucketNotConnectedTitle": "Bitbucket is niet gekoppeld",
-      "bitbucketAdminOnlyDescription": "Alleen organisatie-eigenaren, beheerders en factuurbeheerders kunnen de koppeling instellen.",
+      "bitbucketAdminOnlyDescription": "Vraag een eigenaar, beheerder of factuurbeheerder van de organisatie om het te koppelen.",
       "contextLine": "Voor {{organization}}",
       "contextLinePersonal": "Voor je persoonlijke account"
     },

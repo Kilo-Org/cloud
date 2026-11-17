@@ -910,7 +910,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "ಈ ಖಾತೆಯಲ್ಲಿ ಇನ್ನೂ ಯಾವುದೇ ಸಂಸ್ಥೆಗಳಿಲ್ಲ. ನೀವು ಒಂದು ಸಂಸ್ಥೆಯನ್ನು ರಚಿಸಿದಾಗ ಅಥವಾ ಸೇರಿದಾಗ Bitbucket ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್‌ಗಳನ್ನು ಪರಿಶೀಲಿಸಬಹುದು.",
       "gitlabReconnectAdminOnlyDescription": "ಅದನ್ನು ಮತ್ತೆ ಸಂಪರ್ಕಿಸಲು ಸಂಸ್ಥೆಯ ಮಾಲೀಕರು, ನಿರ್ವಾಹಕರು ಅಥವಾ ಬಿಲ್ಲಿಂಗ್ ವ್ಯವಸ್ಥಾಪಕರಲ್ಲಿ ಒಬ್ಬರನ್ನು ಕೇಳಿ.",
       "bitbucketNotConnectedTitle": "Bitbucket ಸಂಪರ್ಕಗೊಂಡಿಲ್ಲ",
-      "bitbucketAdminOnlyDescription": "ಸಂಸ್ಥೆಯ ಮಾಲೀಕರು, ನಿರ್ವಾಹಕರು ಮತ್ತು ಬಿಲ್ಲಿಂಗ್ ವ್ಯವಸ್ಥಾಪಕರು ಮಾತ್ರ ಅದನ್ನು ಸಂಪರ್ಕಿಸಬಹುದು.",
+      "bitbucketAdminOnlyDescription": "ಅದನ್ನು ಸಂಪರ್ಕಿಸಲು ಸಂಸ್ಥೆಯ ಮಾಲೀಕರು, ನಿರ್ವಾಹಕರು ಅಥವಾ ಬಿಲ್ಲಿಂಗ್ ವ್ಯವಸ್ಥಾಪಕರಲ್ಲಿ ಒಬ್ಬರನ್ನು ಕೇಳಿ.",
       "contextLine": "{{organization}} ಗಾಗಿ",
       "contextLinePersonal": "ನಿಮ್ಮ ವೈಯಕ್ತಿಕ ಖಾತೆಗಾಗಿ"
     },
@@ -1348,7 +1348,7 @@
     "followReviewMd": "REVIEW.md ಅನುಸರಿಸಿ",
     "followReviewMdSubtitle": "ಪ್ರತಿ ರೆಪೊಸಿಟರಿಯ REVIEW.md ಫೈಲ್‌ನ ಸೂಚನೆಗಳನ್ನು ಪಾಲಿಸಿ",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ಸಂಪರ್ಕಗೊಂಡಿಲ್ಲ. ಸಂಸ್ಥೆಯ ಮಾಲೀಕರು, ನಿರ್ವಾಹಕರು ಮತ್ತು ಬಿಲ್ಲಿಂಗ್ ವ್ಯವಸ್ಥಾಪಕರು ಮಾತ್ರ ಅದನ್ನು ಸಂಪರ್ಕಿಸಬಹುದು."
+      "notConnectedReadOnly": "Bitbucket ಸಂಪರ್ಕಗೊಂಡಿಲ್ಲ. ಅದನ್ನು ಸಂಪರ್ಕಿಸಲು ಸಂಸ್ಥೆಯ ಮಾಲೀಕರು, ನಿರ್ವಾಹಕರು ಅಥವಾ ಬಿಲ್ಲಿಂಗ್ ವ್ಯವಸ್ಥಾಪಕರಲ್ಲಿ ಒಬ್ಬರನ್ನು ಕೇಳಿ."
     },
     "bitbucketConnect": {
       "managedOnWeb": "ಈ ಸಂಸ್ಥೆಯ Bitbucket ಸಂಪರ್ಕವನ್ನು ಕಂಪ್ಯೂಟರ್‌ನಿಂದ ವೆಬ್‌ನಲ್ಲಿ ನಿರ್ವಹಿಸಲಾಗುತ್ತದೆ.",

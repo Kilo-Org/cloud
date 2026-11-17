@@ -910,7 +910,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Այս հաշիվն առայժմ չունի որեւէ կազմակերպություն։ Bitbucket-ի pull request-ները հնարավոր կլինի վերանայել, երբ ստեղծես կամ միանաս կազմակերպության։",
       "gitlabReconnectAdminOnlyDescription": "Խնդրիր կազմակերպության սեփականատերերին, ադմինիստրատորներին կամ վճարումների կառավարիչներին նորից միացնել այն։",
       "bitbucketNotConnectedTitle": "Bitbucket-ը միացված չէ",
-      "bitbucketAdminOnlyDescription": "Միայն կազմակերպության սեփականատերերը, ադմինիստրատորները և վճարումների կառավարիչները կարող են այն միացնել։",
+      "bitbucketAdminOnlyDescription": "Խնդրիր կազմակերպության սեփականատիրոջը, ադմինիստրատորին կամ վճարումների կառավարչին միացնել այն։",
       "contextLine": "{{organization}}-ի համար",
       "contextLinePersonal": "Անձնական հաշվի համար"
     },
@@ -1348,7 +1348,7 @@
     "followReviewMd": "Հետևել REVIEW.md-ին",
     "followReviewMdSubtitle": "Հետևել յուրաքանչյուր պահոցի REVIEW.md ֆայլի հրահանգներին",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket-ը միացված չէ։ Միայն կազմակերպության սեփականատերերը, ադմինիստրատորները և վճարումների կառավարիչները կարող են այն միացնել։"
+      "notConnectedReadOnly": "Bitbucket-ը միացված չէ։ Խնդրիր կազմակերպության սեփականատիրոջը, ադմինիստրատորին կամ վճարումների կառավարչին միացնել այն։"
     },
     "bitbucketConnect": {
       "managedOnWeb": "Այս կազմակերպության Bitbucket միացումը կառավարվում է վեբում՝ համակարգչից։",

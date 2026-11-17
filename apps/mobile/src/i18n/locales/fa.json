@@ -910,7 +910,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "این حساب هنوز سازمانی ندارد. پول ریکوئست‌های Bitbucket را می‌توانید پس از ایجاد یک سازمان یا پیوستن به آن بازبینی کنید.",
       "gitlabReconnectAdminOnlyDescription": "از مالک، مدیر یا مدیر صورتحساب سازمان بخواهید آن را دوباره متصل کند.",
       "bitbucketNotConnectedTitle": "Bitbucket متصل نیست",
-      "bitbucketAdminOnlyDescription": "فقط مالکان سازمان، مدیران و مدیران صورتحساب می‌توانند آن را متصل کنند.",
+      "bitbucketAdminOnlyDescription": "از مالک، مدیر یا مدیر صورتحساب سازمان بخواهید آن را متصل کند.",
       "contextLine": "برای {{organization}}",
       "contextLinePersonal": "برای حساب شخصی شما"
     },
@@ -1348,7 +1348,7 @@
     "followReviewMd": "پیروی از REVIEW.md",
     "followReviewMdSubtitle": "رعایت دستورالعمل‌های فایل REVIEW.md در هر مخزن",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket متصل نیست. فقط مالکان سازمان، مدیران و مدیران صورتحساب می‌توانند آن را متصل کنند."
+      "notConnectedReadOnly": "Bitbucket متصل نیست. از مالک، مدیر یا مدیر صورتحساب سازمان بخواهید آن را متصل کند."
     },
     "bitbucketConnect": {
       "managedOnWeb": "اتصال Bitbucket این سازمان از طریق وب و با رایانه مدیریت می‌شود.",

@@ -910,7 +910,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Бұл тіркелгіде әзірге ешбір ұйым жоқ. Ұйым құрғаннан немесе оған қосылғаннан кейін Bitbucket тарту сұрауларын қарауға болады.",
       "gitlabReconnectAdminOnlyDescription": "Оны қайта қосу үшін ұйым иесіне, әкімшісіне немесе төлем менеджеріне жүгініңіз.",
       "bitbucketNotConnectedTitle": "Bitbucket қосылмаған",
-      "bitbucketAdminOnlyDescription": "Оны тек ұйым иелері, әкімшілері мен төлем менеджерлері қоса алады.",
+      "bitbucketAdminOnlyDescription": "Оны қосу үшін ұйым иесіне, әкімшісіне немесе төлем менеджеріне жүгініңіз.",
       "contextLine": "{{organization}} үшін",
       "contextLinePersonal": "Жеке аккаунтыңыз үшін"
     },
@@ -1348,7 +1348,7 @@
     "followReviewMd": "REVIEW.md нұсқауларын орындау",
     "followReviewMdSubtitle": "Әр репозиторийдегі REVIEW.md файлының нұсқауларын орындау",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket қосылмаған. Оны тек ұйым иелері, әкімшілері мен төлем менеджерлері қоса алады."
+      "notConnectedReadOnly": "Bitbucket қосылмаған. Оны қосу үшін ұйым иесіне, әкімшісіне немесе төлем менеджеріне жүгініңіз."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Бұл ұйымның Bitbucket қосылымы компьютерден веб арқылы басқарылады.",

@@ -23,7 +23,9 @@ import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
 import { MAX_PROFILE_MCP_SERVERS } from '@/lib/agent-profile-forms';
 import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
+import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { useFormDraftRef, useFormDraftState } from '@/lib/form-draft';
+import { settleSaveAttempt } from '@/lib/surface-feedback';
 
 /** Catalog key for each refused field, so the message lands under the input at fault. */
 const ERROR_KEYS = {
@@ -89,7 +91,7 @@ type McpFormSheetProps = Readonly<{
    * Persist the validated payload. The caller owns create-vs-update and closes
    * the sheet on success; on failure it returns with the sheet still open.
    */
-  onSave: (payload: McpServerPayload) => void;
+  onSave: (payload: McpServerPayload) => Promise<void>;
   /** The last save refusal, each arm rendered where it belongs in the sheet. */
   saveFailure?: McpSaveFailure | null;
 }>;
@@ -137,6 +139,11 @@ export function McpFormSheet({
     'name' | 'command' | 'url' | 'config' | 'timeout'
   >();
 
+  // One save per Save press burst; see `instruction-form-sheet.tsx`. Its
+  // pending admission closes the burst window the lagging `isSaving` leaves
+  // open, so the dismissal guard reads it too.
+  const { feedback, begin } = useSurfaceFeedback<never>();
+
   const { requestClose, requestDismiss, dialog } = useSheetDismissGuard({
     isDirty: () =>
       nameRef.current !== initial.name ||
@@ -146,10 +153,19 @@ export function McpFormSheet({
       timeoutRef.current !== initial.timeout ||
       type !== initial.type ||
       enabled !== initial.enabled,
+    isRunning: () => isSaving || feedback.status === 'pending',
     onDiscard: onClose,
   });
 
   const submit = () => {
+    void runSubmit();
+  };
+
+  const runSubmit = async () => {
+    const attempt = begin();
+    if (attempt === null) {
+      return;
+    }
     const state = {
       name: nameRef.current,
       type,
@@ -161,12 +177,14 @@ export function McpFormSheet({
     };
     const problem = validateMcpForm(state, existingNames);
     if (problem !== null) {
+      attempt.abandon();
       setError(problem);
       scrollToField(FIELD_FOR_ERROR[problem]);
       return;
     }
     setError(null);
-    onSave(buildMcpServerPayload(state));
+    // The admission rides the save; see `instruction-form-sheet.tsx`.
+    await settleSaveAttempt(attempt, () => onSave(buildMcpServerPayload(state)));
   };
 
   const nameError =

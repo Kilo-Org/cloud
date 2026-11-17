@@ -171,9 +171,7 @@ vi.mock('@shopify/flash-list', async () => {
   };
 });
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
-vi.mock('@/lib/integration-urls', () => ({
-  getBitbucketIntegrationUrl: () => 'https://example.test/bitbucket',
-}));
+
 vi.mock('@/lib/utils', () => ({
   cn: (...values: (string | undefined | false)[]) => values.filter(Boolean).join(' '),
   parseTimestamp: (value: string) => new Date(value),

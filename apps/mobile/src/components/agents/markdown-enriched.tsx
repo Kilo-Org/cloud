@@ -31,6 +31,12 @@ type MarkdownEnrichedProps = {
   value: string;
   palette: MarkdownPalette;
   selectable: boolean;
+  /**
+   * Body line height in the library's sp units. The line box is what a native
+   * inline link exposes as its tappable target, so a caller that needs a taller
+   * link target raises it here.
+   */
+  lineHeight?: number;
   onLongPressLink?: MarkdownLinkLongPressHandler;
   onPressLink?: MarkdownLinkPressHandler;
   onCopyCode?: MarkdownCopyCodeHandler;
@@ -38,7 +44,13 @@ type MarkdownEnrichedProps = {
 
 const CODE_FONT = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
 
-function enrichedStyle(palette: MarkdownPalette, isRtl: boolean): MarkdownStyle {
+const BODY_LINE_HEIGHT = 24;
+
+function enrichedStyle(
+  palette: MarkdownPalette,
+  isRtl: boolean,
+  lineHeight = BODY_LINE_HEIGHT
+): MarkdownStyle {
   const { textColor, mutedTextColor, codeBackground, borderColor } = palette;
   const half = palette.codeTokenScheme === 'onLight' ? 'light' : 'dark';
   const headings = getMarkdownHeadingStyles(palette);
@@ -67,7 +79,7 @@ function enrichedStyle(palette: MarkdownPalette, isRtl: boolean): MarkdownStyle 
     paragraph: {
       color: textColor,
       fontSize: 16,
-      lineHeight: 24,
+      lineHeight,
       marginTop: 0,
       marginBottom: 4,
       ...blockTextAlign,
@@ -126,7 +138,7 @@ function enrichedStyle(palette: MarkdownPalette, isRtl: boolean): MarkdownStyle 
     list: {
       color: textColor,
       fontSize: 16,
-      lineHeight: 24,
+      lineHeight,
       markerColor: textColor,
       bulletColor: textColor,
     },
@@ -154,13 +166,17 @@ export function MarkdownEnriched({
   value,
   palette,
   selectable,
+  lineHeight,
   onLongPressLink,
   onPressLink,
   onCopyCode,
 }: Readonly<MarkdownEnrichedProps>) {
   const { t } = useTranslation();
   const [viewer, setViewer] = useState<{ uri: string; filename: string } | null>(null);
-  const markdownStyle = useMemo(() => enrichedStyle(palette, I18nManager.isRTL), [palette]);
+  const markdownStyle = useMemo(
+    () => enrichedStyle(palette, I18nManager.isRTL, lineHeight),
+    [palette, lineHeight]
+  );
   const images = useMemo(() => findMarkdownImages(value), [value]);
   // One flag per image, so trusting a host or confirming a URI re-renders
   // with the real image and a revoke gates it again.

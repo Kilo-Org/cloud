@@ -348,7 +348,9 @@ describe('OrganizationBillingScreen seats row', () => {
     queries.seats.data = { usedSeats: 3, totalSeats: 4 };
 
     const { renderer, unmount } = await mount();
-    expect(seatsReadout(renderer)).toBe('3 / 4');
+    // Shared readout: the fraction runs inside a left-to-right isolate, so a
+    // right-to-left layout cannot mirror either number.
+    expect(seatsReadout(renderer)).toBe('\u20663 / 4\u2069');
     unmount();
   });
 });

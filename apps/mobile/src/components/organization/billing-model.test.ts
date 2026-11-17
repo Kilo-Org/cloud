@@ -8,6 +8,7 @@ import {
   getOrgTrialStatusPill,
   getScheduledSeatChange,
   type OrgSeatSubscription,
+  seatCountReadout,
 } from '@/components/organization/billing-model';
 
 /** 2026-01-01T00:00:00Z, the paid period's end in these cases. */
@@ -274,6 +275,20 @@ describe('getScheduledSeatChange', () => {
 describe('formatSeatCount', () => {
   it('writes used against total', () => {
     expect(formatSeatCount(3, 5)).toBe('3 / 5');
+  });
+});
+
+describe('seatCountReadout', () => {
+  it('writes the isolated fraction for an enforced organization with bought seats', () => {
+    expect(seatCountReadout({ seatsEnforced: true, used: 3, total: 4 })).toBe('\u20663 / 4\u2069');
+  });
+
+  it('holds a seat-enforcing organization with none bought at the used count', () => {
+    expect(seatCountReadout({ seatsEnforced: true, used: 3, total: 0 })).toBe('3');
+  });
+
+  it('holds an unenforced organization at the used count with a positive total', () => {
+    expect(seatCountReadout({ seatsEnforced: false, used: 3, total: 5 })).toBe('3');
   });
 });
 

@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Bidliet",
     "organizationTrialEnded": "Il-prova tal-organizzazzjoni ntemmet u m'għandhiex pjan attiv. Sid l-organizzazzjoni jista' jaġġorna l-fatturazzjoni fuq kilo.ai, imbagħad jerġa' jipprova.",
-    "privateRepositoryA11y": "{{name}}, repositorju privat"
+    "privateRepositoryA11y": "{{name}}, repositorju privat",
+    "legalDocumentEnglishOnly": "Dan id-dokument huwa disponibbli bl-Ingliż biss."
   },
   "language": {
     "restarting": "L-app qed terġa' tibda biex tapplika l-lingwa",
@@ -1423,7 +1424,8 @@
       "managedOnWeb": "Il-konnessjoni ta' Bitbucket ta' din l-organizzazzjoni tiġi ġestita fuq il-web minn kompjuter.",
       "description": "Oħloq token ta' aċċess għall-ispazju tax-xogħol bil-permessi meħtieġa u waħħlu hawn taħt.",
       "scopes": "Kont: qari · Repożitorji: qari/kitba · PRs: qari · Webhooks: qari/kitba",
-      "tokenPlaceholder": "Token ta' aċċess għall-ispazju tax-xogħol"
+      "tokenPlaceholder": "Token ta' aċċess għall-ispazju tax-xogħol",
+      "tokenRefused": "Bitbucket ma aċċettax dan it-token tal-ispazju tax-xogħol. Iċċekkja li għandu l-permessi ta' hawn fuq, imbagħad ipprova mill-ġdid."
     },
     "scopeList": {
       "personalStillAvailable": "Ir-repożitorji personali xorta disponibbli hawn taħt.",
@@ -1537,7 +1539,8 @@
       "repositoryLine": "Reviżjonijiet: {{reviews}} · Sejbiet: {{findings}}",
       "empty": "Għad m'hemmx reviżjonijiet bi statistika",
       "emptyDescription": "L-istatistika tirrekordja reviżjonijiet kompluti sakemm tkun attiva għall-organizzazzjoni.",
-      "off": "L-istatistika hija mitfija għal din l-organizzazzjoni.",
+      "offTitle": "L-istatistika hija mitfija għal {{platform}}",
+      "offDescription": "Attivaha fis-settjar tal-organizzazzjoni fuq il-web biex tirrekordja reviżjonijiet kompluti.",
       "couldNotLoad": "L-istatistika ma setgħetx tiġi mgħobbija"
     },
     "council": {
@@ -3633,7 +3636,6 @@
     },
     "settingsOnWeb": {
       "title": "Issettjar tal-organizzazzjoni fuq il-web",
-      "integrations": "Integrazzjonijiet fuq il-web",
       "usageDetails": "Dettalji tal-użu",
       "providersAndModels": "Fornituri u mudelli",
       "groups": "Gruppi",
@@ -3642,9 +3644,19 @@
       "ssoAndDomain": "SSO u dominju",
       "dataCollection": "Ġbir tad-data",
       "auditLogs": "Reġistri tal-awditjar",
-      "requestLogs": "Reġistri tat-talbiet",
-      "subOrganizations": "Sotto-organizzazzjonijiet",
-      "distributeFunds": "Iddistribwixxi l-fondi"
+      "requestLogs": "Reġistri tat-talbiet"
+    },
+    "requestLogs": {
+      "hint": "Talbiet tas-siegħa sa tmiem il-perjodu, l-aktar riċenti l-ewwel.",
+      "older": "Siegħa qabel",
+      "newer": "Siegħa wara",
+      "truncated": "Din is-siegħa għandha aktar talbiet milli turi l-lista.",
+      "emptyTitle": "L-ebda talba",
+      "emptyDescription": "Din is-siegħa m'għandha l-ebda talba tal-gateway.",
+      "loadError": "Ma setgħux jitgħabbew ir-reġistri tat-talbiet.",
+      "permissionDenied": "Ir-reġistri tat-talbiet jista' jaqrahom biss sid, amministratur jew maniġer tal-fatturazzjoni tal-organizzazzjoni.",
+      "tokens": "{{input}} dħul · {{output}} ħruġ",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Unitajiet tat-test tad-dħul",
@@ -4737,6 +4749,8 @@
     "topModels": "Il-mudelli l-aktar użati",
     "topFeatures": "Il-funzjonijiet l-aktar użati",
     "emptyTitle": "L-ebda użu f'dan il-perjodu",
+    "unavailableTitle": "L-użu mhux disponibbli",
+    "unavailableDescription": "Dan il-workspace mhuwiex jirrapporta l-użu. L-ippruvar mill-ġdid mhux se jgħin.",
     "orgSelfNotice": "Qed tara l-użu tiegħek stess f'din l-organizzazzjoni.",
     "viewDetails": "Ara d-dettalji tal-użu"
   },
@@ -4895,5 +4909,175 @@
     "unavailableDescription": "Dan il-link għall-qsim skada jew ġie rrevokat.",
     "transcriptUnavailableTitle": "Ma stajniex intellgħu din it-traskrizzjoni",
     "transcriptUnavailableDescription": "Il-link għadu jaħdem. Erġa' pprova fi ftit mumenti."
+  },
+  "organizationGuardrails": {
+    "title": "Gwardjani tal-IA",
+    "permissionDenied": "Sidien u amministraturi tal-organizzazzjoni biss jistgħu jimmaniġġjaw il-Gwardjani tal-IA.",
+    "unavailable": "Il-Gwardjani tal-IA mhumiex disponibbli għal din l-organizzazzjoni.",
+    "loadError": "Il-Gwardjani tal-IA ma setgħux jitgħabbew",
+    "statusSaving": "Qed jiġi salvat…",
+    "statusSaved": "Salvat",
+    "statusFailed": "Ma setax jiġi salvat.",
+    "inputTitle": "Gwardjani tad-dħul",
+    "inputDescription": "Jiskennja kull dħul b'Enkrypt AI, inklużi r-riżultati tal-għodod. Detettur li jimblokka jirrifjuta talba meta Enkrypt ma jkunx disponibbli.",
+    "outputTitle": "Gwardjani tal-ħruġ",
+    "outputDescription": "Jiskennja r-risposti b'Enkrypt AI qabel ma jirċevuhom il-membri. Mitfi sakemm ma tattivahx.",
+    "detectorsHint": "Il-modalità Imblokka tirrifjuta talba mmarkata. Il-modalità Irreġistra biss tirreġistraha mingħajr ma tdewwem it-talba.",
+    "detectorsHintOutput": "Il-modalità Imblokka tfalli risposta mmarkata. Il-modalità Irreġistra biss tirreġistraha mingħajr ma tdewwem ir-risposta.",
+    "choiceLog": "Irreġistra biss",
+    "applyTo": "Applika għal",
+    "applyToAllMembers": "Il-membri kollha",
+    "applyKiloDefault": "Applika l-Valur Predefinit ta' Kilo",
+    "invalidSavedTitle": "L-impostazzjonijiet tad-detetturi tad-dħul salvati ma jistgħux jinqraw",
+    "invalidSavedBody": "It-talbiet jiġu mblokkati sakemm id-detetturi tad-dħul jiġu salvati mill-ġdid. Id-detetturi hawn taħt jibdew mill-Predefinit ta' Kilo.",
+    "invalidSavedOutputTitle": "L-impostazzjonijiet tad-detetturi tal-ħruġ salvati ma jistgħux jinqraw",
+    "invalidSavedOutputBody": "Ir-risposti jinżammu sakemm id-detetturi tal-ħruġ jiġu salvati mill-ġdid. Agħżel id-detetturi tal-ħruġ hawn taħt.",
+    "blockingOutputNote": "Detettur tal-ħruġ li jimblokka jżomm risposta sakemm Enkrypt ikun iċċekkja kollha kemm hi. Uża Irreġistra biss biex tevita d-dewmien.",
+    "inputDetectorRequired": "Attiva mill-inqas detettur wieħed tad-dħul.",
+    "outputDetectorRequired": "Attiva mill-inqas detettur wieħed tal-ħruġ.",
+    "rulesTooMany": "Żid sa {{max}} regoli.",
+    "ruleIdRequired": "Daħħal ID tar-regola.",
+    "ruleIdInvalid": "ID tar-regola jista' juża biss ittri, numri, tikek, trattini u sottolinji.",
+    "ruleTextRequired": "Iddeskrivi x'jipprojbixxi jew jirrikjedi r-regola.",
+    "keywordTooLong": "Kull kelma ewlenija tista' tkun sa {{max}} karattri.",
+    "topicTooLong": "Kull suġġett jista' jkun sa {{max}} karattri.",
+    "keywordsTooMany": "Żid sa {{max}} kliem ewlieni.",
+    "topicsTooMany": "Żid sa {{max}} suġġetti.",
+    "piiEntityRequired": "Agħżel mill-inqas tip wieħed ta' dejta li għandha tiġi rilevata.",
+    "keywordRequired": "Żid mill-inqas kelma ewlenija waħda.",
+    "topicRequired": "Żid mill-inqas suġġett wieħed.",
+    "policyTextRequired": "Daħħal it-test tal-politika.",
+    "ruleRequired": "Żid mill-inqas regola waħda.",
+    "ruleIdDuplicate": "Kull regola trid l-ID tar-regola tagħha stess.",
+    "piiEntities": "Dejta li għandha tiġi rilevata",
+    "keywordsLabel": "Kliem ewlieni",
+    "keywordsHint": "Kelma ewlenija waħda f'kull linja.",
+    "topicsHint": "Suġġett wieħed f'kull linja.",
+    "policyFormat": "Format tal-politika",
+    "policyFormatRules": "Regoli strutturati",
+    "policyFormatRulesDescription": "Regola waħda għal kull rekwiżit, b'kategorija u severità. Rakkomandat.",
+    "policyFormatText": "Test tal-politika",
+    "policyFormatTextDescription": "Ippasta politika eżistenti bħala test sempliċi.",
+    "rulesEmpty": "Għad m'hemmx regoli. Kull regola tiddeskrivi ħaġa waħda li d-dħul m'għandux ikun fih jew jitlob.",
+    "addRule": "Żid regola",
+    "ruleNumber": "Regola {{number}}",
+    "ruleRemove": "Neħħi r-regola {{number}}",
+    "ruleIdLabel": "ID tar-regola",
+    "ruleNameLabel": "Isem (mhux obbligatorju)",
+    "ruleTextLabel": "Regola",
+    "ruleRiskCategory": "Kategorija tar-riskju",
+    "ruleApplicability": "Ambitu",
+    "ruleFrameworks": "Oqfsa",
+    "detector": {
+      "promptInjection": {
+        "label": "Injezzjoni tal-istruzzjonijiet",
+        "description": "Jirrileva tentattivi biex jiġu injorati l-istruzzjonijiet jew il-mudell jinħeles mill-kontroll."
+      },
+      "policyViolation": {
+        "label": "Vjolazzjoni tal-politika",
+        "description": "Jimmarka d-dħul li jikser il-politika tal-organizzazzjoni tiegħek, miktuba bħala test jew regoli.",
+        "descriptionOutput": "Jimmarka r-risposti li jiksru l-politika tal-organizzazzjoni tiegħek, miktuba bħala test jew regoli."
+      },
+      "pii": {
+        "label": "PII u sigrieti",
+        "description": "Jirrileva dejta personali, kredenzjali, indirizzi IP u URL."
+      },
+      "keywords": {
+        "label": "Kliem ewlieni pprojbit",
+        "descriptionOutput": "Jirrileva risposti li fihom kwalunkwe kelma ewlenija li telenka."
+      },
+      "topics": {
+        "label": "Suġġetti",
+        "descriptionOutput": "Jimmarka risposti dwar kwalunkwe suġġett li telenka."
+      },
+      "toxicity": {
+        "label": "Tossiċità",
+        "description": "Jirrileva lingwaġġ tossiku, insultanti, ta' theddid jew ta' mibegħda."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Jirrileva kontenut sesswali jew mod ieħor mhux adatt għax-xogħol."
+      },
+      "bias": {
+        "label": "Preġudizzju",
+        "description": "Jirrileva lingwaġġ preġudikat jew diskriminatorju."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Dejta personali",
+        "description": "Ismijiet, indirizzi tal-email, numri tat-telefon."
+      },
+      "secrets": {
+        "label": "Sigrieti",
+        "description": "Ċwievet API, markaturi, u kliem sigrieti."
+      },
+      "ipAddress": {
+        "label": "Indirizzi IP",
+        "description": "Indirizzi IPv4 u IPv6."
+      },
+      "url": {
+        "label": "Indirizzi URL",
+        "description": "Indirizzi tal-web."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Sigurtà u frodi",
+      "safetyHarm": "Sikurezza u ħsara",
+      "privacyDataProtection": "Privatezza u protezzjoni tad-dejta",
+      "brandReputationTrust": "Marka u reputazzjoni",
+      "biasFairnessEthical": "Preġudizzju u ġustizzja",
+      "legalIpLiability": "Responsabbiltà legali u tal-proprjetà intellettwali",
+      "productMisuse": "Użu ħażin tal-prodott",
+      "performanceQuality": "Prestazzjoni u kwalità"
+    },
+    "applicability": {
+      "user": "Dħul mill-utent",
+      "userAssistant": "Dħul mill-utent u risposti"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Top 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "Att dwar l-IA tal-UE",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Karatteristika tal-intrapriża",
+    "enterpriseOnly": "Din hija karatteristika għall-intrapriżi biss.",
+    "readOnly": "Sidien u amministraturi tal-organizzazzjoni biss jistgħu jbiddlu dawn l-impostazzjonijiet.",
+    "loadError": "Il-fornituri u l-mudelli ma setgħux jitgħabbew",
+    "tabModels": "Mudelli",
+    "tabProviders": "Fornituri",
+    "tabGateways": "Portali",
+    "modelsDescription": "Itfi mudell biex timblokkjah għal kull membru. Il-mudelli mill-fornituri permessi jibdew attivi.",
+    "modelsDeniedOnly": "Miċħuda biss",
+    "modelsEmpty": "Ebda mudell ma jaqbel ma' din it-tfittxija.",
+    "providersDescription": "Itfi fornitur biex twaqqaf lil Kilo milli jidderieġi lejh għal din l-organizzazzjoni.",
+    "providersNeedCatalog": "Is-swiċċijiet tal-fornituri jibqgħu biss għall-qari sakemm jitgħabba l-katalgu sħiħ tal-mudelli. Agħfas Erġa' pprova hawn fuq biex teditjahom.",
+    "providersEmpty": "Ebda fornitur ma jaqbel ma' din it-tfittxija.",
+    "allowAllShown": "Ippermetti kollha li jidhru",
+    "denyAllShown": "Irrifjuta kollha li jidhru",
+    "gatewaysDescription": "Kilo jidderieġi t-talbiet tal-mudelli permezz ta' Vercel AI Gateway jew OpenRouter. Portal mitfi jfalli dawk it-talbiet.",
+    "emptyProviderList": "Ħalli mill-inqas fornitur wieħed attiv. Lista vojta timblokka r-rotot kollha tal-mudelli ta' Kilo.",
+    "gatewaysUnavailable": "L-issettjar tal-portali mhuwiex disponibbli għal din l-organizzazzjoni.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "It-talbiet ta' OpenRouter mhumiex marbuta ma' reġjun.",
+    "inferenceRegion": "Reġjun tal-inferenza",
+    "inferenceRegionDescription": "Jorbot it-talbiet ta' Vercel AI Gateway ma' dan ir-reġjun. Mudell li mhux disponibbli hemmhekk jfalli.",
+    "disableOpenrouterNote": "Id-diżattivazzjoni ta' OpenRouter timblokka wkoll iċ-ċwievet BYOK li jidderieġu t-talbiet permezz tiegħu.",
+    "emptyModelList": "Ħalli mill-inqas mudell wieħed attiv. Jekk tiċħad il-mudelli kollha, il-membri ma jibqgħalhom xejn x'jużaw.",
+    "catalogUnavailable": "Il-katalgu sħiħ tal-mudelli ma tgħabbiex, għalhekk qed jintwerew biss il-listi salvati tiegħek. Erġa' pprova biex jitgħabbew il-mudelli kollha.",
+    "region": {
+      "global": "Globali",
+      "us": "Stati Uniti",
+      "eu": "Unjoni Ewropea",
+      "au": "Awstralja",
+      "jp": "Ġappun"
+    }
   }
 }

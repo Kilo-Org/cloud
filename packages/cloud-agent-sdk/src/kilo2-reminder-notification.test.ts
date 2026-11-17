@@ -102,6 +102,21 @@ test('multiple reminder blocks in one synthetic message stay in one notice', () 
   });
 });
 
+test.each(['', '\n \t\n'])('a reminder with an empty body %j remains a notice', body => {
+  const native = reminder(`<system-reminder>${body}</system-reminder>`);
+  const display = readKilo2Messages(session, [native])[0];
+
+  expect(display?.info.role).toBe('assistant');
+  expect(display?.parts[0]).toMatchObject({
+    type: 'tool',
+    tool: 'agent_notice',
+    state: {
+      output: '',
+      metadata: { backgroundResult: { description: 'System reminder', output: '' } },
+    },
+  });
+});
+
 test('the reminder notice does not replace the user turn parent', () => {
   const display = readKilo2Messages(session, [
     { id: 'msg_user', type: 'user', time: { created: 1 }, text: 'continue' },

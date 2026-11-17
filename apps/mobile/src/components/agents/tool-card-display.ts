@@ -1,4 +1,5 @@
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
+import { readBackgroundResult } from '@kilocode/cloud-agent-sdk/background-result';
 import { z } from 'zod';
 
 import { i18n } from '@/i18n';
@@ -306,6 +307,13 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
     }
     case 'question': {
       return summaryToolDisplay(part, i18n.t('agentChat.toolCard.toolQuestion'));
+    }
+    case 'agent_notice': {
+      const notice = readBackgroundResult(part);
+      if (notice?.kind === 'notice' && notice.description.trim() !== '') {
+        return { title: notice.description.trim(), translatable: true };
+      }
+      return summaryToolDisplay(part, i18n.t('common.details'));
     }
     default: {
       return summaryToolDisplay(part, part.tool);

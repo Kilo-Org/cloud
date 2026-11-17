@@ -36,7 +36,6 @@ function readSystemReminder(
     .map(block => (block[1] ?? '').trim())
     .filter(Boolean)
     .join('\n\n');
-  if (output === '') return undefined;
   const description =
     output
       .split('\n')

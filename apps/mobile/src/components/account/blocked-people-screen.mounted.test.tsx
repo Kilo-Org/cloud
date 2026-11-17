@@ -310,6 +310,29 @@ describe('BlockedPeopleScreen', () => {
     expect(notice.props.variant).toBe('neutral');
   });
 
+  it('names the offline pause of a cold first read instead of the skeleton', async () => {
+    state.hasData = false;
+    state.fetchStatus = 'paused';
+    state.connectivity = 'offline';
+    const root = await mount();
+
+    const errors = root.findAll(node => Object.is(node.type, 'QueryError'));
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.props.variant).toBe('offline');
+    expect(errors[0]?.props.onRetry).toBeTypeOf('function');
+    expect(root.findAll(node => Object.is(node.type, 'Skeleton'))).toHaveLength(0);
+  });
+
+  it('keeps the skeleton for a cold first read while connectivity is unsettled', async () => {
+    state.hasData = false;
+    state.fetchStatus = 'paused';
+    state.connectivity = 'unknown';
+    const root = await mount();
+
+    expect(root.findAll(node => Object.is(node.type, 'QueryError'))).toHaveLength(0);
+    expect(root.findAll(node => Object.is(node.type, 'Skeleton'))).not.toHaveLength(0);
+  });
+
   it('offers pull to refresh wired to the read refetch', async () => {
     await mount();
     expect(state.lastRefreshControl).toBeTruthy();

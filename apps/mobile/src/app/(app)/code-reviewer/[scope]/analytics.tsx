@@ -16,6 +16,7 @@ import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
+import { isRetryableTrpcError, trpcErrorVariant } from '@/lib/trpc-error';
 import { useCodeReviewerAnalyticsFilters } from '@/lib/hooks/use-code-reviewer-analytics-filters';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { PERSONAL_SCOPE, PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
@@ -197,17 +198,23 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
 
   let readState: ReactNode = null;
   if (failure) {
-    const failureTitle =
-      failure.variant === 'offline'
+    // A permanent code (denial, not found) keeps its own variant and no Retry:
+    // the classifier folds every error into `server`, so the thrown error's
+    // own tRPC variant decides the surface when the read failed rather than
+    // paused.
+    const failedVariant = dashboard.isError ? trpcErrorVariant(dashboard.error) : failure.variant;
+    const failedTitle =
+      failedVariant === 'offline'
         ? t('queryError.offlineTitle')
         : t('codeReviewer.analytics.couldNotLoad');
+    const failedRetryable = dashboard.isError ? isRetryableTrpcError(dashboard.error) : true;
     readState = (
       <QueryError
-        variant={failure.variant}
+        variant={failedVariant}
         placement="top"
         className="px-0 pt-0"
-        title={failureTitle}
-        onRetry={() => void dashboard.refetch()}
+        title={failedTitle}
+        onRetry={failedRetryable ? () => void dashboard.refetch() : undefined}
         isRetrying={failure.isRetrying}
       />
     );

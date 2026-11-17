@@ -209,6 +209,21 @@ describe('CodeReviewerAnalyticsRoute read states', () => {
     });
   });
 
+  it('keeps the permanent denial retryable-free when the read fails with FORBIDDEN', () => {
+    state.dashboard.isPending = false;
+    state.dashboard.isError = true;
+    state.dashboard.error = { data: { code: 'FORBIDDEN' } };
+    const renderer = mountRoute();
+
+    const errors = findByType(renderer.root, 'QueryError');
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.props.variant).toBe('permission');
+    expect(errors[0]?.props.onRetry).toBeUndefined();
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
   it('renders the metrics when the read settles', () => {
     state.dashboard.isPending = false;
     state.dashboard.data = DASHBOARD;

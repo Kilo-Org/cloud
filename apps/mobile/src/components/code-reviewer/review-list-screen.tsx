@@ -247,7 +247,10 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
     ) : (
       emptyState
     );
-  } else if (isLoading) {
+  } else if (isLoading || classifiedBody.body.status === 'loading') {
+    // React Query's `isLoading` is false for a paused first read while the
+    // connectivity probe is unsettled and for a reverted idle read, so the
+    // classifier's own loading state keeps the skeleton on those too.
     body = (
       <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
         <Animated.View exiting={FadeOut.duration(150)} className="gap-3">

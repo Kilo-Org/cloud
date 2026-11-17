@@ -178,8 +178,26 @@ export function BlockedPeopleScreen() {
     />
   ) : null;
 
+  const coldPauseWithoutCache =
+    hidden.fetchStatus === 'paused' &&
+    hidden.data == null &&
+    hidden.isPending &&
+    committedConnectivity === 'offline';
   let body: ReactNode = null;
-  if (hidden.isPending) {
+  if (coldPauseWithoutCache) {
+    // An offline cold start pauses the first read with no cache: pending
+    // never settles, so the skeleton would sit forever. A pause while the
+    // probe is unsettled keeps the skeleton, the same way the reviewer
+    // screens classify.
+    body = (
+      <QueryError
+        variant="offline"
+        title={t('queryError.offlineTitle')}
+        onRetry={() => void hidden.refetch()}
+        isRetrying={hidden.isFetching}
+      />
+    );
+  } else if (hidden.isPending) {
     body = (
       <View className="gap-3">
         {SKELETON_ROWS.map(row => (

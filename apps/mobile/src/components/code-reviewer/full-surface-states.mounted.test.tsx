@@ -155,6 +155,7 @@ vi.mock('@/components/tab-screen', () => ({
   TAB_SCREEN_TRAILING_GAP: 16,
   useTabBarBottomPadding: () => 0,
   useTabScreenFrame: () => ({ frameStyle: {}, measureFrame: () => undefined }),
+  TabScreenScrollView: 'TabScreenScrollView',
 }));
 vi.mock('@/components/ui/input', () => ({ Input: 'TextInput' }));
 vi.mock('@/components/repo-toggle-row', () => ({ RepoToggleRow: 'RepoToggleRow' }));
@@ -272,6 +273,8 @@ beforeEach(() => {
   state.reviews.isFetchingNextPage = false;
   state.reviews.isFetchNextPageError = false;
   state.reviews.hasNextPage = false;
+  state.reviews.isPaused = false;
+  state.reviews.fetchStatus = 'idle';
   state.reviews.error.data.code = 'INTERNAL_SERVER_ERROR';
   state.mintInstallState.mockReset();
   state.openExternalUrl.mockReset();
@@ -631,7 +634,7 @@ describe('Recent review bodies', () => {
     unmount();
   });
 
-  it('keeps the empty-list branch while a pause is not a confirmed offline state', async () => {
+  it('keeps the skeleton while a first read is paused with connectivity unsettled', async () => {
     state.reviews.data = undefined;
     state.reviews.isPaused = true;
     state.reviews.fetchStatus = 'paused';
@@ -640,6 +643,8 @@ describe('Recent review bodies', () => {
       createElement(ReviewListScreen, { scope: 'personal' })
     );
     expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).not.toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'FlashList')).toHaveLength(0);
     unmount();
   });
 

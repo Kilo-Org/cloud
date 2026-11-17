@@ -1,6 +1,7 @@
 import { Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 import { type SessionContextInfo } from '@/lib/session-context-info';
 
@@ -55,7 +56,7 @@ const RING_STROKE = 3;
  * cost is the only unbounded part, so it is the one that truncates to one line.
  */
 const PILL_CLASS =
-  'h-[44px] shrink min-w-0 flex-row items-center gap-2 rounded-full border border-border bg-secondary px-3';
+  'shrink min-w-0 flex-row items-center gap-2 rounded-full border border-border bg-secondary px-3';
 const VALUE_ROW_CLASS = 'min-w-0 shrink flex-row items-baseline gap-1';
 const PRIMARY_VALUE_CLASS = 'shrink-0 text-xs tabular-nums';
 const COST_VALUE_CLASS = 'min-w-0 shrink text-xs tabular-nums';
@@ -146,7 +147,7 @@ export function SessionContextMetrics({
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
         hitSlop={8}
-        className={cn(PILL_CLASS, 'active:opacity-70')}
+        className={cn(ROW_TARGET_CLASS, PILL_CLASS, 'active:opacity-70')}
         testID="session-context-metrics"
       >
         {body}
@@ -160,7 +161,7 @@ export function SessionContextMetrics({
       {...(hidden
         ? { accessibilityElementsHidden: true, importantForAccessibility: 'no' as const }
         : {})}
-      className={cn(PILL_CLASS, hidden && 'opacity-0')}
+      className={cn(ROW_TARGET_CLASS, PILL_CLASS, hidden && 'opacity-0')}
       testID="session-context-metrics"
     >
       {body}

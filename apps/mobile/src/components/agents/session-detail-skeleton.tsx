@@ -3,6 +3,8 @@ import { View } from 'react-native';
 import { BlurBar } from '@/components/ui/blur-bar';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 
 /**
  * Bubble height classes. The transcript is anchored to its newest message, so
@@ -74,9 +76,9 @@ export function SessionSkeletonMessages({ sessionId }: Readonly<{ sessionId?: st
  */
 export function SessionReadOnlyFooterPlaceholder() {
   return (
-    <View className="gap-3 border-t border-border bg-secondary px-4 py-3">
-      <Skeleton className="mx-auto h-[17.5px] w-40 bg-muted-soft" />
-      <Skeleton className="h-[48px] bg-muted-soft" />
+    <View className="gap-3 border-t-[0.5px] border-hair-soft bg-secondary px-4 py-3">
+      <Skeleton className="mx-auto h-5 w-40 bg-muted-soft" />
+      <Skeleton className={cn('w-full bg-muted-soft', STATE_ACTION_CLASS)} />
     </View>
   );
 }
@@ -112,7 +114,7 @@ export function SessionComposerSkeleton() {
   // The voice toggle renders the shared 48dp target box, so the row is 48 tall
   // on either platform; a shorter slot would leave the row short of the
   // composer that replaces it, and the transcript would move on resolve.
-  const control = 'h-[48px] w-[48px]';
+  const control = ICON_TARGET_BOX_CLASS;
   return (
     <BlurBar>
       <View className="p-2.5 px-3">
@@ -124,10 +126,10 @@ export function SessionComposerSkeleton() {
                 COMPOSER_FIELD_LINE * fontScale + COMPOSER_FIELD_PADDING + COMPOSER_FIELD_BORDER,
             }}
           >
-            <Skeleton className="h-full w-full rounded-[20px]" />
+            <Skeleton className="h-full w-full rounded-3xl" />
           </View>
-          <Skeleton className={`ms-3 rounded-full ${control}`} />
-          <Skeleton className={`ms-3 rounded-full ${control}`} />
+          <Skeleton className={cn('ms-3 rounded-full', control)} />
+          <Skeleton className={cn('ms-3 rounded-full', control)} />
         </View>
       </View>
     </BlurBar>

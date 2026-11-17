@@ -302,8 +302,12 @@ vi.mock('@/components/ui/icons', () => ({
   AlertCircle: 'AlertCircle',
   Bot: 'Bot',
   ChevronDown: 'ChevronDown',
+  ChevronUp: 'ChevronUp',
   CircleDot: 'CircleDot',
   Clock: 'Clock',
+  Copy: 'Copy',
+  FileDiff: 'FileDiff',
+  History: 'History',
   Link2: 'Link2',
   Loader2: 'Loader2',
   MessageSquare: 'MessageSquare',
@@ -4328,7 +4332,7 @@ describe('session detail zero-render transcript guard (mobile-app e2-open)', () 
     expect(metricsProps.accessibilityElementsHidden).toBe(true);
     expect(metricsProps.importantForAccessibility).toBe('no');
     // The box stays reserved so the header does not shift when the pill hides.
-    expect(metricsProps.className).toContain('h-[44px]');
+    expect(metricsProps.className).toContain('min-h-[48px]');
   });
 
   it('keeps the header pill after a failed stored open leaves nothing to show', async () => {
@@ -5114,15 +5118,14 @@ describe('SessionDetailContent goal visibility', () => {
     expect(section[0]?.props.goal).toEqual(pausedGoal);
   });
 
-  it('sits the goal row a small margin under the header', async () => {
+  it('keeps the shared header padding and sits the goal row under it', async () => {
     goalMountOptions = { goal: pausedGoal, resolvedType: 'remote' };
     const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
 
-    // The screen shrinks the shared header padding for this screen only; the
-    // override replaces the ScreenHeader default `pb-3` through twMerge.
+    // The header owns its bottom padding: the screen no longer shrinks it, so
+    // the goal row starts from the shared `pb-3` and the body's own top pad.
     const header = view.renderer.root.findByType(ScreenHeader);
-    expect(header.props.className).toContain('pb-1');
-    expect(header.props.className).not.toContain('pb-3');
+    expect(header.props.className ?? '').not.toContain('pb-1');
 
     // The goal row still renders directly below the header.
     const ordered = view.renderer.root.findAll(

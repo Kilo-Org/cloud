@@ -3,8 +3,8 @@ import { useTranslation } from 'react-i18next';
 
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Button } from '@/components/ui/button';
-import { DirectionalChevronRight } from '@/components/ui/directional-icons';
-import { ChevronDown } from '@/components/ui/icons';
+import { Card } from '@/components/ui/card';
+import { ChevronDown, ChevronUp } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { type EnvironmentBuildAction } from '@/lib/cloud-environments/environment-build-copy';
@@ -68,10 +68,12 @@ export function BuildLogSection({
         accessibilityLabel={t('agentChat.environment.buildLogs')}
         className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-2 active:opacity-70')}
       >
+        {/* A disclosure caret, not a navigation chevron: it names the state of
+            the log block under the row. */}
         {open ? (
-          <ChevronDown size={16} color={colors.mutedForeground} />
+          <ChevronUp size={16} color={colors.mutedForeground} />
         ) : (
-          <DirectionalChevronRight size={16} color={colors.mutedForeground} />
+          <ChevronDown size={16} color={colors.mutedForeground} />
         )}
         <Text className="text-sm font-medium text-foreground">
           {t('agentChat.environment.buildLogs')}
@@ -116,16 +118,16 @@ export function BuildLogSection({
                   {t('agentChat.environment.buildLogsTruncated')}
                 </Text>
               ) : null}
-              <View className="overflow-hidden rounded-md border border-border bg-card">
+              <Card>
                 <ScrollView
                   style={{ maxHeight: Math.round(windowHeight * LOGS_MAX_WINDOW_FRACTION) }}
-                  contentContainerClassName="p-2"
+                  contentContainerClassName="p-4"
                 >
                   <Text selectable className="font-mono text-xs text-foreground">
                     {lines.map(line => line.text).join('\n')}
                   </Text>
                 </ScrollView>
-              </View>
+              </Card>
             </View>
           ) : null}
         </View>

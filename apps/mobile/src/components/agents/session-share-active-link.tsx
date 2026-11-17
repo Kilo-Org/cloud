@@ -3,7 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 
 /** The inline outcome of the copy action on a live share link. */
 export type ShareCopyState = 'idle' | 'copied' | 'failed';
@@ -59,10 +61,8 @@ export function ShareActiveLink({
   return (
     <View className="gap-3">
       <View className="gap-1">
-        <Text variant="muted" className="text-xs">
-          {lifetimeLabel}
-        </Text>
-        <Text variant="muted" className="text-xs">
+        <Text variant="caption">{lifetimeLabel}</Text>
+        <Text variant="caption">
           {includeNewMessages
             ? t('sessionShare.includesNewMessages')
             : t('sessionShare.excludesNewMessages')}
@@ -74,18 +74,19 @@ export function ShareActiveLink({
         accessibilityRole="button"
         accessibilityLabel={t('common.copyLink')}
         accessibilityState={{ disabled: busy }}
-        className="min-h-[44px] justify-center rounded-md border border-border bg-secondary p-3 active:opacity-70"
+        className={`${ROW_TARGET_CLASS} active:opacity-70`}
         testID="session-share-url"
       >
-        <Text variant="mono" className="text-xs text-foreground">
-          {url}
-        </Text>
+        <Card>
+          <Text variant="mono" className="text-xs text-foreground">
+            {url}
+          </Text>
+        </Card>
       </Pressable>
       {copyState !== 'idle' ? (
         <Text
-          className={
-            copyState === 'failed' ? 'text-xs text-destructive' : 'text-xs text-foreground'
-          }
+          variant="caption"
+          className={copyState === 'failed' ? 'text-destructive' : 'text-foreground'}
           testID="session-share-copy-status"
         >
           {copyState === 'failed'

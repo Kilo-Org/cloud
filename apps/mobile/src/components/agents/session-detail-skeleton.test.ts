@@ -61,7 +61,8 @@ describe('SessionReadOnlyFooterPlaceholder', () => {
 
     const containers = classNameOf(root).split(/\s+/);
     expect(containers).toContain('bg-secondary');
-    expect(containers).toContain('border-t');
+    expect(containers).toContain('border-t-[0.5px]');
+    expect(containers).toContain('border-hair-soft');
     expect(containers).toContain('px-4');
     expect(containers).toContain('py-3');
 
@@ -74,10 +75,10 @@ describe('SessionReadOnlyFooterPlaceholder', () => {
     expect(bars).toHaveLength(2);
     // The footer note's line box, centred, then its action button's floor.
     const [noteBar, buttonBar] = bars.map(bar => classNameOf(bar));
-    expect(noteBar).toContain('h-[17.5px]');
+    expect(noteBar).toContain('h-5');
     expect(noteBar).toContain('w-40');
     expect(noteBar).toContain('mx-auto');
-    expect(buttonBar).toContain('h-[48px]');
+    expect(buttonBar).toContain('min-h-[48px]');
 
     for (const bar of bars) {
       const tokens = classNameOf(bar).split(/\s+/);
@@ -126,7 +127,10 @@ describe('SessionComposerSkeleton', () => {
       const bars = skeletonBars(platformOs);
       expect(bars).toHaveLength(3);
       const [field = [], voice = [], send = []] = bars.map(className => className.split(/\s+/));
-      expect(field).toEqual(expect.arrayContaining(['h-full', 'w-full', 'rounded-[20px]']));
+      // The field's own 20 pt corner is painted by the composer; the slot stands
+      // in with the nearest step on the shared radius scale (21 pt), so the two
+      // boxes read as the same rounded field.
+      expect(field).toEqual(expect.arrayContaining(['h-full', 'w-full', 'rounded-3xl']));
       for (const trailing of [voice, send]) {
         expect(trailing).toEqual(expect.arrayContaining(['h-[48px]', 'w-[48px]']));
         expect(trailing).toContain('ms-3');

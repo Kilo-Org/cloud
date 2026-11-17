@@ -20,6 +20,7 @@ import { type VariableEdit } from '@/components/profiles/profile-variables-model
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, ChevronUp } from '@/components/ui/icons';
+import { RowGroup } from '@/components/ui/row-group';
 import { Text } from '@/components/ui/text';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useAgentProfileList, useAgentProfileMutations } from '@/lib/hooks/use-agent-profiles';
@@ -258,31 +259,35 @@ export function AdvancedConfigPanel({
 
   return (
     <View
-      className="mt-5"
+      className="mt-4"
       onLayout={event => {
         contentOffsetRef.current = event.nativeEvent.layout.y;
       }}
     >
-      <Pressable
-        className={cn(
-          ROW_TARGET_CLASS,
-          'flex-row items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2.5 active:opacity-70'
-        )}
-        onPress={toggleExpanded}
-        disabled={disabled}
-        accessibilityRole="button"
-        accessibilityLabel={t('agentChat.newSession.advancedConfig')}
-        accessibilityState={{ expanded: isExpanded, disabled }}
-      >
-        <Text className="text-sm font-medium text-foreground">
-          {t('agentChat.newSession.advancedConfig')}
-        </Text>
-        {isExpanded ? (
-          <ChevronUp size={18} color={colors.mutedForeground} />
-        ) : (
-          <ChevronDown size={18} color={colors.mutedForeground} />
-        )}
-      </Pressable>
+      <RowGroup>
+        <Pressable
+          className={cn(
+            ROW_TARGET_CLASS,
+            'flex-row items-center justify-between gap-3 px-4 py-3 active:opacity-70'
+          )}
+          onPress={toggleExpanded}
+          disabled={disabled}
+          accessibilityRole="button"
+          accessibilityLabel={t('agentChat.newSession.advancedConfig')}
+          accessibilityState={{ expanded: isExpanded, disabled }}
+        >
+          <Text className="text-sm font-medium text-foreground">
+            {t('agentChat.newSession.advancedConfig')}
+          </Text>
+          {/* A disclosure caret, not a navigation chevron: it names the state of
+              the block under the row. */}
+          {isExpanded ? (
+            <ChevronUp size={16} color={colors.mutedForeground} />
+          ) : (
+            <ChevronDown size={16} color={colors.mutedForeground} />
+          )}
+        </Pressable>
+      </RowGroup>
 
       {isExpanded ? (
         // The revealed body is nested under the disclosure row it belongs to: a
@@ -297,7 +302,7 @@ export function AdvancedConfigPanel({
           />
 
           {effectiveVars > 0 || effectiveCommands > 0 ? (
-            <Text className="text-xs text-muted-foreground">{profileSummary}</Text>
+            <Text variant="caption">{profileSummary}</Text>
           ) : null}
 
           <ManualEnvVarsEditor

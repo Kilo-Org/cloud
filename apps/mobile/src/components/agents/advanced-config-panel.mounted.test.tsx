@@ -401,7 +401,7 @@ describe('AdvancedConfigPanel', () => {
     const renderer = mount({ onRequestReveal });
 
     // The collapsed panel already reports where it sits in the scroll content.
-    layout(layoutView(renderer, 'mt-5'), 812);
+    layout(layoutView(renderer, 'mt-4'), 812);
     press(byLabel(renderer, 'Advanced Configuration'));
     // The reveal waits for the expanded block: a scroll issued at the tap would
     // clamp against the collapsed content height and move nothing.
@@ -422,7 +422,7 @@ describe('AdvancedConfigPanel', () => {
 
     // Re-expanding reveals against the offset the panel last reported.
     press(byLabel(renderer, 'Advanced Configuration'));
-    layout(layoutView(renderer, 'mt-5'), 640);
+    layout(layoutView(renderer, 'mt-4'), 640);
     layout(layoutView(renderer, 'mt-3'), 690);
     expect(onRequestReveal).toHaveBeenCalledTimes(2);
     expect(onRequestReveal).toHaveBeenLastCalledWith(640);

@@ -1669,7 +1669,7 @@ describe('handleSystemOneRequest', () => {
   it('returns a URL policy refusal without sending or recording', async () => {
     const refusal = NextResponse.json({ error_type: 'upstream_url_rejected' }, { status: 503 });
     jest.mocked(isUpstreamUrlPolicyEnforced).mockReturnValue(true);
-    jest.mocked(rejectDisallowedUpstreamUrls).mockResolvedValue(refusal);
+    jest.mocked(rejectDisallowedUpstreamUrls).mockResolvedValue({ rejected: refusal });
 
     const response = await handleSystemOneRequest(makeRequest());
 

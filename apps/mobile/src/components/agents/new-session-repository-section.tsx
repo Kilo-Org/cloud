@@ -170,7 +170,12 @@ export function NewSessionRepositorySection({
           renderConnectCard(platform, needsReconnect)
         ) : (
           <View className="mt-3 gap-2">
-            {/* This row has no header, so its first-connect note names the provider itself. */}
+            {/* This row has no header, so its first-connect note names the provider
+                itself; the reconnect note is provider neutral, so this row states
+                that name on the line above instead. */}
+            {offer.compactContextKey ? (
+              <Text variant="muted">{t(offer.compactContextKey)}</Text>
+            ) : null}
             {offer.compactNoteKey ? <Text variant="muted">{t(offer.compactNoteKey)}</Text> : null}
             {offer.offersAction ? renderConnectActions(platform) : renderRefreshOnly()}
           </View>

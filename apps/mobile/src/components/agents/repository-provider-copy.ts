@@ -58,6 +58,13 @@ export type ConnectCardOffer = {
    * where the card leans on its header for that.
    */
   compactNoteKey: string | undefined;
+  /**
+   * A subject line the compact row states above `compactNoteKey` when that
+   * note's only subject is a pronoun. The reconnect sentence is provider
+   * neutral (the sheet shows it above a title that names the provider), so the
+   * headerless row supplies that name itself instead of leaving "it" unbound.
+   */
+  compactContextKey: string | undefined;
 };
 
 /**
@@ -89,7 +96,12 @@ export function connectCardOffer(
   needsReconnect = false
 ): ConnectCardOffer {
   if (platform !== 'bitbucket') {
-    return { offersAction: true, noteKey: undefined, compactNoteKey: undefined };
+    return {
+      offersAction: true,
+      noteKey: undefined,
+      compactNoteKey: undefined,
+      compactContextKey: undefined,
+    };
   }
   if (role !== undefined && !canManageOrganizationBilling(role)) {
     // The member cannot connect it, so the note names the roles that can and the
@@ -98,11 +110,13 @@ export function connectCardOffer(
       // The workspace is connected but cannot list: the step is a fresh
       // selection or credentials, so the provider-neutral reconnect sentence
       // applies. Both notes carry it because neither has a header to explain
-      // which connect step is left.
+      // which connect step is left; the compact row states the provider name
+      // above it, since that sentence's only subject is a pronoun.
       return {
         offersAction: false,
         noteKey: 'prReview.connect.gitlabReconnectAdminOnlyDescription',
         compactNoteKey: 'prReview.connect.gitlabReconnectAdminOnlyDescription',
+        compactContextKey: 'prReview.connect.reconnectTitleBitbucket',
       };
     }
     return {
@@ -110,12 +124,14 @@ export function connectCardOffer(
       noteKey: 'prReview.connect.bitbucketAdminOnlyDescription',
       // The compact row carries no header, so this copy names Bitbucket itself.
       compactNoteKey: 'codeReviewer.bitbucket.notConnectedReadOnly',
+      compactContextKey: undefined,
     };
   }
   return {
     offersAction: true,
     noteKey: 'agentChat.newSession.bitbucketOrganizationsOnly',
     compactNoteKey: 'agentChat.newSession.bitbucketOrganizationsOnly',
+    compactContextKey: undefined,
   };
 }
 

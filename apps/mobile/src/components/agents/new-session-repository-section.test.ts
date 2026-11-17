@@ -320,6 +320,27 @@ describe('NewSessionRepositorySection Bitbucket connect authority', () => {
     expect(branchSelectorProps(renderer)?.repository).toEqual(githubRow);
   });
 
+  it('names Bitbucket above the reconnect note in a member compact row', () => {
+    // The reconnect sentence's only subject is a pronoun, and this row has no
+    // header, so the row states the provider name on the line above it.
+    orgState.role = 'member';
+    const renderer = mountSection({
+      value: 'github:owner/repo',
+      organizationId: 'org-1',
+      groups: [
+        group('github', 'repos'),
+        { key: 'bitbucket', status: 'connect', rowsUnlisted: true, repositories: [] },
+      ],
+    });
+
+    const text = renderedText(renderer);
+    expect(text).toContain(i18n.t('prReview.connect.reconnectTitleBitbucket'));
+    expect(text).toContain(i18n.t('prReview.connect.gitlabReconnectAdminOnlyDescription'));
+    expect(text).not.toContain(i18n.t('codeReviewer.bitbucket.notConnectedReadOnly'));
+    expect(textNode(renderer, i18n.t('common.connectBitbucket'))).toBeUndefined();
+    expect(renderer.root.findAllByType('Button' as never)).toHaveLength(1);
+  });
+
   it('leaves the other providers actionable for a member', () => {
     orgState.role = 'member';
     const renderer = mountSection({

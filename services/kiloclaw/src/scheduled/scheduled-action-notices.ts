@@ -126,11 +126,11 @@ export type SweepResult = {
 };
 
 /**
- * Pure orchestration interface for the sweep. The DB-backed and
- * worker-binding-backed implementations live in the entry point below;
- * tests inject their own implementations via runSweepWithIO to verify
- * the orchestration logic without a real Postgres or NOTIFICATIONS
- * service binding.
+ * Pure orchestration interface for the sweep. The DB-backed
+ * implementations and the backend HTTP dispatcher live in the entry
+ * point below; tests inject their own implementations via
+ * runSweepWithIO to verify the orchestration logic without a real
+ * Postgres or a running backend endpoint.
  */
 export type SweepIO = {
   /** Reset stuck 'sending' rows from prior crashed sweeps to 'pending'. */

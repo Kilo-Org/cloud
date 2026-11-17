@@ -90,6 +90,15 @@ const readFilterRecord = vi.hoisted(() => vi.fn<(storageKey: string) => Promise<
 // letterspaced capitals are LTR-only and must drop under RTL, keeping the
 // Arabic label's joins.
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
+// The screen's graph reaches `expo` through the session helpers and its rows
+// reach the haptics module; both read the `__DEV__` global the test renderer
+// does not provide, so the native edges stop here.
+vi.mock('expo', () => ({ requireOptionalNativeModule: () => null }));
+vi.mock('@/lib/haptics', () => ({
+  selectionHaptic: vi.fn(),
+  impactHaptic: vi.fn(),
+  notificationHaptic: vi.fn(),
+}));
 vi.mock('expo-secure-store', () => ({
   getItemAsync: readFilterRecord,
 }));

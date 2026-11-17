@@ -326,7 +326,7 @@ describe('TriggerCreateScreen leave guard', () => {
     expect(h.replace).toHaveBeenCalledTimes(1);
     // The form paints the saved values and the New button is disabled: the
     // screen reflects that its draft is saved until an edit starts a new one.
-    await waitFor(() => expect(h.guard.enabled).toBe(false));
+    await waitFor(() => !h.guard.enabled);
   });
 
   it('an edit after a surviving create starts a new draft and re-enables the submit', async () => {

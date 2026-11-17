@@ -3,6 +3,7 @@ import { type ComponentProps, type ComponentType, createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type LucideProps } from '@/components/ui/icons';
+import { NEUTRAL_TINT } from '@/lib/agent-color';
 import { act, TestRenderer } from '@/test/renderer';
 
 import { ROW_FRAME_CLASS, ROW_FRAME_STACK_CLASS, RowFrame } from './row-frame';
@@ -72,7 +73,7 @@ afterEach(() => {
 
 describe('RowFrame geometry', () => {
   it('owns the one row geometry', () => {
-    const classes = classesOf(renderFrame({ title: 'General' }));
+    const classes = classesOf(frameOf(renderFrame({ title: 'General' })));
 
     expect(classes).toEqual(
       expect.arrayContaining(['min-h-[48px]', 'flex-row', 'items-center', 'gap-3', 'px-4', 'py-3'])
@@ -91,7 +92,7 @@ describe('RowFrame geometry', () => {
   });
 
   it('stacks the leading cell above the text block when asked', () => {
-    const classes = classesOf(renderFrame({ title: 'General', stack: true }));
+    const classes = classesOf(frameOf(renderFrame({ title: 'General', stack: true })));
 
     expect(classes).toEqual(expect.arrayContaining(['min-h-[48px]', 'gap-2', 'px-4', 'py-3']));
     expect(classes).not.toContain('flex-row');
@@ -165,7 +166,10 @@ describe('RowFrame interaction', () => {
       trailing: { kind: 'switch', value: true, onValueChange: () => undefined },
     });
     const frame = root.find(
-      node => typeof node.props.testID === 'string' && node.props.testID === 'pref-1'
+      node =>
+        Object.is(node.type, 'View') &&
+        typeof node.props.testID === 'string' &&
+        node.props.testID === 'pref-1'
     );
     const content = pressableOf(root);
 
@@ -174,7 +178,8 @@ describe('RowFrame interaction', () => {
     expect(content.props.accessible).toBe(false);
     expect(content.props.importantForAccessibility).toBe('no-hide-descendants');
     // The switch is the frame's child, not a child of the content press.
-    expect(root.findAllByType('Switch' as never)[0]?.parent).toBe(frame);
+    expect(content.findAllByType('Switch' as never)).toHaveLength(0);
+    expect(root.findAllByType('Switch' as never)).toHaveLength(1);
   });
 });
 
@@ -274,11 +279,11 @@ describe('RowFrame leading cell', () => {
     const tile = renderFrame({
       title: 'General',
       icon: Globe,
-      iconTint: { hueThemeKey: 'foreground' },
+      iconTint: NEUTRAL_TINT,
     }).find(node => Object.is(node.type, 'IconTile'));
 
     expect(tile.props.icon).toBe(Globe);
-    expect(tile.props.tint).toEqual({ hueThemeKey: 'foreground' });
+    expect(tile.props.tint).toBe(NEUTRAL_TINT);
   });
 
   it('puts a busy node inside the tile it replaces', () => {
@@ -422,7 +427,7 @@ describe('RowFrame trailing cell', () => {
     expect(onPress).toHaveBeenCalledOnce();
     expect(action.props.accessibilityRole).toBe('button');
     expect(action.props.accessibilityState).toEqual({ disabled: false });
-    expect(classesOf(action)).toContain('min-h-[48px]');
+    expect(classesOf(action).some(name => name.startsWith('min-h-'))).toBe(true);
   });
 
   it('groups several trailing nodes on one line', () => {

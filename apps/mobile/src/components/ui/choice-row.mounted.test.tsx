@@ -228,8 +228,10 @@ describe('ChoiceRow touch target', () => {
 });
 
 describe('ChoiceRow test handle', () => {
-  it('puts the caller\'s testID on the row control', () => {
-    const control = rowControl(renderRow({ label: 'Balanced', selected: true, testID: 'choice-1' }));
+  it("puts the caller's testID on the row control", () => {
+    const control = rowControl(
+      renderRow({ label: 'Balanced', selected: true, testID: 'choice-1' })
+    );
 
     expect(control.props.testID).toBe('choice-1');
   });

@@ -45,6 +45,11 @@ function skeletons(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTest
   return root.findAllByType('Skeleton' as never);
 }
 
+/** The skeleton's own frame: the outermost element carrying the row padding. */
+function frameOf(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
+  return root.find(node => classesOf(node).includes('py-3'));
+}
+
 function first(node: TestRenderer.ReactTestInstance | undefined): TestRenderer.ReactTestInstance {
   if (node === undefined) {
     throw new Error('Missing node');
@@ -59,8 +64,7 @@ afterEach(() => {
 
 describe('RowSkeleton', () => {
   it('renders the row frame it stands in for', () => {
-    const frame = renderSkeleton({});
-    const classes = classesOf(frame);
+    const classes = classesOf(frameOf(renderSkeleton({})));
 
     for (const name of ROW_FRAME_CLASS.split(' ')) {
       expect(classes).toContain(name);
@@ -71,9 +75,7 @@ describe('RowSkeleton', () => {
   it('reserves the leading tile at the tile primitive size', () => {
     const bars = skeletons(renderSkeleton({ tile: true }));
 
-    expect(classesOf(first(bars[0]))).toEqual(
-      expect.arrayContaining(ROW_TILE_CLASS.split(' '))
-    );
+    expect(classesOf(first(bars[0]))).toEqual(expect.arrayContaining(ROW_TILE_CLASS.split(' ')));
     expect(skeletons(renderSkeleton({}))).toHaveLength(1);
   });
 
@@ -100,13 +102,13 @@ describe('RowSkeleton', () => {
     const bars = skeletons(renderSkeleton({ trailing: 'switch' }));
     const toggle = bars[bars.length - 1];
 
-    expect(classesOf(first(toggle))).toEqual(
-      expect.arrayContaining(['rounded-full', 'shrink-0'])
-    );
+    expect(classesOf(first(toggle))).toEqual(expect.arrayContaining(['rounded-full', 'shrink-0']));
   });
 
   it('stacks the leading cell above the text block in a narrow window', () => {
-    const classes = classesOf(renderSkeleton({ stack: true, tile: true, trailingControl: true }));
+    const classes = classesOf(
+      frameOf(renderSkeleton({ stack: true, tile: true, trailingControl: true }))
+    );
 
     expect(classes).toEqual(expect.arrayContaining(['min-h-[48px]', 'gap-2', 'px-4', 'py-3']));
     expect(classes).not.toContain('flex-row');
@@ -121,10 +123,11 @@ describe('RowSkeleton', () => {
   });
 
   it('keeps the flat-list session shape', () => {
-    const classes = classesOf(renderSkeleton({ variant: 'session', last: false }));
+    const root = renderSkeleton({ variant: 'session', last: false });
+    const classes = classesOf(frameOf(root));
 
     expect(classes).toEqual(expect.arrayContaining(['flex-row', 'px-4', 'py-3']));
     // The strip, the eyebrow, the title and the meta bar.
-    expect(skeletons(renderSkeleton({ variant: 'session', last: false }))).toHaveLength(3);
+    expect(skeletons(root)).toHaveLength(3);
   });
 });

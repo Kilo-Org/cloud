@@ -1,13 +1,18 @@
 import { type ComponentType, type ReactNode } from 'react';
-import { View, type EllipsizeMode, type Insets } from 'react-native';
+import { View, type Insets } from 'react-native';
 
 import { type LucideProps } from '@/components/ui/icons';
-import { RowFrame, RowValue, type RowValueTone } from '@/components/ui/row-frame';
+import {
+  RowFrame,
+  type RowEllipsizeMode,
+  RowValue,
+  type RowValueTone,
+} from '@/components/ui/row-frame';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
-type KvTone = RowValueTone;
+type KvTone = Exclude<RowValueTone, 'default'>;
 
 type KvRowProps = {
   icon?: ComponentType<LucideProps>;
@@ -58,7 +63,7 @@ type KvRowProps = {
    * Where the value truncates. An identifier truncates in the middle so both
    * ends stay legible; a status that ends with its state truncates at the tail.
    */
-  valueEllipsizeMode?: EllipsizeMode;
+  valueEllipsizeMode?: RowEllipsizeMode;
   /**
    * A node in the value's place, for a value that is not one run of text — a
    * badge, a glyph, a value with its own controls. The row keeps its height.
@@ -132,10 +137,7 @@ export function KvRow({
   const colors = useThemeColors();
   const labelNode = (
     <View
-      className={cn(
-        'flex-row items-center gap-2',
-        labelShrink ? 'min-w-0 shrink' : 'shrink-0'
-      )}
+      className={cn('flex-row items-center gap-2', labelShrink ? 'min-w-0 shrink' : 'shrink-0')}
     >
       {dotTone ? <View className={cn('size-2 rounded-full', DOT_TONE[dotTone])} /> : null}
       {Icon ? <Icon size={14} color={colors.mutedForeground} /> : null}
@@ -148,26 +150,24 @@ export function KvRow({
     </View>
   );
 
-  const valueNode =
-    valueContent ??
+  const valueNode = valueContent ?? (
     // Android's `selectable` routes the value through ReactTextView, which
     // re-applies selection when the view attaches and drops the `maxLines`
     // clamp. A selectable value then wraps past the row's one-line height and
     // paints a clipped second line (SPOT-DEFECT: the finding-details Manifest
     // row). The value primitive clamps the values that can hold it.
-    (
-      <RowValue
-        text={value}
-        tone={valueTone}
-        face={valueFace}
-        selectable={selectable}
-        direction={valueDirection}
-        ellipsizeMode={valueEllipsizeMode ?? 'middle'}
-        accessibilityLabel={valueAccessibilityLabel}
-        className={valueClassName}
-        status={valueStatus}
-      />
-    );
+    <RowValue
+      text={value}
+      tone={valueTone}
+      face={valueFace}
+      selectable={selectable}
+      direction={valueDirection}
+      ellipsizeMode={valueEllipsizeMode ?? 'middle'}
+      accessibilityLabel={valueAccessibilityLabel}
+      className={valueClassName}
+      status={valueStatus}
+    />
+  );
 
   return (
     <RowFrame

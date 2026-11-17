@@ -5,8 +5,8 @@ import {
   type AccessibilityRole,
   type AccessibilityState,
   type AccessibilityValue,
-  type EllipsizeMode,
   type Insets,
+  type TextProps,
   type ViewProps,
 } from 'react-native';
 
@@ -40,6 +40,9 @@ export const ROW_TILE_CLASS = 'h-[30px] w-[30px] shrink-0 rounded-lg';
 const TITLE_CLASS = 'text-sm font-medium';
 const SUBTITLE_CLASS = 'mt-0.5 text-xs text-muted-foreground';
 
+/** How a clamped line ends: the RN text `ellipsizeMode`. */
+export type RowEllipsizeMode = NonNullable<TextProps['ellipsizeMode']>;
+
 /** The semantic ink a value or a status can take. */
 export type RowValueTone = 'default' | 'good' | 'warn' | 'danger' | 'muted';
 
@@ -60,7 +63,7 @@ export type RowLine =
       /** `mono` for an identifier, a version or a device id beside a sans title. */
       face?: 'default' | 'mono';
       numberOfLines?: number;
-      ellipsizeMode?: EllipsizeMode;
+      ellipsizeMode?: RowEllipsizeMode;
       className?: string;
     }>;
 
@@ -75,7 +78,7 @@ export type RowValueSpec = Readonly<{
    * its natural width and let the label truncate (`shrink: false`).
    */
   shrink?: boolean;
-  ellipsizeMode?: EllipsizeMode;
+  ellipsizeMode?: RowEllipsizeMode;
   /** A selectable value wraps inside the row instead of being clamped. */
   selectable?: boolean;
   /** Pin a value that names a version, a range or a URL to a left-to-right run. */

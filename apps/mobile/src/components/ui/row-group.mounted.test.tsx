@@ -37,11 +37,11 @@ function first(node: TestRenderer.ReactTestInstance | undefined): TestRenderer.R
 }
 
 function item(position: 'only' | 'first' | 'middle' | 'last', leadingTile = false) {
-  return createElement(
-    RowGroupItem,
-    { position, leadingTile },
-    createElement('Text', null, `${position}-row`)
-  );
+  return createElement(RowGroupItem, {
+    position,
+    leadingTile,
+    children: createElement('Text', null, `${position}-row`),
+  });
 }
 
 afterEach(() => {
@@ -52,12 +52,13 @@ afterEach(() => {
 describe('RowGroup', () => {
   it('draws the surface and a separator between rows only', () => {
     const root = renderGroup(
-      createElement(
-        RowGroup,
-        { leadingTile: true },
-        createElement('Text', null, 'first-row'),
-        createElement('Text', null, 'last-row')
-      )
+      createElement(RowGroup, {
+        leadingTile: true,
+        children: [
+          createElement('Text', null, 'first-row'),
+          createElement('Text', null, 'last-row'),
+        ],
+      })
     );
     const group = root.findAll(node => Object.is(node.type, 'View'))[0];
     const separators = root.findAll(
@@ -109,9 +110,13 @@ describe('RowGroupItem', () => {
 
   it('insets the separator after a leading tile', () => {
     const tiled = renderGroup(item('first', true));
-    const tiledSeparator = classesOf(first(tiled.findAll(node => classesOf(node).includes('border-b-[0.5px]'))[0]));
+    const tiledSeparator = classesOf(
+      first(tiled.findAll(node => classesOf(node).includes('border-b-[0.5px]'))[0])
+    );
     const dotted = renderGroup(item('first', false));
-    const dottedSeparator = classesOf(first(dotted.findAll(node => classesOf(node).includes('border-b-[0.5px]'))[0]));
+    const dottedSeparator = classesOf(
+      first(dotted.findAll(node => classesOf(node).includes('border-b-[0.5px]'))[0])
+    );
 
     expect(tiledSeparator).toContain('ms-[54.5px]');
     expect(dottedSeparator).toContain('ms-4');

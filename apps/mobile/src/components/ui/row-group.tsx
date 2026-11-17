@@ -86,7 +86,9 @@ export function RowGroupItem({
   children,
 }: Readonly<RowGroupItemProps>) {
   return (
-    <View className={cn('overflow-hidden bg-secondary', GROUPED_SURFACE_CLASS[position], className)}>
+    <View
+      className={cn('overflow-hidden bg-secondary', GROUPED_SURFACE_CLASS[position], className)}
+    >
       {children}
       {position === 'first' || position === 'middle' ? (
         <View

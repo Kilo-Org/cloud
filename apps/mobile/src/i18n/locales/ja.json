@@ -676,7 +676,8 @@
       "managedOnWeb": "この組織のBitbucket接続は、パソコンからWebで管理されています。",
       "description": "必要なスコープを指定してワークスペースアクセストークンを作成し、下に貼り付けてください。",
       "scopes": "アカウント：読み取り、リポジトリ：読み取り・書き込み、プルリクエスト：読み取り、Webhook：読み取り・書き込み",
-      "tokenPlaceholder": "ワークスペースアクセストークン"
+      "tokenPlaceholder": "ワークスペースアクセストークン",
+      "tokenRefused": "Bitbucketはこのワークスペースアクセストークンを受け付けませんでした。上記のスコープが付与されていることを確認してから、もう一度お試しください。"
     },
     "followReviewMd": "REVIEW.mdに従う",
     "followReviewMdSubtitle": "各リポジトリのREVIEW.mdに記載された指示に従う",
@@ -777,6 +778,7 @@
     },
     "reviewList": {
       "configureProvider": "プロバイダーを設定",
+      "connectOwnerOnly": "組織のオーナーまたは管理者にプロバイダーの接続を依頼してください。",
       "couldNotLoad": "レビューを読み込めませんでした。",
       "noReviews": "まだレビューはありません",
       "noReviewsDescription": "コードレビュアーがプルリクエストをレビューすると、その結果がここに表示されます。",
@@ -2430,6 +2432,7 @@
     "signOutThisDevice": "このデバイスからサインアウト",
     "signOutSessionLabel": "{{device}}からサインアウト、サインイン：{{signedIn}}、最終アクセス：{{lastSeen}}",
     "sessionSignedOut": "セッションからサインアウトしました。",
+    "sessionSignOutFailed": "このセッションからサインアウトできませんでした。もう一度お試しください。",
     "signOutThisDeviceTitle": "このデバイスからサインアウトしますか？",
     "signOutThisSessionTitle": "このセッションからサインアウトしますか？",
     "signOutThisSessionMessage": "{{device}}からサインアウトします。最終アクセス：{{lastSeen}}。ただし、最大1時間はAPIにアクセスできる状態が続くことがあります。",
@@ -2553,12 +2556,14 @@
     "manage": {
       "billingHistory": "請求履歴",
       "billingHistoryEmpty": "請求履歴はまだありません。",
+      "billingHistoryError": "請求履歴を読み込めませんでした",
       "cancel": "サブスクリプションを解約",
       "cancelDescription": "Kilo Pass は請求期間の終了まで有効で、その後は更新されません。",
       "cancelScheduled": "{{date}} に解約予定",
       "cancelScheduledChange": "予定された変更を取り消す",
       "cancelled": "サブスクリプションを解約しました",
       "creditHistoryEmpty": "Kilo Pass のクレジットはまだありません。",
+      "creditHistoryError": "クレジット履歴を読み込めませんでした",
       "resume": "サブスクリプションを再開",
       "resumeCancelledDescription": "Kilo Pass の自動更新が再び有効になります。",
       "resumePausedDescription": "Kilo Pass は予定の再開日を待たずに今すぐ再開されます。",
@@ -3330,7 +3335,7 @@
       "selectOrganization": "組織を選択",
       "unavailableDescription": "この組織は利用できなくなりました。続行するには、プロフィールから組織を選択してください。",
       "unavailableSessionsDescription": "この組織は利用できなくなりました。セッションを読み込めません。",
-      "accessDeniedDescription": "この組織にアクセスする権限がありません。"
+      "accessDeniedDescription": "組織のオーナーまたは管理者にアクセス権の付与を依頼してください。"
     },
     "create": {
       "title": "組織を作成",
@@ -3463,16 +3468,27 @@
     },
     "settingsOnWeb": {
       "title": "Webでの組織設定",
-      "integrations": "Webでの連携",
       "usageDetails": "使用状況の詳細",
       "providersAndModels": "プロバイダーとモデル",
       "groups": "グループ",
       "guardrails": "ガードレール",
       "byok": "独自のキーを使用",
+      "ssoAndDomain": "SSOとドメイン",
+      "dataCollection": "データ収集",
       "auditLogs": "監査ログ",
-      "requestLogs": "リクエストログ",
-      "subOrganizations": "サブ組織",
-      "distributeFunds": "資金の配分"
+      "requestLogs": "リクエストログ"
+    },
+    "requestLogs": {
+      "hint": "表示期間の終了時刻までの1時間のリクエストを新しい順に表示しています。",
+      "older": "前の1時間",
+      "newer": "次の1時間",
+      "truncated": "この1時間には、一覧に表示しきれないリクエストがあります。",
+      "emptyTitle": "リクエストはありません",
+      "emptyDescription": "この1時間にゲートウェイへのリクエストはありません。",
+      "loadError": "リクエストログを読み込めませんでした。",
+      "permissionDenied": "リクエストログを閲覧できるのは、組織のオーナー、管理者、または請求管理者のみです。",
+      "tokens": "入力 {{input}} · 出力 {{output}}",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "入力トークン",
@@ -4521,6 +4537,8 @@
     "topModels": "上位のモデル",
     "topFeatures": "上位の機能",
     "emptyTitle": "この期間の使用はありません",
+    "unavailableTitle": "使用状況を利用できません",
+    "unavailableDescription": "このワークスペースは使用状況を報告していません。再試行しても解決しません。",
     "orgSelfNotice": "この組織でのあなた自身の使用状況を表示しています。",
     "viewDetails": "使用状況の詳細を表示"
   },
@@ -4592,7 +4610,7 @@
       "fieldCron": "Cron式",
       "fieldCronHelp": "5つのフィールド：分、時、日、月、曜日。最短間隔は1分です。",
       "fieldTimezone": "タイムゾーン",
-      "nameLocked": "名前はウェブフックURLの一部であるため、変更できません。",
+      "nameLocked": "名前はトリガーの作成後に変更できません。",
       "repositoryLocked": "リポジトリはトリガーの作成後に変更できません。",
       "environmentAutomatic": "リポジトリに応じて自動",
       "notSelected": "未選択",
@@ -4679,5 +4697,175 @@
     "unavailableDescription": "この共有リンクは期限切れか、無効化されています。",
     "transcriptUnavailableTitle": "このトランスクリプトを読み込めませんでした",
     "transcriptUnavailableDescription": "リンクは引き続き有効です。しばらくしてからもう一度お試しください。"
+  },
+  "organizationGuardrails": {
+    "title": "AIガードレール",
+    "permissionDenied": "AIガードレールを管理できるのは組織の所有者と管理者のみです。",
+    "unavailable": "AIガードレールはこの組織では利用できません。",
+    "loadError": "AIガードレールを読み込めませんでした",
+    "statusSaving": "保存中…",
+    "statusSaved": "保存しました",
+    "statusFailed": "保存できませんでした。",
+    "inputTitle": "入力ガードレール",
+    "inputDescription": "Enkrypt AIで、ツールの結果を含むすべての入力をスキャンします。Enkryptが利用できない場合、ブロック検出器はリクエストを拒否します。",
+    "outputTitle": "出力ガードレール",
+    "outputDescription": "メンバーが受け取る前に、Enkrypt AIで応答をスキャンします。オンにしない限りオフです。",
+    "detectorsHint": "ブロックは、フラグが付いたリクエストを拒否します。ログのみは、リクエストを遅延させずに記録だけを行います。",
+    "detectorsHintOutput": "ブロックは、フラグが付いた応答を失敗させます。ログのみは、応答を遅延させずに記録だけを行います。",
+    "choiceLog": "ログのみ",
+    "applyTo": "適用先",
+    "applyToAllMembers": "すべてのメンバー",
+    "applyKiloDefault": "Kiloのデフォルトを適用",
+    "invalidSavedTitle": "保存された入力検出器の設定を読み取れません",
+    "invalidSavedBody": "入力検出器が再度保存されるまで、リクエストはブロックされます。以下の検出器はKiloのデフォルトから開始します。",
+    "invalidSavedOutputTitle": "保存された出力検出器の設定を読み取れません",
+    "invalidSavedOutputBody": "出力検出器が再度保存されるまで、応答は保留されます。以下から出力検出器を選択してください。",
+    "blockingOutputNote": "ブロックする出力検出器は、Enkryptが応答全体をチェックするまで応答を保留します。遅延を避けるにはログのみを使用してください。",
+    "inputDetectorRequired": "少なくとも1つの入力検出器をオンにしてください。",
+    "outputDetectorRequired": "少なくとも1つの出力検出器をオンにしてください。",
+    "rulesTooMany": "ルールは最大{{max}}件まで追加できます。",
+    "ruleIdRequired": "ルールIDを入力してください。",
+    "ruleIdInvalid": "ルールIDには英字、数字、ドット、ハイフン、アンダースコアのみ使用できます。",
+    "ruleTextRequired": "ルールが禁止または要求する内容を記述してください。",
+    "keywordTooLong": "各キーワードは最大{{max}}文字です。",
+    "topicTooLong": "各トピックは最大{{max}}文字です。",
+    "keywordsTooMany": "キーワードは最大{{max}}件まで追加できます。",
+    "topicsTooMany": "トピックは最大{{max}}件まで追加できます。",
+    "piiEntityRequired": "検出するデータを少なくとも1つ選択してください。",
+    "keywordRequired": "キーワードを少なくとも1つ追加してください。",
+    "topicRequired": "トピックを少なくとも1つ追加してください。",
+    "policyTextRequired": "ポリシーテキストを入力してください。",
+    "ruleRequired": "ルールを少なくとも1つ追加してください。",
+    "ruleIdDuplicate": "各ルールには固有のルールIDが必要です。",
+    "piiEntities": "検出するデータ",
+    "keywordsLabel": "キーワード",
+    "keywordsHint": "1行に1つのキーワード。",
+    "topicsHint": "1行に1つのトピック。",
+    "policyFormat": "ポリシー形式",
+    "policyFormatRules": "構造化ルール",
+    "policyFormatRulesDescription": "要件ごとに1つのルールを、カテゴリと重大度を付けて指定します。推奨。",
+    "policyFormatText": "ポリシーテキスト",
+    "policyFormatTextDescription": "既存のポリシーをプレーンテキストとして貼り付けます。",
+    "rulesEmpty": "ルールはまだありません。各ルールは、入力に含めてはならない、または要求してはならない内容を1つ記述します。",
+    "addRule": "ルールを追加",
+    "ruleNumber": "ルール{{number}}",
+    "ruleRemove": "ルール{{number}}を削除",
+    "ruleIdLabel": "ルールID",
+    "ruleNameLabel": "名前（任意）",
+    "ruleTextLabel": "ルール",
+    "ruleRiskCategory": "リスクカテゴリ",
+    "ruleApplicability": "スコープ",
+    "ruleFrameworks": "フレームワーク",
+    "detector": {
+      "promptInjection": {
+        "label": "プロンプトインジェクション",
+        "description": "指示を上書きしたりモデルをジェイルブレイクしたりする試みを検出します。"
+      },
+      "policyViolation": {
+        "label": "ポリシー違反",
+        "description": "テキストまたはルールで記述された組織ポリシーに違反する入力を検出します。",
+        "descriptionOutput": "テキストまたはルールで記述された組織ポリシーに違反する応答を検出します。"
+      },
+      "pii": {
+        "label": "PIIとシークレット",
+        "description": "個人データ、認証情報、IPアドレス、URLを検出します。"
+      },
+      "keywords": {
+        "label": "禁止キーワード",
+        "descriptionOutput": "指定したキーワードのいずれかを含む応答を検出します。"
+      },
+      "topics": {
+        "label": "トピック",
+        "descriptionOutput": "指定したトピックのいずれかに関する応答を検出します。"
+      },
+      "toxicity": {
+        "label": "有害性",
+        "description": "有害、侮辱的、脅迫的、または憎悪的な表現を検出します。"
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "性的な内容、またはその他の職場閲覧に適さない内容を検出します。"
+      },
+      "bias": {
+        "label": "バイアス",
+        "description": "偏見のある、または差別的な表現を検出します。"
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "個人データ",
+        "description": "氏名、メールアドレス、電話番号。"
+      },
+      "secrets": {
+        "label": "シークレット",
+        "description": "APIキー、トークン、パスワード。"
+      },
+      "ipAddress": {
+        "label": "IPアドレス",
+        "description": "IPv4およびIPv6アドレス。"
+      },
+      "url": {
+        "label": "URL",
+        "description": "ウェブアドレス。"
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "セキュリティと詐欺",
+      "safetyHarm": "安全性と危害",
+      "privacyDataProtection": "プライバシーとデータ保護",
+      "brandReputationTrust": "ブランドと評判",
+      "biasFairnessEthical": "バイアスと公平性",
+      "legalIpLiability": "法務および知的財産責任",
+      "productMisuse": "製品の誤用",
+      "performanceQuality": "パフォーマンスと品質"
+    },
+    "applicability": {
+      "user": "ユーザー入力",
+      "userAssistant": "ユーザー入力と応答"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLMトップ10（2025）",
+      "nist": "NIST AI RMF",
+      "euAiAct": "EU AI法",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "エンタープライズ機能",
+    "enterpriseOnly": "これはエンタープライズ限定の機能です。",
+    "readOnly": "これらの設定を変更できるのは組織の所有者と管理者のみです。",
+    "loadError": "プロバイダーとモデルを読み込めませんでした",
+    "tabModels": "モデル",
+    "tabProviders": "プロバイダー",
+    "tabGateways": "ゲートウェイ",
+    "modelsDescription": "モデルをオフにすると、すべてのメンバーに対してそのモデルをブロックします。許可されたプロバイダーのモデルはオンで開始します。",
+    "modelsDeniedOnly": "拒否のみ",
+    "modelsEmpty": "この検索に一致するモデルはありません。",
+    "providersDescription": "プロバイダーをオフにすると、この組織でKiloがそのプロバイダーへルーティングするのを停止します。",
+    "providersNeedCatalog": "モデルカタログ全体が読み込まれるまで、プロバイダーのスイッチは読み取り専用です。編集するには、上の再試行をタップしてください。",
+    "providersEmpty": "この検索に一致するプロバイダーはありません。",
+    "allowAllShown": "表示されているすべてを許可",
+    "denyAllShown": "表示されているすべてを拒否",
+    "gatewaysDescription": "KiloはモデルリクエストをVercel AI GatewayまたはOpenRouter経由でルーティングします。無効なゲートウェイはそれらのリクエストを失敗させます。",
+    "emptyProviderList": "少なくとも1つのプロバイダーを許可してください。リストが空の場合、Kiloのすべてのモデルルーティングがブロックされます。",
+    "gatewaysUnavailable": "この組織ではゲートウェイ設定を利用できません。",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "OpenRouterのリクエストはリージョンに固定されません。",
+    "inferenceRegion": "推論リージョン",
+    "inferenceRegionDescription": "Vercel AI Gatewayのリクエストをこのリージョンに固定します。そこで利用できないモデルは失敗します。",
+    "disableOpenrouterNote": "OpenRouterを無効にすると、それを経由してリクエストをルーティングするBYOKキーもブロックされます。",
+    "emptyModelList": "少なくとも1つのモデルをオンのままにしてください。すべてのモデルを拒否すると、メンバーが使用できるものがなくなります。",
+    "catalogUnavailable": "モデルカタログ全体を読み込めなかったため、保存済みのリストのみを表示しています。すべてのモデルを読み込むには再試行してください。",
+    "region": {
+      "global": "グローバル",
+      "us": "アメリカ合衆国",
+      "eu": "欧州連合",
+      "au": "オーストラリア",
+      "jp": "日本"
+    }
   }
 }

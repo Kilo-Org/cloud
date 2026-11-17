@@ -1354,7 +1354,8 @@
       "managedOnWeb": "Muunganisho wa Bitbucket wa shirika hili unasimamiwa kwenye wavuti kutoka kwenye kompyuta.",
       "description": "Unda tokeni ya kufikia nafasi ya kazi yenye ruhusa zinazohitajika kisha uibandike hapa chini.",
       "scopes": "Akaunti: kusoma · Hazina: kusoma/kuandika · Maombi ya kuunganisha: kusoma · Arifa za wavuti: kusoma/kuandika",
-      "tokenPlaceholder": "Tokeni ya kufikia nafasi ya kazi"
+      "tokenPlaceholder": "Tokeni ya kufikia nafasi ya kazi",
+      "tokenRefused": "Bitbucket haikukubali tokeni hii ya kufikia nafasi ya kazi. Hakikisha kuwa ina ruhusa zilizo hapo juu, kisha ujaribu tena."
     },
     "scopeList": {
       "personalStillAvailable": "Hazina zako binafsi bado zinapatikana hapa chini.",
@@ -1366,7 +1367,8 @@
       "noReviews": "Hakuna ukaguzi bado",
       "noReviewsDescription": "Ukaguzi utaonekana hapa baada ya mkaguzi wa msimbo kukagua ombi la kuunganisha.",
       "startManualReview": "Anzisha ukaguzi mwenyewe",
-      "configureProvider": "Sanidi mtoa huduma"
+      "configureProvider": "Sanidi mtoa huduma",
+      "connectOwnerOnly": "Omba mmiliki wa shirika au msimamizi aunganishe mtoa huduma."
     },
     "platformList": {
       "checking": "Inaangalia…",
@@ -2973,6 +2975,7 @@
     "signOutThisDevice": "Toka kwenye akaunti kwenye kifaa hiki",
     "signOutSessionLabel": "Toka kwenye akaunti kwenye {{device}}, Kuingia: {{signedIn}}, Kuonekana mara ya mwisho: {{lastSeen}}",
     "sessionSignedOut": "Kikao kimeondolewa kwenye akaunti.",
+    "sessionSignOutFailed": "Imeshindikana kuondoka kwenye kikao hiki. Jaribu tena.",
     "signOutThisDeviceTitle": "Ungependa kutoka kwenye akaunti kwenye kifaa hiki?",
     "signOutThisSessionTitle": "Ungependa kuondoka kwenye kikao hiki?",
     "signOutThisSessionMessage": "{{device}} kitaondolewa kwenye akaunti. Kuonekana mara ya mwisho: {{lastSeen}}. Kinaweza kuendelea kufikia API kwa hadi saa moja.",
@@ -3096,12 +3099,14 @@
     "manage": {
       "billingHistory": "Historia ya malipo",
       "billingHistoryEmpty": "Bado hakuna historia ya malipo.",
+      "billingHistoryError": "Imeshindwa kupakia historia ya malipo",
       "cancel": "Ghairi usajili",
       "cancelDescription": "Kilo Pass yako itaendelea kutumika hadi mwisho wa kipindi cha malipo na haitasasishwa.",
       "cancelScheduled": "Itaghairiwa tarehe {{date}}",
       "cancelScheduledChange": "Ghairi mabadiliko yaliyoratibiwa",
       "cancelled": "Usajili umeghairiwa",
       "creditHistoryEmpty": "Bado hakuna salio la Kilo Pass.",
+      "creditHistoryError": "Imeshindwa kupakia historia ya salio",
       "resume": "Endeleza usajili",
       "resumeCancelledDescription": "Kilo Pass yako itaanza tena kusasishwa kiotomatiki.",
       "resumePausedDescription": "Kilo Pass yako inaendelea sasa, kabla ya tarehe iliyoratibiwa ya kuendelea.",
@@ -3338,7 +3343,7 @@
       "selectOrganization": "Chagua shirika",
       "unavailableDescription": "Shirika hili halipatikani tena. Chagua moja kutoka kwenye wasifu wako ili uendelee.",
       "unavailableSessionsDescription": "Shirika hili halipatikani tena. Vikao vyake haviwezi kupakiwa.",
-      "accessDeniedDescription": "Huna ruhusa ya kufikia shirika hili."
+      "accessDeniedDescription": "Mwombe mmiliki wa shirika au msimamizi akupatie ruhusa."
     },
     "create": {
       "title": "Unda shirika",
@@ -3458,16 +3463,27 @@
     },
     "settingsOnWeb": {
       "title": "Mipangilio ya shirika kwenye wavuti",
-      "integrations": "Miunganisho kwenye wavuti",
       "usageDetails": "Maelezo ya matumizi",
       "providersAndModels": "Watoa huduma na miundo",
       "groups": "Vikundi",
       "guardrails": "Mipaka ya usalama",
       "byok": "Tumia ufunguo wako mwenyewe",
+      "ssoAndDomain": "SSO na kikoa",
+      "dataCollection": "Ukusanyaji wa data",
       "auditLogs": "Kumbukumbu za ukaguzi",
-      "requestLogs": "Kumbukumbu za maombi",
-      "subOrganizations": "Mashirika tanzu",
-      "distributeFunds": "Gawa fedha"
+      "requestLogs": "Kumbukumbu za maombi"
+    },
+    "requestLogs": {
+      "hint": "Maombi ya saa moja kabla ya mwisho wa kipindi, mapya kwanza.",
+      "older": "Saa iliyotangulia",
+      "newer": "Saa inayofuata",
+      "truncated": "Saa hii ina maombi mengi kuliko yanayoonyeshwa kwenye orodha.",
+      "emptyTitle": "Hakuna maombi",
+      "emptyDescription": "Hakuna maombi ya lango katika saa hii.",
+      "loadError": "Imeshindwa kupakia kumbukumbu za maombi.",
+      "permissionDenied": "Ni mmiliki, msimamizi au meneja wa malipo wa shirika pekee anayeweza kusoma kumbukumbu zake za maombi.",
+      "tokens": "{{input}} ndani · {{output}} nje",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Tokeni za ingizo",
@@ -4521,6 +4537,8 @@
     "topModels": "Modeli zinazoongoza",
     "topFeatures": "Vipengele vinavyoongoza",
     "emptyTitle": "Hakuna matumizi katika kipindi hiki",
+    "unavailableTitle": "Matumizi hayapatikani",
+    "unavailableDescription": "Eneo hili la kazi haliripoti matumizi. Kujaribu tena hakutasaidia.",
     "orgSelfNotice": "Unaona matumizi yako mwenyewe katika shirika hili.",
     "viewDetails": "Angalia maelezo ya matumizi"
   },
@@ -4592,7 +4610,7 @@
       "fieldCron": "Usemi wa ratiba",
       "fieldCronHelp": "Sehemu tano: dakika, saa, siku, mwezi na siku ya wiki. Muda mfupi zaidi ni dakika moja.",
       "fieldTimezone": "Eneo la saa",
-      "nameLocked": "Jina ni sehemu ya URL ya ndoano ya wavuti na haliwezi kubadilika.",
+      "nameLocked": "Jina haiwezi kubadilika baada ya kichocheo kuundwa.",
       "repositoryLocked": "Hazina haiwezi kubadilika baada ya kichocheo kuundwa.",
       "environmentAutomatic": "Kiotomatiki kwa hazina",
       "notSelected": "Haijachaguliwa",
@@ -4679,5 +4697,175 @@
     "unavailableDescription": "Muda wa kiungo hiki cha kushiriki umeisha au kimebatilishwa.",
     "transcriptUnavailableTitle": "Imeshindwa kupakia nakala hii",
     "transcriptUnavailableDescription": "Kiungo bado kinafanya kazi. Jaribu tena baada ya muda mfupi."
+  },
+  "organizationGuardrails": {
+    "title": "Vizuizi vya Akili Bandia",
+    "permissionDenied": "Wamiliki na wasimamizi wa shirika pekee wanaweza kudhibiti Vizuizi vya Akili Bandia.",
+    "unavailable": "Vizuizi vya Akili Bandia havipatikani kwa shirika hili.",
+    "loadError": "Vizuizi vya Akili Bandia havikuweza kupakiwa",
+    "statusSaving": "Inahifadhi…",
+    "statusSaved": "Imehifadhiwa",
+    "statusFailed": "Imeshindwa kuhifadhi.",
+    "inputTitle": "Vizuizi vya maingizo",
+    "inputDescription": "Huchunguza kila ingizo kwa Enkrypt AI, ikiwa ni pamoja na matokeo ya zana. Kigunduzi kinachozuia hukataa ombi Enkrypt haipopatikana.",
+    "outputTitle": "Vizuizi vya matokeo",
+    "outputDescription": "Huchunguza majibu kwa Enkrypt AI kabla wanachama hawajayapokea. Imezimwa isipokuwa uwashe.",
+    "detectorsHint": "Zuia hukataa ombi lililoalamishwa. Rekodi tu huliandika bila kuchelewesha ombi.",
+    "detectorsHintOutput": "Zuia hufanya jibu lililoalamishwa lishindwe. Rekodi tu huliandika bila kuchelewesha jibu.",
+    "choiceLog": "Rekodi tu",
+    "applyTo": "Tumia kwa",
+    "applyToAllMembers": "Wanachama wote",
+    "applyKiloDefault": "Tumia Chaguo-msingi la Kilo",
+    "invalidSavedTitle": "Mipangilio ya vigunduzi vya maingizo iliyohifadhiwa haiwezi kusomwa",
+    "invalidSavedBody": "Maombi yanazuiwa hadi vigunduzi vya maingizo vihifadhiwe tena. Vigunduzi vilivyo hapa chini huanza kutoka Chaguo-msingi la Kilo.",
+    "invalidSavedOutputTitle": "Mipangilio ya vigunduzi vya matokeo iliyohifadhiwa haiwezi kusomwa",
+    "invalidSavedOutputBody": "Majibu huzuiwa hadi vigunduzi vya matokeo vihifadhiwe tena. Chagua vigunduzi vya matokeo hapa chini.",
+    "blockingOutputNote": "Kigunduzi cha matokeo kinachozuia hushikilia jibu hadi Enkrypt ikague yote. Tumia Rekodi tu ili kuepuka ucheleweshaji.",
+    "inputDetectorRequired": "Washa angalau kigunduzi kimoja cha maingizo.",
+    "outputDetectorRequired": "Washa angalau kigunduzi kimoja cha matokeo.",
+    "rulesTooMany": "Ongeza hadi {{max}} kanuni.",
+    "ruleIdRequired": "Weka kitambulisho cha kanuni.",
+    "ruleIdInvalid": "Kitambulisho cha kanuni kinaweza kutumia herufi, nambari, nukta, kistari, na alama za chini pekee.",
+    "ruleTextRequired": "Eleza kile ambacho kanuni inakataza au inahitaji.",
+    "keywordTooLong": "Kila neno muhimu linaweza kuwa na hadi herufi {{max}}.",
+    "topicTooLong": "Kila mada inaweza kuwa na hadi herufi {{max}}.",
+    "keywordsTooMany": "Ongeza hadi {{max}} maneno muhimu.",
+    "topicsTooMany": "Ongeza hadi {{max}} mada.",
+    "piiEntityRequired": "Chagua angalau aina moja ya taarifa za kutambua.",
+    "keywordRequired": "Ongeza angalau neno muhimu moja.",
+    "topicRequired": "Ongeza angalau mada moja.",
+    "policyTextRequired": "Weka maandishi ya sera.",
+    "ruleRequired": "Ongeza angalau kanuni moja.",
+    "ruleIdDuplicate": "Kila kanuni inahitaji kitambulisho chake cha kanuni.",
+    "piiEntities": "Taarifa za kutambua",
+    "keywordsLabel": "Maneno muhimu",
+    "keywordsHint": "Neno muhimu moja kwa kila mstari.",
+    "topicsHint": "Mada moja kwa kila mstari.",
+    "policyFormat": "Muundo wa sera",
+    "policyFormatRules": "Kanuni zilizopangwa",
+    "policyFormatRulesDescription": "Kanuni moja kwa kila hitaji, ikiwa na kategoria na ukali. Inapendekezwa.",
+    "policyFormatText": "Maandishi ya sera",
+    "policyFormatTextDescription": "Bandika sera iliyopo kama maandishi matupu.",
+    "rulesEmpty": "Bado hakuna kanuni. Kila kanuni inaeleza jambo moja ambalo maingizo hayapaswi kuwa nalo au kuliomba.",
+    "addRule": "Ongeza kanuni",
+    "ruleNumber": "Kanuni {{number}}",
+    "ruleRemove": "Ondoa kanuni {{number}}",
+    "ruleIdLabel": "Kitambulisho cha kanuni",
+    "ruleNameLabel": "Jina (hiari)",
+    "ruleTextLabel": "Kanuni",
+    "ruleRiskCategory": "Kategoria ya hatari",
+    "ruleApplicability": "Wigo",
+    "ruleFrameworks": "Mifumo",
+    "detector": {
+      "promptInjection": {
+        "label": "Uingizaji wa maagizo",
+        "description": "Hutambua majaribio ya kubatilisha maagizo au kuvunja ulinzi wa modeli."
+      },
+      "policyViolation": {
+        "label": "Ukiukaji wa sera",
+        "description": "Huonyesha maingizo yanayovunja sera ya shirika lako, yaliyoandikwa kama maandishi au kanuni.",
+        "descriptionOutput": "Huonyesha majibu yanayovunja sera ya shirika lako, yaliyoandikwa kama maandishi au kanuni."
+      },
+      "pii": {
+        "label": "PII na siri",
+        "description": "Hutambua taarifa binafsi, vitambulisho, anwani za IP, na URL."
+      },
+      "keywords": {
+        "label": "Maneno muhimu yaliyopigwa marufuku",
+        "descriptionOutput": "Hutambua majibu yaliyo na neno lolote muhimu uliloorodhesha."
+      },
+      "topics": {
+        "label": "Mada",
+        "descriptionOutput": "Huonyesha majibu kuhusu mada yoyote uliyoorodhesha."
+      },
+      "toxicity": {
+        "label": "Usumu",
+        "description": "Hutambua lugha yenye sumu, ya matusi, ya vitisho, au ya chuki."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Hutambua maudhui ya kingono au mengine yasiyofaa kwa mahali pa kazi."
+      },
+      "bias": {
+        "label": "Upendeleo",
+        "description": "Hutambua lugha ya upendeleo au ya ubaguzi."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Taarifa binafsi",
+        "description": "Majina, anwani za barua pepe, namba za simu."
+      },
+      "secrets": {
+        "label": "Siri",
+        "description": "Funguo za API, tokeni, nenosiri."
+      },
+      "ipAddress": {
+        "label": "Anwani za IP",
+        "description": "Anwani za IPv4 na IPv6."
+      },
+      "url": {
+        "label": "URL",
+        "description": "Anwani za wavuti."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Usalama na ulaghai",
+      "safetyHarm": "Usalama na madhara",
+      "privacyDataProtection": "Faragha na ulinzi wa taarifa",
+      "brandReputationTrust": "Chapa na sifa",
+      "biasFairnessEthical": "Upendeleo na haki",
+      "legalIpLiability": "Dhima ya kisheria na ya IP",
+      "productMisuse": "Matumizi mabaya ya bidhaa",
+      "performanceQuality": "Utendaji na ubora"
+    },
+    "applicability": {
+      "user": "Maingizo ya mtumiaji",
+      "userAssistant": "Maingizo ya mtumiaji na majibu"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM 10 Bora (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "Sheria ya Akili Bandia ya Umoja wa Ulaya",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Kipengele cha biashara",
+    "enterpriseOnly": "Hiki ni kipengele cha biashara pekee.",
+    "readOnly": "Wamiliki na wasimamizi wa shirika pekee wanaweza kubadilisha mipangilio hii.",
+    "loadError": "Watoa huduma na modeli hawakuweza kupakiwa",
+    "tabModels": "Modeli",
+    "tabProviders": "Watoa huduma",
+    "tabGateways": "Malango",
+    "modelsDescription": "Zima modeli ili kuizuia kwa kila mwanachama. Modeli kutoka kwa watoa huduma walioruhusiwa huanza zikiwa zimewashwa.",
+    "modelsDeniedOnly": "Zilizokataliwa pekee",
+    "modelsEmpty": "Hakuna modeli zinazolingana na utafutaji huu.",
+    "providersDescription": "Zima mtoa huduma ili kuzuia Kilo kupeleka maombi kwake kwa shirika hili.",
+    "providersNeedCatalog": "Swichi za watoa huduma zitabaki za kusoma tu hadi orodha kamili ya miundo ipakie. Gusa Jaribu tena hapo juu ili kuzihariri.",
+    "providersEmpty": "Hakuna watoa huduma wanaolingana na utafutaji huu.",
+    "allowAllShown": "Ruhusu vitu vyote vinavyoonyeshwa",
+    "denyAllShown": "Kataza vitu vyote vinavyoonyeshwa",
+    "gatewaysDescription": "Kilo hupeleka maombi ya modeli kupitia Vercel AI Gateway au OpenRouter. Lango lililozimwa hufanya maombi hayo kushindwa.",
+    "emptyProviderList": "Ruhusu angalau mtoa huduma mmoja. Orodha tupu inazuia njia zote za modeli za Kilo.",
+    "gatewaysUnavailable": "Mipangilio ya malango haipatikani kwa shirika hili.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "Maombi ya OpenRouter hayafungwi kwa eneo.",
+    "inferenceRegion": "Eneo la utambuzi",
+    "inferenceRegionDescription": "Hufunga maombi ya Vercel AI Gateway kwenye eneo hili. Modeli ambayo haipatikani hapo hushindwa.",
+    "disableOpenrouterNote": "Kuzima OpenRouter pia huzuia funguo za BYOK zinazopeleka maombi kupitia hiyo.",
+    "emptyModelList": "Acha angalau modeli moja ikiwa imewashwa. Kukataa kila modeli kunawaacha wanachama bila chochote cha kutumia.",
+    "catalogUnavailable": "Katalogi kamili ya modeli haikupakiwa, kwa hivyo ni orodha zako zilizohifadhiwa pekee zinazoonyeshwa. Jaribu tena ili kupakia modeli zote.",
+    "region": {
+      "global": "Dunia nzima",
+      "us": "Marekani",
+      "eu": "Umoja wa Ulaya",
+      "au": "Australia",
+      "jp": "Japani"
+    }
   }
 }

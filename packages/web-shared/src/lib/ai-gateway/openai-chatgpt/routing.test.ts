@@ -42,7 +42,6 @@ jest.mock('next/server', () => ({
 }));
 
 import { afterAll, beforeEach, describe, expect, it } from '@jest/globals';
-import { createHash } from 'node:crypto';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { resolveOpenAiChatGptAccessToken } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/refresh';
 import { getOpenAiChatGptStoredConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
@@ -1047,50 +1046,6 @@ describe('delegated request normalization', () => {
     expect(body.input).toEqual([added ? { ...original, summary: [] } : original]);
   });
 
-  it.each([
-    ['function_call', 'function_call_output'],
-    ['custom_tool_call', 'custom_tool_call_output'],
-  ])('hashes a long call_id consistently for %s and %s', async (callType, outputType) => {
-    const callId = 'synthetic-call-'.repeat(6);
-    const otherId = 'synthetic-other-'.repeat(6);
-    const digest = createHash('sha256').update(callId).digest('hex');
-    const input = [
-      { type: outputType, call_id: callId, output: 'private output' },
-      { type: callType, call_id: callId, name: 'read', arguments: 'private arguments' },
-      { type: callType, call_id: otherId, name: 'read' },
-    ];
-    const original = structuredClone(input);
-    const body = await normalize({ input });
-
-    expect(digest).toMatch(/^[a-f0-9]{64}$/);
-    expect(body.input).toEqual([
-      { ...original[0], call_id: digest },
-      { ...original[1], call_id: digest },
-      { ...original[2], call_id: createHash('sha256').update(otherId).digest('hex') },
-    ]);
-    expect((await normalize({ input: structuredClone(original) })).input).toEqual(body.input);
-  });
-
-  it('preserves short call ids and unrelated items', async () => {
-    const input = [
-      ...[
-        'function_call',
-        'function_call_output',
-        'custom_tool_call',
-        'custom_tool_call_output',
-      ].flatMap(type => [
-        { type, call_id: 'x'.repeat(64) },
-        { type, call_id: 'short' },
-        { type },
-        { type, call_id: null },
-      ]),
-      { type: 'future_item', call_id: 'x'.repeat(65), content: 'private content' },
-    ];
-    const original = structuredClone(input);
-
-    expect((await normalize({ input })).input).toEqual(original);
-  });
-
   const namespace = (name: string, toolName = 'read', toolType = 'function') => ({
     type: 'namespace',
     name,
@@ -1177,8 +1132,8 @@ describe('delegated request normalization', () => {
       input: [
         'unchanged',
         { type: 'reasoning', encrypted_content: 'opaque' },
-        { type: 'function_call', name: 'read', call_id: 'x'.repeat(65), arguments: '{}' },
-        { type: 'function_call_output', call_id: 'x'.repeat(65), output: 'private output' },
+        { type: 'function_call', name: 'read', call_id: 'call_1', arguments: '{}' },
+        { type: 'function_call_output', call_id: 'call_1', output: 'private output' },
       ],
       tools: [namespace('files')],
     };
@@ -1201,12 +1156,12 @@ describe('delegated request normalization', () => {
         {
           type: 'function_call',
           name: 'read',
-          call_id: 'private-id'.repeat(10),
+          call_id: 'private-id',
           arguments: 'private arguments',
         },
         {
           type: 'function_call_output',
-          call_id: 'private-id'.repeat(10),
+          call_id: 'private-id',
           output: 'private output',
         },
       ],
@@ -1225,7 +1180,6 @@ describe('delegated request normalization', () => {
           'store_disabled',
           'stream_options_include_usage_removed',
           'reasoning_summary_added',
-          'tool_call_id_hashed',
           'tool_namespace_added',
           'reasoning_effort_ultra_to_max',
           'traceability_metadata_added',

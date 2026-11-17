@@ -676,7 +676,8 @@
       "managedOnWeb": "Połączeniem tej organizacji z Bitbucket zarządza się w przeglądarce na komputerze.",
       "description": "Utwórz token dostępu do obszaru roboczego z wymaganymi uprawnieniami i wklej go poniżej.",
       "scopes": "Konto: odczyt · Repozytoria: odczyt/zapis · PR: odczyt · Webhooki: odczyt/zapis",
-      "tokenPlaceholder": "Token dostępu do obszaru roboczego"
+      "tokenPlaceholder": "Token dostępu do obszaru roboczego",
+      "tokenRefused": "Bitbucket nie zaakceptował tego tokenu dostępu do obszaru roboczego. Sprawdź, czy ma powyższe uprawnienia, a następnie spróbuj ponownie."
     },
     "followReviewMd": "Postępuj zgodnie z REVIEW.md",
     "followReviewMdSubtitle": "Przestrzegaj instrukcji z pliku REVIEW.md w każdym repozytorium",
@@ -777,6 +778,7 @@
     },
     "reviewList": {
       "configureProvider": "Skonfiguruj dostawcę",
+      "connectOwnerOnly": "Poproś właściciela organizacji lub administratora o połączenie dostawcy.",
       "couldNotLoad": "Nie udało się wczytać przeglądów.",
       "noReviews": "Brak przeglądów",
       "noReviewsDescription": "Przeglądy pojawią się tutaj, gdy recenzent kodu przeanalizuje PR.",
@@ -2494,6 +2496,7 @@
     "signOutThisDevice": "Wyloguj to urządzenie",
     "signOutSessionLabel": "Wyloguj {{device}}, logowanie: {{signedIn}}, ostatnia aktywność: {{lastSeen}}",
     "sessionSignedOut": "Zakończono sesję logowania.",
+    "sessionSignOutFailed": "Nie udało się zakończyć tej sesji logowania. Spróbuj ponownie.",
     "signOutThisDeviceTitle": "Wylogować to urządzenie?",
     "signOutThisSessionTitle": "Zakończyć tę sesję logowania?",
     "signOutThisSessionMessage": "Urządzenie {{device}} zostanie wylogowane. Ostatnia aktywność: {{lastSeen}}. Może nadal mieć dostęp do API przez maksymalnie godzinę.",
@@ -2621,12 +2624,14 @@
     "manage": {
       "billingHistory": "Historia płatności",
       "billingHistoryEmpty": "Brak historii płatności.",
+      "billingHistoryError": "Nie udało się wczytać historii płatności",
       "cancel": "Anuluj subskrypcję",
       "cancelDescription": "Twój Kilo Pass pozostanie aktywny do końca okresu rozliczeniowego i nie zostanie odnowiony.",
       "cancelScheduled": "Wygasa {{date}}",
       "cancelScheduledChange": "Anuluj zaplanowaną zmianę",
       "cancelled": "Subskrypcja anulowana",
       "creditHistoryEmpty": "Brak kredytów z Kilo Pass.",
+      "creditHistoryError": "Nie udało się wczytać historii kredytów z Kilo Pass",
       "resume": "Wznów subskrypcję",
       "resumeCancelledDescription": "Twój Kilo Pass znów będzie odnawiany automatycznie.",
       "resumePausedDescription": "Twój Kilo Pass zostanie wznowiony teraz, przed zaplanowaną datą wznowienia.",
@@ -3444,7 +3449,7 @@
       "selectOrganization": "Wybierz organizację",
       "unavailableDescription": "Ta organizacja nie jest już dostępna. Wybierz inną w swoim profilu, aby kontynuować.",
       "unavailableSessionsDescription": "Ta organizacja nie jest już dostępna. Nie można wczytać jej sesji.",
-      "accessDeniedDescription": "Nie masz dostępu do tej organizacji."
+      "accessDeniedDescription": "Poproś właściciela organizacji lub administratora o przyznanie Ci dostępu."
     },
     "create": {
       "title": "Utwórz organizację",
@@ -3577,16 +3582,27 @@
     },
     "settingsOnWeb": {
       "title": "Ustawienia organizacji w wersji internetowej",
-      "integrations": "Integracje w wersji internetowej",
       "usageDetails": "Szczegóły użycia",
       "providersAndModels": "Dostawcy i modele",
       "groups": "Grupy",
       "guardrails": "Zabezpieczenia",
       "byok": "Własny klucz",
+      "ssoAndDomain": "SSO i domena",
+      "dataCollection": "Zbieranie danych",
       "auditLogs": "Dzienniki audytu",
-      "requestLogs": "Dzienniki żądań",
-      "subOrganizations": "Organizacje podrzędne",
-      "distributeFunds": "Rozdziel środki"
+      "requestLogs": "Dzienniki żądań"
+    },
+    "requestLogs": {
+      "hint": "Żądania z godziny przed końcem okna, od najnowszych.",
+      "older": "Wcześniejsza godzina",
+      "newer": "Późniejsza godzina",
+      "truncated": "W tej godzinie jest więcej żądań, niż pokazuje lista.",
+      "emptyTitle": "Brak żądań",
+      "emptyDescription": "W tej godzinie nie było żądań do bramy.",
+      "loadError": "Nie udało się wczytać dzienników żądań.",
+      "permissionDenied": "Dzienniki żądań może przeglądać tylko właściciel, administrator lub menedżer rozliczeń organizacji.",
+      "tokens": "{{input}} wej. · {{output}} wyj.",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Tokeny wejściowe",
@@ -4661,6 +4677,8 @@
     "topModels": "Najczęściej używane modele",
     "topFeatures": "Najczęściej używane funkcje",
     "emptyTitle": "Brak użycia w tym okresie",
+    "unavailableTitle": "Użycie niedostępne",
+    "unavailableDescription": "Ta przestrzeń robocza nie raportuje użycia. Ponowna próba nie pomoże.",
     "orgSelfNotice": "Widzisz własne użycie w tej organizacji.",
     "viewDetails": "Wyświetl szczegóły użycia"
   },
@@ -4732,7 +4750,7 @@
       "fieldCron": "Wyrażenie cron",
       "fieldCronHelp": "Pięć pól: minuta, godzina, dzień, miesiąc i dzień tygodnia. Najkrótszy interwał to jedna minuta.",
       "fieldTimezone": "Strefa czasowa",
-      "nameLocked": "Nazwa jest częścią adresu URL webhooka i nie można jej zmienić.",
+      "nameLocked": "Nie można zmienić nazwy po utworzeniu wyzwalacza.",
       "repositoryLocked": "Nie można zmienić repozytorium po utworzeniu wyzwalacza.",
       "environmentAutomatic": "Automatycznie według repozytorium",
       "notSelected": "Nie wybrano",
@@ -4819,5 +4837,175 @@
     "unavailableDescription": "Ten link do udostępniania wygasł lub został unieważniony.",
     "transcriptUnavailableTitle": "Nie udało się wczytać tej transkrypcji",
     "transcriptUnavailableDescription": "Link nadal działa. Spróbuj ponownie za chwilę."
+  },
+  "organizationGuardrails": {
+    "title": "Zabezpieczenia AI",
+    "permissionDenied": "Tylko właściciele i administratorzy organizacji mogą zarządzać Zabezpieczeniami AI.",
+    "unavailable": "Zabezpieczenia AI nie są dostępne dla tej organizacji.",
+    "loadError": "Nie udało się załadować Zabezpieczeń AI",
+    "statusSaving": "Zapisywanie…",
+    "statusSaved": "Zapisano",
+    "statusFailed": "Nie udało się zapisać.",
+    "inputTitle": "Zabezpieczenia danych wejściowych",
+    "inputDescription": "Skanuje wszystkie dane wejściowe za pomocą Enkrypt AI, w tym wyniki narzędzi. Detektor blokujący odrzuca żądanie, gdy Enkrypt jest niedostępny.",
+    "outputTitle": "Zabezpieczenia danych wyjściowych",
+    "outputDescription": "Skanuje odpowiedzi za pomocą Enkrypt AI, zanim członkowie je otrzymają. Wyłączone, chyba że je włączysz.",
+    "detectorsHint": "Blokuj odrzuca oznaczone żądanie. Tylko rejestruj zapisuje je bez opóźniania żądania.",
+    "detectorsHintOutput": "Blokuj powoduje niepowodzenie oznaczonej odpowiedzi. Tylko rejestruj zapisuje ją bez opóźniania odpowiedzi.",
+    "choiceLog": "Tylko rejestruj",
+    "applyTo": "Zastosuj do",
+    "applyToAllMembers": "Wszyscy członkowie",
+    "applyKiloDefault": "Zastosuj domyślne ustawienia Kilo",
+    "invalidSavedTitle": "Nie można odczytać zapisanych ustawień detektora danych wejściowych",
+    "invalidSavedBody": "Żądania są blokowane, dopóki detektory danych wejściowych nie zostaną zapisane ponownie. Poniższe detektory zaczynają od domyślnych ustawień Kilo.",
+    "invalidSavedOutputTitle": "Nie można odczytać zapisanych ustawień detektora danych wyjściowych",
+    "invalidSavedOutputBody": "Odpowiedzi są wstrzymywane, dopóki detektory danych wyjściowych nie zostaną zapisane ponownie. Wybierz poniżej detektory danych wyjściowych.",
+    "blockingOutputNote": "Detektor danych wyjściowych blokujący wstrzymuje odpowiedź, dopóki Enkrypt nie sprawdzi jej w całości. Użyj opcji Tylko rejestruj, aby uniknąć opóźnienia.",
+    "inputDetectorRequired": "Włącz co najmniej jeden detektor danych wejściowych.",
+    "outputDetectorRequired": "Włącz co najmniej jeden detektor danych wyjściowych.",
+    "rulesTooMany": "Dodaj maksymalnie {{max}} reguł.",
+    "ruleIdRequired": "Wprowadź identyfikator reguły.",
+    "ruleIdInvalid": "Identyfikator reguły może zawierać tylko litery, cyfry, kropki, myślniki i podkreślenia.",
+    "ruleTextRequired": "Opisz, czego reguła zabrania lub czego wymaga.",
+    "keywordTooLong": "Każde słowo kluczowe może mieć maksymalnie {{max}} znaków.",
+    "topicTooLong": "Każdy temat może mieć maksymalnie {{max}} znaków.",
+    "keywordsTooMany": "Dodaj maksymalnie {{max}} słów kluczowych.",
+    "topicsTooMany": "Dodaj maksymalnie {{max}} tematów.",
+    "piiEntityRequired": "Wybierz co najmniej jeden typ danych do wykrycia.",
+    "keywordRequired": "Dodaj co najmniej jedno słowo kluczowe.",
+    "topicRequired": "Dodaj co najmniej jeden temat.",
+    "policyTextRequired": "Wpisz tekst polityki.",
+    "ruleRequired": "Dodaj co najmniej jedną regułę.",
+    "ruleIdDuplicate": "Każda reguła musi mieć własne ID.",
+    "piiEntities": "Dane do wykrycia",
+    "keywordsLabel": "Słowa kluczowe",
+    "keywordsHint": "Jedno słowo kluczowe w wierszu.",
+    "topicsHint": "Jeden temat w wierszu.",
+    "policyFormat": "Format polityki",
+    "policyFormatRules": "Reguły strukturalne",
+    "policyFormatRulesDescription": "Jedna reguła na wymóg, z kategorią i poziomem istotności. Zalecane.",
+    "policyFormatText": "Tekst polityki",
+    "policyFormatTextDescription": "Wklej istniejącą politykę jako zwykły tekst.",
+    "rulesEmpty": "Brak reguł. Każda reguła opisuje jedną rzecz, której dane wejściowe nie mogą zawierać ani o którą nie mogą prosić.",
+    "addRule": "Dodaj regułę",
+    "ruleNumber": "Reguła {{number}}",
+    "ruleRemove": "Usuń regułę {{number}}",
+    "ruleIdLabel": "Identyfikator reguły",
+    "ruleNameLabel": "Nazwa (opcjonalnie)",
+    "ruleTextLabel": "Reguła",
+    "ruleRiskCategory": "Kategoria ryzyka",
+    "ruleApplicability": "Zakres",
+    "ruleFrameworks": "Standardy",
+    "detector": {
+      "promptInjection": {
+        "label": "Wstrzyknięcie polecenia",
+        "description": "Wykrywa próby nadpisania instrukcji lub złamania zabezpieczeń modelu."
+      },
+      "policyViolation": {
+        "label": "Naruszenie polityki",
+        "description": "Oznacza dane wejściowe naruszające politykę organizacji zapisaną jako tekst lub reguły.",
+        "descriptionOutput": "Oznacza odpowiedzi naruszające politykę organizacji zapisaną jako tekst lub reguły."
+      },
+      "pii": {
+        "label": "PII i sekrety",
+        "description": "Wykrywa dane osobowe, dane uwierzytelniające, adresy IP i adresy URL."
+      },
+      "keywords": {
+        "label": "Zabronione słowa kluczowe",
+        "descriptionOutput": "Wykrywa odpowiedzi zawierające dowolne wymienione słowo kluczowe."
+      },
+      "topics": {
+        "label": "Tematy",
+        "descriptionOutput": "Oznacza odpowiedzi dotyczące dowolnego wymienionego tematu."
+      },
+      "toxicity": {
+        "label": "Toksyczność",
+        "description": "Wykrywa toksyczny, obraźliwy, zagrażający lub nienawistny język."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Wykrywa treści seksualne lub inne nieodpowiednie w miejscu pracy."
+      },
+      "bias": {
+        "label": "Stronniczość",
+        "description": "Wykrywa stronniczy lub dyskryminujący język."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Dane osobowe",
+        "description": "Imiona i nazwiska, adresy e-mail, numery telefonów."
+      },
+      "secrets": {
+        "label": "Sekrety",
+        "description": "Klucze API, tokeny, hasła."
+      },
+      "ipAddress": {
+        "label": "Adresy IP",
+        "description": "Adresy IPv4 i IPv6."
+      },
+      "url": {
+        "label": "Adresy URL",
+        "description": "Adresy internetowe."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Bezpieczeństwo i oszustwa",
+      "safetyHarm": "Bezpieczeństwo i szkody",
+      "privacyDataProtection": "Prywatność i ochrona danych",
+      "brandReputationTrust": "Marka i reputacja",
+      "biasFairnessEthical": "Stronniczość i sprawiedliwość",
+      "legalIpLiability": "Odpowiedzialność prawna i z tytułu własności intelektualnej",
+      "productMisuse": "Niewłaściwe użycie produktu",
+      "performanceQuality": "Wydajność i jakość"
+    },
+    "applicability": {
+      "user": "Dane wejściowe użytkownika",
+      "userAssistant": "Dane wejściowe użytkownika i odpowiedzi"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "RODO",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Top 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "Akt w sprawie sztucznej inteligencji UE",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Funkcja dla przedsiębiorstw",
+    "enterpriseOnly": "Ta funkcja jest dostępna tylko dla przedsiębiorstw.",
+    "readOnly": "Tylko właściciele i administratorzy organizacji mogą zmieniać te ustawienia.",
+    "loadError": "Nie udało się załadować dostawców i modeli",
+    "tabModels": "Modele",
+    "tabProviders": "Dostawcy",
+    "tabGateways": "Bramy",
+    "modelsDescription": "Wyłącz model, aby zablokować go dla wszystkich członków. Modele od dozwolonych dostawców są domyślnie włączone.",
+    "modelsDeniedOnly": "Tylko zablokowane",
+    "modelsEmpty": "Żadne modele nie pasują do tego wyszukiwania.",
+    "providersDescription": "Wyłącz dostawcę, aby Kilo przestało kierować do niego żądania w tej organizacji.",
+    "providersNeedCatalog": "Przełączniki dostawców pozostają tylko do odczytu, dopóki nie wczyta się pełny katalog modeli. Aby je edytować, dotknij przycisku Spróbuj ponownie powyżej.",
+    "providersEmpty": "Żaden dostawca nie pasuje do tego wyszukiwania.",
+    "allowAllShown": "Zezwól na wszystkie widoczne",
+    "denyAllShown": "Zablokuj wszystkie widoczne",
+    "gatewaysDescription": "Kilo kieruje żądania modeli przez Vercel AI Gateway lub OpenRouter. Wyłączona brama powoduje niepowodzenie tych żądań.",
+    "emptyProviderList": "Zezwól na co najmniej jednego dostawcę. Pusta lista blokuje wszystkie trasy modeli Kilo.",
+    "gatewaysUnavailable": "Ustawienia bram nie są dostępne dla tej organizacji.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "Żądania OpenRouter nie są przypisane do regionu.",
+    "inferenceRegion": "Region wnioskowania",
+    "inferenceRegionDescription": "Przypisuje żądania Vercel AI Gateway do tego regionu. Model niedostępny w tym regionie zwraca błąd.",
+    "disableOpenrouterNote": "Wyłączenie OpenRouter blokuje również klucze BYOK, które kierują żądania przez niego.",
+    "emptyModelList": "Pozostaw włączony co najmniej jeden model. Odrzucenie wszystkich modeli sprawi, że członkowie nie będą mieli z czego korzystać.",
+    "catalogUnavailable": "Nie udało się wczytać pełnego katalogu modeli, więc wyświetlane są tylko zapisane listy. Spróbuj ponownie, aby wczytać wszystkie modele.",
+    "region": {
+      "global": "Globalny",
+      "us": "Stany Zjednoczone",
+      "eu": "Unia Europejska",
+      "au": "Australia",
+      "jp": "Japonia"
+    }
   }
 }

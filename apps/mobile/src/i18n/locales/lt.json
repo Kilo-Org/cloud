@@ -1400,7 +1400,8 @@
       "managedOnWeb": "Šios organizacijos Bitbucket ryšys valdomas žiniatinklyje naudojant kompiuterį.",
       "description": "Sukurk darbo srities prieigos raktą su reikiamomis teisėmis ir įklijuok jį žemiau.",
       "scopes": "Paskyra: skaityti · Saugyklos: skaityti / rašyti · Pakeitimų užklausos: skaityti · Webhook: skaityti / rašyti",
-      "tokenPlaceholder": "Darbo srities prieigos raktas"
+      "tokenPlaceholder": "Darbo srities prieigos raktas",
+      "tokenRefused": "Bitbucket nepriėmė šio darbo srities prieigos rakto. Patikrink, ar jis turi aukščiau nurodytas teises, tada bandyk dar kartą."
     },
     "scopeList": {
       "personalStillAvailable": "Asmenines saugyklas vis dar gali pasiekti žemiau.",
@@ -1412,7 +1413,8 @@
       "noReviews": "Peržiūrų dar nėra",
       "noReviewsDescription": "Peržiūros bus rodomos čia, kai kodo peržiūros agentas peržiūrės PR.",
       "startManualReview": "Pradėti rankinę peržiūrą",
-      "configureProvider": "Konfigūruoti paslaugų teikėją"
+      "configureProvider": "Konfigūruoti paslaugų teikėją",
+      "connectOwnerOnly": "Paprašykite organizacijos savininko ar administratoriaus prijungti paslaugų teikėją."
     },
     "platformList": {
       "checking": "Tikrinama…",
@@ -1647,7 +1649,7 @@
       "findingsCount": "Radinių: {{displayCount}}",
       "notMeasured": "Neišmatuota",
       "actFirst": "Svarbiausi veiksmai",
-      "actionPosture": "Veiksmų apžvalga",
+      "actionPosture": "Veiksmų būklė",
       "codebaseRisk": "Kodo bazės rizika",
       "repositoryActionPlan": "Saugyklos veiksmų planas",
       "noOpenFindings": "Nėra atvirų radinių, kuriems reikia dėmesio",
@@ -1688,7 +1690,7 @@
       "syncing": "Sinchronizuojama…",
       "syncNow": "Sinchronizuoti dabar",
       "syncQueued": "Sinchronizavimas įtrauktas į eilę",
-      "syncStatusUnavailable": "Nepavyko gauti sinchronizavimo būsenos",
+      "syncStatusUnavailable": "Sinchronizavimo būsena neprieinama",
       "daysOverdue_one": "Pradelsta diena: {{displayCount}}",
       "daysOverdue_other": "Pradelsta dienų: {{displayCount}}",
       "daysOverdue_few": "Pradelsta dienos: {{displayCount}}",
@@ -1719,14 +1721,14 @@
       "breakdownHigh_few": "aukšto lygio: {{displayCount}}",
       "breakdownHigh_many": "aukšto lygio: {{displayCount}}",
       "breakdownHigh_other": "aukšto lygio: {{displayCount}}",
-      "breakdownMediumLow": "vidutinio ir mažo pavojingumo: {{displayCount}}",
-      "breakdownMediumLow_one": "vidutinio ir mažo pavojingumo: {{displayCount}}",
-      "breakdownMediumLow_few": "vidutinio ir mažo pavojingumo: {{displayCount}}",
-      "breakdownMediumLow_many": "vidutinio ir mažo pavojingumo: {{displayCount}}",
-      "breakdownMediumLow_other": "vidutinio ir mažo pavojingumo: {{displayCount}}",
+      "breakdownMediumLow": "vidutinio ir mažo lygio: {{displayCount}}",
+      "breakdownMediumLow_one": "vidutinio ir mažo lygio: {{displayCount}}",
+      "breakdownMediumLow_few": "vidutinio ir mažo lygio: {{displayCount}}",
+      "breakdownMediumLow_many": "vidutinio ir mažo lygio: {{displayCount}}",
+      "breakdownMediumLow_other": "vidutinio ir mažo lygio: {{displayCount}}",
       "dueThisWeek": "Terminas šią savaitę",
       "dueThisWeekDetail": "{{exploitable}} iš šių patvirtinti kaip išnaudojami",
-      "dueThisWeekDetail_one": "{{exploitable}} iš šių patvirtinti kaip išnaudojami",
+      "dueThisWeekDetail_one": "{{exploitable}} iš šių patvirtintas kaip išnaudojamas",
       "dueThisWeekDetail_few": "{{exploitable}} iš šių patvirtinti kaip išnaudojami",
       "dueThisWeekDetail_many": "{{exploitable}} iš šių patvirtinti kaip išnaudojami",
       "dueThisWeekDetail_other": "{{exploitable}} iš šių patvirtinti kaip išnaudojami",
@@ -1735,18 +1737,18 @@
       "allOpenFindingsTracked": "Visi atviri radiniai stebimi"
     },
     "dismiss": {
-      "title": "Atmesti problemą",
+      "title": "Atmesti radinį",
       "reason": "Priežastis",
       "reasonFixStarted": "Taisymas jau pradėtas",
       "reasonNoBandwidth": "Trūksta laiko",
       "reasonTolerableRisk": "Rizika priimtina",
-      "reasonInaccurate": "Problema nurodyta netiksliai",
+      "reasonInaccurate": "Radinys nurodytas netiksliai",
       "reasonNotUsed": "Pažeidžiamas kodas nenaudojamas",
       "commentLabel": "Komentaras (neprivaloma)",
       "commentPlaceholder": "Papildoma informacija apie atmetimą…",
-      "notFoundTitle": "Problema nerasta",
-      "notFoundDescription": "Šis radinys galėjo būti pašalintas arba nebeturi prieigos prie jo.",
-      "couldNotLoad": "Nepavyko įkelti šios problemos",
+      "notFoundTitle": "Radinys nerastas",
+      "notFoundDescription": "Šis radinys galėjo būti pašalintas arba tu nebeturi prieigos prie jo.",
+      "couldNotLoad": "Nepavyko įkelti šio radinio",
       "couldNotCheckPermissions": "Nepavyko patikrinti teisės atmesti radinius",
       "cannotDismissTitle": "Šio radinio atmesti negalima",
       "cannotDismissDescription": "Radinius gali atmesti tik organizacijos savininkai, administratoriai ir atsiskaitymų administratoriai.",
@@ -1973,7 +1975,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "Saugos paslauga nesukonfigūruota. Kol tai nebus sutvarkyta, pakartotinai pateikti užklausos nepavyks.",
-      "serviceUnavailable": "Saugos tarnyba nepasiekiama. Bandyk dar kartą.",
+      "serviceUnavailable": "Saugos paslauga nepasiekiama. Bandyk dar kartą.",
       "syncMayNotHaveCompleted": "Sinchronizavimas galėjo likti neužbaigtas. Bandyk dar kartą, kad suderintum jo būseną, arba atmesk užklausą.",
       "syncInProgress": "Saugos duomenys jau sinchronizuojami. Bandyk dar kartą.",
       "dismissalInProgress": "Šis radinys jau atmetamas. Bandyk dar kartą.",
@@ -1982,11 +1984,11 @@
       "settleFailed": "Veiksmas buvo atliktas, bet nepavyko įrašyti rezultato. Bandyk dar kartą.",
       "replayFailed": "Šis veiksmas nebuvo užbaigtas. Bandyk dar kartą.",
       "actionFailed": "Nepavyko užbaigti šio veiksmo. Bandyk dar kartą.",
-      "actionBlocked": "Nepavyko užbaigti šio veiksmo. Iš pradžių reikia išspręsti problemą.",
-      "syncNoRepositories": "Sinchronizavimo apimtyje nėra saugyklų. Pasirinkite saugyklas, kurias stebi Saugos agentas, ir sinchronizuokite dar kartą.",
+      "actionBlocked": "Nepavyko užbaigti šio veiksmo. Kol problema neišspręsta, bandyti dar kartą nepavyks.",
+      "syncNoRepositories": "Sinchronizavimo apimtyje nėra saugyklų. Pasirink saugyklas, kurias stebi Saugos agentas, ir sinchronizuok dar kartą.",
       "syncNoRepositoriesNoManage": "Sinchronizavimo apimtyje nėra saugyklų. Kad būtų galima sinchronizuoti, organizacijos savininkas, administratorius arba atsiskaitymų administratorius turi prijungti saugyklas.",
-      "syncIntegrationInactive": "Saugos agento GitHub ryšys neaktyvus. Iš naujo prijunkite Kilo GitHub App, tada sinchronizuokite dar kartą.",
-      "syncMissingPermission": "Kilo GitHub programėlė negali skaityti vulnerability alerts. Suteik šį leidimą GitHub, tada sinchronizuok dar kartą.",
+      "syncIntegrationInactive": "Saugos agento GitHub ryšys neaktyvus. Iš naujo prijunk Kilo GitHub programėlę, tada sinchronizuok dar kartą.",
+      "syncMissingPermission": "Kilo GitHub programėlė negali skaityti pažeidžiamumo įspėjimų. Suteik šį leidimą GitHub, tada sinchronizuok dar kartą.",
       "configConflict": "Saugos agento nustatymai pakeisti kitoje vietoje. Peržiūrėk naujausius nustatymus ir išsaugok dar kartą."
     },
     "analysisState": {
@@ -2023,8 +2025,8 @@
       "noSlaDeadline": "Nėra SLA termino",
       "overdueNow": "Vėluojama",
       "overdue_one": "Vėluojama {{count}} dieną",
-      "overdue_few": "vėluojama {{count}} dienas",
-      "overdue_many": "vėluojama {{count}} dienos",
+      "overdue_few": "Vėluojama {{count}} dienas",
+      "overdue_many": "Vėluojama {{count}} dienos",
       "overdue_other": "Vėluojama {{count}} dienų",
       "dueToday": "Terminas šiandien",
       "dueTomorrow": "Terminas rytoj",
@@ -2054,12 +2056,12 @@
       "findingNotOpen": "Radinys nebėra atviras.",
       "repoNotInScope": "Ši saugykla nepasirinkta saugos agento stebėjimui.",
       "analysisRequired": "Prieš taisymą paleisk kodo analizę.",
-      "staleAnalysis": "Po analizės radinys pasikeitė. Prieš pradėdamas taisymą, pakartok analizę.",
+      "staleAnalysis": "Po analizės radinys pasikeitė. Prieš pradedant taisymą, pakartoti analizę.",
       "notExploitable": "Analizės metu nerasta vykdymo kelio, kuriuo būtų galima pasiekti pažeidžiamą funkciją. Automatinis taisymas negalimas.",
       "exploitabilityUnknown": "Analizės metu nepavyko patvirtinti, ar pažeidžiamumą galima išnaudoti. Prieš taisant vienu paspaudimu, radinį turi peržiūrėti žmogus.",
       "manualReviewRequired": "Analizės išvadose rekomenduojama žmogaus peržiūra, todėl taisymas vienu paspaudimu negalimas.",
       "monitorRequired": "Analizės išvadose rekomenduojama stebėti radinį, o ne kurti PR.",
-      "triageOnly": "Baigtas tik pirminis vertinimas. Prieš pradėdamas taisymą, atlik kodo bazės analizę.",
+      "triageOnly": "Baigtas tik pirminis vertinimas. Prieš pradedant taisymą, atlikti kodo bazės analizę.",
       "actionNotConcrete": "Nėra konkrečios priklausomybės pataisos ar siūlomo taisymo.",
       "remediationActive": "Taisymo bandymas jau vyksta.",
       "prAlreadyOpened": "Taisymo PR jau atidarytas.",
@@ -3083,6 +3085,7 @@
     "signOutThisDevice": "Atsijungti šiame įrenginyje",
     "signOutSessionLabel": "Atsijungti „{{device}}“, prisijungta {{signedIn}}, paskutinė veikla {{lastSeen}}",
     "sessionSignedOut": "Sesija baigta.",
+    "sessionSignOutFailed": "Nepavyko baigti šios sesijos. Bandykite dar kartą.",
     "signOutThisDeviceTitle": "Atsijungti šiame įrenginyje?",
     "signOutThisSessionTitle": "Baigti šią sesiją?",
     "signOutThisSessionMessage": "Nuo paskyros bus atsijungta: {{device}}. Paskutinė veikla {{lastSeen}}. Prieiga prie API gali galioti dar iki valandos.",
@@ -3210,12 +3213,14 @@
     "manage": {
       "billingHistory": "Atsiskaitymų istorija",
       "billingHistoryEmpty": "Atsiskaitymų istorijos dar nėra.",
+      "billingHistoryError": "Nepavyko įkelti atsiskaitymų istorijos",
       "cancel": "Atšaukti prenumeratą",
       "cancelDescription": "Jūsų Kilo Pass liks aktyvus iki atsiskaitymo laikotarpio pabaigos ir nebus atnaujintas.",
       "cancelScheduled": "Bus atšaukta {{date}}",
       "cancelScheduledChange": "Atšaukti suplanuotą pakeitimą",
       "cancelled": "Prenumerata atšaukta",
       "creditHistoryEmpty": "Kilo Pass kreditų dar nėra.",
+      "creditHistoryError": "Nepavyko įkelti kreditų istorijos",
       "resume": "Tęsti prenumeratą",
       "resumeCancelledDescription": "Jūsų Kilo Pass vėl bus atnaujinamas automatiškai.",
       "resumePausedDescription": "Jūsų Kilo Pass bus tęsiamas dabar, anksčiau nei suplanuota.",
@@ -3452,7 +3457,7 @@
       "selectOrganization": "Pasirinkite organizaciją",
       "unavailableDescription": "Ši organizacija nebepasiekiama. Norėdami tęsti, savo profilyje pasirinkite kitą organizaciją.",
       "unavailableSessionsDescription": "Ši organizacija nebepasiekiama. Jos seansų įkelti negalima.",
-      "accessDeniedDescription": "Neturite prieigos prie šios organizacijos."
+      "accessDeniedDescription": "Paprašykite organizacijos savininko arba administratoriaus suteikti jums prieigą."
     },
     "create": {
       "title": "Sukurti organizaciją",
@@ -3572,16 +3577,27 @@
     },
     "settingsOnWeb": {
       "title": "Organizacijos nustatymai žiniatinklyje",
-      "integrations": "Integracijos žiniatinklyje",
       "usageDetails": "Naudojimo informacija",
       "providersAndModels": "Teikėjai ir modeliai",
       "groups": "Grupės",
       "guardrails": "Apsaugos ribos",
       "byok": "Naudoti savo raktą",
+      "ssoAndDomain": "SSO ir domenas",
+      "dataCollection": "Duomenų rinkimas",
       "auditLogs": "Audito žurnalai",
-      "requestLogs": "Užklausų žurnalai",
-      "subOrganizations": "Antrinės organizacijos",
-      "distributeFunds": "Paskirstyti lėšas"
+      "requestLogs": "Užklausų žurnalai"
+    },
+    "requestLogs": {
+      "hint": "Užklausos per valandą iki lango pabaigos, naujausios pirmos.",
+      "older": "Ankstesnė valanda",
+      "newer": "Vėlesnė valanda",
+      "truncated": "Šią valandą užklausų buvo daugiau, nei rodoma sąraše.",
+      "emptyTitle": "Užklausų nėra",
+      "emptyDescription": "Šią valandą šliuzo užklausų nebuvo.",
+      "loadError": "Nepavyko įkelti užklausų žurnalų.",
+      "permissionDenied": "Organizacijos užklausų žurnalus gali skaityti tik jos savininkas, administratorius arba atsiskaitymų valdytojas.",
+      "tokens": "Įvestis {{input}} · išvestis {{output}}",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Įvesties žetonai",
@@ -4661,6 +4677,8 @@
     "topModels": "Populiariausi modeliai",
     "topFeatures": "Populiariausios funkcijos",
     "emptyTitle": "Šiuo laikotarpiu naudojimo nėra",
+    "unavailableTitle": "Naudojimas nepasiekiamas",
+    "unavailableDescription": "Ši darbo sritis nepraneša apie naudojimą. Bandyti dar kartą nepadės.",
     "orgSelfNotice": "Matote savo naudojimą šioje organizacijoje.",
     "viewDetails": "Peržiūrėti naudojimo informaciją"
   },
@@ -4732,7 +4750,7 @@
       "fieldCron": "Cron išraiška",
       "fieldCronHelp": "Penki laukai: minutė, valanda, diena, mėnuo ir savaitės diena. Trumpiausias intervalas yra viena minutė.",
       "fieldTimezone": "Laiko juosta",
-      "nameLocked": "Pavadinimas yra žiniatinklio kabliuko adreso dalis ir jo pakeisti negalima.",
+      "nameLocked": "Pavadinimo negalima pakeisti po trigerio sukūrimo.",
       "repositoryLocked": "Saugyklos negalima pakeisti po trigerio sukūrimo.",
       "environmentAutomatic": "Automatiškai pagal saugyklą",
       "notSelected": "Nepasirinkta",
@@ -4819,5 +4837,175 @@
     "unavailableDescription": "Šios bendrinimo nuorodos galiojimas baigėsi arba ji buvo atšaukta.",
     "transcriptUnavailableTitle": "Nepavyko įkelti šio pokalbio įrašo",
     "transcriptUnavailableDescription": "Nuoroda vis dar veikia. Bandykite dar kartą po akimirkos."
+  },
+  "organizationGuardrails": {
+    "title": "DI apsaugos priemonės",
+    "permissionDenied": "Tik organizacijos savininkai ir administratoriai gali valdyti DI apsaugos priemones.",
+    "unavailable": "DI apsaugos priemonės šiai organizacijai nepasiekiamos.",
+    "loadError": "Nepavyko įkelti DI apsaugos priemonių",
+    "statusSaving": "Išsaugoma…",
+    "statusSaved": "Išsaugota",
+    "statusFailed": "Nepavyko išsaugoti.",
+    "inputTitle": "Įvesties apsaugos priemonės",
+    "inputDescription": "Kiekviena įvestis nuskaitoma naudojant Enkrypt AI, įskaitant įrankių rezultatus. Blokuojantis detektorius atmeta užklausą, kai Enkrypt nepasiekiamas.",
+    "outputTitle": "Išvesties apsaugos priemonės",
+    "outputDescription": "Atsakymai nuskaitomi naudojant Enkrypt AI, kol nariai jų negauna. Išjungta, nebent įjungsite.",
+    "detectorsHint": "Parinktis „Blokuoti“ atmeta pažymėtą užklausą. Parinktis „Tik registruoti“ ją įrašo nevilkdama užklausos.",
+    "detectorsHintOutput": "Parinktis „Blokuoti“ blokuoja pažymėtą atsakymą. Parinktis „Tik registruoti“ jį įrašo nevilkdama atsakymo.",
+    "choiceLog": "Tik registruoti",
+    "applyTo": "Taikyti",
+    "applyToAllMembers": "Visiems nariams",
+    "applyKiloDefault": "Taikyti „Kilo“ numatytąjį",
+    "invalidSavedTitle": "Nepavyksta nuskaityti išsaugotų įvesties detektorių nustatymų",
+    "invalidSavedBody": "Užklausos blokuojamos, kol įvesties detektoriai vėl bus išsaugoti. Toliau nurodyti detektoriai pradedami nuo „Kilo“ numatytųjų nustatymų.",
+    "invalidSavedOutputTitle": "Nepavyksta nuskaityti išsaugotų išvesties detektorių nustatymų",
+    "invalidSavedOutputBody": "Atsakymai sulaikomi, kol išvesties detektoriai vėl bus išsaugoti. Toliau pasirinkite išvesties detektorius.",
+    "blockingOutputNote": "Blokuojantis išvesties detektorius sulaiko atsakymą, kol Enkrypt patikrins visą jo turinį. Naudokite „Tik registruoti“, kad išvengtumėte delsimo.",
+    "inputDetectorRequired": "Įjunkite bent vieną įvesties detektorių.",
+    "outputDetectorRequired": "Įjunkite bent vieną išvesties detektorių.",
+    "rulesTooMany": "Pridėkite iki {{max}} taisyklių.",
+    "ruleIdRequired": "Įveskite taisyklės identifikatorių.",
+    "ruleIdInvalid": "Taisyklės identifikatoriuje galima naudoti tik raides, skaičius, taškus, brūkšnelius ir pabraukimo ženklus.",
+    "ruleTextRequired": "Aprašykite, ką taisyklė draudžia arba ko reikalauja.",
+    "keywordTooLong": "Kiekvienas raktinis žodis gali būti iki {{max}} simbolių.",
+    "topicTooLong": "Kiekviena tema gali būti iki {{max}} simbolių.",
+    "keywordsTooMany": "Pridėkite iki {{max}} raktinių žodžių.",
+    "topicsTooMany": "Pridėkite iki {{max}} temų.",
+    "piiEntityRequired": "Pasirinkite bent vieną aptinkamą duomenų tipą.",
+    "keywordRequired": "Pridėkite bent vieną raktinį žodį.",
+    "topicRequired": "Pridėkite bent vieną temą.",
+    "policyTextRequired": "Įveskite politikos tekstą.",
+    "ruleRequired": "Pridėkite bent vieną taisyklę.",
+    "ruleIdDuplicate": "Kiekviena taisyklė turi turėti savo taisyklės ID.",
+    "piiEntities": "Aptinkami duomenys",
+    "keywordsLabel": "Raktiniai žodžiai",
+    "keywordsHint": "Vienas raktinis žodis eilutėje.",
+    "topicsHint": "Viena tema eilutėje.",
+    "policyFormat": "Politikos formatas",
+    "policyFormatRules": "Struktūrinės taisyklės",
+    "policyFormatRulesDescription": "Viena taisyklė vienam reikalavimui, su kategorija ir sunkumu. Rekomenduojama.",
+    "policyFormatText": "Politikos tekstas",
+    "policyFormatTextDescription": "Įklijuokite esamą politiką kaip paprastą tekstą.",
+    "rulesEmpty": "Taisyklių dar nėra. Kiekviena taisyklė aprašo vieną dalyką, kurio įvestyse neturi būti arba kurio neturi būti prašoma.",
+    "addRule": "Pridėti taisyklę",
+    "ruleNumber": "Taisyklė {{number}}",
+    "ruleRemove": "Pašalinti taisyklę {{number}}",
+    "ruleIdLabel": "Taisyklės identifikatorius",
+    "ruleNameLabel": "Pavadinimas (neprivalomas)",
+    "ruleTextLabel": "Taisyklė",
+    "ruleRiskCategory": "Rizikos kategorija",
+    "ruleApplicability": "Taikymo sritis",
+    "ruleFrameworks": "Reguliavimo sistemos",
+    "detector": {
+      "promptInjection": {
+        "label": "Užklausos įterpimas",
+        "description": "Aptinka bandymus nepaisyti instrukcijų arba apeiti modelio apsaugą."
+      },
+      "policyViolation": {
+        "label": "Politikos pažeidimas",
+        "description": "Pažymi įvestis, kurios pažeidžia jūsų organizacijos politiką, užrašytą tekstu arba taisyklėmis.",
+        "descriptionOutput": "Pažymi atsakymus, kurie pažeidžia jūsų organizacijos politiką, užrašytą tekstu arba taisyklėmis."
+      },
+      "pii": {
+        "label": "PII ir slaptieji duomenys",
+        "description": "Aptinka asmens duomenis, prisijungimo duomenis, IP adresus ir URL adresus."
+      },
+      "keywords": {
+        "label": "Draudžiami raktiniai žodžiai",
+        "descriptionOutput": "Aptinka atsakymus, kuriuose yra bet kuris jūsų išvardytas raktinis žodis."
+      },
+      "topics": {
+        "label": "Temos",
+        "descriptionOutput": "Pažymi atsakymus, susijusius su bet kuria jūsų išvardyta tema."
+      },
+      "toxicity": {
+        "label": "Toksiškumas",
+        "description": "Aptinka toksišką, įžeidžiančią, grėsmingą ar neapykantą kurstančią kalbą."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Aptinka seksualinį ar kitaip darbo aplinkai netinkamą turinį."
+      },
+      "bias": {
+        "label": "Šališkumas",
+        "description": "Aptinka šališką ar diskriminacinę kalbą."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Asmens duomenys",
+        "description": "Vardai, el. pašto adresai, telefono numeriai."
+      },
+      "secrets": {
+        "label": "Slaptieji duomenys",
+        "description": "API raktai, žetonai, slaptažodžiai."
+      },
+      "ipAddress": {
+        "label": "IP adresai",
+        "description": "IPv4 ir IPv6 adresai."
+      },
+      "url": {
+        "label": "URL adresai",
+        "description": "Interneto adresai."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Saugumas ir sukčiavimas",
+      "safetyHarm": "Sauga ir žala",
+      "privacyDataProtection": "Privatumas ir duomenų apsauga",
+      "brandReputationTrust": "Prekės ženklas ir reputacija",
+      "biasFairnessEthical": "Šališkumas ir sąžiningumas",
+      "legalIpLiability": "Teisinė ir intelektinės nuosavybės atsakomybė",
+      "productMisuse": "Netinkamas produkto naudojimas",
+      "performanceQuality": "Veikimas ir kokybė"
+    },
+    "applicability": {
+      "user": "Naudotojo įvestis",
+      "userAssistant": "Naudotojo įvestis ir atsakymai"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM 10 svarbiausių (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "ES dirbtinio intelekto aktas",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Įmonės funkcija",
+    "enterpriseOnly": "Tai funkcija, skirta tik įmonėms.",
+    "readOnly": "Tik organizacijos savininkai ir administratoriai gali keisti šiuos nustatymus.",
+    "loadError": "Nepavyko įkelti teikėjų ir modelių",
+    "tabModels": "Modeliai",
+    "tabProviders": "Teikėjai",
+    "tabGateways": "Vartai",
+    "modelsDescription": "Išjunkite modelį, kad jis būtų užblokuotas kiekvienam nariui. Leidžiamų teikėjų modeliai įjungiami pagal numatytuosius nustatymus.",
+    "modelsDeniedOnly": "Tik draudžiami",
+    "modelsEmpty": "Nė vienas modelis neatitinka šios paieškos.",
+    "providersDescription": "Išjunkite teikėją, kad Kilo nebesiųstų jam užklausų šioje organizacijoje.",
+    "providersNeedCatalog": "Teikėjų jungikliai lieka tik skaitomi, kol neįkeliamas visas modelių katalogas. Norėdami juos redaguoti, viršuje bakstelėkite Bandyti dar kartą.",
+    "providersEmpty": "Nė vienas teikėjas neatitinka šios paieškos.",
+    "allowAllShown": "Leisti visus rodomus",
+    "denyAllShown": "Drausti visus rodomus",
+    "gatewaysDescription": "Kilo nukreipia modelių užklausas per Vercel AI Gateway arba OpenRouter. Kai vartai išjungti, tos užklausos nepavyksta.",
+    "emptyProviderList": "Leiskite bent vieną teikėją. Tuščias sąrašas užblokuoja visus Kilo modelių maršrutus.",
+    "gatewaysUnavailable": "Šiai organizacijai vartų nustatymai nepasiekiami.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "OpenRouter užklausos nėra pririštos prie regiono.",
+    "inferenceRegion": "Inferencijos regionas",
+    "inferenceRegionDescription": "Pririša Vercel AI Gateway užklausas prie šio regiono. Jei modelis ten nepasiekiamas, užklausa nepavyksta.",
+    "disableOpenrouterNote": "Išjungus OpenRouter taip pat blokuojami BYOK raktai, kurie nukreipia užklausas per jį.",
+    "emptyModelList": "Palikite įjungtą bent vieną modelį. Uždraudus visus modelius, nariai neturės ką naudoti.",
+    "catalogUnavailable": "Nepavyko įkelti viso modelių katalogo, todėl rodomi tik jūsų išsaugoti sąrašai. Bandykite dar kartą, kad įkeltumėte visus modelius.",
+    "region": {
+      "global": "Pasaulinis",
+      "us": "Jungtinės Valstijos",
+      "eu": "Europos Sąjunga",
+      "au": "Australija",
+      "jp": "Japonija"
+    }
   }
 }

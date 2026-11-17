@@ -676,7 +676,8 @@
       "managedOnWeb": "Kết nối Bitbucket của tổ chức này được quản lý trên web từ máy tính.",
       "description": "Tạo mã truy cập không gian làm việc với các quyền cần thiết rồi dán vào bên dưới.",
       "scopes": "Tài khoản: đọc · Kho lưu trữ: đọc/ghi · Yêu cầu hợp nhất: đọc · Webhook: đọc/ghi",
-      "tokenPlaceholder": "Mã truy cập không gian làm việc"
+      "tokenPlaceholder": "Mã truy cập không gian làm việc",
+      "tokenRefused": "Bitbucket không chấp nhận mã truy cập không gian làm việc này. Hãy kiểm tra rằng mã có các quyền ở trên, rồi thử lại."
     },
     "followReviewMd": "Tuân theo REVIEW.md",
     "followReviewMdSubtitle": "Tuân theo tệp hướng dẫn REVIEW.md của từng kho lưu trữ",
@@ -777,6 +778,7 @@
     },
     "reviewList": {
       "configureProvider": "Cấu hình nhà cung cấp",
+      "connectOwnerOnly": "Hãy yêu cầu chủ sở hữu tổ chức hoặc quản trị viên kết nối nhà cung cấp.",
       "couldNotLoad": "Không thể tải danh sách lượt rà soát.",
       "noReviews": "Chưa có lượt rà soát nào",
       "noReviewsDescription": "Kết quả sẽ xuất hiện tại đây sau khi Trình rà soát mã chạy trên một yêu cầu hợp nhất.",
@@ -2431,6 +2433,7 @@
     "signOutThisDevice": "Đăng xuất khỏi thiết bị này",
     "signOutSessionLabel": "Đăng xuất khỏi {{device}}, đăng nhập lúc {{signedIn}}, hoạt động gần nhất {{lastSeen}}",
     "sessionSignedOut": "Đã đăng xuất phiên.",
+    "sessionSignOutFailed": "Không thể đăng xuất phiên này. Hãy thử lại.",
     "signOutThisDeviceTitle": "Đăng xuất khỏi thiết bị này?",
     "signOutThisSessionTitle": "Đăng xuất phiên này?",
     "signOutThisSessionMessage": "{{device}} sẽ được đăng xuất. Hoạt động gần nhất {{lastSeen}}. Thiết bị này vẫn có thể truy cập API trong tối đa một giờ.",
@@ -2553,12 +2556,14 @@
     "manage": {
       "billingHistory": "Lịch sử thanh toán",
       "billingHistoryEmpty": "Chưa có lịch sử thanh toán.",
+      "billingHistoryError": "Không thể tải lịch sử thanh toán",
       "cancel": "Hủy gói đăng ký",
       "cancelDescription": "Kilo Pass của bạn vẫn hoạt động đến hết kỳ thanh toán và sẽ không được gia hạn.",
       "cancelScheduled": "Sẽ hủy vào {{date}}",
       "cancelScheduledChange": "Hủy thay đổi đã lên lịch",
       "cancelled": "Đã hủy gói đăng ký",
       "creditHistoryEmpty": "Chưa có tín dụng Kilo Pass nào.",
+      "creditHistoryError": "Không thể tải lịch sử tín dụng Kilo Pass",
       "resume": "Tiếp tục gói đăng ký",
       "resumeCancelledDescription": "Kilo Pass của bạn sẽ lại được tự động gia hạn.",
       "resumePausedDescription": "Kilo Pass của bạn sẽ tiếp tục ngay bây giờ, trước ngày tiếp tục đã lên lịch.",
@@ -3330,7 +3335,7 @@
       "selectOrganization": "Chọn một tổ chức",
       "unavailableDescription": "Bạn không còn truy cập được tổ chức này. Hãy chọn tổ chức khác trong hồ sơ để tiếp tục.",
       "unavailableSessionsDescription": "Bạn không còn truy cập được tổ chức này. Không thể tải phiên của tổ chức này.",
-      "accessDeniedDescription": "Bạn không có quyền truy cập vào tổ chức này."
+      "accessDeniedDescription": "Hãy yêu cầu chủ sở hữu hoặc quản trị viên của tổ chức cấp quyền truy cập cho bạn."
     },
     "create": {
       "title": "Tạo tổ chức",
@@ -3463,16 +3468,27 @@
     },
     "settingsOnWeb": {
       "title": "Cài đặt tổ chức trên web",
-      "integrations": "Tích hợp trên web",
       "usageDetails": "Chi tiết sử dụng",
       "providersAndModels": "Nhà cung cấp và mô hình",
       "groups": "Nhóm",
       "guardrails": "Rào chắn an toàn",
       "byok": "Dùng khóa riêng của bạn",
+      "ssoAndDomain": "SSO và tên miền",
+      "dataCollection": "Thu thập dữ liệu",
       "auditLogs": "Nhật ký kiểm tra",
-      "requestLogs": "Nhật ký yêu cầu",
-      "subOrganizations": "Tổ chức con",
-      "distributeFunds": "Phân bổ tiền"
+      "requestLogs": "Nhật ký yêu cầu"
+    },
+    "requestLogs": {
+      "hint": "Các yêu cầu trong một giờ tính đến cuối khung thời gian, mới nhất ở trên.",
+      "older": "Giờ cũ hơn",
+      "newer": "Giờ mới hơn",
+      "truncated": "Giờ này có nhiều yêu cầu hơn số hiển thị trong danh sách.",
+      "emptyTitle": "Không có yêu cầu",
+      "emptyDescription": "Không có yêu cầu nào qua gateway trong giờ này.",
+      "loadError": "Không thể tải nhật ký yêu cầu.",
+      "permissionDenied": "Chỉ chủ sở hữu, quản trị viên hoặc người quản lý thanh toán của tổ chức mới có thể xem nhật ký yêu cầu của tổ chức.",
+      "tokens": "{{input}} vào · {{output}} ra",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Token đầu vào",
@@ -4521,6 +4537,8 @@
     "topModels": "Mô hình hàng đầu",
     "topFeatures": "Tính năng hàng đầu",
     "emptyTitle": "Không có mức sử dụng trong kỳ này",
+    "unavailableTitle": "Mức sử dụng không khả dụng",
+    "unavailableDescription": "Vùng làm việc này không báo cáo mức sử dụng. Thử lại sẽ không giúp ích.",
     "orgSelfNotice": "Bạn đang xem mức sử dụng của chính mình trong tổ chức này.",
     "viewDetails": "Xem chi tiết mức sử dụng"
   },
@@ -4592,7 +4610,7 @@
       "fieldCron": "Biểu thức cron",
       "fieldCronHelp": "Năm trường: phút, giờ, ngày, tháng và thứ trong tuần. Khoảng thời gian ngắn nhất là một phút.",
       "fieldTimezone": "Múi giờ",
-      "nameLocked": "Tên là một phần của URL webhook và không thể thay đổi.",
+      "nameLocked": "Tên không thể thay đổi sau khi tạo trình kích hoạt.",
       "repositoryLocked": "Kho lưu trữ không thể thay đổi sau khi tạo trình kích hoạt.",
       "environmentAutomatic": "Tự động theo kho lưu trữ",
       "notSelected": "Chưa chọn",
@@ -4679,5 +4697,175 @@
     "unavailableDescription": "Liên kết chia sẻ này đã hết hạn hoặc đã bị thu hồi.",
     "transcriptUnavailableTitle": "Không thể tải bản ghi này",
     "transcriptUnavailableDescription": "Liên kết vẫn hoạt động. Hãy thử lại sau giây lát."
+  },
+  "organizationGuardrails": {
+    "title": "Rào chắn AI",
+    "permissionDenied": "Chỉ chủ sở hữu và quản trị viên tổ chức mới có thể quản lý Rào chắn AI.",
+    "unavailable": "Rào chắn AI không khả dụng cho tổ chức này.",
+    "loadError": "Không thể tải Rào chắn AI",
+    "statusSaving": "Đang lưu…",
+    "statusSaved": "Đã lưu",
+    "statusFailed": "Không thể lưu.",
+    "inputTitle": "Rào chắn đầu vào",
+    "inputDescription": "Quét mọi đầu vào bằng Enkrypt AI, bao gồm cả kết quả công cụ. Bộ phát hiện chặn sẽ từ chối yêu cầu khi Enkrypt không khả dụng.",
+    "outputTitle": "Rào chắn đầu ra",
+    "outputDescription": "Quét phản hồi bằng Enkrypt AI trước khi thành viên nhận được. Tắt trừ khi bạn bật.",
+    "detectorsHint": "Chặn sẽ từ chối yêu cầu bị gắn cờ. Chỉ ghi nhật ký sẽ ghi lại mà không làm chậm yêu cầu.",
+    "detectorsHintOutput": "Chặn sẽ làm phản hồi bị gắn cờ thất bại. Chỉ ghi nhật ký sẽ ghi lại mà không làm chậm phản hồi.",
+    "choiceLog": "Chỉ ghi nhật ký",
+    "applyTo": "Áp dụng cho",
+    "applyToAllMembers": "Tất cả thành viên",
+    "applyKiloDefault": "Áp dụng Mặc định của Kilo",
+    "invalidSavedTitle": "Không thể đọc cài đặt bộ phát hiện đầu vào đã lưu",
+    "invalidSavedBody": "Yêu cầu bị chặn cho đến khi các bộ phát hiện đầu vào được lưu lại. Các bộ phát hiện bên dưới bắt đầu từ Mặc định của Kilo.",
+    "invalidSavedOutputTitle": "Không thể đọc cài đặt bộ phát hiện đầu ra đã lưu",
+    "invalidSavedOutputBody": "Phản hồi bị giữ lại cho đến khi các bộ phát hiện đầu ra được lưu lại. Chọn bộ phát hiện đầu ra bên dưới.",
+    "blockingOutputNote": "Bộ phát hiện đầu ra ở chế độ chặn sẽ giữ phản hồi cho đến khi Enkrypt đã kiểm tra toàn bộ. Dùng Chỉ ghi nhật ký để tránh độ trễ.",
+    "inputDetectorRequired": "Bật ít nhất một bộ phát hiện đầu vào.",
+    "outputDetectorRequired": "Bật ít nhất một bộ phát hiện đầu ra.",
+    "rulesTooMany": "Thêm tối đa {{max}} quy tắc.",
+    "ruleIdRequired": "Nhập ID quy tắc.",
+    "ruleIdInvalid": "ID quy tắc chỉ có thể dùng chữ cái, số, dấu chấm, dấu gạch ngang và dấu gạch dưới.",
+    "ruleTextRequired": "Mô tả điều mà quy tắc cấm hoặc yêu cầu.",
+    "keywordTooLong": "Mỗi từ khóa có thể dài tối đa {{max}} ký tự.",
+    "topicTooLong": "Mỗi chủ đề có thể dài tối đa {{max}} ký tự.",
+    "keywordsTooMany": "Thêm tối đa {{max}} từ khóa.",
+    "topicsTooMany": "Thêm tối đa {{max}} chủ đề.",
+    "piiEntityRequired": "Chọn ít nhất một loại dữ liệu cần phát hiện.",
+    "keywordRequired": "Thêm ít nhất một từ khóa.",
+    "topicRequired": "Thêm ít nhất một chủ đề.",
+    "policyTextRequired": "Nhập văn bản chính sách.",
+    "ruleRequired": "Thêm ít nhất một quy tắc.",
+    "ruleIdDuplicate": "Mỗi quy tắc cần có ID quy tắc riêng.",
+    "piiEntities": "Dữ liệu cần phát hiện",
+    "keywordsLabel": "Từ khóa",
+    "keywordsHint": "Mỗi dòng một từ khóa.",
+    "topicsHint": "Mỗi dòng một chủ đề.",
+    "policyFormat": "Định dạng chính sách",
+    "policyFormatRules": "Quy tắc có cấu trúc",
+    "policyFormatRulesDescription": "Mỗi yêu cầu một quy tắc, kèm danh mục và mức độ nghiêm trọng. Được khuyến nghị.",
+    "policyFormatText": "Văn bản chính sách",
+    "policyFormatTextDescription": "Dán chính sách hiện có dưới dạng văn bản thuần.",
+    "rulesEmpty": "Chưa có quy tắc nào. Mỗi quy tắc mô tả một điều mà đầu vào không được chứa hoặc không được yêu cầu.",
+    "addRule": "Thêm quy tắc",
+    "ruleNumber": "Quy tắc {{number}}",
+    "ruleRemove": "Xóa quy tắc {{number}}",
+    "ruleIdLabel": "ID quy tắc",
+    "ruleNameLabel": "Tên (không bắt buộc)",
+    "ruleTextLabel": "Quy tắc",
+    "ruleRiskCategory": "Danh mục rủi ro",
+    "ruleApplicability": "Phạm vi",
+    "ruleFrameworks": "Khung tuân thủ",
+    "detector": {
+      "promptInjection": {
+        "label": "Chèn lệnh nhắc",
+        "description": "Phát hiện các nỗ lực ghi đè hướng dẫn hoặc vượt qua rào chắn mô hình."
+      },
+      "policyViolation": {
+        "label": "Vi phạm chính sách",
+        "description": "Gắn cờ các đầu vào vi phạm chính sách tổ chức của bạn, được viết dưới dạng văn bản hoặc quy tắc.",
+        "descriptionOutput": "Gắn cờ các phản hồi vi phạm chính sách tổ chức của bạn, được viết dưới dạng văn bản hoặc quy tắc."
+      },
+      "pii": {
+        "label": "PII và bí mật",
+        "description": "Phát hiện dữ liệu cá nhân, thông tin xác thực, địa chỉ IP và URL."
+      },
+      "keywords": {
+        "label": "Từ khóa bị cấm",
+        "descriptionOutput": "Phát hiện các phản hồi chứa bất kỳ từ khóa nào bạn liệt kê."
+      },
+      "topics": {
+        "label": "Chủ đề",
+        "descriptionOutput": "Gắn cờ các phản hồi về bất kỳ chủ đề nào bạn liệt kê."
+      },
+      "toxicity": {
+        "label": "Tính độc hại",
+        "description": "Phát hiện ngôn ngữ độc hại, xúc phạm, đe dọa hoặc thù địch."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Phát hiện nội dung khiêu dâm hoặc nội dung không an toàn cho nơi làm việc."
+      },
+      "bias": {
+        "label": "Thiên kiến",
+        "description": "Phát hiện ngôn ngữ thiên kiến hoặc phân biệt đối xử."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Dữ liệu cá nhân",
+        "description": "Tên, địa chỉ thư điện tử, số điện thoại."
+      },
+      "secrets": {
+        "label": "Bí mật",
+        "description": "Khóa API, mã thông báo, mật khẩu."
+      },
+      "ipAddress": {
+        "label": "Địa chỉ IP",
+        "description": "Địa chỉ IPv4 và IPv6."
+      },
+      "url": {
+        "label": "URL",
+        "description": "Địa chỉ trang mạng."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Bảo mật và gian lận",
+      "safetyHarm": "An toàn và tổn hại",
+      "privacyDataProtection": "Quyền riêng tư và bảo vệ dữ liệu",
+      "brandReputationTrust": "Thương hiệu và uy tín",
+      "biasFairnessEthical": "Thiên kiến và công bằng",
+      "legalIpLiability": "Trách nhiệm pháp lý và sở hữu trí tuệ",
+      "productMisuse": "Lạm dụng sản phẩm",
+      "performanceQuality": "Hiệu suất và chất lượng"
+    },
+    "applicability": {
+      "user": "Đầu vào của người dùng",
+      "userAssistant": "Đầu vào của người dùng và phản hồi"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Top 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "Đạo luật AI EU",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Tính năng doanh nghiệp",
+    "enterpriseOnly": "Đây là tính năng chỉ dành cho doanh nghiệp.",
+    "readOnly": "Chỉ chủ sở hữu và quản trị viên tổ chức mới có thể thay đổi các cài đặt này.",
+    "loadError": "Không thể tải nhà cung cấp và mô hình",
+    "tabModels": "Mô hình",
+    "tabProviders": "Nhà cung cấp",
+    "tabGateways": "Cổng kết nối",
+    "modelsDescription": "Tắt một mô hình để chặn mô hình đó với mọi thành viên. Các mô hình từ nhà cung cấp được phép sẽ được bật sẵn.",
+    "modelsDeniedOnly": "Chỉ bị từ chối",
+    "modelsEmpty": "Không có mô hình nào khớp với tìm kiếm này.",
+    "providersDescription": "Tắt một nhà cung cấp để ngăn Kilo định tuyến đến nhà cung cấp đó cho tổ chức này.",
+    "providersNeedCatalog": "Các công tắc nhà cung cấp sẽ ở chế độ chỉ đọc cho đến khi danh mục mô hình đầy đủ được tải. Nhấn Thử lại ở trên để chỉnh sửa.",
+    "providersEmpty": "Không có nhà cung cấp nào khớp với tìm kiếm này.",
+    "allowAllShown": "Cho phép tất cả mục đang hiển thị",
+    "denyAllShown": "Từ chối tất cả mục đang hiển thị",
+    "gatewaysDescription": "Kilo định tuyến yêu cầu mô hình qua Vercel AI Gateway hoặc OpenRouter. Cổng kết nối bị tắt sẽ làm các yêu cầu đó thất bại.",
+    "emptyProviderList": "Hãy cho phép ít nhất một nhà cung cấp. Danh sách trống sẽ chặn mọi tuyến mô hình của Kilo.",
+    "gatewaysUnavailable": "Cài đặt cổng kết nối không khả dụng cho tổ chức này.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "Các yêu cầu OpenRouter không được ghim vào một khu vực.",
+    "inferenceRegion": "Khu vực suy luận",
+    "inferenceRegionDescription": "Ghim các yêu cầu Vercel AI Gateway vào khu vực này. Mô hình không khả dụng ở đó sẽ thất bại.",
+    "disableOpenrouterNote": "Tắt OpenRouter cũng chặn các khóa BYOK định tuyến yêu cầu qua đó.",
+    "emptyModelList": "Hãy bật ít nhất một mô hình. Nếu từ chối mọi mô hình, thành viên sẽ không còn gì để sử dụng.",
+    "catalogUnavailable": "Không tải được toàn bộ danh mục mô hình, nên chỉ hiển thị các danh sách bạn đã lưu. Hãy thử lại để tải mọi mô hình.",
+    "region": {
+      "global": "Toàn cầu",
+      "us": "Hoa Kỳ",
+      "eu": "Liên minh châu Âu",
+      "au": "Úc",
+      "jp": "Nhật Bản"
+    }
   }
 }

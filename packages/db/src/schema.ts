@@ -7514,6 +7514,42 @@ export const device_refresh_tokens = pgTable(
 export type DeviceRefreshToken = typeof device_refresh_tokens.$inferSelect;
 
 /**
+ * A one-time, short-lived grant that opens one app-shell page for one user.
+ *
+ * The native app mints it through an authenticated mutation immediately before
+ * it opens the in-app browser, and the web consumes it once at
+ * `/app-shell/handoff`. The row carries the target the token opens, so the
+ * consuming request cannot redirect anywhere else, and only the SHA-256 digest
+ * of the issued token is stored: a leaked row authorizes nothing.
+ */
+export const app_shell_handoff_tokens = pgTable(
+  'app_shell_handoff_tokens',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    token_hash: text().notNull(),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    /** The allow-listed shell path this token opens, including its query. */
+    target_path: text().notNull(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_app_shell_handoff_tokens_token_hash').on(table.token_hash),
+    index('IDX_app_shell_handoff_tokens_expires_at').on(table.expires_at),
+    index('IDX_app_shell_handoff_tokens_kilo_user_id').on(table.kilo_user_id),
+  ]
+);
+
+export type AppShellHandoffToken = typeof app_shell_handoff_tokens.$inferSelect;
+export type NewAppShellHandoffToken = typeof app_shell_handoff_tokens.$inferInsert;
+
+/**
  * A one-time, short-lived grant that lets a native app session add, rename, or
  * remove a passkey.
  *

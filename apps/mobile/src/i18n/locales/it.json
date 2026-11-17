@@ -643,7 +643,8 @@
       "managedOnWeb": "La connessione Bitbucket di questa organizzazione si gestisce sul web da un computer.",
       "description": "Crea un token di accesso all'area di lavoro con le autorizzazioni richieste e incollalo qui sotto.",
       "scopes": "Account: lettura · Repository: lettura/scrittura · Pull request: lettura · Webhook: lettura/scrittura",
-      "tokenPlaceholder": "Token di accesso all'area di lavoro"
+      "tokenPlaceholder": "Token di accesso all'area di lavoro",
+      "tokenRefused": "Bitbucket non ha accettato questo token dell'area di lavoro. Verifica che disponga delle autorizzazioni indicate sopra, quindi riprova."
     },
     "followReviewMd": "Segui REVIEW.md",
     "followReviewMdSubtitle": "Rispetta le istruzioni nel file REVIEW.md di ogni repository",
@@ -744,6 +745,7 @@
     },
     "reviewList": {
       "configureProvider": "Configura la piattaforma",
+      "connectOwnerOnly": "Chiedi a un proprietario o a un amministratore dell'organizzazione di connettere una piattaforma.",
       "couldNotLoad": "Impossibile caricare le revisioni.",
       "noReviews": "Ancora nessuna revisione",
       "noReviewsDescription": "Le revisioni compaiono qui quando il Code Reviewer viene eseguito su una pull request.",
@@ -2462,6 +2464,7 @@
     "signOutThisDevice": "Disconnetti questo dispositivo",
     "signOutSessionLabel": "Disconnetti {{device}}, accesso effettuato {{signedIn}}, ultima attività {{lastSeen}}",
     "sessionSignedOut": "Sessione disconnessa.",
+    "sessionSignOutFailed": "Impossibile disconnettere questa sessione. Riprovi.",
     "signOutThisDeviceTitle": "Disconnettere questo dispositivo?",
     "signOutThisSessionTitle": "Disconnettere questa sessione?",
     "signOutThisSessionMessage": "{{device}} verrà disconnesso. Ultima attività {{lastSeen}}. Potrà mantenere l'accesso alle API per un massimo di un'ora.",
@@ -2587,12 +2590,14 @@
     "manage": {
       "billingHistory": "Cronologia fatturazione",
       "billingHistoryEmpty": "Nessuna cronologia di fatturazione.",
+      "billingHistoryError": "Impossibile caricare la cronologia di fatturazione",
       "cancel": "Annulla abbonamento",
       "cancelDescription": "Il tuo Kilo Pass resta attivo fino alla fine del periodo di fatturazione e non verrà rinnovato.",
       "cancelScheduled": "Si annulla il {{date}}",
       "cancelScheduledChange": "Annulla modifica programmata",
       "cancelled": "Abbonamento annullato",
       "creditHistoryEmpty": "Nessun credito Kilo Pass per ora.",
+      "creditHistoryError": "Impossibile caricare la cronologia dei crediti",
       "resume": "Riprendi abbonamento",
       "resumeCancelledDescription": "Il tuo Kilo Pass tornerà a rinnovarsi automaticamente.",
       "resumePausedDescription": "Il tuo Kilo Pass riprende ora, prima della data di ripresa programmata.",
@@ -3387,7 +3392,7 @@
       "selectOrganization": "Seleziona un'organizzazione",
       "unavailableDescription": "Questa organizzazione non è più disponibile. Scegline una dal tuo profilo per continuare.",
       "unavailableSessionsDescription": "Questa organizzazione non è più disponibile. Non è possibile caricare le sue sessioni.",
-      "accessDeniedDescription": "Non hai accesso a questa organizzazione."
+      "accessDeniedDescription": "Chiedi a un proprietario o a un amministratore dell'organizzazione di concederti l'accesso."
     },
     "create": {
       "title": "Crea organizzazione",
@@ -3520,16 +3525,27 @@
     },
     "settingsOnWeb": {
       "title": "Impostazioni dell'organizzazione sul web",
-      "integrations": "Integrazioni sul web",
       "usageDetails": "Dettagli di utilizzo",
       "providersAndModels": "Provider e modelli",
       "groups": "Gruppi",
       "guardrails": "Guardrail",
       "byok": "Usa la tua chiave",
+      "ssoAndDomain": "SSO e dominio",
+      "dataCollection": "Raccolta dati",
       "auditLogs": "Registri di controllo",
-      "requestLogs": "Registri delle richieste",
-      "subOrganizations": "Sotto-organizzazioni",
-      "distributeFunds": "Distribuisci fondi"
+      "requestLogs": "Registri delle richieste"
+    },
+    "requestLogs": {
+      "hint": "Richieste dell'ora precedente la fine dell'intervallo, dalle più recenti.",
+      "older": "Ora precedente",
+      "newer": "Ora successiva",
+      "truncated": "In quest'ora ci sono più richieste di quelle mostrate.",
+      "emptyTitle": "Nessuna richiesta",
+      "emptyDescription": "Nessuna richiesta al gateway in quest'ora.",
+      "loadError": "Impossibile caricare i registri delle richieste.",
+      "permissionDenied": "Solo un proprietario, un amministratore o un responsabile della fatturazione dell'organizzazione può consultare i registri delle richieste.",
+      "tokens": "{{input}} input · {{output}} output",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Token in ingresso",
@@ -4591,6 +4607,8 @@
     "topModels": "Modelli più usati",
     "topFeatures": "Funzionalità più usate",
     "emptyTitle": "Nessun utilizzo in questo periodo",
+    "unavailableTitle": "Utilizzo non disponibile",
+    "unavailableDescription": "Questo spazio di lavoro non segnala utilizzo. Riprovare non aiuterà.",
     "orgSelfNotice": "Stai visualizzando il tuo utilizzo in questa organizzazione.",
     "viewDetails": "Visualizza dettagli utilizzo"
   },
@@ -4662,7 +4680,7 @@
       "fieldCron": "Espressione cron",
       "fieldCronHelp": "Cinque campi: minuto, ora, giorno, mese e giorno della settimana. L'intervallo minimo è di un minuto.",
       "fieldTimezone": "Fuso orario",
-      "nameLocked": "Il nome fa parte dell'URL webhook e non può essere modificato.",
+      "nameLocked": "Il nome non può essere modificato dopo la creazione dell'attivatore.",
       "repositoryLocked": "Il repository non può essere modificato dopo la creazione dell'attivatore.",
       "environmentAutomatic": "Automatico per repository",
       "notSelected": "Non selezionato",
@@ -4749,5 +4767,175 @@
     "unavailableDescription": "Questo link di condivisione è scaduto o è stato revocato.",
     "transcriptUnavailableTitle": "Impossibile caricare questa trascrizione",
     "transcriptUnavailableDescription": "Il link funziona ancora. Riprova tra qualche istante."
+  },
+  "organizationGuardrails": {
+    "title": "Protezioni AI",
+    "permissionDenied": "Solo i proprietari e gli amministratori dell'organizzazione possono gestire le Protezioni AI.",
+    "unavailable": "Le Protezioni AI non sono disponibili per questa organizzazione.",
+    "loadError": "Impossibile caricare le Protezioni AI",
+    "statusSaving": "Salvataggio…",
+    "statusSaved": "Salvato",
+    "statusFailed": "Impossibile salvare.",
+    "inputTitle": "Protezioni per gli input",
+    "inputDescription": "Analizza ogni input con Enkrypt AI, inclusi i risultati degli strumenti. Un rilevatore bloccante rifiuta una richiesta quando Enkrypt non è disponibile.",
+    "outputTitle": "Protezioni per le risposte",
+    "outputDescription": "Analizza le risposte con Enkrypt AI prima che i membri le ricevano. Disattivate a meno che tu non le attivi.",
+    "detectorsHint": "L'opzione Blocca rifiuta una richiesta segnalata. L'opzione Solo registrazione la registra senza ritardare la richiesta.",
+    "detectorsHintOutput": "L'opzione Blocca fa fallire una risposta segnalata. L'opzione Solo registrazione la registra senza ritardare la risposta.",
+    "choiceLog": "Solo registrazione",
+    "applyTo": "Applica a",
+    "applyToAllMembers": "Tutti i membri",
+    "applyKiloDefault": "Applica il predefinito Kilo",
+    "invalidSavedTitle": "Impossibile leggere le impostazioni salvate dei rilevatori di input",
+    "invalidSavedBody": "Le richieste vengono bloccate finché i rilevatori di input non vengono salvati di nuovo. I rilevatori seguenti partono dal predefinito Kilo.",
+    "invalidSavedOutputTitle": "Impossibile leggere le impostazioni salvate dei rilevatori delle risposte",
+    "invalidSavedOutputBody": "Le risposte vengono trattenute finché i rilevatori delle risposte non vengono salvati di nuovo. Scegli i rilevatori delle risposte qui sotto.",
+    "blockingOutputNote": "Un rilevatore bloccante delle risposte trattiene una risposta finché Enkrypt non l'ha controllata tutta. Usa Solo registrazione per evitare il ritardo.",
+    "inputDetectorRequired": "Attiva almeno un rilevatore di input.",
+    "outputDetectorRequired": "Attiva almeno un rilevatore delle risposte.",
+    "rulesTooMany": "Aggiungi fino a {{max}} regole.",
+    "ruleIdRequired": "Inserisci un identificativo della regola.",
+    "ruleIdInvalid": "Un identificativo della regola può usare solo lettere, numeri, punti, trattini e trattini bassi.",
+    "ruleTextRequired": "Descrivi ciò che la regola vieta o richiede.",
+    "keywordTooLong": "Ogni parola chiave può contenere fino a {{max}} caratteri.",
+    "topicTooLong": "Ogni argomento può contenere fino a {{max}} caratteri.",
+    "keywordsTooMany": "Aggiungi fino a {{max}} parole chiave.",
+    "topicsTooMany": "Aggiungi fino a {{max}} argomenti.",
+    "piiEntityRequired": "Seleziona almeno un tipo di dati da rilevare.",
+    "keywordRequired": "Aggiungi almeno una parola chiave.",
+    "topicRequired": "Aggiungi almeno un argomento.",
+    "policyTextRequired": "Inserisci il testo dei criteri.",
+    "ruleRequired": "Aggiungi almeno una regola.",
+    "ruleIdDuplicate": "Ogni regola deve avere il proprio ID regola.",
+    "piiEntities": "Dati da rilevare",
+    "keywordsLabel": "Parole chiave",
+    "keywordsHint": "Una parola chiave per riga.",
+    "topicsHint": "Un argomento per riga.",
+    "policyFormat": "Formato dei criteri",
+    "policyFormatRules": "Regole strutturate",
+    "policyFormatRulesDescription": "Una regola per requisito, con una categoria e una gravità. Consigliato.",
+    "policyFormatText": "Testo dei criteri",
+    "policyFormatTextDescription": "Incolla criteri esistenti come testo semplice.",
+    "rulesEmpty": "Nessuna regola per ora. Ogni regola descrive un elemento che gli input non devono contenere o richiedere.",
+    "addRule": "Aggiungi regola",
+    "ruleNumber": "Regola {{number}}",
+    "ruleRemove": "Rimuovi regola {{number}}",
+    "ruleIdLabel": "Identificativo regola",
+    "ruleNameLabel": "Nome (facoltativo)",
+    "ruleTextLabel": "Regola",
+    "ruleRiskCategory": "Categoria di rischio",
+    "ruleApplicability": "Ambito",
+    "ruleFrameworks": "Quadri normativi",
+    "detector": {
+      "promptInjection": {
+        "label": "Iniezione di prompt",
+        "description": "Rileva tentativi di ignorare le istruzioni o aggirare le protezioni del modello."
+      },
+      "policyViolation": {
+        "label": "Violazione dei criteri",
+        "description": "Segnala gli input che violano i criteri della tua organizzazione, espressi come testo o regole.",
+        "descriptionOutput": "Segnala le risposte che violano i criteri della tua organizzazione, espressi come testo o regole."
+      },
+      "pii": {
+        "label": "PII e segreti",
+        "description": "Rileva dati personali, credenziali, indirizzi IP e URL."
+      },
+      "keywords": {
+        "label": "Parole chiave vietate",
+        "descriptionOutput": "Rileva le risposte che contengono una qualsiasi delle parole chiave che elenchi."
+      },
+      "topics": {
+        "label": "Argomenti",
+        "descriptionOutput": "Segnala le risposte su qualsiasi argomento che elenchi."
+      },
+      "toxicity": {
+        "label": "Tossicità",
+        "description": "Rileva linguaggio tossico, offensivo, minaccioso o di odio."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Rileva contenuti sessuali o comunque non adatti al lavoro."
+      },
+      "bias": {
+        "label": "Pregiudizio",
+        "description": "Rileva linguaggio prevenuto o discriminatorio."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Dati personali",
+        "description": "Nomi, indirizzi email, numeri di telefono."
+      },
+      "secrets": {
+        "label": "Segreti",
+        "description": "Chiavi API, token, password."
+      },
+      "ipAddress": {
+        "label": "Indirizzi IP",
+        "description": "Indirizzi IPv4 e IPv6."
+      },
+      "url": {
+        "label": "URL",
+        "description": "Indirizzi web."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Sicurezza e frode",
+      "safetyHarm": "Incolumità e danni",
+      "privacyDataProtection": "Riservatezza e protezione dei dati",
+      "brandReputationTrust": "Marchio e reputazione",
+      "biasFairnessEthical": "Pregiudizio ed equità",
+      "legalIpLiability": "Responsabilità legale e di proprietà intellettuale",
+      "productMisuse": "Uso improprio del prodotto",
+      "performanceQuality": "Prestazioni e qualità"
+    },
+    "applicability": {
+      "user": "Input dell'utente",
+      "userAssistant": "Input dell'utente e risposte"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Top 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "Regolamento sull'IA dell'UE",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Funzionalità aziendale",
+    "enterpriseOnly": "Questa è una funzionalità riservata alle aziende.",
+    "readOnly": "Solo i proprietari e gli amministratori dell'organizzazione possono modificare queste impostazioni.",
+    "loadError": "Impossibile caricare fornitori e modelli",
+    "tabModels": "Modelli",
+    "tabProviders": "Fornitori",
+    "tabGateways": "Canali di accesso",
+    "modelsDescription": "Disattiva un modello per bloccarlo per ogni membro. I modelli dei fornitori consentiti partono attivi.",
+    "modelsDeniedOnly": "Solo negati",
+    "modelsEmpty": "Nessun modello corrisponde a questa ricerca.",
+    "providersDescription": "Disattiva un fornitore per impedire a Kilo di instradare verso di esso per questa organizzazione.",
+    "providersNeedCatalog": "Gli interruttori dei fornitori restano in sola lettura finché non viene caricato il catalogo completo dei modelli. Tocca Riprova qui sopra per modificarli.",
+    "providersEmpty": "Nessun fornitore corrisponde a questa ricerca.",
+    "allowAllShown": "Consenti tutti quelli mostrati",
+    "denyAllShown": "Nega tutti quelli mostrati",
+    "gatewaysDescription": "Kilo instrada le richieste dei modelli tramite Vercel AI Gateway o OpenRouter. Un canale di accesso disattivato fa fallire tali richieste.",
+    "emptyProviderList": "Consenti almeno un fornitore. Con un elenco vuoto, tutte le route dei modelli Kilo vengono bloccate.",
+    "gatewaysUnavailable": "Le impostazioni dei canali di accesso non sono disponibili per questa organizzazione.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "Le richieste a OpenRouter non sono vincolate a una regione.",
+    "inferenceRegion": "Regione di inferenza",
+    "inferenceRegionDescription": "Vincola le richieste di Vercel AI Gateway a questa regione. Un modello non disponibile lì fallisce.",
+    "disableOpenrouterNote": "Disattivare OpenRouter blocca anche le chiavi BYOK che instradano le richieste tramite esso.",
+    "emptyModelList": "Lascia attivo almeno un modello. Negando tutti i modelli, i membri non avranno nulla da usare.",
+    "catalogUnavailable": "Il catalogo completo dei modelli non è stato caricato, quindi vengono mostrati solo i tuoi elenchi salvati. Riprova per caricare tutti i modelli.",
+    "region": {
+      "global": "Globale",
+      "us": "Stati Uniti",
+      "eu": "Unione europea",
+      "au": "Australia",
+      "jp": "Giappone"
+    }
   }
 }

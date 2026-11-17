@@ -71,6 +71,10 @@ const NATIVE_ONLY_PATHS: Record<string, true> = {
   // Disabling a gateway or pinning a data region changes routing for every member, so org admins
   // set it in the app only.
   'organizations.settings.updateGatewaySettings': true,
+  // Browser control decides whether agents get browser tools at all and which origins they act on
+  // without asking. An MCP caller must not widen its own authorization, so org admins set it in
+  // the app only; clients read the policy from /api/organizations/[id]/browser-policy.
+  'organizations.settings.updateBrowserControl': true,
   'activeSessions.widgetCredential': true,
   'agentBriefing.updateContextPreferences': true,
   // Stores a raw GitHub credential as the user's personal identity.
@@ -85,6 +89,10 @@ const NATIVE_ONLY_PATHS: Record<string, true> = {
   // Sharing a Claude payer binds a paid Claude organization to another Kilo scope.
   'claudeBilling.share': true,
   'claudeBilling.sharePersonal': true,
+  // Mints a one-time token for a page the native app opens in its in-app browser. The
+  // token is only useful with the browser that receives the shell cookie, so it is an
+  // app-internal hand-off, not an API for agents.
+  'appShell.mintHandoff': true,
 };
 
 /**

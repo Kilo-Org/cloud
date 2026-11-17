@@ -46,6 +46,7 @@ const calls = vi.hoisted(() => ({
   confirm: vi.fn<(request: { title: string; onConfirm: () => void }) => void>(),
   refetch: vi.fn<() => void>(),
   openExternal: vi.fn<(url: string) => void>(),
+  handoff: vi.fn<(target: unknown) => void>(),
   push: vi.fn<(href: unknown) => void>(),
   bitbucketRefetch: vi.fn<() => void>(),
 }));
@@ -130,6 +131,12 @@ vi.mock('@/lib/trpc-error', () => ({
   trpcErrorVariant: () => 'server',
 }));
 
+vi.mock('@/lib/app-shell-handoff', () => ({
+  openAppShellHandoff: (target: unknown) => {
+    calls.handoff(target);
+    return Promise.resolve();
+  },
+}));
 vi.mock('@/lib/external-link', () => ({
   openExternalUrl: (url: string) => {
     calls.openExternal(url);
@@ -319,6 +326,15 @@ describe('IntegrationsScreen', () => {
     expect(actionOf(rowTitled(root, 'GitHub'))?.props.accessibilityLabel).toBe(
       'Manage on the web. GitHub'
     );
+    // The GitHub row's web management link is the shell's integration page,
+    // reached through a one-time hand-off rather than a full-web URL.
+    press(actionOf(rowTitled(root, 'GitHub')));
+    expect(calls.handoff).toHaveBeenCalledWith({
+      page: 'integration',
+      platform: 'github',
+      organizationId: 'org-1',
+    });
+    expect(calls.openExternal).not.toHaveBeenCalled();
     // Bitbucket's connection is changed in the app, so an owner's installed row
     // disconnects instead of opening the web page.
     const bitbucket = actionOf(rowTitled(root, 'Bitbucket'));

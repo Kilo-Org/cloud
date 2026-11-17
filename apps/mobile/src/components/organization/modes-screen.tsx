@@ -146,6 +146,8 @@ export function OrganizationModesScreen() {
         className="flex-1"
         contentContainerClassName="gap-4 pb-8 pt-4"
         showsVerticalScrollIndicator={false}
+        // The design gate's proof readiness marker for this route.
+        testID="organization-modes-list"
       >
         {body}
       </TabScreenScrollView>

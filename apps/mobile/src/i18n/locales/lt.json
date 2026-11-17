@@ -1513,7 +1513,8 @@
       "repositoryLine": "Peržiūros: {{reviews}} · Radiniai: {{findings}}",
       "empty": "Dar nėra peržiūrų su analitika",
       "emptyDescription": "Analitika fiksuoja užbaigtas peržiūras, kol ji įjungta organizacijai.",
-      "off": "Šioje organizacijoje analitika išjungta platformai {{platform}}.",
+      "offTitle": "Analitika išjungta platformai {{platform}}",
+      "offDescription": "Įjunk ją organizacijos nustatymuose žiniatinklyje, kad fiksuotų užbaigtas peržiūras.",
       "couldNotLoad": "Nepavyko įkelti analitikos"
     },
     "council": {

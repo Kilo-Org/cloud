@@ -922,7 +922,8 @@
       "repositoryLine": "Reviews: {{reviews}} · Bevindingen: {{findings}}",
       "empty": "Nog geen reviews met statistieken",
       "emptyDescription": "Statistieken leggen afgeronde reviews vast zolang ze voor de organisatie zijn ingeschakeld.",
-      "off": "Statistieken staan uit voor {{platform}} in deze organisatie.",
+      "offTitle": "Statistieken staan uit voor {{platform}}",
+      "offDescription": "Schakel de statistieken in bij de organisatie-instellingen op het web om afgeronde reviews vast te leggen.",
       "couldNotLoad": "Kan statistieken niet laden"
     },
     "council": {

@@ -922,7 +922,8 @@
       "repositoryLine": "İncelemeler: {{reviews}} · Bulgular: {{findings}}",
       "empty": "Henüz istatistiği olan inceleme yok",
       "emptyDescription": "İstatistikler, kuruluş için etkin olduğu sürece tamamlanan incelemeleri kaydeder.",
-      "off": "Bu kuruluşta {{platform}} için istatistikler kapalı.",
+      "offTitle": "{{platform}} için istatistikler kapalı",
+      "offDescription": "Tamamlanan incelemeleri kaydetmek için Web'deki kuruluş ayarlarında istatistikleri aç.",
       "couldNotLoad": "İstatistikler yüklenemedi"
     },
     "council": {

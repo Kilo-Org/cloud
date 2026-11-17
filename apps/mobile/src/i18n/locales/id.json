@@ -922,7 +922,8 @@
       "repositoryLine": "Tinjauan: {{reviews}} · Temuan: {{findings}}",
       "empty": "Belum ada tinjauan dengan analitik",
       "emptyDescription": "Analitik mencatat tinjauan yang selesai selama fitur ini aktif untuk organisasi.",
-      "off": "Analitik nonaktif untuk {{platform}} di organisasi ini.",
+      "offTitle": "Analitik nonaktif untuk {{platform}}",
+      "offDescription": "Aktifkan analitik di Pengaturan organisasi di web untuk mencatat tinjauan yang selesai.",
       "couldNotLoad": "Tidak dapat memuat analitik"
     },
     "council": {

@@ -1465,7 +1465,8 @@
       "repositoryLine": "Yfirferðir: {{reviews}} · Frávik: {{findings}}",
       "empty": "Engar yfirferðir með tölfræði ennþá",
       "emptyDescription": "Tölfræðin skráir yfirferðir sem klárast meðan hún er virk fyrir fyrirtækið.",
-      "off": "Tölfræðin er óvirk fyrir {{platform}} í þessu fyrirtæki.",
+      "offTitle": "Tölfræðin er óvirk fyrir {{platform}}",
+      "offDescription": "Kveiktu á henni í stillingum félags á vefnum til að skrá yfirferðir sem klárast.",
       "couldNotLoad": "Tókst ekki að sækja tölfræðina"
     },
     "council": {

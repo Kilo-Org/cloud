@@ -1532,7 +1532,8 @@
       "repositoryLine": "Reviews: {{reviews}} · Findings: {{findings}}",
       "empty": "No reviews with analytics yet",
       "emptyDescription": "Analytics records completed reviews while it is enabled for the organization.",
-      "off": "Analytics is off for {{platform}} in this organization.",
+      "offTitle": "Analytics is off for {{platform}}",
+      "offDescription": "Turn it on in the organization's settings on the web to record completed reviews.",
       "couldNotLoad": "Could not load analytics"
     },
     "council": {

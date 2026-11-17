@@ -1465,7 +1465,8 @@
       "repositoryLine": "Àtúnyẹ̀wò: {{reviews}} · Àbùkù: {{findings}}",
       "empty": "Kò sí àtúnyẹ̀wò pẹ̀lú ìṣirò",
       "emptyDescription": "Ìṣirò ń gbasilẹ̀ àwọn àtúnyẹ̀wò tó parí nígbà tí ó bá ṣí fún àjọ.",
-      "off": "Ìṣirò ti pa fún {{platform}} nínú àjọ yìí.",
+      "offTitle": "Ìṣirò ti pa fún {{platform}}",
+      "offDescription": "Mú Ìṣirò ṣiṣẹ́ nínú ààtò àjọ lórí wẹ́ẹ̀bù láti gbasilẹ̀ àwọn àtúnyẹ̀wò tó parí.",
       "couldNotLoad": "A kò lè gbé ìṣirò wọlé"
     },
     "council": {

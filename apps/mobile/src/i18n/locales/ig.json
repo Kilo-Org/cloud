@@ -1465,7 +1465,8 @@
       "repositoryLine": "Nyocha: {{reviews}} · Ihe achọpụtara: {{findings}}",
       "empty": "Enweghị nyocha nwere ọnụọgụgụ nyocha",
       "emptyDescription": "Ọnụọgụgụ nyocha na-edekọ nyocha ndị gụchara mgbe agbanyere ya maka nzukọ.",
-      "off": "Agbanyụrụ ọnụọgụgụ nyocha maka {{platform}} na nzukọ a.",
+      "offTitle": "Agbanyụrụ ọnụọgụgụ nyocha maka {{platform}}",
+      "offDescription": "Gbanye ya na ntọala òtù na weebụ ka ọ dekọọ nyocha ndị gụchara.",
       "couldNotLoad": "Enweghị ike ibudata ọnụọgụgụ nyocha"
     },
     "council": {

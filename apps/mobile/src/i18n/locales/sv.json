@@ -1465,7 +1465,8 @@
       "repositoryLine": "Granskningar: {{reviews}} · Fynd: {{findings}}",
       "empty": "Inga granskningar med statistik än",
       "emptyDescription": "Statistiken registrerar slutförda granskningar så länge den är aktiverad för organisationen.",
-      "off": "Statistiken är avstängd för {{platform}} i denna organisation.",
+      "offTitle": "Statistiken är avstängd för {{platform}}",
+      "offDescription": "Aktivera den i organisationsinställningarna på webben för att registrera slutförda granskningar.",
       "couldNotLoad": "Det gick inte att läsa in statistiken"
     },
     "council": {

@@ -1465,7 +1465,8 @@
       "repositoryLine": "Revisións: {{reviews}} · Achados: {{findings}}",
       "empty": "Aínda non hai revisións con analítica",
       "emptyDescription": "A analítica rexistra as revisións completadas mentres estea activada para a organización.",
-      "off": "A analítica está desactivada para {{platform}} nesta organización.",
+      "offTitle": "A analítica está desactivada para {{platform}}",
+      "offDescription": "Actívaa na configuración da organización na web para rexistrar as revisións completadas.",
       "couldNotLoad": "Non se puido cargar a analítica"
     },
     "council": {

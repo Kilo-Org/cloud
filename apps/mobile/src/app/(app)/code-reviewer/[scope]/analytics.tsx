@@ -172,15 +172,23 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
     );
   } else {
     const { summary, repositories, settings } = dashboard.data;
-    body = (
+    body = !settings.enabled ? (
+      // Analytics is enabled per platform, so a disabled one is a state, not an
+      // empty dataset: the zero stat cards and the generic empty state would
+      // read as data the organization has none of. One EmptyState names the
+      // platform whose setting is off and says where to turn it on; the
+      // segment controls above stay so the reader can flip to the other
+      // platform without leaving the screen.
+      <EmptyState
+        placement="center"
+        icon={LineChart}
+        title={t('codeReviewer.analytics.offTitle', {
+          platform: reviewerPlatformLabel(settings.platform),
+        })}
+        description={t('codeReviewer.analytics.offDescription')}
+      />
+    ) : (
       <View className="gap-6 px-6 pt-4">
-        {!settings.enabled ? (
-          <Text variant="muted" className="text-xs">
-            {t('codeReviewer.analytics.off', {
-              platform: reviewerPlatformLabel(settings.platform),
-            })}
-          </Text>
-        ) : null}
         <View className="gap-3">
           <View className="flex-row gap-3">
             <MetricCard
@@ -209,15 +217,11 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
         </View>
 
         {repositories.length === 0 ? (
-          // The muted note above already says analytics is off, so the generic
-          // description would restate it.
           <EmptyState
             placement="static"
             icon={LineChart}
             title={t('codeReviewer.analytics.empty')}
-            description={
-              settings.enabled ? t('codeReviewer.analytics.emptyDescription') : undefined
-            }
+            description={t('codeReviewer.analytics.emptyDescription')}
           />
         ) : (
           <View className="gap-2">

@@ -890,7 +890,8 @@
       "repositoryLine": "Revisões: {{reviews}} · Ocorrências: {{findings}}",
       "empty": "Nenhuma revisão com estatísticas ainda",
       "emptyDescription": "As estatísticas registram revisões concluídas enquanto estão ativadas para a organização.",
-      "off": "As estatísticas estão desativadas para {{platform}} nesta organização.",
+      "offTitle": "As estatísticas estão desativadas para {{platform}}",
+      "offDescription": "Ative-as nas configurações da organização na web para registrar revisões concluídas.",
       "couldNotLoad": "Não foi possível carregar as estatísticas"
     },
     "council": {

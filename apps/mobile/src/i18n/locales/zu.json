@@ -1465,7 +1465,8 @@
       "repositoryLine": "Ukuhlolwa: {{reviews}} · Okutholakele: {{findings}}",
       "empty": "Akukho kuhlolwa okunezibalo okwamanje",
       "emptyDescription": "Izibalo ziqopha ukuhlolwa okuqediwe ngenkathi zivuliwe enhlanganweni.",
-      "off": "Izibalo ze-{{platform}} zivaliwe kule nhlangano.",
+      "offTitle": "Izibalo ze-{{platform}} zivaliwe",
+      "offDescription": "Zivule izibalo kuzilungiselelo zenhlangano kuwebhu ukuqopha ukuhlolwa okuqediwe.",
       "couldNotLoad": "Ayikwazanga ukulayisha izibalo"
     },
     "council": {

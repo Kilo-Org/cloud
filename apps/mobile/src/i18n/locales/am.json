@@ -1465,7 +1465,8 @@
       "repositoryLine": "ግምገማዎች፦ {{reviews}} · ግኝቶች፦ {{findings}}",
       "empty": "እስካሁን ትንታኔ ያላቸው ግምገማዎች የሉም",
       "emptyDescription": "ትንታኔ ለድርጅቱ ነቅቶ እያለ የተጠናቀቁ ግምገማዎችን ይመዘግባል።",
-      "off": "በዚህ ድርጅት ውስጥ ለ{{platform}} ትንታኔ ጠፍቷል።",
+      "offTitle": "ለ{{platform}} ትንታኔ ጠፍቷል",
+      "offDescription": "የተጠናቀቁ ግምገማዎችን ለመመዝገብ ትንታኔን በድር ላይ ባሉ የድርጅት ቅንብሮች ውስጥ ያንቁት።",
       "couldNotLoad": "ትንታኔን መጫን አልተቻለም"
     },
     "council": {

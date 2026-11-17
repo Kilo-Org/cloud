@@ -1465,7 +1465,8 @@
       "repositoryLine": "Koʻrib chiqishlar: {{reviews}} · Muammolar: {{findings}}",
       "empty": "Statistikasi bor koʻrib chiqishlar hozircha yoʻq",
       "emptyDescription": "Statistika tashkilot uchun yoqilgan boʻlsa, tugallangan koʻrib chiqishlarni qayd etadi.",
-      "off": "Bu tashkilotda {{platform}} uchun statistika oʻchirilgan.",
+      "offTitle": "{{platform}} uchun statistika oʻchirilgan",
+      "offDescription": "Tugallangan koʻrib chiqishlarni qayd etish uchun veb-saytdagi tashkilot sozlamalarida statistikani yoqing.",
       "couldNotLoad": "Statistikani yuklab boʻlmadi"
     },
     "council": {

@@ -342,35 +342,37 @@ describe('CodeReviewerAnalytics period labels', () => {
 });
 
 describe('CodeReviewerAnalytics empty state', () => {
-  it('drops the generic description when analytics is off and keeps it when analytics is on', () => {
+  it('renders a disabled EmptyState naming the platform when analytics is off', () => {
     queries.dashboard.data = { ...dashboard, settings: { enabled: false, platform: 'github' } };
     const offRenderer = mountScreen();
 
-    const offTexts = findByType(offRenderer.root, 'TextMock').map(node => node.props.children);
-    expect(offTexts).toContain('Analytics is off for GitHub in this organization.');
     const offEmpty = findByType(offRenderer.root, 'EmptyStateMock')[0];
-    expect(offEmpty?.props.title).toBe('No reviews with analytics yet');
-    expect(offEmpty?.props.description).toBeUndefined();
+    expect(offEmpty?.props.title).toBe('Analytics is off for GitHub');
+    expect(offEmpty?.props.description).toBe(
+      "Turn it on in the organization's settings on the web to record completed reviews."
+    );
+    expect(findByType(offRenderer.root, 'TextMock')).toHaveLength(0);
+    expect(findByType(offRenderer.root, 'ConfigureRowMock')).toHaveLength(0);
 
     act(() => {
       offRenderer.unmount();
     });
 
-    // Analytics is enabled per platform, so the note names the platform whose
+    // Analytics is enabled per platform, so the state names the platform whose
     // setting it renders: the same organization with GitLab off reads as GitLab
     // being off, not the whole organization.
     queries.dashboard.data = { ...dashboard, settings: { enabled: false, platform: 'gitlab' } };
     const offGitLabRenderer = mountScreen();
 
-    const offGitLabTexts = findByType(offGitLabRenderer.root, 'TextMock').map(
-      node => node.props.children
-    );
-    expect(offGitLabTexts).toContain('Analytics is off for GitLab in this organization.');
+    const offGitLabEmpty = findByType(offGitLabRenderer.root, 'EmptyStateMock')[0];
+    expect(offGitLabEmpty?.props.title).toBe('Analytics is off for GitLab');
 
     act(() => {
       offGitLabRenderer.unmount();
     });
+  });
 
+  it('keeps the metric cards and the generic empty state when analytics is on', () => {
     queries.dashboard.data = dashboard;
     const onRenderer = mountScreen();
 

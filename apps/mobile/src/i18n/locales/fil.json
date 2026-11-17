@@ -1465,7 +1465,8 @@
       "repositoryLine": "Mga pagsusuri: {{reviews}} · Mga natuklasan: {{findings}}",
       "empty": "Wala pang pagsusuring may analitika",
       "emptyDescription": "Itinatala ng analitika ang mga natapos na pagsusuri habang pinagana ito para sa organisasyon.",
-      "off": "Naka-off ang analitika para sa {{platform}} sa organisasyong ito.",
+      "offTitle": "Naka-off ang analitika para sa {{platform}}",
+      "offDescription": "Paganahin ito sa mga setting ng organisasyon sa web para itala ang mga natapos na pagsusuri.",
       "couldNotLoad": "Hindi ma-load ang analitika"
     },
     "council": {

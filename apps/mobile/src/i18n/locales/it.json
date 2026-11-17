@@ -890,7 +890,8 @@
       "repositoryLine": "Revisioni: {{reviews}} · Segnalazioni: {{findings}}",
       "empty": "Nessuna revisione con statistiche",
       "emptyDescription": "Le statistiche registrano le revisioni completate mentre sono attive per l'organizzazione.",
-      "off": "Le statistiche sono disattivate per {{platform}} in questa organizzazione.",
+      "offTitle": "Le statistiche sono disattivate per {{platform}}",
+      "offDescription": "Attivale nelle impostazioni dell'organizzazione sul web per registrare le revisioni completate.",
       "couldNotLoad": "Impossibile caricare le statistiche"
     },
     "council": {

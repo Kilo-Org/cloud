@@ -1489,7 +1489,8 @@
       "repositoryLine": "Pārskatīšanas: {{reviews}} · Konstatējumi: {{findings}}",
       "empty": "Vēl nav pārskatīšanu ar analītiku",
       "emptyDescription": "Analītika reģistrē pabeigtas pārskatīšanas, kamēr tā ir iespējota organizācijai.",
-      "off": "{{platform}} platformā analītika šai organizācijai ir izslēgta.",
+      "offTitle": "{{platform}} platformā analītika ir izslēgta",
+      "offDescription": "Ieslēdz to organizācijas iestatījumos tīmeklī, lai reģistrētu pabeigtas pārskatīšanas.",
       "couldNotLoad": "Neizdevās ielādēt analītiku"
     },
     "council": {

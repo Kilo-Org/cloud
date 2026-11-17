@@ -1465,7 +1465,8 @@
       "repositoryLine": "Ngā arotake: {{reviews}} · Ngā kitenga: {{findings}}",
       "empty": "Kāore anō he arotake whai tātaritanga",
       "emptyDescription": "Ka tuhia e ngā tātaritanga ngā arotake kua oti i te wā e whakahohea ana mō te rōpū.",
-      "off": "Kua weto ngā tātaritanga mō {{platform}} i tēnei rōpū.",
+      "offTitle": "Kua weto ngā tātaritanga mō {{platform}}",
+      "offDescription": "Whakahohea ngā tātaritanga i ngā tautuhinga rōpū i te ipurangi ki te tuhi i ngā arotake kua oti.",
       "couldNotLoad": "Kāore i taea te uta i ngā tātaritanga"
     },
     "council": {

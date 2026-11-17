@@ -922,7 +922,8 @@
       "repositoryLine": "Reviews: {{reviews}} · Befunde: {{findings}}",
       "empty": "Noch keine Reviews mit Analysen",
       "emptyDescription": "Analysen erfassen abgeschlossene Reviews, solange sie für die Organisation aktiviert sind.",
-      "off": "Analysen sind für {{platform}} in dieser Organisation deaktiviert.",
+      "offTitle": "Analysen sind für {{platform}} deaktiviert",
+      "offDescription": "Aktiviere sie in den Organisationseinstellungen im Web, um abgeschlossene Reviews zu erfassen.",
       "couldNotLoad": "Analysen konnten nicht geladen werden"
     },
     "council": {

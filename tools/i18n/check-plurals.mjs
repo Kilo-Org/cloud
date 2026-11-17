@@ -469,7 +469,12 @@ function declaredKeys(entry, declaration) {
     ) {
       return;
     }
-    keys = objectKeys(node.init);
+    // A declarator without an initialiser does not declare the keys either,
+    // and objectKeys would read through null, so it stays the same null the
+    // missing-alias case reports.
+    if (node.init !== null) {
+      keys = objectKeys(node.init);
+    }
   });
   return keys;
 }

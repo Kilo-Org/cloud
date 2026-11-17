@@ -276,14 +276,38 @@ export function countGlanceableApprovals(sessions: readonly GlanceableSessionRow
 }
 
 /**
+ * Order two rows by one of their timestamps. `extreme` uses the vocabulary the
+ * package owns for its extreme-row selector: 'earliest' is oldest first,
+ * 'latest' is newest first. A missing or unparseable time ranks after every
+ * known time in both directions, so the rule is stated once here and not
+ * restated per sort; a tie compares 0, so the caller's stable sort keeps source
+ * order. This is the sort-facing view of the ordering that
+ * `extremeTimestampRow` applies when it picks one winner.
+ */
+export function compareSessionInstant<T extends GlanceableSessionRow>(
+  read: (row: T) => string | undefined,
+  extreme: 'earliest' | 'latest'
+): (a: T, b: T) => number {
+  return (a, b) => {
+    const left = timestampMs(read(a));
+    const right = timestampMs(read(b));
+    if (left === null || right === null) {
+      return Number(left === null) - Number(right === null);
+    }
+    return extreme === 'earliest' ? left - right : right - left;
+  };
+}
+
+/**
  * The row whose chosen timestamp is the earliest or the latest among the rows
  * that `qualifies` admits, or null when no admitted row carries a parseable
  * time.
  *
  * A row with a missing or unparseable timestamp is skipped rather than read as
- * now, which would understate a wait or overstate how new a change is. Only a
- * strictly earlier or strictly later value replaces the winner, so the first
- * row of a tie stays the winner.
+ * now, which would understate a wait or overstate how new a change is — the
+ * selector skips what the sort-facing `compareSessionInstant` would rank last.
+ * Only a strictly earlier or strictly later value replaces the winner, so the
+ * first row of a tie stays the winner.
  */
 function extremeTimestampRow(
   sessions: readonly GlanceableSessionRow[],

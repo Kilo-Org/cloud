@@ -273,8 +273,21 @@ function isSupersededFinding(finding: SecurityFinding): boolean {
   return finding.status === 'ignored' && getSupersedingFindingId(finding) !== null;
 }
 
+// Reused instead of building a DateTimeFormat per call
+// (toLocaleDateString with options constructs one every time): the deadline
+// helpers run once per finding row, so a full page is N constructions per
+// render. Construction is deferred to first use — mobile imports this module
+// before its Intl polyfill warm-up, and the native Intl that exists at import
+// time must not own the cached formatter.
+let findingDateFormatValue: Intl.DateTimeFormat | null = null;
+
 function formatFindingDate(date: Date): string {
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  findingDateFormatValue ??= new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+  return findingDateFormatValue.format(date);
 }
 
 function startOfDay(date: Date): number {

@@ -415,6 +415,19 @@ export function useUpdateRecommendationsDigest() {
   );
 }
 
+export function useUpdateOrganizationBrowserControl() {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+
+  return useMutation(
+    trpc.organizations.settings.updateBrowserControl.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: trpc.organizations.pathKey() });
+      },
+    })
+  );
+}
+
 export function useEnableOssSponsorship() {
   const trpc = useTRPC();
   const invalidate = useInvalidateAllOrganizationData();

@@ -14,18 +14,22 @@ import { SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS } from '../src/lib/android-noti
 const BUNDLE_IDENTIFIER = 'com.kilocode.kiloapp';
 const ANDROID_PACKAGE = 'com.kilocode.kiloapp';
 const SCHEME = 'kiloapp';
-const ASSOCIATED_DOMAIN = 'applinks:app.kilo.ai';
+// The one host this app claims on the web. The universal-link claim, the
+// passkey relying-party claim and the Expo Head origin below derive from it, so
+// the three forms cannot name different hosts.
+const APP_HOST = 'app.kilo.ai';
+const ASSOCIATED_DOMAIN = `applinks:${APP_HOST}`;
 // The passkey relying-party claim on iOS. The claim is split by platform: iOS
 // carries its half here (the Associated Domains entitlement the platform
 // authenticator reads), Android carries its half in the served Digital Asset
 // Links file, whose `delegate_permission/common.get_login_creds` relation
 // apps/web/src/lib/app-site-association.test.ts pins. Both halves name the one
 // relying-party host, app.kilo.ai.
-const PASSKEY_ASSOCIATED_DOMAIN = 'webcredentials:app.kilo.ai';
+const PASSKEY_ASSOCIATED_DOMAIN = `webcredentials:${APP_HOST}`;
 // Expo Head's handoff origin (extra.router.headOrigin). It is the origin of
 // ASSOCIATED_DOMAIN above: the session link the app advertises and the
 // universal link the app claims have to be the same URL.
-const HEAD_ORIGIN = 'https://app.kilo.ai';
+const HEAD_ORIGIN = `https://${APP_HOST}`;
 // Time Sensitive Notifications capability: the iOS half of the needs-input
 // raise's `interruptionLevel: 'timeSensitive'` break-through contract.
 const TIME_SENSITIVE_ENTITLEMENT = 'com.apple.developer.usernotifications.time-sensitive';

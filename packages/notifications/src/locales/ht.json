@@ -12,7 +12,6 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
     }
   },
@@ -36,14 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "Vyolasyon SLA"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "Yon chèk sekirite gen yon aktyalizasyon"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "Sesyon Kilo ou pare pou kontwole soti nan telefòn ou"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

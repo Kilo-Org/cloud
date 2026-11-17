@@ -12,7 +12,6 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
     }
   },
@@ -36,14 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA დარღვევა"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "უსაფრთხოების შემოწმებას განახლება აქვს"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "თქვენი Kilo სესია მზადაა ტელეფონიდან სამართავად"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

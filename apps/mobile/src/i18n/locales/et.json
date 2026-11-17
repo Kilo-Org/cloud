@@ -1354,7 +1354,8 @@
       "managedOnWeb": "Selle organisatsiooni Bitbucketi ühendust hallatakse arvutis veebi kaudu.",
       "description": "Loo nõutavate õigustega tööruumi juurdepääsutunnus ja kleebi see allolevale väljale.",
       "scopes": "Konto: lugemine · Hoidlad: lugemine/kirjutamine · Tõmbetaotlused: lugemine · Veebihaagid: lugemine/kirjutamine",
-      "tokenPlaceholder": "Tööruumi juurdepääsutunnus"
+      "tokenPlaceholder": "Tööruumi juurdepääsutunnus",
+      "tokenRefused": "Bitbucket ei võtnud seda tööruumi juurdepääsutunnust vastu. Kontrolli, et sellel oleksid ülaltoodud õigused, ja proovi seejärel uuesti."
     },
     "scopeList": {
       "personalStillAvailable": "Isiklikud hoidlad on allpool siiski saadaval.",
@@ -3462,7 +3463,6 @@
     },
     "settingsOnWeb": {
       "title": "Organisatsiooni seaded veebis",
-      "integrations": "Integratsioonid veebis",
       "usageDetails": "Kasutuse üksikasjad",
       "providersAndModels": "Teenusepakkujad ja mudelid",
       "groups": "Grupid",
@@ -3471,9 +3471,19 @@
       "ssoAndDomain": "SSO ja domeen",
       "dataCollection": "Andmete kogumine",
       "auditLogs": "Auditilogid",
-      "requestLogs": "Päringulogid",
-      "subOrganizations": "Alamorganisatsioonid",
-      "distributeFunds": "Jaota vahendeid"
+      "requestLogs": "Päringulogid"
+    },
+    "requestLogs": {
+      "hint": "Akna lõpule eelnenud tunni päringud, uusimad eespool.",
+      "older": "Varasem tund",
+      "newer": "Hilisem tund",
+      "truncated": "Selles tunnis on rohkem päringuid, kui loendis kuvatakse.",
+      "emptyTitle": "Päringuid pole",
+      "emptyDescription": "Selles tunnis pole lüüsipäringuid.",
+      "loadError": "Päringulogide laadimine ebaõnnestus.",
+      "permissionDenied": "Päringulogisid saavad lugeda ainult organisatsiooni omanik, administraator või arvelduse haldur.",
+      "tokens": "{{input}} sisse · {{output}} välja",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Sisendtokenid",
@@ -4527,6 +4537,8 @@
     "topModels": "Enimkasutatud mudelid",
     "topFeatures": "Enimkasutatud funktsioonid",
     "emptyTitle": "Sel perioodil kasutust pole",
+    "unavailableTitle": "Kasutus pole saadaval",
+    "unavailableDescription": "See tööruum ei edasta kasutust. Uuesti proovimine ei aita.",
     "orgSelfNotice": "Näed oma kasutust selles organisatsioonis.",
     "viewDetails": "Vaata kasutuse üksikasju"
   },
@@ -4685,5 +4697,175 @@
     "unavailableDescription": "See jagamislink on aegunud või tühistatud.",
     "transcriptUnavailableTitle": "Seda transkripti ei õnnestunud laadida",
     "transcriptUnavailableDescription": "Link töötab endiselt. Proovi hetke pärast uuesti."
+  },
+  "organizationGuardrails": {
+    "title": "AI kaitsepiirangud",
+    "permissionDenied": "AI kaitsepiiranguid saavad hallata ainult organisatsiooni omanikud ja administraatorid.",
+    "unavailable": "AI kaitsepiirangud pole selle organisatsiooni jaoks saadaval.",
+    "loadError": "AI kaitsepiiranguid ei õnnestunud laadida",
+    "statusSaving": "Salvestamine…",
+    "statusSaved": "Salvestatud",
+    "statusFailed": "Salvestamine ebaõnnestus.",
+    "inputTitle": "Sisendi kaitsepiirangud",
+    "inputDescription": "Kontrollib Enkrypt AI abil iga sisendit, sh tööriistade tulemusi. Kui Enkrypt pole saadaval, lükkab blokeeriv detektor päringu tagasi.",
+    "outputTitle": "Väljundi kaitsepiirangud",
+    "outputDescription": "Kontrollib vastuseid Enkrypt AI abil enne, kui liikmed need kätte saavad. On välja lülitatud, kuni selle sisse lülitad.",
+    "detectorsHint": "„Blokeeri” lükkab märgitud päringu tagasi. „Ainult logi” salvestab selle logisse päringut viivitamata.",
+    "detectorsHintOutput": "„Blokeeri” nurjab märgitud vastuse. „Ainult logi” salvestab selle logisse vastust viivitamata.",
+    "choiceLog": "Ainult logi",
+    "applyTo": "Kehtib",
+    "applyToAllMembers": "Kõigile liikmetele",
+    "applyKiloDefault": "Rakenda Kilo vaikesätted",
+    "invalidSavedTitle": "Salvestatud sisendidetektorite sätteid ei saa lugeda",
+    "invalidSavedBody": "Päringud on blokeeritud, kuni sisendidetektorid uuesti salvestatakse. Allolevad detektorid lähtuvad Kilo vaikesätetest.",
+    "invalidSavedOutputTitle": "Salvestatud väljunddetektorite sätteid ei saa lugeda",
+    "invalidSavedOutputBody": "Vastuseid hoitakse kinni, kuni väljunddetektorid uuesti salvestatakse. Vali allpool väljunddetektorid.",
+    "blockingOutputNote": "Blokeeriv väljunddetektor hoiab vastust kinni, kuni Enkrypt on selle täielikult kontrollinud. Viivituse vältimiseks kasuta valikut „Ainult logi”.",
+    "inputDetectorRequired": "Lülita sisse vähemalt üks sisendidetektor.",
+    "outputDetectorRequired": "Lülita sisse vähemalt üks väljunddetektor.",
+    "rulesTooMany": "Lisada saab kuni {{max}} reeglit.",
+    "ruleIdRequired": "Sisesta reegli ID.",
+    "ruleIdInvalid": "Reegli ID võib sisaldada ainult tähti, numbreid, punkte, sidekriipse ja alakriipse.",
+    "ruleTextRequired": "Kirjelda, mida reegel keelab või nõuab.",
+    "keywordTooLong": "Iga märksõna võib olla kuni {{max}} märki pikk.",
+    "topicTooLong": "Iga teema võib olla kuni {{max}} märki pikk.",
+    "keywordsTooMany": "Lisa kuni {{max}} märksõna.",
+    "topicsTooMany": "Lisa kuni {{max}} teemat.",
+    "piiEntityRequired": "Vali vähemalt üks tuvastatav andmetüüp.",
+    "keywordRequired": "Lisa vähemalt üks märksõna.",
+    "topicRequired": "Lisa vähemalt üks teema.",
+    "policyTextRequired": "Sisesta poliitika tekst.",
+    "ruleRequired": "Lisa vähemalt üks reegel.",
+    "ruleIdDuplicate": "Igal reeglil peab olema oma reegli ID.",
+    "piiEntities": "Tuvastatavad andmed",
+    "keywordsLabel": "Märksõnad",
+    "keywordsHint": "Üks märksõna rea kohta.",
+    "topicsHint": "Üks teema rea kohta.",
+    "policyFormat": "Poliitika vorming",
+    "policyFormatRules": "Struktureeritud reeglid",
+    "policyFormatRulesDescription": "Iga nõude kohta üks reegel koos kategooria ja raskusastmega. Soovitatav.",
+    "policyFormatText": "Poliitika tekst",
+    "policyFormatTextDescription": "Kleebi olemasolev poliitika lihttekstina.",
+    "rulesEmpty": "Reegleid veel pole. Iga reegel kirjeldab üht asja, mida sisendid ei tohi sisaldada ega küsida.",
+    "addRule": "Lisa reegel",
+    "ruleNumber": "Reegel {{number}}",
+    "ruleRemove": "Eemalda reegel {{number}}",
+    "ruleIdLabel": "Reegli ID",
+    "ruleNameLabel": "Nimi (valikuline)",
+    "ruleTextLabel": "Reegel",
+    "ruleRiskCategory": "Riskikategooria",
+    "ruleApplicability": "Ulatus",
+    "ruleFrameworks": "Raamistikud",
+    "detector": {
+      "promptInjection": {
+        "label": "Viibasüst",
+        "description": "Tuvastab katseid juhiseid üle kirjutada või mudeli piiranguid murda."
+      },
+      "policyViolation": {
+        "label": "Poliitika rikkumine",
+        "description": "Märgib sisendid, mis rikuvad sinu organisatsiooni tekstina või reeglitena kirja pandud poliitikat.",
+        "descriptionOutput": "Märgib vastused, mis rikuvad sinu organisatsiooni tekstina või reeglitena kirja pandud poliitikat."
+      },
+      "pii": {
+        "label": "Isikuandmed ja saladused",
+        "description": "Tuvastab isikuandmeid, mandaate, IP-aadresse ja URL-e."
+      },
+      "keywords": {
+        "label": "Keelatud märksõnad",
+        "descriptionOutput": "Tuvastab vastused, mis sisaldavad mõnda sinu loetletud märksõna."
+      },
+      "topics": {
+        "label": "Teemad",
+        "descriptionOutput": "Märgib vastused, mis käsitlevad mõnda sinu loetletud teemat."
+      },
+      "toxicity": {
+        "label": "Toksilisus",
+        "description": "Tuvastab toksilist, solvavat, ähvardavat või vaenulikku keelekasutust."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Tuvastab seksuaalset või muul viisil tööks sobimatut sisu."
+      },
+      "bias": {
+        "label": "Kallutatus",
+        "description": "Tuvastab kallutatud või diskrimineerivat keelekasutust."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Isikuandmed",
+        "description": "Nimed, e-posti aadressid, telefoninumbrid."
+      },
+      "secrets": {
+        "label": "Saladused",
+        "description": "API-võtmed, tokenid, paroolid."
+      },
+      "ipAddress": {
+        "label": "IP-aadressid",
+        "description": "IPv4- ja IPv6-aadressid."
+      },
+      "url": {
+        "label": "URL-id",
+        "description": "Veebiaadressid."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Turvalisus ja pettused",
+      "safetyHarm": "Ohutus ja kahju",
+      "privacyDataProtection": "Privaatsus ja andmekaitse",
+      "brandReputationTrust": "Bränd ja maine",
+      "biasFairnessEthical": "Kallutatus ja õiglus",
+      "legalIpLiability": "Õiguslik ja intellektuaalomandi vastutus",
+      "productMisuse": "Toote väärkasutus",
+      "performanceQuality": "Jõudlus ja kvaliteet"
+    },
+    "applicability": {
+      "user": "Kasutaja sisend",
+      "userAssistant": "Kasutaja sisend ja vastused"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Top 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "ELi tehisintellekti määrus",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Enterprise-funktsioon",
+    "enterpriseOnly": "See funktsioon on saadaval ainult Enterprise-paketiga.",
+    "readOnly": "Neid sätteid saavad muuta ainult organisatsiooni omanikud ja administraatorid.",
+    "loadError": "Teenusepakkujaid ja mudeleid ei õnnestunud laadida",
+    "tabModels": "Mudelid",
+    "tabProviders": "Teenusepakkujad",
+    "tabGateways": "Lüüsid",
+    "modelsDescription": "Lülita mudel välja, et blokeerida see kõigi liikmete jaoks. Lubatud teenusepakkujate mudelid on algselt sisse lülitatud.",
+    "modelsDeniedOnly": "Ainult keelatud",
+    "modelsEmpty": "Sellele otsingule ei vasta ükski mudel.",
+    "providersDescription": "Lülita teenusepakkuja välja, et Kilo ei suunaks selle organisatsiooni päringuid sellele.",
+    "providersNeedCatalog": "Teenusepakkujate lülitid on kirjutuskaitstud, kuni kogu mudelikataloog on laaditud. Nende muutmiseks puuduta ülal nuppu Proovi uuesti.",
+    "providersEmpty": "Sellele otsingule ei vasta ükski teenusepakkuja.",
+    "allowAllShown": "Luba kõik kuvatud",
+    "denyAllShown": "Keela kõik kuvatud",
+    "gatewaysDescription": "Kilo suunab mudelipäringud läbi Vercel AI Gateway või OpenRouteri. Kui lüüs on välja lülitatud, need päringud nurjuvad.",
+    "emptyProviderList": "Luba vähemalt üks teenusepakkuja. Tühi loend blokeerib kõik Kilo mudelimarsruudid.",
+    "gatewaysUnavailable": "Lüüside seaded pole selle organisatsiooni jaoks saadaval.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "OpenRouteri päringud pole seotud kindla piirkonnaga.",
+    "inferenceRegion": "Järeldusepiirkond",
+    "inferenceRegionDescription": "Seob Vercel AI Gateway päringud selle piirkonnaga. Kui mudel pole seal saadaval, päring nurjub.",
+    "disableOpenrouterNote": "OpenRouteri väljalülitamine blokeerib ka BYOK-võtmed, mis suunavad päringuid selle kaudu.",
+    "emptyModelList": "Jäta vähemalt üks mudel sisse lülitatuks. Kui keelad kõik mudelid, pole liikmetel midagi kasutada.",
+    "catalogUnavailable": "Täielikku mudelikataloogi ei laaditud, seega kuvatakse ainult sinu salvestatud loendid. Kõigi mudelite laadimiseks proovi uuesti.",
+    "region": {
+      "global": "Globaalne",
+      "us": "Ameerika Ühendriigid",
+      "eu": "Euroopa Liit",
+      "au": "Austraalia",
+      "jp": "Jaapan"
+    }
   }
 }

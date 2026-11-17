@@ -94,7 +94,7 @@ const upstreamEndpoints = [
       completion: '0.000002',
       input_cache_read: '0.0000001',
       discount: 0.25,
-      overrides: [{ prompt: '0.000003' }],
+      display_pricing: [{ kind: 'token', price: '0.000003' }],
     },
     has_zdr: true,
     has_no_training: false,

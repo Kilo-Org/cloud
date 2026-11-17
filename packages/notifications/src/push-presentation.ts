@@ -51,9 +51,6 @@ export const LEGACY_AGENT_ANDROID_CHANNEL_ID = 'agent';
  */
 export const AGENT_CHANNEL_SPLIT_APP_VERSION = '1.0.12';
 
-/** Both channel resolvers gate on the same first split-channel release. */
-export const ANDROID_AGENT_KIND_CHANNELS_MIN_APP_VERSION = AGENT_CHANNEL_SPLIT_APP_VERSION;
-
 /**
  * The first mobile version whose every build creates `agent-briefing`. Builds of
  * `1.0.15` shipped without it, so a lower version keeps the brief on
@@ -63,8 +60,8 @@ export const AGENT_BRIEFING_CHANNEL_APP_VERSION = '1.0.16';
 
 /** Channels that only a build at or above the given version creates. */
 const ANDROID_CHANNEL_MIN_APP_VERSIONS: Partial<Record<AndroidNotificationChannelId, string>> = {
-  'needs-input': ANDROID_AGENT_KIND_CHANNELS_MIN_APP_VERSION,
-  'agent-progress': ANDROID_AGENT_KIND_CHANNELS_MIN_APP_VERSION,
+  'needs-input': AGENT_CHANNEL_SPLIT_APP_VERSION,
+  'agent-progress': AGENT_CHANNEL_SPLIT_APP_VERSION,
   'agent-briefing': AGENT_BRIEFING_CHANNEL_APP_VERSION,
 };
 

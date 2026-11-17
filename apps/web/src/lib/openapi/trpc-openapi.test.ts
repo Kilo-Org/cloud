@@ -182,7 +182,18 @@ describe('generateTrpcOpenApiDocument', () => {
                 properties: {
                   groupBy: {
                     type: 'array',
-                    items: { enum: ['feature', 'model', 'mode', 'user', 'provider', 'project'] },
+                    items: {
+                      enum: [
+                        'feature',
+                        'model',
+                        'mode',
+                        'user',
+                        'provider',
+                        'project',
+                        'autoModel',
+                        'inferenceProvider',
+                      ],
+                    },
                   },
                   limit: { default: 1000 },
                 },

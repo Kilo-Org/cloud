@@ -86,20 +86,14 @@ export function TriggerFormBasics({
         />
       ) : (
         <View className="gap-1">
-          <Text className="text-sm text-muted-foreground">
-            {t('cloudAgent.triggers.fieldName')}
-          </Text>
+          <Text variant="muted">{t('cloudAgent.triggers.fieldName')}</Text>
           <Text variant="mono">{draft.name}</Text>
-          <Text variant="muted" className="text-xs">
-            {t('cloudAgent.triggers.nameLocked')}
-          </Text>
+          <Text variant="caption">{t('cloudAgent.triggers.nameLocked')}</Text>
         </View>
       )}
 
       <View className="gap-2">
-        <Text className="text-sm text-muted-foreground">
-          {t('cloudAgent.triggers.fieldActivation')}
-        </Text>
+        <Text variant="muted">{t('cloudAgent.triggers.fieldActivation')}</Text>
         {mode === 'create' ? (
           <SegmentedControl
             options={ACTIVATION_OPTIONS.map(option => ({
@@ -135,9 +129,7 @@ export function TriggerFormBasics({
             spellCheck={false}
             placeholder={TRIGGER_FIELD_EXAMPLES.cron}
           />
-          <Text variant="muted" className="text-xs">
-            {t('cloudAgent.triggers.fieldCronHelp')}
-          </Text>
+          <Text variant="caption">{t('cloudAgent.triggers.fieldCronHelp')}</Text>
           <FormField
             label={t('cloudAgent.triggers.fieldTimezone')}
             defaultValue={draft.timezone}
@@ -168,17 +160,13 @@ export function TriggerFormBasics({
               }}
               error={triggerProblemText(shownProblem('repository'))}
             />
-            <Text variant="muted" className="text-xs">
-              {t('cloudAgent.triggers.repositoryLocked')}
-            </Text>
+            <Text variant="caption">{t('cloudAgent.triggers.repositoryLocked')}</Text>
           </>
         ) : (
           <>
-            <Text className="text-sm text-muted-foreground">{t('common.repository')}</Text>
+            <Text variant="muted">{t('common.repository')}</Text>
             <Text variant="mono">{draft.repository}</Text>
-            <Text variant="muted" className="text-xs">
-              {t('cloudAgent.triggers.repositoryLocked')}
-            </Text>
+            <Text variant="caption">{t('cloudAgent.triggers.repositoryLocked')}</Text>
           </>
         )}
       </View>

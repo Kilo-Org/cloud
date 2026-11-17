@@ -129,9 +129,7 @@ export function TriggerDetailScreen({
           // A legacy KiloClaw Chat trigger that this viewer may write is still
           // not a Cloud Agent one: this screen has no KiloClaw form, so it says
           // where the trigger is managed instead of offering the wrong one.
-          <Text variant="muted" className="text-xs">
-            {t('common.manageOnWeb')}
-          </Text>
+          <Text variant="caption">{t('common.manageOnWeb')}</Text>
         ) : null}
         <View className="gap-2">
           <Text className="text-sm font-medium text-foreground">

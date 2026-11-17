@@ -53,7 +53,11 @@ const rows = [
 const copyWebhookUrl = vi.hoisted(() => vi.fn());
 const router = vi.hoisted(() => ({ push: vi.fn() }));
 
-vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
+vi.mock('react-native', () => ({
+  Pressable: 'Pressable',
+  View: 'View',
+  useWindowDimensions: () => ({ width: 390, height: 844 }),
+}));
 vi.mock('expo-router', () => ({ useRouter: () => router }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => new Proxy({}, { get: () => '#000000' }),
@@ -97,6 +101,13 @@ vi.mock('@/components/ui/icons', () => ({
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/switch', () => ({ Switch: 'Switch' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/section', () => ({ Section: 'Section' }));
+vi.mock('@/components/ui/row-group', () => ({ RowGroup: 'RowGroup' }));
+vi.mock('@/components/ui/row-skeleton', () => ({ RowSkeleton: 'RowSkeleton' }));
+vi.mock('@/components/ui/icon-tile', () => ({ IconTile: 'IconTile' }));
+vi.mock('@/components/ui/row-chevron', () => ({ RowChevron: 'RowChevron' }));
+vi.mock('@/lib/font-scale/system-font-scale-context', () => ({ useLiveFontScale: () => 1 }));
+vi.mock('@/lib/narrow-layout', () => ({ isNarrowLayout: () => false }));
 
 const SWITCH = 'Switch' as ElementType;
 const ICON_BUTTON = 'IconButton' as ElementType;

@@ -48,7 +48,9 @@ export function TriggerSelectRow({
         onPress={onPress}
         className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 active:opacity-70')}
       >
-        <Text className="shrink-0 text-sm text-muted-foreground">{label}</Text>
+        <Text variant="muted" className="shrink-0">
+          {label}
+        </Text>
         <Text
           numberOfLines={1}
           className={cn(
@@ -91,11 +93,7 @@ export function TriggerSwitchRow({
         >
           {title}
         </Text>
-        {description === undefined ? null : (
-          <Text variant="muted" className="text-xs">
-            {description}
-          </Text>
-        )}
+        {description === undefined ? null : <Text variant="caption">{description}</Text>}
       </View>
       <Switch
         accessibilityLabel={title}

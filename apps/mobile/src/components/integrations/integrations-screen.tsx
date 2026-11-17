@@ -10,7 +10,9 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { useConfirmDialog } from '@/components/ui/dialog';
-import { Skeleton } from '@/components/ui/skeleton';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { openAppShellHandoff } from '@/lib/app-shell-handoff';
 import {
@@ -23,6 +25,7 @@ import { useBitbucketIntegrationStatus } from '@/lib/hooks/use-bitbucket';
 import { bitbucketConnectHref } from '@/lib/bitbucket-connect-navigation';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useOrgDeepLinkSelection } from '@/lib/hooks/use-org-deep-link-selection';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { buildIntegrationRows, type IntegrationRow } from '@/lib/integrations/integration-rows';
 import {
@@ -201,18 +204,14 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
       />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="px-4 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
       >
-        <View className="gap-4">
-          <Text className="text-sm text-muted-foreground">{t('integrations.subtitle')}</Text>
-          {namesOwner ? (
-            <Text className="text-xs text-muted-foreground">
-              {t('integrations.managedByOwner')}
-            </Text>
-          ) : null}
+        <Section>
+          <Text variant="muted">{t('integrations.subtitle')}</Text>
+          {namesOwner ? <Text variant="caption">{t('integrations.managedByOwner')}</Text> : null}
           {rows.length > 0 ? (
-            <View className="rounded-lg bg-secondary px-3">
+            <RowGroup leadingTile>
               {rows.map(row => (
                 <IntegrationProviderRow
                   key={row.provider}
@@ -236,9 +235,9 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
                   retryingConnection={bitbucket.isFetching}
                 />
               ))}
-            </View>
+            </RowGroup>
           ) : null}
-        </View>
+        </Section>
       </TabScreenScrollView>
       {dialog}
     </View>
@@ -257,16 +256,15 @@ function IntegrationsSkeleton({ organizationName }: Readonly<{ organizationName?
       />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="px-4 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
       >
-        <Animated.View exiting={FadeOut.duration(150)} className="gap-4">
-          <Skeleton className="h-4 w-3/4 rounded" />
-          <View className="rounded-lg bg-secondary px-3">
+        <Animated.View exiting={FadeOut.duration(150)}>
+          <RowGroup leadingTile>
             {Array.from({ length: 5 }, (_, index) => (
-              <Skeleton key={index} className="my-3 h-9 w-full rounded" />
+              <RowSkeleton key={index} tile subtitle />
             ))}
-          </View>
+          </RowGroup>
         </Animated.View>
       </TabScreenScrollView>
     </View>

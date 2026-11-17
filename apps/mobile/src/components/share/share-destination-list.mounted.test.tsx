@@ -42,20 +42,20 @@ vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/icons', () => ({
   Search: 'Search',
   Share2: 'Share2',
   Terminal: 'Terminal',
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/ui/row-skeleton', () => ({ RowSkeleton: 'RowSkeleton' }));
+vi.mock('@/components/ui/row-group', () => ({ RowGroup: 'RowGroup' }));
+vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
 vi.mock('@/components/agents/session-list-section-header', () => ({
   SessionListSectionHeader: 'SectionHeader',
 }));
 vi.mock('@/components/agents/session-row', () => ({ StoredSessionRow: 'StoredSessionRow' }));
-vi.mock('@/components/destination-option-row', () => ({
-  DestinationOptionRow: 'DestinationOptionRow',
-}));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
 
 const instance: ShareCliSpawnRow = {
@@ -138,7 +138,7 @@ describe('ShareDestinationList surface states', () => {
   it.each([empty, retryable])('keeps $kind inline beside connected CLI choices', async state => {
     const { renderer, unmount } = await mount(state, [instance]);
     const list = renderer.root.find(node => String(node.type) === 'FlashList');
-    expect(list.findAll(node => String(node.type) === 'DestinationOptionRow')).toHaveLength(1);
+    expect(list.findAll(node => String(node.type) === 'ConfigureRow')).toHaveLength(1);
     expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(0);
     if (state.kind === 'retryable') {
       expect(list.find(node => String(node.type) === 'QueryError').props).toMatchObject({
@@ -161,9 +161,7 @@ describe('ShareDestinationList surface states', () => {
     );
     expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(0);
     expect(renderer.root.findAll(node => String(node.type) === 'FlashList')).toHaveLength(0);
-    expect(
-      renderer.root.findAll(node => String(node.type) === 'DestinationOptionRow')
-    ).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'ConfigureRow')).toHaveLength(0);
     const emptyState = renderer.root.find(node => String(node.type) === 'EmptyState');
     expect(emptyState.props).toMatchObject({
       title: 'Share unavailable',
@@ -191,9 +189,7 @@ describe('ShareDestinationList surface states', () => {
     );
     expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(1);
     expect(renderer.root.findAll(node => String(node.type) === 'FlashList')).toHaveLength(0);
-    expect(
-      renderer.root.findAll(node => String(node.type) === 'DestinationOptionRow')
-    ).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'ConfigureRow')).toHaveLength(0);
     unmount();
   });
 
@@ -246,9 +242,7 @@ describe('ShareDestinationList surface states', () => {
       (input.props as { onChangeText: (text: string) => void }).onChangeText('no match');
     });
     expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(0);
-    expect(
-      renderer.root.findAll(node => String(node.type) === 'DestinationOptionRow')
-    ).toHaveLength(1);
+    expect(renderer.root.findAll(node => String(node.type) === 'ConfigureRow')).toHaveLength(1);
     expect(renderer.root.findAll(node => String(node.type) === 'StoredSessionRow')).toHaveLength(0);
     unmount();
   });
@@ -261,7 +255,7 @@ describe('ShareDestinationList surface states', () => {
       showList: true,
       listMode: 'skeleton',
     });
-    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(5);
+    expect(renderer.root.findAll(node => String(node.type) === 'RowSkeleton')).toHaveLength(5);
     expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(0);
     unmount();
   });

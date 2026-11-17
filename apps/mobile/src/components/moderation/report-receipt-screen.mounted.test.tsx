@@ -118,14 +118,20 @@ async function mount() {
   return view.renderer.root;
 }
 
+/** A `Text` node's visible string, whichever shape the primitive handed it. */
+function textOf(node: { props: { children?: unknown } }) {
+  const children = Array.isArray(node.props.children) ? node.props.children : [node.props.children];
+  return children.filter(child => typeof child === 'string').join('');
+}
+
 function texts(root: ReactTestRenderer['root']) {
-  return root.findAll(node => Object.is(node.type, 'Text')).map(node => node.props.children);
+  return root.findAll(node => Object.is(node.type, 'Text')).map(node => textOf(node));
 }
 
 function textNode(root: ReactTestRenderer['root'], value: string) {
-  const [node] = root.findAll(
-    candidate => Object.is(candidate.type, 'Text') && candidate.props.children === value
-  );
+  const node = root
+    .findAll(candidate => Object.is(candidate.type, 'Text'))
+    .find(candidate => textOf(candidate) === value);
   if (!node) {
     throw new Error(`missing text node for ${value}`);
   }
@@ -172,14 +178,14 @@ describe('ReportReceiptScreen', () => {
       throw new Error('missing copy control');
     }
 
-    // The copy row cuts at the middle, so both ends of the id stay visible while
-    // the control copies it whole; the status rows keep one line, end cut.
+    // Every value row cuts at the middle, so both ends of a truncated value
+    // stay visible, and the copy control carries the id whole.
     expect(textNode(root, RECEIPT_ID).props.numberOfLines).toBe(1);
     expect(textNode(root, RECEIPT_ID).props.ellipsizeMode).toBe('middle');
     expect(textNode(root, 'Received').props.numberOfLines).toBe(1);
-    expect(textNode(root, 'Received').props.ellipsizeMode).toBe('tail');
+    expect(textNode(root, 'Received').props.ellipsizeMode).toBe('middle');
     expect(textNode(root, 'None submitted').props.numberOfLines).toBe(1);
-    expect(textNode(root, 'None submitted').props.ellipsizeMode).toBe('tail');
+    expect(textNode(root, 'None submitted').props.ellipsizeMode).toBe('middle');
 
     act(() => {
       (copyControl.props.onPress as () => void)();

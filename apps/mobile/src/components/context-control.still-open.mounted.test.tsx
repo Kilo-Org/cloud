@@ -14,6 +14,10 @@ const pushMock = vi.hoisted(() => vi.fn());
 type NavigationState = { index: number; routes: { name: string }[] };
 const navigation = vi.hoisted(() => ({
   getState: vi.fn<() => NavigationState | undefined>(() => undefined),
+  /** The navigator above: set per test to exercise the ancestor walk. */
+  getParent: vi.fn<() => { getState: () => NavigationState | undefined } | undefined>(
+    () => undefined
+  ),
 }));
 type FocusEffect = () => (() => void) | undefined;
 const focusEffects = vi.hoisted(() => [] as FocusEffect[]);
@@ -151,6 +155,7 @@ describe('openPicker while the account picker route is already presented', () =>
     slotSet.mockReset();
     pushMock.mockReset();
     navigation.getState.mockReset().mockReturnValue(undefined);
+    navigation.getParent.mockReset().mockReturnValue(undefined);
     focusEffects.length = 0;
     list.mockReset().mockReturnValue(orgs as unknown as Promise<typeof orgs>);
   });
@@ -182,6 +187,18 @@ describe('openPicker while the account picker route is already presented', () =>
   it('returns without writing or pushing when the route is already presented', async () => {
     const ui = await mount();
     navigation.getState.mockReturnValue(PRESENTED_STATE);
+    await openPicker(ui);
+    expect(pushMock).toHaveBeenCalledTimes(0);
+    expect(contextPickerSlot.get(UNFENCED_ROUTE_KEY)).toBeUndefined();
+  });
+
+  it('walks to the parent navigator when only its own state shows the sheet', async () => {
+    // The tab-in-(app)-stack shape: the control's nearest navigator still
+    // reports the tab row on top while the parent `(app)` stack carries the
+    // presented context-picker — the shape the stacking bug came from.
+    const ui = await mount();
+    navigation.getState.mockReturnValue({ index: 0, routes: [{ name: 'index' }] });
+    navigation.getParent.mockReturnValue({ getState: () => PRESENTED_STATE });
     await openPicker(ui);
     expect(pushMock).toHaveBeenCalledTimes(0);
     expect(contextPickerSlot.get(UNFENCED_ROUTE_KEY)).toBeUndefined();

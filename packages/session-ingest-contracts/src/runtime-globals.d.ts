@@ -17,7 +17,7 @@ declare var TextEncoder: new () => {
 
 declare var TextDecoder: new (
   encoding?: string,
-  options?: { fatal?: boolean; ignoreBOM?: boolean },
+  options?: { fatal?: boolean; ignoreBOM?: boolean }
 ) => { readonly encoding: string; decode(input?: ArrayBuffer | ArrayBufferView): string };
 
 declare var atob: (data: string) => string;

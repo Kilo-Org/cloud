@@ -26,6 +26,7 @@ import { fetchGeneration } from './providers/upstream-request';
 import { OPENROUTER } from './providers/definitions/openrouter';
 import { VERCEL_AI_GATEWAY } from './providers/definitions/vercel';
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
+import { isStagingDeployment } from '@kilocode/web-shared/lib/constants';
 import { captureException, captureMessage, startSpan, startInactiveSpan } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
 import PostHogClient from '@kilocode/web-shared/lib/posthog';
@@ -441,11 +442,9 @@ async function enqueueUsageWithinLifetime(
 type UsageAccountingTransport = 'queue' | 'direct';
 
 function usageAccountingTransport(): UsageAccountingTransport {
-  const vercelEnv = process.env.VERCEL_ENV;
-  const targetEnv = process.env.VERCEL_TARGET_ENV;
-  const staging = targetEnv === 'staging' && vercelEnv !== 'production';
-  const production = vercelEnv === 'production' && targetEnv === 'production';
-  return staging || production ? 'queue' : 'direct';
+  const production =
+    process.env.VERCEL_ENV === 'production' && process.env.VERCEL_TARGET_ENV === 'production';
+  return isStagingDeployment() || production ? 'queue' : 'direct';
 }
 
 export async function logMicrodollarUsage(

@@ -42,6 +42,23 @@ export type ConsumedAppShellHandoff = {
 };
 
 /**
+ * Deletes the hand-off rows no request can use again: ones a browser already
+ * consumed, and ones whose two-minute window has passed. The mint-then-consume
+ * flow adds a row per hand-off, so the sweep runs with the other credential
+ * cleanup jobs; a consumed row is dead the moment it is spent, and keeping it
+ * would only serve an audit the token digest cannot support.
+ */
+export async function cleanupExpiredAppShellHandoffTokens(): Promise<number> {
+  const result = await db
+    .delete(app_shell_handoff_tokens)
+    .where(
+      sql`${app_shell_handoff_tokens.expires_at} <= NOW() OR ${app_shell_handoff_tokens.consumed_at} IS NOT NULL`
+    );
+
+  return result.rowCount ?? 0;
+}
+
+/**
  * Consumes the token in one conditional update, so a replay — including two
  * requests racing on the same token — gets a result exactly once.
  */

@@ -3,7 +3,11 @@ import { and, eq } from 'drizzle-orm';
 import { app_shell_handoff_tokens } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { consumeAppShellHandoff, createAppShellHandoff } from './handoff-token';
+import {
+  cleanupExpiredAppShellHandoffTokens,
+  consumeAppShellHandoff,
+  createAppShellHandoff,
+} from './handoff-token';
 
 const createdUserIds: string[] = [];
 
@@ -58,6 +62,30 @@ describe('app shell hand-off tokens', () => {
   it('refuses an unknown token', async () => {
     await expect(consumeAppShellHandoff('not-a-minted-token')).resolves.toBeNull();
     await expect(consumeAppShellHandoff('')).resolves.toBeNull();
+  });
+
+  it('sweeps expired and consumed rows and keeps a live token', async () => {
+    const live = await mintHandoff('/app-shell/github-app');
+    const expired = await mintHandoff('/app-shell/sign-in');
+    const consumed = await mintHandoff('/app-shell/integrations/slack');
+
+    await db
+      .update(app_shell_handoff_tokens)
+      .set({ expires_at: new Date(Date.now() - 1000).toISOString() })
+      .where(eq(app_shell_handoff_tokens.kilo_user_id, expired.userId));
+    await expect(consumeAppShellHandoff(consumed.token)).resolves.not.toBeNull();
+
+    await expect(cleanupExpiredAppShellHandoffTokens()).resolves.toBeGreaterThanOrEqual(2);
+
+    const rowsOf = (userId: string) =>
+      db
+        .select()
+        .from(app_shell_handoff_tokens)
+        .where(eq(app_shell_handoff_tokens.kilo_user_id, userId));
+
+    await expect(rowsOf(expired.userId)).resolves.toHaveLength(0);
+    await expect(rowsOf(consumed.userId)).resolves.toHaveLength(0);
+    await expect(rowsOf(live.userId)).resolves.toHaveLength(1);
   });
 
   it('stores only a digest of the token', async () => {

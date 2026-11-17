@@ -398,6 +398,35 @@ test('reports a malformed wording-exceptions file instead of throwing', () => {
   );
 });
 
+test('reports a valid JSON wording-exceptions value of the wrong shape', () => {
+  // JSON.parse accepts every one of these, so the shape of the parsed value is
+  // the only thing between the file and the callers that index it by tag.
+  for (const shape of ['null', '[]', '0', '"text"']) {
+    const found = run({ wordingExceptions: shape });
+    assert.match(
+      found.join('\n'),
+      /check-catalogs: cannot read tools\/i18n\/wording-exceptions\.json: expected an object that maps each tag to a list of English strings/
+    );
+  }
+});
+
+test('reports a wording-exceptions entry that is not a list of strings', () => {
+  // A number is not iterable, a null entry is not a set of strings, and a bare
+  // string iterates character by character in the callers.
+  for (const entry of [5, null, 'Agents']) {
+    const found = run({ wordingExceptions: JSON.stringify({ ru: entry }) });
+    assert.match(
+      found.join('\n'),
+      /check-catalogs: cannot read tools\/i18n\/wording-exceptions\.json: expected an object that maps each tag to a list of English strings/
+    );
+  }
+});
+
+test('accepts a wording-exceptions map of tag to string list', () => {
+  const found = run({ wordingExceptions: JSON.stringify({ ru: [] }) });
+  assert.ok(!found.join('\n').includes('cannot read'), found.join('\n'));
+});
+
 test('ignores a mounted-harness helper while a source file still reports its keys', () => {
   const source = "t('agents.missing');\n";
   const inSource = run({ source });

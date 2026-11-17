@@ -557,9 +557,8 @@ export const startLocalAgentsHost = (
       });
 
       if (!redeemed.ok) {
-        if (redeemed.reason !== 'invalid') {
-          await savePairingNotice(storage, redeemed.reason);
-        }
+        // Every reason has a settings hint; none of them ends the attempt silently.
+        await savePairingNotice(storage, redeemed.reason);
 
         return;
       }

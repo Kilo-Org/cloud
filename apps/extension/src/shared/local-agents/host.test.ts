@@ -748,6 +748,40 @@ describe('pairing admission', () => {
     host.stop();
   });
 
+  it('shows a retry hint when the CLI cannot be reached', async () => {
+    const harness = createHarness();
+    harness.storage.items.set(LOCAL_AGENT_SETTINGS_STORAGE_KEY, { enabled: true });
+    harness.pairingResults.set(TOKEN, { status: 503 });
+    const host = startHost(harness);
+    await host.ready;
+
+    harness.listeners.tabUpdated?.(83, { url: PAIRING_URL }, { url: PAIRING_URL });
+
+    await vi.waitFor(async () => {
+      await expect(loadPairingNotice(harness.storage)).resolves.toBe('unreachable');
+    });
+    expect(harness.storage.items.get(LOCAL_AGENT_ENDPOINTS_STORAGE_KEY)).toBeUndefined();
+    expect(harness.sockets).toHaveLength(0);
+    host.stop();
+  });
+
+  it('shows an update hint when the CLI sends an invalid response', async () => {
+    const harness = createHarness();
+    harness.storage.items.set(LOCAL_AGENT_SETTINGS_STORAGE_KEY, { enabled: true });
+    harness.pairingResults.set(TOKEN, { key: 'short', ws: WS });
+    const host = startHost(harness);
+    await host.ready;
+
+    harness.listeners.tabUpdated?.(84, { url: PAIRING_URL }, { url: PAIRING_URL });
+
+    await vi.waitFor(async () => {
+      await expect(loadPairingNotice(harness.storage)).resolves.toBe('invalid');
+    });
+    expect(harness.storage.items.get(LOCAL_AGENT_ENDPOINTS_STORAGE_KEY)).toBeUndefined();
+    expect(harness.sockets).toHaveLength(0);
+    host.stop();
+  });
+
   it('replaces the key and URL when the same hub pairs again, dropping its old rows', async () => {
     const harness = createHarness();
     seedEnabledWithEndpoint(harness.storage);

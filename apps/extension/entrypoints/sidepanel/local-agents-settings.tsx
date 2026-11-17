@@ -35,8 +35,10 @@ const HOST_MISSING_PERMISSION_HINT =
   'Native messaging is blocked. Turn the switch off and on, then allow the permission prompt.';
 const PAIRING_NOTICE_HINTS = {
   expired: 'Pairing link expired. Run pairing again.',
+  invalid: 'The Kilo CLI sent an invalid pairing response. Update the Kilo CLI and the extension.',
   not_allowed:
     'The CLI did not allow this browser. Run any Kilo CLI command once, then pair again.',
+  unreachable: 'Could not reach the Kilo CLI. Make sure it is running, then run pairing again.',
 } satisfies Record<LocalAgentPairingNotice, string>;
 const WAITING_HINT = 'Waiting for a Kilo CLI…';
 const IDLE_HINT = 'No agents connected.';

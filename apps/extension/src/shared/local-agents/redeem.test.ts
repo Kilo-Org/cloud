@@ -57,7 +57,7 @@ describe('pairing key redemption', () => {
     });
     await expect(redeem(fetchReturning(500, null).fetchImpl)).resolves.toStrictEqual({
       ok: false,
-      reason: 'invalid',
+      reason: 'unreachable',
     });
   });
 
@@ -93,9 +93,16 @@ describe('pairing key redemption', () => {
     });
   });
 
-  it('treats a transport failure as invalid', async () => {
+  it('treats a transport failure as retryable', async () => {
     const failing: LocalAgentFetch = () => Promise.reject(new Error('offline'));
 
-    await expect(redeem(failing)).resolves.toStrictEqual({ ok: false, reason: 'invalid' });
+    await expect(redeem(failing)).resolves.toStrictEqual({ ok: false, reason: 'unreachable' });
+  });
+
+  it('keeps a malformed response non-retryable', async () => {
+    await expect(redeem(fetchReturning(200, null).fetchImpl)).resolves.toStrictEqual({
+      ok: false,
+      reason: 'invalid',
+    });
   });
 });

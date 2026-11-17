@@ -9,11 +9,11 @@ import type { LocalAgentStorageArea } from './storage';
 
 export const LOCAL_AGENT_PAIRING_NOTICE_STORAGE_KEY = 'session:kiloLocalAgentPairingNotice';
 
-export type LocalAgentPairingNotice = 'expired' | 'not_allowed';
+export type LocalAgentPairingNotice = 'expired' | 'invalid' | 'not_allowed' | 'unreachable';
 
 export const pairingNoticeSchema = z
   .object({
-    notice: z.enum(['expired', 'not_allowed']).nullable().default(null),
+    notice: z.enum(['expired', 'invalid', 'not_allowed', 'unreachable']).nullable().default(null),
   })
   .strip();
 

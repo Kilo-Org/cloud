@@ -10,7 +10,7 @@ import type { LocalAgentStoredEndpoint } from './pairing';
  * is not allowlisted, 404 means the token is unknown, expired, or already used.
  */
 
-export type LocalAgentRedeemFailure = 'expired' | 'invalid' | 'not_allowed';
+export type LocalAgentRedeemFailure = 'expired' | 'invalid' | 'not_allowed' | 'unreachable';
 
 export type LocalAgentRedeemResult =
   | { ok: true; endpoint: LocalAgentStoredEndpoint }
@@ -66,11 +66,16 @@ export const redeemPairingKey = async ({
       method: 'POST',
     });
   } catch {
-    return { ok: false, reason: 'invalid' };
+    // A transport failure says nothing about the request, so it is retryable.
+    return { ok: false, reason: 'unreachable' };
   }
 
   if (response === null) {
-    return { ok: false, reason: 'invalid' };
+    return { ok: false, reason: 'unreachable' };
+  }
+
+  if (response.status >= 500) {
+    return { ok: false, reason: 'unreachable' };
   }
 
   if (response.status === 403) {

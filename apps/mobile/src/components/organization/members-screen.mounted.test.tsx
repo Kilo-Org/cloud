@@ -295,9 +295,9 @@ describe('OrganizationMembersScreen empty-state precedence', () => {
     expect(texts).not.toContain('EMPTY_STATE:No members yet');
   });
 
-  it('keeps a skeleton over an in-flight read with neither data nor answer yet', async () => {
-    // Pending, not fetching yet (isLoading false is the paused shape), no data,
-    // no error: neither settled body may render — the list skeleton holds.
+  it('keeps a skeleton over a read with neither data nor an answer yet', async () => {
+    // Pending with no fetch in flight and no error: the screen renders no
+    // settled body — the list skeleton holds until the read answers.
     withMembersQuery.isPending = true;
     withMembersQuery.isLoading = false;
     withMembersQuery.data = undefined;

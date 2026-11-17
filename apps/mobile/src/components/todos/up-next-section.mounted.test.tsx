@@ -71,7 +71,7 @@ const ACTION_LABEL: Record<string, true> = {
   'notifications.action.openSession': true,
   'agentChat.newSession.startSession': true,
 };
-const CIRCLE_CLASS = 'size-10 items-center justify-center rounded-full bg-secondary';
+const CIRCLE_CLASS = 'size-10 items-center justify-center rounded-full bg-background';
 
 /** The row's own pressable is labelled with the item title, so only these two match. */
 function trailingActions(root: ReactTestInstance): ReactTestInstance[] {

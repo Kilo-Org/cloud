@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type TextInput } from 'react-native';
 
 import '@/i18n';
-import { MIN_TAP_TARGET_DP, TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
+import { FIELD_CLEAR_BOX_CLASS, MIN_TAP_TARGET_DP, TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
 import { SessionListSearchHeader } from './session-list-search-header';
 
 const state = vi.hoisted(() => ({
@@ -65,6 +65,22 @@ function fieldRow(renderer: TestRenderer.ReactTestRenderer) {
   return row;
 }
 
+/** The un-bordered frame that owns the page gutter and the sensor insets. */
+function fieldGutter(renderer: TestRenderer.ReactTestRenderer) {
+  const gutter = renderer.root
+    .findAll(
+      node =>
+        node.type === ('View' as ElementType) &&
+        typeof node.props.className === 'string' &&
+        node.props.className.split(' ').includes('px-4')
+    )
+    .at(0);
+  if (!gutter) {
+    throw new Error('search field gutter was not found');
+  }
+  return gutter;
+}
+
 function searchInput(renderer: TestRenderer.ReactTestRenderer) {
   const input = renderer.root.findAll(node => node.type === ('TextInput' as ElementType)).at(0);
   if (!input) {
@@ -96,25 +112,29 @@ describe('SessionListSearchHeader landscape sensor insets', () => {
   it('keeps the page gutter in portrait where the side insets are 0', async () => {
     state.insets = { top: 59, right: 0, bottom: 34, left: 0 };
     const renderer = await mount(<SessionListSearchHeader {...baseProps} />);
-    expect(String(fieldRow(renderer).props.className).split(' ')).toContain('px-4');
-    expect(fieldRow(renderer).props.style).toBeUndefined();
+    expect(String(fieldGutter(renderer).props.className).split(' ')).toContain('px-4');
+    expect(fieldGutter(renderer).props.style).toBeUndefined();
+    // The bordered field keeps its own inset, outside the page gutter.
+    expect(String(fieldRow(renderer).props.className).split(' ')).toContain('px-2');
+    expect(String(fieldRow(renderer).props.className).split(' ')).not.toContain('px-4');
   });
 
   it('gains the landscape sensor insets on both sides so the field clears the housing', async () => {
     state.insets = { top: 59, right: 59, bottom: 34, left: 47 };
     const renderer = await mount(<SessionListSearchHeader {...baseProps} />);
-    expect(fieldRow(renderer).props.style).toEqual({ paddingLeft: 47, paddingRight: 59 });
+    expect(fieldGutter(renderer).props.style).toEqual({ paddingLeft: 47, paddingRight: 59 });
+    expect(fieldRow(renderer).props.style).toBeUndefined();
   });
 
   it('updates the insets on rotation without a remount', async () => {
     state.insets = { top: 59, right: 0, bottom: 34, left: 0 };
     const renderer = await mount(<SessionListSearchHeader {...baseProps} />);
-    expect(fieldRow(renderer).props.style).toBeUndefined();
+    expect(fieldGutter(renderer).props.style).toBeUndefined();
     state.insets = { top: 59, right: 59, bottom: 34, left: 47 };
     await act(() => {
       renderer.update(<SessionListSearchHeader {...baseProps} />);
     });
-    expect(fieldRow(renderer).props.style).toEqual({ paddingLeft: 47, paddingRight: 59 });
+    expect(fieldGutter(renderer).props.style).toEqual({ paddingLeft: 47, paddingRight: 59 });
   });
 
   it('asks the IME for no full-screen editor so the screen keeps the keyboard', async () => {
@@ -195,38 +215,28 @@ describe('SessionListSearchHeader clear control', () => {
         node.type === ('Pressable' as ElementType) &&
         node.props.accessibilityLabel === 'Clear search'
     );
-    // `h-10 w-10` are theme lengths (`calc(var(--spacing) * 10)`), so the dp
-    // follows the compiler's baked-in 14pt rem rather than a literal.
+    const className = clear.props.className as string;
     const box = {
-      height: await compiledLengthDp(clear.props.className as string, 'height'),
-      width: await compiledLengthDp(clear.props.className as string, 'width'),
+      height: await compiledLengthDp(className, 'height'),
+      width: await compiledLengthDp(className, 'width'),
     };
     return {
       renderer,
       box,
-      slop: clear.props.hitSlop as { top: number; right: number; bottom: number; left: number },
+      className,
       rowClassName: fieldRow(renderer).props.className as string,
     };
   }
 
-  it('lays out a box at least 28dp on a side', async () => {
-    const { box } = await mountWithClear();
+  it('lays out the shared clear box on the control itself', async () => {
+    const { box, className } = await mountWithClear();
+    expect(className).toContain(FIELD_CLEAR_BOX_CLASS);
     expect(box.height).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
     expect(box.width).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
-  });
-
-  it('carries the reach past the 44pt minimum target, not onto it', async () => {
-    const { box, slop } = await mountWithClear();
-    expect(box.height + slop.top + slop.bottom).toBeGreaterThan(TOUCH_TARGET_DP);
-    expect(box.width + slop.left + slop.right).toBeGreaterThan(TOUCH_TARGET_DP);
-  });
-
-  it('stops the clear control left of the row gap, so it cannot cover the input', async () => {
-    const { slop, rowClassName } = await mountWithClear();
-    // The row's `gap-2` compiles to 7pt at the app's 14pt rem; the control's
-    // left slop meets the input at that gap instead of reaching into it.
-    expect(await compiledLengthDp(rowClassName, 'gap')).toBe(7);
-    expect(slop.left).toBeLessThanOrEqual(7);
+    // The box alone now clears the design target, so the frame carries no reach
+    // toward the field beside it.
+    expect(box.height).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    expect(box.width).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
   });
 
   it('keeps the clear control inside the shared field floor', async () => {
@@ -234,10 +244,10 @@ describe('SessionListSearchHeader clear control', () => {
     const rowClasses = String(fieldRow(renderer).props.className).split(' ');
 
     // The row carries no vertical padding or floor of its own: the shared
-    // input box's 44pt `min-h` lays it out, and the clear control stays under
-    // that floor, so typing cannot shift the list.
+    // input box's 44pt `min-h` lays it out, and the clear box's `-my-[7px]`
+    // leaves 34pt of cross size, so typing cannot shift the list.
     expect(rowClasses.some(name => /^(?:py|p)-/.test(name))).toBe(false);
     expect(rowClasses.some(name => name.startsWith('min-h-'))).toBe(false);
-    expect(box.height).toBeLessThanOrEqual(44);
+    expect(box.height - 14).toBeLessThanOrEqual(44);
   });
 });

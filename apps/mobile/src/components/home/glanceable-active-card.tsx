@@ -197,20 +197,20 @@ export function GlanceableActiveCardSkeleton() {
       <View className={COUNTS_CLASS}>
         {STATUS_FILTER_ORDER.map(line => (
           <View key={line.kind} className={COUNT_ROW_CLASS}>
-            <Skeleton className="size-3 rounded-full" />
-            <Skeleton className="h-3 w-6 rounded" />
-            <Skeleton className="h-3 w-24 rounded" />
+            <Skeleton className="size-3 rounded-full bg-muted-soft" />
+            <Skeleton className="h-3 w-6 rounded bg-muted-soft" />
+            <Skeleton className="h-3 w-24 rounded bg-muted-soft" />
           </View>
         ))}
       </View>
       <View className={DIVIDER_CLASS} />
       <View className={NEWEST_BLOCK_CLASS}>
         <View className="min-h-5 justify-center">
-          <Skeleton className="h-3 w-2/3 rounded" />
+          <Skeleton className="h-3 w-2/3 rounded bg-muted-soft" />
         </View>
         <View className={NEWEST_ROW_CLASS}>
-          <Skeleton className="size-3 rounded-full" />
-          <Skeleton className="h-3 w-20 rounded" />
+          <Skeleton className="size-3 rounded-full bg-muted-soft" />
+          <Skeleton className="h-3 w-20 rounded bg-muted-soft" />
         </View>
       </View>
     </View>

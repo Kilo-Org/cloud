@@ -2,10 +2,9 @@ import { useState } from 'react';
 import { Pressable } from 'react-native';
 
 import { showNamePreview } from '@/components/todos/list-settings-name-selection';
-import { Input } from '@/components/ui/input';
+import { Input, INPUT_BOX_SHAPE_CLASS } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 
 /**
  * The name box, over the shared `Input`: an unfocused single-line Android
@@ -40,8 +39,8 @@ export function NameField(
           setEditing(true);
         }}
         className={cn(
-          ROW_TARGET_CLASS,
-          'justify-center rounded-md border border-input bg-background px-2'
+          INPUT_BOX_SHAPE_CLASS,
+          'justify-center rounded-md border border-input bg-background'
         )}
       >
         <Text className="text-base text-foreground" numberOfLines={1}>

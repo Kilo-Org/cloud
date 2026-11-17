@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one preview surface: the backdrop, the card's open/close gesture, the polled live row, the action menu and the delete/rename confirmations read as one component */
 import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { Portal } from '@rn-primitives/portal';
 import { useQuery } from '@tanstack/react-query';
@@ -350,9 +351,11 @@ function SessionPreviewContent({
           style={containerStyle}
         >
           <Animated.View style={[cardStyle, cardHeightStyle]}>
-            <Card className="flex-1 overflow-hidden">
+            <Card padding="none" className="flex-1">
               <GestureDetector gesture={pan}>
-                <View className="flex-row items-center gap-3">
+                {/* The header owns its inset inside the card surface; the
+                    transcript below brings its own row padding. */}
+                <View className="flex-row items-center gap-3 px-4 py-3">
                   <SessionPreviewHeaderMeta target={target} liveRow={liveRow} />
                 </View>
               </GestureDetector>

@@ -5,19 +5,11 @@ import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 
 import { Input } from '@/components/ui/input';
-import { COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
+import { FIELD_CLEAR_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
 import { useSideInsetStyle } from '@/lib/screen-insets';
 import { cn } from '@/lib/utils';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-
-// NativeWind's gap-2 is 7pt; cap the clear target's facing slop at that gap.
-const CLEAR_HIT_SLOP = {
-  top: COMPACT_CONTROL_HIT_SLOP_DP,
-  bottom: COMPACT_CONTROL_HIT_SLOP_DP,
-  right: COMPACT_CONTROL_HIT_SLOP_DP,
-  left: 7,
-};
 
 type SessionListSearchHeaderProps = {
   inputRef: RefObject<TextInput | null>;
@@ -55,18 +47,15 @@ export function SessionListSearchHeader({
   // area clear of the sensor housing; portrait insets are 0, leaving only the
   // page gutter.
   const sideInsetStyle = useSideInsetStyle();
+  // The gutter and the landscape sensor insets sit outside the bordered field,
+  // so the field's border box keeps only its own inset (`px-2`) and the page
+  // inset never becomes padding inside it.
   return (
-    <View className={inline ? 'min-w-0 flex-1' : undefined}>
-      <View
-        style={inline ? undefined : sideInsetStyle}
-        className={cn(
-          // The same field recipe `FormField` draws: the canvas fill, the input
-          // border token and the control radius. The compact field sits in a
-          // header row, so it carries the page gutter rather than a card.
-          'flex-row items-center gap-2 rounded-md border border-input bg-background px-2',
-          !inline && cn('my-2', SCREEN_GUTTER_CLASS)
-        )}
-      >
+    <View
+      style={inline ? undefined : sideInsetStyle}
+      className={cn(inline ? 'min-w-0 flex-1' : cn('my-2', SCREEN_GUTTER_CLASS))}
+    >
+      <View className="flex-row items-center gap-2 rounded-md border border-input bg-background px-2">
         {/* Fixed-size slot: the spinner swaps in for the icon, so the row never reflows. */}
         <View className="size-5 items-center justify-center">
           {showSearchBusy ? (
@@ -108,19 +97,10 @@ export function SessionListSearchHeader({
             onPress={onClearSearch}
             accessibilityLabel={t('common.clearSearch')}
             accessibilityRole="button"
-            // The frame, not the 16pt glyph, is what the size audit measures.
-            // One size, spelled as the spacing scale the mounted test compiles:
-            // the 40pt box clears the 28dp floor, and the shared 8pt slop
-            // carries the reach past the 44pt target rather than onto it,
-            // because `@/lib/a11y/tap-target` records a 44dp target measuring
-            // 43.81dp at density 420. The shared field's `min-h-[44px]` floor
-            // already holds this box plus the input's border, so the control
-            // never grows the row. A second `h-*`/`w-*` pair here would set the
-            // same properties and leave the real size to Tailwind's emit order.
-            // `-mr-2` keeps the glyph near its old inset and the frame's left
-            // edge inside the field's right padding.
-            hitSlop={CLEAR_HIT_SLOP}
-            className="-mr-2 h-10 w-10 items-center justify-center active:opacity-70"
+            // The shared in-field clear box carries the whole 48pt target on its
+            // own node, so the 16pt glyph is never what the size audit measures
+            // and the frame needs no `hitSlop` toward the input beside it.
+            className={cn(FIELD_CLEAR_BOX_CLASS, 'active:opacity-70')}
           >
             <X size={16} color={colors.mutedForeground} />
           </Pressable>

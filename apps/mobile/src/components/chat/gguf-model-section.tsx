@@ -258,7 +258,7 @@ export function GgufModelSection({
       </Button>
       {snapshot.loadFailed && (
         <Card>
-          <Text variant="heading">{t('common.couldNotLoadModels')}</Text>
+          <Text>{t('common.couldNotLoadModels')}</Text>
           <Button
             variant="outline"
             onPress={() => {

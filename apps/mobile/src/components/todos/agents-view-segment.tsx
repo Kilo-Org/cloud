@@ -3,7 +3,7 @@ import { Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
 import { tabEntryA11y } from '@/lib/a11y/tab-entry';
-import { textActionTargetClass } from '@/lib/a11y/tap-target';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
 export type AgentsView = 'sessions' | 'todos';
@@ -29,8 +29,8 @@ export function AgentsViewSegment({
             }
           }}
           className={cn(
-            textActionTargetClass(),
-            'shrink justify-center border-b-2 active:opacity-70',
+            ROW_TARGET_CLASS,
+            'shrink self-stretch justify-center border-b-2 active:opacity-70',
             value === view ? 'border-foreground' : 'border-transparent'
           )}
         >

@@ -242,9 +242,8 @@ function press(label: string) {
 /** The one glanceable card's frame; absent while no card is shown. */
 // The Home card now renders through the shared adaptive frame that holds the
 // live card, the briefing and the pending placeholder.
-const CARD_FRAME = 'flex-row items-stretch overflow-hidden rounded-xl bg-secondary';
 function cardFrame() {
-  return nodes('View').find(node => node.props.className === CARD_FRAME);
+  return nodes('View').find(node => node.props.testID === 'home-card-frame');
 }
 /** The card's newest-session title line, the card's stable identity. */
 function newestTitleNode() {

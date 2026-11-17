@@ -9,30 +9,7 @@ import { compiledLengthDp } from '@/test/native-dimensions';
 import { describe, expect, it, vi } from 'vitest';
 
 import { SessionListSearchHeader } from './session-list-search-header';
-import {
-  COMPACT_CONTROL_HIT_SLOP_DP,
-  MIN_TAP_TARGET_DP,
-  TOUCH_TARGET_DP,
-} from '@/lib/a11y/tap-target';
-
-type Insets = { top: number; right: number; bottom: number; left: number };
-
-/** The clear control's `hitSlop` as per-side insets, validating the shape. */
-function slopInsets(hitSlop: unknown): Insets {
-  if (typeof hitSlop !== 'object' || hitSlop === null) {
-    throw new TypeError(`no measurable hitSlop in ${JSON.stringify(hitSlop)}`);
-  }
-  const insets = hitSlop as Partial<Insets>;
-  if (
-    typeof insets.top !== 'number' ||
-    typeof insets.right !== 'number' ||
-    typeof insets.bottom !== 'number' ||
-    typeof insets.left !== 'number'
-  ) {
-    throw new TypeError(`no measurable hitSlop in ${JSON.stringify(hitSlop)}`);
-  }
-  return { top: insets.top, right: insets.right, bottom: insets.bottom, left: insets.left };
-}
+import { FIELD_CLEAR_BOX_CLASS, MIN_TAP_TARGET_DP, TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
 
 vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
@@ -95,33 +72,25 @@ describe('SessionListSearchHeader clear button touch target', () => {
         node.props.accessibilityLabel === 'common.clearSearch'
     );
 
-    // The glyph is 16pt; sized to it the audit reported 16dp. The frame is
-    // what the audit measures and the slop on top of it carries the reach past
-    // the 44pt target. One box width/height pair only: compiling the class is
-    // what proves the real box, so a second, conflicting pair cannot hide
-    // behind the order Tailwind emits its rules in.
-    expect(clear.props.className).toContain('h-10 w-10');
-    expect(clear.props.className).toContain('items-center');
-    const slop = slopInsets(clear.props.hitSlop);
-    expect(slop.top).toBe(COMPACT_CONTROL_HIT_SLOP_DP);
-    expect(slop.right).toBe(COMPACT_CONTROL_HIT_SLOP_DP);
-    expect(slop.bottom).toBe(COMPACT_CONTROL_HIT_SLOP_DP);
-    // The left side stops at the row's `gap-2` (7pt at the app's 14pt rem) so
-    // the control's touch region meets the input's instead of covering it.
-    expect(slop.left).toBe(7);
+    // The glyph is 16pt; sized to it the audit reported 16dp. The shared clear
+    // box carries the whole target on the control's own node, so no slop is
+    // needed toward the field beside it.
+    const className = clear.props.className as string;
+    expect(className).toContain(FIELD_CLEAR_BOX_CLASS);
+    expect(className).toContain('items-center');
+    expect(clear.props.hitSlop).toBeUndefined();
 
-    // `h-10 w-10` are theme lengths (`calc(var(--spacing) * 10)`), so the dp
-    // follows the compiler's baked-in 14pt rem rather than a literal.
+    // The box's dp follows the compiled class rather than a literal.
     const box = {
-      height: await compiledLengthDp(clear.props.className as string, 'height'),
-      width: await compiledLengthDp(clear.props.className as string, 'width'),
+      height: await compiledLengthDp(className, 'height'),
+      width: await compiledLengthDp(className, 'width'),
     };
     expect(box.height).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
     expect(box.width).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
     // Past 44pt, not onto it: `@/lib/a11y/tap-target` records a 44dp target
     // measuring 43.81dp at density 420.
-    expect(box.height + slop.top + slop.bottom).toBeGreaterThan(TOUCH_TARGET_DP);
-    expect(box.width + slop.left + slop.right).toBeGreaterThan(TOUCH_TARGET_DP);
+    expect(box.height).toBeGreaterThan(TOUCH_TARGET_DP);
+    expect(box.width).toBeGreaterThan(TOUCH_TARGET_DP);
 
     renderer.unmount();
   });
@@ -132,8 +101,9 @@ describe('SessionListSearchHeader clear button touch target', () => {
 
     // Same field in both states: the X appears on the first keystroke and must
     // not move the list below it. The field's floor is the shared input box's
-    // `min-h-[44px]`, taller than the 40pt clear control, so the row class
-    // carries no height of its own and cannot shift.
+    // `min-h-[44px]`, and the clear box cancels its extra height with a
+    // negative vertical margin, so the row class carries no height of its own
+    // and cannot shift.
     const fieldWithText = fieldOf(withText);
     const fieldWithoutText = fieldOf(withoutText);
     expect(fieldWithText.props.className).toBe(fieldWithoutText.props.className);

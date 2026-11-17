@@ -111,6 +111,16 @@ vi.mock('react-native-safe-area-context', () => ({
     right: controls.rightInset,
   }),
 }));
+// The content's skeleton rows are the shared `RowSkeleton`, whose row graph
+// reaches the haptics module and, behind the session helpers, `expo` itself.
+// Both read React Native/expo globals the test renderer does not provide
+// (`__DEV__`), so the native edges stop here.
+vi.mock('expo', () => ({ requireOptionalNativeModule: () => null }));
+vi.mock('@/lib/haptics', () => ({
+  selectionHaptic: vi.fn(),
+  impactHaptic: vi.fn(),
+  notificationHaptic: vi.fn(),
+}));
 vi.mock('@/components/agents/session-row', () => ({ StoredSessionRow: 'StoredSessionRow' }));
 vi.mock('@/components/agents/session-list-section-header', () => ({
   SessionListSectionHeader: 'SessionListSectionHeader',

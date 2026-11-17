@@ -220,7 +220,7 @@ function BackendSettingsContent({
               {backends.length === 0 && <Text>{t('modelChat.backends.empty')}</Text>}
               {backends.map(backend => (
                 <Card key={backend.id}>
-                  <Text variant="heading">{backend.name}</Text>
+                  <Text className="font-medium">{backend.name}</Text>
                   <Text variant="muted">{backend.baseUrl}</Text>
                   {backend.models.map(model => (
                     <BackendProviderChoice

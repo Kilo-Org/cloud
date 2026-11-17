@@ -15,8 +15,8 @@ import { TodoItemRow } from '@/components/todos/todo-item-row';
 import { TodoQuickAdd } from '@/components/todos/todo-quick-add';
 import { useStartTodo } from '@/components/todos/use-start-todo';
 import { useTodoListDefaultsSummary } from '@/components/todos/use-todo-list-defaults-summary';
-import { ConfigureRow } from '@/components/ui/configure-row';
 import { RowChevron } from '@/components/ui/row-chevron';
+import { RowFrame } from '@/components/ui/row-frame';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { ChevronDown, Settings2 } from '@/components/ui/icons';
@@ -48,15 +48,28 @@ function TodoRowsSkeleton() {
 function ListDefaultsLine({ list, onPress }: Readonly<{ list: TodoList; onPress: () => void }>) {
   const { t } = useTranslation();
   const summary = useTodoListDefaultsSummary(list);
+  // The row's title is the resolved defaults, so the accessible name carries
+  // them too; the summary is a whole repository/mode/model sentence and takes
+  // a second line rather than a tail ellipsis.
+  const title = summary ?? t('todos.list.setDefaults');
+  const accessibilityLabel =
+    summary === null
+      ? t('todos.listSettings.title')
+      : `${t('todos.listSettings.title')}: ${summary}`;
   return (
     <View className="mx-4 pb-1">
       <RowGroup leadingTile>
-        <ConfigureRow
+        <RowFrame
           icon={Settings2}
-          title={summary ?? t('todos.list.setDefaults')}
-          accessibilityLabel={t('todos.listSettings.title')}
+          trailing={{ kind: 'chevron' }}
           onPress={onPress}
-        />
+          accessibilityRole="button"
+          accessibilityLabel={accessibilityLabel}
+        >
+          <Text className="text-sm font-medium text-foreground" numberOfLines={2}>
+            {title}
+          </Text>
+        </RowFrame>
       </RowGroup>
     </View>
   );

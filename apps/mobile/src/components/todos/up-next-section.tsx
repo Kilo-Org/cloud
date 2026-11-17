@@ -61,14 +61,14 @@ export function UpNextSection({
             ? t('todos.item.startNewSessionHint')
             : t('todos.item.startNowHint');
           return (
-            <View key={item.id} className="min-h-14 flex-row items-center gap-3 px-4 py-2">
+            <View key={item.id} className="min-h-14 flex-row items-center gap-3 px-4">
               <Pressable
                 onPress={() => {
                   router.push(todoItemPath(item.id));
                 }}
                 accessibilityRole="button"
                 accessibilityLabel={item.title}
-                className="min-w-0 flex-1 flex-row items-center gap-3 active:opacity-70"
+                className="min-w-0 flex-1 flex-row items-center gap-3 py-2 active:opacity-70"
               >
                 <IconTile
                   tint={NEUTRAL_TINT}
@@ -118,7 +118,7 @@ export function UpNextSection({
               >
                 {/* The visible circle keeps its 35pt size inside the frame:
                   DESIGN.md keeps the target, not the visual, at 44pt. */}
-                <View className="size-10 items-center justify-center rounded-full bg-secondary">
+                <View className="size-10 items-center justify-center rounded-full bg-background">
                   {isStarting(item.id) ? (
                     <ActivityIndicator color={colors.foreground} />
                   ) : (

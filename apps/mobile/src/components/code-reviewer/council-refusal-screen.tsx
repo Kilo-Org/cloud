@@ -1,14 +1,16 @@
 import { useRouter } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { CenteredState } from '@/components/centered-state';
+import { useContextPicker } from '@/components/context-control';
 import { Text } from '@/components/ui/text';
 import { UNDER_COPY_ACTION_BOX_CLASS, UNDER_COPY_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { isPersonal } from '@/lib/hooks/use-code-reviewer';
 import { type CouncilRefusalReason } from '@/lib/hooks/use-reviewer-council';
 import { CREATE_ORGANIZATION_HREF } from '@/lib/organization-navigation';
-import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
+import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
 /**
@@ -61,12 +63,14 @@ export function CouncilRefusalScreen({
 }>) {
   const { t } = useTranslation();
   const router = useRouter();
+  const trpc = useTRPC();
+  const orgs = useQuery(trpc.organizations.list.queryOptions()).data;
+  const { openPicker } = useContextPicker(orgs);
   const personal = isPersonal(scope);
   // An unsettled list says nothing about memberships, so its action copy stays
   // neutral: "Create an organization" names a step that exists either way,
   // while "Switch organization" names one only a member can take.
   const actionKey = membershipState === 'some' ? personalActionKey(true) : personalActionKey(false);
-  const actionHref = membershipState === 'some' ? PROFILE_TAB_HREF : CREATE_ORGANIZATION_HREF;
   return (
     <CenteredState contentContainerClassName="px-6">
       <View className="items-center gap-2">
@@ -76,7 +80,14 @@ export function CouncilRefusalScreen({
         {personal ? (
           <Pressable
             onPress={() => {
-              router.push(actionHref);
+              if (membershipState === 'some') {
+                // The app's established equivalent for a reader with
+                // memberships: the shared account picker, not a screen the
+                // reader must then find the control on.
+                openPicker();
+                return;
+              }
+              router.push(CREATE_ORGANIZATION_HREF);
             }}
             accessibilityRole="button"
             accessibilityLabel={t(actionKey)}

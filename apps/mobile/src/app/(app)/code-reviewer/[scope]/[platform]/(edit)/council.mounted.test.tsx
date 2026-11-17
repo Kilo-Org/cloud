@@ -109,6 +109,13 @@ vi.mock('@/lib/trpc', () => ({
     },
   }),
 }));
+vi.mock('@/components/context-control', () => ({
+  useContextPicker: () => ({
+    openPicker: () => {
+      state.routerPush('/(app)/context-picker');
+    },
+  }),
+}));
 vi.mock('@tanstack/react-query', async importOriginal => {
   const actual = await importOriginal<object>();
   return { ...actual, useQuery: () => ({ data: state.orgs }) };
@@ -292,7 +299,9 @@ describe('council route gate', () => {
     await act(() => {
       onPress?.();
     });
-    expect(state.routerPush).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)');
+    // The press opens the shared account picker (the app's established
+    // equivalent), which the mocked single-push route records.
+    expect(state.routerPush).toHaveBeenCalledWith('/(app)/context-picker');
 
     mounted.unmount();
   });

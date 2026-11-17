@@ -19,7 +19,7 @@ export function McpFormSheetFixture() {
       onClose={() => {
         router.back();
       }}
-      onSave={() => undefined}
+      onSave={() => Promise.resolve()}
     />
   );
 }

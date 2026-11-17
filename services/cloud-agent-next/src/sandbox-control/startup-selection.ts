@@ -52,23 +52,37 @@ function isIsolatedNativeSandbox(cohort: StartupCohortContext | undefined): bool
   return sandboxClass === 'isolated-small' || sandboxClass === 'isolated-standard';
 }
 
+function cohortOrgId(cohort: StartupCohortContext | undefined): string | undefined {
+  const routes = cohort?.preparingRoutes ?? [];
+  if (routes.length === 0) return undefined;
+  let orgId: string | undefined;
+  for (const route of routes) {
+    if (route.orgId === undefined || route.orgId === '') return undefined;
+    if (orgId !== undefined && route.orgId !== orgId) return undefined;
+    orgId = route.orgId;
+  }
+  return orgId;
+}
+
 function inOrgScope(
-  provider: AgentSandboxProvider,
   cohort: StartupCohortContext | undefined,
   orgIds: '*' | readonly string[]
 ): boolean {
-  if (provider === 'cloudflare-containers' && !isIsolatedNativeSandbox(cohort)) return false;
   if (orgIds === '*') return true;
   if (orgIds.length === 0) return false;
-  const routes = cohort?.preparingRoutes ?? [];
-  if (routes.length === 0) return false;
-  let orgId: string | undefined;
-  for (const route of routes) {
-    if (route.orgId === undefined || route.orgId === '') return false;
-    if (orgId !== undefined && route.orgId !== orgId) return false;
-    orgId = route.orgId;
-  }
+  const orgId = cohortOrgId(cohort);
   return orgId !== undefined && orgIds.includes(orgId);
+}
+
+function allSessionScope(
+  cohort: StartupCohortContext | undefined,
+  allSessionOrgIds: '*' | readonly string[] | undefined
+): boolean {
+  if (allSessionOrgIds === undefined) return false;
+  if (allSessionOrgIds === '*') return true;
+  if (allSessionOrgIds.length === 0) return false;
+  const orgId = cohortOrgId(cohort);
+  return orgId !== undefined && allSessionOrgIds.includes(orgId);
 }
 
 type StartupEnv = Pick<
@@ -79,6 +93,7 @@ type StartupEnv = Pick<
   | 'RUNTIME_INTERACTIVE_ORG_IDS'
   | 'RUNTIME_RELEASE_DESCRIPTOR_KILO2'
   | 'RUNTIME_KILO2_ORG_IDS'
+  | 'RUNTIME_KILO2_ALL_SESSION_ORG_IDS'
 >;
 
 function startupTarget(
@@ -101,8 +116,9 @@ function startupTarget(
 /**
  * The harness a sandbox's first allocation selects. Only a downloaded start in
  * the `RUNTIME_KILO2_ORG_IDS` scope runs v2 when every route has the trusted
- * cloud-agent-web origin. `*` includes all organizations and personal accounts.
- * An unset list keeps v1 everywhere.
+ * cloud-agent-web origin. `RUNTIME_KILO2_ALL_SESSION_ORG_IDS` admits every
+ * origin and native sandbox class for its own accounts. `*` includes all
+ * organizations and personal accounts. An unset list keeps v1 everywhere.
  */
 export function newSandboxHarness(
   env: StartupEnv,
@@ -111,13 +127,16 @@ export function newSandboxHarness(
 ): RuntimeHarness {
   startupTarget(env, provider);
   const orgIds = configuredOrgIds(env.RUNTIME_KILO2_ORG_IDS);
+  if (orgIds === undefined) return 'kilo';
+  const allSessionOrgIds = configuredOrgIds(env.RUNTIME_KILO2_ALL_SESSION_ORG_IDS);
+  const allSessions = allSessionScope(cohort, allSessionOrgIds);
+  if (!inOrgScope(cohort, orgIds)) return 'kilo';
+  if (provider === 'cloudflare-containers' && !allSessions && !isIsolatedNativeSandbox(cohort))
+    return 'kilo';
   const routes = cohort?.preparingRoutes ?? [];
-  return orgIds !== undefined &&
-    inOrgScope(provider, cohort, orgIds) &&
-    routes.length > 0 &&
-    routes.every(route => route.billingOrigin === 'cloud-agent-web')
-    ? 'kilo2'
-    : 'kilo';
+  const webOnly =
+    routes.length > 0 && routes.every(route => route.billingOrigin === 'cloud-agent-web');
+  return routes.length > 0 && (webOnly || allSessions) ? 'kilo2' : 'kilo';
 }
 
 /** Resolve trusted deployment configuration once per create attempt. */

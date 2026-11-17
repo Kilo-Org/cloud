@@ -1,8 +1,8 @@
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { useQuery } from '@tanstack/react-query';
-import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
+import { FlashList, type FlashListRef, type ListRenderItemInfo } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
-import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, type TextInput, View, type ViewStyle } from 'react-native';
 
@@ -83,6 +83,7 @@ export function ProviderKeyProviderPickerScreen({
   const trpc = useTRPC();
   const colors = useThemeColors();
   const inputRef = useRef<TextInput>(null);
+  const listRef = useRef<FlashListRef<ProviderOption>>(null);
   const [query, setQuery] = useState('');
   const scope = providerKeyScope(organizationId);
   const providers = useQuery(trpc.byok.listProviders.queryOptions(providerKeyScopeInput(scope)));
@@ -106,6 +107,14 @@ export function ProviderKeyProviderPickerScreen({
     );
   }, [providers.data, query, i18n.language]);
 
+  // A query change draws a shorter list under the current offset, so a deep
+  // scroll would leave the matching rows above the viewport (a cleared search
+  // opened past the first provider). `repository-rows-list` carries the same
+  // reset.
+  useEffect(() => {
+    listRef.current?.scrollToOffset({ offset: 0, animated: false });
+  }, [query]);
+
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<ProviderOption>) => <ProviderRow provider={item} scope={scope} />,
     [scope]
@@ -124,25 +133,36 @@ export function ProviderKeyProviderPickerScreen({
     body = (
       <QueryError onRetry={() => void providers.refetch()} isRetrying={providers.isFetching} />
     );
+  } else if (filtered.length === 0) {
+    // The empty state replaces the list instead of riding in it as a
+    // `ListEmptyComponent`: FlashList mis-lays-out the empty → populated
+    // transition, and a list remounted with rows starts at the top, so a
+    // cleared search shows the first provider (see `session-list-content`
+    // for the same shape). The search field sits above the list, so the swap
+    // cannot remount the input.
+    body = (
+      <EmptyState
+        placement="top"
+        icon={Search}
+        title={t('profile.providerKeys.noProvidersTitle')}
+        description={t('profile.providerKeys.noProvidersDescription')}
+      />
+    );
   } else {
     body = (
-      <FlashList
+      <FlashList<ProviderOption>
+        ref={listRef}
         style={listStyle}
         data={filtered}
-        keyExtractor={provider => provider.id}
+        keyExtractor={(provider: ProviderOption | undefined, index) =>
+          provider?.id ?? String(index)
+        }
+        maintainVisibleContentPosition={{ disabled: true }}
         renderItem={renderItem}
         getItemType={() => 'provider'}
         ItemSeparatorComponent={PROVIDER_ROW_SEPARATOR}
         contentContainerStyle={listContentContainerStyle}
         {...SEARCHABLE_PICKER_LIST_PROPS}
-        ListEmptyComponent={
-          <EmptyState
-            placement="top"
-            icon={Search}
-            title={t('profile.providerKeys.noProvidersTitle')}
-            description={t('profile.providerKeys.noProvidersDescription')}
-          />
-        }
       />
     );
   }

@@ -25,11 +25,12 @@ vi.mock('@shopify/flash-list', async () => {
     FlashList: (props: {
       data: unknown[];
       renderItem: (info: { item: unknown }) => React.ReactNode;
+      maintainVisibleContentPosition?: unknown;
       ListEmptyComponent?: React.ReactNode;
     }) =>
       React.createElement(
         'FlashList',
-        { itemCount: props.data.length },
+        { itemCount: props.data.length, mvc: props.maintainVisibleContentPosition },
         props.data.length === 0
           ? props.ListEmptyComponent
           : props.data.map((item, index) =>
@@ -173,6 +174,41 @@ describe('ProviderKeyProviderPickerScreen', () => {
     expect(
       root.findAll(node => Object.is(node.type, 'EmptyState')).map(node => node.props.title)
     ).toEqual(['No matching providers']);
+  });
+
+  it('returns the full list from its first provider when the search clears', async () => {
+    const root = await mount();
+
+    act(() => {
+      (searchInput(root).props.onChangeText as (value: string) => void)('gpt');
+    });
+    act(() => {
+      (searchInput(root).props.onChangeText as (value: string) => void)('');
+    });
+
+    // The no-match state replaced the list; clearing the query brings the rows
+    // back with the first provider where the reader left the list.
+    expect(rowLabels(root).map(node => node.props.accessibilityLabel)).toEqual([
+      'Anthropic',
+      'OpenAI',
+    ]);
+    expect(root.findAll(node => Object.is(node.type, 'FlashList')).at(0)?.props.itemCount).toBe(2);
+    expect(root.findAll(node => Object.is(node.type, 'FlashList')).at(0)?.props.mvc).toEqual({
+      disabled: true,
+    });
+  });
+
+  it('shows the matching rows after a no-match search finds a provider again', async () => {
+    const root = await mount();
+
+    act(() => {
+      (searchInput(root).props.onChangeText as (value: string) => void)('gpt');
+    });
+    act(() => {
+      (searchInput(root).props.onChangeText as (value: string) => void)('openai');
+    });
+
+    expect(rowLabels(root).map(node => node.props.accessibilityLabel)).toEqual(['OpenAI']);
   });
 
   it('matches a provider by its id', async () => {

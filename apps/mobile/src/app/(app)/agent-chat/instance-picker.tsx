@@ -309,8 +309,15 @@ export default function InstancePickerScreen() {
         accessibilityRole="radiogroup"
         accessibilityLabel={t('agentChat.instancePicker.runOn')}
         data={listItems}
-        keyExtractor={item => item.key}
-        getItemType={item => item.type}
+        // FlashList stores its props during render and can index `data` past
+        // its end for a render React discarded; the fallbacks are the ones
+        // FlashList uses when these callbacks are absent (see the model
+        // picker's comment).
+        keyExtractor={(item: InstancePickerListItem | undefined, index) =>
+          item?.key ?? String(index)
+        }
+        getItemType={(item: InstancePickerListItem | undefined) => item?.type}
+        maintainVisibleContentPosition={{ disabled: true }}
         contentContainerStyle={{ paddingBottom: bottomClearance }}
         ListHeaderComponent={
           <Pressable

@@ -131,12 +131,18 @@ function VoiceLanguageList({
   }
 
   return (
-    <FlashList
+    <FlashList<VoiceLanguageOption>
       nestedScrollEnabled
       style={[listStyle, { backgroundColor: colors.background }]}
       contentContainerStyle={listContentContainerStyle}
       data={filtered}
-      keyExtractor={option => option.tag ?? 'automatic'}
+      // FlashList stores its props during render and can index `data` past its
+      // end for a render React discarded; the fallback is the one FlashList
+      // uses when the callback is absent (see the model picker's comment).
+      keyExtractor={(option: VoiceLanguageOption | undefined, index) =>
+        option?.tag ?? String(index)
+      }
+      maintainVisibleContentPosition={{ disabled: true }}
       {...SEARCHABLE_PICKER_LIST_PROPS}
       ListFooterComponent={<View style={{ height: insets.bottom }} pointerEvents="none" />}
       renderItem={({ item, index }) => (

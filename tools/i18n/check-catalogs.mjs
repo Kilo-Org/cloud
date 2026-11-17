@@ -46,7 +46,11 @@ const ROOT = fileURLToPath(new URL('../../', import.meta.url));
  * Each entry also carries the catalog's own policy. `baseKeyOf` names how a
  * consumer appends its part to a key. `englishCopyRules` lists the checks the
  * catalog's English copy must pass. `localeRegistry` names a hand-written
- * module the push runtime reads its catalogs from.
+ * module the push runtime reads its catalogs from. `calledKeyOf` reads the key
+ * one translate call names, `keyPrefixOf` the static head of a key built as a
+ * template literal (null when the catalog builds none), and
+ * `collectsDestructiveKeys` whether the scan gathers the keys object literals
+ * paint on destructive buttons.
  */
 function catalogsOf(root) {
   return [
@@ -56,6 +60,9 @@ function catalogsOf(root) {
       sourceRoots: [join(root, 'apps/mobile/src')],
       baseKeyOf: pluralBaseKey,
       englishCopyRules: [checkEnglishCopies, checkMobileEnglishIdentical],
+      calledKeyOf: mobileCalledKey,
+      keyPrefixOf: null,
+      collectsDestructiveKeys: true,
     },
     {
       name: 'notifications',
@@ -64,6 +71,9 @@ function catalogsOf(root) {
       sourceRoots: [join(root, 'packages/notifications/src'), join(root, 'services')],
       baseKeyOf: pushBaseKey,
       englishCopyRules: [checkPushEnglishCopy],
+      calledKeyOf: pushCalledKeyOf,
+      keyPrefixOf: pushKeyPrefix,
+      collectsDestructiveKeys: false,
     },
   ];
 }
@@ -814,7 +824,7 @@ function scanSource(catalog, root) {
   const referenced = new Set();
   const keyPrefixes = new Set();
   const destructiveKeys = new Set();
-  const mobile = catalog.name === 'mobile';
+  const { calledKeyOf, keyPrefixOf, collectsDestructiveKeys } = catalog;
   for (const sourceRoot of catalog.sourceRoots) {
     // A fixture tree holds only the parts a test gives it; a root the tree does
     // not have has nothing to scan.
@@ -840,7 +850,7 @@ function scanSource(catalog, root) {
           return;
         }
         if (node.type === 'ObjectExpression') {
-          if (mobile) {
+          if (collectsDestructiveKeys) {
             for (const key of destructiveLabels(node)) {
               destructiveKeys.add(key);
             }
@@ -850,19 +860,12 @@ function scanSource(catalog, root) {
         if (node.type !== 'CallExpression') {
           return;
         }
-        if (mobile) {
-          const found = mobileCalledKey(node, file);
-          problems.push(...found.problems);
-          if (found.key !== null) {
-            called.add(found.key);
-          }
-          return;
+        const found = calledKeyOf(node, file);
+        problems.push(...found.problems);
+        if (found.key !== null) {
+          called.add(found.key);
         }
-        const key = pushCalledKey(node);
-        if (key !== null) {
-          called.add(key);
-        }
-        const prefix = pushKeyPrefix(node);
+        const prefix = keyPrefixOf === null ? null : keyPrefixOf(node);
         if (prefix !== null) {
           keyPrefixes.add(prefix);
         }
@@ -907,6 +910,17 @@ function mobileCalledKey(call, file) {
         : null,
     problems,
   };
+}
+
+/**
+ * The push side of the uniform reader every catalog's scan calls: the key one
+ * `translatePush(locale, key, …)` call names, wrapped in the
+ * `{ key, problems }` shape `mobileCalledKey` writes. A push key is never a
+ * template literal — the prefix below serves that form — so this reader has no
+ * problem to report.
+ */
+function pushCalledKeyOf(call) {
+  return { key: pushCalledKey(call), problems: [] };
 }
 
 /**

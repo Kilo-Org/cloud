@@ -18,6 +18,7 @@ vi.mock('react-native', () => ({
   FlatList: 'FlatList',
   I18nManager: { isRTL: false },
   Keyboard: { dismiss: vi.fn() },
+  Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   TextInput: 'TextInput',
@@ -219,6 +220,7 @@ describe('repository picker row layout', () => {
     const renderer = await mount();
     const row = rowFor(renderer, SIBLING_NAME);
     expect(row.props.accessibilityLabel).toBe(`GitHub ${SIBLING_NAME}`);
-    expect(row.props.accessibilityState).toEqual({ selected: false });
+    // The shared choice row states selection and enablement together.
+    expect(row.props.accessibilityState).toMatchObject({ selected: false, disabled: false });
   });
 });

@@ -5,16 +5,21 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown } from '@/components/ui/icons';
 import { sessionResumeUrl } from '@kilocode/app-shared/universal-links';
 import { type ResolvedSession, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
 import { SheetHeader } from '@/components/sheet-header';
-import { DirectionalChevronRight } from '@/components/ui/directional-icons';
+import { Card } from '@/components/ui/card';
+import { ConfigureRow } from '@/components/ui/configure-row';
+import { Bot, ChevronDown, ChevronUp, Copy, FileDiff, History } from '@/components/ui/icons';
+import { KvRow } from '@/components/ui/kv-row';
+import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatNumber, formatPercent } from '@/lib/format';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { resolveRunningOnLabel } from '@/lib/instance-target-label';
 import { cn } from '@/lib/utils';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -278,69 +283,74 @@ export function SessionContextSheet({
 
       {/* First row of the sheet body, outside the ScrollView so it stays
           visible while the context details scroll. */}
-      <View className="px-6 pb-2 pt-2">
-        <SessionAutoApproveRow state={autoApproveState} onValueChange={onAutoApproveChange} />
+      <View className="px-4 pt-2">
+        <RowGroup>
+          <SessionAutoApproveRow state={autoApproveState} onValueChange={onAutoApproveChange} />
+        </RowGroup>
       </View>
 
       {/* Always-visible, outside the ScrollView so the connection reading stays
           on screen while the details scroll. */}
-      <View
-        className="flex-row items-center justify-between gap-3 px-6 pb-2 pt-1"
-        testID="session-context-sheet-connection"
-      >
-        <Text className="text-xs uppercase tracking-wide text-muted-foreground">
-          {t('agentChat.sessionConnection.label')}
-        </Text>
-        <View className="min-h-[28px] flex-row items-center gap-2">
-          <Text className="text-sm font-medium text-foreground">{connectionLabel}</Text>
-          {connectionDisplay === 'lost' ? (
-            <Pressable
-              onPress={onRetryConnection}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel={t('agentChat.sessionConnection.retryConnection')}
-              className="min-h-[28px] min-w-[28px] items-center justify-center active:opacity-70"
-              testID="session-context-sheet-connection-retry"
-            >
-              <Text className="text-sm font-medium text-primary">{t('common.retry')}</Text>
-            </Pressable>
-          ) : null}
-        </View>
+      <View className="px-4 pb-2 pt-2" testID="session-context-sheet-connection">
+        <RowGroup>
+          <KvRow
+            label={t('agentChat.sessionConnection.label')}
+            value={connectionLabel}
+            valueFace="text"
+            trailing={
+              connectionDisplay === 'lost' ? (
+                <Pressable
+                  onPress={onRetryConnection}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('agentChat.sessionConnection.retryConnection')}
+                  className={cn(
+                    ROW_TARGET_CLASS,
+                    'min-w-14 items-center justify-center active:opacity-70'
+                  )}
+                  testID="session-context-sheet-connection-retry"
+                >
+                  <Text className="text-sm font-medium text-primary">{t('common.retry')}</Text>
+                </Pressable>
+              ) : undefined
+            }
+          />
+        </RowGroup>
       </View>
 
       {/* Rows below are exposed individually to screen readers; collapsing
           them behind a single ScrollView accessibilityLabel would shadow the
           natural read order. */}
-      <ScrollView className="flex-1" contentContainerClassName="px-6 pb-6 pt-2">
-        {/* The ring sits beside its value, not above it. Stacked, the ring held
-            the sheet's first text a ring-height down the scroll content, which
-            the design gate reads as empty space under the title: the ring draws
-            nothing the accessibility tree reports. Side by side, the ring fills
-            the row and the value centres on the ring's own middle, so the pair
-            reads as one figure and neither half floats off its partner's
-            centre. */}
-        <View className="flex-row items-center justify-center gap-3 pt-2">
-          <ContextUsageRing
-            size={SHEET_RING_SIZE}
-            strokeWidth={SHEET_RING_STROKE}
-            arcFraction={arcFraction}
-            tone={tone}
-            testID="session-context-sheet-ring"
-          />
-          <View className="min-h-[32px] justify-center">
-            {content.percentage ? (
-              <Text className={cn('text-2xl font-semibold tabular-nums', toneTextClass(tone))}>
-                {content.percentage}
-              </Text>
-            ) : (
-              <Text className="text-base text-muted-foreground">
-                {content.windowUnavailableLabel}
-              </Text>
-            )}
+      <ScrollView className="flex-1" contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-6')}>
+        <Card>
+          {/* The ring sits beside its value, not above it. Stacked, the ring
+              held the sheet's first text a ring-height down the scroll content,
+              which the design gate reads as empty space under the title: the
+              ring draws nothing the accessibility tree reports. Side by side,
+              the ring fills the row and the value centres on the ring's own
+              middle, so the pair reads as one figure and neither half floats
+              off its partner's centre. */}
+          <View className="flex-row items-center justify-center gap-3">
+            <ContextUsageRing
+              size={SHEET_RING_SIZE}
+              strokeWidth={SHEET_RING_STROKE}
+              arcFraction={arcFraction}
+              tone={tone}
+              testID="session-context-sheet-ring"
+            />
+            <View className="min-h-8 justify-center">
+              {content.percentage ? (
+                <Text variant="figure" className={toneTextClass(tone)}>
+                  {content.percentage}
+                </Text>
+              ) : (
+                <Text variant="muted" className="text-base">
+                  {content.windowUnavailableLabel}
+                </Text>
+              )}
+            </View>
           </View>
-        </View>
 
-        <View className="mt-6 gap-4">
           <Row label={t('agentChat.contextUsage.used')}>
             <Text className="text-base font-medium text-foreground tabular-nums">
               {content.usedTokens ?? '-'}
@@ -390,9 +400,11 @@ export function SessionContextSheet({
               {sessionTitle}
             </Text>
           </Row>
+        </Card>
 
-          <SessionTodoLinkRow sessionId={sessionId} />
+        <SessionTodoLinkRow sessionId={sessionId} />
 
+        <RowGroup>
           {/* The pill is independent of goal and PR status: the sheet shows the
               associated PR in every state (open/draft/merged/closed) whenever
               the session has one, unlike the session page which gates on an
@@ -426,61 +438,50 @@ export function SessionContextSheet({
             onPress={linkCopy.handlePress}
           />
 
-          <SessionShareSection sessionId={sessionId} visible={visible} />
-
           {runningOn.kind !== 'hidden' ? (
-            <Row label={t('agentChat.instancePicker.runOn')}>
-              <Text className="text-base font-medium text-foreground">
-                {runningOn.kind === 'label' ? runningOn.label : t('common.loading')}
-              </Text>
-            </Row>
+            <KvRow
+              label={t('agentChat.instancePicker.runOn')}
+              value={runningOn.kind === 'label' ? runningOn.label : t('common.loading')}
+              valueFace="text"
+            />
           ) : null}
+        </RowGroup>
 
-          {/* The sandbox sits beside Run on: both describe where the session
-              runs. Its state and, after a failed start, the fresh-start
-              recovery come from the worker, so a lost or paused sandbox never
-              reads as a healthy session. */}
-          <SessionSandboxSection
-            cloudAgentSessionId={cloudAgentSessionId}
-            organizationId={organizationId}
-            startFailed={cloudStatusType === 'error'}
-          />
+        <SessionShareSection sessionId={sessionId} visible={visible} />
 
-          {/* The row paints the combined total, so its gate is that total, not
-              the model-only figure: a read-only session with no model cost can
-              still owe a workspace's positive sandbox compute, and hiding the
-              row would hide its figure and its sharing note together. */}
+        <SessionSandboxSection
+          cloudAgentSessionId={cloudAgentSessionId}
+          organizationId={organizationId}
+          startFailed={cloudStatusType === 'error'}
+        />
+
+        {/* The row paints the combined total, so its gate is that total, not
+            the model-only figure: a read-only session with no model cost can
+            still owe a workspace's positive sandbox compute, and hiding the
+            row would hide its figure and its sharing note together. */}
+        <Card>
           {totalCostText !== null || autoApproveState !== 'unavailable' ? (
-            <Row label={t('agentChat.contextUsage.totalCost')}>
-              <Text className="text-base font-medium text-foreground tabular-nums">
-                {totalCostText ?? '-'}
-              </Text>
-              {/* The web session information dialog adds the whole workspace's
-                  recorded compute to its total and names that sharing under the
-                  Compute figure. This total is the same one the header pill
-                  paints, so it carries the same note rather than reading as
-                  this chat's own sandbox spend. */}
-              {computeCharges.data?.scope === 'workspace' ? (
-                <Text
-                  className="text-xs text-muted-foreground"
-                  testID="session-context-sheet-shared-compute"
-                >
-                  {t('cloudAgent.compute.sharedWorkspace')}
-                </Text>
-              ) : null}
-            </Row>
+            <KvRow
+              label={t('agentChat.contextUsage.totalCost')}
+              value={totalCostText ?? '-'}
+              valueFace="numeric"
+            />
           ) : null}
+          {/* The web session information dialog adds the whole workspace's
+              recorded compute to its total and names that sharing under the
+              Compute figure. This total is the same one the header pill
+              paints, so it carries the same note rather than reading as this
+              chat's own sandbox spend. */}
+          {computeCharges.data?.scope === 'workspace' ? (
+            <Text variant="caption" testID="session-context-sheet-shared-compute">
+              {t('cloudAgent.compute.sharedWorkspace')}
+            </Text>
+          ) : null}
+          <Text variant="caption">{t('agentChat.contextUsage.usageReflectsLatest')}</Text>
+        </Card>
 
-          <Text className="text-xs text-muted-foreground">
-            {t('agentChat.contextUsage.usageReflectsLatest')}
-          </Text>
-        </View>
-
-        <View className="mt-8 gap-4">
-          <Text className="text-sm font-semibold text-foreground">
-            {t('agentChat.contextUsage.tokenUsage')}
-          </Text>
-          <View className="gap-3">
+        <Section label={t('agentChat.contextUsage.tokenUsage')}>
+          <RowGroup>
             <TokenRow label={t('agentChat.messageDetails.input')} value={breakdown.totals.input} />
             <TokenRow
               label={t('agentChat.messageDetails.output')}
@@ -499,26 +500,30 @@ export function SessionContextSheet({
               value={breakdown.totals.cacheWrite}
             />
             <TokenRow label={t('agentChat.messageDetails.total')} value={breakdown.totals.total} />
-            <Row label={t('agentChat.contextUsage.cacheRate')}>
-              <Text className="text-base font-medium text-foreground tabular-nums">
-                {breakdown.totals.cacheRatePct === null
+            <KvRow
+              label={t('agentChat.contextUsage.cacheRate')}
+              value={
+                breakdown.totals.cacheRatePct === null
                   ? '-'
-                  : formatPercent(breakdown.totals.cacheRatePct, i18n.language)}
-              </Text>
-            </Row>
-          </View>
-        </View>
+                  : formatPercent(breakdown.totals.cacheRatePct, i18n.language)
+              }
+              valueFace="numeric"
+            />
+          </RowGroup>
+        </Section>
 
         {modelsSectionCount > 0 ? (
-          <View className="mt-8 gap-3">
-            {/* i18n-dup-ok: 'agentChat.contextUsage.modelsCount_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules. */}
-            <Text className="text-sm font-semibold text-foreground">
-              {t('agentChat.contextUsage.modelsCount', {
-                count: modelsSectionCount,
-                displayCount: formatNumber(modelsSectionCount, i18n.language),
-              })}
-            </Text>
-            <View className="gap-2">
+          /* i18n-dup-ok: 'agentChat.contextUsage.modelsCount_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules. */
+          <Section
+            label={t('agentChat.contextUsage.modelsCount', {
+              count: modelsSectionCount,
+              displayCount: formatNumber(modelsSectionCount, i18n.language),
+            })}
+            notice={
+              <Text variant="caption">{t('agentChat.contextUsage.tokenTotalsNote')}</Text>
+            }
+          >
+            <RowGroup>
               {visibleModels.map(model => (
                 <ModelRow
                   key={`${model.providerID}:${model.modelID}`}
@@ -532,11 +537,8 @@ export function SessionContextSheet({
               {olderActivityCostUsd > 0 ? (
                 <OlderActivityRow costUsd={olderActivityCostUsd} />
               ) : null}
-            </View>
-            <Text className="mt-1 text-xs text-muted-foreground">
-              {t('agentChat.contextUsage.tokenTotalsNote')}
-            </Text>
-          </View>
+            </RowGroup>
+          </Section>
         ) : null}
 
         <SessionComputeSection
@@ -623,34 +625,43 @@ function CopyRow({
   status: string | null;
   onPress: () => void;
 }>) {
+  // The row keeps its call-to-action name in every state; the copy outcome
+  // renders beside it, so one capture of the sheet shows both the row the
+  // scenario names and the feedback it demands.
+  //
+  // The value is an identifier or a resume URL, so it keeps the mono face and
+  // ellipsizes in the middle: the tail of a session id and the tail of a URL
+  // are what identify it, and a tail ellipsis would hide both. `ConfigureRow`
+  // types its subtitle as a plain string painted in the caption face, so the
+  // value line fills the row's subtitle slot as a node instead.
   return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      className={cn(ROW_TARGET_CLASS, 'justify-center gap-1 active:opacity-70')}
+    <ConfigureRow
       testID={testID}
-    >
-      {/* The row keeps its call-to-action name in every state; the copy
-          outcome renders beside it, so one capture of the sheet shows both the
-          row the scenario names and the feedback it demands. The child texts
-          are the accessible name in reading order. */}
-      <View className="flex-row items-center justify-between">
-        <Text className="text-xs uppercase tracking-wide text-muted-foreground">{label}</Text>
-        {status ? (
+      icon={Copy}
+      title={label}
+      subtitlePlaceholder={
+        <Text
+          variant="mono"
+          className="mt-0.5 text-xs text-foreground"
+          numberOfLines={1}
+          ellipsizeMode="middle"
+        >
+          {value}
+        </Text>
+      }
+      variant="action"
+      onPress={onPress}
+      trailing={
+        status ? (
           <Text
-            className={cn(
-              'text-xs uppercase tracking-wide',
-              state === 'failed' ? 'text-destructive' : 'text-foreground'
-            )}
+            variant="caption"
+            className={state === 'failed' ? 'text-destructive' : 'text-foreground'}
           >
             {status}
           </Text>
-        ) : null}
-      </View>
-      <Text variant="mono" className="text-xs text-foreground">
-        {value}
-      </Text>
-    </Pressable>
+        ) : undefined
+      }
+    />
   );
 }
 
@@ -665,10 +676,14 @@ function SessionChangesRow({
   onClose,
 }: Readonly<{ sessionId: string; onClose: () => void }>) {
   const { t } = useTranslation();
-  const colors = useThemeColors();
   const label = t('agentChat.sessionChanges.viewChanges');
   return (
-    <Pressable
+    <ConfigureRow
+      testID="session-context-sheet-view-changes"
+      icon={FileDiff}
+      title={label}
+      variant="navigation"
+      accessibilityLabel={label}
       onPress={() => {
         onClose();
         void (async () => {
@@ -676,17 +691,7 @@ function SessionChangesRow({
           router.push(`/(app)/session-changes/${sessionId}` as Href);
         })();
       }}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      className={cn(
-        ROW_TARGET_CLASS,
-        'flex-row items-center justify-between gap-3 active:opacity-70'
-      )}
-      testID="session-context-sheet-view-changes"
-    >
-      <Text className="text-base font-medium text-foreground">{label}</Text>
-      <DirectionalChevronRight size={16} color={colors.mutedForeground} />
-    </Pressable>
+    />
   );
 }
 
@@ -707,7 +712,7 @@ function ModelRow({
     steps: formatNumber(model.steps, i18n.language),
   });
   return (
-    <View className="overflow-hidden rounded-md border border-border">
+    <View>
       <Pressable
         onPress={() => {
           setExpanded(value => !value);
@@ -720,37 +725,33 @@ function ModelRow({
           cost: formatCost(model.costUsd),
         })}
         accessibilityState={{ expanded }}
-        className="flex-row items-center gap-2 px-3 py-3 active:opacity-70"
+        className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 px-4 py-3 active:opacity-70')}
       >
-        {expanded ? (
-          <ChevronDown size={16} color={colors.mutedForeground} />
-        ) : (
-          <DirectionalChevronRight size={16} color={colors.mutedForeground} />
-        )}
-        <View className="min-w-0 flex-1 gap-0.5">
+        <View className="min-w-0 flex-1">
           <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
             {name}
           </Text>
-          <Text className="text-xs text-muted-foreground">
+          <Text variant="caption" className="mt-0.5">
             {provider} · {stepsLabel}
           </Text>
         </View>
         <Text className="text-sm font-medium text-foreground tabular-nums">
           {formatCost(model.costUsd)}
         </Text>
+        {/* A disclosure caret, not a navigation chevron: it names the state of
+            the block under it and flips with it. */}
+        {expanded ? (
+          <ChevronUp size={14} color={colors.mutedForeground} />
+        ) : (
+          <ChevronDown size={14} color={colors.mutedForeground} />
+        )}
       </Pressable>
       {expanded ? (
-        <View className="gap-2 border-t border-border px-3 py-3">
+        <View className="pb-3">
           <TokenRow label={t('agentChat.messageDetails.input')} value={model.tokens.input} />
           <TokenRow label={t('agentChat.messageDetails.output')} value={model.tokens.output} />
-          <TokenRow
-            label={t('agentChat.messageDetails.reasoning')}
-            value={model.tokens.reasoning}
-          />
-          <TokenRow
-            label={t('agentChat.messageDetails.cacheRead')}
-            value={model.tokens.cacheRead}
-          />
+          <TokenRow label={t('agentChat.messageDetails.reasoning')} value={model.tokens.reasoning} />
+          <TokenRow label={t('agentChat.messageDetails.cacheRead')} value={model.tokens.cacheRead} />
           <TokenRow
             label={t('agentChat.messageDetails.cacheWrite')}
             value={model.tokens.cacheWrite}
@@ -765,37 +766,33 @@ function ModelRow({
 function SubagentRow({ costUsd }: Readonly<{ costUsd: number }>) {
   const { t } = useTranslation();
   return (
-    <View className="flex-row items-center justify-between rounded-md border border-border px-3 py-3">
-      <View className="gap-0.5">
-        <Text className="text-sm font-medium text-foreground">
-          {t('agentChat.contextUsage.subagents')}
+    <ConfigureRow
+      icon={Bot}
+      title={t('agentChat.contextUsage.subagents')}
+      subtitle={t('agentChat.contextUsage.subagentsDescription')}
+      variant="action"
+      trailing={
+        <Text className="text-sm font-medium text-foreground tabular-nums">
+          {formatCost(costUsd)}
         </Text>
-        <Text className="text-xs text-muted-foreground">
-          {t('agentChat.contextUsage.subagentsDescription')}
-        </Text>
-      </View>
-      <Text className="text-sm font-medium text-foreground tabular-nums">
-        {formatCost(costUsd)}
-      </Text>
-    </View>
+      }
+    />
   );
 }
 
 function OlderActivityRow({ costUsd }: Readonly<{ costUsd: number }>) {
   const { t } = useTranslation();
   return (
-    <View className="flex-row items-center justify-between rounded-md border border-border px-3 py-3">
-      <View className="gap-0.5">
-        <Text className="text-sm font-medium text-foreground">
-          {t('agentChat.contextUsage.olderActivity')}
+    <ConfigureRow
+      icon={History}
+      title={t('agentChat.contextUsage.olderActivity')}
+      subtitle={t('agentChat.contextUsage.olderActivityDescription')}
+      variant="action"
+      trailing={
+        <Text className="text-sm font-medium text-foreground tabular-nums">
+          {formatCost(costUsd)}
         </Text>
-        <Text className="text-xs text-muted-foreground">
-          {t('agentChat.contextUsage.olderActivityDescription')}
-        </Text>
-      </View>
-      <Text className="text-sm font-medium text-foreground tabular-nums">
-        {formatCost(costUsd)}
-      </Text>
-    </View>
+      }
+    />
   );
 }

@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { displaySafeText } from '@kilocode/app-shared/display-text';
 
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
 import {
   applyBlockingCardAppearance,
@@ -136,24 +137,22 @@ export function PermissionCard({
   const showPatterns = patterns.length > 0 && !command;
 
   return (
-    <View className="mx-4 my-2 shrink overflow-hidden rounded-xl border border-border bg-card">
-      <View className="border-b border-border bg-secondary px-4 py-3">
-        <Text ref={titleRef} accessible accessibilityLabel={title} className="text-sm font-medium">
+    <Card className="mx-4 my-2 shrink">
+      <View className="gap-1">
+        <Text ref={titleRef} accessible accessibilityLabel={title} variant="heading">
           {title}
         </Text>
-        <Text className="mt-1 text-xs text-muted-foreground">
-          {presentation.protocolExplanation}
-        </Text>
+        <Text variant="caption">{presentation.protocolExplanation}</Text>
       </View>
 
       {presentation.errorMessage ? (
-        <View className="border-b border-border bg-danger-tile-bg px-4 py-2">
-          <Text className="text-xs text-destructive">{presentation.errorMessage}</Text>
-        </View>
+        <Text variant="caption" className="text-destructive">
+          {presentation.errorMessage}
+        </Text>
       ) : null}
 
       <ScrollView className="max-h-96 shrink">
-        <View className="gap-3 p-4">
+        <View className="gap-3">
           <Text className="text-sm text-foreground">
             {t('agentChat.permissionCard.allowQuestion', { permission: permissionDisplay })}
           </Text>
@@ -185,7 +184,7 @@ export function PermissionCard({
       </ScrollView>
 
       {presentation.hasPrimaryCta || presentation.hasRetryCta ? (
-        <View className="flex-row gap-2 border-t border-border p-3">
+        <View className="flex-row gap-2 border-t-[0.5px] border-hair-soft pt-3">
           {presentation.hasPrimaryCta ? (
             <>
               <Button
@@ -267,6 +266,6 @@ export function PermissionCard({
           ) : null}
         </View>
       ) : null}
-    </View>
+    </Card>
   );
 }

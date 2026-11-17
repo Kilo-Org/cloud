@@ -1,9 +1,7 @@
 import { FlashList } from '@shopify/flash-list';
-import { selectionHaptic } from '@/lib/haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Check } from '@/components/ui/icons';
 import { useState } from 'react';
-import { Pressable, ScrollView, View, type ViewStyle } from 'react-native';
+import { ScrollView, View, type ViewStyle } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -20,11 +18,12 @@ import {
   type ModeOption,
 } from '@/components/agents/mode-normalize';
 import { PickerSheet } from '@/components/picker-sheet';
+import { ChoiceRow } from '@/components/ui/choice-row';
+import { SectionHeader } from '@/components/ui/section-header';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { parseParam } from '@/lib/route-params';
 import { modePickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
-import { selectionCheckColor } from '@/lib/selection-check-color';
 
 // FlashList takes `style`/`contentContainerStyle` (never `className`), so the
 // list's `flex-1 bg-background` classes become the list style plus the themed
@@ -48,7 +47,6 @@ export default function ModePickerScreen() {
   }
 
   function handleSelect(mode: AgentMode) {
-    selectionHaptic();
     bridge?.onSelect(mode);
     modePickerSlot.clear(routeKey);
     router.back();
@@ -83,29 +81,31 @@ export default function ModePickerScreen() {
       : item.description;
 
     return (
-      <Pressable
-        className="flex-row items-center gap-3 px-4 py-3.5 active:bg-secondary"
-        onPress={() => {
-          handleSelect(item.value);
-        }}
-        accessibilityRole="button"
-        accessibilityLabel={t('agentChat.modePicker.modeLabel', {
+      <ChoiceRow
+        className="border-b-[0.5px] border-hair-soft"
+        selected={selected}
+        accessibleName={t('agentChat.modePicker.modeLabel', {
           label,
           description,
         })}
-        accessibilityState={{ selected }}
+        onPress={() => {
+          handleSelect(item.value);
+        }}
       >
-        <Icon size={20} color={colors.foreground} />
-        <View className="flex-1">
-          <Text className="text-base font-medium text-foreground">{label}</Text>
-          <Text className="text-sm text-muted-foreground">{description}</Text>
+        <View className="min-w-0 flex-1 flex-row items-center gap-3">
+          <Icon size={18} color={colors.foreground} />
+          <View className="min-w-0 flex-1">
+            <Text className="text-sm font-medium" numberOfLines={1}>
+              {label}
+            </Text>
+            <Text variant="muted" className="mt-0.5 text-xs">
+              {description}
+            </Text>
+          </View>
         </View>
-        {selected && <Check size={18} color={selectionCheckColor(colors)} />}
-      </Pressable>
+      </ChoiceRow>
     );
   }
-
-  const separator = <View className="mx-4 border-b border-border" />;
 
   return (
     <PickerSheet
@@ -122,24 +122,15 @@ export default function ModePickerScreen() {
           data={MODE_OPTIONS}
           keyExtractor={item => item.value}
           renderItem={renderItem}
-          ItemSeparatorComponent={() => separator}
         />
       ) : (
         <ScrollView nestedScrollEnabled className="flex-1 bg-background">
-          {MODE_OPTIONS.map((item, index) => (
-            <View key={item.value}>
-              {index > 0 ? separator : null}
-              {renderItem({ item })}
-            </View>
+          {MODE_OPTIONS.map(item => (
+            <View key={item.value}>{renderItem({ item })}</View>
           ))}
-          <Text className="px-4 pt-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            {t('agentChat.modePicker.customModes')}
-          </Text>
-          {custom.map((item, index) => (
-            <View key={item.value}>
-              {index > 0 ? separator : null}
-              {renderItem({ item })}
-            </View>
+          <SectionHeader inset label={t('agentChat.modePicker.customModes')} />
+          {custom.map(item => (
+            <View key={item.value}>{renderItem({ item })}</View>
           ))}
         </ScrollView>
       )}

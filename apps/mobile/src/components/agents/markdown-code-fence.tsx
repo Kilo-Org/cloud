@@ -62,7 +62,7 @@ export function MarkdownCodeFence({
         )}
       >
         <Text
-          className="text-[11px] font-medium"
+          variant="caption"
           // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- the label tracks the markdown variant's palette
           style={{ color: palette.mutedTextColor }}
           numberOfLines={1}

@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { SectionHeader } from '@/components/ui/section-header';
 import { Text } from '@/components/ui/text';
 import { FIELD_CLEAR_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
@@ -195,13 +196,7 @@ export function ModelPickerContent() {
         return null;
       }
       if (item.type === 'header') {
-        return (
-          <View className="bg-secondary px-4 py-2">
-            <Text className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {item.title}
-            </Text>
-          </View>
-        );
+        return <SectionHeader inset label={item.title} />;
       }
 
       return (

@@ -24,10 +24,13 @@ import { KeyboardLiftView } from '@/components/keyboard-lift-view';
 import { OrganizationPlanRefusal } from '@/components/organization/plan-refusal';
 import { type VariableEdit } from '@/components/profiles/profile-variables-model';
 import { SegmentedControl } from '@/components/ui/segmented-control';
+import { ScreenFooter } from '@/components/ui/screen-footer';
 import { Text } from '@/components/ui/text';
 import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
-import { useDetailScreenBottomPadding, useSideInsetStyle } from '@/lib/screen-insets';
+import { useSideInsetStyle } from '@/lib/screen-insets';
+import { cn } from '@/lib/utils';
 
 /**
  * The profile override the new-session screen adds to the shared contract: the
@@ -176,7 +179,6 @@ export function NewSessionConfigureForm({
   // fixed at the sheet triggers: a formSheet anchors over the keyboard that is
   // up at its first layout and never re-anchors, so the keyboard must be
   // dismissed before the sheet opens.)
-  const bottomClearance = useDetailScreenBottomPadding();
   const { bottom } = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const { height: keyboardHeight, isVisible: keyboardVisible } = useKeyboardState();
@@ -253,7 +255,7 @@ export function NewSessionConfigureForm({
     <ScrollView
       ref={scrollRef}
       className="flex-1"
-      contentContainerClassName="flex-grow px-4 pt-4 pb-4"
+      contentContainerClassName={cn('flex-grow', SCREEN_BODY_CLASS)}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
     >
@@ -436,37 +438,37 @@ export function NewSessionConfigureForm({
   // which path selected it.
   const footer = (
     <View
-      className="bg-background px-4 pt-3"
-      style={{ paddingBottom: bottomClearance }}
       onLayout={event => {
         setFooterHeight(event.nativeEvent.layout.height);
       }}
     >
-      {cloudCreateError && !isRemote ? (
-        <NewSessionCloudCreateError
-          failure={cloudCreateError}
-          onRetry={onRetryCloudCreate}
-          isRetryDisabled={isStartDisabled}
-        />
-      ) : null}
+      <ScreenFooter keyboard="host">
+        {cloudCreateError && !isRemote ? (
+          <NewSessionCloudCreateError
+            failure={cloudCreateError}
+            onRetry={onRetryCloudCreate}
+            isRetryDisabled={isStartDisabled}
+          />
+        ) : null}
 
-      {isRemote && remoteSpawnFailure !== null ? (
-        <NewSessionRemoteSpawnFailure
-          failure={remoteSpawnFailure}
-          onRetry={onRetryRemoteSpawn}
-          isRetryDisabled={isStartDisabled}
-        />
-      ) : null}
+        {isRemote && remoteSpawnFailure !== null ? (
+          <NewSessionRemoteSpawnFailure
+            failure={remoteSpawnFailure}
+            onRetry={onRetryRemoteSpawn}
+            isRetryDisabled={isStartDisabled}
+          />
+        ) : null}
 
-      <NewSessionStartButton
-        isCloneEntry={isCloneEntry}
-        isRemote={isRemote}
-        isStartDisabled={isStartDisabled}
-        isStarting={isStarting}
-        startBlockedReason={startBlockedReason}
-        startBlockedAction={startBlockedAction}
-        onStartSession={onStartSession}
-      />
+        <NewSessionStartButton
+          isCloneEntry={isCloneEntry}
+          isRemote={isRemote}
+          isStartDisabled={isStartDisabled}
+          isStarting={isStarting}
+          startBlockedReason={startBlockedReason}
+          startBlockedAction={startBlockedAction}
+          onStartSession={onStartSession}
+        />
+      </ScreenFooter>
     </View>
   );
 

@@ -30,6 +30,8 @@ type ChoiceRowProps = {
   multi?: boolean;
   /** Extra classes on the row container, e.g. a divider border. */
   className?: string;
+  /** Test handle for the row's own control, for native E2E scripts. */
+  testID?: string;
   /**
    * Custom row content instead of the default label/description text — e.g. an
    * icon-prefixed row. A caller that supplies it owns the disabled cue: the row
@@ -53,6 +55,7 @@ export function ChoiceRow({
   busy,
   multi,
   className,
+  testID,
   children,
 }: Readonly<ChoiceRowProps>) {
   // A busy row needs an explicit accessible name: React Native replaces the
@@ -64,6 +67,7 @@ export function ChoiceRow({
 
   return (
     <Pressable
+      testID={testID}
       className={cn(
         ROW_TARGET_CLASS,
         'min-h-[48px] flex-row items-center justify-between gap-3 px-4 py-3 active:opacity-70',

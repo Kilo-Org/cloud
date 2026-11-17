@@ -8,7 +8,6 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -21,6 +20,7 @@ import { useSessionChangesReview } from '@/components/session-changes/use-sessio
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
 import { RefreshCw } from '@/components/ui/icons';
+import { ScreenFooter } from '@/components/ui/screen-footer';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatDate } from '@/lib/format';
@@ -34,7 +34,6 @@ import {
 
 export function SessionChangesScreen({ sessionId }: Readonly<{ sessionId: string }>) {
   const { t } = useTranslation();
-  const insets = useSafeAreaInsets();
   const colors = useThemeColors();
 
   const data = useSessionChangesData(sessionId);
@@ -243,10 +242,7 @@ export function SessionChangesScreen({ sessionId }: Readonly<{ sessionId: string
         )}
       </View>
       {draft.comments.length > 0 ? (
-        <View
-          className="flex-row justify-end border-t border-hair-soft bg-background px-4 py-2"
-          style={{ paddingBottom: Math.max(insets.bottom, 8) }}
-        >
+        <ScreenFooter>
           <Button
             onPress={() => {
               setReviewOpen(true);
@@ -257,7 +253,7 @@ export function SessionChangesScreen({ sessionId }: Readonly<{ sessionId: string
               {t('agentChat.sessionChanges.reviewTitle', { count: draft.comments.length })}
             </Text>
           </Button>
-        </View>
+        </ScreenFooter>
       ) : null}
       {commentTarget === null ? null : (
         <SessionChangesCommentDialog

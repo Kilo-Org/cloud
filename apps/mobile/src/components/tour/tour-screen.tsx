@@ -1,23 +1,27 @@
 import { type Href, useFocusEffect, useRouter } from 'expo-router';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BackHandler, ScrollView, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BackHandler, Pressable, ScrollView, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { TourStepHeader } from '@/components/tour/tour-step-header';
 import { Button } from '@/components/ui/button';
-import { ChoiceRow } from '@/components/ui/choice-row';
+import { Card } from '@/components/ui/card';
 import { Cloud, type LucideIcon, Monitor, Sparkles } from '@/components/ui/icons';
+import { IconTile } from '@/components/ui/icon-tile';
+import { ScreenFooter } from '@/components/ui/screen-footer';
 import { Text } from '@/components/ui/text';
 import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
+import { NEUTRAL_TINT } from '@/lib/agent-color';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { useOrganization } from '@/lib/organization-context';
 import { PRESELECT_CLOUD_RUN_ON, PRESELECT_COMPUTER_RUN_ON } from '@/lib/run-on-destination';
 import { dismissTour } from '@/lib/tour/tour-dismiss';
 import { useTourCompletion } from '@/lib/tour/tour-completion';
+import { cn } from '@/lib/utils';
 
 /**
  * The first-sign-in tour shell.
@@ -48,24 +52,21 @@ type ForkOptionProps = {
 
 /** One selectable fork card: icon tile, title, body. */
 function ForkOption({ icon: Icon, title, body, onPress }: Readonly<ForkOptionProps>) {
-  const colors = useThemeColors();
-
   return (
-    <ChoiceRow
-      selected={false}
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={title}
       onPress={onPress}
-      className="gap-3 rounded-xl border border-border bg-card px-4"
+      className="active:opacity-70"
     >
-      <View className="h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-secondary">
-        <Icon size={22} color={colors.foreground} />
-      </View>
-      <View className="flex-1 gap-0.5">
-        <Text className="text-base font-semibold text-foreground">{title}</Text>
-        <Text variant="muted" className="text-sm">
-          {body}
-        </Text>
-      </View>
-    </ChoiceRow>
+      <Card>
+        <IconTile icon={Icon} tint={NEUTRAL_TINT} />
+        <View className="gap-1">
+          <Text variant="heading">{title}</Text>
+          <Text variant="muted">{body}</Text>
+        </View>
+      </Card>
+    </Pressable>
   );
 }
 
@@ -76,7 +77,7 @@ function ForkStep({ onChoose }: Readonly<ForkStepProps>) {
   return (
     <ScrollView
       className="flex-1"
-      contentContainerClassName="grow justify-center gap-8 px-6 py-6"
+      contentContainerClassName={cn(SCREEN_BODY_CLASS, 'grow justify-center pb-6')}
       keyboardShouldPersistTaps="handled"
     >
       {/* Centred in the band between the header and the Skip bar: the content
@@ -86,7 +87,7 @@ function ForkStep({ onChoose }: Readonly<ForkStepProps>) {
           fixed height, so the block still scrolls: a large system font or a
           short screen starts at the top padding rather than being pushed over
           the header or the action bar. */}
-      <View className="items-center gap-4">
+      <View className="items-center gap-3">
         <TourStepHeader
           icon={<Sparkles size={36} color={colors.foreground} />}
           eyebrow={t('tour.eyebrow')}
@@ -123,7 +124,6 @@ export function TourScreen() {
   // replace, so the two exits use two routers.
   const router = useRouter();
   const stackSafeRouter = useStackSafeReplace();
-  const insets = useSafeAreaInsets();
   const { userId } = useCurrentUserId();
   const { recordCompleted } = useTourCompletion(userId);
   // The hand-off's scope: the new-session form resolves its repositories, model
@@ -208,17 +208,13 @@ export function TourScreen() {
         <ForkStep onChoose={choosePath} />
       </View>
 
-      {/* Action bar: Skip is always available as the one alternate exit. The
-          bottom inset is dynamic, so it goes through `style` like ScreenHeader
-          and the pr-review footers. */}
-      <View
-        className="flex-row items-center gap-3 px-6 pt-2"
-        style={{ paddingBottom: Math.max(insets.bottom, 16) }}
-      >
-        <Button variant="ghost" className="flex-1" onPress={dismiss}>
+      {/* Skip is always available as the one alternate exit; the shared footer
+          owns the bottom band and the keyboard rule. */}
+      <ScreenFooter>
+        <Button variant="ghost" onPress={dismiss}>
           <Text>{t('tour.skip')}</Text>
         </Button>
-      </View>
+      </ScreenFooter>
     </View>
   );
 }

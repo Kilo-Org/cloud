@@ -384,7 +384,8 @@ describe('NewSessionRepositorySection connect card layout stability', () => {
 
     const card = renderer.root.find(
       node =>
-        node.type === ('Animated.View' as never) && String(node.props.className).includes('bg-card')
+        node.type === ('Animated.View' as never) &&
+        String(node.props.className).includes('rounded-lg bg-secondary')
     );
     expect(card.props.layout).toBeUndefined();
 

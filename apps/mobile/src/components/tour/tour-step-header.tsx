@@ -6,7 +6,7 @@ import { Eyebrow } from '@/components/ui/eyebrow';
 import { Text } from '@/components/ui/text';
 
 type TourStepHeaderProps = {
-  /** Icon node for the tile; size and color are set by the step. */
+  /** Icon node for the step; size and color are set by the step. */
   icon: ReactNode;
   /**
    * The label above the title. It belongs to this centred step header, not
@@ -18,7 +18,7 @@ type TourStepHeaderProps = {
 };
 
 /**
- * The opening block for a tour step: icon tile, eyebrow, title, and body.
+ * The opening block for a tour step: icon, eyebrow, title, and body.
  *
  * One component so the font-scale cap that keeps the subtitle whole above
  * the scroll fold (see `tour-font-scale`) cannot drift between steps.
@@ -28,23 +28,22 @@ type TourStepHeaderProps = {
 export function TourStepHeader({ icon, eyebrow, title, body }: Readonly<TourStepHeaderProps>) {
   return (
     <>
-      <View className="h-20 w-20 items-center justify-center rounded-3xl border border-border bg-card">
-        {icon}
-      </View>
+      {icon}
       <View className="items-center gap-1">
         <Eyebrow className="text-center" maxFontSizeMultiplier={TOUR_HEADER_MAX_FONT_SCALE}>
           {eyebrow}
         </Eyebrow>
         <Text
-          variant="h3"
+          variant="large"
           className="text-center"
+          accessibilityRole="header"
           maxFontSizeMultiplier={TOUR_HEADER_MAX_FONT_SCALE}
         >
           {title}
         </Text>
         <Text
           variant="muted"
-          className="text-center text-base"
+          className="text-center"
           maxFontSizeMultiplier={TOUR_HEADER_MAX_FONT_SCALE}
         >
           {body}

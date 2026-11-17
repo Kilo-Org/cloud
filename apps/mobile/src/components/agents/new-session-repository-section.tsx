@@ -3,6 +3,8 @@ import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';
+import { Card } from '@/components/ui/card';
+import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { QueryError } from '@/components/query-error';
 import { RepoSelector } from '@/components/agents/repo-selector';
 import { RepositoryBranchSelector } from '@/components/agents/repository-branch-selector';
@@ -103,10 +105,8 @@ export function NewSessionRepositorySection({
     null;
 
   return (
-    <View className="mt-5">
-      <Text className="mb-2 text-sm font-medium text-muted-foreground">
-        {t('common.repository')}
-      </Text>
+    <View className="gap-2">
+      <FormFieldLabel label={t('common.repository')} />
 
       {/*
         The picker renders unconditionally. Its trigger always reserves its
@@ -218,7 +218,7 @@ export function NewSessionRepositorySection({
     const noteKey = connectNoteKey(platform);
     return (
       <CollapsibleSection
-        className="mt-3 rounded-lg border border-border bg-card"
+        className="mt-3"
         contentClassName="gap-3"
         // The connected-but-empty card below is a `p-4` surface, and the two are
         // mutually exclusive states of the same region, so this one keeps that
@@ -266,7 +266,7 @@ export function NewSessionRepositorySection({
   function renderConnectedEmptyCard(platform: RepositoryPlatform): ReactElement | null {
     const copy = PROVIDER_COPY[platform];
     return (
-      <View className="mt-3 gap-3 rounded-lg border border-border bg-card p-4">
+      <Card className="mt-3">
         <View className="gap-1">
           <Text className="text-sm font-semibold text-foreground">{t(copy.connectedTitle)}</Text>
           <Text variant="muted">{t(copy.emptyDescription)}</Text>
@@ -274,7 +274,7 @@ export function NewSessionRepositorySection({
         <View className="flex-row gap-2">
           <RepositoryRefreshButton onRefreshRepos={onRefreshRepos} isRetrying={isRetrying} />
         </View>
-      </View>
+      </Card>
     );
   }
 }

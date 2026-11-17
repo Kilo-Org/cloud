@@ -92,7 +92,7 @@ export function pillOf(root: React.ReactElement): React.ReactElement {
 }
 
 export const PILL_LAYOUT_TOKENS = [
-  'h-[44px]',
+  'min-h-[48px]',
   'flex-row',
   'items-center',
   'gap-2',

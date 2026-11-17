@@ -2951,7 +2951,6 @@ export function SessionDetailContent({
             backFallback={AGENTS_SESSIONS_HREF}
             headerRight={headerRight}
             headerRightShrinks
-            className="pb-1"
             {...(rename.isTitleInteractive
               ? {
                   onTitlePress: rename.openModal,
@@ -3406,7 +3405,7 @@ export function SessionDetailContent({
       });
       return (
         <CenteredState>
-          <View className="items-center gap-3 px-6">
+          <View className="items-center gap-3 px-4">
             <QueryError
               variant={shownTerminalError.variant}
               placement="top"
@@ -3467,7 +3466,7 @@ export function SessionDetailContent({
       // not move, and give the user the only useful action: retry.
       return (
         <CenteredState>
-          <View className="items-center gap-3 px-6">
+          <View className="items-center gap-3 px-4">
             <Text className="text-center text-sm text-muted-foreground">
               {t('common.takingLonger')}
             </Text>
@@ -3494,7 +3493,7 @@ export function SessionDetailContent({
       if (transcriptView === 'status' && statusIndicator !== null) {
         return (
           <CenteredState>
-            <View className="items-center px-6">
+            <View className="items-center px-4">
               <SessionStatusIndicator indicator={statusIndicator} />
             </View>
           </CenteredState>

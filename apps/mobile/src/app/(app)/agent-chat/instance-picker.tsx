@@ -1,18 +1,18 @@
 /* eslint-disable max-lines -- the picker's five presentations (expired, loading, error, zero instances, list) share one sheet chrome and one refetch, and the error and zero-instance actions both carry the shared state-action floor */
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { selectionHaptic } from '@/lib/haptics';
-import { Check, Cloud, Server, Terminal } from '@/components/ui/icons';
+import { Cloud, Server, Terminal } from '@/components/ui/icons';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Pressable, View, type ViewStyle } from 'react-native';
+import { View, type ViewStyle } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { EmptyState } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
 import { Button } from '@/components/ui/button';
-import { radioItemA11y } from '@/components/ui/radio-group';
-import { Skeleton } from '@/components/ui/skeleton';
+import { ChoiceRow } from '@/components/ui/choice-row';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { SectionHeader } from '@/components/ui/section-header';
 import { Text } from '@/components/ui/text';
 import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
@@ -21,7 +21,6 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { instancePickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
-import { selectionCheckColor } from '@/lib/selection-check-color';
 import { resolveLiveInstance } from '@/lib/resolve-live-instance';
 import {
   type InstancePickerListItem,
@@ -123,7 +122,6 @@ export default function InstancePickerScreen() {
   });
 
   const handleSelectCloudAgent = useCallback(() => {
-    selectionHaptic();
     bridgeRef.current?.onSelect(null);
     instancePickerSlot.clear(UNFENCED_ROUTE_KEY);
     bridgeRef.current = undefined;
@@ -132,7 +130,6 @@ export default function InstancePickerScreen() {
 
   const handleSelectInstance = useCallback(
     (instance: InstancePickerInstance) => {
-      selectionHaptic();
       bridgeRef.current?.onSelect(instance);
       instancePickerSlot.clear(UNFENCED_ROUTE_KEY);
       bridgeRef.current = undefined;
@@ -164,14 +161,7 @@ export default function InstancePickerScreen() {
   const renderItem = useCallback(
     ({ item: row }: ListRenderItemInfo<InstancePickerListItem>) => {
       if (row.type === 'header') {
-        return (
-          <Text
-            accessibilityRole="header"
-            className="px-4 pt-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-          >
-            {t(INSTANCE_GROUP_LABEL_KEYS[row.kind])}
-          </Text>
-        );
+        return <SectionHeader inset label={t(INSTANCE_GROUP_LABEL_KEYS[row.kind])} />;
       }
       const item = row.instance;
       const selected = !pendingComputer && item.connectionId === currentConnectionId;
@@ -191,33 +181,37 @@ export default function InstancePickerScreen() {
         i18n.language
       );
       return (
-        <Pressable
+        <ChoiceRow
           testID={item.testID}
-          className="flex-row items-center gap-3 border-b border-border px-4 py-3 active:bg-secondary"
+          className="border-b-[0.5px] border-hair-soft"
+          selected={selected}
+          accessibleName={label}
           onPress={() => {
             handleSelectInstance(item);
           }}
-          {...radioItemA11y({ label, checked: selected })}
         >
-          <InstanceIcon size={18} color={colors.foreground} />
-          <View className="flex-1">
-            <Text className="text-base text-foreground">{item.name}</Text>
-            <Text variant="muted" className="text-sm">
-              {item.projectName}
-            </Text>
-            {item.displayFacts ? (
-              <Text variant="muted" className="text-sm">
-                {item.displayFacts}
+          <View className="min-w-0 flex-1 flex-row items-center gap-3">
+            <InstanceIcon size={18} color={colors.foreground} />
+            <View className="min-w-0 flex-1">
+              <Text className="text-sm font-medium" numberOfLines={1}>
+                {item.name}
               </Text>
-            ) : null}
-            {item.dedupSuffix ? (
-              <Text variant="mono" className="text-xs text-muted-foreground">
-                #{item.dedupSuffix}
+              <Text variant="muted" className="mt-0.5 text-xs">
+                {item.projectName}
               </Text>
-            ) : null}
+              {item.displayFacts ? (
+                <Text variant="muted" className="mt-0.5 text-xs">
+                  {item.displayFacts}
+                </Text>
+              ) : null}
+              {item.dedupSuffix ? (
+                <Text variant="mono" className="mt-0.5 text-xs text-muted-foreground">
+                  #{item.dedupSuffix}
+                </Text>
+              ) : null}
+            </View>
           </View>
-          {selected ? <Check size={18} color={selectionCheckColor(colors)} /> : null}
-        </Pressable>
+        </ChoiceRow>
       );
     },
     [currentConnectionId, pendingComputer, colors, handleSelectInstance, t, i18n.language]
@@ -248,10 +242,7 @@ export default function InstancePickerScreen() {
       >
         <View className="bg-background" style={{ paddingBottom: bottomClearance }}>
           {Array.from({ length: SKELETON_ROW_COUNT }, (_, i) => (
-            <View key={i} className="px-4 py-3">
-              <Skeleton className="h-5 w-2/3 rounded-md" />
-              <Skeleton className="mt-2 h-4 w-1/3 rounded-md" />
-            </View>
+            <RowSkeleton key={i} subtitle />
           ))}
         </View>
       </PickerSheet>
@@ -317,50 +308,47 @@ export default function InstancePickerScreen() {
         getItemType={item => item.type}
         contentContainerStyle={{ paddingBottom: bottomClearance }}
         ListHeaderComponent={
-          <Pressable
-            className="flex-row items-center gap-3 border-b border-border px-4 py-3 active:bg-secondary"
+          <ChoiceRow
+            className="border-b-[0.5px] border-hair-soft"
+            selected={cloudAgentSelected}
+            accessibleName={t('agentChat.instancePicker.runOnCloudAgent')}
             onPress={handleSelectCloudAgent}
-            {...radioItemA11y({
-              label: t('agentChat.instancePicker.runOnCloudAgent'),
-              checked: cloudAgentSelected,
-            })}
           >
-            <Cloud size={18} color={colors.foreground} />
-            <View className="flex-1">
-              <Text className="text-base font-medium text-foreground">
-                {t('agentChat.instancePicker.cloudAgent')}
-              </Text>
-              <Text variant="muted" className="text-sm">
-                {t('agentChat.instancePicker.cloudAgentDescription')}
-              </Text>
+            <View className="min-w-0 flex-1 flex-row items-center gap-3">
+              <Cloud size={18} color={colors.foreground} />
+              <View className="min-w-0 flex-1">
+                <Text className="text-sm font-medium" numberOfLines={1}>
+                  {t('agentChat.instancePicker.cloudAgent')}
+                </Text>
+                <Text variant="muted" className="mt-0.5 text-xs">
+                  {t('agentChat.instancePicker.cloudAgentDescription')}
+                </Text>
+              </View>
             </View>
-            {cloudAgentSelected ? <Check size={18} color={selectionCheckColor(colors)} /> : null}
-          </Pressable>
+          </ChoiceRow>
         }
         ListEmptyComponent={
-          <View className="items-center justify-center px-6 pt-10">
-            <EmptyState
-              icon={Server}
-              placement="top"
-              title={t('agentChat.instancePicker.noCliInstances')}
-              description={stripInlineCodeMarkers(
-                t('agentChat.instancePicker.noCliInstancesDescription')
-              )}
-              action={
-                <Button
-                  className={STATE_ACTION_CLASS}
-                  variant="outline"
-                  onPress={() => {
-                    void refetchInstances();
-                  }}
-                  loading={isRefetching}
-                  accessibilityLabel={t('common.refresh')}
-                >
-                  <Text>{t('common.refresh')}</Text>
-                </Button>
-              }
-            />
-          </View>
+          <EmptyState
+            icon={Server}
+            placement="top"
+            title={t('agentChat.instancePicker.noCliInstances')}
+            description={stripInlineCodeMarkers(
+              t('agentChat.instancePicker.noCliInstancesDescription')
+            )}
+            action={
+              <Button
+                className={STATE_ACTION_CLASS}
+                variant="outline"
+                onPress={() => {
+                  void refetchInstances();
+                }}
+                loading={isRefetching}
+                accessibilityLabel={t('common.refresh')}
+              >
+                <Text>{t('common.refresh')}</Text>
+              </Button>
+            }
+          />
         }
         renderItem={renderItem}
       />

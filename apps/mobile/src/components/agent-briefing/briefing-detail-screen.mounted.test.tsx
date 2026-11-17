@@ -51,7 +51,13 @@ vi.mock('@/lib/organization-context', () => ({
 }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/lib/utils', () => ({
+  cn: (...classes: unknown[]) => classes.filter(Boolean).join(' '),
+}));
+
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/card', () => ({ Card: 'Card' }));
+vi.mock('@/components/ui/section', () => ({ Section: 'Section' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));

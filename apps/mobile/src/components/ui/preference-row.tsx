@@ -34,6 +34,8 @@ type PreferenceRowProps = Readonly<{
    * state the person last asked for.
    */
   resolveValue?: () => boolean;
+  /** Test handle for the row's own container, for native E2E scripts. */
+  testID?: string;
 }>;
 
 /** Switch row shaped like the Notifications category row. */
@@ -47,6 +49,7 @@ export function PreferenceRow({
   onValueChange,
   inactiveSubtitle,
   resolveValue,
+  testID,
 }: PreferenceRowProps) {
   const colors = useThemeColors();
   const isDark = useColorScheme() === 'dark';
@@ -77,7 +80,7 @@ export function PreferenceRow({
   // description drops a whole line below the title. The extra 3.5 dp keeps the
   // title clear of the boundary, so the frame is the line the row paints.
   return (
-    <View className="min-h-[48px] flex-row items-center gap-2 px-4 py-3">
+    <View testID={testID} className="min-h-[48px] flex-row items-center gap-2 px-4 py-3">
       <Pressable
         className={cn(
           ROW_TARGET_CLASS,

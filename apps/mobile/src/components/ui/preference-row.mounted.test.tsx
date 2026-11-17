@@ -50,6 +50,7 @@ function renderRow(props: {
   resolveValue?: () => boolean;
   subtitle?: string;
   inactiveSubtitle?: string;
+  testID?: string;
 }) {
   act(() => {
     const element = createElement(PreferenceRow, {
@@ -310,5 +311,15 @@ describe('PreferenceRow', () => {
     expect(trackColor.true).toBe(darkColors.selection);
     expect(contrast(toggle.props.thumbColor as string, trackColor.false)).toBeGreaterThanOrEqual(3);
     expect(contrast(trackColor.false, darkColors.secondary)).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe('PreferenceRow test handle', () => {
+  it('puts the caller\'s testID on the row container', () => {
+    const row = renderRow({ value: true, onValueChange: () => undefined, testID: 'pref-1' }).find(
+      node => typeof node.type === 'string' && node.props.testID === 'pref-1'
+    );
+
+    expect(row.type).toBe('View');
   });
 });

@@ -155,10 +155,9 @@ describe('FixedPartRow mounted', () => {
     // RN's small spinner is 20x20 while the status icons are 16x16. Without the
     // fixed square the spinner sizes the row and the transcript row is ~2.5dp
     // taller while a tool runs than after it resolves. The spinner must render
-    // inside the same 16x16 slot the completed/error icons occupy.
+    // inside the same measured square the completed/error icons occupy.
     const slot = spinner.parent;
     expect(slot?.type).toBe('View');
-    expect(slot?.props.className).toContain('size-[16px]');
     expect(slot?.props.className).toContain('items-center');
     expect(slot?.props.className).toContain('justify-center');
 
@@ -169,7 +168,8 @@ describe('FixedPartRow mounted', () => {
       accessibilityLabel: 'bash tool, completed',
     });
     const completedIcon = findHost(completed.root, 'Eye')[0];
-    expect(completedIcon?.props.size).toBe(16);
+    expect(completedIcon?.props.size).toBe(slot?.props.style.width);
+    expect(slot?.props.style.height).toBe(slot?.props.style.width);
   });
 
   it('renders the completed icon when status is completed and an icon is provided', async () => {

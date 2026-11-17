@@ -76,6 +76,8 @@ type ConfigureRowProps = {
   accessibilityLabel?: string;
   trailing?: ReactNode;
   className?: string;
+  /** Test handle for the row's own control, for native E2E scripts. */
+  testID?: string;
 };
 
 /** Tile + title + subtitle + trailing mark row. */
@@ -94,6 +96,7 @@ export function ConfigureRow({
   accessibilityLabel,
   trailing,
   className,
+  testID,
 }: Readonly<ConfigureRowProps>) {
   const { width } = useWindowDimensions();
   const fontScale = useLiveFontScale();
@@ -161,6 +164,7 @@ export function ConfigureRow({
 
   const inner = (
     <View
+      testID={onPress ? undefined : testID}
       className={cn(
         'min-h-[48px] px-4 py-3',
         stack ? 'gap-2' : 'flex-row items-center gap-3',
@@ -188,6 +192,7 @@ export function ConfigureRow({
   if (onPress) {
     return (
       <Pressable
+        testID={testID}
         onPress={onPress}
         disabled={disabled}
         accessibilityRole="button"

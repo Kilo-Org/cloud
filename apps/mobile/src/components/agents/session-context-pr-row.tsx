@@ -1,10 +1,9 @@
 import { useAtomValue } from 'jotai';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
 import { type AssociatedPrData, type SessionManager } from '@kilocode/cloud-agent-sdk';
 
-import { Text } from '@/components/ui/text';
+import { KvRow } from '@/components/ui/kv-row';
 import { openExternalUrl } from '@/lib/external-link';
 import { resolveSessionPrTapTarget } from '@/lib/session-pr-navigation';
 
@@ -54,22 +53,28 @@ export function SessionContextPrRow({
   };
 
   return (
-    <View className="min-h-[44px] flex-row items-stretch justify-between gap-3">
-      <Text className="self-center text-xs uppercase tracking-wide text-muted-foreground">
-        {t('common.pullRequest')}
-      </Text>
-      <SessionPrBadge
-        pr={pr}
-        loading={false}
-        // The pill is this row's only control and its compact box is ~18pt;
-        // stretching it to the row's 44pt reserves the full touch target,
-        // matching the session page's goal pressable (a `hitSlop` would be
-        // clipped by the row's own bounds on Android).
-        className="self-stretch justify-center"
-        onPress={() => {
-          openPr(pr);
-        }}
-      />
-    </View>
+    // The badge is the row's value, so it takes the value slot: the label stays
+    // left at the row rhythm and the pill keeps its own press target. The pill
+    // itself is ~18pt, so the row hands its full height to it (`items-stretch`
+    // plus the badge's `self-stretch justify-center`): the whole row answers the
+    // tap instead of the short pill alone, and a `hitSlop` would be clipped by
+    // the row's own bounds on Android.
+    <KvRow
+      label={t('common.pullRequest')}
+      className="items-stretch"
+      value=""
+      valueFace="text"
+      testID="session-context-pr-row"
+      trailing={
+        <SessionPrBadge
+          pr={pr}
+          loading={false}
+          className="self-stretch justify-center"
+          onPress={() => {
+            openPr(pr);
+          }}
+        />
+      }
+    />
   );
 }

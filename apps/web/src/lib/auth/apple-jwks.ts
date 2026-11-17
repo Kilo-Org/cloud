@@ -68,6 +68,11 @@ async function refreshAppleKeys(): Promise<AppleJWK[]> {
       return keys;
     } catch (error) {
       lastRefreshError = error;
+      if (cachedKeys) {
+        // Serve the still-present key set; the next attempt stays on the
+        // refresh cooldown while lastRefreshError records the failure.
+        return cachedKeys.keys;
+      }
       throw error;
     } finally {
       refreshInFlight = null;

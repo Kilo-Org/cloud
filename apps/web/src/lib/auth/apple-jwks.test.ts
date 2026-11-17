@@ -160,7 +160,7 @@ describe('verifyAppleJwtWithJwks', () => {
     const fetchMock = jest
       .spyOn(global, 'fetch')
       .mockResolvedValueOnce(jwksResponse([jwkForKey('current-key')]))
-      .mockResolvedValueOnce(new Response(null, { status: 503 }));
+      .mockResolvedValue(new Response(null, { status: 503 }));
 
     const goodToken = signToken('current-key', { sub: 'user-1' });
     await verifyAppleJwtWithJwks(goodToken, 'com.kilocode.kiloapp');
@@ -168,18 +168,32 @@ describe('verifyAppleJwtWithJwks', () => {
 
     now += 31_000;
     const unknownToken = signToken('rotated-away-key');
-    await expect(verifyAppleJwtWithJwks(unknownToken, 'com.kilocode.kiloapp')).rejects.toThrow(
-      'Failed to fetch Apple JWKS: 503'
-    );
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-
+    // The first unknown-kid token starts the refresh; its failure falls back
+    // to the cached key set, so the rejection names the missing key instead of
+    // surfacing the fetch failure.
     await expect(verifyAppleJwtWithJwks(unknownToken, 'com.kilocode.kiloapp')).rejects.toThrow(
       AppleJwtClientError
     );
     expect(fetchMock).toHaveBeenCalledTimes(2);
 
+    await expect(verifyAppleJwtWithJwks(unknownToken, 'com.kilocode.kiloapp')).rejects.toThrow(
+      'No matching Apple public key'
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    // Within the TTL and the refresh cooldown, the cached key set still
+    // verifies tokens whose kid it holds.
     const payload = await verifyAppleJwtWithJwks(goodToken, 'com.kilocode.kiloapp');
     expect(payload.sub).toBe('user-1');
     expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    // After the cache TTL expires with refreshes still failing, the cached key
+    // set keeps verifying the kid it holds while the retry stays bounded.
+    now += 60 * 60 * 1000;
+    await verifyAppleJwtWithJwks(signToken('current-key', { sub: 'user-1' }), 'com.kilocode.kiloapp');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    now += 31_000;
+    await verifyAppleJwtWithJwks(signToken('current-key', { sub: 'user-1' }), 'com.kilocode.kiloapp');
+    expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 });

@@ -39,24 +39,31 @@ function ActivityEntry({
 }) {
   const label = item.kind === 'shell' ? item.title || item.command : item.description || item.agent;
   return (
-    <li className="space-y-1 py-2 text-xs">
-      <div className="flex items-start justify-between gap-2">
-        <span className="min-w-0 break-words" title={label}>
+    <li className="py-0.5 text-xs">
+      <div className="flex items-center gap-2">
+        <span
+          className="min-w-0 flex-1 truncate"
+          title={item.descendant ? `${label} · From ${item.parentLabel}` : label}
+        >
           {label}
+        </span>
+        {item.descendant && (
+          <span className="text-muted-foreground hidden max-w-28 truncate sm:inline">
+            From {item.parentLabel}
+          </span>
+        )}
+        <span className="text-muted-foreground shrink-0">
+          {item.waiting ? 'Needs input' : 'Running'}
         </span>
         <span className="text-muted-foreground shrink-0">
           <ElapsedTime started={item.time.started} />
         </span>
-      </div>
-      <div className="text-muted-foreground flex flex-wrap items-center gap-x-2">
-        <span>{item.waiting ? 'Needs input' : 'Running'}</span>
-        {item.descendant && <span>From {item.parentLabel}</span>}
         {item.kind === 'subagent' && (
           <Button
             type="button"
             size="sm"
             variant="ghost"
-            className="ml-auto min-h-11 text-xs"
+            className="h-7 shrink-0 px-2 text-xs pointer-coarse:min-h-11"
             onClick={() =>
               onOpenChildSession({
                 sessionId: item.childSessionID as KiloSessionId,
@@ -166,7 +173,7 @@ export function BackgroundActivityStrip({
                     aria-label={kind === 'subagent' ? 'Agents' : 'Shells'}
                     className="mb-2 last:mb-0"
                   >
-                    <h3 className="text-xs font-medium">
+                    <h3 className="mb-1 text-xs font-medium">
                       {kind === 'subagent' ? 'Agents' : 'Shells'}
                     </h3>
                     <ul>

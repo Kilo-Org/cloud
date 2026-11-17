@@ -174,7 +174,10 @@ export function ProviderKeyProviderPickerScreen({
         title={t('profile.providerKeys.chooseProvider')}
         backFallback={PROFILE_TAB_HREF}
       />
-      <View className="px-4 pb-1 pt-2">
+      <View className="pb-1 pt-2 px-[16px]">
+        {/* px-[16px], not px-4: the app's inlineRem is 14, so px-4 is 14 and the
+            list rows' `paddingHorizontal: 16` would leave this box 2 wider on
+            each side than the rows it sits above. */}
         <View className="min-h-[44px] flex-row items-center gap-2 rounded-lg bg-secondary px-3">
           <Search size={18} color={colors.mutedForeground} />
           <Input

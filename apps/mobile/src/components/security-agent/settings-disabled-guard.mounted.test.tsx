@@ -268,9 +268,9 @@ function pressRadioOption(label: string) {
   // the current frame's `selected` and `onPress` — a segmented segment ignores
   // a press while it is already selected, and only the latest closure knows
   // which one that is.
-  const option = [...radioOptions.options]
-    .reverse()
-    .find(candidate => candidate.accessibilityLabel === label);
+  const option = radioOptions.options.findLast(
+    candidate => candidate.accessibilityLabel === label
+  );
   if (!option) {
     throw new Error(`radio option not found: ${label}`);
   }

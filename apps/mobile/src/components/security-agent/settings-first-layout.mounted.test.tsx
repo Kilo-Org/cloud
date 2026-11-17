@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one hydration harness drives all four settings screens; splitting it would duplicate the mock set and the frame recorder */
 // Regression for the four Security Agent settings screens that hydrate their
 // draft from the loaded config in an effect. A body painted before that
 // hydration shows the default draft and then moves every control below it once

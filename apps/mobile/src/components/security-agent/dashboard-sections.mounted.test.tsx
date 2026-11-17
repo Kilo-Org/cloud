@@ -11,6 +11,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import { Section } from '@/components/ui/section';
+import { SectionHeaderSkeleton } from '@/components/ui/section-header-skeleton';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { ROW_TARGET_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import {
@@ -478,44 +479,54 @@ describe('DashboardSectionsSkeleton', () => {
     return renderer;
   }
 
-  /** The section cards: the views that carry the card frame. */
-  function cards(instance: Instance): Instance[] {
-    return instance.findAll(
-      n =>
-        typeof n.type === 'string' &&
-        (n.type as string) === 'View' &&
-        String(n.props.className ?? '').includes('bg-secondary')
-    );
+  /**
+   * One block per placeholder section: the `View` that holds the section's
+   * reserved label line, found through the header twin itself.
+   */
+  function placeholderBlocks(instance: Instance): Instance[] {
+    return instance
+      .findAllByType(SectionHeaderSkeleton)
+      .map(header => header.parent)
+      .filter((parent): parent is Instance => parent !== null);
+  }
+
+  /** The placeholder's bars: the label's line, then each row's lines. */
+  function reservedLines(block: Instance): number {
+    return block.findAll(node => String(node.type) === 'Skeleton').length;
   }
 
   it.each([true, false])('draws one placeholder per loaded section (slaEnabled=%s)', slaEnabled => {
     const loaded = renderSections({ slaEnabled }).root.findAllByType(Section);
-    const placeholders = renderSkeleton(slaEnabled).root.findAllByType(Section);
+    const placeholders = renderSkeleton(slaEnabled).root.findAllByType(SectionHeaderSkeleton);
 
+    // The posture section is the one SLA tracking hides, so the reserve follows
+    // the loaded tree: three sections with the deadlines on, four without.
+    expect(placeholders).toHaveLength(slaEnabled ? 3 : 4);
     expect(placeholders).toHaveLength(loaded.length);
   });
 
   it('names nothing it has not measured', () => {
-    const placeholders = cards(renderSkeleton(true).root);
+    const renderer = renderSkeleton(true).root;
+    const placeholders = placeholderBlocks(renderer);
 
-    expect(placeholders.every(card => copy(card).length === 0)).toBe(true);
-    expect(placeholders.every(card => card.findAllByType('Skeleton').length > 0)).toBe(true);
+    expect(renderer.findAllByType('Text')).toHaveLength(0);
+    expect(placeholders.every(block => block.findAllByType(RowSkeleton).length > 0)).toBe(true);
   });
 
   it('draws the Act-first placeholder at the height of the card a never-synced scope loads', () => {
     // Before the first sync that card holds one line of pending copy instead of
     // a title over its repository, so the placeholder that has the read's
-    // answer draws that single line and does not lose a second one when the
+    // answer draws that single row and does not lose a second one when the
     // cards replace it.
     const placeholderLines = (neverSynced: boolean) => {
-      const card = cards(renderSkeleton(true, neverSynced).root)[0];
-      if (!card) {
+      const block = placeholderBlocks(renderSkeleton(true, neverSynced).root)[0];
+      if (!block) {
         throw new Error('priority placeholder not found');
       }
-      return card.findAllByType('Skeleton').length;
+      return reservedLines(block);
     };
     const loadedLines = (neverSynced: boolean) => {
-      const card = cards(renderSections({ slaEnabled: true, neverSynced }).root)[0];
+      const card = renderSections({ slaEnabled: true, neverSynced }).root.findAllByType(Section)[0];
       if (!card) {
         throw new Error('priority card not found');
       }
@@ -541,11 +552,11 @@ describe('DashboardSectionsSkeleton', () => {
       return risk.findAllByType('KvRow').length;
     };
     const placeholderRows = (slaEnabled: boolean) => {
-      const section = renderSkeleton(slaEnabled).root.findAllByType(Section)[slaEnabled ? 1 : 2];
-      if (!section) {
+      const block = placeholderBlocks(renderSkeleton(slaEnabled).root)[slaEnabled ? 1 : 2];
+      if (!block) {
         throw new Error('risk placeholder not found');
       }
-      return section.findAllByType(RowSkeleton).length;
+      return block.findAllByType(RowSkeleton).length;
     };
 
     expect(placeholderRows(true)).toBe(loadedRows(true));

@@ -68,8 +68,10 @@ describe('PillGroup disabled cue', () => {
     expect(rows).toHaveLength(OPTIONS.length);
     for (const row of rows) {
       const tokens = String(row.props.className).split(/\s+/);
-      expect(tokens).toContain('active:opacity-70');
-      expect(tokens).not.toContain('opacity-50');
+      // The muted label token is the whole cue. An opacity utility on the row
+      // would halve it a second time, and the pressed cue is not due either:
+      // a row with nothing to press does not light up.
+      expect(tokens.filter(token => token.includes('opacity-'))).toEqual([]);
     }
   });
 

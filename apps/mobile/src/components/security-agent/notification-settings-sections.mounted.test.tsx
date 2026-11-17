@@ -85,6 +85,10 @@ vi.mock('@/components/destructive-confirm-dialog', () => ({
   DestructiveConfirmDialog: () => null,
 }));
 vi.mock('@/components/ui/input', () => ({ Input: 'Input' }));
+// `PreferenceRow` puts its busy spinner in the row's tile; the shared
+// indicator reaches the reduced-motion policy (expo-battery, reanimated), so
+// the row's graph needs it stubbed to load under the test renderer.
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/radio-group', () => ({

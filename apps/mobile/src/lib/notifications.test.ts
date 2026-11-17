@@ -1314,9 +1314,9 @@ const needsInputPush = {
   category: 'attention',
 };
 
-// Kinds this app retired but the shared schema still declares: the catalog still
-// supplies their copy, so a foreground delivery would draw a banner whose tap
-// resolves no route.
+// Kinds this app retired. A server that has not stopped sending them still
+// delivers them, and the catalog still supplies their copy, so a foreground
+// delivery would draw a banner whose tap resolves no route.
 const RETIRED_PUSHES: [string, Record<string, unknown>][] = [
   [
     'chat.message',

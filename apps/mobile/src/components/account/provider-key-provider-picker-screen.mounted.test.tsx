@@ -77,6 +77,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 vi.mock('@/lib/a11y/tap-target', () => ({
   COMPACT_CONTROL_HIT_SLOP_DP: 8,
+  FIELD_CLEAR_BOX_CLASS: 'h-[48px] w-[48px] -my-[7px] items-center justify-center',
   ROW_TARGET_CLASS: 'min-h-11',
   STATE_ACTION_CLASS: '',
 }));

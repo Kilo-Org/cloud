@@ -13,7 +13,7 @@ import { Search, X } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { COMPACT_CONTROL_HIT_SLOP_DP, ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { FIELD_CLEAR_BOX_CLASS, ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
 import {
   providerKeyNewHref,
@@ -195,10 +195,9 @@ export function ProviderKeyProviderPickerScreen({
           />
           {query === '' ? null : (
             <Pressable
-              hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
               accessibilityRole="button"
               accessibilityLabel={t('common.clearSearch')}
-              className="h-[38px] w-[38px] items-center justify-center active:opacity-70"
+              className={cn(FIELD_CLEAR_BOX_CLASS, '-me-3 active:opacity-70')}
               onPress={() => {
                 setQuery('');
                 inputRef.current?.clear();

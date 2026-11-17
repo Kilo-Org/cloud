@@ -89,4 +89,10 @@ describe('failedMessageRetryTarget', () => {
 
     expect(failedMessageRetryTarget(messages, new Map([['m1', failed]]))).toBeNull();
   });
+
+  it('offers nothing for a queued slash command, which a prompt re-send would not run', () => {
+    const messages = [userRow('m1', [text('/compact keep the plan', { synthetic: true })])];
+
+    expect(failedMessageRetryTarget(messages, new Map([['m1', failed]]))).toBeNull();
+  });
 });

@@ -17,7 +17,9 @@ export type FailedMessageRetryTarget = {
  * re-send deletes. A delivered row stays in history, so a re-send would show the
  * prompt twice. The re-send carries the prompt text alone, so a row with an
  * attachment or more than one text part is not offered, because a retry would
- * silently drop that content.
+ * silently drop that content. A queued slash command renders as `/command args`
+ * text, and a re-send would submit that text as a plain prompt, so a row whose
+ * text starts with `/` is not offered either.
  */
 export function failedMessageRetryTarget(
   messages: readonly StoredMessage[],
@@ -28,7 +30,8 @@ export function failedMessageRetryTarget(
   const delivery = pendingMessages.get(latestUserRow.info.id);
   if (delivery?.status !== 'failed' || delivery.reason === 'interrupted') return null;
   const prompt = onlyPromptText(latestUserRow);
-  return prompt === null ? null : { messageId: latestUserRow.info.id, prompt };
+  if (prompt === null || prompt.trimStart().startsWith('/')) return null;
+  return { messageId: latestUserRow.info.id, prompt };
 }
 
 /**

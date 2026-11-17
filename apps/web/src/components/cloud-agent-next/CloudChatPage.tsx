@@ -15,7 +15,7 @@ import dynamic from 'next/dynamic';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
 import { toast } from 'sonner';
-import { ArrowDown, Loader2, MessageSquare, RotateCw } from 'lucide-react';
+import { ArrowDown, MessageSquare, RotateCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -738,7 +738,11 @@ export default function CloudChatPage({
   }, [canCreateWorktreeChat, createWorktreeChat, newChatComposer, sessionIdFromParams]);
 
   const handleSendMessage = useCallback(
-    async (prompt: string, attachments?: CloudAgentAttachments) => {
+    async (
+      prompt: string,
+      attachments?: CloudAgentAttachments,
+      onOptimisticSend?: () => void
+    ) => {
       // Sending takes the position over only once the send is accepted: end a
       // resume that is still looking for its anchor, or its effect re-pauses
       // follow and cancels this scroll when the message lands. A rejected send
@@ -758,6 +762,7 @@ export default function CloudChatPage({
           variant: selection.variant,
         },
         attachments: supportsAttachments ? attachments : undefined,
+        onOptimisticSend,
       });
       // Pins the tail when the list already follows. While a resume has the
       // follow off this is a no-op, so a refused send never moves the reader
@@ -788,21 +793,24 @@ export default function CloudChatPage({
     ]
   );
 
-  const [retryingFailedMessageId, setRetryingFailedMessageId] = useState<string | null>(null);
   const handleRetryFailedMessage = useCallback(
     async (target: FailedMessageRetryTarget) => {
       // Captured before the await: the user can switch chats while the re-send
       // is in flight, and the resolution belongs to the chat that owns the row.
       const ownerSessionId = fetchedSessionData?.kiloSessionId;
-      setRetryingFailedMessageId(target.messageId);
+      if (!ownerSessionId) return;
+      let accepted = false;
       try {
-        // The re-send is a new user turn. Once it is accepted, the failed row
-        // and its error are resolved so the prompt does not show twice.
-        if (await handleSendMessage(target.prompt)) {
-          manager.clearFailedMessage(target.messageId, ownerSessionId);
-        }
+        // The re-send is a new user turn with its own optimistic row. Hide the
+        // failed row in the same tap, or the prompt shows twice for the whole
+        // round-trip. Once accepted, the failed row and its error are resolved.
+        accepted = await handleSendMessage(target.prompt, undefined, () =>
+          manager.markMessageSuperseded(target.messageId, ownerSessionId)
+        );
+        if (accepted) manager.clearFailedMessage(target.messageId, ownerSessionId);
       } finally {
-        setRetryingFailedMessageId(null);
+        // A rejected re-send delivered nothing: show the failed row and its Retry again.
+        if (!accepted) manager.unmarkMessageSuperseded(target.messageId, ownerSessionId);
       }
     },
     [fetchedSessionData?.kiloSessionId, handleSendMessage, manager]
@@ -1430,10 +1438,26 @@ export default function CloudChatPage({
       billingFailure,
     },
   });
-  const shownMessages = useMemo(
-    () => [...shownTranscript.staticMessages, ...shownTranscript.dynamicMessages],
-    [shownTranscript.staticMessages, shownTranscript.dynamicMessages]
-  );
+  // A failed row that a Retry re-sent stays hidden while the re-send is in
+  // flight and after it is accepted, also across a chat switch and a relaunch.
+  const resolvedDeliveryFailures = useAtomValue(manager.atoms.resolvedDeliveryFailures);
+  const supersededInFlightMessageIds = useAtomValue(manager.atoms.supersededInFlightMessageIds);
+  const shownMessages = useMemo(() => {
+    const messages = [...shownTranscript.staticMessages, ...shownTranscript.dynamicMessages];
+    if (resolvedDeliveryFailures.size === 0 && supersededInFlightMessageIds.size === 0) {
+      return messages;
+    }
+    return messages.filter(
+      message =>
+        !resolvedDeliveryFailures.has(message.info.id) &&
+        !supersededInFlightMessageIds.has(message.info.id)
+    );
+  }, [
+    shownTranscript.staticMessages,
+    shownTranscript.dynamicMessages,
+    resolvedDeliveryFailures,
+    supersededInFlightMessageIds,
+  ]);
   const currentChatProgress =
     statusIndicator?.type === 'progress' && isCurrentSession && sessionIdFromParams
       ? { sessionId: sessionIdFromParams, message: statusIndicator.message }
@@ -1971,17 +1995,11 @@ export default function CloudChatPage({
                                               <Button
                                                 type="button"
                                                 size="sm"
-                                                disabled={retryingFailedMessageId !== null}
                                                 onClick={() =>
                                                   void handleRetryFailedMessage(failedMessageRetry)
                                                 }
                                               >
-                                                {retryingFailedMessageId ===
-                                                failedMessageRetry.messageId ? (
-                                                  <Loader2 className="size-4 animate-spin" />
-                                                ) : (
-                                                  <RotateCw className="size-4" />
-                                                )}
+                                                <RotateCw className="size-4" />
                                                 Retry
                                               </Button>
                                             )}

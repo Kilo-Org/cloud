@@ -1380,10 +1380,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
           },
         });
         if (!success) {
-          if (
-            route.createdOnPlatform === 'code-review' ||
-            route.createdOnPlatform === 'security-remediation'
-          ) {
+          if (reply.response === 'reject') {
             log(
               `turn: automatic permission already resolved origin=${route.createdOnPlatform} sessionId=${route.sessionId} permissionId=${permissionId}`
             );

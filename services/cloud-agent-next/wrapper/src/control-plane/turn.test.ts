@@ -3564,9 +3564,15 @@ describe('automatic permissions', () => {
     }
   );
 
-  it.each(['code-review', 'security-remediation'])(
-    'continues a %s turn when a later automatic rejection is already resolved',
-    async createdOnPlatform => {
+  it.each([
+    ['code-review', {}],
+    ['security-remediation', {}],
+    ...['slack', 'github', 'security-agent', 'webhook', 'scheduled', undefined].flatMap(origin =>
+      ['skillShell', 'sandboxEscalation'].map(flag => [origin, { [flag]: true }] as const)
+    ),
+  ] as const)(
+    'continues a %s turn when a later automatic rejection is already resolved (%j)',
+    async (createdOnPlatform, metadata) => {
       const h = createHarness();
       const spec = routeSpec({ createdOnPlatform });
       h.registerRoute(spec);
@@ -3578,7 +3584,9 @@ describe('automatic permissions', () => {
         return attempts === 1;
       });
       for (const id of ['p1', 'p2']) {
-        h.manager.observeKiloEvent(kiloEvent('permission.asked', { sessionID: KILO_SESSION, id }));
+        h.manager.observeKiloEvent(
+          kiloEvent('permission.asked', { sessionID: KILO_SESSION, id, metadata })
+        );
         await settle();
       }
 

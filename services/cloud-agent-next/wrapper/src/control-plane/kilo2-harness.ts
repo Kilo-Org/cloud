@@ -6,13 +6,7 @@ import { DrainSessionError, isKiloServerUnreachableError } from '../kilo-api.js'
 import { logToFile } from '../utils.js';
 import type { Harness, HarnessSession } from './harness.js';
 import { readSessionSnapshot } from './session-snapshot.js';
-import {
-  createKilo2Api,
-  Kilo2HttpError,
-  kilo2FormSchema,
-  kilo2PermissionSchema,
-  kilo2SessionPath,
-} from './kilo2-api.js';
+import { createKilo2Api, Kilo2HttpError, kilo2FormSchema, kilo2SessionPath } from './kilo2-api.js';
 import { createKilo2Reads, kilo2LocationQuery as locationQuery } from './kilo2-reads.js';
 import { restoreKilo2History } from './kilo2-history.js';
 import type { Kilo2Lifecycle } from './kilo2-lifecycle.js';
@@ -289,9 +283,7 @@ export function createKilo2Harness(options: {
     },
     async answer({ reply, directory, signal }) {
       if (reply.action === 'permission') {
-        const pending = z
-          .array(kilo2PermissionSchema)
-          .parse(await api.data(`/api/permission/request?${locationQuery(directory)}`, { signal }));
+        const pending = await reads.getPermissions(directory, signal);
         const request = pending.find(item => item.id === reply.permissionId);
         if (!request) return false;
         try {
@@ -301,7 +293,10 @@ export function createKilo2Harness(options: {
             signal
           );
         } catch (error) {
-          if (error instanceof Kilo2HttpError && error.status === 404) return false;
+          if (error instanceof Kilo2HttpError && error.status === 404) {
+            const pending = await reads.getPermissions(directory, signal);
+            if (!pending.some(item => item.id === reply.permissionId)) return false;
+          }
           throw error;
         }
       } else {

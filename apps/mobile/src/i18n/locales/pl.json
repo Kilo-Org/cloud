@@ -3583,6 +3583,8 @@
       "groups": "Grupy",
       "guardrails": "Zabezpieczenia",
       "byok": "Własny klucz",
+      "ssoAndDomain": "SSO i domena",
+      "dataCollection": "Zbieranie danych",
       "auditLogs": "Dzienniki audytu",
       "requestLogs": "Dzienniki żądań",
       "subOrganizations": "Organizacje podrzędne",

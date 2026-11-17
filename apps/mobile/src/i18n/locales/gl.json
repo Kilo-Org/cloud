@@ -3464,6 +3464,8 @@
       "groups": "Grupos",
       "guardrails": "Barreiras de protección",
       "byok": "Usa a túa propia clave",
+      "ssoAndDomain": "SSO e dominio",
+      "dataCollection": "Recollida de datos",
       "auditLogs": "Rexistros de auditoría",
       "requestLogs": "Rexistros de solicitudes",
       "subOrganizations": "Suborganizacións",

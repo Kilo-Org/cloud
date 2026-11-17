@@ -3583,6 +3583,8 @@
       "groups": "Группы",
       "guardrails": "Ограничения",
       "byok": "Собственный ключ",
+      "ssoAndDomain": "SSO и домен",
+      "dataCollection": "Сбор данных",
       "auditLogs": "Журналы аудита",
       "requestLogs": "Журналы запросов",
       "subOrganizations": "Дочерние организации",

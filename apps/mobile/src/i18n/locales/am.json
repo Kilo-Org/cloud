@@ -3464,6 +3464,8 @@
       "groups": "ቡድኖች",
       "guardrails": "የጥበቃ ገደቦች",
       "byok": "የራስዎን ቁልፍ ይጠቀሙ",
+      "ssoAndDomain": "SSO እና ጎራ",
+      "dataCollection": "የውሂብ አሰባሰብ",
       "auditLogs": "የኦዲት መዝገቦች",
       "requestLogs": "የጥያቄ መዝገቦች",
       "subOrganizations": "ንዑስ ድርጅቶች",

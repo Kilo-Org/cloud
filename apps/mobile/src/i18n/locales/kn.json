@@ -3464,6 +3464,8 @@
       "groups": "ಗುಂಪುಗಳು",
       "guardrails": "ಗಾರ್ಡ್‌ರೇಲ್‌ಗಳು",
       "byok": "ನಿಮ್ಮ ಸ್ವಂತ ಕೀ ಬಳಸಿ",
+      "ssoAndDomain": "SSO ಮತ್ತು ಡೊಮೇನ್",
+      "dataCollection": "ಡೇಟಾ ಸಂಗ್ರಹಣೆ",
       "auditLogs": "ಆಡಿಟ್ ಲಾಗ್‌ಗಳು",
       "requestLogs": "ವಿನಂತಿ ಲಾಗ್‌ಗಳು",
       "subOrganizations": "ಉಪ-ಸಂಸ್ಥೆಗಳು",

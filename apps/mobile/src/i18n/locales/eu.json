@@ -3464,6 +3464,8 @@
       "groups": "Taldeak",
       "guardrails": "Babes-mugak",
       "byok": "Erabili zure gakoa",
+      "ssoAndDomain": "SSO eta domeinua",
+      "dataCollection": "Datu-bilketa",
       "auditLogs": "Ikuskaritza-erregistroak",
       "requestLogs": "Eskaeren erregistroak",
       "subOrganizations": "Azpierakundeak",

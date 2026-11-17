@@ -3464,6 +3464,8 @@
       "groups": "Grupet",
       "guardrails": "Masat mbrojtëse",
       "byok": "Përdor çelësin tënd",
+      "ssoAndDomain": "SSO dhe domeni",
+      "dataCollection": "Mbledhja e të dhënave",
       "auditLogs": "Regjistrat e auditimit",
       "requestLogs": "Regjistrat e kërkesave",
       "subOrganizations": "Nënorganizatat",

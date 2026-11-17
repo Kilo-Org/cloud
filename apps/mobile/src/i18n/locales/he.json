@@ -3526,6 +3526,8 @@
       "groups": "קבוצות",
       "guardrails": "מעקות בטיחות",
       "byok": "שימוש במפתח משלך",
+      "ssoAndDomain": "SSO ודומיין",
+      "dataCollection": "איסוף נתונים",
       "auditLogs": "יומני ביקורת",
       "requestLogs": "יומני בקשות",
       "subOrganizations": "ארגוני משנה",

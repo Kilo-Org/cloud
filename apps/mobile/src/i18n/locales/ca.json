@@ -3521,6 +3521,8 @@
       "groups": "Grups",
       "guardrails": "Salvaguardes",
       "byok": "Utilitza la teva pròpia clau",
+      "ssoAndDomain": "SSO i domini",
+      "dataCollection": "Recollida de dades",
       "auditLogs": "Registres d'auditoria",
       "requestLogs": "Registres de sol·licituds",
       "subOrganizations": "Suborganitzacions",

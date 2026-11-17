@@ -3464,6 +3464,8 @@
       "groups": "গ্রুপ",
       "guardrails": "গার্ডরেল",
       "byok": "নিজের কী ব্যবহার করুন",
+      "ssoAndDomain": "SSO ও ডোমেইন",
+      "dataCollection": "ডেটা সংগ্রহ",
       "auditLogs": "অডিট লগ",
       "requestLogs": "রিকোয়েস্ট লগ",
       "subOrganizations": "উপ-সংস্থা",

@@ -3464,6 +3464,8 @@
       "groups": "กลุ่ม",
       "guardrails": "Guardrails",
       "byok": "ใช้คีย์ของคุณเอง",
+      "ssoAndDomain": "SSO และโดเมน",
+      "dataCollection": "การเก็บรวบรวมข้อมูล",
       "auditLogs": "บันทึกการตรวจสอบ",
       "requestLogs": "บันทึกคำขอ",
       "subOrganizations": "องค์กรย่อย",

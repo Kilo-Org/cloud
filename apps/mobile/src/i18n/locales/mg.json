@@ -3464,6 +3464,8 @@
       "groups": "Vondrona",
       "guardrails": "Fefy fiarovana",
       "byok": "Ampiasao ny lakilenao manokana",
+      "ssoAndDomain": "SSO sy sehatra",
+      "dataCollection": "Fanangonana angona",
       "auditLogs": "Rakitry ny fanaraha-maso",
       "requestLogs": "Rakitry ny fangatahana",
       "subOrganizations": "Zana-pikambanana",

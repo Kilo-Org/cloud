@@ -3464,6 +3464,8 @@
       "groups": "Kooxaha",
       "guardrails": "Xayndaabyada",
       "byok": "Keen furahaaga",
+      "ssoAndDomain": "SSO iyo domain",
+      "dataCollection": "Ururinta xogta",
       "auditLogs": "Diiwaannada hubinta",
       "requestLogs": "Diiwaannada codsiyada",
       "subOrganizations": "Ururrada hoose",

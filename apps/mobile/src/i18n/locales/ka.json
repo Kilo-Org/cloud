@@ -3464,6 +3464,8 @@
       "groups": "ჯგუფები",
       "guardrails": "დამცავი წესები",
       "byok": "საკუთარი გასაღების გამოყენება",
+      "ssoAndDomain": "SSO და დომენი",
+      "dataCollection": "მონაცემთა შეგროვება",
       "auditLogs": "აუდიტის ჟურნალები",
       "requestLogs": "მოთხოვნების ჟურნალები",
       "subOrganizations": "ქვეორგანიზაციები",

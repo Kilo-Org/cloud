@@ -3464,6 +3464,8 @@
       "groups": "Групи",
       "guardrails": "Заштитни ограничувања",
       "byok": "Сопствен клуч (BYOK)",
+      "ssoAndDomain": "SSO и домен",
+      "dataCollection": "Собирање податоци",
       "auditLogs": "Дневници за ревизија",
       "requestLogs": "Дневници на барања",
       "subOrganizations": "Подорганизации",

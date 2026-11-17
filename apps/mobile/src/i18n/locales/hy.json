@@ -3464,6 +3464,8 @@
       "groups": "Խմբեր",
       "guardrails": "Պաշտպանիչ սահմանափակումներ",
       "byok": "Սեփական բանալի",
+      "ssoAndDomain": "SSO և դոմեն",
+      "dataCollection": "Տվյալների հավաքում",
       "auditLogs": "Աուդիտի մատյաններ",
       "requestLogs": "Հարցումների մատյաններ",
       "subOrganizations": "Ենթակազմակերպություններ",

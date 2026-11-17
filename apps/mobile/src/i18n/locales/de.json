@@ -3469,6 +3469,8 @@
       "groups": "Gruppen",
       "guardrails": "Guardrails",
       "byok": "Eigenen Schlüssel verwenden",
+      "ssoAndDomain": "SSO und Domain",
+      "dataCollection": "Datenerfassung",
       "auditLogs": "Audit-Logs",
       "requestLogs": "Anfrage-Logs",
       "subOrganizations": "Unterorganisationen",

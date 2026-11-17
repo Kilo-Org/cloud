@@ -3635,6 +3635,8 @@
       "groups": "Gruppi",
       "guardrails": "Salvagwardji",
       "byok": "Uża ċ-ċavetta tiegħek",
+      "ssoAndDomain": "SSO u dominju",
+      "dataCollection": "Ġbir tad-data",
       "auditLogs": "Reġistri tal-awditjar",
       "requestLogs": "Reġistri tat-talbiet",
       "subOrganizations": "Sotto-organizzazzjonijiet",

@@ -3464,6 +3464,8 @@
       "groups": "ਗਰੁੱਪ",
       "guardrails": "ਗਾਰਡਰੇਲ",
       "byok": "ਆਪਣੀ ਖੁਦ ਦੀ ਕੁੰਜੀ ਵਰਤੋ",
+      "ssoAndDomain": "SSO ਅਤੇ ਡੋਮੇਨ",
+      "dataCollection": "ਡਾਟਾ ਇਕੱਠਾ ਕਰਨਾ",
       "auditLogs": "ਆਡਿਟ ਲੌਗ",
       "requestLogs": "ਬੇਨਤੀ ਲੌਗ",
       "subOrganizations": "ਉਪ-ਸੰਸਥਾਵਾਂ",

@@ -3464,6 +3464,8 @@
       "groups": "Gareewwan",
       "guardrails": "Daangaa eegumsaa",
       "byok": "Furtuu mataa keetii fayyadami",
+      "ssoAndDomain": "SSO fi doomeenii",
+      "dataCollection": "Funaansa daataa",
       "auditLogs": "Galmeewwan odiitii",
       "requestLogs": "Galmeewwan gaaffii",
       "subOrganizations": "Dhaabbilee jalaa",

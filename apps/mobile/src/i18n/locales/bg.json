@@ -3464,6 +3464,8 @@
       "groups": "Групи",
       "guardrails": "Защитни ограничения",
       "byok": "Използвай собствен ключ",
+      "ssoAndDomain": "SSO и домейн",
+      "dataCollection": "Събиране на данни",
       "auditLogs": "Одитни журнали",
       "requestLogs": "Журнали на заявките",
       "subOrganizations": "Подорганизации",

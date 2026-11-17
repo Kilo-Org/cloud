@@ -3464,6 +3464,8 @@
       "groups": "ډلې",
       "guardrails": "خوندي حدونه",
       "byok": "خپله کیلي راوړئ",
+      "ssoAndDomain": "SSO او ډومېن",
+      "dataCollection": "د معلوماتو راټولول",
       "auditLogs": "د پلټنې لاګونه",
       "requestLogs": "د غوښتنو لاګونه",
       "subOrganizations": "فرعي سازمانونه",

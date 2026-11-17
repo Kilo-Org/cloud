@@ -3469,6 +3469,8 @@
       "groups": "Nhóm",
       "guardrails": "Rào chắn an toàn",
       "byok": "Dùng khóa riêng của bạn",
+      "ssoAndDomain": "SSO và tên miền",
+      "dataCollection": "Thu thập dữ liệu",
       "auditLogs": "Nhật ký kiểm tra",
       "requestLogs": "Nhật ký yêu cầu",
       "subOrganizations": "Tổ chức con",

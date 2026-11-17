@@ -3521,6 +3521,8 @@
       "groups": "Grupe",
       "guardrails": "Zaštitna ograničenja",
       "byok": "Sopstveni ključ",
+      "ssoAndDomain": "SSO i domen",
+      "dataCollection": "Prikupljanje podataka",
       "auditLogs": "Dnevnici revizije",
       "requestLogs": "Dnevnici zahteva",
       "subOrganizations": "Podorganizacije",

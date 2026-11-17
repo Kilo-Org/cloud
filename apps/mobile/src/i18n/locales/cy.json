@@ -3692,6 +3692,8 @@
       "groups": "Grwpiau",
       "guardrails": "Mesurau diogelu",
       "byok": "Dewch â'ch allwedd eich hun",
+      "ssoAndDomain": "SSO a pharth",
+      "dataCollection": "Casglu data",
       "auditLogs": "Logiau archwilio",
       "requestLogs": "Logiau ceisiadau",
       "subOrganizations": "Is-sefydliadau",

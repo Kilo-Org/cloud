@@ -3464,6 +3464,8 @@
       "groups": "ກຸ່ມ",
       "guardrails": "ມາດຕະການປ້ອງກັນ",
       "byok": "ໃຊ້ກະແຈຂອງທ່ານເອງ",
+      "ssoAndDomain": "SSO ແລະ ໂດເມນ",
+      "dataCollection": "ການເກັບກຳຂໍ້ມູນ",
       "auditLogs": "ບັນທຶກການກວດສອບ",
       "requestLogs": "ບັນທຶກຄຳຮ້ອງຂໍ",
       "subOrganizations": "ອົງກອນຍ່ອຍ",

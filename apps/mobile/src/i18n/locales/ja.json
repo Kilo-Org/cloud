@@ -3469,6 +3469,8 @@
       "groups": "グループ",
       "guardrails": "ガードレール",
       "byok": "独自のキーを使用",
+      "ssoAndDomain": "SSOとドメイン",
+      "dataCollection": "データ収集",
       "auditLogs": "監査ログ",
       "requestLogs": "リクエストログ",
       "subOrganizations": "サブ組織",

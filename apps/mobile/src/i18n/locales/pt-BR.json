@@ -3532,6 +3532,8 @@
       "groups": "Grupos",
       "guardrails": "Proteções",
       "byok": "Use sua própria chave",
+      "ssoAndDomain": "SSO e domínio",
+      "dataCollection": "Coleta de dados",
       "auditLogs": "Registros de auditoria",
       "requestLogs": "Registros de solicitações",
       "subOrganizations": "Suborganizações",

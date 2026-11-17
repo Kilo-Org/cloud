@@ -3521,6 +3521,8 @@
       "groups": "Grupuri",
       "guardrails": "Măsuri de protecție",
       "byok": "Folosește propria cheie",
+      "ssoAndDomain": "SSO și domeniu",
+      "dataCollection": "Colectarea datelor",
       "auditLogs": "Jurnale de audit",
       "requestLogs": "Jurnale de cereri",
       "subOrganizations": "Suborganizații",

@@ -3464,6 +3464,8 @@
       "groups": "Kumpulan",
       "guardrails": "Kawalan keselamatan",
       "byok": "Bawa kunci anda sendiri",
+      "ssoAndDomain": "SSO dan domain",
+      "dataCollection": "Pengumpulan data",
       "auditLogs": "Log audit",
       "requestLogs": "Log permintaan",
       "subOrganizations": "Suborganisasi",

@@ -3464,6 +3464,8 @@
       "groups": "Grupid",
       "guardrails": "Kaitsepiirangud",
       "byok": "Kasuta oma võtit",
+      "ssoAndDomain": "SSO ja domeen",
+      "dataCollection": "Andmete kogumine",
       "auditLogs": "Auditilogid",
       "requestLogs": "Päringulogid",
       "subOrganizations": "Alamorganisatsioonid",

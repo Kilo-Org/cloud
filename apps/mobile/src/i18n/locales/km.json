@@ -3464,6 +3464,8 @@
       "groups": "ក្រុម",
       "guardrails": "របាំងការពារ",
       "byok": "ប្រើសោផ្ទាល់ខ្លួន",
+      "ssoAndDomain": "SSO និងដែន",
+      "dataCollection": "ការប្រមូលទិន្នន័យ",
       "auditLogs": "កំណត់ហេតុសវនកម្ម",
       "requestLogs": "កំណត់ហេតុសំណើ",
       "subOrganizations": "អង្គការរង",

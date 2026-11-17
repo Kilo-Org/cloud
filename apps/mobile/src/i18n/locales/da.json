@@ -3464,6 +3464,8 @@
       "groups": "Grupper",
       "guardrails": "Sikkerhedsgrænser",
       "byok": "Brug din egen nøgle",
+      "ssoAndDomain": "SSO og domæne",
+      "dataCollection": "Dataindsamling",
       "auditLogs": "Revisionslogs",
       "requestLogs": "Anmodningslogs",
       "subOrganizations": "Underorganisationer",

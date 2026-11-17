@@ -3578,6 +3578,8 @@
       "groups": "Групы",
       "guardrails": "Абмежаванні бяспекі",
       "byok": "Уласны ключ",
+      "ssoAndDomain": "SSO і дамен",
+      "dataCollection": "Збор даных",
       "auditLogs": "Журналы аўдыту",
       "requestLogs": "Журналы запытаў",
       "subOrganizations": "Падарганізацыі",

@@ -3464,6 +3464,8 @@
       "groups": "Mga grupo",
       "guardrails": "Mga guardrail",
       "byok": "Gamitin ang sarili mong key",
+      "ssoAndDomain": "SSO at domain",
+      "dataCollection": "Pangongolekta ng data",
       "auditLogs": "Mga audit log",
       "requestLogs": "Mga request log",
       "subOrganizations": "Mga sub-organisasyon",

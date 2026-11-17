@@ -3464,6 +3464,8 @@
       "groups": "කණ්ඩායම්",
       "guardrails": "ආරක්ෂක සීමා",
       "byok": "ඔබේම යතුර භාවිත කරන්න",
+      "ssoAndDomain": "SSO සහ වසම",
+      "dataCollection": "දත්ත එකතු කිරීම",
       "auditLogs": "විගණන ලොග",
       "requestLogs": "ඉල්ලීම් ලොග",
       "subOrganizations": "උප සංවිධාන",

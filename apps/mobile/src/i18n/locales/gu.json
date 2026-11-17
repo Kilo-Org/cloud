@@ -3464,6 +3464,8 @@
       "groups": "ગ્રુપ",
       "guardrails": "ગાર્ડરેલ્સ",
       "byok": "તમારી પોતાની કી વાપરો",
+      "ssoAndDomain": "SSO અને ડોમેન",
+      "dataCollection": "ડેટા સંગ્રહ",
       "auditLogs": "ઑડિટ લૉગ",
       "requestLogs": "રિક્વેસ્ટ લૉગ",
       "subOrganizations": "પેટા-સંસ્થાઓ",

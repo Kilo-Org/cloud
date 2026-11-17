@@ -3697,6 +3697,8 @@
       "groups": "المجموعات",
       "guardrails": "ضوابط الحماية",
       "byok": "استخدام مفتاحك الخاص",
+      "ssoAndDomain": "SSO والنطاق",
+      "dataCollection": "جمع البيانات",
       "auditLogs": "سجلات التدقيق",
       "requestLogs": "سجلات الطلبات",
       "subOrganizations": "المؤسسات الفرعية",

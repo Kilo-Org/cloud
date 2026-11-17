@@ -3464,6 +3464,8 @@
       "groups": "Ryhmät",
       "guardrails": "Suojakaiteet",
       "byok": "Oma avain",
+      "ssoAndDomain": "SSO ja verkkotunnus",
+      "dataCollection": "Tiedonkeruu",
       "auditLogs": "Tarkastuslokit",
       "requestLogs": "Pyyntölokit",
       "subOrganizations": "Alaorganisaatiot",

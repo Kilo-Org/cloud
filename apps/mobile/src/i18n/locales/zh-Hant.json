@@ -3469,6 +3469,8 @@
       "groups": "群組",
       "guardrails": "防護機制",
       "byok": "自備金鑰",
+      "ssoAndDomain": "SSO 與網域",
+      "dataCollection": "資料收集",
       "auditLogs": "稽核記錄",
       "requestLogs": "請求記錄",
       "subOrganizations": "子組織",

@@ -3464,6 +3464,8 @@
       "groups": "Guruhlar",
       "guardrails": "Himoya qoidalari",
       "byok": "O'z kalitingizdan foydalanish",
+      "ssoAndDomain": "SSO va domen",
+      "dataCollection": "Ma'lumotlar yig'ish",
       "auditLogs": "Audit jurnallari",
       "requestLogs": "So'rovlar jurnallari",
       "subOrganizations": "Quyi tashkilotlar",

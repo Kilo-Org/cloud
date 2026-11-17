@@ -3578,6 +3578,8 @@
       "groups": "Skupiny",
       "guardrails": "Ochranné pravidlá",
       "byok": "Vlastný kľúč",
+      "ssoAndDomain": "SSO a doména",
+      "dataCollection": "Zber údajov",
       "auditLogs": "Protokoly auditu",
       "requestLogs": "Protokoly požiadaviek",
       "subOrganizations": "Podorganizácie",

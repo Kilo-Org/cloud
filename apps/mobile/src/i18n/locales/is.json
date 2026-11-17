@@ -3464,6 +3464,8 @@
       "groups": "Hópar",
       "guardrails": "Öryggismörk",
       "byok": "Notaðu eigin lykil",
+      "ssoAndDomain": "SSO og lén",
+      "dataCollection": "Gagnasöfnun",
       "auditLogs": "Endurskoðunarskrár",
       "requestLogs": "Beiðnaskrár",
       "subOrganizations": "Undirfélög",

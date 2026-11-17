@@ -3578,6 +3578,8 @@
       "groups": "Grupės",
       "guardrails": "Apsaugos ribos",
       "byok": "Naudoti savo raktą",
+      "ssoAndDomain": "SSO ir domenas",
+      "dataCollection": "Duomenų rinkimas",
       "auditLogs": "Audito žurnalai",
       "requestLogs": "Užklausų žurnalai",
       "subOrganizations": "Antrinės organizacijos",

@@ -3469,6 +3469,8 @@
       "groups": "ग्रुप",
       "guardrails": "गार्डरेल",
       "byok": "अपनी खुद की की (key) इस्तेमाल करें",
+      "ssoAndDomain": "SSO और डोमेन",
+      "dataCollection": "डेटा कलेक्शन",
       "auditLogs": "ऑडिट लॉग",
       "requestLogs": "रिक्वेस्ट लॉग",
       "subOrganizations": "सब-संगठन",

@@ -3578,6 +3578,8 @@
       "groups": "Skupine",
       "guardrails": "Varovala",
       "byok": "Uporaba lastnega ključa",
+      "ssoAndDomain": "SSO in domena",
+      "dataCollection": "Zbiranje podatkov",
       "auditLogs": "Revizijski dnevniki",
       "requestLogs": "Dnevniki zahtev",
       "subOrganizations": "Podorganizacije",

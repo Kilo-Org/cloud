@@ -3464,6 +3464,8 @@
       "groups": "Gwoup",
       "guardrails": "Baryè sekirite",
       "byok": "Itilize pwòp kle ou",
+      "ssoAndDomain": "SSO ak domèn",
+      "dataCollection": "Koleksyon done",
       "auditLogs": "Jounal odit",
       "requestLogs": "Jounal demann",
       "subOrganizations": "Sou-òganizasyon",

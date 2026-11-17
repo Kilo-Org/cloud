@@ -3464,6 +3464,8 @@
       "groups": "Топтар",
       "guardrails": "Қорғаныс шектеулері",
       "byok": "Өз кілтіңізді пайдалану",
+      "ssoAndDomain": "SSO және домен",
+      "dataCollection": "Деректер жинау",
       "auditLogs": "Аудит журналдары",
       "requestLogs": "Сұраныс журналдары",
       "subOrganizations": "Еншілес ұйымдар",

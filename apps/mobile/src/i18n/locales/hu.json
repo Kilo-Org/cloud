@@ -3464,6 +3464,8 @@
       "groups": "Csoportok",
       "guardrails": "Védőkorlátok",
       "byok": "Saját kulcs használata",
+      "ssoAndDomain": "SSO és domain",
+      "dataCollection": "Adatgyűjtés",
       "auditLogs": "Auditnaplók",
       "requestLogs": "Kérésnaplók",
       "subOrganizations": "Alszervezetek",

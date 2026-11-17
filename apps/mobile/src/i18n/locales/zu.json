@@ -3464,6 +3464,8 @@
       "groups": "Amaqembu",
       "guardrails": "Izivikelo",
       "byok": "Sebenzisa ukhiye wakho",
+      "ssoAndDomain": "I-SSO nesizinda",
+      "dataCollection": "Ukuqoqwa kwedatha",
       "auditLogs": "Amarekhodi okucwaninga",
       "requestLogs": "Amarekhodi ezicelo",
       "subOrganizations": "Izinhlangano ezingaphansi",

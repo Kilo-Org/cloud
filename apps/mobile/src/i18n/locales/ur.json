@@ -3464,6 +3464,8 @@
       "groups": "گروپس",
       "guardrails": "گارڈ ریلز",
       "byok": "اپنی کلید خود لائیں",
+      "ssoAndDomain": "SSO اور ڈومین",
+      "dataCollection": "ڈیٹا کا حصول",
       "auditLogs": "آڈٹ لاگز",
       "requestLogs": "درخواست لاگز",
       "subOrganizations": "ذیلی تنظیمیں",

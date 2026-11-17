@@ -3464,6 +3464,8 @@
       "groups": "Vikundi",
       "guardrails": "Mipaka ya usalama",
       "byok": "Tumia ufunguo wako mwenyewe",
+      "ssoAndDomain": "SSO na kikoa",
+      "dataCollection": "Ukusanyaji wa data",
       "auditLogs": "Kumbukumbu za ukaguzi",
       "requestLogs": "Kumbukumbu za maombi",
       "subOrganizations": "Mashirika tanzu",

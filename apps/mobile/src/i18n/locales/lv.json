@@ -3521,6 +3521,8 @@
       "groups": "Grupas",
       "guardrails": "Drošības ierobežojumi",
       "byok": "Izmantot savu atslēgu",
+      "ssoAndDomain": "SSO un domēns",
+      "dataCollection": "Datu vākšana",
       "auditLogs": "Audita žurnāli",
       "requestLogs": "Pieprasījumu žurnāli",
       "subOrganizations": "Apakšorganizācijas",

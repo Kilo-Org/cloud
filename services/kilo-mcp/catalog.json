@@ -16783,7 +16783,7 @@
   "models.selectorList": {
     "path": "models.selectorList",
     "kind": "query",
-    "summary": "List the models available for a model selector: returns the personal model list for a user, or the models available to a specific organization filtered by audience (member or admin). Use when an agent needs to populate a model picker or check which models a user or organization can access.",
+    "summary": "List the models available for a model selector: returns the personal model list for a user, or the models available to a specific organization filtered by audience (member or shared services). Use when an agent needs to populate a model picker or check which models a user or organization can access.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -16809,7 +16809,7 @@
       "organizationid",
       "audience"
     ],
-    "searchBlob": "models.selectorList List the models available for a model selector: returns the personal model list for a user, or the models available to a specific organization filtered by audience (member or admin). Use when an agent needs to populate a model picker or check which models a user or organization can access. models selectorlist organizationid audience organizationId audience"
+    "searchBlob": "models.selectorList List the models available for a model selector: returns the personal model list for a user, or the models available to a specific organization filtered by audience (member or shared services). Use when an agent needs to populate a model picker or check which models a user or organization can access. models selectorlist organizationid audience organizationId audience"
   },
   "moderation.acceptTerms": {
     "path": "moderation.acceptTerms",

@@ -63,6 +63,14 @@ export function TriggerFormAgent({
   const profiles = useTriggerProfiles(draft.runAsCreator ? undefined : organizationId, true);
   const isCustomAgent = !BUILTIN_AGENT_MODES.some(mode => mode === draft.agent);
   const { markTouched, shownProblem } = useTouchedProblems(problems);
+  // TanStack Query v5 resets a no-data query to `pending` when it refetches,
+  // clearing `error`, so `isError` alone would unmount the failure row (and its
+  // retry) the moment the retry is pressed. Keeping the failed state through
+  // the refetch leaves the row in place and lets the retry show its busy state
+  // until the request settles. Same contract as the tool-summary settings
+  // screen and `use-current-user-id`.
+  const catalogueFailed =
+    (models.isError || (models.isLoading && models.isFetched)) && models.models.length === 0;
 
   const agentOptions: TriggerChoice[] = [
     ...BUILTIN_AGENT_MODES.map(mode => ({
@@ -127,10 +135,10 @@ export function TriggerFormAgent({
               markTouched('model');
             }}
             isLoading={models.isLoading}
-            disabled={models.isError && models.models.length === 0}
+            disabled={catalogueFailed}
           />
         </View>
-        {models.isError ? (
+        {catalogueFailed ? (
           <View className="flex-row items-center gap-2">
             <Text accessibilityRole="alert" className="min-w-0 flex-1 text-xs text-destructive">
               {t('common.couldNotLoadModels')}

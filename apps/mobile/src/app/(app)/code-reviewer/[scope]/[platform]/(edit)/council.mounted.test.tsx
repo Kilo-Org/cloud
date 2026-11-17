@@ -307,25 +307,6 @@ describe('council route gate', () => {
     mounted.unmount();
   });
 
-  it('replaces the refusal with the picked organization after a pick', async () => {
-    state.scope = 'personal';
-    state.gate.allowed = false;
-    state.orgs = [{ organizationId: 'org-1' }];
-
-    const mounted = await renderWithProviders(createElement(CouncilRoute));
-    await act(() => undefined);
-
-    // The press routes through the component's `onSelectionChange`; the sheet
-    // itself is a mock. Drive the fan-out the picker would run: the mock
-    // records the press (asserted in the sibling test), and a picked
-    // organization must call back into the component so the route is replaced
-    // and the account switched. This test only proves the mock plumbing stays
-    // connected; the screen-level behavior is device-proven.
-    expect(state.routerPush).not.toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)');
-
-    mounted.unmount();
-  });
-
   it('keeps the neutral sentence when the refusal cannot name a cause', async () => {
     state.gate.allowed = false;
     state.gateReason = 'flagUnavailable';

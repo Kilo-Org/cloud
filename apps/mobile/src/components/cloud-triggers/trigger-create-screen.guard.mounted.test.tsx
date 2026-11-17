@@ -326,6 +326,9 @@ describe('TriggerCreateScreen leave guard', () => {
     expect(h.replace).toHaveBeenCalledTimes(1);
     // The form paints the saved values and the New button is disabled: the
     // screen reflects that its draft is saved until an edit starts a new one.
+    // `canSubmit` is the prop the form's New button reads, so it is asserted
+    // beside the guard read.
+    expect(renderer.root.findByProps({ mode: 'create' }).props.canSubmit).toBe(false);
     await waitFor(() => !h.guard.enabled);
   });
 

@@ -56,6 +56,7 @@ import { addMonths } from 'date-fns';
 import {
   getProviderDisplayPricing,
   getVercelModelForPricing,
+  isVercelEndpointOfProvider,
   getVercelPricingMetadata,
   type VercelPricingMetadata,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-endpoint-pricing';
@@ -66,6 +67,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/metadata-cache';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getVercelOnlyCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/vercel-only-models';
+import { getModelDisplayPricing } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/display-pricing';
 
 const OPENROUTER_MODELS_CACHE_TTL_MS = 5 * 60 * 1000;
 const OPENROUTER_MODELS_FETCH_TIMEOUT_MS = 15_000;
@@ -148,9 +150,9 @@ export function formatName(model: OpenRouterModel, preferredIndex: number) {
 }
 
 /**
- * The price the model picker shows for a catalog entry: the preferred
- * provider's route price when the snapshot knows one, otherwise the entry's
- * own catalog price.
+ * The price the model picker shows for a catalog entry: the preferred provider's undiscounted peak
+ * route price when the gateway metadata knows one, otherwise the entry's own undiscounted catalog
+ * price.
  */
 export function pickerModelPricing(
   model: OpenRouterModel,
@@ -162,7 +164,18 @@ export function pickerModelPricing(
     preferredProviderOrderConfig,
     model.id
   ).at(0);
-  const endpoints = endpointsMetadata[model.id]?.endpoints ?? [];
+  const vercelModel = getVercelModelForPricing(vercel, model.id);
+  const openRouterModel = endpointsMetadata[model.id];
+  if (!openRouterModel && vercelModel) {
+    // A model only Vercel serves is priced like its preferred provider's Vercel endpoint.
+    const vercelEndpoint =
+      (preferredProvider &&
+        vercelModel.endpoints.find(e => isVercelEndpointOfProvider(e, preferredProvider))) ||
+      vercelModel.endpoints[0];
+    const vercelPricing = getModelDisplayPricing(vercelEndpoint?.pricing);
+    if (vercelPricing) return vercelPricing;
+  }
+  const endpoints = openRouterModel?.endpoints ?? [];
   const endpoint = !preferredProvider
     ? endpoints[0]
     : (endpoints.find(e => e.tag === preferredProvider) ??
@@ -170,11 +183,9 @@ export function pickerModelPricing(
         e => normalizeInferenceProviderId(e.tag) === normalizeInferenceProviderId(preferredProvider)
       ));
   return (
-    getProviderDisplayPricing(
-      endpoint?.tag,
-      endpoint?.pricing,
-      getVercelModelForPricing(vercel, model.id)
-    ) ?? model.pricing
+    getProviderDisplayPricing(endpoint?.tag, endpoint?.pricing, vercelModel) ??
+    getModelDisplayPricing(model.pricing) ??
+    model.pricing
   );
 }
 
@@ -261,7 +272,19 @@ async function enhancedModelList(models: OpenRouterModel[], countryCode: string 
         alias_target: aliasTarget,
       };
     })
-    .concat(vercelOnlyCatalogModels.filter(model => isListableGatewayModelId(model.id)))
+    .concat(
+      vercelOnlyCatalogModels
+        .filter(model => isListableGatewayModelId(model.id))
+        .map(model => ({
+          ...model,
+          pricing: pickerModelPricing(
+            model,
+            endpointsMetadata,
+            preferredProviderOrderConfig,
+            vercelPricingMetadata
+          ),
+        }))
+    )
     .concat(autoModels);
   const displayPricingById = new Map(
     gatewayModels.map(model => [

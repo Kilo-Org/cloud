@@ -63,6 +63,7 @@ export function projectBackgroundResult(
   message: Kilo2Message,
   result: BackgroundResult
 ): Kilo2Message {
+  const metadata = z.record(z.string(), z.unknown()).safeParse(message['metadata']);
   return {
     ...message,
     type: 'assistant',
@@ -76,9 +77,7 @@ export function projectBackgroundResult(
         state: {
           input: {},
           metadata: {
-            ...(message['metadata'] == null
-              ? {}
-              : z.record(z.string(), z.unknown()).parse(message['metadata'])),
+            ...(metadata.success ? metadata.data : {}),
             backgroundResult: result,
           },
           content: [{ type: 'text', text: result.output }],

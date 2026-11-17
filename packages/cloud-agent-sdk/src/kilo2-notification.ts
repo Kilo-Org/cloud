@@ -33,7 +33,7 @@ function readSystemReminder(
   // Only a whole-message reminder is system context; a prompt with an appended reminder stays user content.
   if (message.text.replace(reminderBlock, '').trim() !== '') return undefined;
   const output = blocks
-    .map(block => block[1].trim())
+    .map(block => (block[1] ?? '').trim())
     .filter(Boolean)
     .join('\n\n');
   if (output === '') return undefined;

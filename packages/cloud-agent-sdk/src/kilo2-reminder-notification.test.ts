@@ -123,6 +123,17 @@ test.each(['callback', 'review', 'wakeup', 'queued', 'optimistic'])(
   }
 );
 
+test.each(['note', 42, ['tag']])(
+  'a reminder with non-object metadata %j still becomes a notice',
+  metadata => {
+    const native = { ...reminder(agentSwitchReminder), metadata };
+    const display = readKilo2Messages(session, [native])[0];
+
+    expect(display?.info.role).toBe('assistant');
+    expect(display?.parts[0]).toMatchObject({ type: 'tool', tool: 'agent_notice' });
+  }
+);
+
 test('live reminder events and reloaded snapshots have the same notice and preserve raw text', () => {
   const native = reminder(agentSwitchReminder);
   const event: NativeEvent = {

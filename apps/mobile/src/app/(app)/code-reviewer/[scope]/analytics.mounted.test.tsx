@@ -144,6 +144,17 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 
 vi.mock('react-native', () => ({ View: 'View', useColorScheme: () => 'light' }));
+// The route draws the shared skeleton and segmented primitives, whose motion
+// and haptic helpers load Expo native modules Node cannot evaluate (`__DEV__`
+// comes from the Expo runtime). Both are decoration only on this screen.
+vi.mock('@/lib/a11y/motion', () => ({ useMotionPolicy: () => ({ reducedMotion: false }) }));
+vi.mock('expo-haptics', () => ({
+  impactAsync: vi.fn(),
+  notificationAsync: vi.fn(),
+  selectionAsync: vi.fn(),
+  ImpactFeedbackStyle: { Light: 'Light', Medium: 'Medium', Heavy: 'Heavy' },
+  NotificationFeedbackType: { Success: 'Success', Warning: 'Warning', Error: 'Error' },
+}));
 
 const Screen = CodeReviewerAnalyticsRoute as ComponentType<Record<string, never>>;
 

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, type TextInputProps, View } from 'react-native';
 
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
@@ -23,8 +24,13 @@ import { trpcClient, useTRPC } from '@/lib/trpc';
 
 import { staleOrganizationScopeExit } from './organization-scope-model';
 
-/** One line under the field: a failure the person can act on, or a result. */
-type CreateMessage = { text: string; tone: 'error' | 'notice' };
+/**
+ * One line under the field: a failure the person can act on, or a result. The
+ * attempt counter keys the status line so a retry that fails with the same
+ * words as the failure before it still re-announces — a repeated message is
+ * a new event for a screen-reader user, not a re-render of the old one.
+ */
+type CreateMessage = { text: string; tone: 'error' | 'notice'; attempt: number };
 
 /** The navigation object a screen of a Stack sees. */
 type StackNavigation = {
@@ -61,10 +67,17 @@ export function CreateOrganizationScreen() {
   // The submit control stays disabled from the tap until the completion ends,
   // so it never looks actionable while the lock below drops its taps.
   const [settling, setSettling] = useState(false);
+  const aliveRef = useRef(true);
   // The create outlives this screen: a back press or a push while the request
   // or the list refresh runs must not move the active organization. The
   // completion reads these live values, never the render that started it.
-  const aliveRef = useRef(true);
+  // Counts the failed submits this mount has reported as an announced status,
+  // so the status line's announcement key (its `key` prop) changes with every
+  // new failure even when the words are identical.
+  const attemptRef = useRef(0);
+  const report = useCallback((text: string, tone: CreateMessage['tone']) => {
+    setMessage({ text, tone, attempt: attemptRef.current++ });
+  }, []);
   const focusedRef = useRef(routeFocused);
   const selectOrganizationRef = useRef(setOrganizationId);
   // A create that already succeeded must not repeat while the list refresh
@@ -103,7 +116,7 @@ export function CreateOrganizationScreen() {
           trpc.organizations.list.queryKey()
         );
         if (memberships?.some(entry => entry.organizationId === organizationId) !== true) {
-          setMessage({ text: t('organization.create.createdNotListed'), tone: 'notice' });
+          report(t('organization.create.createdNotListed'), 'notice');
           return;
         }
         selectOrganizationRef.current(organizationId);
@@ -134,6 +147,15 @@ export function CreateOrganizationScreen() {
   );
 
   const createOrganization = useMutation({
+    // Reachability is the create's outcome, not a precondition: the default
+    // `networkMode: 'online'` pauses the mutation while the connectivity
+    // manager reports the device offline, so the request is never sent and
+    // `isPending` never settles — the button keeps its spinner and the field
+    // stays disabled for as long as the outage lasts, with no failure
+    // surface. Attempting the request instead lets it fail through the normal
+    // path: `onError` releases the form and reports the failure, so the
+    // person can retry once the connection is back.
+    networkMode: 'always',
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (input: { name: string }) =>
       trpcClient.organizations.create.mutate({ name: input.name, autoAddCreator: true }),
@@ -146,7 +168,7 @@ export function CreateOrganizationScreen() {
     onError: (error: unknown) => {
       submitLockedRef.current = false;
       setSettling(false);
-      setMessage({ text: organizationErrorMessage(error), tone: 'error' });
+      report(organizationErrorMessage(error), 'error');
     },
   });
 
@@ -156,7 +178,7 @@ export function CreateOrganizationScreen() {
     }
     const name = nameRef.current.trim();
     if (!hasVisibleText(name)) {
-      setMessage({ text: t('organization.create.nameRequired'), tone: 'error' });
+      report(t('organization.create.nameRequired'), 'error');
       return;
     }
     setMessage(null);
@@ -213,15 +235,15 @@ export function CreateOrganizationScreen() {
         </View>
         <Text className="text-xs text-muted-foreground">{t('organization.create.trialNote')}</Text>
         {message == null ? null : (
-          <Text
-            className={
-              message.tone === 'error'
-                ? 'text-sm text-destructive'
-                : 'text-sm text-muted-foreground'
-            }
-          >
-            {message.text}
-          </Text>
+          // Keyed on the attempt counter: TalkBack/VoiceOver announce a
+          // repeated identical failure as a new event, the way the
+          // message-details sheet does for cancel feedback.
+          <AccessibleStatus
+            key={message.attempt}
+            message={message.text}
+            tone={message.tone === 'error' ? 'error' : 'status'}
+            className="text-sm"
+          />
         )}
         <Button
           className={STATE_ACTION_CLASS}

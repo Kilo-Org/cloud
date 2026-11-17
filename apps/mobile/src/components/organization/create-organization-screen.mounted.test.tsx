@@ -8,12 +8,16 @@
 // The tRPC client is mocked so no request leaves the test.
 
 import { createElement } from 'react';
+import { onlineManager } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 import '@/i18n';
+// Rendered for real: the announced-status contract (live region on Android,
+// announceForAccessibility on iOS) is what the failure tests below pin.
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { CreateOrganizationScreen } from './create-organization-screen';
 import { ORGANIZATION_HUB_PATH, ORGANIZATION_HUB_ROUTE_NAME } from '@/lib/organization-navigation';
 
@@ -69,6 +73,11 @@ vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({ organizations: { list: { queryKey: () => ['organizations.list'] } } }),
 }));
 
+// `AccessibleStatus` renders live: on Android through a polite live region and
+// on iOS through `AccessibilityInfo.announceForAccessibility`. The announce
+// spy is the iOS-side surface these tests assert.
+const announce = vi.hoisted(() => vi.fn());
+
 vi.mock('@/lib/organization-context', () => ({ useOrganization: () => mocks }));
 
 // The create completes outside the screen's lifetime, so the focus answer and
@@ -115,7 +124,11 @@ vi.mock('@/components/ui/text', async () => {
   };
 });
 
-vi.mock('react-native', () => ({ View: 'View', Platform: { OS: 'ios' } }));
+vi.mock('react-native', () => ({
+  View: 'View',
+  Platform: { OS: 'ios' },
+  AccessibilityInfo: { announceForAccessibility: announce },
+}));
 
 function mount() {
   return renderWithProviders(createElement(CreateOrganizationScreen));
@@ -144,6 +157,19 @@ function texts(renderer: ReactTestRenderer): unknown[] {
   return renderer.root.findAllByType('Text').flatMap(node => node.props.children);
 }
 
+/** The status line's `AccessibleStatus`, or `undefined` while it renders nothing. */
+function statusOf(renderer: ReactTestRenderer): ReactTestInstance | undefined {
+  return renderer.root.find(node => node.type === AccessibleStatus && node.props.message != null);
+}
+
+/**
+ * Restores connectivity even when an expectation above it threw — a test that
+ * dies while offline must not park the later tests with a paused scheduler.
+ */
+function backOnline() {
+  onlineManager.setOnline(true);
+}
+
 async function type(renderer: ReactTestRenderer, value: string) {
   await act(() => {
     handlerOf(inputOf(renderer), 'onChangeText')?.(value);
@@ -166,6 +192,8 @@ beforeEach(() => {
   // The Profile entry pushes create: it is the only route of the organization
   // Stack when it mounts.
   setStack(['create']);
+  backOnline();
+  announce.mockClear();
 });
 
 describe('CreateOrganizationScreen', () => {
@@ -374,6 +402,113 @@ describe('CreateOrganizationScreen', () => {
 
     expect(mocks.replace).not.toHaveBeenCalled();
     expect(texts(renderer)).toContain('You already own the maximum number of organizations.');
+    unmount();
+  });
+
+  it('reports a failure through the announced status line', async () => {
+    mocks.createMutate.mockRejectedValue(new Error('You already own the maximum number of organizations.'));
+    const { renderer, unmount } = await mount();
+
+    await type(renderer, 'Acme');
+    await act(() => {
+      handlerOf(submitOf(renderer), 'onPress')?.();
+    });
+
+    const status = statusOf(renderer);
+    expect(status).toBeDefined();
+    expect(status?.props.message).toBe('You already own the maximum number of organizations.');
+    expect(status?.props.tone).toBe('error');
+    // On the iOS-mocked platform the announcement comes from the imperative
+    // channel (`announceForAccessibility`); Android receives the same status
+    // through the live region `AccessibleStatus` renders.
+    expect(announce).toHaveBeenCalledWith('You already own the maximum number of organizations.');
+    unmount();
+  });
+
+  it('announces a repeated identical failure as a new event', async () => {
+    mocks.createMutate.mockRejectedValue(new Error('You already own the maximum number of organizations.'));
+    const { renderer, unmount } = await mount();
+
+    await type(renderer, 'Acme');
+    await act(() => {
+      handlerOf(submitOf(renderer), 'onPress')?.();
+    });
+    // A retry clears the line, then fails with the same words. The line's
+    // key changes with the attempt counter, so the status is a new
+    // announcement, not a silent re-render of the old one.
+    await type(renderer, ' Acme ');
+    await act(() => {
+      handlerOf(submitOf(renderer), 'onPress')?.();
+    });
+
+    expect(announce).toHaveBeenCalledTimes(2);
+    const occurrences = renderer.root
+      .findAll(node => node.type === AccessibleStatus && node.props.message != null)
+      .length;
+    expect(occurrences).toBe(1);
+    unmount();
+  });
+
+  it('settles the form when the request cannot reach the server and the retry then succeeds', async () => {
+    // The online manager reporting offline pauses a default `networkMode:
+    // 'online'` mutation forever: no request, `isPending` never settles, and
+    // the form stays locked. `networkMode: 'always'` sends it, so the
+    // unreachable request rejects and the form returns through `onError`.
+    onlineManager.setOnline(false);
+    mocks.createMutate.mockRejectedValueOnce(new Error('offline fixture'));
+    const { renderer, queryClient, unmount } = await mount();
+    queryClient.setQueryData(['organizations.list'], [{ organizationId: 'org-new' }]);
+
+    await type(renderer, 'Acme');
+    await act(() => {
+      handlerOf(submitOf(renderer), 'onPress')?.();
+    });
+    // The unreachable request settled the form: the failure is announced and
+    // visible, and the retry surface is back.
+    const status = statusOf(renderer);
+    expect(status?.props.message).toBe('offline fixture');
+    expect(status?.props.tone).toBe('error');
+    expect(mocks.createMutate).toHaveBeenCalledTimes(1);
+    expect(submitOf(renderer).props.disabled).toBe(false);
+    expect(inputOf(renderer).props.editable).toBe(true);
+    expect(announce).toHaveBeenLastCalledWith('offline fixture');
+
+    // Back online, the same name creates for real.
+    onlineManager.setOnline(true);
+    mocks.createMutate.mockResolvedValueOnce({ organization: { id: 'org-new' } });
+    await act(() => {
+      handlerOf(submitOf(renderer), 'onPress')?.();
+    });
+
+    expect(mocks.setOrganizationId).toHaveBeenCalledWith('org-new');
+    expect(mocks.replace).toHaveBeenCalledWith(ORGANIZATION_HUB_PATH);
+    unmount();
+  });
+
+  it('drops taps while the create is in flight but not after the failure', async () => {
+    const pending = Promise.withResolvers<{ organization: { id: string } }>();
+    mocks.createMutate.mockReturnValue(pending.promise);
+    const { renderer, queryClient, unmount } = await mount();
+    queryClient.setQueryData(['organizations.list'], [{ organizationId: 'org-new' }]);
+
+    await type(renderer, 'Acme');
+    await act(() => {
+      handlerOf(submitOf(renderer), 'onPress')?.();
+    });
+    expect(submitOf(renderer).props.disabled).toBe(true);
+    // The double-submit guard holds while the create is in flight, without
+    // consulting `isPending` alone.
+    expect(mocks.createMutate).toHaveBeenCalledTimes(1);
+    const lockedHandler = handlerOf(submitOf(renderer), 'onPress');
+    expect(lockedHandler).toBeDefined();
+    lockedHandler?.();
+    expect(mocks.createMutate).toHaveBeenCalledTimes(1);
+
+    // The failure releases the lock: `submitLockedRef` dropped with the error.
+    await act(() => {
+      pending.resolve({ organization: { id: 'org-new' } });
+    });
+    expect(submitOf(renderer).props.disabled).toBe(false);
     unmount();
   });
 });

@@ -3,7 +3,10 @@ import {
   mutateOrganizationSettings,
   setOrganizationRecommendationsDigestEnabled,
 } from '@kilocode/web-shared/lib/organizations/organizations';
-import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type {
+  OrganizationPlan,
+  OrganizationSettings,
+} from '@kilocode/web-shared/lib/organizations/organization-types';
 import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import {
   OrganizationIdInputSchema,
@@ -29,6 +32,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
 import { ORGANIZATION_DATA_REGION_NAMES } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 import { ORG_AUTO_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
+import { getModelGateways } from '@kilocode/web-shared/lib/ai-gateway/providers/model-gateway-availability';
 import {
   DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS,
   MAX_ORGANIZATION_AUTO_ROUTES,
@@ -332,18 +336,25 @@ const SettingsResponseSchema = z.object({
 
 const UpdateGatewaySettingsInputSchema = OrganizationIdInputSchema.extend({
   disable_openrouter: z.boolean().optional(),
-  disable_vercel_ai_gateway: z.boolean().optional(),
   data_region: OrganizationDataRegionSchema.nullable().optional(),
 });
 
 const GatewaySettingsResponseSchema = z.object({
   available: z.boolean(),
   disable_openrouter: z.boolean(),
-  disable_vercel_ai_gateway: z.boolean(),
   data_region: OrganizationDataRegionSchema.nullable(),
 });
 
-async function isGatewaySettingsAvailable(organizationId: string) {
+const ModelGatewayAvailabilityResponseSchema = z.object({
+  gateways: z.array(z.enum(['vercel', 'openrouter'])),
+});
+
+/**
+ * The advanced gateway policies are an enterprise feature, rolled out per organization through the
+ * `gateway_settings` organization feature. The gateway ignores them on any other plan.
+ */
+async function isGatewaySettingsAvailable(organizationId: string, plan: OrganizationPlan) {
+  if (plan !== 'enterprise') return false;
   return isOrganizationFeatureEnabled(
     await readOrganizationFeatures(db),
     'gateway_settings',
@@ -359,19 +370,14 @@ function createGatewaySettingsDiffMessage(
   if (!!oldSettings.disable_openrouter !== !!newSettings.disable_openrouter) {
     changes.push(`OpenRouter ${newSettings.disable_openrouter ? 'disabled' : 'enabled'}`);
   }
-  if (!!oldSettings.disable_vercel_ai_gateway !== !!newSettings.disable_vercel_ai_gateway) {
-    changes.push(
-      `Vercel AI Gateway ${newSettings.disable_vercel_ai_gateway ? 'disabled' : 'enabled'}`
-    );
-  }
   if ((oldSettings.data_region ?? null) !== (newSettings.data_region ?? null)) {
     changes.push(
-      `Data region: ${newSettings.data_region ? ORGANIZATION_DATA_REGION_NAMES[newSettings.data_region] : 'Global'}`
+      `Inference region: ${newSettings.data_region ? ORGANIZATION_DATA_REGION_NAMES[newSettings.data_region] : 'Global'}`
     );
   }
   return changes.length > 0
-    ? `Updated gateway settings: ${changes.join('; ')}`
-    : 'Updated gateway settings: no changes';
+    ? `Updated advanced policies: ${changes.join('; ')}`
+    : 'Updated advanced policies: no changes';
 }
 
 export const organizationsSettingsRouter = createTRPCRouter({
@@ -385,22 +391,42 @@ export const organizationsSettingsRouter = createTRPCRouter({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
       }
       return {
-        available: await isGatewaySettingsAvailable(input.organizationId),
+        available: await isGatewaySettingsAvailable(input.organizationId, organization.plan),
         disable_openrouter: organization.settings.disable_openrouter ?? false,
-        disable_vercel_ai_gateway: organization.settings.disable_vercel_ai_gateway ?? false,
         data_region: organization.settings.data_region ?? null,
       };
+    }),
+
+  getModelGatewayAvailability: organizationMemberProcedure
+    .input(OrganizationIdInputSchema.extend({ modelId: z.string().min(1) }))
+    .output(ModelGatewayAvailabilityResponseSchema)
+    .query(async ({ input }) => {
+      const organization = await getOrganizationById(input.organizationId);
+      if (!organization) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+      }
+      if (!(await isGatewaySettingsAvailable(input.organizationId, organization.plan))) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Advanced policies are not available for this organization.',
+        });
+      }
+      return { gateways: await getModelGateways(input.modelId) };
     }),
 
   updateGatewaySettings: organizationAdminMutationProcedure
     .input(UpdateGatewaySettingsInputSchema)
     .output(SettingsResponseSchema)
     .mutation(async ({ input, ctx }) => {
-      const { organizationId, disable_openrouter, disable_vercel_ai_gateway, data_region } = input;
-      if (!(await isGatewaySettingsAvailable(organizationId))) {
+      const { organizationId, disable_openrouter, data_region } = input;
+      const organization = await getOrganizationById(organizationId);
+      if (!organization) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+      }
+      if (!(await isGatewaySettingsAvailable(organizationId, organization.plan))) {
         throw new TRPCError({
           code: 'FORBIDDEN',
-          message: 'Gateway settings are not available for this organization.',
+          message: 'Advanced policies are not available for this organization.',
         });
       }
 
@@ -413,9 +439,6 @@ export const organizationsSettingsRouter = createTRPCRouter({
             const settingsUpdate: OrganizationSettings = { ...organization.settings };
             if (disable_openrouter !== undefined) {
               settingsUpdate.disable_openrouter = disable_openrouter;
-            }
-            if (disable_vercel_ai_gateway !== undefined) {
-              settingsUpdate.disable_vercel_ai_gateway = disable_vercel_ai_gateway;
             }
             if (data_region !== undefined) {
               settingsUpdate.data_region = data_region;

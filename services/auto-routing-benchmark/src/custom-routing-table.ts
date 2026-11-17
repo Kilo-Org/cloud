@@ -1,13 +1,15 @@
 import type {
-  BenchmarkConfig,
+  AutoRouter,
+  BenchmarkPair,
   CustomRoutingTable,
   CustomRoutingTableResponse,
-  BenchmarkPair,
+  PolicySettingSource,
 } from '@kilocode/auto-routing-contracts';
 import {
   ComplexityLabelsSchema,
   MAX_POOL_ENTRIES,
   benchmarkPairKey,
+  resolveEffectivePolicy,
 } from '@kilocode/auto-routing-contracts';
 import {
   getRoutingCaseResultsForEntries,
@@ -43,20 +45,7 @@ function assertUniqueEntries(entries: readonly BenchmarkPair[]): void {
  */
 export async function assembleCustomRoutingTable(
   db: D1Database,
-  config: Pick<
-    BenchmarkConfig,
-    'deciderRepetitions' | 'minAccuracy' | 'switchCostFactor' | 'bestAccuracySwitchThreshold'
-  > &
-    Partial<
-      Pick<
-        BenchmarkConfig,
-        | 'router'
-        | 'accuracyNoiseBand'
-        | 'productionTokenProfile'
-        | 'switchHorizonTurns'
-        | 'lowConfidenceThreshold'
-      >
-    >,
+  config: PolicySettingSource & { router?: AutoRouter },
   entries: readonly BenchmarkPair[],
   options: {
     now?: Date;
@@ -65,6 +54,7 @@ export async function assembleCustomRoutingTable(
   } = {}
 ): Promise<CustomRoutingTableResponse> {
   assertUniqueEntries(entries);
+  const policy = resolveEffectivePolicy(config);
   const current = currentProfileContextFromConfig(config);
   const readyRows = await listReadyCurrentProfilesForEntries(db, current, entries);
 
@@ -98,13 +88,13 @@ export async function assembleCustomRoutingTable(
 
   const table: CustomRoutingTable | null = buildCustomRoutingTable({
     generatedAt,
-    minAccuracy: config.minAccuracy,
-    accuracyNoiseBand: config.accuracyNoiseBand,
-    switchCostFactor: config.switchCostFactor,
-    bestAccuracySwitchThreshold: config.bestAccuracySwitchThreshold,
-    productionTokenProfile: config.productionTokenProfile ?? null,
-    switchHorizonTurns: config.switchHorizonTurns ?? null,
-    lowConfidenceThreshold: config.lowConfidenceThreshold ?? null,
+    minAccuracy: policy.minAccuracy,
+    accuracyNoiseBand: policy.accuracyNoiseBand,
+    switchCostFactor: policy.switchCostFactor,
+    bestAccuracySwitchThreshold: policy.bestAccuracySwitchThreshold,
+    productionTokenProfile: policy.productionTokenProfile,
+    switchHorizonTurns: policy.switchHorizonTurns,
+    lowConfidenceThreshold: policy.lowConfidenceThreshold,
     prices,
     readyEntries,
     summaries,

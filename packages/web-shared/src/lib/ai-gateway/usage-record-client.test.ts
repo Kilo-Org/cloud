@@ -12,6 +12,26 @@ jest.mock('@kilocode/web-shared/lib/constants', () => ({
   APP_URL: 'https://app.example.com',
 }));
 
+// A test that needs a different APP_URL loads the module again under
+// jest.resetModules() with a doMock factory, because the static import above is
+// bound to the factory-mocked constants value registered at the top of this file.
+const withOverriddenAppUrl = async <T>(
+  run: (record: (payload: UsageRecordRequest) => Promise<unknown>) => T
+): Promise<T> => {
+  jest.resetModules();
+  jest.doMock('@kilocode/web-shared/lib/constants', () => ({
+    ...jest.requireActual<object>('@kilocode/web-shared/lib/constants'),
+    APP_URL: 'http://app.example.com',
+  }));
+  try {
+    const client = await import('./usage-record-client');
+    return await run(client.recordUsageInPrimaryRegion);
+  } finally {
+    jest.dontMock('@kilocode/web-shared/lib/constants');
+    jest.resetModules();
+  }
+};
+
 // The mock function is created inside the factory rather than captured from
 // module scope: jest.mock is hoisted above const declarations, so referencing an
 // outer const here throws "Cannot access before initialization" and silently
@@ -65,6 +85,14 @@ beforeEach(() => {
 });
 
 describe('recordUsageInPrimaryRegion', () => {
+  test('requires an https or loopback app endpoint', async () => {
+    await withOverriddenAppUrl(async record => {
+      const outcome = await record(payload);
+      expect(outcome).toEqual({ kind: 'unavailable', reason: 'unsupported_app_url' });
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+  });
+
   test('posts to the Frankfurt endpoint with the internal secret', async () => {
     mockFetch.mockResolvedValue(jsonResponse(recorded));
 

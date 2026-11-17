@@ -3,9 +3,9 @@ import {
   O11Y_KILO_GATEWAY_CLIENT_SECRET,
   O11Y_SERVICE_URL,
 } from '@kilocode/web-shared/lib/config.server';
-import type { CompletionUsage } from 'openai/resources/completions';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type { MicrodollarUsageStats } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
+import { parseInternalServiceUrl } from '@kilocode/web-shared/lib/internal-service-url';
 
 export type ApiMetricsTokens = {
   inputTokens?: number;
@@ -33,30 +33,6 @@ export type ApiMetricsParams = {
   statusCode: number;
   tokens?: ApiMetricsTokens;
 };
-
-export function getTokensFromCompletionUsage(
-  usage: CompletionUsage | null | undefined
-): ApiMetricsTokens | undefined {
-  if (!usage) return undefined;
-
-  const tokens: ApiMetricsTokens = {
-    inputTokens: usage.prompt_tokens,
-    outputTokens: usage.completion_tokens,
-    cacheHitTokens: usage.prompt_tokens_details?.cached_tokens,
-    totalTokens: usage.total_tokens,
-    // cacheWriteTokens isn't reported in OpenAI/OpenRouter usage.
-    cacheWriteTokens: undefined,
-  };
-
-  const hasAny =
-    tokens.inputTokens !== undefined ||
-    tokens.outputTokens !== undefined ||
-    tokens.cacheWriteTokens !== undefined ||
-    tokens.cacheHitTokens !== undefined ||
-    tokens.totalTokens !== undefined;
-
-  return hasAny ? tokens : undefined;
-}
 
 function trimString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -164,12 +140,8 @@ export function getToolsUsed(request: GatewayRequest): string[] {
 }
 
 const apiMetricsUrl = (() => {
-  if (!O11Y_SERVICE_URL) return null;
-  try {
-    return new URL('/ingest/api-metrics', O11Y_SERVICE_URL);
-  } catch {
-    return null;
-  }
+  const baseUrl = parseInternalServiceUrl(O11Y_SERVICE_URL);
+  return baseUrl ? new URL('/ingest/api-metrics', baseUrl) : null;
 })();
 
 async function sendApiMetrics(params: ApiMetricsParams): Promise<void> {

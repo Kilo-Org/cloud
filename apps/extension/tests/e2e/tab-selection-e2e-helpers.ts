@@ -118,8 +118,8 @@ export const createNewConversation = async (sidePanel: Page): Promise<void> => {
   await sidePanel.getByLabel('New conversation').click();
 };
 
-export const delayConversationStoreHydration = (sidePanel: Page): Promise<void> =>
-  sidePanel.addInitScript(() => {
+export const delayConversationStoreHydration = async (sidePanel: Page): Promise<void> => {
+  await sidePanel.addInitScript(() => {
     const pageGlobal = globalThis as typeof globalThis & {
       __resolveKiloConversationStoreHydration?: () => void;
       browser?: {
@@ -151,6 +151,7 @@ export const delayConversationStoreHydration = (sidePanel: Page): Promise<void> 
       return originalGet(keys);
     };
   });
+};
 
 export const releaseConversationStoreHydration = (sidePanel: Page): Promise<void> =>
   sidePanel.evaluate(() => {

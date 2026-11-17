@@ -68,6 +68,11 @@ const routerPush = vi.hoisted(() => vi.fn());
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: routerPush, back: vi.fn() }),
 }));
+// The picker opener guards its press burst; this suite asserts the press reaches
+// the route, so the guard's push is the mock it already checks.
+vi.mock('@/lib/hooks/use-single-push-route', () => ({
+  useSinglePushRoute: () => routerPush,
+}));
 
 const Text = 'Text' as ElementType;
 const ChevronDown = 'ChevronDown' as ElementType;

@@ -6,6 +6,11 @@ import { i18n } from '@/i18n';
 import { type ProviderPrPlatform } from '@kilocode/app-shared/provider-review';
 
 /**
+ * The Lithuanian catalog used a second word for the same English "Open" in the
+ * standalone open chip, so it did not read like the combined chips on the same
+ * screen. The unavailable copy named an unspecified service, and the file
+ * field named a field instead of the filter action.
+ *
  * Lithuanian `peržiūrėti` takes an accusative object, `į` takes the accusative
  * and `sujungti` takes the accusative too, so a noun interpolated in the
  * nominative could not sit inside any of those phrases. The catalog now names
@@ -22,6 +27,23 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await i18n.changeLanguage('en');
+});
+
+describe('Lithuanian pull-request review copy', () => {
+  it('reads the open chip like the combined chips on the same screen', () => {
+    const open = i18n.t('prReview.overview.stateOpen');
+    expect(i18n.t('prReview.overview.stateOpenApproved').startsWith(open)).toBe(true);
+    expect(i18n.t('prReview.overview.stateOpenReviewRequired').startsWith(open)).toBe(true);
+  });
+
+  it('names the review service in the unavailable copy', () => {
+    expect(i18n.t('prReview.reviewServiceUnavailable')).toContain('Peržiūros');
+    expect(i18n.t('prReview.reviewServiceUnavailableDescription')).toContain('Peržiūros');
+  });
+
+  it('asks the file field to filter by path', () => {
+    expect(i18n.t('prReview.fileNavigator.filterPlaceholder').startsWith('Filtruoti')).toBe(true);
+  });
 });
 
 const PLATFORMS: readonly ProviderPrPlatform[] = ['github', 'gitlab'];

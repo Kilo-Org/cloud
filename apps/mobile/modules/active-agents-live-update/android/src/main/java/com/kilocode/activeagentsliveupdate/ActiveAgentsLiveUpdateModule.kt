@@ -7,7 +7,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Color
-import android.graphics.drawable.Icon
 import android.net.Uri
 import android.os.Build
 import android.text.SpannableString
@@ -215,16 +214,10 @@ class ActiveAgentsLiveUpdateModule : Module() {
    */
   private fun postedChannelId(): String? = notificationState.getString(POSTED_CHANNEL, null)
 
-  private fun newBuilder(channelId: String): Notification.Builder {
-    if (Build.VERSION.SDK_INT >= 26) {
-      // The JS side creates and names every channel before the first post.
-      return Notification.Builder(context, channelId)
-    }
-    return legacyBuilder()
+  /** The view intent one deep-link record mints, so every copy matches on filterEquals. */
+  private fun viewIntent(url: String): Intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+    setPackage(context.packageName)
   }
-
-  @Suppress("DEPRECATION")
-  private fun legacyBuilder(): Notification.Builder = Notification.Builder(context)
 
   /**
    * A PendingIntent that deep-links the app to the URL the JS side named: the
@@ -238,17 +231,13 @@ class ActiveAgentsLiveUpdateModule : Module() {
    * holds one Open record at a time and a post that throws leaves the card still
    * in the shade with the record it already carries.
    */
-  private fun openPendingIntent(openUrl: String): PendingIntent {
-    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(openUrl)).apply {
-      setPackage(context.packageName)
-    }
-    return PendingIntent.getActivity(
+  private fun openPendingIntent(openUrl: String): PendingIntent =
+    PendingIntent.getActivity(
       context,
       OPEN_REQUEST_CODE,
-      intent,
+      viewIntent(openUrl),
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
-  }
 
   /**
    * Drop the PendingIntent record a superseded Open URL created. `FLAG_NO_CREATE`
@@ -256,13 +245,10 @@ class ActiveAgentsLiveUpdateModule : Module() {
    * no-op rather than a new record.
    */
   private fun cancelOpenIntent(openUrl: String) {
-    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(openUrl)).apply {
-      setPackage(context.packageName)
-    }
     PendingIntent.getActivity(
       context,
       OPEN_REQUEST_CODE,
-      intent,
+      viewIntent(openUrl),
       PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
     )?.cancel()
   }
@@ -301,29 +287,18 @@ class ActiveAgentsLiveUpdateModule : Module() {
    * The New agent action: the app's fixed new-agent deep link. One constant URL,
    * so the record under its request code never accumulates.
    */
-  private fun newAgentPendingIntent(url: String): PendingIntent {
-    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
-      setPackage(context.packageName)
-    }
-    return PendingIntent.getActivity(
+  private fun newAgentPendingIntent(url: String): PendingIntent =
+    PendingIntent.getActivity(
       context,
       NEW_AGENT_REQUEST_CODE,
-      intent,
+      viewIntent(url),
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
-  }
 
   /** The app is drawing in its dark theme: the card's accent and retry red follow it. */
   private fun isNight(): Boolean =
     (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
       Configuration.UI_MODE_NIGHT_YES
-
-  private fun action(label: String, intent: PendingIntent): Notification.Action =
-    Notification.Action.Builder(
-      Icon.createWithResource(context, CardStyle.icon(context)),
-      label,
-      intent
-    ).build()
 
   /**
    * The channel a card still in the shade carries, or null when no card is
@@ -383,8 +358,9 @@ class ActiveAgentsLiveUpdateModule : Module() {
     } else {
       card.text
     }
-    val builder = newBuilder(channelId)
-      .setSmallIcon(CardStyle.icon(context))
+    val icon = CardStyle.icon(context)
+    val builder = CardBuilders.builder(context, channelId)
+      .setSmallIcon(icon)
       .setColor(Color.parseColor(if (night) CardStyle.PRIMARY_NIGHT else CardStyle.PRIMARY_DAY))
       .setContentTitle(card.title)
       .setContentText(text)
@@ -398,12 +374,14 @@ class ActiveAgentsLiveUpdateModule : Module() {
     // answered elsewhere or while an answer is in flight. Approve runs once the
     // device is unlocked, so it goes through the gate activity.
     card.approveLabel?.let {
+      builder.addAction(ApprovalGate.action(context, icon, it, approvePendingIntent()))
+    }
+    builder.addAction(CardBuilders.action(context, icon, card.openLabel, contentIntent))
+    card.newAgentLabel?.let {
       builder.addAction(
-        ApprovalGate.action(context, CardStyle.icon(context), it, approvePendingIntent())
+        CardBuilders.action(context, icon, it, newAgentPendingIntent(card.newAgentUrl))
       )
     }
-    builder.addAction(action(card.openLabel, contentIntent))
-    card.newAgentLabel?.let { builder.addAction(action(it, newAgentPendingIntent(card.newAgentUrl))) }
 
     if (needsInput) {
       // Only the first entry into the kind alerts; a later update in the same

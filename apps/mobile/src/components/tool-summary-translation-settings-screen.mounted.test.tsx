@@ -45,9 +45,9 @@ vi.mock('react-native', () => ({
   View: 'View',
   ActivityIndicator: 'ActivityIndicator',
 }));
-vi.mock('expo-router', () => ({
-  useRouter: () => router,
-}));
+vi.mock('expo-router', () => ({ useRouter: () => router }));
+// The model row hands the picker the screen's guarded push (the router spy).
+vi.mock('@/lib/hooks/use-single-push-route', () => ({ useSinglePushRoute: () => router.push }));
 vi.mock('@/components/ui/icons', () => ({
   Cpu: 'Cpu',
   WandSparkles: 'WandSparkles',
@@ -266,8 +266,10 @@ describe('ToolSummaryTranslationSettingsScreen', () => {
     });
 
     expect(openModelPicker).toHaveBeenCalledTimes(1);
-    const [calledRouter, params] = lastPickerCall();
-    expect(calledRouter).toBe(router);
+    const [calledPush, params] = lastPickerCall();
+    // The picker now receives the screen's guarded push function, not the
+    // router object.
+    expect(calledPush).toBe(router.push);
     // The translation model carries no reasoning effort: the picker gets the
     // live catalogue but is told the picked effort has nowhere to be stored, so
     // its rows leave the effort chips out and a model tap is the whole pick.

@@ -9,12 +9,15 @@ import { parseSignupStepUpMethodsParam } from '@/lib/auth/redirect-urls';
 export function AuthErrorNotification({
   error,
   stepUpMethods,
+  shell = false,
 }: {
   error: string;
   /** The untrusted `methods` query value that accompanies `SIGNUP-STEP-UP`. */
   stepUpMethods?: string;
+  /** True inside the app shell, which renders no link out of itself. */
+  shell?: boolean;
 }) {
-  if (error === 'BLOCKED') return <BlockedNotification />;
+  if (error === 'BLOCKED') return <BlockedNotification shell={shell} />;
 
   if (error === 'DIFFERENT-OAUTH')
     return (
@@ -95,12 +98,16 @@ export function AuthErrorNotification({
       <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
         <ErrorNotificationBox title="Signup Blocked">
           Automated account creation was detected and blocked. If this was a mistake, please{' '}
-          <a
-            href="https://kilo.ai/support"
-            className={`underline hover:text-red-100 ${INLINE_LINK_TOUCH_TARGET}`}
-          >
-            contact support
-          </a>{' '}
+          {shell ? (
+            'contact support'
+          ) : (
+            <a
+              href="https://kilo.ai/support"
+              className={`underline hover:text-red-100 ${INLINE_LINK_TOUCH_TARGET}`}
+            >
+              contact support
+            </a>
+          )}{' '}
           and we&apos;ll get you sorted out.
         </ErrorNotificationBox>
       </div>
@@ -136,12 +143,16 @@ export function AuthErrorNotification({
         <ErrorNotificationBox title="Account Already Exists">
           An account already exists for this email address. Try signing in with the original login
           method, or{' '}
-          <a
-            href="https://kilo.ai/support"
-            className={`underline hover:text-red-100 ${INLINE_LINK_TOUCH_TARGET}`}
-          >
-            contact support
-          </a>{' '}
+          {shell ? (
+            'contact support'
+          ) : (
+            <a
+              href="https://kilo.ai/support"
+              className={`underline hover:text-red-100 ${INLINE_LINK_TOUCH_TARGET}`}
+            >
+              contact support
+            </a>
+          )}{' '}
           if you need help accessing it.
         </ErrorNotificationBox>
       </div>

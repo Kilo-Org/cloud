@@ -39,7 +39,7 @@ vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileMutations: () => h.mutations,
 }));
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ back: h.back }),
+  useRouter: () => ({ back: h.back, canGoBack: () => true }),
   usePreventRemove: () => undefined,
 }));
 vi.mock('sonner-native', () => ({ toast: { error: h.error } }));

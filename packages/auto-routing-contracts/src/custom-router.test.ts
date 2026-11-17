@@ -26,6 +26,7 @@ import {
   MAX_CUSTOM_ROUTER_ENTRY_KEY_LENGTH,
   MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH,
   MAX_CUSTOM_ROUTER_PROVIDER_ID_LENGTH,
+  MeasuredAsModelIdSchema,
   RegisterClientEntryRequestSchema,
   UpdateCustomRouterRequestSchema,
   customRouterCandidateModel,
@@ -97,6 +98,15 @@ describe('custom router model IDs', () => {
   });
 });
 
+describe('MeasuredAsModelIdSchema', () => {
+  it('accepts a concrete platform model and refuses the reserved auto namespace', () => {
+    expect(MeasuredAsModelIdSchema.safeParse('anthropic/claude-sonnet-4').success).toBe(true);
+    expect(MeasuredAsModelIdSchema.safeParse(' KILO-AUTO/balanced ').success).toBe(false);
+    expect(MeasuredAsModelIdSchema.safeParse('kilo-auto/custom/mine').success).toBe(false);
+    expect(MeasuredAsModelIdSchema.safeParse('client:ollama/qwen3:32b').success).toBe(false);
+  });
+});
+
 describe('custom router entry keys', () => {
   it('keys gateway and client entries and converts them to candidate models', () => {
     expect(customRouterEntryKey(gatewayEntry)).toBe('gateway:anthropic/claude-sonnet-4');
@@ -147,7 +157,17 @@ describe('custom router entry keys', () => {
 
 describe('custom router entries', () => {
   it('rejects duplicate keys, over-long pools, and client providers with a slash', () => {
-    expect(CustomRouterEntriesSchema.safeParse([gatewayEntry, gatewayEntry]).success).toBe(false);
+    const duplicate = CustomRouterEntriesSchema.safeParse([gatewayEntry, gatewayEntry]);
+
+    expect(duplicate.success).toBe(false);
+    if (!duplicate.success) {
+      expect(duplicate.error.issues).toContainEqual(
+        expect.objectContaining({
+          path: [1],
+          message: 'Duplicate entry gateway:anthropic/claude-sonnet-4',
+        })
+      );
+    }
     expect(
       CustomRouterEntriesSchema.safeParse(
         Array.from({ length: 21 }, (_, index) => ({ kind: 'gateway', model: `model-${index}` }))

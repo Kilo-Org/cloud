@@ -37,7 +37,7 @@ describe('Hermes Intl surface', () => {
 
       for (const language of SUPPORTED_LANGUAGES) {
         prewarmIntl(language);
-        expect(format.formatMoney(1234.5, language)).toBeTruthy();
+        expect(format.formatPrefixedMoney(1234.5, language)).toBeTruthy();
         expect(format.formatNumber(3, language)).toBeTruthy();
         expect(format.formatPercent(0.5, language)).toBeTruthy();
         expect(format.formatList(['a', 'b', 'c'], language)).toBeTruthy();

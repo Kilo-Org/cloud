@@ -32,6 +32,9 @@ export default function ProfilePickerScreen() {
         onDone={() => {
           router.back();
         }}
+        onCancel={() => {
+          router.back();
+        }}
         scrollable={false}
         topInset="never"
         expired

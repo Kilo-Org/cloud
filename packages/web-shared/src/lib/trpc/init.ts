@@ -22,8 +22,10 @@ import {
   deriveCredentialKind,
   type AdminStepUpDecision,
   type AdminStepUpState,
+  type PrivilegedActionClass,
   type PrivilegedCredentialKind,
   type PrivilegedTarget,
+  type PrivilegedTargetKind,
 } from '@kilocode/web-shared/lib/admin/privileged-access';
 import {
   actionClassForAdminProcedure,
@@ -96,6 +98,12 @@ export type TRPCContext = {
    * request.
    */
   adminStepUpDecision?: AdminStepUpDecision;
+  /**
+   * Credential and privileged-inventory entry resolved once by the admin guard,
+   * so the step-up enforcement chained after it and specialized guards cannot
+   * name a different credential or action for the same request.
+   */
+  adminAttribution?: AdminAttribution;
   ip?: string | null;
   // Procedure path and type, injected into the context by `baseProcedure` so
   // that `is_admin` elevation sites *inside* a resolver (which only receive
@@ -332,11 +340,19 @@ export const baseProcedure = t.procedure
   .use(sentryMiddleware)
   .use(auditContextMiddleware);
 
-// Admin-only procedure. The creditManager/superadmin/sessionViewer procedures in
-// lib/trpc/admin-procedures chain on this, so emitting here covers the whole
-// admin.* tRPC surface with a single event.
-type AdminGuardFn = Parameters<typeof t.middleware>[0];
-const adminGuardFn = markPrivilegedGuard<AdminGuardFn>(async ({ ctx, path, type, next }) => {
+export type AdminAttribution = {
+  credential: PrivilegedCredentialKind;
+  actionClass: PrivilegedActionClass;
+  inventoryId: string | null;
+  targetKind: PrivilegedTargetKind;
+};
+
+// Derives the credential and the privileged-inventory entry once per admin
+// request. The guard publishes the result on the context, so the step-up
+// enforcement that runs after it reuses it instead of deriving the same two
+// values from the same inputs.
+function resolveAdminAttribution(ctx: TRPCContext, path: string, type: string): AdminAttribution {
+  if (ctx.adminAttribution) return ctx.adminAttribution;
   const credential =
     ctx.credential ??
     deriveCredentialKind({
@@ -344,16 +360,24 @@ const adminGuardFn = markPrivilegedGuard<AdminGuardFn>(async ({ ctx, path, type,
       tokenSource: ctx.tokenSource ?? null,
       internalApiUse: ctx.internalApiUse,
     });
-  const isBearer = credential !== 'session';
-  const { actionClass, inventoryId } = actionClassForAdminProcedure(path, type);
+  return { credential, ...actionClassForAdminProcedure(path, type) };
+}
+
+// Admin-only procedure. The creditManager/superadmin/sessionViewer procedures in
+// lib/trpc/admin-procedures chain on this, so emitting here covers the whole
+// admin.* tRPC surface with a single event.
+type AdminGuardFn = Parameters<typeof t.middleware>[0];
+const adminGuardFn = markPrivilegedGuard<AdminGuardFn>(async ({ ctx, path, type, next }) => {
+  const attribution = resolveAdminAttribution(ctx, path, type);
+  const isBearer = attribution.credential !== 'session';
   const emitPrivileged = (outcome: 'succeeded' | 'denied' | 'failed') =>
     emitPrivilegedAccessEvent({
       surface: 'trpc',
       user: ctx.user,
-      credential,
+      credential: attribution.credential,
       outcome,
-      actionClass,
-      actionId: inventoryId,
+      actionClass: attribution.actionClass,
+      actionId: attribution.inventoryId,
       target: null,
       wouldBlock: true,
       userAgentProduct: userAgentProductFromHeaders(ctx.headersList ?? new Headers()),
@@ -376,7 +400,7 @@ const adminGuardFn = markPrivilegedGuard<AdminGuardFn>(async ({ ctx, path, type,
     user: ctx.user,
     authViaToken: ctx.authViaToken ?? false,
     tokenSource: ctx.tokenSource ?? null,
-    credential,
+    credential: attribution.credential,
     wouldBlock: isBearer,
     userAgentProduct: userAgentProductFromHeaders(ctx.headersList ?? new Headers()),
     route: path,
@@ -384,7 +408,7 @@ const adminGuardFn = markPrivilegedGuard<AdminGuardFn>(async ({ ctx, path, type,
     ip: ctx.ip ?? null,
   });
   try {
-    const result = await next();
+    const result = await next({ ctx: { adminAttribution: attribution } });
     if (isBearer) {
       if (result.ok) {
         emitPrivileged('succeeded');
@@ -416,14 +440,10 @@ const adminStepUpEnforcementMiddleware = t.middleware(
     const enabled = isAdminStepUpEnabled();
     if (!enabled || path.startsWith('stepUp.') || resolvesOwnStepUp(path)) return next();
 
-    const credential =
-      ctx.credential ??
-      deriveCredentialKind({
-        authViaToken: ctx.authViaToken ?? false,
-        tokenSource: ctx.tokenSource ?? null,
-        internalApiUse: ctx.internalApiUse,
-      });
-    const { actionClass, targetKind } = actionClassForAdminProcedure(path, type);
+    // The attribution lookup already resolved the inventory entry, which names
+    // the target kind; re-deriving it would be a second lookup for the same
+    // value.
+    const { credential, actionClass, targetKind } = resolveAdminAttribution(ctx, path, type);
     // An operation proof is bound to the account or organization the request
     // input names. A session-class decision ignores the target, so it stays
     // unbound.

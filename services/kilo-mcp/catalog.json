@@ -4251,7 +4251,7 @@
   "claudeBilling.remove": {
     "path": "claudeBilling.remove",
     "kind": "mutation",
-    "summary": "Disconnect Claude billing for the selected scope so it stops charging, retiring the Anthropic profile when no other scope shares it; shared-services scope requires an organization owner or admin.",
+    "summary": "Unlink Claude billing for the selected scope so it stops charging, retiring the Anthropic profile when no other scope shares it; an organization link requires an organization owner or admin.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -4260,25 +4260,20 @@
           "type": "string",
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "scope": {
-          "type": "string",
-          "const": "shared_services"
         }
       }
     },
     "tags": [
       "claudebilling",
       "remove",
-      "organizationid",
-      "scope"
+      "organizationid"
     ],
-    "searchBlob": "claudeBilling.remove Disconnect Claude billing for the selected scope so it stops charging, retiring the Anthropic profile when no other scope shares it; shared-services scope requires an organization owner or admin. claudebilling remove organizationid scope organizationId scope"
+    "searchBlob": "claudeBilling.remove Unlink Claude billing for the selected scope so it stops charging, retiring the Anthropic profile when no other scope shares it; an organization link requires an organization owner or admin. claudebilling remove organizationid organizationId"
   },
   "claudeBilling.status": {
     "path": "claudeBilling.status",
     "kind": "query",
-    "summary": "Check whether Claude billing is connected for a user or organization, including connection state and whether the caller can manage it.",
+    "summary": "Check whether Claude billing is linked for a user or organization, including link state and whether the caller can manage it.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -4287,20 +4282,15 @@
           "type": "string",
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "scope": {
-          "type": "string",
-          "const": "shared_services"
         }
       }
     },
     "tags": [
       "claudebilling",
       "status",
-      "organizationid",
-      "scope"
+      "organizationid"
     ],
-    "searchBlob": "claudeBilling.status Check whether Claude billing is connected for a user or organization, including connection state and whether the caller can manage it. claudebilling status organizationid scope organizationId scope"
+    "searchBlob": "claudeBilling.status Check whether Claude billing is linked for a user or organization, including link state and whether the caller can manage it. claudebilling status organizationid organizationId"
   },
   "cliSessions.create": {
     "path": "cliSessions.create",
@@ -5351,7 +5341,7 @@
       "properties": {
         "session_id": {
           "type": "string",
-          "minLength": 1
+          "pattern": "^[A-Za-z0-9_-]{1,255}$"
         },
         "limit": {
           "default": 50,
@@ -6975,6 +6965,37 @@
     ],
     "searchBlob": "cloudAgentNext.getStackedWorkspaceSource Look up an existing workspace's branch, repository, and PR details so it can be used as the parent for creating a stacked workspace. Returns read-only source info, including whether the branch has been pushed and which provider/integration it belongs to. cloudagentnext getstackedworkspacesource worktreeid worktreeId"
   },
+  "cloudAgentNext.getWorkspaceArtifactDownloadUrl": {
+    "path": "cloudAgentNext.getWorkspaceArtifactDownloadUrl",
+    "kind": "query",
+    "summary": "Get a short-lived download link for a file saved in a Cloud Agent workspace's /artifacts directory. Pass the relative path from the artifact listing.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cloudAgentSessionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "relativePath": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "cloudAgentSessionId",
+        "relativePath"
+      ],
+      "additionalProperties": false
+    },
+    "tags": [
+      "cloudagentnext",
+      "getworkspaceartifactdownloadurl",
+      "cloudagentsessionid",
+      "relativepath"
+    ],
+    "searchBlob": "cloudAgentNext.getWorkspaceArtifactDownloadUrl Get a short-lived download link for a file saved in a Cloud Agent workspace's /artifacts directory. Pass the relative path from the artifact listing. cloudagentnext getworkspaceartifactdownloadurl cloudagentsessionid relativepath cloudAgentSessionId relativePath"
+  },
   "cloudAgentNext.getWorkspaceSnapshotRecovery": {
     "path": "cloudAgentNext.getWorkspaceSnapshotRecovery",
     "kind": "query",
@@ -7283,6 +7304,31 @@
     ],
     "searchBlob": "cloudAgentNext.listRepositoryBranches Lists a repository's branches and its default branch for the new-session flow in personal context; GitHub and GitLab use the caller's own connection, and Bitbucket reports the explicit organization-only unavailable state. cloudagentnext listrepositorybranches platform repository platform repository"
   },
+  "cloudAgentNext.listWorkspaceArtifacts": {
+    "path": "cloudAgentNext.listWorkspaceArtifacts",
+    "kind": "query",
+    "summary": "List the files saved from a Cloud Agent workspace's /artifacts directory, shared by sibling chats and retained after the sandbox stops. Returns the artifact revision and each file's path, size, content type, and expiry.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cloudAgentSessionId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "cloudAgentSessionId"
+      ],
+      "additionalProperties": false
+    },
+    "tags": [
+      "cloudagentnext",
+      "listworkspaceartifacts",
+      "cloudagentsessionid"
+    ],
+    "searchBlob": "cloudAgentNext.listWorkspaceArtifacts List the files saved from a Cloud Agent workspace's /artifacts directory, shared by sibling chats and retained after the sandbox stops. Returns the artifact revision and each file's path, size, content type, and expiry. cloudagentnext listworkspaceartifacts cloudagentsessionid cloudAgentSessionId"
+  },
   "cloudAgentNext.prepareSession": {
     "path": "cloudAgentNext.prepareSession",
     "kind": "mutation",
@@ -7437,8 +7483,8 @@
                     },
                     "variant": {
                       "type": "string",
-                      "maxLength": 50,
-                      "pattern": "^[a-zA-Z]+$"
+                      "minLength": 1,
+                      "maxLength": 50
                     }
                   },
                   "required": [
@@ -7476,8 +7522,8 @@
                     },
                     "variant": {
                       "type": "string",
-                      "maxLength": 50,
-                      "pattern": "^[a-zA-Z]+$"
+                      "minLength": 1,
+                      "maxLength": 50
                     }
                   },
                   "required": [
@@ -7589,8 +7635,8 @@
             },
             "variant": {
               "type": "string",
-              "maxLength": 50,
-              "pattern": "^[a-zA-Z]+$"
+              "minLength": 1,
+              "maxLength": 50
             },
             "requestedEnvironment": {
               "type": "object",
@@ -8252,8 +8298,8 @@
             },
             "variant": {
               "type": "string",
-              "maxLength": 50,
-              "pattern": "^[a-zA-Z]+$"
+              "minLength": 1,
+              "maxLength": 50
             },
             "requestedEnvironment": {
               "type": "object",
@@ -8958,8 +9004,8 @@
                 },
                 "variant": {
                   "type": "string",
-                  "maxLength": 50,
-                  "pattern": "^[a-zA-Z]+$"
+                  "minLength": 1,
+                  "maxLength": 50
                 }
               },
               "required": [
@@ -8997,8 +9043,8 @@
                 },
                 "variant": {
                   "type": "string",
-                  "maxLength": 50,
-                  "pattern": "^[a-zA-Z]+$"
+                  "minLength": 1,
+                  "maxLength": 50
                 }
               },
               "required": [
@@ -16790,6 +16836,37 @@
     ],
     "searchBlob": "models.preferred Return the ordered list of preferred AI models for the app, including free/auto models and top paid models. Use it to populate model pickers or determine default model selection order. models preferred"
   },
+  "models.selectorList": {
+    "path": "models.selectorList",
+    "kind": "query",
+    "summary": "List the models available for a model selector: returns the personal model list for a user, or the models available to a specific organization filtered by audience (member or shared services). Use when an agent needs to populate a model picker or check which models a user or organization can access.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "audience": {
+          "default": "member",
+          "type": "string",
+          "enum": [
+            "member",
+            "shared_services"
+          ]
+        }
+      }
+    },
+    "tags": [
+      "models",
+      "selectorlist",
+      "organizationid",
+      "audience"
+    ],
+    "searchBlob": "models.selectorList List the models available for a model selector: returns the personal model list for a user, or the models available to a specific organization filtered by audience (member or shared services). Use when an agent needs to populate a model picker or check which models a user or organization can access. models selectorlist organizationid audience organizationId audience"
+  },
   "moderation.acceptTerms": {
     "path": "moderation.acceptTerms",
     "kind": "mutation",
@@ -18876,6 +18953,62 @@
     ],
     "searchBlob": "organizations.cloudAgentNext.getStackedWorkspaceSource Look up an existing workspace to stack a new workspace on top of it, returning its repository, branch, pull request number, and whether its branch has been pushed. Use this to preview the parent source before starting a stacked Cloud Agent session. organizations cloudagentnext getstackedworkspacesource organizationid worktreeid organizationId worktreeId"
   },
+  "organizations.cloudAgentNext.getWorkspaceArtifactDownloadUrl": {
+    "path": "organizations.cloudAgentNext.getWorkspaceArtifactDownloadUrl",
+    "kind": "query",
+    "summary": "Get a short-lived download link for a file saved in an organization Cloud Agent workspace's /artifacts directory. Pass the relative path from the artifact listing.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "allOf": [
+        {
+          "type": "object",
+          "properties": {
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "organizationId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "cloudAgentSessionId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "relativePath": {
+              "type": "string",
+              "minLength": 1
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "cloudAgentSessionId",
+            "relativePath",
+            "organizationId"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "tags": [
+      "organizations",
+      "cloudagentnext",
+      "getworkspaceartifactdownloadurl",
+      "organizationid",
+      "cloudagentsessionid",
+      "relativepath"
+    ],
+    "searchBlob": "organizations.cloudAgentNext.getWorkspaceArtifactDownloadUrl Get a short-lived download link for a file saved in an organization Cloud Agent workspace's /artifacts directory. Pass the relative path from the artifact listing. organizations cloudagentnext getworkspaceartifactdownloadurl organizationid cloudagentsessionid relativepath organizationId cloudAgentSessionId relativePath"
+  },
   "organizations.cloudAgentNext.getWorkspaceSnapshotRecovery": {
     "path": "organizations.cloudAgentNext.getWorkspaceSnapshotRecovery",
     "kind": "query",
@@ -19426,6 +19559,56 @@
     ],
     "searchBlob": "organizations.cloudAgentNext.listRepositoryBranches Lists a repository's branches and its default branch for the new-session flow in organization context, using the organization's connected GitHub, GitLab, or Bitbucket integration. organizations cloudagentnext listrepositorybranches organizationid platform repository organizationId platform repository"
   },
+  "organizations.cloudAgentNext.listWorkspaceArtifacts": {
+    "path": "organizations.cloudAgentNext.listWorkspaceArtifacts",
+    "kind": "query",
+    "summary": "List the files saved from an organization Cloud Agent workspace's /artifacts directory, shared by sibling chats and retained after the sandbox stops. Returns the artifact revision and each file's path, size, content type, and expiry.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "allOf": [
+        {
+          "type": "object",
+          "properties": {
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "organizationId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "cloudAgentSessionId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "cloudAgentSessionId",
+            "organizationId"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "tags": [
+      "organizations",
+      "cloudagentnext",
+      "listworkspaceartifacts",
+      "organizationid",
+      "cloudagentsessionid"
+    ],
+    "searchBlob": "organizations.cloudAgentNext.listWorkspaceArtifacts List the files saved from an organization Cloud Agent workspace's /artifacts directory, shared by sibling chats and retained after the sandbox stops. Returns the artifact revision and each file's path, size, content type, and expiry. organizations cloudagentnext listworkspaceartifacts organizationid cloudagentsessionid organizationId cloudAgentSessionId"
+  },
   "organizations.cloudAgentNext.prepareSession": {
     "path": "organizations.cloudAgentNext.prepareSession",
     "kind": "mutation",
@@ -19600,8 +19783,8 @@
                         },
                         "variant": {
                           "type": "string",
-                          "maxLength": 50,
-                          "pattern": "^[a-zA-Z]+$"
+                          "minLength": 1,
+                          "maxLength": 50
                         }
                       },
                       "required": [
@@ -19639,8 +19822,8 @@
                         },
                         "variant": {
                           "type": "string",
-                          "maxLength": 50,
-                          "pattern": "^[a-zA-Z]+$"
+                          "minLength": 1,
+                          "maxLength": 50
                         }
                       },
                       "required": [
@@ -19752,8 +19935,8 @@
                 },
                 "variant": {
                   "type": "string",
-                  "maxLength": 50,
-                  "pattern": "^[a-zA-Z]+$"
+                  "minLength": 1,
+                  "maxLength": 50
                 },
                 "requestedEnvironment": {
                   "type": "object",
@@ -20421,8 +20604,8 @@
                 },
                 "variant": {
                   "type": "string",
-                  "maxLength": 50,
-                  "pattern": "^[a-zA-Z]+$"
+                  "minLength": 1,
+                  "maxLength": 50
                 },
                 "requestedEnvironment": {
                   "type": "object",
@@ -21219,8 +21402,8 @@
                 },
                 "variant": {
                   "type": "string",
-                  "maxLength": 50,
-                  "pattern": "^[a-zA-Z]+$"
+                  "minLength": 1,
+                  "maxLength": 50
                 }
               },
               "required": [
@@ -21258,8 +21441,8 @@
                 },
                 "variant": {
                   "type": "string",
-                  "maxLength": 50,
-                  "pattern": "^[a-zA-Z]+$"
+                  "minLength": 1,
+                  "maxLength": 50
                 }
               },
               "required": [
@@ -26708,8 +26891,8 @@
           "anyOf": [
             {
               "type": "string",
-              "maxLength": 50,
-              "pattern": "^[a-zA-Z]+$"
+              "minLength": 1,
+              "maxLength": 50
             },
             {
               "type": "null"
@@ -26798,8 +26981,8 @@
                     "anyOf": [
                       {
                         "type": "string",
-                        "maxLength": 50,
-                        "pattern": "^[a-zA-Z]+$"
+                        "minLength": 1,
+                        "maxLength": 50
                       },
                       {
                         "type": "null"
@@ -27103,8 +27286,8 @@
           "anyOf": [
             {
               "type": "string",
-              "maxLength": 50,
-              "pattern": "^[a-zA-Z]+$"
+              "minLength": 1,
+              "maxLength": 50
             },
             {
               "type": "null"
@@ -27206,8 +27389,8 @@
                 "anyOf": [
                   {
                     "type": "string",
-                    "maxLength": 50,
-                    "pattern": "^[a-zA-Z]+$"
+                    "minLength": 1,
+                    "maxLength": 50
                   },
                   {
                     "type": "null"
@@ -27224,6 +27407,15 @@
         },
         "disableReviewMd": {
           "type": "boolean"
+        },
+        "reviewGuidelineSourceRepositories": {
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 140,
+            "pattern": "^[A-Za-z0-9-]+\\/[A-Za-z0-9_.-]+$"
+          }
         },
         "skipBotPullRequests": {
           "type": "boolean"
@@ -27312,8 +27504,8 @@
                         "anyOf": [
                           {
                             "type": "string",
-                            "maxLength": 50,
-                            "pattern": "^[a-zA-Z]+$"
+                            "minLength": 1,
+                            "maxLength": 50
                           },
                           {
                             "type": "null"
@@ -27384,13 +27576,14 @@
       "manuallyaddedrepositories",
       "repositorymodeloverrides",
       "disablereviewmd",
+      "reviewguidelinesourcerepositories",
       "skipbotpullrequests",
       "gatethreshold",
       "council",
       "councilenabledrepositoryids",
       "autoconfigurewebhooks"
     ],
-    "searchBlob": "organizations.reviewAgent.patchReviewConfig Update specific settings on an existing organization code review agent configuration. Use to tweak the review agent without replacing the whole config. organizations reviewagent patchreviewconfig organizationid platform reviewstyle focusareas custominstructions modelslug thinkingeffort repositoryselectionmode selectedrepositoryids selectedrepositorydelta manuallyaddedrepositories repositorymodeloverrides disablereviewmd skipbotpullrequests gatethreshold council councilenabledrepositoryids autoconfigurewebhooks organizationId platform reviewStyle focusAreas customInstructions modelSlug thinkingEffort repositorySelectionMode selectedRepositoryIds selectedRepositoryDelta manuallyAddedRepositories repositoryModelOverrides disableReviewMd skipBotPullRequests gateThreshold council councilEnabledRepositoryIds autoConfigureWebhooks"
+    "searchBlob": "organizations.reviewAgent.patchReviewConfig Update specific settings on an existing organization code review agent configuration. Use to tweak the review agent without replacing the whole config. organizations reviewagent patchreviewconfig organizationid platform reviewstyle focusareas custominstructions modelslug thinkingeffort repositoryselectionmode selectedrepositoryids selectedrepositorydelta manuallyaddedrepositories repositorymodeloverrides disablereviewmd reviewguidelinesourcerepositories skipbotpullrequests gatethreshold council councilenabledrepositoryids autoconfigurewebhooks organizationId platform reviewStyle focusAreas customInstructions modelSlug thinkingEffort repositorySelectionMode selectedRepositoryIds selectedRepositoryDelta manuallyAddedRepositories repositoryModelOverrides disableReviewMd reviewGuidelineSourceRepositories skipBotPullRequests gateThreshold council councilEnabledRepositoryIds autoConfigureWebhooks"
   },
   "organizations.reviewAgent.rotateGitLabWebhookSecret": {
     "path": "organizations.reviewAgent.rotateGitLabWebhookSecret",
@@ -27465,8 +27658,8 @@
           "anyOf": [
             {
               "type": "string",
-              "maxLength": 50,
-              "pattern": "^[a-zA-Z]+$"
+              "minLength": 1,
+              "maxLength": 50
             },
             {
               "type": "null"
@@ -27539,8 +27732,8 @@
                 "anyOf": [
                   {
                     "type": "string",
-                    "maxLength": 50,
-                    "pattern": "^[a-zA-Z]+$"
+                    "minLength": 1,
+                    "maxLength": 50
                   },
                   {
                     "type": "null"
@@ -27557,6 +27750,15 @@
         },
         "disableReviewMd": {
           "type": "boolean"
+        },
+        "reviewGuidelineSourceRepositories": {
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 140,
+            "pattern": "^[A-Za-z0-9-]+\\/[A-Za-z0-9_.-]+$"
+          }
         },
         "skipBotPullRequests": {
           "type": "boolean"
@@ -27645,8 +27847,8 @@
                         "anyOf": [
                           {
                             "type": "string",
-                            "maxLength": 50,
-                            "pattern": "^[a-zA-Z]+$"
+                            "minLength": 1,
+                            "maxLength": 50
                           },
                           {
                             "type": "null"
@@ -27720,13 +27922,14 @@
       "manuallyaddedrepositories",
       "repositorymodeloverrides",
       "disablereviewmd",
+      "reviewguidelinesourcerepositories",
       "skipbotpullrequests",
       "gatethreshold",
       "council",
       "councilenabledrepositoryids",
       "autoconfigurewebhooks"
     ],
-    "searchBlob": "organizations.reviewAgent.saveReviewConfig Save the full configuration for an organization's code review agent, including repositories, model, and review style. Use to set up the review agent. organizations reviewagent savereviewconfig organizationid platform reviewstyle focusareas custominstructions modelslug thinkingeffort repositoryselectionmode selectedrepositoryids manuallyaddedrepositories repositorymodeloverrides disablereviewmd skipbotpullrequests gatethreshold council councilenabledrepositoryids autoconfigurewebhooks organizationId platform reviewStyle focusAreas customInstructions modelSlug thinkingEffort repositorySelectionMode selectedRepositoryIds manuallyAddedRepositories repositoryModelOverrides disableReviewMd skipBotPullRequests gateThreshold council councilEnabledRepositoryIds autoConfigureWebhooks"
+    "searchBlob": "organizations.reviewAgent.saveReviewConfig Save the full configuration for an organization's code review agent, including repositories, model, and review style. Use to set up the review agent. organizations reviewagent savereviewconfig organizationid platform reviewstyle focusareas custominstructions modelslug thinkingeffort repositoryselectionmode selectedrepositoryids manuallyaddedrepositories repositorymodeloverrides disablereviewmd reviewguidelinesourcerepositories skipbotpullrequests gatethreshold council councilenabledrepositoryids autoconfigurewebhooks organizationId platform reviewStyle focusAreas customInstructions modelSlug thinkingEffort repositorySelectionMode selectedRepositoryIds manuallyAddedRepositories repositoryModelOverrides disableReviewMd reviewGuidelineSourceRepositories skipBotPullRequests gateThreshold council councilEnabledRepositoryIds autoConfigureWebhooks"
   },
   "organizations.reviewAgent.toggleReviewAgent": {
     "path": "organizations.reviewAgent.toggleReviewAgent",
@@ -29331,6 +29534,38 @@
     ],
     "searchBlob": "organizations.settings.getGatewaySettings Get an organization's AI gateway settings, including whether OpenRouter or the Vercel AI Gateway are disabled and which data region is configured. organizations settings getgatewaysettings organizationid organizationId"
   },
+  "organizations.settings.getModelGatewayAvailability": {
+    "path": "organizations.settings.getModelGatewayAvailability",
+    "kind": "query",
+    "summary": "List which AI gateways (Vercel and OpenRouter) serve a given model. Use this to see if a model is reachable before configuring gateway or model routing settings.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "modelId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "organizationId",
+        "modelId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "settings",
+      "getmodelgatewayavailability",
+      "organizationid",
+      "modelid"
+    ],
+    "searchBlob": "organizations.settings.getModelGatewayAvailability List which AI gateways (Vercel and OpenRouter) serve a given model. Use this to see if a model is reachable before configuring gateway or model routing settings. organizations settings getmodelgatewayavailability organizationid modelid organizationId modelId"
+  },
   "organizations.settings.listAvailableModels": {
     "path": "organizations.settings.listAvailableModels",
     "kind": "query",
@@ -30817,8 +31052,8 @@
           "anyOf": [
             {
               "type": "string",
-              "maxLength": 50,
-              "pattern": "^[a-zA-Z]+$"
+              "minLength": 1,
+              "maxLength": 50
             },
             {
               "type": "null"
@@ -30907,8 +31142,8 @@
                     "anyOf": [
                       {
                         "type": "string",
-                        "maxLength": 50,
-                        "pattern": "^[a-zA-Z]+$"
+                        "minLength": 1,
+                        "maxLength": 50
                       },
                       {
                         "type": "null"
@@ -31090,8 +31325,8 @@
           "anyOf": [
             {
               "type": "string",
-              "maxLength": 50,
-              "pattern": "^[a-zA-Z]+$"
+              "minLength": 1,
+              "maxLength": 50
             },
             {
               "type": "null"
@@ -31181,8 +31416,8 @@
                 "anyOf": [
                   {
                     "type": "string",
-                    "maxLength": 50,
-                    "pattern": "^[a-zA-Z]+$"
+                    "minLength": 1,
+                    "maxLength": 50
                   },
                   {
                     "type": "null"
@@ -31199,6 +31434,15 @@
         },
         "disableReviewMd": {
           "type": "boolean"
+        },
+        "reviewGuidelineSourceRepositories": {
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 140,
+            "pattern": "^[A-Za-z0-9-]+\\/[A-Za-z0-9_.-]+$"
+          }
         },
         "skipBotPullRequests": {
           "type": "boolean"
@@ -31232,11 +31476,12 @@
       "manuallyaddedrepositories",
       "repositorymodeloverrides",
       "disablereviewmd",
+      "reviewguidelinesourcerepositories",
       "skipbotpullrequests",
       "gatethreshold",
       "autoconfigurewebhooks"
     ],
-    "searchBlob": "personalReviewAgent.patchReviewConfig Update individual fields of an existing personal code review agent configuration without replacing the whole config. Use it to change one or a few settings, including adding or removing selected repositories. personalreviewagent patchreviewconfig platform reviewstyle focusareas custominstructions modelslug thinkingeffort repositoryselectionmode selectedrepositoryids selectedrepositorydelta manuallyaddedrepositories repositorymodeloverrides disablereviewmd skipbotpullrequests gatethreshold autoconfigurewebhooks platform reviewStyle focusAreas customInstructions modelSlug thinkingEffort repositorySelectionMode selectedRepositoryIds selectedRepositoryDelta manuallyAddedRepositories repositoryModelOverrides disableReviewMd skipBotPullRequests gateThreshold autoConfigureWebhooks"
+    "searchBlob": "personalReviewAgent.patchReviewConfig Update individual fields of an existing personal code review agent configuration without replacing the whole config. Use it to change one or a few settings, including adding or removing selected repositories. personalreviewagent patchreviewconfig platform reviewstyle focusareas custominstructions modelslug thinkingeffort repositoryselectionmode selectedrepositoryids selectedrepositorydelta manuallyaddedrepositories repositorymodeloverrides disablereviewmd reviewguidelinesourcerepositories skipbotpullrequests gatethreshold autoconfigurewebhooks platform reviewStyle focusAreas customInstructions modelSlug thinkingEffort repositorySelectionMode selectedRepositoryIds selectedRepositoryDelta manuallyAddedRepositories repositoryModelOverrides disableReviewMd reviewGuidelineSourceRepositories skipBotPullRequests gateThreshold autoConfigureWebhooks"
   },
   "personalReviewAgent.saveReviewConfig": {
     "path": "personalReviewAgent.saveReviewConfig",
@@ -31279,8 +31524,8 @@
           "anyOf": [
             {
               "type": "string",
-              "maxLength": 50,
-              "pattern": "^[a-zA-Z]+$"
+              "minLength": 1,
+              "maxLength": 50
             },
             {
               "type": "null"
@@ -31347,8 +31592,8 @@
                 "anyOf": [
                   {
                     "type": "string",
-                    "maxLength": 50,
-                    "pattern": "^[a-zA-Z]+$"
+                    "minLength": 1,
+                    "maxLength": 50
                   },
                   {
                     "type": "null"
@@ -31365,6 +31610,15 @@
         },
         "disableReviewMd": {
           "type": "boolean"
+        },
+        "reviewGuidelineSourceRepositories": {
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 140,
+            "pattern": "^[A-Za-z0-9-]+\\/[A-Za-z0-9_.-]+$"
+          }
         },
         "skipBotPullRequests": {
           "type": "boolean"
@@ -31403,11 +31657,12 @@
       "manuallyaddedrepositories",
       "repositorymodeloverrides",
       "disablereviewmd",
+      "reviewguidelinesourcerepositories",
       "skipbotpullrequests",
       "gatethreshold",
       "autoconfigurewebhooks"
     ],
-    "searchBlob": "personalReviewAgent.saveReviewConfig Save or replace the personal code review agent settings, such as review style, focus areas, custom instructions, model, and which repositories to review. Use it to create the review configuration for a user. personalreviewagent savereviewconfig platform reviewstyle focusareas custominstructions modelslug thinkingeffort repositoryselectionmode selectedrepositoryids manuallyaddedrepositories repositorymodeloverrides disablereviewmd skipbotpullrequests gatethreshold autoconfigurewebhooks platform reviewStyle focusAreas customInstructions modelSlug thinkingEffort repositorySelectionMode selectedRepositoryIds manuallyAddedRepositories repositoryModelOverrides disableReviewMd skipBotPullRequests gateThreshold autoConfigureWebhooks"
+    "searchBlob": "personalReviewAgent.saveReviewConfig Save or replace the personal code review agent settings, such as review style, focus areas, custom instructions, model, and which repositories to review. Use it to create the review configuration for a user. personalreviewagent savereviewconfig platform reviewstyle focusareas custominstructions modelslug thinkingeffort repositoryselectionmode selectedrepositoryids manuallyaddedrepositories repositorymodeloverrides disablereviewmd reviewguidelinesourcerepositories skipbotpullrequests gatethreshold autoconfigurewebhooks platform reviewStyle focusAreas customInstructions modelSlug thinkingEffort repositorySelectionMode selectedRepositoryIds manuallyAddedRepositories repositoryModelOverrides disableReviewMd reviewGuidelineSourceRepositories skipBotPullRequests gateThreshold autoConfigureWebhooks"
   },
   "personalReviewAgent.toggleReviewAgent": {
     "path": "personalReviewAgent.toggleReviewAgent",
@@ -35084,18 +35339,6 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 200
-        },
-        "organizationId": {
-          "anyOf": [
-            {
-              "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-            },
-            {
-              "type": "null"
-            }
-          ]
         }
       },
       "required": [
@@ -35106,10 +35349,9 @@
       "todos",
       "items",
       "candidatesforsession",
-      "sessionid",
-      "organizationid"
+      "sessionid"
     ],
-    "searchBlob": "todos.items.candidatesForSession List open to-do items that could be linked to a session, prioritizing ones in the same repository. todos items candidatesforsession sessionid organizationid sessionId organizationId"
+    "searchBlob": "todos.items.candidatesForSession List open to-do items that could be linked to a session, prioritizing ones in the same repository. todos items candidatesforsession sessionid sessionId"
   },
   "todos.items.create": {
     "path": "todos.items.create",
@@ -36090,6 +36332,14 @@
             "maxLength": 256
           }
         },
+        "autoModels": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
         "modes": {
           "maxItems": 500,
           "type": "array",
@@ -36107,6 +36357,14 @@
           }
         },
         "providers": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "inferenceProviders": {
           "maxItems": 500,
           "type": "array",
           "items": {
@@ -36138,6 +36396,14 @@
             "maxLength": 256
           }
         },
+        "excludedAutoModels": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
         "excludedModes": {
           "maxItems": 500,
           "type": "array",
@@ -36162,6 +36428,14 @@
             "maxLength": 256
           }
         },
+        "excludedInferenceProviders": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
         "excludedProjects": {
           "maxItems": 500,
           "type": "array",
@@ -36179,6 +36453,8 @@
             "user",
             "provider",
             "project",
+            "autoModel",
+            "inferenceProvider",
             "organization"
           ]
         },
@@ -36218,21 +36494,25 @@
       "viewas",
       "features",
       "models",
+      "automodels",
       "modes",
       "userids",
       "providers",
+      "inferenceproviders",
       "projects",
       "excludedfeatures",
       "excludedmodels",
+      "excludedautomodels",
       "excludedmodes",
       "excludeduserids",
       "excludedproviders",
+      "excludedinferenceproviders",
       "excludedprojects",
       "dimension",
       "metric",
       "limit"
     ],
-    "searchBlob": "usageAnalytics.getBreakdown Rank a dimension (model, feature, project, provider, user, mode) by an aggregate metric to show top contributors and their percentages. usageanalytics getbreakdown startdate enddate granularity costsource organizationid organizationids personalscope viewas features models modes userids providers projects excludedfeatures excludedmodels excludedmodes excludeduserids excludedproviders excludedprojects dimension metric limit startDate endDate granularity costSource organizationId organizationIds personalScope viewAs features models modes userIds providers projects excludedFeatures excludedModels excludedModes excludedUserIds excludedProviders excludedProjects dimension metric limit"
+    "searchBlob": "usageAnalytics.getBreakdown Rank a dimension (model, feature, project, provider, user, mode) by an aggregate metric to show top contributors and their percentages. usageanalytics getbreakdown startdate enddate granularity costsource organizationid organizationids personalscope viewas features models automodels modes userids providers inferenceproviders projects excludedfeatures excludedmodels excludedautomodels excludedmodes excludeduserids excludedproviders excludedinferenceproviders excludedprojects dimension metric limit startDate endDate granularity costSource organizationId organizationIds personalScope viewAs features models autoModels modes userIds providers inferenceProviders projects excludedFeatures excludedModels excludedAutoModels excludedModes excludedUserIds excludedProviders excludedInferenceProviders excludedProjects dimension metric limit"
   },
   "usageAnalytics.getScopeOrganizations": {
     "path": "usageAnalytics.getScopeOrganizations",
@@ -36340,6 +36620,14 @@
             "maxLength": 256
           }
         },
+        "autoModels": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
         "modes": {
           "maxItems": 500,
           "type": "array",
@@ -36357,6 +36645,14 @@
           }
         },
         "providers": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "inferenceProviders": {
           "maxItems": 500,
           "type": "array",
           "items": {
@@ -36388,6 +36684,14 @@
             "maxLength": 256
           }
         },
+        "excludedAutoModels": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
         "excludedModes": {
           "maxItems": 500,
           "type": "array",
@@ -36405,6 +36709,14 @@
           }
         },
         "excludedProviders": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "excludedInferenceProviders": {
           "maxItems": 500,
           "type": "array",
           "items": {
@@ -36440,18 +36752,22 @@
       "viewas",
       "features",
       "models",
+      "automodels",
       "modes",
       "userids",
       "providers",
+      "inferenceproviders",
       "projects",
       "excludedfeatures",
       "excludedmodels",
+      "excludedautomodels",
       "excludedmodes",
       "excludeduserids",
       "excludedproviders",
+      "excludedinferenceproviders",
       "excludedprojects"
     ],
-    "searchBlob": "usageAnalytics.getSummary Fetch aggregate usage totals (cost, requests, tokens, errors, latency, active users) over a date range for a user or organization, optionally filtered by model/feature/project/provider. usageanalytics getsummary startdate enddate granularity costsource organizationid organizationids personalscope viewas features models modes userids providers projects excludedfeatures excludedmodels excludedmodes excludeduserids excludedproviders excludedprojects startDate endDate granularity costSource organizationId organizationIds personalScope viewAs features models modes userIds providers projects excludedFeatures excludedModels excludedModes excludedUserIds excludedProviders excludedProjects"
+    "searchBlob": "usageAnalytics.getSummary Fetch aggregate usage totals (cost, requests, tokens, errors, latency, active users) over a date range for a user or organization, optionally filtered by model/feature/project/provider. usageanalytics getsummary startdate enddate granularity costsource organizationid organizationids personalscope viewas features models automodels modes userids providers inferenceproviders projects excludedfeatures excludedmodels excludedautomodels excludedmodes excludeduserids excludedproviders excludedinferenceproviders excludedprojects startDate endDate granularity costSource organizationId organizationIds personalScope viewAs features models autoModels modes userIds providers inferenceProviders projects excludedFeatures excludedModels excludedAutoModels excludedModes excludedUserIds excludedProviders excludedInferenceProviders excludedProjects"
   },
   "usageAnalytics.getTable": {
     "path": "usageAnalytics.getTable",
@@ -36534,6 +36850,14 @@
             "maxLength": 256
           }
         },
+        "autoModels": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
         "modes": {
           "maxItems": 500,
           "type": "array",
@@ -36551,6 +36875,14 @@
           }
         },
         "providers": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "inferenceProviders": {
           "maxItems": 500,
           "type": "array",
           "items": {
@@ -36582,6 +36914,14 @@
             "maxLength": 256
           }
         },
+        "excludedAutoModels": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
         "excludedModes": {
           "maxItems": 500,
           "type": "array",
@@ -36599,6 +36939,14 @@
           }
         },
         "excludedProviders": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "excludedInferenceProviders": {
           "maxItems": 500,
           "type": "array",
           "items": {
@@ -36625,7 +36973,9 @@
               "mode",
               "user",
               "provider",
-              "project"
+              "project",
+              "autoModel",
+              "inferenceProvider"
             ]
           }
         },
@@ -36656,20 +37006,24 @@
       "viewas",
       "features",
       "models",
+      "automodels",
       "modes",
       "userids",
       "providers",
+      "inferenceproviders",
       "projects",
       "excludedfeatures",
       "excludedmodels",
+      "excludedautomodels",
       "excludedmodes",
       "excludeduserids",
       "excludedproviders",
+      "excludedinferenceproviders",
       "excludedprojects",
       "groupby",
       "limit"
     ],
-    "searchBlob": "usageAnalytics.getTable Return a tabular grid of usage rows (cost, tokens, errors) grouped by any combination of feature, model, mode, user, provider, and project dimensions over time. usageanalytics gettable startdate enddate granularity costsource organizationid organizationids personalscope viewas features models modes userids providers projects excludedfeatures excludedmodels excludedmodes excludeduserids excludedproviders excludedprojects groupby limit startDate endDate granularity costSource organizationId organizationIds personalScope viewAs features models modes userIds providers projects excludedFeatures excludedModels excludedModes excludedUserIds excludedProviders excludedProjects groupBy limit"
+    "searchBlob": "usageAnalytics.getTable Return a tabular grid of usage rows (cost, tokens, errors) grouped by any combination of feature, model, mode, user, provider, and project dimensions over time. usageanalytics gettable startdate enddate granularity costsource organizationid organizationids personalscope viewas features models automodels modes userids providers inferenceproviders projects excludedfeatures excludedmodels excludedautomodels excludedmodes excludeduserids excludedproviders excludedinferenceproviders excludedprojects groupby limit startDate endDate granularity costSource organizationId organizationIds personalScope viewAs features models autoModels modes userIds providers inferenceProviders projects excludedFeatures excludedModels excludedAutoModels excludedModes excludedUserIds excludedProviders excludedInferenceProviders excludedProjects groupBy limit"
   },
   "usageAnalytics.getTimeseries": {
     "path": "usageAnalytics.getTimeseries",
@@ -36752,6 +37106,14 @@
             "maxLength": 256
           }
         },
+        "autoModels": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
         "modes": {
           "maxItems": 500,
           "type": "array",
@@ -36769,6 +37131,14 @@
           }
         },
         "providers": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "inferenceProviders": {
           "maxItems": 500,
           "type": "array",
           "items": {
@@ -36800,6 +37170,14 @@
             "maxLength": 256
           }
         },
+        "excludedAutoModels": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
         "excludedModes": {
           "maxItems": 500,
           "type": "array",
@@ -36817,6 +37195,14 @@
           }
         },
         "excludedProviders": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "excludedInferenceProviders": {
           "maxItems": 500,
           "type": "array",
           "items": {
@@ -36857,7 +37243,9 @@
             "mode",
             "user",
             "provider",
-            "project"
+            "project",
+            "autoModel",
+            "inferenceProvider"
           ]
         }
       },
@@ -36881,20 +37269,24 @@
       "viewas",
       "features",
       "models",
+      "automodels",
       "modes",
       "userids",
       "providers",
+      "inferenceproviders",
       "projects",
       "excludedfeatures",
       "excludedmodels",
+      "excludedautomodels",
       "excludedmodes",
       "excludeduserids",
       "excludedproviders",
+      "excludedinferenceproviders",
       "excludedprojects",
       "metric",
       "splitby"
     ],
-    "searchBlob": "usageAnalytics.getTimeseries Get a metric (requests, cost, tokens, latency, etc.) bucketed over time for a date range, optionally split into per-dimension series. usageanalytics gettimeseries startdate enddate granularity costsource organizationid organizationids personalscope viewas features models modes userids providers projects excludedfeatures excludedmodels excludedmodes excludeduserids excludedproviders excludedprojects metric splitby startDate endDate granularity costSource organizationId organizationIds personalScope viewAs features models modes userIds providers projects excludedFeatures excludedModels excludedModes excludedUserIds excludedProviders excludedProjects metric splitBy"
+    "searchBlob": "usageAnalytics.getTimeseries Get a metric (requests, cost, tokens, latency, etc.) bucketed over time for a date range, optionally split into per-dimension series. usageanalytics gettimeseries startdate enddate granularity costsource organizationid organizationids personalscope viewas features models automodels modes userids providers inferenceproviders projects excludedfeatures excludedmodels excludedautomodels excludedmodes excludeduserids excludedproviders excludedinferenceproviders excludedprojects metric splitby startDate endDate granularity costSource organizationId organizationIds personalScope viewAs features models autoModels modes userIds providers inferenceProviders projects excludedFeatures excludedModels excludedAutoModels excludedModes excludedUserIds excludedProviders excludedInferenceProviders excludedProjects metric splitBy"
   },
   "usageAnalytics.resolveOrgUsers": {
     "path": "usageAnalytics.resolveOrgUsers",
@@ -37648,7 +38040,7 @@
         "sessionId": {
           "type": "string",
           "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$"
         }
       },
       "required": [
@@ -38278,8 +38670,8 @@
         },
         "variant": {
           "type": "string",
-          "maxLength": 50,
-          "pattern": "^[a-zA-Z]+$"
+          "minLength": 1,
+          "maxLength": 50
         },
         "sandboxAllocation": {
           "type": "string",
@@ -38565,6 +38957,9 @@
             "webhook",
             "scheduled"
           ]
+        },
+        "withEditability": {
+          "type": "boolean"
         }
       }
     },
@@ -38573,9 +38968,10 @@
       "list",
       "organizationid",
       "targettype",
-      "activationmode"
+      "activationmode",
+      "witheditability"
     ],
-    "searchBlob": "webhookTriggers.list List webhook triggers owned by the current user or organization, with optional filtering by target type or activation mode, including their inbound webhook URLs. webhooktriggers list organizationid targettype activationmode organizationId targetType activationMode"
+    "searchBlob": "webhookTriggers.list List webhook triggers owned by the current user or organization, with optional filtering by target type or activation mode, including their inbound webhook URLs. webhooktriggers list organizationid targettype activationmode witheditability organizationId targetType activationMode withEditability"
   },
   "webhookTriggers.listRequests": {
     "path": "webhookTriggers.listRequests",
@@ -38649,8 +39045,8 @@
           "anyOf": [
             {
               "type": "string",
-              "maxLength": 50,
-              "pattern": "^[a-zA-Z]+$"
+              "minLength": 1,
+              "maxLength": 50
             },
             {
               "type": "null"

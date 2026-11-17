@@ -1,26 +1,12 @@
 import { z } from 'zod';
-import { approvalKeySchema } from '@kilocode/app-shared/approval-key';
 import { glanceableAgentsSnapshotSchema } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { HOME_WIDGET_TITLE_LIMIT, homeWidgetDetailsSchema } from '@kilocode/app-shared/home-widget';
-import {
-  SESSION_LIVE_COMMAND_LIMIT,
-  sessionLiveChangesSchema,
-  sessionLiveFailureSchema,
-  sessionLivePlanSchema,
-  sessionLiveStepSchema,
-} from '@kilocode/session-ingest-contracts/session-live-summary';
+import { homeWidgetDetailsSchema } from '@kilocode/app-shared/home-widget';
 
 import { NEEDS_INPUT_ATTENTION_KINDS } from './needs-input-actions';
-import {
-  instanceLifecycleEventSchema,
-  scheduledActionEventSchema,
-  securityLifecyclePayloadShape,
-} from './notification-events';
-import { SESSION_CARD_STATUS_KINDS, sessionLiveOutcomeSchema } from './session-live-content';
+import { securityLifecyclePayloadShape } from './notification-events';
+import { sessionLiveActivityContentStateSchema } from './session-live-content';
 import { nonEmptyStringSchema } from './non-empty-string';
 import { refineSpendAlertScope, spendAlertScopeShape } from './spend-alert-scope';
-
-export { nonEmptyStringSchema };
 
 // Discriminates between attention-requiring and status-only cloud agent
 // session notifications. Optional everywhere it appears so old producers
@@ -30,71 +16,11 @@ export const cloudAgentSessionCategorySchema = z.enum(['attention', 'status']);
 export type CloudAgentSessionCategory = z.infer<typeof cloudAgentSessionCategorySchema>;
 
 /**
- * The raw content-state one followed session's Live Activity renders
- * (`.specs/mobile-session-live-activity.md`). Unlike the aggregate card, it
- * carries the session title: the user started the card with Follow. The
- * session id routes taps and approval and is never drawn. It must never carry
- * an organization name, repository, generated text, or a raw account id.
- */
-export const sessionLiveActivityContentStateSchema = z.object({
-  sessionId: nonEmptyStringSchema,
-  /** Trimmed and capped display title; null for an untitled session. */
-  title: z.string().max(HOME_WIDGET_TITLE_LIMIT).nullable(),
-  statusKind: z.enum(SESSION_CARD_STATUS_KINDS),
-  /** ISO 8601; when the current status kind began. */
-  statusSince: z.string(),
-  /** ISO 8601 wake time for a scheduled session, else null. */
-  scheduledAt: z.string().nullable(),
-  /** True only when Approve can answer the waiting permission request. */
-  awaitingPermission: z.boolean(),
-  /** SHA-256 hex of `JSON.stringify([sessionId, permissionId])`, else null. */
-  approvalKey: approvalKeySchema,
-  /** ISO 8601; when the server confirmed this content. */
-  updatedAt: z.string(),
-  /** The step the agent is on; null when the session is not working. */
-  currentStep: sessionLiveStepSchema.nullable().optional(),
-  /** Plan progress while the agent works from a todo list. */
-  plan: sessionLivePlanSchema.nullable().optional(),
-  /** The command Approve answers, trimmed to one line; null without one. */
-  permissionCommand: z.string().max(SESSION_LIVE_COMMAND_LIMIT).nullable().optional(),
-  /** The diff this session produced so far. */
-  changes: sessionLiveChangesSchema.nullable().optional(),
-  /** ISO 8601; the last activity the server saw. */
-  lastActivityAt: z.string().nullable().optional(),
-  /** The cost so far, in microdollars. */
-  costMicrodollars: z.number().int().nonnegative().nullable().optional(),
-  /** How a finished session ended. */
-  outcome: sessionLiveOutcomeSchema.nullable().optional(),
-  /** Why a finished turn failed; null while nothing failed. */
-  failure: sessionLiveFailureSchema.nullable().optional(),
-  /** ISO 8601; when the session started. */
-  startedAt: z.string().nullable().optional(),
-});
-
-export type SessionLiveActivityContentState = z.infer<typeof sessionLiveActivityContentStateSchema>;
-
-/**
  * Schema for the `data` blob attached to Expo push notifications.
  * This crosses the OS boundary as untyped JSON, so it MUST be
  * Zod-parsed by the mobile notification handler before use.
  */
 export const pushDataSchema = z.discriminatedUnion('type', [
-  z.object({
-    type: z.literal('chat.message'),
-    sandboxId: nonEmptyStringSchema,
-    conversationId: nonEmptyStringSchema,
-    messageId: nonEmptyStringSchema,
-  }),
-  z.object({
-    type: z.literal('instance-lifecycle'),
-    event: instanceLifecycleEventSchema,
-    sandboxId: nonEmptyStringSchema,
-  }),
-  z.object({
-    type: z.literal('scheduled-action'),
-    event: scheduledActionEventSchema,
-    sandboxId: nonEmptyStringSchema,
-  }),
   z.object({
     type: z.literal('cloud_agent_session'),
     cliSessionId: nonEmptyStringSchema,
@@ -204,15 +130,3 @@ export type GlanceableLiveActivityContentState = Pick<
   | 'scheduled'
   | 'scheduledAt'
 >;
-
-/**
- * Relevance per spec "Presentation order": iOS shows the highest score in the
- * Dynamic Island and orders the Lock Screen by it. Both producers use this.
- */
-export const LIVE_ACTIVITY_RELEVANCE = {
-  sessionNeedsInput: 100,
-  aggregateNeedsInput: 80,
-  sessionActive: 60,
-  aggregate: 40,
-  sessionIdle: 20,
-} as const;

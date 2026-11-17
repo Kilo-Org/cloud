@@ -133,11 +133,7 @@ export const TriggerConfigInput = z
     githubRepo: z.string().trim().min(1, 'githubRepo is required').optional(),
     mode: z.string().trim().min(1, 'mode is required').optional(),
     model: z.string().trim().min(1, 'model is required').optional(),
-    variant: z
-      .string()
-      .max(50)
-      .regex(/^[a-zA-Z]+$/)
-      .optional(),
+    variant: z.string().min(1).max(50).optional(),
     sandboxAllocation: sandboxAllocationSchema.optional(),
     environmentId: z.string().uuid().nullable().optional(),
     promptTemplate: z.string().trim().min(1, 'promptTemplate is required'),
@@ -273,12 +269,7 @@ export const TriggerConfigUpdateInput = z
     executionUserId: z.never().optional(),
     mode: z.string().trim().min(1).optional(),
     model: z.string().trim().min(1).optional(),
-    variant: z
-      .string()
-      .max(50)
-      .regex(/^[a-zA-Z]+$/)
-      .nullable()
-      .optional(),
+    variant: z.string().min(1).max(50).nullable().optional(),
     sandboxAllocation: sandboxAllocationSchema.nullable().optional(),
     environmentId: z.string().uuid().nullable().optional(),
     promptTemplate: z.string().trim().min(1).optional(),

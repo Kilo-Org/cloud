@@ -1,3 +1,4 @@
+import { characterCut } from '@kilocode/session-ingest-contracts/session-live-summary';
 import { z } from 'zod';
 
 export const BRIEFING_MAX_SESSIONS = 32;
@@ -456,10 +457,12 @@ export function redactBriefingExcerptOrDrop(
 
 /**
  * A title for a session or a source. The report schema requires one, so a title that
- * screening cannot clear becomes a neutral fallback.
+ * screening cannot clear, or one whose first character is wider than the cap and so
+ * truncates to nothing, becomes a neutral fallback.
  */
 export function redactBriefingTitle(value: string, maxBytes = BRIEFING_MAX_TITLE_LENGTH): string {
-  return redactBriefingExcerptOrDrop(value, maxBytes) ?? BRIEFING_FALLBACK_TITLE;
+  const title = redactBriefingExcerptOrDrop(value, maxBytes);
+  return title === undefined || title === '' ? BRIEFING_FALLBACK_TITLE : title;
 }
 
 export function truncateBriefingUtf8(value: string, maxBytes: number): string {
@@ -467,6 +470,14 @@ export function truncateBriefingUtf8(value: string, maxBytes: number): string {
   return end === value.length ? value : value.slice(0, end);
 }
 
+/**
+ * The end of the longest prefix of `value` that fits in `maxBytes` UTF-8 bytes,
+ * on a character boundary. The byte walk counts every code point exactly, so the
+ * byte-feasible end may fall inside one character: a joiner sequence, a flag, a
+ * skin-tone or keycap modifier, or a combining mark. The cut then backs up to the
+ * character boundary at or before that end, so a capped excerpt never ends inside
+ * a drawn character. A value that fits entirely keeps its own length.
+ */
 function briefingUtf8End(value: string, maxBytes: number): number {
   let bytes = 0;
   let end = 0;
@@ -479,5 +490,5 @@ function briefingUtf8End(value: string, maxBytes: number): number {
     bytes += width;
     end += pair ? 2 : 1;
   }
-  return end;
+  return end === value.length ? end : characterCut(value, end);
 }

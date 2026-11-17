@@ -105,8 +105,8 @@ export function LegalDocumentScreen({
         showsVerticalScrollIndicator={false}
       >
         {showsEnglishOnlyNotice ? (
-          <View className="mb-4 rounded-lg border border-border bg-card px-3 py-2">
-            <Text className="text-sm text-muted-foreground">
+          <View className="mb-4 rounded-lg border border-border bg-secondary p-3">
+            <Text className="text-base text-foreground">
               {t('common.legalDocumentEnglishOnly')}
             </Text>
           </View>

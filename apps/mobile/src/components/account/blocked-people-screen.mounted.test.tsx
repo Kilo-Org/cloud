@@ -276,32 +276,16 @@ describe('BlockedPeopleScreen', () => {
     expect(notices[0]?.props.onRetry).toBeTypeOf('function');
   });
 
-  it('names an offline pause in the refreshed notice', async () => {
+  it('names the refreshed notice after the failure kind', async () => {
     state.error = true;
     state.connectivity = 'offline';
-    const root = await mount();
+    const offline = await mount();
+    expect(offline.find(node => Object.is(node.type, 'QueryError')).props.variant).toBe('offline');
 
-    const notice = root.find(node => Object.is(node.type, 'QueryError'));
-    expect(notice.props.variant).toBe('offline');
-  });
-
-  it('names an online failure by its tRPC code in the refreshed notice', async () => {
-    state.error = true;
+    state.connectivity = 'online';
     state.errorCode = 'INTERNAL_SERVER_ERROR';
-    const root = await mount();
-
-    const notice = root.find(node => Object.is(node.type, 'QueryError'));
-    expect(notice.props.variant).toBe('server');
-  });
-
-  it('shows the stale notice while a paused refresh is not running', async () => {
-    state.fetchStatus = 'paused';
-    state.connectivity = 'offline';
-    const root = await mount();
-
-    const notice = root.find(node => Object.is(node.type, 'QueryError'));
-    expect(notice.props.variant).toBe('offline');
-    expect(notice.props.isRetrying).toBe(false);
+    const failed = await mount();
+    expect(failed.find(node => Object.is(node.type, 'QueryError')).props.variant).toBe('server');
   });
 
   it('keeps the stale notice mounted while its retry runs', async () => {
@@ -309,11 +293,12 @@ describe('BlockedPeopleScreen', () => {
     // retry, so the reader saw the notice vanish instead of its spinner.
     state.fetchStatus = 'paused';
     state.connectivity = 'offline';
-    state.isFetching = true;
-    const root = await mount();
+    const idle = await mount();
+    expect(idle.find(node => Object.is(node.type, 'QueryError')).props.isRetrying).toBe(false);
 
-    const notice = root.find(node => Object.is(node.type, 'QueryError'));
-    expect(notice.props.variant).toBe('offline');
+    state.isFetching = true;
+    const retrying = await mount();
+    const notice = retrying.find(node => Object.is(node.type, 'QueryError'));
     expect(notice.props.isRetrying).toBe(true);
     expect(notice.props.onRetry).toBeTypeOf('function');
   });

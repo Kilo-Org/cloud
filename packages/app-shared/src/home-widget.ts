@@ -20,6 +20,7 @@ import {
   type BuildGlanceableSnapshotInput,
   type GlanceableSessionRow,
   type GlanceableStatusKind,
+  compareSessionInstant,
 } from './glanceable-agents-snapshot';
 import { timestampMs, timestampToIso } from './utils';
 
@@ -57,13 +58,23 @@ export const homeWidgetDetailsSchema = z.object({
     .max(HOME_WIDGET_DETAIL_LIMIT),
 });
 export type HomeWidgetDetails = z.infer<typeof homeWidgetDetailsSchema>;
-export const EMPTY_HOME_WIDGET_DETAILS: HomeWidgetDetails = {
-  approvalKey: null,
-  primaryKind: null,
-  primaryTitle: null,
-  waitingAgents: [],
-  scheduledAgents: [],
-};
+
+/**
+ * Details with no private work to describe, as a record the caller owns. A
+ * payload that shared one instance's arrays would let a caller's write change
+ * what every later empty payload reports.
+ */
+function emptyHomeWidgetDetails(): HomeWidgetDetails {
+  return {
+    approvalKey: null,
+    primaryKind: null,
+    primaryTitle: null,
+    waitingAgents: [],
+    scheduledAgents: [],
+  };
+}
+
+export const EMPTY_HOME_WIDGET_DETAILS: HomeWidgetDetails = emptyHomeWidgetDetails();
 
 export const homeWidgetDataSchema = z.object({
   snapshot: glanceableAgentsSnapshotSchema,
@@ -164,28 +175,6 @@ export function glanceableSessionTitle(value: string | null | undefined): string
 }
 
 /**
- * Order sessions by one of their timestamps. `direction` uses the vocabulary
- * the package already owns for its extreme-row selector: 'earliest' is oldest
- * first, 'latest' is newest first. A missing or unparseable time ranks after
- * every known time in both directions, so the rule is stated here and not
- * restated per sort; a tie compares 0, so the caller's stable sort keeps source
- * order.
- */
-function compareSessionInstant(
-  read: (row: HomeWidgetSessionRow) => string | undefined,
-  direction: 'earliest' | 'latest'
-): (a: HomeWidgetSessionRow, b: HomeWidgetSessionRow) => number {
-  return (a, b) => {
-    const left = timestampMs(read(a));
-    const right = timestampMs(read(b));
-    if (left === null || right === null) {
-      return Number(left === null) - Number(right === null);
-    }
-    return direction === 'earliest' ? left - right : right - left;
-  };
-}
-
-/**
  * Same authorized rows as counts, with stable ties and unknown times ranked
  * last. Returns the kind its `primaryTitle` belongs to, so the title and the
  * count drawn beside it cannot describe different kinds.
@@ -239,7 +228,7 @@ export function buildHomeWidgetData(
   return {
     snapshot,
     details: isTerminalGlanceableStatus(snapshot.status)
-      ? { ...EMPTY_HOME_WIDGET_DETAILS }
+      ? emptyHomeWidgetDetails()
       : buildHomeWidgetDetails(input.sessions),
   };
 }

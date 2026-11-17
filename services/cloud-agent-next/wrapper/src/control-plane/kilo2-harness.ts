@@ -173,7 +173,7 @@ export function createKilo2Harness(options: {
         });
         const servers = z
           .array(mcpServerSchema)
-          .parse(await api.request(`/api/mcp?${query}`, { signal }));
+          .parse(await api.data(`/api/mcp?${query}`, { signal }));
         if (servers.find(server => server.name === MCP_SERVER_NAME)?.status.status === 'connected')
           return;
       } catch {

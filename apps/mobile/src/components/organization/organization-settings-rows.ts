@@ -11,15 +11,18 @@ import {
   FileText,
   KeyRound,
   LineChart,
+  Lock,
   type LucideIcon,
   Plug,
   ScrollText,
+  Server,
   Shield,
   SlidersHorizontal,
   Users,
   Wallet,
 } from '@/components/ui/icons';
 import { i18n } from '@/i18n';
+import { type AppShellTarget } from '@/lib/app-shell-handoff';
 import { providerKeysHref } from '@/lib/byok/provider-key-scope';
 import { WEB_BASE_URL } from '@/lib/config';
 
@@ -40,9 +43,14 @@ import { WEB_BASE_URL } from '@/lib/config';
  * - `sub-organizations` and `distribute-funds` additionally redirect for a
  *   child organization (`parent_organization_id !== null`);
  * - `integrations` renders for every member;
- * - `sso-and-domain`, `email-preferences` and `data-collection` are cards on
- *   the organization dashboard rather than pages of their own, and the
- *   dashboard links to the seats purchase, so the hub lists none of them.
+ * - `custom-modes` is one of the areas the app opens itself, so it is an in-app
+ *   row rather than a web one;
+ * - `data-collection` is the dashboard card a teams plan shows where an
+ *   enterprise plan shows providers and models;
+ * - `sso-and-domain` and `data-collection` are dashboard cards on the full web,
+ *   but the app shell owns both, so those two rows hand off to shell pages
+ *   instead of the full-web dashboard. Email preferences is a card with no
+ *   shell page, so it has no row: the dashboard is a billing surface.
  *
  * Seven areas are in-app destinations instead, and each carries the gate its
  * own procedure applies: usage (every member), the audit log (billing role,
@@ -51,7 +59,13 @@ import { WEB_BASE_URL } from '@/lib/config';
  * (no gate) and groups (the enterprise plan), and BYOK (the billing role,
  * opening the app's own provider-keys screen with the organization's scope).
  */
-type OrgSettingsArea = 'requestLogs' | 'integrations' | 'subOrganizations' | 'distributeFunds';
+type OrgSettingsArea =
+  | 'ssoAndDomain'
+  | 'dataCollection'
+  | 'requestLogs'
+  | 'integrations'
+  | 'subOrganizations'
+  | 'distributeFunds';
 
 export type OrgSettingsGate = Readonly<{
   role: OrganizationRole | undefined;
@@ -60,12 +74,17 @@ export type OrgSettingsGate = Readonly<{
   isTopLevel: boolean;
 }>;
 
+/** Where a row opens: a full-web page, or a shell page reached by hand-off. */
+type OrgSettingsRowTarget =
+  | Readonly<{ kind: 'web'; url: string }>
+  | Readonly<{ kind: 'app-shell'; target: AppShellTarget }>;
+
 export type OrgSettingsRow = Readonly<{
   area: OrgSettingsArea;
   title: string;
   icon: LucideIcon;
-  /** The web page that owns the setting. */
-  url: string;
+  /** The destination that owns the setting. */
+  target: OrgSettingsRowTarget;
 }>;
 
 /**
@@ -104,16 +123,43 @@ export type OrgInAppSettingsGate = Readonly<{
 type OrgSettingsRowSpec = Readonly<{
   area: OrgSettingsArea;
   icon: LucideIcon;
-  /** The page's path after `/organizations/<id>`. */
-  suffix: string;
   visible: (gate: OrgSettingsGate) => boolean;
-}>;
+}> &
+  (
+    | {
+        /** The page's path after `/organizations/<id>`. */
+        readonly suffix: string;
+      }
+    | {
+        /**
+         * The shell page that owns this card. The full web shows these two only
+         * inside the app shell, so the row hands off to that page instead of a
+         * full-web path.
+         */
+        readonly shellPage: 'organization-sso' | 'organization-data-collection';
+      }
+  );
 
 const ROW_SPECS: readonly OrgSettingsRowSpec[] = [
-  // The SSO card, the email preferences card and the data collection card live
-  // on the organization dashboard itself, and that page links to the seats
-  // purchase. The hub does not list a row that lands there: no suffix means a
-  // dashboard card, and the dashboard is never a settings destination here.
+  // The SSO card renders only on an enterprise dashboard. It is a card rather
+  // than a page of its own, and the app shell owns it, so the row opens the
+  // shell page.
+  {
+    area: 'ssoAndDomain',
+    icon: Lock,
+    shellPage: 'organization-sso',
+    visible: gate => gate.plan === 'enterprise',
+  },
+  // Data collection card: the teams dashboard shows it in place of providers
+  // and models, and the app shell owns the card. Email preferences is a
+  // dashboard card with no shell page, and the dashboard links to the seats
+  // purchase, so the hub lists no row for it.
+  {
+    area: 'dataCollection',
+    icon: Server,
+    shellPage: 'organization-data-collection',
+    visible: gate => gate.plan === 'teams',
+  },
   // "Request Logs": billing role.
   {
     area: 'requestLogs',
@@ -141,6 +187,8 @@ const ROW_SPECS: readonly OrgSettingsRowSpec[] = [
 ];
 
 const TITLE_KEYS = {
+  ssoAndDomain: 'organization.settingsOnWeb.ssoAndDomain',
+  dataCollection: 'organization.settingsOnWeb.dataCollection',
   requestLogs: 'organization.settingsOnWeb.requestLogs',
   // The in-app organization Integrations row opens the app's own screen; this
   // one opens the web page, so it names the web instead of repeating that title.
@@ -249,11 +297,14 @@ export function visibleOrgSettingsRows(
   gate: OrgSettingsGate,
   organizationId: string
 ): readonly OrgSettingsRow[] {
-  return ROW_SPECS.filter(spec => spec.visible(gate)).map(spec => ({
+  return ROW_SPECS.filter(spec => spec.visible(gate)).map((spec): OrgSettingsRow => ({
     area: spec.area,
     title: i18n.t(TITLE_KEYS[spec.area]),
     icon: spec.icon,
-    url: `${WEB_BASE_URL}/organizations/${organizationId}${spec.suffix}`,
+    target:
+      'shellPage' in spec
+        ? { kind: 'app-shell', target: { page: spec.shellPage, organizationId } }
+        : { kind: 'web', url: `${WEB_BASE_URL}/organizations/${organizationId}${spec.suffix}` },
   }));
 }
 

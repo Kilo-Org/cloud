@@ -43,6 +43,7 @@ import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
 import { NEUTRAL_TINT, type Tint, toneColor } from '@/lib/agent-color';
+import { openAppShellHandoff } from '@/lib/app-shell-handoff';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import { useCanLinkExternalPurchase } from '@/lib/billing/external-purchase-link';
 import { WEB_BASE_URL } from '@/lib/config';
@@ -511,7 +512,11 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
                   title={row.title}
                   last={index === settingsRows.length - 1}
                   onPress={() => {
-                    void openExternalUrl(row.url, { label: row.title });
+                    if (row.target.kind === 'app-shell') {
+                      void openAppShellHandoff(row.target.target, { label: row.title });
+                      return;
+                    }
+                    void openExternalUrl(row.target.url, { label: row.title });
                   }}
                 />
               ))}

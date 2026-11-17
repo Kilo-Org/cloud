@@ -25,7 +25,7 @@ import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
 
 const alertMock = vi.hoisted(() => vi.fn());
 const platformMock = vi.hoisted(() => ({ OS: 'ios' }));
-const mintInstallStateMock = vi.hoisted(() => vi.fn());
+const handoffUrlMock = vi.hoisted(() => vi.fn());
 const openAuthSessionMock = vi.hoisted(() => vi.fn());
 const openBrowserMock = vi.hoisted(() => vi.fn());
 const focusedRoute = vi.hoisted(() => ({ focused: true }));
@@ -116,12 +116,8 @@ vi.mock('@/lib/config', () => ({
   WEB_BASE_URL: 'https://web.test',
 }));
 
-vi.mock('@/lib/trpc', () => ({
-  trpcClient: {
-    githubApps: {
-      mintInstallState: { mutate: mintInstallStateMock },
-    },
-  },
+vi.mock('@/lib/app-shell-handoff', () => ({
+  appShellHandoffUrl: handoffUrlMock,
 }));
 
 vi.mock('@/components/agents/session-list-screen', () => ({
@@ -252,8 +248,8 @@ describe('buildGitHubInstallOutcomeAlert (C13 outcome states)', () => {
 describe('Agents tab return-outcome rendering', () => {
   beforeEach(() => {
     alertMock.mockReset();
-    mintInstallStateMock.mockReset();
-    mintInstallStateMock.mockResolvedValue({ token: 'fresh-token' });
+    handoffUrlMock.mockReset();
+    handoffUrlMock.mockResolvedValue('https://web.test/app-shell/handoff?token=fresh-token');
     openAuthSessionMock.mockReset();
     openAuthSessionMock.mockResolvedValue(undefined);
     openBrowserMock.mockReset();
@@ -299,9 +295,9 @@ describe('Agents tab return-outcome rendering', () => {
     });
     await flushMicrotasks();
 
-    expect(mintInstallStateMock).toHaveBeenCalledWith({ returnTo: '/cloud/sessions' });
+    expect(handoffUrlMock).toHaveBeenCalledWith({ page: 'github-app' });
     expect(openAuthSessionMock).toHaveBeenCalledWith(
-      'https://web.test/github-app?installState=fresh-token&fromApp=1'
+      'https://web.test/app-shell/handoff?token=fresh-token'
     );
     expect(openBrowserMock).not.toHaveBeenCalled();
     act(() => {
@@ -325,12 +321,12 @@ describe('Agents tab return-outcome rendering', () => {
     });
     await flushMicrotasks();
 
-    expect(mintInstallStateMock).toHaveBeenCalledWith({
+    expect(handoffUrlMock).toHaveBeenCalledWith({
+      page: 'github-app',
       organizationId: 'org-123',
-      returnTo: '/cloud/sessions',
     });
     expect(openAuthSessionMock).toHaveBeenCalledWith(
-      'https://web.test/github-app?organizationId=org-123&installState=fresh-token&fromApp=1'
+      'https://web.test/app-shell/handoff?token=fresh-token'
     );
     act(() => {
       renderer.unmount();
@@ -341,7 +337,7 @@ describe('Agents tab return-outcome rendering', () => {
     setGitHubInstallReturnOutcome({ kind: 'error', code: 'installation_failed' });
     const renderer = mountRoute();
 
-    mintInstallStateMock.mockRejectedValueOnce(new Error('network'));
+    handoffUrlMock.mockRejectedValueOnce(new Error('network'));
     const tryAgain = lastAlertButtons()?.find(button => button.text === 'Try again');
     act(() => {
       tryAgain?.onPress?.();
@@ -357,9 +353,9 @@ describe('Agents tab return-outcome rendering', () => {
       failureButtons?.[0]?.onPress?.();
     });
     await flushMicrotasks();
-    expect(mintInstallStateMock).toHaveBeenCalledTimes(2);
+    expect(handoffUrlMock).toHaveBeenCalledTimes(2);
     expect(openAuthSessionMock).toHaveBeenCalledWith(
-      'https://web.test/github-app?installState=fresh-token&fromApp=1'
+      'https://web.test/app-shell/handoff?token=fresh-token'
     );
     act(() => {
       renderer.unmount();
@@ -416,7 +412,7 @@ describe('Agents tab return-outcome rendering', () => {
     await flushMicrotasks();
 
     expect(openBrowserMock).toHaveBeenCalledWith(
-      'https://web.test/github-app?installState=fresh-token&fromApp=1'
+      'https://web.test/app-shell/handoff?token=fresh-token'
     );
     expect(openAuthSessionMock).not.toHaveBeenCalled();
     act(() => {

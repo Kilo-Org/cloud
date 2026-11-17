@@ -67,7 +67,7 @@ export type TriggerDraft = Readonly<{
 }>;
 
 /** The fields a problem can be attached to, so the form can place its copy. */
-type TriggerDraftField =
+export type TriggerDraftField =
   | 'name'
   | 'cron'
   | 'repository'

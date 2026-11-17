@@ -16,8 +16,10 @@ vi.mock('@/components/ui/icons', () => ({
   FileText: 'FileText',
   KeyRound: 'KeyRound',
   LineChart: 'LineChart',
+  Lock: 'Lock',
   Plug: 'Plug',
   ScrollText: 'ScrollText',
+  Server: 'Server',
   Shield: 'Shield',
   SlidersHorizontal: 'SlidersHorizontal',
   Users: 'Users',
@@ -55,19 +57,29 @@ function inAppAreas(overrides: Partial<OrgInAppSettingsGate> = {}) {
 
 describe('visibleOrgSettingsRows', () => {
   it('lists every web area for an owner of an enterprise organization', () => {
-    expect(areas()).toEqual(['requestLogs', 'integrations', 'subOrganizations', 'distributeFunds']);
+    expect(areas()).toEqual([
+      'ssoAndDomain',
+      'requestLogs',
+      'integrations',
+      'subOrganizations',
+      'distributeFunds',
+    ]);
   });
 
   it('keeps only the member-readable rows for a member on enterprise', () => {
-    expect(areas({ role: 'member' })).toEqual(['integrations']);
+    // The SSO card is the shell's own page, so it carries no billing gate.
+    expect(areas({ role: 'member' })).toEqual(['ssoAndDomain', 'integrations']);
   });
 
   it('drops the enterprise-only rows for a member on teams', () => {
-    expect(areas({ role: 'member', plan: 'teams' })).toEqual(['integrations']);
+    // Data collection is the teams dashboard card the shell hosts, so a member
+    // sees it where an enterprise member sees providers and models.
+    expect(areas({ role: 'member', plan: 'teams' })).toEqual(['dataCollection', 'integrations']);
   });
 
   it('keeps billing, management and admin rows for an admin on teams', () => {
     expect(areas({ role: 'admin', plan: 'teams' })).toEqual([
+      'dataCollection',
       'requestLogs',
       'integrations',
       'subOrganizations',
@@ -87,29 +99,31 @@ describe('visibleOrgSettingsRows', () => {
     expect(rows).toContain('requestLogs');
   });
 
-  it('opens a page of its own for every row, never the dashboard', () => {
-    for (const role of ['owner', 'admin', 'billing_manager', 'member'] as const) {
-      for (const plan of ['enterprise', 'teams'] as const) {
-        const rows = visibleOrgSettingsRows(gate({ role, plan }), 'org_1');
-        for (const row of rows) {
-          // A suffix-less row lands on the organization dashboard, which links
-          // to the seats purchase; the hub lists no such row.
-          expect(new URL(row.url).pathname).not.toBe('/organizations/org_1');
-          expect(
-            new URL(row.url, 'http://localhost').pathname.startsWith('/organizations/org_1/')
-          ).toBe(true);
-        }
-      }
-    }
-    const byArea = new Map(visibleOrgSettingsRows(gate(), 'org_1').map(row => [row.area, row.url]));
-    expect(byArea.get('subOrganizations')?.endsWith('/organizations/org_1/sub-organizations')).toBe(
+  it('opens the web page that owns each setting', () => {
+    const rows = visibleOrgSettingsRows(gate(), 'org_1');
+    const byArea = new Map(rows.map(row => [row.area, row]));
+    const webUrl = (area: 'subOrganizations' | 'distributeFunds') => {
+      const target = byArea.get(area)?.target;
+      return target?.kind === 'web' ? target.url : undefined;
+    };
+    expect(webUrl('subOrganizations')?.endsWith('/organizations/org_1/sub-organizations')).toBe(
       true
     );
     expect(
-      byArea
-        .get('distributeFunds')
-        ?.endsWith('/organizations/org_1/sub-organizations/distribute-funds')
+      webUrl('distributeFunds')?.endsWith('/organizations/org_1/sub-organizations/distribute-funds')
     ).toBe(true);
+    // The two dashboard cards the app shell owns hand off to their shell pages.
+    expect(byArea.get('ssoAndDomain')?.target).toEqual({
+      kind: 'app-shell',
+      target: { page: 'organization-sso', organizationId: 'org_1' },
+    });
+    // Data collection is the teams dashboard's card, in place of providers and
+    // models, so it appears on that plan only.
+    const teams = visibleOrgSettingsRows(gate({ plan: 'teams' }), 'org_1');
+    expect(teams.find(row => row.area === 'dataCollection')?.target).toEqual({
+      kind: 'app-shell',
+      target: { page: 'organization-data-collection', organizationId: 'org_1' },
+    });
   });
 
   it('keeps every in-app area out of the web group', () => {

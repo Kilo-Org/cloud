@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/components/ui/accessible-status.mounted.test.tsx) */
 import { type ComponentProps, createElement, type ReactElement, useState } from 'react';
-import type { HostInstance } from 'react-native';
+import { type HostInstance } from 'react-native';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -217,10 +217,7 @@ describe('SheetHeader', () => {
 
     expect(titleRef.current).not.toBeNull();
     const header = renderer.root.find(
-      node =>
-        typeof node.type === 'string' &&
-        node.type === 'Text' &&
-        node.props.accessibilityRole === 'header'
+      node => String(node.type) === 'Text' && node.props.accessibilityRole === 'header'
     );
     expect(header.props.accessibilityLabel).toBe('Reactions');
 

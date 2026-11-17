@@ -4728,7 +4728,7 @@
       "fieldCron": "Výraz cron",
       "fieldCronHelp": "Päť polí: minúta, hodina, deň, mesiac a deň v týždni. Najkratší interval je jedna minúta.",
       "fieldTimezone": "Časové pásmo",
-      "nameLocked": "Názov je súčasťou URL webhooku a nemožno ho zmeniť.",
+      "nameLocked": "Názov nemožno po vytvorení spúšťača zmeniť.",
       "repositoryLocked": "Repozitár nemožno po vytvorení spúšťača zmeniť.",
       "environmentAutomatic": "Automaticky podľa repozitára",
       "notSelected": "Nevybraté",

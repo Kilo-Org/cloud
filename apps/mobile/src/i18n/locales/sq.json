@@ -4588,7 +4588,7 @@
       "fieldCron": "Shprehje cron",
       "fieldCronHelp": "Pesë fusha: minutë, orë, ditë, muaj dhe ditë e javës. Intervali më i shkurtër është një minutë.",
       "fieldTimezone": "Zona kohore",
-      "nameLocked": "Emri është pjesë e URL-së së webhook-ut dhe nuk mund të ndryshojë.",
+      "nameLocked": "Emri nuk mund të ndryshojë pas krijimit të shkaktarit.",
       "repositoryLocked": "Repozitori nuk mund të ndryshojë pas krijimit të shkaktarit.",
       "environmentAutomatic": "Automatik sipas repozitorit",
       "notSelected": "Nuk është zgjedhur",

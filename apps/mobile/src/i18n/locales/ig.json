@@ -4588,7 +4588,7 @@
       "fieldCron": "Okwu cron",
       "fieldCronHelp": "Ubi ise: nkeji, elekere, ụbọchị, ọnwa na ụbọchị izu. Oge kacha nso bụ otu nkeji.",
       "fieldTimezone": "Mpaghara oge",
-      "nameLocked": "Aha ahụ bụ akụkụ nke adreesị webhook ma ọ nweghị ike ịgbanwe.",
+      "nameLocked": "E nweghị ike ịgbanwe aha ahụ mgbe emepụtara ihe mkpalite.",
       "repositoryLocked": "E nweghị ike ịgbanwe ebe nchekwa koodu mgbe emepụtara ihe mkpalite.",
       "environmentAutomatic": "Akpaghị aka site na ebe nchekwa koodu",
       "notSelected": "Ahọpụtaghị",

@@ -4588,7 +4588,7 @@
       "fieldCron": "Cron expression",
       "fieldCronHelp": "Five fields: minute, hour, day, month and weekday. The shortest interval is one minute.",
       "fieldTimezone": "Time zone",
-      "nameLocked": "The name is part of the webhook URL and cannot change.",
+      "nameLocked": "The name cannot change after the trigger is created.",
       "repositoryLocked": "The repository cannot change after the trigger is created.",
       "environmentAutomatic": "Automatic by repository",
       "notSelected": "Not selected",

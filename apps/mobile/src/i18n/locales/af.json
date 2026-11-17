@@ -4588,7 +4588,7 @@
       "fieldCron": "Cron-uitdrukking",
       "fieldCronHelp": "Vyf velde: minuut, uur, dag, maand en weeksdag. Die kortste interval is een minuut.",
       "fieldTimezone": "Tydsone",
-      "nameLocked": "Die naam is deel van die webhaak-URL en kan nie verander nie.",
+      "nameLocked": "Die naam kan nie verander nadat die sneller geskep is nie.",
       "repositoryLocked": "Die bewaarplek kan nie verander nadat die sneller geskep is nie.",
       "environmentAutomatic": "Outomaties volgens bewaarplek",
       "notSelected": "Nie gekies nie",

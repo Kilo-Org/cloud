@@ -4588,7 +4588,7 @@
       "fieldCron": "Ekspresi cron",
       "fieldCronHelp": "Lima kolom: menit, jam, hari, bulan, dan hari dalam seminggu. Interval terpendek adalah satu menit.",
       "fieldTimezone": "Zona waktu",
-      "nameLocked": "Nama adalah bagian dari URL webhook dan tidak dapat diubah.",
+      "nameLocked": "Nama tidak dapat diubah setelah pemicu dibuat.",
       "repositoryLocked": "Repositori tidak dapat diubah setelah pemicu dibuat.",
       "environmentAutomatic": "Otomatis berdasarkan repositori",
       "notSelected": "Belum dipilih",

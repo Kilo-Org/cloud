@@ -4588,7 +4588,7 @@
       "fieldCron": "Cron ifadesi",
       "fieldCronHelp": "Beş alan: dakika, saat, gün, ay ve haftanın günü. En kısa aralık bir dakikadır.",
       "fieldTimezone": "Saat dilimi",
-      "nameLocked": "Ad, web kancası URL'sinin bir parçasıdır ve değiştirilemez.",
+      "nameLocked": "Tetikleyici oluşturulduktan sonra ad değiştirilemez.",
       "repositoryLocked": "Tetikleyici oluşturulduktan sonra depo değiştirilemez.",
       "environmentAutomatic": "Depoya göre otomatik",
       "notSelected": "Seçilmedi",

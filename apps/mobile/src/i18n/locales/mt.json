@@ -4798,7 +4798,7 @@
       "fieldCron": "Espressjoni cron",
       "fieldCronHelp": "Ħames oqsma: minuta, siegħa, jum, xahar u jum tal-ġimgħa. L-iqsar intervallo huwa minuta waħda.",
       "fieldTimezone": "Żona tal-ħin",
-      "nameLocked": "L-isem huwa parti mill-URL tal-webhook u ma jistax jinbidel.",
+      "nameLocked": "L-isem ma jistax jinbidel wara li jinħoloq l-iskattatur.",
       "repositoryLocked": "Ir-repożitorju ma jistax jinbidel wara li jinħoloq l-iskattatur.",
       "environmentAutomatic": "Awtomatiku skont ir-repożitorju",
       "notSelected": "Mhux magħżul",

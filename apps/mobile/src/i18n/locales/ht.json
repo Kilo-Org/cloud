@@ -4588,7 +4588,7 @@
       "fieldCron": "Ekspresyon kron",
       "fieldCronHelp": "Senk chan: minit, è, jou, mwa ak jou semèn. Entèval ki pi kout la se yon minit.",
       "fieldTimezone": "Zòn lè",
-      "nameLocked": "Non an fè pati URL wèbhuk la epi li pa ka chanje.",
+      "nameLocked": "Non an pa ka chanje apre deklanchè a kreye.",
       "repositoryLocked": "Depo a pa ka chanje apre deklanchè a kreye.",
       "environmentAutomatic": "Otomatik selon depo",
       "notSelected": "Pa chwazi",

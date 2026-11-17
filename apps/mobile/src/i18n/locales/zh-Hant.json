@@ -4588,7 +4588,7 @@
       "fieldCron": "排程運算式",
       "fieldCronHelp": "五個欄位：分鐘、小時、日、月與星期幾。最短間隔為一分鐘。",
       "fieldTimezone": "時區",
-      "nameLocked": "名稱是網路鉤子網址的一部分，無法變更。",
+      "nameLocked": "建立觸發器後即無法變更名稱。",
       "repositoryLocked": "建立觸發器後即無法變更儲存庫。",
       "environmentAutomatic": "依儲存庫自動",
       "notSelected": "未選取",

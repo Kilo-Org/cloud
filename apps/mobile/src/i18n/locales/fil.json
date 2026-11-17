@@ -4588,7 +4588,7 @@
       "fieldCron": "Ekspresyong cron",
       "fieldCronHelp": "Limang patlang: minuto, oras, araw, buwan at araw ng linggo. Ang pinakamaikling agwat ay isang minuto.",
       "fieldTimezone": "Sona ng oras",
-      "nameLocked": "Bahagi ng URL ng webhook ang pangalan at hindi ito mababago.",
+      "nameLocked": "Hindi na mababago ang pangalan pagkatapos magawa ang pampapagana.",
       "repositoryLocked": "Hindi na mababago ang imbakan pagkatapos magawa ang pampapagana.",
       "environmentAutomatic": "Awtomatiko batay sa imbakan",
       "notSelected": "Hindi napili",

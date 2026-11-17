@@ -4588,7 +4588,7 @@
       "fieldCron": "Usemi wa ratiba",
       "fieldCronHelp": "Sehemu tano: dakika, saa, siku, mwezi na siku ya wiki. Muda mfupi zaidi ni dakika moja.",
       "fieldTimezone": "Eneo la saa",
-      "nameLocked": "Jina ni sehemu ya URL ya ndoano ya wavuti na haliwezi kubadilika.",
+      "nameLocked": "Jina haiwezi kubadilika baada ya kichocheo kuundwa.",
       "repositoryLocked": "Hazina haiwezi kubadilika baada ya kichocheo kuundwa.",
       "environmentAutomatic": "Kiotomatiki kwa hazina",
       "notSelected": "Haijachaguliwa",

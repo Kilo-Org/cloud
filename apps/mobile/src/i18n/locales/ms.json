@@ -4588,7 +4588,7 @@
       "fieldCron": "Ungkapan cron",
       "fieldCronHelp": "Lima medan: minit, jam, hari, bulan dan hari dalam minggu. Selang terpendek ialah satu minit.",
       "fieldTimezone": "Zon waktu",
-      "nameLocked": "Nama ialah sebahagian daripada URL webhook dan tidak boleh berubah.",
+      "nameLocked": "Nama tidak boleh berubah selepas pencetus dicipta.",
       "repositoryLocked": "Repositori tidak boleh berubah selepas pencetus dicipta.",
       "environmentAutomatic": "Automatik mengikut repositori",
       "notSelected": "Tidak dipilih",

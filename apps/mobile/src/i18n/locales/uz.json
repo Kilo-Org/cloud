@@ -4588,7 +4588,7 @@
       "fieldCron": "Cron ifodasi",
       "fieldCronHelp": "Beshta maydon: daqiqa, soat, kun, oy va hafta kuni. Eng qisqa oraliq — bir daqiqa.",
       "fieldTimezone": "Vaqt mintaqasi",
-      "nameLocked": "Nom vebhook URL manzilining bir qismidir va oʻzgartirilmaydi.",
+      "nameLocked": "Ishga tushirgich yaratilgandan soʻng nomni oʻzgartirib boʻlmaydi.",
       "repositoryLocked": "Ishga tushirgich yaratilgandan soʻng repozitoriyni oʻzgartirib boʻlmaydi.",
       "environmentAutomatic": "Repozitoriy boʻyicha avtomatik",
       "notSelected": "Tanlanmagan",

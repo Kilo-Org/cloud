@@ -4728,7 +4728,7 @@
       "fieldCron": "Cron išraiška",
       "fieldCronHelp": "Penki laukai: minutė, valanda, diena, mėnuo ir savaitės diena. Trumpiausias intervalas yra viena minutė.",
       "fieldTimezone": "Laiko juosta",
-      "nameLocked": "Pavadinimas yra žiniatinklio kabliuko adreso dalis ir jo pakeisti negalima.",
+      "nameLocked": "Pavadinimo negalima pakeisti po trigerio sukūrimo.",
       "repositoryLocked": "Saugyklos negalima pakeisti po trigerio sukūrimo.",
       "environmentAutomatic": "Automatiškai pagal saugyklą",
       "notSelected": "Nepasirinkta",

@@ -4658,7 +4658,7 @@
       "fieldCron": "Cron izraz",
       "fieldCronHelp": "Pet polja: minuta, sat, dan, mjesec i dan u tjednu. Najkraći interval je jedna minuta.",
       "fieldTimezone": "Vremenska zona",
-      "nameLocked": "Naziv je dio URL-a webhooka i ne može se promijeniti.",
+      "nameLocked": "Naziv se ne može promijeniti nakon stvaranja okidača.",
       "repositoryLocked": "Repozitorij se ne može promijeniti nakon stvaranja okidača.",
       "environmentAutomatic": "Automatski prema repozitoriju",
       "notSelected": "Nije odabrano",

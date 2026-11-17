@@ -4607,6 +4607,7 @@
       "authHeaderLabel": "请求头名称",
       "authSecretLabel": "共享密钥",
       "authSecretKeep": "留空以保留已保存的密钥。",
+      "authSecretSet": "必填。请选择足够强的随机字符串。",
       "authSecretCreator": "当触发器以创建者身份运行时，请使用至少 16 个字符。",
       "autoCommit": "运行结束时提交更改",
       "condenseOnComplete": "运行结束时压缩上下文",

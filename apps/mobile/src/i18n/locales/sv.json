@@ -4607,6 +4607,7 @@
       "authHeaderLabel": "Sidhuvudets namn",
       "authSecretLabel": "Delad hemlighet",
       "authSecretKeep": "Lämna tomt för att behålla den sparade hemligheten.",
+      "authSecretSet": "Obligatorisk. Välj en stark slumpmässig sträng.",
       "authSecretCreator": "Använd minst 16 tecken när utlösaren körs som sin skapare.",
       "autoCommit": "Checka in ändringar när körningen är klar",
       "condenseOnComplete": "Komprimera kontexten när körningen är klar",

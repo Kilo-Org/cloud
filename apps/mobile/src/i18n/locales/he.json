@@ -4677,6 +4677,7 @@
       "authHeaderLabel": "שם הכותרת",
       "authSecretLabel": "סוד משותף",
       "authSecretKeep": "השאירו ריק כדי לשמור על הסוד השמור.",
+      "authSecretSet": "חובה. בחרו מחרוזת אקראית חזקה.",
       "authSecretCreator": "השתמשו בלפחות 16 תווים כשהטריגר פועל בזהות היוצר שלו.",
       "autoCommit": "בצעו קומיט לשינויים כשההרצה מסתיימת",
       "condenseOnComplete": "כווצו את ההקשר כשההרצה מסתיימת",

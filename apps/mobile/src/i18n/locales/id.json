@@ -4607,6 +4607,7 @@
       "authHeaderLabel": "Nama header",
       "authSecretLabel": "Rahasia bersama",
       "authSecretKeep": "Biarkan kosong untuk mempertahankan rahasia yang tersimpan.",
+      "authSecretSet": "Wajib diisi. Pilih string acak yang kuat.",
       "authSecretCreator": "Gunakan setidaknya 16 karakter saat pemicu berjalan sebagai pembuatnya.",
       "autoCommit": "Komit perubahan saat eksekusi selesai",
       "condenseOnComplete": "Ringkas konteks saat eksekusi selesai",

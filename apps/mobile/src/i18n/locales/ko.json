@@ -4607,6 +4607,7 @@
       "authHeaderLabel": "헤더 이름",
       "authSecretLabel": "공유 시크릿",
       "authSecretKeep": "저장된 시크릿을 유지하려면 비워 두세요.",
+      "authSecretSet": "필수. 강력한 무작위 문자열을 선택하세요.",
       "authSecretCreator": "트리거가 만든 사람으로 실행되는 경우 16자 이상을 사용하세요.",
       "autoCommit": "실행이 끝나면 변경 사항 커밋",
       "condenseOnComplete": "실행이 끝나면 컨텍스트 압축",

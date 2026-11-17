@@ -4607,6 +4607,7 @@
       "authHeaderLabel": "標頭名稱",
       "authSecretLabel": "共用密鑰",
       "authSecretKeep": "留空即可保留已儲存的密鑰。",
+      "authSecretSet": "必填。請選擇足夠強的隨機字串。",
       "authSecretCreator": "觸發器以建立者身分執行時，請使用至少 16 個字元。",
       "autoCommit": "執行完成時提交變更",
       "condenseOnComplete": "執行完成時精簡內容脈絡",

@@ -4607,6 +4607,7 @@
       "authHeaderLabel": "Orúkọ àkọlé",
       "authSecretLabel": "Àṣírí tí a pín",
       "authSecretKeep": "Fi sílẹ̀ ní òfo láti tọ́jú àṣírí tí a ti fipamọ́.",
+      "authSecretSet": "Tó pọn dandan. Yan okun àìtòlẹ́sẹẹsẹ tí ó lágbára.",
       "authSecretCreator": "Lo ó kéré tó 16 lẹ́tà nígbà tí ìmúṣiṣẹ́ bá ń ṣiṣẹ́ gẹ́gẹ́ bí ẹni tí ó ṣẹ̀dá rẹ̀.",
       "autoCommit": "Ṣe àkójọ àwọn àyípadà nígbà tí ìṣiṣẹ́ bá parí",
       "condenseOnComplete": "Ṣe àkópọ̀ àyíká ọ̀rọ̀ nígbà tí ìṣiṣẹ́ bá parí",

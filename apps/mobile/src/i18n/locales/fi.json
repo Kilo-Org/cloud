@@ -4607,6 +4607,7 @@
       "authHeaderLabel": "Otsakkeen nimi",
       "authSecretLabel": "Jaettu salaisuus",
       "authSecretKeep": "Jätä tyhjäksi, jos haluat säilyttää tallennetun salaisuuden.",
+      "authSecretSet": "Pakollinen. Valitse vahva satunnainen merkkijono.",
       "authSecretCreator": "Käytä vähintään 16 merkkiä, kun liipaisin ajetaan sen luojan oikeuksilla.",
       "autoCommit": "Vahvista muutokset, kun ajo päättyy",
       "condenseOnComplete": "Tiivistä konteksti, kun ajo päättyy",

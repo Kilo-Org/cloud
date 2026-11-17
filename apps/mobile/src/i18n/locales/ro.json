@@ -4677,6 +4677,7 @@
       "authHeaderLabel": "Nume antet",
       "authSecretLabel": "Secret partajat",
       "authSecretKeep": "Lasă necompletat pentru a păstra secretul salvat.",
+      "authSecretSet": "Obligatoriu. Alege un șir aleator puternic.",
       "authSecretCreator": "Folosește cel puțin 16 caractere când declanșatorul rulează ca creatorul său.",
       "autoCommit": "Comite modificările când rularea se încheie",
       "condenseOnComplete": "Condensează contextul când rularea se încheie",

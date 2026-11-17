@@ -4607,6 +4607,7 @@
       "authHeaderLabel": "Headernavn",
       "authSecretLabel": "Delt hemmelighet",
       "authSecretKeep": "La det stå tomt for å beholde den lagrede hemmeligheten.",
+      "authSecretSet": "Påkrevd. Velg en sterk tilfeldig streng.",
       "authSecretCreator": "Bruk minst 16 tegn når triggeren kjøres som oppretteren.",
       "autoCommit": "Sjekk inn endringer når kjøringen er ferdig",
       "condenseOnComplete": "Komprimer konteksten når kjøringen er ferdig",

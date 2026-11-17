@@ -4607,6 +4607,7 @@
       "authHeaderLabel": "የራስጌ ስም",
       "authSecretLabel": "የተጋራ ምስጢር",
       "authSecretKeep": "የተቀመጠውን ምስጢር ለማቆየት ባዶ ይተዉት።",
+      "authSecretSet": "አስፈላጊ። ጠንካራ የዘፈቀደ ሕብረቁምፊ ይምረጡ።",
       "authSecretCreator": "ቀስቅሴው በፈጣሪው ስም ሲሠራ ቢያንስ 16 ቁምፊዎችን ይጠቀሙ።",
       "autoCommit": "ሩጫው ሲጠናቀቅ ለውጦችን ያስመዝግቡ",
       "condenseOnComplete": "ሩጫው ሲጠናቀቅ ዐውዱን ያሳጥሩ",

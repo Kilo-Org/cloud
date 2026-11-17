@@ -4607,6 +4607,7 @@
       "authHeaderLabel": "Non antèt",
       "authSecretLabel": "Sekrè pataje",
       "authSecretKeep": "Kite vid pou kenbe sekrè ki anrejistre a.",
+      "authSecretSet": "Obligatwa. Chwazi yon fisèl fò o aza.",
       "authSecretCreator": "Sèvi ak omwen 16 karaktè lè deklanchè a egzekite kòm kreyatè li.",
       "autoCommit": "Komite chanjman yo lè egzekisyon an fini",
       "condenseOnComplete": "Kondanse kontèks la lè egzekisyon an fini",

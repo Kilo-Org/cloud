@@ -4747,6 +4747,7 @@
       "authHeaderLabel": "Názov hlavičky",
       "authSecretLabel": "Zdieľané tajomstvo",
       "authSecretKeep": "Nechajte prázdne, ak chcete zachovať uložené tajomstvo.",
+      "authSecretSet": "Povinné. Vyberte silný náhodný reťazec.",
       "authSecretCreator": "Ak sa spúšťač spúšťa ako jeho tvorca, použite aspoň 16 znakov.",
       "autoCommit": "Commitnúť zmeny po dokončení spustenia",
       "condenseOnComplete": "Zhustiť kontext po dokončení spustenia",

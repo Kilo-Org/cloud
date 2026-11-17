@@ -4607,6 +4607,7 @@
       "authHeaderLabel": "Sarlavha nomi",
       "authSecretLabel": "Umumiy sir",
       "authSecretKeep": "Saqlangan sirni saqlab qolish uchun boʻsh qoldiring.",
+      "authSecretSet": "Majburiy. Kuchli tasodifiy satr tanlang.",
       "authSecretCreator": "Ishga tushirgich yaratuvchisi nomidan ishlaganda kamida 16 ta belgidan foydalaning.",
       "autoCommit": "Ishga tushirish tugagach oʻzgarishlarni qayd etish",
       "condenseOnComplete": "Ishga tushirish tugagach kontekstni ixchamlash",

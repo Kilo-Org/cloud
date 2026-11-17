@@ -4607,6 +4607,7 @@
       "authHeaderLabel": "Magaca madaxa",
       "authSecretLabel": "Sirta la wadaago",
       "authSecretKeep": "Madhan u dhaaf si aad u haysato sirta la kaydiyay.",
+      "authSecretSet": "Loo baahan yahay. Dooro xadhig adag oo random ah.",
       "authSecretCreator": "Isticmaal ugu yaraan 16 xaraf marka kiciyahu ku socdo aqoonsiga abuurahiisa.",
       "autoCommit": "Kaydi isbeddellada marka socodku dhammaado",
       "condenseOnComplete": "Soo koob macnaha guud marka socodku dhammaado",

@@ -4747,6 +4747,7 @@
       "authHeaderLabel": "Ime zaglavja",
       "authSecretLabel": "Skupna skrivnost",
       "authSecretKeep": "Pustite prazno, da obdržite shranjeno skrivnost.",
+      "authSecretSet": "Obvezno. Izberite močan naključen niz.",
       "authSecretCreator": "Uporabite vsaj 16 znakov, ko se sprožilec izvaja kot njegov ustvarjalec.",
       "autoCommit": "Potrdi spremembe, ko se izvajanje konča",
       "condenseOnComplete": "Zgošči kontekst, ko se izvajanje konča",

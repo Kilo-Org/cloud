@@ -4887,6 +4887,7 @@
       "authHeaderLabel": "Enw’r pennawd",
       "authSecretLabel": "Cyfrinach a rennir",
       "authSecretKeep": "Gadewch yn wag i gadw’r gyfrinach a gadwyd.",
+      "authSecretSet": "Gofynnol. Dewiswch linyn hap cryf.",
       "authSecretCreator": "Defnyddiwch o leiaf 16 nod pan fydd y sbardun yn rhedeg fel ei grëwr.",
       "autoCommit": "Cyflwyno newidiadau pan fydd y rhediad yn gorffen",
       "condenseOnComplete": "Cywasgu’r cyd-destun pan fydd y rhediad yn gorffen",

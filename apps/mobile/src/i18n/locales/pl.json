@@ -4747,6 +4747,7 @@
       "authHeaderLabel": "Nazwa nagłówka",
       "authSecretLabel": "Współdzielony sekret",
       "authSecretKeep": "Pozostaw puste, aby zachować zapisany sekret.",
+      "authSecretSet": "Wymagane. Wybierz silny losowy łańcuch.",
       "authSecretCreator": "Użyj co najmniej 16 znaków, gdy wyzwalacz jest uruchamiany jako jego twórca.",
       "autoCommit": "Zatwierdź zmiany po zakończeniu uruchomienia",
       "condenseOnComplete": "Skondensuj kontekst po zakończeniu uruchomienia",

@@ -4677,6 +4677,7 @@
       "authHeaderLabel": "Galvenes nosaukums",
       "authSecretLabel": "Koplietotais noslēpums",
       "authSecretKeep": "Atstājiet tukšu, lai paturētu saglabāto noslēpumu.",
+      "authSecretSet": "Obligāts. Izvēlieties stipru nejaušu virkni.",
       "authSecretCreator": "Izmantojiet vismaz 16 rakstzīmes, ja trigeris darbojas veidotāja vārdā.",
       "autoCommit": "Fiksēt izmaiņas, kad palaišana beidzas",
       "condenseOnComplete": "Saspiest kontekstu, kad palaišana beidzas",

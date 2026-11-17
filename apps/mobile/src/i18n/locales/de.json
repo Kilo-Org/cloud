@@ -4607,6 +4607,7 @@
       "authHeaderLabel": "Header-Name",
       "authSecretLabel": "Gemeinsames Geheimnis",
       "authSecretKeep": "Leer lassen, um das gespeicherte Geheimnis zu behalten.",
+      "authSecretSet": "Erforderlich. Wähle eine starke zufällige Zeichenkette.",
       "authSecretCreator": "Verwende mindestens 16 Zeichen, wenn der Auslöser unter seinem Ersteller ausgeführt wird.",
       "autoCommit": "Änderungen festschreiben, wenn der Lauf endet",
       "condenseOnComplete": "Kontext verdichten, wenn der Lauf endet",

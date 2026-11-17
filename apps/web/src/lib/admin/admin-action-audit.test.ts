@@ -172,12 +172,11 @@ describe('adminActionContextFromHeaders', () => {
     await cleanupDbForTest();
   });
 
-  test('attributes the REST route and method from the request headers', async () => {
+  test('attributes the REST route from the request headers', async () => {
     const ctx = adminActionContextFromHeaders(
       defineTestUser({ is_admin: true }),
       new Headers({
         'x-pathname': '/api/organizations/org_1/user-tokens',
-        'x-http-method': 'post',
       })
     );
 

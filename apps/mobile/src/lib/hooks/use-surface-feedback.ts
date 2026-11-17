@@ -36,7 +36,8 @@ type KeyedSurfaceFeedbackController<Key extends string, Failure extends SurfaceF
 const IDLE_DEFAULT: SurfaceFeedback<never> = { status: 'idle' };
 const DEFAULT_KEY = 'default';
 
-function useKeyedSurfaceFeedback<
+/** One keyed phase per item on a surface, for surfaces that act on many items at once. */
+export function useKeyedSurfaceFeedback<
   Key extends string,
   Failure extends SurfaceFailure,
 >(): KeyedSurfaceFeedbackController<Key, Failure> {

@@ -20,7 +20,7 @@ import { checkCatalogs } from './check-catalogs.mjs';
 // The checker parses with oxc through the shared scanner, so the import-only
 // probe links the repository's dependency tree at its own root.
 const REPO = realpathSync(new URL('../..', import.meta.url).pathname);
-const SHARED_MODULES = ['ast.mjs', 'catalogs.mjs', 'source-files.mjs'];
+const SHARED_MODULES = ['ast.mjs', 'catalogs.mjs', 'entry-point.mjs', 'source-files.mjs'];
 const WORDING_EXCEPTIONS = readFileSync(
   new URL('./wording-exceptions.json', import.meta.url),
   'utf8'
@@ -73,6 +73,7 @@ function run({
   pushEnglish = {},
   pushTranslated = {},
   pushSource = '',
+  wordingExceptions = WORDING_EXCEPTIONS,
   extraFiles = {},
 } = {}) {
   const root = fixture({
@@ -90,7 +91,9 @@ function run({
       `import ${language.replaceAll('-', '_')} from './locales/${language}.json';`,
       `const pushCatalogs = { 'en': en, '${language}': ${language.replaceAll('-', '_')} };`,
     ].join('\n'),
-    'tools/i18n/wording-exceptions.json': WORDING_EXCEPTIONS,
+    ...(wordingExceptions === null
+      ? {}
+      : { 'tools/i18n/wording-exceptions.json': wordingExceptions }),
     ...extraFiles,
   });
   return checkCatalogs(root).problems;
@@ -366,6 +369,62 @@ test('reports an unreadable locale catalog without inventing missing keys', () =
     found[0],
     /^mobile\/ru: cannot audit catalog: its strings and braces do not balance/
   );
+});
+
+test('reports a missing wording-exceptions file instead of throwing', () => {
+  // The exception map is read before the language registry, so a tree without
+  // one reports it once and still audits everything else: the copy that reads
+  // the same in every locale is reported alongside the read failure.
+  const found = run({
+    wordingExceptions: null,
+    english: { agents: { title: 'Agents' } },
+    translated: { agents: { title: 'Agents' } },
+    source: "t('agents.title');",
+  });
+  assert.ok(found.length > 0, 'expected problems');
+  assert.match(
+    found.join('\n'),
+    /check-catalogs: cannot read tools\/i18n\/wording-exceptions\.json: /
+  );
+  assert.match(found.join('\n'), /mobile: "agents\.title" equals English in every locale/);
+});
+
+test('reports a malformed wording-exceptions file instead of throwing', () => {
+  const found = run({ wordingExceptions: '{' });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(
+    found.join('\n'),
+    /check-catalogs: cannot read tools\/i18n\/wording-exceptions\.json: ./
+  );
+});
+
+test('reports a valid JSON wording-exceptions value of the wrong shape', () => {
+  // JSON.parse accepts every one of these, so the shape of the parsed value is
+  // the only thing between the file and the callers that index it by tag.
+  for (const shape of ['null', '[]', '0', '"text"']) {
+    const found = run({ wordingExceptions: shape });
+    assert.match(
+      found.join('\n'),
+      /check-catalogs: cannot read tools\/i18n\/wording-exceptions\.json: expected an object that maps each tag to a list of English strings/
+    );
+  }
+});
+
+test('reports a wording-exceptions entry that is not a list of strings', () => {
+  // A number is not iterable, a null entry is not a set of strings, and a bare
+  // string iterates character by character in the callers.
+  for (const entry of [5, null, 'Agents']) {
+    const found = run({ wordingExceptions: JSON.stringify({ ru: entry }) });
+    assert.match(
+      found.join('\n'),
+      /check-catalogs: cannot read tools\/i18n\/wording-exceptions\.json: expected an object that maps each tag to a list of English strings/
+    );
+  }
+});
+
+test('accepts a wording-exceptions map of tag to string list', () => {
+  const found = run({ wordingExceptions: JSON.stringify({ ru: [] }) });
+  assert.ok(!found.join('\n').includes('cannot read'), found.join('\n'));
 });
 
 test('ignores a mounted-harness helper while a source file still reports its keys', () => {
@@ -1610,6 +1669,56 @@ test('accepts a push source that builds its key from the payload', () => {
     ].join('\n'),
   });
   assert.deepEqual(found, []);
+});
+
+test('accepts a leaf table whose built key the source names at runtime', () => {
+  // The catalog leaf lives in a table and the key is built from it. The leaf
+  // literal beside the built head is the only place the key is named, so the
+  // dead-key rule must read both together.
+  const found = run({
+    pushEnglish: PUSH_ENGLISH,
+    pushTranslated: PUSH_TRANSLATED,
+    pushSource: [
+      "translatePush(locale, 'generic.title', undefined, 'Kilo');",
+      "const LEAF_BY_TYPE = { 'chat.message': 'chatMessage' };",
+      'const leaf = LEAF_BY_TYPE[type];',
+      'translatePush(locale, `generic.body.${leaf}`, undefined, en.generic.body[leaf]);',
+    ].join('\n'),
+  });
+  assert.deepEqual(found, []);
+});
+
+test('rejects a push key under a built head that no leaf names', () => {
+  const found = run({
+    pushEnglish: {
+      generic: {
+        title: 'Kilo',
+        body: {
+          chatMessage: 'You have a new message',
+          scheduledAction: 'A scheduled action has an update',
+        },
+      },
+    },
+    pushTranslated: {
+      generic: {
+        title: 'Kilo',
+        body: {
+          chatMessage: 'Tienes un mensaje nuevo',
+          scheduledAction: 'Una acción programada tiene una actualización',
+        },
+      },
+    },
+    pushSource: [
+      "const LEAF_BY_TYPE = { 'chat.message': 'chatMessage' };",
+      'const leaf = LEAF_BY_TYPE[type];',
+      'translatePush(locale, `generic.body.${leaf}`, undefined, en.generic.body[leaf]);',
+    ].join('\n'),
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(
+    found.join('\n'),
+    /notifications: en\.json defines "generic\.body\.scheduledAction", which no source file uses/
+  );
 });
 
 test('rejects a push value left in English in one locale', () => {

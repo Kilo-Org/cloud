@@ -148,19 +148,18 @@ describe('performRefresh', () => {
     setSignOutTeardownActive(false);
   });
 
-  it('returns unreadable, not refused, when no refresh token is stored but a token is', async () => {
+  it('returns unrenewable, not refused, when no refresh token is stored but a token is', async () => {
     store.set(AUTH_TOKEN_KEY, 'stored-token');
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
 
     const outcome = await performRefresh();
 
-    // A null refresh-token read is a failed read of one member, not an
-    // absent session: it must never refuse (which the handler signs out on).
+    // A set with no refresh token can never rotate. It is not a refusal — the
+    // caller ends the session once with the branch it records — and it is not a
+    // failed read either: the device was unlocked, so the null is an absence.
     expect(outcome).toEqual({
-      ok: false,
-      refused: false,
-      unreadable: true,
-      presentKeys: [AUTH_TOKEN_KEY],
+      kind: 'unrenewable',
+      sessionVersion: currentAuthEpoch(),
     });
     expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
@@ -171,12 +170,7 @@ describe('performRefresh', () => {
 
     const outcome = await performRefresh();
 
-    expect(outcome).toEqual({
-      ok: false,
-      refused: false,
-      unreadable: true,
-      presentKeys: [],
-    });
+    expect(outcome).toEqual({ kind: 'unreadable' });
     expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
   });
@@ -189,8 +183,7 @@ describe('performRefresh', () => {
 
     const outcome = await performRefresh();
     expect(outcome).toEqual({
-      ok: false,
-      refused: true,
+      kind: 'refused',
       sessionVersion: currentAuthEpoch(),
     });
   });
@@ -202,7 +195,7 @@ describe('performRefresh', () => {
     );
 
     const outcome = await performRefresh();
-    expect(outcome).toEqual({ ok: false, refused: false });
+    expect(outcome).toEqual({ kind: 'transient' });
   });
 
   it('returns transient when the response body fails validation (missing fields)', async () => {
@@ -212,7 +205,7 @@ describe('performRefresh', () => {
     );
 
     const outcome = await performRefresh();
-    expect(outcome).toEqual({ ok: false, refused: false });
+    expect(outcome).toEqual({ kind: 'transient' });
     // Must not write partial data.
     expect(store.get(AUTH_TOKEN_KEY)).toBeUndefined();
   });
@@ -222,7 +215,7 @@ describe('performRefresh', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response('not json', { status: 200 }));
 
     const outcome = await performRefresh();
-    expect(outcome).toEqual({ ok: false, refused: false });
+    expect(outcome).toEqual({ kind: 'transient' });
   });
 
   it('returns success and persists the new token pair on valid response', async () => {
@@ -240,8 +233,8 @@ describe('performRefresh', () => {
     const outcome = await performRefresh();
     const after = Date.now();
 
-    expect(outcome.ok).toBe(true);
-    if (outcome.ok) {
+    expect(outcome.kind).toBe('ok');
+    if (outcome.kind === 'ok') {
       expect(outcome.token).toBe('new-token');
       expect(outcome.refreshToken).toBe('new-refresh');
       expect(outcome.expiresIn).toBe(3600);
@@ -259,7 +252,7 @@ describe('performRefresh', () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('Network error'));
 
     const outcome = await performRefresh();
-    expect(outcome).toEqual({ ok: false, refused: false });
+    expect(outcome).toEqual({ kind: 'transient' });
     // Old credentials are untouched.
     expect(store.get(REFRESH_TOKEN_KEY)).toBe('old-refresh');
   });
@@ -283,7 +276,7 @@ describe('performRefresh', () => {
 
     // Must be the same outcome — single-flight.
     expect(outcome1).toEqual(outcome2);
-    if (outcome1.ok) {
+    if (outcome1.kind === 'ok') {
       expect(outcome1.token).toBe('shared');
     }
     // fetch must be called exactly once.
@@ -311,7 +304,7 @@ describe('performRefresh', () => {
       Response.json({ token: 'new-token', refreshToken: 'new-refresh', expiresIn: 3600 })
     );
 
-    expect(await refresh).toEqual({ ok: false, refused: false, superseded: true });
+    expect(await refresh).toEqual({ kind: 'superseded' });
     expect(store.get(AUTH_TOKEN_KEY)).toBeUndefined();
     expect(store.get(REFRESH_TOKEN_KEY)).toBe('old-refresh');
   });
@@ -339,7 +332,7 @@ describe('performRefresh', () => {
       Response.json({ token: 'old-token', refreshToken: 'old-refresh-2', expiresIn: 3600 })
     );
 
-    expect(await refresh).toEqual({ ok: false, refused: false, superseded: true });
+    expect(await refresh).toEqual({ kind: 'superseded' });
     expect(store.get(AUTH_TOKEN_KEY)).toBe('newer-token');
     expect(store.get(REFRESH_TOKEN_KEY)).toBe('newer-refresh');
   });
@@ -364,7 +357,7 @@ describe('performRefresh', () => {
     store.set(REFRESH_TOKEN_KEY, 'newer-refresh');
     resolveResponse?.(Response.json({ error: 'expired' }, { status: 401 }));
 
-    expect(await refresh).toEqual({ ok: false, refused: false, superseded: true });
+    expect(await refresh).toEqual({ kind: 'superseded' });
     expect(store.get(REFRESH_TOKEN_KEY)).toBe('newer-refresh');
   });
 
@@ -377,7 +370,7 @@ describe('performRefresh', () => {
 
     const outcome = await performRefresh();
 
-    expect(outcome).toEqual({ ok: false, refused: false, superseded: true });
+    expect(outcome).toEqual({ kind: 'superseded' });
     expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
   });
@@ -394,7 +387,7 @@ describe('performRefresh', () => {
 
     const outcome = await performRefresh();
 
-    expect(outcome).toEqual({ ok: false, refused: false, superseded: true });
+    expect(outcome).toEqual({ kind: 'superseded' });
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(store.get(REFRESH_TOKEN_KEY)).toBe('old-refresh');
     fetchSpy.mockRestore();
@@ -424,7 +417,7 @@ describe('performRefresh', () => {
       Response.json({ token: 'new-token', refreshToken: 'new-refresh', expiresIn: 3600 })
     );
 
-    expect(await refresh).toEqual({ ok: false, refused: false, superseded: true });
+    expect(await refresh).toEqual({ kind: 'superseded' });
     expect(store.get(AUTH_TOKEN_KEY)).toBeUndefined();
     expect(store.get(REFRESH_TOKEN_KEY)).toBe('old-refresh');
     expect(getActiveToken()).toBeNull();
@@ -462,7 +455,7 @@ describe('performRefresh', () => {
       await vi.advanceTimersByTimeAsync(15_001);
 
       // A timed-out refresh is transient: the old credentials stay untouched.
-      await expect(promise).resolves.toEqual({ ok: false, refused: false });
+      await expect(promise).resolves.toEqual({ kind: 'transient' });
       expect(store.get(REFRESH_TOKEN_KEY)).toBe('old-refresh');
       expect(fetchSpy).toHaveBeenCalledTimes(1);
       expect(fetchSpy.mock.calls[0]?.[1]?.signal).toBeDefined();
@@ -568,7 +561,7 @@ describe('persistSignInCredentialsAtEpoch', () => {
     releaseCredentialWrites();
 
     const result = await refresh;
-    expect(result).toEqual({ ok: false, refused: false, superseded: true });
+    expect(result).toEqual({ kind: 'superseded' });
     expect(store.has(AUTH_TOKEN_KEY)).toBe(false);
     expect(store.has(REFRESH_TOKEN_KEY)).toBe(false);
     expect(store.has(TOKEN_EXPIRES_AT_KEY)).toBe(false);

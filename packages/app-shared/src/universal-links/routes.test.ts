@@ -11,6 +11,9 @@ import {
 
 const WEB = 'https://app.kilo.ai';
 
+/** The app screen both `/organizations/new` and `/organizations/create` open. */
+const CREATE_APP_PATH = '/(app)/(tabs)/(3_profile)/organization/create';
+
 const ROW_CASES = [
   {
     path: '/home',
@@ -131,8 +134,8 @@ const ROW_CASES = [
 ] as const;
 
 describe('UNIVERSAL_LINK_ROUTES', () => {
-  it('has exactly 30 rows', () => {
-    expect(UNIVERSAL_LINK_ROUTES).toHaveLength(30);
+  it('has exactly 32 rows', () => {
+    expect(UNIVERSAL_LINK_ROUTES).toHaveLength(32);
   });
 });
 
@@ -209,13 +212,21 @@ describe('wildcard capture substitution', () => {
     );
   });
 
-  it('keeps the organization create pages in the browser', () => {
-    // `/organizations/new` matches the bare row's shape but is the web create
-    // form, which must open where the account is asked to sign in.
-    expect(resolveIncomingUrl(`${WEB}/organizations/new`)).toBeNull();
-    expect(resolveIncomingUrl(`${WEB}/organizations/create`)).toBeNull();
-    expect(webPathToAppPath('/organizations/new')).toBeNull();
-    expect(webPathToAppPath('/organizations/create')).toBeNull();
+  it('opens the organization create pages on the app screen that asks the same', () => {
+    // `/organizations/new` matches the bare row's shape, but it means "create
+    // one": the app's own form asks the same name and plan, so both literal
+    // paths open it instead of the web page.
+    expect(resolveIncomingUrl(`${WEB}/organizations/new`)).toBe(CREATE_APP_PATH);
+    expect(resolveIncomingUrl(`${WEB}/organizations/create`)).toBe(CREATE_APP_PATH);
+    expect(webPathToAppPath('/organizations/new')).toBe(CREATE_APP_PATH);
+    expect(webPathToAppPath('/organizations/create')).toBe(CREATE_APP_PATH);
+  });
+
+  it('keeps a deeper create-shaped path in the browser', () => {
+    // Only the two literal pages are the create form; `new` is not an
+    // organization id, and nothing below it is an app screen.
+    expect(webPathToAppPath('/organizations/new/plan')).toBeNull();
+    expect(webPathToAppPath('/organizations/create/x')).toBeNull();
   });
 
   it('keeps every deeper organization page in the browser', () => {
@@ -452,8 +463,8 @@ describe('parseKiloWebPath', () => {
 });
 
 describe('aasaComponents', () => {
-  it('returns 35 entries (30 rows + 5 exclusions)', () => {
-    expect(aasaComponents()).toHaveLength(35);
+  it('returns 37 entries (32 rows + 5 exclusions)', () => {
+    expect(aasaComponents()).toHaveLength(37);
   });
 
   it('every entry has a "/" key', () => {
@@ -480,20 +491,36 @@ describe('aasaComponents', () => {
     expect(components[row]).toEqual({ '/': '/organizations/*/code-reviews/*' });
   });
 
-  it('excludes the organization create paths before the bare organization row', () => {
+  it('associates the organization create paths, then excludes them from the bare row', () => {
     const components = aasaComponents();
     const paths = components.map(c => c['/']);
     const bare = paths.indexOf('/organizations/*');
     expect(bare).toBeGreaterThan(0);
-    expect(paths.slice(0, bare)).toEqual(
-      expect.arrayContaining(['/organizations/new', '/organizations/create'])
-    );
-    const created = components.filter(
-      c => c['/'] === '/organizations/new' || c['/'] === '/organizations/create'
-    );
-    expect(created).toHaveLength(2);
-    for (const entry of created) {
-      expect(entry).toMatchObject({ exclude: true });
+
+    // The create rows claim both literals before the bare row, so a tap on
+    // either page opens the app.
+    const newRow = paths.indexOf('/organizations/new');
+    const createRow = paths.indexOf('/organizations/create');
+    expect(newRow).toBeGreaterThan(-1);
+    expect(createRow).toBeGreaterThan(-1);
+    expect(newRow).toBeLessThan(bare);
+    expect(createRow).toBeLessThan(bare);
+    expect(components[newRow]).toEqual({ '/': '/organizations/new' });
+    expect(components[createRow]).toEqual({ '/': '/organizations/create' });
+
+    // The bare row still excludes both: a deeper `/organizations/new/…` page
+    // must fall through to the browser instead of reading `new` as an id. The
+    // excludes sit between the association rows and the bare row, where
+    // first-match-wins keeps the two literal pages associated.
+    const before = components.slice(bare - 3, bare).map(c => c['/']);
+    expect(before).toContain('/organizations/new');
+    expect(before).toContain('/organizations/create');
+    const excluded = components
+      .slice(bare - 3, bare)
+      .filter(c => c['/'] === '/organizations/new' || c['/'] === '/organizations/create');
+    expect(excluded).toHaveLength(2);
+    for (const entry of excluded) {
+      expect(entry).toEqual({ '/': entry['/'], exclude: true });
     }
   });
 
@@ -565,6 +592,8 @@ describe('androidPathPatterns', () => {
       '/organizations/.*/overview',
       '/organizations/.*/integrations',
       '/organizations/.*/usage-details',
+      '/organizations/new',
+      '/organizations/create',
       // The only row that departs from the `.*` compile: it must match one
       // segment, or the Android filter swallows every web-only org page.
       '/organizations/[^/]+',
@@ -589,6 +618,10 @@ describe('androidPathPatterns', () => {
       '/integrations',
       '/subscriptions/kilo-pass',
       '/security-agent/config',
+      // The two create-form pages: literal, so a deeper `/organizations/new/…`
+      // page is not claimed by them.
+      '/organizations/new',
+      '/organizations/create',
     ]) {
       expect(patterns).toContain(literal);
     }

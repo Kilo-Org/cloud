@@ -587,10 +587,12 @@
   "lt": [
     "analysis failed",
     "block",
+    "cancelled",
     "commit",
     "edit",
     "files",
     "manual review",
+    "merge",
     "open",
     "open pull request",
     "outdated",
@@ -631,6 +633,7 @@
     "dismissed",
     "files",
     "manual review",
+    "merge",
     "no changes needed",
     "open",
     "open pull request",
@@ -638,7 +641,8 @@
     "receipt",
     "remediation blocked",
     "remediation failed",
-    "token"
+    "token",
+    "tokens"
   ],
   "mk": [
     "analysis failed",

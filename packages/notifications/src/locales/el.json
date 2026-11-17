@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Η συνεδρία του πράκτορά σας έχει μια ενημέρωση",
-      "chatMessage": "Έχετε ένα νέο μήνυμα",
-      "instanceLifecycle": "Η παρουσία σας έχει μια ενημέρωση",
-      "scheduledAction": "Μια προγραμματισμένη ενέργεια έχει μια ενημέρωση",
       "lowBalance": "Το υπόλοιπό σας χρειάζεται προσοχή",
       "spendAlert": "Οι δαπάνες σας χρειάζονται προσοχή",
       "securityFinding": "Ένα εύρημα ασφαλείας χρειάζεται προσοχή",
@@ -19,12 +16,6 @@
       "body": "{{message}}"
     }
   },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · Χωρίς τίτλο",
-      "body": "{{bodyPreview}}"
-    }
-  },
   "internal": {
     "lowBalance": {
       "title": "Ειδοποίηση χαμηλού υπολοίπου",
@@ -34,50 +25,21 @@
       "title": "Ειδοποίηση δαπάνης",
       "body": "Οι δαπάνες του {{scopeName}} ξεπέρασαν τα ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Νέο εύρημα ασφαλείας ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} στο {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Νέο εύρημα ασφαλείας ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Προειδοποίηση SLA",
-      "body": "{{findingTitle}} στο {{repoFullName}}"
+      "title": "Προειδοποίηση SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Παραβίαση SLA",
-      "body": "{{findingTitle}} στο {{repoFullName}}"
+      "title": "Παραβίαση SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",
       "body": "Ένας έλεγχος ασφαλείας έχει μια ενημέρωση"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "Το {{instanceName}} είναι έτοιμο",
-      "body": "Πατήστε για να ξεκινήσετε τη συνομιλία."
-    },
-    "startFailed": {
-      "title": "Το {{instanceName}} απέτυχε να ξεκινήσει",
-      "body": "Η εκκίνηση απέτυχε."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "Το {{instanceName}} θα επανεκκινηθεί σύντομα",
-      "body": "Προγραμματίστηκε επανεκκίνηση στις {{when}}."
-    },
-    "restartCancelled": {
-      "title": "Η επανεκκίνηση του {{instanceName}} ακυρώθηκε",
-      "body": "Η προηγουμένως προγραμματισμένη επανεκκίνηση ακυρώθηκε."
-    },
-    "versionChangeNotice": {
-      "title": "Το {{instanceName}} θα αναβαθμιστεί σύντομα",
-      "bodyWithTag": "Αναβάθμιση σε {{targetImageTag}} στις {{when}}.",
-      "bodyWithoutTag": "Προγραμματισμένη αναβάθμιση στις {{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "Η αναβάθμιση του {{instanceName}} ακυρώθηκε",
-      "body": "Η προηγουμένως προγραμματισμένη αναβάθμιση ακυρώθηκε."
     }
   },
   "sessionReady": {

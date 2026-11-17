@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Umboðslotan þín hefur uppfærslu",
-      "chatMessage": "Þú hefur ný skilaboð",
-      "instanceLifecycle": "Dæmið þitt hefur uppfærslu",
-      "scheduledAction": "Skipulögð aðgerð hefur uppfærslu",
       "lowBalance": "Staðan þín þarfnast athygli",
       "spendAlert": "Útgjöldin þín þarfnast athygli",
       "securityFinding": "Öryggisfundur þarfnast athygli",
@@ -19,12 +16,6 @@
       "body": "{{message}}"
     }
   },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · Án titils",
-      "body": "{{bodyPreview}}"
-    }
-  },
   "internal": {
     "lowBalance": {
       "title": "Viðvörun um lága stöðu",
@@ -34,50 +25,21 @@
       "title": "Viðvörun um útgjöld",
       "body": "Útgjöld {{scopeName}} fóru yfir ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Nýr öryggisfundur ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} í {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Nýr öryggisfundur ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA-viðvörun",
-      "body": "{{findingTitle}} í {{repoFullName}}"
+      "title": "SLA-viðvörun"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA-brot",
-      "body": "{{findingTitle}} í {{repoFullName}}"
+      "title": "SLA-brot"
     },
     "securityLifecycle": {
       "title": "Kilo",
       "body": "Öryggisathugun hefur uppfærslu"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} er tilbúið",
-      "body": "Bankaðu til að byrja að spjalla."
-    },
-    "startFailed": {
-      "title": "{{instanceName}} mistókst að ræsa",
-      "body": "Ræsing mistókst."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} mun endurræsa bráðlega",
-      "body": "Áætluð endurræsing klukkan {{when}}."
-    },
-    "restartCancelled": {
-      "title": "Endurræsing {{instanceName}} aflýst",
-      "body": "Fyrri endurræsingin sem var áætluð hefur verið aflýst."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} mun uppfærast bráðlega",
-      "bodyWithTag": "Uppfæra í {{targetImageTag}} klukkan {{when}}.",
-      "bodyWithoutTag": "Áætluð uppfærsla klukkan {{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "Uppfærsla {{instanceName}} aflýst",
-      "body": "Fyrri uppfærslan sem var áætluð hefur verið aflýst."
     }
   },
   "sessionReady": {

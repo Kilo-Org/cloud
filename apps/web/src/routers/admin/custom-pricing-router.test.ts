@@ -58,7 +58,7 @@ describe('adminCustomPricingRouter', () => {
   it('stores, updates, and clears the config without touching other columns', async () => {
     const preferredModels = { models: ['provider/model-a'] };
     await db.insert(ai_gateway_config).values({
-      config: { vercel_routing_enabled: false },
+      config: { vercel_routing_opt_out_models: [] },
       preferred_models: preferredModels,
     });
     const caller = await createCallerForUser(admin.id);
@@ -74,7 +74,7 @@ describe('adminCustomPricingRouter', () => {
 
     const [row] = await db.select().from(ai_gateway_config);
     expect(row).toMatchObject({
-      config: { vercel_routing_enabled: false },
+      config: { vercel_routing_opt_out_models: [] },
       preferred_models: preferredModels,
       custom_pricing: null,
     });
@@ -90,6 +90,20 @@ describe('adminCustomPricingRouter', () => {
         },
       })
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(await db.select().from(ai_gateway_config)).toEqual([]);
+  });
+
+  it('rejects an entry for a latest alias without writing', async () => {
+    const caller = await createCallerForUser(admin.id);
+    const [entry] = config.models;
+    await expect(
+      caller.admin.customPricing.set({
+        config: { models: [entry, { ...entry, model: '~vendor/model-latest' }] },
+      })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: expect.stringContaining('is a latest alias'),
+    });
     expect(await db.select().from(ai_gateway_config)).toEqual([]);
   });
 });

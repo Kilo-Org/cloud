@@ -66,7 +66,8 @@ reason.
 
 ## Unified Elements
 
-One element per concern. `no-restricted-imports` in `.oxlintrc.json` enforces the "Use instead" column.
+One element per concern. `no-restricted-imports` in `.oxlintrc.json` is the
+authoritative list; this table summarizes the main concerns.
 
 | Concern | Element | Use instead of |
 |---|---|---|
@@ -74,14 +75,18 @@ One element per concern. `no-restricted-imports` in `.oxlintrc.json` enforces th
 | Bottom sheet, route | expo-router `formSheet` via `useFormSheetScreenOptions()` | a JS bottom-sheet library |
 | Confirm that needs the red affordance | `useConfirmDialog()` from `@/components/ui/dialog` (a native sheet) | `Alert.alert` for a destructive confirm; a direct `@rn-primitives/dialog` import |
 | Dialog form (a field, a form) | `DialogCard` from `@/components/ui/dialog` | a direct `@rn-primitives/dialog` import |
+| Form fields | `FormField` from `@/components/ui/form-field` | `react-hook-form`, `@tanstack/react-form` |
 | System confirm, non-destructive | `Alert.alert` | — |
 | Keyboard avoidance | `react-native-keyboard-controller` | `KeyboardAvoidingView` from `react-native` |
+| Keep awake | `useKeepAwake` from `@/lib/keep-awake` | `expo-keep-awake` |
 | Lists | `@shopify/flash-list` | `FlatList`, `VirtualizedList`, `SectionList`, `@legendapp/list` |
+| Skeleton | `Skeleton` from `@/components/ui/skeleton` | `moti`, `react-native-reanimated-skeleton`, `react-native-skeleton-placeholder` |
 | Image viewer | `@/components/ui/image-viewer` | `react-native-image-viewing`, `react-native-awesome-gallery` |
 | Video | `expo-video` | `react-native-video`, `expo-av` |
 | Blur | `expo-blur` | `expo-glass-effect`, `@callstack/liquid-glass` (no Liquid Glass) |
 | Toast | `sonner-native` | `react-native-toast-message`, `burnt` |
 | Images | `Image` from `@/components/ui/image` | `Image` from `react-native`, `expo-image` |
+| Segmented control | `SegmentedControl` from `@/components/ui/segmented-control` | `@react-native-segmented-control/segmented-control` |
 | Icons | `@/components/ui/icons` | `lucide-react-native` |
 | Markdown | `MarkdownText` from `@/components/agents/markdown-text`, rendered by `react-native-enriched-markdown` | `react-native-marked`, `react-native-markdown-display` |
 | HTML in markdown | `MarkdownText`: `markdown-html-convert` turns HTML markdown can express into markdown; the rest renders through `MarkdownHtml` (`@native-html/render`) | `react-native-render-html` |
@@ -104,8 +109,10 @@ Use a concrete height and `flex: 0` for an inline `FlashList`; `maxHeight` alone
 Omit empty-state descriptions that repeat the title or tell the user to use a disabled action.
 
 Keyboard avoidance is `react-native-keyboard-controller`, wrapped in one `KeyboardProvider` at the app root.
-`KeyboardAvoidingView` clears the IME on the session, quick-chat, session-detail, new-session,
-conversation, manual-review and PR-discussion surfaces; the Agents list and the stored history render
+`KeyboardAvoidingView` clears the IME on the session, quick-chat, session-detail, conversation and
+manual-review surfaces. The new-session form and the PR-discussion comment bar render
+`@/components/keyboard-lift-view` instead, which pads by a height the screen computes from the keyboard state
+and animates it with the keyboard's own motion progress. The Agents list and the stored history render
 `@/components/agents/owned-keyboard-lift` instead, which pads by the keyboard their own search field raised and
 writes that pad on every render (the library container drops its animated style when `enabled` turns false, and
 the property it last applied stays on the native view). The pad never takes more room than the body can spare:
@@ -118,9 +125,13 @@ render a rotation produces, so a frame measured in the previous window is releas
 being trusted. `useKeyboardState` is the app's one keyboard-height read.
 The conversation list follows the newest message when its viewport shrinks; it must not add a second keyboard inset.
 A surface whose content
-pads the platform's bottom inset itself passes `keyboardVerticalOffset={keyboardInsetOffset(bottom)}`
-(`@/lib/keyboard-inset-offset`) — the provider's Android height spans the translucent navigation bar, so
-without the reduction the content floats a navigation-bar height above the keyboard.
+pads the platform's bottom inset itself passes `height={Math.max(0, keyboardHeight - bottom)}` to
+`@/components/keyboard-lift-view` — the provider's Android height spans the translucent navigation bar, so
+without the reduction the content floats a navigation-bar height above the keyboard. That view pads by the
+height the screen computes from `useKeyboardState` and animates it with the keyboard's own motion progress;
+a library `KeyboardAvoidingView` derives its lift from a container frame an async native call reports, and a
+frame that has not landed yet leaves the lift short by the container's own top (the pinned new-session footer
+stayed behind the keyboard that way).
 
 Nothing else may read the keyboard: no surface adds a listener beside the provider.
 
@@ -164,10 +175,30 @@ Keep `pt-5` for the sheet grabber on top of that clearance.
 - Fetch backend data through tRPC. Zod-parse only genuinely untrusted HTTP input at entry; do not re-parse trusted tRPC or shared-package data in components.
 - Parse backend dates with `parseTimestamp()` from `@/lib/utils`; `new Date()` breaks on PostgreSQL timestamps in Hermes.
 - Every mutation hook shows `toast.error(error.message)` in `onError`. Put shared error handling in the hook, not in each component.
-- Optimistic updates come in two kinds, and each has exactly one owner. A value that lives in the TanStack query cache is owned by its mutation: snapshot in `onMutate`, roll back in `onError` only when `isLatestMutationGeneration` says this mutation still owns the key, reconcile in `onSettled`. Never add a second optimistic owner over the same query-backed value.
-- Only the per-chat web-search and Kilo MCP flags use the registry's `setChatFlag` (`@/lib/chat/registry`), which persists and applies them in the chat's own operation order and publishes the result through `ChatState`. Other standalone persisted values stay with their owning stores; components must not add a competing optimistic mirror beside either kind.
+- Optimistic updates have one owner each. A value in the TanStack query cache belongs to its mutation: snapshot in `onMutate`, roll back in `onError` only while `isLatestMutationGeneration` says this mutation still owns the key, and reconcile in `onSettled`. Never add a second optimistic copy over a query-backed value.
+- A stored value has one owner. Change it only through that owner's API, and never keep a second optimistic copy beside it in a component.
 - After a session mutation, refresh stored search queries as well as the list through `invalidateAgentSessionQueries`.
 - Keep route files thin. Put screen logic in components or hooks.
+
+## State Machines
+
+A phase that several flags, refs, nullable fields, or timers encode together is an implicit state machine. Do not write one.
+
+- Model each phase as one discriminated union with a tag for each state, and keep each payload inside the state that owns it.
+- Before you add a flag beside existing state, list the combinations it creates. If one is invalid, extend the union instead.
+- Tie every async result to the attempt that started it. A result whose attempt no longer owns the state publishes nothing.
+- For the status of an action a person starts (idle, pending, succeeded, failed), use `useSurfaceFeedback` from `@/lib/hooks/use-surface-feedback`, or `useKeyedSurfaceFeedback` for one action per row:
+  - Call `begin()` before the first `await`. When it returns `null`, an attempt is already running: do nothing, and do not add a second lock.
+  - Settle the attempt exactly once. Leave no entry behind that nothing renders; the doc in `@/lib/surface-feedback` says which settle keeps one.
+  - After an `await`, check `attempt.owns()` and the auth epoch before any effect outside the phase, such as closing a sheet, clearing a draft, posting, or changing account-bound UI.
+  - Give every failure a `kind`, keep its copy in the same object, and render it with a `switch` that ends in `assertSurfaceFailureHandled(failure)`.
+- Keep scoped module state (per account, organization, session, or request) keyed by that scope, and check the scope again before an async result publishes.
+- Settle async work by its own request identity, never by a shared attribute such as a product id or a name.
+- When an outcome cannot be tied to one request, keep the safe state and give the person an explicit way out. Never leave a state with no exit.
+- Scope a barrier to the account or identity that created it. Release it only on an authoritative outcome or the person's informed consent.
+- Progress UI ends when its own work ends. It never waits for an outcome to be attributed.
+- Retire retained state only when its identity still matches. At capacity, refuse new entries; never evict an unresolved one.
+- A regression test must fail on the code before the fix. Prove that once before the fix lands.
 
 ## React Native Rules
 

@@ -56,8 +56,9 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('expo-router', () => {
   // Stable objects, like the real hooks: a new identity per render would re-run
-  // the effects `usePopOnce` registers on them.
-  const router = { back: state.back };
+  // the effects `usePopOnce` registers on them. The screen's own Back press asks
+  // whether there is history to pop; this harness always has some.
+  const router = { back: state.back, canGoBack: () => true };
   const navigation = {
     isFocused: () => state.focused,
     addListener: () => () => {

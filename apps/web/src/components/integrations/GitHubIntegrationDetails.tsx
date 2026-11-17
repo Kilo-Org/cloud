@@ -26,6 +26,14 @@ import { buildGitHubInstallState } from './github-install-state';
 import { useConfirm } from '@/components/ui/confirm';
 import { OrganizationGitHubInstallations } from './OrganizationGitHubInstallations';
 import { GitHubIdentityCard } from './GitHubIdentityCard';
+import {
+  APP_RETURN_PATH,
+  INSTALLATION_UNAVAILABLE_MESSAGE,
+  appReturnBasePath,
+  buildAppReturnHref,
+  buildAppReturnOutcomeView,
+  buildInstallStateRecoveryHref,
+} from './github-app-outcome';
 
 type GitHubIntegrationDetailsProps = {
   organizationId?: string;
@@ -40,103 +48,14 @@ type GitHubIntegrationDetailsProps = {
   pendingApproval?: boolean;
   existingPendingOrg?: string;
   appReturnPath?: string;
+  /**
+   * The app shell page that mints the install state and sets the shell's flow
+   * cookie. When set, starting or retrying an install navigates there instead
+   * of minting from the browser, so the callback is bound to this browser.
+   */
+  installStartPath?: string;
   onInstallationDetected?: () => void;
 };
-
-/**
- * /cloud/sessions return href for an app-initiated install outcome.  Carries
- * the original organizationId so the mobile app can retry an org-scoped
- * install on the same organization owner.
- */
-function buildAppReturnHref(query: string, organizationId?: string): string {
-  const orgParam = organizationId ? `&organizationId=${encodeURIComponent(organizationId)}` : '';
-  return `/cloud/sessions?${query}${orgParam}`;
-}
-
-/**
- * A canonical installation GitHub reports as suspended or deleted refuses the
- * completion, so the card must name that state instead of the
- * claimed-by-another-account reason.
- */
-const INSTALLATION_UNAVAILABLE_MESSAGE =
-  'This GitHub App installation is suspended or no longer available. Restore or reinstall it in GitHub, then start again.';
-
-export type AppReturnOutcomeView = {
-  kind: 'installed' | 'pending' | 'blocked' | 'retryable';
-  title: string;
-  description: string;
-  cta: string;
-  href: string;
-};
-
-/**
- * View model for the fromApp outcome card. `blocked` (non-retryable) shows
- * `Back` and never offers retry; `retryable` shows `Try again` (a real action
- * wired by the component) plus `Return to Kilo App`, both via `href`.
- */
-export function buildAppReturnOutcomeView(input: {
-  success?: boolean;
-  pendingApproval?: boolean;
-  error?: string;
-  organizationId?: string;
-}): AppReturnOutcomeView {
-  const isSuccess = Boolean(input.success);
-  const isPending = !isSuccess && Boolean(input.pendingApproval);
-  const isNonRetryable =
-    input.error === 'install_state_user_mismatch' ||
-    input.error === 'not_installation_admin' ||
-    input.error === 'installation_already_claimed' ||
-    input.error === 'shared_installation_disabled' ||
-    input.error === 'incompatible_workflow' ||
-    input.error === 'installation_unavailable' ||
-    input.error === 'multiple_installations_disabled';
-  const returnQuery = isSuccess
-    ? 'github_install=success'
-    : isPending
-      ? 'github_pending_approval=true'
-      : `error=${encodeURIComponent(input.error ?? 'installation_failed')}`;
-  const title = isSuccess
-    ? 'GitHub App installed'
-    : isPending
-      ? 'Awaiting admin approval'
-      : isNonRetryable
-        ? 'Cannot complete installation'
-        : 'Installation failed';
-  const description = isSuccess
-    ? 'Your repositories are now connected.'
-    : isPending
-      ? 'An organization admin must approve the installation request.'
-      : input.error === 'not_installation_admin'
-        ? 'Only a GitHub admin of that account can connect it. Ask an organization admin to install Kilo.'
-        : input.error === 'installation_already_claimed'
-          ? 'That GitHub installation is already connected to another Kilo account. Disconnect it there first.'
-          : input.error === 'shared_installation_disabled'
-            ? 'That GitHub installation is connected elsewhere, and shared access is not approved for this organization.'
-            : input.error === 'incompatible_workflow'
-              ? 'That GitHub installation has an existing workflow that is not yet compatible with shared access.'
-              : input.error === 'multiple_installations_disabled'
-                ? 'This Kilo organization can currently connect only one GitHub organization.'
-                : input.error === 'installation_unavailable'
-                  ? INSTALLATION_UNAVAILABLE_MESSAGE
-                  : input.error === 'install_state_user_mismatch'
-                    ? 'This connection was started from the Kilo App signed in as a different account. Sign in to the web with that account, or start again from the app.'
-                    : 'The installation did not complete. Try again or return to the Kilo App.';
-  const cta = isSuccess ? 'Continue' : isPending ? 'Done' : isNonRetryable ? 'Back' : 'Try again';
-
-  return {
-    kind: isSuccess
-      ? 'installed'
-      : isPending
-        ? 'pending'
-        : isNonRetryable
-          ? 'blocked'
-          : 'retryable',
-    title,
-    description,
-    cta,
-    href: buildAppReturnHref(returnQuery, input.organizationId),
-  };
-}
 
 /** Targets the displayed installation so management actions cannot drift to another association. */
 export function buildGitHubManagementInput(
@@ -310,6 +229,7 @@ function GitHubIntegrationDetailsContent({
   error,
   pendingApproval,
   appReturnPath,
+  installStartPath,
   onInstallationDetected,
 }: GitHubIntegrationDetailsProps) {
   const trpc = useTRPC();
@@ -317,6 +237,15 @@ function GitHubIntegrationDetailsContent({
   const confirm = useConfirm();
   const input = organizationId ? { organizationId } : undefined;
   const hasAppOutcome = Boolean(success || pendingApproval || error);
+  // A shell install returns to the shell page instead of the Cloud sessions page.
+  const appBasePath = appReturnBasePath(appReturnPath);
+  // The shell mints its own install state so the callback is bound to the
+  // browser that started it; the full web page mints from here.
+  const shellInstallStartPath = installStartPath
+    ? `${installStartPath}${
+        organizationId ? `?${new URLSearchParams({ organizationId }).toString()}` : ''
+      }`
+    : null;
 
   // Fetch organization data to check GitHub app type
   const { data: organizationData } = useOrganizationWithMembers(organizationId ?? '', {
@@ -480,13 +409,23 @@ function GitHubIntegrationDetailsContent({
   };
 
   const handleInstall = async () => {
+    // Inside the shell, the start route mints the state and sets the flow
+    // cookie the GitHub callback requires, so the browser never mints here.
+    if (shellInstallStartPath) {
+      window.location.href = shellInstallStartPath;
+      return;
+    }
     try {
       // Pre-minted state from the mobile app — use it directly without a
       // second mint.  The state token is the raw database token; it must be
       // passed to GitHub exactly as received.
       if (installState) {
         if (launchedInstallStates.current.has(installState)) {
-          window.location.href = `/github-app?error=install_state_invalid${fromApp ? '&fromApp=1' : ''}`;
+          window.location.href = buildInstallStateRecoveryHref({
+            fromApp,
+            appBasePath,
+            organizationId,
+          });
           return;
         }
         launchedInstallStates.current.add(installState);
@@ -517,14 +456,22 @@ function GitHubIntegrationDetailsContent({
    * token was consumed by the callback.  A retry must never reuse it.
    */
   const handleAppRetry = async () => {
+    if (shellInstallStartPath) {
+      window.location.href = shellInstallStartPath;
+      return;
+    }
     if (installState) {
-      window.location.href = `/github-app?error=install_state_invalid${fromApp ? '&fromApp=1' : ''}`;
+      window.location.href = buildInstallStateRecoveryHref({
+        fromApp,
+        appBasePath,
+        organizationId,
+      });
       return;
     }
     try {
       const result = await mintInstallState.mutateAsync({
         organizationId: organizationId ?? undefined,
-        returnTo: '/cloud/sessions',
+        returnTo: appReturnPath ?? APP_RETURN_PATH,
       });
       const installUrl = `https://github.com/apps/${githubAppName}/installations/new?state=${encodeURIComponent(buildGitHubInstallState(result.token))}`;
       window.open(installUrl, '_blank', 'noopener,noreferrer');
@@ -673,8 +620,9 @@ function GitHubIntegrationDetailsContent({
                 Install the Kilo GitHub App
               </h2>
               <p className="type-body max-w-xl text-muted-foreground">
-                Choose the GitHub organization and repositories Kilo can access. GitHub opens in a
-                new tab so this setup guide stays available.
+                {shellInstallStartPath
+                  ? 'Choose the GitHub organization and repositories Kilo can access. GitHub setup opens next, and this page shows the result when it finishes.'
+                  : 'Choose the GitHub organization and repositories Kilo can access. GitHub opens in a new tab so this setup guide stays available.'}
               </p>
             </div>
             <Badge variant="secondary" className="shrink-0">
@@ -716,11 +664,12 @@ function GitHubIntegrationDetailsContent({
             }
           >
             {mintInstallState.isPending ? 'Starting installation...' : 'Open GitHub setup'}
-            <ExternalLink className="size-4" />
+            {shellInstallStartPath ? null : <ExternalLink className="size-4" />}
           </Button>
           <p className="type-label mt-3 text-muted-foreground">
-            Complete setup in the new tab, then return here. This page checks your connection when
-            you return.
+            {shellInstallStartPath
+              ? 'Complete setup in GitHub, then return here. This page checks your connection when you return.'
+              : 'Complete setup in the new tab, then return here. This page checks your connection when you return.'}
           </p>
           <div className="mt-5">
             <DevAddGitHubInstallationCard
@@ -735,7 +684,13 @@ function GitHubIntegrationDetailsContent({
   }
 
   if (fromApp && hasAppOutcome) {
-    const view = buildAppReturnOutcomeView({ success, pendingApproval, error, organizationId });
+    const view = buildAppReturnOutcomeView({
+      success,
+      pendingApproval,
+      error,
+      organizationId,
+      appBasePath,
+    });
     const isRetryable = view.kind === 'retryable';
 
     return (
@@ -992,7 +947,11 @@ function GitHubIntegrationDetailsContent({
       </Card>
 
       {!organizationId ? (
-        <GitHubIdentityCard isInstalled={Boolean(isInstalled)} />
+        // The identity link round trip completes on the full web app (its
+        // callback requires a web session), so the shell does not offer it.
+        appReturnPath ? null : (
+          <GitHubIdentityCard isInstalled={Boolean(isInstalled)} />
+        )
       ) : (
         !appReturnPath && (
           <Card>
@@ -1040,7 +999,13 @@ function GitHubIntegrationDetailsContent({
                     </p>
                   </div>
                   <Button asChild className="mt-2">
-                    <Link href={buildAppReturnHref('github_install=success', organizationId)}>
+                    <Link
+                      href={buildAppReturnHref(
+                        'github_install=success',
+                        organizationId,
+                        appBasePath
+                      )}
+                    >
                       Continue
                     </Link>
                   </Button>
@@ -1056,7 +1021,13 @@ function GitHubIntegrationDetailsContent({
                     </p>
                   </div>
                   <Button asChild variant="outline" className="mt-2">
-                    <Link href={buildAppReturnHref('github_pending_approval=true', organizationId)}>
+                    <Link
+                      href={buildAppReturnHref(
+                        'github_pending_approval=true',
+                        organizationId,
+                        appBasePath
+                      )}
+                    >
                       Done
                     </Link>
                   </Button>
@@ -1073,7 +1044,11 @@ function GitHubIntegrationDetailsContent({
                   </div>
                   <Button asChild variant="outline" className="mt-2">
                     <Link
-                      href={buildAppReturnHref('error=install_state_user_mismatch', organizationId)}
+                      href={buildAppReturnHref(
+                        'error=install_state_user_mismatch',
+                        organizationId,
+                        appBasePath
+                      )}
                     >
                       Back
                     </Link>
@@ -1094,7 +1069,8 @@ function GitHubIntegrationDetailsContent({
                     <Link
                       href={buildAppReturnHref(
                         `error=${encodeURIComponent(error)}`,
-                        organizationId
+                        organizationId,
+                        appBasePath
                       )}
                     >
                       Back
@@ -1115,7 +1091,8 @@ function GitHubIntegrationDetailsContent({
                       <Link
                         href={buildAppReturnHref(
                           `error=${encodeURIComponent(error ?? 'installation_failed')}`,
-                          organizationId
+                          organizationId,
+                          appBasePath
                         )}
                       >
                         Back

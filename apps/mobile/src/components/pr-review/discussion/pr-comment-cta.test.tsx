@@ -24,11 +24,18 @@ vi.mock('react-i18next', async importOriginal => {
 
 const insetsState = vi.hoisted(() => ({ bottom: 0 }));
 const platformState = vi.hoisted(() => ({ OS: 'ios' }));
+const keyboardState = vi.hoisted(() => ({ height: 0 }));
 
 vi.mock('react-native', () => ({
   View: 'View',
   Platform: platformState,
 }));
+
+vi.mock('react-native-keyboard-controller', () => ({
+  useKeyboardState: () => ({ height: keyboardState.height, isVisible: keyboardState.height > 0 }),
+}));
+
+vi.mock('@/components/keyboard-lift-view', () => ({ KeyboardLiftView: 'KeyboardLiftView' }));
 
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => insetsState,
@@ -93,13 +100,14 @@ function paddingValues(renderer: TestRenderer.ReactTestRenderer): number[] {
 
 /** The keyboard-lift wrapper the bar rides while the Discussion tab is focused. */
 function liftView(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance {
-  return renderer.root.find(node => String(node.type) === 'KeyboardAvoidingView');
+  return renderer.root.find(node => String(node.type) === 'KeyboardLiftView');
 }
 
 describe('PrCommentCta', () => {
   beforeEach(() => {
     platformState.OS = 'ios';
     insetsState.bottom = 0;
+    keyboardState.height = 0;
     BASE_PROPS.onPress.mockClear();
   });
 
@@ -131,23 +139,24 @@ describe('PrCommentCta', () => {
   });
 
   it('lifts above the keyboard while it is open', () => {
+    keyboardState.height = 300;
     const renderer = mountCta();
-    // The bar rides a padding-behavior keyboard lift. On iOS the reported frame
+    // The lift carries the keyboard's own height. On iOS the reported frame
     // already reaches the screen bottom, so the lift takes no inset correction.
     const lift = liftView(renderer);
-    expect(lift.props.behavior).toBe('padding');
-    expect(lift.props.keyboardVerticalOffset).toBe(0);
+    expect(lift.props.height).toBe(300);
   });
 
-  it("lifts by the raw Android metric, which the bar's own inset padding completes", () => {
+  it("reduces the lift by the inset the bar's own padding already covers", () => {
     // The bar's inner padding already includes the platform's bottom inset
-    // (`useDetailScreenBottomPadding`), so the Android lift is reduced by that
-    // inset (a negative `keyboardVerticalOffset`) and the button never floats a
-    // navigation-bar height above the keyboard (2026-09-21 review finding).
-    platformState.OS = 'android';
+    // (`useDetailScreenBottomPadding`), so the lift is reduced by that inset and
+    // the button never floats a navigation-bar height above the keyboard
+    // (2026-09-21 review finding). Android reports the keyboard across the
+    // translucent navigation bar, which is where this inset comes from.
     insetsState.bottom = 63;
+    keyboardState.height = 300;
     const renderer = mountCta();
-    expect(liftView(renderer).props.keyboardVerticalOffset).toBe(-63);
+    expect(liftView(renderer).props.height).toBe(237);
     expect(paddingValues(renderer)).toEqual([79]);
   });
 
@@ -158,9 +167,7 @@ describe('PrCommentCta', () => {
     // behind the sheet and parks the last thread's reply field under the bar
     // (uxs3 spot check, e4-confirm-discard).
     const renderer = mountCta({ keyboardLift: false });
-    expect(
-      renderer.root.findAll(node => String(node.type) === 'KeyboardAvoidingView')
-    ).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'KeyboardLiftView')).toHaveLength(0);
     // The bar itself still renders; only the lift wrapper is gone.
     expect(renderer.root.find(node => String(node.type) === 'Button')).toBeDefined();
     // useDetailScreenBottomPadding floors the reported inset: max(0, 16) + 16.

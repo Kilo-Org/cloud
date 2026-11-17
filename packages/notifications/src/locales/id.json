@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Sesi agen Anda memiliki pembaruan",
-      "chatMessage": "Anda memiliki pesan baru",
-      "instanceLifecycle": "Instance Anda memiliki pembaruan",
-      "scheduledAction": "Tindakan terjadwal memiliki pembaruan",
       "lowBalance": "Saldo Anda perlu diperhatikan",
       "spendAlert": "Pengeluaran Anda perlu diperhatikan",
       "securityFinding": "Temuan keamanan perlu diperhatikan",
@@ -19,12 +16,6 @@
       "body": "{{message}}"
     }
   },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · Tanpa judul",
-      "body": "{{bodyPreview}}"
-    }
-  },
   "internal": {
     "lowBalance": {
       "title": "Peringatan saldo rendah",
@@ -34,50 +25,21 @@
       "title": "Peringatan pengeluaran",
       "body": "Pengeluaran {{scopeName}} melewati ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Temuan keamanan baru ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} di {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Temuan keamanan baru ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Peringatan SLA",
-      "body": "{{findingTitle}} di {{repoFullName}}"
+      "title": "Peringatan SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Pelanggaran SLA",
-      "body": "{{findingTitle}} di {{repoFullName}}"
+      "title": "Pelanggaran SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",
       "body": "Pemeriksaan keamanan memiliki pembaruan"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} siap",
-      "body": "Ketuk untuk mulai mengobrol."
-    },
-    "startFailed": {
-      "title": "{{instanceName}} gagal dimulai",
-      "body": "Gagal dimulai."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} akan segera dimulai ulang",
-      "body": "Dijadwalkan untuk dimulai ulang pada {{when}}."
-    },
-    "restartCancelled": {
-      "title": "Mulai ulang {{instanceName}} dibatalkan",
-      "body": "Mulai ulang yang dijadwalkan sebelumnya telah dibatalkan."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} akan segera ditingkatkan",
-      "bodyWithTag": "Tingkatkan ke {{targetImageTag}} pada {{when}}.",
-      "bodyWithoutTag": "Peningkatan dijadwalkan pada {{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "Peningkatan {{instanceName}} dibatalkan",
-      "body": "Peningkatan yang dijadwalkan sebelumnya telah dibatalkan."
     }
   },
   "sessionReady": {

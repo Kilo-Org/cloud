@@ -1,7 +1,7 @@
 import { KILO_PASS_TITLE } from '@kilocode/app-shared/commerce';
 
 import { i18n } from '@/i18n';
-import { formatDate, formatUsd } from '@/lib/format';
+import { formatDate, formatPrefixedMoney } from '@/lib/format';
 import { parseTimestamp } from '@/lib/utils';
 
 /**
@@ -191,10 +191,12 @@ function usageRow(subscription: KiloPassSubscription, bonusUsd: number): KiloPas
   }
   const usedUsd = Math.max(0, subscription.currentPeriodUsageUsd);
   const totalUsd = baseUsd + bonusUsd;
+  const used = formatPrefixedMoney(usedUsd, i18n.language);
+  const total = formatPrefixedMoney(totalUsd, i18n.language);
   return {
     id: 'usage',
     label: i18n.t('kiloPass.usageThisMonth'),
-    value: `${formatUsd(usedUsd, i18n.language)} / ${formatUsd(totalUsd, i18n.language)}`,
+    value: `${used} / ${total}`,
   };
 }
 
@@ -216,7 +218,7 @@ function activeRows(subscription: KiloPassSubscription): KiloPassRow[] {
     rows.push({
       id: 'bonus',
       label: bonus.label,
-      value: formatUsd(bonus.amountUsd, i18n.language),
+      value: formatPrefixedMoney(bonus.amountUsd, i18n.language),
     });
   }
 

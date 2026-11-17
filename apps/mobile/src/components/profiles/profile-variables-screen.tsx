@@ -1,3 +1,4 @@
+import { type Href } from 'expo-router';
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -61,7 +62,13 @@ function initialVariableEdit(row: VariableRow | undefined): VariableEdit {
 export function ProfileVariablesScreen({
   profileId,
   organizationId,
-}: Readonly<{ profileId: string; organizationId?: string }>) {
+  backFallback,
+}: Readonly<{
+  profileId: string;
+  organizationId?: string;
+  /** The Profiles list of the stack that mounted this screen. */
+  backFallback: Href;
+}>) {
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const varsQuery = useAgentProfileVars(profileId, organizationId);
@@ -248,20 +255,19 @@ export function ProfileVariablesScreen({
         {isAdding ? renderEditForm(true, initialVariableEdit(undefined)) : null}
 
         <ProfileManageSlot permission={permission}>
+          {showAdd && atVariableCap ? (
+            <AccessibleStatus
+              message={t('profiles.variableLimitReached', { max: MAX_PROFILE_VARS })}
+              tone="warn"
+              className="text-sm"
+            />
+          ) : null}
           {showAdd ? (
-            <Button onPress={startAdd}>
+            <Button disabled={atVariableCap} onPress={startAdd}>
               <Text>{t('profiles.addVariable')}</Text>
             </Button>
           ) : null}
         </ProfileManageSlot>
-
-        {atVariableCap && canManage ? (
-          <AccessibleStatus
-            message={t('profiles.variableLimitReached', { max: MAX_PROFILE_VARS })}
-            tone="warn"
-            className="text-sm"
-          />
-        ) : null}
       </>
     );
   }
@@ -272,6 +278,7 @@ export function ProfileVariablesScreen({
         profileId={profileId}
         organizationId={organizationId}
         title={t('profiles.variablesTitle')}
+        backFallback={backFallback}
       />
       <TabScreenScrollView
         className="flex-1"

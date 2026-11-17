@@ -14,8 +14,11 @@ import {
   createPendingLink,
   createPendingLinkForDifferentOAuth,
   getPendingLinkMethods,
+  hashPendingLinkSecret,
   MAX_EMAIL_CODE_SENDS_PER_PENDING_LINK,
   releaseEmailCodeSend,
+  resolvePendingLinkForUser,
+  resolveStoredPendingLinkForUser,
 } from './pending-link';
 import type * as UserModule from '@/lib/user';
 
@@ -233,6 +236,64 @@ describe('pending auth link attach rule', () => {
     ]);
     expect(results.filter(r => r.status === 'linked')).toHaveLength(1);
     expect(results.filter(r => r.status === 'failed')).toHaveLength(1);
+  });
+});
+
+describe('pending auth link sign-in mapping', () => {
+  it('returns undefined for a missing secret', async () => {
+    await expect(resolvePendingLinkForUser(undefined, 'any-user')).resolves.toBeUndefined();
+  });
+
+  it('returns undefined for a null secret hash', async () => {
+    await expect(resolveStoredPendingLinkForUser(null, 'any-user')).resolves.toBeUndefined();
+  });
+
+  it('reports EXPIRED for an unknown secret hash', async () => {
+    await expect(
+      resolveStoredPendingLinkForUser(hashPendingLinkSecret('not-a-real-secret'), 'any-user')
+    ).resolves.toEqual({ status: 'failed', reason: 'EXPIRED' });
+  });
+
+  it('completes a live link by hash, then maps a thrown link failure', async () => {
+    const user = await makeUser('pending-stored@example.com');
+    const { secret } = await createPendingLink({
+      kiloUserId: user.id,
+      kind: 'existing_account',
+      identity: githubIdentity(user.google_user_email, 'github-stored-1'),
+      emailCodeAllowed: true,
+    });
+
+    await expect(
+      resolveStoredPendingLinkForUser(hashPendingLinkSecret(secret), user.id)
+    ).resolves.toEqual({ status: 'linked', provider: 'github' });
+
+    const again = await createPendingLink({
+      kiloUserId: user.id,
+      kind: 'existing_account',
+      identity: githubIdentity(user.google_user_email, 'github-stored-2'),
+      emailCodeAllowed: true,
+    });
+    mockLinkAccount.mockRejectedValueOnce(new Error('database unavailable'));
+
+    await expect(
+      resolveStoredPendingLinkForUser(hashPendingLinkSecret(again.secret), user.id)
+    ).resolves.toEqual({ status: 'failed', reason: 'LINKING-FAILED' });
+  });
+
+  it('maps a thrown link failure for a secret to LINKING-FAILED', async () => {
+    const user = await makeUser('pending-signin-throws@example.com');
+    const { secret } = await createPendingLink({
+      kiloUserId: user.id,
+      kind: 'existing_account',
+      identity: githubIdentity(user.google_user_email),
+      emailCodeAllowed: true,
+    });
+    mockLinkAccount.mockRejectedValueOnce(new Error('database unavailable'));
+
+    await expect(resolvePendingLinkForUser(secret, user.id)).resolves.toEqual({
+      status: 'failed',
+      reason: 'LINKING-FAILED',
+    });
   });
 });
 

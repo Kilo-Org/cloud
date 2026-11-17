@@ -30,10 +30,6 @@ export type OpenRouterProviderConfig = {
   max_price?: { prompt?: number; completion?: number; request?: number; image?: number };
 };
 
-export function isOpenRouterProviderConfig(value: unknown): value is OpenRouterProviderConfig {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 export type VercelInferenceProviderConfig =
   | { apiKey: string; baseURL?: string }
   | AzureCredentials

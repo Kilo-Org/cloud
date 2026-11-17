@@ -422,8 +422,10 @@ export { classifyProviderState } from '@/lib/code-reviewer-status';
 export { useReviewerEditGuard, useReviewerPermission } from '@/lib/hooks/use-reviewer-permission';
 
 // Bitbucket hooks live in use-bitbucket.ts (keeps this file under the
-// max-lines limit); re-exported here so call sites are unchanged.
-export { useBitbucketReadiness, useConnectBitbucket } from '@/lib/hooks/use-bitbucket';
+// max-lines limit); the readiness read is re-exported here so its call sites
+// are unchanged. The connect mutations are imported from use-bitbucket.ts
+// directly, next to the form that runs them.
+export { useBitbucketReadiness } from '@/lib/hooks/use-bitbucket';
 
 // Review-memory hooks live in use-review-memory.ts (keeps this file under
 // the max-lines limit); re-exported here so call sites are unchanged.

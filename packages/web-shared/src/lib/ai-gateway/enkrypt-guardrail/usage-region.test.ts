@@ -2,14 +2,54 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   ...jest.requireActual<Record<string, unknown>>('@kilocode/web-shared/lib/drizzle'),
   isUSRegion: jest.fn(() => false),
 }));
+jest.mock('next/server', () => ({
+  ...jest.requireActual<Record<string, unknown>>('next/server'),
+  after: jest.fn(),
+}));
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   ...jest.requireActual<object>('@kilocode/web-shared/lib/config.server'),
   INTERNAL_API_SECRET: 'test-internal-secret',
+  USAGE_INGEST_URL: undefined,
+  USAGE_INGEST_PUBLISH_SECRET: undefined,
 }));
 jest.mock('@kilocode/web-shared/lib/constants', () => ({
   ...jest.requireActual<object>('@kilocode/web-shared/lib/constants'),
   APP_URL: 'https://app.example.com',
 }));
+
+// The mocked captureException is created here rather than captured from module
+// scope (jest.mock is hoisted above const declarations), for the same reason as
+// the other suites in this repository.
+jest.mock('@sentry/nextjs', () => ({
+  ...jest.requireActual<object>('@sentry/nextjs'),
+  captureException: jest.fn(),
+}));
+
+const withOverriddenAppUrl = async (
+  run: (record: () => Promise<boolean>, captured: jest.Mock) => Promise<void>
+): Promise<void> => {
+  jest.resetModules();
+  jest.doMock('@kilocode/web-shared/lib/constants', () => ({
+    ...jest.requireActual<object>('@kilocode/web-shared/lib/constants'),
+    APP_URL: 'http://app.example.com',
+  }));
+  try {
+    const [{ recordEnkryptUsageInPrimaryRegion }, { captureException }] = await Promise.all([
+      import('./usage-primary-region'),
+      import('@sentry/nextjs'),
+    ]);
+    const usageRecord = await enkryptUsageRecordForNewOrganization();
+    const usageWrite: EnkryptUsageWriteInput = {
+      ...usageRecord,
+      id: randomUUID(),
+      occurredAt: new Date().toISOString(),
+    };
+    await run(() => recordEnkryptUsageInPrimaryRegion(usageWrite), captureException as jest.Mock);
+  } finally {
+    jest.dontMock('@kilocode/web-shared/lib/constants');
+    jest.resetModules();
+  }
+};
 
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { randomUUID } from 'crypto';
@@ -20,7 +60,7 @@ import {
   organizationMicrodollarsUsed,
 } from '@kilocode/web-shared/tests/helpers/enkrypt-usage.helper';
 import { MICRODOLLARS_PER_ENKRYPT_CREDIT, recordEnkryptUsage } from './usage';
-import { EnkryptUsageWriteSchema } from '@kilocode/usage-contracts';
+import { EnkryptUsageWriteSchema, type EnkryptUsageWriteInput } from '@kilocode/usage-contracts';
 import { readJsonBody, requestUrlOf } from '@kilocode/web-shared/tests/helpers/request-body.helper';
 
 const mockedIsUSRegion = jest.mocked(isUSRegion);
@@ -220,7 +260,14 @@ describe('recordEnkryptUsage region routing', () => {
       const handedOff = EnkryptUsageWriteSchema.parse(
         readJsonBody(mockFetch.mock.calls[0][1]?.body)
       );
-      expect(consoleWarn).toHaveBeenCalledTimes(1);
+      expect(consoleWarn).toHaveBeenCalledTimes(2);
+      expect(consoleWarn).toHaveBeenCalledWith('usage enqueue unavailable', {
+        usageId: handedOff.id,
+        usage_kind: 'enkrypt_usage',
+        execution_region: expect.any(String),
+        kind: 'unavailable',
+        reason: 'publisher_not_configured',
+      });
       expect(consoleWarn).toHaveBeenCalledWith(warning, {
         usage_id: handedOff.id,
         error_name: errorName,
@@ -238,4 +285,20 @@ describe('recordEnkryptUsage region routing', () => {
       );
     }
   );
+
+  it('requires an https or loopback app endpoint', async () => {
+    mockedIsUSRegion.mockReturnValue(true);
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    await withOverriddenAppUrl(async (record, captured) => {
+      await expect(record()).resolves.toBe(false);
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(consoleError).toHaveBeenCalledWith(
+        '[enkrypt-guardrail] failed to record usage in the primary region; writing locally',
+        { usage_id: expect.any(String), reason: 'unsupported_app_url' }
+      );
+      const calls = captured.mock.calls as Array<[unknown, { tags: Record<string, string> }]>;
+      const last = calls[calls.length - 1];
+      expect(last?.[1]?.tags).toMatchObject({ reason: 'unsupported_app_url' });
+    });
+  });
 });

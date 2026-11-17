@@ -38,6 +38,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { DENSE_ROW_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { formatList, formatNumber, formatPrefixedMoney } from '@/lib/format';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
@@ -683,6 +684,10 @@ function RuleCard({
           <Pressable
             onPress={onOpenNotifications}
             accessibilityRole="button"
+            // The row keeps the group's density (`min-h-11`, 38.5 dp at the
+            // native 14-point rem), so the touch region reaches the 44 dp
+            // design target through the shared slop, not a taller row.
+            hitSlop={DENSE_ROW_HIT_SLOP}
             className="min-h-11 flex-row items-center justify-between active:opacity-70"
           >
             <Text className="text-sm text-muted-foreground">{t('notifications.push')}</Text>

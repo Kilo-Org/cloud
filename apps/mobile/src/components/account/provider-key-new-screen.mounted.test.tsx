@@ -322,7 +322,9 @@ describe('ProviderKeyNewScreen', () => {
   });
 
   it('keeps the generic copy for a permission denial that is not the unavailable provider', async () => {
-    state.mutateAsync.mockRejectedValueOnce(serverRefusal('FORBIDDEN', 'You cannot write this key'));
+    state.mutateAsync.mockRejectedValueOnce(
+      serverRefusal('FORBIDDEN', 'You cannot write this key')
+    );
     const root = await mount();
 
     await submitKey(root, 'sk-test-123');
@@ -334,7 +336,9 @@ describe('ProviderKeyNewScreen', () => {
   });
 
   it('reports a store failure in its own words for a server fault', async () => {
-    state.mutateAsync.mockRejectedValueOnce(serverRefusal('INTERNAL_SERVER_ERROR', 'KMS unavailable'));
+    state.mutateAsync.mockRejectedValueOnce(
+      serverRefusal('INTERNAL_SERVER_ERROR', 'KMS unavailable')
+    );
     const root = await mount();
 
     await submitKey(root, 'sk-test-123');
@@ -426,7 +430,9 @@ describe('ProviderKeyNewScreen', () => {
     });
 
     expect(state.mutateAsync).not.toHaveBeenCalled();
-    expect(statusMessages(root)).toEqual(['This key is not in the format this provider expects. Check it and try again.']);
+    expect(statusMessages(root)).toEqual([
+      'This key is not in the format this provider expects. Check it and try again.',
+    ]);
   });
 
   it('retires the structured field error and the refusal once the form is edited', async () => {
@@ -443,7 +449,9 @@ describe('ProviderKeyNewScreen', () => {
     expect(credentialForm(root).errors).toEqual({
       resourceName: 'Azure resource name is required.',
     });
-    expect(statusMessages(root)).toEqual(['This key is not in the format this provider expects. Check it and try again.']);
+    expect(statusMessages(root)).toEqual([
+      'This key is not in the format this provider expects. Check it and try again.',
+    ]);
 
     act(() => {
       credentialForm(root).onEdit();

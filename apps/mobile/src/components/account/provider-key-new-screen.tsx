@@ -1,4 +1,3 @@
-import { BYOK_PROVIDER_UNAVAILABLE_MESSAGE } from '@kilocode/app-shared/byok-errors';
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -30,6 +29,7 @@ import {
   readStructuredCredential,
   withoutUnshownValues,
 } from '@/lib/byok/credential-fields';
+import { type KeySaveFailure, refusedKeyMessage } from '@/lib/byok/key-refusal';
 import {
   providerKeyNewParams,
   providerKeyPermissions,
@@ -42,50 +42,9 @@ import { assertSurfaceFailureHandled } from '@/lib/surface-feedback';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { normalizeOrgQueryParam } from '@/lib/org-deep-link';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
-import { isRetryableTrpcError, readTrpcErrorField } from '@/lib/trpc-error';
 import { useTRPC } from '@/lib/trpc';
-import { i18n } from '@/i18n';
 
 type ProviderOption = inferRouterOutputs<MobileRouter>['byok']['listProviders'][number];
-
-type SaveFailure =
-  | { readonly kind: 'retryable'; readonly message: string }
-  | { readonly kind: 'refused'; readonly message: string };
-
-/**
- * Why the server refused the key, in the app's own words, or `null` when it has
- * not made a final decision and asking again can still succeed. Its message can
- * quote the provider's response, which names things this form does not show and
- * does not translate, so the code decides the copy. The unavailable-provider
- * refusal is the one exception: `FORBIDDEN` alone also covers other denials, so
- * it is recognised by the code and the sentence together, where the sentence is
- * the constant both sides import.
- */
-function refusedKeyMessage(error: unknown): string | null {
-  const code = readTrpcErrorField(error, 'code');
-  if (code === 'CONFLICT') {
-    return i18n.t('profile.providerKeys.keyAlreadyExists');
-  }
-  if (code === 'PRECONDITION_FAILED') {
-    return i18n.t('profile.providerKeys.keyManagedByCodingPlan');
-  }
-  if (code === 'UNPROCESSABLE_CONTENT') {
-    return i18n.t('profile.providerKeys.invalidCredentials');
-  }
-  // The server refuses a provider it has not opened for this account. Retrying
-  // the same request cannot change that verdict, so the copy must not ask for
-  // one.
-  if (
-    code === 'FORBIDDEN' &&
-    readTrpcErrorField(error, 'message') === BYOK_PROVIDER_UNAVAILABLE_MESSAGE
-  ) {
-    return i18n.t('profile.providerKeys.providerUnavailable');
-  }
-  // Any other verdict the server will repeat for the same value: a duplicate, a
-  // malformed credential or another denial. The reader can only fix the value,
-  // so the generic store copy asks for that rather than for a retry.
-  return isRetryableTrpcError(error) ? null : i18n.t('profile.providerKeys.keyStoreFailed');
-}
 
 /**
  * The empty field-error state. One shared object, not a fresh `{}`, so an edit
@@ -117,7 +76,7 @@ export function ProviderKeyNewScreen() {
   const [authMode, setAuthMode] = useState<BedrockAuthMode>('apiKey');
   const [fieldErrors, setFieldErrors] =
     useState<Partial<Record<CredentialFieldId, string>>>(NO_FIELD_ERRORS);
-  const save = useSurfaceFeedback<SaveFailure>();
+  const save = useSurfaceFeedback<KeySaveFailure>();
   const scope = providerKeyScope(parsedParam.success ? parsedParam.data.org : undefined);
   const scopeInput = providerKeyScopeInput(scope);
   const keyId = parsedParam.success ? parsedParam.data.id : undefined;

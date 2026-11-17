@@ -26,10 +26,10 @@ import {
   providerKeyScope,
   providerKeyScopeInput,
 } from '@/lib/byok/provider-key-scope';
+import { announceTestOutcome } from '@/lib/byok/key-test-outcome';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
-import { captureTelemetry } from '@/lib/telemetry/error-sink';
 import { isRetryableTrpcError, trpcErrorVariant } from '@/lib/trpc-error';
 import { useTRPC } from '@/lib/trpc';
 
@@ -191,59 +191,7 @@ export function ProviderKeysScreen({ organizationId }: Readonly<{ organizationId
 
   const test = useMutation(
     trpc.byok.testApiKey.mutationOptions({
-      // The server reports one of a fixed set of verdicts on the stored key. The
-      // app says which in its own words; the provider's own text stays on the
-      // server, because it can quote the upstream account and is untranslated.
-      onSuccess: result => {
-        switch (result.outcome) {
-          case 'ok': {
-            announcingToast.success(
-              t('profile.providerKeys.testSucceeded', {
-                provider: result.provider,
-                model: result.model,
-              })
-            );
-            break;
-          }
-          case 'incomplete': {
-            announcingToast.error(t('profile.providerKeys.testIncomplete'));
-            break;
-          }
-          case 'rejected': {
-            announcingToast.error(t('profile.providerKeys.testRejected'));
-            break;
-          }
-          case 'unsupported-provider': {
-            announcingToast.error(t('profile.providerKeys.testUnsupportedProvider'));
-            break;
-          }
-          case 'unreadable-key': {
-            announcingToast.error(t('profile.providerKeys.testUnreadableKey'));
-            break;
-          }
-          case 'deprecated-provider': {
-            announcingToast.error(t('profile.providerKeys.testDeprecatedProvider'));
-            break;
-          }
-          case 'failed': {
-            announcingToast.error(t('profile.providerKeys.testFailed'));
-            break;
-          }
-          default: {
-            // `result` is `never`: this build knows every outcome the union
-            // declares. The union belongs to the server, and a build installed
-            // before the server adds one still receives it, so the tap answers
-            // with the generic failure copy and the outcome is recorded.
-            captureTelemetry({
-              level: 'warning',
-              message: 'Unhandled BYOK key test outcome',
-              extra: { result },
-            });
-            announcingToast.error(t('profile.providerKeys.testFailed'));
-            break;
-          }
-        }
-      },
+      onSuccess: announceTestOutcome,
       onError: () => announcingToast.error(t('profile.providerKeys.testFailed')),
       onSettled: (_result, _error, input) => {
         setTestingId(current => (current === input.id ? null : current));

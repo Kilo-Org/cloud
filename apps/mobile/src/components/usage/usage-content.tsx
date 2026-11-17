@@ -138,12 +138,12 @@ export function UsageContent({ scope }: Readonly<{ scope: UsageScope }>) {
         <View className="gap-6">
           <View className="gap-3">
             <View className="flex-row gap-3">
-              <Skeleton className="h-[66px] flex-1 rounded-lg bg-muted-soft" />
-              <Skeleton className="h-[66px] flex-1 rounded-lg bg-muted-soft" />
+              <Skeleton className="h-[63px] flex-1 rounded-lg bg-muted-soft" />
+              <Skeleton className="h-[63px] flex-1 rounded-lg bg-muted-soft" />
             </View>
             <View className="flex-row gap-3">
-              <Skeleton className="h-[99px] flex-1 rounded-lg bg-muted-soft" />
-              <Skeleton className="h-[99px] flex-1 rounded-lg bg-muted-soft" />
+              <Skeleton className="h-[95px] flex-1 rounded-lg bg-muted-soft" />
+              <Skeleton className="h-[95px] flex-1 rounded-lg bg-muted-soft" />
             </View>
           </View>
           <Skeleton className="h-[148px] w-full rounded-lg bg-muted-soft" />

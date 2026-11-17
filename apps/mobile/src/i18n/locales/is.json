@@ -3466,6 +3466,18 @@
       "auditLogs": "Endurskoðunarskrár",
       "requestLogs": "Beiðnaskrár"
     },
+    "requestLogs": {
+      "hint": "Beiðnir frá klukkustundinni fyrir lok tímabilsins, nýjustu fyrst.",
+      "older": "Fyrri klukkustund",
+      "newer": "Næsta klukkustund",
+      "truncated": "Fleiri beiðnir eru á þessari klukkustund en listinn sýnir.",
+      "emptyTitle": "Engar beiðnir",
+      "emptyDescription": "Engar gáttarbeiðnir voru á þessari klukkustund.",
+      "loadError": "Ekki tókst að sækja beiðnaskrár.",
+      "permissionDenied": "Aðeins eigandi, stjórnandi eða greiðslustjóri félags getur lesið beiðnaskrár þess.",
+      "tokens": "{{input}} inn · {{output}} út",
+      "byok": "BYOK"
+    },
     "usageStats": {
       "inputTokens": "Inntakstókar",
       "orgLast30Days": "Allir meðlimir · Síðustu 30 dagar",

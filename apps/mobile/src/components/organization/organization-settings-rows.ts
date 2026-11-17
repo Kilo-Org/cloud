@@ -80,7 +80,13 @@ export type OrgSettingsRow = Readonly<{
  * The areas the app reads and writes itself, each opening its own screen
  * instead of a web page.
  */
-type OrgInAppSettingsArea = 'customModes' | 'groups' | 'usageDetails' | 'auditLogs' | 'byok';
+type OrgInAppSettingsArea =
+  | 'customModes'
+  | 'groups'
+  | 'usageDetails'
+  | 'auditLogs'
+  | 'requestLogs'
+  | 'byok';
 
 export type OrgInAppSettingsRow = Readonly<{
   area: OrgInAppSettingsArea;
@@ -178,6 +184,14 @@ const IN_APP_ROW_SPECS: readonly OrgInAppSettingsRowSpec[] = [
     href: () => '/(app)/(tabs)/(3_profile)/organization/audit-log',
     visible: gate => canViewOrgAuditLog(gate.role, gate.plan),
   },
+  // "Request logs": the sidebar's billing-role gate, and the procedure behind
+  // the page answers only that role, so the row and the screen read one gate.
+  {
+    area: 'requestLogs',
+    icon: FileText,
+    href: () => '/(app)/(tabs)/(3_profile)/organization/request-logs',
+    visible: gate => canManageOrganizationBilling(gate.role),
+  },
   // BYOK: the sidebar's billing-role gate, and the app's own provider-keys
   // screen with this organization's scope.
   {
@@ -195,6 +209,7 @@ const IN_APP_TITLE_KEYS = {
   // area under Dashboard, and check:i18n refuses a second key with this copy.
   usageDetails: 'organization.settingsOnWeb.usageDetails',
   auditLogs: 'organization.settingsOnWeb.auditLogs',
+  requestLogs: 'organization.settingsOnWeb.requestLogs',
   byok: 'organization.settingsOnWeb.byok',
 } satisfies Record<OrgInAppSettingsArea, string>;
 

@@ -3471,6 +3471,18 @@
       "auditLogs": "Auditlogboeken",
       "requestLogs": "Verzoeklogboeken"
     },
+    "requestLogs": {
+      "hint": "Verzoeken uit het uur vóór het einde van het venster, nieuwste eerst.",
+      "older": "Eerder uur",
+      "newer": "Later uur",
+      "truncated": "Dit uur bevat meer verzoeken dan de lijst toont.",
+      "emptyTitle": "Geen verzoeken",
+      "emptyDescription": "Er zijn geen gatewayverzoeken in dit uur.",
+      "loadError": "Kan verzoeklogboeken niet laden.",
+      "permissionDenied": "Alleen een eigenaar, beheerder of factureringsbeheerder van de organisatie kan de verzoeklogboeken bekijken.",
+      "tokens": "{{input}} in · {{output}} uit",
+      "byok": "BYOK"
+    },
     "usageStats": {
       "inputTokens": "Invoertokens",
       "orgLast30Days": "Alle leden · Laatste 30 dagen",

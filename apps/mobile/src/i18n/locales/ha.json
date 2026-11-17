@@ -3466,6 +3466,18 @@
       "auditLogs": "Rajistun bincike",
       "requestLogs": "Rajistun buƙatu"
     },
+    "requestLogs": {
+      "hint": "Buƙatun awa ɗaya kafin ƙarshen wannan lokaci, sababbi a farko.",
+      "older": "Awa ta baya",
+      "newer": "Awa ta gaba",
+      "truncated": "Wannan awa tana da buƙatu fiye da waɗanda jerin ke nunawa.",
+      "emptyTitle": "Babu buƙatu",
+      "emptyDescription": "Babu buƙatun gateway a wannan awa.",
+      "loadError": "An kasa loda rajistun buƙatu.",
+      "permissionDenied": "Mai ƙungiya, mai gudanarwa ko manajan biyan kuɗi ne kaɗai zai iya karanta rajistun buƙatun ƙungiyar.",
+      "tokens": "{{input}} shigarwa · {{output}} fitarwa",
+      "byok": "BYOK"
+    },
     "usageStats": {
       "inputTokens": "Guntayen rubutun shigarwa",
       "orgLast30Days": "Membobi duka · Kwanaki 30 da suka gabata",

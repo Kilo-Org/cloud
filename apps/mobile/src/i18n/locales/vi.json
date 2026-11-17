@@ -3471,6 +3471,18 @@
       "auditLogs": "Nhật ký kiểm tra",
       "requestLogs": "Nhật ký yêu cầu"
     },
+    "requestLogs": {
+      "hint": "Các yêu cầu trong một giờ tính đến cuối khung thời gian, mới nhất ở trên.",
+      "older": "Giờ cũ hơn",
+      "newer": "Giờ mới hơn",
+      "truncated": "Giờ này có nhiều yêu cầu hơn số hiển thị trong danh sách.",
+      "emptyTitle": "Không có yêu cầu",
+      "emptyDescription": "Không có yêu cầu nào qua gateway trong giờ này.",
+      "loadError": "Không thể tải nhật ký yêu cầu.",
+      "permissionDenied": "Chỉ chủ sở hữu, quản trị viên hoặc người quản lý thanh toán của tổ chức mới có thể xem nhật ký yêu cầu của tổ chức.",
+      "tokens": "{{input}} vào · {{output}} ra",
+      "byok": "BYOK"
+    },
     "usageStats": {
       "inputTokens": "Token đầu vào",
       "orgLast30Days": "Tất cả thành viên · 30 Ngày qua",

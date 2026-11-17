@@ -3466,6 +3466,18 @@
       "auditLogs": "Log audit",
       "requestLogs": "Log permintaan"
     },
+    "requestLogs": {
+      "hint": "Permintaan dalam sejam sebelum julat masa berakhir, terkini dahulu.",
+      "older": "Jam sebelumnya",
+      "newer": "Jam berikutnya",
+      "truncated": "Jam ini ada lebih banyak permintaan daripada yang dipaparkan.",
+      "emptyTitle": "Tiada permintaan",
+      "emptyDescription": "Tiada permintaan get laluan dalam jam ini.",
+      "loadError": "Tidak dapat memuatkan log permintaan.",
+      "permissionDenied": "Hanya pemilik, pentadbir atau pengurus pengebilan organisasi boleh membaca log permintaannya.",
+      "tokens": "{{input}} masuk · {{output}} keluar",
+      "byok": "BYOK"
+    },
     "usageStats": {
       "inputTokens": "Token masukan",
       "orgLast30Days": "Semua ahli · 30 Hari terakhir",

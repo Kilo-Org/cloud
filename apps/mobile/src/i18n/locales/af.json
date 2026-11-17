@@ -3466,6 +3466,18 @@
       "auditLogs": "Ouditlogs",
       "requestLogs": "Versoeklogs"
     },
+    "requestLogs": {
+      "hint": "Versoeke uit die uur voordat die venster eindig, nuutste eerste.",
+      "older": "Vroeër uur",
+      "newer": "Later uur",
+      "truncated": "Hierdie uur het meer versoeke as wat die lys wys.",
+      "emptyTitle": "Geen versoeke nie",
+      "emptyDescription": "Hierdie uur het geen gateway-versoeke nie.",
+      "loadError": "Kon nie versoeklogs laai nie.",
+      "permissionDenied": "Slegs 'n organisasie-eienaar, -administrateur of -faktuurbestuurder kan die organisasie se versoeklogs lees.",
+      "tokens": "{{input}} in · {{output}} uit",
+      "byok": "BYOK"
+    },
     "usageStats": {
       "inputTokens": "Invoertekens",
       "orgLast30Days": "Alle lede · Laaste 30 dae",

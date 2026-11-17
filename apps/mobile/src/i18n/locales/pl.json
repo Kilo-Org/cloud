@@ -3585,6 +3585,18 @@
       "auditLogs": "Dzienniki audytu",
       "requestLogs": "Dzienniki żądań"
     },
+    "requestLogs": {
+      "hint": "Żądania z godziny przed końcem okna, od najnowszych.",
+      "older": "Wcześniejsza godzina",
+      "newer": "Późniejsza godzina",
+      "truncated": "W tej godzinie jest więcej żądań, niż pokazuje lista.",
+      "emptyTitle": "Brak żądań",
+      "emptyDescription": "W tej godzinie nie było żądań do bramy.",
+      "loadError": "Nie udało się wczytać dzienników żądań.",
+      "permissionDenied": "Dzienniki żądań może przeglądać tylko właściciel, administrator lub menedżer rozliczeń organizacji.",
+      "tokens": "{{input}} wej. · {{output}} wyj.",
+      "byok": "BYOK"
+    },
     "usageStats": {
       "inputTokens": "Tokeny wejściowe",
       "orgLast30Days": "Wszyscy członkowie · Ostatnie 30 dni",

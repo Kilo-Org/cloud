@@ -3580,6 +3580,18 @@
       "auditLogs": "Revizijski dnevniki",
       "requestLogs": "Dnevniki zahtev"
     },
+    "requestLogs": {
+      "hint": "Zahteve iz ure pred koncem časovnega okna, od najnovejše naprej.",
+      "older": "Prejšnja ura",
+      "newer": "Naslednja ura",
+      "truncated": "V tej uri je več zahtev, kot jih prikazuje seznam.",
+      "emptyTitle": "Ni zahtev",
+      "emptyDescription": "V tej uri ni zahtev prek prehoda.",
+      "loadError": "Dnevnikov zahtev ni bilo mogoče naložiti.",
+      "permissionDenied": "Dnevnike zahtev organizacije lahko bere samo njen lastnik, skrbnik ali upravitelj obračunavanja.",
+      "tokens": "{{input}} vhod · {{output}} izhod",
+      "byok": "BYOK"
+    },
     "usageStats": {
       "inputTokens": "Vhodni žetoni",
       "orgLast30Days": "Vsi člani · Zadnjih 30 dni",

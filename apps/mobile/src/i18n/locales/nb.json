@@ -3466,6 +3466,18 @@
       "auditLogs": "Revisjonslogger",
       "requestLogs": "Forespørselslogger"
     },
+    "requestLogs": {
+      "hint": "Forespørsler fra timen før vinduet slutter, nyeste først.",
+      "older": "Eldre time",
+      "newer": "Nyere time",
+      "truncated": "Denne timen har flere forespørsler enn listen viser.",
+      "emptyTitle": "Ingen forespørsler",
+      "emptyDescription": "Denne timen har ingen gateway-forespørsler.",
+      "loadError": "Kunne ikke laste inn forespørselslogger.",
+      "permissionDenied": "Bare en eier, administrator eller faktureringsansvarlig i organisasjonen kan lese forespørselsloggene.",
+      "tokens": "{{input}} inn · {{output}} ut",
+      "byok": "BYOK"
+    },
     "usageStats": {
       "inputTokens": "Inndatatokener",
       "orgLast30Days": "Alle medlemmer · Siste 30 dager",

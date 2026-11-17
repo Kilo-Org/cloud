@@ -3471,6 +3471,18 @@
       "auditLogs": "Log audit",
       "requestLogs": "Log permintaan"
     },
+    "requestLogs": {
+      "hint": "Permintaan dalam satu jam sebelum akhir rentang waktu, terbaru di atas.",
+      "older": "Jam sebelumnya",
+      "newer": "Jam berikutnya",
+      "truncated": "Jam ini memiliki lebih banyak permintaan daripada yang ditampilkan.",
+      "emptyTitle": "Tidak ada permintaan",
+      "emptyDescription": "Tidak ada permintaan gateway dalam jam ini.",
+      "loadError": "Tidak dapat memuat log permintaan.",
+      "permissionDenied": "Hanya pemilik, admin, atau pengelola penagihan organisasi yang dapat membaca log permintaannya.",
+      "tokens": "{{input}} masuk · {{output}} keluar",
+      "byok": "BYOK"
+    },
     "usageStats": {
       "inputTokens": "Token masukan",
       "orgLast30Days": "Semua anggota · 30 Hari terakhir",

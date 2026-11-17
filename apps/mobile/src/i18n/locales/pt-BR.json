@@ -3534,6 +3534,18 @@
       "auditLogs": "Registros de auditoria",
       "requestLogs": "Registros de solicitações"
     },
+    "requestLogs": {
+      "hint": "Solicitações da hora anterior ao fim da janela, mais recentes primeiro.",
+      "older": "Hora anterior",
+      "newer": "Hora seguinte",
+      "truncated": "Esta hora tem mais solicitações do que a lista mostra.",
+      "emptyTitle": "Nenhuma solicitação",
+      "emptyDescription": "Esta hora não tem solicitações ao gateway.",
+      "loadError": "Não foi possível carregar os registros de solicitações.",
+      "permissionDenied": "Somente proprietários, administradores ou gerentes de faturamento de uma organização podem ver os registros de solicitações dela.",
+      "tokens": "{{input}} de entrada · {{output}} de saída",
+      "byok": "BYOK"
+    },
     "usageStats": {
       "inputTokens": "Tokens de entrada",
       "orgLast30Days": "Todos os membros · Últimos 30 dias",

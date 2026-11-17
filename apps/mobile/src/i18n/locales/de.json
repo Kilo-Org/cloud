@@ -3471,6 +3471,18 @@
       "auditLogs": "Audit-Logs",
       "requestLogs": "Anfrage-Logs"
     },
+    "requestLogs": {
+      "hint": "Anfragen aus der Stunde vor Ende des Zeitfensters, neueste zuerst.",
+      "older": "Frühere Stunde",
+      "newer": "Spätere Stunde",
+      "truncated": "Diese Stunde enthält mehr Anfragen, als die Liste anzeigt.",
+      "emptyTitle": "Keine Anfragen",
+      "emptyDescription": "In dieser Stunde gab es keine Gateway-Anfragen.",
+      "loadError": "Anfrage-Logs konnten nicht geladen werden.",
+      "permissionDenied": "Nur Inhaber, Admins oder Abrechnungsverantwortliche einer Organisation können deren Anfrage-Logs einsehen.",
+      "tokens": "{{input}} ein · {{output}} aus",
+      "byok": "BYOK"
+    },
     "usageStats": {
       "inputTokens": "Eingabe-Tokens",
       "orgLast30Days": "Alle Mitglieder · Letzte 30 Tage",

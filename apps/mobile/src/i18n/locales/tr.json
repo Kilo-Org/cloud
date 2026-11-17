@@ -3471,6 +3471,18 @@
       "auditLogs": "Denetim günlükleri",
       "requestLogs": "İstek günlükleri"
     },
+    "requestLogs": {
+      "hint": "Pencerenin bitişinden önceki bir saatteki istekler, en yeniden eskiye.",
+      "older": "Önceki saat",
+      "newer": "Sonraki saat",
+      "truncated": "Bu saatte listede gösterilenden daha fazla istek var.",
+      "emptyTitle": "İstek yok",
+      "emptyDescription": "Bu saatte ağ geçidi isteği yok.",
+      "loadError": "İstek günlükleri yüklenemedi.",
+      "permissionDenied": "İstek günlüklerini yalnızca kuruluşun sahibi, yöneticisi veya faturalandırma yöneticisi görüntüleyebilir.",
+      "tokens": "{{input}} giriş · {{output}} çıkış",
+      "byok": "BYOK"
+    },
     "usageStats": {
       "inputTokens": "Girdi tokenları",
       "orgLast30Days": "Tüm üyeler · Son 30 gün",

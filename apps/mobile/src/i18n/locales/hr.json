@@ -3523,6 +3523,18 @@
       "auditLogs": "Revizijski zapisnici",
       "requestLogs": "Zapisnici zahtjeva"
     },
+    "requestLogs": {
+      "hint": "Zahtjevi iz sata prije kraja razdoblja, najnoviji prvi.",
+      "older": "Prethodni sat",
+      "newer": "Sljedeći sat",
+      "truncated": "U ovom satu ima više zahtjeva nego što je prikazano.",
+      "emptyTitle": "Nema zahtjeva",
+      "emptyDescription": "U ovom satu nema zahtjeva prema pristupniku.",
+      "loadError": "Učitavanje zapisnika zahtjeva nije uspjelo.",
+      "permissionDenied": "Zapisnike zahtjeva organizacije mogu čitati samo vlasnik, administrator ili upravitelj naplate.",
+      "tokens": "ulaz: {{input}} · izlaz: {{output}}",
+      "byok": "BYOK"
+    },
     "usageStats": {
       "inputTokens": "Ulazni tokeni",
       "orgLast30Days": "Svi članovi · Zadnjih 30 dana",

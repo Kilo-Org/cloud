@@ -3466,6 +3466,18 @@
       "auditLogs": "Ndekọ nyocha",
       "requestLogs": "Ndekọ arịrịọ"
     },
+    "requestLogs": {
+      "hint": "Arịrịọ nke otu awa tupu oge a na-egosi agwụ, nke kachasị ọhụrụ bụ mbụ.",
+      "older": "Awa gara aga",
+      "newer": "Awa na-esote",
+      "truncated": "Awa a nwere arịrịọ karịa ndị ndepụta a na-egosi.",
+      "emptyTitle": "Enweghị arịrịọ",
+      "emptyDescription": "Enweghị arịrịọ gateway n'awa a.",
+      "loadError": "Enweghị ike ibudata ndekọ arịrịọ.",
+      "permissionDenied": "Naanị onye nwe òtù, onye nchịkwa ma ọ bụ onye na-ahụ maka ịkwụ ụgwọ nwere ike ịgụ ndekọ arịrịọ ya.",
+      "tokens": "{{input}} batara · {{output}} pụtara",
+      "byok": "BYOK"
+    },
     "usageStats": {
       "inputTokens": "Tokin ntinye",
       "orgLast30Days": "Ndị otu niile · Ụbọchị 30 gara aga",

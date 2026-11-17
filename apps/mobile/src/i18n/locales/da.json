@@ -3466,6 +3466,18 @@
       "auditLogs": "Revisionslogs",
       "requestLogs": "Anmodningslogs"
     },
+    "requestLogs": {
+      "hint": "Anmodninger fra timen op til vinduets sluttidspunkt, nyeste først.",
+      "older": "Forrige time",
+      "newer": "Næste time",
+      "truncated": "Denne time har flere anmodninger, end listen viser.",
+      "emptyTitle": "Ingen anmodninger",
+      "emptyDescription": "Der er ingen gateway-anmodninger i denne time.",
+      "loadError": "Anmodningslogs kunne ikke indlæses.",
+      "permissionDenied": "Kun en ejer, administrator eller faktureringsansvarlig i organisationen kan se dens anmodningslogs.",
+      "tokens": "{{input}} ind · {{output}} ud",
+      "byok": "BYOK"
+    },
     "usageStats": {
       "inputTokens": "Tokens i inddata",
       "orgLast30Days": "Alle medlemmer · Seneste 30 dage",

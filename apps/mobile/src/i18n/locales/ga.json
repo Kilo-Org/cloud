@@ -3637,6 +3637,18 @@
       "auditLogs": "Logaí iniúchta",
       "requestLogs": "Logaí iarratas"
     },
+    "requestLogs": {
+      "hint": "Iarratais ón uair an chloig roimh dheireadh na fuinneoige, na cinn is déanaí ar dtús.",
+      "older": "Uair níos luaithe",
+      "newer": "Uair níos déanaí",
+      "truncated": "Tá níos mó iarratas san uair seo ná mar a thaispeántar sa liosta.",
+      "emptyTitle": "Níl aon iarratais",
+      "emptyDescription": "Níl aon iarratais chuig an ngeata san uair seo.",
+      "loadError": "Níorbh fhéidir logaí iarratas a lódáil.",
+      "permissionDenied": "Ní féidir ach le húinéir, riarthóir nó bainisteoir billeála eagraíochta a logaí iarratas a léamh.",
+      "tokens": "{{input}} isteach · {{output}} amach",
+      "byok": "BYOK"
+    },
     "usageStats": {
       "inputTokens": "Comharthaí ionchuir",
       "orgLast30Days": "Na baill go léir · Na 30 lá deireanacha",

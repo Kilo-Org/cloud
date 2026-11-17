@@ -3523,6 +3523,18 @@
       "auditLogs": "Dnevnici revizije",
       "requestLogs": "Dnevnici zahteva"
     },
+    "requestLogs": {
+      "hint": "Zahtevi iz sata pre kraja intervala, počev od najnovijih.",
+      "older": "Prethodni sat",
+      "newer": "Sledeći sat",
+      "truncated": "U ovom satu ima više zahteva nego što lista prikazuje.",
+      "emptyTitle": "Nema zahteva",
+      "emptyDescription": "U ovom satu nema zahteva preko gateway-a.",
+      "loadError": "Učitavanje dnevnika zahteva nije uspelo.",
+      "permissionDenied": "Dnevnike zahteva organizacije mogu da čitaju samo njen vlasnik, administrator ili menadžer za naplatu.",
+      "tokens": "{{input}} ulaz · {{output}} izlaz",
+      "byok": "BYOK"
+    },
     "usageStats": {
       "inputTokens": "Ulazni tokeni",
       "orgLast30Days": "Svi članovi · Poslednjih 30 dana",

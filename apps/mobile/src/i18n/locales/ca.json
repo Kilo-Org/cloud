@@ -3523,6 +3523,18 @@
       "auditLogs": "Registres d'auditoria",
       "requestLogs": "Registres de sol·licituds"
     },
+    "requestLogs": {
+      "hint": "Sol·licituds de l'hora que acaba al final de la finestra, les més recents primer.",
+      "older": "Hora anterior",
+      "newer": "Hora següent",
+      "truncated": "Aquesta hora té més sol·licituds de les que mostra la llista.",
+      "emptyTitle": "No hi ha sol·licituds",
+      "emptyDescription": "En aquesta hora no hi ha cap sol·licitud a la passarel·la.",
+      "loadError": "No s'han pogut carregar els registres de sol·licituds.",
+      "permissionDenied": "Només un propietari, administrador o gestor de facturació d'una organització pot consultar-ne els registres de sol·licituds.",
+      "tokens": "{{input}} d'entrada · {{output}} de sortida",
+      "byok": "BYOK"
+    },
     "usageStats": {
       "inputTokens": "Tòkens d'entrada",
       "orgLast30Days": "Tots els membres · Últims 30 dies",

@@ -3580,6 +3580,18 @@
       "auditLogs": "Audito žurnalai",
       "requestLogs": "Užklausų žurnalai"
     },
+    "requestLogs": {
+      "hint": "Užklausos per valandą iki lango pabaigos, naujausios pirmos.",
+      "older": "Ankstesnė valanda",
+      "newer": "Vėlesnė valanda",
+      "truncated": "Šią valandą užklausų buvo daugiau, nei rodoma sąraše.",
+      "emptyTitle": "Užklausų nėra",
+      "emptyDescription": "Šią valandą šliuzo užklausų nebuvo.",
+      "loadError": "Nepavyko įkelti užklausų žurnalų.",
+      "permissionDenied": "Organizacijos užklausų žurnalus gali skaityti tik jos savininkas, administratorius arba atsiskaitymų valdytojas.",
+      "tokens": "Įvestis {{input}} · išvestis {{output}}",
+      "byok": "BYOK"
+    },
     "usageStats": {
       "inputTokens": "Įvesties žetonai",
       "orgLast30Days": "Visi nariai · Pastarosios 30 dienų",

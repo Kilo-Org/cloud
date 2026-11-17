@@ -126,6 +126,7 @@ describe('visibleInAppSettingsRows', () => {
         'groups',
         'usageDetails',
         'auditLogs',
+        'requestLogs',
         'byok',
       ]);
     }
@@ -138,7 +139,12 @@ describe('visibleInAppSettingsRows', () => {
   });
 
   it('keeps the billing rows for a billing role on the teams plan, where the audit log is refused', () => {
-    expect(inAppAreas({ plan: 'teams' })).toEqual(['customModes', 'usageDetails', 'byok']);
+    expect(inAppAreas({ plan: 'teams' })).toEqual([
+      'customModes',
+      'usageDetails',
+      'requestLogs',
+      'byok',
+    ]);
   });
 
   it('opens the native screen that owns each setting', () => {
@@ -148,6 +154,9 @@ describe('visibleInAppSettingsRows', () => {
     expect(byArea.get('groups')?.href).toBe('/(app)/(tabs)/(3_profile)/organization/groups');
     expect(byArea.get('usageDetails')?.href).toBe('/(app)/(tabs)/(3_profile)/organization/usage');
     expect(byArea.get('auditLogs')?.href).toBe('/(app)/(tabs)/(3_profile)/organization/audit-log');
+    expect(byArea.get('requestLogs')?.href).toBe(
+      '/(app)/(tabs)/(3_profile)/organization/request-logs'
+    );
     expect(byArea.get('byok')?.href).toEqual({
       pathname: '/(app)/(tabs)/(3_profile)/provider-keys',
       params: { org: 'org_1' },

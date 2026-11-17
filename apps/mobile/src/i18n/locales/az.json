@@ -3466,6 +3466,18 @@
       "auditLogs": "Audit jurnalları",
       "requestLogs": "Sorğu jurnalları"
     },
+    "requestLogs": {
+      "hint": "Pəncərə bitənədək son bir saatın sorğuları, ən yeniləri əvvəldə.",
+      "older": "Əvvəlki saat",
+      "newer": "Sonrakı saat",
+      "truncated": "Bu saatda siyahıda göstəriləndən daha çox sorğu var.",
+      "emptyTitle": "Sorğu yoxdur",
+      "emptyDescription": "Bu saatda şlüz sorğusu yoxdur.",
+      "loadError": "Sorğu jurnallarını yükləmək mümkün olmadı.",
+      "permissionDenied": "Sorğu jurnallarını yalnız təşkilatın sahibi, administratoru və ya ödəniş meneceri oxuya bilər.",
+      "tokens": "{{input}} giriş · {{output}} çıxış",
+      "byok": "BYOK"
+    },
     "usageStats": {
       "inputTokens": "Giriş tokenləri",
       "orgLast30Days": "Bütün üzvlər · Son 30 gün",

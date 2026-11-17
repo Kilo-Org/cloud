@@ -3466,6 +3466,18 @@
       "auditLogs": "Amarekhodi okucwaninga",
       "requestLogs": "Amarekhodi ezicelo"
     },
+    "requestLogs": {
+      "hint": "Izicelo zehora elingaphambi kokuphela kwesikhathi esiboniswayo, ezakamuva kuqala.",
+      "older": "Ihora elidlule",
+      "newer": "Ihora elilandelayo",
+      "truncated": "Leli hora linezicelo eziningi kunalezo eziboniswa uhlu.",
+      "emptyTitle": "Azikho izicelo",
+      "emptyDescription": "Leli hora alinazo izicelo ze-gateway.",
+      "loadError": "Akukwazekanga ukulayisha amarekhodi ezicelo.",
+      "permissionDenied": "Ngumnikazi wenhlangano, umlawuli noma umphathi wokukhokha kuphela ongafunda amarekhodi ayo ezicelo.",
+      "tokens": "{{input}} okungenayo · {{output}} okuphumayo",
+      "byok": "BYOK"
+    },
     "usageStats": {
       "inputTokens": "Amathokheni okufakiwe",
       "orgLast30Days": "Amalungu onke · Izinsuku ezingama-30 ezedlule",

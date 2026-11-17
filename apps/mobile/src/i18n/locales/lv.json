@@ -3523,6 +3523,18 @@
       "auditLogs": "Audita žurnāli",
       "requestLogs": "Pieprasījumu žurnāli"
     },
+    "requestLogs": {
+      "hint": "Pieprasījumi stundā līdz laika loga beigām, jaunākie vispirms.",
+      "older": "Iepriekšējā stunda",
+      "newer": "Nākamā stunda",
+      "truncated": "Šajā stundā ir vairāk pieprasījumu, nekā parādīts sarakstā.",
+      "emptyTitle": "Nav pieprasījumu",
+      "emptyDescription": "Šajā stundā nav vārtejas pieprasījumu.",
+      "loadError": "Neizdevās ielādēt pieprasījumu žurnālus.",
+      "permissionDenied": "Organizācijas pieprasījumu žurnālus var skatīt tikai tās īpašnieks, administrators vai norēķinu pārvaldnieks.",
+      "tokens": "{{input}} ievade · {{output}} izvade",
+      "byok": "BYOK"
+    },
     "usageStats": {
       "inputTokens": "Ievades tokeni",
       "orgLast30Days": "Visi dalībnieki · Pēdējās 30 dienas",

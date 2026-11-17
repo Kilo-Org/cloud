@@ -3466,6 +3466,18 @@
       "auditLogs": "Galmeewwan odiitii",
       "requestLogs": "Galmeewwan gaaffii"
     },
+    "requestLogs": {
+      "hint": "Gaaffiiwwan sa'aatii xumura yeroo filatamee dura jiru, kan haaraan dura.",
+      "older": "Sa'aatii darbe",
+      "newer": "Sa'aatii itti aanu",
+      "truncated": "Sa'aatiin kun gaaffiiwwan tarree kana irratti mul'atan caalaa qaba.",
+      "emptyTitle": "Gaaffiin hin jiru",
+      "emptyDescription": "Sa'aatii kana keessa gaaffiin gateway hin jiru.",
+      "loadError": "Galmeewwan gaaffii fe'uun hin danda'amne.",
+      "permissionDenied": "Galmeewwan gaaffii dhaabbataa kan dubbisuu danda'an abbaa dhaabbataa, bulchaa ykn hogganaa kaffaltii qofa.",
+      "tokens": "{{input}} seene · {{output}} ba'e",
+      "byok": "BYOK"
+    },
     "usageStats": {
       "inputTokens": "Tookanoota galtee",
       "orgLast30Days": "Miseensoota hunda · Guyyoota 30 dhumaa",

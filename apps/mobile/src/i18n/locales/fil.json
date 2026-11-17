@@ -3466,6 +3466,18 @@
       "auditLogs": "Mga audit log",
       "requestLogs": "Mga request log"
     },
+    "requestLogs": {
+      "hint": "Mga request sa loob ng isang oras bago magtapos ang window, pinakabago muna.",
+      "older": "Mas lumang oras",
+      "newer": "Mas bagong oras",
+      "truncated": "Mas marami ang request sa oras na ito kaysa sa ipinapakita ng listahan.",
+      "emptyTitle": "Walang request",
+      "emptyDescription": "Walang gateway request sa oras na ito.",
+      "loadError": "Hindi ma-load ang mga request log.",
+      "permissionDenied": "Ang may-ari, admin o billing manager lang ng organisasyon ang puwedeng magbasa ng mga request log nito.",
+      "tokens": "{{input}} input · {{output}} output",
+      "byok": "BYOK"
+    },
     "usageStats": {
       "inputTokens": "Mga papasok na token",
       "orgLast30Days": "Lahat ng miyembro · Huling 30 araw",

@@ -3466,6 +3466,18 @@
       "auditLogs": "Diiwaannada hubinta",
       "requestLogs": "Diiwaannada codsiyada"
     },
+    "requestLogs": {
+      "hint": "Codsiyadii saacadda ka horreysay dhammaadka muddada, kuwa ugu cusub ayaa ugu horreeya.",
+      "older": "Saacaddii hore",
+      "newer": "Saacadda xigta",
+      "truncated": "Saacaddan waxay leedahay codsiyo ka badan inta liisku muujinayo.",
+      "emptyTitle": "Ma jiraan codsiyo",
+      "emptyDescription": "Saacaddan ma jiraan codsiyo gateway.",
+      "loadError": "Lama soo rari karin diiwaannada codsiyada.",
+      "permissionDenied": "Kaliya milkiilaha ururka, maamulaha ama maareeyaha biilasha ayaa akhrin kara diiwaannada codsiyada ururka.",
+      "tokens": "{{input}} gal · {{output}} bax",
+      "byok": "BYOK"
+    },
     "usageStats": {
       "inputTokens": "Halbeegyada qoraalka la geliyay",
       "orgLast30Days": "Dhammaan xubnaha · 30-Kii maalmood ee la soo dhaafay",

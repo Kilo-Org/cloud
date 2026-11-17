@@ -3466,6 +3466,18 @@
       "auditLogs": "Tarkastuslokit",
       "requestLogs": "Pyyntölokit"
     },
+    "requestLogs": {
+      "hint": "Aikaikkunan päättymistä edeltävän tunnin pyynnöt, uusimmat ensin.",
+      "older": "Edellinen tunti",
+      "newer": "Seuraava tunti",
+      "truncated": "Tällä tunnilla on enemmän pyyntöjä kuin luettelossa näytetään.",
+      "emptyTitle": "Ei pyyntöjä",
+      "emptyDescription": "Tällä tunnilla ei ole yhdyskäytäväpyyntöjä.",
+      "loadError": "Pyyntölokien lataaminen epäonnistui.",
+      "permissionDenied": "Vain organisaation omistaja, ylläpitäjä tai laskutusvastaava voi lukea organisaation pyyntölokeja.",
+      "tokens": "{{input}} sisään · {{output}} ulos",
+      "byok": "BYOK"
+    },
     "usageStats": {
       "inputTokens": "Syötetokenit",
       "orgLast30Days": "Kaikki jäsenet · Viimeiset 30 päivää",

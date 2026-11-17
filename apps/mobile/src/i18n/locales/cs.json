@@ -3580,6 +3580,18 @@
       "auditLogs": "Auditní protokoly",
       "requestLogs": "Protokoly požadavků"
     },
+    "requestLogs": {
+      "hint": "Požadavky z hodiny před koncem časového okna, od nejnovějších.",
+      "older": "Starší hodina",
+      "newer": "Novější hodina",
+      "truncated": "V této hodině je více požadavků, než seznam zobrazuje.",
+      "emptyTitle": "Žádné požadavky",
+      "emptyDescription": "V této hodině nejsou žádné požadavky na bránu.",
+      "loadError": "Protokoly požadavků se nepodařilo načíst.",
+      "permissionDenied": "Protokoly požadavků organizace si může prohlížet jen její vlastník, administrátor nebo správce fakturace.",
+      "tokens": "{{input}} vstup · {{output}} výstup",
+      "byok": "BYOK"
+    },
     "usageStats": {
       "inputTokens": "Vstupní tokeny",
       "orgLast30Days": "Všichni členové · Posledních 30 dní",

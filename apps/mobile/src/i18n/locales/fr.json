@@ -3528,6 +3528,18 @@
       "auditLogs": "Journaux d'audit",
       "requestLogs": "Journaux des requêtes"
     },
+    "requestLogs": {
+      "hint": "Requêtes de l'heure précédant la fin de la plage, les plus récentes en premier.",
+      "older": "Heure précédente",
+      "newer": "Heure suivante",
+      "truncated": "Cette heure compte plus de requêtes que la liste n'en affiche.",
+      "emptyTitle": "Aucune requête",
+      "emptyDescription": "Aucune requête de passerelle pendant cette heure.",
+      "loadError": "Impossible de charger les journaux des requêtes.",
+      "permissionDenied": "Seuls un propriétaire, un administrateur ou un responsable de la facturation d'une organisation peuvent consulter ses journaux des requêtes.",
+      "tokens": "{{input}} en entrée · {{output}} en sortie",
+      "byok": "BYOK"
+    },
     "usageStats": {
       "inputTokens": "Jetons d'entrée",
       "orgLast30Days": "Tous les membres · 30 derniers jours",

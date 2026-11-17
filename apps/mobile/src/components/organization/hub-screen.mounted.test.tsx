@@ -1022,9 +1022,21 @@ describe('Organization hub settings-on-the-web group', () => {
   });
 
   it('keeps the heading for a role that still has a web page', async () => {
+    // Model Access is the remaining web destination, and it needs the
+    // enterprise plan, so the group exists exactly where that row does.
+    boundary.plan = 'enterprise';
     const { renderer, unmount } = await renderHub();
 
     expect(headings(renderer)).toHaveLength(1);
+    unmount();
+  });
+
+  it('paints no heading when no web destination survives for the role', async () => {
+    // An owner on the teams plan has no Model Access row, and the organization
+    // has not enabled Kilo Encrypt, so the group would name nothing.
+    const { renderer, unmount } = await renderHub();
+
+    expect(headings(renderer)).toHaveLength(0);
     unmount();
   });
 
@@ -1038,6 +1050,23 @@ describe('Organization hub settings-on-the-web group', () => {
       .map(node => String(node.props.title));
     expect(titles).not.toContain('Sub-organizations');
     expect(titles).not.toContain('Distribute funds');
+    unmount();
+  });
+
+  it('opens request logs natively instead of the web page', async () => {
+    const { renderer, unmount } = await renderHub();
+
+    const row = renderer.root
+      .findAllByType('ConfigureRow')
+      .find(node => node.props.title === i18n.t('organization.settingsOnWeb.requestLogs'));
+    if (row === undefined) {
+      throw new Error('the hub shows the request logs row');
+    }
+    act(() => {
+      (row.props.onPress as () => void)();
+    });
+    expect(routerPush).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/organization/request-logs');
+    expect(openExternalUrlMock).not.toHaveBeenCalled();
     unmount();
   });
 });

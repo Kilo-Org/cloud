@@ -273,6 +273,11 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   // The CLI's product name, a title for a device-sessions row. A product name
   // has nothing to translate, so every catalog keeps the published spelling.
   'deviceSessions.kiloCli',
+  // The request-logs row's marker for a request that spent the reader's own
+  // provider key. `BYOK` is the acronym the provider-key screens and the
+  // gateway's own copy use, so every catalog keeps it rather than transliterating
+  // an initialism.
+  'organization.requestLogs.byok',
 ]);
 
 /**

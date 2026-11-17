@@ -3637,6 +3637,18 @@
       "auditLogs": "Reġistri tal-awditjar",
       "requestLogs": "Reġistri tat-talbiet"
     },
+    "requestLogs": {
+      "hint": "Talbiet tas-siegħa sa tmiem il-perjodu, l-aktar riċenti l-ewwel.",
+      "older": "Siegħa qabel",
+      "newer": "Siegħa wara",
+      "truncated": "Din is-siegħa għandha aktar talbiet milli turi l-lista.",
+      "emptyTitle": "L-ebda talba",
+      "emptyDescription": "Din is-siegħa m'għandha l-ebda talba tal-gateway.",
+      "loadError": "Ma setgħux jitgħabbew ir-reġistri tat-talbiet.",
+      "permissionDenied": "Ir-reġistri tat-talbiet jista' jaqrahom biss sid, amministratur jew maniġer tal-fatturazzjoni tal-organizzazzjoni.",
+      "tokens": "{{input}} dħul · {{output}} ħruġ",
+      "byok": "BYOK"
+    },
     "usageStats": {
       "inputTokens": "Unitajiet tat-test tad-dħul",
       "orgLast30Days": "Il-membri kollha · L-aħħar 30 ġurnata",

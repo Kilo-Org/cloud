@@ -3523,6 +3523,18 @@
       "auditLogs": "Jurnale de audit",
       "requestLogs": "Jurnale de cereri"
     },
+    "requestLogs": {
+      "hint": "Cererile din ora dinaintea finalului intervalului, cele mai recente primele.",
+      "older": "Ora anterioară",
+      "newer": "Ora următoare",
+      "truncated": "Această oră are mai multe cereri decât arată lista.",
+      "emptyTitle": "Nicio cerere",
+      "emptyDescription": "Nu există cereri către gateway în această oră.",
+      "loadError": "Jurnalele de cereri nu au putut fi încărcate.",
+      "permissionDenied": "Jurnalele de cereri pot fi citite doar de proprietarul, un administrator sau un manager de facturare al organizației.",
+      "tokens": "{{input}} intrare · {{output}} ieșire",
+      "byok": "BYOK"
+    },
     "usageStats": {
       "inputTokens": "Tokenuri de intrare",
       "orgLast30Days": "Toți membrii · Ultimele 30 de zile",

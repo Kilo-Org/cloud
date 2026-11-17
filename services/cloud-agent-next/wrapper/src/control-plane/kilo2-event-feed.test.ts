@@ -411,6 +411,7 @@ it.each([200, 503])(
 it('forwards an unchanged assistant projection once', async () => {
   const directory = '/workspace';
   const sessionID = 'ses_local';
+  const error = { type: 'provider.quota', message: 'Request failed', status: 402 };
   const events: KiloFeedEvent[] = [];
   let text = 'first';
   let controller: ReadableStreamDefaultController<Uint8Array> | undefined;
@@ -441,6 +442,7 @@ it('forwards an unchanged assistant projection once', async () => {
               type: 'assistant',
               time: { created: 2 },
               content: [{ type: 'text', text }],
+              error,
             },
           ],
           cursor: { next: null },
@@ -476,7 +478,18 @@ it('forwards an unchanged assistant projection once', async () => {
     text = 'second';
     controller?.enqueue(frame('session.step.ended', { sessionID }));
     await until(() => updates().length === 2);
-    expect(updates()[1].properties).toMatchObject({ parentID: '', message: { id: 'msg_answer' } });
+    expect(updates()[1].properties).toMatchObject({
+      parentID: '',
+      message: { id: 'msg_answer', error },
+    });
+    expect(activity[0].activity).toMatchObject({
+      type: 'message',
+      message: {
+        id: 'msg_answer',
+        sessionId: sessionID,
+        error: { name: 'APIError', data: { statusCode: 402 } },
+      },
+    });
     // Each changed read reports the message, then its parts under the delta identity.
     expect(
       activity.map(event =>

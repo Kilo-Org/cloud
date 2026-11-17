@@ -1,5 +1,6 @@
 import type { Kilo2Message } from '../../../src/shared/kilo2-conversation.js';
 import type { ActivityPart, ActivitySnapshotMessage, ActivityTool } from './harness-activity.js';
+import { nativeErrorSchema, nativeTurnError } from './kilo2-native-error.js';
 
 /**
  * Text and reasoning items are identified by their per-kind ordinal, as the
@@ -73,11 +74,12 @@ export function kilo2MessageActivity(
       if (tool) parts.push({ ...identity('tool', tool.callId), kind: 'tool', tool });
     }
   }
+  const error = nativeErrorSchema.safeParse(message.error);
   return {
     ...base,
     role: 'assistant',
     time: message.time,
-    ...(message.error ? { error: message.error } : {}),
+    ...(error.success ? { error: nativeTurnError(error.data) } : {}),
     parts,
   };
 }

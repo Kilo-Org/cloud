@@ -97,21 +97,28 @@ function SectionError({
 }
 
 /**
- * A row title without the product name the screen header already prints: a row
- * that repeats it buries the part that tells the rows apart, the credits' own
- * kind and tier. Only one leading "Kilo Pass " is removed, and the remainder
- * keeps its sentence capital so the title still reads as a title.
+ * A row title without the parts of the server's description that are not for
+ * the reader.
+ *
+ * The product name comes off because the screen header already prints it, and a
+ * row that repeats it buries the part that tells the rows apart, the credits'
+ * own kind. The trailing parenthesis comes off because it carries internal
+ * identifiers — the plan id, the cadence, a streak, the issue month — while the
+ * header names the plan and cadence and the row prints its own date. Left in, it
+ * leaks identifiers into every locale, untranslated.
+ *
+ * The remainder keeps its sentence capital so the title still reads as a title.
  */
 function creditRowTitle(description: string): string {
-  const stripped = description.replace(/^kilo pass\s+/i, '');
-  if (stripped === description) {
-    return firstNonEmpty(description, i18n.t('common.creditHistory'));
-  }
-  if (stripped.length === 0) {
+  const title = description
+    .replace(/^kilo pass\s+/i, '')
+    .replace(/\s*\([^()]*\)\s*$/, '')
+    .trim();
+  if (title.length === 0) {
     return i18n.t('common.creditHistory');
   }
   // The first grapheme is display text, so its case is the active locale's.
-  return capitalize(stripped);
+  return capitalize(title);
 }
 
 function CreditHistoryLine({ entry }: Readonly<{ entry: KiloPassCreditEntry }>) {

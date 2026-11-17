@@ -270,8 +270,10 @@ function creditEntry(description: string): KiloPassCreditEntry {
   return { ...CREDIT_ENTRY, description };
 }
 
-// The screen header already prints "Kilo Pass", so each row title drops that
-// leading product name and keeps the part that tells the rows apart.
+// The screen header already prints "Kilo Pass" and names the plan and cadence,
+// so each row title drops that leading product name and the server's trailing
+// parenthesis of internal identifiers, and keeps the part that tells the rows
+// apart.
 describe('credit row titles', () => {
   beforeEach(async () => {
     await i18n.changeLanguage('en');
@@ -279,7 +281,16 @@ describe('credit row titles', () => {
 
   it.each([
     ['Kilo Pass monthly credits — Tier 19', 'Monthly credits — Tier 19'],
-    ['Kilo Pass base credits (19, monthly)', 'Base credits (19, monthly)'],
+    // The shapes the server writes for a pass grant, each with its own
+    // parenthesis of plan id, cadence, streak or issue month.
+    ['Kilo Pass base credits (tier_49, monthly)', 'Base credits'],
+    ['Kilo Pass base credits (tier_19, yearly, 2026-11)', 'Base credits'],
+    [
+      'Kilo Pass yearly remaining base credits (tier_49, remaining_months=3)',
+      'Yearly remaining base credits',
+    ],
+    ['Kilo Pass promo 50% bonus (tier_19, streak=1)', 'Promo 50% bonus'],
+    ['Kilo Pass referral bonus (2026-11)', 'Referral bonus'],
     // No leading product name: the description prints exactly as the server sent it.
     [CREDIT_DESCRIPTION, CREDIT_DESCRIPTION],
   ])('prints the row for %s as %s', async (description, expected) => {
@@ -293,6 +304,23 @@ describe('credit row titles', () => {
     if (description !== expected) {
       expect(titles).not.toContain(description);
     }
+    expect(titles.join(' ')).not.toMatch(/tier_\d|remaining_months|streak=/);
+    renderer.unmount();
+  });
+
+  it('falls back to the section name when the description is only identifiers', async () => {
+    const renderer = await renderElement(
+      createElement(KiloPassCreditHistorySection, {
+        history: {
+          query: ledgerQuery(),
+          entries: [creditEntry('Kilo Pass (tier_49, monthly)')],
+          hasMore: false,
+        },
+      })
+    );
+    const titles = textNodeChildren(renderer);
+    expect(titles).toContain(i18n.t('common.creditHistory'));
+    expect(titles.join(' ')).not.toMatch(/tier_49/);
     renderer.unmount();
   });
 });

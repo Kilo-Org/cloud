@@ -88,6 +88,7 @@ function mountSheet(
       },
       onSave: (payload: unknown) => {
         h.onSave(payload);
+        return Promise.resolve();
       },
     })
   );

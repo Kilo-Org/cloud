@@ -347,6 +347,47 @@ describe('browser_take_screenshot', () => {
     expect(inputs[0]?.scale).toBe(2);
   });
 
+  it('reports the masked image as PNG whatever the capture type was', async () => {
+    const iframeRect = { content: [40, 120, 440, 120, 440, 320, 40, 320], height: 200, width: 400 };
+    const { session } = createSession({
+      boxes: { 12: iframeRect, 99: iframeRect },
+      frameTree: FRAME_TREE_WITH_PAY,
+    });
+    const { mask } = recordMask();
+
+    const result = await runReadBrowserTool(
+      'browser_take_screenshot',
+      { scale: 'css', target: 'e12', type: 'jpeg' },
+      session,
+      { agentScope: { readableOrigins: ['https://app.example.com'] }, maskScreenshot: mask }
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: { dataUrl: 'data:image/png;base64,TUFTS0VE', mediaType: 'image/png' },
+    });
+  });
+
+  it('keeps the capture media type when nothing is masked', async () => {
+    const { session } = createSession({ frameTree: FRAME_TREE_WITH_PAY });
+
+    const result = await runReadBrowserTool(
+      'browser_take_screenshot',
+      { scale: 'css', type: 'jpeg' },
+      session,
+      {
+        agentScope: { readableOrigins: ['https://app.example.com', 'https://pay.example.com'] },
+        maskScreenshot: () =>
+          Promise.resolve({ dataUrl: 'data:image/png;base64,TUFTS0VE', ok: true }),
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: { dataUrl: 'data:image/jpeg;base64,QUJD', mediaType: 'image/jpeg' },
+    });
+  });
+
   it('captures and masks a scrolled element in document space', async () => {
     // The box model reports viewport coordinates; the clip the capture takes is document-space.
     const viewportRect = {

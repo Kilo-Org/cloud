@@ -648,6 +648,9 @@ const translateBoxesIntoClip = (
         ];
   });
 
+/** The masker re-encodes every masked image as PNG, so a masked capture reports that type. */
+const MASKED_SCREENSHOT_MEDIA_TYPE = 'image/png';
+
 const maskAgentScreenshot = async (
   deps: BrowserReadActionDeps,
   input: {
@@ -658,9 +661,11 @@ const maskAgentScreenshot = async (
     readonly fullPage: boolean;
     readonly mediaType: string;
   }
-): Promise<{ readonly dataUrl: string } | { readonly error: string }> => {
+): Promise<
+  { readonly dataUrl: string; readonly mediaType: string } | { readonly error: string }
+> => {
   if (deps.agentScope === undefined) {
-    return { dataUrl: input.dataUrl };
+    return { dataUrl: input.dataUrl, mediaType: input.mediaType };
   }
 
   const frames = await readAgentFrameTree(deps.session);
@@ -697,7 +702,7 @@ const maskAgentScreenshot = async (
   }
 
   if (boxes.length === 0) {
-    return { dataUrl: input.dataUrl };
+    return { dataUrl: input.dataUrl, mediaType: input.mediaType };
   }
 
   const mask = deps.maskScreenshot ?? maskScreenshotDataUrl;
@@ -709,7 +714,10 @@ const maskAgentScreenshot = async (
     scale: input.clip === undefined ? geometry.scale : (input.clipScale ?? 1),
   });
 
-  return masked.ok ? { dataUrl: masked.dataUrl } : { error: masked.error };
+  // The masker always re-encodes as PNG, whatever the capture's media type was.
+  return masked.ok
+    ? { dataUrl: masked.dataUrl, mediaType: MASKED_SCREENSHOT_MEDIA_TYPE }
+    : { error: masked.error };
 };
 
 const browserSnapshotHandler: BrowserReadActionHandler = async (arguments_, deps) => {
@@ -900,7 +908,7 @@ const browserTakeScreenshotHandler: BrowserReadActionHandler = async (arguments_
 
   const value: BrowserToolScreenshotValue = {
     dataUrl: masked.dataUrl,
-    mediaType,
+    mediaType: masked.mediaType,
     text,
   };
 

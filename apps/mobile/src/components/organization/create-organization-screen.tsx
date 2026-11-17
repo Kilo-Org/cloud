@@ -1,6 +1,7 @@
 import { ORGANIZATION_NAME_MAX_LENGTH } from '@kilocode/app-shared/organizations';
 import { hasVisibleText } from '@kilocode/app-shared/text';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, type TextInputProps, View } from 'react-native';
@@ -14,13 +15,20 @@ import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { type OrgListEntry } from '@/lib/hooks/use-organization-queries';
 import { useRouteFocused } from '@/lib/navigation/route-focus';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
-import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
+import { ORGANIZATION_HUB_PATH, ORGANIZATION_HUB_ROUTE_NAME } from '@/lib/organization-navigation';
 import { useOrganization } from '@/lib/organization-context';
 import { organizationErrorMessage } from '@/lib/server-error-copy';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
+import { staleOrganizationScopeExit } from './organization-scope-model';
+
 /** One line under the field: a failure the person can act on, or a result. */
 type CreateMessage = { text: string; tone: 'error' | 'notice' };
+
+/** The navigation object a screen of a Stack sees. */
+type StackNavigation = {
+  getState: () => { index: number; routes: { name: string }[] };
+};
 
 /**
  * Creates an organization with the same defaults the web create flow uses:
@@ -37,6 +45,8 @@ export function CreateOrganizationScreen() {
   const queryClient = useQueryClient();
   const trpc = useTRPC();
   const stackSafeRouter = useStackSafeReplace();
+  const router = useRouter();
+  const navigation = useNavigation<StackNavigation>();
   const routeFocused = useRouteFocused();
   const { setOrganizationId } = useOrganization();
   // The field keeps what the person typed. Android commits this screen while
@@ -96,13 +106,30 @@ export function CreateOrganizationScreen() {
           return;
         }
         selectOrganizationRef.current(organizationId);
+        // The boundary enters this screen with the hub already beneath it, so
+        // pushing or replacing with the hub would leave two of them and Back
+        // would return to the stale one instead of leaving the flow. Pop over
+        // the existing hub instead (`dismissTo` dispatches POP_TO, one commit).
+        // POP_TO with no matching route rewrites the stack in one commit, the
+        // remove-and-insert shape that crashes the Android native stack, so the
+        // push-based entry keeps the push plus post-transition retire.
+        const state = navigation.getState();
+        const exit = staleOrganizationScopeExit({
+          routes: state.routes,
+          currentIndex: state.index,
+          hubRouteName: ORGANIZATION_HUB_ROUTE_NAME,
+        });
+        if (exit === 'hub') {
+          router.dismissTo(ORGANIZATION_HUB_PATH);
+          return;
+        }
         stackSafeRouter.replace(ORGANIZATION_HUB_PATH);
       } finally {
         submitLockedRef.current = false;
         setSettling(false);
       }
     },
-    [queryClient, stackSafeRouter, t, trpc]
+    [navigation, queryClient, router, stackSafeRouter, t, trpc]
   );
 
   const createOrganization = useMutation({

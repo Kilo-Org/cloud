@@ -3,13 +3,7 @@ import { Pressable, View } from 'react-native';
 
 import { ChevronDown, ChevronUp, Trash2 } from '@/components/ui/icons';
 import { cn } from '@/lib/utils';
-import { LINE_ACTION_BOX_CLASS, LINE_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
-
-/** The box a row's control floats on the field's label line, at the 36 dp width floor. */
-const ROW_CONTROL_BOX_CLASS = cn(
-  LINE_ACTION_BOX_CLASS,
-  'min-w-[36px] items-center justify-center active:opacity-70'
-);
+import { LABELLED_LINE_ACTION_CLASS, LABELLED_LINE_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
 
 function LineIconButton({
   label,
@@ -24,12 +18,14 @@ function LineIconButton({
   onPress: () => void;
   children: ReactNode;
 }>) {
-  // The box floats a 28 dp high, 36 dp wide frame over the label line and
-  // reaches 46 dp each way with its slop, so the row is one text line tall.
+  // React Native keeps a touch area inside its parent's bounds, so a box that
+  // floats over the label line is only as tall as that line. The control is the
+  // 44 dp target itself instead, and the label row lays itself out one target
+  // tall so the extra height falls below the label rather than above it.
   return (
     <Pressable
-      className={cn(ROW_CONTROL_BOX_CLASS, disabled && 'opacity-40')}
-      hitSlop={LINE_ACTION_HIT_SLOP}
+      className={cn(LABELLED_LINE_ACTION_CLASS, 'active:opacity-70', disabled && 'opacity-40')}
+      hitSlop={LABELLED_LINE_ACTION_HIT_SLOP}
       disabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={label}

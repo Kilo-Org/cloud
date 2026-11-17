@@ -21,13 +21,14 @@ import { i18n } from '@/i18n';
 import { act } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
 import { resetFormDraftsForTests } from '@/lib/form-draft';
-import {
-  LINE_ACTION_BOX_CLASS,
-  LINE_ACTION_HIT_SLOP,
-  MIN_TAP_TARGET_DP,
-  tapTargetReachDp,
-  TOUCH_TARGET_DP,
-} from '@/lib/a11y/tap-target';
+import { LABELLED_LINE_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
+
+/**
+ * The target a control carries on its own node. A box that floats over the
+ * label line is only as tall as that line, because React Native clips a touch
+ * area to its parent's bounds, so the box itself has to be the target.
+ */
+const TOUCH_TARGET_BOX_CLASS_TOKEN = 'h-[44px]';
 
 const h = vi.hoisted(() => ({
   error: vi.fn(),
@@ -335,7 +336,7 @@ describe('ProfileCommandsScreen', () => {
     unmount();
   });
 
-  it('floats each row control on the label line and reaches the touch target with slop', async () => {
+  it('gives each row control the whole touch target on its own node', async () => {
     h.query.data = testCommands(['a', 'b', 'c']);
     h.query.isPending = false;
 
@@ -350,36 +351,24 @@ describe('ProfileCommandsScreen', () => {
     expect(controls.map(node => node.props.accessibilityLabel)).toEqual(labels);
 
     for (const control of controls) {
-      // The box floats over the label's line instead of setting the row's
-      // height, so the card's top padding stays the screen's own gap.
-      for (const token of LINE_ACTION_BOX_CLASS.split(' ')) {
-        expect(String(control.props.className)).toContain(token);
-      }
-      expect(control.props.hitSlop).toBe(LINE_ACTION_HIT_SLOP);
-      // A `min-h-[28px]` box measures 27.8dp on Android: the slop carries the
-      // reach the shortened box gives up on its own node.
-      expect(
-        tapTargetReachDp(MIN_TAP_TARGET_DP - 0.2, LINE_ACTION_HIT_SLOP.top)
-      ).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
-      // The icon is 20dp, below the audit floor, so the rect keeps a 36dp
-      // width, which measures 35.81dp on Android and still reaches 44dp across
-      // with its 5dp side slop.
-      expect(String(control.props.className)).toContain('min-w-[36px]');
-      expect(tapTargetReachDp(35.81, LINE_ACTION_HIT_SLOP.left)).toBeGreaterThanOrEqual(
-        TOUCH_TARGET_DP
-      );
+      // React Native clips a touch area to its parent's bounds, so the target
+      // has to be the control's own box rather than a slop outside it: a box
+      // that floats over a one-line label row is only as tall as that row.
+      expect(String(control.props.className)).toContain(TOUCH_TARGET_BOX_CLASS_TOKEN);
+      // Only the horizontal side can reach past the box; a vertical slop would
+      // be clipped by the row the control fills.
+      expect(control.props.hitSlop).toEqual(LABELLED_LINE_ACTION_HIT_SLOP);
     }
-    // The row keeps its 10.5dp gap, so the two neighbouring 5dp bands sit
-    // 10.5dp apart and a tap just outside one control cannot land on the
-    // destructive control beside it. One such row per card, three controls each.
-    const rows = findAll(renderer.root, 'View').filter(
-      node => node.props.className === 'flex-row items-center gap-3'
-    );
-    expect(rows).toHaveLength(3);
-    for (const row of rows) {
-      expect(findAll(row, 'Pressable')).toHaveLength(3);
+    // The label row must lay itself out one target tall so the control fits,
+    // and the label's copy stays at its top: the card's own padding above the
+    // label is unchanged and the extra height falls between the label and the
+    // field instead of above the label. The field owns that row, so the screen
+    // asks it for it.
+    const fields = findAll(renderer.root, 'FormField');
+    expect(fields).toHaveLength(3);
+    for (const field of fields) {
+      expect(field.props.labelAccessoryIsTarget).toBe(true);
     }
-
     unmount();
   });
 

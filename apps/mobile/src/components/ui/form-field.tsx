@@ -16,9 +16,15 @@ type FormFieldProps = Omit<TextInputProps, 'value'> &
      * Controls that belong to the field's own row, rendered at the end of the
      * label line: the reorder and delete controls of a list a field sits in.
      * The label keeps the line's remaining width and the row is as tall as the
-     * accessory, so the controls take no separate band under the input.
+     * accessory, so the controls take no separate band under the input. Pass
+     * `labelAccessoryIsTarget` when that accessory is a full touch target.
      */
     labelAccessory?: React.ReactNode;
+    /**
+     * The accessory carries its own touch target, so the label row lays out one
+     * target tall and the label's copy stays at its top.
+     */
+    labelAccessoryIsTarget?: boolean;
     /** Reserve the tallest localized message, including wrapping and font scaling. */
     reserveErrorMessages?: readonly string[];
     disabled?: boolean;
@@ -55,6 +61,7 @@ type FormFieldProps = Omit<TextInputProps, 'value'> &
 function FormField({
   label,
   labelAccessory,
+  labelAccessoryIsTarget,
   error,
   reserveErrorMessages,
   disabled,
@@ -89,7 +96,11 @@ function FormField({
 
   return (
     <View className="gap-1.5" onLayout={containerOnLayout}>
-      <FormFieldLabel label={label} labelAccessory={labelAccessory} />
+      <FormFieldLabel
+        label={label}
+        labelAccessory={labelAccessory}
+        accessoryIsTarget={labelAccessoryIsTarget}
+      />
       <Input
         ref={instance => {
           nativeInput.current = instance;

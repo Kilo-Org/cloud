@@ -63,7 +63,13 @@ export function SetupCommandField({
   if (readOnly) {
     return (
       <View className="gap-1.5">
-        <FormFieldLabel label={label} labelAccessory={trailing} />
+        <FormFieldLabel
+          label={label}
+          labelAccessory={trailing}
+          // The controls carry their own target, so the row lays out one target
+          // tall; a viewer without them keeps the plain label line.
+          accessoryIsTarget={trailing !== undefined}
+        />
         <View className="min-h-[44px] justify-center rounded-md border border-input bg-background px-3 py-2.5 dark:bg-[#FFFFFF0A]">
           <SelectableText
             accessibilityLabel={label}
@@ -88,6 +94,7 @@ export function SetupCommandField({
       <FormField
         label={label}
         labelAccessory={trailing}
+        labelAccessoryIsTarget={trailing !== undefined}
         defaultValue={command}
         placeholder={t('profiles.commandPlaceholder')}
         className="min-h-[44px] leading-[normal]"

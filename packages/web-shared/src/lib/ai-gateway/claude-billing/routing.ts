@@ -17,7 +17,11 @@ import { ClaudeBillingConnectionStatus } from '@kilocode/db/schema-types';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import type { ClaudeBillingOwner } from './store';
 import { resolveClaudeBillingConnector } from './connector';
-import { getAuthoritativeClaudeBillingState, type ClaudeBillingPayerState } from './payer-state';
+import {
+  getAuthoritativeClaudeBillingState,
+  ClaudeBillingPayerStateParseError,
+  type ClaudeBillingPayerState,
+} from './payer-state';
 import { getClaudeOperatorToken, isClaudeOperatorConfigured } from './operator';
 
 /** The provider type of a request served on a customer's Claude organization. */
@@ -184,7 +188,16 @@ export async function checkClaudeBilling(
     let connection: ClaudeBillingPayerState | null;
     try {
       connection = await getAuthoritativeClaudeBillingState(owner);
-    } catch {
+    } catch (error) {
+      // A reply outside the wire contract names a release mismatch, so the
+      // refusal stays without a retry hint; other failures stay retryable.
+      if (error instanceof ClaudeBillingPayerStateParseError) {
+        return {
+          kind: 'unavailable',
+          message:
+            'Your Claude link cannot be checked right now. An owner or admin can link it again.',
+        };
+      }
       return {
         kind: 'unavailable',
         message: 'We could not check your Claude link. Try again.',

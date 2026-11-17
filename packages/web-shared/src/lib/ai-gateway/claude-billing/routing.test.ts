@@ -20,6 +20,7 @@ import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/provide
 import { getGrantedClaudeBillingConnection } from './store';
 import { getClaudeOperatorToken, isClaudeOperatorConfigured } from './operator';
 import { buildClaudeBillingProvider, checkClaudeBilling } from './routing';
+import { ClaudeBillingPayerStateParseError } from './payer-state';
 import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 
@@ -419,6 +420,17 @@ describe('Claude customer-billed routing', () => {
     expect(await checkClaudeBilling(input())).toMatchObject({
       kind: 'unavailable',
       retryable: true,
+    });
+    expect(getClaudeOperatorToken).not.toHaveBeenCalled();
+  });
+
+  it('does not mark a payer reply that violates its contract as retryable', async () => {
+    jest
+      .mocked(getGrantedClaudeBillingConnection)
+      .mockRejectedValueOnce(new ClaudeBillingPayerStateParseError());
+    expect(await checkClaudeBilling(input())).toEqual({
+      kind: 'unavailable',
+      message: 'Your Claude link cannot be checked right now. An owner or admin can link it again.',
     });
     expect(getClaudeOperatorToken).not.toHaveBeenCalled();
   });

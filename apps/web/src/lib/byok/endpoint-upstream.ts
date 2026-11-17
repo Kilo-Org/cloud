@@ -1,13 +1,5 @@
-import {
-  BYOK_ENDPOINT_MODEL_PLACEHOLDER,
-  type ByokEndpointCredentials,
-  type ByokEndpointModel,
-} from '@kilocode/db/schema-types';
-import {
-  getByokEndpointModelBaseUrl,
-  hasByokEndpointModelPlaceholder,
-  resolveByokEndpointAuth,
-} from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
+import { type ByokEndpointCredentials, type ByokEndpointModel } from '@kilocode/db/schema-types';
+import { resolveByokEndpointAuth } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
 import { parseByokEndpointModelsResponse } from '@/lib/byok/endpoint-models';
 import { signBedrockRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/aws-bedrock-signing';
 import {
@@ -19,8 +11,6 @@ import {
 const REQUEST_TIMEOUT_MS = 15_000;
 const MAX_RESPONSE_BYTES = 5 * 1024 * 1024;
 const ANTHROPIC_VERSION = '2023-06-01';
-/** Fills `{model}` when a base URL is checked before any model is known. */
-const SAMPLE_MODEL_ID = 'model';
 
 /** A failure whose message is safe to show to the organization member who configured the endpoint. */
 export class ByokEndpointRequestError extends Error {}
@@ -39,11 +29,9 @@ async function findUrlViolationMessage(url: string): Promise<string | null> {
   return violation ? URL_VIOLATION_MESSAGES[violation] : null;
 }
 
-/** Why `baseUrl` may not be used for an endpoint, checked with a sample model for `{model}`. */
+/** Why `baseUrl` may not be used for an endpoint. */
 export function findByokEndpointBaseUrlViolation(baseUrl: string): Promise<string | null> {
-  return findUrlViolationMessage(
-    getByokEndpointModelBaseUrl({ base_url: baseUrl }, { internal_id: SAMPLE_MODEL_ID })
-  );
+  return findUrlViolationMessage(baseUrl);
 }
 
 function credentialSecrets(credentials: ByokEndpointCredentials): string[] {
@@ -186,11 +174,6 @@ export async function fetchByokEndpointModels({
   baseUrl: string;
   credentials: ByokEndpointCredentials;
 }): Promise<ByokEndpointModel[]> {
-  if (hasByokEndpointModelPlaceholder(baseUrl)) {
-    throw new ByokEndpointRequestError(
-      `Models cannot be imported when the base URL contains ${BYOK_ENDPOINT_MODEL_PLACEHOLDER}. Add the models manually.`
-    );
-  }
   const response = await fetchByokEndpoint({
     url: `${baseUrl}/models`,
     method: 'GET',

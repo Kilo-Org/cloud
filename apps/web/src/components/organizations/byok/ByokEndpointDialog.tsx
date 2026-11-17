@@ -6,7 +6,6 @@ import { ChevronDown, ChevronRight, Download, Eye, EyeOff, Info, Plus, Trash2 } 
 import { toast } from 'sonner';
 import {
   BYOK_ENDPOINT_MAX_MODELS,
-  BYOK_ENDPOINT_MODEL_PLACEHOLDER,
   type ByokEndpointDefinition,
   type ByokEndpointModel,
   type ByokEndpointReasoningFormat,
@@ -586,7 +585,6 @@ function ByokEndpointForm({
   const [importedModels, setImportedModels] = useState<ByokEndpointModel[] | null>(null);
   const updateForm = (update: Partial<EndpointForm>) =>
     setForm(current => ({ ...current, ...update }));
-  const hasPlaceholder = form.base_url.includes(BYOK_ENDPOINT_MODEL_PLACEHOLDER);
   // Saved credentials only go to the host they were saved for.
   const hostChanged = editingKey
     ? !editingKey.endpoint || endpointOriginChanged(editingKey.endpoint.base_url, form.base_url)
@@ -703,9 +701,7 @@ function ByokEndpointForm({
           </div>
           <p className="text-muted-foreground text-xs sm:col-span-2">
             The API root, without a trailing slash; requests go to /chat/completions, /messages, or
-            /responses under it. Include <code>{BYOK_ENDPOINT_MODEL_PLACEHOLDER}</code> to send the
-            upstream model ID in the URL instead of the request body, for example{' '}
-            <code>https://example.com/models/{BYOK_ENDPOINT_MODEL_PLACEHOLDER}/v1</code>.
+            /responses under it.
           </p>
         </div>
 
@@ -803,7 +799,7 @@ function ByokEndpointForm({
                 variant="outline"
                 size="sm"
                 onClick={handleImport}
-                disabled={!form.base_url.trim() || hasPlaceholder || listModelsMutation.isPending}
+                disabled={!form.base_url.trim() || listModelsMutation.isPending}
               >
                 <Download />
                 {listModelsMutation.isPending ? 'Importing…' : 'Import from /models'}
@@ -820,12 +816,6 @@ function ByokEndpointForm({
               </Button>
             </div>
           </div>
-          {hasPlaceholder ? (
-            <p className="text-muted-foreground text-xs">
-              Import is unavailable when the base URL contains{' '}
-              <code>{BYOK_ENDPOINT_MODEL_PLACEHOLDER}</code>. Add the models manually.
-            </p>
-          ) : null}
           <Alert>
             <Info className="size-4" />
             <AlertDescription className="space-y-1">

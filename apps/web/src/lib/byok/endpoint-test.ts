@@ -4,11 +4,7 @@ import type {
   ByokEndpointModel,
   CustomLlmApiKind,
 } from '@kilocode/db/schema-types';
-import {
-  getByokEndpointModelBaseUrl,
-  getByokEndpointModelClientApiKind,
-  hasByokEndpointModelPlaceholder,
-} from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
+import { getByokEndpointModelClientApiKind } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
 import {
   ByokEndpointRequestError,
   describeByokEndpointError,
@@ -26,7 +22,7 @@ const API_PATHS = {
 
 function testRequestBody(
   apiKind: CustomLlmApiKind,
-  model: string | undefined,
+  model: string,
   maxTokensField: 'max_tokens' | 'max_completion_tokens'
 ): Record<string, unknown> {
   switch (apiKind) {
@@ -70,15 +66,12 @@ export async function testByokEndpoint({
   }
 
   const apiKind = getByokEndpointModelClientApiKind(definition, model);
-  const url = getByokEndpointModelBaseUrl(definition, model) + API_PATHS[apiKind];
-  const bodyModel = hasByokEndpointModelPlaceholder(definition.base_url)
-    ? undefined
-    : model.internal_id;
+  const url = definition.base_url + API_PATHS[apiKind];
   const send = (maxTokensField: 'max_tokens' | 'max_completion_tokens') =>
     fetchByokEndpoint({
       url,
       method: 'POST',
-      body: JSON.stringify(testRequestBody(apiKind, bodyModel, maxTokensField)),
+      body: JSON.stringify(testRequestBody(apiKind, model.internal_id, maxTokensField)),
       credentials,
       headers: apiKind === 'messages' ? { 'anthropic-version': '2023-06-01' } : {},
     });

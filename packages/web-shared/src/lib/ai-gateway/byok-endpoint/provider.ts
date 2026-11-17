@@ -10,9 +10,7 @@ import {
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import {
   getByokEndpointModelApiKinds,
-  getByokEndpointModelBaseUrl,
   getByokEndpointModelResponseTransform,
-  hasByokEndpointModelPlaceholder,
 } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
 
 const ANTHROPIC_VERSION = '2023-06-01';
@@ -40,11 +38,8 @@ export function buildByokEndpointProvider(
     'byok-endpoint',
     getByokEndpointModelApiKinds(definition, model),
     {
-      base_url: getByokEndpointModelBaseUrl(definition, model),
-      // A `{model}` URL names the model, so the body carries none.
-      internal_id: hasByokEndpointModelPlaceholder(definition.base_url)
-        ? undefined
-        : model.internal_id,
+      base_url: definition.base_url,
+      internal_id: model.internal_id,
       reasoning_details_transform:
         getByokEndpointModelResponseTransform(definition, model) ?? undefined,
     },

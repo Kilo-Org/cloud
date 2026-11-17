@@ -1,6 +1,5 @@
 import { randomInt } from 'node:crypto';
 import {
-  BYOK_ENDPOINT_MODEL_PLACEHOLDER,
   BYOK_ENDPOINT_PROVIDER_ID_PREFIX,
   ByokEndpointCredentialsSchema,
   getCustomLlmClientApiKind,
@@ -79,21 +78,6 @@ export function getByokEndpointModelResponseTransform(
 ): ReasoningDetailsTransform | null {
   const format = model.reasoning_format ?? definition.reasoning_format;
   return format === 'reasoning-details' ? null : format;
-}
-
-export function hasByokEndpointModelPlaceholder(baseUrl: string): boolean {
-  return baseUrl.includes(BYOK_ENDPOINT_MODEL_PLACEHOLDER);
-}
-
-/** The API root for `model`, with the `{model}` placeholder filled in. */
-export function getByokEndpointModelBaseUrl(
-  definition: Pick<ByokEndpointDefinition, 'base_url'>,
-  model: Pick<ByokEndpointModel, 'internal_id'>
-): string {
-  return definition.base_url.replaceAll(
-    BYOK_ENDPOINT_MODEL_PLACEHOLDER,
-    encodeURIComponent(model.internal_id)
-  );
 }
 
 export function parseByokEndpointCredentials(decrypted: string): ByokEndpointCredentials | null {

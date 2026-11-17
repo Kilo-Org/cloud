@@ -3088,9 +3088,6 @@ export const ByokEndpointProviderIdSchema = z.custom<ByokEndpointProviderId>(
   { message: 'must be an endpoint provider id such as "endpoint-a1b2c3d4e5"' }
 );
 
-/** Replaced by the model's `internal_id` in `base_url`; the request body then carries no model. */
-export const BYOK_ENDPOINT_MODEL_PLACEHOLDER = '{model}';
-
 /** How the upstream returns reasoning; `reasoning-details` is OpenRouter's shape and needs no transform. */
 export const ByokEndpointReasoningFormatSchema = z.enum([
   'reasoning-details',

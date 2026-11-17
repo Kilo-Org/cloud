@@ -203,7 +203,7 @@ describe('BYOK endpoints', () => {
 
     test.each([
       ['http://llm.example.com/v1', 'The endpoint URL must use HTTPS.'],
-      ['https://127.0.0.1/{model}/v1', 'The endpoint URL must point to a public host.'],
+      ['https://127.0.0.1/v1', 'The endpoint URL must point to a public host.'],
     ])('rejects %s where the URL policy applies', async (base_url, message) => {
       process.env.VERCEL_TARGET_ENV = 'production';
       await expect(createEndpoint({ ...DEFINITION, base_url })).rejects.toThrow(message);
@@ -517,24 +517,6 @@ describe('BYOK endpoints', () => {
       expect(upstream.calls).toHaveLength(0);
     });
 
-    test('compares the host of a per-model URL with the {model} placeholder filled in', async () => {
-      const created = await createEndpoint({
-        ...DEFINITION,
-        base_url: 'https://llm.example.com/{model}/v1',
-      });
-      const upstream = mockUpstream(() => Response.json(MODELS_RESPONSE));
-      restoreFetch = upstream.restore;
-      const caller = await createCallerForUser(owner.id);
-
-      await caller.byok.listModelsFromEndpoint({
-        organizationId: organization.id,
-        base_url: 'https://llm.example.com/v1',
-        id: created.id,
-      });
-
-      expect(upstream.calls).toHaveLength(1);
-    });
-
     test('signs AWS requests with SigV4', async () => {
       const upstream = mockUpstream(() => Response.json(MODELS_RESPONSE));
       restoreFetch = upstream.restore;
@@ -570,12 +552,6 @@ describe('BYOK endpoints', () => {
     });
 
     test.each([
-      [
-        'a per-model URL',
-        'https://llm.example.com/{model}/v1',
-        () => Response.json(MODELS_RESPONSE),
-        'Models cannot be imported when the base URL contains {model}',
-      ],
       [
         'a rejected key',
         'https://llm.example.com/v1',
@@ -658,10 +634,10 @@ describe('BYOK endpoints', () => {
       expect(bodyOf(upstream.calls[1])).not.toHaveProperty('max_tokens');
     });
 
-    test('sends a Messages request with the model in the URL to a chosen model', async () => {
+    test('sends a Messages request to a chosen model', async () => {
       const created = await createEndpoint({
         ...DEFINITION,
-        base_url: 'https://llm.example.com/models/{model}',
+        base_url: 'https://llm.example.com/models',
         api_kinds: ['chat_completions', 'messages'],
         models: [
           ...DEFINITION.models,
@@ -685,11 +661,10 @@ describe('BYOK endpoints', () => {
           modelId: 'claude',
         })
       ).resolves.toMatchObject({ success: true });
-      expect(upstream.calls[0].url).toBe('https://llm.example.com/models/claude%2Fsonnet/messages');
+      expect(upstream.calls[0].url).toBe('https://llm.example.com/models/messages');
       expect(headersOf(upstream.calls[0]).get('anthropic-version')).toBe('2023-06-01');
       const body = bodyOf(upstream.calls[0]);
-      expect(body).not.toHaveProperty('model');
-      expect(body).toMatchObject({ max_tokens: 256 });
+      expect(body).toMatchObject({ model: 'claude/sonnet', max_tokens: 256 });
     });
 
     test('redacts the credentials the upstream echoes', async () => {

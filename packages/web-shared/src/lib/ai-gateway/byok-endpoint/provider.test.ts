@@ -90,16 +90,6 @@ describe('buildByokEndpointProvider', () => {
     expect(body.model).toBe('Acme Coder/v2');
   });
 
-  it('puts the upstream id in a {model} URL instead of the body', async () => {
-    const { provider, body } = await transform(
-      definition({ base_url: 'https://llm.acme.example/deployments/{model}/v1' }),
-      chatRequest()
-    );
-
-    expect(provider.apiUrl).toBe('https://llm.acme.example/deployments/Acme%20Coder%2Fv2/v1');
-    expect(body).not.toHaveProperty('model');
-  });
-
   it('removes OpenRouter provider routing and the tracking ids Kilo adds', async () => {
     const { body } = await transform(definition(), chatRequest());
 

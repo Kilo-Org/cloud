@@ -44,7 +44,7 @@ describe('buildEndpointDefinition', () => {
   test('round-trips a stored definition with model overrides', () => {
     const definition = {
       name: 'Gateway',
-      base_url: 'https://api.example.com/{model}',
+      base_url: 'https://api.example.com/v1',
       api_kinds: ['chat_completions' as const, 'messages' as const],
       client_provider: 'anthropic' as const,
       reasoning_format: 'reasoning-content' as const,

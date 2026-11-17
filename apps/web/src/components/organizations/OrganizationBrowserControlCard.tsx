@@ -25,6 +25,7 @@ import {
   useOrganizationWithMembers,
   useUpdateOrganizationBrowserControl,
 } from '@/app/api/organizations/hooks';
+import { inspectOrganizationBrowserPolicy } from '@/lib/organizations/browser-policy';
 
 type ControlOption = {
   value: OrganizationBrowserControl;
@@ -53,6 +54,26 @@ const CONTROL_OPTIONS: readonly ControlOption[] = [
 ];
 
 type ParsedOrigins = { origins: string[] } | { error: string };
+
+export type BrowserControlCardValues = {
+  browserControl: OrganizationBrowserControl;
+  browserAllowedOrigins: string[];
+  controlUnreadable: boolean;
+};
+
+/**
+ * The enforced policy for the editor's initial state. Rendering the raw stored value
+ * would show Allow while clients enforce Off, and a save would re-send a value no
+ * client can read.
+ */
+export function browserControlCardValues(settings: unknown): BrowserControlCardValues {
+  const report = inspectOrganizationBrowserPolicy({ settings });
+  return {
+    browserControl: report.policy.browserControl,
+    browserAllowedOrigins: report.policy.browserAllowedOrigins,
+    controlUnreadable: report.storedControl === 'unreadable',
+  };
+}
 
 function parseOriginLines(text: string): ParsedOrigins {
   const entries = text
@@ -87,10 +108,17 @@ type FormProps = {
   organizationId: string;
   savedControl: OrganizationBrowserControl;
   savedOrigins: readonly string[];
+  controlUnreadable: boolean;
   readonly: boolean;
 };
 
-function BrowserControlForm({ organizationId, savedControl, savedOrigins, readonly }: FormProps) {
+function BrowserControlForm({
+  organizationId,
+  savedControl,
+  savedOrigins,
+  controlUnreadable,
+  readonly,
+}: FormProps) {
   const id = useId();
   const update = useUpdateOrganizationBrowserControl();
   const [draftControl, setDraftControl] = useState<OrganizationBrowserControl | null>(null);
@@ -99,7 +127,8 @@ function BrowserControlForm({ organizationId, savedControl, savedOrigins, readon
 
   const control = draftControl ?? savedControl;
   const originsText = draftOrigins ?? savedOrigins.join('\n');
-  const dirty = control !== savedControl || originsText !== savedOrigins.join('\n');
+  const dirty =
+    controlUnreadable || control !== savedControl || originsText !== savedOrigins.join('\n');
   const selected = CONTROL_OPTIONS.find(option => option.value === control) ?? CONTROL_OPTIONS[0];
 
   const save = () => {
@@ -138,6 +167,17 @@ function BrowserControlForm({ organizationId, savedControl, savedOrigins, readon
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {controlUnreadable ? (
+          <Alert>
+            <AlertTitle>Stored browser access setting is invalid</AlertTitle>
+            <AlertDescription>
+              <p>
+                Every Kilo client enforces this organization&apos;s browser access as Off until a
+                valid value is saved. Choose a setting below and save to repair it.
+              </p>
+            </AlertDescription>
+          </Alert>
+        ) : null}
         <div className="max-w-sm space-y-2">
           <Label htmlFor={`${id}-control`}>Browser access</Label>
           <Select
@@ -223,11 +263,14 @@ export function OrganizationBrowserControlCard({ organizationId, readonly = fals
     return null;
   }
 
+  const values = browserControlCardValues(data.settings);
+
   return (
     <BrowserControlForm
       organizationId={organizationId}
-      savedControl={data.settings?.browserControl ?? 'allow'}
-      savedOrigins={data.settings?.browserAllowedOrigins ?? []}
+      savedControl={values.browserControl}
+      savedOrigins={values.browserAllowedOrigins}
+      controlUnreadable={values.controlUnreadable}
       readonly={readonly}
     />
   );

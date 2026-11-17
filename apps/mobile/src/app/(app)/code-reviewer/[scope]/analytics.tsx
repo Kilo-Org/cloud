@@ -51,7 +51,7 @@ function MetricCard({
 }: Readonly<{ icon: LucideIcon; label: string; value: string }>) {
   const colors = useThemeColors();
   return (
-    <View className="min-w-0 flex-1 justify-center gap-1 rounded-lg bg-secondary p-4">
+    <View className="min-w-0 flex-1 justify-between gap-1 rounded-lg bg-secondary p-4">
       <View className="flex-row items-center gap-2">
         <Icon size={14} color={colors.mutedForeground} />
         <Text variant="muted" className="min-w-0 flex-1 text-xs" numberOfLines={2}>
@@ -65,7 +65,7 @@ function MetricCard({
 
 function AnalyticsSkeleton() {
   return (
-    <View className="gap-3 px-6 pt-4">
+    <View className="gap-3 pt-4">
       <Skeleton className="h-10 w-full rounded-lg" />
       <View className="flex-row gap-3">
         <Skeleton className="h-20 flex-1 rounded-lg" />
@@ -169,7 +169,7 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
   } else {
     const { summary, repositories, settings } = dashboard.data;
     body = (
-      <View className="gap-6 px-6 pt-4">
+      <View className="gap-6 pt-4">
         {!settings.enabled ? (
           <Text variant="muted" className="text-xs">
             {t('codeReviewer.analytics.off')}

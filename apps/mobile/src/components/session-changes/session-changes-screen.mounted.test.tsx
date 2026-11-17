@@ -205,7 +205,7 @@ describe('session changes header eyebrow', () => {
     const header = headerProps(renderer);
 
     expect(header.eyebrow).toBe('agentChat.sessionChanges.asOf');
-    expect(header.reserveEyebrow).toBeUndefined();
+    expect(header.reserveEyebrow).toBe(false);
     expect(header.eyebrowPlaceholder).toBeUndefined();
     renderer.unmount();
   });
@@ -221,7 +221,7 @@ describe('session changes header eyebrow', () => {
     // No label can arrive, so the title centres on the back control alone
     // instead of sitting above a line nothing fills.
     expect(header.eyebrow).toBeUndefined();
-    expect(header.reserveEyebrow).toBeUndefined();
+    expect(header.reserveEyebrow).toBe(false);
     expect(header.eyebrowPlaceholder).toBeUndefined();
     renderer.unmount();
   });

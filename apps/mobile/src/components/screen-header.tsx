@@ -569,8 +569,7 @@ export function ScreenHeader({
   // of that title's own lines, painted from the first frame: counting it here
   // keeps the row's shape (and the back control's gutter pull) from changing
   // when the label lands.
-  const separateHeading =
-    centerTitle && (Boolean(title) || Boolean(eyebrow) || reserveEyebrow);
+  const separateHeading = centerTitle && (Boolean(title) || Boolean(eyebrow) || reserveEyebrow);
 
   // The reserve, as a band rather than a box around the title: a zero-width,
   // clipped twin of the eyebrow and the title's line cap holds the header's text

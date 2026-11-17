@@ -39,13 +39,16 @@ const METRIC_OPTIONS = [
 ] as const;
 
 /**
- * One tile of the totals grid: a value, its caption directly under it, and an
- * optional readable detail line. The minimum height fits a value, a caption and
- * a two-line detail at the default font scale. The token tile's input/output
- * detail is one line in most locales and two in the long ones, and it may not
- * be ellipsized, so the floor keeps the whole 2x2 grid on one height instead of
- * letting that one tile pull its row taller than the row above it. A floor,
- * never a cap: a larger font scale grows the content instead of clipping it.
+ * One tile of the totals grid: a value, its caption directly under it, and the
+ * detail slot. The caption comes before the detail so the two tiles of a row
+ * keep one caption baseline when the detail wraps.
+ *
+ * The slot reserves two detail lines on every tile, so the tile whose detail is
+ * one line in most locales and two in the long ones sits on the same height as
+ * its neighbours and the whole 2x2 grid stays even: a floor that the shorter
+ * tiles hold as empty space, never a cap that would ellipsize the figures. The
+ * space is reserved rather than added later, so the grid does not shift when the
+ * totals arrive. A larger font scale grows the slot with its text.
  */
 function StatTile({
   label,
@@ -57,10 +60,12 @@ function StatTile({
   subtext?: string;
 }>) {
   return (
-    <View className="min-h-[112px] flex-1 gap-1 rounded-lg bg-secondary px-3 py-3">
+    <View className="flex-1 gap-1 rounded-lg bg-secondary px-3 py-3">
       <Text className="text-lg font-bold text-foreground">{value}</Text>
       <Text className="text-xs text-muted-foreground">{label}</Text>
-      {subtext !== undefined && <Text className="text-xs text-muted-foreground">{subtext}</Text>}
+      <View className="min-h-[32px]">
+        {subtext !== undefined && <Text className="text-xs text-muted-foreground">{subtext}</Text>}
+      </View>
     </View>
   );
 }
@@ -130,12 +135,12 @@ export function UsageContent({ scope }: Readonly<{ scope: UsageScope }>) {
         <View className="gap-6">
           <View className="gap-3">
             <View className="flex-row gap-3">
-              <Skeleton className="h-[112px] flex-1 rounded-lg bg-muted-soft" />
-              <Skeleton className="h-[112px] flex-1 rounded-lg bg-muted-soft" />
+              <Skeleton className="h-[105px] flex-1 rounded-lg bg-muted-soft" />
+              <Skeleton className="h-[105px] flex-1 rounded-lg bg-muted-soft" />
             </View>
             <View className="flex-row gap-3">
-              <Skeleton className="h-[112px] flex-1 rounded-lg bg-muted-soft" />
-              <Skeleton className="h-[112px] flex-1 rounded-lg bg-muted-soft" />
+              <Skeleton className="h-[105px] flex-1 rounded-lg bg-muted-soft" />
+              <Skeleton className="h-[105px] flex-1 rounded-lg bg-muted-soft" />
             </View>
           </View>
           <Skeleton className="h-[148px] w-full rounded-lg bg-muted-soft" />

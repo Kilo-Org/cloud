@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { formFieldA11y } from '@/components/ui/form-field-a11y';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { ICON_TARGET_DP } from '@/lib/a11y/tap-target';
 import { type BusyAction } from '@/lib/auth/use-native-auth';
 import { foldDecimalDigits } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -93,15 +93,18 @@ export function EmailOtpForm({
         {t('login.codeArrivalHint')}
       </Text>
       <Input
-        // The shared box supplies the Android center gravity and the single
-        // line box; the call site keeps its chrome — border, fill and radius —
-        // the way every single-line field does. `ROW_TARGET_CLASS` is the 48pt
-        // floor (never a fixed height), so Dynamic Type can still grow it.
-        className={`${ROW_TARGET_CLASS} rounded-md border border-input bg-background pl-3 pr-3 text-lg tracking-widest text-foreground`}
+        // The shared box supplies the single line inset (`INPUT_BOX_SHAPE_CLASS`,
+        // min-h-44 and the horizontal padding); the call site keeps its chrome —
+        // border, fill and radius — the way every single-line field does. The
+        // field's 48pt floor comes from the tap-target 48 constant the controls
+        // beside it use, as an inline minimum rather than a row's target class:
+        // it is a min-height, never a fixed height, so Dynamic Type still grows
+        // the box.
+        className="rounded-md border border-input bg-background text-lg tracking-widest text-foreground"
         // textAlign is applied inline, not via a `text-center` class: NativeWind maps
         // textAlign to a native prop for TextInput and crashes on it in this version.
         // eslint-disable-next-line react-native/no-inline-styles -- see comment above
-        style={{ textAlign: 'center' }}
+        style={{ textAlign: 'center', minHeight: ICON_TARGET_DP }}
         placeholder="123456"
         placeholderTextColor={colors.mutedForeground}
         keyboardType="number-pad"

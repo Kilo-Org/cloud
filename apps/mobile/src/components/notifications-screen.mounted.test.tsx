@@ -74,10 +74,14 @@ vi.mock('expo-notifications', () => ({
 }));
 vi.mock('expo-application', () => ({ nativeApplicationVersion: '1.0.4' }));
 vi.mock('sonner-native', () => ({ toast: { error: toastError, success: vi.fn() } }));
+// RowFrame's trailing renderer calls the selection haptic; the real module loads
+// expo-haptics' runtime, which reads `__DEV__`.
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
 vi.mock('@/components/ui/icons', () => ({
   Bell: 'Bell',
   BellOff: 'BellOff',
   Bot: 'Bot',
+  Check: 'Check',
   CircleCheck: 'CircleCheck',
   KeyRound: 'KeyRound',
   ListTodo: 'ListTodo',
@@ -96,7 +100,12 @@ vi.mock('@/components/ui/section', () => ({
   // The real `Section` draws its label through `SectionHeader`; the mock keeps
   // the label in the tree so the assertions can read the section names.
   Section: ({ label, children }: { label?: string; children?: ReactNode }): ReactNode =>
-    createElement('View', null, label === undefined ? null : createElement('Text', null, label), children),
+    createElement(
+      'View',
+      null,
+      label === undefined ? null : createElement('Text', null, label),
+      children
+    ),
 }));
 vi.mock('@/components/ui/row-group', () => ({
   RowGroup: ({ children }: { children?: ReactNode }): ReactNode => children,

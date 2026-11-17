@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { selectionHaptic } from '@/lib/haptics';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { Pressable, useWindowDimensions, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { DetailScreenScrollView } from '@/components/detail-screen';
@@ -42,6 +42,7 @@ import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preferenc
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { type LegalDocument } from '@/lib/legal-document';
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
+import { isNarrowLayout } from '@/lib/narrow-layout';
 import { HIDDEN_BALANCE } from '@/lib/storage-keys';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
@@ -85,6 +86,13 @@ function expiryCaptionFloor(fontScale: number): number {
 /** Reserved pack-row space while the store connects, so rows never jump in. */
 const PACK_SKELETON_ROWS = 4;
 
+/**
+ * The scale at which `ConfigureRow` stacks its tile above the copy, shared with
+ * the loading placeholder so the reservation and the row it stands in for take
+ * the same shape. `configure-row.tsx` keeps the number itself.
+ */
+const CONFIGURE_ROW_STACK_FONT_SCALE = 1.8;
+
 /** The row and the pending card say the same thing about a waiting request. */
 const WAIT_COPY_KEYS = {
   store: 'credits.waitingForStore',
@@ -106,6 +114,11 @@ export function CreditPurchaseScreen() {
   // side insets the scroller applies to its own content.
   const sideInsetStyle = useSideInsetStyle();
   const fontScale = useLiveFontScale();
+  const { width } = useWindowDimensions();
+  // The same presentation `ConfigureRow` picks for the loaded rows: a narrow
+  // window or a large Dynamic Type scale hands the copy the row's full width,
+  // so the loading placeholder reserves that shape instead of a shorter one.
+  const stackRows = fontScale >= CONFIGURE_ROW_STACK_FONT_SCALE || isNarrowLayout(width);
   const trpc = useTRPC();
   const {
     connected,
@@ -408,7 +421,7 @@ export function CreditPurchaseScreen() {
               <RowGroup>
                 {Array.from({ length: PACK_SKELETON_ROWS }, (_, index) => (
                   <View key={index} testID="credit-pack-placeholder">
-                    <RowSkeleton tile subtitle />
+                    <RowSkeleton tile subtitle stack={stackRows} />
                   </View>
                 ))}
               </RowGroup>

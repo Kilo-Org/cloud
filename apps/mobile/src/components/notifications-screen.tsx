@@ -82,6 +82,16 @@ const permissionQueryKey = ['notificationPermission'] as const;
 const MASTER_GATE_ICON = { on: Bell, off: BellOff } as const;
 
 /**
+ * The master row's subtitle, by its settled presentation: the neutral state
+ * says nothing yet, so it has no key.
+ */
+const MASTER_GATE_SUBTITLE_KEYS = {
+  neutral: undefined,
+  on: 'notifications.onDescription',
+  off: 'notifications.offDescription',
+} as const;
+
+/**
  * The glanceable row's subtitle: what it promises while the OS allows it, and
  * what to do about it when the OS does not. Each platform names its own surface
  * and its own setting.
@@ -655,17 +665,13 @@ export function NotificationsScreen() {
   const previewTerminal = previewErrorCode === 'UNAUTHORIZED';
   const previewDisabled = !notificationsEnabled || isPreviewPending || previewTerminal;
 
-  let masterSubtitle: string | undefined;
-  if (masterLeading === 'on') {
-    masterSubtitle = t('notifications.onDescription');
-  } else if (masterLeading === 'off') {
-    masterSubtitle = t('notifications.offDescription');
-  }
+  const masterSubtitleKey = MASTER_GATE_SUBTITLE_KEYS[masterLeading];
+  const masterSubtitle = masterSubtitleKey === undefined ? undefined : t(masterSubtitleKey);
 
   // Master trailing slot — first match wins: a settling permission read or a
   // token query still in flight shows its skeleton, a permission read that
   // failed offers the retry, and only a settled gate draws the real switch.
-  let masterTrailing: ReactNode;
+  let masterTrailing: ReactNode = null;
   if (permissionLoading) {
     masterTrailing = <Skeleton className="h-8 w-14 rounded-full" />;
   } else if (permissionError) {

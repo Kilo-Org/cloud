@@ -57,10 +57,12 @@ vi.mock('@/components/ui/directional-icons', () => ({
   DirectionalChevronRight: 'DirectionalChevronRight',
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/ui/icons', () => ({ Check: 'Check' }));
 vi.mock('@/components/kilo-pass/kilo-pass-icon', () => ({ KiloPassIcon: 'KiloPassIcon' }));
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   View: 'View',
+  useColorScheme: () => 'light',
   useWindowDimensions: () => windowDims,
 }));
 
@@ -93,7 +95,11 @@ describe('KiloPassSubscriptionCard mounted layout', () => {
     // A narrow window puts the copy on its own row below the icon tile row.
     windowDims.width = 160;
     const root = renderCard();
-    const cards = root.findAllByProps({ accessibilityRole: 'button' });
+    // The host control only: `ConfigureRow` passes the role to `RowFrame`, so
+    // matching by prop would count the composite and its Pressable twice.
+    const cards = root.findAll(
+      node => typeof node.type === 'string' && node.props.accessibilityRole === 'button'
+    );
     expect(cards).toHaveLength(1);
     expect(cards[0]?.props.accessibilityLabel).toBe('Kilo Pass. Active');
 
@@ -113,8 +119,7 @@ describe('KiloPassSubscriptionCard loading layout', () => {
     const bars = root
       .findAll(
         node =>
-          Object.is(node.type, 'Skeleton') &&
-          String(node.props.className).includes('max-w-full')
+          Object.is(node.type, 'Skeleton') && String(node.props.className).includes('max-w-full')
       )
       .map(node => String(node.props.className));
     // The skeleton row is the shared row primitive: its title and subtitle bars
@@ -133,8 +138,7 @@ describe('KiloPassSubscriptionCard loading layout', () => {
       const root = renderCard(true);
       const hidden = root.findAll(
         node =>
-          typeof node.props.className === 'string' &&
-          node.props.className.includes('opacity-0')
+          typeof node.props.className === 'string' && node.props.className.includes('opacity-0')
       );
       expect(hidden).toHaveLength(1);
       expect(hidden[0]?.findAll(node => Object.is(node.type, 'Skeleton')).length).toBeGreaterThan(

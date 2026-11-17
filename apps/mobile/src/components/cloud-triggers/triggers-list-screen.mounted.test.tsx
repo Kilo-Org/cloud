@@ -56,8 +56,12 @@ const router = vi.hoisted(() => ({ push: vi.fn() }));
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   View: 'View',
+  useColorScheme: () => 'light',
   useWindowDimensions: () => ({ width: 390, height: 844 }),
 }));
+// RowFrame's trailing renderer calls the selection haptic; the real module loads
+// expo-haptics' runtime, which reads `__DEV__`.
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
 vi.mock('expo-router', () => ({ useRouter: () => router }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => new Proxy({}, { get: () => '#000000' }),
@@ -94,6 +98,7 @@ vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/icon-button', () => ({ IconButton: 'IconButton' }));
 vi.mock('@/components/ui/icons', () => ({
+  Check: 'Check',
   Copy: 'Copy',
   Plus: 'Plus',
   Workflow: 'Workflow',

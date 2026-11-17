@@ -1954,6 +1954,32 @@ function checkPushEnglishCopy({ catalogName, english, localeValues }) {
   return problems;
 }
 
+/**
+ * The policy fields a scan reads on one catalog descriptor. Every catalog
+ * needs a called-key reader; `keyPrefixOf` stays null when the catalog builds
+ * no key from a template head; the destructive collection is a real decision,
+ * because an entry that leaves the field out reads as one that chose not to
+ * collect. A misconfigured entry fails the audit as a named problem before the
+ * scan runs, instead of as a TypeError partway through the tree or a silently
+ * skipped rule.
+ */
+function checkScanPolicy(catalog) {
+  const missing = [];
+  if (typeof catalog.calledKeyOf !== 'function') {
+    missing.push('calledKeyOf');
+  }
+  if (typeof catalog.keyPrefixOf !== 'function' && catalog.keyPrefixOf !== null) {
+    missing.push('keyPrefixOf');
+  }
+  if (typeof catalog.collectsDestructiveKeys !== 'boolean') {
+    missing.push('collectsDestructiveKeys');
+  }
+  return missing.map(
+    field =>
+      `${catalog.name}: the catalog descriptor declares no ${field}; every entry of catalogsOf declares its scan policy`
+  );
+}
+
 /** Every key the source names exists, and every English key is used. */
 function checkSourceUsage({ catalogName, english, source, baseKeyOf, englishFamilies }) {
   const problems = [];
@@ -1991,6 +2017,9 @@ export function checkCatalogs(root = ROOT) {
   problems.push(...languageProblems);
 
   const catalogs = catalogsOf(root);
+  for (const catalog of catalogs) {
+    problems.push(...checkScanPolicy(catalog));
+  }
   for (const catalog of catalogs) {
     if (catalog.localeRegistry) {
       problems.push(...checkPushLocaleRegistry({ root, catalog }));

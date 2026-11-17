@@ -1,6 +1,15 @@
 jest.mock('./served-models', () => ({
   isOpenAiModelServed: jest.fn(async () => true),
 }));
+// The real walk resolves the stored credential through refresh.ts, which reads
+// the OpenAI client configuration. The fixture's `expires_at` is far in the
+// future, so the resolver takes its fast path and never contacts the network;
+// the mock only satisfies the config guard.
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
+  BYOK_ENCRYPTION_KEY: process.env.BYOK_ENCRYPTION_KEY,
+  OPENAI_CLIENT_ID: 'test-client-id',
+  OPENAI_CLIENT_SECRET: 'test-client-secret',
+}));
 
 import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 import { randomUUID } from 'crypto';
@@ -11,7 +20,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { getOpenAiChatGptStoredConnection, saveOpenAiChatGptConnection } from './store';
-import { getOpenAiChatGptByokModelIds, isOpenAiChatGptEligible } from './routing';
+import { getOpenAiChatGptByokModelIds, checkOpenAiChatGptByok } from './routing';
 import type { OpenAiChatGptConnection } from './types';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 
@@ -140,15 +149,16 @@ describe('openai-chatgpt owner scope (real database)', () => {
     ).resolves.toBeNull();
   });
 
+
   it('routes an organization request to the member connection for that organization', async () => {
     await expect(
-      isOpenAiChatGptEligible({
+      checkOpenAiChatGptByok({
         request: responsesRequest(),
         requestedModel: REQUESTED_MODEL,
         userId: user.id,
         organizationId: orgA.id,
       })
-    ).resolves.toBe(true);
+    ).resolves.toMatchObject({ kind: 'provider' });
   });
 
   it('keeps two members of the same organization on their own connections', async () => {
@@ -169,13 +179,13 @@ describe('openai-chatgpt owner scope (real database)', () => {
 
   it('does not route an account without a connection, even when another account has one', async () => {
     await expect(
-      isOpenAiChatGptEligible({
+      checkOpenAiChatGptByok({
         request: responsesRequest(),
         requestedModel: REQUESTED_MODEL,
         userId: user.id,
         organizationId: orgB.id,
       })
-    ).resolves.toBe(false);
+    ).resolves.toBeNull();
 
     await expect(
       getOpenAiChatGptByokModelIds({ kiloUserId: user.id, organizationId: orgB.id }, [

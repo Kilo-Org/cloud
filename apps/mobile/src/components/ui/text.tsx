@@ -24,6 +24,7 @@ const textVariants = cva('text-foreground text-base font-medium', {
       large: 'text-lg font-semibold',
       heading: 'text-base font-semibold',
       small: 'text-sm font-medium leading-none',
+      figure: 'text-2xl font-bold tabular-nums',
       muted: 'text-muted-foreground text-sm',
       caption: 'text-xs text-muted-foreground',
       mono: 'font-mono-medium text-sm',

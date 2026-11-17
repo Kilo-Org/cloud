@@ -289,4 +289,79 @@ describe('TriggerCreateScreen leave guard', () => {
     await waitFor(() => !h.guard.enabled);
     expect(h.guard.enabled).toBe(false);
   });
+
+  it('re-arms the guard when a created screen survives its hand-off', async () => {
+    // The push-then-retire hand-off dropped the retire: the replace dispatched
+    // but the navigator kept the create screen mounted and focused.
+    h.createMutation.mutateAsync.mockResolvedValue({ triggerId: 'trigger-new' });
+    const { renderer } = await renderWithProviders(<TriggerCreateScreen />);
+
+    const formProps = renderer.root.findByProps({ mode: 'create' }).props as {
+      onDraftChange: (next: Record<string, unknown>) => void;
+      onSubmit: () => void;
+    };
+    act(() => {
+      formProps.onDraftChange({
+        name: 'trigger-new',
+        activation: 'webhook',
+        cron: '',
+        timezone: deviceTimeZone(),
+        repository: 'owner/repo',
+        agent: 'code',
+        model: 'kilo-auto/efficient',
+        variant: '',
+        prompt: 'Describe this webhook request payload:\n\n{{body}}',
+        environmentId: null,
+        profileId: null,
+        bodySchemaJson: '',
+        autoCommit: false,
+        condenseOnComplete: false,
+        active: true,
+        authEnabled: false,
+        authHeader: '',
+        authSecret: '',
+        runAsCreator: false,
+      });
+    });
+    await act(async () => {
+      formProps.onSubmit();
+      await Promise.resolve();
+    });
+    await waitFor(() => h.replace.mock.calls.length === 1);
+    await waitFor(() => !h.guard.enabled);
+
+    // A later edit on the surviving screen must be guarded again: the latch
+    // cleared once the leave settled, so the derived recompute runs.
+    const formNode = renderer.root.findByProps({ mode: 'create' });
+    const draftProps = formNode.props as {
+      onDraftChange: (next: Record<string, unknown>) => void;
+    };
+    act(() => {
+      draftProps.onDraftChange({
+        name: 'trigger-new-edited',
+        activation: 'webhook',
+        cron: '',
+        timezone: deviceTimeZone(),
+        repository: 'owner/repo',
+        agent: 'code',
+        model: 'kilo-auto/efficient',
+        variant: '',
+        prompt: 'Describe this webhook request payload:\n\n{{body}}',
+        environmentId: null,
+        profileId: null,
+        bodySchemaJson: '',
+        autoCommit: false,
+        condenseOnComplete: false,
+        active: true,
+        authEnabled: false,
+        authHeader: '',
+        authSecret: '',
+        runAsCreator: false,
+      });
+    });
+    expect(h.guard.enabled).toBe(true);
+
+    pressBack();
+    expect(h.confirm).toHaveBeenCalledTimes(1);
+  });
 });

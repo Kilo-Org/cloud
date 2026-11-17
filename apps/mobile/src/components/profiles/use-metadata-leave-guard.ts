@@ -62,10 +62,10 @@ export function useMetadataLeaveGuard({
   // this render commits. A screen that is leaving stops recomputing — the draft
   // the create just saved still differs from a fresh form, and the recompute
   // would re-arm the guard in the render after the clear, turning the route's
-  // removal into a prompt about a save that already landed. The latch spans the
-  // rest of the mount on purpose: every leave this guard answers removes the
-  // screen (the save's replace retires it, a discard pops it), so the latch
-  // dies with the screen and never suppresses a prompt a later edit needed.
+  // removal into a prompt about a save that already landed. The latch clears
+  // again once the leave has settled: the push-then-retire hand-off drops the
+  // retire when the source becomes focused again, so the create screen can
+  // survive its own leave and must keep asking about a later edit.
   if (isDirty !== undefined && !leavingRef.current) {
     const next = isDirty();
     if (next !== dirty) {
@@ -108,6 +108,11 @@ export function useMetadataLeaveGuard({
     leaveTimerRef.current = setTimeout(() => {
       leaveTimerRef.current = undefined;
       leave();
+      // The leave has been dispatched, so the disarm render is behind us and
+      // the recompute can resume: if the leave turned out to drop the route,
+      // the latch dies with the mount; if the route survived (a hand-off whose
+      // retire the navigator refused), the next render re-arms the guard.
+      leavingRef.current = false;
     }, 0);
   }, []);
 
@@ -142,7 +147,11 @@ export function useMetadataLeaveGuard({
         if (pending === null) {
           return;
         }
-        leavingRef.current = true;
+        // The latch never spans the discard: the disarm render is committed by
+        // the time `leave` queues it, and the replay effect dispatches the
+        // removal after that render. If the replay removes the route the latch
+        // state dies with the mount; if the navigator refused the removal, the
+        // recompute resumes and re-arms the guard.
         dirtyRef.current = false;
         setDirty(false);
         pending();

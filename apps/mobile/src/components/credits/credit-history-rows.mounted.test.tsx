@@ -173,8 +173,11 @@ describe('PurchaseHistoryRow in the reader language', () => {
       const label = readable(String(receiptLabelOf(renderer)));
       // The receipt sentence names its own purchase: the kind title, the
       // painted amount, and the painted date all read inside the sentence,
-      // no matter what order the translation chooses.
+      // no matter what order the translation chooses. The verb phrase comes
+      // from ar.json's own frame, so a fallback to the English sentence
+      // cannot pass these checks.
       expect(label).toContain('شراء رصيد');
+      expect(label).toContain('فتح إيصال');
       expect(label).toContain(amount);
       expect(label).toContain(date);
       renderer.unmount();
@@ -196,6 +199,7 @@ describe('PurchaseHistoryRow in the reader language', () => {
       const { amount, date } = paintedAmountAndDate(renderer);
       const label = readable(String(receiptLabelOf(renderer)));
       expect(label).toContain('الشحن التلقائي');
+      expect(label).toContain('فتح إيصال');
       expect(label).toContain(amount);
       expect(label).toContain(date);
       renderer.unmount();

@@ -4,6 +4,12 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/claude-billing/operator', () => (
   unlinkClaudeUserProfile: jest.fn(async () => ({ kind: 'unlinked', revokedConnectionIds: [] })),
 }));
 
+jest.mock('@kilocode/web-shared/lib/auth/claude/config', () => ({
+  ...jest.requireActual<typeof claudeConfigModule>('@kilocode/web-shared/lib/auth/claude/config'),
+  isClaudeBillingLinkingConfigured: jest.fn(() => true),
+}));
+
+import type * as claudeConfigModule from '@kilocode/web-shared/lib/auth/claude/config';
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { eq } from 'drizzle-orm';
 import {
@@ -19,6 +25,7 @@ import {
   isClaudeOperatorConfigured,
   unlinkClaudeUserProfile,
 } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/operator';
+import { isClaudeBillingLinkingConfigured } from '@kilocode/web-shared/lib/auth/claude/config';
 import { getClaudeBillingConnection } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -74,6 +81,7 @@ async function seedConnectedOrganization(organizationId: string, createdBy: stri
 
 beforeEach(() => {
   jest.mocked(isClaudeOperatorConfigured).mockReset().mockReturnValue(false);
+  jest.mocked(isClaudeBillingLinkingConfigured).mockReset().mockReturnValue(true);
   jest
     .mocked(unlinkClaudeUserProfile)
     .mockReset()
@@ -417,5 +425,29 @@ describe('claudeBillingRouter organization connector state', () => {
     const status = await (await callerFor(manager.id)).status({ organizationId: org.id });
 
     expect(status).toMatchObject({ state: 'billing_unavailable' });
+  });
+});
+
+describe('claudeBillingRouter.status linking availability', () => {
+  it('reports linking available when the OAuth app and operator are configured', async () => {
+    jest.mocked(isClaudeOperatorConfigured).mockReturnValue(true);
+    const user = await insertTestUser();
+
+    const status = await (await callerFor(user.id)).status({});
+
+    expect(status).toMatchObject({ state: 'not_connected', linkingAvailable: true });
+  });
+
+  it.each<[string, boolean, boolean]>([
+    ['the billing OAuth app', false, true],
+    ['the operator credentials', true, false],
+  ])('reports linking unavailable without %s', async (_missing, linking, operator) => {
+    jest.mocked(isClaudeBillingLinkingConfigured).mockReturnValue(linking);
+    jest.mocked(isClaudeOperatorConfigured).mockReturnValue(operator);
+    const user = await insertTestUser();
+
+    const status = await (await callerFor(user.id)).status({});
+
+    expect(status.linkingAvailable).toBe(false);
   });
 });

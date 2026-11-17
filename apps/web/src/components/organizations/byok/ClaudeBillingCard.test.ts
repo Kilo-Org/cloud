@@ -31,6 +31,7 @@ function status(state: ClaudeBillingStatus['state']): ClaudeBillingStatus {
     providerId: CLAUDE_BILLING_PROVIDER_ID,
     providerName: CLAUDE_BILLING_PROVIDER_NAME,
     canManage: true,
+    linkingAvailable: true,
     canSharePersonal: false,
     shareableLinks: [],
     sharedWith: [],
@@ -72,6 +73,47 @@ describe('ClaudeBillingCardView', () => {
 
   it('offers no linking action when the release gate omits it', () => {
     expect(buttons({ status: status('not_connected') })).toHaveLength(0);
+  });
+
+  it('hides an unlinked card when linking is unavailable', () => {
+    expect(render({ status: { ...status('not_connected'), linkingAvailable: false } })).toBe('');
+  });
+
+  it('hides the connect action when linking is unavailable', () => {
+    expect(
+      buttons({
+        status: { ...status('not_connected'), linkingAvailable: false },
+        onConnect: () => undefined,
+      })
+    ).toHaveLength(0);
+  });
+
+  it('keeps sharing and removal when linking is unavailable', () => {
+    const shareable = buttons({
+      status: {
+        ...status('not_connected'),
+        linkingAvailable: false,
+        shareableLinks: [
+          {
+            payerId: '00000000-0000-4000-8000-000000000001',
+            source: { organizationId: '00000000-0000-4000-8000-000000000010' },
+            label: 'Acme',
+            connectedAt: '2026-09-16T12:00:00.000Z',
+          },
+        ],
+      },
+      scope: 'personal',
+      onConnect: () => undefined,
+      onShare: () => undefined,
+    });
+    expect(shareable.map(button => button.textContent)).toEqual(['Use Claude link from Acme']);
+
+    const connected = buttons({
+      status: { ...status('connected'), linkingAvailable: false },
+      onConnect: () => undefined,
+      onRemove: () => undefined,
+    });
+    expect(connected.map(button => button.textContent)).toEqual(['Remove from Kilo']);
   });
 
   it('retains removal when an existing link has no linking action', () => {

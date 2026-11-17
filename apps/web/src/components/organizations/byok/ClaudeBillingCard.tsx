@@ -155,9 +155,13 @@ export function ClaudeBillingCardView({
   const connected =
     status?.state === 'connected' || status?.state === 'billing_unavailable' || reconnectRequired;
   const shareableLinks = !connected && status ? status.shareableLinks : [];
+  const linkingAvailable = status?.linkingAvailable === true;
   const [selectedPayerId, setSelectedPayerId] = useState<string | null>(null);
   const selectedShareLink =
     shareableLinks.find(link => link.payerId === selectedPayerId) ?? shareableLinks[0];
+  if (status && !linkingAvailable && status.state === 'not_connected' && !selectedShareLink) {
+    return null;
+  }
   return (
     <Card>
       <CardHeader className="grid grid-cols-[1fr_auto] items-start gap-4 pb-4">
@@ -207,9 +211,10 @@ export function ClaudeBillingCardView({
                   : null}
               </p>
             ) : null}
-            {status.canManage && (onConnect || (onShare && selectedShareLink) || connected) ? (
+            {status.canManage &&
+            ((onConnect && linkingAvailable) || (onShare && selectedShareLink) || connected) ? (
               <div className="flex flex-wrap items-center gap-2">
-                {onConnect ? (
+                {onConnect && linkingAvailable ? (
                   <Button
                     type="button"
                     size="sm"
@@ -293,7 +298,7 @@ export function ClaudeBillingCardView({
                   </Button>
                 ) : null}
               </div>
-            ) : !status.canManage ? (
+            ) : !status.canManage && linkingAvailable ? (
               <p className="type-body text-muted-foreground">
                 Ask a Kilo organization owner or admin to link a Claude organization.
               </p>

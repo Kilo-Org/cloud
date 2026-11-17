@@ -20,6 +20,8 @@ import {
   createTRPCRouter,
   type TRPCContext,
 } from '@kilocode/web-shared/lib/trpc/init';
+import { isClaudeBillingLinkingConfigured } from '@kilocode/web-shared/lib/auth/claude/config';
+import { isClaudeOperatorConfigured } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/operator';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import {
@@ -68,6 +70,8 @@ export const ClaudeBillingStatusSchema = z.object({
   providerName: z.literal(CLAUDE_BILLING_PROVIDER_NAME),
   /** Whether the signed-in person may start or remove the connection. */
   canManage: z.boolean(),
+  /** Whether Kilo can complete a new link here: the OAuth app and operator are configured. */
+  linkingAvailable: z.boolean(),
   /** Whether this scope can use the person's connected personal payer. */
   canSharePersonal: z.boolean(),
   /** Connected Claude links controlled by the caller that can be shared to this scope. */
@@ -114,6 +118,7 @@ function statusOf(
     providerId: CLAUDE_BILLING_PROVIDER_ID,
     providerName: CLAUDE_BILLING_PROVIDER_NAME,
     canManage,
+    linkingAvailable: isClaudeBillingLinkingConfigured() && isClaudeOperatorConfigured(),
     canSharePersonal,
     shareableLinks: sharing.shareableLinks,
     sharedWith: sharing.sharedWith,

@@ -59,8 +59,8 @@ const detectResponseSchema = z.object({
 
 /**
  * How much of the part `text` covers. Units (segments, or slices of a segment too long for one
- * call) with a cached verdict are left out, and the rest are packed into calls of at most
- * `ENKRYPT_MAX_SCAN_CHARACTERS`; `chunk` locates this call among them. For tool definitions, the
+ * call) with a cached verdict are left out, and each of the rest is scanned by its own call;
+ * `chunk` locates this call among them. For tool definitions, the
  * totals and cached counts are those of the one tool the call scans.
  */
 export type EnkryptScanCoverage = {

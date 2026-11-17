@@ -439,9 +439,10 @@ const INJECTION =
 
 /**
  * About 250,000 characters: five sequential reads of about 48,000 characters each. Each read fits in
- * one call, so none is sliced, and uncached segments are packed into calls of up to
- * `ENKRYPT_MAX_SCAN_CHARACTERS`, so two reads share a call. Every read calls `read_file` with the
- * same arguments, and tool call ids are not scanned, so their tool calls are one unit, scanned once.
+ * one call, so none is sliced, and every uncached unit is scanned by a call of its own: 5 for
+ * `chatTurn1`, one for the reads' tool calls, and one per read, so 11 calls. Every read calls
+ * `read_file` with the same arguments, and tool call ids are not scanned, so their tool calls are
+ * one unit, scanned once.
  */
 const longConversation = [
   ...chatTurn1,
@@ -458,9 +459,8 @@ const MIDDLE_SLICE_HEADER = '[tool result, beginning and end omitted]';
 
 /**
  * One read of about 250,000 characters, too long for one call, so it is scanned in three
- * overlapping slices, each a unit of its own, with the injection in the middle of the middle slice,
- * outside the overlaps. The middle slice fills a call of its own; the first leaves room for the
- * overlap, so it is packed with the messages before it.
+ * overlapping slices, each a unit scanned by a call of its own, with the injection in the middle of
+ * the middle slice, outside the overlaps. With the user message and the tool call, that is 5 calls.
  */
 function injectionInSlice(): unknown[] {
   const filler = schemaSlice(0, 250_000);
@@ -485,8 +485,8 @@ function injectionInSlice(): unknown[] {
 const sliceInjectionConversation = injectionInSlice();
 
 /**
- * Like `longConversation`, with the injection in the last read, so in the last call, packed with
- * the fourth read.
+ * Like `longConversation`, with the injection in the last read, so in the last of 11 calls, each
+ * scanning one unit.
  */
 const fourReads = [0, 1, 2, 3].flatMap(index => readTurn([schemaSlice(index * 48_000, 48_000)]));
 
@@ -541,11 +541,12 @@ function both(parts: Partial<Record<Part, string>>): Expected {
 
 type StepResults = Record<ScanKind, EnkryptCachedScanResult[]>;
 
-/** Whether the blocking conversation scan caches a block for any of its units. */
-function conversationCachesBlock(results: StepResults): boolean {
+/** How many units the blocking conversation scan caches a block for. */
+function conversationCachedBlocks(results: StepResults): number {
   return results.blocking
     .filter(result => result.report?.part === 'conversation')
-    .some(result => result.cacheEntries.some(entry => entry.verdict !== 'allow'));
+    .flatMap(result => result.cacheEntries)
+    .filter(entry => entry.verdict !== 'allow').length;
 }
 
 type Step = {
@@ -574,7 +575,7 @@ const steps: Step[] = [
     expected: both({
       tools: 'miss allow tools=0/3 calls=3',
       system: 'miss allow calls=1',
-      conversation: 'miss allow calls=1',
+      conversation: 'miss allow calls=5 chunks=5',
     }),
   },
   {
@@ -584,7 +585,7 @@ const steps: Step[] = [
     expected: both({
       tools: 'hit allow tools=3/0 calls=0',
       system: 'hit allow calls=0',
-      conversation: 'hit allow calls=1',
+      conversation: 'hit allow calls=3 chunks=3',
     }),
   },
   {
@@ -628,12 +629,12 @@ const steps: Step[] = [
       blocking: {
         tools: 'hit allow tools=3/0 calls=0',
         system: 'hit allow calls=0',
-        conversation: 'hit block calls=1',
+        conversation: 'hit block calls=2 chunks=2',
       },
       log_only: {
         tools: 'hit allow tools=3/0 calls=0',
         system: 'hit allow calls=0',
-        conversation: 'hit allow calls=1',
+        conversation: 'hit allow calls=2 chunks=2',
       },
     },
   },
@@ -646,7 +647,7 @@ const steps: Step[] = [
     expected: both({
       tools: 'hit allow tools=3/0 calls=0',
       system: 'hit allow calls=0',
-      conversation: 'hit allow calls=1',
+      conversation: 'hit allow calls=2 chunks=2',
     }),
   },
   {
@@ -657,7 +658,7 @@ const steps: Step[] = [
     expected: both({
       tools: 'miss allow tools=0/3 calls=3',
       system: 'miss allow calls=1',
-      conversation: 'miss allow calls=1',
+      conversation: 'miss allow calls=10 chunks=10',
     }),
   },
   {
@@ -667,7 +668,7 @@ const steps: Step[] = [
     expected: both({
       tools: 'miss allow tools=0/3 calls=3',
       system: 'miss allow calls=1',
-      conversation: 'miss allow calls=1',
+      conversation: 'miss allow calls=5 chunks=5',
     }),
   },
   {
@@ -677,7 +678,7 @@ const steps: Step[] = [
     expected: both({
       tools: 'miss allow tools=0/3 calls=3',
       system: 'miss allow calls=1',
-      conversation: 'miss allow calls=1',
+      conversation: 'miss allow calls=5 chunks=5',
     }),
   },
   {
@@ -688,7 +689,7 @@ const steps: Step[] = [
     expected: both({
       tools: 'miss allow tools=0/60 calls=60',
       system: 'miss allow calls=1',
-      conversation: 'miss allow calls=1',
+      conversation: 'miss allow calls=5 chunks=5',
     }),
     check: results => {
       const report = results.blocking.find(result => result.report?.part === 'tools')?.report;
@@ -716,7 +717,7 @@ const steps: Step[] = [
     expected: both({
       tools: 'miss allow tools=0/4 calls=5',
       system: 'miss allow calls=1',
-      conversation: 'miss allow calls=1',
+      conversation: 'miss allow calls=5 chunks=5',
     }),
     check: (_results, logs) => {
       const giant = logs.filter(
@@ -735,7 +736,7 @@ const steps: Step[] = [
     expected: both({
       tools: 'miss allow tools=0/3 calls=3',
       system: 'miss allow calls=1',
-      conversation: 'miss allow calls=3 chunks=3',
+      conversation: 'miss allow calls=11 chunks=11',
     }),
     check: results => {
       const total =
@@ -751,7 +752,7 @@ const steps: Step[] = [
     expected: both({
       tools: 'hit allow tools=3/0 calls=0',
       system: 'hit allow calls=0',
-      conversation: 'hit allow calls=3 chunks=3',
+      conversation: 'hit allow calls=5 chunks=5',
     }),
   },
   {
@@ -762,12 +763,12 @@ const steps: Step[] = [
       blocking: {
         tools: 'miss allow tools=0/3 calls=3',
         system: 'miss allow calls=1',
-        conversation: 'miss block calls=3 chunks=3',
+        conversation: 'miss block calls=5 chunks=5',
       },
       log_only: {
         tools: 'miss allow tools=0/3 calls=3',
         system: 'miss allow calls=1',
-        conversation: 'miss allow calls=3 chunks=3',
+        conversation: 'miss allow calls=5 chunks=5',
       },
     },
     check: (results, logs) => {
@@ -785,14 +786,15 @@ const steps: Step[] = [
       if (fired.length !== 1 || fired[0] !== sliceCall?.chunk?.index) {
         failures.push(`injection fired in calls ${fired}, expected ${sliceCall?.chunk?.index}`);
       }
-      if (!conversationCachesBlock(results)) {
-        failures.push('the block of a call of one slice was not cached');
+      const cachedBlocks = conversationCachedBlocks(results);
+      if (cachedBlocks !== 1) {
+        failures.push(`${cachedBlocks} blocks cached, expected only the slice's`);
       }
       return failures;
     },
   },
-  // The slice was the only unit of its call, so its block was cached and rejects the next request
-  // without a blocking call.
+  // The slice was scanned by a call of its own, so its block was cached and rejects the next
+  // request without a blocking call.
   {
     name: '17-slice-block-cached',
     request: chat([...sliceInjectionConversation, { role: 'user', content: 'Continue.' }]),
@@ -811,43 +813,45 @@ const steps: Step[] = [
     },
   },
   {
-    name: '18-injection-in-packed-call',
+    name: '18-injection-in-late-unit',
     request: chat(injectionInLateChunk),
     store: lateBlockStore,
     expected: {
       blocking: {
         tools: 'miss allow tools=0/3 calls=3',
         system: 'miss allow calls=1',
-        conversation: 'miss block calls=3 chunks=3',
+        conversation: 'miss block calls=11 chunks=11',
       },
       log_only: {
         tools: 'miss allow tools=0/3 calls=3',
         system: 'miss allow calls=1',
-        conversation: 'miss allow calls=3 chunks=3',
+        conversation: 'miss allow calls=11 chunks=11',
       },
     },
     check: (results, logs) => {
       const failures: string[] = [];
       const fired = blockedCalls(logs);
-      if (fired.join() !== '2') failures.push(`injection fired in calls ${fired}, expected only 2`);
-      if (conversationCachesBlock(results)) {
-        failures.push('the block of a call of several units was cached');
+      if (fired.join() !== '10')
+        failures.push(`injection fired in calls ${fired}, expected only 10`);
+      const cachedBlocks = conversationCachedBlocks(results);
+      if (cachedBlocks !== 1) {
+        failures.push(`${cachedBlocks} blocks cached, expected only the last read's`);
       }
       return failures;
     },
   },
-  // Enkrypt does not say which unit of a packed call fired, so the block is not cached. The
-  // blocking scan rescans the units of that call, the fourth and fifth reads, with the new message;
-  // the log-only scan allowed every call, so it scans only the new message.
+  // Each unit is scanned by a call of its own, so the block of the last read was cached and rejects
+  // the next request without a blocking call; the log-only scan allowed every call, so it scans only
+  // the new message.
   {
-    name: '19-packed-block-rescanned',
+    name: '19-unit-block-cached',
     request: chat([...injectionInLateChunk, { role: 'user', content: 'Continue.' }]),
     store: lateBlockStore,
     expected: {
       blocking: {
         tools: 'hit allow tools=3/0 calls=0',
         system: 'hit allow calls=0',
-        conversation: 'hit block calls=1',
+        conversation: 'hit block calls=0',
       },
       log_only: {
         tools: 'hit allow tools=3/0 calls=0',
@@ -856,8 +860,8 @@ const steps: Step[] = [
       },
     },
   },
-  // The units of the allowed calls are cached, so with the injection removed the blocking scan
-  // rescans only the fourth read and the changed fifth, and the log-only scan only the fifth.
+  // The verdicts of the allowed units are cached, so with the injection removed both scans rescan
+  // only the changed fifth read.
   {
     name: '20-allowed-calls-cached',
     request: chat([...chatTurn1, ...fourReads, ...readTurn([schemaSlice(192_000, 48_000)])]),

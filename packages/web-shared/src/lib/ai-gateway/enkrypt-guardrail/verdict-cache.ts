@@ -24,7 +24,6 @@ import {
   type RequestToolDefinition,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
 import {
-  packUnits,
   scanUnits,
   type ScanUnit,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/scan-chunks';
@@ -260,19 +259,18 @@ function cachedCoverage(
 }
 
 /**
- * The units without a cached verdict, each once, packed into Enkrypt calls. A unit that appears
- * more than once, such as a repeated message, is scanned once.
+ * The units without a cached verdict, each once and each scanned by its own Enkrypt call, so
+ * different segments, such as a user message and a tool result, are never judged together. A unit
+ * that appears more than once, such as a repeated message, is scanned once.
  */
-function uncachedCalls(units: LookedUpUnit[]): KeyedUnit[][] {
+function uncachedUnits(units: LookedUpUnit[]): KeyedUnit[] {
   const seen = new Set<string>();
-  return packUnits(
-    units.filter(unit => {
-      const id = unit.key ?? unit.text;
-      if (unit.verdict || seen.has(id)) return false;
-      seen.add(id);
-      return true;
-    })
-  );
+  return units.filter(unit => {
+    const id = unit.key ?? unit.text;
+    if (unit.verdict || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
 }
 
 /**
@@ -320,25 +318,20 @@ function cacheableVerdict(
 }
 
 /**
- * What to cache for the calls of a part: an allowed call caches an allow for each of its units, and
- * a failed call a short-lived allow, so the next request rescans only the units of a failed call,
- * and only once their allow expired. Writes are deferred and auto-pipelined, and an allow is never
- * overwritten. Enkrypt does not say which unit of a packed call fired, so a genuine block is cached
- * only for a call of one unit.
+ * What to cache for the calls of a part, each the scan of one unit: an allow or a genuine block, or
+ * for a failed call a short-lived allow, so the next request rescans only the units without a
+ * verdict, and a failed unit only once its allow expired. Writes are deferred and auto-pipelined,
+ * and an allow is never overwritten.
  */
 function callCacheEntries(
-  calls: KeyedUnit[][],
+  calls: KeyedUnit[],
   results: EnkryptGuardrailScanResult[],
   cache: VerdictCache | null
 ): EnkryptVerdictCacheEntry[] {
   if (!cache) return [];
-  return calls.flatMap((call, index): EnkryptVerdictCacheEntry[] => {
+  return calls.flatMap(({ key }, index): EnkryptVerdictCacheEntry[] => {
     const cacheable = cacheableVerdict(required(results[index]), cache.config);
-    if (cacheable?.verdict === 'allow') {
-      return call.flatMap(({ key }) => (key ? [{ key, ...cacheable }] : []));
-    }
-    const [only] = call;
-    return cacheable && call.length === 1 && only?.key ? [{ key: only.key, ...cacheable }] : [];
+    return cacheable && key ? [{ key, ...cacheable }] : [];
   });
 }
 
@@ -417,18 +410,18 @@ type PartPlan = {
 };
 
 /**
- * A scan for each call, its units joined like segments. With nothing to scan, one scan of no text
- * still reports the part, without an Enkrypt call.
+ * A scan for each call, of its one unit. With nothing to scan, one scan of no text still reports
+ * the part, without an Enkrypt call.
  */
 function callScans(
   request: EnkryptScanContext,
   coverage: EnkryptScanCoverage,
-  calls: KeyedUnit[][]
+  calls: KeyedUnit[]
 ): EnkryptGuardrailScan[] {
   if (calls.length === 0) return [{ ...request, text: '', coverage }];
   return calls.map((call, index) => ({
     ...request,
-    text: joinSegments(call.map(unit => unit.text)),
+    text: call.text,
     coverage: { ...coverage, chunk: { index, count: calls.length } },
   }));
 }
@@ -436,8 +429,8 @@ function callScans(
 /**
  * Plans the system prompt or the conversation. Each segment, or each slice of a segment too long
  * for one Enkrypt call, has its verdict cached on its own; only the units without one are scanned,
- * packed into as few calls as fit. A cached block of any unit rejects the request. A cache failure
- * scans the part in full. A failed scan is cached as allowed only briefly; see `isFailedAllow`.
+ * each by its own call. A cached block of any unit rejects the request. A cache failure scans the
+ * part in full. A failed scan is cached as allowed only briefly; see `isFailedAllow`.
  */
 async function planSegmentsPart(
   part: EnkryptSegmentsPart,
@@ -485,7 +478,7 @@ async function planSegmentsPart(
       }),
     };
   }
-  const calls = uncachedCalls(units);
+  const calls = uncachedUnits(units);
   const scans = callScans(request, coverage, calls);
   return {
     scans,
@@ -616,14 +609,14 @@ type ToolPlan = {
   characters: number;
   totalUnits: number;
   cachedUnits: number;
-} & ({ verdict: CachedVerdict } | { calls: KeyedUnit[][]; scans: EnkryptGuardrailScan[] });
+} & ({ verdict: CachedVerdict } | { calls: KeyedUnit[]; scans: EnkryptGuardrailScan[] });
 
 /**
  * Plans the tool definitions and response formats. Each segment of each is cached on its own, as
  * for the other parts, so a changed, added, or removed tool rescans only what changed. Each tool
- * with uncached segments is scanned by its own Enkrypt calls, so a detection is reported for the
- * tool that fired it. Each call pays Enkrypt's per-call minimum, so an uncached tool set costs more
- * than one combined call would; verdicts are shared across the organization, so that is paid once
+ * with uncached segments is scanned by its own Enkrypt calls, one per segment, so a detection is
+ * reported for the tool that fired it. Each call pays Enkrypt's per-call minimum, so an uncached
+ * tool set costs more than one combined call would; verdicts are shared across the organization, so that is paid once
  * per tool and detector set. The results are aggregated into one result for the part: it blocks
  * when any tool blocks, and is otherwise unavailable or fails open when any tool's scan is or does.
  */
@@ -655,7 +648,7 @@ async function planTools(
     if (units.every(unit => unit.verdict === 'allow')) {
       return { tool, characters, ...unitCounts, verdict: 'allow' };
     }
-    const calls = uncachedCalls(units);
+    const calls = uncachedUnits(units);
     const coverage: EnkryptScanCoverage = {
       part: 'tools',
       cache: status,

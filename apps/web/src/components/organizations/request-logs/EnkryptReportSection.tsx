@@ -188,7 +188,7 @@ function charactersSent(scan: Scan): DetailItem {
   }
   return {
     label: 'Characters sent',
-    hint: 'Includes separators and slice headers, so it can exceed the total.',
+    hint: 'Includes slice headers and overlaps, so it can exceed the total.',
     value: `${formatCount(scan.scanned_characters)} of ${formatCount(scan.total_characters)}`,
   };
 }
@@ -250,7 +250,7 @@ function scanItems(scan: Scan): DetailItem[] {
           : []),
         {
           label: 'Calls needed',
-          hint: 'Uncached units, packed into calls of up to 100k characters.',
+          hint: 'One call per uncached unit.',
           value: formatCount(scan.chunks),
         },
         attempts(scan),

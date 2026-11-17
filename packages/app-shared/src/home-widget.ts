@@ -57,13 +57,23 @@ export const homeWidgetDetailsSchema = z.object({
     .max(HOME_WIDGET_DETAIL_LIMIT),
 });
 export type HomeWidgetDetails = z.infer<typeof homeWidgetDetailsSchema>;
-export const EMPTY_HOME_WIDGET_DETAILS: HomeWidgetDetails = {
-  approvalKey: null,
-  primaryKind: null,
-  primaryTitle: null,
-  waitingAgents: [],
-  scheduledAgents: [],
-};
+
+/**
+ * Details with no private work to describe, as a record the caller owns. A
+ * payload that shared one instance's arrays would let a caller's write change
+ * what every later empty payload reports.
+ */
+function emptyHomeWidgetDetails(): HomeWidgetDetails {
+  return {
+    approvalKey: null,
+    primaryKind: null,
+    primaryTitle: null,
+    waitingAgents: [],
+    scheduledAgents: [],
+  };
+}
+
+export const EMPTY_HOME_WIDGET_DETAILS: HomeWidgetDetails = emptyHomeWidgetDetails();
 
 export const homeWidgetDataSchema = z.object({
   snapshot: glanceableAgentsSnapshotSchema,
@@ -239,7 +249,7 @@ export function buildHomeWidgetData(
   return {
     snapshot,
     details: isTerminalGlanceableStatus(snapshot.status)
-      ? { ...EMPTY_HOME_WIDGET_DETAILS }
+      ? emptyHomeWidgetDetails()
       : buildHomeWidgetDetails(input.sessions),
   };
 }

@@ -16,6 +16,7 @@ import type {
   GatewayRequest,
   OpenRouterProviderConfig,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import { legacyOpenRouterAliases } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-openrouter-model-ids';
 import type * as MapModelIdToVercelModule from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 
 const originalFriendliApiKey = process.env.FRIENDLI_API_KEY;
@@ -436,8 +437,9 @@ describe('isValidVercelModelId', () => {
     jest.resetModules();
     jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
       getVercelModelsFromDatabase: jest.fn(async () => new Set(vercelModelIds)),
-      isValidOpenRouterModelId: jest.fn(async (modelId: string) =>
-        openRouterModelIds.includes(modelId)
+      isValidOpenRouterModelId: jest.fn(
+        async (modelId: string) =>
+          legacyOpenRouterAliases.has(modelId) || openRouterModelIds.includes(modelId)
       ),
     }));
     jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel', () => {
@@ -514,14 +516,14 @@ describe('isValidVercelModelId', () => {
     await expect(isValidVercelModelId('anthropic/claude-haiku-4.5')).resolves.toBe(true);
   });
 
-  it('accepts a retained legacy alias that uses the Vercel spelling', async () => {
-    const isValidVercelModelId = await loadIsValidVercelModelId({
-      vercelModelIds: ['zai/glm-5.3'],
-      openRouterModelIds: ['zai/glm-5.3'],
-    });
+  it.each(['zai/glm-5.3', 'zai/glm-5.3-flash'])(
+    'accepts the retained legacy alias %s that uses the Vercel spelling',
+    async modelId => {
+      const isValidVercelModelId = await loadIsValidVercelModelId({ vercelModelIds: [modelId] });
 
-    await expect(isValidVercelModelId('zai/glm-5.3')).resolves.toBe(true);
-  });
+      await expect(isValidVercelModelId(modelId)).resolves.toBe(true);
+    }
+  );
 
   it('accepts a latest alias that resolves to a model Vercel serves', async () => {
     const isValidVercelModelId = await loadIsValidVercelModelId({

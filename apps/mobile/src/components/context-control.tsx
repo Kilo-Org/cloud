@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
-import { type Href } from 'expo-router';
+import { useNavigation } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
@@ -19,6 +19,7 @@ import { type OrgListEntry } from '@/lib/hooks/use-organization-queries';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
+import { pickerRouteOnTop, PR_PICKER } from '@/lib/picker-routes';
 import { contextPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
@@ -48,6 +49,7 @@ export function useContextPicker(
   shownOrganizationId?: string | null
 ) {
   const pushOnce = useSinglePushRoute();
+  const navigation = useNavigation();
   const { t } = useTranslation();
   const { setOrganizationId, organizationId } = useOrganization();
   const shownId = shownOrganizationId !== undefined ? shownOrganizationId : organizationId;
@@ -83,6 +85,12 @@ export function useContextPicker(
       if (!orgs) {
         return;
       }
+      // While the sheet is presented, a second open must not write the slot
+      // again or push another copy of the route — one Done then returns to the
+      // screen underneath instead of walking a stack of copies.
+      if (pickerRouteOnTop(navigation.getState())) {
+        return;
+      }
       // The route reads its rows and its pick from the registry, so the
       // memberships and the selection identity the control shows are the ones
       // the sheet renders.
@@ -91,7 +99,7 @@ export function useContextPicker(
         currentIndex,
         onSelect: select,
       });
-      pushOnce('/(app)/context-picker' as Href);
+      pushOnce(PR_PICKER);
     },
   };
 }

@@ -643,7 +643,8 @@
       "managedOnWeb": "La connessione Bitbucket di questa organizzazione si gestisce sul web da un computer.",
       "description": "Crea un token di accesso all'area di lavoro con le autorizzazioni richieste e incollalo qui sotto.",
       "scopes": "Account: lettura · Repository: lettura/scrittura · Pull request: lettura · Webhook: lettura/scrittura",
-      "tokenPlaceholder": "Token di accesso all'area di lavoro"
+      "tokenPlaceholder": "Token di accesso all'area di lavoro",
+      "tokenRefused": "Bitbucket non ha accettato questo token dell'area di lavoro. Verifica che disponga delle autorizzazioni indicate sopra, quindi riprova."
     },
     "followReviewMd": "Segui REVIEW.md",
     "followReviewMdSubtitle": "Rispetta le istruzioni nel file REVIEW.md di ogni repository",

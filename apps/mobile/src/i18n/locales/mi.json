@@ -1354,7 +1354,8 @@
       "managedOnWeb": "Ka whakahaerehia te hononga Bitbucket o tēnei rōpū i runga ipurangi, mā tētahi rorohiko.",
       "description": "Hangaia he tohu uru mokowāmahi me ngā whakaaetanga e hiahiatia ana, kātahi ka whakapiri ki raro nei.",
       "scopes": "Pūkete: pānui · Pūranga: pānui/tuhi · Tono kume: pānui · Matau tukutuku: pānui/tuhi",
-      "tokenPlaceholder": "Tohu uru mokowāmahi"
+      "tokenPlaceholder": "Tohu uru mokowāmahi",
+      "tokenRefused": "Kāore a Bitbucket i whakaae ki tēnei tohu uru mokowāmahi. Tirohia kei a ia ngā whakaaetanga kei runga ake nei, kātahi ka whakamātau anō."
     },
     "scopeList": {
       "personalStillAvailable": "E wātea tonu ana ngā pūranga whaiaro ki raro nei.",

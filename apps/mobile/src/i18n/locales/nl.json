@@ -676,7 +676,8 @@
       "managedOnWeb": "De Bitbucket-verbinding van deze organisatie wordt via het web op een computer beheerd.",
       "description": "Maak een toegangstoken voor de werkruimte met de vereiste rechten en plak het hieronder.",
       "scopes": "Vereiste rechten: account lezen, repositories lezen en schrijven, PR's lezen en webhooks lezen en schrijven.",
-      "tokenPlaceholder": "Toegangstoken voor de werkruimte"
+      "tokenPlaceholder": "Toegangstoken voor de werkruimte",
+      "tokenRefused": "Bitbucket heeft dit toegangstoken voor de werkruimte niet geaccepteerd. Controleer of het de rechten hierboven heeft en probeer het daarna opnieuw."
     },
     "followReviewMd": "REVIEW.md volgen",
     "followReviewMdSubtitle": "Volg de REVIEW.md-instructiebestanden per repository",

@@ -676,7 +676,8 @@
       "managedOnWeb": "La conexión de Bitbucket de esta organización se gestiona en la web desde un ordenador.",
       "description": "Crea un token de acceso del espacio de trabajo con los permisos necesarios y pégalo abajo.",
       "scopes": "Cuenta: lectura · Repositorios: lectura/escritura · PR: lectura · Webhooks: lectura/escritura",
-      "tokenPlaceholder": "Token de acceso del espacio de trabajo"
+      "tokenPlaceholder": "Token de acceso del espacio de trabajo",
+      "tokenRefused": "Bitbucket no ha aceptado este token de acceso del espacio de trabajo. Comprueba que tiene los permisos indicados arriba y vuelve a intentarlo."
     },
     "followReviewMd": "Seguir las instrucciones de REVIEW.md",
     "followReviewMdSubtitle": "Respeta las instrucciones del archivo REVIEW.md de cada repositorio",

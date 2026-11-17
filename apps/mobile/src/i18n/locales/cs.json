@@ -1400,7 +1400,8 @@
       "managedOnWeb": "Připojení Bitbucket této organizace se spravuje na webu z počítače.",
       "description": "Vytvořte přístupový token pracovního prostoru s požadovanými oprávněními a vložte jej níže.",
       "scopes": "Účet: čtení · Repozitáře: čtení/zápis · PR: čtení · Webhooky: čtení/zápis",
-      "tokenPlaceholder": "Přístupový token pracovního prostoru"
+      "tokenPlaceholder": "Přístupový token pracovního prostoru",
+      "tokenRefused": "Bitbucket tento token pracovního prostoru nepřijal. Zkontrolujte, že má výše uvedená oprávnění, a poté to zkuste znovu."
     },
     "scopeList": {
       "personalStillAvailable": "Osobní repozitáře jsou stále k dispozici níže.",

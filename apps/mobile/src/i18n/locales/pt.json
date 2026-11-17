@@ -1377,7 +1377,8 @@
       "managedOnWeb": "A ligação ao Bitbucket desta organização é gerida na Web, a partir de um computador.",
       "description": "Cria um token de acesso ao espaço de trabalho com as permissões necessárias e cola-o abaixo.",
       "scopes": "Conta: leitura · Repositórios: leitura/escrita · Pedidos de integração: leitura · Webhooks: leitura/escrita",
-      "tokenPlaceholder": "Token de acesso ao espaço de trabalho"
+      "tokenPlaceholder": "Token de acesso ao espaço de trabalho",
+      "tokenRefused": "O Bitbucket não aceitou este token de acesso ao espaço de trabalho. Verifica se tem as permissões acima e tenta novamente."
     },
     "scopeList": {
       "personalStillAvailable": "Os repositórios pessoais ainda estão disponíveis abaixo.",

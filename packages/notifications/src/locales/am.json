@@ -12,7 +12,6 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
     }
   },
@@ -36,14 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "የSLA ጥሰት"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "የደህንነት ፍተሻ ማዘመኛ አለው"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "የKilo ክፍለ-ጊዜዎ ከስልክዎ ለመቆጣጠር ዝግጁ ነው"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

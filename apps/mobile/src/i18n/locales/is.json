@@ -1354,7 +1354,8 @@
       "managedOnWeb": "Bitbucket-tengingu þessarar stofnunar er stjórnað á vefnum í tölvu.",
       "description": "Búðu til aðgangstóka fyrir vinnusvæðið með tilskildum heimildum og límdu hann hér fyrir neðan.",
       "scopes": "Reikningur: lestur · Geymslur: lestur/skrift · Samrunabeiðnir: lestur · Vefkrækjur: lestur/skrift",
-      "tokenPlaceholder": "Aðgangstóki vinnusvæðis"
+      "tokenPlaceholder": "Aðgangstóki vinnusvæðis",
+      "tokenRefused": "Bitbucket tók ekki við þessum aðgangstóka vinnusvæðis. Athugaðu að hann hafi heimildirnar hér fyrir ofan og reyndu svo aftur."
     },
     "scopeList": {
       "personalStillAvailable": "Persónulegar geymslur eru enn tiltækar hér fyrir neðan.",
@@ -1366,7 +1367,8 @@
       "noReviews": "Engar yfirferðir ennþá",
       "noReviewsDescription": "Yfirferðir birtast hér þegar kóðarýnirinn fer yfir samrunabeiðni.",
       "startManualReview": "Hefja handvirka yfirferð",
-      "configureProvider": "Stilla þjónustuveitanda"
+      "configureProvider": "Stilla þjónustuveitanda",
+      "connectOwnerOnly": "Biddu eiganda eða stjórnanda samtakanna um að tengja þjónustuveitanda."
     },
     "platformList": {
       "checking": "Athuga…",
@@ -2973,6 +2975,7 @@
     "signOutThisDevice": "Skrá þetta tæki út",
     "signOutSessionLabel": "Skrá {{device}} út, innskráning {{signedIn}}, síðast virkt {{lastSeen}}",
     "sessionSignedOut": "Skráð var út úr lotunni.",
+    "sessionSignOutFailed": "Ekki tókst að skrá þessa lotu út. Reyndu aftur.",
     "signOutThisDeviceTitle": "Skrá þetta tæki út?",
     "signOutThisSessionTitle": "Skrá þessa lotu út?",
     "signOutThisSessionMessage": "{{device}} verður skráð út. Síðast virkt {{lastSeen}}. Það getur haldið API-aðgangi í allt að klukkustund.",
@@ -3096,12 +3099,14 @@
     "manage": {
       "billingHistory": "Greiðsluferill",
       "billingHistoryEmpty": "Enginn greiðsluferill enn.",
+      "billingHistoryError": "Tókst ekki að hlaða greiðsluferil",
       "cancel": "Segja upp áskrift",
       "cancelDescription": "Kilo Pass verður áfram virkt til loka greiðslutímabilsins og endurnýjast ekki.",
       "cancelScheduled": "Lýkur {{date}}",
       "cancelScheduledChange": "Hætta við áætlaða breytingu",
       "cancelled": "Áskrift sagt upp",
       "creditHistoryEmpty": "Engin Kilo Pass-inneign enn.",
+      "creditHistoryError": "Tókst ekki að hlaða inneignarferil",
       "resume": "Halda áskrift áfram",
       "resumeCancelledDescription": "Kilo Pass byrjar aftur að endurnýjast sjálfkrafa.",
       "resumePausedDescription": "Kilo Pass fer aftur í gang núna, á undan áætluðum degi.",
@@ -3338,7 +3343,7 @@
       "selectOrganization": "Val á félagi",
       "unavailableDescription": "Þetta félag er ekki lengur tiltækt. Veldu eitt úr prófílnum þínum til að halda áfram.",
       "unavailableSessionsDescription": "Þetta félag er ekki lengur tiltækt. Ekki er hægt að hlaða setum þess.",
-      "accessDeniedDescription": "Þú hefur ekki aðgang að þessu félagi."
+      "accessDeniedDescription": "Biddu eiganda eða stjórnanda félagsins um að veita þér aðgang."
     },
     "create": {
       "title": "Stofna félag",
@@ -3458,16 +3463,27 @@
     },
     "settingsOnWeb": {
       "title": "Stillingar félags á vefnum",
-      "integrations": "Samþættingar á vefnum",
       "usageDetails": "Upplýsingar um notkun",
       "providersAndModels": "Veitur og líkön",
       "groups": "Hópar",
       "guardrails": "Öryggismörk",
       "byok": "Notaðu eigin lykil",
+      "ssoAndDomain": "SSO og lén",
+      "dataCollection": "Gagnasöfnun",
       "auditLogs": "Endurskoðunarskrár",
-      "requestLogs": "Beiðnaskrár",
-      "subOrganizations": "Undirfélög",
-      "distributeFunds": "Dreifa fjármunum"
+      "requestLogs": "Beiðnaskrár"
+    },
+    "requestLogs": {
+      "hint": "Beiðnir frá klukkustundinni fyrir lok tímabilsins, nýjustu fyrst.",
+      "older": "Fyrri klukkustund",
+      "newer": "Næsta klukkustund",
+      "truncated": "Fleiri beiðnir eru á þessari klukkustund en listinn sýnir.",
+      "emptyTitle": "Engar beiðnir",
+      "emptyDescription": "Engar gáttarbeiðnir voru á þessari klukkustund.",
+      "loadError": "Ekki tókst að sækja beiðnaskrár.",
+      "permissionDenied": "Aðeins eigandi, stjórnandi eða greiðslustjóri félags getur lesið beiðnaskrár þess.",
+      "tokens": "{{input}} inn · {{output}} út",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Inntakstókar",
@@ -4521,6 +4537,8 @@
     "topModels": "Mest notuðu líkön",
     "topFeatures": "Mest notaðir eiginleikar",
     "emptyTitle": "Engin notkun á þessu tímabili",
+    "unavailableTitle": "Notkun ekki tiltæk",
+    "unavailableDescription": "Þetta vinnusvæði tilkynnir ekki notkun. Að reyna aftur mun ekki hjálpa.",
     "orgSelfNotice": "Þú sérð þína eigin notkun í þessu fyrirtæki.",
     "viewDetails": "Skoða upplýsingar um notkun"
   },
@@ -4592,7 +4610,7 @@
       "fieldCron": "Cron-tjáning",
       "fieldCronHelp": "Fimm svæði: mínúta, klukkustund, dagur, mánuður og vikudagur. Stysta bilið er ein mínúta.",
       "fieldTimezone": "Tímabelti",
-      "nameLocked": "Heitið er hluti vefkrókarslóðarinnar og getur ekki breyst.",
+      "nameLocked": "Heitið getur ekki breyst eftir að kveikjan er búin til.",
       "repositoryLocked": "Geymslan getur ekki breyst eftir að kveikjan er búin til.",
       "environmentAutomatic": "Sjálfvirkt eftir geymslu",
       "notSelected": "Ekki valið",
@@ -4618,6 +4636,7 @@
       "saveFailedTitle": "Gat ekki vistað kveikjuna",
       "deleteTitle": "Eyða þessari kveikju?",
       "deleteMessage": "Köll til {{name}} munu mistakast. Þetta er ekki hægt að afturkalla.",
+      "deleteMessageScheduled": "Áætlaðar keyrslur kveikjunnar {{name}} stöðvast. Þetta er ekki hægt að afturkalla.",
       "runNow": "Keyra núna",
       "runStarted": "Keyrsla hafin",
       "created": "Kveikja búin til",
@@ -4678,5 +4697,175 @@
     "unavailableDescription": "Þessi deilitengill er útrunninn eða hefur verið afturkallaður.",
     "transcriptUnavailableTitle": "Ekki tókst að hlaða þessu endurriti",
     "transcriptUnavailableDescription": "Tengillinn virkar enn. Reyndu aftur eftir smástund."
+  },
+  "organizationGuardrails": {
+    "title": "Gervigreindarvarnir",
+    "permissionDenied": "Aðeins eigendur og stjórnendur samtaka geta stýrt Gervigreindarvörnum.",
+    "unavailable": "Gervigreindarvarnir eru ekki í boði fyrir þessi samtök.",
+    "loadError": "Ekki tókst að hlaða Gervigreindarvörnum",
+    "statusSaving": "Vista…",
+    "statusSaved": "Vistað",
+    "statusFailed": "Ekki tókst að vista.",
+    "inputTitle": "Inntaksvarnir",
+    "inputDescription": "Skannar hvert inntak með Enkrypt AI, þar á meðal niðurstöður verkfæra. Blokkunarskynjari hafnar beiðni þegar Enkrypt er ekki tiltækt.",
+    "outputTitle": "Úttaksvarnir",
+    "outputDescription": "Skannar svör með Enkrypt AI áður en meðlimir fá þau. Slökkt nema þú kveikir á því.",
+    "detectorsHint": "Blokkun hafnar merktri beiðni. Einungis skráning skráir hana án þess að tefja beiðnina.",
+    "detectorsHintOutput": "Blokkun lætur merkt svar mistakast. Einungis skráning skráir það án þess að tefja svarið.",
+    "choiceLog": "Einungis skráning",
+    "applyTo": "Beita á",
+    "applyToAllMembers": "Alla meðlimi",
+    "applyKiloDefault": "Beita Kilo-sjálfgefnu",
+    "invalidSavedTitle": "Ekki er hægt að lesa vistaðar stillingar inntaksskynjara",
+    "invalidSavedBody": "Beiðnum er lokað þar til inntaksskynjarar eru vistaðir aftur. Skynjararnir hér fyrir neðan byrja frá Kilo-sjálfgefnu.",
+    "invalidSavedOutputTitle": "Ekki er hægt að lesa vistaðar stillingar úttaksskynjara",
+    "invalidSavedOutputBody": "Svörum er haldið eftir þar til úttaksskynjarar eru vistaðir aftur. Veldu úttaksskynjara hér fyrir neðan.",
+    "blockingOutputNote": "Blokkunarskynjari fyrir úttak heldur svari þar til Enkrypt hefur kannað það allt. Notaðu Einungis skráningu til að forðast töfina.",
+    "inputDetectorRequired": "Kveiktu á að minnsta kosti einum inntaksskynjara.",
+    "outputDetectorRequired": "Kveiktu á að minnsta kosti einum úttaksskynjara.",
+    "rulesTooMany": "Bættu við allt að {{max}} reglum.",
+    "ruleIdRequired": "Sláðu inn regluauðkenni.",
+    "ruleIdInvalid": "Regluauðkenni má aðeins nota bókstafi, tölur, punkta, bandstrik og undirstrik.",
+    "ruleTextRequired": "Lýstu því sem reglan bannar eða krefst.",
+    "keywordTooLong": "Hvert lykilorð má vera að hámarki {{max}} stafir.",
+    "topicTooLong": "Hvert umræðuefni má vera að hámarki {{max}} stafir.",
+    "keywordsTooMany": "Bættu við allt að {{max}} lykilorðum.",
+    "topicsTooMany": "Bættu við allt að {{max}} umræðuefnum.",
+    "piiEntityRequired": "Veldu að minnsta kosti eina tegund gagna til að greina.",
+    "keywordRequired": "Bættu við að minnsta kosti einu lykilorði.",
+    "topicRequired": "Bættu við að minnsta kosti einu umræðuefni.",
+    "policyTextRequired": "Sláðu inn stefnutexta.",
+    "ruleRequired": "Bættu við að minnsta kosti einni reglu.",
+    "ruleIdDuplicate": "Hver regla þarf sitt eigið reglu-ID.",
+    "piiEntities": "Gögn til að greina",
+    "keywordsLabel": "Lykilorð",
+    "keywordsHint": "Eitt lykilorð í hverri línu.",
+    "topicsHint": "Eitt umræðuefni í hverri línu.",
+    "policyFormat": "Snið stefnu",
+    "policyFormatRules": "Skipulagðar reglur",
+    "policyFormatRulesDescription": "Ein regla fyrir hverja kröfu, með flokki og alvarleika. Mælt með.",
+    "policyFormatText": "Stefnutexti",
+    "policyFormatTextDescription": "Límdu fyrirliggjandi stefnu sem venjulegan texta.",
+    "rulesEmpty": "Engar reglur ennþá. Hver regla lýsir einu sem inntak má ekki innihalda eða biðja um.",
+    "addRule": "Bæta við reglu",
+    "ruleNumber": "Regla {{number}}",
+    "ruleRemove": "Fjarlægja reglu {{number}}",
+    "ruleIdLabel": "Regluauðkenni",
+    "ruleNameLabel": "Heiti (valfrjálst)",
+    "ruleTextLabel": "Regla",
+    "ruleRiskCategory": "Áhættuflokkur",
+    "ruleApplicability": "Gildissvið",
+    "ruleFrameworks": "Rammar",
+    "detector": {
+      "promptInjection": {
+        "label": "Innspýting í fyrirmæli",
+        "description": "Greinir tilraunir til að hnekkja fyrirmælum eða komast fram hjá vernd líkansins."
+      },
+      "policyViolation": {
+        "label": "Brot á stefnu",
+        "description": "Finnur og merkir inntak sem brýtur stefnu samtakanna þinna, hvort sem hún er skrifuð sem texti eða reglur.",
+        "descriptionOutput": "Finnur og merkir svör sem brjóta stefnu samtakanna þinna, hvort sem hún er skrifuð sem texti eða reglur."
+      },
+      "pii": {
+        "label": "PII og leyndarmál",
+        "description": "Greinir persónugögn, auðkenni, IP-tölur og URL-slóðir."
+      },
+      "keywords": {
+        "label": "Bönnuð lykilorð",
+        "descriptionOutput": "Greinir svör sem innihalda eitthvað af þeim lykilorðum sem þú skráir."
+      },
+      "topics": {
+        "label": "Umræðuefni",
+        "descriptionOutput": "Finnur og merkir svör um hvert það umræðuefni sem þú skráir."
+      },
+      "toxicity": {
+        "label": "Eituráhrif",
+        "description": "Greinir eitrað, móðgandi, ógnandi eða hatursfullt tungumál."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Greinir kynferðislegt eða annað efni sem er ekki öruggt fyrir vinnustað."
+      },
+      "bias": {
+        "label": "Hlutdrægni",
+        "description": "Greinir hlutdrægt eða fordómafullt tungumál."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Persónugögn",
+        "description": "Nöfn, netföng, símanúmer."
+      },
+      "secrets": {
+        "label": "Leyndarmál",
+        "description": "API-lyklar, auðkennistákn og lykilorð."
+      },
+      "ipAddress": {
+        "label": "IP-tölur",
+        "description": "IPv4- og IPv6-tölur."
+      },
+      "url": {
+        "label": "URL-slóðir",
+        "description": "Vefslóðir."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Öryggi og svik",
+      "safetyHarm": "Öryggi og skaði",
+      "privacyDataProtection": "Persónuvernd og gagnavernd",
+      "brandReputationTrust": "Vörumerki og orðspor",
+      "biasFairnessEthical": "Hlutdrægni og sanngirni",
+      "legalIpLiability": "Lagaleg og hugverkaábyrgð",
+      "productMisuse": "Misnotkun vöru",
+      "performanceQuality": "Afköst og gæði"
+    },
+    "applicability": {
+      "user": "Inntak notanda",
+      "userAssistant": "Inntak notanda og svör"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM topp 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "Lög ESB um gervigreind",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Fyrirtækjaeiginleiki",
+    "enterpriseOnly": "Þetta er eingöngu fyrirtækjaeiginleiki.",
+    "readOnly": "Aðeins eigendur og stjórnendur samtaka geta breytt þessum stillingum.",
+    "loadError": "Ekki tókst að hlaða veitendum og líkönum",
+    "tabModels": "Líkön",
+    "tabProviders": "Veitendur",
+    "tabGateways": "Gáttir",
+    "modelsDescription": "Slökktu á líkani til að loka því fyrir hvern meðlim. Líkön frá leyfðum veitendum eru virk sjálfgefið.",
+    "modelsDeniedOnly": "Aðeins synjað",
+    "modelsEmpty": "Engin líkön passa við þessa leit.",
+    "providersDescription": "Slökktu á veitanda til að koma í veg fyrir að Kilo beini beiðnum til hans fyrir þessi samtök.",
+    "providersNeedCatalog": "Rofar veitenda verða skrifvarðir þar til öll líkanaskráin hefur hlaðist inn. Ýttu á Reyna aftur hér að ofan til að breyta þeim.",
+    "providersEmpty": "Engir veitendur passa við þessa leit.",
+    "allowAllShown": "Leyfa allt sem sýnt er",
+    "denyAllShown": "Hafna öllu sem sýnt er",
+    "gatewaysDescription": "Kilo beinir beiðnum um líkön í gegnum Vercel AI Gateway eða OpenRouter. Óvirk gátt lætur þessar beiðnir mistakast.",
+    "emptyProviderList": "Leyfðu að minnsta kosti einn veitanda. Tómur listi lokar á allar beiningar Kilo til líkana.",
+    "gatewaysUnavailable": "Gáttastillingar eru ekki í boði fyrir þessi samtök.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "Beiðnir OpenRouter eru ekki bundnar við svæði.",
+    "inferenceRegion": "Ályktunarsvæði",
+    "inferenceRegionDescription": "Bindur beiðnir Vercel AI Gateway við þetta svæði. Líkan sem er ekki tiltækt þar mistekst.",
+    "disableOpenrouterNote": "Að slökkva á OpenRouter blokkar einnig BYOK-lykla sem beina beiðnum í gegnum það.",
+    "emptyModelList": "Hafðu að minnsta kosti eitt líkan virkt. Ef öllum líkönum er hafnað hafa meðlimir ekkert til að nota.",
+    "catalogUnavailable": "Heildarlíkanaskráin hlóðst ekki, svo aðeins vistaðir listar þínir eru sýndir. Reyndu aftur til að hlaða öllum líkönum.",
+    "region": {
+      "global": "Alheims",
+      "us": "Bandaríkin",
+      "eu": "Evrópusambandið",
+      "au": "Ástralía",
+      "jp": "Japan"
+    }
   }
 }

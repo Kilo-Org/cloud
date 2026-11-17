@@ -16,7 +16,6 @@ import {
   findIntegrationByInstallationId,
   getIntegrationForOwner,
   getGitHubIntegrationById,
-  getPrimaryGitHubIntegrationForOrganization,
   upsertPlatformIntegrationForOwner,
   updateRepositoriesForIntegration,
   syncIntegrationInstallationDetails,
@@ -51,7 +50,7 @@ import {
   getGitHubUserAuthorizationStatus,
 } from '@/lib/integrations/platforms/github/user-authorization';
 import { seedUserGithubToken } from '@/lib/github-pr-review/dev-seed';
-import { createInstallState } from '@/lib/integrations/github/install-state';
+import { beginGitHubAppInstall } from '@/lib/integrations/github/install-start';
 import {
   canOrganizationCreateSharedGitHubConnection,
   canOrganizationUseMultipleGitHubInstallations,
@@ -393,38 +392,12 @@ export const githubAppsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const owner = await resolveAuthorizedOwner(
-        ctx,
-        input.organizationId,
-        input.organizationId ? ORGANIZATION_MANAGE_ROLES : undefined
-      );
-      if (owner.type === 'org' && !canOrganizationUseMultipleGitHubInstallations(owner.id)) {
-        // The single-installation slot belongs to the organization's live
-        // workflow connection. Anything else still leaves the slot free to
-        // start an installation from: a pending request awaiting a GitHub
-        // organization admin's approval carries no installation id yet, and a
-        // suspended association is a connection GitHub will not serve until it
-        // is restored, so neither is a reason to refuse the install page. A
-        // locally disconnected row keeps relinquishing its slot, which the
-        // connection's health predicate already expresses.
-        const workflowConnection = await getPrimaryGitHubIntegrationForOrganization(owner.id);
-        if (workflowConnection) {
-          throw new TRPCError({
-            code: 'FORBIDDEN',
-            message: 'This organization already has a GitHub installation',
-          });
-        }
-      }
-      const appType = await getGitHubAppTypeForOrganization(input.organizationId ?? null);
-
-      const token = await createInstallState({
-        kiloUserId: ctx.user.id,
-        ownerType: owner.type,
-        ownerId: owner.id,
-        githubAppType: appType,
+      // The app shell's own start route mints through the same helper, so both
+      // entry points enforce the same owner check and installation slot rule.
+      const { token } = await beginGitHubAppInstall(ctx, {
+        organizationId: input.organizationId,
         returnTo: input.returnTo ?? null,
       });
-
       return { token };
     }),
 

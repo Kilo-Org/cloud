@@ -8,7 +8,7 @@ import { supportStepUpPort } from '@kilocode/web-shared/lib/admin/support-step-u
 import {
   ORGANIZATION_BILLING_ROLES,
   ORGANIZATION_MANAGE_ROLES,
-  ORGANIZATION_PARENT_ACCESS_ROLES,
+  ORGANIZATION_ROLE_PRIORITY,
 } from '@kilocode/app-shared/organizations';
 import { baseProcedure } from '@kilocode/web-shared/lib/trpc/init';
 import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
@@ -39,12 +39,16 @@ import {
 } from '@kilocode/web-shared/lib/admin/support-access-resolver';
 import { TRPCError } from '@trpc/server';
 import { and, eq, inArray, isNull, type SQL } from 'drizzle-orm';
-import { alias, type AnyPgColumn, type SelectedFields } from 'drizzle-orm/pg-core';
+import type { AnyPgColumn, SelectedFields } from 'drizzle-orm/pg-core';
 import * as z from 'zod';
-import { activeOrganizationJoinCondition } from '@kilocode/worker-utils/organization-membership';
+import {
+  activeOrganizationJoinCondition,
+  inheritedParentMembershipJoinCondition,
+  parentOrganizationJoinCondition,
+  parentOrganizationsTable,
+} from '@kilocode/worker-utils/organization-membership';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 
-const parentOrganizations = alias(organizations, 'parent_organizations');
 const warnSupportLookupFailure = sentryLogger('support_access_lookup', 'error');
 
 export const OrganizationIdInputSchema = z.object({
@@ -73,10 +77,11 @@ type CallerRoleRowWithOrganization = CallerRoleRow & { organization: Organizatio
 
 /**
  * The caller's membership roles in the organizations matched by
- * `organizationFilter`: a direct membership in a live organization, plus the
- * roles inherited from a live parent organization. The membership,
- * live-organization and inheritable-role rules live only here, so the role
- * check and the organization fetch cannot drift.
+ * `organizationFilter`: a direct membership in a live organization, and the
+ * roles inherited from a live parent organization. The inherited-access SQL
+ * comes from one shared definition in
+ * `@kilocode/worker-utils/organization-membership`, so the role check and the
+ * organization fetch apply the same rule.
  *
  * {@link loadEffectiveMembershipRows} and
  * {@link loadEffectiveMembershipRowsWithOrganization} both read through this
@@ -119,20 +124,10 @@ async function selectCallerRoleRows(
     db
       .select(fields)
       .from(organizations)
-      .innerJoin(
-        parentOrganizations,
-        and(
-          eq(parentOrganizations.id, organizations.parent_organization_id),
-          isNull(parentOrganizations.deleted_at)
-        )
-      )
+      .innerJoin(parentOrganizationsTable, parentOrganizationJoinCondition())
       .innerJoin(
         organization_memberships,
-        and(
-          eq(organization_memberships.organization_id, organizations.parent_organization_id),
-          eq(organization_memberships.kilo_user_id, kiloUserId),
-          inArray(organization_memberships.role, ORGANIZATION_PARENT_ACCESS_ROLES)
-        )
+        inheritedParentMembershipJoinCondition(organization_memberships, organizations, kiloUserId)
       )
       .where(and(organizationFilter(organizations.id), isNull(organizations.deleted_at))),
   ]);
@@ -140,16 +135,15 @@ async function selectCallerRoleRows(
   return [...directRows, ...inheritedRows];
 }
 
-const rolePriority = ['owner', 'admin', 'billing_manager', 'member'] satisfies OrganizationRole[];
-
 export function effectiveMembershipRole(
   rows: { role: OrganizationRole }[],
   roles?: OrganizationRole[]
 ): OrganizationRole | null {
-  const allowedRoles = roles && roles.length > 0 ? roles : rolePriority;
+  const allowedRoles = roles && roles.length > 0 ? roles : ORGANIZATION_ROLE_PRIORITY;
   return (
-    rolePriority.find(role => allowedRoles.includes(role) && rows.some(row => row.role === role)) ??
-    null
+    ORGANIZATION_ROLE_PRIORITY.find(
+      role => allowedRoles.includes(role) && rows.some(row => row.role === role)
+    ) ?? null
   );
 }
 
@@ -654,7 +648,7 @@ export async function getOrganizationsAccessRoles(
       )
     );
     for (const [organizationId, roles] of rolesByOrg) {
-      const best = rolePriority.find(role => roles.includes(role));
+      const best = ORGANIZATION_ROLE_PRIORITY.find(role => roles.includes(role));
       if (best) result.set(organizationId, best);
     }
     return result;
@@ -706,7 +700,7 @@ export async function getOrganizationsAccessRoles(
     await selectCallerRoleRows(ctx.user.id, column => inArray(column, uniqueIds), callerRoleFields)
   );
   for (const [organizationId, roles] of rolesByOrg) {
-    const best = rolePriority.find(role => roles.includes(role));
+    const best = ORGANIZATION_ROLE_PRIORITY.find(role => roles.includes(role));
     if (best) result.set(organizationId, best);
   }
   return result;
@@ -723,7 +717,7 @@ export async function ensureOrganizationsAccess(
   roles?: OrganizationRole[]
 ): Promise<void> {
   const accessByOrg = await getOrganizationsAccessRoles(ctx, organizationIds, roles);
-  const allowedRoles = roles && roles.length > 0 ? roles : rolePriority;
+  const allowedRoles = roles && roles.length > 0 ? roles : ORGANIZATION_ROLE_PRIORITY;
   for (const organizationId of new Set(organizationIds)) {
     const role = accessByOrg.get(organizationId);
     if (!role || !allowedRoles.includes(role)) {

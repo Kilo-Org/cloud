@@ -1354,7 +1354,8 @@
       "managedOnWeb": "Organisasjonens Bitbucket-tilkobling administreres på nettet fra en datamaskin.",
       "description": "Opprett et tilgangstoken for arbeidsområdet med de nødvendige tillatelsene, og lim det inn nedenfor.",
       "scopes": "Konto: lesing · Kodelagre: lesing/skriving · PR-er: lesing · Webhooks: lesing/skriving",
-      "tokenPlaceholder": "Tilgangstoken for arbeidsområdet"
+      "tokenPlaceholder": "Tilgangstoken for arbeidsområdet",
+      "tokenRefused": "Bitbucket godtok ikke dette tilgangstokenet for arbeidsområdet. Kontroller at det har tillatelsene ovenfor, og prøv deretter på nytt."
     },
     "scopeList": {
       "personalStillAvailable": "Personlige kodelagre er fortsatt tilgjengelige nedenfor.",
@@ -1366,7 +1367,8 @@
       "noReviews": "Ingen gjennomganger ennå",
       "noReviewsDescription": "Gjennomganger vises her når kodegranskeren har gjennomgått en PR.",
       "startManualReview": "Start en manuell gjennomgang",
-      "configureProvider": "Konfigurer leverandør"
+      "configureProvider": "Konfigurer leverandør",
+      "connectOwnerOnly": "Be en eier eller administrator i organisasjonen om å koble til en leverandør."
     },
     "platformList": {
       "checking": "Sjekker…",
@@ -2973,6 +2975,7 @@
     "signOutThisDevice": "Logg ut denne enheten",
     "signOutSessionLabel": "Logg ut {{device}}, logget inn {{signedIn}}, sist sett {{lastSeen}}",
     "sessionSignedOut": "Økten er logget ut.",
+    "sessionSignOutFailed": "Kunne ikke logge ut denne økten. Prøv igjen.",
     "signOutThisDeviceTitle": "Logge ut denne enheten?",
     "signOutThisSessionTitle": "Logge ut denne økten?",
     "signOutThisSessionMessage": "{{device}} vil bli logget ut. Sist sett {{lastSeen}}. Den kan beholde API-tilgang i opptil en time.",
@@ -3096,12 +3099,14 @@
     "manage": {
       "billingHistory": "Faktureringshistorikk",
       "billingHistoryEmpty": "Ingen faktureringshistorikk ennå.",
+      "billingHistoryError": "Kunne ikke laste inn faktureringshistorikken",
       "cancel": "Si opp abonnement",
       "cancelDescription": "Kilo Pass forblir aktiv til slutten av faktureringsperioden og fornyes ikke.",
       "cancelScheduled": "Avsluttes {{date}}",
       "cancelScheduledChange": "Avbryt planlagt endring",
       "cancelled": "Abonnementet er sagt opp",
       "creditHistoryEmpty": "Ingen Kilo Pass-kreditter ennå.",
+      "creditHistoryError": "Kunne ikke laste inn kredithistorikken",
       "resume": "Gjenoppta abonnement",
       "resumeCancelledDescription": "Kilo Pass fornyes automatisk igjen.",
       "resumePausedDescription": "Kilo Pass gjenopptas nå, før den planlagte datoen for gjenopptakelse.",
@@ -3338,7 +3343,7 @@
       "selectOrganization": "Velg en organisasjon",
       "unavailableDescription": "Denne organisasjonen er ikke lenger tilgjengelig. Velg en fra profilen din for å fortsette.",
       "unavailableSessionsDescription": "Denne organisasjonen er ikke lenger tilgjengelig. Øktene dens kan ikke lastes inn.",
-      "accessDeniedDescription": "Du har ikke tilgang til denne organisasjonen."
+      "accessDeniedDescription": "Be en eier eller administrator i en organisasjon om å gi deg tilgang."
     },
     "create": {
       "title": "Opprett organisasjon",
@@ -3458,16 +3463,27 @@
     },
     "settingsOnWeb": {
       "title": "Organisasjonsinnstillinger på nettet",
-      "integrations": "Integrasjoner på nettet",
       "usageDetails": "Bruksdetaljer",
       "providersAndModels": "Leverandører og modeller",
       "groups": "Grupper",
       "guardrails": "Sikkerhetsrammer",
       "byok": "Bruk din egen nøkkel",
+      "ssoAndDomain": "SSO og domene",
+      "dataCollection": "Datainnsamling",
       "auditLogs": "Revisjonslogger",
-      "requestLogs": "Forespørselslogger",
-      "subOrganizations": "Underorganisasjoner",
-      "distributeFunds": "Fordel midler"
+      "requestLogs": "Forespørselslogger"
+    },
+    "requestLogs": {
+      "hint": "Forespørsler fra timen før vinduet slutter, nyeste først.",
+      "older": "Eldre time",
+      "newer": "Nyere time",
+      "truncated": "Denne timen har flere forespørsler enn listen viser.",
+      "emptyTitle": "Ingen forespørsler",
+      "emptyDescription": "Denne timen har ingen gateway-forespørsler.",
+      "loadError": "Kunne ikke laste inn forespørselslogger.",
+      "permissionDenied": "Bare en eier, administrator eller faktureringsansvarlig i organisasjonen kan lese forespørselsloggene.",
+      "tokens": "{{input}} inn · {{output}} ut",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Inndatatokener",
@@ -4521,6 +4537,8 @@
     "topModels": "Mest brukte modeller",
     "topFeatures": "Mest brukte funksjoner",
     "emptyTitle": "Ikke noe forbruk i denne perioden",
+    "unavailableTitle": "Forbruk er ikke tilgjengelig",
+    "unavailableDescription": "Dette arbeidsområdet rapporterer ikke forbruk. Det hjelper ikke å prøve igjen.",
     "orgSelfNotice": "Du ser ditt eget forbruk i denne organisasjonen.",
     "viewDetails": "Vis forbruksdetaljer"
   },
@@ -4592,7 +4610,7 @@
       "fieldCron": "Cron-uttrykk",
       "fieldCronHelp": "Fem felt: minutt, time, dag, måned og ukedag. Det korteste intervallet er ett minutt.",
       "fieldTimezone": "Tidssone",
-      "nameLocked": "Navnet er en del av webhook-URL-en og kan ikke endres.",
+      "nameLocked": "Navnet kan ikke endres etter at triggeren er opprettet.",
       "repositoryLocked": "Repositoriet kan ikke endres etter at triggeren er opprettet.",
       "environmentAutomatic": "Automatisk basert på repositoriet",
       "notSelected": "Ikke valgt",
@@ -4618,6 +4636,7 @@
       "saveFailedTitle": "Kunne ikke lagre triggeren",
       "deleteTitle": "Slette denne triggeren?",
       "deleteMessage": "Kall til {{name}} vil mislykkes. Dette kan ikke angres.",
+      "deleteMessageScheduled": "Planlagte kjøringer av {{name}} stopper. Dette kan ikke angres.",
       "runNow": "Kjør nå",
       "runStarted": "Kjøring startet",
       "created": "Trigger opprettet",
@@ -4678,5 +4697,175 @@
     "unavailableDescription": "Denne delingslenken har utløpt eller blitt tilbakekalt.",
     "transcriptUnavailableTitle": "Kunne ikke laste inn denne transkripsjonen",
     "transcriptUnavailableDescription": "Lenken fungerer fortsatt. Prøv igjen om litt."
+  },
+  "organizationGuardrails": {
+    "title": "KI-vernetiltak",
+    "permissionDenied": "Bare organisasjonseiere og administratorer kan administrere KI-vernetiltak.",
+    "unavailable": "KI-vernetiltak er ikke tilgjengelig for denne organisasjonen.",
+    "loadError": "KI-vernetiltak kunne ikke lastes inn",
+    "statusSaving": "Lagrer…",
+    "statusSaved": "Lagret",
+    "statusFailed": "Kunne ikke lagre.",
+    "inputTitle": "Vernetiltak for inndata",
+    "inputDescription": "Skanner alle inndata med Enkrypt AI, inkludert verktøyresultater. En blokkerende detektor avviser en forespørsel når Enkrypt ikke er tilgjengelig.",
+    "outputTitle": "Vernetiltak for utdata",
+    "outputDescription": "Skanner svar med Enkrypt AI før medlemmer mottar dem. Av med mindre du slår det på.",
+    "detectorsHint": "Blokker avviser en forespørsel som er flagget. Bare logg registrerer den uten å forsinke forespørselen.",
+    "detectorsHintOutput": "Blokker får et flagget svar til å feile. Bare logg registrerer det uten å forsinke svaret.",
+    "choiceLog": "Bare logg",
+    "applyTo": "Bruk på",
+    "applyToAllMembers": "Alle medlemmer",
+    "applyKiloDefault": "Bruk Kilo-standard",
+    "invalidSavedTitle": "Lagrede innstillinger for inndatadetektorer kan ikke leses",
+    "invalidSavedBody": "Forespørsler blokkeres til inndatadetektorene er lagret på nytt. Detektorene nedenfor starter fra Kilo-standard.",
+    "invalidSavedOutputTitle": "Lagrede innstillinger for utdatadetektorer kan ikke leses",
+    "invalidSavedOutputBody": "Svar holdes tilbake til utdatadetektorene er lagret på nytt. Velg utdatadetektorer nedenfor.",
+    "blockingOutputNote": "En blokkerende utdatadetektor holder et svar tilbake til Enkrypt har kontrollert alt av det. Bruk Bare logg for å unngå forsinkelsen.",
+    "inputDetectorRequired": "Slå på minst én inndatadetektor.",
+    "outputDetectorRequired": "Slå på minst én utdatadetektor.",
+    "rulesTooMany": "Legg til opptil {{max}} regler.",
+    "ruleIdRequired": "Skriv inn en regel-ID.",
+    "ruleIdInvalid": "En regel-ID kan bare bruke bokstaver, tall, punktum, bindestreker og understreker.",
+    "ruleTextRequired": "Beskriv hva regelen forbyr eller krever.",
+    "keywordTooLong": "Hvert nøkkelord kan være opptil {{max}} tegn.",
+    "topicTooLong": "Hvert emne kan være opptil {{max}} tegn.",
+    "keywordsTooMany": "Legg til opptil {{max}} nøkkelord.",
+    "topicsTooMany": "Legg til opptil {{max}} emner.",
+    "piiEntityRequired": "Velg minst én type data som skal oppdages.",
+    "keywordRequired": "Legg til minst ett nøkkelord.",
+    "topicRequired": "Legg til minst ett emne.",
+    "policyTextRequired": "Skriv inn retningslinjeteksten.",
+    "ruleRequired": "Legg til minst én regel.",
+    "ruleIdDuplicate": "Hver regel trenger sin egen regel-ID.",
+    "piiEntities": "Data som skal oppdages",
+    "keywordsLabel": "Nøkkelord",
+    "keywordsHint": "Ett nøkkelord per linje.",
+    "topicsHint": "Ett emne per linje.",
+    "policyFormat": "Format for retningslinjer",
+    "policyFormatRules": "Strukturerte regler",
+    "policyFormatRulesDescription": "Én regel per krav, med kategori og alvorlighetsgrad. Anbefalt.",
+    "policyFormatText": "Retningslinjetekst",
+    "policyFormatTextDescription": "Lim inn en eksisterende retningslinje som ren tekst.",
+    "rulesEmpty": "Ingen regler ennå. Hver regel beskriver én ting inndata ikke må inneholde eller be om.",
+    "addRule": "Legg til regel",
+    "ruleNumber": "Regel {{number}}",
+    "ruleRemove": "Fjern regel {{number}}",
+    "ruleIdLabel": "Regel-ID",
+    "ruleNameLabel": "Navn (valgfritt)",
+    "ruleTextLabel": "Regel",
+    "ruleRiskCategory": "Risikokategori",
+    "ruleApplicability": "Omfang",
+    "ruleFrameworks": "Rammeverk",
+    "detector": {
+      "promptInjection": {
+        "label": "Ledetekstinjeksjon",
+        "description": "Oppdager forsøk på å overstyre instruksjoner eller omgå modellens sikkerhet."
+      },
+      "policyViolation": {
+        "label": "Brudd på retningslinjer",
+        "description": "Markerer inndata som bryter med organisasjonens retningslinjer, skrevet som tekst eller regler.",
+        "descriptionOutput": "Markerer svar som bryter med organisasjonens retningslinjer, skrevet som tekst eller regler."
+      },
+      "pii": {
+        "label": "PII og hemmeligheter",
+        "description": "Oppdager personopplysninger, påloggingsinformasjon, IP-adresser og URL-er."
+      },
+      "keywords": {
+        "label": "Forbudte nøkkelord",
+        "descriptionOutput": "Oppdager svar som inneholder noen av nøkkelordene du lister opp."
+      },
+      "topics": {
+        "label": "Emner",
+        "descriptionOutput": "Markerer svar om noen av emnene du lister opp."
+      },
+      "toxicity": {
+        "label": "Toksicitet",
+        "description": "Oppdager giftig, fornærmende, truende eller hatefull språkbruk."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Oppdager seksuelt innhold eller annet innhold som ikke er trygt for arbeid."
+      },
+      "bias": {
+        "label": "Skjevhet",
+        "description": "Oppdager partisk eller diskriminerende språkbruk."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Personopplysninger",
+        "description": "Navn, e-postadresser, telefonnumre."
+      },
+      "secrets": {
+        "label": "Hemmeligheter",
+        "description": "API-nøkler, tokener, passord."
+      },
+      "ipAddress": {
+        "label": "IP-adresser",
+        "description": "IPv4- og IPv6-adresser."
+      },
+      "url": {
+        "label": "URL-er",
+        "description": "Nettadresser."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Sikkerhet og svindel",
+      "safetyHarm": "Trygghet og skade",
+      "privacyDataProtection": "Personvern og databeskyttelse",
+      "brandReputationTrust": "Merkevare og omdømme",
+      "biasFairnessEthical": "Skjevhet og rettferdighet",
+      "legalIpLiability": "Juridisk og IP-ansvar",
+      "productMisuse": "Misbruk av produkt",
+      "performanceQuality": "Ytelse og kvalitet"
+    },
+    "applicability": {
+      "user": "Brukerinndata",
+      "userAssistant": "Brukerinndata og svar"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Topp 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "EUs KI-forordning",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Bedriftsfunksjon",
+    "enterpriseOnly": "Dette er en funksjon kun for bedrifter.",
+    "readOnly": "Bare organisasjonseiere og administratorer kan endre disse innstillingene.",
+    "loadError": "Leverandører og modeller kunne ikke lastes inn",
+    "tabModels": "Modeller",
+    "tabProviders": "Leverandører",
+    "tabGateways": "Inngangsportaler",
+    "modelsDescription": "Slå av en modell for å blokkere den for alle medlemmer. Modeller fra tillatte leverandører er slått på som standard.",
+    "modelsDeniedOnly": "Kun nektet",
+    "modelsEmpty": "Ingen modeller samsvarer med dette søket.",
+    "providersDescription": "Slå av en leverandør for å hindre at Kilo ruter til den for denne organisasjonen.",
+    "providersNeedCatalog": "Leverandørbryterne er skrivebeskyttet til hele modellkatalogen er lastet inn. Trykk på Prøv igjen ovenfor for å endre dem.",
+    "providersEmpty": "Ingen leverandører samsvarer med dette søket.",
+    "allowAllShown": "Tillat alle viste",
+    "denyAllShown": "Nekt alle viste",
+    "gatewaysDescription": "Kilo ruter modellforespørsler gjennom Vercel AI Gateway eller OpenRouter. En deaktivert inngangsportal får disse forespørslene til å feile.",
+    "emptyProviderList": "Tillat minst én leverandør. En tom liste blokkerer alle Kilo-modellruter.",
+    "gatewaysUnavailable": "Innstillinger for inngangsportaler er ikke tilgjengelige for denne organisasjonen.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "OpenRouter-forespørsler er ikke låst til en region.",
+    "inferenceRegion": "Inferensregion",
+    "inferenceRegionDescription": "Låser Vercel AI Gateway-forespørsler til denne regionen. En modell som ikke er tilgjengelig der, feiler.",
+    "disableOpenrouterNote": "Deaktivering av OpenRouter blokkerer også BYOK-nøkler som ruter forespørsler gjennom den.",
+    "emptyModelList": "La minst én modell være på. Hvis du avviser alle modeller, har medlemmene ingenting å bruke.",
+    "catalogUnavailable": "Hele modellkatalogen ble ikke lastet inn, så bare de lagrede listene dine vises. Prøv på nytt for å laste inn alle modeller.",
+    "region": {
+      "global": "Global",
+      "us": "USA",
+      "eu": "Den europeiske union",
+      "au": "Australia",
+      "jp": "Japan"
+    }
   }
 }

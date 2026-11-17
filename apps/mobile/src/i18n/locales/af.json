@@ -1354,7 +1354,8 @@
       "managedOnWeb": "Hierdie organisasie se Bitbucket-verbinding word op die web vanaf 'n rekenaar bestuur.",
       "description": "Skep 'n toegangstoken vir die werkruimte met die vereiste toestemmings en plak dit hieronder.",
       "scopes": "Rekening: lees · Bewaarplekke: lees/skryf · Trekversoeke: lees · Webhake: lees/skryf",
-      "tokenPlaceholder": "Toegangstoken vir die werkruimte"
+      "tokenPlaceholder": "Toegangstoken vir die werkruimte",
+      "tokenRefused": "Bitbucket het nie hierdie toegangstoken vir die werkruimte aanvaar nie. Kontroleer dat dit die toestemmings hierbo het en probeer dan weer."
     },
     "scopeList": {
       "personalStillAvailable": "Persoonlike bewaarplekke is steeds hieronder beskikbaar.",
@@ -1366,7 +1367,8 @@
       "noReviews": "Nog geen hersienings nie",
       "noReviewsDescription": "Hersienings verskyn hier sodra die Kodehersiener 'n trekversoek hersien.",
       "startManualReview": "Begin 'n handmatige hersiening",
-      "configureProvider": "Stel verskaffer op"
+      "configureProvider": "Stel verskaffer op",
+      "connectOwnerOnly": "Vra 'n organisasie-eienaar of administrateur om 'n verskaffer te koppel."
     },
     "platformList": {
       "checking": "Besig om na te gaan…",
@@ -2974,6 +2976,7 @@
     "signOutThisDevice": "Teken hierdie toestel uit",
     "signOutSessionLabel": "Teken {{device}} uit, ingeteken {{signedIn}}, laas gesien {{lastSeen}}",
     "sessionSignedOut": "Sessie uitgeteken.",
+    "sessionSignOutFailed": "Kon nie hierdie sessie uitteken nie. Probeer weer.",
     "signOutThisDeviceTitle": "Hierdie toestel uitteken?",
     "signOutThisSessionTitle": "Hierdie sessie uitteken?",
     "signOutThisSessionMessage": "{{device}} sal uitgeteken word. Laas gesien {{lastSeen}}. Dit kan nog tot 'n uur lank API-toegang behou.",
@@ -3096,12 +3099,14 @@
     "manage": {
       "billingHistory": "Faktureringsgeskiedenis",
       "billingHistoryEmpty": "Nog geen faktureringsgeskiedenis nie.",
+      "billingHistoryError": "Kon nie faktureringsgeskiedenis laai nie",
       "cancel": "Kanselleer intekening",
       "cancelDescription": "Jou Kilo Pass bly aktief tot aan die einde van die faktureringstydperk en sal nie hernu nie.",
       "cancelScheduled": "Word op {{date}} gekanselleer",
       "cancelScheduledChange": "Kanselleer geskeduleerde verandering",
       "cancelled": "Intekening gekanselleer",
       "creditHistoryEmpty": "Nog geen Kilo Pass-krediete nie.",
+      "creditHistoryError": "Kon nie kredietgeskiedenis laai nie",
       "resume": "Hervat intekening",
       "resumeCancelledDescription": "Jou Kilo Pass sal weer outomaties hernu.",
       "resumePausedDescription": "Jou Kilo Pass word nou hervat, voor die geskeduleerde hervattingsdatum.",
@@ -3338,7 +3343,7 @@
       "selectOrganization": "Kies 'n organisasie",
       "unavailableDescription": "Hierdie organisasie is nie meer beskikbaar nie. Kies een uit jou profiel om voort te gaan.",
       "unavailableSessionsDescription": "Hierdie organisasie is nie meer beskikbaar nie. Sessies daarvoor kan nie gelaai word nie.",
-      "accessDeniedDescription": "Jy het nie toegang tot hierdie organisasie nie."
+      "accessDeniedDescription": "Vra 'n organisasie-eienaar of -administrateur om jou toegang te verleen."
     },
     "create": {
       "title": "Skep organisasie",
@@ -3458,16 +3463,27 @@
     },
     "settingsOnWeb": {
       "title": "Organisasie-instellings op die web",
-      "integrations": "Integrasies op die web",
       "usageDetails": "Gebruiksbesonderhede",
       "providersAndModels": "Verskaffers en modelle",
       "groups": "Groepe",
       "guardrails": "Veiligheidsreëls",
       "byok": "Gebruik jou eie sleutel",
+      "ssoAndDomain": "SSO en domein",
+      "dataCollection": "Data-insameling",
       "auditLogs": "Ouditlogs",
-      "requestLogs": "Versoeklogs",
-      "subOrganizations": "Sub-organisasies",
-      "distributeFunds": "Versprei fondse"
+      "requestLogs": "Versoeklogs"
+    },
+    "requestLogs": {
+      "hint": "Versoeke uit die uur voordat die venster eindig, nuutste eerste.",
+      "older": "Vroeër uur",
+      "newer": "Later uur",
+      "truncated": "Hierdie uur het meer versoeke as wat die lys wys.",
+      "emptyTitle": "Geen versoeke nie",
+      "emptyDescription": "Hierdie uur het geen gateway-versoeke nie.",
+      "loadError": "Kon nie versoeklogs laai nie.",
+      "permissionDenied": "Slegs 'n organisasie-eienaar, -administrateur of -faktuurbestuurder kan die organisasie se versoeklogs lees.",
+      "tokens": "{{input}} in · {{output}} uit",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Invoertekens",
@@ -4521,6 +4537,8 @@
     "topModels": "Topmodelle",
     "topFeatures": "Topfunksies",
     "emptyTitle": "Geen gebruik in hierdie tydperk nie",
+    "unavailableTitle": "Gebruik is nie beskikbaar nie",
+    "unavailableDescription": "Hierdie werkruimte rapporteer nie gebruik nie. Om weer te probeer sal nie help nie.",
     "orgSelfNotice": "Jy sien jou eie gebruik in hierdie organisasie.",
     "viewDetails": "Bekyk gebruiksbesonderhede"
   },
@@ -4592,7 +4610,7 @@
       "fieldCron": "Cron-uitdrukking",
       "fieldCronHelp": "Vyf velde: minuut, uur, dag, maand en weeksdag. Die kortste interval is een minuut.",
       "fieldTimezone": "Tydsone",
-      "nameLocked": "Die naam is deel van die webhaak-URL en kan nie verander nie.",
+      "nameLocked": "Die naam kan nie verander nadat die sneller geskep is nie.",
       "repositoryLocked": "Die bewaarplek kan nie verander nadat die sneller geskep is nie.",
       "environmentAutomatic": "Outomaties volgens bewaarplek",
       "notSelected": "Nie gekies nie",
@@ -4618,6 +4636,7 @@
       "saveFailedTitle": "Kon nie die sneller stoor nie",
       "deleteTitle": "Vee hierdie sneller uit?",
       "deleteMessage": "Oproepe na {{name}} sal misluk. Dit kan nie ongedaan gemaak word nie.",
+      "deleteMessageScheduled": "Geskeduleerde lopies van die sneller {{name}} stop. Dit kan nie ongedaan gemaak word nie.",
       "runNow": "Loop nou",
       "runStarted": "Lopie het begin",
       "created": "Sneller geskep",
@@ -4678,5 +4697,175 @@
     "unavailableDescription": "Hierdie deelskakel het verval of is herroep.",
     "transcriptUnavailableTitle": "Kon nie hierdie transkrip laai nie",
     "transcriptUnavailableDescription": "Die skakel werk steeds. Probeer weer oor 'n oomblik."
+  },
+  "organizationGuardrails": {
+    "title": "KI-veiligheidsreëls",
+    "permissionDenied": "Slegs organisasie-eienaars en -administrateurs kan KI-veiligheidsreëls bestuur.",
+    "unavailable": "KI-veiligheidsreëls is nie vir hierdie organisasie beskikbaar nie.",
+    "loadError": "KI-veiligheidsreëls kon nie laai nie",
+    "statusSaving": "Stoor tans…",
+    "statusSaved": "Gestoor",
+    "statusFailed": "Kon nie stoor nie.",
+    "inputTitle": "Veiligheidsreëls vir invoer",
+    "inputDescription": "Skandeer elke invoer met Enkrypt AI, insluitend gereedskapresultate. 'n Blokkerende detektor verwerp 'n versoek wanneer Enkrypt nie beskikbaar is nie.",
+    "outputTitle": "Veiligheidsreëls vir uitvoer",
+    "outputDescription": "Skandeer antwoorde met Enkrypt AI voordat lede dit ontvang. Af tensy jy dit aanskakel.",
+    "detectorsHint": "Blokkeer verwerp 'n gevlagde versoek. Slegs aanteken hou rekord daarvan sonder om die versoek te vertraag.",
+    "detectorsHintOutput": "Blokkeer laat 'n gevlagde antwoord misluk. Slegs aanteken hou rekord daarvan sonder om die antwoord te vertraag.",
+    "choiceLog": "Slegs aanteken",
+    "applyTo": "Pas toe op",
+    "applyToAllMembers": "Alle lede",
+    "applyKiloDefault": "Pas Kilo-verstek toe",
+    "invalidSavedTitle": "Gestoorde instellings vir invoerdetektors kan nie gelees word nie",
+    "invalidSavedBody": "Versoeke word geblokkeer totdat die invoerdetektors weer gestoor word. Die detektors hieronder begin by Kilo-verstek.",
+    "invalidSavedOutputTitle": "Gestoorde instellings vir uitvoerdetektors kan nie gelees word nie",
+    "invalidSavedOutputBody": "Antwoorde word teruggehou totdat die uitvoerdetektors weer gestoor word. Kies uitvoerdetektors hieronder.",
+    "blockingOutputNote": "'n Blokkerende uitvoerdetektor hou 'n antwoord terug totdat Enkrypt alles nagegaan het. Gebruik Slegs aanteken om die vertraging te vermy.",
+    "inputDetectorRequired": "Skakel minstens een invoerdetektor aan.",
+    "outputDetectorRequired": "Skakel minstens een uitvoerdetektor aan.",
+    "rulesTooMany": "Voeg tot {{max}} reëls by.",
+    "ruleIdRequired": "Voer 'n reël-ID in.",
+    "ruleIdInvalid": "'n Reël-ID kan slegs letters, syfers, punte, koppeltekens en onderstrepe bevat.",
+    "ruleTextRequired": "Beskryf wat die reël verbied of vereis.",
+    "keywordTooLong": "Elke sleutelwoord kan tot {{max}} karakters lank wees.",
+    "topicTooLong": "Elke onderwerp kan tot {{max}} karakters lank wees.",
+    "keywordsTooMany": "Voeg tot {{max}} sleutelwoorde by.",
+    "topicsTooMany": "Voeg tot {{max}} onderwerpe by.",
+    "piiEntityRequired": "Kies ten minste een tipe data om op te spoor.",
+    "keywordRequired": "Voeg ten minste een sleutelwoord by.",
+    "topicRequired": "Voeg ten minste een onderwerp by.",
+    "policyTextRequired": "Voer die beleidsteks in.",
+    "ruleRequired": "Voeg ten minste een reël by.",
+    "ruleIdDuplicate": "Elke reël benodig sy eie reël-ID.",
+    "piiEntities": "Data om op te spoor",
+    "keywordsLabel": "Sleutelwoorde",
+    "keywordsHint": "Een sleutelwoord per lyn.",
+    "topicsHint": "Een onderwerp per lyn.",
+    "policyFormat": "Beleidsformaat",
+    "policyFormatRules": "Gestruktureerde reëls",
+    "policyFormatRulesDescription": "Een reël per vereiste, met 'n kategorie en ernsgraad. Aanbeveel.",
+    "policyFormatText": "Beleidsteks",
+    "policyFormatTextDescription": "Plak 'n bestaande beleid as gewone teks.",
+    "rulesEmpty": "Nog geen reëls nie. Elke reël beskryf een ding wat invoer nie mag bevat of vra nie.",
+    "addRule": "Voeg reël by",
+    "ruleNumber": "Reël {{number}}",
+    "ruleRemove": "Verwyder reël {{number}}",
+    "ruleIdLabel": "Reël-ID",
+    "ruleNameLabel": "Naam (opsioneel)",
+    "ruleTextLabel": "Reël",
+    "ruleRiskCategory": "Risikokategorie",
+    "ruleApplicability": "Omvang",
+    "ruleFrameworks": "Raamwerke",
+    "detector": {
+      "promptInjection": {
+        "label": "Opdraginspuiting",
+        "description": "Spoor pogings op om instruksies te oorskryf of die model te jailbreak."
+      },
+      "policyViolation": {
+        "label": "Beleidsoortreding",
+        "description": "Merk invoer wat jou organisasie se beleid oortree, geskryf as teks of reëls.",
+        "descriptionOutput": "Merk antwoorde wat jou organisasie se beleid oortree, geskryf as teks of reëls."
+      },
+      "pii": {
+        "label": "PII en geheime",
+        "description": "Spoor persoonlike data, aanmeldbewyse, IP-adresse en URL'e op."
+      },
+      "keywords": {
+        "label": "Verbode sleutelwoorde",
+        "descriptionOutput": "Spoor antwoorde op wat enige sleutelwoord bevat wat jy opgee."
+      },
+      "topics": {
+        "label": "Onderwerpe",
+        "descriptionOutput": "Merk antwoorde oor enige onderwerp wat jy opgee."
+      },
+      "toxicity": {
+        "label": "Toksisiteit",
+        "description": "Spoor toksiese, beledigende, dreigende of haatlike taal op."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Spoor seksuele of ander inhoud op wat nie vir die werkplek geskik is nie."
+      },
+      "bias": {
+        "label": "Vooroordeel",
+        "description": "Spoor bevooroordeelde of diskriminerende taal op."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Persoonlike data",
+        "description": "Name, e-posadresse, telefoonnommers."
+      },
+      "secrets": {
+        "label": "Geheime",
+        "description": "API-sleutels, tokens, wagwoorde."
+      },
+      "ipAddress": {
+        "label": "IP-adresse",
+        "description": "IPv4- en IPv6-adresse."
+      },
+      "url": {
+        "label": "URL'e",
+        "description": "Webadresse."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Sekuriteit en bedrog",
+      "safetyHarm": "Veiligheid en skade",
+      "privacyDataProtection": "Privaatheid en databeskerming",
+      "brandReputationTrust": "Handelsmerk en reputasie",
+      "biasFairnessEthical": "Vooroordeel en billikheid",
+      "legalIpLiability": "Regs- en IE-aanspreeklikheid",
+      "productMisuse": "Produkmisbruik",
+      "performanceQuality": "Werkverrigting en gehalte"
+    },
+    "applicability": {
+      "user": "Gebruikersinvoer",
+      "userAssistant": "Gebruikersinvoer en antwoorde"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Top 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "EU se KI-wet",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Ondernemingsfunksie",
+    "enterpriseOnly": "Hierdie funksie is slegs vir ondernemings beskikbaar.",
+    "readOnly": "Slegs organisasie-eienaars en -administrateurs kan hierdie instellings verander.",
+    "loadError": "Verskaffers en modelle kon nie laai nie",
+    "tabModels": "Modelle",
+    "tabProviders": "Verskaffers",
+    "tabGateways": "Gateways",
+    "modelsDescription": "Skakel 'n model af om dit vir alle lede te blokkeer. Modelle van toegelate verskaffers is by verstek aan.",
+    "modelsDeniedOnly": "Slegs geweierdes",
+    "modelsEmpty": "Geen modelle pas by hierdie soektog nie.",
+    "providersDescription": "Skakel 'n verskaffer af sodat Kilo nie meer vir hierdie organisasie daarheen roeteer nie.",
+    "providersNeedCatalog": "Verskafferskakelaars bly leesalleen totdat die volledige modelkatalogus gelaai het. Tik hierbo op Probeer weer om hulle te wysig.",
+    "providersEmpty": "Geen verskaffers pas by hierdie soektog nie.",
+    "allowAllShown": "Laat almal wat gewys word toe",
+    "denyAllShown": "Weier almal wat gewys word",
+    "gatewaysDescription": "Kilo roeteer modelversoeke deur Vercel AI Gateway of OpenRouter. 'n Afgeskakelde gateway laat daardie versoeke misluk.",
+    "emptyProviderList": "Laat ten minste een verskaffer toe. 'n Leë lys blokkeer elke Kilo-modelroete.",
+    "gatewaysUnavailable": "Gateway-instellings is nie vir hierdie organisasie beskikbaar nie.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "OpenRouter-versoeke is nie aan 'n streek vasgepen nie.",
+    "inferenceRegion": "Inferensiestreek",
+    "inferenceRegionDescription": "Pen Vercel AI Gateway-versoeke aan hierdie streek vas. 'n Model wat nie daar beskikbaar is nie, misluk.",
+    "disableOpenrouterNote": "As jy OpenRouter afskakel, word BYOK-sleutels wat versoeke daardeur roeteer ook geblokkeer.",
+    "emptyModelList": "Laat ten minste een model aangeskakel. As elke model geweier word, het lede niks om te gebruik nie.",
+    "catalogUnavailable": "Die volledige modelkatalogus het nie gelaai nie, dus word slegs jou gestoorde lyste gewys. Probeer weer om elke model te laai.",
+    "region": {
+      "global": "Globaal",
+      "us": "Verenigde State",
+      "eu": "Europese Unie",
+      "au": "Australië",
+      "jp": "Japan"
+    }
   }
 }

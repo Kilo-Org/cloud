@@ -115,6 +115,10 @@ export function UsageContent({ scope }: Readonly<{ scope: UsageScope }>) {
       {summaryErrorView !== null && (
         <QueryError
           variant={summaryErrorView.variant}
+          title={summaryErrorView.name === 'unavailable' ? t('usage.unavailableTitle') : undefined}
+          message={
+            summaryErrorView.name === 'unavailable' ? t('usage.unavailableDescription') : undefined
+          }
           onRetry={summaryErrorView.showRetry ? retryAll : undefined}
           isRetrying={usage.isFetching}
           placement="top"
@@ -191,6 +195,14 @@ export function UsageContent({ scope }: Readonly<{ scope: UsageScope }>) {
             {seriesErrorView !== null ? (
               <QueryError
                 variant={seriesErrorView.variant}
+                title={
+                  seriesErrorView.name === 'unavailable' ? t('usage.unavailableTitle') : undefined
+                }
+                message={
+                  seriesErrorView.name === 'unavailable'
+                    ? t('usage.unavailableDescription')
+                    : undefined
+                }
                 onRetry={seriesErrorView.showRetry ? retryAll : undefined}
                 isRetrying={usage.isFetching}
               />
@@ -205,6 +217,14 @@ export function UsageContent({ scope }: Readonly<{ scope: UsageScope }>) {
           {breakdownErrorView !== null ? (
             <QueryError
               variant={breakdownErrorView.variant}
+              title={
+                breakdownErrorView.name === 'unavailable' ? t('usage.unavailableTitle') : undefined
+              }
+              message={
+                breakdownErrorView.name === 'unavailable'
+                  ? t('usage.unavailableDescription')
+                  : undefined
+              }
               onRetry={breakdownErrorView.showRetry ? retryAll : undefined}
               isRetrying={usage.isFetching}
             />

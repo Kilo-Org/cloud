@@ -41,6 +41,7 @@ const boundary = vi.hoisted(() => ({
 }));
 const routerPush = vi.hoisted(() => vi.fn());
 const openExternalUrlMock = vi.hoisted(() => vi.fn());
+const openAppShellHandoffMock = vi.hoisted(() => vi.fn());
 const kiloPassQuery = vi.hoisted(() => ({ enabled: [] as boolean[] }));
 const membersQuery = vi.hoisted(() => ({
   data: undefined as
@@ -132,6 +133,7 @@ vi.mock('@/lib/billing/external-purchase-link', () => ({
 }));
 
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: openExternalUrlMock }));
+vi.mock('@/lib/app-shell-handoff', () => ({ openAppShellHandoff: openAppShellHandoffMock }));
 
 vi.mock('@/lib/format', () => ({
   formatPrefixedMoney: (amount: number) => `$${amount}`,
@@ -316,6 +318,7 @@ beforeEach(() => {
   kiloPassRowState.current = null;
   routerPush.mockClear();
   openExternalUrlMock.mockClear();
+  openAppShellHandoffMock.mockClear();
   kiloPassQuery.enabled = [];
   membersQuery.data = { parent_organization_id: null, settings: {} };
   membersQuery.isError = false;
@@ -347,6 +350,22 @@ describe('Organization hub card', () => {
     // Left-to-right isolate (U+2066) and pop-directional-isolate (U+2069): the
     // pair reads 1 of 5 in either interface direction.
     expect(seats?.props.value).toBe('\u20661 / 5\u2069');
+    unmount();
+  });
+
+  it('holds a brand-new seat-enforcing organization at the used count, without a total', async () => {
+    // A new organization is created with the enforcement switch on and no
+    // seats bought, so its total is 0 and the pair would read `1 / 0` —
+    // a row that reads as over capacity on creation day.
+    boundary.requireSeats = true;
+    boundary.seatCount = { used: 1, total: 0 };
+
+    const { renderer, unmount } = await renderHub();
+
+    const seats = renderer.root
+      .findAllByType('KvRow')
+      .find(node => node.props.label === i18n.t('organization.hub.organizationSeats'));
+    expect(seats?.props.value).toBe('1');
     unmount();
   });
 
@@ -981,36 +1000,153 @@ describe('Organization hub billing card while its data loads', () => {
   });
 });
 
-describe('Organization hub integrations rows', () => {
-  it('names the in-app screen and the web page apart, and opens each where it says', async () => {
+describe('Organization hub integrations row', () => {
+  it('opens the app integrations screen with the organization scope', async () => {
     const { renderer, unmount } = await renderHub();
 
-    // Both rows carry the same Plug glyph and reach different places, so the
-    // titles are the only thing that tells them apart.
+    // One row: the web page that showed the organization's integrations is
+    // gone, and this row opens the app's own screen for the same scope.
     const rows = renderer.root
       .findAllByType('ConfigureRow')
       .filter(node => node.props.icon === 'Plug');
-    expect(rows.map(node => node.props.title)).toEqual([
-      i18n.t('integrations.title'),
-      i18n.t('organization.settingsOnWeb.integrations'),
-    ]);
+    expect(rows.map(node => node.props.title)).toEqual([i18n.t('integrations.title')]);
 
-    const [inApp, web] = rows;
-    if (inApp === undefined || web === undefined) {
-      throw new Error('the hub shows both integrations rows');
+    const [row] = rows;
+    if (row === undefined) {
+      throw new Error('the hub shows the integrations row');
     }
     act(() => {
-      (inApp.props.onPress as () => void)();
+      (row.props.onPress as () => void)();
     });
     expect(routerPush).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/integrations?org=org-1');
+    expect(openExternalUrlMock).not.toHaveBeenCalled();
+    unmount();
+  });
+});
 
+describe('Organization hub settings-on-the-web group', () => {
+  function headings(renderer: TestRenderer.ReactTestRenderer) {
+    return renderer.root
+      .findAllByType('Text')
+      .filter(node => node.props.children === i18n.t('organization.settingsOnWeb.title'));
+  }
+
+  it('paints the heading for a member, whose remaining destination is the shell SSO card', async () => {
+    boundary.role = 'member';
+    boundary.plan = 'enterprise';
+
+    const { renderer, unmount } = await renderHub();
+
+    // Every in-app row is still out of this group, but the SSO card is the
+    // shell's own page and carries no billing gate, so the group has a row.
+    expect(headings(renderer)).toHaveLength(1);
+    const titles = renderer.root
+      .findAllByType('ConfigureRow')
+      .map(node => String(node.props.title));
+    expect(titles).toContain(i18n.t('organization.settingsOnWeb.ssoAndDomain'));
+    unmount();
+  });
+
+  it('keeps the heading on enterprise, where the SSO card is the destination', async () => {
+    // SSO and domain is the enterprise dashboard card the shell hosts, so the
+    // group exists exactly where that card does.
+    boundary.plan = 'enterprise';
+    const { renderer, unmount } = await renderHub();
+
+    expect(headings(renderer)).toHaveLength(1);
+    unmount();
+  });
+
+  it('paints the heading for a member on teams, whose card the app shell owns', async () => {
+    // A teams dashboard shows data collection where enterprise shows providers
+    // and models, and the app shell owns that card, so the plan gate keeps the
+    // row and the group names it.
+    boundary.role = 'member';
+
+    const { renderer, unmount } = await renderHub();
+
+    expect(headings(renderer)).toHaveLength(1);
+    const titles = renderer.root
+      .findAllByType('ConfigureRow')
+      .map(node => String(node.props.title));
+    expect(titles).toContain(i18n.t('organization.settingsOnWeb.dataCollection'));
+    unmount();
+  });
+
+  it('lists no row for the removed sub-organization areas', async () => {
+    const { renderer, unmount } = await renderHub();
+
+    // The two areas are gone from the hub and open nothing: neither a web page
+    // nor a replacement screen stands in for them.
+    const titles = renderer.root
+      .findAllByType('ConfigureRow')
+      .map(node => String(node.props.title));
+    expect(titles).not.toContain('Sub-organizations');
+    expect(titles).not.toContain('Distribute funds');
+    unmount();
+  });
+
+  it('opens request logs natively instead of the web page', async () => {
+    const { renderer, unmount } = await renderHub();
+
+    const row = renderer.root
+      .findAllByType('ConfigureRow')
+      .find(node => node.props.title === i18n.t('organization.settingsOnWeb.requestLogs'));
+    if (row === undefined) {
+      throw new Error('the hub shows the request logs row');
+    }
     act(() => {
-      (web.props.onPress as () => void)();
+      (row.props.onPress as () => void)();
     });
-    expect(openExternalUrlMock).toHaveBeenCalledWith(
-      'https://app.kilo.test/organizations/org-1/integrations',
-      { label: i18n.t('organization.settingsOnWeb.integrations') }
+    expect(routerPush).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/organization/request-logs');
+    expect(openExternalUrlMock).not.toHaveBeenCalled();
+    unmount();
+  });
+});
+
+describe('Organization hub settings rows on the app shell', () => {
+  const rowTitled = (renderer: TestRenderer.ReactTestRenderer, title: string) => {
+    const row = renderer.root
+      .findAllByType('ConfigureRow')
+      .find(node => node.props.title === title);
+    if (row === undefined) {
+      throw new Error(`the hub shows the "${title}" row`);
+    }
+    return row;
+  };
+
+  it('hands the SSO card off to its shell page', async () => {
+    boundary.plan = 'enterprise';
+    const { renderer, unmount } = await renderHub();
+
+    const title = i18n.t('organization.settingsOnWeb.ssoAndDomain');
+    act(() => {
+      (rowTitled(renderer, title).props.onPress as () => void)();
+    });
+
+    // The card lives on the dashboard the shell owns, so the row may not open
+    // the full-web organization page.
+    expect(openAppShellHandoffMock).toHaveBeenCalledWith(
+      { page: 'organization-sso', organizationId: 'org-1' },
+      { label: title }
     );
+    expect(openExternalUrlMock).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('hands the data-collection card off to its shell page', async () => {
+    const { renderer, unmount } = await renderHub();
+
+    const title = i18n.t('organization.settingsOnWeb.dataCollection');
+    act(() => {
+      (rowTitled(renderer, title).props.onPress as () => void)();
+    });
+
+    expect(openAppShellHandoffMock).toHaveBeenCalledWith(
+      { page: 'organization-data-collection', organizationId: 'org-1' },
+      { label: title }
+    );
+    expect(openExternalUrlMock).not.toHaveBeenCalled();
     unmount();
   });
 });

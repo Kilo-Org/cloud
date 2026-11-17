@@ -36,8 +36,7 @@ const save = vi.hoisted(() => ({ mutateAsync: vi.fn(), isPending: false }));
 const saveButton = vi.hoisted(() => ({ onSave: null as (() => Promise<void>) | null }));
 const sideInsets = vi.hoisted(() => ({ left: 0, right: 0 }));
 const manageAccess = vi.hoisted(() => ({
-  openExternalUrl: vi.fn<(url: string, options?: unknown) => Promise<void>>(),
-  mintInstallState: vi.fn<() => Promise<{ token: string }>>(),
+  openAppShellHandoff: vi.fn<(target: unknown, options?: unknown) => Promise<void>>(),
 }));
 
 vi.mock('react-native', () => ({
@@ -103,11 +102,9 @@ vi.mock('@/lib/hooks/use-settings-back-guard', () => ({
     dialog: null,
   }),
 }));
-vi.mock('@/lib/trpc', () => ({
-  trpcClient: { githubApps: { mintInstallState: { mutate: manageAccess.mintInstallState } } },
+vi.mock('@/lib/app-shell-handoff', () => ({
+  openAppShellHandoff: manageAccess.openAppShellHandoff,
 }));
-vi.mock('@/lib/external-link', () => ({ openExternalUrl: manageAccess.openExternalUrl }));
-vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://settings.test' }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   useCommittedConnectivityStatus: () => (connectivity.known ? 'online' : 'unknown'),
 }));
@@ -221,7 +218,7 @@ async function pressEmptyStateAction(renderer: TestRenderer.ReactTestRenderer) {
   const onPress = emptyStateAction(renderer);
   act(onPress);
   await vi.waitFor(() => {
-    expect(manageAccess.mintInstallState).toHaveBeenCalled();
+    expect(manageAccess.openAppShellHandoff).toHaveBeenCalled();
   });
 }
 
@@ -245,10 +242,8 @@ beforeEach(() => {
   saveButton.onSave = null;
   repositories.refetch.mockReset();
   repositories.refetch.mockResolvedValue(undefined);
-  manageAccess.mintInstallState.mockReset();
-  manageAccess.mintInstallState.mockResolvedValue({ token: 'install-state' });
-  manageAccess.openExternalUrl.mockReset();
-  manageAccess.openExternalUrl.mockResolvedValue(undefined);
+  manageAccess.openAppShellHandoff.mockReset();
+  manageAccess.openAppShellHandoff.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -393,50 +388,27 @@ describe('RepositorySettingsScreen repository picker', () => {
 
     await pressEmptyStateAction(renderer);
 
-    expect(manageAccess.openExternalUrl).toHaveBeenCalledTimes(1);
-    expect(manageAccess.openExternalUrl.mock.calls[0]?.[0]).toBe(
-      'https://settings.test/github-app?installState=install-state&fromApp=1'
+    expect(manageAccess.openAppShellHandoff).toHaveBeenCalledTimes(1);
+    expect(manageAccess.openAppShellHandoff).toHaveBeenCalledWith(
+      { page: 'github-app' },
+      expect.any(Object)
     );
     await vi.waitFor(() => {
       expect(repositories.refetch).toHaveBeenCalledTimes(1);
     });
   });
 
-  it('does not read the repositories when no settings page was opened', async () => {
+  it('names the organization on the hand-off target', async () => {
     repositories.data = [];
-    manageAccess.mintInstallState.mockRejectedValueOnce(new Error('mint refused'));
-    const { renderer } = await mount();
+    const { renderer } = await mount('org_123');
 
     await pressEmptyStateAction(renderer);
 
-    expect(manageAccess.openExternalUrl).not.toHaveBeenCalled();
-    expect(repositories.refetch).not.toHaveBeenCalled();
+    expect(manageAccess.openAppShellHandoff).toHaveBeenCalledWith(
+      { page: 'github-app', organizationId: 'org_123' },
+      expect.any(Object)
+    );
   });
-
-  // An organization's mint is refused for a role that may edit these settings
-  // but not manage the installation (`UNAUTHORIZED`) and for an organization
-  // that already holds an installation and cannot take a second one
-  // (`FORBIDDEN`). The settings page mints its own state for the signed-in web
-  // user, so the control still opens it instead of going inert.
-  it.each(['UNAUTHORIZED', 'FORBIDDEN'])(
-    'opens the organization settings page without a minted state on %s',
-    async code => {
-      repositories.data = [];
-      manageAccess.mintInstallState.mockRejectedValueOnce(
-        Object.assign(new Error('mint refused'), { data: { code, httpStatus: 403 } })
-      );
-      const { renderer } = await mount('org_123');
-
-      await pressEmptyStateAction(renderer);
-
-      expect(manageAccess.openExternalUrl.mock.calls[0]?.[0]).toBe(
-        'https://settings.test/github-app?organizationId=org_123'
-      );
-      await vi.waitFor(() => {
-        expect(repositories.refetch).toHaveBeenCalledTimes(1);
-      });
-    }
-  );
 
   it('keeps the EmptyState out while the repository query has no data yet', async () => {
     // TanStack Query reports this shape while an enabled query is paused (the

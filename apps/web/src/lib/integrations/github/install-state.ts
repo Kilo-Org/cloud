@@ -138,6 +138,50 @@ export async function consumeInstallState(
 }
 
 /**
+ * Consumes an install state for a browser that cannot present a web session:
+ * the app shell. The row's user is the caller, so callers must first check that
+ * the row's `return_to` is a shell path — only the shell mints those.
+ */
+export async function consumeInstallStateWithoutSession(
+  token: string
+): Promise<ConsumeInstallStateResult> {
+  const result = await db
+    .update(github_install_states)
+    .set({ consumed_at: sql`NOW()` })
+    .where(
+      and(
+        eq(github_install_states.token, token),
+        isNull(github_install_states.consumed_at),
+        sql`${github_install_states.expires_at} > NOW()`
+      )
+    )
+    .returning();
+
+  const state = result[0];
+  if (state) return { status: 'success', state };
+
+  const reason = await describeUnusableInstallState(token);
+  return { status: 'unusable', reason };
+}
+
+/** Why a token could not be used, for the caller's log and the user's copy. */
+async function describeUnusableInstallState(token: string): Promise<InstallStateRejectionReason> {
+  const [diagnostic] = await db
+    .select({
+      consumed: sql<boolean>`${github_install_states.consumed_at} IS NOT NULL`,
+      expired: sql<boolean>`${github_install_states.expires_at} <= NOW()`,
+    })
+    .from(github_install_states)
+    .where(eq(github_install_states.token, token))
+    .limit(1);
+
+  if (!diagnostic) return 'not_found';
+  if (diagnostic.consumed) return 'consumed';
+  if (diagnostic.expired) return 'expired';
+  return 'unavailable';
+}
+
+/**
  * Deletes install state rows whose expires_at has passed.
  * Returns the count of deleted rows.
  */

@@ -12,7 +12,6 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
     }
   },
@@ -36,14 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA pozuntusu"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "Təhlükəsizlik yoxlamasında yenilənmə var"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "Kilo sessiyanız telefondan idarə etməyə hazırdır"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

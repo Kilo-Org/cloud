@@ -3,9 +3,7 @@ import { useState } from 'react';
 
 import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
-import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
-import { WEB_BASE_URL } from '@/lib/config';
-import { getIntegrationPagePath, getIntegrationPageUrl } from '@/lib/integration-urls';
+import { appShellHandoffUrl } from '@/lib/app-shell-handoff';
 import { type IntegrationProvider, providerLabelKey } from '@/lib/integrations/provider-catalog';
 import {
   openAuthorizationAndWaitForReturn,
@@ -13,7 +11,6 @@ import {
 } from '@/lib/pr-review/connect-gate-platform';
 import { knownServerErrorMessage } from '@/lib/server-error-copy';
 import { trpcClient, useTRPC } from '@/lib/trpc';
-import { isTrpcClientError, readTrpcErrorField } from '@/lib/trpc-error';
 
 /**
  * The scope's connections, from the same read the web integrations hub uses:
@@ -157,46 +154,32 @@ export function useDisconnectIntegration(organizationId: string | undefined) {
 }
 
 /**
- * The provider's connect URL. OAuth callbacks land on the web, so Slack, Linear
- * and Discord connect there; GitHub additionally validates a one-time install
- * state token, which the minted URL carries. GitLab's PAT connect stays on the
- * web page for now. Bitbucket never reaches this function: its workspace access
- * token is pasted in the app's own connect sheet. An organization whose mint is
- * refused still gets the page, without the token, because the page mints its
- * own state for the signed-in web user.
+ * The provider's connect URL. OAuth callbacks land on the web, so every
+ * provider is connected there; each destination is an app-shell page, reached
+ * through a one-time hand-off token. The mint is the only step that can fail,
+ * and its failure is the tap's failure: the caller reports it instead of
+ * opening a page that would refuse the reader again.
+ *
+ * GitHub's connect is the App installation, so it opens the shell's install
+ * page; Slack, Linear, Discord and GitLab open their integration page.
+ * Bitbucket never reaches this function: its workspace access token is pasted
+ * in the app's own connect sheet.
  */
-async function connectUrl(
+function connectUrl(
   provider: WebConnectProvider,
   organizationId: string | undefined
 ): Promise<string> {
-  if (provider !== 'github') {
-    return getIntegrationPageUrl(WEB_BASE_URL, provider, organizationId);
-  }
-  try {
-    const { token } = await trpcClient.githubApps.mintInstallState.mutate({
+  if (provider === 'github') {
+    return appShellHandoffUrl({
+      page: 'github-app',
       ...(organizationId ? { organizationId } : {}),
-      returnTo: getIntegrationPagePath('github', organizationId),
     });
-    return getGitHubIntegrationUrl(WEB_BASE_URL, organizationId, token);
-  } catch (error) {
-    // An organization's mint needs `OWNER`/`ADMIN` and refuses everyone else
-    // with `UNAUTHORIZED`; a non-multi-installation organization that already
-    // has an active GitHub App connection is refused with `FORBIDDEN`. Neither
-    // can mint a token, and the page still works without one: it mints its own
-    // state for the signed-in web user. Both therefore open that page instead
-    // of an error toast, which would leave the row inert in exactly the state
-    // that needs a route to it. A non-tRPC rejection can carry a bare `code`, so
-    // only a real client error counts.
-    const code = readTrpcErrorField(error, 'code');
-    if (
-      organizationId &&
-      isTrpcClientError(error) &&
-      (code === 'FORBIDDEN' || code === 'UNAUTHORIZED')
-    ) {
-      return getGitHubIntegrationUrl(WEB_BASE_URL, organizationId);
-    }
-    throw error;
   }
+  return appShellHandoffUrl({
+    page: 'integration',
+    platform: provider,
+    ...(organizationId ? { organizationId } : {}),
+  });
 }
 
 /** The providers whose connect flow still starts on the web page. */

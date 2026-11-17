@@ -285,7 +285,7 @@ export type KiloPassCardContentState =
  * the join never writes it twice, and the last sentence keeps the closing stop
  * it brought.
  */
-export function joinKiloPassCardSentences(parts: readonly string[]): string {
+function joinKiloPassCardSentences(parts: readonly string[]): string {
   const joiner = i18n.t('common.sentenceJoiner');
   // Every catalog's `common.sentenceJoiner` is one sentence terminator followed
   // by optional spaces (`. `, `। `, `۔ `, `。`), so its first non-space

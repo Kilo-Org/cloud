@@ -3462,7 +3462,6 @@
     },
     "settingsOnWeb": {
       "title": "Saitunan ƙungiya a yanar gizo",
-      "integrations": "Haɗe-haɗe a yanar gizo",
       "usageDetails": "Bayanan amfani",
       "providersAndModels": "Masu samar da sabis da samfura",
       "groups": "Rukunoni",
@@ -3471,9 +3470,19 @@
       "ssoAndDomain": "SSO da yanki",
       "dataCollection": "Tattara bayanai",
       "auditLogs": "Rajistun bincike",
-      "requestLogs": "Rajistun buƙatu",
-      "subOrganizations": "Ƙananan ƙungiyoyi",
-      "distributeFunds": "Raba kuɗi"
+      "requestLogs": "Rajistun buƙatu"
+    },
+    "requestLogs": {
+      "hint": "Buƙatun awa ɗaya kafin ƙarshen wannan lokaci, sababbi a farko.",
+      "older": "Awa ta baya",
+      "newer": "Awa ta gaba",
+      "truncated": "Wannan awa tana da buƙatu fiye da waɗanda jerin ke nunawa.",
+      "emptyTitle": "Babu buƙatu",
+      "emptyDescription": "Babu buƙatun gateway a wannan awa.",
+      "loadError": "An kasa loda rajistun buƙatu.",
+      "permissionDenied": "Mai ƙungiya, mai gudanarwa ko manajan biyan kuɗi ne kaɗai zai iya karanta rajistun buƙatun ƙungiyar.",
+      "tokens": "{{input}} shigarwa · {{output}} fitarwa",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Guntayen rubutun shigarwa",
@@ -4527,6 +4536,8 @@
     "topModels": "Manyan samfura",
     "topFeatures": "Manyan fasaloli",
     "emptyTitle": "Babu amfani a wannan lokaci",
+    "unavailableTitle": "Amfani ba ya samuwa",
+    "unavailableDescription": "Wannan sararin aiki ba ya bayar da rahoton amfani. Sake gwadawa ba zai taimaka ba.",
     "orgSelfNotice": "Kuna ganin amfaninku na kanku a wannan ƙungiyar.",
     "viewDetails": "Duba bayanan amfani"
   },
@@ -4685,5 +4696,175 @@
     "unavailableDescription": "Wannan hanyar haɗin rabawa ta ƙare ko an soke ta.",
     "transcriptUnavailableTitle": "An kasa loda wannan rubutun tattaunawa",
     "transcriptUnavailableDescription": "Hanyar haɗin har yanzu tana aiki. Sake gwadawa nan ba da jimawa ba."
+  },
+  "organizationGuardrails": {
+    "title": "Shingayen Tsaro na Basirar Wucin Gadi",
+    "permissionDenied": "Masu mallakar ƙungiya da masu gudanarwa ne kawai za su iya sarrafa Shingayen Tsaro na Basirar Wucin Gadi.",
+    "unavailable": "Shingayen Tsaro na Basirar Wucin Gadi ba su samuwa ga wannan ƙungiya ba.",
+    "loadError": "An kasa loda Shingayen Tsaro na Basirar Wucin Gadi",
+    "statusSaving": "Ana ajiye…",
+    "statusSaved": "An ajiye",
+    "statusFailed": "An kasa ajiye.",
+    "inputTitle": "Shingayen tsaro na shigarwa",
+    "inputDescription": "Yana duba kowace shigarwa da Enkrypt AI, har da sakamakon kayan aiki. Mai gano abin toshewa yana ƙin buƙata lokacin da Enkrypt ba ya samuwa.",
+    "outputTitle": "Shingayen tsaro na fitarwa",
+    "outputDescription": "Yana duba martani da Enkrypt AI kafin membobi su karɓe su. A kashe ne sai kun kunna shi.",
+    "detectorsHint": "Toshewa yana ƙin buƙatar da aka yi wa alama. Rubuta kawai yana yin rikodin ta ba tare da jinkirta buƙatar ba.",
+    "detectorsHintOutput": "Toshewa yana sa martanin da aka yi wa alama ya gaza. Rubuta kawai yana yin rikodin shi ba tare da jinkirta martanin ba.",
+    "choiceLog": "Rubuta kawai",
+    "applyTo": "Aiwatar da shi ga",
+    "applyToAllMembers": "Dukan membobi",
+    "applyKiloDefault": "Aiwatar da Kilo na Asali",
+    "invalidSavedTitle": "Ba a iya karanta saitunan gano shigarwar da aka ajiye ba",
+    "invalidSavedBody": "Ana toshe buƙatu har sai an sake ajiye masu gano shigarwa. Masu gano da ke ƙasa suna farawa daga Kilo na Asali.",
+    "invalidSavedOutputTitle": "Ba a iya karanta saitunan gano fitarwar da aka ajiye ba",
+    "invalidSavedOutputBody": "Ana riƙe martani har sai an sake ajiye masu gano fitarwa. Zaɓi masu gano fitarwa da ke ƙasa.",
+    "blockingOutputNote": "Mai gano fitarwa mai toshewa yana riƙe martani har sai Enkrypt ya duba dukansa. Yi amfani da Rubuta kawai don guje wa jinkiri.",
+    "inputDetectorRequired": "Kunna aƙalla mai gano shigarwa ɗaya.",
+    "outputDetectorRequired": "Kunna aƙalla mai gano fitarwa ɗaya.",
+    "rulesTooMany": "Ƙara har zuwa {{max}} dokoki.",
+    "ruleIdRequired": "Shigar da lambar doka.",
+    "ruleIdInvalid": "Lambar doka na iya amfani da haruffa, lambobi, ɗigo, layi, da ƙaramin layi kawai.",
+    "ruleTextRequired": "Bayyana abin da doka ta haramta ko ta buƙata.",
+    "keywordTooLong": "Kowace kalma maɓalli na iya zuwa {{max}} haruffa.",
+    "topicTooLong": "Kowace batu na iya zuwa {{max}} haruffa.",
+    "keywordsTooMany": "Ƙara har zuwa {{max}} kalmomi maɓalli.",
+    "topicsTooMany": "Ƙara har zuwa {{max}} batutuwa.",
+    "piiEntityRequired": "Zaɓi aƙalla nau'i ɗaya na bayanan da za a gano.",
+    "keywordRequired": "Ƙara aƙalla kalma maɓalli ɗaya.",
+    "topicRequired": "Ƙara aƙalla batu ɗaya.",
+    "policyTextRequired": "Shigar da rubutun manufa.",
+    "ruleRequired": "Ƙara aƙalla doka ɗaya.",
+    "ruleIdDuplicate": "Kowace doka tana buƙatar nata ID na doka.",
+    "piiEntities": "Bayanan da za a gano",
+    "keywordsLabel": "Kalmomin maɓalli",
+    "keywordsHint": "Kalmar maɓalli ɗaya a kowace layi.",
+    "topicsHint": "Batu ɗaya a kowace layi.",
+    "policyFormat": "Tsarin manufa",
+    "policyFormatRules": "Dokoki masu tsari",
+    "policyFormatRulesDescription": "Doka ɗaya ga kowace buƙata, tare da rukuni da tsanani. An ba da shawara.",
+    "policyFormatText": "Rubutun manufa",
+    "policyFormatTextDescription": "Manna manufar da ke akwai a matsayin rubutu kawai.",
+    "rulesEmpty": "Babu dokoki tukuna. Kowace doka tana bayyana abu ɗaya da shigarwa ba za ta iya ƙunsar ko neman sa ba.",
+    "addRule": "Ƙara doka",
+    "ruleNumber": "Doka {{number}}",
+    "ruleRemove": "Cire doka {{number}}",
+    "ruleIdLabel": "Lambar doka",
+    "ruleNameLabel": "Suna (na zaɓi)",
+    "ruleTextLabel": "Doka",
+    "ruleRiskCategory": "Rukunin haɗari",
+    "ruleApplicability": "Kewayon aiki",
+    "ruleFrameworks": "Tsare-tsare",
+    "detector": {
+      "promptInjection": {
+        "label": "Hadaɓar umarni",
+        "description": "Yana gano ƙoƙarin soke umarni ko fasa tsarin samfurin."
+      },
+      "policyViolation": {
+        "label": "Keta manufa",
+        "description": "Yana yi wa shigarwar da ta karya manufar ƙungiyarka alama, wadda aka rubuta a matsayin rubutu ko dokoki.",
+        "descriptionOutput": "Yana yi wa martanin da ya karya manufar ƙungiyarka alama, wadda aka rubuta a matsayin rubutu ko dokoki."
+      },
+      "pii": {
+        "label": "PII da asirai",
+        "description": "Yana gano bayanan sirri, takaddun shiga, adiresoshin IP, da URL."
+      },
+      "keywords": {
+        "label": "Kalmomin da aka haramta",
+        "descriptionOutput": "Yana gano martanin da ya ƙunshi kowace kalmar maɓalli da ka jera."
+      },
+      "topics": {
+        "label": "Batutuwa",
+        "descriptionOutput": "Yana yi wa martanin da ke kan kowane batu da ka jera alama."
+      },
+      "toxicity": {
+        "label": "Mugunta",
+        "description": "Yana gano harshe mai guba, cin zarafi, barazana, ko ƙiyayya."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Yana gano abun ciki na jima'i ko wanda ba shi da aminci ga aiki."
+      },
+      "bias": {
+        "label": "Son zuciya",
+        "description": "Yana gano harshe mai son zuciya ko nuna wariya."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Bayanan mutum",
+        "description": "Sunaye, adiresoshin imel, lambobin waya."
+      },
+      "secrets": {
+        "label": "Asirai",
+        "description": "Maɓallan API, alamomi, kalmomin sirri."
+      },
+      "ipAddress": {
+        "label": "Adiresoshin IP",
+        "description": "Adiresoshin IPv4 da IPv6."
+      },
+      "url": {
+        "label": "URL",
+        "description": "Adiresoshin yanar gizo."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Tsaro da zamba",
+      "safetyHarm": "Aminci da cutarwa",
+      "privacyDataProtection": "Sirri da kariyar bayanai",
+      "brandReputationTrust": "Alama da suna",
+      "biasFairnessEthical": "Son zuciya da adalci",
+      "legalIpLiability": "Doka da alhakin IP",
+      "productMisuse": "Amfani da samfur ba daidai ba",
+      "performanceQuality": "Aiki da inganci"
+    },
+    "applicability": {
+      "user": "Shigarwar mai amfani",
+      "userAssistant": "Shigarwar mai amfani da martani"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Manyan 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "Dokar AI ta EU",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Siffa ta manyan kamfanoni",
+    "enterpriseOnly": "Wannan siffa ce ta manyan kamfanoni kawai.",
+    "readOnly": "Masu mallakar ƙungiya da masu gudanarwa ne kawai za su iya canza waɗannan saitunan.",
+    "loadError": "Ba a iya loda masu bayarwa da samfura ba",
+    "tabModels": "Samfura",
+    "tabProviders": "Masu bayarwa",
+    "tabGateways": "Ƙofofin shiga",
+    "modelsDescription": "Kashe samfuri don toshe shi ga kowane memba. Samfura daga masu bayarwa da aka ba izini suna farawa a kunne.",
+    "modelsDeniedOnly": "Waɗanda aka hana kawai",
+    "modelsEmpty": "Babu samfuran da suka dace da wannan bincike.",
+    "providersDescription": "Kashe mai bayarwa don hana Kilo tura buƙatu zuwa gare shi ga wannan ƙungiya.",
+    "providersNeedCatalog": "Maɓallan masu bayarwa za su kasance na karatu kawai har sai cikakken kundin samfura ya loda. Danna Sake gwadawa a sama don gyara su.",
+    "providersEmpty": "Babu masu bayarwa da suka dace da wannan bincike.",
+    "allowAllShown": "Ba da izini ga duk waɗanda aka nuna",
+    "denyAllShown": "Hana duk waɗanda aka nuna",
+    "gatewaysDescription": "Kilo yana tura buƙatun samfuri ta Vercel AI Gateway ko OpenRouter. Ƙofar shiga da aka kashe tana sa waɗannan buƙatun su gaza.",
+    "emptyProviderList": "Ba da izinin aƙalla mai bayarwa ɗaya. Jeri mara komai yana toshe duk hanyoyin tura samfuran Kilo.",
+    "gatewaysUnavailable": "Babu saitunan ƙofar shiga ga wannan ƙungiya.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "Ba a kulle buƙatun OpenRouter ga yanki ba.",
+    "inferenceRegion": "Yankin yin hasashe",
+    "inferenceRegionDescription": "Yana kulle buƙatun Vercel AI Gateway ga wannan yankin. Samfurin da ba ya samuwa a can zai gaza.",
+    "disableOpenrouterNote": "Kashe OpenRouter yana kuma toshe maɓallan BYOK waɗanda ke tura buƙatu ta hanyar sa.",
+    "emptyModelList": "Bar aƙalla samfuri ɗaya a kunne. Hana duk samfuran zai bar mambobi ba tare da komai da za su yi amfani da shi ba.",
+    "catalogUnavailable": "Cikakken kundin samfuran bai loda ba, don haka jerin da ka adana kawai ake nunawa. Sake gwadawa don loda duk samfuran.",
+    "region": {
+      "global": "Duniya",
+      "us": "Amurka",
+      "eu": "Ƙungiyar Tarayyar Turai",
+      "au": "Ostiraliya",
+      "jp": "Jafan"
+    }
   }
 }

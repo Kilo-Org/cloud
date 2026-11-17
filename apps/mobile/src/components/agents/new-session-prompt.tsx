@@ -226,12 +226,21 @@ export function NewSessionPrompt({
   }));
 
   // The draft's own laid-out height, reported by the input on every content
-  // change. The field keeps its size, so this only decides whether a vertical
-  // drag over the field scrolls the draft or the form behind it: a drag over a
-  // field whose text fits belongs to the form, exactly as it did when the field
-  // grew to its text and only scrolled once the cap stopped it.
+  // change on Android. The field keeps its size, so this only decides whether a
+  // vertical drag over the field scrolls the draft or the form behind it: a
+  // drag over a field whose text fits belongs to the form, exactly as it did
+  // when the field grew to its text and only scrolled once the cap stopped it.
+  //
+  // iOS cannot use the report: Fabric emits `onContentSizeChange` only when the
+  // field's own frame changes (`RCTTextInputComponentView` `updateLayoutMetrics`),
+  // and this field's frame does not change while the user types. The gate stayed
+  // closed, and a text view that cannot scroll never follows its caret, so the
+  // lines past the third and the caret were hidden. The iOS field always scrolls:
+  // a text view whose content fits does not take a vertical drag, so the form
+  // still gets it.
   const [contentHeight, setContentHeight] = useState(0);
-  const promptScrolls = shouldEnableComposerInputScroll(contentHeight, promptHeight);
+  const promptScrolls =
+    Platform.OS === 'ios' || shouldEnableComposerInputScroll(contentHeight, promptHeight);
   // The fade band over the clipped top line, driven from the field's scroll
   // offset. It lives in a shared value, not React state: a drag reports a frame
   // per few pixels, and this card's toolbar, attachment strip and controls are

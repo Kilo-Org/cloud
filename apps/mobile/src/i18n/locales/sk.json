@@ -3576,7 +3576,6 @@
     },
     "settingsOnWeb": {
       "title": "Nastavenia organizácie na webe",
-      "integrations": "Integrácie na webe",
       "usageDetails": "Podrobnosti o využití",
       "providersAndModels": "Poskytovatelia a modely",
       "groups": "Skupiny",
@@ -3585,9 +3584,19 @@
       "ssoAndDomain": "SSO a doména",
       "dataCollection": "Zber údajov",
       "auditLogs": "Protokoly auditu",
-      "requestLogs": "Protokoly požiadaviek",
-      "subOrganizations": "Podorganizácie",
-      "distributeFunds": "Rozdeliť prostriedky"
+      "requestLogs": "Protokoly požiadaviek"
+    },
+    "requestLogs": {
+      "hint": "Požiadavky z hodiny pred koncom časového okna, najnovšie prvé.",
+      "older": "Staršia hodina",
+      "newer": "Novšia hodina",
+      "truncated": "V tejto hodine je viac požiadaviek, než zoznam zobrazuje.",
+      "emptyTitle": "Žiadne požiadavky",
+      "emptyDescription": "V tejto hodine nie sú žiadne požiadavky na bránu.",
+      "loadError": "Protokoly požiadaviek sa nepodarilo načítať.",
+      "permissionDenied": "Protokoly požiadaviek si môže prezerať iba vlastník, administrátor alebo správca fakturácie organizácie.",
+      "tokens": "{{input}} vstup · {{output}} výstup",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Vstupné tokeny",
@@ -4667,6 +4676,8 @@
     "topModels": "Najpoužívanejšie modely",
     "topFeatures": "Najpoužívanejšie funkcie",
     "emptyTitle": "V tomto období žiadne využitie",
+    "unavailableTitle": "Využitie nie je k dispozícii",
+    "unavailableDescription": "Tento pracovný priestor nevykazuje využitie. Opakovanie nepomôže.",
     "orgSelfNotice": "Vidíte svoje vlastné využitie v tejto organizácii.",
     "viewDetails": "Zobraziť podrobnosti o využití"
   },
@@ -4825,5 +4836,175 @@
     "unavailableDescription": "Platnosť tohto odkazu na zdieľanie vypršala alebo bol zrušený.",
     "transcriptUnavailableTitle": "Tento prepis sa nepodarilo načítať",
     "transcriptUnavailableDescription": "Odkaz stále funguje. Skúste to znova o chvíľu."
+  },
+  "organizationGuardrails": {
+    "title": "AI ochranné mechanizmy",
+    "permissionDenied": "AI ochranné mechanizmy môžu spravovať iba vlastníci organizácie a správcovia.",
+    "unavailable": "AI ochranné mechanizmy nie sú pre túto organizáciu dostupné.",
+    "loadError": "AI ochranné mechanizmy sa nepodarilo načítať",
+    "statusSaving": "Ukladá sa…",
+    "statusSaved": "Uložené",
+    "statusFailed": "Nepodarilo sa uložiť.",
+    "inputTitle": "Vstupné ochranné mechanizmy",
+    "inputDescription": "Skenuje každý vstup pomocou Enkrypt AI vrátane výsledkov nástrojov. Blokujúci detektor odmietne požiadavku, keď je Enkrypt nedostupný.",
+    "outputTitle": "Výstupné ochranné mechanizmy",
+    "outputDescription": "Skenuje odpovede pomocou Enkrypt AI predtým, než ich členovia dostanú. Predvolene vypnuté, kým ich nezapnete.",
+    "detectorsHint": "Blokovanie odmietne označenú požiadavku. Voľba Iba zaznamenať ju len zaznamená bez zdržania požiadavky.",
+    "detectorsHintOutput": "Blokovanie spôsobí zlyhanie označenej odpovede. Voľba Iba zaznamenať ju len zaznamená bez zdržania odpovede.",
+    "choiceLog": "Iba zaznamenať",
+    "applyTo": "Použiť na",
+    "applyToAllMembers": "Všetci členovia",
+    "applyKiloDefault": "Použiť predvolené nastavenia Kilo",
+    "invalidSavedTitle": "Uložené nastavenia vstupných detektorov sa nedajú prečítať",
+    "invalidSavedBody": "Požiadavky sú blokované, kým sa vstupné detektory znova neuložia. Nižšie uvedené detektory vychádzajú z predvolených nastavení Kilo.",
+    "invalidSavedOutputTitle": "Uložené nastavenia výstupných detektorov sa nedajú prečítať",
+    "invalidSavedOutputBody": "Odpovede sa zadržiavajú, kým sa výstupné detektory znova neuložia. Nižšie vyberte výstupné detektory.",
+    "blockingOutputNote": "Blokujúci výstupný detektor zadrží odpoveď, kým ju Enkrypt celú neskontroluje. Ak sa chcete vyhnúť zdržaniu, použite Iba zaznamenať.",
+    "inputDetectorRequired": "Zapnite aspoň jeden vstupný detektor.",
+    "outputDetectorRequired": "Zapnite aspoň jeden výstupný detektor.",
+    "rulesTooMany": "Pridajte najviac {{max}} pravidiel.",
+    "ruleIdRequired": "Zadajte ID pravidla.",
+    "ruleIdInvalid": "ID pravidla môže obsahovať iba písmená, čísla, bodky, pomlčky a podčiarkniky.",
+    "ruleTextRequired": "Opíšte, čo pravidlo zakazuje alebo vyžaduje.",
+    "keywordTooLong": "Každé kľúčové slovo môže mať najviac {{max}} znakov.",
+    "topicTooLong": "Každá téma môže mať najviac {{max}} znakov.",
+    "keywordsTooMany": "Pridajte najviac {{max}} kľúčových slov.",
+    "topicsTooMany": "Pridajte najviac {{max}} tém.",
+    "piiEntityRequired": "Vyberte aspoň jeden typ údajov na detekciu.",
+    "keywordRequired": "Pridajte aspoň jedno kľúčové slovo.",
+    "topicRequired": "Pridajte aspoň jednu tému.",
+    "policyTextRequired": "Zadajte text zásad.",
+    "ruleRequired": "Pridajte aspoň jedno pravidlo.",
+    "ruleIdDuplicate": "Každé pravidlo musí mať vlastné ID pravidla.",
+    "piiEntities": "Údaje na detekciu",
+    "keywordsLabel": "Kľúčové slová",
+    "keywordsHint": "Jedno kľúčové slovo na riadok.",
+    "topicsHint": "Jedna téma na riadok.",
+    "policyFormat": "Formát zásad",
+    "policyFormatRules": "Štruktúrované pravidlá",
+    "policyFormatRulesDescription": "Jedno pravidlo na požiadavku s kategóriou a závažnosťou. Odporúčané.",
+    "policyFormatText": "Text zásad",
+    "policyFormatTextDescription": "Vložte existujúce zásady ako obyčajný text.",
+    "rulesEmpty": "Zatiaľ žiadne pravidlá. Každé pravidlo opisuje jednu vec, ktorú vstupy nesmú obsahovať ani sa na ňu pýtať.",
+    "addRule": "Pridať pravidlo",
+    "ruleNumber": "Pravidlo {{number}}",
+    "ruleRemove": "Odstrániť pravidlo {{number}}",
+    "ruleIdLabel": "ID pravidla",
+    "ruleNameLabel": "Názov (voliteľné)",
+    "ruleTextLabel": "Pravidlo",
+    "ruleRiskCategory": "Kategória rizika",
+    "ruleApplicability": "Rozsah",
+    "ruleFrameworks": "Rámce",
+    "detector": {
+      "promptInjection": {
+        "label": "Injekcia pokynov",
+        "description": "Detekuje pokusy prepísať pokyny alebo obísť bezpečnostné obmedzenia modelu."
+      },
+      "policyViolation": {
+        "label": "Porušenie zásad",
+        "description": "Označuje vstupy, ktoré porušujú zásady vašej organizácie, zapísané ako text alebo pravidlá.",
+        "descriptionOutput": "Označuje odpovede, ktoré porušujú zásady vašej organizácie, zapísané ako text alebo pravidlá."
+      },
+      "pii": {
+        "label": "PII a tajomstvá",
+        "description": "Detekuje osobné údaje, prihlasovacie údaje, IP adresy a URL adresy."
+      },
+      "keywords": {
+        "label": "Zakázané kľúčové slová",
+        "descriptionOutput": "Detekuje odpovede, ktoré obsahujú akékoľvek kľúčové slovo, ktoré uvediete."
+      },
+      "topics": {
+        "label": "Témy",
+        "descriptionOutput": "Označuje odpovede na akúkoľvek tému, ktorú uvediete."
+      },
+      "toxicity": {
+        "label": "Toxicita",
+        "description": "Detekuje toxický, urážlivý, vyhrážajúci sa alebo nenávistný jazyk."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Detekuje sexuálny alebo iný obsah nevhodný pre prácu."
+      },
+      "bias": {
+        "label": "Predpojatosť",
+        "description": "Detekuje predpojatý alebo diskriminačný jazyk."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Osobné údaje",
+        "description": "Mená, e-mailové adresy, telefónne čísla."
+      },
+      "secrets": {
+        "label": "Tajomstvá",
+        "description": "API kľúče, tokeny, heslá."
+      },
+      "ipAddress": {
+        "label": "IP adresy",
+        "description": "Adresy IPv4 a IPv6."
+      },
+      "url": {
+        "label": "URL adresy",
+        "description": "Webové adresy."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Bezpečnosť a podvody",
+      "safetyHarm": "Bezpečnosť a ujmy",
+      "privacyDataProtection": "Súkromie a ochrana údajov",
+      "brandReputationTrust": "Značka a reputácia",
+      "biasFairnessEthical": "Predpojatosť a spravodlivosť",
+      "legalIpLiability": "Právna zodpovednosť a zodpovednosť za duševné vlastníctvo",
+      "productMisuse": "Zneužitie produktu",
+      "performanceQuality": "Výkon a kvalita"
+    },
+    "applicability": {
+      "user": "Vstup používateľa",
+      "userAssistant": "Vstup používateľa a odpovede"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Top 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "Akt EÚ o AI",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Podniková funkcia",
+    "enterpriseOnly": "Toto je funkcia určená iba pre podniky.",
+    "readOnly": "Tieto nastavenia môžu meniť iba vlastníci organizácie a správcovia.",
+    "loadError": "Poskytovateľov a modely nebolo možné načítať",
+    "tabModels": "Modely",
+    "tabProviders": "Poskytovatelia",
+    "tabGateways": "Brány",
+    "modelsDescription": "Vypnutím modelu ho zablokujete pre všetkých členov. Modely od povolených poskytovateľov sú predvolene zapnuté.",
+    "modelsDeniedOnly": "Iba zamietnuté",
+    "modelsEmpty": "Tomuto hľadaniu nezodpovedajú žiadne modely.",
+    "providersDescription": "Vypnutím poskytovateľa zastavíte smerovanie Kilo naň pre túto organizáciu.",
+    "providersNeedCatalog": "Prepínače poskytovateľov zostanú iba na čítanie, kým sa nenačíta celý katalóg modelov. Ak ich chcete upraviť, ťuknite vyššie na Skúsiť znova.",
+    "providersEmpty": "Tomuto hľadaniu nezodpovedajú žiadni poskytovatelia.",
+    "allowAllShown": "Povoliť všetky zobrazené",
+    "denyAllShown": "Zamietnuť všetky zobrazené",
+    "gatewaysDescription": "Kilo smeruje požiadavky na modely cez Vercel AI Gateway alebo OpenRouter. Vypnutá brána spôsobí zlyhanie týchto požiadaviek.",
+    "emptyProviderList": "Povoľte aspoň jedného poskytovateľa. Prázdny zoznam zablokuje všetky trasy modelov Kilo.",
+    "gatewaysUnavailable": "Nastavenia brán nie sú pre túto organizáciu k dispozícii.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "Požiadavky cez OpenRouter nie sú pripnuté k regiónu.",
+    "inferenceRegion": "Región inferencie",
+    "inferenceRegionDescription": "Pripína požiadavky Vercel AI Gateway k tomuto regiónu. Model, ktorý tam nie je dostupný, zlyhá.",
+    "disableOpenrouterNote": "Vypnutie OpenRouter tiež zablokuje kľúče BYOK, ktoré smerujú požiadavky cez neho.",
+    "emptyModelList": "Nechajte zapnutý aspoň jeden model. Ak zakážete všetky modely, členovia nebudú mať čo používať.",
+    "catalogUnavailable": "Úplný katalóg modelov sa nenačítal, preto sa zobrazujú iba vaše uložené zoznamy. Skúste to znova a načítajte všetky modely.",
+    "region": {
+      "global": "Globálny",
+      "us": "Spojené štáty",
+      "eu": "Európska únia",
+      "au": "Austrália",
+      "jp": "Japonsko"
+    }
   }
 }

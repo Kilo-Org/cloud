@@ -1,7 +1,7 @@
-import { FlashList } from '@shopify/flash-list';
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { reloadAppAsync } from 'expo';
 import { useFocusEffect, usePreventRemove } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   I18nManager,
@@ -17,9 +17,9 @@ import { toast } from 'sonner-native';
 import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
 import { LanguagePickerRow } from '@/components/language-picker-row';
+import { LanguageSearchField } from '@/components/language-search-field';
 import { PickerSheet } from '@/components/picker-sheet';
-import { Search, SearchX } from '@/components/ui/icons';
-import { Input } from '@/components/ui/input';
+import { SearchX } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { applyLanguagePreference } from '@/i18n/apply-language';
 import { type LanguagePickerItem, languagePickerItems } from '@/i18n/language-rows';
@@ -28,7 +28,6 @@ import { resolveDeviceLanguage } from '@/i18n/resolve-language';
 import { isRtlLanguage } from '@/i18n/rtl';
 import { type LanguageReturnTarget } from '@/i18n/return-target';
 import { searchPickerHeaderInList } from '@/lib/form-sheet-detents';
-import { cn } from '@/lib/utils';
 import {
   getLanguagePreference,
   getResolvedLanguage,
@@ -100,6 +99,7 @@ export function LanguagePickerSheet({
   // a new native input: without this the field would come back empty while the
   // list stayed filtered by the query it no longer shows.
   const searchTextRef = useRef('');
+  const listRef = useRef<FlashListRef<LanguagePickerItem>>(null);
   const [closing, setClosing] = useState(false);
   const closeRequestedRef = useRef(false);
   const disablePrevention = usePreventRemove(
@@ -152,6 +152,13 @@ export function LanguagePickerSheet({
     [query, appliedLanguage, applied]
   );
   const listIsEmpty = items.length === 0 && !searchInList;
+  // A query change draws a shorter list under the kept offset, so reset the
+  // scroll to the top; the header field cannot move into a body swap without
+  // losing the draft, so `repository-rows-list`'s reset is the answer here.
+  useEffect(() => {
+    listRef.current?.scrollToOffset({ offset: 0, animated: false });
+  }, [query]);
+
   // The list's memoized cells compare `renderItem` and `extraData` by identity
   // before re-rendering a row (see the security-agent finding list). `selected`
   // and the in-flight `busy` state therefore have to travel through `extraData`:
@@ -169,22 +176,25 @@ export function LanguagePickerSheet({
   // the busy state change, and memoized `LanguagePickerRow`s re-render only
   // when their own flag moved.
   const renderItem = useCallback(
-    ({ item, index }: { item: LanguagePickerItem; index: number }) => (
-      <LanguagePickerRow
-        item={item}
-        first={index === 0}
-        showDivider={items[index + 1]?.kind !== 'section'}
-        selected={
-          item.kind === 'device'
-            ? selected === 'device'
-            : item.kind === 'language' && selected === item.row.tag
-        }
-        disabled={busy}
-        deviceEndonym={deviceEndonym}
-        isRtl={isRtl}
-        onSelect={handleSelectRow}
-      />
-    ),
+    ({ item, index }: { item: LanguagePickerItem | undefined; index: number }) =>
+      // A stale index past the end of the rows (the model picker's renderItem
+      // carries the same guard for the same reason).
+      item ? (
+        <LanguagePickerRow
+          item={item}
+          first={index === 0}
+          showDivider={items[index + 1]?.kind !== 'section'}
+          selected={
+            item.kind === 'device'
+              ? selected === 'device'
+              : item.kind === 'language' && selected === item.row.tag
+          }
+          disabled={busy}
+          deviceEndonym={deviceEndonym}
+          isRtl={isRtl}
+          onSelect={handleSelectRow}
+        />
+      ) : null,
     [items, selected, busy, deviceEndonym, isRtl, handleSelectRow]
   );
 
@@ -316,50 +326,20 @@ export function LanguagePickerSheet({
       </PickerSheet>
     );
   }
-  // Filled pill with a leading magnifier, the one search-field shape the
-  // repository and share pickers use. Pinned under the title row in a window
-  // tall enough for it plus a result row; the list header otherwise. The
-  // outlined box this replaced made the same control look like two different
-  // controls across pickers. The field itself is the shared single-line
-  // `Input`: it owns the height floor, the one line box for the placeholder
-  // and the value, and the RTL content alignment, so the pill owns only the
-  // chrome and this field keeps only its flex share and text size.
+  // The field lives in `@/components/language-search-field`: the pill chrome
+  // and the shared single-line `Input`, extracted to keep this sheet within
+  // its max-lines budget.
   const searchField = (
-    <View
-      className={cn(
-        'mb-3 mt-3 flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2',
-        // As the list header the list's own content padding stands in for the
-        // pinned side margin, so the field keeps its width and aligns with the
-        // rows.
-        searchInList ? 'mx-0' : 'mx-4'
-      )}
-    >
-      <Search size={18} color={colors.mutedForeground} />
-      <Input
-        ref={searchInputRef}
-        accessibilityLabel={t('language.search')}
-        // The pill supplies the horizontal inset, so the field zeroes both
-        // physical sides of the shared box.
-        className="flex-1 pl-0 pr-0 text-base text-foreground"
-        placeholder={t('language.search')}
-        placeholderTextColor={colors.mutedForeground}
-        // Uncontrolled: iOS drops keystrokes when state drives `value`. The
-        // focus effect clears the live field through the ref, so a reopen
-        // starts empty.
-        onChangeText={text => {
-          searchTextRef.current = text;
-          setQuery(text);
-        }}
-        // A resize that moves this field between the pinned header and the list
-        // header mounts a new input; the draft then comes back with it.
-        defaultValue={searchTextRef.current}
-        autoCapitalize="none"
-        autoCorrect={false}
-        editable={!busy}
-        clearButtonMode="while-editing"
-        returnKeyType="search"
-      />
-    </View>
+    <LanguageSearchField
+      searchInList={searchInList}
+      editable={!busy}
+      inputRef={searchInputRef}
+      draftRef={searchTextRef}
+      onChangeText={text => {
+        searchTextRef.current = text;
+        setQuery(text);
+      }}
+    />
   );
   return (
     <PickerSheet
@@ -384,13 +364,17 @@ export function LanguagePickerSheet({
         list's content box owns where it sits (see
         `emptyListContentContainerStyle`).
       */}
-      <FlashList
+      <FlashList<LanguagePickerItem>
         nestedScrollEnabled
+        ref={listRef}
         style={listFlexStyle}
         contentContainerStyle={listIsEmpty ? emptyListContentContainerStyle : listPadStyle}
         data={items}
         extraData={rowExtraData}
-        keyExtractor={item => item.key}
+        // The `undefined` guards cover FlashList indexing `data` past its end
+        // for a discarded render (see the model picker's comment).
+        keyExtractor={(item: LanguagePickerItem | undefined, index) => item?.key ?? String(index)}
+        maintainVisibleContentPosition={{ disabled: true }}
         {...SEARCHABLE_PICKER_LIST_PROPS}
         ListHeaderComponent={searchInList ? searchField : undefined}
         ListEmptyComponent={

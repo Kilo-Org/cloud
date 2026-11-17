@@ -14,6 +14,8 @@ type SegmentedControlProps<T extends string> = {
   onChange: (value: T) => void;
   /** The visible group name — required so the radio group is never unnamed. */
   accessibilityLabel: string;
+  /** The choice is fixed while a write that would replace it is in flight. */
+  disabled?: boolean;
 };
 
 /**
@@ -26,6 +28,7 @@ export function SegmentedControl<T extends string>({
   value,
   onChange,
   accessibilityLabel,
+  disabled = false,
 }: Readonly<SegmentedControlProps<T>>) {
   return (
     <RadioGroup label={accessibilityLabel} className="flex-row rounded-lg bg-secondary p-1">
@@ -34,7 +37,8 @@ export function SegmentedControl<T extends string>({
         return (
           <Pressable
             key={option.value}
-            {...radioItemA11y({ label: option.label, checked: selected })}
+            {...radioItemA11y({ label: option.label, checked: selected, disabled })}
+            disabled={disabled}
             onPress={() => {
               if (selected) {
                 return;
@@ -53,7 +57,8 @@ export function SegmentedControl<T extends string>({
               // instead of touching the edges.
               ROW_TARGET_CLASS,
               'flex-1 justify-center rounded-md px-2 py-2 active:opacity-70',
-              selected && 'bg-background'
+              selected && 'bg-background',
+              disabled && 'opacity-50'
             )}
           >
             {/* Every option shows its full label: no line cap, no font shrink

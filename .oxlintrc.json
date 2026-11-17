@@ -219,7 +219,9 @@
       // no-empty-object-type, await-thenable, no-base-to-string,
       // no-duplicate-type-constituents, no-for-in-array, no-implied-eval,
       // no-unsafe-enum-comparison, no-unsafe-unary-minus, restrict-plus-operands and
-      // restrict-template-expressions.
+      // restrict-template-expressions — except where a later tree-specific override
+      // turns one of them off again (cloud-agent-sdk and the two trees of the
+      // Interpolation-by-design override above).
       "rules": {
         "@typescript-eslint/no-explicit-any": "off",
         "@typescript-eslint/no-non-null-assertion": "off",

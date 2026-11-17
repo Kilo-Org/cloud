@@ -1513,7 +1513,7 @@
       "repositoryLine": "Pregledi: {{reviews}} · Ugotovitve: {{findings}}",
       "empty": "Še ni pregledov z analitiko",
       "emptyDescription": "Analitika beleži dokončane preglede, dokler je omogočena za organizacijo.",
-      "off": "Analitika je za {{platform}} v tejto organizaciji izklopljena.",
+      "off": "Analitika je za {{platform}} v tej organizaciji izklopljena.",
       "couldNotLoad": "Analitike ni bilo mogoče naložiti"
     },
     "council": {

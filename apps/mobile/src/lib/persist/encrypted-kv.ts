@@ -48,7 +48,10 @@ import { kv } from './schema';
  * delete-and-recreate recovery runs. A busy or locked failure is the third
  * case. A lock is evidence about another connection, not about the file, so
  * it is reported under the open operation and rethrown with the file and the
- * key intact.
+ * key intact — including a lock that surfaces inside the migration, which is
+ * reported there under the open operation instead of the migration one. The
+ * memo is dropped for it, so the next caller retries the open after the lock
+ * clears.
  */
 
 const DATABASE_NAME = 'kilo-persist.db';
@@ -376,9 +379,15 @@ async function openEncryptedDatabase(): Promise<KVDatabase> {
         if (db) {
           await closeQuietly(db.$client);
         }
+        // A lock reached through the migration is still a lock: report it
+        // under the open operation like every other busy failure, not as a
+        // migration error.
         Sentry.captureException(openError.cause, {
-          level: 'error',
-          tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'migration' },
+          level: isBusySignal(openError.cause) ? 'warning' : 'error',
+          tags: {
+            'error.subsystem': 'encrypted-kv',
+            'error.operation': isBusySignal(openError.cause) ? 'open' : 'migration',
+          },
         });
         throw openError.cause;
       }
@@ -467,6 +476,11 @@ async function openWhenProtectedDataAvailable(): Promise<KVDatabase> {
     if (error instanceof ProtectedDataUnavailableError || !isProtectedDataAvailable()) {
       openPromise = null;
     }
+    // A busy failure is transient: the lock clears, so the next caller must
+    // retry the open instead of rejecting for the rest of the process.
+    if (isBusySignal(error)) {
+      openPromise = null;
+    }
     throw error;
   }
 }
@@ -479,8 +493,9 @@ async function openDatabase(): Promise<KVDatabase> {
   // database, regenerate the key, and report to Sentry once per call — and
   // the read cache calls on every query settle. Nothing an open failure hits
   // is transient: a wrong key, a corrupt file, and a build without SQLCipher
-  // all need a relaunch or a rebuild. A locked device is the one exception
-  // (see `openWhenProtectedDataAvailable`).
+  // all need a relaunch or a rebuild. Two exceptions drop the memo and retry
+  // on the next call: a locked device (see `openWhenProtectedDataAvailable`)
+  // and a busy or locked engine failure, which the same function clears.
   openPromise ??= openWhenProtectedDataAvailable();
   return openPromise;
 }

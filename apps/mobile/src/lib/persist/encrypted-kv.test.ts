@@ -854,15 +854,15 @@ describe('migration failure keeps the database', () => {
     expect(store.get(PERSIST_DB_KEY)).toBe(storedKey);
     expect(Sentry.captureException).toHaveBeenCalledTimes(1);
     expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
-      level: 'error',
-      tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'migration' },
+      level: 'warning',
+      tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'open' },
     });
   });
 
   it('a_busy_message_inside_the_migration_keeps_the_file', async () => {
-    // A lock that surfaces inside `migrate()` flows through the migration
-    // non-corruption branch: report under the migration operation, keep the
-    // file and the key.
+    // A lock that surfaces inside `migrate()` is still a lock: the migration
+    // non-corruption branch routes it to the open report, and the file and
+    // the key stay.
     await setItem('draft:u1', 'k', 'v');
     const storedKey = store.get(PERSIST_DB_KEY);
 
@@ -877,8 +877,8 @@ describe('migration failure keeps the database', () => {
     expect(store.get(PERSIST_DB_KEY)).toBe(storedKey);
     expect(Sentry.captureException).toHaveBeenCalledTimes(1);
     expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
-      level: 'error',
-      tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'migration' },
+      level: 'warning',
+      tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'open' },
     });
   });
 
@@ -927,6 +927,23 @@ describe('busy open failure keeps the database', () => {
       level: 'warning',
       tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'open' },
     });
+  });
+
+  it('a_busy_failure_drops_the_open_memo_so_the_next_caller_retries', async () => {
+    // A lock is transient: the memo must not keep rejecting every caller for
+    // the rest of the process. No test-only reset between the two calls.
+    await setItem('draft:u1', 'k', 'v');
+
+    failNextProbe = true;
+    nextProbeMessage = 'database is locked';
+    resetEncryptedKvOpenForTests();
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('database is locked');
+
+    // The very next caller retries the open and succeeds once the seam's
+    // one-shot probe failure is spent.
+    await expect(getItem('draft:u1', 'k')).resolves.toBe('v');
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(3);
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
   });
 
   it('the_stored_value_survives_a_locked_probe_to_a_later_launch', async () => {

@@ -239,8 +239,8 @@ export const startLocalAgentsHost = (
   const consumedPairings: LocalAgentPairingConsumption = createPairingConsumption({ now });
   /* Fragments being processed now: the second navigation must not duplicate it. */
   const inFlightPairings = new Set<string>();
-  /* HubId -> fragment key, so a successful connect marks the right fragment used. */
-  const pairingKeysByHub = new Map<string, string>();
+  /* Fragment key per connection attempt, so only the connection that proved it can consume it. */
+  const pairingKeysByConnection = new WeakMap<LocalAgentConnection, string>();
   const ready = Promise.withResolvers<void>();
   let enabled = false;
   let settingsLoaded = false;
@@ -374,7 +374,7 @@ export const startLocalAgentsHost = (
         }
 
         if (next.kind === 'connected' && endpoint.transport === 'loopback') {
-          consumeIfConnected(endpoint.hubId);
+          consumeIfConnected(connection);
         }
 
         lastState = next;
@@ -484,11 +484,11 @@ export const startLocalAgentsHost = (
     await publishStatus();
   };
 
+  /**
+   * Idempotent: a retried settings read must apply again, because the previous
+   * attempt may have failed after it set `enabled` but before it finished.
+   */
   const applyEnabled = async (next: boolean): Promise<void> => {
-    if (next === enabled) {
-      return;
-    }
-
     enabled = next;
 
     if (!enabled) {
@@ -512,20 +512,20 @@ export const startLocalAgentsHost = (
     `${endpoint.hubId}|${endpoint.key}|${endpoint.ws}`;
 
   /**
-   * Marks the fragment used once its endpoint reports `connected`. A fragment
-   * seen while the switch was off, or one whose handshake failed, stays unused
-   * so a later attempt can still pair.
+   * Marks a fragment used once the connection whose key came from that fragment
+   * reports `connected`. Another connection for the same hub proves only its own
+   * key, so it must not consume a fragment it never proved. A fragment seen while
+   * the switch was off, or one whose handshake failed, stays unused.
    */
-  const consumeIfConnected = (hubId: string): void => {
-    const connection = connections.get(hubId);
-    const key = pairingKeysByHub.get(hubId);
+  const consumeIfConnected = (connection: LocalAgentConnection): void => {
+    const key = pairingKeysByConnection.get(connection);
 
-    if (key === undefined || connection?.state().kind !== 'connected') {
+    if (key === undefined || connection.state().kind !== 'connected') {
       return;
     }
 
     consumedPairings.add(key);
-    pairingKeysByHub.delete(hubId);
+    pairingKeysByConnection.delete(connection);
   };
 
   const acceptPairing = async (
@@ -546,8 +546,6 @@ export const startLocalAgentsHost = (
         await saveLocalAgentEndpoint(storage, endpoint);
       }
 
-      pairingKeysByHub.set(endpoint.hubId, key);
-
       // Pairing tabs are single-use; closing the tab clears the key from the address bar.
       try {
         await tabs?.remove(tabId);
@@ -556,7 +554,20 @@ export const startLocalAgentsHost = (
       }
 
       await reconcile();
-      consumeIfConnected(endpoint.hubId);
+
+      const connection = connections.get(endpoint.hubId);
+
+      // Bind the fragment to the connection that dials its key.
+      // If that dial already completed, consume it now.
+      if (
+        connection !== undefined &&
+        connection.endpoint.transport === 'loopback' &&
+        connection.endpoint.key === endpoint.key &&
+        connection.endpoint.ws === endpoint.ws
+      ) {
+        pairingKeysByConnection.set(connection, key);
+        consumeIfConnected(connection);
+      }
     } finally {
       inFlightPairings.delete(key);
     }
@@ -587,8 +598,11 @@ export const startLocalAgentsHost = (
     const settings = await loadLocalAgentSettings(storage);
     const firstLoad = !settingsLoaded;
 
-    settingsLoaded = true;
     await applyEnabled(settings.enabled);
+
+    // Only a completed first apply proves the switch state.
+    // A failure keeps the buffer for the next storage event.
+    settingsLoaded = true;
 
     if (firstLoad) {
       flushPendingPairings();

@@ -235,7 +235,7 @@ const connectSocketIfNeeded = async (harness: ReturnType<typeof createHarness>) 
 };
 
 /** Runs the SPEC handshake and waits for `ext.hello`. */
-const completeHandshake = async (socket: FakeSocket): Promise<void> => {
+const completeHandshake = async (socket: FakeSocket, key = KEY): Promise<void> => {
   socket.handlers.onOpen();
   const nonceH = nonce(0x11);
   socket.handlers.onText(JSON.stringify({ nonceH, type: 'challenge' }));
@@ -245,7 +245,7 @@ const completeHandshake = async (socket: FakeSocket): Promise<void> => {
   });
 
   const auth = stringRecordSchema.parse(JSON.parse(socket.sent[0] ?? '{}'));
-  const keyBytes = decodePairingKey(KEY);
+  const keyBytes = decodePairingKey(key);
 
   if (keyBytes === null) {
     throw new Error('test key must decode');
@@ -595,6 +595,79 @@ describe('pairing admission', () => {
       expect(harness.removeTab).toHaveBeenCalledWith(55);
     });
     expect(harness.sockets).toHaveLength(1);
+    host.stop();
+  });
+
+  it('keeps buffered pairings when the first apply fails', async () => {
+    const harness = createHarness();
+    harness.storage.items.set(LOCAL_AGENT_SETTINGS_STORAGE_KEY, { enabled: true });
+    const settingsRead = Promise.withResolvers<void>();
+    let endpointReads = 0;
+    harness.storage.getItem = async (key: LocalAgentStorageKey) => {
+      if (key === LOCAL_AGENT_SETTINGS_STORAGE_KEY) {
+        await settingsRead.promise;
+      }
+
+      if (key === LOCAL_AGENT_ENDPOINTS_STORAGE_KEY) {
+        endpointReads += 1;
+
+        if (endpointReads === 1) {
+          throw new Error('endpoint read failed');
+        }
+      }
+
+      return harness.storage.items.get(key) ?? null;
+    };
+    const host = startHost(harness);
+
+    harness.listeners.tabUpdated?.(70, { url: PAIRING_URL }, { url: PAIRING_URL });
+    settingsRead.resolve();
+    await host.ready;
+
+    expect(harness.removeTab).not.toHaveBeenCalled();
+
+    harness.storage.notify(LOCAL_AGENT_SETTINGS_STORAGE_KEY);
+
+    await vi.waitFor(() => {
+      expect(harness.sockets).toHaveLength(1);
+    });
+    expect(harness.removeTab).toHaveBeenCalledWith(70);
+    host.stop();
+  });
+
+  it('consumes a fragment only through the connection that proved its key', async () => {
+    const harness = createHarness();
+    harness.storage.items.set(LOCAL_AGENT_SETTINGS_STORAGE_KEY, { enabled: true });
+    const host = startHost(harness);
+    await host.ready;
+
+    harness.listeners.tabUpdated?.(60, { url: PAIRING_URL }, { url: PAIRING_URL });
+    await connectSocketIfNeeded(harness);
+
+    harness.listeners.tabUpdated?.(61, { url: REPAIRING_URL }, { url: REPAIRING_URL });
+    await vi.waitFor(() => {
+      expect(harness.sockets).toHaveLength(2);
+    });
+
+    const [, secondSocket] = harness.sockets;
+
+    if (secondSocket === undefined) {
+      throw new Error('expected the re-pairing socket');
+    }
+
+    await completeHandshake(secondSocket, NEW_KEY);
+
+    // The re-paired fragment is spent...
+    harness.listeners.tabUpdated?.(62, { url: REPAIRING_URL }, { url: REPAIRING_URL });
+    expect(harness.removeTab).not.toHaveBeenCalledWith(62);
+
+    // ...but the first fragment was never proven by the second connection.
+    harness.listeners.tabUpdated?.(63, { url: PAIRING_URL }, { url: PAIRING_URL });
+    await vi.waitFor(() => {
+      expect(harness.sockets).toHaveLength(3);
+    });
+    expect(harness.sockets[2]?.url).toBe(WS);
+    expect(harness.removeTab).toHaveBeenCalledWith(63);
     host.stop();
   });
 

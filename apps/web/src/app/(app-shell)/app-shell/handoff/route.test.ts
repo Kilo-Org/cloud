@@ -1,14 +1,19 @@
-import { describe, expect, jest, test } from '@jest/globals';
+import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 import type * as HandoffTokenModule from '@/lib/app-shell/handoff-token';
 import type * as SessionModule from '@/lib/app-shell/session';
 import type * as HandoffRouteModule from './route';
 import { NextRequest } from 'next/server';
+import { shellUser } from '@/tests/helpers/shell-user.helper';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
-  NEXTAUTH_SECRET: 'synthetic-app-shell-signing-secret',
+  NEXTAUTH_SECRET: '[REDACTED by s1-secret-redact]',
 }));
 jest.mock('@/lib/app-shell/handoff-token', () => ({
   consumeAppShellHandoff: jest.fn(),
+}));
+jest.mock('@/lib/app-shell/session', () => ({
+  ...jest.requireActual<typeof SessionModule>('@/lib/app-shell/session'),
+  loadAppShellUser: jest.fn(),
 }));
 
 // This repo's transform does not hoist `jest.mock` above the static imports, so
@@ -16,11 +21,18 @@ jest.mock('@/lib/app-shell/handoff-token', () => ({
 const { consumeAppShellHandoff } = jest.requireMock<typeof HandoffTokenModule>(
   '@/lib/app-shell/handoff-token'
 );
-const { APP_SHELL_SESSION_COOKIE, verifyAppShellSessionToken } =
-  jest.requireActual<typeof SessionModule>('@/lib/app-shell/session');
+const { APP_SHELL_SESSION_COOKIE, verifyAppShellSessionToken, loadAppShellUser } =
+  jest.requireMock<typeof SessionModule>('@/lib/app-shell/session');
 const { GET } = jest.requireActual<typeof HandoffRouteModule>('./route');
 
 const mockConsume = jest.mocked(consumeAppShellHandoff);
+const mockLoadUser = jest.mocked(loadAppShellUser);
+
+beforeEach(() => {
+  mockConsume.mockReset();
+  mockLoadUser.mockReset();
+  mockLoadUser.mockResolvedValue({ status: 'active', user: shellUser('user-1') });
+});
 
 function handoffRequest(token?: string, origin = 'https://kilo.example'): NextRequest {
   const url = new URL(`${origin}/app-shell/handoff`);
@@ -81,5 +93,25 @@ describe('GET /app-shell/handoff', () => {
 
     expect(mockConsume).toHaveBeenCalledWith('');
     expect(response.headers.get('location')).toBe('/app-shell/expired');
+  });
+
+  test('does not hand a blocked account a shell session', async () => {
+    mockConsume.mockResolvedValue({ userId: 'blocked-user', targetPath: '/app-shell/github-app' });
+    mockLoadUser.mockResolvedValue({ status: 'restricted' });
+
+    const response = await GET(handoffRequest('one-time-token'));
+
+    expect(response.headers.get('location')).toBe('/app-shell/account-unavailable');
+    expect(response.cookies.get(APP_SHELL_SESSION_COOKIE)).toBeUndefined();
+  });
+
+  test('does not hand a deleted account a shell session', async () => {
+    mockConsume.mockResolvedValue({ userId: 'deleted-user', targetPath: '/app-shell/github-app' });
+    mockLoadUser.mockResolvedValue({ status: 'gone' });
+
+    const response = await GET(handoffRequest('one-time-token'));
+
+    expect(response.headers.get('location')).toBe('/app-shell/expired');
+    expect(response.cookies.get(APP_SHELL_SESSION_COOKIE)).toBeUndefined();
   });
 });

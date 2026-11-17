@@ -1,14 +1,18 @@
 import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
 import type * as NextHeaders from 'next/headers';
 import type * as FindUserById from '@kilocode/web-shared/lib/user/find-user-by-id';
+import type * as DomainGates from '@kilocode/web-shared/lib/user/domain-gates';
 import type * as SessionModule from './session';
 import { shellUser } from '@/tests/helpers/shell-user.helper';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
-  NEXTAUTH_SECRET: 'synthetic-app-shell-signing-secret',
+  NEXTAUTH_SECRET: '[REDACTED by s1-secret-redact]',
 }));
 jest.mock('next/headers', () => ({ cookies: jest.fn() }));
 jest.mock('@kilocode/web-shared/lib/user/find-user-by-id', () => ({ findUserById: jest.fn() }));
+jest.mock('@kilocode/web-shared/lib/user/domain-gates', () => ({
+  isUserBlacklistedByDomain: jest.fn(),
+}));
 
 // This repo's transform does not hoist `jest.mock` above the static imports, so
 // the mocked modules and the module under test are required here, after the
@@ -16,6 +20,9 @@ jest.mock('@kilocode/web-shared/lib/user/find-user-by-id', () => ({ findUserById
 const { cookies } = jest.requireMock<typeof NextHeaders>('next/headers');
 const { findUserById } = jest.requireMock<typeof FindUserById>(
   '@kilocode/web-shared/lib/user/find-user-by-id'
+);
+const { isUserBlacklistedByDomain } = jest.requireMock<typeof DomainGates>(
+  '@kilocode/web-shared/lib/user/domain-gates'
 );
 const {
   APP_SHELL_SESSION_COOKIE,
@@ -29,6 +36,7 @@ const {
 
 const mockCookies = jest.mocked(cookies);
 const mockFindUserById = jest.mocked(findUserById);
+const mockIsUserBlacklistedByDomain = jest.mocked(isUserBlacklistedByDomain);
 
 function requestWithCookies(values: Record<string, string>) {
   mockCookies.mockResolvedValue({
@@ -38,6 +46,7 @@ function requestWithCookies(values: Record<string, string>) {
 
 beforeEach(() => {
   jest.resetAllMocks();
+  mockIsUserBlacklistedByDomain.mockResolvedValue(false);
 });
 
 afterEach(() => {
@@ -112,6 +121,29 @@ describe('requireAppShellUser', () => {
   test('refuses a session whose account is gone', async () => {
     requestWithCookies({ [APP_SHELL_SESSION_COOKIE]: createAppShellSessionToken('deleted-user') });
     mockFindUserById.mockResolvedValue(undefined);
+
+    await expect(requireAppShellUser()).resolves.toBeNull();
+  });
+
+  // The web session path refuses these two accounts on every read (`R0` for the
+  // domain, `R1` for the block). A shell credential lives for an hour after the
+  // hand-off that minted it, so it repeats both checks instead of trusting the
+  // mint.
+  test('refuses a session whose account was blocked after the hand-off', async () => {
+    requestWithCookies({ [APP_SHELL_SESSION_COOKIE]: createAppShellSessionToken('user-1') });
+    mockFindUserById.mockResolvedValue({
+      ...shellUser('user-1'),
+      blocked_at: '2026-01-02T00:00:00.000Z',
+      blocked_reason: 'abuse',
+    });
+
+    await expect(requireAppShellUser()).resolves.toBeNull();
+  });
+
+  test('refuses a session whose email domain is blocklisted', async () => {
+    requestWithCookies({ [APP_SHELL_SESSION_COOKIE]: createAppShellSessionToken('user-1') });
+    mockFindUserById.mockResolvedValue(shellUser('user-1'));
+    mockIsUserBlacklistedByDomain.mockResolvedValue(true);
 
     await expect(requireAppShellUser()).resolves.toBeNull();
   });

@@ -17,6 +17,12 @@ export const APP_SHELL_COMPLETE_PATH = `${APP_SHELL_PREFIX}/complete`;
 export const APP_SHELL_EXPIRED_PATH = `${APP_SHELL_PREFIX}/expired`;
 
 /**
+ * The terminal shell page for a hand-off whose account the web session path
+ * refuses: a blocked account or a blocklisted email domain.
+ */
+export const APP_SHELL_ACCOUNT_UNAVAILABLE_PATH = `${APP_SHELL_PREFIX}/account-unavailable`;
+
+/**
  * The providers whose connect/manage page the shell hosts. Bitbucket is absent
  * on purpose: the app connects Bitbucket natively.
  */

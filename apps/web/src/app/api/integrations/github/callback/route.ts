@@ -1,8 +1,13 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
-import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
-import { APP_SHELL_EXPIRED_PATH, isAppShellPath } from '@/lib/app-shell/shell-paths';
+import {
+  APP_SHELL_ACCOUNT_UNAVAILABLE_PATH,
+  APP_SHELL_EXPIRED_PATH,
+  isAppShellPath,
+} from '@/lib/app-shell/shell-paths';
+import { loadAppShellUser } from '@/lib/app-shell/session';
+import { oauthCallbackRedirectPath } from '@/lib/integrations/oauth/common';
 import { platform_integrations, type GitHubInstallState, type User } from '@kilocode/db/schema';
 import { Octokit } from '@octokit/rest';
 import { createAppAuth } from '@octokit/auth-app';
@@ -188,12 +193,14 @@ export async function GET(request: NextRequest) {
     if (!user) {
       const flow = rawState ? verifyAppShellFlowToken(request, rawState) : null;
       if (!rawState || !flow) {
-        return NextResponse.redirect(new URL('/', APP_URL));
+        // A browser that still carries the shell's flow cookie is in the app, so
+        // it gets the shell's terminal page instead of the full web app.
+        return NextResponse.redirect(new URL(oauthCallbackRedirectPath(request, '/'), APP_URL));
       }
       // Preflight first so a tampered pair never burns the user's token.
       const preflight = await checkInstallState(rawState, flow.userId);
       if (preflight.status !== 'valid') {
-        return NextResponse.redirect(new URL('/', APP_URL));
+        return NextResponse.redirect(new URL(oauthCallbackRedirectPath(request, '/'), APP_URL));
       }
       const consumed = await consumeInstallStateWithoutSession(rawState);
       if (
@@ -204,11 +211,16 @@ export async function GET(request: NextRequest) {
       ) {
         return NextResponse.redirect(new URL(APP_SHELL_EXPIRED_PATH, APP_URL));
       }
-      const stateUser = await findUserById(flow.userId);
-      if (!stateUser) {
+      // The row names the user; the account gates the web session path applies
+      // still decide whether that id becomes a user.
+      const lookup = await loadAppShellUser(flow.userId);
+      if (lookup.status === 'restricted') {
+        return NextResponse.redirect(new URL(APP_SHELL_ACCOUNT_UNAVAILABLE_PATH, APP_URL));
+      }
+      if (lookup.status === 'gone') {
         return NextResponse.redirect(new URL(APP_SHELL_EXPIRED_PATH, APP_URL));
       }
-      user = stateUser;
+      user = lookup.user;
       consumedByShell = consumed.state;
     }
 
@@ -233,7 +245,9 @@ export async function GET(request: NextRequest) {
           query.set('fromApp', '1');
           if (result.organizationId) query.set('organizationId', result.organizationId);
         }
-        return NextResponse.redirect(new URL(`/github-app?${query}`, APP_URL));
+        return NextResponse.redirect(
+          new URL(oauthCallbackRedirectPath(request, `/github-app?${query}`), APP_URL)
+        );
       }
 
       rejectionReason = result.reason;
@@ -264,7 +278,11 @@ export async function GET(request: NextRequest) {
         },
       }
     );
-    return NextResponse.redirect(new URL('/github-app?error=install_state_invalid', APP_URL));
+    const invalidStatePath = oauthCallbackRedirectPath(
+      request,
+      '/github-app?error=install_state_invalid'
+    );
+    return NextResponse.redirect(new URL(invalidStatePath, APP_URL));
   } catch (error) {
     console.error('Error handling GitHub App callback:', error);
 
@@ -284,7 +302,9 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    return NextResponse.redirect(new URL('/?error=installation_failed', APP_URL));
+    return NextResponse.redirect(
+      new URL(oauthCallbackRedirectPath(request, '/?error=installation_failed'), APP_URL)
+    );
   }
 }
 

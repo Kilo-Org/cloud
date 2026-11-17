@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { TRPCError } from '@trpc/server';
+import * as z from 'zod';
 import { requireAppShellUser } from '@/lib/app-shell/session';
 import { appShellRedirect } from '@/lib/app-shell/redirect';
 import { APP_SHELL_EXPIRED_PATH, APP_SHELL_PREFIX } from '@/lib/app-shell/shell-paths';
@@ -19,6 +20,17 @@ import {
 const SHELL_RETURN_PATH = `${APP_SHELL_PREFIX}/github-app`;
 
 /**
+ * The shell page that renders a start the route refused. A valid organization
+ * id travels with it so the page keeps the organization context and its retry;
+ * an id this route rejected does not, because the page cannot resolve it.
+ */
+function installStartRefused(organizationId?: string): NextResponse {
+  const query = new URLSearchParams({ error: 'installation_start_refused' });
+  if (organizationId) query.set('organizationId', organizationId);
+  return appShellRedirect(`${SHELL_RETURN_PATH}?${query.toString()}`);
+}
+
+/**
  * Starts a GitHub App install inside the shell.
  *
  * The install state is a bearer token, so the callback may not accept it on its
@@ -33,7 +45,11 @@ export async function GET(request: NextRequest) {
     return appShellRedirect(APP_SHELL_EXPIRED_PATH);
   }
 
-  const organizationId = request.nextUrl.searchParams.get('organizationId') ?? undefined;
+  const organizationIdParam = request.nextUrl.searchParams.get('organizationId');
+  if (organizationIdParam !== null && !z.uuid().safeParse(organizationIdParam).success) {
+    return installStartRefused();
+  }
+  const organizationId = organizationIdParam ?? undefined;
   const returnTo = organizationId
     ? `${SHELL_RETURN_PATH}?${new URLSearchParams({ organizationId }).toString()}`
     : SHELL_RETURN_PATH;
@@ -47,12 +63,7 @@ export async function GET(request: NextRequest) {
       error instanceof TRPCError &&
       (error.code === 'FORBIDDEN' || error.code === 'UNAUTHORIZED')
     ) {
-      return appShellRedirect(
-        `${SHELL_RETURN_PATH}?${new URLSearchParams({
-          error: 'installation_start_refused',
-          ...(organizationId ? { organizationId } : {}),
-        }).toString()}`
-      );
+      return installStartRefused(organizationId);
     }
     throw error;
   }

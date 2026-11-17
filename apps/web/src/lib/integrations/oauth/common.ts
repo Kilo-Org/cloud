@@ -8,9 +8,9 @@ import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
 import { createOAuthState, verifyOAuthState } from '@/lib/integrations/oauth-state';
-import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { APP_SHELL_PREFIX, buildAppShellIntegrationPath } from '@/lib/app-shell/shell-paths';
 import { appShellRedirect } from '@/lib/app-shell/redirect';
+import { loadAppShellUser } from '@/lib/app-shell/session';
 import {
   APP_SHELL_FLOW_COOKIE,
   appShellFlowCookieOptions,
@@ -279,14 +279,13 @@ export async function startStatefulOAuthConnect(
   return response;
 }
 
-/** The redirect an aborted connect lands on: the shell page when the shell started it. */
-function oauthConnectFailure(
-  request: NextRequest,
-  platform: StandardOAuthPlatform,
+/** Reports a connect that could not start and returns its user-facing reason. */
+function reportOAuthConnectFailure(
+  platform: string,
   error: unknown,
-  source: string
-): Response {
-  const organizationId = request.nextUrl.searchParams.get('organizationId');
+  source: string,
+  organizationId: string | null
+): string | null {
   const denialCode = organizationAccessDenialErrorCode(error);
   if (!denialCode) {
     captureException(error, {
@@ -300,24 +299,59 @@ function oauthConnectFailure(
     });
   }
 
+  return denialCode;
+}
+
+/**
+ * The redirect an aborted connect lands on: the shell page when the shell
+ * started it, the full web page otherwise.
+ */
+function oauthConnectFailure(
+  request: NextRequest,
+  platform: RetainedOAuthPlatform,
+  error: unknown,
+  source: string
+): Response {
+  const organizationId = request.nextUrl.searchParams.get('organizationId');
+  const errorCode =
+    reportOAuthConnectFailure(platform, error, source, organizationId) ?? 'oauth_init_failed';
+
   if (request.nextUrl.pathname.startsWith(APP_SHELL_PREFIX)) {
-    const errorCode = denialCode ?? 'oauth_init_failed';
-    return appShellRedirect(
-      appendIntegrationOAuthRedirectQuery(
-        buildAppShellIntegrationPath(platform, organizationId ?? undefined),
-        `error=${encodeURIComponent(errorCode)}`
-      )
-    );
+    return appShellConnectFailureRedirect(platform, organizationId, errorCode);
   }
 
   return NextResponse.redirect(
-    new URL(
-      buildIntegrationOAuthConnectErrorPath(
-        platform,
-        organizationId,
-        denialCode ?? 'oauth_init_failed'
-      ),
-      APP_URL
+    new URL(buildIntegrationOAuthConnectErrorPath(platform, organizationId, errorCode), APP_URL)
+  );
+}
+
+/**
+ * The shell's own failure outcome. The shell connect route resolves its session
+ * itself, so it cannot use `handleStatefulPlatformOAuthConnect`'s catch and
+ * calls this instead: an error becomes the shell page that renders the reason,
+ * never a framework error page.
+ */
+export function respondToAppShellOAuthConnectFailure(
+  request: NextRequest,
+  platform: string,
+  error: unknown,
+  source: string
+): Response {
+  const organizationId = request.nextUrl.searchParams.get('organizationId');
+  const errorCode =
+    reportOAuthConnectFailure(platform, error, source, organizationId) ?? 'oauth_init_failed';
+  return appShellConnectFailureRedirect(platform, organizationId, errorCode);
+}
+
+function appShellConnectFailureRedirect(
+  platform: string,
+  organizationId: string | null | undefined,
+  errorCode: string
+): Response {
+  return appShellRedirect(
+    appendIntegrationOAuthRedirectQuery(
+      buildAppShellIntegrationPath(platform, organizationId ?? undefined),
+      `error=${encodeURIComponent(errorCode)}`
     )
   );
 }
@@ -333,8 +367,10 @@ export type OAuthCallbackActor =
  * A web session wins when there is one. Otherwise only a state the app shell
  * minted can identify the caller, and only together with the flow cookie the
  * shell's connect route set for that exact state — so a callback URL on its own
- * never acts as a login. Callbacks re-check organization membership from the
- * database for whichever user this returns.
+ * never acts as a login. The state names a user id, so it runs the same account
+ * gates the web session path runs before it becomes an actor. Callbacks
+ * re-check organization membership from the database for whichever user this
+ * returns.
  */
 export async function resolveOAuthCallbackActor(input: {
   request: NextRequest;
@@ -349,8 +385,10 @@ export async function resolveOAuthCallbackActor(input: {
   const flow = verifyAppShellFlowToken(input.request, input.rawState);
   if (!flow || flow.userId !== input.verified.userId) return { status: 'unauthenticated' };
 
-  const stateUser = await findUserById(input.verified.userId);
-  return stateUser ? { status: 'app_shell', user: stateUser } : { status: 'unauthenticated' };
+  const lookup = await loadAppShellUser(input.verified.userId);
+  return lookup.status === 'active'
+    ? { status: 'app_shell', user: lookup.user }
+    : { status: 'unauthenticated' };
 }
 
 /**

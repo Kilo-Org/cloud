@@ -7,6 +7,7 @@ import {
   handlePlatformOAuthConnectForAppShell,
   handlePlatformOAuthConnectPostForAppShell,
 } from '@/lib/integrations/oauth/routes';
+import { respondToAppShellOAuthConnectFailure } from '@/lib/integrations/oauth/common';
 
 type RouteContext = {
   params: Promise<{ platform: string }>;
@@ -21,6 +22,10 @@ function isShellPlatform(platform: string): boolean {
  * (this route sits under the cookie's `Path`), mints a state marked as a shell
  * flow, and binds the attempt to this browser with a `/api/integrations` cookie
  * so the callback can identify the user without a full web session.
+ *
+ * A flow that cannot start stays in the shell: the connect page renders the
+ * reason, where the web route's own catch would land a shell caller on a full
+ * web page or a framework error page.
  */
 export async function GET(request: NextRequest, context: RouteContext) {
   const { platform } = await context.params;
@@ -33,7 +38,11 @@ export async function GET(request: NextRequest, context: RouteContext) {
     return appShellRedirect(APP_SHELL_EXPIRED_PATH);
   }
 
-  return handlePlatformOAuthConnectForAppShell(request, platform, user);
+  try {
+    return await handlePlatformOAuthConnectForAppShell(request, platform, user);
+  } catch (error) {
+    return respondToAppShellOAuthConnectFailure(request, platform, error, 'app_shell_connect');
+  }
 }
 
 /** The self-hosted GitLab form posts here instead of to the full app's route. */

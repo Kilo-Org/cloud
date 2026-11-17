@@ -48,6 +48,9 @@ import { assertUserAdministersInstallation } from '@/lib/integrations/platforms/
 const mockState = { kind: 'state' } as unknown as StateAdapter;
 
 jest.mock('@kilocode/web-shared/lib/user/server');
+jest.mock('@kilocode/web-shared/lib/user/domain-gates', () => ({
+  isUserBlacklistedByDomain: jest.fn(async () => false),
+}));
 jest.mock('@/lib/bot/github-link-state');
 jest.mock('@/lib/bot-identity');
 jest.mock('@/lib/integrations/platforms/github/adapter');
@@ -1954,8 +1957,56 @@ describe('GET /api/integrations/github/callback app shell flow', () => {
       const { GET } = await import('./route');
       const response = await GET(shellRequest(callbackPath(token, 'delete'), cookie));
 
-      expectRedirectLocation(response, '/');
+      // The cookie says this browser is in the app, so it stays there.
+      expectRedirectLocation(response, '/app-shell/expired');
       expect(mockedConsumeWithoutSession).not.toHaveBeenCalled();
+    } finally {
+      await deleteShellState(token);
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, userId));
+    }
+  });
+
+  test('a matched flow cookie with an expired install state lands on the shell terminal page', async () => {
+    const userId = await createShellUser();
+    const token = await stateModule.createInstallState({
+      kiloUserId: userId,
+      ownerType: 'user',
+      ownerId: userId,
+      githubAppType: 'standard',
+      returnTo: '/app-shell/github-app',
+    });
+    const cookie = `kilo_app_shell_flow=${createAppShellFlowToken({ userId, state: token })}`;
+    await deleteShellState(token);
+    try {
+      const { GET } = await import('./route');
+      const response = await GET(shellRequest(callbackPath(token, 'delete'), cookie));
+
+      expectRedirectLocation(response, '/app-shell/expired');
+      expect(mockedConsumeWithoutSession).not.toHaveBeenCalled();
+    } finally {
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, userId));
+    }
+  });
+
+  test('a shell install state naming a blocked account ends in the shell', async () => {
+    const userId = await createShellUser();
+    const token = await stateModule.createInstallState({
+      kiloUserId: userId,
+      ownerType: 'user',
+      ownerId: userId,
+      githubAppType: 'standard',
+      returnTo: '/app-shell/github-app',
+    });
+    await db
+      .update(kilocode_users)
+      .set({ blocked_at: new Date().toISOString(), blocked_reason: 'abuse' })
+      .where(eq(kilocode_users.id, userId));
+    try {
+      const cookie = `kilo_app_shell_flow=${createAppShellFlowToken({ userId, state: token })}`;
+      const { GET } = await import('./route');
+      const response = await GET(shellRequest(callbackPath(token, 'delete'), cookie));
+
+      expectRedirectLocation(response, '/app-shell/account-unavailable');
     } finally {
       await deleteShellState(token);
       await db.delete(kilocode_users).where(eq(kilocode_users.id, userId));

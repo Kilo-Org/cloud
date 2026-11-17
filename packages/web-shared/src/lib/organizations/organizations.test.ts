@@ -28,15 +28,30 @@ import {
   acceptOrganizationInvite,
   lockOrganizationMembershipMutation,
   ORGANIZATION_INVITATION_SSO_AUTHENTICATION_REQUIRED,
-  updateOrganizationSettings,
   mutateOrganizationSettings,
   markOrganizationAsDeleted,
 } from './organizations';
 import { getOrganizationGroupPolicyContext } from './organization-group-policy-context.server';
+import type { OrganizationSettings } from './organization-types';
 import { bumpOrganizationGroupPolicyRevision } from './organization-groups';
 import { isOrganizationMember } from '@kilocode/worker-utils/account-access';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { DEFAULT_MEMBER_DAILY_LIMIT_USD } from '@kilocode/web-shared/lib/organizations/constants';
+
+/**
+ * Resolves once `reportBlocked` sees a lock waiter row (same bounded poll the
+ * serialization tests use against pg_stat_activity); throws when the loop
+ * exhausts, so a missing interleaving fails with its cause, not a timeout.
+ */
+async function waitForRowLockWaiter(reportBlocked: () => Promise<boolean>): Promise<void> {
+  let blocked = false;
+  for (let attempt = 0; attempt < 2000 && !blocked; attempt += 1) {
+    blocked = await reportBlocked();
+  }
+  if (!blocked) {
+    throw new Error('Settings write never queued behind the organization row lock');
+  }
+}
 
 describe('Organizations', () => {
   afterEach(async () => {
@@ -2990,6 +3005,96 @@ describe('Organizations', () => {
         });
         expect(after.policyRevision).toBe(1);
       });
+      test('enabling code indexing merges against the committed settings row', async () => {
+        // The managed-indexing enablement script writes code_indexing_enabled
+        // through mutateOrganizationSettings after loading its organization
+        // list. Replica of the script's mutation: a concurrent writer holds the
+        // organization row, commits an unrelated settings field, and only then
+        // lets the enablement write proceed. With the old unlocked whole-object
+        // UPDATE this interleaving reverted the concurrent field.
+        const owner = await insertTestUser();
+        const organization = await createOrganization('Managed indexing org', owner.id);
+
+        // Start from a row without the flag, as the script's select expects.
+        const settingsWithoutIndexing: OrganizationSettings = {
+          ...organization.settings,
+          code_indexing_enabled: false,
+        };
+        await db
+          .update(organizations)
+          .set({ settings: settingsWithoutIndexing })
+          .where(eq(organizations.id, organization.id));
+
+        const { promise: writerLockHeld, resolve: signalWriterLockHeld } =
+          Promise.withResolvers<number>();
+        const { promise: enablementMayProceed, resolve: allowEnablement } =
+          Promise.withResolvers<void>();
+        const otherWriter = db.transaction(async tx => {
+          const [current] = await tx
+            .select({ settings: organizations.settings })
+            .from(organizations)
+            .where(eq(organizations.id, organization.id))
+            .for('update');
+          const backend = await tx.execute<{ pid: number }>(
+            sql`SELECT pg_backend_pid()::int AS pid`
+          );
+          const pid = backend.rows[0]?.pid;
+          if (pid === undefined) throw new Error('PostgreSQL backend pid unavailable');
+          signalWriterLockHeld(pid);
+          await tx
+            .update(organizations)
+            .set({
+              settings: {
+                ...current!.settings,
+                enkrypt: {
+                  input_guardrail: { enabled: true, group_id: 'guardrail-group' },
+                },
+              },
+            })
+            .where(eq(organizations.id, organization.id));
+          await enablementMayProceed;
+        });
+
+        const holderPid = await writerLockHeld;
+        const enableIndexing = mutateOrganizationSettings(organization.id, current => {
+          if (current.settings.code_indexing_enabled === true) {
+            return current.settings;
+          }
+          return { ...current.settings, code_indexing_enabled: true };
+        });
+        // The enablement write must be waiting on the row the other writer
+        // holds before that writer releases it.
+        let enablementBlocked = false;
+        try {
+          await waitForRowLockWaiter(async () => {
+            const waiting = await db.execute(sql`
+              SELECT 1
+              FROM pg_stat_activity
+              WHERE datname = current_database()
+                AND wait_event_type = 'Lock'
+                AND ${holderPid} = ANY(pg_blocking_pids(pid))
+            `);
+            enablementBlocked = waiting.rows.length > 0;
+            return enablementBlocked;
+          });
+        } finally {
+          // Unblock either way so a failure does not hang the worker.
+          allowEnablement();
+          await Promise.all([enableIndexing, otherWriter]);
+        }
+        expect(enablementBlocked).toBe(true);
+
+        const [stored] = await db
+          .select({ settings: organizations.settings })
+          .from(organizations)
+          .where(eq(organizations.id, organization.id));
+        expect(stored?.settings.code_indexing_enabled).toBe(true);
+        expect(stored?.settings.enkrypt?.input_guardrail).toEqual({
+          enabled: true,
+          group_id: 'guardrail-group',
+        });
+      });
+
       test('does not deadlock concurrent invite acceptance and settings mutation', async () => {
         const owner = await insertTestUser();
         const invitee = await insertTestUser();
@@ -3513,16 +3618,16 @@ describe('Organizations', () => {
       });
     });
 
-    describe('updateOrganizationSettings', () => {
+    describe('mutateOrganizationSettings runtime validation', () => {
       test('rejects an invalid settings object and leaves the stored settings unchanged', async () => {
         const owner = await insertTestUser();
         const organization = await createOrganization('Test Org', owner.id);
 
         await expect(
-          updateOrganizationSettings(organization.id, {
+          mutateOrganizationSettings(organization.id, () => ({
             // @ts-expect-error testing runtime validation with an unsupported data_collection value
             data_collection: 'maybe',
-          })
+          }))
         ).rejects.toThrow();
 
         const [stored] = await db
@@ -3536,11 +3641,11 @@ describe('Organizations', () => {
         const owner = await insertTestUser();
         const organization = await createOrganization('Test Org', owner.id);
 
-        const updated = await updateOrganizationSettings(organization.id, {
+        const updated = await mutateOrganizationSettings(organization.id, () => ({
           data_collection: 'deny',
-          // @ts-expect-error testing that keys outside the settings schema are dropped
+          // The object literal widens; runtime parsing still drops undeclared keys.
           unknown_setting: true,
-        });
+        })) as { data_collection: string; unknown_setting?: never };
 
         expect(updated).toEqual({ data_collection: 'deny' });
 

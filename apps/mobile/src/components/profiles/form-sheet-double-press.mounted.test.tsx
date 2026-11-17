@@ -143,13 +143,24 @@ async function settleSave(): Promise<void> {
   await Promise.resolve();
 }
 
+/** A save promise that stays in flight until the test unmounts the sheet. */
+function neverSettles(): Promise<void> {
+  return new Promise(resolve => {
+    resolversRef.current = resolve;
+  });
+}
+
+/** The pending resolver of the current `neverSettles()` promise. */
+const resolversRef: { current: (() => void) | null } = { current: null };
+
 beforeEach(() => {
   vi.clearAllMocks();
   resetFormDraftsForTests();
+  resolversRef.current = null;
 });
 
 describe('InstructionFormSheet double press', () => {
-  async function mount() {
+  function mount() {
     return renderWithProviders(
       createElement(InstructionFormSheet, {
         instruction: { name: 'existing-rule', content: 'stored text' },
@@ -157,10 +168,13 @@ describe('InstructionFormSheet double press', () => {
         onClose: () => {
           h.onClose();
         },
+        // A real save stays in flight until the parent settles it. The empty
+        // executor is the point: this save never settles.
         onSave: (submission: unknown) => {
           h.onSave(submission);
-          // A real save stays in flight until the parent settles it.
-          return new Promise<void>(() => {});
+          return new Promise<void>(() => {
+            // This save never settles; the test unmounts first.
+          });
         },
       })
     );
@@ -185,7 +199,6 @@ describe('InstructionFormSheet double press', () => {
   });
 
   it('blocks the second press until the save settles, then saves again', async () => {
-    let release: (() => void) | undefined;
     const { renderer, unmount } = await renderWithProviders(
       createElement(InstructionFormSheet, {
         instruction: { name: 'existing-rule', content: 'stored text' },
@@ -195,9 +208,7 @@ describe('InstructionFormSheet double press', () => {
         },
         onSave: (submission: unknown) => {
           h.onSave(submission);
-          return new Promise<void>(resolve => {
-            release = resolve;
-          });
+          return neverSettles();
         },
       })
     );
@@ -212,7 +223,7 @@ describe('InstructionFormSheet double press', () => {
     expect(h.onSave).toHaveBeenCalledTimes(1);
 
     act(() => {
-      release?.();
+      resolversRef.current?.();
     });
     await settleSave();
     pressDone(renderer.root);
@@ -253,7 +264,7 @@ describe('InstructionFormSheet double press', () => {
 });
 
 describe('SkillFormSheet double press', () => {
-  async function mount() {
+  function mount() {
     return renderWithProviders(
       createElement(SkillFormSheet, {
         skill: { name: 'stored-skill', rawMarkdown: 'stored body' },
@@ -261,9 +272,12 @@ describe('SkillFormSheet double press', () => {
         onClose: () => {
           h.onClose();
         },
+        // This save never settles; the test unmounts first.
         onSave: (submission: unknown) => {
           h.onSave(submission);
-          return new Promise<void>(() => {});
+          return new Promise<void>(() => {
+            // This save never settles; the test unmounts first.
+          });
         },
       })
     );
@@ -312,7 +326,7 @@ describe('SkillFormSheet double press', () => {
 });
 
 describe('McpFormSheet double press', () => {
-  async function mount() {
+  function mount() {
     return renderWithProviders(
       createElement(McpFormSheet, {
         server: null,
@@ -322,9 +336,12 @@ describe('McpFormSheet double press', () => {
         onClose: () => {
           h.onClose();
         },
+        // This save never settles; the test unmounts first.
         onSave: (payload: unknown) => {
           h.onSave(payload);
-          return new Promise<void>(() => {});
+          return new Promise<void>(() => {
+            // This save never settles; the test unmounts first.
+          });
         },
       })
     );
@@ -350,7 +367,7 @@ describe('McpFormSheet double press', () => {
 });
 
 describe('AgentFormSheet double press', () => {
-  async function mount() {
+  function mount() {
     return renderWithProviders(
       createElement(AgentFormSheet, {
         agent: null,
@@ -360,9 +377,12 @@ describe('AgentFormSheet double press', () => {
         onClose: () => {
           h.onClose();
         },
+        // This save never settles; the test unmounts first.
         onSave: (payload: unknown) => {
           h.onSave(payload);
-          return new Promise<void>(() => {});
+          return new Promise<void>(() => {
+            // This save never settles; the test unmounts first.
+          });
         },
       })
     );

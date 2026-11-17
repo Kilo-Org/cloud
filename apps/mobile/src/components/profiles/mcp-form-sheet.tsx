@@ -25,6 +25,7 @@ import { MAX_PROFILE_MCP_SERVERS } from '@/lib/agent-profile-forms';
 import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { useFormDraftRef, useFormDraftState } from '@/lib/form-draft';
+import { settleSaveAttempt } from '@/lib/surface-feedback';
 
 /** Catalog key for each refused field, so the message lands under the input at fault. */
 const ERROR_KEYS = {
@@ -157,6 +158,10 @@ export function McpFormSheet({
   });
 
   const submit = () => {
+    void runSubmit();
+  };
+
+  const runSubmit = async () => {
     const attempt = begin();
     if (attempt === null) {
       return;
@@ -179,11 +184,7 @@ export function McpFormSheet({
     }
     setError(null);
     // The admission rides the save; see `instruction-form-sheet.tsx`.
-    Promise.resolve(onSave(buildMcpServerPayload(state)))
-      .finally(() => {
-        attempt.abandon();
-      })
-      .catch(() => {});
+    await settleSaveAttempt(attempt, () => onSave(buildMcpServerPayload(state)));
   };
 
   const nameError =

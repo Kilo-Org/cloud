@@ -212,3 +212,22 @@ export function createSurfaceFeedbackStore<
 
   return { begin, reset, clearWhere, invalidateAll, subscribe, getSnapshot };
 }
+
+/**
+ * Ride one admitted attempt on a save's promise: released the moment the save
+ * settles, whatever its outcome, so a refused save can be retried with the
+ * same control. The rejection is swallowed here because the caller owns the
+ * failure copy the surface renders; this helper only owns the admission.
+ */
+export async function settleSaveAttempt<Failure extends SurfaceFailure>(
+  attempt: SurfaceAttempt<Failure>,
+  save: () => void | Promise<void>
+): Promise<void> {
+  try {
+    await save();
+  } catch {
+    // The caller's failure copy already covers the refusal.
+  } finally {
+    attempt.abandon();
+  }
+}

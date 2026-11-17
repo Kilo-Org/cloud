@@ -32,6 +32,7 @@ import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { useFormDraftRef, useFormDraftState } from '@/lib/form-draft';
+import { settleSaveAttempt } from '@/lib/surface-feedback';
 import { cn } from '@/lib/utils';
 
 const ERROR_FIELDS = {
@@ -171,6 +172,10 @@ export function AgentFormSheet({
   });
 
   const submit = () => {
+    void runSubmit();
+  };
+
+  const runSubmit = async () => {
     const attempt = begin();
     if (attempt === null) {
       return;
@@ -197,11 +202,7 @@ export function AgentFormSheet({
     }
     setError(null);
     // The admission rides the save; see `instruction-form-sheet.tsx`.
-    Promise.resolve(onSave(buildAgentPayload(state, agent?.config)))
-      .finally(() => {
-        attempt.abandon();
-      })
-      .catch(() => {});
+    await settleSaveAttempt(attempt, () => onSave(buildAgentPayload(state, agent?.config)));
   };
 
   // The one refusal line: a create past the cap names the cap as a warning, and

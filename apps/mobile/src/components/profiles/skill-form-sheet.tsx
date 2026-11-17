@@ -19,6 +19,7 @@ import {
 import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { useFormDraftRef, useFormDraftState } from '@/lib/form-draft';
+import { settleSaveAttempt } from '@/lib/surface-feedback';
 
 /** The validated fields a saved skill is built from. */
 export type SkillFormSubmission = {
@@ -107,6 +108,10 @@ export function SkillFormSheet({
   });
 
   const submit = () => {
+    void runSubmit();
+  };
+
+  const runSubmit = async () => {
     const attempt = begin();
     if (attempt === null) {
       return;
@@ -125,17 +130,13 @@ export function SkillFormSheet({
       scrollToField('status');
     }
     // The admission rides the save; see `instruction-form-sheet.tsx`.
-    Promise.resolve(
+    await settleSaveAttempt(attempt, () =>
       onSave({
         name: nameRef.current.trim(),
         rawMarkdown: contentRef.current,
         ...(result.description === undefined ? {} : { description: result.description }),
       })
-    )
-      .finally(() => {
-        attempt.abandon();
-      })
-      .catch(() => {});
+    );
   };
 
   return (

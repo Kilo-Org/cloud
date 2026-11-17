@@ -25,6 +25,7 @@ import {
 import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { useFormDraftRef } from '@/lib/form-draft';
+import { settleSaveAttempt } from '@/lib/surface-feedback';
 
 /** The validated fields a saved instruction is built from. */
 export type InstructionFormSubmission = { name: string; content: string };
@@ -108,6 +109,10 @@ export function InstructionFormSheet({
   });
 
   const submit = () => {
+    void runSubmit();
+  };
+
+  const runSubmit = async () => {
     // One save per Save press burst: `doneDisabled={isSaving}` only disables
     // Done on the next render, so a second fast press must be refused here
     // instead of starting a second save (see `trigger-create-screen`).
@@ -131,17 +136,9 @@ export function InstructionFormSheet({
     if (saveFailure !== null) {
       scrollToField('status');
     }
-    // The admission rides the save: released the moment the save settles,
-    // whatever its outcome, so a refused save can be retried with Save. The
-    // catch keeps a parent's rejection from surfacing as unhandled: the parent
-    // owns the failure copy the sheet renders.
-    Promise.resolve(
+    await settleSaveAttempt(attempt, () =>
       onSave({ name: cleanInstructionName(nameRef.current), content: contentRef.current })
-    )
-      .finally(() => {
-        attempt.abandon();
-      })
-      .catch(() => {});
+    );
   };
 
   return (

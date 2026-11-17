@@ -1316,7 +1316,7 @@ describe('getUsageEndpointGatewayOptions', () => {
     ).resolves.toEqual({ kind: 'no-eligible-provider', providers: ['azure', 'openai'] });
   });
 
-  it('names the providers by their OpenRouter slugs', async () => {
+  it('matches OpenRouter slugs in the ignore list against Vercel provider ids', async () => {
     const getOptions = await loadGetOptions(['vertex', 'vertexAnthropic', 'bedrock']);
 
     await expect(
@@ -1326,10 +1326,7 @@ describe('getUsageEndpointGatewayOptions', () => {
         provider: { ignore: ['google-vertex', 'amazon-bedrock'] },
         dataRegion: null,
       })
-    ).resolves.toEqual({
-      kind: 'no-eligible-provider',
-      providers: ['google-vertex', 'amazon-bedrock'],
-    });
+    ).resolves.toEqual({ kind: 'no-eligible-provider', providers: ['vertex', 'bedrock'] });
   });
 
   it.each([

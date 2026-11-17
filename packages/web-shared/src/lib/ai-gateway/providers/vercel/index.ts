@@ -9,7 +9,6 @@ import {
   isGatewayUserByokProviderId,
   normalizeVercelInferenceProviderIdForRouting,
   openRouterToVercelInferenceProviderId,
-  vercelToOpenRouterInferenceProviderId,
   VertexCredentialsSchema,
   VercelUserByokInferenceProviderIdSchema,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
@@ -335,7 +334,7 @@ export async function getUsageEndpointGatewayOptions(params: {
   dataRegion: OrganizationDataRegion | null;
 }): Promise<
   | { kind: 'routable'; gateway: NonNullable<VercelProviderConfig['gateway']> }
-  /** `providers` holds the OpenRouter slugs of the model's Vercel providers, when known. */
+  /** `providers` holds the model's Vercel providers, when known. */
   | { kind: 'no-eligible-provider'; providers: string[] }
 > {
   const { vercelModelId, userByok, provider, dataRegion } = params;
@@ -391,9 +390,7 @@ export async function getUsageEndpointGatewayOptions(params: {
     return {
       kind: 'no-eligible-provider',
       providers: vercelInferenceProviders
-        ? routableVercelProviderIds(vercelInferenceProviders, () => true).map(
-            vercelToOpenRouterInferenceProviderId
-          )
+        ? routableVercelProviderIds(vercelInferenceProviders, () => true)
         : [],
     };
   }

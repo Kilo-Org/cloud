@@ -2148,7 +2148,7 @@ describe('handleSystemOneRequest', () => {
         expect(response.status).toBe(403);
         await expect(response.json()).resolves.toMatchObject({
           error:
-            'No eligible provider can serve the selected model. Please enable provider: typesafe, digitalocean',
+            'No eligible provider can serve the selected model. Please enable provider: typesafe-ai, digitalocean',
           error_type: 'provider_not_allowed',
         });
         expect(getCachedVercelInferenceProviderIdsForModel).toHaveBeenCalledWith(

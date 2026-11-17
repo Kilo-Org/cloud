@@ -5,10 +5,10 @@ import {
   resolveOrganizationBrowserPolicy,
 } from './browser-policy';
 
-type SettingsOrganization = Pick<Organization, 'settings'>;
+type Settings = Organization['settings'];
 
-function organizationWith(settings: Organization['settings']): SettingsOrganization {
-  return { settings };
+function organizationWith(settings: unknown) {
+  return { settings } as Pick<Organization, 'settings'>;
 }
 
 describe('resolveOrganizationBrowserPolicy', () => {
@@ -36,28 +36,84 @@ describe('resolveOrganizationBrowserPolicy', () => {
     });
   });
 
-  test('defaults a stored control mode of off', () => {
+  test('keeps a stored off mode', () => {
     expect(
       resolveOrganizationBrowserPolicy(organizationWith({ browserControl: 'off' })).browserControl
     ).toBe('off');
   });
 
-  test('falls back to the defaults when the stored policy is unreadable', () => {
-    const stored = {
-      browserControl: 'ask',
-      browserAllowedOrigins: ['https://example.com/checkout'],
-    } as unknown as Organization['settings'];
+  test('keeps the control mode when a stored origin is unreadable', () => {
+    expect(
+      resolveOrganizationBrowserPolicy(
+        organizationWith({
+          browserControl: 'off',
+          browserAllowedOrigins: ['https://example.com/checkout'],
+        })
+      )
+    ).toEqual({ browserControl: 'off', browserAllowedOrigins: [] });
+  });
 
-    expect(resolveOrganizationBrowserPolicy(organizationWith(stored))).toEqual(
-      DEFAULT_ORGANIZATION_BROWSER_POLICY
-    );
+  test('drops unreadable origins individually and keeps the rest', () => {
+    expect(
+      resolveOrganizationBrowserPolicy(
+        organizationWith({
+          browserAllowedOrigins: [
+            'https://example.com/checkout',
+            'https://ok.example',
+            'not an origin',
+            'http://localhost:3000/',
+          ],
+        })
+      )
+    ).toEqual({
+      browserControl: 'allow',
+      browserAllowedOrigins: ['https://ok.example', 'http://localhost:3000'],
+    });
+  });
+
+  test('deduplicates origins that normalize to the same value', () => {
+    expect(
+      resolveOrganizationBrowserPolicy(
+        organizationWith({ browserAllowedOrigins: ['https://example.com/', 'https://EXAMPLE.com'] })
+      ).browserAllowedOrigins
+    ).toEqual(['https://example.com']);
+  });
+
+  test('treats an unreadable origins value as no origins but keeps the control mode', () => {
+    expect(
+      resolveOrganizationBrowserPolicy(
+        organizationWith({
+          browserControl: 'playwright_only',
+          browserAllowedOrigins: 'https://example.com',
+        })
+      )
+    ).toEqual({ browserControl: 'playwright_only', browserAllowedOrigins: [] });
+  });
+
+  test('fails closed to off when a stored control mode is unreadable', () => {
+    expect(
+      resolveOrganizationBrowserPolicy(organizationWith({ browserControl: 'ask' }))
+    ).toEqual({ browserControl: 'off', browserAllowedOrigins: [] });
+  });
+
+  test('fails closed to off for a non-string stored control mode', () => {
+    expect(
+      resolveOrganizationBrowserPolicy(organizationWith({ browserControl: 1 })).browserControl
+    ).toBe('off');
+  });
+
+  test('treats a null or non-object settings row as no stored policy', () => {
+    const expected = { browserControl: 'allow', browserAllowedOrigins: [] };
+    expect(resolveOrganizationBrowserPolicy(organizationWith(null))).toEqual(expected);
+    expect(resolveOrganizationBrowserPolicy(organizationWith('not settings'))).toEqual(expected);
+    expect(resolveOrganizationBrowserPolicy(organizationWith([1, 2]))).toEqual(expected);
   });
 
   test('ignores unrelated settings', () => {
-    expect(
-      resolveOrganizationBrowserPolicy(
-        organizationWith({ default_model: 'anthropic/claude-sonnet-4', browserControl: 'off' })
-      )
-    ).toEqual({ browserControl: 'off', browserAllowedOrigins: [] });
+    const settings: Settings = { default_model: 'anthropic/claude-sonnet-4', browserControl: 'off' };
+    expect(resolveOrganizationBrowserPolicy(organizationWith(settings))).toEqual({
+      browserControl: 'off',
+      browserAllowedOrigins: [],
+    });
   });
 });

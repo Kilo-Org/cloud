@@ -373,3 +373,250 @@ test('gutter: an out-of-flow overlay is not a column', () => {
 test('gutter: unknown side insets skip the rule', () => {
   assert.deepEqual(run(screen({ header: 22, body: 22 }), { safeAreaKnown: false }), []);
 });
+
+/**
+ * The bottom tab bar as the device measured it (411 dp wide, window 914 dp): an
+ * out-of-flow bar pinned across the page's bottom, its 54 dp row holding four
+ * tab items, each centring its label. The first label paints at 4.95 dp.
+ */
+function tabBarScreen(bodyInset = 14, named = true): ProbeNode[] {
+  const owners = (...names: string[]) => (named ? ['View', ...names, 'View'] : ['View']);
+  return [
+    {
+      parent: 0,
+      tag: 'View',
+      rect: [0, 0, WIDTH, 800],
+      style: { paddingHorizontal: bodyInset },
+    },
+    { parent: 1, tag: 'Paragraph', rect: [bodyInset, 40, 300, 16], text: 'Body line' },
+    {
+      parent: 0,
+      tag: 'View',
+      rect: [0, 720, WIDTH, 80],
+      style: { position: 'absolute' },
+      owners: owners('BottomTabBar'),
+    },
+    {
+      parent: 3,
+      tag: 'View',
+      rect: [0, 720, WIDTH, 54.1],
+      style: { flexDirection: 'row' },
+      owners: owners('BottomTabBar'),
+    },
+    {
+      parent: 4,
+      tag: 'View',
+      rect: [0, 720, 102.86, 54.1],
+      owners: owners('BottomTabItem'),
+    },
+    {
+      parent: 5,
+      tag: 'View',
+      rect: [0, 720, 102.86, 54.1],
+      pressable: true,
+      role: 'button',
+      label: 'Home, tab, 1 of 4',
+      style: { alignItems: 'center', flexDirection: 'column', padding: 5 },
+      owners: owners('BottomTabItem'),
+    },
+    {
+      parent: 6,
+      tag: 'Paragraph',
+      rect: [4.95, 748, 92.95, 14.1],
+      text: 'Home',
+      owners: named ? ['Text', 'TabBarLabel', 'View', 'BottomTabItem'] : ['Text', 'View'],
+    },
+  ];
+}
+
+test('gutter: the bottom tab bar is navigation chrome, its centred labels are not columns', () => {
+  // The bar names itself in the component tree, and an out-of-flow bar pinned
+  // across the page's bottom is the same chrome without those components.
+  assert.deepEqual(run(tabBarScreen()), []);
+  assert.deepEqual(run(tabBarScreen(14, false)), []);
+});
+
+test('gutter: a tab screen body still starts at the gutter', () => {
+  const [finding, ...rest] = run(tabBarScreen(22));
+  assert.equal(rest.length, 0);
+  assert.equal(finding?.measured, 22);
+  assert.equal(finding?.element.text, 'Body line');
+});
+
+test('gutter: an out-of-flow full-height layer does not exempt the column it holds', () => {
+  // A modal backdrop is absolute but starts at the page top: it is not a bar.
+  const [finding, ...rest] = run([
+    { parent: 0, tag: 'View', rect: [0, 0, WIDTH, 800], style: { position: 'absolute' } },
+    { parent: 1, tag: 'View', rect: [0, 0, WIDTH, 800], style: { paddingHorizontal: 21 } },
+    { parent: 2, tag: 'Paragraph', rect: [21, 40, 300, 16], text: 'Body line' },
+  ]);
+  assert.equal(rest.length, 0);
+  assert.equal(finding?.measured, 21);
+});
+
+/**
+ * A pushed screen's header as the device measured it: the band pads 14 dp, the
+ * 48 dp back target is pulled into the gutter (its shell at 0, glyph at 12.19),
+ * and the title after it paints at 51.43 dp.
+ */
+function backHeaderScreen(bodyInset = 14): ProbeNode[] {
+  return [
+    { parent: 0, tag: 'View', rect: [0, 0, WIDTH, 800] },
+    {
+      parent: 1,
+      tag: 'View',
+      rect: [0, 0, WIDTH, 128],
+      style: {
+        backgroundColor: '#fbfaf5',
+        paddingBottom: 10.5,
+        paddingInline: 14,
+        paddingTop: 40,
+      },
+    },
+    {
+      parent: 2,
+      tag: 'View',
+      rect: [14, 40, WIDTH - 28, 48],
+      style: { alignItems: 'center', flexDirection: 'row' },
+    },
+    { parent: 3, tag: 'View', rect: [0, 40, 48, 48], style: { overflow: 'hidden' } },
+    {
+      parent: 4,
+      tag: 'View',
+      rect: [0, 40, 48, 48],
+      pressable: true,
+      role: 'button',
+      label: 'Go back',
+      style: { alignItems: 'center', justifyContent: 'center' },
+    },
+    { parent: 5, tag: 'Image', rect: [12.19, 52, 24, 24] },
+    { parent: 3, tag: 'View', rect: [51.43, 52, 320, 24.76] },
+    { parent: 7, tag: 'Paragraph', rect: [51.43, 52, 320, 24.76], text: 'Preferences' },
+    { parent: 1, tag: 'ScrollView', rect: [0, 128, WIDTH, 672], style: { overflow: 'scroll' } },
+    {
+      parent: 9,
+      tag: 'View',
+      rect: [0, 128, WIDTH, 672],
+      style: { paddingHorizontal: bodyInset },
+    },
+    { parent: 10, tag: 'Paragraph', rect: [bodyInset, 140, 300, 16], text: 'Body line' },
+  ];
+}
+
+test('gutter: a pushed header title follows its back control and is not the column', () => {
+  assert.deepEqual(run(backHeaderScreen()), []);
+  assert.deepEqual(run(mirrored(backHeaderScreen()), { isRTL: true }), []);
+});
+
+test('gutter: a pushed screen whose body column starts at 21 dp still fails', () => {
+  const findings = run(backHeaderScreen(21));
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0]?.measured, 21);
+  assert.equal(findings[0]?.element.text, 'Body line');
+});
+
+/**
+ * The empty state as the device measured it: a body that pads 21 dp and centres
+ * a 205 dp stack, whose own text starts with the stack at 103.24 dp.
+ */
+function emptyStateStack(centeredStack = true): ProbeNode[] {
+  const stackX = centeredStack ? 97.34 : 21;
+  return [
+    { parent: 0, tag: 'View', rect: [0, 0, WIDTH, 800] },
+    {
+      parent: 1,
+      tag: 'View',
+      rect: [0, 300, WIDTH, 229.33],
+      style: { alignItems: 'center', paddingInline: 21 },
+    },
+    {
+      parent: 2,
+      tag: 'View',
+      rect: [stackX, 363, 205.33, 45.71],
+      style: { alignItems: 'center' },
+    },
+    {
+      parent: 3,
+      tag: 'Paragraph',
+      rect: [stackX, 363, 205.33, 17.52],
+      text: 'Start a coding task from your phone.',
+    },
+  ];
+}
+
+test('gutter: a centred empty state measures its stack, not the text inside it', () => {
+  assert.deepEqual(run(emptyStateStack()), []);
+  const [finding, ...rest] = run(emptyStateStack(false));
+  assert.equal(rest.length, 0);
+  assert.equal(finding?.measured, 21);
+});
+
+/**
+ * The two layers the device dump carried on Preferences: the profile tab root
+ * (a 22 dp header column) still mounted under the pushed screen, whose own
+ * header repeats the back-control shape above.
+ */
+function pushedOverTabRoot(bodyInset = 14): ProbeNode[] {
+  return [
+    { parent: 0, tag: 'View', rect: [0, 0, WIDTH, 800] },
+    { parent: 1, tag: 'RNSScreenStack', rect: [0, 0, WIDTH, 800] },
+    { parent: 2, tag: 'RNSScreen', rect: [0, 0, WIDTH, 800], style: { position: 'absolute' } },
+    { parent: 3, tag: 'View', rect: [0, 0, WIDTH, 800] },
+    {
+      parent: 4,
+      tag: 'View',
+      rect: [0, 40, WIDTH, 48],
+      style: { backgroundColor: '#fbfaf5', paddingHorizontal: 22 },
+    },
+    { parent: 5, tag: 'Paragraph', rect: [22, 56, 120, 20], text: 'Profile' },
+    { parent: 2, tag: 'RNSScreen', rect: [0, 0, WIDTH, 800], style: { position: 'absolute' } },
+    { parent: 7, tag: 'View', rect: [0, 0, WIDTH, 800] },
+    {
+      parent: 8,
+      tag: 'View',
+      rect: [0, 0, WIDTH, 128],
+      style: {
+        backgroundColor: '#fbfaf5',
+        paddingBottom: 10.5,
+        paddingInline: 14,
+        paddingTop: 40,
+      },
+    },
+    {
+      parent: 9,
+      tag: 'View',
+      rect: [14, 40, WIDTH - 28, 48],
+      style: { alignItems: 'center', flexDirection: 'row' },
+    },
+    { parent: 10, tag: 'View', rect: [0, 40, 48, 48], style: { overflow: 'hidden' } },
+    {
+      parent: 11,
+      tag: 'View',
+      rect: [0, 40, 48, 48],
+      pressable: true,
+      role: 'button',
+      label: 'Go back',
+      style: { alignItems: 'center', justifyContent: 'center' },
+    },
+    { parent: 12, tag: 'Image', rect: [12.19, 52, 24, 24] },
+    { parent: 10, tag: 'View', rect: [51.43, 52, 320, 24.76] },
+    { parent: 14, tag: 'Paragraph', rect: [51.43, 52, 320, 24.76], text: 'Preferences' },
+    { parent: 8, tag: 'ScrollView', rect: [0, 128, WIDTH, 672], style: { overflow: 'scroll' } },
+    {
+      parent: 16,
+      tag: 'View',
+      rect: [0, 128, WIDTH, 672],
+      style: { paddingHorizontal: bodyInset },
+    },
+    { parent: 17, tag: 'Paragraph', rect: [bodyInset, 140, 300, 16], text: 'Preferences body' },
+  ];
+}
+
+test('gutter: only the top-most screen is measured over the tab root below', () => {
+  // The covered profile root's 22 dp column is not the screen's column.
+  assert.deepEqual(run(pushedOverTabRoot()), []);
+  const findings = run(pushedOverTabRoot(21));
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0]?.measured, 21);
+  assert.equal(findings[0]?.element.text, 'Preferences body');
+});

@@ -15,5 +15,17 @@
       "react-test-renderer": ["./src/test/renderer"]
     }
   },
-  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts", "nativewind-env.d.ts"]
+  // src/lib/env-keys.js and src/lib/android-notification-channels.js carry
+  // @ts-check JSDoc contracts (env keys, silent Android channels) read by
+  // app.config.ts and scripts/assert-expo-config.mjs. Explicitly listed so the
+  // check does not depend on some .ts file happening to import them.
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "src/lib/env-keys.js",
+    "src/lib/android-notification-channels.js",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts",
+    "nativewind-env.d.ts"
+  ]
 }

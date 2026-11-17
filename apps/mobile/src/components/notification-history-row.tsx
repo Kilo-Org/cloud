@@ -2,22 +2,28 @@ import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobil
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
+import { RowChevron } from '@/components/ui/row-chevron';
 import { Text } from '@/components/ui/text';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { notificationHistoryCopy } from '@/lib/notification-history';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
 type HistoryPage = inferRouterOutputs<MobileRouter>['user']['getNotificationHistory'];
 export type HistoryRow = HistoryPage['items'][number];
 
-/** One recorded notification: the copy a push showed, and how long ago. */
+/**
+ * One recorded notification: the copy a push showed, and how long ago. A flat
+ * list row, so it owns the page gutter and the hairline under itself.
+ */
 export function HistoryRowView({
   row,
   now,
+  last,
   onOpen,
 }: Readonly<{
   row: HistoryRow;
   now: number;
+  /** The final row of the list draws no divider under it. */
+  last: boolean;
   onOpen: (payload: Record<string, unknown>) => void;
 }>) {
   const { i18n } = useTranslation();
@@ -28,27 +34,23 @@ export function HistoryRowView({
   return (
     <Pressable
       className={cn(
-        ROW_TARGET_CLASS,
-        'mb-3 justify-center rounded-2xl border border-border bg-card px-4 py-3 active:opacity-70'
+        'gap-1 px-4 py-3 active:opacity-70',
+        !last && 'border-b-[0.5px] border-hair-soft'
       )}
       accessibilityRole="button"
       onPress={() => {
         onOpen(row.payload);
       }}
     >
-      <View className="flex-row items-start gap-3">
+      <View className="flex-row items-baseline gap-3">
         <Text className="flex-1 text-sm font-medium" numberOfLines={headlineLines}>
           {copy.headline}
         </Text>
-        {/* The title's `text-sm` line box is 1.25rem tall; the time takes the
-            same height, so both first lines share one centre while a two-line
-            title keeps its own lines. */}
-        <Text variant="muted" className="text-xs leading-[1.25rem]">
-          {timeAgo(parseTimestamp(row.createdAt), undefined, now)}
-        </Text>
+        <Text variant="caption">{timeAgo(parseTimestamp(row.createdAt), undefined, now)}</Text>
+        <RowChevron />
       </View>
       {copy.detail === null ? null : (
-        <Text variant="muted" className="mt-1 text-sm" numberOfLines={3}>
+        <Text variant="muted" numberOfLines={3}>
           {copy.detail}
         </Text>
       )}

@@ -13,6 +13,7 @@ import { Text } from '@/components/ui/text';
 import { modelLabelFromCatalogue } from '@/lib/auto-model-name';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useOrganization } from '@/lib/organization-context';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useToolSummaryTranslationPreference } from '@/lib/tool-summary-translation/tool-summary-translation-preference';
@@ -94,7 +95,7 @@ export function ToolSummaryTranslationSettingsScreen() {
       />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="px-4 gap-3 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
       >
         <RowGroup>
@@ -107,39 +108,38 @@ export function ToolSummaryTranslationSettingsScreen() {
             onValueChange={setEnabled}
             resolveValue={getRequestedEnabled}
           />
+          <ConfigureRow
+            icon={Cpu}
+            title={t('common.model')}
+            subtitle={modelSubtitle}
+            disabled={modelRowDisabled}
+            onPress={() => {
+              openModelPicker(pushOnce, {
+                options: models,
+                value: model.id,
+                variant: '',
+                // The translation model carries no reasoning effort: the chosen id
+                // is the whole preference, so the picker offers no effort chips
+                // and a model tap commits and closes in one press.
+                acceptsVariant: false,
+                onSelect: id => {
+                  setModel({
+                    id,
+                    // The stored name stays the catalogue's raw one: the row
+                    // localizes it at render, so a later language change is
+                    // reflected without rewriting the stored preference.
+                    name: models.find(candidate => candidate.id === id)?.name ?? id,
+                  });
+                },
+              });
+            }}
+          />
         </RowGroup>
-        <ConfigureRow
-          icon={Cpu}
-          title={t('common.model')}
-          subtitle={modelSubtitle}
-          className="rounded-lg bg-secondary px-3"
-          disabled={modelRowDisabled}
-          onPress={() => {
-            openModelPicker(pushOnce, {
-              options: models,
-              value: model.id,
-              variant: '',
-              // The translation model carries no reasoning effort: the chosen id
-              // is the whole preference, so the picker offers no effort chips
-              // and a model tap commits and closes in one press.
-              acceptsVariant: false,
-              onSelect: id => {
-                setModel({
-                  id,
-                  // The stored name stays the catalogue's raw one: the row
-                  // localizes it at render, so a later language change is
-                  // reflected without rewriting the stored preference.
-                  name: models.find(candidate => candidate.id === id)?.name ?? id,
-                });
-              },
-            });
-          }}
-        />
         {modelUnavailable ? (
           // The kept model stays in the row above and the picker is the only
           // fix, so this names that one action. It must not reuse the catalogue
           // failure copy, which offers a Retry that cannot restore the model.
-          <Text className="px-1 text-xs text-muted-foreground">
+          <Text variant="caption">
             {t('preferences.toolSummaryTranslationModelUnavailableNotice')}
           </Text>
         ) : null}

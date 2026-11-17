@@ -1321,6 +1321,34 @@ describe('authorized native snapshot attachments', () => {
     expect(readAsset).not.toHaveBeenCalled();
   });
 
+  it('rejects asset mappings that disagree about a blob size before any read', async () => {
+    const secondUser = {
+      ...storedUser,
+      id: 'msg_media_user_2',
+    };
+    const conflicting = asset(
+      'conflicting',
+      'message',
+      secondUser.id,
+      '/message/files/0',
+      `media:${mediaHash}`,
+      mediaHash,
+      9,
+      'image/png'
+    );
+    const { request } = snapshotFetch([
+      userEntity,
+      userMapping,
+      entity('message', secondUser.id, { seq: 1, message: secondUser }),
+      conflicting,
+    ]);
+    const readAsset = jest.fn(async () => new Uint8Array([1, 2, 3]).buffer);
+    await expect(fetchNativeSnapshot(request, sessionID, undefined, readAsset)).rejects.toThrow(
+      'disagree about blob size'
+    );
+    expect(readAsset).not.toHaveBeenCalled();
+  });
+
   it('does not reinterpret tool input or metadata strings as downloadable files', async () => {
     const { request } = snapshotFetch([
       entity('message', 'msg_no_files', {

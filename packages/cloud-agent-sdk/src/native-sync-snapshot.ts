@@ -180,8 +180,11 @@ function record(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-/** Maximum simultaneous snapshot blob or attachment reads. */
+/** Maximum simultaneous snapshot JSON blob reads. */
 const SNAPSHOT_READ_CONCURRENCY = 4;
+// Binary attachment reads pin up to the per-blob byte cap each, on top of the
+// retained base64 strings, so they run with a tighter window.
+const SNAPSHOT_ASSET_READ_CONCURRENCY = 2;
 
 /** Hand the buffer's base64 form to `sink` without holding full copies alive. */
 function viewBytesAsBase64(buffer: ArrayBuffer, sink: (base64: string) => void): void {
@@ -259,7 +262,8 @@ async function resolveSnapshotAssets(
   const wants: { file: Kilo2FileReference; hash: string; bytes: number }[] = [];
   const assetURLs: Record<string, string> = {};
   const missing: { hash: string; bytes: number }[] = [];
-  const missingHashes = new Set<string>();
+  const queuedHashes = new Set<string>();
+  const claimedBytes = new Map<string, number>();
   for (const item of snapshot.messages) {
     if (item.incomplete) continue;
     for (const file of readKilo2FileReferences(item.message)) {
@@ -296,20 +300,23 @@ async function resolveSnapshotAssets(
           }
         );
       }
+      const advertised = mapping.blob.bytes;
       const cached = resolvedBlobs.get(mapping.blob.hash);
-      if (cached && cached.bytes !== mapping.blob.bytes) {
+      const claimed = claimedBytes.get(mapping.blob.hash) ?? cached?.bytes;
+      if (claimed !== undefined && claimed !== advertised) {
         throw new Error('Native asset mappings disagree about blob size');
       }
-      if (!cached && !missingHashes.has(mapping.blob.hash)) {
-        missingHashes.add(mapping.blob.hash);
-        missing.push({ hash: mapping.blob.hash, bytes: mapping.blob.bytes });
+      claimedBytes.set(mapping.blob.hash, advertised);
+      if (cached === undefined && !queuedHashes.has(mapping.blob.hash)) {
+        queuedHashes.add(mapping.blob.hash);
+        missing.push({ hash: mapping.blob.hash, bytes: advertised });
       }
-      wants.push({ file, hash: mapping.blob.hash, bytes: mapping.blob.bytes });
+      wants.push({ file, hash: mapping.blob.hash, bytes: advertised });
     }
   }
   if (!readAsset) return assetURLs;
   await readWithBoundedConcurrency(
-    SNAPSHOT_READ_CONCURRENCY,
+    SNAPSHOT_ASSET_READ_CONCURRENCY,
     missing.map(({ hash, bytes }) => async () => {
       const buffer = await readAsset(`${path}/blobs/${hash}`, bytes);
       if (buffer.byteLength !== bytes) {

@@ -17,7 +17,8 @@ import {
   RepositoryRefreshButton,
   RepositoryUnavailableCard,
 } from '@/components/agents/repository-card-actions';
-import { connectNoteKey, PROVIDER_COPY } from '@/components/agents/repository-provider-copy';
+import { connectCardOffer, PROVIDER_COPY } from '@/components/agents/repository-provider-copy';
+import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import {
   type NewSessionRepository,
   type RepositoryGroup,
@@ -90,6 +91,10 @@ export function NewSessionRepositorySection({
 }: Readonly<NewSessionRepositorySectionProps>) {
   const { t } = useTranslation();
   const { collapsedCtas } = useCollapsedConnectCtas();
+  // The organization provider is mounted app-wide, so the route's scope resolves
+  // its membership here instead of through a prop. `role` is what decides
+  // whether a Bitbucket card can offer its connect action at all.
+  const { role } = useOrgBoundary(organizationId);
 
   const hasRepos = repositories.length > 0;
   const anyLoading = groups.some(group => group.status === 'loading');
@@ -159,13 +164,15 @@ export function NewSessionRepositorySection({
   ): ReactElement | null {
     switch (status) {
       case 'connect': {
-        const noteKey = connectNoteKey(platform);
+        const offer = connectCardOffer(platform, organizationId, role);
+        // The compact row after a selection keeps the same gate as the expanded
+        // card: a member who cannot complete the connect gets the note alone.
         return selectedRepository === null ? (
           renderConnectCard(platform)
         ) : (
           <View className="mt-3 gap-2">
-            {noteKey ? <Text variant="muted">{t(noteKey)}</Text> : null}
-            {renderConnectActions(platform)}
+            {offer.noteKey ? <Text variant="muted">{t(offer.noteKey)}</Text> : null}
+            {offer.offersAction ? renderConnectActions(platform) : null}
           </View>
         );
       }
@@ -215,7 +222,7 @@ export function NewSessionRepositorySection({
 
   function renderConnectCard(platform: RepositoryPlatform): ReactElement | null {
     const copy = PROVIDER_COPY[platform];
-    const noteKey = connectNoteKey(platform);
+    const offer = connectCardOffer(platform, organizationId, role);
     return (
       <CollapsibleSection
         className="mt-3 rounded-lg border border-border bg-card"
@@ -242,13 +249,19 @@ export function NewSessionRepositorySection({
           {copy.connectDescription ? (
             <Text variant="muted">{t(copy.connectDescription)}</Text>
           ) : null}
-          {noteKey ? <Text variant="muted">{t(noteKey)}</Text> : null}
+          {offer.noteKey ? <Text variant="muted">{t(offer.noteKey)}</Text> : null}
         </View>
-        {renderConnectActions(platform)}
+        {offer.offersAction ? renderConnectActions(platform) : null}
       </CollapsibleSection>
     );
   }
 
+  /**
+   * The provider's connect action. Callers render it only when
+   * `connectCardOffer` offers it: a Bitbucket member without organization
+   * billing authority is refused by the server, so the card states that
+   * restriction instead of showing a tap that can only fail.
+   */
   function renderConnectActions(platform: RepositoryPlatform): ReactElement {
     const copy = PROVIDER_COPY[platform];
     return (

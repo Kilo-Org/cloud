@@ -2,7 +2,7 @@
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { act, TestRenderer } from '@/test/renderer';
 import { PrReviewConnectGate } from './pr-review-connect-gate';
 import { PrReviewOverviewSkeleton } from './pr-review-overview-skeleton';
@@ -315,8 +315,10 @@ describe('organization Bitbucket connect state', () => {
     queryState.status = { connected: false };
     const renderer = mount('bitbucket', 'org-1');
     expect(renderer.root.findByType('EmptyState').props.title).toBe('Bitbucket not connected');
+    // The line names the roles and the step left to them, so it reads from the
+    // catalog rather than a literal the copy can drift away from.
     expect(renderedText(renderer)).toContain(
-      'Only organization owners, admins, and billing managers can connect it.'
+      i18n.t('prReview.connect.bitbucketAdminOnlyDescription')
     );
     // The title states the absence, so the line below names only the roles and
     // never repeats it.

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { type TestRenderer } from '@/test/renderer';
@@ -46,6 +46,24 @@ vi.mock('@/lib/hooks/use-collapsed-connect-ctas-preference', () => ({
   setConnectCtaCollapsed: vi.fn(),
 }));
 
+// Mutable so a case can answer the caller's organization role. The default is a
+// billing role, which keeps Bitbucket's action in the organization scope these
+// cases mount; the label assertions cover the action the card actually renders.
+const orgState = vi.hoisted(() => ({ role: 'owner' as string | undefined }));
+vi.mock('@/lib/hooks/use-organization-queries', () => ({
+  useOrgBoundary: (organizationId?: string) => ({
+    organizationId,
+    role: orgState.role,
+    org: organizationId === undefined ? null : { organizationId, organizationName: 'Acme' },
+    isResolving: false,
+    isError: false,
+  }),
+}));
+
+beforeEach(() => {
+  orgState.role = 'owner';
+});
+
 /** The connect action's own label node, matched by the copy it renders. */
 function actionLabel(renderer: TestRenderer.ReactTestRenderer, copy: string) {
   // Bitbucket's card header now carries the same copy as its action, so the
@@ -79,6 +97,10 @@ describe('NewSessionRepositorySection connect action labels', () => {
     ['bitbucket', 'common.connectBitbucket'],
   ] as const)('keeps the %s action label on one line', (_provider, copyKey) => {
     const renderer = mountSection({
+      // Bitbucket renders its action only in an organization scope with a
+      // billing role; the other providers keep theirs in either scope, so the
+      // shared mount is the organization one.
+      organizationId: 'org-1',
       groups: [
         group('github', 'connect'),
         group('gitlab', 'connect'),

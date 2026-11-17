@@ -170,4 +170,18 @@ describe('BitbucketConnectSheet', () => {
     const [denied] = root.findAll(node => Object.is(node.type, PERMISSION_DENIED));
     expect(denied?.props.description).toBe(i18n.t('integrations.managedByOwner'));
   });
+
+  it('names the roles that can connect instead of offering a form the server refuses', async () => {
+    // A workspace with no integration is a first connect, which every Bitbucket
+    // connect mutation gates on organization billing authority. The sheet opens
+    // from a deep link as well, so the refusal lives here and not only on the
+    // cards that decide whether to offer the entry point.
+    state.role = 'member';
+    state.status.data = { method: 'workspace_access_token', integrationId: null };
+    const root = await mount();
+
+    expect(root.findAll(node => Object.is(node.type, FORM))).toHaveLength(0);
+    const [denied] = root.findAll(node => Object.is(node.type, PERMISSION_DENIED));
+    expect(denied?.props.description).toBe(i18n.t('codeReviewer.bitbucket.notConnectedReadOnly'));
+  });
 });

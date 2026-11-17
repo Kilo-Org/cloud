@@ -70,6 +70,20 @@ vi.mock('@/lib/hooks/use-collapsed-connect-ctas-preference', () => ({
   setConnectCtaCollapsed: collapseState.setConnectCtaCollapsed,
 }));
 
+// Mutable so each case answers the caller's organization membership role. The
+// default is a billing role: every case that predates the restriction keeps
+// today's permissive card, and the denial cases lower it explicitly.
+const orgState = vi.hoisted(() => ({ role: 'owner' as string | undefined }));
+vi.mock('@/lib/hooks/use-organization-queries', () => ({
+  useOrgBoundary: (organizationId?: string) => ({
+    organizationId,
+    role: orgState.role,
+    org: organizationId === undefined ? null : { organizationId, organizationName: 'Acme' },
+    isResolving: false,
+    isError: false,
+  }),
+}));
+
 /** The rendered Text node holding exactly `copy`, if it is mounted. */
 function textNode(renderer: TestRenderer.ReactTestRenderer, copy: string) {
   // The Bitbucket card's header now carries the same copy as its action, so the
@@ -114,6 +128,7 @@ beforeEach(() => {
   resetSelectedBranchOverrides();
   collapseState.collapsedCtas = [];
   collapseState.setConnectCtaCollapsed.mockClear();
+  orgState.role = 'owner';
 });
 
 describe('NewSessionRepositorySection repository picker', () => {
@@ -223,9 +238,122 @@ describe('NewSessionRepositorySection Bitbucket connect card', () => {
   });
 });
 
+describe('NewSessionRepositorySection Bitbucket connect authority', () => {
+  // The connect action is the centre-aligned label inside the provider's
+  // action row (`textNode`), which the card header's copy alone does not match.
+  it('names the roles that can connect instead of offering a refused action', () => {
+    // Every organization Bitbucket connect takes billing authority, so a member
+    // without it gets the restriction as the card's whole content rather than a
+    // tap that can only end in the server's refusal.
+    orgState.role = 'member';
+    const renderer = mountSection({
+      organizationId: 'org-1',
+      groups: [group('github', 'repos'), group('bitbucket', 'connect')],
+    });
+
+    const text = renderedText(renderer);
+    expect(text).toContain(i18n.t('prReview.connect.bitbucketAdminOnlyDescription'));
+    expect(text).not.toContain(i18n.t('agentChat.newSession.bitbucketOrganizationsOnly'));
+    expect(textNode(renderer, i18n.t('common.connectBitbucket'))).toBeUndefined();
+    expect(renderer.root.findAllByType('Button' as never)).toHaveLength(0);
+    // The card keeps its header and its collapsible frame: only the action goes.
+    expect(connectHeader(renderer, i18n.t('common.connectBitbucket'))).toBeDefined();
+    expect(
+      connectHeader(renderer, i18n.t('common.connectBitbucket'))?.props.accessibilityState
+    ).toEqual({ expanded: true });
+  });
+
+  it.each(['admin', 'billing_manager'])('keeps the action for the %s role', role => {
+    orgState.role = role;
+    const renderer = mountSection({
+      organizationId: 'org-1',
+      groups: [group('github', 'repos'), group('bitbucket', 'connect')],
+    });
+
+    const text = renderedText(renderer);
+    expect(text).toContain(i18n.t('agentChat.newSession.bitbucketOrganizationsOnly'));
+    expect(text).not.toContain(i18n.t('prReview.connect.bitbucketAdminOnlyDescription'));
+    expect(textNode(renderer, i18n.t('common.connectBitbucket'))).toBeDefined();
+    // The one action row carries this provider's connect action and its refresh.
+    expect(renderer.root.findAllByType('Button' as never)).toHaveLength(2);
+  });
+
+  it('keeps the action while the membership read has not answered', () => {
+    // An unresolved role is not a verdict, so the card must not withhold an
+    // action the member may hold: it would otherwise offer nothing and then
+    // show the action a request later.
+    orgState.role = undefined;
+    const renderer = mountSection({
+      organizationId: 'org-1',
+      groups: [group('github', 'repos'), group('bitbucket', 'connect')],
+    });
+
+    expect(renderedText(renderer)).toContain(
+      i18n.t('agentChat.newSession.bitbucketOrganizationsOnly')
+    );
+    expect(textNode(renderer, i18n.t('common.connectBitbucket'))).toBeDefined();
+    expect(renderer.root.findAllByType('Button' as never)).toHaveLength(2);
+  });
+
+  it.each(['member', 'owner'])('offers no action in a personal session whatever the %s role', role => {
+    // A personal session has no organization to connect for, so the sheet
+    // behind the card could only report that no scope is selected.
+    orgState.role = role;
+    const renderer = mountSection({
+      groups: [group('github', 'repos'), group('bitbucket', 'connect')],
+    });
+
+    expect(renderedText(renderer)).toContain(
+      i18n.t('agentChat.newSession.bitbucketOrganizationsOnly')
+    );
+    expect(renderedText(renderer)).not.toContain(
+      i18n.t('prReview.connect.bitbucketAdminOnlyDescription')
+    );
+    expect(textNode(renderer, i18n.t('common.connectBitbucket'))).toBeUndefined();
+    expect(renderer.root.findAllByType('Button' as never)).toHaveLength(0);
+  });
+
+  it('states the restriction in the compact row of a member who already selected', () => {
+    orgState.role = 'member';
+    const renderer = mountSection({
+      value: 'github:owner/repo',
+      organizationId: 'org-1',
+      groups: [group('github', 'repos'), group('bitbucket', 'connect')],
+    });
+
+    const text = renderedText(renderer);
+    expect(text).toContain(i18n.t('prReview.connect.bitbucketAdminOnlyDescription'));
+    expect(text).not.toContain(i18n.t('agentChat.newSession.bitbucketOrganizationsOnly'));
+    expect(textNode(renderer, i18n.t('common.connectBitbucket'))).toBeUndefined();
+    expect(renderer.root.findAllByType('Button' as never)).toHaveLength(0);
+    expect(branchSelectorProps(renderer)?.repository).toEqual(githubRow);
+  });
+
+  it('leaves the other providers actionable for a member', () => {
+    orgState.role = 'member';
+    const renderer = mountSection({
+      organizationId: 'org-1',
+      groups: [group('github', 'connect'), group('gitlab', 'connect')],
+    });
+
+    expect(textNode(renderer, i18n.t('agentChat.newSession.openGithub'))).toBeDefined();
+    expect(textNode(renderer, i18n.t('agentChat.newSession.openGitlab'))).toBeDefined();
+    // One action row per provider, each carrying its connect action and a
+    // refresh.
+    expect(renderer.root.findAllByType('Button' as never)).toHaveLength(4);
+    expect(renderedText(renderer)).not.toContain(
+      i18n.t('prReview.connect.bitbucketAdminOnlyDescription')
+    );
+  });
+});
+
 describe('NewSessionRepositorySection connect card open action', () => {
   it('gives every provider open label the row width and pins it to one line', () => {
     const renderer = mountSection({
+      // Bitbucket offers its action only in an organization scope with a
+      // billing role, so this case mounts one; the default role covers the
+      // authority.
+      organizationId: 'org-1',
       groups: [
         group('github', 'connect'),
         group('gitlab', 'connect'),

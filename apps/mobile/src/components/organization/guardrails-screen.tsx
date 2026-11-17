@@ -20,6 +20,7 @@ import { Text } from '@/components/ui/text';
 import { useOrgGuardrails, useSaveOrgGuardrails } from '@/lib/hooks/use-org-settings-queries';
 import { useOrgBoundary, useOrgWithMembers } from '@/lib/hooks/use-organization-queries';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
+import { knownServerErrorMessage } from '@/lib/server-error-copy';
 import { configKey, draftsEqual } from '@/lib/organization/guardrails-config-key';
 import {
   buildUpdateInput,
@@ -213,7 +214,7 @@ function GuardrailsForm({
     } catch (error) {
       attempt.fail({
         kind: 'save-failed',
-        message: error instanceof Error ? error.message : t('organizationGuardrails.statusFailed'),
+        message: knownServerErrorMessage(error) ?? t('organizationGuardrails.statusFailed'),
       });
     }
   };

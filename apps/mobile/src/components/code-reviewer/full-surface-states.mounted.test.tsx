@@ -666,6 +666,25 @@ describe('Recent review bodies', () => {
     unmount();
   });
 
+  it('adds the offline stale notice above the empty state of a cached empty list', async () => {
+    state.reviews.data = {
+      pages: [{ success: true, reviews: [] }],
+      pageParams: [0],
+    };
+    state.reviews.fetchStatus = 'paused';
+    state.connectivity = 'offline';
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: 'personal' })
+    );
+    const empty = renderer.root.find(node => String(node.type) === 'EmptyState');
+    expect(empty.props.title).toBe('No reviews yet');
+    const alerts = renderer.root
+      .findAll(node => String(node.type) === 'Text')
+      .filter(node => node.props.accessibilityRole === 'alert');
+    expect(alerts).toHaveLength(1);
+    unmount();
+  });
+
   it('dedupes reviews across pages, keeping first occurrence order', async () => {
     state.reviews.data = {
       pages: [

@@ -211,7 +211,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
       />
     );
   } else if (!isLoading && firstPage?.success && reviews.length === 0) {
-    body = (
+    const emptyState = (
       <EmptyState
         icon={GitPullRequest}
         title={t('codeReviewer.reviewList.noReviews')}
@@ -235,6 +235,17 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
           </Button>
         }
       />
+    );
+    // A cached empty list whose refresh is paused or failed keeps its empty
+    // state and gains the same notice rows get: "no rows" must not read as
+    // current when the read that would fill it cannot run.
+    body = staleNotice ? (
+      <View className="flex-1">
+        <View className="px-6 pt-4">{staleNotice}</View>
+        {emptyState}
+      </View>
+    ) : (
+      emptyState
     );
   } else if (isLoading) {
     body = (

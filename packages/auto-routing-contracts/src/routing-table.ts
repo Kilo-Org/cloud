@@ -7,6 +7,7 @@ import {
   POLICY_SETTINGS,
   POLICY_SETTING_VALUE_DEFAULTS,
   POLICY_SETTING_VALUE_SCHEMAS,
+  SWITCH_COST_FACTOR_MIN,
 } from './policy-settings';
 import {
   ProductionTokenProfileSchema,
@@ -176,7 +177,9 @@ const routingTableFields = {
   accuracyNoiseBand: POLICY_SETTING_VALUE_SCHEMAS.accuracyNoiseBand.optional(),
   // Keep a session's incumbent model unless the fresh pick is cheaper by
   // more than this factor.
-  switchCostFactor: POLICY_SETTING_VALUE_SCHEMAS.switchCostFactor,
+  // A published table accepts any factor at or above the policy minimum: the
+  // upper bound is an input limit, and a stored table must keep parsing.
+  switchCostFactor: z.number().min(SWITCH_COST_FACTOR_MIN),
   // In best-accuracy mode, keep a threshold-meeting incumbent unless the
   // fresh pick improves accuracy by more than this absolute delta.
   bestAccuracySwitchThreshold: POLICY_SETTING_VALUE_SCHEMAS.bestAccuracySwitchThreshold.default(

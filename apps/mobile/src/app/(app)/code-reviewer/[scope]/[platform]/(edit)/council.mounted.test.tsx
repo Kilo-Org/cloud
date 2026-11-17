@@ -53,6 +53,8 @@ const state = vi.hoisted(() => {
     toggleProps: [] as ToggleProps[],
     patches: [] as SavedPatch[],
     routerPush: vi.fn(),
+    gateReason: null as string | null,
+    orgs: [] as { organizationId: string }[],
   };
 });
 
@@ -91,7 +93,7 @@ vi.mock('@/lib/hooks/use-reviewer-route-params', () => ({
   useReviewerRouteParams: () => ({ scope: state.scope, platform: state.platform }),
 }));
 vi.mock('@/lib/hooks/use-reviewer-council', () => ({
-  useCouncilGate: () => state.gate,
+  useCouncilGate: () => ({ ...state.gate, refusalReason: state.gateReason }),
   defaultCouncilConfig: () => ({
     enabled: false,
     aggregation_strategy: 'advisory',
@@ -100,6 +102,17 @@ vi.mock('@/lib/hooks/use-reviewer-council', () => ({
   enabledSpecialistCount: (council: { specialists: { enabled: boolean }[] }) =>
     council.specialists.filter(entry => entry.enabled).length,
 }));
+vi.mock('@/lib/trpc', () => ({
+  useTRPC: () => ({
+    organizations: {
+      list: { queryOptions: () => ({ queryKey: ['organizations', 'list'] }) },
+    },
+  }),
+}));
+vi.mock('@tanstack/react-query', async importOriginal => {
+  const actual = await importOriginal<typeof import('@tanstack/react-query')>();
+  return { ...actual, useQuery: () => ({ data: state.orgs }) };
+});
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   isPersonal: (scope: string) => scope === 'personal',
   useReviewConfig: (_scope: string, _platform: string, options?: { enabled?: boolean }) => {
@@ -195,6 +208,8 @@ beforeEach(() => {
   state.patches.length = 0;
   state.save.isPending = false;
   state.routerPush.mockReset();
+  state.gateReason = null;
+  state.orgs = [];
 
   state.config.data = {
     council: {
@@ -255,8 +270,55 @@ describe('council route gate', () => {
     mounted.unmount();
   });
 
+  it('offers the switch step to a personal reader who already has an organization', async () => {
+    state.scope = 'personal';
+    state.gate.allowed = false;
+    state.orgs = [{ organizationId: 'org-1' }];
+
+    const mounted = await renderWithProviders(createElement(CouncilRoute));
+    const { renderer } = mounted;
+    await act(() => undefined);
+
+    const texts = renderedTexts(renderer);
+    expect(texts).toContain(
+      'Council review is not part of a personal account. It needs an Enterprise organization.'
+    );
+    expect(texts).toContain('Switch organization');
+    const action = renderer.root
+      .findAll(node => String(node.type) === 'Pressable')
+      .find(node => node.props.accessibilityLabel === 'Switch organization');
+    expect(action).toBeDefined();
+    const onPress = action?.props.onPress as (() => void) | undefined;
+    await act(() => {
+      onPress?.();
+    });
+    expect(state.routerPush).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)');
+
+    mounted.unmount();
+  });
+
+  it('keeps the neutral sentence when the refusal cannot name a cause', async () => {
+    state.gate.allowed = false;
+    state.gateReason = 'flagUnavailable';
+
+    const mounted = await renderWithProviders(createElement(CouncilRoute));
+    const { renderer } = mounted;
+    await act(() => undefined);
+
+    const texts = renderedTexts(renderer);
+    expect(texts).toContain(
+      'Council review is not available for this organization right now. Try again later.'
+    );
+    expect(texts).not.toContain(
+      'Council review needs the Enterprise plan with an active subscription or trial. This organization does not have it right now.'
+    );
+
+    mounted.unmount();
+  });
+
   it('explains the plan to an unentitled organisation', async () => {
     state.gate.allowed = false;
+    state.gateReason = 'refused';
 
     const mounted = await renderWithProviders(createElement(CouncilRoute));
     const { renderer } = mounted;

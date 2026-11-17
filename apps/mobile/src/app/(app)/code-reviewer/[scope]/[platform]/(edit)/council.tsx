@@ -4,12 +4,11 @@ import {
   COUNCIL_MIN_SPECIALISTS,
   COUNCIL_REQUIRED_LABEL_MAX_LENGTH,
 } from '@kilocode/app-shared/code-review';
-import { type Href, useRouter } from 'expo-router';
+import { type Href } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
-import { CenteredState } from '@/components/centered-state';
 import { CouncilSpecialistsSection } from '@/components/code-reviewer/council-specialists-section';
 import { ReviewerErrorScreen } from '@/components/code-reviewer/reviewer-error-screen';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
@@ -23,7 +22,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
-import { UNDER_COPY_ACTION_BOX_CLASS, UNDER_COPY_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { formatNumber } from '@/lib/format';
 import {
   type CouncilConfig,
@@ -36,9 +34,7 @@ import {
   STRATEGY_DESCRIPTION_KEYS,
   STRATEGY_LABEL_KEYS,
 } from '@/lib/code-reviewer-council';
-import { CREATE_ORGANIZATION_HREF } from '@/lib/organization-navigation';
 import {
-  isPersonal,
   useGitHubRepositories,
   useGitLabRepositories,
   useReviewConfig,
@@ -50,8 +46,10 @@ import {
   enabledSpecialistCount,
   useCouncilGate,
 } from '@/lib/hooks/use-reviewer-council';
+import { useTRPC } from '@/lib/trpc';
+import { useQuery } from '@tanstack/react-query';
+import { CouncilRefusalScreen } from './council-refusal-screen';
 import { useReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
-import { cn } from '@/lib/utils';
 
 export default function CouncilRoute() {
   const params = useReviewerRouteParams();
@@ -61,31 +59,25 @@ export default function CouncilRoute() {
   return <CouncilScreen scope={params.scope} platform={params.platform} />;
 }
 
-/**
- * The unavailable sentence each refused scope reads. A personal account never
- * carries council, Bitbucket has no council on either client, and a settled
- * organization refusal names the plan rule it can act on.
- */
-function unavailableCopyKey(scope: string, platformSupportsCouncil: boolean): string {
-  if (isPersonal(scope)) {
-    return 'codeReviewer.council.unavailablePersonally';
-  }
-  return platformSupportsCouncil
-    ? 'codeReviewer.council.unavailableForOrganization'
-    : 'codeReviewer.council.unavailableOnBitbucket';
-}
-
 function CouncilScreen({
   scope,
   platform,
 }: Readonly<{ scope: string; platform: ReviewerPlatform }>) {
   const { t } = useTranslation();
-  const router = useRouter();
+  const trpc = useTRPC();
   // The same gate as the web page: an entitled organization behind the rollout
   // flag. A personal scope, an unentitled org, or a build older than the flag
   // never reaches the rows below. Bitbucket has no council on either client.
   const gate = useCouncilGate(scope);
   const capabilities = PLATFORM_CAPABILITIES[platform];
+  // The personal refusal's action branches on what the account already has:
+  // memberships let it switch to the organization that may unlock council, no
+  // membership makes creating one the only step. The same organizations.list
+  // read the reviewer permission hook runs, so no extra request: the shared
+  // query cache answers it. It must sit above the early return below, with
+  // every other hook of this screen.
+  const orgs = useQuery(trpc.organizations.list.queryOptions()).data;
+  const hasMemberships = (orgs?.length ?? 0) > 0;
   const surface = councilSurface({
     pending: gate.pending,
     allowed: gate.allowed,
@@ -136,8 +128,7 @@ function CouncilScreen({
     // account never carries council, an organization's plan can lack it, and
     // Bitbucket has no council on either client. The personal scope offers the
     // one step that changes the answer: creating the organization.
-    const unavailableCopy = unavailableCopyKey(scope, capabilities.council);
-    const personal = isPersonal(scope);
+    const refusalReason = gate.refusalReason ?? 'flagUnavailable';
     return (
       <View className="flex-1 bg-background">
         <ReviewerHeader
@@ -145,31 +136,12 @@ function CouncilScreen({
           eyebrow={t('common.codeReviewer')}
         />
         {surface === 'unavailable' ? (
-          <CenteredState contentContainerClassName="px-6">
-            <View className="items-center gap-2">
-              <Text className="text-center text-xs text-muted-foreground">
-                {t(unavailableCopy)}
-              </Text>
-              {personal ? (
-                <Pressable
-                  onPress={() => {
-                    router.push(CREATE_ORGANIZATION_HREF);
-                  }}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('codeReviewer.council.unavailablePersonallyAction')}
-                  hitSlop={UNDER_COPY_ACTION_HIT_SLOP}
-                  className={cn(
-                    'justify-center self-center rounded-md active:opacity-70',
-                    UNDER_COPY_ACTION_BOX_CLASS
-                  )}
-                >
-                  <Text className="text-xs font-semibold text-muted-foreground underline">
-                    {t('codeReviewer.council.unavailablePersonallyAction')}
-                  </Text>
-                </Pressable>
-              ) : null}
-            </View>
-          </CenteredState>
+          <CouncilRefusalScreen
+            scope={scope}
+            platformSupportsCouncil={capabilities.council}
+            refusalReason={refusalReason}
+            hasMemberships={hasMemberships}
+          />
         ) : (
           <View className="gap-3 px-6 pt-4">
             <Skeleton className="h-16 w-full rounded-lg" />

@@ -8,6 +8,11 @@ import { TAB_LABEL_MINIMUM_FONT_SCALE, tabLabelNumberOfLines } from '@/lib/tab-b
  * between words or carries its own break; a single word is never split
  * mid-word. The tab button, not this text, carries the accessibility name, so
  * `accessible={false}` keeps the announced name intact.
+ *
+ * Tab chrome, not a section label: the bar's own 11pt mono capitals and its
+ * measured fit are what `tab-bar-layout` mirrors, so the label keeps its own
+ * class string instead of the section eyebrow (which the layout estimator does
+ * not model).
  */
 export function TabBarLabel({
   label,

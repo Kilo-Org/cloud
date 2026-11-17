@@ -88,7 +88,11 @@ export function AdaptiveHomeCardFrame({
   showBriefing,
 }: Readonly<AdaptiveHomeCardFrameProps>) {
   return (
-    <View className="flex-row items-stretch overflow-hidden rounded-2xl border border-border bg-card">
+    // One card surface that holds two full-height layers: the frame needs a
+    // padless card (the layers own their rows' padding), which `Card` does not
+    // offer yet, so the surface stays spelled here and the layout rules admit
+    // it through the baseline.
+    <View className="flex-row items-stretch overflow-hidden rounded-xl bg-secondary">
       <CardLayer reserved={showBriefing} className="w-full shrink-0">
         {live}
       </CardLayer>
@@ -109,8 +113,8 @@ export function AdaptiveHomeCardFrame({
             </View>
           ))}
         </View>
-        <View className="h-px bg-border" />
-        <View className="min-h-[68px] justify-center px-4 py-3">
+        <View className="h-px bg-hair-soft" />
+        <View className="min-h-20 justify-center px-4 py-3">
           <Text className="text-sm">{'\u200B\n\u200B'}</Text>
         </View>
       </View>

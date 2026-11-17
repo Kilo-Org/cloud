@@ -16,31 +16,27 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { TodoListRow } from '@/components/todos/todo-list-row';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
-import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { IconButton } from '@/components/ui/icon-button';
+import { RowChevron } from '@/components/ui/row-chevron';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { ChevronDown, History, ListTodo, Plus } from '@/components/ui/icons';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useTodoListMutations, useTodoLists } from '@/lib/hooks/use-todos';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
+import { cn } from '@/lib/utils';
 import { useSideInsetStyle } from '@/lib/screen-insets';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { ROW_TARGET_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { todoListPath, todoListSettingsPath } from '@/lib/todos/todo-routes';
 import { type TodoList } from '@/lib/todos/todo-types';
 import { useTRPC } from '@/lib/trpc';
 
 function ListRowsSkeleton() {
   return (
-    <View className="gap-3 px-4 pt-2">
-      {[0, 1, 2].map(row => (
-        <View key={row} className="min-h-16 flex-row items-center gap-3">
-          <Skeleton className="size-9 rounded-lg" />
-          <View className="flex-1 gap-2">
-            <Skeleton className="h-4 w-1/2 rounded" />
-            <Skeleton className="h-3 w-1/3 rounded" />
-          </View>
-        </View>
-      ))}
+    <View className="pt-3">
+      <RowSkeleton tile subtitle />
+      <RowSkeleton tile subtitle />
+      <RowSkeleton tile subtitle last />
     </View>
   );
 }
@@ -186,7 +182,7 @@ export function TodoListsScreen({ tabHeader }: Readonly<{ tabHeader: ReactNode }
             {showArchived ? (
               <ChevronDown size={16} color={colors.mutedForeground} />
             ) : (
-              <DirectionalChevronRight size={16} color={colors.mutedForeground} />
+              <RowChevron />
             )}
             <Text variant="eyebrow">
               {t('todos.lists.archived', { count: archivedLists.length })}
@@ -215,7 +211,6 @@ export function TodoListsScreen({ tabHeader }: Readonly<{ tabHeader: ReactNode }
         title={t('common.agents')}
         size="large"
         showBackButton={false}
-        className="px-[22px] pb-0"
         inlineActions={
           <View className="min-w-0 shrink flex-row items-center">
             <View className="min-w-0 shrink">
@@ -233,8 +228,13 @@ export function TodoListsScreen({ tabHeader }: Readonly<{ tabHeader: ReactNode }
         }
         allowInlineActionsStacking={false}
       />
-      <View style={sideInsetStyle}>
-        <View className="mx-[22px] min-h-[48px] flex-row items-center justify-between border-b border-border">
+      <View style={sideInsetStyle} className={SCREEN_GUTTER_CLASS}>
+        <View
+          className={cn(
+            ROW_TARGET_CLASS,
+            'flex-row items-center justify-between border-b-[0.5px] border-hair-soft'
+          )}
+        >
           {tabHeader}
           {context.isReady ? (
             <IconButton onPress={openNewList} accessibilityLabel={t('todos.lists.newList')}>

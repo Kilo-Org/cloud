@@ -8,6 +8,8 @@ import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { type RemoteMcpServerDraft, type StoredRemoteMcpServer } from '@/lib/chat/remote-mcp-store';
 
 import { RemoteMcpServerForm } from './remote-mcp-server-form';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { cn } from '@/lib/utils';
 
 /**
  * The add-or-edit server form, as a sheet over the chat-tools sheet.
@@ -60,7 +62,7 @@ export function McpServerFormSheet({
           stays reachable on a small screen. */}
       <ScrollView
         className="flex-1"
-        contentContainerClassName="px-6 pb-6 pt-4"
+        contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-6')}
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
       >

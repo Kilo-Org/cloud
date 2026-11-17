@@ -104,7 +104,7 @@ export function ModelCatalogScreen() {
   let footer = <View className="h-12" />;
   if (models.isError && hasPages) {
     footer = (
-      <View className="items-center gap-2 px-6 py-4">
+      <View className="items-center gap-2 px-4 py-4">
         <Text variant="muted" className="text-center text-xs">
           {t('common.couldnTLoadMore')}
         </Text>
@@ -153,7 +153,7 @@ export function ModelCatalogScreen() {
         ListHeaderComponent={
           <View className="gap-3 pt-2">
             {recommended.length > 0 && (
-              <View className="gap-3 px-6 pb-3">
+              <View className="gap-3 px-4 pb-3">
                 <Eyebrow>{t('common.recommended')}</Eyebrow>
                 <Text variant="muted" className="text-xs">
                   {t('modelChat.catalog.recommendationsHelp')}
@@ -166,8 +166,8 @@ export function ModelCatalogScreen() {
                 ))}
               </View>
             )}
-            <Eyebrow className="px-6 pb-1">{t('modelChat.catalog.fromHuggingFace')}</Eyebrow>
-            <Text variant="muted" className="px-6 pb-1 text-xs">
+            <Eyebrow className="px-4 pb-1">{t('modelChat.catalog.fromHuggingFace')}</Eyebrow>
+            <Text variant="muted" className="px-4 pb-1 text-xs">
               {t('modelChat.catalog.compatibilityHelp')}
             </Text>
           </View>

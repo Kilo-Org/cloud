@@ -5,7 +5,7 @@
 
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
-import { compiledDimensions } from '@/test/native-dimensions';
+import { compiledLengthDp } from '@/test/native-dimensions';
 import { describe, expect, it, vi } from 'vitest';
 
 import { SessionListSearchHeader } from './session-list-search-header';
@@ -81,7 +81,7 @@ function fieldOf(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTe
     node =>
       typeof node.type === 'string' &&
       (node.type as string) === 'View' &&
-      String(node.props.className).includes('min-h-[51px]')
+      String(node.props.className).includes('rounded-md')
   );
 }
 
@@ -100,7 +100,7 @@ describe('SessionListSearchHeader clear button touch target', () => {
     // the 44pt target. One box width/height pair only: compiling the class is
     // what proves the real box, so a second, conflicting pair cannot hide
     // behind the order Tailwind emits its rules in.
-    expect(clear.props.className).toContain('h-[38px] w-[38px]');
+    expect(clear.props.className).toContain('h-10 w-10');
     expect(clear.props.className).toContain('items-center');
     const slop = slopInsets(clear.props.hitSlop);
     expect(slop.top).toBe(COMPACT_CONTROL_HIT_SLOP_DP);
@@ -110,11 +110,12 @@ describe('SessionListSearchHeader clear button touch target', () => {
     // the control's touch region meets the input's instead of covering it.
     expect(slop.left).toBe(7);
 
-    const declarations = (await compiledDimensions(clear.props.className as string)) as {
-      height?: number;
-      width?: number;
-    }[];
-    const box = Object.assign({}, ...declarations) as { height: number; width: number };
+    // `h-10 w-10` are theme lengths (`calc(var(--spacing) * 10)`), so the dp
+    // follows the compiler's baked-in 14pt rem rather than a literal.
+    const box = {
+      height: await compiledLengthDp(clear.props.className as string, 'height'),
+      width: await compiledLengthDp(clear.props.className as string, 'width'),
+    };
     expect(box.height).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
     expect(box.width).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
     // Past 44pt, not onto it: `@/lib/a11y/tap-target` records a 44dp target
@@ -125,20 +126,18 @@ describe('SessionListSearchHeader clear button touch target', () => {
     renderer.unmount();
   });
 
-  it('reserves the target height in the field so the button never grows it', () => {
+  it('draws the field from the shared box, so the X cannot change its height', () => {
     const withText = mount(true);
     const withoutText = mount(false);
 
-    // Same field height in both states: the X appears on the first keystroke
-    // and must not move the list below it. A single `min-h` class, so the
-    // effective floor cannot depend on Tailwind's emit order. The floor covers
-    // the 38pt control plus the row's padding and border; the compiled guard in
-    // `session-list-search-header.mounted.test.tsx` holds the arithmetic.
+    // Same field in both states: the X appears on the first keystroke and must
+    // not move the list below it. The field's floor is the shared input box's
+    // `min-h-[44px]`, taller than the 40pt clear control, so the row class
+    // carries no height of its own and cannot shift.
     const fieldWithText = fieldOf(withText);
     const fieldWithoutText = fieldOf(withoutText);
-    expect(fieldWithText.props.className).toContain('min-h-[51px]');
-    expect(fieldWithText.props.className).not.toContain('min-h-[44px]');
-    expect(fieldWithoutText.props.className).toBe(fieldWithText.props.className);
+    expect(fieldWithText.props.className).toBe(fieldWithoutText.props.className);
+    expect(fieldWithText.props.className).not.toMatch(/(?:^|\s)min-h-/);
 
     const clear = withText.root.find(
       node =>

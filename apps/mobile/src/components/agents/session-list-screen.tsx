@@ -526,7 +526,6 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
               showSearchBusy={false}
               onChangeText={query.handleSearchChange}
               defaultValue={query.searchQuery}
-              compact
               onClearSearch={query.handleClearSearch}
               onFocus={keyboard.handleInputFocus}
               onBlur={keyboard.handleInputBlur}

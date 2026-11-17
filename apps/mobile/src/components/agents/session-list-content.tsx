@@ -350,7 +350,7 @@ export function AgentSessionListContent({
   let listFooter: ReactNode = null;
   if (isFetchNextPageError) {
     listFooter = (
-      <View className="items-center gap-3 px-6 py-4">
+      <View className="items-center gap-3 px-4 py-4">
         <Text variant="muted" className="text-center text-xs">
           {t('common.couldnTLoadMore')}
         </Text>
@@ -384,7 +384,7 @@ export function AgentSessionListContent({
         return <SessionSectionHeaderSkeleton />;
       }
       if (item.kind === 'skeleton') {
-        return <SessionRowSkeleton index={item.index} subtitle={false} />;
+        return <SessionRowSkeleton subtitle={false} />;
       }
       if (item.kind === 'section-header') {
         return (

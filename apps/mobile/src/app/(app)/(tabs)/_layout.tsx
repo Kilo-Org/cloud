@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { SessionPreviewOverlay } from '@/components/agents/session-preview-overlay';
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { TabBarButton } from '@/components/tab-bar-button';
-import { TabBarLabel } from '@/components/tab-bar-label';
+import { TabBarLabel } from '@/components/ui/tab-bar-label';
 import { TabSwitchInputSettle } from '@/components/tab-screen-input-gate';
 import { BlurBar } from '@/components/ui/blur-bar';
 import { usePendingAppAction } from '@/lib/app-actions/use-pending-app-action';

@@ -1,7 +1,9 @@
 import { type Ref } from 'react';
-import { Pressable, View, type ViewInstance } from 'react-native';
+import { Pressable, type ViewInstance } from 'react-native';
 
+import { RowGroup } from '@/components/ui/row-group';
 import { Text } from '@/components/ui/text';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
 import { type SessionActionMenu, type SessionActionMenuItem } from './session-row-actions';
@@ -22,7 +24,9 @@ type SessionPreviewActionPanelProps = {
 /**
  * The preview's action panel: one row per item `buildSessionActionMenuItems`
  * produced, in the same order and with the same labels, plus the builder's own
- * Cancel label. Destructive rows take the destructive ink; nothing else
+ * Cancel label. It is the grouped-row surface (`RowGroup`), which draws the
+ * hairline between rows and none after the last, so the panel cannot re-spell
+ * the row anatomy. Destructive rows take the destructive ink; nothing else
  * changes their appearance, so the panel cannot drift from the action sheet.
  */
 export function SessionPreviewActionPanel({
@@ -32,34 +36,34 @@ export function SessionPreviewActionPanel({
   firstItemRef,
 }: Readonly<SessionPreviewActionPanelProps>) {
   return (
-    <View className="mt-3 overflow-hidden rounded-3xl bg-card">
-      {menu.items.map((item, index) => (
+    <RowGroup className="mt-3">
+      {[
+        ...menu.items.map((item, index) => (
+          <Pressable
+            key={item.key}
+            ref={index === 0 ? firstItemRef : undefined}
+            accessibilityRole="button"
+            accessibilityLabel={item.label}
+            onPress={() => {
+              onSelect(item);
+            }}
+            className={cn(ROW_TARGET_CLASS, 'justify-center px-4 py-3 active:bg-muted')}
+          >
+            <Text className={cn('text-base', item.destructive && 'text-destructive')}>
+              {item.label}
+            </Text>
+          </Pressable>
+        )),
         <Pressable
-          key={item.key}
-          ref={index === 0 ? firstItemRef : undefined}
+          key="cancel"
           accessibilityRole="button"
-          accessibilityLabel={item.label}
-          onPress={() => {
-            onSelect(item);
-          }}
-          className={cn(
-            'min-h-[44px] justify-center px-5 py-3 active:bg-muted',
-            index > 0 && 'border-t-[0.5px] border-hair-soft'
-          )}
+          accessibilityLabel={menu.cancelLabel}
+          onPress={onCancel}
+          className={cn(ROW_TARGET_CLASS, 'justify-center px-4 py-3 active:bg-muted')}
         >
-          <Text className={cn('text-base', item.destructive && 'text-destructive')}>
-            {item.label}
-          </Text>
-        </Pressable>
-      ))}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={menu.cancelLabel}
-        onPress={onCancel}
-        className="min-h-[44px] justify-center border-t-[0.5px] border-hair-soft px-5 py-3 active:bg-muted"
-      >
-        <Text className="text-base">{menu.cancelLabel}</Text>
-      </Pressable>
-    </View>
+          <Text className="text-base">{menu.cancelLabel}</Text>
+        </Pressable>,
+      ]}
+    </RowGroup>
   );
 }

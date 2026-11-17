@@ -158,7 +158,7 @@ function ListSettingsForm({ list, organizationId, afterCreate }: Readonly<ListSe
                 }}
                 maxLength={TODO_LIST_EMOJI_MAX_LENGTH}
                 accessibilityLabel={t('todos.listSettings.emoji')}
-                className="rounded-lg border border-border bg-secondary text-base text-foreground"
+                className="rounded-md border border-input bg-background text-base text-foreground"
               />
             </View>
             <View className="min-w-0 flex-1 gap-2">

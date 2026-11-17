@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { RenameModal } from '@/components/rename-modal';
+import { Card } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
 import { requestA11yFocus } from '@/lib/a11y/announce';
 import { SESSION_TRANSCRIPT_STALE_TIME_MS } from '@/lib/agent-session-cache';
@@ -348,24 +349,23 @@ function SessionPreviewContent({
           className="absolute inset-0 justify-center"
           style={containerStyle}
         >
-          <Animated.View
-            className="overflow-hidden rounded-3xl bg-card"
-            style={[cardStyle, cardHeightStyle]}
-          >
-            <GestureDetector gesture={pan}>
-              <View className="flex-row items-center gap-3 px-4 py-3">
-                <SessionPreviewHeaderMeta target={target} liveRow={liveRow} />
+          <Animated.View style={[cardStyle, cardHeightStyle]}>
+            <Card className="flex-1 overflow-hidden">
+              <GestureDetector gesture={pan}>
+                <View className="flex-row items-center gap-3">
+                  <SessionPreviewHeaderMeta target={target} liveRow={liveRow} />
+                </View>
+              </GestureDetector>
+              <View className="flex-1 justify-center">
+                <Text
+                  accessible
+                  accessibilityLabel={t('agentChat.session.transcriptAccessibility')}
+                  pointerEvents="none"
+                  className="absolute inset-0 opacity-0"
+                />
+                <SessionPreviewTranscript {...transcriptState} />
               </View>
-            </GestureDetector>
-            <View className="flex-1 justify-center">
-              <Text
-                accessible
-                accessibilityLabel={t('agentChat.session.transcriptAccessibility')}
-                pointerEvents="none"
-                className="absolute inset-0 opacity-0"
-              />
-              <SessionPreviewTranscript {...transcriptState} />
-            </View>
+            </Card>
           </Animated.View>
           <SessionPreviewActionPanel
             menu={menu}

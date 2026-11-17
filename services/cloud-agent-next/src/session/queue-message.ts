@@ -32,6 +32,7 @@ import type { ControlPlanePromptPayload } from '../shared/control-plane-protocol
 import { preflightExistingPromptModel, preflightSessionRuntime } from './model-preflight.js';
 import {
   createRuntimeAuthorization,
+  RuntimeAuthorizationRevokedError,
   sealRuntimeAuthorization,
 } from '@kilocode/worker-utils/runtime-authorization';
 import { resolveSecret } from '../auth.js';
@@ -181,6 +182,13 @@ export async function preflightRuntimeAuthorizationRecovery(
     onAdmissionRejected: reason =>
       logRuntimeAuthorizationDiagnostic(cloudAgentSessionId, 'admission', reason),
     ...(metadata.identity.orgId ? { organizationId: metadata.identity.orgId } : {}),
+    onBindingRejected: reason =>
+      logRuntimeAuthorizationDiagnostic(cloudAgentSessionId, 'preflight', reason),
+  }).catch((error: unknown) => {
+    if (error instanceof RuntimeAuthorizationRevokedError) {
+      throw new TRPCError({ code: 'FORBIDDEN', message: 'Runtime authorization denied' });
+    }
+    throw error;
   });
   const runtimeAuthorizationSeal = await sealRuntimeAuthorization(created.authorization, secret);
   const result = await withDORetry(

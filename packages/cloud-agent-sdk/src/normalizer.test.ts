@@ -2061,6 +2061,43 @@ describe('normalize', () => {
     );
   });
 
+  describe('cloud.workspace.artifacts.changed', () => {
+    it('normalizes an execution-independent service event with the Cloud envelope identity', () => {
+      const result = normalize({
+        eventId: 1,
+        sessionId: 'agent-1',
+        streamEventType: 'cloud.workspace.artifacts.changed',
+        timestamp: '2026-09-02T00:00:00.000Z',
+        data: { revision: 4 },
+      });
+      expect(result).toEqual({
+        type: 'workspace.artifacts.changed',
+        cloudSessionId: 'agent-1',
+        revision: 4,
+      });
+      if (!result) throw new Error('Expected workspace artifacts event');
+      expect(isChatEvent(result)).toBe(false);
+    });
+
+    it.each([
+      {},
+      { revision: 0 },
+      { revision: '1' },
+      { revision: NaN },
+      { revision: 1, extra: true },
+    ])('rejects invalid data %p', data =>
+      expect(normalize(createRaw('cloud.workspace.artifacts.changed', data))).toBeNull()
+    );
+
+    it.each(['cloud.workspace.artifacts.changed', 'workspace.artifacts.changed'])(
+      'does not accept %s as a Kilo event',
+      type => {
+        expect(normalize(createKilocode(type, { revision: 1 }))).toBeNull();
+        expect(normalizeCliEvent(type, { revision: 1 })).toBeNull();
+      }
+    );
+  });
+
   describe('connected', () => {
     it('preserves bounded ancillary bootstrap omissions beside the authoritative retry snapshot', () => {
       const sessionStatus = { type: 'retry', attempt: 2, message: 'Retrying', next: 42 };

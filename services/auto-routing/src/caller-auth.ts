@@ -22,13 +22,13 @@ import {
 import {
   accountBalanceMicrodollars,
   findOrganizationMemberBalanceRow,
-  findOrganizationMemberRole,
   isApiTokenPepperCurrent,
   createEmailDomainBlacklistCache,
   organizationMemberBalance,
   requestOrganizationId,
 } from '@kilocode/worker-utils/account-access';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { findEffectiveOrganizationMemberRole } from '@kilocode/worker-utils/organization-membership';
 import * as z from 'zod';
 
 export class CustomRouterError extends Error {
@@ -101,8 +101,8 @@ async function verifyCallerToken(env: CallerEnv, token: string): Promise<KiloTok
 }
 
 // Mirrors the gateway's user authentication: token, current pepper, an account outside the
-// blocked email domains and not blocked, and organization membership for the organization
-// context.
+// blocked email domains and not blocked, and effective organization membership for the
+// organization context.
 export async function authenticateCaller(env: CallerEnv, headers: Headers): Promise<Caller> {
   const token = extractBearerToken(headers.get('authorization'));
   if (!token) throw new CustomRouterError('unauthorized', 'Authentication required');
@@ -155,7 +155,12 @@ export async function authenticateCaller(env: CallerEnv, headers: Headers): Prom
     if (!OrganizationIdSchema.safeParse(organizationId).success) {
       throw new CustomRouterError('invalid_request', 'Invalid organization ID');
     }
-    organizationRole = await findOrganizationMemberRole(db, organizationId, payload.kiloUserId);
+    // The organization context resolves through the effective-membership rule: a direct
+    // membership, or a permitted parent-organization role on a live parent.
+    organizationRole = await findEffectiveOrganizationMemberRole(db, {
+      kiloUserId: payload.kiloUserId,
+      organizationId,
+    });
     if (organizationRole === null) {
       throw new CustomRouterError('forbidden', 'Not a member of the organization');
     }

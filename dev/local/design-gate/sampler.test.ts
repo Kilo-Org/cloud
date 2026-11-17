@@ -53,7 +53,10 @@ test('sampling keeps layout changes even when a transform holds the painted fram
   sampler.start(120, 5_000);
   context.mock.timers.tick(120);
   y = 30;
-  context.mock.timers.tick(240);
+  // One tick per interval: the sampler schedules the next tick only after the
+  // current one returns, so a single leap does not fire two of them.
+  context.mock.timers.tick(120);
+  context.mock.timers.tick(120);
   assert.deepEqual(
     sampler.stop().map(sample => [sample.dump.nodes[0].layoutRect[1], sample.repeat]),
     [
@@ -99,7 +102,9 @@ test('repeated screen state retains the newest dump rather than the first snapsh
     nodes: [{ rect: [0, 0, 100, 20] }],
   }));
   sampler.start(120, 5_000);
-  context.mock.timers.tick(240);
+  // Two intervals: one tick fires per interval, each scheduling the next.
+  context.mock.timers.tick(120);
+  context.mock.timers.tick(120);
   const samples = sampler.stop();
   assert.equal(samples.length, 1);
   assert.equal(samples[0]?.repeat, 3);

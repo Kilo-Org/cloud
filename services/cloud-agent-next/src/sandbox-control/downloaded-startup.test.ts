@@ -541,6 +541,84 @@ describe('runtime harness selection', () => {
       }
     }
   );
+  it.each([
+    'cloud-agent-web',
+    'code-review',
+    'desktop',
+    'agent-manager',
+    'slack',
+    'cloud-agent',
+    undefined,
+  ])('selects v2 from origin %s for an all-session organization', billingOrigin => {
+    const env = { ...kilo2Env, RUNTIME_KILO2_ALL_SESSION_ORG_IDS: interactiveOrgId };
+    for (const provider of ['cloudflare-containers', 'vercel'] as const)
+      expect(
+        newSandboxHarness(env, provider, {
+          ...webCohort,
+          preparingRoutes: [{ ...orgRoute, billingOrigin }],
+        })
+      ).toBe('kilo2');
+  });
+  it('keeps v1 outside the all-session scope and for mixed or missing cohorts', () => {
+    const env = { ...kilo2Env, RUNTIME_KILO2_ALL_SESSION_ORG_IDS: otherOrgId };
+    const reviewRoute = { ...orgRoute, billingOrigin: 'code-review' };
+    for (const preparingRoutes of [
+      [reviewRoute],
+      [{ ...reviewRoute, orgId: otherOrgId }],
+      [reviewRoute, { ...reviewRoute, orgId: otherOrgId }],
+      [{ billingOrigin: 'code-review' }],
+      [],
+    ])
+      expect(
+        newSandboxHarness(env, 'cloudflare-containers', { ...webCohort, preparingRoutes })
+      ).toBe('kilo');
+    expect(
+      newSandboxHarness(
+        { ...env, RUNTIME_KILO2_ALL_SESSION_ORG_IDS: '*', RUNTIME_KILO2_ORG_IDS: '*' },
+        'vercel',
+        { ...webCohort, preparingRoutes: [{ billingOrigin: 'code-review' }] }
+      )
+    ).toBe('kilo2');
+  });
+  it('admits the code-review native class for an all-session organization', () => {
+    const env = { ...kilo2Env, RUNTIME_KILO2_ALL_SESSION_ORG_IDS: interactiveOrgId };
+    const preparingRoutes = [{ ...orgRoute, billingOrigin: 'code-review' }];
+    expect(
+      newSandboxHarness(env, 'cloudflare-containers', {
+        ...webCohort,
+        preparingRoutes,
+        sandboxKind: 'code-review',
+      })
+    ).toBe('kilo2');
+    expect(
+      newSandboxHarness(
+        { ...env, RUNTIME_KILO2_ALL_SESSION_ORG_IDS: undefined },
+        'cloudflare-containers',
+        { ...webCohort, preparingRoutes, sandboxKind: 'code-review' }
+      )
+    ).toBe('kilo');
+  });
+  it('requires native isolation outside the all-session scope', () => {
+    const env = { ...kilo2Env, RUNTIME_KILO2_ALL_SESSION_ORG_IDS: otherOrgId };
+    const preparingRoutes = [{ ...orgRoute, billingOrigin: 'code-review' }];
+    expect(
+      newSandboxHarness(env, 'cloudflare-containers', {
+        ...webCohort,
+        preparingRoutes,
+        sandboxKind: 'shared',
+      })
+    ).toBe('kilo');
+    expect(newSandboxHarness(env, 'vercel', { preparingRoutes })).toBe('kilo');
+  });
+  it('rejects an invalid all-session organization list', () => {
+    expect(() =>
+      newSandboxHarness(
+        { ...kilo2Env, RUNTIME_KILO2_ALL_SESSION_ORG_IDS: 'not-an-organization' },
+        'vercel',
+        { ...webCohort, preparingRoutes: [{ ...orgRoute, billingOrigin: 'code-review' }] }
+      )
+    ).toThrow('configuration');
+  });
   it('keeps v1 when its list is unset or empty and rejects retired startup paths', () => {
     for (const ids of [undefined, ''])
       expect(

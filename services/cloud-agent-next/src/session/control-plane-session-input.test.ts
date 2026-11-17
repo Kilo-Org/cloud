@@ -111,6 +111,45 @@ describe('buildControlPlaneMessagePayload variant inheritance', () => {
   });
 });
 
+describe('buildControlPlaneMessagePayload custom mode', () => {
+  function buildWithStoredMode(storedMode: string, overrideMode?: string) {
+    const metadata = {
+      identity: { createdOnPlatform: 'web' },
+      agent: {
+        mode: storedMode,
+        model: 'kilo/anthropic/claude-sonnet-4',
+        appendSystemPrompt: 'Answer in verse.',
+      },
+    } as SessionMetadata;
+    return buildControlPlaneMessagePayload({
+      env: {} as Env,
+      userId: 'user-1',
+      sessionId: 'workspace_12345678-1234-4234-8234-123456789012' as never,
+      metadata,
+      turn: { type: 'prompt', prompt: 'Continue' },
+      ...(overrideMode === undefined ? {} : { agentOverride: { mode: overrideMode } }),
+    });
+  }
+
+  it('accepts the mode a custom-mode session stored', async () => {
+    const payload = await buildWithStoredMode('custom');
+    expect(payload.agent.mode).toBe('custom');
+  });
+
+  it('accepts an override that repeats the stored custom mode', async () => {
+    const payload = await buildWithStoredMode('custom', 'custom');
+    expect(payload.agent.mode).toBe('custom');
+  });
+
+  it('refuses custom mode on a session created without it', async () => {
+    // A message cannot add the appended system prompt `custom` runs, so only
+    // the create can establish it.
+    await expect(buildWithStoredMode('code', 'custom')).rejects.toThrow(
+      'Custom mode requires a system prompt on the session'
+    );
+  });
+});
+
 describe('buildControlPlaneCreateInput', () => {
   it.each([
     { organizationId: '11111111-1111-4111-8111-111111111111' },

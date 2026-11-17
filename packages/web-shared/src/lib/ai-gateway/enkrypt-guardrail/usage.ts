@@ -16,7 +16,6 @@ import type {
   EnkryptGuardrailDecision,
   EnkryptGuardrailDirection,
 } from '@kilocode/db/schema-types';
-import { ENKRYPT_USAGE_QUEUE_ENABLED } from '@kilocode/web-shared/lib/config.server';
 import { db, isUSRegion, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { recordOrganizationConsumption } from '@kilocode/web-shared/lib/kilo-pass-org/consumption';
 import {
@@ -75,14 +74,15 @@ export function enkryptCreditsToMicrodollars(creditsCost: number | null): number
 }
 
 /**
- * With `ENKRYPT_USAGE_QUEUE_ENABLED`, the write goes only to the usage queue, in every region, like
- * queued LLM accounting: it is written directly only when nothing was sent, and is dropped after a
- * failed send because the queue may already hold it.
+ * The write goes only to the usage queue, in every region, like queued LLM accounting: it is
+ * written directly only when nothing was sent, and is dropped after a failed send because the
+ * queue may already hold it.
  *
- * Otherwise, in a US region the write is handed to Frankfurt, next to the primary, so its
- * transaction neither pays cross-region round trips nor holds a primary pool connection for them.
- * A failed handoff falls back to a local write; the usage id makes a repeated delivery a no-op.
- * Gateway callers must defer it with `after()`.
+ * When nothing was sent — a missing/unparseable publisher configuration or a failed request-
+ * lifetime registration — the write takes the direct path: in a US region it is handed to
+ * Frankfurt, next to the primary, so its transaction neither pays cross-region round trips nor
+ * holds a primary pool connection for them. A failed handoff falls back to a local write; the
+ * usage id makes a repeated delivery a no-op. Gateway callers must defer it with `after()`.
  */
 export async function recordEnkryptUsage(usageRecord: EnkryptUsageRecord): Promise<void> {
   const { guardrail = 'input', detectorsFired = [], ...call } = usageRecord;
@@ -96,17 +96,15 @@ export async function recordEnkryptUsage(usageRecord: EnkryptUsageRecord): Promi
     id: randomUUID(),
     occurredAt: new Date().toISOString(),
   };
-  if (ENKRYPT_USAGE_QUEUE_ENABLED) {
-    const outcome = await enqueueWithinRequestLifetime(usageWrite);
-    if (outcome.kind === 'accepted') return;
-    if (!NOTHING_SENT_REASONS.has(outcome.reason)) {
-      console.error('[enkrypt-guardrail] usage queue publication failed; record dropped', {
-        usage_id: usageWrite.id,
-        reason: outcome.reason,
-        ...('errorName' in outcome && { error_name: outcome.errorName }),
-      });
-      return;
-    }
+  const outcome = await enqueueWithinRequestLifetime(usageWrite);
+  if (outcome.kind === 'accepted') return;
+  if (!NOTHING_SENT_REASONS.has(outcome.reason)) {
+    console.error('[enkrypt-guardrail] usage queue publication failed; record dropped', {
+      usage_id: usageWrite.id,
+      reason: outcome.reason,
+      ...('errorName' in outcome && { error_name: outcome.errorName }),
+    });
+    return;
   }
   if (isUSRegion() && (await recordEnkryptUsageInPrimaryRegion(usageWrite))) return;
   await recordEnkryptUsageLocally({ ...usageWrite, guardrail });

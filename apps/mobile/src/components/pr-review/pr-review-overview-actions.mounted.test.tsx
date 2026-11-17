@@ -43,10 +43,8 @@ vi.mock('react-native', () => ({
 }));
 
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://example.test' }));
-vi.mock('@/lib/trpc', () => ({
-  trpcClient: { githubApps: { mintInstallState: { mutate: vi.fn() } } },
-  useTRPC: () => ({}),
-}));
+vi.mock('@/lib/app-shell-handoff', () => ({ appShellHandoffUrl: vi.fn() }));
+vi.mock('@/lib/trpc', () => ({ useTRPC: () => ({}) }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({
     primary: '#4F5B0F',

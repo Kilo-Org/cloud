@@ -504,6 +504,10 @@ export type Env = {
   INTERNAL_API_SECRET_PROD: SecretsStoreSecret;
   /** R2 bucket for storing session logs */
   R2_BUCKET: R2Bucket;
+  /** Private R2 bucket for workspace artifacts synchronized from `/artifacts`. */
+  WORKSPACE_ARTIFACTS_BUCKET: R2Bucket;
+  /** Bucket name used as the S3 bucket in presigned artifact download URLs. */
+  WORKSPACE_ARTIFACTS_BUCKET_NAME?: string;
   /** Runtime startup requires this private artifact bucket; missing configuration fails preflight. */
   RUNTIME_RELEASE_BUCKET?: R2Bucket;
   RUNTIME_STARTUP_MODE?: string;
@@ -514,6 +518,8 @@ export type Env = {
   RUNTIME_RELEASE_DESCRIPTOR?: string;
   /** Comma-separated org UUIDs, or `*` for all accounts' new cloud-agent-web sandboxes. */
   RUNTIME_KILO2_ORG_IDS?: string;
+  /** Comma-separated org UUIDs, or `*`, that select Kilo v2 from every session origin. */
+  RUNTIME_KILO2_ALL_SESSION_ORG_IDS?: string;
   /** The v2 release for `RUNTIME_KILO2_ORG_IDS`, in the same form as `RUNTIME_RELEASE_DESCRIPTOR`. */
   RUNTIME_RELEASE_DESCRIPTOR_KILO2?: string;
   /** Queue for callback messages (optional - supports incremental rollout) */

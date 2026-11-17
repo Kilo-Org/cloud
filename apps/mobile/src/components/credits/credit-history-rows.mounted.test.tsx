@@ -69,6 +69,21 @@ function readable(text: string): string {
   return text.replaceAll(/[\u2066\u2068\u2069]/g, '').replaceAll('\u00A0', ' ');
 }
 
+/** The amount and the date the row paints, in the order the row paints them. */
+function paintedAmountAndDate(renderer: TestRenderer.ReactTestRenderer): {
+  amount: string;
+  date: string;
+} {
+  const painted = texts(renderer).map(text => readable(text));
+  const amountIndex = painted.findIndex(text => text.startsWith('+') || text.startsWith('-'));
+  const amount = painted[amountIndex];
+  const date = painted[amountIndex + 1];
+  if (amount === undefined || date === undefined) {
+    throw new Error('The row did not paint an amount and a date');
+  }
+  return { amount, date };
+}
+
 describe('PurchaseHistoryRow', () => {
   it('keeps the expiry line of a store-sold pack beside its store receipt note', async () => {
     const renderer = await renderRow(entry());
@@ -101,6 +116,41 @@ describe('PurchaseHistoryRow', () => {
     );
     renderer.unmount();
   });
+
+  it('names each card purchase receipt with its own amount and date', async () => {
+    const earlier = await renderRow(
+      entry({
+        id: 'purchase-1',
+        creditSource: 'stripe',
+        date: '2026-10-26T10:00:00.000Z',
+        amount_mUsd: 4_900_000,
+      })
+    );
+    const later = await renderRow(
+      entry({
+        id: 'purchase-2',
+        creditSource: 'stripe',
+        date: '2026-11-02T10:00:00.000Z',
+        amount_mUsd: 12_500_000,
+      })
+    );
+
+    const earlierParts = paintedAmountAndDate(earlier);
+    const laterParts = paintedAmountAndDate(later);
+    const earlierLabel = readable(String(receiptLabelOf(earlier)));
+    const laterLabel = readable(String(receiptLabelOf(later)));
+
+    // Two purchases of the same kind must not share one accessible name: the
+    // reader has to know which receipt the action opens.
+    expect(earlierLabel).not.toBe(laterLabel);
+    expect(earlierLabel).toContain(earlierParts.amount);
+    expect(earlierLabel).toContain(earlierParts.date);
+    expect(laterLabel).toContain(laterParts.amount);
+    expect(laterLabel).toContain(laterParts.date);
+
+    earlier.unmount();
+    later.unmount();
+  });
 });
 
 /** The row's own receipt action, which is the only pressable a card purchase paints. */
@@ -119,7 +169,17 @@ describe('PurchaseHistoryRow in the reader language', () => {
       const renderer = await renderRow(entry({ kind: 'purchase', creditSource: 'stripe' }));
 
       expect(texts(renderer)).toContain('شراء رصيد');
-      expect(receiptLabelOf(renderer)).toBe('فتح إيصال شراء رصيد');
+      const { amount, date } = paintedAmountAndDate(renderer);
+      const label = readable(String(receiptLabelOf(renderer)));
+      // The receipt sentence names its own purchase: the kind title, the
+      // painted amount, and the painted date all read inside the sentence,
+      // no matter what order the translation chooses. The verb phrase comes
+      // from ar.json's own frame, so a fallback to the English sentence
+      // cannot pass these checks.
+      expect(label).toContain('شراء رصيد');
+      expect(label).toContain('فتح إيصال');
+      expect(label).toContain(amount);
+      expect(label).toContain(date);
       renderer.unmount();
     } finally {
       await act(async () => {
@@ -136,7 +196,12 @@ describe('PurchaseHistoryRow in the reader language', () => {
       const renderer = await renderRow(entry({ kind: 'auto_top_up', creditSource: 'stripe' }));
 
       expect(texts(renderer)).toContain('الشحن التلقائي');
-      expect(receiptLabelOf(renderer)).toBe('فتح إيصال الشحن التلقائي');
+      const { amount, date } = paintedAmountAndDate(renderer);
+      const label = readable(String(receiptLabelOf(renderer)));
+      expect(label).toContain('الشحن التلقائي');
+      expect(label).toContain('فتح إيصال');
+      expect(label).toContain(amount);
+      expect(label).toContain(date);
       renderer.unmount();
     } finally {
       await act(async () => {

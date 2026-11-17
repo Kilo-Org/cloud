@@ -4,10 +4,9 @@ import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { readDb, type db } from '@kilocode/web-shared/lib/drizzle';
 
 /**
- * The person a Claude billing row names as the one who linked it. A
- * shared-services connection bills an organization's service runs on the
- * release flag of whoever linked it last, so that person must still be able to
- * pass the flag.
+ * The person a Claude billing row names as the one who linked it. An
+ * organization connection bills on the release flag of whoever linked it last,
+ * so that person must still be able to pass the flag.
  */
 export type ClaudeBillingConnector =
   /** The row names no connector; the previous release did not record one. */

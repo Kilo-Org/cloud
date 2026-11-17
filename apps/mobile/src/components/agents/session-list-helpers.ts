@@ -1,7 +1,12 @@
 import { i18n } from '@/i18n';
 import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
 import { isolateLtrBidiText } from '@/lib/bidi';
-import { CURRENCY_ZERO_THRESHOLD, formatClockTime, formatPrefixedUsd } from '@/lib/format';
+import {
+  CURRENCY_ZERO_THRESHOLD,
+  formatClockTime,
+  formatNumber,
+  formatPrefixedUsd,
+} from '@/lib/format';
 import { type StoredSession } from '@/lib/hooks/use-agent-sessions';
 import { isUnknownOrigin, platformLabel, remoteAgentState } from '@/lib/platform-label';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
@@ -17,6 +22,20 @@ export type SessionSection = {
    * names the same day the heading does. */
   timeZone: string;
 };
+
+/**
+ * Spoken heading for one session-list section: the day label with the number of
+ * sessions under it, counted in the active language. The visible row keeps the
+ * label and a bare numeral apart, so this is the one string that ties the count
+ * to what it counts.
+ */
+export function sessionSectionAccessibilityLabel(title: string, count: number): string {
+  return i18n.t('agents.sessionList.sectionAccessibility', {
+    title,
+    count,
+    displayCount: formatNumber(count, i18n.language),
+  });
+}
 
 /** Platform buckets offered by the session filters, in display order. */
 export const PLATFORM_FILTERS = [

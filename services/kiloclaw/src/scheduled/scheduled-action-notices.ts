@@ -126,11 +126,11 @@ export type SweepResult = {
 };
 
 /**
- * Pure orchestration interface for the sweep. The DB-backed and
- * worker-binding-backed implementations live in the entry point below;
- * tests inject their own implementations via runSweepWithIO to verify
- * the orchestration logic without a real Postgres or NOTIFICATIONS
- * service binding.
+ * Pure orchestration interface for the sweep. The DB-backed
+ * implementations and the backend HTTP dispatcher live in the entry
+ * point below; tests inject their own implementations via
+ * runSweepWithIO to verify the orchestration logic without a real
+ * Postgres or a running backend endpoint.
  */
 export type SweepIO = {
   /** Reset stuck 'sending' rows from prior crashed sweeps to 'pending'. */
@@ -398,16 +398,22 @@ export async function dispatchOne(
       // Email goes through the web internal endpoint because the email
       // log + send infra lives in the web app.
       return dispatchEmail(env, row);
-    case 'mobile_push':
-      // Direct RPC to the notifications service. Worker-to-worker, no
-      // round-trip through web.
-      return dispatchMobilePush(env, row);
     case 'webapp':
       // No-op dispatch — the banner reads its state from
       // `kiloclaw.getStatus.scheduledAction` on each poll, so we just
       // mark the row sent immediately. The fact that a row exists IS
       // the user-visible artifact (a notice row in 'sent' tells the
       // banner what to show; a 'cancelled' row hides it).
+      return { ok: true };
+    case 'mobile_push':
+      // KiloClaw no longer pushes to the mobile app. Rows created before
+      // this change still drain here so they cannot sit pending forever;
+      // nothing is sent.
+      console.log('[notices-sweep] skipping retired mobile_push notification', {
+        notificationId: row.notification_id,
+        kind: row.notification_kind,
+        userId: row.user_id,
+      });
       return { ok: true };
     case 'agent':
       // Reserved for a follow-up PR (kilo-chat sendSystemNotice RPC).
@@ -477,47 +483,6 @@ async function dispatchEmail(
     const msg = err instanceof Error ? err.message : String(err);
     return { ok: false, error: msg.slice(0, 500) };
   }
-}
-
-async function dispatchMobilePush(
-  env: KiloClawEnv,
-  row: DueNotificationRow
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (!env.NOTIFICATIONS) {
-    return { ok: false, error: 'NOTIFICATIONS binding not bound' };
-  }
-  try {
-    const event = mobilePushEventFor(row.action_type, row.notification_kind);
-    await env.NOTIFICATIONS.sendScheduledActionNotice({
-      userId: row.user_id,
-      instanceId: row.instance_sandbox_id,
-      sandboxId: row.instance_sandbox_id,
-      event,
-      instanceName: row.instance_name,
-      scheduledAt: row.scheduled_at,
-      targetImageTag: row.target_image_tag,
-    });
-    return { ok: true };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return { ok: false, error: msg.slice(0, 500) };
-  }
-}
-
-function mobilePushEventFor(
-  actionType: 'scheduled_restart' | 'version_change',
-  kind: 'notice' | 'cancelled'
-):
-  | 'scheduled_restart_notice'
-  | 'scheduled_restart_cancelled'
-  | 'scheduled_version_change_notice'
-  | 'scheduled_version_change_cancelled' {
-  if (actionType === 'scheduled_restart') {
-    return kind === 'notice' ? 'scheduled_restart_notice' : 'scheduled_restart_cancelled';
-  }
-  return kind === 'notice'
-    ? 'scheduled_version_change_notice'
-    : 'scheduled_version_change_cancelled';
 }
 
 /**

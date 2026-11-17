@@ -40,6 +40,38 @@ export function claudeBillingRefusalCodeFor(status: number, body: unknown): stri
   return null;
 }
 
+type ClaudeBillingRefusalClass = 'payment_required' | 'forbidden';
+
+/** The class of Anthropic refusal each code describes. */
+const refusalClassOf: Record<ClaudeBillingRefusal, ClaudeBillingRefusalClass> = {
+  [CLAUDE_BILLING_REFUSALS.spendingLimit]: 'payment_required',
+  [CLAUDE_BILLING_REFUSALS.billingUnavailable]: 'payment_required',
+  [CLAUDE_BILLING_REFUSALS.paymentRequiredWithoutCode]: 'payment_required',
+  [CLAUDE_BILLING_REFUSALS.notBillable]: 'forbidden',
+  [CLAUDE_BILLING_REFUSALS.notAuthorized]: 'forbidden',
+  [CLAUDE_BILLING_REFUSALS.forbiddenWithoutCode]: 'forbidden',
+};
+
+/** The refusals that carry their status class and nothing else. */
+const statusOnlyRefusalClass = new Map<string, ClaudeBillingRefusalClass>([
+  [CLAUDE_BILLING_REFUSALS.forbiddenWithoutCode, 'forbidden'],
+  [CLAUDE_BILLING_REFUSALS.paymentRequiredWithoutCode, 'payment_required'],
+]);
+
+/**
+ * The stored codes a status-only refusal must not replace. Those codes name the
+ * same status class, so a later status-only refusal from the same connection —
+ * the compatibility API sends only `billing_error` — keeps the specific
+ * explanation the customer already had.
+ */
+export function specificRefusalCodesFor(statusOnlyCode: string): string[] {
+  const statusClass = statusOnlyRefusalClass.get(statusOnlyCode);
+  if (!statusClass) return [];
+  return Object.values(CLAUDE_BILLING_REFUSALS).filter(
+    code => !statusOnlyRefusalClass.has(code) && refusalClassOf[code] === statusClass
+  );
+}
+
 export function isClaudeBillingConnectionDead(code: string): boolean {
   return (
     code === CLAUDE_BILLING_REFUSALS.notBillable || code === CLAUDE_BILLING_REFUSALS.notAuthorized

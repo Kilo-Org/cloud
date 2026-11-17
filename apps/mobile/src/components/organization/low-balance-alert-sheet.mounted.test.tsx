@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { LowBalanceAlertSheet } from '@/components/organization/low-balance-alert-sheet';
 import { i18n } from '@/i18n';
+import { formatPrefixedUsd } from '@/lib/format';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 const boundary = vi.hoisted(() => ({
@@ -79,11 +80,30 @@ vi.mock('@/lib/hooks/use-current-user-id', () => ({
 }));
 vi.mock('@/lib/format', () => ({
   formatNumber: String,
+  formatPrefixedUsd: String,
+  normalizeLocalizedNumber: (value: string) => {
+    const text = value.trim().replaceAll(',', '');
+    return /^-?\d+(\.\d+)?$/.test(text) ? text : null;
+  },
   parseLocalizedNumber: (value: string) => {
     const parsed = Number(value.trim().replaceAll(',', ''));
     return Number.isFinite(parsed) ? parsed : null;
   },
 }));
+
+const thresholdFieldOf = (renderer: ReactTestRenderer): ReactTestInstance =>
+  fieldByLabel(renderer, i18n.t('organization.lowBalanceAlert.thresholdLabel'));
+const saveButtonOf = (renderer: ReactTestRenderer): ReactTestInstance =>
+  renderer.root.find(node => String(node.type) === 'Button');
+
+/** The sentence the threshold field shows for an amount above the stored ceiling. */
+const capSentence = () =>
+  i18n.t('spendAlerts.thresholdMaxError', {
+    max: formatPrefixedUsd(1_000_000_000, i18n.language, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }),
+  });
 
 const EMOJI_REJECTION =
   '[{"validation":"email","code":"invalid_format","path":["minimum_balance_alert_email"]}]';
@@ -222,6 +242,86 @@ describe('low balance alert sheet', () => {
     // Correcting the field leaves Save usable.
     const button = renderer.root.find(node => String(node.type) === 'Button');
     expect(button.props.disabled).toBe(false);
+    unmount();
+  });
+
+  it('disables Save for a threshold too large to store, then re-enables it once corrected', async () => {
+    const { renderer, unmount } = await mountSheet();
+    const toggle = renderer.root.find(node => String(node.type) === 'Switch');
+    await act(() => {
+      (toggle.props.onValueChange as (value: boolean) => void)(true);
+    });
+
+    const threshold = thresholdFieldOf(renderer);
+    const paste = '1'.repeat(300);
+    await act(() => {
+      (threshold.props.onChangeText as (value: string) => void)(paste);
+    });
+
+    expect(saveButtonOf(renderer).props.disabled).toBe(true);
+    expect(
+      (thresholdFieldOf(renderer).props.validate as (value: string) => string | null)(paste)
+    ).toBe(capSentence());
+
+    await act(() => {
+      (threshold.props.onChangeText as (value: string) => void)('250');
+    });
+    expect(saveButtonOf(renderer).props.disabled).toBe(false);
+
+    // Switching the alert off unmounts the field and switching it back on
+    // remounts it with the draft still above the ceiling, so the field names
+    // the cap again instead of leaving Save disabled with no reason.
+    await act(() => {
+      (threshold.props.onChangeText as (value: string) => void)('1000000001');
+    });
+    await act(() => {
+      (toggle.props.onValueChange as (value: boolean) => void)(false);
+    });
+    await act(() => {
+      (toggle.props.onValueChange as (value: boolean) => void)(true);
+    });
+    expect(thresholdFieldOf(renderer).props.error).toBe(capSentence());
+    expect(saveButtonOf(renderer).props.disabled).toBe(true);
+    unmount();
+
+    // A stored amount above the ceiling names itself at the mount, with no
+    // interaction: the field shows the cap and Save stays disabled.
+    query.data = {
+      settings: {
+        minimum_balance: 2_000_000_000,
+        minimum_balance_alert_email: ['one@example.com'],
+      },
+    };
+    const seeded = await mountSheet();
+    expect(thresholdFieldOf(seeded.renderer).props.error).toBe(capSentence());
+    expect(saveButtonOf(seeded.renderer).props.disabled).toBe(true);
+
+    const seededThreshold = thresholdFieldOf(seeded.renderer);
+    await act(() => {
+      (seededThreshold.props.onChangeText as (value: string) => void)('250');
+    });
+    expect(thresholdFieldOf(seeded.renderer).props.error).toBeUndefined();
+    expect(saveButtonOf(seeded.renderer).props.disabled).toBe(false);
+    seeded.unmount();
+  });
+
+  it('names the ceiling on the keystroke that pastes an amount above it, before any blur', async () => {
+    const { renderer, unmount } = await mountSheet();
+    expect(thresholdFieldOf(renderer).props.error).toBeUndefined();
+
+    await act(() => {
+      (thresholdFieldOf(renderer).props.onChangeText as (value: string) => void)('1000000001');
+    });
+
+    expect(thresholdFieldOf(renderer).props.error).toBe(capSentence());
+    expect(saveButtonOf(renderer).props.disabled).toBe(true);
+
+    await act(() => {
+      (thresholdFieldOf(renderer).props.onChangeText as (value: string) => void)('250');
+    });
+
+    expect(thresholdFieldOf(renderer).props.error).toBeUndefined();
+    expect(saveButtonOf(renderer).props.disabled).toBe(false);
     unmount();
   });
 

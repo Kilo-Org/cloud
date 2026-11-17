@@ -493,6 +493,7 @@ describe('isValidOpenRouterModelId', () => {
     'inclusionai/ling-3.0-flash-fin',
     'minimax-m3',
     'minimax/minimax-m2.5-20260211',
+    'nvidia/nemotron-3.5-lightning-free',
     'poolside/laguna-s-2.1',
     'qwen/qwen3.8-max',
     'zai/glm-5.3',

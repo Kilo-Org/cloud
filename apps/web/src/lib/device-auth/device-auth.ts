@@ -179,8 +179,6 @@ export async function createDeviceAuthRequest(params: {
   try {
     return await db.transaction(async tx => {
       if (ipAddress) {
-        // The wait for the address lock below is bounded: a request that cannot
-        // take it within the bound is refused with the pending-limit error.
         await tx.execute(sql.raw(`SET LOCAL lock_timeout = '${DEVICE_AUTH_PENDING_LOCK_WAIT_MS}'`));
 
         // The count and the insert below are one serialized unit for this

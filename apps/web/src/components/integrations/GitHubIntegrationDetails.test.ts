@@ -1,7 +1,7 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { buildAppReturnOutcomeView } from './github-app-outcome';
 import {
-  buildAppReturnOutcomeView,
   buildGitHubManagementInput,
   getGitHubUserConnectionErrorMessage,
   GitHubIntegrationDetails,

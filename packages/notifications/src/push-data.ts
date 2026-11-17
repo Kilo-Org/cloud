@@ -130,15 +130,3 @@ export type GlanceableLiveActivityContentState = Pick<
   | 'scheduled'
   | 'scheduledAt'
 >;
-
-/**
- * Relevance per spec "Presentation order": iOS shows the highest score in the
- * Dynamic Island and orders the Lock Screen by it. Both producers use this.
- */
-export const LIVE_ACTIVITY_RELEVANCE = {
-  sessionNeedsInput: 100,
-  aggregateNeedsInput: 80,
-  sessionActive: 60,
-  aggregate: 40,
-  sessionIdle: 20,
-} as const;

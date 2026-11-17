@@ -19,9 +19,10 @@ import { BUILTIN_AGENT_MODES } from '@/components/agents/mode-normalize';
 import { ModelSelector } from '@/components/agents/model-selector';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
-import { triggerProblemMessage } from '@/lib/cloud-triggers/trigger-problem-copy';
+import { triggerProblemText } from '@/lib/cloud-triggers/trigger-problem-copy';
 import { type TriggerDraft, type TriggerDraftProblems } from '@/lib/cloud-triggers/trigger-draft';
 import { TRIGGER_FIELD_EXAMPLES } from '@/lib/cloud-triggers/trigger-field-examples';
+import { useTouchedProblems } from '@/lib/cloud-triggers/use-touched-problems';
 import {
   useTriggerEnvironments,
   useTriggerProfiles,
@@ -59,6 +60,7 @@ export function TriggerFormAgent({
   // Loaded up front so a saved profile's name shows before the sheet is opened.
   const profiles = useTriggerProfiles(draft.runAsCreator ? undefined : organizationId, true);
   const isCustomAgent = !BUILTIN_AGENT_MODES.some(mode => mode === draft.agent);
+  const { markTouched, shownProblem } = useTouchedProblems(problems);
 
   const agentOptions: TriggerChoice[] = [
     ...BUILTIN_AGENT_MODES.map(mode => ({
@@ -75,17 +77,24 @@ export function TriggerFormAgent({
     environment => environment.id === draft.environmentId
   );
   const selectedProfile = profiles.profiles.find(profile => profile.id === draft.profileId);
+  const modelProblemText = triggerProblemText(shownProblem('model'));
 
   return (
     <View className="gap-4">
-      <TriggerSelectRow
-        label={t('common.agent')}
-        value={draft.agent.length === 0 ? t('cloudAgent.triggers.customAgent') : agentValue}
-        onPress={() => {
-          onOpenSheetChange('agent');
-        }}
-        error={problems.agent === undefined ? undefined : triggerProblemMessage(problems.agent)}
-      />
+      <View className="gap-1">
+        <TriggerSelectRow
+          label={t('common.agent')}
+          value={draft.agent.length === 0 ? t('cloudAgent.triggers.customAgent') : agentValue}
+          onPress={() => {
+            markTouched('agent');
+            onOpenSheetChange('agent');
+          }}
+          error={triggerProblemText(shownProblem('agent'))}
+        />
+        <Text variant="muted" className="text-xs">
+          {t('cloudAgent.triggers.agentHelp')}
+        </Text>
+      </View>
       {isCustomAgent && (
         <FormField
           label={t('profiles.agents.slug')}
@@ -101,9 +110,6 @@ export function TriggerFormAgent({
           maxLength={50}
         />
       )}
-      <Text variant="muted" className="text-xs">
-        {t('cloudAgent.triggers.agentHelp')}
-      </Text>
 
       <View className="gap-2">
         <View className="flex-row items-center gap-2">
@@ -115,6 +121,9 @@ export function TriggerFormAgent({
             onSelect={(model, variant) => {
               onDraftChange({ ...draft, model, variant });
             }}
+            onOpen={() => {
+              markTouched('model');
+            }}
             isLoading={models.isLoading}
           />
           {models.isError ? (
@@ -123,8 +132,8 @@ export function TriggerFormAgent({
             </Text>
           ) : null}
         </View>
-        {problems.model === undefined ? null : (
-          <Text className="text-xs text-destructive">{triggerProblemMessage(problems.model)}</Text>
+        {modelProblemText === undefined ? null : (
+          <Text className="text-xs text-destructive">{modelProblemText}</Text>
         )}
       </View>
 
@@ -136,16 +145,18 @@ export function TriggerFormAgent({
           onOpenSheetChange('environment');
         }}
       />
-      <TriggerSelectRow
-        label={t('common.profile')}
-        value={selectedProfile?.name ?? t('cloudAgent.triggers.profileDefaults')}
-        onPress={() => {
-          onOpenSheetChange('profile');
-        }}
-      />
-      <Text variant="muted" className="text-xs">
-        {t('cloudAgent.triggers.profileHelp')}
-      </Text>
+      <View className="gap-1">
+        <TriggerSelectRow
+          label={t('common.profile')}
+          value={selectedProfile?.name ?? t('cloudAgent.triggers.profileDefaults')}
+          onPress={() => {
+            onOpenSheetChange('profile');
+          }}
+        />
+        <Text variant="muted" className="text-xs">
+          {t('cloudAgent.triggers.profileHelp')}
+        </Text>
+      </View>
 
       <TriggerChoiceSheet
         visible={openSheet === 'agent'}

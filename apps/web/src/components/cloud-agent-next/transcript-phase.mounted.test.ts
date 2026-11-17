@@ -404,6 +404,8 @@ describe('CloudChatPage route-aware transcript phase', () => {
       staticMessages: [],
       dynamicMessages: [],
       pendingMessages: new Map(),
+      resolvedDeliveryFailures: new Set(),
+      supersededInFlightMessageIds: new Set(),
       preparationAttempts: [],
       commits: [],
       unreadablePermissions: [],

@@ -69,7 +69,7 @@ const state = vi.hoisted(() => ({
     refetch: vi.fn(),
   },
   push: vi.fn(),
-  mintInstallState: vi.fn(),
+  handoffUrl: vi.fn(),
   openExternalUrl: vi.fn(),
   toastError: vi.fn(),
   resync: vi.fn(() => Promise.resolve()),
@@ -168,6 +168,7 @@ vi.mock('@/components/ui/icons', () => ({
   X: 'X',
 }));
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://example.test' }));
+vi.mock('@/lib/app-shell-handoff', () => ({ appShellHandoffUrl: state.handoffUrl }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: state.openExternalUrl }));
 vi.mock('@/lib/pr-review/connect-gate-platform', () => ({
   openAuthorizationAndWaitForReturn: (url: string) => state.openExternalUrl(url),
@@ -200,11 +201,6 @@ vi.mock('@/lib/trpc', () => ({
       },
     },
   }),
-  trpcClient: {
-    githubApps: {
-      mintInstallState: { mutate: state.mintInstallState },
-    },
-  },
 }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   useCommittedConnectivityStatus: () => 'online',
@@ -269,7 +265,7 @@ beforeEach(() => {
   state.reviews.isFetchNextPageError = false;
   state.reviews.hasNextPage = false;
   state.reviews.error.data.code = 'INTERNAL_SERVER_ERROR';
-  state.mintInstallState.mockReset();
+  state.handoffUrl.mockReset();
   state.openExternalUrl.mockReset();
   state.openExternalUrl.mockResolvedValue(undefined);
   state.toastError.mockReset();
@@ -392,42 +388,39 @@ describe('Reviewer repository bodies', () => {
     unmount();
   });
 
-  it('opens the install page with a minted token', async () => {
+  it('opens the app shell hand-off for the GitHub settings page', async () => {
     state.platform = 'github';
-    state.mintInstallState.mockResolvedValue({ token: 'token-1' });
+    state.handoffUrl.mockResolvedValue('https://example.test/app-shell/handoff?token=handoff-1');
     const { renderer, unmount } = await renderWithProviders(reposRoute());
     pressManageAccess(renderer);
     await vi.waitFor(() => {
       expect(state.openExternalUrl).toHaveBeenCalledWith(
-        'https://example.test/github-app?installState=token-1&fromApp=1'
+        'https://example.test/app-shell/handoff?token=handoff-1'
       );
     });
+    expect(state.handoffUrl).toHaveBeenCalledWith({ page: 'github-app' });
     expect(state.toastError).not.toHaveBeenCalled();
     unmount();
   });
 
-  it('falls back to the tokenless settings page when the org rejects the mint', async () => {
+  it('names the organization on the hand-off target', async () => {
     state.platform = 'github';
     state.scope = 'org-1';
-    state.mintInstallState.mockRejectedValue(
-      Object.assign(new Error('This organization already has a GitHub installation'), {
-        data: { code: 'FORBIDDEN', httpStatus: 403 },
-      })
-    );
+    state.handoffUrl.mockResolvedValue('https://example.test/app-shell/handoff?token=handoff-1');
     const { renderer, unmount } = await renderWithProviders(reposRoute());
     pressManageAccess(renderer);
     await vi.waitFor(() => {
-      expect(state.openExternalUrl).toHaveBeenCalledWith(
-        'https://example.test/github-app?organizationId=org-1'
-      );
+      expect(state.handoffUrl).toHaveBeenCalledWith({
+        page: 'github-app',
+        organizationId: 'org-1',
+      });
     });
-    expect(state.toastError).not.toHaveBeenCalled();
     unmount();
   });
 
-  it('toasts without opening anything on a non-FORBIDDEN mint failure', async () => {
+  it('toasts without opening anything when the hand-off cannot be minted', async () => {
     state.platform = 'github';
-    state.mintInstallState.mockRejectedValue(
+    state.handoffUrl.mockRejectedValue(
       Object.assign(new Error('offline'), { data: { code: 'INTERNAL_SERVER_ERROR' } })
     );
     const { renderer, unmount } = await renderWithProviders(reposRoute());

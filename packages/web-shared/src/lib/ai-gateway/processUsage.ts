@@ -32,7 +32,6 @@ import PostHogClient from '@kilocode/web-shared/lib/posthog';
 import { hasPaymentMethod } from '@kilocode/web-shared/lib/admin-utils-serverside';
 import type { SQL } from 'drizzle-orm';
 import { and, eq, sql } from 'drizzle-orm';
-import { sentryRootSpan } from '../getRootSpan';
 import {
   mutateOrganizationUsage,
   scheduleOrganizationLowBalanceAlert,
@@ -88,6 +87,8 @@ import {
   providerReportsIsByok,
   drainSseStream,
   contentPartSchema,
+  arrayContainingSchema,
+  nonEmptyStringSchema,
   extractVercelIsByok,
   extractVercelUpstreamId,
   parseUsageWithRecovery,
@@ -1434,6 +1435,44 @@ function chatContentText(content: z.infer<typeof chatMessageSchema>['content']):
     .join('');
 }
 
+const generatedReasoningDetailSchema = z.union([
+  z.looseObject({ text: nonEmptyStringSchema }),
+  z.looseObject({ summary: nonEmptyStringSchema }),
+]);
+
+const generatedToolCallSchema = z.looseObject({
+  function: z.union([
+    z.looseObject({ name: nonEmptyStringSchema }),
+    z.looseObject({ arguments: nonEmptyStringSchema }),
+  ]),
+});
+
+// Mistral nests reasoning text in `thinking` content parts.
+const generatedContentPartSchema = z.union([
+  z.looseObject({ text: nonEmptyStringSchema }),
+  z.looseObject({ thinking: arrayContainingSchema(z.looseObject({ text: nonEmptyStringSchema })) }),
+]);
+
+// Role-only, finish, and usage chunks carry no generated tokens, and neither
+// does encrypted reasoning.
+const generatedOutputDeltaSchema = z.union([
+  z.looseObject({
+    content: z.union([nonEmptyStringSchema, arrayContainingSchema(generatedContentPartSchema)]),
+  }),
+  z.looseObject({ reasoning: nonEmptyStringSchema }),
+  z.looseObject({ reasoning_content: nonEmptyStringSchema }),
+  z.looseObject({ reasoning_details: arrayContainingSchema(generatedReasoningDetailSchema) }),
+  z.looseObject({ refusal: nonEmptyStringSchema }),
+  z.looseObject({ tool_calls: arrayContainingSchema(generatedToolCallSchema) }),
+  z.looseObject({ images: z.array(z.unknown()).min(1) }),
+  z.looseObject({
+    audio: z.union([
+      z.looseObject({ transcript: nonEmptyStringSchema }),
+      z.looseObject({ data: nonEmptyStringSchema }),
+    ]),
+  }),
+]);
+
 const chatUsageChunkSchema = chatUsageFieldsSchema.extend({
   choices: z
     .array(
@@ -1472,36 +1511,20 @@ export async function parseMicrodollarUsageFromStream(
     name: 'openrouter-stream-processing',
     op: 'performance',
   });
-  const timeToFirstTokenSpan = startInactiveSpan({
-    name: 'time-to-first-token',
-    op: 'performance',
-  });
-
   let messageId: string | null = null;
   let model: string | null = null;
   let responseContent = ''; // for abuse investigation
   let reportedError = statusCode >= 400;
   let effectiveStatusCode = statusCode;
-  const startedAt = performance.now();
-  let firstTokenReceived = false;
   let usage: z.infer<typeof openRouterUsageSchema> | null = null;
   let inference_provider: string | null = null;
   let finish_reason: unknown = null;
   let vercelProviderMetadata: VercelProviderMetaData | null = null;
 
   const onEvent = (event: EventSourceMessage) => {
-    if (!firstTokenReceived) {
-      sentryRootSpan()?.setAttribute(
-        'openrouter.time_to_first_token_ms',
-        performance.now() - startedAt
-      );
-      firstTokenReceived = true;
-      timeToFirstTokenSpan.end();
-    }
-
     if (event.data === '[DONE]') {
       metadataCapture?.captureVercelMetadata('[DONE]');
-      return;
+      return false;
     }
 
     const rawJson: unknown = JSON.parse(event.data);
@@ -1548,6 +1571,8 @@ export async function parseMicrodollarUsageFromStream(
     finish_reason = choice?.finish_reason ?? finish_reason;
 
     responseContent += chatContentText(choice?.delta?.content);
+
+    return json.choices?.some(c => generatedOutputDeltaSchema.safeParse(c.delta).success) ?? false;
   };
 
   const { wasAborted, malformedEventCount, timing } = await drainSseStream(
@@ -1555,6 +1580,7 @@ export async function parseMicrodollarUsageFromStream(
     onEvent,
     streamProcessingSpan,
     requestStartedAt,
+    'openrouter.time_to_first_token_ms',
     () => ({ kiloUserId, provider, messageId, model })
   );
 

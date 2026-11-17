@@ -15,8 +15,10 @@ vi.mock('@/components/ui/icons', () => ({
   FileText: 'FileText',
   KeyRound: 'KeyRound',
   LineChart: 'LineChart',
+  Lock: 'Lock',
   Plug: 'Plug',
   ScrollText: 'ScrollText',
+  Server: 'Server',
   Shield: 'Shield',
   SlidersHorizontal: 'SlidersHorizontal',
   Users: 'Users',
@@ -47,16 +49,22 @@ function inAppAreas(overrides: Partial<OrgInAppSettingsGate> = {}) {
 
 describe('visibleOrgSettingsRows', () => {
   it('lists every web area for an owner of an enterprise organization', () => {
-    expect(areas()).toEqual(['providersAndModels', 'guardrails']);
+    expect(areas()).toEqual(['providersAndModels', 'guardrails', 'ssoAndDomain']);
   });
 
-  it('lists no web area for a member, who reads every destination in the app', () => {
-    expect(areas({ role: 'member' })).toEqual([]);
-    expect(areas({ role: 'member', plan: 'teams' })).toEqual([]);
+  it('keeps the shell card a member may open on enterprise', () => {
+    // The SSO card is the shell's own page, so it carries no billing gate.
+    expect(areas({ role: 'member' })).toEqual(['ssoAndDomain']);
+  });
+
+  it('shows the teams data collection card where enterprise shows providers and models', () => {
+    // Data collection is the teams dashboard card the shell hosts, so a member
+    // sees it where an enterprise member sees providers and models.
+    expect(areas({ role: 'member', plan: 'teams' })).toEqual(['dataCollection']);
   });
 
   it('keeps billing, management and admin rows for an admin on teams', () => {
-    expect(areas({ role: 'admin', plan: 'teams' })).toEqual(['guardrails']);
+    expect(areas({ role: 'admin', plan: 'teams' })).toEqual(['guardrails', 'dataCollection']);
   });
 
   it('hides guardrails when the organization has not enabled Kilo Encrypt', () => {
@@ -69,38 +77,60 @@ describe('visibleOrgSettingsRows', () => {
     expect(rows).toContain('providersAndModels');
   });
 
-  it('offers no row for the removed sub-organization destinations', () => {
+  it('offers no row for the removed sub-organization and integration destinations', () => {
     for (const role of ['owner', 'admin', 'billing_manager', 'member'] as const) {
       for (const plan of ['enterprise', 'teams'] as const) {
         for (const row of visibleOrgSettingsRows(gate({ role, plan }), 'org_1')) {
-          // The hub names neither area and links nowhere for them.
-          expect(row.url).not.toContain('sub-organizations');
-          expect(row.url).not.toContain('distribute-funds');
-          expect(row.url).not.toContain('request-logs');
+          if (row.target.kind !== 'web') continue;
+          // The hub names none of these areas and links nowhere for them:
+          // sub-organizations and distribute funds are a parent-only area this
+          // app does not reimplement, integrations open the app's own screen
+          // from the members card, and request logs are a native screen.
+          expect(row.target.url).not.toContain('sub-organizations');
+          expect(row.target.url).not.toContain('distribute-funds');
+          expect(row.target.url).not.toContain('/request-logs');
+          expect(row.target.url).not.toContain('/integrations');
         }
       }
     }
   });
 
-  it('opens a page of its own for every row, never the dashboard', () => {
+  it('opens a page of its own for every web row, never the dashboard', () => {
     for (const role of ['owner', 'admin', 'billing_manager', 'member'] as const) {
       for (const plan of ['enterprise', 'teams'] as const) {
-        const rows = visibleOrgSettingsRows(gate({ role, plan }), 'org_1');
-        for (const row of rows) {
+        for (const row of visibleOrgSettingsRows(gate({ role, plan }), 'org_1')) {
+          if (row.target.kind !== 'web') continue;
           // A suffix-less row lands on the organization dashboard, which links
           // to the seats purchase; the hub lists no such row.
-          expect(new URL(row.url).pathname).not.toBe('/organizations/org_1');
-          expect(
-            new URL(row.url, 'http://localhost').pathname.startsWith('/organizations/org_1/')
-          ).toBe(true);
+          expect(new URL(row.target.url).pathname).not.toBe('/organizations/org_1');
+          expect(new URL(row.target.url).pathname.startsWith('/organizations/org_1/')).toBe(true);
         }
       }
     }
-    const byArea = new Map(visibleOrgSettingsRows(gate(), 'org_1').map(row => [row.area, row.url]));
-    expect(
-      byArea.get('providersAndModels')?.endsWith('/organizations/org_1/providers-and-models')
-    ).toBe(true);
-    expect(byArea.get('guardrails')?.endsWith('/organizations/org_1/guardrails')).toBe(true);
+  });
+
+  it('opens the page that owns each row, and the shell page for a dashboard card', () => {
+    const byArea = new Map(
+      visibleOrgSettingsRows(gate(), 'org_1').map(row => [row.area, row.target])
+    );
+    expect(byArea.get('providersAndModels')).toEqual({
+      kind: 'web',
+      url: 'https://app.kilo.ai/organizations/org_1/providers-and-models',
+    });
+    expect(byArea.get('guardrails')).toEqual({
+      kind: 'web',
+      url: 'https://app.kilo.ai/organizations/org_1/guardrails',
+    });
+    // The two dashboard cards the app shell owns hand off to their shell pages.
+    expect(byArea.get('ssoAndDomain')).toEqual({
+      kind: 'app-shell',
+      target: { page: 'organization-sso', organizationId: 'org_1' },
+    });
+    const teams = visibleOrgSettingsRows(gate({ plan: 'teams' }), 'org_1');
+    expect(teams.find(row => row.area === 'dataCollection')?.target).toEqual({
+      kind: 'app-shell',
+      target: { page: 'organization-data-collection', organizationId: 'org_1' },
+    });
   });
 
   it('keeps every in-app area out of the web group', () => {

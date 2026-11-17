@@ -38,6 +38,8 @@ import {
 import { FakeWrapper } from './helpers/fake-wrapper.js';
 import { seedRegistration } from './helpers/seed-registration.js';
 import { waitFor } from './wait-for.js';
+import { pendingNativeStart } from './helpers/pending-native-start.js';
+import { supervisorStartup } from '../fixtures/supervisor-startup.js';
 
 const SESSION = 'workspace_11111111-1111-1111-1111-111111111111';
 const KILO_SESSION = 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -487,6 +489,68 @@ describe('environment snapshot launch', () => {
     await releaseHeld(stub, () => provider.releaseLaunch());
   });
 
+  it('does not retry an interrupted native snapshot launch during worktree deletion', async () => {
+    const fields = vi.spyOn(logger, 'withFields');
+    const native = await pendingNativeStart();
+    native.container.images['runtime-free'] = SNAPSHOT.baseImage;
+    const provider = createFakeProvider();
+    provider.adapter.launch = async (ref, { env: launchEnv }, options) => {
+      provider.launchEnvs.push({ ...launchEnv });
+      const result = await native.stub.launchWrapper({
+        allocationRef: ref,
+        command: supervisorStartup(),
+        env: {},
+        instance: 'standard-4',
+        snapshot: options?.snapshot,
+      });
+      return { startSource: result.startSource };
+    };
+    provider.adapter.stop = async ref => {
+      provider.stopRefs.push(ref);
+      return ref === null ? 'terminal' : native.stub.stop(ref);
+    };
+    const sandboxId = 'sbx__snapshot_delete_during_start';
+    const { stub } = await setup(sandboxId, provider);
+    let deletion: Promise<unknown> | undefined;
+    try {
+      await stub.prepare(prepareInput(BUILD));
+      await waitFor(() => expect(native.container.probes).toBe(1));
+      expect((await stub.getAllocationState()).kind).toBe('creating');
+      deletion = stub.deleteWorktreeResources({
+        worktreeId: 'worktree_11111111-1111-4111-8111-111111111111',
+        kiloUserId: 'user_123',
+        location: { sandboxId, provider: 'cloudflare-containers' },
+        sessionIds: [KILO_SESSION],
+      });
+      await waitFor(() => expect(native.container.destroys).toBe(1));
+      // Deletion has not yet confirmed its stop or changed the allocation reducer.
+      expect((await stub.getAllocationState()).kind).toBe('creating');
+      await waitFor(() =>
+        expect(fields.mock.calls.map(([record]) => record.diagnosticEvent)).toContain(
+          'launch_interrupted'
+        )
+      );
+      native.releaseDestroy();
+      await expect(deletion).resolves.toMatchObject({ deleted: true });
+      native.releaseProbe();
+      await new Promise(resolve => setTimeout(resolve, 25));
+
+      expect((await stub.getAllocationState()).kind).toBe('stopped');
+      expect(native.container.starts).toBe(1);
+      expect(native.container.running).toBe(false);
+      expect(provider.launchEnvs).toHaveLength(1);
+      expect(provider.stopRefs).toHaveLength(1);
+      const diagnostics = fields.mock.calls.map(([record]) => record.diagnosticEvent);
+      expect(diagnostics).not.toContain('snapshot_launch_failed');
+      expect(diagnostics).not.toContain('snapshot_launch_retry');
+      expect(diagnostics).not.toContain('create_failed');
+    } finally {
+      native.releaseProbe();
+      native.releaseDestroy();
+      await deletion;
+    }
+  });
+
   it('retries the same snapshot on the same allocation with its own deadline after a transient start failure', async () => {
     const sandboxId = 'sbx__repo_launch_retry';
     const provider = createFakeProvider({
@@ -586,6 +650,12 @@ describe('environment snapshot launch', () => {
       stopError: scenario.stopError,
     });
     const { stub, peer } = await setup('sbx__repo_retry_stop_failed', provider);
+    // The repeated stop is covered by unit tests; one attempt keeps this test fast.
+    await runInDurableObject(stub, instance => {
+      Object.assign(instance, {
+        sandboxTimers: () => ({ ...CONTROL_PLANE_TIMERS.sandbox, snapshotRetryStopMs: 0 }),
+      });
+    });
     await stub.prepare(prepareInput(BUILD));
     await waitForFailed(peer);
     expect(provider.launchEnvs).toHaveLength(1);

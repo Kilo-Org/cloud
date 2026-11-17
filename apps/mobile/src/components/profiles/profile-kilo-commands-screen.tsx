@@ -16,6 +16,7 @@ import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
 import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import { QueryError } from '@/components/query-error';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Terminal } from '@/components/ui/icons';
@@ -28,6 +29,7 @@ import {
   useAgentProfileSectionMutations,
 } from '@/lib/hooks/use-agent-profiles';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { MAX_PROFILE_KILO_COMMANDS } from '@/lib/agent-profile-forms';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
@@ -67,6 +69,9 @@ export function ProfileKiloCommandsScreen({
 
   const commands = profileQuery.data ?? NO_COMMANDS;
   const rows = kiloCommandRows(commands);
+  // The server counts every row this profile holds and the list returns every
+  // row unfiltered, so the loaded length is the count the cap compares.
+  const atCommandCap = commands.length >= MAX_PROFILE_KILO_COMMANDS;
   // The open form comes from the sibling screens' draft contract: it survives a
   // remount, and its generation is what proves a settling save still owns it.
   const draftScope = `profiles:slash-commands:${profileId}`;
@@ -244,7 +249,14 @@ export function ProfileKiloCommandsScreen({
           );
         })}
         <ProfileManageSlot permission={permission}>
-          <Button onPress={startAdd}>
+          {atCommandCap ? (
+            <AccessibleStatus
+              message={t('profiles.slashCommands.limitReached', { max: MAX_PROFILE_KILO_COMMANDS })}
+              tone="warn"
+              className="text-sm"
+            />
+          ) : null}
+          <Button disabled={atCommandCap} onPress={startAdd}>
             <Text>{t('profiles.slashCommands.add')}</Text>
           </Button>
         </ProfileManageSlot>

@@ -908,10 +908,10 @@ export class UserConnectionDO extends DurableObject<Env> {
     if (attachment.kiloUserId) {
       const changedSessionIds = new Set<string>();
       // `needsApproval` gates the Approve control on the locked surfaces, so a
-      // move into or out of `permission` must bypass the delivery window. Only
-      // the sessions that moved are named: this batch aggregates every
-      // connection, so it can span the personal scope and several orgs, and the
-      // exemption must not reach a scope that had no approval change.
+      // move into or out of `permission` is delivered on the shorter approval
+      // interval. Only the sessions that moved are named: this batch aggregates
+      // every connection, so it can span the personal scope and several orgs,
+      // and the shorter interval belongs only to the scope with the move.
       const approvalChangedSessionIds = new Set<string>();
       for (const session of this.aggregateSessions()) {
         const previous = previousStatuses.get(session.id);
@@ -2165,15 +2165,14 @@ export class UserConnectionDO extends DurableObject<Env> {
           cliSessionIds: rootSessionIds,
           // A disconnecting CLI leaves the live aggregate, so the snapshot the
           // locked surfaces build no longer carries its permission: the Approve
-          // control clears now rather than behind the delivery window. The
-          // attention reset above does not write the stored status — it holds
-          // the clear for the CLI absence window — so this exemption covers the
-          // aggregate drop, and the deferred write fires its own exemption in
-          // `resetAttentionStatusOnCliDisconnect` for a session that stays
-          // snapshot-visible (a cloud agent merged from Postgres, not the live
-          // list). Only the scopes whose roots moved are named: this batch
-          // aggregates every connection, so a request-level flag would exempt
-          // scopes that had no approval change.
+          // control clears on the shorter approval interval. The attention reset
+          // above does not write the stored status — it holds the clear for the
+          // CLI absence window — so this hint covers the aggregate drop, and
+          // `resetAttentionStatusOnCliDisconnect` names the session on the same
+          // path for a session that stays snapshot-visible (a cloud agent merged
+          // from Postgres, not the live list). Only the scopes whose roots moved
+          // are named: this batch aggregates every connection, so a
+          // request-level flag would name scopes with no approval move.
           approvalChangedSessionIds: rootSessionIds.filter(id => permissionRootIds.has(id)),
         })
       );

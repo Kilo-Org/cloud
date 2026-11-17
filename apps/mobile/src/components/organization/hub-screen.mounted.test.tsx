@@ -41,6 +41,7 @@ const boundary = vi.hoisted(() => ({
 }));
 const routerPush = vi.hoisted(() => vi.fn());
 const openExternalUrlMock = vi.hoisted(() => vi.fn());
+const openAppShellHandoffMock = vi.hoisted(() => vi.fn());
 const kiloPassQuery = vi.hoisted(() => ({ enabled: [] as boolean[] }));
 const membersQuery = vi.hoisted(() => ({
   data: undefined as
@@ -132,6 +133,7 @@ vi.mock('@/lib/billing/external-purchase-link', () => ({
 }));
 
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: openExternalUrlMock }));
+vi.mock('@/lib/app-shell-handoff', () => ({ openAppShellHandoff: openAppShellHandoffMock }));
 
 vi.mock('@/lib/format', () => ({
   formatPrefixedMoney: (amount: number) => `$${amount}`,
@@ -316,6 +318,7 @@ beforeEach(() => {
   kiloPassRowState.current = null;
   routerPush.mockClear();
   openExternalUrlMock.mockClear();
+  openAppShellHandoffMock.mockClear();
   kiloPassQuery.enabled = [];
   membersQuery.data = { parent_organization_id: null, settings: {} };
   membersQuery.isError = false;
@@ -1066,6 +1069,53 @@ describe('Organization hub settings-on-the-web group', () => {
       (row.props.onPress as () => void)();
     });
     expect(routerPush).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/organization/request-logs');
+    expect(openExternalUrlMock).not.toHaveBeenCalled();
+    unmount();
+  });
+});
+
+describe('Organization hub settings rows on the app shell', () => {
+  const rowTitled = (renderer: TestRenderer.ReactTestRenderer, title: string) => {
+    const row = renderer.root
+      .findAllByType('ConfigureRow')
+      .find(node => node.props.title === title);
+    if (row === undefined) {
+      throw new Error(`the hub shows the "${title}" row`);
+    }
+    return row;
+  };
+
+  it('hands the SSO card off to its shell page', async () => {
+    boundary.plan = 'enterprise';
+    const { renderer, unmount } = await renderHub();
+
+    const title = i18n.t('organization.settingsOnWeb.ssoAndDomain');
+    act(() => {
+      (rowTitled(renderer, title).props.onPress as () => void)();
+    });
+
+    // The card lives on the dashboard the shell owns, so the row may not open
+    // the full-web organization page.
+    expect(openAppShellHandoffMock).toHaveBeenCalledWith(
+      { page: 'organization-sso', organizationId: 'org-1' },
+      { label: title }
+    );
+    expect(openExternalUrlMock).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('hands the data-collection card off to its shell page', async () => {
+    const { renderer, unmount } = await renderHub();
+
+    const title = i18n.t('organization.settingsOnWeb.dataCollection');
+    act(() => {
+      (rowTitled(renderer, title).props.onPress as () => void)();
+    });
+
+    expect(openAppShellHandoffMock).toHaveBeenCalledWith(
+      { page: 'organization-data-collection', organizationId: 'org-1' },
+      { label: title }
+    );
     expect(openExternalUrlMock).not.toHaveBeenCalled();
     unmount();
   });

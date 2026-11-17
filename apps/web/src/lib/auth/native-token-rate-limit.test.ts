@@ -132,4 +132,29 @@ describe('native token rate limits', () => {
       { level: 'error', tags: { source: 'native_token_rate_limit' } }
     );
   });
+
+  it('reports an account answer the firewall could not evaluate and keeps the answer', async () => {
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: true, error: 'blocked' });
+
+    expect(await isNativeTokenUserRateLimited(createRequest(), 'user-1')).toBe(true);
+    expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      "Firewall rate limit 'native-token-user' could not be evaluated",
+      { level: 'error', tags: { source: 'native_token_rate_limit' } }
+    );
+  });
+
+  it('lets the exchange finish on a blocked account answer that is not limited', async () => {
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: false, error: 'blocked' });
+
+    expect(await isNativeTokenUserRateLimited(createRequest(), 'user-1')).toBe(false);
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      "Firewall rate limit 'native-token-user' could not be evaluated",
+      { level: 'error', tags: { source: 'native_token_rate_limit' } }
+    );
+    expect(mockCaptureMessage).not.toHaveBeenCalledWith(
+      "Firewall rate limit 'native-token-user' is not configured",
+      { level: 'error', tags: { source: 'native_token_rate_limit' } }
+    );
+  });
 });

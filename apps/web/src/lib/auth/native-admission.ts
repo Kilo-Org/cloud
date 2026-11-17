@@ -1,7 +1,6 @@
 import 'server-only';
 import { randomBytes } from 'node:crypto';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
-import { captureMessage } from '@sentry/nextjs';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { native_admission_challenges, native_attested_keys } from '@kilocode/db/schema';
@@ -14,69 +13,19 @@ import {
 } from './native-admission-apple';
 import { verifyPlayIntegrity } from './native-admission-google';
 import { checkFirewallRateLimit } from './firewall-rate-limit';
-import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import {
+  countAdmissionCondition,
+  rollAdmissionWindowIfNeeded,
+} from './native-admission-telemetry';
+import { captureMessage } from '@sentry/nextjs';
 
 // ── Expected-condition telemetry ───────────────────────────────────────────
 
-/**
- * Interval-aggregated counter for expected, traffic-scaled admission
- * conditions (legacy clients, malformed shapes). Emits one structured log
- * line per 60 s window carrying the count observed in that window instead of
- * one event per request, so rollout traffic cannot flood telemetry. The
- * window start is carried on each line so a burst after a traffic pause is
- * attributed to the window it was counted in.
- */
-const AGGREGATE_INTERVAL_MS = 60_000;
-const admissionCounters = new Map<string, number>();
-let admissionCountersWindowStart = 0;
-
-function flushAdmissionCounters(now: number): void {
-  if (admissionCounters.size === 0) return;
-  for (const [metric, count] of admissionCounters) {
-    warnExceptInTest(
-      JSON.stringify({
-        event: 'native_admission_aggregate',
-        metric,
-        count,
-        intervalMs: AGGREGATE_INTERVAL_MS,
-        // Window the counts were accumulated in, not the flush time.
-        windowStart: new Date(admissionCountersWindowStart).toISOString(),
-        at: new Date(now).toISOString(),
-      })
-    );
-  }
-  admissionCounters.clear();
-}
-
-/**
- * Roll the window forward when it has elapsed. Called on every admission
- * check, so the window closes on any later traffic rather than only when
- * another counted condition arrives — the last window of a sparse traffic
- * pattern is not silently dropped.
- */
-function rollAdmissionWindowIfNeeded(now: number): void {
-  if (now - admissionCountersWindowStart >= AGGREGATE_INTERVAL_MS) {
-    flushAdmissionCounters(now);
-    admissionCountersWindowStart = now;
-  }
-}
-
-/**
- * Count an expected, traffic-scaled admission outcome. Refusals are the normal
- * shape of hostile traffic, so they aggregate per window instead of emitting
- * one event each. Unexpected provider faults keep their per-event message.
- */
-export function countAdmissionCondition(metric: string): void {
-  const now = Date.now();
-  rollAdmissionWindowIfNeeded(now);
-  admissionCounters.set(metric, (admissionCounters.get(metric) ?? 0) + 1);
-}
-
-/** Exported for tests: flush any pending counters and reset the interval. */
-export function resetAdmissionCountersForTests(): void {
-  admissionCounters.clear();
-  admissionCountersWindowStart = 0;
-}
+export {
+  countAdmissionCondition,
+  resetAdmissionCountersForTests,
+  rollAdmissionWindowIfNeeded,
+} from './native-admission-telemetry';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -336,7 +285,7 @@ async function verifyAppleAdmission(
     const result = await verifyAppleAttestation(payload, challenge, keyId);
 
     if (!result.ok) {
-      captureMessage(`apple_attestation_failed: ${result.error}`);
+      countAdmissionCondition('apple_attestation_failed');
       return { ok: false, errorCode: 'ADMISSION_REQUIRED' };
     }
 
@@ -362,7 +311,7 @@ async function verifyAppleAdmission(
   });
 
   if (!existingKey) {
-    captureMessage('apple_assertion_unknown_key');
+    countAdmissionCondition('apple_assertion_unknown_key');
     return { ok: false, errorCode: 'ADMISSION_REQUIRED' };
   }
 
@@ -376,7 +325,7 @@ async function verifyAppleAdmission(
   );
 
   if (!assertionResult.ok) {
-    captureMessage(`apple_assertion_failed: ${assertionResult.error}`);
+    countAdmissionCondition('apple_assertion_failed');
     return { ok: false, errorCode: 'ADMISSION_REQUIRED' };
   }
 
@@ -400,12 +349,7 @@ async function verifyAppleAdmission(
 
   if (!updatedKey) {
     // The update matched zero rows, so the assertion is stale or replayed.
-    // Report only the asserted count: `existingKey.sign_count` is the pre-read
-    // value and may have been advanced by a concurrent assertion, so it must
-    // not be presented as the current database count.
-    captureMessage(
-      `apple_assertion_stale_or_replayed: asserted ${assertionResult.signCount} rejected`
-    );
+    countAdmissionCondition('apple_assertion_stale_or_replayed');
     return { ok: false, errorCode: 'ADMISSION_REQUIRED' };
   }
 
@@ -435,7 +379,7 @@ async function verifyAndroidAdmission(
   const result = await verifyPlayIntegrity(payload, challenge);
 
   if (!result.ok) {
-    captureMessage(`play_integrity_failed: ${result.error}`);
+    countAdmissionCondition('play_integrity_failed');
     return { ok: false, errorCode: 'ADMISSION_REQUIRED' };
   }
 

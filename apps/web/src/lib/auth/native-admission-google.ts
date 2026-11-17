@@ -7,6 +7,7 @@ import {
   GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER,
   GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY,
 } from '@kilocode/web-shared/lib/config.server';
+import { countAdmissionCondition } from './native-admission-telemetry';
 
 /**
  * Google Play Integrity verifier.
@@ -149,21 +150,35 @@ function getPlayIntegrityConfig(): PlayIntegrityConfig | null {
   const projectNumber = GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER;
   const serviceAccountKey = GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY;
 
-  if (!projectNumber || !serviceAccountKey || !GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME) {
+  if (
+    !projectNumber ||
+    !serviceAccountKey ||
+    !GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME ||
+    isCertDigestAllowlistMissing()
+  ) {
     return null;
   }
 
-  const expectedCertDigests = GOOGLE_PLAY_INTEGRITY_CERT_DIGESTS
-    ? GOOGLE_PLAY_INTEGRITY_CERT_DIGESTS.split(',')
-        .map(s => s.trim())
-        .filter(Boolean)
-    : [];
+  const expectedCertDigests = GOOGLE_PLAY_INTEGRITY_CERT_DIGESTS!.split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
 
   return {
     serviceAccountKey,
     expectedPackageName: GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME,
     expectedCertDigests,
   };
+}
+
+/** True when the signing-certificate allowlist is unset, blank, or all separators. */
+export function isCertDigestAllowlistMissing(): boolean {
+  const raw = GOOGLE_PLAY_INTEGRITY_CERT_DIGESTS;
+  return (
+    (raw
+      ?.split(',')
+      .map(s => s.trim())
+      .filter(Boolean) ?? []).length === 0
+  );
 }
 
 /**
@@ -183,6 +198,10 @@ export async function verifyPlayIntegrity(
   const config = getPlayIntegrityConfig();
 
   if (!config) {
+    if (isCertDigestAllowlistMissing()) {
+      captureMessage('play_integrity_cert_digest_allowlist_missing');
+      throw new Error('Google Play Integrity certificate allowlist not configured');
+    }
     captureMessage('google_play_integrity_missing_credentials');
     // Fail-closed: missing credentials in production means we cannot verify.
     throw new Error('Google Play Integrity credentials not configured');
@@ -247,9 +266,10 @@ export async function verifyPlayIntegrity(
   };
 
   const payload = result.tokenPayloadExternal;
-  if (!payload) return { ok: false, error: 'INVALID_TOKEN' };
-
-  // ── Challenge binding ───────────────────────────────────────────────────
+  if (!payload) {
+    countAdmissionCondition('play_integrity_invalid_token');
+    return { ok: false, error: 'INVALID_TOKEN' };
+  }
   // Standard requests bind through `requestHash`, returned verbatim; classic
   // requests use `nonce`. The client sends standard requests, so read
   // `requestHash` and fall back to `nonce` only so a device still running a
@@ -257,13 +277,13 @@ export async function verifyPlayIntegrity(
   // against the same digest, so accepting either binds the same challenge.
   const binding = payload.requestDetails?.requestHash ?? payload.requestDetails?.nonce;
   if (!binding) {
-    captureMessage('play_integrity_missing_request_hash');
+    countAdmissionCondition('play_integrity_missing_request_hash');
     return { ok: false, error: 'NONCE_MISMATCH' };
   }
 
   const expectedBinding = createHash('sha256').update(challenge, 'utf8').digest('base64');
   if (binding !== expectedBinding) {
-    captureMessage('play_integrity_request_hash_mismatch');
+    countAdmissionCondition('play_integrity_request_hash_mismatch');
     return { ok: false, error: 'NONCE_MISMATCH' };
   }
 
@@ -271,9 +291,7 @@ export async function verifyPlayIntegrity(
   const actualPackageName =
     payload.requestDetails?.requestPackageName ?? payload.appIntegrity?.packageName;
   if (!actualPackageName || actualPackageName !== config.expectedPackageName) {
-    captureMessage(
-      `play_integrity_package_mismatch: expected=${config.expectedPackageName} got=${actualPackageName ?? 'null'}`
-    );
+    countAdmissionCondition('play_integrity_package_mismatch');
     return { ok: false, error: 'PACKAGE_MISMATCH' };
   }
 
@@ -283,16 +301,14 @@ export async function verifyPlayIntegrity(
     certDigests.some(actual => actual.toLowerCase() === expected.toLowerCase())
   );
   if (!hasMatch) {
-    captureMessage(
-      `play_integrity_cert_digest_mismatch: expected=[${config.expectedCertDigests.join(',')}] got=[${certDigests.join(',')}]`
-    );
+    countAdmissionCondition('play_integrity_cert_digest_mismatch');
     return { ok: false, error: 'CERT_DIGEST_MISMATCH' };
   }
 
   // ── App recognition ─────────────────────────────────────────────────────
   const appVerdict = payload.appIntegrity?.appRecognitionVerdict;
   if (appVerdict !== 'PLAY_RECOGNIZED') {
-    captureMessage(`play_integrity_app_unrecognized: ${appVerdict ?? 'null'}`);
+    countAdmissionCondition('play_integrity_app_unrecognized');
     return { ok: false, error: 'APP_NOT_RECOGNIZED' };
   }
 
@@ -303,9 +319,7 @@ export async function verifyPlayIntegrity(
   }
 
   if (!deviceVerdicts.includes(REQUIRED_INTEGRITY_LABEL)) {
-    captureMessage(
-      `play_integrity_device_verdict_insufficient: got=[${deviceVerdicts.join(',')}] needed=${REQUIRED_INTEGRITY_LABEL}`
-    );
+    countAdmissionCondition('play_integrity_device_verdict_insufficient');
     return { ok: false, error: 'DEVICE_NOT_RECOGNIZED' };
   }
 

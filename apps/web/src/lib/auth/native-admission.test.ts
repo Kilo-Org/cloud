@@ -606,8 +606,16 @@ describe('issueAdmissionChallenge', () => {
 // ── Async admission verification ───────────────────────────────────────────
 
 describe('verifyAdmissionAsync', () => {
+  // Refusal tests force flushes at fixed 6.x million-ms instants, so each test
+  // pins the clock itself; the aggregate refresh spy would otherwise be wiped
+  // by restoreAllMocks in sibling describes.
+  let now: jest.Spied;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    now = jestGlobal.spyOn(Date, 'now');
+    now.mockReturnValue(6_000_000);
+    resetAdmissionCountersForTests();
   });
 
   test('returns error when challenge is already consumed', async () => {
@@ -747,7 +755,13 @@ describe('verifyAdmissionAsync', () => {
     };
     const result = await verifyAdmissionAsync(admission);
     expect(result).toEqual({ ok: false, errorCode: 'ADMISSION_REQUIRED' });
-    expect(mockCaptureMessage).toHaveBeenCalledWith('apple_attestation_failed: CERT_CHAIN_INVALID');
+    expect(mockCaptureMessage).not.toHaveBeenCalled();
+
+    now.mockReturnValue(6_061_000);
+    countAdmissionCondition('native_admission_missing');
+    const lines = aggregateLines().filter(line => line.metric === 'apple_attestation_failed');
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ count: 1 });
   });
 
   // ── iOS assertion ──────────────────────────────────────────────────────
@@ -772,7 +786,13 @@ describe('verifyAdmissionAsync', () => {
     };
     const result = await verifyAdmissionAsync(admission);
     expect(result).toEqual({ ok: false, errorCode: 'ADMISSION_REQUIRED' });
-    expect(mockCaptureMessage).toHaveBeenCalledWith('apple_assertion_unknown_key');
+    expect(mockCaptureMessage).not.toHaveBeenCalled();
+
+    now.mockReturnValue(6_121_000);
+    countAdmissionCondition('native_admission_missing');
+    const lines = aggregateLines().filter(line => line.metric === 'apple_assertion_unknown_key');
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ count: 1 });
   });
 
   test('ios assertion fails when sign count is not increasing', async () => {
@@ -805,9 +825,15 @@ describe('verifyAdmissionAsync', () => {
     };
     const result = await verifyAdmissionAsync(admission);
     expect(result).toEqual({ ok: false, errorCode: 'ADMISSION_REQUIRED' });
-    expect(mockCaptureMessage).toHaveBeenCalledWith(
-      'apple_assertion_stale_or_replayed: asserted 5 rejected'
+    expect(mockCaptureMessage).not.toHaveBeenCalled();
+
+    now.mockReturnValue(6_181_000);
+    countAdmissionCondition('native_admission_missing');
+    const lines = aggregateLines().filter(
+      line => line.metric === 'apple_assertion_stale_or_replayed'
     );
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ count: 1 });
   });
 
   test('ios assertion succeeds and proves the database sign_count < asserted predicate', async () => {
@@ -927,13 +953,19 @@ describe('verifyAdmissionAsync', () => {
       };
       const result = await verifyAdmissionAsync(admission);
       expect(result).toEqual({ ok: false, errorCode: 'ADMISSION_REQUIRED' });
-      expect(mockCaptureMessage).toHaveBeenCalledWith(
-        `apple_assertion_stale_or_replayed: asserted ${staleCount} rejected`
-      );
       // The higher stored count is never overwritten.
       expect(getStored()).toBe(12);
     }
     expect(setMock).toHaveBeenCalledTimes(2);
+
+    expect(mockCaptureMessage).not.toHaveBeenCalled();
+    now.mockReturnValue(6_241_000);
+    countAdmissionCondition('native_admission_missing');
+    const lines = aggregateLines().filter(
+      line => line.metric === 'apple_assertion_stale_or_replayed'
+    );
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ count: 2 });
   });
 
   // ── Android ─────────────────────────────────────────────────────────────

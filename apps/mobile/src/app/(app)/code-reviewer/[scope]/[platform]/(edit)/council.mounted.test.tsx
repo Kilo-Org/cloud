@@ -30,6 +30,9 @@ type ToggleProps = {
 
 type SaveMutation = { mutate: Mock; isPending: boolean };
 
+/** The one field the app's organization list answer carries for the switcher. */
+type OrganizationMembership = { organizationId: string };
+
 type SavedPatch = {
   council?: {
     enabled?: boolean;
@@ -56,7 +59,7 @@ const state = vi.hoisted(() => {
     routerReplace: vi.fn(),
     setOrganizationId: vi.fn(),
     gateReason: null as string | null,
-    orgs: undefined as { organizationId: string }[] | undefined,
+    orgs: undefined as OrganizationMembership[] | undefined,
   };
 });
 
@@ -170,7 +173,18 @@ vi.mock('@/components/ui/radio-group', () => ({
 }));
 vi.mock('@/components/ui/input', () => ({ Input: 'TextInput' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+// `Button` draws its spinner through the activity indicator, whose icon barrel
+// deep-imports lucide; lucide's ESM pulls react-native-svg, whose CJS entry
+// requires the React Native package itself (`import typeof`), which Node's
+// loader cannot parse. This suite presses the real Button but never asserts
+// the spinner, so the indicator is a stub here like in the other render suites.
+vi.mock('@/components/ui/activity-indicator', () => ({
+  ActivityIndicator: 'ActivityIndicator',
+}));
+vi.mock('@/components/ui/text', async () => {
+  const { createContext } = await import('react');
+  return { Text: 'Text', TextClassContext: createContext<string | undefined>(undefined) };
+});
 vi.mock('@/components/tab-screen', () => ({
   TabScreenScrollView: (props: { children?: ReactNode }) =>
     createElement('ScrollView', null, props.children),

@@ -27,6 +27,8 @@ const state = vi.hoisted(() => ({
   status: {
     data: undefined as { method: IntegrationMethod; integrationId: string | null } | undefined,
     isPending: false,
+    isError: false,
+    error: undefined as unknown,
   },
 }));
 
@@ -58,6 +60,8 @@ vi.mock('@/lib/hooks/use-bitbucket', () => ({
   useBitbucketIntegrationStatus: () => ({
     data: state.status.data,
     isPending: state.status.isPending,
+    isError: state.status.isError,
+    error: state.status.error,
     isFetching: false,
     refetch: vi.fn(),
   }),
@@ -80,6 +84,8 @@ vi.mock('@/components/code-reviewer/bitbucket-connect-form', () => ({
 const BUTTON = 'Button' as ElementType;
 const FORM = 'BitbucketConnectForm' as ElementType;
 const PERMISSION_DENIED = 'PermissionDenied' as ElementType;
+const QUERY_ERROR = 'QueryError' as ElementType;
+const SKELETON = 'Skeleton' as ElementType;
 /** The sentence that names where a connection the app cannot change is managed. */
 const MANAGED_ON_WEB = i18n.t('codeReviewer.bitbucketConnect.managedOnWeb');
 
@@ -100,6 +106,8 @@ beforeEach(() => {
   state.readiness.integrationId = null;
   state.status.data = undefined;
   state.status.isPending = false;
+  state.status.isError = false;
+  state.status.error = undefined;
 });
 
 describe('BitbucketConnectSheet', () => {
@@ -125,13 +133,32 @@ describe('BitbucketConnectSheet', () => {
 
   it('replaces the token of the integration the readiness read names', async () => {
     state.readiness.integrationId = 'bitbucket-2';
-    state.status.data = { method: 'workspace_access_token', integrationId: 'bitbucket-2' };
+    // The status read names no token integration, so only the readiness id can
+    // reach the form.
+    state.status.data = { method: 'workspace_access_token', integrationId: null };
     const root = await mount();
 
     expect(rendersText(root, MANAGED_ON_WEB)).toBe(false);
     expect(root.findAll(node => Object.is(node.type, FORM))[0]?.props.integrationId).toBe(
       'bitbucket-2'
     );
+  });
+
+  it('waits for the status read before offering the token form', async () => {
+    state.status.isPending = true;
+    const root = await mount();
+
+    expect(root.findAll(node => Object.is(node.type, FORM))).toHaveLength(0);
+    expect(root.findAll(node => Object.is(node.type, SKELETON)).length).toBeGreaterThan(0);
+  });
+
+  it('retries instead of offering the token form when the status read fails', async () => {
+    state.status.isError = true;
+    state.status.error = new Error('request failed');
+    const root = await mount();
+
+    expect(root.findAll(node => Object.is(node.type, FORM))).toHaveLength(0);
+    expect(root.findAll(node => Object.is(node.type, QUERY_ERROR))).toHaveLength(1);
   });
 
   it('asks for an owner when the viewer cannot change an existing connection', async () => {

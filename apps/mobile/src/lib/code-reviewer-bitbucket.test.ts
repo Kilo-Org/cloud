@@ -122,19 +122,22 @@ describe('bitbucketRepair', () => {
     ).toEqual({ kind: 'manage-connection' });
   });
 
-  it('keeps replacing the token when the integration is a workspace access token', () => {
+  it('connects when the status read names a token row the readiness read cannot name', () => {
+    // Only an OAuth authorization makes the form refuse to connect; a token
+    // row the readiness read did not report still needs the token form.
     expect(
       bitbucketRepair(
         readiness({
           connected: false,
           ready: false,
+          integrationId: null,
           workspace: null,
           missingRequiredScopes: ['account'],
           repositoryCache: { status: 'uninitialized', repositories: [], syncedAt: null },
         }),
         { method: 'workspace_access_token' }
       )
-    ).toEqual({ kind: 'replace-token' });
+    ).toEqual({ kind: 'connect' });
   });
 
   it('does not send a usable workspace to the web page for a stale OAuth answer', () => {

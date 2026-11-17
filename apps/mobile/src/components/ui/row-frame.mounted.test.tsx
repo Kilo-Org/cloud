@@ -142,6 +142,7 @@ describe('RowFrame interaction', () => {
         title: 'General',
         onPress: () => undefined,
         accessibilityLabel: 'Open general settings',
+        accessibilityHint: 'Opens the language, theme and notification preferences',
         hitSlop: { top: 4, bottom: 4 },
         onLayout,
       })
@@ -150,6 +151,9 @@ describe('RowFrame interaction', () => {
     expect(row.props.hitSlop).toEqual({ top: 4, bottom: 4 });
     expect(row.props.onLayout).toBe(onLayout);
     expect(row.props.accessibilityLabel).toBe('Open general settings');
+    expect(row.props.accessibilityHint).toBe(
+      'Opens the language, theme and notification preferences'
+    );
   });
 
   it('presses only the content when a trailing control owns its own touch', () => {

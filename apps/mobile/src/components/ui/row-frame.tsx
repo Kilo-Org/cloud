@@ -153,6 +153,8 @@ type RowFrameProps = Readonly<{
   pressTarget?: 'row' | 'content';
   accessibilityRole?: AccessibilityRole;
   accessibilityLabel?: string;
+  /** The action's hint, for the extra context a label cannot carry. */
+  accessibilityHint?: string;
   accessibilityState?: AccessibilityState;
   /** The value of a select row, e.g. the currently chosen option. */
   accessibilityValue?: AccessibilityValue;
@@ -331,6 +333,7 @@ export function RowFrame({
   pressTarget = 'row',
   accessibilityRole,
   accessibilityLabel,
+  accessibilityHint,
   accessibilityState,
   accessibilityValue,
   disabled = false,
@@ -451,6 +454,7 @@ export function RowFrame({
       disabled={disabled}
       accessibilityRole={accessibilityRole ?? 'button'}
       accessibilityLabel={accessibilityLabel}
+      accessibilityHint={accessibilityHint}
       accessibilityState={accessibilityState ?? { disabled }}
       accessibilityValue={accessibilityValue}
       hitSlop={hitSlop}

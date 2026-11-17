@@ -105,6 +105,21 @@ describe('RowSkeleton', () => {
     );
   });
 
+  it('stacks the leading cell above the text block in a narrow window', () => {
+    const classes = classesOf(renderSkeleton({ stack: true, tile: true, trailingControl: true }));
+
+    expect(classes).toEqual(expect.arrayContaining(['min-h-[48px]', 'gap-2', 'px-4', 'py-3']));
+    expect(classes).not.toContain('flex-row');
+  });
+
+  it('holds the loaded line heights, so the hand-off never shifts the row', () => {
+    const [title, subtitle] = skeletons(renderSkeleton({ lines: 2 }));
+
+    // `text-sm` is 17.5pt tall and `text-xs` 14pt.
+    expect(classesOf(first(title))).toEqual(expect.arrayContaining(['h-5', 'bg-muted-soft']));
+    expect(classesOf(first(subtitle))).toEqual(expect.arrayContaining(['h-4', 'bg-muted-soft']));
+  });
+
   it('keeps the flat-list session shape', () => {
     const classes = classesOf(renderSkeleton({ variant: 'session', last: false }));
 

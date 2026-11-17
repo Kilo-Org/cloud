@@ -1570,6 +1570,8 @@ const scriptSuiteInputs = [
   'services/cloud-agent-next/test/e2e/fake-llm-server.ts',
   '.github/workflows/mobile-native-build.yml',
   '.github/workflows/kilo-mcp-release.yml',
+  '.github/workflows/extension-store-release.yml',
+  'apps/extension/wxt.config.ts',
   'packages/session-ingest-contracts/src/index.ts',
   'pnpm-lock.yaml',
 ];

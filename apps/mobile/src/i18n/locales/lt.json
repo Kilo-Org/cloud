@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Tvarkyti žiniatinklyje",
     "creditHistory": "Kreditų istorija",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Atšaukti",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Pirkimai, kvitai ir kreditų veikla",
     "invoicesSubtitle": "Atsisiųskite savo pirkimų sąskaitas faktūras",
-    "manageBilling": "Tvarkyti atsiskaitymą kilo.ai",
-    "manageBillingIosNote": "Mokėjimo būdai, automatinis papildymas ir atsiskaitymo informacija tvarkomi kilo.ai.",
     "codeReviewerSubtitle": "Automatinės PR peržiūros",
     "securityAgentSubtitle": "Rasti ir pašalinti pažeidžiamumus",
     "reviews": "Peržiūros",
@@ -3197,10 +3193,7 @@
       "cancelScheduled": "Bus atšaukta {{date}}",
       "cancelScheduledChange": "Atšaukti suplanuotą pakeitimą",
       "cancelled": "Prenumerata atšaukta",
-      "changePlan": "Keisti planą kilo.ai",
-      "changePlanIosNote": "Mokamus planus galima keisti kilo.ai.",
       "creditHistoryEmpty": "Kilo Pass kreditų dar nėra.",
-      "manageInStore": "Tvarkyti per {{store}}",
       "resume": "Tęsti prenumeratą",
       "resumeCancelledDescription": "Jūsų Kilo Pass vėl bus atnaujinamas automatiškai.",
       "resumePausedDescription": "Jūsų Kilo Pass bus tęsiamas dabar, anksčiau nei suplanuota.",
@@ -3237,9 +3230,6 @@
     "bonusFree": "Nemokamas bonusas",
     "bonusReferral": "Rekomendacijos bonusas",
     "bonusAvailable": "Galimas nemokamas bonusas",
-    "kiloPassManagement": "Kilo Pass valdymas",
-    "kiloPassSetup": "Kilo Pass sąranka",
-    "opensManagementOnWeb": "Atidaro Kilo Pass valdymo puslapį naršyklėje.",
     "loadFailedRetry": "Patikrink ryšį, tada bandyk dar kartą.",
     "legalTermsOfUse": "Naudojimo sąlygos (EULA)",
     "purchaseDifferentAccount": "Šis App Store pirkinys nesusietas su jūsų Kilo paskyra. Prisijunkite prie perkant naudotos Apple Account paskyros, tada bandykite dar kartą.",
@@ -3425,7 +3415,6 @@
       "buySeats": "Pirkti vietų",
       "setupAutoTopUp": "Nustatyti automatinį papildymą",
       "manageAutoTopUp": "Tvarkyti automatinį papildymą",
-      "webAddress": "Žiniatinklio adresas {{url}}",
       "opensOnWeb": "Atidaroma žiniatinklyje"
     },
     "boundary": {
@@ -3609,7 +3598,6 @@
       "processingBlocked": "Apdorojimas užblokuotas",
       "processingNeedsReview": "Reikia patikrinti apdorojimą",
       "retryHint": "Bando iš naujo įkelti Kilo Pass būseną.",
-      "setupHint": "Atidaro Kilo Pass sąranką naršyklėje.",
       "paidSeat_few": "{{displayCount}} apmokėtos vietos",
       "paidSeat_many": "{{displayCount}} apmokėtos vietos"
     }

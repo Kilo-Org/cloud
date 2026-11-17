@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "በድር ላይ ያስተዳድሩ",
     "creditHistory": "የክሬዲት ታሪክ",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": "። ",
     "listJoiner": "፣ ",
     "cancel": "ተው",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "ግዢዎች፣ ደረሰኞች እና የክሬዲት እንቅስቃሴ",
     "invoicesSubtitle": "ለግዢዎችዎ የክፍያ መጠየቂያዎችን ያውርዱ",
-    "manageBilling": "ክፍያን በkilo.ai ላይ ያስተዳድሩ",
-    "manageBillingIosNote": "የመክፈያ ዘዴዎች፣ ራስ-ሰር መሙላት እና የክፍያ ዝርዝሮች የሚተዳደሩት በkilo.ai ላይ ነው።",
     "codeReviewerSubtitle": "በራስ ሰር የሚደረጉ የPR ግምገማዎች",
     "securityAgentSubtitle": "ተጋላጭነቶችን ፈልገው ያስተካክሉ",
     "reviews": "ግምገማዎች",
@@ -3083,10 +3079,7 @@
       "cancelScheduled": "በ{{date}} ይሰረዛል",
       "cancelScheduledChange": "የታቀደውን ለውጥ ሰርዝ",
       "cancelled": "የደንበኝነት ምዝገባ ተሰርዟል",
-      "changePlan": "እቅድን በkilo.ai ላይ ይቀይሩ",
-      "changePlanIosNote": "የሚከፈልባቸው እቅዶች ለውጦች በkilo.ai ላይ ይገኛሉ።",
       "creditHistoryEmpty": "እስካሁን ምንም የKilo Pass ክሬዲቶች የሉም።",
-      "manageInStore": "በ{{store}} ውስጥ ያስተዳድሩ",
       "resume": "የደንበኝነት ምዝገባን ቀጥል",
       "resumeCancelledDescription": "የእርስዎ Kilo Pass እንደገና በራስ-ሰር መታደስ ይጀምራል።",
       "resumePausedDescription": "የእርስዎ Kilo Pass ከታቀደው የመቀጠያ ቀን በፊት አሁን ይቀጥላል።",
@@ -3123,9 +3116,6 @@
     "bonusFree": "ነጻ ጉርሻ",
     "bonusReferral": "የሪፈራል ጉርሻ",
     "bonusAvailable": "የሚገኝ ነጻ ጉርሻ",
-    "kiloPassManagement": "የKilo Pass አስተዳደር",
-    "kiloPassSetup": "የKilo Pass ማዋቀር",
-    "opensManagementOnWeb": "የKilo Pass አስተዳደርን በድር ላይ ይከፍታል።",
     "loadFailedRetry": "ግንኙነትዎን ይፈትሹ፣ ከዚያ እንደገና ይሞክሩ።",
     "legalTermsOfUse": "የአጠቃቀም ውሎች (EULA)",
     "purchaseDifferentAccount": "ይህ የApp Store ግዢ ከKilo መለያዎ ጋር አልተገናኘም። ለግዢው ወደተጠቀሙበት Apple Account ይግቡ፣ ከዚያ እንደገና ይሞክሩ።",
@@ -3311,7 +3301,6 @@
       "buySeats": "የተጠቃሚ ፈቃዶችን ይግዙ",
       "setupAutoTopUp": "ራስ-ሰር መሙላትን ያዋቅሩ",
       "manageAutoTopUp": "ራስ-ሰር መሙላትን አስተዳድር",
-      "webAddress": "የድር አድራሻ {{url}}",
       "opensOnWeb": "በድር ላይ ይከፈታል"
     },
     "boundary": {
@@ -3494,8 +3483,7 @@
       "paymentPending": "ክፍያው በመጠባበቅ ላይ ነው",
       "processingBlocked": "ሂደቱ ታግዷል",
       "processingNeedsReview": "ሂደቱ ግምገማ ይፈልጋል",
-      "retryHint": "የKilo Pass ሁኔታን ለመጫን እንደገና ይሞክራል።",
-      "setupHint": "የKilo Pass ማዋቀሪያን በድር ላይ ይከፍታል።"
+      "retryHint": "የKilo Pass ሁኔታን ለመጫን እንደገና ይሞክራል።"
     }
   },
   "authErrors": {

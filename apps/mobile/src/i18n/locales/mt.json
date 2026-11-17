@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Immaniġġja fuq il-web",
     "creditHistory": "Storja tal-krediti",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Ikkanċella",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Xiri, irċevuti u attività tal-krediti",
     "invoicesSubtitle": "Niżżel il-fatturi tax-xiri tiegħek",
-    "manageBilling": "Immaniġġja l-ħlasijiet fuq kilo.ai",
-    "manageBillingIosNote": "Il-metodi ta' ħlas, it-top-up awtomatiku u d-dettalji tal-ħlas jiġu mmaniġġjati fuq kilo.ai.",
     "codeReviewerSubtitle": "Reviżjonijiet awtomatiċi tal-PR",
     "securityAgentSubtitle": "Sib u rrimedja l-vulnerabbiltajiet",
     "reviews": "Reviżjonijiet",
@@ -3254,10 +3250,7 @@
       "cancelScheduled": "Jiġi kkanċellat nhar {{date}}",
       "cancelScheduledChange": "Ikkanċella l-bidla skedata",
       "cancelled": "Abbonament ikkanċellat",
-      "changePlan": "Biddel il-pjan fuq kilo.ai",
-      "changePlanIosNote": "Il-bidliet fil-pjanijiet imħallsa huma disponibbli fuq kilo.ai.",
       "creditHistoryEmpty": "Għad m'hemm l-ebda krediti tal-Kilo Pass.",
-      "manageInStore": "Immaniġġja fuq {{store}}",
       "resume": "Kompli l-abbonament",
       "resumeCancelledDescription": "Il-Kilo Pass tiegħek jerġa' jibda jiġġedded awtomatikament.",
       "resumePausedDescription": "Il-Kilo Pass tiegħek ikompli issa, qabel id-data skedata biex jerġa' jibda.",
@@ -3294,9 +3287,6 @@
     "bonusFree": "Bonus b'xejn",
     "bonusReferral": "Bonus tar-referenza",
     "bonusAvailable": "Bonus b'xejn disponibbli",
-    "kiloPassManagement": "Ġestjoni ta' Kilo Pass",
-    "kiloPassSetup": "Konfigurazzjoni ta' Kilo Pass",
-    "opensManagementOnWeb": "Jiftaħ il-ġestjoni ta' Kilo Pass fuq il-web.",
     "loadFailedRetry": "Iċċekkja l-konnessjoni tiegħek, imbagħad erġa' pprova.",
     "legalTermsOfUse": "Termini tal-użu (EULA)",
     "purchaseDifferentAccount": "Dan ix-xiri mill-App Store mhuwiex marbut mal-kont tiegħek ta' Kilo. Idħol fl-Apple Account użat għax-xiri, imbagħad erġa' pprova.",
@@ -3482,7 +3472,6 @@
       "buySeats": "Ixtri postijiet",
       "setupAutoTopUp": "Issettja r-rikarika awtomatika",
       "manageAutoTopUp": "Immaniġġja r-rikarika awtomatika",
-      "webAddress": "Indirizz tal-web {{url}}",
       "opensOnWeb": "Jinfetaħ fuq il-web"
     },
     "boundary": {
@@ -3666,7 +3655,6 @@
       "processingBlocked": "L-ipproċessar imblukkat",
       "processingNeedsReview": "L-ipproċessar għandu bżonn reviżjoni",
       "retryHint": "Jerġa' jipprova jgħabbi l-istatus ta' Kilo Pass.",
-      "setupHint": "Jiftaħ il-konfigurazzjoni ta' Kilo Pass fuq il-web.",
       "paidSeat_two": "{{displayCount}} postijiet imħallsa",
       "paidSeat_few": "{{displayCount}} postijiet imħallsa",
       "paidSeat_many": "{{displayCount}}-il post imħallas"

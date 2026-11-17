@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Jere sou entènèt la",
     "creditHistory": "Istorik kredi",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Anile",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Acha, resi, ak aktivite kredi",
     "invoicesSubtitle": "Telechaje fakti pou acha ou yo",
-    "manageBilling": "Jere faktirasyon sou kilo.ai",
-    "manageBillingIosNote": "Mwayen peman, rechaj otomatik, ak detay faktirasyon yo jere sou kilo.ai.",
     "codeReviewerSubtitle": "Revizyon otomatik PR yo",
     "securityAgentSubtitle": "Jwenn epi korije vilnerabilite",
     "reviews": "Revizyon",
@@ -3083,10 +3079,7 @@
       "cancelScheduled": "Ap anile {{date}}",
       "cancelScheduledChange": "Anile chanjman ki pwograme a",
       "cancelled": "Abònman anile",
-      "changePlan": "Chanje plan sou kilo.ai",
-      "changePlanIosNote": "Chanjman plan peye yo disponib sou kilo.ai.",
       "creditHistoryEmpty": "Poko gen kredi Kilo Pass.",
-      "manageInStore": "Jere nan {{store}}",
       "resume": "Rekòmanse abònman",
       "resumeCancelledDescription": "Kilo Pass ou a ap kòmanse renouvle otomatikman ankò.",
       "resumePausedDescription": "Kilo Pass ou a rekòmanse kounye a, anvan dat li te pwograme pou l rekòmanse a.",
@@ -3123,9 +3116,6 @@
     "bonusFree": "Bonis gratis",
     "bonusReferral": "Bonis referans",
     "bonusAvailable": "Bonis gratis ki disponib",
-    "kiloPassManagement": "Jesyon Kilo Pass",
-    "kiloPassSetup": "Konfigirasyon Kilo Pass",
-    "opensManagementOnWeb": "Louvri paj jesyon Kilo Pass la sou sit entènèt la.",
     "loadFailedRetry": "Tcheke koneksyon w, epi eseye ankò.",
     "legalTermsOfUse": "Kondisyon itilizasyon (EULA)",
     "purchaseDifferentAccount": "Acha App Store sa a pa lye ak kont Kilo ou a. Konekte nan Apple Account ou te itilize pou acha a, epi eseye ankò.",
@@ -3311,7 +3301,6 @@
       "buySeats": "Achte plas",
       "setupAutoTopUp": "Konfigire rechaj otomatik",
       "manageAutoTopUp": "Jere rechaj otomatik",
-      "webAddress": "Adrès entènèt {{url}}",
       "opensOnWeb": "Ap louvri sou entènèt la"
     },
     "boundary": {
@@ -3494,8 +3483,7 @@
       "paymentPending": "Peman annatant",
       "processingBlocked": "Tretman bloke",
       "processingNeedsReview": "Tretman an bezwen verifikasyon",
-      "retryHint": "Eseye chaje estati Kilo Pass la ankò.",
-      "setupHint": "Louvri konfigirasyon Kilo Pass sou entènèt la."
+      "retryHint": "Eseye chaje estati Kilo Pass la ankò."
     }
   },
   "authErrors": {

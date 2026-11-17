@@ -116,7 +116,7 @@ type OrgSettingsRowSpec = Readonly<{
 }> &
   (
     | {
-        /** The page's path after `/organizations/<id>`. Empty for a dashboard card. */
+        /** The page's path after `/organizations/<id>`. */
         readonly suffix: string;
       }
     | {

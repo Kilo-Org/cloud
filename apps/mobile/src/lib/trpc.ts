@@ -13,14 +13,16 @@ import { createNetworkErrorFetch, readTrpcResponseError } from '@/lib/telemetry/
 import { postLatencyBatch } from '@/lib/telemetry/latency-ingest';
 import { createLatencyBuffer, createLatencyFetch } from '@/lib/telemetry/request-latency';
 import { requestUrlString } from '@/lib/telemetry/request-target';
+import { isSignOutActive } from '@/lib/auth/sign-out-state';
 import {
   type ActiveTokenSnapshot,
   getActiveToken,
   getActiveTokenSnapshot,
   getAuthTokenForRequest,
+  isSignOutTeardownActive,
   publishActiveTokenExpiry,
 } from '@/lib/auth/token-owner';
-import { isProtectedDataAvailable } from '@/lib/protected-data';
+import { isProtectedDataAvailable, whenProtectedDataAvailableWithin } from '@/lib/protected-data';
 import { TOKEN_EXPIRES_AT_KEY } from '@/lib/storage-keys';
 
 export const { TRPCProvider, useTRPC } = createTRPCContext<MobileRouter>();
@@ -76,17 +78,74 @@ const e2eFetch =
   E2E_LATENCY_SESSION_MS > 0 || E2E_LATENCY_MESSAGES_MS > 0 ? e2eLatencyFetch : fetch;
 
 /**
- * Fetch wrapper that adds a control-plane deadline (15 s). When E2E latency
- * values are set the deadline is extended by the applicable delay so the
- * synthetic latency does not eat into the real request budget.
+ * The instant a request's control-plane budget started, carried from the auth
+ * header build to the fetch and removed there before the request reaches the
+ * wire.
+ *
+ * The unlock wait is the only part of a tRPC call that spends this budget
+ * before the request itself starts (see `waitForProtectedData`), so only a
+ * build that waited carries the stamp. The header build also runs a proactive
+ * refresh and a cold expiry read, but each of those has its own deadline: a
+ * slow refresh must not eat the budget of the request that follows it. tRPC
+ * resolves the headers and only then calls the link's fetch, handing the two no
+ * shared per-request object, so the wait's start travels in the headers. The
+ * deadline then covers the wait and the request together instead of the wait
+ * buying the request a second full deadline — a locked background run stays
+ * inside one `CONTROL_PLANE_DEADLINE_MS` rather than roughly twice it.
+ */
+const REQUEST_BUDGET_START_HEADER = 'x-kilo-request-budget-start';
+
+/**
+ * The budget left once `startedAt` is spent, or the full deadline when the
+ * stamp is absent or unreadable.
+ */
+function remainingBudgetMs(startedAt: string | null | undefined): number {
+  if (startedAt === null || startedAt === undefined) {
+    return CONTROL_PLANE_DEADLINE_MS;
+  }
+  const startedAtMs = Number(startedAt);
+  if (!Number.isFinite(startedAtMs)) {
+    return CONTROL_PLANE_DEADLINE_MS;
+  }
+  // A header build that spent the whole budget leaves nothing for the request:
+  // it fails as the timeout it is instead of being sent with a fresh deadline.
+  return Math.max(0, CONTROL_PLANE_DEADLINE_MS - (Date.now() - startedAtMs));
+}
+
+/**
+ * The budget a request has left once its header build is done, plus the headers
+ * to send — the same headers without the bookkeeping stamp. A request whose
+ * caller built its own headers carries no stamp and keeps the full deadline.
+ */
+function takeRequestBudget(headers: RequestInit['headers']) {
+  if (headers === undefined || Array.isArray(headers)) {
+    return { remainingMs: CONTROL_PLANE_DEADLINE_MS, headers };
+  }
+  if (headers instanceof Headers) {
+    const remainingMs = remainingBudgetMs(headers.get(REQUEST_BUDGET_START_HEADER));
+    const sent = new Headers(headers);
+    sent.delete(REQUEST_BUDGET_START_HEADER);
+    return { remainingMs, headers: sent };
+  }
+  const sent = Object.fromEntries(
+    Object.entries(headers).filter(([name]) => name !== REQUEST_BUDGET_START_HEADER)
+  );
+  return { remainingMs: remainingBudgetMs(headers[REQUEST_BUDGET_START_HEADER]), headers: sent };
+}
+
+/**
+ * Fetch wrapper that adds a control-plane deadline (15 s), less whatever the
+ * auth header build already spent of it. When E2E latency values are set the
+ * deadline is extended by the applicable delay so the synthetic latency does
+ * not eat into the real request budget.
  */
 export const deadlineFetch: typeof fetch = async (url, init) => {
   const delayMs = e2eLatencyForUrl(requestUrlString(url));
-  const totalDeadline = CONTROL_PLANE_DEADLINE_MS + delayMs;
+  const budget = takeRequestBudget(init?.headers);
   const response = await withDeadline(
-    totalDeadline,
+    budget.remainingMs + delayMs,
     async signal => {
-      const res = await e2eFetch(url, { ...init, signal });
+      const res = await e2eFetch(url, { ...init, headers: budget.headers, signal });
       return res;
     },
     init?.signal ?? undefined
@@ -179,10 +238,88 @@ async function readColdExpiry(active: ActiveTokenSnapshot | null): Promise<numbe
   return resolvedExpiresAtMs;
 }
 
-async function getAuthHeaders() {
-  const token = await getAuthTokenForRequest();
+/**
+ * Waits for the credential gate when no bearer could be served.
+ *
+ * While iOS protected data is unavailable the keychain refuses every read, so a
+ * request built now would go out with no bearer and the server would refuse it
+ * as unauthenticated. That is the documented locked state, not a session
+ * failure: wait for the unlock the startup restore already waits for, bounded by
+ * the control-plane deadline so a background request can never outlive the
+ * app's own request budget. Past the bound the request proceeds exactly as it
+ * did before — no token, no event.
+ *
+ * One wait is shared by every request that needs it: an unlock releases them
+ * all, and past the deadline a single timer leaves the protected-data waiter
+ * set, so a long lock under repeated requests accumulates nothing.
+ *
+ * Android never reaches the wait: it has no protected-data source, so
+ * `isProtectedDataAvailable()` is always true there and foreground requests take
+ * the held-token path.
+ */
+let unlockWait: Promise<void> | null = null;
+
+async function waitForProtectedData(): Promise<void> {
+  if (isProtectedDataAvailable()) {
+    return;
+  }
+  unlockWait ??= whenProtectedDataAvailableWithin(CONTROL_PLANE_DEADLINE_MS);
+  const wait = unlockWait;
+  try {
+    await wait;
+  } finally {
+    // Only the wait that settled may clear the slot: a newer one created after
+    // an unlock belongs to the requests behind it.
+    if (unlockWait === wait) {
+      unlockWait = null;
+    }
+  }
+}
+
+/**
+ * Adds the request's budget stamp when the build spent an unlock wait: the
+ * fetch that follows then gets only what the wait left. A build that did not
+ * wait stamps nothing, so its request keeps the whole deadline.
+ */
+function withUnlockWaitStamp(headers: Record<string, string>, unlockWaitStartMs: number | null) {
+  if (unlockWaitStartMs === null) {
+    return headers;
+  }
+  return { ...headers, [REQUEST_BUDGET_START_HEADER]: String(unlockWaitStartMs) };
+}
+
+/**
+ * The links' header build.
+ *
+ * The budget stamp is taken only at the unlock wait: a proactive refresh, a
+ * cold expiry read or anything else this build does must not be charged to the
+ * request that follows it (see {@link REQUEST_BUDGET_START_HEADER}).
+ */
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  let token = await getAuthTokenForRequest();
+  let unlockWaitStartMs: number | null = null;
+  // The app's own knowledge that no session exists — a sign-out in progress or
+  // a sign-out that finished since (its teardown flag stays set until a
+  // sign-in publishes a pair) — means no unlock can bring a bearer back, and
+  // both flags answer without touching the keychain the lock refuses. A cold
+  // launch of a signed-out device is still indistinguishable from a locked
+  // session: every record of a session is a keychain item.
+  const signedOut = isSignOutTeardownActive() || isSignOutActive();
+  if (!token && !isProtectedDataAvailable() && !signedOut) {
+    // The keychain supplied no bearer because it refuses every read while the
+    // device is locked: wait for the unlock rather than send a request the
+    // server would refuse as unauthenticated, then read the token again. A
+    // held token never takes this path, so an already-authenticated request
+    // is not delayed.
+    unlockWaitStartMs = Date.now();
+    await waitForProtectedData();
+    token = await getAuthTokenForRequest();
+  }
   if (!token) {
-    return { ...buildAuthHeaders(token), ...buildClientMetadataHeaders() };
+    return withUnlockWaitStamp(
+      { ...buildAuthHeaders(token), ...buildClientMetadataHeaders() },
+      unlockWaitStartMs
+    );
   }
 
   // Proactive refresh: if the token is expiring within the margin, rotate
@@ -206,10 +343,16 @@ async function getAuthHeaders() {
   ) {
     await performRefresh();
     const refreshedToken = getActiveToken()?.token ?? (await getAuthTokenForRequest());
-    return { ...buildAuthHeaders(refreshedToken), ...buildClientMetadataHeaders() };
+    return withUnlockWaitStamp(
+      { ...buildAuthHeaders(refreshedToken), ...buildClientMetadataHeaders() },
+      unlockWaitStartMs
+    );
   }
 
-  return { ...buildAuthHeaders(currentToken), ...buildClientMetadataHeaders() };
+  return withUnlockWaitStamp(
+    { ...buildAuthHeaders(currentToken), ...buildClientMetadataHeaders() },
+    unlockWaitStartMs
+  );
 }
 
 const singleLink = httpLink({

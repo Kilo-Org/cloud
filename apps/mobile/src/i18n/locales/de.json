@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Im Web verwalten",
     "creditHistory": "Credit-Verlauf",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Abbrechen",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Käufe, Belege und Credit-Aktivität",
     "invoicesSubtitle": "Rechnungen für deine Käufe herunterladen",
-    "manageBilling": "Abrechnung auf kilo.ai verwalten",
-    "manageBillingIosNote": "Zahlungsmethoden, automatisches Aufladen und Rechnungsdetails werden auf kilo.ai verwaltet.",
     "codeReviewerSubtitle": "Automatische PR-Prüfungen",
     "securityAgentSubtitle": "Schwachstellen finden und beheben",
     "reviews": "Code-Prüfungen",
@@ -2540,10 +2536,7 @@
       "cancelScheduled": "Endet am {{date}}",
       "cancelScheduledChange": "Geplante Änderung abbrechen",
       "cancelled": "Abo gekündigt",
-      "changePlan": "Tarif auf kilo.ai ändern",
-      "changePlanIosNote": "Änderungen an kostenpflichtigen Tarifen sind auf kilo.ai möglich.",
       "creditHistoryEmpty": "Noch keine Credits aus Kilo Pass.",
-      "manageInStore": "In {{store}} verwalten",
       "resume": "Abo fortsetzen",
       "resumeCancelledDescription": "Dein Kilo Pass wird wieder automatisch verlängert.",
       "resumePausedDescription": "Dein Kilo Pass wird ab sofort fortgesetzt, noch vor dem geplanten Datum.",
@@ -2580,9 +2573,6 @@
     "bonusFree": "Kostenloser Bonus",
     "bonusReferral": "Empfehlungsbonus",
     "bonusAvailable": "Verfügbarer kostenloser Bonus",
-    "kiloPassManagement": "Verwaltung von Kilo Pass",
-    "kiloPassSetup": "Einrichtung von Kilo Pass",
-    "opensManagementOnWeb": "Öffnet die Verwaltung von Kilo Pass auf der Website.",
     "loadFailedRetry": "Überprüfe deine Verbindung und versuche es erneut.",
     "legalTermsOfUse": "Nutzungsbedingungen (EULA)",
     "purchaseDifferentAccount": "Dieser Kauf im App Store ist nicht mit deinem Kilo-Konto verknüpft. Melde dich mit dem Apple Account an, den du für den Kauf verwendet hast, und versuche es erneut.",
@@ -3303,7 +3293,6 @@
       "buySeats": "Nutzerplätze kaufen",
       "setupAutoTopUp": "Automatische Aufladung einrichten",
       "manageAutoTopUp": "Automatische Aufladung verwalten",
-      "webAddress": "Webadresse {{url}}",
       "opensOnWeb": "Wird im Web geöffnet"
     },
     "boundary": {
@@ -3486,8 +3475,7 @@
       "paymentPending": "Zahlung ausstehend",
       "processingBlocked": "Verarbeitung blockiert",
       "processingNeedsReview": "Verarbeitung muss geprüft werden",
-      "retryHint": "Lädt den Status von Kilo Pass erneut.",
-      "setupHint": "Öffnet die Einrichtung von Kilo Pass im Browser."
+      "retryHint": "Lädt den Status von Kilo Pass erneut."
     }
   },
   "feedback": {

@@ -16,16 +16,17 @@ vi.mock('@/components/ui/icons', () => ({
   FileText: 'FileText',
   KeyRound: 'KeyRound',
   LineChart: 'LineChart',
-  Lock: 'Lock',
-  Mail: 'Mail',
   Plug: 'Plug',
   ScrollText: 'ScrollText',
-  Server: 'Server',
   Shield: 'Shield',
   SlidersHorizontal: 'SlidersHorizontal',
   Users: 'Users',
   Wallet: 'Wallet',
 }));
+
+// Every row is an absolute web URL, so the suite needs the base the app bakes
+// in. The shared setup mocks this module with no value at all.
+vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://app.kilo.ai' }));
 
 function gate(overrides: Partial<OrgSettingsGate> = {}): OrgSettingsGate {
   return {
@@ -64,20 +65,11 @@ describe('visibleOrgSettingsRows', () => {
   });
 
   it('keeps only the member-readable rows for a member on enterprise', () => {
-    expect(areas({ role: 'member' })).toEqual([
-      'customModes',
-      'groups',
-      'ssoAndDomain',
-      'integrations',
-    ]);
+    expect(areas({ role: 'member' })).toEqual(['customModes', 'groups', 'integrations']);
   });
 
   it('drops the enterprise-only rows for a member on teams', () => {
-    expect(areas({ role: 'member', plan: 'teams' })).toEqual([
-      'customModes',
-      'dataCollection',
-      'integrations',
-    ]);
+    expect(areas({ role: 'member', plan: 'teams' })).toEqual(['customModes', 'integrations']);
   });
 
   it('keeps billing, management and admin rows for an admin on teams', () => {

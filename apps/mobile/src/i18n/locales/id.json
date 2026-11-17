@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Kelola di web",
     "creditHistory": "Riwayat kredit",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Batal",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Pembelian, tanda terima, dan aktivitas kredit",
     "invoicesSubtitle": "Unduh faktur untuk pembelian Anda",
-    "manageBilling": "Kelola penagihan di kilo.ai",
-    "manageBillingIosNote": "Metode pembayaran, isi ulang otomatis, dan detail penagihan dikelola di kilo.ai.",
     "codeReviewerSubtitle": "Tinjauan PR otomatis",
     "securityAgentSubtitle": "Temukan dan perbaiki kerentanan",
     "reviews": "Tinjauan",
@@ -2540,10 +2536,7 @@
       "cancelScheduled": "Berakhir pada {{date}}",
       "cancelScheduledChange": "Batalkan perubahan terjadwal",
       "cancelled": "Langganan dibatalkan",
-      "changePlan": "Ubah paket di kilo.ai",
-      "changePlanIosNote": "Perubahan paket berbayar tersedia di kilo.ai.",
       "creditHistoryEmpty": "Belum ada kredit Kilo Pass.",
-      "manageInStore": "Kelola di {{store}}",
       "resume": "Lanjutkan langganan",
       "resumeCancelledDescription": "Kilo Pass Anda akan kembali diperpanjang secara otomatis.",
       "resumePausedDescription": "Kilo Pass Anda dilanjutkan sekarang, sebelum tanggal lanjutan yang dijadwalkan.",
@@ -2580,9 +2573,6 @@
     "bonusFree": "Bonus gratis",
     "bonusReferral": "Bonus referral",
     "bonusAvailable": "Bonus gratis tersedia",
-    "kiloPassManagement": "Pengelolaan Kilo Pass",
-    "kiloPassSetup": "Penyiapan Kilo Pass",
-    "opensManagementOnWeb": "Membuka pengelolaan Kilo Pass di web.",
     "loadFailedRetry": "Periksa koneksi Anda, lalu coba lagi.",
     "legalTermsOfUse": "Ketentuan penggunaan (EULA)",
     "purchaseDifferentAccount": "Pembelian App Store ini tidak tertaut ke akun Kilo milikmu. Masuk ke Apple Account yang digunakan untuk pembelian, lalu coba lagi.",
@@ -3303,7 +3293,6 @@
       "buySeats": "Beli lisensi",
       "setupAutoTopUp": "Atur isi ulang otomatis",
       "manageAutoTopUp": "Kelola isi ulang otomatis",
-      "webAddress": "Alamat web {{url}}",
       "opensOnWeb": "Dibuka di web"
     },
     "boundary": {
@@ -3486,8 +3475,7 @@
       "paymentPending": "Menunggu pembayaran",
       "processingBlocked": "Pemrosesan terhambat",
       "processingNeedsReview": "Pemrosesan perlu ditinjau",
-      "retryHint": "Mencoba memuat ulang status Kilo Pass.",
-      "setupHint": "Membuka penyiapan Kilo Pass di web."
+      "retryHint": "Mencoba memuat ulang status Kilo Pass."
     }
   },
   "feedback": {

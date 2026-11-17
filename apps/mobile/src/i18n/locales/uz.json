@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Vebda boshqarish",
     "creditHistory": "Kreditlar tarixi",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Bekor qilish",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Xaridlar, cheklar va kredit harakatlari",
     "invoicesSubtitle": "Xaridlaringiz uchun hisob-fakturalarni yuklab oling",
-    "manageBilling": "To‘lovlarni kilo.ai saytida boshqarish",
-    "manageBillingIosNote": "To‘lov usullari, avtomatik to‘ldirish va hisob-kitob ma’lumotlari kilo.ai saytida boshqariladi.",
     "codeReviewerSubtitle": "PR tekshiruvlarini avtomatik bajarish",
     "securityAgentSubtitle": "Zaifliklarni topish va bartaraf etish",
     "reviews": "Tekshiruvlar",
@@ -3083,10 +3079,7 @@
       "cancelScheduled": "{{date}} kuni bekor qilinadi",
       "cancelScheduledChange": "Rejalashtirilgan o‘zgarishni bekor qilish",
       "cancelled": "Obuna bekor qilindi",
-      "changePlan": "Tarifni kilo.ai saytida o‘zgartirish",
-      "changePlanIosNote": "Pullik tariflarni kilo.ai saytida o‘zgartirish mumkin.",
       "creditHistoryEmpty": "Hozircha Kilo Pass kreditlari yo‘q.",
-      "manageInStore": "{{store}} orqali boshqarish",
       "resume": "Obunani davom ettirish",
       "resumeCancelledDescription": "Kilo Pass yana avtomatik ravishda yangilana boshlaydi.",
       "resumePausedDescription": "Kilo Pass rejalashtirilgan sanani kutmasdan, hoziroq davom etadi.",
@@ -3123,9 +3116,6 @@
     "bonusFree": "Bepul bonus",
     "bonusReferral": "Taklif bonusi",
     "bonusAvailable": "Mavjud bepul bonus",
-    "kiloPassManagement": "Kilo Pass boshqaruvi",
-    "kiloPassSetup": "Kilo Passni sozlash",
-    "opensManagementOnWeb": "Kilo Pass boshqaruv sahifasini saytda ochadi.",
     "loadFailedRetry": "Ulanishni tekshiring, so'ng qayta urinib ko'ring.",
     "legalTermsOfUse": "Foydalanish shartlari (EULA)",
     "purchaseDifferentAccount": "Bu App Store xaridi Kilo hisobingizga bog'lanmagan. Xarid uchun ishlatilgan Apple Account hisobiga kiring va qayta urinib ko'ring.",
@@ -3311,7 +3301,6 @@
       "buySeats": "O'rin sotib olish",
       "setupAutoTopUp": "Avtomatik to'ldirishni sozlash",
       "manageAutoTopUp": "Avtomatik to'ldirishni boshqarish",
-      "webAddress": "Veb-manzil {{url}}",
       "opensOnWeb": "Vebda ochiladi"
     },
     "boundary": {
@@ -3494,8 +3483,7 @@
       "paymentPending": "To'lov kutilmoqda",
       "processingBlocked": "Qayta ishlash bloklandi",
       "processingNeedsReview": "Qayta ishlash jarayonini tekshirish kerak",
-      "retryHint": "Kilo Pass holatini qayta yuklaydi.",
-      "setupHint": "Kilo Pass sozlash sahifasini brauzerda ochadi."
+      "retryHint": "Kilo Pass holatini qayta yuklaydi."
     }
   },
   "authErrors": {

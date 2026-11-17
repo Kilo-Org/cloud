@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "વેબ પર મેનેજ કરો",
     "creditHistory": "ક્રેડિટ ઇતિહાસ",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "રદ કરો",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "ખરીદીઓ, રસીદો અને ક્રેડિટ પ્રવૃત્તિ",
     "invoicesSubtitle": "તમારી ખરીદીઓના ઇન્વૉઇસ ડાઉનલોડ કરો",
-    "manageBilling": "kilo.ai પર બિલિંગ મેનેજ કરો",
-    "manageBillingIosNote": "ચુકવણી પદ્ધતિઓ, ઑટો ટૉપ-અપ અને બિલિંગ વિગતો kilo.ai પર મેનેજ થાય છે.",
     "codeReviewerSubtitle": "સ્વચાલિત PR સમીક્ષાઓ",
     "securityAgentSubtitle": "નબળાઈઓ શોધો અને ઠીક કરો",
     "reviews": "સમીક્ષાઓ",
@@ -3083,10 +3079,7 @@
       "cancelScheduled": "{{date}}ના રોજ રદ થશે",
       "cancelScheduledChange": "શેડ્યૂલ કરેલો ફેરફાર રદ કરો",
       "cancelled": "સબ્સ્ક્રિપ્શન રદ કર્યું",
-      "changePlan": "kilo.ai પર પ્લાન બદલો",
-      "changePlanIosNote": "પેઇડ પ્લાનમાં ફેરફાર kilo.ai પર ઉપલબ્ધ છે.",
       "creditHistoryEmpty": "હજી સુધી કોઈ Kilo Pass ક્રેડિટ નથી.",
-      "manageInStore": "{{store}}માં મેનેજ કરો",
       "resume": "સબ્સ્ક્રિપ્શન ફરી શરૂ કરો",
       "resumeCancelledDescription": "તમારો Kilo Pass ફરીથી ઑટોમેટિક રીતે રિન્યૂ થવા લાગશે.",
       "resumePausedDescription": "તમારો Kilo Pass તેની શેડ્યૂલ કરેલી ફરી શરૂ થવાની તારીખ પહેલાં, હમણાં જ ફરી શરૂ થશે.",
@@ -3123,9 +3116,6 @@
     "bonusFree": "મફત બોનસ",
     "bonusReferral": "રેફરલ બોનસ",
     "bonusAvailable": "ઉપલબ્ધ મફત બોનસ",
-    "kiloPassManagement": "Kilo Pass નું સંચાલન",
-    "kiloPassSetup": "Kilo Pass નું સેટઅપ",
-    "opensManagementOnWeb": "વેબ પર Kilo Pass સંચાલન ખોલે છે.",
     "loadFailedRetry": "તમારું કનેક્શન તપાસો, પછી ફરી પ્રયાસ કરો.",
     "legalTermsOfUse": "ઉપયોગની શરતો (EULA)",
     "purchaseDifferentAccount": "આ App Store ખરીદી તમારા Kilo એકાઉન્ટ સાથે જોડાયેલી નથી. ખરીદી માટે વપરાયેલ Apple Account માં સાઇન ઇન કરો, પછી ફરી પ્રયાસ કરો.",
@@ -3311,7 +3301,6 @@
       "buySeats": "સીટો ખરીદો",
       "setupAutoTopUp": "ઑટો ટોપ-અપ સેટ કરો",
       "manageAutoTopUp": "ઑટો ટોપ-અપ મેનેજ કરો",
-      "webAddress": "વેબ સરનામું {{url}}",
       "opensOnWeb": "વેબ પર ખુલે છે"
     },
     "boundary": {
@@ -3494,8 +3483,7 @@
       "paymentPending": "ચૂકવણી બાકી",
       "processingBlocked": "પ્રક્રિયા અવરોધિત છે",
       "processingNeedsReview": "પ્રક્રિયાની સમીક્ષા જરૂરી છે",
-      "retryHint": "Kilo Passની સ્થિતિ લોડ કરવા ફરી પ્રયાસ કરે છે.",
-      "setupHint": "વેબ પર Kilo Pass સેટઅપ ખોલે છે."
+      "retryHint": "Kilo Passની સ્થિતિ લોડ કરવા ફરી પ્રયાસ કરે છે."
     }
   },
   "authErrors": {

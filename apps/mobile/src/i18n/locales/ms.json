@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Urus di web",
     "creditHistory": "Sejarah kredit",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Batal",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Pembelian, resit dan aktiviti kredit",
     "invoicesSubtitle": "Muat turun invois untuk pembelian anda",
-    "manageBilling": "Urus pengebilan di kilo.ai",
-    "manageBillingIosNote": "Kaedah pembayaran, tambah nilai automatik dan butiran pengebilan diuruskan di kilo.ai.",
     "codeReviewerSubtitle": "Semakan PR automatik",
     "securityAgentSubtitle": "Cari dan baiki kelemahan",
     "reviews": "Semakan",
@@ -3083,10 +3079,7 @@
       "cancelScheduled": "Dibatalkan pada {{date}}",
       "cancelScheduledChange": "Batalkan perubahan berjadual",
       "cancelled": "Langganan dibatalkan",
-      "changePlan": "Tukar pelan di kilo.ai",
-      "changePlanIosNote": "Perubahan pelan berbayar tersedia di kilo.ai.",
       "creditHistoryEmpty": "Belum ada kredit Kilo Pass.",
-      "manageInStore": "Urus di {{store}}",
       "resume": "Sambung semula langganan",
       "resumeCancelledDescription": "Kilo Pass anda akan mula diperbaharui secara automatik semula.",
       "resumePausedDescription": "Kilo Pass anda disambung semula sekarang, sebelum tarikh sambung semula yang dijadualkan.",
@@ -3123,9 +3116,6 @@
     "bonusFree": "Bonus percuma",
     "bonusReferral": "Bonus rujukan",
     "bonusAvailable": "Bonus percuma tersedia",
-    "kiloPassManagement": "Pengurusan Kilo Pass",
-    "kiloPassSetup": "Persediaan Kilo Pass",
-    "opensManagementOnWeb": "Membuka halaman pengurusan Kilo Pass di laman web.",
     "loadFailedRetry": "Semak sambungan anda, kemudian cuba lagi.",
     "legalTermsOfUse": "Terma penggunaan (EULA)",
     "purchaseDifferentAccount": "Pembelian App Store ini tidak dipautkan ke akaun Kilo anda. Log masuk ke Apple Account yang digunakan untuk pembelian, kemudian cuba lagi.",
@@ -3311,7 +3301,6 @@
       "buySeats": "Beli slot pengguna",
       "setupAutoTopUp": "Sediakan tambah nilai automatik",
       "manageAutoTopUp": "Urus tambah nilai automatik",
-      "webAddress": "Alamat web {{url}}",
       "opensOnWeb": "Dibuka di web"
     },
     "boundary": {
@@ -3494,8 +3483,7 @@
       "paymentPending": "Pembayaran belum selesai",
       "processingBlocked": "Pemprosesan disekat",
       "processingNeedsReview": "Pemprosesan memerlukan semakan",
-      "retryHint": "Mencuba untuk memuatkan semula status Kilo Pass.",
-      "setupHint": "Membuka halaman penyediaan Kilo Pass di web."
+      "retryHint": "Mencuba untuk memuatkan semula status Kilo Pass."
     }
   },
   "authErrors": {

@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Gestionar en la web",
     "creditHistory": "Historial de créditos",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Cancelar",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Compras, recibos y actividad de créditos",
     "invoicesSubtitle": "Descarga las facturas de tus compras",
-    "manageBilling": "Gestionar la facturación en kilo.ai",
-    "manageBillingIosNote": "Los métodos de pago, la recarga automática y los datos de facturación se gestionan en kilo.ai.",
     "codeReviewerSubtitle": "Revisiones automáticas de PR",
     "securityAgentSubtitle": "Encontrar y corregir vulnerabilidades",
     "reviews": "Revisiones",
@@ -2574,10 +2570,7 @@
       "cancelScheduled": "Se cancela el {{date}}",
       "cancelScheduledChange": "Cancelar cambio programado",
       "cancelled": "Suscripción cancelada",
-      "changePlan": "Cambiar de plan en kilo.ai",
-      "changePlanIosNote": "Los cambios a planes de pago están disponibles en kilo.ai.",
       "creditHistoryEmpty": "Aún no hay créditos de Kilo Pass.",
-      "manageInStore": "Gestionar en {{store}}",
       "resume": "Reanudar suscripción",
       "resumeCancelledDescription": "Tu Kilo Pass volverá a renovarse automáticamente.",
       "resumePausedDescription": "Tu Kilo Pass se reanuda ahora, antes de la fecha de reanudación programada.",
@@ -2614,9 +2607,6 @@
     "bonusFree": "Bono gratis",
     "bonusReferral": "Bono por referidos",
     "bonusAvailable": "Bono gratis disponible",
-    "kiloPassManagement": "Gestión de Kilo Pass",
-    "kiloPassSetup": "Configuración de Kilo Pass",
-    "opensManagementOnWeb": "Abre la gestión de Kilo Pass en la web.",
     "loadFailedRetry": "Comprueba tu conexión e inténtalo de nuevo.",
     "legalTermsOfUse": "Términos de uso (EULA)",
     "purchaseDifferentAccount": "Esta compra de la App Store no está vinculada a tu cuenta de Kilo. Inicia sesión con la cuenta de Apple que usaste para la compra e inténtalo de nuevo.",
@@ -3360,7 +3350,6 @@
       "buySeats": "Comprar licencias",
       "setupAutoTopUp": "Configurar recarga automática",
       "manageAutoTopUp": "Gestionar recarga automática",
-      "webAddress": "Dirección web {{url}}",
       "opensOnWeb": "Se abre en la web"
     },
     "boundary": {
@@ -3544,7 +3533,6 @@
       "processingBlocked": "Procesamiento bloqueado",
       "processingNeedsReview": "El procesamiento requiere revisión",
       "retryHint": "Reintenta la carga del estado de Kilo Pass.",
-      "setupHint": "Abre la configuración de Kilo Pass en la web.",
       "paidSeat_many": "{{displayCount}} licencias pagadas"
     }
   },

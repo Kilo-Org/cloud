@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Whakahaerehia i te ipurangi",
     "creditHistory": "Hītori kiredita",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Whakakore",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Ngā hoko, ngā rihīti, me ngā mahi kiredita",
     "invoicesSubtitle": "Tikiake i ngā pire mō āu hoko",
-    "manageBilling": "Whakahaere utu ki kilo.ai",
-    "manageBillingIosNote": "Ko ngā tikanga utu, te whakakī aunoa, me ngā taipitopito utu ka whakahaerehia ki kilo.ai.",
     "codeReviewerSubtitle": "Ngā arotake PR aunoa",
     "securityAgentSubtitle": "Rapua, whakatikahia hoki ngā whakaraeraetanga",
     "reviews": "Ngā arotake",
@@ -3083,10 +3079,7 @@
       "cancelScheduled": "Ka whakakorea hei te {{date}}",
       "cancelScheduledChange": "Whakakore i te panoni kua whakaritea",
       "cancelled": "Kua whakakorea te ohaurunga",
-      "changePlan": "Panoni mahere ki kilo.ai",
-      "changePlanIosNote": "Kei kilo.ai ngā panonitanga mahere utu.",
       "creditHistoryEmpty": "Kāore anō he kiredita Kilo Pass.",
-      "manageInStore": "Whakahaere ki {{store}}",
       "resume": "Tīmata anō i te ohaurunga",
       "resumeCancelledDescription": "Ka tīmata anō te whakahou aunoa o tō Kilo Pass.",
       "resumePausedDescription": "Ka tīmata anō tō Kilo Pass ināianei, i mua i tōna rā tīmata anō kua whakaritea.",
@@ -3123,9 +3116,6 @@
     "bonusFree": "Pāinga kore utu",
     "bonusReferral": "Pāinga tohutoro",
     "bonusAvailable": "Pāinga kore utu e wātea ana",
-    "kiloPassManagement": "Te whakahaere i a Kilo Pass",
-    "kiloPassSetup": "Te whakarite i a Kilo Pass",
-    "opensManagementOnWeb": "Ka whakatuwhera i te whārangi whakahaere o Kilo Pass ki te paetukutuku.",
     "loadFailedRetry": "Tirohia tō hononga, kātahi ka whakamātau anō.",
     "legalTermsOfUse": "Tikanga whakamahi (EULA)",
     "purchaseDifferentAccount": "Kāore tēnei hokonga App Store i hono ki tō pūkete Kilo. Takiuru ki te Apple Account i whakamahia mō te hokonga, kātahi ka whakamātau anō.",
@@ -3311,7 +3301,6 @@
       "buySeats": "Hoko raihana",
       "setupAutoTopUp": "Whakaritea te whakakī aunoa",
       "manageAutoTopUp": "Whakahaerehia te whakakī aunoa",
-      "webAddress": "Wāhitau ipurangi {{url}}",
       "opensOnWeb": "Ka tuwhera i te ipurangi"
     },
     "boundary": {
@@ -3494,8 +3483,7 @@
       "paymentPending": "Kei te tatari kia utua",
       "processingBlocked": "Kua āraitia te tukatuka",
       "processingNeedsReview": "Me arotake te tukatuka",
-      "retryHint": "Ka whakamātau anō ki te uta i te tūnga Kilo Pass.",
-      "setupHint": "Ka whakatuwhera i ngā whakaritenga Kilo Pass ki te paetukutuku."
+      "retryHint": "Ka whakamātau anō ki te uta i te tūnga Kilo Pass."
     }
   },
   "authErrors": {

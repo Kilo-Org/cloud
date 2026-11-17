@@ -134,12 +134,17 @@ export function EnvironmentBuildDetail({
 
   return (
     <>
+      {/* Same surface rule as the list view this replaces: no status-bar
+          clearance on a content-sized sheet, and the sheet's card surface
+          behind the header so header and body read as one. */}
       <SheetHeader
         title={environment.name}
         onCancel={onBack}
         cancelLabel={t('common.back')}
         onDone={onClose}
         doneDisabled={isSubmitting}
+        topInset="never"
+        surfaceClassName="bg-card"
       />
       <View className="gap-3 px-4 pb-4">
         {status === undefined ? (

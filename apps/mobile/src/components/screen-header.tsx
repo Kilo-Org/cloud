@@ -156,6 +156,12 @@ type ScreenHeaderProps = {
   reserveTitleSpace?: boolean;
   /** Optional mono-uppercase line above the title. */
   eyebrow?: string;
+  /**
+   * Reserve the eyebrow's line even while it has no text, so the label arriving
+   * later cannot change the header's height. The reserved line lives in the
+   * clipped band beside the heading, never above the visible title: a blank
+   * line inside the heading drops the title below the leading control's centre.
+   */
   reserveEyebrow?: boolean;
   centerTitle?: boolean;
   /** Use Focus's large 30px H1 style (list roots). Default 18px (detail). */
@@ -467,20 +473,18 @@ export function ScreenHeader({
 
   const heading = (
     <View className="min-w-0 flex-1">
-      {eyebrow || reserveEyebrow ? (
+      {eyebrow ? (
         <Eyebrow
-          className={cn('mb-0.5', centerTitle && 'text-center', !eyebrow && 'opacity-0')}
+          className={cn('mb-0.5', centerTitle && 'text-center')}
           // A status line is one line: a narrow window truncates it rather than
           // stacking it into a column beside the title. A caller that raises
           // `eyebrowNumberOfLines` opts into the extra lines and the middle
           // ellipsis that keeps a path's distinguishing tail.
           numberOfLines={eyebrowNumberOfLines ?? 1}
           ellipsizeMode={eyebrowNumberOfLines === undefined ? 'tail' : 'middle'}
-          accessible={Boolean(eyebrow)}
-          accessibilityElementsHidden={!eyebrow}
-          importantForAccessibility={eyebrow ? 'auto' : 'no-hide-descendants'}
+          accessible
         >
-          {eyebrow ?? '\u00A0'}
+          {eyebrow}
         </Eyebrow>
       ) : null}
       {titleNode}
@@ -524,20 +528,32 @@ export function ScreenHeader({
   const separateHeading = centerTitle && (Boolean(title) || Boolean(eyebrow));
 
   // The reserve, as a band rather than a box around the title: a zero-width,
-  // clipped twin of the eyebrow and the title's line cap holds the header's text
-  // area to one height for every line count the cap allows, so a title that
-  // grows a line cannot move the body below. The visible text stays at its
-  // natural height and centers on the band, which is what lines the leading
-  // control up with the text rather than with the empty line the reserve keeps.
-  // The twin lays out with the same eyebrow style and the same cap box as the
-  // visible title, so the band follows the font scale, and it needs no measured
-  // height and no line-height constant.
-  const reservedTitleBand = reserveTitleSpace ? (
-    <View className="w-0 overflow-hidden" aria-hidden>
-      {eyebrow || reserveEyebrow ? <Eyebrow className="mb-0.5">{blankEyebrow}</Eyebrow> : null}
-      <View className={reservedTitleHeightClass(size, titleLines)} />
-    </View>
-  ) : null;
+  // clipped twin of the eyebrow and, when the caller reserves the title space,
+  // the title's line cap. It holds the header's text area to one height for
+  // every line count the cap allows, so a title that grows a line cannot move
+  // the body below. The visible text stays at its natural height and centers on
+  // the band, which is what lines the leading control up with the text rather
+  // than with the empty line the reserve keeps. The twin lays out with the same
+  // eyebrow style and the same cap box as the visible title, so the band follows
+  // the font scale, and it needs no measured height and no line-height constant.
+  //
+  // An eyebrow that is reserved but not known yet lives here too. Painting its
+  // blank line above the title stacked that line inside the heading and dropped
+  // the title below the leading control's centre (the session changes header,
+  // whose eyebrow arrives with the capture, sat visibly under its Back and
+  // Refresh controls). The band keeps the eyebrow's line beside the heading, so
+  // the visible title centers on the row and the arriving text cannot change
+  // the height. The band is a sibling, so the row takes the taller of the two:
+  // it holds the eyebrow's line plus the title line the heading paints beside
+  // it, and one line is enough there — the heading already carries every line
+  // the title actually paints.
+  const reservedTitleBand =
+    reserveTitleSpace || (reserveEyebrow && !eyebrow) ? (
+      <View className="w-0 overflow-hidden" aria-hidden>
+        {eyebrow || reserveEyebrow ? <Eyebrow className="mb-0.5">{blankEyebrow}</Eyebrow> : null}
+        <View className={reservedTitleHeightClass(size, reserveTitleSpace ? titleLines : 1)} />
+      </View>
+    ) : null;
 
   // The leading control's pull into the gutter is a START-side margin, never a
   // hand-picked `mr` under RTL. With `I18nManager.doLeftAndRightSwapInRTL` on

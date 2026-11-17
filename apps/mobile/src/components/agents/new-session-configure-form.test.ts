@@ -954,18 +954,19 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(element, t => t === 'Config needs attention')).toBe(true);
   });
 
-  it('keeps the environment row at reserved height with skeletons while loading', () => {
+  it('renders the loading environment row as its title line', () => {
     const element = renderRow({ isProfileLoading: true });
 
-    // The label stays mounted and skeletons hold the row's height, so the
-    // rows below never move when the query settles.
+    // No blank line is reserved while the query runs: the loading copy is the
+    // row's one line, so the card is as tall as what it shows.
     expect(findTextContent(element, t => t === 'Environment')).toBe(true);
-    expect(findElementByType(element, 'Skeleton')).not.toBeNull();
+    expect(findTextContent(element, t => t === '\u00A0\n\u00A0')).toBe(false);
+    expect(findElementByType(element, 'Skeleton')).toBeNull();
     expect(findTextContent(element, t => t === 'Default environment')).toBe(false);
     expect(findTextContent(element, t => t === 'Production')).toBe(false);
   });
 
-  it('keeps the summary slot when a resolved profile has nothing configured', () => {
+  it('renders no summary line when a resolved profile has nothing configured', () => {
     const element = renderRow({
       profile: {
         ...PROFILE,
@@ -978,14 +979,13 @@ describe('NewSessionConfigureForm', () => {
       },
     });
 
-    // The empty count list keeps the two-line placeholder, so the card holds the
-    // height the loading state reserves instead of collapsing.
-    expect(findTextContent(element, t => t === '\u00A0\n\u00A0')).toBe(true);
+    // An empty count list renders the title alone instead of a blank slot.
+    expect(findTextContent(element, t => t === 'Production')).toBe(true);
+    expect(findTextContent(element, t => t === '\u00A0\n\u00A0')).toBe(false);
     const slots = collectElementsByType(element, 'View').filter(
       view => view.importantForAccessibility === 'no-hide-descendants'
     );
-    expect(slots).toHaveLength(1);
-    expect(slots[0]?.accessibilityElementsHidden).toBe(true);
+    expect(slots).toHaveLength(0);
   });
 
   it('renders every Environment row state inside the same card', () => {
@@ -1037,7 +1037,7 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(loadingRow, t => t === 'Environment')).toBe(true);
     expect(findTextContent(loadingRow, t => t === 'Loading…')).toBe(true);
     expect(findTextContent(loadingRow, t => t === 'Default environment')).toBe(false);
-    expect(findElementByType(loadingRow, 'Skeleton')).not.toBeNull();
+    expect(findTextContent(loadingRow, t => t === '\u00A0\n\u00A0')).toBe(false);
     expect(findElementByType(element, 'NewSessionPrompt')?.isCreating).toBe(false);
     expect(findElementByType(element, 'NewSessionStartButton')?.isStartDisabled).toBe(true);
   });

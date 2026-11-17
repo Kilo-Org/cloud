@@ -122,6 +122,17 @@ function findTitlePressable(root: TestInstance): TestInstance {
   );
 }
 
+/** The zero-width reserve beside the heading: height only, never in flow. */
+function findReservedBand(root: TestInstance): TestInstance {
+  return root.find(
+    node =>
+      typeof node.type === 'string' &&
+      String(node.props.className ?? '')
+        .split(' ')
+        .includes('w-0')
+  );
+}
+
 /**
  * The row the header puts `headerRight` on when the window is too narrow for
  * the title and the actions to share one. Only that variant carries `mt-2`;
@@ -907,14 +918,30 @@ describe('ScreenHeader mounted', () => {
     }
   });
 
-  it('keeps a reserved eyebrow hidden and on one line until its label arrives', () => {
+  it('reserves an empty eyebrow beside the heading instead of above the title', () => {
     const renderer = renderHeader({ title: '#6054', reserveEyebrow: true, centerTitle: true });
-    const placeholder = renderer.root.findByType('Eyebrow');
-    expect(placeholder.props.numberOfLines).toBe(1);
-    expect(placeholder.props.accessible).toBe(false);
-    expect(placeholder.props.accessibilityElementsHidden).toBe(true);
-    expect(placeholder.props.importantForAccessibility).toBe('no-hide-descendants');
-    expect(placeholder.props.className).toContain('opacity-0');
+
+    // No blank line sits in flow above the title: the heading holds the title
+    // alone, which is what centers it on the leading and trailing controls.
+    const heading = renderer.root.findByProps({ className: 'min-w-0 flex-1' });
+    expect(heading.findAllByType('Eyebrow')).toHaveLength(0);
+    expect(heading.findAllByType('Text').map(node => node.props.children)).toEqual(['#6054']);
+
+    // The reserved line lives in the clipped band, so the label that arrives
+    // later cannot change the header's height.
+    const band = findReservedBand(renderer.root);
+    expect(band.findAllByType('Eyebrow')).toHaveLength(1);
+    expect(band.findAllByType('Eyebrow')[0]?.children).toEqual(['\u00A0']);
+    // One title line beside the eyebrow's line: the heading already paints the
+    // title, and the empty eyebrow must not add a line to the header.
+    expect(
+      band
+        .findAll(
+          node =>
+            typeof node.type === 'string' && String(node.props.className ?? '').includes('min-h')
+        )
+        .map(node => node.props.className)
+    ).toEqual(['min-h-7']);
 
     act(() => {
       renderer.update(
@@ -927,10 +954,27 @@ describe('ScreenHeader mounted', () => {
       );
     });
     const label = renderer.root.findByType('Eyebrow');
+    expect(label.children).toEqual(['KILO-ORG/CLOUD']);
     expect(label.props.numberOfLines).toBe(1);
     expect(label.props.className).toContain('text-center');
-    expect(label.props.className).not.toContain('opacity-0');
-    expect(label.props.accessible).toBe(true);
+    // The heading now paints the eyebrow line the band reserved, so the header
+    // still holds the same two text lines and keeps its height.
+    const labelledHeading = renderer.root.findByProps({ className: 'min-w-0 flex-1' });
+    expect(labelledHeading.findAllByType('Eyebrow').map(node => node.children)).toEqual([
+      ['KILO-ORG/CLOUD'],
+    ]);
+    expect(labelledHeading.findAllByType('Text').map(node => node.props.children)).toEqual([
+      '#6054',
+    ]);
+    expect(
+      renderer.root.findAll(
+        node =>
+          typeof node.type === 'string' &&
+          String(node.props.className ?? '')
+            .split(' ')
+            .includes('w-0')
+      )
+    ).toHaveLength(0);
     renderer.unmount();
   });
 
@@ -1214,13 +1258,15 @@ describe('ScreenHeader mounted', () => {
     expect(eyebrow.children).toEqual(['KILO-STUB/DISCUSSION-MIXED']);
   });
 
-  it('keeps the reserved eyebrow placeholder on the same single capped line', () => {
+  it('keeps an empty reserved eyebrow out of the title flow', () => {
     const renderer = renderHeader({ reserveEyebrow: true, eyebrowNumberOfLines: 1 });
 
-    const eyebrow = renderer.root.findByType('Eyebrow');
-    expect(eyebrow.props.numberOfLines).toBe(1);
-    expect(eyebrow.props.ellipsizeMode).toBe('middle');
-    expect(eyebrow.children).toEqual(['\u00A0']);
+    // The reserve is the clipped band twin, never a blank line inside the
+    // heading: a placeholder there would push the title below the controls.
+    const band = findReservedBand(renderer.root);
+    const [twin] = band.findAllByType('Eyebrow');
+    expect(twin?.children).toEqual(['\u00A0']);
+    expect(renderer.root.findAllByType('Eyebrow')).toHaveLength(1);
   });
 });
 

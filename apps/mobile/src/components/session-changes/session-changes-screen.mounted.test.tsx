@@ -12,9 +12,9 @@ import { ScreenHeader } from '@/components/screen-header';
 import { SessionChangesScreen } from '@/components/session-changes/session-changes-screen';
 
 const state = vi.hoisted(() => ({
-  data: {} as Record<string, unknown>,
-  file: {} as Record<string, unknown>,
-  review: {} as Record<string, unknown>,
+  data: {} satisfies Record<string, unknown>,
+  file: {} satisfies Record<string, unknown>,
+  review: {} satisfies Record<string, unknown>,
 }));
 
 vi.mock('@/components/session-changes/use-session-changes-data', () => ({

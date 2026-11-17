@@ -11,7 +11,7 @@ import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { QueryError } from '@/components/query-error';
-import { ScreenHeader, type HeaderEyebrow } from '@/components/screen-header';
+import { type HeaderEyebrow, ScreenHeader } from '@/components/screen-header';
 import { SessionChangesBody } from '@/components/session-changes/session-changes-body';
 import { SessionChangesCommentDialog } from '@/components/session-changes/session-changes-comment-dialog';
 import { SessionChangesReviewSheet } from '@/components/session-changes/session-changes-review-sheet';

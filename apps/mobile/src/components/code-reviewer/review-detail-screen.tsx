@@ -32,7 +32,7 @@ import {
 } from '@/components/code-reviewer/review-detail-sections';
 import { QueryError } from '@/components/query-error';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
-import { type HeaderEyebrow } from '@/components/screen-header';
+import { resolveHeaderEyebrow } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { EyebrowPlaceholder } from '@/components/ui/eyebrow-placeholder';
@@ -155,11 +155,7 @@ export function ReviewDetailScreen({
   // lands, nor when a refetch drops it back to loading. A read that settled
   // without a review — the failure and permission branches — paints the same
   // header without the line, so the title centres on the back control.
-  const eyebrow: HeaderEyebrow = loadedReview
-    ? { kind: 'ready', text: loadedReview.repo_full_name }
-    : isLoading
-      ? { kind: 'loading' }
-      : { kind: 'none' };
+  const eyebrow = resolveHeaderEyebrow(loadedReview?.repo_full_name, isLoading);
   const header = (
     <ReviewerHeader
       title={t('codeReviewer.reviewDetail.title')}

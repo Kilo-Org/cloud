@@ -924,9 +924,7 @@ describe('ScreenHeader mounted', () => {
     expect(
       heading
         .findAll(
-          node =>
-            typeof node.type === 'string' &&
-            (node.type === 'Eyebrow' || node.props.accessibilityRole === 'header')
+          node => String(node.type) === 'Eyebrow' || node.props.accessibilityRole === 'header'
         )
         .map(node => node.type)
     ).toEqual(['Eyebrow', 'Text']);

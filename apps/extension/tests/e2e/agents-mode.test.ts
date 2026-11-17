@@ -770,10 +770,10 @@ test('Agents offline pill waits out the connect grace period', async () => {
     const sidePanel = await getSidePanel();
 
     // The mocked ingest socket never completes the connected handshake. The
-    // grace clock starts when the Agents view dials, not when this test gets
-    // to observe it: navigating switches the mode and mounts the list, so the
-    // clock must precede the switch. An assertion anchored after the switch
-    // loses every millisecond setup spends, and a loaded runner fails it.
+    // Grace clock starts when the Agents view dials, not when this test gets
+    // To observe it: navigating switches the mode and mounts the list, so the
+    // Clock must precede the switch. An assertion anchored after the switch
+    // Loses every millisecond setup spends, and a loaded runner fails it.
     const offlinePill = sidePanel.getByText('Offline');
     await expect(offlinePill).toBeHidden();
     const startedAt = Date.now();

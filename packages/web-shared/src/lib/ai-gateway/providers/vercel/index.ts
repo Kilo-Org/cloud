@@ -319,8 +319,12 @@ export function convertProviderOptions(
  * `ignore` and `order`, in Vercel's provider ids), and only Kilo's route a region (see
  * `getRouteInferenceRegion`); Vercel fails the request instead of leaving the region. Both carry
  * the data-handling choices.
+ *
+ * Vercel treats an empty `only` as no filter, so when the routing settings leave no provider that
+ * serves the model, the result names the model's providers instead and the caller rejects the
+ * request, as `canRouteToVercel` keeps chat off Vercel.
  */
-export async function getUsageEndpointGatewayOptions(params: {
+export async function getNonChatGatewayOptions(params: {
   /** The model id the request sends to Vercel, after `mapModelIdToVercel`. */
   vercelModelId: string;
   userByok: readonly BYOKResult[] | null;
@@ -328,7 +332,11 @@ export async function getUsageEndpointGatewayOptions(params: {
     | Pick<OpenRouterProviderConfig, 'only' | 'ignore' | 'order' | 'zdr' | 'data_collection'>
     | undefined;
   dataRegion: OrganizationDataRegion | null;
-}): Promise<NonNullable<VercelProviderConfig['gateway']>> {
+}): Promise<
+  | { kind: 'routable'; gateway: NonNullable<VercelProviderConfig['gateway']> }
+  /** `providers` holds the model's Vercel providers, when known. */
+  | { kind: 'no-eligible-provider'; providers: string[] }
+> {
   const { vercelModelId, userByok, provider, dataRegion } = params;
   const dataHandling = {
     zeroDataRetention: provider?.zdr,
@@ -349,13 +357,25 @@ export async function getUsageEndpointGatewayOptions(params: {
     // A routing preference never removes the last key, so BYOK traffic never bills Kilo.
     const byokProviders =
       Object.keys(retainedByokProviders).length > 0 ? retainedByokProviders : allByokProviders;
-    return { only: Object.keys(byokProviders), byok: byokProviders, ...dataHandling };
+    return {
+      kind: 'routable',
+      gateway: { only: Object.keys(byokProviders), byok: byokProviders, ...dataHandling },
+    };
   }
-  const only = await (async () => {
-    if (!provider?.ignore?.length)
+  const vercelInferenceProviders =
+    provider?.only || provider?.ignore?.length
+      ? await getCachedVercelInferenceProviderIdsForModel(vercelModelId)
+      : null;
+  const only = (() => {
+    if (!provider?.ignore?.length) {
+      if (
+        provider?.only &&
+        !hasCompatibleVercelInferenceProvider(provider.only, vercelInferenceProviders)
+      ) {
+        return [];
+      }
       return provider?.only?.map(openRouterToVercelInferenceProviderId);
-    const vercelInferenceProviders =
-      await getCachedVercelInferenceProviderIdsForModel(vercelModelId);
+    }
     if (vercelInferenceProviders) {
       return getVercelInferenceProvidersExcludingIgnored(
         provider.ignore,
@@ -366,11 +386,22 @@ export async function getUsageEndpointGatewayOptions(params: {
     if (provider.only) return applyVercelIgnoreToOnlyProviders(provider.ignore, provider.only);
     throw new Error('Vercel inference provider data is unavailable to apply provider.ignore');
   })();
+  if (only?.length === 0) {
+    return {
+      kind: 'no-eligible-provider',
+      providers: vercelInferenceProviders
+        ? routableVercelProviderIds(vercelInferenceProviders, () => true)
+        : [],
+    };
+  }
   return {
-    only,
-    order: provider?.order?.map(openRouterToVercelInferenceProviderId),
-    ...dataHandling,
-    ...(dataRegion && { inferenceRegion: { scope: 'zone', geoRegion: dataRegion } }),
+    kind: 'routable',
+    gateway: {
+      only,
+      order: provider?.order?.map(openRouterToVercelInferenceProviderId),
+      ...dataHandling,
+      ...(dataRegion && { inferenceRegion: { scope: 'zone', geoRegion: dataRegion } }),
+    },
   };
 }
 

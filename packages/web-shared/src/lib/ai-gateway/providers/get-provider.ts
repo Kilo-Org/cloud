@@ -85,9 +85,9 @@ import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encrypti
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
+  resolveEmbeddingOrDecisionRoute,
   resolveTranscriptionRoute,
-  resolveUsageEndpointRoute,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/usage-endpoint-provider';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/non-chat-routes';
 import { removePaidServerFeatures } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-paid-server-features';
 import {
   getLocalFakeLlmProvider,
@@ -835,8 +835,8 @@ export async function previewByokRouting({
 }
 
 /**
- * The route of an embeddings request; see `resolveUsageEndpointRoute`. `allowedProviders` holds
- * the OpenRouter provider slugs the organization policy allows, or is undefined for any.
+ * The route of an embeddings request; see `resolveEmbeddingOrDecisionRoute`. `allowedProviders`
+ * holds the OpenRouter provider slugs the organization policy allows, or is undefined for any.
  */
 export async function getEmbeddingProvider(
   requestedModel: string,
@@ -844,7 +844,7 @@ export async function getEmbeddingProvider(
   organizationId: string | undefined,
   options: { allowedProviders?: ReadonlySet<string>; openRouterDisabled?: boolean } = {}
 ): Promise<{ provider: Provider; userByok: BYOKResult[] | null; isFree: boolean }> {
-  const route = await resolveUsageEndpointRoute({
+  const route = await resolveEmbeddingOrDecisionRoute({
     requestedModel,
     modelType: 'embedding',
     user,

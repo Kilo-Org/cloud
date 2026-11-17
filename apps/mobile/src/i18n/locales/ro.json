@@ -3519,7 +3519,6 @@
     },
     "settingsOnWeb": {
       "title": "Setările organizației pe web",
-      "integrations": "Integrări pe web",
       "usageDetails": "Detalii de utilizare",
       "providersAndModels": "Furnizori și modele",
       "groups": "Grupuri",
@@ -3528,9 +3527,19 @@
       "ssoAndDomain": "SSO și domeniu",
       "dataCollection": "Colectarea datelor",
       "auditLogs": "Jurnale de audit",
-      "requestLogs": "Jurnale de cereri",
-      "subOrganizations": "Suborganizații",
-      "distributeFunds": "Distribuie fonduri"
+      "requestLogs": "Jurnale de cereri"
+    },
+    "requestLogs": {
+      "hint": "Cererile din ora dinaintea finalului intervalului, cele mai recente primele.",
+      "older": "Ora anterioară",
+      "newer": "Ora următoare",
+      "truncated": "Această oră are mai multe cereri decât arată lista.",
+      "emptyTitle": "Nicio cerere",
+      "emptyDescription": "Nu există cereri către gateway în această oră.",
+      "loadError": "Jurnalele de cereri nu au putut fi încărcate.",
+      "permissionDenied": "Jurnalele de cereri pot fi citite doar de proprietarul, un administrator sau un manager de facturare al organizației.",
+      "tokens": "{{input}} intrare · {{output}} ieșire",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Tokenuri de intrare",
@@ -4597,6 +4606,8 @@
     "topModels": "Modele principale",
     "topFeatures": "Funcții principale",
     "emptyTitle": "Nicio utilizare în această perioadă",
+    "unavailableTitle": "Utilizarea nu este disponibilă",
+    "unavailableDescription": "Acest spațiu de lucru nu raportează utilizare. Reîncercarea nu va ajuta.",
     "orgSelfNotice": "Vezi propria utilizare în această organizație.",
     "viewDetails": "Vezi detaliile utilizării"
   },

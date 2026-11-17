@@ -3467,7 +3467,6 @@
     },
     "settingsOnWeb": {
       "title": "網頁版組織設定",
-      "integrations": "網頁版整合",
       "usageDetails": "使用詳情",
       "providersAndModels": "供應商與模型",
       "groups": "群組",
@@ -3476,9 +3475,19 @@
       "ssoAndDomain": "SSO 與網域",
       "dataCollection": "資料收集",
       "auditLogs": "稽核記錄",
-      "requestLogs": "請求記錄",
-      "subOrganizations": "子組織",
-      "distributeFunds": "分配資金"
+      "requestLogs": "請求記錄"
+    },
+    "requestLogs": {
+      "hint": "顯示時段結束前一小時內的請求，由新到舊排列。",
+      "older": "較早一小時",
+      "newer": "較晚一小時",
+      "truncated": "這一小時的請求多於清單顯示的數量。",
+      "emptyTitle": "沒有請求",
+      "emptyDescription": "這一小時沒有閘道請求。",
+      "loadError": "無法載入請求記錄。",
+      "permissionDenied": "只有組織的擁有者、管理員或帳務管理員可以查看其請求記錄。",
+      "tokens": "輸入 {{input}} · 輸出 {{output}}",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "輸入詞元",
@@ -4527,6 +4536,8 @@
     "topModels": "最常用模型",
     "topFeatures": "最常用功能",
     "emptyTitle": "此期間沒有用量",
+    "unavailableTitle": "用量無法使用",
+    "unavailableDescription": "此工作區未回報用量。重試不會有幫助。",
     "orgSelfNotice": "你看到的是你自己在此組織中的用量。",
     "viewDetails": "查看用量詳情"
   },

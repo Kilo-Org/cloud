@@ -3542,7 +3542,6 @@
     },
     "settingsOnWeb": {
       "title": "Organization settings on the web",
-      "integrations": "Integrations on the web",
       "usageDetails": "Usage details",
       "providersAndModels": "Providers and models",
       "groups": "Groups",
@@ -3551,9 +3550,19 @@
       "ssoAndDomain": "SSO and domain",
       "dataCollection": "Data collection",
       "auditLogs": "Audit logs",
-      "requestLogs": "Request logs",
-      "subOrganizations": "Sub-organizations",
-      "distributeFunds": "Distribute funds"
+      "requestLogs": "Request logs"
+    },
+    "requestLogs": {
+      "hint": "Requests from the hour before the window ends, newest first.",
+      "older": "Older hour",
+      "newer": "Newer hour",
+      "truncated": "This hour has more requests than the list shows.",
+      "emptyTitle": "No requests",
+      "emptyDescription": "This hour has no gateway requests.",
+      "loadError": "Couldn't load request logs.",
+      "permissionDenied": "Only an organization owner, admin or billing manager can read its request logs.",
+      "tokens": "{{input}} in · {{output}} out",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Input Tokens",
@@ -4527,6 +4536,8 @@
     "topModels": "Top models",
     "topFeatures": "Top features",
     "emptyTitle": "No usage in this period",
+    "unavailableTitle": "Usage is unavailable",
+    "unavailableDescription": "This workspace isn't reporting usage. Retrying won't help.",
     "orgSelfNotice": "You're seeing your own usage in this organization.",
     "viewDetails": "View usage details"
   },

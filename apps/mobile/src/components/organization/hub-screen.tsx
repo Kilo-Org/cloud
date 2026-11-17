@@ -260,22 +260,14 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   );
 
   // The organization dashboard's own settings on the web, one row per area.
-  // The group waits for the membership payload because the parent link decides
-  // whether the sub-organization rows exist: painting them on the cached list
-  // entry's `null` and removing them a request later would move every row
-  // under them. It is the last group on the screen, so its arrival pushes
-  // nothing above it.
+  // The group waits for the membership payload because the guardrails row in
+  // the card above arrives with it: painting the group on the cached list
+  // entry's absence and moving it a request later would shift every row in it.
+  // It is the last group on the screen, so its arrival pushes nothing above it.
   const settingsRows =
     orgWithMembers.data == null && !membershipUnavailable
       ? null
-      : visibleOrgSettingsRows(
-          {
-            role,
-            plan: org.plan,
-            isTopLevel: parentLink === null,
-          },
-          organizationId
-        );
+      : visibleOrgSettingsRows({ plan: org.plan }, organizationId);
 
   return (
     <View className="flex-1 bg-background">
@@ -498,8 +490,10 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
 
         {/* The areas this app does not reimplement. Each row opens the page
             that already owns the setting, and the row set follows the web
-            sidebar's role and plan gates — see `visibleOrgSettingsRows`. */}
-        {settingsRows == null ? null : (
+            sidebar's role and plan gates — see `visibleOrgSettingsRows`. A role
+            the gates leave with no destination paints no heading: the group is
+            the only place they were listed, so an empty one would name nothing. */}
+        {settingsRows == null || settingsRows.length === 0 ? null : (
           <View className="gap-2">
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
               {t('organization.settingsOnWeb.title')}

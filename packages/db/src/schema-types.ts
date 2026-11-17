@@ -1572,6 +1572,53 @@ export type OrganizationMcpConnectTarget =
 export const OrganizationDataRegionSchema = z.enum(['us', 'eu', 'au', 'jp']);
 export type OrganizationDataRegion = z.infer<typeof OrganizationDataRegionSchema>;
 
+// How Kilo clients may drive a browser for this organization's members: anything the
+// member configured, the bundled Playwright browser only, or no browser tools at all.
+export const ORGANIZATION_BROWSER_CONTROL_MODES = ['allow', 'playwright_only', 'off'] as const;
+export const OrganizationBrowserControlSchema = z.enum(ORGANIZATION_BROWSER_CONTROL_MODES);
+export type OrganizationBrowserControl = z.infer<typeof OrganizationBrowserControlSchema>;
+
+export const MAX_ORGANIZATION_BROWSER_ALLOWED_ORIGINS = 200;
+export const MAX_ORGANIZATION_BROWSER_ORIGIN_LENGTH = 2048;
+
+function parseHttpOrigin(value: string): URL | null {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+    return null;
+  }
+  if (url.username !== '' || url.password !== '' || url.search !== '' || url.hash !== '') {
+    return null;
+  }
+  if (url.pathname !== '/') {
+    return null;
+  }
+  return url;
+}
+
+/**
+ * The canonical origin for an allow-list entry, or null when the value is not a
+ * bare http(s) origin. Clients grant `<class>:<origin>`, so a path or query in a
+ * stored value would silently grant nothing usable.
+ */
+export function normalizeOrganizationBrowserOrigin(value: string): string | null {
+  return parseHttpOrigin(value.trim())?.origin ?? null;
+}
+
+export const OrganizationBrowserAllowedOriginSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(MAX_ORGANIZATION_BROWSER_ORIGIN_LENGTH)
+  .refine(
+    value => normalizeOrganizationBrowserOrigin(value) !== null,
+    'Expected an http or https origin such as https://example.com'
+  );
+
 const OrganizationSettingsSchema = z.object({
   // The default model and provider access for organization members. Group
   // policies set the access of their own members. Organization admins manage
@@ -1620,6 +1667,14 @@ const OrganizationSettingsSchema = z.object({
   kilo_encrypt: z.boolean().optional(),
   enkrypt: OrganizationEnkryptSettingsSchema.optional(),
   guardrails: OrganizationGuardrailsSettingsSchema.optional(),
+  // Browser automation policy. Absent means `allow`, which leaves the choice of
+  // backend and origins to each member's client.
+  browserControl: OrganizationBrowserControlSchema.optional(),
+  // Origins every member's client treats as granted for browser read, act, and navigate.
+  browserAllowedOrigins: z
+    .array(OrganizationBrowserAllowedOriginSchema)
+    .max(MAX_ORGANIZATION_BROWSER_ALLOWED_ORIGINS)
+    .optional(),
   // Advanced policies. These apply only to an enterprise organization while the `gateway_settings`
   // organization feature is enabled in the gateway configuration. A null or absent data_region
   // routes Vercel AI Gateway requests globally; a set one also disables OpenRouter.

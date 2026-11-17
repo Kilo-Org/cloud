@@ -3467,7 +3467,6 @@
     },
     "settingsOnWeb": {
       "title": "Cài đặt tổ chức trên web",
-      "integrations": "Tích hợp trên web",
       "usageDetails": "Chi tiết sử dụng",
       "providersAndModels": "Nhà cung cấp và mô hình",
       "groups": "Nhóm",
@@ -3476,9 +3475,19 @@
       "ssoAndDomain": "SSO và tên miền",
       "dataCollection": "Thu thập dữ liệu",
       "auditLogs": "Nhật ký kiểm tra",
-      "requestLogs": "Nhật ký yêu cầu",
-      "subOrganizations": "Tổ chức con",
-      "distributeFunds": "Phân bổ tiền"
+      "requestLogs": "Nhật ký yêu cầu"
+    },
+    "requestLogs": {
+      "hint": "Các yêu cầu trong một giờ tính đến cuối khung thời gian, mới nhất ở trên.",
+      "older": "Giờ cũ hơn",
+      "newer": "Giờ mới hơn",
+      "truncated": "Giờ này có nhiều yêu cầu hơn số hiển thị trong danh sách.",
+      "emptyTitle": "Không có yêu cầu",
+      "emptyDescription": "Không có yêu cầu nào qua gateway trong giờ này.",
+      "loadError": "Không thể tải nhật ký yêu cầu.",
+      "permissionDenied": "Chỉ chủ sở hữu, quản trị viên hoặc người quản lý thanh toán của tổ chức mới có thể xem nhật ký yêu cầu của tổ chức.",
+      "tokens": "{{input}} vào · {{output}} ra",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Token đầu vào",
@@ -4527,6 +4536,8 @@
     "topModels": "Mô hình hàng đầu",
     "topFeatures": "Tính năng hàng đầu",
     "emptyTitle": "Không có mức sử dụng trong kỳ này",
+    "unavailableTitle": "Mức sử dụng không khả dụng",
+    "unavailableDescription": "Vùng làm việc này không báo cáo mức sử dụng. Thử lại sẽ không giúp ích.",
     "orgSelfNotice": "Bạn đang xem mức sử dụng của chính mình trong tổ chức này.",
     "viewDetails": "Xem chi tiết mức sử dụng"
   },

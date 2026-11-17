@@ -3462,7 +3462,6 @@
     },
     "settingsOnWeb": {
       "title": "Tetapan organisasi di web",
-      "integrations": "Integrasi di web",
       "usageDetails": "Butiran penggunaan",
       "providersAndModels": "Penyedia dan model",
       "groups": "Kumpulan",
@@ -3471,9 +3470,19 @@
       "ssoAndDomain": "SSO dan domain",
       "dataCollection": "Pengumpulan data",
       "auditLogs": "Log audit",
-      "requestLogs": "Log permintaan",
-      "subOrganizations": "Suborganisasi",
-      "distributeFunds": "Agihkan dana"
+      "requestLogs": "Log permintaan"
+    },
+    "requestLogs": {
+      "hint": "Permintaan dalam sejam sebelum julat masa berakhir, terkini dahulu.",
+      "older": "Jam sebelumnya",
+      "newer": "Jam berikutnya",
+      "truncated": "Jam ini ada lebih banyak permintaan daripada yang dipaparkan.",
+      "emptyTitle": "Tiada permintaan",
+      "emptyDescription": "Tiada permintaan get laluan dalam jam ini.",
+      "loadError": "Tidak dapat memuatkan log permintaan.",
+      "permissionDenied": "Hanya pemilik, pentadbir atau pengurus pengebilan organisasi boleh membaca log permintaannya.",
+      "tokens": "{{input}} masuk · {{output}} keluar",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Token masukan",
@@ -4527,6 +4536,8 @@
     "topModels": "Model teratas",
     "topFeatures": "Ciri teratas",
     "emptyTitle": "Tiada penggunaan dalam tempoh ini",
+    "unavailableTitle": "Penggunaan tidak tersedia",
+    "unavailableDescription": "Ruang kerja ini tidak melaporkan penggunaan. Mencuba semula tidak akan membantu.",
     "orgSelfNotice": "Anda sedang melihat penggunaan anda sendiri dalam organisasi ini.",
     "viewDetails": "Lihat butiran penggunaan"
   },

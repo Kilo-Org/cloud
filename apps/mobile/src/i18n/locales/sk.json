@@ -3576,7 +3576,6 @@
     },
     "settingsOnWeb": {
       "title": "Nastavenia organizácie na webe",
-      "integrations": "Integrácie na webe",
       "usageDetails": "Podrobnosti o využití",
       "providersAndModels": "Poskytovatelia a modely",
       "groups": "Skupiny",
@@ -3585,9 +3584,19 @@
       "ssoAndDomain": "SSO a doména",
       "dataCollection": "Zber údajov",
       "auditLogs": "Protokoly auditu",
-      "requestLogs": "Protokoly požiadaviek",
-      "subOrganizations": "Podorganizácie",
-      "distributeFunds": "Rozdeliť prostriedky"
+      "requestLogs": "Protokoly požiadaviek"
+    },
+    "requestLogs": {
+      "hint": "Požiadavky z hodiny pred koncom časového okna, najnovšie prvé.",
+      "older": "Staršia hodina",
+      "newer": "Novšia hodina",
+      "truncated": "V tejto hodine je viac požiadaviek, než zoznam zobrazuje.",
+      "emptyTitle": "Žiadne požiadavky",
+      "emptyDescription": "V tejto hodine nie sú žiadne požiadavky na bránu.",
+      "loadError": "Protokoly požiadaviek sa nepodarilo načítať.",
+      "permissionDenied": "Protokoly požiadaviek si môže prezerať iba vlastník, administrátor alebo správca fakturácie organizácie.",
+      "tokens": "{{input}} vstup · {{output}} výstup",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Vstupné tokeny",
@@ -4667,6 +4676,8 @@
     "topModels": "Najpoužívanejšie modely",
     "topFeatures": "Najpoužívanejšie funkcie",
     "emptyTitle": "V tomto období žiadne využitie",
+    "unavailableTitle": "Využitie nie je k dispozícii",
+    "unavailableDescription": "Tento pracovný priestor nevykazuje využitie. Opakovanie nepomôže.",
     "orgSelfNotice": "Vidíte svoje vlastné využitie v tejto organizácii.",
     "viewDetails": "Zobraziť podrobnosti o využití"
   },

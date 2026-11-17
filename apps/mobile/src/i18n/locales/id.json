@@ -3467,7 +3467,6 @@
     },
     "settingsOnWeb": {
       "title": "Pengaturan organisasi di web",
-      "integrations": "Integrasi di web",
       "usageDetails": "Detail penggunaan",
       "providersAndModels": "Penyedia dan model",
       "groups": "Grup",
@@ -3476,9 +3475,19 @@
       "ssoAndDomain": "SSO dan domain",
       "dataCollection": "Pengumpulan data",
       "auditLogs": "Log audit",
-      "requestLogs": "Log permintaan",
-      "subOrganizations": "Sub-organisasi",
-      "distributeFunds": "Distribusikan dana"
+      "requestLogs": "Log permintaan"
+    },
+    "requestLogs": {
+      "hint": "Permintaan dalam satu jam sebelum akhir rentang waktu, terbaru di atas.",
+      "older": "Jam sebelumnya",
+      "newer": "Jam berikutnya",
+      "truncated": "Jam ini memiliki lebih banyak permintaan daripada yang ditampilkan.",
+      "emptyTitle": "Tidak ada permintaan",
+      "emptyDescription": "Tidak ada permintaan gateway dalam jam ini.",
+      "loadError": "Tidak dapat memuat log permintaan.",
+      "permissionDenied": "Hanya pemilik, admin, atau pengelola penagihan organisasi yang dapat membaca log permintaannya.",
+      "tokens": "{{input}} masuk · {{output}} keluar",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Token masukan",
@@ -4527,6 +4536,8 @@
     "topModels": "Model teratas",
     "topFeatures": "Fitur teratas",
     "emptyTitle": "Tidak ada penggunaan pada periode ini",
+    "unavailableTitle": "Penggunaan tidak tersedia",
+    "unavailableDescription": "Workspace ini tidak melaporkan penggunaan. Mencoba lagi tidak akan membantu.",
     "orgSelfNotice": "Anda melihat penggunaan Anda sendiri di organisasi ini.",
     "viewDetails": "Lihat detail penggunaan"
   },

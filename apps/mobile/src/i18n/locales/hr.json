@@ -3519,7 +3519,6 @@
     },
     "settingsOnWeb": {
       "title": "Postavke organizacije na webu",
-      "integrations": "Integracije na webu",
       "usageDetails": "Pojedinosti o potrošnji",
       "providersAndModels": "Pružatelji i modeli",
       "groups": "Grupe",
@@ -3528,9 +3527,19 @@
       "ssoAndDomain": "SSO i domena",
       "dataCollection": "Prikupljanje podataka",
       "auditLogs": "Revizijski zapisnici",
-      "requestLogs": "Zapisnici zahtjeva",
-      "subOrganizations": "Podorganizacije",
-      "distributeFunds": "Raspodjela sredstava"
+      "requestLogs": "Zapisnici zahtjeva"
+    },
+    "requestLogs": {
+      "hint": "Zahtjevi iz sata prije kraja razdoblja, najnoviji prvi.",
+      "older": "Prethodni sat",
+      "newer": "Sljedeći sat",
+      "truncated": "U ovom satu ima više zahtjeva nego što je prikazano.",
+      "emptyTitle": "Nema zahtjeva",
+      "emptyDescription": "U ovom satu nema zahtjeva prema pristupniku.",
+      "loadError": "Učitavanje zapisnika zahtjeva nije uspjelo.",
+      "permissionDenied": "Zapisnike zahtjeva organizacije mogu čitati samo vlasnik, administrator ili upravitelj naplate.",
+      "tokens": "ulaz: {{input}} · izlaz: {{output}}",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Ulazni tokeni",
@@ -4597,6 +4606,8 @@
     "topModels": "Najkorišteniji modeli",
     "topFeatures": "Najkorištenije značajke",
     "emptyTitle": "Nema potrošnje u ovom razdoblju",
+    "unavailableTitle": "Potrošnja nije dostupna",
+    "unavailableDescription": "Ovaj radni prostor ne prijavljuje potrošnju. Ponovni pokušaj neće pomoći.",
     "orgSelfNotice": "Prikazuje se vaša vlastita potrošnja u ovoj organizaciji.",
     "viewDetails": "Prikaži detalje potrošnje"
   },

@@ -3462,7 +3462,6 @@
     },
     "settingsOnWeb": {
       "title": "Cilësimet e organizatës në ueb",
-      "integrations": "Integrimet në ueb",
       "usageDetails": "Detajet e përdorimit",
       "providersAndModels": "Ofruesit dhe modelet",
       "groups": "Grupet",
@@ -3471,9 +3470,19 @@
       "ssoAndDomain": "SSO dhe domeni",
       "dataCollection": "Mbledhja e të dhënave",
       "auditLogs": "Regjistrat e auditimit",
-      "requestLogs": "Regjistrat e kërkesave",
-      "subOrganizations": "Nënorganizatat",
-      "distributeFunds": "Shpërndaj fondet"
+      "requestLogs": "Regjistrat e kërkesave"
+    },
+    "requestLogs": {
+      "hint": "Kërkesat e orës para fundit të dritares, më të rejat në krye.",
+      "older": "Ora e mëparshme",
+      "newer": "Ora pasardhëse",
+      "truncated": "Kjo orë ka më shumë kërkesa nga sa shfaq lista.",
+      "emptyTitle": "Nuk ka kërkesa",
+      "emptyDescription": "Në këtë orë nuk ka kërkesa në gateway.",
+      "loadError": "Regjistrat e kërkesave nuk u ngarkuan.",
+      "permissionDenied": "Vetëm pronari, administratori ose menaxheri i faturimit i një organizate mund t'i lexojë regjistrat e saj të kërkesave.",
+      "tokens": "{{input}} hyrëse · {{output}} dalëse",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Tokenët hyrës",
@@ -4527,6 +4536,8 @@
     "topModels": "Modelet kryesore",
     "topFeatures": "Veçoritë kryesore",
     "emptyTitle": "Asnjë përdorim në këtë periudhë",
+    "unavailableTitle": "Përdorimi nuk është i disponueshëm",
+    "unavailableDescription": "Kjo hapësirë pune nuk raporton përdorim. Riprovimi nuk do të ndihmojë.",
     "orgSelfNotice": "Po shihni përdorimin tuaj në këtë organizatë.",
     "viewDetails": "Shiko detajet e përdorimit"
   },

@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Kikao chako cha wakala kimepokea sasisho",
-      "chatMessage": "Una ujumbe mpya",
-      "instanceLifecycle": "Mfano wako umepokea sasisho",
-      "scheduledAction": "Kitendo kilichopangwa kimepokea sasisho",
       "lowBalance": "Usawa wako unahitaji umakini",
       "spendAlert": "Matumizi yako yanahitaji umakini",
       "securityFinding": "Tokeo la usalama linahitaji umakini",
@@ -17,12 +14,6 @@
     "notification": {
       "title": "{{sessionTitle}}",
       "body": "{{message}}"
-    }
-  },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · Isiyo na jina",
-      "body": "{{bodyPreview}}"
     }
   },
   "internal": {
@@ -49,35 +40,6 @@
     "securityLifecycle": {
       "title": "Kilo",
       "body": "Ukaguzi wa usalama umepokea sasisho"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} iko tayari",
-      "body": "Gusa ili uanze kuzungumza."
-    },
-    "startFailed": {
-      "title": "{{instanceName}} imeshindwa kuanza",
-      "body": "Kuanza kumeshindwa."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} itaanzishwa upya hivi karibuni",
-      "body": "Imepangwa kuanzishwa upya saa {{when}}."
-    },
-    "restartCancelled": {
-      "title": "Kuanzishwa upya kwa {{instanceName}} kumegairiwa",
-      "body": "Kuanzishwa upya kuliopangwa hapo awali kumegairiwa."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} itasasishwa hivi karibuni",
-      "bodyWithTag": "Sasisha hadi {{targetImageTag}} saa {{when}}.",
-      "bodyWithoutTag": "Sasisho lililopangwa saa {{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "Sasisho la {{instanceName}} limeghairiwa",
-      "body": "Sasisho liliopangwa hapo awali limeghairiwa."
     }
   },
   "sessionReady": {

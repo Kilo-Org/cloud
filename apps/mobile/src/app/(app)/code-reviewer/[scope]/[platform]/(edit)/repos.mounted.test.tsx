@@ -53,6 +53,7 @@ const state = vi.hoisted(() => ({
 
 vi.mock('expo-router', () => ({
   useNavigation: () => ({ isFocused: () => true }),
+  useRouter: () => ({ push: vi.fn() }),
 }));
 
 vi.mock('@/lib/hooks/use-reviewer-route-params', () => ({
@@ -215,6 +216,13 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
     refetch: state.readinessRefetch,
     data: state.readiness,
   }),
+}));
+vi.mock('@/lib/hooks/use-bitbucket', () => ({
+  // The setup recovery card reads this only when the workspace's token still
+  // works but its repository cache is unloaded; the screen's own state
+  // assertions do not exercise that branch, and the real module loads the tRPC
+  // client (and through it the expo runtime) at import time.
+  useRefreshBitbucketRepositories: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 vi.mock('@/lib/hooks/use-code-reviewer-repo-sync', () => ({
   useReviewerRepositoriesResync: () => ({ resync: state.resync, resyncing: state.resyncing }),

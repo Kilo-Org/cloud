@@ -38340,7 +38340,7 @@ snapshots:
       minimatch: 3.1.5
       node-abort-controller: 3.1.1
       schema-utils: 3.3.0
-      semver: 7.7.4
+      semver: 7.8.5
       tapable: 2.3.3
       typescript: 7.0.2
       webpack: 5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))(esbuild@0.28.2)
@@ -38357,7 +38357,7 @@ snapshots:
       minimatch: 3.1.5
       node-abort-controller: 3.1.1
       schema-utils: 3.3.0
-      semver: 7.7.4
+      semver: 7.8.5
       tapable: 2.3.3
       typescript: 7.0.2
       webpack: 5.105.4
@@ -39299,7 +39299,7 @@ snapshots:
       '@babel/parser': 7.29.7
       '@istanbuljs/schema': 0.1.3
       istanbul-lib-coverage: 3.2.2
-      semver: 7.7.4
+      semver: 7.8.5
     transitivePeerDependencies:
       - supports-color
 

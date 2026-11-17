@@ -138,6 +138,7 @@ type IngestMetaKey =
   | 'sessionReadyNotified'
   | 'liveSummaryState'
   | 'lastLiveSummaryPersisted'
+  | 'lastBriefingExcerptPersisted'
   | NumericMetaKey
   | ShareInfoMetaKey;
 
@@ -223,6 +224,41 @@ function readLiveSummaryPersisted(db: DrizzleSqliteDODatabase): SessionLiveSumma
   if (raw === null) return null;
   const parsed = sessionLiveSummarySchema.safeParse(JSON.parse(raw));
   return parsed.success ? parsed.data : null;
+}
+
+type BriefingExcerptIdentity = Pick<BriefingExcerpt, 'messageId' | 'completedAt'>;
+
+/** The excerpt identity the last live persist handed to Postgres, or null when none did. */
+function readBriefingExcerptPersisted(
+  db: DrizzleSqliteDODatabase
+): BriefingExcerptIdentity | null {
+  const raw = readIngestMetaValue(db, 'lastBriefingExcerptPersisted');
+  if (raw === null) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== 'object' || parsed === null) return null;
+  const { messageId, completedAt } = parsed as { messageId?: unknown; completedAt?: unknown };
+  if (typeof messageId !== 'string' || messageId.length === 0) return null;
+  if (typeof completedAt !== 'string') return null;
+  return { messageId, completedAt };
+}
+
+/**
+ * Mirrors the SQL ordering in `briefingExcerptUpdate`: a candidate is newer on a later
+ * `completedAt`, or on an equal one and a greater `messageId`. Both times are canonical ISO
+ * strings, so comparing them as text matches comparing them as timestamps.
+ */
+function briefingExcerptIsNewer(
+  next: BriefingExcerptIdentity,
+  last: BriefingExcerptIdentity | null
+): boolean {
+  if (last === null) return true;
+  if (next.completedAt !== last.completedAt) return next.completedAt > last.completedAt;
+  return next.messageId > last.messageId;
 }
 
 function readIngestMetaNumber(db: DrizzleSqliteDODatabase, key: NumericMetaKey): number | null {
@@ -1143,6 +1179,7 @@ export class SessionIngestDO extends DurableObject<Env> {
       const costToPersist = columns.costMicrodollars;
       const activityValueMs = decision.persistActivity ? lastActivityValueMs : undefined;
       const summaryToPersist = columns.liveSummary;
+      let excerptPersisted: BriefingExcerptIdentity | undefined;
       const connectionString = this.env.HYPERDRIVE.connectionString;
       this.ctx.waitUntil(
         (async () => {
@@ -1150,7 +1187,11 @@ export class SessionIngestDO extends DurableObject<Env> {
             if (briefingResponseChanged) {
               try {
                 const excerpt = this.latestBriefingExcerpt(storedItems);
-                if (excerpt) {
+                if (
+                  excerpt &&
+                  briefingExcerptIsNewer(excerpt, readBriefingExcerptPersisted(this.db))
+                ) {
+                  excerptPersisted = excerpt;
                   columns.briefingExcerpt = {
                     excerpt,
                     receivedAtIso: new Date(ingestedAt ?? nowMsLive).toISOString(),
@@ -1167,6 +1208,22 @@ export class SessionIngestDO extends DurableObject<Env> {
             if (this.isDeleted()) return;
             await persistLiveSessionColumns(connectionString, kiloUserId, sessionId, columns);
             if (this.isDeleted()) return;
+            if (excerptPersisted !== undefined) {
+              // Max-merge like the throttle meta, so a slower in-flight batch cannot move the
+              // record backwards. A rejected write never reaches here, so the next batch retries.
+              if (
+                briefingExcerptIsNewer(excerptPersisted, readBriefingExcerptPersisted(this.db))
+              ) {
+                writeIngestMetaValue(
+                  this.db,
+                  'lastBriefingExcerptPersisted',
+                  JSON.stringify({
+                    messageId: excerptPersisted.messageId,
+                    completedAt: excerptPersisted.completedAt,
+                  })
+                );
+              }
+            }
             if (summaryToPersist !== undefined) {
               const prevSummaryAt = readIngestMetaNumber(this.db, 'lastLiveSummaryPersistedAtMs');
               if (prevSummaryAt === null || nowMsLive > prevSummaryAt) {

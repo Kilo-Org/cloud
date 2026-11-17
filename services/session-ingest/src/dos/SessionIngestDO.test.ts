@@ -1402,6 +1402,79 @@ describe('SessionIngestDO live activity + cost persist', () => {
     expect(harness.pgCallCount).toBe(writes);
   });
 
+  it('writes each distinct completed briefing excerpt once', async () => {
+    const harness = makeLiveHarness({ seedMeta: warmLiveMeta() });
+    const completedBatch = [
+      {
+        type: 'part' as const,
+        data: {
+          id: 'final-text',
+          messageID: 'final',
+          type: 'text',
+          text: 'Final response.',
+          time: { start: 1000, end: 3000 },
+        },
+      },
+      {
+        type: 'message' as const,
+        data: {
+          ...assistantItem('final', 0.1).data,
+          finish: 'stop',
+          time: { created: 1000, completed: 3000 },
+        },
+      },
+    ];
+
+    await harness.durableObject.ingest(completedBatch, 'usr_live', 'ses_live', 1, 20_000);
+    await harness.settle();
+    expect(harness.pgCallCount).toBe(1);
+    expect(persistedBriefingExcerpt(harness)).toEqual({
+      messageId: 'final',
+      completedAt: new Date(3000).toISOString(),
+      text: 'Final response.',
+    });
+    expect(harness.meta.get('lastBriefingExcerptPersisted')).toBe(
+      JSON.stringify({ messageId: 'final', completedAt: new Date(3000).toISOString() })
+    );
+
+    // A batch that repeats a completed response whose excerpt is already persisted writes no
+    // excerpt column.
+    await harness.durableObject.ingest(completedBatch, 'usr_live', 'ses_live', 1, 20_000);
+    await harness.settle();
+    expect(harness.pgCallCount).toBe(1);
+
+    await harness.durableObject.ingest(
+      [
+        {
+          type: 'part',
+          data: {
+            id: 'later-text',
+            messageID: 'later',
+            type: 'text',
+            text: 'Later response.',
+            time: { start: 4000, end: 6000 },
+          },
+        },
+        {
+          type: 'message',
+          data: {
+            ...assistantItem('later', 0.1).data,
+            finish: 'stop',
+            time: { created: 4000, completed: 6000 },
+          },
+        },
+      ],
+      'usr_live',
+      'ses_live',
+      1,
+      22_000
+    );
+    await harness.settle();
+    expect(harness.pgCallCount).toBe(2);
+    expect(Object.keys(harness.lastPgSet ?? {})).toEqual(['briefing_excerpt']);
+    expect(persistedBriefingExcerpt(harness)?.messageId).toBe('later');
+  });
+
   it('omits offloaded final text without fetching an R2 body', async () => {
     const part = {
       id: 'large-text',

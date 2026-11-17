@@ -3,15 +3,12 @@ import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { i18n } from '@/i18n';
 import arCatalog from '@/i18n/locales/ar.json';
+import { type LegalDocumentState } from '@/lib/hooks/use-legal-document';
 import { LegalDocumentScreen } from './legal-document-screen';
 
 const CONTENT_HTML = '<h1>Terms of Service</h1><p>English body.</p>';
 const mockedRetry = vi.hoisted(() => vi.fn());
 const mockedPush = vi.hoisted(() => vi.fn());
-type LegalDocumentState =
-  | { kind: 'loading' }
-  | { kind: 'content'; html: string }
-  | { kind: 'failed'; failure: 'retryable' | 'not-found' };
 
 const legalDocumentState = vi.hoisted(() => {
   const holder: { value: LegalDocumentState } = {
@@ -59,6 +56,10 @@ vi.mock('react-native', () => ({
 
 type I = TestRenderer.ReactTestInstance;
 
+const mountedRenderer: { current: TestRenderer.ReactTestRenderer | undefined } = {
+  current: undefined,
+};
+
 function mountScreen(): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
@@ -70,6 +71,7 @@ function mountScreen(): TestRenderer.ReactTestRenderer {
   if (!renderer) {
     throw new Error('renderer was not created');
   }
+  mountedRenderer.current = renderer;
   return renderer;
 }
 
@@ -113,9 +115,12 @@ beforeAll(async () => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // The loading test mutates the shared holder; no test may inherit that state.
+  legalDocumentState.value = { kind: 'content', html: CONTENT_HTML };
 });
 
 afterEach(async () => {
+  mountedRenderer.current?.unmount();
   // Other suites keep their catalog language; restore the default.
   await i18n.changeLanguage('en');
 });

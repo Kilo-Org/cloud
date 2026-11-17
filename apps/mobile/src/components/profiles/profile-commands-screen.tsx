@@ -14,14 +14,15 @@ import {
   replaceCommand,
   sameCommands,
 } from '@/components/profiles/profile-commands-model';
+import { CommandsSkeleton } from '@/components/profiles/profile-commands-skeleton';
 import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
 import { SetupCommandField } from '@/components/profiles/setup-command-field';
 import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import { QueryError } from '@/components/query-error';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, ChevronUp, Terminal, Trash2 } from '@/components/ui/icons';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAgentProfileCommands } from '@/lib/hooks/use-agent-profiles';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
@@ -35,23 +36,6 @@ type CommandRow = Readonly<{ sequence: number; command: string }>;
 
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_COMMAND_ROWS: readonly CommandRow[] = [];
-
-/** Content-shaped cards in the same slots as a loaded command row. */
-function CommandsSkeleton() {
-  return (
-    <View className="gap-3">
-      {[0, 1, 2].map(index => (
-        <View key={index} className="gap-1.5 rounded-lg bg-secondary p-3">
-          <View className="h-[48px] flex-row items-center justify-between">
-            <Skeleton className="h-4 w-20 rounded bg-muted-soft" />
-            <Skeleton className="h-[48px] w-[151px] rounded bg-muted-soft" />
-          </View>
-          <Skeleton className="h-[44px] w-full rounded-md bg-muted-soft" />
-        </View>
-      ))}
-    </View>
-  );
-}
 
 export function ProfileCommandsScreen({
   profileId,
@@ -336,6 +320,13 @@ export function ProfileCommandsScreen({
       <>
         {commands.map((command, index) => renderCommandRow(command, index))}
         <ProfileManageSlot permission={permission}>
+          {commands.length >= MAX_SETUP_COMMANDS ? (
+            <AccessibleStatus
+              message={t('profiles.commandLimitReached', { max: MAX_SETUP_COMMANDS })}
+              tone="warn"
+              className="text-sm"
+            />
+          ) : null}
           <Button onPress={add} disabled={commands.length >= MAX_SETUP_COMMANDS}>
             <Text>{t('profiles.addCommand')}</Text>
           </Button>

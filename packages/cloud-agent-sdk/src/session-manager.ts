@@ -1,11 +1,14 @@
 import type { ToolDisplayMode } from './tool-detail-marker';
+import type { BackgroundActivityState } from './background-activity';
 import type { CloudAgentAttachments } from '@kilocode/app-shared/cloud-agent';
+import { readCloudAgentErrorFields } from '@kilocode/app-shared/cloud-agent-error';
 import {
   errorShapeSchema,
   cloudSessionMetadataSchema,
   cloudSessionMessagesPageSchema,
   parseCustomerBillingFailure,
   type CustomerBillingFailure,
+  type SessionStatus,
 } from './schemas';
 import type {
   CreateRemoteSessionInput,
@@ -30,6 +33,7 @@ import {
   REMOTE_SESSION_EXIT_NOT_SUPPORTED,
   REMOTE_SESSION_CREATION_NOT_SUPPORTED,
   REMOTE_SESSION_CREATION_SCOPE_UNRESOLVED,
+  REMOTE_SESSION_ORGANIZATION_MISMATCH,
 } from './session';
 import type { CloudAgentSession, CloudAgentSessionConfig } from './session';
 import { createChatProcessor } from './chat-processor';
@@ -96,6 +100,11 @@ type CloudAgentModelOverride = {
   variant?: string;
 };
 type WorktreeChangesRefresh = {
+  cloudSessionId: string;
+  revision?: number;
+  connectionVersion: number;
+};
+type WorkspaceArtifactsRefresh = {
   cloudSessionId: string;
   revision?: number;
   connectionVersion: number;
@@ -185,7 +194,7 @@ const PENDING_CONFIRMATION_MAX_SESSIONS = 20;
  * Maximum number of retained messages. Once the loaded transcript exceeds this,
  * `trimRetainedHistory` drops the oldest loaded older-page from local storage.
  */
-const RETAINED_MESSAGE_WINDOW = 200;
+export const RETAINED_MESSAGE_WINDOW = 200;
 
 /**
  * How long a matching `Aborted` error stays suppressed after an interrupt RPC
@@ -402,6 +411,14 @@ type SessionManagerConfig = {
    */
   isStalledTransportError?: (err: unknown) => boolean;
   /**
+   * Opt-in for a consumer that opens a session immediately after creating it
+   * (the extension's CLI target). A just-created session can answer NOT_FOUND
+   * until its row is readable, so inside the window the open keeps loading and
+   * retries instead of latching the terminal not-available state. Absent, a
+   * NOT_FOUND stays terminal, which is what web and mobile expect.
+   */
+  spawnedSessionOpen?: SpawnedSessionOpenOptions;
+  /**
    * The consumer's send path can deliver remote-CLI attachment parts: it
    * materializes the presigned GET parts and passes them as `attachmentParts`.
    * The `supportsAttachments` gate reports a `remote` session supported only
@@ -554,6 +571,7 @@ type SessionManagerAtoms = {
   activePermission: W<StandalonePermission | null>;
   /** Every pending question, oldest first. `activeQuestion` is the head. */
   pendingQuestions: W<readonly StandaloneQuestion[]>;
+  backgroundActivity: W<BackgroundActivityState>;
   /** Every pending permission, oldest first. `activePermission` is the head. */
   pendingPermissions: W<readonly StandalonePermission[]>;
   /**
@@ -604,12 +622,14 @@ type SessionManagerAtoms = {
    */
   availableCommandsCatalogStatus: W<SlashCommandCatalogStatus | null>;
   worktreeChangesRefresh: W<WorktreeChangesRefresh | null>;
+  workspaceArtifactsRefresh: W<WorkspaceArtifactsRefresh | null>;
   messagesList: Atom<StoredMessage[]>;
   staticMessages: Atom<StoredMessage[]>;
   dynamicMessages: Atom<StoredMessage[]>;
   totalCost: Atom<number>;
   contextUsage: Atom<ContextUsage | undefined>;
   childMessages: Atom<(childSessionId: string) => StoredMessage[]>;
+  childSessionStatus: Atom<(childSessionId: string) => SessionStatus | undefined>;
   childSessionHydrationState: Atom<(childSessionId: string) => ChildSessionHydrationState>;
   childSessionError: Atom<(childSessionId: string) => string | null>;
   /** True when the latest page left a non-null cursor (more history to load). */
@@ -649,6 +669,12 @@ type SessionManagerAtoms = {
 
 type SessionManager = {
   switchSession(kiloSessionId: KiloSessionId): Promise<void>;
+  /**
+   * Record that the consumer just created this session, so an open that races
+   * its row can wait for it instead of latching "no longer available". Only
+   * meaningful with `spawnedSessionOpen` configured.
+   */
+  noteSpawnedSession(kiloSessionId: KiloSessionId): void;
   hydrateChildSession(childSessionId: KiloSessionId): Promise<void>;
   /**
    * Load the next page of older messages for a hydrated child session using
@@ -717,6 +743,7 @@ type SessionManager = {
   setCloudAgentModelOverride(override: CloudAgentModelOverride | null): void;
   retryRemoteModels(): void;
   retryRemoteCommands(): void;
+  retryBackgroundActivity(): void;
   createRemoteSession(input?: CreateRemoteSessionInput): Promise<KiloSessionId>;
   exitRemoteSession(): Promise<void>;
   interrupt(): Promise<void>;
@@ -768,6 +795,18 @@ type SessionManager = {
   atoms: SessionManagerAtoms;
 };
 
+export type SpawnedSessionOpenOptions = {
+  /** How long after `noteSpawnedSession` a NOT_FOUND still counts as "not readable yet". */
+  graceMs: number;
+  /** Delay before re-opening a session that answered NOT_FOUND inside the window. */
+  retryDelayMs?: number;
+  /** Cap on NOT_FOUND retries per spawned session, so a missing row still surfaces. */
+  maxAttempts?: number;
+};
+
+const DEFAULT_SPAWNED_RETRY_DELAY_MS = 1_000;
+const DEFAULT_SPAWNED_MAX_ATTEMPTS = 10;
+
 const GENERIC_ERROR = 'Something went wrong. Please retry in a moment.';
 /** Terminal message for a child session whose first page is a worker 404 (not-found). */
 const CHILD_SESSION_NOT_FOUND_MESSAGE = 'This session is no longer available.';
@@ -809,9 +848,9 @@ function formatErrorDetail(err: unknown): FormattedErrorDetail {
   if (r.success) {
     if (isSelectedModelUnavailable(r.data.message))
       return { message: SELECTED_MODEL_UNAVAILABLE_ERROR, code: 'selected-model-unavailable' };
-    const code = r.data.data?.code ?? r.data.shape?.code;
-    const http = r.data.data?.httpStatus ?? r.data.shape?.data?.httpStatus;
-    if (code === 'PAYMENT_REQUIRED' || http === 402)
+    const fields = readCloudAgentErrorFields(err);
+    const { code, httpStatus } = fields;
+    if (code === 'PAYMENT_REQUIRED' || httpStatus === 402)
       return {
         message: 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
         code: 'insufficient-credits',
@@ -823,17 +862,19 @@ function formatErrorDetail(err: unknown): FormattedErrorDetail {
         message: 'Service is unavailable right now. Please try again.',
         code: 'service-unavailable',
       };
-    if (code === 'CONFLICT' || http === 409)
+    if (code === 'CONFLICT' || httpStatus === 409)
       return {
         message: 'Previous task is still finishing up. Please wait a moment.',
         code: 'previous-task-in-progress',
       };
-    if (code === 'SERVICE_UNAVAILABLE' || http === 503)
+    if (code === 'SERVICE_UNAVAILABLE' || httpStatus === 503)
       return {
         message: 'Service is temporarily unavailable. Please retry in a moment.',
         code: 'service-temporarily-unavailable',
       };
-    if (code !== undefined || http !== undefined) {
+    // The numeric JSON-RPC `shape.code` is a server answer, not a code, so it
+    // reaches this branch through `answeredByServer`.
+    if (code !== undefined || httpStatus !== undefined || fields.answeredByServer) {
       const reason = serverErrorReason(r.data.message);
       return {
         message: GENERIC_ERROR,
@@ -1074,6 +1115,7 @@ type SessionOpen = {
   initialPageGeneration: number;
   storage: JotaiSessionStorage;
   resolvedFailures: Set<string>;
+  pendingSendConfirmationsReady: Promise<void>;
   /** False once live replay can start, so a slower cache cannot overwrite it. */
   acceptCachedPage: boolean;
   cacheReadPending: boolean;
@@ -1177,6 +1219,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const permissionAtom = atom<PermissionState | null>(null);
   const activePermissionAtom = atom<StandalonePermission | null>(null);
   const pendingQuestionsAtom = atom<readonly StandaloneQuestion[]>([]);
+  const backgroundActivityAtom = atom<BackgroundActivityState>({ status: 'inactive' });
   const pendingPermissionsAtom = atom<readonly StandalonePermission[]>([]);
   const unreadablePermissionsAtom = atom<readonly UnreadablePermissionState[]>([]);
   const suggestionAtom = atom<SuggestionState | null>(null);
@@ -1205,8 +1248,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    */
   const availableCommandsCatalogStatusAtom = atom<SlashCommandCatalogStatus | null>(null);
   const worktreeChangesRefreshAtom = atom<WorktreeChangesRefresh | null>(null);
+  const workspaceArtifactsRefreshAtom = atom<WorkspaceArtifactsRefresh | null>(null);
   const childSessionHydrationStatesAtom = atom<Map<string, ChildSessionHydrationState>>(new Map());
   const childSessionErrorsAtom = atom<Map<string, string>>(new Map());
+  const childSessionStatusesAtom = atom<ReadonlyMap<string, SessionStatus>>(new Map());
   const hasOlderMessagesAtom = atom<boolean>(false);
   const isLoadingOlderMessagesAtom = atom<boolean>(false);
   const olderMessagesErrorAtom = atom<OlderMessagesError | null>(null);
@@ -1476,6 +1521,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     const errors = get(childSessionErrorsAtom);
     return (childSessionId: string): string | null => errors.get(childSessionId) ?? null;
   });
+  const childSessionStatusAtom = atom(get => {
+    const statuses = get(childSessionStatusesAtom);
+    return (childSessionId: string): SessionStatus | undefined => statuses.get(childSessionId);
+  });
 
   let activeSessionId: KiloSessionId | null = null;
   let switchGeneration = 0;
@@ -1520,6 +1569,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * eviction order (`rememberDeniedSession`).
    */
   const deniedSessionIds = new Set<KiloSessionId>();
+  const spawnedSessions = new Map<KiloSessionId, { attempts: number; spawnedAt: number }>();
+  const spawnedRetryTimers = new Map<KiloSessionId, ReturnType<typeof setTimeout>>();
   let activeSessionType: ActiveSessionType | null = null;
   /**
    * Latest per-session capabilities reported by the live CLI transport's
@@ -1619,9 +1670,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   // further older-page loads for the active session.
   let olderMessagesTerminal: boolean = false;
   /**
-   * Stack of loaded older pages, oldest first. Each entry records the cursor
+   * Stack of loaded older pages, newest first. Each entry records the cursor
    * that was current before that page was fetched and the message ids the page
-   * added. `trimRetainedHistory` pops from the front (oldest) to stay under
+   * added. `trimRetainedHistory` pops from the end (oldest) to stay under
    * `RETAINED_MESSAGE_WINDOW`. The initial bounded page is never pushed here,
    * so the live tail always survives.
    */
@@ -1709,6 +1760,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(permissionAtom, null);
     store.set(activePermissionAtom, null);
     store.set(pendingQuestionsAtom, []);
+    store.set(backgroundActivityAtom, { status: 'inactive' });
     store.set(pendingPermissionsAtom, []);
     store.set(unreadablePermissionsAtom, []);
     store.set(suggestionAtom, null);
@@ -1721,9 +1773,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(fetchedSessionDataAtom, null);
     store.set(childSessionHydrationStatesAtom, new Map());
     store.set(childSessionErrorsAtom, new Map());
+    store.set(childSessionStatusesAtom, new Map());
     store.set(availableCommandsAtom, []);
     store.set(availableCommandsCatalogStatusAtom, null);
     store.set(worktreeChangesRefreshAtom, null);
+    store.set(workspaceArtifactsRefreshAtom, null);
     if (!preserveTranscript) {
       store.set(hasOlderMessagesAtom, false);
       store.set(olderMessagesOmittedItemCountAtom, 0);
@@ -1757,6 +1811,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     childSessionHydrationRequests.clear();
     store.set(childSessionHydrationStatesAtom, new Map());
     store.set(childSessionErrorsAtom, new Map());
+    store.set(childSessionStatusesAtom, new Map());
   }
 
   function setChildSessionHydrationState(
@@ -2542,30 +2597,22 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   function trimRetainedHistory(): void {
     const storage = store.get(sessionStorageAtom);
     if (!storage) return;
-    // The cursor must be the OLDEST popped entry's `cursorBefore`, not the
-    // last one popped. When two or more pages drop in one pass, overwriting
-    // on every pop leaves the cursor pointing at the newest dropped page, so
-    // `loadOlderMessages` could not re-fetch the oldest dropped page.
-    // Count only root-transcript rows. Child pages share this storage and
-    // must not push the window over the limit.
     let trimmedAny = false;
-    let oldestCursorBefore: string | null = null;
+    let resumeCursor: string | null = null;
     while (
       countRootTranscriptMessages(storage) > RETAINED_MESSAGE_WINDOW &&
       retainedHistoryStack.length > 0
     ) {
-      const entry = retainedHistoryStack.shift();
+      const entry = retainedHistoryStack.pop();
       if (!entry) break;
-      if (!trimmedAny) {
-        trimmedAny = true;
-        oldestCursorBefore = entry.cursorBefore;
-      }
+      trimmedAny = true;
+      resumeCursor = entry.cursorBefore;
       for (const id of entry.messageIds) {
         storage.deleteMessage(id);
       }
     }
     if (trimmedAny) {
-      olderMessagesCursor = oldestCursorBefore;
+      olderMessagesCursor = resumeCursor;
       // The rewind restores a page boundary the backend already served — only
       // a successful page is ever pushed onto the stack — so a terminal latch
       // recorded by a later page no longer describes this cursor. Clear the
@@ -2648,7 +2695,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
   /**
    * Remember a prompt a failed send could not deliver, and the message id it
-   * was sent under, for the session that owned the optimistic row (see
+   * was sent under, for the session that sent it (see
    * `failedPromptBySession`). Refreshes insertion order so the most recently
    * touched sessions survive eviction.
    */
@@ -2680,6 +2727,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * manager was destroyed can still retire its durable entry.
    */
   const pendingConfirmationBySession = new Map<KiloSessionId, Map<string, string>>();
+  const commandReceiptsAwaitingResponse = new Map<string, { acknowledged: boolean }>();
 
   /** Re-inserts the session's record last, so the oldest session is evicted first. */
   function boundedPendingConfirmationInsert(
@@ -2699,7 +2747,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
   /**
    * Remember a failed send whose outcome is unknown, under the session that
-   * owned the optimistic row (see `pendingConfirmationBySession`), and persist
+   * sent it (see `pendingConfirmationBySession`), and persist
    * it so an open after this route is gone still settles it.
    */
   function rememberPendingConfirmation(
@@ -2714,50 +2762,102 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   }
 
   /**
-   * Settles a failed send the server accepted anyway. The response was lost, so
-   * the failure reached the caller and it put the text back; the row for that
-   * message id arrives later. Withdrawing the text is what keeps the message in
-   * one place: the transcript owns it now, and a restored draft beside it would
-   * send a duplicate on the next press.
-   *
-   * A row under the failed send's id is the server's record, whatever its
-   * `synthetic` flag says: the client deleted its own optimistic row when the
-   * send failed, and the server stores the turn under the id the client sent
-   * (a queue synthesize carries it too). Only the active session publishes,
-   * because the atom speaks for the chat the user is looking at; another session
-   * keeps its record, and its own activation publishes it.
+   * A server row or command receipt confirms an unknown-outcome send. Kilo v2
+   * commands can use another native id, so their delivery receipts must also retire
+   * the restored draft. Only the active session publishes its composer state.
    */
+  function settlePendingSendConfirmation(kiloSessionId: KiloSessionId, messageId: string): void {
+    const pending = pendingConfirmationBySession.get(kiloSessionId);
+    const text = pending?.get(messageId);
+    if (text === undefined || pending === undefined) return;
+    pending.delete(messageId);
+    if (pending.size === 0) pendingConfirmationBySession.delete(kiloSessionId);
+    config.clearPendingSendConfirmation?.(kiloSessionId, messageId);
+    const failed = failedPromptBySession.get(kiloSessionId);
+    const ownsFailure = failed?.messageId === messageId;
+    if (ownsFailure) failedPromptBySession.delete(kiloSessionId);
+    if (activeSessionId !== kiloSessionId) return;
+    if (ownsFailure) {
+      store.set(failedPromptAtom, null);
+      store.set(billingFailureAtom, null);
+    }
+    deliveredFailedPromptSequence += 1;
+    store.set(deliveredFailedPromptAtom, {
+      messageId,
+      text,
+      sequence: deliveredFailedPromptSequence,
+    });
+  }
+
   function settleDeliveredFailedPrompt(kiloSessionId: KiloSessionId): void {
     const pending = pendingConfirmationBySession.get(kiloSessionId);
-    if (pending === undefined || pending.size === 0) return;
     const storage = store.get(sessionStorageAtom);
-    if (storage === null) return;
-    for (const [messageId, text] of pending) {
-      const info = storage.getMessageInfo(messageId);
-      if (info === undefined || info.role !== 'user') continue;
-      pending.delete(messageId);
-      config.clearPendingSendConfirmation?.(kiloSessionId, messageId);
-      // The record is the only owner of a prompt that may have arrived after
-      // this manager replaced the one that sent it, so the text comes from it.
-      // The failure atoms describe the session's latest failure: they are
-      // cleared only when it is this message, never for a different one whose
-      // cause and restored text must stay put.
-      const failed = failedPromptBySession.get(kiloSessionId);
-      const ownsFailure = failed?.messageId === messageId;
-      if (ownsFailure) failedPromptBySession.delete(kiloSessionId);
-      if (activeSessionId !== kiloSessionId) continue;
-      if (ownsFailure) {
-        store.set(failedPromptAtom, null);
-        store.set(billingFailureAtom, null);
+    if (pending === undefined || storage === null) return;
+    for (const messageId of pending.keys()) {
+      if (storage.getMessageInfo(messageId)?.role === 'user') {
+        settlePendingSendConfirmation(kiloSessionId, messageId);
       }
-      deliveredFailedPromptSequence += 1;
-      store.set(deliveredFailedPromptAtom, {
-        messageId,
-        text,
-        sequence: deliveredFailedPromptSequence,
-      });
     }
-    if (pending.size === 0) pendingConfirmationBySession.delete(kiloSessionId);
+  }
+
+  /**
+   * Whether this NOT_FOUND belongs to a session the consumer just created and
+   * whose row may still be on its way. Consumes one retry of the budget.
+   */
+  function takeSpawnedRetry(kiloSessionId: KiloSessionId): boolean {
+    const options = config.spawnedSessionOpen;
+    const spawned = spawnedSessions.get(kiloSessionId);
+    if (options === undefined || spawned === undefined) return false;
+    if (Date.now() - spawned.spawnedAt > options.graceMs) {
+      spawnedSessions.delete(kiloSessionId);
+      return false;
+    }
+    const maxAttempts = options.maxAttempts ?? DEFAULT_SPAWNED_MAX_ATTEMPTS;
+    if (spawned.attempts >= maxAttempts) {
+      spawnedSessions.delete(kiloSessionId);
+      return false;
+    }
+    spawned.attempts += 1;
+    return true;
+  }
+
+  /**
+   * Cancel a scheduled spawned retry. The handle must not outlive the open it
+   * belongs to: a fired retry re-opens the session by id, which would replace a
+   * session that has since opened or been reported unavailable.
+   */
+  function clearSpawnedRetry(kiloSessionId: KiloSessionId): void {
+    const timer = spawnedRetryTimers.get(kiloSessionId);
+    if (timer === undefined) return;
+    clearTimeout(timer);
+    spawnedRetryTimers.delete(kiloSessionId);
+  }
+
+  /** Cancel every pending spawned retry except the one for the newly opened id. */
+  function clearOtherSpawnedRetries(kiloSessionId: KiloSessionId): void {
+    for (const [id, timer] of spawnedRetryTimers) {
+      if (id === kiloSessionId) continue;
+      clearTimeout(timer);
+      spawnedRetryTimers.delete(id);
+    }
+  }
+
+  /**
+   * Re-open a spawned session that answered NOT_FOUND, unless the caller has
+   * moved on. The session stays in its loading state until the row is readable
+   * or the retry budget runs out.
+   */
+  function scheduleSpawnedRetry(open: SessionOpen): void {
+    const delay = config.spawnedSessionOpen?.retryDelayMs ?? DEFAULT_SPAWNED_RETRY_DELAY_MS;
+    clearSpawnedRetry(open.kiloSessionId);
+    spawnedRetryTimers.set(
+      open.kiloSessionId,
+      scheduleUnrefdTimer(() => {
+        spawnedRetryTimers.delete(open.kiloSessionId);
+        if (open.expectedGeneration !== switchGeneration) return;
+        void switchSession(open.kiloSessionId);
+      }, delay)
+    );
   }
 
   /**
@@ -2887,10 +2987,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
   async function switchSession(kiloSessionId: KiloSessionId): Promise<void> {
     cacheActiveSessionPage();
+    clearOtherSpawnedRetries(kiloSessionId);
     const preserveTranscript = preserveTranscriptOnOpen(kiloSessionId);
     const expectedGeneration = beginSessionOpen(kiloSessionId);
     const resolvedFailures = seedResolvedDeliveryFailures(kiloSessionId, expectedGeneration);
-    seedPendingSendConfirmations(kiloSessionId, expectedGeneration);
 
     const open = startCleanSessionOpen(
       kiloSessionId,
@@ -3005,14 +3105,14 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   function seedPendingSendConfirmations(
     kiloSessionId: KiloSessionId,
     expectedGeneration: number
-  ): void {
-    if (!config.readPendingSendConfirmations) return;
+  ): Promise<void> {
+    if (!config.readPendingSendConfirmations) return Promise.resolve();
     // Nothing is stored for this session unless something is read back: one
     // entry per session ever opened would outlive every one of them.
     const pending = pendingConfirmationBySession.get(kiloSessionId) ?? new Map<string, string>();
     // Not awaited: the first page arrives on its own schedule, and the
     // transcript subscription settles whatever is pending when it does.
-    void config
+    return config
       .readPendingSendConfirmations(kiloSessionId)
       .then(entries => {
         if (expectedGeneration !== switchGeneration) return;
@@ -3060,6 +3160,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       initialPageGeneration: loadOlderGeneration,
       storage: jotaiStorage,
       resolvedFailures,
+      pendingSendConfirmationsReady: seedPendingSendConfirmations(
+        kiloSessionId,
+        expectedGeneration
+      ),
       // A session the server already refused does not use the caller's page
       // until it confirms access again.
       acceptCachedPage: !deniedSessionIds.has(kiloSessionId),
@@ -3234,14 +3338,29 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     if (open.expectedGeneration !== switchGeneration || open.denied) return null;
     // The server confirmed this id, so its page may be used again.
     deniedSessionIds.delete(open.kiloSessionId);
+    spawnedSessions.delete(open.kiloSessionId);
+    clearSpawnedRetry(open.kiloSessionId);
     return data;
   }
 
   function denySessionOpen(open: SessionOpen, error: unknown): boolean {
-    const parsed = errorShapeSchema.safeParse(error);
-    const code = parsed.success ? (parsed.data.data?.code ?? parsed.data.shape?.code) : undefined;
+    const { code } = readCloudAgentErrorFields(error);
     if (code !== 'NOT_FOUND' && code !== 'UNAUTHORIZED' && code !== 'FORBIDDEN') return false;
+    if (code === 'NOT_FOUND' && takeSpawnedRetry(open.kiloSessionId)) {
+      open.denied = true;
+      open.acceptCachedPage = false;
+      stateUnsub?.();
+      stateUnsub = null;
+      currentSession?.destroy();
+      currentSession = null;
+      store.set(isLoadingAtom, true);
+      setIndicator(null);
+      scheduleSpawnedRetry(open);
+      return true;
+    }
     open.denied = true;
+    clearSpawnedRetry(open.kiloSessionId);
+    spawnedSessions.delete(open.kiloSessionId);
     open.acceptCachedPage = false;
     open.surfaceDeferredOpenFailure = null;
     stateUnsub?.();
@@ -3466,6 +3585,43 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         });
       },
       onEvent: event => {
+        if (event.type === 'background.activity') {
+          store.set(backgroundActivityAtom, event.state);
+          return;
+        }
+        if (
+          event.type === 'cloud.message.queued' ||
+          event.type === 'cloud.message.sent' ||
+          event.type === 'cloud.message.completed' ||
+          event.type === 'cloud.message.failed' ||
+          event.type === 'cloud.message.canceled'
+        ) {
+          const receipt = commandReceiptsAwaitingResponse.get(event.messageId);
+          if (receipt) receipt.acknowledged = true;
+        }
+        if (
+          (event.type === 'cloud.message.sent' && event.turnType === 'command') ||
+          event.type === 'cloud.message.completed' ||
+          (event.type === 'cloud.message.failed' &&
+            event.accepted !== false &&
+            (event.accepted === true || event.delivery === 'sent'))
+        ) {
+          settlePendingSendConfirmation(open.kiloSessionId, event.messageId);
+          void open.pendingSendConfirmationsReady.then(() => {
+            if (open.expectedGeneration !== switchGeneration) return;
+            settlePendingSendConfirmation(open.kiloSessionId, event.messageId);
+          });
+        }
+        if (event.type === 'session.status' && event.sessionId !== store.get(rootSessionIdAtom)) {
+          const statuses = new Map(store.get(childSessionStatusesAtom));
+          statuses.set(event.sessionId, event.status);
+          store.set(childSessionStatusesAtom, statuses);
+          if (event.status.type === 'busy') {
+            const errors = new Map(store.get(childSessionErrorsAtom));
+            errors.delete(event.sessionId);
+            store.set(childSessionErrorsAtom, errors);
+          }
+        }
         if (event.type === 'cloud.message.failed' && !open.resolvedFailures.has(event.messageId)) {
           store.set(billingFailureAtom, event.billingFailure ?? null);
         } else if (
@@ -3480,11 +3636,30 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         if (eventSessionId !== null) {
           clearStaleChildSessionHydrationError(session.storage, eventSessionId);
         }
-        if (event.type === 'worktree.changes.ready' || event.type === 'connected') {
+        if (
+          event.type === 'worktree.changes.ready' ||
+          event.type === 'workspace.artifacts.changed' ||
+          event.type === 'connected'
+        ) {
           const cloudSessionId = store.get(sessionIdAtom);
           if (!cloudSessionId || event.cloudSessionId !== cloudSessionId) return;
-          const previous = store.get(worktreeChangesRefreshAtom);
+          if (event.type === 'connected') {
+            const previousWorktree = store.get(worktreeChangesRefreshAtom);
+            store.set(worktreeChangesRefreshAtom, {
+              ...previousWorktree,
+              cloudSessionId,
+              connectionVersion: (previousWorktree?.connectionVersion ?? 0) + 1,
+            });
+            const previousArtifacts = store.get(workspaceArtifactsRefreshAtom);
+            store.set(workspaceArtifactsRefreshAtom, {
+              ...previousArtifacts,
+              cloudSessionId,
+              connectionVersion: (previousArtifacts?.connectionVersion ?? 0) + 1,
+            });
+            return;
+          }
           if (event.type === 'worktree.changes.ready') {
+            const previous = store.get(worktreeChangesRefreshAtom);
             if (event.revision <= (previous?.revision ?? 0)) return;
             store.set(worktreeChangesRefreshAtom, {
               cloudSessionId,
@@ -3492,10 +3667,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
               connectionVersion: previous?.connectionVersion ?? 0,
             });
           } else {
-            store.set(worktreeChangesRefreshAtom, {
-              ...previous,
+            const previous = store.get(workspaceArtifactsRefreshAtom);
+            if (event.revision <= (previous?.revision ?? 0)) return;
+            store.set(workspaceArtifactsRefreshAtom, {
               cloudSessionId,
-              connectionVersion: (previous?.connectionVersion ?? 0) + 1,
+              revision: event.revision,
+              connectionVersion: previous?.connectionVersion ?? 0,
             });
           }
           return;
@@ -3857,26 +4034,23 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       };
     }
 
-    // Optimistic local insert: render the user's prompt (plus any file parts)
-    // as soon as the transport send is attempted, before the server or CLI
-    // echoes it back. Reconciliation differs by session type:
-    //   - cloud-agent: the server honors `messageId`, so the later
-    //     `cloud.message.queued` synthesize is a no-op (existing-id guard) and
-    //     the authoritative `message.updated` overwrites this row by id. If
-    //     that update never lands (the wrapper's event publications can all be
-    //     rejected), the row keeps `info.synthetic` and the transcript renders
-    //     it as an unconfirmed submission — typed failure footer on a recorded
-    //     failed run.
-    //   - remote: new CLIs echo `messageId` back; old CLIs assign their own,
-    //     so we track the id in `remoteOptimisticIds` and retarget when the
-    //     authoritative user message lands (see the onEvent handler).
+    // Cloud prompts preserve messageId; their synthetic row keeps delivery failures
+    // visible if the native message never arrives. Kilo v2 commands can expand under
+    // a different id, so only server queue events create their temporary row;
+    // acceptance removes it. Commands have no optimistic row for markSending or onOptimisticSend.
+    // Older remote CLIs also assign ids; remoteOptimisticIds reconciles those echoes.
     const optimisticStorage = store.get(sessionStorageAtom);
     const optimisticSessionId = store.get(rootSessionIdAtom) ?? kiloSessionId;
-    const insertedOptimisticRow = Boolean(
-      sessionAtSend && optimisticStorage && optimisticSessionId
-    );
+    const insertedOptimisticRow =
+      (input.payload.type === 'prompt' || sessionType === 'remote') &&
+      Boolean(sessionAtSend && optimisticStorage && optimisticSessionId);
+    const commandReceipt =
+      sessionType === 'cloud-agent' && input.payload.type === 'command'
+        ? { acknowledged: false }
+        : null;
+    if (commandReceipt) commandReceiptsAwaitingResponse.set(messageId, commandReceipt);
     try {
-      if (sessionAtSend && optimisticStorage && optimisticSessionId) {
+      if (insertedOptimisticRow && optimisticStorage && optimisticSessionId) {
         insertOptimisticUserMessage({
           storage: optimisticStorage,
           sessionId: optimisticSessionId,
@@ -3968,6 +4142,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       // `switchSession` clears the storage it leaves, so after a switch the
       // confirmation survives only in the page cached on the way out.
       const delivered =
+        commandReceipt?.acknowledged === true ||
         (stillOnSendingChat && mountedRow?.role === 'user' && mountedRow.synthetic !== true) ||
         (!stillOnSendingChat &&
           kiloSessionId !== null &&
@@ -3975,7 +4150,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       if (optimisticStorage && optimisticStorage !== mountedStorage && !delivered) {
         optimisticStorage.deleteMessage(messageId);
       }
-      if (mountedStorage && mountedRow?.role === 'user' && mountedRow.synthetic === true) {
+      if (
+        !delivered &&
+        mountedStorage &&
+        mountedRow?.role === 'user' &&
+        mountedRow.synthetic === true
+      ) {
         mountedStorage.deleteMessage(messageId);
       }
       remoteOptimisticIds.delete(messageId);
@@ -3986,19 +4166,13 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       // that carries a code or an HTTP status is the server's own verdict on
       // this send, whatever `formatErrorDetail` labels it, so no row will ever
       // confirm it; so is a failure no transport could have delivered.
-      const shape = errorShapeSchema.safeParse(err);
-      const answeredByServer =
-        shape.success &&
-        (shape.data.data?.code !== undefined ||
-          shape.data.data?.httpStatus !== undefined ||
-          shape.data.shape?.code !== undefined ||
-          shape.data.shape?.data?.httpStatus !== undefined);
+      const serverAnswered = readCloudAgentErrorFields(err).answeredByServer;
       const outcomeUnknown =
-        !answeredByServer &&
+        !serverAnswered &&
         (detail.code === 'connection-failed' ||
           detail.code === 'connection-lost' ||
           detail.code === 'generic-error');
-      if (insertedOptimisticRow && kiloSessionId) {
+      if (kiloSessionId) {
         if (delivered) {
           failedPromptBySession.delete(kiloSessionId);
         } else {
@@ -4046,6 +4220,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       }
       return false;
     } finally {
+      commandReceiptsAwaitingResponse.delete(messageId);
       // The request is settled either way: the Sending cue is request-pending
       // state, so it must not outlive the call. Server delivery state (queued /
       // failed) takes over from here.
@@ -4308,18 +4483,21 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     currentSession?.retryRemoteCommands();
   }
 
+  /**
+   * Create a session beside the active one. The organization and the other
+   * inheritance fields come from the active session's own row; a caller may
+   * repeat that organization but not change it.
+   */
   async function createRemoteSession(input?: CreateRemoteSessionInput): Promise<KiloSessionId> {
     if (!currentSession || activeSessionType !== 'remote') {
       throw new Error(REMOTE_SESSION_CREATION_NOT_SUPPORTED);
     }
-    // Inheritance from the active session (Decision 6). Explicit caller fields
-    // win when provided (e.g. tests); otherwise store-derived values apply. Only
-    // the active session's own row supplies an organization, and a caller that
-    // names its own organization needs no row.
     const fetched = store.get(fetchedSessionDataAtom);
-    const scopeSupplied = input?.orgId !== undefined;
-    if (!scopeSupplied && fetched?.kiloSessionId !== activeSessionId) {
+    if (fetched?.kiloSessionId !== activeSessionId) {
       throw new Error(REMOTE_SESSION_CREATION_SCOPE_UNRESOLVED);
+    }
+    if (input?.orgId !== undefined && input.orgId !== fetched?.organizationId) {
+      throw new Error(REMOTE_SESSION_ORGANIZATION_MISMATCH);
     }
     const selection = store.get(remoteModelOverrideAtom)?.selection ?? store.get(observedModelAtom);
     const inherited = computeCreateRemoteSessionInheritance({
@@ -4383,6 +4561,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     metadataRecoveryCleanups = [];
     resetChildSessionHydration();
     switchGeneration += 1;
+    for (const timer of spawnedRetryTimers.values()) clearTimeout(timer);
+    spawnedRetryTimers.clear();
+    spawnedSessions.clear();
     stateUnsub?.();
     stateUnsub = null;
     currentSession?.destroy();
@@ -4397,6 +4578,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     supersededInFlightBySession.clear();
     failedPromptBySession.clear();
     pendingConfirmationBySession.clear();
+    commandReceiptsAwaitingResponse.clear();
     deniedSessionIds.clear();
     activeSessionId = null;
     activeSessionType = null;
@@ -4409,6 +4591,15 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
   return {
     switchSession,
+    noteSpawnedSession: (kiloSessionId: KiloSessionId) => {
+      const options = config.spawnedSessionOpen;
+      if (options === undefined) return;
+      const now = Date.now();
+      for (const [id, spawned] of spawnedSessions) {
+        if (now - spawned.spawnedAt > options.graceMs) spawnedSessions.delete(id);
+      }
+      spawnedSessions.set(kiloSessionId, { attempts: 0, spawnedAt: now });
+    },
     hydrateChildSession,
     loadOlderChildMessages,
     loadOlderMessages,
@@ -4419,6 +4610,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     setCloudAgentModelOverride,
     retryRemoteModels,
     retryRemoteCommands,
+    retryBackgroundActivity: () => currentSession?.retryBackgroundActivity?.(),
     createRemoteSession,
     exitRemoteSession,
     interrupt,
@@ -4472,6 +4664,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       permission: permissionAtom,
       activePermission: activePermissionAtom,
       pendingQuestions: pendingQuestionsAtom,
+      backgroundActivity: backgroundActivityAtom,
       pendingPermissions: pendingPermissionsAtom,
       unreadablePermissions: unreadablePermissionsAtom,
       suggestion: suggestionAtom,
@@ -4485,12 +4678,14 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       availableCommands: availableCommandsAtom,
       availableCommandsCatalogStatus: availableCommandsCatalogStatusAtom,
       worktreeChangesRefresh: worktreeChangesRefreshAtom,
+      workspaceArtifactsRefresh: workspaceArtifactsRefreshAtom,
       messagesList: messagesListAtom,
       staticMessages: staticMessagesAtom,
       dynamicMessages: dynamicMessagesAtom,
       totalCost: totalCostAtom,
       contextUsage: contextUsageAtom,
       childMessages: childMessagesAtom,
+      childSessionStatus: childSessionStatusAtom,
       childSessionHydrationState: childSessionHydrationStateAtom,
       childSessionError: childSessionErrorAtom,
       hasOlderMessages: hasOlderMessagesAtom,
@@ -4512,6 +4707,7 @@ export type {
   SessionManagerConfig,
   SessionManagerAtoms,
   WorktreeChangesRefresh,
+  WorkspaceArtifactsRefresh,
   SessionStatusIndicator,
   SessionConfig,
   StandalonePermission,

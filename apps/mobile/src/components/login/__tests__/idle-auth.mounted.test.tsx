@@ -8,7 +8,6 @@ import type * as NativeCSSCompiler from 'react-native-css/compiler';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { openBrowserAsync } from 'expo-web-browser';
 import {
   INLINE_LINK_BOX_CLASS,
   INLINE_LINK_CONNECTOR_CLASS,
@@ -24,7 +23,6 @@ import {
   MIN_TAP_TARGET_DP,
   TOUCH_TARGET_DP,
 } from '@/lib/a11y/tap-target';
-import { PRIVACY_URL, TERMS_URL } from '@/lib/config';
 import { i18n } from '@/i18n';
 
 import { IdleAuth } from '../idle-auth';
@@ -81,8 +79,9 @@ vi.mock('@/lib/auth/use-native-auth', () => ({
 }));
 
 vi.mock('@/lib/login-draft', () => ({
-  setLoginEmailDraft: vi.fn(),
-  setSsoRecoveryDraft: vi.fn(),
+  beginLoginEmail: vi.fn(),
+  holdLoginEmail: vi.fn(),
+  holdSsoRecovery: vi.fn(),
 }));
 
 vi.mock('expo-apple-authentication', () => ({
@@ -114,13 +113,10 @@ vi.mock('@/components/login/apple-logo', () => ({ AppleLogo: 'AppleLogo' }));
 vi.mock('@/components/login/google-logo', () => ({ GoogleLogo: 'GoogleLogo' }));
 vi.mock('@/components/ui/icons', () => ({ KeyRound: 'KeyRound', Mail: 'Mail' }));
 
-vi.mock('expo-web-browser', () => ({
-  openBrowserAsync: vi.fn(),
-}));
+const mockedPush = vi.hoisted(() => vi.fn());
 
-vi.mock('@/lib/config', () => ({
-  TERMS_URL: 'https://app.kilo.ai/terms-app',
-  PRIVACY_URL: 'https://app.kilo.ai/privacy-app',
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: mockedPush }),
 }));
 
 // The real hook pulls expo-router, which the mounted project cannot load.
@@ -1026,21 +1022,28 @@ describe('IdleAuth email continue copy', () => {
     });
   });
 
-  it('opens the browser for Terms and Privacy Policy', async () => {
+  it('opens Terms and Privacy Policy in their native screens', async () => {
     const start = vi.fn<StartFn>();
+    mockedPush.mockClear();
     const renderer = await mountIdleAuth(start);
 
     const terms = findLink(renderer.root, 'Terms of Use');
     act(() => {
       (terms.props.onPress as () => void)();
     });
-    expect(openBrowserAsync).toHaveBeenCalledWith(TERMS_URL);
+    expect(mockedPush).toHaveBeenCalledWith({
+      pathname: '/(auth)/legal/[document]',
+      params: { document: 'terms' },
+    });
 
     const privacy = findLink(renderer.root, 'Privacy Policy');
     act(() => {
       (privacy.props.onPress as () => void)();
     });
-    expect(openBrowserAsync).toHaveBeenCalledWith(PRIVACY_URL);
+    expect(mockedPush).toHaveBeenCalledWith({
+      pathname: '/(auth)/legal/[document]',
+      params: { document: 'privacy' },
+    });
   });
 
   it('reads the whole sentence from one accessible wrapper in visible order', async () => {
@@ -1067,18 +1070,24 @@ describe('IdleAuth email continue copy', () => {
       { name: 'openPrivacy', label: 'Privacy Policy' },
     ]);
 
-    // The wrapper's action handlers open the same URLs the hidden links do.
+    // The wrapper's action handlers open the same screens the hidden links do.
     const handleAction = wrapper.props.onAccessibilityAction as (event: {
       nativeEvent: { actionName: string };
     }) => void;
     act(() => {
       handleAction({ nativeEvent: { actionName: 'openTerms' } });
     });
-    expect(openBrowserAsync).toHaveBeenCalledWith(TERMS_URL);
+    expect(mockedPush).toHaveBeenCalledWith({
+      pathname: '/(auth)/legal/[document]',
+      params: { document: 'terms' },
+    });
     act(() => {
       handleAction({ nativeEvent: { actionName: 'openPrivacy' } });
     });
-    expect(openBrowserAsync).toHaveBeenCalledWith(PRIVACY_URL);
+    expect(mockedPush).toHaveBeenCalledWith({
+      pathname: '/(auth)/legal/[document]',
+      params: { document: 'privacy' },
+    });
 
     act(() => {
       renderer.unmount();

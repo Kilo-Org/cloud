@@ -92,10 +92,11 @@ export function SessionChangesScreen({ sessionId }: Readonly<{ sessionId: string
     snapshot,
     legacyDiffQuery,
     legacyFiles,
-    refreshing,
+    feedback,
+    failure,
     refresh,
-    refreshFailed,
   } = data;
+  const refreshing = feedback.status === 'pending';
   const {
     dialog,
     commentTarget,
@@ -168,7 +169,7 @@ export function SessionChangesScreen({ sessionId }: Readonly<{ sessionId: string
           )
         }
       />
-      {refreshFailed ? (
+      {failure === null ? null : (
         <Pressable
           onPress={refresh}
           accessibilityRole="button"
@@ -176,9 +177,9 @@ export function SessionChangesScreen({ sessionId }: Readonly<{ sessionId: string
           className="border-b border-hair-soft bg-warn-tile-bg px-4 py-2"
           testID="session-changes-refresh-error"
         >
-          <Text className="text-xs text-warn">{t('common.couldNotRefresh')}</Text>
+          <Text className="text-xs text-warn">{failure.message}</Text>
         </Pressable>
-      ) : null}
+      )}
       {sent ? (
         <View className="border-b border-hair-soft bg-secondary px-4 py-2">
           <Text variant="muted" className="text-xs" testID="session-changes-review-sent">

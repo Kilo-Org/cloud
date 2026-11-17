@@ -9,7 +9,7 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { CODE_REVIEW_ACTION_REQUIRED_REASONS } from '@kilocode/app-shared/code-reviews';
+import { CODE_REVIEW_ACTION_REQUIRED_REASONS } from '@kilocode/app-shared/code-review';
 import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
 
 import '@/i18n';
@@ -47,12 +47,16 @@ const permission = vi.hoisted(() => ({
 const webhookWarning = vi.hoisted(() => ({ shown: false }));
 const saveMutation = vi.hoisted(() => ({ isPending: false, mutate: vi.fn() }));
 
-const mintInstallState = vi.hoisted(() =>
-  vi.fn(() => Promise.resolve({ token: 'install-state-token' }))
+const handoffUrl = vi.hoisted(() =>
+  vi.fn((_target: unknown): Promise<string> =>
+    Promise.resolve('https://app.kilo.ai/app-shell/handoff?token=handoff-token')
+  )
 );
 const launchBrowser = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 const openExternal = vi.hoisted(() => vi.fn());
 const openPicker = vi.hoisted(() => vi.fn());
+
+const councilUi = vi.hoisted(() => ({ allowed: false }));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
@@ -95,13 +99,11 @@ vi.mock('@/components/agents/model-selector', () => ({
   openModelPicker: openPicker,
 }));
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://app.kilo.ai' }));
+vi.mock('@/lib/app-shell-handoff', () => ({ appShellHandoffUrl: handoffUrl }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: openExternal }));
 vi.mock('@/lib/pr-review/connect-gate-platform', () => ({
   openAuthorizationAndWaitForReturn: launchBrowser,
   reportLateLaunchFailure: vi.fn(),
-}));
-vi.mock('@/lib/trpc', () => ({
-  trpcClient: { githubApps: { mintInstallState: { mutate: mintInstallState } } },
 }));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('@/components/code-reviewer/bitbucket-overview', () => ({
@@ -161,6 +163,10 @@ vi.mock('@/lib/code-reviewer-config', () => ({
 }));
 vi.mock('@/lib/hooks/use-reviewer-models', () => ({
   useReviewerModels: () => ({ models: [], isLoading: false }),
+}));
+vi.mock('@/lib/hooks/use-reviewer-council', () => ({
+  useCouncilGate: () => ({ allowed: councilUi.allowed, pending: false }),
+  useCouncilUiEnabled: () => councilUi.allowed,
 }));
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   classifyProviderState: () => provider,
@@ -303,7 +309,7 @@ beforeEach(() => {
   motion.reducedMotion = false;
   centeredState.mockClear();
   scrollView.mockClear();
-  mintInstallState.mockClear();
+  handoffUrl.mockClear();
   launchBrowser.mockClear();
   openExternal.mockClear();
   openPicker.mockClear();
@@ -551,12 +557,9 @@ describe('PlatformOverviewScreen actionRequired recovery', () => {
 
     await pressRecovery('Update GitHub App');
 
-    expect(mintInstallState).toHaveBeenCalledWith({
-      organizationId: undefined,
-      returnTo: '/cloud/sessions',
-    });
+    expect(handoffUrl).toHaveBeenCalledWith({ page: 'github-app' });
     expect(launchBrowser).toHaveBeenCalledWith(
-      'https://app.kilo.ai/github-app?installState=install-state-token&fromApp=1'
+      'https://app.kilo.ai/app-shell/handoff?token=handoff-token'
     );
     // Returning from the browser re-reads the config, so a fixed reviewer clears the banner.
     expect(config.refetch).toHaveBeenCalledTimes(1);
@@ -569,43 +572,26 @@ describe('PlatformOverviewScreen actionRequired recovery', () => {
 
     await pressRecovery('Update GitHub App', 'org-1');
 
-    expect(mintInstallState).toHaveBeenCalledWith({
-      organizationId: 'org-1',
-      returnTo: '/cloud/sessions',
-    });
+    expect(handoffUrl).toHaveBeenCalledWith({ page: 'github-app', organizationId: 'org-1' });
     expect(launchBrowser).toHaveBeenCalledWith(
-      'https://app.kilo.ai/github-app?organizationId=org-1&installState=install-state-token&fromApp=1'
+      'https://app.kilo.ai/app-shell/handoff?token=handoff-token'
     );
   });
 
-  it('falls back to the integration page when minting an install state is refused', async () => {
-    // Organizations whose members can edit the config but not mint an install
-    // state, and organizations that already hold an installation, still reach
-    // the page that opens the install/manage flow.
-    mintInstallState.mockImplementationOnce(() =>
-      Promise.reject(new Error('This organization already has a GitHub installation'))
-    );
-    config.data = makeConfig({
-      actionRequired: makeActionRequired('github_installation_required'),
-    });
-
-    await pressRecovery('Update GitHub App', 'org-1');
-
-    expect(launchBrowser).toHaveBeenCalledWith(
-      'https://app.kilo.ai/github-app?organizationId=org-1'
-    );
-    expect(config.refetch).toHaveBeenCalledTimes(1);
-  });
-
-  it('opens the GitLab integration page for a project-access block', async () => {
+  it('opens the GitLab integration shell page for a project-access block', async () => {
     config.data = makeConfig({
       actionRequired: makeActionRequired('gitlab_project_access_required'),
     });
 
     await pressRecovery('Update GitLab integration', 'org-1', 'gitlab');
 
+    expect(handoffUrl).toHaveBeenCalledWith({
+      page: 'integration',
+      platform: 'gitlab',
+      organizationId: 'org-1',
+    });
     expect(launchBrowser).toHaveBeenCalledWith(
-      'https://app.kilo.ai/organizations/org-1/integrations/gitlab'
+      'https://app.kilo.ai/app-shell/handoff?token=handoff-token'
     );
     expect(config.refetch).toHaveBeenCalledTimes(1);
   });

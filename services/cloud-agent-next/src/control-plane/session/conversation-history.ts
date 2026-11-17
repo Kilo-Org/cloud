@@ -12,6 +12,7 @@ import {
   MAX_SESSION_PREVIEW_PAGE_BYTES,
   type readSessionMessagesPage,
   type HistoryCursor,
+  type SessionSnapshotRows,
 } from './history.js';
 import { isKilocodeRow } from './event-queries.js';
 import { events } from './sqlite-schema.js';
@@ -31,7 +32,7 @@ export type Kilo2MessagesPage = {
   omittedItemCount: number;
   updateCursor: number;
   totalCostMicrodollars: number;
-};
+} & SessionSnapshotRows;
 
 type Input = Parameters<typeof readSessionMessagesPage>[0];
 
@@ -100,6 +101,9 @@ export function readKilo2MessagesPage(
   };
   const size = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).byteLength;
   const preview = input.toolDisplay === 'preview';
+  // The caller's appended rows stay outside the hard cap; the soft budget still
+  // decides when a page stops early.
+  const pageLimit = MAX_SESSION_PAGE_BYTES - (input.reservedBytes ?? 0);
   const softBudget = preview ? MAX_SESSION_PREVIEW_PAGE_BYTES : MAX_SESSION_PAGE_BYTES;
   // Reserve the maximum cursor before accepting a native message. Read payloads
   // only after checking their stored size, as in the v1 history reader.
@@ -119,6 +123,9 @@ export function readKilo2MessagesPage(
     .limit(limit + 1)
     .all();
   let consumed: HistoryCursor | undefined;
+  let turnBoundary:
+    | { messageCount: number; cursor: HistoryCursor; omittedItemCount: number }
+    | undefined;
   let more = rows.length > limit;
   for (const row of rows.slice(0, limit)) {
     const key: HistoryCursor = {
@@ -141,7 +148,7 @@ export function readKilo2MessagesPage(
       break;
     }
     consumed = key;
-    if (bytes + rowBytes > MAX_SESSION_PAGE_BYTES) {
+    if (bytes + rowBytes > pageLimit) {
       page.omittedItemCount++;
       continue;
     }
@@ -158,6 +165,18 @@ export function readKilo2MessagesPage(
     const item = displayItem(parsed.data.properties);
     page.messages.push(item);
     bytes += size(item) + 1;
+    if (preview && (item.message.type === 'user' || item.message.type === 'synthetic')) {
+      turnBoundary = {
+        messageCount: page.messages.length,
+        cursor: key,
+        omittedItemCount: page.omittedItemCount,
+      };
+    }
+  }
+  if (more && turnBoundary) {
+    page.messages.length = turnBoundary.messageCount;
+    consumed = turnBoundary.cursor;
+    page.omittedItemCount = turnBoundary.omittedItemCount;
   }
   if (more && consumed) page.nextCursor = encodeCursor(consumed);
   page.messages.reverse();

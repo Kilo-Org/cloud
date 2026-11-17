@@ -321,7 +321,8 @@ export function prMergeDescription(method: AllowedMergeMethod): string {
   return i18n.t(PR_MERGE_DESCRIPTION_KEYS[method]);
 }
 
-function isAllowedMergeMethod(value: string): value is AllowedMergeMethod {
+/** Narrows any string to a merge method this build can submit. */
+export function isAllowedMergeMethod(value: string): value is AllowedMergeMethod {
   return value === 'merge' || value === 'squash' || value === 'rebase';
 }
 

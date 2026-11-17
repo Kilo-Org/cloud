@@ -19,8 +19,17 @@ import { REMOTE_MCP_REDIRECT_URL } from './remote-mcp-oauth-provider';
  */
 const REDIRECT_GRACE_MS = 1500;
 
-/** The one Android sign-in waiting for its redirect. A newer sign-in ends it as turned back. */
-let deliver: ((url: string | null) => void) | undefined = undefined;
+/** The Android sign-ins waiting for their redirect, by the `state` their authorization carried. */
+const waiting = new Map<string, (redirect: string) => void>();
+
+/** The `state` an authorization URL was built with; null when it carries none. */
+function authorizationState(authorizationUrl: string): string | null {
+  try {
+    return new URL(authorizationUrl).searchParams.get('state');
+  } catch {
+    return null;
+  }
+}
 
 function redirectOf(path: string): URL | undefined {
   try {
@@ -32,26 +41,37 @@ function redirectOf(path: string): URL | undefined {
 }
 
 /**
- * Takes a deep link to the redirect path, and answers whether it was one. One
- * that arrives with no sign-in waiting is dropped: nothing can use its code.
+ * Takes a deep link to the redirect path, and answers whether it was one. A
+ * redirect whose `state` matches no waiting sign-in is dropped: handing it to
+ * whatever is waiting would complete a different authorization with it.
  */
 export function takeRemoteMcpRedirect(path: string): boolean {
   const url = redirectOf(path);
   if (url === undefined) {
     return false;
   }
-  deliver?.(url.href);
+  const state = url.searchParams.get('state');
+  if (state !== null) {
+    waiting.get(state)?.(url.href);
+  }
   return true;
 }
 
 async function openOnAndroid(authorizationUrl: string): Promise<string | null> {
+  const state = authorizationState(authorizationUrl);
+  if (state === null) {
+    /* No `state` is no correlation: serving the redirect back would complete a
+       sign-in the app cannot attribute to this request. */
+    throw new Error('The authorization request carried no state.');
+  }
   const redirected = Promise.withResolvers<string | null>();
-  deliver?.(null);
-  const mine = redirected.resolve;
-  deliver = mine;
+  const mine = (redirect: string): void => {
+    redirected.resolve(redirect);
+  };
+  waiting.set(state, mine);
   const returned = Promise.withResolvers<null>();
-  const subscription = AppState.addEventListener('change', state => {
-    if (state === 'active') {
+  const subscription = AppState.addEventListener('change', next => {
+    if (next === 'active') {
       setTimeout(() => {
         returned.resolve(null);
       }, REDIRECT_GRACE_MS);
@@ -63,8 +83,8 @@ async function openOnAndroid(authorizationUrl: string): Promise<string | null> {
     return answered;
   } finally {
     subscription.remove();
-    if (deliver === mine) {
-      deliver = undefined;
+    if (waiting.get(state) === mine) {
+      waiting.delete(state);
     }
   }
 }

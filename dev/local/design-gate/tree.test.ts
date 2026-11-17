@@ -204,3 +204,21 @@ test('normalize leaves iOS sheets and non-sheet subtrees where they report', () 
   );
   assert.ok(ios.nodes.every(node => node.presented === undefined));
 });
+
+test('normalize drops the development error overlay', () => {
+  // The overlay reports a development warning that a release build never shows,
+  // and it floats above the measured screen, so its controls read as overlapping
+  // the screen's own. A finding about it is a finding about the instrument.
+  const layout = normalize(
+    dump([
+      { parent: 0, tag: 'View', rect: [0, 0, 400, 33], owners: ['LogBoxButton'] },
+      { parent: 1, tag: 'View', rect: [0, 0, 400, 33], owners: ['View', 'LogBoxButton'] },
+      { parent: 0, tag: 'View', rect: [0, 40, 100, 40], owners: ['SendButton'] },
+    ])
+  );
+  // The root and the screen's own control survive; the overlay's subtree does not.
+  assert.deepEqual(
+    layout.nodes.map(node => node.rect[1]),
+    [0, 40]
+  );
+});

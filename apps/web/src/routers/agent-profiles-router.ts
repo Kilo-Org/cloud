@@ -485,6 +485,9 @@ export const agentProfilesRouter = createTRPCRouter({
 
   /**
    * Create a new profile.
+   *
+   * The service refuses a create past `MAX_OWNER_PROFILES` with
+   * `PRECONDITION_FAILED`, whose sentence the dialog shows as the reason.
    */
   create: baseProcedure
     .input(ProfileNameSchema.extend({ organizationId: z.uuid().optional() }))

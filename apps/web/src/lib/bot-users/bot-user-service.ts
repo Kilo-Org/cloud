@@ -24,6 +24,34 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 
 /**
+ * Read a bot user by id. The `is_bot` filter is part of the identity: a row
+ * that holds the generated id without being a bot is not the bot user.
+ */
+async function selectBotUserById(id: string): Promise<User | undefined> {
+  const [bot] = await db
+    .select()
+    .from(kilocode_users)
+    .where(and(eq(kilocode_users.id, id), eq(kilocode_users.is_bot, true)))
+    .limit(1);
+  return bot;
+}
+
+/**
+ * Read any user by id, without the `is_bot` filter. Only `ensureInternalBotUser`
+ * uses it: that path must see a non-bot row holding the internal bot id so it
+ * can raise `InternalBotUnusableError` instead of adopting it.
+ */
+async function selectUserById(id: string): Promise<User | undefined> {
+  const [user] = await db.select().from(kilocode_users).where(eq(kilocode_users.id, id)).limit(1);
+  return user;
+}
+
+/** A bot is unusable while either blocked column is set. */
+function isBlockedBotUser(user: Pick<User, 'blocked_at' | 'blocked_reason'>): boolean {
+  return user.blocked_at !== null || user.blocked_reason !== null;
+}
+
+/**
  * Get the user ID of a bot for an organization
  * Returns null if bot user doesn't exist
  */
@@ -32,14 +60,7 @@ export async function getBotUserId(
   botType: BotType
 ): Promise<string | null> {
   const botId = generateBotUserId(organizationId, botType);
-
-  const [bot] = await db
-    .select({ id: kilocode_users.id })
-    .from(kilocode_users)
-    .where(and(eq(kilocode_users.id, botId), eq(kilocode_users.is_bot, true)))
-    .limit(1);
-
-  return bot?.id ?? null;
+  return (await selectBotUserById(botId))?.id ?? null;
 }
 
 export async function getUnblockedBotUserForOrg(
@@ -61,6 +82,8 @@ export async function getUnblockedBotUserForOrg(
       and(
         eq(kilocode_users.id, botId),
         eq(kilocode_users.is_bot, true),
+        // Mirrors isBlockedBotUser: the row is usable only while both blocked
+        // columns are null.
         isNull(kilocode_users.blocked_at),
         isNull(kilocode_users.blocked_reason)
       )
@@ -104,6 +127,32 @@ async function insertBotUser({ id, email, displayName }: BotUserIdentity): Promi
 
   logExceptInTest('[insertBotUser] Bot user created successfully', { botId: id });
   return botUser;
+}
+
+/**
+ * Read the bot user for `identity`, creating the row when it is absent. A
+ * concurrent create is recovered by re-reading the row the winner inserted.
+ * `select` is the caller's by-id read, so a caller that must not filter on
+ * `is_bot` keeps its unfiltered read.
+ */
+async function findOrCreateBotUser(
+  identity: BotUserIdentity,
+  select: (id: string) => Promise<User | undefined>
+): Promise<{ user: User; created: boolean }> {
+  const existing = await select(identity.id);
+  if (existing) {
+    return { user: existing, created: false };
+  }
+
+  try {
+    return { user: await insertBotUser(identity), created: true };
+  } catch (error) {
+    // A concurrent create won the insert; reuse its row.
+    if (!isUniqueViolation(error)) throw error;
+    const recovered = await select(identity.id);
+    if (!recovered) throw error;
+    return { user: recovered, created: false };
+  }
 }
 
 /**
@@ -155,34 +204,16 @@ async function ensureBotIsOrgMember(botUserId: string, organizationId: string): 
 export async function ensureBotUserForOrg(organizationId: string, botType: BotType): Promise<User> {
   try {
     const botId = generateBotUserId(organizationId, botType);
+    const { user: botUser } = await findOrCreateBotUser(
+      {
+        id: botId,
+        email: generateBotUserEmail(organizationId, botType),
+        displayName: getBotDisplayName(botType),
+      },
+      selectBotUserById
+    );
 
-    const selectBotUser = async (): Promise<User | undefined> => {
-      const [bot] = await db
-        .select()
-        .from(kilocode_users)
-        .where(and(eq(kilocode_users.id, botId), eq(kilocode_users.is_bot, true)))
-        .limit(1);
-      return bot;
-    };
-
-    let botUser = await selectBotUser();
-
-    if (!botUser) {
-      try {
-        botUser = await insertBotUser({
-          id: botId,
-          email: generateBotUserEmail(organizationId, botType),
-          displayName: getBotDisplayName(botType),
-        });
-      } catch (error) {
-        // A concurrent create won the insert; reuse its row.
-        if (!isUniqueViolation(error)) throw error;
-        botUser = await selectBotUser();
-        if (!botUser) throw error;
-      }
-    }
-
-    if (botUser.blocked_at !== null || botUser.blocked_reason !== null) {
+    if (isBlockedBotUser(botUser)) {
       throw new Error(`Cannot use blocked bot user ${botId}`);
     }
 
@@ -213,11 +244,6 @@ export class InternalBotUnusableError extends Error {
   }
 }
 
-async function selectUserById(id: string): Promise<User | undefined> {
-  const [user] = await db.select().from(kilocode_users).where(eq(kilocode_users.id, id)).limit(1);
-  return user;
-}
-
 /**
  * Get or create an internal bot user (`bot-internal-<slug>`) and make it a
  * `member` of the organization. Safe to call repeatedly and concurrently: an
@@ -233,28 +259,15 @@ export async function ensureInternalBotUser(input: {
     throw new Error('Invalid internal bot slug');
   }
   const id = internalBotUserId(input.slug);
-  let user = await selectUserById(id);
-  let created = false;
-  if (!user) {
-    try {
-      user = await insertBotUser({
-        id,
-        email: internalBotUserEmail(input.slug),
-        displayName: input.displayName,
-      });
-      created = true;
-    } catch (error) {
-      // A concurrent create won the insert; reuse its row.
-      if (!isUniqueViolation(error)) throw error;
-      user = await selectUserById(id);
-      if (!user) throw error;
-    }
-  }
+  const { user, created } = await findOrCreateBotUser(
+    { id, email: internalBotUserEmail(input.slug), displayName: input.displayName },
+    selectUserById
+  );
 
   if (!user.is_bot) {
     throw new InternalBotUnusableError(`User ${id} exists but is not a bot`);
   }
-  if (user.blocked_at !== null || user.blocked_reason !== null) {
+  if (isBlockedBotUser(user)) {
     throw new InternalBotUnusableError(`Bot user ${id} is blocked`);
   }
   if (!user.api_token_pepper?.trim()) {

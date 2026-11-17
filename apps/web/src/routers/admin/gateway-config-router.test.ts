@@ -21,7 +21,6 @@ beforeEach(async () => {
 });
 
 const input = {
-  vercel_routing_enabled: false,
   vercel_routing_opt_out_models: [' MoonshotAI/Kimi-K3 ', 'moonshotai/kimi-k3', 'openai/gpt-6'],
   note: 'Holding opt-outs',
 };
@@ -34,24 +33,20 @@ describe('adminGatewayConfigRouter', () => {
 
     const saved = await caller.admin.gatewayConfig.set(input);
     expect({
-      vercel_routing_enabled: saved.vercel_routing_enabled,
       vercel_routing_opt_out_models: saved.vercel_routing_opt_out_models,
       note: saved.note,
     }).toEqual({
-      vercel_routing_enabled: false,
       vercel_routing_opt_out_models: normalizedOptOutModels,
       note: 'Holding opt-outs',
     });
 
     const [row] = await db.select().from(ai_gateway_config);
     expect(row.config).toMatchObject({
-      vercel_routing_enabled: false,
       vercel_routing_opt_out_models: normalizedOptOutModels,
       note: 'Holding opt-outs',
     });
 
     await expect(caller.admin.gatewayConfig.get()).resolves.toMatchObject({
-      vercel_routing_enabled: false,
       vercel_routing_opt_out_models: normalizedOptOutModels,
       note: 'Holding opt-outs',
     });
@@ -98,7 +93,6 @@ describe('adminGatewayConfigRouter', () => {
       gateway_settings: [organizationId],
     });
     await expect(caller.admin.gatewayConfig.get()).resolves.toMatchObject({
-      vercel_routing_enabled: false,
       vercel_routing_opt_out_models: normalizedOptOutModels,
     });
   });
@@ -114,7 +108,6 @@ describe('adminGatewayConfigRouter', () => {
     });
 
     await expect(caller.admin.gatewayConfig.get()).resolves.toMatchObject({
-      vercel_routing_enabled: false,
       vercel_routing_opt_out_models: normalizedOptOutModels,
       note: 'Holding opt-outs',
     });

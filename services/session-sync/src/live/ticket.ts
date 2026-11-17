@@ -7,14 +7,14 @@ import type { Env } from '../env';
 import { principalSchema, sessionIDSchema, tenantSchema, userIDSchema } from '../protocol';
 
 export type LiveRole = 'runner' | 'viewer' | 'controller';
-type LiveAudience = 'session-relay' | 'session-presence';
+type LiveAudience = 'session-relay' | 'session-presence' | 'session-notifications';
 
 const MAX_TICKET_SECONDS = 120;
 const numericDate = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
-const ticketSchema = z
+export const ticketSchema = z
   .strictObject({
     version: z.literal(1),
-    aud: z.enum(['session-relay', 'session-presence']),
+    aud: z.enum(['session-relay', 'session-presence', 'session-notifications']),
     env: z.string().min(1),
     tenant: tenantSchema,
     sessionID: sessionIDSchema.optional(),
@@ -29,7 +29,8 @@ const ticketSchema = z
   )
   .refine(ticket =>
     ticket.aud === 'session-relay' ? ticket.sessionID !== undefined : ticket.sessionID === undefined
-  );
+  )
+  .refine(ticket => ticket.aud !== 'session-notifications' || ticket.role === 'viewer');
 
 export type LiveTicket = z.infer<typeof ticketSchema>;
 

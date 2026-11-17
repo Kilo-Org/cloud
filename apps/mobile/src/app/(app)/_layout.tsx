@@ -220,6 +220,7 @@ export default function AppLayout() {
             <Stack.Screen name="agent-chat/instance-picker" options={pickerSheetOptions} />
             <Stack.Screen name="agent-chat/folder-picker" options={pickerSheetOptions} />
             <Stack.Screen name="agent-chat/profile-picker" options={pickerSheetOptions} />
+            <Stack.Screen name="context-picker" options={pickerSheetOptions} />
             <Stack.Screen name="todos/[list-id]" />
             <Stack.Screen name="todos/item/[item-id]" />
             <Stack.Screen
@@ -230,6 +231,7 @@ export default function AppLayout() {
             <Stack.Screen name="agent-briefing/[report-id]" />
             <Stack.Screen name="agent-briefing/settings" />
             <Stack.Screen name="share-gate" options={sheetOptions} />
+            <Stack.Screen name="bitbucket-connect" options={sheetOptions} />
             <Stack.Screen name="language-picker" options={searchSheetOptions} />
             <Stack.Screen name="transcription-model-picker" options={pickerSheetOptions} />
             <Stack.Screen name="voice-language-picker" options={searchSheetOptions} />
@@ -273,6 +275,8 @@ export default function AppLayout() {
                 headerShown: false,
               }}
             />
+            <Stack.Screen name="legal/[document]" options={{ headerShown: false }} />
+            <Stack.Screen name="changelog" options={{ headerShown: false }} />
           </Stack>
         </TabBarLabelContext>
       </EventServiceProvider>

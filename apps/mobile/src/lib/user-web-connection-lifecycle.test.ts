@@ -5,16 +5,25 @@ import {
   HIDDEN_SOCKET_PAUSE_DELAY_MS,
 } from '@/lib/user-web-connection-lifecycle';
 
+type AppState = 'active' | 'background' | 'inactive';
+type ConnectivityState = { isConnected: boolean | null; isInternetReachable: boolean | null };
+
+// Only the no-argument factory result reads these modules; the injected-source
+// cases pass their own sources. The spies are hoisted so the mock factories can
+// reference them and the cases can read their call history.
+const nativeMocks = vi.hoisted(() => ({
+  appStateAddEventListener:
+    vi.fn<(event: string, listener: (state: AppState) => void) => { remove: () => void }>(),
+  netInfoAddEventListener: vi.fn<(listener: (state: ConnectivityState) => void) => () => void>(),
+}));
+
 vi.mock('react-native', () => ({
-  AppState: { currentState: 'active', addEventListener: vi.fn() },
+  AppState: { currentState: 'active', addEventListener: nativeMocks.appStateAddEventListener },
 }));
 
 vi.mock('@react-native-community/netinfo', () => ({
-  addEventListener: vi.fn(),
+  addEventListener: nativeMocks.netInfoAddEventListener,
 }));
-
-type AppState = 'active' | 'background' | 'inactive';
-type ConnectivityState = { isConnected: boolean | null; isInternetReachable: boolean | null };
 
 function createSources(initialAppState: AppState = 'active') {
   let appState = initialAppState;
@@ -251,5 +260,60 @@ describe('createNativeUserWebConnectionLifecycleHooks', () => {
     native.setConnectivity({ isConnected: true, isInternetReachable: true });
     expect(onOnline).toHaveBeenCalledTimes(1);
     cleanup?.();
+  });
+
+  it('wires the native AppState and NetInfo sources when created without a sources argument', () => {
+    const removeAppStateSubscription = vi.fn<() => void>();
+    nativeMocks.appStateAddEventListener.mockReturnValue({ remove: removeAppStateSubscription });
+    const removeNetInfoListener = vi.fn<() => void>();
+    nativeMocks.netInfoAddEventListener.mockReturnValue(removeNetInfoListener);
+
+    const hooks = createNativeUserWebConnectionLifecycleHooks();
+
+    expect(hooks.hiddenPauseDelayMs).toBe(HIDDEN_SOCKET_PAUSE_DELAY_MS);
+
+    const onVisibilityChange = hooks.onVisibilityChange;
+    if (!onVisibilityChange) {
+      throw new Error('the native hooks must handle visibility changes');
+    }
+    const onResume = vi.fn<() => void>();
+    const onHidden = vi.fn<() => void>();
+    const removeVisibilityListener = onVisibilityChange(onResume, onHidden);
+
+    expect(nativeMocks.appStateAddEventListener).toHaveBeenCalledTimes(1);
+    const [eventName, appStateListener] = nativeMocks.appStateAddEventListener.mock.calls[0] ?? [];
+    expect(eventName).toBe('change');
+    if (!appStateListener) {
+      throw new Error('AppState must receive the visibility listener');
+    }
+
+    // The listener React Native received is the one the hook drives.
+    appStateListener('background');
+    appStateListener('active');
+    expect(onHidden).toHaveBeenCalledTimes(1);
+    expect(onResume).toHaveBeenCalledTimes(1);
+
+    removeVisibilityListener();
+    expect(removeAppStateSubscription).toHaveBeenCalledTimes(1);
+
+    const onOnline = hooks.onOnline;
+    if (!onOnline) {
+      throw new Error('the native hooks must handle connectivity changes');
+    }
+    const onOnlineCallback = vi.fn<() => void>();
+    const removeOnlineListener = onOnline(onOnlineCallback);
+
+    expect(nativeMocks.netInfoAddEventListener).toHaveBeenCalledTimes(1);
+    const netInfoListener = nativeMocks.netInfoAddEventListener.mock.calls[0]?.[0];
+    if (!netInfoListener) {
+      throw new Error('NetInfo must receive the connectivity listener');
+    }
+
+    // Offline is the baseline, so only the recovery after it resumes a socket.
+    netInfoListener({ isConnected: false, isInternetReachable: false });
+    netInfoListener({ isConnected: true, isInternetReachable: true });
+    expect(onOnlineCallback).toHaveBeenCalledTimes(1);
+
+    expect(removeOnlineListener).toBe(removeNetInfoListener);
   });
 });

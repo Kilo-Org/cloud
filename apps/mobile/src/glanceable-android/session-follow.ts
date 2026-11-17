@@ -21,8 +21,6 @@ import {
 } from '@/lib/glanceable/session-activity-tokens-android';
 
 import { buildSessionNotificationCard } from './session-notification-card';
-import { ensureAndroidNotificationChannels } from './ensure-notification-channels';
-import { readStoredContext } from './session-stored-context';
 import {
   dismissSessionCard,
   getStoredSessionCards,
@@ -198,22 +196,6 @@ export function restoreFollowedSessionCards(
   for (const sessionId of kept.keys()) {
     void registerAndroidSessionToken({ sessionId, ...ctx });
   }
-}
-
-/**
- * Launch, foreground, and a headless push: rebuild the set from native truth
- * and the stored scope. Resolves false when the keychain could not be read:
- * nothing is cancelled then, and the caller must not read the empty set as
- * "not followed".
- */
-export async function restoreFollowedSessionCardsFromStorage(): Promise<boolean> {
-  await ensureAndroidNotificationChannels();
-  const ctx = await readStoredContext();
-  if (ctx === 'unavailable') {
-    return false;
-  }
-  restoreFollowedSessionCards(ctx);
-  return true;
 }
 
 /** Follow one session from the row the session screen shows. */

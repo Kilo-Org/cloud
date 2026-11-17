@@ -4,8 +4,9 @@ import {
   ORGANIZATION_ROLES,
 } from '@kilocode/app-shared/organizations';
 import type { Organization, organization_invitations } from '@kilocode/db/schema';
+import { hasVisibleText } from '@kilocode/app-shared/text';
 import type { Result } from '@kilocode/web-shared/lib/maybe-result';
-import { CompanyDomainSchema, isValidDomain } from './company-domain';
+import { CompanyDomainSchema, normalizeSsoDomain } from './company-domain';
 
 // Re-export base types that don't depend on schema.ts
 export type {
@@ -29,7 +30,6 @@ import { EnkryptPublishedBenchmarkSchema, OpenCodeSettingsSchema } from '@kiloco
 
 export const OrganizationRoleSchema = z.enum(ORGANIZATION_ROLES);
 
-// API-facing billing cycle values: 'monthly' | 'annual'
 // The DB stores 'yearly' instead of 'annual'; Stripe uses 'year'/'month'.
 export const BillingCycleSchema = z.enum(['monthly', 'annual']);
 export type BillingCycle = z.infer<typeof BillingCycleSchema>;
@@ -49,10 +49,11 @@ export const billingCycleFromDb: (dbCycle: 'monthly' | 'yearly') => BillingCycle
 export const billingCycleFromStripeInterval: (interval: 'month' | 'year') => BillingCycle =
   toBillingCycle;
 
+// `trim()` keeps zero-width and control characters, which made a blank name pass the length check.
 export const OrganizationNameSchema = z
   .string()
   .trim()
-  .min(1, 'Organization name is required')
+  .refine(hasVisibleText, 'Organization name is required')
   .max(
     ORGANIZATION_NAME_MAX_LENGTH,
     `Organization name must be ${ORGANIZATION_NAME_MAX_LENGTH} characters or fewer`
@@ -427,8 +428,11 @@ export type OpenRouterProvidersResponse = z.infer<typeof OpenRouterProvidersResp
 export type OpenRouterModel = z.infer<typeof OpenRouterModelSchema>;
 export type OpenRouterModelsResponse = z.infer<typeof OpenRouterModelsResponseSchema>;
 
-export const OrganizationSSODomainSchema = z
-  .string()
-  .trim()
-  .toLowerCase()
-  .refine(isValidDomain, { message: 'Please enter a valid domain (e.g. acme.com)' });
+export const OrganizationSSODomainSchema = z.string().transform((input, ctx) => {
+  const normalized = normalizeSsoDomain(input);
+  if (normalized === null) {
+    ctx.addIssue({ code: 'custom', message: 'Please enter a valid domain (e.g. acme.com)' });
+    return z.NEVER;
+  }
+  return normalized;
+});

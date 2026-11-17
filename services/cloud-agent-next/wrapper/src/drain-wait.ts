@@ -1,4 +1,5 @@
 import { DrainSessionError, type DrainSessionErrorKind } from './kilo-api.js';
+import { redactSecrets } from './redact-output.js';
 
 export const DRAIN_TRANSIENT_FAILURE_LIMIT = 3;
 const DRAIN_BACKOFF_MS = [1_000, 2_000] as const;
@@ -20,6 +21,40 @@ export type DrainWaiter = {
   start(): Promise<DrainWaitResult>;
   cancel(): void;
 };
+
+export type DrainFailureDiagnostic = {
+  attempt: number;
+  elapsedMs: number;
+  kind: DrainSessionErrorKind;
+  errors: Array<{ name: string; message: string; code?: string; status?: number }>;
+};
+
+function drainErrorDetails(error: unknown): DrainFailureDiagnostic['errors'] {
+  const errors: DrainFailureDiagnostic['errors'] = [];
+  const bounded = (text: string) =>
+    redactSecrets(text)
+      .replace(/https?:\/\/\S+/gi, '[URL]')
+      .replace(/[\r\n\t]/g, ' ')
+      .slice(0, 256);
+  let current = error;
+  for (let depth = 0; depth < 4 && current instanceof Error; depth++) {
+    errors.push({
+      name: bounded(current.name),
+      message:
+        current.name === 'ZodError' || current.name === 'SyntaxError'
+          ? 'Invalid drain response'
+          : bounded(current.message),
+      ...('code' in current && typeof current.code === 'string'
+        ? { code: bounded(current.code) }
+        : {}),
+      ...(current instanceof DrainSessionError && current.status !== undefined
+        ? { status: current.status }
+        : {}),
+    });
+    current = current.cause;
+  }
+  return errors;
+}
 
 function classifyDrainFailure(error: unknown): { kind: DrainSessionErrorKind; reason: string } {
   if (error instanceof DrainSessionError) {
@@ -43,6 +78,7 @@ export function createDrainWaiter(
   drain: (signal: AbortSignal) => Promise<boolean>,
   options: {
     slowFailureResetMs?: number;
+    onFailure?(diagnostic: DrainFailureDiagnostic): void;
     scheduler?: {
       setTimeout(handler: () => void, ms: number): ReturnType<typeof setTimeout>;
       clearTimeout(handle: ReturnType<typeof setTimeout>): void;
@@ -57,6 +93,7 @@ export function createDrainWaiter(
   let controller: AbortController | null = null;
   let backoff: ReturnType<typeof setTimeout> | null = null;
   let failureCount = 0;
+  let attemptCount = 0;
 
   function clearBackoff(): void {
     if (backoff === null) return;
@@ -76,6 +113,7 @@ export function createDrainWaiter(
   }
 
   async function attempt(op: number): Promise<void> {
+    const attemptNumber = ++attemptCount;
     const attemptController = new AbortController();
     controller = attemptController;
     const startedAt = Date.now();
@@ -85,6 +123,13 @@ export function createDrainWaiter(
       value = await drain(attemptController.signal);
     } catch (error) {
       failure = classifyDrainFailure(error);
+      if (op === generation && !attemptController.signal.aborted)
+        options.onFailure?.({
+          attempt: attemptNumber,
+          elapsedMs: Date.now() - startedAt,
+          kind: failure.kind,
+          errors: drainErrorDetails(error),
+        });
     }
     if (attemptController.signal.aborted) {
       if (op === generation) finish({ state: 'cancelled' });
@@ -154,6 +199,7 @@ export function createDrainWaiter(
     start(): Promise<DrainWaitResult> {
       if (current) return current;
       failureCount = 0;
+      attemptCount = 0;
       active = true;
       const op = generation;
       const promise = new Promise<DrainWaitResult>(resolve => {

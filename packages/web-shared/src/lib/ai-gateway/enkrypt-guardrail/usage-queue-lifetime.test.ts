@@ -10,6 +10,7 @@ import {
   enkryptLedgerRows,
   enkryptUsageRecordForNewOrganization,
 } from '@kilocode/web-shared/tests/helpers/enkrypt-usage.helper';
+import { readJsonBody, requestUrlOf } from '@kilocode/web-shared/tests/helpers/request-body.helper';
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   ...jest.requireActual<Record<string, unknown>>('@kilocode/web-shared/lib/drizzle'),
@@ -17,7 +18,6 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   ...jest.requireActual<object>('@kilocode/web-shared/lib/config.server'),
-  ENKRYPT_USAGE_QUEUE_ENABLED: true,
   USAGE_INGEST_URL: 'https://ingest.example.test/usage',
   USAGE_INGEST_PUBLISH_SECRET: 'synthetic-usage-ingest-secret',
 }));
@@ -104,11 +104,11 @@ describe('recordEnkryptUsage with the real after()', () => {
 
     expect(settled).toBe(true);
     expect(lifecycle.errors).toEqual([]);
-    const published = mockFetch.mock.calls.filter(([url]) => String(url) === INGEST_URL);
+    const published = mockFetch.mock.calls.filter(([url]) => requestUrlOf(url) === INGEST_URL);
     expect(published).toHaveLength(1);
-    expect(
-      EnkryptUsageWriteSchema.safeParse(JSON.parse(String(published[0][1]?.body))).success
-    ).toBe(true);
+    expect(EnkryptUsageWriteSchema.safeParse(readJsonBody(published[0][1]?.body)).success).toBe(
+      true
+    );
     expect(await enkryptLedgerRows(usageRecord.organizationId)).toEqual([]);
     expect(jest.mocked(console.warn).mock.calls.map(([message]) => message)).not.toContain(
       NO_LIFETIME

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { resolveEffectivePolicy } from '@kilocode/auto-routing-contracts';
 import { mapConfigRows, toDeciderModelRows } from './config';
 
 const configRow = {
@@ -14,48 +15,65 @@ const configRow = {
   updated_by: 'admin@example.com',
 };
 
+const models = [{ model: 'manual/model', variant: null, reasoning_effort: null }];
+
 describe('platform model configuration', () => {
   it('defaults legacy rows to efficient with the configured ranking defaults', () => {
-    const config = mapConfigRows(
-      configRow,
-      ['classifier'],
-      [{ model: 'manual/model', variant: null, reasoning_effort: null }]
-    );
+    const config = mapConfigRows(configRow, ['classifier'], models);
     expect(config).toMatchObject({
       router: 'efficient',
       accuracyNoiseBand: 0.05,
-      frontierMinAccuracyDelta: 0,
     });
   });
 
-  it('preserves independent frontier ranking knobs and candidate selection', () => {
+  it('preserves the stored accuracy noise band and candidate selection for frontier', () => {
+    const frontierRow = {
+      ...configRow,
+      router: 'frontier' as const,
+      accuracy_noise_band: 0.02,
+      frontier_min_accuracy_delta: 0.1,
+    };
     const config = mapConfigRows(
-      {
-        ...configRow,
-        router: 'frontier',
-        accuracy_noise_band: 0.02,
-        frontier_min_accuracy_delta: 0.1,
-      },
+      frontierRow,
       ['classifier'],
       [{ model: 'frontier/model', variant: null, reasoning_effort: null }]
     );
     expect(config).toMatchObject({
       router: 'frontier',
       accuracyNoiseBand: 0.02,
-      frontierMinAccuracyDelta: 0.1,
       deciderModels: [{ id: 'frontier/model' }],
     });
+    expect(config).not.toHaveProperty('frontierMinAccuracyDelta');
   });
 
-  it('preserves a configured confidence threshold and defaults old rows to disabled', () => {
-    const models = [{ model: 'manual/model', variant: null, reasoning_effort: null }];
-    expect(
-      mapConfigRows(configRow, ['classifier/model'], models)?.lowConfidenceThreshold
-    ).toBeNull();
-    expect(
-      mapConfigRows({ ...configRow, low_confidence_threshold: 0.8 }, ['classifier/model'], models)
-        ?.lowConfidenceThreshold
-    ).toBe(0.8);
+  it('ignores the seven legacy fixed policy columns in a stored row', () => {
+    const legacyRow = {
+      ...configRow,
+      switch_cost_factor: 50,
+      low_confidence_threshold: 0.8,
+      classifier_repetitions: 3,
+      decider_repetitions: 2,
+      classifier_max_p95_latency_ms: 1000,
+    };
+    const config = mapConfigRows(legacyRow, ['classifier/model'], models);
+    if (config === null) throw new Error('expected a mapped config');
+    for (const key of [
+      'frontierMinAccuracyDelta',
+      'switchCostFactor',
+      'bestAccuracySwitchThreshold',
+      'lowConfidenceThreshold',
+      'classifierRepetitions',
+      'deciderRepetitions',
+      'classifierMaxP95LatencyMs',
+    ]) {
+      expect(config).not.toHaveProperty(key);
+    }
+    const policy = resolveEffectivePolicy(config);
+    expect(policy.switchCostFactor).toBe(3);
+    expect(policy.lowConfidenceThreshold).toBeNull();
+    expect(policy.classifierRepetitions).toBe(1);
+    expect(policy.deciderRepetitions).toBe(1);
+    expect(policy.classifierMaxP95LatencyMs).toBeNull();
   });
 
   it.each(['efficient', 'frontier'] as const)(
@@ -77,14 +95,12 @@ describe('platform model configuration', () => {
   });
 
   it('does not fabricate an unsaved or empty config', () => {
-    const models = [{ model: 'manual/model', variant: null, reasoning_effort: null }];
     expect(mapConfigRows(null, ['classifier/model'], models)).toBeNull();
     expect(mapConfigRows(configRow, [], models)).toBeNull();
     expect(mapConfigRows(configRow, ['classifier/model'], [])).toBeNull();
   });
 
   it('maps policy override and computed columns, defaulting absent ones to null', () => {
-    const models = [{ model: 'manual/model', variant: null, reasoning_effort: null }];
     expect(mapConfigRows(configRow, ['classifier/model'], models)).toMatchObject({
       policyOverrides: null,
       policyComputed: null,
@@ -115,7 +131,6 @@ describe('platform model configuration', () => {
   });
 
   it('drops stored policy entries that do not fit their setting', () => {
-    const models = [{ model: 'manual/model', variant: null, reasoning_effort: null }];
     const config = mapConfigRows(
       {
         ...configRow,

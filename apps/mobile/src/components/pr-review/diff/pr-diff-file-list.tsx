@@ -202,7 +202,7 @@ export function PrReviewFileList({
         isFetchingNextPage: query.isFetchingNextPage,
         hasNextPage: query.hasNextPage,
         laterPageError: query.isError && files.length > 0,
-        fetchToCompletionRunning: fetchToCompletion.isRunning,
+        fetchToCompletionRunning: fetchToCompletion.feedback.status === 'pending',
         fetchToCompletionLoaded: fetchToCompletion.loadedFiles,
         totalFiles: changedFiles,
       }),
@@ -216,7 +216,7 @@ export function PrReviewFileList({
       query.hasNextPage,
       query.isError,
       files.length,
-      fetchToCompletion.isRunning,
+      fetchToCompletion.feedback.status,
       fetchToCompletion.loadedFiles,
       changedFiles,
     ]
@@ -227,7 +227,7 @@ export function PrReviewFileList({
   // FlashList reports the end as reached as soon as its content fits the
   // viewport, so a first page shorter than the screen used to be replaced by
   // the next pages before the partial-load row (`prReview.hunkRows
-  // .loadedOfTotalFiles`, "1 of 5 files loaded") and its Load all action could
+  // .loadedOfTotalFiles`, "Files loaded: 1 of 5") and its Load all action could
   // be read. `usePrDiffPageGate` keeps the row the resting state until the
   // user's own drag, and keeps the end report FlashList makes before it. The
   // gate is keyed by the provider ref so a drag on one PR never opens the gate
@@ -307,7 +307,7 @@ export function PrReviewFileList({
     );
   }
 
-  const isTruncated = query.hasNextPage || Boolean(fetchToCompletion.error);
+  const isTruncated = query.hasNextPage || fetchToCompletion.failure !== null;
   // First page still in flight: keep FlashList unmounted. A list that first
   // lays out a single loading pagination-row and later receives the real file
   // rows can measure full content height without mounting cells until scroll.

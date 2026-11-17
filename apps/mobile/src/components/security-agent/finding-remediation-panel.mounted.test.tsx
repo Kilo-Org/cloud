@@ -86,6 +86,7 @@ vi.mock('@/lib/hooks/use-security-remediation', () => ({
   useCancelSecurityRemediation: () => ({ mutate: mocks.cancel, isPending: false }),
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#fff',
   useThemeColors: () => ({
     primaryForeground: '#fff',
     foreground: '#000',

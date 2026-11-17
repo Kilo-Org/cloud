@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'vitest';
 import { kiloCommandCreateInputSchema } from '../contracts/kilo-commands';
+import { MAX_SKILL_DESCRIPTION_LENGTH } from '../contracts/skills';
 import { collectImportItems, parseLocalConfigArchive, type ImportPreview } from './index';
+import { RUNTIME_AGENT_CONFIG_KEYS, RUNTIME_KILO_COMMAND_KEYS } from './runtime-contract';
 import { buildRepresentativeImportArchive, buildStoredZip, buildZip } from './test-fixtures';
 import {
   MAX_IMPORT_CONFIG_NESTING_DEPTH,
@@ -188,6 +190,32 @@ describe('parseLocalConfigArchive', () => {
     // row per nested file key.
     expect(preview.issues.filter(candidate => candidate.category === 'skills')).toHaveLength(1);
     expect(preview.config.skills).toEqual([]);
+  });
+
+  test('reports an over-long skill description with its own issue code', () => {
+    const preview = parseFiles({
+      'skills/deploy/SKILL.md': `---\nname: deploy\ndescription: ${'d'.repeat(MAX_SKILL_DESCRIPTION_LENGTH + 1)}\n---\nDeploy.`,
+    });
+
+    expect(preview.hasErrors).toBe(true);
+    expect(preview.issues).toHaveLength(1);
+    expect(preview.issues[0]).toMatchObject({
+      code: 'skill-description-invalid',
+      field: 'description',
+      category: 'skills',
+    });
+    expect(preview.issues[0]?.message).toContain('2000');
+    expect(preview.config.skills).toEqual([]);
+  });
+
+  test('imports the description of a +++ delimited SKILL.md', () => {
+    const rawMarkdown = '+++\nname: deploy\ndescription: Deploy services\n+++\nDeploy.';
+    const preview = parseFiles({ 'skills/deploy/SKILL.md': rawMarkdown });
+
+    expect(preview.issues).toEqual([]);
+    expect(preview.config.skills).toEqual([
+      { name: 'deploy', description: 'Deploy services', rawMarkdown, files: {} },
+    ]);
   });
 
   test('describes a schema failure without naming an internal contract', () => {
@@ -807,5 +835,145 @@ describe('instruction glob import limits', () => {
     });
     expect(performance.now() - started).toBeLessThan(1000);
     expect(preview.config.instructions).toEqual([]);
+  });
+});
+
+describe('runtime contract field coverage', () => {
+  // Fails if the import stops deriving its agent field sets from the contract
+  // keys, because a contract field the import drops is missing from `config`.
+  test('imports every agent config field from kilo.json and markdown frontmatter', () => {
+    const frontmatter = [
+      'description: Imported description',
+      'mode: subagent',
+      'model: anthropic/claude-sonnet-4',
+      'variant: high',
+      'temperature: 0.3',
+      'top_p: 0.9',
+      'steps: 12',
+      'hidden: true',
+      'disable: false',
+      "color: '#123456'",
+      'permission:',
+      '  edit: deny',
+      'options:',
+      '  reasoningEffort: low',
+    ];
+    const preview = parseFiles({
+      'kilo.json': JSON.stringify({
+        agent: {
+          'json-carrier': {
+            prompt: 'Config prompt.',
+            description: 'Imported description',
+            mode: 'subagent',
+            model: 'anthropic/claude-sonnet-4',
+            variant: 'high',
+            temperature: 0.3,
+            top_p: 0.9,
+            steps: 12,
+            hidden: true,
+            disable: false,
+            color: '#123456',
+            permission: { edit: 'deny' },
+            options: { reasoningEffort: 'low' },
+          },
+        },
+      }),
+      'agent/markdown-carrier.md': ['---', ...frontmatter, '---', 'Imported prompt.'].join('\n'),
+    });
+
+    expect(preview.issues).toEqual([]);
+    for (const agent of preview.config.agents) {
+      expect(Object.keys(agent.config).sort()).toEqual([...RUNTIME_AGENT_CONFIG_KEYS].sort());
+    }
+    expect(preview.config.agents).toEqual([
+      {
+        slug: 'markdown-carrier',
+        name: 'markdown-carrier',
+        config: {
+          description: 'Imported description',
+          mode: 'subagent',
+          model: 'anthropic/claude-sonnet-4',
+          variant: 'high',
+          temperature: 0.3,
+          top_p: 0.9,
+          steps: 12,
+          hidden: true,
+          disable: false,
+          color: '#123456',
+          permission: { edit: 'deny' },
+          options: { reasoningEffort: 'low' },
+          prompt: 'Imported prompt.',
+        },
+      },
+      {
+        slug: 'json-carrier',
+        name: 'json-carrier',
+        config: {
+          prompt: 'Config prompt.',
+          description: 'Imported description',
+          mode: 'subagent',
+          model: 'anthropic/claude-sonnet-4',
+          variant: 'high',
+          temperature: 0.3,
+          top_p: 0.9,
+          steps: 12,
+          hidden: true,
+          disable: false,
+          color: '#123456',
+          permission: { edit: 'deny' },
+          options: { reasoningEffort: 'low' },
+        },
+      },
+    ]);
+  });
+
+  // Fails if the import stops deriving its command field sets from the contract
+  // keys, because a contract field the import drops is missing from the item.
+  test('imports every kilo command field from kilo.json and markdown frontmatter', () => {
+    const preview = parseFiles({
+      'kilo.json': JSON.stringify({
+        command: {
+          'json-carrier': {
+            template: 'Do $ARGUMENTS',
+            description: 'Imported command',
+            agent: 'reviewer',
+            model: 'anthropic/claude-sonnet-4',
+            subtask: true,
+          },
+        },
+      }),
+      'command/markdown-carrier.md': [
+        '---',
+        'description: Imported command',
+        'agent: reviewer',
+        'model: anthropic/claude-sonnet-4',
+        'subtask: true',
+        '---',
+        'Do $ARGUMENTS',
+      ].join('\n'),
+    });
+
+    expect(preview.issues).toEqual([]);
+    for (const command of preview.config.commands) {
+      expect(Object.keys(command).sort()).toEqual([...RUNTIME_KILO_COMMAND_KEYS].sort());
+    }
+    expect(preview.config.commands).toEqual([
+      {
+        name: 'markdown-carrier',
+        template: 'Do $ARGUMENTS',
+        description: 'Imported command',
+        agent: 'reviewer',
+        model: 'anthropic/claude-sonnet-4',
+        subtask: true,
+      },
+      {
+        name: 'json-carrier',
+        template: 'Do $ARGUMENTS',
+        description: 'Imported command',
+        agent: 'reviewer',
+        model: 'anthropic/claude-sonnet-4',
+        subtask: true,
+      },
+    ]);
   });
 });

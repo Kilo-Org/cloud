@@ -1,6 +1,7 @@
 import { byocVercelOwnerSchema } from './byoc/vercel-owner.js';
 import { Hono } from 'hono';
 import { billingSubjectSchema } from '@kilocode/container-usage';
+import { captureCloudAgentException, instrumentCloudAgentWorker } from './sentry.js';
 import type { Context, Next } from 'hono';
 import { trpcServer } from '@hono/trpc-server';
 import { appRouter } from './router.js';
@@ -50,6 +51,7 @@ import { PtyIdSchema, sessionIdSchema } from './router/schemas.js';
 import { registerRuntimeArtifactRoutes } from './sandbox-control/runtime-artifact-routes.js';
 import { registerStartupFailureRoute } from './sandbox-control/startup-failure.js';
 import { registerControlLogRoutes } from './sandbox-control/log-routes.js';
+import { registerWorkspaceArtifactRoutes } from './sandbox-control/workspace-artifact-routes.js';
 import { registerEnvironmentBuildRoutes } from './environment-build/routes.js';
 import {
   runtimeCredentialProxyFacadeBaseUrl,
@@ -91,6 +93,8 @@ import { getVercelSnapshotBuildStub } from './byoc/vercel-snapshot-build-stub.js
 import { getVercelRuntimeIdentity } from './byoc/vercel-runtime-identity.js';
 import { z } from 'zod';
 import { isOrgInList } from './sandbox-id.js';
+import { containersBillingIdentity } from './container-usage-context.js';
+import { CLOUDFLARE_CONTAINERS_INSTANCES } from '@kilocode/worker-utils/sandbox-allocation';
 import { registerVercelScmBrokerRoute } from './scm-broker/vercel-route.js';
 import { isAllowedStreamWebSocketOrigin, isAllowedWebSocketOrigin } from './ws-origin.js';
 
@@ -307,6 +311,7 @@ function requireInternalApi(c: Context<HonoContext>): Response | null {
 }
 
 registerControlLogRoutes(app);
+registerWorkspaceArtifactRoutes(app);
 registerRuntimeArtifactRoutes(app);
 registerStartupFailureRoute(app);
 registerEnvironmentBuildRoutes(app);
@@ -324,6 +329,23 @@ app.get('/internal/code-review/billing/:type/:id', async (c: Context<HonoContext
     subject: subject.data,
   });
   return c.json({ enabled: mode === 'paid' }, 200, { 'Cache-Control': 'no-store' });
+});
+
+app.get('/internal/containers/billing/:type/:id/:instance', async (c: Context<HonoContext>) => {
+  const unauthorized = requireInternalApi(c);
+  if (unauthorized) return unauthorized;
+  const subject = billingSubjectSchema.safeParse({
+    type: c.req.param('type'),
+    id: c.req.param('id'),
+  });
+  if (!subject.success) return c.text('Invalid billing owner', 400);
+  const instance = z.enum(CLOUDFLARE_CONTAINERS_INSTANCES).safeParse(c.req.param('instance'));
+  if (!instance.success) return c.text('Invalid instance size', 400);
+  const billingMode = await c.env.CONTAINER_USAGE_METER.getBillingMode({
+    service: containersBillingIdentity(instance.data).service,
+    subject: subject.data,
+  });
+  return c.json({ billingMode }, 200, { 'Cache-Control': 'no-store' });
 });
 
 app.get('/internal/byoc/vercel-enrollment/:organizationId', (c: Context<HonoContext>) => {
@@ -946,6 +968,7 @@ app.use(
       request: c.req.raw,
     }),
     onError: ({ error, path }: { error: Error; path?: string }) => {
+      captureCloudAgentException(error, { operation: path ?? 'trpc' });
       logger.setTags({ path });
       logger
         .withFields({
@@ -958,7 +981,11 @@ app.use(
 );
 
 app.notFound(createNotFoundHandler());
-app.onError(createWorkerErrorHandler(logger));
+const errorHandler = createWorkerErrorHandler(logger);
+app.onError((error, c) => {
+  captureCloudAgentException(error, { operation: 'http' });
+  return errorHandler(error, c);
+});
 
 export const REPORT_RETENTION_CRON = '17 2 * * *';
 export const OUTCOME_AGGREGATE_CRON = '*/5 * * * *';
@@ -967,7 +994,7 @@ export const OUTCOME_AGGREGATE_CRON = '*/5 * * * *';
 // the collector floors `scheduledTime` to 5-minute buckets, so extra ticks only repeat a bucket.
 export const OUTCOME_AGGREGATE_CRONS = new Set([OUTCOME_AGGREGATE_CRON, '*/3 * * * *']);
 
-export default {
+const worker = {
   fetch(incoming: Request, env: Env, ctx: ExecutionContext): Response | Promise<Response> {
     // The preview marker selects the physical sandbox DO's port path, so a client
     // copy never passes ingress, whichever route later forwards the request.
@@ -988,7 +1015,7 @@ export default {
 
     return app.fetch(request, env, ctx);
   },
-  async queue(batch: MessageBatch<unknown>, env: Env): Promise<void> {
+  async queue(batch: MessageBatch<unknown>, env: Env, _ctx: ExecutionContext): Promise<void> {
     if (batch.queue.startsWith('cloud-agent-next-callback-queue')) {
       const consumer = createCallbackQueueConsumer(env);
       return consumer(batch as MessageBatch<CallbackJob>);
@@ -999,7 +1026,11 @@ export default {
 
     logger.warn(`Received message from unexpected queue: ${batch.queue}`);
   },
-  async scheduled(controller: ScheduledController, env: Env): Promise<void> {
+  async scheduled(
+    controller: ScheduledController,
+    env: Env,
+    _ctx: ExecutionContext
+  ): Promise<void> {
     if (controller.cron === REPORT_RETENTION_CRON) {
       await removeExpiredCloudAgentReportData(env);
       return;
@@ -1016,6 +1047,8 @@ export default {
       cron: controller.cron,
     });
   },
-};
+} satisfies ExportedHandler<Env>;
+
+export default instrumentCloudAgentWorker(worker);
 
 export { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';

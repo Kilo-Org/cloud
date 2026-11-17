@@ -14,6 +14,7 @@ import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatNumber, formatPercent } from '@/lib/format';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { resolveRunningOnLabel } from '@/lib/instance-target-label';
 import { cn } from '@/lib/utils';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -52,6 +53,7 @@ import {
 import { friendlyModelName, resolveModelProviderName } from './session-model-display';
 import { Row, TokenRow } from './session-detail-rows';
 import { SessionPageSheet } from './session-page-sheet';
+import { SessionSandboxSection } from './session-sandbox-section';
 import { copySessionId, copySessionLink } from './session-row-actions';
 import { type SessionConnectionDisplay } from './session-connection-indicator-state';
 import { SessionTodoLinkRow } from '@/components/todos/session-todo-link';
@@ -69,10 +71,6 @@ type SessionContextSheetProps = {
   modelDisplay: string;
   providerDisplay: string;
   totalCostMicrodollars: number | null;
-  /** The viewed session's Cloud Agent id: the compute charges and preview address it. */
-  cloudAgentSessionId?: string | null;
-  /** The session's organization, when it is billed to one. */
-  organizationId?: string;
   breakdownCostUsd: number;
   messages: StoredMessage[];
   modelOptions: SessionModelOption[];
@@ -81,6 +79,11 @@ type SessionContextSheetProps = {
   onAutoApproveChange: (enabled: boolean) => void;
   connectionDisplay: SessionConnectionDisplay;
   onRetryConnection: () => void;
+  /** The control-plane session id; null when this session has no sandbox. */
+  cloudAgentSessionId: string | null;
+  /** See `SessionSandboxSection`: only a failed start offers a fresh start. */
+  cloudStatusType: string | null;
+  organizationId: string | undefined;
 };
 
 const SHEET_RING_SIZE = 96;
@@ -186,8 +189,6 @@ export function SessionContextSheet({
   modelDisplay,
   providerDisplay,
   totalCostMicrodollars,
-  cloudAgentSessionId,
-  organizationId,
   breakdownCostUsd,
   messages,
   modelOptions,
@@ -196,6 +197,9 @@ export function SessionContextSheet({
   onAutoApproveChange,
   connectionDisplay,
   onRetryConnection,
+  cloudAgentSessionId,
+  cloudStatusType,
+  organizationId,
 }: Readonly<SessionContextSheetProps>) {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
@@ -308,7 +312,14 @@ export function SessionContextSheet({
           them behind a single ScrollView accessibilityLabel would shadow the
           natural read order. */}
       <ScrollView className="flex-1" contentContainerClassName="px-6 pb-6 pt-2">
-        <View className="items-center gap-3 pt-2">
+        {/* The ring sits beside its value, not above it. Stacked, the ring held
+            the sheet's first text a ring-height down the scroll content, which
+            the design gate reads as empty space under the title: the ring draws
+            nothing the accessibility tree reports. Side by side, the ring fills
+            the row and the value centres on the ring's own middle, so the pair
+            reads as one figure and neither half floats off its partner's
+            centre. */}
+        <View className="flex-row items-center justify-center gap-3 pt-2">
           <ContextUsageRing
             size={SHEET_RING_SIZE}
             strokeWidth={SHEET_RING_STROKE}
@@ -332,18 +343,17 @@ export function SessionContextSheet({
         <View className="mt-6 gap-4">
           <Row label={t('agentChat.contextUsage.used')}>
             <Text className="text-base font-medium text-foreground tabular-nums">
-              {content.usedTokens}
-              {content.capacityKnown && content.windowTokens ? (
+              {content.usedTokens ?? '-'}
+              {content.usedTokens !== null ? (
                 <Text className="text-sm text-muted-foreground">
                   {' '}
-                  {t('agentChat.contextUsage.ofWindowTokens', { window: content.windowTokens })}
+                  {content.capacityKnown && content.windowTokens
+                    ? t('agentChat.contextUsage.ofWindowTokens', { window: content.windowTokens })
+                    : t('agentChat.contextUsage.tokens', {
+                        count: content.usedTokensCount ?? 0,
+                      })}
                 </Text>
-              ) : (
-                <Text className="text-sm text-muted-foreground">
-                  {' '}
-                  {t('agentChat.contextUsage.tokens')}
-                </Text>
-              )}
+              ) : null}
             </Text>
           </Row>
 
@@ -425,6 +435,16 @@ export function SessionContextSheet({
               </Text>
             </Row>
           ) : null}
+
+          {/* The sandbox sits beside Run on: both describe where the session
+              runs. Its state and, after a failed start, the fresh-start
+              recovery come from the worker, so a lost or paused sandbox never
+              reads as a healthy session. */}
+          <SessionSandboxSection
+            cloudAgentSessionId={cloudAgentSessionId}
+            organizationId={organizationId}
+            startFailed={cloudStatusType === 'error'}
+          />
 
           {/* The row paints the combined total, so its gate is that total, not
               the model-only figure: a read-only session with no model cost can
@@ -607,7 +627,7 @@ function CopyRow({
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      className="gap-1 active:opacity-70"
+      className={cn(ROW_TARGET_CLASS, 'justify-center gap-1 active:opacity-70')}
       testID={testID}
     >
       {/* The row keeps its call-to-action name in every state; the copy
@@ -658,7 +678,10 @@ function SessionChangesRow({
       }}
       accessibilityRole="button"
       accessibilityLabel={label}
-      className="min-h-[44px] flex-row items-center justify-between gap-3 active:opacity-70"
+      className={cn(
+        ROW_TARGET_CLASS,
+        'flex-row items-center justify-between gap-3 active:opacity-70'
+      )}
       testID="session-context-sheet-view-changes"
     >
       <Text className="text-base font-medium text-foreground">{label}</Text>

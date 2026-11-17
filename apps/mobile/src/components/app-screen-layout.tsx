@@ -3,7 +3,7 @@ import { View } from 'react-native';
 
 import { appUnlockScreenLayout } from '@/components/app-unlock-screen';
 import { NativeStateSurface, type ScreenLayoutProps } from '@/components/centered-state-surface';
-import { endLeaveSettle } from '@/lib/navigation/leave-settle';
+import { sceneAt, settleLeaveWindow } from '@/lib/navigation/leave-settle';
 
 /**
  * Hides every covered `(app)` stack scene from screen readers.
@@ -64,13 +64,18 @@ function CoveredScreenA11yGate({
 
 /**
  * Ends the settle window a dismissal opened when this scene's own appearance
- * finishes.
+ * finishes, and opens the grace that follows it.
  *
  * A screen that dismisses itself pops the route that revealed this scene, so
  * the transition that brings this scene in is the one that carried that screen
  * away, and its end is the end of that leave. That end is the only trustworthy
  * signal: a wall-clock span would have to guess the JavaScript commit plus the
- * platform transition, and a loaded device lengthens both.
+ * platform transition, and a loaded device lengthens both. The grace then covers
+ * the press of a reader still acting on the screen that went.
+ *
+ * The listener is mounted on every scene of every stack, so it reports this
+ * scene's own key: an end that belongs to another scene — a tab switch, or a
+ * push that completes while a leave is pending — cannot end that leave.
  */
 function SettledLeaveEndsWithThisScene({
   navigation,
@@ -80,7 +85,9 @@ function SettledLeaveEndsWithThisScene({
   useEffect(() => {
     const unsubscribe = navigation.addListener('transitionEnd', event => {
       if (!event.data.closing) {
-        endLeaveSettle();
+        // This scene's own route key, so a leave armed for another scene is not
+        // settled here. A stack that names no scene settles as before.
+        settleLeaveWindow(sceneAt(navigation.getState()));
       }
     });
     return unsubscribe;

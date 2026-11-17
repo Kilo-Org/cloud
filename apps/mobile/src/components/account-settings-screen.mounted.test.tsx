@@ -17,6 +17,11 @@ vi.mock('react-native', () => ({
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push }),
 }));
+// The picker rows push through the guarded hook; the plain rows keep `useRouter`,
+// so both resolve to the same spy and the assertions observe one call each.
+vi.mock('@/lib/hooks/use-single-push-route', () => ({
+  useSinglePushRoute: () => push,
+}));
 vi.mock('@/components/ui/icons', () => ({
   Ban: 'Ban',
   Cpu: 'Cpu',
@@ -24,7 +29,6 @@ vi.mock('@/components/ui/icons', () => ({
   Globe: 'Globe',
   KeyRound: 'KeyRound',
   Lock: 'Lock',
-  LogOut: 'LogOut',
   Shield: 'Shield',
   Smartphone: 'Smartphone',
   UserRound: 'UserRound',
@@ -32,6 +36,7 @@ vi.mock('@/components/ui/icons', () => ({
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
+vi.mock('@/components/ui/directional-icons', () => ({ DirectionalLogOut: 'DirectionalLogOut' }));
 vi.mock('@/lib/auth/push-registration-reconciliation', () => ({
   attemptPushRegistrationReconciliation: vi.fn(),
 }));
@@ -134,7 +139,7 @@ describe('AccountSettingsScreen', () => {
     act(() => {
       (findConfigureRow(renderer, 'Device sessions').props.onPress as () => void)();
     });
-    expect(push).toHaveBeenCalledWith('/(app)/device-sessions');
+    expect(push).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/device-sessions');
   });
 
   it('opens the account surfaces the web already had', async () => {

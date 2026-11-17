@@ -53,6 +53,12 @@ const REMOTE_SESSION_EXIT_NOT_SUPPORTED =
  */
 const REMOTE_SESSION_CREATION_SCOPE_UNRESOLVED =
   'This session is still loading. Try again in a moment.';
+/**
+ * A create must stay in the active session's organization. The message reaches
+ * a client's toast verbatim, so it names the reader's situation and next step.
+ */
+const REMOTE_SESSION_ORGANIZATION_MISMATCH =
+  "A new session stays in this session's organization. Switch organization first.";
 
 type CloudAgentSessionConfig = {
   kiloSessionId: KiloSessionId;
@@ -163,11 +169,11 @@ type CloudAgentSessionTransport = {
   fetchSnapshot?: ((kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>) | undefined;
   /**
    * Page-aware root snapshot fetch. The transport uses this for its initial
-   * bounded read and any reconnect snapshot replays. After a successful
-   * initial fetch the transport calls `onInitialPageLoaded` so the manager
-   * can record the cursor and `omittedItemCount`; reconnect replays do NOT
+   * bounded read and any reconnect snapshot replays. Once per attach, with the
+   * first page that applies, the transport calls `onInitialPageLoaded` so the
+   * manager can record the cursor and `omittedItemCount`; later replays do NOT
    * fire that callback so the user's already-advanced older-messages cursor
-   * isn't reset to the latest 50 on every reconnect.
+   * isn't reset to the latest 50.
    */
   fetchSnapshotPage?:
     | ((
@@ -182,7 +188,10 @@ type CloudAgentSessionTransport = {
       ) => Promise<unknown>)
     | undefined;
   initialSnapshotRead?: CloudAgentTransportConfig['initialSnapshotRead'];
-  /** Called by the transport after a successful initial bounded page read. */
+  /**
+   * Called by the transport once per attach, with the first page that applies
+   * after the initial read starts.
+   */
   onInitialPageLoaded?: ((page: SessionSnapshotPage) => void) | undefined;
   lifecycleHooks?: ConnectionLifecycleHooks | undefined;
   websocketHeaders?: WebSocketHeaders | undefined;
@@ -210,6 +219,7 @@ type CloudAgentSession = {
   ) => unknown | Promise<unknown>;
   retryRemoteModels: () => void;
   retryRemoteCommands: () => void;
+  retryBackgroundActivity?: () => void;
   observeProjected: (messages: SessionSnapshot['messages']) => void;
   createRemoteSession: (input?: CreateRemoteSessionInput) => Promise<KiloSessionId>;
   exitRemoteSession: () => Promise<void>;
@@ -334,6 +344,13 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
             content: event.content,
             createdAt: event.createdAt,
           });
+        }
+      }
+      if (event.type === 'cloud.message.sent' && event.turnType === 'command') {
+        replayedQueuedMessages.delete(event.messageId);
+        const message = storage.getMessageInfo(event.messageId);
+        if (message?.role === 'user' && message.synthetic === true) {
+          storage.deleteMessage(event.messageId);
         }
       }
       // `cloud.message.canceled` removes the synthetic (or real) local row the
@@ -603,6 +620,9 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     retryRemoteCommands() {
       transport?.retryRemoteCommands?.();
     },
+    retryBackgroundActivity() {
+      transport?.retryBackgroundActivity?.();
+    },
     observeProjected(messages) {
       transport?.observeProjected?.(messages);
     },
@@ -655,6 +675,7 @@ export {
   REMOTE_SESSION_EXIT_NOT_SUPPORTED,
   REMOTE_SESSION_CREATION_NOT_SUPPORTED,
   REMOTE_SESSION_CREATION_SCOPE_UNRESOLVED,
+  REMOTE_SESSION_ORGANIZATION_MISMATCH,
 };
 export type {
   CloudAgentSession,

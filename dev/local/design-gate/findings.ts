@@ -2,24 +2,28 @@ export type Rect = readonly [x: number, y: number, width: number, height: number
 
 export type Severity = 'error' | 'warning';
 
-export type RuleId =
-  | 'clipped'
-  | 'cut-off'
-  | 'overlap'
-  | 'touch-overlap'
-  | 'row-misaligned'
-  | 'ink-off-center'
-  | 'touch-target'
-  | 'inset-asymmetry'
-  | 'layout-shift'
-  | 'rtl-mirror'
-  | 'safe-area'
-  | 'leading-gap'
-  | 'unsettled'
-  | 'loading-placeholder'
-  | 'capture-alignment'
-  | 'blank-frame'
-  | 'env-mismatch';
+export const RULE_IDS = [
+  'clipped',
+  'cut-off',
+  'overlap',
+  'touch-overlap',
+  'row-misaligned',
+  'ink-off-center',
+  'touch-target',
+  'inset-asymmetry',
+  'layout-shift',
+  'rtl-mirror',
+  'safe-area',
+  'leading-gap',
+  'unsettled',
+  'loading-placeholder',
+  'capture-alignment',
+  'blank-frame',
+  'env-mismatch',
+  'link-unopened',
+] as const;
+
+export type RuleId = (typeof RULE_IDS)[number];
 
 export type ElementRef = {
   index: number;

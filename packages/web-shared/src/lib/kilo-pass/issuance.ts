@@ -35,7 +35,6 @@ import { and, asc, eq, gt, inArray, isNull, lt, lte, ne, sql } from 'drizzle-orm
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { computeKiloPassBonusUsd } from '@kilocode/web-shared/lib/kilo-pass/bonus-decision';
 import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
-import type { Dayjs } from 'dayjs';
 
 type Db = typeof defaultDb;
 type DbOrTx = Db | DrizzleTransaction;
@@ -45,10 +44,6 @@ export const KILO_PASS_BONUS_LIKE_ITEM_KINDS = [
   KiloPassIssuanceItemKind.PromoFirstMonth50Pct,
   KiloPassIssuanceItemKind.ReferralBonus,
 ];
-
-export function computeIssueMonth(date: Dayjs): string {
-  return date.utc().format('YYYY-MM-01');
-}
 
 async function computeKiloPassBonusExpiryDate(
   tx: DrizzleTransaction,
@@ -519,11 +514,7 @@ async function getExistingBonusLikeIssuanceItem(
     .where(
       and(
         eq(kilo_pass_issuance_items.kilo_pass_issuance_id, params.issuanceId),
-        inArray(kilo_pass_issuance_items.kind, [
-          KiloPassIssuanceItemKind.Bonus,
-          KiloPassIssuanceItemKind.PromoFirstMonth50Pct,
-          KiloPassIssuanceItemKind.ReferralBonus,
-        ])
+        inArray(kilo_pass_issuance_items.kind, KILO_PASS_BONUS_LIKE_ITEM_KINDS)
       )
     )
     .limit(1);

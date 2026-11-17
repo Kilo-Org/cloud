@@ -24,6 +24,7 @@ import {
 } from '@kilocode/db/schema';
 import {
   activeOrganizationJoinCondition,
+  hasOrganizationAccess,
   organizationMembershipJoinCondition,
   parentOrganizationJoinCondition,
   parentOrganizationMembershipJoinCondition,
@@ -36,6 +37,8 @@ import {
   createSessionForCloudAgentSchema,
   publishCloudAgentSessionStatusSchema,
   type PublishCloudAgentSessionStatusParams,
+  recordCloudAgentSessionHarnessSchema,
+  type RecordCloudAgentSessionHarnessParams,
   cloudAgentSessionIdSchema,
   cloudAgentWorktreeIdSchema,
   cloudAgentWorktreeDeletionManifestSchema,
@@ -129,6 +132,7 @@ import {
   HostedWorkspaceSessionDeleteError,
 } from './services/hosted-workspace-session';
 import { clearSessionLocalState } from './services/session-local-state';
+import { setCloudAgentSessionVersion } from './services/cloud-agent-session-version';
 import { applyReportedSessionTitle, reportSessionTitleSchema } from './services/session-title';
 import { applyMetadataChanges } from './ingest/metadata';
 
@@ -314,6 +318,23 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
     params: CreateSessionForCloudAgentParams
   ): Promise<CreateSessionForCloudAgentResult> {
     const parsed = createSessionForCloudAgentSchema.parse(params);
+
+    // The row and its worktree both carry this organization, so the create
+    // confirms the acting user may act for it before any attribution. The
+    // check runs before the clone so a refused create leaves no destination
+    // work behind.
+    if (parsed.organizationId !== undefined) {
+      const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
+      if (
+        !(await hasOrganizationAccess(db, {
+          kiloUserId: parsed.kiloUserId,
+          organizationId: parsed.organizationId,
+        }))
+      ) {
+        return { status: 'rejected', code: 'organization_access_denied' };
+      }
+    }
+
     const inputGitUrl = parsed.gitUrl === undefined ? undefined : normalizeGitUrl(parsed.gitUrl);
 
     // Require available ingest storage before any clone or row write, so the
@@ -604,6 +625,13 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
       this.ctx,
       input.cloudAgentSessionId
     );
+  }
+
+  async recordCloudAgentSessionHarness(
+    params: RecordCloudAgentSessionHarnessParams
+  ): Promise<boolean> {
+    const input = recordCloudAgentSessionHarnessSchema.parse(params);
+    return setCloudAgentSessionVersion(getWorkerDb(this.env.HYPERDRIVE.connectionString), input);
   }
 
   async setGeneratedTitleForCloudAgent(params: {

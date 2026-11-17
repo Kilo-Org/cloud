@@ -6,6 +6,8 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import {
+  auditCountedCalls,
+  checkDynamicCountedKeySources,
   collectCountedKeys,
   collectDynamicCountedCalls,
   DYNAMIC_COUNTED_KEYS,
@@ -42,9 +44,10 @@ const PRE_FIX_ROWS: { key: string; options: Record<string, unknown> }[] = [
 
 describe('plural families', () => {
   it('declares a family (or a reviewed exemption) for every counted key', () => {
+    const scan = auditCountedCalls();
     // A non-trivial scan, so the assertion below cannot pass by finding nothing.
-    expect(collectCountedKeys().length).toBeGreaterThan(10);
-    expect(findCountlessFamilies()).toEqual([]);
+    expect(collectCountedKeys(scan).length).toBeGreaterThan(10);
+    expect(findCountlessFamilies(scan)).toEqual([]);
   });
 
   it('keeps every NO_AGREEMENT entry documented with a reason', () => {
@@ -83,15 +86,16 @@ describe('plural families', () => {
       ].join('\n')
     );
     try {
+      const scan = auditCountedCalls(root);
       // collectCountedKeys sorts its output, so the fixture order is already stable.
-      expect(collectCountedKeys(root)).toEqual([
+      expect(collectCountedKeys(scan)).toEqual([
         'fixture.backticked',
         'fixture.doubleQuoted',
         'fixture.singleQuoted',
       ]);
-      expect(collectDynamicCountedCalls(root)).toEqual(['dynamicKey']);
+      expect(collectDynamicCountedCalls(scan)).toEqual(['dynamicKey']);
       // The fixture expression is not in the allowlist, so the audit reports it.
-      expect(findUnlistedDynamicCalls(root)).toEqual(['dynamicKey']);
+      expect(findUnlistedDynamicCalls(scan)).toEqual(['dynamicKey']);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -109,7 +113,8 @@ describe('plural families', () => {
       ].join('\n')
     );
     try {
-      expect(collectCountedKeys(root)).toEqual([
+      const scan = auditCountedCalls(root);
+      expect(collectCountedKeys(scan)).toEqual([
         'fixture.blockCommentAfterComma',
         'fixture.blockCommentBeforeComma',
         'fixture.lineCommentAfterComma',
@@ -140,7 +145,8 @@ describe('plural families', () => {
       ].join('\n')
     );
     try {
-      expect(collectCountedKeys(root)).toEqual([
+      const scan = auditCountedCalls(root);
+      expect(collectCountedKeys(scan)).toEqual([
         'fixture.quotedKey',
         'fixture.shorthand',
         'fixture.stringBracket',
@@ -159,8 +165,9 @@ describe('plural families', () => {
       "t<'fixture.typed'>('fixture.typed', { count: 1 });\n"
     );
     try {
-      expect(collectCountedKeys(root)).toEqual(['fixture.typed']);
-      expect(collectDynamicCountedCalls(root)).toEqual([]);
+      const scan = auditCountedCalls(root);
+      expect(collectCountedKeys(scan)).toEqual(['fixture.typed']);
+      expect(collectDynamicCountedCalls(scan)).toEqual([]);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -179,7 +186,8 @@ describe('plural families', () => {
       ].join('\n')
     );
     try {
-      expect(collectCountedKeys(root)).toEqual(['fixture.nestedTemplate']);
+      const scan = auditCountedCalls(root);
+      expect(collectCountedKeys(scan)).toEqual(['fixture.nestedTemplate']);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -190,8 +198,9 @@ describe('plural families', () => {
     mkdirSync(join(root, 'src'), { recursive: true });
     writeFileSync(join(root, 'src', 'fixture.ts'), `t(\`\${prefix}.count\`, { count: 1 });\n`);
     try {
-      expect(collectCountedKeys(root)).toEqual([]);
-      expect(collectDynamicCountedCalls(root)).toEqual([`\`\${prefix}.count\``]);
+      const scan = auditCountedCalls(root);
+      expect(collectCountedKeys(scan)).toEqual([]);
+      expect(collectDynamicCountedCalls(scan)).toEqual([`\`\${prefix}.count\``]);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -208,8 +217,9 @@ describe('plural families', () => {
       ].join('\n')
     );
     try {
-      expect(collectCountedKeys(root)).toEqual([]);
-      expect(collectDynamicCountedCalls(root)).toEqual([]);
+      const scan = auditCountedCalls(root);
+      expect(collectCountedKeys(scan)).toEqual([]);
+      expect(collectDynamicCountedCalls(scan)).toEqual([]);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -220,7 +230,8 @@ describe('plural families', () => {
     mkdirSync(join(root, 'src'), { recursive: true });
     writeFileSync(join(root, 'src', 'broken.ts'), 'const a = ;\n');
     try {
-      expect(findUnparsedFiles(root)).toEqual([
+      const scan = auditCountedCalls(root);
+      expect(findUnparsedFiles(scan)).toEqual([
         expect.stringMatching(/broken\.ts:1: cannot parse: /),
       ]);
     } finally {
@@ -229,13 +240,23 @@ describe('plural families', () => {
   });
 
   it('reviews every dynamic counted call and checks its possible keys', () => {
-    expect(findUnlistedDynamicCalls()).toEqual([]);
+    const scan = auditCountedCalls();
+    expect(findUnlistedDynamicCalls(scan)).toEqual([]);
     // `findCountlessFamilies` above walks the allowlist's keys too, so a stale
     // entry fails the family check. Here only the entries' shape is pinned.
     for (const [expression, listed] of DYNAMIC_COUNTED_KEYS) {
       expect(listed.keys.length, expression).toBeGreaterThan(0);
       expect(listed.reason.length, expression).toBeGreaterThan(0);
+      // The declaration each list mirrors is named so the audit can read it.
+      expect(listed.source.length, expression).toBeGreaterThan(0);
+      expect(listed.declaration.length, expression).toBeGreaterThan(0);
     }
+  });
+
+  it('checks every dynamic key list against its app declaration', () => {
+    // The lists are hand-written, so a member added to a union or a map, or a
+    // key a declaration dropped, drifts from the reviewed set silently.
+    expect(checkDynamicCountedKeySources()).toEqual([]);
   });
 
   it('selects the singular form of a dynamic family at count 1', () => {

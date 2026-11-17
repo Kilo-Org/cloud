@@ -4,6 +4,7 @@ import {
   countActiveSessionFilters,
   createDefaultAgentSessionFilters,
   parseStoredAgentSessionFilters,
+  sameAgentSessionFilters,
 } from './agent-session-filters';
 
 describe('createDefaultAgentSessionFilters', () => {
@@ -124,4 +125,48 @@ it('ignores a legacy stored sortBy field', () => {
       JSON.stringify({ platformFilter: ['cli'], projectFilter: [], sortBy: 'created_at' })
     )
   ).toEqual({ platformFilter: ['cli'], projectFilter: [] });
+});
+
+describe('sameAgentSessionFilters', () => {
+  it('treats two filter sets with the same entries in the same order as one', () => {
+    expect(
+      sameAgentSessionFilters(
+        { platformFilter: ['cli'], projectFilter: ['https://github.com/kilo/cloud'] },
+        { platformFilter: ['cli'], projectFilter: ['https://github.com/kilo/cloud'] }
+      )
+    ).toBe(true);
+    expect(
+      sameAgentSessionFilters(
+        createDefaultAgentSessionFilters(),
+        createDefaultAgentSessionFilters()
+      )
+    ).toBe(true);
+  });
+
+  it('tells a changed entry, a different order, and a different length apart', () => {
+    expect(
+      sameAgentSessionFilters(
+        { platformFilter: ['cli'], projectFilter: [] },
+        { platformFilter: [], projectFilter: [] }
+      )
+    ).toBe(false);
+    expect(
+      sameAgentSessionFilters(
+        { platformFilter: ['cli', 'web'], projectFilter: [] },
+        { platformFilter: ['web', 'cli'], projectFilter: [] }
+      )
+    ).toBe(false);
+    expect(
+      sameAgentSessionFilters(
+        { platformFilter: [], projectFilter: ['one'] },
+        { platformFilter: [], projectFilter: ['two'] }
+      )
+    ).toBe(false);
+    expect(
+      sameAgentSessionFilters(
+        { platformFilter: ['cli'], projectFilter: [] },
+        { platformFilter: ['cli'], projectFilter: ['one'] }
+      )
+    ).toBe(false);
+  });
 });

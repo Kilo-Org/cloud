@@ -230,7 +230,10 @@ describe('enqueueUsage', () => {
     'usage.example.test:8080/usage',
     'ftp://usage.example.test/usage',
     'unix:/tmp/usage.sock',
-  ])('treats a non-http publisher URL as an unstarted publication: %s', async value => {
+    // The Bearer secret must never travel in clear text outside a loopback fixture.
+    'http://usage.example.test/usage',
+    'http://10.0.0.5/usage',
+  ])('treats an unsafe publisher URL as an unstarted publication: %s', async value => {
     config.USAGE_INGEST_URL = value;
     expect(await enqueueUsage(payload, { retryTransientFailures: true })).toEqual({
       kind: 'unavailable',
@@ -1548,6 +1551,52 @@ describe('publisher attempt diagnostics', () => {
     expect(warn).toHaveBeenCalledWith(
       'usage enqueue retrying',
       expect.objectContaining({ usageId: usageWrite.id, usage_kind: 'enkrypt_usage' })
+    );
+  });
+
+  test.each(['http://usage.example.test/usage', 'http://10.0.0.5/usage'])(
+    'rejects a plain-HTTP non-loopback Enkrypt ingest URL: %s',
+    async value => {
+      config.USAGE_INGEST_URL = value;
+      const usageWrite = {
+        id: 'a8f2c3d4-5e6f-4a1b-9c2d-3e4f5a6b7c8d',
+        occurredAt: '2026-08-05T10:11:12.945Z',
+        organizationId: 'b9e1f2a3-4b5c-4d6e-8f7a-1b2c3d4e5f6a',
+        kiloUserId: 'oauth/synthetic',
+        sessionId: null,
+        apiKind: 'messages',
+        decision: 'allowed',
+        creditsCost: 1,
+        addedLatencyMs: null,
+      } satisfies EnkryptUsageWriteInput;
+
+      expect(await enqueueEnkryptUsage(usageWrite)).toEqual({
+        kind: 'unavailable',
+        reason: 'publisher_not_configured',
+      });
+      expect(mockFetch).not.toHaveBeenCalled();
+    }
+  );
+
+  test('accepts a loopback plain-HTTP Enkrypt ingest URL', async () => {
+    config.USAGE_INGEST_URL = 'http://127.0.0.1:8799/usage';
+    mockFetch.mockResolvedValue(new Response(null, { status: 202 }));
+    const usageWrite = {
+      id: 'a8f2c3d4-5e6f-4a1b-9c2d-3e4f5a6b7c8d',
+      occurredAt: '2026-08-05T10:11:12.945Z',
+      organizationId: 'b9e1f2a3-4b5c-4d6e-8f7a-1b2c3d4e5f6a',
+      kiloUserId: 'oauth/synthetic',
+      sessionId: null,
+      apiKind: 'messages',
+      decision: 'allowed',
+      creditsCost: 1,
+      addedLatencyMs: null,
+    } satisfies EnkryptUsageWriteInput;
+
+    expect(await enqueueEnkryptUsage(usageWrite)).toEqual({ kind: 'accepted' });
+    expect(mockFetch).toHaveBeenCalledWith(
+      'http://127.0.0.1:8799/enkrypt-usage',
+      expect.objectContaining({ method: 'POST' })
     );
   });
 

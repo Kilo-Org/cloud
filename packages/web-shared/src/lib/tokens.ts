@@ -17,6 +17,7 @@ import {
   buildModernKiloTokenPayload,
   isKiloResourceAudienceAllowed,
 } from '@kilocode/worker-utils/kilo-token-policy';
+import { kiloTokenPayload } from '@kilocode/worker-utils/kilo-token';
 import { CloudAgentNextRuntimeAuthorizationClaimSchema } from '@kilocode/worker-utils/runtime-proxy-attestation';
 import {
   isCloudAgentAuthorityHttpPathAllowed,
@@ -24,6 +25,7 @@ import {
   type CloudAgentAuthority,
 } from '@kilocode/worker-utils/cloud-agent-authority';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { z } from 'zod';
 import jwt from 'jsonwebtoken';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
@@ -68,19 +70,6 @@ const boundedInternalServiceAudienceSet: ReadonlySet<string> = new Set(
   BOUNDED_INTERNAL_SERVICE_AUDIENCES
 );
 
-export type JWTTokenExtraPayload = {
-  deviceAuthRequestCode?: string;
-  deviceSessionId?: string;
-  botId?: string;
-  organizationId?: string;
-  organizationRole?: OrganizationRole;
-  internalApiUse?: boolean;
-  isAdmin?: boolean;
-  createdOnPlatform?: string;
-  tokenSource?: string;
-  orgMemberships?: Array<{ orgId: string; role: OrganizationRole }>;
-};
-
 const FIVE_YEARS_IN_SECONDS = 5 * 365 * 24 * 60 * 60;
 const THIRTY_DAYS_IN_SECONDS = 30 * 24 * 60 * 60;
 const ONE_HOUR_IN_SECONDS = 60 * 60;
@@ -95,8 +84,9 @@ export const TOKEN_EXPIRY = {
 
 /**
  * Generate a short-lived JWT for authenticating with internal Cloudflare Worker services
- * (e.g. session-ingest). Contains only the minimal fields the workers require:
- * kiloUserId and version. Defaults to a 1-hour expiry.
+ * (e.g. session-ingest). Carries the minimal fields the workers require: kiloUserId and
+ * version, plus an organizationId claim when the caller supplies one. Defaults to a
+ * 1-hour expiry.
  */
 export function generateInternalServiceToken(
   userId: string,
@@ -210,20 +200,54 @@ export function generateOrganizationApiToken(
   };
 }
 
-export type JWTTokenPayload = {
-  kiloUserId: string;
-  version: number;
-  apiTokenPepper?: string;
-  runtimeAuthorization?: unknown;
-  cloudAgentAuthority?: unknown;
-} & JWTTokenExtraPayload;
+/**
+ * The claims a verified Kilo bearer carries, taken from the shared payload
+ * schema so the claim list has one source.
+ *
+ * `version` is widened to any number: the version refusal must stay reachable
+ * for a token issued by an older version. The object is loose because
+ * `validateCloudAgentAuthorityClaims` strict-parses the claim set and denies any
+ * claim name it does not know.
+ */
+const kiloTokenClaims = z.looseObject({
+  ...kiloTokenPayload.omit({ version: true }).shape,
+  version: z.number(),
+  /**
+   * The audience stays unvalidated. `isKiloResourceAudienceAllowed` owns the
+   * audience refusal and its tolerance for legacy, null, blank and array
+   * audiences.
+   */
+  aud: z.unknown().optional(),
+});
+
+/** Claims an issued Kilo token carries; the schema is the single source. */
+export type JWTTokenPayload = z.infer<typeof kiloTokenClaims>;
+
+export type JWTTokenExtraPayload = Pick<
+  JWTTokenPayload,
+  | 'deviceAuthRequestCode'
+  | 'deviceSessionId'
+  | 'botId'
+  | 'organizationId'
+  | 'organizationRole'
+  | 'internalApiUse'
+  | 'isAdmin'
+  | 'createdOnPlatform'
+  | 'tokenSource'
+  | 'orgMemberships'
+>;
 
 function tryJwtVerify(token: string) {
   try {
-    const payload = jwt.verify(token, NEXTAUTH_SECRET, {
+    const verified = jwt.verify(token, NEXTAUTH_SECRET, {
       algorithms: [jwtSigningAlgorithm],
-    }) as jwt.JwtPayload & JWTTokenPayload;
-    return payload;
+    });
+    const parsed = kiloTokenClaims.safeParse(verified);
+    if (!parsed.success) {
+      warnExceptInTest('Token payload does not match the Kilo token schema:', parsed.error);
+      return null;
+    }
+    return parsed.data;
   } catch (error) {
     warnExceptInTest('Token verification failed:', error);
     return null;
@@ -307,7 +331,7 @@ export function validateAuthorizationHeader(
     };
   }
 
-  if (payload.version != JWT_TOKEN_VERSION) {
+  if (payload.version !== JWT_TOKEN_VERSION) {
     warnExceptInTest(`Token version outdated (${traceability_logging_id}):`, {
       version: payload.version,
       kiloUserId: payload.kiloUserId,

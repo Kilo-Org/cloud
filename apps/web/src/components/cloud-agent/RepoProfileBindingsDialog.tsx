@@ -1,4 +1,3 @@
-/** Dialog for managing repo-profile bindings with repo picker. */
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -75,7 +74,6 @@ export function RepoProfileBindingsDialog({
   const [selectedProfileId, setSelectedProfileId] = useState('');
   const [repoPopoverOpen, setRepoPopoverOpen] = useState(false);
 
-  // Fetch repo bindings
   const { data: bindings, isLoading: isBindingsLoading } = useRepoBindings({
     organizationId,
     enabled: open,
@@ -89,7 +87,6 @@ export function RepoProfileBindingsDialog({
   // the controls stay enabled and the server still rejects a non-manager.
   const canManage = permissions?.canManage !== false;
 
-  // Fetch profiles
   const { data: personalProfiles } = useProfiles({
     enabled: open && !organizationId,
   });
@@ -100,7 +97,6 @@ export function RepoProfileBindingsDialog({
 
   const profiles = organizationId ? combinedProfiles?.orgProfiles : personalProfiles;
 
-  // Fetch repositories (same pattern as NewSessionPanel)
   const { data: githubRepoData, isLoading: isLoadingGitHubRepos } = useQuery(
     organizationId
       ? trpc.organizations.cloudAgentNext.listGitHubRepositories.queryOptions({
@@ -418,10 +414,6 @@ export function RepoProfileBindingsDialog({
     </Dialog>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Internal sub-component for repo items in the Command list
-// ---------------------------------------------------------------------------
 
 function RepoCommandItem({
   repo,

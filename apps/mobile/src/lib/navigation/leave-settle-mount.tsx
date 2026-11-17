@@ -4,12 +4,12 @@ import { BackHandler } from 'react-native';
 import {
   clearAcceptedBack,
   endLeaveSettle,
-  insideLeaveSettle,
+  spendsLeaveBackPress,
 } from '@/lib/navigation/leave-settle';
 
 /**
- * Spends a Back that arrives while a screen that dismissed itself is still
- * animating out.
+ * Spends a Back that belongs to a leave: one still animating out, or one whose
+ * animation ended a moment ago.
  *
  * The dismissing screen is unmounted before Android delivers that Back to
  * JavaScript, so its own listener is gone and the press would pop the screen
@@ -21,17 +21,18 @@ import {
  * has already recorded this press as one it accepted. Because that screen is not
  * the one leaving, the mark is dropped here for the press spent instead.
  *
- * The spend also ends the window. The revealed scene's transition end normally
- * does that first; this is the bound when that event never arrives, and it costs
- * one press rather than every press that follows.
+ * The spend also ends the window and the grace after it. The revealed scene's
+ * transition end normally ends the window first; this is the bound when that
+ * event never arrives, and it costs one press rather than every press that
+ * follows.
  *
- * Nothing else is affected: outside the window this returns `false` and the
- * press takes its usual path.
+ * Nothing else is affected: outside the window and its grace this returns
+ * `false` and the press takes its usual path.
  */
 export function LeaveSettleMount(): null {
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (!insideLeaveSettle()) {
+      if (!spendsLeaveBackPress()) {
         return false;
       }
       endLeaveSettle();

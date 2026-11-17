@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "La teva sessió d'agent té una actualització",
-      "chatMessage": "Tens un missatge nou",
-      "instanceLifecycle": "La teva instància té una actualització",
-      "scheduledAction": "Una acció programada té una actualització",
       "lowBalance": "El teu saldo necessita atenció",
       "spendAlert": "La teva despesa necessita atenció",
       "securityFinding": "Una troballa de seguretat necessita atenció",
@@ -13,30 +10,10 @@
       "activeAgentsGlanceable": "Els agents actius tenen una actualització"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Tasca completada"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Fallada: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Interrompuda: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
       "body": "{{message}}"
-    }
-  },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · Sense títol",
-      "body": "{{bodyPreview}}"
     }
   },
   "internal": {
@@ -48,50 +25,21 @@
       "title": "Avís de despesa",
       "body": "La despesa de {{scopeName}} ha superat els ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Nova troballa de seguretat ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} a {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Nova troballa de seguretat ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Avís d'SLA",
-      "body": "{{findingTitle}} a {{repoFullName}}"
+      "title": "Avís d'SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Incompliment d'SLA",
-      "body": "{{findingTitle}} a {{repoFullName}}"
+      "title": "Incompliment d'SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",
       "body": "Una comprovació de seguretat té una actualització"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} està a punt",
-      "body": "Toqueu per començar a xatejar."
-    },
-    "startFailed": {
-      "title": "{{instanceName}} no ha pogut iniciar-se",
-      "body": "L'inici ha fallat."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} es reiniciarà aviat",
-      "body": "Programat per reiniciar-se a les {{when}}."
-    },
-    "restartCancelled": {
-      "title": "Reinici de {{instanceName}} cancel·lat",
-      "body": "El reinici programat anteriorment s'ha cancel·lat."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} s'actualitzarà aviat",
-      "bodyWithTag": "Actualització a {{targetImageTag}} a les {{when}}.",
-      "bodyWithoutTag": "Actualització programada a les {{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "Actualització de {{instanceName}} cancel·lada",
-      "body": "L'actualització programada anteriorment s'ha cancel·lat."
     }
   },
   "sessionReady": {

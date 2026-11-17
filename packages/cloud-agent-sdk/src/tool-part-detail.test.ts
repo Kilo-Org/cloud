@@ -152,4 +152,13 @@ describe('preview merge guard', () => {
       upsertPartDroppingStaleSyntheticParts(stored, tool(), undefined, evidence, true)
     ).toEqual([tool()]);
   });
+
+  test('a preview whose state cannot be read is not a preview of the stored call', () => {
+    const stateOnlyPreview = {
+      ...tool({ cloudDetail: marker }),
+      state: { status: 'completed' },
+    } as unknown as Part;
+    expect(() => isPreviewOfStoredTool(tool(), stateOnlyPreview)).not.toThrow();
+    expect(isPreviewOfStoredTool(tool(), stateOnlyPreview)).toBe(false);
+  });
 });

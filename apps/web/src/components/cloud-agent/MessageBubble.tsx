@@ -27,7 +27,6 @@ export function MessageBubble({
 }: MessageBubbleProps) {
   const getTextForCopy = useCallback(() => message.content, [message.content]);
 
-  // User message
   if (message.role === 'user') {
     const displayName = userName ?? 'You';
     return (
@@ -69,7 +68,6 @@ export function MessageBubble({
       message.ask === 'tool' || message.ask === 'use_mcp_tool' || message.ask === 'command';
 
     if (isToolMessage) {
-      // Render as Kilo Code with tool card
       return (
         <div className="flex items-start gap-2 py-4 md:gap-3">
           <div className="bg-muted flex h-7 w-7 shrink-0 items-center justify-center rounded-full md:h-8 md:w-8">
@@ -102,7 +100,6 @@ export function MessageBubble({
       );
     }
 
-    // Regular system message
     return (
       <div className="flex items-start gap-2 py-4 md:gap-3">
         <div className="bg-muted flex h-7 w-7 shrink-0 items-center justify-center rounded-full md:h-8 md:w-8">
@@ -123,7 +120,6 @@ export function MessageBubble({
     );
   }
 
-  // Assistant message
   return (
     <div className="group/msg flex items-start gap-2 py-4 md:gap-3">
       <div className="bg-muted flex h-7 w-7 shrink-0 items-center justify-center rounded-full md:h-8 md:w-8">

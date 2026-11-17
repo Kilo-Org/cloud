@@ -25,8 +25,9 @@ repositories in one environment; revised 2026-10-31 to define worktree-owned
 shared runtime and MCP configuration; revised 2026-11-04 to state that one
 sandbox serves one workspace; revised 2026-11-04 to add environment start
 commands and skip setup in a workspace started from an environment snapshot;
-revised 2026-11-12 to define organization-connection repository access without
-requiring a personal provider identity and retain GitHub-triggered actor write checks.
+revised 2026-11-05 to add shared workspace artifacts; revised 2026-11-12 to
+define organization-connection repository access without requiring a personal
+provider identity and retain GitHub-triggered actor write checks.
 
 ## Conventions
 
@@ -300,11 +301,13 @@ repository.
    show the snapshot revision, the session's revision, and the actual
    replacement build status, including a skipped build or backoff.
 5. If a snapshot start fails transiently, the session MUST retry the same
-   snapshot within the preparation deadline. A permanent failure MUST fail with
-   a specific reason that asks to rebuild the environment. A repeated transient
-   failure MUST ask the user to send the message again and rebuild only if the
-   failure repeats. In both cases, the session MUST NOT continue from the base
-   image.
+   snapshot within the preparation deadline. Each attempt MUST have its own
+   bound, so a slow or timed-out first attempt MUST NOT prevent the retry. A
+   slow stop of the failed attempt MUST NOT prevent the retry while the stop
+   completes within its own bound. A permanent failure MUST fail with a specific reason that asks to rebuild the
+   environment. A repeated transient failure MUST ask the user to send the
+   message again and rebuild only if the failure repeats. In both cases, the
+   session MUST NOT continue from the base image.
 6. A snapshot MUST NOT contain git or build credentials, reflogs, or a Kilo
    home.
 7. Organization managers and personal owners MAY build, refresh, or cancel a
@@ -357,8 +360,11 @@ repository.
     Missing sessions use history recovery without replacing workspace files.
     New chats MUST attach without resetting files.
 12. A transient provider failure MUST retry the same snapshot within the preparation deadline.
-    An expired, missing or incompatible snapshot, an incompatible peer, a permanent or repeated
-    provider failure, or a failed restore step MUST fail with a specific reason, keep the
+    Each attempt MUST have its own bound, so a slow or timed-out first attempt MUST NOT
+    prevent the retry. A slow stop of the failed attempt MUST NOT prevent the retry while the
+    stop completes within its own bound. An expired, missing or incompatible snapshot, an incompatible peer,
+    a permanent or repeated provider failure, or a failed restore step MUST fail with a
+    specific reason, keep the
     snapshot and queued message identity, and MUST NOT fall back to another source. That
     failure MUST offer "Start fresh", which names the changes since the capture time that it
     discards. A failure that may be transient MUST also say that a new message retries. Diagnostics MUST identify workspace, requesting session, allocation, capture
@@ -464,6 +470,15 @@ repository.
 3. Open workspace tabs — the workspace terminal and file tabs, their order, and
    the active tab — MUST survive refresh and navigation between worktrees, and
    MUST remain scoped to the current user and personal or organization context.
+4. Files a chat saves in `/artifacts` MUST be shared by every sibling chat in
+   the workspace, and MUST remain listable and downloadable after the sandbox
+   stops. Only the session's owner, or an authorized organization member, MUST
+   be able to list, download, or delete them. Deleting a file MUST remove it for
+   the user immediately; a running sandbox MAY keep its local copy. Files MUST
+   expire from the view 14 days after their last change. A replacement sandbox
+   MUST NOT restore artifacts except from a workspace tail snapshot; outside
+   that coverage, saved files remain available from cloud storage but the
+   sandbox's `/artifacts` folder MAY be empty.
 
 ### Shared Worktrees
 
@@ -838,6 +853,15 @@ The following use SHOULD and are not enforced today:
 
 - A pull request on a worktree's checked-out branch now belongs to the worktree
   and shows on every chat in it, without the agent reporting a link.
+
+### 2026-11-05 -- Workspace artifacts
+
+- Files saved in `/artifacts` are shared by sibling chats in the workspace and
+  remain listable and downloadable after the sandbox stops.
+- Access is owner-only, or for an authorized organization member. Deleting a
+  file removes it for the user even when a running sandbox still holds a copy.
+- Saved files expire from the view 14 days after their last change. A
+  replacement sandbox restores them only from a workspace tail snapshot.
 
 ### 2026-11-04 -- Environment start commands
 

@@ -10,7 +10,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import * as z from 'zod';
 
 import { credit_transactions, kilo_pass_store_events, kilocode_users } from '@kilocode/db/schema';
-import type { BouncerCreditEventOutboxDatabase } from '@kilocode/db/bouncer-credit-event-outbox';
+import type { BouncerCreditEventOutboxTransaction } from '@kilocode/db/bouncer-credit-event-outbox';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   KiloPassAuditLogAction,
@@ -276,7 +276,7 @@ function getAppStoreBouncerReport(
  * rejects and propagates to the caller.
  */
 async function resolveAppStoreCreditPackOwner(
-  database: BouncerCreditEventOutboxDatabase,
+  database: BouncerCreditEventOutboxTransaction,
   transaction: AppleStoreDecodedTransaction
 ): Promise<string | null> {
   const creditPackRows = await database
@@ -308,7 +308,7 @@ async function resolveAppStoreCreditPackOwner(
  * only: a store event carries no card and no client IP.
  */
 async function enqueueAppStoreCreditEventToBouncer(
-  database: BouncerCreditEventOutboxDatabase,
+  database: BouncerCreditEventOutboxTransaction,
   params: {
     notification: AppleStoreDecodedNotification;
     transaction: AppleStoreDecodedTransaction;

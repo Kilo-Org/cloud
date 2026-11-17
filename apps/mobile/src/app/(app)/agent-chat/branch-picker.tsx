@@ -9,6 +9,7 @@ import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type BranchPickerBridge } from '@/lib/picker-bridge';
 import { branchPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
+import { selectionCheckColor } from '@/lib/selection-check-color';
 
 /**
  * The new-session branch picker, presented as the standard formSheet (same
@@ -40,6 +41,7 @@ export default function BranchPickerScreen() {
       <PickerSheet
         title={t('agentChat.newSession.branchPickerTitle')}
         onDone={close}
+        onCancel={close}
         scrollable={false}
         expired
       />
@@ -83,7 +85,7 @@ export default function BranchPickerScreen() {
                   {t('agentChat.newSession.branchDefault')}
                 </Text>
               ) : null}
-              {isSelected ? <Check size={18} color={colors.primary} /> : null}
+              {isSelected ? <Check size={18} color={selectionCheckColor(colors)} /> : null}
             </Pressable>
           );
         })}

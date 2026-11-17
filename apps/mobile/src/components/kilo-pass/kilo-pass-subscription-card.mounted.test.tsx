@@ -98,7 +98,7 @@ vi.mock('@/lib/kilo-pass/state', () => ({
       return {
         kind: 'error',
         title: 'kiloPass.unavailable',
-        description: 'kiloPass.tryAgainFromProfile',
+        description: 'kiloPass.loadFailedRetry',
         actionLabel: 'common.retry',
       };
     }

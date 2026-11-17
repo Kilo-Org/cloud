@@ -25,7 +25,7 @@ export function TodoStartActions({
   const { t } = useTranslation();
   const colors = useThemeColors();
   const { linkSession } = useTodoItemMutations(todo.listId);
-  const { review, startNow, startingTodoId } = useStartTodo();
+  const { review, startNow, isStarting } = useStartTodo();
   const navigateToSession = useAgentSessionNavigator();
   const [linking, setLinking] = useState(false);
   const newestSession = todo.sessions[0] ?? null;
@@ -34,7 +34,7 @@ export function TodoStartActions({
     <Button
       size="lg"
       variant={newestSession ? 'outline' : 'default'}
-      loading={startingTodoId === todo.id}
+      loading={isStarting(todo.id)}
       onPress={() => {
         review(todo, todo.list);
       }}

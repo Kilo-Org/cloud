@@ -1,3 +1,5 @@
+import { encodeBase62 } from './base62';
+
 export const MESSAGE_ID_PREFIX = 'msg_';
 export const MESSAGE_ID_TIME_LENGTH = 12;
 export const MESSAGE_ID_RANDOM_LENGTH = 14;
@@ -9,8 +11,6 @@ export const MESSAGE_ID_PATTERN = /^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$/;
 
 export const MESSAGE_ID_FORMAT_DESCRIPTION =
   'messageId must match msg_ followed by 12 lowercase hex characters and 14 base62 characters';
-
-const BASE62_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 
 export function isCanonicalMessageId(value: string): boolean {
   return MESSAGE_ID_PATTERN.test(value);
@@ -35,9 +35,6 @@ export function buildMessageId(now: number, randomBytes: Uint8Array): string {
       `buildMessageId needs ${MESSAGE_ID_RANDOM_LENGTH} random bytes, got ${randomBytes.length}`
     );
   }
-  const randomSuffix = Array.from(
-    randomBytes,
-    byte => BASE62_ALPHABET[byte % BASE62_ALPHABET.length]
-  ).join('');
+  const randomSuffix = encodeBase62(randomBytes);
   return `${MESSAGE_ID_PREFIX}${createTimePrefix(now)}${randomSuffix}`;
 }

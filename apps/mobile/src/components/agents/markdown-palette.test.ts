@@ -9,6 +9,7 @@ const colors = {
   primary: '#4F5A10',
   primaryForeground: '#FFFFFF',
   primaryDisabled: '#6F6A61',
+  primaryDisabledAction: '#6F6A61',
   secondary: '#F0EEE6',
   secondaryForeground: '#14130F',
   secondaryFill: '#F0EEE6',
@@ -48,6 +49,7 @@ const colors = {
   rowSage: '#587C1D',
   rowMoss: '#467C1D',
   rowFern: '#357C1D',
+  rowPine: '#237C1D',
 } satisfies ThemeColors;
 
 describe('markdown palette', () => {

@@ -26,6 +26,22 @@ describe('parseSkillFrontmatter', () => {
     });
   });
 
+  test('reads a +++ delimited frontmatter block', () => {
+    expect(
+      parseSkillFrontmatter('+++\nname: deploy\ndescription: Deploy services\n+++\nBody')
+    ).toEqual({
+      name: 'deploy',
+      description: 'Deploy services',
+    });
+  });
+
+  test('requires the closing delimiter to match the opener', () => {
+    expect(parseSkillFrontmatter('---\nname: deploy\n+++\nBody')).toEqual({
+      name: null,
+      description: null,
+    });
+  });
+
   test('accepts delimiter lines with trailing horizontal whitespace', () => {
     expect(parseSkillFrontmatter('--- \t\nname: deploy\n--- \t\nBody')).toEqual({
       name: 'deploy',

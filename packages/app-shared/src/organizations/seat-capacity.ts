@@ -56,8 +56,10 @@ type SeatCountReadout = {
  * enforces seats and actually bought some, otherwise the used count alone.
  * `getOrganizationSeatUsage` answers `seat_count || 0`, so a legacy (or brand
  * new) organization without purchases would otherwise read `3 / 0` — a row
- * that reads as over capacity on creation day. The web sub-organizations
- * tables and both mobile seat rows show this rule; keep them on one function.
+ * that reads as over capacity on creation day. The People table, both mobile
+ * seat rows, and the Overview table's enforcing children show this value; the
+ * Overview table renders its own `Not required` label for unenforced children.
+ * Keep these call sites on one function.
  */
 export function seatCountReadout({ seatsEnforced, used, total, formatNumber }: SeatCountReadout) {
   return seatsEnforced && total > 0

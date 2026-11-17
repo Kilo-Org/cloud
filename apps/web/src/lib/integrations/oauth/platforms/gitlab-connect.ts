@@ -26,7 +26,6 @@ import {
 } from '@/lib/integrations/oauth/app-shell-flow';
 import { APP_SHELL_PREFIX, buildAppShellIntegrationPath } from '@/lib/app-shell/shell-paths';
 import { appShellRedirect } from '@/lib/app-shell/redirect';
-import { getIntegrationForOrganization } from '@/lib/integrations/db/platform-integrations';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import type { Owner } from '@/lib/integrations/core/types';
 

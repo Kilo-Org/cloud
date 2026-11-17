@@ -642,20 +642,26 @@ export function GitLabIntegrationDetails({
                     {showSelfHosted && (
                       <>
                         <p className="text-muted-foreground mb-2 text-sm">
-                          Using a self-hosted GitLab instance is a{' '}
-                          <a
-                            href="https://kilo.ai/docs/automate/integrations"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-primary underline"
-                          >
-                            feature of Kilo Code Enterprise
-                          </a>
-                          . Contact{' '}
-                          <a href="mailto:sales@kilocode.ai" className="text-primary underline">
-                            Sales
-                          </a>{' '}
-                          to learn more.
+                          {shell ? (
+                            'Using a self-hosted GitLab instance is a feature of Kilo Code Enterprise.'
+                          ) : (
+                            <>
+                              Using a self-hosted GitLab instance is a{' '}
+                              <a
+                                href="https://kilo.ai/docs/automate/integrations"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary underline"
+                              >
+                                feature of Kilo Code Enterprise
+                              </a>
+                              . Contact{' '}
+                              <a href="mailto:sales@kilocode.ai" className="text-primary underline">
+                                Sales
+                              </a>{' '}
+                              to learn more.
+                            </>
+                          )}
                         </p>
                         <div className="space-y-4 rounded-lg border p-4">
                           <div className="space-y-2">

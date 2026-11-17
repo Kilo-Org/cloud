@@ -21,9 +21,15 @@ export type LocalAgentFetchResponse = {
   json(): Promise<Record<string, unknown> | null>;
 };
 
+export type LocalAgentFetchInit = {
+  method: 'POST';
+  headers: { 'content-type': 'application/json' };
+  body: string;
+};
+
 export type LocalAgentFetch = (
   url: string,
-  init: { cache: 'no-store' }
+  init: LocalAgentFetchInit
 ) => Promise<LocalAgentFetchResponse>;
 
 const bodySchema = z.object({
@@ -43,7 +49,7 @@ export const redeemPairingKey = async ({
   token: string;
   ws: string;
 }): Promise<LocalAgentRedeemResult> => {
-  const url = pairingKeyUrl(ws, token);
+  const url = pairingKeyUrl(ws);
 
   if (url === null) {
     return { ok: false, reason: 'invalid' };
@@ -51,8 +57,14 @@ export const redeemPairingKey = async ({
 
   let response: LocalAgentFetchResponse | null = null;
 
+  // A POST with a JSON body makes Chrome attach the extension origin.
+  // A plain GET from the worker carries no Origin at all.
   try {
-    response = await fetchImpl(url, { cache: 'no-store' });
+    response = await fetchImpl(url, {
+      body: JSON.stringify({ t: token }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST',
+    });
   } catch {
     return { ok: false, reason: 'invalid' };
   }

@@ -11,9 +11,9 @@ const WS = 'ws://127.0.0.1:47917/__kilo_browser';
 const TOKEN = 'EBESExQVFhcYGRobHB0eHw';
 
 const fetchReturning = (status: number, body: Record<string, unknown> | null) => {
-  const calls: string[] = [];
+  const calls: { body: string; method: string; url: string }[] = [];
   const fetchImpl: LocalAgentFetch = (url, init) => {
-    calls.push(`${init.cache} ${url}`);
+    calls.push({ body: init.body, method: init.method, url });
 
     return Promise.resolve({ json: () => Promise.resolve(body), status });
   };
@@ -26,10 +26,8 @@ const redeem = (fetchImpl: LocalAgentFetch) =>
 
 describe('pairing key redemption', () => {
   it('builds the redeem URL from the loopback socket origin', () => {
-    expect(pairingKeyUrl(WS, TOKEN)).toBe(
-      `http://127.0.0.1:47917/__kilo_browser_pair/key?t=${TOKEN}`
-    );
-    expect(pairingKeyUrl('ws://hub.kilo.ai/__kilo_browser', TOKEN)).toBeNull();
+    expect(pairingKeyUrl(WS)).toBe('http://127.0.0.1:47917/__kilo_browser_pair/key');
+    expect(pairingKeyUrl('ws://hub.kilo.ai/__kilo_browser')).toBeNull();
   });
 
   it('returns the stored endpoint on 200', async () => {
@@ -40,7 +38,11 @@ describe('pairing key redemption', () => {
       ok: true,
     });
     expect(calls).toStrictEqual([
-      `no-store http://127.0.0.1:47917/__kilo_browser_pair/key?t=${TOKEN}`,
+      {
+        body: JSON.stringify({ t: TOKEN }),
+        method: 'POST',
+        url: 'http://127.0.0.1:47917/__kilo_browser_pair/key',
+      },
     ]);
   });
 

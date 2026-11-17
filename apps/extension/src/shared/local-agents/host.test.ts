@@ -186,8 +186,8 @@ const createHarness = () => {
       hasWebRequest: false,
     },
     createSocket,
-    fetch: (url: string) => {
-      const token = new URL(url).searchParams.get('t') ?? '';
+    fetch: (_url: string, init: { body: string }) => {
+      const token = z.object({ t: z.string() }).parse(JSON.parse(init.body)).t;
       const result = pairingResults.get(token);
 
       if (result === undefined) {

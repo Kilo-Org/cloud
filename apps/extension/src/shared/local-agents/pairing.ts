@@ -80,20 +80,15 @@ export const parseLoopbackSocketUrl = (value: string): string | null => {
   return `ws://${url.hostname}:${url.port}${HUB_WS_PATH}`;
 };
 
-/** The HTTP origin a redeem request may target: the socket's own loopback origin. */
-export const pairingKeyUrl = (ws: string, token: string): string | null => {
+/** The HTTP origin a redeem request targets: the socket's own loopback origin. */
+export const pairingKeyUrl = (ws: string): string | null => {
   const canonical = parseLoopbackSocketUrl(ws);
 
   if (canonical === null) {
     return null;
   }
 
-  const socket = new URL(canonical);
-  const redeem = new URL(`http://${socket.host}${PAIRING_KEY_PATH}`);
-
-  redeem.searchParams.set('t', token);
-
-  return redeem.toString();
+  return `http://${new URL(canonical).host}${PAIRING_KEY_PATH}`;
 };
 
 const parseFragment = (hash: string): Record<string, string> | null => {

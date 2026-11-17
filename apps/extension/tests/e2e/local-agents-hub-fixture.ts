@@ -53,46 +53,68 @@ type PairingState = {
 };
 
 const startServer = async (state: PairingState): Promise<Server> => {
-  const server = createServer((request: IncomingMessage, response: ServerResponse) => {
+  const handleRequest = async (request: IncomingMessage, response: ServerResponse) => {
     const url = new URL(request.url ?? '/', 'http://127.0.0.1');
     const { origin } = request.headers;
 
     if (url.pathname === '/__kilo_browser_pair/key') {
+      const corsHeaders =
+        typeof origin === 'string' ? { 'access-control-allow-origin': origin } : {};
+
       if (request.method === 'OPTIONS') {
         response.writeHead(204, {
+          ...corsHeaders,
           'access-control-allow-headers': 'content-type',
-          'access-control-allow-methods': 'GET',
-          'access-control-allow-origin': typeof origin === 'string' ? origin : 'null',
+          'access-control-allow-methods': 'POST',
         });
         response.end();
 
         return;
       }
 
-      // A host-permission GET from the extension worker carries no Origin.
-      // The token is the capability; a present Origin must still match.
-      if (
-        state.allowedOrigin === null ||
-        (typeof origin === 'string' && origin !== state.allowedOrigin)
-      ) {
-        response.writeHead(403);
+      if (request.method !== 'POST') {
+        response.writeHead(405, corsHeaders);
         response.end();
 
         return;
       }
 
-      if (state.key === null || url.searchParams.get('t') !== state.token) {
-        response.writeHead(
-          404,
-          typeof origin === 'string' ? { 'access-control-allow-origin': origin } : {}
-        );
+      // The hub allowlists the extension origin; a missing Origin is a refusal.
+      if (
+        typeof origin !== 'string' ||
+        state.allowedOrigin === null ||
+        origin !== state.allowedOrigin
+      ) {
+        response.writeHead(403, corsHeaders);
+        response.end();
+
+        return;
+      }
+
+      let raw = '';
+
+      for await (const chunk of request) {
+        raw += typeof chunk === 'string' ? chunk : String(chunk);
+      }
+
+      const body = z.object({ t: z.string() }).safeParse(JSON.parse(raw || '{}'));
+
+      if (!body.success) {
+        response.writeHead(400, corsHeaders);
+        response.end();
+
+        return;
+      }
+
+      if (state.key === null || body.data.t !== state.token) {
+        response.writeHead(404, corsHeaders);
         response.end();
 
         return;
       }
 
       response.writeHead(200, {
-        ...(typeof origin === 'string' ? { 'access-control-allow-origin': origin } : {}),
+        ...corsHeaders,
         'cache-control': 'no-store',
         'content-type': 'application/json',
       });
@@ -110,6 +132,9 @@ const startServer = async (state: PairingState): Promise<Server> => {
 
     response.writeHead(404);
     response.end();
+  };
+  const server = createServer((request, response) => {
+    void handleRequest(request, response);
   });
 
   server.listen(0, '127.0.0.1');

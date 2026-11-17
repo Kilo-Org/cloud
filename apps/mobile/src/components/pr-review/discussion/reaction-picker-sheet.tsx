@@ -65,7 +65,12 @@ export function ReactionPickerSheet({
       titleFocusRequestedRef.current = false;
       return;
     }
-    focusTitle();
+    // A first presentation mounts the title a render after `visible` flips, so
+    // there is nothing to focus yet; the body's layout below is that signal.
+    // A reopen keeps the title mounted, which is the earlier signal.
+    if (titleRef.current !== null) {
+      focusTitle();
+    }
   }, [visible, focusTitle]);
 
   const reacted = new Set<string>();
@@ -83,7 +88,8 @@ export function ReactionPickerSheet({
       <SheetHeader
         title={t('common.reactions')}
         onDone={onClose}
-        doneLabel={t('common.close')}
+        // Same accessible name the picker's own header gave its close control.
+        doneLabel={t('common.closeReactions')}
         topInset="never"
         titleRef={titleRef}
       />

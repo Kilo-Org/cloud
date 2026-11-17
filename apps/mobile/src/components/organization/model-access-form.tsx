@@ -27,6 +27,12 @@ import { type SettingsSaveFailure, settingsSaveStatus } from '@/lib/organization
 
 type Tab = 'models' | 'providers' | 'gateways';
 
+/** The reason a save is refused, by the refusal `modelAccessSave` returned. */
+const BLOCKING_ISSUE_KEYS = {
+  'empty-provider-list': 'organizationModelAccess.emptyProviderList',
+  'empty-model-list': 'organizationModelAccess.emptyModelList',
+} as const;
+
 /**
  * The two lists the organization's routing policy is: which providers may
  * serve it, and which models it denies. Both save together, because the server
@@ -111,11 +117,7 @@ export function ModelAccessForm({
     models: [...catalog, ...models],
   });
   const blockingIssue =
-    savePayload.kind === 'empty-provider-list'
-      ? t('organizationModelAccess.emptyProviderList')
-      : savePayload.kind === 'empty-model-list'
-        ? t('organizationModelAccess.emptyModelList')
-        : null;
+    savePayload.kind === 'ready' ? null : t(BLOCKING_ISSUE_KEYS[savePayload.kind]);
   const cannotSave = !dirty || saving || savePayload.kind !== 'ready';
   const onDraftChange = (next: ModelAccessDraft) => {
     clearWhere(() => true);

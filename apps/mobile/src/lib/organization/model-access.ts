@@ -206,14 +206,12 @@ export function usableModelIds(params: {
   const usable = new Set<string>();
   for (const model of params.models) {
     const id = normalizeModelId(model.id);
-    if (denied.has(id)) {
-      continue;
-    }
     const providers = model.inference_provider_ids ?? [];
-    if (providers.length > 0 && !providers.some(slug => allowedProviders.has(slug))) {
-      continue;
+    const servedByAllowedProvider =
+      providers.length === 0 || providers.some(slug => allowedProviders.has(slug));
+    if (!denied.has(id) && servedByAllowedProvider) {
+      usable.add(id);
     }
-    usable.add(id);
   }
   return [...usable].sort((a, b) => a.localeCompare(b));
 }

@@ -38,46 +38,49 @@ function ActivityEntry({
   onOpenChildSession: OpenChildSession;
 }) {
   const label = item.kind === 'shell' ? item.title || item.command : item.description || item.agent;
+  const row = (
+    <>
+      <span
+        className="min-w-0 flex-1 truncate"
+        title={item.descendant ? `${label} · From ${item.parentLabel}` : label}
+      >
+        {label}
+      </span>
+      {item.descendant && (
+        <span className="text-muted-foreground hidden max-w-28 truncate sm:inline">
+          From {item.parentLabel}
+        </span>
+      )}
+      <span className="text-muted-foreground shrink-0">
+        {item.waiting ? 'Needs input' : 'Running'}
+      </span>
+      <span className="text-muted-foreground shrink-0">
+        <ElapsedTime started={item.time.started} />
+      </span>
+    </>
+  );
   return (
     <li className="py-0.5 text-xs">
-      <div className="flex items-center gap-2">
-        <span
-          className="min-w-0 flex-1 truncate"
-          title={item.descendant ? `${label} · From ${item.parentLabel}` : label}
+      {item.kind === 'subagent' ? (
+        <button
+          type="button"
+          aria-label={`Open transcript: ${label}`}
+          className="hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-left focus-visible:ring-2 focus-visible:outline-none pointer-coarse:min-h-11"
+          onClick={() =>
+            onOpenChildSession({
+              sessionId: item.childSessionID as KiloSessionId,
+              description: item.description,
+              agent: item.agent,
+            })
+          }
         >
-          {label}
-        </span>
-        {item.descendant && (
-          <span className="text-muted-foreground hidden max-w-28 truncate sm:inline">
-            From {item.parentLabel}
-          </span>
-        )}
-        <span className="text-muted-foreground shrink-0">
-          {item.waiting ? 'Needs input' : 'Running'}
-        </span>
-        <span className="text-muted-foreground shrink-0">
-          <ElapsedTime started={item.time.started} />
-        </span>
-        {item.kind === 'subagent' && (
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            className="h-7 shrink-0 px-2 text-xs pointer-coarse:min-h-11"
-            onClick={() =>
-              onOpenChildSession({
-                sessionId: item.childSessionID as KiloSessionId,
-                description: item.description,
-                agent: item.agent,
-              })
-            }
-          >
-            Open transcript
-          </Button>
-        )}
-      </div>
+          {row}
+        </button>
+      ) : (
+        <div className="flex items-center gap-2 px-2 py-1">{row}</div>
+      )}
       {item.kind === 'shell' && item.title && (
-        <pre className="max-h-24 overflow-auto font-mono text-xs whitespace-pre-wrap break-all">
+        <pre className="max-h-24 overflow-auto px-2 font-mono text-xs whitespace-pre-wrap break-all">
           {item.command}
         </pre>
       )}
@@ -173,7 +176,7 @@ export function BackgroundActivityStrip({
                     aria-label={kind === 'subagent' ? 'Agents' : 'Shells'}
                     className="mb-2 last:mb-0"
                   >
-                    <h3 className="mb-1 text-xs font-medium">
+                    <h3 className="mb-1 px-2 text-xs font-medium">
                       {kind === 'subagent' ? 'Agents' : 'Shells'}
                     </h3>
                     <ul>

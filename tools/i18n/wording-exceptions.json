@@ -640,7 +640,8 @@
     "receipt",
     "remediation blocked",
     "remediation failed",
-    "token"
+    "token",
+    "tokens"
   ],
   "mk": [
     "analysis failed",

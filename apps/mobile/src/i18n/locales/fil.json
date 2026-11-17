@@ -4521,7 +4521,7 @@
     "create": "Gumawa ng link",
     "createFailed": "Hindi magawa ang link.",
     "existingTitle": "Umiiral na link",
-    "existingDescription": "May share link na ang session na ito. Kapag gumawa ka ng bago, papalitan nito ang luma at hindi na gagana ang lumang link.",
+    "existingDescription": "May share link na ang session na ito. Kapag gumawa ka ng bagong link gamit ang mga setting na ito, papalitan nito ang luma at hindi na gagana ang lumang link.",
     "rotate": "Gumawa ng bagong link",
     "replacementSettings": "Ang mga setting na ito ay para sa bagong link.",
     "revoke": "Bawiin ang link",

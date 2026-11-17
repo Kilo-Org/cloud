@@ -98,12 +98,7 @@ function ReplacementActions({
   const { t } = useTranslation();
   return (
     <>
-      <View className="gap-2">
-        <Text variant="muted" className="text-xs">
-          {t('sessionShare.replacementSettings')}
-        </Text>
-        <ShareConfiguration choice={choice} busy={busy} />
-      </View>
+      <ShareConfiguration choice={choice} busy={busy} />
       <Button
         variant="outline"
         className="w-full"
@@ -186,6 +181,9 @@ function SupersededPanel(props: ReplacementProps) {
     <View className="gap-3">
       <Text variant="muted" className="text-xs" testID="session-share-superseded">
         {t('sessionShare.superseded')}
+      </Text>
+      <Text variant="muted" className="text-xs">
+        {t('sessionShare.replacementSettings')}
       </Text>
       <ReplacementActions {...props} />
     </View>

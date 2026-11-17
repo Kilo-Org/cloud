@@ -4521,7 +4521,7 @@
     "create": "Buat tautan",
     "createFailed": "Tidak dapat membuat tautan.",
     "existingTitle": "Tautan yang sudah ada",
-    "existingDescription": "Sesi ini sudah memiliki tautan berbagi. Membuat tautan baru akan menggantikannya dan membuat tautan lama tidak berfungsi lagi.",
+    "existingDescription": "Sesi ini sudah memiliki tautan berbagi. Membuat tautan baru dengan setelan ini akan menggantikannya dan membuat tautan lama tidak berfungsi lagi.",
     "rotate": "Buat tautan baru",
     "replacementSettings": "Setelan ini berlaku untuk tautan baru.",
     "revoke": "Cabut tautan",

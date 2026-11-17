@@ -4590,7 +4590,7 @@
     "create": "Kreiraj link",
     "createFailed": "Kreiranje linka nije uspjelo.",
     "existingTitle": "Postojeći link",
-    "existingDescription": "Ova sesija već ima link za dijeljenje. Kreiranje novog linka zamjenjuje postojeći i stari link prestaje raditi.",
+    "existingDescription": "Ova sesija već ima link za dijeljenje. Kreiranje novog linka sa ovim postavkama zamjenjuje postojeći i stari link prestaje raditi.",
     "rotate": "Kreiraj novi link",
     "replacementSettings": "Ove postavke važe za novi link.",
     "revoke": "Opozovi link",

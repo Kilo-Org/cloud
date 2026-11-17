@@ -4521,7 +4521,7 @@
     "create": "Link erstellen",
     "createFailed": "Der Link konnte nicht erstellt werden.",
     "existingTitle": "Bestehender Link",
-    "existingDescription": "Für diese Sitzung gibt es bereits einen Freigabelink. Wenn du einen neuen erstellst, ersetzt er den alten, und der alte Link funktioniert nicht mehr.",
+    "existingDescription": "Für diese Sitzung gibt es bereits einen Freigabelink. Wenn du einen neuen Link mit diesen Einstellungen erstellst, ersetzt er den alten, und der alte Link funktioniert nicht mehr.",
     "rotate": "Neuen Link erstellen",
     "replacementSettings": "Diese Einstellungen gelten für den neuen Link.",
     "revoke": "Link widerrufen",

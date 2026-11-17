@@ -4521,7 +4521,7 @@
     "create": "Link maken",
     "createFailed": "Kan de link niet maken.",
     "existingTitle": "Bestaande link",
-    "existingDescription": "Deze sessie heeft al een deellink. Als je een nieuwe maakt, wordt die vervangen en werkt de oude link niet meer.",
+    "existingDescription": "Deze sessie heeft al een deellink. Als je een nieuwe link met deze instellingen maakt, wordt die vervangen en werkt de oude link niet meer.",
     "rotate": "Nieuwe link maken",
     "replacementSettings": "Deze instellingen gelden voor de nieuwe link.",
     "revoke": "Link intrekken",

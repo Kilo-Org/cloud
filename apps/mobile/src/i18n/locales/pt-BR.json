@@ -4596,7 +4596,7 @@
     "create": "Criar link",
     "createFailed": "Não foi possível criar o link.",
     "existingTitle": "Link existente",
-    "existingDescription": "Esta sessão já tem um link de compartilhamento. Criar um novo link substitui o atual, e o link antigo deixa de funcionar.",
+    "existingDescription": "Esta sessão já tem um link de compartilhamento. Criar um novo link com essas configurações substitui o atual, e o link antigo deixa de funcionar.",
     "rotate": "Criar um novo link",
     "replacementSettings": "Essas configurações se aplicam ao novo link.",
     "revoke": "Revogar link",

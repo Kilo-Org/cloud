@@ -4521,7 +4521,7 @@
     "create": "Havola yaratish",
     "createFailed": "Havolani yaratib boʻlmadi.",
     "existingTitle": "Mavjud havola",
-    "existingDescription": "Bu seans uchun ulashish havolasi allaqachon mavjud. Yangisini yaratsangiz, u eskisining oʻrnini egallaydi va eski havola ishlamay qoladi.",
+    "existingDescription": "Bu seans uchun ulashish havolasi allaqachon mavjud. Bu sozlamalar bilan yangi havola yaratsangiz, u eskisining oʻrnini egallaydi va eski havola ishlamay qoladi.",
     "rotate": "Yangi havola yaratish",
     "replacementSettings": "Bu sozlamalar yangi havolaga tegishli.",
     "revoke": "Havolani olib tashlash",

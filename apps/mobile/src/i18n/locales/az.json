@@ -4521,7 +4521,7 @@
     "create": "Link yarat",
     "createFailed": "Linki yaratmaq alınmadı.",
     "existingTitle": "Mövcud link",
-    "existingDescription": "Bu sessiyanın artıq paylaşım linki var. Yenisini yaratsanız, o köhnəsini əvəz edəcək və köhnə link işləməyəcək.",
+    "existingDescription": "Bu sessiyanın artıq paylaşım linki var. Bu parametrlərlə yenisini yaratsanız, o köhnəsini əvəz edəcək və köhnə link işləməyəcək.",
     "rotate": "Yeni link yarat",
     "replacementSettings": "Bu parametrlər yeni linkə aiddir.",
     "revoke": "Linki sil",

@@ -4728,7 +4728,7 @@
     "create": "Cruthaigh nasc",
     "createFailed": "Níorbh fhéidir an nasc a chruthú.",
     "existingTitle": "Nasc atá ann cheana",
-    "existingDescription": "Tá nasc comhroinnte ag an seisiún seo cheana. Má chruthaíonn tú ceann nua, tiocfaidh sé in áit an chinn atá ann agus ní oibreoidh an seannasc a thuilleadh.",
+    "existingDescription": "Tá nasc comhroinnte ag an seisiún seo cheana. Má chruthaíonn tú ceann nua leis na socruithe seo, tiocfaidh sé in áit an chinn atá ann agus ní oibreoidh an seannasc a thuilleadh.",
     "rotate": "Cruthaigh nasc nua",
     "replacementSettings": "Baineann na socruithe seo leis an nasc nua.",
     "revoke": "Cúlghair nasc",

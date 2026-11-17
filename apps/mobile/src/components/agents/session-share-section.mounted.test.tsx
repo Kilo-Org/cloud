@@ -47,7 +47,10 @@ describe('SessionShareSection state gates', () => {
 
     expect(findByTestID(renderer.root, 'session-share-existing')).toHaveLength(1);
     expect(textContent(renderer.root)).toContain(i18n.t('sessionShare.existingTitle'));
-    expect(textContent(renderer.root)).toContain(i18n.t('sessionShare.replacementSettings'));
+    // The description above the controls already says the new link is created
+    // with them, so a second scope line there would say it twice.
+    expect(textContent(renderer.root)).not.toContain(i18n.t('sessionShare.replacementSettings'));
+    expect(textContent(renderer.root)).toContain(i18n.t('sessionShare.existingDescription'));
     // The replacement takes the person's choice, so the duration and scope
     // controls stay on screen beside the replace action.
     expect(
@@ -88,6 +91,20 @@ describe('SessionShareSection state gates', () => {
       duration: '1d',
       include_new_messages: true,
     });
+  });
+
+  it('names the settings a replacement uses in the superseded state, which has no description', async () => {
+    const renderer = await renderCreatedLink();
+
+    /* A read taken after the create answers that no link exists, so the URL this
+       sheet made is dead. That state states its own cause and has no description
+       above the controls, so the scope line is the only thing naming what the
+       settings apply to. */
+    setReadState({ data: { public_id: null }, dataUpdatedAt: Date.now() + 1_000 });
+    rerenderSection(renderer);
+
+    expect(findByTestID(renderer.root, 'session-share-superseded')).toHaveLength(1);
+    expect(textContent(renderer.root)).toContain(i18n.t('sessionShare.replacementSettings'));
   });
 
   it('settles the session read even while the device reports offline', () => {

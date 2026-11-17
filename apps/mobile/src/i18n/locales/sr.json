@@ -4590,7 +4590,7 @@
     "create": "Napravi link",
     "createFailed": "Nije moguće napraviti link.",
     "existingTitle": "Postojeći link",
-    "existingDescription": "Ova sesija već ima link za deljenje. Pravljenjem novog linka zamenjuje se postojeći, a stari link prestaje da radi.",
+    "existingDescription": "Ova sesija već ima link za deljenje. Pravljenjem novog linka sa ovim podešavanjima zamenjuje se postojeći, a stari link prestaje da radi.",
     "rotate": "Napravi novi link",
     "replacementSettings": "Ova podešavanja važe za novi link.",
     "revoke": "Opozovi link",

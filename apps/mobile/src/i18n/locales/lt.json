@@ -4659,7 +4659,7 @@
     "create": "Sukurti nuorodą",
     "createFailed": "Nepavyko sukurti nuorodos.",
     "existingTitle": "Esama nuoroda",
-    "existingDescription": "Ši sesija jau turi bendrinimo nuorodą. Sukūrus naują, ji pakeis esamą, o senoji nuoroda nustos veikti.",
+    "existingDescription": "Ši sesija jau turi bendrinimo nuorodą. Sukūrus naują nuorodą su šiais nustatymais, ji pakeis esamą, o senoji nuoroda nustos veikti.",
     "rotate": "Sukurti naują nuorodą",
     "replacementSettings": "Šie nustatymai galioja naujai nuorodai.",
     "revoke": "Pašalinti nuorodą",

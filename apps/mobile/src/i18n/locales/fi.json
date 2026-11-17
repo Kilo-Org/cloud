@@ -4521,7 +4521,7 @@
     "create": "Luo linkki",
     "createFailed": "Linkin luominen epäonnistui.",
     "existingTitle": "Olemassa oleva linkki",
-    "existingDescription": "Tällä istunnolla on jo jakolinkki. Uuden luominen korvaa sen, ja vanha linkki lakkaa toimimasta.",
+    "existingDescription": "Tällä istunnolla on jo jakolinkki. Uuden linkin luominen näillä asetuksilla korvaa sen, ja vanha linkki lakkaa toimimasta.",
     "rotate": "Luo uusi linkki",
     "replacementSettings": "Nämä asetukset koskevat uutta linkkiä.",
     "revoke": "Mitätöi linkki",

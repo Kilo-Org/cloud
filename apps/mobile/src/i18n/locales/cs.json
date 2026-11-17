@@ -4659,7 +4659,7 @@
     "create": "Vytvořit odkaz",
     "createFailed": "Odkaz se nepodařilo vytvořit.",
     "existingTitle": "Existující odkaz",
-    "existingDescription": "Tato relace už má odkaz pro sdílení. Vytvořením nového ho nahradíte a starý odkaz přestane fungovat.",
+    "existingDescription": "Tato relace už má odkaz pro sdílení. Vytvořením nového odkazu s těmito nastaveními ho nahradíte a starý odkaz přestane fungovat.",
     "rotate": "Vytvořit nový odkaz",
     "replacementSettings": "Tato nastavení platí pro nový odkaz.",
     "revoke": "Odebrat odkaz",

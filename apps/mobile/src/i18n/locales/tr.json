@@ -4521,7 +4521,7 @@
     "create": "Bağlantı oluştur",
     "createFailed": "Bağlantı oluşturulamadı.",
     "existingTitle": "Mevcut bağlantı",
-    "existingDescription": "Bu oturumun zaten bir paylaşım bağlantısı var. Yeni bir bağlantı oluşturursanız mevcut bağlantının yerini alır ve eski bağlantı çalışmaz hâle gelir.",
+    "existingDescription": "Bu oturumun zaten bir paylaşım bağlantısı var. Bu ayarlarla yeni bir bağlantı oluşturursanız mevcut bağlantının yerini alır ve eski bağlantı çalışmaz hâle gelir.",
     "rotate": "Yeni bağlantı oluştur",
     "replacementSettings": "Bu ayarlar yeni bağlantı için geçerlidir.",
     "revoke": "Bağlantıyı kaldır",

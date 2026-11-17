@@ -4590,7 +4590,7 @@
     "create": "Crear enlace",
     "createFailed": "No se pudo crear el enlace.",
     "existingTitle": "Enlace existente",
-    "existingDescription": "Esta sesión ya tiene un enlace para compartir. Si creas uno nuevo, sustituirá al actual y el enlace anterior dejará de funcionar.",
+    "existingDescription": "Esta sesión ya tiene un enlace para compartir. Si creas un enlace nuevo con estos ajustes, sustituirá al actual y el enlace anterior dejará de funcionar.",
     "rotate": "Crear un enlace nuevo",
     "replacementSettings": "Estos ajustes se aplican al enlace nuevo.",
     "revoke": "Revocar enlace",

@@ -4521,7 +4521,7 @@
     "create": "Krijo lidhjen",
     "createFailed": "Lidhja nuk u krijua.",
     "existingTitle": "Lidhja ekzistuese",
-    "existingDescription": "Kjo seancë ka tashmë një lidhje ndarjeje. Krijimi i një lidhjeje të re e zëvendëson atë dhe e bën lidhjen e vjetër të pavlefshme.",
+    "existingDescription": "Kjo seancë ka tashmë një lidhje ndarjeje. Krijimi i një lidhjeje të re me këto cilësime e zëvendëson atë dhe e bën lidhjen e vjetër të pavlefshme.",
     "rotate": "Krijo një lidhje të re",
     "replacementSettings": "Këto cilësime vlejnë për lidhjen e re.",
     "revoke": "Revoko lidhjen",

@@ -4728,7 +4728,7 @@
     "create": "Oħloq link",
     "createFailed": "Ma stajniex noħolqu l-link.",
     "existingTitle": "Link eżistenti",
-    "existingDescription": "Din is-sessjoni diġà għandha link għall-qsim. Jekk toħloq wieħed ġdid, dan jissostitwixxih u l-link il-qadim jieqaf jaħdem.",
+    "existingDescription": "Din is-sessjoni diġà għandha link għall-qsim. Jekk toħloq wieħed ġdid b'dawn l-issettjar, dan jissostitwixxih u l-link il-qadim jieqaf jaħdem.",
     "rotate": "Oħloq link ġdid",
     "replacementSettings": "Dawn l-issettjar japplikaw għall-link il-ġdid.",
     "revoke": "Irrevoka l-link",

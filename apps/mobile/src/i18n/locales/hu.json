@@ -4521,7 +4521,7 @@
     "create": "Link létrehozása",
     "createFailed": "Nem sikerült létrehozni a linket.",
     "existingTitle": "Meglévő link",
-    "existingDescription": "Ehhez a munkamenethez már tartozik megosztási link. Egy új link létrehozása lecseréli a régit, és a régi link többé nem fog működni.",
+    "existingDescription": "Ehhez a munkamenethez már tartozik megosztási link. Egy új link létrehozása ezekkel a beállításokkal lecseréli a régit, és a régi link többé nem fog működni.",
     "rotate": "Új link létrehozása",
     "replacementSettings": "Ezek a beállítások az új linkre vonatkoznak.",
     "revoke": "Link visszavonása",

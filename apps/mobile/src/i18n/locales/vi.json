@@ -4521,7 +4521,7 @@
     "create": "Tạo liên kết",
     "createFailed": "Không thể tạo liên kết.",
     "existingTitle": "Liên kết hiện có",
-    "existingDescription": "Phiên này đã có liên kết chia sẻ. Tạo liên kết mới sẽ thay thế liên kết đó và khiến liên kết cũ ngừng hoạt động.",
+    "existingDescription": "Phiên này đã có liên kết chia sẻ. Tạo liên kết mới với cài đặt này sẽ thay thế liên kết đó và khiến liên kết cũ ngừng hoạt động.",
     "rotate": "Tạo liên kết mới",
     "replacementSettings": "Cài đặt này áp dụng cho liên kết mới.",
     "revoke": "Thu hồi liên kết",

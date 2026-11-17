@@ -4521,7 +4521,7 @@
     "create": "建立連結",
     "createFailed": "無法建立連結。",
     "existingTitle": "現有連結",
-    "existingDescription": "這個工作階段已有分享連結。建立新連結會取代它，且舊連結將無法再使用。",
+    "existingDescription": "這個工作階段已有分享連結。使用這些設定建立新連結會取代它，且舊連結將無法再使用。",
     "rotate": "建立新連結",
     "replacementSettings": "這些設定將套用於新連結。",
     "revoke": "撤銷連結",

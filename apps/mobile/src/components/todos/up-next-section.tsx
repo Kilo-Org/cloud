@@ -8,9 +8,11 @@ import { Section } from '@/components/ui/section';
 import { useStartTodo } from '@/components/todos/use-start-todo';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { DirectionalArrowRight } from '@/components/ui/directional-icons';
+import { IconTile } from '@/components/ui/icon-tile';
 import { ListTodo, Play } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { NEUTRAL_TINT } from '@/lib/agent-color';
 import { useTodoLists, useUpNextTodos } from '@/lib/hooks/use-todos';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { todoItemPath } from '@/lib/todos/todo-routes';
@@ -66,15 +68,13 @@ export function UpNextSection({
               }}
               accessibilityRole="button"
               accessibilityLabel={item.title}
-              className="min-w-0 flex-1 flex-row items-center gap-3 py-2 active:opacity-70"
+              className="min-w-0 flex-1 flex-row items-center gap-3 active:opacity-70"
             >
-              <View className="size-8 items-center justify-center rounded-lg bg-secondary">
-                {item.listEmoji ? (
-                  <Text className="text-base">{item.listEmoji}</Text>
-                ) : (
-                  <ListTodo size={16} color={colors.mutedForeground} />
-                )}
-              </View>
+              <IconTile
+                tint={NEUTRAL_TINT}
+                icon={item.listEmoji ? undefined : ListTodo}
+                content={item.listEmoji ? <Text className="text-base">{item.listEmoji}</Text> : undefined}
+              />
               <View className="min-w-0 flex-1">
                 <Text className="text-base text-foreground" numberOfLines={1}>
                   {item.title}

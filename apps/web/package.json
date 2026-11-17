@@ -185,7 +185,7 @@
     "@chromatic-com/playwright": "0.12.8",
     "@jest/globals": "30.3.0",
     "@octokit/graphql-schema": "15.26.1",
-    "@playwright/test": "1.58.2",
+    "@playwright/test": "1.65.0",
     "@swc/jest": "0.2.39",
     "@tailwindcss/postcss": "4.2.4",
     "@tailwindcss/typography": "0.5.19",

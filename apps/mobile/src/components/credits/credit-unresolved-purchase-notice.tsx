@@ -116,15 +116,15 @@ function NoticeCopy({
       {announce ? (
         <AccessibleStatus className="text-sm" message={warning} tone="warn" />
       ) : (
-        <Text className="text-sm text-warn">{warning}</Text>
+        <Text className="text-warn">{warning}</Text>
       )}
       {packCopy.length > 0 ? (
         <View className="gap-1">
-          <Text className="font-semibold text-foreground">{packLabel}</Text>
-          <Text className="text-sm text-muted-foreground">{priceLabel}</Text>
+          <Text variant="heading">{packLabel}</Text>
+          <Text variant="muted">{priceLabel}</Text>
         </View>
       ) : (
-        <Text className="text-sm text-muted-foreground">{t('credits.pickPackToBuyAgain')}</Text>
+        <Text variant="muted">{t('credits.pickPackToBuyAgain')}</Text>
       )}
       <View className="flex-row flex-wrap gap-3">{showBuyAgain ? actions : reconcile}</View>
     </View>
@@ -154,10 +154,7 @@ export function CreditUnresolvedPurchaseNotice({
   // leads and the store query stays reachable as the secondary action.
   const buyAgainFirst = resolution === 'not-found' || resolution === 'terminal-refusal';
   return (
-    <View
-      className="rounded-xl border border-border bg-card p-5"
-      testID="credit-unresolved-purchase"
-    >
+    <Card testID="credit-unresolved-purchase">
       {waitCopy !== null && <AccessibleStatus className="text-sm" message={waitCopy} />}
       <NoticeCopy
         announce
@@ -170,6 +167,6 @@ export function CreditUnresolvedPurchaseNotice({
         showBuyAgain={buyAgainAvailable}
         warning={t(WARNING_KEYS[resolution])}
       />
-    </View>
+    </Card>
   );
 }

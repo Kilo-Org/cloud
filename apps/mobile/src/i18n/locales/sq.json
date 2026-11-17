@@ -482,7 +482,19 @@
     },
     "changelog": "Çfarë ka të re",
     "changelogVersionPending": "Shënimet për versionin {{version}} vijnë me përditësimin e ardhshëm të aplikacionit.",
-    "changelogTranslationFixes": "Rregullime të përkthimit për {{languages}}"
+    "changelogGroupNew": "Të reja",
+    "changelogFixesIn": "Rregullime dhe përmirësime në {{areas}}.",
+    "changelogFixesAcrossApp": "Rregullime dhe përmirësime në të gjithë aplikacionin.",
+    "changelogAreas": {
+      "chat": "Biseda",
+      "cloudAgent": "Agjenti në re",
+      "securityAgent": "Agjenti i sigurisë",
+      "codeReviewer": "Rishikuesi i kodit",
+      "signIn": "Hyrja",
+      "profileOrganizations": "Profili dhe organizatat",
+      "notifications": "Njoftimet",
+      "integrations": "Integrimet"
+    }
   },
   "preferences": {
     "general": "Të përgjithshme",

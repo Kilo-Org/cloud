@@ -482,7 +482,19 @@
     },
     "changelog": "కొత్త విశేషాలు",
     "changelogVersionPending": "{{version}} వెర్షన్ విశేషాలు తదుపరి యాప్ అప్‌డేట్‌తో వస్తాయి.",
-    "changelogTranslationFixes": "{{languages}} భాషలకు అనువాద సవరణలు"
+    "changelogGroupNew": "కొత్తవి",
+    "changelogFixesIn": "ఈ విభాగాల్లో పరిష్కారాలు మరియు మెరుగుదలలు: {{areas}}.",
+    "changelogFixesAcrossApp": "యాప్ అంతటా పరిష్కారాలు మరియు మెరుగుదలలు.",
+    "changelogAreas": {
+      "chat": "చాట్",
+      "cloudAgent": "క్లౌడ్ ఏజెంట్",
+      "securityAgent": "భద్రతా ఏజెంట్",
+      "codeReviewer": "కోడ్ సమీక్షకుడు",
+      "signIn": "సైన్ ఇన్",
+      "profileOrganizations": "ప్రొఫైల్ మరియు సంస్థలు",
+      "notifications": "నోటిఫికేషన్‌లు",
+      "integrations": "ఇంటిగ్రేషన్‌లు"
+    }
   },
   "preferences": {
     "general": "సాధారణం",

@@ -482,7 +482,19 @@
     },
     "changelog": "Yang baharu",
     "changelogVersionPending": "Nota untuk versi {{version}} akan tiba bersama kemas kini apl seterusnya.",
-    "changelogTranslationFixes": "Pembetulan terjemahan untuk {{languages}}"
+    "changelogGroupNew": "Baharu",
+    "changelogFixesIn": "Pembetulan dan penambahbaikan dalam {{areas}}.",
+    "changelogFixesAcrossApp": "Pembetulan dan penambahbaikan di seluruh aplikasi.",
+    "changelogAreas": {
+      "chat": "Sembang",
+      "cloudAgent": "Ejen awan",
+      "securityAgent": "Ejen keselamatan",
+      "codeReviewer": "Penyemak kod",
+      "signIn": "Log masuk",
+      "profileOrganizations": "Profil dan organisasi",
+      "notifications": "Pemberitahuan",
+      "integrations": "Integrasi"
+    }
   },
   "preferences": {
     "general": "Umum",

@@ -482,7 +482,19 @@
     },
     "changelog": "Àwọn ohun tuntun",
     "changelogVersionPending": "Àkọsílẹ̀ ẹ̀yà {{version}} yóò dé pẹ̀lú ìmúdójúìwọ̀n áàpù tó kàn.",
-    "changelogTranslationFixes": "Àtúnṣe ìtumọ̀ fún {{languages}}"
+    "changelogGroupNew": "Tuntun",
+    "changelogFixesIn": "Àtúnṣe àti ìlọsíwájú nínú {{areas}}.",
+    "changelogFixesAcrossApp": "Àtúnṣe àti ìlọsíwájú jákèjádò áàpù.",
+    "changelogAreas": {
+      "chat": "Ìfọ̀rọ̀wérọ̀",
+      "cloudAgent": "Aṣojú ìkùukùu",
+      "securityAgent": "Aṣojú ààbò",
+      "codeReviewer": "Olùṣàyẹ̀wò kóòdù",
+      "signIn": "Wíwọlé",
+      "profileOrganizations": "Àkọsílẹ̀ ara ẹni àti àwọn àjọ",
+      "notifications": "Ìfitónilétí",
+      "integrations": "Ìsopọ̀"
+    }
   },
   "preferences": {
     "general": "Gbogbogbo",

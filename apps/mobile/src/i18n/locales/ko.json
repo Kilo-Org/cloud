@@ -482,7 +482,19 @@
     },
     "changelog": "새로운 기능",
     "changelogVersionPending": "{{version}} 버전의 릴리스 노트는 다음 앱 업데이트에 포함됩니다.",
-    "changelogTranslationFixes": "{{languages}} 번역 수정"
+    "changelogGroupNew": "새로운 기능",
+    "changelogFixesIn": "{{areas}} 관련 수정 및 개선 사항.",
+    "changelogFixesAcrossApp": "앱 전반의 수정 및 개선 사항.",
+    "changelogAreas": {
+      "chat": "채팅",
+      "cloudAgent": "클라우드 에이전트",
+      "securityAgent": "보안 에이전트",
+      "codeReviewer": "코드 리뷰어",
+      "signIn": "로그인",
+      "profileOrganizations": "프로필 및 조직",
+      "notifications": "알림",
+      "integrations": "연동"
+    }
   },
   "preferences": {
     "general": "일반",

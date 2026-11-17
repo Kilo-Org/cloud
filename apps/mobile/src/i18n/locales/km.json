@@ -482,7 +482,19 @@
     },
     "changelog": "អ្វីថ្មីខ្លះ",
     "changelogVersionPending": "កំណត់ចំណាំសម្រាប់កំណែ {{version}} នឹងមកជាមួយបច្ចុប្បន្នភាពកម្មវិធីលើកក្រោយ។",
-    "changelogTranslationFixes": "ការកែសម្រួលការបកប្រែសម្រាប់ {{languages}}"
+    "changelogGroupNew": "ថ្មី",
+    "changelogFixesIn": "ការជួសជុល និងការកែលម្អនៅក្នុង {{areas}}។",
+    "changelogFixesAcrossApp": "ការជួសជុល និងការកែលម្អនៅទូទាំងកម្មវិធី។",
+    "changelogAreas": {
+      "chat": "ការជជែក",
+      "cloudAgent": "ភ្នាក់ងារពពក",
+      "securityAgent": "ភ្នាក់ងារសុវត្ថិភាព",
+      "codeReviewer": "អ្នកពិនិត្យកូដ",
+      "signIn": "ការចូល",
+      "profileOrganizations": "ប្រវត្តិរូប និងស្ថាប័ន",
+      "notifications": "ការជូនដំណឹង",
+      "integrations": "ការរួមបញ្ចូល"
+    }
   },
   "preferences": {
     "general": "ទូទៅ",

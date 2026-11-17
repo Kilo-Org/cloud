@@ -37,12 +37,13 @@ export function BillingWebSettings({
   const { t } = useTranslation();
   const canLink = useCanLinkExternalPurchase();
   if (!canLink) {
+    // A footnote under the card, not a card: the statement has no control and no
+    // heading, so it reads as the screen's closing sentence rather than a
+    // settings block the storefront withheld.
     return (
-      <View className="rounded-lg bg-secondary p-3">
-        <Text className="text-sm text-muted-foreground">
-          {t('organization.billing.managedOnWeb')}
-        </Text>
-      </View>
+      <Text className="text-sm text-muted-foreground">
+        {t('organization.billing.managedOnWeb')}
+      </Text>
     );
   }
   return (

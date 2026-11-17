@@ -482,7 +482,19 @@
     },
     "changelog": "പുതിയ വിശേഷങ്ങൾ",
     "changelogVersionPending": "{{version}} പതിപ്പിന്റെ കുറിപ്പുകൾ അടുത്ത ആപ്പ് അപ്ഡേറ്റിനൊപ്പം എത്തും.",
-    "changelogTranslationFixes": "{{languages}} എന്നിവയ്ക്കുള്ള വിവർത്തന തിരുത്തലുകൾ"
+    "changelogGroupNew": "പുതിയത്",
+    "changelogFixesIn": "{{areas}} എന്നിവയിൽ പരിഹാരങ്ങളും മെച്ചപ്പെടുത്തലുകളും.",
+    "changelogFixesAcrossApp": "ആപ്പിലുടനീളം പരിഹാരങ്ങളും മെച്ചപ്പെടുത്തലുകളും.",
+    "changelogAreas": {
+      "chat": "ചാറ്റ്",
+      "cloudAgent": "ക്ലൗഡ് ഏജന്റ്",
+      "securityAgent": "സുരക്ഷാ ഏജന്റ്",
+      "codeReviewer": "കോഡ് അവലോകകൻ",
+      "signIn": "സൈൻ ഇൻ",
+      "profileOrganizations": "പ്രൊഫൈലും സ്ഥാപനങ്ങളും",
+      "notifications": "അറിയിപ്പുകൾ",
+      "integrations": "സംയോജനങ്ങൾ"
+    }
   },
   "preferences": {
     "general": "പൊതുവായത്",

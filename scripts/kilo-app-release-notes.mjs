@@ -69,6 +69,20 @@ import { pathToFileURL } from 'node:url';
 
 const CHANGELOG_DEFAULT = 'apps/mobile/CHANGELOG.md';
 
+// The product areas the reader-facing notes name, and the commit scopes that
+// map to them. One file, shared with the bundled screen
+// (`apps/mobile/src/components/changelog-sections.ts`), so a scope added here
+// reaches both the composed section and the sections that already shipped.
+const AREA_MAP_PATH = new URL(
+  '../apps/mobile/src/components/changelog-areas.json',
+  import.meta.url
+);
+const AREA_MAP = JSON.parse(readFileSync(AREA_MAP_PATH, 'utf8'));
+
+// How many features one section lists; the rest ship their note in the areas
+// line, which the screen and this composer cap identically.
+const NEW_SUBJECT_LIMIT = 6;
+
 // The repository the app commits ship in. A changelog line links its pull
 // request here, so a reader opens the pull request from the rendered file.
 const REPO_URL = 'https://github.com/Kilo-Org/cloud';
@@ -157,8 +171,8 @@ export function linkPullRequest(subject) {
   );
 }
 
-/** `fix(mobile)!: keep the composer` as its type and its body. */
-const CONVENTIONAL_SUBJECT = /^([a-z][a-z-]*)(?:\([^)]*\))?!?:\s+(.+)$/;
+/** `fix(mobile)!: keep the composer` as its type, its scope and its body. */
+const CONVENTIONAL_SUBJECT = /^([a-z][a-z-]*)(?:\(([^)]*)\))?!?:\s+(.+)$/;
 
 /**
  * The commit types whose work a reader cannot see in the app. The release
@@ -191,13 +205,20 @@ const UNSEEN_WORK = [
  */
 const UNREADABLE_SUBJECTS = ['answer the request a glanceable approval names'];
 
+/** The area a commit scope names, or the map's generic tag when it names none. */
+export function areaOfScope(scope) {
+  const key = scope === undefined ? '' : scope.trim().toLowerCase();
+  return AREA_MAP.scopeToArea[key] ?? AREA_MAP.generic;
+}
+
+/** The areas of `AREAS`, in the map's own order so a section reads stably. */
+function orderedAreas(seen) {
+  return Object.keys(AREA_MAP.areas).filter(area => seen.has(area));
+}
+
 /**
- * One shipped subject as the notes carry it: the linked subject, or null when a
- * reader cannot see the change in it.
- *
- * The per-language catalog fixes stay in: the screen folds one version's
- * language bullets into a single line in the reader's own language, so it needs
- * the bullets it folds.
+ * One shipped subject as the notes carry it: its linked sentence and the block
+ * it belongs to, or null when a reader cannot see the change in it.
  */
 export function readerFacingSubject(subject) {
   const conventional = CONVENTIONAL_SUBJECT.exec(subject);
@@ -205,7 +226,8 @@ export function readerFacingSubject(subject) {
   if (type !== null && INTERNAL_SUBJECT_TYPES.includes(type)) {
     return null;
   }
-  const body = conventional ? conventional[2] : subject;
+  const scope = conventional ? conventional[2] : undefined;
+  const body = conventional ? conventional[3] : subject;
   if (UNSEEN_WORK.some(pattern => pattern.test(body))) {
     return null;
   }
@@ -216,19 +238,52 @@ export function readerFacingSubject(subject) {
   if (UNREADABLE_SUBJECTS.includes(plain)) {
     return null;
   }
-  return linkPullRequest(subject);
+  return {
+    kind: type === null || type === 'feat' ? 'new' : 'fix',
+    text: linkPullRequest(subject),
+    scope,
+  };
 }
 
-/** The shipped subjects as the notes list them, oldest first. */
-export function readerFacingNotes(subjects) {
-  const notes = [];
+/**
+ * The body lines a section carries: its newest six features under `### New`,
+ * then one `areas:` line naming the product areas its fixes touched. A section
+ * whose work is all internal carries neither block, and the caller writes the
+ * no-change marker instead.
+ */
+export function changelogBodyLines(subjects) {
+  const news = [];
+  const areas = new Set();
+  let hasFixes = false;
   for (const subject of subjects) {
     const note = readerFacingSubject(subject);
-    if (note !== null) {
-      notes.push(note);
+    if (note === null) {
+      continue;
     }
+    if (note.kind === 'new') {
+      news.push(note.text);
+      continue;
+    }
+    hasFixes = true;
+    areas.add(areaOfScope(note.scope));
   }
-  return notes;
+  const newest = news.slice(-NEW_SUBJECT_LIMIT).reverse();
+  const lines = [];
+  if (newest.length > 0) {
+    lines.push('### New', '', ...newest.map(note => `- ${note}`));
+  }
+  if (hasFixes) {
+    if (lines.length > 0) {
+      lines.push('');
+    }
+    const named = orderedAreas(areas);
+    lines.push(
+      '### Fixes',
+      '',
+      `- areas: ${named.length === 0 ? AREA_MAP.generic : named.join(', ')}`
+    );
+  }
+  return lines;
 }
 
 /**
@@ -509,13 +564,13 @@ function runBody(args) {
     return usage(`--from ref does not resolve: ${options.from}`);
   }
   const subjects = shippedSubjects(options.from, options.to ?? 'HEAD');
-  const notes = readerFacingNotes(subjects);
-  if (notes.length === 0) {
+  const lines = changelogBodyLines(subjects);
+  if (lines.length === 0) {
     console.log(NO_CHANGES_MARKER);
     return 0;
   }
-  for (const note of notes) {
-    console.log(`- ${note}`);
+  for (const line of lines) {
+    console.log(line);
   }
   return 0;
 }

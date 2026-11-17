@@ -482,7 +482,19 @@
     },
     "changelog": "Նորություններ",
     "changelogVersionPending": "{{version}} տարբերակի նշումները կհայտնվեն հավելվածի հաջորդ թարմացմամբ։",
-    "changelogTranslationFixes": "Թարգմանության ուղղումներ՝ {{languages}}"
+    "changelogGroupNew": "Նոր",
+    "changelogFixesIn": "Ուղղումներ և բարելավումներ հետևյալ բաժիններում՝ {{areas}}։",
+    "changelogFixesAcrossApp": "Ուղղումներ և բարելավումներ ամբողջ հավելվածում։",
+    "changelogAreas": {
+      "chat": "Զրույց",
+      "cloudAgent": "Ամպային գործակալ",
+      "securityAgent": "Անվտանգության գործակալ",
+      "codeReviewer": "Կոդի վերանայող",
+      "signIn": "Մուտք",
+      "profileOrganizations": "Պրոֆիլ և կազմակերպություններ",
+      "notifications": "Ծանուցումներ",
+      "integrations": "Ինտեգրումներ"
+    }
   },
   "preferences": {
     "general": "Ընդհանուր",

@@ -482,7 +482,19 @@
     },
     "changelog": "ಹೊಸತೇನಿದೆ",
     "changelogVersionPending": "{{version}} ಆವೃತ್ತಿಯ ಟಿಪ್ಪಣಿಗಳು ಮುಂದಿನ ಆ್ಯಪ್ ಅಪ್‌ಡೇಟ್‌ನೊಂದಿಗೆ ಬರುತ್ತವೆ.",
-    "changelogTranslationFixes": "{{languages}} ಭಾಷೆಗಳಿಗೆ ಅನುವಾದ ಸರಿಪಡಿಸುವಿಕೆಗಳು"
+    "changelogGroupNew": "ಹೊಸದು",
+    "changelogFixesIn": "ಈ ವಿಭಾಗಗಳಲ್ಲಿ ದೋಷ ಪರಿಹಾರಗಳು ಮತ್ತು ಸುಧಾರಣೆಗಳು: {{areas}}.",
+    "changelogFixesAcrossApp": "ಆ್ಯಪ್‌ನಾದ್ಯಂತ ದೋಷ ಪರಿಹಾರಗಳು ಮತ್ತು ಸುಧಾರಣೆಗಳು.",
+    "changelogAreas": {
+      "chat": "ಚಾಟ್",
+      "cloudAgent": "ಕ್ಲೌಡ್ ಏಜೆಂಟ್",
+      "securityAgent": "ಭದ್ರತಾ ಏಜೆಂಟ್",
+      "codeReviewer": "ಕೋಡ್ ಪರಿಶೀಲಕ",
+      "signIn": "ಸೈನ್ ಇನ್",
+      "profileOrganizations": "ಪ್ರೊಫೈಲ್ ಮತ್ತು ಸಂಸ್ಥೆಗಳು",
+      "notifications": "ಅಧಿಸೂಚನೆಗಳು",
+      "integrations": "ಏಕೀಕರಣಗಳು"
+    }
   },
   "preferences": {
     "general": "ಸಾಮಾನ್ಯ",

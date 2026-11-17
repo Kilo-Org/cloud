@@ -482,7 +482,19 @@
     },
     "changelog": "מה חדש",
     "changelogVersionPending": "ההערות לגרסה {{version}} יגיעו עם עדכון האפליקציה הבא.",
-    "changelogTranslationFixes": "תיקוני תרגום עבור {{languages}}"
+    "changelogGroupNew": "חדש",
+    "changelogFixesIn": "תיקונים ושיפורים בתחומים הבאים: {{areas}}.",
+    "changelogFixesAcrossApp": "תיקונים ושיפורים בכל האפליקציה.",
+    "changelogAreas": {
+      "chat": "צ'אט",
+      "cloudAgent": "סוכן ענן",
+      "securityAgent": "סוכן אבטחה",
+      "codeReviewer": "סוקר קוד",
+      "signIn": "התחברות",
+      "profileOrganizations": "פרופיל וארגונים",
+      "notifications": "התראות",
+      "integrations": "שילובים"
+    }
   },
   "preferences": {
     "general": "כללי",

@@ -482,7 +482,19 @@
     },
     "changelog": "Újdonságok",
     "changelogVersionPending": "A(z) {{version}} verzió újdonságai a következő frissítéssel érkeznek.",
-    "changelogTranslationFixes": "Fordítási javítások: {{languages}}"
+    "changelogGroupNew": "Újdonságok",
+    "changelogFixesIn": "Javítások és fejlesztések a következő területeken: {{areas}}.",
+    "changelogFixesAcrossApp": "Javítások és fejlesztések az egész alkalmazásban.",
+    "changelogAreas": {
+      "chat": "Csevegés",
+      "cloudAgent": "Felhőügynök",
+      "securityAgent": "Biztonsági ügynök",
+      "codeReviewer": "Kódellenőrző",
+      "signIn": "Bejelentkezés",
+      "profileOrganizations": "Profil és szervezetek",
+      "notifications": "Értesítések",
+      "integrations": "Integrációk"
+    }
   },
   "preferences": {
     "general": "Általános",

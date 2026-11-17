@@ -1,49 +1,56 @@
 /**
- * The bundled changelog as a reader wants it: one item per version, with the
- * maintainer's parts of the source file removed.
+ * The bundled changelog as a reader wants it: one item per version, a short
+ * "New" list of what shipped, and one line naming the areas the fixes touched.
  *
  * `CHANGELOG.md` is written by the Release workflow for maintainers, not for
- * the screen. Its title and preamble say how the file is maintained, every
- * bullet is a commit subject (`fix(mobile): ...`) that ends in a link to its
- * pull request, and one section is composed per store build — so one version
- * arrives as several. A section can also list work no reader can see (tests,
- * docs, CI, refactors, a demo behind a flag, transport plumbing) and one bullet
- * per language for the catalogs.
+ * the screen. Its title and preamble say how the file is maintained, one
+ * section is composed per store build — so one version arrives as several — and
+ * every bullet is a commit subject (`fix(mobile): ...`) or, in sections written
+ * after this screen existed, a curated line under a `### New` or `### Fixes`
+ * heading.
  *
  * The file is generated output whose shipped sections are already part of the
  * record, so the reader-facing shape is derived here instead of by rewriting
- * it. The Release workflow drops the same classes of subject when it composes a
- * new section (`scripts/kilo-app-release-notes.mjs`).
+ * it. Both shapes land on the same two blocks: the newest features as
+ * sentences, and the fixes as the product areas they touch — the scope table
+ * that names those areas lives in `changelog-areas.json`, which the Release
+ * workflow applies when it composes a section
+ * (`scripts/kilo-app-release-notes.mjs`).
  */
 
-import { translationLanguagesIn } from './changelog-translation-languages';
+import areas from './changelog-areas.json';
+
+/** A product area a fix touched: a key of `changelog-areas.json`'s `areas`. */
+type ChangelogArea = keyof typeof areas.areas;
 
 /**
- * One version's notes. The file carries a section per store build, and every
- * build of a version lands here as one item: the reader sees one list, one
- * heading, and one gap between versions.
+ * One version's notes. They are what the reader is shown, not the file:
+ * `newNotes` is capped at the newest few features, and `fixesAreas` is empty
+ * when the fixes touched no named area (`hasFixes` still marks them).
  */
 export type ChangelogSection = Readonly<{
   /** `1.0.16`, or the heading's own words when it names no version. */
   version: string;
-  /** One sentence per change: no bullet, no commit prefix, no pull request reference. */
-  notes: readonly string[];
-  /**
-   * The languages whose copy this version corrected, as the picker's English
-   * names, in the order the file names them. Drawn as one line, in the
-   * reader's own words.
-   */
-  translationLanguages: readonly string[];
+  /** The newest features, newest first: a sentence each, no prefix, no link. */
+  newNotes: readonly string[];
+  /** The areas the fixes touched, in the map's own order. */
+  fixesAreas: readonly ChangelogArea[];
+  /** Whether the version shipped fix work at all. */
+  hasFixes: boolean;
 }>;
 
+/** How many features one version lists; the rest ship their note in the areas line. */
+const NEW_NOTE_LIMIT = 6;
+
 const RELEASE_HEADING = /^## (.+)$/;
+const GROUP_HEADING = /^### (.+)$/;
 const NOTE = /^- (.+)$/;
 
 /** `1.0.16` in `1.0.16 (build 720 iOS, 721 Android)`. */
 const VERSION_PREFIX = /^\d+\.\d+\.\d+/;
 
 /** `fix(mobile)!: ` in a commit subject: the type, its scope and the separator. */
-const CONVENTIONAL_PREFIX = /^([a-z][a-z-]*)(?:\([^)]*\))?!?:\s+(.+)$/;
+const CONVENTIONAL_PREFIX = /^([a-z][a-z-]*)(?:\(([^)]*)\))?!?:\s+(.+)$/;
 
 /** A slash-joined type, as `chore/remove autotriage code` writes one. */
 const SLASHED_TYPE = /^[a-z][a-z-]*\//;
@@ -53,6 +60,9 @@ const PULL_REQUEST_LINK = /\s*\(\[#\d+\]\([^)]*\)\)$/;
 
 /** The older sections' bare reference: `(#6670)`. */
 const BARE_PULL_REQUEST = /\s*\(#\d+\)$/;
+
+/** The generated sections' machine line: `areas: chat, sign-in`. */
+const AREAS_LINE = /^areas:\s*(.*)$/;
 
 /**
  * The commit types whose work a reader cannot see in the app. The rest — `feat`,
@@ -67,6 +77,17 @@ const INTERNAL_TYPES = {
   style: true,
   test: true,
 } satisfies Readonly<Record<string, true>>;
+
+/** The feature types: what belongs in the New list. */
+const FEATURE_TYPES = { feat: true } satisfies Readonly<Record<string, true>>;
+
+/** The two blocks a composed section states its notes under. */
+function groupOf(label: string): 'new' | 'fixes' | null {
+  if (label === 'new') {
+    return 'new';
+  }
+  return label === 'fixes' ? 'fixes' : null;
+}
 
 /** The workflow's bodies for a section that carries no reader-facing change. */
 const NO_CHANGE_NOTES = {
@@ -121,18 +142,19 @@ function withoutPullRequest(subject: string): string {
   return (bare ? withoutLink.slice(0, bare.index) : withoutLink).trim();
 }
 
-/**
- * A bullet as the reader gets it: a sentence, the languages a copy fix names,
- * or nothing at all for internal work.
- */
-type ReaderNote = Readonly<{ text: string }> | Readonly<{ languages: readonly string[] }>;
+/** The area a commit scope names, or null when the map has no entry for it. */
+function areaOfScope(scope: string | undefined): ChangelogArea | null {
+  if (scope === undefined) {
+    return null;
+  }
+  const key = scope.trim().toLocaleLowerCase('en');
+  const area: unknown = (areas.scopeToArea as Record<string, string | undefined>)[key];
+  return area === undefined ? null : (area as ChangelogArea);
+}
 
-/**
- * The reader-facing note of one bullet, or null when the bullet is internal
- * work: a type nobody sees, a repository scope from a maintenance run, the
- * workflow's own note that no change shipped, work the screen cannot show, or a
- * shipped subject that names nothing.
- */
+/** A bullet as the reader gets it, or null when the bullet is internal work. */
+type ReaderNote = Readonly<{ kind: 'new' | 'fix'; text: string; scope?: string }>;
+
 function readerFacingNote(bullet: string): ReaderNote | null {
   const line = bullet.trim();
   if (Object.hasOwn(NO_CHANGE_NOTES, line) || line.startsWith('(') || SLASHED_TYPE.test(line)) {
@@ -143,73 +165,150 @@ function readerFacingNote(bullet: string): ReaderNote | null {
   if (type !== undefined && Object.hasOwn(INTERNAL_TYPES, type)) {
     return null;
   }
-  const subject = withoutPullRequest(conventional?.[2] ?? line);
+  const subject = withoutPullRequest(conventional?.[3] ?? line);
   if (subject === '' || UNSEEN_WORK.some(pattern => pattern.test(subject))) {
     return null;
-  }
-  const languages = translationLanguagesIn(subject);
-  if (languages.length > 0) {
-    return { languages };
   }
   if (Object.hasOwn(UNREADABLE_NOTES, subject.toLocaleLowerCase('en'))) {
     return null;
   }
+  const isFix = type !== undefined && !Object.hasOwn(FEATURE_TYPES, type);
   // The notes are English commit subjects, so the English casing is the right
   // one: a Turkish device would otherwise take the leading `i` to `İ`.
-  return { text: subject.charAt(0).toLocaleUpperCase('en') + subject.slice(1) };
+  const text = subject.charAt(0).toLocaleUpperCase('en') + subject.slice(1);
+  return isFix ? { kind: 'fix', text, scope: conventional?.[2] } : { kind: 'new', text };
 }
 
-/** One note into the section it belongs to: a sentence, or the languages it names. */
-function applyNote(note: ReaderNote, notes: string[], languages: string[]): void {
-  if ('text' in note) {
-    notes.push(note.text);
+/** The areas a list of scopes names, in the map's own order. */
+function orderedAreas(seen: Iterable<ChangelogArea>): ChangelogArea[] {
+  const present = new Set<ChangelogArea>(seen);
+  return (Object.keys(areas.areas) as ChangelogArea[]).filter(area => present.has(area));
+}
+
+/** The areas a generated `areas:` line names, ignoring tags this build does not ship. */
+function areasOfLine(line: string): ChangelogArea[] {
+  const match = AREAS_LINE.exec(line.trim());
+  if (match === null) {
+    return [];
+  }
+  const known = new Set<string>(Object.keys(areas.areas));
+  const tags = (match[1] ?? '')
+    .split(',')
+    .map(tag => tag.trim())
+    .filter(tag => known.has(tag));
+  return orderedAreas(tags as ChangelogArea[]);
+}
+
+/**
+ * One version under construction while the file is read: the group it is in,
+ * the features it has collected, and the areas its fixes named. A generated
+ * section states both blocks itself; a commit-subject section is classified
+ * from each bullet's type and scope.
+ */
+type Draft = {
+  version: string;
+  group: 'new' | 'fixes' | null;
+  /** A section the workflow composed: its blocks are already curated and ordered. */
+  curated: boolean;
+  newNotes: string[];
+  fixesSeen: ChangelogArea[];
+  isFix: boolean;
+};
+
+function emptyDraft(version: string): Draft {
+  return { version, group: null, curated: false, newNotes: [], fixesSeen: [], isFix: false };
+}
+
+/**
+ * Adds one bullet to the draft. A generated `areas:` line lands as the fixes
+ * block; any other bullet lands in the group its heading names, or — in a
+ * section with no headings — in the block its commit type names.
+ */
+function absorb(draft: Draft, bullet: string): void {
+  if (draft.group === 'fixes') {
+    draft.fixesSeen = orderedAreas([...draft.fixesSeen, ...areasOfLine(bullet)]);
+    draft.isFix = true;
     return;
   }
-  for (const language of note.languages) {
-    if (!languages.includes(language)) {
-      languages.push(language);
-    }
+  const note = readerFacingNote(bullet);
+  if (note === null) {
+    return;
   }
+  // The `### Fixes` block returned above, so this bullet is either a composed
+  // New bullet (no prefix, so it reads `new`) or a shipped one whose type decides.
+  if (note.kind === 'new') {
+    // A shipped version is a commit log read oldest-first, so each feature goes
+    // in front of the one before it; a composed section already lists newest
+    // first and keeps its order.
+    if (draft.curated) {
+      draft.newNotes.push(note.text);
+    } else {
+      draft.newNotes.unshift(note.text);
+    }
+    return;
+  }
+  draft.isFix = true;
+  const area = areaOfScope(note.scope);
+  if (area !== null) {
+    draft.fixesSeen = orderedAreas([...draft.fixesSeen, area]);
+  }
+}
+
+/** The draft as the screen gets it: the newest few features, then the areas. */
+function toSection(draft: Draft): ChangelogSection | null {
+  // A composed section already lists its newest features first; a shipped one
+  // is a commit log, whose newest entry is the last line of the version.
+  const newNotes = draft.newNotes.slice(0, NEW_NOTE_LIMIT);
+  if (newNotes.length === 0 && !draft.isFix) {
+    return null;
+  }
+  return {
+    version: draft.version,
+    newNotes,
+    fixesAreas: orderedAreas(draft.fixesSeen),
+    hasFixes: draft.isFix,
+  };
 }
 
 /**
  * The release sections in file order, newest build first, one per version:
- * consecutive builds of one version merge into one list of notes. Everything
- * above the first `## ` heading — the document title and the maintainer note —
- * is not a section, and a version with nothing a reader can see is not one
- * either.
+ * consecutive builds of one version merge into one item. Everything above the
+ * first `## ` heading — the document title and the maintainer note — is not a
+ * section, and a version with nothing a reader can see is not one either.
  */
 export function changelogSections(markdown: string): ChangelogSection[] {
   const sections: ChangelogSection[] = [];
-  let version: string | null = null;
-  let notes: string[] = [];
-  let languages: string[] = [];
+  let draft: Draft | null = null;
 
   const flush = (): void => {
-    if (version !== null && (notes.length > 0 || languages.length > 0)) {
-      sections.push({ version, notes, translationLanguages: languages });
+    const section = draft === null ? null : toSection(draft);
+    if (section !== null) {
+      sections.push(section);
     }
-    version = null;
-    notes = [];
-    languages = [];
+    draft = null;
   };
 
   for (const line of markdown.split('\n')) {
     const heading = RELEASE_HEADING.exec(line);
-    const next = heading === null ? null : versionOf(heading[1] ?? '');
-    if (next !== null) {
+    if (heading === null) {
+      const bullet = draft === null ? null : NOTE.exec(line);
+      if (bullet?.[1] !== undefined && draft !== null) {
+        absorb(draft, bullet[1]);
+      }
+    } else {
+      const next = versionOf(heading[1] ?? '');
       // Every store build of one version is the same release to the reader, so
       // its notes keep accumulating under the heading already on screen.
-      if (next !== version) {
+      if (draft === null || draft.version !== next) {
         flush();
       }
-      version = next;
-    } else if (version !== null) {
-      const bullet = NOTE.exec(line);
-      const note = bullet?.[1] === undefined ? null : readerFacingNote(bullet[1]);
-      if (note !== null) {
-        applyNote(note, notes, languages);
-      }
+      draft ??= emptyDraft(next);
+    }
+    const group = draft === null ? null : GROUP_HEADING.exec(line);
+    if (group !== null && draft !== null) {
+      const label = (group[1] ?? '').trim().toLocaleLowerCase('en');
+      draft.curated = true;
+      draft.group = groupOf(label);
     }
   }
   flush();

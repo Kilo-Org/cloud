@@ -482,7 +482,19 @@
     },
     "changelog": "新着情報",
     "changelogVersionPending": "バージョン{{version}}のリリースノートは、次回のアプリアップデートで届きます。",
-    "changelogTranslationFixes": "{{languages}}の翻訳の修正"
+    "changelogGroupNew": "新機能",
+    "changelogFixesIn": "{{areas}}に関する修正と改善を行いました。",
+    "changelogFixesAcrossApp": "アプリ全体の修正と改善を行いました。",
+    "changelogAreas": {
+      "chat": "チャット",
+      "cloudAgent": "クラウドエージェント",
+      "securityAgent": "セキュリティエージェント",
+      "codeReviewer": "コードレビュアー",
+      "signIn": "サインイン",
+      "profileOrganizations": "プロフィールと組織",
+      "notifications": "通知",
+      "integrations": "連携"
+    }
   },
   "preferences": {
     "general": "一般",

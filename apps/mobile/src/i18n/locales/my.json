@@ -482,7 +482,19 @@
     },
     "changelog": "အသစ်ပါဝင်လာသည့်အရာများ",
     "changelogVersionPending": "ဗားရှင်း {{version}} အတွက် မှတ်စုများသည် နောက်အက်ပ်အပ်ဒိတ်တွင် ပါလာပါမည်။",
-    "changelogTranslationFixes": "{{languages}} အတွက် ဘာသာပြန်ပြင်ဆင်မှုများ"
+    "changelogGroupNew": "အသစ်",
+    "changelogFixesIn": "{{areas}} တွင် ပြင်ဆင်မှုများနှင့် တိုးတက်မှုများ။",
+    "changelogFixesAcrossApp": "အက်ပ်တစ်ခုလုံးတွင် ပြင်ဆင်မှုများနှင့် တိုးတက်မှုများ။",
+    "changelogAreas": {
+      "chat": "ချတ်",
+      "cloudAgent": "ကလောက်ဒ် အေးဂျင့်",
+      "securityAgent": "လုံခြုံရေး အေးဂျင့်",
+      "codeReviewer": "ကုဒ် စစ်ဆေးသူ",
+      "signIn": "အကောင့်ဝင်ခြင်း",
+      "profileOrganizations": "ပရိုဖိုင်နှင့် အဖွဲ့အစည်းများ",
+      "notifications": "အသိပေးချက်များ",
+      "integrations": "ပေါင်းစပ်မှုများ"
+    }
   },
   "preferences": {
     "general": "အထွေထွေ",

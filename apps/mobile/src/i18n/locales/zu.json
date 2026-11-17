@@ -482,7 +482,19 @@
     },
     "changelog": "Okusha",
     "changelogVersionPending": "Amanothi enguqulo {{version}} azofika nesibuyekezo esilandelayo sohlelo lokusebenza.",
-    "changelogTranslationFixes": "Ukulungiswa kokuhumusha kwe-{{languages}}"
+    "changelogGroupNew": "Okusha",
+    "changelogFixesIn": "Ukulungiswa nokuthuthukiswa kulezi zingxenye: {{areas}}.",
+    "changelogFixesAcrossApp": "Ukulungiswa nokuthuthukiswa kulo lonke uhlelo lokusebenza.",
+    "changelogAreas": {
+      "chat": "Ingxoxo",
+      "cloudAgent": "Umenzeli wefu",
+      "securityAgent": "Umenzeli wezokuphepha",
+      "codeReviewer": "Umbuyekezi wekhodi",
+      "signIn": "Ukungena ngemvume",
+      "profileOrganizations": "Iphrofayela nezinhlangano",
+      "notifications": "Izaziso",
+      "integrations": "Ukuhlanganiswa"
+    }
   },
   "preferences": {
     "general": "Okujwayelekile",

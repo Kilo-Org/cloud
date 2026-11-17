@@ -482,7 +482,19 @@
     },
     "changelog": "Novidades",
     "changelogVersionPending": "As notas da versão {{version}} vêm na próxima atualização da app.",
-    "changelogTranslationFixes": "Correções de tradução para {{languages}}"
+    "changelogGroupNew": "Novidades",
+    "changelogFixesIn": "Correções e melhorias em {{areas}}.",
+    "changelogFixesAcrossApp": "Correções e melhorias em toda a aplicação.",
+    "changelogAreas": {
+      "chat": "Conversa",
+      "cloudAgent": "Agente na nuvem",
+      "securityAgent": "Agente de segurança",
+      "codeReviewer": "Revisor de código",
+      "signIn": "Início de sessão",
+      "profileOrganizations": "Perfil e organizações",
+      "notifications": "Notificações",
+      "integrations": "Integrações"
+    }
   },
   "preferences": {
     "general": "Geral",

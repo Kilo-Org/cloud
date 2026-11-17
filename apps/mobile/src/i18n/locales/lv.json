@@ -482,7 +482,19 @@
     },
     "changelog": "Kas jauns",
     "changelogVersionPending": "Versijas {{version}} piezīmes pienāks ar nākamo atjauninājumu.",
-    "changelogTranslationFixes": "Tulkojumu labojumi: {{languages}}"
+    "changelogGroupNew": "Jaunumi",
+    "changelogFixesIn": "Labojumi un uzlabojumi šajās jomās: {{areas}}.",
+    "changelogFixesAcrossApp": "Labojumi un uzlabojumi visā lietotnē.",
+    "changelogAreas": {
+      "chat": "Tērzēšana",
+      "cloudAgent": "Mākoņa aģents",
+      "securityAgent": "Drošības aģents",
+      "codeReviewer": "Koda pārskatītājs",
+      "signIn": "Pierakstīšanās",
+      "profileOrganizations": "Profils un organizācijas",
+      "notifications": "Paziņojumi",
+      "integrations": "Integrācijas"
+    }
   },
   "preferences": {
     "general": "Vispārīgi",

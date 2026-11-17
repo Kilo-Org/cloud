@@ -482,7 +482,19 @@
     },
     "changelog": "අලුත් දේ",
     "changelogVersionPending": "{{version}} අනුවාදයේ සටහන් ඊළඟ යෙදුම් යාවත්කාලීනය සමඟ ලැබේ.",
-    "changelogTranslationFixes": "{{languages}} සඳහා පරිවර්තන නිවැරදි කිරීම්"
+    "changelogGroupNew": "නව",
+    "changelogFixesIn": "{{areas}} හි නිවැරදි කිරීම් සහ වැඩිදියුණු කිරීම්.",
+    "changelogFixesAcrossApp": "සම්පූර්ණ යෙදුම පුරා නිවැරදි කිරීම් සහ වැඩිදියුණු කිරීම්.",
+    "changelogAreas": {
+      "chat": "කතාබස්",
+      "cloudAgent": "වලාකුළු නියෝජිත",
+      "securityAgent": "ආරක්ෂක නියෝජිත",
+      "codeReviewer": "කේත සමාලෝචක",
+      "signIn": "පුරනය වීම",
+      "profileOrganizations": "පැතිකඩ සහ සංවිධාන",
+      "notifications": "දැනුම්දීම්",
+      "integrations": "ඒකාබද්ධ කිරීම්"
+    }
   },
   "preferences": {
     "general": "සාමාන්‍ය",

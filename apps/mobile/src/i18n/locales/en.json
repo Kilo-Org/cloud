@@ -548,8 +548,20 @@
       "viewReceipt": "View receipt"
     },
     "changelog": "What's New",
-    "changelogVersionPending": "The notes for {{version}} arrive with the next app update.",
-    "changelogTranslationFixes": "Translation fixes for {{languages}}"
+    "changelogGroupNew": "New",
+    "changelogFixesIn": "Fixes and improvements in {{areas}}.",
+    "changelogFixesAcrossApp": "Fixes and improvements across the app.",
+    "changelogAreas": {
+      "chat": "Chat",
+      "cloudAgent": "Cloud Agent",
+      "securityAgent": "Security Agent",
+      "codeReviewer": "Code Reviewer",
+      "signIn": "Sign-in",
+      "profileOrganizations": "Profile and organizations",
+      "notifications": "Notifications",
+      "integrations": "Integrations"
+    },
+    "changelogVersionPending": "The notes for {{version}} arrive with the next app update."
   },
   "preferences": {
     "biometricUnlock": "Unlock with biometrics",

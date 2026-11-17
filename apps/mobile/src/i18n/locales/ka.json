@@ -482,7 +482,19 @@
     },
     "changelog": "სიახლეები",
     "changelogVersionPending": "{{version}} ვერსიის სიახლეები აპის შემდეგ განახლებასთან ერთად გამოჩნდება.",
-    "changelogTranslationFixes": "თარგმანის შესწორებები: {{languages}}"
+    "changelogGroupNew": "ახალი",
+    "changelogFixesIn": "შესწორებები და გაუმჯობესებები შემდეგ სექციებში: {{areas}}.",
+    "changelogFixesAcrossApp": "შესწორებები და გაუმჯობესებები მთელ აპში.",
+    "changelogAreas": {
+      "chat": "ჩატი",
+      "cloudAgent": "ღრუბლოვანი აგენტი",
+      "securityAgent": "უსაფრთხოების აგენტი",
+      "codeReviewer": "კოდის მიმომხილველი",
+      "signIn": "შესვლა",
+      "profileOrganizations": "პროფილი და ორგანიზაციები",
+      "notifications": "შეტყობინებები",
+      "integrations": "ინტეგრაციები"
+    }
   },
   "preferences": {
     "general": "ზოგადი",

@@ -482,7 +482,19 @@
     },
     "changelog": "Ngā mea hou",
     "changelogVersionPending": "Ka tae mai ngā tuhipoka o te putanga {{version}} me te whakahōu taupānga e whai ake.",
-    "changelogTranslationFixes": "Ngā whakatika whakamāoritanga mō {{languages}}"
+    "changelogGroupNew": "Hou",
+    "changelogFixesIn": "Ngā whakatika me ngā whakapainga i ēnei wāhanga: {{areas}}.",
+    "changelogFixesAcrossApp": "Ngā whakatika me ngā whakapainga puta noa i te taupānga.",
+    "changelogAreas": {
+      "chat": "Kōrerorero",
+      "cloudAgent": "Māngai kapua",
+      "securityAgent": "Māngai haumaru",
+      "codeReviewer": "Kaiarotake waehere",
+      "signIn": "Takiuru",
+      "profileOrganizations": "Kōtaha me ngā whakahaere",
+      "notifications": "Whakamōhiotanga",
+      "integrations": "Tūhononga"
+    }
   },
   "preferences": {
     "general": "Whānui",

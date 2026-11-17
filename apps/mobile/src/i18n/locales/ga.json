@@ -482,7 +482,19 @@
     },
     "changelog": "Na rudaí nua",
     "changelogVersionPending": "Beidh nótaí an leagain {{version}} sa chéad nuashonrú eile den aip.",
-    "changelogTranslationFixes": "Ceartúcháin aistriúcháin do na teangacha seo: {{languages}}"
+    "changelogGroupNew": "Nua",
+    "changelogFixesIn": "Ceartúcháin agus feabhsuithe sna réimsí seo: {{areas}}.",
+    "changelogFixesAcrossApp": "Ceartúcháin agus feabhsuithe ar fud na haipe.",
+    "changelogAreas": {
+      "chat": "Comhrá",
+      "cloudAgent": "Gníomhaire néil",
+      "securityAgent": "Gníomhaire slándála",
+      "codeReviewer": "Athbhreithneoir cóid",
+      "signIn": "Síniú isteach",
+      "profileOrganizations": "Próifíl agus eagraíochtaí",
+      "notifications": "Fógraí",
+      "integrations": "Comhtháthuithe"
+    }
   },
   "preferences": {
     "general": "Ginearálta",

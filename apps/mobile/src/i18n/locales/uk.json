@@ -482,7 +482,19 @@
     },
     "changelog": "Що нового",
     "changelogVersionPending": "Примітки до версії {{version}} з’являться з наступним оновленням застосунку.",
-    "changelogTranslationFixes": "Виправлення перекладів для мов: {{languages}}"
+    "changelogGroupNew": "Нове",
+    "changelogFixesIn": "Виправлення та покращення в розділах: {{areas}}.",
+    "changelogFixesAcrossApp": "Виправлення та покращення в усьому застосунку.",
+    "changelogAreas": {
+      "chat": "Чат",
+      "cloudAgent": "Хмарний агент",
+      "securityAgent": "Агент безпеки",
+      "codeReviewer": "Рецензент коду",
+      "signIn": "Вхід",
+      "profileOrganizations": "Профіль і організації",
+      "notifications": "Сповіщення",
+      "integrations": "Інтеграції"
+    }
   },
   "preferences": {
     "general": "Загальні",

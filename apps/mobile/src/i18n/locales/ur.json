@@ -482,7 +482,19 @@
     },
     "changelog": "نیا کیا ہے",
     "changelogVersionPending": "ورژن {{version}} کے نوٹس ایپ کی اگلی اپ ڈیٹ کے ساتھ آئیں گے۔",
-    "changelogTranslationFixes": "{{languages}} کے لیے ترجمے کی درستیاں"
+    "changelogGroupNew": "نیا",
+    "changelogFixesIn": "ان حصوں میں اصلاحات اور بہتریاں: {{areas}}۔",
+    "changelogFixesAcrossApp": "پوری ایپ میں اصلاحات اور بہتریاں۔",
+    "changelogAreas": {
+      "chat": "چیٹ",
+      "cloudAgent": "کلاؤڈ ایجنٹ",
+      "securityAgent": "سیکیورٹی ایجنٹ",
+      "codeReviewer": "کوڈ جائزہ کار",
+      "signIn": "سائن ان",
+      "profileOrganizations": "پروفائل اور تنظیمیں",
+      "notifications": "اطلاعات",
+      "integrations": "انٹیگریشنز"
+    }
   },
   "preferences": {
     "general": "عمومی",

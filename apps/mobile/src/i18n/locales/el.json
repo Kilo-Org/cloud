@@ -482,7 +482,19 @@
     },
     "changelog": "Τι νέο υπάρχει",
     "changelogVersionPending": "Οι σημειώσεις της έκδοσης {{version}} θα έρθουν με την επόμενη ενημέρωση της εφαρμογής.",
-    "changelogTranslationFixes": "Διορθώσεις μεταφράσεων για {{languages}}"
+    "changelogGroupNew": "Νέα",
+    "changelogFixesIn": "Διορθώσεις και βελτιώσεις στα εξής: {{areas}}.",
+    "changelogFixesAcrossApp": "Διορθώσεις και βελτιώσεις σε όλη την εφαρμογή.",
+    "changelogAreas": {
+      "chat": "Συνομιλία",
+      "cloudAgent": "Πράκτορας νέφους",
+      "securityAgent": "Πράκτορας ασφαλείας",
+      "codeReviewer": "Ελεγκτής κώδικα",
+      "signIn": "Σύνδεση",
+      "profileOrganizations": "Προφίλ και οργανισμοί",
+      "notifications": "Ειδοποιήσεις",
+      "integrations": "Ενσωματώσεις"
+    }
   },
   "preferences": {
     "general": "Γενικά",

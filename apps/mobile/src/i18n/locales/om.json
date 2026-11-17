@@ -482,7 +482,19 @@
     },
     "changelog": "Waan haaraa",
     "changelogVersionPending": "Yaadannoon {{version}} haaromsa appii itti aanu waliin dhufa.",
-    "changelogTranslationFixes": "Sirreeffama hiikkaa afaan {{languages}}"
+    "changelogGroupNew": "Haaraa",
+    "changelogFixesIn": "Sirreeffamaa fi fooyya'iinsota {{areas}} keessatti.",
+    "changelogFixesAcrossApp": "Sirreeffamaa fi fooyya'iinsota appii guutuu keessatti.",
+    "changelogAreas": {
+      "chat": "Haasaa",
+      "cloudAgent": "Bakka bu'aa duumessaa",
+      "securityAgent": "Bakka bu'aa nageenyaa",
+      "codeReviewer": "Gamaaggamaa koodii",
+      "signIn": "Seenuu",
+      "profileOrganizations": "Piroofaayilii fi dhaabbilee",
+      "notifications": "Beeksisota",
+      "integrations": "Walqabsiisota"
+    }
   },
   "preferences": {
     "general": "Waliigalaa",

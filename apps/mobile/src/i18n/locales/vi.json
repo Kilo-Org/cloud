@@ -482,7 +482,19 @@
     },
     "changelog": "Có gì mới",
     "changelogVersionPending": "Ghi chú cho phiên bản {{version}} sẽ có trong bản cập nhật ứng dụng sau.",
-    "changelogTranslationFixes": "Sửa lỗi bản dịch cho {{languages}}"
+    "changelogGroupNew": "Mới",
+    "changelogFixesIn": "Các bản sửa lỗi và cải tiến trong {{areas}}.",
+    "changelogFixesAcrossApp": "Các bản sửa lỗi và cải tiến trên toàn ứng dụng.",
+    "changelogAreas": {
+      "chat": "Trò chuyện",
+      "cloudAgent": "Tác tử đám mây",
+      "securityAgent": "Tác tử bảo mật",
+      "codeReviewer": "Trình đánh giá mã",
+      "signIn": "Đăng nhập",
+      "profileOrganizations": "Hồ sơ và tổ chức",
+      "notifications": "Thông báo",
+      "integrations": "Tích hợp"
+    }
   },
   "preferences": {
     "general": "Chung",

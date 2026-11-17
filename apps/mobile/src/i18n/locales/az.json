@@ -482,7 +482,19 @@
     },
     "changelog": "Yeniliklər",
     "changelogVersionPending": "{{version}} versiyasının qeydləri tətbiqin növbəti yeniləməsi ilə gələcək.",
-    "changelogTranslationFixes": "Tərcümə düzəlişləri: {{languages}}"
+    "changelogGroupNew": "Yeni",
+    "changelogFixesIn": "{{areas}} bölmələrində düzəlişlər və təkmilləşdirmələr.",
+    "changelogFixesAcrossApp": "Bütün tətbiqdə düzəlişlər və təkmilləşdirmələr.",
+    "changelogAreas": {
+      "chat": "Söhbət",
+      "cloudAgent": "Bulud agenti",
+      "securityAgent": "Təhlükəsizlik agenti",
+      "codeReviewer": "Kod rəyçisi",
+      "signIn": "Giriş",
+      "profileOrganizations": "Profil və təşkilatlar",
+      "notifications": "Bildirişlər",
+      "integrations": "İnteqrasiyalar"
+    }
   },
   "preferences": {
     "general": "Ümumi",

@@ -482,7 +482,19 @@
     },
     "changelog": "Sabbin abubuwa",
     "changelogVersionPending": "Bayanan siga {{version}} za su zo da sabuntawar manhaja ta gaba.",
-    "changelogTranslationFixes": "Gyaran fassara don {{languages}}"
+    "changelogGroupNew": "Sabbi",
+    "changelogFixesIn": "Gyare-gyare da ingantawa a {{areas}}.",
+    "changelogFixesAcrossApp": "Gyare-gyare da ingantawa a duk faɗin manhajar.",
+    "changelogAreas": {
+      "chat": "Hira",
+      "cloudAgent": "Wakilin gajimare",
+      "securityAgent": "Wakilin tsaro",
+      "codeReviewer": "Mai bitar lambar shiri",
+      "signIn": "Shiga",
+      "profileOrganizations": "Bayanan martaba da ƙungiyoyi",
+      "notifications": "Sanarwa",
+      "integrations": "Haɗe-haɗe"
+    }
   },
   "preferences": {
     "general": "Gaba ɗaya",

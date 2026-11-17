@@ -482,7 +482,19 @@
     },
     "changelog": "Čo je nové",
     "changelogVersionPending": "Poznámky k verzii {{version}} prídu s ďalšou aktualizáciou aplikácie.",
-    "changelogTranslationFixes": "Opravy prekladov: {{languages}}"
+    "changelogGroupNew": "Novinky",
+    "changelogFixesIn": "Opravy a vylepšenia v oblastiach: {{areas}}.",
+    "changelogFixesAcrossApp": "Opravy a vylepšenia v celej aplikácii.",
+    "changelogAreas": {
+      "chat": "Čet",
+      "cloudAgent": "Cloudový agent",
+      "securityAgent": "Bezpečnostný agent",
+      "codeReviewer": "Kontrolór kódu",
+      "signIn": "Prihlásenie",
+      "profileOrganizations": "Profil a organizácie",
+      "notifications": "Upozornenia",
+      "integrations": "Integrácie"
+    }
   },
   "preferences": {
     "general": "Všeobecné",

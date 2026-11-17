@@ -482,7 +482,19 @@
     },
     "changelog": "Berritasunak",
     "changelogVersionPending": "{{version}} bertsioaren oharrak aplikazioaren hurrengo eguneratzearekin iritsiko dira.",
-    "changelogTranslationFixes": "Itzulpen-zuzenketak hizkuntza hauetan: {{languages}}"
+    "changelogGroupNew": "Berrikuntzak",
+    "changelogFixesIn": "Zuzenketak eta hobekuntzak atal hauetan: {{areas}}.",
+    "changelogFixesAcrossApp": "Zuzenketak eta hobekuntzak aplikazio osoan.",
+    "changelogAreas": {
+      "chat": "Txata",
+      "cloudAgent": "Hodeiko agentea",
+      "securityAgent": "Segurtasun-agentea",
+      "codeReviewer": "Kode-berrikuslea",
+      "signIn": "Saioa hastea",
+      "profileOrganizations": "Profila eta erakundeak",
+      "notifications": "Jakinarazpenak",
+      "integrations": "Integrazioak"
+    }
   },
   "preferences": {
     "general": "Orokorra",

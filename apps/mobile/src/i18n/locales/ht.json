@@ -482,7 +482,19 @@
     },
     "changelog": "Sa ki nouvo",
     "changelogVersionPending": "Nòt vèsyon {{version}} an ap vini ak pwochen mizajou aplikasyon an.",
-    "changelogTranslationFixes": "Koreksyon tradiksyon pou {{languages}}"
+    "changelogGroupNew": "Nouvo",
+    "changelogFixesIn": "Koreksyon ak amelyorasyon nan {{areas}}.",
+    "changelogFixesAcrossApp": "Koreksyon ak amelyorasyon nan tout aplikasyon an.",
+    "changelogAreas": {
+      "chat": "Konvèsasyon",
+      "cloudAgent": "Ajan nan nwaj",
+      "securityAgent": "Ajan sekirite",
+      "codeReviewer": "Revizè kòd",
+      "signIn": "Koneksyon",
+      "profileOrganizations": "Pwofil ak òganizasyon",
+      "notifications": "Notifikasyon",
+      "integrations": "Entegrasyon"
+    }
   },
   "preferences": {
     "general": "Jeneral",

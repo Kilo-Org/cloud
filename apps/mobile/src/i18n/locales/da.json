@@ -482,7 +482,19 @@
     },
     "changelog": "Nyheder",
     "changelogVersionPending": "Noterne til version {{version}} kommer med næste appopdatering.",
-    "changelogTranslationFixes": "Oversættelsesrettelser for {{languages}}"
+    "changelogGroupNew": "Nyt",
+    "changelogFixesIn": "Rettelser og forbedringer i {{areas}}.",
+    "changelogFixesAcrossApp": "Rettelser og forbedringer i hele appen.",
+    "changelogAreas": {
+      "chat": "Chat",
+      "cloudAgent": "Cloudagent",
+      "securityAgent": "Sikkerhedsagent",
+      "codeReviewer": "Kodeanmelder",
+      "signIn": "Log-ind",
+      "profileOrganizations": "Profil og organisationer",
+      "notifications": "Notifikationer",
+      "integrations": "Integrationer"
+    }
   },
   "preferences": {
     "general": "Generelt",

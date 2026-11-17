@@ -482,7 +482,19 @@
     },
     "changelog": "ਕੀ ਨਵਾਂ ਹੈ",
     "changelogVersionPending": "{{version}} ਵਰਜਨ ਦੇ ਨੋਟਸ ਐਪ ਦੀ ਅਗਲੀ ਅੱਪਡੇਟ ਨਾਲ ਆਉਣਗੇ।",
-    "changelogTranslationFixes": "{{languages}} ਲਈ ਅਨੁਵਾਦ ਸੁਧਾਰ"
+    "changelogGroupNew": "ਨਵਾਂ",
+    "changelogFixesIn": "{{areas}} ਵਿੱਚ ਫਿਕਸ ਅਤੇ ਸੁਧਾਰ।",
+    "changelogFixesAcrossApp": "ਪੂਰੀ ਐਪ ਵਿੱਚ ਫਿਕਸ ਅਤੇ ਸੁਧਾਰ।",
+    "changelogAreas": {
+      "chat": "ਚੈਟ",
+      "cloudAgent": "ਕਲਾਊਡ ਏਜੰਟ",
+      "securityAgent": "ਸੁਰੱਖਿਆ ਏਜੰਟ",
+      "codeReviewer": "ਕੋਡ ਸਮੀਖਿਅਕ",
+      "signIn": "ਸਾਈਨ ਇਨ",
+      "profileOrganizations": "ਪ੍ਰੋਫਾਈਲ ਅਤੇ ਸੰਸਥਾਵਾਂ",
+      "notifications": "ਸੂਚਨਾਵਾਂ",
+      "integrations": "ਏਕੀਕਰਨ"
+    }
   },
   "preferences": {
     "general": "ਆਮ",

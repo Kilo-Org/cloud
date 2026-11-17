@@ -482,7 +482,19 @@
     },
     "changelog": "Yenilikler",
     "changelogVersionPending": "{{version}} sürümünün notları sonraki uygulama güncellemesiyle gelir.",
-    "changelogTranslationFixes": "{{languages}} için çeviri düzeltmeleri"
+    "changelogGroupNew": "Yeni",
+    "changelogFixesIn": "Şu alanlarda düzeltmeler ve iyileştirmeler: {{areas}}.",
+    "changelogFixesAcrossApp": "Uygulama genelinde düzeltmeler ve iyileştirmeler.",
+    "changelogAreas": {
+      "chat": "Sohbet",
+      "cloudAgent": "Bulut ajanı",
+      "securityAgent": "Güvenlik ajanı",
+      "codeReviewer": "Kod inceleyici",
+      "signIn": "Oturum açma",
+      "profileOrganizations": "Profil ve kuruluşlar",
+      "notifications": "Bildirimler",
+      "integrations": "Entegrasyonlar"
+    }
   },
   "preferences": {
     "general": "Genel",

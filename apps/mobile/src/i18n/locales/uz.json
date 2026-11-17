@@ -482,7 +482,19 @@
     },
     "changelog": "Yangiliklar",
     "changelogVersionPending": "{{version}} versiyasi yangiliklari ilovaning keyingi yangilanishi bilan keladi.",
-    "changelogTranslationFixes": "{{languages}} uchun tarjima tuzatishlari"
+    "changelogGroupNew": "Yangi",
+    "changelogFixesIn": "Quyidagi bo‘limlarda tuzatishlar va yaxshilanishlar: {{areas}}.",
+    "changelogFixesAcrossApp": "Butun ilova bo‘ylab tuzatishlar va yaxshilanishlar.",
+    "changelogAreas": {
+      "chat": "Suhbat",
+      "cloudAgent": "Bulutli agent",
+      "securityAgent": "Xavfsizlik agenti",
+      "codeReviewer": "Kod tekshiruvchi",
+      "signIn": "Kirish",
+      "profileOrganizations": "Profil va tashkilotlar",
+      "notifications": "Bildirishnomalar",
+      "integrations": "Integratsiyalar"
+    }
   },
   "preferences": {
     "general": "Umumiy",

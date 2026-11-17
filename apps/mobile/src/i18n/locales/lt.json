@@ -482,7 +482,19 @@
     },
     "changelog": "Kas naujo",
     "changelogVersionPending": "{{version}} versijos pastabos pasirodys su kitu programėlės atnaujinimu.",
-    "changelogTranslationFixes": "Vertimų pataisymai: {{languages}}"
+    "changelogGroupNew": "Nauja",
+    "changelogFixesIn": "Pataisymai ir patobulinimai šiose srityse: {{areas}}.",
+    "changelogFixesAcrossApp": "Pataisymai ir patobulinimai visoje programėlėje.",
+    "changelogAreas": {
+      "chat": "Pokalbiai",
+      "cloudAgent": "Debesų agentas",
+      "securityAgent": "Saugos agentas",
+      "codeReviewer": "Kodo peržiūrėtojas",
+      "signIn": "Prisijungimas",
+      "profileOrganizations": "Profilis ir organizacijos",
+      "notifications": "Pranešimai",
+      "integrations": "Integracijos"
+    }
   },
   "preferences": {
     "general": "Bendra",

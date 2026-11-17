@@ -482,7 +482,19 @@
     },
     "changelog": "Mapya",
     "changelogVersionPending": "Maelezo ya toleo {{version}} yatakuja na sasisho lijalo la programu.",
-    "changelogTranslationFixes": "Marekebisho ya tafsiri kwa {{languages}}"
+    "changelogGroupNew": "Mpya",
+    "changelogFixesIn": "Marekebisho na maboresho katika {{areas}}.",
+    "changelogFixesAcrossApp": "Marekebisho na maboresho katika programu nzima.",
+    "changelogAreas": {
+      "chat": "Gumzo",
+      "cloudAgent": "Wakala wa wingu",
+      "securityAgent": "Wakala wa usalama",
+      "codeReviewer": "Mkaguzi wa msimbo",
+      "signIn": "Kuingia",
+      "profileOrganizations": "Wasifu na mashirika",
+      "notifications": "Arifa",
+      "integrations": "Miunganisho"
+    }
   },
   "preferences": {
     "general": "Jumla",

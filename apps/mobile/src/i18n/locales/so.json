@@ -482,7 +482,19 @@
     },
     "changelog": "Waxyaabaha cusub",
     "changelogVersionPending": "Qoraallada nooca {{version}} waxay la yimaadaan cusboonaysiinta xigta.",
-    "changelogTranslationFixes": "Hagaajinta tarjumaadda luqadaha {{languages}}"
+    "changelogGroupNew": "Cusub",
+    "changelogFixesIn": "Hagaajinno iyo horumarin lagu sameeyay {{areas}}.",
+    "changelogFixesAcrossApp": "Hagaajinno iyo horumarin lagu sameeyay barnaamijka oo dhan.",
+    "changelogAreas": {
+      "chat": "Sheekaysi",
+      "cloudAgent": "Wakiilka daruuraha",
+      "securityAgent": "Wakiilka amniga",
+      "codeReviewer": "Dib-u-eegaha koodhka",
+      "signIn": "Gelitaanka",
+      "profileOrganizations": "Xogta shakhsiga iyo ururada",
+      "notifications": "Ogeysiisyada",
+      "integrations": "Isku-xidhka"
+    }
   },
   "preferences": {
     "general": "Guud",

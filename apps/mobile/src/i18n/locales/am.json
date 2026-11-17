@@ -482,7 +482,19 @@
     },
     "changelog": "አዲስ ነገር",
     "changelogVersionPending": "የስሪት {{version}} ማስታወሻዎች ከሚቀጥለው የመተግበሪያ ዝማኔ ጋር ይመጣሉ።",
-    "changelogTranslationFixes": "የትርጉም ማስተካከያዎች፦ {{languages}}"
+    "changelogGroupNew": "አዲስ",
+    "changelogFixesIn": "በእነዚህ ክፍሎች ጥገናዎች እና ማሻሻያዎች ተደርገዋል፦ {{areas}}።",
+    "changelogFixesAcrossApp": "በመተግበሪያው ውስጥ በሙሉ ጥገናዎች እና ማሻሻያዎች ተደርገዋል።",
+    "changelogAreas": {
+      "chat": "ውይይት",
+      "cloudAgent": "የደመና ወኪል",
+      "securityAgent": "የደህንነት ወኪል",
+      "codeReviewer": "የኮድ ገምጋሚ",
+      "signIn": "መግቢያ",
+      "profileOrganizations": "መገለጫ እና ድርጅቶች",
+      "notifications": "ማሳወቂያዎች",
+      "integrations": "ውህደቶች"
+    }
   },
   "preferences": {
     "general": "አጠቃላይ",

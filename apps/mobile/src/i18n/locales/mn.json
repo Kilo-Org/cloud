@@ -482,7 +482,19 @@
     },
     "changelog": "Шинэ зүйлс",
     "changelogVersionPending": "{{version}} хувилбарын тэмдэглэл аппын дараагийн шинэчлэлтээр ирнэ.",
-    "changelogTranslationFixes": "{{languages}} хэлний орчуулгын засварууд"
+    "changelogGroupNew": "Шинэ",
+    "changelogFixesIn": "Дараах хэсгүүдэд засвар, сайжруулалт хийгдсэн: {{areas}}.",
+    "changelogFixesAcrossApp": "Апп даяар засвар, сайжруулалт хийгдсэн.",
+    "changelogAreas": {
+      "chat": "Чат",
+      "cloudAgent": "Үүлэн агент",
+      "securityAgent": "Аюулгүй байдлын агент",
+      "codeReviewer": "Код хянагч",
+      "signIn": "Нэвтрэх",
+      "profileOrganizations": "Профайл ба байгууллагууд",
+      "notifications": "Мэдэгдэл",
+      "integrations": "Интеграци"
+    }
   },
   "preferences": {
     "general": "Ерөнхий",

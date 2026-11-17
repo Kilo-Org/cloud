@@ -19,12 +19,12 @@ import {
 /**
  * The release notes the app ships with, as a reader sees them. `CHANGELOG.md` is
  * inlined into the bundle as a string by babel-plugin-inline-import, and
- * `changelogSections` drops the file's maintainer parts, turns each commit
- * subject into a sentence, and folds one version's builds into one list. The
- * newest section here is the release before this build: the Release workflow
- * writes a build's section after its submission lands, so the bytes this build
- * compiled cannot carry their own entry (it arrives in the next build's
- * bundle).
+ * `changelogSections` drops the file's maintainer parts, keeps the newest
+ * features as sentences, and turns the fixes into the product areas they
+ * touched. The newest section here is the release before this build: the
+ * Release workflow writes a build's section after its submission lands, so the
+ * bytes this build compiled cannot carry their own entry (it arrives in the
+ * next build's bundle).
  */
 const CHANGELOG_SECTIONS = changelogSections(changelog);
 
@@ -51,6 +51,8 @@ const listContentContainerStyle = {
 
 const keyExtractor = (section: ChangelogSection) => section.version;
 
+const groupLabelClass = 'uppercase tracking-wide text-muted-foreground';
+
 function NoteRow({ text }: Readonly<{ text: string }>) {
   return (
     <View className="flex-row gap-2">
@@ -61,29 +63,37 @@ function NoteRow({ text }: Readonly<{ text: string }>) {
 }
 
 /**
- * One version's notes: its heading, then a bullet per change. The 24 dp below a
- * version is the only break the reader gets, so every bullet of a version sits
- * one 8 dp gap from the next and a new heading starts the next block.
+ * One version: its heading, the New group, and the line that names the areas
+ * the fixes touched. Bullets sit one 8 dp gap apart, the two groups 16 dp, and
+ * the next version starts 24 dp down.
  */
 function ReleaseSection({ section }: Readonly<{ section: ChangelogSection }>) {
   const { t, i18n } = useTranslation();
+  const areas = section.fixesAreas.map(area => t(`profile.changelogAreas.${area}`));
+  const fixesLabel =
+    areas.length === 0
+      ? t('profile.changelogFixesAcrossApp')
+      : t('profile.changelogFixesIn', { areas: formatList(areas, i18n.language) });
+  const fixesClass =
+    section.newNotes.length === 0
+      ? 'text-sm text-muted-foreground'
+      : 'pt-4 text-sm text-muted-foreground';
   return (
     <View className="pb-6">
       <Text variant="h4" className="pb-2">
         {section.version}
       </Text>
-      <View className="gap-2">
-        {section.notes.map((note, position) => (
-          <NoteRow key={`${note}-${position}`} text={note} />
-        ))}
-        {section.translationLanguages.length === 0 ? null : (
-          <NoteRow
-            text={t('profile.changelogTranslationFixes', {
-              languages: formatList(section.translationLanguages, i18n.language),
-            })}
-          />
-        )}
-      </View>
+      {section.newNotes.length === 0 ? null : (
+        <View className="gap-2">
+          <Text variant="small" className={groupLabelClass}>
+            {t('profile.changelogGroupNew')}
+          </Text>
+          {section.newNotes.map((note, position) => (
+            <NoteRow key={`${note}-${position}`} text={note} />
+          ))}
+        </View>
+      )}
+      {section.hasFixes ? <Text className={fixesClass}>{fixesLabel}</Text> : null}
     </View>
   );
 }
@@ -96,9 +106,11 @@ export function ChangelogScreen() {
     []
   );
   // The notice belongs to the notes, not to the screen: as the list's header it
-  // shares the list's 20 dp inset and scrolls away with the first version.
+  // shares the list's 20 dp inset and scrolls away with the first version. It is
+  // a caption — smaller than a bullet and muted — and its 16 dp foot is the gap
+  // above the first version heading.
   const header: ReactElement | null = NOTES_PENDING ? (
-    <Text variant="muted" className="pb-4">
+    <Text className="pb-4 text-xs text-muted-foreground">
       {t('profile.changelogVersionPending', { version: INSTALLED_VERSION })}
     </Text>
   ) : null;

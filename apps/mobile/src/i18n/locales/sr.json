@@ -482,7 +482,19 @@
     },
     "changelog": "Šta je novo",
     "changelogVersionPending": "Beleške za verziju {{version}} stižu sa sledećim ažuriranjem aplikacije.",
-    "changelogTranslationFixes": "Ispravke prevoda za {{languages}}"
+    "changelogGroupNew": "Ново",
+    "changelogFixesIn": "Исправке и побољшања у следећим областима: {{areas}}.",
+    "changelogFixesAcrossApp": "Исправке и побољшања у целој апликацији.",
+    "changelogAreas": {
+      "chat": "Ћаскање",
+      "cloudAgent": "Агент у облаку",
+      "securityAgent": "Безбедносни агент",
+      "codeReviewer": "Рецензент кода",
+      "signIn": "Пријављивање",
+      "profileOrganizations": "Профил и организације",
+      "notifications": "Обавештења",
+      "integrations": "Интеграције"
+    }
   },
   "preferences": {
     "general": "Opšte",

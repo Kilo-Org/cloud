@@ -482,7 +482,19 @@
     },
     "changelog": "تازه‌ها",
     "changelogVersionPending": "یادداشت‌های نسخهٔ {{version}} با به‌روزرسانی بعدی برنامه می‌رسند.",
-    "changelogTranslationFixes": "اصلاح ترجمه‌ها برای {{languages}}"
+    "changelogGroupNew": "تازه‌ها",
+    "changelogFixesIn": "رفع اشکالات و بهبودها در {{areas}}.",
+    "changelogFixesAcrossApp": "رفع اشکالات و بهبودها در سراسر برنامه.",
+    "changelogAreas": {
+      "chat": "گفتگو",
+      "cloudAgent": "عامل ابری",
+      "securityAgent": "عامل امنیتی",
+      "codeReviewer": "بازبین کد",
+      "signIn": "ورود",
+      "profileOrganizations": "نمایه و سازمان‌ها",
+      "notifications": "اعلان‌ها",
+      "integrations": "یکپارچه‌سازی‌ها"
+    }
   },
   "preferences": {
     "general": "عمومی",

@@ -482,7 +482,19 @@
     },
     "changelog": "X'hemm ġdid",
     "changelogVersionPending": "In-noti għall-verżjoni {{version}} jaslu mal-aġġornament li jmiss tal-app.",
-    "changelogTranslationFixes": "Korrezzjonijiet tat-traduzzjoni għal {{languages}}"
+    "changelogGroupNew": "Ġdid",
+    "changelogFixesIn": "Tiswijiet u titjib f'dawn l-oqsma: {{areas}}.",
+    "changelogFixesAcrossApp": "Tiswijiet u titjib fl-applikazzjoni kollha.",
+    "changelogAreas": {
+      "chat": "Konversazzjoni",
+      "cloudAgent": "Aġent tas-sħab",
+      "securityAgent": "Aġent tas-sigurtà",
+      "codeReviewer": "Reviżur tal-kodiċi",
+      "signIn": "Dħul",
+      "profileOrganizations": "Profil u organizzazzjonijiet",
+      "notifications": "Notifiki",
+      "integrations": "Integrazzjonijiet"
+    }
   },
   "preferences": {
     "general": "Ġenerali",

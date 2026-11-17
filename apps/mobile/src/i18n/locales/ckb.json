@@ -482,7 +482,19 @@
     },
     "changelog": "تازەکان",
     "changelogVersionPending": "تێبینییەکانی وەشانی {{version}} لەگەڵ نوێکردنەوەی داهاتووی ئەپەکە دێن.",
-    "changelogTranslationFixes": "چاککردنی وەرگێڕان بۆ {{languages}}"
+    "changelogGroupNew": "نوێ",
+    "changelogFixesIn": "چاککردن و باشترکردن لەم بەشانەدا: {{areas}}.",
+    "changelogFixesAcrossApp": "چاککردن و باشترکردن لە سەرتاسەری ئەپەکەدا.",
+    "changelogAreas": {
+      "chat": "چات",
+      "cloudAgent": "بریکاری هەور",
+      "securityAgent": "بریکاری ئاسایش",
+      "codeReviewer": "پێداچووەرەوەی کۆد",
+      "signIn": "چوونەژوورەوە",
+      "profileOrganizations": "پرۆفایل و ڕێکخراوەکان",
+      "notifications": "ئاگادارکردنەوەکان",
+      "integrations": "یەکخستنەکان"
+    }
   },
   "preferences": {
     "general": "گشتی",

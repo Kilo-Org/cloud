@@ -482,7 +482,19 @@
     },
     "changelog": "नयाँ कुराहरू",
     "changelogVersionPending": "संस्करण {{version}} का नोटहरू अर्को एप अपडेटसँगै आउनेछन्।",
-    "changelogTranslationFixes": "{{languages}} का लागि अनुवाद सुधारहरू"
+    "changelogGroupNew": "नयाँ",
+    "changelogFixesIn": "{{areas}} मा समाधान र सुधारहरू।",
+    "changelogFixesAcrossApp": "सम्पूर्ण एपमा समाधान र सुधारहरू।",
+    "changelogAreas": {
+      "chat": "च्याट",
+      "cloudAgent": "क्लाउड एजेन्ट",
+      "securityAgent": "सुरक्षा एजेन्ट",
+      "codeReviewer": "कोड समीक्षक",
+      "signIn": "साइन इन",
+      "profileOrganizations": "प्रोफाइल र संस्थाहरू",
+      "notifications": "सूचनाहरू",
+      "integrations": "एकीकरणहरू"
+    }
   },
   "preferences": {
     "general": "सामान्य",

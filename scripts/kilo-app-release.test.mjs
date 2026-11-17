@@ -226,10 +226,7 @@ test('body lists app PRs oldest first and drops bumps, non-app, app-local, chang
 
     const result = runScript(NOTES, ['body', '--from', 'base'], { cwd: dir });
     assert.equal(result.status, 0, result.stderr);
-    assert.equal(
-      result.stdout,
-      '- fix(mobile): second ([#101](https://github.com/Kilo-Org/cloud/pull/101))\n'
-    );
+    assert.equal(result.stdout, ['### Fixes', '', '- areas: app', ''].join('\n'));
 
     const empty = runScript(NOTES, ['body', '--from', 'nopr'], { cwd: dir });
     assert.equal(empty.status, 0, empty.stderr);
@@ -284,11 +281,42 @@ test('body keeps the subjects a reader sees and drops the rest', () => {
 
     const result = runScript(NOTES, ['body', '--from', 'base'], { cwd: dir });
     assert.equal(result.status, 0, result.stderr);
+    // The catalog fix's `mobile` scope names no area, and `auth` maps, so the
+    // section names the one area its fixes reached.
+    assert.equal(result.stdout, ['### Fixes', '', '- areas: signIn', ''].join('\n'));
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test('body lists the newest features under New and the fix areas under Fixes', () => {
+  const dir = initRepo('kilo-notes-curated-');
+  try {
+    commit(dir, { 'apps/mobile/src/first.ts': 'first\n' }, 'feat(mobile): first (#100)');
+    git(dir, ['tag', 'base']);
+    commit(dir, { 'apps/mobile/src/a.ts': 'a\n' }, 'feat(chat): keep the composer visible (#121)');
+    commit(dir, { 'apps/mobile/src/b.ts': 'b\n' }, 'feat(security-agent): name the scope (#122)');
+    commit(dir, { 'apps/mobile/src/c.ts': 'c\n' }, 'fix(auth): link same-email sign-ins (#123)');
+    commit(dir, { 'apps/mobile/src/d.ts': 'd\n' }, 'fix(chat): steady the toolbar (#124)');
+    commit(
+      dir,
+      { 'apps/mobile/src/e.ts': 'e\n' },
+      'fix(notifications): lead with the message (#125)'
+    );
+
+    const result = runScript(NOTES, ['body', '--from', 'base'], { cwd: dir });
+    assert.equal(result.status, 0, result.stderr);
     assert.equal(
       result.stdout,
       [
-        '- fix(auth): link same-email sign-ins ([#115](https://github.com/Kilo-Org/cloud/pull/115))',
-        '- fix(mobile): correct the Igbo code reviewer copy ([#116](https://github.com/Kilo-Org/cloud/pull/116))',
+        '### New',
+        '',
+        '- feat(security-agent): name the scope ([#122](https://github.com/Kilo-Org/cloud/pull/122))',
+        '- feat(chat): keep the composer visible ([#121](https://github.com/Kilo-Org/cloud/pull/121))',
+        '',
+        '### Fixes',
+        '',
+        '- areas: chat, signIn, notifications',
         '',
       ].join('\n')
     );
@@ -297,15 +325,18 @@ test('body keeps the subjects a reader sees and drops the rest', () => {
   }
 });
 
-test('readerFacingSubject keeps a subject with no conventional prefix', () => {
-  assert.equal(
-    readerFacingSubject('Quick Chat polish: bubble width (#117)'),
-    'Quick Chat polish: bubble width ([#117](https://github.com/Kilo-Org/cloud/pull/117))'
-  );
-  assert.equal(
-    readerFacingSubject('feat(mobile): add on-device Gemini Nano (#118)'),
-    'feat(mobile): add on-device Gemini Nano ([#118](https://github.com/Kilo-Org/cloud/pull/118))'
-  );
+test('readerFacingSubject classifies a subject and links it', () => {
+  assert.deepEqual(readerFacingSubject('Quick Chat polish: bubble width (#117)'), {
+    kind: 'new',
+    text: 'Quick Chat polish: bubble width ([#117](https://github.com/Kilo-Org/cloud/pull/117))',
+    scope: undefined,
+  });
+  assert.deepEqual(readerFacingSubject('feat(mobile): add on-device Gemini Nano (#118)'), {
+    kind: 'new',
+    text: 'feat(mobile): add on-device Gemini Nano ([#118](https://github.com/Kilo-Org/cloud/pull/118))',
+    scope: 'mobile',
+  });
+  assert.equal(readerFacingSubject('fix(security-agent): name the scope (#121)')?.kind, 'fix');
   assert.equal(readerFacingSubject('docs(mobile): correct a comment (#119)'), null);
   assert.equal(
     readerFacingSubject('feat(mobile): add shared client transport and web demo (#120)'),
@@ -403,10 +434,7 @@ test('body drops the squashed version-bump merge that carries the changelog', ()
 
     const result = runScript(NOTES, ['body', '--from', 'base'], { cwd: dir });
     assert.equal(result.status, 0, result.stderr);
-    assert.equal(
-      result.stdout,
-      '- fix(mobile): a real fix ([#7002](https://github.com/Kilo-Org/cloud/pull/7002))\n'
-    );
+    assert.equal(result.stdout, ['### Fixes', '', '- areas: app', ''].join('\n'));
 
     const onlyBump = runScript(NOTES, ['body', '--from', 'base', '--to', bumpMerge], { cwd: dir });
     assert.equal(onlyBump.status, 0, onlyBump.stderr);

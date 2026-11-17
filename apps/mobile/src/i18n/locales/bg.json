@@ -482,7 +482,19 @@
     },
     "changelog": "Какво е новото",
     "changelogVersionPending": "Бележките за версия {{version}} идват със следващата актуализация на приложението.",
-    "changelogTranslationFixes": "Поправки в превода: {{languages}}"
+    "changelogGroupNew": "Ново",
+    "changelogFixesIn": "Поправки и подобрения в {{areas}}.",
+    "changelogFixesAcrossApp": "Поправки и подобрения в цялото приложение.",
+    "changelogAreas": {
+      "chat": "Чат",
+      "cloudAgent": "Облачен агент",
+      "securityAgent": "Агент за сигурност",
+      "codeReviewer": "Рецензент на код",
+      "signIn": "Вход",
+      "profileOrganizations": "Профил и организации",
+      "notifications": "Известия",
+      "integrations": "Интеграции"
+    }
   },
   "preferences": {
     "general": "Общи",

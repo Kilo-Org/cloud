@@ -91,9 +91,10 @@ describe('resolveOrganizationBrowserPolicy', () => {
   });
 
   test('fails closed to off when a stored control mode is unreadable', () => {
-    expect(
-      resolveOrganizationBrowserPolicy(organizationWith({ browserControl: 'ask' }))
-    ).toEqual({ browserControl: 'off', browserAllowedOrigins: [] });
+    expect(resolveOrganizationBrowserPolicy(organizationWith({ browserControl: 'ask' }))).toEqual({
+      browserControl: 'off',
+      browserAllowedOrigins: [],
+    });
   });
 
   test('fails closed to off for a non-string stored control mode', () => {
@@ -110,7 +111,10 @@ describe('resolveOrganizationBrowserPolicy', () => {
   });
 
   test('ignores unrelated settings', () => {
-    const settings: Settings = { default_model: 'anthropic/claude-sonnet-4', browserControl: 'off' };
+    const settings: Settings = {
+      default_model: 'anthropic/claude-sonnet-4',
+      browserControl: 'off',
+    };
     expect(resolveOrganizationBrowserPolicy(organizationWith(settings))).toEqual({
       browserControl: 'off',
       browserAllowedOrigins: [],

@@ -85,6 +85,11 @@ const createPort = () => {
 
   return {
     disconnected: () => disconnected,
+    drop: () => {
+      for (const listener of disconnectListeners) {
+        listener();
+      }
+    },
     messages,
     port,
     receive: (message: unknown) => {
@@ -101,7 +106,7 @@ const createHarness = () => {
   const failures: LocalAgentFailure[] = [];
   let ready = 0;
 
-  createNativeDial({
+  const handle = createNativeDial({
     hello: HELLO,
     runtime: {
       connectNative: hostName => {
@@ -123,7 +128,7 @@ const createHarness = () => {
     },
   });
 
-  return { failures, port, ready: () => ready, timers };
+  return { failures, handle, port, ready: () => ready, timers };
 };
 
 describe('native transport', () => {
@@ -146,6 +151,25 @@ describe('native transport', () => {
     expect(harness.port.messages).toHaveLength(1);
     harness.timers.runDue();
     expect(harness.failures).toStrictEqual([]);
+  });
+
+  it('clears the deadline on close so a late timer cannot fire', () => {
+    const harness = createHarness();
+
+    expect(harness.timers.scheduled).toHaveLength(1);
+    harness.handle.close();
+
+    expect(harness.timers.scheduled).toHaveLength(0);
+    expect(harness.port.disconnected()).toBe(1);
+  });
+
+  it('clears the deadline when the host disconnects', () => {
+    const harness = createHarness();
+
+    harness.port.drop();
+
+    expect(harness.timers.scheduled).toHaveLength(0);
+    expect(harness.failures).toStrictEqual([{ kind: 'transport' }]);
   });
 
   it('classifies a missing and a forbidden host', () => {

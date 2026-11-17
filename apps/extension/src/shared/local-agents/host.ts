@@ -34,6 +34,8 @@ import type { LoopbackSocketConnect } from './loopback-transport';
 import { createNativeDial } from './native-transport';
 import type { NativeMessagingRuntime } from './native-transport';
 import { parsePairingUrl } from './pairing';
+import { createPairingConsumption } from './pairing-consumption';
+import type { LocalAgentPairingConsumption } from './pairing-consumption';
 import type { LocalAgentPairingEndpoint } from './pairing';
 import { createLocalAgentControllerRegistry } from './registry';
 import { LOCAL_AGENT_SETTINGS_STORAGE_KEY, loadLocalAgentSettings } from './settings';
@@ -233,8 +235,12 @@ export const startLocalAgentsHost = (
   const publish = createSerialTaskQueue();
   /* Pairing navigations can arrive before the first settings read answers. */
   const pendingPairings: { endpoint: LocalAgentPairingEndpoint; tabId: number }[] = [];
-  /* One fragment pairs once: a replay of the same URL must not re-dial. */
-  const consumedPairings = new Set<string>();
+  /* One fragment pairs once, and only once its handshake succeeded. */
+  const consumedPairings: LocalAgentPairingConsumption = createPairingConsumption({ now });
+  /* Fragments being processed now: the second navigation must not duplicate it. */
+  const inFlightPairings = new Set<string>();
+  /* HubId -> fragment key, so a successful connect marks the right fragment used. */
+  const pairingKeysByHub = new Map<string, string>();
   const ready = Promise.withResolvers<void>();
   let enabled = false;
   let settingsLoaded = false;
@@ -365,6 +371,10 @@ export const startLocalAgentsHost = (
       onStateChange: next => {
         if (lastState.kind === 'connected' && next.kind !== 'connected') {
           void forgetControllersOf(connection);
+        }
+
+        if (next.kind === 'connected' && endpoint.transport === 'loopback') {
+          consumeIfConnected(endpoint.hubId);
         }
 
         lastState = next;
@@ -498,52 +508,77 @@ export const startLocalAgentsHost = (
     await reconcile();
   };
 
-  const acceptPairing = async (
-    endpoint: LocalAgentPairingEndpoint,
-    tabId: number
-  ): Promise<void> => {
-    const stored = await loadLocalAgentEndpoints(storage);
-    const alreadyStored = stored.some(
-      candidate =>
-        candidate.hubId === endpoint.hubId &&
-        candidate.key === endpoint.key &&
-        candidate.ws === endpoint.ws
-    );
-
-    if (!alreadyStored) {
-      await saveLocalAgentEndpoint(storage, endpoint);
-    }
-
-    // Pairing tabs are single-use; closing the tab clears the key from the address bar.
-    try {
-      await tabs?.remove(tabId);
-    } catch {
-      // Already gone (the user closed it) — nothing to do.
-    }
-
-    await reconcile();
-  };
-
   const pairingKey = (endpoint: LocalAgentPairingEndpoint): string =>
     `${endpoint.hubId}|${endpoint.key}|${endpoint.ws}`;
 
-  /** Accepts one pairing navigation at most once per fragment. */
-  const consumePairing = (endpoint: LocalAgentPairingEndpoint): boolean => {
-    const key = pairingKey(endpoint);
+  /**
+   * Marks the fragment used once its endpoint reports `connected`. A fragment
+   * seen while the switch was off, or one whose handshake failed, stays unused
+   * so a later attempt can still pair.
+   */
+  const consumeIfConnected = (hubId: string): void => {
+    const connection = connections.get(hubId);
+    const key = pairingKeysByHub.get(hubId);
 
-    if (consumedPairings.has(key)) {
-      return false;
+    if (key === undefined || connection?.state().kind !== 'connected') {
+      return;
     }
 
     consumedPairings.add(key);
+    pairingKeysByHub.delete(hubId);
+  };
 
-    return true;
+  const acceptPairing = async (
+    endpoint: LocalAgentPairingEndpoint,
+    tabId: number,
+    key: string
+  ): Promise<void> => {
+    try {
+      const stored = await loadLocalAgentEndpoints(storage);
+      const alreadyStored = stored.some(
+        candidate =>
+          candidate.hubId === endpoint.hubId &&
+          candidate.key === endpoint.key &&
+          candidate.ws === endpoint.ws
+      );
+
+      if (!alreadyStored) {
+        await saveLocalAgentEndpoint(storage, endpoint);
+      }
+
+      pairingKeysByHub.set(endpoint.hubId, key);
+
+      // Pairing tabs are single-use; closing the tab clears the key from the address bar.
+      try {
+        await tabs?.remove(tabId);
+      } catch {
+        // Already gone (the user closed it) — nothing to do.
+      }
+
+      await reconcile();
+      consumeIfConnected(endpoint.hubId);
+    } finally {
+      inFlightPairings.delete(key);
+    }
+  };
+
+  const startPairing = (endpoint: LocalAgentPairingEndpoint, tabId: number, key: string): void => {
+    inFlightPairings.add(key);
+    void (async (): Promise<void> => {
+      try {
+        await acceptPairing(endpoint, tabId, key);
+      } catch {
+        inFlightPairings.delete(key);
+      }
+    })();
   };
 
   const flushPendingPairings = (): void => {
     for (const { endpoint, tabId } of pendingPairings.splice(0)) {
-      if (enabled && !stopped) {
-        void acceptPairing(endpoint, tabId);
+      const key = pairingKey(endpoint);
+
+      if (enabled && !stopped && !consumedPairings.has(key) && !inFlightPairings.has(key)) {
+        startPairing(endpoint, tabId, key);
       }
     }
   };
@@ -603,13 +638,17 @@ export const startLocalAgentsHost = (
       return;
     }
 
-    if (!consumePairing(endpoint)) {
+    const key = pairingKey(endpoint);
+
+    if (consumedPairings.has(key) || inFlightPairings.has(key)) {
       return;
     }
 
     // Before the first settings read the switch value is unknown, so buffer the pairing.
     if (!settingsLoaded) {
-      pendingPairings.push({ endpoint, tabId });
+      if (!pendingPairings.some(item => pairingKey(item.endpoint) === key)) {
+        pendingPairings.push({ endpoint, tabId });
+      }
 
       return;
     }
@@ -618,7 +657,7 @@ export const startLocalAgentsHost = (
       return;
     }
 
-    void acceptPairing(endpoint, tabId);
+    startPairing(endpoint, tabId, key);
   });
 
   commands?.onCommand.addListener(command => {

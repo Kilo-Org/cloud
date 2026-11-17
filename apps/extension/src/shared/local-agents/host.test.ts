@@ -532,6 +532,72 @@ describe('pairing admission', () => {
     host.stop();
   });
 
+  it('does not consume a fragment seen while the switch is off', async () => {
+    const harness = createHarness();
+    harness.storage.items.set(LOCAL_AGENT_SETTINGS_STORAGE_KEY, { enabled: false });
+    const host = startHost(harness);
+    await host.ready;
+
+    harness.listeners.tabUpdated?.(50, { url: PAIRING_URL }, { url: PAIRING_URL });
+    expect(harness.removeTab).not.toHaveBeenCalled();
+
+    harness.storage.items.set(LOCAL_AGENT_SETTINGS_STORAGE_KEY, { enabled: true });
+    harness.storage.notify(LOCAL_AGENT_SETTINGS_STORAGE_KEY);
+    await vi.waitFor(() => {
+      expect(harness.alarms.create).toHaveBeenCalledWith('kilo-local-agents-watchdog', {
+        periodInMinutes: 0.5,
+      });
+    });
+
+    harness.listeners.tabUpdated?.(51, { url: PAIRING_URL }, { url: PAIRING_URL });
+    await vi.waitFor(() => {
+      expect(harness.sockets).toHaveLength(1);
+    });
+    expect(harness.removeTab).toHaveBeenCalledWith(51);
+    host.stop();
+  });
+
+  it('consumes the fragment only after the handshake succeeds', async () => {
+    const harness = createHarness();
+    harness.storage.items.set(LOCAL_AGENT_SETTINGS_STORAGE_KEY, { enabled: true });
+    const host = startHost(harness);
+    await host.ready;
+
+    harness.listeners.tabUpdated?.(52, { url: PAIRING_URL }, { url: PAIRING_URL });
+    const socket = await connectSocketIfNeeded(harness);
+    await completeHandshake(socket);
+
+    harness.listeners.tabUpdated?.(53, { url: PAIRING_URL }, { url: PAIRING_URL });
+
+    expect(harness.removeTab).toHaveBeenCalledWith(52);
+    expect(harness.removeTab).not.toHaveBeenCalledWith(53);
+    expect(harness.sockets).toHaveLength(1);
+    host.stop();
+  });
+
+  it('keeps the fragment reusable when its handshake fails', async () => {
+    const harness = createHarness();
+    harness.storage.items.set(LOCAL_AGENT_SETTINGS_STORAGE_KEY, { enabled: true });
+    const host = startHost(harness);
+    await host.ready;
+
+    harness.listeners.tabUpdated?.(54, { url: PAIRING_URL }, { url: PAIRING_URL });
+    const socket = await connectSocketIfNeeded(harness);
+    socket.handlers.onError();
+
+    await vi.waitFor(() => {
+      expect(socket.closed).toBeGreaterThan(0);
+    });
+
+    harness.listeners.tabUpdated?.(55, { url: PAIRING_URL }, { url: PAIRING_URL });
+
+    await vi.waitFor(() => {
+      expect(harness.removeTab).toHaveBeenCalledWith(55);
+    });
+    expect(harness.sockets).toHaveLength(1);
+    host.stop();
+  });
+
   it('replaces the key and URL when the same hub pairs again, dropping its old rows', async () => {
     const harness = createHarness();
     seedEnabledWithEndpoint(harness.storage);

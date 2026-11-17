@@ -148,6 +148,7 @@ export const createNativeDial =
 
       // Reading lastError clears Chrome's unchecked-error warning for the port.
       disposed = true;
+      clearDeadline();
       callbacks.onClosed(classifyNativeMessagingError(runtime.lastError?.message ?? ''));
     });
 
@@ -158,6 +159,7 @@ export const createNativeDial =
         }
 
         disposed = true;
+        clearDeadline();
         port.disconnect();
       },
       send: envelope => {

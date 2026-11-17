@@ -90,7 +90,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { parseAwsBedrockCredentials } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/bedrock-byok';
 import { parseGcpVertexCredentials } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/vertex-byok';
-import { isExperimentalByokEnabled } from '@/lib/byok/experimental-byok';
+import { isByokEndpointsEnabled, isExperimentalByokEnabled } from '@/lib/byok/experimental-byok';
 import { ADD_BYOK_PROVIDERS, getByokProviderDisplayName } from '@/lib/byok/provider-names';
 import { sortByokKeysInRouteOrder } from '@kilocode/web-shared/lib/ai-gateway/byok/route-order';
 import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
@@ -261,6 +261,15 @@ async function rejectUnavailableExperimentalProvider(
     throw new TRPCError({
       code: 'FORBIDDEN',
       message: `Provider ${providerId} is not available yet.`,
+    });
+  }
+}
+
+async function rejectUnavailableEndpoints(organizationId: string) {
+  if (!(await isByokEndpointsEnabled(organizationId))) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'BYOK endpoints are not available yet.',
     });
   }
 }
@@ -484,6 +493,17 @@ export const byokRouter = createTRPCRouter({
         await ensureOrganizationAccess(ctx, input.organizationId);
       }
       return isExperimentalByokEnabled(input.organizationId);
+    }),
+
+  /** Whether BYOK endpoints can be added. */
+  byokEndpointsEnabled: baseProcedure
+    .input(ListBYOKKeysInputSchema)
+    .output(z.boolean())
+    .query(async ({ input, ctx }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      return isByokEndpointsEnabled(input.organizationId);
     }),
 
   list: baseProcedure
@@ -1087,6 +1107,7 @@ export const byokRouter = createTRPCRouter({
         organizationId,
         ORGANIZATION_BILLING_ROLES
       );
+      await rejectUnavailableEndpoints(organizationId);
       await rejectDisallowedEndpointUrl(definition.base_url);
 
       const keyId = crypto.randomUUID();
@@ -1137,6 +1158,7 @@ export const byokRouter = createTRPCRouter({
         organizationId,
         ORGANIZATION_BILLING_ROLES
       );
+      await rejectUnavailableEndpoints(organizationId);
       const existingKey = await findOrganizationEndpointKey(organizationId, id);
       rejectManagedKeyMutation(existingKey.management_source);
       const checkedBaseUrl = credentials
@@ -1200,6 +1222,7 @@ export const byokRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const { organizationId, base_url, id } = input;
       await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES);
+      await rejectUnavailableEndpoints(organizationId);
 
       let credentials = input.credentials;
       if (!credentials && id) {

@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, test } from '@jest/globals';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from '@jest/globals';
 import { and, eq } from 'drizzle-orm';
 import type * as endpointUpstream from '@/lib/byok/endpoint-upstream';
 import { createCallerForUser } from '@/routers/test-utils';
@@ -6,7 +6,7 @@ import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { byok_api_keys, organization_audit_logs } from '@kilocode/db/schema';
+import { ai_gateway_config, byok_api_keys, organization_audit_logs } from '@kilocode/db/schema';
 import type { Organization, User } from '@kilocode/db/schema';
 import type {
   BYOKApiKeyEnvelope,
@@ -57,6 +57,14 @@ const DEFINITION: ByokEndpointDefinition = {
 
 const ENDPOINT_API_KEY = 'endpoint-secret';
 
+async function enableByokEndpoints(organizationIds: string[]) {
+  const config = { organization_features: { byok_endpoints: organizationIds } };
+  await db
+    .insert(ai_gateway_config)
+    .values({ config })
+    .onConflictDoUpdate({ target: ai_gateway_config.id, set: { config } });
+}
+
 const API_KEY_CREDENTIALS: ByokEndpointCredentials = {
   type: 'api_key',
   api_key: ENDPOINT_API_KEY,
@@ -106,6 +114,8 @@ describe('BYOK endpoints', () => {
     await addUserToOrganization(organization.id, member.id, 'member');
   });
 
+  beforeEach(() => enableByokEndpoints([organization.id, otherOrganization.id]));
+
   afterEach(async () => {
     restoreFetch?.();
     restoreFetch = undefined;
@@ -115,8 +125,9 @@ describe('BYOK endpoints', () => {
     await db.delete(byok_api_keys).where(eq(byok_api_keys.organization_id, otherOrganization.id));
   });
 
-  afterAll(() => {
+  afterAll(async () => {
     process.env.VERCEL_TARGET_ENV = originalTargetEnv;
+    await db.delete(ai_gateway_config).where(eq(ai_gateway_config.id, 1));
   });
 
   async function createEndpoint(
@@ -131,6 +142,72 @@ describe('BYOK endpoints', () => {
     const [row] = await db.select().from(byok_api_keys).where(eq(byok_api_keys.id, id));
     return row;
   }
+
+  describe('feature toggle', () => {
+    const UNAVAILABLE = 'BYOK endpoints are not available yet.';
+
+    test('reports whether the organization has the feature', async () => {
+      const caller = await createCallerForUser(owner.id);
+      await expect(
+        caller.byok.byokEndpointsEnabled({ organizationId: organization.id })
+      ).resolves.toBe(true);
+
+      await enableByokEndpoints([otherOrganization.id]);
+      await expect(
+        caller.byok.byokEndpointsEnabled({ organizationId: organization.id })
+      ).resolves.toBe(false);
+      await expect(caller.byok.byokEndpointsEnabled({})).resolves.toBe(false);
+    });
+
+    test('rejects creating, updating and importing models without the feature', async () => {
+      const created = await createEndpoint();
+      await enableByokEndpoints([otherOrganization.id]);
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(createEndpoint()).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+        message: UNAVAILABLE,
+      });
+      await expect(
+        caller.byok.updateEndpoint({
+          organizationId: organization.id,
+          id: created.id,
+          definition: DEFINITION,
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN', message: UNAVAILABLE });
+      await expect(
+        caller.byok.listModelsFromEndpoint({
+          organizationId: organization.id,
+          base_url: DEFINITION.base_url,
+          credentials: API_KEY_CREDENTIALS,
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN', message: UNAVAILABLE });
+    });
+
+    test('keeps existing endpoints listed, switchable, testable and deletable without the feature', async () => {
+      const created = await createEndpoint();
+      await enableByokEndpoints([]);
+      const upstream = mockUpstream(() => Response.json({ choices: [] }));
+      restoreFetch = upstream.restore;
+      const caller = await createCallerForUser(owner.id);
+
+      const keys = await caller.byok.list({ organizationId: organization.id });
+      expect(keys.map(key => key.id)).toContain(created.id);
+      await expect(
+        caller.byok.setEnabled({
+          organizationId: organization.id,
+          id: created.id,
+          is_enabled: false,
+        })
+      ).resolves.toMatchObject({ is_enabled: false });
+      await expect(
+        caller.byok.testApiKey({ organizationId: organization.id, id: created.id })
+      ).resolves.toMatchObject({ success: true });
+      await expect(
+        caller.byok.delete({ organizationId: organization.id, id: created.id })
+      ).resolves.toEqual({ success: true });
+    });
+  });
 
   describe('createEndpoint', () => {
     test('stores the definition and the encrypted credentials, and lists the endpoint by name', async () => {

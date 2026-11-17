@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from '@jest/globals';
 import { ai_gateway_config } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { eq } from 'drizzle-orm';
-import { isExperimentalByokEnabled } from './experimental-byok';
+import { isByokEndpointsEnabled, isExperimentalByokEnabled } from './experimental-byok';
 
 const enabledOrganizationId = '9d278969-5453-4ae3-a51f-a8d2274a7b56';
 const otherOrganizationId = '00000000-0000-4000-8000-000000000002';
@@ -27,5 +27,31 @@ describe('isExperimentalByokEnabled', () => {
     );
     await expect(isExperimentalByokEnabled(otherOrganizationId)).resolves.toBe(false);
     await expect(isExperimentalByokEnabled(undefined)).resolves.toBe(false);
+  });
+});
+
+describe('isByokEndpointsEnabled', () => {
+  afterEach(async () => {
+    await db.delete(ai_gateway_config).where(eq(ai_gateway_config.id, 1));
+  });
+
+  test('is unavailable when the gateway configuration does not exist', async () => {
+    await expect(isByokEndpointsEnabled(enabledOrganizationId)).resolves.toBe(false);
+  });
+
+  test('is available only to organizations listed for its own feature', async () => {
+    await db.insert(ai_gateway_config).values({
+      config: {
+        organization_features: {
+          byok_endpoints: [enabledOrganizationId],
+          experimental_byok: [otherOrganizationId],
+        },
+      },
+    });
+
+    await expect(isByokEndpointsEnabled(enabledOrganizationId)).resolves.toBe(true);
+    await expect(isByokEndpointsEnabled(enabledOrganizationId.toUpperCase())).resolves.toBe(true);
+    await expect(isByokEndpointsEnabled(otherOrganizationId)).resolves.toBe(false);
+    await expect(isByokEndpointsEnabled(undefined)).resolves.toBe(false);
   });
 });

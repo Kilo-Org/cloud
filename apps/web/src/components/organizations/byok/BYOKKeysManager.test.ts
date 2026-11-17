@@ -13,6 +13,7 @@ type ReorderInput = ListInput & { keyIds: string[] };
 
 const listKey = (input: ListInput) => ['byok', 'list', input];
 let mockKeys: BYOKApiKeyResponse[] = [];
+let mockByokEndpointsEnabled = false;
 const mockReorder = jest.fn(async ({ keyIds }: ReorderInput) => {
   mockKeys = keyIds.map(id => {
     const key = mockKeys.find(key => key.id === id);
@@ -50,6 +51,12 @@ jest.mock('@/lib/trpc/utils', () => ({
         },
         experimentalByokEnabled: {
           queryOptions: () => ({ queryKey: ['byok', 'experimental'], queryFn: async () => false }),
+        },
+        byokEndpointsEnabled: {
+          queryOptions: (input: ListInput) => ({
+            queryKey: ['byok', 'endpoints-enabled', input],
+            queryFn: async () => mockByokEndpointsEnabled,
+          }),
         },
         previewRouting: { pathFilter: () => ({ queryKey: ['byok', 'previewRouting'] }) },
         create: mutation,
@@ -155,6 +162,7 @@ describe('BYOK key priorities', () => {
   let cleanup: (() => void) | undefined;
 
   afterEach(async () => {
+    await act(async () => new Promise(resolve => setTimeout(resolve)));
     await act(async () => root?.unmount());
     root = undefined;
     queryClient?.clear();
@@ -163,6 +171,7 @@ describe('BYOK key priorities', () => {
     cleanup = undefined;
     mockReorder.mockClear();
     jest.mocked(toast.error).mockClear();
+    mockByokEndpointsEnabled = false;
   });
 
   async function mount(organizationId?: string, providers = ['anthropic', 'openrouter']) {
@@ -184,6 +193,10 @@ describe('BYOK key priorities', () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     queryClient = client;
     client.setQueryData(listKey(organizationId ? { organizationId } : {}), mockKeys);
+    client.setQueryData(
+      ['byok', 'endpoints-enabled', organizationId ? { organizationId } : {}],
+      mockByokEndpointsEnabled
+    );
     const dom = installDom();
     cleanup = dom.cleanup;
     root = createRoot(dom.container);
@@ -260,4 +273,17 @@ describe('BYOK key priorities', () => {
     );
     expect(toast.error).toHaveBeenCalledWith('Failed to save key priority: Permission denied');
   });
+
+  it.each([
+    [true, true],
+    [false, false],
+  ])(
+    'with BYOK endpoints enabled %s, shows the Add endpoint button: %s',
+    async (enabled, shown) => {
+      mockByokEndpointsEnabled = enabled;
+      const container = await mount('test-org');
+      const buttons = [...container.querySelectorAll('button')];
+      expect(buttons.some(button => button.textContent?.includes('Add endpoint'))).toBe(shown);
+    }
+  );
 });

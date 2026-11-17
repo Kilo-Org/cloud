@@ -364,6 +364,9 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   const { data: experimentalByokEnabled = false } = useQuery(
     trpc.byok.experimentalByokEnabled.queryOptions(listQueryInput)
   );
+  const { data: byokEndpointsEnabled = false } = useQuery(
+    trpc.byok.byokEndpointsEnabled.queryOptions(listQueryInput)
+  );
   const addableProviders = ADD_BYOK_PROVIDERS.filter(
     provider => experimentalByokEnabled || !isExperimentalByokProviderId(provider.id)
   );
@@ -725,7 +728,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
             <CardTitle>BYOK API Keys</CardTitle>
           </div>
           <div className="flex flex-wrap justify-end gap-2">
-            {organizationId ? (
+            {organizationId && byokEndpointsEnabled ? (
               <Button
                 onClick={() => setEndpointDialog({ open: true, editingKeyId: null })}
                 size="sm"

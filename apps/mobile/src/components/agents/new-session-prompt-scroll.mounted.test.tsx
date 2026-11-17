@@ -395,7 +395,7 @@ describe('NewSessionPrompt bottom fade band', () => {
     renderer.unmount();
   });
 
-  it('draws no bottom band on Android, where the typed line pitch is not the assumed line height', async () => {
+  it('draws no bottom band on Android', async () => {
     platform.OS = 'android';
     // The top band's clip edge is a module-level constant, so the component
     // must be re-imported after the platform flips.
@@ -403,9 +403,8 @@ describe('NewSessionPrompt bottom fade band', () => {
 
     reportScrollOffset(renderer, BOTTOM_SCROLLED_OFFSET, platformAct);
 
-    // Android's typed text uses a line pitch that is not the 24 dp line height
-    // the band assumes, so a band there would not sit on the line the field
-    // cuts. The Android field keeps its hard cut.
+    // The band ships on iOS only, where the bottom cut was measured. The
+    // Android field keeps its current bottom edge.
     expect(findFadeBands(renderer, 'bottom')).toEqual([]);
 
     renderer.unmount();

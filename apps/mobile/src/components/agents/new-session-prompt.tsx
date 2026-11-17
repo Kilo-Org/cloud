@@ -106,9 +106,9 @@ const PROMPT_TOP_FADE_STYLE = {
   top: PROMPT_TOP_CLIP_EDGE,
 } as const;
 const PROMPT_TOP_FADE_FILL = { flex: 1 } as const;
-// The bottom band is iOS-only. On Android the typed text uses a line pitch that
-// is not the 24 dp line height this band assumes, so the band would not line up
-// with the line the field cuts. The iOS text view draws scrolled text through
+// The bottom band is iOS-only: the hard bottom cut was seen and the band proven
+// on iOS, while an Android emulator run never reached a state where a line is
+// cut at the text box's bottom edge. The iOS text view draws scrolled text through
 // its padding and clips at its own bounds, so the band sits at the field's
 // bottom edge. Its height comes from the scroll offset and the field's current
 // height, on the UI thread.

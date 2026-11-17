@@ -236,22 +236,23 @@ export function CenteredState({
   // A surface whose own geometry is still arriving (`source: 'pending'`) is
   // such a band too: its resolved insets are 0/0 until the native probe
   // reports, and the probe's safe-area answer moves the band bottom on any
-  // device with a home bar, so the estimate provably disagrees with the
-  // measured placement there. The measured review-list empty state centered
-  // below its final position on the push and jumped up when the probe answered
-  // (explorer:android layout-jump). The scroller's own frame cannot rescue it
-  // — the state reads the surface's insets, not the scroller's — so a pending
-  // native surface waits for its frame exactly like a moved band, while
-  // `unplaceable` still paints the estimate so a state that can never measure
-  // is never hidden.
-  const estimateFits =
-    topInset === 0 && !nativeViewportFillsSurface && !(surface?.source === 'pending');
+  // device with a home bar, so any placement built while it is pending
+  // provably disagrees with the measured one there. The measured review-list
+  // empty state centered below its final position on the push and jumped up
+  // when the probe answered (explorer:android layout-jump). The ordering is
+  // reachable in both directions — the scroller can measure before the probe
+  // (`NativeStateSurface` installs its capture only on focus) or after — so
+  // the hold applies to the measured placement as well, not only to the
+  // estimate. `unplaceable` still paints the estimate so a state whose
+  // surface can never report is never hidden.
+  const surfacePending = surface?.source === 'pending';
+  const estimateFits = topInset === 0 && !nativeViewportFillsSurface && !surfacePending;
   const placement = useMemo(() => {
-    if (layout) {
+    if (layout && !surfacePending) {
       return layout;
     }
     return estimateFits || unplaceable ? getPendingCenteredStateStyle(bottomInset) : null;
-  }, [bottomInset, estimateFits, layout, unplaceable]);
+  }, [bottomInset, estimateFits, layout, surfacePending, unplaceable]);
   const contentStyle = useMemo(
     () => (placement ? { flexGrow: 1, ...placement } : undefined),
     [placement]

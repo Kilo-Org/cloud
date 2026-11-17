@@ -615,5 +615,41 @@ describe('CenteredState first-frame paint', () => {
     // Band: top 80, bottom 900 - 24 = 876; (796 - 188) / 2 = 304 below the top.
     expect(placed.paddingTop).toBeCloseTo(304, 5);
     held.unmount();
+
+    // The scroller can also measure before the probe reports (the surface's
+    // capture installs on focus). The measured path must hold too: with a
+    // measured viewport but a pending surface, no content box paints — a
+    // placement built from the scroller frame alone would move when the
+    // probe's insets landed.
+    native.surface.frame = null;
+    native.surface.bounds = null;
+    native.surface.source = 'pending';
+    native.surface.topInset = 0;
+    native.surface.bottomInset = 0;
+    const heldLate = await mount();
+    heldLate.settle(80, 900 - 80);
+    expect(heldLate.contentNode()).toBeUndefined();
+    expect(heldLate.scroll().contentContainerStyle).toBeUndefined();
+
+    // The probe reports while the scroller stays measured: the first painted
+    // placement carries the insets immediately.
+    native.surface.source = 'native';
+    native.surface.frame = { top: 0, bottom: 900 };
+    native.surface.bounds = { top: 0, bottom: 900 };
+    native.surface.safeAreaBottom = 24;
+    native.surface.topInset = 52;
+    native.surface.bottomInset = 24;
+    heldLate.rerender();
+    heldLate.settle(80, 900 - 80);
+    act(() => {
+      heldLate.contentNode()?.props.onLayout?.({
+        nativeEvent: { layout: { x: 0, y: 0, width: 400, height: 188 } },
+      } as LayoutChangeEvent);
+    });
+    const placedLate = heldLate.scroll().contentContainerStyle as {
+      paddingTop: number;
+    };
+    expect(placedLate.paddingTop).toBeCloseTo(304, 5);
+    heldLate.unmount();
   });
 });

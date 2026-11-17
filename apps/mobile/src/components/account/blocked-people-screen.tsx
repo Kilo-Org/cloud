@@ -153,11 +153,10 @@ export function BlockedPeopleScreen() {
   // rows and paints the notice above them instead (finding). A confirmed
   // offline connectivity names the pause or the failure offline, like the
   // profiles list does; any other failure reports its tRPC code, and a pause
-  // while connectivity is still unsettled keeps the generic copy.
-  const stale =
-    hidden.data != null &&
-    !hidden.isFetching &&
-    (hidden.isError || hidden.fetchStatus === 'paused');
+  // while connectivity is still unsettled keeps the generic copy. The notice
+  // is not gated on `!isFetching`, so it stays mounted while its own Retry
+  // runs and `isRetrying` reports that read.
+  const stale = hidden.data != null && (hidden.isError || hidden.fetchStatus === 'paused');
   let staleVariant: 'offline' | 'neutral' | TrpcErrorVariant = 'neutral';
   if (committedConnectivity === 'offline') {
     staleVariant = 'offline';

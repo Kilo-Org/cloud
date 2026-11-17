@@ -20,7 +20,7 @@ import { isRetryableTrpcError, trpcErrorVariant } from '@/lib/trpc-error';
 import { useCodeReviewerAnalyticsFilters } from '@/lib/hooks/use-code-reviewer-analytics-filters';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { PERSONAL_SCOPE, PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
-import { reviewConfigFailure, useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
+import { queryBodyFailure, useQueryBodyState } from '@/lib/hooks/use-query-body-state';
 import { useTRPC } from '@/lib/trpc';
 
 const PERIOD_OPTIONS = [
@@ -104,7 +104,7 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
   // skeleton. A cached dashboard with a refetch that is now paused or failed
   // keeps the metrics and gains the stale-notice line, so stale rows never
   // pose as current without a way out.
-  const body = useReviewConfigBody({
+  const body = useQueryBodyState({
     data: dashboard.data,
     isError: dashboard.isError,
     isFetching: dashboard.isFetching,
@@ -113,15 +113,14 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
       void dashboard.refetch();
     },
   });
-  const failure = reviewConfigFailure(body, dashboard.isFetching);
+  const failure = queryBodyFailure(body, dashboard.isFetching);
   // Cached metrics with a refresh that cannot run: the classifier reports
   // `ready` the moment data exists, so the notice comes from the read itself —
   // paused (connectivity lost) or failed (the refetch errored). The brief for
-  // this finding names both: rows stay, the reader learns they are stale.
-  const stale =
-    dashboard.data != null &&
-    !dashboard.isFetching &&
-    (dashboard.isError || dashboard.fetchStatus === 'paused');
+  // this finding names both: rows stay, the reader learns they are stale and
+  // gets the action that refreshes them. The notice is not gated on
+  // `!isFetching`, or a Retry would unmount the surface it is running on.
+  const stale = dashboard.data != null && (dashboard.isError || dashboard.fetchStatus === 'paused');
 
   let content: ReactNode = null;
   if (!failure && body.body.status === 'ready' && dashboard.data) {
@@ -221,10 +220,24 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
   } else if (body.body.status === 'loading') {
     readState = <AnalyticsSkeleton />;
   } else if (stale) {
+    // The metrics stay, so the notice carries the action that refreshes them:
+    // a pause always offers Retry, while a permanent code keeps its own
+    // variant and no Retry. The notice stays mounted while that Retry runs, so
+    // `isRetrying` reports the read rather than disappearing with it.
+    const stalePaused = !dashboard.isError && dashboard.fetchStatus === 'paused';
     readState = (
-      <Text accessibilityRole="alert" variant="muted" className="text-xs">
-        {dashboard.isError ? t('common.somethingWentWrong') : t('queryError.offlineTitle')}
-      </Text>
+      <QueryError
+        variant={stalePaused ? 'offline' : trpcErrorVariant(dashboard.error)}
+        placement="top"
+        className="px-0 pt-0"
+        title={stalePaused ? t('queryError.offlineTitle') : t('common.somethingWentWrong')}
+        onRetry={
+          stalePaused || isRetryableTrpcError(dashboard.error)
+            ? () => void dashboard.refetch()
+            : undefined
+        }
+        isRetrying={dashboard.isFetching}
+      />
     );
   }
 
@@ -257,8 +270,8 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
         {/* One body surface below the filters: a paused or failed first load
             paints the classifier's offline/server state with Retry instead of
             the skeleton that would never settle; cached metrics keep their
-            content and report a refresh that is paused or failed with the
-            same stale-notice line the organization usage grid shows. */}
+            content and report a refresh that is paused or failed with an
+            actionable notice above them. */}
         {readState}
         {content}
       </TabScreenScrollView>

@@ -87,8 +87,6 @@ vi.mock('@/components/invalid-route-state', () => ({
 
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
-
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
 vi.mock('@/components/code-reviewer/reviewer-header', () => ({
@@ -239,35 +237,74 @@ describe('CodeReviewerAnalyticsRoute read states', () => {
     });
   });
 
-  it('keeps cached metrics and adds the offline stale notice when the refresh pauses', () => {
+  it('keeps cached metrics and offers Retry when the refresh pauses', () => {
     state.dashboard.isPending = false;
     state.dashboard.data = DASHBOARD;
     state.dashboard.fetchStatus = 'paused';
     state.connectivity = 'offline';
     const renderer = mountRoute();
 
-    expect(findByType(renderer.root, 'QueryError')).toHaveLength(0);
-    const alerts = findByType(renderer.root, 'Text').filter(
-      node => node.props.accessibilityRole === 'alert'
-    );
-    expect(alerts).toHaveLength(1);
+    const notices = findByType(renderer.root, 'QueryError');
+    expect(notices).toHaveLength(1);
+    expect(notices[0]?.props.variant).toBe('offline');
+    expect(notices[0]?.props.placement).toBe('top');
+    expect(notices[0]?.props.isRetrying).toBe(false);
+    const retry = notices[0]?.props.onRetry as (() => void) | undefined;
+    expect(retry).toBeTypeOf('function');
+    retry?.();
+    expect(state.dashboard.refetch).toHaveBeenCalledTimes(1);
     act(() => {
       renderer.unmount();
     });
   });
 
-  it('keeps cached metrics and adds the failure stale notice when the refresh fails', () => {
+  it('keeps the paused stale notice mounted while its Retry runs', () => {
+    // A notice gated on `!isFetching` would unmount on the tap that starts the
+    // retry, so the reader saw the notice vanish instead of its spinner.
+    state.dashboard.isPending = false;
+    state.dashboard.data = DASHBOARD;
+    state.dashboard.fetchStatus = 'paused';
+    state.dashboard.isFetching = true;
+    state.connectivity = 'offline';
+    const renderer = mountRoute();
+
+    const notices = findByType(renderer.root, 'QueryError');
+    expect(notices).toHaveLength(1);
+    expect(notices[0]?.props.variant).toBe('offline');
+    expect(notices[0]?.props.isRetrying).toBe(true);
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps cached metrics and offers Retry when the refresh fails', () => {
     state.dashboard.isPending = false;
     state.dashboard.data = DASHBOARD;
     state.dashboard.isError = true;
     state.dashboard.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
     const renderer = mountRoute();
 
-    expect(findByType(renderer.root, 'QueryError')).toHaveLength(0);
-    const alerts = findByType(renderer.root, 'Text').filter(
-      node => node.props.accessibilityRole === 'alert'
-    );
-    expect(alerts).toHaveLength(1);
+    const notices = findByType(renderer.root, 'QueryError');
+    expect(notices).toHaveLength(1);
+    expect(notices[0]?.props.variant).toBe('server');
+    expect(notices[0]?.props.placement).toBe('top');
+    expect(notices[0]?.props.onRetry).toBeTypeOf('function');
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps a permanent denial retryable-free in the stale notice', () => {
+    state.dashboard.isPending = false;
+    state.dashboard.data = DASHBOARD;
+    state.dashboard.isError = true;
+    state.dashboard.error = { data: { code: 'FORBIDDEN' } };
+    const renderer = mountRoute();
+
+    const notices = findByType(renderer.root, 'QueryError');
+    expect(notices).toHaveLength(1);
+    expect(notices[0]?.props.variant).toBe('permission');
+    expect(notices[0]?.props.onRetry).toBeUndefined();
     act(() => {
       renderer.unmount();
     });

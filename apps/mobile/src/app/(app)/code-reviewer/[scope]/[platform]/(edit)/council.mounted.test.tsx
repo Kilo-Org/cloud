@@ -107,9 +107,9 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   }),
   useGitLabRepositories: () => ({ data: { repositories: [] }, isLoading: false, isError: false }),
 }));
-vi.mock('@/lib/hooks/use-review-config-body', () => ({
-  useReviewConfigBody: () => ({ body: { status: 'ready' } }),
-  reviewConfigFailure: () => null,
+vi.mock('@/lib/hooks/use-query-body-state', () => ({
+  useQueryBodyState: () => ({ body: { status: 'ready' } }),
+  queryBodyFailure: () => null,
 }));
 vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: {

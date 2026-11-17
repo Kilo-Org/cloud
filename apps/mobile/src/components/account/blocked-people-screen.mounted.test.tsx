@@ -20,6 +20,7 @@ type ScreenState = {
   error: boolean;
   hasData: boolean;
   fetchStatus: 'fetching' | 'paused' | 'idle';
+  isFetching: boolean;
   isRefetching: boolean;
   connectivity: 'online' | 'offline' | 'unknown';
   errorCode: string | undefined;
@@ -37,6 +38,7 @@ const state = vi.hoisted((): ScreenState => ({
   error: false,
   hasData: true,
   fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
+  isFetching: false,
   isRefetching: false,
   connectivity: 'online' as 'online' | 'offline' | 'unknown',
   errorCode: undefined as string | undefined,
@@ -61,7 +63,7 @@ vi.mock('@tanstack/react-query', async importOriginal => {
         : null,
       isPending: !state.hasData && !state.error,
       isError: state.error,
-      isFetching: false,
+      isFetching: state.isFetching,
       isRefetching: state.isRefetching,
       fetchStatus: state.fetchStatus,
       error: state.error
@@ -157,6 +159,7 @@ beforeEach(() => {
   state.hasData = true;
   state.fetchStatus = 'idle';
   state.isRefetching = false;
+  state.isFetching = false;
   state.connectivity = 'online';
   state.errorCode = undefined;
   state.mutations = {};
@@ -299,6 +302,20 @@ describe('BlockedPeopleScreen', () => {
     const notice = root.find(node => Object.is(node.type, 'QueryError'));
     expect(notice.props.variant).toBe('offline');
     expect(notice.props.isRetrying).toBe(false);
+  });
+
+  it('keeps the stale notice mounted while its retry runs', async () => {
+    // A notice gated on `!isFetching` would unmount on the tap that starts the
+    // retry, so the reader saw the notice vanish instead of its spinner.
+    state.fetchStatus = 'paused';
+    state.connectivity = 'offline';
+    state.isFetching = true;
+    const root = await mount();
+
+    const notice = root.find(node => Object.is(node.type, 'QueryError'));
+    expect(notice.props.variant).toBe('offline');
+    expect(notice.props.isRetrying).toBe(true);
+    expect(notice.props.onRetry).toBeTypeOf('function');
   });
 
   it('keeps the generic pause copy while connectivity is unsettled', async () => {

@@ -38,7 +38,7 @@ import { useRepositoryAccessSync } from '@/lib/hooks/use-repository-access-sync'
 import { useRepoSelectionToggle } from '@/lib/hooks/use-code-reviewer-repo-selection';
 import { useNowTicker } from '@/lib/hooks/use-now-ticker';
 import { useReviewerModels } from '@/lib/hooks/use-reviewer-models';
-import { reviewConfigFailure, useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
+import { queryBodyFailure, useQueryBodyState } from '@/lib/hooks/use-query-body-state';
 import { useReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
 import { isRetryableTrpcError, trpcErrorVariant } from '@/lib/trpc-error';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
@@ -53,9 +53,9 @@ export default function ReposRoute() {
 
 function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: ReviewerPlatform }>) {
   const config = useReviewConfig(scope, platform);
-  const configBody = useReviewConfigBody(config);
+  const configBody = useQueryBodyState(config);
   const { data } = config;
-  const configFailure = reviewConfigFailure(configBody, config.isFetching);
+  const configFailure = queryBodyFailure(configBody, config.isFetching);
   const save = useSaveReviewConfig(scope, platform);
   const toggleRepo = useRepoSelectionToggle(scope, platform);
   const { models, isLoading: modelsLoading } = useReviewerModels(scope);

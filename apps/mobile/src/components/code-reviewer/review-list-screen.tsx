@@ -21,11 +21,11 @@ import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useReviewerScopeTitle } from '@/lib/hooks/use-reviewer-scope-title';
 import { useGitHubStatus, useGitLabStatus } from '@/lib/hooks/use-code-reviewer';
 import { useReviewList } from '@/lib/hooks/use-code-reviews';
-import { reviewConfigFailure, useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
+import { queryBodyFailure, useQueryBodyState } from '@/lib/hooks/use-query-body-state';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { dedupeById } from '@/lib/query/dedupe-by-id';
-import { readTrpcErrorField, trpcErrorVariant } from '@/lib/trpc-error';
+import { isRetryableTrpcError, readTrpcErrorField, trpcErrorVariant } from '@/lib/trpc-error';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
 const listStyle = { flex: 1 } satisfies ViewStyle;
@@ -161,7 +161,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
   // with Retry, and keeps a pause while connectivity is unsettled inside
   // loading. Cached pages with a refresh that is now paused or failed keep
   // their rows and gain a stale-notice line.
-  const classifiedBody = useReviewConfigBody({
+  const classifiedBody = useQueryBodyState({
     data: data ?? null,
     isError,
     isFetching,
@@ -170,18 +170,26 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
       void refetch();
     },
   });
-  const failure = reviewConfigFailure(classifiedBody, isFetching);
+  const failure = queryBodyFailure(classifiedBody, isFetching);
   // Cached pages with a refresh that is paused or failed keep their rows and
-  // gain a stale-notice line: rows must not pose as current without a way out.
-  // A failed next page also raises `isError` while its loaded pages stay, but
-  // that failure keeps the footer's own error + Retry for the page, so it does
-  // not raise the list banner on top of it.
+  // gain a stale notice: rows must not pose as current without a way out. The
+  // notice is not gated on `!isFetching`, so it stays mounted while its own
+  // Retry runs and `isRetrying` reports that read. A failed next page also
+  // raises `isError` while its loaded pages stay, but that failure keeps the
+  // footer's own error + Retry for the page, so it does not raise the list
+  // banner on top of it.
   const listFailed = isError && !isFetchNextPageError;
-  const stale = data != null && !isFetching && (listFailed || fetchStatus === 'paused');
+  const stale = data != null && (listFailed || fetchStatus === 'paused');
+  const stalePaused = !listFailed && fetchStatus === 'paused';
   const staleNotice = stale ? (
-    <Text accessibilityRole="alert" variant="muted" className="pb-2 text-xs">
-      {listFailed ? t('common.somethingWentWrong') : t('queryError.offlineTitle')}
-    </Text>
+    <QueryError
+      variant={stalePaused ? 'offline' : trpcErrorVariant(error)}
+      placement="top"
+      className="px-0 pt-0"
+      title={stalePaused ? t('queryError.offlineTitle') : t('common.somethingWentWrong')}
+      onRetry={stalePaused || isRetryableTrpcError(error) ? () => void refetch() : undefined}
+      isRetrying={isFetching}
+    />
   ) : null;
 
   let body: ReactNode = null;

@@ -270,6 +270,7 @@ beforeEach(() => {
   state.bitbucket.isError = false;
   state.reviews.data = { pages: [{ success: true, reviews: [] }], pageParams: [0] };
   state.reviews.isError = false;
+  state.reviews.isFetching = false;
   state.reviews.isFetchingNextPage = false;
   state.reviews.isFetchNextPageError = false;
   state.reviews.hasNextPage = false;
@@ -601,7 +602,7 @@ describe('Recent review bodies', () => {
     }
   );
 
-  it('keeps cached reviews after a background failure', async () => {
+  it('keeps cached reviews and adds the failure notice after a background failure', async () => {
     state.reviews.isError = true;
     state.reviews.data = {
       pages: [{ success: true, reviews: [review('r1', 'Saved review')] }],
@@ -612,7 +613,9 @@ describe('Recent review bodies', () => {
     );
     const list = firstList(renderer);
     expect(list.props.data).toEqual([review('r1', 'Saved review')]);
-    expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
+    const notice = renderer.root.find(node => String(node.type) === 'QueryError');
+    expect(notice.props.variant).toBe('server');
+    expect(notice.props.onRetry).toBeTypeOf('function');
     unmount();
   });
 
@@ -648,7 +651,7 @@ describe('Recent review bodies', () => {
     unmount();
   });
 
-  it('keeps cached rows and adds the offline stale notice when the refresh pauses', async () => {
+  it('keeps cached rows and offers Retry on the offline stale notice when the refresh pauses', async () => {
     state.reviews.data = {
       pages: [{ success: true, reviews: [review('r1', 'Saved review')] }],
       pageParams: [0],
@@ -660,14 +663,32 @@ describe('Recent review bodies', () => {
     );
     const list = firstList(renderer);
     expect(list.props.data).toEqual([review('r1', 'Saved review')]);
-    expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
-    const header = list.props.ListHeaderComponent as ReactNode;
-    const mounted = await renderWithProviders(createElement('Header', null, header));
-    const alerts = mounted.renderer.root
-      .findAll(node => String(node.type) === 'Text')
-      .filter(node => node.props.accessibilityRole === 'alert');
-    expect(alerts).toHaveLength(1);
-    mounted.unmount();
+    const notice = renderer.root.find(node => String(node.type) === 'QueryError');
+    expect(notice.props.variant).toBe('offline');
+    expect(notice.props.placement).toBe('top');
+    expect(notice.props.isRetrying).toBe(false);
+    expect(notice.props.onRetry).toBeTypeOf('function');
+    unmount();
+  });
+
+  it('keeps the stale notice mounted while its retry runs', async () => {
+    // A notice gated on `!isFetching` would unmount on the tap that starts the
+    // retry, so the reader saw the notice vanish instead of its spinner.
+    state.reviews.data = {
+      pages: [{ success: true, reviews: [review('r1', 'Saved review')] }],
+      pageParams: [0],
+    };
+    state.reviews.isError = true;
+    state.reviews.isFetching = true;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: 'personal' })
+    );
+    const list = firstList(renderer);
+    expect(list.props.data).toEqual([review('r1', 'Saved review')]);
+    const notice = renderer.root.find(node => String(node.type) === 'QueryError');
+    expect(notice.props.variant).toBe('server');
+    expect(notice.props.isRetrying).toBe(true);
+    expect(notice.props.onRetry).toBeTypeOf('function');
     unmount();
   });
 
@@ -683,10 +704,9 @@ describe('Recent review bodies', () => {
     );
     const empty = renderer.root.find(node => String(node.type) === 'EmptyState');
     expect(empty.props.title).toBe('No reviews yet');
-    const alerts = renderer.root
-      .findAll(node => String(node.type) === 'Text')
-      .filter(node => node.props.accessibilityRole === 'alert');
-    expect(alerts).toHaveLength(1);
+    const notices = renderer.root.findAll(node => String(node.type) === 'QueryError');
+    expect(notices).toHaveLength(1);
+    expect(notices[0]?.props.variant).toBe('offline');
     unmount();
   });
 

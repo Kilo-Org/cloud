@@ -6,7 +6,6 @@ import {
   organization_memberships,
   user_activity_tokens,
   user_notification_preferences,
-  user_push_tokens,
 } from '@kilocode/db/schema';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -14,9 +13,7 @@ import type { MiddlewareHandler } from 'hono';
 import { cors } from 'hono/cors';
 import { useWorkersLogger } from 'workers-tagged-logger';
 
-import { presenceContextForConversation } from '@kilocode/event-service';
 import {
-  badgeBucketForConversation,
   glanceableScopeRefreshRequestSchema,
   internalDispatchRequestSchema,
   markBadgeReadInputSchema,
@@ -32,13 +29,8 @@ import {
   type SendCloudAgentSessionNotificationResult,
   type SendSessionReadyNotificationParams,
   type SendSessionReadyNotificationResult,
-  type SendInstanceLifecycleNotificationParams,
-  type SendInstanceLifecycleNotificationResult,
   type ListBadgesResponse,
   type MarkBadgeReadResponse,
-  type PerRecipientResult,
-  type SendPushForConversationInput,
-  type SendPushForConversationOutput,
 } from '@kilocode/notifications';
 
 import { authMiddleware, type AuthContext } from './auth';
@@ -52,32 +44,14 @@ import {
   type DispatchCloudAgentSessionPushDeps,
   type UserNotificationPreferences,
 } from './lib/cloud-agent-session-push';
-import type { TicketTokenPair } from './lib/expo-push';
-import { sendPushNotifications } from './lib/expo-push';
-import { dispatchInstanceLifecyclePush } from './lib/instance-lifecycle-push';
 import { dispatchInternalPushCore } from './lib/internal-dispatch-push';
 import {
   NOTIFICATION_HISTORY_PRUNE_CRON,
   pruneNotificationHistory,
 } from './lib/notification-history-prune';
-import {
-  dispatchScheduledActionPush,
-  type SendScheduledActionNoticeParams,
-  type SendScheduledActionNoticeResult,
-} from './lib/scheduled-action-push';
 import { queue } from './queue-consumer';
 
 export { NotificationChannelDO } from './dos/NotificationChannelDO';
-export type {
-  InstanceLifecycleEvent,
-  SendInstanceLifecycleNotificationParams,
-  SendInstanceLifecycleNotificationResult,
-} from '@kilocode/notifications';
-export type {
-  ScheduledActionEvent,
-  SendScheduledActionNoticeParams,
-  SendScheduledActionNoticeResult,
-} from './lib/scheduled-action-push';
 
 const ALLOWED_ORIGINS = ['https://kilo.ai', 'https://app.kilo.ai', 'http://localhost:3000'];
 
@@ -199,90 +173,6 @@ type RecipientDOStub = {
   dispatchPush: (input: DispatchPushInput) => Promise<DispatchPushOutcome>;
 };
 
-type ReceiptCheckMessage = {
-  ticketTokenPairs: TicketTokenPair[];
-};
-
-/** Pure core for unit testability. */
-export async function sendPushForConversationCore(
-  input: SendPushForConversationInput,
-  deps: {
-    getRecipientDOStub: (userId: string) => RecipientDOStub;
-    /**
-     * Read the per-recipient notification preferences. Throw = fail-closed
-     * (suppress the recipient). `null` = successful read with no row →
-     * default-on for every category.
-     */
-    readPreferences: (userId: string) => Promise<UserNotificationPreferences | null>;
-  }
-): Promise<SendPushForConversationOutput> {
-  const recipients: string[] = [];
-  const seen = new Set<string>();
-  for (const id of input.recipientUserIds) {
-    if (id === input.senderUserId) continue;
-    if (seen.has(id)) continue;
-    seen.add(id);
-    recipients.push(id);
-  }
-
-  const results = await Promise.allSettled(
-    recipients.map(async userId => {
-      // Per-recipient chat preference gate. Fail-closed: a read throw
-      // suppresses the recipient. `null` row is default-on.
-      let enabled: boolean;
-      try {
-        const prefs = await deps.readPreferences(userId);
-        enabled = (prefs ?? null)?.chatMessagesEnabled ?? true;
-      } catch {
-        return 'failed' as const;
-      }
-      if (!enabled) {
-        return 'suppressed_preference' as const;
-      }
-
-      const stub = deps.getRecipientDOStub(userId);
-      const dispatchInput = {
-        userId,
-        presenceContext: presenceContextForConversation(input.sandboxId, input.conversationId),
-        idempotencyKey: `chat:${input.messageId}:${userId}`,
-        badge: {
-          badgeBucket: badgeBucketForConversation(input.sandboxId, input.conversationId),
-          delta: 1,
-        },
-        push: {
-          title: input.title,
-          body: input.bodyPreview,
-          ...(input.i18nKey !== undefined && {
-            i18nKey: input.i18nKey,
-            i18nParams: input.i18nParams,
-          }),
-          data: {
-            type: 'chat.message',
-            sandboxId: input.sandboxId,
-            conversationId: input.conversationId,
-            messageId: input.messageId,
-          },
-          sound: 'default',
-          priority: 'high',
-        },
-      } satisfies DispatchPushInput;
-      const outcome = await stub.dispatchPush(dispatchInput);
-      // The old conversation RPC never passes a rate limit, but narrow the
-      // DO outcome to the legacy recipient enum anyway (§9.6: do not widen
-      // the existing RPC with `suppressed_rate_limit`).
-      return outcome.kind === 'suppressed_rate_limit' ? 'failed' : outcome.kind;
-    })
-  );
-  const perRecipient: PerRecipientResult[] = recipients.map((userId, index) => {
-    const result = results[index];
-    return {
-      userId,
-      outcome: result?.status === 'fulfilled' ? result.value : 'failed',
-    };
-  });
-  return { perRecipient } satisfies SendPushForConversationOutput;
-}
-
 /**
  * HTTP and RPC entrypoint for the notifications Worker.
  *
@@ -313,17 +203,6 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
     console.log('notification_history_prune_complete', { deleted, hasMore });
   }
 
-  async sendPushForConversation(
-    input: SendPushForConversationInput
-  ): Promise<SendPushForConversationOutput> {
-    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
-    return sendPushForConversationCore(input, {
-      getRecipientDOStub: (userId: string) =>
-        this.env.NOTIFICATION_CHANNEL_DO.get(this.env.NOTIFICATION_CHANNEL_DO.idFromName(userId)),
-      readPreferences: async userId => readPreferencesRow(db, userId),
-    });
-  }
-
   async clearBadgeBucketForUser(
     input: ClearBadgeBucketForUserInput
   ): Promise<ClearBadgeBucketForUserOutput> {
@@ -332,41 +211,6 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
     );
     const badgeCount = await stub.markBucketRead(input.badgeBucket);
     return { badgeCount } satisfies ClearBadgeBucketForUserOutput;
-  }
-
-  async sendInstanceLifecycleNotification(
-    params: SendInstanceLifecycleNotificationParams
-  ): Promise<SendInstanceLifecycleNotificationResult> {
-    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
-
-    return dispatchInstanceLifecyclePush(params, {
-      readPreference: async userId => {
-        const [row] = await db
-          .select({ enabled: user_notification_preferences.kiloclaw_activity_enabled })
-          .from(user_notification_preferences)
-          .where(eq(user_notification_preferences.user_id, userId))
-          .limit(1);
-        return row?.enabled ?? null;
-      },
-      getTokens: async userId => {
-        const rows = await db
-          .select({ token: user_push_tokens.token, locale: user_push_tokens.locale })
-          .from(user_push_tokens)
-          .where(eq(user_push_tokens.user_id, userId));
-        return rows.map(r => ({ token: r.token, locale: r.locale }));
-      },
-      deleteStaleTokens: async tokens => {
-        await db.delete(user_push_tokens).where(inArray(user_push_tokens.token, tokens));
-      },
-      sendPush: async messages => {
-        const accessToken = await this.env.EXPO_ACCESS_TOKEN.get();
-        return sendPushNotifications(messages, accessToken);
-      },
-      enqueueReceipts: async ticketTokenPairs => {
-        const receiptMsg = { ticketTokenPairs } satisfies ReceiptCheckMessage;
-        await this.env.RECEIPTS_QUEUE.send(receiptMsg, { delaySeconds: 900 });
-      },
-    });
   }
 
   async sendCloudAgentSessionNotification(
@@ -575,41 +419,6 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
       },
     };
   }
-
-  async sendScheduledActionNotice(
-    params: SendScheduledActionNoticeParams
-  ): Promise<SendScheduledActionNoticeResult> {
-    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
-
-    return dispatchScheduledActionPush(params, {
-      readPreference: async userId => {
-        const [row] = await db
-          .select({ enabled: user_notification_preferences.kiloclaw_activity_enabled })
-          .from(user_notification_preferences)
-          .where(eq(user_notification_preferences.user_id, userId))
-          .limit(1);
-        return row?.enabled ?? null;
-      },
-      getTokens: async userId => {
-        const rows = await db
-          .select({ token: user_push_tokens.token, locale: user_push_tokens.locale })
-          .from(user_push_tokens)
-          .where(eq(user_push_tokens.user_id, userId));
-        return rows.map(r => ({ token: r.token, locale: r.locale }));
-      },
-      deleteStaleTokens: async tokens => {
-        await db.delete(user_push_tokens).where(inArray(user_push_tokens.token, tokens));
-      },
-      sendPush: async messages => {
-        const accessToken = await this.env.EXPO_ACCESS_TOKEN.get();
-        return sendPushNotifications(messages, accessToken);
-      },
-      enqueueReceipts: async ticketTokenPairs => {
-        const receiptMsg = { ticketTokenPairs } satisfies ReceiptCheckMessage;
-        await this.env.RECEIPTS_QUEUE.send(receiptMsg, { delaySeconds: 900 });
-      },
-    });
-  }
 }
 
 export default NotificationsService;
@@ -618,10 +427,8 @@ export default NotificationsService;
  * Read the full per-category preference row. Returns `null` when the user
  * has no row yet (default-on for every category). A thrown DB error
  * propagates so each call site can choose fail-closed semantics
- * (`agent_push_enabled` swallows it to `failed`; chat suppresses the
- * recipient; lifecycle/scheduled return the zero-count shape with
- * `suppressedByPreference: true`; cloud-agent-session surfaces it as
- * `dispatch_failed`).
+ * (`agent_push_enabled` swallows it to `failed`; cloud-agent-session
+ * surfaces it as `dispatch_failed`).
  */
 async function readPreferencesRow(
   db: ReturnType<typeof getWorkerDb>,
@@ -630,10 +437,8 @@ async function readPreferencesRow(
   const [row] = await db
     .select({
       agentPushEnabled: user_notification_preferences.agent_push_enabled,
-      chatMessagesEnabled: user_notification_preferences.chat_messages_enabled,
       agentAttentionEnabled: user_notification_preferences.agent_attention_enabled,
       sessionStatusEnabled: user_notification_preferences.session_status_enabled,
-      kiloclawActivityEnabled: user_notification_preferences.kiloclaw_activity_enabled,
       balanceAlertsEnabled: user_notification_preferences.balance_alerts_enabled,
       spendAlertsEnabled: user_notification_preferences.spend_alerts_enabled,
       securityFindingsEnabled: user_notification_preferences.security_findings_enabled,

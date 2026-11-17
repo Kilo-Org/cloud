@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Je agentsessie heeft een update",
-      "chatMessage": "Je hebt een nieuw bericht",
-      "instanceLifecycle": "Je instance heeft een update",
-      "scheduledAction": "Een geplande actie heeft een update",
       "lowBalance": "Je saldo heeft aandacht nodig",
       "spendAlert": "Je bestedingen hebben aandacht nodig",
       "securityFinding": "Een beveiligingsbevinding heeft aandacht nodig",
@@ -17,12 +14,6 @@
     "notification": {
       "title": "{{sessionTitle}}",
       "body": "{{message}}"
-    }
-  },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · Zonder titel",
-      "body": "{{bodyPreview}}"
     }
   },
   "internal": {
@@ -49,35 +40,6 @@
     "securityLifecycle": {
       "title": "Kilo",
       "body": "Een beveiligingscontrole heeft een update"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} is klaar",
-      "body": "Tik om te beginnen met chatten."
-    },
-    "startFailed": {
-      "title": "{{instanceName}} kon niet worden gestart",
-      "body": "Starten mislukt."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} wordt binnenkort opnieuw opgestart",
-      "body": "Opnieuw opstarten gepland om {{when}}."
-    },
-    "restartCancelled": {
-      "title": "Opnieuw opstarten van {{instanceName}} geannuleerd",
-      "body": "De eerder geplande herstart is geannuleerd."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} wordt binnenkort bijgewerkt",
-      "bodyWithTag": "Upgrade naar {{targetImageTag}} om {{when}}.",
-      "bodyWithoutTag": "Geplande upgrade om {{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "Upgrade van {{instanceName}} geannuleerd",
-      "body": "De eerder geplande upgrade is geannuleerd."
     }
   },
   "sessionReady": {

@@ -1821,7 +1821,7 @@ the entry even with the key.
 `openai` and `@anthropic-ai/sdk` are the contract the three wires are written
 against, and every import of either is a type. Nothing of either survives the
 build, so both are dev dependencies and a consumer installs neither: 22.9 MiB
-and 14.2 MiB unpacked at `openai` 7.55.0 and `@anthropic-ai/sdk` 0.137.0,
+and 16.5 MiB unpacked at `openai` 7.55.0 and `@anthropic-ai/sdk` 1.8.0,
 against 4 runtime dependencies that are all used.
 
 That holds only while no published declaration names one. Exporting a type

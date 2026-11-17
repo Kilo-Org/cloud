@@ -173,10 +173,14 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
   const failure = reviewConfigFailure(classifiedBody, isFetching);
   // Cached pages with a refresh that is paused or failed keep their rows and
   // gain a stale-notice line: rows must not pose as current without a way out.
-  const stale = data != null && !isFetching && (isError || fetchStatus === 'paused');
+  // A failed next page also raises `isError` while its loaded pages stay, but
+  // that failure keeps the footer's own error + Retry for the page, so it does
+  // not raise the list banner on top of it.
+  const listFailed = isError && !isFetchNextPageError;
+  const stale = data != null && !isFetching && (listFailed || fetchStatus === 'paused');
   const staleNotice = stale ? (
     <Text accessibilityRole="alert" variant="muted" className="pb-2 text-xs">
-      {isError ? t('common.somethingWentWrong') : t('queryError.offlineTitle')}
+      {listFailed ? t('common.somethingWentWrong') : t('queryError.offlineTitle')}
     </Text>
   ) : null;
 

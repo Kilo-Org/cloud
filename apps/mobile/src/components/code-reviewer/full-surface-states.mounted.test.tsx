@@ -786,6 +786,33 @@ describe('Recent review bodies', () => {
     footerRender.unmount();
   });
 
+  it('leaves a failed next page to the footer instead of raising the list banner', async () => {
+    // The same failure also sets the query's `isError` while its pages stay, so
+    // the banner must read the page-level flag: otherwise it stacks a second
+    // error over the footer's own error + Retry for the same page.
+    state.reviews.data = {
+      pages: [{ success: true, reviews: [review('r1')] }],
+      pageParams: [0],
+    };
+    state.reviews.isFetchNextPageError = true;
+    state.reviews.hasNextPage = true;
+    state.reviews.isError = true;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: 'personal' })
+    );
+    const list = firstList(renderer);
+    const data = list.props.data as ReviewStub[];
+    expect(data.map(item => item.id)).toEqual(['r1']);
+    expect(list.props.ListHeaderComponent ?? null).toBeNull();
+    expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
+    const footer = list.props.ListFooterComponent as ReactNode;
+    unmount();
+    const footerRender = await renderWithProviders(createElement('Footer', null, footer));
+    const error = footerRender.renderer.root.find(node => String(node.type) === 'QueryError');
+    expect(error.props.placement).toBe('top');
+    footerRender.unmount();
+  });
+
   it('advances a row relative time without new data, from the shared clock', async () => {
     // The page-one probe keeps refetching while a review is in flight, and its
     // rows come back unchanged, so the row element is never rebuilt with a new

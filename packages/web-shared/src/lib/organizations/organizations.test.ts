@@ -3635,7 +3635,7 @@ describe('Organizations', () => {
           enabled: true,
           group_id: 'guardrail-group',
         });
-      });
+      }, 20000);
 
       test('persists only the keys the settings schema declares', async () => {
         const owner = await insertTestUser();

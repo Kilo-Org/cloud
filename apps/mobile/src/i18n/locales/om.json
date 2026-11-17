@@ -4624,7 +4624,7 @@
       "created": "Kakaawwaan uumame",
       "saved": "Kakaawwaan olkaa'ame",
       "statusArrived": "Ga'e",
-      "defaultPromptWebhook": "Qaama gaaffii waamicha weebhuukii kanaa ibsi:\\n\\n{{body}}",
+      "defaultPromptWebhook": "Qaama gaaffii waamicha weebhuukii kanaa ibsi:\n\n{{body}}",
       "defaultPromptScheduled": "Hojii sagantaa hojjedhu. Yeroo {{scheduledTime}} kakaawwame.",
       "problems": {
         "nameRequired": "Maqaa galchi.",

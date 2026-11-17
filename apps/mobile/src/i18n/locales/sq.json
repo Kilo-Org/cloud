@@ -4624,7 +4624,7 @@
       "created": "Shkaktari u krijua",
       "saved": "Shkaktari u ruajt",
       "statusArrived": "Mbërriti",
-      "defaultPromptWebhook": "Përshkruaj trupin e kërkesës së kësaj thirrjeje webhook:\\n\\n{{body}}",
+      "defaultPromptWebhook": "Përshkruaj trupin e kërkesës së kësaj thirrjeje webhook:\n\n{{body}}",
       "defaultPromptScheduled": "Ekzekuto detyrën e planifikuar. Nisur në {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Vendos një emër.",

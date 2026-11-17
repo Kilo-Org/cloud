@@ -4624,7 +4624,7 @@
       "created": "Kua waihangatia te kaiwhakaara",
       "saved": "Kua tiakina te kaiwhakaara",
       "statusArrived": "Kua tae",
-      "defaultPromptWebhook": "Whakaahuatia te tinana o tēnei tono hononga tukutuku:\\n\\n{{body}}",
+      "defaultPromptWebhook": "Whakaahuatia te tinana o tēnei tono hononga tukutuku:\n\n{{body}}",
       "defaultPromptScheduled": "Rere te mahi kua hōtakahia. I tīmata i {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Whakaurua he ingoa.",

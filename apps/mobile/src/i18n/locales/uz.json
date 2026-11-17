@@ -4624,7 +4624,7 @@
       "created": "Ishga tushirgich yaratildi",
       "saved": "Ishga tushirgich saqlandi",
       "statusArrived": "Yetib keldi",
-      "defaultPromptWebhook": "Ushbu vebhook soʻrovi tanasini tavsiflang:\\n\\n{{body}}",
+      "defaultPromptWebhook": "Ushbu vebhook soʻrovi tanasini tavsiflang:\n\n{{body}}",
       "defaultPromptScheduled": "Jadval boʻyicha vazifani ishga tushiring. {{scheduledTime}} vaqtida ishga tushirildi.",
       "problems": {
         "nameRequired": "Nom kiriting.",

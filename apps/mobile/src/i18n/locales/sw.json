@@ -4624,7 +4624,7 @@
       "created": "Kichocheo kimeundwa",
       "saved": "Kichocheo kimehifadhiwa",
       "statusArrived": "Umefika",
-      "defaultPromptWebhook": "Eleza mwili wa ombi la mwito wa ndoano ya wavuti:\\n\\n{{body}}",
+      "defaultPromptWebhook": "Eleza mwili wa ombi la mwito wa ndoano ya wavuti:\n\n{{body}}",
       "defaultPromptScheduled": "Tekeleza kazi iliyoratibiwa. Ilianzishwa {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Weka jina.",

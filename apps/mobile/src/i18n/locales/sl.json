@@ -4764,7 +4764,7 @@
       "created": "Sprožilec je ustvarjen",
       "saved": "Sprožilec je shranjen",
       "statusArrived": "Prispelo",
-      "defaultPromptWebhook": "Opišite telo zahteve tega spletnega kavlja:\\n\\n{{body}}",
+      "defaultPromptWebhook": "Opišite telo zahteve tega spletnega kavlja:\n\n{{body}}",
       "defaultPromptScheduled": "Zaženite načrtovano opravilo. Sproženo ob {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Vnesite ime.",

@@ -4624,7 +4624,7 @@
       "created": "Utlösare skapad",
       "saved": "Utlösare sparad",
       "statusArrived": "Anlänt",
-      "defaultPromptWebhook": "Beskriv innehållet i den här webhookbegäran:\\n\\n{{body}}",
+      "defaultPromptWebhook": "Beskriv innehållet i den här webhookbegäran:\n\n{{body}}",
       "defaultPromptScheduled": "Kör den schemalagda uppgiften. Utlöst vid {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Ange ett namn.",

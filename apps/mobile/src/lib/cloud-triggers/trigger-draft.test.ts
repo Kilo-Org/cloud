@@ -311,6 +311,9 @@ describe('defaultPrompt', () => {
         // eslint-disable-next-line no-await-in-loop
         await i18n.changeLanguage(language);
         expect(placeholders(defaultPrompt('webhook')), language).toStrictEqual(['body']);
+        // A double-escaped catalog value parses to literal backslashes, so the
+        // body placeholder would sit on the same line as the sentence.
+        expect(defaultPrompt('webhook').endsWith('\n\n{{body}}'), language).toBe(true);
         expect(placeholders(defaultPrompt('scheduled')), language).toStrictEqual(['scheduledTime']);
       }
     } finally {

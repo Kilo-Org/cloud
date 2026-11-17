@@ -4624,7 +4624,7 @@
       "created": "Активаторот е создаден",
       "saved": "Активаторот е зачуван",
       "statusArrived": "Пристигна",
-      "defaultPromptWebhook": "Опиши го телото на барањето од овој вебхук:\\n\\n{{body}}",
+      "defaultPromptWebhook": "Опиши го телото на барањето од овој вебхук:\n\n{{body}}",
       "defaultPromptScheduled": "Изврши ја закажаната задача. Активирано во {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Внесете име.",

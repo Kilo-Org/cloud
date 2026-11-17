@@ -4624,7 +4624,7 @@
       "created": "Tetikleyici oluşturuldu",
       "saved": "Tetikleyici kaydedildi",
       "statusArrived": "Ulaştı",
-      "defaultPromptWebhook": "Bu web kancası isteğinin gövdesini açıklayın:\\n\\n{{body}}",
+      "defaultPromptWebhook": "Bu web kancası isteğinin gövdesini açıklayın:\n\n{{body}}",
       "defaultPromptScheduled": "Zamanlanmış görevi çalıştırın. {{scheduledTime}} zamanında tetiklendi.",
       "problems": {
         "nameRequired": "Bir ad girin.",

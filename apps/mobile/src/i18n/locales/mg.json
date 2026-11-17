@@ -4624,7 +4624,7 @@
       "created": "Voaforona ny fanentanana",
       "saved": "Voatahiry ny fanentanana",
       "statusArrived": "Tonga",
-      "defaultPromptWebhook": "Lazao ny votoatin'ny fangatahana avy amin'ity fiantsoana ity:\\n\\n{{body}}",
+      "defaultPromptWebhook": "Lazao ny votoatin'ny fangatahana avy amin'ity fiantsoana ity:\n\n{{body}}",
       "defaultPromptScheduled": "Hazakazaho ny asa voalahatra. Natomboka tamin'ny {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Ampidiro ny anarana.",

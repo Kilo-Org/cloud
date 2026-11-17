@@ -267,7 +267,7 @@ importers:
         version: 1.0.20
       drizzle-orm:
         specifier: 0.45.4
-        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.2.14)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.2.14)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       eslint-plugin-zod-utils:
         specifier: 1.0.11
         version: 1.0.11(eslint@9.39.4(jiti@2.7.0))(typescript@7.0.2)
@@ -630,7 +630,7 @@ importers:
         version: 2.1.1
       drizzle-orm:
         specifier: 0.45.4
-        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(kysely@0.29.2)(pg@8.23.1)
       effect:
         specifier: 4.1.4
         version: 4.1.4
@@ -737,8 +737,8 @@ importers:
         specifier: ~58.0.14
         version: 58.0.14(expo@58.0.25)(typescript@7.0.2)
       expo-sqlite:
-        specifier: ~58.0.16
-        version: 58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
+        specifier: ~58.0.17
+        version: 58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
       expo-status-bar:
         specifier: ~58.0.5
         version: 58.0.5(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
@@ -1319,7 +1319,7 @@ importers:
         version: 14.25.1(bufferutil@4.2.0)(utf-8-validate@6.0.6)
       drizzle-orm:
         specifier: 0.45.4
-        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.2.14)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.2.14)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       emoji-mart:
         specifier: 5.6.0
         version: 5.6.0
@@ -1602,7 +1602,7 @@ importers:
         version: link:../worker-utils
       drizzle-orm:
         specifier: 0.45.4
-        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       fflate:
         specifier: 0.8.3
         version: 0.8.3
@@ -1704,7 +1704,7 @@ importers:
         version: link:../usage-contracts
       drizzle-orm:
         specifier: 0.45.4
-        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       pg:
         specifier: 8.23.1
         version: 8.23.1
@@ -1784,7 +1784,7 @@ importers:
         version: 1.32.2(@cfworker/json-schema@4.1.1)(zod@4.6.7)
       drizzle-orm:
         specifier: 0.45.4
-        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(kysely@0.29.2)(pg@8.23.1)
       effect:
         specifier: 4.1.4
         version: 4.1.4
@@ -1996,7 +1996,7 @@ importers:
         version: 12.2.0
       drizzle-orm:
         specifier: 0.45.4
-        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       stripe:
         specifier: 'catalog:'
         version: 23.0.0(patch_hash=c2f45d030fab1925e64f5cdb3557a488000733204afea2f752f0f689530fa625)(@types/node@24.12.4)
@@ -2185,7 +2185,7 @@ importers:
         version: 1.11.20
       drizzle-orm:
         specifier: 0.45.4
-        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.2.14)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.2.14)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       eventsource-parser:
         specifier: 3.0.8
         version: 3.0.8
@@ -2303,7 +2303,7 @@ importers:
         version: 1.0.20
       drizzle-orm:
         specifier: 0.45.4
-        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -2337,7 +2337,7 @@ importers:
         version: link:../../packages/worker-utils
       drizzle-orm:
         specifier: 0.45.4
-        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -2389,7 +2389,7 @@ importers:
         version: link:../../packages/worker-utils
       drizzle-orm:
         specifier: 0.45.4
-        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -2432,7 +2432,7 @@ importers:
         version: link:../../packages/worker-utils
       drizzle-orm:
         specifier: 0.45.4
-        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -2508,7 +2508,7 @@ importers:
         version: 11.19.0(typescript@7.0.2)
       drizzle-orm:
         specifier: 0.45.4
-        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -2661,7 +2661,7 @@ importers:
         version: link:../../packages/worker-utils
       drizzle-orm:
         specifier: 0.45.4
-        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
     devDependencies:
       '@cloudflare/workers-types':
         specifier: 'catalog:'
@@ -2698,7 +2698,7 @@ importers:
         version: link:../../packages/worker-utils
       drizzle-orm:
         specifier: 0.45.4
-        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -2750,7 +2750,7 @@ importers:
         version: 22.0.1
       drizzle-orm:
         specifier: 0.45.4
-        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       graphql:
         specifier: 16.14.2
         version: 16.14.2
@@ -2830,7 +2830,7 @@ importers:
         version: 0.5.4
       drizzle-orm:
         specifier: 0.45.4
-        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -2885,7 +2885,7 @@ importers:
         version: 0.10.3
       drizzle-orm:
         specifier: 0.45.4
-        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -2968,7 +2968,7 @@ importers:
         version: 0.9.5
       drizzle-orm:
         specifier: 0.45.4
-        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -3017,7 +3017,7 @@ importers:
         version: 4.1.0
       drizzle-orm:
         specifier: 0.45.4
-        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       jose:
         specifier: 'catalog:'
         version: 6.2.12
@@ -3051,7 +3051,7 @@ importers:
         version: link:../../packages/db
       drizzle-orm:
         specifier: 0.45.4
-        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       node-html-markdown:
         specifier: 2.0.0
         version: 2.0.0
@@ -3181,7 +3181,7 @@ importers:
         version: link:../../packages/worker-utils
       drizzle-orm:
         specifier: 0.45.4
-        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -3224,7 +3224,7 @@ importers:
         version: link:../../packages/worker-utils
       drizzle-orm:
         specifier: 0.45.4
-        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       expo-server-sdk:
         specifier: 6.1.0
         version: 6.1.0(patch_hash=7850520582b5b394397b35d1ea195192fe78589d8a6a748fe15177b818c4ed0b)
@@ -3267,7 +3267,7 @@ importers:
         version: link:../../packages/worker-utils
       drizzle-orm:
         specifier: 0.45.4
-        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -3328,7 +3328,7 @@ importers:
         version: 12.2.0
       drizzle-orm:
         specifier: 0.45.4
-        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       workers-tagged-logger:
         specifier: 'catalog:'
         version: 1.0.0
@@ -3374,7 +3374,7 @@ importers:
         version: link:../../packages/worker-utils
       drizzle-orm:
         specifier: 0.45.4
-        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       workers-tagged-logger:
         specifier: 'catalog:'
         version: 1.0.0
@@ -3411,7 +3411,7 @@ importers:
         version: link:../../packages/worker-utils
       drizzle-orm:
         specifier: 0.45.4
-        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -3460,7 +3460,7 @@ importers:
         version: 0.0.22
       drizzle-orm:
         specifier: 0.45.4
-        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -3506,7 +3506,7 @@ importers:
         version: link:../../packages/worker-utils
       drizzle-orm:
         specifier: 0.45.4
-        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -3592,7 +3592,7 @@ importers:
         version: link:../../packages/worker-utils
       drizzle-orm:
         specifier: 0.45.4
-        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -3638,7 +3638,7 @@ importers:
         version: 10.0.1
       drizzle-orm:
         specifier: 0.45.4
-        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -15409,8 +15409,8 @@ packages:
     peerDependencies:
       expo: '*'
 
-  expo-sqlite@58.0.16:
-    resolution: {integrity: sha512-ASQX8NBNDl/A40mcNdwsu3uHEWKmza8pvsQfuGbo/rgPULbhaiZTqrug+bK1XtoXT5In/4vjc5gHUQnHB+fsgg==}
+  expo-sqlite@58.0.17:
+    resolution: {integrity: sha512-nzIS8doaxGYPBu+jJD1aa1wsF5vsafLEr3ji4wwR1MWd66KV3u4lKotJPylxJkP08DZWn2uUnTXyMw9t7BdGUA==}
     peerDependencies:
       expo: '*'
       react: '*'
@@ -34742,36 +34742,36 @@ snapshots:
       esbuild: 0.28.2
       tsx: 4.23.15
 
-  drizzle-orm@0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.2.14)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1):
+  drizzle-orm@0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.2.14)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1):
     optionalDependencies:
       '@cloudflare/workers-types': 4.20260605.1
       '@opentelemetry/api': 1.9.1
       '@types/pg': 8.23.1
       '@upstash/redis': 1.38.0
       bun-types: 1.4.4
-      expo-sqlite: 58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.2.14)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6)
+      expo-sqlite: 58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.2.14)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6)
       kysely: 0.29.2
       pg: 8.23.1
 
-  drizzle-orm@0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1):
+  drizzle-orm@0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1):
     optionalDependencies:
       '@cloudflare/workers-types': 4.20260605.1
       '@opentelemetry/api': 1.9.1
       '@types/pg': 8.23.1
       '@upstash/redis': 1.38.0
       bun-types: 1.4.4
-      expo-sqlite: 58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6)
+      expo-sqlite: 58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6)
       kysely: 0.29.2
       pg: 8.23.1
 
-  drizzle-orm@0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(kysely@0.29.2)(pg@8.23.1):
+  drizzle-orm@0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(kysely@0.29.2)(pg@8.23.1):
     optionalDependencies:
       '@cloudflare/workers-types': 4.20260605.1
       '@opentelemetry/api': 1.9.1
       '@types/pg': 8.23.1
       '@upstash/redis': 1.38.0
       bun-types: 1.4.4
-      expo-sqlite: 58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
+      expo-sqlite: 58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
       kysely: 0.29.2
       pg: 8.23.1
 
@@ -35949,7 +35949,7 @@ snapshots:
       - supports-color
       - typescript
 
-  expo-sqlite@58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.2.14)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6):
+  expo-sqlite@58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.2.14)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6):
     dependencies:
       await-lock: 2.2.2
       expo: 58.0.25(@babel/core@7.29.7)(@expo/metro-runtime@58.0.17)(bufferutil@4.2.0)(expo-router@58.0.31)(expo-widgets@58.0.28)(react-dom@19.2.6(react@19.2.6))(react-native-webview@14.0.1(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.2.14)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(react-native-worklets@0.13.0(@babel/core@7.29.7)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.2.14)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.2.14)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6)(typescript@7.0.2)(utf-8-validate@6.0.6)
@@ -35957,7 +35957,7 @@ snapshots:
       react-native: 0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.2.14)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6)
     optional: true
 
-  expo-sqlite@58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6):
+  expo-sqlite@58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6):
     dependencies:
       await-lock: 2.2.2
       expo: 58.0.25(@babel/core@7.29.7)(@expo/metro-runtime@58.0.17)(bufferutil@4.2.0)(expo-router@58.0.31)(expo-widgets@58.0.28)(react-dom@19.2.6(react@19.2.6))(react-native-webview@14.0.1(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(react-native-worklets@0.13.0(@babel/core@7.29.7)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6)(typescript@7.0.2)(utf-8-validate@6.0.6)
@@ -35965,7 +35965,7 @@ snapshots:
       react-native: 0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6)
     optional: true
 
-  expo-sqlite@58.0.16(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0):
+  expo-sqlite@58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0):
     dependencies:
       await-lock: 2.2.2
       expo: 58.0.25(@babel/core@7.29.7)(@expo/metro-runtime@58.0.17)(bufferutil@4.2.0)(expo-router@58.0.31)(expo-widgets@58.0.28)(react-dom@19.2.6(react@19.3.0))(react-native-webview@14.0.1(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(react-native-worklets@0.13.0(@babel/core@7.29.7)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(typescript@7.0.2)(utf-8-validate@6.0.6)

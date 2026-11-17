@@ -288,7 +288,12 @@ export function MemberRow({
           setMenu('actions');
         }}
         accessibilityRole="button"
-        accessibilityLabel={t('organization.members.manageA11y', { name: displayName })}
+        // Names can repeat; the email is the row's unique fact, so a reader
+        // hears it too instead of two identical rows.
+        accessibilityLabel={[
+          t('organization.members.manageA11y', { name: displayName }),
+          member.email,
+        ].join(', ')}
         className="px-3 active:opacity-70"
       >
         {inner}

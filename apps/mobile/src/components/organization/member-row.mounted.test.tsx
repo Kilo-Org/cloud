@@ -161,7 +161,7 @@ describe('MemberRow menu', () => {
 
     expect(actionsMenu().visible).toBe(false);
     expect(row.props.accessibilityLabel).toBe(
-      i18n.t('organization.members.manageA11y', { name: 'Member E2E' })
+      `${i18n.t('organization.members.manageA11y', { name: 'Member E2E' })}, member@example.com`
     );
 
     await act(() => {
@@ -179,6 +179,19 @@ describe('MemberRow menu', () => {
     ]);
     expect(menu.options[2]?.destructive).toBe(true);
     expect(menu.options[0]?.destructive).toBeUndefined();
+  });
+
+  it('names a row whose display name repeats another member by its email', async () => {
+    // Two members can carry the same display name; the email is the row's
+    // unique fact, so the accessible name carries it and the rows differ.
+    const duplicate = { ...member, name: 'Same Name' } as unknown as Parameters<
+      typeof MemberRow
+    >[0]['member'];
+    const renderer = await renderRow({ member: duplicate });
+
+    expect(renderer.root.findByType('Pressable').props.accessibilityLabel).toBe(
+      `${i18n.t('organization.members.manageA11y', { name: 'Same Name' })}, member@example.com`
+    );
   });
 
   it('offers an admin the daily limit alone on an owner row', async () => {

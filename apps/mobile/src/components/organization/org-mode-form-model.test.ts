@@ -101,10 +101,25 @@ describe('validateOrgModeForm', () => {
 
   it('refuses a file restriction that is not a regular expression', () => {
     expect(
-      validateOrgModeForm(values({ slug: 'auditor', editFileRegex: '[unclosed' }), existing)
+      validateOrgModeForm(
+        values({ slug: 'auditor', groups: ['edit'], editFileRegex: '[unclosed' }),
+        existing
+      )
     ).toEqual({ editFileRegex: 'restrictionInvalid' });
     expect(
-      validateOrgModeForm(values({ slug: 'auditor', editFileRegex: '\\.md$' }), existing)
+      validateOrgModeForm(
+        values({ slug: 'auditor', groups: ['edit'], editFileRegex: '\\.md$' }),
+        existing
+      )
+    ).toEqual({});
+  });
+
+  it('ignores a pattern while the edit group is off, as the config does', () => {
+    expect(
+      validateOrgModeForm(
+        values({ slug: 'auditor', groups: ['read'], editFileRegex: '[unclosed' }),
+        existing
+      )
     ).toEqual({});
   });
 });

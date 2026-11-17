@@ -98,7 +98,9 @@ export function modeSlugFromName(name: string): string {
  * What the form refuses before it reaches the server: the required strings, the
  * slug's shape, a slug another mode in this organization already holds, and a
  * file pattern that is not a regular expression. The server repeats the bounds,
- * so this only makes the refusal local.
+ * so this only makes the refusal local. The pattern belongs to the `edit` group,
+ * so it is checked only while that group is on — the same rule
+ * `orgModeConfigInput` follows when it drops the restriction with the group.
  */
 export function validateOrgModeForm(
   values: OrgModeFormValues,
@@ -115,15 +117,17 @@ export function validateOrgModeForm(
   } else if (existingModes.some(mode => mode.slug === slug && mode.id !== editingModeId)) {
     slugError = 'identifierTaken';
   }
+  const restrictionInvalid =
+    values.groups.includes('edit') &&
+    values.editFileRegex.length > 0 &&
+    !isValidRegExp(values.editFileRegex);
   const errors = {
     ...(name.length === 0 ? { name: 'nameRequired' as const } : {}),
     ...(slugError === undefined ? {} : { slug: slugError }),
     ...(values.roleDefinition.trim().length === 0
       ? { roleDefinition: 'roleRequired' as const }
       : {}),
-    ...(values.editFileRegex.length > 0 && !isValidRegExp(values.editFileRegex)
-      ? { editFileRegex: 'restrictionInvalid' as const }
-      : {}),
+    ...(restrictionInvalid ? { editFileRegex: 'restrictionInvalid' as const } : {}),
   } satisfies OrgModeFormErrors;
   return errors;
 }

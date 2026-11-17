@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { Platform, Pressable, View } from 'react-native';
 
 import { Share } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
@@ -7,6 +7,8 @@ import { type SheetHeaderTopInset, useSheetHeaderTopClearance } from '@/lib/form
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 import { useScreenInsets } from '@/lib/screen-insets';
+
+const UNDER_HANDLE_PADDING = Platform.OS === 'ios' ? 'pb-5 pt-1' : 'pb-7 pt-0';
 
 export function SheetHeader({
   title,
@@ -95,12 +97,13 @@ export function SheetHeader({
         'border-b border-border px-4',
         // The centred 48dp action row leaves ~10dp of leading above the title's
         // line box and the same below it; `pb-3` puts the divider ~21dp under
-        // the title. A native handle already sits ~22dp above the content
-        // (Material3), so with `pt-4` the gap over the title was 48dp — twice
-        // the gap below it. Under the handle the header drops `pt-4` and pays
-        // the title the same room below: measured 33.9dp above and 35.9dp
-        // below on the emulator.
-        underHandle ? 'pb-7 pt-0' : 'pb-3 pt-4',
+        // the title. A native handle already leaves room above the content, so
+        // `pt-4` made the gap over the title about twice the gap below it.
+        // The handle's own gap differs by platform (Material3 ~22dp, iOS 16pt),
+        // so each platform gets its own split: measured 33.9dp above and
+        // 35.9dp below on the Android emulator, 26.3pt and 41.7pt on iOS with
+        // `pb-7 pt-0`, which `pb-5 pt-1` evens out.
+        underHandle ? UNDER_HANDLE_PADDING : 'pb-3 pt-4',
         surfaceClassName
       )}
     >

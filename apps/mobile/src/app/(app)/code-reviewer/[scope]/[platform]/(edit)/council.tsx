@@ -14,16 +14,20 @@ import { CouncilSpecialistsSection } from '@/components/code-reviewer/council-sp
 import { ReviewerErrorScreen } from '@/components/code-reviewer/reviewer-error-screen';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { InvalidRouteState } from '@/components/invalid-route-state';
-import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
 import { ChoiceRow } from '@/components/ui/choice-row';
+import { Users } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
+import { PreferenceRow } from '@/components/ui/preference-row';
 import { RadioGroup } from '@/components/ui/radio-group';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { Section } from '@/components/ui/section';
 import { TabScreenScrollView } from '@/components/tab-screen';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { formatNumber } from '@/lib/format';
+import { SCREEN_BODY_CLASS, SCREEN_GUTTER_CLASS } from '@/lib/layout';
 import {
   type CouncilConfig,
   PLATFORM_CAPABILITIES,
@@ -121,15 +125,17 @@ function CouncilScreen({
           eyebrow={t('common.codeReviewer')}
         />
         {surface === 'unavailable' ? (
-          <CenteredState contentContainerClassName="px-6">
+          <CenteredState contentContainerClassName={SCREEN_GUTTER_CLASS}>
             <Text className="text-center text-xs text-muted-foreground">
               {t('codeReviewer.council.unavailable')}
             </Text>
           </CenteredState>
         ) : (
-          <View className="gap-3 px-6 pt-4">
-            <Skeleton className="h-16 w-full rounded-lg" />
-            <Skeleton className="h-12 w-full rounded-lg" />
+          <View className={SCREEN_BODY_CLASS}>
+            <RowGroup leadingTile>
+              <RowSkeleton tile subtitle />
+              <RowSkeleton tile subtitle />
+            </RowGroup>
           </View>
         )}
       </View>
@@ -200,27 +206,30 @@ function CouncilScreen({
   return (
     <View className="flex-1 bg-background">
       <ReviewerHeader title={t('codeReviewer.council.title')} eyebrow={t('common.codeReviewer')} />
-      <TabScreenScrollView className="flex-1" contentContainerClassName="gap-6 px-6 pt-4">
-        <View className="gap-2">
-          <ToggleRow
-            title={t('codeReviewer.council.title')}
-            subtitle={t('codeReviewer.council.subtitle')}
-            value={council.enabled}
-            disabled={disabled || (belowMinimum && !council.enabled)}
-            onValueChange={value => {
-              // Turning council off clears the opt-in list in the same save:
-              // keeping the ids would reactivate every repository the user had
-              // opted in, unreviewed, the moment the switch went back on.
-              save.mutate(
-                value
-                  ? { council: { ...council, enabled: true } }
-                  : {
-                      council: { ...council, enabled: false },
-                      councilEnabledRepositoryIds: [],
-                    }
-              );
-            }}
-          />
+      <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
+        <Section>
+          <RowGroup leadingTile>
+            <PreferenceRow
+              icon={Users}
+              title={t('codeReviewer.council.title')}
+              subtitle={t('codeReviewer.council.subtitle')}
+              value={council.enabled}
+              disabled={disabled || (belowMinimum && !council.enabled)}
+              onValueChange={value => {
+                // Turning council off clears the opt-in list in the same save:
+                // keeping the ids would reactivate every repository the user had
+                // opted in, unreviewed, the moment the switch went back on.
+                save.mutate(
+                  value
+                    ? { council: { ...council, enabled: true } }
+                    : {
+                        council: { ...council, enabled: false },
+                        councilEnabledRepositoryIds: [],
+                      }
+                );
+              }}
+            />
+          </RowGroup>
           {belowMinimum ? (
             <Text variant="muted" className="text-xs" accessibilityLiveRegion="polite">
               {t('codeReviewer.council.minSpecialists', {
@@ -229,58 +238,53 @@ function CouncilScreen({
               })}
             </Text>
           ) : null}
-        </View>
+        </Section>
 
-        <View className="gap-2">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('common.repositories')}
-          </Text>
+        <Section label={t('common.repositories')}>
           {selectedRepositories.length === 0 ? (
             <Text variant="muted" className="text-xs">
               {t('codeReviewer.council.noRepositories')}
             </Text>
           ) : (
-            selectedRepositories.map(repository => (
-              <ToggleRow
-                key={repository.id}
-                title={repository.fullName}
-                value={councilRepoIds.includes(repository.id)}
-                disabled={disabled || !councilOn}
-                onValueChange={value => {
-                  setRepositoryEnabled(repository.id, value);
-                }}
-              />
-            ))
+            <RowGroup>
+              {selectedRepositories.map(repository => (
+                <ChoiceRow
+                  key={repository.id}
+                  multi
+                  label={repository.fullName}
+                  selected={councilRepoIds.includes(repository.id)}
+                  disabled={disabled || !councilOn}
+                  onPress={() => {
+                    setRepositoryEnabled(repository.id, !councilRepoIds.includes(repository.id));
+                  }}
+                />
+              ))}
+            </RowGroup>
           )}
-        </View>
+        </Section>
 
         <CouncilSpecialistsSection council={council} disabled={disabled} onWrite={writeCouncil} />
 
-        <View className="gap-2">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('codeReviewer.reviewDetail.decision')}
-          </Text>
+        <Section label={t('codeReviewer.reviewDetail.decision')}>
           <RadioGroup label={t('codeReviewer.reviewDetail.decision')}>
-            {COUNCIL_AGGREGATION_STRATEGIES.map(strategy => (
-              <ChoiceRow
-                key={strategy}
-                label={t(STRATEGY_LABEL_KEYS[strategy])}
-                description={t(STRATEGY_DESCRIPTION_KEYS[strategy])}
-                selected={council.aggregation_strategy === strategy}
-                disabled={disabled}
-                className="border-b-[0.5px] border-hair-soft"
-                onPress={() => {
-                  writeCouncil({ ...council, aggregation_strategy: strategy });
-                }}
-              />
-            ))}
+            <RowGroup>
+              {COUNCIL_AGGREGATION_STRATEGIES.map(strategy => (
+                <ChoiceRow
+                  key={strategy}
+                  label={t(STRATEGY_LABEL_KEYS[strategy])}
+                  description={t(STRATEGY_DESCRIPTION_KEYS[strategy])}
+                  selected={council.aggregation_strategy === strategy}
+                  disabled={disabled}
+                  onPress={() => {
+                    writeCouncil({ ...council, aggregation_strategy: strategy });
+                  }}
+                />
+              ))}
+            </RowGroup>
           </RadioGroup>
-        </View>
+        </Section>
 
-        <View className="gap-2">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('codeReviewer.council.labels')}
-          </Text>
+        <Section label={t('codeReviewer.council.labels')}>
           <Input
             value={labelsText}
             editable={!disabled}
@@ -293,7 +297,7 @@ function CouncilScreen({
           <Text variant="muted" className="text-xs">
             {t('codeReviewer.council.labelsDescription')}
           </Text>
-        </View>
+        </Section>
       </TabScreenScrollView>
     </View>
   );

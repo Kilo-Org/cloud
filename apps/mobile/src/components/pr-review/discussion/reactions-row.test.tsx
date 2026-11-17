@@ -12,10 +12,15 @@ vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   View: 'View',
+  // The shared SheetHeader reads the status bar height and the native
+  // direction the same way every sheet does.
+  StatusBar: { currentHeight: 0 },
+  I18nManager: { isRTL: false },
+  useWindowDimensions: () => ({ fontScale: 1, width: 390, height: 844, scale: 3 }),
 }));
 
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ bottom: 0 }),
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
 vi.mock('@/components/ui/icons', () => ({
@@ -78,18 +83,15 @@ function finishDismiss(renderer: TestRenderer.ReactTestRenderer): void {
 }
 
 /**
- * The native layout pass that runs once the presented picker's title exists;
- * the picker moves accessibility focus from it.
+ * The native layout pass that runs once the presented picker exists; the
+ * picker moves accessibility focus to its title from it. The header is the
+ * shared `SheetHeader`, whose title node is a plain `Text` with no layout
+ * handler of its own, so the signal is the modal body's layout.
  */
 function layoutPickerTitle(renderer: TestRenderer.ReactTestRenderer): void {
-  const title = renderer.root.find(
-    n =>
-      typeof n.type === 'string' &&
-      (n.type as string) === 'Text' &&
-      (n.props as Props).accessibilityRole === 'header'
-  );
+  const surface = renderer.root.findByProps({ accessibilityViewIsModal: true });
   act(() => {
-    (title.props.onLayout as () => void)();
+    (surface.props.onLayout as () => void)();
   });
 }
 

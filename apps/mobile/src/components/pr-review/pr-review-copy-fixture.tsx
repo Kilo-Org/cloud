@@ -10,6 +10,7 @@ import { PrDiffFileNavigator } from '@/components/pr-review/diff/pr-diff-file-na
 import { PrMergeSheet } from '@/components/pr-review/merge/pr-merge-sheet';
 import { providerPrMergeTitles } from '@/components/pr-review/merge/pr-merge-titles';
 import { PrReviewChecksSection } from '@/components/pr-review/pr-review-checks-section';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { PrReviewCommentComposer } from '@/components/pr-review/pr-review-comment-composer';
 import {
   createFixtureClient,
@@ -88,7 +89,7 @@ function ChecksSectionSurface() {
     return null;
   }
   return (
-    <ScrollView contentContainerClassName="gap-4 p-6">
+    <ScrollView contentContainerClassName={SCREEN_BODY_CLASS}>
       <PrReviewChecksSection {...triple} checks={read} />
     </ScrollView>
   );

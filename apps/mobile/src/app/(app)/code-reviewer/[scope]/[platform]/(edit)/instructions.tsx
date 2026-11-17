@@ -5,7 +5,6 @@ import {
   InputAccessoryView,
   Keyboard,
   Pressable,
-  TextInput,
   type TextInputInstance,
   View,
 } from 'react-native';
@@ -18,11 +17,13 @@ import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { AlertTriangle, Copy } from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { type ReviewerPlatform } from '@/lib/code-reviewer-config';
 import { instructionsFieldOverflows } from '@/lib/code-reviewer-instructions-field';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useReviewConfig, useSaveReviewConfig } from '@/lib/hooks/use-code-reviewer';
 import { reviewConfigFailure, useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
 import {
@@ -150,15 +151,15 @@ function InstructionsEditor({
       </View>
       {/* A multiline field takes the platform's generic text-view name on iOS,
           so the accessible name is the localized heading this screen renders.
-          `max-h-[196px]` is the `p-3` padding (2 × 10.5) plus ten
-          `leading-[1.25rem]` line boxes (10 × 17.5, native rem is 14): a cap
-          that is not a whole number of lines paints the top visible line cut
-          when the field scrolls to the caret. Past the cap the field scrolls
-          its own text, so a multi-thousand-character draft no longer turns the
-          page into one oversized text view that pushes the note and Save out
-          of the viewport; the min height still grows the field with a short
-          stored value. */}
-      <TextInput
+          `max-h-56` (196px) is the `p-3` padding (2 × 10.5) plus ten line
+          boxes (10 × 17.5, native rem is 14): a cap that is not a whole number
+          of lines paints the top visible line cut when the field scrolls to
+          the caret. Past the cap the field scrolls its own text, so a
+          multi-thousand-character draft no longer turns the page into one
+          oversized text view that pushes the note and Save out of the
+          viewport; the min height still grows the field with a short stored
+          value. */}
+      <Input
         ref={fieldRef}
         onLayout={event => {
           fieldHeightRef.current = event.nativeEvent.layout.height;
@@ -168,7 +169,7 @@ function InstructionsEditor({
           contentHeightRef.current = event.nativeEvent.contentSize.height;
           alignFirstLineIfOverflowing();
         }}
-        className="min-h-32 max-h-[196px] rounded-lg bg-secondary p-3 text-sm leading-[1.25rem] text-foreground"
+        className="min-h-32 max-h-56 rounded-md border border-input bg-background p-3 text-sm text-foreground focus:border-ring"
         accessibilityLabel={t('codeReviewer.instructions.title')}
         multiline
         textAlignVertical="top"
@@ -318,14 +319,14 @@ function InstructionsScreen({
           // iOS IME inset and focused-field auto-reveal (AGENTS.md: input screens).
           automaticallyAdjustKeyboardInsets
           className="flex-1"
-          contentContainerClassName="px-6 pt-4"
+          contentContainerClassName={SCREEN_BODY_CLASS}
           keyboardShouldPersistTaps="handled"
         >
-          <Animated.View layout={LinearTransition} className="gap-4">
+          <Animated.View layout={LinearTransition} className="gap-6">
             {configBody.body.status === 'loading' && (
-              <Animated.View exiting={FadeOut.duration(150)} className="gap-4">
-                <Skeleton className="h-32 w-full rounded-lg" />
-                <Skeleton className="h-10 w-full rounded-md" />
+              <Animated.View exiting={FadeOut.duration(150)} className="gap-6">
+                <Skeleton className="h-32 w-full rounded-md bg-muted-soft" />
+                <Skeleton className="h-12 w-full rounded-md bg-muted-soft" />
               </Animated.View>
             )}
 

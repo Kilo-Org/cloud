@@ -1,7 +1,6 @@
 import * as Clipboard from 'expo-clipboard';
 import { useFocusEffect } from 'expo-router';
 import { Clipboard as ClipboardIcon, SearchX, X } from '@/components/ui/icons';
-import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { type ReactNode, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
@@ -19,8 +18,13 @@ import { useConfirmDialog } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { RowChevron } from '@/components/ui/row-chevron';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
-import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import {
+  FIELD_CLEAR_BOX_CLASS,
+  FIELD_TRIGGER_FRAME_CLASS,
+  ICON_TARGET_BOX_CLASS,
+} from '@/lib/a11y/tap-target';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { providerPrRefLabel, providerPrRoutePath } from '@/lib/pr-review/provider-pr-ref';
@@ -38,6 +42,7 @@ import {
   removeRecentPr,
 } from '@/lib/pr-review/recent-prs';
 import { usePrLinkField } from '@/lib/pr-review/use-pr-link-field';
+import { cn } from '@/lib/utils';
 
 export function PrReviewEntryScreen() {
   const pushOnce = useSinglePushRoute();
@@ -159,7 +164,7 @@ export function PrReviewEntryScreen() {
     );
   } else {
     recentsBody = (
-      <View className="gap-3">
+      <View>
         {recent.map(entry => {
           const rowState = selectRecentPrRowState(entry);
           const removeLabel = t('prReview.entry.removeRecentAccessibility', {
@@ -169,7 +174,7 @@ export function PrReviewEntryScreen() {
             <View
               key={recentPrKey(entry)}
               testID="recent-row"
-              className="rounded-xl border border-border bg-card"
+              className="border-b-[0.5px] border-hair-soft"
             >
               <Pressable
                 onPress={() => {
@@ -185,15 +190,10 @@ export function PrReviewEntryScreen() {
                     handleRemoveRecent(entry);
                   }
                 }}
-                className="flex-row items-center gap-3 p-3 active:opacity-70"
+                className="flex-row items-center gap-3 py-3 active:opacity-70"
               >
                 <View className="min-w-0 flex-1 gap-1">
-                  <Text
-                    variant="small"
-                    className="text-[10px] uppercase tracking-wide text-muted-foreground"
-                  >
-                    {rowState.provider}
-                  </Text>
+                  <Text variant="eyebrow">{rowState.provider}</Text>
                   <Text className="text-sm font-medium" numberOfLines={2}>
                     {rowState.primary}
                   </Text>
@@ -208,17 +208,17 @@ export function PrReviewEntryScreen() {
                     </Text>
                   ) : null}
                 </View>
-                <DirectionalChevronRight size={16} color={colors.mutedForeground} />
+                <RowChevron />
               </Pressable>
               {rowState.failed ? (
-                // The footer names the item that failed, not just "couldn't
+                // The failure line names the item that failed, not just "couldn't
                 // load": the row stands for one pull/merge request, so the
                 // provider's own noun says what to retry. The retry keeps the
-                // link treatment — a bordered control beside the card's plain
+                // link treatment — a bordered control beside the row's plain
                 // lines read as a piece of another surface — while its own node
                 // still carries the state-action box, because `hitSlop` widens
                 // the touch region without enlarging the rect an audit reads.
-                <View className="flex-row items-center justify-between gap-3 border-t border-hair-soft px-3 py-1">
+                <View className="flex-row items-center justify-between gap-3 border-t-[0.5px] border-hair-soft py-1">
                   <Text variant="muted" className="min-w-0 flex-1 text-xs">
                     {t('common.couldNotOpen', {
                       label: t(providerPrNounKey(entry.platform ?? 'github')),
@@ -256,7 +256,7 @@ export function PrReviewEntryScreen() {
       <View className="gap-4">
         <View className="flex-row items-center gap-2">
           <View
-            className="min-h-14 min-w-0 flex-1 flex-row items-center rounded-md border border-border bg-card"
+            className={cn(FIELD_TRIGGER_FRAME_CLASS, 'min-h-14 min-w-0 flex-1 px-0')}
             testID="pr-link-input-row"
             collapsable={false}
           >
@@ -286,15 +286,14 @@ export function PrReviewEntryScreen() {
             />
             {!hasInput ? <PrLinkPlaceholder label={urlPlaceholder} /> : null}
             {showClearButton ? (
-              // The clear control is icon-only like the paste control beside it,
-              // so it carries the same shared 48dp target; the 45pt box it used
-              // to render (`h-13`, which is 45pt at this app's 14pt rem) sits
-              // under Android's minimum.
+              // The in-field clear control takes the shared box for one: it
+              // carries the touch target on its own node and cancels its
+              // height against the field's floor, so the field does not grow.
               <Pressable
                 onPress={clearField}
                 accessibilityRole="button"
                 accessibilityLabel={t('prReview.entry.clearLink')}
-                className={`${ICON_TARGET_BOX_CLASS} active:opacity-70`}
+                className={cn(FIELD_CLEAR_BOX_CLASS, 'active:opacity-70')}
               >
                 <X size={16} color={colors.mutedForeground} />
               </Pressable>
@@ -306,7 +305,7 @@ export function PrReviewEntryScreen() {
             }}
             accessibilityRole="button"
             accessibilityLabel={t('prReview.entry.pasteLink')}
-            className={`${ICON_TARGET_BOX_CLASS} rounded-md border border-border bg-card active:opacity-70`}
+            className={cn(ICON_TARGET_BOX_CLASS, 'rounded-md active:opacity-70')}
           >
             <ClipboardIcon size={18} color={colors.mutedForeground} />
           </Pressable>

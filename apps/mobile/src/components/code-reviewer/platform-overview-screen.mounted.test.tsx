@@ -145,6 +145,7 @@ vi.mock('@/components/security-agent/settings-toggle-row', () => ({
   ToggleRow: () => null,
 }));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: () => null }));
+vi.mock('@/components/ui/icons', () => ({ Bot: 'Bot', ScrollText: 'ScrollText' }));
 vi.mock('@/components/ui/skeleton', () => ({
   Skeleton: () => {
     skeletonRenders.count += 1;
@@ -690,12 +691,20 @@ describe('PlatformOverviewScreen actionRequired recovery', () => {
 });
 
 describe('PlatformOverviewScreen Automatic reviews account line', () => {
-  /** The muted line painted under the Automatic reviews label, when present. */
+  /**
+   * The optional account line in the Automatic reviews card. Scoped to the
+   * label's own sibling stack so the Follow REVIEW.md subtitle, which is also a
+   * muted line, cannot be mistaken for the account.
+   */
   function accountLines(renderer: TestRenderer.ReactTestRenderer): unknown[] {
-    return renderer.root
+    const label = renderer.root
       .findAllByType('Text')
-      .filter(node => node.props.variant === 'muted')
-      .map(node => node.props.children);
+      .find(node => node.props.children === 'Automatic reviews');
+    const stack = label?.parent?.children ?? [];
+    return stack
+      .filter((child): child is TestRenderer.ReactTestInstance => typeof child !== 'string')
+      .filter(child => child.props.variant === 'muted')
+      .map(child => child.props.children);
   }
 
   it('paints the connected account under the label', async () => {

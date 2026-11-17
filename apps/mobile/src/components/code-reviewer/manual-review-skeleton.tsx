@@ -1,26 +1,31 @@
 import { View } from 'react-native';
 
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Skeleton } from '@/components/ui/skeleton';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 
 /**
  * Loading placeholder for the manual review body while the provider status is
- * still settling: the icon bubble, the title line and the full-width action of
- * the connect state it may resolve to, so the page never shows nothing under
- * its header and the state that arrives keeps the same shape.
+ * still settling: the platform rows the picker renders, so the page never shows
+ * nothing under its header and the state that arrives keeps the same shape.
  *
- * It centers itself instead of going through `CenteredState`: that component
- * places a data state against the band its surface reports and the size its
- * own content reports, so its placement settles one layout pass later. A
- * placeholder has the opposite requirement: it is the only thing on screen
- * while the status is unknown, so it paints from the first frame at a
- * placement that needs no measurement.
+ * It paints from the first frame: a placeholder is the only thing on screen
+ * while the status is unknown, so it must not settle a layout pass later.
  */
 export function ManualReviewSkeleton() {
   return (
-    <View className="flex-1 items-center justify-center gap-4 px-6">
-      <Skeleton className="h-14 w-14 rounded-2xl" />
-      <Skeleton className="h-6 w-44 rounded" />
-      <Skeleton className="mt-3 h-12 w-full rounded-md" />
+    <View className={SCREEN_BODY_CLASS}>
+      <RowGroup>
+        <RowSkeleton subtitle />
+        <RowSkeleton subtitle />
+      </RowGroup>
+      <View className="gap-3">
+        <Skeleton className="h-3 w-24 max-w-full rounded bg-muted-soft" />
+        <Skeleton className="h-12 w-full rounded-md bg-muted-soft" />
+        <Skeleton className="h-3 w-32 max-w-full rounded bg-muted-soft" />
+        <Skeleton className="h-24 w-full rounded-md bg-muted-soft" />
+      </View>
     </View>
   );
 }

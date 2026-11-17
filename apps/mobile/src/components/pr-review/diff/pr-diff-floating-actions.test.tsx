@@ -33,7 +33,6 @@ vi.mock('react-i18next', async importOriginal => {
 });
 
 const routerPush = vi.fn();
-const insets = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: routerPush }),
@@ -42,10 +41,6 @@ vi.mock('expo-router', () => ({
 vi.mock('react-native', () => ({
   View: 'View',
   Platform: { OS: 'ios' },
-}));
-
-vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => insets,
 }));
 
 vi.mock('@/components/ui/icons', () => ({
@@ -61,6 +56,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/screen-footer', () => ({ ScreenFooter: 'ScreenFooter' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/pr-review/diff-selection-bridge', () => ({
   clearDiffSelection: vi.fn(),
@@ -302,32 +298,19 @@ describe('PrDiffFloatingActions provider routes (s6)', () => {
   });
 });
 
-describe('PrDiffFloatingActions bottom inset (plan §6)', () => {
-  beforeEach(() => {
-    insets.bottom = 0;
-  });
-
-  function findRootBar(): React.ReactElement | null {
+describe('PrDiffFloatingActions footer', () => {
+  function footerElement(): React.ReactElement {
     // eslint-disable-next-line new-cap
-    const element = PrDiffFloatingActions(baseProps);
-    return element;
+    return PrDiffFloatingActions(baseProps);
   }
 
-  function rootPaddingBottom(): number | undefined {
-    const root = findRootBar();
-    if (!root) {
-      throw new Error('footer action bar root not found');
-    }
-    return (root.props as { style?: { paddingBottom?: number } }).style?.paddingBottom;
-  }
-
-  it('floors the bar padding at 8 points at a zero inset', () => {
-    expect(rootPaddingBottom()).toBe(8);
-  });
-
-  it('clears the system inset when it exceeds the 8-point floor', () => {
-    insets.bottom = 34;
-    expect(rootPaddingBottom()).toBe(34);
+  it('pins the bar with the shared footer, leaving the band to it', () => {
+    // The bar is a screen footer, so its gutter, its bottom band and the
+    // landscape side insets come from the one primitive instead of a style
+    // object measured here.
+    const props = footerElement().props as { edge?: string; keyboard?: string };
+    expect(props.edge).toBe('background');
+    expect(props.keyboard).toBe('host');
   });
 
   it('renders in-flow, not as an overlay over the list', () => {
@@ -335,52 +318,7 @@ describe('PrDiffFloatingActions bottom inset (plan §6)', () => {
     // the FlashList, so a partly-scrolled diff row was clipped at its top
     // edge. As an in-flow footer the list ends above it at every scroll
     // position.
-    const root = findRootBar();
-    if (!root) {
-      throw new Error('footer action bar root not found');
-    }
-    const classes = ((root.props as { className?: string }).className ?? '').split(' ');
-    expect(classes).not.toContain('absolute');
-    expect(classes).toContain('w-full');
-  });
-});
-
-describe('PrDiffFloatingActions side insets (landscape)', () => {
-  beforeEach(() => {
-    insets.top = 0;
-    insets.bottom = 0;
-    insets.left = 0;
-    insets.right = 0;
-  });
-
-  function rootBarStyle(): Record<string, number | undefined> {
-    // eslint-disable-next-line new-cap
-    const element = PrDiffFloatingActions(baseProps);
-    // The bar is an in-flow footer below the list (not an overlay), so the
-    // component's returned element IS the bar root — there is no wrapper
-    // View with `pointerEvents: box-none` to find.
-    return (element.props as { style?: Record<string, number | undefined> }).style ?? {};
-  }
-
-  it('keeps exactly the current style keys at zero portrait insets', () => {
-    const style = rootBarStyle();
-
-    // Spread only when nonzero: the `px-4` className gutter must survive
-    // portrait untouched (inline style wins over className).
-    expect(style.paddingLeft).toBeUndefined();
-    expect(style.paddingRight).toBeUndefined();
-    expect(style.paddingBottom).toBe(8);
-  });
-
-  it('clears the sensor housing with the landscape side insets', () => {
-    insets.left = 47;
-    insets.right = 59;
-    const style = rootBarStyle();
-
-    expect(style.paddingLeft).toBe(47);
-    expect(style.paddingRight).toBe(59);
-    // The card shrink is horizontal-only: the paddingBottom that feeds the
-    // measured onLayout height (and `prDiffListBottomPadding`) is unchanged.
-    expect(style.paddingBottom).toBe(8);
+    const props = footerElement().props as { className?: string };
+    expect(String(props.className ?? '').split(' ')).not.toContain('absolute');
   });
 });

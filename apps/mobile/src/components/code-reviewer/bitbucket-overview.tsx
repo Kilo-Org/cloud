@@ -15,12 +15,15 @@ import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { QueryError } from '@/components/query-error';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { ConfigureRow } from '@/components/ui/configure-row';
+import { RowGroup } from '@/components/ui/row-group';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { PlatformOverviewSkeleton } from '@/components/code-reviewer/platform-overview-skeleton';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
+import { SCREEN_BODY_CLASS, SCREEN_GUTTER_CLASS } from '@/lib/layout';
 import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
 import { useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
 import {
@@ -105,7 +108,7 @@ export function BitbucketOverview({
     return (
       <View className="flex-1 bg-background">
         <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
-        <CenteredState contentContainerClassName="px-6">
+        <CenteredState contentContainerClassName={SCREEN_GUTTER_CLASS}>
           {canEdit && readinessData ? (
             <BitbucketSetupRecovery
               scope={scope}
@@ -166,7 +169,7 @@ export function BitbucketOverview({
       <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="px-6 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         keyboardShouldPersistTaps="handled"
       >
         <Animated.View layout={LinearTransition}>
@@ -188,7 +191,7 @@ export function BitbucketOverview({
                 />
               )}
 
-              <View className="rounded-lg bg-secondary p-4">
+              <Card>
                 <View className="flex-row items-center justify-between">
                   <View className="flex-1 pe-3">
                     <Text className="text-sm font-medium">{t('codeReviewer.autoReviews')}</Text>
@@ -213,7 +216,7 @@ export function BitbucketOverview({
                   />
                 </View>
                 {isReady && !hasRepoSelection && (
-                  <View className="mt-3 gap-2 border-t border-hair-soft pt-3">
+                  <View className="gap-2 border-t-[0.5px] border-hair-soft pt-3">
                     <Text variant="muted" className="text-xs">
                       {t('codeReviewer.selectRepository')}
                     </Text>
@@ -229,9 +232,9 @@ export function BitbucketOverview({
                     </Button>
                   </View>
                 )}
-              </View>
+              </Card>
 
-              <View>
+              <RowGroup leadingTile>
                 {rows.map(row => (
                   <ConfigureRow
                     key={row.field}
@@ -241,7 +244,7 @@ export function BitbucketOverview({
                     onPress={resolveRowOnPress(row, canEdit, pushField)}
                   />
                 ))}
-              </View>
+              </RowGroup>
 
               {!canEdit && (
                 <Text className="text-center text-xs text-muted-foreground">

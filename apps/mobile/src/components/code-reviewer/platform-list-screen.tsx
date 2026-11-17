@@ -15,7 +15,8 @@ import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { ScopeAccessDeniedScreen } from '@/components/organization/scope-access-denied-screen';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
-import { Text } from '@/components/ui/text';
+import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
@@ -29,6 +30,7 @@ import {
 } from '@/lib/hooks/use-code-reviewer';
 import { classifyOrganizationScopeAccess } from '@/lib/organization-scope-access';
 import { CODE_REVIEWER_HOME_PATH } from '@/lib/profile-agent-navigation';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useTRPC } from '@/lib/trpc';
 
 const PLATFORM_ICONS = {
@@ -147,12 +149,9 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
         titleNumberOfLines={1}
         eyebrow={t('common.codeReviewer')}
       />
-      <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
-        <View className="gap-3">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('codeReviewer.platformList.platforms')}
-          </Text>
-          <View>
+      <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
+        <Section label={t('codeReviewer.platformList.platforms')}>
+          <RowGroup leadingTile>
             {platforms.map(platform => {
               const status = statusFor(platform);
               return (
@@ -167,14 +166,11 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
                 />
               );
             })}
-          </View>
-        </View>
+          </RowGroup>
+        </Section>
 
-        <View className="mt-6 gap-3">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('codeReviewer.platformList.activity')}
-          </Text>
-          <View>
+        <Section label={t('codeReviewer.platformList.activity')}>
+          <RowGroup leadingTile>
             <ConfigureRow
               icon={History}
               title={t('codeReviewer.reviewList.title')}
@@ -200,8 +196,8 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
                 }}
               />
             )}
-          </View>
-        </View>
+          </RowGroup>
+        </Section>
       </TabScreenScrollView>
     </View>
   );

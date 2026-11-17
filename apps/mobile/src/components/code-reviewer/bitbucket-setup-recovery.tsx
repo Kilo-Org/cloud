@@ -4,6 +4,7 @@ import { View } from 'react-native';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
 import {
   bitbucketConnectionFailure,
@@ -70,10 +71,10 @@ export function BitbucketSetupRecovery({
   };
 
   return (
-    <View className={cn('items-center gap-3 rounded-lg bg-secondary p-4', className)}>
+    <Card className={cn('items-center', className)}>
       <Text className="text-center text-xs text-muted-foreground">{message}</Text>
       {failure === null ? actionBody() : failureBody(failure)}
-    </View>
+    </Card>
   );
 
   function actionBody() {

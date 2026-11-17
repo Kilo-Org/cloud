@@ -27,6 +27,14 @@ type ToggleProps = {
   onValueChange?: (value: boolean) => void;
 };
 
+type ChoiceProps = {
+  label: string;
+  selected: boolean;
+  disabled?: boolean;
+  multi?: boolean;
+  onPress?: () => void;
+};
+
 type SaveMutation = { mutate: Mock; isPending: boolean };
 
 type SavedPatch = {
@@ -50,6 +58,7 @@ const state = vi.hoisted(() => {
     save,
     toastErrors: [] as string[],
     toggleProps: [] as ToggleProps[],
+    choiceProps: [] as ChoiceProps[],
     patches: [] as SavedPatch[],
   };
 });
@@ -129,22 +138,25 @@ vi.mock('@/components/centered-state', () => ({
   CenteredState: (props: { children?: ReactNode }) =>
     createElement('CenteredState', null, props.children),
 }));
-vi.mock('@/components/security-agent/settings-toggle-row', () => ({
-  ToggleRow: (props: ToggleProps) => {
+vi.mock('@/components/ui/preference-row', () => ({
+  PreferenceRow: (props: ToggleProps) => {
     state.toggleProps.push(props);
-    return createElement('ToggleRow', props);
+    return createElement('PreferenceRow', props);
   },
 }));
+vi.mock('@/components/ui/icons', () => ({ Users: 'Users', ShieldCheck: 'ShieldCheck' }));
 vi.mock('@/components/ui/choice-row', () => ({
-  ChoiceRow: (props: { label: string; selected: boolean; onPress?: () => void }) =>
-    createElement('ChoiceRow', props),
+  ChoiceRow: (props: ChoiceProps) => {
+    state.choiceProps.push(props);
+    return createElement('ChoiceRow', props);
+  },
 }));
 vi.mock('@/components/ui/radio-group', () => ({
   RadioGroup: (props: { children?: ReactNode }) =>
     createElement('RadioGroup', null, props.children),
 }));
 vi.mock('@/components/ui/input', () => ({ Input: 'TextInput' }));
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/ui/row-skeleton', () => ({ RowSkeleton: 'RowSkeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/tab-screen', () => ({
   TabScreenScrollView: (props: { children?: ReactNode }) =>
@@ -209,7 +221,7 @@ describe('council route gate', () => {
     expect(renderedTexts(renderer)).toContain(
       'Council review is not available for this organization.'
     );
-    expect(renderer.root.findAll(node => String(node.type) === 'ToggleRow')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'PreferenceRow')).toHaveLength(0);
     // The config read is what the editor needs; a refused platform never asks.
     expect(state.configEnabled).toEqual([false]);
 
@@ -240,8 +252,12 @@ describe('council route gate', () => {
     expect(renderedTexts(renderer)).not.toContain(
       'Council review is not available for this organization.'
     );
-    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton').length).toBeGreaterThan(
-      0
+    // The placeholder reserves the row primitive's own shape — a leading tile
+    // and a subtitle line — so it cannot drift into a hand-sized box.
+    const placeholders = renderer.root.findAll(node => String(node.type) === 'RowSkeleton');
+    expect(placeholders.length).toBeGreaterThan(0);
+    expect(placeholders.every(row => row.props.tile === true && row.props.subtitle === true)).toBe(
+      true
     );
 
     mounted.unmount();
@@ -315,9 +331,10 @@ describe('council unit of write', () => {
     await act(() => undefined);
 
     expect(specialistToggle('Council review')?.value).toBe(false);
-    // An opt-in only runs against a stored council, so the row stays closed
-    // until the switch stores one.
-    expect(specialistToggle('kilo/app')?.disabled).toBe(true);
+    // A repository opt-in is a multi-select choice row, and one only runs
+    // against a stored council, so the row stays closed until the switch
+    // stores one.
+    expect(state.choiceProps.findLast(props => props.label === 'kilo/app')?.disabled).toBe(true);
 
     mounted.unmount();
   });

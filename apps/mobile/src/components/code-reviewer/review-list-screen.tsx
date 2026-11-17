@@ -14,10 +14,12 @@ import { QueryError } from '@/components/query-error';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { TabScreenScrollView, useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { RowChevron } from '@/components/ui/row-chevron';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { canConnectAnyProvider } from '@/lib/code-reviewer-status';
 import { isPersonal } from '@/lib/code-reviewer-config';
 import { useReviewerScopeTitle } from '@/lib/hooks/use-reviewer-scope-title';
@@ -35,11 +37,6 @@ import { readTrpcErrorField, trpcErrorVariant } from '@/lib/trpc-error';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
 const listStyle = { flex: 1 } satisfies ViewStyle;
-
-// The gutter each row keeps inside the safe-area side insets. In landscape those
-// insets are what clear the sensor housing, so a title never starts under it;
-// portrait insets are zero and this gutter is the whole margin.
-const LIST_CONTENT_GUTTER = 24;
 
 // Tone classes stay mobile-local; the label is the translated catalog key
 // for the same stable status code web reads, so it can't drift from web.
@@ -89,7 +86,7 @@ function ReviewListFooter({
 }: Readonly<{ loading: boolean; error: boolean; onRetry: () => void }>) {
   const { t } = useTranslation();
   if (loading) {
-    return <Skeleton className="h-20 w-full rounded-lg" />;
+    return <RowSkeleton subtitle />;
   }
   if (error) {
     return (
@@ -114,13 +111,12 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
   const now = useRelativeTimeNow();
   const paddingBottom = useTabBarBottomPadding();
   const insets = useSafeAreaInsets();
-  // One style for the whole content container: every row starts at the same
-  // offset, including the recycled ones, and a rotation re-derives it once.
+  // One style for the whole content container: every row keeps the screen's own
+  // side insets, and the rows draw the page gutter themselves.
   const listContentContainerStyle = useMemo<ViewStyle>(
     () => ({
-      paddingTop: 16,
-      paddingLeft: insets.left + LIST_CONTENT_GUTTER,
-      paddingRight: insets.right + LIST_CONTENT_GUTTER,
+      paddingLeft: insets.left,
+      paddingRight: insets.right,
     }),
     [insets.left, insets.right]
   );
@@ -199,11 +195,11 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
 
   let body: ReactNode = null;
   const reviewsLoadingBody = (
-    <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
+    <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
       <Animated.View exiting={FadeOut.duration(150)} className="gap-3">
-        <Skeleton className="h-20 w-full rounded-lg" />
-        <Skeleton className="h-20 w-full rounded-lg" />
-        <Skeleton className="h-20 w-full rounded-lg" />
+        <RowSkeleton subtitle />
+        <RowSkeleton subtitle />
+        <RowSkeleton subtitle />
       </Animated.View>
     </TabScreenScrollView>
   );
@@ -277,25 +273,28 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
             <Pressable
               accessibilityRole="button"
               className={cn(
-                'py-3 active:opacity-70',
+                'flex-row items-center gap-3 px-4 py-3 active:opacity-70',
                 index < reviews.length - 1 && 'border-b-[0.5px] border-hair-soft'
               )}
               onPress={() => {
                 pushOnce(`/(app)/code-reviewer/${scope}/reviews/${review.id}` as Href);
               }}
             >
-              <Text className="text-sm font-medium" numberOfLines={1}>
-                {review.pr_title}
-              </Text>
-              <Text variant="muted" className="mt-0.5 text-xs">
-                {review.repo_full_name} #{review.pr_number}
-              </Text>
-              <View className="mt-1 flex-row items-center gap-2">
-                <Text className={cn('text-xs', meta.className)}>{meta.label}</Text>
-                <Text variant="muted" className="text-xs">
-                  {timeAgo(reviewTime(review), undefined, now)}
+              <View className="min-w-0 flex-1">
+                <Text className="text-sm font-medium" numberOfLines={1}>
+                  {review.pr_title}
                 </Text>
+                <Text variant="muted" className="mt-0.5 text-xs">
+                  {review.repo_full_name} #{review.pr_number}
+                </Text>
+                <View className="mt-1 flex-row items-center gap-2">
+                  <Text className={cn('text-xs', meta.className)}>{meta.label}</Text>
+                  <Text variant="muted" className="text-xs">
+                    {timeAgo(reviewTime(review), undefined, now)}
+                  </Text>
+                </View>
               </View>
+              <RowChevron />
             </Pressable>
           );
         }}

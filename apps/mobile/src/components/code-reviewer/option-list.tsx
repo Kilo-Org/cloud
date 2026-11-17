@@ -8,8 +8,10 @@ import { Text } from '@/components/ui/text';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { ChoiceRow } from '@/components/ui/choice-row';
+import { RowGroup } from '@/components/ui/row-group';
 import { RadioGroup } from '@/components/ui/radio-group';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { reviewerSaveFailure, type ReviewerSaveFailure } from '@/lib/code-reviewer-save-error';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { usePopOnce } from '@/lib/navigation/pop-once';
@@ -78,31 +80,32 @@ export function OptionList<T extends string, TSaveResult>({
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={title} backFallback={CODE_REVIEWER_HOME_PATH} />
-      <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
+      <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
         <RadioGroup label={title}>
-          {options.map(option => (
-            <View key={option} className="relative">
-              <ChoiceRow
-                label={labels?.[option] ?? option}
-                description={descriptions?.[option]}
-                selected={selected === option}
-                disabled={Boolean(disabled) || pending !== null}
-                busy={pending === option}
-                onPress={() => {
-                  void handleSelect(option);
-                }}
-                className="border-b-[0.5px] border-hair-soft"
-              />
-              {pending === option && (
-                <View className="absolute inset-y-0 right-0 justify-center" pointerEvents="none">
-                  <ActivityIndicator size="small" color={colors.mutedForeground} />
-                </View>
-              )}
-            </View>
-          ))}
+          <RowGroup>
+            {options.map(option => (
+              <View key={option} className="relative">
+                <ChoiceRow
+                  label={labels?.[option] ?? option}
+                  description={descriptions?.[option]}
+                  selected={selected === option}
+                  disabled={Boolean(disabled) || pending !== null}
+                  busy={pending === option}
+                  onPress={() => {
+                    void handleSelect(option);
+                  }}
+                />
+                {pending === option && (
+                  <View className="absolute inset-y-0 right-0 justify-center" pointerEvents="none">
+                    <ActivityIndicator size="small" color={colors.mutedForeground} />
+                  </View>
+                )}
+              </View>
+            ))}
+          </RowGroup>
         </RadioGroup>
         {failure !== null && (
-          <View className="mt-4 rounded-lg bg-warn-tile-bg p-4" accessibilityLiveRegion="polite">
+          <View className="gap-3 rounded-xl bg-warn-tile-bg p-4" accessibilityLiveRegion="polite">
             <Text className="text-sm font-medium">{failure.message}</Text>
             {failure.retryable && (
               <Button

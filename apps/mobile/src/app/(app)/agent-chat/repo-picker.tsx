@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { EmptyState } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
 import { ChoiceRow } from '@/components/ui/choice-row';
+import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { SectionHeader } from '@/components/ui/section-header';
 import { Text } from '@/components/ui/text';
@@ -277,12 +278,12 @@ export default function RepoPickerScreen() {
       return null;
     }
     return (
-      <View className="mx-4 mt-3 gap-1 rounded-lg border border-border bg-card p-3">
+      <Card className="mx-3 mt-3">
         <Text className="text-sm font-semibold text-foreground">
           {t('agentChat.repoPicker.platformBitbucket')}
         </Text>
         <Text variant="muted">{t('agentChat.newSession.bitbucketOrganizationsOnly')}</Text>
-      </View>
+      </Card>
     );
   }
 }

@@ -91,8 +91,7 @@ export function SheetHeader({
   const colors = useThemeColors();
   const insets = useScreenInsets();
   const closeOnly = variant === 'close';
-  const resolvedDoneLabel =
-    doneLabel ?? (closeOnly ? t('common.close') : t('common.done'));
+  const resolvedDoneLabel = doneLabel ?? (closeOnly ? t('common.close') : t('common.done'));
   const resolvedCancelLabel = cancelLabel ?? t('common.cancel');
   const doneUnavailable = disabled || doneDisabled || doneBusy;
   // The top clearance comes from the same rule (and the same inputs) as the

@@ -98,21 +98,14 @@ export function SectionHeader({
       // by jumping between them, and the role is what makes them jump targets.
       // With an icon the wrapper grows, so the label shrinks and truncates.
       accessibilityRole="header"
-      className={cn(
-        'max-w-full',
-        !reserveLabelAir && !notice && !icon && 'grow',
-        icon && 'shrink'
-      )}
+      className={cn('max-w-full', !reserveLabelAir && !notice && !icon && 'grow', icon && 'shrink')}
     >
       {label}
     </Text>
   );
   const labelNode = icon ? (
     <View
-      className={cn(
-        'min-w-0 flex-row items-center gap-2',
-        !reserveLabelAir && !notice && 'grow'
-      )}
+      className={cn('min-w-0 flex-row items-center gap-2', !reserveLabelAir && !notice && 'grow')}
     >
       {icon}
       {labelText}

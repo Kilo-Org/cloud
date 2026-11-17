@@ -23,7 +23,9 @@ describe('SectionHeader gutter', () => {
       // reads as never-assigned.
       const mounted: { renderer?: TestRenderer.ReactTestRenderer } = {};
       act(() => {
-        mounted.renderer = TestRenderer.create(createElement(SectionHeader, { label: 'Explore', inset }));
+        mounted.renderer = TestRenderer.create(
+          createElement(SectionHeader, { label: 'Explore', inset })
+        );
       });
       const renderer = mounted.renderer;
       if (!renderer) {

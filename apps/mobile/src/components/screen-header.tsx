@@ -4,13 +4,7 @@ import { type Ref, useEffect, useState } from 'react';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { ChevronDown } from '@/components/ui/icons';
 import { DirectionalChevronLeft } from '@/components/ui/directional-icons';
-import {
-  Platform,
-  Pressable,
-  type TextInstance,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { Platform, Pressable, type TextInstance, useWindowDimensions, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Eyebrow } from '@/components/ui/eyebrow';

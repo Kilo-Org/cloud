@@ -395,7 +395,9 @@ describe('SectionHeader mounted layout', () => {
       })
     );
     const icon = root.findByType('Icon');
-    const label = root.find(node => Object.is(node.type, 'Text') && node.children.includes('Inbox'));
+    const label = root.find(
+      node => Object.is(node.type, 'Text') && node.children.includes('Inbox')
+    );
     // The icon shares the label's flex line, so it cannot push the label onto a
     // second row, and the label's own width gives way to it.
     expect(label.parent).toBe(icon.parent);
@@ -474,7 +476,9 @@ describe('SectionHeader mounted layout', () => {
       expect.arrayContaining(textActionTargetClass().split(' '))
     );
 
-    const airHeader = shape(createElement(SectionHeader, { label: 'Explore', reserveLabelAir: true }));
+    const airHeader = shape(
+      createElement(SectionHeader, { label: 'Explore', reserveLabelAir: true })
+    );
     const airSkeleton = shape(createElement(SectionHeaderSkeleton, { reserveLabelAir: true }));
     expect(airSkeleton.row).toEqual(airHeader.row);
     expect(airSkeleton.row).toContain(SECTION_HEADER_ROW_PADDING_CLASS);

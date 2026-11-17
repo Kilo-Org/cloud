@@ -10,6 +10,7 @@ import {
   GITHUB_REPOSITORY_PERMISSION_CACHE_TTL_MS,
   MAX_CACHED_REPOSITORY_PERMISSIONS,
 } from './github-repository-permission';
+import { GitHubRateLimitError } from '@/lib/integrations/platforms/github/adapter';
 
 const mockedAssertAuthorized = jest.mocked(assertGitHubInstallationRuntimeAuthorized);
 
@@ -128,6 +129,26 @@ describe('authorizeGitHubRepository', () => {
     expect(result.markdown).toContain('`acme/unreachable`');
     expect(result.markdown).toContain('temporary');
     expect(fetchPermission).toHaveBeenCalledTimes(2);
+  });
+
+  test('a rate-limited lookup names the rate limit and is not retried', async () => {
+    const fetchPermission = createFetchPermission('write');
+    const rateLimitError = new GitHubRateLimitError(new Date('2026-11-17T01:00:00.000Z'));
+    fetchPermission.mockRejectedValue(rateLimitError);
+
+    const result = await authorizeGitHubRepository({
+      platformIntegration: createIntegration(),
+      repository: 'acme/rate-limited',
+      actorLogin: 'octocat',
+      fetchPermission,
+    });
+
+    expect(result.allowed).toBe(false);
+    if (result.allowed) throw new Error('expected a refusal');
+    expect(result.markdown).toContain('rate limit');
+    expect(result.markdown).toContain('`acme/rate-limited`');
+    expect(result.markdown).not.toContain('write access');
+    expect(fetchPermission).toHaveBeenCalledTimes(1);
   });
 
   test('a permission lookup that fails once is retried and allowed', async () => {

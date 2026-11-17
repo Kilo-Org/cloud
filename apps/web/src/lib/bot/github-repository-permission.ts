@@ -2,6 +2,7 @@ import 'server-only';
 import type { PlatformIntegration } from '@kilocode/db';
 import {
   getCollaboratorPermissionLevel,
+  GitHubRateLimitError,
   type CollaboratorPermission,
   type GitHubAppType,
 } from '@/lib/integrations/platforms/github/adapter';
@@ -120,6 +121,19 @@ function transientAccessRequiredMarkdown(repository: string | null): string {
   );
 }
 
+/**
+ * The permission check was rate limited. The retry window stretches as long as
+ * GitHub's rate-limit window (up to an hour), so the copy names it instead of
+ * overpromising a moment.
+ */
+function rateLimitedAccessRequiredMarkdown(repository: string): string {
+  return (
+    `GitHub is rate limiting my checks right now, so I couldn't confirm whether your account ` +
+    `has permission on \`${repository}\`, and I didn't start any work. Try again after the ` +
+    'rate-limit window passes — usually within the hour.'
+  );
+}
+
 function notAllowed(repository: string | null): GitHubRepositoryAuthorization {
   return { allowed: false, markdown: writeAccessRequiredMarkdown(repository) };
 }
@@ -128,18 +142,21 @@ function isSameRepository(left: string, right: string): boolean {
   return left.trim().toLowerCase() === right.trim().toLowerCase();
 }
 
-type WriteAccessResult = 'allowed' | 'denied' | 'transient';
+type WriteAccessResult = 'allowed' | 'denied' | 'transient' | 'rate_limited';
 
 type PermissionLookup =
   | { status: 'answered'; permission: CollaboratorPermission | null }
-  | { status: 'unreachable'; error: string };
+  | { status: 'unreachable'; error: string }
+  | { status: 'rate_limited'; error: GitHubRateLimitError };
 
 /**
  * Asks GitHub for the collaborator permission at most twice: a single failure
  * must not end the action, and neither must a definitive null on the first ask
  * (the adapter returns null for a 404, and one retry covers a lookup that raced
  * an installation change). A null on the retry is answered: GitHub said no.
- * Two thrown failures in a row mean GitHub stayed unreachable.
+ * Two thrown failures in a row mean GitHub stayed unreachable. A typed
+ * rate-limit failure is not retried: another request before `resetAt` cannot
+ * succeed and extends GitHub's penalty, so that attempt ends the lookup.
  */
 async function lookupRepositoryPermission(
   permissionInput: GitHubRepositoryPermissionInput,
@@ -152,6 +169,7 @@ async function lookupRepositoryPermission(
       if (permission !== null) return { status: 'answered', permission };
       lastError = null;
     } catch (error) {
+      if (error instanceof GitHubRateLimitError) return { status: 'rate_limited', error };
       lastError = error;
     }
   }
@@ -206,6 +224,14 @@ async function hasRepositoryWriteAccess(params: {
     });
     return 'transient';
   }
+  if (lookup.status === 'rate_limited') {
+    console.warn('[KiloBot] GitHub rate limited the repository access check:', {
+      repository: params.repository,
+      platformIntegrationId: params.platformIntegrationId,
+      error: lookup.error.message,
+    });
+    return 'rate_limited';
+  }
 
   const { permission } = lookup;
   return permission === 'admin' || permission === 'maintain' || permission === 'write'
@@ -259,6 +285,9 @@ export async function authorizeGitHubRepository(params: {
   if (writeAccess === 'allowed') return { allowed: true };
   if (writeAccess === 'transient') {
     return { allowed: false, markdown: transientAccessRequiredMarkdown(repository) };
+  }
+  if (writeAccess === 'rate_limited' && repository !== null) {
+    return { allowed: false, markdown: rateLimitedAccessRequiredMarkdown(repository) };
   }
   return notAllowed(repository);
 }

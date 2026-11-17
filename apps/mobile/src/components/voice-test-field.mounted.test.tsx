@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import { VoiceTestField } from '@/components/voice-test-field';
 import { renderWithProviders } from '@/test/render-with-providers';
-import { TOUCH_TARGET_DP, tapTargetReachDp, textActionTargetClass } from '@/lib/a11y/tap-target';
+import { tapTargetReachDp, textActionTargetClass, TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
 
 type VoiceInputOptions = {
   disabled: boolean;

@@ -172,9 +172,6 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 vi.mock('@/lib/format', () => ({
   formatDate: () => 'Jan 1, 2026',
-  // The passkey row joins the added date and a recorded last use into its one
-  // secondary line, so the row primitive's own list formatting runs here too.
-  formatList: (parts: string[]) => parts.join(' \u00b7 '),
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/tab-screen', () => ({ useTabBarBottomPadding: () => 0 }));

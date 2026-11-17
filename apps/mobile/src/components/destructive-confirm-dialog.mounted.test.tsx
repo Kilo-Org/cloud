@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { act, TestRenderer } from '@/test/renderer';
 
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
+
 import { DestructiveConfirmDialog } from './destructive-confirm-dialog';
 
 vi.mock('react-native', () => ({
@@ -121,6 +123,20 @@ describe('DestructiveConfirmDialog', () => {
       root.findAll(
         node => isType(node, 'Pressable') && classNameOf(node).includes('bg-destructive')
       )
+    ).toHaveLength(1);
+  });
+
+  it('draws the title in the sheet header over a gutted body', () => {
+    const root = mount();
+
+    // The title is the sheet header's, not a hand-built heading inside the
+    // card, so it sits on the header row with the close control.
+    expect(
+      root.findAll(node => isType(node, 'Text') && node.children.includes('Sign out?'))
+    ).toHaveLength(1);
+    // The body keeps the page gutter and the sheet's own section gap.
+    expect(
+      root.findAll(node => isType(node, 'View') && classNameOf(node) === SCREEN_BODY_CLASS)
     ).toHaveLength(1);
   });
 

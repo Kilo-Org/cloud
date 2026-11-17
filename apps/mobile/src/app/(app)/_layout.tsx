@@ -231,6 +231,7 @@ export default function AppLayout() {
             <Stack.Screen name="agent-briefing/[report-id]" />
             <Stack.Screen name="agent-briefing/settings" />
             <Stack.Screen name="share-gate" options={sheetOptions} />
+            <Stack.Screen name="bitbucket-connect" options={sheetOptions} />
             <Stack.Screen name="language-picker" options={searchSheetOptions} />
             <Stack.Screen name="transcription-model-picker" options={pickerSheetOptions} />
             <Stack.Screen name="voice-language-picker" options={searchSheetOptions} />

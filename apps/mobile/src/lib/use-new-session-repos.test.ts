@@ -9,7 +9,11 @@ import {
   type NewSessionRepository,
   setSelectedBranchOverride,
 } from '@/components/agents/new-session-repository-state';
-import { useNewSessionRepos, useRepositoryBranches } from './use-new-session-repos';
+import {
+  PROVIDER_QUERY_SETTLE_BOUND_MS,
+  useNewSessionRepos,
+  useRepositoryBranches,
+} from './use-new-session-repos';
 
 const mocks = vi.hoisted(() => ({
   query: vi.fn(async (_opts: unknown): Promise<unknown> => ({})),
@@ -25,8 +29,12 @@ const mocks = vi.hoisted(() => ({
   queryCalls: [] as { queryKey?: unknown[]; enabled?: boolean; staleTime?: number }[],
   /** Result the branch query (the one with a `queryFn`) reports. */
   branchQueryResult: emptyQueryResult(),
+  /** Provider list queries, by their key's first element, still in their first load. */
+  pendingProviders: [] as string[],
   /** The browser launch every provider's connect flow waits on. */
   openAuthorization: vi.fn(async (_url: string): Promise<void> => undefined),
+  /** The route push that opens the app's own Bitbucket connect sheet. */
+  routerPush: vi.fn(),
 }));
 
 function emptyQueryResult(): Record<string, unknown> {
@@ -34,6 +42,12 @@ function emptyQueryResult(): Record<string, unknown> {
 }
 
 vi.mock('react-native', () => ({ Platform: { OS: 'ios' } }));
+
+// The hook reads `useRouter` to open the Bitbucket connect sheet; the real
+// module's expo-runtime import cannot load in the pure project.
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: mocks.routerPush }),
+}));
 
 vi.mock('sonner-native', () => ({ toast: { error: mocks.toastError } }));
 
@@ -58,7 +72,13 @@ vi.mock('@tanstack/react-query', () => ({
       error: null,
       refetch: vi.fn(),
     };
-    return options.queryFn ? { ...base, ...mocks.branchQueryResult } : base;
+    if (options.queryFn) {
+      return { ...base, ...mocks.branchQueryResult };
+    }
+    // A provider list query: a case holds the providers it names in their first
+    // load, which is what a throttled link does to all three at once.
+    const pending = mocks.pendingProviders.includes(String(options.queryKey?.[0]));
+    return { ...base, isLoading: pending, isPending: pending };
   },
   useQueryClient: () => ({ query: mocks.query, setQueryData: mocks.setQueryData }),
 }));
@@ -183,6 +203,39 @@ function requireResult(resultRef: { current: ReposResult | null }): ReposResult 
   return result;
 }
 
+/** Mount the hook and keep the renderer, so a case can change the organization prop or re-render. */
+function mountReposScoped(initialOrganizationId: string | undefined) {
+  const resultRef: { current: ReposResult | null } = { current: null };
+  const renderer: { current: TestRenderer.ReactTestRenderer | null } = { current: null };
+  let organizationId = initialOrganizationId;
+  act(() => {
+    renderer.current = TestRenderer.create(
+      React.createElement(Harness, { organizationId, resultRef })
+    );
+  });
+  return {
+    result: () => requireResult(resultRef),
+    /**
+     * Render the same props again with whatever the fakes now report. The
+     * provider queries are the fake's own state, so this is how a case moves
+     * them — a retry of a list that is still in flight, or a list that answered.
+     */
+    rerender() {
+      act(() => {
+        renderer.current?.update(React.createElement(Harness, { organizationId, resultRef }));
+      });
+      return requireResult(resultRef);
+    },
+    changeScope(nextOrganizationId: string | undefined) {
+      organizationId = nextOrganizationId;
+      act(() => {
+        renderer.current?.update(React.createElement(Harness, { organizationId, resultRef }));
+      });
+      return requireResult(resultRef);
+    },
+  };
+}
+
 // Every provider's force-fresh reads `query` with a `queryKey` whose first
 // element names the provider, so the fake can answer Bitbucket and GitLab
 // differently from one call site.
@@ -200,6 +253,7 @@ beforeEach(() => {
   mocks.query.mockImplementation(async (_opts: unknown) => ({ repositories: [] }));
   mocks.queryCalls.length = 0;
   mocks.branchQueryResult = {};
+  mocks.pendingProviders = [];
 });
 
 describe('useNewSessionRepos force-fresh Bitbucket cache write', () => {
@@ -269,6 +323,137 @@ describe('useNewSessionRepos provider staleTime', () => {
   });
 });
 
+// The form paints its Ambiente row on the repository region's settled signal, so
+// a provider list that never lands must not withhold it: the wait is bounded,
+// and a scope change re-arms the bound for the scope it now asks about.
+describe('useNewSessionRepos provider settle bound', () => {
+  const ALL_PROVIDERS = ['github', 'gitlab', 'bitbucket'];
+
+  it('stops waiting for provider lists that outlive the bound and keeps them settled', () => {
+    vi.useFakeTimers();
+    try {
+      mocks.pendingProviders = ALL_PROVIDERS;
+      const mounted = mountReposScoped('org-1');
+
+      expect(mounted.result().providerQueriesResolved).toBe(false);
+
+      act(() => {
+        vi.advanceTimersByTime(PROVIDER_QUERY_SETTLE_BOUND_MS);
+      });
+      expect(mounted.result().providerQueriesResolved).toBe(true);
+
+      // The lists are still in flight, so the bound — not their answer —
+      // released the region, and the same wait stays released.
+      act(() => {
+        vi.advanceTimersByTime(PROVIDER_QUERY_SETTLE_BOUND_MS);
+      });
+      expect(mounted.result().providerQueriesResolved).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('settles on the provider answers that arrive before the bound', () => {
+    const mounted = mountReposScoped('org-1');
+
+    // Every list answered, so no timer had to run for the region to be final.
+    expect(mounted.result().providerQueriesResolved).toBe(true);
+  });
+
+  it('settles at the bound even when the lists are still loading', () => {
+    vi.useFakeTimers();
+    try {
+      mocks.pendingProviders = ALL_PROVIDERS;
+      const mounted = mountReposScoped('org-1');
+
+      // Every list is in its first load and none has answered: without the bound
+      // the region would wait for all of them, and the form's rows with it.
+      expect(mounted.result().providerQueriesResolved).toBe(false);
+
+      act(() => {
+        vi.advanceTimersByTime(PROVIDER_QUERY_SETTLE_BOUND_MS);
+      });
+
+      expect(mounted.result().providerQueriesResolved).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps the region settled across a retry of the same lists', () => {
+    vi.useFakeTimers();
+    try {
+      mocks.pendingProviders = ALL_PROVIDERS;
+      const mounted = mountReposScoped('org-1');
+      act(() => {
+        vi.advanceTimersByTime(PROVIDER_QUERY_SETTLE_BOUND_MS);
+      });
+      expect(mounted.result().providerQueriesResolved).toBe(true);
+
+      // A retry re-issues the same lists. It is the same question, so the rows
+      // that are already on screen must stay: a bound keyed to the request
+      // re-armed here and dropped them again.
+      mocks.pendingProviders = [];
+      expect(mounted.rerender().providerQueriesResolved).toBe(true);
+      mocks.pendingProviders = ALL_PROVIDERS;
+      expect(mounted.rerender().providerQueriesResolved).toBe(true);
+
+      // No timer ran for either render: the scope was already settled.
+      expect(mounted.result().providerQueriesResolved).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('waits out the bound again after an organization change', () => {
+    vi.useFakeTimers();
+    try {
+      mocks.pendingProviders = ALL_PROVIDERS;
+      const mounted = mountReposScoped('org-1');
+      act(() => {
+        vi.advanceTimersByTime(PROVIDER_QUERY_SETTLE_BOUND_MS);
+      });
+      expect(mounted.result().providerQueriesResolved).toBe(true);
+
+      // The new scope asks its own question, so the previous scope's expiry
+      // cannot settle it: the region waits again from the change.
+      expect(mounted.changeScope('org-2').providerQueriesResolved).toBe(false);
+
+      act(() => {
+        vi.advanceTimersByTime(PROVIDER_QUERY_SETTLE_BOUND_MS - 1);
+      });
+      expect(mounted.result().providerQueriesResolved).toBe(false);
+
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(mounted.result().providerQueriesResolved).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('leaves the repositories-settled flag to the provider answers', () => {
+    vi.useFakeTimers();
+    try {
+      mocks.pendingProviders = ALL_PROVIDERS;
+      const mounted = mountReposScoped('org-1');
+      expect(mounted.result().reposSettled).toBe(false);
+
+      act(() => {
+        vi.advanceTimersByTime(PROVIDER_QUERY_SETTLE_BOUND_MS);
+      });
+
+      // The bound releases the form's rows; it never reports that a repository
+      // list arrived, so the picker's own content waits for a real answer.
+      expect(mounted.result().providerQueriesResolved).toBe(true);
+      expect(mounted.result().reposSettled).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
 describe('useNewSessionRepos connect busy state', () => {
   // The connect flow's first step is a network round trip (GitHub mints an
   // install state), so the control that starts it has to show the flow running
@@ -315,6 +500,23 @@ describe('useNewSessionRepos connect busy state', () => {
       pending.resolve();
       await pending.promise;
     });
+    expect(requireResult(resultRef).connectingProvider).toBeNull();
+  });
+
+  it('opens the app connect sheet instead of the browser for Bitbucket', () => {
+    const resultRef = mountRepos('org-1');
+
+    act(() => {
+      requireResult(resultRef).openIntegration('bitbucket');
+    });
+
+    // The token is pasted in the app's own sheet, so the tap is synchronous:
+    // there is no browser wait to report as a running flow.
+    expect(mocks.routerPush).toHaveBeenCalledWith({
+      pathname: '/(app)/bitbucket-connect',
+      params: { scope: 'org-1' },
+    });
+    expect(mocks.openAuthorization).not.toHaveBeenCalled();
     expect(requireResult(resultRef).connectingProvider).toBeNull();
   });
 

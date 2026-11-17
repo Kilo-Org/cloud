@@ -151,6 +151,28 @@ export function glanceableSessionTitle(value: string | null | undefined): string
 }
 
 /**
+ * Order sessions by one of their timestamps. `direction` uses the vocabulary
+ * the package already owns for its extreme-row selector: 'earliest' is oldest
+ * first, 'latest' is newest first. A missing or unparseable time ranks after
+ * every known time in both directions, so the rule is stated here and not
+ * restated per sort; a tie compares 0, so the caller's stable sort keeps source
+ * order.
+ */
+function compareSessionInstant(
+  read: (row: HomeWidgetSessionRow) => string | undefined,
+  direction: 'earliest' | 'latest'
+): (a: HomeWidgetSessionRow, b: HomeWidgetSessionRow) => number {
+  return (a, b) => {
+    const left = timestampMs(read(a));
+    const right = timestampMs(read(b));
+    if (left === null || right === null) {
+      return Number(left === null) - Number(right === null);
+    }
+    return direction === 'earliest' ? left - right : right - left;
+  };
+}
+
+/**
  * Same authorized rows as counts, with stable ties and unknown times ranked
  * last. Returns the kind its `primaryTitle` belongs to, so the title and the
  * count drawn beside it cannot describe different kinds.
@@ -158,18 +180,16 @@ export function glanceableSessionTitle(value: string | null | undefined): string
 export function buildHomeWidgetDetails(
   sessions: readonly HomeWidgetSessionRow[]
 ): HomeWidgetDetails {
+  const byStatusUpdatedAt = compareSessionInstant(row => row.statusUpdatedAt, 'earliest');
   const waiting = sessions
     .filter(row => glanceableStatusKind(row.status) === 'needsInput')
     .sort(
       (a, b) =>
-        Number(b.approvalKey != null) - Number(a.approvalKey != null) ||
-        (timestampMs(a.statusUpdatedAt) ?? Infinity) - (timestampMs(b.statusUpdatedAt) ?? Infinity)
+        Number(b.approvalKey != null) - Number(a.approvalKey != null) || byStatusUpdatedAt(a, b)
     );
   const scheduled = sessions
     .filter(row => glanceableStatusKind(row.status) === 'scheduled')
-    .sort(
-      (a, b) => (timestampMs(a.scheduledAt) ?? Infinity) - (timestampMs(b.scheduledAt) ?? Infinity)
-    );
+    .sort(compareSessionInstant(row => row.scheduledAt, 'earliest'));
   const primaryKind = KIND_ORDER.find(kind =>
     sessions.some(row => glanceableStatusKind(row.status) === kind)
   );
@@ -180,11 +200,7 @@ export function buildHomeWidgetDetails(
         ? scheduled[0]
         : sessions
             .filter(row => glanceableStatusKind(row.status) === primaryKind)
-            .sort(
-              (a, b) =>
-                (timestampMs(b.statusUpdatedAt) ?? -Infinity) -
-                (timestampMs(a.statusUpdatedAt) ?? -Infinity)
-            )[0];
+            .sort(compareSessionInstant(row => row.statusUpdatedAt, 'latest'))[0];
   return {
     approvalKey: waiting.find(row => row.approvalKey != null)?.approvalKey ?? null,
     primaryKind: primaryKind ?? null,
@@ -256,6 +272,23 @@ function scheduledWake(
   return { at: timestampMs(snapshot.scheduledAt), iso: timestampToIso(snapshot.scheduledAt) };
 }
 
+/**
+ * The one status precedence: a terminal snapshot outranks content, content
+ * outranks a request for input, and an acknowledged snapshot that is neither is
+ * either empty or unavailable.
+ */
+function presentationStatus(
+  snapshot: GlanceableAgentsSnapshot,
+  terminal: boolean,
+  primaryKind: GlanceableStatusKind | null
+): HomeWidgetPresentation['status'] {
+  if (terminal) return snapshot.status === 'privacy' ? 'privacy' : 'signed_out';
+  if (primaryKind !== null) return 'content';
+  if (snapshot.status === 'waiting') return 'waiting';
+  if (snapshot.status === 'empty') return 'empty';
+  return 'unavailable';
+}
+
 /** Pure policy: counts survive activity expiry; only explicit privacy/auth clears hide them. */
 export function buildHomeWidgetPresentation(
   data: HomeWidgetData,
@@ -269,17 +302,7 @@ export function buildHomeWidgetPresentation(
   const titleKind = details.primaryKind ?? null;
   const wake = scheduledWake(snapshot, terminal);
   return {
-    status: terminal
-      ? snapshot.status === 'privacy'
-        ? 'privacy'
-        : 'signed_out'
-      : primaryKind !== null
-        ? 'content'
-        : snapshot.status === 'waiting'
-          ? 'waiting'
-          : snapshot.status === 'empty'
-            ? 'empty'
-            : 'unavailable',
+    status: presentationStatus(snapshot, terminal, primaryKind),
     primaryKind,
     primaryCount: primaryKind === null ? 0 : snapshot[primaryKind],
     secondaryCounts: terminal

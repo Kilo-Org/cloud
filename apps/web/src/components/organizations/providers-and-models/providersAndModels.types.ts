@@ -1,3 +1,5 @@
+import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
+
 export type ModelRow = {
   modelId: string;
   modelName: string;
@@ -38,6 +40,8 @@ export type ProviderOffering = OfferingPricing & {
   trains: boolean;
   retainsPrompts: boolean;
   byokOnly?: boolean;
+  /** The regions Vercel AI Gateway can pin the model to at this provider. */
+  vercelInferenceRegions: OrganizationDataRegion[];
 };
 
 export type ProviderModelRow = OfferingPricing & {

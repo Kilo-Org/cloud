@@ -44,8 +44,8 @@ import { useDeleteAccount } from '@/components/use-delete-account';
 import { useFeedbackPrompt } from '@/components/use-feedback-prompt';
 import { useAuth } from '@/lib/auth/auth-context';
 import { providerLabel } from '@/lib/auth/provider-label';
-import { SESSION_SYNC_URL, WEB_BASE_URL } from '@/lib/config';
-import { getCloudTriggersUrl } from '@/lib/cloud-triggers-url';
+import { SESSION_SYNC_URL } from '@/lib/config';
+import { triggersListHref } from '@/lib/cloud-triggers/trigger-routes';
 import { openExternalUrl } from '@/lib/external-link';
 import { useAfterIdle } from '@/lib/hooks/use-after-idle';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
@@ -347,10 +347,8 @@ export function ProfileScreen() {
               router.push(getProfilesPath());
             }}
           />
-          {/* Cloud Agent triggers stay on the web: the editor carries a body
-              schema, target, cron expression and signing secret. The row is the
-              hand-off, and it opens the page for the scope in view (personal or
-              the selected organization) so the browser lands where the app was. */}
+          {/* Cloud Agent triggers are a native screen, for the scope in view:
+              the personal triggers, or the selected organization's. */}
           <ConfigureRow
             icon={Workflow}
             title={t('cloudAgent.triggers.title')}
@@ -359,10 +357,7 @@ export function ProfileScreen() {
             className="rounded-lg bg-secondary px-3"
             last
             onPress={() => {
-              void openExternalUrl(getCloudTriggersUrl(WEB_BASE_URL, organizationId), {
-                label: t('cloudAgent.triggers.title'),
-                retryOnError: true,
-              });
+              router.push(triggersListHref(organizationId ?? undefined));
             }}
           />
         </View>

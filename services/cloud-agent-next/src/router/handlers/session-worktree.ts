@@ -60,6 +60,7 @@ import { getWorktreeWorkspacePath } from '../../workspace.js';
 import { protectedProcedure } from '../auth.js';
 import { resolveSecret } from '../../auth.js';
 import {
+  AgentVariantSchema,
   AttachmentsSchema,
   Limits,
   MessageIdSchema,
@@ -115,11 +116,7 @@ export const CreateHostedWorkspaceSessionInput = z
       .object({
         mode: ModeSlugSchema,
         model: modelIdSchema,
-        variant: z
-          .string()
-          .max(50)
-          .regex(/^[a-zA-Z]+$/)
-          .optional(),
+        variant: AgentVariantSchema.optional(),
       })
       .strict(),
     kilocodeOrganizationId: z.uuid().optional(),

@@ -21,15 +21,16 @@ import { useFeatureFlagEnabled } from 'posthog-js/react';
 import { CLAUDE_PLATFORM_OAUTH_FLAG } from '@kilocode/web-shared/lib/auth/claude/feature-flag';
 import type { ClaudeBillingOwnerInput } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import type { ClaudeBillingStatus } from '@/routers/claude-billing-router';
+import { claudeBillingOutcomeParam } from '@/lib/claude-billing/constants';
 
 const subscribeHydration = () => () => {};
 const LINKED_PLATFORMS_URL = 'https://platform.claude.com/linked-platforms';
 
 /**
- * Which connection the card shows: the person's personal account, their own
- * connection in an organization, or the organization's shared-services one.
+ * Which connection the card shows: the person's personal account, or the
+ * connection of the organization the page belongs to.
  */
-export type ClaudeBillingScope = 'personal' | 'member' | 'shared_services';
+export type ClaudeBillingScope = 'personal' | 'organization';
 
 const CARD_TITLE = 'Claude (linked billing)';
 
@@ -57,22 +58,15 @@ const SCOPE_COPY: Record<
       'Pay Anthropic directly for your Claude usage in Kilo through your Claude API organization. No API key needed.',
     coverageNote: null,
     removeNote:
-      'Removing the link from Kilo restores normal BYOK or Kilo-credit routing. Remove it first to switch to another Claude organization.',
+      "Removing the link from Kilo ends Kilo's link at Anthropic unless another Kilo scope still uses it, then restores normal BYOK or Kilo-credit routing. Remove it first to switch to another Claude organization.",
   },
-  member: {
+  organization: {
     description:
-      'Pay Anthropic directly for the Claude requests you make in this organization through your own Claude API organization. No API key needed.',
+      "Pay Anthropic directly for Claude usage in this organization, both members' requests and Kilo services such as code review, through a Claude API organization. No API key needed.",
     coverageNote:
-      'Only your own requests are covered. Shared services such as code review are not.',
+      "Covers every member's Claude requests in this organization and Kilo services such as code review.",
     removeNote:
-      'Removing the link from Kilo restores normal BYOK or Kilo-credit routing. Remove it first to switch to another Claude organization.',
-  },
-  shared_services: {
-    description:
-      'Link a Claude API organization for this organization. Kilo shared services, such as code review, then bill Anthropic directly instead of using Kilo credits.',
-    coverageNote: 'Only shared services are covered. Members’ own links are separate.',
-    removeNote:
-      'Removing the link from Kilo stops shared services from billing it. Members’ own links are unchanged. Remove it first to switch to another Claude organization.',
+      "Removing the link from Kilo ends Kilo's link at Anthropic unless another Kilo scope still uses it, stops every Claude request in this organization from billing it, and restores normal BYOK or Kilo-credit routing. Remove it first to switch to another Claude organization.",
   },
 };
 
@@ -101,13 +95,10 @@ function outcomeMessage(outcome: string, scope: ClaudeBillingScope, connected: b
         ? 'Linking did not complete. An owner, admin, or billing admin of that Claude organization must approve it, or remove the current link first to link a different Claude organization.'
         : 'Linking did not complete. An owner, admin, or billing admin of your Claude organization must approve it.';
     case 'already_linked':
-      return 'This Claude organization is already linked in Kilo. Use an existing link below if you control it, or ask its owner to share it. To move the link, unlink Kilo under Linked platforms in Claude Console first, then link again.';
+      return 'This Claude organization already has a link. Use an existing link below if you control it, or ask its owner to share it. If neither applies, unlink Kilo under Linked platforms in Claude Console, then link again.';
     case 'forbidden':
-      if (scope === 'shared_services') {
-        return 'Only a Kilo organization owner or admin with access to this feature can link it.';
-      }
-      return scope === 'member'
-        ? 'Only a member of this Kilo organization with access to this feature can link it.'
+      return scope === 'organization'
+        ? 'Only a Kilo organization owner or admin with access to this feature can link it.'
         : 'Claude linked billing is not available for your account yet.';
     default:
       return 'We could not link your Claude organization. Try again.';
@@ -116,7 +107,7 @@ function outcomeMessage(outcome: string, scope: ClaudeBillingScope, connected: b
 
 function refusalMessage(status: ClaudeBillingStatus) {
   if (status.state === 'reconnect_required') {
-    return 'The account that linked Claude billing for this organization is no longer available. An organization owner must link Claude billing again before Kilo shared services can bill this organization again.';
+    return 'The account that linked Claude billing for this organization is no longer available. An organization owner must link Claude billing again before Claude requests in this organization can bill through it.';
   }
   if (status.state === 'billing_unavailable') {
     return 'Claude billing is unavailable. The link may have ended, the Claude organization may be ineligible, or Kilo may have an authentication problem. Check Linked platforms in Claude Console, link it again if needed, or contact Kilo support.';
@@ -307,9 +298,7 @@ export function ClaudeBillingCardView({
               </div>
             ) : !status.canManage ? (
               <p className="type-body text-muted-foreground">
-                {scope === 'shared_services'
-                  ? 'Ask a Kilo organization owner or admin to manage Claude shared services.'
-                  : 'Only direct members of this organization can link their own Claude organization.'}
+                Ask a Kilo organization owner or admin to link a Claude organization.
               </p>
             ) : null}
             <p className="type-body">
@@ -353,7 +342,7 @@ function ClaudeBillingCardContent({
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const outcomeParam = scope === 'shared_services' ? 'claude_billing_shared' : 'claude_billing';
+  const outcomeParam = claudeBillingOutcomeParam({ kind: scope });
   const [outcome, setOutcome] = useState(() => searchParams.get(outcomeParam));
   useEffect(() => {
     const returned = searchParams.get(outcomeParam);
@@ -366,10 +355,7 @@ function ClaudeBillingCardContent({
   }, [outcomeParam, router, searchParams]);
   const [connecting, setConnecting] = useState(false);
   const [lastShareSource, setLastShareSource] = useState<ClaudeBillingOwnerInput | null>(null);
-  const input = {
-    organizationId,
-    ...(scope === 'shared_services' ? { scope: 'shared_services' as const } : {}),
-  };
+  const input = { organizationId };
   const statusQuery = useQuery(trpc.claudeBilling.status.queryOptions(input));
   const flagEnabled = useFeatureFlagEnabled(CLAUDE_PLATFORM_OAUTH_FLAG);
   const invalidateBillingQueries = () =>
@@ -395,8 +381,8 @@ function ClaudeBillingCardContent({
     })
   );
   const shareFailureCode = shareMutation.error?.data?.code;
-  const failureCode =
-    statusQuery.error?.data?.code ?? shareFailureCode ?? removeMutation.error?.data?.code;
+  const removeFailureCode = removeMutation.error?.data?.code;
+  const failureCode = statusQuery.error?.data?.code ?? shareFailureCode ?? removeFailureCode;
   const needsSignIn = failureCode === 'UNAUTHORIZED';
   const needsAdmin = failureCode === 'FORBIDDEN';
   const nonRetryableShareError =
@@ -424,11 +410,9 @@ function ClaudeBillingCardContent({
         needsSignIn
           ? 'Sign in again to manage this link.'
           : needsAdmin
-            ? scope === 'shared_services'
-              ? 'An organization owner or admin must manage Claude shared services.'
-              : scope === 'member'
-                ? 'Only a member of this organization can manage this link.'
-                : 'Linked billing with Claude Platform is not available for your account yet.'
+            ? scope === 'organization'
+              ? 'An organization owner or admin must manage Claude billing for this organization.'
+              : 'Linked billing with Claude Platform is not available for your account yet.'
             : shareFailureCode === 'CONFLICT'
               ? 'This scope already has a Claude link. Remove it from Kilo first to use another link.'
               : shareFailureCode === 'PRECONDITION_FAILED'
@@ -438,7 +422,11 @@ function ClaudeBillingCardContent({
                   : shareMutation.isError
                     ? 'We could not share that Claude link. Try again.'
                     : removeMutation.isError
-                      ? 'We could not remove your Claude link. Try again.'
+                      ? removeFailureCode === 'PRECONDITION_FAILED'
+                        ? 'Kilo kept this Claude link. Unlink Kilo under Linked platforms in Claude Console, then remove it here again.'
+                        : removeFailureCode === 'SERVICE_UNAVAILABLE'
+                          ? 'Anthropic did not confirm the unlink, so Kilo kept this Claude link. Try again.'
+                          : 'We could not remove your Claude link. Try again.'
                       : null
       }
       onRetry={
@@ -462,7 +450,6 @@ function ClaudeBillingCardContent({
                 owner: scope === 'personal' ? 'personal' : (organizationId ?? 'personal'),
                 return: window.location.pathname,
               });
-              if (scope === 'shared_services') query.set('scope', 'shared_services');
               window.location.assign(`/claude/billing/connect?${query}`);
             }
           : undefined
@@ -486,12 +473,12 @@ function ClaudeBillingCardContent({
 
 /**
  * One Claude billing connection card. `scope` picks which connection it shows;
- * the organization's shared-services card is rendered only for people who
- * manage the organization.
+ * the organization card is rendered for every member, with its actions for the
+ * owners and admins who may manage it.
  */
 export function ClaudeBillingCard({
   organizationId,
-  scope = organizationId ? 'member' : 'personal',
+  scope = organizationId ? 'organization' : 'personal',
 }: {
   organizationId?: string;
   scope?: ClaudeBillingScope;

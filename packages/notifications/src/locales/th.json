@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "เซสชันเอเจนต์ของคุณมีการอัปเดต",
-      "chatMessage": "คุณมีข้อความใหม่",
-      "instanceLifecycle": "อินสแตนซ์ของคุณมีการอัปเดต",
-      "scheduledAction": "การดำเนินการที่กำหนดไว้มีการอัปเดต",
       "lowBalance": "ยอดคงเหลือของคุณต้องได้รับการดูแล",
       "spendAlert": "ค่าใช้จ่ายของคุณต้องได้รับการดูแล",
       "securityFinding": "พบปัญหาความปลอดภัยที่ต้องได้รับการดูแล",
@@ -17,12 +14,6 @@
     "notification": {
       "title": "{{sessionTitle}}",
       "body": "{{message}}"
-    }
-  },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · ไม่มีชื่อ",
-      "body": "{{bodyPreview}}"
     }
   },
   "internal": {
@@ -49,35 +40,6 @@
     "securityLifecycle": {
       "title": "Kilo",
       "body": "การตรวจสอบความปลอดภัยมีการอัปเดต"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} พร้อมแล้ว",
-      "body": "แตะเพื่อเริ่มแชท"
-    },
-    "startFailed": {
-      "title": "{{instanceName}} เริ่มต้นไม่สำเร็จ",
-      "body": "เริ่มต้นล้มเหลว"
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} จะรีสตาร์ทเร็ว ๆ นี้",
-      "body": "กำหนดให้รีสตาร์ทที่ {{when}}"
-    },
-    "restartCancelled": {
-      "title": "ยกเลิกการรีสตาร์ท {{instanceName}} แล้ว",
-      "body": "การรีสตาร์ทที่กำหนดไว้ก่อนหน้านี้ถูกยกเลิกแล้ว"
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} จะอัปเกรดเร็ว ๆ นี้",
-      "bodyWithTag": "อัปเกรดเป็น {{targetImageTag}} ที่ {{when}}",
-      "bodyWithoutTag": "กำหนดอัปเกรดที่ {{when}}"
-    },
-    "versionChangeCancelled": {
-      "title": "ยกเลิกการอัปเกรด {{instanceName}} แล้ว",
-      "body": "การอัปเกรดที่กำหนดไว้ก่อนหน้านี้ถูกยกเลิกแล้ว"
     }
   },
   "sessionReady": {

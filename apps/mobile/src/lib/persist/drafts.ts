@@ -139,16 +139,6 @@ export function prCommentDraftKey(
   return `pr-comment:${owner}/${repo}#${number}:${path}:${side}:${startLine ?? line}-${line}`;
 }
 
-const mergeDraftSchema = z.object({
-  title: z.string(),
-  message: z.string(),
-});
-
-/** Runtime shape guard for a merge-sheet draft ({ title, message }). */
-export function isMergeDraft(value: unknown): value is { title: string; message: string } {
-  return mergeDraftSchema.safeParse(value).success;
-}
-
 const sharePayloadsDraftSchema = z.object({
   order: z.array(z.string()),
   entries: z.record(

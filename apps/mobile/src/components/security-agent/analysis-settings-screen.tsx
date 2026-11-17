@@ -2,13 +2,13 @@ import {
   getSettingsDirtyState,
   isPersonalSecurityScope,
 } from '@kilocode/app-shared/security-agent';
-import { useRouter } from 'expo-router';
 import { Brain, Search, Wrench } from '@/components/ui/icons';
 import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
+import { useSettingsSaveFeedback } from '@/components/security-agent/settings-save-feedback';
 import { openModelPicker } from '@/components/agents/model-selector';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
@@ -21,6 +21,7 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { modelLabelFromCatalogue } from '@/lib/auto-model-name';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
@@ -102,11 +103,12 @@ function AnalysisSettingsSkeleton() {
 }
 
 export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const canManage = useSecurityAgentCapability(scope).canManage;
   const config = useSecurityAgentConfig(scope);
-  const save = useSaveSecurityAgentConfig(scope);
+  const save = useSaveSecurityAgentConfig(scope, { announceFailed: false });
+  const feedback = useSettingsSaveFeedback();
   const {
     models,
     isLoading: modelsLoading,
@@ -149,10 +151,11 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   const dirty = baseline !== null && getSettingsDirtyState(baseline, patch, valid) !== 'clean';
   useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled, { dirty });
 
-  const handleSave = async () => {
-    await save.mutateAsync(patch);
-    setBaseline(previous => ({ ...previous, ...patch }));
-  };
+  const handleSave = () =>
+    feedback.run(async () => {
+      await save.mutateAsync(patch);
+      setBaseline(previous => ({ ...previous, ...patch }));
+    });
 
   const { onBack, skipNextGuardRef, dialog } = useSettingsBackGuard({
     dirty,
@@ -198,7 +201,7 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
       ? () => {
           // The Security Agent config stores a model slug and nothing else, so
           // the picker must not offer a thinking effort it would have to drop.
-          openModelPicker(router, {
+          openModelPicker(pushOnce, {
             options: models,
             value,
             variant: '',
@@ -226,6 +229,7 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
           ) : undefined
         }
       />
+      {feedback.node}
       <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 gap-6 pt-4">
         {!canManage && (
           <Text className="text-center text-xs text-muted-foreground">

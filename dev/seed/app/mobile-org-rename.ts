@@ -15,9 +15,10 @@ export const usage = '<fake-email>';
  * - `refusedOrganizationId` never got a seat subscription and its trial ended
  *   more than three days ago, so `classifyOrganizationEntitlement` reports
  *   `trial_expired_hard` with no bypass and every organization mutation is
- *   refused with `FORBIDDEN` / `Organization trial has expired.` The owner
- *   still sees the rename control, so a rename typed here is rejected by the
- *   server while the dialog stays open.
+ *   refused with `FORBIDDEN` / `Organization trial has expired.` The hub reads
+ *   that same verdict, so its rename control states the ended plan instead of
+ *   opening the dialog, and a rename sent from anywhere else is still rejected
+ *   by the server.
  * - `acceptedOrganizationId` is a fresh organization inside its trial, so the
  *   same rename succeeds and the dialog closes.
  */
@@ -102,7 +103,9 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   }
 
   console.log('This fixture represents: an organization owner renaming their organization.');
-  console.log('The refused organization answers every rename with the trial sentence.');
+  console.log(
+    'The refused organization states the ended plan on its rename control; a rename sent another way is refused.'
+  );
   console.log('Suggested next step: open a returned deep link on the signed-in mobile app.');
   return {
     userId,

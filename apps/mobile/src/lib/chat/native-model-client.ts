@@ -10,6 +10,7 @@ import { Cause, Effect, Queue, Stream } from 'effect';
 import { z } from 'zod';
 
 import { nativeModelFailure } from './native-model-error';
+import { cancelNative, openProvider, type Provider } from './native-round-slot';
 import { estimatedTokens, inputTokensOf } from './native-model-usage';
 import {
   nativeRequest,
@@ -66,14 +67,6 @@ export type NativeModelBridge = {
   ) => { remove: () => void };
 };
 
-/** A generation that asked for tools and waits, between two harness rounds, for their results. */
-type ToolLoop = {
-  waiting?: { readonly id: string; readonly calls: readonly string[]; readonly hasText: boolean };
-};
-
-/** One native module and the tool round it may hold open. */
-type Provider = { readonly bridge: NativeModelBridge; readonly loop: ToolLoop };
-
 /** A native promise rejection carries its stable reason as an Expo error code. */
 const codedRejection = z.object({ code: z.string() });
 
@@ -89,11 +82,12 @@ function nextRequestId(): string {
 }
 
 function answer(
-  { bridge, loop }: Provider,
+  provider: Provider,
   availability: NativeAvailability,
   request: ModelRequest
 ): Stream.Stream<ModelEvent, ModelError> {
   return Stream.callback<ModelEvent, ModelError>(queue => {
+    const bridge = provider.bridge;
     const tools = availability.tools === true && bridge.resume !== undefined;
     const offersTools = tools && request.tools !== undefined && request.tools.length > 0;
     const native = nativeRequest(request, {
@@ -104,17 +98,37 @@ function answer(
       maxImages: availability.maxImages,
     });
     const results = tools ? resultsOf(request) : undefined;
-    const { waiting } = loop;
-    loop.waiting = undefined;
+    const held = provider.loop.kind === 'waiting' ? provider.loop.round : undefined;
     // The results answer the waiting generation only when they answer every call it made.
     const resumption =
-      waiting !== undefined &&
-      results?.length === waiting.calls.length &&
-      results.every(result => waiting.calls.includes(result.callId))
-        ? { id: waiting.id, results }
+      held !== undefined &&
+      results?.length === held.calls.length &&
+      results.every(result => held.calls.includes(result.callId))
+        ? { id: held.id, results }
         : undefined;
+    /* The exchange that asked is the only one that may drop its own round. The
+       owner asks again with no results when its turn was abandoned under the
+       tools — Stop, the chat closed, a sign-out — and that round can never be
+       answered, so it is cancelled instead of holding the bridge busy forever. */
+    const abandoned =
+      held !== undefined &&
+      resumption === undefined &&
+      results === undefined &&
+      held.owner !== undefined &&
+      held.owner === request.cacheKey;
+    // Another chat's generation is between two rounds: it is live, and this
+    // request has nothing that answers it. Refuse rather than cancel it or
+    // steal its slot. The slot is untouched for the round that owns it.
+    if (held !== undefined && resumption === undefined && !abandoned) {
+      return Effect.fail(nativeModelFailure('busy', false));
+    }
+    // The round this request answers — or replaces — starts here, so the bridge
+    // is free again until that round asks for tools itself.
+    if (resumption !== undefined || abandoned) {
+      provider.loop = { kind: 'free' };
+    }
     let id = resumption?.id ?? native.id;
-    const hasPreviousText = resumption !== undefined && waiting?.hasText === true;
+    const hasPreviousText = resumption !== undefined && held?.hasText === true;
     // `running` is the only state that owns a live native inference. `waiting`
     // hands it to the next round, which answers its tool calls. `retrying`
     // waits for the failed attempt to settle before a fresh one starts.
@@ -165,10 +179,15 @@ function answer(
     // The round ends here; the native generation waits for the next round's results.
     const pause = async (calls: readonly NativeToolCall[]) => {
       state = 'waiting';
-      loop.waiting = {
-        id,
-        calls: calls.map(call => call.id),
-        hasText: hasPreviousText || output.trim() !== '',
+      // Published before the stream ends, so the results round finds it.
+      provider.loop = {
+        kind: 'waiting',
+        round: {
+          id,
+          owner: request.cacheKey,
+          calls: calls.map(call => call.id),
+          hasText: hasPreviousText || output.trim() !== '',
+        },
       };
       output += calls.map(call => call.name + call.arguments).join('');
       Queue.offerAllUnsafe(
@@ -187,13 +206,6 @@ function answer(
       Queue.offerUnsafe(queue, { kind: 'done', usage, stop: 'tools' });
       Queue.endUnsafe(queue);
     };
-    const stopNative = async (stopped: string) => {
-      try {
-        await bridge.cancel(stopped);
-      } catch {
-        // The native request already ended; there is nothing left to stop.
-      }
-    };
     // The harness ends a turn with a round that offers no tools, so that the
     // model answers from the results it has. A resumed Foundation Models
     // generation keeps the tools its session opened with, and a call it makes
@@ -204,7 +216,7 @@ function answer(
     const refuse = async (calls: readonly NativeToolCall[]) => {
       if (refused) {
         fail('tools_refused');
-        await stopNative(id);
+        await cancelNative(bridge, id);
         return;
       }
       refused = true;
@@ -255,13 +267,13 @@ function answer(
       }
     };
     const run = async () => {
+      // Only the round this owner abandoned, never another chat's generation.
+      if (abandoned) {
+        await cancelNative(bridge, held.id);
+      }
       if (resumption !== undefined) {
         await bridge.resume?.(resumption.id, resumption.results).catch(rejected);
         return;
-      }
-      // A waiting generation this request does not answer can never continue.
-      if (waiting !== undefined) {
-        await stopNative(waiting.id);
       }
       // Results with no generation waiting for them: the round they answer is gone.
       if (results !== undefined) {
@@ -283,7 +295,7 @@ function answer(
           if (state === 'running' || state === 'retrying') {
             // Interrupted mid-answer: stop the native task. Its late events are ignored.
             state = 'over';
-            void stopNative(id);
+            void cancelNative(bridge, id);
           }
         })
       ),
@@ -302,7 +314,7 @@ function answer(
  * resume that generation instead of starting a new one.
  */
 export function nativeModelClient(bridge: NativeModelBridge): ModelClientService {
-  const provider: Provider = { bridge, loop: {} };
+  const provider: Provider = openProvider(bridge);
   return {
     stream: request =>
       Stream.unwrap(

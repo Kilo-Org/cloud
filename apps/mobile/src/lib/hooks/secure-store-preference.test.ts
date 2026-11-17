@@ -1,6 +1,13 @@
+/* eslint-disable max-lines -- one store, one harness: the write-pending suites stay beside the write suites they mirror */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createSecureStorePreference } from './secure-store-preference';
+import {
+  setBreadcrumbSink,
+  setTelemetrySink,
+  type TelemetryBreadcrumb,
+  type TelemetryEvent,
+} from '@/lib/telemetry/error-sink';
 
 const { getItemAsync, setItemAsync, deleteItemAsync } = vi.hoisted(() => ({
   getItemAsync: vi.fn(),
@@ -42,15 +49,20 @@ describe('createSecureStorePreference', () => {
     toastError.mockReset();
   });
 
-  it('logs to Sentry (not a toast) on a read failure and keeps the default value', async () => {
-    // Every attempt rejects, so the retry policy gives up and surfaces the
-    // failure.
+  it('keeps the default value and files no second event on a read failure', async () => {
+    // Every attempt rejects, so the retry policy gives up and the SecureStore
+    // read path reports the failure once. The store must not add a record of
+    // its own for the same rejection.
     getItemAsync.mockRejectedValue(new Error('disk error'));
     const store = createSecureStorePreference<boolean>({
       key: 'k',
       defaultValue: false,
       parse: raw => raw === 'true',
       serialize: value => (value ? 'true' : 'false'),
+    });
+    const events: TelemetryEvent[] = [];
+    setTelemetrySink(event => {
+      events.push(event);
     });
 
     vi.useFakeTimers();
@@ -63,11 +75,50 @@ describe('createSecureStorePreference', () => {
 
       expect(store.get()).toBe(false);
       expect(store.getHasLoaded()).toBe(true);
-      expect(captureException).toHaveBeenCalledWith(expect.any(Error), {
-        tags: { 'error.subsystem': 'preferences', 'error.operation': 'load_secure_store' },
-      });
+      expect(events.map(event => event.fingerprint)).toEqual([['secure-store-failure', 'read']]);
+      expect(captureException).not.toHaveBeenCalled();
       expect(toastError).not.toHaveBeenCalled();
     } finally {
+      setTelemetrySink(null);
+      vi.useRealTimers();
+    }
+  });
+
+  it('files no event for a keychain refusal while the device is locked', async () => {
+    // iOS rejects every read with this message until unlock; the store keeps
+    // its default and the refusal leaves a breadcrumb instead of an event.
+    getItemAsync.mockRejectedValue(new Error('User interaction is not allowed'));
+    const store = createSecureStorePreference<boolean>({
+      key: 'k',
+      defaultValue: false,
+      parse: raw => raw === 'true',
+      serialize: value => (value ? 'true' : 'false'),
+    });
+    const events: TelemetryEvent[] = [];
+    const breadcrumbs: TelemetryBreadcrumb[] = [];
+    setTelemetrySink(event => {
+      events.push(event);
+    });
+    setBreadcrumbSink(breadcrumb => {
+      breadcrumbs.push(breadcrumb);
+    });
+
+    vi.useFakeTimers();
+    try {
+      const loading = store.whenLoaded();
+      await vi.runAllTimersAsync();
+      await loading;
+
+      expect(store.get()).toBe(false);
+      expect(store.getHasLoaded()).toBe(true);
+      expect(events).toHaveLength(0);
+      expect(breadcrumbs.map(breadcrumb => breadcrumb.message)).toEqual([
+        'keychain refused a call while the device was locked',
+      ]);
+      expect(captureException).not.toHaveBeenCalled();
+    } finally {
+      setTelemetrySink(null);
+      setBreadcrumbSink(null);
       vi.useRealTimers();
     }
   });
@@ -142,6 +193,91 @@ describe('createSecureStorePreference', () => {
 
     expect(store.get()).toBe(true);
     expect(setItemAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the last durable value visible while a setAsync write runs', async () => {
+    getItemAsync.mockResolvedValue(null);
+    const writeGate = Promise.withResolvers<undefined>();
+    // The seed write lands at once; the gated one is the pick's write.
+    setItemAsync.mockResolvedValueOnce(undefined).mockImplementation(async () => {
+      await writeGate.promise;
+    });
+    const store = createSecureStorePreference<string>({
+      key: 'k',
+      defaultValue: 'en',
+      parse: raw => raw ?? 'en',
+      serialize: value => value,
+    });
+
+    store.set('en');
+    await store.whenPersisted();
+    expect(store.get()).toBe('en');
+
+    // A pick that must not change memory until the disk takes it. The write is
+    // pending for the language follow, but getRequested() keeps reporting the
+    // last durable value: the pick may still be rejected by the disk.
+    const applying = store.setAsync('es');
+    expect(store.hasPendingWrite()).toBe(true);
+    expect(store.getRequested()).toBe('en');
+
+    writeGate.resolve(undefined);
+    await expect(applying).resolves.toBe(true);
+
+    expect(store.getRequested()).toBe('es');
+    expect(store.hasPendingWrite()).toBe(false);
+  });
+
+  it('surfaces the setAsync pick as the pending write target', async () => {
+    getItemAsync.mockResolvedValue(null);
+    const writeGate = Promise.withResolvers<undefined>();
+    // The seed write lands at once; the gated one is the pick's write.
+    setItemAsync.mockResolvedValueOnce(undefined).mockImplementation(async () => {
+      await writeGate.promise;
+    });
+    const store = createSecureStorePreference<string>({
+      key: 'k',
+      defaultValue: 'en',
+      parse: raw => raw ?? 'en',
+      serialize: value => value,
+    });
+
+    store.set('en');
+    await store.whenPersisted();
+    expect(store.getPendingWriteTarget()).toBeUndefined();
+
+    // The restore of the language follow reads this: the durable value keeps
+    // reading `en` while the write runs, so the pick lives only here.
+    const applying = store.setAsync('es');
+    expect(store.getPendingWriteTarget()).toBe('es');
+    expect(store.getRequested()).toBe('en');
+
+    writeGate.resolve(undefined);
+    await expect(applying).resolves.toBe(true);
+
+    expect(store.getPendingWriteTarget()).toBeUndefined();
+    expect(store.getRequested()).toBe('es');
+  });
+
+  it('keeps the durable value in getRequested after a failed setAsync write', async () => {
+    getItemAsync.mockResolvedValue(null);
+    setItemAsync.mockResolvedValueOnce(undefined).mockRejectedValue(new Error('disk refused'));
+    const store = createSecureStorePreference<string>({
+      key: 'k',
+      defaultValue: 'en',
+      parse: raw => raw ?? 'en',
+      serialize: value => value,
+    });
+
+    store.set('en');
+    await store.whenPersisted();
+
+    await expect(store.setAsync('es')).resolves.toBe(false);
+
+    // The caller rolls its own apply back; memory keeps the durable choice.
+    expect(store.getRequested()).toBe('en');
+    expect(store.getPendingWriteTarget()).toBeUndefined();
+    expect(store.hasPendingWrite()).toBe(false);
+    expect(store.get()).toBe('en');
   });
 
   it('writes the newest choice, not every choice, when several land during one write', async () => {
@@ -279,6 +415,33 @@ describe('createSecureStorePreference', () => {
     // write lands.
     expect(seen.slice(mergedAt).every(entry => entry.length === 2)).toBe(true);
     expect(seen.at(-1)).toEqual(['disk', 'local']);
+    unsubscribe();
+  });
+
+  it('does not claim the list was read when a set lands before the initial read', async () => {
+    const pendingRead = Promise.withResolvers<string | null>();
+    getItemAsync.mockReturnValueOnce(pendingRead.promise);
+    const store = createSecureStorePreference<string[]>({
+      key: 'k',
+      defaultValue: [],
+      parse: raw => (raw === null || raw === '' ? [] : raw.split(',')),
+      serialize: value => value.join(','),
+      mergeOnLoad: (disk, pending) => [...new Set([...disk, ...pending])],
+    });
+
+    /* A screen that adds a server before the first read has to be able to tell
+       "the stored list is known" from "the stored list is still on its way". A
+       write landing answers neither, so it must not settle the read. */
+    const unsubscribe = store.subscribe(noopListener);
+    store.set(['local']);
+    await store.whenPersisted();
+    expect(store.getHasLoaded()).toBe(false);
+
+    pendingRead.resolve('disk');
+    await store.whenLoaded();
+
+    expect(store.getHasLoaded()).toBe(true);
+    expect(store.get()).toEqual(['disk', 'local']);
     unsubscribe();
   });
 

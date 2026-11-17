@@ -122,6 +122,7 @@ export function CommentBodyField({
 export function ComposerFooter({
   isEdit,
   isSubmitting,
+  dismissalLocked,
   primaryDisabled,
   onSave,
   onCommentNow,
@@ -130,6 +131,8 @@ export function ComposerFooter({
 }: {
   isEdit: boolean;
   isSubmitting: boolean;
+  /** Only the in-flight write locks Cancel; the pre-submit Terms gate does not. */
+  dismissalLocked: boolean;
   primaryDisabled: boolean;
   onSave: () => void;
   onCommentNow: () => void;
@@ -170,7 +173,7 @@ export function ComposerFooter({
       <Button
         variant="ghost"
         onPress={onCancel}
-        disabled={isSubmitting}
+        disabled={dismissalLocked}
         className="mt-2"
         accessibilityLabel={t('common.cancel')}
       >

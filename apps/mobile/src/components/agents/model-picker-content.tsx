@@ -13,7 +13,7 @@ import { PickerSheet } from '@/components/picker-sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { FIELD_CLEAR_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -280,15 +280,24 @@ export function ModelPickerContent() {
                 </View>
               ) : null}
             </View>
-            {/* In-field clear, on every platform: `clearButtonMode` is iOS
-                only, so Android rendered the query with no way to reset it. */}
+            {/* In-field clear, on every platform: the native clear affordance is not
+                available on the platform without one, so the field carries its
+                own control. The frame, not the 16pt glyph, is what a
+                control-size audit reads, so the control renders a box that
+                carries the whole target on its own node, and it adds no
+                `hitSlop`: the box already reaches past the target, and a reach
+                across `gap-2` would take taps the search field should get. The
+                box cancels its own extra height, so the field keeps its height.
+                `-me-3` (the field's own `px-3`) puts the box's trailing edge on
+                the field's edge, so the whole box stays inside the field's
+                frame; it is a logical margin, so it mirrors with the row in
+                right-to-left layouts. */}
             {search.length > 0 ? (
               <Pressable
                 onPress={handleClearSearch}
                 accessibilityLabel={t('common.clearSearch')}
                 accessibilityRole="button"
-                hitSlop={12}
-                className="active:opacity-70"
+                className={`${FIELD_CLEAR_BOX_CLASS} -me-3 active:opacity-70`}
               >
                 <X size={16} color={colors.mutedForeground} />
               </Pressable>

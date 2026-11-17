@@ -11,7 +11,7 @@ import {
   createKiloDefaultEnkryptInputDetectors,
   ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
-import { KILO_DEFAULT_POLICY_TEXT } from './kilo-default-policy';
+import { KILO_DEFAULT_POLICY_TEXT } from '@kilocode/app-shared/organizations';
 
 export type EnkryptInputDetectorsDraft = Omit<
   EnkryptInputDetectors,

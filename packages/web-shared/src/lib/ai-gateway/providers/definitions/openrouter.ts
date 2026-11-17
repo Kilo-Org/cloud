@@ -1,20 +1,12 @@
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import { dropThinkingBlocksOnPrefixMismatch } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/thinking-block-binding';
+import { defineGatewayProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/gateway-provider';
 
-export const OPENROUTER = {
+export const OPENROUTER = defineGatewayProvider({
   type: 'openrouter',
   apiUrl: 'https://openrouter.ai/api/v1',
-  apiUrlOverrides: {},
-  disableUrlSuffix: false,
   apiKey: getEnvVariable('OPENROUTER_API_KEY'),
-  apiKeyHeader: null,
-  supportedChatApis: ['chat_completions', 'messages', 'responses'],
-  responseTransforms: null,
-  async transformRequest(context) {
-    dropThinkingBlocksOnPrefixMismatch(context);
-  },
-} as const satisfies Provider;
+});
 
 export function createUserOpenRouterProvider(apiKey: string): Provider {
   return { ...OPENROUTER, apiKey };

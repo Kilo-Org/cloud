@@ -22,10 +22,6 @@ import {
   invalidateOrganizationSessionAccess,
 } from './session-ingest-client';
 
-// ---------------------------------------------------------------------------
-// Mocks
-// ---------------------------------------------------------------------------
-
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
 }));
@@ -44,10 +40,6 @@ global.fetch = mockFetch;
 
 const mockCaptureException = jest.mocked(captureException);
 const mockGenerateBoundedInternalServiceToken = jest.mocked(generateBoundedInternalServiceToken);
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 function makeSnapshot(
   messages: Array<{
@@ -68,10 +60,6 @@ function makeSnapshot(
     })),
   };
 }
-
-// ---------------------------------------------------------------------------
-// fetchSessionSnapshot
-// ---------------------------------------------------------------------------
 
 describe('fetchSessionSnapshot', () => {
   beforeEach(() => {
@@ -219,10 +207,6 @@ describe('fetchSessionSnapshot', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// deleteSession
-// ---------------------------------------------------------------------------
-
 describe('deleteSession', () => {
   beforeEach(() => {
     mockFetch.mockReset();
@@ -348,10 +332,6 @@ describe('deleteSession', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// shareSession
-// ---------------------------------------------------------------------------
-
 describe('shareSession', () => {
   beforeEach(() => {
     mockFetch.mockReset();
@@ -382,7 +362,7 @@ describe('shareSession', () => {
     );
   });
 
-  it('returns share_token on success', async () => {
+  it('returns share_token on success, with a null public_id for an older worker', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,
@@ -391,7 +371,27 @@ describe('shareSession', () => {
 
     const result = await shareSession('ses_abc123', 'user_123');
 
-    expect(result).toEqual({ share_token: 'share.jwt.token' });
+    expect(result).toEqual({ share_token: 'share.jwt.token', public_id: null });
+  });
+
+  it('returns the public_id the worker created', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          success: true,
+          share_token: 'share.jwt.token',
+          public_id: '33333333-3333-4333-8333-333333333333',
+        }),
+    });
+
+    const result = await shareSession('ses_abc123', 'user_123');
+
+    expect(result).toEqual({
+      share_token: 'share.jwt.token',
+      public_id: '33333333-3333-4333-8333-333333333333',
+    });
   });
 
   it('calls POST on the correct URL', async () => {
@@ -497,10 +497,6 @@ describe('shareSession', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// unshareSession
-// ---------------------------------------------------------------------------
-
 describe('unshareSession', () => {
   beforeEach(() => {
     mockFetch.mockReset();
@@ -567,10 +563,6 @@ describe('unshareSession', () => {
     );
   });
 });
-
-// ---------------------------------------------------------------------------
-// fetchSharedSessionMetadata
-// ---------------------------------------------------------------------------
 
 describe('fetchSharedSessionMetadata', () => {
   beforeEach(() => {
@@ -654,10 +646,6 @@ describe('fetchSharedSessionMetadata', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// fetchSharedSessionSnapshot
-// ---------------------------------------------------------------------------
-
 describe('fetchSharedSessionSnapshot', () => {
   beforeEach(() => {
     mockFetch.mockReset();
@@ -721,10 +709,6 @@ describe('fetchSharedSessionSnapshot', () => {
     expect(JSON.stringify(mockCaptureException.mock.calls)).not.toContain('secret.share.jwt.token');
   });
 });
-
-// ---------------------------------------------------------------------------
-// fetchSharedSession
-// ---------------------------------------------------------------------------
 
 describe('fetchSharedSession', () => {
   beforeEach(() => {
@@ -847,10 +831,6 @@ describe('fetchSharedSession', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// fetchSessionMessages (thin wrapper)
-// ---------------------------------------------------------------------------
-
 describe('invalidateOrganizationSessionAccess', () => {
   beforeEach(() => {
     mockFetch.mockReset();
@@ -961,10 +941,6 @@ describe('fetchSessionMessages', () => {
     expect(result).toBeNull();
   });
 });
-
-// ---------------------------------------------------------------------------
-// fetchSessionMessagesPage (paginated authorized history)
-// ---------------------------------------------------------------------------
 
 describe('fetchSessionMessagesPage', () => {
   beforeEach(() => {
@@ -1137,10 +1113,6 @@ describe('fetchSessionMessagesPage', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Bounded upstream budget
-// ---------------------------------------------------------------------------
-
 describe('bounded upstream budget', () => {
   beforeEach(() => {
     jest.useFakeTimers();
@@ -1226,10 +1198,6 @@ describe('bounded upstream budget', () => {
     expect(line).not.toContain('?');
   });
 });
-
-// ---------------------------------------------------------------------------
-// Redacted route label
-// ---------------------------------------------------------------------------
 
 // `SESSION_INGEST_WORKER_URL` is concatenated as-is at every call site
 // (`config.server.ts:479` returns the env value unchanged), so a configured

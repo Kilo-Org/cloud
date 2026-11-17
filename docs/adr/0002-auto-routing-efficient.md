@@ -109,7 +109,7 @@ row cannot be mis-attributed as a user's first model.
 
 A conversation's Durable Object remembers the last served model. The incumbent is
 kept while it still meets the tier's accuracy threshold, unless the fresh pick is
-cheaper by more than the table's `switchCostFactor`. Rationale: a model switch
+cheaper by more than the fixed switch cost factor (3). Rationale: a model switch
 discards the provider's prompt cache, and rebuilding it costs full-price input
 tokens (4–10× cache-read rates) on a context that dominates agent-session spend —
 switching only pays off when recurring per-turn savings clearly exceed that

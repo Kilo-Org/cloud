@@ -226,7 +226,12 @@ describe('registerProfiles multi-variant quota (migrated SQLite)', () => {
         applyBenchmarkMigrations(sqlite);
         const db = sqliteD1(sqlite);
         const orm = drizzle(db);
-        const config = { deciderRepetitions: 1 };
+        const config = {
+          minAccuracy: 0.7,
+          accuracyNoiseBand: 0.05,
+          productionTokenProfile: null,
+          switchHorizonTurns: null,
+        };
         const current = currentProfileContextFromConfig(config);
         const now = new Date('2026-10-18T12:00:00.000Z');
         const requested: BenchmarkPair = { model: 'test/multi-variant', variant: 'high' };
@@ -277,7 +282,12 @@ describe('registerProfiles multi-variant quota (migrated SQLite)', () => {
         applyBenchmarkMigrations(sqlite);
         const db = sqliteD1(sqlite);
         const orm = drizzle(db);
-        const config = { deciderRepetitions: 1 };
+        const config = {
+          minAccuracy: 0.7,
+          accuracyNoiseBand: 0.05,
+          productionTokenProfile: null,
+          switchHorizonTurns: null,
+        };
         const current = currentProfileContextFromConfig(config);
         const now = new Date('2026-10-18T12:00:00.000Z');
         const model = 'test/multi-variant';

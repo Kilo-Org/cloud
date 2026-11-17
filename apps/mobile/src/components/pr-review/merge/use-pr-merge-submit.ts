@@ -12,8 +12,10 @@ import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-revie
 import { type AllowedMergeMethod } from '@/lib/pr-review/merge/merge-blocked-reasons';
 import { applyMergeSuccessEffects } from '@/lib/pr-review/merge/merge-success-effects';
 import {
+  isPrOperationNotAdmitted,
   isPrOperationPersistenceFailed,
   PR_OPERATION_PERSISTENCE_FAILED_MESSAGE,
+  staleHeadRejectionMessage,
 } from '@/lib/pr-review/merge/pr-operation-ledger';
 import {
   type EnableAutoMergeVars,
@@ -23,15 +25,6 @@ import {
 } from '@/lib/pr-review/merge/use-pr-merge-mutations';
 import { reconnectExpiredMessage } from '@/lib/pr-review/mutation-error-display';
 import { type ProviderPrRef } from '@/lib/pr-review/provider-pr-ref';
-import { readTrpcErrorField } from '@/lib/trpc-error';
-
-function staleHeadRejectionMessage(error: unknown): string | null {
-  if (readTrpcErrorField(error, 'code') !== 'CONFLICT') {
-    return null;
-  }
-  const message = error instanceof Error ? error.message : '';
-  return /changed since it was loaded|closed without merging/.test(message) ? message : null;
-}
 
 function mergeForbiddenCopy(platform: ProviderPrPlatform | undefined, t: TFunction): string {
   return platform
@@ -100,6 +93,13 @@ export function usePrMergeSubmit({
       const staleHead = staleHeadRejectionMessage(lastError);
       if (staleHead !== null) {
         setInlineError(staleHead);
+        setInlineErrorKind('non-retryable');
+        return;
+      }
+      // The intent store refused the merge before anything was sent, and only a
+      // resolved intent frees a slot: a Retry here could never succeed.
+      if (isPrOperationNotAdmitted(lastError)) {
+        setInlineError(lastError.message);
         setInlineErrorKind('non-retryable');
         return;
       }

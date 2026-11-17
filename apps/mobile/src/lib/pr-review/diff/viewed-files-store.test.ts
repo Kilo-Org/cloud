@@ -269,6 +269,74 @@ describe('viewed-files-store', () => {
     expect(getViewedFilesSnapshot(REF, SHA1)).toEqual({ paths: [], isLoading: true });
   });
 
+  it('does not un-tick a path from a read taken while its write is still open', async () => {
+    /* Two surfaces read one PR's set. A toggle is optimistic and its durable
+       write settles later; a revalidation that starts inside that window reads
+       the set from before the write, so publishing it would take the tick back
+       off the file the person just ticked. Only the toggle's own revalidation —
+       after the write landed — may change the set. */
+    const durable: string[] = [];
+    storeMocks.getViewedFiles.mockImplementation(async () => {
+      await Promise.resolve();
+      return [...durable];
+    });
+    const writeGate = Promise.withResolvers<undefined>();
+    storeMocks.toggleViewedFile.mockImplementation(async (input: { path: string }) => {
+      await writeGate.promise;
+      durable.push(input.path);
+    });
+    subscribeViewedFiles(REF, SHA1, listenerStub());
+    await waitFor(() => !getViewedFilesSnapshot(REF, SHA1).isLoading);
+
+    const toggling = applyViewedFilesToggle(REF, SHA1, 'a.ts');
+    expect(getViewedFilesSnapshot(REF, SHA1).paths).toEqual(['a.ts']);
+
+    // Both a single revalidation and the fan-out after another key's toggle
+    // land in the window and must not publish the pre-write set.
+    await revalidateViewedFiles(REF, SHA1);
+    expect(getViewedFilesSnapshot(REF, SHA1).paths).toEqual(['a.ts']);
+    revalidateAllViewedFiles();
+    await flushTurn();
+    expect(getViewedFilesSnapshot(REF, SHA1).paths).toEqual(['a.ts']);
+
+    writeGate.resolve(undefined);
+    await toggling;
+    await waitFor(() => storeMocks.getViewedFiles.mock.calls.length > 0);
+    expect(getViewedFilesSnapshot(REF, SHA1).paths).toEqual(['a.ts']);
+  });
+
+  it.each([false, true])('reconciles rejection with the initial read loaded: %s', async loaded => {
+    const initialRead = Promise.withResolvers<string[]>();
+    storeMocks.getViewedFiles.mockReturnValueOnce(initialRead.promise).mockResolvedValue([]);
+    subscribeViewedFiles(REF, SHA1, listenerStub());
+    subscribeViewedFiles(OTHER_REF, SHA1, listenerStub());
+    await waitFor(() => !getViewedFilesSnapshot(OTHER_REF, SHA1).isLoading);
+    if (loaded) {
+      initialRead.resolve([]);
+      await waitFor(() => !getViewedFilesSnapshot(REF, SHA1).isLoading);
+    }
+    const write = Promise.withResolvers<undefined>();
+    storeMocks.toggleViewedFile.mockReturnValueOnce(write.promise);
+    const toggling = applyViewedFilesToggle(REF, SHA1, 'a.ts');
+    const refused = expect(toggling).rejects.toThrow('write failed');
+    if (!loaded) {
+      initialRead.resolve([]);
+    }
+    await flushTurn();
+    expect(getViewedFilesSnapshot(REF, SHA1)).toEqual({
+      paths: ['a.ts'],
+      isLoading: !loaded,
+    });
+    storeMocks.getViewedFiles.mockClear();
+    write.reject(new Error('write failed'));
+    await refused;
+    await flushTurn();
+
+    expect(getViewedFilesSnapshot(REF, SHA1)).toEqual({ paths: [], isLoading: false });
+    expect(storeMocks.getViewedFiles).toHaveBeenCalledWith(REF, SHA1);
+    expect(storeMocks.getViewedFiles).toHaveBeenCalledWith(OTHER_REF, SHA1);
+  });
+
   it('resetViewedFilesStoreForTests clears every entry', async () => {
     storeMocks.getViewedFiles.mockResolvedValue(['a.ts']);
     subscribeViewedFiles(REF, SHA1, listenerStub());

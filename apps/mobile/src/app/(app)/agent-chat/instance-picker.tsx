@@ -228,6 +228,7 @@ export default function InstancePickerScreen() {
       <PickerSheet
         title={t('agentChat.instancePicker.runOn')}
         onDone={closePicker}
+        onCancel={closePicker}
         scrollable={false}
         expired
       />
@@ -242,6 +243,7 @@ export default function InstancePickerScreen() {
       <PickerSheet
         title={t('agentChat.instancePicker.runOn')}
         onDone={closePicker}
+        onCancel={closePicker}
         scrollable={false}
       >
         <View className="bg-background" style={{ paddingBottom: bottomClearance }}>
@@ -264,6 +266,7 @@ export default function InstancePickerScreen() {
       <PickerSheet
         title={t('agentChat.instancePicker.runOn')}
         onDone={closePicker}
+        onCancel={closePicker}
         scrollable={false}
       >
         <EmptyState
@@ -298,6 +301,7 @@ export default function InstancePickerScreen() {
     <PickerSheet
       title={t('agentChat.instancePicker.runOn')}
       onDone={closePicker}
+      onCancel={closePicker}
       scrollable={false}
     >
       {/* The list must stay a direct child of the sheet header for native

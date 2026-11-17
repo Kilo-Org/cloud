@@ -8,6 +8,9 @@ import { Text } from '@/components/ui/text';
 /** The inline outcome of the copy action on a live share link. */
 export type ShareCopyState = 'idle' | 'copied' | 'failed';
 
+/** The one press-time action a link's sheet can be running. */
+export type ShareDistribution = 'copy' | 'share';
+
 export const DURATION_LABEL_KEYS = {
   '1h': 'sessionShare.duration1h',
   '1d': 'sessionShare.duration1d',
@@ -28,6 +31,8 @@ export function ShareActiveLink({
   includeNewMessages,
   copyState,
   busy,
+  revoking,
+  distribution,
   onCopy,
   onShare,
   onRevoke,
@@ -38,6 +43,10 @@ export function ShareActiveLink({
   includeNewMessages: boolean;
   copyState: ShareCopyState;
   busy: boolean;
+  /** The revoke mutation itself, which is the only one this panel can run. */
+  revoking: boolean;
+  /** The press-time read or native hand-off currently running, if any. */
+  distribution: ShareDistribution | null;
   onCopy: () => void;
   onShare: () => void;
   onRevoke: () => void;
@@ -61,8 +70,10 @@ export function ShareActiveLink({
       </View>
       <Pressable
         onPress={onCopy}
+        disabled={busy}
         accessibilityRole="button"
         accessibilityLabel={t('common.copyLink')}
+        accessibilityState={{ disabled: busy }}
         className="min-h-[44px] justify-center rounded-md border border-border bg-secondary p-3 active:opacity-70"
         testID="session-share-url"
       >
@@ -85,6 +96,7 @@ export function ShareActiveLink({
       <Button
         variant="outline"
         className="w-full"
+        loading={distribution === 'copy'}
         disabled={busy}
         onPress={onCopy}
         testID="session-share-copy"
@@ -94,6 +106,7 @@ export function ShareActiveLink({
       <Button
         variant="outline"
         className="w-full"
+        loading={distribution === 'share'}
         disabled={busy}
         onPress={onShare}
         testID="session-share-sheet"
@@ -103,7 +116,8 @@ export function ShareActiveLink({
       <Button
         variant="outline-destructive"
         className="w-full"
-        loading={busy}
+        loading={revoking}
+        disabled={busy}
         onPress={onRevoke}
         testID="session-share-revoke"
       >

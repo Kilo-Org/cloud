@@ -65,6 +65,7 @@ const config: Config = {
   maxWorkers: process.env.JEST_MAX_WORKERS ? process.env.JEST_MAX_WORKERS : '50%',
 
   globalSetup: '<rootDir>/src/tests/setup/globalSetup.ts',
+  setupFiles: ['<rootDir>/src/tests/setup/domGlobals.ts'],
   setupFilesAfterEnv: ['<rootDir>/src/tests/setup/workerSetup.ts'],
 
   silent: process.env.JEST_SILENT === 'true',

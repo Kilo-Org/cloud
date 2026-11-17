@@ -40,10 +40,10 @@ export const EXA_USAGE_TYPE_MAX_LENGTH = 128;
  * Unknown keys are rejected so an LLM usage record cannot be mistaken for one.
  */
 export const ExaUsageRecordSchema = z.strictObject({
-  id: z.string().uuid(),
+  id: z.uuid(),
   occurredAt: z.iso.datetime({ offset: true }),
   userId: z.string().min(1),
-  organizationId: z.string().uuid().nullable(),
+  organizationId: z.uuid().nullable(),
   path: z.enum(EXA_ALLOWED_PATHS),
   costMicrodollars: z.number().int().positive().safe(),
   chargedToBalance: z.boolean(),
@@ -60,7 +60,7 @@ export type ExaUsageRecord = z.infer<typeof ExaUsageRecordSchema>;
  */
 export const ExaUsageWriteResponseSchema = z.strictObject({
   status: z.enum(['recorded', 'duplicate']),
-  usageId: z.string().uuid(),
+  usageId: z.uuid(),
 });
 
 export type ExaUsageWriteResponse = z.infer<typeof ExaUsageWriteResponseSchema>;

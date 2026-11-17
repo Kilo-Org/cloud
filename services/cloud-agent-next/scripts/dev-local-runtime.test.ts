@@ -86,4 +86,5 @@ it.each([['--env', 'production'], ['--env=staging'], ['-e', 'production']])(
 it('does not expose an unprepared package deploy entrypoint', async () => {
   const manifest = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
   expect(manifest.scripts.deploy).toBeUndefined();
+  expect(manifest.scripts.postdeploy).toBeUndefined();
 });

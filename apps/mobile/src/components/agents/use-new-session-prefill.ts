@@ -10,6 +10,7 @@ import {
   resolvePrefillModel,
   resolvePrefillRepoSelection,
   resolveStoredRepoSelection,
+  shouldAbandonRepoSeed,
 } from '@/components/agents/new-session-prefill';
 
 /**
@@ -67,9 +68,14 @@ export type UseNewSessionPrefillTargetsInput = {
   // !isLoadingRepos && !isReposError && repositories.length > 0
   reposSettled: boolean;
   /**
-   * The provider queries' own first-load state: true once each finished
-   * loading, whether or not it errored and whether or not any rows came back.
-   * A paused or disabled query counts as resolved.
+   * The repository region's bounded signal: true once each provider query
+   * finished loading, or once the settle bound expired while one was still
+   * loading. A paused or disabled query counts as resolved.
+   *
+   * Bounded on purpose. A list that never answers must not withhold the form's
+   * rows, here or anywhere else, so a prefill still unanswered at the bound is
+   * given up (`shouldAbandonRepoSeed`) instead of deferred — a late answer then
+   * cannot mount a repository the region was declared final without.
    *
    * This is not `reposSettled`, which also requires no error and at least one
    * row: a prefill can only seed in the render `reposSettled` turns true, so a
@@ -119,6 +125,22 @@ export function useNewSessionPrefillTargets(input: UseNewSessionPrefillTargetsIn
   if (!hasSeededStoredRepo.current && storedSeed) {
     hasSeededStoredRepo.current = true;
     setSelectedRepo(storedSeed);
+  }
+
+  // The bound can settle the region before a prefill lands. Give the request up
+  // then, so a list that answers later cannot mount a repository the form
+  // already painted without. `reposSettled` wins in the same render, because
+  // that is the only render in which the seed can run.
+  if (
+    shouldAbandonRepoSeed({
+      prefillRepo: prefill.repo,
+      applied: hasAppliedRepo.current,
+      selectedRepo,
+      reposSettled,
+      providerQueriesResolved,
+    })
+  ) {
+    hasAppliedRepo.current = true;
   }
 
   if (!hasAppliedRepo.current && reposSettled && !selectedRepo) {

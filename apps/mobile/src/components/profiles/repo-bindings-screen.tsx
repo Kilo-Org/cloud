@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { type Href, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -6,17 +6,19 @@ import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { type ProfileOwnerChoice } from '@/components/profiles/profile-owner-model';
+import { RepoBindingsAddForm } from '@/components/profiles/repo-bindings-add-form';
+import {
+  chosenProfileOf,
+  type ChosenRepo,
+  pickerEmptyDescriptionKey,
+} from '@/components/profiles/repo-bindings-add-model';
 import { ProfilePickerSheet } from '@/components/profiles/repo-bindings-profile-sheet';
 import {
   type RepoBindingPlatform,
   type RepoOption,
   repositoryOptionKey,
 } from '@/components/profiles/repo-bindings-model';
-import {
-  PickerField,
-  RepoBindingRow,
-  RepoBindingsSkeleton,
-} from '@/components/profiles/repo-bindings-rows';
+import { RepoBindingRow, RepoBindingsSkeleton } from '@/components/profiles/repo-bindings-rows';
 import { RepoPickerSheet } from '@/components/profiles/repo-picker-sheet';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -25,10 +27,7 @@ import { Button } from '@/components/ui/button';
 import { GitBranch } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { useAgentProfileList } from '@/lib/hooks/use-agent-profiles';
-import {
-  type OrganizationProfilePermission,
-  useOrganizationProfilePermission,
-} from '@/lib/hooks/use-can-manage-profiles';
+import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 import {
   useRepoBindingMutations,
   useRepoBindings,
@@ -43,35 +42,6 @@ function hasUsableMessage(error: unknown): boolean {
 }
 
 /**
- * The picker's empty-state copy. It names the profile a user could select in
- * this context: a personal one, an organization one, or — without the manage
- * role — who can create an organization profile, since the server rejects the
- * create itself. While the role is still resolving it names the organization
- * profile the context lists: the read-only copy would tell an owner or admin
- * they cannot act on what they can.
- */
-const PICKER_EMPTY_DESCRIPTION_KEYS = {
-  personal: 'profiles.emptyDescription',
-  organization: 'profiles.repoBindings.pickerEmptyDescriptionOrganization',
-  organizationReadOnly: 'profiles.repoBindings.pickerEmptyDescriptionOrganizationReadOnly',
-} as const;
-
-type PickerEmptyDescriptionKey =
-  (typeof PICKER_EMPTY_DESCRIPTION_KEYS)[keyof typeof PICKER_EMPTY_DESCRIPTION_KEYS];
-
-function pickerEmptyDescriptionKey(
-  organizationId: string | undefined,
-  permission: OrganizationProfilePermission
-): PickerEmptyDescriptionKey {
-  if (organizationId === undefined) {
-    return PICKER_EMPTY_DESCRIPTION_KEYS.personal;
-  }
-  return permission === 'read-only'
-    ? PICKER_EMPTY_DESCRIPTION_KEYS.organizationReadOnly
-    : PICKER_EMPTY_DESCRIPTION_KEYS.organization;
-}
-
-/**
  * The repo bindings screen: every default profile binding for the context, with
  * a per-row remove and an Add default form (repo picker + profile picker). The
  * Add action stays disabled until both a repo and a profile are chosen — the
@@ -82,6 +52,7 @@ export function RepoBindingsScreen({
   organizationId,
   stack,
   openedFrom,
+  backFallback,
 }: Readonly<{
   organizationId?: string;
   /** The Stack this screen is mounted in; its create screen opens in it too. */
@@ -92,6 +63,8 @@ export function RepoBindingsScreen({
    * profiles list this screen never had.
    */
   openedFrom?: ProfileExternalOpener;
+  /** Where the header's Back lands when the screen opens with no history to pop. */
+  backFallback?: Href;
 }>) {
   const router = useRouter();
   const { t } = useTranslation();
@@ -114,9 +87,11 @@ export function RepoBindingsScreen({
   const repoOptions = useRepoOptions(organizationId, isAdding);
   const profileChoices =
     organizationId === undefined ? profileList.personalProfiles : profileList.orgProfiles;
-  const selectedProfile = profileChoices.find(profile => profile.id === selectedProfileId);
   const selectedRepoKey = selectedRepo === null ? null : repositoryOptionKey(selectedRepo);
-  const canAdd = selectedRepo !== null && selectedProfileId !== '' && !bind.isPending;
+  const chosenRepo: ChosenRepo =
+    selectedRepo === null ? { kind: 'none' } : { kind: 'chosen', repo: selectedRepo };
+  const chosenProfile = chosenProfileOf(selectedProfileId, profileChoices);
+  const canAdd = chosenRepo.kind === 'chosen' && chosenProfile.kind === 'chosen' && !bind.isPending;
   // The picker lists this context's own profiles, so its empty state names the
   // profile that would appear there.
   const pickerEmptyDescription = t(pickerEmptyDescriptionKey(organizationId, profilePermission));
@@ -146,14 +121,16 @@ export function RepoBindingsScreen({
   };
 
   const handleAdd = async () => {
-    if (selectedRepo === null || selectedProfileId === '') {
+    if (chosenRepo.kind !== 'chosen' || chosenProfile.kind !== 'chosen') {
       return;
     }
+    const { repo } = chosenRepo;
+    const { profile } = chosenProfile;
     try {
       await bind.mutateAsync({
-        profileId: selectedProfileId,
-        repoFullName: selectedRepo.fullName,
-        platform: selectedRepo.platform,
+        profileId: profile.id,
+        repoFullName: repo.fullName,
+        platform: repo.platform,
       });
     } catch (error) {
       if (!hasUsableMessage(error)) {
@@ -161,7 +138,7 @@ export function RepoBindingsScreen({
       }
       return;
     }
-    toast.success(t('profiles.repoBindings.addedToast', { repo: selectedRepo.fullName }));
+    toast.success(t('profiles.repoBindings.addedToast', { repo: repo.fullName }));
     resetAdd();
   };
 
@@ -179,7 +156,7 @@ export function RepoBindingsScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('profiles.repoBindings.title')} />
+      <ScreenHeader title={t('profiles.repoBindings.title')} backFallback={backFallback} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-3 px-6 pt-4 pb-8"
@@ -228,49 +205,22 @@ export function RepoBindingsScreen({
         ) : null}
 
         {isAdding ? (
-          <View className="gap-3 rounded-lg border border-border p-3">
-            <PickerField
-              label={t('profiles.repoBindings.repo')}
-              value={selectedRepo?.fullName ?? null}
-              accessibilityLabel={
-                selectedRepo === null
-                  ? t('profiles.repoBindings.repo')
-                  : t('profiles.repoBindings.repoValue', { name: selectedRepo.fullName })
-              }
-              disabled={bind.isPending}
-              onPress={() => {
-                setRepoPickerOpen(true);
-              }}
-            />
-            <PickerField
-              label={t('profiles.repoBindings.profile')}
-              value={selectedProfile?.name ?? null}
-              accessibilityLabel={
-                selectedProfile === undefined
-                  ? t('profiles.repoBindings.profile')
-                  : t('profiles.repoBindings.profileValue', { name: selectedProfile.name })
-              }
-              disabled={bind.isPending}
-              onPress={() => {
-                setProfilePickerOpen(true);
-              }}
-            />
-            <View className="flex-row justify-end gap-2">
-              <Button variant="ghost" disabled={bind.isPending} onPress={resetAdd}>
-                <Text>{t('common.cancel')}</Text>
-              </Button>
-              <Button
-                disabled={!canAdd}
-                loading={bind.isPending}
-                accessibilityLabel={t('profiles.repoBindings.add')}
-                onPress={() => {
-                  void handleAdd();
-                }}
-              >
-                <Text>{t('profiles.repoBindings.add')}</Text>
-              </Button>
-            </View>
-          </View>
+          <RepoBindingsAddForm
+            chosenRepo={chosenRepo}
+            chosenProfile={chosenProfile}
+            isPending={bind.isPending}
+            canAdd={canAdd}
+            onPickRepo={() => {
+              setRepoPickerOpen(true);
+            }}
+            onPickProfile={() => {
+              setProfilePickerOpen(true);
+            }}
+            onCancel={resetAdd}
+            onAdd={() => {
+              void handleAdd();
+            }}
+          />
         ) : (
           <Button
             accessibilityLabel={t('profiles.repoBindings.add')}

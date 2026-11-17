@@ -13,7 +13,6 @@ import {
   repoPlatformLabelKey,
 } from '@/components/profiles/repo-bindings-model';
 import { QueryError } from '@/components/query-error';
-import { Button } from '@/components/ui/button';
 import { GitBranch, Link2, Plus, Trash2 } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -23,7 +22,13 @@ import {
   useRepoOptions,
 } from '@/lib/hooks/use-repo-bindings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import {
+  ICON_TARGET_BOX_CLASS,
+  SECTION_ACTION_BOX_CLASS,
+  SECTION_ACTION_HIT_SLOP,
+  SECTION_ACTION_ROW_CANCEL_CLASS,
+  SECTION_HEADER_ROW_PADDING_CLASS,
+} from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
 /** The mutation hook toasts `error.message`; the section supplies a fallback otherwise. */
@@ -37,7 +42,7 @@ function RepoPinsSkeleton() {
     <View className="gap-3 rounded-lg border border-border p-3">
       <View className="flex-row items-center justify-between gap-2">
         <Skeleton className="h-4 w-40 rounded bg-muted-soft" />
-        <Skeleton className="h-9 w-28 rounded-md bg-muted-soft" />
+        <Skeleton className="h-7 w-24 rounded-md bg-muted-soft" />
       </View>
       <Skeleton className="h-4 w-full rounded bg-muted-soft" />
       <Skeleton className="h-9 w-full rounded-md bg-muted-soft" />
@@ -101,7 +106,16 @@ export function ProfileRepoPinsSection({
 
   return (
     <View className="gap-3 rounded-lg border border-border p-3">
-      <View className="flex-row items-center justify-between gap-2">
+      {/* The row reserves the action's hit slop as padding and cancels the same
+          amount from its own height, so the action's whole reach sits inside the
+          row that delivers its touches while the card keeps one text line. */}
+      <View
+        className={cn(
+          'flex-row items-center justify-between gap-2',
+          SECTION_HEADER_ROW_PADDING_CLASS,
+          SECTION_ACTION_ROW_CANCEL_CLASS
+        )}
+      >
         <View className="flex-row items-center gap-2">
           <GitBranch size={16} color={colors.mutedForeground} />
           <Text className="text-sm font-medium text-foreground">
@@ -109,18 +123,26 @@ export function ProfileRepoPinsSection({
           </Text>
         </View>
         {canManage ? (
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={bind.isPending}
+          <Pressable
+            className={cn(
+              SECTION_ACTION_BOX_CLASS,
+              'shrink-0 flex-row items-center justify-center gap-1 active:opacity-70',
+              bind.isPending && 'opacity-50'
+            )}
+            hitSlop={SECTION_ACTION_HIT_SLOP}
+            accessibilityRole="button"
             accessibilityLabel={t('profiles.repoBindings.pinRepo')}
+            accessibilityState={{ disabled: bind.isPending }}
+            disabled={bind.isPending}
             onPress={() => {
               setPickerOpen(true);
             }}
           >
-            <Plus size={14} color={colors.foreground} />
-            <Text>{t('profiles.repoBindings.pinRepo')}</Text>
-          </Button>
+            <Plus size={12} color={colors.primary} />
+            <Text variant="eyebrow" className="shrink text-[11px] text-primary">
+              {t('profiles.repoBindings.pinRepo')}
+            </Text>
+          </Pressable>
         ) : null}
       </View>
 

@@ -160,6 +160,15 @@ export const SECTION_ACTION_HIT_SLOP_DP = 9;
 /** The vertical padding of a Home section header row, as {@link SECTION_ACTION_HIT_SLOP_DP}. */
 export const SECTION_HEADER_ROW_PADDING_CLASS = 'py-[9px]';
 
+/**
+ * The negated counterpart of {@link SECTION_ACTION_HIT_SLOP_DP}: a row that
+ * reserves the action's hit slop as padding gives up the same amount as its own
+ * height, so it holds the whole reach in its bounds without growing the card it
+ * sits on. A literal class string, because NativeWind only compiles the classes
+ * it finds in source.
+ */
+export const SECTION_ACTION_ROW_CANCEL_CLASS = '-my-[9px]';
+
 /** The `hitSlop` a Home section header action renders, as {@link SECTION_ACTION_HIT_SLOP_DP}. */
 export const SECTION_ACTION_HIT_SLOP = {
   top: SECTION_ACTION_HIT_SLOP_DP,

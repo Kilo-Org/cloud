@@ -336,7 +336,7 @@ export function validateAuthorizationHeader(
     };
   }
 
-if (payload.version !== KILO_TOKEN_VERSION) {
+  if (payload.version !== KILO_TOKEN_VERSION) {
     warnExceptInTest(`Token version outdated (${traceability_logging_id}):`, {
       version: payload.version,
       kiloUserId: payload.kiloUserId,

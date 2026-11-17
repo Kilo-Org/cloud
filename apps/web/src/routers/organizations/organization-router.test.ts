@@ -2,11 +2,12 @@ import { createCallerForUser } from '@/routers/test-utils';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   credit_transactions,
+  organization_audit_logs,
   organization_invitations,
   organization_memberships,
   organizations,
 } from '@kilocode/db/schema';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, count, eq, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   createOrganization,
@@ -945,6 +946,82 @@ describe('organizations trpc router', () => {
         .update(organizations)
         .set({ name: 'Test Organization' })
         .where(eq(organizations.id, testOrganization.id));
+    });
+
+    it('should write an organization settings audit row when the name changes', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const oldName = 'Test Organization';
+      const newName = 'Audited Rename Organization';
+
+      const [{ value: rowsBefore }] = await db
+        .select({ value: count() })
+        .from(organization_audit_logs)
+        .where(
+          and(
+            eq(organization_audit_logs.organization_id, testOrganization.id),
+            eq(organization_audit_logs.action, 'organization.settings.change'),
+          ),
+        );
+
+      await caller.organizations.update({
+        organizationId: testOrganization.id,
+        name: newName,
+      });
+
+      const rows = await db
+        .select()
+        .from(organization_audit_logs)
+        .where(
+          and(
+            eq(organization_audit_logs.organization_id, testOrganization.id),
+            eq(organization_audit_logs.action, 'organization.settings.change'),
+          ),
+        );
+
+      expect(rows).toHaveLength(rowsBefore + 1);
+      const renameRow = rows[rows.length - 1];
+      expect(renameRow.message).toBe(`Renamed organization from "${oldName}" to "${newName}"`);
+      expect(renameRow.actor_id).toBe(regularUser.id);
+      expect(renameRow.actor_email).toBe(regularUser.google_user_email);
+      expect(renameRow.actor_name).toBe(regularUser.google_user_name);
+
+      // Reset the name for other tests
+      await db
+        .update(organizations)
+        .set({ name: oldName })
+        .where(eq(organizations.id, testOrganization.id));
+    });
+
+    it('should write no audit row when the name does not change', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const currentName = 'Test Organization';
+
+      const [{ value: rowsBefore }] = await db
+        .select({ value: count() })
+        .from(organization_audit_logs)
+        .where(
+          and(
+            eq(organization_audit_logs.organization_id, testOrganization.id),
+            eq(organization_audit_logs.action, 'organization.settings.change'),
+          ),
+        );
+
+      await caller.organizations.update({
+        organizationId: testOrganization.id,
+        name: currentName,
+      });
+
+      const [{ value: rowsAfter }] = await db
+        .select({ value: count() })
+        .from(organization_audit_logs)
+        .where(
+          and(
+            eq(organization_audit_logs.organization_id, testOrganization.id),
+            eq(organization_audit_logs.action, 'organization.settings.change'),
+          ),
+        );
+
+      expect(rowsAfter).toBe(rowsBefore);
     });
 
     it('should throw UNAUTHORIZED error for organization member (non-owner)', async () => {

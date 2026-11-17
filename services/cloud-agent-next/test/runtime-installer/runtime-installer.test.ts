@@ -10,6 +10,7 @@ import { zstdCompressSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { fixtureRuntime } from './fixtures.js';
 import { renderRuntimeBootstrap } from '../../src/sandbox-control/runtime-bootstrap.js';
+import { AGENT_UID } from '../../src/shared/runtime-environment.js';
 import { sha256, writeTarEntries, type PackagedRuntime } from '../../scripts/publish-runtime.js';
 
 const serviceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -118,7 +119,7 @@ after(async () => {
 
 async function setup() {
   const root = path.join(temporary, randomUUID());
-  for (const child of ['platform', 'workspace', 'home/.config'])
+  for (const child of ['platform', 'workspace', 'home/.config', 'homes'])
     await fs.mkdir(path.join(root, child), { recursive: true });
   await fs.writeFile(path.join(root, 'workspace/user-file'), 'user-file');
   await fs.writeFile(path.join(root, 'home/.config/user.json'), '{"preference":"keep"}');
@@ -177,6 +178,8 @@ function run(
     `type=bind,src=${path.join(root, 'workspace')},dst=/workspace/app`,
     '--mount',
     `type=bind,src=${path.join(root, 'home')},dst=/root`,
+    '--mount',
+    `type=bind,src=${path.join(root, 'homes')},dst=/home`,
     '--env',
     `SANDBOX_CONTROL_CREDENTIAL=${credential}`,
     '--env',
@@ -339,6 +342,24 @@ void test('after handoff the grant is absent from probe, supervisor, argv, retai
     }
   }
   await inspect(path.join(root, 'platform'));
+});
+
+void test('startup gives the agent its workspace and platform homes but not other image homes', async () => {
+  const root = await setup();
+  const platformHome = path.join(root, 'homes', 'a'.repeat(64));
+  const imageHome = path.join(root, 'homes', 'ubuntu');
+  await fs.mkdir(path.join(platformHome, '.cache'), { recursive: true });
+  await fs.mkdir(imageHome);
+  await fs.writeFile(path.join(imageHome, 'private'), 'image user data', { mode: 0o600 });
+  const imageOwner = (await fs.stat(imageHome)).uid;
+  await succeeds(root, await fixtureRuntime());
+  const owner = async (file: string) => (await fs.lstat(file)).uid;
+  assert.equal(await owner(path.join(root, 'workspace/user-file')), AGENT_UID);
+  assert.equal(await owner(platformHome), AGENT_UID);
+  assert.equal(await owner(path.join(platformHome, '.cache')), AGENT_UID);
+  assert.equal(await owner(imageHome), imageOwner);
+  assert.equal(await owner(path.join(imageHome, 'private')), imageOwner);
+  assert.equal(await owner(path.join(root, 'homes')), 0);
 });
 
 for (const [mode, code, exit] of [

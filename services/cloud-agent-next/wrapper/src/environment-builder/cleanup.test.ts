@@ -127,7 +127,7 @@ describe('stopOwnedProcesses', () => {
 
 describe('transferAgentOwnership', () => {
   it.skipIf(process.platform !== 'linux' || process.getuid?.() !== 0)(
-    'gives every entry of the existing roots to the agent account',
+    'gives the existing roots and only the platform homes to the agent account',
     async () => {
       const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'builder-ownership-'));
       try {
@@ -139,27 +139,52 @@ describe('transferAgentOwnership', () => {
           path.join(root, 'node_modules', 'pkg', 'index.js')
         );
         await fs.symlink('pkg/index.js', path.join(root, 'node_modules', 'link'));
+        const homes = path.join(directory, 'home');
+        const platformHome = path.join(homes, 'a'.repeat(64));
+        const imageHome = path.join(homes, 'ubuntu');
+        await fs.mkdir(path.join(platformHome, '.cache'), { recursive: true });
+        await fs.mkdir(imageHome);
+        await fs.writeFile(path.join(imageHome, 'private'), 'image user data', { mode: 0o600 });
+        await fs.symlink(imageHome, path.join(homes, 'b'.repeat(64)));
 
-        await transferAgentOwnership(new AbortController().signal, [
+        await transferAgentOwnership(
+          new AbortController().signal,
+          [root, path.join(directory, 'missing')],
+          homes
+        );
+
+        const owner = async (file: string) => {
+          const stat = await fs.lstat(file);
+          return { file: path.relative(directory, file), uid: stat.uid, gid: stat.gid };
+        };
+        for (const file of [
           root,
-          path.join(directory, 'missing'),
-        ]);
-
-        for (const entry of [
-          '',
-          'node_modules',
-          'node_modules/pkg',
-          'node_modules/pkg/index.js',
-          'node_modules/link',
+          path.join(root, 'node_modules'),
+          path.join(root, 'node_modules/pkg'),
+          path.join(root, 'node_modules/pkg/index.js'),
+          path.join(root, 'node_modules/link'),
+          platformHome,
+          path.join(platformHome, '.cache'),
         ]) {
-          const stat = await fs.lstat(path.join(root, entry));
-          expect({ entry, uid: stat.uid, gid: stat.gid }).toEqual({
-            entry,
+          expect(await owner(file)).toEqual({
+            file: path.relative(directory, file),
             uid: AGENT_UID,
             gid: AGENT_GID,
           });
         }
-        expect((await fs.stat(directory)).uid).toBe(0);
+        for (const file of [
+          directory,
+          homes,
+          imageHome,
+          path.join(imageHome, 'private'),
+          path.join(homes, 'b'.repeat(64)),
+        ]) {
+          expect(await owner(file)).toEqual({
+            file: path.relative(directory, file),
+            uid: 0,
+            gid: 0,
+          });
+        }
       } finally {
         await fs.rm(directory, { recursive: true, force: true });
       }

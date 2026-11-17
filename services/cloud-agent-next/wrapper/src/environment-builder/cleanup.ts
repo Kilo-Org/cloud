@@ -5,6 +5,8 @@ import {
   AGENT_GID,
   AGENT_OWNED_ROOTS,
   AGENT_UID,
+  CONTROL_HOME_NAME,
+  CONTROL_HOME_ROOT,
 } from '../../../src/shared/runtime-environment.js';
 import { clearGitCredentialRecord } from '../control/git-credentials.js';
 import type { OwnedProcessScope } from '../control/owned-processes.js';
@@ -85,21 +87,34 @@ export async function stopOwnedProcesses(
   scope.dispose();
 }
 
+async function isRealDirectory(file: string): Promise<boolean> {
+  try {
+    return (await fs.lstat(file)).isDirectory();
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
+    throw error;
+  }
+}
+
 /**
  * Give the agent account the trees that sessions use, so that a session start
  * from this snapshot has nothing to transfer. Builder setup is trusted root work,
- * so every entry, including a multiply linked file, changes owner.
+ * so every entry, including a multiply linked file, changes owner. Only the
+ * platform's homes change owner; the home root and other homes keep theirs.
  */
 export async function transferAgentOwnership(
   signal: AbortSignal,
-  roots: readonly string[] = AGENT_OWNED_ROOTS
+  roots: readonly string[] = AGENT_OWNED_ROOTS,
+  homeRoot: string = CONTROL_HOME_ROOT
 ): Promise<void> {
   const existing: string[] = [];
   for (const root of roots) {
-    try {
-      if ((await fs.lstat(root)).isDirectory()) existing.push(root);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    if (await isRealDirectory(root)) existing.push(root);
+  }
+  if (await isRealDirectory(homeRoot)) {
+    for (const name of await fs.readdir(homeRoot)) {
+      const home = path.join(homeRoot, name);
+      if (CONTROL_HOME_NAME.test(name) && (await isRealDirectory(home))) existing.push(home);
     }
   }
   if (existing.length === 0) return;

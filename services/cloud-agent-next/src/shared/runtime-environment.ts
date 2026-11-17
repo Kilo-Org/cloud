@@ -125,13 +125,18 @@ export const RESERVED_ENV_VAR_PREFIXES = ['XDG_', 'KILO', 'OPENCODE'] as const;
  */
 export const CONTROL_HOME_ROOT = '/home';
 
-/** Trees that startup and the environment builder give to the agent account. */
-export const AGENT_OWNED_ROOTS = [
-  '/workspace',
-  CONTROL_HOME_ROOT,
-  '/artifacts',
-  '/var/cache/kilo',
-] as const;
+/**
+ * Names of the platform's directory-keyed homes (SHA-256 hex) under
+ * `CONTROL_HOME_ROOT`. Other entries there, such as an image's own user homes,
+ * keep their owner.
+ */
+export const CONTROL_HOME_NAME = /^[0-9a-f]{64}$/;
+
+/**
+ * Trees that startup and the environment builder give to the agent account,
+ * together with the `CONTROL_HOME_NAME` entries of `CONTROL_HOME_ROOT`.
+ */
+export const AGENT_OWNED_ROOTS = ['/workspace', '/artifacts', '/var/cache/kilo'] as const;
 
 /**
  * Directory name, under the OS temporary directory, of the per-scope homes of

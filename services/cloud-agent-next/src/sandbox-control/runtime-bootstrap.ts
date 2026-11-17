@@ -28,6 +28,8 @@ import {
   AGENT_OWNED_ROOTS,
   AGENT_UID,
   AGENT_USER,
+  CONTROL_HOME_NAME,
+  CONTROL_HOME_ROOT,
 } from '../shared/runtime-environment.js';
 
 const exitCodes = Object.fromEntries(
@@ -150,6 +152,12 @@ function prepareAgent() {
     realDirectory(directory);
     own(directory);
   }
+  realDirectory(C.agent.homes);
+  const homeName = new RegExp(C.agent.homeName);
+  for (const name of fs.readdirSync(C.agent.homes)) {
+    const home = stat(path.join(C.agent.homes, name));
+    if (homeName.test(name) && home && home.isDirectory()) own(path.join(C.agent.homes, name));
+  }
   const legacy = '/tmp/kilo-worktrees';
   const entry = stat(legacy);
   if (entry) {
@@ -159,8 +167,8 @@ function prepareAgent() {
     fs.chmodSync(legacy, 0o755);
   }
   fs.chmodSync('/root', 0o700);
-  fs.chownSync('/home', 0, 0);
-  fs.chmodSync('/home', 0o755);
+  fs.chownSync(C.agent.homes, 0, 0);
+  fs.chmodSync(C.agent.homes, 0o755);
 }
 async function pause(ms) {
   await new Promise(resolve => setTimeout(resolve, Math.max(0, Math.min(ms, C.deadlineAt - Date.now()))));
@@ -427,7 +435,14 @@ export function renderRuntimeBootstrap(input: {
     maxExpandedBytes: RUNTIME_HARD_MAX_EXPANDED_BYTES,
     credentialHelper: GIT_CREDENTIAL_HELPER.realPath,
     credentialHelperLink: GIT_CREDENTIAL_HELPER.linkPath,
-    agent: { uid: AGENT_UID, gid: AGENT_GID, user: AGENT_USER, roots: AGENT_OWNED_ROOTS },
+    agent: {
+      uid: AGENT_UID,
+      gid: AGENT_GID,
+      user: AGENT_USER,
+      roots: AGENT_OWNED_ROOTS,
+      homes: CONTROL_HOME_ROOT,
+      homeName: CONTROL_HOME_NAME.source,
+    },
   });
   const environment = [
     '/usr/bin/env',

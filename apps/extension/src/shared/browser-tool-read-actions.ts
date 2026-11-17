@@ -610,6 +610,18 @@ interface ScreenshotClip {
 }
 
 /**
+ * Shifts document-space boxes into another image origin (a viewport capture
+ * starts at the scroll position). Nothing is dropped: the painter clamps boxes
+ * that fall outside the image.
+ */
+const translateBoxes = (
+  boxes: readonly ScreenshotBox[],
+  deltaX: number,
+  deltaY: number
+): readonly ScreenshotBox[] =>
+  boxes.map(box => ({ ...box, left: box.left + deltaX, top: box.top + deltaY }));
+
+/**
  * Moves page-space mask boxes into an element capture, whose pixel (0,0) is the
  * clip's top-left. A box outside the clip is dropped: it paints no pixel of this
  * image, and withholding it is what the clip already does.
@@ -653,9 +665,10 @@ const maskAgentScreenshot = async (
 
   const frames = await readAgentFrameTree(deps.session);
   const withheld = withheldFramesOf(frames, deps.agentScope.readableOrigins);
-  const geometry = await readAgentScreenshotGeometry(deps.session, { fullPage: input.fullPage });
+  const geometry = await readAgentScreenshotGeometry(deps.session);
+  // `DOM.getBoxModel` quads are viewport-relative; adding the page's scroll puts every box in document space, the space an element clip and a full-page capture both use.
   const maskedRegions = await readWithheldFrameBoxes(deps.session, frames, withheld, {
-    offset: geometry.offset,
+    offset: geometry.scroll,
   });
 
   if ('error' in maskedRegions) {
@@ -666,7 +679,7 @@ const maskAgentScreenshot = async (
     deps.session,
     frames,
     deps.agentScope.readableOrigins,
-    { offset: geometry.offset }
+    { offset: geometry.scroll }
   );
 
   if ('error' in fields) {
@@ -674,8 +687,14 @@ const maskAgentScreenshot = async (
   }
 
   const pageBoxes = [...maskedRegions.boxes, ...fields.boxes];
-  const boxes =
-    input.clip === undefined ? pageBoxes : translateBoxesIntoClip(pageBoxes, input.clip);
+  // An element clip and a full-page image are document-space; a viewport image starts at the scroll position.
+  let boxes: readonly ScreenshotBox[] = pageBoxes;
+
+  if (input.clip !== undefined) {
+    boxes = translateBoxesIntoClip(pageBoxes, input.clip);
+  } else if (!input.fullPage) {
+    boxes = translateBoxes(pageBoxes, -geometry.scroll.x, -geometry.scroll.y);
+  }
 
   if (boxes.length === 0) {
     return { dataUrl: input.dataUrl };
@@ -780,13 +799,16 @@ const readElementClip = async (
     throw new Error(`Target "${target}" has no layout box to capture.`);
   }
 
+  const geometry = await readAgentScreenshotGeometry(session);
+
   return elementClipSchema.parse({
     height: model.height ?? 0,
     width: model.width ?? 0,
+    // `Page.captureScreenshot` clips are document-space; the box model's quads are viewport-space.
     // eslint-disable-next-line id-length -- CDP `clip` fields are named x and y
-    x: content[0] ?? 0,
+    x: (content[0] ?? 0) + geometry.scroll.x,
     // eslint-disable-next-line id-length -- CDP `clip` fields are named x and y
-    y: content[1] ?? 0,
+    y: (content[1] ?? 0) + geometry.scroll.y,
   });
 };
 
@@ -837,7 +859,7 @@ const browserTakeScreenshotHandler: BrowserReadActionHandler = async (arguments_
   let clipScale = 1;
 
   if (clip !== undefined && scale === 'device') {
-    const geometry = await readAgentScreenshotGeometry(deps.session, { fullPage: false });
+    const geometry = await readAgentScreenshotGeometry(deps.session);
 
     clipScale = geometry.scale;
   }

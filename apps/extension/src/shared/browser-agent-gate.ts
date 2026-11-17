@@ -64,8 +64,15 @@ const describeNodeSchema = z.object({
 
 const argumentTextSchema = z.string().min(1);
 
+/** A `browser_fill_form` field as the vendored contract carries it: `target` is the element reference. */
 const formFieldTargetsSchema = z.array(
-  z.object({ ref: z.string().optional(), selector: z.string().optional() })
+  z.object({
+    element: z.string().optional(),
+    name: z.string().optional(),
+    target: z.string().optional(),
+    type: z.string().optional(),
+    value: z.string().optional(),
+  })
 );
 
 const argumentString = (args: Record<string, unknown>, key: string): string | undefined => {
@@ -101,7 +108,7 @@ const targetTextsOf = (args: Record<string, unknown>): readonly string[] => {
   const fields = formFieldTargetsSchema.safeParse(args['fields']);
 
   for (const field of fields.success ? fields.data : []) {
-    const text = argumentString(field, 'ref') ?? argumentString(field, 'selector');
+    const text = argumentString(field, 'target');
 
     if (text !== undefined) {
       texts.push(text);

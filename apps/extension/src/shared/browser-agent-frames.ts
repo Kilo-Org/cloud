@@ -816,18 +816,21 @@ const layoutMetricsSchema = z.object({
 export interface AgentScreenshotGeometry {
   /** Device pixels per CSS pixel, used to scale frame boxes onto the image. */
   readonly scale: number;
-  /** Document → viewport translation for a non-full-page capture. */
-  readonly offset: { readonly x: number; readonly y: number };
+  /**
+   * The page's scroll position: `DOM.getBoxModel` quads are viewport-relative,
+   * while a `Page.captureScreenshot` clip is document-relative, so this is the
+   * translation between the two.
+   */
+  readonly scroll: { readonly x: number; readonly y: number };
 }
 
 /**
  * The screenshot's pixel geometry: the device scale factor (the layout
- * viewport is in device pixels, the CSS one in CSS pixels) and the scroll
- * offset a viewport capture is translated by.
+ * viewport is in device pixels, the CSS one in CSS pixels) and the page's
+ * scroll position.
  */
 export const readAgentScreenshotGeometry = async (
-  session: Pick<BrowserToolPageSession, 'send'>,
-  options: { readonly fullPage: boolean }
+  session: Pick<BrowserToolPageSession, 'send'>
 ): Promise<AgentScreenshotGeometry> => {
   const parsed = layoutMetricsSchema.safeParse(await session.send('Page.getLayoutMetrics'));
   const layoutWidth = parsed.success ? parsed.data.layoutViewport?.clientWidth : undefined;
@@ -839,11 +842,8 @@ export const readAgentScreenshotGeometry = async (
       : 1;
 
   return {
-    offset:
-      options.fullPage || visual === undefined
-        ? { x: 0, y: 0 }
-        : { x: -(visual.pageX ?? 0), y: -(visual.pageY ?? 0) },
     scale,
+    scroll: { x: visual?.pageX ?? 0, y: visual?.pageY ?? 0 },
   };
 };
 

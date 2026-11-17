@@ -186,7 +186,12 @@ describe('origin grants', () => {
 
   it('requires act for every fill_form field frame, not only the tab origin', async () => {
     const result = await run({
-      args: { fields: [{ ref: 'e12' }, { ref: 'e13' }] },
+      args: {
+        fields: [
+          { name: 'Card', target: 'e12', type: 'textbox', value: '4111' },
+          { name: 'Name', target: 'e13', type: 'textbox', value: 'Igor' },
+        ],
+      },
       authorized: [
         { class: 'act', origin: 'https://app.example.com' },
         { class: 'read', origin: 'https://pay.example.com' },

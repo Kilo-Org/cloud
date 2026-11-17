@@ -273,9 +273,9 @@ describe('screenshot geometry', () => {
       }),
     });
 
-    await expect(readAgentScreenshotGeometry(session, { fullPage: false })).resolves.toStrictEqual({
-      offset: offsetOf(-12, -34),
+    await expect(readAgentScreenshotGeometry(session)).resolves.toStrictEqual({
       scale: 2,
+      scroll: offsetOf(12, 34),
     });
     expect(screenshotScale({ imageWidth: undefined, layoutWidth: 800 })).toBe(1);
   });

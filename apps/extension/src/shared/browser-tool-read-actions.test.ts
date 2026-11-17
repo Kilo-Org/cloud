@@ -347,6 +347,62 @@ describe('browser_take_screenshot', () => {
     expect(inputs[0]?.scale).toBe(2);
   });
 
+  it('captures and masks a scrolled element in document space', async () => {
+    // The box model reports viewport coordinates; the clip the capture takes is document-space.
+    const viewportRect = {
+      content: [40, 120, 440, 120, 440, 320, 40, 320],
+      height: 200,
+      width: 400,
+    };
+    const { commands, session } = createSession({
+      boxes: { 12: viewportRect, 99: viewportRect },
+      frameTree: FRAME_TREE_WITH_PAY,
+      layoutMetrics: {
+        cssLayoutViewport: { clientWidth: 400 },
+        cssVisualViewport: { pageX: 100, pageY: 50 },
+        layoutViewport: { clientWidth: 400 },
+      },
+    });
+    const { inputs, mask } = recordMask();
+
+    await runReadBrowserTool('browser_take_screenshot', { scale: 'css', target: 'e12' }, session, {
+      agentScope: { readableOrigins: ['https://app.example.com'] },
+      maskScreenshot: mask,
+    });
+
+    expect(commands).toContainEqual({
+      method: 'Page.captureScreenshot',
+      params: { clip: { height: 200, scale: 1, width: 400, x: 140, y: 170 }, format: 'png' },
+    });
+    expect(inputs[0]?.boxes).toStrictEqual([{ height: 200, left: 0, top: 0, width: 400 }]);
+  });
+
+  it('masks a scrolled viewport capture where the frame paints in the image', async () => {
+    const viewportRect = {
+      content: [40, 120, 440, 120, 440, 320, 40, 320],
+      height: 200,
+      width: 400,
+    };
+    const { session } = createSession({
+      boxes: { 99: viewportRect },
+      frameTree: FRAME_TREE_WITH_PAY,
+      layoutMetrics: {
+        cssLayoutViewport: { clientWidth: 800 },
+        cssVisualViewport: { pageX: 100, pageY: 50 },
+        layoutViewport: { clientWidth: 800 },
+      },
+    });
+    const { inputs, mask } = recordMask();
+
+    await runReadBrowserTool('browser_take_screenshot', { scale: 'css' }, session, {
+      agentScope: { readableOrigins: ['https://app.example.com'] },
+      maskScreenshot: mask,
+    });
+
+    // The withheld frame sits at viewport (40,120); the viewport image starts at the scroll position.
+    expect(inputs[0]?.boxes).toStrictEqual([{ height: 200, left: 40, top: 120, width: 400 }]);
+  });
+
   it('drops a withheld frame that the element clip does not overlap', async () => {
     const { session } = createSession({
       boxes: {

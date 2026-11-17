@@ -4685,5 +4685,175 @@
     "unavailableDescription": "Esta ligazón para compartir caducou ou foi revogada.",
     "transcriptUnavailableTitle": "Non se puido cargar esta transcrición",
     "transcriptUnavailableDescription": "A ligazón segue funcionando. Téntao de novo nun momento."
+  },
+  "organizationGuardrails": {
+    "title": "Barreiras de seguridade da IA",
+    "permissionDenied": "Só os propietarios e administradores da organización poden xestionar as barreiras de seguridade da IA.",
+    "unavailable": "As barreiras de seguridade da IA non están dispoñibles para esta organización.",
+    "loadError": "Non se puideron cargar as barreiras de seguridade da IA",
+    "statusSaving": "Gardando…",
+    "statusSaved": "Gardado",
+    "statusFailed": "Non se puido gardar.",
+    "inputTitle": "Barreiras de seguridade da entrada",
+    "inputDescription": "Analiza cada entrada con Enkrypt AI, incluídos os resultados das ferramentas. Un detector de bloqueo rexeita unha solicitude cando Enkrypt non está dispoñible.",
+    "outputTitle": "Barreiras de seguridade da saída",
+    "outputDescription": "Analiza as respostas con Enkrypt AI antes de que os membros as reciban. Desactivado a menos que o actives.",
+    "detectorsHint": "Bloquear rexeita unha solicitude sinalada. Só rexistrar limítase a rexistrala sen atrasar a solicitude.",
+    "detectorsHintOutput": "Bloquear fai fallar unha resposta sinalada. Só rexistrar limítase a rexistrala sen atrasar a resposta.",
+    "choiceLog": "Só rexistrar",
+    "applyTo": "Aplicar a",
+    "applyToAllMembers": "Todos os membros",
+    "applyKiloDefault": "Aplicar o predeterminado de Kilo",
+    "invalidSavedTitle": "Non se poden ler os axustes gardados dos detectores de entrada",
+    "invalidSavedBody": "As solicitudes bloquéanse ata que se garden de novo os detectores de entrada. Os detectores de abaixo parten do predeterminado de Kilo.",
+    "invalidSavedOutputTitle": "Non se poden ler os axustes gardados dos detectores de saída",
+    "invalidSavedOutputBody": "As respostas retéñense ata que se garden de novo os detectores de saída. Escolle os detectores de saída a continuación.",
+    "blockingOutputNote": "Un detector de saída de bloqueo retén unha resposta ata que Enkrypt a comprobe por completo. Usa Só rexistrar para evitar o atraso.",
+    "inputDetectorRequired": "Activa polo menos un detector de entrada.",
+    "outputDetectorRequired": "Activa polo menos un detector de saída.",
+    "rulesTooMany": "Engade ata {{max}} regras.",
+    "ruleIdRequired": "Introduce un ID de regra.",
+    "ruleIdInvalid": "Un ID de regra só pode usar letras, números, puntos, guións e guións baixos.",
+    "ruleTextRequired": "Describe o que a regra prohibe ou require.",
+    "keywordTooLong": "Cada palabra clave pode ter ata {{max}} caracteres.",
+    "topicTooLong": "Cada tema pode ter ata {{max}} caracteres.",
+    "keywordsTooMany": "Engade ata {{max}} palabras clave.",
+    "topicsTooMany": "Engade ata {{max}} temas.",
+    "piiEntityRequired": "Selecciona polo menos un tipo de datos que detectar.",
+    "keywordRequired": "Engade polo menos unha palabra clave.",
+    "topicRequired": "Engade polo menos un tema.",
+    "policyTextRequired": "Introduce o texto da política.",
+    "ruleRequired": "Engade polo menos unha regra.",
+    "ruleIdDuplicate": "Cada regra necesita o seu propio ID de regra.",
+    "piiEntities": "Datos que detectar",
+    "keywordsLabel": "Palabras clave",
+    "keywordsHint": "Unha palabra clave por liña.",
+    "topicsHint": "Un tema por liña.",
+    "policyFormat": "Formato da política",
+    "policyFormatRules": "Regras estruturadas",
+    "policyFormatRulesDescription": "Unha regra por requisito, cunha categoría e unha severidade. Recomendado.",
+    "policyFormatText": "Texto da política",
+    "policyFormatTextDescription": "Pega unha política existente como texto plano.",
+    "rulesEmpty": "Aínda non hai regras. Cada regra describe algo que as entradas non deben conter nin solicitar.",
+    "addRule": "Engadir regra",
+    "ruleNumber": "Regra {{number}}",
+    "ruleRemove": "Eliminar regra {{number}}",
+    "ruleIdLabel": "ID da regra",
+    "ruleNameLabel": "Nome (opcional)",
+    "ruleTextLabel": "Regra",
+    "ruleRiskCategory": "Categoría de risco",
+    "ruleApplicability": "Ámbito",
+    "ruleFrameworks": "Marcos",
+    "detector": {
+      "promptInjection": {
+        "label": "Inxección de instrucións",
+        "description": "Detecta intentos de anular as instrucións ou de eludir as restricións do modelo."
+      },
+      "policyViolation": {
+        "label": "Vulneración da política",
+        "description": "Sinala entradas que incumpren a política da túa organización, escrita como texto ou regras.",
+        "descriptionOutput": "Sinala respostas que incumpren a política da túa organización, escrita como texto ou regras."
+      },
+      "pii": {
+        "label": "PII e segredos",
+        "description": "Detecta datos persoais, credenciais, enderezos IP e URL."
+      },
+      "keywords": {
+        "label": "Palabras clave prohibidas",
+        "descriptionOutput": "Detecta respostas que conteñan calquera palabra clave que indiques."
+      },
+      "topics": {
+        "label": "Temas",
+        "descriptionOutput": "Sinala respostas sobre calquera tema que indiques."
+      },
+      "toxicity": {
+        "label": "Toxicidade",
+        "description": "Detecta linguaxe tóxica, insultante, ameazante ou odiosa."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Detecta contido sexual ou que non é apto para o traballo."
+      },
+      "bias": {
+        "label": "Sesgo",
+        "description": "Detecta linguaxe sesgada ou discriminatoria."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Datos persoais",
+        "description": "Nomes, enderezos de correo electrónico, números de teléfono."
+      },
+      "secrets": {
+        "label": "Segredos",
+        "description": "Chaves de API, testemuños de acceso, contrasinais."
+      },
+      "ipAddress": {
+        "label": "Enderezos IP",
+        "description": "Enderezos IPv4 e IPv6."
+      },
+      "url": {
+        "label": "URL",
+        "description": "Enderezos web."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Seguridade e fraude",
+      "safetyHarm": "Seguridade e danos",
+      "privacyDataProtection": "Privacidade e protección de datos",
+      "brandReputationTrust": "Marca e reputación",
+      "biasFairnessEthical": "Sesgo e equidade",
+      "legalIpLiability": "Responsabilidade legal e de propiedade intelectual",
+      "productMisuse": "Uso indebido do produto",
+      "performanceQuality": "Rendemento e calidade"
+    },
+    "applicability": {
+      "user": "Entrada do usuario",
+      "userAssistant": "Entrada do usuario e respostas"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "RGPD",
+      "ccpa": "CCPA",
+      "owasp": "OWASP: 10 principais riscos dos grandes modelos de linguaxe (2025)",
+      "nist": "Marco de xestión de riscos de IA do NIST",
+      "euAiAct": "Regulamento de IA da UE",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Función empresarial",
+    "enterpriseOnly": "Esta é unha función exclusiva para empresas.",
+    "readOnly": "Só os propietarios e administradores da organización poden cambiar estes axustes.",
+    "loadError": "Non se puideron cargar os provedores e os modelos",
+    "tabModels": "Modelos",
+    "tabProviders": "Provedores",
+    "tabGateways": "Pasarelas",
+    "modelsDescription": "Desactiva un modelo para bloquealo para todos os membros. Os modelos dos provedores permitidos comezan activados.",
+    "modelsDeniedOnly": "Só denegados",
+    "modelsEmpty": "Ningún modelo coincide con esta busca.",
+    "providersDescription": "Desactiva un provedor para impedir que Kilo encamiñe solicitudes cara a el para esta organización.",
+    "providersNeedCatalog": "Os interruptores dos provedores permanecen en modo só lectura ata que se cargue o catálogo completo de modelos. Toca en Tentar de novo arriba para editalos.",
+    "providersEmpty": "Ningún provedor coincide con esta busca.",
+    "allowAllShown": "Permitir todos os mostrados",
+    "denyAllShown": "Denegar todos os mostrados",
+    "gatewaysDescription": "Kilo encamiña as solicitudes dos modelos a través de Vercel AI Gateway ou OpenRouter. Unha pasarela desactivada fai fallar esas solicitudes.",
+    "emptyProviderList": "Permite polo menos un provedor. Unha lista baleira bloquea todas as rutas dos modelos de Kilo.",
+    "gatewaysUnavailable": "A configuración das pasarelas non está dispoñible para esta organización.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "As solicitudes de OpenRouter non están fixadas a unha rexión.",
+    "inferenceRegion": "Rexión de inferencia",
+    "inferenceRegionDescription": "Fixa as solicitudes de Vercel AI Gateway a esta rexión. Un modelo que non estea dispoñible alí falla.",
+    "disableOpenrouterNote": "Desactivar OpenRouter tamén bloquea as chaves BYOK que encamiñan solicitudes a través del.",
+    "emptyModelList": "Deixa polo menos un modelo activado. Se denegas todos os modelos, os membros quedan sen nada que usar.",
+    "catalogUnavailable": "Non se cargou o catálogo completo de modelos, polo que só se mostran as túas listas gardadas. Téntao de novo para cargar todos os modelos.",
+    "region": {
+      "global": "Global",
+      "us": "Estados Unidos",
+      "eu": "Unión Europea",
+      "au": "Australia",
+      "jp": "Xapón"
+    }
   }
 }

@@ -122,6 +122,7 @@ import {
   resolveRetryTarget,
   restoreCanceledQueuedMessages,
   retryFailedMessage,
+  unansweredPromptMessageId,
 } from '@/components/agents/session-detail-content-helpers';
 import { shouldKeepSessionAwake } from '@/components/agents/session-keep-awake';
 import { shouldRefetchOnFocus } from '@/components/agents/session-focus-refetch';
@@ -154,6 +155,7 @@ import {
 } from '@/components/agents/session-slow-load';
 import { getLanguageSnapshot } from '@/i18n';
 import { SessionMessageList } from '@/components/agents/session-message-list';
+import { composerInsetForSession } from '@/components/agents/session-message-list-anchor';
 import {
   collectTranscriptItemKeysByPart,
   condenseTranscriptToolRuns,
@@ -354,6 +356,33 @@ export function SessionDetailContent({
   });
   const childSheetReleaseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const composerControlRef = useRef<ChatComposerControl | null>(null);
+  // How far the composer's input grew past its one-line floor. The transcript
+  // holds its bottom edge on that growth in the same commit it lands: the
+  // list's own `onLayout` reaches JS one frame after the viewport shrank, and
+  // the scroll it issues lands later still, which painted the transcript
+  // clipped and then moved it.
+  //
+  // The measurement survives the composer being replaced by other chrome. Only
+  // the reservation is dropped while that chrome is up — the read-only footer
+  // and a blocking card fill the body — so a multi-line draft gets its anchor
+  // back when the composer returns, without waiting for the next line to land.
+  // The measurement is tagged with the session it was taken for, so the previous
+  // session's growth never offsets the new transcript before the new composer
+  // publishes its one-line floor and clears the reservation.
+  const [composerBottomInset, setComposerBottomInset] = useState<{
+    sessionId: KiloSessionId;
+    dp: number;
+  }>({ sessionId, dp: 0 });
+  const handleComposerBottomInsetChange = useCallback(
+    (insetDp: number) => {
+      setComposerBottomInset(current =>
+        current.sessionId === sessionId && current.dp === insetDp
+          ? current
+          : { sessionId, dp: insetDp }
+      );
+    },
+    [sessionId]
+  );
 
   const clearChildSheetReleaseTimeout = useCallback(() => {
     if (childSheetReleaseTimeoutRef.current !== null) {
@@ -379,6 +408,11 @@ export function SessionDetailContent({
   const agentStatus = useAtomValue(manager.atoms.agentStatus);
   const cloudStatus = useAtomValue(manager.atoms.cloudStatus);
   const preparationAttempts = useAtomValue(manager.atoms.preparationAttempts);
+  // A failed preparation row is the run's own failure statement, so it counts as
+  // content: without this the zero-message open would replace it with the
+  // page-load card. Only a failed attempt counts — a running or completed one is
+  // still a load in progress or a loaded run.
+  const hasFailedPreparation = preparationAttempts.some(attempt => attempt.status === 'failed');
   const canSend = useAtomValue(manager.atoms.canSend);
   const isReadOnly = useAtomValue(manager.atoms.isReadOnly);
   // A failed row offers Retry only when this session can accept the re-send now.
@@ -788,6 +822,7 @@ export function SessionDetailContent({
     selectedModel: sessionModels.selectedValue,
     selectedVariant: sessionModels.selectedVariant,
     cloudAgentModelOverride,
+    sessionId,
     spawnedMode,
   });
 
@@ -1726,6 +1761,17 @@ export function SessionDetailContent({
     [canceledQueuedMessages, t]
   );
 
+  // A stored transcript that ends on a prompt says so: the record holds no
+  // delivery state for that turn and nothing follows it. Only a read-only
+  // session draws it — a live prompt at the end is in flight, and its own
+  // delivery states say what happened to it. The note is bound to the same
+  // resolved kind as the read-only footer, so it withdraws with that footer when
+  // the kind turns out to be live after all.
+  const unansweredPromptId =
+    activeSessionType === 'read-only' && !isStreaming
+      ? unansweredPromptMessageId(displayedMessages, baseTranscript, pendingMessages)
+      : null;
+
   const renderItem = useCallback(
     ({ item }: { item: SessionTranscriptItem }) => {
       if (item.type === 'preparation') {
@@ -1793,6 +1839,7 @@ export function SessionDetailContent({
           onRestoreQueued={
             canceledQueuedMessages.has(item.message.info.id) ? handleRestoreQueued : undefined
           }
+          noReplyRecorded={item.message.info.id === unansweredPromptId}
           condenseToolCalls={condenseToolCalls}
         />
       );
@@ -1829,6 +1876,7 @@ export function SessionDetailContent({
       handleOpenDetails,
       handleRestoreQueued,
       canceledQueuedMessages,
+      unansweredPromptId,
       condenseToolCalls,
     ]
   );
@@ -1995,9 +2043,10 @@ export function SessionDetailContent({
         error,
         statusIndicator,
         messageCount: messages.length,
+        hasFailedPreparation,
         connectionLost,
       }),
-    [error, statusIndicator, messages.length, connectionLost]
+    [error, statusIndicator, messages.length, hasFailedPreparation, connectionLost]
   );
   // Acknowledging a terminal error's Retry. The reopen clears `errorAtom` and
   // sets the loading flag before its first await, so the card that carries the
@@ -2069,8 +2118,11 @@ export function SessionDetailContent({
     fetchedData,
     sessionId,
   ]);
+  // A Retry tapped while the rows were still missing must release once the
+  // failed preparation rows arrive: they are the run's own failure statement,
+  // so the stale page-load failure has nothing left to say.
   const shownTerminalError =
-    terminalRetryPending && messages.length === 0
+    terminalRetryPending && messages.length === 0 && !hasFailedPreparation
       ? (terminalError ?? terminalRetry.error)
       : terminalError;
   const handleTerminalRetry = (failure: SessionTerminalError): void => {
@@ -2387,6 +2439,12 @@ export function SessionDetailContent({
   const isComposerVisible =
     !hasBlockingInteraction && !isReadOnlySession && !isSessionChromePending;
   const isReadOnlyContinueVisible = isReadOnlySession && !hasBlockingInteraction;
+  // A blocking card or the read-only footer replaces the composer with chrome of
+  // another height on purpose, so its measurement only applies while the
+  // composer it was measured for is the chrome on screen.
+  const transcriptChromeGrowth = isComposerVisible
+    ? composerInsetForSession(composerBottomInset, sessionId)
+    : 0;
   // The pending slot holds the shape its session will end in. The kind is only
   // set once the transport answers, but the metadata read lands before that and
   // names a cloud-agent session, which is writable by construction; the id
@@ -2988,6 +3046,7 @@ export function SessionDetailContent({
               modelOptions={modelOptions}
               connectionDisplay={connectionDisplay}
               onRetryConnection={retrySessionConnection}
+              cloudStatusType={cloudStatus?.type ?? null}
               autoApproveState={autoApproveState}
               onAutoApproveChange={enabled => {
                 // Selection haptic for the commit: a capability iOS and Android
@@ -3329,6 +3388,7 @@ export function SessionDetailContent({
                   await manager.dismissSuggestion(requestId);
                 }}
                 controlRef={composerControlRef}
+                onInputBottomInsetChange={handleComposerBottomInsetChange}
               />
             </ModelPickerSelectionScopeProvider>
           </View>
@@ -3363,9 +3423,18 @@ export function SessionDetailContent({
               }
               isRetrying={terminalRetryPending}
             />
+            {/* One primary action per surface (DESIGN.md): Back is the recovery
+                action, so it fills; Copy stays outlined as the utility. A
+                read-only transcript keeps its footer beside this card, and that
+                footer's Continue in a new session is the surface's filled
+                primary, so Back steps back to the outline there instead. Dark
+                takes the lifted olive `--selection` with its own label tone
+                instead of the glare of #ffdd00, so both themes give the control
+                the light mode's weight. */}
             <View className="flex-row gap-3">
               <Button
-                variant="ghost"
+                variant="outline"
+                size="action"
                 accessibilityLabel={t('agentChat.session.copyErrorDetails')}
                 onPress={() => {
                   void performCopy(copyText);
@@ -3373,8 +3442,20 @@ export function SessionDetailContent({
               >
                 <Text>{t('common.copy')}</Text>
               </Button>
-              <Button variant="ghost" onPress={handleBackToSessions}>
-                <Text>{t('agentChat.session.backToSessions')}</Text>
+              <Button
+                variant={isReadOnlyContinueVisible ? 'outline' : undefined}
+                size="action"
+                className={cn(!isReadOnlyContinueVisible && 'bg-primary dark:bg-selection')}
+                onPress={handleBackToSessions}
+              >
+                <Text
+                  className={cn(
+                    !isReadOnlyContinueVisible &&
+                      'text-primary-foreground dark:text-selection-foreground'
+                  )}
+                >
+                  {t('agentChat.session.backToSessions')}
+                </Text>
               </Button>
             </View>
           </View>
@@ -3471,29 +3552,33 @@ export function SessionDetailContent({
       // No entrance animation: the transcript body must paint on its own, not
       // after a `FadeIn` (which starts at `opacity: 0`) completes. The
       // skeleton is swapped for the rows in one commit, so it needs none.
-      <View className="flex-1">
-        <SessionMessageList
-          sessionId={sessionId}
-          items={transcript}
-          keyExtractor={getSessionTranscriptItemKey}
-          getItemType={getSessionTranscriptItemType}
-          hasOlderMessages={hasOlderMessages}
-          isLoadingOlderMessages={isLoadingOlderMessages}
-          olderMessagesError={olderMessagesError}
-          olderMessagesOmittedItemCount={olderMessagesOmittedItemCount}
-          onLoadOlderMessages={() => {
-            void manager.loadOlderMessages();
-          }}
-          onReachedBottom={() => {
-            manager.trimRetainedHistory();
-          }}
-          onAnchorChange={handleAnchorChange}
-          onOpenSettledChange={handleOpenSettledChange}
-          renderItem={renderItem}
-          resumeAt={resumeAnchor}
-          followTailNonce={followTailNonce}
-        />
-      </View>
+      // The composer's input growth reaches the list as a paint offset on its
+      // content, applied in the same commit that grows the composer, so the
+      // transcript's bottom edge stays on the composer's top edge. Correcting
+      // from the list's own `onLayout` painted the transcript clipped for the
+      // frames before that callback reached JS, then moved it.
+      <SessionMessageList
+        sessionId={sessionId}
+        chromeGrowthDp={transcriptChromeGrowth}
+        items={transcript}
+        keyExtractor={getSessionTranscriptItemKey}
+        getItemType={getSessionTranscriptItemType}
+        hasOlderMessages={hasOlderMessages}
+        isLoadingOlderMessages={isLoadingOlderMessages}
+        olderMessagesError={olderMessagesError}
+        olderMessagesOmittedItemCount={olderMessagesOmittedItemCount}
+        onLoadOlderMessages={() => {
+          void manager.loadOlderMessages();
+        }}
+        onReachedBottom={() => {
+          manager.trimRetainedHistory();
+        }}
+        onAnchorChange={handleAnchorChange}
+        onOpenSettledChange={handleOpenSettledChange}
+        renderItem={renderItem}
+        resumeAt={resumeAnchor}
+        followTailNonce={followTailNonce}
+      />
     );
   }
 }

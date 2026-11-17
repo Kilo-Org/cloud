@@ -208,9 +208,6 @@ export const INSTRUCTION_NAME_MAX_LENGTH = 100;
 /** Server bound: `import/instructions.ts`'s `MAX_IMPORT_INSTRUCTION_LENGTH`. */
 export const INSTRUCTION_CONTENT_MAX_LENGTH = 100_000;
 
-/** Server pattern: `instructionNameSchema`'s `^[a-z0-9][a-z0-9-]*$`. */
-const INSTRUCTION_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
-
 /** Server rule: the one `RESERVED_INSTRUCTION_NAMES` entry, the Cloud-Agent rules file. */
 const RESERVED_INSTRUCTION_NAME = 'cloud-agent';
 
@@ -239,23 +236,25 @@ export function cleanInstructionName(value: string): string {
 }
 
 /**
- * Validate an instruction the way the server's create schema does: the slug
- * shape, the reserved file name, and the content bounds, in the order the
- * server applies them, so a save it would refuse is refused here with the rule
- * that covers it.
+ * Validate the instruction name the reader typed against the server's create
+ * schema: the slug shape, the reserved file name, and the content bounds, in
+ * the order the server applies them, so a save it would refuse is refused here
+ * with the rule that covers it. A field that is not empty but has nothing the
+ * server's slug accepts is `bad-name`, not `empty`. This function checks the
+ * stored slug, which `cleanInstructionName` already cuts to
+ * `INSTRUCTION_NAME_MAX_LENGTH`, so a long typed name is stored cut and never
+ * refused: it returns no `'too-long'` code.
  */
 export function validateInstructionInput(input: {
   name: string;
   content: string;
 }): InstructionInputError | null {
-  const name = input.name.trim();
-  if (name.length === 0) {
+  const typed = input.name.trim();
+  if (typed.length === 0) {
     return 'empty';
   }
-  if (name.length > INSTRUCTION_NAME_MAX_LENGTH) {
-    return 'too-long';
-  }
-  if (!INSTRUCTION_NAME_PATTERN.test(name)) {
+  const name = cleanInstructionName(typed);
+  if (name.length === 0) {
     return 'bad-name';
   }
   if (name === RESERVED_INSTRUCTION_NAME) {
@@ -292,6 +291,29 @@ export const MAX_SETUP_COMMAND_LENGTH = 500;
 
 /** Server bound: a profile or session accepts at most 20 setup commands. */
 export const MAX_SETUP_COMMANDS = 20;
+
+/**
+ * Server cap: `contracts/agents.ts`'s `MAX_PROFILE_AGENTS`. The server counts
+ * every agent row of a profile, so the profile agents screen compares the
+ * loaded list's length against it before a create goes out, and names the cap
+ * in the reader's language.
+ */
+export const MAX_PROFILE_AGENTS = 20;
+
+/**
+ * Server cap: `profile-mcp-service.ts`'s `MAX_PROFILE_MCP_SERVERS`. The server
+ * counts every server row of a profile, enabled or not, so the MCP servers
+ * screen compares the loaded list's length against it before a create goes out.
+ */
+export const MAX_PROFILE_MCP_SERVERS = 20;
+
+/**
+ * Server cap: `contracts/kilo-commands.ts`'s `MAX_PROFILE_KILO_COMMANDS`. The
+ * server counts every slash command row of a profile, enabled or not, so the
+ * slash commands screen compares the loaded list's length against it before a
+ * create goes out.
+ */
+export const MAX_PROFILE_KILO_COMMANDS = 50;
 
 /**
  * Append a blank setup command for the user to type into. The server caps the

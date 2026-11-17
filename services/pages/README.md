@@ -31,8 +31,9 @@ wrangler.jsonc → wrangler deploy
 
 A Pages package ships a deployment-neutral `wrangler.json`: the fields the code
 fixes (Durable Object classes, migrations, cron triggers, asset handling,
-compatibility date, `NOTEBOOK_CLOUD_OIDC_FLOW`), with no name, route, database,
-bucket or other variable. The build compares those fields with `wrangler.jsonc`
+compatibility date and flags, `NOTEBOOK_CLOUD_OIDC_FLOW`,
+`PAGES_OAUTH_METADATA_EGRESS`), with no name, route, database, bucket or other
+variable. The build compares those fields with `wrangler.jsonc`
 and fails on any difference, naming the fields. So a release that adds a
 Durable Object class, a migration or a cron trigger changes `wrangler.jsonc` in
 the pull request that moves the pin, where it is reviewed.
@@ -102,13 +103,17 @@ a Kilo one.
 
 | Client | Admitted by |
 |---|---|
-| Claude (web, desktop and mobile), Claude Code, ChatGPT | Client ID metadata document, for the clients the Worker names |
+| Any client with a valid public HTTPS client ID metadata document (Claude, Claude Code, ChatGPT, Codex and others) | The metadata document. Known client names are display labels; an unfamiliar client is named by its host on the consent screen |
 | Kilo CLI | Its fixed client id, `pages-kilo` |
-| Any other client | Refused before anything is fetched |
 
-Setting `PAGES_OAUTH_ANY_CLIENT_DOCUMENT` to `true` admits any client that
-publishes a document. Read "Outbound requests" in nteract's
-`apps/pages/DEPLOYMENT.md` before turning it on.
+Every metadata client still needs valid metadata, a listed callback, PKCE S256,
+sign-in and consent. The Worker fetches the document through Cloudflare's
+public routing: the `global_fetch_strictly_public` compatibility flag and
+`PAGES_OAUTH_METADATA_EGRESS=public-https` are both required, and without the
+variable every new metadata authorization gets a 503. The flag covers every
+`fetch` the Worker makes, including the sign-in exchange with the web app.
+`PAGES_OAUTH_ANY_CLIENT_DOCUMENT` is obsolete and has no effect. Read "Outbound
+requests" in nteract's `apps/pages/DEPLOYMENT.md` for the boundary.
 
 `/llms.txt` and `/connect` describe these routes to agents and to people.
 
@@ -224,4 +229,5 @@ Plain variables, set in `vars` in `wrangler.jsonc`.
 | `PAGES_DEFAULT_PAGE_QUOTA` | How many active Pages one account may hold |
 | `PAGES_CATALOG_INDEX` | Epoch label of the D1 catalog index |
 | `NOTEBOOK_CLOUD_OIDC_FLOW` | `server`. Structural: the package names it, and the build checks it |
+| `PAGES_OAUTH_METADATA_EGRESS` | `public-https`. Structural: the package names it, and the build checks it. Tells Pages the Worker fetches client metadata as public Internet traffic, which the `global_fetch_strictly_public` compatibility flag provides. Without it, new metadata authorizations get a 503 |
 | `NOTEBOOK_CLOUD_ANACONDA_API_KEY_*` | Not read while `PAGES_KILO_APP_URL` is set |

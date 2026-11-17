@@ -9,7 +9,6 @@ import {
 } from './active-sessions-live-sync.test-helpers';
 import {
   createKiloAppQueryClient,
-  DEFAULT_QUERY_STALE_TIME_MS,
   getActiveSessionsQueryMetadata,
   subscribeActiveSessionsQueryMetadata,
 } from './query-client';
@@ -67,6 +66,56 @@ describe('query retry policy', () => {
       expect(attempts).toBe(expectedAttempts);
     }
   );
+
+  // A tRPC client error carries `data.code`, while a server-shaped one carries
+  // it under `shape.data`. Reading only the first shape retried a validation
+  // failure the server answers identically every time, so the same request went
+  // out three times before the screen showed anything.
+  it.each([
+    { code: 'BAD_REQUEST', expectedAttempts: 1 },
+    { code: 'INTERNAL_SERVER_ERROR', expectedAttempts: 3 },
+  ])(
+    'invokes the query function $expectedAttempts time(s) for a server-shaped $code',
+    async ({ code, expectedAttempts }) => {
+      const queryClient = createKiloAppQueryClient();
+      const error = Object.assign(new Error(code), { shape: { data: { code } } });
+      let attempts = 0;
+
+      await expect(
+        queryClient.query({
+          queryKey: ['session', 'retry-policy', 'shaped', code],
+          retryDelay: 0,
+          queryFn: () => {
+            attempts += 1;
+            throw error;
+          },
+        })
+      ).rejects.toBe(error);
+
+      expect(attempts).toBe(expectedAttempts);
+    }
+  );
+
+  // A bare top-level `code` also appears on filesystem, transport and domain
+  // errors, so it is not a server verdict and keeps the transient retries.
+  it('retries a non-tRPC error that carries only a top-level code', async () => {
+    const queryClient = createKiloAppQueryClient();
+    const error = Object.assign(new Error('native refusal'), { code: 'UNAUTHORIZED' });
+    let attempts = 0;
+
+    await expect(
+      queryClient.query({
+        queryKey: ['session', 'retry-policy', 'top-level'],
+        retryDelay: 0,
+        queryFn: () => {
+          attempts += 1;
+          throw error;
+        },
+      })
+    ).rejects.toBe(error);
+
+    expect(attempts).toBe(3);
+  });
 });
 
 describe('permission-denied query removal', () => {
@@ -619,11 +668,6 @@ describe('default query stale time', () => {
       const result = await Promise.resolve({ ok: true });
       return result;
     });
-
-  it('defaults new queries to the shared stale time', () => {
-    const client = createKiloAppQueryClient();
-    expect(client.getDefaultOptions().queries?.staleTime).toBe(DEFAULT_QUERY_STALE_TIME_MS);
-  });
 
   it('serves a fresh query from cache on remount without calling the query function again', async () => {
     const client = createKiloAppQueryClient();

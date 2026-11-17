@@ -14,6 +14,7 @@ import {
   creditPurchaseChannel,
   type CreditPurchaseEntry,
 } from '@/lib/credits/credit-history';
+import { keepZoneWithDate } from '@/lib/credits/expiry-zone';
 import { formatDate, formatPrefixedMoney } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { firstNonEmpty, parseTimestamp } from '@/lib/utils';
@@ -23,6 +24,12 @@ const DEDUCTION_LABEL_KEYS = {
   adjustment: 'credits.history.kind.adjustment',
   balance_neutral: 'credits.history.kind.balanceNeutral',
 } satisfies Record<string, string>;
+
+/** The row title a purchase kind renders, in the reader's language. */
+const PURCHASE_TITLE_KEYS = {
+  purchase: 'credits.history.purchaseFallback',
+  auto_top_up: 'organization.billing.autoTopUp',
+} satisfies Record<CreditPurchaseEntry['kind'], string>;
 
 /** The note a store-sold pack carries instead of a receipt action. */
 const STORE_RECEIPT_KEYS = {
@@ -96,21 +103,26 @@ export const PurchaseHistoryRow = memo(function PurchaseHistoryRow({
   const { t } = useTranslation();
   const colors = useThemeColors();
   const channel = creditPurchaseChannel(entry.creditSource);
-  const description = firstNonEmpty(entry.description, t('credits.history.purchaseFallback'));
+  // A kind this app predates still paints a title: the purchase label is the
+  // generic row name, and an empty one reads as a broken row.
+  const title = t(lookup(PURCHASE_TITLE_KEYS, entry.kind) ?? 'credits.history.purchaseFallback');
 
   const storeReceiptKey = lookup(STORE_RECEIPT_KEYS, channel);
   const storeReceiptNote = storeReceiptKey ? t(storeReceiptKey) : null;
+  const dateLabel = formatDate(parseTimestamp(entry.date), i18n.language);
   const expiryLabel = entry.expiryDate
-    ? t('organization.creditActivity.expiresUtc', {
-        date: formatDate(parseTimestamp(entry.expiryDate), i18n.language, { timeZone: 'UTC' }),
-      })
+    ? keepZoneWithDate(
+        t('organization.creditActivity.expiresUtc', {
+          date: formatDate(parseTimestamp(entry.expiryDate), i18n.language, { timeZone: 'UTC' }),
+        })
+      )
     : null;
 
   return (
     <View className="gap-1 rounded-lg bg-secondary p-3">
       <View className="flex-row items-center justify-between gap-3">
         <Text className="min-w-0 flex-1 text-sm font-medium text-foreground" numberOfLines={1}>
-          {description}
+          {title}
         </Text>
         <Text className="text-sm font-medium text-good">
           {creditAmountLabel(entry.amount_mUsd)}
@@ -128,7 +140,11 @@ export const PurchaseHistoryRow = memo(function PurchaseHistoryRow({
             disabled={isOpeningReceipt}
             accessibilityRole="button"
             accessibilityState={{ busy: isOpeningReceipt }}
-            accessibilityLabel={t('credits.history.receiptA11y', { description })}
+            accessibilityLabel={t('credits.history.receiptA11y', {
+              description: title,
+              amount: creditAmountLabel(entry.amount_mUsd),
+              date: dateLabel,
+            })}
             onPress={() => {
               onOpenReceipt(entry.id);
             }}
@@ -142,9 +158,7 @@ export const PurchaseHistoryRow = memo(function PurchaseHistoryRow({
         )}
       </View>
       <View className="flex-row flex-wrap items-center justify-between gap-x-3 gap-y-1">
-        <Text className="text-xs text-muted-foreground">
-          {formatDate(parseTimestamp(entry.date), i18n.language)}
-        </Text>
+        <Text className="text-xs text-muted-foreground">{dateLabel}</Text>
         {/* Both lines, not either: a pack Play sold still expires a year after
             purchase, so its row keeps the expiry beside the store that holds
             the receipt. */}

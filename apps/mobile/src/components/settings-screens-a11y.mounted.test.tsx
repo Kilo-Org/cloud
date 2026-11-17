@@ -65,6 +65,11 @@ vi.mock('expo-router', () => ({
   useNavigationContainerRef: () => ({ addListener: () => () => undefined }),
   useRouter: () => ({ push, back, replace, canGoBack }),
 }));
+// The picker rows push through the guarded hook; this file asserts control labels,
+// not navigation, so the hook only has to exist.
+vi.mock('@/lib/hooks/use-single-push-route', () => ({
+  useSinglePushRoute: () => vi.fn(),
+}));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, left: 0, right: 0, bottom: 0 }),
 }));
@@ -77,7 +82,6 @@ vi.mock('@/components/ui/icons', () => ({
   History: 'History',
   KeyRound: 'KeyRound',
   Lock: 'Lock',
-  LogOut: 'LogOut',
   Mic: 'Mic',
   Shield: 'Shield',
   SlidersHorizontal: 'SlidersHorizontal',
@@ -89,6 +93,7 @@ vi.mock('@/components/ui/icons', () => ({
 vi.mock('@/components/ui/directional-icons', () => ({
   DirectionalChevronLeft: 'DirectionalChevronLeft',
   DirectionalChevronRight: 'DirectionalChevronRight',
+  DirectionalLogOut: 'DirectionalLogOut',
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 // The appearance control is mounted for real below, so its selection haptic is

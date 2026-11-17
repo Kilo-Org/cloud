@@ -18,22 +18,31 @@ describe('validateInstructionInput', () => {
     expect(validateInstructionInput({ name: 'release-notes', content: '# Rules' })).toBeNull();
   });
 
-  it('refuses a blank or whitespace name', () => {
+  it('accepts a typed name that saves as its slug', () => {
+    expect(validateInstructionInput({ name: 'Release Notes', content: 'x' })).toBeNull();
+    expect(cleanInstructionName('Release Notes')).toBe('release-notes');
+    expect(validateInstructionInput({ name: 'UPPER', content: 'x' })).toBeNull();
+  });
+
+  it('refuses a blank or whitespace name as empty', () => {
     expect(validateInstructionInput({ name: '   ', content: 'x' })).toBe('empty');
   });
 
-  it('refuses a name over the server bound', () => {
-    const name = 'a'.repeat(INSTRUCTION_NAME_MAX_LENGTH + 1);
-    expect(validateInstructionInput({ name, content: 'x' })).toBe('too-long');
+  it('refuses a name with nothing the slug accepts as invalid, not empty', () => {
+    expect(validateInstructionInput({ name: 'قواعد', content: 'x' })).toBe('bad-name');
+    expect(validateInstructionInput({ name: '規則', content: 'x' })).toBe('bad-name');
+    expect(validateInstructionInput({ name: '!!!', content: 'x' })).toBe('bad-name');
   });
 
-  it('refuses a name outside the server pattern', () => {
-    expect(validateInstructionInput({ name: 'Release Notes', content: 'x' })).toBe('bad-name');
-    expect(validateInstructionInput({ name: 'UPPER', content: 'x' })).toBe('bad-name');
+  it('accepts a typed name over the server bound, because the save is cut to it', () => {
+    const name = 'a'.repeat(300);
+    expect(validateInstructionInput({ name, content: 'x' })).toBeNull();
+    expect(cleanInstructionName(name).length).toBeLessThanOrEqual(INSTRUCTION_NAME_MAX_LENGTH);
   });
 
   it('refuses the reserved Cloud-Agent rules file name', () => {
     expect(validateInstructionInput({ name: 'cloud-agent', content: 'x' })).toBe('reserved');
+    expect(validateInstructionInput({ name: 'Cloud Agent', content: 'x' })).toBe('reserved');
   });
 
   it('refuses blank content', () => {

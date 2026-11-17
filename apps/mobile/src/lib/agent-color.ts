@@ -213,6 +213,7 @@ export function agentColor(name: string): Tint {
  * | Organization    | Manage/View organization            | lime  |
  * | App             | Preferences, Tutorial               | sage  |
  * | Linked accounts | provider rows                       | moss  |
+ * | Connected       | Integrations                        | pine  |
  * | Actions         | Feedback, Privacy choices, Sign out | fern  |
  * | reserved        | Delete account                      | `danger` tone, never a family step |
  *
@@ -222,7 +223,7 @@ export function agentColor(name: string): Tint {
  * destination never takes a hue from a label, title, translation or hash, and
  * never a status hue.
  */
-export type RowHue = 'honey' | 'gold' | 'lime' | 'sage' | 'moss' | 'fern';
+export type RowHue = 'honey' | 'gold' | 'lime' | 'sage' | 'moss' | 'pine' | 'fern';
 
 export const ROW_PALETTE = {
   honey: {
@@ -272,6 +273,14 @@ export const ROW_PALETTE = {
     tileBgClass: 'bg-row-fern-tile-bg',
     tileBorderClass: 'border-row-fern-tile-border',
     hueThemeKey: 'rowFern',
+  },
+  pine: {
+    hueClass: 'bg-row-pine',
+    hueTextClass: 'text-row-pine',
+    hueBorderClass: 'border-row-pine',
+    tileBgClass: 'bg-row-pine-tile-bg',
+    tileBorderClass: 'border-row-pine-tile-border',
+    hueThemeKey: 'rowPine',
   },
 } as const satisfies Record<RowHue, Tint>;
 

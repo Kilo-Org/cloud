@@ -2,7 +2,6 @@ import { Pressable, View } from 'react-native';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { isolateLtrBidiText } from '@/lib/bidi';
 import { cn } from '@/lib/utils';
 import { type SessionContextInfo } from '@/lib/session-context-info';
 
@@ -215,13 +214,10 @@ export function SessionContextMetrics({
   // reports it, and the cost paints once it is known. A slot whose value is not
   // there keeps its width and paints nothing, so the pill never stands a dash in
   // for a number that has not arrived. A session that reported tokens but no
-  // context window has no honest percentage either, so that slot paints nothing;
-  // the ring's indeterminate arc, the accessibility label and the context sheet
+  // context window has no honest percentage either, so its slot paints nothing;
+  // the ring's bare track, the accessibility label and the context sheet
   // carry the unknown.
-  const costLabel =
-    content.costSlot === 'label' && content.secondary !== null
-      ? isolateLtrBidiText(content.secondary)
-      : null;
+  const costLabel = content.costSlot === 'label' ? content.secondary : null;
   // While the session still resolves, one bar covers the row the two slots lay
   // out. A bar of its own fixed width matched that row only at the default font
   // scale; the row itself is the correct extent at any scale, so the overlay

@@ -14,10 +14,10 @@ import {
   followSession,
   isSessionFollowed,
   restoreFollowedSessionCards,
-  restoreFollowedSessionCardsFromStorage,
   syncFollowedSessionCards,
   unfollowDismissedSession,
 } from './session-follow';
+import { restoreFollowedSessionCardsFromStorage } from './session-follow-storage';
 import { _setStoredContextReaderForTests } from './session-stored-context';
 
 const mocks = vi.hoisted(() => ({
@@ -72,9 +72,7 @@ vi.mock('./count-format', () => ({
 }));
 
 vi.mock('./ensure-notification-channels', () => ({
-  ensureAndroidNotificationChannels: vi.fn(async () => {
-    await Promise.resolve();
-  }),
+  ensureAndroidNotificationChannels: vi.fn(() => Promise.resolve(true)),
 }));
 
 const NOW = Date.parse('2026-10-12T10:00:00.000Z');

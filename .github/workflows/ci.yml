@@ -425,6 +425,7 @@ jobs:
               - 'services/container-usage-meter/.dev.vars.example'
               - 'services/cloud-agent-next/test/e2e/**'
               - '.github/workflows/mobile-native-build.yml'
+              - '.github/workflows/kilo-mcp-release.yml'
               - 'packages/db/**'
               - 'packages/worker-utils/**'
               - 'packages/session-ingest-contracts/**'
@@ -454,6 +455,7 @@ jobs:
               - 'services/container-usage-meter/.dev.vars.example'
               - 'services/cloud-agent-next/test/e2e/**'
               - '.github/workflows/mobile-native-build.yml'
+              - '.github/workflows/kilo-mcp-release.yml'
               - 'packages/db/**'
               - 'packages/worker-utils/**'
               - 'packages/session-ingest-contracts/**'
@@ -1175,6 +1177,15 @@ jobs:
         # step above.
         run: NODE_ENV=development pnpm drizzle migrate && pnpm --filter cloudflare-session-ingest test:postgres
 
+      - name: Run worker-utils membership Postgres tests
+        # The detector names a workspace in the dependency closure of
+        # `@kilocode/worker-utils`, so this step runs whenever the membership
+        # rule or one of its readers changes.
+        if: needs.changes.outputs.test_scripts_db == 'true' || needs.changes.outputs.data_session_ingest == 'true' || needs.changes.outputs.data_meter == 'true'
+        # The suite reads the organizations and memberships tables directly, so
+        # it applies the migrations when it is the only step that runs.
+        run: NODE_ENV=development pnpm drizzle migrate && pnpm --filter @kilocode/worker-utils test:postgres
+
   # In its own job, madge runs beside the script tests instead of before them.
   dependency-cycle-check:
     needs: changes
@@ -1262,16 +1273,16 @@ jobs:
           node-version-file: '.nvmrc'
 
       # The build runs one Next production build, and that build's type check
-      # reads the app's tsconfig include: the app sources and tests, the
-      # web-shared sources the config maps in, the ai-gateway sources a web test
-      # imports, and the sources of one billing service that two web tests import
-      # inside apps/web. That service imports @kilocode/organization-entitlement,
-      # so its dependents are selected rather than every other workspace: a
-      # project outside the install scope has no node_modules, and the type check
-      # then fails on an unresolvable import. Only those closures and the root
-      # project are installed, so the job stops linking the workspaces its build
-      # never reads. Widen the filter when a step here imports a workspace
-      # outside the closure.
+      # reads the app's tsconfig include: the app sources and tests, the two
+      # web-shared ambient declaration files the config lists, the ai-gateway
+      # sources a web test imports, and the sources of one billing service that
+      # two web tests import inside apps/web. That service imports
+      # @kilocode/organization-entitlement, so its dependents are selected
+      # rather than every other workspace: a project outside the install scope
+      # has no node_modules, and the type check then fails on an unresolvable
+      # import. Only those closures and the root project are installed, so the
+      # job stops linking the workspaces its build never reads. Widen the filter
+      # when a step here imports a workspace outside the closure.
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --filter 'web...' --filter 'ai-gateway...' --filter '...@kilocode/organization-entitlement' --filter kilocode-monorepo
 
@@ -1497,12 +1508,13 @@ jobs:
           build_dir=$(mktemp -d "$RUNNER_TEMP/wrapper-build.XXXXXX")
           trap 'rm -rf "$build_dir"' EXIT
 
-          # Match Dockerfile inputs without access to workspace node_modules.
+          # Keep application dependencies isolated; source-map injection needs the build-only CLI.
           tar -C services/cloud-agent-next --exclude=node_modules --exclude=dist \
-            -cf - wrapper src/shared | tar -C "$build_dir" -xf -
+            -cf - wrapper src/shared scripts/sentry-source-maps.ts | tar -C "$build_dir" -xf -
           cd "$build_dir/wrapper"
           bun install --production
           ln -sfn "$build_dir/wrapper/node_modules" "$build_dir/node_modules"
+          ln -s "$GITHUB_WORKSPACE/services/cloud-agent-next/node_modules/@sentry/cli" node_modules/@sentry/cli
           bun run build.ts --install-dir "$build_dir/bin"
 
       - name: Test cloud-agent-next checkers

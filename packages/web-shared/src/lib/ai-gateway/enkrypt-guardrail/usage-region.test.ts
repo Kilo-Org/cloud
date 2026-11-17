@@ -2,14 +2,54 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   ...jest.requireActual<Record<string, unknown>>('@kilocode/web-shared/lib/drizzle'),
   isUSRegion: jest.fn(() => false),
 }));
+jest.mock('next/server', () => ({
+  ...jest.requireActual<Record<string, unknown>>('next/server'),
+  after: jest.fn(),
+}));
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   ...jest.requireActual<object>('@kilocode/web-shared/lib/config.server'),
   INTERNAL_API_SECRET: 'test-internal-secret',
+  USAGE_INGEST_URL: undefined,
+  USAGE_INGEST_PUBLISH_SECRET: undefined,
 }));
 jest.mock('@kilocode/web-shared/lib/constants', () => ({
   ...jest.requireActual<object>('@kilocode/web-shared/lib/constants'),
   APP_URL: 'https://app.example.com',
 }));
+
+// The mocked captureException is created here rather than captured from module
+// scope (jest.mock is hoisted above const declarations), for the same reason as
+// the other suites in this repository.
+jest.mock('@sentry/nextjs', () => ({
+  ...jest.requireActual<object>('@sentry/nextjs'),
+  captureException: jest.fn(),
+}));
+
+const withOverriddenAppUrl = async (
+  run: (record: () => Promise<boolean>, captured: jest.Mock) => Promise<void>
+): Promise<void> => {
+  jest.resetModules();
+  jest.doMock('@kilocode/web-shared/lib/constants', () => ({
+    ...jest.requireActual<object>('@kilocode/web-shared/lib/constants'),
+    APP_URL: 'http://app.example.com',
+  }));
+  try {
+    const [{ recordEnkryptUsageInPrimaryRegion }, { captureException }] = await Promise.all([
+      import('./usage-primary-region'),
+      import('@sentry/nextjs'),
+    ]);
+    const usageRecord = await enkryptUsageRecordForNewOrganization();
+    const usageWrite: EnkryptUsageWriteInput = {
+      ...usageRecord,
+      id: randomUUID(),
+      occurredAt: new Date().toISOString(),
+    };
+    await run(() => recordEnkryptUsageInPrimaryRegion(usageWrite), captureException as jest.Mock);
+  } finally {
+    jest.dontMock('@kilocode/web-shared/lib/constants');
+    jest.resetModules();
+  }
+};
 
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { randomUUID } from 'crypto';
@@ -20,7 +60,8 @@ import {
   organizationMicrodollarsUsed,
 } from '@kilocode/web-shared/tests/helpers/enkrypt-usage.helper';
 import { MICRODOLLARS_PER_ENKRYPT_CREDIT, recordEnkryptUsage } from './usage';
-import { EnkryptUsageWriteSchema } from '@kilocode/usage-contracts';
+import { EnkryptUsageWriteSchema, type EnkryptUsageWriteInput } from '@kilocode/usage-contracts';
+import { readJsonBody, requestUrlOf } from '@kilocode/web-shared/tests/helpers/request-body.helper';
 
 const mockedIsUSRegion = jest.mocked(isUSRegion);
 const nativeFetch = globalThis.fetch;
@@ -61,14 +102,14 @@ describe('recordEnkryptUsage region routing', () => {
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
     const [url, init] = mockFetch.mock.calls[0];
-    expect(String(url)).toBe('https://app.example.com/api/internal/enkrypt-usage/record');
+    expect(requestUrlOf(url)).toBe('https://app.example.com/api/internal/enkrypt-usage/record');
     expect(init?.method).toBe('POST');
     expect(init?.headers).toEqual({
       'content-type': 'application/json',
       'x-internal-api-key': 'test-internal-secret',
     });
-    expect(JSON.parse(String(init?.body))).not.toHaveProperty('guardrail');
-    const body = EnkryptUsageWriteSchema.parse(JSON.parse(String(init?.body)));
+    expect(readJsonBody(init?.body)).not.toHaveProperty('guardrail');
+    const body = EnkryptUsageWriteSchema.parse(readJsonBody(init?.body));
     expect(body).toEqual({
       ...usageRecord,
       guardrail: 'input',
@@ -86,7 +127,7 @@ describe('recordEnkryptUsage region routing', () => {
       mockFetch.mockImplementation(async (_url, init) =>
         Response.json({
           status,
-          usageId: EnkryptUsageWriteSchema.parse(JSON.parse(String(init?.body))).id,
+          usageId: EnkryptUsageWriteSchema.parse(readJsonBody(init?.body)).id,
         })
       );
       const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -154,9 +195,7 @@ describe('recordEnkryptUsage region routing', () => {
     );
     expect(JSON.stringify(consoleError.mock.calls)).not.toContain('test-internal-secret');
     expect(mockFetch).toHaveBeenCalledTimes(1);
-    const handedOff = EnkryptUsageWriteSchema.parse(
-      JSON.parse(String(mockFetch.mock.calls[0][1]?.body))
-    );
+    const handedOff = EnkryptUsageWriteSchema.parse(readJsonBody(mockFetch.mock.calls[0][1]?.body));
     const rows = await enkryptLedgerRows(usageRecord.organizationId);
     expect(rows).toHaveLength(1);
     expect(rows[0].id).toBe(handedOff.id);
@@ -219,9 +258,16 @@ describe('recordEnkryptUsage region routing', () => {
       await expect(recordEnkryptUsage(usageRecord)).resolves.toBeUndefined();
 
       const handedOff = EnkryptUsageWriteSchema.parse(
-        JSON.parse(String(mockFetch.mock.calls[0][1]?.body))
+        readJsonBody(mockFetch.mock.calls[0][1]?.body)
       );
-      expect(consoleWarn).toHaveBeenCalledTimes(1);
+      expect(consoleWarn).toHaveBeenCalledTimes(2);
+      expect(consoleWarn).toHaveBeenCalledWith('usage enqueue unavailable', {
+        usageId: handedOff.id,
+        usage_kind: 'enkrypt_usage',
+        execution_region: expect.any(String),
+        kind: 'unavailable',
+        reason: 'publisher_not_configured',
+      });
       expect(consoleWarn).toHaveBeenCalledWith(warning, {
         usage_id: handedOff.id,
         error_name: errorName,
@@ -239,4 +285,20 @@ describe('recordEnkryptUsage region routing', () => {
       );
     }
   );
+
+  it('requires an https or loopback app endpoint', async () => {
+    mockedIsUSRegion.mockReturnValue(true);
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    await withOverriddenAppUrl(async (record, captured) => {
+      await expect(record()).resolves.toBe(false);
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(consoleError).toHaveBeenCalledWith(
+        '[enkrypt-guardrail] failed to record usage in the primary region; writing locally',
+        { usage_id: expect.any(String), reason: 'unsupported_app_url' }
+      );
+      const calls = captured.mock.calls as Array<[unknown, { tags: Record<string, string> }]>;
+      const last = calls[calls.length - 1];
+      expect(last?.[1]?.tags).toMatchObject({ reason: 'unsupported_app_url' });
+    });
+  });
 });

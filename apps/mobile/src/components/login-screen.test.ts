@@ -15,11 +15,7 @@ import {
 import { recordPendingLinkOutcome, setPendingLinkOffer } from '@/lib/auth/pending-link-state';
 import { type DeviceAuthError } from '@/lib/auth/device-auth-state';
 import { i18n } from '@/i18n';
-import {
-  clearPersistedLoginDrafts,
-  persistLoginDrafts,
-  restoreLoginDrafts,
-} from '@/lib/login-draft';
+import { persistLoginDrafts, restoreLoginDrafts } from '@/lib/login-draft';
 import LoginRoute from '@/app/(auth)/login';
 import { LoginScreen } from './login-screen';
 import {
@@ -59,6 +55,11 @@ const safeInsets = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push }),
+}));
+// The globe's opener goes through the guarded push; the assertion below reads
+// the same spy.
+vi.mock('@/lib/hooks/use-single-push-route', () => ({
+  useSinglePushRoute: () => push,
 }));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
@@ -113,7 +114,6 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: '#111827', mutedForeground: '#6b7280' }),
 }));
 vi.mock('@/lib/login-draft', () => ({
-  clearPersistedLoginDrafts: vi.fn(),
   persistLoginDrafts: vi.fn().mockResolvedValue(undefined),
   restoreLoginDrafts: vi.fn().mockResolvedValue(null),
 }));
@@ -662,7 +662,6 @@ describe('login-screen idle form', () => {
     deviceAuth.resumed = false;
     authState.token = undefined;
     vi.mocked(restoreLoginDrafts).mockResolvedValue({ email: '', ssoRecovery: null });
-    vi.mocked(clearPersistedLoginDrafts).mockClear();
     vi.mocked(persistLoginDrafts).mockClear();
   });
 
@@ -698,26 +697,20 @@ describe('login-screen idle form', () => {
     renderer.unmount();
   });
 
-  it('deletes the persisted drafts only after applying them', async () => {
-    const state: {
-      resolve: ((value: { email: string; ssoRecovery: null }) => void) | undefined;
-    } = { resolve: undefined };
-    vi.mocked(restoreLoginDrafts).mockReturnValue(
-      new Promise(resolve => {
-        state.resolve = resolve;
-      })
-    );
+  it('mounts an empty address once a completed sign-in retired the attempt', async () => {
+    /* A completed sign-in retires the attempt, so its restore answers nothing
+       and the next signed-out mount starts on a blank field. */
+    vi.mocked(restoreLoginDrafts).mockResolvedValue({ email: '', ssoRecovery: null });
 
     const renderer = await mountLoginScreen();
 
-    expect(clearPersistedLoginDrafts).not.toHaveBeenCalled();
-
     await act(async () => {
-      state.resolve?.({ email: '', ssoRecovery: null });
       await Promise.resolve();
     });
 
-    expect(clearPersistedLoginDrafts).toHaveBeenCalledTimes(1);
+    expect(restoreLoginDrafts).toHaveBeenCalled();
+    const idle = findByType(renderer.root, 'IdleAuth');
+    expect(idle[0]?.props.initialEmail).toBe('');
 
     renderer.unmount();
   });

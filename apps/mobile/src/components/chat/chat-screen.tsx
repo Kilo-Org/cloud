@@ -171,7 +171,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   // Until the list loads, the chat keeps the effort it was opened with rather
   // than dropping it for a model the screen cannot see yet.
   const effort = pickedOption === undefined ? state.effort : effortOfVariant(choices, variant);
-  const webSearch = useWebSearchSetting(state.sessionId, model);
+  const webSearch = useWebSearchSetting(place, state.sessionId, model);
   const imagesSupported = useTargetSupportsImages(model);
 
   // The attach control and the send path read image support from the gateway

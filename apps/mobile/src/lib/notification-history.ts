@@ -1,12 +1,13 @@
 import {
   NOTIFICATION_HISTORY_CATEGORIES,
   type NotificationHistoryCategory,
+  pushBodyCatalogKey,
   type PushData,
   pushDataSchema,
   translatePush,
 } from '@kilocode/notifications';
 
-import { type NotificationDestination, notificationDestinationForData } from './notification-path';
+import { notificationPathForData } from './notification-path';
 
 /**
  * Pure logic for the Notification history screen: how a recorded row is read
@@ -47,9 +48,11 @@ function translatedPart(
   part: 'title' | 'body'
 ): string {
   const stored = row[part];
-  return row.i18nKey === null
-    ? stored
-    : translatePush(locale, `${row.i18nKey}.${part}`, row.i18nParams ?? undefined, stored);
+  if (row.i18nKey === null) {
+    return stored;
+  }
+  const key = part === 'body' ? pushBodyCatalogKey(row.i18nKey) : `${row.i18nKey}.title`;
+  return translatePush(locale, key, row.i18nParams ?? undefined, stored);
 }
 
 /**
@@ -81,7 +84,8 @@ export function notificationHistoryCopy(
 
 export type NotificationHistoryTarget = Readonly<{
   data: PushData;
-  destination: NotificationDestination;
+  /** The app route the row opens, with the push origin marker already dropped. */
+  href: string;
 }>;
 
 /**
@@ -106,30 +110,21 @@ function withoutPushOrigin(href: string): string {
 
 /**
  * Where a row's tap goes, or null when the stored payload no longer resolves to
- * a destination or belongs to a retired product.
- *
- * `webBaseUrl` is the Kilo web origin a row that opens a web page — a KiloClaw
- * conversation, which has no mobile screen — uses. An app route ignores it.
+ * a destination — a kind this build does not route, or a payload this build
+ * cannot parse.
  */
 export function notificationHistoryTarget(
-  payload: Record<string, unknown>,
-  webBaseUrl: string
+  payload: Record<string, unknown>
 ): NotificationHistoryTarget | null {
   const parsed = pushDataSchema.safeParse(payload);
   if (!parsed.success) {
     return null;
   }
-  const destination = notificationDestinationForData(parsed.data, webBaseUrl);
-  if (destination === null) {
+  const href = notificationPathForData(parsed.data);
+  if (href === null) {
     return null;
   }
-  return {
-    data: parsed.data,
-    destination:
-      destination.kind === 'app'
-        ? { kind: 'app', href: withoutPushOrigin(destination.href) }
-        : destination,
-  };
+  return { data: parsed.data, href: withoutPushOrigin(href) };
 }
 
 export type NotificationHistoryFilter = Readonly<{
@@ -149,15 +144,25 @@ const CATEGORY_LABEL_KEYS = {
   balanceAlerts: 'notifications.channel.balance',
   spendAlerts: 'notifications.channel.spend',
   securityFindings: 'notifications.channel.security',
-} satisfies Record<Exclude<NotificationHistoryCategory, 'chatMessages'>, string>;
+} as const;
+
+/** A recorded category this build has copy for, so it can draw a chip. */
+type LabeledHistoryCategory = keyof typeof CATEGORY_LABEL_KEYS;
+
+/** The shared list can name a category this build has no chip copy for. */
+function isLabeledCategory(
+  category: NotificationHistoryCategory
+): category is LabeledHistoryCategory {
+  return category in CATEGORY_LABEL_KEYS;
+}
 
 /**
- * Every supported recorded category behind the "All" chip, in settings order.
- * Retired product categories have no filter.
+ * Every labelled recorded category behind the "All" chip, in settings order. A
+ * category this build has no copy for gets no filter.
  */
 export const NOTIFICATION_HISTORY_FILTERS: readonly NotificationHistoryFilter[] = [
   { category: null, labelKey: 'common.all' },
-  ...NOTIFICATION_HISTORY_CATEGORIES.filter(category => category !== 'chatMessages').map(
+  ...NOTIFICATION_HISTORY_CATEGORIES.filter(category => isLabeledCategory(category)).map(
     category => ({
       category,
       labelKey: CATEGORY_LABEL_KEYS[category],

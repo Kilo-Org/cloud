@@ -12,8 +12,8 @@ import type * as NotificationsModule from '@/lib/notifications';
  */
 let notificationsModule: Promise<typeof NotificationsModule> | null = null;
 
-export async function ensureAndroidNotificationChannels(): Promise<void> {
+export async function ensureAndroidNotificationChannels(): Promise<boolean> {
   notificationsModule ??= import('@/lib/notifications');
   const { ensureAndroidNotificationChannels: ensureChannels } = await notificationsModule;
-  await ensureChannels();
+  return ensureChannels();
 }

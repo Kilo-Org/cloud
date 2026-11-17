@@ -1,7 +1,7 @@
 import { checkRateLimit } from '@vercel/firewall';
 import { captureMessage } from '@sentry/nextjs';
 import type { NextRequest } from 'next/server';
-import { isBlockedTLD } from '@kilocode/web-shared/lib/user/server';
+import { isBlockedTLD } from '@kilocode/web-shared/lib/user/domain-gates';
 import { isEmailBlacklisted } from '@kilocode/web-shared/lib/blacklist-domains-config';
 import { findUserByNormalizedEmail } from '@/lib/user';
 import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
@@ -12,7 +12,8 @@ jest.mock('@vercel/firewall', () => ({
 jest.mock('@sentry/nextjs', () => ({
   captureMessage: jest.fn(),
 }));
-jest.mock('@kilocode/web-shared/lib/user/server', () => ({
+jest.mock('@kilocode/web-shared/lib/user/domain-gates', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/user/domain-gates'),
   isBlockedTLD: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/blacklist-domains-config', () => ({

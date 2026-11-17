@@ -102,7 +102,7 @@ function purchase(overrides: Partial<CreditPurchaseEntry> = {}): CreditPurchaseE
   return {
     id: 'purchase-1',
     date: '2026-11-12T10:00:00.000Z',
-    description: 'Credit purchase',
+    kind: 'purchase',
     amount_mUsd: 10_000_000,
     expiryDate: '2027-11-12T00:00:00.000Z',
     creditSource: 'stripe',
@@ -197,6 +197,20 @@ describe('PersonalCreditHistoryScreen', () => {
 
     expect(nodesOfType(renderer, 'PurchaseHistoryRow')).toHaveLength(1);
     expect(texts(renderer)).not.toContain("Couldn't load credit activity.");
+    unmount();
+  });
+
+  it('keeps the profile tab as the Back destination when there is no history', async () => {
+    state.purchases.entries = [purchase()];
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(PersonalCreditHistoryScreen)
+    );
+
+    // A restored route can open with nothing to pop, so the header itself
+    // carries the tab root as the destination its Back lands on.
+    expect(nodesOfType(renderer, 'ScreenHeader')[0]?.props.backFallback).toBe(
+      '/(app)/(tabs)/(3_profile)'
+    );
     unmount();
   });
 });

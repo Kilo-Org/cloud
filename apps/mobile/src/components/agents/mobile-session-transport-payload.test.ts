@@ -32,4 +32,30 @@ describe('normalizeTransportPayload', () => {
       model: 'kilo-auto/efficient',
     });
   });
+
+  it('returns only the command fields for a slash command payload', () => {
+    const result = normalizeTransportPayload({
+      type: 'command',
+      command: 'review',
+      arguments: 'src',
+    });
+    expect(result).toEqual({ type: 'command', command: 'review', arguments: 'src' });
+  });
+
+  it('throws when a prompt payload has no model', () => {
+    expect(() =>
+      normalizeTransportPayload({ type: 'prompt', prompt: 'hello', mode: 'code' })
+    ).toThrow('Model is required');
+  });
+
+  it('throws when a prompt payload selects a non-Kilo provider', () => {
+    expect(() =>
+      normalizeTransportPayload({
+        type: 'prompt',
+        prompt: 'hello',
+        mode: 'code',
+        model: { providerID: 'openrouter', modelID: 'x' },
+      })
+    ).toThrow('Cloud Agent only supports Kilo models');
+  });
 });

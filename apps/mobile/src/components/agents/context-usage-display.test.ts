@@ -18,7 +18,6 @@ import {
   getContextTone,
   getHeaderPillContent,
   getHeaderPillWidth,
-  getIndeterminateArcFraction,
   getMetricsAccessibilityLabel,
   getPillSlotSizers,
   getRemainingTokens,
@@ -95,10 +94,10 @@ describe('formatExactTokens', () => {
 
 describe('formatCost', () => {
   it('preserves the existing four-decimal dollar format', () => {
-    expect(formatCost(0)).toBe('$0.0000');
-    expect(formatCost(0.08)).toBe('$0.0800');
-    expect(formatCost(0.123_456)).toBe('$0.1235');
-    expect(formatCost(1.2)).toBe('$1.2000');
+    expect(formatCost(0)).toBe('\u2066$0.0000\u2069');
+    expect(formatCost(0.08)).toBe('\u2066$0.0800\u2069');
+    expect(formatCost(0.123_456)).toBe('\u2066$0.1235\u2069');
+    expect(formatCost(1.2)).toBe('\u2066$1.2000\u2069');
   });
 });
 
@@ -123,21 +122,12 @@ describe('getContextTone', () => {
 });
 
 describe('getArcFraction', () => {
-  it('maps known percentages and leaves unknown capacity indeterminate', () => {
+  it('maps known percentages and leaves unknown capacity undefined', () => {
     expect(getArcFraction(0)).toBe(0);
     expect(getArcFraction(50)).toBe(0.5);
     expect(getArcFraction(100)).toBe(1);
     expect(getArcFraction(125)).toBe(1);
     expect(getArcFraction(undefined)).toBeUndefined();
-  });
-});
-
-describe('getIndeterminateArcFraction', () => {
-  it('returns a stable non-empty neutral arc fraction', () => {
-    const fraction = getIndeterminateArcFraction();
-    expect(fraction).toBeGreaterThan(0);
-    expect(fraction).toBeLessThan(1);
-    expect(getIndeterminateArcFraction()).toBe(fraction);
   });
 });
 
@@ -184,7 +174,7 @@ describe('getHeaderPillContent', () => {
       hasMessages: true,
     });
     expect(result).toMatchObject({
-      secondary: '$0.08',
+      secondary: '\u2066$0.08\u2069',
       costSlot: 'label',
       tone: 'primary',
       arcFraction: 0.42,
@@ -217,7 +207,7 @@ describe('getHeaderPillContent', () => {
       hasMessages: true,
     });
     expect(result.tone).toBe('warning');
-    expect(result.secondary).toBe('$0.50');
+    expect(result.secondary).toBe('\u2066$0.50\u2069');
     expect(result.arcFraction).toBe(0.8);
     expect(result.interactive).toBe(true);
   });
@@ -241,7 +231,7 @@ describe('getHeaderPillContent', () => {
     });
     expect(result).toMatchObject({
       primary: null,
-      secondary: '$0.12',
+      secondary: '\u2066$0.12\u2069',
       costSlot: 'label',
       tone: 'neutral',
       arcFraction: undefined,
@@ -271,7 +261,7 @@ describe('getHeaderPillContent', () => {
   it('shows cost only, not interactive, arc 0 when transcript exists without context', () => {
     expect(pill({ totalCostMicrodollars: 80_000, hasMessages: true })).toEqual({
       primary: null,
-      secondary: '$0.08',
+      secondary: '\u2066$0.08\u2069',
       costSlot: 'label',
       tone: 'neutral',
       arcFraction: 0,
@@ -378,7 +368,7 @@ describe('getHeaderPillWidth', () => {
 describe('getContextSheetContent', () => {
   it('does not invent usage before the first completed model step', () => {
     expect(getContextSheetContent(undefined, null)).toMatchObject({
-      usedTokens: '-',
+      usedTokens: null,
       windowTokens: null,
       capacityKnown: false,
       percentage: null,
@@ -399,7 +389,7 @@ describe('getContextSheetContent', () => {
     expect(content.percentage).toBe('42%');
     expect(content.remainingTokens).toBe('116,000');
     expect(content.remainingPercentage).toBe('58%');
-    expect(content.cost).toBe('$0.08');
+    expect(content.cost).toBe('\u2066$0.08\u2069');
     expect(content.tone).toBe('primary');
   });
 
@@ -689,7 +679,7 @@ describe('pure integration fallback', () => {
     // The cost takes the cost slot, which holds the widest badge; the
     // percentage slot stays reserved and empty.
     expect(result.primary).toBeNull();
-    expect(result.secondary).toBe('$0.08');
+    expect(result.secondary).toBe('\u2066$0.08\u2069');
     expect(result.costSlot).toBe('label');
   });
 });

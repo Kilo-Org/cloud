@@ -117,7 +117,19 @@ export function AdvancedConfigPanel({
 
   const [isExpanded, setIsExpanded] = useState(false);
   const [createdProfile, setCreatedProfile] = useState<ProfileSelectorProfile | null>(null);
-  const [isSaveOpen, setIsSaveOpen] = useState(false);
+  const [saveSheetInstance, setSaveSheetInstance] = useState<number | null>(null);
+  // Open-instance ownership: a late settlement from a sheet that has since
+  // been closed and reopened must not close the one that replaced it.
+  const saveSheetInstanceRef = useRef(0);
+  const openSaveSheet = () => {
+    saveSheetInstanceRef.current += 1;
+    setSaveSheetInstance(saveSheetInstanceRef.current);
+  };
+  const closeSaveSheet = (instance: number) => {
+    if (saveSheetInstanceRef.current === instance) {
+      setSaveSheetInstance(null);
+    }
+  };
   // This panel's top inside the composer's scroll content, reported by its
   // root's layout. Expanding never moves anything above the disclosure row, so
   // the collapsed measurement still holds when the reveal is requested.
@@ -301,9 +313,7 @@ export function AdvancedConfigPanel({
 
           {hasManualConfig ? (
             <Button
-              onPress={() => {
-                setIsSaveOpen(true);
-              }}
+              onPress={openSaveSheet}
               disabled={disabled}
               accessibilityLabel={t('agentChat.newSession.saveAsProfile')}
             >
@@ -323,12 +333,13 @@ export function AdvancedConfigPanel({
         </View>
       ) : null}
 
-      {isSaveOpen ? (
+      {saveSheetInstance !== null ? (
         <SaveProfileSheet
+          key={saveSheetInstance}
           envVars={manualVars}
           setupCommands={setupCommands}
           onClose={() => {
-            setIsSaveOpen(false);
+            closeSaveSheet(saveSheetInstance);
           }}
           onSave={handleSaveProfile}
         />

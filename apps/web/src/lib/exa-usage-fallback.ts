@@ -4,8 +4,12 @@ import type { ExaUsageRecord } from '@kilocode/usage-contracts';
 import { EXA_USAGE_QUEUE_FALLBACK_ENABLED } from '@kilocode/web-shared/lib/config.server';
 import {
   enqueueExaUsage,
-  type UsageEnqueueOutcome,
+  isExaUsagePublicationConfigured,
 } from '@kilocode/web-shared/lib/ai-gateway/usage-publisher';
+import {
+  unexpectedRejection,
+  type PublicationOutcome,
+} from '@kilocode/web-shared/lib/ai-gateway/usage-publication-outcome';
 
 export type ExaUsageFallbackOutcome =
   | { fallback: 'disabled' | 'not_configured' | 'queued' }
@@ -16,20 +20,12 @@ export type ExaUsageFallbackOutcome =
       fallback_error_name: string;
     };
 
-type PublicationOutcome =
-  | UsageEnqueueOutcome
-  | { kind: 'unavailable'; reason: 'unexpected_rejection'; errorName: string };
-
 /**
- * The publisher reports every transport failure as an outcome, so a rejection is unexpected; only
- * the error's name is kept, because its message can carry the ingress URL.
+ * Whether a failed direct write can still reach durable storage through the queue. Callers use
+ * this to reserve invocation time only for a publication that can actually happen.
  */
-function unexpectedRejection(error: unknown): PublicationOutcome {
-  return {
-    kind: 'unavailable',
-    reason: 'unexpected_rejection',
-    errorName: error instanceof Error ? error.name : typeof error,
-  };
+export function isExaUsageQueueFallbackAvailable(): boolean {
+  return EXA_USAGE_QUEUE_FALLBACK_ENABLED && isExaUsagePublicationConfigured();
 }
 
 /**

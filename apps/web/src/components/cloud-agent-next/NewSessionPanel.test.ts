@@ -18,6 +18,12 @@ const mockQueryClient = {
 };
 const mockCreateLocalSession = jest.fn((_draft: unknown) => 'local-session-1');
 const mockReleaseMutate = jest.fn(async (_input: unknown) => undefined);
+let mockEligibility: { isEligible: boolean; accessLevel: 'full' | 'limited'; balance: number } = {
+  isEligible: true,
+  accessLevel: 'full',
+  balance: 0,
+};
+let mockProfile: unknown;
 let mockEnvironmentListFailed = true;
 let mockUploadUrlRequest:
   | { messageUuid: string; attachmentId: string; contentLength: number }
@@ -62,6 +68,7 @@ const mockRepository = {
 };
 let mockRepositories = [mockRepository];
 let mockEnvironments: EnvironmentSummary[] = [];
+let mockBillingMode: 'shadow' | 'paid' | undefined;
 
 function mockQueryResult(options: { __testKind?: string }) {
   const kind = options.__testKind ?? '';
@@ -77,7 +84,7 @@ function mockQueryResult(options: { __testKind?: string }) {
     refetch: jest.fn(async () => ({ data: undefined })),
   };
   if (kind.endsWith('checkEligibility')) {
-    return { ...base, data: { isEligible: true, accessLevel: 'full', balance: 0 } };
+    return { ...base, data: mockEligibility };
   }
   if (kind.endsWith('listGitHubRepositories')) {
     return { ...base, data: { repositories: mockRepositories, integrationInstalled: true } };
@@ -93,6 +100,27 @@ function mockQueryResult(options: { __testKind?: string }) {
   }
   if (kind.endsWith('recentRepositories')) {
     return { ...base, data: { repositories: [] } };
+  }
+  if (kind === 'cloudAgentNext.getSandboxSelectionOptions') {
+    return {
+      ...base,
+      data: {
+        enabled: false,
+        defaultDestination: {
+          provider: { id: 'cloudflare-containers', account: 'kilo' },
+          instanceType: 'standard-3',
+        },
+        options: [],
+      },
+    };
+  }
+  if (kind === 'computeBilling.rates') {
+    return { ...base, data: [{ instance: 'standard-3', hourlyUsd: 0.18, available: true }] };
+  }
+  if (kind === 'computeBilling.personalBillingMode') {
+    return mockBillingMode
+      ? { ...base, data: { billingMode: mockBillingMode } }
+      : { ...base, isError: true };
   }
   if (kind === 'cloudEnvironments.list') {
     return {
@@ -159,7 +187,7 @@ jest.mock('./local-sessions/LocalSessionsProvider', () => ({
 jest.mock('@/hooks/useCloudAgentProfiles', () => ({
   useProfiles: () => ({ data: [] }),
   useCombinedProfiles: () => ({ data: undefined }),
-  useProfile: () => ({ data: undefined }),
+  useProfile: () => ({ data: mockProfile }),
   useRepoBindings: () => ({ data: [] }),
 }));
 
@@ -171,20 +199,42 @@ jest.mock('@/app/api/organizations/hooks', () => ({
   useOrganizationDefaults: () => ({ data: undefined }),
 }));
 
+const mockDefaultModelCatalog = {
+  data: [
+    {
+      id: 'model-1',
+      name: 'Model One',
+      isFree: true,
+      mayTrainOnYourPrompts: false,
+      hasUserByokAvailable: false,
+      opencode: { variants: {} },
+    },
+    {
+      id: 'model-2',
+      name: 'Model Two',
+      isFree: false,
+      mayTrainOnYourPrompts: false,
+      hasUserByokAvailable: false,
+      opencode: { variants: {} },
+    },
+    {
+      id: 'model-3',
+      name: 'Model Three',
+      isFree: true,
+      mayTrainOnYourPrompts: false,
+      hasUserByokAvailable: false,
+      opencode: { variants: {} },
+    },
+  ],
+};
+let mockModelCatalog: { data: unknown[] } | undefined = mockDefaultModelCatalog;
+let mockModelCatalogError: Error | null = null;
+
 jest.mock('@/lib/hooks/use-openrouter-models', () => ({
   useModelSelectorList: () => ({
-    data: {
-      data: [
-        {
-          id: 'model-1',
-          name: 'Model One',
-          isFree: true,
-          mayTrainOnYourPrompts: false,
-          hasUserByokAvailable: false,
-          opencode: { variants: {} },
-        },
-      ],
-    },
+    data: mockModelCatalog,
+    isLoading: false,
+    error: mockModelCatalogError,
   }),
 }));
 
@@ -206,7 +256,24 @@ jest.mock('@kilocode/cloud-agent-sdk/message-id', () => ({
 
 jest.mock('@/components/SetPageTitle', () => ({ SetPageTitle: () => null }));
 jest.mock('./CloudAgentModeCombobox', () => ({
-  CloudAgentModeCombobox: () => null,
+  CloudAgentModeCombobox: ({
+    onValueChange,
+    customOptions,
+  }: {
+    onValueChange: (value: string) => void;
+    customOptions?: { value: string; label: string }[];
+  }) =>
+    createElement(
+      'div',
+      null,
+      (customOptions ?? []).map(option =>
+        createElement(
+          'button',
+          { key: option.value, onClick: () => onValueChange(option.value) },
+          option.label
+        )
+      )
+    ),
 }));
 jest.mock('@/components/shared/ModelCombobox', () => ({ ModelCombobox: () => null }));
 jest.mock('@/components/shared/VariantCombobox', () => ({ VariantCombobox: () => null }));
@@ -511,8 +578,9 @@ describe.each(scenarios)('$label NewSessionPanel attachment handoff', scenario =
 });
 
 describe.each(scenarios)('$label NewSessionPanel context layout', scenario => {
-  it('keeps responsive context controls without composer pricing or pricing queries', async () => {
+  it('keeps responsive context controls', async () => {
     jest.clearAllMocks();
+    mockBillingMode = undefined;
     mockRepositories = [mockRepository];
     mockEnvironments = [];
     mockEnvironmentListFailed = false;
@@ -539,14 +607,71 @@ describe.each(scenarios)('$label NewSessionPanel context layout', scenario => {
       expect(contextRow?.className).not.toContain('flex-wrap');
       expect(context?.children).toHaveLength(1);
       expect(context?.textContent).not.toContain('Compute');
-      expect(mockQueryOptions).not.toHaveBeenCalledWith(
-        expect.objectContaining({
-          __testKind: expect.stringMatching(/getSandboxSelectionOptions$|^computeBilling\.rates$/),
-        })
-      );
     } finally {
       act(() => root.unmount());
       dom.cleanup();
+    }
+  });
+});
+
+describe('NewSessionPanel compute price', () => {
+  async function renderContext(organizationId?: string) {
+    jest.clearAllMocks();
+    mockRepositories = [mockRepository];
+    mockEnvironments = [];
+    mockEnvironmentListFailed = false;
+    const dom = installLinkedomDom();
+    const root = createRoot(dom.container);
+    act(() => root.render(createElement(NewSessionPanel, { organizationId })));
+    await waitForStartButton(dom.container);
+    const context = dom.container.querySelector('[class*="@container/context"]');
+    return {
+      context,
+      cleanup: () => {
+        act(() => root.unmount());
+        dom.cleanup();
+      },
+    };
+  }
+
+  it.each([
+    ['shadow', 'Upcoming compute price: ~$0.18/hr · 2 vCPU / 8 GiB'],
+    ['paid', 'Compute price: ~$0.18/hr · 2 vCPU / 8 GiB'],
+  ] as const)('shows the personal %s-mode price with the container specs', async (mode, text) => {
+    mockBillingMode = mode;
+    const { context, cleanup } = await renderContext();
+    try {
+      expect(context?.lastElementChild?.textContent).toBe(text);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('hides the price when the billing check fails', async () => {
+    mockBillingMode = undefined;
+    const { context, cleanup } = await renderContext();
+    try {
+      expect(context?.children).toHaveLength(1);
+      expect(context?.textContent).not.toContain('Compute');
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('shows no price and runs no pricing queries for organizations', async () => {
+    mockBillingMode = 'shadow';
+    const { context, cleanup } = await renderContext('org-123');
+    try {
+      expect(context?.textContent).not.toContain('Compute');
+      expect(mockQueryOptions).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          __testKind: expect.stringMatching(
+            /getSandboxSelectionOptions$|^computeBilling\.(rates|personalBillingMode)$/
+          ),
+        })
+      );
+    } finally {
+      cleanup();
     }
   });
 });
@@ -642,4 +767,218 @@ describe.each([
       expect(mockRouterPush).toHaveBeenCalledTimes(1);
     });
   }
+});
+
+describe('NewSessionPanel submitted model gating', () => {
+  const agentCases = [
+    {
+      label: 'requires more credits for the pinned model',
+      model: 'model-2',
+      blocked: true,
+    },
+    {
+      // The default seeding picks model-1, the first free entry, so pinning a
+      // different free model shows that the agent's model decides the gate.
+      label: 'accepts the pinned model within the composer rules',
+      model: 'model-3',
+      blocked: false,
+    },
+  ] as const;
+
+  it.each(agentCases)('$label', async ({ model, blocked }) => {
+    jest.clearAllMocks();
+    mockEligibility = { isEligible: false, accessLevel: 'limited', balance: 0 };
+    mockProfile = {
+      agents: [
+        {
+          slug: 'pinned-agent',
+          name: 'Pinned Agent',
+          config: { description: 'test agent', mode: 'primary', model },
+        },
+      ],
+    };
+    mockEnvironmentListFailed = false;
+    mockRepositories = [mockRepository];
+    mockEnvironments = [];
+    const dom = installLinkedomDom();
+    const root = createRoot(dom.container);
+    let mounted = true;
+
+    try {
+      act(() => {
+        root.render(createElement(NewSessionPanel));
+      });
+      await waitForStartButton(dom.container);
+
+      const agentButton = Array.from(dom.container.querySelectorAll('button')).find(
+        button => button.textContent === 'Pinned Agent'
+      );
+      if (!agentButton) throw new Error('Pinned agent button missing');
+      act(() => {
+        agentButton.click();
+      });
+
+      let gatingButton: HTMLButtonElement | null = null;
+      for (let attempt = 0; attempt < 80; attempt += 1) {
+        await act(async () => {
+          await new Promise(resolve => setTimeout(resolve, 0));
+        });
+        gatingButton = dom.container.querySelector<HTMLButtonElement>(
+          'button[aria-label="Start session"]'
+        );
+        if (gatingButton && gatingButton.hasAttribute('disabled') === blocked) break;
+      }
+      if (!gatingButton) throw new Error('Start session button missing after agent selection');
+      expect(gatingButton.hasAttribute('disabled')).toBe(blocked);
+      if (blocked) {
+        expect(dom.container.textContent).toContain('uses a model that needs credits');
+      } else {
+        expect(dom.container.textContent).not.toContain('uses a model that needs credits');
+      }
+
+      act(() => gatingButton.click());
+      if (blocked) {
+        expect(mockCreateLocalSession).not.toHaveBeenCalled();
+        expect(mockRouterPush).not.toHaveBeenCalled();
+      } else {
+        expect(mockCreateLocalSession).toHaveBeenCalledTimes(1);
+        expect(mockRouterPush).toHaveBeenCalledTimes(1);
+        expect(mockRouterPush).toHaveBeenCalledWith('/cloud/chat?sessionId=local-session-1');
+      }
+
+      act(() => root.unmount());
+      mounted = false;
+    } finally {
+      if (mounted) act(() => root.unmount());
+      dom.cleanup();
+      mockEligibility = { isEligible: true, accessLevel: 'full', balance: 0 };
+      mockProfile = undefined;
+    }
+  });
+
+  const pinnedAgentProfile = {
+    agents: [
+      {
+        slug: 'pinned-agent',
+        name: 'Pinned Agent',
+        config: { description: 'test agent', mode: 'primary', model: 'model-3' },
+      },
+    ],
+  };
+
+  function renderLimitedPanel({ withAgent = true }: { withAgent?: boolean } = {}) {
+    mockEligibility = { isEligible: false, accessLevel: 'limited', balance: 0 };
+    mockProfile = withAgent ? pinnedAgentProfile : undefined;
+    mockEnvironmentListFailed = false;
+    mockRepositories = [mockRepository];
+    mockEnvironments = [];
+    const dom = installLinkedomDom();
+    const root = createRoot(dom.container);
+    act(() => {
+      root.render(createElement(NewSessionPanel));
+    });
+    return { dom, root };
+  }
+
+  async function settle() {
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+  }
+
+  async function selectPinnedAgent(container: HTMLElement) {
+    const agentButton = Array.from(container.querySelectorAll('button')).find(
+      button => button.textContent === 'Pinned Agent'
+    );
+    if (!agentButton) throw new Error('Pinned agent button missing');
+    act(() => {
+      agentButton.click();
+    });
+    await settle();
+  }
+
+  afterEach(() => {
+    mockModelCatalog = mockDefaultModelCatalog;
+    mockModelCatalogError = null;
+  });
+
+  it('shows a credit note only once the model catalog has loaded', async () => {
+    jest.clearAllMocks();
+    mockModelCatalog = undefined;
+    const { dom, root } = renderLimitedPanel();
+
+    try {
+      await settle();
+      expect(dom.container.textContent).not.toContain('needs credits');
+      expect(
+        dom.container
+          .querySelector<HTMLButtonElement>('button[aria-label="Start session"]')
+          ?.hasAttribute('disabled')
+      ).toBe(true);
+
+      await selectPinnedAgent(dom.container);
+      expect(dom.container.textContent).not.toContain('needs credits');
+      expect(dom.container.textContent).not.toContain('model list did not load');
+      expect(
+        dom.container
+          .querySelector<HTMLButtonElement>('button[aria-label="Start session"]')
+          ?.hasAttribute('disabled')
+      ).toBe(true);
+
+      // Once the catalog arrives, the free pin keeps start available with no note.
+      mockModelCatalog = mockDefaultModelCatalog;
+      act(() => {
+        root.render(createElement(NewSessionPanel));
+      });
+      await waitForStartButton(dom.container);
+      expect(dom.container.textContent).not.toContain('needs credits');
+      expect(dom.container.textContent).not.toContain('model list did not load');
+      expect(
+        dom.container
+          .querySelector<HTMLButtonElement>('button[aria-label="Start session"]')
+          ?.hasAttribute('disabled')
+      ).toBe(false);
+    } finally {
+      act(() => root.unmount());
+      dom.cleanup();
+      mockEligibility = { isEligible: true, accessLevel: 'full', balance: 0 };
+      mockProfile = undefined;
+    }
+  });
+
+  it('explains that the model list did not load', async () => {
+    jest.clearAllMocks();
+    mockModelCatalog = undefined;
+    mockModelCatalogError = new Error('catalog');
+    const { dom, root } = renderLimitedPanel({ withAgent: false });
+
+    try {
+      await settle();
+      expect(dom.container.textContent).toContain('model list did not load');
+      expect(dom.container.textContent).not.toContain('needs credits');
+      expect(
+        dom.container
+          .querySelector<HTMLButtonElement>('button[aria-label="Start session"]')
+          ?.hasAttribute('disabled')
+      ).toBe(true);
+
+      mockProfile = pinnedAgentProfile;
+      act(() => {
+        root.render(createElement(NewSessionPanel));
+      });
+      await selectPinnedAgent(dom.container);
+      expect(dom.container.textContent).toContain('model list did not load');
+      expect(dom.container.textContent).not.toContain('needs credits');
+      expect(
+        dom.container
+          .querySelector<HTMLButtonElement>('button[aria-label="Start session"]')
+          ?.hasAttribute('disabled')
+      ).toBe(true);
+    } finally {
+      act(() => root.unmount());
+      dom.cleanup();
+      mockEligibility = { isEligible: true, accessLevel: 'full', balance: 0 };
+      mockProfile = undefined;
+    }
+  });
 });

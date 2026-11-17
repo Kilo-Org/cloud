@@ -136,7 +136,9 @@ function KiloPassDetailBody({
     <KiloPassFrame>
       <DetailScreenScrollView contentContainerClassName="grow gap-5 px-5 pb-8">
         <View className="gap-1">
-          <Text className="text-base font-semibold text-foreground">{detail.planLabel}</Text>
+          <Text variant="large" className="text-foreground">
+            {detail.planLabel}
+          </Text>
           <Text
             className={cn(
               'text-sm',
@@ -181,6 +183,45 @@ function KiloPassMessageBody({ message }: { message: string }) {
   );
 }
 
+/**
+ * A lapsed pass keeps the receipts: the plan it was, the day it stopped, and
+ * both ledgers the account already paid for. It offers no action, because the
+ * app sells nothing here and the pass can no longer change.
+ */
+function KiloPassEndedBody({
+  subscription,
+  detail,
+  creditHistory,
+  billingHistory,
+}: Readonly<{
+  subscription: KiloPassSubscriptionState;
+  detail: Extract<KiloPassDetail, { kind: 'ended' }>;
+  creditHistory: KiloPassCreditHistory;
+  billingHistory: KiloPassBillingHistory;
+}>) {
+  return (
+    <KiloPassFrame>
+      <DetailScreenScrollView contentContainerClassName="grow gap-5 px-5 pb-8">
+        <View className="gap-1">
+          <Text variant="large" className="text-foreground">
+            {detail.planLabel}
+          </Text>
+          <Text className="text-sm text-muted-foreground">{detail.endedLabel}</Text>
+        </View>
+        {/* A section break larger than the gaps inside a section, so the plan
+            summary and the ledgers do not read as one block. */}
+        <View className="mt-2">
+          <KiloPassCreditHistorySection history={creditHistory} />
+        </View>
+        {/* A store-sold pass has no Stripe invoices, and the read rejects one. */}
+        {!isStoreManagedPass(subscription) && (
+          <KiloPassBillingHistorySection history={billingHistory} />
+        )}
+      </DetailScreenScrollView>
+    </KiloPassFrame>
+  );
+}
+
 export function KiloPassSubscriptionScreen() {
   const trpc = useTRPC();
   const stateQuery = useQuery(trpc.kiloPass.getState.queryOptions());
@@ -193,27 +234,29 @@ export function KiloPassSubscriptionScreen() {
   const { t } = useTranslation();
 
   // The pass state introduces three more reads, and each one adds or removes
-  // height below the state rows. Hold the page until all three answer so its
-  // first frame is its last: a ledger or a scheduled plan change that landed
-  // afterwards would push the blocks under it.
-  const isDetail = detail.kind === 'active' && subscription != null;
+  // height below the state rows. Hold the page until every read the state shows
+  // has answered: a ledger or a scheduled plan change that landed afterwards
+  // would push the blocks under it. An ended page waits on its own ledgers the
+  // same way, so its last row does not move once it prints.
+  const hasDetail = (detail.kind === 'active' || detail.kind === 'ended') && subscription != null;
+  const activeDetail = detail.kind === 'active' && subscription != null;
   const storeManaged = subscription != null && isStoreManagedPass(subscription);
-  const creditHistory = useKiloPassCreditHistory(isDetail);
-  const billingHistory = useKiloPassBillingHistory(isDetail && !storeManaged);
+  const creditHistory = useKiloPassCreditHistory(hasDetail);
+  const billingHistory = useKiloPassBillingHistory(hasDetail && !storeManaged);
   // The page waits on this read before it prints, so it must settle even while
   // the online manager reports offline: a paused query never errors and never
   // answers, and the screen would hold its loading state with no retry.
   const scheduledChangeQuery = useQuery({
     ...trpc.kiloPass.getScheduledChange.queryOptions(),
-    enabled: isDetail && !storeManaged,
+    enabled: activeDetail && !storeManaged,
     ...SETTLE_WHILE_OFFLINE,
   });
   // A store-managed pass has neither a Stripe schedule nor invoices, so those
   // two stay disabled and their pending status says nothing.
   const blocksPending =
-    isDetail &&
-    (creditHistory.query.isPending ||
-      (!storeManaged && (billingHistory.query.isPending || scheduledChangeQuery.isPending)));
+    (hasDetail &&
+      (creditHistory.query.isPending || (!storeManaged && billingHistory.query.isPending))) ||
+    (activeDetail && !storeManaged && scheduledChangeQuery.isPending);
 
   if (detail.kind === 'loading' || blocksPending) {
     return <KiloPassLoadingScreen />;
@@ -230,13 +273,21 @@ export function KiloPassSubscriptionScreen() {
   if (detail.kind === 'none') {
     return <KiloPassMessageBody message={t('kiloPass.notAvailableInApp')} />;
   }
-  if (detail.kind === 'ended') {
-    return <KiloPassMessageBody message={t('kiloPass.purchaseUnavailableEnded')} />;
-  }
   if (subscription == null) {
-    // An active detail is derived from a subscription, so this only narrows the
-    // type; the message keeps the screen total rather than throwing on it.
+    // A detail — active or ended — is derived from a subscription, so this only
+    // narrows the type; the message keeps the screen total rather than throwing
+    // on it.
     return <KiloPassMessageBody message={t('kiloPass.notAvailableInApp')} />;
+  }
+  if (detail.kind === 'ended') {
+    return (
+      <KiloPassEndedBody
+        subscription={subscription}
+        detail={detail}
+        creditHistory={creditHistory}
+        billingHistory={billingHistory}
+      />
+    );
   }
   return (
     <KiloPassDetailBody

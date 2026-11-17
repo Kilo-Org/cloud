@@ -234,6 +234,7 @@ export function validateTarget(config, manifest) {
     { name: 'SESSION_SYNC_TENANT_DO', class_name: 'SessionSyncTenantDO' },
     { name: 'SESSION_RELAY_DO', class_name: 'SessionRelayDO' },
     { name: 'SESSION_PRESENCE_DO', class_name: 'SessionPresenceDO' },
+    { name: 'SESSION_NOTIFICATIONS_DO', class_name: 'SessionNotificationsDO' },
   ]);
   assert(/^[a-f0-9]{32}$/.test(manifest.secretsStoreID));
   assert.equal(rendered.secrets_store_secrets.length, 3);
@@ -269,12 +270,12 @@ export function validateTarget(config, manifest) {
     inventory.checkedAt <= manifest.resourceCreatedAt &&
       manifest.resourceCreatedAt - inventory.checkedAt <= 900000
   );
-  assert.equal(manifest.namespaces.length, 4);
+  assert.equal(manifest.namespaces.length, 5);
   assert.deepEqual(
     manifest.namespaces.map(row => row.id).sort(),
     [...manifest.namespaceIDs].sort()
   );
-  assert.equal(new Set(manifest.namespaceIDs).size, 4);
+  assert.equal(new Set(manifest.namespaceIDs).size, 5);
   assert.deepEqual(
     manifest.namespaces.map(row => row.binding).sort(),
     rendered.durable_objects.bindings.map(row => row.name).sort()

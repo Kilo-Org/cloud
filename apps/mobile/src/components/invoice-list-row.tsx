@@ -8,7 +8,8 @@ import { Text } from '@/components/ui/text';
 import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
-import { formatDate, formatMoneyFromCents } from '@/lib/format';
+import { isolateLtrBidiText } from '@/lib/bidi';
+import { formatDate, formatPrefixedMoney } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   getInvoiceDownloadErrorMessage,
@@ -97,7 +98,7 @@ function InvoiceRowContent({
             {title}
           </Text>
           <Text className="text-sm font-medium text-foreground">
-            {formatMoneyFromCents(invoice.amount_due, i18n.language)}
+            {isolateLtrBidiText(formatPrefixedMoney(invoice.amount_due / 100, i18n.language))}
           </Text>
         </View>
         <View className="flex-row items-center justify-between">

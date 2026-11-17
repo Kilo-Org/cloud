@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import * as z from 'zod';
 
 import { callerAddressFromHeaders } from '@/lib/auth/caller-address';
-import { checkFirewallRateLimit } from '@/lib/auth/firewall-rate-limit';
+import { checkFirewallRateLimit, firewallRateLimitRefusal } from '@/lib/auth/firewall-rate-limit';
 import {
   createAuthenticationOptions,
   verifyAuthentication,
@@ -58,12 +58,8 @@ export async function POST(request: NextRequest) {
         request,
         rateLimitKey: `passkey-options:${callerAddressFromHeaders(request.headers)}`,
       });
-      if (limit === 'limited') {
-        return NextResponse.json({ error: 'RATE_LIMITED' }, { status: 429 });
-      }
-      if (limit === 'unavailable') {
-        return NextResponse.json({ error: 'RATE_LIMIT_UNAVAILABLE' }, { status: 503 });
-      }
+      const refusal = firewallRateLimitRefusal(limit);
+      if (refusal) return refusal;
 
       const { challengeId, options } = await createAuthenticationOptions();
       return NextResponse.json({ challengeId, options });
@@ -74,12 +70,8 @@ export async function POST(request: NextRequest) {
       request,
       rateLimitKey: `passkey-verify:${callerAddressFromHeaders(request.headers)}`,
     });
-    if (limit === 'limited') {
-      return NextResponse.json({ error: 'RATE_LIMITED' }, { status: 429 });
-    }
-    if (limit === 'unavailable') {
-      return NextResponse.json({ error: 'RATE_LIMIT_UNAVAILABLE' }, { status: 503 });
-    }
+    const refusal = firewallRateLimitRefusal(limit);
+    if (refusal) return refusal;
 
     const { ticket } = await verifyAuthentication(parsed.data.challengeId, parsed.data.response);
     return NextResponse.json({ ticket });

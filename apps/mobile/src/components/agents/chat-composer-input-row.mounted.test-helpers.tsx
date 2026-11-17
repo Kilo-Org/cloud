@@ -47,6 +47,8 @@ export function makeProps(overrides: Partial<RenderProps> = {}) {
     onSubmit: () => undefined,
     onToggleVoice: () => undefined,
     paperclipDisabled: false,
+    // `check:i18n` lints this tree with .oxlintrc.i18n.json, whose test-location
+    // list is narrower, so this rule still applies to this file there.
     // oxlint-disable-next-line no-literal-copy/no-literal-copy -- the placeholder is fixture input for the row; no test reads it
     placeholder: 'Message the agent',
     returnSendsMessage: false,

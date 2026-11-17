@@ -1,4 +1,10 @@
+import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { type Tool } from '@kilocode/harness-sdk';
+
+import { REMOTE_MCP_SERVERS_KEY, SETTINGS_TOOLS_ENABLED_KEY } from '@/lib/storage-keys';
+
 import {
   addChatBackend,
   clearChatBackends,
@@ -11,12 +17,16 @@ import {
  *
  * The places remembered for a chat scope are cached so the same account and
  * organization answer with the same object — a fresh one each render would
- * re-run the open effect. The Kilo MCP connection is cached for the same
- * reason and carries the same secret: tools discovered with one account's
- * token. The remote MCP connection and the servers stored behind it carry that
- * secret too, and the settings-tools group switch is account-scoped. All of
- * them are dropped with the chats rather than kept for the next person to sign
- * in.
+ * re-run the open effect. The remote MCP connection and the servers stored
+ * behind it carry a secret, the settings-tools group switch is account-scoped,
+ * and the per-chat web-search choice belongs to a chat that is going away. All
+ * of them are dropped with the chats rather than kept for the next person to
+ * sign in.
+ *
+ * The Kilo MCP connection is dropped here too, and so are the per-chat
+ * settings of the chats being deleted. What this file proves about them is the
+ * boundary, not the discovery: the connection is really opened, then really
+ * read back gone (`kilo-mcp.test.ts` owns the discovery itself).
  */
 
 vi.mock('./registry', () => ({
@@ -27,41 +37,81 @@ vi.mock('./store', () => ({
   wipeChats: vi.fn(() => ['gone']),
 }));
 
-vi.mock('./kilo-mcp', () => ({
-  forgetKiloMcp: vi.fn(),
-  forgetMcpEnabled: vi.fn().mockResolvedValue(undefined),
+// The Kilo MCP module runs for real. What a boundary has to drop is the cache
+// and the stored setting themselves, so the fakes below are its dependencies,
+// the way `kilo-mcp.test.ts` fakes them, and the encrypted-kv mock underneath
+// is the store both modules write through.
+const kiloMcpConfig = vi.hoisted(() => ({
+  KILO_MCP_URL: 'https://mcp.example' as string | undefined,
+}));
+vi.mock('@/lib/config', () => kiloMcpConfig);
+// The signed-in session's own token: the one credential a discovery sends.
+vi.mock('@/lib/auth/token-owner', () => ({
+  getAuthTokenForRequest: () => Promise.resolve('token-one'),
+}));
+// One epoch for the whole file: nothing here bumps it, and the secure-store
+// preference a boundary clears writes through `isCurrentAuthEpoch`.
+vi.mock('@/lib/auth/auth-epoch', () => ({
+  currentAuthEpoch: () => 0,
+  isCurrentAuthEpoch: (epoch: number) => epoch === 0,
 }));
 
-const storedQuestions = vi.hoisted(() => new Map<string, string>());
+/**
+ * The plugin, answering with one tool so the connection has something to
+ * cache. None of the transport is under test here; what the boundary drops is.
+ */
+vi.mock('@kilocode/harness-sdk/plugins/remote-mcp', () => ({
+  RemoteMcpError: class FakeRemoteMcpError extends Error {
+    readonly kind: string;
+    constructor(fields: {
+      readonly serverId: string;
+      readonly kind: string;
+      readonly cause: unknown;
+    }) {
+      super(`${fields.serverId}: ${fields.kind}`);
+      this.name = 'RemoteMcpError';
+      this.kind = fields.kind;
+    }
+  },
+  remoteMcpTools: () => Effect.succeed([tool]),
+}));
+
+// One in-test disk behind the encrypted-kv boundary. The per-chat preferences
+// a boundary module writes land here, so a test waits on the stored value
+// instead of on a number of event-loop turns. Each mock returns a settled
+// promise, because an `async` arrow with nothing to await fails the linter.
+const encryptedKv = vi.hoisted(() => new Map<string, string>());
 vi.mock('@/lib/persist/encrypted-kv', () => ({
-  encryptedDatabase: async () => {
-    await Promise.resolve();
-    return {};
+  encryptedDatabase: () => Promise.resolve({}),
+  getItem: (scope: string, key: string) =>
+    Promise.resolve(encryptedKv.get(`${scope}:${key}`) ?? null),
+  setItem: (scope: string, key: string, value: string) => {
+    encryptedKv.set(`${scope}:${key}`, value);
+    return Promise.resolve();
   },
-  getItem: async (scope: string, key: string) => {
-    await Promise.resolve();
-    return storedQuestions.get(`${scope}:${key}`) ?? null;
-  },
-  setItem: async (scope: string, key: string, value: string) => {
-    await Promise.resolve();
-    storedQuestions.set(`${scope}:${key}`, value);
-  },
-  removeItem: async (scope: string, key: string) => {
-    await Promise.resolve();
-    storedQuestions.delete(`${scope}:${key}`);
+  removeItem: (scope: string, key: string) => {
+    encryptedKv.delete(`${scope}:${key}`);
+    return Promise.resolve();
   },
 }));
 
 // The remote MCP store and the settings-tools switch ride on the shared
 // SecureStore preference, which pulls sonner-native -> react-native (Flow
-// `import typeof`) into the node test environment. Mock the native boundaries
-// so the real stores under test can be seeded, read and cleared.
-const secureStore = vi.hoisted(() => ({
-  getItemAsync: vi.fn().mockResolvedValue(null),
-  setItemAsync: vi.fn().mockResolvedValue(undefined),
-  deleteItemAsync: vi.fn().mockResolvedValue(undefined),
+// `import typeof`) into the node test environment. Mock the native boundary
+// with an in-test disk: the real stores under test can be seeded, read and
+// cleared, and a test can wait until a write has landed.
+const secureStore = vi.hoisted(() => ({ disk: new Map<string, string>() }));
+vi.mock('expo-secure-store', () => ({
+  getItemAsync: (key: string) => Promise.resolve(secureStore.disk.get(key) ?? null),
+  setItemAsync: (key: string, value: string) => {
+    secureStore.disk.set(key, value);
+    return Promise.resolve();
+  },
+  deleteItemAsync: (key: string) => {
+    secureStore.disk.delete(key);
+    return Promise.resolve();
+  },
 }));
-vi.mock('expo-secure-store', () => secureStore);
 
 vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
 
@@ -72,14 +122,29 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
 }));
 
 const { chatPlaceOf, forgetChatPlaces } = await import('./scope');
-const { forgetKiloMcp, forgetMcpEnabled } = await import('./kilo-mcp');
-const { addRemoteMcpServer, clearRemoteMcpServers, listRemoteMcpServers } =
+const { addRemoteMcpServer, clearRemoteMcpServers, listRemoteMcpServers, parseRemoteMcpServers } =
   await import('./remote-mcp-store');
 const { remoteMcpState } = await import('./remote-mcp');
 const { clearSettingsToolsEnabled, isSettingsToolsEnabled, setSettingsToolsEnabled } =
   await import('./settings-tools-switch');
+const { ensureKiloMcp, forgetKiloMcp, kiloMcpState, kiloMcpTools, mcpEnabledFor, setMcpEnabled } =
+  await import('./kilo-mcp');
 const { clearChatsForSignOut, releaseChatsForAccountSwitch } = await import('./sign-out');
 const { askedIn, rememberAsked } = await import('./pending');
+const { setWebSearchEnabled, webSearchEnabledFor } = await import('./web-search-setting');
+
+/** The one tool the fake Kilo server offers, named the way the harness names it. */
+const tool: Tool = {
+  definition: {
+    name: 'mcp_kilo_read-file',
+    description: 'Reads one file.',
+    parameters: { type: 'object', properties: {} },
+  },
+  run: () => Effect.succeed(''),
+};
+
+/** The place the Kilo connection is discovered for. */
+const place = { chatScope: 'user-1:personal', org: { kind: 'personal' } } as const;
 
 /** A remote server the account added, so the clears have something to drop. */
 function addServer(): void {
@@ -91,19 +156,32 @@ function addServer(): void {
   });
 }
 
-// A preference becomes visible (and refreshes the snapshots built from it) once
-// its write lands, so the tests let the queued write settle before asserting.
-async function settlePreferences(): Promise<void> {
-  await new Promise<void>(resolve => {
-    setImmediate(resolve);
+/**
+ * Seeds the two secured preferences the boundary drops, and waits until both
+ * writes are on the fake disk and both stores have published them: a clear can
+ * only be shown to erase a value that landed first.
+ */
+async function seedSecuredPreferences(): Promise<void> {
+  addServer();
+  setSettingsToolsEnabled(false);
+  await vi.waitFor(() => {
+    expect(
+      parseRemoteMcpServers(secureStore.disk.get(REMOTE_MCP_SERVERS_KEY) ?? null)
+    ).toHaveLength(1);
+    expect(secureStore.disk.get(SETTINGS_TOOLS_ENABLED_KEY)).toBe('false');
+    // A store publishes one microtask after its write lands.
+    expect(listRemoteMcpServers()).toHaveLength(1);
+    expect(remoteMcpState()).toHaveLength(1);
   });
 }
 
 beforeEach(() => {
+  // A cache and a snapshot outlive a test file otherwise: the connection is a
+  // module-level singleton, the way the app holds it.
+  forgetKiloMcp();
   forgetChatPlaces();
-  storedQuestions.clear();
-  vi.mocked(forgetKiloMcp).mockClear();
-  vi.mocked(forgetMcpEnabled).mockClear();
+  encryptedKv.clear();
+  secureStore.disk.clear();
   clearRemoteMcpServers();
   clearSettingsToolsEnabled();
   clearChatBackends();
@@ -125,26 +203,6 @@ describe('the places remembered for a chat scope', () => {
     await releaseChatsForAccountSwitch();
 
     expect(chatPlaceOf('user-1', 'org-1')).not.toBe(before);
-  });
-});
-
-describe('the Kilo MCP connection', () => {
-  it('is dropped when the account signs out', async () => {
-    await clearChatsForSignOut('user-1');
-
-    expect(forgetKiloMcp).toHaveBeenCalledTimes(1);
-  });
-
-  it('is dropped when another account signs in', async () => {
-    await releaseChatsForAccountSwitch();
-
-    expect(forgetKiloMcp).toHaveBeenCalledTimes(1);
-  });
-
-  it('takes the per-chat settings of the wiped chats with it', async () => {
-    await clearChatsForSignOut('user-1');
-
-    expect(forgetMcpEnabled).toHaveBeenCalledWith(['gone']);
   });
 });
 
@@ -195,11 +253,70 @@ describe('remembered question targets', () => {
   });
 });
 
+describe('the per-chat web-search choice', () => {
+  it('is dropped with the wiped chats and left on the chats that stay', async () => {
+    await setWebSearchEnabled('gone', false);
+    await setWebSearchEnabled('kept', false);
+    // Off differs from the default of a Kilo model, so a setting that did not
+    // land cannot read as off here.
+    expect(await webSearchEnabledFor('gone', 'kilo/one')).toBe(false);
+    expect(await webSearchEnabledFor('kept', 'kilo/one')).toBe(false);
+
+    await clearChatsForSignOut('user-1');
+
+    // The wiped chat reads the default of the model its next question goes to,
+    // which a stored choice of off cannot produce. The chat of another account
+    // keeps the choice it made.
+    expect(await webSearchEnabledFor('gone', 'kilo/one')).toBe(true);
+    expect(await webSearchEnabledFor('kept', 'kilo/one')).toBe(false);
+  });
+});
+
+describe('the Kilo MCP connection', () => {
+  it('is dropped when the account signs out', async () => {
+    await ensureKiloMcp(place);
+    // The tools are cached against the token they were discovered with, so a
+    // connection that landed is what a clear has to take away.
+    expect(kiloMcpTools()).toEqual([tool]);
+    expect(kiloMcpState()).toEqual({ status: 'ready', tools: [tool] });
+
+    await clearChatsForSignOut('user-1');
+
+    expect(kiloMcpState()).toEqual({ status: 'idle' });
+    expect(kiloMcpTools()).toEqual([]);
+  });
+
+  it('is dropped when another account signs in', async () => {
+    await ensureKiloMcp(place);
+    expect(kiloMcpState()).toEqual({ status: 'ready', tools: [tool] });
+
+    await releaseChatsForAccountSwitch();
+
+    expect(kiloMcpState()).toEqual({ status: 'idle' });
+    expect(kiloMcpTools()).toEqual([]);
+  });
+});
+
+describe('the per-chat Kilo MCP setting', () => {
+  it('is dropped with the wiped chats and left on the chats that stay', async () => {
+    await setMcpEnabled('gone', false);
+    await setMcpEnabled('kept', false);
+    // Off differs from the default, so a setting that did not land cannot read
+    // as off here.
+    expect(await mcpEnabledFor('gone')).toBe(false);
+
+    await clearChatsForSignOut('user-1');
+
+    // Absent reads as on, which a stored choice of off cannot produce. The
+    // chat of another account keeps the choice it made.
+    expect(await mcpEnabledFor('gone')).toBe(true);
+    expect(await mcpEnabledFor('kept')).toBe(false);
+  });
+});
+
 describe('the remote MCP connection and its stored servers', () => {
   it('are dropped when the account signs out', async () => {
-    addServer();
-    setSettingsToolsEnabled(false);
-    await settlePreferences();
+    await seedSecuredPreferences();
     expect(listRemoteMcpServers()).toHaveLength(1);
     expect(remoteMcpState()).toHaveLength(1);
     expect(isSettingsToolsEnabled()).toBe(false);
@@ -211,12 +328,15 @@ describe('the remote MCP connection and its stored servers', () => {
     // The group switch is account-scoped: the next account starts from its
     // default rather than inheriting the previous account's choice.
     expect(isSettingsToolsEnabled()).toBe(true);
+    // The erase reaches the disk, not only the snapshots the screens read.
+    await vi.waitFor(() => {
+      expect(secureStore.disk.has(REMOTE_MCP_SERVERS_KEY)).toBe(false);
+      expect(secureStore.disk.has(SETTINGS_TOOLS_ENABLED_KEY)).toBe(false);
+    });
   });
 
   it('are dropped when another account signs in', async () => {
-    addServer();
-    setSettingsToolsEnabled(false);
-    await settlePreferences();
+    await seedSecuredPreferences();
     expect(listRemoteMcpServers()).toHaveLength(1);
     expect(remoteMcpState()).toHaveLength(1);
 
@@ -225,6 +345,10 @@ describe('the remote MCP connection and its stored servers', () => {
     expect(listRemoteMcpServers()).toEqual([]);
     expect(remoteMcpState()).toEqual([]);
     expect(isSettingsToolsEnabled()).toBe(true);
+    await vi.waitFor(() => {
+      expect(secureStore.disk.has(REMOTE_MCP_SERVERS_KEY)).toBe(false);
+      expect(secureStore.disk.has(SETTINGS_TOOLS_ENABLED_KEY)).toBe(false);
+    });
   });
 });
 

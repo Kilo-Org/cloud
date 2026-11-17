@@ -16,10 +16,10 @@ import {
 } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import {
   KILO_PASS_BONUS_LIKE_ITEM_KINDS,
-  computeIssueMonth,
   createOrGetIssuanceHeader,
   issueBonusCreditsForIssuance,
 } from '@kilocode/web-shared/lib/kilo-pass/issuance';
+import { computeIssueMonth } from '@kilocode/web-shared/lib/kilo-pass/issue-month';
 import {
   KILO_PASS_TIER_CONFIG,
   KILO_PASS_YEARLY_MONTHLY_BONUS_PERCENT,

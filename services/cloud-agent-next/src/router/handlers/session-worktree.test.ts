@@ -339,6 +339,7 @@ function fixture(options?: {
     ...(options?.botId ? { botId: options.botId } : {}),
     request: { headers } as Request,
     env: {
+      CONTAINER_USAGE_METER: { getBillingMode: vi.fn().mockResolvedValue('shadow') },
       INTERNAL_API_SECRET: INTERNAL_SECRET,
       NEXTAUTH_SECRET: 'runtime-authorization-test-secret',
       HYPERDRIVE: { connectionString: 'postgres://worktree-handler-test' },

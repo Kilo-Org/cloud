@@ -112,9 +112,11 @@ export const USAGE = `Usage: pnpm dev:mobile:design-gate <command> [flags]
           exit 2 when either target is unreachable or unready; atomic comparison.json contains introduced findings; never reuses output
   help   print this text
 Common: [--platform android|ios] [--device <serial|udid>] [--metro ${DEFAULT_METRO}] [--out <dir>]
-Proof manifest: {"version":1,"targets":[{"id":"card","link":"kiloapp:///card","route":"/card","screen":"card","readyTestID":"card-ready"}]}
+Proof manifest: {"version":1,"targets":[{"id":"card","link":"kiloapp:///card","route":"/card","screen":"card"}]}
+Optional readiness marker: "readyTestID":"card-ready"   without it, a target is ready when its route and screen match and a node is visible
 Optional target diagnostic: {"component":"apps/mobile/src/components/card.tsx","exportName":"default","props":{}}
-  uses link kiloapp:///design-proof-<id>, route /design-proof-<id>, screen (auth)/design-proof-<id>; component must exist in BOTH revisions.
+  uses link kiloapp:///design-proof-<id>, route /design-proof-<id>, screen (auth)/design-proof-<id> ("card") or (app)/design-proof-<id> ("picker-sheet"); component must exist in BOTH revisions.
+  "presentation":"picker-sheet" presents the screen as the composer's picker sheet (half detent on Android, the app's formSheet options elsewhere); the default "card" paints it bare.
   Generated routes are temporary __DEV__-only data fixtures; auth, environment and product implementations are not copied or replaced.
 App: ${APP_ID}; ${PROBE_REQUIREMENT}.`;
 

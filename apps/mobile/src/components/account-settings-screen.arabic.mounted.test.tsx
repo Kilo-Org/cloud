@@ -25,6 +25,11 @@ vi.mock('react-native', () => ({
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push }),
 }));
+// The Language row opens the picker through the guarded hook, so the push spy is
+// what both the router mock and the hook mock return.
+vi.mock('@/lib/hooks/use-single-push-route', () => ({
+  useSinglePushRoute: () => push,
+}));
 vi.mock('@/components/ui/icons', () => ({
   Ban: 'Ban',
   Cpu: 'Cpu',
@@ -32,7 +37,6 @@ vi.mock('@/components/ui/icons', () => ({
   Globe: 'Globe',
   KeyRound: 'KeyRound',
   Lock: 'Lock',
-  LogOut: 'LogOut',
   Shield: 'Shield',
   Smartphone: 'Smartphone',
   UserRound: 'UserRound',
@@ -40,6 +44,7 @@ vi.mock('@/components/ui/icons', () => ({
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
+vi.mock('@/components/ui/directional-icons', () => ({ DirectionalLogOut: 'DirectionalLogOut' }));
 vi.mock('@/lib/auth/push-registration-reconciliation', () => ({
   attemptPushRegistrationReconciliation: vi.fn(),
 }));

@@ -7,12 +7,14 @@ import {
   appendNewSessionPrefill,
   buildContinuePrefillParams,
   describePrefillFallback,
+  isRepoSeedPending,
   type NewSessionPrefill,
   readNewSessionPrefill,
   resolvePrefillModel,
   resolvePrefillRepo,
   resolvePrefillRepoSelection,
   resolveStoredRepoSelection,
+  shouldAbandonRepoSeed,
 } from './new-session-prefill';
 
 vi.mock('@/components/ui/icons', () => ({
@@ -336,6 +338,97 @@ describe('resolvePrefillRepoSelection', () => {
     { repo: '', desc: 'empty string' },
   ])('returns null when repo is $desc', ({ repo }) => {
     expect(resolvePrefillRepoSelection(repos, { mode: 'code', repo })).toBeNull();
+  });
+});
+
+describe('isRepoSeedPending', () => {
+  const base = {
+    prefillRepo: 'owner/repo',
+    applied: false,
+    selectedRepo: '',
+    providerQueriesResolved: false,
+  };
+
+  it('reports a seed pending while a provider query is still in flight', () => {
+    expect(isRepoSeedPending(base)).toBe(true);
+  });
+
+  it('settles once the seed has run for this mount', () => {
+    expect(isRepoSeedPending({ ...base, applied: true })).toBe(false);
+  });
+
+  it('settles a prefill the resolved lists cannot satisfy instead of holding the region', () => {
+    // The regression this clause exists for: the provider queries resolved and
+    // no seed ran (`applied` false, no selection) because the lists have no
+    // match — an error, a disconnected provider, an empty account. No seed can
+    // arrive now, so reporting pending here would keep the region unsettled
+    // forever: the screen would lose the rows below the section and the
+    // section's own retry and reconnect controls.
+    expect(isRepoSeedPending({ ...base, providerQueriesResolved: true })).toBe(false);
+  });
+
+  it('settles when the form already holds a selection', () => {
+    expect(isRepoSeedPending({ ...base, selectedRepo: 'github:owner/repo' })).toBe(false);
+  });
+
+  it('settles a plain New session entry that asked for no repository', () => {
+    // The regression this rule exists for: without a request in the route no
+    // seed is coming, so the form must not wait for one before it paints the
+    // rows below the repository section.
+    expect(
+      isRepoSeedPending({ ...base, prefillRepo: undefined, providerQueriesResolved: true })
+    ).toBe(false);
+  });
+});
+
+describe('shouldAbandonRepoSeed', () => {
+  const base = {
+    prefillRepo: 'owner/repo',
+    applied: false,
+    selectedRepo: '',
+    reposSettled: false,
+    providerQueriesResolved: false,
+  };
+
+  it('abandons the request once the bound settles the region without it', () => {
+    // The regression this rule exists for: the lists never answer, the bound
+    // settles the region, and a later answer must not mount a repository the
+    // form already painted without.
+    expect(shouldAbandonRepoSeed({ ...base, providerQueriesResolved: true })).toBe(true);
+  });
+
+  it('keeps waiting while the lists are still within the bound', () => {
+    expect(shouldAbandonRepoSeed(base)).toBe(false);
+  });
+
+  it('leaves a request the lists can satisfy to the seed', () => {
+    // `reposSettled` is the one render in which the seed runs, so dropping the
+    // request there would lose a prefill that can still land.
+    expect(
+      shouldAbandonRepoSeed({ ...base, reposSettled: true, providerQueriesResolved: true })
+    ).toBe(false);
+  });
+
+  it('does not abandon a plain New session entry', () => {
+    expect(
+      shouldAbandonRepoSeed({ ...base, prefillRepo: undefined, providerQueriesResolved: true })
+    ).toBe(false);
+  });
+
+  it('does not abandon a request that already ran or was abandoned', () => {
+    expect(shouldAbandonRepoSeed({ ...base, applied: true, providerQueriesResolved: true })).toBe(
+      false
+    );
+  });
+
+  it('does not abandon a request the form already satisfied', () => {
+    expect(
+      shouldAbandonRepoSeed({
+        ...base,
+        selectedRepo: 'github:owner/repo',
+        providerQueriesResolved: true,
+      })
+    ).toBe(false);
   });
 });
 

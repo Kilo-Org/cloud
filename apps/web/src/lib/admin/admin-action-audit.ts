@@ -10,8 +10,10 @@ import { ORGANIZATION_PARENT_ACCESS_ROLES } from '@kilocode/app-shared/organizat
 import { and, eq, inArray } from 'drizzle-orm';
 import type { AdminActionAuditAction, AdminActionAuditTargetType } from '@kilocode/db/schema-types';
 import {
+  adminTierFor,
   authViaTokenFromHeaders,
   clientIpFromHeaders,
+  type AdminAccessAttribution,
   type AdminAuditContext,
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
@@ -55,18 +57,14 @@ export type AdminActionEntry = {
   metadata?: Record<string, unknown>;
 };
 
-export type AdminActionEvent = {
+export type AdminActionEvent = Pick<
+  AdminAccessAttribution,
+  'kiloUserId' | 'email' | 'adminTier' | 'authVia' | 'tokenSource' | 'route' | 'ip'
+> & {
   event: 'admin_action';
   action: AdminActionAuditAction;
   auditLogId: string | null;
   persisted: boolean;
-  kiloUserId: string;
-  email: string;
-  adminTier: 'super_admin' | 'platform_admin';
-  authVia: 'token' | 'session';
-  tokenSource: string | null;
-  route: string | null;
-  ip: string | null;
   targetType: AdminActionAuditTargetType | null;
   targetId: string | null;
   message: string;
@@ -136,7 +134,7 @@ export async function recordAdminActions(
       persisted: index < insertedIds.length,
       kiloUserId: ctx.user.id,
       email: ctx.user.google_user_email,
-      adminTier: ctx.user.is_super_admin ? 'super_admin' : 'platform_admin',
+      adminTier: adminTierFor(ctx.user),
       authVia: ctx.authViaToken ? 'token' : 'session',
       tokenSource: ctx.tokenSource ?? null,
       route: ctx.trpcPath ?? null,

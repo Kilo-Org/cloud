@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   authState,
   findConfigureRows,
+  findNode,
   flushIdle,
   idleState,
   keys,
@@ -21,6 +22,12 @@ import { i18n } from '@/i18n';
 import { contextPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 import { act } from '@/test/renderer';
 import { createTestQueryClient, waitFor } from '@/test/render-with-providers';
+
+// The account row opens the shared picker through the press-burst guard, and
+// these assertions read the router mock, so the guarded push is that function.
+vi.mock('@/lib/hooks/use-single-push-route', () => ({
+  useSinglePushRoute: () => routerPush,
+}));
 
 describe('ProfileScreen Organization section', () => {
   beforeEach(() => {
@@ -84,25 +91,120 @@ describe('ProfileScreen Organization section', () => {
     unmount();
   });
 
-  it('leaves the Organization section hidden in Personal context without memberships', async () => {
+  it('keeps the section when a selected organization switches to Personal with memberships listed', async () => {
+    providersQueryFn.mockResolvedValue({ providers: [] });
+    organizationsQueryFn.mockResolvedValue([
+      { organizationId: 'org-1', organizationName: 'Kilo', role: 'admin' },
+    ]);
+
+    const queryClient = createTestQueryClient();
+    const { renderer, unmount } = await mountProfile(queryClient);
+    const root = renderer.root;
+
+    flushIdle();
+    const chooserTitle = i18n.t('organization.boundary.selectOrganization');
+    await waitFor(() => findConfigureRows(root, i18n.t('profile.manageOrganization')).length === 1);
+
+    // The mocked context reads its state at render time, so the cache write is
+    // what re-renders the screen after the context switches to Personal.
+    act(() => {
+      organizationState.organizationId = null;
+      queryClient.setQueryData(keys.organizations, [
+        { organizationId: 'org-1', organizationName: 'Kilo', role: 'admin' },
+      ]);
+    });
+
+    await waitFor(() => findConfigureRows(root, chooserTitle).length === 1);
+
+    expect(nodeCountWithChildren(root, 'Text', i18n.t('common.organization'))).toBe(1);
+    expect(findConfigureRows(root, i18n.t('profile.manageOrganization'))).toHaveLength(0);
+    expect(findConfigureRows(root, chooserTitle)).toHaveLength(1);
+
+    unmount();
+  });
+
+  it('keeps the Organization section and its retry when the memberships read fails', async () => {
+    organizationState.organizationId = null;
+    providersQueryFn.mockResolvedValue({ providers: [] });
+    organizationsQueryFn.mockRejectedValue(new Error('memberships unavailable'));
+
+    const { renderer, unmount } = await mountProfile();
+    const root = renderer.root;
+
+    flushIdle();
+    await waitFor(() => nodeCount(root, 'QueryError') === 1);
+
+    expect(nodeCountWithChildren(root, 'Text', i18n.t('common.organization'))).toBe(1);
+    const error = findNode(root, 'QueryError');
+    expect(error?.props.title).toBe(i18n.t('profile.couldNotLoadOrganization'));
+    expect(
+      findConfigureRows(root, i18n.t('organization.boundary.selectOrganization'))
+    ).toHaveLength(0);
+    // The error branch renders its retry where the rows would be, so no Create
+    // organization row paints beside it and the section offers the retry alone.
+    expect(findConfigureRows(root, i18n.t('organization.create.title'))).toHaveLength(0);
+
+    const callsBeforeRetry = organizationsQueryFn.mock.calls.length;
+    act(() => {
+      (error?.props as { onRetry?: () => void } | undefined)?.onRetry?.();
+    });
+
+    await waitFor(() => organizationsQueryFn.mock.calls.length > callsBeforeRetry);
+
+    unmount();
+  });
+
+  it('offers Create organization when the memberships read settles empty', async () => {
     organizationState.organizationId = null;
     providersQueryFn.mockResolvedValue({ providers: [] });
     organizationsQueryFn.mockResolvedValue([]);
 
     const { renderer, unmount } = await mountProfile();
+    const root = renderer.root;
 
     flushIdle();
     await waitFor(
       () => providersQueryFn.mock.calls.length > 0 && organizationsQueryFn.mock.calls.length > 0
     );
-    await waitFor(() => nodeCount(renderer.root, 'Skeleton') === 0);
+    await waitFor(() => nodeCount(root, 'Skeleton') === 0);
 
-    // Accounts without an organization keep the hub's own boundary; Profile
-    // gains no control for them.
-    expect(nodeCountWithChildren(renderer.root, 'Text', i18n.t('common.organization'))).toBe(0);
+    // A settled read that lists no memberships still keeps the section: Create
+    // organization is the only entry to that flow, so an account without one
+    // has to be offered it here. The account-picker row is dropped instead of
+    // opening a list that holds Personal and nothing else.
+    expect(nodeCountWithChildren(root, 'Text', i18n.t('common.organization'))).toBe(1);
+    expect(findConfigureRows(root, i18n.t('organization.create.title'))).toHaveLength(1);
     expect(
-      findConfigureRows(renderer.root, i18n.t('organization.boundary.selectOrganization'))
+      findConfigureRows(root, i18n.t('organization.boundary.selectOrganization'))
     ).toHaveLength(0);
+
+    const row = findConfigureRows(root, i18n.t('organization.create.title'))[0];
+    act(() => {
+      (row?.props as { onPress?: () => void } | undefined)?.onPress?.();
+    });
+
+    // The row reaches the shared route builder's href, so the create flow opens
+    // from Profile itself rather than sending the user through the hub.
+    expect(routerPush).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/organization/create');
+
+    unmount();
+  });
+
+  it('keeps the Organization section hidden before the memberships read settles', async () => {
+    organizationState.organizationId = null;
+    providersQueryFn.mockResolvedValue({ providers: [] });
+    organizationsQueryFn.mockReturnValue(new Promise<never>(() => undefined));
+
+    const { renderer, unmount } = await mountProfile();
+    const root = renderer.root;
+
+    flushIdle();
+
+    // A read that has not settled yet is not a read that found nothing: the
+    // section stays hidden so no empty state paints and then flips once the
+    // list arrives.
+    expect(nodeCountWithChildren(root, 'Text', i18n.t('common.organization'))).toBe(0);
+    expect(findConfigureRows(root, i18n.t('organization.create.title'))).toHaveLength(0);
 
     unmount();
   });

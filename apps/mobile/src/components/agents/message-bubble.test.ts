@@ -336,6 +336,80 @@ describe('MessageBubble failed delivery state', () => {
   });
 });
 
+describe('MessageBubble stored prompt with no reply', () => {
+  const NOTE = i18n.t('agentChat.messageBubble.noReplyRecorded');
+
+  // The suite leaves `isTextPart` mocked to false, which hides the bubble the
+  // note sits under. Read the real part type here so the prompt renders and the
+  // note's position relative to it is what the assertions read.
+  beforeEach(async () => {
+    const actual = await vi.importActual<typeof PartTypes>('./part-types');
+    const partTypes = await import('./part-types');
+    vi.mocked(partTypes.isTextPart).mockImplementation(actual.isTextPart);
+  });
+
+  afterEach(async () => {
+    const partTypes = await import('./part-types');
+    vi.mocked(partTypes.isTextPart).mockReturnValue(false);
+  });
+
+  /** The props of an unrendered element, or null for text and empty slots. */
+  function elementProps(node: unknown): Record<string, unknown> | null {
+    if (node === null || typeof node !== 'object' || !('props' in node)) {
+      return null;
+    }
+    const props = node.props;
+    return typeof props === 'object' && props !== null ? (props as Record<string, unknown>) : null;
+  }
+
+  /** The row's children in order: the bubble's pressable, then the note. */
+  function rowChildren(tree: unknown): readonly unknown[] {
+    const children = elementProps(tree)?.children;
+    return Array.isArray(children) ? children : [children];
+  }
+
+  it('states that no reply was recorded under the rendered prompt', async () => {
+    const tree = await renderBubbleWithHandlers(userMessage('m-unanswered'), {
+      noReplyRecorded: true,
+      retryAvailable: false,
+    });
+    const children = rowChildren(tree);
+    const promptIndex = children.findIndex(child => elementProps(child)?.onLongPress !== undefined);
+    const noteIndex = children.findIndex(child => findText(child, text => text === NOTE));
+
+    // The prompt bubble is drawn, and the note follows it rather than sitting
+    // inside the pressable or above the prompt.
+    expect(promptIndex).toBeGreaterThanOrEqual(0);
+    expect(noteIndex).toBeGreaterThan(promptIndex);
+    // The record cannot say the send failed, so the note adds no action of its
+    // own; the read-only footer owns the one recovery.
+    expect(
+      findElementByType(
+        tree,
+        'Button',
+        props => props.accessibilityLabel === i18n.t('common.retry')
+      )
+    ).toBeNull();
+  });
+
+  it('draws no note for a row that is not the unanswered prompt', async () => {
+    const tree = await renderBubbleWithHandlers(userMessage('m-answered'), {
+      retryAvailable: false,
+    });
+    expect(findText(tree, text => text === NOTE)).toBe(false);
+  });
+
+  it('never marks an assistant row, even when a caller sets the prop', async () => {
+    const tree = await renderBubbleWithHandlers(assistantMessageWithText('m-asst'), {
+      noReplyRecorded: true,
+    });
+    // The assistant row renders its own part, so this case is not the empty-tree
+    // path: the note is absent because only a user row can carry it.
+    expect(findElementByType(tree, 'PartRenderer')).not.toBeNull();
+    expect(findText(tree, text => text === NOTE)).toBe(false);
+  });
+});
+
 async function renderBubbleWithHandlers(
   message: StoredMessage,
   props: {
@@ -349,6 +423,7 @@ async function renderBubbleWithHandlers(
     onLongPressDetails?: (m: StoredMessage) => void;
     condenseToolCalls?: boolean;
     partsOverride?: readonly StoredMessage['parts'][number][];
+    noReplyRecorded?: boolean;
   }
 ): Promise<unknown> {
   const { MessageBubble } = await import('./message-bubble');

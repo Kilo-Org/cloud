@@ -57,6 +57,11 @@ vi.mock('react', async () => {
     useEffect: vi.fn((fn: React.EffectCallback) => {
       fn();
     }),
+    // The composer publishes its input growth from a layout effect, which must
+    // run before the frame is painted; the mock runs it like `useEffect`.
+    useLayoutEffect: vi.fn((fn: React.EffectCallback) => {
+      fn();
+    }),
     useMemo: vi.fn(<T>(factory: () => T) => factory()),
     useRef: vi.fn(<T>(initial: T) => {
       const index = refSlots.cursor;
@@ -451,7 +456,7 @@ describe('ChatComposer attachment-only send', () => {
 
     // A strip-fail chip is a terminal error: the send is blocked with the
     // remove-or-retry copy, and onSend never fires.
-    expect(toastErrorMock).toHaveBeenCalledWith('Remove or retry failed attachments first.');
+    expect(toastErrorMock).toHaveBeenCalledWith('Remove the attachments that failed to upload.');
     expect(onSendMock).not.toHaveBeenCalled();
   });
 
@@ -464,7 +469,7 @@ describe('ChatComposer attachment-only send', () => {
     await settle();
 
     // A retryable error chip also blocks send until it is retried or removed.
-    expect(toastErrorMock).toHaveBeenCalledWith('Remove or retry failed attachments first.');
+    expect(toastErrorMock).toHaveBeenCalledWith('Remove the attachments that failed to upload.');
     expect(onSendMock).not.toHaveBeenCalled();
   });
 

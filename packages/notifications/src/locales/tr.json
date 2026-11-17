@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Aracı oturumunuzda bir güncelleme var",
-      "chatMessage": "Yeni bir mesajınız var",
-      "instanceLifecycle": "Örneğinizde bir güncelleme var",
-      "scheduledAction": "Zamanlanmış bir eylemde güncelleme var",
       "lowBalance": "Bakiyeniz dikkat gerektiriyor",
       "spendAlert": "Harcamanız dikkat gerektiriyor",
       "securityFinding": "Bir güvenlik bulgusu dikkat gerektiriyor",
@@ -13,30 +10,10 @@
       "activeAgentsGlanceable": "Etkin ajanlarda bir güncelleme var"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Görev tamamlandı"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Başarısız: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Kesildi: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
       "body": "{{message}}"
-    }
-  },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · Başlıksız",
-      "body": "{{bodyPreview}}"
     }
   },
   "internal": {
@@ -48,50 +25,21 @@
       "title": "Harcama uyarısı",
       "body": "{{scopeName}} harcaması ${{amountUsd}} değerini aştı"
     },
-    "securityFindingNew": {
-      "title": "Yeni güvenlik bulgusu ({{severity}})",
+    "securityFinding": {
       "body": "{{repoFullName}} içinde {{findingTitle}}"
+    },
+    "securityFindingNew": {
+      "title": "Yeni güvenlik bulgusu ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA uyarısı",
-      "body": "{{repoFullName}} içinde {{findingTitle}}"
+      "title": "SLA uyarısı"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA ihlali",
-      "body": "{{repoFullName}} içinde {{findingTitle}}"
+      "title": "SLA ihlali"
     },
     "securityLifecycle": {
       "title": "Kilo",
       "body": "Bir güvenlik kontrolünde güncelleme var"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} hazır",
-      "body": "Sohbet etmeye başlamak için dokunun."
-    },
-    "startFailed": {
-      "title": "{{instanceName}} başlatılamadı",
-      "body": "Başlatma başarısız oldu."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} yakında yeniden başlatılacak",
-      "body": "{{when}} tarihinde yeniden başlatma planlandı."
-    },
-    "restartCancelled": {
-      "title": "{{instanceName}} yeniden başlatma iptal edildi",
-      "body": "Önceden planlanan yeniden başlatma iptal edildi."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} yakında yükseltilecek",
-      "bodyWithTag": "{{when}} tarihinde {{targetImageTag}} sürümüne yükseltme.",
-      "bodyWithoutTag": "{{when}} tarihinde planlı yükseltme."
-    },
-    "versionChangeCancelled": {
-      "title": "{{instanceName}} yükseltme iptal edildi",
-      "body": "Önceden planlanan yükseltme iptal edildi."
     }
   },
   "sessionReady": {

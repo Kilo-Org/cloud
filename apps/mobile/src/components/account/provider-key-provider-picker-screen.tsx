@@ -17,10 +17,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { COMPACT_CONTROL_HIT_SLOP_DP, ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
-import { WEB_BASE_URL } from '@/lib/config';
-import { openExternalUrl } from '@/lib/external-link';
+import {
+  providerKeyNewHref,
+  type ProviderKeyScope,
+  providerKeyScope,
+  providerKeyScopeInput,
+} from '@/lib/byok/provider-key-scope';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { isStructuredCredentialProvider } from '@kilocode/app-shared/byok-credentials';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
@@ -39,7 +43,10 @@ const listContentContainerStyle = {
 const PROVIDER_ROW_SEPARATOR = () => <View className="h-px bg-border" />;
 const SKELETON_ROWS = [0, 1, 2, 3, 4, 5];
 
-function ProviderRow({ provider }: Readonly<{ provider: ProviderOption }>) {
+function ProviderRow({
+  provider,
+  scope,
+}: Readonly<{ provider: ProviderOption; scope: ProviderKeyScope }>) {
   const router = useRouter();
   const colors = useThemeColors();
 
@@ -49,10 +56,7 @@ function ProviderRow({ provider }: Readonly<{ provider: ProviderOption }>) {
       accessibilityRole="button"
       accessibilityLabel={provider.name}
       onPress={() => {
-        router.push({
-          pathname: '/(app)/(tabs)/(3_profile)/provider-key-new',
-          params: { provider: provider.id },
-        });
+        router.push(providerKeyNewHref(scope, provider.id));
       }}
     >
       <Text className="min-w-0 flex-1 text-sm text-foreground" numberOfLines={1}>
@@ -72,19 +76,19 @@ function ProviderRow({ provider }: Readonly<{ provider: ProviderOption }>) {
  * key form with that provider fixed, because the two steps cannot share one
  * screen without the provider list pushing the field off a phone.
  */
-export function ProviderKeyProviderPickerScreen() {
+export function ProviderKeyProviderPickerScreen({
+  organizationId,
+}: Readonly<{ organizationId?: string }>) {
   const { t, i18n } = useTranslation();
   const trpc = useTRPC();
   const colors = useThemeColors();
   const inputRef = useRef<TextInput>(null);
   const [query, setQuery] = useState('');
-  const providers = useQuery(trpc.byok.listProviders.queryOptions({}));
+  const scope = providerKeyScope(organizationId);
+  const providers = useQuery(trpc.byok.listProviders.queryOptions(providerKeyScopeInput(scope)));
 
   const filtered = useMemo(() => {
-    // The web form owns this rule; the app reads the same predicate.
-    const rows = (providers.data ?? []).filter(
-      provider => !isStructuredCredentialProvider(provider.id)
-    );
+    const rows = providers.data ?? [];
     const trimmed = query.trim();
     if (trimmed === '') {
       return rows;
@@ -102,12 +106,9 @@ export function ProviderKeyProviderPickerScreen() {
     );
   }, [providers.data, query, i18n.language]);
 
-  const offersWebOnlyProviders =
-    providers.data?.some(provider => isStructuredCredentialProvider(provider.id)) ?? false;
-
   const renderItem = useCallback(
-    ({ item }: ListRenderItemInfo<ProviderOption>) => <ProviderRow provider={item} />,
-    []
+    ({ item }: ListRenderItemInfo<ProviderOption>) => <ProviderRow provider={item} scope={scope} />,
+    [scope]
   );
 
   let body: ReactNode = null;
@@ -148,7 +149,10 @@ export function ProviderKeyProviderPickerScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('profile.providerKeys.chooseProvider')} />
+      <ScreenHeader
+        title={t('profile.providerKeys.chooseProvider')}
+        backFallback={PROFILE_TAB_HREF}
+      />
       <View className="flex-row items-center gap-2 px-4 pb-1 pt-2">
         <Search size={18} color={colors.mutedForeground} />
         <Input
@@ -176,28 +180,6 @@ export function ProviderKeyProviderPickerScreen() {
           </Button>
         )}
       </View>
-      {offersWebOnlyProviders ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('profile.providerKeys.manageOnWeb')}
-          className="mx-4 mb-1 flex-row items-center gap-3 rounded-lg bg-secondary px-3 py-3 active:opacity-70"
-          onPress={() => {
-            void openExternalUrl(`${WEB_BASE_URL}/byok`, {
-              label: t('profile.providerKeys.title'),
-            });
-          }}
-        >
-          <View className="min-w-0 flex-1 gap-1">
-            <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
-              {t('profile.providerKeys.manageOnWeb')}
-            </Text>
-            <Text className="text-xs text-muted-foreground" numberOfLines={2}>
-              {t('profile.providerKeys.manageOnWebReason')}
-            </Text>
-          </View>
-          <DirectionalChevronRight size={14} color={colors.mutedForeground} />
-        </Pressable>
-      ) : null}
       {body}
     </View>
   );

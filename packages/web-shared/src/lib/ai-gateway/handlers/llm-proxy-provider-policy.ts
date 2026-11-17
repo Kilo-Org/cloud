@@ -4,17 +4,20 @@ import {
   getProvider,
   type ProviderRoute,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import type { ProviderType } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type { FailoverRoute } from '@kilocode/web-shared/lib/ai-gateway/providers/byok-failover';
 import type { AiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
 import {
-  getManagedGatewayFromUrl,
   getOrganizationGatewaySettings,
-  isManagedGatewayDisabled,
   NO_ORGANIZATION_GATEWAY_SETTINGS,
   type OrganizationGatewaySettings,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/organization-gateway-settings';
 import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
-import { paidUsageRejection } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
+import {
+  dataCollectionPolicyRejection,
+  managedGatewayRejection,
+  paidUsageRejection,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
 import { getIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
 import {
@@ -24,7 +27,6 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { isInferenceProviderUserByok } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { isVercelUserByokProviderAllowed } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { hasBestEffortGuessDataCollectionRequirement } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import type { CustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
   allowedInferenceProviders,
@@ -32,23 +34,18 @@ import {
   chatGptReconnectResponse,
   claudeBillingReconnectResponse,
   claudeBillingUnavailableResponse,
-  dataCollectionRequiredResponse,
   directByokCatalogOnlyMessage,
   directByokCatalogOnlyResponse,
   efficientPoolBlockedResponse,
   getOrganizationProviderPrivacy,
   inferenceProvidersNotAllowedResponse,
-  managedGatewayDisabledResponse,
   unknownModelResponse,
   modelNotAllowedResponse,
   organizationAutoConfigurationResponse,
   unavailableModelResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import type { BalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
-import {
-  isDataCollectionExplicitlyDisallowed,
-  type OpenRouterProviderConfig,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import type { OpenRouterProviderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { isAnonymousContext, type AnonymousUserContext } from '@kilocode/web-shared/lib/anonymous';
 import { isUnavailableModel } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import { ORG_AUTO_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
@@ -63,6 +60,16 @@ import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/prov
 import type { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import type { ValidatedGatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/llm-proxy-request';
 import type { AdmittedModelResolution } from '@kilocode/web-shared/lib/ai-gateway/handlers/llm-proxy-model-resolution';
+
+/**
+ * The OpenRouter provider slug each delegated route stands for in the organization provider
+ * policy. A delegated route serves the request from its own upstream, so the policy is compared
+ * with that provider directly.
+ */
+const DELEGATED_ROUTE_POLICY_PROVIDER_ID: Partial<Record<ProviderType, string>> = {
+  'claude-billing': 'anthropic',
+  'openai-chatgpt': 'openai',
+};
 
 type ProviderPolicyInput = {
   request: ValidatedGatewayRequest;
@@ -152,7 +159,8 @@ export async function resolveProviderAndPolicy(
   let accessCheck: ReturnType<typeof resolveAccessCheck> | undefined;
   const getAccessCheck = () => (accessCheck ??= resolveAccessCheck(input));
   const isAnonymous = isAnonymousContext(user);
-  const isDirectByokProviderAllowed = async (policyProviderId: string) => {
+  /** Whether the organization policy admits the model served by this one provider. */
+  const isModelAllowedForPolicyProvider = async (policyProviderId: string) => {
     const groupPolicy = await input.organizationGroupPolicyPromise;
     return (
       !groupPolicy || (await isModelAllowedForProviderKey(groupPolicy, model, policyProviderId))
@@ -174,14 +182,13 @@ export async function resolveProviderAndPolicy(
     organizationId: input.organizationId,
     botId: input.botId,
     boundedSpending: input.boundedSpending,
-    organizationDisabledVercelAiGateway: organizationGatewaySettings.disabledGateways.has('vercel'),
     countryCode: input.countryCode,
     getRoutingProviderConfig: async () =>
       (isAnonymous ? undefined : (await getAccessCheck()).effectiveProviderConfig) ??
       request.body.provider,
     getAllowedProviders: async () =>
       isAnonymous ? undefined : (await getAccessCheck()).allowedProviders,
-    isDirectByokProviderAllowed,
+    isDirectByokProviderAllowed: isModelAllowedForPolicyProvider,
     kiloIgnoredProviders: getIgnoredProviders(model, isNonTrialEnterprise),
     onDecision: decision => input.providerMetadataCapture?.captureRoutingDecision(decision),
   });
@@ -191,8 +198,8 @@ export async function resolveProviderAndPolicy(
     return reject(chatGptReconnectResponse(getProviderResult.message));
   }
   if (getProviderResult.kind === 'claude-billing-reconnect') {
-    // The organization's shared-services Claude link was connected by a person
-    // who is gone. Only an owner reconnecting it changes the outcome.
+    // The organization's Claude link was connected by a person who is gone.
+    // Only an owner reconnecting it changes the outcome.
     return reject(claudeBillingReconnectResponse(getProviderResult.message, input.organizationId));
   }
   if (getProviderResult.kind === 'claude-billing-unavailable') {
@@ -225,19 +232,20 @@ export async function resolveProviderAndPolicy(
   const routeRejection = async (
     route: ProviderRoute
   ): Promise<NextResponseType<unknown> | null> => {
-    // A local, so the type guard narrows it rather than `route.provider.type`.
     const providerType = route.provider.type;
-    if (providerType === 'claude-billing' && !(await isDirectByokProviderAllowed('anthropic'))) {
+    const delegatedPolicyProviderId = DELEGATED_ROUTE_POLICY_PROVIDER_ID[providerType];
+    if (
+      delegatedPolicyProviderId &&
+      !(await isModelAllowedForPolicyProvider(delegatedPolicyProviderId))
+    ) {
       return modelNotAllowedResponse();
     }
-    if (isManagedGatewayDisabled(organizationGatewaySettings, providerType)) {
-      return managedGatewayDisabledResponse(providerType);
-    }
-    const providerBaseUrl = route.provider.apiUrlOverrides[request.kind] ?? route.provider.apiUrl;
-    const gatewayByDomain = getManagedGatewayFromUrl(providerBaseUrl);
-    if (gatewayByDomain && isManagedGatewayDisabled(organizationGatewaySettings, gatewayByDomain)) {
-      return managedGatewayDisabledResponse(gatewayByDomain);
-    }
+    const gatewayRejection = managedGatewayRejection(
+      organizationGatewaySettings,
+      providerType,
+      route.provider.apiUrlOverrides[request.kind] ?? route.provider.apiUrl
+    );
+    if (gatewayRejection) return gatewayRejection;
     if (orgAutoRouteTarget) {
       try {
         const directByokTarget = await getDirectByokModel(orgAutoRouteTarget);
@@ -296,7 +304,7 @@ export async function resolveProviderAndPolicy(
       const directByokProvider = findDirectByokProvider(route.userByok?.[0]?.providerId ?? '');
       if (
         !directByokProvider ||
-        !(await isDirectByokProviderAllowed(getDirectByokPolicyProviderId(directByokProvider)))
+        !(await isModelAllowedForPolicyProvider(getDirectByokPolicyProviderId(directByokProvider)))
       ) {
         return poolRouted ? efficientPoolBlockedResponse() : modelNotAllowedResponse();
       }
@@ -334,12 +342,8 @@ export async function resolveProviderAndPolicy(
     }
   }
 
-  if (
-    (await hasBestEffortGuessDataCollectionRequirement(model)) &&
-    isDataCollectionExplicitlyDisallowed(request.body.provider)
-  ) {
-    return reject(dataCollectionRequiredResponse());
-  }
+  const dataCollectionRejected = await dataCollectionPolicyRejection(model, request.body.provider);
+  if (dataCollectionRejected) return reject(dataCollectionRejected);
 
   if (input.customLlm?.definition.public) {
     // Organization policy replaces the request's provider object, so intersect

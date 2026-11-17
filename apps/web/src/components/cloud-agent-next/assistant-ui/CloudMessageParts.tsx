@@ -20,7 +20,7 @@ import { MessageErrorBoundary } from '../MessageErrorBoundary';
 import { isPartStreaming, type Part } from '../types';
 import { getToolActivity } from '../toolCardUtils';
 import { getVisibleAssistantParts } from '../message-presentation';
-import { groupAssistantParts, summarizeAgentWork } from '../shared-transcript-presentation';
+import { summarizeAgentWork } from '../shared-transcript-presentation';
 import { AgentWorkGroup } from './AgentWorkGroup';
 import { CloudToolRenderer } from './CloudToolRenderer';
 import {
@@ -107,20 +107,18 @@ export function CloudMessageParts({ collapseTools = false }: { collapseTools?: b
 
   const parts = getVisibleAssistantParts(presentation.parts.map(part => part.source));
   const indices = new Map(parts.map((part, index) => [part, index]));
-  return groupAssistantParts(parts, 'live').map((segment, segmentIndex, segments) => {
+  return presentation.segments.map(segment => {
     const content = segment.parts.map(part => {
       const index = indices.get(part);
       return index === undefined ? null : <CloudMessagePartByIndex key={part.id} index={index} />;
     });
-    if (segment.type === 'chat')
-      return <React.Fragment key={segment.parts[0]?.id}>{content}</React.Fragment>;
-    const key = `agent-work:${segments[segmentIndex - 1]?.parts[0]?.id ?? 'start'}`;
+    if (segment.type === 'chat') return <React.Fragment key={segment.id}>{content}</React.Fragment>;
     const activePart = presentation.isStreaming
       ? segment.parts.findLast(isPartStreaming)
       : undefined;
     const working = activePart !== undefined;
     return (
-      <div key={key} className="py-1">
+      <div key={segment.id} className="py-1">
         <AgentWorkGroup
           scrollAnchorIds={segment.parts.map(part => part.id)}
           summary={summarizeAgentWork(segment.parts, working)}

@@ -1,3 +1,5 @@
+import { humanizeToken } from '@/lib/admin/queue-format';
+
 export type DeletionAttentionHint = {
   title: string;
   action: string;
@@ -211,7 +213,7 @@ const KNOWN_HINTS: Record<string, DeletionAttentionHint> = {
     action:
       'Open PostHog and confirm the person, events, and recordings deletion. Then Retry or Mark done with evidence.',
   },
-  posthog_verify_unconfirmed: {
+  posthog_verify_timeout: {
     title: 'PostHog deletion did not confirm in time',
     action:
       'Check the PostHog deletion task. If it finished, Mark done with evidence. Otherwise Retry.',
@@ -407,13 +409,9 @@ export function deletionAttentionHint(
     };
   }
   return {
-    title: humanizeCode(code),
+    title: humanizeToken(code),
     action: UNKNOWN_ACTION,
   };
-}
-
-function humanizeCode(code: string): string {
-  return code.replaceAll(/[_-]+/g, ' ').replace(/^./, char => char.toUpperCase());
 }
 
 export function deletionManualSearchHref(params: {

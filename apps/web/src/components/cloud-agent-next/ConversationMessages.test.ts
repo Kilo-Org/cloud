@@ -395,7 +395,7 @@ describe('ConversationMessages', () => {
     ]);
     for (const button of renderedButtons) {
       expect(button).toContain('aria-expanded="false"');
-      expect(button).toContain('aria-controls=');
+      expect(button).not.toContain('aria-controls=');
     }
     expect(html).not.toContain('Reasoning details');
     expect(html).not.toContain('Output for');
@@ -457,7 +457,7 @@ describe('ConversationMessages', () => {
     ]);
     for (const button of buttons(html)) {
       expect(button).toContain('aria-expanded="false"');
-      expect(button).toContain('aria-controls=');
+      expect(button).not.toContain('aria-controls=');
     }
     expect(html).not.toContain('pnpm test');
     expect(html).not.toContain('Reasoning details');
@@ -652,10 +652,12 @@ describe('ConversationMessages', () => {
     expect(renderedButtons[2]).toContain('findParser');
     for (const button of renderedButtons) {
       expect(button).toContain('aria-expanded="false"');
-      expect(button).toContain('aria-controls=');
+      expect(button).not.toContain('aria-controls=');
       expect(button).not.toContain('disabled=');
     }
-    expect(new Set(html.match(/aria-controls="[^"]+"/g)).size).toBe(3);
+    // Every disclosure on this page is collapsed, so no element advertises a
+    // controlled region here.
+    expect(html.match(/aria-controls="[^"]+"/g) ?? []).toHaveLength(0);
     expect(html.match(/data-tool-card=/g)).toHaveLength(4);
     expect(html).toContain('WebFetch');
     expect(html).toContain('href="https://example.com/docs"');
@@ -1124,7 +1126,7 @@ describe('ConversationMessages', () => {
   );
 
   it.each(['pending', 'running'] as const)(
-    'keeps a progress line before %s child activity arrives',
+    'keeps the header status before %s child activity arrives',
     status => {
       const state: ToolPart['state'] =
         status === 'pending'
@@ -1134,7 +1136,8 @@ describe('ConversationMessages', () => {
         assistantMessage('parent', [toolPart('task', 'task', state)]),
       ]);
 
-      expect(html).toContain(status === 'pending' ? 'Delegating...' : 'Working...');
+      expect(html).toContain(`<span>${status === 'pending' ? 'Delegating' : 'Working'}</span>`);
+      expect(html).not.toContain('ml-6');
       expect(html).toContain(`<title>${status === 'pending' ? 'Delegating' : 'Working'}</title>`);
       expect(html).toContain('aria-busy="true"');
       expect(html).not.toContain('0 tool calls');
@@ -1265,7 +1268,13 @@ describe('ConversationMessages', () => {
     mockExpanded = true;
     const expanded = renderConversation([message]);
 
-    expect(buttons(expanded)[0]).toContain('aria-expanded="true"');
+    const trigger = buttons(expanded).find(button => button.includes('aria-expanded="true"'));
+    expect(trigger).toBeDefined();
+    // An open trigger must advertise a controlled element rendered in the same markup.
+    const contentId = trigger?.match(/aria-controls="([^"]+)"/)?.[1];
+    expect(typeof contentId === 'string' && contentId.length > 0).toBe(true);
+    if (!contentId) throw new Error('Open reasoning trigger must advertise aria-controls');
+    expect(expanded).toContain(`id="${contentId}"`);
     expect(expanded).toContain('I checked  before choosing the next step.');
     expect(expanded).not.toContain('[REDACTED]');
     expect(expanded).not.toContain('encrypted-reasoning');
@@ -1667,8 +1676,11 @@ describe('ConversationMessages memoization', () => {
     expect(container.textContent).toContain('Thought');
     expect(container.textContent).toContain('pnpm test -- bash-1');
     expect(container.textContent).not.toContain('Output for');
+    // An open trigger must advertise a controlled element that actually exists.
     const groupContentId = group?.getAttribute('aria-controls');
-    const groupContent = groupContentId ? document.getElementById(groupContentId) : null;
+    expect(typeof groupContentId === 'string' && groupContentId.length > 0).toBe(true);
+    if (!groupContentId) throw new Error('Open group trigger must advertise aria-controls');
+    const groupContent = document.getElementById(groupContentId);
     expect(groupContent).not.toBeNull();
     expect(groupContent?.getAttribute('role')).toBe('region');
     expect(groupContent?.getAttribute('aria-label')).toContain('1 tool call');
@@ -1710,6 +1722,39 @@ describe('ConversationMessages memoization', () => {
     expect(container.textContent).not.toContain('1 tool call');
     expect(container.textContent).toContain('pnpm test -- bash-1');
   });
+
+  it.each([false, true])(
+    'preserves expanded work when paging prepends the same turn (intro=%s)',
+    withIntro => {
+      const latest = assistantMessage('assistant-2', [toolPart('bash-2')]);
+      const props = baseProps({ collapseTools: true, staticMessages: [latest] });
+      renderConversationMessages(props);
+      const group = container.querySelector<HTMLButtonElement>('button[aria-expanded="false"]');
+      expect(group).not.toBeNull();
+      act(() => group?.click());
+      const tool = container.querySelector<HTMLButtonElement>('[data-tool-card] button');
+      act(() => tool?.click());
+      expect(container.textContent).toContain('Output for bash-2');
+
+      renderConversationMessages({
+        ...props,
+        staticMessages: [
+          assistantMessage('assistant-1', [
+            ...(withIntro ? [textPart('intro', 'Inspecting the code')] : []),
+            toolPart('bash-1'),
+          ]),
+          latest,
+        ],
+      });
+
+      expect(container.textContent).toContain('2 tool calls');
+      expect(container.contains(group)).toBe(true);
+      expect(group?.getAttribute('aria-expanded')).toBe('true');
+      expect(container.contains(tool)).toBe(true);
+      expect(tool?.getAttribute('aria-expanded')).toBe('true');
+      expect(container.textContent).toContain('Output for bash-2');
+    }
+  );
 
   it.each(['reasoning', 'todowrite'] as const)(
     'preserves group and tool expansion when leading %s becomes visible while streaming',

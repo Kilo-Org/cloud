@@ -1,4 +1,8 @@
-import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import {
+  baseProcedure,
+  createTRPCRouter,
+  type TRPCContext,
+} from '@kilocode/web-shared/lib/trpc/init';
 import { PAID_CREDIT_EXPIRATION_EFFECTIVE_AT } from '@kilocode/web-shared/lib/config.server';
 import { getPaidCreditPolicyPresentation } from '@kilocode/web-shared/lib/paidCreditPolicy';
 import { invalidateDeviceSession } from '@kilocode/web-shared/lib/auth/device-session-cache';
@@ -25,13 +29,14 @@ import {
   listPasskeysForUser,
   renamePasskey as renameOwnedPasskey,
 } from '@/lib/auth/passkey';
+import { consumePasskeyManagementAuthorization } from '@/lib/auth/passkey-management';
 import { performGdprRemoval } from '@/lib/user/gdpr-removal';
 import { createAccountLinkingSession } from '@/lib/account-linking-session';
 import { TRPCError } from '@trpc/server';
 import { captureException } from '@sentry/nextjs';
 import * as z from 'zod';
 import { assertNoTrpcError, successResult } from '@kilocode/web-shared/lib/maybe-result';
-import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
+import { db, readDb, type DrizzleConnection } from '@kilocode/web-shared/lib/drizzle';
 import { timedUsageQuery } from '@/lib/usage-query';
 import {
   listNotificationHistory,
@@ -57,6 +62,7 @@ import { eq, and, isNull, inArray, or, sql, gte, gt, desc, isNotNull, ne } from 
 import crypto from 'crypto';
 import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-membership';
 import { AuthProviderIdSchema, isAccountLinkingProvider } from '@/lib/auth/provider-metadata';
+import { classifyDeviceSessionClient } from '@/lib/auth/device-session-client';
 import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 import { AUTOCOMPLETE_MODEL } from '@kilocode/web-shared/lib/constants';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
@@ -83,7 +89,9 @@ import { refreshGlanceableScope } from '@kilocode/web-shared/lib/notifications-w
 
 const ACCOUNT_DELETION_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
 const CREDIT_PURCHASE_HISTORY_PAGE_SIZE = 25;
-const PERSONAL_TOP_UP_DESCRIPTIONS = ['Top-up via stripe', 'Auto top-up via stripe'];
+/** The description a Stripe automatic top-up writes on its own grant row. */
+const AUTO_TOP_UP_DESCRIPTION = 'Auto top-up via stripe';
+const PERSONAL_TOP_UP_DESCRIPTIONS = ['Top-up via stripe', AUTO_TOP_UP_DESCRIPTION];
 
 /**
  * Resolve one of the user's passkey credential ids from the opaque row id the
@@ -245,12 +253,21 @@ const CreditPurchaseHistoryInputSchema = z.object({
   organizationId: z.uuid().optional(),
 });
 
+/** How one purchase row earned its credits. */
+const CreditPurchaseKindSchema = z.enum(['purchase', 'auto_top_up']);
+type CreditPurchaseKind = z.infer<typeof CreditPurchaseKindSchema>;
+
 const CreditPurchaseHistoryOutputSchema = z.object({
   entries: z.array(
     z.object({
       id: z.uuid(),
       date: z.iso.datetime(),
-      description: z.string(),
+      /**
+       * A one-off purchase, or the automatic top-up the account ran when its
+       * balance fell below the threshold. The client localizes the row title
+       * from it, so the row reads in the reader's language.
+       */
+      kind: CreditPurchaseKindSchema,
       amount_mUsd: z.number().positive(),
       expiryDate: z.iso.datetime().nullable(),
       /**
@@ -614,14 +631,59 @@ async function computeNotificationCapabilities(userId: string): Promise<Notifica
 }
 
 // Passkey enrollment and management change which authenticators can sign in
-// as this account, so they are bound to a browser session. A bearer token must
-// not be able to add or remove a sign-in factor.
-const passkeyManagementProcedure = baseProcedure.use(({ ctx, next }) => {
-  if (ctx.credential !== 'session') {
-    throw new TRPCError({ code: 'FORBIDDEN', message: 'Browser session required' });
+// as this account, so they are never authorized by a bare bearer token. A
+// browser session keeps its existing rules; a native app session must present
+// the single-use grant minted from a fresh primary proof. The grant is
+// redeemed in the same transaction as the change, so a change that touches no
+// row leaves it unspent.
+async function runWithPasskeyManagement(
+  ctx: TRPCContext,
+  params: { operation: 'rename' | 'remove'; authorization: string | undefined },
+  mutate: (fromDb: DrizzleConnection) => Promise<void>
+): Promise<void> {
+  if (ctx.credential === 'session') {
+    return mutate(db);
   }
-  return next();
-});
+  // An ordinary API key, a CLI device-auth session, or any delegated
+  // credential can never manage passkeys.
+  if (ctx.credential !== 'human_bearer' || !ctx.deviceSessionId) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'PASSKEY_MANAGEMENT_DEVICE_UNSUPPORTED',
+    });
+  }
+  if (!params.authorization) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'PASSKEY_MANAGEMENT_REQUIRED' });
+  }
+  const authorization = params.authorization;
+  const deviceSessionId = ctx.deviceSessionId;
+
+  const granted = await db.transaction(async tx => {
+    const spent = await consumePasskeyManagementAuthorization({
+      token: authorization,
+      userId: ctx.user.id,
+      deviceSessionId,
+      operation: params.operation,
+      fromDb: tx,
+    });
+    if (!spent) return false;
+    await mutate(tx);
+    return true;
+  });
+
+  if (!granted) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'PASSKEY_MANAGEMENT_AUTHORIZATION_INVALID',
+    });
+  }
+}
+
+// The `uuid` column stores any 8-4-4-4-12 hex value, so the version-strict
+// RFC validator `z.uuid()` refuses ids the database can hold. `z.guid()`
+// matches the column, so the device-session list and revoke agree on the same
+// ids.
+const DeviceSessionIdSchema = z.guid();
 
 export const userRouter = createTRPCRouter({
   getPaidCreditPolicy: baseProcedure.query(() =>
@@ -702,33 +764,56 @@ export const userRouter = createTRPCRouter({
     });
   }),
 
-  renamePasskey: passkeyManagementProcedure
-    .input(z.object({ id: z.uuid(), name: z.string().trim().min(1).max(64) }))
+  renamePasskey: baseProcedure
+    .input(
+      z.object({
+        id: z.uuid(),
+        name: z.string().trim().min(1).max(64),
+        managementAuthorization: z.string().trim().min(1).max(512).optional(),
+      })
+    )
     .mutation(async ({ ctx, input }) => {
       const credentialId = await findOwnedPasskeyCredentialId(ctx.user.id, input.id);
       if (!credentialId) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Passkey not found' });
       }
 
-      const renamed = await renameOwnedPasskey(ctx.user.id, credentialId, input.name);
-      if (!renamed) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Passkey not found' });
-      }
+      await runWithPasskeyManagement(
+        ctx,
+        { operation: 'rename', authorization: input.managementAuthorization },
+        async fromDb => {
+          const renamed = await renameOwnedPasskey(ctx.user.id, credentialId, input.name, fromDb);
+          if (!renamed) {
+            throw new TRPCError({ code: 'NOT_FOUND', message: 'Passkey not found' });
+          }
+        }
+      );
       return successResult();
     }),
 
-  deletePasskey: passkeyManagementProcedure
-    .input(z.object({ id: z.uuid() }))
+  deletePasskey: baseProcedure
+    .input(
+      z.object({
+        id: z.uuid(),
+        managementAuthorization: z.string().trim().min(1).max(512).optional(),
+      })
+    )
     .mutation(async ({ ctx, input }) => {
       const credentialId = await findOwnedPasskeyCredentialId(ctx.user.id, input.id);
       if (!credentialId) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Passkey not found' });
       }
 
-      const deleted = await deleteOwnedPasskey(ctx.user.id, credentialId);
-      if (!deleted) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Passkey not found' });
-      }
+      await runWithPasskeyManagement(
+        ctx,
+        { operation: 'remove', authorization: input.managementAuthorization },
+        async fromDb => {
+          const deleted = await deleteOwnedPasskey(ctx.user.id, credentialId, fromDb);
+          if (!deleted) {
+            throw new TRPCError({ code: 'NOT_FOUND', message: 'Passkey not found' });
+          }
+        }
+      );
       return successResult();
     }),
 
@@ -839,8 +924,8 @@ export const userRouter = createTRPCRouter({
       .orderBy(desc(device_sessions.last_seen_at));
 
     return rows.map(row => ({
-      id: row.id,
-      user_agent: row.user_agent,
+      id: DeviceSessionIdSchema.parse(row.id),
+      ...classifyDeviceSessionClient(row.user_agent),
       // Normalize PostgreSQL timestamp text (e.g. `2026-04-29 01:16:12.945+00`)
       // to UTC ISO before returning it over the tRPC JSON boundary.
       created_at: new Date(row.created_at).toISOString(),
@@ -850,7 +935,7 @@ export const userRouter = createTRPCRouter({
   }),
 
   revokeDeviceSessionById: baseProcedure
-    .input(z.object({ sessionId: z.uuid() }))
+    .input(z.object({ sessionId: DeviceSessionIdSchema }))
     .mutation(async ({ ctx, input }) => {
       await revokeOwnedDeviceSession(input.sessionId, ctx.user.id, 'user_revoked');
       return successResult();
@@ -918,17 +1003,20 @@ export const userRouter = createTRPCRouter({
         .offset(input.cursor);
 
       const hasMore = transactions.length > CREDIT_PURCHASE_HISTORY_PAGE_SIZE;
-      const entries = transactions.slice(0, CREDIT_PURCHASE_HISTORY_PAGE_SIZE).map(transaction => ({
-        id: transaction.id,
-        date: new Date(transaction.date).toISOString(),
-        description:
-          transaction.description === 'Auto top-up via stripe'
-            ? 'Automatic top-up'
-            : 'Credit purchase',
-        amount_mUsd: transaction.amount_mUsd,
-        expiryDate: transaction.expiryDate ? new Date(transaction.expiryDate).toISOString() : null,
-        creditSource: transaction.creditSource,
-      }));
+      const entries = transactions.slice(0, CREDIT_PURCHASE_HISTORY_PAGE_SIZE).map(transaction => {
+        const kind: CreditPurchaseKind =
+          transaction.description === AUTO_TOP_UP_DESCRIPTION ? 'auto_top_up' : 'purchase';
+        return {
+          id: transaction.id,
+          date: new Date(transaction.date).toISOString(),
+          kind,
+          amount_mUsd: transaction.amount_mUsd,
+          expiryDate: transaction.expiryDate
+            ? new Date(transaction.expiryDate).toISOString()
+            : null,
+          creditSource: transaction.creditSource,
+        };
+      });
 
       return {
         entries,

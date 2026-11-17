@@ -11,14 +11,14 @@ import type {
   OpenRouterModel,
   OpenRouterProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
-import type { Endpoint } from '@kilocode/db/schema-types';
+import { OrganizationDataRegionSchema, type Endpoint } from '@kilocode/db/schema-types';
 import type { GatewayModelMap } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
-import { findVercelOnlyModels } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/find-vercel-only-models';
 import {
+  findVercelOnlyModels,
   getVendorNamesByModelPrefix,
   getVercelOnlyModelName,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/vercel-only-models';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/find-vercel-only-models';
 import { normalizePublicInferenceProvider } from '@/lib/public-inference-provider';
 
 type ProviderModelData = Array<{ provider: OpenRouterProvider; models: OpenRouterModel[] }>;
@@ -69,10 +69,6 @@ const vercelOnlyProviderMetadata = new Map<string, VercelOnlyProviderMetadata>(
     boundless: {
       termsOfServiceURL: 'https://boundless.network/terms-of-service',
       privacyPolicyURL: 'https://boundless.network/privacy-policy',
-    },
-    particle: {
-      termsOfServiceURL: 'https://particle.ai/legal/terms',
-      privacyPolicyURL: 'https://particle.ai/legal/privacy',
     },
     runinfra: {
       termsOfServiceURL: 'https://runinfra.ai/terms-of-service',
@@ -156,6 +152,20 @@ function addVercelEndpointModel(
 }
 
 /**
+ * Records the regions Vercel can pin the provider's listing of `slug` to. Vercel may serve a model
+ * through several endpoints of one provider (e.g. Vertex), so their regions are combined.
+ */
+function addVercelInferenceRegions(providerData: ProviderData, slug: string, endpoint: Endpoint) {
+  const regions = new Set(endpoint.inference_regions?.flatMap(region => region.geo_region ?? []));
+  const listed = providerData.models.find(m => m.slug === slug)?.endpoint;
+  if (!listed || regions.size === 0) return;
+  for (const region of listed.vercel_inference_regions ?? []) regions.add(region);
+  listed.vercel_inference_regions = OrganizationDataRegionSchema.options.filter(region =>
+    regions.has(region)
+  );
+}
+
+/**
  * Lists `model` under a provider OpenRouter knows, unless OpenRouter already lists it there.
  * Snapshot models keep the provider's own data policy. A model only Vercel serves takes the worst
  * of the provider's policy and the Vercel endpoint's guarantees, so that every endpoint of the model
@@ -232,6 +242,7 @@ function getVercelOnlyOfferings(
   const vendorNames = getVendorNamesByModelPrefix(openRouterCatalogModels);
   return findVercelOnlyModels({
     openRouterModelIds,
+    openRouterModels: openRouterCatalogModels,
     vercelMetadata: vercelModels,
     overrides: vercelModelIdOverrides,
   }).map(vercelOnlyModel => {
@@ -313,6 +324,7 @@ export function injectVercelModels({
       if (openRouterProviders) {
         for (const providerData of openRouterProviders) {
           addToOpenRouterProvider(providerData, offering, endpoint);
+          addVercelInferenceRegions(providerData, offering.model.slug, endpoint);
         }
         continue;
       }
@@ -330,6 +342,7 @@ export function injectVercelModels({
         vercelOnlyProviders.set(providerId, providerData);
       }
       addToVercelOnlyProvider(providerData, offering, endpoint);
+      addVercelInferenceRegions(providerData, offering.model.slug, endpoint);
     }
   }
 

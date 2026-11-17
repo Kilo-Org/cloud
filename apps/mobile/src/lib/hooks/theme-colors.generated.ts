@@ -6,6 +6,7 @@ export const lightColors = {
   primary: '#4F5A10',
   primaryForeground: '#FFFFFF',
   primaryDisabled: '#6F6A61',
+  primaryDisabledAction: '#6F6A61',
   secondary: '#F0EEE6',
   secondaryForeground: '#14130F',
   secondaryFill: '#F0EEE6',
@@ -45,6 +46,7 @@ export const lightColors = {
   rowSage: '#587C1D',
   rowMoss: '#467C1D',
   rowFern: '#357C1D',
+  rowPine: '#237C1D',
 } as const;
 
 export const darkColors = {
@@ -53,6 +55,7 @@ export const darkColors = {
   primary: '#FFDD00',
   primaryForeground: '#1A1A10',
   primaryDisabled: '#8A8680',
+  primaryDisabledAction: '#5A564F',
   secondary: '#1F1F24',
   secondaryForeground: '#F2F0EB',
   secondaryFill: '#44444A',
@@ -92,4 +95,5 @@ export const darkColors = {
   rowSage: '#C4EB84',
   rowMoss: '#B1EB84',
   rowFern: '#9EEB84',
+  rowPine: '#8BEB84',
 } as const;

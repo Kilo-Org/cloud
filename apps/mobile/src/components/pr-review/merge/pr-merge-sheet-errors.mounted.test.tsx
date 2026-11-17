@@ -1,6 +1,10 @@
 import './pr-merge-sheet.test-mocks';
 import { describe, expect, it } from 'vitest';
-import { PR_OPERATION_PERSISTENCE_FAILED_MESSAGE } from '@/lib/pr-review/merge/pr-operation-ledger';
+import { i18n } from '@/i18n';
+import {
+  PR_OPERATION_PERSISTENCE_FAILED_MESSAGE,
+  prOperationNotAdmittedError,
+} from '@/lib/pr-review/merge/pr-operation-ledger';
 import { type ProviderPrRef } from '@/lib/pr-review/provider-pr-ref';
 import {
   baseProps,
@@ -79,6 +83,35 @@ describe('PrMergeSheet mounted errors', () => {
     const renderer = await mount();
     expect(visibleText(renderer)).toContain(PR_OPERATION_PERSISTENCE_FAILED_MESSAGE);
     expect(button(renderer, 'Merge').props.disabled).toBe(true);
+  });
+
+  it('does not offer a retry when the intent store refused the merge', async () => {
+    // Nothing was sent, and only a settled intent frees a slot, so a retry
+    // cannot succeed: the refusal is not a retryable failure.
+    state.merge.error = prOperationNotAdmittedError(i18n.t('prReview.merge.couldNotMerge'));
+    const renderer = await mount();
+    expect(visibleText(renderer)).toContain(i18n.t('prReview.merge.couldNotMerge'));
+    expect(button(renderer, 'Merge').props.disabled).toBe(true);
+  });
+
+  it('shows GitHub’s settled-merge conflict and prevents resubmission', async () => {
+    // The GitHub reconcile settles the row as a moved head or a closed PR and
+    // throws this one message (`github-pr-review-router.ts:1488`).
+    const settled = 'GitHub reported a conflict for this PR';
+    state.merge.error = errorWithCode(settled, 'CONFLICT');
+    const renderer = await mount();
+    expect(visibleText(renderer)).toContain(settled);
+    expect(button(renderer, 'Merge').props.disabled).toBe(true);
+  });
+
+  it('keeps GitHub’s own conflict text retryable', async () => {
+    // A raw 405/409 arrives unchanged, and the same CONFLICT code also carries
+    // the live-lease and ambiguous markers, so the sheet must not block it.
+    const raw = 'Head branch was modified. Review and try the merge again.';
+    state.merge.error = errorWithCode(raw, 'CONFLICT');
+    const renderer = await mount();
+    expect(visibleText(renderer)).toContain(raw);
+    expect(button(renderer, 'Merge').props.disabled).toBe(false);
   });
 
   it('renders an auto-merge mutation error and keeps the sheet open', async () => {

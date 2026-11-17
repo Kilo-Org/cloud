@@ -34,6 +34,12 @@ export const benchmarkConfig = sqliteTable('benchmark_config', {
   router: text('router').$type<AutoRouter>().notNull().default('efficient').unique(),
   min_accuracy: real('min_accuracy').notNull(),
   accuracy_noise_band: real('accuracy_noise_band').notNull().default(0.05),
+  // Legacy policy-knob columns (frontier_min_accuracy_delta, switch_cost_factor,
+  // best_accuracy_switch_threshold, low_confidence_threshold,
+  // classifier_repetitions, decider_repetitions, classifier_max_p95_latency_ms):
+  // no longer read, and replaceConfig writes the canonical fixed policy value on
+  // save. The benchmark_runs and routing_tables copies are separate and still
+  // written from the resolved policy.
   frontier_min_accuracy_delta: real('frontier_min_accuracy_delta').notNull().default(0),
   switch_cost_factor: real('switch_cost_factor').notNull(),
   best_accuracy_switch_threshold: real('best_accuracy_switch_threshold').notNull().default(0.05),

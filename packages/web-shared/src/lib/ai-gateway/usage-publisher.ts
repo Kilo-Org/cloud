@@ -12,6 +12,7 @@ import type {
 } from '@kilocode/usage-contracts';
 import { enqueueVercelUsage } from '@kilocode/usage-queue/vercel/publisher';
 import { USAGE_VERCEL_QUEUE_ENABLED } from '@kilocode/usage-queue/vercel/config';
+import { parseInternalServiceUrl } from '@kilocode/web-shared/lib/internal-service-url';
 import { getVercelExecutionRegion } from '@kilocode/worker-utils/vercel-execution-region';
 
 export const USAGE_ENQUEUE_TIMEOUT_MS = 2_000;
@@ -136,20 +137,6 @@ function reportAttempt(diagnostic: AttemptDiagnostic): void {
   }
 }
 
-/**
- * `fetch` only speaks http(s). `new URL` accepts any `scheme:`, so a value like
- * `localhost:3000/usage` parses as a `localhost:` URL with no host and would fail every
- * attempt. Reject it as configuration before any request is made.
- */
-function parsePublisherUrl(value: string): URL | null {
-  try {
-    const url = new URL(value);
-    return url.protocol === 'http:' || url.protocol === 'https:' ? url : null;
-  } catch {
-    return null;
-  }
-}
-
 /** HTTP 202 confirms enqueueing, not a committed usage row. */
 export async function enqueueUsage(
   payload: LlmUsageQueueMessage,
@@ -176,7 +163,7 @@ function usageIngestSiblingUrl(
   usageIngestUrl: string | undefined,
   siblingPath: string
 ): string | undefined {
-  const url = usageIngestUrl ? parsePublisherUrl(usageIngestUrl) : null;
+  const url = usageIngestUrl ? parseInternalServiceUrl(usageIngestUrl) : null;
   if (!url || url.pathname !== USAGE_INGEST_PATH || url.search || url.hash) return undefined;
   url.pathname = siblingPath;
   return url.toString();
@@ -198,17 +185,16 @@ export async function enqueueEnkryptUsage(
   );
 }
 
-const LOOPBACK_HOSTNAMES: ReadonlySet<string> = new Set(['localhost', '127.0.0.1', '[::1]']);
-
 /**
- * The Bearer secret must never cross the network in clear text, so plain HTTP is accepted only for
- * a loopback host, as in local fixtures; any other `http:` URL counts as no publisher.
+ * True when the Exa queue fallback would attempt a publication: the ingest URL maps to the
+ * sibling `/exa-usage` path and the publish secret is set. Callers use this to avoid reserving
+ * invocation time for a publication that cannot happen.
  */
-function exaUsageIngestUrl(usageIngestUrl: string | undefined): string | undefined {
-  const url = usageIngestSiblingUrl(usageIngestUrl, EXA_USAGE_INGEST_PATH);
-  if (!url) return undefined;
-  const { protocol, hostname } = new URL(url);
-  return protocol === 'https:' || LOOPBACK_HOSTNAMES.has(hostname) ? url : undefined;
+export function isExaUsagePublicationConfigured(): boolean {
+  return (
+    usageIngestSiblingUrl(USAGE_INGEST_URL, EXA_USAGE_INGEST_PATH) !== undefined &&
+    Boolean(USAGE_INGEST_PUBLISH_SECRET)
+  );
 }
 
 /**
@@ -219,7 +205,7 @@ function exaUsageIngestUrl(usageIngestUrl: string | undefined): string | undefin
 export async function enqueueExaUsage(record: ExaUsageRecord): Promise<UsageEnqueueOutcome> {
   return publishToUsageIngest(
     { usageId: record.id, usage_kind: 'exa_usage' },
-    exaUsageIngestUrl(USAGE_INGEST_URL),
+    usageIngestSiblingUrl(USAGE_INGEST_URL, EXA_USAGE_INGEST_PATH),
     record,
     { retryTransientFailures: true }
   );
@@ -237,7 +223,7 @@ async function publishToUsageIngest(
 
   // A URL that is not an absolute http(s) endpoint is configuration, not transport: no
   // request is attempted, so the caller must fall back exactly like a missing publisher.
-  const parsedUrl = parsePublisherUrl(ingestUrl);
+  const parsedUrl = parseInternalServiceUrl(ingestUrl);
   if (!parsedUrl) return reportUnavailable(identity, 'publisher_not_configured');
   const url = parsedUrl.toString();
 

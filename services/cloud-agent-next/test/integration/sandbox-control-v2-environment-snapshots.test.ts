@@ -21,7 +21,9 @@ import type {
 } from '../../src/sandbox-control/provider.js';
 import { ProviderSnapshotCreationError } from '../../src/sandbox-control/provider.js';
 import { RUNTIME_BASE_ABI } from '../../src/sandbox-control/runtime-release.js';
+import { DEADLINE_MS } from '../../src/sandbox-control/deadlines.js';
 import type { ControlPlaneRouteSpec } from '../../src/shared/control-plane-protocol.js';
+import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
 import {
   createFakeCredentialBroker,
   FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
@@ -34,7 +36,10 @@ import {
   installFakeRuntimeProxyPeer,
 } from './helpers/fake-session-peer.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
+import { seedRegistration } from './helpers/seed-registration.js';
 import { waitFor } from './wait-for.js';
+import { pendingNativeStart } from './helpers/pending-native-start.js';
+import { supervisorStartup } from '../fixtures/supervisor-startup.js';
 
 const SESSION = 'workspace_11111111-1111-1111-1111-111111111111';
 const KILO_SESSION = 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -484,7 +489,69 @@ describe('environment snapshot launch', () => {
     await releaseHeld(stub, () => provider.releaseLaunch());
   });
 
-  it('retries the same snapshot on the same allocation and deadline after a transient start failure', async () => {
+  it('does not retry an interrupted native snapshot launch during worktree deletion', async () => {
+    const fields = vi.spyOn(logger, 'withFields');
+    const native = await pendingNativeStart();
+    native.container.images['runtime-free'] = SNAPSHOT.baseImage;
+    const provider = createFakeProvider();
+    provider.adapter.launch = async (ref, { env: launchEnv }, options) => {
+      provider.launchEnvs.push({ ...launchEnv });
+      const result = await native.stub.launchWrapper({
+        allocationRef: ref,
+        command: supervisorStartup(),
+        env: {},
+        instance: 'standard-4',
+        snapshot: options?.snapshot,
+      });
+      return { startSource: result.startSource };
+    };
+    provider.adapter.stop = async ref => {
+      provider.stopRefs.push(ref);
+      return ref === null ? 'terminal' : native.stub.stop(ref);
+    };
+    const sandboxId = 'sbx__snapshot_delete_during_start';
+    const { stub } = await setup(sandboxId, provider);
+    let deletion: Promise<unknown> | undefined;
+    try {
+      await stub.prepare(prepareInput(BUILD));
+      await waitFor(() => expect(native.container.probes).toBe(1));
+      expect((await stub.getAllocationState()).kind).toBe('creating');
+      deletion = stub.deleteWorktreeResources({
+        worktreeId: 'worktree_11111111-1111-4111-8111-111111111111',
+        kiloUserId: 'user_123',
+        location: { sandboxId, provider: 'cloudflare-containers' },
+        sessionIds: [KILO_SESSION],
+      });
+      await waitFor(() => expect(native.container.destroys).toBe(1));
+      // Deletion has not yet confirmed its stop or changed the allocation reducer.
+      expect((await stub.getAllocationState()).kind).toBe('creating');
+      await waitFor(() =>
+        expect(fields.mock.calls.map(([record]) => record.diagnosticEvent)).toContain(
+          'launch_interrupted'
+        )
+      );
+      native.releaseDestroy();
+      await expect(deletion).resolves.toMatchObject({ deleted: true });
+      native.releaseProbe();
+      await new Promise(resolve => setTimeout(resolve, 25));
+
+      expect((await stub.getAllocationState()).kind).toBe('stopped');
+      expect(native.container.starts).toBe(1);
+      expect(native.container.running).toBe(false);
+      expect(provider.launchEnvs).toHaveLength(1);
+      expect(provider.stopRefs).toHaveLength(1);
+      const diagnostics = fields.mock.calls.map(([record]) => record.diagnosticEvent);
+      expect(diagnostics).not.toContain('snapshot_launch_failed');
+      expect(diagnostics).not.toContain('snapshot_launch_retry');
+      expect(diagnostics).not.toContain('create_failed');
+    } finally {
+      native.releaseProbe();
+      native.releaseDestroy();
+      await deletion;
+    }
+  });
+
+  it('retries the same snapshot on the same allocation with its own deadline after a transient start failure', async () => {
     const sandboxId = 'sbx__repo_launch_retry';
     const provider = createFakeProvider({
       launches: [
@@ -496,12 +563,13 @@ describe('environment snapshot launch', () => {
       ...WITH_SNAPSHOT,
       SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
     });
+    const before = Date.now();
     await stub.prepare({
       ...prepareInput(BUILD),
       sandboxSelection: { provider: 'cloudflare-containers' },
     });
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(2));
-    const launchDeadline = (await stub.getAllocationState()).createDeadlineAt;
+    const retryDeadline = (await stub.getAllocationState()).createDeadlineAt;
     const { wrapper, allocationId } = await connect(sandboxId, provider, 2);
 
     expect(provider.launchOptions).toEqual([
@@ -510,8 +578,16 @@ describe('environment snapshot launch', () => {
     ]);
     expect(provider.launchRefs[1]).toBe(provider.launchRefs[0]);
     expect(provider.stopRefs).toEqual([provider.launchRefs[0]]);
-    expect(provider.launchDeadlines[0]).toBe(launchDeadline);
-    expect(provider.launchDeadlines[1]).toBe(launchDeadline);
+    const [firstDeadline, launchedRetryDeadline] = provider.launchDeadlines;
+    if (firstDeadline === undefined || retryDeadline === null)
+      throw new Error('Missing launch deadlines');
+    expect(firstDeadline).toBeGreaterThanOrEqual(before + DEADLINE_MS.repositoryStartup);
+    expect(launchedRetryDeadline).toBe(retryDeadline);
+    expect(retryDeadline).toBeGreaterThan(firstDeadline);
+    expect(provider.launchCommands[1]?.argv.join('\n')).toContain(
+      String(retryDeadline + CONTROL_PLANE_TIMERS.sandbox.wrapperFirstConnectMs)
+    );
+    expect(environmentSnapshotDetails(peer)).toContain('Retrying the snapshot start');
     await prepareFrameOf(wrapper);
     expect(await readLaunchRecord(stub)).toEqual({
       allocationId,
@@ -574,6 +650,12 @@ describe('environment snapshot launch', () => {
       stopError: scenario.stopError,
     });
     const { stub, peer } = await setup('sbx__repo_retry_stop_failed', provider);
+    // The repeated stop is covered by unit tests; one attempt keeps this test fast.
+    await runInDurableObject(stub, instance => {
+      Object.assign(instance, {
+        sandboxTimers: () => ({ ...CONTROL_PLANE_TIMERS.sandbox, snapshotRetryStopMs: 0 }),
+      });
+    });
     await stub.prepare(prepareInput(BUILD));
     await waitForFailed(peer);
     expect(provider.launchEnvs).toHaveLength(1);
@@ -909,7 +991,7 @@ describe('environment snapshot session preparation', () => {
       }
     ).SANDBOX_SESSION;
     const session = sessionNamespace.getByName(sessionDoName('user_123', SESSION));
-    await session.registerSession({
+    await seedRegistration(session, {
       sandboxId,
       ...prepareInput({ ...BUILD, startCommands: ['serve'] }),
     });

@@ -1,0 +1,221 @@
+'use client';
+
+import { useEffect, useState, useRef } from 'react';
+import { useAtomValue } from 'jotai';
+import { Activity, ChevronUp } from 'lucide-react';
+import {
+  backgroundActivityLabel,
+  backgroundActivitySummary,
+  selectBackgroundActivity,
+  type BackgroundActivityState,
+  type BackgroundActivityItem,
+} from '@kilocode/cloud-agent-sdk/background-activity';
+import type { KiloSessionId } from '@kilocode/cloud-agent-sdk';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Button } from '@/components/ui/button';
+import { useManager } from './CloudAgentProvider';
+import type { OpenChildSession } from './ChildSessionSection';
+
+function ElapsedTime({ started }: { started: number }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 10_000);
+    return () => clearInterval(timer);
+  }, []);
+  const seconds = Math.max(0, Math.floor((now - started) / 1000));
+  return (
+    <span className="tabular-nums">
+      {seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m`}
+    </span>
+  );
+}
+
+function ActivityEntry({
+  item,
+  onOpenChildSession,
+}: {
+  item: BackgroundActivityItem;
+  onOpenChildSession: OpenChildSession;
+}) {
+  const label = item.kind === 'shell' ? item.title || item.command : item.description || item.agent;
+  const row = (
+    <>
+      <span
+        className="min-w-0 flex-1 truncate"
+        title={item.descendant ? `${label} · From ${item.parentLabel}` : label}
+      >
+        {label}
+      </span>
+      {item.descendant && (
+        <span className="text-muted-foreground sr-only max-w-28 sm:not-sr-only sm:truncate">
+          From {item.parentLabel}
+        </span>
+      )}
+      <span className="text-muted-foreground shrink-0">
+        {item.waiting ? 'Needs input' : 'Running'}
+      </span>
+      <span className="text-muted-foreground shrink-0">
+        <ElapsedTime started={item.time.started} />
+      </span>
+    </>
+  );
+  return (
+    <li className="py-0.5 text-xs">
+      {item.kind === 'subagent' ? (
+        <button
+          type="button"
+          className="hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-left focus-visible:ring-2 focus-visible:outline-none pointer-coarse:min-h-11"
+          onClick={() =>
+            onOpenChildSession({
+              sessionId: item.childSessionID as KiloSessionId,
+              description: item.description,
+              agent: item.agent,
+            })
+          }
+        >
+          <span className="sr-only">Open transcript: </span>
+          {row}
+        </button>
+      ) : (
+        <div className="flex items-center gap-2 px-2 py-1">{row}</div>
+      )}
+      {item.kind === 'shell' && item.title && (
+        <pre className="max-h-24 overflow-auto px-2 font-mono text-xs whitespace-pre-wrap break-all">
+          {item.command}
+        </pre>
+      )}
+    </li>
+  );
+}
+
+export function BackgroundActivityStrip({
+  state,
+  onRetry,
+  onOpenChildSession,
+}: {
+  state: BackgroundActivityState;
+  onRetry: () => void;
+  onOpenChildSession: OpenChildSession;
+}) {
+  const items = state.status === 'current' ? selectBackgroundActivity(state.inventory) : [];
+  const needed = state.status !== 'inactive' && (state.status !== 'current' || items.length > 0);
+  const [appeared, setAppeared] = useState(false);
+  const [open, setOpen] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const openingTranscript = useRef(false);
+  useEffect(() => {
+    if (!needed) {
+      setAppeared(false);
+      setOpen(false);
+      return;
+    }
+    const timer = setTimeout(() => setAppeared(true), 150);
+    return () => clearTimeout(timer);
+  }, [needed]);
+  const visible = needed && (appeared || state.status === 'unavailable');
+  const label = backgroundActivityLabel(state);
+  const announcement =
+    state.status === 'current'
+      ? items.length
+        ? label
+        : 'No background activity'
+      : state.status === 'unavailable'
+        ? label
+        : '';
+  return (
+    <>
+      <span className="sr-only" aria-live="polite" aria-atomic="true">
+        {announcement}
+      </span>
+      {visible && (
+        <Popover
+          open={open}
+          onOpenChange={value => {
+            if (value) openingTranscript.current = false;
+            setOpen(value);
+          }}
+        >
+          <PopoverTrigger asChild>
+            <button
+              ref={trigger}
+              type="button"
+              className="text-muted-foreground hover:text-foreground hover:bg-muted/40 focus-visible:ring-ring ml-auto flex min-h-8 shrink-0 items-center gap-2 rounded-md px-2 py-1 text-left text-xs whitespace-nowrap focus-visible:ring-2 focus-visible:outline-none pointer-coarse:min-h-11"
+              aria-label={label}
+              title={label}
+            >
+              <Activity className="size-3.5 shrink-0" aria-hidden="true" />
+              <span>{backgroundActivitySummary(state)}</span>
+              <ChevronUp className="size-3.5 shrink-0" aria-hidden="true" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent
+            onCloseAutoFocus={event => {
+              if (openingTranscript.current) event.preventDefault();
+            }}
+            side="top"
+            align="end"
+            collisionPadding={16}
+            aria-label="Background activity"
+            className="max-h-[min(24rem,var(--radix-popover-content-available-height))] w-[min(32rem,var(--radix-popover-content-available-width))] overflow-auto p-3"
+          >
+            {state.status === 'unavailable' ? (
+              <div className="space-y-2 text-xs">
+                <p>Status unavailable. Retry to check current background activity.</p>
+                <Button type="button" variant="outline" className="min-h-11" onClick={onRetry}>
+                  Retry
+                </Button>
+              </div>
+            ) : state.status !== 'current' ? (
+              <p className="text-muted-foreground text-xs">Checking background activity…</p>
+            ) : (
+              (['subagent', 'shell'] as const).map(kind => {
+                const group = items.filter(item => item.kind === kind);
+                return group.length ? (
+                  <section
+                    key={kind}
+                    aria-label={kind === 'subagent' ? 'Agents' : 'Shells'}
+                    className="mb-2 last:mb-0"
+                  >
+                    <h3 className="mb-1 px-2 text-xs font-medium">
+                      {kind === 'subagent' ? 'Agents' : 'Shells'}
+                    </h3>
+                    <ul>
+                      {group.map(item => (
+                        <ActivityEntry
+                          key={item.id}
+                          item={item}
+                          onOpenChildSession={entry => {
+                            openingTranscript.current = true;
+                            trigger.current?.focus();
+                            setOpen(false);
+                            onOpenChildSession(entry);
+                          }}
+                        />
+                      ))}
+                    </ul>
+                  </section>
+                ) : null;
+              })
+            )}
+          </PopoverContent>
+        </Popover>
+      )}
+    </>
+  );
+}
+
+export function SessionBackgroundActivityStrip({
+  onOpenChildSession,
+}: {
+  onOpenChildSession: OpenChildSession;
+}) {
+  const manager = useManager();
+  const state = useAtomValue(manager.atoms.backgroundActivity);
+  return (
+    <BackgroundActivityStrip
+      state={state}
+      onRetry={manager.retryBackgroundActivity}
+      onOpenChildSession={onOpenChildSession}
+    />
+  );
+}

@@ -4,7 +4,7 @@ import { isOrganizationFeatureEnabled } from '@kilocode/web-shared/lib/ai-gatewa
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { getDomain } from 'tldts';
 
-export type ManagedGatewayId = 'openrouter' | 'vercel';
+export type ManagedGatewayId = 'openrouter';
 
 export type OrganizationGatewaySettings = {
   disabledGateways: ReadonlySet<ManagedGatewayId>;
@@ -27,7 +27,6 @@ export function getOrganizationGatewaySettings(
   }
   const disabledGateways = new Set<ManagedGatewayId>();
   if (settings.disable_openrouter) disabledGateways.add('openrouter');
-  if (settings.disable_vercel_ai_gateway) disabledGateways.add('vercel');
   return { disabledGateways, dataRegion: settings.data_region ?? null };
 }
 
@@ -37,8 +36,6 @@ export function getManagedGatewayFromUrl(url: string): ManagedGatewayId | undefi
   switch (getDomain(hostname, { allowPrivateDomains: false })) {
     case 'openrouter.ai':
       return 'openrouter';
-    case 'vercel.sh':
-      return 'vercel';
     default:
       return undefined;
   }
@@ -48,8 +45,5 @@ export function isManagedGatewayDisabled(
   settings: OrganizationGatewaySettings,
   providerType: Provider['type']
 ): providerType is ManagedGatewayId {
-  return (
-    (providerType === 'openrouter' || providerType === 'vercel') &&
-    settings.disabledGateways.has(providerType)
-  );
+  return providerType === 'openrouter' && settings.disabledGateways.has(providerType);
 }

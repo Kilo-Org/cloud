@@ -846,6 +846,101 @@ describe('kiloPassRouter', () => {
       });
     });
 
+    it('answers an ended pass from stored state without reading the provider', async () => {
+      const stripeMock = getStripeMock();
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-get-state-ended@example.com',
+      });
+      await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_test_ended_read',
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Monthly,
+        status: 'canceled',
+      });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.getState();
+
+      expect(result.subscription).toEqual(
+        expect.objectContaining({
+          status: 'canceled',
+          tier: KiloPassTier.Tier49,
+          cadence: KiloPassCadence.Monthly,
+          endedAt: expect.any(String),
+          currentPeriodUsageUsd: 0,
+        })
+      );
+      // A lapsed pass must resolve even when the provider read would fail: the
+      // stored status and end date are the whole answer.
+      expect(stripeMock.subscriptions.retrieve).not.toHaveBeenCalled();
+    });
+
+    it('reports no end date when the provider ends a pass without a timestamp', async () => {
+      const stripeMock = getStripeMock();
+      // A terminal provider status can reach a row whose webhook never landed,
+      // and Stripe does not always report an end date for such a subscription.
+      stripeMock.subscriptions.retrieve.mockResolvedValue({
+        id: 'sub_test_provider_ended_no_date',
+        status: 'unpaid',
+        ended_at: null,
+        canceled_at: null,
+      });
+
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-get-state-provider-ended-no-date@example.com',
+      });
+      await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_test_provider_ended_no_date',
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+      });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.getState();
+
+      expect(result.subscription).toEqual(
+        expect.objectContaining({
+          status: 'unpaid',
+          endedAt: null,
+        })
+      );
+    });
+
+    it('reports the provider canceled_at date when the provider has no ended_at', async () => {
+      const stripeMock = getStripeMock();
+      const canceledAtSeconds = 1_760_000_000;
+      stripeMock.subscriptions.retrieve.mockResolvedValue({
+        id: 'sub_test_provider_ended_canceled_at',
+        status: 'unpaid',
+        ended_at: null,
+        canceled_at: canceledAtSeconds,
+      });
+
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-get-state-provider-ended-canceled-at@example.com',
+      });
+      await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_test_provider_ended_canceled_at',
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+      });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.getState();
+
+      expect(result.subscription).toEqual(
+        expect.objectContaining({
+          status: 'unpaid',
+          endedAt: new Date(canceledAtSeconds * 1000).toISOString(),
+        })
+      );
+    });
+
     it('throws BAD_REQUEST when subscription exists but user has no stripe customer', async () => {
       const user = await insertTestUser({
         google_user_email: 'kilo-pass-get-state-no-stripe@example.com',
@@ -4474,6 +4569,55 @@ describe('kiloPassRouter', () => {
       expect(result.hasMore).toBe(false);
       expect(result.cursor).toBeNull();
     });
+
+    it('lists the invoices of a canceled pass', async () => {
+      const stripeMock = getStripeMock();
+      const invoiceCreatedTs = Math.floor(Date.now() / 1000) - 86400;
+      stripeMock.invoices.list.mockResolvedValue({
+        data: [
+          {
+            id: 'in_canceled_1',
+            created: invoiceCreatedTs,
+            amount_due: 4900,
+            currency: 'usd',
+            status: 'paid',
+            hosted_invoice_url: 'https://stripe.example.test/invoice/canceled',
+            invoice_pdf: 'https://stripe.example.test/invoice/canceled.pdf',
+            lines: { data: [{ description: 'Kilo Pass Tier 49' }] },
+          },
+        ],
+      });
+
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-billing-history-canceled@example.com',
+      });
+      await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_ended_history_test',
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Monthly,
+        status: 'canceled',
+      });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.getBillingHistory({});
+
+      // A lapsed pass keeps its receipts, so the read still answers for it.
+      expect(stripeMock.invoices.list).toHaveBeenCalledWith(
+        expect.objectContaining({ subscription: 'sub_ended_history_test' })
+      );
+      expect(result.entries).toHaveLength(1);
+      const entry = result.entries[0];
+      if (!entry) throw new Error('Expected at least one billing history entry');
+      expect(entry.kind).toBe('stripe');
+      if (entry.kind !== 'stripe') throw new Error('Expected stripe entry');
+      expect(entry.id).toBe('in_canceled_1');
+      expect(entry.amountCents).toBe(4900);
+      expect(entry.currency).toBe('usd');
+      expect(entry.status).toBe('paid');
+      expect(result.hasMore).toBe(false);
+      expect(result.cursor).toBeNull();
+    });
   });
 
   describe('getCreditHistory', () => {
@@ -4495,6 +4639,32 @@ describe('kiloPassRouter', () => {
       const caller = await createCallerForUser(user.id);
       const result = await caller.kiloPass.getCreditHistory({});
 
+      expect(result.entries.length).toBeGreaterThanOrEqual(1);
+      const entry = result.entries[0];
+      if (!entry) throw new Error('Expected at least one credit history entry');
+      expect(entry.kind).toBe('base');
+      expect(entry.amountUsd).toBe(10);
+    });
+
+    it('returns issuance items for a canceled pass', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-credit-history-canceled@example.com',
+      });
+
+      const { id: subscriptionId } = await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_ended_history_credit_test',
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'canceled',
+      });
+
+      await insertBaseCreditsIssuance({ subscriptionId, kiloUserId: user.id });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.getCreditHistory({});
+
+      // A lapsed pass keeps the credits it issued, so the ledger still answers.
       expect(result.entries.length).toBeGreaterThanOrEqual(1);
       const entry = result.entries[0];
       if (!entry) throw new Error('Expected at least one credit history entry');

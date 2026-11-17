@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "جلسة الوكيل لديك بها تحديث",
-      "chatMessage": "لديك رسالة جديدة",
-      "instanceLifecycle": "المثيل لديك به تحديث",
-      "scheduledAction": "إجراء مجدول به تحديث",
       "lowBalance": "رصيدك يحتاج إلى انتباه",
       "spendAlert": "إنفاقك يحتاج إلى انتباه",
       "securityFinding": "نتيجة أمان تحتاج إلى انتباه",
@@ -13,30 +10,10 @@
       "activeAgentsGlanceable": "الوكلاء النشطون لديهم تحديث"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "اكتملت المهمة"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "فشل: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "تمت المقاطعة: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
       "title": "{{sessionTitle}}",
       "body": "{{message}}"
-    }
-  },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · بدون عنوان",
-      "body": "{{bodyPreview}}"
     }
   },
   "internal": {
@@ -48,50 +25,21 @@
       "title": "تنبيه الإنفاق",
       "body": "تجاوز إنفاق {{scopeName}} ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "نتيجة أمان جديدة ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} في {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "نتيجة أمان جديدة ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "تحذير SLA",
-      "body": "{{findingTitle}} في {{repoFullName}}"
+      "title": "تحذير SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "خرق SLA",
-      "body": "{{findingTitle}} في {{repoFullName}}"
+      "title": "خرق SLA"
     },
     "securityLifecycle": {
       "title": "Kilo",
       "body": "فحص أمان به تحديث"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} جاهز",
-      "body": "اضغط لبدء الدردشة."
-    },
-    "startFailed": {
-      "title": "فشل بدء {{instanceName}}",
-      "body": "فشل البدء."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "سيُعاد تشغيل {{instanceName}} قريبًا",
-      "body": "إعادة التشغيل مجدولة في {{when}}."
-    },
-    "restartCancelled": {
-      "title": "تم إلغاء إعادة تشغيل {{instanceName}}",
-      "body": "تم إلغاء إعادة التشغيل المجدولة سابقًا."
-    },
-    "versionChangeNotice": {
-      "title": "ستتم ترقية {{instanceName}} قريبًا",
-      "bodyWithTag": "الترقية إلى {{targetImageTag}} في {{when}}.",
-      "bodyWithoutTag": "ترقية مجدولة في {{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "تم إلغاء ترقية {{instanceName}}",
-      "body": "تم إلغاء الترقية المجدولة سابقًا."
     }
   },
   "sessionReady": {

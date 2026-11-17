@@ -45,7 +45,7 @@ describe('design-gate probe', () => {
     // written by `design-gate prepare` into +native-intent.tsx of its two worktrees
     // only), never applied app-wide: the entry registers no filter for this
     // message and config carries no gate flag.
-    expect(probeSource).toContain('__kiloDesignProofSource');
+    expect(probeSource).toContain('if (globalThis.__kiloDesignProofSource !== undefined)');
     expect(entrySource).not.toContain("Can't perform a React state update on a component");
     expect(configSource).not.toContain('EXPO_PUBLIC_DESIGN_GATE');
   });

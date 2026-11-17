@@ -294,7 +294,11 @@ export const LIVE_ACTIVITY_RELEVANCE = {
 
 /**
  * The smallest gap between adjacent relevance bands, derived from the table so
- * retuning it cannot widen a band into its neighbor's range unnoticed.
+ * retuning it cannot widen a band into its neighbor's range unnoticed. A
+ * degenerate table (fewer than two distinct values) throws: a bands-less
+ * tie-break would make every recency score non-finite and serialize an absent
+ * `relevance-score` in its place, so the derivation fails loudly at module
+ * load instead.
  */
 const LIVE_ACTIVITY_BAND_STEP = ((): number => {
   const bands = [...Object.values(LIVE_ACTIVITY_RELEVANCE)].sort((a, b) => a - b);
@@ -307,6 +311,12 @@ const LIVE_ACTIVITY_BAND_STEP = ((): number => {
   }
   return smallest;
 })();
+
+if (!Number.isFinite(LIVE_ACTIVITY_BAND_STEP)) {
+  throw new Error(
+    'LIVE_ACTIVITY_RELEVANCE bands must have at least two distinct values to derive the tie-break limit'
+  );
+}
 
 /**
  * The bound of the recency tie-break term (`recencyTerm` in

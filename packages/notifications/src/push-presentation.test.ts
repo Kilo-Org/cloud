@@ -548,6 +548,27 @@ describe('LIVE_ACTIVITY_TIE_BREAK_LIMIT', () => {
       // bands must be at least one wider than it can cover.
       expect(bands[index] - bands[index - 1]).toBeGreaterThan(LIVE_ACTIVITY_TIE_BREAK_LIMIT);
     }
+    // A non-finite limit would pass the loop vacuously and serialize an
+    // absent relevance score, so the derived limit must be a real number.
+    expect(Number.isFinite(LIVE_ACTIVITY_TIE_BREAK_LIMIT)).toBe(true);
     expect(LIVE_ACTIVITY_TIE_BREAK_LIMIT).toBeGreaterThan(0);
+  });
+
+  it('resolves the limit from real band values, not a degenerate table', () => {
+    // The derivation the module runs; reports Infinity for a table with
+    // fewer than two distinct values, which the module guard turns into a
+    // load-time error.
+    const stepOf = (values: Record<string, number>): number => {
+      const bands = [...Object.values(values)].sort((a, b) => a - b);
+      let smallest = Number.POSITIVE_INFINITY;
+      for (let index = 1; index < bands.length; index += 1) {
+        const gap = (bands[index] ?? 0) - (bands[index - 1] ?? 0);
+        if (gap > 0 && gap < smallest) smallest = gap;
+      }
+      return smallest;
+    };
+    expect(stepOf({ a: 60, b: 40, c: 20 })).toBe(20);
+    expect(stepOf({ a: 60, b: 60 })).toBe(Infinity);
+    expect(stepOf({ a: 60 })).toBe(Infinity);
   });
 });

@@ -1,6 +1,8 @@
 /**
  * Options for the `expo-dev-client` config plugin.
  *
+ * Probe marker: head. Do not copy.
+ *
  * The developer menu is not the product, and on iOS it opens over the app at
  * launch: `DevMenuManager` (expo-dev-menu/ios/DevMenuManager.swift) auto-shows
  * it while onboarding is unfinished or `EXDevMenuShowsAtLaunch` (default true,

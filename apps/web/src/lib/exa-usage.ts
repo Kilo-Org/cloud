@@ -1,7 +1,7 @@
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { exa_monthly_usage, exa_usage_log, kilocode_users, type User } from '@kilocode/db/schema';
 import { and, eq, sql } from 'drizzle-orm';
-import { isOrganizationMember } from '@kilocode/worker-utils/account-access';
+import { hasEffectiveOrganizationAccess } from '@kilocode/worker-utils/organization-membership';
 import { scheduleOrganizationLowBalanceAlert } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import type { OrganizationUsageMutationResult } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@kilocode/web-shared/lib/constants';
@@ -189,8 +189,11 @@ export async function recordExaUsage(
 
 /**
  * Resolves the payer a record names inside the writing transaction. A record is
- * written only when its user exists and a non-null organization is a live one the
- * user belongs to; otherwise the payer cannot be charged and nothing may be recorded.
+ * written only when its user exists and a non-null organization is a live one
+ * the user may act for under the same effective-membership rule the request
+ * path used (a direct membership, or a permitted role on the live parent
+ * organization); otherwise the payer cannot be charged and nothing may be
+ * recorded.
  */
 async function unresolvablePayer(
   tx: DrizzleTransaction,
@@ -205,7 +208,12 @@ async function unresolvablePayer(
 
   if (params.organizationId === null) return null;
 
-  if (!(await isOrganizationMember(tx, params.organizationId, params.userId))) {
+  if (
+    !(await hasEffectiveOrganizationAccess(tx, {
+      kiloUserId: params.userId,
+      organizationId: params.organizationId,
+    }))
+  ) {
     return 'organization_membership_missing';
   }
 

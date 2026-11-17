@@ -457,6 +457,93 @@ describe('Exa Usage Tracking', () => {
       );
     });
 
+    test('charges an organization the user reaches only through a parent-organization role', async () => {
+      const user = await insertTestUser({
+        microdollars_used: 0,
+        total_microdollars_acquired: 100_000_000,
+      });
+      const parent = await createTestOrganization(
+        `exa-parent-${crypto.randomUUID()}`,
+        user.id,
+        50_000
+      );
+      passFixtureOrganizationIds.push(parent.id);
+      const [child] = await db
+        .insert(organizations)
+        .values({
+          name: `exa-child-${crypto.randomUUID()}`,
+          parent_organization_id: parent.id,
+          total_microdollars_acquired: 50_000,
+          microdollars_balance: 50_000,
+        })
+        .returning();
+      passFixtureOrganizationIds.push(child.id);
+
+      await expect(
+        recordExaUsage({
+          ...usageIdentity(),
+          userId: user.id,
+          organizationId: child.id,
+          path: '/contents',
+          costMicrodollars: 9000,
+          chargedToBalance: true,
+          freeAllowanceMicrodollars: 10_000_000,
+        })
+      ).resolves.toBe('recorded');
+
+      const [chargedChild] = await db
+        .select({ microdollars_used: organizations.microdollars_used })
+        .from(organizations)
+        .where(eq(organizations.id, child.id));
+      expect(chargedChild.microdollars_used).toBe(9000);
+    });
+
+    test('rejects a record the parent-role holder cannot resolve and a plain parent member inherits nothing', async () => {
+      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const parentOwner = await insertTestUser();
+      const parent = await createTestOrganization(
+        `exa-parent-${crypto.randomUUID()}`,
+        parentOwner.id,
+        50_000
+      );
+      passFixtureOrganizationIds.push(parent.id);
+      const plainParentMember = await insertTestUser();
+      await db.insert(organization_memberships).values({
+        organization_id: parent.id,
+        kilo_user_id: plainParentMember.id,
+        role: 'member',
+      });
+      const [child] = await db
+        .insert(organizations)
+        .values({ name: `exa-child-${crypto.randomUUID()}`, parent_organization_id: parent.id })
+        .returning();
+      passFixtureOrganizationIds.push(child.id);
+      const identity = usageIdentity();
+
+      await expect(
+        recordExaUsage({
+          ...identity,
+          userId: plainParentMember.id,
+          organizationId: child.id,
+          path: '/contents',
+          costMicrodollars: 9000,
+          chargedToBalance: true,
+          freeAllowanceMicrodollars: 10_000_000,
+        })
+      ).resolves.toBe('rejected');
+
+      const sourceRows = await db
+        .select()
+        .from(exa_usage_log)
+        .where(eq(exa_usage_log.organization_id, child.id));
+      expect(sourceRows).toHaveLength(0);
+      expect(consoleError).toHaveBeenCalledTimes(1);
+      expect(consoleError).toHaveBeenCalledWith(
+        '[exa-usage] usage record rejected: payer could not be resolved',
+        { usage_id: identity.id, reason: 'organization_membership_missing' }
+      );
+    });
+
     test('rejects an organization record once the organization is marked deleted', async () => {
       const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
       const user = await insertTestUser({

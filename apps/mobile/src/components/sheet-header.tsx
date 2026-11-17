@@ -26,7 +26,6 @@ export function SheetHeader({
   variant = 'default',
   topInset = 'always',
   surfaceClassName = 'bg-background',
-  titleRef,
 }: {
   title: string;
   /**
@@ -86,12 +85,6 @@ export function SheetHeader({
    * near-black window behind it; the app canvas colour is the default.
    */
   surfaceClassName?: string;
-  /**
-   * The title's native node. A sheet that opens into a modal environment
-   * needs a focus target for assistive technology (`sendAccessibilityEvent`
-   * on Android), and the title is the one node every sheet has.
-   */
-  titleRef?: Ref<HostInstance>;
 }) {
   const { t } = useTranslation();
   const colors = useThemeColors();

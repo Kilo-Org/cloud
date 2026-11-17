@@ -1100,8 +1100,8 @@ export async function fetchGitHubPullRequestForHeadBranch(params: {
     request: { signal: AbortSignal.timeout(10_000) },
   });
 
-  const matching = data.filter((pull) => pull.head.ref === headBranch);
-  const pull = matching.find((candidate) => candidate.state === 'open') ?? matching[0];
+  const matching = data.filter(pull => pull.head.ref === headBranch);
+  const pull = matching.find(candidate => candidate.state === 'open') ?? matching[0];
   return pull ? { number: pull.number, url: pull.html_url } : null;
 }
 

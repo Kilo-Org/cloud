@@ -165,7 +165,7 @@ export type SeatCountReadoutInput = Readonly<{
 }>;
 
 /**
- * The seats row's value, shared by every seat count's fallout rate. A total is
+ * The seats row's value, shared by the hub and the billing screen. A total is
  * printed only when the organization enforces seats and actually bought some:
  * `getOrganizationSeatUsage` answers `seat_count || 0`, so a legacy
  * organization would read `3 / 0` — a row that reads as over capacity on the

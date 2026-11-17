@@ -46,6 +46,7 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 vi.mock('@/i18n', () => ({ i18n: { t: (key: string) => key } }));
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: () => undefined }));
 vi.mock('@/components/ui/icons', () => ({
   ExternalLink: 'ExternalLink',
   GitMerge: 'GitMerge',

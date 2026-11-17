@@ -75,6 +75,12 @@ export function ScopeListScreen() {
                 />
               ))
             : null}
+          {/* The organization placeholders join the group the organizations
+              land in, so the rows replace them inside one surface instead of
+              a second card appearing and disappearing below it. */}
+          {orgsBody.status === 'loading'
+            ? [0, 1].map(index => <RowSkeleton key={index} tile />)
+            : null}
         </RowGroup>
 
         {orgsBody.status === 'error' ? (
@@ -85,13 +91,6 @@ export function ScopeListScreen() {
             onRetry={() => void refetch()}
             isRetrying={orgsBody.isRetrying}
           />
-        ) : null}
-
-        {orgsBody.status === 'loading' ? (
-          <RowGroup>
-            <RowSkeleton tile subtitle />
-            <RowSkeleton tile subtitle />
-          </RowGroup>
         ) : null}
       </TabScreenScrollView>
     </View>

@@ -7,7 +7,7 @@ import {
 } from '@kilocode/app-shared/security-agent';
 import { useRouter } from 'expo-router';
 import { ExternalLink, GitMerge } from '@/components/ui/icons';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -20,14 +20,12 @@ import { storedText } from '@/components/security-agent/stored-text';
 import { getDeadlineCopy, isOpenDeadline } from '@/lib/security-agent-copy';
 import { FindingStatusBadge } from '@/components/security-agent/finding-status-badge';
 import { Card } from '@/components/ui/card';
-import { ConfigureRow } from '@/components/ui/configure-row';
 import { KvRow } from '@/components/ui/kv-row';
+import { RowFrame } from '@/components/ui/row-frame';
 import { RowGroup } from '@/components/ui/row-group';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { formatDate } from '@/lib/format';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { getSecurityAgentPath, type SecurityFinding } from '@/lib/security-agent';
@@ -96,14 +94,23 @@ function DismissalOrSupersessionNote({
   if (supersedingFindingId) {
     return (
       <RowGroup leadingTile>
-        <ConfigureRow
+        {/* The title wraps: "Superseded by" leads a sentence-length line in
+            several catalogs, and an ellipsized destination names the wrong
+            thing. */}
+        <RowFrame
           icon={GitMerge}
-          title={t('securityAgent.findingDetails.supersededBy')}
-          subtitle={t('securityAgent.findingDetails.supersededByDescription')}
+          trailing={{ kind: 'chevron' }}
           onPress={() => {
             pushOnce(getSecurityAgentPath(scope, `findings/${supersedingFindingId}`));
           }}
-        />
+        >
+          <Text className="text-sm font-medium text-foreground">
+            {t('securityAgent.findingDetails.supersededBy')}
+          </Text>
+          <Text variant="muted" className="mt-0.5 text-xs">
+            {t('securityAgent.findingDetails.supersededByDescription')}
+          </Text>
+        </RowFrame>
       </RowGroup>
     );
   }
@@ -132,7 +139,6 @@ function DismissalOrSupersessionNote({
 export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsPanelProps>) {
   const router = useRouter();
   const { t } = useTranslation();
-  const colors = useThemeColors();
   const now = useRelativeTimeNow();
   const severity = getFindingSeverityPresentation(finding.severity);
   const status = getFindingLifecycleStatusPresentation(finding);
@@ -332,18 +338,17 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
       </CollapsibleSection>
 
       {advisoryUrl ? (
-        <Pressable
-          className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 active:opacity-70')}
-          onPress={() => {
-            openFindingLink(router, advisoryUrl, t('securityAgent.findingDetails.viewAdvisory'));
-          }}
-          accessibilityRole="link"
-        >
-          <ExternalLink size={14} color={colors.mutedForeground} />
-          <Text className="text-sm font-medium">
-            {t('securityAgent.findingDetails.viewAdvisory')}
-          </Text>
-        </Pressable>
+        <RowGroup leadingTile>
+          <RowFrame
+            icon={ExternalLink}
+            title={t('securityAgent.findingDetails.viewAdvisory')}
+            trailing={{ kind: 'chevron' }}
+            accessibilityRole="link"
+            onPress={() => {
+              openFindingLink(router, advisoryUrl, t('securityAgent.findingDetails.viewAdvisory'));
+            }}
+          />
+        </RowGroup>
       ) : null}
     </View>
   );

@@ -9,9 +9,9 @@ import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { PillGroup } from '@/components/security-agent/settings-pill-group';
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
 import { useSettingsSaveFeedback } from '@/components/security-agent/settings-save-feedback';
-import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
+import { PreferenceRow } from '@/components/ui/preference-row';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Section } from '@/components/ui/section';
@@ -56,10 +56,10 @@ function AutomationSettingsSkeleton() {
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('securityAgent.automation.title')} />
       <View className={SCREEN_BODY_CLASS}>
-        <RowGroup>
-          <RowSkeleton subtitle />
-          <RowSkeleton subtitle />
-          <RowSkeleton subtitle />
+        <RowGroup leadingTile>
+          <RowSkeleton tile subtitle />
+          <RowSkeleton tile subtitle />
+          <RowSkeleton tile subtitle />
         </RowGroup>
       </View>
     </View>
@@ -245,8 +245,8 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
       {feedback.node}
       <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
         <Section label={analysisSection}>
-          <RowGroup>
-            <ToggleRow
+          <RowGroup leadingTile>
+            <PreferenceRow
               icon={ScanSearch}
               title={t('securityAgent.automation.analyzeNewFindings')}
               subtitle={t('securityAgent.automation.autoAnalysisDescription')}
@@ -270,8 +270,8 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
                 disabled={!canManage}
                 onChange={setAutoAnalysisMinSeverity}
               />
-              <RowGroup>
-                <ToggleRow
+              <RowGroup leadingTile>
+                <PreferenceRow
                   icon={Clock}
                   title={t('securityAgent.automation.includeExistingFindings')}
                   accessibilityLabel={formatList(
@@ -289,8 +289,8 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
         </Section>
 
         <Section label={remediationSection}>
-          <RowGroup>
-            <ToggleRow
+          <RowGroup leadingTile>
+            <PreferenceRow
               icon={GitPullRequest}
               title={t('securityAgent.automation.openFixPrs')}
               subtitle={t('securityAgent.automation.autoRemediationDescription')}
@@ -312,8 +312,8 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
                 disabled={!canManage}
                 onChange={setAutoRemediationMinSeverity}
               />
-              <RowGroup>
-                <ToggleRow
+              <RowGroup leadingTile>
+                <PreferenceRow
                   icon={Clock}
                   title={t('securityAgent.automation.includeExistingFindings')}
                   accessibilityLabel={formatList(
@@ -327,7 +327,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
                   disabled={!canManage}
                   onValueChange={setAutoRemediationIncludeExisting}
                 />
-                <ToggleRow
+                <PreferenceRow
                   icon={CircleCheck}
                   title={t('securityAgent.automation.requireApproval')}
                   subtitle={t('securityAgent.automation.requireApprovalSubtitle')}
@@ -341,8 +341,8 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
         </Section>
 
         <Section label={t('securityAgent.automation.autoDismiss')}>
-          <RowGroup>
-            <ToggleRow
+          <RowGroup leadingTile>
+            <PreferenceRow
               icon={Trash2}
               title={t('securityAgent.automation.dismissNonExploitable')}
               subtitle={t('securityAgent.automation.autoDismissDescription')}

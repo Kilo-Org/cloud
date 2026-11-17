@@ -11,10 +11,10 @@ import { View } from 'react-native';
 import { PillGroup } from '@/components/security-agent/settings-pill-group';
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
 import { useSettingsSaveFeedback } from '@/components/security-agent/settings-save-feedback';
-import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { FormField } from '@/components/ui/form-field';
+import { PreferenceRow } from '@/components/ui/preference-row';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Section } from '@/components/ui/section';
@@ -54,12 +54,12 @@ function NotificationSettingsSkeleton() {
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('common.notifications')} />
       <View className={SCREEN_BODY_CLASS}>
-        <RowGroup>
-          <RowSkeleton subtitle />
-          <RowSkeleton subtitle />
+        <RowGroup leadingTile>
+          <RowSkeleton tile subtitle />
+          <RowSkeleton tile subtitle />
         </RowGroup>
-        <RowGroup>
-          <RowSkeleton subtitle />
+        <RowGroup leadingTile>
+          <RowSkeleton tile subtitle />
         </RowGroup>
       </View>
     </View>
@@ -223,8 +223,8 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
           </Text>
         )}
         <Section label={personal ? undefined : t('securityAgent.notifications.newFindingSection')}>
-          <RowGroup>
-            <ToggleRow
+          <RowGroup leadingTile>
+            <PreferenceRow
               icon={Bell}
               title={
                 personal
@@ -260,8 +260,8 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
         </Section>
 
         <Section label={personal ? undefined : t('securityAgent.notifications.slaSection')}>
-          <RowGroup>
-            <ToggleRow
+          <RowGroup leadingTile>
+            <PreferenceRow
               icon={Clock3}
               title={
                 personal
@@ -300,6 +300,11 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
                   isValidDayCount(slaNotificationWarningDays)
                     ? undefined
                     : t('securityAgent.notifications.slaLeadTimeError')
+                }
+                accessibilityHint={
+                  isValidDayCount(slaNotificationWarningDays)
+                    ? undefined
+                    : t('securityAgent.sla.enterWholeNumber')
                 }
                 keyboardType="number-pad"
                 disabled={!canManage}

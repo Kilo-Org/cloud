@@ -3,15 +3,13 @@ import { ShieldOff } from '@/components/ui/icons';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, View } from 'react-native';
-import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
-import { ScreenHeader } from '@/components/screen-header';
+import { SheetHeader } from '@/components/sheet-header';
 import { PillGroup } from '@/components/security-agent/settings-pill-group';
 import { DismissFindingSkeleton } from '@/components/security-agent/dismiss-finding-skeleton';
 import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
@@ -23,11 +21,9 @@ import {
 import { useSecurityAgentCapability } from '@/lib/hooks/use-security-agent';
 import { securityMutationCopyKey } from '@/lib/security-agent-ledger';
 import { useSecurityDismissDraft } from '@/lib/hooks/use-security-dismiss-draft';
-import { useFormSheetHeaderTopInset } from '@/lib/navigation/sheet-header-top-inset';
 import { useDismissSecurityFinding, useSecurityFinding } from '@/lib/hooks/use-security-findings';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { cn } from '@/lib/utils';
-import { useMutedDisabledInk } from '@/lib/hooks/use-theme-colors';
 
 // The five GitHub dismissal reasons the backend's DismissReasonSchema accepts
 // (apps/web/src/lib/security-agent/core/schemas.ts:13-19) — exact value/label
@@ -54,10 +50,6 @@ type DismissFindingScreenProps = {
 export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindingScreenProps>) {
   const router = useRouter();
   const { t } = useTranslation();
-  const mutedDisabledInk = useMutedDisabledInk();
-  // This header is inside a formSheet route: the sheet edge owns the top
-  // clearance unless the sheet is the stack's first screen.
-  const modalTopInset = useFormSheetHeaderTopInset();
   const capability = useSecurityAgentCapability(scope);
   const findingQuery = useSecurityFinding(scope, findingId);
   const [reason, setReason] = useState<DismissReason | null>(null);
@@ -140,10 +132,12 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (notFound) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader
+        <SheetHeader
           title={t('securityAgent.dismiss.title')}
-          modal
-          modalTopInset={modalTopInset}
+          variant="close"
+          onDone={() => {
+            router.back();
+          }}
         />
         <EmptyState
           icon={ShieldOff}
@@ -157,10 +151,12 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (findingQuery.isError && !findingQuery.data) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader
+        <SheetHeader
           title={t('securityAgent.dismiss.title')}
-          modal
-          modalTopInset={modalTopInset}
+          variant="close"
+          onDone={() => {
+            router.back();
+          }}
         />
         <QueryError
           message={t('securityAgent.dismiss.couldNotLoad')}
@@ -173,10 +169,12 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (capability.status === 'error') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader
+        <SheetHeader
           title={t('securityAgent.dismiss.title')}
-          modal
-          modalTopInset={modalTopInset}
+          variant="close"
+          onDone={() => {
+            router.back();
+          }}
         />
         <QueryError
           message={t('securityAgent.dismiss.couldNotCheckPermissions')}
@@ -200,10 +198,12 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (!capability.canManage) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader
+        <SheetHeader
           title={t('securityAgent.dismiss.title')}
-          modal
-          modalTopInset={modalTopInset}
+          variant="close"
+          onDone={() => {
+            router.back();
+          }}
         />
         <EmptyState
           icon={ShieldOff}
@@ -217,10 +217,12 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (finding.status !== 'open') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader
+        <SheetHeader
           title={t('securityAgent.dismiss.title')}
-          modal
-          modalTopInset={modalTopInset}
+          variant="close"
+          onDone={() => {
+            router.back();
+          }}
         />
         <EmptyState
           icon={ShieldOff}
@@ -241,7 +243,17 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('securityAgent.dismiss.title')} modal modalTopInset={modalTopInset} />
+      <SheetHeader
+        title={t('securityAgent.dismiss.title')}
+        onCancel={() => {
+          router.back();
+        }}
+        onDone={onSubmit}
+        // The commit waits for the reason the backend requires, and for a
+        // terminal rejection it stays down: the inline copy explains why.
+        doneDisabled={!reason || dismissBlocked}
+        doneBusy={dismissFinding.isPending}
+      />
       <ScrollView
         className="flex-1"
         contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-8')}
@@ -306,13 +318,6 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
         {dismissFailure === null ? null : (
           <Text className="text-sm text-destructive">{dismissFailure.message}</Text>
         )}
-
-        <Button disabled={!reason || dismissFinding.isPending || dismissBlocked} onPress={onSubmit}>
-          {dismissFinding.isPending ? (
-            <ActivityIndicator size="small" color={mutedDisabledInk} />
-          ) : null}
-          <Text>{t('securityAgent.dismiss.title')}</Text>
-        </Button>
       </ScrollView>
     </View>
   );

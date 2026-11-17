@@ -53,6 +53,7 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({ push: vi.fn() }),
   useFocusEffect: () => undefined,
 }));
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: () => undefined }));
 vi.mock('@/components/ui/icons', () => ({
   ExternalLink: 'ExternalLink',
   ScanSearch: 'ScanSearch',

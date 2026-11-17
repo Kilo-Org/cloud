@@ -76,8 +76,8 @@ vi.mock('@/components/security-agent/settings-save-button', () => ({
     return null;
   },
 }));
-vi.mock('@/components/security-agent/settings-toggle-row', () => ({
-  ToggleRow: (props: {
+vi.mock('@/components/ui/preference-row', () => ({
+  PreferenceRow: (props: {
     title: string;
     value: boolean;
     disabled: boolean;

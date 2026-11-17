@@ -141,8 +141,8 @@ vi.mock('@/components/platform-error-screen', () => ({
   },
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
-vi.mock('@/components/security-agent/settings-toggle-row', () => ({
-  ToggleRow: () => null,
+vi.mock('@/components/ui/preference-row', () => ({
+  PreferenceRow: () => null,
 }));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: () => null }));
 vi.mock('@/components/ui/icons', () => ({ Bot: 'Bot', ScrollText: 'ScrollText' }));

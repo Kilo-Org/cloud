@@ -62,10 +62,13 @@ function RepositorySettingsSkeleton() {
           <RowSkeleton />
           <RowSkeleton />
         </RowGroup>
-        <RowGroup>
-          <RowSkeleton subtitle />
-          <RowSkeleton subtitle />
-        </RowGroup>
+        {/* The picker's own rows are full-bleed one-line rows, not a grouped
+            card: their placeholders carry the same hairline the loaded rows
+            draw under themselves. */}
+        <View>
+          <RowSkeleton className="border-b-[0.5px] border-hair-soft" />
+          <RowSkeleton />
+        </View>
       </View>
     </View>
   );
@@ -259,10 +262,10 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
         // section label above it only repeats the screen title.
         <Section label={repositoriesBody.status === 'empty' ? undefined : t('common.repositories')}>
           {repositoriesBody.status === 'loading' && (
-            <RowGroup>
-              <RowSkeleton subtitle />
-              <RowSkeleton subtitle />
-            </RowGroup>
+            <View>
+              <RowSkeleton className="border-b-[0.5px] border-hair-soft" />
+              <RowSkeleton />
+            </View>
           )}
           {repositoriesFailed && (
             <QueryError

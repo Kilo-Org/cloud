@@ -4,7 +4,7 @@ import {
   getSecurityFindingAnalysisState,
 } from '@kilocode/app-shared/security-agent';
 import { ExternalLink, ScanSearch } from '@/components/ui/icons';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 
@@ -25,13 +25,13 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { KvRow } from '@/components/ui/kv-row';
+import { RowFrame } from '@/components/ui/row-frame';
 import { RowGroup } from '@/components/ui/row-group';
 import { Section } from '@/components/ui/section';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { AnalysisCapacityNotice } from '@/components/security-agent/analysis-capacity-notice';
 import { AnalysisRerunAction } from '@/components/security-agent/analysis-rerun-action';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { formatNumber } from '@/lib/format';
 import { SCREEN_BODY_CLASS, SCREEN_GUTTER_CLASS } from '@/lib/layout';
 import { useSecurityAnalysisCapacity } from '@/lib/hooks/use-security-agent';
@@ -46,7 +46,7 @@ import {
   getSecurityAnalysisDetailDescription,
   getSecurityAnalysisDetailTitle,
 } from '@/lib/security-agent-copy';
-import { cn, firstNonEmpty, parseTimestamp, timeAgo } from '@/lib/utils';
+import { firstNonEmpty, parseTimestamp, timeAgo } from '@/lib/utils';
 
 type FindingAnalysisPanelProps = {
   scope: string;
@@ -242,17 +242,17 @@ export function FindingAnalysisPanel({
       ) : null}
 
       {sessionHref ? (
-        <Pressable
-          className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 active:opacity-70')}
-          onPress={() => {
-            pushOnce(sessionHref);
-          }}
-        >
-          <ExternalLink size={14} color={colors.mutedForeground} />
-          <Text className="text-sm font-medium">
-            {t('securityAgent.analysis.watchInCloudAgent')}
-          </Text>
-        </Pressable>
+        <RowGroup leadingTile>
+          <RowFrame
+            icon={ExternalLink}
+            title={t('securityAgent.analysis.watchInCloudAgent')}
+            trailing={{ kind: 'chevron' }}
+            accessibilityRole="link"
+            onPress={() => {
+              pushOnce(sessionHref);
+            }}
+          />
+        </RowGroup>
       ) : null}
 
       {triageState && triage ? (

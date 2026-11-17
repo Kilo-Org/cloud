@@ -15,6 +15,7 @@ import { KvRow } from '@/components/ui/kv-row';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Section } from '@/components/ui/section';
+import { SectionHeaderSkeleton } from '@/components/ui/section-header-skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { DENSE_ROW_HIT_SLOP, ROW_TARGET_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
@@ -348,6 +349,7 @@ function RepoHealthSection({
         <EmptyState
           icon={FolderGit2}
           placement="top"
+          className="py-3"
           title={t('securityAgent.dashboard.noRepositoryData')}
           description={
             emptyGrant
@@ -429,28 +431,24 @@ export function DashboardSections(props: SectionProps) {
 type SkeletonRow = 1 | 2;
 
 /**
- * A section's placeholder: the eyebrow label over a `RowGroup` whose rows are
- * the shared `RowSkeleton`, so the placeholders and the rows they stand in for
- * share one geometry and the page does not move when the reads resolve.
+ * A section's placeholder: the shared `SectionHeaderSkeleton` label line over a
+ * `RowGroup` whose rows are the shared `RowSkeleton`, so the placeholders and
+ * the rows they stand in for share one geometry and the page does not move when
+ * the reads resolve. The label is a skeleton bar rather than a blank eyebrow,
+ * so a screen reader meets no header that names no section.
  */
 function SectionCardSkeleton({ rows }: Readonly<{ rows: readonly SkeletonRow[] }>) {
   return (
-    <Section label={placeholderLabel}>
+    <View className="gap-3">
+      <SectionHeaderSkeleton />
       <RowGroup>
         {rows.map((lines, index) => (
           <RowSkeleton key={index} subtitle={lines === 2} />
         ))}
       </RowGroup>
-    </Section>
+    </View>
   );
 }
-
-/**
- * The label a placeholder section wears while its copy is still unknown: one
- * space, at the eyebrow's own height, so the header holds its line without
- * naming a section that has not loaded.
- */
-const placeholderLabel = '\u00A0';
 
 /**
  * What the sections look like while the dashboard reads: one placeholder per

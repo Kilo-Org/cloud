@@ -131,11 +131,12 @@ vi.mock('@/components/screen-header', () => ({
   ScreenHeader: (props: { headerRight?: ReactNode }) =>
     createElement(Fragment, null, props.headerRight),
 }));
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: () => undefined }));
 vi.mock('@/components/ui/icons', () => ({ FolderGit2: 'FolderGit2' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
 vi.mock('@/components/ui/radio-group', () => ({ RadioGroup: 'RadioGroup' }));
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/ui/row-skeleton', () => ({ RowSkeleton: 'RowSkeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 
 const THREE_REPOS: readonly [RepoRow, RepoRow, RepoRow] = [
@@ -170,6 +171,12 @@ function repoRow(renderer: TestRenderer.ReactTestRenderer, index: number) {
     throw new Error(`repository row ${index} not found`);
   }
   return row;
+}
+
+// The reserve the loading branch paints: one `RowSkeleton` per repository the
+// loaded list would show, at the same one-line frame.
+function placeholderRows(renderer: TestRenderer.ReactTestRenderer) {
+  return renderer.root.findAll(node => String(node.type) === 'RowSkeleton');
 }
 
 function textContents(renderer: TestRenderer.ReactTestRenderer): unknown[] {
@@ -312,14 +319,16 @@ describe('RepositorySettingsScreen repository picker', () => {
     });
   });
 
-  it('keeps the loading skeletons in the header without mounting rows', async () => {
+  it('reserves the loading rows in the header without mounting rows', async () => {
     repositories.isLoading = true;
     repositories.data = undefined;
     const { renderer } = await mount();
 
-    // Two `RowSkeleton`s at the loaded repository-row geometry, each painting a
-    // title and a subtitle bar.
-    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(4);
+    // The picker's rows are flat one-line rows, so the reserve is two rows of
+    // one bar each — not a second line the loaded row never draws.
+    const placeholders = placeholderRows(renderer);
+    expect(placeholders).toHaveLength(2);
+    expect(placeholders.every(row => row.props.subtitle !== true)).toBe(true);
     expect(repoRows(renderer)).toHaveLength(0);
     expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
   });
@@ -365,7 +374,7 @@ describe('RepositorySettingsScreen repository picker', () => {
     repositories.data = undefined;
     repositories.isLoading = true;
     const loading = await mount();
-    expect(loading.renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(0);
+    expect(placeholderRows(loading.renderer)).toHaveLength(0);
     expect(loading.renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(
       0
     );
@@ -438,7 +447,7 @@ describe('RepositorySettingsScreen repository picker', () => {
     expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
     const error = renderer.root.find(node => String(node.type) === 'QueryError');
     expect((error.props as { variant: string }).variant).toBe('offline');
-    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(0);
+    expect(placeholderRows(renderer)).toHaveLength(0);
   });
 
   it('keeps the skeleton for a paused read whose connectivity is unsettled', async () => {
@@ -451,7 +460,7 @@ describe('RepositorySettingsScreen repository picker', () => {
 
     expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
     expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
-    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(4);
+    expect(placeholderRows(renderer)).toHaveLength(2);
   });
 
   it('shows the selectAtLeastOne validation only with an empty selection', async () => {

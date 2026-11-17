@@ -140,7 +140,7 @@ vi.mock('@/components/security-agent/settings-pill-group', () => ({ PillGroup: '
 vi.mock('@/components/security-agent/settings-save-button', () => ({
   SettingsSaveButton: 'SettingsSaveButton',
 }));
-vi.mock('@/components/security-agent/settings-toggle-row', () => ({ ToggleRow: 'ToggleRow' }));
+vi.mock('@/components/ui/preference-row', () => ({ PreferenceRow: 'ToggleRow' }));
 
 const mounted: TestRenderer.ReactTestRenderer[] = [];
 

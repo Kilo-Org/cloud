@@ -2,7 +2,7 @@
 import { LOCAL_AGENT_PROTOCOL_VERSION, parseHubHello, parseIncomingEnvelope } from './envelope';
 import type { LocalAgentExtensionHello } from './envelope';
 import { LocalAgentDialError } from './transport-types';
-import type { LocalAgentDial, LocalAgentFailure } from './transport-types';
+import type { LocalAgentDial, LocalAgentFailure, LocalAgentTimers } from './transport-types';
 
 /*
  * Native messaging transport. The browser starts the hub through
@@ -12,6 +12,8 @@ import type { LocalAgentDial, LocalAgentFailure } from './transport-types';
  */
 
 export const NATIVE_MESSAGING_HOST_NAME = 'ai.kilo.browser_host';
+
+const NATIVE_HANDSHAKE_TIMEOUT_MS = 10_000;
 
 export type NativeMessagingPort = {
   disconnect(): void;
@@ -41,9 +43,11 @@ export const createNativeDial =
   ({
     hello,
     runtime,
+    timers,
   }: {
     hello: LocalAgentExtensionHello;
     runtime: NativeMessagingRuntime;
+    timers: LocalAgentTimers;
   }): LocalAgentDial =>
   callbacks => {
     const { connectNative } = runtime;
@@ -73,6 +77,14 @@ export const createNativeDial =
     const port: NativeMessagingPort = opened;
     let disposed = false;
     let ready = false;
+    let deadline: number | null = null;
+
+    const clearDeadline = (): void => {
+      if (deadline !== null) {
+        timers.clearTimeout(deadline);
+        deadline = null;
+      }
+    };
 
     const fail = (failure: LocalAgentFailure): void => {
       if (disposed) {
@@ -80,9 +92,15 @@ export const createNativeDial =
       }
 
       disposed = true;
+      clearDeadline();
       port.disconnect();
       callbacks.onClosed(failure);
     };
+
+    // A silent host must not leave the endpoint in `handshaking` forever.
+    deadline = timers.setTimeout(() => {
+      fail({ kind: 'transport' });
+    }, NATIVE_HANDSHAKE_TIMEOUT_MS);
 
     port.onMessage.addListener((message: unknown) => {
       if (disposed) {
@@ -100,6 +118,7 @@ export const createNativeDial =
 
         port.postMessage(hello);
         ready = true;
+        clearDeadline();
         callbacks.onReady();
 
         return;

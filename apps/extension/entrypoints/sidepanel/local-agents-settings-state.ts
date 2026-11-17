@@ -8,7 +8,12 @@ import type { LocalAgentEndpointStatus } from '@/src/shared/local-agents/status'
  * only worth its setup hint while nothing is actually connected.
  */
 
-export type LocalAgentsEmptyState = 'none' | 'host_missing' | 'idle' | 'waiting';
+export type LocalAgentsEmptyState =
+  | 'none'
+  | 'connected'
+  | 'host_missing_not_installed'
+  | 'host_missing_permission'
+  | 'waiting';
 
 export type LocalAgentsControllerGroup = {
   controllerId: string;
@@ -63,12 +68,23 @@ export const deriveLocalAgentsSettingsView = ({
     return { controllerGroups, emptyState: 'none', enabled };
   }
 
-  if (status.some(endpoint => endpoint.state.kind === 'host_missing')) {
-    return { controllerGroups, emptyState: 'host_missing', enabled };
+  // A live connection outranks a failed native endpoint.
+  if (status.some(endpoint => endpoint.state.kind === 'connected')) {
+    return { controllerGroups, emptyState: 'connected', enabled };
   }
 
-  if (status.some(endpoint => endpoint.state.kind === 'connected')) {
-    return { controllerGroups, emptyState: 'idle', enabled };
+  const hostMissing = new Set(
+    status.flatMap(endpoint =>
+      endpoint.state.kind === 'host_missing' ? [endpoint.state.reason] : []
+    )
+  );
+
+  if (hostMissing.has('not_installed')) {
+    return { controllerGroups, emptyState: 'host_missing_not_installed', enabled };
+  }
+
+  if (hostMissing.has('permission_denied')) {
+    return { controllerGroups, emptyState: 'host_missing_permission', enabled };
   }
 
   return { controllerGroups, emptyState: 'waiting', enabled };

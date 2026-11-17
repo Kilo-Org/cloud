@@ -189,6 +189,8 @@ export const createLoopbackDial =
       callbacks.onEnvelope(envelope);
     };
 
+    // The deadline covers the whole handshake, from dial start; a socket that never opens must fail.
+    armHandshakeTimeout();
     socket = connectSocket(endpoint.ws, {
       onClose: () => {
         fail({ kind: 'transport' });
@@ -197,7 +199,7 @@ export const createLoopbackDial =
         fail({ kind: 'transport' });
       },
       onOpen: () => {
-        armHandshakeTimeout();
+        /* The deadline is already running; nothing to re-arm. */
       },
       onText: text => {
         const previous = pending;

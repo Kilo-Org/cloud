@@ -66,7 +66,11 @@ export type LocalAgentAlarmsApi = {
 export type LocalAgentTabsApi = {
   onUpdated: {
     addListener(
-      listener: (tabId: number, changeInfo: { url?: string }, tab: { url?: string }) => void
+      listener: (
+        tabId: number,
+        changeInfo: { url?: string },
+        tab: { openerTabId?: number; url?: string }
+      ) => void
     ): void;
   };
   remove(tabId: number): Promise<void> | void;
@@ -106,7 +110,11 @@ export type LocalAgentsHostApis = {
   watch?: LocalAgentStorageWatch;
 };
 
-export type LocalAgentsHost = { stop(): void };
+export type LocalAgentsHost = {
+  /** Resolves after the first settings read, success or failure. */
+  ready: Promise<void>;
+  stop(): void;
+};
 
 export type LocalAgentGlobalScope = {
   alarms?: LocalAgentAlarmsApi;
@@ -223,7 +231,13 @@ export const startLocalAgentsHost = (
   const controllerConnections = new Map<string, LocalAgentConnection>();
   const cleanup: (() => void)[] = [];
   const publish = createSerialTaskQueue();
+  /* Pairing navigations can arrive before the first settings read answers. */
+  const pendingPairings: { endpoint: LocalAgentPairingEndpoint; tabId: number }[] = [];
+  /* One fragment pairs once: a replay of the same URL must not re-dial. */
+  const consumedPairings = new Set<string>();
+  const ready = Promise.withResolvers<void>();
   let enabled = false;
+  let settingsLoaded = false;
   let stopped = false;
 
   const publishStatus = (): Promise<void> =>
@@ -236,11 +250,10 @@ export const startLocalAgentsHost = (
     void (async (): Promise<void> => {
       try {
         await task();
+        await publishStatus();
       } catch {
-        // Transient bookkeeping failures surface through the connection state.
+        // Transient bookkeeping and status failures surface through the connection state.
       }
-
-      await publishStatus();
     })();
   };
 
@@ -340,7 +353,7 @@ export const startLocalAgentsHost = (
     let lastState: LocalAgentConnectionState = { kind: 'off' };
     const dial =
       endpoint.transport === 'native'
-        ? createNativeDial({ hello: extensionHello, runtime: runtime ?? {} })
+        ? createNativeDial({ hello: extensionHello, runtime: runtime ?? {}, timers })
         : createLoopbackDial({ connectSocket, endpoint, hello: extensionHello, timers });
     const connection = createLocalAgentConnection({
       dial,
@@ -365,13 +378,12 @@ export const startLocalAgentsHost = (
     return connection;
   };
 
+  /**
+   * `close()` fires the state change that calls `forgetControllersOf`, so the
+   * controller mapping must still exist when it runs; deleting it first would
+   * leave the registry rows behind.
+   */
   const closeConnection = (connection: LocalAgentConnection): void => {
-    for (const [controllerId, mapped] of controllerConnections) {
-      if (mapped === connection) {
-        controllerConnections.delete(controllerId);
-      }
-    }
-
     connection.close();
     connections.delete(connection.endpoint.endpointId);
   };
@@ -412,11 +424,26 @@ export const startLocalAgentsHost = (
 
     const endpoints = await loadLocalAgentEndpoints(storage);
 
+    // The switch can turn off while the endpoint list loads; a late close must not resurrect it.
+    if (!enabled || stopped) {
+      return;
+    }
+
     if (!connections.has(NATIVE_ENDPOINT_ID)) {
       addConnection({ endpointId: NATIVE_ENDPOINT_ID, transport: 'native' }, hello).connect();
     }
 
     for (const endpoint of endpoints) {
+      const existing = connections.get(endpoint.hubId);
+
+      // A second pairing for the same hub replaces its key and socket URL; stop the stale dials.
+      if (
+        existing?.endpoint.transport === 'loopback' &&
+        (existing.endpoint.key !== endpoint.key || existing.endpoint.ws !== endpoint.ws)
+      ) {
+        closeConnection(existing);
+      }
+
       if (!connections.has(endpoint.hubId)) {
         addConnection(
           {
@@ -471,10 +498,66 @@ export const startLocalAgentsHost = (
     await reconcile();
   };
 
+  const acceptPairing = async (
+    endpoint: LocalAgentPairingEndpoint,
+    tabId: number
+  ): Promise<void> => {
+    const stored = await loadLocalAgentEndpoints(storage);
+    const alreadyStored = stored.some(
+      candidate =>
+        candidate.hubId === endpoint.hubId &&
+        candidate.key === endpoint.key &&
+        candidate.ws === endpoint.ws
+    );
+
+    if (!alreadyStored) {
+      await saveLocalAgentEndpoint(storage, endpoint);
+    }
+
+    // Pairing tabs are single-use; closing the tab clears the key from the address bar.
+    try {
+      await tabs?.remove(tabId);
+    } catch {
+      // Already gone (the user closed it) — nothing to do.
+    }
+
+    await reconcile();
+  };
+
+  const pairingKey = (endpoint: LocalAgentPairingEndpoint): string =>
+    `${endpoint.hubId}|${endpoint.key}|${endpoint.ws}`;
+
+  /** Accepts one pairing navigation at most once per fragment. */
+  const consumePairing = (endpoint: LocalAgentPairingEndpoint): boolean => {
+    const key = pairingKey(endpoint);
+
+    if (consumedPairings.has(key)) {
+      return false;
+    }
+
+    consumedPairings.add(key);
+
+    return true;
+  };
+
+  const flushPendingPairings = (): void => {
+    for (const { endpoint, tabId } of pendingPairings.splice(0)) {
+      if (enabled && !stopped) {
+        void acceptPairing(endpoint, tabId);
+      }
+    }
+  };
+
   const refreshSettings = async (): Promise<void> => {
     const settings = await loadLocalAgentSettings(storage);
+    const firstLoad = !settingsLoaded;
 
+    settingsLoaded = true;
     await applyEnabled(settings.enabled);
+
+    if (firstLoad) {
+      flushPendingPairings();
+    }
   };
 
   const refreshSettingsQuietly = (): void => {
@@ -483,24 +566,10 @@ export const startLocalAgentsHost = (
         await refreshSettings();
       } catch {
         // A failed settings read leaves the switch off; the next storage event retries.
+      } finally {
+        ready.resolve();
       }
     })();
-  };
-
-  const acceptPairing = async (
-    endpoint: LocalAgentPairingEndpoint,
-    tabId: number
-  ): Promise<void> => {
-    await saveLocalAgentEndpoint(storage, endpoint);
-
-    // Pairing tabs are single-use; closing the tab also clears the key from the address bar.
-    try {
-      await tabs?.remove(tabId);
-    } catch {
-      // Already gone (the user closed it) — nothing to do.
-    }
-
-    await reconcile();
   };
 
   const stopAll = async (): Promise<void> => {
@@ -518,15 +587,38 @@ export const startLocalAgentsHost = (
   });
 
   tabs?.onUpdated.addListener((tabId, changeInfo, tab) => {
-    if (!enabled || stopped) {
+    if (stopped) {
       return;
     }
 
-    const endpoint = parsePairingUrl(changeInfo.url ?? tab.url ?? '');
+    // Only a committed navigation counts; a tab carrying an older fragment does not pair.
+    const endpoint = parsePairingUrl(changeInfo.url ?? '');
 
-    if (endpoint !== null) {
-      void acceptPairing(endpoint, tabId);
+    if (endpoint === null) {
+      return;
     }
+
+    // A page can open this URL itself; the CLI opens a fresh tab without an opener.
+    if (tab.openerTabId !== undefined) {
+      return;
+    }
+
+    if (!consumePairing(endpoint)) {
+      return;
+    }
+
+    // Before the first settings read the switch value is unknown, so buffer the pairing.
+    if (!settingsLoaded) {
+      pendingPairings.push({ endpoint, tabId });
+
+      return;
+    }
+
+    if (!enabled) {
+      return;
+    }
+
+    void acceptPairing(endpoint, tabId);
   });
 
   commands?.onCommand.addListener(command => {
@@ -569,6 +661,7 @@ export const startLocalAgentsHost = (
   refreshSettingsQuietly();
 
   return {
+    ready: ready.promise,
     stop: () => {
       stopped = true;
 

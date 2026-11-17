@@ -2,6 +2,7 @@
 import { z } from 'zod';
 import { isUsablePairingEndpoint } from './pairing';
 import type { LocalAgentPairingEndpoint } from './pairing';
+import { createSerialTaskQueue } from './storage';
 import type { LocalAgentStorageArea } from './storage';
 
 /*
@@ -26,6 +27,10 @@ const storedEndpointsSchema = z
   .strip();
 
 export type LocalAgentStoredEndpoint = z.infer<typeof storedEndpointSchema>;
+
+/* Two pairing navigations can land in the same tick; one queue keeps every
+   read-modify-write on the endpoints key ordered. */
+const endpointWrites = createSerialTaskQueue();
 
 const readEndpoints = async (
   storage: LocalAgentStorageArea
@@ -61,29 +66,31 @@ export const loadLocalAgentEndpoints = (
 ): Promise<LocalAgentStoredEndpoint[]> => readEndpoints(storage);
 
 /** Stores (or replaces by hubId) one endpoint; unusable endpoints are dropped. */
-export const saveLocalAgentEndpoint = async (
+export const saveLocalAgentEndpoint = (
   storage: LocalAgentStorageArea,
   endpoint: LocalAgentPairingEndpoint
-): Promise<LocalAgentStoredEndpoint[]> => {
-  const current = await readEndpoints(storage);
+): Promise<LocalAgentStoredEndpoint[]> =>
+  endpointWrites(async () => {
+    const current = await readEndpoints(storage);
 
-  if (!isUsablePairingEndpoint(endpoint)) {
-    return current;
-  }
+    if (!isUsablePairingEndpoint(endpoint)) {
+      return current;
+    }
 
-  const next = [...current.filter(stored => stored.hubId !== endpoint.hubId), endpoint];
-  await writeEndpoints(storage, next);
+    const next = [...current.filter(stored => stored.hubId !== endpoint.hubId), endpoint];
+    await writeEndpoints(storage, next);
 
-  return next;
-};
+    return next;
+  });
 
-export const removeLocalAgentEndpoint = async (
+export const removeLocalAgentEndpoint = (
   storage: LocalAgentStorageArea,
   hubId: string
-): Promise<LocalAgentStoredEndpoint[]> => {
-  const current = await readEndpoints(storage);
-  const next = current.filter(endpoint => endpoint.hubId !== hubId);
-  await writeEndpoints(storage, next);
+): Promise<LocalAgentStoredEndpoint[]> =>
+  endpointWrites(async () => {
+    const current = await readEndpoints(storage);
+    const next = current.filter(endpoint => endpoint.hubId !== hubId);
+    await writeEndpoints(storage, next);
 
-  return next;
-};
+    return next;
+  });

@@ -10,13 +10,13 @@ import type { LocalAgentConnectedAgent } from '@/src/shared/local-agents/registr
 import {
   LOCAL_AGENT_SETTINGS_STORAGE_KEY,
   loadLocalAgentSettings,
-  saveLocalAgentSettings,
 } from '@/src/shared/local-agents/settings';
 import {
   LOCAL_AGENT_STATUS_STORAGE_KEY,
   loadLocalAgentStatus,
 } from '@/src/shared/local-agents/status';
 import type { LocalAgentEndpointStatus } from '@/src/shared/local-agents/status';
+import { setLocalAgentsEnabled } from './local-agent-toggle';
 import { deriveLocalAgentsSettingsView } from './local-agents-settings-state';
 import { createSerialAsyncChain } from './model-preferences-state';
 import { SettingsToggle } from './workflow-settings';
@@ -25,6 +25,8 @@ const SWITCH_LABEL = 'Allow local agents';
 const SWITCH_DESCRIPTION =
   'Let Kilo CLI agents control this browser. Everything stays on this machine.';
 const HOST_MISSING_HINT = 'Kilo CLI not found. Run any Kilo CLI command once.';
+const HOST_MISSING_PERMISSION_HINT =
+  'Native messaging is blocked. Turn the switch off and on, then allow the permission prompt.';
 const WAITING_HINT = 'Waiting for a Kilo CLI…';
 const IDLE_HINT = 'No agents connected.';
 const LOAD_ERROR_MESSAGE = "Couldn't load local agents. Try again.";
@@ -108,14 +110,14 @@ export const LocalAgentsSettings = (): JSX.Element => {
     setEnabled(next);
     setSaveError(false);
 
-    if (next) {
-      void requestNativeMessagingPermission();
-    }
-
     // Rapid toggles each write the whole record; one chain keeps the last click authoritative.
     void saveChainRef.current.enqueue(async () => {
       try {
-        await saveLocalAgentSettings(storage, { enabled: next });
+        await setLocalAgentsEnabled({
+          next,
+          requestPermission: requestNativeMessagingPermission,
+          storage,
+        });
       } catch {
         setEnabled(!next);
         setSaveError(true);
@@ -161,15 +163,19 @@ export const LocalAgentsSettings = (): JSX.Element => {
         <p className="type-body mt-2 text-status-red-400">{LOAD_ERROR_MESSAGE}</p>
       ) : null}
 
-      {view.emptyState === 'host_missing' ? (
+      {view.emptyState === 'host_missing_not_installed' ? (
         <p className="type-body mt-2 text-foreground-muted">{HOST_MISSING_HINT}</p>
+      ) : null}
+
+      {view.emptyState === 'host_missing_permission' ? (
+        <p className="type-body mt-2 text-foreground-muted">{HOST_MISSING_PERMISSION_HINT}</p>
       ) : null}
 
       {view.emptyState === 'waiting' ? (
         <p className="type-body mt-2 text-foreground-muted">{WAITING_HINT}</p>
       ) : null}
 
-      {view.emptyState === 'idle' ? (
+      {view.emptyState === 'connected' ? (
         <p className="type-body mt-2 text-foreground-muted">{IDLE_HINT}</p>
       ) : null}
 

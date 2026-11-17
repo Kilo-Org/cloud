@@ -10,15 +10,18 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
 import { Archive, FileText, Share } from '@/components/ui/icons';
-import { Skeleton } from '@/components/ui/skeleton';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { codeFailureMessage, DOWNLOAD_CODE_PATTERN } from '@/lib/data-export-code';
 import { getDataExportFailureMessage, shareDataExport } from '@/lib/data-export-download';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useTRPC } from '@/lib/trpc';
 
@@ -129,9 +132,12 @@ export function DataExportScreen() {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('profile.dataExport.title')} backFallback={PROFILE_TAB_HREF} />
-        <View className="gap-3 px-4 pt-4">
-          <Skeleton className="h-[70px] rounded-lg" />
-          <Skeleton className="h-11 rounded-lg" />
+        <View className={SCREEN_BODY_CLASS}>
+          <RowGroup>
+            {SKELETON_ROWS.map(row => (
+              <RowSkeleton key={row} tile subtitle />
+            ))}
+          </RowGroup>
         </View>
       </View>
     );
@@ -164,11 +170,11 @@ export function DataExportScreen() {
   let body: ReactNode = null;
   if (exportsQuery.isPending) {
     body = (
-      <View className="gap-3">
+      <RowGroup>
         {SKELETON_ROWS.map(row => (
-          <Skeleton key={row} className="h-[70px] rounded-lg" />
+          <RowSkeleton key={row} tile subtitle />
         ))}
-      </View>
+      </RowGroup>
     );
   } else if (exportsQuery.isError) {
     body = (
@@ -187,7 +193,7 @@ export function DataExportScreen() {
     );
   } else {
     body = (
-      <View className="gap-3">
+      <RowGroup leadingTile>
         {exportsQuery.data.exports.map(dataExport => (
           <ExportRow
             key={dataExport.id}
@@ -201,7 +207,7 @@ export function DataExportScreen() {
             }}
           />
         ))}
-      </View>
+      </RowGroup>
     );
   }
 
@@ -210,14 +216,12 @@ export function DataExportScreen() {
       <ScreenHeader title={t('profile.dataExport.title')} backFallback={PROFILE_TAB_HREF} />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-6 px-4 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Text variant="muted" className="text-xs">
-          {t('profile.dataExport.description')}
-        </Text>
+        <Text variant="muted">{t('profile.dataExport.description')}</Text>
         <Button
           className={STATE_ACTION_CLASS}
           loading={request.isPending}
@@ -231,10 +235,10 @@ export function DataExportScreen() {
         </Button>
         {body}
         {requestCodeError === null ? null : (
-          <Text className="text-sm text-destructive">{requestCodeError}</Text>
+          <Text className="text-destructive">{requestCodeError}</Text>
         )}
         {openChallenge === null ? null : (
-          <View className="gap-3">
+          <Card>
             <FormField
               key={openChallenge.challengeId}
               label={t('profile.dataExport.codeLabel')}
@@ -274,9 +278,9 @@ export function DataExportScreen() {
               <Text>{t('profile.dataExport.download')}</Text>
             </Button>
             {openChallenge.entryError === null ? null : (
-              <Text className="text-sm text-destructive">{openChallenge.entryError}</Text>
+              <Text className="text-destructive">{openChallenge.entryError}</Text>
             )}
-          </View>
+          </Card>
         )}
       </TabScreenScrollView>
     </View>

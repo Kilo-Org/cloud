@@ -37,6 +37,7 @@ import {
   providerKeysHref,
 } from '@/lib/byok/provider-key-scope';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { assertSurfaceFailureHandled } from '@/lib/surface-feedback';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { normalizeOrgQueryParam } from '@/lib/org-deep-link';
@@ -132,9 +133,12 @@ export function ProviderKeyNewScreen() {
         {providers.isError ? (
           <QueryError onRetry={() => void providers.refetch()} isRetrying={providers.isFetching} />
         ) : (
-          <View className="gap-6 px-4 pt-4">
-            <Skeleton className="h-[74px] rounded-lg" />
-            <Skeleton className="h-11 rounded-lg" />
+          <View className={SCREEN_BODY_CLASS}>
+            <View className="gap-1">
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-12 rounded-md" />
+            </View>
+            <Skeleton className="h-11 rounded-md" />
           </View>
         )}
       </View>
@@ -292,22 +296,20 @@ export function ProviderKeyNewScreen() {
       <ScreenHeader title={title} backFallback={PROFILE_TAB_HREF} />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-6 px-4 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
         <View className="gap-1">
-          <Text className="text-sm font-medium text-foreground">{provider.name}</Text>
-          <Text className="text-xs text-muted-foreground">
+          <Text variant="small">{provider.name}</Text>
+          <Text variant="caption">
             {keyId === undefined
               ? t('profile.providerKeys.newKeyDescription')
               : t('profile.providerKeys.editKeyDescription')}
           </Text>
           {keyId === undefined || !form?.showsModelMappings ? null : (
-            <Text className="text-xs text-muted-foreground">
-              {t('profile.providerKeys.editKeyMappingsWarning')}
-            </Text>
+            <Text variant="caption">{t('profile.providerKeys.editKeyMappingsWarning')}</Text>
           )}
         </View>
         {form ? (

@@ -108,6 +108,10 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
     groups: nextGroups,
   });
 
+  // One list for the suggestion and the save, so the hint cannot offer an
+  // identifier the save would then derive differently.
+  const takenSlugs = existingModes.map(m => m.slug);
+
   const syncDirty = (nextGroups: readonly ModeToolGroup[] = groups) => {
     const next = isOrgModeFormDirty(currentValues(nextGroups), initial);
     if (next !== dirty) {
@@ -137,7 +141,7 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
     const next = orgModeFormSaveValues(
       currentValues(),
       mode === undefined ? 'create' : 'update',
-      existingModes.map(m => m.slug)
+      takenSlugs
     );
     const found = validateOrgModeForm(next, existingModes, mode?.id);
     setErrors(found);
@@ -200,12 +204,7 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
                 setErrors(previous => ({ ...previous, name: undefined }));
               }
               if (mode === undefined && values.slug.length === 0) {
-                setDerivedSlug(
-                  modeSlugFromName(
-                    value,
-                    existingModes.map(m => m.slug)
-                  )
-                );
+                setDerivedSlug(modeSlugFromName(value, takenSlugs));
               }
             }}
           />

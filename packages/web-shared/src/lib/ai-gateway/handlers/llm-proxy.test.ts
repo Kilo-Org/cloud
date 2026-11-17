@@ -100,7 +100,6 @@ import type { FakeR2ClientModule } from '@kilocode/web-shared/tests/helpers/fake
 import { readJsonBody } from '@kilocode/web-shared/tests/helpers/request-body.helper';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { isFreeModelRateLimited } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
-import { inferenceModelCatalogAdmission } from '@kilocode/web-shared/lib/ai-gateway/inference-model-catalog';
 import { GEMMA_4_26B_A4B_IT_FREE_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import {
   getEffectiveModelDecision,
@@ -200,9 +199,6 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-orde
   })),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit');
-jest.mock('@kilocode/web-shared/lib/ai-gateway/inference-model-catalog', () => ({
-  inferenceModelCatalogAdmission: jest.fn(async () => 'allowed' as const),
-}));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/organization-features', () => ({
   ...jest.requireActual<Record<string, unknown>>(
     '@kilocode/web-shared/lib/ai-gateway/organization-features'
@@ -364,7 +360,6 @@ const everyVercelModel = { has: () => true } as unknown as ReadonlySet<string>;
 
 beforeEach(() => {
   mockedGetVercelModels.mockResolvedValue(everyVercelModel);
-  jest.mocked(inferenceModelCatalogAdmission).mockResolvedValue('allowed');
 });
 const mockedEmitApiMetricsForResponse = jest.mocked(emitApiMetricsForResponse);
 const mockedAccountForMicrodollarUsage = jest.mocked(accountForMicrodollarUsage);
@@ -2321,90 +2316,6 @@ describe('POST /api/v1/chat/completions request handling', () => {
     }
   );
 
-  describe.each(['/chat/completions', '/messages', '/responses'])('%s catalog admission', path => {
-    function catalogRequest(model = 'openai/gpt-4o') {
-      return makeRequest(
-        path === '/responses' ? { model, input: 'hello' } : { ...makeBody(model), max_tokens: 100 },
-        undefined,
-        path
-      );
-    }
-
-    it.each([
-      { providerType: 'openrouter', byok: false },
-      { providerType: 'openrouter', byok: true },
-      { providerType: 'vercel', byok: false },
-      { providerType: 'vercel', byok: true },
-    ] as const)(
-      'rejects an upstream-known unlisted model on $providerType (BYOK: $byok)',
-      async ({ providerType, byok }) => {
-        const model = 'vendor/unlisted-model';
-        jest.mocked(inferenceModelCatalogAdmission).mockResolvedValue('unlisted');
-        mockedGetOpenRouterModels.mockResolvedValue(new Set([model]));
-        mockedIsValidOpenRouterModelId.mockResolvedValue(true);
-        mockedGetVercelModels.mockResolvedValue(new Set([model]));
-        mockedGetProvider.mockResolvedValue(
-          providerResult({
-            provider: { ...provider, type: providerType },
-            userByok: byok
-              ? [
-                  {
-                    decryptedAPIKey: 'test-key',
-                    providerId: providerType === 'vercel' ? 'vercel-ai-gateway' : 'openrouter',
-                  },
-                ]
-              : null,
-            isFree: false,
-            bypassAccessCheck: false,
-          })
-        );
-
-        const response = await handleLlmProxyRequest(catalogRequest(model));
-
-        expect(response.status).toBe(404);
-        expect(await response.json()).toMatchObject({ error_type: 'model_not_found' });
-        expect(inferenceModelCatalogAdmission).toHaveBeenCalledWith(model);
-        expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-      }
-    );
-
-    it('serves a listed model using its normalized catalog id', async () => {
-      const response = await handleLlmProxyRequest(catalogRequest(' OpenAI/GPT-4O '));
-
-      expect(response.status).toBe(200);
-      expect(inferenceModelCatalogAdmission).toHaveBeenCalledWith('openai/gpt-4o');
-      expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
-    });
-
-    it('fails closed with a retryable service error when the catalog is unavailable', async () => {
-      jest.mocked(inferenceModelCatalogAdmission).mockResolvedValue('unavailable');
-
-      const response = await handleLlmProxyRequest(catalogRequest());
-
-      expect(response.status).toBe(503);
-      expect(await response.json()).toMatchObject({ error_type: 'temporarily_unavailable' });
-      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-    });
-
-    it('does not exempt catalog-mode direct BYOK from catalog admission', async () => {
-      jest.mocked(inferenceModelCatalogAdmission).mockResolvedValue('unlisted');
-      mockedGetProvider.mockResolvedValue(
-        providerResult({
-          provider: { ...provider, type: 'direct-byok' },
-          userByok: [{ decryptedAPIKey: 'test-key', providerId: 'openai' }],
-          isFree: false,
-          bypassAccessCheck: false,
-        })
-      );
-
-      const response = await handleLlmProxyRequest(catalogRequest());
-
-      expect(response.status).toBe(404);
-      expect(await response.json()).toMatchObject({ error_type: 'model_not_found' });
-      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-    });
-  });
-
   it.each([
     'google/gemma-4-26b-a4b-it:free',
     'google/gemma-4-31b-it:free',
@@ -2998,7 +2909,6 @@ describe('organization data-collection policy on provider-policy exempt routes',
   beforeEach(() => {
     jest.clearAllMocks();
     setUserAuth();
-    jest.mocked(inferenceModelCatalogAdmission).mockResolvedValue('unlisted');
     mockedFindCustomLlm.mockResolvedValue(null);
     mockedIsCustomLlm.mockResolvedValue(false);
     mockedGetOpenRouterModels.mockResolvedValue(new Set());
@@ -3112,7 +3022,6 @@ describe('organization data-collection policy on provider-policy exempt routes',
     );
 
     expect(response.status).toBe(200);
-    expect(inferenceModelCatalogAdmission).not.toHaveBeenCalled();
     expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
   });
 });
@@ -3193,40 +3102,6 @@ describe('kilo-auto/efficient classifier billing', () => {
       expect.objectContaining({ requestedModel: 'kilo-auto/frontier', router: 'frontier' })
     );
     expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
-  });
-
-  it('rejects an unlisted concrete auto-routing target rather than exempting all routed models', async () => {
-    jest.mocked(inferenceModelCatalogAdmission).mockResolvedValue('unlisted');
-
-    const response = await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/efficient')));
-
-    expect(response.status).toBe(404);
-    expect(inferenceModelCatalogAdmission).toHaveBeenCalledWith('anthropic/claude-haiku-4');
-    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-  });
-
-  it('preserves the internal free Auto Small target without admitting it for direct requests', async () => {
-    jest.mocked(inferenceModelCatalogAdmission).mockResolvedValue('unlisted');
-    mockedIsFreeModelRateLimited.mockResolvedValue(false);
-    mockedApplyResolvedAutoModel.mockImplementation(async (_opts, request) => {
-      request.body.model = GEMMA_4_26B_A4B_IT_FREE_ID;
-      return { kind: 'ok', resolved: { model: GEMMA_4_26B_A4B_IT_FREE_ID } };
-    });
-
-    const response = await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/small')));
-
-    expect(response.status).toBe(200);
-    expect(inferenceModelCatalogAdmission).not.toHaveBeenCalled();
-    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
-
-    mockedUpstreamRequest.mockClear();
-    const directResponse = await handleLlmProxyRequest(
-      makeRequest(makeBody(GEMMA_4_26B_A4B_IT_FREE_ID))
-    );
-
-    expect(directResponse.status).toBe(404);
-    expect(await directResponse.json()).toMatchObject({ error_type: 'unavailable_model' });
-    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
   it.each([null, { decision: null, costUsd: 0 }, { decision: null, costUsd: 0.002 }])(
@@ -7978,26 +7853,6 @@ describe('BYOK failover', () => {
       const logger = console[method];
       if (jest.isMockFunction(logger)) logger.mockRestore();
     }
-  });
-
-  it('does not carry a bespoke BYOK catalog exemption into a managed failover route', async () => {
-    jest.mocked(inferenceModelCatalogAdmission).mockResolvedValue('unlisted');
-    const { result, failovers } = withFailover(
-      {
-        ...byokRoute('openai', byokProvider('primary-byok-key', { type: 'direct-byok' })),
-        bypassAccessCheck: true,
-      },
-      byokRoute('vercel-ai-gateway', byokProvider('failover-byok-key', { type: 'vercel' }))
-    );
-    mockedGetProvider.mockResolvedValue(result);
-    mockedUpstreamRequest.mockResolvedValueOnce(upstreamWithStatus(500));
-
-    const response = await handleLlmProxyRequest(makeRequest(makeBody()));
-
-    expect(response.status).toBe(500);
-    expect(failovers[0]).toHaveBeenCalledTimes(1);
-    expect(inferenceModelCatalogAdmission).toHaveBeenCalledWith('openai/gpt-4o');
-    expect(sentApiKeys()).toEqual(['primary-byok-key']);
   });
 
   it.each([401, 429, 500])(

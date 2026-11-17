@@ -1,5 +1,5 @@
 import { sql, type SQL } from 'drizzle-orm';
-import { device_sessions } from '@kilocode/db/schema';
+import { device_sessions } from './schema';
 
 /**
  * A usable device session has three parts: the row id, the account that owns

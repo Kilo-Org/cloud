@@ -117,6 +117,18 @@ function findSheetContent(renderer: RenderedView['renderer']) {
   return content;
 }
 
+/** The explicit height a mocked host View paints, read off its loosely-typed props. */
+function explicitHeight(props: unknown): number | undefined {
+  if (typeof props !== 'object' || props === null || !('style' in props)) {
+    return undefined;
+  }
+  const style = props.style;
+  if (typeof style !== 'object' || style === null || !('height' in style)) {
+    return undefined;
+  }
+  return typeof style.height === 'number' ? style.height : undefined;
+}
+
 /** Project rows only, in render order, so a toggle's reorder would show up. */
 function projectRowLabels(renderer: RenderedView['renderer']) {
   return renderer.root
@@ -304,7 +316,7 @@ describe('SessionFilterModal', () => {
     const { renderer } = await renderModal();
     const spacer = renderer.root
       .findAllByType(View)
-      .find(view => view.props.style?.height === 34);
+      .find(view => explicitHeight(view.props) === insets.bottom);
     expect(spacer).toBeDefined();
   });
 

@@ -54,9 +54,14 @@ export function SessionContextPrRow({
 
   return (
     // The badge is the row's value, so it takes the value slot: the label stays
-    // left at the row rhythm and the pill keeps its own press target.
+    // left at the row rhythm and the pill keeps its own press target. The pill
+    // itself is ~18pt, so the row hands its full height to it (`items-stretch`
+    // plus the badge's `self-stretch justify-center`): the whole row answers the
+    // tap instead of the short pill alone, and a `hitSlop` would be clipped by
+    // the row's own bounds on Android.
     <KvRow
       label={t('common.pullRequest')}
+      className="items-stretch"
       value=""
       valueFace="text"
       testID="session-context-pr-row"
@@ -64,6 +69,7 @@ export function SessionContextPrRow({
         <SessionPrBadge
           pr={pr}
           loading={false}
+          className="self-stretch justify-center"
           onPress={() => {
             openPr(pr);
           }}

@@ -697,6 +697,30 @@ describe('SessionContextSheet copy row touch targets', () => {
   );
 });
 
+describe('SessionContextSheet copy row values', () => {
+  it.each([
+    { testID: 'session-context-sheet-copy-id', value: 'ses-123' },
+    {
+      testID: 'session-context-sheet-copy-link',
+      value: sessionResumeUrl({ sessionId: 'ses-123', anchorMessageId: null }),
+    },
+  ])('paints the $testID value in the mono face with a middle ellipsis', async ({ testID, value }) => {
+    // Both values are identifiers a reader scans by their tail — a session id's
+    // suffix and a URL's target — so the line singles out with a middle
+    // ellipsis and keeps the mono face that marks it as a copied token.
+    const renderer = await mountSheet();
+    const target = findByType(renderer.root, 'Pressable').find(
+      node => node.props.testID === testID
+    );
+    const valueLine = target
+      ?.findAll(node => node.props.variant === 'mono')
+      .find(node => node.props.children === value);
+    expect(valueLine?.props.numberOfLines).toBe(1);
+    expect(valueLine?.props.ellipsizeMode).toBe('middle');
+    await unmount(renderer);
+  });
+});
+
 describe('SessionContextSheet view changes row touch target', () => {
   it('renders the view changes row on the shared full target', async () => {
     // It kept a 44 dp frame between two 48 dp copy rows, so one action list

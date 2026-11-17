@@ -97,14 +97,14 @@ export function MessageDetailsSheet({
         key={cancelQueuedFeedback?.attempt}
         message={visible ? (cancelQueuedFeedback?.message ?? null) : null}
         tone="error"
-        className="px-6 pt-4 text-sm"
+        className="px-4 pt-4 text-sm"
       />
       {/* Keep recovery guidance readable without replaying the outcome announcement. */}
       {visible &&
       message &&
       cancelQueuedGuidance &&
       cancelQueuedFeedback?.message !== cancelQueuedGuidance ? (
-        <Text className="px-6 pt-4 text-sm text-destructive">{cancelQueuedGuidance}</Text>
+        <Text className="px-4 pt-4 text-sm text-destructive">{cancelQueuedGuidance}</Text>
       ) : null}
       {selectVisible ? (
         <MessageTextSelectSheet

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the group's disclosure, step and error states each carry their own mounted assertions. */
 import '@/i18n';
 import { createElement } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';

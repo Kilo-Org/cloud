@@ -13,7 +13,6 @@ import { Card } from '@/components/ui/card';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Bot, ChevronDown, ChevronUp, Copy, FileDiff, History } from '@/components/ui/icons';
 import { KvRow } from '@/components/ui/kv-row';
-import { RowChevron } from '@/components/ui/row-chevron';
 import { RowGroup } from '@/components/ui/row-group';
 import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
@@ -629,13 +628,27 @@ function CopyRow({
   // The row keeps its call-to-action name in every state; the copy outcome
   // renders beside it, so one capture of the sheet shows both the row the
   // scenario names and the feedback it demands.
+  //
+  // The value is an identifier or a resume URL, so it keeps the mono face and
+  // ellipsizes in the middle: the tail of a session id and the tail of a URL
+  // are what identify it, and a tail ellipsis would hide both. `ConfigureRow`
+  // types its subtitle as a plain string painted in the caption face, so the
+  // value line fills the row's subtitle slot as a node instead.
   return (
     <ConfigureRow
       testID={testID}
       icon={Copy}
       title={label}
-      subtitle={value}
-      subtitleNumberOfLines={1}
+      subtitlePlaceholder={
+        <Text
+          variant="mono"
+          className="mt-0.5 text-xs text-foreground"
+          numberOfLines={1}
+          ellipsizeMode="middle"
+        >
+          {value}
+        </Text>
+      }
       variant="action"
       onPress={onPress}
       trailing={

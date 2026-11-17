@@ -126,7 +126,7 @@ export function SessionComposerSkeleton() {
                 COMPOSER_FIELD_LINE * fontScale + COMPOSER_FIELD_PADDING + COMPOSER_FIELD_BORDER,
             }}
           >
-            <Skeleton className="h-full w-full rounded-full" />
+            <Skeleton className="h-full w-full rounded-3xl" />
           </View>
           <Skeleton className={cn('ms-3 rounded-full', control)} />
           <Skeleton className={cn('ms-3 rounded-full', control)} />

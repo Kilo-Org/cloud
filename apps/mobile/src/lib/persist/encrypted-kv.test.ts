@@ -987,6 +987,41 @@ describe('busy open failure keeps the database', () => {
     vi.useRealTimers();
   });
 
+  it('concurrent_callers_share_one_reopen_after_the_cooldown_window', async () => {
+    // The window-expiry branch claims the retry: it clears `busyMemoRejected`
+    // before it drops the memo. Without the claim, a second caller that
+    // arrives while the reopen is still in flight passes the same guard and
+    // starts another open, whose rejection then memoizes.
+    await setItem('draft:u1', 'k', 'v');
+
+    // First busy failure: the memo drops, the window starts.
+    failEveryProbe = true;
+    nextProbeMessage = 'database is locked';
+    resetEncryptedKvOpenForTests();
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('database is locked');
+
+    // The window passes, but the reopen stalls in the keychain read until the
+    // deferred resolver fires, so the two callers below overlap it.
+    failEveryProbe = false;
+    vi.setSystemTime(Date.now() + 11_000);
+    const { promise: keyReadStarted, resolve: markStarted } = Promise.withResolvers<undefined>();
+    const { promise: keyRead, resolve: releaseKeyRead } = Promise.withResolvers<string | null>();
+    vi.mocked(SecureStore.getItemAsync).mockImplementationOnce(() => {
+      markStarted(undefined);
+      return keyRead;
+    });
+
+    const first = getItem('draft:u1', 'k');
+    await keyReadStarted;
+    const second = getItem('draft:u1', 'k');
+    releaseKeyRead(store.get(PERSIST_DB_KEY) ?? null);
+
+    await expect(Promise.all([first, second])).resolves.toEqual(['v', 'v']);
+    expect(vi.mocked(SQLite.openDatabaseSync).mock.calls.length).toBe(3);
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
   it('the_stored_value_survives_a_locked_probe_to_a_later_launch', async () => {
     await setItem('draft:u1', 'k', 'v');
     const storedKey = store.get(PERSIST_DB_KEY);

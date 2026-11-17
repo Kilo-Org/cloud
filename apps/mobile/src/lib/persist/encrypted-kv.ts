@@ -489,16 +489,24 @@ async function openWhenProtectedDataAvailable(): Promise<KVDatabase> {
     // failure while locked drops the memo.
     if (error instanceof ProtectedDataUnavailableError || !isProtectedDataAvailable()) {
       openPromise = null;
+      busyMemoRejected = false;
     }
     // A busy failure is transient: the lock clears, so the open must retry
     // instead of rejecting for the rest of the process. The cooldown bounds
     // the retry: inside the window the memoized rejection fails fast, and a
     // longer lock costs one open per window instead of one per store call.
     if (isBusySignal(error)) {
-      busyMemoRejected = true;
       if (Date.now() >= busyRetryNotBefore) {
+        // Drop the memo and start the window. The flag stays false: nothing
+        // is memoized now, and the guard must not fire on the reopen this
+        // drop starts.
         openPromise = null;
+        busyMemoRejected = false;
         busyRetryNotBefore = Date.now() + BUSY_RETRY_COOLDOWN_MS;
+      } else {
+        // Inside the window: the rejected promise stays memoized and the
+        // guard drops it once the window passes.
+        busyMemoRejected = true;
       }
     }
     throw error;

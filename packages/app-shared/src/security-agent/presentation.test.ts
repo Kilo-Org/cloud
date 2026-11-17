@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- one file testing the whole ported security-agent
    presentation module (list/deadline + details/analysis/remediation); the
    coverage is the point, splitting by describe block would just scatter it. */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   formatRemediationOrigin,
@@ -303,28 +303,69 @@ describe('getSecurityDeadlinePresentation', () => {
   });
 
   it('writes the deadline detail with the reused short-date formatter', () => {
-    // formatFindingDate is a memoized "Jul 5, 2026"-style formatter: reused
-    // across rows, so pinning the output here also pins the reuse path.
+    // formatFindingDate is a memoized short-date formatter reused across rows.
+    // The reference string comes from the same zone and options, so this holds
+    // in every host timezone, like the local-component fixtures above.
     const finding = makeFinding({ status: 'fixed', fixed_at: '2026-07-01 12:00:00+00' });
-    expect(getSecurityDeadlinePresentation(finding, now).detail).toMatch(/^Fixed Jul 1, 2026$/);
-  });
-
-  it('keeps using the current device zone for the fixed date after a zone move', () => {
-    // The memoized formatter resolves its zone when built; a device that moves
-    // time zones must rebuild it or keep writing the old wall clock (the same
-    // guard the mobile intl-cache describes). Stress the guard by walking the
-    // clock past its one-second probe window and changing the zone once.
-    const first = new Date('2026-07-01T12:00:00Z');
-    const beforeEachZone = new Intl.DateTimeFormat('en-US', {
+    const expected = new Intl.DateTimeFormat('en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
-    }).format(first);
+    }).format(new Date('2026-07-01T12:00:00Z'));
+    expect(getSecurityDeadlinePresentation(finding, now).detail).toBe(`Fixed ${expected}`);
+  });
+
+  it('rebuilds the memoized date formatter after a device zone move', () => {
+    // The memoized formatter resolves its zone when built; a device that moves
+    // zones must rebuild it or keep writing the old wall clock (the same guard
+    // the mobile intl-cache describes). Drive the probe inputs the helper
+    // reads — the wall clock and the zone the no-argument probe resolves —
+    // then flip the zone between two renders of the same fixed date.
     const finding = makeFinding({ status: 'fixed', fixed_at: '2026-07-01 12:00:00+00' });
-    const before = getSecurityDeadlinePresentation(finding, now).detail;
-    expect(before).toBe(`Fixed ${beforeEachZone}`);
-    // Sanity only: a second render in the same zone names the same date.
-    expect(getSecurityDeadlinePresentation(finding, now).detail).toBe(before);
+    const RealDateTimeFormat = Intl.DateTimeFormat;
+    // Zones whose wall clock puts the Jul 1 noon-UTC fixed date on a different
+    // calendar day: UTC-11 midday reads Jul 1, UTC+14 midnight reads Jul 2.
+    const zoneAt = { value: 'Pacific/Midway' };
+    const formatIn = (at: Date): string =>
+      `Fixed ${new RealDateTimeFormat('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        timeZone: zoneAt.value,
+      }).format(at)}`;
+    const mock = vi
+      .spyOn(Intl, 'DateTimeFormat')
+      // The zone probe constructs with an undefined locale; every other call
+      // keeps the real behavior so the memoized formatter renders real bits.
+      // Bound through Reflect.construct so the mock stays constructible.
+      .mockImplementation(function (...args: ConstructorParameters<typeof Intl.DateTimeFormat>) {
+        // A real device resolves its zone inside every unzoned construction:
+        // both the guard's probe `(undefined, {})` and the memoized rebuild
+        // `(en-US, FINDING_DATE_OPTIONS)` must read `zoneAt.value`, or the
+        // rebuilt formatter would render the host zone, not the moved zone.
+        return Reflect.construct(RealDateTimeFormat, [
+          args[0],
+          { ...(args[1] as Intl.DateTimeFormatOptions), timeZone: zoneAt.value },
+        ]);
+      } as unknown as typeof Intl.DateTimeFormat);
+    try {
+      // The fixed-at instant is noon UTC; Pacific/Midway (UTC-11) reads Jul 1.
+      expect(getSecurityDeadlinePresentation(finding, now).detail).toBe(
+        formatIn(new Date('2026-07-01T12:00:00Z'))
+      );
+
+      // Step the wall clock forward past the one-second probe window and move
+      // the device zone to UTC+14, whose midnight already reads Jul 2; the
+      // next call must rebuild and re-render the day boundary.
+      const advance = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 2000);
+      zoneAt.value = 'Pacific/Kiritimati';
+      expect(getSecurityDeadlinePresentation(finding, now).detail).toBe(
+        formatIn(new Date('2026-07-01T12:00:00Z'))
+      );
+      advance.mockRestore();
+    } finally {
+      mock.mockRestore();
+    }
   });
 
   it.each<[string, string, string, string, number?]>([

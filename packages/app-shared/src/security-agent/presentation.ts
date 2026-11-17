@@ -289,13 +289,21 @@ const FINDING_DATE_OPTIONS: Intl.DateTimeFormatOptions = {
 let findingDateFormatValue: Intl.DateTimeFormat | null = null;
 let findingDateDeviceZone: string | null = null;
 let findingDateZoneCheckedAt = 0;
+const FINDING_DATE_ZONE_CHECK_MS = 1000;
 
 function formatFindingDate(date: Date): string {
   // One Intl read per second, matching the mobile intl-cache convention
   // (dropDateFormattersForNewDeviceZone) so a row render cannot re-probe Intl
-  // on every keystroke.
+  // on every keystroke. A clock that stepped backwards reads as a stale check
+  // rather than a negative age, so it re-probes instead of waiting for the
+  // wall clock to catch up.
   const zoneProbeAt = Date.now();
-  if (findingDateDeviceZone === null || zoneProbeAt - findingDateZoneCheckedAt >= 1000) {
+  const sinceLastCheck = zoneProbeAt - findingDateZoneCheckedAt;
+  if (
+    findingDateDeviceZone === null ||
+    sinceLastCheck < 0 ||
+    sinceLastCheck >= FINDING_DATE_ZONE_CHECK_MS
+  ) {
     findingDateZoneCheckedAt = zoneProbeAt;
     const deviceZone = new Intl.DateTimeFormat(undefined, {}).resolvedOptions().timeZone;
     if (deviceZone !== findingDateDeviceZone) {

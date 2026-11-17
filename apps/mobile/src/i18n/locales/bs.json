@@ -927,7 +927,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Ovaj račun još nema organizacije. Zahtjeve za spajanje na Bitbucketu možeš pregledati kada kreiraš ili se pridružiš organizaciji.",
       "gitlabReconnectAdminOnlyDescription": "Zamolite vlasnika organizacije, administratora ili menadžera za naplatu da je ponovo poveže.",
       "bitbucketNotConnectedTitle": "Bitbucket nije povezan",
-      "bitbucketAdminOnlyDescription": "Zamolite vlasnika organizacije, administratora ili menadžera za naplatu da je poveže.",
+      "bitbucketAdminOnlyDescription": "Zamolite vlasnika organizacije, administratora ili menadžera za naplatu da ga poveže.",
       "contextLine": "Za {{organization}}",
       "contextLinePersonal": "Za lični nalog"
     },
@@ -1371,7 +1371,7 @@
     "followReviewMd": "Slijedi upute iz REVIEW.md",
     "followReviewMdSubtitle": "Poštuj upute iz datoteke REVIEW.md u svakom repozitoriju",
     "bitbucket": {
-      "notConnectedReadOnly": "Platforma Bitbucket nije povezana. Zamolite vlasnika organizacije, administratora ili menadžera za naplatu da je poveže."
+      "notConnectedReadOnly": "Bitbucket nije povezan. Zamolite vlasnika organizacije, administratora ili menadžera za naplatu da ga poveže."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket vezom ove organizacije upravlja se na webu s računara.",

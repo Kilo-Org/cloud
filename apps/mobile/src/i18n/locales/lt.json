@@ -944,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Ši paskyra dar neturi jokių organizacijų. Sukūręs arba prisijungęs prie organizacijos galėsi peržiūrėti Bitbucket pakeitimų užklausas.",
       "gitlabReconnectAdminOnlyDescription": "Paprašyk organizacijos savininko, administratoriaus ar atsiskaitymų administratoriaus jį prijungti iš naujo.",
       "bitbucketNotConnectedTitle": "Bitbucket neprijungtas",
-      "bitbucketAdminOnlyDescription": "Paprašykite organizacijos savininko, administratoriaus ar atsiskaitymų administratoriaus ją prijungti.",
+      "bitbucketAdminOnlyDescription": "Paprašykite organizacijos savininko, administratoriaus ar atsiskaitymų administratoriaus jį prijungti.",
       "contextLine": "Skirta {{organization}}",
       "contextLinePersonal": "Skirta asmeninei paskyrai"
     },
@@ -1394,7 +1394,7 @@
     "followReviewMd": "Laikytis REVIEW.md instrukcijų",
     "followReviewMdSubtitle": "Laikytis kiekvienos saugyklos REVIEW.md faile pateiktų instrukcijų",
     "bitbucket": {
-      "notConnectedReadOnly": "Platforma Bitbucket neprijungta. Paprašykite organizacijos savininko, administratoriaus ar atsiskaitymų administratoriaus ją prijungti."
+      "notConnectedReadOnly": "Bitbucket neprijungtas. Paprašykite organizacijos savininko, administratoriaus ar atsiskaitymų administratoriaus jį prijungti."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Šios organizacijos Bitbucket ryšys valdomas žiniatinklyje naudojant kompiuterį.",

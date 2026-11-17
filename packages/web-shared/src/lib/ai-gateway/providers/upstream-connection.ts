@@ -33,11 +33,11 @@ const UPSTREAM_AGENT_CONNECTIONS_PER_HOST = 64;
 type UpstreamPin = { addresses: string[]; expiresAt: number };
 
 /**
- * Checked addresses per normalized hostname, oldest insertion first. A name with
+ * Checked addresses per normalized hostname, unused longest first. A name with
  * no entry here is refused at connect time.
  */
 const pinnedAddresses = new Map<string, UpstreamPin>();
-/** One connection pool per normalized hostname, oldest insertion first. */
+/** One connection pool per normalized hostname, unused longest first. */
 const upstreamDispatchers = new Map<string, Agent>();
 
 export class UpstreamAddressUnverifiedError extends Error {

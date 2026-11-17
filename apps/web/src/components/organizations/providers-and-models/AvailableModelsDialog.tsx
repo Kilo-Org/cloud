@@ -14,6 +14,20 @@ import { List } from 'lucide-react';
 import { LoadingCard } from '@/components/LoadingCard';
 import { ErrorCard } from '@/components/ErrorCard';
 
+const PREFERRED_PROVIDER_PRICE_NOTE =
+  'Prices are for our preferred provider. Actual charges can differ, and may be higher, if a request fails over to another provider or provider restrictions are configured.';
+
+function parseModelPrice(model: { pricing: { prompt: string; completion: string } }) {
+  const promptPrice = parseFloat(model.pricing.prompt);
+  const completionPrice = parseFloat(model.pricing.completion);
+  const hasKnownPrice =
+    Number.isFinite(promptPrice) &&
+    promptPrice > 0 &&
+    Number.isFinite(completionPrice) &&
+    completionPrice > 0;
+  return { hasKnownPrice, promptPrice, completionPrice };
+}
+
 type AvailableModelsDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -65,13 +79,7 @@ export function AvailableModelsDialog({
           {modelsData && (
             <div className="space-y-2">
               {modelsData.data.map(model => {
-                const promptPrice = parseFloat(model.pricing.prompt);
-                const completionPrice = parseFloat(model.pricing.completion);
-                const hasKnownPrice =
-                  Number.isFinite(promptPrice) &&
-                  promptPrice > 0 &&
-                  Number.isFinite(completionPrice) &&
-                  completionPrice > 0;
+                const { hasKnownPrice, promptPrice, completionPrice } = parseModelPrice(model);
                 const promptPricePer1M = (promptPrice * 1000).toFixed(2);
                 const completionPricePer1M = (completionPrice * 1000).toFixed(2);
 
@@ -97,6 +105,10 @@ export function AvailableModelsDialog({
             </div>
           )}
         </div>
+
+        {modelsData?.data.some(model => parseModelPrice(model).hasKnownPrice) && (
+          <p className="text-muted-foreground text-xs">{PREFERRED_PROVIDER_PRICE_NOTE}</p>
+        )}
 
         <DialogFooter>
           <Button onClick={() => onOpenChange(false)}>Close</Button>

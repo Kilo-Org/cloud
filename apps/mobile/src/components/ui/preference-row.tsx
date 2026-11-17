@@ -1,29 +1,27 @@
-import { type LucideIcon } from '@/components/ui/icons';
-import { Pressable, useColorScheme, View } from 'react-native';
+import { type ComponentType } from 'react';
+import { useColorScheme, View } from 'react-native';
 
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
-import { IconTile } from '@/components/ui/icon-tile';
-import { Switch } from '@/components/ui/switch';
+import { type LucideProps } from '@/components/ui/icons';
+import { RowFrame } from '@/components/ui/row-frame';
 import { Text } from '@/components/ui/text';
-import { NEUTRAL_TINT } from '@/lib/agent-color';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
 type PreferenceRowProps = Readonly<{
-  icon: LucideIcon;
+  /** Omit it for a switch row that leads with its title, with no tile of its own. */
+  icon?: ComponentType<LucideProps>;
   title: string;
-  subtitle: string;
+  /** The line under the title. Omit it for a one-line switch row. */
+  subtitle?: string;
   value: boolean;
   disabled: boolean;
   busy?: boolean;
   onValueChange: (next: boolean) => void;
   /**
    * The subtitle this row shows when its own state stops the preference from
-   * applying, so the row can say why it is inert instead of leaving a greyed
-   * switch unexplained. Only the visible subtitle is painted and announced; the
-   * other one is laid out invisibly underneath it, so the row keeps the taller
-   * of the two in every language and never resizes when the caller swaps them.
+   * applying. The other copy stays in the tree at zero opacity so the row keeps
+   * the height of the taller line and never moves when the state changes.
    */
   inactiveSubtitle?: string;
   /**
@@ -34,13 +32,18 @@ type PreferenceRowProps = Readonly<{
    * state the person last asked for.
    */
   resolveValue?: () => boolean;
+  /**
+   * Full spoken name of the switch. Set it when the title alone does not say
+   * what the switch controls, e.g. a composed "spend alerts for Acme" name.
+   */
+  accessibilityLabel?: string;
   /** Test handle for the row's own container, for native E2E scripts. */
   testID?: string;
 }>;
 
 /** Switch row shaped like the Notifications category row. */
 export function PreferenceRow({
-  icon: Icon,
+  icon,
   title,
   subtitle,
   value,
@@ -49,6 +52,7 @@ export function PreferenceRow({
   onValueChange,
   inactiveSubtitle,
   resolveValue,
+  accessibilityLabel,
   testID,
 }: PreferenceRowProps) {
   const colors = useThemeColors();
@@ -80,91 +84,69 @@ export function PreferenceRow({
   // description drops a whole line below the title. The extra 3.5 dp keeps the
   // title clear of the boundary, so the frame is the line the row paints.
   return (
-    <View testID={testID} className="min-h-[48px] flex-row items-center gap-2 px-4 py-3">
-      <Pressable
-        className={cn(
-          ROW_TARGET_CLASS,
-          'min-w-0 flex-1 flex-row items-center gap-3 active:opacity-70'
-        )}
-        disabled={disabled}
-        onPress={flip}
-        accessible={false}
-        importantForAccessibility="no-hide-descendants"
-      >
-        {busy ? (
+    <RowFrame
+      testID={testID}
+      className="gap-2"
+      pressTarget="content"
+      icon={icon}
+      iconContent={
+        busy ? (
           // The busy spinner takes the icon's place inside the tile, never the
           // tile's place: a row that loses its 30 dp column while it saves
           // moves its own title sideways.
-          <IconTile
-            tint={NEUTRAL_TINT}
-            content={<ActivityIndicator size="small" color={colors.mutedForeground} />}
-          />
-        ) : (
-          <IconTile icon={Icon} tint={NEUTRAL_TINT} />
-        )}
-        <View accessible={false} importantForAccessibility="no" className="min-w-0 flex-1">
-          {/* Disabled cue is the muted title, not row opacity — see the same
-              pattern in notifications-screen's CategoryRow. */}
-          <Text
-            accessible={false}
-            importantForAccessibility="no"
-            className={cn('text-sm font-medium', disabled && 'text-muted-foreground')}
+          <ActivityIndicator size="small" color={colors.mutedForeground} />
+        ) : undefined
+      }
+      trailing={{
+        kind: 'switch',
+        value,
+        onValueChange: flip,
+        disabled,
+        thumbColor: switchColors?.thumbColor,
+        trackColor: switchColors?.trackColor,
+        accessibilityLabel: accessibilityLabel ?? title,
+        accessibilityHint: subtitle,
+        accessibilityState: { disabled, busy, checked: value },
+      }}
+      onPress={flip}
+      disabled={disabled}
+    >
+      {/* Disabled cue is the muted title, not row opacity — see the same
+          pattern in notifications-screen's CategoryRow. */}
+      <Text className={cn('text-sm font-medium', disabled && 'text-muted-foreground')}>
+        {title}
+      </Text>
+      {/* Only the visible subtitle is painted and announced. When the caller
+          passes both, full-width overlapping copies reserve the taller one in
+          native layout — the idiom in form-field's reserved error area — so
+          swapping them cannot change the row's height in any language, font
+          scale or width, without measuring. */}
+      {subtitle === undefined ? null : inactiveSubtitle === undefined ? (
+        <Text variant="muted" className="mt-0.5 text-xs">
+          {subtitle}
+        </Text>
+      ) : (
+        <View className="mt-0.5">
+          <View
+            className="flex-row opacity-0"
+            pointerEvents="none"
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
           >
-            {title}
-          </Text>
-          {/* Only the visible subtitle is painted and announced. When the
-              caller passes both, full-width overlapping copies reserve the
-              taller one in native layout — the idiom in form-field's reserved
-              error area — so swapping them cannot change the row's height in
-              any language, font scale or width, without measuring. */}
-          {inactiveSubtitle === undefined ? (
-            <Text
-              accessible={false}
-              importantForAccessibility="no"
-              variant="muted"
-              className="mt-0.5 text-xs"
-            >
+            <Text variant="muted" className="w-full shrink-0 text-xs">
               {subtitle}
             </Text>
-          ) : (
-            <View className="mt-0.5">
-              <View
-                className="flex-row opacity-0"
-                pointerEvents="none"
-                accessibilityElementsHidden
-                importantForAccessibility="no-hide-descendants"
-              >
-                <Text variant="muted" className="w-full shrink-0 text-xs">
-                  {subtitle}
-                </Text>
-                <Text variant="muted" className="-ms-[100%] w-full shrink-0 text-xs">
-                  {inactiveSubtitle}
-                </Text>
-              </View>
-              <View className="absolute inset-x-0 top-0">
-                <Text
-                  accessible={false}
-                  importantForAccessibility="no"
-                  variant="muted"
-                  className="text-xs"
-                >
-                  {subtitle}
-                </Text>
-              </View>
-            </View>
-          )}
+            <Text variant="muted" className="-ms-[100%] w-full shrink-0 text-xs">
+              {inactiveSubtitle}
+            </Text>
+          </View>
+          <View className="absolute inset-x-0 top-0">
+            <Text variant="muted" className="text-xs">
+              {subtitle}
+            </Text>
+          </View>
         </View>
-      </Pressable>
-      <Switch
-        value={value}
-        disabled={disabled}
-        thumbColor={switchColors?.thumbColor}
-        trackColor={switchColors?.trackColor}
-        accessibilityLabel={title}
-        accessibilityHint={subtitle}
-        accessibilityState={{ disabled, busy, checked: value }}
-        onValueChange={flip}
-      />
-    </View>
+      )}
+    </RowFrame>
   );
 }

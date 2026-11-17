@@ -1,13 +1,11 @@
-import { selectionHaptic } from '@/lib/haptics';
 import { type ReactNode } from 'react';
-import { Pressable, View } from 'react-native';
 
-import { RowCheck } from '@/components/ui/row-check';
+import { RowFrame } from '@/components/ui/row-frame';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { selectableRowA11y } from '@/lib/a11y/selectable-row';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { formatList } from '@/lib/format';
+import { selectionHaptic } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
 
 type ChoiceRowProps = {
@@ -22,7 +20,13 @@ type ChoiceRowProps = {
    */
   accessibleName?: string;
   selected: boolean;
-  onPress: () => void;
+  /**
+   * Runs the selection. Return `false` when the press does not apply — a save
+   * in flight, a locked scope — and the row skips its selection tick, so the
+   * haptic never announces a choice that did not happen. `void` counts as
+   * applied, which keeps every existing caller unchanged.
+   */
+  onPress: () => void | boolean;
   disabled?: boolean;
   /** Marks the row as busy for a11y, e.g. while its own save is in flight. */
   busy?: boolean;
@@ -66,17 +70,16 @@ export function ChoiceRow({
     children == null ? [label, description].flatMap(part => (part ? [part] : [])) : [];
 
   return (
-    <Pressable
+    <RowFrame
       testID={testID}
-      className={cn(
-        ROW_TARGET_CLASS,
-        'min-h-[48px] flex-row items-center justify-between gap-3 px-4 py-3 active:opacity-70',
-        className
-      )}
+      className={className}
+      trailing={{ kind: 'check', selected, disabled }}
       disabled={disabled}
       onPress={() => {
-        selectionHaptic();
-        onPress();
+        const applied = onPress();
+        if (applied !== false) {
+          selectionHaptic();
+        }
       }}
       {...selectableRowA11y({
         multi: Boolean(multi),
@@ -90,21 +93,20 @@ export function ChoiceRow({
       }
     >
       {children ?? (
-        <View className="flex-1">
+        <>
+          {/* The disabled cue is the label's muted token, not a row opacity: a
+              caption under a dimmed row drops to roughly 2:1 on the row
+              surface, and this one is read, not decorative. */}
           <Text className={cn('text-sm font-medium', disabled && 'text-muted-foreground')}>
             {label}
           </Text>
           {description ? (
-            // The disabled cue is the label's muted token, not a row opacity:
-            // a caption under a dimmed row drops to roughly 2:1 on the row
-            // surface, and this one is read, not decorative.
             <Text variant="muted" className="mt-0.5 text-xs">
               {description}
             </Text>
           ) : null}
-        </View>
+        </>
       )}
-      <RowCheck selected={selected} disabled={disabled} />
-    </Pressable>
+    </RowFrame>
   );
 }

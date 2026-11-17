@@ -55,12 +55,7 @@ function inAppAreas(overrides: Partial<OrgInAppSettingsGate> = {}) {
 
 describe('visibleOrgSettingsRows', () => {
   it('lists every web area for an owner of an enterprise organization', () => {
-    expect(areas()).toEqual([
-      'requestLogs',
-      'integrations',
-      'subOrganizations',
-      'distributeFunds',
-    ]);
+    expect(areas()).toEqual(['requestLogs', 'integrations', 'subOrganizations', 'distributeFunds']);
   });
 
   it('keeps only the member-readable rows for a member on enterprise', () => {

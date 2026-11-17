@@ -51,11 +51,7 @@ import { WEB_BASE_URL } from '@/lib/config';
  * (no gate) and groups (the enterprise plan), and BYOK (the billing role,
  * opening the app's own provider-keys screen with the organization's scope).
  */
-type OrgSettingsArea =
-  | 'requestLogs'
-  | 'integrations'
-  | 'subOrganizations'
-  | 'distributeFunds';
+type OrgSettingsArea = 'requestLogs' | 'integrations' | 'subOrganizations' | 'distributeFunds';
 
 export type OrgSettingsGate = Readonly<{
   role: OrganizationRole | undefined;

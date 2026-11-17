@@ -4618,6 +4618,7 @@
       "saveFailedTitle": "Liipaisimen tallennus epäonnistui",
       "deleteTitle": "Poistetaanko tämä liipaisin?",
       "deleteMessage": "Kutsut kohteeseen {{name}} epäonnistuvat. Tätä ei voi kumota.",
+      "deleteMessageScheduled": "Liipaisimen {{name}} ajastetut suoritukset pysähtyvät. Tätä ei voi kumota.",
       "runNow": "Suorita nyt",
       "runStarted": "Ajo aloitettu",
       "created": "Liipaisin luotu",

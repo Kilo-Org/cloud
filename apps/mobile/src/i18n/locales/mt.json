@@ -4828,6 +4828,7 @@
       "saveFailedTitle": "Ma setax jiġi salvat l-iskattatur",
       "deleteTitle": "Tħassar dan l-iskattatur?",
       "deleteMessage": "Is-sejħiet lil {{name}} se jfallu. Dan ma jistax jiġi annullat.",
+      "deleteMessageScheduled": "L-eżekuzzjonijiet ipprogrammati ta' {{name}} se jieqfu. Dan ma jistax jiġi annullat.",
       "runNow": "Eżegwi issa",
       "runStarted": "Eżekuzzjoni bdiet",
       "created": "Skattatur maħluq",

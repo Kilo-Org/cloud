@@ -4758,6 +4758,7 @@
       "saveFailedTitle": "Nepodarilo sa uložiť spúšťač",
       "deleteTitle": "Odstrániť tento spúšťač?",
       "deleteMessage": "Volania na {{name}} zlyhajú. Toto sa nedá vrátiť späť.",
+      "deleteMessageScheduled": "Naplánované spustenia spúšťača {{name}} sa zastavia. Toto sa nedá vrátiť späť.",
       "runNow": "Spustiť teraz",
       "runStarted": "Spustenie začalo",
       "created": "Spúšťač vytvorený",

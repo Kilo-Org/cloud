@@ -4688,6 +4688,7 @@
       "saveFailedTitle": "Impossible d’enregistrer le déclencheur",
       "deleteTitle": "Supprimer ce déclencheur ?",
       "deleteMessage": "Les appels à {{name}} échoueront. Cette action est irréversible.",
+      "deleteMessageScheduled": "Les exécutions planifiées de {{name}} s'arrêteront. Cette action est irréversible.",
       "runNow": "Exécuter maintenant",
       "runStarted": "Exécution démarrée",
       "created": "Déclencheur créé",

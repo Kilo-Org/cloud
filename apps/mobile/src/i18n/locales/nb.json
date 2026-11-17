@@ -4618,6 +4618,7 @@
       "saveFailedTitle": "Kunne ikke lagre triggeren",
       "deleteTitle": "Slette denne triggeren?",
       "deleteMessage": "Kall til {{name}} vil mislykkes. Dette kan ikke angres.",
+      "deleteMessageScheduled": "Planlagte kjøringer av {{name}} stopper. Dette kan ikke angres.",
       "runNow": "Kjør nå",
       "runStarted": "Kjøring startet",
       "created": "Trigger opprettet",

@@ -4618,6 +4618,7 @@
       "saveFailedTitle": "Couldn't save the trigger",
       "deleteTitle": "Delete this trigger?",
       "deleteMessage": "Calls to {{name}} will fail. This cannot be undone.",
+      "deleteMessageScheduled": "Scheduled runs of {{name}} stop. This cannot be undone.",
       "runNow": "Run now",
       "runStarted": "Run started",
       "created": "Trigger created",

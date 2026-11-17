@@ -4688,6 +4688,7 @@
       "saveFailedTitle": "No se pudo guardar el disparador",
       "deleteTitle": "¿Eliminar este disparador?",
       "deleteMessage": "Las llamadas a {{name}} fallarán. Esto no se puede deshacer.",
+      "deleteMessageScheduled": "Las ejecuciones programadas de {{name}} se detendrán. Esto no se puede deshacer.",
       "runNow": "Ejecutar ahora",
       "runStarted": "Ejecución iniciada",
       "created": "Disparador creado",

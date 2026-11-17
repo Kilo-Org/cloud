@@ -4758,6 +4758,7 @@
       "saveFailedTitle": "Sprožilca ni bilo mogoče shraniti",
       "deleteTitle": "Želite izbrisati ta sprožilec?",
       "deleteMessage": "Klici na {{name}} ne bodo uspeli. Tega ni mogoče razveljaviti.",
+      "deleteMessageScheduled": "Načrtovani zagoni sprožilca {{name}} se bodo ustavili. Tega ni mogoče razveljaviti.",
       "runNow": "Zaženi zdaj",
       "runStarted": "Izvajanje se je začelo",
       "created": "Sprožilec je ustvarjen",

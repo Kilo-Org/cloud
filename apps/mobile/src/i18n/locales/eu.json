@@ -4618,6 +4618,7 @@
       "saveFailedTitle": "Ezin izan da abiarazlea gorde",
       "deleteTitle": "Abiarazle hau ezabatu?",
       "deleteMessage": "{{name}}(e)rako deiak huts egingo dute. Hau ezin da desegin.",
+      "deleteMessageScheduled": "{{name}}(r)en exekuzio programatuak geldituko dira. Hau ezin da desegin.",
       "runNow": "Exekutatu orain",
       "runStarted": "Exekuzioa hasi da",
       "created": "Abiarazlea sortu da",

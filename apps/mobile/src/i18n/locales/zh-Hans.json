@@ -4618,6 +4618,7 @@
       "saveFailedTitle": "无法保存触发器",
       "deleteTitle": "删除此触发器？",
       "deleteMessage": "对 {{name}} 的调用将失败。此操作无法撤销。",
+      "deleteMessageScheduled": "{{name}} 的已计划运行将停止。此操作无法撤销。",
       "runNow": "立即运行",
       "runStarted": "运行已开始",
       "created": "触发器已创建",

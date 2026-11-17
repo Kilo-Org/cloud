@@ -4618,6 +4618,7 @@
       "saveFailedTitle": "Nou pa t kapab sove deklanchè a",
       "deleteTitle": "Efase deklanchè sa a?",
       "deleteMessage": "Apèl sou {{name}} ap echwe. Sa pa ka defèt.",
+      "deleteMessageScheduled": "Egzekisyon pwograme pou deklanchè {{name}} sispann. Sa pa ka defèt.",
       "runNow": "Lanse kounye a",
       "runStarted": "Egzekisyon kòmanse",
       "created": "Deklanchè kreye",

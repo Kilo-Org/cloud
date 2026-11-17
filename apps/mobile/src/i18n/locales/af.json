@@ -4618,6 +4618,7 @@
       "saveFailedTitle": "Kon nie die sneller stoor nie",
       "deleteTitle": "Vee hierdie sneller uit?",
       "deleteMessage": "Oproepe na {{name}} sal misluk. Dit kan nie ongedaan gemaak word nie.",
+      "deleteMessageScheduled": "Geskeduleerde lopies van die sneller {{name}} stop. Dit kan nie ongedaan gemaak word nie.",
       "runNow": "Loop nou",
       "runStarted": "Lopie het begin",
       "created": "Sneller geskep",

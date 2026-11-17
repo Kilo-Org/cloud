@@ -4618,6 +4618,7 @@
       "saveFailedTitle": "Der Auslöser konnte nicht gespeichert werden",
       "deleteTitle": "Diesen Auslöser löschen?",
       "deleteMessage": "Aufrufe an {{name}} schlagen fehl. Dies kann nicht rückgängig gemacht werden.",
+      "deleteMessageScheduled": "Geplante Ausführungen von {{name}} werden gestoppt. Dies kann nicht rückgängig gemacht werden.",
       "runNow": "Jetzt ausführen",
       "runStarted": "Lauf gestartet",
       "created": "Auslöser erstellt",

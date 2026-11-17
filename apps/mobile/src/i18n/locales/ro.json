@@ -4688,6 +4688,7 @@
       "saveFailedTitle": "Nu s-a putut salva declanșatorul",
       "deleteTitle": "Ștergi acest declanșator?",
       "deleteMessage": "Apelurile către {{name}} vor eșua. Această acțiune nu poate fi anulată.",
+      "deleteMessageScheduled": "Execuțiile programate ale {{name}} se opresc. Această acțiune nu poate fi anulată.",
       "runNow": "Rulează acum",
       "runStarted": "Rularea a început",
       "created": "Declanșator creat",

@@ -4618,6 +4618,7 @@
       "saveFailedTitle": "Gat ekki vistað kveikjuna",
       "deleteTitle": "Eyða þessari kveikju?",
       "deleteMessage": "Köll til {{name}} munu mistakast. Þetta er ekki hægt að afturkalla.",
+      "deleteMessageScheduled": "Áætlaðar keyrslur kveikjunnar {{name}} stöðvast. Þetta er ekki hægt að afturkalla.",
       "runNow": "Keyra núna",
       "runStarted": "Keyrsla hafin",
       "created": "Kveikja búin til",

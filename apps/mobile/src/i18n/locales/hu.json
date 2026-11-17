@@ -4618,6 +4618,7 @@
       "saveFailedTitle": "Nem sikerült menteni a triggert",
       "deleteTitle": "Törli ezt a triggert?",
       "deleteMessage": "A {{name}} hívásai sikertelenek lesznek. Ez nem vonható vissza.",
+      "deleteMessageScheduled": "A {{name}} ütemezett futtatásai leállnak. Ez nem vonható vissza.",
       "runNow": "Futtatás most",
       "runStarted": "A futás elindult",
       "created": "A trigger létrejött",

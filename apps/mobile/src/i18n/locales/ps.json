@@ -4618,6 +4618,7 @@
       "saveFailedTitle": "ټرېګر خوندي نشو",
       "deleteTitle": "دا ټرېګر ړنګ کړو؟",
       "deleteMessage": "{{name}} ته غوښتنې به ناکامې شي. دا بېرته نه‌شی ګرځول کېدای.",
+      "deleteMessageScheduled": "د {{name}} مهال ویش شوې چلېدنې به ودرېږي. دا بېرته نه‌شی ګرځول کېدای.",
       "runNow": "اوس چل کړه",
       "runStarted": "چل پیل شو",
       "created": "ټرېګر جوړ شو",

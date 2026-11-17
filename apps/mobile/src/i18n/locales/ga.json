@@ -4828,6 +4828,7 @@
       "saveFailedTitle": "Níorbh fhéidir an truicear a shábháil",
       "deleteTitle": "Scrios an truicear seo?",
       "deleteMessage": "Teipfidh glaonna chuig {{name}}. Ní féidir é seo a chealú.",
+      "deleteMessageScheduled": "Stopfaidh ritheanna sceidealaithe an truicir {{name}}. Ní féidir é seo a chealú.",
       "runNow": "Rith anois",
       "runStarted": "Tosaíodh an rith",
       "created": "Cruthaíodh an truicear",

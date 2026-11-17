@@ -4618,6 +4618,7 @@
       "saveFailedTitle": "Tidak dapat menyimpan pemicu",
       "deleteTitle": "Hapus pemicu ini?",
       "deleteMessage": "Panggilan ke {{name}} akan gagal. Tindakan ini tidak dapat dibatalkan.",
+      "deleteMessageScheduled": "Eksekusi terjadwal pemicu {{name}} akan berhenti. Tindakan ini tidak dapat dibatalkan.",
       "runNow": "Jalankan sekarang",
       "runStarted": "Eksekusi dimulai",
       "created": "Pemicu dibuat",

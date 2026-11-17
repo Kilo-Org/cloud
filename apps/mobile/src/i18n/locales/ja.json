@@ -4618,6 +4618,7 @@
       "saveFailedTitle": "トリガーを保存できませんでした",
       "deleteTitle": "このトリガーを削除しますか？",
       "deleteMessage": "{{name}}への呼び出しは失敗します。この操作は元に戻せません。",
+      "deleteMessageScheduled": "{{name}}の予定された実行は停止します。この操作は元に戻せません。",
       "runNow": "今すぐ実行",
       "runStarted": "実行を開始しました",
       "created": "トリガーを作成しました",

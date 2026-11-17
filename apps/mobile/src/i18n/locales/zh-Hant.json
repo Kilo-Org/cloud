@@ -4618,6 +4618,7 @@
       "saveFailedTitle": "無法儲存觸發器",
       "deleteTitle": "要刪除此觸發器嗎？",
       "deleteMessage": "對 {{name}} 的呼叫將會失敗。此動作無法復原。",
+      "deleteMessageScheduled": "{{name}} 觸發器的已排程執行將會停止。此動作無法復原。",
       "runNow": "立即執行",
       "runStarted": "已開始執行",
       "created": "已建立觸發器",

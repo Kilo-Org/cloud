@@ -4618,6 +4618,7 @@
       "saveFailedTitle": "Det gick inte att spara utlösaren",
       "deleteTitle": "Ta bort den här utlösaren?",
       "deleteMessage": "Anrop till {{name}} kommer att misslyckas. Detta kan inte ångras.",
+      "deleteMessageScheduled": "Schemalagda körningar av {{name}} stoppas. Detta kan inte ångras.",
       "runNow": "Kör nu",
       "runStarted": "Körning startad",
       "created": "Utlösare skapad",

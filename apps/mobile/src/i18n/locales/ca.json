@@ -4688,6 +4688,7 @@
       "saveFailedTitle": "No s'ha pogut desar el disparador",
       "deleteTitle": "Vols eliminar aquest disparador?",
       "deleteMessage": "Les crides a {{name}} fallaran. Això no es pot desfer.",
+      "deleteMessageScheduled": "Les execucions programades del disparador {{name}} s'aturaran. Això no es pot desfer.",
       "runNow": "Executa ara",
       "runStarted": "Execució iniciada",
       "created": "Disparador creat",

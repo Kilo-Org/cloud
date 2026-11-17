@@ -4618,6 +4618,7 @@
       "saveFailedTitle": "Enweghị ike ichekwa ihe mkpalite",
       "deleteTitle": "Hichapụ ihe mkpalite a?",
       "deleteMessage": "Oku gaa {{name}} ga-ada. Enweghị ike iweghachi nke a.",
+      "deleteMessageScheduled": "Ọsọ ahaziri nke ihe mkpalite {{name}} ga-akwụsị. Enweghị ike iweghachi nke a.",
       "runNow": "Gbaa ugbu a",
       "runStarted": "Malitere ọsọ",
       "created": "Emepụtara ihe mkpalite",

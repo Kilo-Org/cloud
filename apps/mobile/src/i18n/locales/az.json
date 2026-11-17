@@ -4618,6 +4618,7 @@
       "saveFailedTitle": "Tətikləyici yadda saxlanıla bilmədi",
       "deleteTitle": "Bu tətikləyici silinsin?",
       "deleteMessage": "{{name}} ünvanına edilən çağırışlar uğursuz olacaq. Bu əməliyyat geri qaytarıla bilməz.",
+      "deleteMessageScheduled": "{{name}} tətikləyicisinin planlaşdırılıb icra olunan çağırışları dayanacaq. Bu əməliyyat geri qaytarıla bilməz.",
       "runNow": "İndi işlət",
       "runStarted": "İcra başladı",
       "created": "Tətikləyici yaradıldı",

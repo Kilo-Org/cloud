@@ -4618,6 +4618,7 @@
       "saveFailedTitle": "Ishga tushirgichni saqlab boʻlmadi",
       "deleteTitle": "Bu ishga tushirgich oʻchirilsinmi?",
       "deleteMessage": "{{name}} ga qilingan chaqiruvlar muvaffaqiyatsiz boʻladi. Buni ortga qaytarib boʻlmaydi.",
+      "deleteMessageScheduled": "{{name}} ishga tushirgichining rejalashtirilgan ishga tushirishlari toʻxtaydi. Buni ortga qaytarib boʻlmaydi.",
       "runNow": "Hozir ishga tushirish",
       "runStarted": "Ishga tushirish boshlandi",
       "created": "Ishga tushirgich yaratildi",

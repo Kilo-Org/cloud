@@ -4618,6 +4618,7 @@
       "saveFailedTitle": "트리거를 저장하지 못했습니다",
       "deleteTitle": "이 트리거를 삭제할까요?",
       "deleteMessage": "{{name}}에 대한 호출이 실패합니다. 이 작업은 되돌릴 수 없습니다.",
+      "deleteMessageScheduled": "{{name}} 트리거의 예약된 실행이 중지됩니다. 이 작업은 되돌릴 수 없습니다.",
       "runNow": "지금 실행",
       "runStarted": "실행 시작됨",
       "created": "트리거가 생성됨",

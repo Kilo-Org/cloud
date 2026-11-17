@@ -4618,6 +4618,7 @@
       "saveFailedTitle": "Shkaktari nuk mund të ruhej",
       "deleteTitle": "Ta fshij këtë shkaktar?",
       "deleteMessage": "Thirrjet drejtuar {{name}} do të dështojnë. Ky veprim nuk mund të zhbëhet.",
+      "deleteMessageScheduled": "Ekzekutimet e planifikuara të {{name}} do të ndalojnë. Ky veprim nuk mund të zhbëhet.",
       "runNow": "Ekzekuto tani",
       "runStarted": "Ekzekutimi filloi",
       "created": "Shkaktari u krijua",

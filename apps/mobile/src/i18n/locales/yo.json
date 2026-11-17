@@ -4618,6 +4618,7 @@
       "saveFailedTitle": "A kò lè fi ìmúṣiṣẹ́ pamọ́",
       "deleteTitle": "Yọ ìmúṣiṣẹ́ yìí kúrò?",
       "deleteMessage": "Àwọn ìpè sí {{name}} máa kùnà. A kò lè yí èyí padà.",
+      "deleteMessageScheduled": "Àwọn ìṣiṣẹ́ ti ṣètò fún ìmúṣiṣẹ́ {{name}} máa dúró. A kò lè yí èyí padà.",
       "runNow": "Ṣiṣẹ́ báyìí",
       "runStarted": "Ìṣiṣẹ́ ti bẹ̀rẹ̀",
       "created": "A ti ṣẹ̀dá ìmúṣiṣẹ́",

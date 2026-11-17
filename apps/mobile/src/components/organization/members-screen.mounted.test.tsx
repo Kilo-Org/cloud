@@ -531,9 +531,7 @@ describe('OrganizationMembersScreen self-row identity gate', () => {
   const otherMember = { status: 'active', id: 'member-9', name: 'Ada', email: 'ada@example.com' };
 
   function rowPropsFor(memberId: string): Record<string, unknown> {
-    const props = memberRowProps
-      .filter(row => (row.member as { id: string }).id === memberId)
-      .at(-1);
+    const props = memberRowProps.findLast(row => (row.member as { id: string }).id === memberId);
     if (!props) {
       throw new Error(`member row for ${memberId} never rendered`);
     }

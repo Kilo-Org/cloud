@@ -1959,9 +1959,10 @@ function checkPushEnglishCopy({ catalogName, english, localeValues }) {
  * needs a called-key reader; `keyPrefixOf` stays null when the catalog builds
  * no key from a template head; the destructive collection is a real decision,
  * because an entry that leaves the field out reads as one that chose not to
- * collect. A misconfigured entry fails the audit as a named problem before the
- * scan runs, instead of as a TypeError partway through the tree or a silently
- * skipped rule.
+ * collect. A misconfigured entry is reported as a named problem and the audit
+ * skips its scan entirely, instead of dying on the missing reader partway
+ * through the tree — the problems the run collected before the scan would
+ * never be printed.
  */
 function checkScanPolicy(catalog) {
   const missing = [];
@@ -2017,16 +2018,26 @@ export function checkCatalogs(root = ROOT) {
   problems.push(...languageProblems);
 
   const catalogs = catalogsOf(root);
+  const unscannable = new Set();
   for (const catalog of catalogs) {
-    problems.push(...checkScanPolicy(catalog));
+    const policyProblems = checkScanPolicy(catalog);
+    problems.push(...policyProblems);
+    if (policyProblems.length > 0) {
+      // A descriptor without its policy cannot be scanned: scanSource would
+      // call the missing reader and die partway through the tree, so the
+      // named problems above would never be printed. Skipping the catalog
+      // keeps the diagnostic what the developer sees.
+      unscannable.add(catalog);
+    }
   }
-  for (const catalog of catalogs) {
+  const scannable = catalogs.filter(catalog => !unscannable.has(catalog));
+  for (const catalog of scannable) {
     if (catalog.localeRegistry) {
       problems.push(...checkPushLocaleRegistry({ root, catalog }));
     }
   }
 
-  for (const catalog of catalogs) {
+  for (const catalog of scannable) {
     const catalogName = catalog.name;
     const present = new Set(catalogTags(catalog.dir));
 

@@ -322,7 +322,8 @@ describe.each([true, false])('finding load states with local history=%s', hasLoc
     finding.data = undefined;
     const tree = renderScreen();
 
-    expect(tree.root.findAllByType(Skeleton)).toHaveLength(4);
+    // Four body skeletons plus the bar on the header's reserved eyebrow line.
+    expect(tree.root.findAllByType(Skeleton)).toHaveLength(5);
     expect(tree.root.findAllByType(QueryError)).toHaveLength(0);
     expect(tree.root.findAllByProps({ accessibilityLabel: 'common.retry' })).toHaveLength(0);
     expectSafeBack(tree);
@@ -377,7 +378,8 @@ describe.each([true, false])('finding load states with local history=%s', hasLoc
     renderScreen('finding-2');
 
     expect(tree.root.findAllByType(QueryError)).toHaveLength(0);
-    expect(tree.root.findAllByType(Skeleton)).toHaveLength(4);
+    // Four body skeletons plus the bar on the header's reserved eyebrow line.
+    expect(tree.root.findAllByType(Skeleton)).toHaveLength(5);
   });
 
   it('recovers the finding through Retry after a transient load failure', () => {

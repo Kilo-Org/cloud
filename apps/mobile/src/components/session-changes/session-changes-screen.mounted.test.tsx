@@ -52,7 +52,10 @@ vi.mock('@/components/ui/eyebrow', () => ({ Eyebrow: 'Eyebrow' }));
 vi.mock('@/components/ui/eyebrow-placeholder', () => ({
   EyebrowPlaceholder: 'EyebrowPlaceholder',
 }));
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock('react-i18next', () => ({
+  initReactI18next: { type: '3rdParty', init: () => undefined },
+  useTranslation: () => ({ t: (key: string) => key }),
+}));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({ foreground: '#000' }) }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ canGoBack: () => false }),

@@ -31,7 +31,7 @@ export function useProfileOwnerLabel(): (owner: ProfileSectionKey) => string {
  * it, so the owner groups and the settings group that follows them share one
  * text style.
  */
-export function ProfileSectionHeading({ children }: Readonly<{ children: string }>) {
+function ProfileSectionHeading({ children }: Readonly<{ children: string }>) {
   return <Eyebrow>{children}</Eyebrow>;
 }
 

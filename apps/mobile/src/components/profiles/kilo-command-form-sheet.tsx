@@ -23,13 +23,11 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FormField } from '@/components/ui/form-field';
 import { PreferenceRow } from '@/components/ui/preference-row';
 import { RowGroup } from '@/components/ui/row-group';
-import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { MAX_PROFILE_KILO_COMMANDS } from '@/lib/agent-profile-forms';
 import { useFormDraftRef, useFormDraftState } from '@/lib/form-draft';
 import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
-import { cn } from '@/lib/utils';
 
 /** Catalog key for each refused field, so the message lands under the input at fault. */
 const ERROR_KEYS = {

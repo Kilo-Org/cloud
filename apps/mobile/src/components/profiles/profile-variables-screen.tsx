@@ -254,13 +254,15 @@ export function ProfileVariablesScreen({
     content = (
       <View className="gap-3">
         {editedIndex === -1 ? (
-          <RowGroup>{rows.map(renderRow)}</RowGroup>
+          <RowGroup>{rows.map(row => renderRow(row))}</RowGroup>
         ) : (
           <>
-            {editedIndex > 0 ? <RowGroup>{rows.slice(0, editedIndex).map(renderRow)}</RowGroup> : null}
+            {editedIndex > 0 ? (
+              <RowGroup>{rows.slice(0, editedIndex).map(row => renderRow(row))}</RowGroup>
+            ) : null}
             {renderEditForm(false, initialVariableEdit(rows[editedIndex]))}
             {editedIndex < rows.length - 1 ? (
-              <RowGroup>{rows.slice(editedIndex + 1).map(renderRow)}</RowGroup>
+              <RowGroup>{rows.slice(editedIndex + 1).map(row => renderRow(row))}</RowGroup>
             ) : null}
           </>
         )}

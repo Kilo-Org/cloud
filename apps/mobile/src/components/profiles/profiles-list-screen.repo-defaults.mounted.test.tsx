@@ -138,7 +138,8 @@ describe('ProfilesListScreen repo defaults entry', () => {
     // The entry sits in the second section, in a row group of its own.
     const settingsGroup = rowGroup(renderer.root, repoDefaultsRow(renderer.root));
     const secondSection = groupChildren(scroll)[1];
-    expect(secondSection.findAll(node => node === settingsGroup)).toHaveLength(1);
+    expect(secondSection).toBeDefined();
+    expect(secondSection?.findAll(node => node === settingsGroup)).toHaveLength(1);
     expect(groupChildren(settingsGroup)).toEqual([repoDefaultsRow(renderer.root)]);
 
     unmount();

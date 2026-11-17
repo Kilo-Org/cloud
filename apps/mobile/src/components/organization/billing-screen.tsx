@@ -234,6 +234,39 @@ export function OrganizationBillingScreen() {
     );
   };
 
+  const renderKiloPassState = () => {
+    if (kiloPassRowState == null) {
+      return null;
+    }
+    if (kiloPassRowState.loading) {
+      return <BillingCardSkeleton />;
+    }
+    return (
+      <RowGroup>
+        <KvRow
+          label={t('kiloPass.title')}
+          value={kiloPassRowState.subtitle}
+          valueFace="text"
+          valueTone={kiloPassRowState.attention ? 'warn' : 'default'}
+          trailing={
+            kiloPassRowState.action === 'retry' ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onPress={() => {
+                  void kiloPassSummary.refetch();
+                }}
+                loading={kiloPassSummary.isFetching}
+              >
+                <Text>{t('common.retry')}</Text>
+              </Button>
+            ) : undefined
+          }
+        />
+      </RowGroup>
+    );
+  };
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={screenTitle} backFallback={ORGANIZATION_HUB_PATH} />
@@ -278,32 +311,7 @@ export function OrganizationBillingScreen() {
 
         <Section label={t('organization.billing.autoTopUp')}>{renderAutoTopUpState()}</Section>
 
-        {kiloPassRowState == null ? null : kiloPassRowState.loading ? (
-          <BillingCardSkeleton />
-        ) : (
-          <RowGroup>
-            <KvRow
-              label={t('kiloPass.title')}
-              value={kiloPassRowState.subtitle}
-              valueFace="text"
-              valueTone={kiloPassRowState.attention ? 'warn' : 'default'}
-              trailing={
-                kiloPassRowState.action === 'retry' ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onPress={() => {
-                      void kiloPassSummary.refetch();
-                    }}
-                    loading={kiloPassSummary.isFetching}
-                  >
-                    <Text>{t('common.retry')}</Text>
-                  </Button>
-                ) : undefined
-              }
-            />
-          </RowGroup>
-        )}
+        {renderKiloPassState()}
 
         <Section label={t('organization.billing.manageOnWeb')}>
           <Card>

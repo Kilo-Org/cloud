@@ -160,6 +160,17 @@ export function OrganizationMembersScreen() {
     />
   );
 
+  // A member's or invite's rounded corners follow its run inside one group: the
+  // rows after a section header start the run, and the last row of the group
+  // closes it.
+  const rowPosition = (index: number, last: boolean) => {
+    const isFirst = index === 0 || items[index - 1]?.kind === 'section';
+    if (last) {
+      return isFirst ? 'only' : 'last';
+    }
+    return isFirst ? 'first' : 'middle';
+  };
+
   const renderItem = ({ item, index }: { item: MembersListItem; index: number }) => {
     switch (item.kind) {
       case 'section': {
@@ -169,11 +180,8 @@ export function OrganizationMembersScreen() {
         return emptyState;
       }
       case 'member': {
-        const isFirst = index === 0 || items[index - 1]?.kind === 'section';
         return (
-          <RowGroupItem
-            position={item.last ? (isFirst ? 'only' : 'last') : isFirst ? 'first' : 'middle'}
-          >
+          <RowGroupItem position={rowPosition(index, item.last)}>
             <MemberRow
               member={item.member}
               canManage={
@@ -194,11 +202,8 @@ export function OrganizationMembersScreen() {
         );
       }
       case 'invite': {
-        const isFirst = index === 0 || items[index - 1]?.kind === 'section';
         return (
-          <RowGroupItem
-            position={item.last ? (isFirst ? 'only' : 'last') : isFirst ? 'first' : 'middle'}
-          >
+          <RowGroupItem position={rowPosition(index, item.last)}>
             <InvitedMemberRow
               invite={item.invite}
               canManage={canManageMembers && (item.invite.role !== 'owner' || canManageOwners)}

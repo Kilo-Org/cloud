@@ -650,8 +650,9 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
   renders a new startup command and artifact grant for that bound, and reports "Retrying the
   snapshot start" on the snapshot step. A slow first attempt therefore never uses up the retry. A
   container wedged in a snapshot start can take minutes to destroy, so the stop repeats with the
-  stop ladder's pauses for up to 4 minutes (`snapshotRetryStopMs`). A stop that is not confirmed
-  in that bound fails the start. A permanent reason (expired, missing, image mismatch,
+  stop ladder's pauses for up to 4 minutes (`snapshotRetryStopMs`). After the first unconfirmed
+  stop, the snapshot step reports "Waiting for the failed sandbox to stop". A stop that is not
+  confirmed in that bound fails the start. A permanent reason (expired, missing, image mismatch,
   provenance, or a provider that started the image instead) fails at once and asks to rebuild the
   environment.
   A repeated transient failure asks to send the message again, and to rebuild only if the failure

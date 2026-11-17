@@ -64,7 +64,7 @@ type SandboxUnit = {
     createDeadlineAt: number,
     step: 'restore' | 'environment_snapshot'
   ) => Promise<boolean>;
-  notifySnapshotStartFailure: () => Promise<void>;
+  notifySnapshotStartStep: (allocationId: string, step: string, detail: string) => Promise<void>;
   failCreationRoutes: () => Promise<void>;
   launchWithSnapshotRetry: (request: typeof input) => Promise<unknown>;
   failSnapshotStart: (allocationId: string, error: unknown) => Promise<void>;
@@ -82,7 +82,7 @@ function unit(launch: ProviderAdapter['launch']) {
     cause: 'stop_confirmed',
   }));
   sandbox.startSnapshotRetry = vi.fn(async () => true);
-  sandbox.notifySnapshotStartFailure = vi.fn(async () => {});
+  sandbox.notifySnapshotStartStep = vi.fn(async () => {});
   sandbox.failCreationRoutes = vi.fn(async () => {});
   return sandbox;
 }
@@ -455,6 +455,13 @@ describe('SandboxControlV2 snapshot start diagnostics', () => {
 
     await expect(launched).resolves.toMatchObject({ owned: false });
     expect(sandbox.stopRef).toHaveBeenCalledTimes(3);
+    // The wait shows once, after the first unconfirmed stop.
+    expect(sandbox.notifySnapshotStartStep).toHaveBeenCalledTimes(1);
+    expect(sandbox.notifySnapshotStartStep).toHaveBeenCalledWith(
+      ALLOCATION_ID,
+      'environment_snapshot',
+      'Waiting for the failed sandbox to stop'
+    );
     expect(sandbox.startSnapshotRetry).toHaveBeenCalledTimes(1);
     expect(launch).toHaveBeenCalledTimes(2);
   });

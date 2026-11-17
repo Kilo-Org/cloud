@@ -5,6 +5,7 @@ import { Pressable, View } from 'react-native';
 
 import { CenteredState } from '@/components/centered-state';
 import { useContextPicker } from '@/components/context-control';
+import { useOrganization } from '@/lib/organization-context';
 import { Text } from '@/components/ui/text';
 import { UNDER_COPY_ACTION_BOX_CLASS, UNDER_COPY_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { isPersonal } from '@/lib/hooks/use-code-reviewer';
@@ -54,18 +55,34 @@ export function CouncilRefusalScreen({
   platformSupportsCouncil,
   refusalReason,
   membershipState,
+  onScopePicked,
 }: Readonly<{
   scope: string;
   platformSupportsCouncil: boolean;
   refusalReason: CouncilRefusalReason;
   /** What the account's organization list answers: none, some, or not settled. */
   membershipState: 'none' | 'some' | 'unsettled';
+  /**
+   * A member's picker pick changes the active account, but the refusal reads
+   * the route's scope, so the caller must replace it — otherwise the reader
+   * stays on this same refusal, which a pick did not change.
+   */
+  onScopePicked: (organizationId: string) => void;
 }>) {
   const { t } = useTranslation();
   const router = useRouter();
   const trpc = useTRPC();
+  const { setOrganizationId } = useOrganization();
   const orgs = useQuery(trpc.organizations.list.queryOptions()).data;
-  const { openPicker } = useContextPicker(orgs);
+  const { openPicker } = useContextPicker(orgs, organizationId => {
+    if (organizationId === null) {
+      return;
+    }
+    // The pick is the new active account everywhere; the route itself is
+    // replaced by the caller.
+    setOrganizationId(organizationId);
+    onScopePicked(organizationId);
+  });
   const personal = isPersonal(scope);
   // An unsettled list says nothing about memberships, so its action copy stays
   // neutral: "Create an organization" names a step that exists either way,

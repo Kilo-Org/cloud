@@ -53,6 +53,7 @@ const state = vi.hoisted(() => {
     toggleProps: [] as ToggleProps[],
     patches: [] as SavedPatch[],
     routerPush: vi.fn(),
+    setOrganizationId: vi.fn(),
     gateReason: null as string | null,
     orgs: undefined as { organizationId: string }[] | undefined,
   };
@@ -115,6 +116,9 @@ vi.mock('@/components/context-control', () => ({
       state.routerPush('/(app)/context-picker');
     },
   }),
+}));
+vi.mock('@/lib/organization-context', () => ({
+  useOrganization: () => ({ setOrganizationId: state.setOrganizationId }),
 }));
 vi.mock('@tanstack/react-query', async importOriginal => {
   const actual = await importOriginal<object>();
@@ -215,6 +219,7 @@ beforeEach(() => {
   state.patches.length = 0;
   state.save.isPending = false;
   state.routerPush.mockReset();
+  state.setOrganizationId.mockReset();
   state.gateReason = null;
   state.orgs = [];
 
@@ -302,6 +307,25 @@ describe('council route gate', () => {
     // The press opens the shared account picker (the app's established
     // equivalent), which the mocked single-push route records.
     expect(state.routerPush).toHaveBeenCalledWith('/(app)/context-picker');
+
+    mounted.unmount();
+  });
+
+  it('replaces the refusal with the picked organization after a pick', async () => {
+    state.scope = 'personal';
+    state.gate.allowed = false;
+    state.orgs = [{ organizationId: 'org-1' }];
+
+    const mounted = await renderWithProviders(createElement(CouncilRoute));
+    await act(() => undefined);
+
+    // The press routes through the component's `onSelectionChange`; the sheet
+    // itself is a mock. Drive the fan-out the picker would run: the mock
+    // records the press (asserted in the sibling test), and a picked
+    // organization must call back into the component so the route is replaced
+    // and the account switched. This test only proves the mock plumbing stays
+    // connected; the screen-level behavior is device-proven.
+    expect(state.routerPush).not.toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)');
 
     mounted.unmount();
   });

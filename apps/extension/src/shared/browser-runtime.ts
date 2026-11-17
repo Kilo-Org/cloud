@@ -115,6 +115,8 @@ export interface BrowserRuntime {
   readonly adoptEnded: (input: BrowserSessionRef) => Promise<BrowserTabGroupOpenResult>;
   /** Ends a session: its group collapses, turns grey and becomes `Kilo · ended`. */
   readonly closeSession: (input: BrowserSessionRef) => Promise<void>;
+  /** Drops the caller's ref registries for good; the tab sessions and leases stay alive for others. */
+  readonly disposeCaller: (caller: BrowserCaller) => number;
   /** Tab closed or left the extension's reach: drop the session, its lease and its override. */
   readonly disposeTab: (tabId: number) => Promise<void>;
   /** Runs workflow `page` scripts through the tab's one attachment. */
@@ -123,6 +125,7 @@ export interface BrowserRuntime {
   readonly listSessions: () => BrowserTabGroupSessionSummary[];
   /** Creates the session's group `Kilo · <title>` (or tracks tabs without one). */
   readonly openSession: (input: BrowserOpenSessionInput) => Promise<BrowserTabGroupOpenResult>;
+  /** Ends the caller's tab leases. Its refs survive, so the next turn can click by an earlier ref. */
   readonly releaseCaller: (caller: BrowserCaller) => number;
   readonly runTool: (input: BrowserToolRunInput) => Promise<BrowserToolRunOutcome>;
   /** Moves the active tab (or the named one) into the session's group (`/browser share`). */
@@ -492,11 +495,11 @@ export const createBrowserRuntime = ({
     });
   };
 
-  const releaseCaller = (caller: BrowserCaller): number => {
+  const disposeCaller = (caller: BrowserCaller): number => {
     const key = browserCallerKey(caller);
 
     for (const session of sessions.values()) {
-      session.releaseCaller(key);
+      session.disposeCaller(key);
     }
 
     return leases.releaseCaller(caller);
@@ -510,12 +513,14 @@ export const createBrowserRuntime = ({
         await tabGroups.closeSession(input);
       }
     },
+    disposeCaller,
     disposeTab,
     evalInTab,
     listSessions: () => (tabGroups === undefined ? [] : tabGroups.listSessions()),
     openSession: input =>
       tabGroups === undefined ? Promise.resolve({}) : tabGroups.openSession(input),
-    releaseCaller,
+    // Turn end: the lease goes, the caller's refs stay. Playwright-like, a ref from an earlier snapshot keeps resolving for as long as the caller and the tab session live.
+    releaseCaller: caller => leases.releaseCaller(caller),
     runTool,
     shareActiveTab: input =>
       tabGroups === undefined

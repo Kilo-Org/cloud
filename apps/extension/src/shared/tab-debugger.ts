@@ -12,6 +12,7 @@ export const WEB_MCP_DISCOVER_MESSAGE = 'kilo.tabs.webMcpDiscover';
 export const WEB_MCP_EXECUTE_MESSAGE = 'kilo.tabs.webMcpExecute';
 export const BROWSER_TOOL_MESSAGE = 'kilo.tabs.browserTool';
 export const RELEASE_BROWSER_CALLER_MESSAGE = 'kilo.tabs.releaseBrowserCaller';
+export const DISPOSE_BROWSER_CALLER_MESSAGE = 'kilo.tabs.disposeBrowserCaller';
 export const DEFAULT_EVAL_TIMEOUT_MS = 5000;
 /**
  * The debugger can only attach to ordinary pages. `chrome://`, extension and
@@ -254,6 +255,10 @@ export type TabDebuggerRequest =
       readonly type: typeof RELEASE_BROWSER_CALLER_MESSAGE;
     }
   | {
+      readonly caller: BrowserCaller;
+      readonly type: typeof DISPOSE_BROWSER_CALLER_MESSAGE;
+    }
+  | {
       readonly query?: string;
       readonly tabId: number;
       readonly textStart?: number;
@@ -357,6 +362,16 @@ export type TabDebuggerResponse =
       readonly type: typeof BROWSER_TOOL_MESSAGE;
     }
   | {
+      readonly released: number;
+      readonly ok: true;
+      readonly type: typeof DISPOSE_BROWSER_CALLER_MESSAGE;
+    }
+  | {
+      readonly result: EvalTabResult;
+      readonly ok: true;
+      readonly type: typeof BROWSER_TOOL_MESSAGE;
+    }
+  | {
       readonly ok: true;
       readonly takeOver: BrowserTabTakeOverRequest;
       readonly type: typeof BROWSER_TOOL_MESSAGE;
@@ -421,6 +436,10 @@ const tabDebuggerRequestSchema = z.union([
     type: z.literal(RELEASE_BROWSER_CALLER_MESSAGE),
   }),
   z.object({
+    caller: browserCallerSchema,
+    type: z.literal(DISPOSE_BROWSER_CALLER_MESSAGE),
+  }),
+  z.object({
     agent: z
       .object({
         authorized: z.array(
@@ -476,6 +495,16 @@ const tabDebuggerResponseSchema = z.union([
   z.object({
     ok: z.literal(true),
     originChanged: z.object({ from: z.string(), to: z.string() }),
+    result: evalTabResultSchema,
+    type: z.literal(BROWSER_TOOL_MESSAGE),
+  }),
+  z.object({
+    ok: z.literal(true),
+    released: z.number(),
+    type: z.literal(DISPOSE_BROWSER_CALLER_MESSAGE),
+  }),
+  z.object({
+    ok: z.literal(true),
     result: evalTabResultSchema,
     type: z.literal(BROWSER_TOOL_MESSAGE),
   }),

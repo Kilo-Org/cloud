@@ -72,7 +72,7 @@ import { loadWorkflowSettings } from '@/src/shared/agent-workflows-storage';
 import { loadWebMcpSettings } from '@/src/shared/web-mcp-settings';
 import { executeWorkflowToolCall } from './agent-workflow-tool-runtime';
 import { evalInTab, getTabUrl, navigateTab } from './agent-workflow-runtime';
-import { releaseBrowserCaller } from './browser-tool-runtime';
+import { disposeBrowserCaller, releaseBrowserCaller } from './browser-tool-runtime';
 import { BrowserTabTakeOverCard } from './browser-tab-takeover-card';
 import type { BrowserCaller } from '@/src/shared/browser-caller';
 import { AUTO_COMPACT_RATIO, getContextRatio } from '@/src/shared/context-usage';
@@ -844,11 +844,11 @@ export const AgentChatPanel = ({
         updateThinkingBlock: runState.updateRunThinkingBlock,
         workflowToolContext: {
           allowWorkflowsInSafeMode,
+          disposeBrowserCaller,
           evalInTab,
           getTabUrl,
           mode: runMode,
           navigateTab,
-          releaseBrowserCaller,
           requestApproval: (kind, draft) =>
             requestApproval(storage, kind, draft, runState.abort.signal),
           selectedTabId: runSelectedTabId,
@@ -1108,11 +1108,11 @@ export const AgentChatPanel = ({
         const runMode = conversation.mode ?? defaultMode;
         result = await executeWorkflowToolCall(toolCall, {
           allowWorkflowsInSafeMode: settings.allowWorkflowsInSafeMode,
+          disposeBrowserCaller,
           evalInTab: (tabId, code) => evalInTab(tabId, code),
           getTabUrl: tabId => getTabUrl(tabId),
           mode: runMode,
           navigateTab: (tabId, url) => navigateTab(tabId, url),
-          releaseBrowserCaller,
           requestApproval: (kind, draft) =>
             requestApproval(storage, kind, draft, runState.abort.signal),
           selectedTabId: runSelectedTabId,
@@ -1360,6 +1360,8 @@ export const AgentChatPanel = ({
       }
 
       abortConversationRun(conversationId);
+      // The conversation is gone for good, so its browser caller's refs go too; the tab and other conversations keep working.
+      void disposeBrowserCaller({ conversationId, kind: 'panel', panelId });
       setConversationStore(currentStore =>
         deleteStoredConversation(currentStore, conversationId, emptyDefaultConversationEvents())
       );

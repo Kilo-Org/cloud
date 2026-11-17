@@ -71,11 +71,11 @@ const makeToolDef = (name: string): KiloGatewayToolDefinition =>
 
 const makeWorkflowCtx = (mode: 'dangerous' | 'safe' = 'dangerous') => ({
   allowWorkflowsInSafeMode: false,
+  disposeBrowserCaller: vi.fn(),
   evalInTab: vi.fn(),
   getTabUrl: vi.fn(),
   mode,
   navigateTab: vi.fn(),
-  releaseBrowserCaller: vi.fn(),
   requestApproval: vi.fn(),
   selectedTabId: 7,
   selectedTabTitle: 'Test',

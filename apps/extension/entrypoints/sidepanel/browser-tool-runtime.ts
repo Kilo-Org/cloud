@@ -3,6 +3,7 @@ import type { KiloBrowserToolCallEvent } from '@/src/shared/agent-conversation';
 import type { BrowserCaller } from '@/src/shared/browser-caller';
 import {
   BROWSER_TOOL_MESSAGE,
+  DISPOSE_BROWSER_CALLER_MESSAGE,
   RELEASE_BROWSER_CALLER_MESSAGE,
   isTabDebuggerResponse,
 } from '@/src/shared/tab-debugger';
@@ -94,9 +95,10 @@ export const executeKiloBrowserToolCall = async (
 };
 
 /**
- * Drops the caller's tab leases and ref registries. A turn or a workflow run
- * releases on its way out so the next owner — another conversation, or a CLI
- * agent waiting in the queue — can take the tab.
+ * Ends the caller's tab leases without touching its refs. A turn ends this
+ * way so the next owner — another conversation, or a CLI agent waiting in the
+ * queue — can take the tab, while a ref this conversation snapshotted earlier
+ * keeps resolving in its next turn.
  */
 export const releaseBrowserCaller = async (caller: BrowserCaller): Promise<void> => {
   try {
@@ -106,5 +108,21 @@ export const releaseBrowserCaller = async (caller: BrowserCaller): Promise<void>
     });
   } catch {
     // The background restarted and holds no lease for this caller.
+  }
+};
+
+/**
+ * Drops the caller's tab leases and ref registries for good: its conversation
+ * was deleted, its workflow run finished, or its agent session closed. Closing
+ * a turn is not disposal.
+ */
+export const disposeBrowserCaller = async (caller: BrowserCaller): Promise<void> => {
+  try {
+    await browser.runtime.sendMessage({
+      caller,
+      type: DISPOSE_BROWSER_CALLER_MESSAGE,
+    });
+  } catch {
+    // The background restarted and holds no state for this caller.
   }
 };

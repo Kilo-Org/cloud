@@ -26,7 +26,7 @@ vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/ui/screen-footer', () => ({ ScreenFooter: 'ScreenFooter' }));
 
 function mountHeader(overrides: { title?: string; eyebrow?: string } = {}) {
-  const onBack = vi.fn();
+  const onBack = vi.fn<() => void>();
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
     ref.current = TestRenderer.create(

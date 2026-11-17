@@ -20,6 +20,7 @@ import {
   type BuildGlanceableSnapshotInput,
   type GlanceableSessionRow,
   type GlanceableStatusKind,
+  compareSessionInstant,
 } from './glanceable-agents-snapshot';
 import { timestampMs, timestampToIso } from './utils';
 
@@ -171,28 +172,6 @@ export function glanceableTitle(value: string | null | undefined): string {
 export function glanceableSessionTitle(value: string | null | undefined): string | null {
   const title = glanceableTitle(value);
   return title === '' || isDefaultSessionTitle(title) ? null : title;
-}
-
-/**
- * Order sessions by one of their timestamps. `direction` uses the vocabulary
- * the package already owns for its extreme-row selector: 'earliest' is oldest
- * first, 'latest' is newest first. A missing or unparseable time ranks after
- * every known time in both directions, so the rule is stated here and not
- * restated per sort; a tie compares 0, so the caller's stable sort keeps source
- * order.
- */
-function compareSessionInstant(
-  read: (row: HomeWidgetSessionRow) => string | undefined,
-  direction: 'earliest' | 'latest'
-): (a: HomeWidgetSessionRow, b: HomeWidgetSessionRow) => number {
-  return (a, b) => {
-    const left = timestampMs(read(a));
-    const right = timestampMs(read(b));
-    if (left === null || right === null) {
-      return Number(left === null) - Number(right === null);
-    }
-    return direction === 'earliest' ? left - right : right - left;
-  };
 }
 
 /**

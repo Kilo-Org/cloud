@@ -75,6 +75,18 @@ vi.mock('@/lib/cloud-triggers/use-trigger-options', () => ({
     isError: false,
     refetch: vi.fn(),
   }),
+  useTriggerEnvironments: () => ({
+    environments: [],
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
+  useTriggerProfiles: () => ({
+    profiles: [],
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
 }));
 
 const FIELD = 'FormField' as ElementType;
@@ -142,7 +154,9 @@ function typePrompt(root: ReactTestRenderer['root'], value: string): void {
 }
 
 afterEach(() => {
-  act(() => renderer?.unmount());
+  act(() => {
+    renderer?.unmount();
+  });
   renderer = undefined;
 });
 

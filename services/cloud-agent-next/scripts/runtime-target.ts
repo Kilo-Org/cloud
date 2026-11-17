@@ -54,6 +54,7 @@ export function validateRuntimeTarget(config: unknown, environment: string) {
       'RUNTIME_RELEASE_DESCRIPTOR',
       'RUNTIME_INTERACTIVE_ORG_IDS',
       'RUNTIME_KILO2_ORG_IDS',
+      'RUNTIME_KILO2_ALL_SESSION_ORG_IDS',
       'RUNTIME_RELEASE_DESCRIPTOR_KILO2',
     ].some(key => vars[key] !== undefined)
   )
@@ -120,6 +121,9 @@ export function renderRuntimeTarget(input: {
       throw new Error('Kilo v2 target requires a verified Kilo v2 runtime handoff');
     target.vars.RUNTIME_KILO2_ORG_IDS =
       startup.kilo2.orgIds === '*' ? '*' : startup.kilo2.orgIds.join(',');
+    if (startup.kilo2.allSessionOrgIds !== undefined)
+      target.vars.RUNTIME_KILO2_ALL_SESSION_ORG_IDS =
+        startup.kilo2.allSessionOrgIds === '*' ? '*' : startup.kilo2.allSessionOrgIds.join(',');
     target.vars.RUNTIME_RELEASE_DESCRIPTOR_KILO2 = z
       .string()
       .regex(/^[a-f0-9]{64}$/)

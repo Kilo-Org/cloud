@@ -9,6 +9,7 @@ import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import {
   buildAssistantMessageItem,
   buildSessionItem,
+  buildToolPartItem,
   buildUserMessageItem,
   parseSessionIngestServiceStatus,
   type SessionIngestItem,
@@ -25,12 +26,23 @@ const PROMPT_ONE_ID = 'msgSharedFenceUser00001';
 const PLAIN_ASSISTANT_ID = 'msgSharedFenceAsst0001';
 const PROMPT_TWO_ID = 'msgSharedFenceUser00002';
 const FENCE_ASSISTANT_ID = 'msgSharedFenceAsst0002';
+const PROMPT_THREE_ID = 'msgSharedFenceUser00003';
+const TOOL_ASSISTANT_ID = 'msgSharedFenceAsst0003';
 
 const PROMPT_ONE_PART = 'prtSharedFencePrompt01';
 const PLAIN_PART = 'prtSharedFencePlain001';
 const PROMPT_TWO_PART = 'prtSharedFencePrompt02';
 const FENCE_PART = 'prtSharedFenceCode0001';
-const EXPECTED = [PROMPT_ONE_PART, PLAIN_PART, PROMPT_TWO_PART, FENCE_PART];
+const PROMPT_THREE_PART = 'prtSharedFencePrompt03';
+const TOOL_PART = 'prtSharedFenceBash0001';
+const EXPECTED = [
+  PROMPT_ONE_PART,
+  PLAIN_PART,
+  PROMPT_TWO_PART,
+  FENCE_PART,
+  PROMPT_THREE_PART,
+  TOOL_PART,
+];
 
 const T0 = 1_700_500_000_000;
 
@@ -52,11 +64,71 @@ const FENCE_TEXT = [
   'It returns one line, so the transcript renders a single code block.',
 ].join('\n');
 
+const PROMPT_THREE_TEXT = 'Check the ingest log for the failing shard.';
+
+// Frozen as the tool output the shared viewer reads: long enough that the row
+// cannot inline it, and carrying one marker the snapshot assertion can find.
+const BASH_OUTPUT = [
+  '2026-11-17T09:12:01.114Z INFO  ingest.worker boot pid=4821 version=1.14.2',
+  '2026-11-17T09:12:01.118Z INFO  ingest.queue connected stream=session.parts',
+  '2026-11-17T09:12:01.204Z INFO  ingest.shard claim shard=us-central1-a consumers=4',
+  '2026-11-17T09:12:01.310Z INFO  ingest.shard claim shard=us-central1-b consumers=4',
+  '2026-11-17T09:12:01.402Z INFO  ingest.shard claim shard=eu-west-1 consumers=2',
+  '2026-11-17T09:12:02.006Z INFO  ingest.batch start batch=batch_9f2c docs=512 bytes=1884112',
+  '2026-11-17T09:12:02.114Z INFO  ingest.batch persist batch=batch_9f2c rows=512 ms=108',
+  '2026-11-17T09:12:02.201Z INFO  ingest.batch ack batch=batch_9f2c',
+  '2026-11-17T09:12:02.309Z INFO  ingest.batch start batch=batch_9f2d docs=498 bytes=1802112',
+  '2026-11-17T09:12:02.412Z INFO  ingest.batch persist batch=batch_9f2d rows=498 ms=103',
+  '2026-11-17T09:12:02.518Z INFO  ingest.batch ack batch=batch_9f2d',
+  '2026-11-17T09:12:03.011Z WARN  ingest.chunk retry attempt=1 batch=batch_9f2e',
+  '2026-11-17T09:12:03.148Z WARN  ingest.chunk retry attempt=2 batch=batch_9f2e',
+  '2026-11-17T09:12:03.302Z ERROR ingest.chunk failed batch=batch_9f2e cause=queue_timeout',
+  '2026-11-17T09:12:03.401Z WARN  ingest.shard backlog shard=eu-west-1 depth=128',
+  '2026-11-17T09:12:03.512Z WARN  ingest.shard backlog shard=eu-west-1 depth=256',
+  '2026-11-17T09:12:03.604Z WARN  ingest.shard backlog shard=eu-west-1 depth=384',
+  '2026-11-17T09:12:04.002Z INFO  ingest.shard.rebalance from=us-central1-a to=eu-west-1',
+  '2026-11-17T09:12:04.111Z INFO  ingest.consumer start shard=eu-west-1 id=consumer-17',
+  '2026-11-17T09:12:04.208Z INFO  ingest.consumer start shard=eu-west-1 id=consumer-18',
+  '2026-11-17T09:12:04.319Z INFO  ingest.batch start batch=batch_9f2f docs=512 bytes=1901224',
+  '2026-11-17T09:12:04.427Z INFO  ingest.batch persist batch=batch_9f2f rows=512 ms=108',
+  '2026-11-17T09:12:04.533Z INFO  ingest.batch ack batch=batch_9f2f',
+  '2026-11-17T09:12:05.011Z INFO  ingest.batch start batch=batch_9f30 docs=512 bytes=1897440',
+  '2026-11-17T09:12:05.118Z INFO  ingest.batch persist batch=batch_9f30 rows=512 ms=107',
+  '2026-11-17T09:12:05.226Z INFO  ingest.batch ack batch=batch_9f30',
+  '2026-11-17T09:12:05.341Z INFO  ingest.shard backlog shard=eu-west-1 depth=192',
+  '2026-11-17T09:12:05.455Z INFO  ingest.shard backlog shard=eu-west-1 depth=64',
+  '2026-11-17T09:12:05.602Z INFO  ingest.shard backlog shard=eu-west-1 depth=0',
+  '2026-11-17T09:12:06.004Z INFO  ingest.chunk replay batch=batch_9f2e attempt=3',
+  '2026-11-17T09:12:06.121Z INFO  ingest.batch persist batch=batch_9f2e rows=311 ms=117',
+  '2026-11-17T09:12:06.230Z INFO  ingest.batch ack batch=batch_9f2e',
+  '2026-11-17T09:12:06.402Z INFO  ingest.shard report shard=us-central1-a lag_ms=4',
+  '2026-11-17T09:12:06.511Z INFO  ingest.shard report shard=us-central1-b lag_ms=3',
+  '2026-11-17T09:12:06.620Z INFO  ingest.shard report shard=eu-west-1 lag_ms=0',
+  '2026-11-17T09:12:07.002Z INFO  ingest.queue heartbeat consumers=10 inflight=0',
+  '2026-11-17T09:12:07.118Z INFO  ingest.worker usage rss_mb=214 heap_mb=96',
+  '2026-11-17T09:12:07.402Z INFO  ingest.shard audit shard=eu-west-1 lag_ms=0 — healthy',
+  '2026-11-17T09:12:07.511Z INFO  ingest.queue heartbeat consumers=10 inflight=0',
+  '2026-11-17T09:12:07.620Z INFO  ingest.worker usage rss_mb=214 heap_mb=96',
+  '2026-11-17T09:12:08.004Z INFO  ingest.batch start batch=batch_9f31 docs=88 bytes=320144',
+  '2026-11-17T09:12:08.112Z INFO  ingest.batch persist batch=batch_9f31 rows=88 ms=82',
+  '2026-11-17T09:12:08.221Z INFO  ingest.batch ack batch=batch_9f31',
+  '2026-11-17T09:12:08.330Z INFO  ingest.worker idle shards=3 consumers=10',
+].join('\n');
+
+const PROMPT_THREE_AT = T0 + 120_000;
+const TOOL_ASSISTANT_AT = T0 + 121_000;
+const TOOL_START = T0 + 121_500;
+const TOOL_END = T0 + 128_500;
+const TOOL_ASSISTANT_DONE = T0 + 129_000;
+
 function printUsage(): void {
   console.log(`Usage: pnpm dev:seed app:mobile-shared-transcript ${usage}`);
   console.log('');
   console.log('Seeds one public shared transcript through the local cloudflare-session-ingest');
-  console.log('worker: two assistant replies, one plain and one with a fenced ts code block.');
+  console.log(
+    'worker: three assistant replies — one plain, one with a fenced ts code block, and one'
+  );
+  console.log('with a completed bash tool call whose frozen output is too long to read inline.');
   console.log('Resets only its own session.');
   console.log('');
   console.log('Example:');
@@ -199,6 +271,35 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     }),
     textPart(PROMPT_TWO_PART, 'Now show the same helper as code.', PROMPT_TWO_ID),
     textPart(FENCE_PART, FENCE_TEXT, FENCE_ASSISTANT_ID),
+    buildUserMessageItem({
+      messageId: PROMPT_THREE_ID,
+      sessionId: SESSION_ID,
+      createdAt: PROMPT_THREE_AT,
+    }),
+    buildAssistantMessageItem({
+      messageId: TOOL_ASSISTANT_ID,
+      sessionId: SESSION_ID,
+      parentId: PROMPT_THREE_ID,
+      createdAt: TOOL_ASSISTANT_AT,
+      completedAt: TOOL_ASSISTANT_DONE,
+      cost: 0.01,
+      tokens: { total: 210, input: 150, output: 60, reasoning: 0, cache: { read: 0, write: 0 } },
+    }),
+    textPart(PROMPT_THREE_PART, PROMPT_THREE_TEXT, PROMPT_THREE_ID),
+    buildToolPartItem({
+      partId: TOOL_PART,
+      sessionId: SESSION_ID,
+      messageId: TOOL_ASSISTANT_ID,
+      callId: 'callSharedFenceBash01',
+      tool: 'bash',
+      status: 'completed',
+      input: { command: 'tail -n 40 /workspace/logs/ingest.log' },
+      output: BASH_OUTPUT,
+      title: 'Read the ingest log tail',
+      metadata: { exitCode: 0, lines: 44 },
+      start: TOOL_START,
+      end: TOOL_END,
+    }),
   ];
 
   const ingestResponse = await fetch(`${baseUrl}/api/session/${SESSION_ID}/ingest?v=1`, {
@@ -252,9 +353,15 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   if (!snapshot.includes('```ts')) {
     throw new Error('shared snapshot does not include the fenced ts block');
   }
+  if (!snapshot.includes('ingest.shard.rebalance')) {
+    throw new Error('shared snapshot does not include the bash tool output');
+  }
+  if (!snapshot.includes(TOOL_PART)) {
+    throw new Error('shared snapshot does not include the bash tool part');
+  }
 
   console.log(
-    'This fixture represents: one public shared transcript with two assistant replies — one plain and one with a fenced ts code block — read through the session-ingest share token, not through the owner session.'
+    'This fixture represents: one public shared transcript with three assistant replies — one plain, one with a fenced ts code block, and one with a completed bash tool call whose output is too long to read inline — read through the session-ingest share token, not through the owner session.'
   );
   console.log(
     'Published through the real worker share endpoint (POST /api/session/<id>/share with duration=forever and include_new_messages=true), which sets cli_sessions_v2.public_id and mints the capability.'

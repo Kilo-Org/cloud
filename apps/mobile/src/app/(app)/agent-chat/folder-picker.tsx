@@ -110,6 +110,7 @@ export default function FolderPickerScreen() {
       <PickerSheet
         title={t('agentChat.folderPicker.fieldLabel')}
         onDone={closePicker}
+        onCancel={closePicker}
         scrollable={false}
         expired
       />

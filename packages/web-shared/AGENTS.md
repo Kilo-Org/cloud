@@ -82,6 +82,12 @@ path, enrols that traffic automatically, so such a change needs the same review
 as this contract. The [root `AGENTS.md`](../../AGENTS.md) remains the source of
 truth for which function regions actually run those deployments.
 
+## Autocomplete routes
+
+The edit and FIM (autocomplete) handlers intentionally skip the account rate
+limit and Enkrypt guardrails: their small models are not attack targets in
+practice, and the added latency makes no sense for autocomplete.
+
 ## Data collection versus ZDR
 
 `provider.data_collection: 'deny'` only excludes providers that store prompts

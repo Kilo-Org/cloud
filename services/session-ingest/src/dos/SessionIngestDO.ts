@@ -248,7 +248,9 @@ function readBriefingExcerptPersisted(db: DrizzleSqliteDODatabase): BriefingExce
 /**
  * Mirrors the SQL ordering in `briefingExcerptUpdate`: a candidate is newer on a later
  * `completedAt`, or on an equal one and a greater `messageId`. Both times are canonical ISO
- * strings, so comparing them as text matches comparing them as timestamps.
+ * strings, so comparing them as text matches comparing them as timestamps. The SQL guard orders
+ * the ids with `COLLATE "C"`, which is byte order, so the ids are compared as their UTF-8 bytes
+ * rather than by UTF-16 code unit.
  */
 function briefingExcerptIsNewer(
   next: BriefingExcerptIdentity,
@@ -256,7 +258,12 @@ function briefingExcerptIsNewer(
 ): boolean {
   if (last === null) return true;
   if (next.completedAt !== last.completedAt) return next.completedAt > last.completedAt;
-  return next.messageId > last.messageId;
+  const left = new TextEncoder().encode(next.messageId);
+  const right = new TextEncoder().encode(last.messageId);
+  for (let index = 0; index < Math.min(left.length, right.length); index += 1) {
+    if (left[index] !== right[index]) return left[index] > right[index];
+  }
+  return left.length > right.length;
 }
 
 /** Records the excerpt the object is sending, so the next identical batch adds no column. */
@@ -651,6 +658,8 @@ export class SessionIngestDO extends DurableObject<Env> {
   private db: DrizzleSqliteDODatabase;
   private readonly activeR2Writes = new Set<Promise<unknown>>();
   private cleanupOperation: Promise<void> | undefined;
+  /** The excerpt a scheduled live persist carries, so an identical batch adds no column. */
+  private briefingExcerptInFlight: BriefingExcerptIdentity | null = null;
 
   constructor(state: DurableObjectState, env: Env) {
     super(state, env);
@@ -1190,15 +1199,25 @@ export class SessionIngestDO extends DurableObject<Env> {
       const activityValueMs = decision.persistActivity ? lastActivityValueMs : undefined;
       const summaryToPersist = columns.liveSummary;
       // The excerpt gate runs before the write is scheduled: a batch that repeats a response the
-      // object already sent, or one another in-flight batch is sending, adds no excerpt column.
-      // The record is the reservation, so a slower batch cannot render a newer one redundant.
-      let excerptReserved: BriefingExcerptIdentity | undefined;
+      // object already persisted, or one a scheduled write still carries, adds no excerpt column.
+      // The in-flight identity is memory, so it lapses with the instance and a write that never
+      // runs leaves no trace.
+      let excerptInFlight: BriefingExcerptIdentity | undefined;
       if (briefingResponseChanged) {
         try {
           const excerpt = this.latestBriefingExcerpt(storedItems);
-          if (excerpt && briefingExcerptIsNewer(excerpt, readBriefingExcerptPersisted(this.db))) {
-            excerptReserved = excerpt;
-            writeBriefingExcerptPersisted(this.db, excerpt);
+          const inFlight = this.briefingExcerptInFlight;
+          const alreadyInFlight =
+            inFlight !== null &&
+            inFlight.messageId === excerpt?.messageId &&
+            inFlight.completedAt === excerpt?.completedAt;
+          if (
+            excerpt &&
+            !alreadyInFlight &&
+            briefingExcerptIsNewer(excerpt, readBriefingExcerptPersisted(this.db))
+          ) {
+            excerptInFlight = excerpt;
+            this.briefingExcerptInFlight = excerpt;
             columns.briefingExcerpt = {
               excerpt,
               receivedAtIso: new Date(ingestedAt ?? nowMsLive).toISOString(),
@@ -1219,6 +1238,14 @@ export class SessionIngestDO extends DurableObject<Env> {
             if (this.isDeleted()) return;
             await persistLiveSessionColumns(connectionString, kiloUserId, sessionId, columns);
             if (this.isDeleted()) return;
+            if (excerptInFlight !== undefined) {
+              // Max-merge, so a slower batch that carried an older excerpt cannot replace the
+              // identity of the newer one already recorded.
+              if (briefingExcerptIsNewer(excerptInFlight, readBriefingExcerptPersisted(this.db))) {
+                writeBriefingExcerptPersisted(this.db, excerptInFlight);
+              }
+              this.releaseBriefingExcerptInFlight(excerptInFlight);
+            }
             if (summaryToPersist !== undefined) {
               const prevSummaryAt = readIngestMetaNumber(this.db, 'lastLiveSummaryPersistedAtMs');
               if (prevSummaryAt === null || nowMsLive > prevSummaryAt) {
@@ -1280,21 +1307,9 @@ export class SessionIngestDO extends DurableObject<Env> {
               }
             }
           } catch (error) {
-            // The record is written before the statement, so a rejected statement releases the
-            // reservation it made: the next batch must be free to send the same excerpt again,
-            // unless a newer reservation has replaced it.
-            const stored = readBriefingExcerptPersisted(this.db);
-            if (
-              excerptReserved !== undefined &&
-              stored !== null &&
-              stored.messageId === excerptReserved.messageId &&
-              stored.completedAt === excerptReserved.completedAt
-            ) {
-              this.db
-                .delete(ingestMeta)
-                .where(eq(ingestMeta.key, 'lastBriefingExcerptPersisted'))
-                .run();
-            }
+            // Nothing was recorded, because the record is written after the statement. The
+            // in-flight identity still has to go, or the next batch would skip the same excerpt.
+            if (excerptInFlight !== undefined) this.releaseBriefingExcerptInFlight(excerptInFlight);
             console.error('SessionIngestDO failed to persist live session columns', {
               kiloUserId,
               sessionId,
@@ -1405,6 +1420,16 @@ export class SessionIngestDO extends DurableObject<Env> {
    */
   async resetAttentionStatusOnCliDisconnect(kiloUserId: string, sessionId: string): Promise<void> {
     await resetAttentionStatusOnCliDisconnect(this.env, kiloUserId, sessionId, this.ctx);
+  }
+
+  /** Drops the in-flight identity, unless a later batch already replaced it. */
+  private releaseBriefingExcerptInFlight(identity: BriefingExcerptIdentity): void {
+    const inFlight = this.briefingExcerptInFlight;
+    const sameIdentity =
+      inFlight !== null &&
+      inFlight.messageId === identity.messageId &&
+      inFlight.completedAt === identity.completedAt;
+    if (sameIdentity) this.briefingExcerptInFlight = null;
   }
 
   private latestBriefingExcerpt(items: IngestBatch): BriefingExcerpt | undefined {

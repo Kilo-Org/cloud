@@ -1,6 +1,6 @@
 import { act } from '@/test/renderer';
 import type * as ReactQuery from '@tanstack/react-query';
-import { createElement } from 'react';
+import { createElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type DeviceSession } from '@/lib/device-sessions';
@@ -45,10 +45,10 @@ vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 // assertions read (the row's one-line title, its subtitle, and the control the
 // row carries), at the geometry the real primitive owns.
 vi.mock('@/components/ui/section', () => ({
-  Section: (props: { children?: unknown }) => props.children,
+  Section: ({ children }: { children?: ReactNode }): ReactNode => children,
 }));
 vi.mock('@/components/ui/row-group', () => ({
-  RowGroup: (props: { children?: unknown }) => props.children,
+  RowGroup: ({ children }: { children?: ReactNode }): ReactNode => children,
 }));
 vi.mock('@/components/ui/row-skeleton', () => ({
   RowSkeleton: (props: { tile?: boolean; subtitle?: boolean }) =>
@@ -61,7 +61,7 @@ vi.mock('@/components/ui/row-skeleton', () => ({
     ),
 }));
 vi.mock('@/components/ui/configure-row', () => ({
-  ConfigureRow: (props: { title: string; subtitle?: string; trailing?: unknown }) =>
+  ConfigureRow: (props: { title: string; subtitle?: string; trailing?: ReactNode }) =>
     createElement(
       'View',
       null,
@@ -71,7 +71,11 @@ vi.mock('@/components/ui/configure-row', () => ({
     ),
 }));
 vi.mock('@/components/ui/icon-button', () => ({
-  IconButton: (props: { children?: unknown; accessibilityLabel?: string; onPress?: () => void }) =>
+  IconButton: (props: {
+    children?: ReactNode;
+    accessibilityLabel?: string;
+    onPress?: () => void;
+  }) =>
     createElement(
       'Pressable',
       { ...props, className: 'h-[48px] w-[48px] items-center justify-center' },

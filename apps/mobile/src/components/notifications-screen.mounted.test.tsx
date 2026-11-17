@@ -6,7 +6,7 @@
 // with an inline retry, a UNAUTHORIZED failure disables the row with no retry,
 // and an unresolved preference query renders a skeleton with no control.
 
-import { createElement } from 'react';
+import { createElement, type ReactNode } from 'react';
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -93,10 +93,10 @@ vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 // assertions drive: the row text, the control a row carries in its trailing
 // slot, and a skeleton bar for the loading geometry.
 vi.mock('@/components/ui/section', () => ({
-  Section: (props: { children?: unknown }) => props.children,
+  Section: ({ children }: { children?: ReactNode }): ReactNode => children,
 }));
 vi.mock('@/components/ui/row-group', () => ({
-  RowGroup: (props: { children?: unknown }) => props.children,
+  RowGroup: ({ children }: { children?: ReactNode }): ReactNode => children,
 }));
 vi.mock('@/components/ui/card', () => ({ Card: 'View' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Pressable' }));
@@ -105,8 +105,8 @@ vi.mock('@/components/ui/configure-row', () => ({
   ConfigureRow: (props: {
     title: string;
     subtitle?: string;
-    subtitlePlaceholder?: unknown;
-    trailing?: unknown;
+    subtitlePlaceholder?: ReactNode;
+    trailing?: ReactNode;
   }) =>
     createElement(
       'View',
@@ -147,7 +147,7 @@ vi.mock('@/components/agent-briefing/briefing-notification-toggle', () => ({
   BriefingNotificationCategoryRow: () => null,
 }));
 vi.mock('@/components/tab-screen', () => ({
-  TabScreenScrollView: (props: { children?: unknown }) => props.children,
+  TabScreenScrollView: ({ children }: { children?: ReactNode }): ReactNode => children,
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));

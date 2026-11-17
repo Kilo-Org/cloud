@@ -256,7 +256,7 @@ describe('ContextPickerSheet', () => {
     const accounts = renderer.root.findAll(accountRow);
 
     expect(accounts.map(row => row.props.accessibilityLabel)).toEqual(options);
-    expect(accounts.filter(row => selectedState(row) === true)).toHaveLength(1);
+    expect(accounts.filter(row => checkedState(row) === true)).toHaveLength(1);
     act(() => {
       for (const row of accounts) {
         (row.props.onPress as () => void)();

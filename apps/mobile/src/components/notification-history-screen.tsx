@@ -53,6 +53,12 @@ const MAX_PAGES = 10;
 const listStyle = { flex: 1 } satisfies ViewStyle;
 
 /**
+ * Space under the list's last element, past the tab bar's own clearance, so the
+ * cap notice and the next-page retry sit above the band rather than against it.
+ */
+const FOOTER_BOTTOM_GAP = 32;
+
+/**
  * The pushes this account received, newest first: one row per recorded
  * notification, rendered on the device from the catalog key and params the push
  * carried, filtered by the same categories the settings screen toggles, and
@@ -212,7 +218,7 @@ export function NotificationHistoryScreen() {
   // The page bound, not the server, ends the list: say so.
   const capped = !query.hasNextPage && (query.data?.pages.at(-1)?.nextCursor ?? null) !== null;
   let footer = (
-    <View className="pb-8" style={{ paddingBottom: paddingBottom + 32 }}>
+    <View className="px-4" style={{ paddingBottom: paddingBottom + FOOTER_BOTTOM_GAP }}>
       {capped ? (
         <Text variant="muted" className="text-center text-xs">
           {t('notifications.history.capped')}
@@ -222,7 +228,7 @@ export function NotificationHistoryScreen() {
   );
   if (query.isFetchNextPageError) {
     footer = (
-      <View className="pb-8" style={{ paddingBottom: paddingBottom + 32 }}>
+      <View className="px-4" style={{ paddingBottom: paddingBottom + FOOTER_BOTTOM_GAP }}>
         <Button
           variant="ghost"
           onPress={() => {

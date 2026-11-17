@@ -280,7 +280,10 @@ export type MarkdownHtmlSplit = {
  * segmented. With `snapshot` the value is the same source shape as that
  * snapshot's value. With `previous` and `appended` the value extends exactly
  * the previous publish's raw value by `appended`, so only that appended
- * region is folded through `previous.convert`.
+ * region is folded through `previous.convert`. With `previous` and
+ * `wholeConverted` the publish declined that reuse: `wholeConverted` is the
+ * conversion of the whole raw value, and the previous snapshot still verifies
+ * the head.
  *
  * The intersection keeps the discriminant open for call sites that build the
  * object in one expression; the function narrows with `'previous' in input`.
@@ -291,18 +294,23 @@ export type MarkdownHtmlIncrementalInput = {
   previous: MarkdownHtmlIncrementalConverted;
   appended: string;
   snapshot: MarkdownHtmlSnapshot;
+  wholeConverted: string;
 }>;
 
 /**
  * What the previous publish turned into segments, kept so the next publish can
- * reuse it: `tail` is that publish's snapshot, and `convert` folds the raw
- * source a publish saw into the markdown the splitter segments. A longer value
- * that starts with `tail.value` only appends, so `convert` runs on the
- * appended region alone and the split segments the previous converted source
- * joined with the appended region's conversion.
+ * reuse it: `tail` is that publish's snapshot, and `convert` folds raw source
+ * into the markdown the splitter segments, joining the previous converted
+ * source it is given: `(suffix, previous) => previous + converted(suffix)`. A
+ * publish that extends the previous raw value passes the appended region, so
+ * `convert` returns the previous converted source joined with the appended
+ * region's conversion; a publish the gate declines passes the whole converted
+ * value and `convert` returns it alone.
  */
 export type MarkdownHtmlIncrementalConverted = {
   tail: MarkdownHtmlSnapshot;
+  /** The raw source the previous publish saw, for the extends-previous guard. */
+  rawValue?: string;
   convert: (suffix: string, previous: string) => string;
 };
 
@@ -447,7 +455,9 @@ function appendTokens(
  * only its appended region is converted again before this function sees a
  * whole string that extends `previous.tail.value`.
  */
-export function splitMarkdownHtmlIncremental(input: MarkdownHtmlIncrementalInput): MarkdownHtmlSplit {
+export function splitMarkdownHtmlIncremental(
+  input: MarkdownHtmlIncrementalInput
+): MarkdownHtmlSplit {
   // The three forms reuse the same body over one string. A plain value and a
   // snapshot value segment as stored; the previous form folds only the
   // appended region through the previous publish's conversion and joins the
@@ -455,7 +465,14 @@ export function splitMarkdownHtmlIncremental(input: MarkdownHtmlIncrementalInput
   // head is still the previous publish's exact value.
   const previous = input.previous;
   if (previous !== undefined) {
-    const effective = `${previous.tail.value}${previous.convert(input.appended ?? '', previous.tail.value)}`;
+    // The closure joins the previous converted source itself; joining here a
+    // second time would duplicate that source in every reuse. A gated publish
+    // passes only the appended region and the closure returns the previous
+    // converted source joined with the appended region's conversion; a
+    // declined publish passes the whole converted value, which replaces the
+    // previous source entirely.
+    const effective =
+      input.wholeConverted ?? previous.convert(input.appended ?? '', previous.tail.value);
     return splitFromSnapshot(effective, previous.tail);
   }
   return splitFromSnapshot(input.value, input.snapshot);

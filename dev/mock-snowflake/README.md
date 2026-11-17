@@ -88,7 +88,7 @@ pnpm dev:start app --without=mock-snowflake
 
 `--without` accepts a comma-separated list (or `$KILO_DEV_WITHOUT`); the web app
 then starts without the stand-in and every warehouse read reports its failure
-with a Retry. `pnpm dev:stop` also stops it with everything else.
+with a Try again action. `pnpm dev:stop` also stops it with everything else.
 
 ## Run it by hand
 

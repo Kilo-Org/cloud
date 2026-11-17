@@ -64,6 +64,14 @@ function setStack(routes: Route[], index: number) {
   nav.state = { routes, index };
 }
 
+function endTransition() {
+  act(() => {
+    for (const listener of nav.listeners) {
+      listener();
+    }
+  });
+}
+
 const r = (key: string, name: string, params?: object): Route => ({ key, name, params });
 
 beforeEach(() => {
@@ -100,5 +108,29 @@ describe('useRepairTriggerRouteStack', () => {
     mount();
 
     expect(pushMock).not.toHaveBeenCalled();
+  });
+
+  it('retires the original copy once its rebuilt copy has settled on top', () => {
+    setStack([r('tabs', '(tabs)'), r('d', DETAIL)], 1);
+    mount();
+    expect(nav.listeners.size).toBeGreaterThan(0);
+    expect(resetMock).not.toHaveBeenCalled();
+
+    // The rebuilt copy is on top; the original is still in the middle.
+    setStack(
+      [
+        r('tabs', '(tabs)'),
+        r('d', DETAIL),
+        r('l', LIST, { stackRebuilt: '1' }),
+        r('d-rebuilt', DETAIL, { stackRebuilt: '1' }),
+      ],
+      3
+    );
+    endTransition();
+
+    expect(resetMock).toHaveBeenCalledTimes(1);
+    const [nextState] = resetMock.mock.calls[0] as [State];
+    expect(nextState.routes.map(route => route.key)).toEqual(['tabs', 'l', 'd-rebuilt']);
+    expect(nextState.index).toBe(2);
   });
 });

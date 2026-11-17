@@ -228,7 +228,8 @@ describe('POST /api/fim/completions', () => {
       error_type: ProxyErrorType.rate_limit_exceeded,
     });
     expect(gatewayRateLimitKey).toHaveBeenCalledWith(request.headers, '127.0.0.1');
-    expect(isGatewayAccountRateLimited).toHaveBeenCalledWith(request, 'account-key');
+    expect(isGatewayAccountRateLimited).toHaveBeenCalledTimes(1);
+    expect(jest.mocked(isGatewayAccountRateLimited).mock.calls[0]?.[1]).toBe('account-key');
     expect(mockedGetUserFromAuth).not.toHaveBeenCalled();
     expect(mockedFetch).not.toHaveBeenCalled();
   });

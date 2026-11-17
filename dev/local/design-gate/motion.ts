@@ -5,6 +5,7 @@ import {
   InfraError,
   IN_APP_SAMPLE_INTERVAL_MS,
   openTarget,
+  sampleInterval,
   sampleUntilSettled,
   writeJson,
   type Clock,
@@ -250,6 +251,8 @@ export type MotionResult = {
   segments: MotionSegment[];
   findings: Finding[];
   samplingTruncated: boolean;
+  /** The spacing the samples reported; the motion findings are timed with it. */
+  intervalMs: number;
 };
 
 const PRESS_FAILURES: Record<string, true> = { 'not-found': true, 'not-pressable': true };
@@ -302,7 +305,11 @@ export async function runMotion(
     );
   }
   const timeline = expandSamples(samples);
-  const findings = checkShift(timeline.map(normalize), IN_APP_SAMPLE_INTERVAL_MS).map(finding => ({
+  // The sampler ticks again only after the previous tick returns, so the real
+  // cadence is the interval plus the tick's own cost. The shifts are timed with
+  // the spacing the samples themselves report, not with the interval asked for.
+  const intervalMs = sampleInterval(samples);
+  const findings = checkShift(timeline.map(normalize), intervalMs).map(finding => ({
     ...finding,
     cell: 'motion',
     target: options.target,
@@ -327,6 +334,7 @@ export async function runMotion(
     segments,
     findings,
     samplingTruncated: truncated,
+    intervalMs,
   };
   writeJson(path.join(ctx.out, 'motion.json'), {
     version: 1,

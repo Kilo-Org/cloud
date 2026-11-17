@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Jikwaa na weebụ",
     "creditHistory": "Akụkọ kredit",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Kagbuo",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Ịzụ ahịa, rịsịt, na ihe omume kredit",
     "invoicesSubtitle": "Budata akwụkwọ ụgwọ maka ihe ị zụrụ",
-    "manageBilling": "Jikwaa ịkwụ ụgwọ na kilo.ai",
-    "manageBillingIosNote": "A na-ejikwa ụzọ ịkwụ ụgwọ, itinye kredit na-akpaghị aka, na nkọwa ịkwụ ụgwọ na kilo.ai.",
     "codeReviewerSubtitle": "Nyocha PR akpaghị aka",
     "securityAgentSubtitle": "Chọta ma dozie adịghị ike nchebe",
     "reviews": "Nyocha",
@@ -2015,6 +2011,9 @@
       "completedWillAppear": "Nnọkọ ndị emechara ga-apụta ebe a.",
       "noPastSessions": "Enweghị nnọkọ gara aga",
       "pastSessions": "Nnọkọ gara aga",
+      "sectionAccessibility_one": "{{title}}: {{displayCount}} nnọkọ",
+      "sectionAccessibility_other": "{{title}}: {{displayCount}} nnọkọ",
+      "sectionAccessibility": "{{title}}: {{displayCount}} nnọkọ",
       "live": "NA-AGA UGBU A",
       "updating": "Na-emelite"
     },
@@ -3052,6 +3051,9 @@
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
     "searchPlaceholder": "Nchọgharị nnọkọ ndị na-adịbeghị anya",
     "connectedCli": "Na CLI ejikọrọ",
+    "connectedCliAccessibility_one": "{{title}}: {{displayCount}} ihe atụ",
+    "connectedCliAccessibility_other": "{{title}}: {{displayCount}} ihe atụ",
+    "connectedCliAccessibility": "{{title}}: {{displayCount}} ihe atụ",
     "newSessionOn": "Nnọkọ ọhụrụ na {{name}}",
     "noMatchingSessions": "Enweghị nnọkọ dabara.",
     "onlyFirstFilesAttached": "Naanị faịlụ {{displayCount}} mbụ ka a ga-etinye.",
@@ -3077,10 +3079,7 @@
       "cancelScheduled": "Ọ ga-akagbu na {{date}}",
       "cancelScheduledChange": "Kagbuo mgbanwe a haziri",
       "cancelled": "Akagburu ndenye aha",
-      "changePlan": "Gbanwee atụmatụ na kilo.ai",
-      "changePlanIosNote": "Mgbanwe atụmatụ a na-akwụ ụgwọ dị na kilo.ai.",
       "creditHistoryEmpty": "Enweghị kredit Kilo Pass ka ugbu a.",
-      "manageInStore": "Jikwaa na {{store}}",
       "resume": "Maliteghachi ndenye aha",
       "resumeCancelledDescription": "Kilo Pass gị ga-amaliteghachi imeghari ọhụrụ na-akpaghị aka.",
       "resumePausedDescription": "Kilo Pass gị ga-amaliteghachi ugbu a, tupu ụbọchị a haziri maka ịmaliteghachi ya.",
@@ -3117,9 +3116,6 @@
     "bonusFree": "Bonus efu",
     "bonusReferral": "Bonus ntụaka",
     "bonusAvailable": "Bonus efu dị",
-    "kiloPassManagement": "Njikwa Kilo Pass",
-    "kiloPassSetup": "Nhazi Kilo Pass",
-    "opensManagementOnWeb": "Na-emeghe njikwa Kilo Pass na webụ.",
     "loadFailedRetry": "Lelee njikọ gị, wee nwaa ọzọ.",
     "legalTermsOfUse": "Ụkpụrụ ojiji (EULA)",
     "purchaseDifferentAccount": "Ihe azụrụ na App Store a ejikọghị na akaụntụ Kilo gị. Banye na Apple Account e ji zụta ya, wee nwaa ọzọ.",
@@ -3305,7 +3301,6 @@
       "buySeats": "Zụta oghere",
       "setupAutoTopUp": "Hazie mgbakwunye akpaaka",
       "manageAutoTopUp": "Jikwaa mgbakwunye akpaaka",
-      "webAddress": "Adreesị weebụ {{url}}",
       "opensOnWeb": "Na-emepe na weebụ"
     },
     "boundary": {
@@ -3447,9 +3442,6 @@
       "groups": "Ìgwè",
       "guardrails": "Mgbochi nchekwa",
       "byok": "Jiri igodo nke gị",
-      "ssoAndDomain": "SSO na domain",
-      "emailPreferences": "Mmasị email",
-      "dataCollection": "Nchịkọta data",
       "auditLogs": "Ndekọ nyocha",
       "requestLogs": "Ndekọ arịrịọ",
       "subOrganizations": "Òtù ndị dị n'okpuru",
@@ -3489,8 +3481,7 @@
       "paymentPending": "Ịkwụ ụgwọ na-echere",
       "processingBlocked": "Egbochiri nhazi",
       "processingNeedsReview": "Nhazi chọrọ nyocha",
-      "retryHint": "Ọ na-anwa ibudata ọnọdụ Kilo Pass ọzọ.",
-      "setupHint": "Ọ na-emepe nhazi Kilo Pass na weebụ."
+      "retryHint": "Ọ na-anwa ibudata ọnọdụ Kilo Pass ọzọ."
     }
   },
   "authErrors": {

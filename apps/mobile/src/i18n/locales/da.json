@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Administrer på nettet",
     "creditHistory": "Kredithistorik",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Annuller",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Køb, kvitteringer og kreditaktivitet",
     "invoicesSubtitle": "Download fakturaer for dine køb",
-    "manageBilling": "Administrer betaling på kilo.ai",
-    "manageBillingIosNote": "Betalingsmetoder, automatisk optankning og betalingsoplysninger administreres på kilo.ai.",
     "codeReviewerSubtitle": "Automatiske PR-gennemgange",
     "securityAgentSubtitle": "Find og afhjælp sårbarheder",
     "reviews": "Kodegennemgange",
@@ -2015,6 +2011,9 @@
       "completedWillAppear": "Afsluttede sessioner vises her.",
       "noPastSessions": "Ingen tidligere sessioner",
       "pastSessions": "Tidligere sessioner",
+      "sectionAccessibility_one": "{{title}}: {{displayCount}} session",
+      "sectionAccessibility_other": "{{title}}: {{displayCount}} sessioner",
+      "sectionAccessibility": "{{title}}: {{displayCount}} sessioner",
       "live": "I REALTID",
       "updating": "Opdaterer"
     },
@@ -3052,6 +3051,9 @@
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
     "searchPlaceholder": "Søgning i seneste sessioner",
     "connectedCli": "På en tilsluttet CLI",
+    "connectedCliAccessibility_one": "{{title}}: {{displayCount}} instans",
+    "connectedCliAccessibility_other": "{{title}}: {{displayCount}} instanser",
+    "connectedCliAccessibility": "{{title}}: {{displayCount}} instanser",
     "newSessionOn": "Ny session på {{name}}",
     "noMatchingSessions": "Der blev ikke fundet nogen matchende sessioner.",
     "onlyFirstFilesAttached": "Kun de første {{displayCount}} filer vedhæftes.",
@@ -3077,10 +3079,7 @@
       "cancelScheduled": "Opsiges den {{date}}",
       "cancelScheduledChange": "Annuller planlagt ændring",
       "cancelled": "Abonnementet er opsagt",
-      "changePlan": "Skift abonnement på kilo.ai",
-      "changePlanIosNote": "Ændringer af betalte abonnementer kan foretages på kilo.ai.",
       "creditHistoryEmpty": "Ingen Kilo Pass-kreditter endnu.",
-      "manageInStore": "Administrer i {{store}}",
       "resume": "Genoptag abonnement",
       "resumeCancelledDescription": "Dit Kilo Pass begynder igen at blive fornyet automatisk.",
       "resumePausedDescription": "Dit Kilo Pass genoptages nu, før den planlagte genoptagelsesdato.",
@@ -3117,9 +3116,6 @@
     "bonusFree": "Gratis bonus",
     "bonusReferral": "Henvisningsbonus",
     "bonusAvailable": "Tilgængelig gratis bonus",
-    "kiloPassManagement": "Kilo Pass-administration",
-    "kiloPassSetup": "Kilo Pass-opsætning",
-    "opensManagementOnWeb": "Åbner administrationen af Kilo Pass på hjemmesiden.",
     "loadFailedRetry": "Tjek din forbindelse, og prøv derefter igen.",
     "legalTermsOfUse": "Brugsvilkår (EULA)",
     "purchaseDifferentAccount": "Dette App Store-køb er ikke knyttet til din Kilo-konto. Log ind på den Apple-konto, der blev brugt til købet, og prøv igen.",
@@ -3305,7 +3301,6 @@
       "buySeats": "Køb pladser",
       "setupAutoTopUp": "Konfigurer automatisk optankning",
       "manageAutoTopUp": "Administrer automatisk optankning",
-      "webAddress": "Webadresse {{url}}",
       "opensOnWeb": "Åbner på nettet"
     },
     "boundary": {
@@ -3447,9 +3442,6 @@
       "groups": "Grupper",
       "guardrails": "Sikkerhedsgrænser",
       "byok": "Brug din egen nøgle",
-      "ssoAndDomain": "SSO og domæne",
-      "emailPreferences": "E-mailpræferencer",
-      "dataCollection": "Dataindsamling",
       "auditLogs": "Revisionslogs",
       "requestLogs": "Anmodningslogs",
       "subOrganizations": "Underorganisationer",
@@ -3489,8 +3481,7 @@
       "paymentPending": "Afventer betaling",
       "processingBlocked": "Behandling blokeret",
       "processingNeedsReview": "Behandlingen skal gennemgås",
-      "retryHint": "Prøver at indlæse status for Kilo Pass igen.",
-      "setupHint": "Åbner opsætningen af Kilo Pass i browseren."
+      "retryHint": "Prøver at indlæse status for Kilo Pass igen."
     }
   },
   "authErrors": {

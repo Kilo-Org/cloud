@@ -1,3 +1,4 @@
+import { type Href } from 'expo-router';
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -56,7 +57,13 @@ function McpSkeleton() {
 export function ProfileMcpScreen({
   profileId,
   organizationId,
-}: Readonly<{ profileId: string; organizationId?: string }>) {
+  backFallback,
+}: Readonly<{
+  profileId: string;
+  organizationId?: string;
+  /** The Profiles list of the stack that mounted this screen. */
+  backFallback: Href;
+}>) {
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const profileQuery = useAgentProfileMcpServers(profileId, organizationId);
@@ -238,6 +245,7 @@ export function ProfileMcpScreen({
         profileId={profileId}
         organizationId={organizationId}
         title={t('profiles.mcp.title')}
+        backFallback={backFallback}
       />
       <TabScreenScrollView
         className="flex-1"

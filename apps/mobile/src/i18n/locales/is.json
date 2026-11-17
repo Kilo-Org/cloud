@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Stjórna á vefnum",
     "creditHistory": "Inneignarferill",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Hætta við",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Kaup, kvittanir og hreyfingar inneignar",
     "invoicesSubtitle": "Sæktu reikninga fyrir kaupin þín",
-    "manageBilling": "Stjórna greiðslum á kilo.ai",
-    "manageBillingIosNote": "Greiðslumátum, sjálfvirkri áfyllingu og greiðsluupplýsingum er stjórnað á kilo.ai.",
     "codeReviewerSubtitle": "Sjálfvirk yfirferð PR",
     "securityAgentSubtitle": "Finna og laga veikleika",
     "reviews": "Yfirferðir",
@@ -2015,6 +2011,9 @@
       "completedWillAppear": "Hér birtast lotur sem er lokið.",
       "noPastSessions": "Engar fyrri lotur",
       "pastSessions": "Fyrri lotur",
+      "sectionAccessibility_one": "{{title}}: {{displayCount}} lota",
+      "sectionAccessibility_other": "{{title}}: {{displayCount}} lotur",
+      "sectionAccessibility": "{{title}}: {{displayCount}} lotur",
       "live": "Í RAUNTÍMA",
       "updating": "Uppfæri"
     },
@@ -3052,6 +3051,9 @@
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
     "searchPlaceholder": "Leita í nýlegum lotum",
     "connectedCli": "Á tengdu CLI",
+    "connectedCliAccessibility_one": "{{title}}: {{displayCount}} tilvik",
+    "connectedCliAccessibility_other": "{{title}}: {{displayCount}} tilvik",
+    "connectedCliAccessibility": "{{title}}: {{displayCount}} tilvik",
     "newSessionOn": "Ný lota á {{name}}",
     "noMatchingSessions": "Engar lotur samsvara leitinni.",
     "onlyFirstFilesAttached": "Aðeins fyrstu {{displayCount}} skrárnar verða hengdar við.",
@@ -3077,10 +3079,7 @@
       "cancelScheduled": "Lýkur {{date}}",
       "cancelScheduledChange": "Hætta við áætlaða breytingu",
       "cancelled": "Áskrift sagt upp",
-      "changePlan": "Breyta áskriftarleið á kilo.ai",
-      "changePlanIosNote": "Hægt er að breyta greiddum áskriftarleiðum á kilo.ai.",
       "creditHistoryEmpty": "Engin Kilo Pass-inneign enn.",
-      "manageInStore": "Stjórna í {{store}}",
       "resume": "Halda áskrift áfram",
       "resumeCancelledDescription": "Kilo Pass byrjar aftur að endurnýjast sjálfkrafa.",
       "resumePausedDescription": "Kilo Pass fer aftur í gang núna, á undan áætluðum degi.",
@@ -3117,9 +3116,6 @@
     "bonusFree": "Ókeypis bónus",
     "bonusReferral": "Tilvísunarbónus",
     "bonusAvailable": "Fáanlegur ókeypis bónus",
-    "kiloPassManagement": "Umsjón með Kilo Pass",
-    "kiloPassSetup": "Uppsetning Kilo Pass",
-    "opensManagementOnWeb": "Opnar Kilo Pass-stjórnun á vefnum.",
     "loadFailedRetry": "Athugaðu nettenginguna þína og reyndu aftur.",
     "legalTermsOfUse": "Notendaskilmálar (EULA)",
     "purchaseDifferentAccount": "Þessi kaup í App Store eru ekki tengd Kilo-reikningnum þínum. Skráðu þig inn á Apple Account-reikninginn sem var notaður við kaupin og reyndu svo aftur.",
@@ -3305,7 +3301,6 @@
       "buySeats": "Kaupa notendasæti",
       "setupAutoTopUp": "Setja upp sjálfvirka áfyllingu",
       "manageAutoTopUp": "Stjórna sjálfvirkri áfyllingu",
-      "webAddress": "Veffang {{url}}",
       "opensOnWeb": "Opnast á vefnum"
     },
     "boundary": {
@@ -3447,9 +3442,6 @@
       "groups": "Hópar",
       "guardrails": "Öryggismörk",
       "byok": "Notaðu eigin lykil",
-      "ssoAndDomain": "SSO og lén",
-      "emailPreferences": "Tölvupóststillingar",
-      "dataCollection": "Gagnasöfnun",
       "auditLogs": "Endurskoðunarskrár",
       "requestLogs": "Beiðnaskrár",
       "subOrganizations": "Undirfélög",
@@ -3489,8 +3481,7 @@
       "paymentPending": "Greiðsla í bið",
       "processingBlocked": "Vinnsla stöðvuð",
       "processingNeedsReview": "Vinnsla þarfnast yfirferðar",
-      "retryHint": "Reynir aftur að hlaða stöðu Kilo Pass.",
-      "setupHint": "Opnar Kilo Pass-uppsetningu á vefnum."
+      "retryHint": "Reynir aftur að hlaða stöðu Kilo Pass."
     }
   },
   "authErrors": {

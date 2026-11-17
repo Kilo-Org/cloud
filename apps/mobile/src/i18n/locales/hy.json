@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Կառավարել վեբում",
     "creditHistory": "Կրեդիտների պատմություն",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": "։ ",
     "listJoiner": ", ",
     "cancel": "Չեղարկել",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Գնումներ, անդորրագրեր և կրեդիտների շարժ",
     "invoicesSubtitle": "Ներբեռնեք ձեր գնումների հաշիվ-ապրանքագրերը",
-    "manageBilling": "Կառավարել վճարումները kilo.ai-ում",
-    "manageBillingIosNote": "Վճարման եղանակները, ավտոմատ համալրումը և վճարային տվյալները կառավարվում են kilo.ai-ում։",
     "codeReviewerSubtitle": "PR-ների ավտոմատ ստուգումներ",
     "securityAgentSubtitle": "Գտնել և վերացնել խոցելիությունները",
     "reviews": "Վերանայումներ",
@@ -2015,6 +2011,9 @@
       "completedWillAppear": "Ավարտված նստաշրջանները կհայտնվեն այստեղ։",
       "noPastSessions": "Նախորդ նստաշրջաններ չկան",
       "pastSessions": "Նախորդ նստաշրջաններ",
+      "sectionAccessibility_one": "{{title}}: {{displayCount}} նստաշրջան",
+      "sectionAccessibility_other": "{{title}}: {{displayCount}} նստաշրջան",
+      "sectionAccessibility": "{{title}}: {{displayCount}} նստաշրջան",
       "live": "ԱԿՏԻՎ",
       "updating": "Թարմացվում է"
     },
@@ -3052,6 +3051,9 @@
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
     "searchPlaceholder": "Վերջին նստաշրջանների որոնում",
     "connectedCli": "Միացված CLI-ում",
+    "connectedCliAccessibility_one": "{{title}}: {{displayCount}} օրինակ",
+    "connectedCliAccessibility_other": "{{title}}: {{displayCount}} օրինակ",
+    "connectedCliAccessibility": "{{title}}: {{displayCount}} օրինակ",
     "newSessionOn": "Նոր նստաշրջան {{name}}-ում",
     "noMatchingSessions": "Համապատասխան նստաշրջաններ չկան։",
     "onlyFirstFilesAttached": "Կկցվեն միայն առաջին {{displayCount}} ֆայլերը։",
@@ -3077,10 +3079,7 @@
       "cancelScheduled": "Կչեղարկվի՝ {{date}}",
       "cancelScheduledChange": "Չեղարկել պլանավորված փոփոխությունը",
       "cancelled": "Բաժանորդագրությունը չեղարկվեց",
-      "changePlan": "Փոխել պլանը kilo.ai-ում",
-      "changePlanIosNote": "Վճարովի պլանի փոփոխությունները հասանելի են kilo.ai-ում։",
       "creditHistoryEmpty": "Kilo Pass-ի կրեդիտներ դեռ չկան։",
-      "manageInStore": "Կառավարել {{store}}-ում",
       "resume": "Վերսկսել բաժանորդագրությունը",
       "resumeCancelledDescription": "Ձեր Kilo Pass-ը կրկին ավտոմատ կերպով կերկարաձգվի։",
       "resumePausedDescription": "Ձեր Kilo Pass-ը կվերսկսվի հիմա՝ նախքան վերսկսման պլանավորված ամսաթիվը։",
@@ -3117,9 +3116,6 @@
     "bonusFree": "Անվճար բոնուս",
     "bonusReferral": "Ուղղորդման բոնուս",
     "bonusAvailable": "Հասանելի անվճար բոնուս",
-    "kiloPassManagement": "Kilo Pass-ի կառավարում",
-    "kiloPassSetup": "Kilo Pass-ի կարգավորում",
-    "opensManagementOnWeb": "Կայքում բացում է Kilo Pass-ի կառավարման էջը։",
     "loadFailedRetry": "Ստուգիր կապը, ապա կրկին փորձիր։",
     "legalTermsOfUse": "Օգտագործման պայմաններ (EULA)",
     "purchaseDifferentAccount": "App Store-ի այս գնումը կապված չէ քո Kilo հաշվի հետ։ Մուտք գործիր գնումը կատարելու համար օգտագործած Apple Account-ը, ապա կրկին փորձիր։",
@@ -3305,7 +3301,6 @@
       "buySeats": "Գնել տեղեր",
       "setupAutoTopUp": "Կարգավորել ավտոմատ համալրումը",
       "manageAutoTopUp": "Կառավարել ավտոմատ համալրումը",
-      "webAddress": "Վեբ հասցե՝ {{url}}",
       "opensOnWeb": "Բացվում է վեբում"
     },
     "boundary": {
@@ -3447,9 +3442,6 @@
       "groups": "Խմբեր",
       "guardrails": "Պաշտպանիչ սահմանափակումներ",
       "byok": "Սեփական բանալի",
-      "ssoAndDomain": "SSO և դոմեն",
-      "emailPreferences": "Էլփոստի կարգավորումներ",
-      "dataCollection": "Տվյալների հավաքում",
       "auditLogs": "Աուդիտի մատյաններ",
       "requestLogs": "Հարցումների մատյաններ",
       "subOrganizations": "Ենթակազմակերպություններ",
@@ -3489,8 +3481,7 @@
       "paymentPending": "Վճարումը սպասման մեջ է",
       "processingBlocked": "Մշակումն արգելափակված է",
       "processingNeedsReview": "Մշակումը ստուգման կարիք ունի",
-      "retryHint": "Կրկին փորձում է բեռնել Kilo Pass-ի կարգավիճակը։",
-      "setupHint": "Զննարկչում բացում է Kilo Pass-ի կարգավորման էջը։"
+      "retryHint": "Կրկին փորձում է բեռնել Kilo Pass-ի կարգավիճակը։"
     }
   },
   "authErrors": {

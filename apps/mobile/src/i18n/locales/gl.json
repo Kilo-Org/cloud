@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Xestionar na web",
     "creditHistory": "Historial de créditos",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Cancelar",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Compras, recibos e actividade de créditos",
     "invoicesSubtitle": "Descarga as facturas das túas compras",
-    "manageBilling": "Xestionar a facturación en kilo.ai",
-    "manageBillingIosNote": "Os métodos de pagamento, a recarga automática e os datos de facturación xestiónanse en kilo.ai.",
     "codeReviewerSubtitle": "Revisións automáticas de PR",
     "securityAgentSubtitle": "Atopar e corrixir vulnerabilidades",
     "reviews": "Revisións",
@@ -2015,6 +2011,9 @@
       "completedWillAppear": "As sesións completadas aparecerán aquí.",
       "noPastSessions": "Non hai sesións anteriores",
       "pastSessions": "Sesións anteriores",
+      "sectionAccessibility_one": "{{title}}: {{displayCount}} sesión",
+      "sectionAccessibility_other": "{{title}}: {{displayCount}} sesións",
+      "sectionAccessibility": "{{title}}: {{displayCount}} sesións",
       "live": "EN TEMPO REAL",
       "updating": "Actualizando"
     },
@@ -3052,6 +3051,9 @@
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
     "searchPlaceholder": "Buscar sesións recentes",
     "connectedCli": "Nun CLI conectado",
+    "connectedCliAccessibility_one": "{{title}}: {{displayCount}} instancia",
+    "connectedCliAccessibility_other": "{{title}}: {{displayCount}} instancias",
+    "connectedCliAccessibility": "{{title}}: {{displayCount}} instancias",
     "newSessionOn": "Nova sesión en {{name}}",
     "noMatchingSessions": "Non hai sesións que coincidan.",
     "onlyFirstFilesAttached": "Só se anexarán os primeiros {{displayCount}} ficheiros.",
@@ -3077,10 +3079,7 @@
       "cancelScheduled": "Cancélase o {{date}}",
       "cancelScheduledChange": "Cancelar cambio programado",
       "cancelled": "Subscrición cancelada",
-      "changePlan": "Cambiar de plan en kilo.ai",
-      "changePlanIosNote": "Os cambios a plans de pagamento están dispoñibles en kilo.ai.",
       "creditHistoryEmpty": "Aínda non hai créditos de Kilo Pass.",
-      "manageInStore": "Xestionar en {{store}}",
       "resume": "Retomar subscrición",
       "resumeCancelledDescription": "O teu Kilo Pass volverá renovarse automaticamente.",
       "resumePausedDescription": "O teu Kilo Pass retómase agora, antes da data de reactivación programada.",
@@ -3117,9 +3116,6 @@
     "bonusFree": "Bono gratuíto",
     "bonusReferral": "Bono por referidos",
     "bonusAvailable": "Bono gratuíto dispoñible",
-    "kiloPassManagement": "Xestión de Kilo Pass",
-    "kiloPassSetup": "Configuración de Kilo Pass",
-    "opensManagementOnWeb": "Abre a xestión de Kilo Pass na web.",
     "loadFailedRetry": "Comproba a túa conexión e téntao de novo.",
     "legalTermsOfUse": "Termos de uso (EULA)",
     "purchaseDifferentAccount": "Esta compra da App Store non está vinculada á túa conta de Kilo. Inicia sesión na Apple Account que usaches para a compra e téntao de novo.",
@@ -3305,7 +3301,6 @@
       "buySeats": "Mercar prazas",
       "setupAutoTopUp": "Configurar recarga automática",
       "manageAutoTopUp": "Xestionar a recarga automática",
-      "webAddress": "Enderezo web {{url}}",
       "opensOnWeb": "Ábrese na web"
     },
     "boundary": {
@@ -3447,9 +3442,6 @@
       "groups": "Grupos",
       "guardrails": "Barreiras de protección",
       "byok": "Usa a túa propia clave",
-      "ssoAndDomain": "SSO e dominio",
-      "emailPreferences": "Preferencias de correo electrónico",
-      "dataCollection": "Recollida de datos",
       "auditLogs": "Rexistros de auditoría",
       "requestLogs": "Rexistros de solicitudes",
       "subOrganizations": "Suborganizacións",
@@ -3489,8 +3481,7 @@
       "paymentPending": "Pagamento pendente",
       "processingBlocked": "Procesamento bloqueado",
       "processingNeedsReview": "Cómpre revisar o procesamento",
-      "retryHint": "Volve tentar cargar o estado de Kilo Pass.",
-      "setupHint": "Abre a configuración de Kilo Pass na web."
+      "retryHint": "Volve tentar cargar o estado de Kilo Pass."
     }
   },
   "authErrors": {

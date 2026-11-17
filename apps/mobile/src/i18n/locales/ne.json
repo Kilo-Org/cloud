@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "वेबमा व्यवस्थापन गर्नुहोस्",
     "creditHistory": "क्रेडिट इतिहास",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": "। ",
     "listJoiner": ", ",
     "cancel": "रद्द गर्नुहोस्",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "खरिद, रसिद र क्रेडिट गतिविधि",
     "invoicesSubtitle": "तपाईंका खरिदहरूका इनभ्वाइस डाउनलोड गर्नुहोस्",
-    "manageBilling": "kilo.ai मा बिलिङ व्यवस्थापन गर्नुहोस्",
-    "manageBillingIosNote": "भुक्तानी विधि, स्वतः टप-अप र बिलिङ विवरणहरू kilo.ai मा व्यवस्थापन गरिन्छन्।",
     "codeReviewerSubtitle": "स्वचालित PR समीक्षाहरू",
     "securityAgentSubtitle": "सुरक्षा कमजोरीहरू पत्ता लगाएर समाधान गर्नुहोस्",
     "reviews": "समीक्षाहरू",
@@ -2015,6 +2011,9 @@
       "completedWillAppear": "पूरा भएका सत्रहरू यहाँ देखा पर्नेछन्।",
       "noPastSessions": "पुराना सत्रहरू छैनन्",
       "pastSessions": "पुराना सत्रहरू",
+      "sectionAccessibility_one": "{{title}}: {{displayCount}} सत्र",
+      "sectionAccessibility_other": "{{title}}: {{displayCount}} सत्रहरू",
+      "sectionAccessibility": "{{title}}: {{displayCount}} सत्रहरू",
       "live": "प्रत्यक्ष",
       "updating": "अद्यावधिक हुँदै"
     },
@@ -3052,6 +3051,9 @@
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
     "searchPlaceholder": "हालैका सत्रहरूको खोजी",
     "connectedCli": "जडान भएको CLI मा",
+    "connectedCliAccessibility_one": "{{title}}: {{displayCount}} इन्स्ट्यान्स",
+    "connectedCliAccessibility_other": "{{title}}: {{displayCount}} इन्स्ट्यान्सहरू",
+    "connectedCliAccessibility": "{{title}}: {{displayCount}} इन्स्ट्यान्सहरू",
     "newSessionOn": "{{name}} मा नयाँ सत्र",
     "noMatchingSessions": "मिल्ने कुनै सत्र छैन।",
     "onlyFirstFilesAttached": "सुरुका {{displayCount}} फाइल मात्र संलग्न गरिनेछन्।",
@@ -3077,10 +3079,7 @@
       "cancelScheduled": "{{date}} मा रद्द हुन्छ",
       "cancelScheduledChange": "तय गरिएको परिवर्तन रद्द गर्नुहोस्",
       "cancelled": "सदस्यता रद्द गरियो",
-      "changePlan": "kilo.ai मा योजना परिवर्तन गर्नुहोस्",
-      "changePlanIosNote": "सशुल्क योजना परिवर्तन kilo.ai मा उपलब्ध छन्।",
       "creditHistoryEmpty": "अहिलेसम्म कुनै Kilo Pass क्रेडिट छैन।",
-      "manageInStore": "{{store}} मा व्यवस्थापन गर्नुहोस्",
       "resume": "सदस्यता पुनः सुरु गर्नुहोस्",
       "resumeCancelledDescription": "तपाईंको Kilo Pass फेरि स्वतः नवीकरण हुन थाल्छ।",
       "resumePausedDescription": "तपाईंको Kilo Pass तय गरिएको पुनः सुरु मितिभन्दा पहिले, अहिले नै पुनः सुरु हुन्छ।",
@@ -3117,9 +3116,6 @@
     "bonusFree": "नि:शुल्क बोनस",
     "bonusReferral": "रेफरल बोनस",
     "bonusAvailable": "उपलब्ध नि:शुल्क बोनस",
-    "kiloPassManagement": "Kilo Pass व्यवस्थापन",
-    "kiloPassSetup": "Kilo Pass सेटअप",
-    "opensManagementOnWeb": "वेबमा Kilo Pass व्यवस्थापन गर्ने पृष्ठ खोल्छ।",
     "loadFailedRetry": "तपाईंको जडान जाँच्नुहोस्, त्यसपछि फेरि प्रयास गर्नुहोस्।",
     "legalTermsOfUse": "प्रयोगका सर्तहरू (EULA)",
     "purchaseDifferentAccount": "यो App Store खरिद तपाईंको Kilo खातासँग जोडिएको छैन। खरिद गर्दा प्रयोग गरेको Apple Account मा साइन इन गर्नुहोस्, त्यसपछि फेरि प्रयास गर्नुहोस्।",
@@ -3305,7 +3301,6 @@
       "buySeats": "सिटहरू किन्नुहोस्",
       "setupAutoTopUp": "स्वतः टप-अप सेट अप गर्नुहोस्",
       "manageAutoTopUp": "स्वतः टप-अप व्यवस्थापन गर्नुहोस्",
-      "webAddress": "वेब ठेगाना {{url}}",
       "opensOnWeb": "वेबमा खुल्छ"
     },
     "boundary": {
@@ -3447,9 +3442,6 @@
       "groups": "समूहहरू",
       "guardrails": "गार्डरेलहरू",
       "byok": "आफ्नै की प्रयोग गर्नुहोस्",
-      "ssoAndDomain": "SSO र डोमेन",
-      "emailPreferences": "इमेल प्राथमिकताहरू",
-      "dataCollection": "डेटा सङ्कलन",
       "auditLogs": "अडिट लगहरू",
       "requestLogs": "अनुरोध लगहरू",
       "subOrganizations": "उप-संस्थाहरू",
@@ -3489,8 +3481,7 @@
       "paymentPending": "भुक्तानी पर्खाइमा",
       "processingBlocked": "प्रशोधन रोकिएको",
       "processingNeedsReview": "प्रशोधनको समीक्षा आवश्यक",
-      "retryHint": "Kilo Pass को स्थिति लोड गर्न पुनः प्रयास गर्छ।",
-      "setupHint": "वेबमा Kilo Pass सेटअप खोल्छ।"
+      "retryHint": "Kilo Pass को स्थिति लोड गर्न पुनः प्रयास गर्छ।"
     }
   },
   "authErrors": {

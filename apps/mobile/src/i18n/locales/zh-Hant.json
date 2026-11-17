@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "在網頁上管理",
     "creditHistory": "點數紀錄",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": "。",
     "listJoiner": "、",
     "cancel": "取消",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "購買、收據與點數活動",
     "invoicesSubtitle": "下載你的購買發票",
-    "manageBilling": "在 kilo.ai 管理帳單",
-    "manageBillingIosNote": "付款方式、自動儲值與帳單詳細資料皆在 kilo.ai 上管理。",
     "codeReviewerSubtitle": "自動 PR 審查",
     "securityAgentSubtitle": "尋找並修復漏洞",
     "reviews": "審查",
@@ -1472,6 +1468,9 @@
       "completedWillAppear": "已完成的工作階段將顯示在這裡。",
       "noPastSessions": "尚無過往工作階段",
       "pastSessions": "過往工作階段",
+      "sectionAccessibility_one": "{{title}}：{{displayCount}} 個工作階段",
+      "sectionAccessibility_other": "{{title}}：{{displayCount}} 個工作階段",
+      "sectionAccessibility": "{{title}}：{{displayCount}} 個工作階段",
       "live": "即時",
       "updating": "更新中"
     },
@@ -2509,6 +2508,9 @@
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
     "searchPlaceholder": "搜尋最近的工作階段",
     "connectedCli": "已連線的 CLI",
+    "connectedCliAccessibility_one": "{{title}}：{{displayCount}} 個執行個體",
+    "connectedCliAccessibility_other": "{{title}}：{{displayCount}} 個執行個體",
+    "connectedCliAccessibility": "{{title}}：{{displayCount}} 個執行個體",
     "newSessionOn": "{{name}} 上的新工作階段",
     "noMatchingSessions": "沒有相符的工作階段。",
     "onlyFirstFilesAttached": "只會附加前 {{displayCount}} 個檔案。",
@@ -2534,10 +2536,7 @@
       "cancelScheduled": "將於 {{date}} 取消",
       "cancelScheduledChange": "取消排定的變更",
       "cancelled": "已取消訂閱",
-      "changePlan": "在 kilo.ai 變更方案",
-      "changePlanIosNote": "付費方案變更請至 kilo.ai 進行。",
       "creditHistoryEmpty": "尚無 Kilo Pass 點數。",
-      "manageInStore": "在 {{store}} 管理",
       "resume": "恢復訂閱",
       "resumeCancelledDescription": "你的 Kilo Pass 將重新開始自動續訂。",
       "resumePausedDescription": "你的 Kilo Pass 將立即恢復，不必等到排定的恢復日期。",
@@ -2574,9 +2573,6 @@
     "bonusFree": "免費獎勵",
     "bonusReferral": "推薦獎勵",
     "bonusAvailable": "可用免費獎勵",
-    "kiloPassManagement": "Kilo Pass 管理",
-    "kiloPassSetup": "Kilo Pass 設定",
-    "opensManagementOnWeb": "開啟 Kilo Pass 網頁版管理頁面。",
     "loadFailedRetry": "請檢查您的網路連線，然後再試一次。",
     "legalTermsOfUse": "使用條款（EULA）",
     "purchaseDifferentAccount": "此 App Store 購買項目未連結至你的 Kilo 帳戶。請登入購買時使用的 Apple 帳戶後再試一次。",
@@ -3297,7 +3293,6 @@
       "buySeats": "購買席次",
       "setupAutoTopUp": "設定自動儲值",
       "manageAutoTopUp": "管理自動儲值",
-      "webAddress": "網址 {{url}}",
       "opensOnWeb": "在網頁上開啟"
     },
     "boundary": {
@@ -3452,9 +3447,6 @@
       "groups": "群組",
       "guardrails": "防護機制",
       "byok": "自備金鑰",
-      "ssoAndDomain": "SSO 與網域",
-      "emailPreferences": "電子郵件偏好設定",
-      "dataCollection": "資料收集",
       "auditLogs": "稽核記錄",
       "requestLogs": "請求記錄",
       "subOrganizations": "子組織",
@@ -3481,8 +3473,7 @@
       "paymentPending": "付款待處理",
       "processingBlocked": "處理受阻",
       "processingNeedsReview": "處理程序待審查",
-      "retryHint": "重新載入 Kilo Pass 狀態。",
-      "setupHint": "在瀏覽器中開啟 Kilo Pass 設定。"
+      "retryHint": "重新載入 Kilo Pass 狀態。"
     }
   },
   "feedback": {

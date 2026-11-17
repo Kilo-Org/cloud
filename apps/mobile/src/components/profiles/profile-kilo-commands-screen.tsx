@@ -1,3 +1,4 @@
+import { type Href } from 'expo-router';
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -45,7 +46,13 @@ function hasUsableMessage(error: unknown): boolean {
 export function ProfileKiloCommandsScreen({
   profileId,
   organizationId,
-}: Readonly<{ profileId: string; organizationId?: string }>) {
+  backFallback,
+}: Readonly<{
+  profileId: string;
+  organizationId?: string;
+  /** The Profiles list of the stack that mounted this screen. */
+  backFallback: Href;
+}>) {
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const profileQuery = useAgentProfileKiloCommands(profileId, organizationId);
@@ -263,6 +270,7 @@ export function ProfileKiloCommandsScreen({
         profileId={profileId}
         organizationId={organizationId}
         title={t('profiles.slashCommands.title')}
+        backFallback={backFallback}
       />
       <TabScreenScrollView
         className="flex-1"

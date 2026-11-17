@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Ṣàkóso lórí wẹ́ẹ̀bù",
     "creditHistory": "Ìtàn kírẹ́dítì",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Fagilé",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Àwọn ìrajà, ìwé ẹ̀rí ìsanwó, àti ìgbòkègbodò kírẹ́dítì",
     "invoicesSubtitle": "Ṣe ìgbàsílẹ̀ àwọn ìwé owó fún àwọn ìrajà rẹ",
-    "manageBilling": "Ṣàkóso ìsanwó lórí kilo.ai",
-    "manageBillingIosNote": "A ń ṣàkóso àwọn ọ̀nà ìsanwó, àfikún owó aládàáṣe, àti àwọn àlàyé ìsanwó lórí kilo.ai.",
     "codeReviewerSubtitle": "Àtúnyẹ̀wò PR láìfọwọ́yí",
     "securityAgentSubtitle": "Wá àwọn àlàfo ààbò kí o sì ṣàtúnṣe wọn",
     "reviews": "Àwọn àtúnyẹ̀wò",
@@ -2015,6 +2011,9 @@
       "completedWillAppear": "Àwọn ìgbà iṣẹ́ tó ti parí yóò hàn níbí.",
       "noPastSessions": "Kò sí ìgbà iṣẹ́ tó ti kọjá",
       "pastSessions": "Àwọn ìgbà iṣẹ́ tó ti kọjá",
+      "sectionAccessibility_one": "{{title}}: ìgbà iṣẹ́ {{displayCount}}",
+      "sectionAccessibility_other": "{{title}}: ìgbà iṣẹ́ {{displayCount}}",
+      "sectionAccessibility": "{{title}}: ìgbà iṣẹ́ {{displayCount}}",
       "live": "LỌ́WỌ́LỌ́WỌ́",
       "updating": "Ń ṣe ìmúdójúìwọ̀n"
     },
@@ -3052,6 +3051,9 @@
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
     "searchPlaceholder": "Ìwádìí àwọn ìgbà iṣẹ́ àìpẹ́",
     "connectedCli": "Lórí CLI tó sopọ̀",
+    "connectedCliAccessibility_one": "{{title}}: {{displayCount}} ẹ̀dá",
+    "connectedCliAccessibility_other": "{{title}}: {{displayCount}} ẹ̀dá",
+    "connectedCliAccessibility": "{{title}}: {{displayCount}} ẹ̀dá",
     "newSessionOn": "Ìgbà iṣẹ́ tuntun lórí {{name}}",
     "noMatchingSessions": "Kò sí ìgbà iṣẹ́ tó bá ohun tí o wá mu.",
     "onlyFirstFilesAttached": "Fáìlì {{displayCount}} àkọ́kọ́ nìkan ni a ó so mọ́ ọn.",
@@ -3077,10 +3079,7 @@
       "cancelScheduled": "Yóò parí ní {{date}}",
       "cancelScheduledChange": "Fagilé àyípadà tí a ṣètò",
       "cancelled": "A ti fagilé ìforúkọsílẹ̀",
-      "changePlan": "Yí ètò padà lórí kilo.ai",
-      "changePlanIosNote": "Àwọn àyípadà ètò tí a ń sanwó fún wà lórí kilo.ai.",
       "creditHistoryEmpty": "Kò sí kírẹ́dítì Kilo Pass síbẹ̀.",
-      "manageInStore": "Ṣàkóso nínú {{store}}",
       "resume": "Tún ìforúkọsílẹ̀ bẹ̀rẹ̀",
       "resumeCancelledDescription": "Kilo Pass rẹ yóò tún bẹ̀rẹ̀ sí í sọ ara rẹ̀ dọ̀tun láìfọwọ́yí.",
       "resumePausedDescription": "Kilo Pass rẹ yóò tún bẹ̀rẹ̀ báyìí, ṣáájú ọjọ́ tí a ṣètò fún un láti tún bẹ̀rẹ̀.",
@@ -3117,9 +3116,6 @@
     "bonusFree": "Ẹ̀bùn ọ̀fẹ́",
     "bonusReferral": "Ẹ̀bùn ìtọ́ka",
     "bonusAvailable": "Ẹ̀bùn ọ̀fẹ́ tó wà",
-    "kiloPassManagement": "Ìṣàkóso Kilo Pass",
-    "kiloPassSetup": "Ìṣètò Kilo Pass",
-    "opensManagementOnWeb": "Ó ṣí ìṣàkóso Kilo Pass lórí wẹ́ẹ̀bù.",
     "loadFailedRetry": "Ṣàyẹ̀wò ìsopọ̀ rẹ, kí o sì tún gbìyànjú.",
     "legalTermsOfUse": "Àwọn ìlànà lílo (EULA)",
     "purchaseDifferentAccount": "Ohun tí o rà nínú App Store yìí kò so pọ̀ mọ́ àkọọ́lẹ̀ Kilo rẹ. Wọlé sí Apple Account tí o lò fún rírà náà, kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
@@ -3305,7 +3301,6 @@
       "buySeats": "Ra ààyè",
       "setupAutoTopUp": "Ṣètò ìfikún owó aládàáṣe",
       "manageAutoTopUp": "Ṣàkóso ìfikún owó aládàáṣe",
-      "webAddress": "Àdírẹ́sì wẹ́ẹ̀bù {{url}}",
       "opensOnWeb": "Yóò ṣí lórí wẹ́ẹ̀bù"
     },
     "boundary": {
@@ -3447,9 +3442,6 @@
       "groups": "Àwọn ẹgbẹ́",
       "guardrails": "Àwọn ààlà ààbò",
       "byok": "Lo kọ́kọ́rọ́ tìrẹ",
-      "ssoAndDomain": "SSO àti dómèènì",
-      "emailPreferences": "Ààyò ímeèlì",
-      "dataCollection": "Gbígba dátà",
       "auditLogs": "Àwọn àkọsílẹ̀ àyẹ̀wò",
       "requestLogs": "Àwọn àkọsílẹ̀ ìbéèrè",
       "subOrganizations": "Àwọn àjọ abẹ́lé",
@@ -3489,8 +3481,7 @@
       "paymentPending": "Ìsanwó ń dúró",
       "processingBlocked": "A ti dí ìmúṣẹ lọ́wọ́",
       "processingNeedsReview": "Ìmúṣẹ nílò àyẹ̀wò",
-      "retryHint": "Ó tún gbìyànjú láti gbé ipò Kilo Pass wọlé.",
-      "setupHint": "Ó ṣí ìṣètò Kilo Pass lórí ayélujára."
+      "retryHint": "Ó tún gbìyànjú láti gbé ipò Kilo Pass wọlé."
     }
   },
   "authErrors": {

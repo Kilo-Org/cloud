@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "වෙබයේ කළමනාකරණය කරන්න",
     "creditHistory": "ක්‍රෙඩිට් ඉතිහාසය",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "අවලංගු කරන්න",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "මිලදී ගැනීම්, රිසිට්පත් සහ ක්‍රෙඩිට් ක්‍රියාකාරකම්",
     "invoicesSubtitle": "ඔබේ මිලදී ගැනීම් සඳහා ඉන්වොයිස් බාගන්න",
-    "manageBilling": "kilo.ai හි බිල්පත් කළමනාකරණය කරන්න",
-    "manageBillingIosNote": "ගෙවීම් ක්‍රම, ස්වයංක්‍රීය ටොප්-අප් සහ බිල්පත් විස්තර kilo.ai හි කළමනාකරණය කෙරේ.",
     "codeReviewerSubtitle": "ස්වයංක්‍රීය PR සමාලෝචන",
     "securityAgentSubtitle": "ආරක්ෂක දුර්වලතා සොයා පිළියම් යොදන්න",
     "reviews": "සමාලෝචන",
@@ -2015,6 +2011,9 @@
       "completedWillAppear": "සම්පූර්ණ කළ සැසි මෙහි දිස්වනු ඇත.",
       "noPastSessions": "පසුගිය සැසි නැත",
       "pastSessions": "පසුගිය සැසි",
+      "sectionAccessibility_one": "{{title}}: {{displayCount}} සැසිය",
+      "sectionAccessibility_other": "{{title}}: {{displayCount}} සැසි",
+      "sectionAccessibility": "{{title}}: {{displayCount}} සැසි",
       "live": "සජීවී",
       "updating": "යාවත්කාලීන වෙමින්"
     },
@@ -3052,6 +3051,9 @@
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
     "searchPlaceholder": "මෑත සැසි සෙවීම",
     "connectedCli": "සම්බන්ධිත CLI එකක",
+    "connectedCliAccessibility_one": "{{title}}: {{displayCount}} අවස්ථාව",
+    "connectedCliAccessibility_other": "{{title}}: {{displayCount}} අවස්ථා",
+    "connectedCliAccessibility": "{{title}}: {{displayCount}} අවස්ථා",
     "newSessionOn": "{{name}} හි නව සැසියක්",
     "noMatchingSessions": "ගැළපෙන සැසි නොමැත.",
     "onlyFirstFilesAttached": "පළමු ගොනු {{displayCount}} ක් පමණක් අමුණනු ඇත.",
@@ -3077,10 +3079,7 @@
       "cancelScheduled": "{{date}} දින අවලංගු වේ",
       "cancelScheduledChange": "සැලසුම් කළ වෙනස අවලංගු කරන්න",
       "cancelled": "දායකත්වය අවලංගු කරන ලදී",
-      "changePlan": "kilo.ai හි සැලැස්ම වෙනස් කරන්න",
-      "changePlanIosNote": "ගෙවන සැලසුම් වෙනස් කිරීම් kilo.ai හි ලබා ගත හැක.",
       "creditHistoryEmpty": "තවම Kilo Pass ක්‍රෙඩිට් නැත.",
-      "manageInStore": "{{store}} හි කළමනාකරණය කරන්න",
       "resume": "දායකත්වය නැවත අරඹන්න",
       "resumeCancelledDescription": "ඔබේ Kilo Pass නැවතත් ස්වයංක්‍රීයව අලුත් වීමට පටන් ගනී.",
       "resumePausedDescription": "ඔබේ Kilo Pass එහි නියමිත නැවත ආරම්භ දිනයට පෙර, දැන්ම නැවත ආරම්භ වේ.",
@@ -3117,9 +3116,6 @@
     "bonusFree": "නොමිලේ ප්‍රසාදය",
     "bonusReferral": "හඳුන්වාදීමේ ප්‍රසාදය",
     "bonusAvailable": "ලබාගත හැකි නොමිලේ ප්‍රසාදය",
-    "kiloPassManagement": "Kilo Pass කළමනාකරණය",
-    "kiloPassSetup": "Kilo Pass සැකසුම",
-    "opensManagementOnWeb": "වෙබ් අඩවියේ Kilo Pass කළමනාකරණ පිටුව විවෘත කරයි.",
     "loadFailedRetry": "ඔබේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
     "legalTermsOfUse": "භාවිත කොන්දේසි (EULA)",
     "purchaseDifferentAccount": "මෙම App Store මිලදී ගැනීම ඔබේ Kilo ගිණුමට සම්බන්ධ කර නැත. මිලදී ගැනීමට භාවිතා කළ Apple Account වෙත පිවිසී නැවත උත්සාහ කරන්න.",
@@ -3305,7 +3301,6 @@
       "buySeats": "සාමාජික ස්ථාන මිලදී ගන්න",
       "setupAutoTopUp": "ස්වයංක්‍රීය ටොප්-අප් සකසන්න",
       "manageAutoTopUp": "ස්වයංක්‍රීය ටොප්-අප් කළමනාකරණය කරන්න",
-      "webAddress": "වෙබ් ලිපිනය {{url}}",
       "opensOnWeb": "වෙබයේ විවෘත වේ"
     },
     "boundary": {
@@ -3447,9 +3442,6 @@
       "groups": "කණ්ඩායම්",
       "guardrails": "ආරක්ෂක සීමා",
       "byok": "ඔබේම යතුර භාවිත කරන්න",
-      "ssoAndDomain": "SSO සහ වසම",
-      "emailPreferences": "ඊමේල් මනාප",
-      "dataCollection": "දත්ත එකතු කිරීම",
       "auditLogs": "විගණන ලොග",
       "requestLogs": "ඉල්ලීම් ලොග",
       "subOrganizations": "උප සංවිධාන",
@@ -3489,8 +3481,7 @@
       "paymentPending": "ගෙවීම පොරොත්තුවේ",
       "processingBlocked": "සැකසීම අවහිර වී ඇත",
       "processingNeedsReview": "සැකසීම සමාලෝචනය කළ යුතුයි",
-      "retryHint": "Kilo Pass තත්ත්වය පූරණය කිරීමට නැවත උත්සාහ කරයි.",
-      "setupHint": "Kilo Pass සැකසුම වෙබ් අඩවියේ විවෘත කරයි."
+      "retryHint": "Kilo Pass තත්ත්වය පූරණය කිරීමට නැවත උත්සාහ කරයි."
     }
   },
   "authErrors": {

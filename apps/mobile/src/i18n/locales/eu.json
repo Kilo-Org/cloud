@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Kudeatu webean",
     "creditHistory": "Kredituen historia",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Utzi",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Erosketak, ordainagiriak eta kredituen jarduera",
     "invoicesSubtitle": "Deskargatu zure erosketen fakturak",
-    "manageBilling": "Kudeatu fakturazioa kilo.ai-n",
-    "manageBillingIosNote": "Ordainketa-metodoak, saldoaren birkarga automatikoa eta fakturazio-xehetasunak kilo.ai-n kudeatzen dira.",
     "codeReviewerSubtitle": "PR-ak automatikoki berrikustea",
     "securityAgentSubtitle": "Aurkitu eta konpondu ahultasunak",
     "reviews": "Berrikuspenak",
@@ -2015,6 +2011,9 @@
       "completedWillAppear": "Amaitutako saioak hemen agertuko dira.",
       "noPastSessions": "Ez dago aurreko saiorik",
       "pastSessions": "Aurreko saioak",
+      "sectionAccessibility_one": "{{title}}: {{displayCount}} saio",
+      "sectionAccessibility_other": "{{title}}: {{displayCount}} saio",
+      "sectionAccessibility": "{{title}}: {{displayCount}} saio",
       "live": "ZUZENEAN",
       "updating": "Eguneratzen"
     },
@@ -3052,6 +3051,9 @@
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
     "searchPlaceholder": "Azkenaldiko saioen bilaketa",
     "connectedCli": "Konektatutako CLI batean",
+    "connectedCliAccessibility_one": "{{title}}: {{displayCount}} instantzia",
+    "connectedCliAccessibility_other": "{{title}}: {{displayCount}} instantzia",
+    "connectedCliAccessibility": "{{title}}: {{displayCount}} instantzia",
     "newSessionOn": "Saio berria {{name}} izeneko instantzian",
     "noMatchingSessions": "Ez dago bat datorren saiorik.",
     "onlyFirstFilesAttached": "Lehenengo {{displayCount}} fitxategiak bakarrik erantsiko dira.",
@@ -3077,10 +3079,7 @@
       "cancelScheduled": "Ezeztatze-data: {{date}}",
       "cancelScheduledChange": "Ezeztatu programatutako aldaketa",
       "cancelled": "Harpidetza ezeztatu da",
-      "changePlan": "Aldatu plana kilo.ai-n",
-      "changePlanIosNote": "Ordainpeko planen aldaketak kilo.ai-n egin daitezke.",
       "creditHistoryEmpty": "Oraindik ez dago Kilo Pass krediturik.",
-      "manageInStore": "Kudeatu hemen: {{store}}",
       "resume": "Berraktibatu harpidetza",
       "resumeCancelledDescription": "Zure Kilo Pass-a berriro automatikoki berrituko da.",
       "resumePausedDescription": "Zure Kilo Pass-a orain berraktibatuko da, programatutako berrabiatze-data baino lehen.",
@@ -3117,9 +3116,6 @@
     "bonusFree": "Doako bonusa",
     "bonusReferral": "Erreferentzia-bonusa",
     "bonusAvailable": "Eskura dagoen doako bonusa",
-    "kiloPassManagement": "Kilo Pass-en kudeaketa",
-    "kiloPassSetup": "Kilo Pass-en konfigurazioa",
-    "opensManagementOnWeb": "Kilo Pass kudeatzeko orria irekitzen du webgunean.",
     "loadFailedRetry": "Egiaztatu zure konexioa, eta gero saiatu berriro.",
     "legalTermsOfUse": "Erabilera-baldintzak (EULA)",
     "purchaseDifferentAccount": "App Store-ko erosketa hau ez dago zure Kilo kontuarekin lotuta. Hasi saioa erosketa egiteko erabili zenuen Apple Account kontuan, eta saiatu berriro.",
@@ -3305,7 +3301,6 @@
       "buySeats": "Erosi lizentziak",
       "setupAutoTopUp": "Konfiguratu birkarga automatikoa",
       "manageAutoTopUp": "Kudeatu birkarga automatikoa",
-      "webAddress": "Web-helbidea {{url}}",
       "opensOnWeb": "Webean irekitzen da"
     },
     "boundary": {
@@ -3447,9 +3442,6 @@
       "groups": "Taldeak",
       "guardrails": "Babes-mugak",
       "byok": "Erabili zure gakoa",
-      "ssoAndDomain": "SSO eta domeinua",
-      "emailPreferences": "Posta elektronikoaren hobespenak",
-      "dataCollection": "Datu-bilketa",
       "auditLogs": "Ikuskaritza-erregistroak",
       "requestLogs": "Eskaeren erregistroak",
       "subOrganizations": "Azpierakundeak",
@@ -3489,8 +3481,7 @@
       "paymentPending": "Ordainketa egiteko zain",
       "processingBlocked": "Prozesamendua blokeatuta",
       "processingNeedsReview": "Prozesamenduak berrikuspena behar du",
-      "retryHint": "Kilo Pass-en egoera kargatzen saiatzen da berriro.",
-      "setupHint": "Kilo Pass-en konfigurazioa webean irekitzen du."
+      "retryHint": "Kilo Pass-en egoera kargatzen saiatzen da berriro."
     }
   },
   "authErrors": {

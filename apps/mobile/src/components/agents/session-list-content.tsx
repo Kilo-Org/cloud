@@ -16,7 +16,10 @@ import {
   type SessionListClearAction,
 } from '@/components/agents/session-list-body-model';
 import { selectSessionListContentSurface } from '@/components/agents/session-list-content-surface';
-import { type SessionSection } from '@/components/agents/session-list-helpers';
+import {
+  type SessionSection,
+  sessionSectionAccessibilityLabel,
+} from '@/components/agents/session-list-helpers';
 import { SessionListRefreshStatus } from '@/components/agents/session-list-refresh-status';
 import {
   flattenSessionSections,
@@ -386,7 +389,13 @@ export function AgentSessionListContent({
         return <SessionRowSkeleton index={item.index} subtitle={false} />;
       }
       if (item.kind === 'section-header') {
-        return <SessionListSectionHeader title={item.title} count={item.count} />;
+        return (
+          <SessionListSectionHeader
+            title={item.title}
+            count={item.count}
+            accessibilityLabel={sessionSectionAccessibilityLabel(item.title, item.count)}
+          />
+        );
       }
       return (
         <StoredSessionRow

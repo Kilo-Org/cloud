@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- profile-editor instructions: section body, sheet and delete flow share one screen */
+import { type Href } from 'expo-router';
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
@@ -127,7 +129,8 @@ function InstructionsSkeleton() {
 export function ProfileInstructionsScreen({
   profileId,
   organizationId,
-}: Readonly<{ profileId: string; organizationId?: string }>) {
+  backFallback,
+}: Readonly<{ profileId: string; organizationId?: string; backFallback: Href }>) {
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const profileQuery = useAgentProfileInstructions(profileId, organizationId);
@@ -315,6 +318,7 @@ export function ProfileInstructionsScreen({
         profileId={profileId}
         organizationId={organizationId}
         title={t('profiles.instructionsTitle')}
+        backFallback={backFallback}
       />
       <TabScreenScrollView
         className="flex-1"

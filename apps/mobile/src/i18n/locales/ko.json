@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "웹에서 관리",
     "creditHistory": "크레딧 내역",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "취소",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "구매, 영수증 및 크레딧 활동",
     "invoicesSubtitle": "구매 인보이스 다운로드",
-    "manageBilling": "kilo.ai에서 결제 관리",
-    "manageBillingIosNote": "결제 수단, 자동 충전 및 결제 정보는 kilo.ai에서 관리합니다.",
     "codeReviewerSubtitle": "자동 PR 리뷰",
     "securityAgentSubtitle": "취약점 탐지 및 해결",
     "reviews": "리뷰",
@@ -1472,6 +1468,9 @@
       "completedWillAppear": "완료된 세션이 여기에 표시됩니다.",
       "noPastSessions": "지난 세션 없음",
       "pastSessions": "지난 세션",
+      "sectionAccessibility_one": "{{title}}: 세션 {{displayCount}}개",
+      "sectionAccessibility_other": "{{title}}: 세션 {{displayCount}}개",
+      "sectionAccessibility": "{{title}}: 세션 {{displayCount}}개",
       "live": "실시간",
       "updating": "업데이트 중"
     },
@@ -2509,6 +2508,9 @@
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
     "searchPlaceholder": "최근 세션 검색",
     "connectedCli": "연결된 CLI",
+    "connectedCliAccessibility_one": "{{title}}: CLI {{displayCount}}개",
+    "connectedCliAccessibility_other": "{{title}}: CLI {{displayCount}}개",
+    "connectedCliAccessibility": "{{title}}: CLI {{displayCount}}개",
     "newSessionOn": "{{name}}의 새 세션",
     "noMatchingSessions": "일치하는 세션이 없습니다.",
     "onlyFirstFilesAttached": "처음 {{displayCount}}개의 파일만 첨부됩니다.",
@@ -2534,10 +2536,7 @@
       "cancelScheduled": "{{date}}에 취소 예정",
       "cancelScheduledChange": "예약된 변경 취소",
       "cancelled": "구독이 취소되었습니다",
-      "changePlan": "kilo.ai에서 요금제 변경",
-      "changePlanIosNote": "유료 요금제 변경은 kilo.ai에서 할 수 있습니다.",
       "creditHistoryEmpty": "아직 Kilo Pass 크레딧이 없습니다.",
-      "manageInStore": "{{store}}에서 관리",
       "resume": "구독 재개",
       "resumeCancelledDescription": "Kilo Pass가 다시 자동으로 갱신됩니다.",
       "resumePausedDescription": "Kilo Pass가 예정된 재개일 전에 지금 바로 재개됩니다.",
@@ -2574,9 +2573,6 @@
     "bonusFree": "무료 보너스",
     "bonusReferral": "추천 보너스",
     "bonusAvailable": "사용 가능한 무료 보너스",
-    "kiloPassManagement": "Kilo Pass 관리",
-    "kiloPassSetup": "Kilo Pass 설정",
-    "opensManagementOnWeb": "웹에서 Kilo Pass 관리 페이지를 엽니다.",
     "loadFailedRetry": "연결을 확인한 후 다시 시도하세요.",
     "legalTermsOfUse": "이용 약관(EULA)",
     "purchaseDifferentAccount": "이 App Store 구매 내역은 Kilo 계정에 연결되어 있지 않습니다. 구매에 사용한 Apple Account로 로그인한 후 다시 시도하세요.",
@@ -3297,7 +3293,6 @@
       "buySeats": "라이선스 구매",
       "setupAutoTopUp": "자동 충전 설정",
       "manageAutoTopUp": "자동 충전 관리",
-      "webAddress": "웹 주소 {{url}}",
       "opensOnWeb": "웹에서 열림"
     },
     "boundary": {
@@ -3452,9 +3447,6 @@
       "groups": "그룹",
       "guardrails": "가드레일",
       "byok": "자체 키 사용(BYOK)",
-      "ssoAndDomain": "SSO 및 도메인",
-      "emailPreferences": "이메일 환경설정",
-      "dataCollection": "데이터 수집",
       "auditLogs": "감사 로그",
       "requestLogs": "요청 로그",
       "subOrganizations": "하위 조직",
@@ -3481,8 +3473,7 @@
       "paymentPending": "결제 대기 중",
       "processingBlocked": "처리 차단됨",
       "processingNeedsReview": "처리 검토 필요",
-      "retryHint": "Kilo Pass 상태를 다시 불러옵니다.",
-      "setupHint": "웹에서 Kilo Pass 설정을 엽니다."
+      "retryHint": "Kilo Pass 상태를 다시 불러옵니다."
     }
   },
   "feedback": {

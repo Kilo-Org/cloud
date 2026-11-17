@@ -24,8 +24,6 @@
   "common": {
     "manageOnWeb": "Web'de yönet",
     "creditHistory": "Kredi geçmişi",
-    "appStore": "App Store",
-    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "İptal",
@@ -252,8 +250,6 @@
   "profile": {
     "creditHistorySubtitle": "Satın alımlar, makbuzlar ve kredi hareketleri",
     "invoicesSubtitle": "Satın alımlarınızın faturalarını indirin",
-    "manageBilling": "Faturalandırmayı kilo.ai üzerinden yönet",
-    "manageBillingIosNote": "Ödeme yöntemleri, otomatik yükleme ve fatura bilgileri kilo.ai üzerinden yönetilir.",
     "codeReviewerSubtitle": "Otomatik PR incelemeleri",
     "securityAgentSubtitle": "Güvenlik açıklarını bul ve gider",
     "reviews": "İncelemeler",
@@ -1472,6 +1468,9 @@
       "completedWillAppear": "Tamamlanan oturumlar burada görünecek.",
       "noPastSessions": "Geçmiş oturum yok",
       "pastSessions": "Geçmiş oturumlar",
+      "sectionAccessibility_one": "{{title}}: {{displayCount}} oturum",
+      "sectionAccessibility_other": "{{title}}: {{displayCount}} oturum",
+      "sectionAccessibility": "{{title}}: {{displayCount}} oturum",
       "live": "CANLI",
       "updating": "Güncelleniyor"
     },
@@ -2509,6 +2508,9 @@
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
     "searchPlaceholder": "Son oturumlarda arama",
     "connectedCli": "Bağlı bir CLI üzerinden",
+    "connectedCliAccessibility_one": "{{title}}: {{displayCount}} örnek",
+    "connectedCliAccessibility_other": "{{title}}: {{displayCount}} örnek",
+    "connectedCliAccessibility": "{{title}}: {{displayCount}} örnek",
     "newSessionOn": "{{name}} üzerinde yeni oturum",
     "noMatchingSessions": "Eşleşen oturum yok.",
     "onlyFirstFilesAttached": "Yalnızca ilk {{displayCount}} dosya eklenecek.",
@@ -2534,10 +2536,7 @@
       "cancelScheduled": "{{date}} tarihinde iptal edilecek",
       "cancelScheduledChange": "Planlanan değişikliği iptal et",
       "cancelled": "Abonelik iptal edildi",
-      "changePlan": "Planı kilo.ai üzerinden değiştir",
-      "changePlanIosNote": "Ücretli plan değişiklikleri kilo.ai üzerinden yapılabilir.",
       "creditHistoryEmpty": "Henüz Kilo Pass kredisi yok.",
-      "manageInStore": "{{store}} üzerinden yönet",
       "resume": "Aboneliği sürdür",
       "resumeCancelledDescription": "Kilo Pass'ınız yeniden otomatik olarak yenilenmeye başlar.",
       "resumePausedDescription": "Kilo Pass'ınız planlanan devam tarihini beklemeden şimdi devam eder.",
@@ -2574,9 +2573,6 @@
     "bonusFree": "Ücretsiz bonus",
     "bonusReferral": "Davet bonusu",
     "bonusAvailable": "Kullanılabilir ücretsiz bonus",
-    "kiloPassManagement": "Kilo Pass yönetimi",
-    "kiloPassSetup": "Kilo Pass kurulumu",
-    "opensManagementOnWeb": "Kilo Pass yönetimini web sitesinde açar.",
     "loadFailedRetry": "Bağlantını kontrol et, sonra tekrar dene.",
     "legalTermsOfUse": "Kullanım koşulları (EULA)",
     "purchaseDifferentAccount": "Bu App Store satın alımı Kilo hesabına bağlı değil. Satın alımda kullanılan Apple Account ile oturum aç, ardından tekrar dene.",
@@ -3297,7 +3293,6 @@
       "buySeats": "Lisans satın al",
       "setupAutoTopUp": "Otomatik yüklemeyi ayarla",
       "manageAutoTopUp": "Otomatik yüklemeyi yönet",
-      "webAddress": "Web adresi {{url}}",
       "opensOnWeb": "Web'de açılır"
     },
     "boundary": {
@@ -3452,9 +3447,6 @@
       "groups": "Gruplar",
       "guardrails": "Koruma kuralları",
       "byok": "Kendi anahtarınızı kullanın",
-      "ssoAndDomain": "SSO ve alan adı",
-      "emailPreferences": "E-posta tercihleri",
-      "dataCollection": "Veri toplama",
       "auditLogs": "Denetim günlükleri",
       "requestLogs": "İstek günlükleri",
       "subOrganizations": "Alt kuruluşlar",
@@ -3481,8 +3473,7 @@
       "paymentPending": "Ödeme bekleniyor",
       "processingBlocked": "İşleme engellendi",
       "processingNeedsReview": "İşlemin incelenmesi gerekiyor",
-      "retryHint": "Kilo Pass durumunu yüklemeyi tekrar dener.",
-      "setupHint": "Kilo Pass kurulumunu tarayıcıda açar."
+      "retryHint": "Kilo Pass durumunu yüklemeyi tekrar dener."
     }
   },
   "feedback": {

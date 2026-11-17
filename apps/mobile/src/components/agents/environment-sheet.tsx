@@ -172,7 +172,7 @@ function EnvironmentList({
         topInset="never"
         surfaceClassName="bg-card"
       />
-      <Text className="px-4 pb-2 text-sm text-muted-foreground" numberOfLines={1}>
+      <Text className="px-4 py-2 text-sm text-muted-foreground" numberOfLines={1}>
         {t('agentChat.environment.environmentsForRepository', { repository: repositoryLabel })}
       </Text>
       <ScrollView style={{ maxHeight: Math.round(windowHeight * LIST_MAX_WINDOW_FRACTION) }}>

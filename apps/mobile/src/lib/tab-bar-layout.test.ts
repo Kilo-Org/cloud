@@ -32,7 +32,7 @@ const LAYOUT_SOURCE = readFileSync(
   'utf8'
 );
 const LABEL_SOURCE = readFileSync(
-  fileURLToPath(new URL('../components/tab-bar-label.tsx', import.meta.url)),
+  fileURLToPath(new URL('../components/ui/tab-bar-label.tsx', import.meta.url)),
   'utf8'
 );
 
@@ -337,7 +337,7 @@ describe('mirrored tab label metrics', () => {
   // component's style, so the "keep these in step" pointer must name the file
   // that actually owns that style, and the copied tokens must still match it.
   it('points at the component that owns the tab label style', () => {
-    expect(LAYOUT_SOURCE).toContain('apps/mobile/src/components/tab-bar-label.tsx');
+    expect(LAYOUT_SOURCE).toContain('apps/mobile/src/components/ui/tab-bar-label.tsx');
     expect(LABEL_SOURCE).toContain('export function TabBarLabel');
   });
 

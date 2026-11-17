@@ -370,7 +370,6 @@
   "apps/mobile/src/components/session-changes/session-changes-screen.tsx": { "L6": 1 },
   "apps/mobile/src/components/share/share-destination-list.tsx": { "L1": 1, "L8": 1 },
   "apps/mobile/src/components/share/share-gate-sheet.tsx": { "L8": 1 },
-  "apps/mobile/src/components/tab-bar-label.tsx": { "L1": 4, "L3": 4 },
   "apps/mobile/src/components/todos/agents-view-segment.tsx": { "L8": 2 },
   "apps/mobile/src/components/todos/list-settings-name-field.tsx": { "L4": 2, "L8": 1 },
   "apps/mobile/src/components/todos/save-draft-as-todo-sheet.tsx": { "L4": 1 },

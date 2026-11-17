@@ -3815,6 +3815,28 @@
     ],
     "searchBlob": "appReportedMessages.createReport Report a problematic app or extension message for review, such as an unparsed or unstyled message from a CLI session. Submit the message content, mode, model, and report type to store it for investigation. appreportedmessages createreport message cli_session_id mode model report_type message cli_session_id mode model report_type"
   },
+  "byok.byokEndpointsEnabled": {
+    "path": "byok.byokEndpointsEnabled",
+    "kind": "query",
+    "summary": "Checks whether BYOK custom endpoints (an organization's own OpenAI- or Anthropic-compatible upstream providers) are enabled and available to add, optionally for a specific organization. Returns false when no organization is given or the feature has not been enabled for it.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      }
+    },
+    "tags": [
+      "byok",
+      "byokendpointsenabled",
+      "organizationid"
+    ],
+    "searchBlob": "byok.byokEndpointsEnabled Checks whether BYOK custom endpoints (an organization's own OpenAI- or Anthropic-compatible upstream providers) are enabled and available to add, optionally for a specific organization. Returns false when no organization is given or the feature has not been enabled for it. byok byokendpointsenabled organizationid organizationId"
+  },
   "byok.create": {
     "path": "byok.create",
     "kind": "mutation",

@@ -1366,7 +1366,8 @@
       "noReviews": "अहिलेसम्म कुनै समीक्षा छैन",
       "noReviewsDescription": "कोड समीक्षकले पुल रिक्वेस्टको समीक्षा गरेपछि समीक्षाहरू यहाँ देखिनेछन्।",
       "startManualReview": "म्यानुअल समीक्षा सुरु गर्नुहोस्",
-      "configureProvider": "प्रदायकका सेटिङहरू मिलाउनुहोस्"
+      "configureProvider": "प्रदायकका सेटिङहरू मिलाउनुहोस्",
+      "connectOwnerOnly": "प्रदायक जडान गर्न संस्थाको मालिक वा प्रशासकलाई अनुरोध गर्नुहोस्।"
     },
     "platformList": {
       "checking": "जाँच गर्दै…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "यो यन्त्रबाट साइन आउट गर्नुहोस्",
     "signOutSessionLabel": "{{device}} बाट साइन आउट गर्नुहोस्, साइन इन: {{signedIn}}, अन्तिम पटक देखिएको: {{lastSeen}}",
     "sessionSignedOut": "सत्रबाट साइन आउट गरियो।",
+    "sessionSignOutFailed": "यो सत्रबाट साइन आउट गर्न सकिएन, फेरि प्रयास गर्नुहोस्।",
     "signOutThisDeviceTitle": "यो यन्त्रबाट साइन आउट गर्ने?",
     "signOutThisSessionTitle": "यो सत्रबाट साइन आउट गर्ने?",
     "signOutThisSessionMessage": "{{device}} बाट साइन आउट गरिनेछ। अन्तिम पटक देखिएको: {{lastSeen}}। त्यसपछि पनि यो यन्त्रसँग एक घण्टासम्म API पहुँच रहन सक्छ।",

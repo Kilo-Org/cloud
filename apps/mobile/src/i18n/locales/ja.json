@@ -777,6 +777,7 @@
     },
     "reviewList": {
       "configureProvider": "プロバイダーを設定",
+      "connectOwnerOnly": "組織のオーナーまたは管理者にプロバイダーの接続を依頼してください。",
       "couldNotLoad": "レビューを読み込めませんでした。",
       "noReviews": "まだレビューはありません",
       "noReviewsDescription": "コードレビュアーがプルリクエストをレビューすると、その結果がここに表示されます。",
@@ -2430,6 +2431,7 @@
     "signOutThisDevice": "このデバイスからサインアウト",
     "signOutSessionLabel": "{{device}}からサインアウト、サインイン：{{signedIn}}、最終アクセス：{{lastSeen}}",
     "sessionSignedOut": "セッションからサインアウトしました。",
+    "sessionSignOutFailed": "このセッションからサインアウトできませんでした。もう一度お試しください。",
     "signOutThisDeviceTitle": "このデバイスからサインアウトしますか？",
     "signOutThisSessionTitle": "このセッションからサインアウトしますか？",
     "signOutThisSessionMessage": "{{device}}からサインアウトします。最終アクセス：{{lastSeen}}。ただし、最大1時間はAPIにアクセスできる状態が続くことがあります。",

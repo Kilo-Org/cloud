@@ -1366,7 +1366,8 @@
       "noReviews": "እስካሁን ምንም ግምገማዎች የሉም",
       "noReviewsDescription": "የኮድ ገምጋሚው የኮድ ውህደት ጥያቄን ከገመገመ በኋላ ግምገማዎች እዚህ ይታያሉ።",
       "startManualReview": "ግምገማ ራስዎ ያስጀምሩ",
-      "configureProvider": "አቅራቢውን ያዋቅሩ"
+      "configureProvider": "አቅራቢውን ያዋቅሩ",
+      "connectOwnerOnly": "የድርጅት ባለቤት ወይም አስተዳዳሪ አቅራቢውን እንዲያገናኙ ይጠይቁ።"
     },
     "platformList": {
       "checking": "በመፈተሽ ላይ…",
@@ -2974,6 +2975,7 @@
     "signOutThisDevice": "ከዚህ መሣሪያ ይውጡ",
     "signOutSessionLabel": "ከ{{device}} ይውጡ፣ የገቡበት ጊዜ፦ {{signedIn}}፣ ለመጨረሻ ጊዜ የታየበት፦ {{lastSeen}}",
     "sessionSignedOut": "ከክፍለ ጊዜው ወጥተዋል።",
+    "sessionSignOutFailed": "ከዚህ ክፍለ ጊዜ መውጣት አልተቻለም። እንደገና ይሞክሩ።",
     "signOutThisDeviceTitle": "ከዚህ መሣሪያ መውጣት ይፈልጋሉ?",
     "signOutThisSessionTitle": "ከዚህ ክፍለ ጊዜ መውጣት ይፈልጋሉ?",
     "signOutThisSessionMessage": "{{device}} ከመለያዎ ይወጣል። ለመጨረሻ ጊዜ የታየበት፦ {{lastSeen}}። እስከ አንድ ሰዓት ድረስ APIን መጠቀም ሊቀጥል ይችላል።",

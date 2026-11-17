@@ -1366,7 +1366,8 @@
       "noReviews": "Сè уште нема прегледи",
       "noReviewsDescription": "Прегледите ќе се појават тука откако прегледувачот на код ќе обработи барање за спојување.",
       "startManualReview": "Започни рачен преглед",
-      "configureProvider": "Постави ја платформата"
+      "configureProvider": "Постави ја платформата",
+      "connectOwnerOnly": "Побарајте од сопственик или администратор на организацијата да ја поврзат платформата."
     },
     "platformList": {
       "checking": "Се проверува…",
@@ -2974,6 +2975,7 @@
     "signOutThisDevice": "Одјави го овој уред",
     "signOutSessionLabel": "Одјави го {{device}}, најава: {{signedIn}}, последна активност: {{lastSeen}}",
     "sessionSignedOut": "Сесијата е одјавена.",
+    "sessionSignOutFailed": "Не можеше да се одјави оваа сесија. Обидете се повторно.",
     "signOutThisDeviceTitle": "Да се одјави овој уред?",
     "signOutThisSessionTitle": "Да се одјави оваа сесија?",
     "signOutThisSessionMessage": "Уредот {{device}} ќе се одјави. Последна активност: {{lastSeen}}. Може да го задржи пристапот до API уште најмногу еден час.",

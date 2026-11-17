@@ -777,6 +777,7 @@
     },
     "reviewList": {
       "configureProvider": "Anbieter konfigurieren",
+      "connectOwnerOnly": "Bitte einen Organisationsinhaber oder Admin, einen Anbieter zu verbinden.",
       "couldNotLoad": "Die Reviews konnten nicht geladen werden.",
       "noReviews": "Noch keine Reviews",
       "noReviewsDescription": "Hier erscheinen Reviews, sobald Code Reviewer einen Pull-Request prüft.",
@@ -2430,6 +2431,7 @@
     "signOutThisDevice": "Dieses Gerät abmelden",
     "signOutSessionLabel": "{{device}} abmelden, angemeldet: {{signedIn}}, zuletzt aktiv: {{lastSeen}}",
     "sessionSignedOut": "Sitzung abgemeldet.",
+    "sessionSignOutFailed": "Diese Sitzung konnte nicht abgemeldet werden. Erneut versuchen.",
     "signOutThisDeviceTitle": "Dieses Gerät abmelden?",
     "signOutThisSessionTitle": "Diese Sitzung abmelden?",
     "signOutThisSessionMessage": "{{device}} wird abgemeldet. Zuletzt aktiv: {{lastSeen}}. Der API-Zugriff kann danach noch bis zu einer Stunde bestehen bleiben.",

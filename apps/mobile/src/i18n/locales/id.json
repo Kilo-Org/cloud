@@ -777,6 +777,7 @@
     },
     "reviewList": {
       "configureProvider": "Atur penyedia",
+      "connectOwnerOnly": "Minta pemilik organisasi atau admin untuk menghubungkan penyedia.",
       "couldNotLoad": "Tidak dapat memuat tinjauan.",
       "noReviews": "Belum ada tinjauan",
       "noReviewsDescription": "Tinjauan muncul di sini setelah Peninjau kode meninjau PR.",
@@ -2430,6 +2431,7 @@
     "signOutThisDevice": "Keluar dari perangkat ini",
     "signOutSessionLabel": "Keluar dari {{device}}, masuk {{signedIn}}, terakhir aktif {{lastSeen}}",
     "sessionSignedOut": "Sesi masuk telah diakhiri.",
+    "sessionSignOutFailed": "Tidak dapat keluar dari sesi ini. Coba lagi.",
     "signOutThisDeviceTitle": "Keluar dari perangkat ini?",
     "signOutThisSessionTitle": "Keluar dari sesi ini?",
     "signOutThisSessionMessage": "Sesi masuk di {{device}} akan diakhiri. Terakhir aktif {{lastSeen}}. Perangkat tersebut masih dapat mengakses API hingga satu jam.",

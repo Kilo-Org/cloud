@@ -1366,7 +1366,8 @@
       "noReviews": "Одоогоор шалгалт байхгүй",
       "noReviewsDescription": "Кодын шалгагч нэгтгэх хүсэлтийг шалгасны дараа шалгалтууд энд харагдана.",
       "startManualReview": "Шалгалтыг гараар эхлүүлэх",
-      "configureProvider": "Үйлчилгээ үзүүлэгчийг тохируулах"
+      "configureProvider": "Үйлчилгээ үзүүлэгчийг тохируулах",
+      "connectOwnerOnly": "Байгууллагын эзэмшигч эсвэл админаас үйлчилгээ үзүүлэгчийг холбохыг хүснэ үү."
     },
     "platformList": {
       "checking": "Шалгаж байна…",
@@ -2974,6 +2975,7 @@
     "signOutThisDevice": "Энэ төхөөрөмжөөс гарах",
     "signOutSessionLabel": "{{device}} төхөөрөмжөөс гарах, нэвтэрсэн: {{signedIn}}, сүүлд идэвхтэй байсан: {{lastSeen}}",
     "sessionSignedOut": "Нэвтрэлтийг дуусгалаа.",
+    "sessionSignOutFailed": "Энэ нэвтрэлтийг дуусгаж чадсангүй. Дахин оролдоно уу.",
     "signOutThisDeviceTitle": "Энэ төхөөрөмжөөс гарах уу?",
     "signOutThisSessionTitle": "Энэ нэвтрэлтийг дуусгах уу?",
     "signOutThisSessionMessage": "{{device}} төхөөрөмжийг бүртгэлээс гаргана. Сүүлд идэвхтэй байсан: {{lastSeen}}. API-д хандах эрх нь нэг цаг хүртэл хүчинтэй хэвээр байж болно.",

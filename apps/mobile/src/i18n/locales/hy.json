@@ -1366,7 +1366,8 @@
       "noReviews": "Ստուգումներ դեռ չկան",
       "noReviewsDescription": "Ստուգումներն այստեղ կհայտնվեն, երբ Կոդի ստուգիչը ստուգի pull request։",
       "startManualReview": "Սկսել ձեռքով ստուգում",
-      "configureProvider": "Կարգավորել մատակարարը"
+      "configureProvider": "Կարգավորել մատակարարը",
+      "connectOwnerOnly": "Խնդրիր կազմակերպության սեփականատիրոջը կամ ադմինիստրատորին միացնել մատակարար։"
     },
     "platformList": {
       "checking": "Ստուգվում է…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "Դուրս գալ այս սարքից",
     "signOutSessionLabel": "Դուրս գալ {{device}} սարքից, մուտք՝ {{signedIn}}, վերջին ակտիվություն՝ {{lastSeen}}",
     "sessionSignedOut": "Նստաշրջանից դուրս եկաք։",
+    "sessionSignOutFailed": "Չհաջողվեց դուրս գալ այս նստաշրջանից։ Փորձեք կրկին։",
     "signOutThisDeviceTitle": "Դո՞ւրս գալ այս սարքի հաշվից",
     "signOutThisSessionTitle": "Դո՞ւրս գալ այս նստաշրջանից",
     "signOutThisSessionMessage": "{{device}} դուրս կգա հաշվից։ Վերջին ակտիվությունը՝ {{lastSeen}}։ Այն կարող է պահպանել API-ի հասանելիությունը մինչև մեկ ժամ։",

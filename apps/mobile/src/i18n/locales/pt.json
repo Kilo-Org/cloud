@@ -1389,7 +1389,8 @@
       "noReviews": "Ainda sem revisões",
       "noReviewsDescription": "As revisões aparecem aqui depois de o revisor de código analisar um pedido de integração.",
       "startManualReview": "Iniciar uma revisão manual",
-      "configureProvider": "Configurar fornecedor"
+      "configureProvider": "Configurar fornecedor",
+      "connectOwnerOnly": "Peça a um proprietário ou administrador da organização que ligue um fornecedor."
     },
     "platformList": {
       "checking": "A verificar…",
@@ -3034,6 +3035,7 @@
     "signOutThisDevice": "Terminar sessão neste dispositivo",
     "signOutSessionLabel": "Terminar sessão em {{device}}, início de sessão: {{signedIn}}, última atividade: {{lastSeen}}",
     "sessionSignedOut": "Sessão terminada.",
+    "sessionSignOutFailed": "Não foi possível terminar esta sessão. Tente novamente.",
     "signOutThisDeviceTitle": "Terminar sessão neste dispositivo?",
     "signOutThisSessionTitle": "Terminar esta sessão?",
     "signOutThisSessionMessage": "A sessão em {{device}} será terminada. Última atividade: {{lastSeen}}. O dispositivo pode manter o acesso à API durante até uma hora.",

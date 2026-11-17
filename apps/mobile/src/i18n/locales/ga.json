@@ -1435,7 +1435,8 @@
       "noReviews": "Níl aon athbhreithniú ann fós",
       "noReviewsDescription": "Beidh athbhreithnithe le feiceáil anseo nuair a dhéanfaidh an tAthbhreithneoir cóid athbhreithniú ar iarratas tarraingthe.",
       "startManualReview": "Tosaigh athbhreithniú de láimh",
-      "configureProvider": "Cumraigh soláthraí"
+      "configureProvider": "Cumraigh soláthraí",
+      "connectOwnerOnly": "Iarr ar Úinéir eagraíochta nó Riarthóir soláthraí a cheangal."
     },
     "platformList": {
       "checking": "Ag seiceáil…",
@@ -3138,6 +3139,7 @@
     "signOutThisDevice": "Sínigh amach ón ngléas seo",
     "signOutSessionLabel": "Sínigh amach ó {{device}}, síniú isteach: {{signedIn}}, feicthe go deireanach: {{lastSeen}}",
     "sessionSignedOut": "Seisiún sínithe amach.",
+    "sessionSignOutFailed": "Níorbh fhéidir síniú amach ón seisiún seo. Bain triail eile as.",
     "signOutThisDeviceTitle": "An bhfuil tú ag iarraidh síniú amach ón ngléas seo?",
     "signOutThisSessionTitle": "An bhfuil tú ag iarraidh síniú amach ón seisiún seo?",
     "signOutThisSessionMessage": "Síneofar {{device}} amach. Feicthe go deireanach: {{lastSeen}}. Is féidir leis rochtain API a choinneáil ar feadh uair an chloig ar a mhéad.",

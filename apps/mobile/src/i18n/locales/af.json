@@ -1366,7 +1366,8 @@
       "noReviews": "Nog geen hersienings nie",
       "noReviewsDescription": "Hersienings verskyn hier sodra die Kodehersiener 'n trekversoek hersien.",
       "startManualReview": "Begin 'n handmatige hersiening",
-      "configureProvider": "Stel verskaffer op"
+      "configureProvider": "Stel verskaffer op",
+      "connectOwnerOnly": "Vra 'n organisasie-eienaar of administrateur om 'n verskaffer te koppel."
     },
     "platformList": {
       "checking": "Besig om na te gaan…",
@@ -2974,6 +2975,7 @@
     "signOutThisDevice": "Teken hierdie toestel uit",
     "signOutSessionLabel": "Teken {{device}} uit, ingeteken {{signedIn}}, laas gesien {{lastSeen}}",
     "sessionSignedOut": "Sessie uitgeteken.",
+    "sessionSignOutFailed": "Kon nie hierdie sessie uitteken nie. Probeer weer.",
     "signOutThisDeviceTitle": "Hierdie toestel uitteken?",
     "signOutThisSessionTitle": "Hierdie sessie uitteken?",
     "signOutThisSessionMessage": "{{device}} sal uitgeteken word. Laas gesien {{lastSeen}}. Dit kan nog tot 'n uur lank API-toegang behou.",

@@ -1366,7 +1366,8 @@
       "noReviews": "Ülevaatusi pole veel",
       "noReviewsDescription": "Ülevaatused ilmuvad siia pärast seda, kui koodiülevaataja on tõmbetaotluse üle vaadanud.",
       "startManualReview": "Käivita ülevaatus käsitsi",
-      "configureProvider": "Seadista teenusepakkuja"
+      "configureProvider": "Seadista teenusepakkuja",
+      "connectOwnerOnly": "Palu organisatsiooni omanikul või administraatoril teenusepakkuja ühendada."
     },
     "platformList": {
       "checking": "Kontrollimine…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "Logi sellest seadmest välja",
     "signOutSessionLabel": "Logi seadmest {{device}} välja, sisse logitud {{signedIn}}, viimati nähtud {{lastSeen}}",
     "sessionSignedOut": "Seansist on välja logitud.",
+    "sessionSignOutFailed": "Sellest seansist ei saanud välja logida. Proovi uuesti.",
     "signOutThisDeviceTitle": "Kas logida sellest seadmest välja?",
     "signOutThisSessionTitle": "Kas logida sellest seansist välja?",
     "signOutThisSessionMessage": "{{device}} logitakse välja. Viimati nähtud {{lastSeen}}. Seadme juurdepääs API-le võib säilida veel kuni tund aega.",

@@ -1435,7 +1435,8 @@
       "noReviews": "S'issa l-ebda reviżjoni",
       "noReviewsDescription": "Ir-reviżjonijiet jidhru hawn wara li r-reviżur tal-kodiċi jirrevedi PR.",
       "startManualReview": "Ibda reviżjoni manwali",
-      "configureProvider": "Ikkonfigura l-fornitur"
+      "configureProvider": "Ikkonfigura l-fornitur",
+      "connectOwnerOnly": "Itlob lis-sid ta' organizzazzjoni jew lill-amministratur biex jikkonnettja fornitur."
     },
     "platformList": {
       "checking": "Qed jiġi ċċekkjat…",
@@ -3139,6 +3140,7 @@
     "signOutThisDevice": "Oħroġ mill-kont fuq dan l-apparat",
     "signOutSessionLabel": "Oħroġ mill-kont fuq {{device}}, dħul: {{signedIn}}, l-aħħar attività: {{lastSeen}}",
     "sessionSignedOut": "Il-ħruġ mill-kont f'din is-sessjoni tlesta.",
+    "sessionSignOutFailed": "Il-ħruġ mill-kont f'din is-sessjoni ma rnexxiex. Erġa' pprova.",
     "signOutThisDeviceTitle": "Toħroġ mill-kont fuq dan l-apparat?",
     "signOutThisSessionTitle": "Toħroġ mill-kont f'din is-sessjoni?",
     "signOutThisSessionMessage": "Se toħroġ mill-kont fuq {{device}}. L-aħħar attività: {{lastSeen}}. L-apparat jista' jibqa' jaċċessa l-API sa siegħa.",

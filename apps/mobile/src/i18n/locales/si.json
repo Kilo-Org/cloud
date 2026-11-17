@@ -1366,7 +1366,8 @@
       "noReviews": "තවම සමාලෝචන නොමැත",
       "noReviewsDescription": "කේත සමාලෝචකයා PR එකක් සමාලෝචනය කළ පසු එම සමාලෝචන මෙහි දිස් වේ.",
       "startManualReview": "ඔබම සමාලෝචනයක් ආරම්භ කරන්න",
-      "configureProvider": "සැපයුම්කරුගේ සැකසුම් සකසන්න"
+      "configureProvider": "සැපයුම්කරුගේ සැකසුම් සකසන්න",
+      "connectOwnerOnly": "සැපයුම්කරු සම්බන්ධ කරන ලෙස සංවිධානයේ හිමිකරු හෝ පරිපාලකගෙන් ඉල්ලන්න."
     },
     "platformList": {
       "checking": "පරීක්ෂා කරමින්…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "මෙම උපාංගයෙන් පිටවන්න",
     "signOutSessionLabel": "{{device}} උපාංගයෙන් පිටවන්න, පුරනය වූයේ {{signedIn}}, අවසන් වරට සක්‍රීය වූයේ {{lastSeen}}",
     "sessionSignedOut": "සැසියෙන් පිටව ඇත.",
+    "sessionSignOutFailed": "මෙම සැසියෙන් පිටවීමට නොහැකි විය. නැවත උත්සාහ කරන්න.",
     "signOutThisDeviceTitle": "මෙම උපාංගයෙන් පිටවන්නද?",
     "signOutThisSessionTitle": "මෙම සැසියෙන් පිටවන්නද?",
     "signOutThisSessionMessage": "{{device}} උපාංගයේ ගිණුමෙන් පිටවනු ඇත. අවසන් වරට සක්‍රීය වූයේ {{lastSeen}}. එයට තවත් පැයක් දක්වා API ප්‍රවේශය තිබිය හැක.",

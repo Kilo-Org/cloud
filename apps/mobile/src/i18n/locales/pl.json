@@ -777,6 +777,7 @@
     },
     "reviewList": {
       "configureProvider": "Skonfiguruj dostawcę",
+      "connectOwnerOnly": "Poproś właściciela organizacji lub administratora o połączenie dostawcy.",
       "couldNotLoad": "Nie udało się wczytać przeglądów.",
       "noReviews": "Brak przeglądów",
       "noReviewsDescription": "Przeglądy pojawią się tutaj, gdy recenzent kodu przeanalizuje PR.",
@@ -2494,6 +2495,7 @@
     "signOutThisDevice": "Wyloguj to urządzenie",
     "signOutSessionLabel": "Wyloguj {{device}}, logowanie: {{signedIn}}, ostatnia aktywność: {{lastSeen}}",
     "sessionSignedOut": "Zakończono sesję logowania.",
+    "sessionSignOutFailed": "Nie udało się zakończyć tej sesji logowania. Spróbuj ponownie.",
     "signOutThisDeviceTitle": "Wylogować to urządzenie?",
     "signOutThisSessionTitle": "Zakończyć tę sesję logowania?",
     "signOutThisSessionMessage": "Urządzenie {{device}} zostanie wylogowane. Ostatnia aktywność: {{lastSeen}}. Może nadal mieć dostęp do API przez maksymalnie godzinę.",

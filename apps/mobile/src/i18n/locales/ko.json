@@ -777,6 +777,7 @@
     },
     "reviewList": {
       "configureProvider": "연결 서비스 설정",
+      "connectOwnerOnly": "조직 소유자 또는 관리자에게 서비스 연결을 요청하세요.",
       "couldNotLoad": "리뷰를 불러올 수 없습니다.",
       "noReviews": "아직 리뷰 없음",
       "noReviewsDescription": "코드 리뷰어가 풀 리퀘스트를 리뷰하면 결과가 여기에 표시됩니다.",
@@ -2430,6 +2431,7 @@
     "signOutThisDevice": "이 기기 로그아웃",
     "signOutSessionLabel": "{{device}} 기기 로그아웃, {{signedIn}}에 로그인함, 마지막 활동 {{lastSeen}}",
     "sessionSignedOut": "세션이 로그아웃되었습니다.",
+    "sessionSignOutFailed": "이 세션에서 로그아웃하지 못했습니다. 다시 시도해 주세요.",
     "signOutThisDeviceTitle": "이 기기에서 로그아웃할까요?",
     "signOutThisSessionTitle": "이 세션에서 로그아웃할까요?",
     "signOutThisSessionMessage": "{{device}} 기기에서 로그아웃됩니다. 마지막 활동 {{lastSeen}}. 로그아웃 후에도 최대 1시간 동안 API에 접근할 수 있습니다.",

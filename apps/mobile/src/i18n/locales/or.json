@@ -1366,7 +1366,8 @@
       "noReviews": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ସମୀକ୍ଷା ନାହିଁ",
       "noReviewsDescription": "କୋଡ୍ ସମୀକ୍ଷକ ଏକ ପୁଲ୍ ରିକ୍ୱେଷ୍ଟର ସମୀକ୍ଷା କରିବା ପରେ ତାହା ଏଠାରେ ଦେଖାଯାଏ।",
       "startManualReview": "ନିଜେ ଏକ ସମୀକ୍ଷା ଆରମ୍ଭ କରନ୍ତୁ",
-      "configureProvider": "ସେବା ପ୍ରଦାତାଙ୍କ ସେଟଅପ୍ କରନ୍ତୁ"
+      "configureProvider": "ସେବା ପ୍ରଦାତାଙ୍କ ସେଟଅପ୍ କରନ୍ତୁ",
+      "connectOwnerOnly": "ଏକ ସେବା ପ୍ରଦାତା ସଂଯୋଗ କରିବା ପାଇଁ ଜଣେ ସଂଗଠନ ମାଲିକ କିମ୍ବା ପ୍ରଶାସକଙ୍କୁ ଅନୁରୋଧ କରନ୍ତୁ।"
     },
     "platformList": {
       "checking": "ଯାଞ୍ଚ କରାଯାଉଛି…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "ଏହି ଡିଭାଇସରୁ ସାଇନ୍ ଆଉଟ୍ କରନ୍ତୁ",
     "signOutSessionLabel": "{{device}} ରୁ ସାଇନ୍ ଆଉଟ୍ କରନ୍ତୁ, ସାଇନ୍ ଇନ୍: {{signedIn}}, ଶେଷ ଥର ସକ୍ରିୟ: {{lastSeen}}",
     "sessionSignedOut": "ସେସନ୍ ସାଇନ୍ ଆଉଟ୍ ହେଲା।",
+    "sessionSignOutFailed": "ଏହି ସେସନରୁ ସାଇନ୍ ଆଉଟ୍ କରିପାରିଲୁ ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
     "signOutThisDeviceTitle": "ଏହି ଡିଭାଇସରୁ ସାଇନ୍ ଆଉଟ୍ କରିବେ?",
     "signOutThisSessionTitle": "ଏହି ସେସନରୁ ସାଇନ୍ ଆଉଟ୍ କରିବେ?",
     "signOutThisSessionMessage": "{{device}} ରୁ ସାଇନ୍ ଆଉଟ୍ ହେବ। ଶେଷ ଥର ସକ୍ରିୟ: {{lastSeen}}। ତଥାପି ଏହା ଏକ ଘଣ୍ଟା ପର୍ଯ୍ୟନ୍ତ API ବ୍ୟବହାର କରିପାରିବ।",

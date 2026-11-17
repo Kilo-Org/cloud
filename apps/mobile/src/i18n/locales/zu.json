@@ -1366,7 +1366,8 @@
       "noReviews": "Akukho ukuhlolwa okwamanje",
       "noReviewsDescription": "Ukuhlolwa kuvela lapha ngemva kokuba umhloli wekhodi esebenze esicelweni sokuhlanganisa ikhodi.",
       "startManualReview": "Qalisa ukuhlola ngokwakho",
-      "configureProvider": "Setha umhlinzeki"
+      "configureProvider": "Setha umhlinzeki",
+      "connectOwnerOnly": "Cela umnikazi noma umlawuli wenhlangano ukuxhuma umhlinzeki."
     },
     "platformList": {
       "checking": "Kuyahlolwa…",
@@ -2974,6 +2975,7 @@
     "signOutThisDevice": "Phuma ngemvume kule divayisi",
     "signOutSessionLabel": "Phuma ngemvume ku-{{device}}, kungene ngemvume: {{signedIn}}, kugcine ukubonwa: {{lastSeen}}",
     "sessionSignedOut": "Iseshini ikhishiwe ku-akhawunti.",
+    "sessionSignOutFailed": "Akwenzekanga ukuphuma ngemvume kule seshini. Zama futhi.",
     "signOutThisDeviceTitle": "Uyafuna ukuphuma ngemvume kule divayisi?",
     "signOutThisSessionTitle": "Uyafuna ukuphuma ngemvume kule seshini?",
     "signOutThisSessionMessage": "{{device}} izokhishwa ku-akhawunti. Kugcine ukubonwa: {{lastSeen}}. Isengafinyelela ku-API isikhathi esifinyelela ehoreni elilodwa.",

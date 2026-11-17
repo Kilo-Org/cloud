@@ -1366,7 +1366,8 @@
       "noReviews": "Belum ada semakan",
       "noReviewsDescription": "Semakan muncul di sini selepas Penyemak Kod menyemak permintaan penarikan.",
       "startManualReview": "Mulakan semakan manual",
-      "configureProvider": "Konfigurasikan penyedia"
+      "configureProvider": "Konfigurasikan penyedia",
+      "connectOwnerOnly": "Minta pemilik organisasi atau pentadbir untuk menyambungkan penyedia."
     },
     "platformList": {
       "checking": "Menyemak…",
@@ -2974,6 +2975,7 @@
     "signOutThisDevice": "Log keluar daripada peranti ini",
     "signOutSessionLabel": "Log keluar daripada {{device}}, log masuk {{signedIn}}, terakhir dilihat {{lastSeen}}",
     "sessionSignedOut": "Sesi dilog keluar.",
+    "sessionSignOutFailed": "Tidak dapat log keluar daripada sesi ini. Cuba lagi.",
     "signOutThisDeviceTitle": "Log keluar daripada peranti ini?",
     "signOutThisSessionTitle": "Log keluar daripada sesi ini?",
     "signOutThisSessionMessage": "{{device}} akan dilog keluar. Terakhir dilihat {{lastSeen}}. Ia boleh mengekalkan akses API sehingga satu jam.",

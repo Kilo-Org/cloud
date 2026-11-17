@@ -1366,7 +1366,8 @@
       "noReviews": "Kò sí àtúnyẹ̀wò síbẹ̀",
       "noReviewsDescription": "Àwọn àtúnyẹ̀wò yóò hàn níbí lẹ́yìn tí Olùṣàtúnyẹ̀wò kóòdù bá ṣiṣẹ́ lórí ìbéèrè àkópọ̀.",
       "startManualReview": "Bẹ̀rẹ̀ àtúnyẹ̀wò fúnra rẹ",
-      "configureProvider": "Ṣètò olùpèsè"
+      "configureProvider": "Ṣètò olùpèsè",
+      "connectOwnerOnly": "Ẹ bẹ̀ Ẹni tó ni àjọ tàbí Alákòóso kí wọ́n so olùpèsè kan pọ̀."
     },
     "platformList": {
       "checking": "A ń ṣàyẹ̀wò…",
@@ -2974,6 +2975,7 @@
     "signOutThisDevice": "Jáde lórí ẹ̀rọ yìí",
     "signOutSessionLabel": "Jáde lórí {{device}}, wọlé {{signedIn}}, a rí i gbẹ̀yìn {{lastSeen}}",
     "sessionSignedOut": "A ti jáde kúrò nínú ìgbà ìwọlé náà.",
+    "sessionSignOutFailed": "A kò lè jáde kúrò nínú ìgbà ìwọlé yìí. Tún gbìyànjú.",
     "signOutThisDeviceTitle": "Jáde lórí ẹ̀rọ yìí?",
     "signOutThisSessionTitle": "Jáde kúrò nínú ìgbà ìwọlé yìí?",
     "signOutThisSessionMessage": "A ó mú {{device}} jáde. A rí i gbẹ̀yìn {{lastSeen}}. Ẹ̀rọ náà ṣì lè lo API fún àkókò tó tó wákàtí kan.",

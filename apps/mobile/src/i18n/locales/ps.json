@@ -1366,7 +1366,8 @@
       "noReviews": "تر اوسه هېڅ بیاکتنه نشته",
       "noReviewsDescription": "کله چې د کوډ بیاکتونکی د یو پل ریکویسټ بیاکتنه وکړي، بیاکتنې به دلته ښکاره شي.",
       "startManualReview": "لاسي بیاکتنه پیل کړئ",
-      "configureProvider": "د خدمت چمتو کوونکی تنظیم کړئ"
+      "configureProvider": "د خدمت چمتو کوونکی تنظیم کړئ",
+      "connectOwnerOnly": "له یو سازمان مالک یا مدیر څخه وغواړئ چې یو خدمت چمتو کوونکی ونښلوي."
     },
     "platformList": {
       "checking": "کتل کېږي…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "له دې وسیلې ووځئ",
     "signOutSessionLabel": "له {{device}} ووځئ، د ننوتلو وخت: {{signedIn}}، وروستی لیدل شوی وخت: {{lastSeen}}",
     "sessionSignedOut": "له ناستې ووتل شو.",
+    "sessionSignOutFailed": "له دې ناستې ووتل ونه شول، بیا هڅه وکړئ.",
     "signOutThisDeviceTitle": "له دې وسیلې حساب وباسم؟",
     "signOutThisSessionTitle": "له دې ناستې ووځم؟",
     "signOutThisSessionMessage": "حساب به له {{device}} څخه وایستل شي. وروستی لیدل شوی وخت: {{lastSeen}}. وسیله تر یوه ساعت پورې API ته لاسرسی ساتلی شي.",

@@ -1366,7 +1366,8 @@
       "noReviews": "Әзірге тексерулер жоқ",
       "noReviewsDescription": "Код тексерушісі біріктіру сұрауын тексергеннен кейін нәтижесі осында көрсетіледі.",
       "startManualReview": "Қолмен тексеруді бастау",
-      "configureProvider": "Провайдерді баптау"
+      "configureProvider": "Провайдерді баптау",
+      "connectOwnerOnly": "Провайдерді қосу үшін ұйым иесіне немесе әкімшісіне жүгініңіз."
     },
     "platformList": {
       "checking": "Тексерілуде…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "Бұл құрылғыдан шығу",
     "signOutSessionLabel": "{{device}} құрылғысынан шығу, кірген уақыты: {{signedIn}}, соңғы белсенділігі: {{lastSeen}}",
     "sessionSignedOut": "Сессия аяқталды.",
+    "sessionSignOutFailed": "Бұл сессиядан шығу мүмкін болмады. Қайталап көріңіз.",
     "signOutThisDeviceTitle": "Бұл құрылғыдан шығасыз ба?",
     "signOutThisSessionTitle": "Бұл сессиядан шығасыз ба?",
     "signOutThisSessionMessage": "{{device}} сессиясы аяқталады. Соңғы белсенділігі: {{lastSeen}}. Құрылғы API қызметіне тағы бір сағатқа дейін қол жеткізе алады.",

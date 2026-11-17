@@ -777,6 +777,7 @@
     },
     "reviewList": {
       "configureProvider": "प्रदाता कॉन्फ़िगर करें",
+      "connectOwnerOnly": "संगठन के मालिक या एडमिन से प्रदाता कनेक्ट करने का अनुरोध करें।",
       "couldNotLoad": "समीक्षाएँ लोड नहीं हो सकीं।",
       "noReviews": "अभी कोई समीक्षा नहीं",
       "noReviewsDescription": "कोड समीक्षक के किसी पुल रिक्वेस्ट की समीक्षा करने के बाद समीक्षाएँ यहाँ दिखाई देंगी।",
@@ -2430,6 +2431,7 @@
     "signOutThisDevice": "इस डिवाइस से साइन आउट करें",
     "signOutSessionLabel": "{{device}} से साइन आउट करें, साइन इन: {{signedIn}}, आखिरी बार सक्रिय: {{lastSeen}}",
     "sessionSignedOut": "इस सत्र से साइन आउट हो गया।",
+    "sessionSignOutFailed": "इस सत्र से साइन आउट नहीं हो सका। फिर से कोशिश करें।",
     "signOutThisDeviceTitle": "इस डिवाइस से साइन आउट करें?",
     "signOutThisSessionTitle": "इस सत्र से साइन आउट करें?",
     "signOutThisSessionMessage": "{{device}} से साइन आउट हो जाएगा। आखिरी बार सक्रिय: {{lastSeen}}। वह एक घंटे तक API की पहुँच बनाए रख सकता है।",

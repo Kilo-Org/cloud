@@ -777,6 +777,7 @@
     },
     "reviewList": {
       "configureProvider": "إعداد المزوّد",
+      "connectOwnerOnly": "اطلب من مالك مؤسسة أو مشرف ربط المزوّد.",
       "couldNotLoad": "تعذّر تحميل المراجعات.",
       "noReviews": "لا توجد مراجعات بعد",
       "noReviewsDescription": "تظهر المراجعات هنا بعد أن يراجع مراجع الشفرة طلب سحب.",
@@ -2559,6 +2560,7 @@
     "signOutThisDevice": "تسجيل الخروج من هذا الجهاز",
     "signOutSessionLabel": "تسجيل الخروج من {{device}}، تسجيل الدخول: {{signedIn}}، آخر ظهور: {{lastSeen}}",
     "sessionSignedOut": "تم تسجيل الخروج من الجلسة.",
+    "sessionSignOutFailed": "تعذّر تسجيل الخروج من هذه الجلسة. حاول مرة أخرى.",
     "signOutThisDeviceTitle": "تسجيل الخروج من هذا الجهاز؟",
     "signOutThisSessionTitle": "تسجيل الخروج من هذه الجلسة؟",
     "signOutThisSessionMessage": "سيتم تسجيل الخروج من {{device}}. آخر ظهور: {{lastSeen}}. قد يظل قادرًا على الوصول إلى API لمدة تصل إلى ساعة.",

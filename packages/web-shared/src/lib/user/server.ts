@@ -23,12 +23,12 @@ import { IS_DEVELOPMENT, ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib
 import { redirect } from 'next/navigation';
 import type { Organization, User } from '@kilocode/db/schema';
 import { isDeviceSessionActive } from '@kilocode/web-shared/lib/auth/device-session-cache';
-import { liveDeviceSessionCondition } from '@kilocode/web-shared/lib/auth/device-session-condition';
+import { liveDeviceSessionCondition } from '@kilocode/db/device-session-condition';
 import {
   isApiTokenPepperCurrent,
-  isOrganizationMember,
   requestOrganizationId,
 } from '@kilocode/worker-utils/account-access';
+import { hasEffectiveOrganizationAccess } from '@kilocode/worker-utils/organization-membership';
 import type { FailureResult } from '@kilocode/web-shared/lib/maybe-result';
 import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
 import { isAdminStepUpEnabled, NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
@@ -751,8 +751,16 @@ async function validateUserAuthorization({
         ...(organizationId === '' && { rejectionReason: 'empty_organization_context' }),
       });
     }
-    const isMember = await isOrganizationMember(fromDb, organizationId, kiloUserId);
-    if (!isMember) {
+    // An organization context resolves through the effective-membership rule:
+    // the caller holds a direct membership in the live organization, or a
+    // permitted role (owner, admin, billing_manager) on its live parent
+    // organization. The balance and member-allowance rules are separate and do
+    // not follow inheritance.
+    const hasAccess = await hasEffectiveOrganizationAccess(fromDb, {
+      kiloUserId,
+      organizationId,
+    });
+    if (!hasAccess) {
       return authError(403, 'Access denied (not a member of the organization)', kiloUserId, {
         authorizationRefused: true,
         internalApiUse,

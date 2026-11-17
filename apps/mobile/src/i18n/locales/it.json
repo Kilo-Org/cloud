@@ -744,6 +744,7 @@
     },
     "reviewList": {
       "configureProvider": "Configura la piattaforma",
+      "connectOwnerOnly": "Chiedi a un proprietario o a un amministratore dell'organizzazione di connettere una piattaforma.",
       "couldNotLoad": "Impossibile caricare le revisioni.",
       "noReviews": "Ancora nessuna revisione",
       "noReviewsDescription": "Le revisioni compaiono qui quando il Code Reviewer viene eseguito su una pull request.",
@@ -2462,6 +2463,7 @@
     "signOutThisDevice": "Disconnetti questo dispositivo",
     "signOutSessionLabel": "Disconnetti {{device}}, accesso effettuato {{signedIn}}, ultima attività {{lastSeen}}",
     "sessionSignedOut": "Sessione disconnessa.",
+    "sessionSignOutFailed": "Impossibile disconnettere questa sessione. Riprovi.",
     "signOutThisDeviceTitle": "Disconnettere questo dispositivo?",
     "signOutThisSessionTitle": "Disconnettere questa sessione?",
     "signOutThisSessionMessage": "{{device}} verrà disconnesso. Ultima attività {{lastSeen}}. Potrà mantenere l'accesso alle API per un massimo di un'ora.",

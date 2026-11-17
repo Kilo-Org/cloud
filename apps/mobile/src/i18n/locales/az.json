@@ -1366,7 +1366,8 @@
       "noReviews": "Hələ kod yoxlaması yoxdur",
       "noReviewsDescription": "Kod yoxlayıcısı PR-i yoxladıqdan sonra kod yoxlamaları burada görünəcək.",
       "startManualReview": "Əl ilə yoxlamaya başla",
-      "configureProvider": "Provayderi tənzimlə"
+      "configureProvider": "Provayderi tənzimlə",
+      "connectOwnerOnly": "Provayderi qoşmaq üçün təşkilat sahibindən və ya inzibatçıdan xahiş edin."
     },
     "platformList": {
       "checking": "Yoxlanılır…",
@@ -2974,6 +2975,7 @@
     "signOutThisDevice": "Bu cihazdan çıxış et",
     "signOutSessionLabel": "{{device}} cihazından çıxış et, Giriş: {{signedIn}}, Son fəaliyyət: {{lastSeen}}",
     "sessionSignedOut": "Sessiyadan çıxıldı.",
+    "sessionSignOutFailed": "Bu sessiyadan çıxış etmək mümkün olmadı. Yenidən cəhd edin.",
     "signOutThisDeviceTitle": "Bu cihazdan çıxış edilsin?",
     "signOutThisSessionTitle": "Bu sessiyadan çıxış edilsin?",
     "signOutThisSessionMessage": "{{device}} cihazındakı hesabdan çıxılacaq. Son fəaliyyət: {{lastSeen}}. Cihazın API-yə girişi bir saata qədər davam edə bilər.",

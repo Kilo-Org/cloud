@@ -1366,7 +1366,8 @@
       "noReviews": "ਅਜੇ ਕੋਈ ਸਮੀਖਿਆ ਨਹੀਂ",
       "noReviewsDescription": "ਕੋਡ ਸਮੀਖਿਅਕ ਵੱਲੋਂ ਕਿਸੇ ਪੁੱਲ ਰਿਕਵੈਸਟ ਦੀ ਸਮੀਖਿਆ ਕਰਨ ਤੋਂ ਬਾਅਦ ਸਮੀਖਿਆਵਾਂ ਇੱਥੇ ਦਿਖਾਈ ਦੇਣਗੀਆਂ।",
       "startManualReview": "ਦਸਤੀ ਸਮੀਖਿਆ ਸ਼ੁਰੂ ਕਰੋ",
-      "configureProvider": "ਪ੍ਰਦਾਤਾ ਦਾ ਸੈੱਟਅੱਪ ਕਰੋ"
+      "configureProvider": "ਪ੍ਰਦਾਤਾ ਦਾ ਸੈੱਟਅੱਪ ਕਰੋ",
+      "connectOwnerOnly": "ਕਿਸੇ ਸੰਗਠਨ ਦੇ ਮਾਲਕ ਜਾਂ ਐਡਮਿਨ ਨੂੰ ਪ੍ਰਦਾਤਾ ਕਨੈਕਟ ਕਰਨ ਲਈ ਕਹੋ।"
     },
     "platformList": {
       "checking": "ਜਾਂਚ ਕੀਤੀ ਜਾ ਰਹੀ ਹੈ…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "ਇਸ ਡਿਵਾਈਸ ਤੋਂ ਸਾਈਨ ਆਉਟ ਕਰੋ",
     "signOutSessionLabel": "{{device}} ਤੋਂ ਸਾਈਨ ਆਉਟ ਕਰੋ, ਸਾਈਨ ਇਨ ਕੀਤਾ: {{signedIn}}, ਆਖ਼ਰੀ ਵਾਰ ਵੇਖਿਆ: {{lastSeen}}",
     "sessionSignedOut": "ਸੈਸ਼ਨ ਸਾਈਨ ਆਉਟ ਹੋ ਗਿਆ।",
+    "sessionSignOutFailed": "ਇਸ ਸੈਸ਼ਨ ਤੋਂ ਸਾਈਨ ਆਉਟ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "signOutThisDeviceTitle": "ਕੀ ਇਸ ਡਿਵਾਈਸ ਤੋਂ ਸਾਈਨ ਆਉਟ ਕਰਨਾ ਹੈ?",
     "signOutThisSessionTitle": "ਕੀ ਇਸ ਸੈਸ਼ਨ ਤੋਂ ਸਾਈਨ ਆਉਟ ਕਰਨਾ ਹੈ?",
     "signOutThisSessionMessage": "{{device}} ਤੋਂ ਸਾਈਨ ਆਉਟ ਕਰ ਦਿੱਤਾ ਜਾਵੇਗਾ। ਆਖ਼ਰੀ ਵਾਰ ਵੇਖਿਆ: {{lastSeen}}। ਇਸ ਤੋਂ ਬਾਅਦ ਵੀ ਇਸ ਦੀ API ਤੱਕ ਪਹੁੰਚ ਇੱਕ ਘੰਟੇ ਤੱਕ ਬਣੀ ਰਹਿ ਸਕਦੀ ਹੈ।",

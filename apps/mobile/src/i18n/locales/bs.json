@@ -1389,7 +1389,8 @@
       "noReviews": "Još nema pregleda",
       "noReviewsDescription": "Pregledi se pojavljuju ovdje nakon što agent za pregled koda obradi zahtjev za spajanje.",
       "startManualReview": "Započni ručni pregled",
-      "configureProvider": "Podesi platformu"
+      "configureProvider": "Podesi platformu",
+      "connectOwnerOnly": "Zamolite vlasnika organizacije ili administratora da je poveže."
     },
     "platformList": {
       "checking": "Provjera…",
@@ -3029,6 +3030,7 @@
     "signOutThisDevice": "Odjavi ovaj uređaj",
     "signOutSessionLabel": "Odjavi uređaj {{device}}, prijava: {{signedIn}}, posljednja aktivnost: {{lastSeen}}",
     "sessionSignedOut": "Sesija odjavljena.",
+    "sessionSignOutFailed": "Nije moguće odjaviti ovu sesiju. Pokušajte ponovo.",
     "signOutThisDeviceTitle": "Odjaviti ovaj uređaj?",
     "signOutThisSessionTitle": "Odjaviti ovu sesiju?",
     "signOutThisSessionMessage": "Uređaj {{device}} bit će odjavljen. Posljednja aktivnost: {{lastSeen}}. Može zadržati pristup API-ju još najviše sat vremena.",

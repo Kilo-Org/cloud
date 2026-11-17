@@ -744,6 +744,7 @@
     },
     "reviewList": {
       "configureProvider": "Configurar provedor",
+      "connectOwnerOnly": "Peça a um proprietário ou administrador da organização para conectar um provedor.",
       "couldNotLoad": "Não foi possível carregar as revisões.",
       "noReviews": "Ainda não há revisões",
       "noReviewsDescription": "As revisões aparecem aqui quando o revisor de código analisa um PR.",
@@ -2468,6 +2469,7 @@
     "signOutThisDevice": "Sair deste dispositivo",
     "signOutSessionLabel": "Sair de {{device}}, entrada: {{signedIn}}, último acesso: {{lastSeen}}",
     "sessionSignedOut": "Sessão encerrada.",
+    "sessionSignOutFailed": "Não foi possível encerrar esta sessão. Tente novamente.",
     "signOutThisDeviceTitle": "Sair deste dispositivo?",
     "signOutThisSessionTitle": "Encerrar esta sessão?",
     "signOutThisSessionMessage": "{{device}} será desconectado. Último acesso: {{lastSeen}}. Ele pode manter o acesso à API por até uma hora.",

@@ -1412,7 +1412,8 @@
       "noReviews": "Peržiūrų dar nėra",
       "noReviewsDescription": "Peržiūros bus rodomos čia, kai kodo peržiūros agentas peržiūrės PR.",
       "startManualReview": "Pradėti rankinę peržiūrą",
-      "configureProvider": "Konfigūruoti paslaugų teikėją"
+      "configureProvider": "Konfigūruoti paslaugų teikėją",
+      "connectOwnerOnly": "Paprašykite organizacijos savininko ar administratoriaus prijungti paslaugų teikėją."
     },
     "platformList": {
       "checking": "Tikrinama…",
@@ -3083,6 +3084,7 @@
     "signOutThisDevice": "Atsijungti šiame įrenginyje",
     "signOutSessionLabel": "Atsijungti „{{device}}“, prisijungta {{signedIn}}, paskutinė veikla {{lastSeen}}",
     "sessionSignedOut": "Sesija baigta.",
+    "sessionSignOutFailed": "Nepavyko baigti šios sesijos. Bandykite dar kartą.",
     "signOutThisDeviceTitle": "Atsijungti šiame įrenginyje?",
     "signOutThisSessionTitle": "Baigti šią sesiją?",
     "signOutThisSessionMessage": "Nuo paskyros bus atsijungta: {{device}}. Paskutinė veikla {{lastSeen}}. Prieiga prie API gali galioti dar iki valandos.",

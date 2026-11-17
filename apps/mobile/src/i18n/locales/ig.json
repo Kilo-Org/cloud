@@ -1366,7 +1366,8 @@
       "noReviews": "Enwebeghị nyocha",
       "noReviewsDescription": "Nyocha na-apụta ebe a mgbe onye nyocha koodu nyochachara arịrịọ ijikọ koodu.",
       "startManualReview": "Jiri aka malite nyocha",
-      "configureProvider": "Hazie onye na-enye ọrụ"
+      "configureProvider": "Hazie onye na-enye ọrụ",
+      "connectOwnerOnly": "Rịọ onye nwe nzukọ ma ọ bụ onye nchịkwa ka ha jikọọ onye na-enye ọrụ."
     },
     "platformList": {
       "checking": "Na-enyocha…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "Pụọ na ngwaọrụ a",
     "signOutSessionLabel": "Pụọ na {{device}}, a banyere na {{signedIn}}, a hụrụ ikpeazụ na {{lastSeen}}",
     "sessionSignedOut": "Apụrụ na nnọkọ ahụ.",
+    "sessionSignOutFailed": "Enweghị ike ịpụ na nnọkọ a. Nwaa ọzọ.",
     "signOutThisDeviceTitle": "Pụọ na ngwaọrụ a?",
     "signOutThisSessionTitle": "Pụọ na nnọkọ a?",
     "signOutThisSessionMessage": "A ga-eme ka {{device}} pụọ. A hụrụ ikpeazụ na {{lastSeen}}. Ọ ka nwere ike ịnweta API ruo otu awa.",

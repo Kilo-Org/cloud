@@ -1412,7 +1412,8 @@
       "noReviews": "Пакуль няма праверак",
       "noReviewsDescription": "Праверкі з'явяцца тут пасля таго, як агент праверкі кода праверыць запыт на зліццё.",
       "startManualReview": "Пачаць ручную праверку",
-      "configureProvider": "Наладзіць платформу"
+      "configureProvider": "Наладзіць платформу",
+      "connectOwnerOnly": "Папрасіце ўладальніка арганізацыі або адміністратара падключыць платформу."
     },
     "platformList": {
       "checking": "Праверка…",
@@ -3084,6 +3085,7 @@
     "signOutThisDevice": "Выйсці з уліковага запісу на гэтай прыладзе",
     "signOutSessionLabel": "Выйсці з прылады {{device}}, Уваход: {{signedIn}}, Апошняя актыўнасць: {{lastSeen}}",
     "sessionSignedOut": "Сеанс завершаны.",
+    "sessionSignOutFailed": "Не ўдалося завяршыць гэты сеанс. Паспрабуйце яшчэ раз.",
     "signOutThisDeviceTitle": "Выйсці з уліковага запісу на гэтай прыладзе?",
     "signOutThisSessionTitle": "Завяршыць гэты сеанс?",
     "signOutThisSessionMessage": "Сеанс на прыладзе {{device}} будзе завершаны. Апошняя актыўнасць: {{lastSeen}}. Доступ да API можа захоўвацца яшчэ да гадзіны.",

@@ -777,6 +777,7 @@
     },
     "reviewList": {
       "configureProvider": "Налаштувати сервіс",
+      "connectOwnerOnly": "Попросіть власника організації або адміністратора підключити сервіс.",
       "couldNotLoad": "Не вдалося завантажити перевірки.",
       "noReviews": "Перевірок ще немає",
       "noReviewsDescription": "Перевірки з'являться тут після запуску перевірки коду для запиту на злиття.",
@@ -2495,6 +2496,7 @@
     "signOutThisDevice": "Вийти на цьому пристрої",
     "signOutSessionLabel": "Вийти на пристрої {{device}}, вхід: {{signedIn}}, остання активність: {{lastSeen}}",
     "sessionSignedOut": "Сеанс завершено.",
+    "sessionSignOutFailed": "Не вдалося завершити цей сеанс. Спробуйте ще раз.",
     "signOutThisDeviceTitle": "Вийти на цьому пристрої?",
     "signOutThisSessionTitle": "Завершити цей сеанс?",
     "signOutThisSessionMessage": "Сеанс входу на пристрої {{device}} завершиться. Остання активність: {{lastSeen}}. Доступ до API може зберігатися ще протягом години.",

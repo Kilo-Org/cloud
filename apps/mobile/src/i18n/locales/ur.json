@@ -1366,7 +1366,8 @@
       "noReviews": "ابھی کوئی جائزہ نہیں",
       "noReviewsDescription": "جب کوڈ ریویور کسی پل ریکویسٹ کا جائزہ لے گا تو وہ یہاں ظاہر ہو گا۔",
       "startManualReview": "دستی جائزہ شروع کریں",
-      "configureProvider": "فراہم کنندہ کی ترتیبات طے کریں"
+      "configureProvider": "فراہم کنندہ کی ترتیبات طے کریں",
+      "connectOwnerOnly": "ادارے کے کسی مالک یا منتظم سے فراہم کنندہ کو منسلک کرنے کی درخواست کریں۔"
     },
     "platformList": {
       "checking": "جانچ ہو رہی ہے…",
@@ -2974,6 +2975,7 @@
     "signOutThisDevice": "اس ڈیوائس سے سائن آؤٹ کریں",
     "signOutSessionLabel": "{{device}} سے سائن آؤٹ کریں، سائن ان: {{signedIn}}، آخری سرگرمی: {{lastSeen}}",
     "sessionSignedOut": "سیشن سائن آؤٹ ہو گیا۔",
+    "sessionSignOutFailed": "اس سیشن سے سائن آؤٹ نہیں ہو سکا۔ دوبارہ کوشش کریں۔",
     "signOutThisDeviceTitle": "اس ڈیوائس سے سائن آؤٹ کریں؟",
     "signOutThisSessionTitle": "اس سیشن سے سائن آؤٹ کریں؟",
     "signOutThisSessionMessage": "{{device}} سے سائن آؤٹ ہو جائے گا۔ آخری سرگرمی: {{lastSeen}}۔ اس کی API تک رسائی مزید ایک گھنٹے تک برقرار رہ سکتی ہے۔",

@@ -1366,7 +1366,8 @@
       "noReviews": "Wala pang pagsusuri",
       "noReviewsDescription": "Lalabas dito ang mga pagsusuri kapag nagsuri na ng pull request ang Code Reviewer.",
       "startManualReview": "Magsimula ng manu-manong pagsusuri",
-      "configureProvider": "Isaayos ang provider"
+      "configureProvider": "Isaayos ang provider",
+      "connectOwnerOnly": "Hilingin sa isang may-ari ng organisasyon o admin na ikonekta ang isang provider."
     },
     "platformList": {
       "checking": "Sinusuri…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "I-sign out ang device na ito",
     "signOutSessionLabel": "I-sign out ang {{device}}, nag-sign in: {{signedIn}}, huling nakita: {{lastSeen}}",
     "sessionSignedOut": "Na-sign out ang sesyon.",
+    "sessionSignOutFailed": "Hindi ma-sign out ang sesyong ito. Subukan muli.",
     "signOutThisDeviceTitle": "I-sign out ang device na ito?",
     "signOutThisSessionTitle": "I-sign out ang sesyong ito?",
     "signOutThisSessionMessage": "Masa-sign out ang {{device}}. Huling nakita: {{lastSeen}}. Maaari pa rin nitong ma-access ang API nang hanggang isang oras.",

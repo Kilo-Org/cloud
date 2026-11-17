@@ -1389,7 +1389,8 @@
       "noReviews": "Încă nu există revizuiri",
       "noReviewsDescription": "Revizuirile apar aici după ce agentul de revizuire a codului analizează un PR.",
       "startManualReview": "Începe o revizuire manuală",
-      "configureProvider": "Configurează furnizorul"
+      "configureProvider": "Configurează furnizorul",
+      "connectOwnerOnly": "Cere unui proprietar de organizație sau unui administrator să conecteze un furnizor."
     },
     "platformList": {
       "checking": "Se verifică…",
@@ -3028,6 +3029,7 @@
     "signOutThisDevice": "Deconectează acest dispozitiv",
     "signOutSessionLabel": "Deconectează {{device}}, autentificare: {{signedIn}}, ultima activitate: {{lastSeen}}",
     "sessionSignedOut": "Sesiune deconectată.",
+    "sessionSignOutFailed": "Nu s-a putut deconecta această sesiune. Încearcă din nou.",
     "signOutThisDeviceTitle": "Deconectezi acest dispozitiv?",
     "signOutThisSessionTitle": "Deconectezi această sesiune?",
     "signOutThisSessionMessage": "{{device}} va fi deconectat. Ultima activitate: {{lastSeen}}. Accesul la API poate rămâne activ încă cel mult o oră.",

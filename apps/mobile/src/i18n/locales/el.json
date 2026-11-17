@@ -1366,7 +1366,8 @@
       "noReviews": "Κανένας έλεγχος ακόμη",
       "noReviewsDescription": "Οι έλεγχοι εμφανίζονται εδώ μόλις ο ελεγκτής κώδικα εκτελεστεί σε ένα PR.",
       "startManualReview": "Έναρξη χειροκίνητου ελέγχου",
-      "configureProvider": "Ρύθμιση παρόχου"
+      "configureProvider": "Ρύθμιση παρόχου",
+      "connectOwnerOnly": "Ζήτησε από έναν κάτοχο ή διαχειριστή του οργανισμού να συνδέσει έναν πάροχο."
     },
     "platformList": {
       "checking": "Έλεγχος…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "Αποσύνδεση από αυτή τη συσκευή",
     "signOutSessionLabel": "Αποσύνδεση από το {{device}}, σύνδεση: {{signedIn}}, τελευταία δραστηριότητα: {{lastSeen}}",
     "sessionSignedOut": "Η συνεδρία αποσυνδέθηκε.",
+    "sessionSignOutFailed": "Δεν ήταν δυνατή η αποσύνδεση από αυτή τη συνεδρία. Δοκιμάστε ξανά.",
     "signOutThisDeviceTitle": "Αποσύνδεση από αυτή τη συσκευή;",
     "signOutThisSessionTitle": "Αποσύνδεση από αυτή τη συνεδρία;",
     "signOutThisSessionMessage": "Η συσκευή {{device}} θα αποσυνδεθεί. Τελευταία δραστηριότητα: {{lastSeen}}. Μπορεί να διατηρήσει την πρόσβαση στο API για έως και μία ώρα.",

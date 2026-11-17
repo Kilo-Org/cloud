@@ -1366,7 +1366,8 @@
       "noReviews": "Inga granskningar ännu",
       "noReviewsDescription": "Granskningar visas här när Code Reviewer har granskat en pull-begäran.",
       "startManualReview": "Starta en manuell granskning",
-      "configureProvider": "Konfigurera leverantör"
+      "configureProvider": "Konfigurera leverantör",
+      "connectOwnerOnly": "Be en organisationsägare eller administratör att ansluta en leverantör."
     },
     "platformList": {
       "checking": "Kontrollerar…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "Logga ut från den här enheten",
     "signOutSessionLabel": "Logga ut från {{device}}, inloggad {{signedIn}}, senast aktiv {{lastSeen}}",
     "sessionSignedOut": "Sessionen är utloggad.",
+    "sessionSignOutFailed": "Det gick inte att logga ut den här sessionen. Försök igen.",
     "signOutThisDeviceTitle": "Logga ut från den här enheten?",
     "signOutThisSessionTitle": "Logga ut den här sessionen?",
     "signOutThisSessionMessage": "{{device}} loggas ut. Senast aktiv {{lastSeen}}. Den kan behålla API-åtkomst i upp till en timme.",

@@ -777,6 +777,7 @@
     },
     "reviewList": {
       "configureProvider": "הגדרת ספק",
+      "connectOwnerOnly": "בקש מבעלים של הארגון או מנהל לחבר ספק.",
       "couldNotLoad": "לא ניתן לטעון את הסקירות.",
       "noReviews": "אין עדיין סקירות",
       "noReviewsDescription": "סקירות יופיעו כאן לאחר שסוקר הקוד יסקור בקשת משיכה.",
@@ -2462,6 +2463,7 @@
     "signOutThisDevice": "ניתוק המכשיר הזה מהחשבון",
     "signOutSessionLabel": "ניתוק {{device}} מהחשבון, מועד הכניסה: {{signedIn}}, פעילות אחרונה: {{lastSeen}}",
     "sessionSignedOut": "החיבור נותק.",
+    "sessionSignOutFailed": "לא ניתן לנתק את החיבור הזה. נסו שוב.",
     "signOutThisDeviceTitle": "להתנתק מהמכשיר הזה?",
     "signOutThisSessionTitle": "לנתק את החיבור הזה?",
     "signOutThisSessionMessage": "{{device}} ינותק מהחשבון. פעילות אחרונה: {{lastSeen}}. הגישה שלו ל-API יכולה להישאר פעילה למשך עד שעה.",

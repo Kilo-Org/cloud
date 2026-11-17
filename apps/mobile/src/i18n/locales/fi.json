@@ -1366,7 +1366,8 @@
       "noReviews": "Ei vielä katselmointeja",
       "noReviewsDescription": "Katselmoinnit näkyvät tässä, kun koodikatselmoija on katselmoinut muutospyynnön.",
       "startManualReview": "Aloita manuaalinen katselmointi",
-      "configureProvider": "Määritä palveluntarjoaja"
+      "configureProvider": "Määritä palveluntarjoaja",
+      "connectOwnerOnly": "Pyydä organisaation omistajaa tai ylläpitäjää yhdistämään palveluntarjoajan."
     },
     "platformList": {
       "checking": "Tarkistetaan…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "Kirjaa tämä laite ulos",
     "signOutSessionLabel": "Kirjaa {{device}} ulos, kirjautunut {{signedIn}}, viimeksi käytössä {{lastSeen}}",
     "sessionSignedOut": "Istunto kirjattiin ulos.",
+    "sessionSignOutFailed": "Istuntoa ei voitu kirjata ulos. Yritä uudelleen.",
     "signOutThisDeviceTitle": "Kirjataanko tämä laite ulos?",
     "signOutThisSessionTitle": "Kirjataanko tämä istunto ulos?",
     "signOutThisSessionMessage": "{{device}} kirjataan ulos. Viimeksi käytössä {{lastSeen}}. Sen API-käyttöoikeus voi säilyä vielä tunnin ajan.",

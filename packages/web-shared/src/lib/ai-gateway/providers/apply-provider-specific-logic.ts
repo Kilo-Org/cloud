@@ -425,11 +425,12 @@ export async function applyProviderSpecificLogic(
   if (provider.type === 'vercel') {
     // A user's own Vercel AI Gateway key is shaped like a managed request: the
     // user's account pays and the provider routing settings still apply.
+    // The inference region pins only a route Kilo pays for; a user's own key is exempt.
     await applyVercelSettings(
       requestedModel,
       requestToMutate,
       usesUserGatewayKey ? null : userByok,
-      dataRegion
+      userByok === null ? dataRegion : null
     );
   }
 

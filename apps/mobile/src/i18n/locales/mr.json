@@ -1366,7 +1366,8 @@
       "noReviews": "अद्याप कोणतेही पुनरावलोकन नाही",
       "noReviewsDescription": "कोड पुनरावलोककाने पुल रिक्वेस्टचे पुनरावलोकन केल्यानंतर ते येथे दिसेल.",
       "startManualReview": "पुनरावलोकन स्वतः सुरू करा",
-      "configureProvider": "सेवा पुरवठादाराच्या सेटिंग्ज ठरवा"
+      "configureProvider": "सेवा पुरवठादाराच्या सेटिंग्ज ठरवा",
+      "connectOwnerOnly": "संस्थेच्या मालक किंवा प्रशासकाला सेवा पुरवठादार जोडण्यास सांगा."
     },
     "platformList": {
       "checking": "तपासत आहे…",
@@ -2974,6 +2975,7 @@
     "signOutThisDevice": "या डिव्हाइसवरून साइन आउट करा",
     "signOutSessionLabel": "{{device}} वरून साइन आउट करा, साइन इन: {{signedIn}}, शेवटचे सक्रिय: {{lastSeen}}",
     "sessionSignedOut": "सत्र साइन आउट झाले.",
+    "sessionSignOutFailed": "या सत्रातून साइन आउट करता आले नाही. पुन्हा प्रयत्न करा.",
     "signOutThisDeviceTitle": "या डिव्हाइसवरून साइन आउट करायचे?",
     "signOutThisSessionTitle": "या सत्रातून साइन आउट करायचे?",
     "signOutThisSessionMessage": "{{device}} वरून साइन आउट केले जाईल. शेवटचे सक्रिय: {{lastSeen}}. मात्र, त्याचा API प्रवेश आणखी एक तासापर्यंत चालू राहू शकतो.",

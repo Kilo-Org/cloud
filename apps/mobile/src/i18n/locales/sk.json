@@ -1412,7 +1412,8 @@
       "noReviews": "Zatiaľ žiadne kontroly",
       "noReviewsDescription": "Kontroly sa tu zobrazia, keď kontrolór kódu skontroluje PR.",
       "startManualReview": "Spustiť manuálnu kontrolu",
-      "configureProvider": "Nastaviť poskytovateľa"
+      "configureProvider": "Nastaviť poskytovateľa",
+      "connectOwnerOnly": "Požiadajte vlastníka organizácie alebo správcu, aby pripojil poskytovateľa."
     },
     "platformList": {
       "checking": "Kontroluje sa…",
@@ -3083,6 +3084,7 @@
     "signOutThisDevice": "Odhlásiť toto zariadenie",
     "signOutSessionLabel": "Odhlásiť zariadenie {{device}}, prihlásenie: {{signedIn}}, posledná aktivita: {{lastSeen}}",
     "sessionSignedOut": "Relácia bola odhlásená.",
+    "sessionSignOutFailed": "Reláciu nebolo možné odhlásiť. Skúste to znova.",
     "signOutThisDeviceTitle": "Odhlásiť toto zariadenie?",
     "signOutThisSessionTitle": "Odhlásiť túto reláciu?",
     "signOutThisSessionMessage": "Zariadenie {{device}} sa odhlási. Posledná aktivita: {{lastSeen}}. Prístup k API mu môže zostať ešte hodinu.",

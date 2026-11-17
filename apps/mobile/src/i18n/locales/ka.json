@@ -1366,7 +1366,8 @@
       "noReviews": "შემოწმებები ჯერ არ არის",
       "noReviewsDescription": "შემოწმებები აქ გამოჩნდება მას შემდეგ, რაც კოდის შემმოწმებელი PR-ს შეამოწმებს.",
       "startManualReview": "ხელით შემოწმების დაწყება",
-      "configureProvider": "პროვაიდერის გამართვა"
+      "configureProvider": "პროვაიდერის გამართვა",
+      "connectOwnerOnly": "სთხოვეთ ორგანიზაციის მფლობელს ან ადმინისტრატორს, რომ დააკავშიროს პროვაიდერი."
     },
     "platformList": {
       "checking": "მოწმდება…",
@@ -2973,6 +2974,7 @@
     "signOutThisDevice": "ამ მოწყობილობიდან გასვლა",
     "signOutSessionLabel": "{{device}}-დან გასვლა, შესვლა: {{signedIn}}, ბოლო აქტივობა: {{lastSeen}}",
     "sessionSignedOut": "სესია დაიხურა.",
+    "sessionSignOutFailed": "ამ სესიიდან გასვლა ვერ მოხერხდა. სცადეთ ხელახლა.",
     "signOutThisDeviceTitle": "გავიდეთ ამ მოწყობილობიდან?",
     "signOutThisSessionTitle": "გავიდეთ ამ სესიიდან?",
     "signOutThisSessionMessage": "{{device}} ანგარიშიდან გახვალთ. ბოლო აქტივობა: {{lastSeen}}. მოწყობილობას API-ზე წვდომა კიდევ ერთ საათამდე შეიძლება შეუნარჩუნდეს.",

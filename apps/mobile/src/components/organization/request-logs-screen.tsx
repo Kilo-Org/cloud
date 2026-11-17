@@ -59,11 +59,13 @@ export function canStepOlderTo(windowEndMs: number, anchorMs: number): boolean {
   return windowEndMs >= anchorMs - (HISTORY_DAYS * 24 - 1) * HOUR_MS;
 }
 
-// FlashList takes `contentContainerStyle` (no className), so the top pad maps
-// to its pixel value; the cards carry the page gutter themselves. The tab bar's
-// own bottom padding rides on the footer, which `gap` would not cover.
+// The cards carry the page gutter themselves. The tab bar's own bottom padding
+// rides on the footer, which `gap` would not cover, and the body's top pad sits
+// on a header component because a FlashList cannot take a class on its content
+// container.
 const listStyle = { flex: 1 } satisfies ViewStyle;
-const listContentContainerStyle = { paddingTop: 10.5 } satisfies ViewStyle;
+
+const ListTopPad = () => <View className="pt-3" />;
 
 const WINDOW_DATE = { weekday: 'short', month: 'short', day: 'numeric' } as const;
 
@@ -283,7 +285,7 @@ export function OrganizationRequestLogsScreen() {
             renderItem={renderItem}
             getItemType={() => 'requestLog'}
             ItemSeparatorComponent={RowSeparator}
-            contentContainerStyle={listContentContainerStyle}
+            ListHeaderComponent={<ListTopPad />}
             refreshControl={refreshControl}
             ListFooterComponent={
               <View className="pt-3">
@@ -353,9 +355,7 @@ export function OrganizationRequestLogsScreen() {
             <Text>{t('organization.requestLogs.newer')}</Text>
           </Button>
         </View>
-        <Text variant="caption">
-          {t('organization.requestLogs.hint')}
-        </Text>
+        <Text variant="caption">{t('organization.requestLogs.hint')}</Text>
       </View>
       {renderBody(body)}
     </View>

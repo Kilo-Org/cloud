@@ -24,11 +24,13 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
 import { parseTimestamp } from '@/lib/utils';
 
-// FlashList takes `contentContainerStyle` (no className), so the top pad maps
-// to its pixel value; the cards carry the page gutter themselves. The tab bar's
-// own bottom padding rides on the footer, which `gap` would not cover.
+// The cards carry the page gutter themselves. The tab bar's own bottom padding
+// rides on the footer, which `gap` would not cover, and the body's top pad sits
+// on a header component because a FlashList cannot take a class on its content
+// container.
 const listStyle = { flex: 1 } satisfies ViewStyle;
-const listContentContainerStyle = { paddingTop: 10.5 } satisfies ViewStyle;
+
+const ListTopPad = () => <View className="pt-3" />;
 
 const AUDIT_DATE = { year: 'numeric', month: 'short', day: 'numeric' } as const;
 
@@ -233,7 +235,7 @@ export function OrganizationAuditLogScreen() {
         renderItem={renderItem}
         getItemType={() => 'auditLog'}
         ItemSeparatorComponent={RowSeparator}
-        contentContainerStyle={listContentContainerStyle}
+        ListHeaderComponent={<ListTopPad />}
         ListFooterComponent={footer}
       />
     );

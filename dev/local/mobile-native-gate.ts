@@ -3,7 +3,12 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { artifactName, findNativeArtifacts } from './mobile-remote-native';
+import {
+  artifactName,
+  claimArtifactName,
+  findNativeArtifacts,
+  findNativeClaims,
+} from './mobile-remote-native';
 
 export const NATIVE_WORKFLOW_PATH = '.github/workflows/mobile-native-build.yml';
 
@@ -41,6 +46,7 @@ export function decideNativeBuildGate(input: {
   iosHash: string;
   androidHash: string;
   lookup: (name: string) => boolean;
+  claimLookup: (name: string) => boolean;
 }): NativeBuildGate {
   const prefix =
     input.eventName === 'pull_request'
@@ -52,7 +58,8 @@ export function decideNativeBuildGate(input: {
       : '';
   const plan = (platform: Platform, hash: string): PlatformPlan => {
     if (input.platform !== 'all' && input.platform !== platform) return { need: false };
-    return { need: !input.lookup(`${prefix}${artifactName(platform, hash)}`) };
+    if (input.lookup(`${prefix}${artifactName(platform, hash)}`)) return { need: false };
+    return { need: !input.claimLookup(claimArtifactName(prefix, platform, hash)) };
   };
   return {
     prefix,
@@ -111,6 +118,19 @@ function lookupArtifact(repository: string, name: string): boolean {
   );
 }
 
+// Claims fail open like artifact lookups: an unreadable claim means the
+// platform builds, which costs a duplicate build, never a missing
+// artifact. The caller's own run is excluded so a re-run rebuilds instead
+// of skipping on its own claim.
+function lookupClaimArtifact(repository: string, name: string): boolean {
+  const runId = Number(process.env.GITHUB_RUN_ID ?? '');
+  return (
+    findNativeClaims(name, repository, process.env.GITHUB_SHA ?? '', pullRequestValidationScope(), {
+      excludeRunId: Number.isSafeInteger(runId) && runId > 0 ? runId : undefined,
+    }).length > 0
+  );
+}
+
 // The API lists the PR's changed files against its base; a workflow-file edit
 // anywhere in the diff keeps the pull_request run out of the install
 // namespace. Paginated so a large PR is not truncated at the first page.
@@ -149,9 +169,13 @@ function appendOutput(key: string, value: string): void {
 // A lookup failure must not cost the build. The safe direction is "not
 // published": the job builds, which is the duplicate this re-check exists to
 // avoid, not a hash left without an artifact.
-function lookupOrMissing(repository: string, name: string): boolean {
+function lookupOrMissing(
+  repository: string,
+  name: string,
+  lookup: (repository: string, name: string) => boolean = lookupArtifact
+): boolean {
   try {
-    return lookupArtifact(repository, name);
+    return lookup(repository, name);
   } catch (error) {
     process.stderr.write(
       `artifact ${name}: lookup failed (${error instanceof Error ? error.message : error}); ` +
@@ -198,6 +222,11 @@ function main(): void {
       const found = lookupOrMissing(repository, name);
       process.stderr.write(`artifact ${name}: ${found ? 'published' : 'missing'}\n`);
       return found;
+    },
+    claimLookup: name => {
+      const claimed = lookupOrMissing(repository, name, lookupClaimArtifact);
+      process.stderr.write(`claim ${name}: ${claimed ? 'in flight' : 'none'}\n`);
+      return claimed;
     },
   });
   appendOutput('prefix', gate.prefix);

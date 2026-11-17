@@ -9,6 +9,8 @@ import test from 'node:test';
 import {
   artifactName,
   assertSimulatorRuntimeSupports,
+  findNativeClaims,
+  NATIVE_CLAIM_MAX_AGE_MS,
   parseNativeProducerJobs,
   parseNativeProducerRuns,
   parseRemoteBranchTip,
@@ -1305,4 +1307,142 @@ test('fetch re-evaluates remaining candidates when the picked producer just fail
       assert.match(log(), /artifacts\/401\/zip/);
     }
   );
+});
+
+function claimArtifact(
+  id = 501,
+  runId = 301,
+  overrides: Record<string, unknown> = {}
+): Record<string, unknown> {
+  return {
+    id,
+    name: nativeName,
+    expired: false,
+    created_at: '2026-10-28T00:00:00Z',
+    expires_at: '2027-01-25T00:00:00Z',
+    workflow_run: {
+      id: runId,
+      repository_id: repositoryId,
+      head_repository_id: repositoryId,
+      head_sha: HEAD,
+    },
+    ...overrides,
+  };
+}
+
+function activeRun(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return { ...trustedRun(), status: 'in_progress', conclusion: null, ...overrides };
+}
+
+test('claim lookup returns a fresh, active push claim from another run', () => {
+  withOfflineArtifacts([claimArtifact()], { 301: activeRun() }, invoke => {
+    assert.deepEqual(JSON.parse(invoke(`native.findNativeClaims(${JSON.stringify(nativeName)})`)), [
+      {
+        id: 501,
+        name: nativeName,
+        created_at: '2026-10-28T00:00:00Z',
+        expires_at: '2027-01-25T00:00:00Z',
+      },
+    ]);
+  });
+});
+
+test('claim lookup ignores a completed successful run that the artifact lookup accepts', () => {
+  withOfflineArtifacts([claimArtifact()], { 301: trustedRun() }, invoke => {
+    const [artifacts, claims] = JSON.parse(
+      invoke(
+        `[native.findNativeArtifacts(${JSON.stringify(nativeName)}), native.findNativeClaims(${JSON.stringify(nativeName)})]`
+      )
+    );
+    assert.deepEqual(claims, []);
+    assert.equal(artifacts.length, 1);
+    assert.equal(artifacts[0].id, 501);
+  });
+});
+
+test('claim lookup ignores a completed failed run', () => {
+  const run = { ...trustedRun(), conclusion: 'failure' };
+  withOfflineArtifacts([claimArtifact()], { 301: run }, invoke => {
+    assert.deepEqual(
+      JSON.parse(invoke(`native.findNativeClaims(${JSON.stringify(nativeName)})`)),
+      []
+    );
+  });
+});
+
+test('claim lookup rejects a claim older than the maximum claim age', () => {
+  const stale = claimArtifact(501, 301, { created_at: '2026-10-27T00:00:00Z' });
+  withOfflineArtifacts([stale], { 301: activeRun() }, invoke => {
+    assert.deepEqual(
+      JSON.parse(invoke(`native.findNativeClaims(${JSON.stringify(nativeName)})`)),
+      []
+    );
+  });
+  withOfflineArtifacts([claimArtifact()], { 301: activeRun() }, invoke => {
+    const now = Date.parse('2026-10-28T00:00:00Z');
+    const fresh = `native.findNativeClaims(${JSON.stringify(nativeName)}, undefined, undefined, undefined, {now: ${now}})`;
+    const atLimit = `native.findNativeClaims(${JSON.stringify(nativeName)}, undefined, undefined, undefined, {now: ${now + NATIVE_CLAIM_MAX_AGE_MS}})`;
+    const past = `native.findNativeClaims(${JSON.stringify(nativeName)}, undefined, undefined, undefined, {now: ${now + NATIVE_CLAIM_MAX_AGE_MS + 1}})`;
+    assert.equal(JSON.parse(invoke(fresh)).length, 1);
+    assert.equal(JSON.parse(invoke(atLimit)).length, 1);
+    assert.equal(JSON.parse(invoke(past)).length, 0);
+  });
+});
+
+test('claim lookup ignores the excluded run so a re-run rebuilds', () => {
+  withOfflineArtifacts([claimArtifact()], { 301: activeRun() }, invoke => {
+    assert.equal(
+      JSON.parse(
+        invoke(
+          `native.findNativeClaims(${JSON.stringify(nativeName)}, undefined, undefined, undefined, {excludeRunId: 301})`
+        )
+      ).length,
+      0
+    );
+    assert.equal(
+      JSON.parse(
+        invoke(
+          `native.findNativeClaims(${JSON.stringify(nativeName)}, undefined, undefined, undefined, {excludeRunId: 302})`
+        )
+      ).length,
+      1
+    );
+  });
+});
+
+test('claim lookup rejects a fork claim and a foreign workflow run', () => {
+  const fork = claimArtifact();
+  fork.workflow_run = {
+    ...(fork.workflow_run as Record<string, unknown>),
+    head_repository_id: 999,
+  };
+  withOfflineArtifacts([fork], { 301: activeRun({ head_repository: { id: 999 } }) }, invoke => {
+    assert.deepEqual(
+      JSON.parse(invoke(`native.findNativeClaims(${JSON.stringify(nativeName)})`)),
+      []
+    );
+  });
+  withOfflineArtifacts([claimArtifact()], { 301: activeRun({ workflow_id: 999 }) }, invoke => {
+    assert.deepEqual(
+      JSON.parse(invoke(`native.findNativeClaims(${JSON.stringify(nativeName)})`)),
+      []
+    );
+  });
+});
+
+test('claim lookup scopes a pull-request claim to its pull request and source repository', () => {
+  const run = activeRun({ event: 'pull_request', head_branch: 'feature/native' });
+  const claim = claimArtifact();
+  claim.created_at = '2026-10-28T00:00:00Z';
+  withOfflineArtifacts([claim], { 301: run }, invoke => {
+    const scope = (number: number, head: number) =>
+      `native.findNativeClaims(${JSON.stringify(nativeName)}, undefined, ${JSON.stringify(OTHER)}, {pullRequestNumber: ${number}, headRepositoryId: ${head}})`;
+    assert.equal(JSON.parse(invoke(scope(6115, 101))).length, 1);
+    assert.equal(JSON.parse(invoke(scope(6116, 101))).length, 0);
+    assert.equal(JSON.parse(invoke(scope(6115, 999))).length, 0);
+    assert.equal(
+      JSON.parse(invoke(`native.findNativeClaims(${JSON.stringify(nativeName)})`)).length,
+      0
+    );
+  });
 });

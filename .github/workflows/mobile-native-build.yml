@@ -27,7 +27,12 @@ on:
       - '.github/workflows/mobile-native-build.yml'
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # Only pull requests serialize and supersede on the ref. A push or
+  # workflow_dispatch run takes no shared slot: the platform jobs below
+  # already key their own never-cancelling slots on the nativeHash, and a
+  # shared whole-run slot made a second run wait out — or, while still
+  # pending, be cancelled by — an unrelated run of the same ref.
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   # Never cancel a push build: it is producing an artifact hosts will
   # install. A superseded pull_request build produces nothing anyone
   # keeps, so it must not hold a macOS runner for 90 minutes.
@@ -91,6 +96,34 @@ jobs:
           echo "ios_hash=$ios_hash" >> "$GITHUB_OUTPUT"
           echo "android_hash=$android_hash" >> "$GITHUB_OUTPUT"
           pnpm exec tsx dev/local/mobile-native-gate.ts "$ios_hash" "$android_hash"
+          printf '{"ios":"%s","android":"%s"}\n' "$ios_hash" "$android_hash" > native-build-claim.json
+
+      # A claim marks a hash this run decided to build, so a duplicate
+      # run's gate skips the same build instead of queueing behind it or
+      # building it a second time. The claim is inert once this run
+      # finishes: a success leaves the published artifact covering the
+      # hash, a failure or cancellation leaves the claim untrusted, and a
+      # hung run ages out after NATIVE_CLAIM_MAX_AGE_MS in
+      # dev/local/mobile-remote-native.ts.
+      - name: Claim the iOS build
+        if: steps.decide.outputs.need_ios == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.decide.outputs.prefix }}mobile-native-claim-ios-${{ steps.decide.outputs.ios_hash }}
+          path: native-build-claim.json
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Claim the Android build
+        if: steps.decide.outputs.need_android == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.decide.outputs.prefix }}mobile-native-claim-android-${{ steps.decide.outputs.android_hash }}
+          path: native-build-claim.json
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
 
   # One harness SDK build per run. Both platform jobs need
   # packages/harness-sdk/dist and start together after the gate, so running the

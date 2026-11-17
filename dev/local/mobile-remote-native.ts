@@ -45,6 +45,14 @@ export function artifactName(platform: 'ios' | 'android', nativeHash: string): s
   return `mobile-native-${platform}-${nativeHash}`;
 }
 
+export function claimArtifactName(
+  prefix: string,
+  platform: 'ios' | 'android',
+  nativeHash: string
+): string {
+  return `${prefix}mobile-native-claim-${platform}-${nativeHash}`;
+}
+
 function log(message: string): void {
   process.stderr.write(`mobile-remote-native: ${message}\n`);
 }
@@ -143,87 +151,204 @@ function verifiedNativeSource(repository: string): VerifiedNativeSource {
   return { base, repoId, defaultBranch, workflowId, workflowPath };
 }
 
+type NativeLookupContext = {
+  base: string;
+  repo: { id: number; default_branch: string };
+  workflow: { id: number };
+  workflowPath: string;
+  expectedHeadSha: string | undefined;
+  validationScope?: { pullRequestNumber: number; headRepositoryId: number };
+};
+
+// Metadata every trusted artifact or claim entry must carry. The
+// workflow_run reference must point inside the repository, or inside the
+// caller's pull-request fork scope when there is one.
+type NativeListingEntry = {
+  id: number;
+  name: string;
+  created_at: string;
+  expires_at: string;
+  source: { id: number; head_repository_id: number; head_sha: string };
+};
+
+function nativeLookupContext(
+  repository: string,
+  expectedHeadSha: string | undefined,
+  validationScope?: { pullRequestNumber: number; headRepositoryId: number }
+): NativeLookupContext {
+  const verified = verifiedNativeSource(repository);
+  return {
+    base: verified.base,
+    repo: { id: verified.repoId, default_branch: verified.defaultBranch },
+    workflow: { id: verified.workflowId },
+    workflowPath: verified.workflowPath,
+    expectedHeadSha,
+    validationScope,
+  };
+}
+
+function nativeListingEntry(
+  name: string,
+  artifact: ArtifactMetadata | null,
+  context: NativeLookupContext
+): NativeListingEntry | null {
+  if (
+    typeof artifact?.id !== 'number' ||
+    !Number.isSafeInteger(artifact.id) ||
+    artifact.id <= 0 ||
+    artifact.name !== name ||
+    artifact.expired !== false ||
+    typeof artifact.created_at !== 'string' ||
+    !Number.isFinite(Date.parse(artifact.created_at)) ||
+    typeof artifact.expires_at !== 'string' ||
+    Date.parse(artifact.expires_at) <= Date.now() ||
+    !Number.isFinite(Date.parse(artifact.expires_at))
+  ) {
+    return null;
+  }
+  const source = artifact.workflow_run;
+  if (
+    typeof source?.id !== 'number' ||
+    !Number.isSafeInteger(source.id) ||
+    source.id <= 0 ||
+    source.repository_id !== context.repo.id ||
+    typeof source.head_repository_id !== 'number' ||
+    !Number.isSafeInteger(source.head_repository_id) ||
+    source.head_repository_id <= 0 ||
+    (source.head_repository_id !== context.repo.id &&
+      source.head_repository_id !== context.validationScope?.headRepositoryId) ||
+    typeof source.head_sha !== 'string' ||
+    !/^[a-f0-9]{40}$/.test(source.head_sha)
+  ) {
+    return null;
+  }
+  return {
+    id: artifact.id,
+    name,
+    created_at: artifact.created_at,
+    expires_at: artifact.expires_at,
+    source: {
+      id: source.id,
+      head_repository_id: source.head_repository_id,
+      head_sha: source.head_sha,
+    },
+  };
+}
+
+function listNativeEntries(context: NativeLookupContext, name: string): NativeListingEntry[] {
+  const listing = JSON.parse(
+    gh([`api`, `${context.base}/actions/artifacts?name=${encodeURIComponent(name)}&per_page=100`])
+  ) as { artifacts?: (ArtifactMetadata | null)[] } | null;
+  if (!Array.isArray(listing?.artifacts)) throw new Error('Invalid native artifact listing');
+  const entries: NativeListingEntry[] = [];
+  for (const artifact of listing.artifacts) {
+    const entry = nativeListingEntry(name, artifact, context);
+    if (entry) entries.push(entry);
+  }
+  return entries;
+}
+
+// The provenance both lookups share: the producing run belongs to the
+// canonical workflow and repository, and only the producer shapes a
+// consumer may install count as evidence — a same-repository push to the
+// default branch, a manual dispatch of the exact consumer commit, or the
+// caller's own pull request. Artifact lookups additionally require a
+// completed successful run; claim lookups require an active one.
+function nativeRunTrusted(
+  run: RunMetadata | null,
+  entry: NativeListingEntry,
+  context: NativeLookupContext,
+  requireCompleted: boolean
+): boolean {
+  const source = entry.source;
+  if (
+    run?.id !== source.id ||
+    run.workflow_id !== context.workflow.id ||
+    run.path !== context.workflowPath ||
+    run.repository?.id !== context.repo.id ||
+    run.head_repository?.id !== source.head_repository_id ||
+    run.head_sha !== source.head_sha ||
+    (requireCompleted
+      ? run.status !== 'completed' || run.conclusion !== 'success'
+      : !ACTIVE_PRODUCER_STATUSES.has(run.status ?? '')) ||
+    typeof run.head_branch !== 'string' ||
+    run.head_branch.length === 0 ||
+    !(
+      (source.head_repository_id === context.repo.id &&
+        ((run.event === 'workflow_dispatch' && run.head_sha === context.expectedHeadSha) ||
+          (run.event === 'push' && run.head_branch === context.repo.default_branch))) ||
+      (context.validationScope !== undefined &&
+        run.event === 'pull_request' &&
+        source.head_repository_id === context.validationScope.headRepositoryId &&
+        Array.isArray(run.pull_requests) &&
+        run.pull_requests.some(
+          request =>
+            request?.number === context.validationScope?.pullRequestNumber &&
+            request.head?.repo?.id === context.validationScope?.headRepositoryId &&
+            request.base?.repo?.id === context.repo.id
+        ))
+    )
+  ) {
+    return false;
+  }
+  return true;
+}
+
 export function findNativeArtifacts(
   name: string,
   repository = '{owner}/{repo}',
   expectedHeadSha: string | undefined = git(['rev-parse', 'HEAD']),
   validationScope?: { pullRequestNumber: number; headRepositoryId: number }
 ): NativeArtifact[] {
-  const verified = verifiedNativeSource(repository);
-  const { base, workflowPath } = verified;
-  const repo = { id: verified.repoId, default_branch: verified.defaultBranch };
-  const workflow = { id: verified.workflowId };
-  const listing = JSON.parse(
-    gh(['api', `${base}/actions/artifacts?name=${encodeURIComponent(name)}&per_page=100`])
-  ) as { artifacts?: (ArtifactMetadata | null)[] } | null;
-  if (!Array.isArray(listing?.artifacts)) throw new Error('Invalid native artifact listing');
+  const context = nativeLookupContext(repository, expectedHeadSha, validationScope);
   const trusted: NativeArtifact[] = [];
-  for (const artifact of listing.artifacts) {
-    if (
-      typeof artifact?.id !== 'number' ||
-      !Number.isSafeInteger(artifact.id) ||
-      artifact.id <= 0 ||
-      artifact.name !== name ||
-      artifact.expired !== false ||
-      typeof artifact.created_at !== 'string' ||
-      !Number.isFinite(Date.parse(artifact.created_at)) ||
-      typeof artifact.expires_at !== 'string' ||
-      Date.parse(artifact.expires_at) <= Date.now() ||
-      !Number.isFinite(Date.parse(artifact.expires_at))
-    ) {
-      continue;
-    }
-    const source = artifact.workflow_run;
-    if (
-      typeof source?.id !== 'number' ||
-      !Number.isSafeInteger(source.id) ||
-      source.id <= 0 ||
-      source.repository_id !== repo.id ||
-      typeof source.head_repository_id !== 'number' ||
-      !Number.isSafeInteger(source.head_repository_id) ||
-      source.head_repository_id <= 0 ||
-      (source.head_repository_id !== repo.id &&
-        source.head_repository_id !== validationScope?.headRepositoryId) ||
-      typeof source.head_sha !== 'string' ||
-      !/^[a-f0-9]{40}$/.test(source.head_sha)
-    ) {
-      continue;
-    }
-    const run = JSON.parse(gh(['api', `${base}/actions/runs/${source.id}`])) as RunMetadata | null;
-    if (
-      run?.id !== source.id ||
-      run.workflow_id !== workflow.id ||
-      run.path !== workflowPath ||
-      run.repository?.id !== repo.id ||
-      run.head_repository?.id !== source.head_repository_id ||
-      run.head_sha !== source.head_sha ||
-      run.status !== 'completed' ||
-      run.conclusion !== 'success' ||
-      typeof run.head_branch !== 'string' ||
-      run.head_branch.length === 0 ||
-      !(
-        (source.head_repository_id === repo.id &&
-          ((run.event === 'workflow_dispatch' && run.head_sha === expectedHeadSha) ||
-            (run.event === 'push' && run.head_branch === repo.default_branch))) ||
-        (validationScope !== undefined &&
-          run.event === 'pull_request' &&
-          source.head_repository_id === validationScope.headRepositoryId &&
-          Array.isArray(run.pull_requests) &&
-          run.pull_requests.some(
-            request =>
-              request?.number === validationScope.pullRequestNumber &&
-              request.head?.repo?.id === validationScope.headRepositoryId &&
-              request.base?.repo?.id === repo.id
-          ))
-      )
-    ) {
-      continue;
-    }
+  for (const entry of listNativeEntries(context, name)) {
+    const run = JSON.parse(
+      gh([`api`, `${context.base}/actions/runs/${entry.source.id}`])
+    ) as RunMetadata | null;
+    if (!nativeRunTrusted(run, entry, context, true)) continue;
     trusted.push({
-      id: artifact.id,
+      id: entry.id,
       name,
-      created_at: artifact.created_at,
-      expires_at: artifact.expires_at,
+      created_at: entry.created_at,
+      expires_at: entry.expires_at,
+    });
+  }
+  return trusted;
+}
+
+// How long a claim stays trusted while its producing run never reaches a
+// terminal state: above the 90-minute ios job timeout, so a hung run ages
+// out and the next trigger rebuilds the hash.
+export const NATIVE_CLAIM_MAX_AGE_MS = 120 * 60 * 1000;
+
+// A claim marks a hash a run is about to build. Trust rules match
+// findNativeArtifacts except the producing run must still be active and
+// the claim must be fresh. Claims uploaded by the excluded run (the
+// caller's own run, seen again on a re-run) never count, so a re-run
+// rebuilds instead of skipping on its own stale claim.
+export function findNativeClaims(
+  name: string,
+  repository = '{owner}/{repo}',
+  expectedHeadSha: string | undefined = git(['rev-parse', 'HEAD']),
+  validationScope?: { pullRequestNumber: number; headRepositoryId: number },
+  options: { excludeRunId?: number; now?: number } = {}
+): NativeArtifact[] {
+  const context = nativeLookupContext(repository, expectedHeadSha, validationScope);
+  const now = options.now ?? Date.now();
+  const trusted: NativeArtifact[] = [];
+  for (const entry of listNativeEntries(context, name)) {
+    if (options.excludeRunId !== undefined && entry.source.id === options.excludeRunId) continue;
+    if (now - Date.parse(entry.created_at) > NATIVE_CLAIM_MAX_AGE_MS) continue;
+    const run = JSON.parse(
+      gh([`api`, `${context.base}/actions/runs/${entry.source.id}`])
+    ) as RunMetadata | null;
+    if (!nativeRunTrusted(run, entry, context, false)) continue;
+    trusted.push({
+      id: entry.id,
+      name,
+      created_at: entry.created_at,
+      expires_at: entry.expires_at,
     });
   }
   return trusted;

@@ -14,10 +14,11 @@ import {
   decideNativeBuildGate,
   pullRequestArtifactPrefix,
 } from './mobile-native-gate';
-import { artifactName } from './mobile-remote-native';
+import { artifactName, claimArtifactName } from './mobile-remote-native';
 
 type WorkflowStep = {
   id?: string;
+  name?: string;
   if?: string;
   run?: string;
   uses?: string;
@@ -85,7 +86,10 @@ test('a superseded pull_request build is cancelled', () => {
     workflow.concurrency['cancel-in-progress'],
     "${{ github.event_name == 'pull_request' }}"
   );
-  assert.equal(workflow.concurrency.group, '${{ github.workflow }}-${{ github.ref }}');
+  assert.equal(
+    workflow.concurrency.group,
+    "${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}"
+  );
 });
 
 test('the gate reads the pull request changed files', () => {
@@ -206,6 +210,7 @@ test('a pull request whose artifacts exist costs one gate job and no macOS runne
       queried.push(name);
       return true;
     },
+    claimLookup: () => false,
   });
   assert.deepEqual(gate, {
     prefix: '',
@@ -231,6 +236,7 @@ test('a pull request that changes a native input builds under the plain name', (
       queried.push(name);
       return false;
     },
+    claimLookup: () => false,
   });
   assert.deepEqual(gate, {
     prefix: '',
@@ -256,6 +262,7 @@ test('a pull request that edits the workflow never publishes an installable name
       queried.push(name);
       return false;
     },
+    claimLookup: () => false,
   });
   assert.deepEqual(gate, {
     prefix: 'pr6115-abc12345-',
@@ -277,6 +284,7 @@ test('a push always publishes the plain, installable name', () => {
     iosHash: 'ioshash',
     androidHash: 'androidhash',
     lookup: () => false,
+    claimLookup: () => false,
   });
   assert.deepEqual(gate, {
     prefix: '',
@@ -294,6 +302,7 @@ test('a push run skips an existing trusted artifact', () => {
     iosHash: 'ioshash',
     androidHash: 'androidhash',
     lookup: () => true,
+    claimLookup: () => false,
   });
   assert.deepEqual(gate, {
     prefix: '',
@@ -315,6 +324,7 @@ test('the platform input gates a single platform and skips its artifact lookup',
       queried.push(name);
       return false;
     },
+    claimLookup: () => false,
   });
   assert.deepEqual(gate, {
     prefix: '',
@@ -369,6 +379,8 @@ function runGateCli(options: {
   eventName?: string;
   changedFiles?: string[];
   artifacts?: string[];
+  claims?: string[];
+  runId?: string;
   published?: string;
   failLookups?: boolean;
   eventScope?: unknown;
@@ -396,13 +408,14 @@ function runGateCli(options: {
   const unexpected = path.join(dir, 'unexpected.log');
   fs.writeFileSync(unexpected, '');
   const artifacts = (options.artifacts ?? []).map(item => JSON.parse(item));
+  const claims = (options.claims ?? []).map(item => JSON.parse(item));
   fs.writeFileSync(
     path.join(bin, 'gh'),
     `#!${process.execPath}
 const fs = require('node:fs');
 const args = process.argv.slice(2);
 fs.appendFileSync(${JSON.stringify(ghLog)}, args.join(' ') + '\\n');
-const artifacts = ${JSON.stringify(artifacts)};
+const artifacts = ${JSON.stringify([...artifacts, ...claims])};
 const endpoint = args[1];
 const base = 'repos/Kilo-Org/kilocode';
 let result;
@@ -420,7 +433,7 @@ if (args[0] === 'api' && (args.length === 2 || (endpoint === base + '/pulls/6115
     }
     const query = new URLSearchParams(endpoint.split('?')[1]);
     const name = query.get('name');
-    if (query.get('per_page') === '100' && name && /^(pr6115-[a-f0-9]{8}-)?mobile-native-(ios-ioshash|android-androidhash)$/.test(name)) {
+    if (query.get('per_page') === '100' && name && /^(pr6115-[a-f0-9]{8}-)?mobile-native-(claim-)?(ios-ioshash|android-androidhash)$/.test(name)) {
       result = {artifacts: artifacts.map(({run, ...item}) => ({...item, name}))};
     }
   } else if (endpoint.startsWith(base + '/actions/runs/')) {
@@ -452,6 +465,7 @@ process.stdout.write(JSON.stringify(result));
           GITHUB_EVENT_NAME: options.eventName ?? 'pull_request',
           GITHUB_REPOSITORY: 'Kilo-Org/kilocode',
           GITHUB_SHA: options.consumerSha ?? 'a'.repeat(40),
+          GITHUB_RUN_ID: options.runId ?? '',
           GITHUB_EVENT_PATH: options.missingEventPath ? '' : eventPath,
           PR_NUMBER: '6115',
           PLATFORM: 'all',
@@ -707,4 +721,184 @@ test('a manual gate with no consumer SHA rejects manual artifacts', () => {
     artifacts: [artifact(11, { event: 'workflow_dispatch', head_branch: 'feature/native' })],
   });
   assert.deepEqual(outputs, gateOutputs({ ios: { need: true }, android: { need: true } }));
+});
+
+function claim(
+  id: number,
+  runOverrides: Record<string, unknown> = {},
+  artifactOverrides: Record<string, unknown> = {}
+): string {
+  const now = Date.now();
+  return JSON.stringify({
+    id,
+    expired: false,
+    created_at: new Date(now - 60 * 1000).toISOString(),
+    expires_at: new Date(now + 24 * 60 * 60 * 1000).toISOString(),
+    workflow_run: {
+      id: id + 1000,
+      repository_id: 101,
+      head_repository_id: 101,
+      head_sha: 'a'.repeat(40),
+    },
+    run: {
+      id: id + 1000,
+      workflow_id: 201,
+      path: NATIVE_WORKFLOW_PATH,
+      event: 'push',
+      status: 'in_progress',
+      conclusion: null,
+      head_sha: 'a'.repeat(40),
+      head_branch: 'main',
+      repository: { id: 101 },
+      head_repository: { id: 101 },
+      pull_requests: [{ number: 6115, head: { repo: { id: 101 } }, base: { repo: { id: 101 } } }],
+      ...runOverrides,
+    },
+    ...artifactOverrides,
+  });
+}
+
+test('the gate claims a build it decided to run', () => {
+  const job = readWorkflow().jobs.gate;
+  const decide = job.steps.indexOf(step(job, 'decide'));
+  assert.match(step(job, 'decide').run ?? '', /native-build-claim\.json/);
+  const expectedName = {
+    ios: '${{ steps.decide.outputs.prefix }}mobile-native-claim-ios-${{ steps.decide.outputs.ios_hash }}',
+    android:
+      '${{ steps.decide.outputs.prefix }}mobile-native-claim-android-${{ steps.decide.outputs.android_hash }}',
+  };
+  for (const platform of ['ios', 'android'] as const) {
+    const label = platform === 'ios' ? 'iOS' : 'Android';
+    const index = job.steps.findIndex(item => item.name === `Claim the ${label} build`);
+    assert.ok(index > decide, `${platform}: the claim must follow the decide step`);
+    const claimStep = job.steps[index];
+    assert.equal(
+      claimStep.uses,
+      'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a',
+      `${platform}: the claim must use the pinned upload action`
+    );
+    assert.equal(claimStep.if, `steps.decide.outputs.need_${platform} == 'true'`);
+    assert.equal(claimStep.with?.name, expectedName[platform]);
+    assert.equal(claimStep.with?.path, 'native-build-claim.json');
+    assert.equal(String(claimStep.with?.['retention-days']), '1');
+    assert.equal(claimStep.with?.['compression-level'], 0);
+  }
+});
+
+test('a fresh claim from another run skips the platform', () => {
+  const { outputs } = runGateCli({ eventName: 'push', claims: [claim(21)] });
+  assert.deepEqual(outputs, gateOutputs({}));
+});
+
+test('a stale claim does not skip the platform', () => {
+  const stale = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+  const { outputs } = runGateCli({
+    eventName: 'push',
+    claims: [claim(21, {}, { created_at: stale })],
+  });
+  assert.deepEqual(outputs, gateOutputs({ ios: { need: true }, android: { need: true } }));
+});
+
+test("a failed twin's claim does not skip the platform", () => {
+  const { outputs } = runGateCli({
+    eventName: 'push',
+    claims: [claim(21, { status: 'completed', conclusion: 'failure' })],
+  });
+  assert.deepEqual(outputs, gateOutputs({ ios: { need: true }, android: { need: true } }));
+});
+
+test('a claim from this run does not skip a re-run', () => {
+  const owned = claim(4555);
+  assert.deepEqual(
+    runGateCli({ eventName: 'push', claims: [owned], runId: '5555' }).outputs,
+    gateOutputs({ ios: { need: true }, android: { need: true } })
+  );
+  assert.deepEqual(
+    runGateCli({ eventName: 'push', claims: [owned], runId: '5556' }).outputs,
+    gateOutputs({})
+  );
+});
+
+test('a PR claim covers only its own pull request', () => {
+  const prClaim = claim(31, { event: 'pull_request' });
+  assert.deepEqual(runGateCli({ claims: [prClaim] }).outputs, gateOutputs({}));
+  assert.deepEqual(
+    runGateCli({
+      claims: [prClaim],
+      eventScope: { number: 6116, pull_request: { head: { repo: { id: 101 } } } },
+    }).outputs,
+    gateOutputs({ ios: { need: true }, android: { need: true } })
+  );
+});
+
+test('a fresh claim skips the platform and queries the claim names', () => {
+  const queried: string[] = [];
+  const gate = decideNativeBuildGate({
+    eventName: 'push',
+    platform: 'all',
+    prNumber: '',
+    workflowHash: '',
+    changedFiles: [],
+    iosHash: 'ioshash',
+    androidHash: 'androidhash',
+    lookup: () => false,
+    claimLookup: name => {
+      queried.push(name);
+      return true;
+    },
+  });
+  assert.deepEqual(gate, {
+    prefix: '',
+    platforms: { ios: { need: false }, android: { need: false } },
+  });
+  assert.deepEqual(queried, [
+    claimArtifactName('', 'ios', 'ioshash'),
+    claimArtifactName('', 'android', 'androidhash'),
+  ]);
+});
+
+test('a published artifact short-circuits the claim lookup', () => {
+  let claims = 0;
+  const gate = decideNativeBuildGate({
+    eventName: 'push',
+    platform: 'all',
+    prNumber: '',
+    workflowHash: '',
+    changedFiles: [],
+    iosHash: 'ioshash',
+    androidHash: 'androidhash',
+    lookup: () => true,
+    claimLookup: () => {
+      claims += 1;
+      return false;
+    },
+  });
+  assert.deepEqual(gate, {
+    prefix: '',
+    platforms: { ios: { need: false }, android: { need: false } },
+  });
+  assert.equal(claims, 0, 'a published artifact must not read claims');
+});
+
+test('the platform input limits the claim lookup to its platform', () => {
+  const queried: string[] = [];
+  const gate = decideNativeBuildGate({
+    eventName: 'workflow_dispatch',
+    platform: 'ios',
+    prNumber: '',
+    workflowHash: '',
+    changedFiles: [],
+    iosHash: 'ioshash',
+    androidHash: 'androidhash',
+    lookup: () => false,
+    claimLookup: name => {
+      queried.push(name);
+      return false;
+    },
+  });
+  assert.deepEqual(gate, {
+    prefix: '',
+    platforms: { ios: { need: true }, android: { need: false } },
+  });
+  assert.deepEqual(queried, [claimArtifactName('', 'ios', 'ioshash')]);
 });

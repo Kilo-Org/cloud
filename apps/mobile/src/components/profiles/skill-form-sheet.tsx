@@ -10,6 +10,7 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import {
   SKILL_NAME_MAX_LENGTH,
   type SkillInputError,
@@ -132,7 +133,7 @@ export function SkillFormSheet({
       <ScrollView
         ref={scrollRef}
         className="flex-1"
-        contentContainerClassName="gap-4 px-6 pt-4 pb-8"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}

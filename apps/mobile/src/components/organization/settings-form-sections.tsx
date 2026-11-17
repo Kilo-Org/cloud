@@ -1,11 +1,11 @@
 import { type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 
-import { DirectionalChevronRight } from '@/components/ui/directional-icons';
+import { Card } from '@/components/ui/card';
+import { RowChevron } from '@/components/ui/row-chevron';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
 /**
@@ -31,11 +31,11 @@ export function SettingsSection({
 }>) {
   const showsSwitch = enabled !== undefined && onEnabledChange !== undefined;
   return (
-    <View className="gap-4 rounded-lg bg-secondary p-4">
+    <Card>
       <View className="flex-row items-start justify-between gap-3">
-        <View className="flex-1 gap-1">
-          <Text className="text-base font-semibold text-foreground">{title}</Text>
-          <Text className="text-xs text-muted-foreground">{description}</Text>
+        <View className="min-w-0 flex-1 gap-1">
+          <Text variant="heading">{title}</Text>
+          <Text variant="caption">{description}</Text>
         </View>
         {showsSwitch ? (
           <Switch
@@ -47,7 +47,7 @@ export function SettingsSection({
         ) : null}
       </View>
       {!showsSwitch || enabled ? children : null}
-    </View>
+    </Card>
   );
 }
 
@@ -81,12 +81,15 @@ export function SettingsSwitchRow({
         }}
       >
         <View className="gap-0.5">
-          <Text className={cn('text-sm', disabled ? 'text-muted-foreground' : 'text-foreground')}>
+          <Text
+            className={cn(
+              'text-sm font-medium',
+              disabled ? 'text-muted-foreground' : 'text-foreground'
+            )}
+          >
             {label}
           </Text>
-          {description ? (
-            <Text className="text-xs text-muted-foreground">{description}</Text>
-          ) : null}
+          {description ? <Text variant="caption">{description}</Text> : null}
         </View>
       </Pressable>
       <Switch
@@ -113,12 +116,11 @@ export function SettingsValueRow({
   onPress: () => void;
   disabled?: boolean;
 }>) {
-  const colors = useThemeColors();
   return (
     <Pressable
       className={cn(
         ROW_TARGET_CLASS,
-        'flex-row items-center justify-between gap-3 py-2 active:opacity-70'
+        'flex-row items-center justify-between gap-3 px-4 py-3 active:opacity-70'
       )}
       disabled={disabled}
       accessibilityRole="button"
@@ -126,12 +128,12 @@ export function SettingsValueRow({
       accessibilityState={{ disabled }}
       onPress={onPress}
     >
-      <Text className="text-sm text-foreground">{label}</Text>
-      <View className="shrink flex-row items-center gap-2">
-        <Text className="shrink text-sm text-muted-foreground" numberOfLines={1}>
+      <Text className="text-sm font-medium text-foreground">{label}</Text>
+      <View className="min-w-0 shrink flex-row items-center gap-2">
+        <Text variant="caption" className="shrink" numberOfLines={1}>
           {value}
         </Text>
-        <DirectionalChevronRight size={16} color={colors.mutedForeground} />
+        <RowChevron />
       </View>
     </Pressable>
   );

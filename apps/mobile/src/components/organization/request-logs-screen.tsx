@@ -12,7 +12,7 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
-import { DirectionalChevronLeft, DirectionalChevronRight } from '@/components/ui/directional-icons';
+import { Card } from '@/components/ui/card';
 import { FileText } from '@/components/ui/icons';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -27,7 +27,6 @@ import {
   UNMEASURED_VALUE,
 } from '@/lib/format';
 import { type OrgRequestLogEntry, useOrgRequestLogs } from '@/lib/hooks/use-org-billing-queries';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
 import { isRetryableTrpcError, trpcErrorVariant, type TrpcErrorVariant } from '@/lib/trpc-error';
@@ -60,11 +59,13 @@ export function canStepOlderTo(windowEndMs: number, anchorMs: number): boolean {
   return windowEndMs >= anchorMs - (HISTORY_DAYS * 24 - 1) * HOUR_MS;
 }
 
-// FlashList takes `contentContainerStyle` (no className), so the `px-6 pt-4`
-// inset maps to its pixel values; the tab bar's own bottom padding rides on the
-// footer, which `gap` would not cover.
+// The cards carry the page gutter themselves. The tab bar's own bottom padding
+// rides on the footer, which `gap` would not cover, and the body's top pad sits
+// on a header component because a FlashList cannot take a class on its content
+// container.
 const listStyle = { flex: 1 } satisfies ViewStyle;
-const listContentContainerStyle = { paddingHorizontal: 24, paddingTop: 16 } satisfies ViewStyle;
+
+const ListTopPad = () => <View className="pt-3" />;
 
 const WINDOW_DATE = { weekday: 'short', month: 'short', day: 'numeric' } as const;
 
@@ -72,11 +73,11 @@ const RowSeparator = () => <View className="h-3" />;
 
 function RowSkeleton() {
   return (
-    <View className="gap-2 rounded-lg bg-secondary p-3">
+    <Card className="mx-4">
       <Skeleton className="h-4 w-3/4 rounded bg-muted-soft" />
       <Skeleton className="h-3 w-1/2 rounded bg-muted-soft" />
       <Skeleton className="h-3 w-1/3 rounded bg-muted-soft" />
-    </View>
+    </Card>
   );
 }
 
@@ -136,35 +137,35 @@ const RequestLogRow = memo(function RequestLogRow({
     [entry.user.name, entry.user.email, entry.user.id].find(Boolean) ?? UNMEASURED_VALUE;
 
   return (
-    <View className="gap-1 rounded-lg bg-secondary p-3">
+    <Card className="mx-4">
       <View className="flex-row items-baseline gap-3">
-        <Text className="flex-1 font-mono text-xs text-foreground" numberOfLines={1}>
+        <Text variant="mono" className="flex-1" numberOfLines={1}>
           {entry.model ?? UNMEASURED_VALUE}
         </Text>
         <Text className="shrink-0 text-sm font-medium tabular-nums text-foreground">{cost}</Text>
       </View>
       <View className="flex-row items-center gap-3">
-        <Text className="flex-1 text-xs text-muted-foreground" numberOfLines={1}>
+        <Text variant="caption" className="flex-1" numberOfLines={1}>
           {userName}
         </Text>
-        <Text className="shrink-0 text-xs text-muted-foreground" numberOfLines={1}>
+        <Text variant="caption" className="shrink-0" numberOfLines={1}>
           {entry.provider ?? UNMEASURED_VALUE}
         </Text>
       </View>
       <View className="flex-row items-center gap-2">
-        <Text className="text-xs tabular-nums text-muted-foreground">
+        <Text variant="caption" className="tabular-nums">
           {isolateLtrBidiText(time)}
         </Text>
-        <Text className="flex-1 text-xs tabular-nums text-muted-foreground" numberOfLines={1}>
+        <Text variant="caption" className="flex-1 tabular-nums" numberOfLines={1}>
           {tokens}
         </Text>
         {entry.is_user_byok ? (
-          <Text className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase text-muted-foreground">
+          <Text variant="eyebrow" className="shrink-0 rounded bg-muted px-1.5 py-0.5">
             {t('organization.requestLogs.byok')}
           </Text>
         ) : null}
       </View>
-    </View>
+    </Card>
   );
 });
 
@@ -183,7 +184,6 @@ const RequestLogRow = memo(function RequestLogRow({
  */
 export function OrganizationRequestLogsScreen() {
   const { t } = useTranslation();
-  const colors = useThemeColors();
   const { organizationId, role, org, isResolving } = useOrgBoundary();
   // The window's newest end. The anchor is captured once, so "Newer" has a
   // fixed edge to return to instead of sliding with the clock.
@@ -239,7 +239,7 @@ export function OrganizationRequestLogsScreen() {
     switch (current.kind) {
       case 'loading': {
         return (
-          <View className="gap-3 px-6 pt-4">
+          <View className="gap-3 pt-3">
             <RowSkeleton />
             <RowSkeleton />
             <RowSkeleton />
@@ -285,12 +285,12 @@ export function OrganizationRequestLogsScreen() {
             renderItem={renderItem}
             getItemType={() => 'requestLog'}
             ItemSeparatorComponent={RowSeparator}
-            contentContainerStyle={listContentContainerStyle}
+            ListHeaderComponent={<ListTopPad />}
             refreshControl={refreshControl}
             ListFooterComponent={
               <View className="pt-3">
                 {current.truncated ? (
-                  <Text variant="muted" className="px-6 text-center text-xs">
+                  <Text variant="caption" className="px-4 text-center">
                     {t('organization.requestLogs.truncated')}
                   </Text>
                 ) : null}
@@ -318,12 +318,12 @@ export function OrganizationRequestLogsScreen() {
           is both the time range and the paging. The hint states the window's
           one rule in place, and it never changes, so no row moves when a
           window loads. */}
-      <View className="gap-2 px-6 pt-4">
+      <View className="gap-2 px-4 pt-3">
         <View className="gap-0.5">
           <Text className="text-sm font-medium text-foreground">
             {formatDate(windowStart, i18n.language, WINDOW_DATE)}
           </Text>
-          <Text className="text-xs tabular-nums text-muted-foreground">
+          <Text variant="caption" className="tabular-nums">
             {isolateLtrBidiText(
               `${formatClockTime(windowStart, i18n.language)}–${formatClockTime(windowEnd, i18n.language)}`
             )}
@@ -340,7 +340,6 @@ export function OrganizationRequestLogsScreen() {
             }}
             accessibilityLabel={t('organization.requestLogs.older')}
           >
-            <DirectionalChevronLeft size={16} color={colors.foreground} />
             <Text>{t('organization.requestLogs.older')}</Text>
           </Button>
           <Button
@@ -354,12 +353,9 @@ export function OrganizationRequestLogsScreen() {
             accessibilityLabel={t('organization.requestLogs.newer')}
           >
             <Text>{t('organization.requestLogs.newer')}</Text>
-            <DirectionalChevronRight size={16} color={colors.foreground} />
           </Button>
         </View>
-        <Text variant="muted" className="text-xs">
-          {t('organization.requestLogs.hint')}
-        </Text>
+        <Text variant="caption">{t('organization.requestLogs.hint')}</Text>
       </View>
       {renderBody(body)}
     </View>

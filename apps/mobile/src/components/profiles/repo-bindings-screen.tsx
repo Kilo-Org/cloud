@@ -25,6 +25,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { GitBranch } from '@/components/ui/icons';
+import { RowGroup } from '@/components/ui/row-group';
 import { Text } from '@/components/ui/text';
 import { useAgentProfileList } from '@/lib/hooks/use-agent-profiles';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
@@ -33,6 +34,7 @@ import {
   useRepoBindings,
   useRepoOptions,
 } from '@/lib/hooks/use-repo-bindings';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { getNewProfilePath, type ProfileManagementStack } from '@/lib/profile-agent-navigation';
 import { type ProfileExternalOpener } from '@/lib/profile-route-stack';
 
@@ -159,7 +161,7 @@ export function RepoBindingsScreen({
       <ScreenHeader title={t('profiles.repoBindings.title')} backFallback={backFallback} />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-3 px-6 pt-4 pb-8"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
@@ -188,7 +190,7 @@ export function RepoBindingsScreen({
         ) : null}
 
         {!bindingsQuery.isError && !bindingsQuery.isLoading && bindingsQuery.bindings.length > 0 ? (
-          <View className="gap-2">
+          <RowGroup leadingTile>
             {bindingsQuery.bindings.map(binding => (
               <RepoBindingRow
                 key={`${binding.platform}:${binding.repoFullName}`}
@@ -201,7 +203,7 @@ export function RepoBindingsScreen({
                 }}
               />
             ))}
-          </View>
+          </RowGroup>
         ) : null}
 
         {isAdding ? (

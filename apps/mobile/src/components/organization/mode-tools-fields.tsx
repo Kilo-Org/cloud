@@ -5,10 +5,13 @@ import {
   MODE_TOOL_GROUPS,
   type ModeToolGroup,
 } from '@/components/organization/org-mode-form-model';
+import { Card } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
 import { FormFieldLabel } from '@/components/ui/form-field-label';
+import { RowGroup } from '@/components/ui/row-group';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
 const TOOL_LABEL_KEYS = {
@@ -52,16 +55,15 @@ export function ModeToolsFields({
     <>
       <View className="gap-2">
         <FormFieldLabel label={t('profiles.agents.tools')} />
-        <View className="overflow-hidden rounded-lg bg-secondary">
-          {MODE_TOOL_GROUPS.map((group, index) => (
+        <RowGroup>
+          {MODE_TOOL_GROUPS.map(group => (
             <View
               key={group}
-              className={cn(
-                'flex-row items-center gap-3 px-4 py-3',
-                index < MODE_TOOL_GROUPS.length - 1 && 'border-b-[0.5px] border-hair-soft'
-              )}
+              className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 px-4 py-3')}
             >
-              <Text className="flex-1 text-sm text-foreground">{t(TOOL_LABEL_KEYS[group])}</Text>
+              <Text className="flex-1 text-sm font-medium text-foreground">
+                {t(TOOL_LABEL_KEYS[group])}
+              </Text>
               <Switch
                 value={groups.includes(group)}
                 disabled={disabled}
@@ -72,11 +74,11 @@ export function ModeToolsFields({
               />
             </View>
           ))}
-        </View>
+        </RowGroup>
       </View>
 
       {groups.includes('edit') ? (
-        <View className="gap-4 rounded-lg border border-border p-4">
+        <Card>
           <FormField
             label={t('organization.modes.restrictionPattern')}
             defaultValue={editFileRegex}
@@ -86,16 +88,14 @@ export function ModeToolsFields({
             error={filePatternError}
             onChangeText={onChangeFilePattern}
           />
-          <Text variant="muted" className="text-xs">
-            {t('organization.modes.restrictionHint')}
-          </Text>
+          <Text variant="caption">{t('organization.modes.restrictionHint')}</Text>
           <FormField
             label={t('organization.modes.restrictionLabel')}
             defaultValue={editRestrictionLabel}
             disabled={disabled}
             onChangeText={onChangeRestrictionLabel}
           />
-        </View>
+        </Card>
       ) : null}
     </>
   );

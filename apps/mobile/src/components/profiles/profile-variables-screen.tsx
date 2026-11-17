@@ -25,12 +25,14 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { KeyRound } from '@/components/ui/icons';
+import { RowGroup } from '@/components/ui/row-group';
 import { Text } from '@/components/ui/text';
 import { useAgentProfileMutations, useAgentProfileVars } from '@/lib/hooks/use-agent-profiles';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { MAX_PROFILE_VARS } from '@/lib/agent-profile-forms';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import { clearFormDraft, useFormDraftState } from '@/lib/form-draft';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
@@ -224,32 +226,43 @@ export function ProfileVariablesScreen({
       />
     );
   } else {
+    const renderRow = (row: VariableRow) => (
+      <VariableRowView
+        key={row.key}
+        row={row}
+        isDeleting={deleteVar.isPending}
+        onEdit={
+          canManage
+            ? () => {
+                beginEdit(row.key);
+              }
+            : undefined
+        }
+        onDelete={
+          canManage
+            ? () => {
+                confirmDelete(row.key);
+              }
+            : undefined
+        }
+      />
+    );
+    // The edited row's form takes that row's place in the group: the rows above
+    // and below keep their order around it, and each run of rows stays one
+    // `RowGroup` because the form block is not a row.
+    const editedIndex = rows.findIndex(row => isEditing && row.key === editingKey);
     content = (
-      <>
-        {rows.map(row =>
-          isEditing && row.key === editingKey ? (
-            renderEditForm(false, initialVariableEdit(row))
-          ) : (
-            <VariableRowView
-              key={row.key}
-              row={row}
-              isDeleting={deleteVar.isPending}
-              onEdit={
-                canManage
-                  ? () => {
-                      beginEdit(row.key);
-                    }
-                  : undefined
-              }
-              onDelete={
-                canManage
-                  ? () => {
-                      confirmDelete(row.key);
-                    }
-                  : undefined
-              }
-            />
-          )
+      <View className="gap-3">
+        {editedIndex === -1 ? (
+          <RowGroup>{rows.map(renderRow)}</RowGroup>
+        ) : (
+          <>
+            {editedIndex > 0 ? <RowGroup>{rows.slice(0, editedIndex).map(renderRow)}</RowGroup> : null}
+            {renderEditForm(false, initialVariableEdit(rows[editedIndex]))}
+            {editedIndex < rows.length - 1 ? (
+              <RowGroup>{rows.slice(editedIndex + 1).map(renderRow)}</RowGroup>
+            ) : null}
+          </>
         )}
 
         {isAdding ? renderEditForm(true, initialVariableEdit(undefined)) : null}
@@ -268,7 +281,7 @@ export function ProfileVariablesScreen({
             </Button>
           ) : null}
         </ProfileManageSlot>
-      </>
+      </View>
     );
   }
 
@@ -282,7 +295,7 @@ export function ProfileVariablesScreen({
       />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-3 px-6 pt-4 pb-8"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}

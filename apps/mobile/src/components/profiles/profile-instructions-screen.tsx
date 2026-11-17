@@ -18,13 +18,17 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { FileText, Pencil, Trash2 } from '@/components/ui/icons';
-import { Skeleton } from '@/components/ui/skeleton';
+import { IconTile } from '@/components/ui/icon-tile';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
+import { NEUTRAL_TINT } from '@/lib/agent-color';
 import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
-import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { ICON_TARGET_BOX_CLASS, ROW_TARGET_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { MAX_PROFILE_INSTRUCTIONS } from '@/lib/agent-profile-forms';
 import { isolateLtrBidiText } from '@/lib/bidi';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import {
   type AgentProfileInstructionRow,
   useAgentProfileInstructions,
@@ -76,12 +80,13 @@ function InstructionRow({
   const { t } = useTranslation();
   const colors = useThemeColors();
   return (
-    <View className="min-h-16 flex-row items-center gap-1 rounded-lg bg-secondary px-3 py-2">
+    <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 px-4 py-3')}>
+      <IconTile icon={FileText} tint={NEUTRAL_TINT} />
       <View className="min-w-0 flex-1 gap-0.5">
         <Text variant="mono" numberOfLines={1} {...HIDDEN_LABEL_PROPS}>
           {instruction.name}
         </Text>
-        <Text variant="muted" className="text-xs" numberOfLines={1} {...HIDDEN_LABEL_PROPS}>
+        <Text variant="caption" numberOfLines={1} {...HIDDEN_LABEL_PROPS}>
           {`.kilocode/rules/${instruction.name}.md`}
         </Text>
       </View>
@@ -118,11 +123,11 @@ function InstructionRow({
 /** Content-shaped rows in the same slot and height as a loaded instruction row. */
 function InstructionsSkeleton() {
   return (
-    <View className="gap-3">
+    <RowGroup>
       {[0, 1, 2].map(index => (
-        <Skeleton key={index} className="h-16 w-full rounded-lg bg-muted-soft" />
+        <RowSkeleton key={index} tile subtitle />
       ))}
-    </View>
+    </RowGroup>
   );
 }
 
@@ -259,43 +264,45 @@ export function ProfileInstructionsScreen({
     );
   } else {
     content = (
-      <>
-        {instructions.map(instruction => (
-          <InstructionRow
-            key={instruction.id}
-            instruction={instruction}
-            onToggle={
-              canManage
-                ? guardRowPress(enabled => {
-                    setInstructionEnabled.mutate(
-                      { profileId, instructionId: instruction.id, enabled },
-                      {
-                        onError: error => {
-                          if (!hasUsableMessage(error)) {
-                            toast.error(t('profiles.instructionToggleFailed'));
-                          }
-                        },
-                      }
-                    );
-                  })
-                : undefined
-            }
-            onEdit={
-              canManage
-                ? guardRowPress(() => {
-                    form.startEdit(instruction);
-                  })
-                : undefined
-            }
-            onDelete={
-              canManage
-                ? guardRowPress(() => {
-                    confirmDelete({ id: instruction.id, name: instruction.name });
-                  })
-                : undefined
-            }
-          />
-        ))}
+      <View className="gap-3">
+        <RowGroup leadingTile>
+          {instructions.map(instruction => (
+            <InstructionRow
+              key={instruction.id}
+              instruction={instruction}
+              onToggle={
+                canManage
+                  ? guardRowPress(enabled => {
+                      setInstructionEnabled.mutate(
+                        { profileId, instructionId: instruction.id, enabled },
+                        {
+                          onError: error => {
+                            if (!hasUsableMessage(error)) {
+                              toast.error(t('profiles.instructionToggleFailed'));
+                            }
+                          },
+                        }
+                      );
+                    })
+                  : undefined
+              }
+              onEdit={
+                canManage
+                  ? guardRowPress(() => {
+                      form.startEdit(instruction);
+                    })
+                  : undefined
+              }
+              onDelete={
+                canManage
+                  ? guardRowPress(() => {
+                      confirmDelete({ id: instruction.id, name: instruction.name });
+                    })
+                  : undefined
+              }
+            />
+          ))}
+        </RowGroup>
         <ProfileManageSlot permission={permission}>
           {atInstructionCap ? (
             <AccessibleStatus
@@ -308,7 +315,7 @@ export function ProfileInstructionsScreen({
             <Text>{t('profiles.addInstruction')}</Text>
           </Button>
         </ProfileManageSlot>
-      </>
+      </View>
     );
   }
 
@@ -322,7 +329,7 @@ export function ProfileInstructionsScreen({
       />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-3 px-6 pt-4 pb-8"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}

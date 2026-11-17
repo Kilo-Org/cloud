@@ -29,6 +29,7 @@ import { OrgFormActions } from '@/components/organization/org-form-actions';
 import { ModeToolsFields } from '@/components/organization/mode-tools-fields';
 import { Text } from '@/components/ui/text';
 import { useOrgModeMutations } from '@/lib/hooks/use-org-modes-queries';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { usePopOnce } from '@/lib/navigation/pop-once';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 
@@ -165,7 +166,7 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
       <ScreenHeader title={mode === undefined ? t('organization.modes.create') : mode.name} />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-5 px-6 pb-10 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
@@ -208,7 +209,7 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
               }
             }}
           />
-          <Text variant="muted" className="text-xs">
+          <Text variant="caption">
             {values.slug.length > 0 || derivedSlug.length === 0
               ? t('organization.modes.identifierHint')
               : `${derivedSlug} · ${t('organization.modes.identifierHint')}`}

@@ -13,6 +13,8 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { RowGroup } from '@/components/ui/row-group';
 import { IconButton } from '@/components/ui/icon-button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -21,6 +23,7 @@ import { useOrgModes } from '@/lib/hooks/use-org-modes-queries';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { collator } from '@/lib/intl-cache';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 
 const MODE_FORM_PATH = '/(app)/(tabs)/(3_profile)/organization/mode-form' as const;
 
@@ -33,14 +36,10 @@ function sortModes(modes: readonly OrgMode[], language: string): readonly OrgMod
 
 function ModesSkeleton() {
   return (
-    <View className="mx-6 gap-2 rounded-lg bg-secondary p-4">
+    <Card className="mx-4">
       <Skeleton className="h-4 w-40 rounded bg-muted-soft" />
       <Skeleton className="h-3 w-56 rounded bg-muted-soft" />
-      <View className="pt-2">
-        <Skeleton className="h-4 w-32 rounded bg-muted-soft" />
-        <Skeleton className="mt-2 h-3 w-48 rounded bg-muted-soft" />
-      </View>
-    </View>
+    </Card>
   );
 }
 
@@ -107,8 +106,8 @@ export function OrganizationModesScreen() {
   } else {
     const sorted = sortModes(modes, i18n.language);
     body = (
-      <View className="mx-6 overflow-hidden rounded-lg bg-secondary">
-        {sorted.map((mode, index) => (
+      <RowGroup className="mx-4">
+        {sorted.map(mode => (
           <OrgRecordRow
             key={mode.id}
             title={mode.name}
@@ -118,10 +117,9 @@ export function OrganizationModesScreen() {
             onPress={() => {
               openModeForm(mode.id);
             }}
-            last={index === sorted.length - 1}
           />
         ))}
-      </View>
+      </RowGroup>
     );
   }
 
@@ -142,7 +140,7 @@ export function OrganizationModesScreen() {
       />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-4 pb-8 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
       >
         {body}

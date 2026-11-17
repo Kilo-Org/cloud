@@ -19,11 +19,16 @@ import { SheetScrollView } from '@/components/tab-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { cn } from '@/lib/utils';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import {
@@ -115,20 +120,26 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
 
   return (
     <>
-      <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
-        <Text className="text-sm font-medium">{t('common.enabled')}</Text>
-        <Switch
-          accessibilityLabel={t('organization.lowBalanceAlert.enableA11y')}
-          value={enabled}
-          onValueChange={value => {
-            selectionHaptic();
-            setEnabled(value);
-            setDraftThresholdError(value ? fieldThresholdError(thresholdRef.current) : null);
-            revalidate(value, thresholdRef.current, emailsRef.current);
-            clearSaveError();
-          }}
-        />
-      </View>
+      <RowGroup>
+        <View
+          className={cn(ROW_TARGET_CLASS, 'flex-row items-center justify-between gap-3 px-4 py-3')}
+        >
+          <Text className="text-sm font-medium text-foreground">
+            {t('organization.lowBalanceAlert.title')}
+          </Text>
+          <Switch
+            accessibilityLabel={t('organization.lowBalanceAlert.enableA11y')}
+            value={enabled}
+            onValueChange={value => {
+              selectionHaptic();
+              setEnabled(value);
+              setDraftThresholdError(value ? fieldThresholdError(thresholdRef.current) : null);
+              revalidate(value, thresholdRef.current, emailsRef.current);
+              clearSaveError();
+            }}
+          />
+        </View>
+      </RowGroup>
 
       {enabled && (
         <>
@@ -164,9 +175,7 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
                 clearSaveError();
               }}
             />
-            <Text variant="muted" className="text-xs">
-              {t('organization.lowBalanceAlert.separateEmailsHint')}
-            </Text>
+            <Text variant="caption">{t('organization.lowBalanceAlert.separateEmailsHint')}</Text>
             <AccessibleStatus
               message={saveError?.field === 'emails' ? saveError.message : null}
               className="text-sm"
@@ -210,9 +219,11 @@ export function LowBalanceAlertSheet() {
     return (
       <SheetScrollView
         className="flex-1 bg-background"
-        contentContainerClassName="px-6 gap-6 pb-8 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
       >
-        <Skeleton className="h-[52px] rounded-lg" />
+        <RowGroup>
+          <RowSkeleton />
+        </RowGroup>
         <View className="gap-1.5">
           <Skeleton className="h-3.5 w-28 rounded" />
           <Skeleton className="h-11 rounded-md" />
@@ -235,8 +246,8 @@ export function LowBalanceAlertSheet() {
   if (orgWithMembers.isError && !orgWithMembers.data) {
     return (
       <>
-        <View collapsable={false} className="bg-background px-6 pt-4">
-          <Text className="text-center text-lg font-semibold text-foreground">
+        <View collapsable={false} className="bg-background px-4 pt-3">
+          <Text variant="large" className="text-center">
             {t('organization.lowBalanceAlert.title')}
           </Text>
         </View>
@@ -252,11 +263,11 @@ export function LowBalanceAlertSheet() {
   return (
     <SheetScrollView
       className="flex-1 bg-background"
-      contentContainerClassName="px-6 gap-6 pb-8 pt-4"
+      contentContainerClassName={SCREEN_BODY_CLASS}
       automaticallyAdjustKeyboardInsets
       keyboardShouldPersistTaps="handled"
     >
-      <Text className="text-center text-lg font-semibold text-foreground">
+      <Text variant="large" className="text-center">
         {t('organization.lowBalanceAlert.title')}
       </Text>
 

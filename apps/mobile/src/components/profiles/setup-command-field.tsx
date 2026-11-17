@@ -64,7 +64,7 @@ export function SetupCommandField({
     return (
       <View className="gap-1.5">
         <FormFieldLabel label={label} labelAccessory={trailing} />
-        <View className="min-h-[44px] justify-center rounded-md border border-input bg-background px-3 py-2.5 dark:bg-[#FFFFFF0A]">
+        <View className="justify-center rounded-md border border-input bg-background px-3 py-2.5 dark:bg-[#FFFFFF0A]">
           <SelectableText
             accessibilityLabel={label}
             accessibilityHint={accessibilityHint}
@@ -90,7 +90,6 @@ export function SetupCommandField({
         labelAccessory={trailing}
         defaultValue={command}
         placeholder={t('profiles.commandPlaceholder')}
-        className="min-h-[44px] leading-[normal]"
         maxLength={MAX_SETUP_COMMAND_LENGTH}
         autoCapitalize="none"
         autoCorrect={false}
@@ -105,7 +104,8 @@ export function SetupCommandField({
         <View className="flex-row justify-end">
           {/* i18n-dup-ok: 'agentChat.composer.charactersRemaining_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules. */}
           <Text
-            className="text-xs font-normal text-muted-foreground"
+            variant="caption"
+            className="font-normal"
             accessibilityLabel={t('agentChat.composer.charactersRemaining', { count: remaining })}
           >
             {remaining}

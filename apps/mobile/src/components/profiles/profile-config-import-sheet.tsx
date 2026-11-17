@@ -23,12 +23,16 @@ import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { FormField } from '@/components/ui/form-field';
 import { ClipboardPaste } from '@/components/ui/icons';
+import { KvRow } from '@/components/ui/kv-row';
+import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { configImportArchiveFromText } from '@/lib/config-import-archive';
 import { useConfigImportMutations } from '@/lib/hooks/use-config-import-mutations';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 
 type ProfileConfigImportSheetProps = Readonly<{
   profileId: string;
@@ -204,7 +208,7 @@ export function ProfileConfigImportSheet({
       />
       <ScrollView
         className="flex-1"
-        contentContainerClassName="gap-4 px-6 pt-4 pb-8"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
@@ -266,11 +270,10 @@ export function ProfileConfigImportSheet({
         ) : null}
 
         {views.map(section => (
-          <View key={section.category} className="gap-1">
-            <View className="flex-row items-center gap-2">
-              <Text className="min-w-0 flex-1" numberOfLines={2}>
-                {t(section.titleKey)}
-              </Text>
+          <Section
+            key={section.category}
+            label={t(section.titleKey)}
+            notice={
               <Switch
                 value={selection[section.category]}
                 accessibilityLabel={t('profiles.importConfigIncludeSection', {
@@ -281,35 +284,35 @@ export function ProfileConfigImportSheet({
                   setSelection(current => ({ ...current, [section.category]: selected }));
                 }}
               />
-            </View>
-            {section.items.map(item => (
-              <View key={`${section.category}:${item.id}`} className="flex-row gap-2 pl-2">
-                <Text variant="mono" className="min-w-0 flex-1 text-xs" numberOfLines={1}>
-                  {item.label}
-                </Text>
-                <Text variant="muted" className="text-xs">
-                  {t(
+            }
+          >
+            <RowGroup>
+              {section.items.map(item => (
+                <KvRow
+                  key={`${section.category}:${item.id}`}
+                  label={item.label}
+                  value={t(
                     item.status === 'added'
                       ? 'profiles.importConfigAdded'
                       : 'profiles.importConfigChanged'
                   )}
-                </Text>
-              </View>
-            ))}
-          </View>
+                  valueFace="text"
+                />
+              ))}
+            </RowGroup>
+          </Section>
         ))}
 
         {issues.length === 0 ? null : (
-          <View className="gap-1">
-            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-              {t('profiles.importConfigIssuesTitle')}
-            </Text>
-            {issues.map((issue, index) => (
-              <Text key={`${issue.severity}:${String(index)}`} variant="muted" className="text-xs">
-                {`${issue.severity === 'error' ? '●' : '○'} ${issue.message}`}
-              </Text>
-            ))}
-          </View>
+          <Section label={t('profiles.importConfigIssuesTitle')}>
+            <View className="gap-1">
+              {issues.map((issue, index) => (
+                <Text key={`${issue.severity}:${String(index)}`} variant="caption">
+                  {`${issue.severity === 'error' ? '●' : '○'} ${issue.message}`}
+                </Text>
+              ))}
+            </View>
+          </Section>
         )}
       </ScrollView>
       <View style={{ height: insets.bottom }} className="bg-background" />

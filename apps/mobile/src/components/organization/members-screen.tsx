@@ -21,7 +21,9 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { SectionHeader } from '@/components/ui/section-header';
 import { Text } from '@/components/ui/text';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
@@ -67,19 +69,9 @@ function sortInvitedMembers(invites: InvitedOrgMember[]): InvitedOrgMember[] {
   });
 }
 
-function MemberRowSkeleton({ last }: Readonly<{ last?: boolean }>) {
-  return (
-    <View className={!last ? 'border-b-[0.5px] border-hair-soft' : undefined}>
-      <View className="gap-1.5 px-3 py-3">
-        <Skeleton className="h-4 w-32 rounded" />
-        <Skeleton className="h-3 w-44 rounded" />
-      </View>
-    </View>
-  );
-}
+const ListTopPad = () => <View className="pt-3" />;
 
 const listStyle = { flex: 1 } satisfies ViewStyle;
-const listContentContainerStyle = { paddingTop: 16, flexGrow: 1 } satisfies ViewStyle;
 
 /** The refused removal this row must state, read from the screen-level store. */
 function readRemovalFailure(snapshot: MemberRemovalStore['snapshot'], memberId: string) {
@@ -171,11 +163,7 @@ export function OrganizationMembersScreen() {
   const renderItem = ({ item, index }: { item: MembersListItem; index: number }) => {
     switch (item.kind) {
       case 'section': {
-        return (
-          <View className="bg-background px-6 pb-2 pt-4">
-            <Text variant="eyebrow">{item.title}</Text>
-          </View>
-        );
+        return <SectionHeader label={item.title} inset />;
       }
       case 'members-empty': {
         return emptyState;
@@ -185,9 +173,9 @@ export function OrganizationMembersScreen() {
         return (
           <View
             className={cn(
-              'mx-6 bg-secondary',
-              isFirst && 'rounded-t-lg',
-              item.last && 'rounded-b-lg'
+              'mx-4 bg-secondary',
+              isFirst && 'rounded-t-xl',
+              item.last && 'rounded-b-xl'
             )}
           >
             <MemberRow
@@ -215,9 +203,9 @@ export function OrganizationMembersScreen() {
         return (
           <View
             className={cn(
-              'mx-6 bg-secondary',
-              isFirst && 'rounded-t-lg',
-              item.last && 'rounded-b-lg'
+              'mx-4 bg-secondary',
+              isFirst && 'rounded-t-xl',
+              item.last && 'rounded-b-xl'
             )}
           >
             <InvitedMemberRow
@@ -293,16 +281,16 @@ export function OrganizationMembersScreen() {
             }
           }}
           getItemType={item => item.kind}
+          ListHeaderComponent={<ListTopPad />}
           ListEmptyComponent={
-            <View className="mx-6 rounded-lg bg-secondary">
-              <MemberRowSkeleton />
-              <MemberRowSkeleton />
-              <MemberRowSkeleton last />
-            </View>
+            <RowGroup className="mx-4">
+              <RowSkeleton subtitle />
+              <RowSkeleton subtitle />
+              <RowSkeleton subtitle />
+            </RowGroup>
           }
           ListFooterComponent={<View style={{ height: paddingBottom }} pointerEvents="none" />}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={listContentContainerStyle}
         />
       )}
     </View>

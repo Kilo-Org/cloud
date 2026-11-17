@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 
 import { type ProfileSectionKey } from '@/components/profiles/profile-list-model';
-import { Text } from '@/components/ui/text';
+import { Eyebrow } from '@/components/ui/eyebrow';
 
 /**
  * The owner words every profile surface uses: the heading above one owner's
@@ -32,11 +32,7 @@ export function useProfileOwnerLabel(): (owner: ProfileSectionKey) => string {
  * text style.
  */
 export function ProfileSectionHeading({ children }: Readonly<{ children: string }>) {
-  return (
-    <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-      {children}
-    </Text>
-  );
+  return <Eyebrow>{children}</Eyebrow>;
 }
 
 /** The heading above one owner's group of profile rows. */

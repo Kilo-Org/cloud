@@ -5,6 +5,7 @@ import { Pressable, Share, View } from 'react-native';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { formatDate } from '@/lib/format';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import { type InvitedOrgMember } from '@/lib/hooks/use-organization-queries';
@@ -93,7 +94,8 @@ export function InvitedMemberRow({
   const inner = (
     <View
       className={cn(
-        'flex-row items-center justify-between gap-3 py-3',
+        ROW_TARGET_CLASS,
+        'flex-row items-center justify-between gap-3 px-4 py-3',
         !last && 'border-b-[0.5px] border-hair-soft'
       )}
     >
@@ -102,16 +104,14 @@ export function InvitedMemberRow({
           {invite.email}
         </Text>
         {dateLabel && (
-          <Text className="mt-0.5 text-xs text-muted-foreground" numberOfLines={1}>
+          <Text variant="caption" className="mt-0.5" numberOfLines={1}>
             {dateLabel}
           </Text>
         )}
         {statusLabel && (
           <Text
-            className={cn(
-              'mt-0.5 text-xs',
-              invite.emailStatus === 'failed' ? 'text-destructive' : 'text-muted-foreground'
-            )}
+            variant="caption"
+            className={cn('mt-0.5', invite.emailStatus === 'failed' && 'text-destructive')}
             numberOfLines={1}
           >
             {statusLabel}
@@ -120,7 +120,7 @@ export function InvitedMemberRow({
       </View>
       {/* Same chip weight as MemberRow's role label; the reason lives there. */}
       <View className="rounded-full bg-muted px-2 py-0.5">
-        <Text className="text-[11px] font-semibold text-muted-foreground">
+        <Text variant="caption" className="font-semibold">
           {roleLabel(invite.role)}
         </Text>
       </View>
@@ -129,7 +129,7 @@ export function InvitedMemberRow({
 
   if (!canManage) {
     return (
-      <View className="px-3">
+      <View>
         {inner}
         {dialog}
       </View>
@@ -141,7 +141,7 @@ export function InvitedMemberRow({
       onPress={openActions}
       accessibilityRole="button"
       accessibilityLabel={t('organization.members.manageInvitationA11y', { email: invite.email })}
-      className="px-3 active:opacity-70"
+      className="active:opacity-70"
     >
       {inner}
       {dialog}

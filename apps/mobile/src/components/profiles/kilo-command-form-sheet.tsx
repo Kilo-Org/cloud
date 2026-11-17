@@ -21,13 +21,17 @@ import {
 import { SheetHeader } from '@/components/sheet-header';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FormField } from '@/components/ui/form-field';
+import { RowGroup } from '@/components/ui/row-group';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { MAX_PROFILE_KILO_COMMANDS } from '@/lib/agent-profile-forms';
 import { useFormDraftRef, useFormDraftState } from '@/lib/form-draft';
 import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { cn } from '@/lib/utils';
 
 /** Catalog key for each refused field, so the message lands under the input at fault. */
 const ERROR_KEYS = {
@@ -206,7 +210,7 @@ export function KiloCommandFormSheet({
       <ScrollView
         ref={scrollRef}
         className="flex-1"
-        contentContainerClassName="gap-4 px-6 pt-4 pb-8"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
@@ -280,17 +284,19 @@ export function KiloCommandFormSheet({
             modelRef.current = value;
           }}
         />
-        <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-          <Text {...HIDDEN_LABEL_PROPS} className="flex-1 text-sm font-medium text-foreground">
-            {t('profiles.slashCommands.subtask')}
-          </Text>
-          <Switch
-            value={subtask}
-            disabled={isSaving}
-            accessibilityLabel={t('profiles.slashCommands.subtask')}
-            onValueChange={setSubtask}
-          />
-        </View>
+        <RowGroup>
+          <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 px-4 py-3')}>
+            <Text {...HIDDEN_LABEL_PROPS} className="min-w-0 flex-1 text-sm font-medium text-foreground">
+              {t('profiles.slashCommands.subtask')}
+            </Text>
+            <Switch
+              value={subtask}
+              disabled={isSaving}
+              accessibilityLabel={t('profiles.slashCommands.subtask')}
+              onValueChange={setSubtask}
+            />
+          </View>
+        </RowGroup>
       </ScrollView>
       <View style={{ height: insets.bottom }} className="bg-background" />
       {dialog}

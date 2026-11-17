@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { type OrgListEntry } from '@/lib/hooks/use-organization-queries';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useRouteFocused } from '@/lib/navigation/route-focus';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { ORGANIZATION_HUB_PATH, ORGANIZATION_HUB_ROUTE_NAME } from '@/lib/organization-navigation';
@@ -174,12 +175,10 @@ export function CreateOrganizationScreen() {
       <ScreenHeader title={t('organization.create.title')} backFallback={PROFILE_TAB_HREF} />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="px-6 gap-4 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
       >
-        <Text className="text-sm text-muted-foreground">
-          {t('organization.create.description')}
-        </Text>
+        <Text variant="muted">{t('organization.create.description')}</Text>
         <View className="gap-2">
           <Text className="text-sm font-medium text-foreground">
             {t('organization.create.nameLabel')}
@@ -187,10 +186,10 @@ export function CreateOrganizationScreen() {
           <Input
             accessible
             accessibilityLabel={t('organization.create.nameLabel')}
-            // Single-line: `leading-[normal]` keeps iOS from drawing the
-            // placeholder lower than the typed text, and `min-h-*` (not `py-*`)
-            // keeps the text and placeholders centered.
-            className="min-h-[44px] rounded-md border border-input bg-background pl-3 pr-3 text-sm leading-[normal] text-foreground"
+            // The primitive owns the single-line box (`min-h-[44px]`,
+            // physical `pl-3 pr-3`, `leading-[normal]`); the call site keeps
+            // its own chrome and text size.
+            className="rounded-md border border-input bg-background text-sm text-foreground"
             placeholder={t('organization.hub.renamePlaceholder')}
             maxLength={ORGANIZATION_NAME_MAX_LENGTH}
             {...textProps}
@@ -211,14 +210,11 @@ export function CreateOrganizationScreen() {
             accessibilityState={{ disabled: pending }}
           />
         </View>
-        <Text className="text-xs text-muted-foreground">{t('organization.create.trialNote')}</Text>
+        <Text variant="caption">{t('organization.create.trialNote')}</Text>
         {message == null ? null : (
           <Text
-            className={
-              message.tone === 'error'
-                ? 'text-sm text-destructive'
-                : 'text-sm text-muted-foreground'
-            }
+            className={message.tone === 'error' ? 'text-sm text-destructive' : undefined}
+            variant={message.tone === 'error' ? undefined : 'muted'}
           >
             {message.text}
           </Text>

@@ -16,6 +16,7 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Bot } from '@/components/ui/icons';
+import { RowGroup } from '@/components/ui/row-group';
 import { Text } from '@/components/ui/text';
 import {
   type AgentProfileDetail,
@@ -27,6 +28,7 @@ import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
 import { MAX_PROFILE_AGENTS } from '@/lib/agent-profile-forms';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { isolateBidiText } from '@/lib/bidi';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
@@ -166,36 +168,38 @@ export function ProfileAgentsScreen({
     );
   } else {
     content = (
-      <>
-        {rows.map((row, index) => {
-          const source = agents[index];
-          if (source === undefined) {
-            return null;
-          }
-          return (
-            <AgentRowView
-              key={source.id}
-              name={source.name}
-              visibility={row.visibility}
-              description={row.description}
-              model={row.model}
-              onEdit={
-                canManage
-                  ? guardRowPress(() => {
-                      form.startEdit(source);
-                    })
-                  : undefined
-              }
-              onDelete={
-                canManage
-                  ? guardRowPress(() => {
-                      confirmDelete(source);
-                    })
-                  : undefined
-              }
-            />
-          );
-        })}
+      <View className="gap-3">
+        <RowGroup leadingTile>
+          {rows.map((row, index) => {
+            const source = agents[index];
+            if (source === undefined) {
+              return null;
+            }
+            return (
+              <AgentRowView
+                key={source.id}
+                name={source.name}
+                visibility={row.visibility}
+                description={row.description}
+                model={row.model}
+                onEdit={
+                  canManage
+                    ? guardRowPress(() => {
+                        form.startEdit(source);
+                      })
+                    : undefined
+                }
+                onDelete={
+                  canManage
+                    ? guardRowPress(() => {
+                        confirmDelete(source);
+                      })
+                    : undefined
+                }
+              />
+            );
+          })}
+        </RowGroup>
         <ProfileManageSlot permission={permission}>
           {atAgentCap ? (
             <AccessibleStatus
@@ -208,7 +212,7 @@ export function ProfileAgentsScreen({
             <Text>{t('profiles.agents.add')}</Text>
           </Button>
         </ProfileManageSlot>
-      </>
+      </View>
     );
   }
 
@@ -222,7 +226,7 @@ export function ProfileAgentsScreen({
       />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-3 px-6 pt-4 pb-8"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}

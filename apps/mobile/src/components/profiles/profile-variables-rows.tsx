@@ -11,9 +11,11 @@ import {
   type VariableRow,
 } from '@/components/profiles/profile-variables-model';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
 import { Eye, EyeOff, Lock, Trash2 } from '@/components/ui/icons';
-import { Skeleton } from '@/components/ui/skeleton';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -25,11 +27,11 @@ import { cn } from '@/lib/utils';
 /** Content-shaped rows in the same slot, height and gap as loaded variable rows. */
 export function VariablesSkeleton() {
   return (
-    <View className="gap-3">
+    <RowGroup>
       {[0, 1, 2].map(index => (
-        <Skeleton key={index} className="h-14 w-full rounded-lg bg-muted-soft" />
+        <RowSkeleton key={index} subtitle />
       ))}
-    </View>
+    </RowGroup>
   );
 }
 
@@ -102,9 +104,9 @@ export function VariableRowView({
   const colors = useThemeColors();
   const revealLabel = revealed ? t('profiles.secrets.hide') : t('profiles.secrets.reveal');
   return (
-    <View className="min-h-14 flex-row items-center gap-1 rounded-lg bg-secondary pr-1 pl-3">
+    <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-1 py-2 pl-4 pr-1')}>
       <Pressable
-        className="min-h-14 flex-1 flex-row items-center gap-2 py-2 active:opacity-70"
+        className={cn(ROW_TARGET_CLASS, 'flex-1 flex-row items-center gap-2 active:opacity-70')}
         accessibilityRole="button"
         accessibilityLabel={row.key}
         disabled={onEdit === undefined}
@@ -274,7 +276,7 @@ export function VariableEditForm({
   };
 
   return (
-    <View className="gap-3 rounded-lg border border-border bg-card p-3">
+    <Card>
       <View className="gap-1.5">
         <FormField
           label={t('profiles.keyLabel')}
@@ -299,9 +301,7 @@ export function VariableEditForm({
           }}
         />
         {keyPreview === null ? null : (
-          <Text className="text-xs text-muted-foreground">
-            {t('profiles.keyWillBeSavedAs', { key: keyPreview })}
-          </Text>
+          <Text variant="caption">{t('profiles.keyWillBeSavedAs', { key: keyPreview })}</Text>
         )}
       </View>
       <FormField
@@ -337,31 +337,19 @@ export function VariableEditForm({
           ) : (
             <Eye size={18} color={colors.mutedForeground} />
           )}
-          <Text className="text-sm text-muted-foreground">{revealLabel}</Text>
+          <Text variant="muted">{revealLabel}</Text>
         </Pressable>
       ) : null}
-      <View
-        className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 rounded-lg bg-secondary p-3')}
-      >
+      <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3')}>
         <Lock size={18} color={colors.secondaryForeground} />
         <Text {...HIDDEN_LABEL_PROPS} className="flex-1 text-sm font-medium text-foreground">
           {t('profiles.secrets.markSecret')}
         </Text>
-        {/* The native switch draws its 32dp track inside a box that reserves the
-            thumb's overhang, so the track ends about 12dp before the box does
-            and the row's 10.5dp padding leaves it 23dp from the row's edge,
-            twice the 13dp the lock glyph keeps from its opposite edge. Pulling
-            the box out by the padding itself lines the track's end up with the
-            glyph on both edges. The pull is on the END edge, so it must stay
-            logical: `marginInlineEnd` follows the writing direction, while a
-            hand-picked `-mr-3` lands on the title's side under RTL. */}
-        <View className="-me-3">
-          <Switch
-            value={isSecret}
-            accessibilityLabel={t('profiles.secrets.markSecret')}
-            onValueChange={setIsSecret}
-          />
-        </View>
+        <Switch
+          value={isSecret}
+          accessibilityLabel={t('profiles.secrets.markSecret')}
+          onValueChange={setIsSecret}
+        />
       </View>
       <View className="flex-row gap-2">
         <Button variant="outline" className="flex-1" onPress={onCancel}>
@@ -378,6 +366,6 @@ export function VariableEditForm({
           <Text>{t('common.save')}</Text>
         </Button>
       </View>
-    </View>
+    </Card>
   );
 }

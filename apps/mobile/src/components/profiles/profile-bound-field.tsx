@@ -79,7 +79,8 @@ function BoundProfileField({
         <View className="flex-row justify-end">
           {/* i18n-dup-ok: 'agentChat.composer.charactersRemaining_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules. */}
           <Text
-            className="text-xs font-normal text-muted-foreground"
+            variant="caption"
+            className="font-normal"
             accessibilityLabel={t('agentChat.composer.charactersRemaining', { count: remaining })}
           >
             {remaining}

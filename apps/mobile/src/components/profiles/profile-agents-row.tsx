@@ -13,10 +13,13 @@ import {
 } from '@/components/profiles/profile-agents-model';
 import { ProfileRowIdentity, profileRowLabel } from '@/components/profiles/profile-row-identity';
 import { Bot, Pencil, Trash2 } from '@/components/ui/icons';
-import { Skeleton } from '@/components/ui/skeleton';
+import { IconTile } from '@/components/ui/icon-tile';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
+import { NEUTRAL_TINT } from '@/lib/agent-color';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { ICON_TARGET_BOX_CLASS, ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
 type AgentRowViewProps = Readonly<{
@@ -31,7 +34,8 @@ type AgentRowViewProps = Readonly<{
 /**
  * One agent row: name, visibility, optional model and description, edit/delete.
  * The name and what qualifies it are one identity element declared first, so a
- * screen reader hears what the row is before the controls that change it.
+ * screen reader hears what the row is before the controls that change it. It
+ * lives in a `RowGroup`, which draws the separator between rows.
  */
 export function AgentRowView({
   name,
@@ -44,29 +48,24 @@ export function AgentRowView({
   const { t } = useTranslation();
   const colors = useThemeColors();
   const visibilityLabel = t(AGENT_VISIBILITY_LABEL_KEYS[visibility]);
-  // The name owns its row, so an agent name is ellipsized only when it alone is
-  // wider than the card; the mode label never takes the room a short name needs.
-  // The label is metadata, so it leads the column under the name at the same
-  // 2 dp gap the card uses between its meta lines.
+  // The name owns its line, so an agent name is ellipsized only when it alone is
+  // wider than the row; the mode label is metadata and never takes the room a
+  // short name needs.
   return (
-    <View className="min-h-16 flex-row items-start gap-1 rounded-lg bg-secondary px-3 py-2">
+    <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 px-4 py-3')}>
+      <IconTile icon={Bot} tint={NEUTRAL_TINT} />
       <ProfileRowIdentity label={profileRowLabel(name, visibilityLabel, model, description)}>
-        <View className="flex-row items-center gap-2">
-          <Bot size={16} color={colors.mutedForeground} />
-          <Text className="min-w-0 shrink text-sm font-medium text-foreground" numberOfLines={1}>
-            {name}
-          </Text>
-        </View>
-        <Text className="text-xs uppercase tracking-wide text-muted-foreground">
-          {visibilityLabel}
+        <Text className="min-w-0 shrink text-sm font-medium text-foreground" numberOfLines={1}>
+          {name}
         </Text>
+        <Text variant="caption">{visibilityLabel}</Text>
         {model.length > 0 ? (
           <Text variant="mono" className="text-xs text-muted-foreground" numberOfLines={1}>
             {model}
           </Text>
         ) : null}
         {description.length > 0 ? (
-          <Text className="text-xs text-muted-foreground" numberOfLines={2}>
+          <Text variant="caption" numberOfLines={2}>
             {description}
           </Text>
         ) : null}
@@ -98,10 +97,10 @@ export function AgentRowView({
 /** Content-shaped rows in the same slots as a loaded agent row. */
 export function AgentsSkeleton() {
   return (
-    <View className="gap-3">
+    <RowGroup>
       {[0, 1, 2].map(index => (
-        <Skeleton key={index} className="h-16 w-full rounded-lg bg-muted-soft" />
+        <RowSkeleton key={index} tile subtitle />
       ))}
-    </View>
+    </RowGroup>
   );
 }

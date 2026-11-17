@@ -13,7 +13,10 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { IconButton } from '@/components/ui/icon-button';
+import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
@@ -21,19 +24,16 @@ import { formatNumber } from '@/lib/format';
 import { useOrgGroups } from '@/lib/hooks/use-org-groups-queries';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 
 const GROUP_FORM_PATH = '/(app)/(tabs)/(3_profile)/organization/group-form' as const;
 
 function GroupsSkeleton() {
   return (
-    <View className="mx-6 gap-2 rounded-lg bg-secondary p-4">
+    <Card className="mx-4">
       <Skeleton className="h-4 w-32 rounded bg-muted-soft" />
       <Skeleton className="h-3 w-24 rounded bg-muted-soft" />
-      <View className="pt-2">
-        <Skeleton className="h-4 w-40 rounded bg-muted-soft" />
-        <Skeleton className="mt-2 h-3 w-28 rounded bg-muted-soft" />
-      </View>
-    </View>
+    </Card>
   );
 }
 
@@ -88,25 +88,21 @@ export function OrganizationGroupsScreen() {
     );
   } else if (memberGroups !== null) {
     body = (
-      <View className="mx-6 gap-2">
-        <Text variant="eyebrow">{t('organization.groups.memberViewTitle')}</Text>
+      <Section label={t('organization.groups.memberViewTitle')} className="mx-4">
         {memberGroups.length === 0 ? (
-          <Text variant="muted" className="text-sm">
-            {t('organization.groups.memberViewEmpty')}
-          </Text>
+          <Text variant="muted">{t('organization.groups.memberViewEmpty')}</Text>
         ) : (
-          <View className="overflow-hidden rounded-lg bg-secondary">
-            {memberGroups.map((group, index) => (
+          <RowGroup>
+            {memberGroups.map(group => (
               <OrgRecordRow
                 key={group.id}
                 title={group.name}
                 description={group.description ?? undefined}
-                last={index === memberGroups.length - 1}
               />
             ))}
-          </View>
+          </RowGroup>
         )}
-      </View>
+      </Section>
     );
   } else if (managerGroups === null || managerGroups.length === 0) {
     body = (
@@ -131,8 +127,8 @@ export function OrganizationGroupsScreen() {
     );
   } else {
     body = (
-      <View className="mx-6 overflow-hidden rounded-lg bg-secondary">
-        {managerGroups.map((group, index) => (
+      <RowGroup className="mx-4">
+        {managerGroups.map(group => (
           <OrgRecordRow
             key={group.id}
             title={group.name}
@@ -149,10 +145,9 @@ export function OrganizationGroupsScreen() {
                   }
                 : undefined
             }
-            last={index === managerGroups.length - 1}
           />
         ))}
-      </View>
+      </RowGroup>
     );
   }
 
@@ -175,7 +170,7 @@ export function OrganizationGroupsScreen() {
       />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-4 pb-8 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
       >
         {body}

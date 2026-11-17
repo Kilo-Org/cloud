@@ -285,14 +285,14 @@ describe('OrganizationMembersScreen section labels', () => {
     const cards = renderer.root.findAll(
       node =>
         typeof node.props.className === 'string' &&
-        node.props.className.includes('mx-6 bg-secondary')
+        node.props.className.includes('mx-4 bg-secondary')
     );
     expect(cards).toHaveLength(1);
     const card = cards[0];
     if (!card) {
       throw new Error('member card not found');
     }
-    expect(card.props.className).toContain('rounded-t-lg');
+    expect(card.props.className).toContain('rounded-t-xl');
     unmount();
   });
 

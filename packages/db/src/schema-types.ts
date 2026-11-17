@@ -2528,11 +2528,30 @@ export type SecurityFindingAnalysis = {
 
 // --- OpenRouter types ---
 
+/**
+ * Time-of-day prices. OpenRouter lists the prices of each UTC window in `overrides`; Vercel AI
+ * Gateway multiplies its token prices by `peak_pricing.multiplier` during peak windows.
+ */
+export const PriceOverrideSchema = z.looseObject({
+  prompt: z.string().optional().catch(undefined),
+  completion: z.string().optional().catch(undefined),
+  input_cache_read: z.string().optional().catch(undefined),
+  input_cache_write: z.string().optional().catch(undefined),
+});
+
+export const PeakPricingSchema = z.looseObject({ multiplier: z.number() });
+
+const TimeOfDayPricingFields = {
+  overrides: z.array(PriceOverrideSchema).optional().catch(undefined),
+  peak_pricing: PeakPricingSchema.optional().catch(undefined),
+};
+
 export type OpenRouterPricing = z.infer<typeof OpenRouterPricing>;
 export const OpenRouterPricing = z.object({
   prompt: z.string(),
   completion: z.string(),
   discount: z.number().optional(),
+  ...TimeOfDayPricingFields,
 });
 
 export type OpenRouterBaseModel = z.infer<typeof OpenRouterBaseModel>;
@@ -3421,6 +3440,7 @@ export const EndpointPricingSchema = z.object({
   web_search: z.string().optional(),
   internal_reasoning: z.string().optional(),
   discount: z.number().optional(),
+  ...TimeOfDayPricingFields,
 });
 
 export const EndpointInferenceRegionSchema = z.object({

@@ -208,6 +208,63 @@ describe('GET /api/openrouter/models/[provider]/[model]/endpoints', () => {
     ]);
   });
 
+  test("compares both gateways' peak prices", async () => {
+    const model = {
+      id: 'deepseek/deepseek-v4.1-flash-1017',
+      name: 'DeepSeek: DeepSeek V4.1 Flash',
+      endpoints: [
+        {
+          tag: 'alibaba',
+          provider_name: 'Alibaba',
+          pricing: {
+            prompt: '0.00000018',
+            completion: '0.00000072',
+            input_cache_read: '0.0000000036',
+            overrides: [
+              { utc_start: 0, utc_end: 1400, prompt: '0.00000018', completion: '0.00000072' },
+              { utc_start: 1400, utc_end: 0, prompt: '0.00000009', completion: '0.00000036' },
+            ],
+          },
+        },
+      ],
+    };
+    mockedGetOpenRouterModelsMetadataFromDatabase.mockResolvedValue({ [model.id]: model });
+    mockedGetVercelModelsMetadataFromDatabase.mockResolvedValue({
+      [model.id]: {
+        id: model.id,
+        name: 'DeepSeek V4.1 Flash',
+        endpoints: [
+          {
+            provider_name: 'alibaba',
+            pricing: {
+              prompt: '0.00000015',
+              completion: '0.0000006',
+              input_cache_read: '0.000000015',
+              peak_pricing: { multiplier: 2 },
+            },
+          },
+        ],
+      },
+    });
+
+    const response = await handleModelEndpointsRequest(request(model.id), {
+      params: Promise.resolve({ provider: 'deepseek', model: 'deepseek-v4.1-flash-1017' }),
+    });
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).data.endpoints).toEqual([
+      {
+        tag: 'alibaba',
+        provider_name: 'Alibaba',
+        pricing: {
+          prompt: '0.000000300000',
+          completion: '0.000001200000',
+          input_cache_read: '0.000000030000',
+        },
+      },
+    ]);
+  });
+
   test('lists the endpoints and prices of the model a latest alias resolves to', async () => {
     const alias = {
       id: '~anthropic/claude-sonnet-latest',

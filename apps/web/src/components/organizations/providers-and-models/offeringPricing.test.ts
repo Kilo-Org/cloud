@@ -21,4 +21,16 @@ describe('getOfferingPricing', () => {
     expect(formatPrice(pricing.promptPrice)).toBe('$1.00/1M tokens');
     expect(formatPrice(pricing.completionPrice)).toBe('$5.00/1M tokens');
   });
+
+  test('shows the peak price of time-of-day pricing', () => {
+    expect(
+      getOfferingPricing({
+        prompt: '0.00000009',
+        completion: '0.00000036',
+        overrides: [
+          { utc_start: 0, utc_end: 1400, prompt: '0.00000018', completion: '0.00000072' },
+        ],
+      })
+    ).toEqual({ promptPrice: '0.00000018', completionPrice: '0.00000072' });
+  });
 });

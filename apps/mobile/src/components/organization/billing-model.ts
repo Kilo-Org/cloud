@@ -1,5 +1,6 @@
 import { i18n } from '@/i18n';
 import { isolateLtrBidiText } from '@/lib/bidi';
+import { isRunningTrialStage } from '@kilocode/app-shared/organizations';
 import { formatDate, formatNumber, formatPrefixedMoney } from '@/lib/format';
 import { parseTimestamp } from '@/lib/utils';
 
@@ -58,18 +59,6 @@ type BillingStateTone = 'default' | 'good' | 'warn' | 'danger' | 'muted';
 export type BillingState = Readonly<{ label: string; tone: BillingStateTone }>;
 
 /**
- * The four stages in which the trial is still running, mirroring the server's
- * `isRunningTrialStage`. The server publishes only these, so a device reads the
- * same predicate over the payload rather than re-deriving dates.
- */
-const RUNNING_TRIAL_STATUSES = {
-  trial_active: true,
-  trial_ending_soon: true,
-  trial_ending_very_soon: true,
-  trial_expires_today: true,
-} as const satisfies Record<string, true>;
-
-/**
  * Statuses Stripe reports after it stops billing: the subscription exists in
  * the record, so the row states that it ended instead of pretending none was
  * ever bought. `unpaid` is not one of them: Stripe keeps the unpaid invoice
@@ -108,15 +97,17 @@ function formattedPeriodEnd(input: OrgSeatSubscription): string | null {
 /**
  * The trial readout as a state pill, or `null` when the organization is not on
  * a running trial. Both surfaces that name the plan state read this one
- * function, so the copy and the criteria cannot drift between them.
+ * function, so the copy and the criteria cannot drift between them. The
+ * running-stage set is the server's own predicate
+ * (`isRunningTrialStage` in `@kilocode/app-shared/organizations`), not a local
+ * mirror, so a stage added server-side is picked up here by type.
  *
  * The date is parsed with `parseTimestamp`: `new Date()` throws on the
  * PostgreSQL timestamps Hermes cannot read, and the server sends the trial end
  * as an ISO instant either way.
  */
 export function getOrgTrialStatusPill(trial: OrgTrialState): BillingState | null {
-  const status = trial.trialStatus;
-  if (status == null || !Object.hasOwn(RUNNING_TRIAL_STATUSES, status)) {
+  if (!isRunningTrialStage(trial.trialStatus)) {
     return null;
   }
   const endsAt = trial.trialEndsAt;

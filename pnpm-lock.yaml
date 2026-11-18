@@ -1552,6 +1552,9 @@ importers:
 
   packages/app-shared:
     dependencies:
+      '@kilocode/organization-entitlement':
+        specifier: 'workspace:*'
+        version: link:../organization-entitlement
       '@kilocode/session-ingest-contracts':
         specifier: workspace:*
         version: link:../session-ingest-contracts

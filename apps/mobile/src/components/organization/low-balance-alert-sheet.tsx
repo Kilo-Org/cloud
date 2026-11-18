@@ -120,9 +120,12 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
         {/* The slot wraps the label and carries the gutter (`pe-3`) instead of
             the label, so a wrapped catalog line stays clear of the switch's
             own 44 dp box — the shape sibling toggle rows use. The label keeps
-            the hidden-label props: the switch below already names the row. */}
-        <View {...HIDDEN_LABEL_PROPS} className="min-w-0 flex-1 pe-3">
-          <Text className="text-sm font-medium">
+            the hidden-label props: hiding the wrapper's own node would leave
+            the inner text in the tree (`no` hides one view,
+            `no-hide-descendants` hides a subtree), so the props sit on the
+            text itself. The switch below already names the row. */}
+        <View className="min-w-0 flex-1 pe-3">
+          <Text {...HIDDEN_LABEL_PROPS} className="text-sm font-medium">
             {t('organization.lowBalanceAlert.enableA11y')}
           </Text>
         </View>

@@ -4748,15 +4748,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
     };
     // Pre-deploy wrappers reject unknown fields in both prepare and attach frames.
     if (attachment?.runtimeInstructions !== true) delete wireSpec.runtimeInstructions;
-    if (
-      attachment?.runtimeWebSearch !== true &&
-      (wireSpec.webSearchDisabled || wireSpec.webSearchProvider)
-    ) {
-      delete wireSpec.webSearchDisabled;
-      delete wireSpec.webSearchProvider;
-      if (attachment?.runtimeHarness === 'kilo2') {
+    if (attachment?.runtimeWebSearch !== true) {
+      if (wireSpec.webSearchDisabled && attachment?.runtimeHarness === 'kilo2') {
         wireSpec.permission = { ...wireSpec.permission, websearch: 'deny' };
       }
+      delete wireSpec.webSearchDisabled;
+      delete wireSpec.webSearchProvider;
     }
     // A restored workspace tail runs no commands, so the frame carries none. A
     // non-tail start sends the environment build boundary and start list.

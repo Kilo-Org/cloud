@@ -4861,6 +4861,8 @@
       "created": "Cruthaíodh an truicear",
       "saved": "Sábháladh an truicear",
       "statusArrived": "Tagtha",
+      "defaultPromptWebhook": "Déan cur síos ar chomhlacht an iarratais chruca ghréasáin seo:\n\n{{body}}",
+      "defaultPromptScheduled": "Rith an tasc sceidealaithe. Truiceartha ag {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Cuir isteach ainm.",
         "nameTooShort": "Úsáid 8 gcarachtar ar a laghad.",

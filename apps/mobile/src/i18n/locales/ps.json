@@ -4651,6 +4651,8 @@
       "created": "ټرېګر جوړ شو",
       "saved": "ټرېګر خوندي شو",
       "statusArrived": "ورسېد",
+      "defaultPromptWebhook": "د دې ویب‌هوک غوښتنې د بدن تشریح وکړئ:\n\n{{body}}",
+      "defaultPromptScheduled": "مهالویز کار وچلوئ. {{scheduledTime}} کې ټرېګر شو.",
       "problems": {
         "nameRequired": "نوم ولیکئ.",
         "nameTooShort": "لږ تر لږه 8 توري وکاروئ.",

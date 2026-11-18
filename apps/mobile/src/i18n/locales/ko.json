@@ -4651,6 +4651,8 @@
       "created": "트리거가 생성됨",
       "saved": "트리거가 저장됨",
       "statusArrived": "도착함",
+      "defaultPromptWebhook": "이 웹훅 요청의 본문을 설명하세요:\n\n{{body}}",
+      "defaultPromptScheduled": "예약된 작업을 실행하세요. {{scheduledTime}}에 실행을 시작했습니다.",
       "problems": {
         "nameRequired": "이름을 입력하세요.",
         "nameTooShort": "8자 이상 사용하세요.",

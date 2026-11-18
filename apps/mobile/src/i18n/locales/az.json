@@ -4651,6 +4651,8 @@
       "created": "Tətikləyici yaradıldı",
       "saved": "Tətikləyici yadda saxlanıldı",
       "statusArrived": "Gəldi",
+      "defaultPromptWebhook": "Bu vebhuk sorğusunun gövdəsini təsvir edin:\n\n{{body}}",
+      "defaultPromptScheduled": "Planlaşdırılmış tapşırığı icra edin. Tetiklənmə vaxtı: {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Ad daxil edin.",
         "nameTooShort": "Ən azı 8 simvol istifadə edin.",

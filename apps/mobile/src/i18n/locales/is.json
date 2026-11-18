@@ -4651,6 +4651,8 @@
       "created": "Kveikja búin til",
       "saved": "Kveikja vistuð",
       "statusArrived": "Borist",
+      "defaultPromptWebhook": "Lýstu meginmáli þessarar vefkrókabeiðni:\n\n{{body}}",
+      "defaultPromptScheduled": "Keyrðu tímasettu verkefnið. Kveikt á {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Sláðu inn heiti.",
         "nameTooShort": "Notaðu að minnsta kosti 8 stafi.",

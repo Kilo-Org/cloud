@@ -4651,6 +4651,8 @@
       "created": "ট্রিগার তৈরি হয়েছে",
       "saved": "ট্রিগার সংরক্ষিত হয়েছে",
       "statusArrived": "পৌঁছেছে",
+      "defaultPromptWebhook": "এই ওয়েবহুক অনুরোধের বডি বর্ণনা করুন:\n\n{{body}}",
+      "defaultPromptScheduled": "নির্ধারিত কাজটি চালান। চালনা শুরু হয়েছে {{scheduledTime}}-এ।",
       "problems": {
         "nameRequired": "একটি নাম লিখুন।",
         "nameTooShort": "কমপক্ষে ৮ অক্ষর ব্যবহার করুন।",

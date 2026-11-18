@@ -4651,6 +4651,8 @@
       "created": "ट्रिगर सिर्जना गरियो",
       "saved": "ट्रिगर सुरक्षित गरियो",
       "statusArrived": "आइपुग्यो",
+      "defaultPromptWebhook": "यो वेबहुक अनुरोधको बडीको वर्णन गर्नुहोस्:\n\n{{body}}",
+      "defaultPromptScheduled": "अनुसूचित कार्य चलाउनुहोस्। {{scheduledTime}} मा ट्रिगर भयो।",
       "problems": {
         "nameRequired": "नाम प्रविष्ट गर्नुहोस्।",
         "nameTooShort": "कम्तीमा 8 वर्ण प्रयोग गर्नुहोस्।",

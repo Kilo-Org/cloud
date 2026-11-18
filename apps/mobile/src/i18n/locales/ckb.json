@@ -4651,6 +4651,8 @@
       "created": "چالاککەر دروستکرا",
       "saved": "چالاککەر پاشەکەوت کرا",
       "statusArrived": "گەیشت",
+      "defaultPromptWebhook": "ناوەڕۆکی داواکاری ئەم وێبهووکە باس بکە:\n\n{{body}}",
+      "defaultPromptScheduled": "ئەرکی خشتەکی ڕابکە۔ ڕاکردن لە {{scheduledTime}} دەستی پێکرد۔",
       "problems": {
         "nameRequired": "ناوێک بنووسە۔",
         "nameTooShort": "کەمترین 8 پیت بەکاربهێنە۔",

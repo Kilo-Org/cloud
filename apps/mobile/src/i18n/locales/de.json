@@ -4651,6 +4651,8 @@
       "created": "Auslöser erstellt",
       "saved": "Auslöser gespeichert",
       "statusArrived": "Eingetroffen",
+      "defaultPromptWebhook": "Beschreibe den Anfragekörper dieses Webhooks:\n\n{{body}}",
+      "defaultPromptScheduled": "Führe die geplante Aufgabe aus. Ausgelöst um {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Gib einen Namen ein.",
         "nameTooShort": "Verwende mindestens 8 Zeichen.",

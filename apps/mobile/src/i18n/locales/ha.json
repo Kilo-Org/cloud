@@ -4651,6 +4651,8 @@
       "created": "An ƙirƙiri mai jawowa",
       "saved": "An ajiye mai jawowa",
       "statusArrived": "Ya iso",
+      "defaultPromptWebhook": "Bayyana jikin buƙatar wannan kiran yanar gizo:\n\n{{body}}",
+      "defaultPromptScheduled": "Gudanar da aikin da aka jadawalta. An fara gudana a {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Shigar da suna.",
         "nameTooShort": "Yi amfani da aƙalla haruffa 8.",

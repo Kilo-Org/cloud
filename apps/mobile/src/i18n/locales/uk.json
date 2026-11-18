@@ -4791,6 +4791,8 @@
       "created": "Тригер створено",
       "saved": "Тригер збережено",
       "statusArrived": "Надійшло",
+      "defaultPromptWebhook": "Опишіть тіло цього запиту вебхука:\n\n{{body}}",
+      "defaultPromptScheduled": "Запустіть задачу за розкладом. Тригер спрацював о {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Введіть назву.",
         "nameTooShort": "Використовуйте щонайменше 8 символів.",

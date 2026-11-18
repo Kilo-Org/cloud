@@ -4651,6 +4651,8 @@
       "created": "Isibangeli sidalwe",
       "saved": "Isibangeli sigciniwe",
       "statusArrived": "Kufikile",
+      "defaultPromptWebhook": "Chaza umzimba wesicelo sale-webhook:\n\n{{body}}",
+      "defaultPromptScheduled": "Qalisa umsebenzi ohleliwe. Kucushwe ngesikhathi {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Faka igama.",
         "nameTooShort": "Sebenzisa okungenani izinhlamvu eziyi-8.",

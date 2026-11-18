@@ -4931,6 +4931,8 @@
       "created": "تم إنشاء المشغل",
       "saved": "تم حفظ المشغل",
       "statusArrived": "وصل",
+      "defaultPromptWebhook": "صف جسم طلب الويب هوك هذا:\n\n{{body}}",
+      "defaultPromptScheduled": "شغّل المهمة المجدولة. بدأ التشغيل في {{scheduledTime}}.",
       "problems": {
         "nameRequired": "أدخل اسماً.",
         "nameTooShort": "استخدم 8 أحرف على الأقل.",

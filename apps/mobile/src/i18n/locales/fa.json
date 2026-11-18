@@ -4651,6 +4651,8 @@
       "created": "تریگر ساخته شد",
       "saved": "تریگر ذخیره شد",
       "statusArrived": "رسید",
+      "defaultPromptWebhook": "بدنه درخواست این وب‌هوک را توصیف کنید:\n\n{{body}}",
+      "defaultPromptScheduled": "کار زمان‌بندی‌شده را اجرا کنید. اجرا در {{scheduledTime}} آغاز شد.",
       "problems": {
         "nameRequired": "نامی وارد کنید.",
         "nameTooShort": "دست‌کم ۸ نویسه استفاده کنید.",

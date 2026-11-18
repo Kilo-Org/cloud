@@ -695,7 +695,10 @@ export function NotificationsScreen() {
               onPress={() => void Linking.openSettings()}
               accessibilityRole="button"
               accessibilityLabel={t('common.openSettings')}
-              className="min-h-[44px] items-center justify-center rounded-lg bg-primary py-2.5 active:opacity-80"
+              className={cn(
+                STATE_ACTION_CLASS,
+                'items-center justify-center rounded-lg bg-primary py-2.5 active:opacity-80'
+              )}
             >
               <Text className="text-sm font-semibold text-primary-foreground">
                 {t('common.openSettings')}
@@ -784,7 +787,10 @@ export function NotificationsScreen() {
                 disabled={isMasterBusy}
                 accessibilityRole="button"
                 accessibilityLabel={t('notifications.enable')}
-                className="mt-3 min-h-[44px] items-center justify-center rounded-lg bg-primary py-2.5 active:opacity-80"
+                className={cn(
+                  STATE_ACTION_CLASS,
+                  'mt-3 items-center justify-center rounded-lg bg-primary py-2.5 active:opacity-80'
+                )}
               >
                 {isMasterBusy ? (
                   <ActivityIndicator size="small" color={colors.primaryForeground} />

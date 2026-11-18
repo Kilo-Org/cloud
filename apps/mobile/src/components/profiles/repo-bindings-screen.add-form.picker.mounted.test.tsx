@@ -143,7 +143,7 @@ describe('RepoBindingsScreen add form profile picker', () => {
     expect(empty.description).toBe(
       'Create a profile to reuse environment variables, setup commands, and skills across sessions.'
     );
-    expect(empty.action?.props.children.props.children).toBe('Create profile');
+    expect(empty.action?.props.label).toBe('Create profile');
     act(() => {
       empty.action?.props.onPress();
     });

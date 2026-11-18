@@ -38,7 +38,7 @@ type EmptyStateNode = {
   props: {
     title?: string;
     description?: string;
-    action?: { props: { onPress: () => void; children: { props: { children: string } } } };
+    action?: { props: { label: string; onPress: () => void } };
   };
 };
 

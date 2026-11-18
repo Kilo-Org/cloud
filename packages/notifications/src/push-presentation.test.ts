@@ -12,10 +12,15 @@ import {
   androidChannelIdForAgentKind,
   androidChannelIdForPushData,
   androidChannelIdForPushDataToAppVersion,
+  BRIEFING_FALLBACK_CHANNEL_ID,
   LEGACY_AGENT_ANDROID_CHANNEL_ID,
+  LEGACY_ACTIVE_AGENTS_ANDROID_CHANNEL_ID,
+  LIVE_ACTIVITY_RELEVANCE,
+  LIVE_ACTIVITY_TIE_BREAK_LIMIT,
   androidChannelIdForRegisteredClient,
   iosInterruptionLevelForPushData,
   iosMutableContentForPushData,
+  liveActivityBandStep,
 } from './push-presentation';
 import { genericPushContentForPushData } from './push-copy';
 
@@ -391,9 +396,20 @@ describe('androidChannelIdForPushDataToAppVersion', () => {
   });
 
   it('shares the channel gate and preserves the legacy glanceable route', () => {
-    expect(androidChannelIdForPushDataToAppVersion(glanceable(2), '1.0.11')).toBe('active-agents');
+    expect(androidChannelIdForPushDataToAppVersion(glanceable(2), '1.0.11')).toBe(
+      LEGACY_ACTIVE_AGENTS_ANDROID_CHANNEL_ID
+    );
+    expect(LEGACY_ACTIVE_AGENTS_ANDROID_CHANNEL_ID).toBe('active-agents');
     expect(androidChannelIdForPushDataToAppVersion(glanceable(2), '1.0.12')).toBe('needs-input');
     expect(androidChannelIdForPushDataToAppVersion(glanceable(0), '1.0.12')).toBe('agent-progress');
+  });
+
+  it('keeps the briefing fallback on the channel the version gate names', () => {
+    const brief = { type: 'agent_briefing', url: '/agent-briefing' } as const;
+    expect(androidChannelIdForPushDataToAppVersion(brief, '1.0.15')).toBe(
+      BRIEFING_FALLBACK_CHANNEL_ID
+    );
+    expect(BRIEFING_FALLBACK_CHANNEL_ID).toBe('agent-progress');
   });
 
   it('routes an agent push through its kind', () => {
@@ -520,5 +536,39 @@ describe('androidChannelIdForRegisteredClient', () => {
       expect(androidChannelIdForRegisteredClient(channelId, splitVersion)).toBe(channelId);
       expect(androidChannelIdForRegisteredClient(channelId, null)).toBeUndefined();
     }
+  });
+});
+
+describe('LIVE_ACTIVITY_TIE_BREAK_LIMIT', () => {
+  it('stays one below the smallest gap between adjacent relevance bands', () => {
+    const bands = [...Object.values(LIVE_ACTIVITY_RELEVANCE)].sort((a, b) => a - b);
+    for (let index = 1; index < bands.length; index += 1) {
+      // A tie-break term is capped at the limit, so every adjacent pair of
+      // bands must be at least one wider than it can cover.
+      expect(bands[index] - bands[index - 1]).toBeGreaterThan(LIVE_ACTIVITY_TIE_BREAK_LIMIT);
+    }
+    // A non-finite limit would pass the loop vacuously and serialize an
+    // absent relevance score, so the derived limit must be a real number.
+    expect(Number.isFinite(LIVE_ACTIVITY_TIE_BREAK_LIMIT)).toBe(true);
+    expect(LIVE_ACTIVITY_TIE_BREAK_LIMIT).toBeGreaterThan(0);
+  });
+
+  describe('relevance table retunes (module load guards)', () => {
+    // The derivation the module's own constant runs. Asserting on the real
+    // exported function keeps a regression in the module (not a test-local
+    // copy) failing here, and pins the guard the constant goes through.
+    it('derives the limit from the real table it loads', () => {
+      expect(liveActivityBandStep([60, 40, 20])).toBe(20);
+      expect(LIVE_ACTIVITY_TIE_BREAK_LIMIT).toBe(
+        liveActivityBandStep(Object.values(LIVE_ACTIVITY_RELEVANCE)) - 1
+      );
+    });
+
+    it('refuses to derive a limit when the table cannot space the bands', () => {
+      // A degenerate table would leave every recency score non-finite and
+      // serialize an absent relevance score, so it throws instead.
+      expect(() => liveActivityBandStep([60, 60])).toThrow(/at least two distinct values/);
+      expect(() => liveActivityBandStep([60])).toThrow(/at least two distinct values/);
+    });
   });
 });

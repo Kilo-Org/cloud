@@ -145,6 +145,11 @@ describe('LegalDocumentScreen English-only notice', () => {
     expect(noticeNodes).toHaveLength(1);
     const notice = noticeNodes.at(0);
     expect(notice?.props.children).toBe(arCatalog.common.legalDocumentEnglishOnly);
+
+    // The English legal prose keeps its own base direction while the
+    // interface mirrors.
+    const body = children.flatMap(child => deepDescendants(child)).find(n => isBody(n));
+    expect(body?.props.documentDirection).toBe('ltr');
   });
 
   it('shows no notice when the app language is English', async () => {

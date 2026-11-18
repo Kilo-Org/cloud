@@ -6,8 +6,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-command-catalog';
 import { Text as renderText } from '@/components/ui/text';
+import { RemainingCharactersCounter } from '@/components/ui/remaining-characters-counter';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import { type SlashCommandInfo } from '@kilocode/cloud-agent-sdk';
+import type * as ReactI18next from 'react-i18next';
+import '@/i18n';
 import { type ChatComposer } from './chat-composer';
 
 // A remote catalog that advertises safe session detach, so /exit and /quit
@@ -121,6 +124,20 @@ vi.mock('react-native', () => ({
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => safeAreaInsets,
 }));
+
+// The shared counter row reads its phrase through `useTranslation`; the mocked
+// hooks above leave no renderer for the real hook, so serve `t` from the app's
+// initialised instance.
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => {
+      const i18n = actual.getI18n();
+      return { t: i18n.t.bind(i18n), i18n };
+    },
+  };
+});
 
 // The composer reads the keyboard from the provider, not from a listener of its own.
 vi.mock('react-native-keyboard-controller', () => ({
@@ -508,6 +525,13 @@ function collectNodes(
       found
     );
   }
+  if (type === RemainingCharactersCounter && props !== undefined) {
+    return collectNodes(
+      RemainingCharactersCounter(props as React.ComponentProps<typeof RemainingCharactersCounter>),
+      predicate,
+      found
+    );
+  }
   for (const child of Array.isArray(props?.children) ? props.children : [props?.children]) {
     collectNodes(child as Node, predicate, found);
   }
@@ -531,6 +555,12 @@ function findNode(
   }
   if (type === renderText && props !== undefined) {
     return findNode(renderText(props as React.ComponentProps<typeof renderText>), predicate);
+  }
+  if (type === RemainingCharactersCounter && props !== undefined) {
+    return findNode(
+      RemainingCharactersCounter(props as React.ComponentProps<typeof RemainingCharactersCounter>),
+      predicate
+    );
   }
   const children = props?.children;
   for (const child of Array.isArray(children) ? children : [children]) {
@@ -916,38 +946,38 @@ describe('ChatComposer CLI suggestion', () => {
 });
 
 describe('ChatComposer counter', () => {
+  function findCounter(render: React.ReactElement) {
+    return findNode(
+      render,
+      (type, props) =>
+        type === 'Text' &&
+        typeof props.children === 'string' &&
+        props.children.endsWith('characters remaining')
+    );
+  }
+
   it.each(TEXT_DIRECTIONS)(
     'shows the remaining-character counter only once the draft nears the limit in $direction',
     async ({ isRTL, style }) => {
       layoutDirection.isRTL = isRTL;
       const render = await mount(makeProps({}));
-      expect(
-        findNode(render, (type, props) => type === 'Text' && typeof props.children === 'number')
-      ).toBeNull();
+      expect(findCounter(render)).toBeNull();
 
       requireInputRowOnChangeText(render)('hello');
       await settle();
-      expect(
-        findNode(
-          await rerender(makeProps({})),
-          (type, props) => type === 'Text' && typeof props.children === 'number'
-        )
-      ).toBeNull();
+      expect(findCounter(await rerender(makeProps({})))).toBeNull();
 
       requireInputRowOnChangeText(render)('x'.repeat(CLOUD_AGENT_PROMPT_MAX_LENGTH - 5));
       await settle();
 
-      const rerendered = await rerender(makeProps({}));
-      const counter = findNode(
-        rerendered,
-        (type, props) => type === 'Text' && props.children === 5
-      );
+      const counter = findCounter(await rerender(makeProps({})));
       expect(counter).not.toBeNull();
       expect(counter?.props).toMatchObject({
-        accessibilityLabel: '5 characters remaining',
+        children: '5 characters remaining',
         className: 'text-xs font-normal text-muted-foreground',
         style,
       });
+      expect(counter?.props.accessibilityLabel).toBeUndefined();
     }
   );
 });

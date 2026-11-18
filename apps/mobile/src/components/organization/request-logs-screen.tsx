@@ -8,17 +8,20 @@ import { View, type ViewStyle } from 'react-native';
 import { EmptyState } from '@/components/empty-state';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { PermissionDenied } from '@/components/organization/permission-denied';
+import { RequestLogsSkeleton } from '@/components/organization/request-logs-skeleton';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
-import { DirectionalChevronLeft, DirectionalChevronRight } from '@/components/ui/directional-icons';
-import { FileText } from '@/components/ui/icons';
+import {
+  DirectionalChevronLeft,
+  DirectionalChevronRight,
+  DirectionalLogs,
+} from '@/components/ui/directional-icons';
 import { RefreshControl } from '@/components/ui/refresh-control';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { isolateLtrBidiText } from '@/lib/bidi';
+import { isolateBidiText } from '@/lib/bidi';
 import {
   formatClockTime,
   formatDate,
@@ -60,25 +63,17 @@ export function canStepOlderTo(windowEndMs: number, anchorMs: number): boolean {
   return windowEndMs >= anchorMs - (HISTORY_DAYS * 24 - 1) * HOUR_MS;
 }
 
-// FlashList takes `contentContainerStyle` (no className), so the `px-6 pt-4`
-// inset maps to its pixel values; the tab bar's own bottom padding rides on the
-// footer, which `gap` would not cover.
+// FlashList takes `contentContainerStyle` (no className), so the header's and
+// the skeleton's `px-6 pt-4` inset is spelled in pixels here. NativeWind's
+// native rem is 14, which makes px-6 21 dp and pt-4 14 dp; writing 24/16 (the
+// web rem) puts the cards 3 dp inside the date and the stepper above them. The
+// tab bar's own bottom padding rides on the footer, which `gap` would not cover.
 const listStyle = { flex: 1 } satisfies ViewStyle;
-const listContentContainerStyle = { paddingHorizontal: 24, paddingTop: 16 } satisfies ViewStyle;
+const listContentContainerStyle = { paddingHorizontal: 21, paddingTop: 14 } satisfies ViewStyle;
 
 const WINDOW_DATE = { weekday: 'short', month: 'short', day: 'numeric' } as const;
 
 const RowSeparator = () => <View className="h-3" />;
-
-function RowSkeleton() {
-  return (
-    <View className="gap-2 rounded-lg bg-secondary p-3">
-      <Skeleton className="h-4 w-3/4 rounded bg-muted-soft" />
-      <Skeleton className="h-3 w-1/2 rounded bg-muted-soft" />
-      <Skeleton className="h-3 w-1/3 rounded bg-muted-soft" />
-    </View>
-  );
-}
 
 /**
  * The body one window paints. A window keeps the rows it already holds while a
@@ -152,14 +147,20 @@ const RequestLogRow = memo(function RequestLogRow({
         </Text>
       </View>
       <View className="flex-row items-center gap-2">
-        <Text className="text-xs tabular-nums text-muted-foreground">
-          {isolateLtrBidiText(time)}
-        </Text>
+        {/* One run, so the time and the token pair keep the catalog's own
+            separators: a `gap` between two `Text`s spaced the first dot
+            differently from the dot inside `in · out`. The time is isolated on
+            its own so the AM/PM marker stays beside its clock in either
+            direction. */}
         <Text className="flex-1 text-xs tabular-nums text-muted-foreground" numberOfLines={1}>
-          {tokens}
+          {`${isolateBidiText(time)} · ${tokens}`}
         </Text>
         {entry.is_user_byok ? (
-          <Text className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase text-muted-foreground">
+          // Muted text with no box: `bg-muted` is the card's own `bg-secondary`
+          // in both themes, so a filled badge paints nothing, and its padding
+          // pulled the marker inside the right edge that cost and provider
+          // share while adding a line of height the other rows lack.
+          <Text className="shrink-0 text-xs text-muted-foreground">
             {t('organization.requestLogs.byok')}
           </Text>
         ) : null}
@@ -238,13 +239,7 @@ export function OrganizationRequestLogsScreen() {
   const renderBody = (current: RequestLogsBody): ReactNode => {
     switch (current.kind) {
       case 'loading': {
-        return (
-          <View className="gap-3 px-6 pt-4">
-            <RowSkeleton />
-            <RowSkeleton />
-            <RowSkeleton />
-          </View>
-        );
+        return <RequestLogsSkeleton />;
       }
       case 'retryable': {
         return (
@@ -269,9 +264,8 @@ export function OrganizationRequestLogsScreen() {
       case 'empty': {
         return (
           <EmptyState
-            icon={FileText}
+            icon={DirectionalLogs}
             title={t('organization.requestLogs.emptyTitle')}
-            description={t('organization.requestLogs.emptyDescription')}
             refreshControl={refreshControl}
           />
         );
@@ -315,18 +309,21 @@ export function OrganizationRequestLogsScreen() {
       />
       {/* The window the rows below belong to, and the only filter the phone
           needs: the procedure answers one hour at a time, so moving the window
-          is both the time range and the paging. The hint states the window's
-          one rule in place, and it never changes, so no row moves when a
-          window loads. */}
+          is both the time range and the paging. */}
       <View className="gap-2 px-6 pt-4">
         <View className="gap-0.5">
           <Text className="text-sm font-medium text-foreground">
             {formatDate(windowStart, i18n.language, WINDOW_DATE)}
           </Text>
+          {/* Each time is isolated on its own, so the AM/PM marker it carries
+              stays beside its own clock, and the join is the catalog's, so a
+              right-to-left reader gets the pair in that language's order
+              instead of one reversed run. */}
           <Text className="text-xs tabular-nums text-muted-foreground">
-            {isolateLtrBidiText(
-              `${formatClockTime(windowStart, i18n.language)}–${formatClockTime(windowEnd, i18n.language)}`
-            )}
+            {t('common.timeRange', {
+              start: isolateBidiText(formatClockTime(windowStart, i18n.language)),
+              end: isolateBidiText(formatClockTime(windowEnd, i18n.language)),
+            })}
           </Text>
         </View>
         <View className="flex-row gap-2">
@@ -357,9 +354,6 @@ export function OrganizationRequestLogsScreen() {
             <DirectionalChevronRight size={16} color={colors.foreground} />
           </Button>
         </View>
-        <Text variant="muted" className="text-xs">
-          {t('organization.requestLogs.hint')}
-        </Text>
       </View>
       {renderBody(body)}
     </View>

@@ -680,12 +680,12 @@ test('mobile-native-build builds the harness SDK once and both platform jobs dow
   assert.deepEqual(actionUsers, [harnessProducer], 'only the producer builds the harness SDK');
 
   const producer = jobs[harnessProducer];
-  assert.equal(producer.needs, 'gate', 'the producer waits for the gate it is skipped by');
   assert.equal(
-    producer.if,
-    "needs.gate.outputs.need_ios == 'true' || needs.gate.outputs.need_android == 'true'",
-    'a run with every platform published must not pay a build for nobody'
+    producer.needs,
+    undefined,
+    'the producer starts beside the gate instead of behind it'
   );
+  assert.equal(producer.if, undefined, 'the producer waits for no job before building');
   const producerSteps = producer.steps;
   const producerInstall = producerSteps.findIndex(step =>
     /^pnpm install --frozen-lockfile\b/.test(step.run ?? '')
@@ -904,12 +904,12 @@ test('mobile-native-build builds the tRPC declarations once and both platform jo
   assert.deepEqual(actionUsers, [trpcProducer], 'only the producer builds the declarations');
 
   const producer = jobs[trpcProducer];
-  assert.equal(producer.needs, 'gate', 'the producer waits for the gate it is skipped by');
   assert.equal(
-    producer.if,
-    "needs.gate.outputs.need_ios == 'true' || needs.gate.outputs.need_android == 'true'",
-    'a run with every platform published must not pay a build for nobody'
+    producer.needs,
+    undefined,
+    'the producer starts beside the gate instead of behind it'
   );
+  assert.equal(producer.if, undefined, 'the producer waits for no job before building');
   const producerSteps = producer.steps;
   const installIndex = producerSteps.findIndex(step =>
     /^pnpm install --frozen-lockfile\b/.test(step.run ?? '')

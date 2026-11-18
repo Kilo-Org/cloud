@@ -29,6 +29,13 @@ type Dashboard = {
     suggestionFindings: number;
   }[];
   settings: { enabled: boolean };
+  coverage: {
+    enrolledCompletedReviews: number;
+    captured: number;
+    missing: number;
+    invalid: number;
+    omitted: number;
+  };
 };
 
 const queries = vi.hoisted(() => ({
@@ -56,6 +63,13 @@ const dashboard: Dashboard = {
   },
   repositories: [],
   settings: { enabled: true },
+  coverage: {
+    enrolledCompletedReviews: 13,
+    captured: 12,
+    missing: 1,
+    invalid: 0,
+    omitted: 0,
+  },
 };
 
 const denial = { data: { code: 'UNAUTHORIZED', httpStatus: 401 } };
@@ -349,7 +363,7 @@ describe('CodeReviewerAnalytics empty state', () => {
     const offEmpty = findByType(offRenderer.root, 'EmptyStateMock')[0];
     expect(offEmpty?.props.title).toBe('Analytics is off for GitHub');
     expect(offEmpty?.props.description).toBe(
-      "Turn it on in the organization's settings on the web to record completed reviews."
+      'Organization billing roles can turn analytics on in the settings on the web to record completed reviews.'
     );
     expect(findByType(offRenderer.root, 'TextMock')).toHaveLength(0);
     expect(findByType(offRenderer.root, 'ConfigureRowMock')).toHaveLength(0);
@@ -382,6 +396,49 @@ describe('CodeReviewerAnalytics empty state', () => {
 
     act(() => {
       onRenderer.unmount();
+    });
+  });
+
+  it('explains what tracked reviews counts and names the uncounted amount beside the cards', () => {
+    queries.dashboard.data = dashboard;
+    const onRenderer = mountScreen();
+
+    const captions = findByType(onRenderer.root, 'TextMock')
+      .map(node => node.props.children)
+      .filter(child => typeof child === 'string');
+    expect(captions).toContain(
+      'Completed reviews that finished in this period with analytics turned on. Running and failed reviews are never counted.'
+    );
+    expect(captions).toContain('Not counted: 1 of 13 finished reviews without a captured result.');
+
+    act(() => {
+      onRenderer.unmount();
+    });
+
+    // Every completed review captured, so the caption says what tracked
+    // counts and nothing implies a problem.
+    queries.dashboard.data = {
+      ...dashboard,
+      coverage: {
+        ...dashboard.coverage,
+        captured: dashboard.coverage.enrolledCompletedReviews,
+        missing: 0,
+      },
+    };
+    const completeRenderer = mountScreen();
+
+    const completeCaptions = findByType(completeRenderer.root, 'TextMock')
+      .map(node => node.props.children)
+      .filter(child => typeof child === 'string');
+    expect(completeCaptions).toContain(
+      'Completed reviews that finished in this period with analytics turned on. Running and failed reviews are never counted.'
+    );
+    expect(completeCaptions).toContain(
+      'Not counted: 0 of 13 finished reviews without a captured result.'
+    );
+
+    act(() => {
+      completeRenderer.unmount();
     });
   });
 });

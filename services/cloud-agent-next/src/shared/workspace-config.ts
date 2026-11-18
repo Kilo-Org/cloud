@@ -10,20 +10,37 @@ export function workspaceConfigRuntimeKey(
   return spec.runtimeIsolation === 'per-session' ? spec.sessionId : spec.directory;
 }
 
+type RuntimeProfileFields = Pick<
+  ControlPlaneRouteSpec,
+  | 'runtimeSkills'
+  | 'runtimeInstructions'
+  | 'runtimeAgents'
+  | 'builtinAgents'
+  | 'modelContextLimits'
+  | 'kiloCommands'
+>;
+
+export function projectRuntimeProfileFields(spec: RuntimeProfileFields): RuntimeProfileFields {
+  return {
+    ...(spec.runtimeSkills === undefined ? {} : { runtimeSkills: spec.runtimeSkills }),
+    ...(spec.runtimeInstructions === undefined
+      ? {}
+      : { runtimeInstructions: spec.runtimeInstructions }),
+    ...(spec.runtimeAgents === undefined ? {} : { runtimeAgents: spec.runtimeAgents }),
+    ...(spec.builtinAgents === undefined ? {} : { builtinAgents: spec.builtinAgents }),
+    ...(spec.modelContextLimits === undefined
+      ? {}
+      : { modelContextLimits: spec.modelContextLimits }),
+    ...(spec.kiloCommands === undefined ? {} : { kiloCommands: spec.kiloCommands }),
+  };
+}
+
 export function workspaceConfigFromSpec(
   spec: Pick<
     ControlPlaneRouteSpec,
-    | 'env'
-    | 'secretEnvKeys'
-    | 'setupCommands'
-    | 'startCommands'
-    | 'environmentSetupCommandCount'
-    | 'runtimeSkills'
-    | 'runtimeInstructions'
-    | 'runtimeAgents'
-    | 'builtinAgents'
-    | 'kiloCommands'
-  >,
+    'env' | 'secretEnvKeys' | 'setupCommands' | 'startCommands' | 'environmentSetupCommandCount'
+  > &
+    RuntimeProfileFields,
   mcp: WorkspaceConfig['mcp']
 ): WorkspaceConfig {
   return {
@@ -35,13 +52,7 @@ export function workspaceConfigFromSpec(
     ...(spec.environmentSetupCommandCount === undefined
       ? {}
       : { environmentSetupCommandCount: spec.environmentSetupCommandCount }),
-    ...(spec.runtimeSkills === undefined ? {} : { runtimeSkills: spec.runtimeSkills }),
-    ...(spec.runtimeInstructions === undefined
-      ? {}
-      : { runtimeInstructions: spec.runtimeInstructions }),
-    ...(spec.runtimeAgents === undefined ? {} : { runtimeAgents: spec.runtimeAgents }),
-    ...(spec.builtinAgents === undefined ? {} : { builtinAgents: spec.builtinAgents }),
-    ...(spec.kiloCommands === undefined ? {} : { kiloCommands: spec.kiloCommands }),
+    ...projectRuntimeProfileFields(spec),
   };
 }
 
@@ -57,6 +68,7 @@ export function attachmentSpecFromRouteSpec(spec: ControlPlaneRouteSpec): Attach
     runtimeInstructions: _runtimeInstructions,
     runtimeAgents: _runtimeAgents,
     builtinAgents: _builtinAgents,
+    modelContextLimits: _modelContextLimits,
     kiloCommands: _kiloCommands,
     ...attachment
   } = spec;

@@ -22,6 +22,10 @@ import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/provide
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type { GatewayModelMap } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import {
+  describeLatestAliasTarget,
+  getLatestAliasTargets,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/latest-alias-targets';
+import {
   getDataCollectionRequiredModelIds,
   getProviderSlugsForModels,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
@@ -208,6 +212,7 @@ async function enhancedModelList(models: OpenRouterModel[], countryCode: string 
     customLlmsById,
     customPricingConfig,
     vercelPricingMetadata,
+    latestAliasTargets,
   ] = await Promise.all([
     getOpenRouterModelsMetadataFromDatabase(),
     getDataCollectionRequiredModelIds(),
@@ -217,7 +222,9 @@ async function enhancedModelList(models: OpenRouterModel[], countryCode: string 
     getCustomLlmsById(),
     getCustomPricingConfig(),
     getVercelPricingMetadata(),
+    getLatestAliasTargets(),
   ]);
+  const modelNamesById = new Map(models.map(model => [model.id, model.name]));
   const publicCustomLlms = [...customLlmsById.values()].flatMap(customLlm =>
     isPublicCustomLlm(customLlm.definition) &&
     !unavailableModelIds.has(customLlm.public_id.toLowerCase()) &&
@@ -267,6 +274,14 @@ async function enhancedModelList(models: OpenRouterModel[], countryCode: string 
         : undefined;
       return {
         ...model,
+        ...(aliasTarget && {
+          description: `${model.description}\n\n${describeLatestAliasTarget({
+            target: aliasTarget,
+            stored: latestAliasTargets.get(model.id),
+            namesById: modelNamesById,
+            nowMs: Date.now(),
+          })}`,
+        }),
         pricing,
         ...(terminalBench && { terminalBench }),
         alias_target: aliasTarget,

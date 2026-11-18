@@ -26,6 +26,7 @@
     "creditHistory": "Kredithistorik",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Avbryt",
     "done": "Klar",
     "retry": "Försök igen",
@@ -482,7 +483,14 @@
       "viewReceipt": "Visa kvitto"
     },
     "changelog": "Nyheter",
-    "changelogVersionPending": "Nyheter för denna version kommer med nästa appuppdatering."
+    "changelogVersionPending": "Nyheter för version {{version}} kommer med nästa appuppdatering.",
+    "changelogGroupNew": "Nytt",
+    "changelogFixesIn": "Korrigeringar och förbättringar i {{areas}}.",
+    "changelogFixesPolish": "Korrigeringar och förbättringar i hela appen.",
+    "changelogAreas": {
+      "signIn": "Inloggning",
+      "profileOrganizations": "Profil och organisationer"
+    }
   },
   "preferences": {
     "general": "Allmänt",
@@ -1468,8 +1476,12 @@
       "empty": "Inga granskningar med statistik än",
       "emptyDescription": "Statistiken registrerar slutförda granskningar så länge den är aktiverad för organisationen.",
       "offTitle": "Statistiken är avstängd för {{platform}}",
-      "offDescription": "Aktivera den i organisationsinställningarna på webben för att registrera slutförda granskningar.",
-      "couldNotLoad": "Det gick inte att läsa in statistiken"
+      "offDescription": "Organisationens faktureringsroller (ägare, administratörer och fakturahanterare) kan aktivera statistiken i organisationens inställningar på webben för att registrera slutförda granskningar.",
+      "couldNotLoad": "Det gick inte att läsa in statistiken",
+      "trackedReviewsCaption": "Slutförda granskningar som avslutades under den här perioden medan statistiken var aktiverad. Pågående och misslyckade granskningar räknas aldrig.",
+      "trackedReviewsUncounted": "Räknas inte: {{displayCount}} av organisationens {{displayTotal}} avslutade granskningar utan registrerat resultat.",
+      "trackedReviewsUncounted_one": "Räknas inte: {{displayCount}} av organisationens {{displayTotal}} avslutade granskningar utan registrerat resultat.",
+      "trackedReviewsUncounted_other": "Räknas inte: {{displayCount}} av organisationens {{displayTotal}} avslutade granskningar utan registrerat resultat."
     },
     "council": {
       "title": "Rådsgranskning",
@@ -3125,7 +3137,6 @@
     "completingPurchase": "Slutför köpet…",
     "subscriptionLoading": "Läser in Kilo Pass-prenumerationen",
     "retryHint": "Försöker läsa in Kilo Pass-status igen.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Avslutad {{date}}",
     "notAvailableInApp": "Kilo Pass är inte tillgängligt i appen.",
     "statusActive": "Aktiv",
@@ -3328,6 +3339,7 @@
       "manageOnWeb": "Faktureringsinställningar på webben",
       "changePlan": "Byt plan",
       "buySeats": "Köp platser",
+      "managedOnWeb": "Planen, platserna och den automatiska påfyllningen hanteras på webben.",
       "setupAutoTopUp": "Konfigurera automatisk påfyllning",
       "manageAutoTopUp": "Hantera automatisk påfyllning",
       "opensOnWeb": "Öppnas på webben"
@@ -3476,12 +3488,10 @@
       "requestLogs": "Förfrågningsloggar"
     },
     "requestLogs": {
-      "hint": "Förfrågningar från timmen före fönstrets sluttid, nyaste först.",
       "older": "Tidigare timme",
       "newer": "Senare timme",
       "truncated": "Den här timmen har fler förfrågningar än listan visar.",
       "emptyTitle": "Inga förfrågningar",
-      "emptyDescription": "Den här timmen har inga gateway-förfrågningar.",
       "loadError": "Det gick inte att läsa in förfrågningsloggarna.",
       "permissionDenied": "Endast en ägare, administratör eller faktureringsansvarig i organisationen kan läsa dess förfrågningsloggar.",
       "tokens": "{{input}} in · {{output}} ut",
@@ -4285,8 +4295,7 @@
       "repoValue": "Kodarkiv: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Den här profilen är inte längre tillgänglig. Välj en annan.",
-      "pickerEmptyDescriptionOrganization": "Skapa en organisationsprofil för att återanvända miljövariabler, installationskommandon och färdigheter över sessioner.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "En organisationsägare eller administratör kan skapa en organisationsprofil."
+      "pickerEmptyDescriptionOrganization": "Skapa en organisationsprofil för att återanvända miljövariabler, installationskommandon och färdigheter över sessioner."
     },
     "variablesDeleteFailed": "Det gick inte att ta bort variabeln",
     "deleteVariable": "Ta bort variabel {{key}}",
@@ -4472,7 +4481,6 @@
     "dismiss": "Avskriv rapport",
     "offline": "Offline · sparad rapport",
     "cached": "Sparad rapport · kan inte uppdateras",
-    "window": "{{start}} – {{end}}",
     "summary": "AI-sammanfattning",
     "summaryPending": "AI-sammanfattningen pågår. Den bifogas här när den är klar.",
     "summaryUnavailable": "AI-sammanfattningen är inte tillgänglig. Din strukturerade rapport finns fortfarande.",
@@ -4591,6 +4599,7 @@
       "title": "Utlösare och webhooks",
       "subtitle": "Automatisera Cloud Agent-körningar från ett webhookanrop eller enligt ett schema.",
       "new": "Ny utlösare",
+      "create": "Skapa utlösare",
       "emptyTitle": "Inga utlösare än",
       "emptyDescription": "Skapa en utlösare för att starta en Cloud Agent-körning från ett webhookanrop eller enligt ett schema.",
       "loadFailedTitle": "Det gick inte att läsa in utlösare",
@@ -4644,6 +4653,8 @@
       "created": "Utlösare skapad",
       "saved": "Utlösare sparad",
       "statusArrived": "Anlänt",
+      "defaultPromptWebhook": "Beskriv innehållet i den här webhookbegäran:\n\n{{body}}",
+      "defaultPromptScheduled": "Kör den schemalagda uppgiften. Utlöst vid {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Ange ett namn.",
         "nameTooShort": "Använd minst 8 tecken.",

@@ -171,6 +171,20 @@ const cases: ReadonlyArray<
 ];
 
 describe('classifyControlPlaneFailure', () => {
+  it('classifies a quiet drain expiry as a platform failure without wrapper output', () => {
+    expect(
+      classifyControlPlaneRunFailure({
+        reason: 'completion_quiet_drain',
+        dispatchState: 'accepted',
+        status: 'failed',
+      })
+    ).toMatchObject({
+      stage: 'post_dispatch_no_activity',
+      code: 'wrapper_no_output',
+      responsibility: 'platform',
+    });
+  });
+
   it('attributes quota denial to account capacity rather than provider or wrapper failure', () => {
     expect(
       classifyControlPlaneRunFailure({

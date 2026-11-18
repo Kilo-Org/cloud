@@ -26,6 +26,7 @@
     "creditHistory": "Riwayat kredit",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Batal",
     "done": "Selesai",
     "retry": "Coba lagi",
@@ -482,7 +483,14 @@
       "viewReceipt": "Lihat tanda terima"
     },
     "changelog": "Yang baru",
-    "changelogVersionPending": "Catatan versi ini hadir di pembaruan aplikasi berikutnya."
+    "changelogVersionPending": "Catatan versi {{version}} hadir di pembaruan aplikasi berikutnya.",
+    "changelogGroupNew": "Baru",
+    "changelogFixesIn": "Perbaikan dan peningkatan pada {{areas}}.",
+    "changelogFixesPolish": "Perbaikan dan peningkatan di seluruh aplikasi.",
+    "changelogAreas": {
+      "signIn": "Masuk",
+      "profileOrganizations": "Profil dan organisasi"
+    }
   },
   "preferences": {
     "general": "Umum",
@@ -925,8 +933,12 @@
       "empty": "Belum ada tinjauan dengan analitik",
       "emptyDescription": "Analitik mencatat tinjauan yang selesai selama fitur ini aktif untuk organisasi.",
       "offTitle": "Analitik nonaktif untuk {{platform}}",
-      "offDescription": "Aktifkan analitik di Pengaturan organisasi di web untuk mencatat tinjauan yang selesai.",
-      "couldNotLoad": "Tidak dapat memuat analitik"
+      "offDescription": "Peran penagihan organisasi (pemilik, admin, dan pengelola penagihan) dapat mengaktifkan analitik di pengaturan organisasi di web untuk mencatat tinjauan yang selesai.",
+      "couldNotLoad": "Tidak dapat memuat analitik",
+      "trackedReviewsCaption": "Tinjauan yang selesai selama periode ini dengan analitik aktif. Tinjauan yang sedang berjalan dan gagal tidak pernah dihitung.",
+      "trackedReviewsUncounted": "Tidak dihitung: {{displayCount}} dari {{displayTotal}} tinjauan yang selesai milik organisasi, hasilnya tidak terekam.",
+      "trackedReviewsUncounted_one": "Tidak dihitung: {{displayCount}} dari {{displayTotal}} tinjauan yang selesai milik organisasi, hasilnya tidak terekam.",
+      "trackedReviewsUncounted_other": "Tidak dihitung: {{displayCount}} dari {{displayTotal}} tinjauan yang selesai milik organisasi, hasilnya tidak terekam."
     },
     "council": {
       "title": "Tinjauan dewan",
@@ -2582,7 +2594,6 @@
     "completingPurchase": "Menyelesaikan pembelian",
     "subscriptionLoading": "Memuat langganan Kilo Pass",
     "retryHint": "Mencoba memuat ulang status Kilo Pass.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Berakhir pada {{date}}",
     "notAvailableInApp": "Kilo Pass tidak tersedia di aplikasi.",
     "statusActive": "Aktif",
@@ -3320,6 +3331,7 @@
       "manageOnWeb": "Pengaturan penagihan di web",
       "changePlan": "Ubah paket",
       "buySeats": "Beli lisensi",
+      "managedOnWeb": "Paket, lisensi pengguna, dan isi ulang otomatis dikelola di web.",
       "setupAutoTopUp": "Atur isi ulang otomatis",
       "manageAutoTopUp": "Kelola isi ulang otomatis",
       "opensOnWeb": "Dibuka di web"
@@ -3481,12 +3493,10 @@
       "requestLogs": "Log permintaan"
     },
     "requestLogs": {
-      "hint": "Permintaan dalam satu jam sebelum akhir rentang waktu, terbaru di atas.",
       "older": "Jam sebelumnya",
       "newer": "Jam berikutnya",
       "truncated": "Jam ini memiliki lebih banyak permintaan daripada yang ditampilkan.",
       "emptyTitle": "Tidak ada permintaan",
-      "emptyDescription": "Tidak ada permintaan gateway dalam jam ini.",
       "loadError": "Tidak dapat memuat log permintaan.",
       "permissionDenied": "Hanya pemilik, admin, atau pengelola penagihan organisasi yang dapat membaca log permintaannya.",
       "tokens": "{{input}} masuk · {{output}} keluar",
@@ -4285,8 +4295,7 @@
       "repoValue": "Repositori: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Profil ini tidak lagi tersedia. Pilih profil lain.",
-      "pickerEmptyDescriptionOrganization": "Buat profil organisasi untuk menggunakan kembali variabel lingkungan, perintah pengaturan, dan keterampilan di seluruh sesi.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Pemilik atau admin organisasi dapat membuat profil organisasi."
+      "pickerEmptyDescriptionOrganization": "Buat profil organisasi untuk menggunakan kembali variabel lingkungan, perintah pengaturan, dan keterampilan di seluruh sesi."
     },
     "variablesDeleteFailed": "Tidak dapat menghapus variabel",
     "deleteVariable": "Hapus variabel {{key}}",
@@ -4472,7 +4481,6 @@
     "dismiss": "Abaikan laporan",
     "offline": "Offline · laporan tersimpan",
     "cached": "Laporan tersimpan · tidak dapat diperbarui",
-    "window": "{{start}} – {{end}}",
     "summary": "Ringkasan AI",
     "summaryPending": "Ringkasan AI sedang diproses. Ringkasan akan muncul di sini setelah siap.",
     "summaryUnavailable": "Ringkasan AI tidak tersedia. Laporan terstruktur Anda tetap tersedia.",
@@ -4591,6 +4599,7 @@
       "title": "Pemicu & webhook",
       "subtitle": "Otomatiskan eksekusi Cloud Agent dari panggilan webhook atau jadwal.",
       "new": "Pemicu baru",
+      "create": "Buat pemicu",
       "emptyTitle": "Belum ada pemicu",
       "emptyDescription": "Buat pemicu untuk memulai eksekusi Cloud Agent dari panggilan webhook atau sesuai jadwal.",
       "loadFailedTitle": "Tidak dapat memuat pemicu",
@@ -4644,6 +4653,8 @@
       "created": "Pemicu dibuat",
       "saved": "Pemicu disimpan",
       "statusArrived": "Tiba",
+      "defaultPromptWebhook": "Jelaskan isi permintaan webhook ini:\n\n{{body}}",
+      "defaultPromptScheduled": "Jalankan tugas terjadwal. Eksekusi dimulai pada {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Masukkan nama.",
         "nameTooShort": "Gunakan setidaknya 8 karakter.",

@@ -154,7 +154,11 @@ function codeFences(renderer: TestRenderer.ReactTestRenderer): CodeFenceProps[] 
 
 type EnrichedHostProps = {
   markdown: string;
-  markdownStyle: { paragraph: { lineHeight: number }; list: { lineHeight: number } };
+  markdownStyle: {
+    paragraph: { lineHeight: number; textAlign?: 'right' };
+    h1: { textAlign?: 'right' };
+    list: { lineHeight: number };
+  };
   onLinkPress: (event: { url: string }) => void;
   onLinkLongPress?: (event: { url: string }) => void;
   onImagePress: (event: { url: string; altText: string }) => void;
@@ -1146,21 +1150,111 @@ describe('splitMarkdownHtmlIncremental', () => {
 });
 
 describe('MarkdownText body line height', () => {
-  const value = 'See [#10334](https://github.com/Kilo-Org/cloud/pull/10334)';
-
-  it('raises the paragraph and list body line height to the given value', async () => {
-    const renderer = await mount(<MarkdownText value={value} lineHeight={28} />);
-    const { paragraph, list } = enrichedProps(renderer).markdownStyle;
-
-    expect(paragraph.lineHeight).toBe(28);
-    expect(list.lineHeight).toBe(28);
-  });
-
-  it('keeps the 24 dp body line height without the prop', async () => {
-    const renderer = await mount(<MarkdownText value={value} />);
+  it('uses the 24 dp body line height', async () => {
+    const renderer = await mount(
+      <MarkdownText value="See [#10334](https://github.com/Kilo-Org/cloud/pull/10334)" />
+    );
     const { paragraph, list } = enrichedProps(renderer).markdownStyle;
 
     expect(paragraph.lineHeight).toBe(24);
     expect(list.lineHeight).toBe(24);
+  });
+});
+
+describe('MarkdownText document direction', () => {
+  const value = '# Heading\n\nBody text\n\n- one\n- two';
+
+  it('aligns chat blocks with a right-to-left interface and marks its list items', async () => {
+    rnStub.I18nManager.isRTL = true;
+    // Only Android resolves a list item from its own first strong character.
+    rnStub.Platform.OS = 'android';
+    try {
+      const renderer = await mount(<MarkdownText value={value} />);
+      const props = enrichedProps(renderer);
+
+      expect(props.markdownStyle.paragraph.textAlign).toBe('right');
+      expect(props.markdownStyle.h1).toMatchObject({ textAlign: 'right' });
+      // `rtlListItems` names the start edge and isolates the item's own text.
+      expect(props.markdown).toContain('\u200F\u2068one\u2069');
+    } finally {
+      rnStub.I18nManager.isRTL = false;
+      rnStub.Platform.OS = 'ios';
+    }
+  });
+
+  it('keeps a document body at the left edge without the list-item mark', async () => {
+    rnStub.I18nManager.isRTL = true;
+    rnStub.Platform.OS = 'android';
+    try {
+      const renderer = await mount(<MarkdownText value={value} documentDirection="ltr" />);
+      const props = enrichedProps(renderer);
+
+      expect(props.markdownStyle.paragraph).not.toHaveProperty('textAlign');
+      expect(props.markdownStyle.h1).not.toHaveProperty('textAlign');
+      expect(props.markdown).toBe(value);
+    } finally {
+      rnStub.I18nManager.isRTL = false;
+      rnStub.Platform.OS = 'ios';
+    }
+  });
+
+  it('leaves a left-to-right interface unchanged', async () => {
+    const renderer = await mount(<MarkdownText value={value} documentDirection="ltr" />);
+    const props = enrichedProps(renderer);
+
+    expect(props.markdownStyle.paragraph).not.toHaveProperty('textAlign');
+    expect(props.markdownStyle.h1).not.toHaveProperty('textAlign');
+    expect(props.markdown).toBe(value);
+  });
+
+  it('names the base direction of an HTML body only for a document', async () => {
+    rnStub.I18nManager.isRTL = true;
+    try {
+      const chat = await mount(<MarkdownText value="> <u>quoted</u>" />);
+      expect(htmlProps(chat).baseStyle).not.toHaveProperty('direction');
+
+      const document = await mount(
+        <MarkdownText value="> <u>quoted</u>" documentDirection="ltr" />
+      );
+      expect(htmlProps(document).baseStyle).toMatchObject({ direction: 'ltr' });
+    } finally {
+      rnStub.I18nManager.isRTL = false;
+    }
+  });
+
+  it('renders an image alt fallback in the body direction on both platforms', async () => {
+    // A scheme the image view cannot draw leaves the alt text as plain text.
+    rnStub.I18nManager.isRTL = true;
+    try {
+      const chatHost = await mount(<MarkdownText value="> <u>quoted</u>" />);
+      const chatImage = requiredRenderer(htmlProps(chatHost).renderers, 'img');
+      const chatAlt = await renderCustom(chatImage, {
+        attributes: { src: 'ftp://example.com/a.png', alt: 'shot' },
+        parent: null,
+      });
+      const chatProps = chatAlt.root.findByType(TextType).props as {
+        style?: { writingDirection?: string; direction?: string };
+      };
+      expect(chatProps.style).toMatchObject({ writingDirection: 'rtl' });
+      expect(chatProps.style).not.toHaveProperty('direction');
+
+      const documentHost = await mount(
+        <MarkdownText value="> <u>quoted</u>" documentDirection="ltr" />
+      );
+      const documentImage = requiredRenderer(htmlProps(documentHost).renderers, 'img');
+      const documentAlt = await renderCustom(documentImage, {
+        attributes: { src: 'ftp://example.com/a.png', alt: 'shot' },
+        parent: null,
+      });
+      const documentProps = documentAlt.root.findByType(TextType).props as {
+        style?: { writingDirection?: string; direction?: string };
+      };
+      expect(documentProps.style).toMatchObject({
+        direction: 'ltr',
+        writingDirection: 'ltr',
+      });
+    } finally {
+      rnStub.I18nManager.isRTL = false;
+    }
   });
 });

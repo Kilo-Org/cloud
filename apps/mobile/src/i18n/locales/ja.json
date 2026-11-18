@@ -26,6 +26,7 @@
     "creditHistory": "クレジット履歴",
     "sentenceJoiner": "。",
     "listJoiner": "、",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "キャンセル",
     "done": "完了",
     "retry": "再試行",
@@ -482,7 +483,14 @@
       "viewReceipt": "受付確認を表示"
     },
     "changelog": "新着情報",
-    "changelogVersionPending": "このバージョンのリリースノートは、次回のアプリアップデートで届きます。"
+    "changelogVersionPending": "バージョン{{version}}のリリースノートは、次回のアプリアップデートで届きます。",
+    "changelogGroupNew": "新機能",
+    "changelogFixesIn": "{{areas}}に関する修正と改善を行いました。",
+    "changelogFixesPolish": "アプリ全体の修正と改善を行いました。",
+    "changelogAreas": {
+      "signIn": "サインイン",
+      "profileOrganizations": "プロフィールと組織"
+    }
   },
   "preferences": {
     "general": "一般",
@@ -925,8 +933,12 @@
       "empty": "分析データのあるレビューはまだありません",
       "emptyDescription": "分析機能は、組織で有効になっている間に完了したレビューを記録します。",
       "offTitle": "{{platform}}の分析がオフになっています",
-      "offDescription": "Webでの組織設定で分析を有効にすると、完了したレビューが記録されます。",
-      "couldNotLoad": "分析を読み込めませんでした"
+      "offDescription": "分析をオンにできるのは、組織のオーナー、管理者、請求マネージャーといった請求ロールです。Web 上の組織設定からオンにすると、完了したレビューが記録されます。",
+      "couldNotLoad": "分析を読み込めませんでした",
+      "trackedReviewsCaption": "分析が有効な状態でこの期間内に完了したレビューです。実行中のレビューと失敗したレビューは決してカウントされません。",
+      "trackedReviewsUncounted": "カウント対象外：この組織の終了済みレビュー {{displayTotal}} 件のうち {{displayCount}} 件は、結果が記録されていません。",
+      "trackedReviewsUncounted_one": "カウント対象外：この組織の終了済みレビュー {{displayTotal}} 件のうち {{displayCount}} 件は、結果が記録されていません。",
+      "trackedReviewsUncounted_other": "カウント対象外：この組織の終了済みレビュー {{displayTotal}} 件のうち {{displayCount}} 件は、結果が記録されていません。"
     },
     "council": {
       "title": "合議レビュー",
@@ -2582,7 +2594,6 @@
     "completingPurchase": "購入手続き中",
     "subscriptionLoading": "Kilo Passのサブスクリプションを読み込み中",
     "retryHint": "Kilo Passの状態の取得を再試行します。",
-    "cardAccessibility": "{{title}}。{{description}}。{{actionLabel}}",
     "endedOn": "{{date}}に終了しました",
     "notAvailableInApp": "Kilo Passはアプリでは利用できません。",
     "statusActive": "有効",
@@ -3320,6 +3331,7 @@
       "manageOnWeb": "Webでの請求設定",
       "changePlan": "プランを変更",
       "buySeats": "シートを購入",
+      "managedOnWeb": "プラン、シート数、自動チャージはWebで管理されています。",
       "setupAutoTopUp": "自動チャージを設定",
       "manageAutoTopUp": "自動チャージを管理",
       "opensOnWeb": "Webで開きます"
@@ -3481,12 +3493,10 @@
       "requestLogs": "リクエストログ"
     },
     "requestLogs": {
-      "hint": "表示期間の終了時刻までの1時間のリクエストを新しい順に表示しています。",
       "older": "前の1時間",
       "newer": "次の1時間",
       "truncated": "この1時間には、一覧に表示しきれないリクエストがあります。",
       "emptyTitle": "リクエストはありません",
-      "emptyDescription": "この1時間にゲートウェイへのリクエストはありません。",
       "loadError": "リクエストログを読み込めませんでした。",
       "permissionDenied": "リクエストログを閲覧できるのは、組織のオーナー、管理者、または請求管理者のみです。",
       "tokens": "入力 {{input}} · 出力 {{output}}",
@@ -4285,8 +4295,7 @@
       "repoValue": "リポジトリ: {{name}}",
       "profileValue": "プロフィール: {{name}}",
       "profileUnavailable": "このプロフィールは使用できなくなりました。別のプロフィールを選択してください。",
-      "pickerEmptyDescriptionOrganization": "組織プロフィールを作成して、セッション間で環境変数、セットアップコマンド、スキルを再利用します。",
-      "pickerEmptyDescriptionOrganizationReadOnly": "組織のオーナーまたは管理者が組織プロフィールを作成できます。"
+      "pickerEmptyDescriptionOrganization": "組織プロフィールを作成して、セッション間で環境変数、セットアップコマンド、スキルを再利用します。"
     },
     "variablesDeleteFailed": "変数を削除できませんでした",
     "deleteVariable": "変数{{key}}を削除",
@@ -4472,7 +4481,6 @@
     "dismiss": "ブリーフィングを非表示にする",
     "offline": "オフライン · 保存済みブリーフィング",
     "cached": "保存済みレポート · 更新できません",
-    "window": "{{start}} – {{end}}",
     "summary": "AI要約",
     "summaryPending": "AI要約を作成中です。完了するとここに追加されます。",
     "summaryUnavailable": "AI要約は利用できません。構造化レポートは引き続き利用できます。",
@@ -4591,6 +4599,7 @@
       "title": "トリガーとウェブフック",
       "subtitle": "ウェブフック呼び出しまたはスケジュールからCloud Agentの実行を自動化します。",
       "new": "新規トリガー",
+      "create": "トリガーを作成",
       "emptyTitle": "トリガーはまだありません",
       "emptyDescription": "ウェブフック呼び出しまたはスケジュールでCloud Agentの実行を開始するトリガーを作成します。",
       "loadFailedTitle": "トリガーを読み込めませんでした",
@@ -4644,6 +4653,8 @@
       "created": "トリガーを作成しました",
       "saved": "トリガーを保存しました",
       "statusArrived": "到着",
+      "defaultPromptWebhook": "このウェブフックリクエストの本文を説明してください。\n\n{{body}}",
+      "defaultPromptScheduled": "スケジュールされたタスクを実行してください。{{scheduledTime}} に実行を開始しました。",
       "problems": {
         "nameRequired": "名前を入力してください。",
         "nameTooShort": "8文字以上使用してください。",

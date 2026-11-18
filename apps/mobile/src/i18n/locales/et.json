@@ -26,6 +26,7 @@
     "creditHistory": "Krediitide ajalugu",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Tühista",
     "done": "Valmis",
     "retry": "Proovi uuesti",
@@ -482,7 +483,14 @@
       "viewReceipt": "Vaata kinnitust"
     },
     "changelog": "Mis on uut",
-    "changelogVersionPending": "Selle versiooni märkmed saabuvad rakenduse järgmise uuendusega."
+    "changelogVersionPending": "Versiooni {{version}} märkmed saabuvad rakenduse järgmise uuendusega.",
+    "changelogGroupNew": "Uut",
+    "changelogFixesIn": "Parandused ja täiustused järgmistes osades: {{areas}}.",
+    "changelogFixesPolish": "Parandused ja täiustused kogu rakenduses.",
+    "changelogAreas": {
+      "signIn": "Sisselogimine",
+      "profileOrganizations": "Profiil ja organisatsioonid"
+    }
   },
   "preferences": {
     "general": "Üldine",
@@ -1468,8 +1476,12 @@
       "empty": "Analüütikaga ülevaatusi veel pole",
       "emptyDescription": "Analüütika salvestab lõpetatud ülevaatused, kui see on organisatsioonis lubatud.",
       "offTitle": "Analüütika on platvormil {{platform}} välja lülitatud",
-      "offDescription": "Lülita see sisse organisatsiooni seadetes veebis, et salvestada lõpetatud ülevaatused.",
-      "couldNotLoad": "Analüütikat ei õnnestunud laadida"
+      "offDescription": "Organisatsiooni arveldusrollid saavad analüütika sisse lülitada seadetes veebis, et salvestada lõpetatud ülevaatused.",
+      "couldNotLoad": "Analüütikat ei õnnestunud laadida",
+      "trackedReviewsCaption": "Lõpetatud ülevaatused, mis said selle perioodi jooksul valmis, kui analüütika oli sisse lülitatud. Käimasolevaid ja nurjunud ülevaatusi ei arvestata kunagi.",
+      "trackedReviewsUncounted": "Arvestamata: {{displayCount}} organisatsiooni {{displayTotal}} lõpetatud ülevaatusest, mille tulemust ei salvestatud.",
+      "trackedReviewsUncounted_one": "Arvestamata: {{displayCount}} organisatsiooni {{displayTotal}} lõpetatud ülevaatusest, mille tulemust ei salvestatud.",
+      "trackedReviewsUncounted_other": "Arvestamata: {{displayCount}} organisatsiooni {{displayTotal}} lõpetatud ülevaatusest, mille tulemust ei salvestatud."
     },
     "council": {
       "title": "Nõukogu ülevaatus",
@@ -3125,7 +3137,6 @@
     "completingPurchase": "Ostu lõpetamine",
     "subscriptionLoading": "Kilo Passi tellimuse laadimine",
     "retryHint": "Proovib Kilo Passi olekut uuesti laadida.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Lõppenud {{date}}",
     "notAvailableInApp": "Kilo Pass ei ole rakenduses saadaval.",
     "statusActive": "Aktiivne",
@@ -3328,6 +3339,7 @@
       "manageOnWeb": "Arvelduse seaded veebis",
       "changePlan": "Muuda plaani",
       "buySeats": "Osta kasutajakohti",
+      "managedOnWeb": "Plaani, kasutajakohti ja automaatset täiendamist hallatakse veebis.",
       "setupAutoTopUp": "Seadista automaatne täiendamine",
       "manageAutoTopUp": "Halda automaatset täiendamist",
       "opensOnWeb": "Avaneb veebis"
@@ -3476,12 +3488,10 @@
       "requestLogs": "Päringulogid"
     },
     "requestLogs": {
-      "hint": "Akna lõpule eelnenud tunni päringud, uusimad eespool.",
       "older": "Varasem tund",
       "newer": "Hilisem tund",
       "truncated": "Selles tunnis on rohkem päringuid, kui loendis kuvatakse.",
       "emptyTitle": "Päringuid pole",
-      "emptyDescription": "Selles tunnis pole lüüsipäringuid.",
       "loadError": "Päringulogide laadimine ebaõnnestus.",
       "permissionDenied": "Päringulogisid saavad lugeda ainult organisatsiooni omanik, administraator või arvelduse haldur.",
       "tokens": "{{input}} sisse · {{output}} välja",
@@ -4285,8 +4295,7 @@
       "repoValue": "Hoidla: {{name}}",
       "profileValue": "Profiil: {{name}}",
       "profileUnavailable": "See profiil pole enam saadaval. Vali mõni teine.",
-      "pickerEmptyDescriptionOrganization": "Loo organisatsiooniprofiil keskkonnamuutujate, häälestuskäskude ja oskuste taaskasutamiseks seansside jooksul.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Organisatsiooni omanik või administraator saab organisatsiooniprofiili luua."
+      "pickerEmptyDescriptionOrganization": "Loo organisatsiooniprofiil keskkonnamuutujate, häälestuskäskude ja oskuste taaskasutamiseks seansside jooksul."
     },
     "variablesDeleteFailed": "Muutujat ei õnnestunud kustutada",
     "deleteVariable": "Kustuta muutuja {{key}}",
@@ -4472,7 +4481,6 @@
     "dismiss": "Jäta ülevaade kõrvale",
     "offline": "Võrguühenduseta · salvestatud ülevaade",
     "cached": "Salvestatud ülevaade · värskendamine pole saadaval",
-    "window": "{{start}} – {{end}}",
     "summary": "AI kokkuvõte",
     "summaryPending": "AI kokkuvõtet koostatakse. See lisatakse siia, kui on valmis.",
     "summaryUnavailable": "AI kokkuvõte pole saadaval. Struktureeritud ülevaade on endiselt saadaval.",
@@ -4591,6 +4599,7 @@
       "title": "Päästikud ja veebihaagid",
       "subtitle": "Automatiseeri Cloud Agent käivitused veebihaagi kutse või ajakava kaudu.",
       "new": "Uus päästik",
+      "create": "Loo päästik",
       "emptyTitle": "Päästikuid veel pole",
       "emptyDescription": "Loo päästik, et alustada Cloud Agent käivitust veebihaagi kutse või ajakava alusel.",
       "loadFailedTitle": "Päästikute laadimine ebaõnnestus",
@@ -4644,6 +4653,8 @@
       "created": "Päästik loodud",
       "saved": "Päästik salvestatud",
       "statusArrived": "Saabunud",
+      "defaultPromptWebhook": "Kirjelda selle veebihaagi päringu keha:\n\n{{body}}",
+      "defaultPromptScheduled": "Käivita ajastatud ülesanne. Käivitatud kell {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Sisesta nimi.",
         "nameTooShort": "Kasuta vähemalt 8 tähemärki.",

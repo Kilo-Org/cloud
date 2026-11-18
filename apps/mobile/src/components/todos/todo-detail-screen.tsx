@@ -113,11 +113,10 @@ function TodoDetailBody({ todo }: Readonly<{ todo: TodoItemDetail }>) {
           <TodoDonePrompt todo={todo} />
           <TodoNotesSection todo={todo} />
           {/* The notes block above ends flush, so the sessions header owns the
-              break between the two sections: `reserveLabelAir` puts the label at
-              the bottom of the 28 dp air box with the row's 9 dp padding above
-              it (about 23 dp of air) and the same 9 dp below it that the notes
-              header leaves before its body. */}
-          <SectionHeader label={t('todos.item.sessions')} reserveLabelAir />
+              break between the two sections: its own `py-2` leaves the label the
+              same 8 dp of air every other section header has, above and below
+              the line. */}
+          <SectionHeader label={t('todos.item.sessions')} />
           {todo.sessions.length === 0 ? (
             <Text className="px-4 pb-2 text-sm text-ink2">{t('todos.item.noSessions')}</Text>
           ) : (

@@ -48,7 +48,7 @@ export function UpNextSection({
     return null;
   }
   return (
-    <Section label={t('todos.upNext')} reserveLabelAir>
+    <Section label={t('todos.upNext')}>
       <RowGroup leadingTile>
         {items.map(item => {
           const list = lists.data?.find(candidate => candidate.id === item.listId);

@@ -263,7 +263,6 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
     >
       <SectionHeader
         label={t('profile.credits')}
-        reserveLabelAir
         actionLabel={purchase?.label}
         onActionPress={purchase?.onPress}
       />

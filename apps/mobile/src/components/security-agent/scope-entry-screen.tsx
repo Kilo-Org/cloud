@@ -42,18 +42,18 @@ import { classifyOrganizationScopeAccess } from '@/lib/organization-scope-access
  * the dashboard frame instead (`DashboardLoadingView`).
  *
  * Frames come from the spacing scale, not hand-picked pixels: the `ShieldCheck`
- * mark, the title line, two description lines, the step the button carries, and
- * a button-height box at the shared control radius.
+ * bubble, the title line, two description lines, and the compact action's box
+ * at the shared control radius.
  */
 function ScopeEntryBodySkeleton() {
   return (
     <View className={cn('flex-1 items-center justify-center', SCREEN_GUTTER_CLASS)}>
-      <View className="w-full items-center gap-3">
-        <Skeleton className="size-8 rounded-full" />
-        <Skeleton className="h-5 w-40 rounded" />
+      <View className="w-full items-center gap-4">
+        <Skeleton className="size-14 rounded-full" />
+        <Skeleton className="h-6 w-40 rounded" />
         <Skeleton className="h-4 w-full rounded" />
         <Skeleton className="h-4 w-2/3 rounded" />
-        <Skeleton className="mt-3 h-11 w-full rounded-md" />
+        <Skeleton className="mt-3 h-9 w-36 rounded-md" />
       </View>
     </View>
   );

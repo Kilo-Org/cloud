@@ -9,13 +9,13 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
-import { CenteredState } from '@/components/centered-state';
 import { CouncilSpecialistsSection } from '@/components/code-reviewer/council-specialists-section';
 import { ReviewerErrorScreen } from '@/components/code-reviewer/reviewer-error-screen';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { InvalidRouteState } from '@/components/invalid-route-state';
+import { EmptyState } from '@/components/empty-state';
 import { ChoiceRow } from '@/components/ui/choice-row';
-import { Users } from '@/components/ui/icons';
+import { Lock, Users } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { PreferenceRow } from '@/components/ui/preference-row';
 import { RadioGroup } from '@/components/ui/radio-group';
@@ -27,7 +27,7 @@ import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { formatNumber } from '@/lib/format';
-import { SCREEN_BODY_CLASS, SCREEN_GUTTER_CLASS } from '@/lib/layout';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import {
   type CouncilConfig,
   PLATFORM_CAPABILITIES,
@@ -125,11 +125,11 @@ function CouncilScreen({
           eyebrow={t('common.codeReviewer')}
         />
         {surface === 'unavailable' ? (
-          <CenteredState contentContainerClassName={SCREEN_GUTTER_CLASS}>
-            <Text className="text-center text-xs text-muted-foreground">
-              {t('codeReviewer.council.unavailable')}
-            </Text>
-          </CenteredState>
+          <EmptyState
+            icon={Lock}
+            title={t('organizationModelAccess.enterpriseOnlyTitle')}
+            description={t('codeReviewer.council.unavailable')}
+          />
         ) : (
           <View className={SCREEN_BODY_CLASS}>
             <RowGroup leadingTile>

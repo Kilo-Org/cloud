@@ -489,7 +489,7 @@ export async function syncAndStoreProviders() {
 
   const providers = await syncProviders({
     providers: openrouterProviders,
-    openRouterModels: applyLatestAliasTargets(openRouterModels, latestAliasTargets, Date.now()),
+    openRouterModels: applyLatestAliasTargets(openRouterModels, latestAliasTargets),
     openRouterCatalogModels: openRouterCatalog.data,
     vercelModels,
     vercelModelIdOverrides,

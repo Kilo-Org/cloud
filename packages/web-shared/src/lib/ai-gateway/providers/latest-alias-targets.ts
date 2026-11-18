@@ -39,26 +39,17 @@ export const getLatestAliasTargets = createCachedFetch<LatestAliasTargets>(
   { name: 'latestAliasTargets' }
 );
 
-/** The stored target, or the pending one once it takes effect, before the next refresh stores it. */
-export function effectiveLatestAliasTarget(entry: LatestAliasTarget, nowMs: number): string {
-  return entry.pending && Date.parse(entry.pending.effective_at) <= nowMs
-    ? entry.pending.target
-    : entry.target;
-}
-
 /**
  * Points every listed alias with a stored target at that target. An alias without a stored target,
  * or whose stored target is not in the map, keeps the target the gateway reports.
  */
 export function applyLatestAliasTargets(
   models: GatewayModelMap,
-  targets: LatestAliasTargets,
-  nowMs: number
+  targets: LatestAliasTargets
 ): GatewayModelMap {
   if (targets.size === 0) return models;
   const result: GatewayModelMap = { ...models };
-  for (const [alias, entry] of targets) {
-    const target = effectiveLatestAliasTarget(entry, nowMs);
+  for (const [alias, { target }] of targets) {
     const model = Object.hasOwn(models, alias) ? models[alias] : undefined;
     if (!model?.alias_target || !Object.hasOwn(models, target)) continue;
     if (model.alias_target.slug === target) continue;
@@ -140,9 +131,7 @@ export function describeLatestAliasTarget(params: {
   const { target, stored, namesById, nowMs } = params;
   const current = `This alias currently points to ${formatModel(target, namesById)}.`;
   const pending = stored?.target === target ? stored.pending : undefined;
-  if (!pending || pending.target === target || Date.parse(pending.effective_at) <= nowMs) {
-    return current;
-  }
+  if (!pending || pending.target === target) return current;
   const hours = Math.max(1, Math.round((Date.parse(pending.effective_at) - nowMs) / 3_600_000));
   return `${current} It will switch to ${formatModel(pending.target, namesById)} in approximately ${hours} ${hours === 1 ? 'hour' : 'hours'}.`;
 }

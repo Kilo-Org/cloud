@@ -163,33 +163,15 @@ describe('updateLatestAliasTargets', () => {
 describe('applyLatestAliasTargets', () => {
   it('points an alias at its stored target', () => {
     const live = models('vendor/new', 'vendor/old', 'vendor/new');
-    const result = applyLatestAliasTargets(
-      live,
-      stored({ alias: ALIAS, target: 'vendor/old' }),
-      NOW
-    );
+    const result = applyLatestAliasTargets(live, stored({ alias: ALIAS, target: 'vendor/old' }));
     expect(result[ALIAS]?.alias_target?.slug).toBe('vendor/old');
     expect(live[ALIAS]?.alias_target?.slug).toBe('vendor/new');
-  });
-
-  it('uses a pending target once it takes effect', () => {
-    const result = applyLatestAliasTargets(
-      models('vendor/new', 'vendor/old', 'vendor/new'),
-      stored({
-        alias: ALIAS,
-        target: 'vendor/old',
-        pending: { target: 'vendor/new', effective_at: new Date(NOW - 1).toISOString() },
-      }),
-      NOW
-    );
-    expect(result[ALIAS]?.alias_target?.slug).toBe('vendor/new');
   });
 
   it('falls back to the live target when the stored target is not in the catalog', () => {
     const result = applyLatestAliasTargets(
       models('vendor/new', 'vendor/new'),
-      stored({ alias: ALIAS, target: 'vendor/gone' }),
-      NOW
+      stored({ alias: ALIAS, target: 'vendor/gone' })
     );
     expect(result[ALIAS]?.alias_target?.slug).toBe('vendor/new');
   });

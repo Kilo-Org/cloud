@@ -69,7 +69,7 @@ export const getOpenRouterModelsMetadataFromDatabase = createGatewayModelsFetche
   OPENROUTER,
   openRouterGatewayModelsSource,
   'OpenRouter',
-  async models => applyLatestAliasTargets(models, await getLatestAliasTargets(), Date.now())
+  async models => applyLatestAliasTargets(models, await getLatestAliasTargets())
 );
 
 export async function resolveOpenRouterModelAlias(modelId: string): Promise<string> {

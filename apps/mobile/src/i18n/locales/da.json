@@ -1471,9 +1471,7 @@
       "offDescription": "Organisationens faktureringsroller kan slå analysen til i organisationsindstillingerne på nettet for at registrere afsluttede gennemgange.",
       "couldNotLoad": "Kunne ikke indlæse analysedata",
       "trackedReviewsCaption": "Afsluttede gennemgange, der blev færdige i denne periode, mens analysen var slået til. Igangværende og mislykkede gennemgange tælles aldrig med.",
-      "trackedReviewsUncounted": "{{displayCount}} af organisationens {{displayTotal}} afsluttede gennemgange tælles ikke med: deres resultat blev ikke registreret.",
-      "trackedReviewsUncounted_one": "{{displayCount}} af organisationens {{displayTotal}} afsluttede gennemgang tælles ikke med: dens resultat blev ikke registreret.",
-      "trackedReviewsUncounted_other": "{{displayCount}} af organisationens {{displayTotal}} afsluttede gennemgange tælles ikke med: deres resultat blev ikke registreret."
+      "trackedReviewsUncounted": "{{displayCount}} af organisationens {{displayTotal}} afsluttede gennemgange tælles ikke med: deres resultat blev ikke registreret."
     },
     "council": {
       "title": "Rådsgennemgang",

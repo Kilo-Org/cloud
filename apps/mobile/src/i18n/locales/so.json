@@ -1471,9 +1471,7 @@
       "offDescription": "Mulkiilayaasha, maamulayaasha iyo maareerayaasha lacag-bixinta ee ururku waxay tirakoobka shidi karaan habaynta ururka ee bogga web-ka si loo diiwaangeliyo dib-u-eegisyo dhammaaday.",
       "couldNotLoad": "Tirakoobka lama soo dejin karin",
       "trackedReviewsCaption": "Dib-u-eegisyo dhammaaday oo mudadaan ku dhammaystay iyadoo tirakoobku shidan yahay. Dib-u-eegisyaasha socda iyo kuwa guuldaraysan waligood lama tirin.",
-      "trackedReviewsUncounted": "{{displayCount}} ka mid ah {{displayTotal}} dib-u-eegis oo dhammaaday ee ay ururku helayo lama tirin: natiijadeeda lama qin.",
-      "trackedReviewsUncounted_one": "{{displayCount}} ka mid ah {{displayTotal}} dib-u-eegis oo dhammaaday ee ay ururku helayo lama tirin: natiijadeeda lama qin.",
-      "trackedReviewsUncounted_other": "{{displayCount}} ka mid ah {{displayTotal}} dib-u-eegis oo dhammaaday ee ay ururku helayo lama tirin: natiijadeeda lama qin."
+      "trackedReviewsUncounted": "{{displayCount}} ka mid ah {{displayTotal}} dib-u-eegis oo dhammaaday ee ay ururku helayo lama tirin: natiijadeeda lama qin."
     },
     "council": {
       "title": "Dib-u-eegista golaha",

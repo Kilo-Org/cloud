@@ -1471,9 +1471,7 @@
       "offDescription": "Os roles de facturación da organización poden activar a analítica nos axustes da organización na web para rexistrar as revisións completadas.",
       "couldNotLoad": "Non se puido cargar a analítica",
       "trackedReviewsCaption": "Revisións completadas que remataron neste período coa analítica activada. As revisións en execución e as falladas nunca se contan.",
-      "trackedReviewsUncounted": "{{displayCount}} das {{displayTotal}} revisións rematadas que ten a organización non se contan: non se gardou o seu resultado.",
-      "trackedReviewsUncounted_one": "{{displayCount}} da {{displayTotal}} revisión rematada que ten a organización non se conta: non se gardou o seu resultado.",
-      "trackedReviewsUncounted_other": "{{displayCount}} das {{displayTotal}} revisións rematadas que ten a organización non se contan: non se gardou o seu resultado."
+      "trackedReviewsUncounted": "{{displayCount}} das {{displayTotal}} revisións rematadas que ten a organización non se contan: non se gardou o seu resultado."
     },
     "council": {
       "title": "Revisión en consello",

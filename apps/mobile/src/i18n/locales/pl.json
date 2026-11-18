@@ -930,9 +930,7 @@
       "offDescription": "Analitykę mogą włączyć w ustawieniach organizacji w wersji internetowej role związane z rozliczeniami — właściciele, administratorzy i menedżerowie rozliczeń — aby rejestrować ukończone przeglądy.",
       "couldNotLoad": "Nie udało się wczytać analityki",
       "trackedReviewsCaption": "Ukończone przeglądy, które zakończyły się w tym okresie przy włączonej analityce. Przeglądy w toku i zakończone niepowodzeniem nigdy nie są zliczane.",
-      "trackedReviewsUncounted": "Nie zliczono {{displayCount}} z {{displayTotal}} ukończonych przeglądów organizacji: ich wynik nie został zapisany.",
-      "trackedReviewsUncounted_one": "Nie zliczono {{displayCount}} z {{displayTotal}} ukończonych przeglądów organizacji: jego wynik nie został zapisany.",
-      "trackedReviewsUncounted_other": "Nie zliczono {{displayCount}} z {{displayTotal}} ukończonych przeglądów organizacji: ich wynik nie został zapisany."
+      "trackedReviewsUncounted": "Nie zliczono {{displayCount}} z {{displayTotal}} ukończonych przeglądów organizacji: ich wynik nie został zapisany."
     },
     "council": {
       "title": "Przegląd rady",

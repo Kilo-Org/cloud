@@ -169,7 +169,7 @@ export const NO_AGREEMENT = new Map([
   ['profiles.counts.mcp', 'initialism, not agreement: "{{count}} MCP" names no inflected word'],
   [
     'codeReviewer.analytics.trackedReviewsUncounted',
-    'verb-free label: "Not counted: N of M finished reviews" names no inflected word',
+    'possessive read-out: "Not counted: N of M finished reviews without a captured result" ends in one sound',
   ],
 ]);
 

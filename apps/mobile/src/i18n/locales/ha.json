@@ -1471,9 +1471,7 @@
       "offDescription": "Matsayuna na biyan kuɗi a ƙungiyar (masu mallaka, masu gudanarwa da manajojin biyan kuɗi) za su iya kunna nazari a saitunan ƙungiyar a yanar gizo domin a adana bitocin da aka kammala.",
       "couldNotLoad": "An kasa loda nazari",
       "trackedReviewsCaption": "Bitocin da aka kammala waɗanda suka ƙare a cikin wannan lokacin, yayin da aka kunna nazari. Ba a taɓa ƙidaya bitocin da ke gudana ko waɗanda suka kasa ba.",
-      "trackedReviewsUncounted": "{{displayCount}} daga cikin {{displayTotal}} bitocin da aka kammala waɗanda ƙungiyar ke da su ba a ƙidaya su ba: ba a adana sakamakonsu ba.",
-      "trackedReviewsUncounted_one": "{{displayCount}} daga cikin {{displayTotal}} bitar da aka kammala wadda ƙungiyar ke da ita ba a ƙidaya ta ba: ba a adana sakamakonta ba.",
-      "trackedReviewsUncounted_other": "{{displayCount}} daga cikin {{displayTotal}} bitocin da aka kammala waɗanda ƙungiyar ke da su ba a ƙidaya su ba: ba a adana sakamakonsu ba."
+      "trackedReviewsUncounted": "{{displayCount}} daga cikin {{displayTotal}} bitocin da aka kammala waɗanda ƙungiyar ke da su ba a ƙidaya su ba: ba a adana sakamakonsu ba."
     },
     "council": {
       "title": "Bitar majalisa",

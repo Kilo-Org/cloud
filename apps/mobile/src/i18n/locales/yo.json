@@ -1471,9 +1471,7 @@
       "offDescription": "Àwọn ipò owó-ìnáwó àjọ (àwọn olóhun, àwọn alákòóso àti àwọn olùdarí ìnáwó) lè ṣí ìṣirò sílẹ̀ nínú àwọn ètò àjọ lórí ayélujára láti gbasilẹ̀ àwọn àtúnyẹ̀wò tó parí.",
       "couldNotLoad": "A kò lè gbé ìṣirò wọlé",
       "trackedReviewsCaption": "Àwọn àtúnyẹ̀wò tó parí ní àkókò yìí nígbà tí ìṣirò ti ṣí sílẹ̀. A kì í tọpinpin àwọn àtúnyẹ̀wò tí ó ń ṣiṣẹ́ lọ́wọ́ báyìí àti àwọn tí ó kùnà rárá.",
-      "trackedReviewsUncounted": "{{displayCount}} nínú {{displayTotal}} àwọn àtúnyẹ̀wò tó parí tí àjọ ní kì í ṣe tọpinpin: àbájá wọn kò tíì gbasilẹ̀.",
-      "trackedReviewsUncounted_one": "{{displayCount}} nínú {{displayTotal}} àtúnyẹ̀wò tó parí tí àjọ ní kì í ṣe tọpinpin: àbájá rẹ̀ kò tíì gbasilẹ̀.",
-      "trackedReviewsUncounted_other": "{{displayCount}} nínú {{displayTotal}} àwọn àtúnyẹ̀wò tó parí tí àjọ ní kì í ṣe tọpinpin: àbájá wọn kò tíì gbasilẹ̀."
+      "trackedReviewsUncounted": "{{displayCount}} nínú {{displayTotal}} àwọn àtúnyẹ̀wò tó parí tí àjọ ní kì í ṣe tọpinpin: àbájá wọn kò tíì gbasilẹ̀."
     },
     "council": {
       "title": "Àtúnyẹ̀wò ìgbìmọ̀",

@@ -1543,9 +1543,7 @@
       "offDescription": "Ir-rwoli tal-fatturazzjoni tal-organizzazzjoni jistgħu jixgħlu l-istatistika fil-settings tal-organizzazzjoni fuq il-web biex jirrekordjaw reviżjonijiet kompluti.",
       "couldNotLoad": "L-istatistika ma setgħetx tiġi mgħobbija",
       "trackedReviewsCaption": "Reviżjonijiet kompluti li spiċċaw f'dan il-perjodu meta l-istatistika kienet mixgħula. Reviżjonijiet li għadhom għaddejjin u dawk li tfallu qatt ma jingħaddu.",
-      "trackedReviewsUncounted": "{{displayCount}} mill-{{displayTotal}} reviżjonijiet kompluti tal-organizzazzjoni ma jingħaddux: ir-riżultat tagħhom ma ġiex rekordjat.",
-      "trackedReviewsUncounted_one": "{{displayCount}} mill-{{displayTotal}} reviżjoni kompluta tal-organizzazzjoni ma tingħaddax: ir-riżultat tagħha ma ġiex rekordjat.",
-      "trackedReviewsUncounted_other": "{{displayCount}} mill-{{displayTotal}} reviżjonijiet kompluti tal-organizzazzjoni ma jingħaddux: ir-riżultat tagħhom ma ġiex rekordjat."
+      "trackedReviewsUncounted": "{{displayCount}} mill-{{displayTotal}} reviżjonijiet kompluti tal-organizzazzjoni ma jingħaddux: ir-riżultat tagħhom ma ġiex rekordjat."
     },
     "council": {
       "title": "Reviżjoni tal-kunsill",

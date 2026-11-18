@@ -1471,9 +1471,7 @@
       "offDescription": "Majukumu ya bili ya shirika — wamiliki, wasimamizi na mameneja wa bili — yanaweza kuwasha takwimu katika mipangilio ya shirika kwenye wavuti ili kurekodi ukaguzi uliokamilika.",
       "couldNotLoad": "Imeshindwa kupakia takwimu",
       "trackedReviewsCaption": "Ukaguzi uliokamilika ulioisha katika kipindi hiki wakati takwimu zilikuwa zimewashwa. Ukaguzi unaoendelea na ulioshindikana hauhesabiwi kamwe.",
-      "trackedReviewsUncounted": "{{displayCount}} kati ya ukaguzi {{displayTotal}} uliokamilika wa shirika hauhesabiwi: matokeo yake hayakurekodiwa.",
-      "trackedReviewsUncounted_one": "{{displayCount}} kati ya ukaguzi {{displayTotal}} uliokamilika wa shirika hauhesabiwi: tokeo lake halikurekodiwa.",
-      "trackedReviewsUncounted_other": "{{displayCount}} kati ya ukaguzi {{displayTotal}} uliokamilika wa shirika hauhesabiwi: matokeo yake hayakurekodiwa."
+      "trackedReviewsUncounted": "{{displayCount}} kati ya ukaguzi {{displayTotal}} uliokamilika wa shirika hauhesabiwi: matokeo yake hayakurekodiwa."
     },
     "council": {
       "title": "Ukaguzi wa baraza",

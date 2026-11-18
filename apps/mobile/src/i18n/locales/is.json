@@ -1471,9 +1471,7 @@
       "offDescription": "Eigendur, stjórnendur og rekningastjórar fyrirtækisins geta kveikt á tölfræðinni í stillingum fyrirtækisins á vefnum til að skrá yfirferðir sem klárast.",
       "couldNotLoad": "Tókst ekki að sækja tölfræðina",
       "trackedReviewsCaption": "Yfirferðir sem klárast á þessu tímabili, meðan tölfræðin er virk. Yfirferðir í gangi eða misheppnaðar teljast aldrei.",
-      "trackedReviewsUncounted": "{{displayCount}} af {{displayTotal}} yfirferðum fyrirtækisins sem hafa klárast teljast ekki, vegna þess að niðurstöðan þeirra var ekki skráð.",
-      "trackedReviewsUncounted_one": "{{displayCount}} af {{displayTotal}} yfirferðum fyrirtækisins sem hafa klárast telst ekki, vegna þess að niðurstöðan hennar var ekki skráð.",
-      "trackedReviewsUncounted_other": "{{displayCount}} af {{displayTotal}} yfirferðum fyrirtækisins sem hafa klárast teljast ekki, vegna þess að niðurstöðan þeirra var ekki skráð."
+      "trackedReviewsUncounted": "{{displayCount}} af {{displayTotal}} yfirferðum fyrirtækisins sem hafa klárast teljast ekki, vegna þess að niðurstöðan þeirra var ekki skráð."
     },
     "council": {
       "title": "Ráðsyfirferð",

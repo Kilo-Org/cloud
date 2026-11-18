@@ -1519,9 +1519,7 @@
       "offDescription": "Lastniki, skrbniki in upravitelji obračunavanja v organizaciji lahko vklopijo analitiko v nastavitvah organizacije na spletu, da se beležijo dokončani pregledi.",
       "couldNotLoad": "Analitike ni bilo mogoče naložiti",
       "trackedReviewsCaption": "Dokončani pregledi, ki so se zaključili v tem obdobju z vklopljeno analitiko. Pregledi v teku in neuspešni pregledi se nikoli ne štejejo.",
-      "trackedReviewsUncounted": "{{displayCount}} od {{displayTotal}} dokončanih pregledov, ki jih ima organizacija, ni preštetih: njihov rezultat ni bil zajet.",
-      "trackedReviewsUncounted_one": "{{displayCount}} od {{displayTotal}} dokončanih pregledov, ki jih ima organizacija, ni preštet: njegov rezultat ni bil zajet.",
-      "trackedReviewsUncounted_other": "{{displayCount}} od {{displayTotal}} dokončanih pregledov, ki jih ima organizacija, ni preštetih: njihov rezultat ni bil zajet."
+      "trackedReviewsUncounted": "{{displayCount}} od {{displayTotal}} dokončanih pregledov, ki jih ima organizacija, ni preštetih: njihov rezultat ni bil zajet."
     },
     "council": {
       "title": "Kolegijski pregled",

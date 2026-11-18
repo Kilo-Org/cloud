@@ -929,9 +929,7 @@
       "offDescription": "Los roles de facturación de la organización (propietarios, administradores y gestores de facturación) pueden activar las analíticas en los ajustes de la organización en la web para registrar las revisiones completadas.",
       "couldNotLoad": "No se pudieron cargar las analíticas",
       "trackedReviewsCaption": "Revisiones completadas que finalizaron en este periodo con las analíticas activadas. Las revisiones en curso y fallidas nunca se cuentan.",
-      "trackedReviewsUncounted": "{{displayCount}} de las {{displayTotal}} revisiones finalizadas que tiene la organización no se cuentan: no se capturó su resultado.",
-      "trackedReviewsUncounted_one": "{{displayCount}} de las {{displayTotal}} revisiones finalizadas que tiene la organización no se cuenta: no se capturó su resultado.",
-      "trackedReviewsUncounted_other": "{{displayCount}} de las {{displayTotal}} revisiones finalizadas que tiene la organización no se cuentan: no se capturó su resultado."
+      "trackedReviewsUncounted": "{{displayCount}} de las {{displayTotal}} revisiones finalizadas que tiene la organización no se cuentan: no se capturó su resultado."
     },
     "council": {
       "title": "Revisión por consejo",

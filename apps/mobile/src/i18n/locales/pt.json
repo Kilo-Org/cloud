@@ -1495,7 +1495,7 @@
       "offDescription": "As funções de faturação da organização (proprietários, administradores e gestores de faturação) podem ativar as estatísticas nas definições da organização na Web para registar revisões concluídas.",
       "couldNotLoad": "Não foi possível carregar as estatísticas",
       "trackedReviewsCaption": "Revisões concluídas que terminaram neste período com as estatísticas ativadas. As revisões em execução e as falhadas nunca são contadas.",
-      "trackedReviewsUncounted": "{{count}} das {{total}} revisões concluídas da organização não são contadas: os resultados não foram capturados."
+      "trackedReviewsUncounted": "Não contadas: {{displayCount}} das {{displayTotal}} revisões concluídas da organização sem resultado capturado."
     },
     "council": {
       "title": "Revisão do conselho",

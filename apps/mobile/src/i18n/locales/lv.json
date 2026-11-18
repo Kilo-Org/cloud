@@ -1495,9 +1495,7 @@
       "offDescription": "Organizācijas norēķinu lomas (īpašnieki, administratori un norēķinu pārvaldnieki) var ieslēgt analītiku organizācijas iestatījumos tīmeklī, lai reģistrētu pabeigtas pārskatīšanas.",
       "couldNotLoad": "Neizdevās ielādēt analītiku",
       "trackedReviewsCaption": "Pabeigtas pārskatīšanas, kas noslēgušās šajā periodā, kamēr analītika bija ieslēgta. Notiekošās un neveiksmīgās pārskatīšanas nekad netiek ieskaitītas.",
-      "trackedReviewsUncounted": "{{displayCount}} no {{displayTotal}} organizācijas pabeigtajām pārskatīšanām netiek ieskaitītas: to rezultāts netika reģistrēts.",
-      "trackedReviewsUncounted_one": "{{displayCount}} no {{displayTotal}} organizācijas pabeigtajām pārskatīšanām netiek ieskaitīta: tās rezultāts netika reģistrēts.",
-      "trackedReviewsUncounted_other": "{{displayCount}} no {{displayTotal}} organizācijas pabeigtajām pārskatīšanām netiek ieskaitītas: to rezultāts netika reģistrēts."
+      "trackedReviewsUncounted": "{{displayCount}} no {{displayTotal}} organizācijas pabeigtajām pārskatīšanām netiek ieskaitītas: to rezultāts netika reģistrēts."
     },
     "council": {
       "title": "Padomes pārskatīšana",

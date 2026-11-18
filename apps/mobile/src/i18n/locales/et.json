@@ -1471,9 +1471,7 @@
       "offDescription": "Organisatsiooni arveldusrollid saavad analüütika sisse lülitada seadetes veebis, et salvestada lõpetatud ülevaatused.",
       "couldNotLoad": "Analüütikat ei õnnestunud laadida",
       "trackedReviewsCaption": "Lõpetatud ülevaatused, mis said selle perioodi jooksul valmis, kui analüütika oli sisse lülitatud. Käimasolevaid ja nurjunud ülevaatusi ei arvestata kunagi.",
-      "trackedReviewsUncounted": "Organisatsiooni {{displayTotal}} lõpetatud ülevaatustest on {{displayCount}} arvestamata: nende tulemust ei salvestatud.",
-      "trackedReviewsUncounted_one": "Organisatsiooni {{displayTotal}} lõpetatud ülevaatustest on {{displayCount}} arvestamata: selle tulemust ei salvestatud.",
-      "trackedReviewsUncounted_other": "Organisatsiooni {{displayTotal}} lõpetatud ülevaatustest on {{displayCount}} arvestamata: nende tulemust ei salvestatud."
+      "trackedReviewsUncounted": "Organisatsiooni {{displayTotal}} lõpetatud ülevaatustest on {{displayCount}} arvestamata: nende tulemust ei salvestatud."
     },
     "council": {
       "title": "Nõukogu ülevaatus",

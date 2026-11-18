@@ -1471,9 +1471,7 @@
       "offDescription": "Erakundeko fakturazio-rolek analitika gaitu dezakete erakundearen webean dauden ezarpenetan, amaitutako berrikuspenak erregistratzeko.",
       "couldNotLoad": "Ezin izan da analitika kargatu",
       "trackedReviewsCaption": "Aldi honetan analitika gaituta amaitu diren berrikuspenak. Martxan dauden eta huts egin duten berrikuspenak inoiz ez dira zenbatzen.",
-      "trackedReviewsUncounted": "Erakundeak duen {{displayTotal}} berrikuspenetatik {{displayCount}} ez dira zenbatzen: beren emaitza ez da jaso.",
-      "trackedReviewsUncounted_one": "Erakundeak duen {{displayTotal}} berrikuspenetatik {{displayCount}} ez da zenbatzen: bere emaitza ez da jaso.",
-      "trackedReviewsUncounted_other": "Erakundeak duen {{displayTotal}} berrikuspenetatik {{displayCount}} ez dira zenbatzen: beren emaitza ez da jaso."
+      "trackedReviewsUncounted": "Erakundeak duen {{displayTotal}} berrikuspenetatik {{displayCount}} ez dira zenbatzen: beren emaitza ez da jaso."
     },
     "council": {
       "title": "Kontseilu-berrikuspena",

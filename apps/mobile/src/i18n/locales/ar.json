@@ -932,9 +932,7 @@
       "offDescription": "يمكن لأصحاب أدوار الفوترة في المؤسسة تفعيل التحليلات في إعدادات المؤسسة على الويب لتسجّل المراجعات المكتملة.",
       "couldNotLoad": "تعذّر تحميل التحليلات",
       "trackedReviewsCaption": "المراجعات المكتملة التي انتهت خلال هذه الفترة والتحليلات مفعّلة. لا تُحتسب المراجعات الجارية والفاشلة أبدًا.",
-      "trackedReviewsUncounted": "{{displayCount}} من أصل {{displayTotal}} مراجعة مكتملة لدى المؤسسة لا تُحتسب: لم تُرصد نتيجتها.",
-      "trackedReviewsUncounted_one": "{{displayCount}} من أصل {{displayTotal}} مراجعة مكتملة لدى المؤسسة لا تُحتسب: لم تُرصد نتيجتها.",
-      "trackedReviewsUncounted_other": "{{displayCount}} من أصل {{displayTotal}} مراجعة مكتملة لدى المؤسسة لا تُحتسب: لم تُرصد نتيجتها."
+      "trackedReviewsUncounted": "{{displayCount}} من أصل {{displayTotal}} مراجعة مكتملة لدى المؤسسة لا تُحتسب: لم تُرصد نتيجتها."
     },
     "council": {
       "title": "مراجعة المجلس",

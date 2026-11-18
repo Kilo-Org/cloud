@@ -1495,9 +1495,7 @@
       "offDescription": "Vlasnici, administratori i menadžeri naplate mogu da uključe analitiku u podešavanjima organizacije na vebu kako bi beležila završene preglede.",
       "couldNotLoad": "Nije moguće učitati analitiku",
       "trackedReviewsCaption": "Završeni pregledi koji su okončani u ovom periodu dok je analitika bila uključena. Pregledi u toku i neuspešni pregledi se nikada ne računaju.",
-      "trackedReviewsUncounted": "{{displayCount}} od {{displayTotal}} završenih pregleda koje organizacija ima nije uračunato: njihov rezultat nije bio sačuvan.",
-      "trackedReviewsUncounted_one": "{{displayCount}} od {{displayTotal}} završenih pregleda koje organizacija ima nije uračunat: njegov rezultat nije bio sačuvan.",
-      "trackedReviewsUncounted_other": "{{displayCount}} od {{displayTotal}} završenih pregleda koje organizacija ima nije uračunato: njihov rezultat nije bio sačuvan."
+      "trackedReviewsUncounted": "{{displayCount}} od {{displayTotal}} završenih pregleda koje organizacija ima nije uračunato: njihov rezultat nije bio sačuvan."
     },
     "council": {
       "title": "Pregled veća",

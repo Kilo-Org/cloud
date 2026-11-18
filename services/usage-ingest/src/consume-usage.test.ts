@@ -1201,6 +1201,31 @@ describe('tagged Exa usage messages', () => {
     }
   );
 
+  it('ACKs a rejected outcome without a retry delay or a second delivery', async () => {
+    const { fetch, logs, processingLogs } = setup();
+    fetch.mockResolvedValue(exaAcknowledgement('rejected'));
+    const msg = message(exaMessage);
+    await worker.queue(batch([msg]), env);
+    expect(msg.ack).toHaveBeenCalledExactlyOnceWith();
+    expect(msg.retry).not.toHaveBeenCalled();
+    expect(fetch).toHaveBeenCalledExactlyOnceWith(
+      exaWriterUrl,
+      expect.objectContaining({ method: 'POST' })
+    );
+    expect(outcomes(processingLogs)).toEqual([
+      expect.objectContaining({
+        level: 'info',
+        outcome: 'rejected',
+        queue_action: 'ack',
+        usage_id: exaRecord.id,
+        usage_kind: 'exa_usage',
+      }),
+    ]);
+    expect(outcomes(processingLogs)[0]).not.toHaveProperty('retry_delay_seconds');
+    expect(outcomes(processingLogs)[0]).not.toHaveProperty('retry_class');
+    expectNoRecordValues(logs);
+  });
+
   it('retries an admission 429 with the admission delay and reports writer overload', async () => {
     const { fetch, logs, processingLogs } = setup();
     fetch.mockResolvedValue(

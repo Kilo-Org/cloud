@@ -61,6 +61,7 @@ import {
   RuntimeAuthorizationRevokedError,
   sealRuntimeAuthorization,
 } from '@kilocode/worker-utils/runtime-authorization';
+import { resolveRuntimeEnvironment } from '@kilocode/worker-utils/runtime-authorization-contract';
 
 import { agentSandboxProviderSchema, type Env, type SandboxId } from '../types.js';
 import {
@@ -111,6 +112,7 @@ import { generateKiloSessionId } from '../utils/kilo-session-id.js';
 import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import { assertKiloModelAvailable } from '../model-validation.js';
 import { initialAdmissionFailure } from './admission-failure.js';
+import { logRuntimeAuthorizationDiagnostic } from './runtime-authorization-diagnostics.js';
 import {
   createCloudAgentSessionReport,
   recordCloudAgentSandboxIdentity,
@@ -119,7 +121,6 @@ import {
 import { createMessageId } from './message-id.js';
 import { canonicalRequestedEnvironment } from './requested-environment-intent.js';
 import { isPolicyBearingAuthToken } from './policy-bearing-token.js';
-import { logRuntimeAuthorizationDiagnostic } from './runtime-authorization-diagnostics.js';
 import type { MessageResultRPCResponse } from './message-result.js';
 import { classifyStoredInitialTurn, initialTurnTerminalFailure } from './initial-turn-outcome.js';
 import type {
@@ -935,6 +936,9 @@ async function issueSessionRuntimeAuthorization(
       connectionString: ctx.env.HYPERDRIVE.connectionString,
       resourceKind: 'cloud-agent-next',
       resourceId: cloudAgentSessionId,
+      environment: resolveRuntimeEnvironment(ctx.env.ENVIRONMENT),
+      onAdmissionRejected: reason =>
+        logRuntimeAuthorizationDiagnostic(cloudAgentSessionId, 'admission', reason),
       ...(orgId ? { organizationId: orgId } : {}),
       onBindingRejected: reason =>
         logRuntimeAuthorizationDiagnostic(cloudAgentSessionId, 'binding_check', reason),
@@ -2124,6 +2128,7 @@ function profileCreateIntent(
     runtimeSkills: resolved.runtimeSkills,
     runtimeAgents: resolved.runtimeAgents,
     builtinAgents: resolved.builtinAgents,
+    modelContextLimits: resolved.modelContextLimits,
     kiloCommands: resolved.kiloCommands,
     runtimeInstructions: resolved.runtimeInstructions,
   };

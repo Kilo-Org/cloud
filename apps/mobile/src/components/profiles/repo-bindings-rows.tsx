@@ -36,7 +36,11 @@ export function RepoBindingRow({
   platform: string;
   profileName: string;
   isRemoving: boolean;
-  onRemove: () => void;
+  /**
+   * Absent for a caller who may not unbind, such as an organization member: the
+   * row then renders no control, since the server would refuse it.
+   */
+  onRemove?: () => void;
 }>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
@@ -64,15 +68,17 @@ export function RepoBindingRow({
       >
         {repoPlatformBadge(platform)}
       </Text>
-      <Pressable
-        className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
-        accessibilityRole="button"
-        accessibilityLabel={t('profiles.repoBindings.removeForRepo', { repo: repoFullName })}
-        disabled={isRemoving}
-        onPress={onRemove}
-      >
-        <Trash2 size={18} color={colors.mutedForeground} />
-      </Pressable>
+      {onRemove === undefined ? null : (
+        <Pressable
+          className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
+          accessibilityRole="button"
+          accessibilityLabel={t('profiles.repoBindings.removeForRepo', { repo: repoFullName })}
+          disabled={isRemoving}
+          onPress={onRemove}
+        >
+          <Trash2 size={18} color={colors.mutedForeground} />
+        </Pressable>
+      )}
     </View>
   );
 }

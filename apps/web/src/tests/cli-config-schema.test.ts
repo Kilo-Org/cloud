@@ -127,13 +127,6 @@ describe('kilo config.json schema merge', () => {
     expect(browser.properties.target.anyOf.some(variant => variant.type === 'null')).toBe(true);
   });
 
-  test('browser_extension is a boolean experimental flag', () => {
-    const experimental = props.experimental as { properties: Record<string, unknown> };
-    expect(experimental.properties.browser_extension).toEqual(
-      expect.objectContaining({ type: 'boolean', default: false })
-    );
-  });
-
   test('retention exposes enabled boolean and maxAgeDays number', () => {
     const retention = props.retention as {
       type: string;
@@ -223,6 +216,7 @@ describe('kilo config.json schema merge', () => {
   test('merges kilo experimental keys without restoring retired keys', () => {
     const exp = props.experimental as { properties: Record<string, unknown> };
     expect(exp.properties.codebase_search).toBeUndefined();
+    expect(exp.properties.browser_extension).toBeUndefined();
     expect(exp.properties.agent_requirements).toEqual(expect.objectContaining({ type: 'boolean' }));
     expect(exp.properties.native_notebook_tools).toEqual(
       expect.objectContaining({ type: 'boolean' })

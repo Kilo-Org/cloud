@@ -3,6 +3,7 @@ import {
   CloudAgentCallbackFailureSchema,
   type CloudAgentSafeFailure,
 } from '@kilocode/worker-utils/cloud-agent-failure';
+import { resolveRuntimeEnvironment } from '@kilocode/worker-utils/runtime-authorization-contract';
 import { z } from 'zod';
 import {
   getActiveAnalysisAttemptToken,
@@ -482,7 +483,7 @@ export async function finalizeCompletedAnalysisCallbackFromEnv(params: {
       const authToken = await generateTriageToken(
         actor,
         nextAuthSecret,
-        params.env.ENVIRONMENT,
+        resolveRuntimeEnvironment(params.env.ENVIRONMENT),
         params.env.SHARED_RESOURCE_TOKENS_ENABLED,
         finding.owned_by_organization_id ?? undefined
       );

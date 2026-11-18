@@ -591,9 +591,16 @@ const HTML_ELEMENT_MODELS = {
 
 const CODE_FONT = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
 
+// The engine's base style is CSS-like: `direction` names a block's base
+// direction, and its `MixedStyleDeclaration` has no `writingDirection` (that is
+// the native `Text` spelling, `LTR_TEXT_DIRECTION`).
+const LTR_BASE_DIRECTION = { direction: 'ltr' } as const;
+
 type MarkdownHtmlProps = {
   html: string;
   palette: MarkdownPalette;
+  /** Base direction of the document body; see `MarkdownTextProps`. */
+  documentDirection?: 'ltr';
   selectable: boolean;
   onLongPressLink?: MarkdownLinkLongPressHandler;
   onPressLink?: MarkdownLinkPressHandler;
@@ -602,6 +609,7 @@ type MarkdownHtmlProps = {
 export function MarkdownHtml({
   html,
   palette,
+  documentDirection,
   selectable,
   onLongPressLink,
   onPressLink,
@@ -609,8 +617,16 @@ export function MarkdownHtml({
   const { width } = useWindowDimensions();
   const source = useMemo(() => ({ html }), [html]);
   const baseStyle = useMemo(
-    () => ({ color: palette.textColor, fontSize: 16, lineHeight: 24 }),
-    [palette]
+    () => ({
+      color: palette.textColor,
+      fontSize: 16,
+      lineHeight: 24,
+      // Naming the body's own direction makes the engine resolve every block
+      // left to right and left aligned; chat leaves the interface's direction
+      // in place.
+      ...(documentDirection === 'ltr' ? LTR_BASE_DIRECTION : {}),
+    }),
+    [palette, documentDirection]
   );
   // Most keys, subscripts and superscripts become markdown before they reach
   // this renderer (`markdown-html-inline.ts`). What is left draws as smaller
@@ -675,8 +691,15 @@ export function MarkdownHtml({
     const HtmlImage: CustomBlockRenderer = ({ tnode }) => {
       const src = tnode.attributes.src ?? '';
       if (!isSupportedScheme(src)) {
+        // Alt text is document content: a body with its own direction names
+        // both halves of the direction — the interface mark would keep it
+        // mirrored on iOS, where `writingDirection` is the paragraph's base.
+        const altStyle =
+          documentDirection === 'ltr'
+            ? { ...baseStyle, writingDirection: 'ltr' as const }
+            : withRtlWritingDirection(baseStyle);
         return (
-          <Text selectable={selectable} style={withRtlWritingDirection(baseStyle)}>
+          <Text selectable={selectable} style={altStyle}>
             {tnode.attributes.alt ?? ''}
           </Text>
         );
@@ -716,7 +739,7 @@ export function MarkdownHtml({
       img: HtmlImage,
       details: HtmlDetails,
     };
-  }, [baseStyle, onLongPressLink, onPressLink, selectable]);
+  }, [baseStyle, documentDirection, onLongPressLink, onPressLink, selectable]);
 
   return (
     <RenderHTML

@@ -19,8 +19,7 @@ import { SquareUserRound } from 'lucide-react';
 import React from 'react';
 import type { SignInFormInitialState } from '@/hooks/useSignInFlow';
 import { OAuthProviderIds } from '@/lib/auth/provider-metadata';
-import { withLaunchedClaudeSignIn } from '@/lib/auth/claude/access';
-import { useClaudeSignInEnabled } from '@/lib/auth/claude/use-claude-sign-in-enabled';
+import { useClaudeSignInConfigured } from '@/lib/auth/claude/use-claude-sign-in-configured';
 import { buildEnterpriseSsoHref, buildNormalSignInHref } from '@/lib/auth/sign-in-navigation';
 import { SIGNUP_STEP_UP_METHODS_PARAM } from '@/lib/auth/redirect-urls';
 import type { SsoAccountMismatch } from '@/lib/auth/sso-account-mismatch';
@@ -64,8 +63,10 @@ export function SignInForm({
     isSignUp,
     storybookInitialState,
   });
-  const claudeSignInEnabled = useClaudeSignInEnabled();
-  const offeredOAuthProviderIds = withLaunchedClaudeSignIn(OAuthProviderIds, claudeSignInEnabled);
+  const claudeConfigured = useClaudeSignInConfigured();
+  const offeredOAuthProviderIds = OAuthProviderIds.filter(
+    id => id !== 'claude' || claudeConfigured
+  );
 
   // An Enterprise SSO request for a different address than the signed-in
   // session cannot proceed; offer the one-tap switch before any normal
@@ -234,10 +235,8 @@ export function SignInForm({
 
                 // The remembered provider is the whole list; "see other
                 // sign-in methods" below opens the full group.
-                const displayedProviders = withLaunchedClaudeSignIn(
-                  [lastAuthMethod],
-                  claudeSignInEnabled
-                );
+                const displayedProviders =
+                  lastAuthMethod === 'claude' && !claudeConfigured ? [] : [lastAuthMethod];
 
                 return (
                   <div className="mx-auto max-w-md space-y-4">

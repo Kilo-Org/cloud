@@ -1,4 +1,7 @@
-import type { RuntimeAuthorizationBindingRejectionReason } from '@kilocode/worker-utils/runtime-authorization';
+import type {
+  RuntimeAuthorizationAdmissionRejectionReason,
+  RuntimeAuthorizationBindingRejectionReason,
+} from '@kilocode/worker-utils/runtime-authorization';
 import { logger } from '../logger.js';
 
 export type RecoveryDenialReason =
@@ -11,6 +14,7 @@ export type RecoveryDenialReason =
   | 'authorization_state_changed';
 
 type DiagnosticReason =
+  | RuntimeAuthorizationAdmissionRejectionReason
   | RuntimeAuthorizationBindingRejectionReason
   | RecoveryDenialReason
   | 'stored_authorization_invalid'
@@ -24,7 +28,7 @@ type DiagnosticReason =
 
 export function logRuntimeAuthorizationDiagnostic(
   sessionId: string | undefined,
-  stage: 'preflight' | 'recovery_state' | 'renewal' | 'binding_check' | 'recovery',
+  stage: 'preflight' | 'recovery_state' | 'renewal' | 'binding_check' | 'recovery' | 'admission',
   reason: DiagnosticReason
 ): void {
   try {

@@ -4,6 +4,7 @@ import {
   RuntimeSkillsSchema,
   RuntimeAgentsSchema,
   RuntimeBuiltinAgentsSchema,
+  RuntimeModelContextLimitsSchema,
   RuntimeKiloCommandsSchema,
   RuntimeInstructionsSchema,
 } from '../shared/runtime-profile.js';
@@ -250,6 +251,7 @@ const SharedSessionProfileFields = {
   runtimeSkills: RuntimeSkillsSchema.optional(),
   runtimeAgents: RuntimeAgentsSchema.optional(),
   builtinAgents: RuntimeBuiltinAgentsSchema.optional(),
+  modelContextLimits: RuntimeModelContextLimitsSchema.optional(),
 };
 
 export const SessionProfileBundleSchema = z.object({

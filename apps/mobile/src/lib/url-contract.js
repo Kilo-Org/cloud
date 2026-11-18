@@ -18,18 +18,26 @@ export const URL_SCHEMES = {
   // Optional: client-observed latency ingest. The committed production default
   // is LATENCY_INGEST_URL_DEFAULT below; an explicit value overrides it.
   latencyIngestUrl: ['https:'],
+  // Optional: the Kilo MCP server the chat reaches with the signed-in
+  // session's own token (lib/chat/kilo-mcp.ts). An explicit value overrides
+  // the committed production default in lib/config.ts.
+  kiloMcpUrl: ['https:'],
 };
 
 /** Production host allowlist, seeded from the committed mobile production
  *  defaults: the apps/mobile/.env URL values (api.kilo.ai, app.kilo.ai,
  *  cloud-agent-next.kilosessions.ai, ingest.kilosessions.ai,
- *  events.kiloapps.io, notifications.kiloapps.io) and the latency ingest
- *  default committed in LATENCY_INGEST_URL_DEFAULT below. url-contract.test.ts
- *  asserts every committed default against this list, so a missing host fails
- *  the test before any build. Preflight is the runtime safety net: the release
- *  preflight runs assertProductionHost against the real production values, so
- *  an incomplete allowlist fails preflight before any build, never at runtime
- *  in a store build. */
+ *  events.kiloapps.io, notifications.kiloapps.io), the latency ingest
+ *  default committed in LATENCY_INGEST_URL_DEFAULT below, and the Kilo MCP
+ *  default committed in lib/config.ts (KILO_MCP_URL_PRODUCTION).
+ *  url-contract.test.ts asserts the committed .env values and the latency
+ *  default through assertProductionHost directly; the MCP default has no
+ *  url-contract case — config.test.ts's production-resolution case imports
+ *  config.ts, so its module-load assertProductionHost is the check. Preflight
+ *  is the runtime
+ *  safety net: the release preflight runs assertProductionHost against the
+ *  real production values, so an incomplete allowlist fails preflight before
+ *  any build, never at runtime in a store build. */
 export const PRODUCTION_HOSTS = [
   'api.kilo.ai',
   'app.kilo.ai',
@@ -37,6 +45,7 @@ export const PRODUCTION_HOSTS = [
   'events.kiloapps.io',
   'ingest.kilosessions.ai',
   'latency.kiloapps.io',
+  'mcp.kiloapps.io',
   'notifications.kiloapps.io',
 ];
 
@@ -46,6 +55,13 @@ export const PRODUCTION_HOSTS = [
  *  credential-shaped to the release gate. The optional LATENCY_INGEST_URL
  *  key overrides it; config.ts is the only consumer. */
 export const LATENCY_INGEST_URL_DEFAULT = 'https://latency.kiloapps.io';
+
+/** Config keys whose env name ends in _URL but carry no scheme or
+ *  production-host check. Every entry needs a reason here; an empty list
+ *  today means every URL-valued key is registered in URL_SCHEMES. The
+ *  coverage test (url-contract.test.ts) refuses an unregistered URL-valued
+ *  env key unless it appears in this list. */
+export const URL_KEY_EXEMPTIONS = [];
 
 /** Parse a URL value, throwing a clear error for a missing or malformed URL.
  *  @param {string} name

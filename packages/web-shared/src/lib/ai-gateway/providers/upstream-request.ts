@@ -25,6 +25,11 @@ import {
   rejectDisallowedUpstreamUrls,
   rejectUpstreamRedirect,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-url-policy';
+import {
+  UpstreamAddressUnverifiedError,
+  upstreamDispatcherFor,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-connection';
+import type { Dispatcher } from 'undici';
 import { fetchClaudeWithRetry } from '@kilocode/web-shared/lib/auth/claude/http';
 
 type UpstreamFetchFailureFamily =
@@ -185,6 +190,27 @@ function createLoggedFetchFailure(errorName: string, errorMessage: string): Erro
   const loggedError = new Error(errorMessage);
   loggedError.name = errorName;
   return loggedError;
+}
+
+/**
+ * The gateway refuses a connection whose target it could not verify (see
+ * `upstream-connection.ts`): before the fetch, or inside the connection when the
+ * pinned address is gone. undici reports the second as a fetch error whose cause
+ * is the refusal, so the cause chain is followed.
+ */
+function findUpstreamAddressUnverified(error: unknown): UpstreamAddressUnverifiedError | undefined {
+  let current: unknown = error;
+  for (let depth = 0; depth < 4 && typeof current === 'object' && current !== null; depth += 1) {
+    if (current instanceof UpstreamAddressUnverifiedError) return current;
+    try {
+      current = 'cause' in current ? current.cause : undefined;
+    } catch {
+      // A cause that a wrapped error refuses to read is not a refusal; the fetch
+      // failure handling below then reports the error it already reports.
+      return undefined;
+    }
+  }
+  return undefined;
 }
 
 function classifyUpstreamFetchFailure({
@@ -427,7 +453,7 @@ async function sendUpstreamFetch({
     // SSRF guard: see upstream-url-policy.ts. The secure proxy fetches the
     // upstream URL from the relay body, so both hops are checked.
     const enforceUrlPolicy = isUpstreamUrlPolicyEnforced();
-    const urlRejection = enforceUrlPolicy
+    const urlPolicy = enforceUrlPolicy
       ? await rejectDisallowedUpstreamUrls({
           urls: provider.secureProxy ? [outgoing.url, targetUrl] : [outgoing.url],
           providerId: provider.type,
@@ -435,18 +461,27 @@ async function sendUpstreamFetch({
           signal: combinedSignal,
         })
       : null;
-    if (urlRejection) {
+    if (urlPolicy?.rejected) {
       budgetSignal.removeEventListener('abort', onBudgetExceeded);
-      return { type: 'error', response: urlRejection };
+      return { type: 'error', response: urlPolicy.rejected };
     }
 
-    const requestOptions: RequestInit & { duplex: 'half' } = {
+    // The request below dials the hop this process opens, so it connects to the
+    // addresses the policy checked for that exact URL. The secure-proxy
+    // `targetUrl` is a body field the relay dials itself, so only the policy
+    // check applies to it.
+    const dispatcher = urlPolicy
+      ? upstreamDispatcherFor(urlPolicy.dialed.hostname, urlPolicy.dialed.addresses)
+      : undefined;
+
+    const requestOptions: RequestInit & { duplex: 'half'; dispatcher?: Dispatcher } = {
       method,
       headers: outgoing.headers,
       body: outgoing.body,
       redirect: enforceUrlPolicy ? 'manual' : 'follow',
       duplex: 'half',
       signal: combinedSignal,
+      ...(dispatcher ? { dispatcher } : {}),
     };
     const response =
       provider.type === 'claude-billing'
@@ -475,6 +510,37 @@ async function sendUpstreamFetch({
     // No response body to bound; a later fallback attempt must not be blamed
     // for this attempt's budget.
     budgetSignal.removeEventListener('abort', onBudgetExceeded);
+    // A refused connection is the gateway's own decision, not a provider fault,
+    // so it is reported apart from the upstream fetch failures. The client
+    // answer stays the generic upstream failure response.
+    const unverified = findUpstreamAddressUnverified(error);
+    if (unverified) {
+      try {
+        const metadata = {
+          providerId: provider.type,
+          targetHost: getProviderTargetHost(apiUrl),
+          path,
+          code: unverified.code,
+          ...(vercelRequestId && { vercelRequestId }),
+        };
+        errorExceptInTest('AI gateway upstream connection refused', metadata);
+        captureException(unverified, {
+          level: 'error',
+          tags: {
+            source: 'ai-gateway-upstream-connection',
+            provider: provider.type,
+            code: unverified.code,
+          },
+          extra: metadata,
+        });
+      } catch {
+        // The failure must remain caller-visible even when reporting fails.
+      }
+      return {
+        type: 'error',
+        response: upstreamFetchFailureResponse('unknown', vercelRequestId, reasoningEffort),
+      };
+    }
     // The caller passes the incoming request signal, so a client that goes away
     // aborts this fetch as well. Those aborts are client-side cancellations and
     // must not be reported (or alerted on) as upstream failures.

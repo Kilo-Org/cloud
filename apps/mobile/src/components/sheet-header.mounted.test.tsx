@@ -237,11 +237,13 @@ describe('SheetHeader', () => {
     });
 
     // The sheet paints the drag handle above this header, and Material3's
-    // handle already reserves 22dp of padding under the bar. Stacking `pt-4`
-    // on that made the gap above the title twice the gap to its divider.
+    // handle already reserves 22dp of padding under the bar (iOS's reserves
+    // 16pt), so the header splits its own padding to even out the gap above and
+    // below the title: `pt-1.5 pb-4` on iOS, `pt-0 pb-7` on Android.
     const classes = String(findHeaderContainer(renderer.root).props.className).split(' ');
-    expect(classes).toContain('pt-0');
-    expect(classes).toContain('pb-7');
+    const [top, bottom] = rn.os === 'ios' ? ['pt-1.5', 'pb-4'] : ['pt-0', 'pb-7'];
+    expect(classes).toContain(top);
+    expect(classes).toContain(bottom);
     expect(classes).not.toContain('pt-4');
     expect(classes).not.toContain('pb-3');
 

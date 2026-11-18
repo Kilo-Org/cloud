@@ -176,7 +176,7 @@ describe('direct BYOK model lists in catalog mode', () => {
       mockedKeys.mockResolvedValueOnce(keys({ synthetic: true, 'zai-coding': true }));
       const isServingAllowed = jest.fn(
         async (_catalogModelId: string, target: DirectByokPolicyTarget) =>
-          target.providerSlug === allowedProviderId
+          target.kind === 'provider' && target.providerSlug === allowedProviderId
       );
 
       const catalogIds = await getDirectByokCatalogModelIds(

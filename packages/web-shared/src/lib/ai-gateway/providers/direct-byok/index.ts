@@ -3,6 +3,7 @@ import {
   type DirectByokAiSdkProvider,
   type DirectByokModel,
   type DirectByokProvider,
+  type StaticDirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import type { CustomLlmProvider, OpenRouterProvider } from '@kilocode/db/schema-types';
 import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
@@ -34,15 +35,23 @@ export function getDirectByokPolicyProviderId(provider: DirectByokProvider): str
   return provider.openrouter_inference_provider_id ?? provider.id;
 }
 
-/** What the organization policy checks for a request a direct BYOK key serves. */
-export type DirectByokPolicyTarget = {
-  kind: 'provider';
-  /** See `getDirectByokPolicyProviderId`. */
-  providerSlug: string;
-};
+/**
+ * What the organization policy checks for a request a direct BYOK key serves: the provider its
+ * provider allow-list names, or, for the organization's own endpoint, which the allow-list cannot
+ * name, only its model policy.
+ */
+export type DirectByokPolicyTarget =
+  | {
+      kind: 'provider';
+      /** See `getDirectByokPolicyProviderId`. */
+      providerSlug: string;
+    }
+  | { kind: 'organization-endpoint' };
 
 export function getDirectByokPolicyTarget(provider: DirectByokProvider): DirectByokPolicyTarget {
-  return { kind: 'provider', providerSlug: getDirectByokPolicyProviderId(provider) };
+  return provider.organization_endpoint
+    ? { kind: 'organization-endpoint' }
+    : { kind: 'provider', providerSlug: getDirectByokPolicyProviderId(provider) };
 }
 
 /**
@@ -50,7 +59,7 @@ export function getDirectByokPolicyTarget(provider: DirectByokProvider): DirectB
  * lacks.
  */
 export function getDirectByokProviderListings(): OpenRouterProvider[] {
-  const providers: ReadonlyArray<DirectByokProvider> = DIRECT_BYOK_PROVIDERS;
+  const providers: ReadonlyArray<StaticDirectByokProvider> = DIRECT_BYOK_PROVIDERS;
   return providers.flatMap(({ id, provider_listing }) => {
     if (!provider_listing) return [];
     const name = DIRECT_BYOK_PROVIDERS_META[id];
@@ -60,12 +69,18 @@ export function getDirectByokProviderListings(): OpenRouterProvider[] {
 
 /** The name model lists and error messages show for the provider. */
 export function getDirectByokProviderName(provider: DirectByokProvider): string {
-  return DIRECT_BYOK_PROVIDERS_META[provider.id];
+  return provider.organization_endpoint
+    ? provider.organization_endpoint.name
+    : DIRECT_BYOK_PROVIDERS_META[provider.id];
 }
 
-/** How error messages name the caller's key for the provider, such as `Synthetic key`. */
+/**
+ * How error messages name the caller's key for the provider, such as `Synthetic key`, or
+ * `Acme endpoint` for an organization's endpoint.
+ */
 export function getDirectByokKeyLabel(provider: DirectByokProvider): string {
-  return `${getDirectByokProviderName(provider)} key`;
+  const noun = provider.organization_endpoint ? 'endpoint' : 'key';
+  return `${getDirectByokProviderName(provider)} ${noun}`;
 }
 
 export function formatDirectByokModelId(provider: DirectByokProvider, model: DirectByokModel) {
@@ -141,9 +156,12 @@ export function directByokProvidersForKeys(
   );
 }
 
-/** Catalog mode needs models.dev data to map upstream models to catalog ids. */
+/**
+ * Catalog mode needs models.dev data to map upstream models to catalog ids. An organization's
+ * endpoint names each model by the catalog id it serves in catalog mode.
+ */
 export function supportsCatalogMode(provider: DirectByokProvider): boolean {
-  return provider.models_dev_id !== undefined;
+  return provider.models_dev_id !== undefined || provider.organization_endpoint !== undefined;
 }
 
 export type DirectByokCatalogEntry = { catalogModelId: string; model: DirectByokModel };

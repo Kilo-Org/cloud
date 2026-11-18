@@ -1,5 +1,5 @@
 import type { DirectByokProviderMetaId } from './direct-byok-meta';
-import type { DirectByokProvider } from './types';
+import type { StaticDirectByokProvider } from './types';
 import alibabaTokenPlan from './alibaba-token-plan';
 import bedrockByok from './bedrock-byok';
 import byteplusCoding from './byteplus-coding';
@@ -43,7 +43,7 @@ const DIRECT_BYOK_PROVIDERS = [
   xiaomiTokenPlanAms,
   xiaomiTokenPlanSgp,
   zaiCoding,
-] satisfies ReadonlyArray<DirectByokProvider>;
+] satisfies ReadonlyArray<StaticDirectByokProvider>;
 
 /** A provider the shared metadata names without a definition; such a provider cannot be used. */
 type UndefinedDirectByokProviderId = Exclude<

@@ -4,12 +4,33 @@ import {
   hasInferenceProviderUserByokForModel,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { getByokEndpointCatalogModelIds } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint/models';
-import { getDirectByokCatalogModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import {
+  getDirectByokCatalogModelIds,
+  type DirectByokPolicyTarget,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
+  allowsInferenceProviderUserByok,
+  getEffectiveModelDecision,
   isModelAllowedForProviderKey,
   type EffectiveOrganizationModelPolicy,
 } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
+
+/**
+ * Whether `policy` admits `modelId` served by the organization's catalog-mode direct BYOK key with
+ * policy target `target`: checked against the key's provider alone (see
+ * `isModelAllowedForProviderKey`), or, for the organization's own endpoint, which provider
+ * allow-lists cannot name, against its model policy alone (see `allowsInferenceProviderUserByok`).
+ */
+export async function isModelAllowedForDirectByokKey(
+  policy: EffectiveOrganizationModelPolicy,
+  modelId: string,
+  target: DirectByokPolicyTarget
+): Promise<boolean> {
+  return target.kind === 'provider'
+    ? isModelAllowedForProviderKey(policy, modelId, target.providerSlug)
+    : allowsInferenceProviderUserByok(await getEffectiveModelDecision(policy, modelId));
+}
 
 /**
  * The catalog ids the organization's catalog-mode direct BYOK keys serve under `policy`, as
@@ -25,7 +46,7 @@ export async function getAllowedDirectByokCatalogModelIds(
     { type: 'organization', id: organizationId },
     async (catalogModelId, target) =>
       !(await isCustomLlm(catalogModelId)) &&
-      (await isModelAllowedForProviderKey(policy, catalogModelId, target.providerSlug))
+      (await isModelAllowedForDirectByokKey(policy, catalogModelId, target))
   );
 }
 

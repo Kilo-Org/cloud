@@ -999,7 +999,8 @@ describe('getProvider direct BYOK routing', () => {
       serveCatalogModels: true,
     });
     const isDirectByokProviderAllowed = jest.fn(
-      async (target: DirectByokPolicyTarget) => target.providerSlug === 'z-ai'
+      async (target: DirectByokPolicyTarget) =>
+        target.kind === 'provider' && target.providerSlug === 'z-ai'
     );
 
     const result = await getProvider(

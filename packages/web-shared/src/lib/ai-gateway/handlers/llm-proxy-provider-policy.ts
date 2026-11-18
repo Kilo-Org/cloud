@@ -183,15 +183,16 @@ export async function resolveProviderAndPolicy(
       !groupPolicy || (await isModelAllowedForProviderKey(groupPolicy, model, policyProviderId))
     );
   };
-  /** Whether the organization policy admits the model served by a catalog-mode direct BYOK key. */
+  /**
+   * Whether the organization policy admits the model served by a catalog-mode direct BYOK key. The
+   * organization configured its own endpoints, so its provider allow-lists do not restrict them.
+   */
   const isDirectByokServingAllowed = async (target: DirectByokPolicyTarget) =>
-    isModelAllowedForPolicyProvider(target.providerSlug);
-
-  /** Whether the organization model policy admits the model served by a catalog-mode endpoint. */
-  const isByokEndpointModelAllowed = async () =>
-    !isAnonymous &&
-    !!input.organizationId &&
-    (await getAccessCheck()).groupModelAllowedForInferenceProviderUserByok;
+    target.kind === 'provider'
+      ? isModelAllowedForPolicyProvider(target.providerSlug)
+      : !isAnonymous &&
+        !!input.organizationId &&
+        (await getAccessCheck()).groupModelAllowedForInferenceProviderUserByok;
 
   const isNonTrialEnterprise = await resolveIsNonTrialEnterprise(input);
   const organizationAccount = input.organizationId
@@ -216,7 +217,7 @@ export async function resolveProviderAndPolicy(
     getAllowedProviders: async () =>
       isAnonymous ? undefined : (await getAccessCheck()).allowedProviders,
     isDirectByokProviderAllowed: isDirectByokServingAllowed,
-    isByokEndpointModelAllowed,
+    isByokEndpointModelAllowed: () => isDirectByokServingAllowed({ kind: 'organization-endpoint' }),
     kiloIgnoredProviders: getIgnoredProviders(model, isNonTrialEnterprise),
     openRouterDisabled: organizationGatewaySettings.openRouterDisabled,
     onDecision: decision => input.providerMetadataCapture?.captureRoutingDecision(decision),
@@ -350,7 +351,7 @@ export async function resolveProviderAndPolicy(
     if (route.provider.type === 'byok-endpoint') {
       // The organization configured the endpoint itself, so its provider allow-lists do not apply.
       // Routing already skips endpoints the model policy rejects.
-      if (!(await isByokEndpointModelAllowed())) {
+      if (!(await isDirectByokServingAllowed({ kind: 'organization-endpoint' }))) {
         return poolRouted ? efficientPoolBlockedResponse() : modelNotAllowedResponse();
       }
       return null;

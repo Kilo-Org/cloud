@@ -7,6 +7,7 @@ import type {
   TransformRequestContext,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type {
+  ByokEndpointProviderId,
   CustomLlmProvider,
   DirectByokModel,
   OpenRouterProvider,
@@ -63,7 +64,6 @@ export type DirectByokAiSdkProviderChoice = {
 };
 
 type DirectByokProviderBase = {
-  id: DirectByokProviderMetaId;
   /** models.dev provider key; omitted for providers models.dev does not list. */
   models_dev_id?: string;
   models: () => Promise<ReadonlyArray<DirectByokModel>>;
@@ -90,7 +90,10 @@ type DirectByokProviderBase = {
  * general provider list already has names it; any other provider gets its own listing under its
  * id, so allow-lists can name every direct BYOK provider.
  */
-type DirectByokProviderPolicyName =
+type StaticDirectByokProviderIdentity = {
+  id: DirectByokProviderMetaId;
+  organization_endpoint?: undefined;
+} & (
   | {
       /** The general provider list entry for the same service. */
       openrouter_inference_provider_id: OpenRouterInferenceProviderId;
@@ -99,14 +102,26 @@ type DirectByokProviderPolicyName =
   | {
       openrouter_inference_provider_id?: undefined;
       provider_listing: DirectByokProviderListing;
-    };
+    }
+);
+
+/**
+ * An organization's own endpoint, built from its key (`ByokEndpointDefinition`). Provider
+ * allow-lists cannot name it, so only the organization's model policy applies to it.
+ */
+type OrganizationEndpointIdentity = {
+  id: ByokEndpointProviderId;
+  organization_endpoint: { name: string };
+  openrouter_inference_provider_id?: undefined;
+  provider_listing?: undefined;
+};
 
 /**
  * The chat APIs are known without the credential, so routing can choose between keys, and the
  * BYOK routing preview can explain the choice, without decrypting any key.
  */
 export type DirectByokProvider = DirectByokProviderBase &
-  DirectByokProviderPolicyName &
+  (StaticDirectByokProviderIdentity | OrganizationEndpointIdentity) &
   (
     | {
         /** The chat APIs the upstream serves every model over. */
@@ -122,6 +137,9 @@ export type DirectByokProvider = DirectByokProviderBase &
         getModelChatApis?(model: DirectByokModel): ReadonlyArray<GatewayChatApiKind>;
       }
   );
+
+/** A provider of `DIRECT_BYOK_PROVIDERS`, which every owner's keys can use. */
+export type StaticDirectByokProvider = DirectByokProvider & StaticDirectByokProviderIdentity;
 
 /**
  * The credential as its own header, for an upstream that does not take a bearer token. Providers

@@ -257,7 +257,8 @@ export function createEcsClient(input: {
       // Preserve the physical identity before validating mutable task metadata, so failed admission can still stop it.
       return result.tasks[0];
     },
-    async findByStartedBy(cluster: string, startedBy: string): Promise<string | undefined> {
+    /** Lists tasks whose desired status is RUNNING. ECS omits stopped tasks from this lookup. */
+    async findByStartedBy(cluster: string, startedBy: string): Promise<string[] | undefined> {
       const result = await request(
         'ListTasks',
         {
@@ -267,8 +268,8 @@ export function createEcsClient(input: {
         },
         z.object({ taskArns: z.array(awsEcsTaskArnSchema).max(2), nextToken: z.string().nullish() })
       );
-      // An intent owns exactly one task. A partial or ambiguous page cannot establish its identity.
-      return !result.nextToken && result.taskArns.length === 1 ? result.taskArns[0] : undefined;
+      // A partial page cannot establish the task set.
+      return result.nextToken ? undefined : result.taskArns;
     },
     async get(
       cluster: string,

@@ -402,8 +402,13 @@ The lifecycle saves that identity before checking mutable runtime metadata. Stop
 The customer role grants read-only `ecs:ListTasks` access restricted to the stack cluster and region.
 Existing customer stacks need the updated role policy before using this recovery path.
 
-Discovery reads one bounded page. Empty, partial, ambiguous or temporarily missing results never prove termination.
+Discovery reads one bounded page. Partial, ambiguous or temporarily missing results never prove termination.
 They retain `provider_cleanup_required` and block replacement. A later attempt can recover when exact identity becomes available.
+`ListTasks` returns only tasks whose desired status is `RUNNING`. A complete empty page therefore means that no live task exists.
+No replay starts after five minutes. One more minute lets a replay that started inside the bound settle.
+After that, an empty page retires the operation, so a task that stopped after a lost reply does not block the sandbox.
+ECS keeps stopped tasks for about an hour. After that, `DescribeTasks` reports the stored ARN as missing and `StopTask` rejects it with HTTP 400.
+When both happen after the same settle period, Stop confirms termination. A recently launched task that reads missing stays retryable.
 MicroVM has no corresponding intent lookup; unidentified requests still require operator repair after five minutes.
 See [ListTasks](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_ListTasks.html)
 and [ECS IAM actions](https://docs.aws.amazon.com/service-authorization/latest/reference/list_ecs.html).

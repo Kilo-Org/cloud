@@ -40,12 +40,15 @@ function request(): EcsRunRequest {
 }
 describe('ECS transport and isolation boundary', () => {
   it.each([
-    { taskArns: [ecsTask().taskArn], nextToken: null, expected: ecsTask().taskArn },
-    { taskArns: [], expected: undefined },
+    { taskArns: [ecsTask().taskArn], nextToken: null, expected: [ecsTask().taskArn] },
+    { taskArns: [], expected: [] },
     { taskArns: [ecsTask().taskArn], nextToken: 'more', expected: undefined },
-    { taskArns: [ecsTask().taskArn, ecsTask().taskArn], expected: undefined },
+    {
+      taskArns: [ecsTask().taskArn, ecsTask().taskArn],
+      expected: [ecsTask().taskArn, ecsTask().taskArn],
+    },
   ])(
-    'uses one bounded intent query and accepts only a complete unique result: $nextToken',
+    'uses one bounded intent query and returns only a complete page: $nextToken',
     async ({ expected, ...response }) => {
       let calls = 0;
       const client = createEcsClient({
@@ -64,7 +67,7 @@ describe('ECS transport and isolation boundary', () => {
           return Response.json(response);
         },
       });
-      expect(await client.findByStartedBy(config.clusterArn, 'allocation-1')).toBe(expected);
+      expect(await client.findByStartedBy(config.clusterArn, 'allocation-1')).toEqual(expected);
       expect(calls).toBe(1);
     }
   );

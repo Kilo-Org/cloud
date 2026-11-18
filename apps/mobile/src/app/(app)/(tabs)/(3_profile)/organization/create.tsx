@@ -1,10 +1,9 @@
 import { CreateOrganizationScreen } from '@/components/organization/create-organization-screen';
-import { useRepairOrganizationRouteStack } from '@/lib/hooks/use-repair-organization-route-stack';
 
 export default function CreateOrganizationRoute() {
-  // A link or a relaunch restore that arrives without the hub beneath it
-  // rebuilds it, so Back returns to the hub instead of leaving the
-  // organization tree.
-  useRepairOrganizationRouteStack({ self: '/(app)/(tabs)/(3_profile)/organization/create' });
+  // No stack repair: the Profile tab's row opens create over the tab root, not
+  // over the hub, and the screen's completion handles both entries by itself
+  // (`create-organization-screen.tsx`). Rebuilding the hub beneath it would
+  // point Back at a hub the reader never passed through.
   return <CreateOrganizationScreen />;
 }

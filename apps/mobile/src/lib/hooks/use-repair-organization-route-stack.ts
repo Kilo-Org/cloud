@@ -29,7 +29,6 @@ export const ORGANIZATION_ROUTE_NAMES: readonly string[] = [
   ORGANIZATION_HUB_ROUTE_NAME,
   'audit-log',
   'billing',
-  'create',
   'credit-activity',
   'guardrails',
   'group-form',

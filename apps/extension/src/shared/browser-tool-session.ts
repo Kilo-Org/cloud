@@ -412,7 +412,7 @@ const frameNavigatedParamsSchema = z.object({
 const domGetDocumentResponseSchema = z.object({
   root: z.object({ nodeId: z.number() }).optional(),
 });
-const domQuerySelectorResponseSchema = z.object({ nodeId: z.number() });
+const domQuerySelectorAllResponseSchema = z.object({ nodeIds: z.array(z.number()) });
 
 const refPattern = /^(?:ref=)?((?:f\d+)?e\d+)$/u;
 const parseRef = (target: string): string | undefined => refPattern.exec(target.trim())?.[1];
@@ -2029,17 +2029,20 @@ export const createBrowserToolSession = ({
       return undefined;
     }
 
-    const response = await debuggerApi.sendCommand(target, 'DOM.querySelector', {
+    // A selector must name exactly one element: querySelector would silently take the first match, so an ambiguous selector would type into an arbitrary field.
+    const response = await debuggerApi.sendCommand(target, 'DOM.querySelectorAll', {
       nodeId: rootNodeId,
       selector,
     });
-    const parsed = domQuerySelectorResponseSchema.safeParse(response);
+    const parsed = domQuerySelectorAllResponseSchema.safeParse(response);
+    const nodeId =
+      parsed.success && parsed.data.nodeIds.length === 1 ? parsed.data.nodeIds[0] : undefined;
 
-    if (!parsed.success || parsed.data.nodeId === 0) {
+    if (nodeId === undefined || nodeId === 0) {
       return undefined;
     }
 
-    return { kind: 'selector', nodeId: parsed.data.nodeId, selector };
+    return { kind: 'selector', nodeId, selector };
   };
 
   const resolveTarget = async (

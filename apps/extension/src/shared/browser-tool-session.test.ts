@@ -33,12 +33,14 @@ const createDebuggerApi = ({
   documentNodeId = 11,
   gate,
   responseBodies,
+  selectorMatches = [42],
   visibilityState = 'visible',
 }: {
   documentNodeId?: number;
   /** When set, `sendCommand` waits on `gate.wait` before resolving the gated method. */
   gate?: { readonly command: string; readonly wait: Promise<void> };
   responseBodies?: Record<string, { base64Encoded?: boolean; body: string }>;
+  selectorMatches?: readonly number[];
   visibilityState?: string;
 } = {}): {
   api: ChromeDebuggerApi;
@@ -101,8 +103,8 @@ const createDebuggerApi = ({
         return { root: { nodeId: currentDocumentNodeId } };
       }
 
-      if (method === 'DOM.querySelector') {
-        return { nodeId: 42 };
+      if (method === 'DOM.querySelectorAll') {
+        return { nodeIds: selectorMatches };
       }
 
       if (method === 'Network.getResponseBody') {
@@ -179,15 +181,18 @@ const createSession = ({
   url = 'https://example.com/',
   gate,
   responseBodies,
+  selectorMatches,
 }: {
   tabId?: number;
   url?: string;
   gate?: { readonly command: string; readonly wait: Promise<void> };
   responseBodies?: Record<string, { base64Encoded?: boolean; body: string }>;
+  selectorMatches?: readonly number[];
 } = {}) => {
   const debuggerApi = createDebuggerApi({
     ...(gate === undefined ? {} : { gate }),
     ...(responseBodies === undefined ? {} : { responseBodies }),
+    ...(selectorMatches === undefined ? {} : { selectorMatches }),
   });
   const tabsApi = createTabsApi({ url });
 
@@ -880,8 +885,24 @@ describe('browser tool session', () => {
       selector: '#submit',
     });
     expect(
-      debuggerApi.commands.filter(command => command.method === 'DOM.querySelector')
-    ).toStrictEqual([{ method: 'DOM.querySelector', params: { nodeId: 11, selector: '#submit' } }]);
+      debuggerApi.commands.filter(command => command.method === 'DOM.querySelectorAll')
+    ).toStrictEqual([
+      { method: 'DOM.querySelectorAll', params: { nodeId: 11, selector: '#submit' } },
+    ]);
+  });
+
+  it('refuses a selector that matches zero or several elements', async () => {
+    const none = createSession({ selectorMatches: [] });
+    const many = createSession({ selectorMatches: [42, 43] });
+    const one = createSession({ selectorMatches: [42] });
+
+    await expect(none.session.resolveTarget('#ambiguous')).resolves.toBeUndefined();
+    await expect(many.session.resolveTarget('#ambiguous')).resolves.toBeUndefined();
+    await expect(one.session.resolveTarget('#unique')).resolves.toStrictEqual({
+      kind: 'selector',
+      nodeId: 42,
+      selector: '#unique',
+    });
   });
 
   it('replaces the ref registry so an older snapshot ref cannot resolve', async () => {
@@ -1050,7 +1071,7 @@ describe('browser tool session', () => {
     });
     expect(
       debuggerApi.commands
-        .filter(command => command.method === 'DOM.querySelector')
+        .filter(command => command.method === 'DOM.querySelectorAll')
         .map(command => command.params)
     ).toStrictEqual([
       { nodeId: 11, selector: '#first' },
@@ -1095,7 +1116,7 @@ describe('browser tool session', () => {
     ]);
     expect(
       debuggerApi.commands
-        .filter(command => command.method === 'DOM.querySelector')
+        .filter(command => command.method === 'DOM.querySelectorAll')
         .map(command => command.params)
     ).toStrictEqual([
       { nodeId: 11, selector: '#frame' },

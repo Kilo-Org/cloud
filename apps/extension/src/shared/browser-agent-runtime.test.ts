@@ -146,8 +146,8 @@ const createFakeCdp = (): FakeCdp => {
       case 'DOM.getDocument': {
         return { root: { nodeId: 1 } };
       }
-      case 'DOM.querySelector': {
-        return { nodeId: 5 };
+      case 'DOM.querySelectorAll': {
+        return { nodeIds: [5] };
       }
       case 'DOM.resolveNode': {
         return { object: { objectId: 'obj-5' } };

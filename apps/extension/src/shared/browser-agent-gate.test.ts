@@ -71,6 +71,7 @@ const createSession = (
     readonly mainUrl?: string;
     readonly probe?: Record<string, unknown>;
     readonly probeByObject?: Record<string, Record<string, unknown>>;
+    readonly selectors?: Record<string, { readonly frameId: string; readonly nodeId: number }>;
     readonly targetFrameId?: string;
   } = {}
 ): FakeGateSession => {
@@ -83,7 +84,12 @@ const createSession = (
       }
 
       if (params?.['nodeId'] !== undefined) {
-        return { node: { backendNodeId: 40 } };
+        const { nodeId } = params;
+        const selector = Object.values(options.selectors ?? {}).find(
+          entry => entry.nodeId === nodeId
+        );
+
+        return { node: { backendNodeId: 40, frameId: selector?.frameId ?? 'main' } };
       }
 
       if (params?.['objectId'] !== undefined) {
@@ -178,10 +184,17 @@ const createSession = (
   };
 
   return {
-    resolveTarget: async (target: string) =>
-      target.startsWith('e') && Number.isInteger(Number(target.slice(1)))
+    resolveTarget: async (target: string) => {
+      const selector = options.selectors?.[target];
+
+      if (selector !== undefined) {
+        return { kind: 'selector', nodeId: selector.nodeId, selector: target };
+      }
+
+      return target.startsWith('e') && Number.isInteger(Number(target.slice(1)))
         ? { backendNodeId: Number(target.slice(1)), kind: 'ref', ref: target }
-        : undefined,
+        : undefined;
+    },
     send: async (method, params) => {
       const handler = handlers[method];
 
@@ -570,6 +583,67 @@ describe('sensitive steps', () => {
     expect(sensitiveOf(refusedStep)).toStrictEqual({
       origin: 'https://pay.example.com',
       reason: 'typing into a field inside https://pay.example.com',
+    });
+  });
+
+  it('classifies a selector that names a password field', async () => {
+    const result = await run({
+      args: { target: '#pw' },
+      session: createSession({
+        probeByObject: { 'obj-5': passwordProbe },
+        selectors: { '#pw': { frameId: 'main', nodeId: 5 } },
+      }),
+      toolName: 'browser_type',
+    });
+
+    expect(failureOf(result)).toStrictEqual({
+      items: [
+        {
+          class: 'sensitive',
+          origin: 'https://app.example.com',
+          reason: SENSITIVE_REASON.password,
+        },
+      ],
+      kind: 'needs_permission',
+    });
+    expect(sensitiveOf(result)).toStrictEqual({
+      element: '#pw',
+      origin: 'https://app.example.com',
+      reason: SENSITIVE_REASON.password,
+    });
+  });
+
+  it('asks for the frame origin of a selector inside an iframe', async () => {
+    const result = await run({
+      args: { target: '#frame-field' },
+      authorized: [{ class: 'act', origin: 'https://app.example.com' }],
+      session: createSession({
+        selectors: { '#frame-field': { frameId: 'f1', nodeId: 6 } },
+      }),
+      toolName: 'browser_type',
+    });
+
+    expect(failureOf(result)).toStrictEqual({
+      items: [{ class: 'act', frame: true, origin: 'https://pay.example.com' }],
+      kind: 'needs_permission',
+    });
+  });
+
+  it('counts a selector that resolves nothing as sensitive', async () => {
+    const result = await run({
+      args: { target: '#ambiguous' },
+      toolName: 'browser_type',
+    });
+
+    expect(failureOf(result)).toStrictEqual({
+      items: [
+        {
+          class: 'sensitive',
+          origin: 'https://app.example.com',
+          reason: SENSITIVE_REASON.unknownField,
+        },
+      ],
+      kind: 'needs_permission',
     });
   });
 

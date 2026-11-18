@@ -1117,6 +1117,7 @@ export class NativeSyncClient {
             integrityError = projectedFrameGap;
             publish({});
             if (!recovery) recoverIncomplete(epoch, true);
+            return undefined;
           }
         })();
         if (!projected) return;

@@ -293,8 +293,10 @@ describe('ProviderKeyNewScreen', () => {
   });
 
   it('reports a managed key refused with a conflict as read-only, not as a duplicate', async () => {
-    // The update route reuses `CONFLICT` for a plan-managed key, so the screen
-    // must match the shared sentence rather than the code alone.
+    // The update route reuses `CONFLICT` for a plan-managed key, so the edit
+    // path is the one that reaches this refusal; the screen must match the
+    // shared sentence rather than the code alone.
+    state.params = { provider: 'anthropic', id: KEY_ID };
     state.mutateAsync.mockRejectedValueOnce(
       serverRefusal('CONFLICT', MANAGED_KEY_READ_ONLY_MESSAGE)
     );
@@ -302,6 +304,10 @@ describe('ProviderKeyNewScreen', () => {
 
     await submitKey(root, 'sk-test-123');
 
+    expect(state.mutateAsync).toHaveBeenCalledWith(
+      'update',
+      expect.objectContaining({ id: KEY_ID })
+    );
     expect(statusMessages(root)).toEqual([
       "A coding plan manages this provider's key, and the key is read-only. Cancel the coding plan to add your own.",
     ]);

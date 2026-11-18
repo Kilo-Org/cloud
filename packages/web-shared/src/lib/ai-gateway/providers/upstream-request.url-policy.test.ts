@@ -1,5 +1,3 @@
-import { lookup } from 'node:dns/promises';
-import type { LookupAddress } from 'node:dns';
 import type { Dispatcher } from 'undici';
 import { captureException } from '@sentry/nextjs';
 import { buildDirectProvider } from './build-direct-provider';
@@ -12,7 +10,19 @@ import {
 import { UPSTREAM_DURATION_BUDGET_MS, upstreamRequest } from './upstream-request';
 import { clearUpstreamUrlPolicyCache } from './upstream-url-policy';
 
-jest.mock('node:dns/promises', () => ({ lookup: jest.fn() }));
+const mockResolve4 = jest.fn<Promise<string[]>, [string]>();
+
+// The policy resolves A and AAAA records through c-ares; the tests answer the A
+// query and leave the AAAA query empty.
+jest.mock('node:dns/promises', () => ({
+  Resolver: jest.fn(function () {
+    return {
+      resolve4: (hostname: string) => mockResolve4(hostname),
+      resolve6: async () => [],
+      cancel: jest.fn(),
+    };
+  }),
+}));
 
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
@@ -25,7 +35,10 @@ jest.mock('next/server', () => ({
 }));
 
 const originalFetch = global.fetch;
-const originalTargetEnv = process.env.VERCEL_TARGET_ENV;
+const originalEnv = {
+  NODE_ENV: process.env.NODE_ENV,
+  VERCEL_TARGET_ENV: process.env.VERCEL_TARGET_ENV,
+};
 
 const PUBLIC_IP_URL = 'https://104.18.2.115/v1';
 
@@ -75,12 +88,6 @@ function send(provider: ReturnType<typeof directProvider>, signal?: AbortSignal)
   });
 }
 
-type LookupAll = (hostname: string, options: { all: true }) => Promise<LookupAddress[]>;
-
-// The policy awaits the `{ all: true }` overload, so the mock is typed for that
-// one; `jest.mocked` would otherwise pick a single-address overload.
-const lookupMock = jest.mocked(lookup as unknown as LookupAll);
-
 function pinnedAddressOf(hostname: string) {
   const calls: Array<[unknown, unknown, unknown]> = [];
   lookupPinnedUpstreamAddress(hostname, { all: false }, (error, address, family) => {
@@ -89,27 +96,37 @@ function pinnedAddressOf(hostname: string) {
   return calls;
 }
 
-function setTargetEnv(value: string | undefined) {
-  if (value === undefined) delete process.env.VERCEL_TARGET_ENV;
-  else process.env.VERCEL_TARGET_ENV = value;
+function setEnv(name: keyof typeof originalEnv, value: string | undefined) {
+  const env: Record<string, string | undefined> = process.env;
+  if (value === undefined) delete env[name];
+  else env[name] = value;
 }
+
+const FUTURE_EXPIRY = () => Date.now() + 60_000;
 
 describe('upstreamRequest upstream URL policy', () => {
   beforeEach(() => {
     clearUpstreamUrlPolicyCache();
     clearUpstreamConnectionCache();
-    lookupMock.mockReset();
+    mockResolve4.mockReset();
     jest.mocked(captureException).mockReset();
   });
 
   afterEach(() => {
     global.fetch = originalFetch;
-    setTargetEnv(originalTargetEnv);
+    setEnv('NODE_ENV', originalEnv.NODE_ENV);
+    setEnv('VERCEL_TARGET_ENV', originalEnv.VERCEL_TARGET_ENV);
   });
 
-  describe.each(['production', 'staging'])('when VERCEL_TARGET_ENV is %s', targetEnv => {
+  describe.each([
+    ['production', 'production'],
+    ['production', 'staging'],
+    ['production', 'preview'],
+    ['production', undefined],
+  ])('when NODE_ENV is %s and VERCEL_TARGET_ENV is %s', (nodeEnv, targetEnv) => {
     beforeEach(() => {
-      setTargetEnv(targetEnv);
+      setEnv('NODE_ENV', nodeEnv);
+      setEnv('VERCEL_TARGET_ENV', targetEnv);
     });
 
     it('sends to a public HTTPS upstream without following redirects', async () => {
@@ -125,7 +142,7 @@ describe('upstreamRequest upstream URL policy', () => {
     });
 
     it('pins the checked address the request dials', async () => {
-      lookupMock.mockResolvedValue([{ address: '104.18.2.115', family: 4 }]);
+      mockResolve4.mockResolvedValue(['104.18.2.115']);
       const fetchMock = mockFetch();
 
       await send(directProvider('https://llm.example.com/v1'));
@@ -137,11 +154,13 @@ describe('upstreamRequest upstream URL policy', () => {
       // undici exposes the connect options of an Agent only behind private
       // symbols, so the pool's identity is the public proof that this request
       // dials the checked host with the address pinned above.
-      expect(dispatcher).toBe(upstreamDispatcherFor('llm.example.com', ['104.18.2.115']));
+      expect(dispatcher).toBe(
+        upstreamDispatcherFor('llm.example.com', ['104.18.2.115'], FUTURE_EXPIRY())
+      );
     });
 
     it('reports a refused connection apart from an upstream failure', async () => {
-      lookupMock.mockResolvedValue([{ address: '104.18.2.115', family: 4 }]);
+      mockResolve4.mockResolvedValue(['104.18.2.115']);
       // A refused pin reaches the request as a fetch error whose cause is the
       // refusal, which `upstream-connection.test.ts` shows on this runtime.
       const refusal = new UpstreamAddressUnverifiedError(
@@ -167,11 +186,8 @@ describe('upstreamRequest upstream URL policy', () => {
     });
 
     it('pins the proxy host for a secure proxy request', async () => {
-      lookupMock.mockImplementation(async hostname => [
-        {
-          address: hostname.startsWith('proxy.') ? '104.18.2.115' : '104.18.3.116',
-          family: 4,
-        },
+      mockResolve4.mockImplementation(async hostname => [
+        hostname.startsWith('proxy.') ? '104.18.2.115' : '104.18.3.116',
       ]);
       const fetchMock = mockFetch();
 
@@ -185,31 +201,31 @@ describe('upstreamRequest upstream URL policy', () => {
         ?.dispatcher;
       // The request dials the proxy; the relayed upstream URL travels in the
       // body.
-      expect(dispatcher).toBe(upstreamDispatcherFor('proxy.example.com', ['104.18.2.115']));
-      expect(dispatcher).not.toBe(upstreamDispatcherFor('llm.example.com', ['104.18.3.116']));
+      expect(dispatcher).toBe(
+        upstreamDispatcherFor('proxy.example.com', ['104.18.2.115'], FUTURE_EXPIRY())
+      );
+      expect(dispatcher).not.toBe(
+        upstreamDispatcherFor('llm.example.com', ['104.18.3.116'], FUTURE_EXPIRY())
+      );
     });
 
     it('keeps the first checked address when a second resolution would answer another', async () => {
-      lookupMock
-        .mockResolvedValueOnce([{ address: '104.18.2.115', family: 4 }])
-        .mockResolvedValue([{ address: '10.1.2.3', family: 4 }]);
+      mockResolve4.mockResolvedValueOnce(['104.18.2.115']).mockResolvedValue(['10.1.2.3']);
       mockFetch();
 
       await send(directProvider('https://llm.example.com/v1'));
       await send(directProvider('https://llm.example.com/v1'));
 
-      expect(lookupMock).toHaveBeenCalledTimes(1);
+      expect(mockResolve4).toHaveBeenCalledTimes(1);
       expect(pinnedAddressOf('llm.example.com')).toEqual([[null, '104.18.2.115', 4]]);
     });
 
     it('re-checks the host when the request dials after the pin expired', async () => {
-      lookupMock
-        .mockResolvedValueOnce([{ address: '104.18.2.115', family: 4 }])
-        .mockResolvedValue([{ address: '104.18.9.9', family: 4 }]);
+      mockResolve4.mockResolvedValueOnce(['104.18.2.115']).mockResolvedValue(['104.18.9.9']);
       const fetchMock = mockFetch();
 
       await send(directProvider('https://llm.example.com/v1'));
-      expect(lookupMock).toHaveBeenCalledTimes(1);
+      expect(mockResolve4).toHaveBeenCalledTimes(1);
 
       // The pin outlives a connection but not the request budget, so a request
       // that dials after the TTL asks the URL policy for a fresh check and
@@ -217,18 +233,18 @@ describe('upstreamRequest upstream URL policy', () => {
       jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 60_001);
       await send(directProvider('https://llm.example.com/v1'));
 
-      expect(lookupMock).toHaveBeenCalledTimes(2);
+      expect(mockResolve4).toHaveBeenCalledTimes(2);
       expect(pinnedAddressOf('llm.example.com')).toEqual([[null, '104.18.9.9', 4]]);
       const [, init] = fetchMock.mock.calls[1];
       expect((init as (RequestInit & { dispatcher?: Dispatcher }) | undefined)?.dispatcher).toBe(
-        upstreamDispatcherFor('llm.example.com', ['104.18.9.9'])
+        upstreamDispatcherFor('llm.example.com', ['104.18.9.9'], FUTURE_EXPIRY())
       );
       jest.restoreAllMocks();
     });
 
     it('reports the second request when a re-check fails after both caches expired', async () => {
-      lookupMock
-        .mockResolvedValueOnce([{ address: '104.18.2.115', family: 4 }])
+      mockResolve4
+        .mockResolvedValueOnce(['104.18.2.115'])
         .mockRejectedValue(new Error('getaddrinfo ENOTFOUND'));
       const fetchMock = mockFetch();
 
@@ -272,7 +288,7 @@ describe('upstreamRequest upstream URL policy', () => {
     });
 
     it('reports an unresolvable host as temporarily unavailable', async () => {
-      lookupMock.mockRejectedValue(new Error('getaddrinfo ENOTFOUND llm.example.com'));
+      mockResolve4.mockRejectedValue(new Error('getaddrinfo ENOTFOUND llm.example.com'));
       const fetchMock = mockFetch();
 
       const result = await send(directProvider('https://llm.example.com/v1'));
@@ -291,7 +307,7 @@ describe('upstreamRequest upstream URL policy', () => {
     ])(
       'releases the request when the client disconnects with %s during a stalled DNS lookup',
       async (_label, reason) => {
-        lookupMock.mockReturnValue(new Promise(() => {}));
+        mockResolve4.mockReturnValue(new Promise(() => {}));
         const fetchMock = mockFetch();
         const client = new AbortController();
 
@@ -336,10 +352,11 @@ describe('upstreamRequest upstream URL policy', () => {
     });
   });
 
-  it.each(['preview', 'development', undefined])(
-    'leaves the request unchecked when VERCEL_TARGET_ENV is %s',
-    async targetEnv => {
-      setTargetEnv(targetEnv);
+  it.each(['development', 'test'])(
+    'leaves the request unchecked when NODE_ENV is %s',
+    async nodeEnv => {
+      setEnv('NODE_ENV', nodeEnv);
+      setEnv('VERCEL_TARGET_ENV', 'production');
       const fetchMock = mockFetch();
 
       const result = await send(directProvider('http://localhost:8080/v1'));

@@ -1,5 +1,6 @@
 import { generateKeyPairSync } from 'node:crypto';
 import jwt from 'jsonwebtoken';
+import { STALE_CACHE_MAX_AGE_MS } from './apple-jwks';
 
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 
@@ -8,8 +9,6 @@ jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 // refresh state across cases.
 
 describe('verifyAppleJwtWithJwks', () => {
-  // Mirrors the module's unexported stale-cache bound.
-  const STALE_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
   const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
   const publicJwk = publicKey.export({ format: 'jwk' });
 
@@ -171,7 +170,7 @@ describe('verifyAppleJwtWithJwks', () => {
   });
 
   it('keeps the cached key set usable when a refresh fails', async () => {
-    const { verifyAppleJwtWithJwks, AppleJwtClientError } = await loadFreshModule();
+    const { verifyAppleJwtWithJwks } = await loadFreshModule();
     let now = 1_700_000_000_000;
     jest.spyOn(Date, 'now').mockImplementation(() => now);
     const fetchMock = jest
@@ -186,19 +185,20 @@ describe('verifyAppleJwtWithJwks', () => {
     now += 31_000;
     const unknownToken = signToken('rotated-away-key');
     // The first unknown-kid token starts the refresh; its failure falls back
-    // to the cached key set, so the rejection names the missing key instead of
-    // surfacing the fetch failure. The swallowed failure is still reported.
-    await expect(verifyAppleJwtWithJwks(unknownToken, 'com.kilocode.kiloapp')).rejects.toThrow(
-      AppleJwtClientError
-    );
+    // to the cached key set, so the failed-refresh fallback propagates the
+    // fetch error as a server fault while the held kid still verifies. The
+    // swallowed failure is still reported.
+    await expect(
+      verifyAppleJwtWithJwks(unknownToken, 'com.kilocode.kiloapp')
+    ).rejects.toThrow('Failed to fetch Apple JWKS: 503');
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(
       jest.requireMock<{ captureException: jest.Mock }>('@sentry/nextjs').captureException
     ).toHaveBeenCalledTimes(1);
 
-    await expect(verifyAppleJwtWithJwks(unknownToken, 'com.kilocode.kiloapp')).rejects.toThrow(
-      'No matching Apple public key'
-    );
+    await expect(
+      verifyAppleJwtWithJwks(unknownToken, 'com.kilocode.kiloapp')
+    ).rejects.toThrow('Failed to fetch Apple JWKS: 503');
     expect(fetchMock).toHaveBeenCalledTimes(2);
 
     // Within the TTL and the refresh cooldown, the cached key set still

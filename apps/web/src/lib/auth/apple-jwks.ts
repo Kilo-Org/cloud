@@ -32,7 +32,7 @@ let lastRefreshError: unknown = null;
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 // Upper bound on how long a failed refresh may keep serving the cached key
 // set: past this age, verification fails closed until a refresh succeeds.
-const STALE_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
+export const STALE_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
 const REFRESH_COOLDOWN_MS = 30 * 1000;
 const JWKS_FETCH_TIMEOUT_MS = 10_000;
 
@@ -109,7 +109,10 @@ function jwkToPem(jwk: AppleJWK): string {
  * set at most once per cooldown through a single shared in-flight fetch, keeping
  * the current cached keys for at most 24 hours after the last successful fetch;
  * past that bound, or when no cached set exists, a failed refresh propagates to
- * the caller. Tokens whose `kid` remains absent after that refresh are rejected.
+ * the caller. When the fallback key set cannot resolve the `kid` and the latest
+ * refresh failed, the refresh error propagates too: a fetch failure is a server
+ * fault, while a kid absent from a successfully fetched set is rejected as a
+ * client error.
  *
  * @param token - The Apple-signed JWT to verify
  * @param audience - Expected `aud` claim (Apple client ID(s))
@@ -136,6 +139,16 @@ export async function verifyAppleJwtWithJwks(
     const refreshedKeys = await refreshAppleKeys();
     matchingKey = refreshedKeys.find(k => k.kid === kid);
     if (!matchingKey) {
+      // The most recent refresh attempt failed, so the key set just served is
+      // the stale fallback (a success clears lastRefreshError): the missing
+      // kid may be a rotated one that a healthy fetch would resolve. A fetch
+      // failure is a server fault, not a caller error, so it propagates and
+      // routes answer 500 instead of misreporting an invalid token.
+      if (lastRefreshError !== null) {
+        throw lastRefreshError instanceof Error
+          ? lastRefreshError
+          : new Error('Apple JWKS is unavailable');
+      }
       throw new AppleJwtClientError('No matching Apple public key');
     }
   }

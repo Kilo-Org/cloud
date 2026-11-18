@@ -1,0 +1,1 @@
+ALTER TABLE `oauth_refresh_token_history` ADD `previous` integer DEFAULT false NOT NULL;

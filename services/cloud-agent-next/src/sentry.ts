@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/cloudflare';
+import { isNetworkConnectionLost } from '@kilocode/worker-utils';
 import { TRPCError } from '@trpc/server';
 import { HTTPException } from 'hono/http-exception';
 import type { DurableObject } from 'cloudflare:workers';
@@ -20,6 +21,9 @@ import {
 export function shouldCaptureCloudAgentException(error: unknown): boolean {
   if (error instanceof TRPCError) return error.code === 'INTERNAL_SERVER_ERROR';
   if (error instanceof HTTPException) return error.status >= 500;
+  // A closed client or Durable Object connection is a transport event, not a
+  // server fault; the exact platform message is the evidence of the closure.
+  if (isNetworkConnectionLost(error)) return false;
   return true;
 }
 

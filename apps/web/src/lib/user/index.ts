@@ -90,6 +90,7 @@ import {
   kiloclaw_subscriptions,
   kiloclaw_admin_audit_logs,
   admin_action_audit_logs,
+  blacklisted_domains_settings,
   kiloclaw_cli_runs,
   user_push_tokens,
   user_activity_tokens,
@@ -1191,6 +1192,7 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  * - organization_mcp_connect_events (retained; user ID reference only, no PII, deleted after 90 days)
  * - kiloclaw_admin_audit_logs (actor PII nulled, target_user_id anonymized)
  * - admin_action_audit_logs (actor PII nulled, user target_id anonymized)
+ * - blacklisted_domains_settings (editor PII nulled; settings retained)
  * - model_eval_ingestions (promoter email anonymized)
  * - credit_campaigns (created_by_kilo_user_id anonymized)
  * - payment_methods (soft-deleted, address/name/IP fields nulled)
@@ -1359,6 +1361,11 @@ export async function anonymizeCloudUserData(
     actorKiloUserId: userId,
     reason: 'actor account soft-deleted',
   });
+
+  await tx
+    .update(blacklisted_domains_settings)
+    .set({ updated_by: null, updated_by_email: null })
+    .where(eq(blacklisted_domains_settings.updated_by, userId));
 
   // ── 2. Hard-delete PII tables ────────────────────────────────────────
   await tx.delete(user_auth_provider).where(eq(user_auth_provider.kilo_user_id, userId));

@@ -39,6 +39,7 @@ import { SidebarSettingsSection } from './SidebarSettingsSection';
 import { SoundPreferencesSection } from './SoundPreferencesSection';
 import { TranscriptPreferencesSection } from './TranscriptPreferencesSection';
 import { VercelComputeSettings } from './VercelComputeSettings';
+import { WebSearchSection } from './WebSearchSection';
 
 export type SettingsSection =
   | 'general'
@@ -265,6 +266,7 @@ function CloudAgentSettings({
             </div>
             <TranscriptPreferencesSection />
             <SoundPreferencesSection />
+            {!organizationId && <WebSearchSection />}
             {settings ? (
               <>
                 <BuiltinAgentsSection organizationId={organizationId} settings={settings} />

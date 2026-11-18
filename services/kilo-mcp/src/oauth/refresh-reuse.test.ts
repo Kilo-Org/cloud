@@ -6,6 +6,7 @@ import {
   detectRefreshTokenReuse,
   hashRefreshToken,
   parseRefreshToken,
+  parseTokenUserId,
   readTokenBody,
   rememberIssuedRefreshToken,
   type IssuedRefreshToken,
@@ -17,11 +18,20 @@ function makeDeps() {
   const tokens = new Map<string, IssuedRefreshToken>();
   const store: RefreshReuseStore = {
     getRefreshToken: async hash => tokens.get(hash) ?? null,
-    rememberRefreshToken: async (hash, parts) => {
+    rememberRefreshToken: async (hash, parts, _expiresAt, presentedHash) => {
       for (const token of tokens.values()) {
-        if (token.userId === parts.userId && token.grantId === parts.grantId) token.current = false;
+        if (token.userId === parts.userId && token.grantId === parts.grantId) {
+          token.current = false;
+          token.previous = false;
+        }
       }
-      tokens.set(hash, { ...parts, current: true });
+      if (presentedHash !== null) {
+        const presented = tokens.get(presentedHash);
+        if (presented?.userId === parts.userId && presented.grantId === parts.grantId) {
+          presented.previous = true;
+        }
+      }
+      tokens.set(hash, { ...parts, current: true, previous: false });
     },
     forgetRefreshTokens: async parts => {
       for (const [hash, token] of tokens) {
@@ -44,13 +54,28 @@ function makeTtlDeps() {
     getRefreshToken: async (hash, nowIso) => {
       const row = rows.get(hash);
       if (!row || row.expiresAt <= nowIso) return null;
-      return { userId: row.userId, grantId: row.grantId, current: row.current };
+      return {
+        userId: row.userId,
+        grantId: row.grantId,
+        current: row.current,
+        previous: row.previous,
+      };
     },
-    rememberRefreshToken: async (hash, parts, expiresAt) => {
+    rememberRefreshToken: async (hash, parts, expiresAt, presentedHash) => {
       for (const row of rows.values()) {
-        if (row.userId === parts.userId && row.grantId === parts.grantId) row.current = false;
+        if (row.userId === parts.userId && row.grantId === parts.grantId) {
+          row.current = false;
+          row.previous = false;
+        }
       }
-      rows.set(hash, { ...parts, current: true, expiresAt });
+      if (presentedHash !== null) {
+        const presented = rows.get(presentedHash);
+        if (presented?.userId === parts.userId && presented.grantId === parts.grantId) {
+          presented.previous = true;
+          presented.expiresAt = expiresAt;
+        }
+      }
+      rows.set(hash, { ...parts, current: true, previous: false, expiresAt });
     },
     forgetRefreshTokens: async parts => {
       for (const [hash, row] of rows) {
@@ -80,6 +105,14 @@ function refreshRequest(refreshToken: string, origin?: string): Request {
   });
 }
 
+function codeRequest(): Request {
+  return new Request('https://kilo-mcp.test/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'grant_type=authorization_code&code=code',
+  });
+}
+
 /** The handler's steps in order: read the body, then decide. */
 async function guard(request: Request, deps: RefreshReuseDeps): Promise<Response | null> {
   const body = await readTokenBody(request);
@@ -100,6 +133,20 @@ describe('parseRefreshToken', () => {
   );
 });
 
+describe('parseTokenUserId', () => {
+  it('returns the account id in a well-formed token prefix', () => {
+    expect(parseTokenUserId('user-1:grant-1:secret')).toBe('user-1');
+  });
+
+  it('caps the id and rejects anything malformed', () => {
+    expect(parseTokenUserId(`u${'x'.repeat(128)}:grant:secret`)).toBeNull();
+    expect(parseTokenUserId(`u${'x'.repeat(127)}:grant:secret`)).toBe(`u${'x'.repeat(127)}`);
+    for (const token of ['nope', 'a:b', ':grant:secret', 'user:grant:']) {
+      expect(parseTokenUserId(token)).toBeNull();
+    }
+  });
+});
+
 describe('detectRefreshTokenReuse', () => {
   it('does not revoke a grant when only its public token parts match', async () => {
     const deps = makeDeps();
@@ -116,11 +163,46 @@ describe('detectRefreshTokenReuse', () => {
     expect(deps.revokeGrant).not.toHaveBeenCalled();
   });
 
-  it('allows the current token but revokes on a known superseded token', async () => {
+  it('accepts the token the provider rotated away from and keeps its successor current', async () => {
+    const deps = makeDeps();
+    const handle = createRefreshReuseHandler(deps);
+    await handle(codeRequest(), async () => Response.json({ refresh_token: 'u:g:first' }));
+    expect(
+      (
+        await handle(refreshRequest('u:g:first'), async () =>
+          Response.json({ refresh_token: 'u:g:second' })
+        )
+      ).status
+    ).toBe(200);
+    // The provider accepts the current and the immediately previous token, so
+    // this rotation is the tolerated race/lost-response case, not a replay.
+    expect(
+      (
+        await handle(refreshRequest('u:g:first'), async () =>
+          Response.json({ refresh_token: 'u:g:third' })
+        )
+      ).status
+    ).toBe(200);
+    expect(deps.revokeGrant).not.toHaveBeenCalled();
+    expect(deps.tokens.get(await hashRefreshToken('u:g:third'))?.current).toBe(true);
+    expect(deps.tokens.get(await hashRefreshToken('u:g:first'))?.previous).toBe(true);
+    expect(deps.tokens.get(await hashRefreshToken('u:g:second'))?.current).toBe(false);
+    expect(deps.tokens.get(await hashRefreshToken('u:g:second'))?.previous).toBe(false);
+  });
+
+  it('revokes a token older than the previous one and answers with the reuse error', async () => {
     const deps = makeDeps();
     await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:first' }), deps);
-    await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:second' }), deps);
-    expect(await guard(refreshRequest('u:g:second'), deps)).toBeNull();
+    await rememberIssuedRefreshToken(
+      Response.json({ refresh_token: 'u:g:second' }),
+      deps,
+      'u:g:first'
+    );
+    await rememberIssuedRefreshToken(
+      Response.json({ refresh_token: 'u:g:third' }),
+      deps,
+      'u:g:second'
+    );
     const response = await guard(refreshRequest('u:g:first', 'https://client.test'), deps);
     expect(response?.status).toBe(400);
     expect(response?.headers.get('Cache-Control')).toBe('no-store');
@@ -132,10 +214,53 @@ describe('detectRefreshTokenReuse', () => {
     expect(deps.revokeGrant).toHaveBeenCalledExactlyOnceWith('g', 'u');
   });
 
+  it('revokes the token a previous-token acceptance superseded', async () => {
+    const deps = makeDeps();
+    const handle = createRefreshReuseHandler(deps);
+    // R1 is presented while R2 is current, so the provider issues R3 and keeps
+    // R1 acceptable; R2 is now neither token the provider accepts.
+    await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:first' }), deps);
+    await rememberIssuedRefreshToken(
+      Response.json({ refresh_token: 'u:g:second' }),
+      deps,
+      'u:g:first'
+    );
+    await rememberIssuedRefreshToken(
+      Response.json({ refresh_token: 'u:g:third' }),
+      deps,
+      'u:g:first'
+    );
+
+    // R1 is the previous token again, so presenting it is forwarded.
+    expect(
+      (
+        await handle(refreshRequest('u:g:first'), async () =>
+          Response.json({ refresh_token: 'u:g:fourth' })
+        )
+      ).status
+    ).toBe(200);
+    expect(deps.revokeGrant).not.toHaveBeenCalled();
+
+    // R2 is neither current nor previous — the provider would refuse it, so
+    // the guard revokes instead of forwarding a doomed request.
+    const middle = await guard(refreshRequest('u:g:second'), deps);
+    expect(middle?.status).toBe(400);
+    expect(deps.revokeGrant).toHaveBeenCalledExactlyOnceWith('g', 'u');
+  });
+
   it('forgets the revoked grant’s hashes and leaves a live grant’s alone', async () => {
     const deps = makeDeps();
     await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:first' }), deps);
-    await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:second' }), deps);
+    await rememberIssuedRefreshToken(
+      Response.json({ refresh_token: 'u:g:second' }),
+      deps,
+      'u:g:first'
+    );
+    await rememberIssuedRefreshToken(
+      Response.json({ refresh_token: 'u:g:third' }),
+      deps,
+      'u:g:second'
+    );
     await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:other:live' }), deps);
 
     expect(await guard(refreshRequest('u:g:first'), deps)).not.toBeNull();
@@ -143,7 +268,7 @@ describe('detectRefreshTokenReuse', () => {
     // A revoked grant's hashes can never authenticate another replay, so they
     // are dropped with the revocation instead of waiting for the history TTL.
     expect(deps.tokens.has(await hashRefreshToken('u:g:first'))).toBe(false);
-    expect(deps.tokens.has(await hashRefreshToken('u:g:second'))).toBe(false);
+    expect(deps.tokens.has(await hashRefreshToken('u:g:third'))).toBe(false);
     expect([...deps.tokens.values()].map(token => token.grantId)).toEqual(['other']);
   });
 
@@ -153,24 +278,35 @@ describe('detectRefreshTokenReuse', () => {
       userId: 'stored-user',
       grantId: 'stored-grant',
       current: false,
+      previous: false,
     });
     await guard(refreshRequest('not:trusted:parts'), deps);
     expect(deps.revokeGrant).toHaveBeenCalledExactlyOnceWith('stored-grant', 'stored-user');
   });
 
-  it('still detects a superseded token late in the one-month session', async () => {
+  it('still detects a token older than the previous one late in the one-month session', async () => {
     vi.useFakeTimers();
     try {
-      // Day 0: the code exchange issues the first token, then one rotation.
+      // Day 0: the code exchange issues the first token, then two rotations.
       vi.setSystemTime(Date.UTC(2026, 0, 1, 12));
       const deps = makeTtlDeps();
       await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:first' }), deps);
-      await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:second' }), deps);
+      await rememberIssuedRefreshToken(
+        Response.json({ refresh_token: 'u:g:second' }),
+        deps,
+        'u:g:first'
+      );
+      await rememberIssuedRefreshToken(
+        Response.json({ refresh_token: 'u:g:third' }),
+        deps,
+        'u:g:second'
+      );
 
       // Day 29: the last full day of the session. With a history shorter than
-      // the session this superseded row would be gone, the guard would forward
-      // the replay to the provider, and the provider would answer it. The
-      // history must cover the whole session the provider serves.
+      // the session this revoked row would be gone, the guard would forward the
+      // replay, and the provider would refuse it without ending the session —
+      // the replay would stay undetected. The history must cover the whole
+      // session the provider serves.
       vi.setSystemTime(Date.UTC(2026, 0, 30, 12));
       const response = await guard(refreshRequest('u:g:first'), deps);
       expect(response?.status).toBe(400);
@@ -216,7 +352,16 @@ describe('detectRefreshTokenReuse', () => {
     const oauthSignIn = vi.fn();
     const deps = { ...makeDeps(), analytics: () => ({ oauthSignIn }) as unknown as McpAnalytics };
     await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:first' }), deps);
-    await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:second' }), deps);
+    await rememberIssuedRefreshToken(
+      Response.json({ refresh_token: 'u:g:second' }),
+      deps,
+      'u:g:first'
+    );
+    await rememberIssuedRefreshToken(
+      Response.json({ refresh_token: 'u:g:third' }),
+      deps,
+      'u:g:second'
+    );
 
     expect(await guard(refreshRequest('u:g:first'), deps)).not.toBeNull();
     expect(oauthSignIn).toHaveBeenCalledExactlyOnceWith({
@@ -268,7 +413,7 @@ describe('rememberIssuedRefreshToken', () => {
 });
 
 describe('createRefreshReuseHandler (one per named DO)', () => {
-  it('never issues two rotations for concurrent uses of the same token', async () => {
+  it('serializes concurrent uses of one token, accepting the second as the previous token', async () => {
     const deps = makeDeps();
     const handle = createRefreshReuseHandler(deps);
     await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:current' }), deps);
@@ -278,9 +423,29 @@ describe('createRefreshReuseHandler (one per named DO)', () => {
       handle(refreshRequest('u:g:current'), forward),
       handle(refreshRequest('u:g:current'), forward),
     ]);
-    expect(responses.filter(response => response.ok)).toHaveLength(1);
-    expect(forward).toHaveBeenCalledTimes(1);
-    expect(deps.revokeGrant).toHaveBeenCalledExactlyOnceWith('g', 'u');
+    // Two processes refreshing at once is the case the provider tolerates: the
+    // second presents the token the first rotated away from.
+    expect(responses.map(response => response.status)).toEqual([200, 200]);
+    expect(forward).toHaveBeenCalledTimes(2);
+    expect(deps.revokeGrant).not.toHaveBeenCalled();
+    expect(deps.tokens.get(await hashRefreshToken('u:g:next-2'))?.current).toBe(true);
+    expect(deps.tokens.get(await hashRefreshToken('u:g:next-1'))?.current).toBe(false);
+    expect(deps.tokens.get(await hashRefreshToken('u:g:next-1'))?.previous).toBe(false);
+    expect(deps.tokens.get(await hashRefreshToken('u:g:current'))?.previous).toBe(true);
+  });
+
+  it('hands the forwarded handler the account in the presented refresh token', async () => {
+    const deps = makeDeps();
+    const handle = createRefreshReuseHandler(deps);
+    const seen: Array<{ tokenUserId: string | null }> = [];
+    const forward = vi.fn(async (_request: Request, context: { tokenUserId: string | null }) => {
+      seen.push(context);
+      return Response.json({ refresh_token: 'u:g:next' });
+    });
+    await handle(codeRequest(), forward);
+    await handle(refreshRequest('u-7:g:secret'), forward);
+    await handle(refreshRequest('nope'), forward);
+    expect(seen).toEqual([{ tokenUserId: null }, { tokenUserId: 'u-7' }, { tokenUserId: null }]);
   });
 
   it.each(['/mcp', '/register', '/authorize', '/.well-known/oauth-authorization-server', '/token'])(

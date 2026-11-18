@@ -1,11 +1,10 @@
 import { z } from 'zod';
 /**
- * The history has to outlive the grant for which the provider still accepts the
- * token: the provider accepts the current and the immediately previous refresh
- * token, so a superseded hash replayed late in a dormant session must still be
- * in memory when the replay arrives. Tied to the session bound (one month), not
- * a shorter fixed window, or the guard would forward the replay and the
- * provider would answer it.
+ * The history has to outlive the grant it describes. The provider accepts the
+ * current and the immediately previous refresh token, and the guard forwards
+ * both; a hash older than that is a replay the guard revokes. A replay that
+ * arrives late in a dormant session must still be recognised, so the window is
+ * tied to the session bound (one month), not a shorter fixed one.
  */
 import { REFRESH_HISTORY_TTL_MS } from './session-lifetime';
 import { REFRESH_TOKEN_REUSE_DETAIL } from '../analytics';
@@ -17,12 +16,29 @@ export const TOKEN_ENDPOINT_PATH = '/token';
 export const TOKEN_REQUEST_MAX_BYTES = 16 * 1024;
 
 export type RefreshTokenParts = { userId: string; grantId: string };
-export type IssuedRefreshToken = RefreshTokenParts & { current: boolean };
+export type IssuedRefreshToken = RefreshTokenParts & { current: boolean; previous: boolean };
+
+/** Request-scoped facts the guard hands to the provider handler it forwards to. */
+export type TokenRequestContext = {
+  /** The account id in the presented refresh token's prefix; unauthenticated. */
+  tokenUserId: string | null;
+};
 
 /** Strongly consistent DO SQLite state, not eventually consistent Workers KV. */
 export type RefreshReuseStore = {
   getRefreshToken(hash: string, nowIso: string): Promise<IssuedRefreshToken | null>;
-  rememberRefreshToken(hash: string, parts: RefreshTokenParts, expiresAt: string): Promise<void>;
+  /**
+   * Records a newly issued hash. `presentedHash` is the hash the client sent in
+   * a `refresh_token` exchange (null for an authorization-code exchange): the
+   * provider accepts that token once more after rotating, so it becomes the
+   * grant's previous token.
+   */
+  rememberRefreshToken(
+    hash: string,
+    parts: RefreshTokenParts,
+    expiresAt: string,
+    presentedHash: string | null
+  ): Promise<void>;
   /**
    * Drop every hash recorded for a grant. The revoke path owns this cleanup, so
    * a revoked grant does not hold DO rows until the history TTL expires.
@@ -103,6 +119,20 @@ export function parseRefreshToken(token: string): RefreshTokenParts | null {
   return { userId, grantId };
 }
 
+/** Bound on the account id telemetry may carry; a real id is far shorter. */
+const TOKEN_USER_ID_MAX_LENGTH = 128;
+const tokenUserIdSchema = z.string().min(1).max(TOKEN_USER_ID_MAX_LENGTH);
+
+/**
+ * The account id in a presented token's prefix, for attributing a failed
+ * refresh. The prefix is unauthenticated input: it is never proof of anything,
+ * and a missing, malformed, or over-long id yields null rather than a value.
+ */
+export function parseTokenUserId(token: string): string | null {
+  const parsed = tokenUserIdSchema.safeParse(parseRefreshToken(token)?.userId);
+  return parsed.success ? parsed.data : null;
+}
+
 export function isTokenRequest(request: Request): boolean {
   return request.method === 'POST' && new URL(request.url).pathname === TOKEN_ENDPOINT_PATH;
 }
@@ -155,6 +185,11 @@ export function bodyTooLargeResponse(request: Request): Response {
  * Decides from the form the client sent. A repeated parameter other than
  * `resource` is left to the library, which owns the duplicate-parameter
  * rejection.
+ *
+ * The library accepts the current and the immediately previous refresh token:
+ * two clients can race a rotation, and a rotation response can be lost, so the
+ * previous token is legitimate. Only a known token older than that is the
+ * replay the library itself refuses; that is the one case revoked here.
  */
 export async function detectRefreshTokenReuse(
   request: Request,
@@ -172,8 +207,9 @@ export async function detectRefreshTokenReuse(
     new Date().toISOString()
   );
   // A mismatch with the latest token is NOT proof of replay. Only a full hash
-  // of a previously issued token authenticates the stored grant identity.
-  if (!issued || issued.current) return null;
+  // of a previously issued token authenticates the stored grant identity, and
+  // the provider still accepts the one it rotated away from last.
+  if (!issued || issued.current || issued.previous) return null;
   await deps.revokeGrant(issued.grantId, issued.userId);
   // The grant is revoked now, so no hash of it can authenticate another replay:
   // forget the history rather than leaving it for the history TTL.
@@ -190,9 +226,15 @@ export async function detectRefreshTokenReuse(
   return reuseDetectedResponse(request);
 }
 
+/**
+ * Records the rotation the library just performed. `presentedToken` is the
+ * refresh token the client sent (null for an authorization-code exchange): the
+ * provider keeps it acceptable as the previous token, so the history must too.
+ */
 export async function rememberIssuedRefreshToken(
   response: Response,
-  deps: Pick<RefreshReuseDeps, 'store'>
+  deps: Pick<RefreshReuseDeps, 'store'>,
+  presentedToken: string | null = null
 ): Promise<void> {
   if (!response.ok) return;
   let body: unknown;
@@ -209,7 +251,8 @@ export async function rememberIssuedRefreshToken(
   await deps.store.rememberRefreshToken(
     await hashRefreshToken(token),
     parts,
-    new Date(Date.now() + REFRESH_HISTORY_TTL_MS).toISOString()
+    new Date(Date.now() + REFRESH_HISTORY_TTL_MS).toISOString(),
+    presentedToken === null ? null : await hashRefreshToken(presentedToken)
   );
 }
 
@@ -218,25 +261,34 @@ export async function rememberIssuedRefreshToken(
  * entire check → library rotation/revocation → durable history write, including
  * external awaits. An isolate-local queue in the Worker would not be sufficient.
  * Only token requests queue; MCP responses are never cloned or parsed here.
-
+ *
+ * `forward` receives the request-scoped context the provider hook needs to
+ * attribute a failed refresh; nothing about it is persisted.
  */
 export function createRefreshReuseHandler(deps: RefreshReuseDeps) {
   let pending: Promise<unknown> = Promise.resolve();
   return async (
     request: Request,
-    forward: (request: Request) => Promise<Response>
+    forward: (request: Request, context: TokenRequestContext) => Promise<Response>
   ): Promise<Response> => {
-    if (!isTokenRequest(request)) return forward(request);
+    if (!isTokenRequest(request)) return forward(request, { tokenUserId: null });
     const body = await readTokenBody(request);
     if (body.kind === 'too_large') return bodyTooLargeResponse(request);
     const forwarded = forwardable(request, body.body);
+    const presentedToken =
+      body.kind === 'form' && body.params.get('grant_type') === 'refresh_token'
+        ? (body.params.get('refresh_token') ?? null)
+        : null;
+    const context: TokenRequestContext = {
+      tokenUserId: presentedToken ? parseTokenUserId(presentedToken) : null,
+    };
     const response = pending.then(async () => {
       if (body.kind === 'form') {
         const rejected = await detectRefreshTokenReuse(request, body.params, deps);
         if (rejected) return rejected;
       }
-      const result = await forward(forwarded);
-      await rememberIssuedRefreshToken(result, deps);
+      const result = await forward(forwarded, context);
+      await rememberIssuedRefreshToken(result, deps, presentedToken);
       return result;
     });
     // A failed request must not poison the queue for subsequent retries.

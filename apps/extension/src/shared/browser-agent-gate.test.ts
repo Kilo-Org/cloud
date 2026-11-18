@@ -274,7 +274,7 @@ describe('origin grants', () => {
 
   it('asks for the frame origin when a ref lives inside an iframe', async () => {
     const result = await run({
-      args: { element: 'e12' },
+      args: { target: 'e12' },
       authorized: grants.filter(grant => grant.origin === 'https://app.example.com'),
       session: createSession({ targetFrameId: 'f1' }),
       toolName: 'browser_click',
@@ -288,7 +288,7 @@ describe('origin grants', () => {
 
   it('allows an act inside a granted frame and marks it as a frame target', async () => {
     const result = await run({
-      args: { element: 'e12' },
+      args: { target: 'e12' },
       session: createSession({ targetFrameId: 'f1' }),
       toolName: 'browser_click',
     });
@@ -325,7 +325,7 @@ describe('origin grants', () => {
 
   it('refuses a target whose frame cannot be read', async () => {
     const result = await run({
-      args: { element: 'e12' },
+      args: { target: 'e12' },
       session: createSession({ describeNodeFails: true }),
       toolName: 'browser_click',
     });
@@ -415,7 +415,7 @@ describe('sensitive steps', () => {
 
   it('refuses typing a password without a step token', async () => {
     const result = await run({
-      args: { element: 'e12', text: 'hunter2' },
+      args: { target: 'e12', text: 'hunter2' },
       probe: passwordProbe,
       toolName: 'browser_type',
     });
@@ -636,6 +636,33 @@ describe('sensitive steps', () => {
     });
   });
 
+  it('runs a unique target even when the element description matches several', async () => {
+    const result = await run({
+      args: { element: 'button', target: '#unique' },
+      session: createSession({
+        ambiguousSelectors: { button: 3 },
+        selectors: { '#unique': { frameId: 'main', nodeId: 7 } },
+      }),
+      toolName: 'browser_click',
+    });
+
+    expect(result).toMatchObject({ ok: true });
+  });
+
+  it('asks for the grant before it discloses an ambiguous selector', async () => {
+    const result = await run({
+      args: { target: '#many' },
+      authorized: [{ class: 'act', origin: 'https://other.example.com' }],
+      session: createSession({ ambiguousSelectors: { '#many': 3 } }),
+      toolName: 'browser_click',
+    });
+
+    expect(failureOf(result)).toStrictEqual({
+      items: [{ class: 'act', origin: 'https://app.example.com' }],
+      kind: 'needs_permission',
+    });
+  });
+
   it('refuses an ambiguous selector before asking for any permission', async () => {
     const result = await run({
       args: { target: '#many' },
@@ -675,7 +702,7 @@ describe('sensitive steps', () => {
 
   it('counts a target it cannot probe as sensitive', async () => {
     const result = await run({
-      args: { element: 'zz' },
+      args: { target: 'zz' },
       toolName: 'browser_click',
     });
 
@@ -763,7 +790,7 @@ describe('sensitive steps', () => {
 
   it('allows the retry that carries the binding token, then burns it', async () => {
     const tokens = createStepTokenStore({ now: () => 1000, random: () => 'token-b' });
-    const args = { element: 'e12', text: 'hunter2' };
+    const args = { target: 'e12', text: 'hunter2' };
     const token = tokens.issue({
       argumentHash: hashBrowserToolArguments(args),
       element: 'e12',
@@ -791,7 +818,7 @@ describe('sensitive steps', () => {
   it('refuses a token issued for other arguments', async () => {
     const tokens = createStepTokenStore({ now: () => 1000, random: () => 'token-c' });
     const token = tokens.issue({
-      argumentHash: hashBrowserToolArguments({ element: 'e12', text: 'other' }),
+      argumentHash: hashBrowserToolArguments({ target: 'e12', text: 'other' }),
       element: 'e12',
       origin: 'https://app.example.com',
       reason: SENSITIVE_REASON.password,
@@ -801,7 +828,7 @@ describe('sensitive steps', () => {
 
     const result = await run(
       {
-        args: { element: 'e12', text: 'hunter2' },
+        args: { target: 'e12', text: 'hunter2' },
         probe: passwordProbe,
         stepTokens: [token],
         toolName: 'browser_type',
@@ -814,7 +841,7 @@ describe('sensitive steps', () => {
 
   it('classifies a submit inside a card form', async () => {
     const result = await run({
-      args: { element: 'e12' },
+      args: { target: 'e12' },
       probe: { fields: [], paymentFormSubmit: true },
       toolName: 'browser_click',
     });
@@ -824,7 +851,7 @@ describe('sensitive steps', () => {
 
   it('classifies an OAuth consent page as sensitive', async () => {
     const result = await run({
-      args: { element: 'e12' },
+      args: { target: 'e12' },
       authorized: [
         ...grants,
         { class: 'act', origin: 'https://accounts.google.com' },
@@ -848,7 +875,7 @@ describe('sensitive steps', () => {
 
   it('leaves an ordinary text field alone', async () => {
     const result = await run({
-      args: { element: 'e12', text: 'igor@example.com' },
+      args: { target: 'e12', text: 'igor@example.com' },
       probe: { fields: [], paymentFormSubmit: false },
       toolName: 'browser_type',
     });

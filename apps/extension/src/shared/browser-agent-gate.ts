@@ -100,10 +100,38 @@ interface TargetFrame {
  * Every element target an act tool accepts: the single-target keys, one target
  * per `browser_fill_form` field, and both ends of a `browser_drag`.
  */
+/**
+ * The element references a call carries, without human-readable descriptions:
+ * a description may coincide with several elements and must not be resolved.
+ */
+const targetReferencesOf = (args: Record<string, unknown>): readonly string[] => {
+  const texts: string[] = [];
+
+  for (const key of ['target', 'startTarget', 'endTarget']) {
+    const text = argumentString(args, key);
+
+    if (text !== undefined) {
+      texts.push(text);
+    }
+  }
+
+  const fields = formFieldTargetsSchema.safeParse(args['fields']);
+
+  for (const field of fields.success ? fields.data : []) {
+    const text = argumentString(field, 'target');
+
+    if (text !== undefined) {
+      texts.push(text);
+    }
+  }
+
+  return [...new Set(texts)];
+};
+
 const targetTextsOf = (args: Record<string, unknown>): readonly string[] => {
   const texts: string[] = [];
 
-  for (const key of ['element', 'target', 'ref', 'selector', 'startTarget', 'endTarget']) {
+  for (const key of ['target', 'ref', 'selector', 'startTarget', 'endTarget']) {
     const text = argumentString(args, key);
 
     if (text !== undefined) {
@@ -142,7 +170,8 @@ const targetFrameOf = async (
   }
 
   if (resolved.kind === 'ambiguous') {
-    return { frame: true, origin: OPAQUE_ORIGIN };
+    // The call is refused later as ambiguous; it adds no origin requirement here.
+    return undefined;
   }
 
   const response = await session.send(
@@ -339,19 +368,6 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
 
   const targetTexts = grantClass === 'navigate' ? [] : targetTextsOf(input.args);
 
-  // A selector that names several elements cannot run: refuse it plainly before any grant or step-token ask, so the user is never asked to approve it.
-  for (const text of targetTexts) {
-    // eslint-disable-next-line no-await-in-loop -- one resolution per target text, in argument order
-    const resolved = await input.session.resolveTarget(text);
-
-    if (resolved?.kind === 'ambiguous') {
-      return {
-        failure: { error: ambiguousSelectorError(resolved.matches), kind: 'blocked' },
-        ok: false,
-      };
-    }
-  }
-
   const targetFrames: TargetFrame[] = [];
 
   for (const text of targetTexts) {
@@ -391,6 +407,19 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
     );
 
     return { failure: { items, kind: 'needs_permission' }, ok: false };
+  }
+
+  // The call is granted: only now spend a DOM read on cardinality. A selector that names several elements cannot run, so it is refused plainly before any sensitive-step ask instead of prompting for a call that would fail.
+  for (const text of targetReferencesOf(input.args)) {
+    // eslint-disable-next-line no-await-in-loop -- one resolution per reference, in argument order
+    const resolved = await input.session.resolveTarget(text);
+
+    if (resolved?.kind === 'ambiguous') {
+      return {
+        failure: { error: ambiguousSelectorError(resolved.matches), kind: 'blocked' },
+        ok: false,
+      };
+    }
   }
 
   if (grantClass !== 'act') {

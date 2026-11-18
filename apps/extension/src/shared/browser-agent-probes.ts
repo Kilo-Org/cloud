@@ -549,7 +549,7 @@ export const sensitiveTargetsOf = (
 
   const targets: string[] = [];
 
-  for (const key of ['element', 'target', 'ref', 'selector', 'startTarget', 'endTarget']) {
+  for (const key of ['target', 'ref', 'selector', 'startTarget', 'endTarget']) {
     const target = argumentTextSchema.safeParse(args[key]);
 
     if (target.success) {

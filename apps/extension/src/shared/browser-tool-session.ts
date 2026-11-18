@@ -425,6 +425,8 @@ const domGetDocumentResponseSchema = z.object({
   root: z.object({ nodeId: z.number() }).optional(),
 });
 const domQuerySelectorAllResponseSchema = z.object({ nodeIds: z.array(z.number()) });
+const injectedNumberSchema = z.number();
+const injectedResultSchema = z.object({ result: z.number() });
 
 const refPattern = /^(?:ref=)?((?:f\d+)?e\d+)$/u;
 const parseRef = (target: string): string | undefined => refPattern.exec(target.trim())?.[1];
@@ -2023,12 +2025,49 @@ export const createBrowserToolSession = ({
     return documentNodeId;
   };
 
+  /** How many elements a selector matches, on the scripting backend where there is no DOM node id. */
+  const countScriptingSelectorMatches = async (selector: string): Promise<number | undefined> => {
+    if (scriptingApi === undefined) {
+      return undefined;
+    }
+
+    try {
+      const injected = await scriptingApi.executeScript({
+        args: [selector],
+        func: (value: string) => document.querySelectorAll(value).length,
+        target: { tabId },
+        world: 'MAIN',
+      });
+      const first = Array.isArray(injected) ? injected[0] : injected;
+      const direct = injectedNumberSchema.safeParse(first?.result);
+
+      if (direct.success) {
+        return direct.data;
+      }
+
+      const wrapped = injectedResultSchema.safeParse(first?.result);
+
+      return wrapped.success ? wrapped.data.result : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+
   const resolveSelector = async (
     selector: string
   ): Promise<BrowserToolResolvedTarget | undefined> => {
     if (debuggerApi === undefined) {
-      // The scripting path resolves a target by selector; there is no debugger node id, so the tool implementations in `callTool` use `selector` and never `nodeId`.
+      // The scripting path resolves a target by selector; there is no debugger node id, so the tool implementations in `callTool` use `selector` and never `nodeId`. The match count still has to be unique.
       await attach();
+      const matches = await countScriptingSelectorMatches(selector);
+
+      if (matches === undefined || matches === 0) {
+        return undefined;
+      }
+
+      if (matches > 1) {
+        return { kind: 'ambiguous', matches, selector };
+      }
 
       return { kind: 'selector', nodeId: 0, selector };
     }

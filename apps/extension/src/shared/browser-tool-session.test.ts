@@ -270,6 +270,12 @@ const createScriptingApi = (
   return { api, codes };
 };
 
+/** A scripting fake that answers a selector with its match count. */
+const selectorCountScript =
+  (counts: Record<string, number>) =>
+  (details: { readonly args: string[] }): Promise<{ readonly result?: unknown }[]> =>
+    Promise.resolve([{ result: counts[details.args[0] ?? ''] }]);
+
 const createScriptingSession = (options: { readonly result?: (code: string) => unknown } = {}) => {
   const scriptingApi = createScriptingApi(options.result);
   const tabsApi = createTabsApi();
@@ -906,6 +912,30 @@ describe('browser tool session', () => {
       kind: 'selector',
       nodeId: 42,
       selector: '#unique',
+    });
+  });
+
+  it('applies the unique-match rule on the scripting backend too', async () => {
+    const scriptingApi: BrowserScriptingApi = {
+      executeScript: selectorCountScript({ '#many': 3, '#none': 0, '#one': 1 }),
+    };
+    const tabsApi = createTabsApi();
+    const session = createBrowserToolSession({
+      scriptingApi,
+      tabId: 7,
+      tabsApi: tabsApi.api,
+    });
+
+    await expect(session.resolveTarget('#many')).resolves.toStrictEqual({
+      kind: 'ambiguous',
+      matches: 3,
+      selector: '#many',
+    });
+    await expect(session.resolveTarget('#none')).resolves.toBeUndefined();
+    await expect(session.resolveTarget('#one')).resolves.toStrictEqual({
+      kind: 'selector',
+      nodeId: 0,
+      selector: '#one',
     });
   });
 

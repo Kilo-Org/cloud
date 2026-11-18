@@ -4689,6 +4689,7 @@
     "superseded": "Bu bağlantı başka bir cihazdan yenisiyle değiştirildiği için artık çalışmıyor."
   },
   "sharedSession": {
+    "startedAt": "{{time}}'de başladı",
     "title": "Paylaşılan oturum",
     "someone": "Biri",
     "sharedBy": "Paylaşan: {{owner}}",

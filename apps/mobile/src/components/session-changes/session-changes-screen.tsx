@@ -19,7 +19,7 @@ import { useSessionChangesData } from '@/components/session-changes/use-session-
 import { useSessionChangesFile } from '@/components/session-changes/use-session-changes-file';
 import { useSessionChangesReview } from '@/components/session-changes/use-session-changes-review';
 import { Button } from '@/components/ui/button';
-import { EyebrowPlaceholder } from '@/components/ui/eyebrow-placeholder';
+import { eyebrowHeaderProps } from '@/components/ui/eyebrow-placeholder';
 import { IconButton } from '@/components/ui/icon-button';
 import { RefreshCw } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
@@ -143,28 +143,30 @@ export function SessionChangesScreen({ sessionId }: Readonly<{ sessionId: string
   }, [snapshot, legacyDiffQuery.isSuccess, legacyDiffQuery.dataUpdatedAt, t]);
 
   // The eyebrow is the capture time above the title. Its line is reserved while
-  // a read can still answer with one and after a read fails — a retry paints the
-  // same line, so the title never moves — and dropped only when a read settled
+  // a read is pending — with the placeholder bar, because the time is on its way
+  // — and after a read fails, where the same line stays blank so the title keeps
+  // its place without pulsing. It is dropped only when a read settled
   // successfully without a capture time: the title then centres alone instead of
   // keeping a line no label fills.
-  const unsettled = (read: { isPending: boolean; isError: boolean }) =>
-    read.isPending || read.isError;
-  const captureReadUnsettled =
-    cloudAgentSessionId === null ? readOnly && unsettled(legacyDiffQuery) : unsettled(changesQuery);
+  const captureReadPending =
+    cloudAgentSessionId === null ? readOnly && legacyDiffQuery.isPending : changesQuery.isPending;
+  const captureReadFailed =
+    cloudAgentSessionId === null ? readOnly && legacyDiffQuery.isError : changesQuery.isError;
   let eyebrow: HeaderEyebrow = { kind: 'none' };
   if (asOf !== undefined) {
     eyebrow = { kind: 'ready', text: asOf };
-  } else if (unsettled(sessionQuery) || captureReadUnsettled) {
-    eyebrow = { kind: 'reserved' };
+  } else if (sessionQuery.isPending || captureReadPending) {
+    eyebrow = { kind: 'loading' };
+  } else if (sessionQuery.isError || captureReadFailed) {
+    eyebrow = { kind: 'held' };
   }
+  const eyebrowProps = eyebrowHeaderProps(eyebrow);
 
   return (
     <View className="flex-1 bg-background" testID="session-changes-screen">
       <ScreenHeader
         title={openFile === null ? t('common.changes') : openFile.path}
-        eyebrow={eyebrow.kind === 'ready' ? eyebrow.text : undefined}
-        reserveEyebrow={eyebrow.kind === 'reserved'}
-        eyebrowPlaceholder={eyebrow.kind === 'reserved' ? <EyebrowPlaceholder /> : undefined}
+        {...eyebrowProps}
         titleNumberOfLines={1}
         onBack={
           openFile === null

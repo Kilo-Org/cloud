@@ -4759,6 +4759,7 @@
     "superseded": "Acest link a fost înlocuit de pe alt dispozitiv, așa că nu mai funcționează."
   },
   "sharedSession": {
+    "startedAt": "Începută la {{time}}",
     "title": "Sesiune partajată",
     "someone": "Cineva",
     "sharedBy": "Partajată de {{owner}}",

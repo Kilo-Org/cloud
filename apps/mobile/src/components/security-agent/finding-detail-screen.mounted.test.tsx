@@ -319,6 +319,7 @@ describe.each([true, false])('finding load states with local history=%s', hasLoc
 
   it('keeps Back available during loading without offering Retry', () => {
     finding.isLoading = true;
+    finding.isFetching = true;
     finding.data = undefined;
     const tree = renderScreen();
 
@@ -336,9 +337,9 @@ describe.each([true, false])('finding load states with local history=%s', hasLoc
     const tree = renderScreen();
 
     expect(tree.root.findAllByType(QueryError)).toHaveLength(1);
-    // The header keeps the eyebrow line it reserved while loading; its
-    // placeholder bar is the only skeleton this state leaves.
-    expect(tree.root.findAllByType(Skeleton)).toHaveLength(1);
+    // The header keeps the eyebrow line it reserved while loading, and no bar
+    // paints over it once the read has failed: this state leaves no skeleton.
+    expect(tree.root.findAllByType(Skeleton)).toHaveLength(0);
     expectSafeBack(tree);
   });
 
@@ -425,8 +426,9 @@ describe.each([true, false])('finding load states with local history=%s', hasLoc
     expect(tree.root.findAllByProps({ accessibilityLabel: 'common.retry' })).toHaveLength(0);
     expect(tree.root.findAllByType(QueryError)).toHaveLength(0);
     // The first frame of every open is the loading one, so the not-found answer
-    // keeps the line it reserved then instead of pulling the title up.
-    expect(tree.root.findAllByType(Skeleton)).toHaveLength(1);
+    // keeps the line it reserved then instead of pulling the title up — held
+    // blank, because no read is running to fill it.
+    expect(tree.root.findAllByType(Skeleton)).toHaveLength(0);
     expectSafeBack(tree);
   });
 });

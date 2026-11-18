@@ -4969,6 +4969,7 @@
     "superseded": "Disodlwyd y ddolen hon mewn man arall, felly nid yw'n gweithio mwyach."
   },
   "sharedSession": {
+    "startedAt": "Dechreuwyd am {{time}}",
     "title": "Sesiwn a rannwyd",
     "someone": "Rhywun",
     "sharedBy": "Rhannwyd gan {{owner}}",

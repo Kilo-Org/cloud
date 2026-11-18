@@ -4759,6 +4759,7 @@
     "superseded": "Šī saite tika aizstāta citur, tāpēc tā vairs nedarbojas."
   },
   "sharedSession": {
+    "startedAt": "Sākta {{time}}",
     "title": "Kopīgota sesija",
     "someone": "Kāds",
     "sharedBy": "Kopīgoja {{owner}}",

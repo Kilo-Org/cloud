@@ -75,8 +75,10 @@ describe('finding detail back control wiring', () => {
     // title, and the first frame of every open reserves that line while the read
     // runs. A failure or a not-found that dropped the line would pull the title
     // up out of the position the loading frame gave it, and a retry would move
-    // it back down again.
-    expect(pendingHeaderSource).toMatch(/\breserveEyebrow\b/);
+    // it back down again. `eyebrowHeaderProps` is what turns the pending state
+    // into that reserved line; the mounted suite pins that it holds it blank
+    // after a failure.
+    expect(pendingHeaderSource).toMatch(/eyebrowHeaderProps\(pendingEyebrow\)/);
   });
 
   it('passes showBackButton on every ScreenHeader usage', () => {

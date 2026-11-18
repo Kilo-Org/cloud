@@ -36,7 +36,7 @@ const buttons = vi.hoisted(() => ({
 }));
 
 const screenHeaders = vi.hoisted(() => ({
-  rendered: [] as { eyebrow?: string; reserveEyebrow?: boolean }[],
+  rendered: [] as { eyebrow?: string; reserveEyebrow?: boolean; eyebrowPlaceholder?: unknown }[],
 }));
 
 const viewRenders = vi.hoisted(() => ({
@@ -148,7 +148,11 @@ vi.mock('@/components/query-error', () => ({
   },
 }));
 vi.mock('@/components/screen-header', () => ({
-  ScreenHeader: (props: { eyebrow?: string; reserveEyebrow?: boolean }) => {
+  ScreenHeader: (props: {
+    eyebrow?: string;
+    reserveEyebrow?: boolean;
+    eyebrowPlaceholder?: unknown;
+  }) => {
     screenHeaders.rendered.push(props);
     return null;
   },
@@ -1041,9 +1045,23 @@ describe('ReviewDetailScreen error states', () => {
 
     // A retry re-enters the loading state on this same line, so dropping it on
     // the failure would move the title on the way in and on the way back out.
+    // Nothing paints over the line while no read runs, so the header stops
+    // pulsing as soon as the failure lands.
     expect(screenHeaders.rendered).toHaveLength(1);
     expect(screenHeaders.rendered[0]?.eyebrow).toBeUndefined();
     expect(screenHeaders.rendered[0]?.reserveEyebrow).toBe(true);
+    expect(screenHeaders.rendered[0]?.eyebrowPlaceholder).toBeUndefined();
+  });
+
+  it('reserves the line with the placeholder bar while the read runs', () => {
+    detail.isLoading = true;
+    detail.data = null;
+
+    renderScreen();
+
+    expect(screenHeaders.rendered[0]?.eyebrow).toBeUndefined();
+    expect(screenHeaders.rendered[0]?.reserveEyebrow).toBe(true);
+    expect(screenHeaders.rendered[0]?.eyebrowPlaceholder).toBeTruthy();
   });
 
   it('keeps the eyebrow line through a not-found answer', () => {
@@ -1054,6 +1072,7 @@ describe('ReviewDetailScreen error states', () => {
     renderScreen();
 
     expect(screenHeaders.rendered[0]?.reserveEyebrow).toBe(true);
+    expect(screenHeaders.rendered[0]?.eyebrowPlaceholder).toBeUndefined();
   });
 
   it('paints the review repository on the eyebrow line once the read answers', () => {

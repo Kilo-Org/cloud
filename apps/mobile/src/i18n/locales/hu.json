@@ -4689,6 +4689,7 @@
     "superseded": "Ezt a linket máshol lecserélték, ezért már nem működik."
   },
   "sharedSession": {
+    "startedAt": "Indítva: {{time}}",
     "title": "Megosztott munkamenet",
     "someone": "Valaki",
     "sharedBy": "Megosztotta: {{owner}}",

@@ -4899,6 +4899,7 @@
     "superseded": "Dan il-link ġie sostitwit minn post ieħor, għalhekk m'għadux jaħdem."
   },
   "sharedSession": {
+    "startedAt": "Bdiet {{time}}",
     "title": "Sessjoni kondiviża",
     "someone": "Xi ħadd",
     "sharedBy": "Kondiviża minn {{owner}}",

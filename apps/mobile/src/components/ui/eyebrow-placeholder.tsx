@@ -1,15 +1,33 @@
+import { type HeaderEyebrow } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 
 /**
- * The bar a header's reserved eyebrow line paints while its label is still
- * loading. It is one eyebrow line tall and as wide as a short label, so the
- * reserved line stays the height the arriving text takes; the header paints it
- * over that line, which is why it never sizes the slot.
+ * The header props a caller's eyebrow state maps to, so every screen that
+ * names its eyebrow from a read decides the same thing in one place.
  *
- * It lives beside `Eyebrow` rather than in it: only a caller that reserves the
- * line pulls in the skeleton's shimmer, and every header that paints an
- * eyebrow from its first frame stays off that surface.
+ * `loading` reserves the line and paints the bar over it: one eyebrow line tall
+ * and as wide as a short label (`h-2.5 w-20`), so the slot the arriving text
+ * takes stays the height the text needs — the header paints the bar over the
+ * line, which is why the bar never sizes it.
+ *
+ * `held` reserves the same line with nothing painted, so a read that stopped
+ * (failed, not found, permission denied) leaves the title in place without an
+ * animation it can never finish: nothing pulses on a screen whose label can
+ * only arrive through a retry. `ready` and `none` reserve no line at all.
  */
-export function EyebrowPlaceholder() {
-  return <Skeleton className="h-2.5 w-20 rounded-full" />;
+export function eyebrowHeaderProps(eyebrow: HeaderEyebrow) {
+  switch (eyebrow.kind) {
+    case 'ready':
+      return { eyebrow: eyebrow.text, reserveEyebrow: false, eyebrowPlaceholder: undefined };
+    case 'loading':
+      return {
+        eyebrow: undefined,
+        reserveEyebrow: true,
+        eyebrowPlaceholder: <Skeleton className="h-2.5 w-20 rounded-full" />,
+      };
+    case 'held':
+      return { eyebrow: undefined, reserveEyebrow: true, eyebrowPlaceholder: undefined };
+    case 'none':
+      return { eyebrow: undefined, reserveEyebrow: false, eyebrowPlaceholder: undefined };
+  }
 }

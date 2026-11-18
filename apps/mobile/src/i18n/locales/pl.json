@@ -4829,6 +4829,7 @@
     "superseded": "Ten link został zastąpiony na innym urządzeniu, więc już nie działa."
   },
   "sharedSession": {
+    "startedAt": "Rozpoczęto o {{time}}",
     "title": "Udostępniona sesja",
     "someone": "Ktoś",
     "sharedBy": "Udostępnione przez: {{owner}}",

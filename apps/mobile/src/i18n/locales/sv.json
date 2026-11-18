@@ -4689,6 +4689,7 @@
     "superseded": "Den här länken har ersatts på annat håll och fungerar därför inte längre."
   },
   "sharedSession": {
+    "startedAt": "Startade kl. {{time}}",
     "title": "Delad session",
     "someone": "Någon",
     "sharedBy": "Delad av {{owner}}",

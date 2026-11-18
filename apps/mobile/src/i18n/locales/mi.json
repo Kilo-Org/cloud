@@ -4689,6 +4689,7 @@
     "superseded": "Kua whakakapia tēnei hono i wāhi kē, nō reira kua kore e mahi."
   },
   "sharedSession": {
+    "startedAt": "I tīmata i te {{time}}",
     "title": "Wātū kua tohatohaina",
     "someone": "Tētahi tangata",
     "sharedBy": "Nā {{owner}} i tohatoha",

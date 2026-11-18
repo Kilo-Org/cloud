@@ -4689,6 +4689,7 @@
     "superseded": "Þessum tengli var skipt út annars staðar og því virkar hann ekki lengur."
   },
   "sharedSession": {
+    "startedAt": "Byrjaði kl. {{time}}",
     "title": "Samnýtt lota",
     "someone": "Einhver",
     "sharedBy": "Deilt af {{owner}}",

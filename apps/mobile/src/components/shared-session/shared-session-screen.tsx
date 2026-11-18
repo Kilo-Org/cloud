@@ -7,7 +7,7 @@ import { SessionPreviewTranscript } from '@/components/agents/session-preview-tr
 import { formatGitUrlProject } from '@/components/agents/session-list-helpers';
 import { QueryError } from '@/components/query-error';
 import { type HeaderEyebrow, ScreenHeader } from '@/components/screen-header';
-import { EyebrowPlaceholder } from '@/components/ui/eyebrow-placeholder';
+import { eyebrowHeaderProps } from '@/components/ui/eyebrow-placeholder';
 import { i18n } from '@/i18n';
 import { formatDate } from '@/lib/format';
 import { trpcErrorVariant } from '@/lib/trpc-error';
@@ -59,8 +59,13 @@ export function SharedSessionScreen({ shareToken }: Readonly<{ shareToken: strin
   const dateLabel = createdDate
     ? formatDate(createdDate, i18n.language, { month: 'short', day: 'numeric' })
     : null;
-  const asOfLabel = createdDate
-    ? t('agentChat.sessionChanges.asOf', {
+  // The share time is not part of the public read: the payload carries the
+  // session's own `createdAt`, and the link's `shared_at` stays inside the
+  // token the server resolves. So the line names the session start, and the
+  // subtitle's date above gives it a day — this prints the time alone rather
+  // than repeating that date under a "shared" label the payload cannot back.
+  const startedAtLabel = createdDate
+    ? t('sharedSession.startedAt', {
         time: formatDate(createdDate, i18n.language, { timeStyle: 'short' }),
       })
     : null;
@@ -77,16 +82,18 @@ export function SharedSessionScreen({ shareToken }: Readonly<{ shareToken: strin
   };
 
   // The eyebrow names the session: its repository, which the payload carries
-  // only when the session had a git URL, and otherwise the time it was created.
-  // Every state keeps the line — while the read is pending, after it fails, and
-  // when the payload has no usable timestamp the reserved line with the
-  // placeholder bar holds its place — so the shared header never opens a gap
-  // that then closes under the title.
-  let eyebrow: HeaderEyebrow = { kind: 'reserved' };
+  // only when the session had a git URL, and otherwise the time it started.
+  // A read that is pending reserves the line with the placeholder bar; a read
+  // that failed, and a payload with neither a repository nor a usable
+  // timestamp, keep the same line blank — the title holds its place and
+  // nothing pulses on a header whose label can no longer arrive.
+  let eyebrow: HeaderEyebrow = { kind: 'held' };
   if (repoLabel !== null) {
     eyebrow = { kind: 'ready', text: repoLabel };
-  } else if (asOfLabel !== null) {
-    eyebrow = { kind: 'ready', text: asOfLabel };
+  } else if (startedAtLabel !== null) {
+    eyebrow = { kind: 'ready', text: startedAtLabel };
+  } else if (query.isPending) {
+    eyebrow = { kind: 'loading' };
   }
 
   let body: ReactNode = null;
@@ -132,9 +139,7 @@ export function SharedSessionScreen({ shareToken }: Readonly<{ shareToken: strin
     <View className="flex-1 bg-background" testID="shared-session-screen">
       <ScreenHeader
         title={metadata?.title ?? t('sharedSession.title')}
-        eyebrow={eyebrow.kind === 'ready' ? eyebrow.text : undefined}
-        reserveEyebrow={eyebrow.kind === 'reserved'}
-        eyebrowPlaceholder={eyebrow.kind === 'reserved' ? <EyebrowPlaceholder /> : undefined}
+        {...eyebrowHeaderProps(eyebrow)}
         subtitle={query.data ? subtitle : undefined}
         reserveSubtitle
         titleNumberOfLines={2}

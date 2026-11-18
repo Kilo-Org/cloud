@@ -4829,6 +4829,7 @@
     "superseded": "Ši nuoroda buvo pakeista kitame įrenginyje, todėl nebeveikia."
   },
   "sharedSession": {
+    "startedAt": "Pradėta {{time}}",
     "title": "Bendrinama sesija",
     "someone": "Kažkas",
     "sharedBy": "Pasidalijo {{owner}}",

@@ -229,19 +229,23 @@ describe('SheetHeader', () => {
     renderer.unmount();
   });
 
-  it('mirrors the native handle padding below the title when the sheet owns one', async () => {
+  it.each([
+    { os: 'ios', top: 'pt-1.5', bottom: 'pb-4' },
+    { os: 'android', top: 'pt-0', bottom: 'pb-7' },
+  ])('mirrors the native handle padding below the title on $os', async ({ os, top, bottom }) => {
+    // The sheet paints the drag handle above this header, and Material3's
+    // handle already reserves 22dp of padding under the bar (iOS's reserves
+    // 16pt), so the header splits its own padding to even out the gap above
+    // and below the title. The header resolves that split at render, so each
+    // platform is mounted once and its own pair asserted.
+    rn.os = os;
     const renderer = await mount({
       title: 'Environment',
       onDone: () => undefined,
       underHandle: true,
     });
 
-    // The sheet paints the drag handle above this header, and Material3's
-    // handle already reserves 22dp of padding under the bar (iOS's reserves
-    // 16pt), so the header splits its own padding to even out the gap above and
-    // below the title: `pt-1.5 pb-4` on iOS, `pt-0 pb-7` on Android.
     const classes = String(findHeaderContainer(renderer.root).props.className).split(' ');
-    const [top, bottom] = rn.os === 'ios' ? ['pt-1.5', 'pb-4'] : ['pt-0', 'pb-7'];
     expect(classes).toContain(top);
     expect(classes).toContain(bottom);
     expect(classes).not.toContain('pt-4');

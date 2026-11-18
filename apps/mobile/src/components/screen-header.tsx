@@ -170,7 +170,9 @@ type ScreenHeaderProps = {
    * available yet, such as a bar one eyebrow line tall. It is drawn over the
    * reserved text, which still holds the line's height, so neither the
    * placeholder nor the arriving label moves the body. The caller supplies the
-   * node, so the header itself pulls in no loading surface.
+   * node, so the header itself pulls in no loading surface; a read that stopped
+   * passes none, leaving the reserved line blank. `eyebrowHeaderProps` maps the
+   * caller's `HeaderEyebrow` state to all three props.
    */
   eyebrowPlaceholder?: React.ReactNode;
   centerTitle?: boolean;
@@ -258,17 +260,18 @@ type ScreenHeaderProps = {
 
 /**
  * The eyebrow line a header paints when its label comes from a read: the label
- * itself once the read answers, a reserved line (with the caller's placeholder
- * bar) while the read can still answer with one or after it failed — the title
- * then holds the position the label will take instead of moving — or no line at
- * all once the read settled without a label, where the title centres on the
- * leading control alone. A caller keeps one of these values as its single source
- * of truth, so the line is reserved exactly while a label exists or a read can
- * still produce one.
+ * itself once the read answers, a reserved line while the read is pending —
+ * with the caller's placeholder bar over it, because the label is still on its
+ * way — a reserved line with nothing painted after the read failed, where the
+ * title holds the position the label will take without an animation that may
+ * never finish, or no line at all once the read settled without a label, where
+ * the title centres on the leading control alone. A caller keeps one of these
+ * values as its single source of truth.
  */
 export type HeaderEyebrow =
   | { readonly kind: 'ready'; readonly text: string }
-  | { readonly kind: 'reserved' }
+  | { readonly kind: 'loading' }
+  | { readonly kind: 'held' }
   | { readonly kind: 'none' };
 
 /**

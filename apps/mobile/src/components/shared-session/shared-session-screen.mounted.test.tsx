@@ -1,8 +1,10 @@
 // The shared session header always names the session on its eyebrow line: the
-// repository when the payload has one, and otherwise the time the session was
-// created, so a link without a repository never centres a title over a line it
-// dropped. A read that is still running, a read that failed, and a payload with
-// no usable timestamp all keep the reserved line with its placeholder bar.
+// repository when the payload has one, and otherwise the time the session
+// started, so a link without a repository never centres a title over a line it
+// dropped. That time is the payload's `createdAt`, never a snapshot time, so
+// the copy says the session started. Only a read that is still running paints
+// the placeholder bar; a failed read and a payload with no usable timestamp
+// keep the reserved line blank.
 
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -47,9 +49,7 @@ vi.mock('@/components/agents/session-list-helpers', () => ({
   formatGitUrlProject: (gitUrl: string) => gitUrl,
 }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/ui/eyebrow-placeholder', () => ({
-  EyebrowPlaceholder: 'EyebrowPlaceholder',
-}));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/screen-header', () => ({
   ScreenHeader: (props: HeaderProps) => {
     headers.rendered.push(props);
@@ -89,8 +89,8 @@ function renderScreen(): TestRenderer.ReactTestRenderer {
   return renderer;
 }
 
-function asOfLabel(createdAt: string): string {
-  return i18n.t('agentChat.sessionChanges.asOf', {
+function startedAtLabel(createdAt: string): string {
+  return i18n.t('sharedSession.startedAt', {
     time: formatDate(new Date(createdAt), i18n.language, { timeStyle: 'short' }),
   });
 }
@@ -133,7 +133,9 @@ describe('shared session header eyebrow', () => {
     const renderer = renderScreen();
 
     expect(headers.rendered).toHaveLength(1);
-    expect(headers.rendered[0]?.eyebrow).toBe(asOfLabel(CREATED_AT));
+    // The payload carries the session's creation time, not the share time, so
+    // the line says the session started then instead of claiming a snapshot.
+    expect(headers.rendered[0]?.eyebrow).toBe(startedAtLabel(CREATED_AT));
     expect(headers.rendered[0]?.reserveEyebrow).toBe(false);
     renderer.unmount();
   });
@@ -153,9 +155,11 @@ describe('shared session header eyebrow', () => {
     query.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
     const renderer = renderScreen();
 
+    // The line stays reserved so the title holds its place, but nothing paints
+    // over it: the failed read is not loading, so the bar would pulse forever.
     expect(headers.rendered[0]?.eyebrow).toBeUndefined();
     expect(headers.rendered[0]?.reserveEyebrow).toBe(true);
-    expect(headers.rendered[0]?.eyebrowPlaceholder).toBeTruthy();
+    expect(headers.rendered[0]?.eyebrowPlaceholder).toBeUndefined();
     renderer.unmount();
   });
 
@@ -169,9 +173,11 @@ describe('shared session header eyebrow', () => {
     });
     const renderer = renderScreen();
 
+    // A settled payload that names neither a repository nor a time is not a
+    // pending read, so the line holds blank instead of loading.
     expect(headers.rendered[0]?.eyebrow).toBeUndefined();
     expect(headers.rendered[0]?.reserveEyebrow).toBe(true);
-    expect(headers.rendered[0]?.eyebrowPlaceholder).toBeTruthy();
+    expect(headers.rendered[0]?.eyebrowPlaceholder).toBeUndefined();
     renderer.unmount();
   });
 });

@@ -4689,6 +4689,7 @@
     "superseded": "Esteka hau beste nonbait ordeztu da, beraz, jada ez du funtzionatzen."
   },
   "sharedSession": {
+    "startedAt": "Hasiera: {{time}}",
     "title": "Partekatutako saioa",
     "someone": "Norbait",
     "sharedBy": "Partekatzailea: {{owner}}",

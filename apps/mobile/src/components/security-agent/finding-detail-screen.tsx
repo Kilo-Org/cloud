@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
-import { ScreenHeader } from '@/components/screen-header';
+import { type HeaderEyebrow, ScreenHeader } from '@/components/screen-header';
 import { FindingAnalysisPanel } from '@/components/security-agent/finding-analysis-panel';
 import { FindingDetailsPanel } from '@/components/security-agent/finding-details-panel';
 import { FindingRemediationPanel } from '@/components/security-agent/finding-remediation-panel';
@@ -14,7 +14,7 @@ import { PanelErrorBoundary } from '@/components/security-agent/panel-error-boun
 import { SecurityCommandRetryCard } from '@/components/security-agent/security-command-retry-card';
 import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
 import { Button } from '@/components/ui/button';
-import { EyebrowPlaceholder } from '@/components/ui/eyebrow-placeholder';
+import { eyebrowHeaderProps } from '@/components/ui/eyebrow-placeholder';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -160,14 +160,16 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   // line, and neither a not-found nor a failed read can be known before the
   // first paint — the first frame is always the loading one — so dropping the
   // line afterwards would pull the title up out of the position the loading
-  // frame gave it. Keeping the reserved line and its placeholder bar holds the
-  // title still through the whole state machine.
+  // frame gave it. Only a read that is still running paints the placeholder
+  // bar: a terminal answer, and a failure the retry surface holds, keep the
+  // same line blank so nothing pulses on a finishable screen.
+  const pendingEyebrow: HeaderEyebrow =
+    findingQuery.isFetching && !notFound ? { kind: 'loading' } : { kind: 'held' };
   const pendingHeader = (
     <ScreenHeader
       className="px-6"
       title={t('securityAgent.findingDetail.title')}
-      reserveEyebrow
-      eyebrowPlaceholder={<EyebrowPlaceholder />}
+      {...eyebrowHeaderProps(pendingEyebrow)}
       showBackButton
       onBack={handleBack}
     />

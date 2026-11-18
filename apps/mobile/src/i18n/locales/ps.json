@@ -4689,6 +4689,7 @@
     "superseded": "دا لینک په بل ځای کې بدل شوی دی، نو نور کار نه کوي."
   },
   "sharedSession": {
+    "startedAt": "په {{time}} کې پیل شو",
     "title": "شریکه شوې ناسته",
     "someone": "یو څوک",
     "sharedBy": "د {{owner}} لخوا شریک شوې",

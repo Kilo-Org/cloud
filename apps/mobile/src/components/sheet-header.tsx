@@ -8,8 +8,6 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 import { useScreenInsets } from '@/lib/screen-insets';
 
-const UNDER_HANDLE_PADDING = Platform.OS === 'ios' ? 'pb-4 pt-1.5' : 'pb-7 pt-0';
-
 export function SheetHeader({
   title,
   titleEllipsis = 'tail',
@@ -77,6 +75,10 @@ export function SheetHeader({
   // clears the status bar. It is known before the first frame, so the header
   // paints once, already settled, instead of moving by the inset.
   const topInsetHeight = useSheetHeaderTopClearance(topInset);
+  // Resolved at render, not at import: the split depends on the platform the
+  // header paints on, and a module-level read freezes whatever platform the
+  // first import happened under.
+  const underHandlePadding = Platform.OS === 'ios' ? 'pb-4 pt-1.5' : 'pb-7 pt-0';
   const safeAreaStyle =
     topInsetHeight > 0 || insets.left > 0 || insets.right > 0
       ? {
@@ -104,7 +106,7 @@ export function SheetHeader({
         // 35.9dp below on the Android emulator, and 26.3pt above and 33.7pt
         // below on iOS with `pb-5 pt-1`. `pb-4 pt-1.5` predicts 28.3pt and
         // 29.7pt, so the gap over the title is no larger than the gap below it.
-        underHandle ? UNDER_HANDLE_PADDING : 'pb-3 pt-4',
+        underHandle ? underHandlePadding : 'pb-3 pt-4',
         surfaceClassName
       )}
     >

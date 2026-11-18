@@ -35,7 +35,7 @@ import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { type HeaderEyebrow } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
-import { EyebrowPlaceholder } from '@/components/ui/eyebrow-placeholder';
+import { eyebrowHeaderProps } from '@/components/ui/eyebrow-placeholder';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -150,22 +150,18 @@ export function ReviewDetailScreen({
   }
 
   // One header for every state. The eyebrow is the review's repository, which
-  // only the payload knows, so its line is reserved while the read can still
-  // answer with it: the title above the body must not move when the review
-  // lands, nor when a refetch drops it back to loading. A read that fails — the
-  // failure, not-found and permission branches — keeps the same line it drew
-  // while loading, so the title stays where the retry will land it.
+  // only the payload knows, so its line is reserved while the read is pending —
+  // with the placeholder bar, because the label is on its way — and after the
+  // read stopped, where the same line stays reserved and blank so the title
+  // keeps its place without an animation: a retry re-enters the loading state on
+  // that line, so neither the failure nor the retry moves the title.
   const eyebrow: HeaderEyebrow = loadedReview
     ? { kind: 'ready', text: loadedReview.repo_full_name }
-    : { kind: 'reserved' };
-  const header = (
-    <ReviewerHeader
-      title={t('codeReviewer.reviewDetail.title')}
-      eyebrow={eyebrow.kind === 'ready' ? eyebrow.text : undefined}
-      reserveEyebrow={eyebrow.kind === 'reserved'}
-      eyebrowPlaceholder={eyebrow.kind === 'reserved' ? <EyebrowPlaceholder /> : undefined}
-    />
-  );
+    : isLoading
+      ? { kind: 'loading' }
+      : { kind: 'held' };
+  const eyebrowProps = eyebrowHeaderProps(eyebrow);
+  const header = <ReviewerHeader title={t('codeReviewer.reviewDetail.title')} {...eyebrowProps} />;
 
   if (isLoading) {
     return (

@@ -4969,6 +4969,7 @@
     "superseded": "تم استبدال هذا الرابط من جهاز آخر، لذا لم يعد يعمل."
   },
   "sharedSession": {
+    "startedAt": "بدأت في {{time}}",
     "title": "جلسة مُشارَكة",
     "someone": "شخص ما",
     "sharedBy": "شاركها {{owner}}",

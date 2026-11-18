@@ -4689,6 +4689,7 @@
     "superseded": "Pautan ini telah diganti di tempat lain, jadi pautan ini tidak lagi berfungsi."
   },
   "sharedSession": {
+    "startedAt": "Dimulakan pada {{time}}",
     "title": "Sesi dikongsi",
     "someone": "Seseorang",
     "sharedBy": "Dikongsi oleh {{owner}}",

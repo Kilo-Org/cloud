@@ -4689,6 +4689,7 @@
     "superseded": "Bu havola boshqa joyda almashtirilgani uchun endi ishlamaydi."
   },
   "sharedSession": {
+    "startedAt": "{{time}} da boshlandi",
     "title": "Ulashilgan seans",
     "someone": "Kimdir",
     "sharedBy": "Ulashgan: {{owner}}",

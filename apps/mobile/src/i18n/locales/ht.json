@@ -4689,6 +4689,7 @@
     "superseded": "Yo te ranplase lyen sa a yon lòt kote, kidonk li pa mache ankò."
   },
   "sharedSession": {
+    "startedAt": "Kòmanse a {{time}}",
     "title": "Sesyon pataje",
     "someone": "Yon moun",
     "sharedBy": "Pataje pa {{owner}}",

@@ -4689,6 +4689,7 @@
     "superseded": "Pinalitan ang link na ito sa ibang device, kaya hindi na ito gumagana."
   },
   "sharedSession": {
+    "startedAt": "Sinimulan noong {{time}}",
     "title": "Ibinahaging session",
     "someone": "Isang user",
     "sharedBy": "Ibinahagi ng {{owner}}",

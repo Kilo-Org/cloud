@@ -4689,6 +4689,7 @@
     "superseded": "Hierdie skakel is elders vervang en werk dus nie meer nie."
   },
   "sharedSession": {
+    "startedAt": "Begin om {{time}}",
     "title": "Gedeelde sessie",
     "someone": "Iemand",
     "sharedBy": "Gedeel deur {{owner}}",

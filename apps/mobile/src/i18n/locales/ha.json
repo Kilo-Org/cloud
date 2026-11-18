@@ -4689,6 +4689,7 @@
     "superseded": "An maye gurbin wannan hanyar haɗin a wani wuri, don haka ta daina aiki."
   },
   "sharedSession": {
+    "startedAt": "An fara da {{time}}",
     "title": "Zaman da aka raba",
     "someone": "Wani",
     "sharedBy": "An raba ta hannun {{owner}}",

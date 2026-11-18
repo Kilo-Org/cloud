@@ -1,6 +1,7 @@
 // The session changes header draws the capture time on its eyebrow line. This
 // suite pins where that line comes from: reserved with a placeholder bar while
-// a read can still answer with a time and after a read fails, the label once it
+// a read is pending, reserved and blank after a read fails — the label can only
+// return through a retry, so nothing pulses until one runs — the label once it
 // answers, and no line at all only when the session settles without a capture
 // and without a session diff — a reserved line there would leave the title above
 // a gap no label ever fills.
@@ -50,9 +51,7 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/eyebrow', () => ({ Eyebrow: 'Eyebrow' }));
-vi.mock('@/components/ui/eyebrow-placeholder', () => ({
-  EyebrowPlaceholder: 'EyebrowPlaceholder',
-}));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: () => undefined },
   useTranslation: () => ({ t: (key: string) => key }),
@@ -221,10 +220,11 @@ describe('session changes header eyebrow', () => {
     const header = headerProps(renderer);
 
     // The retry re-enters the loading state on this same line, so dropping it
-    // on the failure would move the title twice.
+    // on the failure would move the title twice. Nothing paints over the line
+    // while no read is running, so the header does not pulse after the error.
     expect(header.eyebrow).toBeUndefined();
     expect(header.reserveEyebrow).toBe(true);
-    expect(header.eyebrowPlaceholder).toBeTruthy();
+    expect(header.eyebrowPlaceholder).toBeUndefined();
     renderer.unmount();
   });
 
@@ -235,7 +235,7 @@ describe('session changes header eyebrow', () => {
 
     expect(header.eyebrow).toBeUndefined();
     expect(header.reserveEyebrow).toBe(true);
-    expect(header.eyebrowPlaceholder).toBeTruthy();
+    expect(header.eyebrowPlaceholder).toBeUndefined();
     renderer.unmount();
   });
 
@@ -246,7 +246,7 @@ describe('session changes header eyebrow', () => {
 
     expect(header.eyebrow).toBeUndefined();
     expect(header.reserveEyebrow).toBe(true);
-    expect(header.eyebrowPlaceholder).toBeTruthy();
+    expect(header.eyebrowPlaceholder).toBeUndefined();
     renderer.unmount();
   });
 

@@ -4689,6 +4689,7 @@
     "superseded": "Le linki ithathelwe indawo kwenye indawo, ngakho ayisasebenzi."
   },
   "sharedSession": {
+    "startedAt": "Kuqale ngo-{{time}}",
     "title": "Iseshini eyabiwe",
     "someone": "Othile",
     "sharedBy": "Yabiwe ngu-{{owner}}",

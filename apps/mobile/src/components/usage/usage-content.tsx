@@ -39,6 +39,22 @@ const METRIC_OPTIONS = [
   { value: 'tokens', labelKey: 'codeReviewer.reviewDetail.tokens' },
 ] as const;
 
+/**
+ * One tile of the totals grid: a value, its caption directly under it, then the
+ * optional detail below the caption, each pair one small gap apart.
+ *
+ * The content is top-aligned, so every tile of a row starts its value at the
+ * same padding as the row above, and spare height falls below the content
+ * instead of pushing the value and caption down.
+ *
+ * The detail holds a two-line floor, never a cap, so a detail that needs more
+ * lines still grows the tile, and every locale whose detail fits two lines
+ * loads at one height that its loading skeleton matches. A one-line detail
+ * starts at the top of that floor, so the caption keeps the same small gap
+ * whether the detail is short or long, and its spare line falls below.
+ *
+ * A larger font scale grows the tile with its text.
+ */
 function StatTile({
   label,
   value,
@@ -51,12 +67,15 @@ function StatTile({
   return (
     <Card className="flex-1">
       <Text variant="figure">{value}</Text>
-      {subtext !== undefined && (
-        <Text variant="caption" numberOfLines={1}>
-          {subtext}
-        </Text>
-      )}
       <Text variant="caption">{label}</Text>
+      {subtext !== undefined && (
+        // Two caption lines' floor (28pt on the spacing scale): a one-line
+        // detail keeps the caption's gap, and a detail that needs more lines
+        // grows the tile instead of clipping the tokens breakdown.
+        <View className="min-h-8">
+          <Text variant="caption">{subtext}</Text>
+        </View>
+      )}
     </Card>
   );
 }
@@ -146,7 +165,9 @@ export function UsageContent({ scope }: Readonly<{ scope: UsageScope }>) {
               <Card className="flex-1">
                 <Skeleton className="h-6 w-16" />
                 <Skeleton className="h-3 w-20" />
-                <Skeleton className="h-3 w-20" />
+                <View className="min-h-8">
+                  <Skeleton className="h-3 w-20" />
+                </View>
               </Card>
               <Card className="flex-1">
                 <Skeleton className="h-6 w-16" />

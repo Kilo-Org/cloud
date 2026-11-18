@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "更改",
     "organizationTrialEnded": "组织的试用期已结束，且没有生效的套餐。组织所有者可以在 kilo.ai 更新账单信息，然后重试。",
-    "privateRepositoryA11y": "{{name}}，私有仓库"
+    "privateRepositoryA11y": "{{name}}，私有仓库",
+    "legalDocumentEnglishOnly": "本文件仅提供英文版本。"
   },
   "language": {
     "restarting": "正在重启以应用语言设置",
@@ -676,7 +677,8 @@
       "managedOnWeb": "此组织的 Bitbucket 连接需在电脑上通过网页版进行管理。",
       "description": "创建具有所需权限范围的工作区访问令牌，并粘贴到下方。",
       "scopes": "账户：读取 · 仓库：读/写 · 拉取请求：读取 · Webhook：读/写",
-      "tokenPlaceholder": "工作区访问令牌"
+      "tokenPlaceholder": "工作区访问令牌",
+      "tokenRefused": "Bitbucket 未接受此工作区访问令牌。请检查其是否具有上述权限范围，然后重试。"
     },
     "followReviewMd": "遵循 REVIEW.md",
     "followReviewMdSubtitle": "遵循各仓库 REVIEW.md 文件中的说明",
@@ -922,7 +924,8 @@
       "repositoryLine": "审查：{{reviews}} · 问题：{{findings}}",
       "empty": "还没有带分析数据的审查",
       "emptyDescription": "在组织启用分析期间，系统会记录已完成的审查。",
-      "off": "此组织已关闭分析。",
+      "offTitle": "已关闭 {{platform}} 的分析",
+      "offDescription": "在网页版组织设置中启用分析，即可记录已完成的审查。",
       "couldNotLoad": "无法加载分析数据"
     },
     "council": {

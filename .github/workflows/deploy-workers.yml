@@ -369,6 +369,11 @@ jobs:
               echo "Skipping $dir: wrangler.jsonc does not define env.$TARGET_ENVIRONMENT"
             elif ! git diff --quiet "$BASE_SHA" HEAD -- "$dir/"; then
               CHANGED+=("$dir")
+            elif [ "$dir" = services/pages-output ] \
+              && ! git diff --quiet "$BASE_SHA" HEAD -- services/pages/source.json; then
+              # The output shell builds from the Pages pin, so a pin move
+              # deploys it beside services/pages, under either rule below.
+              CHANGED+=("$dir")
             elif [ "$NARROW" = true ] && grep -Fxq "$dir" <<< "$WORKSPACE_DIRS"; then
               if grep -Fxq "$dir" <<< "$AFFECTED_DIRS"; then
                 CHANGED+=("$dir")

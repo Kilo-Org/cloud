@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Pakeitimai",
     "organizationTrialEnded": "Organizacijos bandomasis laikotarpis baigėsi ir ji neturi aktyvaus plano. Organizacijos savininkas gali atnaujinti atsiskaitymo duomenis adresu kilo.ai, tada bandykite dar kartą.",
-    "privateRepositoryA11y": "{{name}}, privati saugykla"
+    "privateRepositoryA11y": "{{name}}, privati saugykla",
+    "legalDocumentEnglishOnly": "Šis dokumentas prieinamas tik anglų kalba."
   },
   "language": {
     "restarting": "Paleidžiama iš naujo, kad būtų pakeista kalba",
@@ -1400,7 +1401,8 @@
       "managedOnWeb": "Šios organizacijos Bitbucket ryšys valdomas žiniatinklyje naudojant kompiuterį.",
       "description": "Sukurk darbo srities prieigos raktą su reikiamomis teisėmis ir įklijuok jį žemiau.",
       "scopes": "Paskyra: skaityti · Saugyklos: skaityti / rašyti · Pakeitimų užklausos: skaityti · Webhook: skaityti / rašyti",
-      "tokenPlaceholder": "Darbo srities prieigos raktas"
+      "tokenPlaceholder": "Darbo srities prieigos raktas",
+      "tokenRefused": "Bitbucket nepriėmė šio darbo srities prieigos rakto. Patikrink, ar jis turi aukščiau nurodytas teises, tada bandyk dar kartą."
     },
     "scopeList": {
       "personalStillAvailable": "Asmenines saugyklas vis dar gali pasiekti žemiau.",
@@ -1513,7 +1515,8 @@
       "repositoryLine": "Peržiūros: {{reviews}} · Radiniai: {{findings}}",
       "empty": "Dar nėra peržiūrų su analitika",
       "emptyDescription": "Analitika fiksuoja užbaigtas peržiūras, kol ji įjungta organizacijai.",
-      "off": "Šiai organizacijai analitika išjungta.",
+      "offTitle": "Analitika išjungta platformai {{platform}}",
+      "offDescription": "Įjunk ją organizacijos nustatymuose žiniatinklyje, kad fiksuotų užbaigtas peržiūras.",
       "couldNotLoad": "Nepavyko įkelti analitikos"
     },
     "council": {

@@ -159,6 +159,7 @@ function mountSheet(
       },
       onSave: (submission: unknown) => {
         h.onSave(submission);
+        return Promise.resolve();
       },
     })
   );

@@ -24,6 +24,7 @@ import {
 } from '@/lib/cloud-triggers/trigger-draft';
 import { useTouchedProblems } from '@/lib/cloud-triggers/use-touched-problems';
 import { useTriggerRepositories } from '@/lib/cloud-triggers/use-trigger-options';
+import { ltrValueTextStyle } from '@/lib/rtl-text';
 
 import { TriggerSelectRow } from './trigger-form-rows';
 
@@ -113,6 +114,9 @@ export function TriggerFormBasics({
 
       {isScheduled && (
         <View className="gap-4">
+          {/* A cron expression is a value that reads left to right, so the
+              field pins its own base direction; without it the bidi algorithm
+              reorders `0 3 * * *` under a right-to-left interface. */}
           <FormField
             label={t('cloudAgent.triggers.fieldCron')}
             required
@@ -128,6 +132,7 @@ export function TriggerFormBasics({
             autoCorrect={false}
             spellCheck={false}
             placeholder={TRIGGER_FIELD_EXAMPLES.cron}
+            style={ltrValueTextStyle()}
           />
           <Text variant="caption">{t('cloudAgent.triggers.fieldCronHelp')}</Text>
           <FormField

@@ -188,7 +188,12 @@ export default function FolderPickerScreen() {
           nestedScrollEnabled
           style={[listStyle, { backgroundColor: colors.background }]}
           data={data}
-          keyExtractor={entry => entry.path}
+          // FlashList stores its props during render and can index `data` past
+          // its end for a render React discarded; the fallbacks are the ones
+          // FlashList uses when these callbacks are absent (see the model
+          // picker's comment).
+          keyExtractor={(entry: DirectoryEntry | undefined, index) => entry?.path ?? String(index)}
+          maintainVisibleContentPosition={{ disabled: true }}
           contentContainerStyle={listContentStyle}
           ListHeaderComponent={
             data.length > 0 ? (
@@ -201,33 +206,38 @@ export default function FolderPickerScreen() {
           }
           ListEmptyComponent={empty}
           scrollEnabled={data.length > 0}
-          renderItem={({ item }) => (
-            <Pressable
-              className={cn(
-                ROW_TARGET_CLASS,
-                'flex-row items-center gap-3 border-b-[0.5px] border-hair-soft px-4 py-3 active:bg-secondary'
-              )}
-              onPress={() => {
-                openChild(item);
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={item.name}
-              accessibilityHint={t('agentChat.folderPicker.tapToListHint')}
-            >
-              <View className="min-w-0 flex-1">
-                <Text className="text-sm font-medium" numberOfLines={1}>
-                  {item.name}
-                </Text>
-              </View>
-              <View
-                pointerEvents="none"
-                accessibilityElementsHidden
-                importantForAccessibility="no-hide-descendants"
+          renderItem={({ item }) =>
+            // FlashList can ask for an index past the end of a shorter rows
+            // array React discarded; the row is then undefined (the model
+            // picker carries the same guard for the same reason).
+            item ? (
+              <Pressable
+                className={cn(
+                  ROW_TARGET_CLASS,
+                  'flex-row items-center gap-3 border-b-[0.5px] border-hair-soft px-4 py-3 active:bg-secondary'
+                )}
+                onPress={() => {
+                  openChild(item);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={item.name}
+                accessibilityHint={t('agentChat.folderPicker.tapToListHint')}
               >
-                <RowChevron />
-              </View>
-            </Pressable>
-          )}
+                <View className="min-w-0 flex-1">
+                  <Text className="text-sm font-medium" numberOfLines={1}>
+                    {item.name}
+                  </Text>
+                </View>
+                <View
+                  pointerEvents="none"
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants"
+                >
+                  <RowChevron />
+                </View>
+              </Pressable>
+            ) : null
+          }
         />
       )}
     </PickerSheet>

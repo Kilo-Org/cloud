@@ -1,4 +1,5 @@
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
+import { readBackgroundResult } from '@kilocode/cloud-agent-sdk/background-result';
 import { buildToolDetailSummary } from '@kilocode/app-shared/tool-detail';
 
 import { i18n } from '@/i18n';
@@ -49,6 +50,14 @@ export function searchToolDisplay(
     subtitle: search ? truncateText(search, 60) : label,
     translatable: Boolean(search),
   };
+}
+
+export function agentNoticeDisplay(part: ToolPart): ToolDisplay {
+  const notice = readBackgroundResult(part);
+  const description = notice?.kind === 'notice' ? notice.description.trim() : '';
+  return description
+    ? { title: description, translatable: true }
+    : summaryToolDisplay(part, i18n.t('common.details'));
 }
 
 /**

@@ -14,10 +14,12 @@ import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ChevronDown, ChevronUp, ScrollText } from '@/components/ui/icons';
+import { RefreshControl } from '@/components/ui/refresh-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatClockTime, formatDate } from '@/lib/format';
+import { useManualRefresh } from '@/lib/hooks/use-manual-refresh';
 import { type OrgAuditLogEntry, useOrgAuditLogPage } from '@/lib/hooks/use-org-billing-queries';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -133,6 +135,12 @@ export function OrganizationAuditLogScreen() {
   const { query, entries, hasMore } = useOrgAuditLogPage(organizationId, allowed);
   const paddingBottom = useTabBarBottomPadding();
 
+  // An audit entry can be written while this screen is open (another admin
+  // changes settings on the web), so the pull is the reader's way to ask for
+  // the new events without leaving the list.
+  const [refreshing, onRefresh] = useManualRefresh(query.refetch, t('common.couldNotRefresh'));
+  const refreshControl = <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />;
+
   // `AuditLogRow` is memoized at module scope, so one identity across data
   // updates keeps every unchanged row from re-rendering. The row reads `t`
   // itself instead of taking it as a prop: `useTranslation` subscribes each row
@@ -186,6 +194,7 @@ export function OrganizationAuditLogScreen() {
         icon={ScrollText}
         title={t('organization.auditLog.emptyTitle')}
         description={t('organization.auditLog.emptyDescription')}
+        refreshControl={refreshControl}
       />
     );
   } else {
@@ -236,6 +245,7 @@ export function OrganizationAuditLogScreen() {
         getItemType={() => 'auditLog'}
         ItemSeparatorComponent={RowSeparator}
         ListHeaderComponent={<ListTopPad />}
+        refreshControl={refreshControl}
         ListFooterComponent={footer}
       />
     );

@@ -8,6 +8,7 @@ import { i18n } from '@/i18n';
 import { applyLanguagePreference } from '@/i18n/apply-language';
 import type * as ApplyLanguageModule from '@/i18n/apply-language';
 import { LanguagePickerSheet } from '@/components/language-picker-sheet';
+import { LanguageSearchField } from '@/components/language-search-field';
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
 
@@ -323,12 +324,14 @@ describe('LanguagePickerSheet apply', () => {
 
     const sheet = findByType(renderer.root, 'PickerSheet')[0];
     expect(sheet?.props.headerInBody).toBe(true);
-    const listHeader = renderer.root.findByType(flashListMock).props
-      .ListHeaderComponent as TestRenderer.ReactTestInstance | null;
-    expect(String(listHeader?.props.className)).toContain('rounded-full');
+    // The extracted `LanguageSearchField` owns the pill chrome: its own
+    // instance carries no className, so step into its rendered `View`.
+    const field = renderer.root.findByType(LanguageSearchField);
+    const pill = field.findByType('View');
+    expect(String(pill.props.className)).toContain('rounded-full');
     // The field keeps the page gutter as the list header too, so the rows it
     // scrolls with and the field itself share one inset.
-    expect(String(listHeader?.props.className)).toContain('mx-4');
+    expect(String(pill.props.className)).toContain('mx-4');
     // One field on screen: the list header, not a second copy in the chrome.
     expect(findByType(renderer.root, 'TextInput')).toHaveLength(1);
 

@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Mga pagbabago",
     "organizationTrialEnded": "Natapos na ang trial ng organisasyon at wala itong aktibong plano. Maaaring i-update ng may-ari ng organisasyon ang billing sa kilo.ai, pagkatapos ay subukan muli.",
-    "privateRepositoryA11y": "{{name}}, pribadong repositoryo"
+    "privateRepositoryA11y": "{{name}}, pribadong repositoryo",
+    "legalDocumentEnglishOnly": "Ang dokumentong ito ay makukuha lamang sa Ingles."
   },
   "language": {
     "restarting": "Ini-restart para ilapat ang wika",
@@ -1354,7 +1355,8 @@
       "managedOnWeb": "Pinamamahalaan sa web gamit ang computer ang koneksyon sa Bitbucket ng organisasyong ito.",
       "description": "Gumawa ng token para sa access sa workspace na may mga kinakailangang saklaw ng pahintulot at i-paste ito sa ibaba.",
       "scopes": "Account: pagbasa · Mga repository: pagbasa/pagsulat · Mga pull request: pagbasa · Mga webhook: pagbasa/pagsulat",
-      "tokenPlaceholder": "Token para sa access sa workspace"
+      "tokenPlaceholder": "Token para sa access sa workspace",
+      "tokenRefused": "Hindi tinanggap ng Bitbucket ang token para sa access sa workspace na ito. Tiyakin na taglay nito ang mga saklaw ng pahintulot sa itaas, pagkatapos ay subukan muli."
     },
     "scopeList": {
       "personalStillAvailable": "Magagamit pa rin sa ibaba ang mga personal na repository.",
@@ -1465,7 +1467,8 @@
       "repositoryLine": "Mga pagsusuri: {{reviews}} · Mga natuklasan: {{findings}}",
       "empty": "Wala pang pagsusuring may analitika",
       "emptyDescription": "Itinatala ng analitika ang mga natapos na pagsusuri habang pinagana ito para sa organisasyon.",
-      "off": "Naka-off ang analitika para sa organisasyong ito.",
+      "offTitle": "Naka-off ang analitika para sa {{platform}}",
+      "offDescription": "Paganahin ito sa mga setting ng organisasyon sa web para itala ang mga natapos na pagsusuri.",
       "couldNotLoad": "Hindi ma-load ang analitika"
     },
     "council": {

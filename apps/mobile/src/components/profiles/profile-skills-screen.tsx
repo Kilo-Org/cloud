@@ -345,9 +345,7 @@ export function ProfileSkillsScreen({
           saveFailure={saveFailure?.message ?? null}
           saveFailureTone={saveFailure?.tone}
           onClose={handleClose}
-          onSave={submission => {
-            void saveSkill(form.editing, submission);
-          }}
+          onSave={submission => saveSkill(form.editing, submission)}
         />
       ) : null}
 

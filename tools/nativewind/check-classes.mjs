@@ -974,11 +974,15 @@ export function checkRules(relative, program, text, lineOf) {
  */
 export function checkCompilerStillDropsThese() {
   const problems = [];
+  // The first line of an error: compile failures and resolution failures are
+  // reported the same way, and a stack trace would bury the fixture name.
+  const firstLine = error =>
+    (error instanceof Error ? error.message : String(error)).split('\n')[0];
   let compile;
   try {
     ({ compile } = require('react-native-css/compiler'));
   } catch (error) {
-    const detail = error instanceof Error ? error.message.split('\n')[0] : String(error);
+    const detail = firstLine(error);
     problems.push(
       `check-classes: react-native-css/compiler did not resolve (${detail}) — run pnpm install; the compiler pins cannot be verified without it`
     );
@@ -1018,8 +1022,17 @@ export function checkCompilerStillDropsThese() {
     );
   }
 
-  const alignment = compile('.x { text-align: start; }').warnings();
-  if (!JSON.stringify(alignment).includes('text-align')) {
+  let alignment;
+  try {
+    alignment = compile('.x { text-align: start; }').warnings();
+  } catch (error) {
+    const detail = firstLine(error);
+    problems.push(
+      `check-classes: the compiler failed on the text-align: start fixture (${detail}) — the compiler pins cannot be verified without it`
+    );
+    return problems;
+  }
+  if (!JSON.stringify(alignment ?? null).includes('text-align')) {
     problems.push(
       'check-classes: text-align: start is no longer dropped — drop the text-start/end rule'
     );
@@ -1029,13 +1042,21 @@ export function checkCompilerStillDropsThese() {
   // deferred colorMix over the variable; the runtime cannot decompose it and
   // drops the declaration. When the compiler resolves it instead, this stops
   // matching and the rule above can go.
-  const themeOpacity = emittedValue(
-    '@theme inline { --color-destructive: var(--destructive); }\n' +
-      ':root { --destructive: #b0483a; }\n' +
-      '.x { background-color: color-mix(in oklab, var(--color-destructive) 10%, transparent); }',
-    undefined,
-    'backgroundColor'
-  );
+  let themeOpacity;
+  try {
+    themeOpacity = emittedValue(
+      '@theme inline { --color-destructive: var(--destructive); }\n' +
+        ':root { --destructive: #b0483a; }\n' +
+        '.x { background-color: color-mix(in oklab, var(--color-destructive) 10%, transparent); }',
+      undefined,
+      'backgroundColor'
+    );
+  } catch (error) {
+    problems.push(
+      `check-classes: the compiler failed on the color-mix over an @theme inline variable fixture (${firstLine(error)}) — the compiler pins cannot be verified without it`
+    );
+    return problems;
+  }
   if (!defersTo(themeOpacity, 'colorMix')) {
     problems.push(
       `check-classes: color-mix over an @theme inline variable now compiles to ${JSON.stringify(themeOpacity ?? null)} instead of a deferred colorMix — drop the theme-token opacity rule`
@@ -1046,11 +1067,19 @@ export function checkCompilerStillDropsThese() {
   // scale reaches the runtime as a deferred calc inside the line-height
   // function, which multiplies the result by the font size. When the compiler
   // folds it to a length instead, this stops matching and the rule can go.
-  const spacingLeading = emittedValue(
-    ':root { --spacing: 0.25rem; }\n.x { line-height: calc(var(--spacing) * 5); }',
-    { inlineVariables: false },
-    'lineHeight'
-  );
+  let spacingLeading;
+  try {
+    spacingLeading = emittedValue(
+      ':root { --spacing: 0.25rem; }\n.x { line-height: calc(var(--spacing) * 5); }',
+      { inlineVariables: false },
+      'lineHeight'
+    );
+  } catch (error) {
+    problems.push(
+      `check-classes: the compiler failed on the spacing-scale line-height fixture (${firstLine(error)}) — the compiler pins cannot be verified without it`
+    );
+    return problems;
+  }
   if (!defersTo(spacingLeading, 'calc')) {
     problems.push(
       `check-classes: a spacing-scale line height now compiles to ${JSON.stringify(spacingLeading ?? null)} instead of a deferred calc — drop the numeric leading rule`

@@ -10,11 +10,8 @@ import PostHog, { PostHogPersistedProperty } from 'posthog-react-native';
 import { useCallback, useSyncExternalStore } from 'react';
 
 import { POSTHOG_API_KEY } from '@/lib/config';
-import {
-  currentAppVersion,
-  getFeatureFlagDefinition,
-  isAppVersionAtLeast,
-} from '@/lib/feature-flags';
+import { currentAppVersion, getFeatureFlagDefinition } from '@/lib/feature-flags';
+import { isAppVersionAtLeast } from '@kilocode/app-shared/app-version';
 import { allowsMandatory, allowsOptional, currentGeneration } from '@/lib/telemetry/controller';
 import {
   posthogCustomStorage,

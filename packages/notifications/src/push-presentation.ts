@@ -1,3 +1,5 @@
+import { isAppVersionAtLeast } from '@kilocode/app-shared/app-version';
+
 import { type PushData } from './push-data';
 
 /**
@@ -79,36 +81,6 @@ const ANDROID_CHANNEL_MIN_APP_VERSIONS: Partial<Record<AndroidNotificationChanne
   'agent-briefing': AGENT_BRIEFING_CHANNEL_APP_VERSION,
 };
 
-/**
- * Compare dotted-numeric versions (`1.10.0` > `1.9.9`, missing segments count
- * as zero). A version the server cannot parse sorts below every release, so a
- * client that cannot prove its age never receives a channel id it may not have
- * created.
- */
-export function comparePushAppVersions(a: string, b: string): number {
-  const left = a.split('.').map(segment => Number.parseInt(segment, 10) || 0);
-  const right = b.split('.').map(segment => Number.parseInt(segment, 10) || 0);
-  const length = Math.max(left.length, right.length);
-  for (let index = 0; index < length; index += 1) {
-    const delta = (left[index] ?? 0) - (right[index] ?? 0);
-    if (delta !== 0) {
-      return delta < 0 ? -1 : 1;
-    }
-  }
-  return 0;
-}
-
-/**
- * True when `current` is at or above `min`. An unknown version never clears the
- * gate, so a token without a recorded version is treated as an older build.
- */
-export function isPushAppVersionAtLeast(current: string | null | undefined, min: string): boolean {
-  if (!current) {
-    return false;
-  }
-  return comparePushAppVersions(current, min) >= 0;
-}
-
 /** A channel a server push may address, including pre-split channel ids. */
 export type AndroidPushChannelId =
   | AndroidNotificationChannelId
@@ -159,7 +131,7 @@ export function androidChannelIdForRegisteredClient(
   if (minAppVersion === undefined) {
     return channelId;
   }
-  return isPushAppVersionAtLeast(appVersion, minAppVersion) ? channelId : undefined;
+  return isAppVersionAtLeast(appVersion, minAppVersion) ? channelId : undefined;
 }
 
 /**
@@ -222,6 +194,14 @@ const AGENT_KIND_CHANNEL: Record<AgentNotificationKind, AndroidNotificationChann
   progress: 'agent-progress',
 };
 
+/** The reverse of `AGENT_KIND_CHANNEL`: the kind each agent channel carries. */
+const AGENT_CHANNEL_KIND: ReadonlyMap<string, AgentNotificationKind> = new Map(
+  Object.entries(AGENT_KIND_CHANNEL).map(
+    ([kind, channelId]) =>
+      [channelId, kind] as [AndroidNotificationChannelId, AgentNotificationKind]
+  )
+);
+
 /** The Android channel that carries a kind. */
 export function androidChannelIdForAgentKind(
   kind: AgentNotificationKind
@@ -239,14 +219,10 @@ export function androidChannelIdForAgentKind(
 export function agentNotificationKindForAndroidChannelId(
   channelId: string | null | undefined
 ): AgentNotificationKind | null {
-  switch (channelId) {
-    case 'needs-input':
-      return 'needs-input';
-    case 'agent-progress':
-      return 'progress';
-    default:
-      return null;
+  if (channelId == null) {
+    return null;
   }
+  return AGENT_CHANNEL_KIND.get(channelId) ?? null;
 }
 
 /**

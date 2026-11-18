@@ -316,6 +316,162 @@ describe('api routes', () => {
     });
   });
 
+  it('POST /workspaces/:worktreeId/notify delivers only an authorized workspace event', async () => {
+    const worktreeId = 'worktree_11111111-1111-4111-8111-111111111111';
+    const organizationId = '22222222-2222-4222-8222-222222222222';
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ worktreeId }]);
+    const notifyWorkspaceUpdates = vi.fn(async () => ({ delivered: 2 }));
+    vi.mocked(getUserConnectionDO).mockReturnValue({ notifyWorkspaceUpdates } as never);
+
+    const response = await makeApiApp().fetch(
+      new Request(`http://local/workspaces/${worktreeId}/notify`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ organizationId }),
+      }),
+      makeTestEnv()
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ delivered: 2 });
+    expect(notifyWorkspaceUpdates).toHaveBeenCalledWith([worktreeId]);
+    const condition = fns.selectWhere.mock.calls[0]?.[0];
+    expect(condition).toBeInstanceOf(SQL);
+    if (!(condition instanceof SQL)) throw new Error('Expected workspace authorization predicate');
+    const query = new PgDialect().sqlToQuery(condition);
+    expect(query.params).toEqual([worktreeId, 'usr_test', organizationId]);
+    expect(query.sql).toContain('"organization_memberships"."id" is not null');
+    expect(query.sql).toContain('"parent_organization_memberships"."id" is not null');
+    expect(fns.update).not.toHaveBeenCalled();
+  });
+
+  it('POST /workspaces/:worktreeId/notify does not notify an inaccessible workspace', async () => {
+    const { db } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    const response = await makeApiApp().fetch(
+      new Request('http://local/workspaces/worktree_11111111-1111-4111-8111-111111111111/notify', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ organizationId: null }),
+      }),
+      makeTestEnv()
+    );
+    expect(response.status).toBe(404);
+    expect(getUserConnectionDO).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { worktreeId: 'invalid', body: { organizationId: null } },
+    { body: {} },
+    { body: { organizationId: 'invalid' } },
+    { body: null },
+  ])('POST /workspaces/:worktreeId/notify validates %j', async input => {
+    const worktreeId = input.worktreeId ?? 'worktree_11111111-1111-4111-8111-111111111111';
+    const response = await makeApiApp().fetch(
+      new Request(`http://local/workspaces/${worktreeId}/notify`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(input.body),
+      }),
+      makeTestEnv()
+    );
+    expect(response.status).toBe(400);
+    expect(getWorkerDb).not.toHaveBeenCalled();
+    expect(getUserConnectionDO).not.toHaveBeenCalled();
+  });
+
+  it('POST /workspaces/notify uses one authorization query and one RPC for a maximum batch', async () => {
+    const worktreeIds = Array.from(
+      { length: 200 },
+      (_, index) => `worktree_${index.toString(16).padStart(8, '0')}-1111-4111-8111-111111111111`
+    );
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce(worktreeIds.map(worktreeId => ({ worktreeId })));
+    const notifyWorkspaceUpdates = vi.fn(async () => ({ delivered: 2 }));
+    vi.mocked(getUserConnectionDO).mockReturnValue({ notifyWorkspaceUpdates } as never);
+    const response = await makeApiApp().fetch(
+      new Request('http://local/workspaces/notify', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ organizationId: null, worktreeIds }),
+      }),
+      makeTestEnv()
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ delivered: 2 });
+    expect(fns.select).toHaveBeenCalledTimes(1);
+    expect(notifyWorkspaceUpdates.mock.calls).toEqual([[worktreeIds]]);
+    expect(fns.update).not.toHaveBeenCalled();
+  });
+
+  it('POST /workspaces/notify rejects the entire batch before notifying when one ID is inaccessible', async () => {
+    const worktreeIds = [
+      'worktree_11111111-1111-4111-8111-111111111111',
+      'worktree_22222222-2222-4222-8222-222222222222',
+    ];
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ worktreeId: worktreeIds[0] }]);
+    const response = await makeApiApp().fetch(
+      new Request('http://local/workspaces/notify', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ organizationId: null, worktreeIds }),
+      }),
+      makeTestEnv()
+    );
+    expect(response.status).toBe(404);
+    expect(getUserConnectionDO).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { worktreeIds: ['invalid'] },
+    {
+      worktreeIds: [
+        'worktree_11111111-1111-4111-8111-111111111111',
+        'worktree_11111111-1111-4111-8111-111111111111',
+      ],
+    },
+    {
+      worktreeIds: Array.from(
+        { length: 201 },
+        (_, index) => `worktree_${index.toString(16).padStart(8, '0')}-1111-4111-8111-111111111111`
+      ),
+    },
+    { worktreeIds: null },
+    { worktreeIds: [], organizationId: undefined },
+  ])('POST /workspaces/notify rejects invalid batch %#', async input => {
+    const response = await makeApiApp().fetch(
+      new Request('http://local/workspaces/notify', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ organizationId: null, ...input }),
+      }),
+      makeTestEnv()
+    );
+    expect(response.status).toBe(400);
+    expect(getWorkerDb).not.toHaveBeenCalled();
+    expect(getUserConnectionDO).not.toHaveBeenCalled();
+  });
+
+  it('POST /workspaces/notify handles an empty batch without querying or notifying', async () => {
+    const response = await makeApiApp().fetch(
+      new Request('http://local/workspaces/notify', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ organizationId: null, worktreeIds: [] }),
+      }),
+      makeTestEnv()
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ delivered: 0 });
+    expect(getWorkerDb).not.toHaveBeenCalled();
+    expect(getUserConnectionDO).not.toHaveBeenCalled();
+  });
+
   it('returns 400 for invalid sessionId on ingest/delete/share/unshare', async () => {
     const { db } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
@@ -3163,6 +3319,7 @@ describe('api routes', () => {
       .mockResolvedValueOnce([{ worktreeId: orgSession.cloud_agent_worktree_id, scopeId: null }])
       .mockResolvedValueOnce([{ started: null }])
       .mockResolvedValueOnce([orgSession])
+      .mockResolvedValueOnce([{ worktreeId: orgSession.cloud_agent_worktree_id }])
       .mockResolvedValueOnce([orgSession])
       .mockResolvedValueOnce([]);
 

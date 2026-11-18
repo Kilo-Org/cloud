@@ -2570,6 +2570,13 @@
       "when": 1794998083411,
       "tag": "0366_latest_alias_targets",
       "breakpoints": true
+    },
+    {
+      "idx": 367,
+      "version": "7",
+      "when": 1795011067710,
+      "tag": "0367_workspace_read_model",
+      "breakpoints": true
     }
   ]
 }

@@ -667,6 +667,7 @@ export type SessionStatusUpdatedPayload = z.infer<typeof sessionStatusUpdatedPay
 export const sessionDeletedPayloadSchema = z.object({
   source: z.literal('v2'),
   sessionId: z.string(),
+  worktreeId: z.string().nullable().optional(),
   parentSessionId: z.string().nullable(),
   organizationId: z.string().nullable(),
   gitUrl: z.string().nullable(),
@@ -681,6 +682,7 @@ export const sessionEventPayloadSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('session.updated'), data: sessionRowEventPayloadSchema }),
   z.object({ type: z.literal('session.status.updated'), data: sessionStatusUpdatedPayloadSchema }),
   z.object({ type: z.literal('session.deleted'), data: sessionDeletedPayloadSchema }),
+  z.object({ type: z.literal('workspace.updated'), data: z.object({ worktreeId: z.string() }) }),
 ]);
 export type SessionEventPayload = z.infer<typeof sessionEventPayloadSchema>;
 

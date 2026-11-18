@@ -33,6 +33,10 @@ import { createWebSessionTranscriptCache, transcriptCacheScope } from './session
 import { createWebSessionResolver } from './session-resolver';
 import { dbSessionsAtom } from './store/db-session-atoms';
 import { serializeBackgroundActivityReads } from '@kilocode/cloud-agent-sdk/background-activity';
+import {
+  cachedWorkspaceCloudSessionId,
+  type WorkspaceSessionCache,
+} from './workspace-session-cache';
 
 const ManagerContext = createContext<SessionManager | null>(null);
 const UserWebConnectionContext = createContext<UserWebConnection | null>(null);
@@ -175,6 +179,19 @@ export function CloudAgentProvider({ children, userId, organizationId }: CloudAg
           if (fetchedSession?.organization_id === (organizationId ?? null)) {
             return fetchedSession.cloud_agent_session_id;
           }
+          const workspaceSessionId = cachedWorkspaceCloudSessionId(
+            kiloSessionId,
+            organizationId ?? null,
+            [
+              ...queryClient.getQueriesData<WorkspaceSessionCache>(
+                trpc.cliSessionsV2.listWorkspaces.pathFilter()
+              ),
+              ...queryClient.getQueriesData<WorkspaceSessionCache>(
+                trpc.cliSessionsV2.workspaceSummaries.pathFilter()
+              ),
+            ]
+          );
+          if (workspaceSessionId) return workspaceSessionId;
           return storeRef.current
             .get(dbSessionsAtom)
             .find(

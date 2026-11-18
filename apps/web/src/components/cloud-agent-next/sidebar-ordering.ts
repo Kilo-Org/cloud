@@ -1,9 +1,9 @@
 import { positionBetween } from '@/lib/todos/position';
 import type {
   SmartFolderPreset,
-  WorkspaceFolder,
   WorkspaceFolderSortMode,
 } from '@/lib/cloud-agent/workspace-folders';
+import type { WorkspaceDestination } from '@/lib/cloud-agent/workspace-activity';
 
 /** Workspace rows are ordered independently of single-session rows. */
 export type WorkspaceOrder = WorkspaceFolderSortMode;
@@ -20,6 +20,7 @@ export type SidebarWorkspaceRow = {
   statusUpdatedAt: string | null;
   hasPendingQuestion: boolean;
   lastTurnFailed: boolean;
+  destination: WorkspaceDestination;
 };
 
 export type SidebarWorkspaceGroup = {
@@ -90,7 +91,12 @@ export function sortWorkspaceGroups(
   groups: readonly SidebarWorkspaceGroup[],
   order: WorkspaceOrder
 ): SidebarWorkspaceGroup[] {
-  return [...groups].sort((a, b) => compareRoots(a.root, b.root, order));
+  const activity = (group: SidebarWorkspaceGroup) =>
+    Math.max(...[group.root, ...group.layers].map(row => time(row.lastActivityAt)));
+  return [...groups].sort(
+    (a, b) =>
+      (order === 'activity' ? activity(b) - activity(a) : 0) || compareRoots(a.root, b.root, order)
+  );
 }
 
 /** New smart-folder members precede the last explicitly saved order. */
@@ -115,50 +121,9 @@ export function sortSmartFolderGroups(
   });
 }
 
-function groupNeedsYou(group: SidebarWorkspaceGroup): boolean {
-  return [group.root, ...group.layers].some(
-    row =>
-      row.hasPendingQuestion ||
-      row.lastTurnFailed ||
-      row.status === 'question' ||
-      row.status === 'permission' ||
-      row.status === 'failed' ||
-      row.status === 'system_interrupted'
-  );
-}
-
-function groupInReview(group: SidebarWorkspaceGroup): boolean {
-  return [group.root, ...group.layers].some(
-    row => row.prState === 'open' || row.prState === 'draft'
-  );
-}
-
-function groupDone(group: SidebarWorkspaceGroup): boolean {
-  const rows = [group.root, ...group.layers];
-  return (
-    rows.some(row => row.prState !== null) &&
-    rows.every(row => row.prState === 'merged' || row.prState === 'closed')
-  );
-}
-
-/**
- * A workspace or stack appears exactly once. Manual folders win over the
- * automatic review buckets; only the urgent "Needs you" bucket overrides a
- * manual folder. Automatic buckets are considered only when their folder is
- * enabled (the folder row is present).
- */
 export function groupWorkspaceGroupsByDestination(
-  orderedGroups: readonly SidebarWorkspaceGroup[],
-  folders: readonly WorkspaceFolder[]
+  orderedGroups: readonly SidebarWorkspaceGroup[]
 ): WorkspaceDestinations {
-  const manualFolders = new Set(
-    folders.filter(folder => folder.kind === 'manual').map(folder => folder.id)
-  );
-  const smartFolders = new Set(
-    folders.flatMap(folder =>
-      folder.kind === 'smart' && folder.smartPreset ? [folder.smartPreset] : []
-    )
-  );
   const manual = new Map<string, SidebarWorkspaceGroup[]>();
   const smart = new Map<SmartFolderPreset, SidebarWorkspaceGroup[]>();
   const unfiled: SidebarWorkspaceGroup[] = [];
@@ -170,24 +135,10 @@ export function groupWorkspaceGroupsByDestination(
   };
 
   for (const group of orderedGroups) {
-    if (smartFolders.has('needs_you') && groupNeedsYou(group)) {
-      push(smart, 'needs_you', group);
-      continue;
-    }
-    const folderId = group.root.folderId;
-    if (folderId && manualFolders.has(folderId)) {
-      push(manual, folderId, group);
-      continue;
-    }
-    if (smartFolders.has('in_review') && !groupNeedsYou(group) && groupInReview(group)) {
-      push(smart, 'in_review', group);
-      continue;
-    }
-    if (smartFolders.has('done') && !groupNeedsYou(group) && groupDone(group)) {
-      push(smart, 'done', group);
-      continue;
-    }
-    unfiled.push(group);
+    const destination = group.root.destination;
+    if (destination.kind === 'manual') push(manual, destination.folderId, group);
+    else if (destination.kind === 'smart') push(smart, destination.preset, group);
+    else unfiled.push(group);
   }
 
   return { manual, smart, unfiled };

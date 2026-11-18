@@ -506,6 +506,36 @@ describe('parseCustomerBillingFailure', () => {
 });
 
 describe('session worktree event schemas', () => {
+  it('parses workspace updates without a session ID', () => {
+    const event = {
+      type: 'workspace.updated',
+      data: { worktreeId: 'worktree_11111111-1111-4111-8111-111111111111' },
+    };
+    expect(sessionEventPayloadSchema.parse(event)).toEqual(event);
+    expect(sessionEventPayloadSchema.safeParse({ ...event, data: {} }).success).toBe(false);
+  });
+
+  it.each([undefined, null, 'worktree_11111111-1111-4111-8111-111111111111'])(
+    'preserves deletion worktree ID %s with legacy compatibility',
+    worktreeId => {
+      const data = {
+        source: 'v2',
+        sessionId: 'ses_12345678901234567890123456',
+        parentSessionId: null,
+        organizationId: null,
+        gitUrl: null,
+        gitBranch: null,
+        createdOnPlatform: 'web',
+        deletedAt: '2026-01-01T00:00:02.000Z',
+        ...(worktreeId === undefined ? {} : { worktreeId }),
+      };
+      expect(sessionEventPayloadSchema.parse({ type: 'session.deleted', data })).toEqual({
+        type: 'session.deleted',
+        data,
+      });
+    }
+  );
+
   const session = {
     source: 'v2' as const,
     sessionId: 'ses_12345678901234567890123456',

@@ -55,6 +55,9 @@ beforeAll(async () => {
       worktree_id text PRIMARY KEY,
       kilo_user_id text NOT NULL,
       organization_id uuid,
+      closed_session_ids text[] NOT NULL DEFAULT '{}',
+      tab_order text[] NOT NULL DEFAULT '{}',
+      updated_at timestamptz NOT NULL DEFAULT now(),
       deletion_started_at timestamptz
     );
     CREATE TEMP TABLE cli_sessions_v2 (
@@ -103,7 +106,37 @@ async function readSessionIds(): Promise<string[]> {
 }
 
 describe('deleteHostedWorkspaceSessionRows', () => {
+  it('does not rewrite workspace tuples when deleted roots and descendants have no stored tabs', async () => {
+    await client.db.execute(sql`
+      UPDATE pg_temp.cloud_agent_worktrees
+      SET closed_session_ids = ARRAY[${rootKiloSessionId}], tab_order = ARRAY[${rootKiloSessionId}]
+    `);
+    const readTuple = async () =>
+      (
+        await client.db.execute(sql`
+          SELECT ctid::text, updated_at FROM pg_temp.cloud_agent_worktrees
+          WHERE worktree_id = ${workspaceId}
+        `)
+      ).rows;
+    const before = await readTuple();
+
+    await deleteHostedWorkspaceSessionRows(client.db as unknown as WorkerDb, {
+      kiloUserId: userId,
+      workspaceId,
+      sessionId: siblingKiloSessionId,
+      cloudAgentSessionId: siblingCloudSessionId,
+    });
+
+    expect(await readSessionIds()).toEqual([rootKiloSessionId]);
+    expect(await readTuple()).toEqual(before);
+  });
+
   it('deletes one middle root and its descendants while preserving the workspace and siblings', async () => {
+    await client.db.execute(sql`
+      UPDATE pg_temp.cloud_agent_worktrees
+      SET closed_session_ids = ARRAY[${siblingKiloSessionId}, ${rootKiloSessionId}, ${childKiloSessionId}],
+        tab_order = ARRAY[${rootKiloSessionId}, ${siblingKiloSessionId}, ${childKiloSessionId}]
+    `);
     const outcome = await deleteHostedWorkspaceSessionRows(client.db as unknown as WorkerDb, {
       kiloUserId: userId,
       workspaceId,
@@ -118,6 +151,13 @@ describe('deleteHostedWorkspaceSessionRows', () => {
       SELECT worktree_id FROM pg_temp.cloud_agent_worktrees
     `);
     expect(worktrees.rows).toEqual([{ worktree_id: workspaceId }]);
+    const tabs = await client.db.execute(sql`
+      SELECT closed_session_ids, tab_order FROM pg_temp.cloud_agent_worktrees
+    `);
+    expect(tabs.rows).toEqual([
+      { closed_session_ids: [rootKiloSessionId], tab_order: [rootKiloSessionId] },
+    ]);
+    expect(outcome.rows.every(row => row.cloud_agent_worktree_id === workspaceId)).toBe(true);
   });
 
   it('rejects deleting the final hosted root and leaves the session intact', async () => {

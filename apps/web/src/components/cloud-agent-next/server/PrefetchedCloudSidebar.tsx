@@ -3,7 +3,6 @@ import type { ReactNode } from 'react';
 import * as Sentry from '@sentry/nextjs';
 import { dehydrate, HydrationBoundary, QueryClient } from '@tanstack/react-query';
 import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query';
-import pLimit from 'p-limit';
 import { createTRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 import { rootRouter } from '@/routers/root-router';
 import {
@@ -11,7 +10,6 @@ import {
   sidebarListInput,
   sidebarWorkspaceListInput,
   workspaceFoldersQueryKey,
-  sidebarWorktreeDetailsBatches,
 } from '../hooks/sidebar-queries';
 import { DEFAULT_SIDEBAR_PREFERENCES } from '../sidebar-preferences';
 import type { SidebarPreferences } from '../sidebar-preferences';
@@ -68,7 +66,7 @@ async function prefetchSidebar(
     gitUrl: projectFilter.length > 0 ? projectFilter : undefined,
   };
   const foldersOptions = trpc.workspaceFolders.list.queryOptions({ organizationId });
-  const [list, , workspaceList] = await Promise.all([
+  await Promise.all([
     queryClient.query(
       trpc.cliSessionsV2.list.queryOptions(sidebarListInput({ updatedSince, ...filters }))
     ),
@@ -83,21 +81,5 @@ async function prefetchSidebar(
         })
       )
       .catch(() => undefined),
-    queryClient.query(trpc.cloudAgentSettings.getWorkspaceOrder.queryOptions()),
   ]);
-  const limit = pLimit(4);
-  const sessions = list?.cliSessions ?? [];
-  await Promise.all(
-    sidebarWorktreeDetailsBatches(
-      sessions.map(session => session.cloud_agent_worktree_id),
-      workspaceList?.pages.flatMap(page => page.workspaces) ?? []
-    ).map(worktreeIds =>
-      limit(() => {
-        if (Date.now() >= deadlineAt) return;
-        return queryClient
-          .query(trpc.cliSessionsV2.worktreeDetails.queryOptions({ worktreeIds, organizationId }))
-          .catch(() => undefined);
-      })
-    )
-  );
 }

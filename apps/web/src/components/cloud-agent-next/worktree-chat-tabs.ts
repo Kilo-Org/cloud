@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import type { StoredSession } from './types';
 
 export function getWorkspaceControlSession(
@@ -93,6 +94,13 @@ export type WorktreeChatTabsAction =
   | { type: 'close'; sessionId: string }
   | { type: 'forgetWorktree'; worktreeId: string; sessionIds: readonly string[] }
   | {
+      type: 'reorder';
+      worktreeId: string;
+      sessionId: string;
+      beforeSessionId: string | null;
+      openSessionIds: readonly string[];
+    }
+  | {
       type: 'replace';
       worktreeId: string;
       oldSessionId: string;
@@ -125,6 +133,43 @@ export function parseWorktreeChatTabs(rawValue: string | null): WorktreeChatTabs
   }
 }
 
+export function legacyWorkspaceTabImport(rawValue: string): WorktreeChatTabsState {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(rawValue);
+  } catch {
+    return { closedSessionIds: [], sessionOrderByWorktree: {} };
+  }
+  const result = z
+    .object({
+      closedSessionIds: z.array(z.unknown()).catch([]),
+      sessionOrderByWorktree: z.record(z.string(), z.array(z.unknown()).catch([])).catch({}),
+    })
+    .safeParse(Array.isArray(parsed) ? { closedSessionIds: parsed } : parsed);
+  if (!result.success) return { closedSessionIds: [], sessionOrderByWorktree: {} };
+  const tabs = result.data;
+  const validId = (id: unknown): id is string =>
+    typeof id === 'string' && id.length > 0 && id.length <= 200;
+  let remainingOrderIds = 10_000;
+  const orders = Object.entries(tabs.sessionOrderByWorktree)
+    .flatMap(([id, order]) => {
+      if (!cloudAgentWorktreeIdSchema.safeParse(id).success || remainingOrderIds === 0) return [];
+      const sessionIds = [...new Set(order.filter(validId))].slice(
+        0,
+        Math.min(2_000, remainingOrderIds)
+      );
+      remainingOrderIds -= sessionIds.length;
+      return [[id, sessionIds] as const];
+    })
+    .slice(0, 500);
+  return {
+    closedSessionIds: [...new Set(tabs.closedSessionIds.filter(validId).toReversed())]
+      .slice(0, 10_000)
+      .toReversed(),
+    sessionOrderByWorktree: Object.fromEntries(orders),
+  };
+}
+
 export function reduceWorktreeChatTabs(
   state: WorktreeChatTabsState,
   action: WorktreeChatTabsAction
@@ -150,6 +195,21 @@ export function reduceWorktreeChatTabs(
       return {
         closedSessionIds: state.closedSessionIds.filter(sessionId => !deletedIds.has(sessionId)),
         sessionOrderByWorktree,
+      };
+    }
+    case 'reorder': {
+      if (action.beforeSessionId === action.sessionId) return state;
+      const order = getOpenWorktreeChatSessionIds(
+        action.openSessionIds,
+        state.closedSessionIds,
+        state.sessionOrderByWorktree[action.worktreeId]
+      ).filter(id => id !== action.sessionId);
+      const beforeIndex =
+        action.beforeSessionId === null ? -1 : order.indexOf(action.beforeSessionId);
+      order.splice(beforeIndex === -1 ? order.length : beforeIndex, 0, action.sessionId);
+      return {
+        ...state,
+        sessionOrderByWorktree: { ...state.sessionOrderByWorktree, [action.worktreeId]: order },
       };
     }
     case 'replace': {
@@ -191,6 +251,70 @@ export function reduceWorktreeChatTabs(
       };
     }
   }
+}
+
+type WorkspaceChatTab = {
+  sessionId: string;
+  createdAt: string;
+  lastActivityAt: string | null;
+};
+
+export type WorkspaceChatTabSummary = {
+  worktreeId: string;
+  openChats: readonly WorkspaceChatTab[];
+  closedChats: readonly WorkspaceChatTab[];
+  latestOpenSessionId: string | null;
+};
+
+export function workspaceChatTabsState(
+  workspaces: readonly WorkspaceChatTabSummary[]
+): WorktreeChatTabsState {
+  return {
+    closedSessionIds: workspaces.flatMap(workspace =>
+      workspace.closedChats.toReversed().map(chat => chat.sessionId)
+    ),
+    sessionOrderByWorktree: Object.fromEntries(
+      workspaces.map(workspace => [
+        workspace.worktreeId,
+        workspace.openChats.map(chat => chat.sessionId),
+      ])
+    ),
+  };
+}
+
+export function patchWorkspaceChatTabs<Workspace extends WorkspaceChatTabSummary>(
+  workspace: Workspace,
+  action: WorktreeChatTabsAction
+): Workspace {
+  const before = workspaceChatTabsState([workspace]);
+  const tabs = reduceWorktreeChatTabs(before, action);
+  if (tabs === before) return workspace;
+  const chats = [...workspace.openChats, ...workspace.closedChats];
+  const byId = new Map(chats.map(chat => [chat.sessionId, chat]));
+  const orderedIds = getOpenWorktreeChatSessionIds(
+    chats.map(chat => chat.sessionId),
+    tabs.closedSessionIds,
+    tabs.sessionOrderByWorktree[workspace.worktreeId]
+  );
+  const openChats = orderedIds.flatMap(id => {
+    const chat = byId.get(id);
+    return chat ? [chat] : [];
+  });
+  const closedChats = tabs.closedSessionIds.toReversed().flatMap(id => {
+    const chat = byId.get(id);
+    return chat ? [chat] : [];
+  });
+  const latestOpen = [...openChats].sort(
+    (a, b) =>
+      Date.parse(b.lastActivityAt ?? b.createdAt) - Date.parse(a.lastActivityAt ?? a.createdAt) ||
+      b.sessionId.localeCompare(a.sessionId)
+  )[0];
+  return {
+    ...workspace,
+    openChats,
+    closedChats,
+    latestOpenSessionId: latestOpen?.sessionId ?? null,
+  };
 }
 
 export function getOpenWorktreeChatSessionIds(

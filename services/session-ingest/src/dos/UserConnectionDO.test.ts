@@ -2028,6 +2028,90 @@ describe('UserConnectionDO', () => {
     });
   });
 
+  describe('workspace update batches', () => {
+    const worktreeIds = [
+      'worktree_11111111-1111-4111-8111-111111111111',
+      'worktree_22222222-2222-4222-8222-222222222222',
+    ];
+
+    it('broadcasts existing workspace frames only to current viewers and counts sockets', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cli = addCliSocket(mockCtx, 'cli');
+      const first = addWebSocket(mockCtx, 'first');
+      const second = addWebSocket(mockCtx, 'second');
+      const replaced = addWebSocket(mockCtx, 'replaced');
+      replaced.serializeAttachment({
+        role: 'web',
+        connectionId: 'replaced',
+        subscribedSessions: [],
+        replaced: true,
+      });
+
+      expect(await doInstance.notifyWorkspaceUpdates(worktreeIds)).toEqual({ delivered: 2 });
+      for (const viewer of [first, second]) {
+        expect(viewer.send).toHaveBeenCalledTimes(2);
+        expect(worktreeIds.map((_, index) => parseSent(viewer, index))).toEqual(
+          worktreeIds.map(worktreeId => ({
+            type: 'system',
+            event: 'workspace.updated',
+            data: { worktreeId },
+          }))
+        );
+      }
+      expect(cli.send).not.toHaveBeenCalled();
+      expect(replaced.send).not.toHaveBeenCalled();
+    });
+
+    it('broadcasts the maximum batch without changing the workspace event format', async () => {
+      const { doInstance, mockCtx } = setup();
+      const web = addWebSocket(mockCtx, 'web');
+      const ids = Array.from(
+        { length: 200 },
+        (_, index) => `worktree_${index.toString(16).padStart(8, '0')}-1111-4111-8111-111111111111`
+      );
+      expect(await doInstance.notifyWorkspaceUpdates(ids)).toEqual({ delivered: 1 });
+      expect(web.send).toHaveBeenCalledTimes(200);
+      expect(parseSent(web, 199)).toEqual({
+        type: 'system',
+        event: 'workspace.updated',
+        data: { worktreeId: ids[199] },
+      });
+    });
+
+    it('continues delivering the complete batch when another viewer send fails', async () => {
+      const { doInstance, mockCtx } = setup();
+      const failed = addWebSocket(mockCtx, 'failed');
+      const healthy = addWebSocket(mockCtx, 'healthy');
+      failed.send.mockImplementationOnce(() => {
+        throw new Error('socket unavailable');
+      });
+
+      expect(await doInstance.notifyWorkspaceUpdates(worktreeIds)).toEqual({ delivered: 1 });
+      expect(healthy.send).toHaveBeenCalledTimes(2);
+    });
+
+    it.each([
+      ['invalid'],
+      [worktreeIds[0], worktreeIds[0]],
+      Array.from(
+        { length: 201 },
+        (_, index) => `worktree_${index.toString(16).padStart(8, '0')}-1111-4111-8111-111111111111`
+      ),
+    ])('rejects invalid batches before any fanout %#', async (...ids) => {
+      const { doInstance, mockCtx } = setup();
+      const web = addWebSocket(mockCtx, 'web');
+      await expect(doInstance.notifyWorkspaceUpdates(ids)).rejects.toThrow();
+      expect(web.send).not.toHaveBeenCalled();
+    });
+
+    it('does not count empty batches as deliveries', async () => {
+      const { doInstance, mockCtx } = setup();
+      const web = addWebSocket(mockCtx, 'web');
+      expect(await doInstance.notifyWorkspaceUpdates([])).toEqual({ delivered: 0 });
+      expect(web.send).not.toHaveBeenCalled();
+    });
+  });
+
   describe('viewer connection identity', () => {
     it('replaces an older web viewer with the same connectionId and broadcasts only to its replacement', async () => {
       const { doInstance, mockCtx } = setup();

@@ -130,6 +130,8 @@ import {
   assertHostedWorkspaceSessionDeletable as checkHostedWorkspaceSessionDeletable,
   deleteHostedWorkspaceSessionRows,
   HostedWorkspaceSessionDeleteError,
+  removeWorkspaceSessionTabs,
+  lockSessionWorkspaces,
 } from './services/hosted-workspace-session';
 import { clearSessionLocalState } from './services/session-local-state';
 import { setCloudAgentSessionVersion } from './services/cloud-agent-session-version';
@@ -535,7 +537,26 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
           target: [cli_sessions_v2.session_id, cli_sessions_v2.kilo_user_id],
         })
         .returning();
-      if (created) return { existingRow: undefined, persistedRow: created };
+      if (created) {
+        if (created.cloud_agent_worktree_id != null) {
+          await tx
+            .update(cloud_agent_worktrees)
+            .set({ last_activity_at: created.created_at })
+            .where(
+              and(
+                eq(cloud_agent_worktrees.worktree_id, created.cloud_agent_worktree_id),
+                eq(cloud_agent_worktrees.kilo_user_id, parsed.kiloUserId),
+                sql`${cloud_agent_worktrees.organization_id} IS NOT DISTINCT FROM ${created.organization_id}`,
+                isNull(cloud_agent_worktrees.deletion_started_at),
+                or(
+                  isNull(cloud_agent_worktrees.last_activity_at),
+                  lt(cloud_agent_worktrees.last_activity_at, created.created_at)
+                )
+              )
+            );
+        }
+        return { existingRow: undefined, persistedRow: created };
+      }
 
       const [existing] = await tx
         .select()
@@ -1564,6 +1585,7 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
             data: {
               source: 'v2',
               sessionId: row.session_id,
+              worktreeId: row.cloud_agent_worktree_id,
               parentSessionId: row.parent_session_id,
               organizationId: row.organization_id,
               gitUrl: row.git_url,
@@ -1613,26 +1635,30 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
   private async deleteRootSessionRow(parsed: DeleteSessionForCloudAgentParams): Promise<void> {
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
 
-    const deletedRows = await db
-      .select()
-      .from(cli_sessions_v2)
-      .where(
-        and(
-          eq(cli_sessions_v2.session_id, parsed.sessionId),
-          eq(cli_sessions_v2.kilo_user_id, parsed.kiloUserId)
+    const deletedRow = await db.transaction(async tx => {
+      const [row] = await tx
+        .select()
+        .from(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.session_id, parsed.sessionId),
+            eq(cli_sessions_v2.kilo_user_id, parsed.kiloUserId)
+          )
         )
-      )
-      .limit(1);
-    const deletedRow = deletedRows[0];
-
-    await db
-      .delete(cli_sessions_v2)
-      .where(
-        and(
-          eq(cli_sessions_v2.session_id, parsed.sessionId),
-          eq(cli_sessions_v2.kilo_user_id, parsed.kiloUserId)
-        )
-      );
+        .limit(1);
+      if (!row) return undefined;
+      await lockSessionWorkspaces(tx, parsed.kiloUserId, [row]);
+      await removeWorkspaceSessionTabs(tx, parsed.kiloUserId, row);
+      await tx
+        .delete(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.session_id, parsed.sessionId),
+            eq(cli_sessions_v2.kilo_user_id, parsed.kiloUserId)
+          )
+        );
+      return row;
+    });
 
     if (deletedRow) {
       notifyUserSessionEvent(
@@ -1643,6 +1669,7 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
           data: {
             source: 'v2',
             sessionId: deletedRow.session_id,
+            worktreeId: deletedRow.cloud_agent_worktree_id,
             parentSessionId: deletedRow.parent_session_id,
             organizationId: deletedRow.organization_id,
             gitUrl: deletedRow.git_url,

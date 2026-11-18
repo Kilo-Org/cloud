@@ -4982,6 +4982,51 @@
     ],
     "searchBlob": "cliSessions.update Update an existing CLI session owned by the user, such as changing its title or other saved fields. clisessions update session_id title git_url version last_mode last_model organization_id session_id title git_url version last_mode last_model organization_id"
   },
+  "cliSessionsV2.closeWorkspaceTab": {
+    "path": "cliSessionsV2.closeWorkspaceTab",
+    "kind": "mutation",
+    "summary": "Close a chat tab in a workspace so it stops appearing among the open tabs, while remembering it as closed so it can be restored later.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "worktreeId": {
+          "type": "string",
+          "pattern": "^worktree_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "sessionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        }
+      },
+      "required": [
+        "organizationId",
+        "worktreeId",
+        "sessionId"
+      ]
+    },
+    "tags": [
+      "clisessionsv2",
+      "closeworkspacetab",
+      "organizationid",
+      "worktreeid",
+      "sessionid"
+    ],
+    "searchBlob": "cliSessionsV2.closeWorkspaceTab Close a chat tab in a workspace so it stops appearing among the open tabs, while remembering it as closed so it can be restored later. clisessionsv2 closeworkspacetab organizationid worktreeid sessionid organizationId worktreeId sessionId"
+  },
   "cliSessionsV2.delete": {
     "path": "cliSessionsV2.delete",
     "kind": "mutation",
@@ -5453,6 +5498,67 @@
     ],
     "searchBlob": "cliSessionsV2.getWithRuntimeState Get a session record together with its current cloud agent runtime state and any associated GitHub pull request metadata for the session's branch. clisessionsv2 getwithruntimestate session_id session_id"
   },
+  "cliSessionsV2.importWorkspaceTabs": {
+    "path": "cliSessionsV2.importWorkspaceTabs",
+    "kind": "mutation",
+    "summary": "Bulk import a workspace's closed chat tabs and per-workspace tab ordering, for example to sync locally held tab state to the server.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "closedSessionIds": {
+          "maxItems": 10000,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "sessionOrderByWorktree": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^worktree_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "additionalProperties": {
+            "maxItems": 2000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        }
+      },
+      "required": [
+        "organizationId",
+        "closedSessionIds",
+        "sessionOrderByWorktree"
+      ]
+    },
+    "tags": [
+      "clisessionsv2",
+      "importworkspacetabs",
+      "organizationid",
+      "closedsessionids",
+      "sessionorderbyworktree"
+    ],
+    "searchBlob": "cliSessionsV2.importWorkspaceTabs Bulk import a workspace's closed chat tabs and per-workspace tab ordering, for example to sync locally held tab state to the server. clisessionsv2 importworkspacetabs organizationid closedsessionids sessionorderbyworktree organizationId closedSessionIds sessionOrderByWorktree"
+  },
   "cliSessionsV2.list": {
     "path": "cliSessionsV2.list",
     "kind": "query",
@@ -5482,6 +5588,10 @@
           ]
         },
         "includeChildren": {
+          "default": false,
+          "type": "boolean"
+        },
+        "standaloneOnly": {
           "default": false,
           "type": "boolean"
         },
@@ -5558,6 +5668,7 @@
       "limit",
       "orderby",
       "includechildren",
+      "standaloneonly",
       "sharedonly",
       "createdonplatform",
       "organizationid",
@@ -5567,7 +5678,7 @@
       "version",
       "fetchreviewdecision"
     ],
-    "searchBlob": "cliSessionsV2.list List the current user's CLI/agent sessions with pagination, filtering by organization, worktree, git URL, platform, shared/public status, version, or recent updates. clisessionsv2 list cursor limit orderby includechildren sharedonly createdonplatform organizationid worktreeid giturl updatedsince version fetchreviewdecision cursor limit orderBy includeChildren sharedOnly createdOnPlatform organizationId worktreeId gitUrl updatedSince version fetchReviewDecision"
+    "searchBlob": "cliSessionsV2.list List the current user's CLI/agent sessions with pagination, filtering by organization, worktree, git URL, platform, shared/public status, version, or recent updates. clisessionsv2 list cursor limit orderby includechildren standaloneonly sharedonly createdonplatform organizationid worktreeid giturl updatedsince version fetchreviewdecision cursor limit orderBy includeChildren standaloneOnly sharedOnly createdOnPlatform organizationId worktreeId gitUrl updatedSince version fetchReviewDecision"
   },
   "cliSessionsV2.listWorkspaces": {
     "path": "cliSessionsV2.listWorkspaces",
@@ -5864,6 +5975,162 @@
     ],
     "searchBlob": "cliSessionsV2.renameWorktree Rename a cloud agent worktree owned by the user or their organization. Return the new worktree name. clisessionsv2 renameworktree worktreeid organizationid name worktreeId organizationId name"
   },
+  "cliSessionsV2.reopenWorkspaceTab": {
+    "path": "cliSessionsV2.reopenWorkspaceTab",
+    "kind": "mutation",
+    "summary": "Restore a previously closed chat tab in a workspace, bringing the chat back into the open tab list and order.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "worktreeId": {
+          "type": "string",
+          "pattern": "^worktree_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "sessionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        }
+      },
+      "required": [
+        "organizationId",
+        "worktreeId",
+        "sessionId"
+      ]
+    },
+    "tags": [
+      "clisessionsv2",
+      "reopenworkspacetab",
+      "organizationid",
+      "worktreeid",
+      "sessionid"
+    ],
+    "searchBlob": "cliSessionsV2.reopenWorkspaceTab Restore a previously closed chat tab in a workspace, bringing the chat back into the open tab list and order. clisessionsv2 reopenworkspacetab organizationid worktreeid sessionid organizationId worktreeId sessionId"
+  },
+  "cliSessionsV2.reorderWorkspaceTab": {
+    "path": "cliSessionsV2.reorderWorkspaceTab",
+    "kind": "mutation",
+    "summary": "Move a chat tab to a different position in a workspace's tab order, optionally placing it before another chat.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "worktreeId": {
+          "type": "string",
+          "pattern": "^worktree_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "sessionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "beforeSessionId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "organizationId",
+        "worktreeId",
+        "sessionId",
+        "beforeSessionId"
+      ]
+    },
+    "tags": [
+      "clisessionsv2",
+      "reorderworkspacetab",
+      "organizationid",
+      "worktreeid",
+      "sessionid",
+      "beforesessionid"
+    ],
+    "searchBlob": "cliSessionsV2.reorderWorkspaceTab Move a chat tab to a different position in a workspace's tab order, optionally placing it before another chat. clisessionsv2 reorderworkspacetab organizationid worktreeid sessionid beforesessionid organizationId worktreeId sessionId beforeSessionId"
+  },
+  "cliSessionsV2.replaceWorkspaceTab": {
+    "path": "cliSessionsV2.replaceWorkspaceTab",
+    "kind": "mutation",
+    "summary": "Swap one chat tab for another in a workspace, replacing the old chat slot with the newly opened chat while marking the old one closed.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "worktreeId": {
+          "type": "string",
+          "pattern": "^worktree_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "oldSessionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "newSessionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        }
+      },
+      "required": [
+        "organizationId",
+        "worktreeId",
+        "oldSessionId",
+        "newSessionId"
+      ]
+    },
+    "tags": [
+      "clisessionsv2",
+      "replaceworkspacetab",
+      "organizationid",
+      "worktreeid",
+      "oldsessionid",
+      "newsessionid"
+    ],
+    "searchBlob": "cliSessionsV2.replaceWorkspaceTab Swap one chat tab for another in a workspace, replacing the old chat slot with the newly opened chat while marking the old one closed. clisessionsv2 replaceworkspacetab organizationid worktreeid oldsessionid newsessionid organizationId worktreeId oldSessionId newSessionId"
+  },
   "cliSessionsV2.resumeWatchPr": {
     "path": "cliSessionsV2.resumeWatchPr",
     "kind": "mutation",
@@ -6107,6 +6374,156 @@
       "session_id"
     ],
     "searchBlob": "cliSessionsV2.unshare Stop sharing a CLI session and revoke its public link. Return success. clisessionsv2 unshare session_id session_id"
+  },
+  "cliSessionsV2.workspaceChats": {
+    "path": "cliSessionsV2.workspaceChats",
+    "kind": "query",
+    "summary": "List the chat sessions belonging to a single workspace with cursor-based pagination for older chats.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "worktreeId": {
+          "type": "string",
+          "pattern": "^worktree_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "limit": {
+          "default": 50,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        },
+        "cursor": {
+          "type": "object",
+          "properties": {
+            "createdAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            },
+            "sessionId": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "createdAt",
+            "sessionId"
+          ]
+        }
+      },
+      "required": [
+        "worktreeId",
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "clisessionsv2",
+      "workspacechats",
+      "worktreeid",
+      "organizationid",
+      "limit",
+      "cursor"
+    ],
+    "searchBlob": "cliSessionsV2.workspaceChats List the chat sessions belonging to a single workspace with cursor-based pagination for older chats. clisessionsv2 workspacechats worktreeid organizationid limit cursor worktreeId organizationId limit cursor"
+  },
+  "cliSessionsV2.workspaceSummaries": {
+    "path": "cliSessionsV2.workspaceSummaries",
+    "kind": "query",
+    "summary": "Fetch summary details for one or more workspaces, including optional ancestor workspaces, filterable by platform, repository, and search text.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "worktreeIds": {
+          "maxItems": 200,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^worktree_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "organizationId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "includeAncestors": {
+          "type": "boolean"
+        },
+        "createdOnPlatform": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              }
+            }
+          ]
+        },
+        "gitUrl": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "minItems": 1,
+              "maxItems": 100,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "search": {
+          "type": "string",
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "worktreeIds",
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "clisessionsv2",
+      "workspacesummaries",
+      "worktreeids",
+      "organizationid",
+      "includeancestors",
+      "createdonplatform",
+      "giturl",
+      "search"
+    ],
+    "searchBlob": "cliSessionsV2.workspaceSummaries Fetch summary details for one or more workspaces, including optional ancestor workspaces, filterable by platform, repository, and search text. clisessionsv2 workspacesummaries worktreeids organizationid includeancestors createdonplatform giturl search worktreeIds organizationId includeAncestors createdOnPlatform gitUrl search"
   },
   "cliSessionsV2.worktreeDetails": {
     "path": "cliSessionsV2.worktreeDetails",
@@ -39593,7 +40010,7 @@
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         },
         "worktreeIds": {
-          "maxItems": 200,
+          "maxItems": 500,
           "type": "array",
           "items": {
             "type": "string",

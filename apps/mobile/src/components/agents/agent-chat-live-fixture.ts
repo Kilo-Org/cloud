@@ -39,11 +39,7 @@ import { type SessionStatus } from '@kilocode/cloud-agent-sdk/schemas';
 import { cloudAgentId } from '@kilocode/cloud-agent-sdk/test-helpers';
 
 import { AGENT_CHAT_FIXTURE_SESSION_ID } from './agent-chat-fixture-session';
-import {
-  BLOCKED_BASH_COMMAND,
-  EMOJI_ANSWER,
-  PENDING_BASH_ASK,
-} from './agent-chat-fixture-states';
+import { BLOCKED_BASH_COMMAND, EMOJI_ANSWER, PENDING_BASH_ASK } from './agent-chat-fixture-states';
 
 /**
  * The agent chat screen — transcript and composer — against one fixed

@@ -43,7 +43,7 @@ import {
   useReviewConfig,
   useSaveReviewConfig,
 } from '@/lib/hooks/use-code-reviewer';
-import { reviewConfigFailure, useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
+import { queryBodyFailure, useQueryBodyState } from '@/lib/hooks/use-query-body-state';
 import {
   defaultCouncilConfig,
   enabledSpecialistCount,
@@ -92,7 +92,7 @@ function CouncilScreen({
   });
   const councilUiEnabled = surface === 'editor';
   const config = useReviewConfig(scope, platform, { enabled: councilUiEnabled });
-  const configBody = useReviewConfigBody(config, { restartable: councilUiEnabled });
+  const configBody = useQueryBodyState(config, { restartable: councilUiEnabled });
   const save = useSaveReviewConfig(scope, platform);
   const githubRepos = useGitHubRepositories(scope, councilUiEnabled && platform === 'github');
   const gitlabRepos = useGitLabRepositories(scope, councilUiEnabled && platform === 'gitlab');
@@ -159,7 +159,7 @@ function CouncilScreen({
     );
   }
 
-  const failure = reviewConfigFailure(configBody, config.isFetching);
+  const failure = queryBodyFailure(configBody, config.isFetching);
   if (failure) {
     return (
       <ReviewerErrorScreen

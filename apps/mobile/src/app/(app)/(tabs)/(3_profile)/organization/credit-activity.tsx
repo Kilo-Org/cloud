@@ -23,9 +23,10 @@ export default function OrganizationCreditActivityRoute() {
   // push is a query string, because the object form drops params
   // (`profile-route-stack.ts`), and a rebuilt link screen without its org
   // would re-scope to the persisted selection.
-  const self = orgParam !== undefined
-    ? `${CREDIT_ACTIVITY_PATH}?org=${encodeURIComponent(orgParam)}`
-    : CREDIT_ACTIVITY_PATH;
+  const self =
+    orgParam !== undefined
+      ? `${CREDIT_ACTIVITY_PATH}?org=${encodeURIComponent(orgParam)}`
+      : CREDIT_ACTIVITY_PATH;
   useRepairOrganizationRouteStack({ self });
   if (stale) {
     return null;

@@ -96,7 +96,7 @@ function payload(): OrgGuardrails {
       injection_attack: { enabled: true, action: 'log' },
       pii: { enabled: false, action: 'log', entities: ['secrets'] },
       keyword_detector: { enabled: false, action: 'block', banned_keywords: [] },
-      topic_detector: { enabled: false, topic: [] },
+      topic_detector: { enabled: false, action: 'block', topic: [] },
       policy_violation: {
         enabled: false,
         action: 'block',
@@ -117,7 +117,7 @@ function payload(): OrgGuardrails {
         nsfw: { enabled: false },
         bias: { enabled: false, action: 'log' },
         keyword_detector: { enabled: false, action: 'block', banned_keywords: [] },
-        topic_detector: { enabled: false, topic: [] },
+        topic_detector: { enabled: false, action: 'block', topic: [] },
       },
     },
     output_available: false,

@@ -17,7 +17,9 @@ export default function OrganizationModeFormRoute() {
   // would open as an empty create form.
   const modeIdParam = parseParam(modeId);
   const self =
-    modeIdParam !== null ? `${MODE_FORM_PATH}?modeId=${encodeURIComponent(modeIdParam)}` : MODE_FORM_PATH;
+    modeIdParam !== null
+      ? `${MODE_FORM_PATH}?modeId=${encodeURIComponent(modeIdParam)}`
+      : MODE_FORM_PATH;
   useRepairOrganizationRouteStack({ self });
   return <OrganizationModeFormScreen />;
 }

@@ -28,9 +28,10 @@ export default function OrganizationUsageRoute() {
   // push is a query string, because the object form drops params
   // (`profile-route-stack.ts`), and a rebuilt link screen without its org
   // would re-scope to the persisted selection.
-  const self = orgIdOverride !== undefined
-    ? `${USAGE_PATH}?org=${encodeURIComponent(orgIdOverride)}`
-    : USAGE_PATH;
+  const self =
+    orgIdOverride !== undefined
+      ? `${USAGE_PATH}?org=${encodeURIComponent(orgIdOverride)}`
+      : USAGE_PATH;
   useRepairOrganizationRouteStack({ self });
   // Usage keeps accruing off-screen, so a returning screen asks again.
   useRouteForegroundRefresh([

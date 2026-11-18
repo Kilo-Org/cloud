@@ -5,7 +5,12 @@ import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { z } from 'zod';
-import { DOWNLOAD_BODY, DOWNLOAD_FILENAME, startDownloadFixture } from './download-fixture';
+import {
+  DOWNLOAD_BODY,
+  DOWNLOAD_FILENAME,
+  DOWNLOAD_PATH,
+  startDownloadFixture,
+} from './download-fixture';
 import { launchExtensionContext } from './extension-context-fixture';
 import { mockKiloApi } from './kilo-api-fixture';
 import { startFakeHub } from './local-agents-hub-fixture';
@@ -63,7 +68,11 @@ test('a guarded click cancels the download, and the approved retry keeps it', as
   const downloadsPath = await mkdtemp(join(tmpdir(), 'kilo-downloads-'));
   const fixture = await startDownloadFixture();
   const hub = await startFakeHub();
-  const { context, extensionId, userDataDir } = await launchExtensionContext({ downloadsPath });
+  const { context, extensionId, userDataDir } = await launchExtensionContext({
+    downloadsPath,
+    // The state after the switch's permission prompt is accepted; automation cannot answer it.
+    grantPermissions: ['downloads'],
+  });
   await mockKiloApi(context, {});
   await context.addInitScript({
     content:
@@ -116,13 +125,13 @@ test('a guarded click cancels the download, and the approved retry keeps it', as
     expect(items).toStrictEqual([{ class: 'sensitive', origin, reason: 'downloading a file' }]);
     expect(fixture.hits()).toBeGreaterThan(0);
 
-    // The response was aborted before it became a download: no file, and no download announced at all.
+    // The browser created the download and the guard cancelled it, so nothing reached the directory,
+    // The one download the page started reports a cancelled failure rather than a completed file.
     await expect.poll(() => readdir(downloadsPath), { timeout: 15_000 }).toStrictEqual([]);
-    expect(downloads).toStrictEqual([]);
-    // Any outcome Playwright did report is awaited: a `null` failure means a file landed.
-    const failures = await Promise.all(downloads.map(download => download.failure()));
-
-    expect(failures.filter(failure => failure === null)).toStrictEqual([]);
+    await expect.poll(() => downloads.length, { timeout: 15_000 }).toBe(1);
+    expect(await Promise.all(downloads.map(download => download.failure()))).toStrictEqual([
+      expect.stringContaining('canceled'),
+    ]);
 
     // 2. The human approved: the identical call with the token runs with the guard off once.
     const approved = await session.callTool(
@@ -162,6 +171,90 @@ test('a guarded click cancels the download, and the approved retry keeps it', as
     expect(reguarded).toMatchObject({ afterAction: true, code: -32_010, kind: 'error' });
     // The approved file is still the only one, unchanged.
     await expect.poll(() => readdir(downloadsPath), { timeout: 10_000 }).toHaveLength(1);
+    expect(await readFile(saved, 'utf8')).toBe(DOWNLOAD_BODY);
+  } finally {
+    await context.close();
+    await hub.close();
+    await fixture.close();
+    await rm(downloadsPath, { force: true, recursive: true });
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('a navigate to an attachment asks first, then keeps the file once approved', async () => {
+  test.setTimeout(120_000);
+  const downloadsPath = await mkdtemp(join(tmpdir(), 'kilo-downloads-'));
+  const fixture = await startDownloadFixture();
+  const hub = await startFakeHub();
+  const { context, extensionId, userDataDir } = await launchExtensionContext({
+    downloadsPath,
+    grantPermissions: ['downloads'],
+  });
+  await mockKiloApi(context, {});
+  await context.addInitScript({
+    content:
+      "Object.defineProperty(chrome.permissions, 'request', { value: () => Promise.resolve(true) });",
+  });
+
+  try {
+    const sidePanel = await context.newPage();
+    const agentPage = await context.newPage();
+    const downloads: Download[] = [];
+
+    agentPage.on('download', download => downloads.push(download));
+    await agentPage.goto(`${fixture.url}/page`);
+
+    const origin = fixture.url;
+    const grants = grant(origin);
+    const session = await openPairedAgentSession({
+      beforeShare: async () => {
+        await activateTab(sidePanel, `${fixture.url}/page`);
+      },
+      context,
+      extensionId,
+      hub,
+      sidePanel,
+      title: 'Download E2E session',
+    });
+
+    // A page can start a download with no click at all: the navigate itself is the action.
+    const guarded = await session.callTool(
+      'browser_navigate',
+      { url: `${fixture.url}${DOWNLOAD_PATH}` },
+      grants
+    );
+
+    expect(guarded).toMatchObject({ afterAction: true, code: -32_010, kind: 'error' });
+    const items = z
+      .array(permissionItemSchema)
+      .parse(guarded.kind === 'error' ? guarded.items : []);
+    expect(items).toStrictEqual([{ class: 'sensitive', origin, reason: 'downloading a file' }]);
+    await expect.poll(() => readdir(downloadsPath), { timeout: 15_000 }).toStrictEqual([]);
+    await expect.poll(() => downloads.length, { timeout: 15_000 }).toBe(1);
+
+    const approved = await session.callTool(
+      'browser_navigate',
+      { url: `${fixture.url}${DOWNLOAD_PATH}` },
+      grants,
+      [guarded.kind === 'error' ? (guarded.stepToken ?? '') : '']
+    );
+
+    // The browser answers a download navigation with an aborted page load; the file is the result the human approved.
+    expect(approved.kind).toBe('result');
+    await expect.poll(() => readdir(downloadsPath), { timeout: 15_000 }).toHaveLength(1);
+    const download = downloads.at(-1);
+
+    if (download === undefined) {
+      throw new Error('the approved navigate produced no download');
+    }
+
+    expect(download.suggestedFilename()).toBe(DOWNLOAD_FILENAME);
+    const saved = await download.path();
+
+    if (saved === null) {
+      throw new Error('the approved download has no file on disk');
+    }
+
     expect(await readFile(saved, 'utf8')).toBe(DOWNLOAD_BODY);
   } finally {
     await context.close();

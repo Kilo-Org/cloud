@@ -854,7 +854,11 @@ const readElementClip = async (
   session: BrowserToolPageSession,
   target: string,
   options: { readonly failClosedOnGeometryError: boolean }
-): Promise<z.infer<typeof elementClipSchema>> => {
+): Promise<{
+  readonly clip: z.infer<typeof elementClipSchema>;
+  /** The geometry the clip was measured against, reused for its device-pixel scale and the mask. */
+  readonly geometry: AgentScreenshotGeometry;
+}> => {
   const resolved = await session.resolveTarget(target);
 
   if (resolved?.kind === 'ambiguous') {
@@ -888,15 +892,18 @@ const readElementClip = async (
     return { scale: 1, scroll: NO_SCROLL };
   });
 
-  return elementClipSchema.parse({
-    height: model.height ?? 0,
-    width: model.width ?? 0,
-    // `Page.captureScreenshot` clips are document-space; the box model's quads are viewport-space.
-    // eslint-disable-next-line id-length -- CDP `clip` fields are named x and y
-    x: (content[0] ?? 0) + geometry.scroll.x,
-    // eslint-disable-next-line id-length -- CDP `clip` fields are named x and y
-    y: (content[1] ?? 0) + geometry.scroll.y,
-  });
+  return {
+    clip: elementClipSchema.parse({
+      height: model.height ?? 0,
+      width: model.width ?? 0,
+      // `Page.captureScreenshot` clips are document-space; the box model's quads are viewport-space.
+      // eslint-disable-next-line id-length -- CDP `clip` fields are named x and y
+      x: (content[0] ?? 0) + geometry.scroll.x,
+      // eslint-disable-next-line id-length -- CDP `clip` fields are named x and y
+      y: (content[1] ?? 0) + geometry.scroll.y,
+    }),
+    geometry,
+  };
 };
 
 const SCREENSHOT_MEDIA_TYPES = {
@@ -940,15 +947,17 @@ const browserTakeScreenshotHandler: BrowserReadActionHandler = async (arguments_
     );
   }
 
-  const clip =
+  const measured =
     target === undefined || target === ''
       ? undefined
       : await readElementClip(deps.session, target, {
           failClosedOnGeometryError: deps.agentScope !== undefined,
         });
-  // The mask needs the tab's scroll position and scale, and a device-pixel element capture needs the scale too — for every caller, not only an agent: one read serves both.
-  const needsGeometry = deps.agentScope !== undefined || (clip !== undefined && scale === 'device');
-  const geometry = needsGeometry ? await readAgentScreenshotGeometry(deps.session) : undefined;
+  const clip = measured?.clip;
+  // An element capture measured its own geometry, with the CSS-scale fallback a panel caller relies on; only a viewport capture an agent will mask needs a fresh read.
+  const geometry =
+    measured?.geometry ??
+    (deps.agentScope === undefined ? undefined : await readAgentScreenshotGeometry(deps.session));
   // A device-pixel element capture renders the clip at the tab's device pixel ratio; the mask boxes move with it.
   const clipScale = clip !== undefined && scale === 'device' ? (geometry?.scale ?? 1) : 1;
 

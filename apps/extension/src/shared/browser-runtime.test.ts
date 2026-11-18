@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createTabLeaseRegistry, AGENT_TAB_WAIT_MS } from './browser-tab-leases';
 import { createBrowserRuntime } from './browser-runtime';
-import type { BrowserRuntime } from './browser-runtime';
+import type { BrowserDownloadsApi, BrowserRuntime } from './browser-runtime';
 import { TAB_BUSY_ERROR, TAB_TAKEN_ERROR } from './browser-caller';
 import type { BrowserCaller } from './browser-caller';
 import type { BrowserToolTabsApi } from './browser-tool-session';
@@ -149,11 +149,20 @@ const createFakeTabsApi = (): BrowserTabsApi => {
   };
 };
 
+/** The optional `downloads` permission in its granted state, which every guarded page load needs. */
+const grantedDownloads = (): BrowserDownloadsApi => ({
+  cancel: async () => {},
+  erase: async () => {},
+  onCreated: { addListener: () => {}, removeListener: () => {} },
+  removeFile: async () => {},
+});
+
 const createHarness = async () => {
   const debugger_ = createFakeDebugger();
   const leases = createTabLeaseRegistry({});
   const runtime = createBrowserRuntime({
     debuggerApi: debugger_.api,
+    downloadsApi: grantedDownloads,
     leases,
     scriptingApi: undefined,
     tabsApi: createFakeTabsApi(),

@@ -1,10 +1,11 @@
 /* eslint-disable import/no-nodejs-modules, max-lines, promise/avoid-new, promise/prefer-await-to-callbacks */
 import { chromium, expect } from '@playwright/test';
 import type { BrowserContext, Page } from '@playwright/test';
-import { access, mkdtemp } from 'node:fs/promises';
+import { access, cp, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join, resolve as resolvePath } from 'node:path';
+import { z } from 'zod';
 import {
   applyPosthogE2eBrowserWorkarounds,
   EXTENSION_E2E_LAUNCH_ARGS,
@@ -107,12 +108,54 @@ export const startFixtureServer = async ({
   };
 };
 
+const manifestSchema = z.looseObject({
+  optional_permissions: z.array(z.string()).optional(),
+  permissions: z.array(z.string()).optional(),
+});
+
+/**
+ * A copy of the built extension with these optional permissions promoted to
+ * required ones. Chrome grants a required permission at load time; an optional
+ * one needs a prompt only a human can answer, so a headless spec that needs the
+ * permission in its granted state loads this copy. The shipped manifest is not
+ * touched, and the extension code under test is byte-identical.
+ */
+const copyExtensionWithGrantedPermissions = async (granted: readonly string[]): Promise<string> => {
+  const target = await mkdtemp(join(tmpdir(), 'kilo-extension-granted-'));
+  await cp(extensionPath, target, { recursive: true });
+  const manifestPath = join(target, 'manifest.json');
+  // Kept as written: the build's manifest carries every field Chrome needs to load it.
+  const { optional_permissions: optionalPermissions, permissions } = manifestSchema.parse(
+    JSON.parse(await readFile(manifestPath, 'utf8'))
+  );
+  const optional = (optionalPermissions ?? []).filter(name => !granted.includes(name));
+
+  await writeFile(
+    manifestPath,
+    JSON.stringify(
+      {
+        ...manifestSchema.parse(JSON.parse(await readFile(manifestPath, 'utf8'))),
+        optional_permissions: optional,
+        permissions: [...new Set([...(permissions ?? []), ...granted])],
+      },
+      null,
+      2
+    )
+  );
+
+  return target;
+};
+
 export const launchExtensionContext = async (
   /**
    * A spec that asserts on files the browser accepted passes its own directory,
    * so "no file landed" is a real directory read rather than a Playwright event.
    */
-  options: { readonly downloadsPath?: string | undefined } = {}
+  options: {
+    readonly downloadsPath?: string;
+    /** Optional permissions Chrome cannot be asked for by automation, granted at load time in a copy of the build; `[]` loads the shipped manifest. */
+    readonly grantPermissions?: readonly string[];
+  } = {}
 ): Promise<{
   context: BrowserContext;
   extensionId: string;
@@ -123,7 +166,11 @@ export const launchExtensionContext = async (
   userDataDir: string;
 }> => {
   const userDataDir = await mkdtemp(join(tmpdir(), 'kilo-extension-e2e-'));
-  await access(join(extensionPath, 'manifest.json'));
+  // The normal state is the optional permissions granted: the switch asks for them, and an agent page load without the guard is refused.
+  const loadedExtensionPath = await copyExtensionWithGrantedPermissions(
+    options.grantPermissions ?? ['downloads']
+  );
+  await access(join(loadedExtensionPath, 'manifest.json'));
   const isHeaded = process.env['EXTENSION_E2E_HEADED'] === '1';
 
   const executablePath = process.env['EXTENSION_E2E_EXECUTABLE_PATH'];
@@ -131,8 +178,8 @@ export const launchExtensionContext = async (
 
   const context = await chromium.launchPersistentContext(userDataDir, {
     args: [
-      `--disable-extensions-except=${extensionPath}`,
-      `--load-extension=${extensionPath}`,
+      `--disable-extensions-except=${loadedExtensionPath}`,
+      `--load-extension=${loadedExtensionPath}`,
       ...EXTENSION_E2E_LAUNCH_ARGS,
     ],
     ...(options.downloadsPath === undefined ? {} : { downloadsPath: options.downloadsPath }),

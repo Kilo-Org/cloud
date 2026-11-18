@@ -73,21 +73,34 @@ export const toolGrantClass = (toolName: string): BrowserGrantClass =>
   CLASS_BY_TOOL.get(toolName) ?? 'act';
 
 /**
- * The act tools whose page action can start a download: a click, a dropped or
- * dragged item, a key press (Enter on a focused link), and the two tools that
- * run model-authored code. A tab action, a resize or a dialog answer cannot,
- * so they pay no guard window.
+ * Every tool whose page action can start a download: a click, a dropped or
+ * dragged item, a key press (Enter on a focused link), the two tools that run
+ * model-authored code, and a load the page did not ask a human for — a
+ * navigate to an attachment URL, a back/forward to one, or a tab opened at a
+ * URL that answers with a file.
  */
 const DOWNLOAD_CAPABLE_TOOLS: ReadonlySet<string> = new Set([
   'browser_click',
   'browser_drag',
   'browser_drop',
   'browser_evaluate',
+  'browser_navigate',
+  'browser_navigate_back',
+  'browser_navigate_forward',
   'browser_press_key',
+  'browser_reload',
   'browser_run_code_unsafe',
+  'browser_tabs',
 ]);
 
-export const canStartDownload = (toolName: string): boolean => DOWNLOAD_CAPABLE_TOOLS.has(toolName);
+/** `browser_tabs` opens a page only for `new`; list, select and close touch no document. */
+export const canStartDownload = (toolName: string, args: Record<string, unknown> = {}): boolean => {
+  if (toolName === 'browser_tabs') {
+    return args['action'] === 'new';
+  }
+
+  return DOWNLOAD_CAPABLE_TOOLS.has(toolName);
+};
 
 /**
  * A refusal for a download-capable call when neither guard can run: the

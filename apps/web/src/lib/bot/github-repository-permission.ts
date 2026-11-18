@@ -155,7 +155,7 @@ function rateLimitedAccessRequiredMarkdown(repository: string, resetAt: Date): s
   const resetHours = `${String(resetAt.getUTCHours()).padStart(2, '0')}:${String(
     resetAt.getUTCMinutes()
   ).padStart(2, '0')} UTC`;
-  const minutesRemaining = Math.max(0, Math.floor((resetAt.getTime() - Date.now()) / 60_000));
+  const minutesRemaining = Math.max(0, Math.ceil((resetAt.getTime() - Date.now()) / 60_000));
   return (
     `GitHub is rate limiting my checks right now, so I couldn't confirm whether your account ` +
     `has permission on \`${repository}\`, and I didn't start any work. Try again after the ` +

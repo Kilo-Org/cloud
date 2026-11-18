@@ -203,6 +203,8 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
       // platform without leaving the screen.
       <EmptyState
         placement="center"
+        // The scroll body already insets this state by the page gutter.
+        inset="none"
         icon={LineChart}
         title={t('codeReviewer.analytics.offTitle', {
           platform: reviewerPlatformLabel(settings.platform),

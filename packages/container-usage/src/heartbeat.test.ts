@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Container } from '@cloudflare/containers';
-import { ContainerUsageAdmissionError, ContainerUsageClient } from './client';
+import {
+  ContainerUsageAdmissionError,
+  ContainerUsageClient,
+  ContainerUsageContractError,
+} from './client';
 import {
   getBillingContext,
   setBillingContext,
@@ -180,6 +184,43 @@ describe('installBillingHeartbeat', () => {
     expect(schedule).toHaveBeenCalledWith(300, BILLING_HEARTBEAT_CALLBACK, expect.any(String));
     expect((await getBillingContext(storage))?.nextSeq).toBe(2);
   });
+
+  it.each(['stop verdict', 'unreadable verdict'])(
+    'defers stop delivery after a %s',
+    async verdict => {
+      const storage = memoryStorage();
+      await storedContext(storage);
+      const client = usageClient('stop');
+      if (verdict === 'unreadable verdict') {
+        vi.spyOn(client, 'recordHeartbeat').mockRejectedValueOnce(
+          new ContainerUsageContractError('recordHeartbeat', new Error('invalid ack'))
+        );
+      }
+      const recordStop = vi
+        .spyOn(client, 'recordStop')
+        .mockRejectedValueOnce(new Error('stop timed out'));
+      const enforceBudgetStop = vi.fn();
+      const schedule = vi.fn();
+      const controller = installBillingHeartbeat(
+        {
+          deleteSchedules: vi.fn(),
+          getState: vi.fn(async () => ({ status: 'running' as const, lastChange: Date.now() })),
+          schedule: schedule as Container['schedule'],
+        },
+        { client, storage, enforceBudgetStop }
+      );
+
+      await expect(controller.billingHeartbeatTick()).resolves.toBeUndefined();
+      expect(enforceBudgetStop).toHaveBeenCalledOnce();
+      expect((await getBillingContext(storage))?.pendingStop).toMatchObject({ seq: 2 });
+      expect(schedule).toHaveBeenCalledWith(300, BILLING_HEARTBEAT_CALLBACK, expect.any(String));
+
+      await expect(controller.billingHeartbeatTick()).resolves.toBeUndefined();
+      expect(recordStop).toHaveBeenCalledTimes(2);
+      expect(recordStop.mock.calls[1]).toEqual(recordStop.mock.calls[0]);
+      expect(await getBillingContext(storage)).toBeUndefined();
+    }
+  );
 
   it('surfaces a failed post-ack write and keeps the pending heartbeat', async () => {
     const storage = memoryStorage();

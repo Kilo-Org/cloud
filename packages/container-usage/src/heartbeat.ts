@@ -481,7 +481,12 @@ export function installBillingHeartbeat(
           'BILLING_UNAVAILABLE'
         );
         if (!dependencies.deferBudgetStopFinalSettlement) {
-          await recordStopForGeneration({ reason: 'runtime_signal' }, context.generation);
+          await recordStopForGeneration(
+            { reason: 'runtime_signal' },
+            context.generation,
+            undefined,
+            recoverStopDelivery
+          );
         }
         return;
       }
@@ -509,7 +514,12 @@ export function installBillingHeartbeat(
           startEpochMs: context.startEpochMs,
         });
         if (!dependencies.deferBudgetStopFinalSettlement) {
-          await recordStopForGeneration({ reason: 'runtime_signal' }, context.generation);
+          await recordStopForGeneration(
+            { reason: 'runtime_signal' },
+            context.generation,
+            undefined,
+            recoverStopDelivery
+          );
         }
         return;
       }

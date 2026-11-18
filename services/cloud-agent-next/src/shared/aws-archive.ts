@@ -1,18 +1,27 @@
 import { z } from 'zod';
-import {
-  awsByocConfigurationSchema,
-  type AwsByocConfiguration,
-} from '@kilocode/worker-utils/aws-byoc';
+import type { AwsByocConfiguration } from '@kilocode/worker-utils/aws-byoc';
 import { rootfsArchiveDescriptorSchema } from './rootfs-archive.js';
+
+/**
+ * The isolated wrapper build cannot resolve `@kilocode/worker-utils` values, so
+ * `aws-archive.parity.test.ts` holds these equal to the BYOC configuration fields.
+ */
+export const awsArchiveIdentityFields = {
+  region: z.literal('us-east-1'),
+  bucket: z.string().regex(/^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/),
+  stackId: z
+    .string()
+    .regex(/^arn:aws:cloudformation:us-east-1:\d{12}:stack\/[A-Za-z0-9-]+\/[a-f0-9-]+$/),
+  imageIdentifier: z
+    .string()
+    .regex(/^arn:aws:lambda:us-east-1:\d{12}:microvm-image:[A-Za-z0-9_-]+$/),
+  imageVersion: z.string().regex(/^\d+\.\d+$/),
+};
 
 const baseSchema = z
   .object({
     connectionId: z.uuid(),
-    region: awsByocConfigurationSchema.shape.region,
-    bucket: awsByocConfigurationSchema.shape.bucket,
-    stackId: awsByocConfigurationSchema.shape.stackId,
-    imageIdentifier: awsByocConfigurationSchema.shape.imageIdentifier,
-    imageVersion: awsByocConfigurationSchema.shape.imageVersion,
+    ...awsArchiveIdentityFields,
   })
   .strict()
   .refine(value => value.stackId.split(':')[4] === value.imageIdentifier.split(':')[4]);

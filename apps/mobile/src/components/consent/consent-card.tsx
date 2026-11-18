@@ -198,7 +198,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
         </View>
       </ScrollView>
 
-      <View className="gap-3 border-t border-border bg-background px-6 pt-4" style={footerStyle}>
+      <View className="gap-3 border-t border-border bg-background px-6 pt-3" style={footerStyle}>
         {/* The error lives in the pinned footer, not the scroll content: the
             footer draws over the scroll tail, so a content-placed error was
             invisible behind the buttons (b911 vr2 device repro — staging
@@ -208,14 +208,14 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
             pinned here too, because at the foot of the scrolling body the
             footer edge cut the sentence in half. Its font scale is capped so
             the pinned height stays bounded (see
-            CONSENT_DISCLOSURE_MAX_FONT_SCALE). The policy link's 28dp box
-            overflows its 17.5dp line by 5.25dp, which stays inside this
-            footer's top padding rather than reaching the scroll region above
-            it. The disclosure and the actions sit in one equal rhythm: the
-            footer's top padding matches the `gap-3` between the disclosure
-            and the primary button, so the line reads as part of the block it
-            qualifies instead of floating between the divider and the
-            buttons. */}
+            CONSENT_DISCLOSURE_MAX_FONT_SCALE). The disclosure and the
+            actions sit in one equal rhythm: the footer's top padding is the
+            same 12dp that separates the disclosure from the primary button
+            (`gap-3`), so the line reads as part of the block it qualifies
+            instead of floating between the divider and the buttons. The
+            policy link's 28dp box overflows its 17.5dp line by 5.25dp, which
+            stays inside this top padding rather than reaching the scroll
+            region above it. */}
         <ConsentPolicySentence
           prefix={t('consent.privacyPolicyPrefix')}
           linkLabel={t('consent.privacyPolicy')}

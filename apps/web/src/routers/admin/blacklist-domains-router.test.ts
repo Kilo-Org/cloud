@@ -58,6 +58,8 @@ const redisValues = new Map<string, string>();
 
 const saveFailureMessage =
   'Blacklist save failed. Reload the list before retrying; the signup TLDs may have been saved.';
+const preWriteFailureMessage =
+  'Blacklist save failed before the signup TLDs were saved. Reload the list before retrying.';
 const conflictMessage = 'Blacklist changed. Reload the complete list before saving.';
 const unusedVersion = '0'.repeat(64);
 
@@ -755,6 +757,51 @@ describe('admin.blacklistDomains.set', () => {
     }
   }, 30000);
 
+  it('reports an actor lock timeout before saving and allows a retry after the lock clears', async () => {
+    const previousRaw = storeSettings(previousSettings);
+    const caller = await createCallerForUser(admin.id);
+    const { version } = await caller.admin.blacklistDomains.get();
+    const lockReady = Promise.withResolvers<number>();
+    const releaseLock = Promise.withResolvers<void>();
+    const blocker = db.transaction(async tx => {
+      const { rows } = await tx.execute<{ pid: number }>(sql`SELECT pg_backend_pid() AS pid`);
+      if (!rows[0]) throw new Error('Missing blocking transaction PID');
+      await tx.select().from(kilocode_users).where(eq(kilocode_users.id, admin.id)).for('update');
+      lockReady.resolve(rows[0].pid);
+      await releaseLock.promise;
+    });
+    const operations: Promise<unknown>[] = [blocker];
+    try {
+      const blockerPid = await Promise.race([
+        lockReady.promise,
+        blocker.then(() => {
+          throw new Error('Blocker finished without holding the actor lock');
+        }),
+      ]);
+      const input = { domains: [], blocked_tlds: [], expected_version: version };
+      const save = caller.admin.blacklistDomains.set(input);
+      operations.push(save);
+      const failure = expect(save).rejects.toMatchObject({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: preWriteFailureMessage,
+      });
+      expect(await waitForTransactionLock(blockerPid, 'blocker')).toBe(true);
+      await failure;
+      expect(redisValues.get(BLACKLIST_DOMAINS_SETTINGS_REDIS_KEY)).toBe(previousRaw);
+      expect(await tableSettings()).toEqual([]);
+      expect(mockedRedisSet).not.toHaveBeenCalled();
+
+      releaseLock.resolve();
+      await blocker;
+      await expect(caller.admin.blacklistDomains.set(input)).resolves.toMatchObject({
+        blocked_signup_tlds: [],
+      });
+    } finally {
+      releaseLock.resolve();
+      await Promise.allSettled(operations);
+    }
+  }, 30000);
+
   it('holds the actor lock until a winning save commits, then deletion scrubs its editor', async () => {
     storeSettings(previousSettings);
     const caller = await createCallerForUser(admin.id);
@@ -1030,7 +1077,7 @@ describe('admin.blacklistDomains.set', () => {
         domains: ['mailinator.com'],
         expected_version: unusedVersion,
       })
-    ).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR', message: saveFailureMessage });
+    ).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR', message: preWriteFailureMessage });
 
     expect(await tableDomains()).toEqual(['previous.example']);
     expect(mockedBackfill).not.toHaveBeenCalled();
@@ -1143,7 +1190,7 @@ describe('admin.blacklistDomains.set', () => {
         })
       ).rejects.toMatchObject({
         code: 'INTERNAL_SERVER_ERROR',
-        message: saveFailureMessage,
+        message: preWriteFailureMessage,
         cause: { cause: { message: 'forced settings mirror failure' } },
       });
 
@@ -1193,7 +1240,7 @@ describe('admin.blacklistDomains.set', () => {
     try {
       await expect(caller.admin.blacklistDomains.set(input)).rejects.toMatchObject({
         code: 'INTERNAL_SERVER_ERROR',
-        message: saveFailureMessage,
+        message: preWriteFailureMessage,
         cause: { cause: { message: 'forced second blacklist batch failure' } },
       });
 
@@ -1522,7 +1569,7 @@ describe('admin.blacklistDomains.get', () => {
           domains: ['mailinator.com'],
           expected_version: unusedVersion,
         })
-      ).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR', message: saveFailureMessage });
+      ).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR', message: preWriteFailureMessage });
 
       expect(await tableDomains()).toEqual(['previous.example']);
       expect(redisValues.get(BLACKLIST_DOMAINS_SETTINGS_REDIS_KEY)).toBe(raw);

@@ -103,6 +103,7 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
     ];
 
     let saved;
+    let settingsWriteAttempted = false;
     try {
       saved = await db.transaction(async tx => {
         // Serializes saves, including the previous-config read.
@@ -152,6 +153,7 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
           .onConflictDoUpdate({ target: blacklisted_domains_settings.id, set: settings });
         // Redis and the commit cannot be atomic. Writing last keeps a failed statement from
         // applying the settings; only a failed commit can leave Redis ahead of Postgres.
+        settingsWriteAttempted = true;
         await redisClient.set(BLACKLIST_DOMAINS_SETTINGS_REDIS_KEY, JSON.stringify(settings));
         return { settings, addedDomains };
       });
@@ -162,8 +164,9 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
       captureException(error, { tags: { source: 'blacklist_domains_save' } });
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
-        message:
-          'Blacklist save failed. Reload the list before retrying; the signup TLDs may have been saved.',
+        message: settingsWriteAttempted
+          ? 'Blacklist save failed. Reload the list before retrying; the signup TLDs may have been saved.'
+          : 'Blacklist save failed before the signup TLDs were saved. Reload the list before retrying.',
         cause: error,
       });
     }

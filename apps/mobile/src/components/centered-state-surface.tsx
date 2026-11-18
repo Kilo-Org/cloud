@@ -156,12 +156,18 @@ export function NativeStateSurface({ children, navigation, options }: ScreenLayo
   // in the same render, and setting state during render is the update React
   // rejects on a scene that has not mounted yet (`setThemePreference` orders
   // its writes around the same warning).
+  // The installed set is a guard, not a cache: our own `setOptions` write comes
+  // back as the incoming props, so re-deriving them would hand the navigator a
+  // new object every render and restart the install in an endless update loop.
   const derivedPropsRef = useRef({
     incoming: options.unstable_nativeProps,
     external: options.unstable_nativeProps,
   });
   const incomingProps = options.unstable_nativeProps;
-  if (incomingProps !== derivedPropsRef.current.incoming) {
+  if (
+    incomingProps !== installedPropsRef.current &&
+    incomingProps !== derivedPropsRef.current.incoming
+  ) {
     const installed = installedPropsRef.current;
     const previous = derivedPropsRef.current.external;
     derivedPropsRef.current = {

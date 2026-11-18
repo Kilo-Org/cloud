@@ -8,7 +8,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 import { useScreenInsets } from '@/lib/screen-insets';
 
-const UNDER_HANDLE_PADDING = Platform.OS === 'ios' ? 'pb-5 pt-1' : 'pb-7 pt-0';
+const UNDER_HANDLE_PADDING = Platform.OS === 'ios' ? 'pb-4 pt-1.5' : 'pb-7 pt-0';
 
 export function SheetHeader({
   title,
@@ -101,8 +101,9 @@ export function SheetHeader({
         // `pt-4` made the gap over the title about twice the gap below it.
         // The handle's own gap differs by platform (Material3 ~22dp, iOS 16pt),
         // so each platform gets its own split: measured 33.9dp above and
-        // 35.9dp below on the Android emulator, 26.3pt and 41.7pt on iOS with
-        // `pb-7 pt-0`, which `pb-5 pt-1` evens out.
+        // 35.9dp below on the Android emulator, and 26.3pt above and 33.7pt
+        // below on iOS with `pb-5 pt-1`. `pb-4 pt-1.5` predicts 28.3pt and
+        // 29.7pt, so the gap over the title is no larger than the gap below it.
         underHandle ? UNDER_HANDLE_PADDING : 'pb-3 pt-4',
         surfaceClassName
       )}

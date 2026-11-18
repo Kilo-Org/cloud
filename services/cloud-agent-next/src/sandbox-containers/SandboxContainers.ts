@@ -79,6 +79,7 @@ import {
 } from './egress-policy.js';
 import type { NativeRuntimeImage } from '../sandbox-control/startup-selection.js';
 import { ContainersLaunchInterruptedError } from './launch-interrupted.js';
+import { readSentryIdentity, sentryIdentityFromBilling } from '../sentry-identity.js';
 
 export type { ContainerInstanceSize, ContainersStartSource } from './native-start.js';
 export type { NativeCaptureResult } from './native-capture.js';
@@ -295,6 +296,11 @@ export class SandboxContainers extends DurableObject<Env> {
         )
       );
     }
+  }
+
+  async [readSentryIdentity]() {
+    const billing = await getBillingContext(this.ctx.storage);
+    return billing ? sentryIdentityFromBilling(billing) : undefined;
   }
 
   private runExclusive<T>(task: () => Promise<T>): Promise<T> {

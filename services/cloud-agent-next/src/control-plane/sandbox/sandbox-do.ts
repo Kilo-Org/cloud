@@ -468,6 +468,8 @@ import {
   type SnapshotValidatorInput,
 } from './snapshot-validator.js';
 
+import { readSentryIdentity, sentryIdentityFromBilling } from '../../sentry-identity.js';
+
 const GENERATION_KEY = 'control_plane_generation';
 const GENERATION = 2;
 const WORKSPACE_ARTIFACT_ORPHAN_SWEEP_DELAY_MS = 60_000;
@@ -1060,6 +1062,20 @@ export class SandboxControlV2 extends DurableObject<Env> {
     });
     this.provider = this.createProviderAdapter(this.defaultPin('cloudflare-containers'));
     this.initialized = ctx.blockConcurrencyWhile(() => this.initializeStorage());
+  }
+
+  async [readSentryIdentity]() {
+    const pin = this.providerPin;
+    const billing = pin?.billing ? sentryIdentityFromBilling(pin.billing) : undefined;
+    return {
+      userId: (await this.requireOwner().catch(() => null)) ?? billing?.userId ?? pin?.byoc?.userId,
+      orgId:
+        billing?.orgId ??
+        pin?.byoc?.organizationId ??
+        (pin?.byoc?.userId ? '(personal)' : undefined),
+      sessionId: billing?.sessionId,
+      sandboxId: this.sandboxId,
+    };
   }
 
   async requestBillingStop(input: NativeBillingStopRequest): Promise<boolean> {

@@ -4425,8 +4425,7 @@
       "repoValue": "Repozitorij: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Ta profil ni več na voljo. Izberi drugega.",
-      "pickerEmptyDescriptionOrganization": "Ustvarite organizacijski profil za ponovno uporabo spremenljivk okolja, nastavitvenih ukazov in veščin med sejami.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Organizacijski profil lahko ustvari lastnik organizacije ali skrbnik."
+      "pickerEmptyDescriptionOrganization": "Ustvarite organizacijski profil za ponovno uporabo spremenljivk okolja, nastavitvenih ukazov in veščin med sejami."
     },
     "variablesDeleteFailed": "Spremenljivke ni bilo mogoče izbrisati",
     "deleteVariable": "Izbriši spremenljivko {{key}}",
@@ -4792,6 +4791,8 @@
       "created": "Sprožilec je ustvarjen",
       "saved": "Sprožilec je shranjen",
       "statusArrived": "Prispelo",
+      "defaultPromptWebhook": "Opišite telo zahteve tega spletnega kavlja:\n\n{{body}}",
+      "defaultPromptScheduled": "Zaženite načrtovano opravilo. Sproženo ob {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Vnesite ime.",
         "nameTooShort": "Uporabite vsaj 8 znakov.",

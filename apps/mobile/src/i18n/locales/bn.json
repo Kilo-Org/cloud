@@ -4293,8 +4293,7 @@
       "repoValue": "সংগ্রহস্থল: {{name}}",
       "profileValue": "প্রোফাইল: {{name}}",
       "profileUnavailable": "এই প্রোফাইলটি আর উপলভ্য নেই। অন্য একটি বেছে নিন।",
-      "pickerEmptyDescriptionOrganization": "সেশন জুড়ে পরিবেশ ভেরিয়েবল, সেটআপ কমান্ড এবং দক্ষতা পুনরায় ব্যবহার করার জন্য একটি সংগঠন প্রোফাইল তৈরি করুন।",
-      "pickerEmptyDescriptionOrganizationReadOnly": "একজন সংগঠন মালিক বা অ্যাডমিন সংগঠন প্রোফাইল তৈরি করতে পারেন।"
+      "pickerEmptyDescriptionOrganization": "সেশন জুড়ে পরিবেশ ভেরিয়েবল, সেটআপ কমান্ড এবং দক্ষতা পুনরায় ব্যবহার করার জন্য একটি সংগঠন প্রোফাইল তৈরি করুন।"
     },
     "variablesDeleteFailed": "ভেরিয়েবল মুছে ফেলা যায়নি",
     "deleteVariable": "ভেরিয়েবল {{key}} মুছুন",
@@ -4652,6 +4651,8 @@
       "created": "ট্রিগার তৈরি হয়েছে",
       "saved": "ট্রিগার সংরক্ষিত হয়েছে",
       "statusArrived": "পৌঁছেছে",
+      "defaultPromptWebhook": "এই ওয়েবহুক অনুরোধের বডি বর্ণনা করুন:\n\n{{body}}",
+      "defaultPromptScheduled": "নির্ধারিত কাজটি চালান। চালনা শুরু হয়েছে {{scheduledTime}}-এ।",
       "problems": {
         "nameRequired": "একটি নাম লিখুন।",
         "nameTooShort": "কমপক্ষে ৮ অক্ষর ব্যবহার করুন।",

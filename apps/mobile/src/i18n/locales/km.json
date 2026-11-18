@@ -4293,8 +4293,7 @@
       "repoValue": "ឃ្លាំងកូដ: {{name}}",
       "profileValue": "កម្រងព័ត៌មាន: {{name}}",
       "profileUnavailable": "កម្រងព័ត៌មាននេះលែងមានទៀតហើយ។ សូមជ្រើសរើសកម្រងព័ត៌មានផ្សេង។",
-      "pickerEmptyDescriptionOrganization": "បង្កើតកម្រងព័ត៌មានអង្គភាពមួយ ដើម្បីប្រើអថេរបរិស្ថាន ពាក្យបញ្ជាដំឡើង និងជំនាញឡើងវិញនៅទូទាំងវគ្គ។",
-      "pickerEmptyDescriptionOrganizationReadOnly": "ម្ចាស់អង្គភាព ឬអ្នកគ្រប់គ្រងអង្គភាពអាចបង្កើតកម្រងព័ត៌មានអង្គភាពបាន។"
+      "pickerEmptyDescriptionOrganization": "បង្កើតកម្រងព័ត៌មានអង្គភាពមួយ ដើម្បីប្រើអថេរបរិស្ថាន ពាក្យបញ្ជាដំឡើង និងជំនាញឡើងវិញនៅទូទាំងវគ្គ។"
     },
     "variablesDeleteFailed": "មិនអាចលុបអថេរបានទេ។",
     "deleteVariable": "លុបអថេរ {{key}}",
@@ -4652,6 +4651,8 @@
       "created": "បានបង្កើតការកេះ",
       "saved": "បានរក្សាទុកការកេះ",
       "statusArrived": "បានមកដល់",
+      "defaultPromptWebhook": "ពិពណ៌នាតួសារសំណើវេបហុកនេះ៖\n\n{{body}}",
+      "defaultPromptScheduled": "ដំណើរការកិច្ចការដែលបានកំណត់ពេល។ ការប្រតិបត្តិបានចាប់ផ្តើមនៅ {{scheduledTime}}។",
       "problems": {
         "nameRequired": "សូមបញ្ចូលឈ្មោះ។",
         "nameTooShort": "ប្រើយ៉ាងតិច 8 តួអក្សរ។",

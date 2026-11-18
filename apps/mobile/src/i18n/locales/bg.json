@@ -4293,8 +4293,7 @@
       "repoValue": "Хранилище: {{name}}",
       "profileValue": "Профил: {{name}}",
       "profileUnavailable": "Този профил вече не е наличен. Избери друг.",
-      "pickerEmptyDescriptionOrganization": "Създайте организационен профил за повторно използване на променливи на средата, команди за настройка и умения в сесиите.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Собственик или администратор на организация може да създава организационен профил."
+      "pickerEmptyDescriptionOrganization": "Създайте организационен профил за повторно използване на променливи на средата, команди за настройка и умения в сесиите."
     },
     "variablesDeleteFailed": "Променливата не можа да бъде изтрита",
     "deleteVariable": "Изтрийте променлива {{key}}",
@@ -4652,6 +4651,8 @@
       "created": "Тригерът е създаден",
       "saved": "Тригерът е запазен",
       "statusArrived": "Пристигна",
+      "defaultPromptWebhook": "Опишете тялото на заявката от този уебхук:\n\n{{body}}",
+      "defaultPromptScheduled": "Изпълнете планираната задача. Изпълнението започна в {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Въведете име.",
         "nameTooShort": "Използвайте поне 8 знака.",

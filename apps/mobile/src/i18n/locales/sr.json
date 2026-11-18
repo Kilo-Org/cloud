@@ -4359,8 +4359,7 @@
       "repoValue": "Spremište: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Ovaj profil više nije dostupan. Izaberi drugi.",
-      "pickerEmptyDescriptionOrganization": "Napravite profil organizacije da biste ponovo koristili promenljive okruženja, komande za podešavanje i veštine u svim sesijama.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Vlasnik ili administrator organizacije može da napravi profil organizacije."
+      "pickerEmptyDescriptionOrganization": "Napravite profil organizacije da biste ponovo koristili promenljive okruženja, komande za podešavanje i veštine u svim sesijama."
     },
     "variablesDeleteFailed": "Nije moguće izbrisati promenljivu",
     "deleteVariable": "Obriši promenljivu {{key}}",
@@ -4722,6 +4721,8 @@
       "created": "Okidač je napravljen",
       "saved": "Okidač je sačuvan",
       "statusArrived": "Stiglo",
+      "defaultPromptWebhook": "Opiši telo zahteva ovog vebhuka:\n\n{{body}}",
+      "defaultPromptScheduled": "Pokreni zakazani zadatak. Pokrenuto u {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Unesite naziv.",
         "nameTooShort": "Koristite najmanje 8 znakova.",

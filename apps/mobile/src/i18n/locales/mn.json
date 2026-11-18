@@ -4293,8 +4293,7 @@
       "repoValue": "Хадгалах газар: {{name}}",
       "profileValue": "Профайл: {{name}}",
       "profileUnavailable": "Энэ профайлыг ашиглах боломжгүй болсон. Өөр профайл сонгоорой.",
-      "pickerEmptyDescriptionOrganization": "Хүрээлэн буй орчны хувьсагч, тохируулах команд, ур чадварыг сешнүүдэд дахин ашиглахын тулд байгууллагын профайл үүсгээрэй.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Байгууллагын эзэмшигч эсвэл админ байгууллагын профайл үүсгэх боломжтой."
+      "pickerEmptyDescriptionOrganization": "Хүрээлэн буй орчны хувьсагч, тохируулах команд, ур чадварыг сешнүүдэд дахин ашиглахын тулд байгууллагын профайл үүсгээрэй."
     },
     "variablesDeleteFailed": "Хувьсагчийг устгаж чадсангүй",
     "deleteVariable": "{{key}} хувьсагчийг устгах",
@@ -4652,6 +4651,8 @@
       "created": "Триггер үүслээ",
       "saved": "Триггер хадгалагдлаа",
       "statusArrived": "Ирсэн",
+      "defaultPromptWebhook": "Вебхук хүсэлтийн биеийг тайлбарлана уу:\n\n{{body}}",
+      "defaultPromptScheduled": "Хуваарийн даалгаврыг ажиллуулна уу. Триггер {{scheduledTime}} цагт ажилласан.",
       "problems": {
         "nameRequired": "Нэр оруулна уу.",
         "nameTooShort": "Дор хаяж 8 тэмдэгт ашиглана уу.",

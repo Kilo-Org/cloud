@@ -4293,8 +4293,7 @@
       "repoValue": "Kho lưu trữ: {{name}}",
       "profileValue": "Hồ sơ: {{name}}",
       "profileUnavailable": "Hồ sơ này không còn khả dụng. Hãy chọn hồ sơ khác.",
-      "pickerEmptyDescriptionOrganization": "Tạo hồ sơ tổ chức để sử dụng lại các biến môi trường, lệnh thiết lập và kỹ năng trong các phiên.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Chủ sở hữu hoặc quản trị viên của tổ chức có thể tạo hồ sơ tổ chức."
+      "pickerEmptyDescriptionOrganization": "Tạo hồ sơ tổ chức để sử dụng lại các biến môi trường, lệnh thiết lập và kỹ năng trong các phiên."
     },
     "variablesDeleteFailed": "Không thể xóa biến",
     "deleteVariable": "Xóa biến {{key}}",
@@ -4652,6 +4651,8 @@
       "created": "Đã tạo trình kích hoạt",
       "saved": "Đã lưu trình kích hoạt",
       "statusArrived": "Đã đến",
+      "defaultPromptWebhook": "Mô tả nội dung yêu cầu webhook này:\n\n{{body}}",
+      "defaultPromptScheduled": "Chạy tác vụ theo lịch. Được kích hoạt lúc {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Nhập tên.",
         "nameTooShort": "Dùng ít nhất 8 ký tự.",

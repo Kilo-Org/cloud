@@ -52,6 +52,14 @@ export function useSetReviewMemoryEnabled(scope: string) {
   const billingAction = useBillingAction(reviewMemoryOrganizationId(scope));
 
   return useMutation({
+    // Reachability is the switch's outcome, not a precondition: the default
+    // `networkMode: 'online'` pauses the mutation while the connectivity
+    // manager reports the device offline, so the request is never sent, the
+    // caller's `mutateAsync` never settles, and the queued write lands
+    // silently once the connection returns. Attempting the request instead
+    // lets it fail through the normal path: onError toasts the failure, so
+    // the switch returns to an enabled retry state.
+    networkMode: 'always',
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (enabled: boolean) =>
       trpcClient.reviewMemory.setEnabled.mutate({ ...ownerInput, enabled }),
@@ -88,6 +96,13 @@ export function useTriggerReviewMemoryAnalysis(scope: string) {
   const billingAction = useBillingAction(reviewMemoryOrganizationId(scope));
 
   return useMutation({
+    // Reachability is the run's outcome, not a precondition: the default
+    // `networkMode: 'online'` pauses the mutation while the device reports
+    // offline, so the caller's `mutateAsync` never settles and the run lands
+    // silently later. Attempting the request instead lets it fail through the
+    // normal path: onError toasts the failure, so the action returns to an
+    // enabled retry state.
+    networkMode: 'always',
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (repoFullName: string) =>
       trpcClient.reviewMemory.triggerAnalysis.mutate({ ...ownerInput, repoFullName }),
@@ -135,8 +150,18 @@ export function useReviewMemoryProposalActions(scope: string) {
       }),
     ]);
   };
+  // Reachability is each proposal action's outcome, not a precondition: the
+  // default `networkMode: 'online'` pauses a mutation while the device
+  // reports offline, so the caller's `mutateAsync` never settles (the
+  // combined `isPending` flag stays true with no failure surface) and the
+  // queued write — including the approval that opens a change request —
+  // lands silently once the connection returns. Attempting the request
+  // instead lets it fail through the normal path: onError toasts the failure,
+  // so the controls return to an enabled retry state.
+  const networkMode = { networkMode: 'always' } as const;
   const save = useMutation(
     trpc.reviewMemory.updateProposal.mutationOptions({
+      ...networkMode,
       onError,
       onSettled,
       onSuccess: () => {
@@ -146,6 +171,7 @@ export function useReviewMemoryProposalActions(scope: string) {
   );
   const reject = useMutation(
     trpc.reviewMemory.rejectProposal.mutationOptions({
+      ...networkMode,
       onError,
       onSettled,
       onSuccess: () => {
@@ -155,6 +181,7 @@ export function useReviewMemoryProposalActions(scope: string) {
   );
   const approve = useMutation(
     trpc.reviewMemory.approveAndOpenChangeRequest.mutationOptions({
+      ...networkMode,
       onError,
       onSettled,
       onSuccess: proposal => {

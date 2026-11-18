@@ -4293,8 +4293,7 @@
       "repoValue": "Repositori: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Profil ini tidak lagi tersedia. Pilih profil lain.",
-      "pickerEmptyDescriptionOrganization": "Buat profil organisasi untuk menggunakan kembali variabel lingkungan, perintah pengaturan, dan keterampilan di seluruh sesi.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Pemilik atau admin organisasi dapat membuat profil organisasi."
+      "pickerEmptyDescriptionOrganization": "Buat profil organisasi untuk menggunakan kembali variabel lingkungan, perintah pengaturan, dan keterampilan di seluruh sesi."
     },
     "variablesDeleteFailed": "Tidak dapat menghapus variabel",
     "deleteVariable": "Hapus variabel {{key}}",
@@ -4652,6 +4651,8 @@
       "created": "Pemicu dibuat",
       "saved": "Pemicu disimpan",
       "statusArrived": "Tiba",
+      "defaultPromptWebhook": "Jelaskan isi permintaan webhook ini:\n\n{{body}}",
+      "defaultPromptScheduled": "Jalankan tugas terjadwal. Eksekusi dimulai pada {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Masukkan nama.",
         "nameTooShort": "Gunakan setidaknya 8 karakter.",

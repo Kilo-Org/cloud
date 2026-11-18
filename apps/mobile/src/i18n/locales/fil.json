@@ -4293,8 +4293,7 @@
       "repoValue": "Repositoryo: {{name}}",
       "profileValue": "Profile: {{name}}",
       "profileUnavailable": "Hindi na available ang profile na ito. Pumili ng iba.",
-      "pickerEmptyDescriptionOrganization": "Gumawa ng profile ng organisasyon para magamit muli ang mga variable ng kapaligiran, mga utos sa pag-setup, at mga kasanayan sa mga session.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Ang may-ari ng organisasyon o admin ang makakagawa ng profile ng organisasyon."
+      "pickerEmptyDescriptionOrganization": "Gumawa ng profile ng organisasyon para magamit muli ang mga variable ng kapaligiran, mga utos sa pag-setup, at mga kasanayan sa mga session."
     },
     "variablesDeleteFailed": "Hindi ma-delete ang variable",
     "deleteVariable": "Burahin ang variable {{key}}",
@@ -4652,6 +4651,8 @@
       "created": "Nagawa ang pampapagana",
       "saved": "Naimbak ang pampapagana",
       "statusArrived": "Dumating",
+      "defaultPromptWebhook": "Ilarawan ang katawan ng kahilingang webhook na ito:\n\n{{body}}",
+      "defaultPromptScheduled": "Patakbuhin ang naka-iskedyul na gawain. Sinimulan noong {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Maglagay ng pangalan.",
         "nameTooShort": "Gumamit ng hindi bababa sa 8 karakter.",

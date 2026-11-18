@@ -4491,8 +4491,7 @@
       "repoValue": "Stór: {{name}}",
       "profileValue": "Próifíl: {{name}}",
       "profileUnavailable": "Níl an phróifíl seo ar fáil a thuilleadh. Roghnaigh ceann eile.",
-      "pickerEmptyDescriptionOrganization": "Cruthaigh próifíl eagrais chun athróga timpeallachta, orduithe socraithe, agus scileanna a athúsáid thar seisiúin.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Is féidir le húinéir nó riarthóir eagrais próifíl eagrais a chruthú."
+      "pickerEmptyDescriptionOrganization": "Cruthaigh próifíl eagrais chun athróga timpeallachta, orduithe socraithe, agus scileanna a athúsáid thar seisiúin."
     },
     "variablesDeleteFailed": "Níorbh fhéidir an athróg a scriosadh",
     "deleteVariable": "Scrios athróg {{key}}",
@@ -4862,6 +4861,8 @@
       "created": "Cruthaíodh an truicear",
       "saved": "Sábháladh an truicear",
       "statusArrived": "Tagtha",
+      "defaultPromptWebhook": "Déan cur síos ar chomhlacht an iarratais chruca ghréasáin seo:\n\n{{body}}",
+      "defaultPromptScheduled": "Rith an tasc sceidealaithe. Truiceartha ag {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Cuir isteach ainm.",
         "nameTooShort": "Úsáid 8 gcarachtar ar a laghad.",

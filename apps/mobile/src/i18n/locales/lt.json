@@ -4425,8 +4425,7 @@
       "repoValue": "Saugykla: {{name}}",
       "profileValue": "Profilis: {{name}}",
       "profileUnavailable": "Šis profilis nebepasiekiamas. Pasirinkite kitą.",
-      "pickerEmptyDescriptionOrganization": "Sukurkite organizacijos profilį, kad seansų metu pakartotinai naudotumėte aplinkos kintamuosius, sąrankos komandas ir įgūdžius.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Organizacijos savininkas arba administratorius gali sukurti organizacijos profilį."
+      "pickerEmptyDescriptionOrganization": "Sukurkite organizacijos profilį, kad seansų metu pakartotinai naudotumėte aplinkos kintamuosius, sąrankos komandas ir įgūdžius."
     },
     "variablesDeleteFailed": "Nepavyko ištrinti kintamojo",
     "deleteVariable": "Ištrinti kintamąjį {{key}}",
@@ -4792,6 +4791,8 @@
       "created": "Trigeris sukurtas",
       "saved": "Trigeris išsaugotas",
       "statusArrived": "Gauta",
+      "defaultPromptWebhook": "Aprašykite šio žiniatinklio kabliuko užklausos turinį:\n\n{{body}}",
+      "defaultPromptScheduled": "Paleiskite suplanuotą užduotį. Paleidimo laikas: {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Įveskite pavadinimą.",
         "nameTooShort": "Naudokite bent 8 simbolius.",

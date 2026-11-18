@@ -4293,8 +4293,7 @@
       "repoValue": "Depo: {{name}}",
       "profileValue": "Pwofil: {{name}}",
       "profileUnavailable": "Pwofil sa a pa disponib ankò. Chwazi yon lòt.",
-      "pickerEmptyDescriptionOrganization": "Kreye yon pwofil òganizasyon pou reitilize varyab anviwònman yo, kòmandman konfigirasyon, ak ladrès atravè sesyon yo.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Yon pwopriyetè oswa administratè òganizasyon ka kreye yon pwofil òganizasyon."
+      "pickerEmptyDescriptionOrganization": "Kreye yon pwofil òganizasyon pou reitilize varyab anviwònman yo, kòmandman konfigirasyon, ak ladrès atravè sesyon yo."
     },
     "variablesDeleteFailed": "Pa t 'kapab efase varyab",
     "deleteVariable": "Efase varyab {{key}}",
@@ -4652,6 +4651,8 @@
       "created": "Deklanchè kreye",
       "saved": "Deklanchè sove",
       "statusArrived": "Rive",
+      "defaultPromptWebhook": "Dekri kò demann wèbhuk sa a:\n\n{{body}}",
+      "defaultPromptScheduled": "Lanse travay pwograme a. Deklanche a {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Antre yon non.",
         "nameTooShort": "Sèvi ak omwen 8 karaktè.",

@@ -4425,8 +4425,7 @@
       "repoValue": "Репозиторий: {{name}}",
       "profileValue": "Профиль: {{name}}",
       "profileUnavailable": "Этот профиль больше недоступен. Выберите другой.",
-      "pickerEmptyDescriptionOrganization": "Создайте профиль организации для повторного использования переменных среды, команд настройки и навыков в разных сеансах.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Создать профиль организации может владелец организации или её администратор."
+      "pickerEmptyDescriptionOrganization": "Создайте профиль организации для повторного использования переменных среды, команд настройки и навыков в разных сеансах."
     },
     "variablesDeleteFailed": "Не удалось удалить переменную",
     "deleteVariable": "Удалить переменную {{key}}",
@@ -4792,6 +4791,8 @@
       "created": "Триггер создан",
       "saved": "Триггер сохранён",
       "statusArrived": "Получено",
+      "defaultPromptWebhook": "Опишите тело этого запроса вебхука:\n\n{{body}}",
+      "defaultPromptScheduled": "Запустите задачу по расписанию. Триггер сработал в {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Введите имя.",
         "nameTooShort": "Используйте не менее 8 символов.",

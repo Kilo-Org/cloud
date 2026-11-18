@@ -4293,8 +4293,7 @@
       "repoValue": "Opslagplaats: {{name}}",
       "profileValue": "Profiel: {{name}}",
       "profileUnavailable": "Dit profiel is niet meer beschikbaar. Kies een ander profiel.",
-      "pickerEmptyDescriptionOrganization": "Maak een organisatieprofiel aan om omgevingsvariabelen, installatieopdrachten en vaardigheden tijdens sessies opnieuw te gebruiken.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Een organisatie-eigenaar of beheerder kan een organisatieprofiel aanmaken."
+      "pickerEmptyDescriptionOrganization": "Maak een organisatieprofiel aan om omgevingsvariabelen, installatieopdrachten en vaardigheden tijdens sessies opnieuw te gebruiken."
     },
     "variablesDeleteFailed": "Kan variabele niet verwijderen",
     "deleteVariable": "Variabele {{key}} verwijderen",
@@ -4652,6 +4651,8 @@
       "created": "Trigger aangemaakt",
       "saved": "Trigger opgeslagen",
       "statusArrived": "Aangekomen",
+      "defaultPromptWebhook": "Beschrijf de inhoud van dit webhookverzoek:\n\n{{body}}",
+      "defaultPromptScheduled": "Voer de geplande taak uit. Geactiveerd om {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Voer een naam in.",
         "nameTooShort": "Gebruik minstens 8 tekens.",

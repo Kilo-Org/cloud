@@ -4293,8 +4293,7 @@
       "repoValue": "Repositori: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Profil ini tidak lagi tersedia. Pilih profil lain.",
-      "pickerEmptyDescriptionOrganization": "Buat profil organisasi untuk menggunakan semula pembolehubah persekitaran, arahan persediaan dan kemahiran merentas sesi.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Pemilik atau pentadbir organisasi boleh membuat profil organisasi."
+      "pickerEmptyDescriptionOrganization": "Buat profil organisasi untuk menggunakan semula pembolehubah persekitaran, arahan persediaan dan kemahiran merentas sesi."
     },
     "variablesDeleteFailed": "Tidak dapat memadam pembolehubah",
     "deleteVariable": "Padam pembolehubah {{key}}",
@@ -4652,6 +4651,8 @@
       "created": "Pencetus dicipta",
       "saved": "Pencetus disimpan",
       "statusArrived": "Tiba",
+      "defaultPromptWebhook": "Huraikan badan permintaan webhook ini:\n\n{{body}}",
+      "defaultPromptScheduled": "Jalankan tugas berjadual. Dicetuskan pada {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Masukkan nama.",
         "nameTooShort": "Gunakan sekurang-kurangnya 8 aksara.",

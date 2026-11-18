@@ -4293,8 +4293,7 @@
       "repoValue": "زېرمتون: {{name}}",
       "profileValue": "پروفایل: {{name}}",
       "profileUnavailable": "دا پروفایل نور شتون نه لري. بل پروفایل غوره کړئ.",
-      "pickerEmptyDescriptionOrganization": "د چاپېریال متغیرونو، تنظیم کولو امرونو، او په ناستو کې مهارتونه د بیا کارولو لپاره د سازمان پروفایل رامینځته کړئ.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "د سازمان خاوند یا مدیر کولی شي د سازمان پروفایل رامینځته کړي."
+      "pickerEmptyDescriptionOrganization": "د چاپېریال متغیرونو، تنظیم کولو امرونو، او په ناستو کې مهارتونه د بیا کارولو لپاره د سازمان پروفایل رامینځته کړئ."
     },
     "variablesDeleteFailed": "متغیر ړنګول نشو کړای",
     "deleteVariable": "د {{key}} متغیر ړنګ کړئ",
@@ -4652,6 +4651,8 @@
       "created": "ټرېګر جوړ شو",
       "saved": "ټرېګر خوندي شو",
       "statusArrived": "ورسېد",
+      "defaultPromptWebhook": "د دې ویب‌هوک غوښتنې د بدن تشریح وکړئ:\n\n{{body}}",
+      "defaultPromptScheduled": "مهالویز کار وچلوئ. {{scheduledTime}} کې ټرېګر شو.",
       "problems": {
         "nameRequired": "نوم ولیکئ.",
         "nameTooShort": "لږ تر لږه 8 توري وکاروئ.",

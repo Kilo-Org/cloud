@@ -4425,8 +4425,7 @@
       "repoValue": "Úložiště: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Tento profil už není dostupný. Vyberte jiný.",
-      "pickerEmptyDescriptionOrganization": "Vytvořte profil organizace pro opětovné použití proměnných prostředí, instalačních příkazů a dovedností napříč relacemi.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Profil organizace může vytvořit vlastník organizace nebo správce."
+      "pickerEmptyDescriptionOrganization": "Vytvořte profil organizace pro opětovné použití proměnných prostředí, instalačních příkazů a dovedností napříč relacemi."
     },
     "variablesDeleteFailed": "Proměnnou se nepodařilo smazat",
     "deleteVariable": "Smazat proměnnou {{key}}",
@@ -4792,6 +4791,8 @@
       "created": "Spouštěč vytvořen",
       "saved": "Spouštěč uložen",
       "statusArrived": "Dorazilo",
+      "defaultPromptWebhook": "Popište tělo tohoto požadavku webhooku:\n\n{{body}}",
+      "defaultPromptScheduled": "Spusťte naplánovaný úkol. Spuštěno v {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Zadejte název.",
         "nameTooShort": "Použijte alespoň 8 znaků.",

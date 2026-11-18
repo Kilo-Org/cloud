@@ -4293,8 +4293,7 @@
       "repoValue": "仓库: {{name}}",
       "profileValue": "配置文件: {{name}}",
       "profileUnavailable": "此配置文件已不可用。请选择其他配置文件。",
-      "pickerEmptyDescriptionOrganization": "创建组织配置文件，以跨会话重复使用环境变量、设置命令和技能。",
-      "pickerEmptyDescriptionOrganizationReadOnly": "组织所有者或管理员可以创建组织配置文件。"
+      "pickerEmptyDescriptionOrganization": "创建组织配置文件，以跨会话重复使用环境变量、设置命令和技能。"
     },
     "variablesDeleteFailed": "无法删除变量",
     "deleteVariable": "删除变量 {{key}}",
@@ -4652,6 +4651,8 @@
       "created": "触发器已创建",
       "saved": "触发器已保存",
       "statusArrived": "已到达",
+      "defaultPromptWebhook": "描述此 Webhook 请求的请求体：\n\n{{body}}",
+      "defaultPromptScheduled": "运行计划任务。触发时间为 {{scheduledTime}}。",
       "problems": {
         "nameRequired": "请输入名称。",
         "nameTooShort": "请使用至少 8 个字符。",

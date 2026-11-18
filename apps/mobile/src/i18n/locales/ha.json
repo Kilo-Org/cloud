@@ -4293,8 +4293,7 @@
       "repoValue": "Wurin ajiya: {{name}}",
       "profileValue": "Bayanin martaba: {{name}}",
       "profileUnavailable": "Wannan bayanin martaba ba ya samuwa kuma. Zaɓi wani.",
-      "pickerEmptyDescriptionOrganization": "Ƙirƙirar bayanin martaban ƙungiya don sake amfani da masu canjin yanayi, umarnin saitin, da ƙwarewa a cikin zaman.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Ma'abucin ƙungiya ko mai gudanarwa na iya ƙirƙirar bayanin martaban ƙungiya."
+      "pickerEmptyDescriptionOrganization": "Ƙirƙirar bayanin martaban ƙungiya don sake amfani da masu canjin yanayi, umarnin saitin, da ƙwarewa a cikin zaman."
     },
     "variablesDeleteFailed": "An kasa share canji",
     "deleteVariable": "Share canji {{key}}",
@@ -4652,6 +4651,8 @@
       "created": "An ƙirƙiri mai jawowa",
       "saved": "An ajiye mai jawowa",
       "statusArrived": "Ya iso",
+      "defaultPromptWebhook": "Bayyana jikin buƙatar wannan kiran yanar gizo:\n\n{{body}}",
+      "defaultPromptScheduled": "Gudanar da aikin da aka jadawalta. An fara gudana a {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Shigar da suna.",
         "nameTooShort": "Yi amfani da aƙalla haruffa 8.",

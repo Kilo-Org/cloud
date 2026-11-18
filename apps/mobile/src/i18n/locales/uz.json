@@ -4293,8 +4293,7 @@
       "repoValue": "Repozitoriy: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Bu profil endi mavjud emas. Boshqasini tanlang.",
-      "pickerEmptyDescriptionOrganization": "Seanslar davomida muhit o'zgaruvchilari, sozlash buyruqlari va ko'nikmalarni qayta ishlatish uchun tashkilot profili yarating.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Tashkilot profili tashkilot egasi yoki administratori tomonidan yaratilishi mumkin."
+      "pickerEmptyDescriptionOrganization": "Seanslar davomida muhit o'zgaruvchilari, sozlash buyruqlari va ko'nikmalarni qayta ishlatish uchun tashkilot profili yarating."
     },
     "variablesDeleteFailed": "Oʻzgaruvchi oʻchirilmadi",
     "deleteVariable": "{{key}} oʻzgaruvchisini oʻchiring",
@@ -4652,6 +4651,8 @@
       "created": "Ishga tushirgich yaratildi",
       "saved": "Ishga tushirgich saqlandi",
       "statusArrived": "Yetib keldi",
+      "defaultPromptWebhook": "Ushbu vebhook soʻrovi tanasini tavsiflang:\n\n{{body}}",
+      "defaultPromptScheduled": "Jadval boʻyicha vazifani ishga tushiring. {{scheduledTime}} vaqtida ishga tushirildi.",
       "problems": {
         "nameRequired": "Nom kiriting.",
         "nameTooShort": "Kamida 8 ta belgidan foydalaning.",

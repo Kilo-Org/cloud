@@ -4293,8 +4293,7 @@
       "repoValue": "Lager: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Denne profil er ikke længere tilgængelig. Vælg en anden.",
-      "pickerEmptyDescriptionOrganization": "Opret en organisationsprofil for at genbruge miljøvariabler, opsætningskommandoer og færdigheder på tværs af sessioner.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "En organisationsejer eller administrator kan oprette en organisationsprofil."
+      "pickerEmptyDescriptionOrganization": "Opret en organisationsprofil for at genbruge miljøvariabler, opsætningskommandoer og færdigheder på tværs af sessioner."
     },
     "variablesDeleteFailed": "Variablen kunne ikke slettes",
     "deleteVariable": "Slet variabel {{key}}",
@@ -4652,6 +4651,8 @@
       "created": "Udløser oprettet",
       "saved": "Udløser gemt",
       "statusArrived": "Ankommet",
+      "defaultPromptWebhook": "Beskriv indholdet af denne webhook-anmodning:\n\n{{body}}",
+      "defaultPromptScheduled": "Kør den planlagte opgave. Udløst kl. {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Indtast et navn.",
         "nameTooShort": "Brug mindst 8 tegn.",

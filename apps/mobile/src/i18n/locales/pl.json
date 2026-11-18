@@ -4425,8 +4425,7 @@
       "repoValue": "Repozytorium: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Ten profil nie jest już dostępny. Wybierz inny.",
-      "pickerEmptyDescriptionOrganization": "Utwórz profil organizacji, aby ponownie używać zmiennych środowiskowych, poleceń konfiguracyjnych i umiejętności w różnych sesjach.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Właściciel lub administrator organizacji może utworzyć profil organizacji."
+      "pickerEmptyDescriptionOrganization": "Utwórz profil organizacji, aby ponownie używać zmiennych środowiskowych, poleceń konfiguracyjnych i umiejętności w różnych sesjach."
     },
     "variablesDeleteFailed": "Nie udało się usunąć zmiennej",
     "deleteVariable": "Usuń zmienną {{key}}",
@@ -4792,6 +4791,8 @@
       "created": "Utworzono wyzwalacz",
       "saved": "Zapisano wyzwalacz",
       "statusArrived": "Dotarło",
+      "defaultPromptWebhook": "Opisz treść żądania webhooka:\n\n{{body}}",
+      "defaultPromptScheduled": "Uruchom zaplanowane zadanie. Wyzwolone o {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Wprowadź nazwę.",
         "nameTooShort": "Użyj co najmniej 8 znaków.",

@@ -4293,8 +4293,7 @@
       "repoValue": "ගබඩාව: {{name}}",
       "profileValue": "පැතිකඩ: {{name}}",
       "profileUnavailable": "මෙම පැතිකඩ තවදුරටත් ලබා ගත නොහැක. වෙනත් පැතිකඩක් තෝරන්න.",
-      "pickerEmptyDescriptionOrganization": "සැසි හරහා පරිසර විචල්‍ය, සැකසුම් විධාන සහ කුසලතා නැවත භාවිතා කිරීමට සංවිධාන පැතිකඩක් සාදන්න.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "සංවිධාන හිමිකරුවෙකුට හෝ පරිපාලකයෙකුට සංවිධාන පැතිකඩක් සෑදිය හැක."
+      "pickerEmptyDescriptionOrganization": "සැසි හරහා පරිසර විචල්‍ය, සැකසුම් විධාන සහ කුසලතා නැවත භාවිතා කිරීමට සංවිධාන පැතිකඩක් සාදන්න."
     },
     "variablesDeleteFailed": "විචල්‍යය මකා දැමීමට නොහැකි විය",
     "deleteVariable": "විචල්‍යය {{key}} මකන්න",
@@ -4652,6 +4651,8 @@
       "created": "ට්‍රිගර් සාදන ලදි",
       "saved": "ට්‍රිගර් සුරකින ලදි",
       "statusArrived": "පැමිණියා",
+      "defaultPromptWebhook": "මෙම වෙබ්හුක් ඉල්ලීමේ බොඩිය විස්තර කරන්න:\n\n{{body}}",
+      "defaultPromptScheduled": "කාලසටහන්ගත කාර්යය ධාවනය කරන්න෴ {{scheduledTime}} වේලාවේ ට්‍රිගර් විය෴",
       "problems": {
         "nameRequired": "නමක් ඇතුළත් කරන්න෴",
         "nameTooShort": "අවම වශයෙන් අක්ෂර 8ක් භාවිත කරන්න෴",

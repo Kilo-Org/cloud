@@ -4293,8 +4293,7 @@
       "repoValue": "Kaydka: {{name}}",
       "profileValue": "Astaanta: {{name}}",
       "profileUnavailable": "Astaantan hadda lama heli karo. Dooro mid kale.",
-      "pickerEmptyDescriptionOrganization": "Abuur profile urur si dib loogu isticmaalo doorsoomayaasha deegaanka, amarrada dejinta, iyo xirfadaha kalfadhiyada oo dhan.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Milkiilaha ururka ama maamulaha ayaa abuuri kara profile urur."
+      "pickerEmptyDescriptionOrganization": "Abuur profile urur si dib loogu isticmaalo doorsoomayaasha deegaanka, amarrada dejinta, iyo xirfadaha kalfadhiyada oo dhan."
     },
     "variablesDeleteFailed": "Way tirtiran kari wayday doorsoomaha",
     "deleteVariable": "Tirtir doorsoomaha {{key}}",
@@ -4652,6 +4651,8 @@
       "created": "Kiciye waa la abuuray",
       "saved": "Kiciye waa la kaydiyay",
       "statusArrived": "Waa yimid",
+      "defaultPromptWebhook": "Qeex jirka codsiga wicitaankan web:\n\n{{body}}",
+      "defaultPromptScheduled": "Socodsii hawsha jadwalka. La kiciyay {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Geli magac.",
         "nameTooShort": "Isticmaal ugu yaraan 8 xaraf.",

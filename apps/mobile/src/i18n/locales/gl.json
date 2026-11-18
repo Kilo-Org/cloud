@@ -4293,8 +4293,7 @@
       "repoValue": "Repositorio: {{name}}",
       "profileValue": "Perfil: {{name}}",
       "profileUnavailable": "Este perfil xa non está dispoñible. Escolle outro.",
-      "pickerEmptyDescriptionOrganization": "Crea un perfil de organización para reutilizar as variables de ambiente, os comandos de configuración e as habilidades nas sesións.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Un propietario ou administrador da organización pode crear un perfil de organización."
+      "pickerEmptyDescriptionOrganization": "Crea un perfil de organización para reutilizar as variables de ambiente, os comandos de configuración e as habilidades nas sesións."
     },
     "variablesDeleteFailed": "Non se puido eliminar a variable",
     "deleteVariable": "Eliminar a variable {{key}}",
@@ -4652,6 +4651,8 @@
       "created": "Disparador creado",
       "saved": "Disparador gardado",
       "statusArrived": "Chegou",
+      "defaultPromptWebhook": "Describe o corpo desta solicitude de webhook:\n\n{{body}}",
+      "defaultPromptScheduled": "Executa a tarefa programada. Activado en {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Introduce un nome.",
         "nameTooShort": "Usa polo menos 8 caracteres.",

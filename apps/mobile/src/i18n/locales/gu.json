@@ -4293,8 +4293,7 @@
       "repoValue": "રિપોઝિટરી: {{name}}",
       "profileValue": "પ્રોફાઇલ: {{name}}",
       "profileUnavailable": "આ પ્રોફાઇલ હવે ઉપલબ્ધ નથી. બીજી પસંદ કરો.",
-      "pickerEmptyDescriptionOrganization": "સમગ્ર સત્રોમાં પર્યાવરણ ચલો, સેટઅપ આદેશ અને કૌશલ્યોનો ફરીથી ઉપયોગ કરવા માટે સંસ્થા પ્રોફાઇલ બનાવો.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "સંસ્થા માલિક અથવા એડમિન સંસ્થા પ્રોફાઇલ બનાવી શકે છે."
+      "pickerEmptyDescriptionOrganization": "સમગ્ર સત્રોમાં પર્યાવરણ ચલો, સેટઅપ આદેશ અને કૌશલ્યોનો ફરીથી ઉપયોગ કરવા માટે સંસ્થા પ્રોફાઇલ બનાવો."
     },
     "variablesDeleteFailed": "ચલ કાઢી શકાયું નથી",
     "deleteVariable": "ચલ {{key}} કાઢી નાખો",
@@ -4652,6 +4651,8 @@
       "created": "ટ્રિગર બન્યો",
       "saved": "ટ્રિગર સાચવ્યો",
       "statusArrived": "આવ્યું",
+      "defaultPromptWebhook": "આ વેબહૂક વિનંતીની બોડીનું વર્ણન કરો:\n\n{{body}}",
+      "defaultPromptScheduled": "નિર્ધારિત કાર્ય ચલાવો. રન {{scheduledTime}} પર શરૂ થયું.",
       "problems": {
         "nameRequired": "નામ દાખલ કરો।",
         "nameTooShort": "ઓછામાં ઓછા 8 અક્ષરો વાપરો।",

@@ -29,6 +29,7 @@ import type * as OperationKeyModule from '@/lib/operation-key';
 import {
   isSecuritySyncInProgress,
   isSecuritySyncRetryable,
+  localizedSecurityMarkerMessage,
   mapSecurityDismissOperationError,
   mapSecuritySyncOperationError,
   SECURITY_AMBIGUOUS_MESSAGE,
@@ -954,6 +955,27 @@ describe('ledger marker copy per surface', () => {
     );
     expect(mapped.message).toBe(
       'Security service is not configured. Resubmitting cannot succeed until this is fixed.'
+    );
+    expect(isSecuritySyncRetryable(mapped)).toBe(false);
+  });
+
+  it('maps the remediation service rejection onto its copy, still non-retryable', () => {
+    const rejection = Object.assign(
+      new Error('Security remediation service request was rejected'),
+      {
+        data: { code: 'PRECONDITION_FAILED' },
+      }
+    );
+    // The surface contract: the remediation toasts render this localizer's
+    // result and keep the raw sentence only when it returns null. Asserting on
+    // the localizer is what guards the new marker case — the generic mapped
+    // copy equals this sentence even without the marker.
+    expect(localizedSecurityMarkerMessage(rejection)).toBe(
+      'Could not complete this action. The problem needs fixing before you can retry.'
+    );
+    const mapped = mapSecuritySyncOperationError(rejection);
+    expect(mapped.message).toBe(
+      'Could not complete this action. The problem needs fixing before you can retry.'
     );
     expect(isSecuritySyncRetryable(mapped)).toBe(false);
   });

@@ -47,6 +47,10 @@ const analysis = vi.hoisted(() => ({
   refetch: vi.fn(),
 }));
 
+const useSecurityAnalysis = vi.hoisted(() =>
+  vi.fn((_scope: string, _findingId: string, _enabled?: boolean) => analysis)
+);
+
 const capability = vi.hoisted(() => ({ canManage: true }));
 
 const trackInteraction = vi.hoisted(() => ({ mutate: vi.fn() }));
@@ -117,7 +121,8 @@ vi.mock('@/lib/hooks/use-security-agent', () => ({
 }));
 vi.mock('@/lib/hooks/use-security-findings', () => ({
   useSecurityFinding: () => finding,
-  useSecurityAnalysis: () => analysis,
+  useSecurityAnalysis: (scope: string, findingId: string, enabled?: boolean) =>
+    useSecurityAnalysis(scope, findingId, enabled),
 }));
 const dismissFailureCopy = vi.hoisted(() =>
   vi.fn((draft: { lastError: string | null }) => draft.lastError ?? '')
@@ -282,6 +287,44 @@ describe('FindingDetailScreen pane containers', () => {
     expect(tree.root.findAllByType(CenteredState)).toHaveLength(1);
     expect(tree.root.findAllByType(SettingsRecoveryStatus)).toHaveLength(0);
     expect(tree.root.findAllByProps({ accessibilityLabel: 'common.retry' })).toHaveLength(0);
+  });
+});
+
+describe('FindingDetailScreen analysis query activation', () => {
+  // The analysis query polls while a run is active, so it stays disabled until
+  // an analysis surface (analysis or remediation) is the selected tab: the
+  // details tab reads the finding, never its analysis.
+  function enabledArg(): unknown {
+    return useSecurityAnalysis.mock.lastCall?.[2];
+  }
+
+  function pressTab(tree: R, index: number) {
+    act(findingTabs(tree)[index]?.props.onPress as () => void);
+  }
+
+  it('reads the analysis only while an analysis surface is selected', () => {
+    const tree = renderScreen();
+    expect(enabledArg()).toBeFalsy();
+
+    pressTab(tree, 1);
+    expect(enabledArg()).toBe(true);
+
+    pressTab(tree, 2);
+    expect(enabledArg()).toBe(true);
+
+    pressTab(tree, 0);
+    expect(enabledArg()).toBeFalsy();
+  });
+
+  it('keeps the analysis query off while the finding is unavailable', () => {
+    finding.isError = true;
+    finding.error = { data: { code: 'NOT_FOUND' } };
+    finding.data = undefined;
+    const tree = renderScreen();
+
+    expect(tree.root.findAllByType(CenteredState)).toHaveLength(1);
+    expect(useSecurityAnalysis).toHaveBeenCalled();
+    expect(enabledArg()).toBeFalsy();
   });
 });
 

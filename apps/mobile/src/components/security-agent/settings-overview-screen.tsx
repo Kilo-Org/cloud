@@ -103,11 +103,14 @@ export function SettingsOverviewScreen({
     recoveryError = t('common.couldNotLoadRepositories');
   }
   // The failed read determines the branch, so each failure reads only its own
-  // error. A capability retry clears its error while it runs: an empty error
-  // list must not classify as "never reached the server", so the variant stays
-  // on the branch's earlier answer until the attempt settles.
+  // error. A retry of a no-data read downgrades it back to pending and clears
+  // its error (v5, see `use-available-models`), so the classifier would read
+  // an empty list mid-retry and flip the presentation. The variant of the last
+  // settled failure is kept in a ref and re-derived only when a read settles:
+  // the error branch keeps the answer it showed until a settled state replaces
+  // it, for both branches.
   const configFailure = {
-    errors: [config.error],
+    errors: config.error ? [config.error] : [],
     isPaused: config.fetchStatus === 'paused',
     connectivity,
   } as const;
@@ -116,9 +119,14 @@ export function SettingsOverviewScreen({
     isPaused: capability.fetchStatus === 'paused',
     connectivity,
   } as const;
-  const variant = configUnavailable
-    ? classifyReadFailureVariant(configFailure)
-    : classifyReadFailureVariant(capabilityFailure);
+  const settledVariantRef = useRef<'offline' | 'server' | null>(null);
+  const settledVariant = configUnavailable || capability.isError
+    ? (settledVariantRef.current =
+        classifyReadFailureVariant(
+          configUnavailable || config.isError ? configFailure : capabilityFailure
+        ) as 'offline' | 'server')
+    : settledVariantRef.current;
+  const variant = settledVariant ?? 'server';
   if (configUnavailable || capabilityUnavailable) {
     return (
       <PlatformErrorScreen

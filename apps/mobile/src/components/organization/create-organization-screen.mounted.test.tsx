@@ -25,6 +25,14 @@ import { ORGANIZATION_HUB_PATH, ORGANIZATION_HUB_ROUTE_NAME } from '@/lib/organi
 // shared doubles live in `vi.hoisted` and the factories only read them.
 const mocks = vi.hoisted(() => ({
   createMutate: vi.fn(),
+  createOptions: vi.fn(
+    (
+      options: Record<string, unknown> & { networkMode?: string }
+    ): Record<string, unknown> & { mutationKey?: unknown[] } => ({
+      mutationKey: [['organizations', 'create']],
+      ...options,
+    })
+  ),
   replace: vi.fn(),
   setOrganizationId: vi.fn(),
   focused: { current: true },
@@ -70,7 +78,14 @@ vi.mock('expo-router', () => ({
 
 vi.mock('@/lib/trpc', () => ({
   trpcClient: { organizations: { create: { mutate: mocks.createMutate } } },
-  useTRPC: () => ({ organizations: { list: { queryKey: () => ['organizations.list'] } } }),
+  useTRPC: () => ({
+    organizations: {
+      list: { queryKey: () => ['organizations.list'] },
+      // The screen spreads the typed options it would ship with, so the
+      // mounted behavior includes the production `networkMode`.
+      create: { mutationOptions: mocks.createOptions },
+    },
+  }),
 }));
 
 // `AccessibleStatus` renders live: on Android through a polite live region and
@@ -184,6 +199,7 @@ function setStack(names: string[]) {
 
 beforeEach(() => {
   mocks.createMutate.mockReset();
+  mocks.createOptions.mockClear();
   mocks.replace.mockClear();
   mocks.setOrganizationId.mockClear();
   mocks.focused.current = true;
@@ -197,6 +213,15 @@ beforeEach(() => {
 });
 
 describe('CreateOrganizationScreen', () => {
+  it('keeps the create attempting while the connectivity manager reports offline', async () => {
+    const { renderer, unmount } = await mount();
+    // The screen spreads the production `mutationOptions`, so the contract its
+    // rendering depends on is the deployed one, not the test's copy.
+    expect(mocks.createOptions).toHaveBeenCalledWith(
+      expect.objectContaining({ networkMode: 'always' })
+    );
+    unmount();
+  });
   it('refuses an empty name without a request', async () => {
     const { renderer, unmount } = await mount();
 

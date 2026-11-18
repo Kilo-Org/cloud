@@ -97,7 +97,9 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
     // last child ("See full details", the scroll content's final pressable)
     // clear of it when the list is scrolled to its end: without the extra
     // tail that row stops flush against the border and the scroll extent
-    // reads as "one row short" instead of "one scroll away".
+    // reads as "one row short" instead of "one scroll away". The tail only
+    // adds blank space after that final pressable, so it acts once the list
+    // is scrolled to its end — at rest above the fold it changes nothing.
     paddingBottom: 40,
   };
   // The action buttons sit in a pinned footer below the ScrollView, not in

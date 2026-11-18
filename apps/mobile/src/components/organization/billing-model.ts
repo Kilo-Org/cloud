@@ -130,40 +130,29 @@ export function getOrgTrialStatusPill(trial: OrgTrialState): BillingState | null
 }
 
 /**
- * The Stripe statuses that are payment trouble, and outrank the trial readout.
- * One record feeds both the guard's `Object.hasOwn` test and the helper's
- * parameter type, so a status can join one side without the other.
+ * The Stripe statuses that are payment trouble, and the row each one paints:
+ * the past-due row for a card Stripe is still or has stopped retrying, the
+ * checkout warning for an incomplete first payment, the pause notice for a
+ * suspended plan. The record is the single source for both the guard below
+ * (`Object.hasOwn`) and each status's row, so a status added here must name its
+ * own row — the record's type leaves no key without one, and the guard never
+ * reads a row for a status the record does not hold.
+ *
+ * A row holds its catalog key rather than the text: the copy is read when the
+ * row is built, so a language applied in place reaches the next render
+ * (`provider-label.ts` keeps its labels the same way).
  */
-const FAILURE_SET = {
-  past_due: true,
-  unpaid: true,
-  incomplete: true,
-  paused: true,
-} as const;
+const PAYMENT_TROUBLE_ROWS = {
+  past_due: { key: 'organization.billing.statePastDue', tone: 'danger' },
+  unpaid: { key: 'organization.billing.statePastDue', tone: 'danger' },
+  incomplete: { key: 'kiloPass.statusIncomplete', tone: 'warn' },
+  paused: { key: 'kiloPass.statusPaused', tone: 'warn' },
+} as const satisfies Record<string, { key: string; tone: BillingStateTone }>;
 
-type FailureStatus = keyof typeof FAILURE_SET;
+type PaymentTroubleStatus = keyof typeof PAYMENT_TROUBLE_ROWS;
 
-/**
- * The subscription's own payment trouble: the past-due row for a card Stripe
- * is still or has stopped retrying, the checkout warning for an incomplete
- * first payment, the pause notice for a suspended plan. The parameter is the
- * exact union the caller's guard narrows to through `FAILURE_SET`, so a status
- * joining that set without a row here fails to compile only when the union
- * stops covering it — and a row added without joining the set is unreachable
- * by the guard. The two lists are one record.
- */
-function subscriptionFailureState(status: FailureStatus): BillingState {
-  if (status === 'past_due' || status === 'unpaid') {
-    return { label: i18n.t('organization.billing.statePastDue'), tone: 'danger' };
-  }
-  if (status === 'incomplete') {
-    return { label: i18n.t('kiloPass.statusIncomplete'), tone: 'warn' };
-  }
-  // The parameter type leaves no other value: the guard that calls this
-  // narrows to `FailureStatus` through the same `FAILURE_SET` the union is
-  // keyed from, so a status added there lands in this branch only when the
-  // cases above have not claimed it.
-  return { label: i18n.t('kiloPass.statusPaused'), tone: 'warn' };
+function isPaymentTroubleStatus(status: string | undefined): status is PaymentTroubleStatus {
+  return status != null && Object.hasOwn(PAYMENT_TROUBLE_ROWS, status);
 }
 
 /**
@@ -192,9 +181,12 @@ export function getOrgSubscriptionState(
   // Payment trouble outranks the trial readout: `past_due`/`unpaid` is a
   // paying status the server treats as paid, and `incomplete`/`paused` is a
   // checkout or billing pause the trial must not swallow — each is the one
-  // failure signal on this screen, and each is fixable now.
-  if (subscription != null && status != null && Object.hasOwn(FAILURE_SET, status)) {
-    return subscriptionFailureState(status as FailureStatus);
+  // failure signal on this screen, and each is fixable now. The guard and the
+  // row come from one record, so no status can be admitted without naming the
+  // row it paints.
+  if (isPaymentTroubleStatus(status)) {
+    const row = PAYMENT_TROUBLE_ROWS[status];
+    return { label: i18n.t(row.key), tone: row.tone };
   }
   const trialState = trial == null ? null : getOrgTrialStatusPill(trial);
   if (trialState != null) {

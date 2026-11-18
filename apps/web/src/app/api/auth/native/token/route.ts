@@ -577,6 +577,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
         } catch (err) {
           if (err instanceof KeyCollisionError) {
             countAdmissionCondition('native_attested_key_cross_user_collision');
+            countAdmissionCondition('native_admission_refused');
             phase = 'release';
             return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
           }
@@ -589,6 +590,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
         } catch (err) {
           if (err instanceof KeyCollisionError) {
             countAdmissionCondition('native_attested_key_cross_user_collision');
+            countAdmissionCondition('native_admission_refused');
             phase = 'release';
             return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
           }
@@ -725,6 +727,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
     } catch (err) {
       if (err instanceof KeyCollisionError) {
         countAdmissionCondition('native_attested_key_cross_user_collision');
+        countAdmissionCondition('native_admission_refused');
         return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
       }
       captureMessage('native_attested_key_persist_failed_after_settlement');
@@ -735,6 +738,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
     } catch (err) {
       if (err instanceof KeyCollisionError) {
         countAdmissionCondition('native_attested_key_cross_user_collision');
+        countAdmissionCondition('native_admission_refused');
         return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
       }
       captureMessage('native_attested_key_persist_failed_after_settlement');

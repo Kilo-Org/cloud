@@ -281,7 +281,9 @@ async function verifyAppleAdmission(
     const result = await verifyAppleAttestation(payload, challenge, keyId);
 
     if (!result.ok) {
-      countAdmissionCondition('apple_attestation_failed');
+      // The error is a fixed server-side enum, so the per-cause metric stays
+      // bounded — one metric per reason, like the Play Integrity counters.
+      countAdmissionCondition(`apple_attestation_failed:${result.error}`);
       return { ok: false, errorCode: 'ADMISSION_REQUIRED' };
     }
 
@@ -321,7 +323,7 @@ async function verifyAppleAdmission(
   );
 
   if (!assertionResult.ok) {
-    countAdmissionCondition('apple_assertion_failed');
+    countAdmissionCondition(`apple_assertion_failed:${assertionResult.error}`);
     return { ok: false, errorCode: 'ADMISSION_REQUIRED' };
   }
 
@@ -371,11 +373,12 @@ async function verifyAndroidAdmission(
   }
 
   // verifyPlayIntegrity throws on infrastructure faults — caller must
-  // catch and surface as 5xx.
+  // catch and surface as 5xx. Every refusal verdict it returns is counted
+  // there on its own reason metric, so the admission layer adds no second
+  // count: each counted refusal is reported exactly once.
   const result = await verifyPlayIntegrity(payload, challenge);
 
   if (!result.ok) {
-    countAdmissionCondition('play_integrity_failed');
     return { ok: false, errorCode: 'ADMISSION_REQUIRED' };
   }
 

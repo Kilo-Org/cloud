@@ -759,7 +759,11 @@ describe('verifyAdmissionAsync', () => {
 
     now.mockReturnValue(6_061_000);
     countAdmissionCondition('native_admission_missing');
-    const lines = aggregateLines().filter(line => line.metric === 'apple_attestation_failed');
+    // The verifier's fixed enum value lands in the metric name, so the cause
+    // is one bounded metric like the Play Integrity counters.
+    const lines = aggregateLines().filter(
+      line => line.metric === 'apple_attestation_failed:CERT_CHAIN_INVALID'
+    );
     expect(lines).toHaveLength(1);
     expect(lines[0]).toMatchObject({ count: 1 });
   });
@@ -791,6 +795,49 @@ describe('verifyAdmissionAsync', () => {
     now.mockReturnValue(6_121_000);
     countAdmissionCondition('native_admission_missing');
     const lines = aggregateLines().filter(line => line.metric === 'apple_assertion_unknown_key');
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ count: 1 });
+  });
+
+  test('ios assertion fails with provider error and counts one per-cause metric', async () => {
+    const setMock = jest.fn().mockReturnValue({
+      where: jest.fn().mockReturnValue({
+        returning: jest.fn().mockResolvedValue([{ challenge: 'ch123' }]),
+      }),
+    });
+    jest.mocked(db.update).mockReturnValue({ set: setMock } as any);
+
+    const existingKey = {
+      key_id: 'key1',
+      kilo_user_id: 'user1',
+      platform: 'ios',
+      public_key: 'base64pubkey',
+      sign_count: 10,
+      attested_at: '2026-01-01T00:00:00.000Z',
+      created_at: '2026-01-01T00:00:00.000Z',
+      last_used_at: null,
+    };
+    jest.mocked(db.query.native_attested_keys.findFirst).mockResolvedValue(existingKey as any);
+    mockVerifyAppleAssertion.mockResolvedValue({ ok: false, error: 'INVALID_ASSERTION' });
+
+    const admission: AdmissionPayload = {
+      platform: 'ios',
+      kind: 'assertion',
+      challenge: 'ch123',
+      payload: 'base64assertion',
+      keyId: 'key1',
+    };
+    const result = await verifyAdmissionAsync(admission);
+    expect(result).toEqual({ ok: false, errorCode: 'ADMISSION_REQUIRED' });
+    expect(mockCaptureMessage).not.toHaveBeenCalled();
+
+    // The verifier's fixed enum value lands in the metric name, so the cause
+    // is one bounded metric like the Play Integrity counters.
+    now.mockReturnValue(6_241_000);
+    countAdmissionCondition('native_admission_missing');
+    const lines = aggregateLines().filter(
+      line => line.metric === 'apple_assertion_failed:INVALID_ASSERTION'
+    );
     expect(lines).toHaveLength(1);
     expect(lines[0]).toMatchObject({ count: 1 });
   });
@@ -1017,6 +1064,20 @@ describe('verifyAdmissionAsync', () => {
     };
     const result = await verifyAdmissionAsync(admission);
     expect(result).toEqual({ ok: false, errorCode: 'ADMISSION_REQUIRED' });
+
+    // The verifier counts its own reason metric (pinned against the real
+    // verifyPlayIntegrity in native-admission-google.test.ts); the admission
+    // layer adds no coarse play_integrity_failed count, so one refusal is
+    // reported exactly once. The mocked verifier emits nothing here, so the
+    // forced flush must carry no Play Integrity metric at all.
+    now.mockReturnValue(6_301_000);
+    countAdmissionCondition('native_admission_missing');
+    now.mockReturnValue(6_361_000);
+    countAdmissionCondition('native_admission_missing');
+
+    expect(aggregateLines().filter(line => line.metric.startsWith('play_integrity_'))).toHaveLength(
+      0
+    );
   });
 
   test('android attestation kind is refused', async () => {

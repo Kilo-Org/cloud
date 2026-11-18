@@ -1553,6 +1553,10 @@ describe('POST /api/auth/native/token', () => {
       expect(
         aggregateLines().filter(line => line.metric === 'native_attested_key_cross_user_collision')
       ).toHaveLength(1);
+      // The collision is also a refusal: both routes count the same pair.
+      expect(
+        aggregateLines().filter(line => line.metric === 'native_admission_refused')
+      ).toHaveLength(1);
       mockReleaseSignInCode.mockClear();
     });
 
@@ -1596,6 +1600,9 @@ describe('POST /api/auth/native/token', () => {
         line => line.metric === 'native_attested_key_cross_user_collision'
       );
       expect(collisionLine).toMatchObject({ count: 1 });
+      // The collision is also a refusal: both routes count the same pair.
+      const refusedLine = aggregateLines().find(line => line.metric === 'native_admission_refused');
+      expect(refusedLine).toMatchObject({ count: 1 });
     });
 
     // ── Fix 1: KeyCollisionError is not swallowed ─────────────────────

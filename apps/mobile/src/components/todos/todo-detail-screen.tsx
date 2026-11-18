@@ -24,7 +24,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTodoItem, useTodoItemMutations } from '@/lib/hooks/use-todos';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { TODO_TITLE_MAX_LENGTH } from '@/lib/todos/todo-model';
-import { selectTodoQueryErrorView } from '@/lib/todos/todo-query-error';
+import { selectTodoItemQueryErrorView } from '@/lib/todos/todo-query-error';
 import { type TodoItemDetail } from '@/lib/todos/todo-types';
 
 const LISTS_HREF = '/(app)/(tabs)/(2_agents)' as Href;
@@ -158,7 +158,7 @@ function TodoDetailBody({ todo }: Readonly<{ todo: TodoItemDetail }>) {
 export function TodoDetailScreen({ itemId }: Readonly<{ itemId: string }>) {
   const query = useTodoItem(itemId);
   const todo = query.data;
-  const errorView = selectTodoQueryErrorView(query.error);
+  const errorView = selectTodoItemQueryErrorView(query.error);
 
   if (todo) {
     return <TodoDetailBody key={todo.id} todo={todo} />;
@@ -181,10 +181,11 @@ export function TodoDetailScreen({ itemId }: Readonly<{ itemId: string }>) {
         backFallback={LISTS_HREF}
       />
       {query.isError ? (
+        // The state is the whole body under the header, so it centres in it
+        // rather than pinning to its top (the placement rule: centre owns the
+        // surface, top only sits under intro text or controls).
         <QueryError
           variant={errorView.variant}
-          placement="top"
-          inset="gutter"
           onRetry={errorView.showRetry ? () => void query.refetch() : undefined}
           isRetrying={query.isFetching}
         />

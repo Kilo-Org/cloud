@@ -77,10 +77,10 @@ vi.mock('@/lib/hooks/use-todos', () => ({
   }),
 }));
 
-function renderScreen(): TestRenderer.ReactTestRenderer {
+function renderScreen(itemId = 'item-1'): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
-    ref.current = TestRenderer.create(createElement(TodoDetailScreen, { itemId: 'item-1' }));
+    ref.current = TestRenderer.create(createElement(TodoDetailScreen, { itemId }));
   });
   const renderer = ref.current;
   if (!renderer) {
@@ -121,6 +121,42 @@ describe('todo detail header eyebrow', () => {
     expect(headers.rendered[0]?.eyebrow).toBeUndefined();
     expect(headers.rendered[0]?.reserveEyebrow).toBe(true);
     expect(headers.rendered[0]?.eyebrowPlaceholder).toBeUndefined();
+    renderer.unmount();
+  });
+});
+
+function propOf(instance: TestRenderer.ReactTestInstance | undefined, key: string): unknown {
+  if (!instance) {
+    return undefined;
+  }
+  /* eslint-disable typescript-eslint/no-unsafe-member-access -- renderer props are an index signature */
+  return instance.props[key];
+  /* eslint-enable typescript-eslint/no-unsafe-member-access */
+}
+
+describe('todo detail error state', () => {
+  it('reads an id the API refuses as not-found, centred and with no retry', () => {
+    query.isError = true;
+    query.error = { data: { code: 'BAD_REQUEST' } };
+    const renderer = renderScreen('not-a-seeded-item');
+
+    const error = renderer.root.findAllByType('QueryError')[0];
+    expect(propOf(error, 'variant')).toBe('not-found');
+    expect(propOf(error, 'onRetry')).toBeUndefined();
+    // The state is the whole body under the header, so it takes the shared
+    // centre placement instead of pinning to the top of the surface.
+    expect(propOf(error, 'placement')).toBeUndefined();
+    renderer.unmount();
+  });
+
+  it('keeps a read that failed on the server retryable on the same centred state', () => {
+    query.isError = true;
+    query.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
+    const renderer = renderScreen();
+
+    const error = renderer.root.findAllByType('QueryError')[0];
+    expect(propOf(error, 'variant')).toBe('server');
+    expect(typeof propOf(error, 'onRetry')).toBe('function');
     renderer.unmount();
   });
 });

@@ -203,6 +203,7 @@ function CodeEntry({
         // full-screen extract editor, which would cover the controls below.
         disableFullscreenUI
         error={error}
+        alwaysReserve
         reserveErrorMessages={[
           t('profile.passkeyVerifyCodeRejected'),
           t('profile.passkeyVerifyTooManyAttempts'),

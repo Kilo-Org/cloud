@@ -26,6 +26,7 @@
     "creditHistory": "क्रेडिट इतिहास",
     "sentenceJoiner": "। ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "रद्द करें",
     "done": "हो गया",
     "retry": "फिर से कोशिश करें",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "बदलाव",
     "organizationTrialEnded": "संगठन का परीक्षण समाप्त हो गया है और इसकी कोई सक्रिय योजना नहीं है। एक संगठन मालिक kilo.ai पर बिलिंग अपडेट कर सकता है, फिर दोबारा प्रयास करें।",
-    "privateRepositoryA11y": "{{name}}, निजी रिपॉज़िटरी"
+    "privateRepositoryA11y": "{{name}}, निजी रिपॉज़िटरी",
+    "legalDocumentEnglishOnly": "यह दस्तावेज़ केवल अंग्रेज़ी में उपलब्ध है।"
   },
   "language": {
     "restarting": "भाषा बदलने के लिए ऐप फिर से शुरू हो रहा है",
@@ -481,7 +483,14 @@
       "viewReceipt": "रसीद देखें"
     },
     "changelog": "नया क्या है",
-    "changelogVersionPending": "इस वर्शन के नोट्स अगले ऐप अपडेट के साथ आएंगे।"
+    "changelogVersionPending": "वर्शन {{version}} के नोट्स अगले ऐप अपडेट के साथ आएंगे।",
+    "changelogGroupNew": "नया",
+    "changelogFixesIn": "{{areas}} में त्रुटि-सुधार और बेहतरी।",
+    "changelogFixesPolish": "पूरे ऐप में त्रुटि-सुधार और बेहतरी।",
+    "changelogAreas": {
+      "signIn": "साइन-इन",
+      "profileOrganizations": "प्रोफ़ाइल और संगठन"
+    }
   },
   "preferences": {
     "general": "सामान्य",
@@ -923,13 +932,25 @@
       "repositoryLine": "समीक्षाएँ: {{reviews}} · निष्कर्ष: {{findings}}",
       "empty": "अभी तक एनालिटिक्स वाली कोई समीक्षा नहीं",
       "emptyDescription": "संगठन के लिए चालू रहने पर एनालिटिक्स पूरी हो चुकी समीक्षाएँ दर्ज करता है।",
-      "off": "इस संगठन के लिए एनालिटिक्स बंद है।",
-      "couldNotLoad": "एनालिटिक्स लोड नहीं हो सका"
+      "offTitle": "{{platform}} के लिए एनालिटिक्स बंद है",
+      "offDescription": "संगठन की बिलिंग भूमिकाएँ (मालिक, एडमिन और बिलिंग मैनेजर) वेब पर संगठन की सेटिंग्स में एनालिटिक्स चालू कर सकती हैं, जिससे पूरी हो चुकी समीक्षाएँ दर्ज हो सकें।",
+      "couldNotLoad": "एनालिटिक्स लोड नहीं हो सका",
+      "trackedReviewsCaption": "इस अवधि में एनालिटिक्स चालू रहने पर पूरी हो चुकी समीक्षाएँ। चल रही और विफल समीक्षाएँ कभी नहीं गिनी जातीं।",
+      "trackedReviewsUncounted": "गिने नहीं गए: संगठन की {{displayTotal}} पूरी हो चुकी समीक्षाओं में से {{displayCount}} समीक्षाएँ जिनका परिणाम कैप्चर नहीं किया गया था।",
+      "trackedReviewsUncounted_one": "गिने नहीं गए: संगठन की {{displayTotal}} पूरी हो चुकी समीक्षाओं में से {{displayCount}} समीक्षाएँ जिनका परिणाम कैप्चर नहीं किया गया था।",
+      "trackedReviewsUncounted_other": "गिने नहीं गए: संगठन की {{displayTotal}} पूरी हो चुकी समीक्षाओं में से {{displayCount}} समीक्षाएँ जिनका परिणाम कैप्चर नहीं किया गया था।"
     },
     "council": {
       "title": "काउंसिल समीक्षा",
       "subtitle": "कई विशेषज्ञ हर पुल रिक्वेस्ट की समीक्षा करते हैं, और उनके वोट मिलकर एक फ़ैसला बनाते हैं।",
-      "unavailable": "इस संगठन के लिए काउंसिल समीक्षा उपलब्ध नहीं है।",
+      "unavailablePersonallyTitle": "Enterprise संगठन आवश्यक है",
+      "unavailablePersonally": "काउंसिल समीक्षा व्यक्तिगत खाते का हिस्सा नहीं है।",
+      "unavailablePersonallyAction": "संगठन बनाएँ",
+      "unavailablePersonallySwitchAction": "संगठन बदलें",
+      "unavailableOrganizationTitle": "काउंसिल समीक्षा अभी उपलब्ध नहीं है",
+      "unavailableForOrganization": "काउंसिल समीक्षा के लिए सक्रिय सब्सक्रिप्शन या ट्रायल वाला Enterprise प्लान चाहिए। इस संगठन के पास यह अभी नहीं है।",
+      "unavailableForOrganizationNeutral": "इस संगठन के लिए काउंसिल समीक्षा अभी उपलब्ध नहीं है। कृपया बाद में पुनः प्रयास करें।",
+      "unavailableOnBitbucket": "काउंसिल समीक्षा Bitbucket रिपॉज़िटरी के लिए उपलब्ध नहीं है।",
       "noRepositories": "अभी तक कोई रिपॉज़िटरी नहीं चुनी गई है। पहले रिपॉज़िटरी सेटिंग में रिपॉज़िटरी चुनें।",
       "specialists": "विशेषज्ञ",
       "labels": "काउंसिल समीक्षा शुरू करने वाले लेबल",
@@ -2580,7 +2601,6 @@
     "completingPurchase": "खरीदारी पूरी हो रही है",
     "subscriptionLoading": "Kilo Pass की सदस्यता लोड हो रही है",
     "retryHint": "Kilo Pass की स्थिति फिर से लोड करता है।",
-    "cardAccessibility": "{{title}}। {{description}}। {{actionLabel}}",
     "endedOn": "{{date}} को समाप्त",
     "notAvailableInApp": "Kilo Pass ऐप में उपलब्ध नहीं है।",
     "statusActive": "सक्रिय",
@@ -3318,6 +3338,7 @@
       "manageOnWeb": "वेब पर बिलिंग सेटिंग्स",
       "changePlan": "प्लान बदलें",
       "buySeats": "सीटें खरीदें",
+      "managedOnWeb": "प्लान, सीटें और ऑटो टॉप-अप वेब पर प्रबंधित किए जाते हैं।",
       "setupAutoTopUp": "ऑटो टॉप-अप सेट करें",
       "manageAutoTopUp": "ऑटो टॉप-अप प्रबंधित करें",
       "opensOnWeb": "वेब पर खुलता है"
@@ -3472,19 +3493,17 @@
       "providersAndModels": "प्रदाता और मॉडल",
       "groups": "ग्रुप",
       "guardrails": "गार्डरेल",
-      "byok": "अपनी खुद की की (key) इस्तेमाल करें",
+      "byok": "अपनी खुद की कुंजी इस्तेमाल करें",
       "ssoAndDomain": "SSO और डोमेन",
       "dataCollection": "डेटा कलेक्शन",
       "auditLogs": "ऑडिट लॉग",
       "requestLogs": "रिक्वेस्ट लॉग"
     },
     "requestLogs": {
-      "hint": "विंडो ख़त्म होने से पहले के एक घंटे की रिक्वेस्ट, सबसे नई पहले।",
       "older": "पिछला घंटा",
       "newer": "अगला घंटा",
       "truncated": "इस घंटे की सभी रिक्वेस्ट सूची में नहीं दिख रही हैं।",
       "emptyTitle": "कोई रिक्वेस्ट नहीं",
-      "emptyDescription": "इस घंटे में कोई गेटवे रिक्वेस्ट नहीं है।",
       "loadError": "रिक्वेस्ट लॉग लोड नहीं हो सके।",
       "permissionDenied": "सिर्फ़ संगठन के मालिक, एडमिन या बिलिंग प्रबंधक ही इसके रिक्वेस्ट लॉग देख सकते हैं।",
       "tokens": "{{input}} इनपुट · {{output}} आउटपुट",
@@ -4283,8 +4302,7 @@
       "repoValue": "रिपॉज़िटरी: {{name}}",
       "profileValue": "प्रोफ़ाइल: {{name}}",
       "profileUnavailable": "यह प्रोफ़ाइल अब उपलब्ध नहीं है। कोई दूसरी प्रोफ़ाइल चुनें।",
-      "pickerEmptyDescriptionOrganization": "सभी सत्रों में एनवायरनमेंट चर, सेटअप आदेश और कौशल का पुन: उपयोग करने के लिए एक संगठन प्रोफ़ाइल बनाएं।",
-      "pickerEmptyDescriptionOrganizationReadOnly": "संगठन मालिक या एडमिन एक संगठन प्रोफ़ाइल बना सकता है।"
+      "pickerEmptyDescriptionOrganization": "सभी सत्रों में एनवायरनमेंट चर, सेटअप आदेश और कौशल का पुन: उपयोग करने के लिए एक संगठन प्रोफ़ाइल बनाएं।"
     },
     "variablesDeleteFailed": "चर हटाया नहीं जा सका",
     "deleteVariable": "चर {{key}} हटाएँ",
@@ -4470,7 +4488,6 @@
     "dismiss": "ब्रीफ़िंग खारिज करें",
     "offline": "ऑफ़लाइन · सहेजी गई ब्रीफ़िंग",
     "cached": "सहेजी गई रिपोर्ट · रीफ़्रेश उपलब्ध नहीं",
-    "window": "{{start}} – {{end}}",
     "summary": "AI सारांश",
     "summaryPending": "AI सारांश बन रहा है। तैयार होने पर यहाँ जुड़ जाएगा।",
     "summaryUnavailable": "AI सारांश उपलब्ध नहीं है। आपकी संरचित रिपोर्ट अभी भी उपलब्ध है।",
@@ -4589,6 +4606,7 @@
       "title": "ट्रिगर और वेबहुक",
       "subtitle": "वेबहुक कॉल या शेड्यूल से Cloud Agent रन स्वचालित करें।",
       "new": "नया ट्रिगर",
+      "create": "ट्रिगर बनाएँ",
       "emptyTitle": "अभी कोई ट्रिगर नहीं है",
       "emptyDescription": "वेबहुक कॉल या शेड्यूल पर Cloud Agent रन शुरू करने के लिए ट्रिगर बनाएँ।",
       "loadFailedTitle": "ट्रिगर लोड नहीं हो सके",
@@ -4642,6 +4660,8 @@
       "created": "ट्रिगर बनाया गया",
       "saved": "ट्रिगर सहेजा गया",
       "statusArrived": "पहुँच गया",
+      "defaultPromptWebhook": "इस वेबहुक अनुरोध के बॉडी का वर्णन करें:\n\n{{body}}",
+      "defaultPromptScheduled": "निर्धारित कार्य चलाएँ। रन {{scheduledTime}} पर शुरू हुआ।",
       "problems": {
         "nameRequired": "नाम दर्ज करें।",
         "nameTooShort": "कम से कम 8 अक्षर उपयोग करें।",
@@ -4690,6 +4710,7 @@
     "superseded": "इस लिंक को किसी दूसरे डिवाइस से बदल दिया गया है, इसलिए यह अब काम नहीं करता।"
   },
   "sharedSession": {
+    "startedAt": "{{time}} पर शुरू हुआ",
     "title": "शेयर किया गया सत्र",
     "someone": "कोई व्यक्ति",
     "sharedBy": "{{owner}} द्वारा शेयर किया गया",

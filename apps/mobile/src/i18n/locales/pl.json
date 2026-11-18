@@ -26,6 +26,7 @@
     "creditHistory": "Historia kredytów",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Anuluj",
     "done": "Gotowe",
     "retry": "Spróbuj ponownie",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "Zmiany",
     "organizationTrialEnded": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Właściciel organizacji może zaktualizować rozliczenia na kilo.ai, a następnie spróbować ponownie.",
-    "privateRepositoryA11y": "{{name}}, prywatne repozytorium"
+    "privateRepositoryA11y": "{{name}}, prywatne repozytorium",
+    "legalDocumentEnglishOnly": "Ten dokument jest dostępny wyłącznie w języku angielskim."
   },
   "language": {
     "restarting": "Ponowne uruchamianie po zmianie języka",
@@ -481,7 +483,14 @@
       "viewReceipt": "Wyświetl potwierdzenie"
     },
     "changelog": "Co nowego",
-    "changelogVersionPending": "Opis tej wersji dotrze z kolejną aktualizacją aplikacji."
+    "changelogVersionPending": "Opis wersji {{version}} dotrze z kolejną aktualizacją aplikacji.",
+    "changelogGroupNew": "Nowości",
+    "changelogFixesIn": "Poprawki i ulepszenia w obszarach: {{areas}}.",
+    "changelogFixesPolish": "Poprawki i ulepszenia w całej aplikacji.",
+    "changelogAreas": {
+      "signIn": "Logowanie",
+      "profileOrganizations": "Profil i organizacje"
+    }
   },
   "preferences": {
     "general": "Ogólne",
@@ -925,13 +934,27 @@
       "repositoryLine": "Przeglądy: {{reviews}} · Problemy: {{findings}}",
       "empty": "Brak przeglądów z analityką",
       "emptyDescription": "Analityka rejestruje ukończone przeglądy, dopóki jest włączona dla organizacji.",
-      "off": "Analityka jest wyłączona dla tej organizacji.",
-      "couldNotLoad": "Nie udało się wczytać analityki"
+      "offTitle": "Analityka jest wyłączona dla {{platform}}",
+      "offDescription": "Analitykę mogą włączyć w ustawieniach organizacji w wersji internetowej role związane z rozliczeniami — właściciele, administratorzy i menedżerowie rozliczeń — aby rejestrować ukończone przeglądy.",
+      "couldNotLoad": "Nie udało się wczytać analityki",
+      "trackedReviewsCaption": "Ukończone przeglądy, które zakończyły się w tym okresie przy włączonej analityce. Przeglądy w toku i zakończone niepowodzeniem nigdy nie są zliczane.",
+      "trackedReviewsUncounted": "Nie zliczono: {{displayCount}} z {{displayTotal}} ukończonych przeglądów organizacji, których wynik nie został zapisany.",
+      "trackedReviewsUncounted_few": "Nie zliczono: {{displayCount}} z {{displayTotal}} ukończonych przeglądów organizacji, których wynik nie został zapisany.",
+      "trackedReviewsUncounted_many": "Nie zliczono: {{displayCount}} z {{displayTotal}} ukończonych przeglądów organizacji, których wynik nie został zapisany.",
+      "trackedReviewsUncounted_one": "Nie zliczono: {{displayCount}} z {{displayTotal}} ukończonych przeglądów organizacji, których wynik nie został zapisany.",
+      "trackedReviewsUncounted_other": "Nie zliczono: {{displayCount}} z {{displayTotal}} ukończonych przeglądów organizacji, których wynik nie został zapisany."
     },
     "council": {
       "title": "Przegląd rady",
       "subtitle": "Każdy pull request przegląda kilku specjalistów, a ich głosy łączą się w jedną decyzję.",
-      "unavailable": "Przegląd rady nie jest dostępny dla tej organizacji.",
+      "unavailablePersonallyTitle": "Wymaga organizacji Enterprise",
+      "unavailablePersonally": "Przegląd rady nie jest częścią konta osobistego.",
+      "unavailablePersonallyAction": "Utwórz organizację",
+      "unavailablePersonallySwitchAction": "Przełącz organizację",
+      "unavailableOrganizationTitle": "Przegląd rady nie jest obecnie dostępny",
+      "unavailableForOrganization": "Przegląd rady wymaga planu Enterprise z aktywną subskrypcją lub okresem próbnym. Ta organizacja obecnie go nie ma.",
+      "unavailableForOrganizationNeutral": "Przegląd rady nie jest obecnie dostępny dla tej organizacji. Spróbuj ponownie później.",
+      "unavailableOnBitbucket": "Przegląd rady nie jest dostępny dla repozytoriów Bitbucket.",
       "noRepositories": "Nie wybrano jeszcze żadnego repozytorium. Najpierw wybierz repozytoria w ustawieniach repozytoriów.",
       "specialists": "Specjaliści",
       "labels": "Etykiety uruchamiające przegląd rady",
@@ -2648,7 +2671,6 @@
     "completingPurchase": "Finalizowanie zakupu",
     "subscriptionLoading": "Ładowanie subskrypcji Kilo Pass",
     "retryHint": "Ponownie sprawdza stan Kilo Pass.",
-    "cardAccessibility": "{{title}}. {{description}}. Działanie: {{actionLabel}}",
     "endedOn": "Zakończono {{date}}",
     "notAvailableInApp": "Kilo Pass nie jest dostępny w aplikacji.",
     "statusActive": "Aktywny",
@@ -3432,6 +3454,7 @@
       "manageOnWeb": "Ustawienia rozliczeń w wersji internetowej",
       "changePlan": "Zmień plan",
       "buySeats": "Kup miejsca",
+      "managedOnWeb": "Plan, miejsca i automatyczne doładowanie są zarządzane w wersji internetowej.",
       "setupAutoTopUp": "Skonfiguruj automatyczne doładowanie",
       "manageAutoTopUp": "Zarządzaj automatycznym doładowaniem",
       "opensOnWeb": "Otwiera się w przeglądarce"
@@ -3593,12 +3616,10 @@
       "requestLogs": "Dzienniki żądań"
     },
     "requestLogs": {
-      "hint": "Żądania z godziny przed końcem okna, od najnowszych.",
       "older": "Wcześniejsza godzina",
       "newer": "Późniejsza godzina",
       "truncated": "W tej godzinie jest więcej żądań, niż pokazuje lista.",
       "emptyTitle": "Brak żądań",
-      "emptyDescription": "W tej godzinie nie było żądań do bramy.",
       "loadError": "Nie udało się wczytać dzienników żądań.",
       "permissionDenied": "Dzienniki żądań może przeglądać tylko właściciel, administrator lub menedżer rozliczeń organizacji.",
       "tokens": "{{input}} wej. · {{output}} wyj.",
@@ -4415,8 +4436,7 @@
       "repoValue": "Repozytorium: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Ten profil nie jest już dostępny. Wybierz inny.",
-      "pickerEmptyDescriptionOrganization": "Utwórz profil organizacji, aby ponownie używać zmiennych środowiskowych, poleceń konfiguracyjnych i umiejętności w różnych sesjach.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Właściciel lub administrator organizacji może utworzyć profil organizacji."
+      "pickerEmptyDescriptionOrganization": "Utwórz profil organizacji, aby ponownie używać zmiennych środowiskowych, poleceń konfiguracyjnych i umiejętności w różnych sesjach."
     },
     "variablesDeleteFailed": "Nie udało się usunąć zmiennej",
     "deleteVariable": "Usuń zmienną {{key}}",
@@ -4610,7 +4630,6 @@
     "dismiss": "Odrzuć raport",
     "offline": "Offline · zapisany raport",
     "cached": "Zapisany raport · odświeżanie niedostępne",
-    "window": "{{start}} – {{end}}",
     "summary": "Podsumowanie AI",
     "summaryPending": "Trwa tworzenie podsumowania AI. Pojawi się tutaj, gdy będzie gotowe.",
     "summaryUnavailable": "Podsumowanie AI niedostępne. Raport ustrukturyzowany jest nadal dostępny.",
@@ -4729,6 +4748,7 @@
       "title": "Wyzwalacze i webhooki",
       "subtitle": "Automatyzuj uruchomienia Cloud Agent przez wywołanie webhooka lub harmonogram.",
       "new": "Nowy wyzwalacz",
+      "create": "Utwórz wyzwalacz",
       "emptyTitle": "Brak wyzwalaczy",
       "emptyDescription": "Utwórz wyzwalacz, aby uruchomić Cloud Agent przez wywołanie webhooka lub według harmonogramu.",
       "loadFailedTitle": "Nie udało się wczytać wyzwalaczy",
@@ -4782,6 +4802,8 @@
       "created": "Utworzono wyzwalacz",
       "saved": "Zapisano wyzwalacz",
       "statusArrived": "Dotarło",
+      "defaultPromptWebhook": "Opisz treść żądania webhooka:\n\n{{body}}",
+      "defaultPromptScheduled": "Uruchom zaplanowane zadanie. Wyzwolone o {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Wprowadź nazwę.",
         "nameTooShort": "Użyj co najmniej 8 znaków.",
@@ -4830,6 +4852,7 @@
     "superseded": "Ten link został zastąpiony na innym urządzeniu, więc już nie działa."
   },
   "sharedSession": {
+    "startedAt": "Rozpoczęto o {{time}}",
     "title": "Udostępniona sesja",
     "someone": "Ktoś",
     "sharedBy": "Udostępnione przez: {{owner}}",

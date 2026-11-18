@@ -26,6 +26,7 @@
     "creditHistory": "Istorik kredi",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Anile",
     "done": "Fèt",
     "retry": "Eseye ankò",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "Chanjman",
     "organizationTrialEnded": "Esè òganizasyon an fini epi li pa gen okenn plan aktif. Yon pwopriyetè òganizasyon ka mete ajou faktirasyon sou kilo.ai, epi eseye ankò.",
-    "privateRepositoryA11y": "{{name}}, repòsitwa prive"
+    "privateRepositoryA11y": "{{name}}, repòsitwa prive",
+    "legalDocumentEnglishOnly": "Dokiman sa a disponib nan lang angle sèlman."
   },
   "language": {
     "restarting": "Ap rekòmanse pou itilize lang ou chwazi a",
@@ -481,7 +483,14 @@
       "viewReceipt": "Wè resi a"
     },
     "changelog": "Sa ki nouvo",
-    "changelogVersionPending": "Nòt vèsyon sa a ap vini ak pwochen mizajou aplikasyon an."
+    "changelogVersionPending": "Nòt vèsyon {{version}} an ap vini ak pwochen mizajou aplikasyon an.",
+    "changelogGroupNew": "Nouvo",
+    "changelogFixesIn": "Koreksyon ak amelyorasyon nan {{areas}}.",
+    "changelogFixesPolish": "Koreksyon ak amelyorasyon nan tout aplikasyon an.",
+    "changelogAreas": {
+      "signIn": "Koneksyon",
+      "profileOrganizations": "Pwofil ak òganizasyon"
+    }
   },
   "preferences": {
     "general": "Jeneral",
@@ -1466,13 +1475,25 @@
       "repositoryLine": "Revizyon: {{reviews}} · Konsta: {{findings}}",
       "empty": "Poko gen revizyon ak estatistik",
       "emptyDescription": "Estatistik yo anrejistre revizyon ki fini pandan yo aktive pou òganizasyon an.",
-      "off": "Estatistik yo dezaktive pou òganizasyon sa a.",
-      "couldNotLoad": "Nou pa t ka chaje estatistik yo"
+      "offTitle": "Estatistik yo dezaktive pou {{platform}}",
+      "offDescription": "Wòl faktirasyon òganizasyon an (pwopriyetè, administratè ak manadjè faktirasyon) ka aktive estatistik nan paramèt òganizasyon an sou wèb la pou anrejistre revizyon ki fini.",
+      "couldNotLoad": "Nou pa t ka chaje estatistik yo",
+      "trackedReviewsCaption": "Revizyon ki fini nan peryòd sa a pandan estatistik yo te aktive. Revizyon k ap kouri ak revizyon ki echwe pa janm konte.",
+      "trackedReviewsUncounted": "Pa konte: {{displayCount}} sou {{displayTotal}} revizyon ki fini òganizasyon an genyen, rezilta yo pa te kaptire.",
+      "trackedReviewsUncounted_one": "Pa konte: {{displayCount}} sou {{displayTotal}} revizyon ki fini òganizasyon an genyen, rezilta yo pa te kaptire.",
+      "trackedReviewsUncounted_other": "Pa konte: {{displayCount}} sou {{displayTotal}} revizyon ki fini òganizasyon an genyen, rezilta yo pa te kaptire."
     },
     "council": {
       "title": "Revizyon konsèy",
       "subtitle": "Plizyè espesyalis revize chak demann fizyon, epi vòt yo mete ansanm pou fè yon sèl desizyon.",
-      "unavailable": "Revizyon konsèy pa disponib pou òganizasyon sa a.",
+      "unavailablePersonallyTitle": "Bezwen yon òganizasyon Enterprise",
+      "unavailablePersonally": "Revizyon konsèy se pa yon kont pèsonèl.",
+      "unavailablePersonallyAction": "Kreye yon òganizasyon",
+      "unavailablePersonallySwitchAction": "Chanje òganizasyon",
+      "unavailableOrganizationTitle": "Revizyon konsèy pa disponib",
+      "unavailableForOrganization": "Revizyon konsèy bezwen plan Enterprise a ak yon abònman oswa yon peryòd esè aktif. Òganizasyon sa a pa gen li kounye a.",
+      "unavailableForOrganizationNeutral": "Revizyon konsèy pa disponib pou òganizasyon sa a kounye a. Eseye ankò pita.",
+      "unavailableOnBitbucket": "Revizyon konsèy pa disponib pou depo Bitbucket.",
       "noRepositories": "Poko gen depo ki chwazi. Chwazi depo nan paramèt depo yo anvan.",
       "specialists": "Espesyalis",
       "labels": "Etikèt ki deklanche revizyon konsèy",
@@ -3123,7 +3144,6 @@
     "completingPurchase": "Ap finalize acha a",
     "subscriptionLoading": "Abònman Kilo Pass ap chaje",
     "retryHint": "Eseye chaje eta Kilo Pass la ankò.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Fini {{date}}",
     "notAvailableInApp": "Kilo Pass pa disponib nan aplikasyon an.",
     "statusActive": "Aktif",
@@ -3326,6 +3346,7 @@
       "manageOnWeb": "Paramèt faktirasyon sou entènèt",
       "changePlan": "Chanje plan",
       "buySeats": "Achte plas",
+      "managedOnWeb": "Se sou entènèt yo jere plan an, plas yo ak rechaj otomatik la.",
       "setupAutoTopUp": "Konfigire rechaj otomatik",
       "manageAutoTopUp": "Jere rechaj otomatik",
       "opensOnWeb": "Ap louvri sou entènèt la"
@@ -3474,12 +3495,10 @@
       "requestLogs": "Jounal demann"
     },
     "requestLogs": {
-      "hint": "Demann nan èdtan anvan fen fenèt la, pi resan yo an premye.",
       "older": "Èdtan anvan",
       "newer": "Èdtan apre",
       "truncated": "Èdtan sa a gen plis demann pase sa lis la montre.",
       "emptyTitle": "Pa gen demann",
-      "emptyDescription": "Pa gen demann pasrèl nan èdtan sa a.",
       "loadError": "Nou pa t ka chaje jounal demann yo.",
       "permissionDenied": "Se sèlman yon pwopriyetè, yon administratè oswa yon jesyonè faktirasyon nan òganizasyon an ki ka li jounal demann li.",
       "tokens": "{{input}} antre · {{output}} soti",
@@ -4283,8 +4302,7 @@
       "repoValue": "Depo: {{name}}",
       "profileValue": "Pwofil: {{name}}",
       "profileUnavailable": "Pwofil sa a pa disponib ankò. Chwazi yon lòt.",
-      "pickerEmptyDescriptionOrganization": "Kreye yon pwofil òganizasyon pou reitilize varyab anviwònman yo, kòmandman konfigirasyon, ak ladrès atravè sesyon yo.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Yon pwopriyetè oswa administratè òganizasyon ka kreye yon pwofil òganizasyon."
+      "pickerEmptyDescriptionOrganization": "Kreye yon pwofil òganizasyon pou reitilize varyab anviwònman yo, kòmandman konfigirasyon, ak ladrès atravè sesyon yo."
     },
     "variablesDeleteFailed": "Pa t 'kapab efase varyab",
     "deleteVariable": "Efase varyab {{key}}",
@@ -4470,7 +4488,6 @@
     "dismiss": "Rejte rapò a",
     "offline": "Hò liy · rapò anrejistre",
     "cached": "Rapò anrejistre · pa ka rafrechi",
-    "window": "{{start}} – {{end}}",
     "summary": "Rezime AI",
     "summaryPending": "Rezime AI a ap prepare. L ap parèt isit la lè l pare.",
     "summaryUnavailable": "Rezime AI a pa disponib. Rapò estriktire ou a toujou disponib.",
@@ -4589,6 +4606,7 @@
       "title": "Deklanchè ak wèbhuk",
       "subtitle": "Otomatize egzekisyon Cloud Agent soti nan yon apèl wèbhuk oswa yon pwogramasyon.",
       "new": "Nouvo deklanchè",
+      "create": "Kreye deklanchè",
       "emptyTitle": "Pa gen deklanchè ankò",
       "emptyDescription": "Kreye yon deklanchè pou kòmanse yon egzekisyon Cloud Agent soti nan yon apèl wèbhuk oswa sou yon pwogramasyon.",
       "loadFailedTitle": "Nou pa t kapab chaje deklanchè yo",
@@ -4642,6 +4660,8 @@
       "created": "Deklanchè kreye",
       "saved": "Deklanchè sove",
       "statusArrived": "Rive",
+      "defaultPromptWebhook": "Dekri kò demann wèbhuk sa a:\n\n{{body}}",
+      "defaultPromptScheduled": "Lanse travay pwograme a. Deklanche a {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Antre yon non.",
         "nameTooShort": "Sèvi ak omwen 8 karaktè.",
@@ -4690,6 +4710,7 @@
     "superseded": "Yo te ranplase lyen sa a yon lòt kote, kidonk li pa mache ankò."
   },
   "sharedSession": {
+    "startedAt": "Kòmanse a {{time}}",
     "title": "Sesyon pataje",
     "someone": "Yon moun",
     "sharedBy": "Pataje pa {{owner}}",

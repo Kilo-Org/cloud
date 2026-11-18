@@ -1,16 +1,21 @@
 /**
- * Internal API: mint a short-lived Kilo API token for the MCP catalog dump.
+ * Internal API: mint a short-lived Kilo API token for internal CI jobs that need
+ * the gateway.
  *
- * Called by `.github/workflows/kilo-mcp-catalog.yml`. The catalog dump shells
- * out to `kilo run` to generate missing search summaries, and the CLI
- * authenticates against the gateway with a user API token. The workflow holds
- * `MCP_CATALOG_TOKEN_SECRET`, a shared secret whose only purpose is this mint,
- * and exchanges it for a token that belongs to the benchmarking service
+ * Called by `.github/workflows/kilo-mcp-catalog.yml`, whose dump shells out to
+ * `kilo run` to generate missing search summaries, and by the kilo-app changelog
+ * workflows (`.github/workflows/kilo-app-release.yml` for a new build and
+ * `.github/workflows/kilo-app-changelog-history.yml` for the one-time rewrite),
+ * which ask the gateway for reader-facing release notes. The CLI and the notes
+ * script authenticate against the gateway with a user API token. The workflows
+ * hold `MCP_CATALOG_TOKEN_SECRET`, a shared secret whose only purpose is this
+ * mint, and exchange it for a token that belongs to the benchmarking service
  * account instead of a maintainer's personal login.
  *
  * The minted token is a full user API token (includes `apiTokenPepper`) so the
- * gateway accepts it as a real user token. It expires in 1 hour — a single
- * catalog dump run — and is scoped to the benchmarking organization.
+ * gateway accepts it as a real user token. It expires in 1 hour — one catalog
+ * dump run or one changelog rewrite — and is scoped to the benchmarking
+ * organization.
  *
  * Because the token carries that account's pepper and organization claims, the
  * identity is held to the same rules as the sibling bot-token mint: an

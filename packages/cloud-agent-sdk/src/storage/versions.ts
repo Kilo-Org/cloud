@@ -46,7 +46,7 @@ function forgetPartVersion(
       // The message keeps no part but this one — its last remaining part was removed.
       if (
         !sessionStorage.getMessageInfo(messageId) &&
-        !sessionStorage.getParts(messageId).some(part => part.id !== partId)
+        !sessionStorage.getPartIds(messageId).some(id => id !== partId)
       ) {
         versions.messages.delete(`${row.sessionId}\u0000${messageId}`);
       }

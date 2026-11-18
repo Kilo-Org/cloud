@@ -11,7 +11,7 @@ import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { QueryError } from '@/components/query-error';
-import { ScreenHeader } from '@/components/screen-header';
+import { type HeaderEyebrow, ScreenHeader } from '@/components/screen-header';
 import { SessionChangesBody } from '@/components/session-changes/session-changes-body';
 import { SessionChangesCommentDialog } from '@/components/session-changes/session-changes-comment-dialog';
 import { SessionChangesReviewSheet } from '@/components/session-changes/session-changes-review-sheet';
@@ -19,6 +19,7 @@ import { useSessionChangesData } from '@/components/session-changes/use-session-
 import { useSessionChangesFile } from '@/components/session-changes/use-session-changes-file';
 import { useSessionChangesReview } from '@/components/session-changes/use-session-changes-review';
 import { Button } from '@/components/ui/button';
+import { eyebrowHeaderProps } from '@/components/ui/eyebrow-placeholder';
 import { IconButton } from '@/components/ui/icon-button';
 import { RefreshCw } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
@@ -141,12 +142,31 @@ export function SessionChangesScreen({ sessionId }: Readonly<{ sessionId: string
     return undefined;
   }, [snapshot, legacyDiffQuery.isSuccess, legacyDiffQuery.dataUpdatedAt, t]);
 
+  // The eyebrow is the capture time above the title. Its line is reserved while
+  // a read is pending — with the placeholder bar, because the time is on its way
+  // — and after a read fails, where the same line stays blank so the title keeps
+  // its place without pulsing. It is dropped only when a read settled
+  // successfully without a capture time: the title then centres alone instead of
+  // keeping a line no label fills.
+  const captureReadPending =
+    cloudAgentSessionId === null ? readOnly && legacyDiffQuery.isPending : changesQuery.isPending;
+  const captureReadFailed =
+    cloudAgentSessionId === null ? readOnly && legacyDiffQuery.isError : changesQuery.isError;
+  let eyebrow: HeaderEyebrow = { kind: 'none' };
+  if (asOf !== undefined) {
+    eyebrow = { kind: 'ready', text: asOf };
+  } else if (sessionQuery.isPending || captureReadPending) {
+    eyebrow = { kind: 'loading' };
+  } else if (sessionQuery.isError || captureReadFailed) {
+    eyebrow = { kind: 'held' };
+  }
+  const eyebrowProps = eyebrowHeaderProps(eyebrow);
+
   return (
     <View className="flex-1 bg-background" testID="session-changes-screen">
       <ScreenHeader
         title={openFile === null ? t('common.changes') : openFile.path}
-        eyebrow={asOf}
-        reserveEyebrow
+        {...eyebrowProps}
         titleNumberOfLines={1}
         onBack={
           openFile === null

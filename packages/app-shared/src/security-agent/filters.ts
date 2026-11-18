@@ -63,6 +63,13 @@ export function getNextSecurityFindingsOffset(
   loadedCount: number,
   totalCount: number
 ): number | undefined {
+  // A page with no rows is evidence of no progress, not of rows remaining: the
+  // backend count can disagree with the rows a page returns (a finding moves
+  // between the count and the page read), so retrying the same offset would
+  // loop. End the chain instead.
+  if (loadedCount <= 0) {
+    return undefined;
+  }
   const nextOffset = initialOffset + loadedCount;
   return nextOffset < totalCount ? nextOffset : undefined;
 }

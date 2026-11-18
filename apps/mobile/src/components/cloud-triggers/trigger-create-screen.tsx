@@ -96,7 +96,7 @@ export function TriggerCreateScreen({ organizationId }: TriggerCreateScreenProps
           }}
           authConfigured={false}
           submitting={submitting}
-          submitLabel={t('cloudAgent.triggers.new')}
+          submitLabel={t('cloudAgent.triggers.create')}
           canSubmit={!hasTriggerDraftProblems(problems) && !submitting}
           onSubmit={() => {
             void submit();

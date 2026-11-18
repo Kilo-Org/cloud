@@ -26,6 +26,7 @@
     "creditHistory": "Cronologia crediti",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Annulla",
     "done": "Fatto",
     "retry": "Riprova",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "Modifiche",
     "organizationTrialEnded": "Il periodo di prova dell'organizzazione è terminato e non è presente alcun piano attivo. Il proprietario dell'organizzazione può aggiornare la fatturazione su kilo.ai, poi riprova.",
-    "privateRepositoryA11y": "{{name}}, repository privato"
+    "privateRepositoryA11y": "{{name}}, repository privato",
+    "legalDocumentEnglishOnly": "Questo documento è disponibile solo in inglese."
   },
   "language": {
     "restarting": "Riavvio per applicare la lingua selezionata",
@@ -481,7 +483,14 @@
       "viewReceipt": "Visualizza ricevuta"
     },
     "changelog": "Novità",
-    "changelogVersionPending": "Le note di questa versione arriveranno con il prossimo aggiornamento dell'app."
+    "changelogVersionPending": "Le note della versione {{version}} arriveranno con il prossimo aggiornamento dell'app.",
+    "changelogGroupNew": "Novità",
+    "changelogFixesIn": "Correzioni e miglioramenti in {{areas}}.",
+    "changelogFixesPolish": "Correzioni e miglioramenti in tutta l'app.",
+    "changelogAreas": {
+      "signIn": "Accesso",
+      "profileOrganizations": "Profilo e organizzazioni"
+    }
   },
   "notifications": {
     "channel": {
@@ -891,13 +900,26 @@
       "repositoryLine": "Revisioni: {{reviews}} · Segnalazioni: {{findings}}",
       "empty": "Nessuna revisione con statistiche",
       "emptyDescription": "Le statistiche registrano le revisioni completate mentre sono attive per l'organizzazione.",
-      "off": "Le statistiche sono disattivate per questa organizzazione.",
-      "couldNotLoad": "Impossibile caricare le statistiche"
+      "offTitle": "Le statistiche sono disattivate per {{platform}}",
+      "offDescription": "I ruoli di fatturazione dell'organizzazione (proprietari, amministratori e gestori della fatturazione) possono attivare le statistiche nelle impostazioni dell'organizzazione sul web per registrare le revisioni completate.",
+      "couldNotLoad": "Impossibile caricare le statistiche",
+      "trackedReviewsCaption": "Revisioni completate che si sono concluse in questo periodo con le statistiche attive. Le revisioni in corso e non riuscite non vengono mai conteggiate.",
+      "trackedReviewsUncounted": "Senza conteggio: {{displayCount}} delle {{displayTotal}} revisioni terminate dell’organizzazione con risultato non registrato.",
+      "trackedReviewsUncounted_many": "Senza conteggio: {{displayCount}} delle {{displayTotal}} revisioni terminate dell’organizzazione con risultato non registrato.",
+      "trackedReviewsUncounted_one": "Senza conteggio: {{displayCount}} delle {{displayTotal}} revisioni terminate dell’organizzazione con risultato non registrato.",
+      "trackedReviewsUncounted_other": "Senza conteggio: {{displayCount}} delle {{displayTotal}} revisioni terminate dell’organizzazione con risultato non registrato."
     },
     "council": {
       "title": "Revisione del gruppo di revisori",
       "subtitle": "Diversi specialisti revisionano ogni pull request e i loro voti si combinano in un'unica decisione.",
-      "unavailable": "La revisione del gruppo di revisori non è disponibile per questa organizzazione.",
+      "unavailablePersonallyTitle": "Richiede un'organizzazione Enterprise",
+      "unavailablePersonally": "La revisione del gruppo di revisori non fa parte di un account personale.",
+      "unavailablePersonallyAction": "Crea organizzazione",
+      "unavailablePersonallySwitchAction": "Cambia organizzazione",
+      "unavailableOrganizationTitle": "La revisione del gruppo di revisori non è disponibile al momento",
+      "unavailableForOrganization": "La revisione del gruppo di revisori richiede il piano Enterprise con un abbonamento attivo o un periodo di prova. Questa organizzazione non lo ha al momento.",
+      "unavailableForOrganizationNeutral": "La revisione del gruppo di revisori non è disponibile per questa organizzazione al momento. Riprova più tardi.",
+      "unavailableOnBitbucket": "La revisione del gruppo di revisori non è disponibile per i repository Bitbucket.",
       "noRepositories": "Nessun repository selezionato. Scegli prima i repository nelle impostazioni dei repository.",
       "specialists": "Specialisti",
       "labels": "Etichette che attivano la revisione del gruppo di revisori",
@@ -2614,7 +2636,6 @@
     "completingPurchase": "Completamento dell'acquisto…",
     "subscriptionLoading": "Caricamento dell'abbonamento Kilo Pass",
     "retryHint": "Riprova a caricare lo stato di Kilo Pass.",
-    "cardAccessibility": "{{title}}: {{description}}. {{actionLabel}}",
     "endedOn": "Terminato il {{date}}",
     "notAvailableInApp": "Kilo Pass non è disponibile nell'app.",
     "statusActive": "Attivo",
@@ -3375,6 +3396,7 @@
       "manageOnWeb": "Impostazioni di fatturazione sul web",
       "changePlan": "Cambia piano",
       "buySeats": "Acquista posti",
+      "managedOnWeb": "Il piano, i posti e la ricarica automatica sono gestiti sul web.",
       "setupAutoTopUp": "Configura la ricarica automatica",
       "manageAutoTopUp": "Gestisci la ricarica automatica",
       "opensOnWeb": "Si apre sul web"
@@ -3536,12 +3558,10 @@
       "requestLogs": "Registri delle richieste"
     },
     "requestLogs": {
-      "hint": "Richieste dell'ora precedente la fine dell'intervallo, dalle più recenti.",
       "older": "Ora precedente",
       "newer": "Ora successiva",
       "truncated": "In quest'ora ci sono più richieste di quelle mostrate.",
       "emptyTitle": "Nessuna richiesta",
-      "emptyDescription": "Nessuna richiesta al gateway in quest'ora.",
       "loadError": "Impossibile caricare i registri delle richieste.",
       "permissionDenied": "Solo un proprietario, un amministratore o un responsabile della fatturazione dell'organizzazione può consultare i registri delle richieste.",
       "tokens": "{{input}} input · {{output}} output",
@@ -4349,8 +4369,7 @@
       "repoValue": "Archivio: {{name}}",
       "profileValue": "Profilo: {{name}}",
       "profileUnavailable": "Questo profilo non è più disponibile. Scegline un altro.",
-      "pickerEmptyDescriptionOrganization": "Crea un profilo dell'organizzazione per riutilizzare variabili di ambiente, comandi di configurazione e competenze tra le sessioni.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Un proprietario o un amministratore dell'organizzazione può creare un profilo dell'organizzazione."
+      "pickerEmptyDescriptionOrganization": "Crea un profilo dell'organizzazione per riutilizzare variabili di ambiente, comandi di configurazione e competenze tra le sessioni."
     },
     "variablesDeleteFailed": "Impossibile eliminare la variabile",
     "deleteVariable": "Elimina la variabile {{key}}",
@@ -4540,7 +4559,6 @@
     "dismiss": "Ignora il briefing",
     "offline": "Offline · briefing salvato",
     "cached": "Report salvato · aggiornamento non disponibile",
-    "window": "{{start}} – {{end}}",
     "summary": "Riepilogo AI",
     "summaryPending": "Riepilogo AI in corso. Verrà allegato qui quando pronto.",
     "summaryUnavailable": "Riepilogo AI non disponibile. Il report strutturato è comunque disponibile.",
@@ -4659,6 +4677,7 @@
       "title": "Attivatori e webhook",
       "subtitle": "Automatizza le esecuzioni di Cloud Agent da una chiamata webhook o da una pianificazione.",
       "new": "Nuovo attivatore",
+      "create": "Crea attivatore",
       "emptyTitle": "Nessun attivatore per ora",
       "emptyDescription": "Crea un attivatore per avviare un'esecuzione di Cloud Agent da una chiamata webhook o in base a una pianificazione.",
       "loadFailedTitle": "Impossibile caricare gli attivatori",
@@ -4712,6 +4731,8 @@
       "created": "Attivatore creato",
       "saved": "Attivatore salvato",
       "statusArrived": "Arrivata",
+      "defaultPromptWebhook": "Descrivi il corpo di questa richiesta webhook:\n\n{{body}}",
+      "defaultPromptScheduled": "Esegui l'attività pianificata. Attivato alle {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Inserisci un nome.",
         "nameTooShort": "Usa almeno 8 caratteri.",
@@ -4760,6 +4781,7 @@
     "superseded": "Questo link è stato sostituito da un altro dispositivo, quindi non funziona più."
   },
   "sharedSession": {
+    "startedAt": "Avviata alle {{time}}",
     "title": "Sessione condivisa",
     "someone": "Qualcuno",
     "sharedBy": "Condivisa da {{owner}}",

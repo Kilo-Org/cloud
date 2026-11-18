@@ -26,6 +26,7 @@
     "creditHistory": "Tantaran'ny kredita",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Foano",
     "done": "Vita",
     "retry": "Andramo indray",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "Fiovana",
     "organizationTrialEnded": "Lasa ny fe-potoana fanandramana ho an'ny fikambanana ary tsy manana drafitra mavitrika izy. Ny tompon'ny fikambanana dia afaka manavao ny faktiora ao amin'ny kilo.ai, ary hanandrana indray.",
-    "privateRepositoryA11y": "{{name}}, tahirin-kaody manokana"
+    "privateRepositoryA11y": "{{name}}, tahirin-kaody manokana",
+    "legalDocumentEnglishOnly": "Ity antontan-taratasy ity dia tsy misy afa-tsy amin'ny teny anglisy."
   },
   "language": {
     "restarting": "Manomboka indray mba hampiharana ny fiteny",
@@ -481,7 +483,14 @@
       "viewReceipt": "Jereo ny porofo"
     },
     "changelog": "Ny vaovao",
-    "changelogVersionPending": "Ny naotin'ity kinova ity dia ho avy amin'ny fanavaozana manaraka."
+    "changelogVersionPending": "Ny naotin'ny kinova {{version}} dia ho avy amin'ny fanavaozana manaraka.",
+    "changelogGroupNew": "Vaovao",
+    "changelogFixesIn": "Fanitsiana sy fanatsarana amin'ireto sehatra ireto: {{areas}}.",
+    "changelogFixesPolish": "Fanitsiana sy fanatsarana manerana ny fampiharana.",
+    "changelogAreas": {
+      "signIn": "Fidirana",
+      "profileOrganizations": "Mombamomba sy fikambanana"
+    }
   },
   "preferences": {
     "general": "Ankapobeny",
@@ -1466,13 +1475,25 @@
       "repositoryLine": "Fandinihana: {{reviews}} · Olana hita: {{findings}}",
       "empty": "Tsy mbola misy fandinihana misy antontan'isa",
       "emptyDescription": "Mirakitra ny fandinihana vita ny antontan'isa rehefa velona ho an'ny fikambanana izy.",
-      "off": "Maty ny antontan'isa ho an'ity fikambanana ity.",
-      "couldNotLoad": "Tsy afaka nampiditra ny antontan'isa"
+      "offTitle": "Maty ny antontan'isa ho an'i {{platform}}",
+      "offDescription": "Ny andraikitra momba ny faktiora ao amin'ny fikambanana (tompony, mpitantana ary mpitantana ny faktiora) no afaka mamelona ny antontan'isa ao amin'ny fandrindrana ny fikambanana eo amin'ny tranonkala, mba hirakitra ny fandinihana vita.",
+      "couldNotLoad": "Tsy afaka nampiditra ny antontan'isa",
+      "trackedReviewsCaption": "Ny fandinihana vita nifarana tao anatin'io vanim-potoana io rehefa velona ny antontan'isa. Ny fandinihana mandeha sy ny fandinihana tsy nahomby dia tsy isaina mihitsy.",
+      "trackedReviewsUncounted": "Tsy isaina: {{displayCount}} amin’ny {{displayTotal}} fandinihana vitan’ny fikambanana, no tsy voarakitra ny antontan’isany.",
+      "trackedReviewsUncounted_one": "Tsy isaina: {{displayCount}} amin’ny {{displayTotal}} fandinihana vitan’ny fikambanana, no tsy voarakitra ny antontan’isany.",
+      "trackedReviewsUncounted_other": "Tsy isaina: {{displayCount}} amin’ny {{displayTotal}} fandinihana vitan’ny fikambanana, no tsy voarakitra ny antontan’isany."
     },
     "council": {
       "title": "Fandinihan'ny filankevitra",
       "subtitle": "Manam-pahaizana maro no mandinika ny PR tsirairay, ary mitambatra ho fanapahan-kevitra iray ny latsa-batony.",
-      "unavailable": "Tsy misy ny fandinihan'ny filankevitra ho an'ity fikambanana ity.",
+      "unavailablePersonallyTitle": "Mila fikambanana Enterprise",
+      "unavailablePersonally": "Tsy tafiditra ao amin'ny kaonty manokana ny fandinihan'ny filankevitra.",
+      "unavailablePersonallyAction": "Hamorona fikambanana",
+      "unavailablePersonallySwitchAction": "Mifindra fikambanana",
+      "unavailableOrganizationTitle": "Tsy misy ny Fandinihan'ny filankevitra",
+      "unavailableForOrganization": "Mila drafitra Enterprise misy famandrihana na andrana miasa ny fandinihan'ny filankevitra. Tsy manana izany ity fikambanana ity amin'izao fotoana izao.",
+      "unavailableForOrganizationNeutral": "Tsy misy ny fandinihan'ny filankevitra ho an'ity fikambanana ity amin'izao fotoana izao. Andramo indray aoriana.",
+      "unavailableOnBitbucket": "Tsy misy ny fandinihan'ny filankevitra ho an'ny tahirin-kaody Bitbucket.",
       "noRepositories": "Tsy mbola misy tahirin-kaody voafidy. Misafidiana tahirin-kaody ao amin'ny fikirana tahirin-kaody aloha.",
       "specialists": "Manam-pahaizana",
       "labels": "Marika mampandeha ny fandinihan'ny filankevitra",
@@ -3123,7 +3144,6 @@
     "completingPurchase": "Mamita ny fividianana",
     "subscriptionLoading": "Mampiditra ny famandrihana Kilo Pass",
     "retryHint": "Manandrana maka indray ny satan'ny Kilo Pass.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Vita tamin'ny {{date}}",
     "notAvailableInApp": "Tsy azo ampiasaina ao amin'ny rindranasa ny Kilo Pass.",
     "statusActive": "Mavitrika",
@@ -3326,6 +3346,7 @@
       "manageOnWeb": "Fikirakiran'ny faktiora amin'ny tranonkala",
       "changePlan": "Ovao ny drafitra",
       "buySeats": "Mividiana toerana",
+      "managedOnWeb": "Tantanina amin'ny tranonkala ny drafitra, ny toerana ary ny famenoana ho azy.",
       "setupAutoTopUp": "Alamino ny famenoana ho azy",
       "manageAutoTopUp": "Tantano ny famenoana ho azy",
       "opensOnWeb": "Misokatra ao amin'ny tranonkala"
@@ -3474,12 +3495,10 @@
       "requestLogs": "Rakitry ny fangatahana"
     },
     "requestLogs": {
-      "hint": "Fangatahana nandritra ny ora iray talohan'ny fiafaran'ny fe-potoana, ny vaovao indrindra aloha.",
       "older": "Ora teo aloha",
       "newer": "Ora manaraka",
       "truncated": "Mihoatra noho izay aseho ao amin'ny lisitra ny fangatahana tamin'ity ora ity.",
       "emptyTitle": "Tsy misy fangatahana",
-      "emptyDescription": "Tsy nisy fangatahana tamin'ny vavahady nandritra ity ora ity.",
       "loadError": "Tsy afaka nampiditra ny rakitry ny fangatahana.",
       "permissionDenied": "Ny tompon'ny fikambanana, ny mpitantana na ny mpitantana ny faktiora ihany no afaka mamaky ny rakitry ny fangatahana.",
       "tokens": "{{input}} miditra · {{output}} mivoaka",
@@ -4283,8 +4302,7 @@
       "repoValue": "Tahiry: {{name}}",
       "profileValue": "Mombamomba: {{name}}",
       "profileUnavailable": "Tsy misy intsony ity mombamomba ity. Misafidiana iray hafa.",
-      "pickerEmptyDescriptionOrganization": "Mamorona mombamomba momba ny fikambanana hampiasaina indray ny fari-piainan'ny tontolo iainana, baiko fanamboarana ary fahaiza-manao mandritra ny fotoam-pivoriana.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Ny tompon'ny fikambanana na ny mpandrindra dia afaka mamorona mombamomba momba ny fikambanana."
+      "pickerEmptyDescriptionOrganization": "Mamorona mombamomba momba ny fikambanana hampiasaina indray ny fari-piainan'ny tontolo iainana, baiko fanamboarana ary fahaiza-manao mandritra ny fotoam-pivoriana."
     },
     "variablesDeleteFailed": "Tsy afaka namafa ny ova",
     "deleteVariable": "Fafao miovaova {{key}}",
@@ -4470,7 +4488,6 @@
     "dismiss": "Esory ny tatitra",
     "offline": "Tsy misy tambajotra · tatitra voatahiry",
     "cached": "Tatitra voatahiry · tsy azo havaozina",
-    "window": "{{start}} – {{end}}",
     "summary": "Famintinana AI",
     "summaryPending": "Eo am-panomanana ny famintinana AI. Hiseho eto izy rehefa vita.",
     "summaryUnavailable": "Tsy misy ny famintinana AI. Mbola azo jerena ny tatitra voalamina.",
@@ -4589,6 +4606,7 @@
       "title": "Fanentanana sy fiantsoana",
       "subtitle": "Ataovy ho azy ny fanatanterahana Cloud Agent avy amin'ny fiantsoana na fandaharam-potoana.",
       "new": "Fanentanana vaovao",
+      "create": "Mamorona fanentanana",
       "emptyTitle": "Mbola tsy misy fanentanana",
       "emptyDescription": "Mamorona fanentanana hanombohana fanatanterahana Cloud Agent avy amin'ny fiantsoana na araka ny fandaharam-potoana.",
       "loadFailedTitle": "Tsy afaka nampiditra ny fanentanana",
@@ -4642,6 +4660,8 @@
       "created": "Voaforona ny fanentanana",
       "saved": "Voatahiry ny fanentanana",
       "statusArrived": "Tonga",
+      "defaultPromptWebhook": "Lazao ny votoatin'ny fangatahana avy amin'ity fiantsoana ity:\n\n{{body}}",
+      "defaultPromptScheduled": "Hazakazaho ny asa voalahatra. Natomboka tamin'ny {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Ampidiro ny anarana.",
         "nameTooShort": "Mampiasà farafahakeliny 8 tarehintsoratra.",
@@ -4690,6 +4710,7 @@
     "superseded": "Nosoloina tany an-kafa ity rohy ity, ka tsy miasa intsony."
   },
   "sharedSession": {
+    "startedAt": "Nanomboka tamin'ny {{time}}",
     "title": "Fotoam-piasana nozaraina",
     "someone": "Olona iray",
     "sharedBy": "Nozarain'i {{owner}}",

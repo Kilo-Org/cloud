@@ -43,6 +43,10 @@ const analysis = vi.hoisted(() => ({
   refetch: vi.fn(),
 }));
 
+const useSecurityAnalysis = vi.hoisted(() =>
+  vi.fn((_scope: string, _findingId: string, _enabled?: boolean) => analysis)
+);
+
 const capability = vi.hoisted(() => ({ canManage: true }));
 
 const trackInteraction = vi.hoisted(() => ({ mutate: vi.fn() }));
@@ -95,7 +99,8 @@ vi.mock('@/lib/hooks/use-security-agent', () => ({
 }));
 vi.mock('@/lib/hooks/use-security-findings', () => ({
   useSecurityFinding: () => finding,
-  useSecurityAnalysis: () => analysis,
+  useSecurityAnalysis: (scope: string, findingId: string, enabled?: boolean) =>
+    useSecurityAnalysis(scope, findingId, enabled),
 }));
 vi.mock('@/lib/hooks/use-security-dismiss-draft', () => ({
   useSecurityDismissDraft: () => dismissDraft,
@@ -258,6 +263,44 @@ describe('FindingDetailScreen pane containers', () => {
   });
 });
 
+describe('FindingDetailScreen analysis query activation', () => {
+  // The analysis query polls while a run is active, so it stays disabled until
+  // an analysis surface (analysis or remediation) is the selected tab: the
+  // details tab reads the finding, never its analysis.
+  function enabledArg(): unknown {
+    return useSecurityAnalysis.mock.lastCall?.[2];
+  }
+
+  function pressTab(tree: R, index: number) {
+    act(findingTabs(tree)[index]?.props.onPress as () => void);
+  }
+
+  it('reads the analysis only while an analysis surface is selected', () => {
+    const tree = renderScreen();
+    expect(enabledArg()).toBeFalsy();
+
+    pressTab(tree, 1);
+    expect(enabledArg()).toBe(true);
+
+    pressTab(tree, 2);
+    expect(enabledArg()).toBe(true);
+
+    pressTab(tree, 0);
+    expect(enabledArg()).toBeFalsy();
+  });
+
+  it('keeps the analysis query off while the finding is unavailable', () => {
+    finding.isError = true;
+    finding.error = { data: { code: 'NOT_FOUND' } };
+    finding.data = undefined;
+    const tree = renderScreen();
+
+    expect(tree.root.findAllByType(CenteredState)).toHaveLength(1);
+    expect(useSecurityAnalysis).toHaveBeenCalled();
+    expect(enabledArg()).toBeFalsy();
+  });
+});
+
 describe('FindingDetailScreen dismiss retry card states', () => {
   it.each([
     null,
@@ -319,10 +362,12 @@ describe.each([true, false])('finding load states with local history=%s', hasLoc
 
   it('keeps Back available during loading without offering Retry', () => {
     finding.isLoading = true;
+    finding.isFetching = true;
     finding.data = undefined;
     const tree = renderScreen();
 
-    expect(tree.root.findAllByType(Skeleton)).toHaveLength(4);
+    // Four body skeletons plus the bar on the header's reserved eyebrow line.
+    expect(tree.root.findAllByType(Skeleton)).toHaveLength(5);
     expect(tree.root.findAllByType(QueryError)).toHaveLength(0);
     expect(tree.root.findAllByProps({ accessibilityLabel: 'common.retry' })).toHaveLength(0);
     expectSafeBack(tree);
@@ -335,6 +380,9 @@ describe.each([true, false])('finding load states with local history=%s', hasLoc
     const tree = renderScreen();
 
     expect(tree.root.findAllByType(QueryError)).toHaveLength(1);
+    // The header keeps the eyebrow line it reserved while loading, and no bar
+    // paints over it once the read has failed: this state leaves no skeleton.
+    expect(tree.root.findAllByType(Skeleton)).toHaveLength(0);
     expectSafeBack(tree);
   });
 
@@ -354,7 +402,9 @@ describe.each([true, false])('finding load states with local history=%s', hasLoc
 
     expect(tree.root.findAllByType(QueryError)).toHaveLength(1);
     expect(tree.root.findByType(QueryError).props.isRetrying).toBe(true);
-    expect(tree.root.findAllByType(Skeleton)).toHaveLength(0);
+    // The body stays on the error surface; only the header's reserved eyebrow
+    // bar remains, so the retry window paints no body skeleton.
+    expect(tree.root.findAllByType(Skeleton)).toHaveLength(1);
 
     finding.isFetching = false;
     finding.data = { status: 'open', repo_full_name: 'org/recovered' };
@@ -377,7 +427,8 @@ describe.each([true, false])('finding load states with local history=%s', hasLoc
     renderScreen('finding-2');
 
     expect(tree.root.findAllByType(QueryError)).toHaveLength(0);
-    expect(tree.root.findAllByType(Skeleton)).toHaveLength(4);
+    // Four body skeletons plus the bar on the header's reserved eyebrow line.
+    expect(tree.root.findAllByType(Skeleton)).toHaveLength(5);
   });
 
   it('recovers the finding through Retry after a transient load failure', () => {
@@ -417,6 +468,10 @@ describe.each([true, false])('finding load states with local history=%s', hasLoc
     ).toHaveLength(1);
     expect(tree.root.findAllByProps({ accessibilityLabel: 'common.retry' })).toHaveLength(0);
     expect(tree.root.findAllByType(QueryError)).toHaveLength(0);
+    // The first frame of every open is the loading one, so the not-found answer
+    // keeps the line it reserved then instead of pulling the title up — held
+    // blank, because no read is running to fill it.
+    expect(tree.root.findAllByType(Skeleton)).toHaveLength(0);
     expectSafeBack(tree);
   });
 });

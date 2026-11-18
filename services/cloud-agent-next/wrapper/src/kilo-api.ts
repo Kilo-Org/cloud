@@ -186,7 +186,12 @@ function requireSdkData<T>(
   return result.data;
 }
 
-export type DrainSessionErrorKind = 'transient' | 'definitive' | 'anomalous' | 'unclassified';
+export type DrainSessionErrorKind =
+  | 'transient'
+  | 'definitive'
+  | 'anomalous'
+  | 'unclassified'
+  | 'quiet_drain';
 
 /**
  * A classified drain failure. Transport-level retry policy reads `kind`; the

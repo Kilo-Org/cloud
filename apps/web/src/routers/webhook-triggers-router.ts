@@ -1,5 +1,14 @@
 import { webhookBodySchema } from '@kilocode/worker-utils/webhook-body-validation';
 import {
+  existingChatWorkspaceSettingsError,
+  hasExistingChatWorkspaceSettings,
+  triggerChatIdRequired,
+  triggerChatIdSchema,
+  triggerChatRequiresCreator,
+  webhookTriggerTargetSchema,
+} from '@kilocode/worker-utils/webhook-trigger-target';
+import { checkWorkspaceChatTarget } from '@kilocode/worker-utils/cloud-agent-session-access';
+import {
   createTRPCRouter,
   baseProcedure,
   type TRPCContext,
@@ -17,13 +26,15 @@ import {
   type EnvironmentResponse,
 } from '@kilocode/cloud-agent-profile';
 import { TRPCError } from '@trpc/server';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, isNull } from 'drizzle-orm';
 import pLimit from 'p-limit';
 import * as z from 'zod';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { isUniqueViolation } from '@/lib/db-errors';
 import {
   cloud_agent_webhook_triggers,
+  cli_sessions_v2,
+  cloud_agent_worktrees,
   organization_memberships,
   agent_environment_profiles,
   kiloclaw_instances,
@@ -75,7 +86,8 @@ export const WebhookTriggerCreateInput = z
     triggerId: triggerIdCreateSchema,
     organizationId: z.string().uuid().optional(),
     runAsCreator: z.boolean().optional(),
-    targetType: z.enum(['cloud_agent', 'kiloclaw_chat']).default('cloud_agent'),
+    targetType: webhookTriggerTargetSchema.default('cloud_agent'),
+    cloudAgentSessionId: triggerChatIdSchema.optional(),
     // KiloClaw Chat target fields
     kiloclawInstanceId: z.string().uuid().optional(),
     // Cloud Agent target fields (optional — required only when targetType = 'cloud_agent')
@@ -108,7 +120,7 @@ export const WebhookTriggerCreateInput = z
   .superRefine((data, ctx) => {
     if (
       data.bodySchema != null &&
-      (data.targetType !== 'cloud_agent' || data.activationMode !== 'webhook')
+      (data.targetType === 'kiloclaw_chat' || data.activationMode !== 'webhook')
     ) {
       ctx.addIssue({
         code: 'custom',
@@ -117,7 +129,7 @@ export const WebhookTriggerCreateInput = z
       });
     }
     if (data.runAsCreator) {
-      if (!data.organizationId || data.targetType !== 'cloud_agent') {
+      if (!data.organizationId || data.targetType === 'kiloclaw_chat') {
         ctx.addIssue({
           code: 'custom',
           message: 'Run as creator is only available for organization Cloud Agent triggers',
@@ -177,12 +189,38 @@ export const WebhookTriggerCreateInput = z
         });
       }
     }
-    if (data.targetType === 'cloud_agent') {
-      if (!data.githubRepo)
-        ctx.addIssue({ code: 'custom', message: 'GitHub repo is required', path: ['githubRepo'] });
+    if (data.targetType === 'cloud_agent' && !data.githubRepo) {
+      ctx.addIssue({ code: 'custom', message: 'GitHub repo is required', path: ['githubRepo'] });
+    }
+    if (data.targetType !== 'kiloclaw_chat') {
       if (!data.mode) ctx.addIssue({ code: 'custom', message: 'Mode is required', path: ['mode'] });
       if (!data.model)
         ctx.addIssue({ code: 'custom', message: 'Model is required', path: ['model'] });
+    }
+    if (data.targetType === 'cloud_agent_chat') {
+      if (!data.cloudAgentSessionId) {
+        ctx.addIssue({
+          code: 'custom',
+          message: triggerChatIdRequired,
+          path: ['cloudAgentSessionId'],
+        });
+      }
+      if (data.organizationId && !data.runAsCreator) {
+        ctx.addIssue({
+          code: 'custom',
+          message: triggerChatRequiresCreator,
+          path: ['runAsCreator'],
+        });
+      }
+      if (hasExistingChatWorkspaceSettings(data)) {
+        ctx.addIssue({ code: 'custom', message: existingChatWorkspaceSettingsError });
+      }
+    } else if (data.cloudAgentSessionId !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'A chat ID is only used for an existing chat target.',
+        path: ['cloudAgentSessionId'],
+      });
     }
     if (data.targetType === 'kiloclaw_chat') {
       if (!data.kiloclawInstanceId)
@@ -208,12 +246,15 @@ export const WebhookTriggerCreateInput = z
     }
   });
 
-// Note: targetType and kiloclawInstanceId are immutable after creation.
-// To change the target type or instance, delete and recreate the trigger.
 export const WebhookTriggerUpdateInput = z
   .object({
     triggerId: triggerIdSchema,
     organizationId: z.string().uuid().optional(),
+    cloudAgentSessionId: z
+      .never({
+        error: 'The target chat cannot be changed. Create a new trigger to use a different chat.',
+      })
+      .optional(),
     mode: webhookTriggerModeSchema.optional(),
     model: z.string().min(1).optional(),
     variant: agentVariantSchema.nullable().optional(),
@@ -408,6 +449,27 @@ function assertCreatorWebhookSecretStrength(secret: string): void {
   }
 }
 
+async function assertExistingChatTarget(
+  cloudAgentSessionId: string | null | undefined,
+  userId: string,
+  organizationId: string | undefined
+): Promise<void> {
+  if (!cloudAgentSessionId) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: triggerChatIdRequired });
+  }
+  const failure = await checkWorkspaceChatTarget(db, {
+    cloudAgentSessionId,
+    userId,
+    organizationId: organizationId ?? null,
+  });
+  if (failure) {
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: 'Cloud Agent chat not found or not accessible',
+    });
+  }
+}
+
 /**
  * Helper to validate profile ownership.
  * Throws NOT_FOUND if the profile is missing or not accessible by the owner.
@@ -555,6 +617,46 @@ async function assertSandboxAllocationAvailable(
 }
 
 export const webhookTriggersRouter = createTRPCRouter({
+  listChatTargets: baseProcedure
+    .input(z.object({ organizationId: z.string().uuid().optional() }))
+    .query(async ({ ctx, input }) => {
+      if (input.organizationId) await ensureOrganizationAccess(ctx, input.organizationId);
+      const userId = ctx.user.id;
+      const chatScope = input.organizationId
+        ? eq(cli_sessions_v2.organization_id, input.organizationId)
+        : isNull(cli_sessions_v2.organization_id);
+      const workspaceScope = input.organizationId
+        ? eq(cloud_agent_worktrees.organization_id, input.organizationId)
+        : isNull(cloud_agent_worktrees.organization_id);
+      const chats = await db
+        .select({
+          id: cli_sessions_v2.cloud_agent_session_id,
+          title: cli_sessions_v2.title,
+          workspaceName: cloud_agent_worktrees.name,
+        })
+        .from(cli_sessions_v2)
+        .innerJoin(
+          cloud_agent_worktrees,
+          eq(cli_sessions_v2.cloud_agent_worktree_id, cloud_agent_worktrees.worktree_id)
+        )
+        .where(
+          and(
+            eq(cli_sessions_v2.kilo_user_id, userId),
+            eq(cloud_agent_worktrees.kilo_user_id, userId),
+            chatScope,
+            workspaceScope,
+            isNotNull(cli_sessions_v2.cloud_agent_session_id),
+            isNull(cloud_agent_worktrees.deletion_started_at)
+          )
+        )
+        .orderBy(desc(cli_sessions_v2.updated_at))
+        .limit(50);
+      return chats.flatMap(chat => {
+        const id = triggerChatIdSchema.safeParse(chat.id);
+        return id.success ? [{ ...chat, id: id.data }] : [];
+      });
+    }),
+
   capabilities: baseProcedure
     .input(
       z.object({
@@ -595,7 +697,7 @@ export const webhookTriggersRouter = createTRPCRouter({
     .input(
       z.object({
         organizationId: z.string().uuid().optional(),
-        targetType: z.enum(['cloud_agent', 'kiloclaw_chat']).optional(),
+        targetType: webhookTriggerTargetSchema.optional(),
         activationMode: z.enum(['webhook', 'scheduled']).optional(),
         withEditability: z.boolean().optional(),
       })
@@ -617,8 +719,9 @@ export const webhookTriggersRouter = createTRPCRouter({
             isNull(cloud_agent_webhook_triggers.organization_id)
           );
       const filters = [ownerFilter];
-      if (input.targetType)
+      if (input.targetType) {
         filters.push(eq(cloud_agent_webhook_triggers.target_type, input.targetType));
+      }
       if (input.activationMode)
         filters.push(eq(cloud_agent_webhook_triggers.activation_mode, input.activationMode));
       const whereClause = and(...filters);
@@ -800,6 +903,10 @@ export const webhookTriggersRouter = createTRPCRouter({
       }
     }
 
+    if (input.targetType === 'cloud_agent_chat') {
+      await assertExistingChatTarget(input.cloudAgentSessionId, userId, input.organizationId);
+    }
+
     if (input.sandboxAllocation !== undefined) {
       await assertSandboxAllocationAvailable(
         ctx.user,
@@ -873,6 +980,7 @@ export const webhookTriggersRouter = createTRPCRouter({
           user_id: input.organizationId ? null : userId,
           organization_id: input.organizationId ?? null,
           target_type: input.targetType,
+          cloud_agent_session_id: input.cloudAgentSessionId ?? null,
           activation_mode: input.activationMode,
           kiloclaw_instance_id: input.kiloclawInstanceId ?? null,
           github_repo: input.githubRepo ?? null,
@@ -904,6 +1012,7 @@ export const webhookTriggersRouter = createTRPCRouter({
         input.triggerId,
         {
           targetType: input.targetType,
+          cloudAgentSessionId: input.cloudAgentSessionId,
           executionUserId: input.runAsCreator ? userId : undefined,
           kiloclawInstanceId: input.kiloclawInstanceId,
           githubRepo: input.githubRepo,
@@ -1008,6 +1117,37 @@ export const webhookTriggersRouter = createTRPCRouter({
       }
     }
 
+    const hasConfigurationUpdates = [
+      input.mode,
+      input.model,
+      input.variant,
+      input.sandboxAllocation,
+      input.environmentId,
+      input.promptTemplate,
+      input.profileId,
+      input.bodySchema,
+      input.autoCommit,
+      input.condenseOnComplete,
+      input.webhookAuth,
+      input.cronExpression,
+      input.cronTimezone,
+    ].some(value => value !== undefined);
+    const isDeactivationOnly = input.isActive === false && !hasConfigurationUpdates;
+
+    if (dbTrigger.target_type === 'cloud_agent_chat' && !isDeactivationOnly) {
+      if (input.organizationId && !executionUserId) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: triggerChatRequiresCreator });
+      }
+      if (hasExistingChatWorkspaceSettings(input)) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: existingChatWorkspaceSettingsError });
+      }
+      await assertExistingChatTarget(
+        dbTrigger.cloud_agent_session_id,
+        executionUserId ?? userId,
+        input.organizationId
+      );
+    }
+
     if (input.sandboxAllocation !== undefined && dbTrigger.target_type === 'kiloclaw_chat') {
       throw new TRPCError({
         code: 'BAD_REQUEST',
@@ -1033,7 +1173,7 @@ export const webhookTriggersRouter = createTRPCRouter({
 
     if (
       input.bodySchema != null &&
-      (dbTrigger.target_type !== 'cloud_agent' || dbTrigger.activation_mode !== 'webhook')
+      (dbTrigger.target_type === 'kiloclaw_chat' || dbTrigger.activation_mode !== 'webhook')
     ) {
       throw new TRPCError({
         code: 'BAD_REQUEST',
@@ -1065,24 +1205,7 @@ export const webhookTriggersRouter = createTRPCRouter({
       );
     }
 
-    const hasUpdates = [
-      input.mode,
-      input.model,
-      input.variant,
-      input.sandboxAllocation,
-      input.environmentId,
-      input.promptTemplate,
-      input.profileId,
-      input.bodySchema,
-      input.autoCommit,
-      input.condenseOnComplete,
-      input.isActive,
-      input.webhookAuth,
-      input.cronExpression,
-      input.cronTimezone,
-    ].some(value => value !== undefined);
-
-    if (!hasUpdates) {
+    if (!hasConfigurationUpdates && input.isActive === undefined) {
       throw new TRPCError({
         code: 'BAD_REQUEST',
         message: 'No updates provided',

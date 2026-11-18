@@ -14,7 +14,6 @@ import {
   claudeBillingOutcomeParam,
 } from '@/lib/claude-billing/constants';
 import { canManageClaudeBillingOrganization } from '@/lib/claude-billing/access';
-import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 
 function outcomeRedirect(
   returnPath: string,
@@ -75,9 +74,6 @@ export async function GET(request: NextRequest) {
   const owner = await resolveOwner(request, user.id);
   if (!owner) {
     return outcomeRedirect(returnPath, requestedOwner(request), 'forbidden');
-  }
-  if (!(await isClaudePlatformOAuthEnabled(user.google_user_email))) {
-    return outcomeRedirect(returnPath, owner, 'forbidden');
   }
 
   try {

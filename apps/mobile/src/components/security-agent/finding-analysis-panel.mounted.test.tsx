@@ -36,6 +36,10 @@ const startAnalysis = vi.hoisted(() => ({
   isPending: false,
 }));
 
+const useSecurityAnalysisCapacity = vi.hoisted(() =>
+  vi.fn((_scope: string, _enabled?: boolean) => capacity)
+);
+
 const kvRows = vi.hoisted(() => ({
   labels: [] as string[],
   values: new Map<string, unknown>(),
@@ -58,7 +62,7 @@ vi.mock('@/components/ui/icons', () => ({
   ScanSearch: 'ScanSearch',
 }));
 vi.mock('@/lib/hooks/use-security-agent', () => ({
-  useSecurityAnalysisCapacity: () => capacity,
+  useSecurityAnalysisCapacity,
 }));
 vi.mock('@/lib/hooks/use-security-findings', () => ({
   useStartSecurityAnalysis: () => startAnalysis,
@@ -529,5 +533,38 @@ describe('FindingAnalysisPanel identifier values', () => {
     );
     expect(location, 'the panel draws the located path').toBeDefined();
     expect(location?.props.style).toMatchObject({ direction: 'ltr', writingDirection: 'ltr' });
+  });
+});
+
+describe('FindingAnalysisPanel capacity read activation', () => {
+  // Only a startable analysis needs the admission counters, so the read (and
+  // its full-capacity poll) stays off everywhere else.
+  beforeEach(() => {
+    capacity.state = 'available';
+    capacity.isLoading = false;
+    capacity.isError = false;
+    useSecurityAnalysisCapacity.mockClear();
+  });
+
+  it('reads capacity for an open finding with no analysis yet', () => {
+    renderPanel(analysisFixture({ status: null }));
+
+    expect(useSecurityAnalysisCapacity.mock.lastCall?.[1]).toBe(true);
+  });
+
+  it('skips the capacity read once the finding has a finished analysis', () => {
+    renderPanel(analysisFixture({ status: 'completed' }));
+
+    expect(useSecurityAnalysisCapacity.mock.lastCall?.[1]).toBe(false);
+  });
+
+  it.each([
+    ['while the analysis loads', { isLoading: true }],
+    ['after a failed analysis read', { isError: true }],
+    ['with no analysis response', {}],
+  ] as const)('keeps the capacity read off %s', (_label, props) => {
+    renderPanel(undefined, props);
+
+    expect(useSecurityAnalysisCapacity.mock.lastCall?.[1]).toBeFalsy();
   });
 });

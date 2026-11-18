@@ -5,7 +5,7 @@ import { deriveCallbackToken } from '@kilocode/worker-utils';
 import { resolveRuntimeEnvironment } from '@kilocode/worker-utils/runtime-authorization-contract';
 import { buildSecurityFindingAnalysisInput } from '@kilocode/worker-utils/security-remediation-policy';
 import {
-  clearAnalysisStatus,
+  clearSupersededAnalysisStatus,
   getSecurityFindingById,
   setFindingPending,
   tryAcquireAnalysisStartLease,
@@ -18,8 +18,13 @@ import {
 import { logger } from './logger.js';
 import { generateControlToken, generateTriageToken } from './token.js';
 import { triageSecurityFinding } from './triage.js';
+import { readAnalysisCreditAdmission } from './credit-admission.js';
+import {
+  SESSION_CLEANUP_TIMEOUT_MS,
+  interruptAnalysisCloudAgentSession,
+} from './session-interrupt.js';
 import { maybeAutoDismissCompletedAnalysis } from './auto-dismiss.js';
-import type { AnalysisMode, SecurityFindingAnalysis } from './types.js';
+import type { AnalysisMode, AutoAnalysisFailureCode, SecurityFindingAnalysis } from './types.js';
 
 export class InsufficientCreditsError extends Error {
   readonly httpStatus = 402;
@@ -168,6 +173,11 @@ export type StartSecurityAnalysisResult = {
   error?: string;
   triageOnly?: boolean;
   failureNeedsLifecycleTransition?: boolean;
+  /**
+   * Declared classification of a failed start. Callers must use it instead of
+   * classifying `error` text when it is present.
+   */
+  failureCode?: AutoAnalysisFailureCode;
 };
 
 export async function startSecurityAnalysis(
@@ -198,30 +208,67 @@ export async function startSecurityAnalysis(
   const existingTriage = params.retrySandboxOnly ? finding.analysis?.triage : undefined;
   const skipTriage = params.retrySandboxOnly === true && existingTriage !== undefined;
 
-  await setFindingPending(
-    params.db,
-    params.findingId,
-    skipTriage ? (finding.analysis ?? null) : null
-  );
+  let controlToken: string | undefined;
+  let preparedAttempt: { cloudAgentSessionId: string; kiloSessionId: string } | null = null;
 
   try {
     const environment = resolveRuntimeEnvironment(params.env.ENVIRONMENT);
-    const [controlToken, triageToken] = await Promise.all([
-      generateControlToken(
-        params.actorUser,
-        params.nextAuthSecret,
-        environment,
-        params.env.SHARED_RESOURCE_TOKENS_ENABLED,
-        finding.owned_by_organization_id ?? undefined
-      ),
-      generateTriageToken(
-        params.actorUser,
-        params.nextAuthSecret,
-        environment,
-        params.env.SHARED_RESOURCE_TOKENS_ENABLED,
-        finding.owned_by_organization_id ?? undefined
-      ),
-    ]);
+    // The control token is minted first because the credit admission read and
+    // any cleanup interrupt authenticate with it.
+    controlToken = await generateControlToken(
+      params.actorUser,
+      params.nextAuthSecret,
+      environment,
+      params.env.SHARED_RESOURCE_TOKENS_ENABLED,
+      finding.owned_by_organization_id ?? undefined
+    );
+
+    const admission = await readAnalysisCreditAdmission({
+      env: params.env,
+      authToken: controlToken,
+      organizationId: finding.owned_by_organization_id ?? undefined,
+    });
+    if (admission.outcome === 'insufficient_credits') {
+      // The denial is raised before any paid work runs; the caller settles the
+      // credit-gated outcome.
+      throw new InsufficientCreditsError(admission.message);
+    }
+    if (admission.outcome === 'refused') {
+      // The refusal is permanent, so it declares its own classification and the
+      // caller does not spend retry attempts on it.
+      return {
+        started: false,
+        error: admission.message,
+        failureNeedsLifecycleTransition: true,
+        failureCode: 'PERMISSION_DENIED_PERMANENT',
+      };
+    }
+    if (admission.outcome === 'unavailable') {
+      // The read could not decide and no paid work ran, so the caller retries
+      // under its own consumer's attempt bound and gives up when it ends.
+      return {
+        started: false,
+        error: admission.message,
+        failureNeedsLifecycleTransition: true,
+        failureCode: 'REQUEUE_TEMPORARY_PRECONDITION',
+      };
+    }
+
+    // The pending write follows admission, and the caller's start-failed
+    // transition releases the reservation this write records.
+    await setFindingPending(
+      params.db,
+      params.findingId,
+      skipTriage ? (finding.analysis ?? null) : null
+    );
+
+    const triageToken = await generateTriageToken(
+      params.actorUser,
+      params.nextAuthSecret,
+      environment,
+      params.env.SHARED_RESOURCE_TOKENS_ENABLED,
+      finding.owned_by_organization_id ?? undefined
+    );
     const triage = skipTriage
       ? existingTriage
       : await triageSecurityFinding({
@@ -254,7 +301,10 @@ export async function startSecurityAnalysis(
         outcome: { type: 'triage-only-completed', analysis: triageOnlyAnalysis },
       });
       if (!transition.transitioned) {
-        await clearAnalysisStatus(params.db, params.findingId);
+        await clearSupersededAnalysisStatus(params.db, {
+          findingId: params.findingId,
+          claimToken: params.lifecycleClaim.claimToken,
+        });
         return { started: false, error: 'Finding was superseded during analysis' };
       }
       await maybeAutoDismissCompletedAnalysis({
@@ -334,12 +384,16 @@ export async function startSecurityAnalysis(
     }
 
     const { cloudAgentSessionId, kiloSessionId } = parsedPrepare.data.result.data;
+    preparedAttempt = { cloudAgentSessionId, kiloSessionId };
     const runningTransition = await transitionAnalysisStartLifecycle(params.db, {
       claim: params.lifecycleClaim,
       outcome: { type: 'sandbox-running', cloudAgentSessionId, kiloSessionId },
     });
     if (!runningTransition.transitioned) {
-      await clearAnalysisStatus(params.db, params.findingId);
+      await clearSupersededAnalysisStatus(params.db, {
+        findingId: params.findingId,
+        claimToken: params.lifecycleClaim.claimToken,
+      });
       return { started: false, error: 'Finding was superseded during analysis' };
     }
 
@@ -377,6 +431,7 @@ export async function startSecurityAnalysis(
       };
     }
 
+    preparedAttempt = null;
     return { started: true, triageOnly: false };
   } catch (error) {
     if (error instanceof InsufficientCreditsError) {
@@ -395,5 +450,20 @@ export async function startSecurityAnalysis(
       error: errorMessage,
       failureNeedsLifecycleTransition: true,
     };
+  } finally {
+    // An attempt that does not start interrupts exactly the session it
+    // prepared; no other attempt's session is touched, so a superseded or
+    // newer attempt belonging to another claim keeps running. The start outcome
+    // is already decided here, so the cleanup uses the shorter bound instead of
+    // the restart path's deadline and cannot hold the queue consumer message.
+    if (preparedAttempt && controlToken) {
+      await interruptAnalysisCloudAgentSession({
+        env: params.env,
+        authToken: controlToken,
+        cloudAgentSessionId: preparedAttempt.cloudAgentSessionId,
+        findingId: params.findingId,
+        timeoutMs: SESSION_CLEANUP_TIMEOUT_MS,
+      });
+    }
   }
 }

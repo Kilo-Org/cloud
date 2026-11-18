@@ -151,13 +151,3 @@ export function readReadyAwsConfiguration(
     throw new AwsSetupError('byoc_aws_setup_unavailable');
   }
 }
-export function publicAwsConfiguration(configuration: AwsByocConfiguration) {
-  return {
-    accountId: configuration.roleArn.split(':')[4],
-    roleArn: configuration.roleArn,
-    stackId: configuration.stackId,
-    region: configuration.region,
-    templateVersion: configuration.templateVersion,
-    proxyProtocolVersion: configuration.proxyProtocolVersion,
-  };
-}

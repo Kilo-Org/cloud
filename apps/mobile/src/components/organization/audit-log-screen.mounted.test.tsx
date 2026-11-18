@@ -476,10 +476,10 @@ describe('OrganizationAuditLogScreen', () => {
       // line's direction; the email stays beside it as plain Latin text.
       expect(timeText?.props.children).toBe(expectedMetaTime('ar'));
       expect(actorText?.props.children).toBe('owner@example.com');
-      // The reader hears actor and time in one sentence, with the date parts
-      // in the order the catalog writes them.
-      const pressable = renderer.root.findByType('Pressable');
-      expect(pressable.props.accessibilityLabel).toContain('owner@example.com, ');
+      // A row without structured details renders no disclosure at all: the
+      // reader hears the event, the actor, and the time from the plain row,
+      // never the stored English sentence.
+      expect(renderer.root.findAllByType('Pressable')).toHaveLength(0);
       unmount();
     } finally {
       await act(async () => {

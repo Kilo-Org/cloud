@@ -145,7 +145,7 @@ export function TriggerFormAgent({
               accessibilityLabel={t('common.retry')}
               accessibilityRole="button"
               accessibilityState={{ disabled: models.isFetching }}
-              className={cn(LINE_ACTION_BOX_CLASS, 'min-w-[36px] justify-center active:opacity-70')}
+              className={cn(LINE_ACTION_BOX_CLASS, 'min-w-10 justify-center active:opacity-70')}
               disabled={models.isFetching}
               hitSlop={LINE_ACTION_HIT_SLOP}
               onPress={() => void models.refetch()}

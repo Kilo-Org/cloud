@@ -188,17 +188,17 @@ describe('verifyAppleJwtWithJwks', () => {
     // to the cached key set, so the failed-refresh fallback propagates the
     // fetch error as a server fault while the held kid still verifies. The
     // swallowed failure is still reported.
-    await expect(
-      verifyAppleJwtWithJwks(unknownToken, 'com.kilocode.kiloapp')
-    ).rejects.toThrow('Failed to fetch Apple JWKS: 503');
+    await expect(verifyAppleJwtWithJwks(unknownToken, 'com.kilocode.kiloapp')).rejects.toThrow(
+      'Failed to fetch Apple JWKS: 503'
+    );
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(
       jest.requireMock<{ captureException: jest.Mock }>('@sentry/nextjs').captureException
     ).toHaveBeenCalledTimes(1);
 
-    await expect(
-      verifyAppleJwtWithJwks(unknownToken, 'com.kilocode.kiloapp')
-    ).rejects.toThrow('Failed to fetch Apple JWKS: 503');
+    await expect(verifyAppleJwtWithJwks(unknownToken, 'com.kilocode.kiloapp')).rejects.toThrow(
+      'Failed to fetch Apple JWKS: 503'
+    );
     expect(fetchMock).toHaveBeenCalledTimes(2);
 
     // Within the TTL and the refresh cooldown, the cached key set still

@@ -444,12 +444,13 @@ export async function hasPRCommentWithMarker(
 /**
  * Returns the permission string ('admin' | 'maintain' | 'write' | 'read' | 'none') or null
  * when GitHub gives a definitive non-answer: the collaborator is unknown (404), GitHub
- * reports a permission outside the known set, any other non-rate-limit 4xx from the token
- * mint or the lookup, or the installation is unavailable (the mint answers 404 or the
- * runtime authorization rejects the installation). Rate limits are thrown as typed
- * {@link GitHubRateLimitError}s so callers can surface the reset time; server errors and
- * network failures are thrown so callers can decide whether to retry rather than treating
- * a temporary failure as a denial.
+ * reports a permission outside the known set, a 403 or 422 from the token mint or the
+ * lookup, or the installation is unavailable (the mint answers 404 or the runtime
+ * authorization rejects the installation). Rate limits are thrown as typed
+ * {@link GitHubRateLimitError}s so callers can surface the reset time; rejected App or
+ * installation credentials (401), server errors, and network failures are thrown so
+ * callers can decide whether to retry rather than treating a temporary failure as a
+ * denial.
  */
 export type CollaboratorPermission = 'admin' | 'maintain' | 'write' | 'read' | 'none';
 

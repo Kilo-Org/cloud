@@ -43,7 +43,11 @@ jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
 }));
 
 jest.mock('@kilocode/web-shared/lib/tokens', () => ({
-  generateCloudAgentToken: () => 'test-cloud-agent-token',
+  generateCloudAgentWorkflowToken: jest.fn(() => 'test-cloud-agent-token'),
+  TOKEN_EXPIRY: { oneHour: 3600 },
+}));
+jest.mock('@/lib/auth/cloud-agent-workflow-user', () => ({
+  prepareCloudAgentWorkflowUser: (user: User) => Promise.resolve(user),
 }));
 
 const mockCreateWorkerTrigger = jest.fn<typeof createWorkerTriggerType>();
@@ -882,6 +886,24 @@ describe('webhook trigger variant inputs', () => {
       code: 'UNAUTHORIZED',
     });
     expect(mockGetSandboxSelectionOptions).not.toHaveBeenCalled();
+  });
+
+  it('mints a bounded workflow credential for the Worker capability read', async () => {
+    const { generateCloudAgentWorkflowToken } = jest.requireMock(
+      '@kilocode/web-shared/lib/tokens'
+    ) as { generateCloudAgentWorkflowToken: jest.Mock };
+    const organizationId = '00000000-0000-4000-8000-000000000003';
+    mockEnsureOrganizationAccess.mockResolvedValue('member');
+    mockGetSandboxSelectionOptions.mockResolvedValueOnce({ enabled: true, options: [] });
+
+    await expect(createCaller({ user }).capabilities({ organizationId })).resolves.toEqual({
+      canSetSandboxAllocation: true,
+      sandboxSelection: { enabled: true, options: [] },
+    });
+    expect(generateCloudAgentWorkflowToken).toHaveBeenCalledWith(
+      user,
+      expect.objectContaining({ tokenSource: 'webhook-trigger', expiresIn: 3600 })
+    );
   });
 
   it.each(['webhook', 'scheduled'] as const)(

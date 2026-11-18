@@ -139,7 +139,9 @@ overrides:
   '@babel/core': 7.29.7
   mdast-util-to-hast: 13.2.1
   storybook: 10.6.2
-  next: 16.4.2
+  next: 16.4.5
+  # Preserve the existing SWC helper runtime while Next's patch is re-resolved.
+  '@swc/helpers@0.5.23>tslib': 2.8.1
   preact: 10.28.4
   adm-zip: 0.6.1
   baseline-browser-mapping: 2.11.20

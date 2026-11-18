@@ -10,6 +10,11 @@ import { ScreenHeader } from '@/components/screen-header';
 import { SettingsOverviewSkeleton } from '@/components/security-agent/settings-overview-skeleton';
 import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
 import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
+import {
+  getDisabledCopy,
+  repoCountCopy,
+  settingsEnabledCounts,
+} from '@/components/security-agent/settings-overview-copy';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -26,6 +31,7 @@ import {
 } from '@/lib/hooks/use-security-agent';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
+import { classifyReadFailureVariant } from '@/lib/query/read-failure-variant';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 
 const ANALYSIS_MODE_KEYS = {
@@ -35,17 +41,8 @@ const ANALYSIS_MODE_KEYS = {
 };
 
 // The loading state lives in its own module (`settings-overview-skeleton`) so
-// the settled screen keeps under the file-length cap.
-
-function getDisabledCopy(canManage: boolean, hasEffectiveRepo: boolean): string {
-  if (!canManage) {
-    return i18n.t('securityAgent.settingsOverview.disabledNoManage');
-  }
-  if (!hasEffectiveRepo) {
-    return i18n.t('securityAgent.settingsOverview.disabledNoRepo');
-  }
-  return i18n.t('securityAgent.settingsOverview.disabledPrompt');
-}
+// the settled screen keeps under the file-length cap; the settled subtitles
+// live in `settings-overview-copy` for the same cap.
 
 export function SettingsOverviewScreen({
   scope,
@@ -61,7 +58,8 @@ export function SettingsOverviewScreen({
   const { t } = useTranslation();
   const config = useSecurityAgentConfig(scope);
   const capability = useSecurityAgentCapability(scope);
-  const isConnectivityKnown = useCommittedConnectivityStatus() !== 'unknown';
+  const connectivity = useCommittedConnectivityStatus();
+  const isConnectivityKnown = connectivity !== 'unknown';
   const setEnabled = useSetSecurityAgentEnabled(scope);
   const trackInteraction = useTrackSecurityAgentInteraction(scope);
   const repositories = useSecurityAgentRepositories(scope);
@@ -104,11 +102,32 @@ export function SettingsOverviewScreen({
   } else if (repositoriesError) {
     recoveryError = t('common.couldNotLoadRepositories');
   }
+  // The failed read determines the branch, so each failure reads only its own
+  // error. A retry of a no-data read downgrades it back to pending and clears
+  // its error (v5, see `use-available-models`), so deriving from an in-flight
+  // read would flip the presentation mid-retry. Only a settled failure — an
+  // errored read, or a read paused by a connectivity the app has confirmed —
+  // re-derives the variant; every other state (a retry in flight, a loading
+  // read) keeps the last settled answer, and a first render before any settled
+  // failure paints the server default.
+  const settledFailure = (error: unknown, fetchStatus: string) =>
+    classifyReadFailureVariant({
+      errors: error ? [error] : [],
+      isPaused: fetchStatus === 'paused',
+      connectivity,
+    }) as 'offline' | 'server';
+  const settledVariantRef = useRef<'offline' | 'server' | null>(null);
+  if (config.isError || (config.fetchStatus === 'paused' && isConnectivityKnown)) {
+    settledVariantRef.current = settledFailure(config.error, config.fetchStatus);
+  } else if (capability.isError || (capability.fetchStatus === 'paused' && isConnectivityKnown)) {
+    settledVariantRef.current = settledFailure(capability.error, capability.fetchStatus);
+  }
+  const variant = settledVariantRef.current ?? 'server';
   if (configUnavailable || capabilityUnavailable) {
     return (
       <PlatformErrorScreen
         title={t('securityAgent.dashboard.settings')}
-        variant={configUnavailable ? 'offline' : 'server'}
+        variant={variant}
         message={recoveryError}
         onRetry={() => void recovery.retry()}
         isRetrying={recovery.isRetrying}
@@ -141,28 +160,14 @@ export function SettingsOverviewScreen({
   // is the only way out, so hiding the CTA there left the page with no way to
   // grant repositories and no way to turn the agent back on.
   const showRepoCta = !data.isEnabled && capability.canManage && !hasEffectiveRepo;
-  let repoCountLabel = t('securityAgent.settingsOverview.repositoriesCount', {
-    count: data.selectedRepositoryIds.length,
-    displayCount: formatNumber(data.selectedRepositoryIds.length, i18n.language),
+  const repoCountLabel = repoCountCopy({
+    selectionMode: data.repositorySelectionMode,
+    selectionCount: data.selectedRepositoryIds.length,
+    language: i18n.language,
+    grantsSettledEmpty: repositoriesSettledEmpty,
   });
-  if (data.repositorySelectionMode === 'all') {
-    // "All repositories" is a claim about the GitHub App grant, so a settled
-    // empty grant must not make it: the repositories screen already answers
-    // this state with its own no-repositories empty state, and the two
-    // readings sit one tap apart.
-    repoCountLabel = repositoriesSettledEmpty
-      ? t('securityAgent.repositories.noRepositories')
-      : t('common.allRepositories');
-  }
-  const automationEnabledCount = [
-    data.autoAnalysisEnabled,
-    data.autoRemediationEnabled,
-    data.autoDismissEnabled,
-  ].filter(Boolean).length;
-  const notificationsEnabledCount = [
-    data.newFindingNotificationsEnabled,
-    data.slaNotificationsEnabled,
-  ].filter(Boolean).length;
+  const { automation: automationEnabledCount, notifications: notificationsEnabledCount } =
+    settingsEnabledCounts(data);
   const analysisModeLabel = Object.hasOwn(ANALYSIS_MODE_KEYS, data.analysisMode)
     ? t(ANALYSIS_MODE_KEYS[data.analysisMode])
     : data.analysisMode;

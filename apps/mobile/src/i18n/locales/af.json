@@ -1486,7 +1486,14 @@
     "council": {
       "title": "Raadhersiening",
       "subtitle": "Verskeie spesialiste hersien elke trekversoek, en hul stemme word tot een besluit saamgevoeg.",
-      "unavailable": "Raadhersiening is nie vir hierdie organisasie beskikbaar nie.",
+      "unavailablePersonallyTitle": "Benodig 'n Enterprise-organisasie",
+      "unavailablePersonally": "Raadhersiening is nie deel van 'n persoonlike rekening nie.",
+      "unavailablePersonallyAction": "Skep organisasie",
+      "unavailablePersonallySwitchAction": "Wissel organisasie",
+      "unavailableOrganizationTitle": "Raadhersiening is nie op die oomblik beskikbaar nie",
+      "unavailableForOrganization": "Raadhersiening verg die Enterprise-plan met 'n aktiewe intekening of proefperiode. Hierdie organisasie het dit nie op die oomblik nie.",
+      "unavailableForOrganizationNeutral": "Raadhersiening is nie op die oomblik vir hierdie organisasie beskikbaar nie. Probeer later weer.",
+      "unavailableOnBitbucket": "Raadhersiening is nie beskikbaar vir Bitbucket-bewaarplekke nie.",
       "noRepositories": "Nog geen bewaarplekke gekies nie. Kies eers bewaarplekke in die bewaarplekinstellings.",
       "specialists": "Spesialiste",
       "labels": "Etikette wat raadhersiening aktiveer",
@@ -4704,6 +4711,7 @@
     "superseded": "Hierdie skakel is elders vervang en werk dus nie meer nie."
   },
   "sharedSession": {
+    "startedAt": "Begin om {{time}}",
     "title": "Gedeelde sessie",
     "someone": "Iemand",
     "sharedBy": "Gedeel deur {{owner}}",
@@ -4859,6 +4867,8 @@
     "modelsDescription": "Skakel 'n model af om dit vir alle lede te blokkeer. Modelle van toegelate verskaffers is by verstek aan.",
     "modelsDeniedOnly": "Slegs geweierdes",
     "modelsEmpty": "Geen modelle pas by hierdie soektog nie.",
+    "modelsDeniedEmpty": "Geen model word geweier nie.",
+    "modelsDeniedSearchEmpty": "Geen geweierde model pas by hierdie soektog nie.",
     "providersDescription": "Skakel 'n verskaffer af sodat Kilo nie meer vir hierdie organisasie daarheen roeteer nie.",
     "providersNeedCatalog": "Verskafferskakelaars bly leesalleen totdat die volledige modelkatalogus gelaai het. Tik hierbo op Probeer weer om hulle te wysig.",
     "providersEmpty": "Geen verskaffers pas by hierdie soektog nie.",

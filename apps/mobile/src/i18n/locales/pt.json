@@ -1511,7 +1511,14 @@
     "council": {
       "title": "Revisão do conselho",
       "subtitle": "Vários especialistas revêm cada pedido de integração e os votos deles combinam-se numa única decisão.",
-      "unavailable": "A revisão do conselho não está disponível para esta organização.",
+      "unavailablePersonallyTitle": "Precisa de uma organização Enterprise",
+      "unavailablePersonally": "A revisão do conselho não faz parte de uma conta pessoal.",
+      "unavailablePersonallyAction": "Criar organização",
+      "unavailablePersonallySwitchAction": "Trocar de organização",
+      "unavailableOrganizationTitle": "Revisão do conselho não está disponível",
+      "unavailableForOrganization": "A revisão do conselho precisa do plano Enterprise com uma subscrição ou um período de teste ativos. Esta organização não o tem neste momento.",
+      "unavailableForOrganizationNeutral": "A revisão do conselho não está disponível para esta organização neste momento. Tente novamente mais tarde.",
+      "unavailableOnBitbucket": "A revisão do conselho não está disponível para repositórios Bitbucket.",
       "noRepositories": "Ainda não há repositórios selecionados. Escolhe primeiro repositórios nas definições de repositórios.",
       "specialists": "Especialistas",
       "labels": "Etiquetas que ativam a revisão do conselho",
@@ -4781,6 +4788,7 @@
     "superseded": "Este link foi substituído noutro dispositivo, por isso deixou de funcionar."
   },
   "sharedSession": {
+    "startedAt": "Iniciada às {{time}}",
     "title": "Sessão partilhada",
     "someone": "Alguém",
     "sharedBy": "Partilhada por {{owner}}",
@@ -4936,6 +4944,8 @@
     "modelsDescription": "Desative um modelo para o bloquear para todos os membros. Os modelos de fornecedores permitidos começam ativados.",
     "modelsDeniedOnly": "Apenas negados",
     "modelsEmpty": "Nenhum modelo corresponde a esta pesquisa.",
+    "modelsDeniedEmpty": "Nenhum modelo está negado.",
+    "modelsDeniedSearchEmpty": "Nenhum modelo negado corresponde a esta pesquisa.",
     "providersDescription": "Desative um fornecedor para impedir o Kilo de encaminhar pedidos para ele nesta organização.",
     "providersNeedCatalog": "Os interruptores dos fornecedores ficam só de leitura até o catálogo completo de modelos ser carregado. Toque em Tentar novamente acima para os editar.",
     "providersEmpty": "Nenhum fornecedor corresponde a esta pesquisa.",

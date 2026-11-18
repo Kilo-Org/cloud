@@ -75,6 +75,8 @@ export const CONTROL_RUNTIME_RESERVED_ENV_VARS = [
  * write-time rejection because it cannot import from this service.
  */
 export const RESERVED_ENV_VAR_PREFIXES = ['XDG_', 'KILO', 'OPENCODE'] as const;
+export const CLOUD_WEB_SEARCH_DISABLED_ENV = 'KILO_CLOUD_WEB_SEARCH_DISABLED';
+export const CLOUD_WEB_SEARCH_PROVIDER_ENV = 'KILO_CLOUD_WEB_SEARCH_PROVIDER';
 
 /**
  * Root of the directory-keyed homes (plan "Builder and session home"). A

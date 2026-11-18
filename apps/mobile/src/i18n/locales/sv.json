@@ -1486,7 +1486,14 @@
     "council": {
       "title": "Rådsgranskning",
       "subtitle": "Flera experter granskar varje pull-begäran och deras röster kombineras till ett beslut.",
-      "unavailable": "Rådsgranskning är inte tillgänglig för denna organisation.",
+      "unavailablePersonallyTitle": "Kräver en Enterprise-organisation",
+      "unavailablePersonally": "Rådsgranskning ingår inte i ett personligt konto.",
+      "unavailablePersonallyAction": "Skapa organisation",
+      "unavailablePersonallySwitchAction": "Byt organisation",
+      "unavailableOrganizationTitle": "Rådsgranskning är inte tillgänglig",
+      "unavailableForOrganization": "Rådsgranskning kräver Enterprise-planen med ett aktivt abonnemang eller en provperiod. Den här organisationen har det inte just nu.",
+      "unavailableForOrganizationNeutral": "Rådsgranskning är inte tillgänglig för den här organisationen just nu. Försök igen senare.",
+      "unavailableOnBitbucket": "Rådsgranskning är inte tillgänglig för Bitbucket-kodarkiv.",
       "noRepositories": "Inga kodarkiv har valts än. Välj kodarkiv i inställningarna för kodarkiv först.",
       "specialists": "Experter",
       "labels": "Etiketter som utlöser rådsgranskning",
@@ -4704,6 +4711,7 @@
     "superseded": "Den här länken har ersatts på annat håll och fungerar därför inte längre."
   },
   "sharedSession": {
+    "startedAt": "Startade kl. {{time}}",
     "title": "Delad session",
     "someone": "Någon",
     "sharedBy": "Delad av {{owner}}",
@@ -4859,6 +4867,8 @@
     "modelsDescription": "Stäng av en modell för att blockera den för alla medlemmar. Modeller från tillåtna leverantörer är på från början.",
     "modelsDeniedOnly": "Endast nekade",
     "modelsEmpty": "Inga modeller matchar den här sökningen.",
+    "modelsDeniedEmpty": "Ingen modell är nekad.",
+    "modelsDeniedSearchEmpty": "Inga nekade modeller matchar den här sökningen.",
     "providersDescription": "Stäng av en leverantör för att stoppa Kilo från att dirigera till den för den här organisationen.",
     "providersNeedCatalog": "Leverantörsreglagen är skrivskyddade tills hela modellkatalogen har lästs in. Tryck på Försök igen ovan för att ändra dem.",
     "providersEmpty": "Inga leverantörer matchar den här sökningen.",

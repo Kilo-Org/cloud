@@ -1486,7 +1486,14 @@
     "council": {
       "title": "የጉባኤ ግምገማ",
       "subtitle": "በርካታ ባለሙያዎች እያንዳንዱን የመሳብ ጥያቄ ይገመግማሉ፤ ድምፆቻቸውም ወደ አንድ ውሳኔ ይጣመራሉ።",
-      "unavailable": "የጉባኤ ግምገማ ለዚህ ድርጅት አይገኝም።",
+      "unavailablePersonallyTitle": "Enterprise ድርጅት ያስፈልጋል",
+      "unavailablePersonally": "የጉባኤ ግምገማ የግል መለያ አካል አይደለም።",
+      "unavailablePersonallyAction": "ድርጅት ፍጠር",
+      "unavailablePersonallySwitchAction": "ድርጅት ይቀይሩ",
+      "unavailableOrganizationTitle": "የጉባኤ ግምገማ አሁን አይገኝም",
+      "unavailableForOrganization": "የጉባኤ ግምገማ ንቁ የደንበኝነት ምዝገባ ወይም የሙከራ ጊዜ ያለው የEnterprise ዕቅድ ይፈልጋል። ይህ ድርጅት አሁን የለውም።",
+      "unavailableForOrganizationNeutral": "የጉባኤ ግምገማ ለዚህ ድርጅት አሁን አይገኝም። በኋላ እንደገና ይሞክሩ።",
+      "unavailableOnBitbucket": "የጉባኤ ግምገማ ለBitbucket ማከማቻዎች አይገኝም።",
       "noRepositories": "እስካሁን ምንም ማከማቻ አልተመረጠም። መጀመሪያ በማከማቻ ቅንብሮች ውስጥ ማከማቻዎችን ይምረጡ።",
       "specialists": "ባለሙያዎች",
       "labels": "የጉባኤ ግምገማን የሚያስጀምሩ መለያዎች",
@@ -4704,6 +4711,7 @@
     "superseded": "ይህ ሊንክ በሌላ ቦታ ተተክቷል፣ ስለዚህ ከእንግዲህ ወዲህ አይሰራም።"
   },
   "sharedSession": {
+    "startedAt": "የተጀመረው በ{{time}}",
     "title": "የተጋራ ክፍለ ጊዜ",
     "someone": "አንድ ሰው",
     "sharedBy": "በ{{owner}} የተጋራ",
@@ -4859,6 +4867,8 @@
     "modelsDescription": "ሞዴልን ለሁሉም አባላት ለማገድ ያጥፉት። ከተፈቀዱ አቅራቢዎች የሚመጡ ሞዴሎች በርተው ይጀምራሉ።",
     "modelsDeniedOnly": "የተከለከሉ ብቻ",
     "modelsEmpty": "ከዚህ ፍለጋ ጋር የሚዛመዱ ሞዴሎች የሉም።",
+    "modelsDeniedEmpty": "የተከለከለ ሞዴል የለም።",
+    "modelsDeniedSearchEmpty": "ከዚህ ፍለጋ ጋር የሚዛመድ የተከለከለ ሞዴል የለም።",
     "providersDescription": "Kilo ለዚህ ድርጅት ወደ አንድ አቅራቢ ማዘዋወሩን እንዲያቆም አቅራቢውን ያጥፉት።",
     "providersNeedCatalog": "ሙሉው የሞዴል ካታሎግ እስኪጫን ድረስ የአቅራቢ ማብሪያ/ማጥፊያዎች ሊቀየሩ አይችሉም። እነሱን ለማርትዕ ከላይ ያለውን እንደገና ሞክር ይንኩ።",
     "providersEmpty": "ከዚህ ፍለጋ ጋር የሚዛመዱ አቅራቢዎች የሉም።",

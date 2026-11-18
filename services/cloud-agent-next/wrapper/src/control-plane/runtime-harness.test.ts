@@ -1,8 +1,111 @@
 import { describe, expect, it } from 'bun:test';
-import { runtimeHarness, kilo2RuntimeEnvironment } from './runtime-harness.js';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import {
+  CLOUD_WEB_SEARCH_DISABLED_ENV,
+  CLOUD_WEB_SEARCH_PROVIDER_ENV,
+} from '../../../src/shared/runtime-environment.js';
+import { webSearchProviderSchema } from '../../../src/shared/web-search-provider.js';
+import {
+  runtimeHarness,
+  kilo2RuntimeEnvironment,
+  prepareKilo2RuntimeEnvironment,
+} from './runtime-harness.js';
 import { readKilo2Sse } from './kilo2-event-feed.js';
 
 describe('runtime harness selection', () => {
+  it.each(webSearchProviderSchema.options)('sets the selected provider %s in v2', provider => {
+    const env = { [CLOUD_WEB_SEARCH_PROVIDER_ENV]: provider, KILO_CONFIG_CONTENT: '{}' };
+    const result = kilo2RuntimeEnvironment(env);
+    expect(JSON.parse(result.KILO_CONFIG_CONTENT).websearch).toEqual({ provider });
+    expect(result[CLOUD_WEB_SEARCH_PROVIDER_ENV]).toBeUndefined();
+  });
+  it('applies the personal opt-out as inline v2 config', () => {
+    const env = { [CLOUD_WEB_SEARCH_DISABLED_ENV]: '1', KILO_CONFIG_CONTENT: '{}' };
+    const result = kilo2RuntimeEnvironment(env);
+    expect(JSON.parse(result.KILO_CONFIG_CONTENT).websearch).toBe(false);
+    expect(result[CLOUD_WEB_SEARCH_DISABLED_ENV]).toBeUndefined();
+    expect(env.KILO_CONFIG_CONTENT).toBe('{}');
+  });
+  it.each([undefined, { provider: 'parallel' }, false])(
+    'defaults v2 web search without replacing profile settings (%j)',
+    async websearch => {
+      const home = await fs.mkdtemp(path.join(os.tmpdir(), 'kilo2-websearch-'));
+      try {
+        const profilePath = path.join(home, 'profile.json');
+        const profile = { command: { test: { template: 'Run tests' } }, websearch };
+        await fs.writeFile(profilePath, JSON.stringify(profile));
+        const env = { HOME: home, KILO_CONFIG: profilePath };
+        const result = await prepareKilo2RuntimeEnvironment(env);
+        expect(result.KILO2_CONFIG).not.toBe(profilePath);
+        expect(JSON.parse(await fs.readFile(result.KILO2_CONFIG, 'utf8'))).toEqual({
+          ...profile,
+          websearch: websearch ?? { provider: 'exa' },
+        });
+        expect(await fs.readFile(profilePath, 'utf8')).toBe(JSON.stringify(profile));
+        expect(JSON.parse(result.KILO_CONFIG_CONTENT).websearch).toBeUndefined();
+      } finally {
+        await fs.rm(home, { recursive: true, force: true });
+      }
+    }
+  );
+
+  it('writes the Exa default into the runtime home when no disk profile exists', async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'kilo2-websearch-'));
+    try {
+      const result = await prepareKilo2RuntimeEnvironment({ HOME: home });
+      const configPath = path.join(home, '.config', 'kilo', 'cloud-agent-v2.json');
+      expect(result.KILO2_CONFIG).toBe(configPath);
+      expect(JSON.parse(await fs.readFile(configPath, 'utf8'))).toEqual({
+        websearch: { provider: 'exa' },
+      });
+      expect((await fs.stat(configPath)).mode & 0o777).toBe(0o600);
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it('does not prepare a config file when HOME is unset', async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'kilo2-websearch-'));
+    try {
+      const profilePath = path.join(home, 'profile.json');
+      await fs.writeFile(profilePath, JSON.stringify({ websearch: false }));
+      const result = await prepareKilo2RuntimeEnvironment({ KILO_CONFIG: profilePath });
+      expect(result.KILO2_CONFIG).toBe(profilePath);
+      expect(await fs.readdir(home)).not.toContain('cloud-agent-v2.json');
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    ['missing', undefined],
+    ['malformed', '{not json'],
+    ['a non-record', '["array"]'],
+  ])('falls back to the Exa default when the disk profile is %s', async (_label, content) => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'kilo2-websearch-'));
+    const logPath = path.join(home, 'wrapper.log');
+    const originalLogPath = process.env.WRAPPER_LOG_PATH;
+    process.env.WRAPPER_LOG_PATH = logPath;
+    try {
+      const profilePath = path.join(home, 'profile.json');
+      if (content !== undefined) await fs.writeFile(profilePath, content);
+      const result = await prepareKilo2RuntimeEnvironment({
+        HOME: home,
+        KILO_CONFIG: profilePath,
+      });
+      expect(JSON.parse(await fs.readFile(result.KILO2_CONFIG, 'utf8'))).toEqual({
+        websearch: { provider: 'exa' },
+      });
+      expect(await fs.readFile(logPath, 'utf8')).toContain(profilePath);
+    } finally {
+      if (originalLogPath === undefined) delete process.env.WRAPPER_LOG_PATH;
+      else process.env.WRAPPER_LOG_PATH = originalLogPath;
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
   it.each([undefined, '0', '1'])('enables release config for v2 when inherited as %s', value => {
     const env: Record<string, string> =
       value === undefined ? {} : { KILO_USE_RELEASE_CONFIG: value };

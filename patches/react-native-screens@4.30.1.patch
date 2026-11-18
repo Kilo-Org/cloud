@@ -1,5 +1,5 @@
 diff --git a/android/src/main/java/com/swmansion/rnscreens/bottomsheet/SheetDelegate.kt b/android/src/main/java/com/swmansion/rnscreens/bottomsheet/SheetDelegate.kt
-index 800407998ed12d559a6fde732dde1a6ae8b3f172..4bb4e2d1c40f0678e913f606c4be8de382559483 100644
+index 8004079..4bb4e2d 100644
 --- a/android/src/main/java/com/swmansion/rnscreens/bottomsheet/SheetDelegate.kt
 +++ b/android/src/main/java/com/swmansion/rnscreens/bottomsheet/SheetDelegate.kt
 @@ -3,6 +3,7 @@ package com.swmansion.rnscreens.bottomsheet
@@ -71,7 +71,7 @@ index 800407998ed12d559a6fde732dde1a6ae8b3f172..4bb4e2d1c40f0678e913f606c4be8de3
          InsetsObserverProxy.removeOnApplyWindowInsetsListener(this)
      }
 diff --git a/ios/RNSScreenStack.mm b/ios/RNSScreenStack.mm
-index 5da11964f5932cb44e1131c44a2480803c0a62b5..e6fe3dee90800cc4be730638006fe5251835a198 100644
+index 5da1196..e6fe3de 100644
 --- a/ios/RNSScreenStack.mm
 +++ b/ios/RNSScreenStack.mm
 @@ -1,4 +1,5 @@

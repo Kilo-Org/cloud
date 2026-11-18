@@ -1486,7 +1486,14 @@
     "council": {
       "title": "Semakan panel",
       "subtitle": "Beberapa pakar menyemak setiap permintaan penarikan, dan undian mereka digabungkan menjadi satu keputusan.",
-      "unavailable": "Semakan panel tidak tersedia untuk organisasi ini.",
+      "unavailablePersonallyTitle": "Memerlukan organisasi Enterprise",
+      "unavailablePersonally": "Semakan panel bukan sebahagian daripada akaun peribadi.",
+      "unavailablePersonallyAction": "Cipta organisasi",
+      "unavailablePersonallySwitchAction": "Tukar organisasi",
+      "unavailableOrganizationTitle": "Semakan panel tidak tersedia",
+      "unavailableForOrganization": "Semakan panel memerlukan pelan Enterprise dengan langganan atau percubaan yang aktif. Organisasi ini tidak memilikinya sekarang.",
+      "unavailableForOrganizationNeutral": "Semakan panel tidak tersedia untuk organisasi ini sekarang. Cuba lagi kemudian.",
+      "unavailableOnBitbucket": "Semakan panel tidak tersedia untuk repositori Bitbucket.",
       "noRepositories": "Belum ada repositori dipilih. Pilih repositori dalam tetapan repositori dahulu.",
       "specialists": "Pakar",
       "labels": "Label yang mencetuskan semakan panel",
@@ -4704,6 +4711,7 @@
     "superseded": "Pautan ini telah diganti di tempat lain, jadi pautan ini tidak lagi berfungsi."
   },
   "sharedSession": {
+    "startedAt": "Dimulakan pada {{time}}",
     "title": "Sesi dikongsi",
     "someone": "Seseorang",
     "sharedBy": "Dikongsi oleh {{owner}}",
@@ -4859,6 +4867,8 @@
     "modelsDescription": "Matikan model untuk menyekatnya bagi setiap ahli. Model daripada pembekal yang dibenarkan dihidupkan secara lalai.",
     "modelsDeniedOnly": "Ditolak sahaja",
     "modelsEmpty": "Tiada model sepadan dengan carian ini.",
+    "modelsDeniedEmpty": "Tiada model ditolak.",
+    "modelsDeniedSearchEmpty": "Tiada model yang ditolak sepadan dengan carian ini.",
     "providersDescription": "Matikan pembekal untuk menghentikan Kilo daripada menghalakan permintaan kepadanya bagi organisasi ini.",
     "providersNeedCatalog": "Suis pembekal kekal baca sahaja sehingga katalog model penuh dimuatkan. Ketik Cuba lagi di atas untuk mengeditnya.",
     "providersEmpty": "Tiada pembekal sepadan dengan carian ini.",

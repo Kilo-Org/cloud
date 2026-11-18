@@ -912,7 +912,14 @@
     "council": {
       "title": "Revisione del gruppo di revisori",
       "subtitle": "Diversi specialisti revisionano ogni pull request e i loro voti si combinano in un'unica decisione.",
-      "unavailable": "La revisione del gruppo di revisori non è disponibile per questa organizzazione.",
+      "unavailablePersonallyTitle": "Richiede un'organizzazione Enterprise",
+      "unavailablePersonally": "La revisione del gruppo di revisori non fa parte di un account personale.",
+      "unavailablePersonallyAction": "Crea organizzazione",
+      "unavailablePersonallySwitchAction": "Cambia organizzazione",
+      "unavailableOrganizationTitle": "La revisione del gruppo di revisori non è disponibile al momento",
+      "unavailableForOrganization": "La revisione del gruppo di revisori richiede il piano Enterprise con un abbonamento attivo o un periodo di prova. Questa organizzazione non lo ha al momento.",
+      "unavailableForOrganizationNeutral": "La revisione del gruppo di revisori non è disponibile per questa organizzazione al momento. Riprova più tardi.",
+      "unavailableOnBitbucket": "La revisione del gruppo di revisori non è disponibile per i repository Bitbucket.",
       "noRepositories": "Nessun repository selezionato. Scegli prima i repository nelle impostazioni dei repository.",
       "specialists": "Specialisti",
       "labels": "Etichette che attivano la revisione del gruppo di revisori",
@@ -4775,6 +4782,7 @@
     "superseded": "Questo link è stato sostituito da un altro dispositivo, quindi non funziona più."
   },
   "sharedSession": {
+    "startedAt": "Avviata alle {{time}}",
     "title": "Sessione condivisa",
     "someone": "Qualcuno",
     "sharedBy": "Condivisa da {{owner}}",
@@ -4930,6 +4938,8 @@
     "modelsDescription": "Disattiva un modello per bloccarlo per ogni membro. I modelli dei fornitori consentiti partono attivi.",
     "modelsDeniedOnly": "Solo negati",
     "modelsEmpty": "Nessun modello corrisponde a questa ricerca.",
+    "modelsDeniedEmpty": "Nessun modello è negato.",
+    "modelsDeniedSearchEmpty": "Nessun modello negato corrisponde a questa ricerca.",
     "providersDescription": "Disattiva un fornitore per impedire a Kilo di instradare verso di esso per questa organizzazione.",
     "providersNeedCatalog": "Gli interruttori dei fornitori restano in sola lettura finché non viene caricato il catalogo completo dei modelli. Tocca Riprova qui sopra per modificarli.",
     "providersEmpty": "Nessun fornitore corrisponde a questa ricerca.",

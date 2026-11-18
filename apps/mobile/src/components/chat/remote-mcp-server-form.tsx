@@ -298,6 +298,8 @@ export function RemoteMcpServerForm({
       <FormField
         label={t('modelChat.mcp.fieldUrl')}
         defaultValue={initialUrl}
+        validateWhileTyping
+        reserveErrorMessages={[t('common.required'), t('modelChat.mcp.fieldUrlInvalid')]}
         autoCapitalize="none"
         autoCorrect={false}
         keyboardType="url"

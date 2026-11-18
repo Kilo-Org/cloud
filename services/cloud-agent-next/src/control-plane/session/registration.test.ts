@@ -1265,6 +1265,8 @@ describe('profile runtime delivery', () => {
     ],
     kiloCommands: [{ name: 'review-now', template: 'Review $ARGUMENTS', agent: 'reviewer' }],
     modelContextLimits: { 'openai/gpt-6.1-sol': 300_000 },
+    webSearchDisabled: true as const,
+    webSearchProvider: 'parallel' as const,
   };
 
   it.each([
@@ -1273,6 +1275,8 @@ describe('profile runtime delivery', () => {
     'kiloCommands',
     'runtimeInstructions',
     'modelContextLimits',
+    'webSearchDisabled',
+    'webSearchProvider',
   ] as const)('delivers %s with compatibility isolation', key => {
     const registration = buildControlPlaneSessionRegistration(
       metadata({ profile: { [key]: profile[key] } }),

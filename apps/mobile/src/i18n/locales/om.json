@@ -1486,7 +1486,14 @@
     "council": {
       "title": "Sakatta'a gumii",
       "subtitle": "Ogeessota hedduun PR tokkoon tokkoo sakatta'u, sagaleen isaanii immoo murtee tokko ta'a.",
-      "unavailable": "Sakatta'aan gumii dhaabbata kanaaf hin argamu.",
+      "unavailablePersonallyTitle": "Dhaabbata Enterprise barbaachisa",
+      "unavailablePersonally": "Sakatta'aan gumii waan hisaabii dhuunirraa ta'e miti.",
+      "unavailablePersonallyAction": "Dhaabbata uumi",
+      "unavailablePersonallySwitchAction": "Dhaabbata jijjiiruu",
+      "unavailableOrganizationTitle": "Sakatta'a gumii yeroo ammaa hin jiru",
+      "unavailableForOrganization": "Sakatta'aan gumii karooraa Enterprise qabaachuu qaba, kan Galmee tajaajilaa sochuu qabu ykn yeroo dhayaabaa qabu. Dhaabbanni kun yeroo ammaa isa hin qabu.",
+      "unavailableForOrganizationNeutral": "Sakatta'aan gumii dhaabbata kanaaf yeroo ammaa hin jiru. Booda irra deebi'ii yaali.",
+      "unavailableOnBitbucket": "Sakatta'aan gumii kuusaa koodii Bitbucket tiif hin argamu.",
       "noRepositories": "Ammatti kuusaan koodii filatame hin jiru. Dura qindaa'ina kuusaa koodii keessatti kuusaawwan koodii filadhu.",
       "specialists": "Ogeessota",
       "labels": "Mallattoowwan sakatta'a gumii kakaasan",
@@ -4704,6 +4711,7 @@
     "superseded": "Liinkiin kun bakka biraatti bakka buufameera, kanaaf kana booda hin hojjetu."
   },
   "sharedSession": {
+    "startedAt": "Yeroo {{time}} jalqabame",
     "title": "Seshinii qoodame",
     "someone": "Nama tokko",
     "sharedBy": "Kan qoode {{owner}}",
@@ -4859,6 +4867,8 @@
     "modelsDescription": "Moodela dhaabi miseensa hundaaf dhorkuuf. Moodeloonni dhiyeessitoota hayyamaman irraa dhufan banamaniin eegalu.",
     "modelsDeniedOnly": "Kan dhorkaman qofa",
     "modelsEmpty": "Moodelaan barbaacha kanaaf hin jiru.",
+    "modelsDeniedEmpty": "Moodelaan dhorkaman hin jiru.",
+    "modelsDeniedSearchEmpty": "Moodelaan dhorkaman barbaacha kanaaf hin jiru.",
     "providersDescription": "Dhiyeessaa dhaabi dhaabbata kanaaf Kilo gara isaa akka hin geessineef.",
     "providersNeedCatalog": "Furtuuwwan dhiyeessaa hanga kaataalogiin moodeelaa guutuun fe'amutti dubbisuuf qofa ta'anii turu. Isaan gulaaluuf Irra deebi'ii yaali armaan olii tuqi.",
     "providersEmpty": "Dhiyeessaan barbaacha kanaaf hin jiru.",

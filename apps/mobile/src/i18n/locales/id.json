@@ -943,7 +943,14 @@
     "council": {
       "title": "Tinjauan dewan",
       "subtitle": "Beberapa spesialis meninjau setiap PR, dan suara mereka digabungkan menjadi satu keputusan.",
-      "unavailable": "Tinjauan dewan tidak tersedia untuk organisasi ini.",
+      "unavailablePersonallyTitle": "Memerlukan organisasi Enterprise",
+      "unavailablePersonally": "Tinjauan dewan bukan bagian dari akun pribadi.",
+      "unavailablePersonallyAction": "Buat organisasi",
+      "unavailablePersonallySwitchAction": "Ganti organisasi",
+      "unavailableOrganizationTitle": "Tinjauan dewan tidak tersedia",
+      "unavailableForOrganization": "Tinjauan dewan membutuhkan paket Enterprise dengan langganan aktif atau masa uji coba. Organisasi ini tidak memilikinya saat ini.",
+      "unavailableForOrganizationNeutral": "Tinjauan dewan tidak tersedia untuk organisasi ini saat ini. Coba lagi nanti.",
+      "unavailableOnBitbucket": "Tinjauan dewan tidak tersedia untuk repositori Bitbucket.",
       "noRepositories": "Belum ada repositori yang dipilih. Pilih repositori di setelan repositori terlebih dahulu.",
       "specialists": "Spesialis",
       "labels": "Label yang memicu tinjauan dewan",
@@ -4704,6 +4711,7 @@
     "superseded": "Tautan ini telah diganti dari perangkat lain, sehingga tidak lagi berfungsi."
   },
   "sharedSession": {
+    "startedAt": "Dimulai pukul {{time}}",
     "title": "Sesi yang dibagikan",
     "someone": "Seseorang",
     "sharedBy": "Dibagikan oleh {{owner}}",
@@ -4859,6 +4867,8 @@
     "modelsDescription": "Nonaktifkan model untuk memblokirnya bagi setiap anggota. Model dari penyedia yang diizinkan aktif secara bawaan.",
     "modelsDeniedOnly": "Hanya yang ditolak",
     "modelsEmpty": "Tidak ada model yang cocok dengan pencarian ini.",
+    "modelsDeniedEmpty": "Tidak ada model yang ditolak.",
+    "modelsDeniedSearchEmpty": "Tidak ada model yang ditolak yang cocok dengan pencarian ini.",
     "providersDescription": "Nonaktifkan penyedia untuk menghentikan Kilo merutekan ke penyedia itu untuk organisasi ini.",
     "providersNeedCatalog": "Sakelar penyedia tetap hanya-baca hingga katalog model lengkap dimuat. Coba lagi di atas untuk mengeditnya.",
     "providersEmpty": "Tidak ada penyedia yang cocok dengan pencarian ini.",

@@ -1511,7 +1511,14 @@
     "council": {
       "title": "Pregled veća",
       "subtitle": "Nekoliko stručnjaka pregleda svaki pull request, a njihovi glasovi se spajaju u jednu odluku.",
-      "unavailable": "Pregled veća nije dostupan za ovu organizaciju.",
+      "unavailablePersonallyTitle": "Potrebna je Enterprise organizacija",
+      "unavailablePersonally": "Pregled veća nije deo ličnog naloga.",
+      "unavailablePersonallyAction": "Napravi organizaciju",
+      "unavailablePersonallySwitchAction": "Promeni organizaciju",
+      "unavailableOrganizationTitle": "Pregled veća trenutno nije dostupan",
+      "unavailableForOrganization": "Pregled veća zahteva Enterprise plan sa aktivnom pretplatom ili probnim periodom. Ova organizacija ga trenutno ne poseduje.",
+      "unavailableForOrganizationNeutral": "Pregled veća trenutno nije dostupan za ovu organizaciju. Pokušajte ponovo kasnije.",
+      "unavailableOnBitbucket": "Pregled veća nije dostupan za Bitbucket repozitorijume.",
       "noRepositories": "Još nije izabran nijedan repozitorijum. Najpre izaberi repozitorijume u podešavanjima repozitorijuma.",
       "specialists": "Stručnjaci",
       "labels": "Oznake koje pokreću pregled veća",
@@ -4775,6 +4782,7 @@
     "superseded": "Ovaj link je zamenjen na drugom mestu, pa više ne radi."
   },
   "sharedSession": {
+    "startedAt": "Započeto u {{time}}",
     "title": "Deljena sesija",
     "someone": "Neko",
     "sharedBy": "Podelio/la {{owner}}",
@@ -4930,6 +4938,8 @@
     "modelsDescription": "Isključite model da biste ga blokirali za svakog člana. Modeli dozvoljenih pružalaca su na početku uključeni.",
     "modelsDeniedOnly": "Samo zabranjeni",
     "modelsEmpty": "Nijedan model ne odgovara ovoj pretrazi.",
+    "modelsDeniedEmpty": "Nijedan model nije zabranjen.",
+    "modelsDeniedSearchEmpty": "Nijedan zabranjeni model ne odgovara ovoj pretrazi.",
     "providersDescription": "Isključite pružaoca da Kilo za ovu organizaciju prestane da usmerava na njega.",
     "providersNeedCatalog": "Prekidači pružalaca ostaju samo za čitanje dok se ne učita ceo katalog modela. Da biste ih menjali, dodirnite Pokušaj ponovo iznad.",
     "providersEmpty": "Nijedan pružalac ne odgovara ovoj pretrazi.",

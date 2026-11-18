@@ -1486,7 +1486,14 @@
     "council": {
       "title": "Şura yoxlaması",
       "subtitle": "Hər pull request-i bir neçə mütəxəssis yoxlayır və onların səsləri vahid qərarda birləşir.",
-      "unavailable": "Şura yoxlaması bu təşkilat üçün əlçatan deyil.",
+      "unavailablePersonallyTitle": "Enterprise təşkilatı tələb olunur",
+      "unavailablePersonally": "Şura yoxlaması şəxsi hesabın bir hissəsi deyil.",
+      "unavailablePersonallyAction": "Təşkilat yarat",
+      "unavailablePersonallySwitchAction": "Təşkilatı dəyişdir",
+      "unavailableOrganizationTitle": "Şura yoxlaması mövcud deyil",
+      "unavailableForOrganization": "Şura yoxlaması aktiv abunəlik və ya sınaq dövrü olan Enterprise plan tələb edir. Bu təşkilatda hazırda bu yoxdur.",
+      "unavailableForOrganizationNeutral": "Şura yoxlaması hazırda bu təşkilat üçün mövcud deyil. Daha sonra yenidən cəhd edin.",
+      "unavailableOnBitbucket": "Şura yoxlaması Bitbucket repozitoriyaları üçün əlçatan deyil.",
       "noRepositories": "Hələ heç bir repozitoriya seçilməyib. Əvvəlcə repozitoriya ayarlarında repozitoriyaları seç.",
       "specialists": "Mütəxəssislər",
       "labels": "Şura yoxlamasını işə salan etiketlər",
@@ -4704,6 +4711,7 @@
     "superseded": "Bu link başqa yerdə əvəzləndiyi üçün artıq işləmir."
   },
   "sharedSession": {
+    "startedAt": "Başlama vaxtı {{time}}",
     "title": "Paylaşılan sessiya",
     "someone": "Kimsə",
     "sharedBy": "Paylaşan: {{owner}}",
@@ -4859,6 +4867,8 @@
     "modelsDescription": "Modeli bütün üzvlər üçün bloklamaq üçün onu söndürün. İcazə verilən provayderlərin modelləri standart olaraq aktivdir.",
     "modelsDeniedOnly": "Yalnız qadağan olunanlar",
     "modelsEmpty": "Bu axtarışa uyğun model yoxdur.",
+    "modelsDeniedEmpty": "Qadağan olunan model yoxdur.",
+    "modelsDeniedSearchEmpty": "Bu axtarışa uyğun qadağan olunan model yoxdur.",
     "providersDescription": "Kilo-nun bu təşkilat üçün sorğuları provayderə yönləndirməsini dayandırmaq üçün onu söndürün.",
     "providersNeedCatalog": "Provayder açarları tam model kataloqu yüklənənə qədər yalnız oxunuş rejimində qalır. Onları redaktə etmək üçün yuxarıdakı Yenidən cəhd et düyməsinə toxunun.",
     "providersEmpty": "Bu axtarışa uyğun provayder yoxdur.",

@@ -75,44 +75,55 @@ function meetsAutoDismissConfidenceThreshold(
 }
 
 /**
+ * Narrow a SecurityReviewOwner into a discriminated owner identity.
+ * Every owner-shaped derivation (config owner, audit owner, audit event key,
+ * finding predicate, analytics organization id) derives from this result.
+ */
+function ownerIdentity(
+  owner: SecurityReviewOwner
+): { type: 'organization'; id: string } | { type: 'user'; id: string } {
+  if ('organizationId' in owner && owner.organizationId) {
+    return { type: 'organization', id: owner.organizationId };
+  }
+  if ('userId' in owner && owner.userId) {
+    return { type: 'user', id: owner.userId };
+  }
+  throw new Error('Invalid owner: must have either organizationId or userId');
+}
+
+/**
  * Convert SecurityReviewOwner + userId to Owner format for config lookups.
  * The userId represents the user performing the action (needed for audit/permissions).
  */
 function toOwner(securityOwner: SecurityReviewOwner, userId: string): Owner {
-  if ('organizationId' in securityOwner && securityOwner.organizationId) {
-    return { type: 'org', id: securityOwner.organizationId, userId };
-  }
-  if ('userId' in securityOwner && securityOwner.userId) {
-    return { type: 'user', id: securityOwner.userId, userId: securityOwner.userId };
-  }
-  throw new Error('Invalid owner: must have either organizationId or userId');
+  const identity = ownerIdentity(securityOwner);
+  return identity.type === 'organization'
+    ? { type: 'org', id: identity.id, userId }
+    : { type: 'user', id: identity.id, userId: identity.id };
 }
 
 function toAuditOwner(owner: SecurityReviewOwner): SecurityFindingAuditOwner {
-  if ('organizationId' in owner && owner.organizationId) {
-    return { type: 'organization', organizationId: owner.organizationId };
-  }
-  if ('userId' in owner && owner.userId) {
-    return { type: 'user', userId: owner.userId };
-  }
-  throw new Error('Invalid owner: must have either organizationId or userId');
+  const identity = ownerIdentity(owner);
+  return identity.type === 'organization'
+    ? { type: 'organization', organizationId: identity.id }
+    : { type: 'user', userId: identity.id };
 }
 
 function ownerAuditKeyPart(owner: SecurityReviewOwner): string {
-  if ('organizationId' in owner && owner.organizationId)
-    return `organization:${owner.organizationId}`;
-  if ('userId' in owner && owner.userId) return `user:${owner.userId}`;
-  throw new Error('Invalid owner: must have either organizationId or userId');
+  const identity = ownerIdentity(owner);
+  return `${identity.type}:${identity.id}`;
 }
 
 function ownerFindingCondition(owner: SecurityReviewOwner) {
-  if ('organizationId' in owner && owner.organizationId) {
-    return eq(security_findings.owned_by_organization_id, owner.organizationId);
-  }
-  if ('userId' in owner && owner.userId) {
-    return eq(security_findings.owned_by_user_id, owner.userId);
-  }
-  throw new Error('Invalid owner: must have either organizationId or userId');
+  const identity = ownerIdentity(owner);
+  return identity.type === 'organization'
+    ? eq(security_findings.owned_by_organization_id, identity.id)
+    : eq(security_findings.owned_by_user_id, identity.id);
+}
+
+/** Organization id for analytics events, or undefined for user-owned owners. */
+function ownerOrganizationId(owner: Owner): string | undefined {
+  return owner.type === 'org' ? owner.id : undefined;
 }
 
 function autoDismissCandidateCondition(owner: Owner) {
@@ -363,7 +374,7 @@ export async function maybeAutoDismissAnalysis(options: {
     trackSecurityAgentAutoDismiss({
       distinctId: userId,
       userId,
-      organizationId: 'organizationId' in owner ? owner.organizationId : undefined,
+      organizationId: ownerOrganizationId(ownerConverted),
       findingId,
       source: 'sandbox',
     });
@@ -404,7 +415,7 @@ export async function maybeAutoDismissAnalysis(options: {
       trackSecurityAgentAutoDismiss({
         distinctId: userId,
         userId,
-        organizationId: 'organizationId' in owner ? owner.organizationId : undefined,
+        organizationId: ownerOrganizationId(ownerConverted),
         findingId,
         source: 'triage',
         confidence: triage.confidence,
@@ -539,7 +550,7 @@ export async function autoDismissEligibleFindings(
   trackSecurityAgentAutoDismiss({
     distinctId: userId,
     userId,
-    organizationId: 'organizationId' in owner ? owner.organizationId : undefined,
+    organizationId: ownerOrganizationId(ownerConverted),
     source: 'bulk',
     dismissed,
     skipped,

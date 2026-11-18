@@ -7,6 +7,8 @@ import {
   RUNTIME_HARNESSES,
   RUNTIME_INSTRUCTIONS_HEADER,
   RUNTIME_INSTRUCTIONS_VERSION,
+  RUNTIME_WEB_SEARCH_HEADER,
+  RUNTIME_WEB_SEARCH_VERSION,
   type RuntimeHarness,
   WORKSPACE_CONFIGURATION_HEADER,
   WORKSPACE_CONFIGURATION_VERSION,
@@ -545,6 +547,7 @@ const wrapperSocketAttachmentSchema = z.object({
   transferGrants: z.literal(true).optional(),
   workspaceConfiguration: z.literal(true).optional(),
   runtimeInstructions: z.literal(true).optional(),
+  runtimeWebSearch: z.literal(true).optional(),
   runtimeCapability: z.literal('worktree').optional(),
   runtimeHarness: z.enum(RUNTIME_HARNESSES).optional(),
   kiloCliVersion: SandboxRuntimeVersionSchema.optional(),
@@ -2928,6 +2931,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
         ...(request.headers.get(RUNTIME_INSTRUCTIONS_HEADER) === RUNTIME_INSTRUCTIONS_VERSION
           ? { runtimeInstructions: true as const }
           : {}),
+        ...(request.headers.get(RUNTIME_WEB_SEARCH_HEADER) === RUNTIME_WEB_SEARCH_VERSION
+          ? { runtimeWebSearch: true as const }
+          : {}),
         ...runtimeHarnessField(parseRuntimeHarness(request.headers.get(RUNTIME_HARNESS_HEADER))),
         ...(observedRuntime.kiloCliVersion === null
           ? {}
@@ -4760,6 +4766,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
     };
     // Pre-deploy wrappers reject unknown fields in both prepare and attach frames.
     if (attachment?.runtimeInstructions !== true) delete wireSpec.runtimeInstructions;
+    if (attachment?.runtimeWebSearch !== true) {
+      if (wireSpec.webSearchDisabled && attachment?.runtimeHarness === 'kilo2') {
+        wireSpec.permission = { ...wireSpec.permission, websearch: 'deny' };
+      }
+      delete wireSpec.webSearchDisabled;
+      delete wireSpec.webSearchProvider;
+    }
     // A restored workspace tail runs no commands, so the frame carries none. A
     // non-tail start sends the environment build boundary and start list.
     if (snapshotFrame.workspaceSnapshot !== undefined) {
@@ -7064,6 +7077,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         ...(frame.transferGrants ? { transferGrants: true } : {}),
         ...(attachment?.workspaceConfiguration ? { workspaceConfiguration: true } : {}),
         ...(attachment?.runtimeInstructions ? { runtimeInstructions: true } : {}),
+        ...(attachment?.runtimeWebSearch ? { runtimeWebSearch: true } : {}),
         ...runtimeHarnessField(attachment?.runtimeHarness),
       });
       logControlDiagnostic('workspace_snapshot_capability', {

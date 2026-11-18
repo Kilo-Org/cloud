@@ -11,7 +11,11 @@ import { APP_URL, FIRST_TOPUP_BONUS_AMOUNT } from '@kilocode/web-shared/lib/cons
 import { summarizeUserPayments } from '@kilocode/web-shared/lib/creditTransactions';
 import { isAutoTopUpInFlight } from '@kilocode/web-shared/lib/autoTopUpInFlight';
 import { type User } from '@kilocode/db/schema';
-import { errorExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import {
+  errorExceptInTest,
+  logExceptInTest,
+  warnExceptInTest,
+} from '@kilocode/web-shared/lib/utils.server';
 import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
 
 import type { Span } from '@sentry/nextjs';
@@ -1573,10 +1577,9 @@ function extractEmbeddingUsage(
   const hasError = !json.model || json.error != null || statusCode >= 400;
 
   if (!usage && !hasError) {
-    captureMessage('SUSPICIOUS: No embedding usage information', {
-      level: 'error',
-      tags: { source: 'embedding_usage_processing' },
-      extra: { model: json.model, statusCode },
+    logExceptInTest('[extractEmbeddingUsage] No embedding usage information', {
+      model: json.model,
+      statusCode,
     });
   }
 

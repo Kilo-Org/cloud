@@ -143,15 +143,19 @@ async function generateAndStoreKey(): Promise<string> {
   return key;
 }
 
-// The bounded escape hatch for a migration that fails the same way on every
-// launch: a buggy shipped migration, or a downgrade to a build whose code
-// cannot apply the file's newer schema. Keeping the file forever would leave
-// the store — and with it drafts, the chats table and the conversation
-// tables — unusable with no recovery path. After this many consecutive
-// non-transient migration failures the open falls back to the same
-// delete-and-recreate recovery a failed probe runs: a bounded, reported loss
-// instead of a wedge. The count lives beside the key in SecureStore, not in
-// the failing database.
+// The bounded escape hatch for a store that fails to open launch after
+// launch: a buggy shipped migration, a downgrade to a build whose code
+// cannot apply the file's newer schema, or any other non-transient failure
+// that repeats. The rule is every non-transient failure on a readable file —
+// engine messages cannot tell a schema conflict from a full disk or denied
+// permissions, and a streak of repeated failures leaves the store unusable
+// either way, with drafts, the chats table and the conversation tables
+// unreachable. After this many consecutive failures the open falls back to
+// the same delete-and-recreate recovery a failed probe runs: a bounded,
+// reported loss instead of a wedge. A recreated file cannot fix every cause
+// (a full disk fails the same way), so the reset report carries the cause
+// for diagnosis. The count lives beside the key in SecureStore, not in the
+// failing database.
 const MIGRATION_FAILURE_RESET_THRESHOLD = 3;
 
 /** Counts one consecutive migration failure in SecureStore; a failed read or write leaves the count untouched. Returns the new consecutive count. */

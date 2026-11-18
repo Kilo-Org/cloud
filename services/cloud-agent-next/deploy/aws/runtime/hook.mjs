@@ -65,7 +65,12 @@ const server = createServer(async (request, response) => {
       ],
       { env, stdio: 'inherit', detached: true }
     );
+    const launched = child;
     child.on('error', () => console.error('AWS launch process failed'));
+    // A later run may relaunch after the launcher exits, for example after a failed download.
+    child.on('exit', () => {
+      if (child === launched) child = undefined;
+    });
     response.writeHead(200).end();
   } catch {
     response.writeHead(400).end('Invalid launch');

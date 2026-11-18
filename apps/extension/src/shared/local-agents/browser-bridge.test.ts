@@ -1,7 +1,7 @@
 /* eslint-disable eslint/max-statements, max-lines, max-lines-per-function, max-expects, require-await, typescript/require-await, typescript-eslint/consistent-type-definitions -- one fake runtime serves every protocol branch, and its recorders read as one table */
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { AGENT_TAB_OUTSIDE_GROUP_ERROR } from '../browser-agent-checks';
+import { AGENT_TAB_OUTSIDE_GROUP_ERROR, SENSITIVE_REASON } from '../browser-agent-checks';
 import { TAB_BUSY_ERROR, TAB_TAKEN_ERROR } from '../browser-caller';
 import type { BrowserCaller } from '../browser-caller';
 import type { BrowserToolRunInput, BrowserToolRunOutcome } from '../browser-runtime';
@@ -14,6 +14,8 @@ import { LOCAL_AGENT_ERROR_CODES } from './jsonrpc';
 const CONTROLLER = '6f1c2d3e-4a5b-4c6d-8e9f-0a1b2c3d4e5f';
 const HANDLE = '11111111-2222-4333-8444-555555555555';
 const SECOND_HANDLE = '99999999-8888-4777-8666-555555555555';
+/** The token the runtime hands back for a stopped download, which the CLI's repeat carries. */
+const APPROVAL_TOKEN = 'step-token-1';
 
 type FakeRuntime = {
   readonly closed: string[];
@@ -35,6 +37,8 @@ const createFakeRuntime = (
   options: {
     readonly outcome?: ((input: BrowserToolRunInput) => BrowserToolRunOutcome) | undefined;
     readonly share?: { readonly groupId?: number | undefined; readonly tabId: number } | undefined;
+    /** What `tabInfo` reports; the default is a tab that finished its navigation. */
+    readonly tabInfo?: { readonly title: string; readonly url: string } | undefined;
   } = {}
 ): FakeRuntime => {
   const sessions = new Map<string, { ended: boolean; tabs: number[] }>();
@@ -136,7 +140,8 @@ const createFakeRuntime = (
         ...(shared.groupId === undefined ? {} : { groupId: shared.groupId }),
       };
     },
-    tabInfo: async () => ({ title: 'Started', url: 'https://app.example.com/next' }),
+    tabInfo: async () =>
+      options.tabInfo ?? { title: 'Started', url: 'https://app.example.com/next' },
   };
 
   return {
@@ -374,6 +379,121 @@ describe('local agent browser bridge', () => {
             title: 'Started',
             url: 'https://app.example.com/next',
           }),
+          type: 'text',
+        },
+      ],
+    });
+  });
+
+  it('runs the approved repeat of browser_tabs new as the navigate it asked for', async () => {
+    let calls = 0;
+    const fake = createFakeRuntime({
+      outcome: () => {
+        calls += 1;
+
+        return calls === 1
+          ? {
+              afterAction: true,
+              items: [
+                {
+                  class: 'sensitive',
+                  origin: 'https://app.example.com',
+                  reason: SENSITIVE_REASON.download,
+                },
+              ],
+              kind: 'needs_permission',
+              stepToken: APPROVAL_TOKEN,
+            }
+          : { kind: 'result', result: { ok: true, value: 'report.txt: The file was downloaded.' } };
+      },
+    });
+    const bridge = createRuntimeBrowserBridge({ runtime: () => fake.runtime });
+
+    await bridge.openSession({ controllerId: CONTROLLER, sessionHandle: HANDLE, title: 'Work' });
+
+    const params = {
+      arguments: { action: 'new', url: 'https://app.example.com/report.txt' },
+      authorized: [{ class: 'navigate', origin: 'https://app.example.com' }],
+      name: 'browser_tabs',
+      sessionHandle: HANDLE,
+    };
+
+    // The first call opens the session's tab and loads the url under the guard, which stops the download and asks.
+    const guarded = await rejectionOf(bridge.callTool(CONTROLLER, params));
+
+    expect(guarded).toMatchObject({
+      code: LOCAL_AGENT_ERROR_CODES.needsPermission,
+      data: { afterAction: true, stepToken: APPROVAL_TOKEN },
+    });
+    expect(fake.run[0]).toMatchObject({
+      arguments: { url: 'https://app.example.com/report.txt' },
+      tabId: 77,
+      toolName: 'browser_navigate',
+    });
+
+    // The CLI repeats the `browser_tabs` call it sent, not the navigate the token is bound to.
+    // It has to run as that navigate on the tab the first call opened: a second tab would load the url unguarded.
+    const approved = await bridge.callTool(CONTROLLER, {
+      ...params,
+      sensitive: [APPROVAL_TOKEN],
+    });
+
+    expect(fake.ownTabs).toHaveLength(1);
+    expect(fake.run).toHaveLength(2);
+    expect(fake.run[1]).toMatchObject({
+      agent: { sensitive: [APPROVAL_TOKEN] },
+      arguments: { url: 'https://app.example.com/report.txt' },
+      tabId: 77,
+      toolName: 'browser_navigate',
+    });
+    expect(approved).toStrictEqual({
+      content: [{ text: 'report.txt: The file was downloaded.', type: 'text' }],
+    });
+  });
+
+  it('reports the navigation that failed instead of a tab that never loaded', async () => {
+    const fake = createFakeRuntime({
+      outcome: () => ({
+        kind: 'result',
+        result: { error: 'net::ERR_NAME_NOT_RESOLVED', ok: false },
+      }),
+    });
+    const bridge = createRuntimeBrowserBridge({ runtime: () => fake.runtime });
+
+    await bridge.openSession({ controllerId: CONTROLLER, sessionHandle: HANDLE, title: 'Work' });
+
+    const result = await bridge.callTool(CONTROLLER, {
+      arguments: { action: 'new', url: 'https://app.example.com/missing' },
+      authorized: [{ class: 'navigate', origin: 'https://app.example.com' }],
+      name: 'browser_tabs',
+      sessionHandle: HANDLE,
+    });
+
+    // The tab exists, so `selected: true` would read as success; the model needs the load error it must act on.
+    expect(result).toStrictEqual({
+      content: [{ text: 'net::ERR_NAME_NOT_RESOLVED', type: 'text' }],
+      isError: true,
+    });
+  });
+
+  it('falls back to the opened url when the browser withholds it', async () => {
+    const fake = createFakeRuntime({ tabInfo: { title: '', url: '' } });
+    const bridge = createRuntimeBrowserBridge({ runtime: () => fake.runtime });
+
+    await bridge.openSession({ controllerId: CONTROLLER, sessionHandle: HANDLE, title: 'Work' });
+
+    const result = await bridge.callTool(CONTROLLER, {
+      arguments: { action: 'new' },
+      authorized: [],
+      name: 'browser_tabs',
+      sessionHandle: HANDLE,
+    });
+
+    // An `about:blank` tab reports no url without the `tabs` permission, which is not a tab at the empty url.
+    expect(result).toStrictEqual({
+      content: [
+        {
+          text: JSON.stringify({ selected: true, tabId: 77, title: '', url: 'about:blank' }),
           type: 'text',
         },
       ],

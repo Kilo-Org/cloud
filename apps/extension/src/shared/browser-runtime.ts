@@ -235,7 +235,7 @@ const TAB_COMMIT_POLL_MS = 50;
  * gets its file deleted, but the call itself does not wait for a download it
  * never started.
  */
-const DOWNLOAD_GUARD_LINGER_MS = 2_000;
+const DOWNLOAD_GUARD_LINGER_MS = 2000;
 
 /** How long an approved navigate waits for the browser to name the file it kept. */
 const KEPT_DOWNLOAD_POLLS = 60;
@@ -253,12 +253,23 @@ const NAVIGATE_DOWNLOAD_POLLS = 15;
 const DOWNLOAD_SETTLE_POLL_MS = 100;
 const DOWNLOAD_SETTLE_POLLS = 20;
 
-/** One download this call stopped: its file is gone, or the browser kept it under a name. */
+/**
+ * How long an act call looks for the download its own command started. The
+ * browser creates the item a moment after the command returns, so a guard that
+ * only listened would leave a file nobody was told about. The call pays this
+ * only when it saw nothing, and it stops at the first item it finds.
+ */
+const DOWNLOAD_OBSERVE_POLL_MS = 10;
+const DOWNLOAD_OBSERVE_POLLS = 10;
+
+/** One download this call stopped: its file is gone, still being written, or kept under a name. */
 type DiscardOutcome =
   | { readonly kind: 'kept'; readonly filename: string }
+  /** The cancel landed on an item the browser was still writing: the file that lands is deleted off the call's path. */
+  | { readonly kind: 'pending' }
   | { readonly kind: 'removed' };
 
-/** What a guard stopped: files it removed, and files the browser had already written. */
+/** What a guard stopped: files it could not delete, and downloads it stopped or is still finishing. */
 interface GuardSettlement {
   readonly kept: readonly string[];
   readonly stopped: number;
@@ -380,42 +391,82 @@ const startedByThisCall = (
 };
 
 /**
- * Stops one download of this call. `cancel` resolves even for an item that
- * already finished, so this waits for the item's own terminal state and then
- * removes the file of one that completed first; a guard that could not delete
- * the file says so and names it instead of claiming a removal it did not do.
+ * Stops one download of this call. The cancel is the call's own business; the
+ * file the browser had already finished is deleted here too, because one read
+ * of the item says whether there is one. An item the browser is still writing
+ * is left to `finishDownload`: a call may not wait for a file nobody reads.
  */
 const discardDownload = async (
   api: BrowserDownloadsApi,
   item: BrowserDownloadItem
 ): Promise<DiscardOutcome> => {
+  let cancelled = true;
+
   try {
     await api.cancel(item.id);
   } catch {
-    // Too late for the cancel: the state below says whether a file was written.
+    // Too late for the cancel: the item's own state below says whether a file exists.
+    cancelled = false;
   }
 
-  const settled = await settledDownload(api, item.id);
-  const filename = fileNameOf(settled ?? item);
+  // One read, never a poll: the item's state now is what the browser knows about its file.
+  const current = await readDownload(api, item.id);
+  const reached = current ?? item;
 
   // `interrupted` is the browser's own proof that no file exists.
-  if (settled?.state === 'interrupted') {
+  if (reached.state === 'interrupted') {
     return { kind: 'removed' };
   }
 
   if (api.removeFile === undefined) {
-    // Nothing can delete a file the browser wrote, so a finished item is a file the user kept.
-    return { kind: 'kept', filename };
+    // Nothing can delete a file the browser wrote, so an uncancelled item is a file the user keeps.
+    return cancelled ? { kind: 'removed' } : { filename: fileNameOf(reached), kind: 'kept' };
   }
 
-  try {
-    await api.removeFile(item.id);
-    await api.erase?.({ id: item.id });
+  if (reached.state === 'complete') {
+    try {
+      await api.removeFile(item.id);
+      await api.erase?.({ id: item.id });
 
-    return { kind: 'removed' };
+      return { kind: 'removed' };
+    } catch {
+      return { filename: fileNameOf(reached), kind: 'kept' };
+    }
+  }
+
+  // Still in progress: the call reports the download now, and whatever file lands is deleted off its path.
+  void finishDownload(api, item.id);
+
+  return cancelled ? { kind: 'removed' } : { kind: 'pending' };
+};
+
+/** One read of a download's own state; `undefined` when the browser has no such item. */
+const readDownload = async (
+  api: BrowserDownloadsApi,
+  id: number
+): Promise<BrowserDownloadItem | undefined> => {
+  try {
+    const found = await api.search?.({ id });
+
+    return found?.find(candidate => candidate.id === id);
   } catch {
-    // A cancel still in flight holds no file yet, so only a finished item is a kept file.
-    return settled?.state === 'in_progress' ? { kind: 'removed' } : { kind: 'kept', filename };
+    return undefined;
+  }
+};
+
+/**
+ * Deletes the file of a download the call could not settle, after the call has
+ * answered: the browser may need a moment to finish writing it, and the tab
+ * must not wait for a file the model does not read.
+ */
+const finishDownload = async (api: BrowserDownloadsApi, id: number): Promise<void> => {
+  await settledDownload(api, id);
+
+  try {
+    await api.removeFile?.(id);
+    await api.erase?.({ id });
+  } catch {
+    // No file was written, or this browser will not delete it; there is no caller left to tell.
   }
 };
 
@@ -439,34 +490,20 @@ const settledDownload = async (
   id: number
 ): Promise<BrowserDownloadItem | undefined> => {
   for (let attempt = 0; attempt < DOWNLOAD_SETTLE_POLLS; attempt += 1) {
-    try {
-      // eslint-disable-next-line no-await-in-loop -- bounded wait for the browser to finish the item
-      const found = (await api.search?.({ id }))?.find(candidate => candidate.id === id);
+    // eslint-disable-next-line no-await-in-loop -- bounded wait for the browser to finish the item
+    const item = await readDownload(api, id);
 
-      if (found === undefined || found.state === 'complete' || found.state === 'interrupted') {
-        return found;
-      }
-    } catch {
-      return undefined;
+    if (item === undefined || item.state === 'complete' || item.state === 'interrupted') {
+      return item;
     }
 
     // eslint-disable-next-line no-await-in-loop -- see above
     await after(DOWNLOAD_SETTLE_POLL_MS);
   }
 
-  try {
-    return (await api.search?.({ id }))?.find(candidate => candidate.id === id);
-  } catch {
-    return undefined;
-  }
+  return readDownload(api, id);
 };
 
-/**
- * The guard that uses the optional `downloads` permission: the browser names a
- * download when it creates it — before the call's own command returns — and the
- * call's own items are cancelled and their files deleted. It is the only guard:
- * it sees `blob:` and `data:` downloads, which issue no network request at all.
- */
 /**
  * The download a navigate started, polled because the browser creates it on its
  * own schedule: a navigation that became a download never reaches its
@@ -514,14 +551,75 @@ interface DownloadAttribution {
   readonly tabIds: () => readonly number[];
 }
 
+/**
+ * The downloads an act call started that the stream has not named yet, searched
+ * for because the browser creates the item a moment after the call's own
+ * command returns. A guard that only listened would leave the linger deleting a
+ * file the model was never told about.
+ */
+const observeDownloads = async ({
+  api,
+  mine,
+  startedAt,
+}: {
+  readonly api: BrowserDownloadsApi;
+  /** Whether an item is this call's own, by the same attribution the stream uses. */
+  readonly mine: (item: BrowserDownloadItem) => boolean;
+  readonly startedAt: number;
+}): Promise<readonly BrowserDownloadItem[]> => {
+  for (let attempt = 0; attempt < DOWNLOAD_OBSERVE_POLLS; attempt += 1) {
+    try {
+      // eslint-disable-next-line no-await-in-loop -- one search per bounded attempt
+      const found = await api.search?.({ startedAfter: startedAt });
+      const started = (found ?? []).filter(item => mine(item));
+
+      if (started.length > 0) {
+        return started;
+      }
+    } catch {
+      // A search that fails leaves the listener's own window as the only evidence.
+      return [];
+    }
+
+    // eslint-disable-next-line no-await-in-loop -- bounded wait for the browser to create it
+    await after(DOWNLOAD_OBSERVE_POLL_MS);
+  }
+
+  return [];
+};
+
+/**
+ * The guard that uses the optional `downloads` permission: the browser names a
+ * download when it creates it, and every item this call started is cancelled
+ * and its file deleted. It is the only guard: it sees `blob:` and `data:`
+ * downloads, which issue no network request at all.
+ *
+ * Everything it waits for is bounded and cheap — a cancel, one state read, a
+ * short search for a download that lands after the command returned — because
+ * the next call on the tab waits behind this one. A file the browser is still
+ * writing is deleted after the call has answered.
+ */
 const armDownloadGuard = (
   api: BrowserDownloadsApi,
   attribution: DownloadAttribution
 ): DownloadGuard => {
   const { navigation, tab, tabIds } = attribution;
   const startedAt = Date.now();
-  const discards: Promise<DiscardOutcome>[] = [];
+  /** One stop per download: the stream and the searches name the same item, and it is stopped once. */
+  const stops = new Map<number, Promise<DiscardOutcome>>();
+  const owned = (item: BrowserDownloadItem): boolean =>
+    item.tabId === undefined || tabIds().includes(item.tabId);
   let created = false;
+  let listening = true;
+
+  const stop = (item: BrowserDownloadItem): void => {
+    created = true;
+
+    if (!stops.has(item.id)) {
+      stops.set(item.id, discardDownload(api, item));
+    }
+  };
+
   const listener = (item: BrowserDownloadItem): void => {
     // A navigate answers with the file it asked for even when the browser reports no tab for it.
     // An item the browser ties to another tab is that tab's download, so the same url in a second tab is left alone.
@@ -536,16 +634,23 @@ const armDownloadGuard = (
       return;
     }
 
-    created = true;
-    discards.push(discardDownload(api, item));
+    stop(item);
+  };
+
+  const disarm = (): void => {
+    if (listening) {
+      listening = false;
+      api.onCreated.removeListener(listener);
+    }
   };
 
   const report = async (): Promise<GuardSettlement> => {
-    const outcomes = await Promise.all(discards);
+    const outcomes = await Promise.all([...stops.values()]);
 
     return {
       kept: outcomes.flatMap(outcome => (outcome.kind === 'kept' ? [outcome.filename] : [])),
-      stopped: outcomes.filter(outcome => outcome.kind === 'removed').length,
+      // A download whose file is still being written counts as stopped too: the guard is deleting whatever lands.
+      stopped: outcomes.filter(outcome => outcome.kind !== 'kept').length,
     };
   };
 
@@ -553,37 +658,42 @@ const armDownloadGuard = (
 
   return {
     settle: async () => {
-      // A navigate that became a download never reaches its destination, so the tab answers at once and the
-      // requested url finds the item while it is in progress. A navigation that landed pays nothing.
-      if (!created && navigation !== undefined && api.search !== undefined) {
-        if (!(await navigation.landed().catch(() => true))) {
-          const owned = (item: BrowserDownloadItem): boolean =>
-            item.tabId === undefined || tabIds().includes(item.tabId);
+      if (navigation !== undefined && api.search !== undefined) {
+        // A navigate that became a download never reaches its destination, so the tab answers at once.
+        const landed = created || (await navigation.landed().catch(() => true));
 
-          for (const item of await findNavigateDownloads({
-            api,
-            navigation,
-            owned,
-            startedAt,
-          })) {
-            discards.push(discardDownload(api, item));
+        if (!landed) {
+          for (const item of await findNavigateDownloads({ api, navigation, owned, startedAt })) {
+            stop(item);
           }
         }
       }
 
-      if (!created && discards.length === 0) {
-        // Nothing started, so the call does not pay for a window it may never need: the listener stays armed for a
-        // bounded linger and deletes a download whose headers arrived after the call returned.
+      // An act call's download is created a moment after its own command returns, so the guard looks for it.
+      // Without this the linger would delete a file the model was never told about.
+      if (!created && navigation === undefined) {
+        for (const item of await observeDownloads({
+          api,
+          mine: candidate => startedByThisCall(candidate, tab, tabIds()),
+          startedAt,
+        })) {
+          stop(item);
+        }
+      }
+
+      if (stops.size === 0) {
+        // Nothing started, so the call does not pay for a window it may never need.
+        // The listener stays armed for a bounded linger, so a download whose headers arrive late is deleted too.
         void (async (): Promise<void> => {
           await after(DOWNLOAD_GUARD_LINGER_MS);
-          api.onCreated.removeListener(listener);
+          disarm();
           await report();
         })();
 
         return { kept: [], stopped: 0 };
       }
 
-      api.onCreated.removeListener(listener);
+      disarm();
 
       return report();
     },
@@ -662,7 +772,8 @@ export const createBrowserRuntime = ({
 
     const created = createBrowserToolSession({
       debuggerApi,
-      ...(sessionOwnedTabs.has(tabId) ? { ownedTab: true } : {}),
+      // A live predicate, not a copy: the voucher lasts only while the tab is still a blank one this runtime opened.
+      ownedTab: () => sessionOwnedTabs.has(tabId),
       scriptingApi,
       tabId,
       tabsApi,
@@ -787,10 +898,39 @@ export const createBrowserRuntime = ({
     }
   };
 
+  /**
+   * Whether this tab is one the runtime opened for a session and is still
+   * blank. The bit is the runtime's own voucher, so it goes the moment the
+   * voucher stops being true: the tab closed, the session that opened it no
+   * longer holds it, or a document committed and the precheck can judge it.
+   */
+  const sessionTabBlank = async (tabId: number): Promise<boolean> => {
+    if (!sessionOwnedTabs.has(tabId)) {
+      return false;
+    }
+
+    const tab = await tabProgressOf(tabId);
+
+    if (tab === undefined || groups.sessionForTab(tabId) === undefined) {
+      sessionOwnedTabs.delete(tabId);
+
+      return false;
+    }
+
+    if (tab.url === undefined || tab.url === '' || tab.url === 'about:blank') {
+      return true;
+    }
+
+    sessionOwnedTabs.delete(tabId);
+
+    return false;
+  };
+
   const reachable = async (tabId: number): Promise<EvalTabResult | undefined> => {
     // A session's own tab starts blank, and the precheck exists to protect the user's browser-internal pages.
-    // It cannot judge this tab, so the attach reports what it cannot reach.
-    if (sessionOwnedTabs.has(tabId)) {
+    // The precheck cannot judge a tab with no readable url, so the attach reports what it cannot reach instead.
+    // That voucher ends with the tab's first document: afterwards it is an ordinary tab the precheck judges.
+    if (await sessionTabBlank(tabId)) {
       return undefined;
     }
 
@@ -867,25 +1007,32 @@ export const createBrowserRuntime = ({
     return withheldFramesOf(frames, readable).map(frame => frame.origin);
   };
 
+  /** The refusal every sensitive step shares: the items to approve, and what the call already did. */
   const needsPermissionOutcome = (
     items: readonly BrowserPermissionItem[],
-    stepToken: string | undefined,
-    afterAction?: boolean,
-    keptFiles: readonly string[] = []
-  ): BrowserToolRunOutcome => ({
-    items,
-    kind: 'needs_permission',
-    // A file the guard could not delete is named: the refusal must not read as "nothing was written".
-    result: {
-      error:
-        keptFiles.length === 0
-          ? NEEDS_PERMISSION_ERROR
-          : `The browser action needs permission for this origin. The browser had already saved ${keptFiles.join(', ')} in the downloads folder before the download could be stopped.`,
-      ok: false,
-    },
-    ...(stepToken === undefined ? {} : { stepToken }),
-    ...(afterAction === true ? { afterAction: true } : {}),
-  });
+    answer: {
+      readonly afterAction?: boolean;
+      readonly keptFiles?: readonly string[];
+      readonly stepToken?: string;
+    } = {}
+  ): BrowserToolRunOutcome => {
+    const { afterAction, keptFiles = [], stepToken } = answer;
+
+    return {
+      items,
+      kind: 'needs_permission',
+      // A file the guard could not delete is named: the refusal must not read as "nothing was written".
+      result: {
+        error:
+          keptFiles.length === 0
+            ? NEEDS_PERMISSION_ERROR
+            : `The browser action needs permission for this origin. The browser had already saved ${keptFiles.join(', ')} in the downloads folder before the download could be stopped.`,
+        ok: false,
+      },
+      ...(stepToken === undefined ? {} : { stepToken }),
+      ...(afterAction === true ? { afterAction: true } : {}),
+    };
+  };
 
   const claimTab = async ({ caller, from, tabId }: BrowserTabClaimInput): Promise<boolean> => {
     // The handover runs before the acquire, in one message.
@@ -1009,7 +1156,9 @@ export const createBrowserRuntime = ({
 
           return needsPermissionOutcome(
             preflight.failure.items,
-            preflight.sensitive === undefined ? undefined : issueSensitiveToken(preflight.sensitive)
+            preflight.sensitive === undefined
+              ? {}
+              : { stepToken: issueSensitiveToken(preflight.sensitive) }
           );
         }
 
@@ -1056,10 +1205,6 @@ export const createBrowserRuntime = ({
           }
         };
 
-        if (guardTab !== undefined) {
-          tabsApi.onCreated?.addListener(noteBrowserOpenedTab);
-        }
-
         const guardTabIds = (): readonly number[] => [...callTabs];
         // A navigate names the document it asked for, so a download that starts after the call returns can still be found.
         const destination =
@@ -1089,6 +1234,8 @@ export const createBrowserRuntime = ({
         }
 
         if (downloadGuard !== undefined) {
+          // The guard reports the tabs this call opened, so its listener lives exactly as long as the guard does.
+          tabsApi.onCreated?.addListener(noteBrowserOpenedTab);
           await setDownloadBehavior(session, 'deny');
         }
 
@@ -1172,14 +1319,14 @@ export const createBrowserRuntime = ({
         ) {
           const origin = preflight?.ok ? preflight.origin : '';
           const reason = SENSITIVE_REASON.download;
+          const stepToken = preflight?.ok ? issueSensitiveToken({ origin, reason }) : undefined;
 
           // The click already ran and the download was cancelled. `afterAction` tells the CLI not to replay it.
-          return needsPermissionOutcome(
-            [{ class: 'sensitive', origin, reason }],
-            preflight?.ok ? issueSensitiveToken({ origin, reason }) : undefined,
-            true,
-            settlement.kept
-          );
+          return needsPermissionOutcome([{ class: 'sensitive', origin, reason }], {
+            afterAction: true,
+            keptFiles: settlement.kept,
+            ...(stepToken === undefined ? {} : { stepToken }),
+          });
         }
 
         // An approved navigate to an attachment keeps its file and still answers `ERR_ABORTED`: that is a success with no page change, not a failure.

@@ -169,7 +169,9 @@ export type AgentFrameSession = Pick<BrowserToolPageSession, 'send'> & {
 const readChildFrame = async (
   session: Pick<BrowserToolPageSession, 'send'>,
   sessionId: string
-): Promise<{ readonly origin: string; readonly parentId?: string; readonly url: string } | undefined> => {
+): Promise<
+  { readonly origin: string; readonly parentId?: string; readonly url: string } | undefined
+> => {
   try {
     const parsed = frameTreePayloadSchema.safeParse(
       await session.send('Page.getFrameTree', undefined, sessionId)
@@ -209,7 +211,8 @@ export const readAgentFrames = async (session: AgentFrameSession): Promise<Agent
       childSessions.set(frameId, child.sessionId);
       // eslint-disable-next-line no-await-in-loop -- one child-session read per attached frame
       const childFrame = await readChildFrame(session, child.sessionId);
-      const url = childFrame?.url === undefined || childFrame.url === '' ? child.url : childFrame.url;
+      const url =
+        childFrame?.url === undefined || childFrame.url === '' ? child.url : childFrame.url;
 
       frames.push({
         id: frameId,

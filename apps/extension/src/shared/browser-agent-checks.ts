@@ -74,16 +74,18 @@ export const toolGrantClass = (toolName: string): BrowserGrantClass =>
 
 /**
  * Every tool whose page action can start a download: a click, a dropped or
- * dragged item, a key press (Enter on a focused link), the two tools that run
- * model-authored code, and a load the page did not ask a human for — a
- * navigate to an attachment URL, a back/forward to one, or a tab opened at a
- * URL that answers with a file.
+ * dragged item, a key press (Enter on a focused link), a form filled or
+ * submitted, the two tools that run model-authored code, and a load the page
+ * did not ask a human for — a navigate to an attachment URL, a back/forward to
+ * one, or a tab opened at a URL that answers with a file.
  */
 const DOWNLOAD_CAPABLE_TOOLS: ReadonlySet<string> = new Set([
   'browser_click',
   'browser_drag',
   'browser_drop',
   'browser_evaluate',
+  // Fills each field through the page's own `input`/`change` handler, and clicks a checkbox or radio into place.
+  'browser_fill_form',
   'browser_navigate',
   'browser_navigate_back',
   'browser_navigate_forward',
@@ -93,6 +95,8 @@ const DOWNLOAD_CAPABLE_TOOLS: ReadonlySet<string> = new Set([
   // Dispatches `change` on the element, and an export-style handler can answer with an attachment.
   'browser_select_option',
   'browser_tabs',
+  // `submit` presses Enter on the filled field, and typing alone fires the page's `input` handler.
+  'browser_type',
   // Runs page-registered code, which can start a download like any other page action.
   'browser_webmcp_call',
 ]);

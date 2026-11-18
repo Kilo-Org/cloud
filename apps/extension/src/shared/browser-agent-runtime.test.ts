@@ -322,6 +322,10 @@ const createFakeDownloads = (
   const searched: BrowserDownloadItem[] = [];
   // One entry per item, as `chrome.downloads.search({ id })` reports it after the guard's cancel.
   const items = new Map<number, BrowserDownloadItem>();
+  /** When the browser created each item, so a `startedAfter` search sees only that call's own window. */
+  const recordedAt = new Map<number, number>();
+  /** The items the browser itself created, in creation order; a url search answers the seeded history instead. */
+  const created: BrowserDownloadItem[] = [];
   const api: BrowserDownloadsApi = {
     // Sorted keys: `cancel` first, as chrome.downloads declares them.
     cancel: async downloadId => {
@@ -354,14 +358,30 @@ const createFakeDownloads = (
       removed.push(downloadId);
     },
     search: async query => {
-      if (query.id === undefined) {
-        return searched;
+      if (query.id !== undefined) {
+        const item = items.get(query.id);
+
+        return item === undefined ? [] : [item];
       }
 
-      const item = items.get(query.id);
+      const since = query.startedAfter;
 
-      return item === undefined ? [] : [item];
+      if (since !== undefined) {
+        // The items the browser created inside this call's window, plus whatever a test placed in the history itself.
+        return [...searched, ...created.filter(item => (recordedAt.get(item.id) ?? 0) >= since)];
+      }
+
+      return searched;
     },
+  };
+
+  const record = (item: BrowserDownloadItem): void => {
+    // A cancel that landed leaves the browser's own `interrupted`; a test says `complete` when it lost the race.
+    const recorded = { state: 'interrupted', ...item };
+
+    items.set(item.id, recorded);
+    recordedAt.set(item.id, Date.now());
+    created.push(recorded);
   };
 
   return {
@@ -369,8 +389,7 @@ const createFakeDownloads = (
     cancelled,
     /** Records an item and tells the guard, as `chrome.downloads.onCreated` does. */
     emit: (item: BrowserDownloadItem) => {
-      // A cancel that landed leaves the browser's own `interrupted`; a test says `complete` when it lost the race.
-      items.set(item.id, { state: 'interrupted', ...item });
+      record(item);
 
       for (const listener of listeners) {
         listener(item);
@@ -378,6 +397,8 @@ const createFakeDownloads = (
     },
     erased,
     live: () => listeners.length,
+    /** Records an item without telling the guard: the browser creates one after the call's own command returned. */
+    record,
     removed,
     searched,
   };
@@ -736,6 +757,35 @@ describe('agent browser calls', () => {
     expect(cdp.commands()).not.toContain('Page.navigate');
   });
 
+  it('leaves no tab listener behind when the optional permission is missing', async () => {
+    const created = new Set<(tab: { readonly id?: number }) => void>();
+    const tabsApi: BrowserTabsApi = {
+      get: async () => ({ id: TAB_ID, title: 'Example', url: `${MAIN_ORIGIN}/dashboard` }),
+      onCreated: {
+        addListener: listener => created.add(listener),
+        removeListener: listener => created.delete(listener),
+      },
+      query: async () => [{ id: TAB_ID, title: 'Example', url: `${MAIN_ORIGIN}/dashboard` }],
+    };
+    const { runtime } = await createHarness({ downloadsGranted: false, tabsApi });
+
+    const click = () =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+
+    // The refusal returns before the guard exists, so the tab listener it would have fed is never registered.
+    await expect(click()).resolves.toMatchObject({
+      kind: 'result',
+      result: { error: DOWNLOAD_PERMISSION_MISSING_ERROR, ok: false },
+    });
+    expect(created.size).toBe(0);
+  });
+
   it('runs a download call unguarded once with the approval token, then burns it', async () => {
     const { cdp, runtime } = await createHarness();
 
@@ -946,6 +996,82 @@ describe('agent browser calls', () => {
     expect(downloads.cancelled).toStrictEqual([42]);
   });
 
+  it('asks for approval for a download the browser created after the click returned', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+    let announcing = true;
+
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': () => {
+        if (announcing) {
+          announcing = false;
+          // The item is created once the click's own command has returned, so the stream never names it in time;
+          // by the time the guard looks for it, the small file is already complete.
+          downloads.record({
+            filename: '/home/me/Downloads/report.txt',
+            id: 47,
+            state: 'complete',
+            tabId: TAB_ID,
+          });
+        }
+
+        return {};
+      },
+    });
+
+    const outcome = await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant] },
+      arguments: { target: '#pay' },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_click',
+    });
+
+    // The model must be told a download happened, and the file the browser finished before the cancel is deleted.
+    expect(outcome).toMatchObject({ afterAction: true, kind: 'needs_permission' });
+    expect(downloads.removed).toStrictEqual([47]);
+  });
+
+  it('deletes a download it stopped while the browser was still writing it', async () => {
+    const downloads = createFakeDownloads({ cancelRejects: true });
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+    let announcing = true;
+
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': () => {
+        if (announcing) {
+          announcing = false;
+          downloads.record({
+            filename: '/home/me/Downloads/slow.bin',
+            id: 48,
+            state: 'in_progress',
+            tabId: TAB_ID,
+          });
+        }
+
+        return {};
+      },
+    });
+
+    const outcome = await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant] },
+      arguments: { target: '#pay' },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_click',
+    });
+
+    // The call reports the download and answers; the file that lands is deleted after the call, not inside it.
+    expect(outcome).toMatchObject({ afterAction: true, kind: 'needs_permission' });
+
+    await vi.waitFor(
+      () => {
+        expect(downloads.removed).toStrictEqual([48]);
+      },
+      { timeout: 4000 }
+    );
+  });
+
   it('deletes the file of a download that completed before the cancel', async () => {
     const downloads = createFakeDownloads({ cancelRejects: true });
     const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
@@ -955,7 +1081,12 @@ describe('agent browser calls', () => {
       'Input.dispatchMouseEvent': () => {
         if (emitting) {
           emitting = false;
-          downloads.emit({ filename: '/home/me/Downloads/report.txt', id: 43, state: 'complete', tabId: TAB_ID });
+          downloads.emit({
+            filename: '/home/me/Downloads/report.txt',
+            id: 43,
+            state: 'complete',
+            tabId: TAB_ID,
+          });
         }
 
         return {};
@@ -1101,7 +1232,7 @@ describe('agent browser calls', () => {
       () => {
         expect(downloads.live()).toBe(0);
       },
-      { timeout: 4_000 }
+      { timeout: 4000 }
     );
   });
 
@@ -1470,6 +1601,140 @@ describe('agent browser calls', () => {
     // The precheck would refuse a tab with no readable url as browser-internal; the attach runs instead.
     expect(cdp.commands().length).toBeGreaterThan(0);
     expect(JSON.stringify(outcome)).not.toContain('not inspectable');
+  });
+
+  it('applies the inspectability precheck once the session tab has a page', async () => {
+    const cdp = createFakeCdp();
+    const { controller } = createGroups();
+    const urls = new Map<number, string>([[88, '']]);
+
+    const runtime = createBrowserRuntime({
+      debuggerApi: cdp.api,
+      leases: createTabLeaseRegistry({}),
+      scriptingApi: undefined,
+      tabGroups: controller,
+      tabsApi: {
+        create: async () => ({ id: 88, title: '' }),
+        get: async tabId => ({ id: tabId, title: '', url: urls.get(tabId) ?? '' }),
+        query: async () => [
+          { active: true, id: TAB_ID, title: 'Example', url: MAIN_ORIGIN, windowId: 1 },
+        ],
+      },
+    });
+    const snapshot = () =>
+      runtime.runTool({
+        agent: { authorized: [readGrant] },
+        arguments: {},
+        caller: agent(),
+        tabId: 88,
+        toolName: 'browser_snapshot',
+      });
+
+    await runtime.openSession({
+      controllerId: 'controller-1',
+      sessionHandle: 'session-1',
+      title: 'Work',
+    });
+    await runtime.openSessionTab({ sessionHandle: 'session-1' });
+
+    expect(JSON.stringify(await snapshot())).not.toContain('not inspectable');
+
+    // The tab settled on a browser-internal page: it is an ordinary tab now, so the precheck judges it like one.
+    urls.set(88, 'chrome://settings');
+
+    expect(JSON.stringify(await snapshot())).toContain('not inspectable');
+  });
+
+  it('drops the blank-tab exemption when the session tab closes', async () => {
+    const cdp = createFakeCdp();
+    const { controller } = createGroups();
+    let alive = true;
+
+    const runtime = createBrowserRuntime({
+      debuggerApi: cdp.api,
+      leases: createTabLeaseRegistry({}),
+      scriptingApi: undefined,
+      tabGroups: controller,
+      tabsApi: {
+        create: async () => ({ id: 88, title: '' }),
+        get: async tabId => {
+          if (!alive) {
+            throw new Error(`No tab with id: ${String(tabId)}.`);
+          }
+
+          return { id: tabId, title: '', url: '' };
+        },
+        query: async () => [
+          { active: true, id: TAB_ID, title: 'Example', url: MAIN_ORIGIN, windowId: 1 },
+        ],
+      },
+    });
+
+    await runtime.openSession({
+      controllerId: 'controller-1',
+      sessionHandle: 'session-1',
+      title: 'Work',
+    });
+    await runtime.openSessionTab({ sessionHandle: 'session-1' });
+    alive = false;
+
+    const refused = await runtime.runTool({
+      agent: { authorized: [readGrant] },
+      arguments: {},
+      caller: agent(),
+      tabId: 88,
+      toolName: 'browser_snapshot',
+    });
+
+    // A closed tab is not a blank one: the precheck answers instead of an attach against a dead target.
+    expect(JSON.stringify(refused)).toContain('not inspectable');
+  });
+
+  it('stops vouching for a tab once the session that opened it ends', async () => {
+    const cdp = createFakeCdp();
+    const { controller } = createGroups();
+    const urls = new Map<number, string>([[88, '']]);
+
+    const runtime = createBrowserRuntime({
+      debuggerApi: cdp.api,
+      leases: createTabLeaseRegistry({}),
+      scriptingApi: undefined,
+      tabGroups: controller,
+      tabsApi: {
+        create: async () => ({ id: 88, title: '' }),
+        get: async tabId => ({ id: tabId, title: '', url: urls.get(tabId) ?? '' }),
+        query: async () => [
+          { active: true, id: TAB_ID, title: 'Example', url: MAIN_ORIGIN, windowId: 1 },
+        ],
+      },
+    });
+
+    await runtime.openSession({
+      controllerId: 'controller-1',
+      sessionHandle: 'session-1',
+      title: 'Work',
+    });
+    await runtime.openSessionTab({ sessionHandle: 'session-1' });
+    await runtime.closeSession({ sessionHandle: 'session-1' });
+
+    // The ended group is adopted whole, so the tab is a live session's — but not the one whose voucher it carried.
+    await runtime.openSession({
+      controllerId: 'controller-2',
+      sessionHandle: 'session-2',
+      title: 'Adopted',
+    });
+    await runtime.adoptEnded({ sessionHandle: 'session-2' });
+    urls.set(88, 'chrome://settings');
+
+    const refused = await runtime.runTool({
+      agent: { authorized: [readGrant] },
+      arguments: {},
+      caller: agent('session-2'),
+      tabId: 88,
+      toolName: 'browser_snapshot',
+    });
+
+    expect(JSON.stringify(refused)).toContain('not inspectable');
   });
 
   it('reports no session tab when the browser cannot create tabs', async () => {

@@ -71,6 +71,8 @@ describe('download-capable tools', () => {
       'browser_drag',
       'browser_drop',
       'browser_evaluate',
+      // Each field goes through the page's `input`/`change` handler, and a checkbox is clicked into place.
+      'browser_fill_form',
       'browser_navigate',
       'browser_navigate_back',
       'browser_navigate_forward',
@@ -80,6 +82,8 @@ describe('download-capable tools', () => {
       // An export-style `change` handler and page-registered WebMCP code can each answer with an attachment.
       'browser_select_option',
       'browser_webmcp_call',
+      // `submit` presses Enter, exactly as `browser_press_key` does, and typing alone fires `input`.
+      'browser_type',
     ]) {
       expect(canStartDownload(name)).toBe(true);
     }

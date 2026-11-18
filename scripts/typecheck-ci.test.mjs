@@ -140,7 +140,7 @@ test('the mobile workflow publishes no colliding required check name', () => {
   }
 });
 
-test('dependency cache keeps only the content store on the mounted filesystem', t => {
+test('dependency cache keeps a graph that matches the checkout and drops a stale one', t => {
   const action = load(
     readFileSync(new URL('../.github/actions/pnpm-store/action.yml', import.meta.url), 'utf8')
   );
@@ -153,7 +153,7 @@ test('dependency cache keeps only the content store on the mounted filesystem', 
 
   const mountIndex = action.runs.steps.indexOf(mount);
   const cleanupIndex = action.runs.steps.findIndex(
-    step => step.name === 'Reset pnpm installed graph'
+    step => step.name === 'Reset pnpm installed graph unless it matches this checkout'
   );
   const configureIndex = action.runs.steps.findIndex(step => step.name === 'Configure pnpm store');
   assert.ok(mountIndex < cleanupIndex && cleanupIndex < configureIndex);
@@ -170,7 +170,9 @@ test('dependency cache keeps only the content store on the mounted filesystem', 
   writeFileSync(join(modules, '.pnpm/lock.yaml'), 'stale graph');
   symlinkSync('../package', join(modules, 'stale-package'));
 
-  const cleanup = action.runs.steps.find(step => step.name === 'Reset pnpm installed graph');
+  const cleanup = action.runs.steps.find(
+    step => step.name === 'Reset pnpm installed graph unless it matches this checkout'
+  );
   assert.equal(cleanup.uses, './.github/actions/pnpm-store/cleanup');
   const cleanupAction = load(
     readFileSync(
@@ -206,6 +208,29 @@ test('dependency cache keeps only the content store on the mounted filesystem', 
     env: { ...process.env, GITHUB_WORKSPACE: missingMountWorkspace },
   });
   assert.equal(missingMountResult.status, 0, missingMountResult.stderr);
+
+  // The install after the mount repairs a graph whose lockfile copy matches
+  // this checkout, so the reset leaves it in place and the job links nothing.
+  const matching = mkdtempSync(join(tmpdir(), 'pnpm-cache-matching-'));
+  t.after(() => rmSync(matching, { recursive: true, force: true }));
+  const matchingModules = join(matching, 'node_modules');
+  mkdirSync(join(matchingModules, '.pnpm'), { recursive: true });
+  mkdirSync(join(matchingModules, '.bin'), { recursive: true });
+  writeFileSync(join(matching, 'pnpm-lock.yaml'), "lockfileVersion: '9.0'");
+  writeFileSync(join(matchingModules, '.pnpm', 'lock.yaml'), "lockfileVersion: '9.0'");
+  writeFileSync(join(matchingModules, '.modules.yaml'), 'matching graph');
+
+  const matchingResult = spawnSync(process.execPath, [pnpmCleanup], {
+    encoding: 'utf8',
+    env: { ...process.env, GITHUB_WORKSPACE: matching },
+  });
+  assert.equal(matchingResult.status, 0, matchingResult.stderr);
+  assert.equal(
+    readFileSync(join(matchingModules, '.pnpm', 'lock.yaml'), 'utf8'),
+    "lockfileVersion: '9.0'"
+  );
+  assert.equal(existsSync(join(matchingModules, '.bin')), true);
+  assert.equal(readFileSync(join(matchingModules, '.modules.yaml'), 'utf8'), 'matching graph');
 });
 
 // The reset runs before install and again after the job, so it must never reach

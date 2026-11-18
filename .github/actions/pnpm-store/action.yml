@@ -1,12 +1,17 @@
 name: pnpm store
 description: >-
   Mount node_modules on a Blacksmith sticky disk so pnpm's content store and
-  virtual store share one filesystem. Before each install, remove every cached
-  installed link and metadata file while preserving only the content-addressed
-  store, so full and filtered installs always rebuild their own graph.
+  virtual store share one filesystem. The mounted graph is kept when its copy
+  of the lockfile matches the checkout, so the install that follows repairs it
+  in place instead of rebuilding every link from the store. Otherwise every
+  cached installed link and metadata file is removed while the
+  content-addressed store is preserved, so an install never reads a graph that
+  a different lockfile produced.
 
   Each job mounts its own clone of the disk, so parallel jobs do not wait on
-  each other. Keep Branch Protection for sticky disks on in the Blacksmith
+  each other. Only a job that changed its clone commits it, so a job that
+  installed nothing cannot publish the graph it mounted over the one another
+  job just linked. Keep Branch Protection for sticky disks on in the Blacksmith
   dashboard (Settings): then only default-branch runs commit the disk, and a
   pull request job cannot change what main reads.
 
@@ -18,8 +23,9 @@ runs:
       with:
         key: ${{ github.repository }}-node-modules-${{ runner.os }}-${{ runner.arch }}
         path: ./node_modules
+        commit: on-change
 
-    - name: Reset pnpm installed graph
+    - name: Reset pnpm installed graph unless it matches this checkout
       uses: ./.github/actions/pnpm-store/cleanup
 
     - name: Configure pnpm store

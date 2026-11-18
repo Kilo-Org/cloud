@@ -1,7 +1,25 @@
-const { lstatSync, readdirSync, realpathSync, rmSync } = require('node:fs');
+const { lstatSync, readFileSync, readdirSync, realpathSync, rmSync } = require('node:fs');
 const { isAbsolute, join } = require('node:path');
 
 const warn = message => process.stdout.write(`::warning::${message}\n`);
+
+const read = path => {
+  try {
+    return readFileSync(path);
+  } catch {
+    return undefined;
+  }
+};
+
+// pnpm writes a copy of the lockfile it resolved into node_modules/.pnpm. An
+// identical copy means the mounted graph was built for this checkout, and the
+// install that follows repairs it in place. Linking the graph from the store
+// instead costs about 30 seconds per job, measured on the workspace suites.
+const matchesCheckout = (modules, workspace) => {
+  const installed = read(join(modules, '.pnpm', 'lock.yaml'));
+  const checkout = read(join(workspace, 'pnpm-lock.yaml'));
+  return installed !== undefined && checkout !== undefined && installed.equals(checkout);
+};
 
 const reset = () => {
   const workspace = process.env.GITHUB_WORKSPACE;
@@ -24,6 +42,8 @@ const reset = () => {
     warn(`Leaving node_modules untouched: ${modules} resolves outside the checkout.`);
     return;
   }
+
+  if (matchesCheckout(modulesReal, workspaceReal)) return;
 
   for (const entry of readdirSync(modulesReal)) {
     if (entry === '.pnpm-store') continue;

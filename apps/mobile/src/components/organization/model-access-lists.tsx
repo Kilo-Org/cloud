@@ -192,7 +192,7 @@ export function ModelDenyList({
   );
 
   const emptyLabel = (() => {
-    if (deniedOnly && search) {
+    if (deniedOnly && search.trim()) {
       return t('organizationModelAccess.modelsDeniedSearchEmpty');
     }
     if (deniedOnly) {

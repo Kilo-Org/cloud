@@ -1,4 +1,8 @@
-import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import {
+  db,
+  type DrizzleConnection,
+  type DrizzleTransaction,
+} from '@kilocode/web-shared/lib/drizzle';
 import {
   security_findings,
   security_analysis_queue,
@@ -330,11 +334,7 @@ export async function countRunningAnalyses(owner: SecurityReviewOwner): Promise<
     const ownerConverted = toOwner(owner);
     const conditions = [];
 
-    if (ownerConverted.type === 'org') {
-      conditions.push(eq(security_findings.owned_by_organization_id, ownerConverted.id));
-    } else {
-      conditions.push(eq(security_findings.owned_by_user_id, ownerConverted.id));
-    }
+    conditions.push(ownerFindingsCondition(ownerConverted));
 
     conditions.push(
       or(
@@ -423,33 +423,12 @@ export async function tryReserveAnalysisStartSlot(
 
     // Inflight = findings already flipped to pending/running, plus scheduled
     // queue claims that reserve a slot while the finding status is still null.
-    // Distinct by finding: a finding counted in the first term cannot add a
-    // second slot through its queue row.
-    const [inflight] = await tx
-      .select({ total: countDistinct(security_findings.id) })
-      .from(security_findings)
-      .leftJoin(
-        security_analysis_queue,
-        eq(security_analysis_queue.finding_id, security_findings.id)
-      )
-      .where(
-        and(
-          ownerFindingsCondition(ownerConverted),
-          or(
-            inArray(security_findings.analysis_status, ['pending', 'running']),
-            and(
-              isNull(security_findings.analysis_status),
-              inArray(security_analysis_queue.queue_status, ['pending', 'running'])
-            )
-          )
-        )
-      );
-    const currentCount = inflight?.total ?? 0;
+    const currentCount = await countInflightAnalysesUnderOwnerLock(tx, ownerConverted);
     if (currentCount >= maxConcurrent) {
       return { reserved: false, reason: 'cap', currentCount, limit: maxConcurrent } as const;
     }
 
-    const acquired = await acquireAnalysisStartLeaseInTransaction(tx, findingId);
+    const acquired = await acquireAnalysisStartLease(tx, findingId);
     if (!acquired) {
       return { reserved: false, reason: 'in_progress' } as const;
     }
@@ -490,27 +469,8 @@ export async function tryReserveAnalysisRestartSlot(
       throw new Error('security_analysis_owner_state row missing after upsert');
     }
 
-    const [inflight] = await tx
-      .select({ total: countDistinct(security_findings.id) })
-      .from(security_findings)
-      .leftJoin(
-        security_analysis_queue,
-        eq(security_analysis_queue.finding_id, security_findings.id)
-      )
-      .where(
-        and(
-          ownerFindingsCondition(ownerConverted),
-          or(
-            inArray(security_findings.analysis_status, ['pending', 'running']),
-            and(
-              isNull(security_findings.analysis_status),
-              inArray(security_analysis_queue.queue_status, ['pending', 'running'])
-            )
-          ),
-          sql`${security_findings.id} <> ${findingId}::uuid`
-        )
-      );
-    const currentCount = inflight?.total ?? 0;
+    // Inflight excludes the restarted finding: a restart reuses its own slot.
+    const currentCount = await countInflightAnalysesUnderOwnerLock(tx, ownerConverted, findingId);
     if (currentCount >= maxConcurrent) {
       return { reserved: false, reason: 'cap', currentCount, limit: maxConcurrent } as const;
     }
@@ -554,12 +514,50 @@ function ownerFindingsCondition(owner: Owner) {
     : eq(security_findings.owned_by_user_id, owner.id);
 }
 
-/** Shared predicate of `tryAcquireAnalysisStartLease`, scoped to a transaction. */
-async function acquireAnalysisStartLeaseInTransaction(
+/**
+ * Inflight = findings already flipped to pending/running, plus scheduled queue
+ * claims that reserve a slot while the finding status is still null. Distinct
+ * by finding: a finding counted in the first term cannot add a second slot
+ * through its queue row. Callers must hold the owner's
+ * `security_analysis_owner_state` row lock `FOR UPDATE`.
+ */
+async function countInflightAnalysesUnderOwnerLock(
   tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  owner: Owner,
+  excludeFindingId?: string
+): Promise<number> {
+  const [inflight] = await tx
+    .select({ total: countDistinct(security_findings.id) })
+    .from(security_findings)
+    .leftJoin(security_analysis_queue, eq(security_analysis_queue.finding_id, security_findings.id))
+    .where(
+      and(
+        ownerFindingsCondition(owner),
+        or(
+          inArray(security_findings.analysis_status, ['pending', 'running']),
+          and(
+            isNull(security_findings.analysis_status),
+            inArray(security_analysis_queue.queue_status, ['pending', 'running'])
+          )
+        ),
+        excludeFindingId === undefined
+          ? undefined
+          : sql`${security_findings.id} <> ${excludeFindingId}::uuid`
+      )
+    );
+  return inflight?.total ?? 0;
+}
+
+/**
+ * Shared start-lease predicate of `tryAcquireAnalysisStartLease`, scoped to a
+ * transaction by the slot reservations and to the primary `db` by the Worker
+ * pre-launch path.
+ */
+async function acquireAnalysisStartLease(
+  executor: DrizzleConnection,
   findingId: string
 ): Promise<boolean> {
-  const [lease] = await tx
+  const [lease] = await executor
     .update(security_findings)
     .set({ analysis_status: 'pending', updated_at: sql`now()` })
     .where(
@@ -585,11 +583,7 @@ export async function getFindingsPendingAnalysis(
     const ownerConverted = toOwner(owner);
     const conditions = [];
 
-    if (ownerConverted.type === 'org') {
-      conditions.push(eq(security_findings.owned_by_organization_id, ownerConverted.id));
-    } else {
-      conditions.push(eq(security_findings.owned_by_user_id, ownerConverted.id));
-    }
+    conditions.push(ownerFindingsCondition(ownerConverted));
 
     conditions.push(eq(security_findings.status, 'open'));
     conditions.push(sql`${security_findings.analysis_status} IS NULL`);
@@ -689,11 +683,7 @@ export async function listSecurityFindingsWithAnalysis(params: {
     const ownerConverted = toOwner(owner);
     const conditions = [];
 
-    if (ownerConverted.type === 'org') {
-      conditions.push(eq(security_findings.owned_by_organization_id, ownerConverted.id));
-    } else {
-      conditions.push(eq(security_findings.owned_by_user_id, ownerConverted.id));
-    }
+    conditions.push(ownerFindingsCondition(ownerConverted));
 
     conditions.push(isNotNull(security_findings.analysis_status));
 
@@ -722,11 +712,7 @@ export async function countSecurityFindingsWithAnalysis(
     const ownerConverted = toOwner(owner);
     const conditions = [];
 
-    if (ownerConverted.type === 'org') {
-      conditions.push(eq(security_findings.owned_by_organization_id, ownerConverted.id));
-    } else {
-      conditions.push(eq(security_findings.owned_by_user_id, ownerConverted.id));
-    }
+    conditions.push(ownerFindingsCondition(ownerConverted));
 
     conditions.push(isNotNull(security_findings.analysis_status));
 
@@ -807,26 +793,7 @@ export async function resetOwnerAutoAnalysisEnabledAt(
 }
 
 export async function tryAcquireAnalysisStartLease(findingId: string): Promise<boolean> {
-  const [lease] = await db
-    .update(security_findings)
-    .set({
-      analysis_status: 'pending',
-      updated_at: sql`now()`,
-    })
-    .where(
-      and(
-        eq(security_findings.id, findingId),
-        eq(security_findings.status, 'open'),
-        or(
-          isNull(security_findings.analysis_status),
-          eq(security_findings.analysis_status, 'completed'),
-          eq(security_findings.analysis_status, 'failed')
-        )
-      )
-    )
-    .returning({ id: security_findings.id });
-
-  return Boolean(lease);
+  return acquireAnalysisStartLease(db, findingId);
 }
 
 /**

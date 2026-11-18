@@ -255,14 +255,7 @@ function warningDump(text: string): ProbeDump {
         parent: 5,
         tag: 'View',
         rect: [52.19, 556.19, 260.95, 22.1],
-        owners: [
-          'View',
-          'LogBoxNotificationMessage',
-          'View',
-          'Pressable',
-          'LogBoxButton',
-          'View',
-        ],
+        owners: ['View', 'LogBoxNotificationMessage', 'View', 'Pressable', 'LogBoxButton', 'View'],
       },
       {
         parent: 6,

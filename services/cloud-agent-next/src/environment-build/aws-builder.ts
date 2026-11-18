@@ -39,6 +39,27 @@ import {
 import { mintAwsBuildEgressCredential } from './aws-egress-credential.js';
 import { verifyRunnerCredential } from './runner-credential.js';
 import { AwsRequestError } from '@kilocode/worker-utils/aws-client';
+import { ProviderLifecycleError } from '../sandbox-control/provider-failure.js';
+
+const RETRYABLE_START_REASONS: ReadonlySet<string> = new Set([
+  'byoc_aws_not_ready',
+  'byoc_aws_proxy_unavailable',
+]);
+
+/**
+ * A transient AWS fault keeps the build preparing, and the next tick starts it again within the build
+ * deadline. Setup reads reach this point already normalized to `ProviderLifecycleError`.
+ */
+export function awsBuilderStartFailure(error: unknown): unknown {
+  if (
+    error instanceof AwsRequestError &&
+    (error.status === 0 || error.status === 429 || error.status >= 500)
+  )
+    return new BuilderRetryableError('AWS builder request is temporarily unavailable');
+  if (error instanceof ProviderLifecycleError && RETRYABLE_START_REASONS.has(error.reason))
+    return new BuilderRetryableError('AWS builder setup is temporarily unavailable');
+  return error;
+}
 
 /** Compute differs by engine. Launch ordering, proxy setup and runner delivery stay common. */
 export function createAwsBuilderLifecycle(deps: { env: Env; now?: () => number }) {
@@ -202,12 +223,7 @@ export function createAwsBuilderLifecycle(deps: { env: Env; now?: () => number }
           { deadlineAt: startupDeadlineAt }
         );
       } catch (error) {
-        if (
-          error instanceof AwsRequestError &&
-          (error.status === 0 || error.status === 429 || error.status >= 500)
-        )
-          throw new BuilderRetryableError('AWS builder request is temporarily unavailable');
-        throw error;
+        throw awsBuilderStartFailure(error);
       }
       assertActive();
     },

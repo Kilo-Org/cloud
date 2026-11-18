@@ -197,7 +197,8 @@ describe('AWS durable allocation lifecycle', () => {
     const ref = await create(adapter);
     await adapter.launch(ref, startup);
     f.failDelete(true);
-    await adapter.stop(ref);
+    expect(await adapter.stop(ref)).toBe('terminal');
+    expect(await adapter.stop(ref)).toBe('terminal');
     expect([...f.vms.values()][0]?.current.state).toBe('TERMINATED');
     expect(f.operations.get(intent.intentId)?.phase).toBe('terminated');
     expect(f.objects.size).toBe(1);

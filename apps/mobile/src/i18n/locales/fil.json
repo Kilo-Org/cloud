@@ -1443,7 +1443,7 @@
       "title": "Pagsusuri ng konseho",
       "subtitle": "Sinusuri ng ilang espesyalista ang bawat pull request, at pinagsasama ang kanilang mga boto sa iisang desisyon.",
       "unavailablePersonallyTitle": "Kailangan ng Enterprise na organisasyon",
-      "unavailablePersonally": "Hindi bahagi ng personal na account ang pagsusuri ng konseho. Kailangan nito ang isang Enterprise na organisasyon.",
+      "unavailablePersonally": "Hindi bahagi ng personal na account ang pagsusuri ng konseho.",
       "unavailablePersonallyAction": "Gumawa ng organisasyon",
       "unavailablePersonallySwitchAction": "Lumipat ng organisasyon",
       "unavailableOrganizationTitle": "Hindi magagamit ang pagsusuri ng konseho",

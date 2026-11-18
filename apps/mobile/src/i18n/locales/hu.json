@@ -1443,7 +1443,7 @@
       "title": "Tanácsellenőrzés",
       "subtitle": "Több szakértő ellenőrzi az egyes PR-eket, és szavazataik egyetlen döntéssé állnak össze.",
       "unavailablePersonallyTitle": "Enterprise szervezet szükséges",
-      "unavailablePersonally": "A tanácsellenőrzés nem része a személyes fióknak. Enterprise szervezetet igényel.",
+      "unavailablePersonally": "A tanácsellenőrzés nem része a személyes fióknak.",
       "unavailablePersonallyAction": "Szervezet létrehozása",
       "unavailablePersonallySwitchAction": "Szervezet váltása",
       "unavailableOrganizationTitle": "A tanácsellenőrzés jelenleg nem érhető el",

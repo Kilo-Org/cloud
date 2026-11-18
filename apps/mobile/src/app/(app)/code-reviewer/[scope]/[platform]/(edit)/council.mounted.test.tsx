@@ -284,9 +284,8 @@ describe('council route gate', () => {
 
     const texts = renderedTexts(renderer);
     expect(texts).toContain('Needs an Enterprise organization');
-    expect(texts).toContain(
-      'Council review is not part of a personal account. It needs an Enterprise organization.'
-    );
+    expect(texts).toContain('Council review is not part of a personal account.');
+    expect(texts).not.toContain('It needs an Enterprise organization.');
     expect(texts).not.toContain(
       'Council review needs the Enterprise plan with an active subscription or trial. This organization does not have it right now.'
     );
@@ -315,9 +314,8 @@ describe('council route gate', () => {
 
     const texts = renderedTexts(renderer);
     expect(texts).toContain('Needs an Enterprise organization');
-    expect(texts).toContain(
-      'Council review is not part of a personal account. It needs an Enterprise organization.'
-    );
+    expect(texts).toContain('Council review is not part of a personal account.');
+    expect(texts).not.toContain('It needs an Enterprise organization.');
     expect(texts).toContain('Switch organization');
     const action = renderer.root
       .findAll(node => String(node.type) === 'Pressable')

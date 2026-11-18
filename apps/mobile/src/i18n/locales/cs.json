@@ -1491,7 +1491,7 @@
       "title": "Kontrola radou",
       "subtitle": "Každý pull request zkontroluje několik specialistů a jejich hlasy se spojí do jednoho rozhodnutí.",
       "unavailablePersonallyTitle": "Vyžaduje organizaci Enterprise",
-      "unavailablePersonally": "Kontrola radou není součástí osobního účtu. Vyžaduje organizaci Enterprise.",
+      "unavailablePersonally": "Kontrola radou není součástí osobního účtu.",
       "unavailablePersonallyAction": "Vytvořit organizaci",
       "unavailablePersonallySwitchAction": "Přepnout organizaci",
       "unavailableOrganizationTitle": "Kontrola radou není nyní dostupná",

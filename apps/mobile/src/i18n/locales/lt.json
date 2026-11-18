@@ -1491,7 +1491,7 @@
       "title": "Tarybos peržiūra",
       "subtitle": "Kiekvieną PR peržiūri keli specialistai, o jų balsai sujungiami į vieną sprendimą.",
       "unavailablePersonallyTitle": "Reikia Enterprise organizacijos",
-      "unavailablePersonally": "Tarybos peržiūra neįeina į asmeninę paskyrą. Jai reikia Enterprise organizacijos.",
+      "unavailablePersonally": "Tarybos peržiūra neįeina į asmeninę paskyrą.",
       "unavailablePersonallyAction": "Sukurti organizaciją",
       "unavailablePersonallySwitchAction": "Perjungti organizaciją",
       "unavailableOrganizationTitle": "Tarybos peržiūra neprieinama",

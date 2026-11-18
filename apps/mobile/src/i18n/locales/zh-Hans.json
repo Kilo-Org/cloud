@@ -900,7 +900,7 @@
       "title": "评审团审查",
       "subtitle": "多位专家分别审查每个拉取请求，他们的投票汇总为一个决定。",
       "unavailablePersonallyTitle": "需要 Enterprise 组织",
-      "unavailablePersonally": "评审团审查不包含在个人账户中。它需要 Enterprise 组织。",
+      "unavailablePersonally": "评审团审查不包含在个人账户中。",
       "unavailablePersonallyAction": "创建组织",
       "unavailablePersonallySwitchAction": "切换组织",
       "unavailableOrganizationTitle": "评审团审查目前无法使用",

@@ -1510,7 +1510,7 @@
       "title": "Council review",
       "subtitle": "Several specialists review each pull request, and their votes combine into one decision.",
       "unavailablePersonallyTitle": "Needs an Enterprise organization",
-      "unavailablePersonally": "Council review is not part of a personal account. It needs an Enterprise organization.",
+      "unavailablePersonally": "Council review is not part of a personal account.",
       "unavailablePersonallyAction": "Create an organization",
       "unavailablePersonallySwitchAction": "Switch organization",
       "unavailableOrganizationTitle": "Council review is unavailable",

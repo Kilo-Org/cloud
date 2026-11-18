@@ -130,6 +130,7 @@ import {
   type ControlPlaneRouteUpdate,
   type ControlPlaneRouteView,
   type ControlPlaneSessionRefPayload,
+  type ControlPlaneReleasePayload,
   type ControlPlaneSetupCommandKind,
   type ControlPlaneSetupEvent,
   type ControlPlaneStatusResult,
@@ -571,7 +572,7 @@ export type ControlPlaneSandboxPeer = SharedWorktreeChangesPeer & {
     payload: ControlPlaneCancelWorkspacePayload
   ): Promise<ControlPlaneCancelWorkspaceResult>;
   answer(payload: ControlPlaneAnswerPayload): Promise<ControlPlaneDispatchResult>;
-  release(payload: ControlPlaneSessionRefPayload): Promise<void>;
+  release(payload: ControlPlaneReleasePayload): Promise<void>;
   /** H4: the Sandbox DO returns the connected allocation fence for a bound handle. */
   getRuntimeCredentialProxyFence(input: {
     ownerId: string;
@@ -3344,9 +3345,16 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.enqueue(async () => {
       const peer = this.sandboxPeer();
       if (peer !== null) {
+        const standalone =
+          this.metadata !== null && this.metadata.workspace?.worktreeId === undefined;
         await withDORetry(
           () => peer,
-          current => current.release({ sessionId: this.sessionId }),
+          current =>
+            current.release(
+              standalone
+                ? { sessionId: this.sessionId, reason: 'standalone_session_deleted' }
+                : { sessionId: this.sessionId }
+            ),
           'release'
         );
       }

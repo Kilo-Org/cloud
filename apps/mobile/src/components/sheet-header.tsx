@@ -18,9 +18,10 @@ import { useScreenInsets } from '@/lib/screen-insets';
  * `SheetHeader` applies the `header` pair through `underHandle`: its divider
  * ends the gap below the title. A sheet that draws its own title row with no
  * divider uses the `row` pair, because there the first content's own top
- * padding adds to the gap below the title. On iOS that measured 28 pt above
- * against 42 pt below with the header pair, so the row pair moves 6 pt to the
- * top. Android measured balanced with one pair for both (41 / 43 dp).
+ * padding adds to the gap below the title. On iOS the row pair `pt-3 pb-2.5`
+ * measured 33.3 pt above the title against 26.7 pt below, so it moves 4 pt
+ * back below the title. Android measured balanced with one pair for both
+ * (41 / 43 dp).
  *
  * Resolved at render, not at import: the split depends on the platform the row
  * paints on, and a module-level read freezes whatever platform the first import
@@ -30,7 +31,7 @@ export function sheetUnderHandlePaddingClass(surface: 'header' | 'row'): string 
   if (Platform.OS !== 'ios') {
     return 'pb-7 pt-0';
   }
-  return surface === 'header' ? 'pb-4 pt-1.5' : 'pb-2.5 pt-3';
+  return surface === 'header' ? 'pb-4 pt-1.5' : 'pb-3.5 pt-2';
 }
 
 export function SheetHeader({

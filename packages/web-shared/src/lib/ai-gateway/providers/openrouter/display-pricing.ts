@@ -82,13 +82,11 @@ function peakPricing(pricing: EndpointPricing, includeLongContext: boolean): End
     input_cache_write_tiers,
     ...prices
   } = pricing;
+  const tiers = { prompt_tiers, completion_tiers, input_cache_read_tiers, input_cache_write_tiers };
   if (
     overrides === undefined &&
     peak_pricing === undefined &&
-    prompt_tiers === undefined &&
-    completion_tiers === undefined &&
-    input_cache_read_tiers === undefined &&
-    input_cache_write_tiers === undefined
+    Object.values(tiers).every(tier => tier === undefined)
   )
     return pricing;
   let result: EndpointPricing = prices;
@@ -103,12 +101,6 @@ function peakPricing(pricing: EndpointPricing, includeLongContext: boolean): End
     });
   }
   if (includeLongContext) {
-    const tiers = {
-      prompt_tiers,
-      completion_tiers,
-      input_cache_read_tiers,
-      input_cache_write_tiers,
-    };
     for (const [tiersKey, priceKey] of TIER_FIELDS) {
       for (const { cost } of tiers[tiersKey] ?? []) {
         result = maxEndpointPricing(result, { [priceKey]: cost });

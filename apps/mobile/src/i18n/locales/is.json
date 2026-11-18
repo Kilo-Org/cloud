@@ -1470,8 +1470,7 @@
       "emptyDescription": "Tölfræðin skráir yfirferðir sem klárast meðan hún er virk fyrir fyrirtækið.",
       "offTitle": "Tölfræðin er óvirk fyrir {{platform}}",
       "offDescription": "Kveiktu á henni í stillingum félags á vefnum til að skrá yfirferðir sem klárast.",
-      "couldNotLoad": "Tókst ekki að sækja tölfræðina",
-      "off": "Tölfræðin er óvirk fyrir þetta fyrirtæki."
+      "couldNotLoad": "Tókst ekki að sækja tölfræðina"
     },
     "council": {
       "title": "Ráðsyfirferð",
@@ -3475,10 +3474,7 @@
       "ssoAndDomain": "SSO og lén",
       "dataCollection": "Gagnasöfnun",
       "auditLogs": "Endurskoðunarskrár",
-      "requestLogs": "Beiðnaskrár",
-      "integrations": "Samþættingar á vefnum",
-      "subOrganizations": "Undirfélög",
-      "distributeFunds": "Dreifa fjármunum"
+      "requestLogs": "Beiðnaskrár"
     },
     "requestLogs": {
       "hint": "Beiðnir frá klukkustundinni fyrir lok tímabilsins, nýjustu fyrst.",

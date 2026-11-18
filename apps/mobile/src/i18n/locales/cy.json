@@ -1566,8 +1566,7 @@
       "emptyDescription": "Mae dadansoddeg yn cofnodi adolygiadau a gwblhawyd tra bo'r nodwedd wedi'i galluogi ar gyfer y sefydliad.",
       "offTitle": "Mae dadansoddeg wedi'i diffodd ar gyfer {{platform}}",
       "offDescription": "Trowch hi ymlaen yng ngosodiadau'r sefydliad ar y we i gofnodi adolygiadau a gwblhawyd.",
-      "couldNotLoad": "Methwyd llwytho'r dadansoddeg",
-      "off": "Mae dadansoddeg wedi'i diffodd ar gyfer y sefydliad hwn."
+      "couldNotLoad": "Methwyd llwytho'r dadansoddeg"
     },
     "council": {
       "title": "Adolygiad cyngor",
@@ -3703,10 +3702,7 @@
       "ssoAndDomain": "SSO a pharth",
       "dataCollection": "Casglu data",
       "auditLogs": "Logiau archwilio",
-      "requestLogs": "Logiau ceisiadau",
-      "integrations": "Integreiddiadau ar y we",
-      "subOrganizations": "Is-sefydliadau",
-      "distributeFunds": "Dosbarthu arian"
+      "requestLogs": "Logiau ceisiadau"
     },
     "requestLogs": {
       "hint": "Ceisiadau o'r awr cyn i'r ffenestr ddod i ben, y diweddaraf yn gyntaf.",

@@ -927,8 +927,7 @@
       "emptyDescription": "İstatistikler, kuruluş için etkin olduğu sürece tamamlanan incelemeleri kaydeder.",
       "offTitle": "{{platform}} için istatistikler kapalı",
       "offDescription": "Tamamlanan incelemeleri kaydetmek için Web'deki kuruluş ayarlarında istatistikleri aç.",
-      "couldNotLoad": "İstatistikler yüklenemedi",
-      "off": "Bu kuruluş için istatistikler kapalı."
+      "couldNotLoad": "İstatistikler yüklenemedi"
     },
     "council": {
       "title": "Konsey incelemesi",
@@ -3480,10 +3479,7 @@
       "ssoAndDomain": "SSO ve alan adı",
       "dataCollection": "Veri toplama",
       "auditLogs": "Denetim günlükleri",
-      "requestLogs": "İstek günlükleri",
-      "integrations": "Web'deki entegrasyonlar",
-      "subOrganizations": "Alt kuruluşlar",
-      "distributeFunds": "Fonları dağıt"
+      "requestLogs": "İstek günlükleri"
     },
     "requestLogs": {
       "hint": "Pencerenin bitişinden önceki bir saatteki istekler, en yeniden eskiye.",

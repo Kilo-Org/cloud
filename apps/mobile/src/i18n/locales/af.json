@@ -1470,8 +1470,7 @@
       "emptyDescription": "Ontleding teken voltooide hersienings aan terwyl dit vir die organisasie geaktiveer is.",
       "offTitle": "Ontleding is af vir {{platform}}",
       "offDescription": "Skakel dit aan in die organisasie-instellings op die web om voltooide hersienings aan te teken.",
-      "couldNotLoad": "Kon nie ontleding laai nie",
-      "off": "Ontleding is af vir hierdie organisasie."
+      "couldNotLoad": "Kon nie ontleding laai nie"
     },
     "council": {
       "title": "Raadhersiening",
@@ -3475,10 +3474,7 @@
       "ssoAndDomain": "SSO en domein",
       "dataCollection": "Data-insameling",
       "auditLogs": "Ouditlogs",
-      "requestLogs": "Versoeklogs",
-      "integrations": "Integrasies op die web",
-      "subOrganizations": "Sub-organisasies",
-      "distributeFunds": "Versprei fondse"
+      "requestLogs": "Versoeklogs"
     },
     "requestLogs": {
       "hint": "Versoeke uit die uur voordat die venster eindig, nuutste eerste.",

@@ -1470,8 +1470,7 @@
       "emptyDescription": "Itinatala ng analitika ang mga natapos na pagsusuri habang pinagana ito para sa organisasyon.",
       "offTitle": "Naka-off ang analitika para sa {{platform}}",
       "offDescription": "Paganahin ito sa mga setting ng organisasyon sa web para itala ang mga natapos na pagsusuri.",
-      "couldNotLoad": "Hindi ma-load ang analitika",
-      "off": "Naka-off ang analitika para sa organisasyong ito."
+      "couldNotLoad": "Hindi ma-load ang analitika"
     },
     "council": {
       "title": "Pagsusuri ng konseho",
@@ -3475,10 +3474,7 @@
       "ssoAndDomain": "SSO at domain",
       "dataCollection": "Pangongolekta ng data",
       "auditLogs": "Mga audit log",
-      "requestLogs": "Mga request log",
-      "integrations": "Mga Integration sa web",
-      "subOrganizations": "Mga sub-organisasyon",
-      "distributeFunds": "Ipamahagi ang pondo"
+      "requestLogs": "Mga request log"
     },
     "requestLogs": {
       "hint": "Mga request sa loob ng isang oras bago magtapos ang window, pinakabago muna.",

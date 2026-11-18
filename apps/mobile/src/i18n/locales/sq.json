@@ -1470,8 +1470,7 @@
       "emptyDescription": "Statistikat regjistrojnë shqyrtimet e përfunduara sa kohë që janë aktive për organizatën.",
       "offTitle": "Statistikat janë çaktivizuar për {{platform}}",
       "offDescription": "Aktivizo statistikat në cilësimet e organizatës në ueb për të regjistruar shqyrtimet e përfunduara.",
-      "couldNotLoad": "Statistikat nuk mund të ngarkoheshin",
-      "off": "Statistikat janë çaktivizuar për këtë organizatë."
+      "couldNotLoad": "Statistikat nuk mund të ngarkoheshin"
     },
     "council": {
       "title": "Shqyrtimi nga këshilli",
@@ -3475,10 +3474,7 @@
       "ssoAndDomain": "SSO dhe domeni",
       "dataCollection": "Mbledhja e të dhënave",
       "auditLogs": "Regjistrat e auditimit",
-      "requestLogs": "Regjistrat e kërkesave",
-      "integrations": "Integrimet në ueb",
-      "subOrganizations": "Nënorganizatat",
-      "distributeFunds": "Shpërndaj fondet"
+      "requestLogs": "Regjistrat e kërkesave"
     },
     "requestLogs": {
       "hint": "Kërkesat e orës para fundit të dritares, më të rejat në krye.",

@@ -928,8 +928,7 @@
       "emptyDescription": "Las analíticas registran las revisiones completadas mientras estén activadas para la organización.",
       "offTitle": "Las analíticas están desactivadas para {{platform}}",
       "offDescription": "Actívalas en los ajustes de la organización en la web para registrar las revisiones completadas.",
-      "couldNotLoad": "No se pudieron cargar las analíticas",
-      "off": "Las analíticas están desactivadas para esta organización."
+      "couldNotLoad": "No se pudieron cargar las analíticas"
     },
     "council": {
       "title": "Revisión por consejo",
@@ -3537,10 +3536,7 @@
       "ssoAndDomain": "SSO y dominio",
       "dataCollection": "Recopilación de datos",
       "auditLogs": "Registros de auditoría",
-      "requestLogs": "Registros de solicitudes",
-      "integrations": "Integraciones en la web",
-      "subOrganizations": "Suborganizaciones",
-      "distributeFunds": "Distribuir fondos"
+      "requestLogs": "Registros de solicitudes"
     },
     "requestLogs": {
       "hint": "Solicitudes de la hora previa al fin del intervalo, las más recientes primero.",

@@ -927,8 +927,7 @@
       "emptyDescription": "Analitik mencatat tinjauan yang selesai selama fitur ini aktif untuk organisasi.",
       "offTitle": "Analitik nonaktif untuk {{platform}}",
       "offDescription": "Aktifkan analitik di Pengaturan organisasi di web untuk mencatat tinjauan yang selesai.",
-      "couldNotLoad": "Tidak dapat memuat analitik",
-      "off": "Analitik nonaktif untuk organisasi ini."
+      "couldNotLoad": "Tidak dapat memuat analitik"
     },
     "council": {
       "title": "Tinjauan dewan",
@@ -3480,10 +3479,7 @@
       "ssoAndDomain": "SSO dan domain",
       "dataCollection": "Pengumpulan data",
       "auditLogs": "Log audit",
-      "requestLogs": "Log permintaan",
-      "integrations": "Integrasi di web",
-      "subOrganizations": "Sub-organisasi",
-      "distributeFunds": "Distribusikan dana"
+      "requestLogs": "Log permintaan"
     },
     "requestLogs": {
       "hint": "Permintaan dalam satu jam sebelum akhir rentang waktu, terbaru di atas.",

@@ -1494,8 +1494,7 @@
       "emptyDescription": "L'analítica registra les revisions completades mentre està activada per a l'organització.",
       "offTitle": "L'analítica està desactivada per a {{platform}}",
       "offDescription": "Activa-la a la configuració de l'organització al web per registrar les revisions completades.",
-      "couldNotLoad": "No s'ha pogut carregar l'analítica",
-      "off": "L'analítica està desactivada per a aquesta organització."
+      "couldNotLoad": "No s'ha pogut carregar l'analítica"
     },
     "council": {
       "title": "Revisió en consell",
@@ -3532,10 +3531,7 @@
       "ssoAndDomain": "SSO i domini",
       "dataCollection": "Recollida de dades",
       "auditLogs": "Registres d'auditoria",
-      "requestLogs": "Registres de sol·licituds",
-      "integrations": "Integracions al web",
-      "subOrganizations": "Suborganitzacions",
-      "distributeFunds": "Distribueix fons"
+      "requestLogs": "Registres de sol·licituds"
     },
     "requestLogs": {
       "hint": "Sol·licituds de l'hora que acaba al final de la finestra, les més recents primer.",

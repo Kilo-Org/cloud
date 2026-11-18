@@ -895,8 +895,7 @@
       "emptyDescription": "As estatísticas registram revisões concluídas enquanto estão ativadas para a organização.",
       "offTitle": "As estatísticas estão desativadas para {{platform}}",
       "offDescription": "Ative-as nas configurações da organização na web para registrar revisões concluídas.",
-      "couldNotLoad": "Não foi possível carregar as estatísticas",
-      "off": "As estatísticas estão desativadas para esta organização."
+      "couldNotLoad": "Não foi possível carregar as estatísticas"
     },
     "council": {
       "title": "Revisão do conselho",
@@ -3543,10 +3542,7 @@
       "ssoAndDomain": "SSO e domínio",
       "dataCollection": "Coleta de dados",
       "auditLogs": "Registros de auditoria",
-      "requestLogs": "Registros de solicitações",
-      "integrations": "Integrações na web",
-      "subOrganizations": "Suborganizações",
-      "distributeFunds": "Distribuir fundos"
+      "requestLogs": "Registros de solicitações"
     },
     "requestLogs": {
       "hint": "Solicitações da hora anterior ao fim da janela, mais recentes primeiro.",

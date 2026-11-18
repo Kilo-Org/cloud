@@ -1542,8 +1542,7 @@
       "emptyDescription": "L-istatistika tirrekordja reviżjonijiet kompluti sakemm tkun attiva għall-organizzazzjoni.",
       "offTitle": "L-istatistika hija mitfija għal {{platform}}",
       "offDescription": "Attivaha fis-settjar tal-organizzazzjoni fuq il-web biex tirrekordja reviżjonijiet kompluti.",
-      "couldNotLoad": "L-istatistika ma setgħetx tiġi mgħobbija",
-      "off": "L-istatistika hija mitfija għal din l-organizzazzjoni."
+      "couldNotLoad": "L-istatistika ma setgħetx tiġi mgħobbija"
     },
     "council": {
       "title": "Reviżjoni tal-kunsill",
@@ -3646,10 +3645,7 @@
       "ssoAndDomain": "SSO u dominju",
       "dataCollection": "Ġbir tad-data",
       "auditLogs": "Reġistri tal-awditjar",
-      "requestLogs": "Reġistri tat-talbiet",
-      "integrations": "Integrazzjonijiet fuq il-web",
-      "subOrganizations": "Sotto-organizzazzjonijiet",
-      "distributeFunds": "Iddistribwixxi l-fondi"
+      "requestLogs": "Reġistri tat-talbiet"
     },
     "requestLogs": {
       "hint": "Talbiet tas-siegħa sa tmiem il-perjodu, l-aktar riċenti l-ewwel.",

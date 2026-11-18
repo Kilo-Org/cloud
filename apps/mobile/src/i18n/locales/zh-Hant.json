@@ -927,8 +927,7 @@
       "emptyDescription": "在組織啟用分析期間，系統會記錄已完成的審查。",
       "offTitle": "已關閉 {{platform}} 的分析",
       "offDescription": "在網頁版組織設定中啟用分析，以記錄已完成的審查。",
-      "couldNotLoad": "無法載入分析資料",
-      "off": "此組織已關閉分析。"
+      "couldNotLoad": "無法載入分析資料"
     },
     "council": {
       "title": "審查小組審查",
@@ -3480,10 +3479,7 @@
       "ssoAndDomain": "SSO 與網域",
       "dataCollection": "資料收集",
       "auditLogs": "稽核記錄",
-      "requestLogs": "請求記錄",
-      "integrations": "網頁版整合",
-      "subOrganizations": "子組織",
-      "distributeFunds": "分配資金"
+      "requestLogs": "請求記錄"
     },
     "requestLogs": {
       "hint": "顯示時段結束前一小時內的請求，由新到舊排列。",

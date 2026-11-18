@@ -929,8 +929,7 @@
       "emptyDescription": "Analityka rejestruje ukończone przeglądy, dopóki jest włączona dla organizacji.",
       "offTitle": "Analityka jest wyłączona dla {{platform}}",
       "offDescription": "Włącz ją w ustawieniach organizacji w wersji internetowej, aby rejestrowała ukończone przeglądy.",
-      "couldNotLoad": "Nie udało się wczytać analityki",
-      "off": "Analityka jest wyłączona dla tej organizacji."
+      "couldNotLoad": "Nie udało się wczytać analityki"
     },
     "council": {
       "title": "Przegląd rady",
@@ -3594,10 +3593,7 @@
       "ssoAndDomain": "SSO i domena",
       "dataCollection": "Zbieranie danych",
       "auditLogs": "Dzienniki audytu",
-      "requestLogs": "Dzienniki żądań",
-      "integrations": "Integracje w wersji internetowej",
-      "subOrganizations": "Organizacje podrzędne",
-      "distributeFunds": "Rozdziel środki"
+      "requestLogs": "Dzienniki żądań"
     },
     "requestLogs": {
       "hint": "Żądania z godziny przed końcem okna, od najnowszych.",

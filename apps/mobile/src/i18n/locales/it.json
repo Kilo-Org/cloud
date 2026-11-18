@@ -895,8 +895,7 @@
       "emptyDescription": "Le statistiche registrano le revisioni completate mentre sono attive per l'organizzazione.",
       "offTitle": "Le statistiche sono disattivate per {{platform}}",
       "offDescription": "Attivale nelle impostazioni dell'organizzazione sul web per registrare le revisioni completate.",
-      "couldNotLoad": "Impossibile caricare le statistiche",
-      "off": "Le statistiche sono disattivate per questa organizzazione."
+      "couldNotLoad": "Impossibile caricare le statistiche"
     },
     "council": {
       "title": "Revisione del gruppo di revisori",
@@ -3537,10 +3536,7 @@
       "ssoAndDomain": "SSO e dominio",
       "dataCollection": "Raccolta dati",
       "auditLogs": "Registri di controllo",
-      "requestLogs": "Registri delle richieste",
-      "integrations": "Integrazioni sul web",
-      "subOrganizations": "Sotto-organizzazioni",
-      "distributeFunds": "Distribuisci fondi"
+      "requestLogs": "Registri delle richieste"
     },
     "requestLogs": {
       "hint": "Richieste dell'ora precedente la fine dell'intervallo, dalle più recenti.",

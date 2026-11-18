@@ -1470,8 +1470,7 @@
       "emptyDescription": "Istaatiksiin sakatta'awwan xumuraman yeroo dhaabbataaf banamu galmeessa.",
       "offTitle": "Istaatiksiin {{platform}} cufameera",
       "offDescription": "Sakatta'awwan xumuraman galmeessuuf Istaatiksiin Qindaa'ina dhaabbataa weebii irratti isa bani.",
-      "couldNotLoad": "Istaatiksii fe'uun hin danda'amne",
-      "off": "Istaatiksiin dhaabbata kanaaf cufameera."
+      "couldNotLoad": "Istaatiksii fe'uun hin danda'amne"
     },
     "council": {
       "title": "Sakatta'a gumii",
@@ -3475,10 +3474,7 @@
       "ssoAndDomain": "SSO fi doomeenii",
       "dataCollection": "Funaansa daataa",
       "auditLogs": "Galmeewwan odiitii",
-      "requestLogs": "Galmeewwan gaaffii",
-      "integrations": "Walitti hidhamiinsota weebii irratti",
-      "subOrganizations": "Dhaabbilee jalaa",
-      "distributeFunds": "Maallaqa qoodi"
+      "requestLogs": "Galmeewwan gaaffii"
     },
     "requestLogs": {
       "hint": "Gaaffiiwwan sa'aatii xumura yeroo filatamee dura jiru, kan haaraan dura.",

@@ -1470,8 +1470,7 @@
       "emptyDescription": "A statisztika a befejezett kódellenőrzéseket rögzíti, amíg be van kapcsolva a szervezetnél.",
       "offTitle": "A statisztika ki van kapcsolva a {{platform}} platformhoz",
       "offDescription": "Kapcsold be a statisztikát a szervezeti beállításokban a weben, hogy rögzítsd a befejezett kódellenőrzéseket.",
-      "couldNotLoad": "Nem sikerült betölteni a statisztikát",
-      "off": "A statisztika ki van kapcsolva ennél a szervezetnél."
+      "couldNotLoad": "Nem sikerült betölteni a statisztikát"
     },
     "council": {
       "title": "Tanácsellenőrzés",
@@ -3475,10 +3474,7 @@
       "ssoAndDomain": "SSO és domain",
       "dataCollection": "Adatgyűjtés",
       "auditLogs": "Auditnaplók",
-      "requestLogs": "Kérésnaplók",
-      "integrations": "Integrációk a weben",
-      "subOrganizations": "Alszervezetek",
-      "distributeFunds": "Pénzeszközök elosztása"
+      "requestLogs": "Kérésnaplók"
     },
     "requestLogs": {
       "hint": "Az időablak vége előtti egy óra kérései, a legújabbak elöl.",

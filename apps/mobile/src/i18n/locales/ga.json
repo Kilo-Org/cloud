@@ -1542,8 +1542,7 @@
       "emptyDescription": "Taifeadann an anailísíocht athbhreithnithe críochnaithe fad atá sí cumasaithe don eagraíocht.",
       "offTitle": "Tá an anailísíocht múchta do {{platform}}",
       "offDescription": "Cumasaigh í i socruithe eagraíochta ar an ngréasán chun athbhreithnithe críochnaithe a thaifeadadh.",
-      "couldNotLoad": "Níorbh fhéidir an anailísíocht a lódáil",
-      "off": "Tá an anailísíocht múchta don eagraíocht seo."
+      "couldNotLoad": "Níorbh fhéidir an anailísíocht a lódáil"
     },
     "council": {
       "title": "Athbhreithniú comhairle",
@@ -3646,10 +3645,7 @@
       "ssoAndDomain": "SSO agus fearann",
       "dataCollection": "Bailiú sonraí",
       "auditLogs": "Logaí iniúchta",
-      "requestLogs": "Logaí iarratas",
-      "integrations": "Comhtháthuithe ar an ngréasán",
-      "subOrganizations": "Fo-eagraíochtaí",
-      "distributeFunds": "Dáil cistí"
+      "requestLogs": "Logaí iarratas"
     },
     "requestLogs": {
       "hint": "Iarratais ón uair an chloig roimh dheireadh na fuinneoige, na cinn is déanaí ar dtús.",

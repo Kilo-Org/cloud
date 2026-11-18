@@ -1518,8 +1518,7 @@
       "emptyDescription": "Analytika zaznamenává dokončené kontroly, pokud je pro organizaci zapnutá.",
       "offTitle": "Analytika je pro {{platform}} vypnutá",
       "offDescription": "Zapněte analytiku v nastavení organizace na webu, aby zaznamenávala dokončené kontroly.",
-      "couldNotLoad": "Analytiku se nepodařilo načíst",
-      "off": "Analytika je pro tuto organizaci vypnutá."
+      "couldNotLoad": "Analytiku se nepodařilo načíst"
     },
     "council": {
       "title": "Kontrola radou",
@@ -3589,10 +3588,7 @@
       "ssoAndDomain": "SSO a doména",
       "dataCollection": "Shromažďování dat",
       "auditLogs": "Auditní protokoly",
-      "requestLogs": "Protokoly požadavků",
-      "integrations": "Integrace na webu",
-      "subOrganizations": "Podorganizace",
-      "distributeFunds": "Rozdělit prostředky"
+      "requestLogs": "Protokoly požadavků"
     },
     "requestLogs": {
       "hint": "Požadavky z hodiny před koncem časového okna, od nejnovějších.",

@@ -1470,8 +1470,7 @@
       "emptyDescription": "Nazari yana adana bitocin da aka kammala yayin da aka kunna shi ga ƙungiyar.",
       "offTitle": "An kashe nazari ga {{platform}}",
       "offDescription": "Kunna ta a cikin saitunan ƙungiya a yanar gizo don nazari ya adana bitocin da aka kammala.",
-      "couldNotLoad": "An kasa loda nazari",
-      "off": "An kashe nazari ga wannan ƙungiyar."
+      "couldNotLoad": "An kasa loda nazari"
     },
     "council": {
       "title": "Bitar majalisa",
@@ -3475,10 +3474,7 @@
       "ssoAndDomain": "SSO da yanki",
       "dataCollection": "Tattara bayanai",
       "auditLogs": "Rajistun bincike",
-      "requestLogs": "Rajistun buƙatu",
-      "integrations": "Haɗe-haɗe a yanar gizo",
-      "subOrganizations": "Ƙananan ƙungiyoyi",
-      "distributeFunds": "Raba kuɗi"
+      "requestLogs": "Rajistun buƙatu"
     },
     "requestLogs": {
       "hint": "Buƙatun awa ɗaya kafin ƙarshen wannan lokaci, sababbi a farko.",

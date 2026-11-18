@@ -1494,8 +1494,7 @@
       "emptyDescription": "Analitika bilježi dovršene preglede dok je uključena za organizaciju.",
       "offTitle": "Analitika je isključena za {{platform}}",
       "offDescription": "Uključi je u postavkama organizacije na webu kako bi bilježila dovršene preglede.",
-      "couldNotLoad": "Nije moguće učitati analitiku",
-      "off": "Analitika je isključena za ovu organizaciju."
+      "couldNotLoad": "Nije moguće učitati analitiku"
     },
     "council": {
       "title": "Pregled vijeća",
@@ -3532,10 +3531,7 @@
       "ssoAndDomain": "SSO i domena",
       "dataCollection": "Prikupljanje podataka",
       "auditLogs": "Revizijski zapisnici",
-      "requestLogs": "Zapisnici zahtjeva",
-      "integrations": "Integracije na webu",
-      "subOrganizations": "Podorganizacije",
-      "distributeFunds": "Raspodjela sredstava"
+      "requestLogs": "Zapisnici zahtjeva"
     },
     "requestLogs": {
       "hint": "Zahtjevi iz sata prije kraja razdoblja, najnoviji prvi.",

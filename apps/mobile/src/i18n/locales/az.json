@@ -1470,8 +1470,7 @@
       "emptyDescription": "Analitika təşkilat üçün aktiv olduğu müddətdə tamamlanmış yoxlamaları qeydə alır.",
       "offTitle": "{{platform}} üçün analitika deaktivdir",
       "offDescription": "Tamamlanmış yoxlamaları qeydə almaq üçün analitikanı vebdə təşkilat ayarlarında aktivləşdir.",
-      "couldNotLoad": "Analitikanı yükləmək mümkün olmadı",
-      "off": "Bu təşkilat üçün analitika deaktivdir."
+      "couldNotLoad": "Analitikanı yükləmək mümkün olmadı"
     },
     "council": {
       "title": "Şura yoxlaması",
@@ -3475,10 +3474,7 @@
       "ssoAndDomain": "SSO və domen",
       "dataCollection": "Məlumat toplanması",
       "auditLogs": "Audit jurnalları",
-      "requestLogs": "Sorğu jurnalları",
-      "integrations": "Vebdə inteqrasiyalar",
-      "subOrganizations": "Alt təşkilatlar",
-      "distributeFunds": "Vəsaitləri bölüşdür"
+      "requestLogs": "Sorğu jurnalları"
     },
     "requestLogs": {
       "hint": "Pəncərə bitənədək son bir saatın sorğuları, ən yeniləri əvvəldə.",

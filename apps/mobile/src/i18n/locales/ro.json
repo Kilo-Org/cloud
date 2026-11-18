@@ -1494,8 +1494,7 @@
       "emptyDescription": "Statisticile înregistrează revizuirile finalizate cât timp sunt activate pentru organizație.",
       "offTitle": "Statisticile sunt dezactivate pentru {{platform}}",
       "offDescription": "Activează statisticile în setările organizației pe web pentru a înregistra revizuirile finalizate.",
-      "couldNotLoad": "Statisticile nu au putut fi încărcate",
-      "off": "Statisticile sunt dezactivate pentru această organizație."
+      "couldNotLoad": "Statisticile nu au putut fi încărcate"
     },
     "council": {
       "title": "Revizuire în consiliu",
@@ -3532,10 +3531,7 @@
       "ssoAndDomain": "SSO și domeniu",
       "dataCollection": "Colectarea datelor",
       "auditLogs": "Jurnale de audit",
-      "requestLogs": "Jurnale de cereri",
-      "integrations": "Integrări pe web",
-      "subOrganizations": "Suborganizații",
-      "distributeFunds": "Distribuie fonduri"
+      "requestLogs": "Jurnale de cereri"
     },
     "requestLogs": {
       "hint": "Cererile din ora dinaintea finalului intervalului, cele mai recente primele.",

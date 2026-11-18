@@ -1470,8 +1470,7 @@
       "emptyDescription": "Takwimu hurekodi ukaguzi uliokamilika wakati imewashwa kwa shirika.",
       "offTitle": "Takwimu zimezimwa kwa {{platform}}",
       "offDescription": "Ziwashe takwimu katika mipangilio ya shirika kwenye wavuti ili kurekodi ukaguzi uliokamilika.",
-      "couldNotLoad": "Imeshindwa kupakia takwimu",
-      "off": "Takwimu zimezimwa kwa shirika hili."
+      "couldNotLoad": "Imeshindwa kupakia takwimu"
     },
     "council": {
       "title": "Ukaguzi wa baraza",
@@ -3475,10 +3474,7 @@
       "ssoAndDomain": "SSO na kikoa",
       "dataCollection": "Ukusanyaji wa data",
       "auditLogs": "Kumbukumbu za ukaguzi",
-      "requestLogs": "Kumbukumbu za maombi",
-      "integrations": "Miunganisho kwenye wavuti",
-      "subOrganizations": "Mashirika tanzu",
-      "distributeFunds": "Gawa fedha"
+      "requestLogs": "Kumbukumbu za maombi"
     },
     "requestLogs": {
       "hint": "Maombi ya saa moja kabla ya mwisho wa kipindi, mapya kwanza.",

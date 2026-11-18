@@ -1470,8 +1470,7 @@
       "emptyDescription": "Analüütika salvestab lõpetatud ülevaatused, kui see on organisatsioonis lubatud.",
       "offTitle": "Analüütika on platvormil {{platform}} välja lülitatud",
       "offDescription": "Lülita see sisse organisatsiooni seadetes veebis, et salvestada lõpetatud ülevaatused.",
-      "couldNotLoad": "Analüütikat ei õnnestunud laadida",
-      "off": "Analüütika on selles organisatsioonis välja lülitatud."
+      "couldNotLoad": "Analüütikat ei õnnestunud laadida"
     },
     "council": {
       "title": "Nõukogu ülevaatus",
@@ -3475,10 +3474,7 @@
       "ssoAndDomain": "SSO ja domeen",
       "dataCollection": "Andmete kogumine",
       "auditLogs": "Auditilogid",
-      "requestLogs": "Päringulogid",
-      "integrations": "Integratsioonid veebis",
-      "subOrganizations": "Alamorganisatsioonid",
-      "distributeFunds": "Jaota vahendeid"
+      "requestLogs": "Päringulogid"
     },
     "requestLogs": {
       "hint": "Akna lõpule eelnenud tunni päringud, uusimad eespool.",

@@ -1470,8 +1470,7 @@
       "emptyDescription": "Ọnụọgụgụ nyocha na-edekọ nyocha ndị gụchara mgbe agbanyere ya maka nzukọ.",
       "offTitle": "Agbanyụrụ ọnụọgụgụ nyocha maka {{platform}}",
       "offDescription": "Gbanye ya na ntọala òtù na weebụ ka ọ dekọọ nyocha ndị gụchara.",
-      "couldNotLoad": "Enweghị ike ibudata ọnụọgụgụ nyocha",
-      "off": "Agbanyụrụ ọnụọgụgụ nyocha maka nzukọ a."
+      "couldNotLoad": "Enweghị ike ibudata ọnụọgụgụ nyocha"
     },
     "council": {
       "title": "Nyocha otu ndị nyocha",
@@ -3475,10 +3474,7 @@
       "ssoAndDomain": "SSO na domain",
       "dataCollection": "Nchịkọta data",
       "auditLogs": "Ndekọ nyocha",
-      "requestLogs": "Ndekọ arịrịọ",
-      "integrations": "Njikọ na weebụ",
-      "subOrganizations": "Òtù ndị dị n'okpuru",
-      "distributeFunds": "Kesaa ego"
+      "requestLogs": "Ndekọ arịrịọ"
     },
     "requestLogs": {
       "hint": "Arịrịọ nke otu awa tupu oge a na-egosi agwụ, nke kachasị ọhụrụ bụ mbụ.",

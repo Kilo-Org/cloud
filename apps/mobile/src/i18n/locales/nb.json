@@ -1470,8 +1470,7 @@
       "emptyDescription": "Statistikken registrerer fullførte gjennomganger så lenge den er aktivert for organisasjonen.",
       "offTitle": "Statistikken er slått av for {{platform}}",
       "offDescription": "Aktiver den i organisasjonsinnstillingene på nettet for å registrere fullførte gjennomganger.",
-      "couldNotLoad": "Kunne ikke laste statistikken",
-      "off": "Statistikken er slått av for denne organisasjonen."
+      "couldNotLoad": "Kunne ikke laste statistikken"
     },
     "council": {
       "title": "Panelvurdering",
@@ -3475,10 +3474,7 @@
       "ssoAndDomain": "SSO og domene",
       "dataCollection": "Datainnsamling",
       "auditLogs": "Revisjonslogger",
-      "requestLogs": "Forespørselslogger",
-      "integrations": "Integrasjoner på nettet",
-      "subOrganizations": "Underorganisasjoner",
-      "distributeFunds": "Fordel midler"
+      "requestLogs": "Forespørselslogger"
     },
     "requestLogs": {
       "hint": "Forespørsler fra timen før vinduet slutter, nyeste først.",

@@ -1470,8 +1470,7 @@
       "emptyDescription": "Statistika tashkilot uchun yoqilgan boʻlsa, tugallangan koʻrib chiqishlarni qayd etadi.",
       "offTitle": "{{platform}} uchun statistika oʻchirilgan",
       "offDescription": "Tugallangan koʻrib chiqishlarni qayd etish uchun veb-saytdagi tashkilot sozlamalarida statistikani yoqing.",
-      "couldNotLoad": "Statistikani yuklab boʻlmadi",
-      "off": "Bu tashkilot uchun statistika oʻchirilgan."
+      "couldNotLoad": "Statistikani yuklab boʻlmadi"
     },
     "council": {
       "title": "Kengash koʻrib chiqishi",
@@ -3475,10 +3474,7 @@
       "ssoAndDomain": "SSO va domen",
       "dataCollection": "Ma'lumotlar yig'ish",
       "auditLogs": "Audit jurnallari",
-      "requestLogs": "So'rovlar jurnallari",
-      "integrations": "Veb-saytdagi integratsiyalar",
-      "subOrganizations": "Quyi tashkilotlar",
-      "distributeFunds": "Mablag'larni taqsimlash"
+      "requestLogs": "So'rovlar jurnallari"
     },
     "requestLogs": {
       "hint": "Oraliq oxiridan oldingi bir soatdagi so'rovlar, eng yangilari tepada.",

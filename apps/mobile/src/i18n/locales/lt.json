@@ -1518,8 +1518,7 @@
       "emptyDescription": "Analitika fiksuoja užbaigtas peržiūras, kol ji įjungta organizacijai.",
       "offTitle": "Analitika išjungta platformai {{platform}}",
       "offDescription": "Įjunk ją organizacijos nustatymuose žiniatinklyje, kad fiksuotų užbaigtas peržiūras.",
-      "couldNotLoad": "Nepavyko įkelti analitikos",
-      "off": "Šiai organizacijai analitika išjungta."
+      "couldNotLoad": "Nepavyko įkelti analitikos"
     },
     "council": {
       "title": "Tarybos peržiūra",
@@ -3589,10 +3588,7 @@
       "ssoAndDomain": "SSO ir domenas",
       "dataCollection": "Duomenų rinkimas",
       "auditLogs": "Audito žurnalai",
-      "requestLogs": "Užklausų žurnalai",
-      "integrations": "Integracijos žiniatinklyje",
-      "subOrganizations": "Antrinės organizacijos",
-      "distributeFunds": "Paskirstyti lėšas"
+      "requestLogs": "Užklausų žurnalai"
     },
     "requestLogs": {
       "hint": "Užklausos per valandą iki lango pabaigos, naujausios pirmos.",

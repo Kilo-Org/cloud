@@ -1494,8 +1494,7 @@
       "emptyDescription": "Analītika reģistrē pabeigtas pārskatīšanas, kamēr tā ir iespējota organizācijai.",
       "offTitle": "{{platform}} platformā analītika ir izslēgta",
       "offDescription": "Ieslēdz to organizācijas iestatījumos tīmeklī, lai reģistrētu pabeigtas pārskatīšanas.",
-      "couldNotLoad": "Neizdevās ielādēt analītiku",
-      "off": "Analītika šai organizācijai ir izslēgta."
+      "couldNotLoad": "Neizdevās ielādēt analītiku"
     },
     "council": {
       "title": "Padomes pārskatīšana",
@@ -3532,10 +3531,7 @@
       "ssoAndDomain": "SSO un domēns",
       "dataCollection": "Datu vākšana",
       "auditLogs": "Audita žurnāli",
-      "requestLogs": "Pieprasījumu žurnāli",
-      "integrations": "Integrācijas tīmeklī",
-      "subOrganizations": "Apakšorganizācijas",
-      "distributeFunds": "Sadalīt līdzekļus"
+      "requestLogs": "Pieprasījumu žurnāli"
     },
     "requestLogs": {
       "hint": "Pieprasījumi stundā līdz laika loga beigām, jaunākie vispirms.",

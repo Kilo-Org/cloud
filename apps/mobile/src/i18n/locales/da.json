@@ -1470,8 +1470,7 @@
       "emptyDescription": "Analyse registrerer afsluttede gennemgange, mens funktionen er slået til for organisationen.",
       "offTitle": "Analyse er slået fra for {{platform}}",
       "offDescription": "Slå den til i organisationsindstillingerne på nettet for at registrere afsluttede gennemgange.",
-      "couldNotLoad": "Kunne ikke indlæse analysedata",
-      "off": "Analyse er slået fra for denne organisation."
+      "couldNotLoad": "Kunne ikke indlæse analysedata"
     },
     "council": {
       "title": "Rådsgennemgang",
@@ -3475,10 +3474,7 @@
       "ssoAndDomain": "SSO og domæne",
       "dataCollection": "Dataindsamling",
       "auditLogs": "Revisionslogs",
-      "requestLogs": "Anmodningslogs",
-      "integrations": "Integrationer på nettet",
-      "subOrganizations": "Underorganisationer",
-      "distributeFunds": "Fordel midler"
+      "requestLogs": "Anmodningslogs"
     },
     "requestLogs": {
       "hint": "Anmodninger fra timen op til vinduets sluttidspunkt, nyeste først.",

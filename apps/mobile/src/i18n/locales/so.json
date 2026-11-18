@@ -1470,8 +1470,7 @@
       "emptyDescription": "Tirakoobku wuxuu diiwaangeliyaa dib-u-eegisyo dhammaaday inta uu ururka u shidan yahay.",
       "offTitle": "Tirakoobku wuu dansan yahay {{platform}}",
       "offDescription": "Shid tirakoobka gudaha dejinta ururka ee shabakadda si loo diiwaangeliyo dib-u-eegisyo dhammaaday.",
-      "couldNotLoad": "Tirakoobka lama soo dejin karin",
-      "off": "Tirakoobku wuu dansan yahay ururkan."
+      "couldNotLoad": "Tirakoobka lama soo dejin karin"
     },
     "council": {
       "title": "Dib-u-eegista golaha",
@@ -3475,10 +3474,7 @@
       "ssoAndDomain": "SSO iyo domain",
       "dataCollection": "Ururinta xogta",
       "auditLogs": "Diiwaannada hubinta",
-      "requestLogs": "Diiwaannada codsiyada",
-      "integrations": "Isku-xidhka ee shabakadda",
-      "subOrganizations": "Ururrada hoose",
-      "distributeFunds": "Qaybi lacagta"
+      "requestLogs": "Diiwaannada codsiyada"
     },
     "requestLogs": {
       "hint": "Codsiyadii saacadda ka horreysay dhammaadka muddada, kuwa ugu cusub ayaa ugu horreeya.",

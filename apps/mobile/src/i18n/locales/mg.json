@@ -1470,8 +1470,7 @@
       "emptyDescription": "Mirakitra ny fandinihana vita ny antontan'isa rehefa velona ho an'ny fikambanana izy.",
       "offTitle": "Maty ny antontan'isa ho an'i {{platform}}",
       "offDescription": "Alefaso ny antontan'isa ao amin'ny fikirakiran'ny fikambanana amin'ny tranonkala mba hirakitra ny fandinihana vita.",
-      "couldNotLoad": "Tsy afaka nampiditra ny antontan'isa",
-      "off": "Maty ny antontan'isa ho an'ity fikambanana ity."
+      "couldNotLoad": "Tsy afaka nampiditra ny antontan'isa"
     },
     "council": {
       "title": "Fandinihan'ny filankevitra",
@@ -3475,10 +3474,7 @@
       "ssoAndDomain": "SSO sy sehatra",
       "dataCollection": "Fanangonana angona",
       "auditLogs": "Rakitry ny fanaraha-maso",
-      "requestLogs": "Rakitry ny fangatahana",
-      "integrations": "Fampifandraisana amin'ny tranonkala",
-      "subOrganizations": "Zana-pikambanana",
-      "distributeFunds": "Hizara vola"
+      "requestLogs": "Rakitry ny fangatahana"
     },
     "requestLogs": {
       "hint": "Fangatahana nandritra ny ora iray talohan'ny fiafaran'ny fe-potoana, ny vaovao indrindra aloha.",

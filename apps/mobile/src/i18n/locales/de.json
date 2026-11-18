@@ -927,8 +927,7 @@
       "emptyDescription": "Analysen erfassen abgeschlossene Reviews, solange sie für die Organisation aktiviert sind.",
       "offTitle": "Analysen sind für {{platform}} deaktiviert",
       "offDescription": "Aktiviere sie in den Organisationseinstellungen im Web, um abgeschlossene Reviews zu erfassen.",
-      "couldNotLoad": "Analysen konnten nicht geladen werden",
-      "off": "Analysen sind für diese Organisation deaktiviert."
+      "couldNotLoad": "Analysen konnten nicht geladen werden"
     },
     "council": {
       "title": "Gremium-Review",
@@ -3480,10 +3479,7 @@
       "ssoAndDomain": "SSO und Domain",
       "dataCollection": "Datenerfassung",
       "auditLogs": "Audit-Logs",
-      "requestLogs": "Anfrage-Logs",
-      "integrations": "Integrationen im Web",
-      "subOrganizations": "Unterorganisationen",
-      "distributeFunds": "Guthaben verteilen"
+      "requestLogs": "Anfrage-Logs"
     },
     "requestLogs": {
       "hint": "Anfragen aus der Stunde vor Ende des Zeitfensters, neueste zuerst.",

@@ -1470,8 +1470,7 @@
       "emptyDescription": "Analytiikka tallentaa valmiit katselmoinnit, kun se on käytössä organisaatiossa.",
       "offTitle": "Analytiikka ei ole käytössä alustalla {{platform}}",
       "offDescription": "Ota se käyttöön organisaation asetuksissa verkossa, jotta analytiikka tallentaa valmiit katselmoinnit.",
-      "couldNotLoad": "Analytiikan lataaminen epäonnistui",
-      "off": "Analytiikka ei ole käytössä tässä organisaatiossa."
+      "couldNotLoad": "Analytiikan lataaminen epäonnistui"
     },
     "council": {
       "title": "Neuvostokatselmointi",
@@ -3475,10 +3474,7 @@
       "ssoAndDomain": "SSO ja verkkotunnus",
       "dataCollection": "Tiedonkeruu",
       "auditLogs": "Tarkastuslokit",
-      "requestLogs": "Pyyntölokit",
-      "integrations": "Integraatiot verkossa",
-      "subOrganizations": "Alaorganisaatiot",
-      "distributeFunds": "Jaa varoja"
+      "requestLogs": "Pyyntölokit"
     },
     "requestLogs": {
       "hint": "Aikaikkunan päättymistä edeltävän tunnin pyynnöt, uusimmat ensin.",

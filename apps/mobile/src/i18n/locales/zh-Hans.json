@@ -927,8 +927,7 @@
       "emptyDescription": "在组织启用分析期间，系统会记录已完成的审查。",
       "offTitle": "已关闭 {{platform}} 的分析",
       "offDescription": "在网页版组织设置中启用分析，即可记录已完成的审查。",
-      "couldNotLoad": "无法加载分析数据",
-      "off": "此组织已关闭分析。"
+      "couldNotLoad": "无法加载分析数据"
     },
     "council": {
       "title": "评审团审查",
@@ -3480,10 +3479,7 @@
       "ssoAndDomain": "SSO 和域名",
       "dataCollection": "数据收集",
       "auditLogs": "审计日志",
-      "requestLogs": "请求日志",
-      "integrations": "网页版集成",
-      "subOrganizations": "子组织",
-      "distributeFunds": "分配资金"
+      "requestLogs": "请求日志"
     },
     "requestLogs": {
       "hint": "显示时段结束前一小时内的请求，最新的在前。",

@@ -1470,8 +1470,7 @@
       "emptyDescription": "Izibalo ziqopha ukuhlolwa okuqediwe ngenkathi zivuliwe enhlanganweni.",
       "offTitle": "Izibalo ze-{{platform}} zivaliwe",
       "offDescription": "Zivule izibalo kuzilungiselelo zenhlangano kuwebhu ukuqopha ukuhlolwa okuqediwe.",
-      "couldNotLoad": "Ayikwazanga ukulayisha izibalo",
-      "off": "Izibalo zivaliwe kule nhlangano."
+      "couldNotLoad": "Ayikwazanga ukulayisha izibalo"
     },
     "council": {
       "title": "Ukuhlola komkhandlu",
@@ -3475,10 +3474,7 @@
       "ssoAndDomain": "I-SSO nesizinda",
       "dataCollection": "Ukuqoqwa kwedatha",
       "auditLogs": "Amarekhodi okucwaninga",
-      "requestLogs": "Amarekhodi ezicelo",
-      "integrations": "Ukuhlanganiswa kuwebhu",
-      "subOrganizations": "Izinhlangano ezingaphansi",
-      "distributeFunds": "Yaba izimali"
+      "requestLogs": "Amarekhodi ezicelo"
     },
     "requestLogs": {
       "hint": "Izicelo zehora elingaphambi kokuphela kwesikhathi esiboniswayo, ezakamuva kuqala.",

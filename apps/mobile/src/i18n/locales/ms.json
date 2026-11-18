@@ -1470,8 +1470,7 @@
       "emptyDescription": "Analitik merekodkan semakan yang selesai selagi ciri ini didayakan untuk organisasi.",
       "offTitle": "Analitik dimatikan untuk {{platform}}",
       "offDescription": "Dayakannya dalam tetapan organisasi di web untuk merekodkan semakan yang selesai.",
-      "couldNotLoad": "Tidak dapat memuatkan analitik",
-      "off": "Analitik dimatikan untuk organisasi ini."
+      "couldNotLoad": "Tidak dapat memuatkan analitik"
     },
     "council": {
       "title": "Semakan panel",
@@ -3475,10 +3474,7 @@
       "ssoAndDomain": "SSO dan domain",
       "dataCollection": "Pengumpulan data",
       "auditLogs": "Log audit",
-      "requestLogs": "Log permintaan",
-      "integrations": "Integrasi di web",
-      "subOrganizations": "Suborganisasi",
-      "distributeFunds": "Agihkan dana"
+      "requestLogs": "Log permintaan"
     },
     "requestLogs": {
       "hint": "Permintaan dalam sejam sebelum julat masa berakhir, terkini dahulu.",

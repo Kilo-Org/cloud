@@ -927,8 +927,7 @@
       "emptyDescription": "분석은 조직에서 이 기능이 켜져 있는 동안 완료된 리뷰를 기록합니다.",
       "offTitle": "{{platform}}의 분석이 꺼져 있습니다",
       "offDescription": "완료된 리뷰를 기록하려면 웹의 조직 설정에서 분석을 활성화하세요.",
-      "couldNotLoad": "분석을 불러오지 못했습니다",
-      "off": "이 조직에서는 분석이 꺼져 있습니다."
+      "couldNotLoad": "분석을 불러오지 못했습니다"
     },
     "council": {
       "title": "협의체 리뷰",
@@ -3480,10 +3479,7 @@
       "ssoAndDomain": "SSO 및 도메인",
       "dataCollection": "데이터 수집",
       "auditLogs": "감사 로그",
-      "requestLogs": "요청 로그",
-      "integrations": "웹에서 연동",
-      "subOrganizations": "하위 조직",
-      "distributeFunds": "자금 배분"
+      "requestLogs": "요청 로그"
     },
     "requestLogs": {
       "hint": "선택한 시간대가 끝나기 전 1시간의 요청을 최신순으로 표시합니다.",

@@ -1537,8 +1537,7 @@
       "emptyDescription": "Analytics records completed reviews while it is enabled for the organization.",
       "offTitle": "Analytics is off for {{platform}}",
       "offDescription": "Turn it on in the organization's settings on the web to record completed reviews.",
-      "couldNotLoad": "Could not load analytics",
-      "off": "Analytics is off for this organization."
+      "couldNotLoad": "Could not load analytics"
     },
     "council": {
       "title": "Council review",
@@ -3555,10 +3554,7 @@
       "ssoAndDomain": "SSO and domain",
       "dataCollection": "Data collection",
       "auditLogs": "Audit logs",
-      "requestLogs": "Request logs",
-      "integrations": "Integrations on the web",
-      "subOrganizations": "Sub-organizations",
-      "distributeFunds": "Distribute funds"
+      "requestLogs": "Request logs"
     },
     "requestLogs": {
       "hint": "Requests from the hour before the window ends, newest first.",

@@ -927,8 +927,7 @@
       "emptyDescription": "分析機能は、組織で有効になっている間に完了したレビューを記録します。",
       "offTitle": "{{platform}}の分析がオフになっています",
       "offDescription": "Webでの組織設定で分析を有効にすると、完了したレビューが記録されます。",
-      "couldNotLoad": "分析を読み込めませんでした",
-      "off": "この組織では分析がオフになっています。"
+      "couldNotLoad": "分析を読み込めませんでした"
     },
     "council": {
       "title": "合議レビュー",
@@ -3480,10 +3479,7 @@
       "ssoAndDomain": "SSOとドメイン",
       "dataCollection": "データ収集",
       "auditLogs": "監査ログ",
-      "requestLogs": "リクエストログ",
-      "integrations": "Webでの連携",
-      "subOrganizations": "サブ組織",
-      "distributeFunds": "資金の配分"
+      "requestLogs": "リクエストログ"
     },
     "requestLogs": {
       "hint": "表示期間の終了時刻までの1時間のリクエストを新しい順に表示しています。",

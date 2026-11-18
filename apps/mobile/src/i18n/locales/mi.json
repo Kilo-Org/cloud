@@ -1470,8 +1470,7 @@
       "emptyDescription": "Ka tuhia e ngā tātaritanga ngā arotake kua oti i te wā e whakahohea ana mō te rōpū.",
       "offTitle": "Kua weto ngā tātaritanga mō {{platform}}",
       "offDescription": "Whakahohea ngā tātaritanga i ngā tautuhinga rōpū i te ipurangi ki te tuhi i ngā arotake kua oti.",
-      "couldNotLoad": "Kāore i taea te uta i ngā tātaritanga",
-      "off": "Kua weto ngā tātaritanga mō tēnei rōpū."
+      "couldNotLoad": "Kāore i taea te uta i ngā tātaritanga"
     },
     "council": {
       "title": "Arotake kaunihera",
@@ -3475,10 +3474,7 @@
       "ssoAndDomain": "SSO me te rohe",
       "dataCollection": "Kohinga raraunga",
       "auditLogs": "Ngā pūkete arotake",
-      "requestLogs": "Ngā pūkete tono",
-      "integrations": "Ngā Tūhononga i te ipurangi",
-      "subOrganizations": "Ngā rōpū iti",
-      "distributeFunds": "Tohaina ngā pūtea"
+      "requestLogs": "Ngā pūkete tono"
     },
     "requestLogs": {
       "hint": "Ngā tono o te haora i mua i te mutunga o te awhe, ko ngā mea hou rawa ki mua.",

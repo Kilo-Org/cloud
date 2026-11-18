@@ -927,8 +927,7 @@
       "emptyDescription": "Statistieken leggen afgeronde reviews vast zolang ze voor de organisatie zijn ingeschakeld.",
       "offTitle": "Statistieken staan uit voor {{platform}}",
       "offDescription": "Schakel de statistieken in bij de organisatie-instellingen op het web om afgeronde reviews vast te leggen.",
-      "couldNotLoad": "Kan statistieken niet laden",
-      "off": "Statistieken staan uit voor deze organisatie."
+      "couldNotLoad": "Kan statistieken niet laden"
     },
     "council": {
       "title": "Panelbeoordeling",
@@ -3480,10 +3479,7 @@
       "ssoAndDomain": "SSO en domein",
       "dataCollection": "Gegevensverzameling",
       "auditLogs": "Auditlogboeken",
-      "requestLogs": "Verzoeklogboeken",
-      "integrations": "Integraties op het web",
-      "subOrganizations": "Suborganisaties",
-      "distributeFunds": "Tegoed verdelen"
+      "requestLogs": "Verzoeklogboeken"
     },
     "requestLogs": {
       "hint": "Verzoeken uit het uur vóór het einde van het venster, nieuwste eerst.",

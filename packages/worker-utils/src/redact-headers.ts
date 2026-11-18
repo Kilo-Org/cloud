@@ -8,6 +8,7 @@ const SENSITIVE_HEADERS = new Set([
   'x-api-key',
   'x-kilo-briefing-settlement',
   'x-gitlab-token',
+  'private-token',
   'x-hub-signature',
   'x-hub-signature-256',
 ]);

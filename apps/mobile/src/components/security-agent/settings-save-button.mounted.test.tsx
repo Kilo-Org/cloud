@@ -6,11 +6,12 @@
 // screen title at ~0 width on the narrowest 320 dp viewport. The action must
 // bound itself at its source, exactly like PR review's Submit review.
 
-import { createElement } from 'react';
+import { createElement, type ReactElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SettingsSaveButton } from './settings-save-button';
+import { useSettingsSaveFeedback } from './settings-save-feedback';
 import { NavigationContext } from 'expo-router/build/react-navigation/core/NavigationContext';
 
 const routerState = vi.hoisted(() => ({ back: vi.fn() }));
@@ -235,6 +236,31 @@ describe('SettingsSaveButton header cap', () => {
   });
 });
 
+// Admission lives in the shared `useSettingsSaveFeedback().run` that every
+// caller passes as `onSave`, not in the button. These two mounts wire the
+// button to the real hook exactly as the screens do, so the admission tests
+// exercise the real refusal path.
+type FeedbackHarness = {
+  element: ReactElement;
+  onSave: ReturnType<typeof vi.fn<() => Promise<void>>>;
+};
+
+function mountThroughRealFeedback(
+  onSave: ReturnType<typeof vi.fn<() => Promise<void>>>
+): FeedbackHarness {
+  function Harness() {
+    const feedback = useSettingsSaveFeedback();
+    return createElement(SettingsSaveButton, {
+      dirty: true,
+      valid: true,
+      pending: false,
+      onSave: () => feedback.run(() => onSave()),
+      skipNextGuardRef: { current: false },
+    });
+  }
+  return { element: createElement(Harness), onSave };
+}
+
 describe('SettingsSaveButton current save', () => {
   beforeEach(() => {
     routerState.back.mockReset();
@@ -291,30 +317,55 @@ describe('SettingsSaveButton current save', () => {
     expect(routerState.back).toHaveBeenCalledOnce();
   });
 
-  it('starts only one save when two presses land before the pending re-render', async () => {
+  it('does not start a second save or pop when two presses land before the pending re-render', async () => {
     // The mutation's `pending` prop only becomes true on a later render; both
-    // presses here see `pending: false`. The synchronous claim must admit the
-    // first and refuse the second.
+    // presses here see `pending: false`. Admission lives in the shared
+    // `useSettingsSaveFeedback().run` the screens wire as `onSave`: the second
+    // press is refused with the sentinel, so it neither starts a duplicate
+    // write nor pops the screen while the first save is still in flight.
     const { promise: savePromise, resolve: settleSave } = Promise.withResolvers<undefined>();
-    const onSave = vi.fn().mockImplementation(() => savePromise);
-    const renderer = render({ onSave });
+    const onSave = vi.fn<() => Promise<void>>().mockImplementation(() => savePromise);
+    const { element } = mountThroughRealFeedback(onSave);
+    const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+    act(() => {
+      ref.current = TestRenderer.create(element);
+    });
+    const renderer = ref.current;
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
 
     pressSave(renderer);
     pressSave(renderer);
+    expect(onSave).toHaveBeenCalledOnce();
+
+    // The refused press must not have popped; the admitted save then settles
+    // successfully and pops exactly once.
+    expect(routerState.back).not.toHaveBeenCalled();
     settleSave(undefined);
     await flushSave();
-
-    expect(onSave).toHaveBeenCalledOnce();
     expect(routerState.back).toHaveBeenCalledOnce();
+
+    act(() => {
+      renderer.unmount();
+    });
   });
 
-  it('lets a retry start after a refused save cleared the claim', async () => {
-    const refused = vi.fn().mockRejectedValue(new Error('refused'));
-    const renderer = render({ onSave: refused });
+  it('admits a retry after the first save settled', async () => {
+    const refused = vi.fn<() => Promise<void>>().mockRejectedValue(new Error('refused'));
+    const { element } = mountThroughRealFeedback(refused);
+    const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+    act(() => {
+      ref.current = TestRenderer.create(element);
+    });
+    const renderer = ref.current;
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
 
     pressSave(renderer);
-    // The rejection walks the awaited chain: catch and finally each take a
-    // tick before the claim clears.
+    // The rejection walks the awaited chain: the catch takes a tick before
+    // the admission releases.
     await flushSave();
     await flushSave();
     await flushSave();
@@ -322,22 +373,19 @@ describe('SettingsSaveButton current save', () => {
     expect(routerState.back).not.toHaveBeenCalled();
 
     // The retry is a second instance of the same save: it must be admitted.
-    const retry = vi.fn().mockResolvedValue(undefined);
+    const retry = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    const retryMount = mountThroughRealFeedback(retry);
     act(() => {
-      renderer.update(
-        createElement(SettingsSaveButton, {
-          dirty: true,
-          valid: true,
-          pending: false,
-          onSave: retry,
-          skipNextGuardRef: { current: false },
-        })
-      );
+      renderer.update(retryMount.element);
     });
     pressSave(renderer);
     await flushSave();
 
     expect(retry).toHaveBeenCalledOnce();
     expect(routerState.back).toHaveBeenCalledOnce();
+
+    act(() => {
+      renderer.unmount();
+    });
   });
 });

@@ -56,10 +56,12 @@ export function SettingsSaveButton({
     };
   }, []);
   const navigation = useContext(NavigationContext) as { isFocused?: () => boolean } | undefined;
-  // One save at a time, claimed synchronously: two presses delivered before the
-  // mutation's `pending` prop re-renders would otherwise each start `onSave`.
-  // The disabled prop stays the visible state; this is the admission guard.
-  const inFlightRef = useRef(false);
+  // Admission is not owned here. Every caller's `onSave` runs through
+  // `useSettingsSaveFeedback().run`, whose `surface-feedback.begin()` is the
+  // family's one admission authority — it refuses a save while another is in
+  // flight, whichever surface delivered it (this header press or the back
+  // guard's dialog Save). Keeping a second lock beside it would violate the
+  // surface-feedback contract. The disabled prop stays the visible state.
   // A settings header holds this one action, and a filled primary is the
   // loudest thing on the screen. It should not outshout the content's own way
   // out (the repository picker's "Manage GitHub App access" is exactly that
@@ -81,13 +83,6 @@ export function SettingsSaveButton({
       variant={actionable ? 'default' : 'ghost'}
       disabled={!actionable || pending}
       onPress={() => {
-        // Admission before the first await: a second press in the same frame
-        // returns before it can start a duplicate write. A save that was
-        // refused clears the claim, so the retry path stays open.
-        if (inFlightRef.current) {
-          return;
-        }
-        inFlightRef.current = true;
         void (async () => {
           try {
             await onSave();
@@ -103,8 +98,6 @@ export function SettingsSaveButton({
             }
           } catch {
             // The screen's refusal line reports the failure; stay on screen.
-          } finally {
-            inFlightRef.current = false;
           }
         })();
       }}

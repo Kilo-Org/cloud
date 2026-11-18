@@ -1,11 +1,13 @@
 'use client';
 
 import type { DrawerStackHelpers } from '@/components/drawer';
-import type { OrganizationGroupPolicyType } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { organizationGroupPolicyDefinition } from '@/components/organizations/groups/policies/registry.client';
-import type { OrganizationGroupPolicyTarget } from '@/components/organizations/groups/policies/types';
+import type {
+  EditableOrganizationGroupPolicyType,
+  OrganizationGroupPolicyTarget,
+} from '@/components/organizations/groups/policies/types';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { OrganizationGroupsDrawerRef } from './types';
 
@@ -19,7 +21,7 @@ export function PolicyEditorPanel({
 }: {
   organizationId: string;
   target: OrganizationGroupPolicyTarget;
-  policyType: OrganizationGroupPolicyType;
+  policyType: EditableOrganizationGroupPolicyType;
   helpers: DrawerStackHelpers<OrganizationGroupsDrawerRef>;
 }) {
   const trpc = useTRPC();

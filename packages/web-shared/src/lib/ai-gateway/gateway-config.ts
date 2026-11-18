@@ -65,6 +65,7 @@ export const OrganizationFeaturesSchema = z.object({
   experimental_byok: storedOrganizationIds,
   enkrypt_output_guardrail: storedOrganizationIds,
   gateway_settings: storedOrganizationIds,
+  org_permission_policy: storedOrganizationIds,
 });
 
 export type OrganizationFeatures = z.infer<typeof OrganizationFeaturesSchema>;
@@ -86,6 +87,11 @@ export const ORGANIZATION_FEATURE_DESCRIPTIONS = {
     label: 'Advanced policies',
     description:
       'Lets an enterprise organization turn off OpenRouter and pin requests paid with Kilo credits to a Vercel AI Gateway inference region, on the Advanced policies tab of its Providers & Models page. The policies stop applying if the organization leaves the enterprise plan.',
+  },
+  org_permission_policy: {
+    label: 'Organization permission policy',
+    description:
+      'Makes versioned agent and client permission policies available to Enterprise organizations.',
   },
 } as const satisfies Record<OrganizationFeature, { label: string; description: string }>;
 
@@ -115,4 +121,5 @@ export const OrganizationFeaturesInputSchema = z.object({
   experimental_byok: organizationIdsInput,
   enkrypt_output_guardrail: organizationIdsInput,
   gateway_settings: organizationIdsInput,
+  org_permission_policy: organizationIdsInput,
 }) satisfies z.ZodType<OrganizationFeatures, unknown>;

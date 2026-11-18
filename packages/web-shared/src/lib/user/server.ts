@@ -69,6 +69,7 @@ import {
   isKiloCredentialExchangeEligible,
   verifyKiloTokenForPolicy,
   type KiloCredentialExchangeEligibilityPolicy,
+  type KiloTokenPolicyClaims,
 } from '@kilocode/worker-utils/kilo-token-policy';
 
 // NextAuth calls a user-provided `debug` logger regardless of the `debug` option,
@@ -388,22 +389,26 @@ export async function getUserFromSessionForCredentialIssuanceOrRedirect(
   );
 }
 
-export async function getUserFromBearerForCredentialExchange(
-  requestHeaders: Headers,
-  policy: KiloCredentialExchangeEligibilityPolicy
-): Promise<GetAuthResponse> {
+async function verifyKiloApiBearer(requestHeaders: Headers) {
   const token = extractBearerToken(requestHeaders.get('authorization'));
-  if (!token) return authError(401, 'Unauthorized', '?');
+  if (!token) return null;
 
-  let auth: Awaited<ReturnType<typeof verifyKiloTokenForPolicy>>;
   try {
-    auth = await verifyKiloTokenForPolicy(token, NEXTAUTH_SECRET, {
+    return await verifyKiloTokenForPolicy(token, NEXTAUTH_SECRET, {
       audience: KILO_API_AUDIENCE,
       mode: 'allow-legacy',
     });
   } catch {
-    return authError(401, 'Unauthorized', '?');
+    return null;
   }
+}
+
+export async function getUserFromBearerForCredentialExchange(
+  requestHeaders: Headers,
+  policy: KiloCredentialExchangeEligibilityPolicy
+): Promise<GetAuthResponse> {
+  const auth = await verifyKiloApiBearer(requestHeaders);
+  if (!auth) return authError(401, 'Unauthorized', '?');
 
   if (auth.claims.env !== process.env.NODE_ENV) {
     return authError(401, 'Unauthorized', auth.userId);
@@ -429,6 +434,64 @@ export async function getUserFromBearerForCredentialExchange(
     return authError(401, 'Unauthorized', auth.userId);
   }
   return result;
+}
+
+const accountBearerClaimNames: ReadonlySet<string> = new Set([
+  'version',
+  'kiloUserId',
+  'apiTokenPepper',
+  'env',
+  'iat',
+  'exp',
+  'aud',
+  'tokenPurpose',
+  'credentialExchange',
+  'deviceAuthRequestCode',
+  'deviceSessionId',
+  'organizationId',
+  'organizationRole',
+] satisfies (keyof KiloTokenPolicyClaims)[]);
+
+export async function getUserFromAccountBearer(requestHeaders: Headers): Promise<GetAuthResponse> {
+  const auth = await verifyKiloApiBearer(requestHeaders);
+  if (!auth) return authError(401, 'Unauthorized', '?');
+
+  const { userId, claims, claimNames } = auth;
+  const { tokenPurpose, deviceSessionId, organizationId, credentialExchange } = claims;
+  if (
+    claims.env !== process.env.NODE_ENV ||
+    claims.apiTokenPepper === undefined ||
+    credentialExchange === true ||
+    !claimNames.every(name => accountBearerClaimNames.has(name)) ||
+    (tokenPurpose !== undefined &&
+      tokenPurpose !== 'human-api' &&
+      tokenPurpose !== 'device-access') ||
+    (tokenPurpose === 'device-access' && deviceSessionId === undefined)
+  ) {
+    return authError(401, 'Unauthorized', userId);
+  }
+
+  const user = await findUserById(userId, db);
+  if (!user || user.is_bot || claims.apiTokenPepper !== user.api_token_pepper) {
+    return authError(401, 'Unauthorized', userId);
+  }
+  const result = await validateUserAuthorization({
+    kiloUserId: userId,
+    user,
+    opts: { adminOnly: false },
+  });
+  if (!result.user) return result;
+
+  if (
+    deviceSessionId !== undefined &&
+    (!uuid.safeParse(deviceSessionId).success ||
+      !(await readActiveDeviceSession(deviceSessionId, userId)))
+  ) {
+    return authError(401, 'Device session is no longer active', userId);
+  }
+
+  // The caller authorizes the requested organization against this signed binding, not a header.
+  return { ...result, organizationId };
 }
 
 async function resolveUserFromAuth(

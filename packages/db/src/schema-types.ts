@@ -1688,12 +1688,10 @@ export const MAX_ORGANIZATION_GROUPS = 100;
 export const MAX_ORGANIZATION_GROUP_ASSIGNMENTS = 1_000;
 
 // Persisted shape of organization group policies. The runtime Zod contracts,
-// per-policy schemas, limits, defaults, and helpers live in the web app
-// (`apps/web/src/lib/organizations/group-policies`) so this package stays
+// per-policy schemas, limits, defaults, and helpers live in web-shared
+// (`packages/web-shared/src/lib/organizations/group-policies`) so this package stays
 // focused on database concerns. These structural types exist only to type the
 // `jsonb` columns in `schema.ts`; the app-side schemas assert compatibility.
-export type OrganizationGroupPolicyType = 'model_access';
-
 export type OrganizationGroupModelAccessPolicy = {
   type: 'model_access';
   data:
@@ -1702,7 +1700,41 @@ export type OrganizationGroupModelAccessPolicy = {
     | { mode: 'selected'; model_allow_list: string[]; provider_allow_list: string[] };
 };
 
-export type OrganizationGroupPolicy = OrganizationGroupModelAccessPolicy;
+type OrganizationPermissionAction = 'allow' | 'ask' | 'deny';
+type OrganizationPermissionRule = { pattern: string; action: OrganizationPermissionAction };
+
+export type OrganizationGroupAgentPermissionsPolicy = {
+  type: 'agent_permissions';
+  data: {
+    schema_version: 1;
+    unrestricted_mode?: 'allow' | 'deny';
+    tools?: Record<
+      string,
+      | OrganizationPermissionAction
+      | { rules: OrganizationPermissionRule[]; fallback?: OrganizationPermissionAction }
+    >;
+    shell?: Partial<
+      Record<
+        'bash' | 'powershell',
+        { fallback: 'ask' | 'deny'; rules: OrganizationPermissionRule[] }
+      >
+    >;
+  };
+};
+
+export type OrganizationGroupClientAccessPolicy = {
+  type: 'client_access';
+  data: { schema_version: 1 } & (
+    | { mode: 'allowlist'; clients: { feature: string; min_version?: string }[] }
+    | { mode: 'blocklist'; clients: { feature: string }[] }
+  );
+};
+
+export type OrganizationGroupPolicy =
+  | OrganizationGroupModelAccessPolicy
+  | OrganizationGroupAgentPermissionsPolicy
+  | OrganizationGroupClientAccessPolicy;
+export type OrganizationGroupPolicyType = OrganizationGroupPolicy['type'];
 export type OrganizationGroupPolicies = OrganizationGroupPolicy[];
 
 const GroupNameSchema = z.enum(['read', 'edit', 'browser', 'command', 'mcp']);

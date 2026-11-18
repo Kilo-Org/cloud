@@ -1,7 +1,6 @@
 'use client';
 
 import type { DrawerStackHelpers } from '@/components/drawer';
-import type { OrganizationGroupPolicies } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronRight, Plus } from 'lucide-react';
 import { organizationGroupPolicyDefinition } from '@/components/organizations/groups/policies/registry.client';
@@ -34,7 +33,7 @@ export function GroupPoliciesPanel({
     ...trpc.organizations.groups.getPolicySettings.queryOptions({ organizationId }),
     enabled: target.kind === 'default',
   });
-  const policies: OrganizationGroupPolicies | undefined =
+  const policies =
     target.kind === 'group' ? groupQuery.data?.group.policies : settingsQuery.data?.defaultPolicies;
 
   if (!policies)

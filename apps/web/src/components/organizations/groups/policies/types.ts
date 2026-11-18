@@ -1,4 +1,5 @@
 import type {
+  OrganizationGroupModelAccessPolicy,
   OrganizationGroupPolicy,
   OrganizationGroupPolicyOf,
   OrganizationGroupPolicyType,
@@ -9,6 +10,8 @@ import type { ComponentType } from 'react';
 export type OrganizationGroupPolicyTarget =
   | { kind: 'group'; groupId: string }
   | { kind: 'default' };
+
+export type EditableOrganizationGroupPolicyType = OrganizationGroupModelAccessPolicy['type'];
 
 export type OrganizationGroupPolicyEditorProps<T extends OrganizationGroupPolicyType> = {
   organizationId: string;
@@ -41,8 +44,8 @@ export type OrganizationGroupPolicyClientDefinition<T extends OrganizationGroupP
 };
 
 export type AnyOrganizationGroupPolicyClientDefinition = {
-  [T in OrganizationGroupPolicyType]: OrganizationGroupPolicyClientDefinition<T>;
-}[OrganizationGroupPolicyType];
+  [T in EditableOrganizationGroupPolicyType]: OrganizationGroupPolicyClientDefinition<T>;
+}[EditableOrganizationGroupPolicyType];
 
 export function policyMatchesType<T extends OrganizationGroupPolicyType>(
   policy: OrganizationGroupPolicy,

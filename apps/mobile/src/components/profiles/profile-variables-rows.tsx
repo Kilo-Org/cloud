@@ -135,16 +135,20 @@ export function VariableRowView({
           <View className="shrink-0 flex-row items-center gap-1">
             <Lock size={12} color={colors.mutedForeground} />
             <Text
-              className="text-xs text-muted-foreground"
+              className="text-sm text-muted-foreground"
               accessibilityLabel={t('profiles.secrets.masked')}
             >
               {row.maskedValue}
             </Text>
           </View>
         ) : (
-          // The value is secondary: it takes the width the key leaves and cuts
-          // at the end, so it never takes width the key needs.
-          <Text className="min-w-0 shrink text-xs text-muted-foreground" numberOfLines={1}>
+          // The value is secondary in ink, not in size: it matches the key's
+          // type size and keeps the muted colour. It takes the width the key
+          // leaves and cuts at the end, so it never takes width the key needs.
+          <Text
+            className="min-w-0 shrink text-sm text-muted-foreground"
+            numberOfLines={1}
+          >
             {revealed ? row.value : row.maskedValue}
           </Text>
         )}

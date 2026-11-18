@@ -133,6 +133,8 @@ export interface BrowserRuntime {
   readonly claimTab: (input: BrowserTabClaimInput) => Promise<boolean>;
   /** Ends a session: its group collapses, turns grey and becomes `Kilo · ended`. */
   readonly closeSession: (input: BrowserSessionRef) => Promise<void>;
+  /** Records a tab the browser opened from one of a session's tabs, so the session may use it. */
+  readonly noteTabCreated: (tabId: number, openerTabId: number | undefined) => void;
   /** Drops the caller's ref registries for good; the tab sessions and leases stay alive for others. */
   readonly disposeCaller: (caller: BrowserCaller) => number;
   /** Tab closed or left the extension's reach: drop the session, its lease and its override. */
@@ -493,6 +495,7 @@ export const createBrowserRuntime = ({
                         .filter(grant => grant.class === 'read')
                         .map(grant => grant.origin),
                     },
+                    noteTabCreated,
                   }),
               ...(options?.now === undefined ? {} : { now: options.now }),
               ...(options?.webMcpDiscover === undefined
@@ -586,6 +589,26 @@ export const createBrowserRuntime = ({
     return leases.releaseCaller(caller);
   };
 
+  const noteTabCreated = (tabId: number, openerTabId: number | undefined): void => {
+    if (openerTabId === undefined) {
+      return;
+    }
+
+    const openerSession = groups.sessionForTab(openerTabId);
+
+    if (openerSession === undefined) {
+      return;
+    }
+
+    const groupId = groups
+      .listSessions()
+      .find(session => session.sessionHandle === openerSession)?.groupId;
+
+    if (groupId !== undefined) {
+      groups.noteTabAdded(tabId, groupId);
+    }
+  };
+
   return {
     adoptEnded: input => groups.adoptEnded(input),
     claimTab,
@@ -596,6 +619,7 @@ export const createBrowserRuntime = ({
     disposeTab,
     evalInTab,
     listSessions: () => groups.listSessions(),
+    noteTabCreated,
     openSession: input => groups.openSession(input),
     // Turn end: the lease goes, the caller's refs stay. Playwright-like, a ref from an earlier snapshot keeps resolving for as long as the caller and the tab session live.
     releaseCaller: caller => leases.releaseCaller(caller),

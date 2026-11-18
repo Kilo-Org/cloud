@@ -83,6 +83,7 @@ const createSession = (
 
       return { object: { objectId: `obj-${String(id)}` } };
     },
+    'Page.createIsolatedWorld': () => ({ executionContextId: 9 }),
     'Page.getFrameTree': () => frameTree(options.mainUrl ?? MAIN_URL),
     'Runtime.callFunctionOn': params => {
       const objectId = params?.['objectId'];
@@ -437,6 +438,39 @@ describe('sensitive steps', () => {
         },
       ],
       kind: 'needs_permission',
+    });
+  });
+
+  it('labels the approval with the sensitive element\u2019s own frame origin', async () => {
+    const passwords = { 'obj-12': passwordProbe };
+    const result = await run({
+      args: {
+        fields: [
+          { name: 'Name', target: 'e11', type: 'textbox', value: 'Igor' },
+          { name: 'Password', target: 'e12', type: 'textbox', value: 'hunter2' },
+        ],
+      },
+      session: createSession({
+        frameIdForBackendNode: frameIdForTestNode,
+        probeByObject: passwords,
+      }),
+      toolName: 'browser_fill_form',
+    });
+
+    expect(failureOf(result)).toStrictEqual({
+      items: [
+        {
+          class: 'sensitive',
+          origin: 'https://pay.example.com',
+          reason: SENSITIVE_REASON.password,
+        },
+      ],
+      kind: 'needs_permission',
+    });
+    expect(sensitiveOf(result)).toStrictEqual({
+      element: 'e12',
+      origin: 'https://pay.example.com',
+      reason: SENSITIVE_REASON.password,
     });
   });
 

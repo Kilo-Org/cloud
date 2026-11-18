@@ -617,6 +617,23 @@ describe('agent browser calls', () => {
     ).resolves.toMatchObject({ kind: 'result', result: { ok: true } });
   });
 
+  it('adds a tab opened from a session tab to that session', async () => {
+    const { controller } = createGroups();
+    const { runtime } = createHarness(controller);
+
+    await runtime.openSession({
+      controllerId: 'controller-1',
+      sessionHandle: 'session-1',
+      title: 'Work',
+    });
+    await runtime.shareActiveTab({ sessionHandle: 'session-1' });
+
+    runtime.noteTabCreated(8, TAB_ID);
+    runtime.noteTabCreated(9, 999);
+
+    expect(controller.tabsForSession('session-1')).toStrictEqual([TAB_ID, 8]);
+  });
+
   it('ends the group as `Kilo · ended` and stops targeting its tabs', async () => {
     const { controller, updates } = createGroups();
     const { runtime } = createHarness(controller);

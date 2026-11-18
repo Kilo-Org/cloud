@@ -341,11 +341,18 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
     return { class: grantClass, ok: true, origin, targetOriginFrame };
   }
 
+  // The approval is labelled with the sensitive element's own frame origin, not the first target's: a password field may live in another frame than the form.
+  const sensitiveFrame =
+    sensitive.element === undefined
+      ? undefined
+      : await targetFrameOf(input.session, frames, sensitive.element);
+  const sensitiveOrigin = sensitiveFrame?.origin ?? origin;
+  const sensitiveStep = { ...sensitive, origin: sensitiveOrigin };
   const binding: StepTokenBinding = {
     argumentHash: hashBrowserToolArguments(input.args),
     // The refusal reports the element that probed sensitive; the runtime issues the token for that element, so the retry must bind exactly it.
     element: sensitive.element,
-    origin,
+    origin: sensitiveOrigin,
     tabId: input.tabId,
     toolName: input.toolName,
   };
@@ -357,11 +364,11 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
 
   return {
     failure: {
-      items: [{ class: 'sensitive', origin, reason: sensitive.reason }],
+      items: [{ class: 'sensitive', origin: sensitiveOrigin, reason: sensitive.reason }],
       kind: 'needs_permission',
     },
     ok: false,
-    sensitive,
+    sensitive: sensitiveStep,
   };
 };
 

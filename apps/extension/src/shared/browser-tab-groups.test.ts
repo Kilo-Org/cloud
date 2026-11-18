@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- One suite walks the session/group state machine end to end; splitting it would scatter the transitions. */
 /* eslint-disable require-await, unicorn/no-useless-undefined, vitest/max-expects, vitest/prefer-mock-return-shorthand -- fakes must return promises like the browser API, and one test body checks one state-machine transition end to end */
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -14,6 +15,16 @@ const createGroupMock = (id: number) =>
 const createUpdateMock = () =>
   vi.fn(async (_groupId: number, _props: BrowserTabGroupUpdate) => undefined);
 
+/** Chrome rejects grouping zero tabs; this fake models that while accepting a real tab. */
+const emptyGroupRejectingMock = () =>
+  vi.fn(async (options: { readonly tabIds: number[] }) => {
+    if (options.tabIds.length === 0) {
+      throw new Error('No tabs to group');
+    }
+
+    return 12;
+  });
+
 describe('tab group titles', () => {
   it('builds the exact live title and the ended title', () => {
     expect(browserTabGroupTitle('Report')).toBe('Kilo · Report');
@@ -23,20 +34,48 @@ describe('tab group titles', () => {
 });
 
 describe('browser tab groups', () => {
-  it('opens a session group titled Kilo · <title> without a colour', async () => {
+  it('creates the group with its first tab and titles it Kilo · <title>', async () => {
     const group = createGroupMock(9);
     const update = createUpdateMock();
     const controller = createBrowserTabGroupController({ api: { group, update } });
 
     await expect(
       controller.openSession({ controllerId: 'c1', sessionHandle: 's1', title: 'Report' })
-    ).resolves.toStrictEqual({ groupId: 9 });
+    ).resolves.toStrictEqual({});
 
-    expect(group).toHaveBeenCalledWith({ tabIds: [] });
-    expect(update).toHaveBeenCalledExactlyOnceWith(9, { title: 'Kilo · Report' });
+    // Chrome rejects a group with no tabs, so the title waits for the first tab.
+    expect(group).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+
+    await expect(
+      controller.shareActiveTab({ sessionHandle: 's1', tabId: 7 })
+    ).resolves.toStrictEqual({ groupId: 9, tabId: 7 });
+
+    expect(group).toHaveBeenCalledExactlyOnceWith({ tabIds: [7] });
+    expect(update).toHaveBeenCalledExactlyOnceWith(9, {
+      color: 'grey',
+      title: 'Kilo · Report',
+    });
     expect(controller.listSessions()).toStrictEqual([
-      { ended: false, groupId: 9, sessionHandle: 's1', tabs: [], title: 'Report' },
+      { ended: false, groupId: 9, sessionHandle: 's1', tabs: [7], title: 'Report' },
     ]);
+  });
+
+  it('keeps the session understandable when tabs.group rejects an empty group', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const group = emptyGroupRejectingMock();
+    const update = createUpdateMock();
+    const controller = createBrowserTabGroupController({ api: { group, update } });
+
+    await expect(
+      controller.openSession({ controllerId: 'c1', sessionHandle: 's1', title: 'Report' })
+    ).resolves.toStrictEqual({});
+
+    await expect(
+      controller.shareActiveTab({ sessionHandle: 's1', tabId: 8 })
+    ).resolves.toStrictEqual({ groupId: 12, tabId: 8 });
+    expect(update).toHaveBeenCalledWith(12, { color: 'grey', title: 'Kilo · Report' });
+    warn.mockRestore();
   });
 
   it('records a session without a group when tabs.group is missing', async () => {
@@ -72,19 +111,21 @@ describe('browser tab groups', () => {
   it('validates the group id instead of trusting it', async () => {
     const group = createGroupMock(Number.NaN);
     const controller = createBrowserTabGroupController({ api: { group } });
+    await controller.openSession({ controllerId: 'c1', sessionHandle: 's1', title: 'Report' });
 
     await expect(
-      controller.openSession({ controllerId: 'c1', sessionHandle: 's1', title: 'Report' })
-    ).resolves.toStrictEqual({});
+      controller.shareActiveTab({ sessionHandle: 's1', tabId: 15 })
+    ).resolves.toStrictEqual({ tabId: 15 });
   });
 
   it('records the group id even when tabGroups.update is missing', async () => {
     const group = createGroupMock(4);
     const controller = createBrowserTabGroupController({ api: { group } });
+    await controller.openSession({ controllerId: 'c1', sessionHandle: 's1', title: 'Report' });
 
     await expect(
-      controller.openSession({ controllerId: 'c1', sessionHandle: 's1', title: 'Report' })
-    ).resolves.toStrictEqual({ groupId: 4 });
+      controller.shareActiveTab({ sessionHandle: 's1', tabId: 16 })
+    ).resolves.toStrictEqual({ groupId: 4, tabId: 16 });
   });
 
   it('groups and records an explicitly shared tab', async () => {
@@ -243,12 +284,13 @@ describe('browser tab groups', () => {
     const controller = createBrowserTabGroupController({ api: { group } });
     await controller.openSession({ controllerId: 'c1', sessionHandle: 'a', title: 'Alpha' });
     await controller.openSession({ controllerId: 'c1', sessionHandle: 'b', title: 'Beta' });
+    await controller.shareActiveTab({ sessionHandle: 'a', tabId: 51 });
+    await controller.shareActiveTab({ sessionHandle: 'b', tabId: 52 });
 
-    controller.noteTabAdded(51, 1);
-    controller.noteTabAdded(52, 2);
-    controller.noteTabAdded(53);
+    // Group 1 belongs to session a: a tab the browser reports there joins it.
+    controller.noteTabAdded(53, 1);
 
-    expect(controller.tabsForSession('a')).toStrictEqual([51]);
+    expect(controller.tabsForSession('a')).toStrictEqual([51, 53]);
     expect(controller.tabsForSession('b')).toStrictEqual([52]);
   });
 

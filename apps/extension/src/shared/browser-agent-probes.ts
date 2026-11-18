@@ -47,6 +47,49 @@ const frameExecutionContext = async (
   }
 };
 
+const frameTreeSchema = z.object({
+  frameTree: z.object({ frame: z.object({ id: z.string() }) }),
+});
+
+const describeNodeSchema = z.object({
+  node: z.object({ frameId: z.string().optional() }).optional(),
+});
+
+/** The frame a resolved target lives in, so the probe can run in that frame's isolated world. */
+const targetFrameId = async (
+  session: ProbeSession,
+  resolved:
+    | { readonly kind: 'ref'; readonly backendNodeId: number }
+    | { readonly kind: 'selector'; readonly nodeId: number }
+): Promise<string | undefined> => {
+  try {
+    const parsed = describeNodeSchema.safeParse(
+      await session.send(
+        'DOM.describeNode',
+        resolved.kind === 'ref'
+          ? { backendNodeId: resolved.backendNodeId }
+          : { nodeId: resolved.nodeId }
+      )
+    );
+
+    return parsed.success ? parsed.data.node?.frameId : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+const mainFrameId = async (
+  session: Pick<BrowserToolPageSession, 'send'>
+): Promise<string | undefined> => {
+  try {
+    const parsed = frameTreeSchema.safeParse(await session.send('Page.getFrameTree'));
+
+    return parsed.success ? parsed.data.frameTree.frame.id : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 const probeJsonSchema = z.string();
 
 /**
@@ -287,11 +330,27 @@ export const readSensitiveProbeForFocusedElement = async (
   session: ProbeSession
 ): Promise<BrowserSensitiveProbe> => {
   try {
+    const frameId = await mainFrameId(session);
+    const contextId =
+      frameId === undefined ? undefined : await frameExecutionContext(session, frameId);
+
+    if (contextId === undefined) {
+      return { fields: [], paymentFormSubmit: false };
+    }
+
+    // Same-origin frames are followed through activeElement; a cross-origin frame's document is unreadable from here.
+    const expression = `(() => {
+      var element = document.activeElement;
+      while (element && (element.tagName === 'IFRAME' || element.tagName === 'FRAME')) {
+        var doc = null;
+        try { doc = element.contentDocument; } catch (error) { doc = null; }
+        if (!doc) { return JSON.stringify({ fields: [], paymentFormSubmit: false }); }
+        element = doc.activeElement;
+      }
+      return element ? (${SENSITIVE_TARGET_PROBE_FUNCTION}).call(element) : JSON.stringify({ fields: [], paymentFormSubmit: false });
+    })()`;
     const response = runtimeEvaluateSchema.safeParse(
-      await session.send('Runtime.evaluate', {
-        expression: `(() => { const element = document.activeElement; return element ? (${SENSITIVE_TARGET_PROBE_FUNCTION}).call(element) : JSON.stringify({ fields: [], paymentFormSubmit: false }); })()`,
-        returnByValue: true,
-      })
+      await session.send('Runtime.evaluate', { contextId, expression, returnByValue: true })
     );
 
     return decodeSensitiveProbe(response.success ? response.data.result?.value : undefined);
@@ -320,12 +379,22 @@ export const readSensitiveProbeForTarget = async (
       return { fields: [], paymentFormSubmit: false };
     }
 
+    // Resolve the node inside the frame's isolated world: page script can shadow
+    // `type`/`getAttribute`, so the probe must not run in the main world.
+    const frameId = await targetFrameId(session, resolved);
+    const executionContextId =
+      frameId === undefined ? undefined : await frameExecutionContext(session, frameId);
+
+    if (frameId === undefined || executionContextId === undefined) {
+      return { fields: [], paymentFormSubmit: false };
+    }
+
     const resolvedNode = resolveObjectSchema.safeParse(
       await session.send(
         'DOM.resolveNode',
         resolved.kind === 'ref'
-          ? { backendNodeId: resolved.backendNodeId }
-          : { nodeId: resolved.nodeId }
+          ? { backendNodeId: resolved.backendNodeId, executionContextId }
+          : { executionContextId, nodeId: resolved.nodeId }
       )
     );
     const objectId = resolvedNode.success ? resolvedNode.data.object?.objectId : undefined;

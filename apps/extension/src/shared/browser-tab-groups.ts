@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- The controller owns session, group and tab-id state that reads as one state machine; splitting it would scatter the id bookkeeping. */
 import { z } from 'zod';
 
 /**
@@ -32,8 +33,14 @@ export type BrowserTabQuery = Pick<BrowserActiveTabInfo, 'active'> & {
 
 /** The injected browser surface; responses are validated at every call. */
 export interface BrowserTabGroupsApi {
-  /** `tabs.group`: a lone tab id joins its window's group or creates one. */
-  readonly group?: (options: { readonly tabIds: number[] }) => MaybeAsync<number>;
+  /**
+   * `tabs.group`: with `groupId` a tab joins that group; without it the tab's
+   * window gets a new group. chrome rejects an empty `tabIds`.
+   */
+  readonly group?: (options: {
+    readonly groupId?: number;
+    readonly tabIds: number[];
+  }) => MaybeAsync<number>;
   readonly queryGroup?: (groupId: number) => MaybeAsync<readonly BrowserTabGroupInfo[]>;
   /** `tabGroups.update`: the only way to set a title or collapsed state. */
   readonly update?: (groupId: number, props: BrowserTabGroupUpdate) => MaybeAsync<void>;
@@ -130,12 +137,14 @@ export const createBrowserTabGroupController = ({
       session.tabs.push(tabId);
     }
   };
-  const createGroup = async (tabIds: number[]): Promise<number | undefined> => {
+  const createGroup = async (tabIds: number[], groupId?: number): Promise<number | undefined> => {
     const { group } = api;
     if (group === undefined) {
       return undefined;
     }
-    const parsed = tabGroupIdSchema.safeParse(await attempt(() => group({ tabIds })));
+    const parsed = tabGroupIdSchema.safeParse(
+      await attempt(() => group(groupId === undefined ? { tabIds } : { groupId, tabIds }))
+    );
     return parsed.success ? parsed.data : undefined;
   };
   const updateGroup = async (groupId: number, props: BrowserTabGroupUpdate): Promise<void> => {
@@ -158,22 +167,13 @@ export const createBrowserTabGroupController = ({
     return parsed.data.find(tab => tab.active === true)?.id ?? parsed.data[0]?.id;
   };
 
-  const openSession = async (
-    input: BrowserOpenSessionInput
-  ): Promise<BrowserTabGroupOpenResult> => {
+  const openSession = (input: BrowserOpenSessionInput): Promise<BrowserTabGroupOpenResult> => {
     const session = ensureSession(input.sessionHandle);
     session.ended = false;
     delete session.endedAt;
     session.title = input.title;
-    // The group starts empty; tabs join through shareActiveTab/noteTabAdded.
-    const groupId = await createGroup([]);
-    if (groupId === undefined) {
-      session.groupId = undefined;
-      return {};
-    }
-    session.groupId = groupId;
-    await updateGroup(groupId, { title: browserTabGroupTitle(input.title) });
-    return { groupId };
+    // Chrome rejects an empty tabs.group, so the group is created with the first tab.
+    return Promise.resolve(session.groupId === undefined ? {} : { groupId: session.groupId });
   };
 
   const closeSession = async ({ sessionHandle }: BrowserSessionRef): Promise<void> => {
@@ -192,6 +192,25 @@ export const createBrowserTabGroupController = ({
         title: browserTabGroupEndedTitle(),
       });
     }
+  };
+
+  /** Moves a tab into the session's group, creating and titling the group on first use. */
+  const groupTab = async (session: SessionState, tabId: number): Promise<number | undefined> => {
+    const groupId = await createGroup([tabId], session.groupId);
+
+    if (groupId === undefined) {
+      return session.groupId;
+    }
+
+    if (session.groupId === undefined) {
+      session.groupId = groupId;
+      await updateGroup(groupId, {
+        color: BROWSER_TAB_GROUP_COLOR,
+        title: browserTabGroupTitle(session.title),
+      });
+    }
+
+    return session.groupId;
   };
 
   const adoptEnded = async ({
@@ -232,11 +251,7 @@ export const createBrowserTabGroupController = ({
     }
     recordTab(session, resolved);
     if (api.group !== undefined) {
-      const groupId = await createGroup([resolved]);
-      // The opened group stays authoritative; a lone tab's group fills a gap.
-      if (groupId !== undefined && session.groupId === undefined) {
-        session.groupId = groupId;
-      }
+      await groupTab(session, resolved);
     }
     return session.groupId === undefined
       ? { tabId: resolved }

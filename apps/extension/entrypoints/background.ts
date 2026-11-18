@@ -146,10 +146,16 @@ const getBrowserRuntime = ({
 
   browserRuntimes.set(tabsApi, runtime);
 
-  if (!runtimeCleanupWiredTabsApis.has(tabsApi) && tabsApi.onRemoved !== undefined) {
+  if (!runtimeCleanupWiredTabsApis.has(tabsApi)) {
     runtimeCleanupWiredTabsApis.add(tabsApi);
-    tabsApi.onRemoved.addListener(tabId => {
+    tabsApi.onRemoved?.addListener(tabId => {
       void runtime.disposeTab(tabId);
+    });
+    // A tab opened from a tab in a session's group joins that session (D9).
+    tabsApi.onCreated?.addListener(tab => {
+      if (tab.id !== undefined) {
+        runtime.noteTabCreated(tab.id, tab.openerTabId);
+      }
     });
   }
 

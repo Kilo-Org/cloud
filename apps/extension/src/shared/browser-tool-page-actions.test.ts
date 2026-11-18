@@ -508,6 +508,68 @@ describe('browser-tool-page-actions', () => {
       expect(tabs.creates).toHaveLength(0);
     });
 
+    it('refuses a select allowed only by an act grant outside the group', async () => {
+      const tabs = createFakeTabsApi([
+        inspectableTab(1, 'First', 'https://first.example.com/'),
+        inspectableTab(2, 'Second', 'https://second.example.com/'),
+      ]);
+
+      const result = await runPageBrowserTool(
+        'kilo_browser_tabs',
+        { action: 'select', index: 1 },
+        undefined,
+        {
+          agentAccess: {
+            actOrigins: ['https://second.example.com'],
+            groupTabs: [],
+            navigateOrigins: [],
+            readableOrigins: [],
+          },
+          tabId: 1,
+          tabsApi: tabs.tabsApi,
+        }
+      );
+
+      expect(result.ok).toBe(false);
+      expect(tabs.updates).toHaveLength(0);
+    });
+
+    it('names the missing navigate grant when a new tab origin is ungranted', async () => {
+      const tabs = tabsWithOnePage();
+
+      const result = await runPageBrowserTool(
+        'kilo_browser_tabs',
+        { action: 'new', url: 'https://new.example.com/' },
+        undefined,
+        {
+          agentAccess: { actOrigins: [], groupTabs: [], navigateOrigins: [], readableOrigins: [] },
+          tabId: 1,
+          tabsApi: tabs.tabsApi,
+        }
+      );
+
+      expect(result).toMatchObject({ ok: false });
+      expect(JSON.stringify(result)).toContain('navigate grant');
+    });
+
+    it('records a created tab with the tab that opened it', async () => {
+      const tabs = tabsWithOnePage();
+      const created: [number, number | undefined][] = [];
+
+      await runPageBrowserTool(
+        'kilo_browser_tabs',
+        { action: 'new', url: 'https://new.example.com/' },
+        undefined,
+        {
+          noteTabCreated: (tabId, openerTabId) => created.push([tabId, openerTabId]),
+          tabId: 1,
+          tabsApi: tabs.tabsApi,
+        }
+      );
+
+      expect(created).toStrictEqual([[99, 1]]);
+    });
+
     it('rejects a select without an index', async () => {
       const tabs = tabsWithOnePage();
 

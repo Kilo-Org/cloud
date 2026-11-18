@@ -134,6 +134,8 @@ export interface BrowserAgentAccess {
 export interface BrowserToolPageActionOptions {
   /** Present only for a CLI agent caller: the tab actions enforce the D9 boundary and per-origin grants. */
   readonly agentAccess?: BrowserAgentAccess | undefined;
+  /** Records a tab the call opened, with the tab that opened it, so the session may use it later. */
+  readonly noteTabCreated?: ((tabId: number, openerTabId: number | undefined) => void) | undefined;
   /** WebMCP discovery across frames; wired to the existing WebMCP runtime. */
   readonly webMcpDiscover?: (tabId: number) => Promise<WebMcpDiscoveryResult | undefined>;
   /** WebMCP execution by tool name; wired to the existing WebMCP runtime. */
@@ -812,11 +814,12 @@ const tabReadable = (
 ): boolean =>
   access.groupTabs?.includes(tab.id) === true || grantsOrigin(access.readableOrigins, tab.url);
 
-const tabActable = (
-  access: BrowserAgentAccess,
-  tab: { readonly id: number; readonly url?: string | undefined }
-): boolean =>
-  access.groupTabs?.includes(tab.id) === true || grantsOrigin(access.actOrigins, tab.url);
+/**
+ * Acting on another tab is the D9 boundary: the session's group (which includes
+ * tabs the user shared) is the only allowance; a grant for that origin is not.
+ */
+const tabActable = (access: BrowserAgentAccess, tab: { readonly id: number }): boolean =>
+  access.groupTabs?.includes(tab.id) === true;
 
 const runTabs = async (
   args: Record<string, unknown>,
@@ -859,10 +862,14 @@ const runTabs = async (
       url !== undefined &&
       !grantsOrigin(options.agentAccess.navigateOrigins, url)
     ) {
-      return fail(TAB_GROUP_BLOCKED_ERROR);
+      return fail(`Opening a tab at ${url} needs a navigate grant for that origin (blocked).`);
     }
 
     const tab = await create(url === undefined ? {} : { url });
+
+    if (tab?.id !== undefined) {
+      options.noteTabCreated?.(tab.id, options.tabId);
+    }
 
     return done({
       selected: true,

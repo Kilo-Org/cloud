@@ -94,6 +94,12 @@ export interface BrowserTabInfo {
   readonly windowId?: number;
 }
 
+export interface BrowserTabCreatedApi {
+  readonly addListener: (
+    listener: (tab: { readonly id?: number; readonly openerTabId?: number }) => void
+  ) => void;
+}
+
 export interface BrowserTabRemovedApi {
   readonly addListener: (listener: (tabId: number) => void) => void;
   readonly removeListener: (listener: (tabId: number) => void) => void;
@@ -106,6 +112,8 @@ export interface BrowserTabsApi {
   ) => Promise<string> | string;
   readonly get?: (tabId: number) => Promise<BrowserTabInfo> | BrowserTabInfo;
   /** `chrome.tabs.onRemoved` — a browser-tool session disposes when its tab closes. */
+  /** `chrome.tabs.onCreated` — a tab opened from a session's tab joins that session. */
+  readonly onCreated?: BrowserTabCreatedApi;
   readonly onRemoved?: BrowserTabRemovedApi;
   readonly query: (
     queryInfo: Record<string, unknown>

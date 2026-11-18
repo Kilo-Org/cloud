@@ -43,6 +43,8 @@ export type BrowserToolDispatchSession = BrowserToolPageSession &
 export interface BrowserToolDispatchOptions {
   /** The agent caller's grants and group, so the tab actions enforce D9; absent for the panel and workflow callers. */
   readonly agentAccess?: BrowserAgentAccess | undefined;
+  /** Records a tab the page tools opened, with its opener tab. */
+  readonly noteTabCreated?: ((tabId: number, openerTabId: number | undefined) => void) | undefined;
   /** Frame scoping for a CLI agent caller; absent for the panel and workflow callers. */
   readonly agentScope?: AgentReadScope | undefined;
   readonly now?: () => number;
@@ -75,6 +77,7 @@ const readToolOptions = (options: BrowserToolDispatchOptions): BrowserReadToolOp
 
 const pageToolOptions = (options: BrowserToolDispatchOptions): BrowserToolPageActionOptions => ({
   ...(options.agentAccess === undefined ? {} : { agentAccess: options.agentAccess }),
+  ...(options.noteTabCreated === undefined ? {} : { noteTabCreated: options.noteTabCreated }),
   ...(options.now === undefined ? {} : { now: options.now }),
   ...(options.tabId === undefined ? {} : { tabId: options.tabId }),
   ...(options.tabsApi === undefined ? {} : { tabsApi: options.tabsApi }),

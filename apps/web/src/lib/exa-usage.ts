@@ -1,9 +1,11 @@
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { exa_monthly_usage, exa_usage_log, kilocode_users, type User } from '@kilocode/db/schema';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
+import { hasEffectiveOrganizationAccess } from '@kilocode/worker-utils/organization-membership';
 import { scheduleOrganizationLowBalanceAlert } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import type { OrganizationUsageMutationResult } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@kilocode/web-shared/lib/constants';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { recordOrganizationConsumption } from '@kilocode/web-shared/lib/kilo-pass-org/consumption';
 import type { ExaUsageRecord, ExaUsageWriteResponse } from '@kilocode/usage-contracts';
 
@@ -73,8 +75,10 @@ const WRITE_IDLE_TIMEOUT_MS = 60_000;
 
 /**
  * Records the source row, monthly counter, and charged owner mutation atomically.
- * A repeated `id`/`occurredAt` pair is a no-op, so retries cannot double-charge.
- * Low-balance notification scheduling happens only after commit.
+ * A repeated `id`/`occurredAt` pair is a no-op, so retries cannot double-charge; a
+ * committed record keeps answering `duplicate` even when its payer no longer resolves.
+ * A record whose named payer cannot be resolved resolves to `rejected` and writes
+ * nothing; low-balance notification scheduling happens only after a commit.
  */
 export async function recordExaUsage(
   record: ExaUsageRecord,
@@ -105,6 +109,22 @@ export async function recordExaUsage(
       await tx.execute(
         sql.raw(`SET LOCAL idle_in_transaction_session_timeout = '${idleTimeoutMs}'`)
       );
+    }
+
+    const rejectionReason = await unresolvablePayer(tx, {
+      userId,
+      organizationId: organizationId ?? null,
+    });
+    if (rejectionReason) {
+      const [committed] = await tx
+        .select({ id: exa_usage_log.id })
+        .from(exa_usage_log)
+        .where(and(eq(exa_usage_log.id, id), eq(exa_usage_log.created_at, occurredAt)))
+        .limit(1);
+      if (committed) {
+        return { status: 'duplicate' as const, organizationUsage: null };
+      }
+      return { status: 'rejected' as const, organizationUsage: null, rejectionReason };
     }
 
     const [inserted] = await tx
@@ -153,11 +173,55 @@ export async function recordExaUsage(
     return { status: 'recorded' as const, organizationUsage };
   });
 
+  if (outcome.status === 'rejected') {
+    // Warning level plus a Sentry capture: a step change in rejected volume must be visible in
+    // alerting, not only as log noise. The reason distinguishes an unknown payer from a
+    // membership the record no longer names.
+    sentryLogger('exa-usage', 'warning')('usage record rejected: payer could not be resolved', {
+      usage_id: id,
+      reason: outcome.rejectionReason,
+    });
+    return 'rejected';
+  }
+
   if (organizationId && outcome.organizationUsage) {
     scheduleOrganizationLowBalanceAlert(organizationId, outcome.organizationUsage);
   }
 
   return outcome.status;
+}
+
+/**
+ * Resolves the payer a record names inside the writing transaction. A record is
+ * written only when its user exists and a non-null organization is a live one
+ * the user may act for under the same effective-membership rule the request
+ * path used (a direct membership, or a permitted role on the live parent
+ * organization); otherwise the payer cannot be charged and nothing may be
+ * recorded.
+ */
+async function unresolvablePayer(
+  tx: DrizzleTransaction,
+  params: { userId: string; organizationId: string | null }
+): Promise<'user_not_found' | 'organization_membership_missing' | null> {
+  const [user] = await tx
+    .select({ id: kilocode_users.id })
+    .from(kilocode_users)
+    .where(eq(kilocode_users.id, params.userId))
+    .limit(1);
+  if (!user) return 'user_not_found';
+
+  if (params.organizationId === null) return null;
+
+  if (
+    !(await hasEffectiveOrganizationAccess(tx, {
+      kiloUserId: params.userId,
+      organizationId: params.organizationId,
+    }))
+  ) {
+    return 'organization_membership_missing';
+  }
+
+  return null;
 }
 
 /**

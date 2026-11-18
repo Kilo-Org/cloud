@@ -9362,6 +9362,17 @@
     ],
     "searchBlob": "cloudAgentSettings.getBuiltinAgents Get the current user's personal built-in agent settings, including disabled modes and per-agent model overrides. cloudagentsettings getbuiltinagents"
   },
+  "cloudAgentSettings.getModelContextLimits": {
+    "path": "cloudAgentSettings.getModelContextLimits",
+    "kind": "query",
+    "summary": "Get the current user's personal Cloud Agent context caps, as a map from gateway model IDs to token counts.",
+    "inputSchema": {},
+    "tags": [
+      "cloudagentsettings",
+      "getmodelcontextlimits"
+    ],
+    "searchBlob": "cloudAgentSettings.getModelContextLimits Get the current user's personal Cloud Agent context caps, as a map from gateway model IDs to token counts. cloudagentsettings getmodelcontextlimits"
+  },
   "cloudAgentSettings.getWorkspaceOrder": {
     "path": "cloudAgentSettings.getWorkspaceOrder",
     "kind": "query",
@@ -9515,6 +9526,39 @@
       "allocation"
     ],
     "searchBlob": "cloudAgentSettings.setContextAllocation Set or clear the default sandbox allocation used for Cloud Agent context, for the current user or their organization. cloudagentsettings setcontextallocation organizationid allocation organizationId allocation"
+  },
+  "cloudAgentSettings.setModelContextLimits": {
+    "path": "cloudAgentSettings.setModelContextLimits",
+    "kind": "mutation",
+    "summary": "Replace the current user's personal Cloud Agent context caps for new workspaces. Pass gateway model IDs mapped to token counts, or an empty map to clear all caps.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "limits": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 1000,
+            "maximum": 10000000
+          }
+        }
+      },
+      "required": [
+        "limits"
+      ]
+    },
+    "tags": [
+      "cloudagentsettings",
+      "setmodelcontextlimits",
+      "limits"
+    ],
+    "searchBlob": "cloudAgentSettings.setModelContextLimits Replace the current user's personal Cloud Agent context caps for new workspaces. Pass gateway model IDs mapped to token counts, or an empty map to clear all caps. cloudagentsettings setmodelcontextlimits limits limits"
   },
   "cloudAgentSettings.setRepositorySettings": {
     "path": "cloudAgentSettings.setRepositorySettings",

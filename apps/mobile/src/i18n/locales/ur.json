@@ -4292,8 +4292,7 @@
       "repoValue": "ذخیرہ: {{name}}",
       "profileValue": "پروفائل: {{name}}",
       "profileUnavailable": "یہ پروفائل اب دستیاب نہیں ہے۔ کوئی دوسرا پروفائل منتخب کریں۔",
-      "pickerEmptyDescriptionOrganization": "سیشنوں میں ماحولیاتی متغیرات، سیٹ اپ کمانڈز، اور مہارتوں کو دوبارہ استعمال کرنے کے لیے ایک تنظیمی پروفائل بنائیں۔",
-      "pickerEmptyDescriptionOrganizationReadOnly": "تنظیم کا مالک یا ایڈمن تنظیمی پروفائل بنا سکتا ہے۔"
+      "pickerEmptyDescriptionOrganization": "سیشنوں میں ماحولیاتی متغیرات، سیٹ اپ کمانڈز، اور مہارتوں کو دوبارہ استعمال کرنے کے لیے ایک تنظیمی پروفائل بنائیں۔"
     },
     "variablesDeleteFailed": "متغیر حذف نہیں کیا جا سکا",
     "deleteVariable": "متغیر {{key}} کو حذف کریں",
@@ -4651,6 +4650,8 @@
       "created": "ٹرگر بن گیا",
       "saved": "ٹرگر محفوظ ہو گیا",
       "statusArrived": "پہنچ گیا",
+      "defaultPromptWebhook": "اس ویب ہک درخواست کے باڈی کی وضاحت کریں:\n\n{{body}}",
+      "defaultPromptScheduled": "شیڈول شدہ کام چلائیں۔ {{scheduledTime}} پر ٹرگر ہوا۔",
       "problems": {
         "nameRequired": "نام درج کریں۔",
         "nameTooShort": "کم از کم 8 حروف استعمال کریں۔",

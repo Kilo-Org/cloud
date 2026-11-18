@@ -4424,8 +4424,7 @@
       "repoValue": "Сховішча: {{name}}",
       "profileValue": "Профіль: {{name}}",
       "profileUnavailable": "Гэты профіль больш недаступны. Выберыце іншы.",
-      "pickerEmptyDescriptionOrganization": "Стварыце профіль арганізацыі для паўторнага выкарыстання зменных асяроддзя, каманд наладкі і навыкаў у сеансах.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Уладальнік арганізацыі або адмін можа стварыць профіль арганізацыі."
+      "pickerEmptyDescriptionOrganization": "Стварыце профіль арганізацыі для паўторнага выкарыстання зменных асяроддзя, каманд наладкі і навыкаў у сеансах."
     },
     "variablesDeleteFailed": "Не ўдалося выдаліць зменную",
     "deleteVariable": "Выдаліць зменную {{key}}",
@@ -4791,6 +4790,8 @@
       "created": "Трыгер створаны",
       "saved": "Трыгер захаваны",
       "statusArrived": "Прыйшла",
+      "defaultPromptWebhook": "Апішыце цела запыту гэтага вэбхука:\n\n{{body}}",
+      "defaultPromptScheduled": "Запусціце задачу па раскладзе. Запуск пачаўся ў {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Увядзіце назву.",
         "nameTooShort": "Не менш за 8 сімвалаў.",

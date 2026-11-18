@@ -4358,8 +4358,7 @@
       "repoValue": "Repozitorijs: {{name}}",
       "profileValue": "Profils: {{name}}",
       "profileUnavailable": "Šis profils vairs nav pieejams. Izvēlieties citu.",
-      "pickerEmptyDescriptionOrganization": "Izveidojiet organizācijas profilu, lai sesijās atkārtoti izmantotu vides mainīgos, iestatīšanas komandas un prasmes.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Organizācijas īpašnieks vai administrators var izveidot organizācijas profilu."
+      "pickerEmptyDescriptionOrganization": "Izveidojiet organizācijas profilu, lai sesijās atkārtoti izmantotu vides mainīgos, iestatīšanas komandas un prasmes."
     },
     "variablesDeleteFailed": "Nevarēja izdzēst mainīgo",
     "deleteVariable": "Dzēst mainīgo {{key}}",
@@ -4721,6 +4720,8 @@
       "created": "Trigeris izveidots",
       "saved": "Trigeris saglabāts",
       "statusArrived": "Saņemts",
+      "defaultPromptWebhook": "Aprakstiet šī tīmekļa āķa pieprasījuma pamattekstu:\n\n{{body}}",
+      "defaultPromptScheduled": "Palaidiet ieplānoto uzdevumu. Palaišanas laiks: {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Ievadiet nosaukumu.",
         "nameTooShort": "Izmantojiet vismaz 8 rakstzīmes.",

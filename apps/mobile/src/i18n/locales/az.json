@@ -4292,8 +4292,7 @@
       "repoValue": "Repozitoru: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Bu profil artıq mövcud deyil. Başqa profil seçin.",
-      "pickerEmptyDescriptionOrganization": "Mühit dəyişənlərindən, quraşdırma əmrlərindən və sessiyalar arasında bacarıqlardan təkrar istifadə etmək üçün təşkilat profili yaradın.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Təşkilat sahibi və ya administratoru təşkilat profili yarada bilər."
+      "pickerEmptyDescriptionOrganization": "Mühit dəyişənlərindən, quraşdırma əmrlərindən və sessiyalar arasında bacarıqlardan təkrar istifadə etmək üçün təşkilat profili yaradın."
     },
     "variablesDeleteFailed": "Dəyişəni silmək mümkün olmadı",
     "deleteVariable": "{{key}} dəyişənini sil",
@@ -4651,6 +4650,8 @@
       "created": "Tətikləyici yaradıldı",
       "saved": "Tətikləyici yadda saxlanıldı",
       "statusArrived": "Gəldi",
+      "defaultPromptWebhook": "Bu vebhuk sorğusunun gövdəsini təsvir edin:\n\n{{body}}",
+      "defaultPromptScheduled": "Planlaşdırılmış tapşırığı icra edin. Tetiklənmə vaxtı: {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Ad daxil edin.",
         "nameTooShort": "Ən azı 8 simvol istifadə edin.",

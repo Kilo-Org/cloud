@@ -70,14 +70,24 @@ export async function resolveOpenRouterModelAlias(modelId: string): Promise<stri
   return getOpenRouterAliasTarget(models, modelId) ?? modelId;
 }
 
-/**
- * The ids of language models, including those with no endpoints. Vercel models
- * carry a `type`; OpenRouter models are language models when they output text.
- */
-export function getLanguageModelIds(models: GatewayModelMap): string[] {
+/** The ids of Vercel language models, including those with no endpoints. */
+export function getVercelLanguageModelIds(models: GatewayModelMap): string[] {
   return Object.values(models)
-    .filter(
-      model => model.type === 'language' || model.architecture?.output_modalities.includes('text')
+    .filter(model => model.type === 'language')
+    .map(model => model.id);
+}
+
+/**
+ * The ids of models OpenRouter serves on its chat APIs, including those with no endpoints: models
+ * that output text or images. Vercel rejects image models on its chat APIs, so this is
+ * OpenRouter-only.
+ */
+export function getOpenRouterChatModelIds(models: GatewayModelMap): string[] {
+  return Object.values(models)
+    .filter(model =>
+      model.architecture?.output_modalities.some(
+        modality => modality === 'text' || modality === 'image'
+      )
     )
     .map(model => model.id);
 }
@@ -130,30 +140,35 @@ export async function getCachedVercelInferenceProviderIdsForModel(
   return (await getVercelInferenceProviderIdsByModel()).get(modelId) ?? null;
 }
 
-function createLanguageModelIdsFetcher(name: string, fetchModels: () => Promise<GatewayModelMap>) {
+function createModelIdsFetcher(
+  name: string,
+  fetchModels: () => Promise<GatewayModelMap>,
+  selectModelIds: (models: GatewayModelMap) => string[]
+) {
   return createCachedFetch<ReadonlySet<string>>(
-    async () => new Set(getLanguageModelIds(await fetchModels())),
+    async () => new Set(selectModelIds(await fetchModels())),
     TTL_MS,
     new Set<string>(),
     { name }
   );
 }
 
-export const getVercelModelsFromDatabase = createLanguageModelIdsFetcher(
+export const getVercelModelsFromDatabase = createModelIdsFetcher(
   'vercelLanguageModelIds',
-  getVercelModelsMetadataFromDatabase
+  getVercelModelsMetadataFromDatabase,
+  getVercelLanguageModelIds
 );
 
-export const getOpenRouterModelsFromDatabase = createLanguageModelIdsFetcher(
-  'openRouterLanguageModelIds',
-  getOpenRouterModelsMetadataFromDatabase
+export const getOpenRouterModelsFromDatabase = createModelIdsFetcher(
+  'openRouterChatModelIds',
+  getOpenRouterModelsMetadataFromDatabase,
+  getOpenRouterChatModelIds
 );
 
-export const getOpenRouterSystemOneModelsFromDatabase = createCachedFetch<ReadonlySet<string>>(
-  async () => new Set(getSystemOneModelIds(await getOpenRouterModelsMetadataFromDatabase())),
-  TTL_MS,
-  new Set<string>(),
-  { name: 'openRouterSystemOneModelIds' }
+export const getOpenRouterSystemOneModelsFromDatabase = createModelIdsFetcher(
+  'openRouterSystemOneModelIds',
+  getOpenRouterModelsMetadataFromDatabase,
+  getSystemOneModelIds
 );
 
 // The cached empty id set is the same instance for a whole TTL window, so warning once per distinct

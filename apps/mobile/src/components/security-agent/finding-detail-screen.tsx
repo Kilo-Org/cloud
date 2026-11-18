@@ -66,7 +66,10 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   const { t } = useTranslation();
   const [tab, setTab] = useState<FindingTab>('details');
   const findingQuery = useSecurityFinding(scope, findingId);
-  const analysisQuery = useSecurityAnalysis(scope, findingId);
+  // The analysis query polls while a run is active, and only the analysis and
+  // remediation panels read it — the details tab never does.
+  const analysisActive = tab === 'analysis' || tab === 'remediation';
+  const analysisQuery = useSecurityAnalysis(scope, findingId, analysisActive);
   // Bumped once the boundary's recovery refetch settles, so the boundary
   // remounts with clean state over the recovered payload. Bumping it in the
   // same tick would mount the fresh boundary against the still-cached

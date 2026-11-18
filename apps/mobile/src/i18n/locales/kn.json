@@ -4292,8 +4292,7 @@
       "repoValue": "ರೆಪೊಸಿಟರಿ: {{name}}",
       "profileValue": "ಪ್ರೊಫೈಲ್: {{name}}",
       "profileUnavailable": "ಈ ಪ್ರೊಫೈಲ್ ಇನ್ನು ಲಭ್ಯವಿಲ್ಲ. ಬೇರೊಂದನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
-      "pickerEmptyDescriptionOrganization": "ಸೆಷನ್‍ಗಳಾದ್ಯಂತ ಪರಿಸರ ವೇರಿಯಬಲ್‍ಗಳು, ಸೆಟಪ್ ಆಜ್ಞೆ‍ಗಳು ಮತ್ತು ಕೌಶಲ್ಯಗಳನ್ನು ಮರುಬಳಕೆ ಮಾಡಲು ಸಂಸ್ಥೆ ಪ್ರೊಫೈಲ್ ಅನ್ನು ರಚಿಸಿ.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "ಸಂಸ್ಥೆ ಮಾಲೀಕರು ಅಥವಾ ನಿರ್ವಾಹಕರು ಸಂಸ್ಥೆ ಪ್ರೊಫೈಲ್ ಅನ್ನು ರಚಿಸಬಹುದು."
+      "pickerEmptyDescriptionOrganization": "ಸೆಷನ್‍ಗಳಾದ್ಯಂತ ಪರಿಸರ ವೇರಿಯಬಲ್‍ಗಳು, ಸೆಟಪ್ ಆಜ್ಞೆ‍ಗಳು ಮತ್ತು ಕೌಶಲ್ಯಗಳನ್ನು ಮರುಬಳಕೆ ಮಾಡಲು ಸಂಸ್ಥೆ ಪ್ರೊಫೈಲ್ ಅನ್ನು ರಚಿಸಿ."
     },
     "variablesDeleteFailed": "ವೇರಿಯಬಲ್ ಅನ್ನು ಅಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
     "deleteVariable": "ವೇರಿಯಬಲ್ {{key}} ಅನ್ನು ಅಳಿಸಿ",
@@ -4651,6 +4650,8 @@
       "created": "ಟ್ರಿಗರ್ ರಚಿಸಲಾಗಿದೆ",
       "saved": "ಟ್ರಿಗರ್ ಉಳಿಸಲಾಗಿದೆ",
       "statusArrived": "ಬಂದಿದೆ",
+      "defaultPromptWebhook": "ಈ ವೆಬ್ಹುಕ್ ವಿನಂತಿಯ ಬಾಡಿಯನ್ನು ವಿವರಿಸಿ:\n\n{{body}}",
+      "defaultPromptScheduled": "ನಿಗದಿತ ಕಾರ್ಯವನ್ನು ರನ್ ಮಾಡಿ. ರನ್ {{scheduledTime}} ಕ್ಕೆ ಪ್ರಾರಂಭವಾಗಿದೆ.",
       "problems": {
         "nameRequired": "ಹೆಸರನ್ನು ನಮೂದಿಸಿ।",
         "nameTooShort": "ಕನಿಷ್ಠ 8 ಅಕ್ಷರಗಳನ್ನು ಬಳಸಿ।",

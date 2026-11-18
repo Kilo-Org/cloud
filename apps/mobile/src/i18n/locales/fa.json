@@ -4292,8 +4292,7 @@
       "repoValue": "مخزن: {{name}}",
       "profileValue": "پروفایل: {{name}}",
       "profileUnavailable": "این پروفایل دیگر در دسترس نیست. پروفایل دیگری انتخاب کنید.",
-      "pickerEmptyDescriptionOrganization": "یک نمایه سازمانی برای استفاده مجدد از متغیرهای محیطی، دستورات راه‌اندازی و مهارت‌ها در جلسات ایجاد کنید.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "مالک یا مدیر سازمان می‌تواند یک نمایه سازمانی ایجاد کند."
+      "pickerEmptyDescriptionOrganization": "یک نمایه سازمانی برای استفاده مجدد از متغیرهای محیطی، دستورات راه‌اندازی و مهارت‌ها در جلسات ایجاد کنید."
     },
     "variablesDeleteFailed": "متغیر حذف نشد",
     "deleteVariable": "متغیر {{key}} را حذف کنید",
@@ -4651,6 +4650,8 @@
       "created": "تریگر ساخته شد",
       "saved": "تریگر ذخیره شد",
       "statusArrived": "رسید",
+      "defaultPromptWebhook": "بدنه درخواست این وب‌هوک را توصیف کنید:\n\n{{body}}",
+      "defaultPromptScheduled": "کار زمان‌بندی‌شده را اجرا کنید. اجرا در {{scheduledTime}} آغاز شد.",
       "problems": {
         "nameRequired": "نامی وارد کنید.",
         "nameTooShort": "دست‌کم ۸ نویسه استفاده کنید.",

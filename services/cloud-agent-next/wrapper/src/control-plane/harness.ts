@@ -84,6 +84,15 @@ export type Harness = {
       restoreFiles: boolean;
       roots?: RestoreRoots;
       onRestore(): void;
+      snapshotRestore?: {
+        startedAt?: number;
+        timings: Partial<Record<'downloadMs' | 'importMs' | 'diffsMs', number>>;
+        durationMs?: number;
+        result?: {
+          outcome: 'restored' | 'partial' | 'fallback' | 'failed';
+          reason?: 'download' | 'import' | 'diffs' | 'not_found' | 'empty';
+        };
+      };
     }
   ): Promise<boolean>;
   submit(input: HarnessPrompt): Promise<void>;

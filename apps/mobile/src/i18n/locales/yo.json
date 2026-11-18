@@ -4292,8 +4292,7 @@
       "repoValue": "Ibi ipamọ: {{name}}",
       "profileValue": "Profaili: {{name}}",
       "profileUnavailable": "Profaili yìí kò sí mọ́. Yan òmíràn.",
-      "pickerEmptyDescriptionOrganization": "Ṣẹda profaili ajọ kan lati tun lo awọn oniyipada ayika, awọn pipaṣẹ iṣeto, ati awọn ọgbọn kọja awọn akoko.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Olukilani ajọ tabi olùṣàkoso ajọ le ṣẹda profaili ajọ kan."
+      "pickerEmptyDescriptionOrganization": "Ṣẹda profaili ajọ kan lati tun lo awọn oniyipada ayika, awọn pipaṣẹ iṣeto, ati awọn ọgbọn kọja awọn akoko."
     },
     "variablesDeleteFailed": "Ko le paarẹ oniyipada",
     "deleteVariable": "Pa oniyipada {{key}} rẹ́",
@@ -4651,6 +4650,8 @@
       "created": "A ti ṣẹ̀dá ìmúṣiṣẹ́",
       "saved": "A ti fi ìmúṣiṣẹ́ pamọ́",
       "statusArrived": "Ó ti dé",
+      "defaultPromptWebhook": "Ṣàpèjúwe ara ìbéèrè wẹ́ẹ̀bùhóòkù yìí:\n\n{{body}}",
+      "defaultPromptScheduled": "Ṣe iṣẹ́ àtòjọ náà. A mú un ṣiṣẹ́ ní {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Tẹ orúkọ kan.",
         "nameTooShort": "Lo ó kéré tó 8 lẹ́tà.",

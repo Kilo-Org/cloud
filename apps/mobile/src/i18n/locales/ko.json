@@ -4292,8 +4292,7 @@
       "repoValue": "저장소: {{name}}",
       "profileValue": "프로필: {{name}}",
       "profileUnavailable": "이 프로필은 더 이상 사용할 수 없습니다. 다른 프로필을 선택하세요.",
-      "pickerEmptyDescriptionOrganization": "세션 전체에서 환경 변수, 설정 명령 및 기술을 재사용하기 위한 조직 프로필을 만듭니다.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "조직 소유자 또는 관리자는 조직 프로필을 만들 수 있습니다."
+      "pickerEmptyDescriptionOrganization": "세션 전체에서 환경 변수, 설정 명령 및 기술을 재사용하기 위한 조직 프로필을 만듭니다."
     },
     "variablesDeleteFailed": "변수를 삭제할 수 없습니다",
     "deleteVariable": "변수 {{key}}을(를) 삭제",
@@ -4651,6 +4650,8 @@
       "created": "트리거가 생성됨",
       "saved": "트리거가 저장됨",
       "statusArrived": "도착함",
+      "defaultPromptWebhook": "이 웹훅 요청의 본문을 설명하세요:\n\n{{body}}",
+      "defaultPromptScheduled": "예약된 작업을 실행하세요. {{scheduledTime}}에 실행을 시작했습니다.",
       "problems": {
         "nameRequired": "이름을 입력하세요.",
         "nameTooShort": "8자 이상 사용하세요.",

@@ -4292,8 +4292,7 @@
       "repoValue": "存儲庫: {{name}}",
       "profileValue": "個人資料: {{name}}",
       "profileUnavailable": "此個人資料已無法使用。請選擇其他個人資料。",
-      "pickerEmptyDescriptionOrganization": "建立組織設定檔以跨會話重複使用環境變數、設定命令和技能。",
-      "pickerEmptyDescriptionOrganizationReadOnly": "組織擁有者或管理員可以建立組織設定檔。"
+      "pickerEmptyDescriptionOrganization": "建立組織設定檔以跨會話重複使用環境變數、設定命令和技能。"
     },
     "variablesDeleteFailed": "無法刪除變數",
     "deleteVariable": "刪除變數 {{key}}",
@@ -4651,6 +4650,8 @@
       "created": "已建立觸發器",
       "saved": "已儲存觸發器",
       "statusArrived": "已送達",
+      "defaultPromptWebhook": "描述此網路鉤子請求的內文：\n\n{{body}}",
+      "defaultPromptScheduled": "執行排程工作。觸發時間為 {{scheduledTime}}。",
       "problems": {
         "nameRequired": "請輸入名稱。",
         "nameTooShort": "請使用至少 8 個字元。",

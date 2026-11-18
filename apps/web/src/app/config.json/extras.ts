@@ -175,12 +175,6 @@ export const kiloExtras = {
     notebook_execute: { $ref: '#/$defs/PermissionRuleConfig' },
   },
   experimental: {
-    browser_extension: {
-      description:
-        'Enable the Kilo browser extension backend, which lets agents drive your own browser instead of the bundled one',
-      type: 'boolean',
-      default: false,
-    },
     agent_requirements: {
       description:
         'Require declared agent skills, MCPs, and VS Code extensions before VS Code prompts can run',

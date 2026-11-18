@@ -3,6 +3,7 @@ import {
   RuntimeSkillsSchema,
   RuntimeAgentsSchema,
   RuntimeBuiltinAgentsSchema,
+  RuntimeModelContextLimitsSchema,
   RuntimeKiloCommandsSchema,
   RuntimeInstructionsSchema,
 } from './runtime-profile.js';
@@ -483,6 +484,7 @@ const routeSpecObjectSchema = z
     runtimeInstructions: RuntimeInstructionsSchema.optional(),
     runtimeAgents: RuntimeAgentsSchema.optional(),
     builtinAgents: RuntimeBuiltinAgentsSchema.optional(),
+    modelContextLimits: RuntimeModelContextLimitsSchema.optional(),
     kiloCommands: RuntimeKiloCommandsSchema.optional(),
     /**
      * Preserves the runtime key and HOME of existing allocations. The Sandbox
@@ -539,6 +541,7 @@ export const workspaceConfigSchema = routeSpecObjectSchema
     runtimeInstructions: true,
     runtimeAgents: true,
     builtinAgents: true,
+    modelContextLimits: true,
     kiloCommands: true,
   })
   .strict();
@@ -556,6 +559,7 @@ export const attachmentSpecSchema = routeSpecObjectSchema
     runtimeInstructions: true,
     runtimeAgents: true,
     builtinAgents: true,
+    modelContextLimits: true,
     kiloCommands: true,
   })
   .strict()
@@ -1216,6 +1220,24 @@ const controlPlaneSessionReadyFrameSchema = z
   })
   .strict();
 
+const restoreDurationSchema = z.number().int().nonnegative().max(86_400_000);
+const controlPlaneSessionRestoreFrameSchema = z
+  .object({
+    type: z.literal('session.restore_attempt'),
+    sessionId: z.string().min(1).max(128),
+    attempt: z.number().int().min(1).max(2),
+    durationMs: restoreDurationSchema,
+    downloadMs: restoreDurationSchema.optional(),
+    importMs: restoreDurationSchema.optional(),
+    diffsMs: restoreDurationSchema.optional(),
+    outcome: z.enum(['restored', 'partial', 'fallback', 'failed', 'cancelled']),
+    reason: z
+      .enum(['download', 'import', 'diffs', 'not_found', 'empty', 'restore_error'])
+      .optional(),
+    willRetry: z.boolean(),
+  })
+  .strict();
+
 /**
  * Wrapper to Sandbox DO: the workspace is prepared and holds no credential, so the
  * DO may snapshot the container. `commit` is diagnostic only.
@@ -1703,6 +1725,7 @@ export const controlPlaneWrapperFrameSchema = z.discriminatedUnion('type', [
   controlPlaneSessionPrepareFrameSchema,
   controlPlaneSessionAttachFrameSchema,
   controlPlaneSessionProgressFrameSchema,
+  controlPlaneSessionRestoreFrameSchema,
   controlPlaneSessionReadyFrameSchema,
   controlPlaneWorkspaceCaptureFrameSchema,
   controlPlaneWorkspaceCapturedFrameSchema,

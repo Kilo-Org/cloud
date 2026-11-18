@@ -28,13 +28,21 @@ import {
   getEnkryptBenchmarks,
   publishEnkryptModels,
 } from '@kilocode/web-shared/lib/model-stats/enkrypt';
+import { CATALOG_CACHE_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/handlers/catalog-cache-headers';
 
-async function modelResponse(response: OpenRouterModelsResponse, fromDb: ModelStatsLoadClient) {
+async function modelResponse(
+  response: OpenRouterModelsResponse,
+  cacheScope: keyof typeof CATALOG_CACHE_HEADERS,
+  fromDb: ModelStatsLoadClient
+) {
   const snapshot = await getEnkryptBenchmarks({ fromDb });
-  return NextResponse.json({
-    ...response,
-    data: publishEnkryptModels(response.data, snapshot),
-  });
+  return NextResponse.json(
+    {
+      ...response,
+      data: publishEnkryptModels(response.data, snapshot),
+    },
+    { headers: CATALOG_CACHE_HEADERS[cacheScope] }
+  );
 }
 
 async function tryGetUserFromAuth() {
@@ -119,20 +127,23 @@ export async function handleModelsRequest(
         endpoint: 'openrouter/models',
       });
       if (catalog) {
-        return await modelResponse(catalog, readDb);
+        return await modelResponse(catalog, 'perCaller', readDb);
       }
     }
 
     if (!auth?.user) {
       const data = await getEnhancedOpenRouterModels({ countryCode, fromDb: readDb });
       if (!Array.isArray(data.data)) {
-        return NextResponse.json(data);
+        // The passed-through body belongs to the catalog for this request
+        // country, so it carries the same directive as the catalog response.
+        return NextResponse.json(data, { headers: CATALOG_CACHE_HEADERS.sharedByCountry });
       }
       const models = await addAutoRoutingModels(data.data);
       return await modelResponse(
         {
           data: appendLocalFakeDeterministicCatalogModels(models),
         },
+        'sharedByCountry',
         readDb
       );
     }
@@ -143,7 +154,9 @@ export async function handleModelsRequest(
       fromDb: readDb,
       endpoint: 'openrouter/models',
     });
-    return NextResponse.json(personal);
+    // A body derived for the calling user: it must never populate a shared
+    // cache entry.
+    return NextResponse.json(personal, { headers: CATALOG_CACHE_HEADERS.perCaller });
   } catch (error) {
     captureException(error, {
       tags: { endpoint: 'openrouter/models' },

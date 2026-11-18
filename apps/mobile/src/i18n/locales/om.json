@@ -4292,8 +4292,7 @@
       "repoValue": "Kuusaa: {{name}}",
       "profileValue": "Profaayilii: {{name}}",
       "profileUnavailable": "Profaayiliin kun kana booda hin argamu. Kan biraa filadhu.",
-      "pickerEmptyDescriptionOrganization": "Jijjiiramoota naannoo, ajajoota saaguu, fi dandeettiiwwan turtii hunda irra deebi'ee fayyadamuuf piroofaayilii dhaabbataa uumi.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Abbaan dhaabbataa yookiin bulchaan dhaabbataa piroofaayilii dhaabbataa uumuu danda'a."
+      "pickerEmptyDescriptionOrganization": "Jijjiiramoota naannoo, ajajoota saaguu, fi dandeettiiwwan turtii hunda irra deebi'ee fayyadamuuf piroofaayilii dhaabbataa uumi."
     },
     "variablesDeleteFailed": "Jijjiiramaa haquu hin dandeenye",
     "deleteVariable": "Jijjiiramaa {{key}} balleessi",
@@ -4651,6 +4650,8 @@
       "created": "Kakaawwaan uumame",
       "saved": "Kakaawwaan olkaa'ame",
       "statusArrived": "Ga'e",
+      "defaultPromptWebhook": "Qaama gaaffii waamicha weebhuukii kanaa ibsi:\n\n{{body}}",
+      "defaultPromptScheduled": "Hojii sagantaa hojjedhu. Yeroo {{scheduledTime}} kakaawwame.",
       "problems": {
         "nameRequired": "Maqaa galchi.",
         "nameTooShort": "Yoo xiqqaate mallattoo 8 fayyadami.",

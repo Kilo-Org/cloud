@@ -4358,8 +4358,7 @@
       "repoValue": "Repositori: {{name}}",
       "profileValue": "Perfil: {{name}}",
       "profileUnavailable": "Aquest perfil ja no està disponible. Tria'n un altre.",
-      "pickerEmptyDescriptionOrganization": "Creeu un perfil d'organització per reutilitzar variables d'entorn, ordres de configuració i habilitats entre sessions.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Un propietari o administrador de l'organització pot crear un perfil d'organització."
+      "pickerEmptyDescriptionOrganization": "Creeu un perfil d'organització per reutilitzar variables d'entorn, ordres de configuració i habilitats entre sessions."
     },
     "variablesDeleteFailed": "No s'ha pogut suprimir la variable",
     "deleteVariable": "Elimina la variable {{key}}",
@@ -4721,6 +4720,8 @@
       "created": "Disparador creat",
       "saved": "Disparador desat",
       "statusArrived": "Arribat",
+      "defaultPromptWebhook": "Descriu el cos d'aquesta sol·licitud de ganxo web:\n\n{{body}}",
+      "defaultPromptScheduled": "Executa la tasca programada. Activat a {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Introdueix un nom.",
         "nameTooShort": "Utilitza almenys 8 caràcters.",

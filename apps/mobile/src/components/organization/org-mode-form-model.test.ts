@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   isOrgModeFormDirty,
   modeSlugFromName,
+  ORG_MODE_SLUG_MAX_LENGTH,
   type OrgMode,
   orgModeConfigInput,
   orgModeFormSaveValues,
@@ -54,7 +55,37 @@ describe('modeSlugFromName', () => {
 
   it('leaves no leading or trailing hyphen', () => {
     expect(modeSlugFromName('-Docs-')).toBe('docs');
-    expect(modeSlugFromName('###')).toBe('');
+  });
+
+  it('suggests nothing for an empty or whitespace-only name, taken slugs or not', () => {
+    expect(modeSlugFromName('')).toBe('');
+    expect(modeSlugFromName('   ')).toBe('');
+    expect(modeSlugFromName('', ['architect', 'mode'])).toBe('');
+    expect(modeSlugFromName('   ', ['mode'])).toBe('');
+  });
+
+  it('suggests a free mode counter when the name folds away completely', () => {
+    expect(modeSlugFromName('###')).toBe('mode');
+    expect(modeSlugFromName('وضع الاستدلال')).toBe('mode');
+  });
+
+  it('counts the fallback past the taken slugs', () => {
+    expect(modeSlugFromName('###', ['architect', 'mode'])).toBe('mode-2');
+    expect(modeSlugFromName('وضع', ['mode', 'mode-2', 'mode-3'])).toBe('mode-4');
+  });
+
+  it('counts past the taken slugs, ignoring the ones that are not candidates', () => {
+    const taken = ['mode', 'mode-2', 'mode-3', 'mode-4'];
+    expect(modeSlugFromName('###', [...taken, 'unrelated'])).toBe('mode-5');
+  });
+
+  it('keeps the fallback inside the server slug bound', () => {
+    const taken = Array.from({ length: 49 }, (_, index) =>
+      index === 0 ? 'mode' : `mode-${index + 1}`
+    );
+    const suggestion = modeSlugFromName('###', taken);
+    expect(suggestion).toBe('mode-50');
+    expect(suggestion.length).toBeLessThanOrEqual(ORG_MODE_SLUG_MAX_LENGTH);
   });
 });
 
@@ -127,17 +158,42 @@ describe('validateOrgModeForm', () => {
 describe('orgModeFormSaveValues', () => {
   it('derives an empty identifier from the name on create', () => {
     expect(
-      orgModeFormSaveValues(values({ slug: '', name: 'Security Reviewer' }), 'create').slug
+      orgModeFormSaveValues(values({ slug: '', name: 'Security Reviewer' }), 'create', []).slug
     ).toBe('security-reviewer');
   });
 
+  it('derives the fallback past the slugs the organization holds on create', () => {
+    expect(
+      orgModeFormSaveValues(values({ slug: '', name: 'وضع' }), 'create', ['mode', 'mode-2']).slug
+    ).toBe('mode-3');
+  });
+
+  it('derives the fallback for a fold-away name on create, empty slug or not', () => {
+    expect(orgModeFormSaveValues(values({ slug: '', name: '###' }), 'create', []).slug).toBe(
+      'mode'
+    );
+    expect(orgModeFormSaveValues(values({ slug: '', name: '###' }), 'create', ['mode']).slug).toBe(
+      'mode-2'
+    );
+  });
+
+  it('derives nothing from an empty name, so the save is refused as missing', () => {
+    const saved = orgModeFormSaveValues(values({ slug: '', name: '' }), 'create', []);
+    expect(saved.slug).toBe('');
+    expect(saved.name).toBe('');
+    expect(validateOrgModeForm(saved, [])).toEqual({
+      name: 'nameRequired',
+      slug: 'identifierRequired',
+    });
+  });
+
   it('keeps an identifier the person typed on create', () => {
-    expect(orgModeFormSaveValues(values({ slug: 'auditor' }), 'create').slug).toBe('auditor');
+    expect(orgModeFormSaveValues(values({ slug: 'auditor' }), 'create', []).slug).toBe('auditor');
   });
 
   it('never derives one on update, so a cleared identifier is reported missing', () => {
     const cleared = values({ slug: '' });
-    const saved = orgModeFormSaveValues(cleared, 'update');
+    const saved = orgModeFormSaveValues(cleared, 'update', []);
     expect(saved.slug).toBe('');
     expect(validateOrgModeForm(saved, [])).toEqual({ slug: 'identifierRequired' });
   });

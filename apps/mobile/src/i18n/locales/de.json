@@ -4292,8 +4292,7 @@
       "repoValue": "Repository: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Dieses Profil ist nicht mehr verfügbar. Wähle ein anderes aus.",
-      "pickerEmptyDescriptionOrganization": "Erstelle ein Organisationsprofil, um Umgebungsvariablen, Setup-Befehle und Fähigkeiten sitzungsübergreifend wiederzuverwenden.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Organisationsinhaber oder -administratoren können ein Organisationsprofil erstellen."
+      "pickerEmptyDescriptionOrganization": "Erstelle ein Organisationsprofil, um Umgebungsvariablen, Setup-Befehle und Fähigkeiten sitzungsübergreifend wiederzuverwenden."
     },
     "variablesDeleteFailed": "Die Variable konnte nicht gelöscht werden",
     "deleteVariable": "Variable {{key}} löschen",
@@ -4651,6 +4650,8 @@
       "created": "Auslöser erstellt",
       "saved": "Auslöser gespeichert",
       "statusArrived": "Eingetroffen",
+      "defaultPromptWebhook": "Beschreibe den Anfragekörper dieses Webhooks:\n\n{{body}}",
+      "defaultPromptScheduled": "Führe die geplante Aufgabe aus. Ausgelöst um {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Gib einen Namen ein.",
         "nameTooShort": "Verwende mindestens 8 Zeichen.",

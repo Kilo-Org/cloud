@@ -274,6 +274,11 @@ export function buildControlPlaneSessionRegistration(
     Object.keys(profile.builtinAgents).length > 0
       ? { builtinAgents: profile.builtinAgents }
       : {}),
+    ...(!readOnlyBitbucketReview &&
+    profile.modelContextLimits &&
+    Object.keys(profile.modelContextLimits).length > 0
+      ? { modelContextLimits: profile.modelContextLimits }
+      : {}),
     ...(!readOnlyBitbucketReview && profile.kiloCommands?.length
       ? { kiloCommands: profile.kiloCommands }
       : {}),

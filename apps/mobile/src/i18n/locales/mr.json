@@ -4292,8 +4292,7 @@
       "repoValue": "रेपॉजिटरी: {{name}}",
       "profileValue": "प्रोफाइल: {{name}}",
       "profileUnavailable": "हे प्रोफाइल आता उपलब्ध नाही. दुसरे निवडा.",
-      "pickerEmptyDescriptionOrganization": "संपूर्ण सत्रांमध्ये पर्यावरण व्हेरिएबल्स, सेटअप कमांड आणि कौशल्ये पुन्हा वापरण्यासाठी संस्था प्रोफाइल तयार करा.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "संस्था मालक किंवा प्रशासक संस्था प्रोफाइल तयार करू शकतो."
+      "pickerEmptyDescriptionOrganization": "संपूर्ण सत्रांमध्ये पर्यावरण व्हेरिएबल्स, सेटअप कमांड आणि कौशल्ये पुन्हा वापरण्यासाठी संस्था प्रोफाइल तयार करा."
     },
     "variablesDeleteFailed": "व्हेरिएबल हटवता आले नाही",
     "deleteVariable": "व्हेरिएबल {{key}} हटवा",
@@ -4651,6 +4650,8 @@
       "created": "ट्रिगर तयार झाला",
       "saved": "ट्रिगर जतन झाला",
       "statusArrived": "आले",
+      "defaultPromptWebhook": "या वेबहूक विनंतीच्या बॉडीचे वर्णन करा:\n\n{{body}}",
+      "defaultPromptScheduled": "शेड्यूल केलेले कार्य चालवा. {{scheduledTime}} वेळी ट्रिगर झाले.",
       "problems": {
         "nameRequired": "नाव प्रविष्ट करा.",
         "nameTooShort": "कमीत कमी 8 अक्षरे वापरा.",

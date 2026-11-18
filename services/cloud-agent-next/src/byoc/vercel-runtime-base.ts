@@ -44,7 +44,10 @@ export const VERCEL_BASE_TOOL_SETUP = [
   'link_base_tool "$(sudo npm prefix -g)/bin/pnpm" pnpm',
 ].join('\n');
 
-/** Proves a builder or a snapshot has the pinned toolchain and every base command. */
+/**
+ * Proves a builder or a snapshot has the pinned toolchain and every base command.
+ * The base digest hashes this check, so a stricter check marks older snapshots as outdated.
+ */
 export const VERCEL_BASE_VERIFICATION = [
   toolchainVerificationScript(TOOLCHAIN_TOOLS),
   baseBinaryCheckScript(),
@@ -69,6 +72,7 @@ export async function vercelRuntimeBaseDigest(): Promise<string> {
     bunSetup: VERCEL_BASE_NODE_SETUP,
     ghStackSetup: VERCEL_BASE_GH_STACK_SETUP,
     toolSetup: VERCEL_BASE_TOOL_SETUP,
+    verification: VERCEL_BASE_VERIFICATION,
   });
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input));
   return `downloaded-base-v1:${Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')}`;

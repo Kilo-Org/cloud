@@ -27,7 +27,7 @@ Kilo, with only `RUNTIME_PROCESS_PATH`, so the build links `npm`, `npx` and `pnp
 The same verification, including `BASE_REQUIRED_BINARIES` on that `PATH`, runs on the builder and again on
 the validator, which boots from the new snapshot.
 Downloaded startup installs the selected immutable CLI
-and control release as root. The base digest covers the ABI, Node major, Bun, and base setup commands;
+and control release as root. The base digest covers the ABI, Node major, Bun, base setup commands, and base verification;
 CLI and wrapper changes do not change that digest or require a new snapshot. Existing allocations keep
 their installed release until a new allocation starts. Base dependency changes still require a snapshot
 upgrade. BYOC base snapshots contain no CLI or wrapper. Native image selection does not affect Vercel

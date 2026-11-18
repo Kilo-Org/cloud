@@ -27,6 +27,22 @@ describe('getVercelRuntimeIdentity', () => {
     }
   });
 
+  it('invalidates the downloaded base when the base check requires another command', async () => {
+    const originalDigest = await vercelRuntimeBaseDigest();
+    vi.resetModules();
+    vi.doMock('../shared/runtime-distribution.js', async importOriginal => ({
+      ...(await importOriginal<typeof runtimeDistribution>()),
+      BASE_REQUIRED_BINARIES: [...runtimeDistribution.BASE_REQUIRED_BINARIES, 'make'],
+    }));
+    try {
+      const { vercelRuntimeBaseDigest: changedDigest } = await import('./vercel-runtime-base.js');
+      expect(await changedDigest()).not.toBe(originalDigest);
+    } finally {
+      vi.doUnmock('../shared/runtime-distribution.js');
+      vi.resetModules();
+    }
+  });
+
   it('reports one stable base identity for every downloaded runtime', async () => {
     const first = await getVercelRuntimeIdentity();
     const second = await getVercelRuntimeIdentity();

@@ -3,6 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { notificationHaptic } from '@/lib/haptics';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { View } from 'react-native';
 
 import { CenteredState } from '@/components/centered-state';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
@@ -201,7 +202,20 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
   // `organizationAdminMutationProcedure`, and the web members card gates its
   // limit editor on `canManageMembers`.
   if (!canManageOrganization(role)) {
-    return <PermissionDenied description={t('organization.memberLimit.permissionDenied')} />;
+    return (
+      <View className="flex-1 bg-background">
+        <SheetHeader
+          title={t('organization.memberLimit.title')}
+          variant="close"
+          onDone={closeSheet}
+          topInset={headerTopInset}
+        />
+        <PermissionDenied
+          description={t('organization.memberLimit.permissionDenied')}
+          showBack={false}
+        />
+      </View>
+    );
   }
 
   const loadFailed = orgWithMembers.isError && !orgWithMembers.data;

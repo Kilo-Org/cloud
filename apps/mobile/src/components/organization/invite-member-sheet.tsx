@@ -151,7 +151,22 @@ export function InviteMemberSheet() {
     return <OrganizationBoundary />;
   }
   if (!isMoneyRole(myRole)) {
-    return <PermissionDenied description={t('organization.inviteMember.permissionDenied')} />;
+    // The denial is the sheet's whole surface: the header stays, so the sheet
+    // keeps its title and its one way out, and the state carries no second Back.
+    return (
+      <View className="flex-1 bg-background">
+        <SheetHeader
+          title={t('organization.inviteMember.title')}
+          variant="close"
+          onDone={requestClose}
+          topInset={modalTopInset}
+        />
+        <PermissionDenied
+          description={t('organization.inviteMember.permissionDenied')}
+          showBack={false}
+        />
+      </View>
+    );
   }
 
   // Seat capacity is the rule the web dialog shows and the invite procedure

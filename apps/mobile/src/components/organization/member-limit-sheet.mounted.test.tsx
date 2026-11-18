@@ -195,11 +195,16 @@ describe('organization sheet surfaces', () => {
   });
 
   it.each([...sheets, { name: 'invite', element: createElement(InviteMemberSheet) }])(
-    'keeps $name permission denial outside a scroller',
+    'keeps $name permission denial under the sheet header',
     async ({ element }) => {
       boundary.role = 'member';
       const { renderer, unmount } = await renderWithProviders(element);
-      expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(1);
+      const header = renderer.root.find(node => String(node.type) === 'SheetHeader');
+      // The denial keeps the sheet's title and close control, so the state
+      // carries no way out of its own.
+      expect(propsOf(header).variant).toBe('close');
+      const emptyState = renderer.root.find(node => String(node.type) === 'EmptyState');
+      expect(propsOf(emptyState).action).toBeUndefined();
       expect(renderer.root.findAll(node => String(node.type) === 'ScrollView')).toHaveLength(0);
       unmount();
     }

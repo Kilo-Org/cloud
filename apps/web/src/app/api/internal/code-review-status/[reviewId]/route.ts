@@ -27,6 +27,7 @@ import {
   getSessionUsageFromBilling,
   updateCodeReviewAttemptForCallback,
   getLatestCodeReviewAttempt,
+  countCodeReviewAttemptsByReason,
   createInfraRetryAttemptIfMissing,
   recordCodeReviewAttemptPublicationStatus,
 } from '@/lib/code-reviews/db/code-reviews';
@@ -34,7 +35,11 @@ import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-
 import { settleCodeReviewLedgerRow } from '@/lib/code-reviews/code-review-ledger';
 import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-worker-client';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
-import { logExceptInTest, errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import {
+  logExceptInTest,
+  errorExceptInTest,
+  warnExceptInTest,
+} from '@kilocode/web-shared/lib/utils.server';
 import {
   addReactionToPR,
   createPRComment,
@@ -122,6 +127,7 @@ import {
   getManualCodeReviewConfig,
   shouldPublishCodeReviewToProvider,
 } from '@/lib/code-reviews/manual-config';
+import { AUTOMATIC_RETRY_ATTEMPT_LIMIT } from '@/lib/code-reviews/retry-review';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import type { CodeReviewAgentConfig } from '@kilocode/db/schema-types';
 
@@ -409,6 +415,18 @@ function getActionRequiredTerminalReason(
 const MAX_FAILED_SESSION_TOKENS_FOR_AUTO_RETRY = 100_000;
 const MAX_FAILED_SESSION_COST_MUSD_FOR_AUTO_RETRY = 200_000;
 
+/**
+ * Marks a retry that the guard allowed while the failed session's usage was
+ * unmeasurable. The reason is the persisted bound read: the guard counts these
+ * attempt rows when the next usage-unavailable failure arrives, so the allowance
+ * survives a redelivered callback.
+ */
+const USAGE_UNAVAILABLE_RETRY_REASON = 'usage_unavailable';
+/** Usage-unavailable retries one review may spend while its spend cannot be measured. */
+const MAX_USAGE_UNAVAILABLE_RETRIES = 1;
+/** One lag re-read: billing rows for a session that just failed can trail the callback. */
+const USAGE_LAG_RECHECK_DELAY_MS = 3_000;
+
 // Pre-dispatch codes that only mean the session never reached the agent: the
 // sandbox never connected, the workspace never finished, the runtime or the
 // Kilo server never came up, or preparation timed out. None of them can have
@@ -500,47 +518,121 @@ function canRetryFailedSessionUsage(usage: FailedSessionUsage): boolean {
   );
 }
 
+/**
+ * Spend gate for one infra retry after a failed session.
+ *
+ * `skip` is true when the guard blocks the retry. `retryReason` names the
+ * reason the created attempt carries: the plain infra marker when the usage
+ * was measurable, and the usage-unavailable marker when the guard allowed a
+ * bounded retry without one, so the bound can be read back from the attempts.
+ */
+type FailedSessionUsageGate =
+  | { skip: false; retryReason: string }
+  | {
+      skip: true;
+      reason: 'expensive_session' | 'usage_unavailable_retries_exhausted' | 'usage_unavailable';
+    };
+
+// Failure stages that mean the agent already ran: the failure happened while
+// the session was live or while its work was being collected. Only these earn
+// the bounded usage-unavailable retry, because an unmeasurable read here is a
+// billing-pipeline gap, not proof the session never dispatched.
+const POST_DISPATCH_FAILURE_STAGES: Readonly<Record<string, true>> = {
+  agent_activity: true,
+  post_dispatch_no_activity: true,
+};
+
 async function shouldSkipAutoRetryForFailedSessionUsage(params: {
   reviewId: string;
   failedAttemptId: string;
   failedCliSessionId?: string | null;
   reviewCreatedAt: string;
   failure?: CloudAgentSafeFailure;
-}): Promise<boolean> {
+}): Promise<FailedSessionUsageGate> {
   if (!params.failedCliSessionId) {
     logExceptInTest('[code-review-status] Auto-retry token guard could not measure usage', {
       reviewId: params.reviewId,
       failedAttemptId: params.failedAttemptId,
       reason: 'missing_cli_session_id',
     });
-    return false;
+    return { skip: false, retryReason: 'infra_failure' };
   }
 
-  const usage = await getSessionUsageFromBilling(params.failedCliSessionId, params.reviewCreatedAt);
+  const failureStage = params.failure?.stage;
+  let usage = await getSessionUsageFromBilling(params.failedCliSessionId, params.reviewCreatedAt);
+  if (!usage && failureStage && POST_DISPATCH_FAILURE_STAGES[failureStage]) {
+    // Billing rows trail the callback: the session just failed, and the
+    // microdollar aggregate may not have its rows yet. One bounded re-read
+    // covers that lag before the review is treated as unmeasurable.
+    const lagDelay = Promise.withResolvers<void>();
+    setTimeout(lagDelay.resolve, USAGE_LAG_RECHECK_DELAY_MS);
+    await lagDelay.promise;
+    usage = await getSessionUsageFromBilling(params.failedCliSessionId, params.reviewCreatedAt);
+  }
   if (!usage) {
     // A pre-dispatch failure means the agent never ran, so an unmeasurable
     // attempt cannot have spent model usage and the spend guard must not block
     // the single infra retry.
     const failureCode = params.failure?.code;
-    const allowUnavailableUsage =
-      params.failure?.stage === 'pre_dispatch' &&
+    const preDispatchSessionless =
+      failureStage === 'pre_dispatch' &&
       !!failureCode &&
       SESSIONLESS_PRE_DISPATCH_FAILURE_CODES.has(failureCode);
+    if (preDispatchSessionless) {
+      return { skip: false, retryReason: 'infra_failure' };
+    }
+    // A post-dispatch failure whose spend cannot be measured still gets its one
+    // infrastructure retry — the same single retry a measurable under-cap
+    // failure gets — but the allowance is bounded: the guard counts the tagged
+    // attempt rows from the review's own persisted attempts, under the review's
+    // automatic retry attempt limit, and a repeat escalates to a person instead
+    // of billing another blind run.
+    const countedRetries = await countCodeReviewAttemptsByReason(
+      params.reviewId,
+      USAGE_UNAVAILABLE_RETRY_REASON
+    );
+    const withinBound =
+      countedRetries < MAX_USAGE_UNAVAILABLE_RETRIES &&
+      countedRetries < AUTOMATIC_RETRY_ATTEMPT_LIMIT;
+    if (withinBound && failureStage !== undefined && POST_DISPATCH_FAILURE_STAGES[failureStage]) {
+      logExceptInTest('[code-review-status] Auto-retry token guard could not measure usage', {
+        reviewId: params.reviewId,
+        failedAttemptId: params.failedAttemptId,
+        cliSessionId: params.failedCliSessionId,
+        reason: 'usage_unavailable',
+        failureStage,
+        failureCode: params.failure?.code,
+        usageUnavailableRetries: countedRetries,
+        maxUsageUnavailableRetries: MAX_USAGE_UNAVAILABLE_RETRIES,
+        automaticRetryAttemptLimit: AUTOMATIC_RETRY_ATTEMPT_LIMIT,
+        allowUnavailableUsage: true,
+      });
+      return { skip: false, retryReason: USAGE_UNAVAILABLE_RETRY_REASON };
+    }
+    const boundReached =
+      countedRetries >= MAX_USAGE_UNAVAILABLE_RETRIES ||
+      countedRetries >= AUTOMATIC_RETRY_ATTEMPT_LIMIT;
     logExceptInTest('[code-review-status] Auto-retry token guard could not measure usage', {
       reviewId: params.reviewId,
       failedAttemptId: params.failedAttemptId,
       cliSessionId: params.failedCliSessionId,
       reason: 'usage_unavailable',
-      failureStage: params.failure?.stage,
+      failureStage,
       failureCode: params.failure?.code,
-      allowUnavailableUsage,
+      usageUnavailableRetries: countedRetries,
+      maxUsageUnavailableRetries: MAX_USAGE_UNAVAILABLE_RETRIES,
+      automaticRetryAttemptLimit: AUTOMATIC_RETRY_ATTEMPT_LIMIT,
+      allowUnavailableUsage: false,
     });
-    return !allowUnavailableUsage;
+    return {
+      skip: true,
+      reason: boundReached ? 'usage_unavailable_retries_exhausted' : 'usage_unavailable',
+    };
   }
 
   const failedSessionTokens = failedSessionTokenCount(usage);
   if (canRetryFailedSessionUsage(usage)) {
-    return false;
+    return { skip: false, retryReason: 'infra_failure' };
   }
 
   logExceptInTest('[code-review-status] Skipping infra retry after expensive failed session', {
@@ -554,7 +646,7 @@ async function shouldSkipAutoRetryForFailedSessionUsage(params: {
     maxFailedSessionCostMusdForAutoRetry: MAX_FAILED_SESSION_COST_MUSD_FOR_AUTO_RETRY,
     maxFailedSessionTokensForAutoRetry: MAX_FAILED_SESSION_TOKENS_FOR_AUTO_RETRY,
   });
-  return true;
+  return { skip: true, reason: 'expensive_session' };
 }
 
 function isSupersededReview(review: CloudAgentCodeReview): boolean {
@@ -1390,9 +1482,21 @@ export async function POST(
           retryReason: attempt.retry_reason,
           sessionId,
         });
+        if (attempt.retry_reason === USAGE_UNAVAILABLE_RETRY_REASON) {
+          // The bounded usage-unavailable retry itself failed, so the bound is
+          // spent by definition: escalate instead of leaving a stuck gate.
+          warnExceptInTest('[code-review-status] Review needs a manual restart', {
+            reviewId,
+            failedAttemptId: attempt.id,
+            failedCliSessionId:
+              attempt.cli_session_id ?? cliSessionId ?? review.cli_session_id ?? null,
+            terminalReason,
+            reason: 'usage_unavailable_retries_exhausted',
+          });
+        }
       } else {
         const failedCliSessionId = attempt.cli_session_id ?? cliSessionId ?? review.cli_session_id;
-        const skipRetryForSessionUsage = await shouldSkipAutoRetryForFailedSessionUsage({
+        const retryGate = await shouldSkipAutoRetryForFailedSessionUsage({
           reviewId,
           failedAttemptId: attempt.id,
           failedCliSessionId,
@@ -1400,10 +1504,23 @@ export async function POST(
           failure,
         });
 
-        if (!skipRetryForSessionUsage) {
+        if (retryGate.skip) {
+          // Escalation instead of a silent stuck gate: the spend gate refused
+          // the retry, so the next restart is a person's.
+          warnExceptInTest('[code-review-status] Review needs a manual restart', {
+            reviewId,
+            failedAttemptId: attempt.id,
+            failedCliSessionId: failedCliSessionId ?? null,
+            terminalReason,
+            reason: retryGate.reason,
+          });
+        }
+
+        if (!retryGate.skip) {
           const retryAttemptResult = await createInfraRetryAttemptIfMissing({
             codeReviewId: reviewId,
             retryOfAttemptId: attempt.id,
+            retryReason: retryGate.retryReason,
           });
 
           if (retryAttemptResult.outcome === 'created') {

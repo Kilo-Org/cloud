@@ -1015,4 +1015,60 @@ describe('unresolved native attachments degrade at message granularity', () => {
     });
     expect(second).toHaveLength(2);
   });
+
+  it('omits a message whose user file is storage-free and keeps its siblings', () => {
+    // A user file with neither bytes nor a uri cannot project: kilo2MessageSchema
+    // rejects the message before the guards, so every call site degrades it the
+    // same way as an unresolved attachment.
+    const storageFree = {
+      id: 'msg_storage_free_file',
+      type: 'user',
+      time: { created: 2 },
+      text: 'attached',
+      files: [{ mime: 'image/png', source: { type: 'inline' } }],
+    };
+    // readKilo2Messages keeps its throwing contract for the raw message; the
+    // guarded call sites never see it because the per-event schema rejects it.
+    expect(() => readKilo2Messages(session, [storageFree as never])).toThrow(
+      'Native attachment msg_storage_free_file_000001 requires authorized asset resolution'
+    );
+    expect(hasUnresolvedKilo2Assets(storageFree as never)).toBe(false);
+
+    const display = cloudSessionMessagesPageSchema.parse({
+      ...page,
+      messages: [
+        { message: user },
+        { message: storageFree, parentID: user.id },
+        { message: assistant },
+      ],
+    });
+    expect(display?.messages.map(message => message.info.id)).toEqual([user.id, assistant.id]);
+    expect(display?.omittedItemCount).toBe(1);
+
+    const reader = createConversationSourceReader();
+    expect(
+      reader.read(
+        wire('conversation.message.updated', {
+          sessionID: session.id,
+          source,
+          message: storageFree,
+        })
+      ).events
+    ).toEqual([]);
+    const followup = {
+      id: 'msg_after_storage_free',
+      type: 'assistant',
+      time: { created: 3 },
+      content: [{ type: 'text', text: 'next turn' }],
+    };
+    const second = reader.read(
+      wire('conversation.message.updated', {
+        sessionID: session.id,
+        source,
+        message: followup,
+        parentID: user.id,
+      })
+    ).events;
+    expect(second[0]).toMatchObject({ type: 'message.updated', info: { id: followup.id } });
+  });
 });

@@ -200,6 +200,58 @@ describe('readToolPartDetail', () => {
       } as Part)
     ).toEqual({ kind: 'not_found' });
   });
+
+  test('degrades a native detail whose user file is storage-free to absent', () => {
+    const source = {
+      version: 'v2' as const,
+      session: {
+        id: 'ses_native',
+        location: { directory: '/workspace/app' },
+        time: { created: 1, updated: 2 },
+      },
+    };
+    // A user file with neither bytes nor a uri cannot project, and the
+    // per-message schema rejects it before the guard: the detail response must
+    // still stay absent instead of failing the caller.
+    const detail = readToolPartDetail(
+      {
+        kind: 'found',
+        source,
+        revision: 12,
+        message: {
+          id: 'msg_storage_free_detail',
+          type: 'user',
+          time: { created: 1 },
+          text: 'attached',
+          files: [{ mime: 'image/png', source: { type: 'inline' } }],
+        },
+      },
+      {
+        id: 'msg_storage_free_detail',
+        messageID: 'msg_storage_free_detail',
+        sessionID: 'ses_native',
+        type: 'tool',
+        callID: 'call_storage_free',
+        tool: 'browser',
+        state: {
+          status: 'completed',
+          input: {},
+          output: 'browser preview',
+          title: 'browser',
+          metadata: {},
+          time: { start: 1, end: 2 },
+        },
+        cloudDetail: {
+          version: 1,
+          revision: 12,
+          omitted: ['output'],
+          omittedCount: 1,
+          omittedBytes: 10,
+        },
+      } as Part
+    );
+    expect(detail).toEqual({ kind: 'not_found' });
+  });
 });
 
 describe('preview merge guard', () => {

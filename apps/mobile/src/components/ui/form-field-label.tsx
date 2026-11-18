@@ -15,10 +15,9 @@ type FormFieldLabelProps = Readonly<{
  * of its line. Shared so a read-only value keeps the label its editable
  * sibling has, and so those controls stay out of the value's accessible name.
  *
- * The accessory there is a full touch target and its own box sets the row's
- * height, so `items-center` levels the copy with it: the glyph sits on the
- * label's line and the two read as one row. A caller whose accessory is not a
- * target gets the same row, one line tall.
+ * The accessory floats its own box on this line, so a control taller than the
+ * text (a `hitSlop` target) does not set the row's height: `items-center`
+ * levels the copy with the line and both read as one row.
  */
 export function FormFieldLabel({ label, labelAccessory }: Readonly<FormFieldLabelProps>) {
   if (labelAccessory === undefined) {

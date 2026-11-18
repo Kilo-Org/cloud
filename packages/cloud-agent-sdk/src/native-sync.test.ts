@@ -1087,11 +1087,21 @@ test('per-frame gap detection stays first-match and additive for changed message
     entities: [],
     messages: [
       {
-        message: { id: 'msg_first', type: 'assistant', time: { created: 1 }, content: [{ type: 'text', text: 'one' }] },
+        message: {
+          id: 'msg_first',
+          type: 'assistant',
+          time: { created: 1 },
+          content: [{ type: 'text', text: 'one' }],
+        },
         seq: 1,
       },
       {
-        message: { id: 'msg_second', type: 'assistant', time: { created: 1 }, content: [{ type: 'text', text: 'two' }] },
+        message: {
+          id: 'msg_second',
+          type: 'assistant',
+          time: { created: 1 },
+          content: [{ type: 'text', text: 'two' }],
+        },
         seq: 2,
       },
     ],
@@ -1143,11 +1153,21 @@ test('per-frame gap detection stays first-match and additive for changed message
     revision: 3,
     messages: [
       {
-        message: { id: 'msg_first', type: 'assistant', time: { created: 1, completed: 6 }, content: [{ type: 'text', text: 'one' }] },
+        message: {
+          id: 'msg_first',
+          type: 'assistant',
+          time: { created: 1, completed: 6 },
+          content: [{ type: 'text', text: 'one' }],
+        },
         seq: 1,
       },
       {
-        message: { id: 'msg_second', type: 'assistant', time: { created: 1 }, content: [{ type: 'text', text: 'two' }] },
+        message: {
+          id: 'msg_second',
+          type: 'assistant',
+          time: { created: 1 },
+          content: [{ type: 'text', text: 'two' }],
+        },
         seq: 2,
       },
     ],
@@ -1161,7 +1181,10 @@ test('per-frame gap detection stays first-match and additive for changed message
   const beforeFirst = state?.messages[0];
   socket.frame(
     'session.text.delta',
-    { syncPosition: 9, data: { data: { assistantMessageID: 'msg_second', ordinal: 0, delta: '!' } } },
+    {
+      syncPosition: 9,
+      data: { data: { assistantMessageID: 'msg_second', ordinal: 0, delta: '!' } },
+    },
     8,
     'events'
   );
@@ -1206,7 +1229,11 @@ test('a replaced native asset re-reports stale references through already covere
               id: 'call',
               name: 'read',
               time: { created: 1, ran: 1, completed: 1 },
-              state: { status: 'completed', input: { path: 'stale.png' }, content: [{ type: 'file', uri: 'file:///owned/stale.png', mime: 'image/png' }] },
+              state: {
+                status: 'completed',
+                input: { path: 'stale.png' },
+                content: [{ type: 'file', uri: 'file:///owned/stale.png', mime: 'image/png' }],
+              },
             },
           ],
         },
@@ -1223,7 +1250,11 @@ test('a replaced native asset re-reports stale references through already covere
               id: 'call',
               name: 'read',
               time: { created: 1, ran: 1, completed: 2 },
-              state: { status: 'completed', input: { path: 'other.png' }, content: [{ type: 'file', uri: 'file:///owned/other.png', mime: 'image/png' }] },
+              state: {
+                status: 'completed',
+                input: { path: 'other.png' },
+                content: [{ type: 'file', uri: 'file:///owned/other.png', mime: 'image/png' }],
+              },
             },
           ],
         },
@@ -1257,7 +1288,11 @@ test('a replaced native asset re-reports stale references through already covere
               id: 'call',
               name: 'read',
               time: { created: 1, ran: 1, completed: 3 },
-              state: { status: 'completed', input: { path: 'other.png' }, content: [{ type: 'file', uri: 'file:///owned/other.png', mime: 'image/png' }] },
+              state: {
+                status: 'completed',
+                input: { path: 'other.png' },
+                content: [{ type: 'file', uri: 'file:///owned/other.png', mime: 'image/png' }],
+              },
             },
           ],
         },
@@ -1271,7 +1306,10 @@ test('a replaced native asset re-reports stale references through already covere
   expect(state?.pendingSnapshotMessageIDs).toEqual(['msg_stale', 'msg_other']);
   snapshot.mockResolvedValueOnce({
     ...complete(6),
-    assetURLs: { [staleKey]: 'data:image/png;base64,c3RhbGU=', [otherKey]: 'data:image/png;base64,b3RoZXI=' },
+    assetURLs: {
+      [staleKey]: 'data:image/png;base64,c3RhbGU=',
+      [otherKey]: 'data:image/png;base64,b3RoZXI=',
+    },
     messages: [
       {
         message: {
@@ -1284,7 +1322,11 @@ test('a replaced native asset re-reports stale references through already covere
               id: 'call',
               name: 'read',
               time: { created: 1, ran: 1, completed: 1 },
-              state: { status: 'completed', input: { path: 'stale.png' }, content: [{ type: 'file', uri: 'file:///owned/stale.png', mime: 'image/png' }] },
+              state: {
+                status: 'completed',
+                input: { path: 'stale.png' },
+                content: [{ type: 'file', uri: 'file:///owned/stale.png', mime: 'image/png' }],
+              },
             },
           ],
         },
@@ -1301,7 +1343,11 @@ test('a replaced native asset re-reports stale references through already covere
               id: 'call',
               name: 'read',
               time: { created: 1, ran: 1, completed: 3 },
-              state: { status: 'completed', input: { path: 'other.png' }, content: [{ type: 'file', uri: 'file:///owned/other.png', mime: 'image/png' }] },
+              state: {
+                status: 'completed',
+                input: { path: 'other.png' },
+                content: [{ type: 'file', uri: 'file:///owned/other.png', mime: 'image/png' }],
+              },
             },
           ],
         },

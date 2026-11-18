@@ -1047,11 +1047,7 @@ export class NativeSyncClient {
           const pending = reduceNativePendingRequests(state.pending, frame);
           const session = applyNativeSessionEvent(state.session, frame);
           const previousByID = indexNativeMessages(state.messages);
-          const assetURLs = nativeAssetURLsAfterMessages(
-            previousByID,
-            messages,
-            state.assetURLs
-          );
+          const assetURLs = nativeAssetURLsAfterMessages(previousByID, messages, state.assetURLs);
           const pendingIDs = new Set(state.pendingSnapshotMessageIDs ?? []);
           const newGaps = nativeGapMessages(
             messages,
@@ -1134,7 +1130,9 @@ export class NativeSyncClient {
           quarantined.push({
             seq: frame.seq,
             position:
-              typeof body['syncPosition'] === 'number' ? body['syncPosition'] : snapshotPosition + 1,
+              typeof body['syncPosition'] === 'number'
+                ? body['syncPosition']
+                : snapshotPosition + 1,
           });
           lastSeq = frame.seq;
           integrityError =

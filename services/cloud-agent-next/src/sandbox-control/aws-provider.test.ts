@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AWS_TEST_CONFIGURATION, awsProviderFixture } from '../../test/fixtures/aws-provider.js';
-import { AWS_LAUNCH_RECOVERY_MS } from './aws-provider.js';
+import { AWS_LAUNCH_RECOVERY_MS } from './aws-compute-lifecycle.js';
 import { encodeAwsProviderRef } from './aws-operation.js';
 import { ProviderCreationError } from './provider.js';
 import { AwsRequestError } from '@kilocode/worker-utils/aws-client';

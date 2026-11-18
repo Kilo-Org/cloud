@@ -20,7 +20,6 @@ import {
   type AwsComputeAdapter,
   type AwsPrepareSnapshot,
 } from './aws-compute-lifecycle.js';
-export { AWS_LAUNCH_RECOVERY_MS } from './aws-compute-lifecycle.js';
 export type AwsProviderAdapter = AwsComputeAdapter;
 export type AwsRuntimeAccess = {
   config: AwsByocConfiguration;

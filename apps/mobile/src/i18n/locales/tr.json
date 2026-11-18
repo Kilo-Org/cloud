@@ -4866,6 +4866,8 @@
     "modelsDescription": "Bir modeli her üye için engellemek üzere kapatın. İzin verilen sağlayıcılardan gelen modeller açık başlar.",
     "modelsDeniedOnly": "Yalnızca engellenenler",
     "modelsEmpty": "Bu aramayla eşleşen model yok.",
+    "modelsDeniedEmpty": "Engellenen model yok.",
+    "modelsDeniedSearchEmpty": "Bu aramayla eşleşen engellenen model yok.",
     "providersDescription": "Kilo'nun bu kuruluş için o sağlayıcıya yönlendirme yapmasını durdurmak üzere bir sağlayıcıyı kapatın.",
     "providersNeedCatalog": "Tam model kataloğu yüklenene kadar sağlayıcı anahtarları salt okunur kalır. Bunları düzenlemek için yukarıdaki Tekrar dene düğmesine dokunun.",
     "providersEmpty": "Bu aramayla eşleşen sağlayıcı yok.",

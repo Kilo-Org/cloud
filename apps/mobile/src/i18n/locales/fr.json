@@ -4937,6 +4937,8 @@
     "modelsDescription": "Désactivez un modèle pour le bloquer pour tous les membres. Les modèles des fournisseurs autorisés sont activés par défaut.",
     "modelsDeniedOnly": "Refusés uniquement",
     "modelsEmpty": "Aucun modèle ne correspond à cette recherche.",
+    "modelsDeniedEmpty": "Aucun modèle n'est refusé.",
+    "modelsDeniedSearchEmpty": "Aucun modèle refusé ne correspond à cette recherche.",
     "providersDescription": "Désactivez un fournisseur pour que Kilo cesse de lui acheminer les requêtes de cette organisation.",
     "providersNeedCatalog": "Les interrupteurs des fournisseurs restent en lecture seule tant que le catalogue complet des modèles n'est pas chargé. Appuyez sur Réessayer ci-dessus pour les modifier.",
     "providersEmpty": "Aucun fournisseur ne correspond à cette recherche.",

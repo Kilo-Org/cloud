@@ -327,7 +327,10 @@ test(
       TMUX_PANE: _childTmuxPane,
       ...childEnv
     } = process.env as Record<string, string | undefined>;
-    childEnv.TERM = process.env.TERM ?? 'xterm-256color';
+    childEnv.TERM =
+      process.env.TERM && process.env.TERM !== 'dumb'
+        ? process.env.TERM
+        : 'xterm-256color';
 
     const clientProc =
       process.platform === 'darwin'

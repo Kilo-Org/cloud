@@ -160,17 +160,32 @@ export type AgentFrameSession = Pick<BrowserToolPageSession, 'send'> & {
  * is how a nested OOPIF is attached to its real parent instead of the main
  * frame. `DOM.describeNode` cannot answer this: on an iframe element its
  * `frameId` is the hosted frame, not the document holding the element.
+ *
+ * The same payload carries the frame's own URL and origin, which the attach
+ * event may have reported before its document committed (`about:blank`, an
+ * opaque origin). Reading it here means every call sees the frame as it is now
+ * rather than as it was when the target attached.
  */
-const readChildFrameParent = async (
+const readChildFrame = async (
   session: Pick<BrowserToolPageSession, 'send'>,
   sessionId: string
-): Promise<string | undefined> => {
+): Promise<{ readonly origin: string; readonly parentId?: string; readonly url: string } | undefined> => {
   try {
     const parsed = frameTreePayloadSchema.safeParse(
       await session.send('Page.getFrameTree', undefined, sessionId)
     );
 
-    return parsed.success ? parsed.data.frameTree.frame.parentId : undefined;
+    if (!parsed.success) {
+      return undefined;
+    }
+
+    const { frame } = parsed.data.frameTree;
+
+    return {
+      origin: frameOriginOf(frame),
+      ...(frame.parentId === undefined ? {} : { parentId: frame.parentId }),
+      url: frame.url,
+    };
   } catch {
     return undefined;
   }
@@ -193,14 +208,15 @@ export const readAgentFrames = async (session: AgentFrameSession): Promise<Agent
     if (!frames.some(frame => frame.id === frameId)) {
       childSessions.set(frameId, child.sessionId);
       // eslint-disable-next-line no-await-in-loop -- one child-session read per attached frame
-      const parentFrameId = await readChildFrameParent(session, child.sessionId);
+      const childFrame = await readChildFrame(session, child.sessionId);
+      const url = childFrame?.url === undefined || childFrame.url === '' ? child.url : childFrame.url;
 
       frames.push({
         id: frameId,
-        // A URL no origin can be read from is opaque, so no grant matches it.
-        origin: toBrowserOrigin(child.url) ?? 'opaque:null',
-        parentId: parentFrameId ?? main.id,
-        url: child.url,
+        // A URL no origin can be read from is opaque, so no grant matches it until the frame's own document names one.
+        origin: childFrame?.origin ?? toBrowserOrigin(child.url) ?? 'opaque:null',
+        parentId: childFrame?.parentId ?? main.id,
+        url,
       });
     }
   }

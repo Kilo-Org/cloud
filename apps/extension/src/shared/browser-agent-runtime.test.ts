@@ -1,6 +1,6 @@
 /* eslint-disable vitest/no-conditional-in-test -- the fake CDP and tabs API answer per method and per tab id */
 /* eslint-disable max-lines, require-await -- the suite drives one fake CDP session and one fake tab-group API through every agent tool path, whose fakes are async by contract. */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { createBrowserTabGroupController } from './browser-tab-groups';
 import type { BrowserTabGroupController } from './browser-tab-groups';
@@ -312,12 +312,16 @@ const createTabsApi = (): BrowserTabsApi => {
 };
 
 /** `chrome.downloads` as the runtime sees it: the single `onCreated` stream and the erase that deletes the file. */
-const createFakeDownloads = (options: { readonly cancelRejects?: boolean } = {}) => {
+const createFakeDownloads = (
+  options: { readonly cancelRejects?: boolean; readonly removeRejects?: boolean } = {}
+) => {
   const listeners: ((item: BrowserDownloadItem) => void)[] = [];
   const cancelled: number[] = [];
   const erased: { readonly id: number }[] = [];
   const removed: number[] = [];
   const searched: BrowserDownloadItem[] = [];
+  // One entry per item, as `chrome.downloads.search({ id })` reports it after the guard's cancel.
+  const items = new Map<number, BrowserDownloadItem>();
   const api: BrowserDownloadsApi = {
     // Sorted keys: `cancel` first, as chrome.downloads declares them.
     cancel: async downloadId => {
@@ -343,15 +347,31 @@ const createFakeDownloads = (options: { readonly cancelRejects?: boolean } = {})
       },
     },
     removeFile: async downloadId => {
+      if (options.removeRejects === true) {
+        throw new Error('cannot delete');
+      }
+
       removed.push(downloadId);
     },
-    search: async () => searched,
+    search: async query => {
+      if (query.id === undefined) {
+        return searched;
+      }
+
+      const item = items.get(query.id);
+
+      return item === undefined ? [] : [item];
+    },
   };
 
   return {
     api,
     cancelled,
+    /** Records an item and tells the guard, as `chrome.downloads.onCreated` does. */
     emit: (item: BrowserDownloadItem) => {
+      // A cancel that landed leaves the browser's own `interrupted`; a test says `complete` when it lost the race.
+      items.set(item.id, { state: 'interrupted', ...item });
+
       for (const listener of listeners) {
         listener(item);
       }
@@ -935,7 +955,7 @@ describe('agent browser calls', () => {
       'Input.dispatchMouseEvent': () => {
         if (emitting) {
           emitting = false;
-          downloads.emit({ id: 43, tabId: TAB_ID });
+          downloads.emit({ filename: '/home/me/Downloads/report.txt', id: 43, state: 'complete', tabId: TAB_ID });
         }
 
         return {};
@@ -955,25 +975,22 @@ describe('agent browser calls', () => {
     expect(outcome).toMatchObject({ afterAction: true, kind: 'needs_permission' });
   });
 
-  it('does not claim a cancel it could not perform', async () => {
-    const downloads = createFakeDownloads({ cancelRejects: true });
-    const api: BrowserDownloadsApi = {
-      ...downloads.api,
-      erase: async () => {
-        throw new Error('erase refused');
-      },
-      removeFile: async () => {
-        throw new Error('removeFile refused');
-      },
-    };
-    const { cdp, runtime } = await createHarness({ downloadsApi: api });
+  it('names a file it could not delete instead of claiming it was removed', async () => {
+    const downloads = createFakeDownloads({ cancelRejects: true, removeRejects: true });
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
     let emitting = true;
 
     cdp.setHandlers({
       'Input.dispatchMouseEvent': () => {
         if (emitting) {
           emitting = false;
-          downloads.emit({ id: 44, tabId: TAB_ID });
+          // The file finished before the cancel and the browser refuses to delete it, so the guard has to admit it.
+          downloads.emit({
+            filename: '/home/me/Downloads/report.txt',
+            id: 44,
+            state: 'complete',
+            tabId: TAB_ID,
+          });
         }
 
         return {};
@@ -988,17 +1005,34 @@ describe('agent browser calls', () => {
       toolName: 'browser_click',
     });
 
-    // Neither stop worked, so the call reports its own result rather than a cancel that did not happen.
-    expect(outcome.kind).toBe('result');
+    // The call is still refused as a sensitive step, and the refusal names the file the browser kept.
+    expect(outcome).toMatchObject({ afterAction: true, kind: 'needs_permission' });
+    const message =
+      outcome.kind === 'needs_permission' && !outcome.result.ok ? outcome.result.error : '';
+    expect(message).toContain('report.txt');
+    expect(message).not.toContain('Nothing was changed');
+    expect(downloads.removed).toStrictEqual([]);
   });
 
-  it('disarms the guard when the tool fails', async () => {
+  it('deletes a file whose cancel resolved but whose item finished first', async () => {
     const downloads = createFakeDownloads();
     const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+    let emitting = true;
 
     cdp.setHandlers({
       'Input.dispatchMouseEvent': () => {
-        throw new Error('dispatch failed');
+        if (emitting) {
+          emitting = false;
+          // `cancel` resolves for an item that already completed; only its terminal state proves a file exists.
+          downloads.emit({
+            filename: '/home/me/Downloads/report.txt',
+            id: 46,
+            state: 'complete',
+            tabId: TAB_ID,
+          });
+        }
+
+        return {};
       },
     });
 
@@ -1010,9 +1044,65 @@ describe('agent browser calls', () => {
       toolName: 'browser_click',
     });
 
-    // The dispatch refused the command and the call reported it; the guard still came off.
+    expect([downloads.cancelled, downloads.removed, downloads.erased]).toStrictEqual([
+      [46],
+      [46],
+      [{ id: 46 }],
+    ]);
+    expect(outcome).toMatchObject({ afterAction: true, kind: 'needs_permission' });
+  });
+
+  it('returns without a settle window and still deletes a download that starts late', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+
+    cdp.setHandlers({ 'Input.dispatchMouseEvent': () => ({}) });
+
+    const outcome = await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant] },
+      arguments: { target: '#pay' },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_click',
+    });
+
+    // The click started nothing, so the call pays no wait; the guard stays armed briefly for a late item.
+    expect([outcome.kind, downloads.live()]).toStrictEqual(['result', 1]);
+
+    downloads.emit({ id: 71, tabId: TAB_ID });
+
+    await vi.waitFor(() => {
+      expect(downloads.cancelled).toStrictEqual([71]);
+    });
+  });
+
+  it('disarms the guard when the tool fails', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': () => {
+        throw new Error('browser refused the click');
+      },
+    });
+
+    const outcome = await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant] },
+      arguments: { target: '#pay' },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_click',
+    });
+
+    // The dispatch refused the command and the call reported it; the guard still comes off, and the linger
+    // (armed because the call started no download) releases its listener on its own.
     expect(outcome).toMatchObject({ kind: 'result', result: { ok: false } });
-    expect(downloads.live()).toBe(0);
+    await vi.waitFor(
+      () => {
+        expect(downloads.live()).toBe(0);
+      },
+      { timeout: 4_000 }
+    );
   });
 
   it('reads the downloads permission on every call, so a grant after construction counts', async () => {

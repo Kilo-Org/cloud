@@ -522,6 +522,28 @@ describe('out-of-process iframes', () => {
     expect(capture.withheldFrames).toStrictEqual([OOPIF_ORIGIN]);
   });
 
+  it('reads the frame origin from the child session when the attach predates its document', async () => {
+    // A target attaches while the frame is still blank, which is what a tab opened before its page loads reports; the
+    // origin must come from the frame's own tree, not from the attach event.
+    const session = oopifSession(
+      {},
+      new Map([[OOPIF_ID, { sessionId: OOPIF_SESSION, url: 'about:blank' }]])
+    );
+
+    const withheld = await captureAgentAriaSnapshot(session, { readableOrigins: [MAIN_ORIGIN] });
+
+    expect(withheld.text).toContain(`[origin withheld: ${OOPIF_ORIGIN}]`);
+    expect(withheld.withheldFrames).toStrictEqual([OOPIF_ORIGIN]);
+
+    const granted = await captureAgentAriaSnapshot(oopifSession(
+      {},
+      new Map([[OOPIF_ID, { sessionId: OOPIF_SESSION, url: 'about:blank' }]])
+    ), { readableOrigins: [MAIN_ORIGIN, OOPIF_ORIGIN] });
+
+    expect(granted.text).toContain('- text: oopif marker-9');
+    expect(granted.withheldFrames).toStrictEqual([]);
+  });
+
   it('splices the child session’s tree in when the frame origin is granted', async () => {
     const capture = await captureAgentAriaSnapshot(oopifSession(), {
       readableOrigins: [MAIN_ORIGIN, OOPIF_ORIGIN],

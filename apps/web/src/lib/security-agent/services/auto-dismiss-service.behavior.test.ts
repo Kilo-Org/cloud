@@ -237,4 +237,58 @@ describe('auto-dismiss eligibility', () => {
       'personal-high': 'open',
     });
   });
+
+  it('dismisses a backlog larger than one read page with real keyset paging', async () => {
+    const user = await insertTestUser();
+    await enableAutoDismissFor(user.id);
+
+    // One full read page plus a short tail proves the loop keeps advancing the
+    // id cursor instead of re-reading the same open candidates forever.
+    const total = 103;
+    await db.insert(security_findings).values(
+      Array.from({ length: total }, (_, index) =>
+        finding(user.id, `bulk-page-${String(index).padStart(3, '0')}`, {
+          analysis: triageAnalysis({ confidence: 'high', needsSandboxReasoning: 'Unreachable' }),
+        })
+      )
+    );
+
+    await expect(
+      autoDismissEligibleFindings(
+        { userId: user.id },
+        {
+          type: SecurityAuditLogActorType.CustomerUser,
+          id: user.id,
+          email: 'owner@example.com',
+          name: 'Owner Example',
+        }
+      )
+    ).resolves.toEqual({ dismissed: total, skipped: 0, errors: 0 });
+
+    const statuses = await statusesBySourceId(user.id);
+    const pageStatuses = Object.entries(statuses).filter(([sourceId]) =>
+      sourceId.startsWith('bulk-page-')
+    );
+    expect(pageStatuses).toHaveLength(total);
+    expect(pageStatuses.every(([, status]) => status === 'ignored')).toBe(true);
+
+    await expect(countEligibleForAutoDismiss({ userId: user.id }, user.id)).resolves.toEqual({
+      eligible: 0,
+      byConfidence: { high: 0, medium: 0, low: 0 },
+    });
+    // The sweep stops when the final read page is short: a second run finds no
+    // remaining candidates.
+    await expect(
+      autoDismissEligibleFindings(
+        { userId: user.id },
+        {
+          type: SecurityAuditLogActorType.CustomerUser,
+          id: user.id,
+          email: 'owner@example.com',
+          name: 'Owner Example',
+        }
+      )
+    ).resolves.toEqual({ dismissed: 0, skipped: 0, errors: 0 });
+    expect(mockDismissDependabotAlert).not.toHaveBeenCalled();
+  });
 });

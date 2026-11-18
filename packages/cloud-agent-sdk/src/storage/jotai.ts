@@ -257,6 +257,23 @@ function createJotaiStorage(
       return snapshot;
     },
 
+    getPart(messageId, partId) {
+      // Same direct-reader contract as `getParts` above, but for one part: a
+      // keyed read costs an array scan with no per-part clones and no snapshot
+      // rebuild, so a per-event caller does not pay for the message it did not
+      // ask about.
+      applyPendingTextDeltas(messageId);
+      const part = partsMap.get(messageId)?.find(item => item.id === partId);
+      return part ? createReadonlyPartView(part) : undefined;
+    },
+
+    // Consuming pending deltas first matches `getPart`/`getParts`: a direct
+    // reader must see the chunks that already arrived.
+    getPartIds(messageId) {
+      applyPendingTextDeltas(messageId);
+      return (partsMap.get(messageId) ?? []).map(p => p.id);
+    },
+
     subscribe: subscribers.subscribe,
 
     clear() {

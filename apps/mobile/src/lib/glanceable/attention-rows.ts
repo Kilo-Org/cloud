@@ -32,8 +32,12 @@ import { isAttentionAcked, sessionNeedsInput } from '@/lib/session-attention';
 export type AttentionRow = {
   id: string;
   status: string;
-  /** Server status time when the row carries one; tray rows do. */
-  statusUpdatedAt?: string;
+  /**
+   * Server status time when the row carries one; tray rows do. Absent, null
+   * (a producer that serialized the absent fact) and unparseable read the
+   * same: the raise is undated and the ack falls back to the status alone.
+   */
+  statusUpdatedAt?: string | null;
 };
 
 /** Whether this row's attention raise is one the user has already answered. */
@@ -42,6 +46,8 @@ export function isAnsweredAttentionRow(row: AttentionRow): boolean {
     return false;
   }
   return isAttentionAcked(row.id, {
+    // The raise identity is `statusUpdatedAt ?? status`: a row the surface
+    // cannot date names only the kind of raise. Null reads like absent.
     raiseId: row.statusUpdatedAt ?? row.status,
     status: row.status,
   });

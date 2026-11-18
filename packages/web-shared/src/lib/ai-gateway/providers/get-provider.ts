@@ -466,7 +466,6 @@ async function selectProvider(
     request,
     requestedModel,
     userId: isAnonymousContext(user) ? null : user.id,
-    requesterEmail: isAnonymousContext(user) ? null : user.google_user_email,
     organizationId,
   });
   if (claudeBilling?.kind === 'reconnect') {

@@ -58,7 +58,10 @@ vi.mock('@/components/empty-state', () => ({
 }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/security-agent/collapsible-section', () => ({
-  CollapsibleSection: 'CollapsibleSection',
+  // The real section resolves a function child inside its expanded branch; this
+  // suite renders the body unconditionally so it can read the expanded rows.
+  CollapsibleSection: ({ children }: { children: ReactNode | (() => ReactNode) }) =>
+    typeof children === 'function' ? children() : children,
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));

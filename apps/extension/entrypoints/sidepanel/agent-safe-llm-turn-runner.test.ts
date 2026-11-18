@@ -69,6 +69,8 @@ const makeToolDef = (name: string): KiloGatewayToolDefinition =>
 
 const makeWorkflowCtx = () => ({
   allowWorkflowsInSafeMode: true,
+  claimTab: vi.fn().mockResolvedValue(true),
+  disposeBrowserCaller: vi.fn(),
   evalInTab: vi.fn(),
   getTabUrl: vi.fn(),
   mode: 'safe' as const,
@@ -86,6 +88,7 @@ describe('safe turn runner workflow wiring', () => {
     ({
       apiBaseUrl: 'https://api.example.com',
       appendEvents: vi.fn() as never,
+      browserCaller: { conversationId: 'conversation-1', kind: 'panel', panelId: 'panel-1' },
       conversationEvents: [],
       fetch: vi.fn() as never,
       model: 'test-model',

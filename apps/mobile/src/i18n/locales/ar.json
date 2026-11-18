@@ -26,6 +26,7 @@
     "creditHistory": "سجل الرصيد",
     "sentenceJoiner": ". ",
     "listJoiner": "، ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "إلغاء",
     "done": "تم",
     "retry": "إعادة المحاولة",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "التغييرات",
     "organizationTrialEnded": "انتهت الفترة التجريبية للمؤسسة ولم تعد لديها خطة نشطة. يمكن لمالك المؤسسة تحديث الفوترة على kilo.ai، ثم المحاولة مرة أخرى.",
-    "privateRepositoryA11y": "{{name}}، مستودع خاص"
+    "privateRepositoryA11y": "{{name}}، مستودع خاص",
+    "legalDocumentEnglishOnly": "هذا المستند متوفر باللغة الإنجليزية فقط."
   },
   "language": {
     "restarting": "جارٍ إعادة التشغيل لتطبيق اللغة",
@@ -481,7 +483,14 @@
       "viewReceipt": "عرض الإيصال"
     },
     "changelog": "ما الجديد",
-    "changelogVersionPending": "ستصل ملاحظات هذا الإصدار مع التحديث القادم للتطبيق."
+    "changelogVersionPending": "ستصل ملاحظات الإصدار {{version}} مع التحديث القادم للتطبيق.",
+    "changelogGroupNew": "جديد",
+    "changelogFixesIn": "إصلاحات وتحسينات في {{areas}}.",
+    "changelogFixesPolish": "إصلاحات وتحسينات في جميع أنحاء التطبيق.",
+    "changelogAreas": {
+      "signIn": "تسجيل الدخول",
+      "profileOrganizations": "الملف الشخصي والمؤسسات"
+    }
   },
   "preferences": {
     "general": "عام",
@@ -927,7 +936,8 @@
       "repositoryLine": "المراجعات: {{reviews}} · النتائج: {{findings}}",
       "empty": "لا توجد مراجعات بتحليلات بعد",
       "emptyDescription": "تسجّل التحليلات المراجعات المكتملة ما دامت مفعّلة للمؤسسة.",
-      "off": "التحليلات متوقفة لهذه المؤسسة.",
+      "offTitle": "التحليلات متوقفة لمنصة {{platform}}",
+      "offDescription": "فعّلها في إعدادات المؤسسة على الويب لتسجّل المراجعات المكتملة.",
       "couldNotLoad": "تعذّر تحميل التحليلات"
     },
     "council": {
@@ -3546,6 +3556,7 @@
       "manageOnWeb": "إعدادات الفوترة على الويب",
       "changePlan": "تغيير الخطة",
       "buySeats": "شراء مقاعد",
+      "managedOnWeb": "تتم إدارة الخطة والمقاعد والشحن التلقائي على الويب.",
       "setupAutoTopUp": "إعداد الشحن التلقائي",
       "manageAutoTopUp": "إدارة الشحن التلقائي",
       "opensOnWeb": "يُفتح على الويب"
@@ -3707,12 +3718,10 @@
       "requestLogs": "سجلات الطلبات"
     },
     "requestLogs": {
-      "hint": "طلبات الساعة السابقة لنهاية الفترة المعروضة، الأحدث أولًا.",
       "older": "الساعة الأقدم",
       "newer": "الساعة الأحدث",
       "truncated": "في هذه الساعة طلبات أكثر مما تعرضه القائمة.",
       "emptyTitle": "لا توجد طلبات",
-      "emptyDescription": "لا توجد طلبات عبر البوابة في هذه الساعة.",
       "loadError": "تعذّر تحميل سجلات الطلبات.",
       "permissionDenied": "يمكن فقط لمالك المؤسسة أو مسؤولها أو مدير الفوترة فيها قراءة سجلات الطلبات الخاصة بها.",
       "tokens": "{{input}} إدخال · {{output}} إخراج",
@@ -4547,8 +4556,7 @@
       "repoValue": "المستودع: {{name}}",
       "profileValue": "الملف الشخصي: {{name}}",
       "profileUnavailable": "لم يعد هذا الملف الشخصي متاحًا. اختر ملفًا شخصيًا آخر.",
-      "pickerEmptyDescriptionOrganization": "قم بإنشاء ملف شخصي للمؤسسة لإعادة استخدام متغيرات البيئة وأوامر الإعداد والمهارات عبر الجلسات.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "يمكن لمالك المؤسسة أو أحد مسؤوليها إنشاء ملف شخصي للمؤسسة."
+      "pickerEmptyDescriptionOrganization": "قم بإنشاء ملف شخصي للمؤسسة لإعادة استخدام متغيرات البيئة وأوامر الإعداد والمهارات عبر الجلسات."
     },
     "variablesDeleteFailed": "تعذر حذف المتغير",
     "deleteVariable": "احذف المتغير {{key}}",
@@ -4750,7 +4758,6 @@
     "dismiss": "استبعاد التقرير",
     "offline": "غير متصل · تقرير محفوظ",
     "cached": "تقرير محفوظ · التحديث غير متاح",
-    "window": "{{start}} – {{end}}",
     "summary": "ملخص AI",
     "summaryPending": "جارٍ إعداد ملخص AI. سيُرفق هنا عند جاهزيته.",
     "summaryUnavailable": "ملخص AI غير متاح. لا يزال تقريرك المنظّم متاحًا.",
@@ -4869,6 +4876,7 @@
       "title": "المشغلات والويب هوك",
       "subtitle": "أتمت تشغيل Cloud Agent من استدعاء ويب هوك أو جدول زمني.",
       "new": "مشغل جديد",
+      "create": "أنشئ مشغلاً",
       "emptyTitle": "لا توجد مشغلات بعد",
       "emptyDescription": "أنشئ مشغلاً لبدء تشغيل Cloud Agent من استدعاء ويب هوك أو وفق جدول زمني.",
       "loadFailedTitle": "تعذر تحميل المشغلات",
@@ -4922,6 +4930,8 @@
       "created": "تم إنشاء المشغل",
       "saved": "تم حفظ المشغل",
       "statusArrived": "وصل",
+      "defaultPromptWebhook": "صف جسم طلب الويب هوك هذا:\n\n{{body}}",
+      "defaultPromptScheduled": "شغّل المهمة المجدولة. بدأ التشغيل في {{scheduledTime}}.",
       "problems": {
         "nameRequired": "أدخل اسماً.",
         "nameTooShort": "استخدم 8 أحرف على الأقل.",

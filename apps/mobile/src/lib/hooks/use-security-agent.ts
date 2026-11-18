@@ -253,7 +253,9 @@ export function useSecurityAgentCapability(scope: string) {
 // `state` is the derived, single-source answer every action surface reads
 // ("still loading" / "failed to load" / "full" / "available"); the raw counts
 // and flags stay for callers that need them.
-export function useSecurityAnalysisCapacity(scope: string) {
+// Pass `enabled: false` when the caller offers no start action: the read polls
+// while the owner is at the limit, which no other state needs.
+export function useSecurityAnalysisCapacity(scope: string, enabled = true) {
   const trpc = useTRPC();
   const capacityInput = { status: 'open' as const, limit: 1, offset: 0 };
   // While the owner is at the limit nothing on this screen changes when a
@@ -277,7 +279,7 @@ export function useSecurityAnalysisCapacity(scope: string) {
       : false;
   const personal = useQuery({
     ...trpc.securityAgent.listFindings.queryOptions(capacityInput),
-    enabled: isPersonalSecurityScope(scope),
+    enabled: enabled && isPersonalSecurityScope(scope),
     refetchInterval,
   });
   const organization = useQuery({
@@ -285,7 +287,7 @@ export function useSecurityAnalysisCapacity(scope: string) {
       organizationId: scope,
       ...capacityInput,
     }),
-    enabled: !isPersonalSecurityScope(scope),
+    enabled: enabled && !isPersonalSecurityScope(scope),
     refetchInterval,
   });
   const active = isPersonalSecurityScope(scope) ? personal : organization;

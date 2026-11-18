@@ -1919,6 +1919,41 @@ test('reports a broken catalog through the command and exits non-zero', () => {
   assert.match(result.stderr, /check-catalogs: \d+ problem\(s\)/);
 });
 
+test('reports a directory named like a catalog through the command and skips it', () => {
+  // `catalogTags` counts only regular files, and the membership rule names the
+  // directory itself, so the run prints one line and exits 1 instead of
+  // reading the directory as a catalog (a stack trace) or passing silently.
+  const root = cliFixture({
+    ...standardFiles(),
+    'apps/mobile/src/i18n/locales/xx.json/keep.txt': '',
+  });
+  const result = cli(root);
+  assert.equal(result.status, 1);
+  assert.match(
+    result.stderr,
+    /mobile: catalog "xx\.json" is not a regular file; remove it or make it a catalog/
+  );
+  assert.doesNotMatch(result.stderr, /EISDIR|mobile\/xx/);
+  assert.match(result.stderr, /check-catalogs: \d+ problem\(s\)/);
+});
+
+test('reports a locale file the filesystem refuses through the command', () => {
+  // The read sits inside the same handling as the JSON.parse it feeds: one
+  // problem line here instead of an uncaught ENOENT ending the audit. The
+  // unreadable entry is English's own: `checkCatalogs` reads it through
+  // `parseCatalog` unconditionally, whatever the tag set says.
+  const root = cliFixture(standardFiles());
+  rmSync(join(root, 'apps/mobile/src/i18n/locales/en.json'));
+  symlinkSync(
+    join(root, 'missing-locale-target'),
+    join(root, 'apps/mobile/src/i18n/locales/en.json')
+  );
+  const result = cli(root);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /mobile\/en: cannot audit catalog: ENOENT/);
+  assert.doesNotMatch(result.stderr, /Error:|at /);
+});
+
 // The descriptor policy guard keeps a misconfigured catalog from throwing: the
 // copy rules and the base-key reader are used after the catalogs' value
 // problems are collected, so a throw there would hide them. Each case patches

@@ -26,6 +26,7 @@
     "creditHistory": "Istoric credite",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Anulează",
     "done": "Gata",
     "retry": "Reîncearcă",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "Modificări",
     "organizationTrialEnded": "Perioada de probă a organizației s-a încheiat și nu are un plan activ. Un proprietar al organizației poate actualiza facturarea pe kilo.ai, apoi poate încerca din nou.",
-    "privateRepositoryA11y": "{{name}}, repository privat"
+    "privateRepositoryA11y": "{{name}}, repository privat",
+    "legalDocumentEnglishOnly": "Acest document este disponibil doar în engleză."
   },
   "language": {
     "restarting": "Se repornește aplicația pentru a schimba limba",
@@ -481,7 +483,14 @@
       "viewReceipt": "Vezi confirmarea"
     },
     "changelog": "Noutăți",
-    "changelogVersionPending": "Notele acestei versiuni vin cu următoarea actualizare."
+    "changelogVersionPending": "Notele versiunii {{version}} vin cu următoarea actualizare a aplicației.",
+    "changelogGroupNew": "Noutăți",
+    "changelogFixesIn": "Remedieri și îmbunătățiri în {{areas}}.",
+    "changelogFixesPolish": "Remedieri și îmbunătățiri în întreaga aplicație.",
+    "changelogAreas": {
+      "signIn": "Autentificare",
+      "profileOrganizations": "Profil și organizații"
+    }
   },
   "preferences": {
     "general": "General",
@@ -1490,7 +1499,8 @@
       "repositoryLine": "Revizuiri: {{reviews}} · Constatări: {{findings}}",
       "empty": "Nicio revizuire cu statistici deocamdată",
       "emptyDescription": "Statisticile înregistrează revizuirile finalizate cât timp sunt activate pentru organizație.",
-      "off": "Statisticile sunt dezactivate pentru această organizație.",
+      "offTitle": "Statisticile sunt dezactivate pentru {{platform}}",
+      "offDescription": "Activează statisticile în setările organizației pe web pentru a înregistra revizuirile finalizate.",
       "couldNotLoad": "Statisticile nu au putut fi încărcate"
     },
     "council": {
@@ -3383,6 +3393,7 @@
       "manageOnWeb": "Setările de facturare pe web",
       "changePlan": "Schimbă planul",
       "buySeats": "Cumpără locuri",
+      "managedOnWeb": "Planul, locurile și reîncărcarea automată sunt gestionate pe web.",
       "setupAutoTopUp": "Configurează reîncărcarea automată",
       "manageAutoTopUp": "Gestionează reîncărcarea automată",
       "opensOnWeb": "Se deschide pe web"
@@ -3531,12 +3542,10 @@
       "requestLogs": "Jurnale de cereri"
     },
     "requestLogs": {
-      "hint": "Cererile din ora dinaintea finalului intervalului, cele mai recente primele.",
       "older": "Ora anterioară",
       "newer": "Ora următoare",
       "truncated": "Această oră are mai multe cereri decât arată lista.",
       "emptyTitle": "Nicio cerere",
-      "emptyDescription": "Nu există cereri către gateway în această oră.",
       "loadError": "Jurnalele de cereri nu au putut fi încărcate.",
       "permissionDenied": "Jurnalele de cereri pot fi citite doar de proprietarul, un administrator sau un manager de facturare al organizației.",
       "tokens": "{{input}} intrare · {{output}} ieșire",
@@ -4349,8 +4358,7 @@
       "repoValue": "Depozitul: {{name}}",
       "profileValue": "Profilul: {{name}}",
       "profileUnavailable": "Acest profil nu mai este disponibil. Alege altul.",
-      "pickerEmptyDescriptionOrganization": "Creați un profil de organizație pentru a reutiliza variabilele de mediu, comenzile de configurare și abilitățile în sesiuni.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Un proprietar sau un administrator al organizației poate crea un profil de organizație."
+      "pickerEmptyDescriptionOrganization": "Creați un profil de organizație pentru a reutiliza variabilele de mediu, comenzile de configurare și abilitățile în sesiuni."
     },
     "variablesDeleteFailed": "Variabila nu a putut fi ștearsă",
     "deleteVariable": "Șterge variabila {{key}}",
@@ -4540,7 +4548,6 @@
     "dismiss": "Ignoră raportul",
     "offline": "Offline · raport salvat",
     "cached": "Raport salvat · reîmprospătare indisponibilă",
-    "window": "{{start}} – {{end}}",
     "summary": "Rezumat AI",
     "summaryPending": "Rezumatul AI este în curs. Va fi atașat aici când este gata.",
     "summaryUnavailable": "Rezumatul AI nu este disponibil. Raportul structurat este în continuare disponibil.",
@@ -4659,6 +4666,7 @@
       "title": "Declanșatoare și webhook-uri",
       "subtitle": "Automatizează rulările Cloud Agent dintr-un apel webhook sau conform unui program.",
       "new": "Declanșator nou",
+      "create": "Creează declanșator",
       "emptyTitle": "Nu există declanșatoare încă",
       "emptyDescription": "Creează un declanșator pentru a porni o rulare Cloud Agent dintr-un apel webhook sau conform unui program.",
       "loadFailedTitle": "Nu s-au putut încărca declanșatoarele",
@@ -4712,6 +4720,8 @@
       "created": "Declanșator creat",
       "saved": "Declanșator salvat",
       "statusArrived": "Sosit",
+      "defaultPromptWebhook": "Descrie corpul cererii acestui webhook:\n\n{{body}}",
+      "defaultPromptScheduled": "Rulează sarcina programată. Declanșată la {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Introdu un nume.",
         "nameTooShort": "Folosește cel puțin 8 caractere.",

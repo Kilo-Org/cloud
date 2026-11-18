@@ -26,6 +26,7 @@
     "creditHistory": "點數紀錄",
     "sentenceJoiner": "。",
     "listJoiner": "、",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "取消",
     "done": "完成",
     "retry": "再試一次",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "變更",
     "organizationTrialEnded": "組織的試用期已結束，且沒有使用中的方案。組織擁有者可以在 kilo.ai 更新帳單資訊，然後再試一次。",
-    "privateRepositoryA11y": "{{name}}，私有儲存庫"
+    "privateRepositoryA11y": "{{name}}，私有儲存庫",
+    "legalDocumentEnglishOnly": "本文件僅提供英文版本。"
   },
   "language": {
     "restarting": "正在重新啟動以套用語言",
@@ -481,7 +483,14 @@
       "viewReceipt": "檢視回執"
     },
     "changelog": "最新消息",
-    "changelogVersionPending": "此版本的說明將隨下次應用程式更新提供。"
+    "changelogVersionPending": "{{version}} 版的說明將隨下次應用程式更新提供。",
+    "changelogGroupNew": "新功能",
+    "changelogFixesIn": "{{areas}}的修正與改進。",
+    "changelogFixesPolish": "整個應用程式的修正與改進。",
+    "changelogAreas": {
+      "signIn": "登入",
+      "profileOrganizations": "個人資料與組織"
+    }
   },
   "preferences": {
     "general": "一般",
@@ -923,7 +932,8 @@
       "repositoryLine": "審查：{{reviews}} · 問題：{{findings}}",
       "empty": "尚無含有分析資料的審查",
       "emptyDescription": "在組織啟用分析期間，系統會記錄已完成的審查。",
-      "off": "此組織已關閉分析。",
+      "offTitle": "已關閉 {{platform}} 的分析",
+      "offDescription": "在網頁版組織設定中啟用分析，以記錄已完成的審查。",
       "couldNotLoad": "無法載入分析資料"
     },
     "council": {
@@ -3318,6 +3328,7 @@
       "manageOnWeb": "網頁版帳單設定",
       "changePlan": "變更套餐",
       "buySeats": "購買席次",
+      "managedOnWeb": "套餐、席次和自動儲值是在網頁版上管理。",
       "setupAutoTopUp": "設定自動儲值",
       "manageAutoTopUp": "管理自動儲值",
       "opensOnWeb": "在網頁上開啟"
@@ -3479,12 +3490,10 @@
       "requestLogs": "請求記錄"
     },
     "requestLogs": {
-      "hint": "顯示時段結束前一小時內的請求，由新到舊排列。",
       "older": "較早一小時",
       "newer": "較晚一小時",
       "truncated": "這一小時的請求多於清單顯示的數量。",
       "emptyTitle": "沒有請求",
-      "emptyDescription": "這一小時沒有閘道請求。",
       "loadError": "無法載入請求記錄。",
       "permissionDenied": "只有組織的擁有者、管理員或帳務管理員可以查看其請求記錄。",
       "tokens": "輸入 {{input}} · 輸出 {{output}}",
@@ -4283,8 +4292,7 @@
       "repoValue": "存儲庫: {{name}}",
       "profileValue": "個人資料: {{name}}",
       "profileUnavailable": "此個人資料已無法使用。請選擇其他個人資料。",
-      "pickerEmptyDescriptionOrganization": "建立組織設定檔以跨會話重複使用環境變數、設定命令和技能。",
-      "pickerEmptyDescriptionOrganizationReadOnly": "組織擁有者或管理員可以建立組織設定檔。"
+      "pickerEmptyDescriptionOrganization": "建立組織設定檔以跨會話重複使用環境變數、設定命令和技能。"
     },
     "variablesDeleteFailed": "無法刪除變數",
     "deleteVariable": "刪除變數 {{key}}",
@@ -4470,7 +4478,6 @@
     "dismiss": "忽略簡報",
     "offline": "離線 · 已儲存的簡報",
     "cached": "已儲存的報告 · 無法重新整理",
-    "window": "{{start}} – {{end}}",
     "summary": "AI 摘要",
     "summaryPending": "AI 摘要產生中，完成後會附加於此。",
     "summaryUnavailable": "無法使用 AI 摘要。你的結構化報告仍可查看。",
@@ -4589,6 +4596,7 @@
       "title": "觸發器與網路鉤子",
       "subtitle": "透過網路鉤子呼叫或排程自動執行 Cloud Agent。",
       "new": "新增觸發器",
+      "create": "建立觸發器",
       "emptyTitle": "尚無觸發器",
       "emptyDescription": "建立觸發器，以透過網路鉤子呼叫或排程啟動 Cloud Agent 執行。",
       "loadFailedTitle": "無法載入觸發器",
@@ -4642,6 +4650,8 @@
       "created": "已建立觸發器",
       "saved": "已儲存觸發器",
       "statusArrived": "已送達",
+      "defaultPromptWebhook": "描述此網路鉤子請求的內文：\n\n{{body}}",
+      "defaultPromptScheduled": "執行排程工作。觸發時間為 {{scheduledTime}}。",
       "problems": {
         "nameRequired": "請輸入名稱。",
         "nameTooShort": "請使用至少 8 個字元。",

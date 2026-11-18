@@ -77,6 +77,15 @@ async function assertPublicIdIsClaimable(publicId: string) {
   }
 }
 
+/** A partner serves a catalog model, so its id must name one. */
+async function assertPartnerPublicIdIsCatalogModel(publicId: string) {
+  if (!Object.hasOwn(await getOpenRouterModelsMetadataFromDatabase(), publicId)) {
+    badRequest(
+      `public_id "${publicId}" must exist in the OpenRouter model list when partner is set`
+    );
+  }
+}
+
 const UpsertCustomLlmSchema = z.object({
   public_id: publicIdSchema,
   definition: CustomLlmDefinitionSchema,
@@ -113,7 +122,10 @@ export const adminCustomLlmRouter = createTRPCRouter({
       where: eq(custom_llm2.public_id, input.public_id),
     });
 
-    if (!existing) {
+    if (input.definition.partner) {
+      await assertPartnerPublicIdIsCatalogModel(input.public_id);
+    } else if (!existing || existing.definition.partner) {
+      // A former partner's id names a catalog model, which a custom LLM must not hide.
       await assertPublicIdIsClaimable(input.public_id);
     }
 
@@ -177,6 +189,9 @@ export const adminCustomLlmRouter = createTRPCRouter({
         code: 'NOT_FOUND',
         message: `Custom LLM with public_id "${input.source_public_id}" not found`,
       });
+    }
+    if (source.definition.partner) {
+      badRequest('A partner custom LLM cannot be copied');
     }
     assertPricingMatchesPublicId(input.public_id, source.definition);
     await assertPublicIdIsClaimable(input.public_id);

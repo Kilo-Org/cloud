@@ -16,7 +16,7 @@ import {
   type GatewayChatApiKind,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { getGoogleServiceAccountAccessToken } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/google-service-account';
-import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
+import { toMistralChatCompletionsBody } from '@kilocode/web-shared/lib/ai-gateway/providers/mistral';
 
 /**
  * Vertex AI serves Gemini and the managed open and partner models through its
@@ -48,36 +48,6 @@ const VERTEX_ANTHROPIC_VERSION = 'vertex-2023-10-16';
 // Mistral models are only served in these regions, not `global`.
 const MISTRAL_US_LOCATION = 'us-central1';
 const MISTRAL_EU_LOCATION = 'europe-west4';
-// Mistral's API rejects any other request or message field with a 422.
-const MISTRAL_REQUEST_FIELDS = new Set([
-  'model',
-  'messages',
-  'temperature',
-  'top_p',
-  'max_tokens',
-  'stream',
-  'stream_options',
-  'stop',
-  'random_seed',
-  'response_format',
-  'tools',
-  'tool_choice',
-  'presence_penalty',
-  'frequency_penalty',
-  'n',
-  'parallel_tool_calls',
-  'prediction',
-  'safe_prompt',
-]);
-const MISTRAL_MESSAGE_FIELDS = new Set([
-  'role',
-  'content',
-  'name',
-  'tool_calls',
-  'tool_call_id',
-  'prefix',
-]);
-
 export type GcpVertexCredentials = {
   project: string;
   location: string;
@@ -105,34 +75,6 @@ export function getGcpVertexMistralLocation(location: string) {
   return location === 'eu' || location.startsWith('europe-')
     ? MISTRAL_EU_LOCATION
     : MISTRAL_US_LOCATION;
-}
-
-function deleteFieldsExcept(value: object, allowed: ReadonlySet<string>) {
-  for (const key of Object.keys(value)) {
-    if (!allowed.has(key)) Reflect.deleteProperty(value, key);
-  }
-}
-
-/** Reduces an OpenAI-style Chat Completions body to the fields Mistral's API accepts. */
-export function toMistralChatCompletionsBody(body: object) {
-  const maxCompletionTokens: unknown = Reflect.get(body, 'max_completion_tokens');
-  if (Reflect.get(body, 'max_tokens') === undefined && maxCompletionTokens !== undefined) {
-    Reflect.set(body, 'max_tokens', maxCompletionTokens);
-  }
-  const seed: unknown = Reflect.get(body, 'seed');
-  if (Reflect.get(body, 'random_seed') === undefined && seed !== undefined) {
-    Reflect.set(body, 'random_seed', seed);
-  }
-  deleteFieldsExcept(body, MISTRAL_REQUEST_FIELDS);
-
-  const messages: unknown = Reflect.get(body, 'messages');
-  for (const message of Array.isArray(messages) ? messages : []) {
-    if (isRecord(message)) deleteFieldsExcept(message, MISTRAL_MESSAGE_FIELDS);
-  }
-  const tools: unknown = Reflect.get(body, 'tools');
-  for (const tool of Array.isArray(tools) ? tools : []) {
-    if (isRecord(tool) && isRecord(tool.function)) delete tool.function.strict;
-  }
 }
 
 export function parseGcpVertexCredentials(credential: string): GcpVertexCredentials {

@@ -7,8 +7,8 @@ import vertexByok, {
   getGcpVertexHost,
   parseGcpVertexCredentials,
   resolveGcpVertexUpstream,
-  toMistralChatCompletionsBody,
 } from './vertex-byok';
+import { toMistralChatCompletionsBody } from '../mistral';
 
 jest.mock('../../custom-llm/google-service-account', () => ({
   getGoogleServiceAccountAccessToken: jest.fn(async () => 'gcp-token'),

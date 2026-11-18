@@ -2963,6 +2963,8 @@ export const ReasoningDetailsTransform = {
   ReasoningContent: 'reasoning-content',
   /** The upstream sends reasoning as a plain `reasoning` string, without `reasoning_details`. */
   Reasoning: 'reasoning',
+  /** The upstream is Mistral's Chat Completions API, which sends reasoning as `thinking` content chunks. */
+  MistralThinking: 'mistral-thinking',
 } as const;
 
 export const ReasoningDetailsTransformSchema = z.enum(ReasoningDetailsTransform);
@@ -3118,6 +3120,20 @@ export const CustomLlmPublicSchema = z.object({
 
 export type CustomLlmPublic = z.infer<typeof CustomLlmPublicSchema>;
 
+/**
+ * Makes a custom LLM a partner route for the gateway catalog model with the same
+ * public id. It does not own the id: Kilo-paid requests for the model try the
+ * partner first and fall back to the regular route when it answers with an
+ * unsuccessful status. User BYOK keys and other user-paid routes are unaffected.
+ */
+export const CustomLlmPartnerSchema = z.object({
+  /** The provider slug the partner serves the model as. Organization provider allow
+   * lists and request provider settings decide whether the partner may serve. */
+  inference_provider: CustomLlmInferenceProviderSlugSchema,
+});
+
+export type CustomLlmPartner = z.infer<typeof CustomLlmPartnerSchema>;
+
 /** An ISO 3166-1 alpha-2 code as sent in Vercel's `x-vercel-ip-country` header. */
 export const VercelCountryCodeSchema = z
   .string()
@@ -3169,6 +3185,8 @@ export const CustomLlmDefinitionSchema = z
     organization_ids: z.array(z.uuid()).optional(),
     group_ids: z.array(z.uuid()).optional(),
     public: CustomLlmPublicSchema.optional(),
+    /** Requires pricing, and excludes public, organization_ids, and group_ids. */
+    partner: CustomLlmPartnerSchema.optional(),
     /** Hidden from model lists and refused by the gateway for requests from these countries.
      * A request without a known country is not restricted. */
     country_deny_list: z.array(VercelCountryCodeSchema).optional(),
@@ -3195,6 +3213,24 @@ export const CustomLlmDefinitionSchema = z
         path: ['may_train_on_prompts'],
         message: 'may_train_on_prompts must not be set without pricing',
       });
+    }
+    if (definition.partner) {
+      if (!definition.pricing) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['pricing'],
+          message: 'pricing must be set when partner is set',
+        });
+      }
+      for (const key of ['public', 'organization_ids', 'group_ids'] as const) {
+        if (definition[key] !== undefined) {
+          ctx.addIssue({
+            code: 'custom',
+            path: [key],
+            message: `${key} must not be set when partner is set`,
+          });
+        }
+      }
     }
     if (!definition.public) return;
     for (const key of ['organization_ids', 'group_ids'] as const) {

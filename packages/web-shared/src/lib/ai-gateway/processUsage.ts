@@ -1774,7 +1774,8 @@ export async function processTokenData(
   if (
     !usageStats.model || // fallback for failure cases
     usageContext.provider === 'custom' ||
-    usageContext.provider === 'custom-public' // custom LLMs do not reveal their upstream model
+    usageContext.provider === 'custom-public' || // custom LLMs do not reveal their upstream model
+    usageContext.provider === 'partner'
   ) {
     usageStats.model = usageContext.requested_model;
   }

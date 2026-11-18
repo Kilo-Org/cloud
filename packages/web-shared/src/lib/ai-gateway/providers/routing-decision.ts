@@ -46,6 +46,17 @@ const RoutingDecisionByokCandidateSchema = z.object({
 
 type RoutingDecisionByokCandidate = z.infer<typeof RoutingDecisionByokCandidateSchema>;
 
+const PartnerSkipReasonSchema = z.enum([
+  'unsupported-api-kind',
+  'bounded-spending',
+  'openrouter-disabled',
+  'country-denied',
+  'provider-settings',
+  'invalid-credentials',
+]);
+
+export type PartnerSkipReason = z.infer<typeof PartnerSkipReasonSchema>;
+
 const CustomLlmVisibilitySchema = z.enum(['public', 'private']);
 
 /**
@@ -139,12 +150,21 @@ const RoutingDecisionStepSchema = z.union([
     provider_id: UserByokProviderIdSchema,
     supported_api_kinds: z.array(GatewayChatApiKindSchema),
   }),
+  /** A partner for the model exists but may not serve the request; see `CustomLlmPartnerSchema`. */
+  z.object({
+    step: z.literal('partner'),
+    outcome: z.literal('skipped'),
+    inference_provider: z.string(),
+    reason: PartnerSkipReasonSchema,
+  }),
   z.object({
     step: z.literal('kilo'),
     outcome: z.literal('selected'),
     gateway: z.enum(['vercel', 'openrouter']),
     bounded_spending: z.boolean(),
     kilo_ignored_providers: z.array(z.string()),
+    /** Set when a partner serves the request first, with the gateway as its failover. */
+    partner_inference_provider: z.string().optional(),
   }),
 ]);
 

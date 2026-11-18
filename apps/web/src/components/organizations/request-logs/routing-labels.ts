@@ -63,6 +63,7 @@ const SENT_TO_LABELS: Record<string, string> = {
   'claude-billing': 'Anthropic (Claude organization)',
   custom: PROMOTIONAL_MODEL_PROVIDER,
   'custom-public': PROMOTIONAL_MODEL_PROVIDER,
+  partner: 'a Kilo partner provider',
   'dev-tools': 'Development tools',
 };
 
@@ -222,8 +223,21 @@ function describeByokKey(step: RequestLogRoutingStep, failedOver: boolean): stri
     : 'No BYOK key can serve this model.';
 }
 
+const PARTNER_SKIP_REASON_LABELS: Record<string, string> = {
+  'unsupported-api-kind': 'The partner does not support this API.',
+  'bounded-spending': 'The request carries a spend ceiling.',
+  'openrouter-disabled': 'The organization gateway settings exclude the partner.',
+  'country-denied': 'The partner is not available in the country the request came from.',
+  'provider-settings': 'Excluded by provider settings.',
+  'invalid-credentials': 'The partner is temporarily unavailable.',
+};
+
 function describeKilo(step: RequestLogRoutingStep): string {
   const gateway = (step.gateway ? gatewayName(step.gateway) : null) ?? 'a Kilo gateway';
+  if (step.partner_inference_provider) {
+    const partner = inferenceProviderNames([step.partner_inference_provider]);
+    return `Paid with Kilo credits and sent to ${partner} directly, with ${gateway} as the fallback.`;
+  }
   return `Paid with Kilo credits and routed through ${gateway}.`;
 }
 
@@ -277,6 +291,12 @@ export function describeStep(
         tone,
       };
     }
+    case 'partner':
+      return {
+        title: 'Partner provider',
+        detail: step.reason ? lookup(PARTNER_SKIP_REASON_LABELS, step.reason) : '',
+        tone,
+      };
     case 'kilo':
       return { title: 'Kilo credits', detail: describeKilo(step), tone };
     default:

@@ -31,6 +31,8 @@ const identity = {
   buildId: '44444444-4444-4444-8444-444444444444',
   allocationId: '55555555-5555-4555-8555-555555555555',
 };
+// Opt-in: CI does not run these cases. They need Linux, root (the HTTPS fixture listens on port 443),
+// /usr/local/bin/node, /usr/bin/python3, openssl and a hosts entry that maps the bucket host above to 127.0.0.1 (docs/aws-byoc.md).
 const enabled = process.platform === 'linux' && process.env.KILO_AWS_ARCHIVE_BOOTSTRAP_TEST === '1';
 const baseImage = awsArchiveBaseImage(connectionId, AWS_TEST_CONFIGURATION);
 function command(

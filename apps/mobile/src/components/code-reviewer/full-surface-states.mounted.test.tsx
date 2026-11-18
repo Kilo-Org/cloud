@@ -779,7 +779,7 @@ describe('Recent review bodies', () => {
       createElement(ReviewListScreen, { scope: 'personal' })
     );
     expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
-    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).not.toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'RowSkeleton')).not.toHaveLength(0);
     expect(renderer.root.findAll(node => String(node.type) === 'FlashList')).toHaveLength(0);
     unmount();
   });

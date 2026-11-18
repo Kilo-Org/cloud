@@ -50,20 +50,21 @@ import { kv } from './schema';
  * so the failure is reported under the migration operation and rethrown
  * without deleting anything — unless the rejection carries a corruption
  * signal, which means the file is unreadable after all, and the same
- * delete-and-recreate recovery runs. A streak of repeated failures is the
- * bounded exception: once a migration has failed non-transiently on this
- * many consecutive launches (`MIGRATION_FAILURE_RESET_THRESHOLD`, counted in
+ * delete-and-recreate recovery runs. A streak of counted migration failures
+ * is the bounded exception: once such a failure has repeated on this many
+ * consecutive launches (`MIGRATION_FAILURE_RESET_THRESHOLD`, counted in
  * SecureStore beside the key), the open falls back to the same
  * delete-and-recreate recovery — a wedge would leave the store, and with it
  * the chats and conversation tables, unusable on every later launch.
- * Corruption and busy failures never spend a count: a corruption resets
- * immediately, and a lock is transient. A migration that succeeds clears the
- * count. A busy or locked failure is the third case. A lock is evidence
- * about another connection, not about the file, so it is reported under the
- * open operation and rethrown with the file and the key intact — including
- * a lock that surfaces inside the migration, which is reported there under
- * the open operation instead of the migration one. The memo is dropped for
- * it, so the next caller retries the open after the lock clears.
+ * Corruption resets immediately. A lock and an engine limit never spend a
+ * count, because deleting the file cannot lift either. A migration that
+ * succeeds clears the count. A busy or locked failure is the third case. A
+ * lock is evidence about another connection, not about the file, so it is
+ * reported under the open operation and rethrown with the file and the key
+ * intact — including a lock that surfaces inside the migration, which is
+ * reported there under the open operation instead of the migration one. The
+ * memo is dropped for it, so the next caller retries the open after the lock
+ * clears.
  */
 
 const DATABASE_NAME = 'kilo-persist.db';
@@ -144,18 +145,17 @@ async function generateAndStoreKey(): Promise<string> {
 }
 
 // The bounded escape hatch for a store that fails to open launch after
-// launch: a buggy shipped migration, a downgrade to a build whose code
-// cannot apply the file's newer schema, or any other non-transient failure
-// that repeats. The rule is every non-transient failure on a readable file —
-// engine messages cannot tell a schema conflict from a full disk or denied
-// permissions, and a streak of repeated failures leaves the store unusable
-// either way, with drafts, the chats table and the conversation tables
-// unreachable. After this many consecutive failures the open falls back to
-// the same delete-and-recreate recovery a failed probe runs: a bounded,
-// reported loss instead of a wedge. A recreated file cannot fix every cause
-// (a full disk fails the same way), so the reset report carries the cause
-// for diagnosis. The count lives beside the key in SecureStore, not in the
-// failing database.
+// launch: a buggy shipped migration, a downgrade to a build whose code cannot
+// apply the file's newer schema, or another failing migration that repeats.
+// Only that class counts. A lock is transient evidence about another
+// connection, and an engine limit (a full disk, a read-only file, a denied
+// permission) says nothing about the file's contents: deleting the file cannot
+// lift either, and the recreated file meets the same limit after the chats and
+// conversation tables are already gone. After this many counted failures the
+// open falls back to the same delete-and-recreate recovery a failed probe runs:
+// a bounded, reported loss instead of a wedge that leaves drafts, the chats
+// table and the conversation tables unreachable. The count lives beside the key
+// in SecureStore, not in the failing database.
 const MIGRATION_FAILURE_RESET_THRESHOLD = 3;
 
 /** Counts one consecutive migration failure in SecureStore; a failed read or write leaves the count untouched. Returns the new consecutive count. */
@@ -308,28 +308,14 @@ const MIGRATION_FAILURE_MESSAGE = 'encrypted-kv: schema migration failed on a ke
 // Damage in a non-first page passes the `sqlite_master` count and surfaces
 // inside `migrate()` instead. These engine messages mean the file itself is
 // unreadable, so the open routes them into the same delete-and-recreate
-// recovery as a failed probe. Every other migrate rejection is a migration or
-// environment failure on a readable file and keeps the file.
+// recovery as a failed probe. Every other migrate rejection is a migration
+// failure, a lock, or an engine limit on a readable file and keeps the file.
 const CORRUPTION_SIGNALS = [
   'SQLITE_CORRUPT',
   'SQLITE_NOTADB',
   'file is not a database',
   'database disk image is malformed',
 ];
-
-function isCorruptionSignal(error: unknown): boolean {
-  // Drizzle wraps a failed statement in its own error and keeps the engine
-  // error in `cause`, so the signal can sit one level down.
-  let current = error;
-  for (let depth = 0; current instanceof Error && depth < 4; depth += 1) {
-    const candidate = current;
-    if (CORRUPTION_SIGNALS.some(signal => candidate.message.includes(signal))) {
-      return true;
-    }
-    current = current.cause;
-  }
-  return false;
-}
 
 // A lock is transient evidence about another connection, not about the file.
 // The engine reports it from the `sqlite_master` probe and from `PRAGMA key`
@@ -342,18 +328,53 @@ const BUSY_SIGNALS = [
   'database table is locked',
 ];
 
-function isBusySignal(error: unknown): boolean {
-  // Same walk as `isCorruptionSignal`: the driver keeps the engine error in
-  // `cause`, so the signal can sit one level down.
+// An engine limit is neither about the key nor about the file's contents: the
+// disk is full, the file is read-only, a permission is denied, or the path
+// cannot be opened. Deleting and recreating cannot lift it — the recreated file
+// meets the same limit while the stored chats and conversation tables are
+// already gone — so it never spends one of the bounded recovery attempts and
+// never deletes the file. A lock is the other such case (`BUSY_SIGNALS`). A
+// plain `disk I/O error` is deliberately absent: the engine reports an
+// unreadable page the same way, so it keeps counting toward the bounded
+// recovery instead.
+const ENVIRONMENT_SIGNALS = [
+  'SQLITE_FULL',
+  'database or disk is full',
+  'SQLITE_READONLY',
+  'attempt to write a readonly database',
+  'SQLITE_PERM',
+  'access permission denied',
+  'SQLITE_CANTOPEN',
+  'unable to open database file',
+];
+
+// Every check walks the `cause` chain: Drizzle wraps a failed statement in its
+// own error and keeps the engine error in `cause`, so a signal can sit one level
+// down.
+function carriesSignal(error: unknown, signals: readonly string[]): boolean {
   let current = error;
   for (let depth = 0; current instanceof Error && depth < 4; depth += 1) {
+    // A fresh binding keeps the `instanceof` narrowing that the loop's own
+    // reassignment of `current` drops.
     const candidate = current;
-    if (BUSY_SIGNALS.some(signal => candidate.message.includes(signal))) {
+    if (signals.some(signal => candidate.message.includes(signal))) {
       return true;
     }
-    current = current.cause;
+    current = candidate.cause;
   }
   return false;
+}
+
+function isCorruptionSignal(error: unknown): boolean {
+  return carriesSignal(error, CORRUPTION_SIGNALS);
+}
+
+function isBusySignal(error: unknown): boolean {
+  return carriesSignal(error, BUSY_SIGNALS);
+}
+
+function isEnvironmentSignal(error: unknown): boolean {
+  return carriesSignal(error, ENVIRONMENT_SIGNALS);
 }
 
 function probeSchema(db: KVDatabase): void {
@@ -383,6 +404,27 @@ function reportAbortedReset(cause: unknown): never {
   Sentry.captureException(cause, {
     level: 'error',
     tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'reset' },
+  });
+  throw cause;
+}
+
+/**
+ * Closes the handle, reports a failure that leaves the file intact under the
+ * open operation, and rethrows the cause. A lock and an engine limit both say
+ * nothing about the key or the file's contents. A handle that will not close is
+ * a leaked connection, which the relaunch clears; the failure itself is still
+ * the reported one.
+ */
+async function reportTransientOpenFailure(
+  db: KVDatabase | undefined,
+  cause: unknown
+): Promise<never> {
+  if (db) {
+    await closeQuietly(db.$client);
+  }
+  Sentry.captureException(cause, {
+    level: 'warning',
+    tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'open' },
   });
   throw cause;
 }
@@ -435,27 +477,21 @@ async function openEncryptedDatabase(): Promise<KVDatabase> {
     }
     // The file opened and keyed correctly, so the migration failed there. A
     // corruption signal means the file is unreadable after all: route it into
-    // the delete-and-recreate recovery below, like a failed probe. A busy
-    // failure is transient: report it and rethrow. Any other rejection is a
-    // migration or environment failure on a readable file — it is counted,
-    // and only a streak reaching the threshold routes it into the delete-and-
-    // recreate recovery, because deleting the file would lose the chats and
-    // conversation tables the failure never touched.
+    // the delete-and-recreate recovery below, like a failed probe. A lock and
+    // an engine limit are reported and rethrown with the file intact. Any
+    // other rejection is a migration failure on a readable file — it is
+    // counted, and only a streak reaching the threshold routes it into the
+    // delete-and-recreate recovery, because deleting the file would lose the
+    // chats and conversation tables the failure never touched.
     let resetCause = openError;
     if (openError instanceof Error && openError.message === MIGRATION_FAILURE_MESSAGE) {
       // A lock reached through the migration is still a lock — transient
-      // evidence about another connection, not about the file. The
-      // cooldown retry waits it out; a lock must never spend one of the
-      // bounded recovery attempts on a file that is readable.
-      if (isBusySignal(openError.cause)) {
-        if (db) {
-          await closeQuietly(db.$client);
-        }
-        Sentry.captureException(openError.cause, {
-          level: 'warning',
-          tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'open' },
-        });
-        throw openError.cause;
+      // evidence about another connection, not about the file. An engine limit
+      // is the same kind of evidence: a full disk or a read-only file cannot be
+      // fixed by deleting the store. Neither spends one of the bounded recovery
+      // attempts.
+      if (isBusySignal(openError.cause) || isEnvironmentSignal(openError.cause)) {
+        await reportTransientOpenFailure(db, openError.cause);
       }
       // A corruption signal means the file is unreadable after all: route it
       // into the delete-and-recreate recovery below, like a failed probe. The
@@ -465,9 +501,9 @@ async function openEncryptedDatabase(): Promise<KVDatabase> {
       if (isCorruptionSignal(openError.cause)) {
         resetCause = openError.cause;
       } else {
-        // A non-transient failure on a readable file counts toward the
-        // bounded recovery: the report rides on either outcome below, so a
-        // separate capture would file the same failure twice.
+        // A counted failure on a readable file: the report rides on either
+        // outcome below, so a separate capture would file the same failure
+        // twice.
         const failureCount = await recordMigrationFailure();
         // Under the threshold the file stays: close the handle, report under
         // the migration operation, and rethrow. At the threshold, mirror the
@@ -481,21 +517,12 @@ async function openEncryptedDatabase(): Promise<KVDatabase> {
         }
       }
     }
-    // A lock proves another connection held the file, not that the file or the
-    // key is bad. Report it and rethrow with the store intact: deleting it
-    // would discard readable data the lock never touched, and the next launch
-    // opens the same file again.
-    if (isBusySignal(resetCause)) {
-      // A handle that will not close is a leaked connection, which the
-      // relaunch clears; the failure itself is still the busy one.
-      if (db) {
-        await closeQuietly(db.$client);
-      }
-      Sentry.captureException(resetCause, {
-        level: 'warning',
-        tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'open' },
-      });
-      throw resetCause;
+    // The probe reported a lock or an engine limit, not a bad file: report it
+    // and rethrow with the store intact. Deleting it would discard readable
+    // data neither condition is about, and a recreated file meets the same
+    // limit.
+    if (isBusySignal(resetCause) || isEnvironmentSignal(resetCause)) {
+      await reportTransientOpenFailure(db, resetCause);
     }
     // Wrong key, corrupt file, or a tampered key: cache and drafts are
     // recoverable losses. Close, delete the file, regenerate the key, and
@@ -557,8 +584,22 @@ let openPromise: Promise<KVDatabase> | null = null;
 // flag marks a memo that holds a busy rejection, so only that memo is ever
 // dropped.
 const BUSY_RETRY_COOLDOWN_MS = 10_000;
+
+// The window is measured on a monotonic reading, so a device clock correction
+// cannot stretch it. On `Date.now()` a step backwards leaves the recorded end
+// in the future and serves the memoized rejection until the clock catches up.
+function cooldownNow(): number {
+  return performance.now();
+}
+
 let busyRetryNotBefore = 0;
 let busyMemoRejected = false;
+
+/** Ends the recorded busy episode: nothing is memoized and no cooldown is armed. */
+function endBusyEpisode(): void {
+  busyMemoRejected = false;
+  busyRetryNotBefore = 0;
+}
 
 /**
  * The key lives in the keychain, which refuses every call while the device is
@@ -569,28 +610,29 @@ async function openWhenProtectedDataAvailable(): Promise<KVDatabase> {
   await whenProtectedDataAvailable();
   try {
     const db = await openEncryptedDatabase();
-    busyMemoRejected = false;
+    endBusyEpisode();
     return db;
   } catch (error) {
     // The key read and write sit outside the open's own lock check, and the
     // keychain refuses them with a raw native error, not the typed one. Any
-    // failure while locked drops the memo.
+    // failure while locked drops the memo, and with it the cooldown of the
+    // episode it recorded.
     if (error instanceof ProtectedDataUnavailableError || !isProtectedDataAvailable()) {
       openPromise = null;
-      busyMemoRejected = false;
+      endBusyEpisode();
     }
     // A busy failure is transient: the lock clears, so the open must retry
     // instead of rejecting for the rest of the process. The cooldown bounds
     // the retry: inside the window the memoized rejection fails fast, and a
     // longer lock costs one open per window instead of one per store call.
     if (isBusySignal(error)) {
-      if (Date.now() >= busyRetryNotBefore) {
+      if (cooldownNow() >= busyRetryNotBefore) {
         // Drop the memo and start the window. The flag stays false: nothing
         // is memoized now, and the guard must not fire on the reopen this
         // drop starts.
         openPromise = null;
         busyMemoRejected = false;
-        busyRetryNotBefore = Date.now() + BUSY_RETRY_COOLDOWN_MS;
+        busyRetryNotBefore = cooldownNow() + BUSY_RETRY_COOLDOWN_MS;
       } else {
         // Inside the window: the rejected promise stays memoized and the
         // guard drops it once the window passes.
@@ -618,7 +660,7 @@ async function openDatabase(): Promise<KVDatabase> {
   // also claims the retry by clearing the flag, so concurrent callers that
   // arrive while the reopen is in flight await the same promise instead of
   // each starting another open.
-  if (openPromise && busyMemoRejected && Date.now() >= busyRetryNotBefore) {
+  if (openPromise && busyMemoRejected && cooldownNow() >= busyRetryNotBefore) {
     openPromise = null;
     busyMemoRejected = false;
   }
@@ -630,8 +672,7 @@ async function openDatabase(): Promise<KVDatabase> {
 // (the same pattern as `inFlightSaveCount` in save-chain.ts).
 export function resetEncryptedKvOpenForTests(): void {
   openPromise = null;
-  busyRetryNotBefore = 0;
-  busyMemoRejected = false;
+  endBusyEpisode();
 }
 
 /**
@@ -642,12 +683,14 @@ export function resetEncryptedKvOpenForTests(): void {
  * means one key, one SQLCipher probe, and one delete-and-recreate recovery
  * rather than a second copy of all three. The delete runs on a failed probe,
  * on a migration rejection that carries a corruption signal, or on a
- * migration that has now failed non-transiently on enough consecutive
- * launches to trigger the bounded recovery (`MIGRATION_FAILURE_RESET_THRESHOLD`);
- * busy failures never count toward it, a successful migration clears the
- * count, and every other failed migration reports and rethrows, and the file
- * stays. A busy or locked failure reports and rethrows the same way: a lock
- * says nothing about the file or the key.
+ * migration failure that has repeated on enough consecutive launches to
+ * trigger the bounded recovery (`MIGRATION_FAILURE_RESET_THRESHOLD`). Locks
+ * and engine limits never count toward it and never delete the file, a
+ * successful migration clears the count, and every other failed migration
+ * reports and rethrows with the file intact. A busy or locked failure reports
+ * and rethrows the same way: a lock says nothing about the file or the key. A
+ * probe that reports a lock or an engine limit keeps the file too, because
+ * neither is evidence about its contents.
  */
 export async function encryptedDatabase(): Promise<SQLite.SQLiteDatabase> {
   const db = await openDatabase();

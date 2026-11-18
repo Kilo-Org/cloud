@@ -46,6 +46,9 @@ vi.mock('@/components/ui/configure-row', () => ({
 }));
 vi.mock('@/components/ui/icons', () => ({
   Bot: 'Bot',
+  Check: 'Check',
+  ChevronLeft: 'ChevronLeft',
+  ChevronRight: 'ChevronRight',
   CircleDot: 'CircleDot',
   GitBranch: 'GitBranch',
   GitCommit: 'GitCommit',

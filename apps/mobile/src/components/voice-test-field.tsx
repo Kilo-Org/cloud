@@ -9,6 +9,7 @@ import { VoiceInputButton, VoiceInputStatus } from '@/components/voice-input-con
 import { applyVoiceDraftToInput } from '@/lib/voice-input/voice-input-draft';
 import { resolveVoiceInputFeedbackPresentation } from '@/lib/voice-input/voice-input-feedback';
 import { useVoiceInput } from '@/lib/voice-input/use-voice-input';
+import { REWRITTEN_INPUT_AUTO_CORRECT } from '@/lib/input-suggestions';
 
 /**
  * Requirement 3 surface: a free-text area in voice settings that shows the
@@ -75,6 +76,11 @@ export function VoiceTestField(): React.ReactElement {
       <Text className="text-sm font-medium text-foreground">{t('voiceInput.testTitle')}</Text>
       <Input
         ref={inputRef}
+        // Voice dictation rewrites this field's text programmatically and the
+        // Clear button empties it, so Android keeps the framework suggestion
+        // popup off — it crashes against rewritten text (see
+        // REWRITTEN_INPUT_AUTO_CORRECT).
+        autoCorrect={REWRITTEN_INPUT_AUTO_CORRECT}
         // The visible title above is a separate `Text`, so the multiline field
         // names itself with the same catalog key instead of the transcript. The
         // shared Input owns the box's inner padding: Android drops the logical

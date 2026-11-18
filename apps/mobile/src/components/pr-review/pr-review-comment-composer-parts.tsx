@@ -26,6 +26,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type DiffSelection } from '@/lib/pr-review/diff-selection-bridge';
 import { resolveAlphaColor } from '@/lib/theme-color';
 import { cn } from '@/lib/utils';
+import { REWRITTEN_INPUT_AUTO_CORRECT } from '@/lib/input-suggestions';
 
 // Body field geometry (line box, whole-line caps) lives in
 // comment-body-geometry.ts, kept separate so it stays testable without the
@@ -74,6 +75,11 @@ export function CommentBodyField({
         ref={inputRef}
         defaultValue={defaultValue}
         editable={!isDisabled}
+        // The composer rewrites this field's text programmatically (the
+        // Insert-suggestion write), so Android keeps the framework
+        // suggestion popup off — it crashes against rewritten text (see
+        // REWRITTEN_INPUT_AUTO_CORRECT).
+        autoCorrect={REWRITTEN_INPUT_AUTO_CORRECT}
         placeholder={t('prReview.composer.commentBodyPlaceholder')}
         placeholderTextColor={colors.mutedForeground}
         accessibilityLabel={t('prReview.composer.commentBody')}

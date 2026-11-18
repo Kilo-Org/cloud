@@ -41,6 +41,7 @@ import {
   shouldEnableComposerInputScroll,
 } from '@/components/agents/chat-composer-input-height';
 import { useReturnSendsMessagePreference } from '@/lib/hooks/use-return-sends-message-preference';
+import { REWRITTEN_INPUT_AUTO_CORRECT } from '@/lib/input-suggestions';
 import {
   resolveNewSessionPromptControlState,
   resolvePromptCounterRemaining,
@@ -625,6 +626,11 @@ export function NewSessionPrompt({
             submitBehavior={returnSendsMessage ? 'submit' : 'newline'}
             onSubmitEditing={returnSendsMessage ? handleReturnSubmit : undefined}
             maxFontSizeMultiplier={1}
+            // The app rewrites this field's text programmatically (voice
+            // transcript, paste, share prefill), so Android keeps the
+            // framework suggestion popup off — it crashes against rewritten
+            // text (see REWRITTEN_INPUT_AUTO_CORRECT).
+            autoCorrect={REWRITTEN_INPUT_AUTO_CORRECT}
             // Focus on arrival only when the form has nothing left to configure
             // (the host resolves this) and no share payload prefills it: the
             // keyboard it raises would otherwise shrink the frame past the

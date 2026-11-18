@@ -34,8 +34,10 @@ type AgentRowViewProps = Readonly<{
 /**
  * One agent row: name, visibility, optional model and description, edit/delete.
  * The name and what qualifies it are one identity element declared first, so a
- * screen reader hears what the row is before the controls that change it. It
- * lives in a `RowGroup`, which draws the separator between rows.
+ * screen reader hears what the row is before the controls that change it. The
+ * description holds one line and ellipsizes: the row is a list entry, and its
+ * whole text stays in the identity element's spoken label. It lives in a
+ * `RowGroup`, which draws the separator between rows.
  */
 export function AgentRowView({
   name,
@@ -65,7 +67,7 @@ export function AgentRowView({
           </Text>
         ) : null}
         {description.length > 0 ? (
-          <Text variant="caption" numberOfLines={2}>
+          <Text variant="caption" numberOfLines={1} ellipsizeMode="tail">
             {description}
           </Text>
         ) : null}

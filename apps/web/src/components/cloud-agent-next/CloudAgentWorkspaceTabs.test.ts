@@ -523,12 +523,6 @@ describe('CloudAgentWorkspaceTabs', () => {
     expect(html).not.toContain('New terminal');
   });
 
-  it('leaves preview out of the chat tab controls', () => {
-    const html = renderWorkspaceTabs({ canCreateTerminal: true }, true);
-
-    expect(html).not.toContain('Open preview');
-  });
-
   it('offers eligible terminal creation and history in the caret without chat creation', () => {
     const html = renderWorkspaceTabs({ onCreateChat: undefined, canCreateTerminal: true }, true);
 

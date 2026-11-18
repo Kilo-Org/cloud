@@ -138,8 +138,14 @@ export function WorktreeChangesButton({
     });
   }, [refreshSignal, cloudAgentSessionId, queryClient, queryKey]);
 
-  const fileCount = getWorktreeChangesTotals(saved.data?.snapshot)?.fileCount ?? 0;
-  const summary = fileCount > 0 ? `${fileCount} ${fileCount === 1 ? 'file' : 'files'}` : undefined;
+  const totals = getWorktreeChangesTotals(saved.data?.snapshot);
+  const fileCount = totals?.fileCount ?? 0;
+  const fileNoun = fileCount === 1 ? 'file' : 'files';
+  const hasChanges = fileCount > 0;
+  const description =
+    totals && hasChanges
+      ? `${fileCount} changed ${fileNoun}, ${totals.additions} additions, ${totals.deletions} deletions${totals.countsComplete ? '' : ' (partial summary)'}`
+      : undefined;
 
   return (
     <Tooltip delayDuration={400}>
@@ -150,14 +156,14 @@ export function WorktreeChangesButton({
           variant="ghost"
           className="text-muted-foreground aria-expanded:bg-secondary"
           aria-label="Changes"
-          aria-description={summary}
+          aria-description={description}
           aria-expanded={open}
           aria-controls={open ? 'worktree-changes-panel' : undefined}
           onClick={onToggle}
         >
           <span className="relative size-4">
             <FileDiff className="size-4" aria-hidden="true" />
-            {summary && (
+            {hasChanges && (
               <span
                 aria-hidden="true"
                 className="bg-foreground ring-background absolute -top-0.5 -right-0.5 size-1.5 rounded-full ring-2"
@@ -166,7 +172,9 @@ export function WorktreeChangesButton({
           </span>
         </Button>
       </TooltipTrigger>
-      <TooltipContent sideOffset={4}>{summary ? `Changes · ${summary}` : 'Changes'}</TooltipContent>
+      <TooltipContent sideOffset={4}>
+        {hasChanges ? `Changes · ${fileCount} ${fileNoun}` : 'Changes'}
+      </TooltipContent>
     </Tooltip>
   );
 }

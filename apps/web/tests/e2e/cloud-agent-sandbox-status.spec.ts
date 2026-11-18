@@ -12,6 +12,7 @@ import { organization_memberships, organizations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import type { SandboxStatusSnapshot } from '@/routers/cloud-agent-next-schemas';
+import type { CloudSessionMessagesWirePage } from '@kilocode/cloud-agent-sdk/schemas';
 import type {
   GetWorktreeFileOutput,
   WorktreeChangesSnapshot,
@@ -103,7 +104,7 @@ function worktreeSnapshot(revision: number): WorktreeChangesSnapshot {
   };
 }
 
-const worktreeSummary = (revision: number) => `1 changed files, ${revision} additions, 0 deletions`;
+const worktreeSummary = (revision: number) => `1 changed file, ${revision} additions, 0 deletions`;
 
 async function mountFixtures(
   page: Page,
@@ -134,6 +135,7 @@ async function mountFixtures(
     });
   let worktreeFileReply: (request: WorktreeFileRequest) => RpcResult | Promise<RpcResult> = () =>
     failure('NOT_FOUND');
+  let previewEnabled = false;
   let eventId = 0;
 
   function snapshot(overrides: Partial<SandboxStatusSnapshot> = {}): SandboxStatusSnapshot {
@@ -293,6 +295,44 @@ async function mountFixtures(
           });
         if (procedure === 'cliSessionsV2.getSessionMessages')
           return success({ info: { id: args.session_id }, messages: [] });
+        if (procedure.endsWith('cloudAgentNext.getSession')) {
+          const session = sessions.find(session => session.cloudId === args.cloudAgentSessionId);
+          if (!session?.cloudId) return failure('NOT_FOUND');
+          const local = row(session);
+          return success({
+            ...local.runtimeState,
+            kiloSessionId: session.id,
+            userId: 'controlled-browser-user',
+            orgId: session.organizationId,
+            title: session.title,
+            gitUrl: local.git_url,
+            upstreamBranch: local.git_branch,
+            createdOnPlatform: local.created_on_platform,
+          });
+        }
+        if (procedure.endsWith('cloudAgentNext.getSessionMessagesPage')) {
+          const session = sessions.find(session => session.cloudId === args.sessionId);
+          if (!session) return failure('NOT_FOUND');
+          return success({
+            kind: 'success',
+            info: { id: session.id, title: session.title },
+            messages: [],
+            nextCursor: null,
+            omittedItemCount: 0,
+            updateCursor: 0,
+          } satisfies CloudSessionMessagesWirePage);
+        }
+        if (procedure.endsWith('cloudAgentNext.listWorkspaceArtifacts'))
+          return success({ revision: 0, entries: [] });
+        if (procedure === 'cloudAgentNext.getPreviewOptions')
+          return success(
+            previewEnabled
+              ? { enabled: true, urlTemplate: 'https://preview-{port}.example.com' }
+              : { enabled: false }
+          );
+        if (procedure === 'cloudAgentNext.listPreviewServices')
+          return success({ status: 'running', services: [] });
+        if (procedure === 'cloudAgentNextFeedback.list') return success([]);
         if (procedure.endsWith('.getWorktreeChanges')) {
           const worktreeRequest: WorktreeChangesRequest = {
             cloudAgentSessionId: args.cloudAgentSessionId,
@@ -340,6 +380,9 @@ async function mountFixtures(
     worktreeFileRequests,
     procedures,
     snapshot,
+    enablePreview() {
+      previewEnabled = true;
+    },
     setReply(handler: typeof reply) {
       reply = handler;
     },
@@ -478,6 +521,14 @@ async function withOrganization(
 }
 
 const indicator = (page: Page) => page.getByRole('button', { name: /^Sandbox status:/ });
+const moreOptions = (page: Page) => page.getByRole('button', { name: 'More options', exact: true });
+const artifacts = (page: Page) => page.getByRole('button', { name: 'Artifacts', exact: true });
+const toolbarButtons = (page: Page) => [
+  page.getByRole('button', { name: 'Changes', exact: true }),
+  artifacts(page),
+  indicator(page),
+  moreOptions(page),
+];
 const details = (page: Page) => page.getByRole('dialog', { name: 'Sandbox status details' });
 const detailValue = (container: Locator, label: string) =>
   container
@@ -554,12 +605,7 @@ async function expectToolbarGeometry(page: Page, targetSize = 32) {
     const box = element.getBoundingClientRect();
     return box.y + box.height / 2;
   });
-  for (const button of [
-    sandbox,
-    page.getByRole('button', { name: /^(Mute|Enable) completion sounds$/ }),
-    page.getByRole('button', { name: 'More options', exact: true }),
-    page.getByRole('button', { name: 'Send feedback', exact: true }),
-  ]) {
+  for (const button of toolbarButtons(page)) {
     await expect(button).toHaveCSS('width', `${targetSize}px`);
     await expect(button).toHaveCSS('height', `${targetSize}px`);
     await expect(button).toHaveCSS('border-radius', radius);
@@ -711,7 +757,7 @@ test.describe('control-plane sandbox header', () => {
         const publish = (revision: number) =>
           fixture.setWorktreeChanges(worktreeSnapshot(revision), firstWorkspace, organizationId);
         const changes = page.getByRole('button', { name: 'Changes', exact: true });
-        const drawer = page.getByRole('dialog', { name: 'Changes', exact: true });
+        const panel = page.locator('#worktree-changes-panel');
         publish(1);
         await fixture.open(firstId, organizationId);
         await expect(changes).toHaveAttribute('aria-description', worktreeSummary(1));
@@ -742,20 +788,20 @@ test.describe('control-plane sandbox header', () => {
         await expect(changes).toHaveAttribute('aria-description', worktreeSummary(2));
 
         await changes.click();
-        await expect(drawer.getByText('revision-3.ts', { exact: true })).toBeVisible();
+        await expect(panel.getByRole('button', { name: /src\/revision-3\.ts/ })).toBeVisible();
         await expect.poll(captureCount).toBe(1);
         const openReads = readCount();
         publish(4);
         await fixture.advance(15_000);
         expect(readCount()).toBe(openReads);
-        await expect(drawer.getByText('revision-3.ts', { exact: true })).toBeVisible();
+        await expect(panel.getByRole('button', { name: /src\/revision-3\.ts/ })).toBeVisible();
         await fixture.worktreeReady(firstWorkspace, 4);
-        await expect(drawer.getByText('revision-4.ts', { exact: true })).toBeVisible();
+        await expect(panel.getByRole('button', { name: /src\/revision-4\.ts/ })).toBeVisible();
         await expect(changes).toHaveAttribute('aria-description', worktreeSummary(4));
         expect(readCount()).toBe(openReads + 1);
         expect(captureCount()).toBe(1);
-        await page.keyboard.press('Escape');
-        await expect(drawer).toHaveCount(0);
+        await changes.click();
+        await expect(panel).toHaveCount(0);
         const closedReads = readCount();
         publish(5);
         await fixture.advance(15_000);
@@ -780,6 +826,7 @@ test.describe('control-plane sandbox header', () => {
   test('preserves open A for B-only updates and reloads A after its same-count payload changes', async ({
     page,
   }, testInfo) => {
+    await page.setViewportSize({ width: 1440, height: 600 });
     const fixture = await mountFixtures(page);
     const lines = Array.from({ length: 80 }, (_, index) => `line_${index + 1}\n`);
     const aRecord = (revision: number, replacement: string): WorktreeFileRecord => {
@@ -879,8 +926,8 @@ test.describe('control-plane sandbox header', () => {
     await fixture.open();
     const changes = page.getByRole('button', { name: 'Changes', exact: true });
     await changes.click();
-    const drawer = page.getByRole('dialog', { name: 'Changes', exact: true });
-    await drawer.getByRole('button', { name: /a\.ts/ }).click();
+    const panel = page.locator('#worktree-changes-panel');
+    await panel.getByRole('button', { name: /a\.ts/ }).click();
     const individualExpansion = page
       .getByRole('button', { name: 'Show more unchanged lines', exact: true })
       .and(page.locator('[data-expand-button]:not([data-expand-all-button])'))
@@ -1655,7 +1702,7 @@ test.describe('control-plane sandbox header', () => {
     const fixture = await mountFixtures(page);
     await fixture.open();
     await expect(indicator(page)).toHaveAccessibleName('Sandbox status: Active');
-    await page.getByRole('button', { name: 'New terminal' }).focus();
+    await artifacts(page).focus();
     await page.keyboard.press('Tab');
     await expect(indicator(page)).toBeFocused();
     await expect(indicator(page)).not.toHaveCSS('box-shadow', 'none');
@@ -1676,7 +1723,7 @@ test.describe('control-plane sandbox header', () => {
     await expectDebugCollapsed(page);
     await expect(debugSummary(page)).toBeFocused();
     await page.keyboard.press('Tab');
-    await expect(page.getByRole('button', { name: 'Changes', exact: true })).toBeFocused();
+    await expect(moreOptions(page)).toBeFocused();
     await expect(details(page)).toHaveCount(0);
     await indicator(page).click();
     await expect(details(page)).toBeVisible();
@@ -1746,9 +1793,9 @@ test.describe('control-plane sandbox header', () => {
         await expect(page.getByRole('tooltip')).toHaveCount(0);
         const destination =
           key === 'Tab'
-            ? page.getByRole('button', { name: 'Changes', exact: true })
+            ? moreOptions(page)
             : key === 'Shift+Tab'
-              ? page.getByRole('button', { name: 'New terminal' })
+              ? artifacts(page)
               : indicator(page);
         await expect(destination).toBeFocused();
       });
@@ -2344,12 +2391,7 @@ test.describe('control-plane sandbox header', () => {
     await expectStaticIndicator(page);
     await expectToolbarGeometry(page);
     const highlights = [];
-    for (const button of [
-      indicator(page),
-      page.getByRole('button', { name: 'Mute completion sounds', exact: true }),
-      page.getByRole('button', { name: 'More options', exact: true }),
-      page.getByRole('button', { name: 'Send feedback', exact: true }),
-    ]) {
+    for (const button of toolbarButtons(page)) {
       await button.hover();
       await fixture.advance(250);
       const hover = await button.evaluate(element => {
@@ -2367,10 +2409,55 @@ test.describe('control-plane sandbox header', () => {
       highlights.push({ hover, focus });
     }
     for (const highlight of highlights) expect(highlight).toEqual(highlights[0]);
-    await page.getByRole('button', { name: 'Mute completion sounds', exact: true }).click();
+  });
+
+  test('opens Preview and Feedback from More options and restores focus on Escape', async ({
+    page,
+  }) => {
+    const fixture = await mountFixtures(page);
+    fixture.enablePreview();
+    await fixture.open();
+
+    for (const name of ['Open preview', 'Send feedback']) {
+      await expect(page.getByRole('button', { name, exact: true })).toHaveCount(0);
+      await moreOptions(page).press('Enter');
+      const menu = page.getByRole('menu');
+      await menu.getByRole('menuitem', { name, exact: true }).click();
+      const dialog = page.getByRole('dialog', { name });
+      await expect(dialog).toBeVisible();
+      await expect(menu).toBeHidden();
+      await expect(dialog.locator(':focus')).toHaveCount(1);
+      await page.keyboard.press('Escape');
+      await expect(dialog).toBeHidden();
+      await expect(moreOptions(page)).toBeFocused();
+    }
+  });
+
+  test('keeps completion sound off by default and saves opt-in from Preferences', async ({
+    page,
+  }) => {
+    const fixture = await mountFixtures(page);
+    await fixture.open();
+    const settings = page.getByRole('button', { name: 'Cloud Agent settings', exact: true });
+    const dialog = page.getByRole('dialog', { name: 'Cloud Agent settings', exact: true });
+    const preferences = dialog.getByRole('tab', { name: 'Preferences', exact: true });
+    const sound = dialog.getByRole('switch', { name: 'Completion sound', exact: true });
+
     await expect(
-      page.getByRole('button', { name: 'Enable completion sounds', exact: true })
-    ).toBeVisible();
+      page.getByRole('button', { name: /^(Mute|Enable) completion sounds$/ })
+    ).toHaveCount(0);
+    await settings.click();
+    await preferences.click();
+    await expect(sound).not.toBeChecked();
+    await sound.click();
+    await expect(sound).toBeChecked();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    await settings.click();
+    await preferences.click();
+    await expect(sound).toBeChecked();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
     await expectToolbarGeometry(page);
   });
 
@@ -2434,13 +2521,10 @@ test.describe('control-plane sandbox header', () => {
           animations: 'disabled',
         });
       }
-      for (const name of [
-        'New terminal',
-        'Mute completion sounds',
-        'More options',
-        'Send feedback',
+      for (const control of [
+        page.getByRole('button', { name: 'New terminal', exact: true }),
+        ...toolbarButtons(page),
       ]) {
-        const control = page.getByRole('button', { name, exact: true });
         await expect(control).toBeVisible();
         const box = await control.boundingBox();
         expect(box?.x).toBeGreaterThanOrEqual(0);

@@ -357,7 +357,7 @@ export function ScreenHeader({
   title,
   titleContent,
   titleNumberOfLines = 1,
-    subtitle,
+  subtitle,
   reserveSubtitle = false,
   subtitlePlaceholder,
   eyebrowNumberOfLines,

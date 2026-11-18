@@ -899,6 +899,7 @@ export async function fetchGitHubRootTextFileAtRef(params: {
       repo,
       path,
       ref,
+      request: { signal: AbortSignal.timeout(10_000) },
     });
 
     if (Array.isArray(data)) return null;
@@ -924,8 +925,28 @@ export async function fetchGitHubRepositoryDefaultBranch(params: {
 }): Promise<string> {
   const { token, owner, repo } = params;
   const octokit = new Octokit({ auth: token });
-  const { data } = await octokit.repos.get({ owner, repo });
+  const { data } = await octokit.repos.get({
+    owner,
+    repo,
+    request: { signal: AbortSignal.timeout(10_000) },
+  });
   return data.default_branch;
+}
+
+export async function fetchGitHubRepositoryDefaultBranchSha(params: {
+  token: string;
+  owner: string;
+  repo: string;
+}): Promise<string> {
+  const branch = await fetchGitHubRepositoryDefaultBranch(params);
+  const octokit = new Octokit({ auth: params.token });
+  const { data } = await octokit.git.getRef({
+    owner: params.owner,
+    repo: params.repo,
+    ref: `heads/${branch}`,
+    request: { signal: AbortSignal.timeout(10_000) },
+  });
+  return data.object.sha;
 }
 
 export async function fetchGitHubRepositorySize(params: {
@@ -957,6 +978,7 @@ export async function createGitHubBranch(params: {
     owner,
     repo,
     ref: `heads/${baseBranch}`,
+    request: { signal: AbortSignal.timeout(10_000) },
   });
 
   try {
@@ -965,6 +987,7 @@ export async function createGitHubBranch(params: {
       repo,
       ref: `refs/heads/${branchName}`,
       sha: baseRef.object.sha,
+      request: { signal: AbortSignal.timeout(10_000) },
     });
   } catch (error) {
     if (
@@ -992,10 +1015,23 @@ export async function createOrUpdateGitHubRootTextFile(params: {
   let sha: string | undefined;
 
   try {
-    const { data } = await octokit.repos.getContent({ owner, repo, path, ref: branch });
+    const { data } = await octokit.repos.getContent({
+      owner,
+      repo,
+      path,
+      ref: branch,
+      request: { signal: AbortSignal.timeout(10_000) },
+    });
     if (!Array.isArray(data)) {
       const existing = data as GitHubRepositoryContent;
       if (existing.type === 'file') {
+        if (
+          existing.encoding === 'base64' &&
+          typeof existing.content === 'string' &&
+          decodeGitHubBase64Content(existing.content) === content
+        ) {
+          return;
+        }
         sha = existing.sha;
       }
     }
@@ -1013,6 +1049,7 @@ export async function createOrUpdateGitHubRootTextFile(params: {
     message,
     content: Buffer.from(content, 'utf8').toString('base64'),
     ...(sha ? { sha } : {}),
+    request: { signal: AbortSignal.timeout(10_000) },
   });
 }
 
@@ -1034,9 +1071,38 @@ export async function createGitHubPullRequest(params: {
     body,
     head: headBranch,
     base: baseBranch,
+    request: { signal: AbortSignal.timeout(10_000) },
   });
 
   return { number: data.number, url: data.html_url };
+}
+
+export type GitHubHeadPullRequest = { number: number; url: string };
+
+/**
+ * Lists the repository's pull requests for a head branch, preferring the open
+ * one; the API returns newest first.
+ */
+export async function fetchGitHubPullRequestForHeadBranch(params: {
+  token: string;
+  owner: string;
+  repo: string;
+  headBranch: string;
+}): Promise<GitHubHeadPullRequest | null> {
+  const { token, owner, repo, headBranch } = params;
+  const octokit = new Octokit({ auth: token });
+  const { data } = await octokit.pulls.list({
+    owner,
+    repo,
+    state: 'all',
+    head: `${owner}:${headBranch}`,
+    per_page: 100,
+    request: { signal: AbortSignal.timeout(10_000) },
+  });
+
+  const matching = data.filter(pull => pull.head.ref === headBranch);
+  const pull = matching.find(candidate => candidate.state === 'open') ?? matching[0];
+  return pull ? { number: pull.number, url: pull.html_url } : null;
 }
 
 export async function getGitHubReviewComment(
@@ -1049,6 +1115,10 @@ export async function getGitHubReviewComment(
   id: number;
   body: string;
   userLogin: string | null;
+  /** GitHub account type of the comment author: 'User' | 'Bot' | 'Organization'. */
+  userType: string | null;
+  /** Numeric GitHub user id of the comment author; survives an App rename. */
+  userId: number | null;
   inReplyToId: number | null;
 } | null> {
   const tokenData = await generateGitHubInstallationToken(installationId, appType);
@@ -1064,6 +1134,8 @@ export async function getGitHubReviewComment(
       id: data.id,
       body: data.body,
       userLogin: data.user?.login ?? null,
+      userType: data.user?.type ?? null,
+      userId: data.user?.id ?? null,
       inReplyToId: data.in_reply_to_id ?? null,
     };
   } catch (error) {

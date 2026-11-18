@@ -41,7 +41,10 @@ import {
   isFreeNemotronModel,
   NVIDIA_TRIAL_TOS,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/nvidia';
-import { applyCustomPricingToModel } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
+import {
+  applyCustomPricingToModel,
+  applyCustomPricingToPricing,
+} from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
 import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
 import {
   getCustomLlmsById,
@@ -50,7 +53,13 @@ import {
 import { convertCustomLlmToCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/listAvailableCustomLlms';
 import { isCustomLlmDeniedInCountry } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
 import { addMonths } from 'date-fns';
-import { getModelDisplayPricing } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/display-pricing';
+import {
+  getProviderDisplayPricing,
+  getVercelModelForPricing,
+  isVercelEndpointOfProvider,
+  getVercelPricingMetadata,
+  type VercelPricingMetadata,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-endpoint-pricing';
 import {
   assertMinimumCount,
   createCachedMetadataReader,
@@ -58,6 +67,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/metadata-cache';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getVercelOnlyCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/vercel-only-models';
+import { getModelDisplayPricing } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/display-pricing';
 
 const OPENROUTER_MODELS_CACHE_TTL_MS = 5 * 60 * 1000;
 const OPENROUTER_MODELS_FETCH_TIMEOUT_MS = 15_000;
@@ -140,27 +150,43 @@ export function formatName(model: OpenRouterModel, preferredIndex: number) {
 }
 
 /**
- * The price the model picker shows for a catalog entry: the preferred
- * provider's route price when the snapshot knows one, otherwise the entry's
- * own catalog price.
+ * The price the model picker shows for a catalog entry: the preferred provider's undiscounted peak
+ * route price when the gateway metadata knows one, otherwise the entry's own undiscounted catalog
+ * price.
  */
 export function pickerModelPricing(
   model: OpenRouterModel,
   endpointsMetadata: GatewayModelMap,
-  preferredProviderOrderConfig: PreferredProviderOrderConfig
+  preferredProviderOrderConfig: PreferredProviderOrderConfig,
+  vercel: VercelPricingMetadata
 ): OpenRouterModel['pricing'] {
   const preferredProvider = resolvePreferredProviderOrder(
     preferredProviderOrderConfig,
     model.id
   ).at(0);
-  const endpoints = endpointsMetadata[model.id]?.endpoints ?? [];
-  const rawPricing = !preferredProvider
-    ? endpoints[0]?.pricing
-    : (endpoints.find(e => e.tag === preferredProvider)?.pricing ??
+  const vercelModel = getVercelModelForPricing(vercel, model.id);
+  const openRouterModel = endpointsMetadata[model.id];
+  if (!openRouterModel && vercelModel) {
+    // A model only Vercel serves is priced like its preferred provider's Vercel endpoint.
+    const vercelEndpoint =
+      (preferredProvider &&
+        vercelModel.endpoints.find(e => isVercelEndpointOfProvider(e, preferredProvider))) ||
+      vercelModel.endpoints[0];
+    const vercelPricing = getModelDisplayPricing(vercelEndpoint?.pricing);
+    if (vercelPricing) return vercelPricing;
+  }
+  const endpoints = openRouterModel?.endpoints ?? [];
+  const endpoint = !preferredProvider
+    ? endpoints[0]
+    : (endpoints.find(e => e.tag === preferredProvider) ??
       endpoints.find(
         e => normalizeInferenceProviderId(e.tag) === normalizeInferenceProviderId(preferredProvider)
-      )?.pricing);
-  return getModelDisplayPricing(rawPricing) ?? model.pricing;
+      ));
+  return (
+    getProviderDisplayPricing(endpoint?.tag, endpoint?.pricing, vercelModel) ??
+    getModelDisplayPricing(model.pricing) ??
+    model.pricing
+  );
 }
 
 /**
@@ -181,6 +207,7 @@ async function enhancedModelList(models: OpenRouterModel[], countryCode: string 
     preferredProviderOrderConfig,
     customLlmsById,
     customPricingConfig,
+    vercelPricingMetadata,
   ] = await Promise.all([
     getOpenRouterModelsMetadataFromDatabase(),
     getDataCollectionRequiredModelIds(),
@@ -189,6 +216,7 @@ async function enhancedModelList(models: OpenRouterModel[], countryCode: string 
     getPreferredProviderOrderConfig(),
     getCustomLlmsById(),
     getCustomPricingConfig(),
+    getVercelPricingMetadata(),
   ]);
   const publicCustomLlms = [...customLlmsById.values()].flatMap(customLlm =>
     isPublicCustomLlm(customLlm.definition) &&
@@ -210,20 +238,29 @@ async function enhancedModelList(models: OpenRouterModel[], countryCode: string 
     // OpenRouter may add a model after a custom LLM claimed its id, and
     // routing serves the custom LLM.
     !customLlmsById.has(modelId.toLowerCase()) && !unavailableModelIds.has(modelId);
+  const hasEndpointsMetadata = Object.keys(endpointsMetadata).length > 0;
+  const listedModels = models.filter(
+    model =>
+      (!hasEndpointsMetadata || endpointsMetadata[model.id] !== undefined) &&
+      isListableGatewayModelId(model.id) &&
+      !model.id.endsWith(':batch')
+  );
   const [vercelOnlyCatalogModels, summaries] = await Promise.all([
-    getVercelOnlyCatalogModels({ openRouterModels: models, openRouterMetadata: endpointsMetadata }),
+    getVercelOnlyCatalogModels({
+      openRouterModels: models,
+      listedOpenRouterModels: listedModels,
+      openRouterMetadata: endpointsMetadata,
+    }),
     getTerminalBenchSummaries(),
   ]);
-  const hasEndpointsMetadata = Object.keys(endpointsMetadata).length > 0;
-  const catalogModels = models
-    .filter(
-      model =>
-        (!hasEndpointsMetadata || endpointsMetadata[model.id] !== undefined) &&
-        isListableGatewayModelId(model.id) &&
-        !model.id.endsWith(':batch')
-    )
+  const gatewayModels = listedModels
     .map((model): OpenRouterModel => {
-      const pricing = pickerModelPricing(model, endpointsMetadata, preferredProviderOrderConfig);
+      const pricing = pickerModelPricing(
+        model,
+        endpointsMetadata,
+        preferredProviderOrderConfig,
+        vercelPricingMetadata
+      );
       const terminalBench = terminalBenchFor(summaries, model.id);
       const aliasTarget = model.id.startsWith('~')
         ? endpointsMetadata[model.id]?.alias_target?.slug
@@ -235,9 +272,39 @@ async function enhancedModelList(models: OpenRouterModel[], countryCode: string 
         alias_target: aliasTarget,
       };
     })
-    .concat(vercelOnlyCatalogModels.filter(model => isListableGatewayModelId(model.id)))
-    .concat(autoModels)
-    .map(model => applyCustomPricingToModel(customPricingConfig, model))
+    .concat(
+      vercelOnlyCatalogModels
+        .filter(model => isListableGatewayModelId(model.id))
+        .map(model => ({
+          ...model,
+          pricing: pickerModelPricing(
+            model,
+            endpointsMetadata,
+            preferredProviderOrderConfig,
+            vercelPricingMetadata
+          ),
+        }))
+    )
+    .concat(autoModels);
+  const displayPricingById = new Map(
+    gatewayModels.map(model => [
+      model.id,
+      applyCustomPricingToModel(customPricingConfig, model).pricing,
+    ])
+  );
+  const catalogModels = gatewayModels
+    .map(model => {
+      if (!model.alias_target) return applyCustomPricingToModel(customPricingConfig, model);
+      // An alias keeps its own name and shows the price its listed target shows. An alias whose
+      // target is not listed shows its own price, replaced by its target's custom pricing as
+      // billing replaces it.
+      return {
+        ...model,
+        pricing:
+          displayPricingById.get(model.alias_target) ??
+          applyCustomPricingToPricing(customPricingConfig, model.id, model.pricing),
+      };
+    })
     // Public custom LLMs are complete as defined; id-based pricing, PDF, and
     // protocol guesses below would describe a model routing does not serve.
     .concat(publicCustomLlmModels);

@@ -19,8 +19,7 @@ import { SquareUserRound } from 'lucide-react';
 import React from 'react';
 import type { SignInFormInitialState } from '@/hooks/useSignInFlow';
 import { OAuthProviderIds } from '@/lib/auth/provider-metadata';
-import { withLaunchedClaudeSignIn } from '@/lib/auth/claude/access';
-import { useClaudeSignInEnabled } from '@/lib/auth/claude/use-claude-sign-in-enabled';
+import { useClaudeSignInConfigured } from '@/lib/auth/claude/use-claude-sign-in-configured';
 import { buildEnterpriseSsoHref, buildNormalSignInHref } from '@/lib/auth/sign-in-navigation';
 import { SIGNUP_STEP_UP_METHODS_PARAM } from '@/lib/auth/redirect-urls';
 import type { SsoAccountMismatch } from '@/lib/auth/sso-account-mismatch';
@@ -37,6 +36,11 @@ type SignInFormProps = {
   ssoMode?: boolean; // If true, triggers SSO-specific messaging and email input view
   accountMismatch?: SsoAccountMismatch; // SSO request for a different account than the session
   storybookInitialState?: SignInFormInitialState;
+  /**
+   * True inside the app shell, which may not link to any page outside it: the
+   * "back to sign in options" link is the one exit this form renders.
+   */
+  shell?: boolean;
 };
 
 export function SignInForm({
@@ -50,6 +54,7 @@ export function SignInForm({
   ssoMode = false,
   accountMismatch,
   storybookInitialState,
+  shell = false,
 }: SignInFormProps) {
   const flow = useSignInFlow({
     searchParams,
@@ -58,8 +63,10 @@ export function SignInForm({
     isSignUp,
     storybookInitialState,
   });
-  const claudeSignInEnabled = useClaudeSignInEnabled();
-  const offeredOAuthProviderIds = withLaunchedClaudeSignIn(OAuthProviderIds, claudeSignInEnabled);
+  const claudeConfigured = useClaudeSignInConfigured();
+  const offeredOAuthProviderIds = OAuthProviderIds.filter(
+    id => id !== 'claude' || claudeConfigured
+  );
 
   // An Enterprise SSO request for a different address than the signed-in
   // session cannot proceed; offer the one-tap switch before any normal
@@ -87,6 +94,7 @@ export function SignInForm({
     <AuthErrorNotification
       error={flow.error}
       stepUpMethods={searchParams[SIGNUP_STEP_UP_METHODS_PARAM]}
+      shell={shell}
     />
   ) : null;
 
@@ -227,10 +235,8 @@ export function SignInForm({
 
                 // The remembered provider is the whole list; "see other
                 // sign-in methods" below opens the full group.
-                const displayedProviders = withLaunchedClaudeSignIn(
-                  [lastAuthMethod],
-                  claudeSignInEnabled
-                );
+                const displayedProviders =
+                  lastAuthMethod === 'claude' && !claudeConfigured ? [] : [lastAuthMethod];
 
                 return (
                   <div className="mx-auto max-w-md space-y-4">
@@ -323,13 +329,16 @@ export function SignInForm({
                   />
 
                   {ssoMode ? (
-                    // In SSO mode, show a link back to the main sign-in page
-                    <Link
-                      href={buildNormalSignInHref(searchParams)}
-                      className="text-muted-foreground mt-6 inline-block text-sm hover:underline pointer-coarse:min-h-11 pointer-coarse:content-center"
-                    >
-                      ← Back to sign in options
-                    </Link>
+                    // In SSO mode, show a link back to the main sign-in page,
+                    // except inside the app shell, which has no page to go back to.
+                    shell ? null : (
+                      <Link
+                        href={buildNormalSignInHref(searchParams)}
+                        className="text-muted-foreground mt-6 inline-block text-sm hover:underline pointer-coarse:min-h-11 pointer-coarse:content-center"
+                      >
+                        ← Back to sign in options
+                      </Link>
+                    )
                   ) : !emailOnly && isSignUp ? (
                     // In regular email input mode (not emailOnly), show back button
                     <button

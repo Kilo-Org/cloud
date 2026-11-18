@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one case per attachment shape in the sheet's image-failure matrix */
 import '@/i18n';
 import { type FilePart, type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { act, createElement } from 'react';
@@ -17,6 +18,7 @@ vi.mock('./tool-card-image-cache', () => ({
   useToolCardImageUri: (id: string) => cache.get(id),
 }));
 vi.mock('react-native', () => ({
+  I18nManager: { isRTL: false },
   Modal: 'Modal',
   View: 'View',
   ScrollView: 'ScrollView',

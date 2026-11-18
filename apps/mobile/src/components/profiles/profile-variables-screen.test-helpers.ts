@@ -1,9 +1,13 @@
+import { type Href } from 'expo-router';
 import { createElement } from 'react';
 import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { ProfileVariablesScreen } from '@/components/profiles/profile-variables-screen';
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
+
+/** The default destination the Profile tab's routes pass: their own Profiles list. */
+const PROFILES_LIST_HREF = '/(app)/(tabs)/(3_profile)/profiles' as Href;
 
 /**
  * Shared harness for the Profile Variables mounted tests. The `vi.mock` calls
@@ -130,7 +134,11 @@ export function confirmRequest(confirm: TestConfirmMock): void {
 // eslint-disable-next-line typescript-eslint/promise-function-async -- returning the harness promise unchanged
 export function mountScreen(organizationId?: string) {
   return renderWithProviders(
-    createElement(ProfileVariablesScreen, { profileId: 'profile-1', organizationId })
+    createElement(ProfileVariablesScreen, {
+      profileId: 'profile-1',
+      organizationId,
+      backFallback: PROFILES_LIST_HREF,
+    })
   );
 }
 
@@ -143,7 +151,11 @@ export function rerenderScreen(
     createElement(
       QueryClientProvider,
       { client: queryClient },
-      createElement(ProfileVariablesScreen, { profileId: 'profile-1', organizationId })
+      createElement(ProfileVariablesScreen, {
+        profileId: 'profile-1',
+        organizationId,
+        backFallback: PROFILES_LIST_HREF,
+      })
     )
   );
 }

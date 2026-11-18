@@ -29,21 +29,24 @@ import { useOrgDeepLinkSelection } from '@/lib/hooks/use-org-deep-link-selection
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useOrganization } from '@/lib/organization-context';
 import { normalizeOrgQueryParam } from '@/lib/org-deep-link';
+import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
 import { trpcErrorVariant } from '@/lib/trpc-error';
 import { cn, firstNonEmpty, parseTimestamp } from '@/lib/utils';
 
 // FlashList takes `contentContainerStyle` (no className), so the FlatList's
-// `grow gap-3 px-6 pt-4` content classes map to their pixel values. FlashList v2
-// positions every cell absolutely and has no `gap` handling (2.3.2 ships zero
-// `gap` references), so the 12px inter-row gap rides on the measured item
-// separator instead of `contentContainerStyle.gap`. The old container `gap` also
-// sat between the last row and the pagination footer; FlashList's separator only
-// spans items, so that boundary carries the same 12px as `pt-3` on the footer.
+// `grow gap-3 px-6 pt-4` content classes map to their pixel values: NativeWind's
+// native rem is 14, so px-6 is 21 dp and pt-4 is 14 dp (24/16 is the web rem and
+// sits 3 dp inside the skeleton it replaces). FlashList v2 positions every cell
+// absolutely and has no `gap` handling (2.3.2 ships zero `gap` references), so
+// the 12px inter-row gap rides on the measured item separator instead of
+// `contentContainerStyle.gap`. The old container `gap` also sat between the last
+// row and the pagination footer; FlashList's separator only spans items, so that
+// boundary carries the same 12px as `pt-3` on the footer.
 const listStyle = { flex: 1 } satisfies ViewStyle;
 const listContentContainerStyle = {
   flexGrow: 1,
-  paddingHorizontal: 24,
-  paddingTop: 16,
+  paddingHorizontal: 21,
+  paddingTop: 14,
 } satisfies ViewStyle;
 
 const CreditRowSeparator = () => <View className="h-3" />;
@@ -172,6 +175,7 @@ export function OrganizationCreditActivityScreen() {
     return (
       <OrganizationBoundary
         title={t('organization.creditActivity.title')}
+        backFallback={ORGANIZATION_HUB_PATH}
         organizationIdOverride={orgParam}
       />
     );
@@ -298,7 +302,10 @@ export function OrganizationCreditActivityScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('organization.creditActivity.title')} />
+      <ScreenHeader
+        title={t('organization.creditActivity.title')}
+        backFallback={ORGANIZATION_HUB_PATH}
+      />
       {body}
     </View>
   );

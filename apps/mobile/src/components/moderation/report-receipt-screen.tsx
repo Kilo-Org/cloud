@@ -1,20 +1,28 @@
 import { type Href, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Alert, View } from 'react-native';
+import { Alert, Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 import { z } from 'zod';
 
+import { performCopy } from '@/components/agents/use-message-copy';
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
+import { Copy } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import {
+  COMPACT_CONTROL_BOX_CLASS,
+  COMPACT_CONTROL_HIT_SLOP_DP,
+  STATE_ACTION_CLASS,
+} from '@/lib/a11y/tap-target';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTRPC } from '@/lib/trpc';
+import { cn } from '@/lib/utils';
 import { i18n } from '@/i18n';
 
 const ACCOUNT_ROUTE = '/(app)/(tabs)/(3_profile)/account' as Href;
@@ -35,6 +43,37 @@ const APPEAL_KEYS = {
   rejected: 'profile.reportReceipt.appealRejected',
 } as const;
 
+const NEXT_STEP_KEYS = {
+  received: 'profile.reportReceipt.nextStepReceived',
+  inReview: 'profile.reportReceipt.nextStepInReview',
+  appeal: 'profile.reportReceipt.nextStepAppeal',
+  final: 'profile.reportReceipt.nextStepFinal',
+} as const;
+
+/**
+ * The sentence that says what happens next, or `null` when there is nothing to
+ * add: the appeal button is the next step itself, and a status the server adds
+ * is shown by its row without a sentence this screen cannot derive.
+ */
+function nextStepKey(triageStatus: string, appealStatus: string): string | null {
+  if (appealStatus === 'submitted') {
+    return NEXT_STEP_KEYS.appeal;
+  }
+  if (appealStatus === 'accepted' || appealStatus === 'rejected') {
+    return NEXT_STEP_KEYS.final;
+  }
+  if (appealStatus !== 'none') {
+    return null;
+  }
+  if (triageStatus === 'received') {
+    return NEXT_STEP_KEYS.received;
+  }
+  if (triageStatus === 'open') {
+    return NEXT_STEP_KEYS.inReview;
+  }
+  return null;
+}
+
 /**
  * Translates a status the server reports, through the key its dictionary holds.
  * An unrecognised status is shown as the server sent it, so a status added on the
@@ -45,15 +84,54 @@ function statusLabel(dictionary: Readonly<Record<string, string>>, status: strin
   return key === undefined ? status : i18n.t(key);
 }
 
-function StatusRow({ label, value }: Readonly<{ label: string; value: string }>) {
+/**
+ * One label/value line. `copyLabel` turns the row into one whose value the
+ * reader can carry away. The control copies the whole value it was given.
+ *
+ * A copy row holds its value on one line and cuts at its middle. The first and
+ * last characters of an id therefore stay on screen. A row without a control
+ * also holds one line, with the end cut.
+ *
+ * The row's `gap-5` is 17.5dp at NativeWind's 14pt rem. It is the only
+ * clearance a value keeps once it fills its box, which the copy row's id does
+ * when it truncates, so it stays above the 16dp a label needs from its value.
+ */
+function StatusRow({
+  label,
+  value,
+  copyLabel,
+}: Readonly<{ label: string; value: string; copyLabel?: string }>) {
+  const colors = useThemeColors();
   return (
-    <View className="flex-row items-center justify-between gap-3 rounded-lg bg-secondary p-3">
-      <Text className="text-sm text-muted-foreground" numberOfLines={1}>
+    <View className="flex-row items-center justify-between gap-5 rounded-lg bg-secondary p-3">
+      <Text className="shrink text-sm text-muted-foreground" numberOfLines={1}>
         {label}
       </Text>
-      <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
-        {value}
-      </Text>
+      <View className="min-w-0 flex-1 flex-row items-center justify-end gap-2">
+        <Text
+          className="min-w-0 shrink text-sm font-medium text-foreground"
+          numberOfLines={1}
+          ellipsizeMode={copyLabel === undefined ? 'tail' : 'middle'}
+        >
+          {value}
+        </Text>
+        {copyLabel === undefined ? null : (
+          <Pressable
+            // The compact box carries the whole tap target, and its negative
+            // margin cancels back to one text line, so the row is no higher than
+            // the value's single line.
+            className={cn(COMPACT_CONTROL_BOX_CLASS, '-my-[7px]', 'active:opacity-70')}
+            hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
+            accessibilityRole="button"
+            accessibilityLabel={copyLabel}
+            onPress={() => {
+              void performCopy(value);
+            }}
+          >
+            <Copy size={16} color={colors.mutedForeground} />
+          </Pressable>
+        )}
+      </View>
     </View>
   );
 }
@@ -69,6 +147,9 @@ function StatusRow({ label, value }: Readonly<{ label: string; value: string }>)
  * An appeal can be submitted once. When it can, the button asks first: the
  * submission cannot be taken back, so it is confirmed the way a non-destructive
  * but final action is (`Alert.alert`), not with the red affordance of a deletion.
+ *
+ * The screen states the next step whenever it offers no appeal, and stays silent
+ * when the appeal button is the next step.
  */
 export function ReportReceiptScreen() {
   const { t } = useTranslation();
@@ -129,6 +210,8 @@ export function ReportReceiptScreen() {
     receipt.data.appealStatus === 'none' &&
     (receipt.data.triageStatus === 'actioned' || receipt.data.triageStatus === 'rejected');
 
+  const nextStep = nextStepKey(receipt.data.triageStatus, receipt.data.appealStatus);
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('profile.reportReceipt.title')} />
@@ -144,6 +227,7 @@ export function ReportReceiptScreen() {
           <StatusRow
             label={t('profile.reportReceipt.receiptLabel')}
             value={receipt.data.receiptId}
+            copyLabel={t('profile.reportReceipt.copyReceiptId')}
           />
           <StatusRow
             label={t('common.status')}
@@ -154,6 +238,11 @@ export function ReportReceiptScreen() {
             value={statusLabel(APPEAL_KEYS, receipt.data.appealStatus)}
           />
         </View>
+        {nextStep === null ? null : (
+          <Text variant="muted" className="text-xs">
+            {t(nextStep)}
+          </Text>
+        )}
         {appealable ? (
           <Button
             variant="outline"

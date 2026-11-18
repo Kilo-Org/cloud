@@ -1084,6 +1084,22 @@ describe('githubPrReviewRouter.listInbox', () => {
     });
   }
 
+  it('answers a spent mobile budget retryably before asking GitHub', async () => {
+    const caller = createCaller({
+      user: { id: 'user-1' } as User,
+      controlPlaneStartedAt: performance.now() - 9_900,
+    });
+    const octokit = buildOctokit('t1');
+
+    await expect(caller.listInbox({ direction: 'forward' })).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'Your review inbox took too long to load. Try again.',
+    });
+
+    expect(octokit.request).not.toHaveBeenCalled();
+    expect(getGitHubUserAccessToken).not.toHaveBeenCalled();
+  });
+
   it('maps search nodes to inbox items and returns nextCursor from pageInfo', async () => {
     getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
     const caller = createCaller({ user: { id: 'user-1' } as User });

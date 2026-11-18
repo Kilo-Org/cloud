@@ -7,7 +7,9 @@ their Kilo accounts.
 Pages source lives in `nteract/nteract`, directory `apps/pages`. nteract
 builds it and publishes each build as a release asset. This folder holds what
 this repository decides about a deployment: which release is deployed, and the
-Worker's Wrangler configuration. The build runs no nteract code. One exception
+Worker's Wrangler configuration. The same release carries the output shell, a
+second Worker that serves the sandboxed frames a Page's interactive views run
+in. `services/pages-output` deploys it from the pin in this folder. The build runs no nteract code. One exception
 sits in Wrangler: when Cloudflare refuses an upload with a startup error,
 `wrangler deploy` loads the bundle in a local workerd to explain it. There it
 has network access but no environment, files or `nodejs_compat`.
@@ -19,28 +21,38 @@ source.json → nteract release pages-<build_id> + sha256 of its archive
   → pnpm run build (download, check sha256, read archive, compare configurations)
   → dist/worker (Worker module + WASM), dist/public (browser assets)
 wrangler.jsonc → wrangler deploy
+
+source.json → the same archive, read by the same code
+  → ../pages-output: pnpm run build (compare output/wrangler.json, check output/worker.js)
+  → ../pages-output/dist/worker.js
+../pages-output/wrangler.jsonc → wrangler deploy (nteract-pages-outputs)
 ```
 
 | File | Holds |
 |---|---|
-| `source.json` | The release tag and the sha256 of its archive |
+| `source.json` | The release tag and the sha256 of its archive, for this Worker and the output shell |
 | `wrangler.jsonc` | What deploys: the Worker's name, route, bindings, migrations, cron triggers and variables |
 | `scripts/build.mjs` | Downloads the pinned archive, checks it, and fills `dist/` |
 | `scripts/pin.mjs` | Moves the pin to a release, after checking its attestation |
+| `scripts/pinned.mjs` | Reads `source.json`, downloads the archive and checks it; both builds call it |
 | `scripts/package.mjs` | The checks on the archive and its configuration |
 
 A Pages package ships a deployment-neutral `wrangler.json`: the fields the code
 fixes (Durable Object classes, migrations, cron triggers, asset handling,
-compatibility date, `NOTEBOOK_CLOUD_OIDC_FLOW`), with no name, route, database,
-bucket or other variable. The build compares those fields with `wrangler.jsonc`
+compatibility date and flags, `NOTEBOOK_CLOUD_OIDC_FLOW`,
+`PAGES_OAUTH_METADATA_EGRESS`), with no name, route, database, bucket or other
+variable. The build compares those fields with `wrangler.jsonc`
 and fails on any difference, naming the fields. So a release that adds a
 Durable Object class, a migration or a cron trigger changes `wrangler.jsonc` in
 the pull request that moves the pin, where it is reviewed.
 
 The build reads the archive as untrusted input. It accepts regular files at
 the package's paths only: no links, no directory entries, no `.` or `..`
-components, no file outside `worker/`, `public/`, `build-receipt.json` and
-`wrangler.json`, and no two names that differ only in case. Under `public/`,
+components, no file outside `worker/`, `public/`, `output/`,
+`build-receipt.json` and `wrangler.json`, and no two names that differ only in
+case. `output/` holds exactly `output/worker.js` and `output/wrangler.json`,
+both required. This build copies `worker/`, `public/` and `build-receipt.json`
+into `dist/`; `output/` never reaches this Worker's modules or assets. Under `public/`,
 names starting with `_` configure the asset server, so it refuses them except
 the package's `_headers`. Its contents are not checked: the Worker runs before
 the asset server and can set any header itself. Names from the archive are
@@ -102,13 +114,17 @@ a Kilo one.
 
 | Client | Admitted by |
 |---|---|
-| Claude (web, desktop and mobile), Claude Code, ChatGPT | Client ID metadata document, for the clients the Worker names |
+| Any client with a valid public HTTPS client ID metadata document (Claude, Claude Code, ChatGPT, Codex and others) | The metadata document. Known client names are display labels; an unfamiliar client is named by its host on the consent screen |
 | Kilo CLI | Its fixed client id, `pages-kilo` |
-| Any other client | Refused before anything is fetched |
 
-Setting `PAGES_OAUTH_ANY_CLIENT_DOCUMENT` to `true` admits any client that
-publishes a document. Read "Outbound requests" in nteract's
-`apps/pages/DEPLOYMENT.md` before turning it on.
+Every metadata client still needs valid metadata, a listed callback, PKCE S256,
+sign-in and consent. The Worker fetches the document through Cloudflare's
+public routing: the `global_fetch_strictly_public` compatibility flag and
+`PAGES_OAUTH_METADATA_EGRESS=public-https` are both required, and without the
+variable every new metadata authorization gets a 503. The flag covers every
+`fetch` the Worker makes, including the sign-in exchange with the web app.
+`PAGES_OAUTH_ANY_CLIENT_DOCUMENT` is obsolete and has no effect. Read "Outbound
+requests" in nteract's `apps/pages/DEPLOYMENT.md` for the boundary.
 
 `/llms.txt` and `/connect` describe these routes to agents and to people.
 
@@ -132,6 +148,13 @@ by its `wrangler.jsonc`, runs `predeploy` (`pnpm run build`), then
 it depends on, deploys `pages-dev`. Nothing else deploys it: no Wrangler
 deploy from a laptop.
 
+A change to `source.json` also deploys `services/pages-output`, the output
+shell, in the same run. The two deploys run side by side, in no fixed order.
+The frame protocol is versioned for that window: a change that breaks it adds
+a new frame path and the shell keeps the previous one for at least one release.
+The viewer's default frame address is the shell's origin, so this Worker sets
+no `PAGES_OUTPUT_FRAME_URL`.
+
 A deploy is a pull request that moves the pin. Run the "Pages package release"
 workflow in nteract for the commit you want, then pin its release here:
 
@@ -144,7 +167,9 @@ file, and runs `gh attestation verify` against nteract's release workflow
 before it writes `source.json`. The deploy job checks only the sha256, so the
 pin is where the archive's origin is checked. Link the nteract compare range in
 the pull request. If the build reports that `wrangler.jsonc` differs, change it
-in the same pull request. `/health` reports the build id as `build`.
+in the same pull request. `/health` reports the build id as `build`, and the
+shell's `https://pages.kilousercontent.com/health` answers
+`pages-output-v2 <build_id>` with the same id.
 
 ### Development
 
@@ -224,4 +249,5 @@ Plain variables, set in `vars` in `wrangler.jsonc`.
 | `PAGES_DEFAULT_PAGE_QUOTA` | How many active Pages one account may hold |
 | `PAGES_CATALOG_INDEX` | Epoch label of the D1 catalog index |
 | `NOTEBOOK_CLOUD_OIDC_FLOW` | `server`. Structural: the package names it, and the build checks it |
+| `PAGES_OAUTH_METADATA_EGRESS` | `public-https`. Structural: the package names it, and the build checks it. Tells Pages the Worker fetches client metadata as public Internet traffic, which the `global_fetch_strictly_public` compatibility flag provides. Without it, new metadata authorizations get a 503 |
 | `NOTEBOOK_CLOUD_ANACONDA_API_KEY_*` | Not read while `PAGES_KILO_APP_URL` is set |

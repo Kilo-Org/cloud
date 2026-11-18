@@ -7,6 +7,8 @@ import {
   genericPushContentForPushData,
   iosInterruptionLevelForPushData,
   iosMutableContentForPushData,
+  pushBodyCatalogKey,
+  pushTitleCatalogKey,
   resolvePushLocale,
   translatePush,
   type DispatchPushInput,
@@ -292,16 +294,19 @@ export class NotificationChannelDO extends DurableObject<Env> {
       } else if (input.push.i18nKey !== undefined) {
         // Per-token translation of the system copy. User-authored fields
         // (session title, conversation title, finding title, instance name)
-        // arrive as i18nParams and pass through the catalog templates.
+        // arrive as i18nParams and pass through the catalog templates. Both
+        // keys come from the mapping because sibling kinds can share one
+        // entry: the security-finding kinds read one body, both session kinds
+        // read one title, and each kind keeps its own entry otherwise.
         title = translatePush(
           resolvedLocale,
-          `${input.push.i18nKey}.title`,
+          pushTitleCatalogKey(input.push.i18nKey),
           input.push.i18nParams,
           input.push.title
         );
         body = translatePush(
           resolvedLocale,
-          `${input.push.i18nKey}.body`,
+          pushBodyCatalogKey(input.push.i18nKey),
           input.push.i18nParams,
           input.push.body
         );

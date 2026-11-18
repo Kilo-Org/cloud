@@ -10,6 +10,8 @@
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
   "preview_urls": false,
+  "upload_source_maps": true,
+  "version_metadata": { "binding": "CF_VERSION_METADATA" },
   "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
   "workers_dev": true,
   "dev": {
@@ -53,6 +55,9 @@
     },
   ],
   "vars": {
+    // Deployment environment shared with the token minters' `env` claim
+    // (`process.env.NODE_ENV` on the web app): admission refused on mismatch.
+    "ENVIRONMENT": "production",
     "KILOCODE_BACKEND_BASE_URL": "https://api.kilo.ai",
     "GITHUB_APP_SLUG": "kiloconnect",
     "GITHUB_APP_BOT_USER_ID": "240665456",
@@ -62,6 +67,7 @@
     "CLI_TIMEOUT_SECONDS": "900",
     "REAPER_INTERVAL_MS": "300000",
     "R2_ATTACHMENTS_BUCKET": "cloud-agent-attachments",
+    "WORKSPACE_ARTIFACTS_BUCKET_NAME": "cloud-agent-workspace-artifacts",
     // The web origins that open /stream and /terminal. The staging web target
     // reaches this Worker too, because cloud-agent-next has no staging
     // deployment of its own.
@@ -169,6 +175,10 @@
     {
       "binding": "R2_BUCKET",
       "bucket_name": "kilocode-sessions",
+    },
+    {
+      "binding": "WORKSPACE_ARTIFACTS_BUCKET",
+      "bucket_name": "cloud-agent-workspace-artifacts",
     },
   ],
   // Native Cloudflare Containers is the only sandbox runtime. The retired
@@ -354,6 +364,7 @@
         },
       ],
       "vars": {
+        "ENVIRONMENT": "development",
         "KILOCODE_BACKEND_BASE_URL": "http://localhost:3000",
         "KILO_OPENROUTER_BASE": "http://localhost:3000/api",
         "GITHUB_APP_SLUG": "kiloconnect-development",
@@ -365,6 +376,7 @@
         "CLI_TIMEOUT_SECONDS": "900",
         "REAPER_INTERVAL_MS": "300000",
         "R2_ATTACHMENTS_BUCKET": "cloud-agent-attachments-dev",
+        "WORKSPACE_ARTIFACTS_BUCKET_NAME": "cloud-agent-workspace-artifacts-dev",
         "WS_ALLOWED_ORIGINS": "http://localhost:3000,http://host.docker.internal:3000",
         "KILO_SESSION_INGEST_URL": "http://localhost:8800",
         "CONTAINER_BILLING_HEARTBEAT_SECONDS": "60",
@@ -409,6 +421,10 @@
         {
           "binding": "R2_BUCKET",
           "bucket_name": "kilocode-sessions-dev",
+        },
+        {
+          "binding": "WORKSPACE_ARTIFACTS_BUCKET",
+          "bucket_name": "cloud-agent-workspace-artifacts-dev",
         },
         {
           "binding": "RUNTIME_RELEASE_BUCKET",

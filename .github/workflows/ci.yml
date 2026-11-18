@@ -393,16 +393,20 @@ jobs:
               - '.npmrc'
       # The script chain behind `pnpm run test:scripts`. Every entry below comes
       # from what a suite in that chain imports or reads: scripts/** for the
-      # web-env, mobile-artifacts, mobile-sbom, kilo-app-release and
-      # kilo-mcp-release suites; dev/** for dev-local; tools/oxlint/** for the
-      # plugin suite. The rewrites suite also enumerates the route directories
-      # of both apps, the dev-local suites read the mobile design-gate sources,
-      # the web env example, the auto-routing and meter dev-vars examples, the
-      # fake LLM used by the tunnel tests, the native build workflow, the web
-      # load-env module and three workspace packages. None of this is web source
-      # outside those paths, so a web-only diff no longer starts the chain. Add
-      # an entry here when a suite starts reading a new path: a missing entry
-      # stops its suite silently on the change it protects.
+      # web-env, mobile-artifacts, mobile-sbom, kilo-app-release,
+      # kilo-mcp-release and kilo-extension-release suites; dev/** for
+      # dev-local; tools/oxlint/** for the plugin suite. The rewrites suite also
+      # enumerates the route directories of both apps, the dev-local suites read
+      # the mobile design-gate sources, the web env example, the auto-routing and
+      # meter dev-vars examples, the fake LLM used by the tunnel tests, the
+      # native build workflow, the web load-env module and three workspace
+      # packages. The extension suite pins the store build's sources allowlist in
+      # apps/extension/wxt.config.ts, and the store release workflow is the other
+      # caller of the notes script it tests, so a change to either starts the
+      # chain. None of this is web source outside those paths, so a web-only diff
+      # no longer starts the chain. Add an entry here when a suite starts reading
+      # a new path: a missing entry stops its suite silently on the change it
+      # protects.
       - name: Detect script-suite changes
         id: filter_test_scripts
         continue-on-error: true
@@ -425,7 +429,9 @@ jobs:
               - 'services/container-usage-meter/.dev.vars.example'
               - 'services/cloud-agent-next/test/e2e/**'
               - '.github/workflows/mobile-native-build.yml'
+              - '.github/workflows/extension-store-release.yml'
               - '.github/workflows/kilo-mcp-release.yml'
+              - 'apps/extension/wxt.config.ts'
               - 'packages/db/**'
               - 'packages/worker-utils/**'
               - 'packages/session-ingest-contracts/**'
@@ -455,7 +461,9 @@ jobs:
               - 'services/container-usage-meter/.dev.vars.example'
               - 'services/cloud-agent-next/test/e2e/**'
               - '.github/workflows/mobile-native-build.yml'
+              - '.github/workflows/extension-store-release.yml'
               - '.github/workflows/kilo-mcp-release.yml'
+              - 'apps/extension/wxt.config.ts'
               - 'packages/db/**'
               - 'packages/worker-utils/**'
               - 'packages/session-ingest-contracts/**'
@@ -1508,12 +1516,13 @@ jobs:
           build_dir=$(mktemp -d "$RUNNER_TEMP/wrapper-build.XXXXXX")
           trap 'rm -rf "$build_dir"' EXIT
 
-          # Match Dockerfile inputs without access to workspace node_modules.
+          # Keep application dependencies isolated; source-map injection needs the build-only CLI.
           tar -C services/cloud-agent-next --exclude=node_modules --exclude=dist \
-            -cf - wrapper src/shared | tar -C "$build_dir" -xf -
+            -cf - wrapper src/shared scripts/sentry-source-maps.ts | tar -C "$build_dir" -xf -
           cd "$build_dir/wrapper"
           bun install --production
           ln -sfn "$build_dir/wrapper/node_modules" "$build_dir/node_modules"
+          ln -s "$GITHUB_WORKSPACE/services/cloud-agent-next/node_modules/@sentry/cli" node_modules/@sentry/cli
           bun run build.ts --install-dir "$build_dir/bin"
 
       - name: Test cloud-agent-next checkers

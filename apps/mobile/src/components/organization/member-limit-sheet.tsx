@@ -43,7 +43,7 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
   const router = useRouter();
   const { t } = useTranslation();
   const mutations = useOrganizationMutations(organizationId ?? '', {
-    silenceUpdateMemberToast: true,
+    silenceMemberToast: true,
   });
   const currentLimit = member.dailyUsageLimitUsd;
   const hasCurrentLimit = currentLimit != null;
@@ -131,9 +131,7 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
         loading={mutations.updateMember.isPending}
         onPress={onSave}
       >
-        <Text
-          className={cn('text-primary-foreground', canSave && 'dark:text-selection-foreground')}
-        >
+        <Text className={cn(canSave && 'text-primary-foreground dark:text-selection-foreground')}>
           {t('common.save')}
         </Text>
       </Button>
@@ -163,7 +161,13 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
     (m): m is ActiveOrgMember => isActiveOrgMember(m) && m.id === memberId
   );
 
-  if (isResolving || orgWithMembers.isLoading) {
+  // isPending (no data AND no error) rather than isLoading: an offline paused
+  // fetch has isLoading false but no data — it must show the skeleton instead
+  // of a settled state until the read answers (reconnect) or the person
+  // retries, while a real error still reaches QueryError. The organizationId
+  // guard keeps a disabled query (null org, pending forever) falling through
+  // to OrganizationBoundary below.
+  if (isResolving || (organizationId != null && orgWithMembers.isPending)) {
     return (
       <SheetScrollView
         className="flex-1 bg-background"

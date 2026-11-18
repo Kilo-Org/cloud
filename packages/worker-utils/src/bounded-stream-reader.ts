@@ -26,7 +26,7 @@ export async function readBoundedStream(
 
       totalBytes += result.value.byteLength;
       if (totalBytes > declaredBytes) {
-        await cancelReader(reader);
+        void cancelReader(reader);
         return { ok: false, reason: 'too_large' };
       }
       chunks.push(result.value);
@@ -39,7 +39,10 @@ export async function readBoundedStream(
 async function cancelReader(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<void> {
   try {
     await reader.cancel('stream exceeded ingest byte limit');
-  } catch {
-    // The typed overflow result remains authoritative if cancellation itself fails.
+  } catch (error) {
+    // Do not log arbitrary error names or messages from the stream source.
+    console.warn('bounded stream cancellation failed', {
+      error_name: error instanceof Error ? 'Error' : typeof error,
+    });
   }
 }

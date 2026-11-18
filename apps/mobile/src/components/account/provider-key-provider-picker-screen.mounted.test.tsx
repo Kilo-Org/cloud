@@ -14,8 +14,7 @@ const state = vi.hoisted(() => ({
   providers: [] as Provider[],
   error: false,
   push: vi.fn(),
-  clear: vi.fn(),
-  openExternalUrl: vi.fn(),
+  scrollToOffset: vi.fn(),
 }));
 
 vi.mock('react-native', () => ({ View: 'View', Pressable: 'Pressable', TextInput: 'TextInput' }));
@@ -24,20 +23,34 @@ vi.mock('@shopify/flash-list', async () => {
   // be loaded from inside the factory rather than at the top of the module.
   const React = await import('react');
   return {
-    FlashList: (props: {
-      data: unknown[];
-      renderItem: (info: { item: unknown }) => React.ReactNode;
-      ListEmptyComponent?: React.ReactNode;
-    }) =>
-      React.createElement(
-        'FlashList',
-        { itemCount: props.data.length },
-        props.data.length === 0
-          ? props.ListEmptyComponent
-          : props.data.map((item, index) =>
-              React.createElement(React.Fragment, { key: index }, props.renderItem({ item }))
-            )
-      ),
+    FlashList: React.forwardRef(
+      (
+        props: {
+          data: unknown[];
+          renderItem: (info: { item: unknown }) => React.ReactNode;
+          maintainVisibleContentPosition?: unknown;
+          ListEmptyComponent?: React.ReactNode;
+        },
+        ref
+      ) => {
+        // The screen's effect calls `listRef.current?.scrollToOffset(...)`;
+        // the real FlashList exposes the method through its forwarded ref.
+        React.useImperativeHandle(ref, () => ({
+          scrollToOffset: (params: { offset: number; animated: boolean }) =>
+            state.scrollToOffset(params),
+          props: {},
+        }));
+        return React.createElement(
+          'FlashList',
+          { itemCount: props.data.length, mvc: props.maintainVisibleContentPosition },
+          props.data.length === 0
+            ? props.ListEmptyComponent
+            : props.data.map((item, index) =>
+                React.createElement(React.Fragment, { key: index }, props.renderItem({ item }))
+              )
+        );
+      }
+    ),
   };
 });
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: state.push }) }));
@@ -59,13 +72,12 @@ vi.mock('@tanstack/react-query', async importOriginal => {
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({ byok: { listProviders: { queryOptions: () => ({}), queryKey: () => [] } } }),
 }));
-vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://app.example.test' }));
-vi.mock('@/lib/external-link', () => ({ openExternalUrl: state.openExternalUrl }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#888888' }),
 }));
 vi.mock('@/lib/a11y/tap-target', () => ({
   COMPACT_CONTROL_HIT_SLOP_DP: 8,
+  FIELD_CLEAR_BOX_CLASS: 'h-[48px] w-[48px] -my-[7px] items-center justify-center',
   ROW_TARGET_CLASS: 'min-h-11',
   STATE_ACTION_CLASS: '',
 }));
@@ -83,20 +95,30 @@ vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 
 let renderer: ReactTestRenderer | undefined = undefined;
 
-async function mount() {
-  const view = await renderWithProviders(createElement(ProviderKeyProviderPickerScreen));
+async function mount(organizationId?: string) {
+  const view = await renderWithProviders(
+    createElement(
+      ProviderKeyProviderPickerScreen,
+      organizationId === undefined ? {} : { organizationId }
+    )
+  );
   renderer = view.renderer;
   return view.renderer.root;
 }
 
-/** The provider rows: the web row is a pressable with its own label. */
+/** The provider rows: one pressable per provider, labelled with its name.
+ *
+ * Scoped to the mocked list so the row's own clear control — a labelled
+ * `Pressable` beside the input — never counts as a provider row. */
 function rowLabels(root: ReactTestRenderer['root']) {
-  return root.findAll(
-    node =>
-      Object.is(node.type, 'Pressable') &&
-      typeof node.props.accessibilityLabel === 'string' &&
-      node.props.accessibilityLabel !== 'Manage on the web'
-  );
+  return root
+    .findAll(node => Object.is(node.type, 'FlashList'))
+    .flatMap(list =>
+      list.findAll(
+        node =>
+          Object.is(node.type, 'Pressable') && typeof node.props.accessibilityLabel === 'string'
+      )
+    );
 }
 
 function row(root: ReactTestRenderer['root'], index: number) {
@@ -115,6 +137,16 @@ function searchInput(root: ReactTestRenderer['root']) {
   return input;
 }
 
+function clearControl(root: ReactTestRenderer['root']) {
+  const [control] = root.findAll(
+    node => Object.is(node.type, 'Pressable') && node.props.accessibilityLabel === 'Clear search'
+  );
+  if (!control) {
+    throw new Error('missing clear control');
+  }
+  return control;
+}
+
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   state.providers = [
@@ -123,6 +155,7 @@ beforeEach(() => {
   ];
   state.error = false;
   state.push.mockClear();
+  state.scrollToOffset.mockClear();
 });
 
 afterEach(() => {
@@ -151,6 +184,19 @@ describe('ProviderKeyProviderPickerScreen', () => {
     });
   });
 
+  it('keeps the organization’s scope on the form it opens', async () => {
+    const root = await mount('org_1');
+
+    act(() => {
+      (row(root, 0).props.onPress as () => void)();
+    });
+
+    expect(state.push).toHaveBeenCalledWith({
+      pathname: '/(app)/(tabs)/(3_profile)/provider-key-new',
+      params: { provider: 'anthropic', org: 'org_1' },
+    });
+  });
+
   it('filters by name and explains when nothing matches', async () => {
     const root = await mount();
 
@@ -162,6 +208,78 @@ describe('ProviderKeyProviderPickerScreen', () => {
     expect(
       root.findAll(node => Object.is(node.type, 'EmptyState')).map(node => node.props.title)
     ).toEqual(['No matching providers']);
+  });
+
+  it('clears the query from its own control and returns the full list', async () => {
+    const root = await mount();
+
+    act(() => {
+      (searchInput(root).props.onChangeText as (value: string) => void)('gpt');
+    });
+    expect(rowLabels(root)).toHaveLength(0);
+
+    act(() => {
+      (clearControl(root).props.onPress as () => void)();
+    });
+
+    expect(rowLabels(root).map(node => node.props.accessibilityLabel)).toEqual([
+      'Anthropic',
+      'OpenAI',
+    ]);
+    expect(
+      root.findAll(
+        node =>
+          Object.is(node.type, 'Pressable') && node.props.accessibilityLabel === 'Clear search'
+      )
+    ).toHaveLength(0);
+  });
+
+  it('returns the full list from its first provider when the search clears', async () => {
+    const root = await mount();
+
+    act(() => {
+      (searchInput(root).props.onChangeText as (value: string) => void)('gpt');
+    });
+    act(() => {
+      (searchInput(root).props.onChangeText as (value: string) => void)('');
+    });
+
+    // The no-match state replaced the list; clearing the query brings the rows
+    // back with the first provider where the reader left the list, and the
+    // list re-anchors at its top so the first provider is what shows.
+    expect(rowLabels(root).map(node => node.props.accessibilityLabel)).toEqual([
+      'Anthropic',
+      'OpenAI',
+    ]);
+    expect(state.scrollToOffset).toHaveBeenCalledWith({ offset: 0, animated: false });
+    expect(root.findAll(node => Object.is(node.type, 'FlashList')).at(0)?.props.itemCount).toBe(2);
+    expect(root.findAll(node => Object.is(node.type, 'FlashList')).at(0)?.props.mvc).toEqual({
+      disabled: true,
+    });
+  });
+
+  it('re-anchors the list at the top when a query change shortens it', async () => {
+    const root = await mount();
+
+    act(() => {
+      (searchInput(root).props.onChangeText as (value: string) => void)('openai');
+    });
+
+    expect(state.scrollToOffset).toHaveBeenCalledWith({ offset: 0, animated: false });
+    expect(rowLabels(root).map(node => node.props.accessibilityLabel)).toEqual(['OpenAI']);
+  });
+
+  it('shows the matching rows after a no-match search finds a provider again', async () => {
+    const root = await mount();
+
+    act(() => {
+      (searchInput(root).props.onChangeText as (value: string) => void)('gpt');
+    });
+    act(() => {
+      (searchInput(root).props.onChangeText as (value: string) => void)('openai');
+    });
+
+    expect(rowLabels(root).map(node => node.props.accessibilityLabel)).toEqual(['OpenAI']);
   });
 
   it('matches a provider by its id', async () => {
@@ -192,7 +310,7 @@ describe('ProviderKeyProviderPickerScreen', () => {
     }
   });
 
-  it('offers the structured-credential providers on the web instead', async () => {
+  it('offers the structured-credential providers its own form', async () => {
     state.providers = [
       { id: 'anthropic', name: 'Anthropic' },
       { id: 'azure', name: 'Azure Foundry' },
@@ -203,24 +321,24 @@ describe('ProviderKeyProviderPickerScreen', () => {
     ];
     const root = await mount();
 
-    expect(rowLabels(root).map(node => node.props.accessibilityLabel)).toEqual(['Anthropic']);
-
-    const webRow = root.findAll(
-      node =>
-        Object.is(node.type, 'Pressable') && node.props.accessibilityLabel === 'Manage on the web'
-    );
-    const [onlyWebRow] = webRow;
-    if (!onlyWebRow) {
-      throw new Error('missing the web row');
-    }
+    // The app holds no provider back: each one opens the form for its own
+    // credential, and nothing is sent to the web.
+    expect(rowLabels(root).map(node => node.props.accessibilityLabel)).toEqual([
+      'Anthropic',
+      'Azure Foundry',
+      'Amazon Bedrock',
+      'AWS Bedrock (direct)',
+      'Google Vertex AI',
+      'Google Vertex AI (direct)',
+    ]);
 
     act(() => {
-      (onlyWebRow.props.onPress as () => void)();
+      (row(root, 1).props.onPress as () => void)();
     });
-    expect(state.openExternalUrl).toHaveBeenCalledWith(
-      'https://app.example.test/byok',
-      expect.objectContaining({ label: 'Provider keys' })
-    );
+    expect(state.push).toHaveBeenCalledWith({
+      pathname: '/(app)/(tabs)/(3_profile)/provider-key-new',
+      params: { provider: 'azure' },
+    });
   });
 
   it('keeps a retry when the provider list cannot be read', async () => {

@@ -7,15 +7,56 @@ import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { createAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import {
+  dataCollectionPolicyRejection,
+  freeModelRateLimitRejection,
+  gatewayAccountRateLimitRejection,
   gatewayUsageContextBase,
+  gatewaySettingsRejection,
   organizationProviderPreferences,
   paidUsageRejection,
   readGatewayBalance,
   resolveGatewayCaller,
+  resolveOrganizationGatewaySettings,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
+import { hasBestEffortGuessDataCollectionRequirement } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import type { OpenRouterProviderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import {
+  gatewayRateLimitKey,
+  isGatewayAccountRateLimited,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
+import { isFreeModelRateLimited } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
+import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
+import { DEFAULT_ORGANIZATION_FEATURES } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
+import {
+  NO_ORGANIZATION_GATEWAY_SETTINGS,
+  type OrganizationGatewaySettings,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/organization-gateway-settings';
+import { DEFAULT_BENCHMARK_USER_ID } from '@kilocode/auto-routing-contracts';
 
 jest.mock('@kilocode/web-shared/lib/organizations/organization-usage', () => ({
   getBalanceAndOrgSettings: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
+  ...jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/ai-gateway/is-free-model'
+  ),
+  hasBestEffortGuessDataCollectionRequirement: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit', () => ({
+  gatewayRateLimitKey: jest.fn(),
+  isGatewayAccountRateLimited: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit', () => ({
+  ...jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit'
+  ),
+  isFreeModelRateLimited: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/organization-features', () => ({
+  ...jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/ai-gateway/organization-features'
+  ),
+  getRuntimeOrganizationFeatures: jest.fn(),
 }));
 
 const user = { id: 'user-1', google_user_email: 'user@example.com', microdollars_used: 5 } as User;
@@ -240,6 +281,46 @@ describe('organizationProviderPreferences', () => {
     });
   });
 
+  it('keeps the request provider options while the organization limits the routes', () => {
+    expect(
+      organizationProviderPreferences({
+        decision: {
+          allowed: true,
+          eligibleProviderRoutes: new Set(['openai', 'azure', 'virtual']),
+        },
+        settings: { data_collection: 'deny' },
+        requestProvider: {
+          only: ['openai', 'anthropic'],
+          ignore: ['azure'],
+          order: ['openai', 'azure'],
+          zdr: true,
+        },
+      })
+    ).toEqual({
+      kind: 'allowed',
+      provider: {
+        only: ['openai'],
+        ignore: ['azure'],
+        order: ['openai', 'azure'],
+        zdr: true,
+        data_collection: 'deny',
+      },
+    });
+  });
+
+  it('rejects a request whose providers the organization routes exclude', () => {
+    const preferences = organizationProviderPreferences({
+      decision: { allowed: true, eligibleProviderRoutes: new Set(['openai']) },
+      settings: { data_collection: 'allow' },
+      requestProvider: { only: ['anthropic'], zdr: true },
+    });
+
+    expect(preferences.kind).toBe('rejected');
+    if (preferences.kind === 'rejected') {
+      expect(preferences.response.status).toBe(404);
+    }
+  });
+
   it.each([
     { organization: 'allow', request: 'deny' },
     { organization: 'deny', request: 'allow' },
@@ -254,6 +335,46 @@ describe('organizationProviderPreferences', () => {
           requestProvider: { data_collection: request },
         })
       ).toEqual({ kind: 'allowed', provider: { data_collection: 'deny' } });
+    }
+  );
+});
+
+describe('dataCollectionPolicyRejection', () => {
+  const model = 'vendor/model';
+
+  it.each<OpenRouterProviderConfig>([
+    { data_collection: 'deny' },
+    { zdr: true },
+    { data_collection: 'allow', zdr: true },
+  ])('rejects a model requiring data collection under %j', async provider => {
+    jest.mocked(hasBestEffortGuessDataCollectionRequirement).mockResolvedValue(true);
+
+    const response = await dataCollectionPolicyRejection(model, provider);
+
+    expect(hasBestEffortGuessDataCollectionRequirement).toHaveBeenCalledWith(model);
+    expect(response?.status).toBe(400);
+    await expect(response?.json()).resolves.toMatchObject({
+      error_type: ProxyErrorType.data_collection_required,
+    });
+  });
+
+  it.each<OpenRouterProviderConfig | undefined>([
+    undefined,
+    {},
+    { data_collection: 'allow' },
+    { zdr: false },
+  ])('admits a model requiring data collection under %j', async provider => {
+    jest.mocked(hasBestEffortGuessDataCollectionRequirement).mockResolvedValue(true);
+
+    await expect(dataCollectionPolicyRejection(model, provider)).resolves.toBeNull();
+  });
+
+  it.each<OpenRouterProviderConfig>([{ data_collection: 'deny' }, { zdr: true }])(
+    'admits a model without a data collection requirement under %j',
+    async provider => {
+      jest.mocked(hasBestEffortGuessDataCollectionRequirement).mockResolvedValue(false);
+
+      await expect(dataCollectionPolicyRejection(model, provider)).resolves.toBeNull();
     }
   );
 });
@@ -333,5 +454,219 @@ describe('gatewayUsageContextBase', () => {
     );
 
     expect(base.clientAttributed).toBe(clientAttributed);
+  });
+});
+
+describe('gatewayAccountRateLimitRejection', () => {
+  const request = new NextRequest('http://localhost:3000/api/v1/embeddings', { method: 'POST' });
+
+  beforeEach(() => {
+    jest.mocked(gatewayRateLimitKey).mockReset().mockReturnValue('account-key');
+    jest.mocked(isGatewayAccountRateLimited).mockReset();
+  });
+
+  it('admits an account under the cap', async () => {
+    jest.mocked(isGatewayAccountRateLimited).mockResolvedValue(false);
+
+    await expect(gatewayAccountRateLimitRejection(request, '192.0.2.1')).resolves.toBeNull();
+    expect(gatewayRateLimitKey).toHaveBeenCalledWith(request.headers, '192.0.2.1');
+    expect(isGatewayAccountRateLimited).toHaveBeenCalledWith(request, 'account-key');
+  });
+
+  it('answers an account over the cap with the rate limit response', async () => {
+    jest.mocked(isGatewayAccountRateLimited).mockResolvedValue(true);
+
+    const response = await gatewayAccountRateLimitRejection(request, undefined);
+
+    expect(response?.status).toBe(429);
+    await expect(response?.json()).resolves.toEqual({
+      error: 'Rate limit exceeded',
+      error_type: ProxyErrorType.rate_limit_exceeded,
+      message: 'Too many requests. Please try again later.',
+    });
+  });
+});
+
+describe('freeModelRateLimitRejection', () => {
+  const request = new NextRequest('http://localhost:3000/api/v1/embeddings', { method: 'POST' });
+  const signedIn = { kind: 'signed-in', user, organizationId: undefined } as const;
+  const anonymous = { kind: 'anonymous', user: createAnonymousContext('192.0.2.1') } as const;
+
+  function reject(caller: typeof signedIn | typeof anonymous) {
+    return freeModelRateLimitRejection({
+      request,
+      caller,
+      model: 'vendor/model:free',
+      feature: null,
+    });
+  }
+
+  beforeEach(() => {
+    jest.mocked(isFreeModelRateLimited).mockReset();
+  });
+
+  it('counts a signed-in caller per account', async () => {
+    jest.mocked(isFreeModelRateLimited).mockResolvedValue(false);
+
+    await expect(reject(signedIn)).resolves.toBeNull();
+    expect(isFreeModelRateLimited).toHaveBeenCalledWith(request, {
+      kind: 'account',
+      kiloUserId: 'user-1',
+    });
+  });
+
+  it('answers a limited account with the account response', async () => {
+    jest.mocked(isFreeModelRateLimited).mockResolvedValue(true);
+
+    const response = await reject(signedIn);
+
+    expect(response?.status).toBe(429);
+    expect(response?.headers.get('x-should-retry')).toBe('false');
+    const body = await response?.json();
+    expect(body).toMatchObject({ error_type: ProxyErrorType.rate_limit_exceeded });
+    expect(JSON.stringify(body)).not.toContain('PROMOTION_MODEL_LIMIT_REACHED');
+  });
+
+  it('counts an anonymous caller per IP and answers with the sign-up prompt', async () => {
+    jest.mocked(isFreeModelRateLimited).mockResolvedValue(true);
+
+    const response = await reject(anonymous);
+
+    expect(isFreeModelRateLimited).toHaveBeenCalledWith(request, {
+      kind: 'ip',
+      ipAddress: '192.0.2.1',
+    });
+    expect(response?.status).toBe(429);
+    await expect(response?.json()).resolves.toMatchObject({
+      error: { code: 'PROMOTION_MODEL_LIMIT_REACHED' },
+      error_type: ProxyErrorType.rate_limit_exceeded,
+    });
+  });
+
+  it('exempts the default benchmark user without counting it', async () => {
+    jest.mocked(isFreeModelRateLimited).mockResolvedValue(true);
+
+    await expect(
+      reject({ ...signedIn, user: { ...user, id: DEFAULT_BENCHMARK_USER_ID } })
+    ).resolves.toBeNull();
+    expect(isFreeModelRateLimited).not.toHaveBeenCalled();
+  });
+});
+
+describe('gatewaySettingsRejection', () => {
+  const openRouterDisabled: OrganizationGatewaySettings = {
+    openRouterDisabled: true,
+    dataRegion: null,
+  };
+  const euRegion: OrganizationGatewaySettings = { openRouterDisabled: true, dataRegion: 'eu' };
+  const vercel = { type: 'vercel', apiUrl: 'https://ai-gateway.vercel.sh/v1' } as const;
+  const userByok = [{ decryptedAPIKey: 'sk-user', providerId: 'openrouter' }] as const;
+
+  it.each([
+    { type: 'openrouter', apiUrl: 'https://openrouter.ai/api/v1' },
+    { type: 'custom', apiUrl: 'https://openrouter.ai/api/v1' },
+  ] as const)('rejects a $type provider at $apiUrl when OpenRouter is disabled', async provider => {
+    const response = gatewaySettingsRejection(openRouterDisabled, { provider, userByok: null });
+
+    expect(response?.status).toBe(403);
+    await expect(response?.json()).resolves.toMatchObject({
+      error:
+        'This request would be routed through OpenRouter, which your organization has disabled.',
+      error_type: ProxyErrorType.provider_not_allowed,
+    });
+  });
+
+  it.each([
+    { type: 'openrouter', apiUrl: 'https://openrouter.ai/api/v1' },
+    { type: 'custom', apiUrl: 'https://llm.example.com/v1' },
+  ] as const)('rejects a $type provider under an inference region', async provider => {
+    const response = gatewaySettingsRejection(euRegion, { provider, userByok: null });
+
+    expect(response?.status).toBe(403);
+    await expect(response?.json()).resolves.toMatchObject({
+      error:
+        'Your organization requires inference in the European Union region, which this request cannot use.',
+      error_type: ProxyErrorType.provider_not_allowed,
+    });
+  });
+
+  it.each([
+    { settings: openRouterDisabled, provider: vercel, userByok: null },
+    { settings: euRegion, provider: vercel, userByok: null },
+    {
+      settings: openRouterDisabled,
+      provider: { type: 'custom', apiUrl: 'https://notopenrouter.ai/v1' },
+      userByok: null,
+    },
+    {
+      settings: NO_ORGANIZATION_GATEWAY_SETTINGS,
+      provider: { type: 'openrouter', apiUrl: 'https://openrouter.ai/api/v1' },
+      userByok: null,
+    },
+    {
+      settings: euRegion,
+      provider: { type: 'openrouter', apiUrl: 'https://openrouter.ai/api/v1' },
+      userByok,
+    },
+    {
+      settings: euRegion,
+      provider: { type: 'direct-byok', apiUrl: 'https://api.openai.com/v1' },
+      userByok: [{ decryptedAPIKey: 'sk-user', providerId: 'openai' }],
+    },
+  ] as const)('admits a $provider.type route', ({ settings, provider, userByok }) => {
+    expect(gatewaySettingsRejection(settings, { provider, userByok })).toBeNull();
+  });
+});
+
+describe('resolveOrganizationGatewaySettings', () => {
+  const settings = { disable_openrouter: true, data_region: 'eu' } as const;
+
+  beforeEach(() => {
+    jest
+      .mocked(getRuntimeOrganizationFeatures)
+      .mockReset()
+      .mockResolvedValue({ ...DEFAULT_ORGANIZATION_FEATURES, gateway_settings: ['org-1'] });
+  });
+
+  it('returns the settings of an enterprise organization with the organization feature', async () => {
+    await expect(
+      resolveOrganizationGatewaySettings({
+        organizationId: 'org-1',
+        plan: 'enterprise',
+        settings,
+      })
+    ).resolves.toEqual({ openRouterDisabled: true, dataRegion: 'eu' });
+  });
+
+  it.each([
+    { name: 'a teams plan', organizationId: 'org-1', plan: 'teams', settings },
+    { name: 'an unknown plan', organizationId: 'org-1', plan: undefined, settings },
+    {
+      name: 'an organization outside the feature',
+      organizationId: 'org-2',
+      plan: 'enterprise',
+      settings,
+    },
+    { name: 'no organization', organizationId: undefined, plan: 'enterprise', settings },
+    { name: 'no settings', organizationId: 'org-1', plan: 'enterprise', settings: undefined },
+  ] as const)('applies no settings for $name', async ({ organizationId, plan, settings }) => {
+    await expect(
+      resolveOrganizationGatewaySettings({ organizationId, plan, settings })
+    ).resolves.toEqual(NO_ORGANIZATION_GATEWAY_SETTINGS);
+  });
+
+  it('skips the feature lookup without an organization or settings', async () => {
+    await resolveOrganizationGatewaySettings({
+      organizationId: undefined,
+      plan: 'enterprise',
+      settings,
+    });
+    await resolveOrganizationGatewaySettings({
+      organizationId: 'org-1',
+      plan: 'enterprise',
+      settings: undefined,
+    });
+
+    expect(getRuntimeOrganizationFeatures).not.toHaveBeenCalled();
   });
 });

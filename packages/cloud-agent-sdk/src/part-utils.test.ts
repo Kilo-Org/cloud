@@ -1,10 +1,19 @@
-import type { Part, PatchPart, ReasoningPart, StepFinishPart, TextPart, ToolPart } from './types';
+import type {
+  FilePart,
+  Part,
+  PatchPart,
+  ReasoningPart,
+  StepFinishPart,
+  TextPart,
+  ToolPart,
+} from './types';
 import {
   getStepFinishRoutedModel,
   normalizeMissingPartText,
   normalizeMissingPatchFiles,
   normalizeToolPartState,
   partSettledAt,
+  stripPartContentIfFile,
 } from './part-utils';
 
 function stepFinishPart(overrides: Partial<StepFinishPart> = {}): StepFinishPart {
@@ -427,5 +436,157 @@ describe('normalizeToolPartState', () => {
     });
 
     expect(normalizeToolPartState(part)).toBe(part);
+  });
+});
+
+describe('stripPartContentIfFile', () => {
+  function filePart(overrides: Partial<FilePart> = {}): FilePart {
+    return {
+      id: 'p-file',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'file',
+      mime: 'text/plain',
+      filename: 'readme.txt',
+      url: 'data:text/plain;base64,aGVsbG8=',
+      source: {
+        type: 'file',
+        path: '/readme.txt',
+        text: { value: 'file content here', start: 0, end: 17 },
+      },
+      ...overrides,
+    };
+  }
+
+  function completedToolWith(attachments: unknown): Part {
+    return {
+      id: 'p-tool',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'tool',
+      callID: 'call-1',
+      tool: 'read',
+      state: {
+        status: 'completed',
+        input: {},
+        output: 'ok',
+        title: 'read',
+        metadata: {},
+        time: { start: 1, end: 2 },
+        attachments,
+      },
+    } as unknown as Part;
+  }
+
+  function attachmentsOf(part: Part): FilePart[] | undefined {
+    const state = (part satisfies Part as ToolPart).state;
+    if (state.status !== 'completed') return undefined;
+    return state.attachments as FilePart[] | undefined;
+  }
+
+  it('blanks the url and the source text of a top-level file part', () => {
+    const stripped = stripPartContentIfFile(filePart()) satisfies Part as FilePart;
+    const source = stripped.source;
+    if (!source || source.type !== 'file') throw new Error('expected a file source');
+
+    expect(stripped.url).toBe('');
+    expect(source.text.value).toBe('');
+    expect(source.path).toBe('/readme.txt');
+  });
+
+  it('keeps every other field of a top-level file part, including synthetic', () => {
+    const part = filePart({ synthetic: true });
+    const stripped = stripPartContentIfFile(part) satisfies Part as FilePart;
+
+    expect(stripped.id).toBe('p-file');
+    expect(stripped.sessionID).toBe('ses-1');
+    expect(stripped.messageID).toBe('msg-1');
+    expect(stripped.mime).toBe('text/plain');
+    expect(stripped.filename).toBe('readme.txt');
+    expect(stripped.synthetic).toBe(true);
+  });
+
+  it('passes non-file non-tool parts through unchanged', () => {
+    const text: TextPart = {
+      id: 'p-text',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'text',
+      text: 'hi',
+    };
+
+    expect(stripPartContentIfFile(text)).toBe(text);
+  });
+
+  it('blanks the url and source text of each readable attachment', () => {
+    const part = completedToolWith([
+      {
+        id: 'att-1',
+        mime: 'image/png',
+        filename: 'shot.png',
+        url: 'data:image/png;base64,AAA',
+        source: { type: 'file', path: '/shot.png', text: { value: 'bytes', start: 0, end: 5 } },
+      },
+    ]);
+
+    const stored = attachmentsOf(stripPartContentIfFile(part))?.[0];
+    if (!stored) throw new Error('expected one stored attachment');
+
+    expect(stored.url).toBe('');
+    expect(stored.source?.text.value).toBe('');
+    expect(stored.filename).toBe('shot.png');
+    expect(stored.id).toBe('att-1');
+  });
+
+  it('keeps extra attachment fields the seam does not read, including synthetic', () => {
+    const attachment = {
+      id: 'att-1',
+      mime: 'image/png',
+      url: 'data:image/png;base64,AAA',
+      synthetic: true,
+    };
+    const stored = attachmentsOf(stripPartContentIfFile(completedToolWith([attachment])))?.[0];
+
+    expect(stored).toEqual({ ...attachment, url: '' });
+  });
+
+  it('gives a malformed attachment source without text an empty text value', () => {
+    const attachment = {
+      mime: 'image/png',
+      url: 'data:image/png;base64,AAA',
+      source: { type: 'file', path: '/shot.png' },
+    };
+    const stored = attachmentsOf(stripPartContentIfFile(completedToolWith([attachment])))?.[0];
+    if (!stored) throw new Error('expected one stored attachment');
+    const source = stored.source;
+    if (!source || source.type !== 'file') throw new Error('expected a file source');
+
+    expect(source.text).toEqual({ value: '' });
+    expect(source.path).toBe('/shot.png');
+  });
+
+  it('leaves an attachment without a source untouched apart from the url', () => {
+    const attachment = { mime: 'image/png', url: 'data:image/png;base64,AAA' };
+    const stored = attachmentsOf(stripPartContentIfFile(completedToolWith([attachment])))?.[0];
+    if (!stored) throw new Error('expected one stored attachment');
+
+    expect(stored.source).toBeUndefined();
+    expect(stored.url).toBe('');
+  });
+
+  it('stores an empty list when no attachment is readable and keeps other tools unchanged', () => {
+    const unreadable = completedToolWith([null, 'nope', { mime: 42, url: 'data:x' }]);
+    expect(attachmentsOf(stripPartContentIfFile(unreadable))).toEqual([]);
+
+    const running: Part = {
+      id: 'p-tool',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'tool',
+      callID: 'call-1',
+      tool: 'bash',
+      state: { status: 'running', input: {}, time: { start: 1 } },
+    };
+    expect(stripPartContentIfFile(running)).toBe(running);
   });
 });

@@ -150,6 +150,7 @@ vi.mock('@/components/voice-input-control', () => ({
 // ── hooks ──────────────────────────────────────────────────────────
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({
+    card: '#fff',
     foreground: '#000',
     mutedForeground: '#666',
     primaryForeground: '#fff',

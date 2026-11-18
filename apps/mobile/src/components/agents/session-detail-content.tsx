@@ -822,6 +822,7 @@ export function SessionDetailContent({
     selectedModel: sessionModels.selectedValue,
     selectedVariant: sessionModels.selectedVariant,
     cloudAgentModelOverride,
+    sessionId,
     spawnedMode,
   });
 

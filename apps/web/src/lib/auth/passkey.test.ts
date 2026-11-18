@@ -11,13 +11,21 @@ import {
 
 import {
   kilocode_users,
+  device_sessions,
   passkey_challenges,
   passkey_credentials,
+  passkey_management_authorizations,
   passkey_sign_in_tickets,
 } from '@kilocode/db/schema';
 import { NEXTAUTH_URL } from '@kilocode/web-shared/lib/config.server';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { defineTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+
+import {
+  bindPasskeyManagementChallenge,
+  consumePasskeyManagementAuthorization,
+  mintPasskeyManagementAuthorization,
+} from './passkey-management';
 
 import {
   cleanupExpiredPasskeyRows,
@@ -29,6 +37,7 @@ import {
   listPasskeysForUser,
   renamePasskey,
   verifyAuthentication,
+  verifyNativeRegistration,
   verifyRegistration,
   PasskeyVerificationError,
 } from './passkey';
@@ -703,6 +712,131 @@ describe('passkey', () => {
         .from(passkey_sign_in_tickets)
         .where(eq(passkey_sign_in_tickets.ticket_hash, sha256Hex(live)));
       expect(liveRows).toHaveLength(1);
+    });
+  });
+
+  describe('verifyNativeRegistration', () => {
+    async function mintEnrollGrant(deviceSessionId: string, kiloUserId = userId) {
+      return mintPasskeyManagementAuthorization({
+        userId: kiloUserId,
+        deviceSessionId,
+        operation: 'enroll',
+      });
+    }
+
+    async function insertNativeSession(kiloUserId = userId): Promise<string> {
+      const [row] = await db
+        .insert(device_sessions)
+        .values({ kilo_user_id: kiloUserId })
+        .returning({ id: device_sessions.id });
+      return row!.id;
+    }
+
+    /** The consumption the register route hands to `verifyNativeRegistration`. */
+    function redeem(grant: { token: string }, deviceSessionId: string, challengeId: string) {
+      return (tx: DrizzleTransaction) =>
+        consumePasskeyManagementAuthorization({
+          token: grant.token,
+          userId,
+          deviceSessionId,
+          operation: 'enroll',
+          challengeId,
+          fromDb: tx,
+        });
+    }
+
+    it('stores the credential and spends the grant in the same transaction', async () => {
+      const deviceSessionId = await insertNativeSession();
+      const grant = await mintEnrollGrant(deviceSessionId);
+      const authenticator = createTestAuthenticator();
+      const { challengeId, options } = await createRegistrationOptions(userId, userEmail);
+      await bindPasskeyManagementChallenge({
+        token: grant.token,
+        userId,
+        deviceSessionId,
+        challengeId,
+      });
+
+      const credential = await verifyNativeRegistration(
+        userId,
+        challengeId,
+        buildRegistrationResponse(authenticator, { challenge: options.challenge }),
+        redeem(grant, deviceSessionId, challengeId)
+      );
+
+      expect(credential.credential_id).toBe(authenticator.credentialId);
+      const [grantRow] = await db
+        .select({ consumed_at: passkey_management_authorizations.consumed_at })
+        .from(passkey_management_authorizations)
+        .where(eq(passkey_management_authorizations.id, grant.id));
+      expect(grantRow?.consumed_at).not.toBeNull();
+    });
+
+    it('stores nothing when the grant does not authorize this enrollment', async () => {
+      const otherSessionId = await insertNativeSession(otherUserId);
+      const otherGrant = await mintEnrollGrant(otherSessionId, otherUserId);
+      const authenticator = createTestAuthenticator();
+      const { challengeId, options } = await createRegistrationOptions(userId, userEmail);
+
+      await expectRefusal(
+        verifyNativeRegistration(
+          userId,
+          challengeId,
+          buildRegistrationResponse(authenticator, { challenge: options.challenge }),
+          redeem(otherGrant, otherSessionId, challengeId)
+        ),
+        'PASSKEY_MANAGEMENT_AUTHORIZATION_INVALID'
+      );
+
+      const rows = await db
+        .select({ id: passkey_credentials.id })
+        .from(passkey_credentials)
+        .where(eq(passkey_credentials.credential_id, authenticator.credentialId));
+      expect(rows).toHaveLength(0);
+      // The failed attempt must not spend the other account's grant.
+      const [otherGrantRow] = await db
+        .select({ consumed_at: passkey_management_authorizations.consumed_at })
+        .from(passkey_management_authorizations)
+        .where(eq(passkey_management_authorizations.id, otherGrant.id));
+      expect(otherGrantRow?.consumed_at).toBeNull();
+    });
+
+    it('cannot enroll a second credential with a spent grant', async () => {
+      const deviceSessionId = await insertNativeSession();
+      const grant = await mintEnrollGrant(deviceSessionId);
+      const first = createTestAuthenticator();
+      const firstOptions = await createRegistrationOptions(userId, userEmail);
+      await bindPasskeyManagementChallenge({
+        token: grant.token,
+        userId,
+        deviceSessionId,
+        challengeId: firstOptions.challengeId,
+      });
+      await verifyNativeRegistration(
+        userId,
+        firstOptions.challengeId,
+        buildRegistrationResponse(first, { challenge: firstOptions.options.challenge }),
+        redeem(grant, deviceSessionId, firstOptions.challengeId)
+      );
+
+      const second = createTestAuthenticator();
+      const secondOptions = await createRegistrationOptions(userId, userEmail);
+
+      await expectRefusal(
+        verifyNativeRegistration(
+          userId,
+          secondOptions.challengeId,
+          buildRegistrationResponse(second, { challenge: secondOptions.options.challenge }),
+          redeem(grant, deviceSessionId, secondOptions.challengeId)
+        ),
+        'PASSKEY_MANAGEMENT_AUTHORIZATION_INVALID'
+      );
+
+      const rows = await db
+        .select({ credential_id: passkey_credentials.credential_id })
+        .from(passkey_credentials)
+        .where(eq(passkey_credentials.kilo_user_id, userId));
+      expect(rows.map(row => row.credential_id)).toEqual([first.credentialId]);
     });
   });
 });

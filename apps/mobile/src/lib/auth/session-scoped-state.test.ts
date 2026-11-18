@@ -21,6 +21,10 @@ const formDraftMock = vi.hoisted(() => ({
   clearFormDrafts: vi.fn(),
 }));
 
+const mergeOperationKeyMock = vi.hoisted(() => ({
+  clearMergeOperationKeys: vi.fn(),
+}));
+
 vi.mock('@/lib/native-system-search', () => nativeSearchMock);
 
 // The App Intents catalog is the same titles in another place; the boundary's
@@ -37,12 +41,22 @@ vi.mock('@/lib/pr-review/recent-prs', () => recentPrsMock);
 // spied here; the store's own behavior is pinned in `lib/form-draft.mounted.test.tsx`.
 vi.mock('@/lib/form-draft', () => formDraftMock);
 
+// The retained merge intent keys live in a module-level store; the boundary's
+// call is spied here and the store's own behavior is pinned in
+// `lib/operation-key-store.test.ts`.
+vi.mock('@/lib/pr-review/merge/pr-merge-operation-key', () => mergeOperationKeyMock);
+
 /* eslint-disable import/first */
 // vi.mock is hoisted by Vitest before the real import resolves.
 import {
   isSessionGoalCollapsed,
   setSessionGoalCollapsed,
 } from '@/components/agents/session-goal-collapse';
+import {
+  getCodeReviewerAnalyticsSelection,
+  setCodeReviewerAnalyticsPeriod,
+  setCodeReviewerAnalyticsPlatform,
+} from '@/lib/hooks/use-code-reviewer-analytics-filters';
 import {
   conversationRetentionKey,
   retainConversationAcrossMounts,
@@ -534,9 +548,33 @@ describe('clearSessionScopedState', () => {
     expect(isSessionGoalCollapsed('session-scoped-goal')).toBe(false);
   });
 
+  // The analytics filters store stays real as well: the next account must not
+  // open an organization on the previous account's platform and period.
+  it('drops the per-organization analytics selection on sign-out', () => {
+    setCodeReviewerAnalyticsPlatform('session-scoped-analytics-org', 'gitlab');
+    setCodeReviewerAnalyticsPeriod('session-scoped-analytics-org', 90);
+    expect(getCodeReviewerAnalyticsSelection('session-scoped-analytics-org')).toEqual({
+      platform: 'gitlab',
+      period: 90,
+    });
+
+    clearSessionScopedState();
+
+    expect(getCodeReviewerAnalyticsSelection('session-scoped-analytics-org')).toEqual({
+      platform: 'github',
+      period: 30,
+    });
+  });
+
   it('drops the typed profile form drafts, including their secrets', () => {
     clearSessionScopedState();
 
     expect(formDraftMock.clearFormDrafts).toHaveBeenCalled();
+  });
+
+  it('drops the retained merge intent keys, so no merge replays across accounts', () => {
+    clearSessionScopedState();
+
+    expect(mergeOperationKeyMock.clearMergeOperationKeys).toHaveBeenCalled();
   });
 });

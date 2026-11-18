@@ -29,7 +29,10 @@ function segment(from: string, to: string): string {
 
 describe('ActiveAgentsLiveUpdate channel switch', () => {
   it('reads the channel the module last posted from its own state', () => {
-    const postedChannelId = segment('private fun postedChannelId()', 'private fun newBuilder');
+    const postedChannelId = segment(
+      'private fun postedChannelId()',
+      'private fun postedChannelOrNull()'
+    );
     expect(postedChannelId).toContain('notificationState.getString(POSTED_CHANNEL, null)');
     // No version fork: `Notification.channelId` exists only on API 26+, while
     // the module's mirror holds the channel on every supported API.

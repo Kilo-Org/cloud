@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { z } from 'zod';
 import type { WorkerDb } from '@kilocode/db/client';
 import { deriveCallbackToken } from '@kilocode/worker-utils';
+import { resolveRuntimeEnvironment } from '@kilocode/worker-utils/runtime-authorization-contract';
 import { buildSecurityFindingAnalysisInput } from '@kilocode/worker-utils/security-remediation-policy';
 import {
   clearSupersededAnalysisStatus,
@@ -211,7 +212,7 @@ export async function startSecurityAnalysis(
   let preparedAttempt: { cloudAgentSessionId: string; kiloSessionId: string } | null = null;
 
   try {
-    const environment = params.env.ENVIRONMENT === 'production' ? 'production' : 'development';
+    const environment = resolveRuntimeEnvironment(params.env.ENVIRONMENT);
     // The control token is minted first because the credit admission read and
     // any cleanup interrupt authenticate with it.
     controlToken = await generateControlToken(
@@ -268,7 +269,6 @@ export async function startSecurityAnalysis(
       params.env.SHARED_RESOURCE_TOKENS_ENABLED,
       finding.owned_by_organization_id ?? undefined
     );
-
     const triage = skipTriage
       ? existingTriage
       : await triageSecurityFinding({

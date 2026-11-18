@@ -2,6 +2,7 @@ import {
   AutoRouterSchema,
   RefreshBenchmarkProfilesRequestSchema,
   resolveBenchmarkIdentity,
+  resolveEffectivePolicy,
 } from '@kilocode/auto-routing-contracts';
 import { zodJsonValidator } from '@kilocode/worker-utils';
 import type { Hono } from 'hono';
@@ -34,7 +35,7 @@ export function registerProfileRefreshRoute(app: Hono<HonoEnv>): void {
             {
               router,
               engineIdentity: computeEngineIdentity('decider', router),
-              repetitions: config.deciderRepetitions,
+              repetitions: resolveEffectivePolicy(config).deciderRepetitions,
               entries: request.entries,
               mode: request.mode,
             },

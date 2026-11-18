@@ -248,3 +248,14 @@ export async function fetchGitHubRootTextFileAtRef(_params: {
 }): Promise<string | null> {
   return null;
 }
+
+export type GitHubHeadPullRequest = { number: number; url: string };
+
+export async function fetchGitHubPullRequestForHeadBranch(_params: {
+  token: string;
+  owner: string;
+  repo: string;
+  headBranch: string;
+}): Promise<GitHubHeadPullRequest | null> {
+  return null;
+}

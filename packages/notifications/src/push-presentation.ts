@@ -11,7 +11,6 @@ export const ANDROID_NOTIFICATION_CHANNELS = [
   { id: 'needs-input', name: 'Needs input', importance: 'high', bypassDnd: true },
   { id: 'agent-progress', name: 'Agent progress', importance: 'default', bypassDnd: false },
   { id: 'agent-briefing', name: 'Agent brief', importance: 'default', bypassDnd: false },
-  { id: 'kiloclaw', name: 'KiloClaw activity', importance: 'default', bypassDnd: false },
   { id: 'balance', name: 'Balance alerts', importance: 'default', bypassDnd: false },
   { id: 'security', name: 'Security findings', importance: 'high', bypassDnd: false },
   // Importance is immutable after channel creation. A new ID replaces the
@@ -39,21 +38,13 @@ export type AndroidNotificationChannelId = (typeof ANDROID_NOTIFICATION_CHANNELS
 export const LEGACY_AGENT_ANDROID_CHANNEL_ID = 'agent';
 
 /**
- * The first mobile version that creates both split agent channels. `app_version`
+ * The first mobile build that creates both split agent channels. `app_version`
  * on a push token is the build that created that device's channels, so a lower
- * version only has `LEGACY_AGENT_ANDROID_CHANNEL_ID`.
- *
- * This must stay the version in `apps/mobile/app.config.ts` — the build this
- * branch ships. It cannot be a version that already reached users without the
- * split: `1.0.11` was released before the split channels existed, so a token
- * recorded there has no `needs-input`/`agent-progress` channel and Android 8+
- * would drop the push. Only the build configured here creates both channels, so
- * only that build and later may be addressed with them.
+ * version has only `LEGACY_AGENT_ANDROID_CHANNEL_ID`: `1.0.11` was released
+ * before the split, so a token recorded there has no `needs-input`/
+ * `agent-progress` channel and Android 8+ would drop a push addressed to it.
  */
 export const AGENT_CHANNEL_SPLIT_APP_VERSION = '1.0.12';
-
-/** Both channel resolvers gate on the same first split-channel release. */
-export const ANDROID_AGENT_KIND_CHANNELS_MIN_APP_VERSION = AGENT_CHANNEL_SPLIT_APP_VERSION;
 
 /**
  * The first mobile version whose every build creates `agent-briefing`. Builds of
@@ -64,8 +55,8 @@ export const AGENT_BRIEFING_CHANNEL_APP_VERSION = '1.0.16';
 
 /** Channels that only a build at or above the given version creates. */
 const ANDROID_CHANNEL_MIN_APP_VERSIONS: Partial<Record<AndroidNotificationChannelId, string>> = {
-  'needs-input': ANDROID_AGENT_KIND_CHANNELS_MIN_APP_VERSION,
-  'agent-progress': ANDROID_AGENT_KIND_CHANNELS_MIN_APP_VERSION,
+  'needs-input': AGENT_CHANNEL_SPLIT_APP_VERSION,
+  'agent-progress': AGENT_CHANNEL_SPLIT_APP_VERSION,
   'agent-briefing': AGENT_BRIEFING_CHANNEL_APP_VERSION,
 };
 
@@ -103,7 +94,6 @@ export function isPushAppVersionAtLeast(current: string | null | undefined, min:
 export type AndroidPushChannelId =
   | AndroidNotificationChannelId
   | typeof LEGACY_AGENT_ANDROID_CHANNEL_ID
-  | 'chat'
   | 'active-agents';
 
 /**
@@ -124,8 +114,6 @@ export function androidChannelIdForPushDataToAppVersion(
   switch (data.type) {
     case 'cloud_agent_session':
       return LEGACY_AGENT_ANDROID_CHANNEL_ID;
-    case 'chat.message':
-      return 'chat';
     case 'active_agents_glanceable':
       return 'active-agents';
     case 'agent_briefing':
@@ -168,16 +156,12 @@ export type AgentNotificationKind = (typeof AGENT_NOTIFICATION_KINDS)[number];
 
 type AgentPushData = Extract<
   PushData,
-  { type: 'cloud_agent_session' | 'chat.message' | 'active_agents_glanceable' }
+  { type: 'cloud_agent_session' | 'active_agents_glanceable' }
 >;
 
 /** True for the push variants that are agent notifications and carry a kind. */
 function isAgentPushData(data: PushData): data is AgentPushData {
-  return (
-    data.type === 'cloud_agent_session' ||
-    data.type === 'chat.message' ||
-    data.type === 'active_agents_glanceable'
-  );
+  return data.type === 'cloud_agent_session' || data.type === 'active_agents_glanceable';
 }
 
 /**
@@ -198,9 +182,6 @@ function agentKindForAgentPush(data: AgentPushData): AgentNotificationKind {
       // The schema default is 'status', applied at the producer's enforcement
       // read site; an omitted category is a status update, not a question.
       return data.category === 'attention' ? 'needs-input' : 'progress';
-    case 'chat.message':
-      // A reply in the user's conversation is what the user answers.
-      return 'needs-input';
     case 'active_agents_glanceable':
       return agentNotificationKindForGlanceableSnapshot(data);
     default: {
@@ -216,11 +197,17 @@ export function agentNotificationKindForPushData(data: PushData): AgentNotificat
   return isAgentPushData(data) ? agentKindForAgentPush(data) : null;
 }
 
+/** The Android channel that carries each kind. Total, so a new kind fails typecheck. */
+const AGENT_KIND_CHANNEL: Record<AgentNotificationKind, AndroidNotificationChannelId> = {
+  'needs-input': 'needs-input',
+  progress: 'agent-progress',
+};
+
 /** The Android channel that carries a kind. */
 export function androidChannelIdForAgentKind(
   kind: AgentNotificationKind
 ): AndroidNotificationChannelId {
-  return kind === 'needs-input' ? 'needs-input' : 'agent-progress';
+  return AGENT_KIND_CHANNEL[kind];
 }
 
 /**
@@ -272,15 +259,24 @@ export function iosMutableContentForPushData(data: PushData): boolean {
   return agentNotificationKindForPushData(data) === 'progress';
 }
 
+/**
+ * Relevance per spec "Presentation order": iOS shows the highest score in the
+ * Dynamic Island and orders the Lock Screen by it. Both producers use this.
+ */
+export const LIVE_ACTIVITY_RELEVANCE = {
+  sessionNeedsInput: 100,
+  aggregateNeedsInput: 80,
+  sessionActive: 60,
+  aggregate: 40,
+  sessionIdle: 20,
+} as const;
+
 /** Map a push payload to the Android channel that should carry it. */
 export function androidChannelIdForPushData(data: PushData): AndroidNotificationChannelId {
   if (isAgentPushData(data)) {
     return androidChannelIdForAgentKind(agentKindForAgentPush(data));
   }
   switch (data.type) {
-    case 'instance-lifecycle':
-    case 'scheduled-action':
-      return 'kiloclaw';
     case 'low_balance':
     case 'spend_alert':
       return 'balance';

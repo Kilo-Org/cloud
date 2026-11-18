@@ -30,6 +30,9 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
 jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing', () => ({
   tagOpenAiChatGptByokModels: jest.fn((_userId: string, models: unknown[]) => models),
 }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/claude-billing/byok-models', () => ({
+  tagClaudeBillingByokModels: jest.fn((_owner: unknown, models: unknown[]) => models),
+}));
 jest.mock('@kilocode/web-shared/lib/organizations/organization-models', () => ({
   getAvailableModelsForOrganization: jest.fn(),
 }));
@@ -58,6 +61,9 @@ const { addUserByokAvailability, getUserByokProviderIds } = jest.requireMock(
 const { tagOpenAiChatGptByokModels } = jest.requireMock(
   '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing'
 );
+const { tagClaudeBillingByokModels } = jest.requireMock(
+  '@kilocode/web-shared/lib/ai-gateway/claude-billing/byok-models'
+);
 const { getAvailableModelsForOrganization } = jest.requireMock(
   '@kilocode/web-shared/lib/organizations/organization-models'
 );
@@ -83,6 +89,7 @@ const mockedGetDirectByokCatalogModelIds = jest.mocked(getDirectByokCatalogModel
 const mockedAddUserByokAvailability = jest.mocked(addUserByokAvailability);
 const mockedGetUserByokProviderIds = jest.mocked(getUserByokProviderIds);
 const mockedTagOpenAiChatGptByokModels = jest.mocked(tagOpenAiChatGptByokModels);
+const mockedTagClaudeBillingByokModels = jest.mocked(tagClaudeBillingByokModels);
 const mockedGetAvailableModelsForOrganization = jest.mocked(getAvailableModelsForOrganization);
 const mockedGetCachedRoutingTable = jest.mocked(getCachedRoutingTable);
 const mockedGetAutoFreeCandidates = jest.mocked(getAutoFreeCandidates);
@@ -124,6 +131,9 @@ describe('GET /api/openrouter/models', () => {
     mockedGetDirectByokCatalogModelIds.mockResolvedValue(new Set());
     mockedTagOpenAiChatGptByokModels.mockImplementation(
       (_userId: string, models: OpenRouterModel[]) => models
+    );
+    mockedTagClaudeBillingByokModels.mockImplementation(
+      (_owner: unknown, models: OpenRouterModel[]) => models
     );
     mockedGetAvailableModelsForOrganization.mockResolvedValue(null);
     mockedGetCachedRoutingTable.mockResolvedValue(null);
@@ -243,6 +253,23 @@ describe('GET /api/openrouter/models', () => {
     expect(mockedTagOpenAiChatGptByokModels).toHaveBeenCalledWith(
       { kiloUserId: 'user-id', organizationId: null },
       [openAiModel, otherModel]
+    );
+  });
+
+  test('tags the personal list from the personal Claude billing link', async () => {
+    const claudeModel = makeModel('anthropic/claude-sonnet-4.6');
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: { id: 'user-id' },
+      organizationId: null,
+    } as never);
+    mockedGetEnhancedOpenRouterModels.mockResolvedValue({ data: [claudeModel] });
+    mockedAddUserByokAvailability.mockResolvedValue([claudeModel]);
+
+    await handleModelsRequest(request());
+
+    expect(mockedTagClaudeBillingByokModels).toHaveBeenCalledWith(
+      { kind: 'personal', kiloUserId: 'user-id' },
+      [claudeModel]
     );
   });
 
@@ -394,5 +421,21 @@ describe('GET /api/openrouter/models', () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ data: [publicModel] });
+  });
+
+  test('serves the organization catalog without custom routers when loading them fails', async () => {
+    const allowedModel = makeModel('openai/gpt-5.4-mini');
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: { id: 'user-id' },
+      organizationId: 'org-1',
+      authFailedResponse: null,
+    } as never);
+    mockedGetAvailableModelsForOrganization.mockResolvedValue({ data: [allowedModel] } as never);
+    mockedListUsableCustomRouters.mockRejectedValue(new Error('database unavailable'));
+
+    const response = await handleModelsRequest(request());
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ data: [allowedModel] });
   });
 });

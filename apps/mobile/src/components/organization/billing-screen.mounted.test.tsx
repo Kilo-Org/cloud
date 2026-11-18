@@ -47,7 +47,11 @@ const queries = vi.hoisted(() => ({
 const boundary = vi.hoisted(() => ({
   requireSeats: true,
   seatCount: { used: 3, total: 3 },
+  isTrialExpiredForEnforcement: false,
 }));
+
+/** Whether the storefront rule lets this surface link to the web page. */
+const platform = vi.hoisted(() => ({ linkAllowed: true }));
 
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
   isMoneyRole: () => true,
@@ -60,7 +64,7 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
       plan: 'enterprise',
       seatCount: boundary.seatCount,
       requireSeats: boundary.requireSeats,
-      isTrialExpiredForEnforcement: false,
+      isTrialExpiredForEnforcement: boundary.isTrialExpiredForEnforcement,
       parentOrganizationId: null,
     },
     isResolving: false,
@@ -81,8 +85,8 @@ vi.mock('@/lib/credits/add-credits-destination', () => ({
   organizationBillingUrl: (organizationId: string) => `http://localhost:3000/${organizationId}`,
 }));
 
-vi.mock('@/lib/external-billing-action', () => ({
-  externalBillingAction: (url: string) => ({ kind: 'link', url }),
+vi.mock('@/lib/billing/external-purchase-link', () => ({
+  useCanLinkExternalPurchase: () => platform.linkAllowed,
 }));
 
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
@@ -91,7 +95,11 @@ vi.mock('@/lib/a11y/tap-target', () => ({ STATE_ACTION_CLASS: 'state-action' }))
 
 vi.mock('@/components/organization/external-billing-link', async () => {
   const { createElement: h } = await import('react');
-  return { ExternalBillingLink: (props: { label?: string }) => h('ExternalBillingLink', props) };
+  return {
+    // The settings block owns the storefront gate, so this control is always
+    // the control it was asked for.
+    ExternalBillingLink: (props: { label?: string }) => h('ExternalBillingLink', props),
+  };
 });
 
 vi.mock('@/components/organization/organization-boundary', async () => {
@@ -181,9 +189,7 @@ function subscriptionReadout() {
 
 /** The seats row's rendered value, as the screen hands it to `KvRow`. */
 function seatsReadout(renderer: ReactTestRenderer): unknown {
-  const row = renderer.root
-    .findAllByType('KvRow')
-    .find(node => node.props.label === 'Organization seats');
+  const row = renderer.root.findAllByType('KvRow').find(node => node.props.label === 'In use');
   return row?.props.value;
 }
 
@@ -199,6 +205,13 @@ function manageOnWebLink(renderer: ReactTestRenderer, url: string): ReactTestIns
     .find(node => node.props.url === url);
 }
 
+/** The lapsed-plan banner's action, narrowed out of the renderer's untyped props. */
+function bannerAction(renderer: ReactTestRenderer): { label?: string } | undefined {
+  const banner = renderer.root.findByType('OrganizationPlanRefusal' as never);
+  const action: unknown = banner.props.action;
+  return action as { label?: string } | undefined;
+}
+
 beforeEach(() => {
   for (const query of Object.values(queries)) {
     query.isPending = false;
@@ -209,6 +222,8 @@ beforeEach(() => {
   }
   boundary.requireSeats = true;
   boundary.seatCount = { used: 3, total: 3 };
+  boundary.isTrialExpiredForEnforcement = false;
+  platform.linkAllowed = true;
   queries.seats.data = { usedSeats: 3, totalSeats: 3 };
   queries.autoTopUp.data = { enabled: true, amountCents: 5000, thresholdCents: 1000 };
 });
@@ -280,7 +295,9 @@ describe('OrganizationBillingScreen seats row', () => {
     queries.seats.data = { usedSeats: 3, totalSeats: 4 };
 
     const { renderer, unmount } = await mount();
-    expect(seatsReadout(renderer)).toBe('3 / 4');
+    // Shared readout: the fraction runs inside a left-to-right isolate, so a
+    // right-to-left layout cannot mirror either number.
+    expect(seatsReadout(renderer)).toBe('\u20663 / 4\u2069');
     unmount();
   });
 });
@@ -326,6 +343,51 @@ describe('OrganizationBillingScreen manage-on-web links', () => {
     const { renderer, unmount } = await mount();
 
     expect(manageOnWebLink(renderer, AUTO_TOP_UP_URL)?.props.label).toBe('Set up auto top-up');
+    unmount();
+  });
+});
+
+describe('OrganizationBillingScreen change plan placement', () => {
+  it('leads a lapsed plan from the banner and keeps its row neutral', async () => {
+    boundary.isTrialExpiredForEnforcement = true;
+    queries.subscription.data = subscriptionReadout();
+    const { renderer, unmount } = await mount();
+
+    expect(bannerAction(renderer)?.label).toBe('Change plan');
+    // The banner above already holds this destination, so the card's own copy
+    // is gone; the block's other destinations stay.
+    expect(manageOnWebLink(renderer, SUBSCRIPTIONS_URL)).toBeUndefined();
+    expect(manageOnWebLink(renderer, `${SUBSCRIPTIONS_URL}/seats`)?.props.label).toBe('Buy seats');
+    expect(manageOnWebLink(renderer, AUTO_TOP_UP_URL)?.props.url).toBe(AUTO_TOP_UP_URL);
+    // The banner carries the ended state, so the plan value keeps the row's
+    // own neutral tone instead of a second danger colour.
+    const plan = renderer.root
+      .findAllByType('KvRow' as never)
+      .find(node => node.props.label === 'Organization plan');
+    expect(plan).toBeDefined();
+    expect(plan?.props.valueTone).toBeUndefined();
+    unmount();
+  });
+
+  it('states where the settings live when the storefront rule refuses the link', async () => {
+    // Outside the US storefront nothing links, so the banner has no action and
+    // the card states where the settings live: one line, no heading naming the
+    // web, and no purchase call to action.
+    boundary.isTrialExpiredForEnforcement = true;
+    platform.linkAllowed = false;
+    const { renderer, unmount } = await mount();
+
+    expect(bannerAction(renderer)).toBeUndefined();
+    expect(renderer.root.findAllByType('ExternalBillingLink' as never)).toHaveLength(0);
+    expect(texts(renderer)).toContain('The plan, seats and auto top-up are managed on the web.');
+    unmount();
+  });
+
+  it('renders no banner and keeps the card copy while the plan is active', async () => {
+    const { renderer, unmount } = await mount();
+
+    expect(renderer.root.findAllByType('OrganizationPlanRefusal' as never).length).toBe(0);
+    expect(manageOnWebLink(renderer, SUBSCRIPTIONS_URL)?.props.label).toBe('Change plan');
     unmount();
   });
 });

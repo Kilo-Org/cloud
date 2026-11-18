@@ -98,7 +98,7 @@ This is a concrete, selective map from the shared Kilo token entry points. It do
 | Git operations | `apps/web/src/lib/integrations/platforms/{bitbucket,github,gitlab}/`; generic GitHub disconnect in `apps/web/src/lib/integrations/platforms/github/user-authorization-client.ts` | `services/git-token-service/src/index.ts` | Operation-specific values listed above; disconnect has none | Preserve existing values; potential later `git-token-service:github-user-authorizations:disconnect` | Do not replace mandatory operation-specific audiences with broad `git-token-service`. |
 | User-data export | `apps/web/src/lib/user-data-export-worker-client.ts` | `services/user-data-export/src/index.ts` | `user-data-export` | Preserve `user-data-export` | Requires its additional internal API key and five-minute assertion limit. |
 | Organization and attribution | `apps/web/src/app/api/organizations/[id]/user-tokens/route.ts` | `services/ai-attribution/src/util/auth.ts` | None | `ai-attribution` | Organization-bearing tokens have other valid uses; attribution consumer transport was not fully traced. |
-| MCP catalog dump | `apps/web/src/app/api/internal/mcp-catalog/token/route.ts` | `.github/workflows/kilo-mcp-catalog.yml` `kilo run` (benchmarking service account) | None | `kilo-api` / `kilo-gateway` based on actual downstream call | `tokenSource: 'mcp-catalog'` identifies issuance; the `MCP_CATALOG_TOKEN_SECRET` shared secret only authenticates the mint and is never a Kilo credential. Minting requires an unblocked `bot-internal-*` bot user with a non-empty API-token pepper and an owner or member role in the benchmarking organization, the same rules as the internal-bot mint (`apps/web/src/lib/bot-users/eligibility.ts`); the response names the resolved account id. |
+| MCP catalog dump and kilo-app changelog | `apps/web/src/app/api/internal/mcp-catalog/token/route.ts` | `.github/workflows/kilo-mcp-catalog.yml` `kilo run`; `.github/workflows/kilo-app-release.yml` and `.github/workflows/kilo-app-changelog-history.yml` release-notes rewrite (benchmarking service account) | None | `kilo-api` / `kilo-gateway` based on actual downstream call | `tokenSource: 'mcp-catalog'` identifies issuance; the `MCP_CATALOG_TOKEN_SECRET` shared secret only authenticates the mint and is never a Kilo credential. Minting requires an unblocked `bot-internal-*` bot user with a non-empty API-token pepper and an owner or member role in the benchmarking organization, the same rules as the internal-bot mint (`apps/web/src/lib/bot-users/eligibility.ts`); the response names the resolved account id. |
 | Internal bot users | `apps/web/src/app/api/internal/bot-token/route.ts` | `services/auto-routing-benchmark/src/benchmark-token.ts` (decider CLI and executable model catalog); other internal workloads running as `bot-internal-*` users | None (legacy); `kilo-api` + `kilo-gateway` (modern) | `kilo-api` / `kilo-gateway`, one hour | `tokenSource: 'internal-bot'`; minting requires a `bot-internal-*` bot user with a pepper and no block, plus an owner or member role in the requested organization; `BOT_TOKEN_MINT_SECRET` only authenticates the mint and is never a Kilo credential. Modern shape gated by `INTERNAL_BOT_RESOURCE_TOKENS_ENABLED`. |
 
 ## Existing markers and excluded families
@@ -259,3 +259,21 @@ User-source GraphQL requests retain the user's GitHub permissions; they are not 
 Repository-only and installation-source capabilities continue to use their scoped installation credentials.
 Redemption still checks the container binding, current authorization, integration, and recorded identity.
 If the selected user authorization disappears, redemption fails without falling back to the bot.
+
+## Native passkey management
+
+A device-session bearer identifies the caller but cannot authorize a passkey change alone.
+Adding, renaming, or removing a passkey also requires fresh primary verification.
+Email codes and passkey assertions use the existing sign-in proof checks.
+Accounts that require SSO approve the change through a fresh browser SSO session for the required organization.
+The browser verifies the same account and current SSO policy; management then finishes in the native app.
+
+Each opaque authorization is bound to the account, device session, and operation.
+Enrollment also binds its registration challenge.
+Only the authorization digest is stored, and successful mutation consumes it atomically.
+An authorization expires after five minutes; an SSO approval request expires after ten minutes.
+Revocation and account recovery invalidate outstanding authorizations.
+Approval URLs carry no authorization secret, and this flow issues no access or refresh token.
+
+`device_auth_request_id` is not an app-versus-CLI security boundary: mobile browser sign-in also sets it.
+Authorization depends on the live owned session and independent primary proof, never a user-agent label.

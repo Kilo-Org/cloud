@@ -34,7 +34,7 @@ const PROFILE_ROOTS = {
  * The name the profiles list registers under inside each Stack. Expo Router
  * names a screen after its file below the layout that declares it, and an
  * `index.tsx` keeps the `index` segment, the same shape the layouts rely on
- * (`unstable_settings.initialRouteName: 'index'`).
+ * (`unstable_settings.anchor: 'index'`).
  */
 const PROFILE_LIST_ROUTE_NAMES = {
   app: 'profile-management/index',

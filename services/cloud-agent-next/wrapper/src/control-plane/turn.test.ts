@@ -282,6 +282,7 @@ function createHarness(
     clientThrowsWhileRestarting?: boolean;
     runCondense?: TurnManagerDeps['runCondense'];
     runAutoCommit?: TurnManagerDeps['runAutoCommit'];
+    flushArtifacts?: () => void;
     materializeAttachments?: (
       message: { prompt?: string; parts?: unknown[] },
       deps?: { signal?: AbortSignal }
@@ -324,6 +325,7 @@ function createHarness(
     log: message => logs.push(message),
     onDiagnostic: (event, fields) => diagnostics.push({ event, fields }),
     onNativeDiagnostic: (event, fields) => nativeDiagnostics.push({ event, fields }),
+    ...(options.flushArtifacts === undefined ? {} : { flushArtifacts: options.flushArtifacts }),
     now: () => clock,
     scheduler,
     materializeAttachments: (async (
@@ -646,6 +648,24 @@ describe('turn manager submission', () => {
     const outcomes = outcomeFrames(h.frames);
     expect(outcomes).toHaveLength(1);
     expect(outcomes[0]).toMatchObject({ status: 'completed', lastMessageId: 'm1' });
+  });
+
+  it('flushes artifacts when a turn reaches an outcome', async () => {
+    let flushes = 0;
+    const h = createHarness({
+      flushArtifacts: () => {
+        flushes += 1;
+      },
+    });
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    expect(flushes).toBe(0);
+
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(outcomeFrames(h.frames)).toHaveLength(1);
+    expect(flushes).toBe(1);
   });
 
   it('routes /compact without auto and fails when summarize returns false', async () => {
@@ -3545,6 +3565,51 @@ describe('automatic permissions', () => {
   );
 
   it.each([
+    ['code-review', {}],
+    ['security-remediation', {}],
+    ...['slack', 'github', 'security-agent', 'webhook', 'scheduled', undefined].flatMap(origin =>
+      ['skillShell', 'sandboxEscalation'].map(flag => [origin, { [flag]: true }] as const)
+    ),
+  ] as const)(
+    'continues a %s turn when a later automatic rejection is already resolved (%j)',
+    async (createdOnPlatform, metadata) => {
+      const h = createHarness();
+      const spec = routeSpec({ createdOnPlatform });
+      h.registerRoute(spec);
+      h.manager.submit(SESSION_ID, promptPayload('m1'));
+      await settle();
+      let attempts = 0;
+      h.client(spec).setPermissionImpl(async () => {
+        attempts += 1;
+        return attempts === 1;
+      });
+      for (const id of ['p1', 'p2']) {
+        h.manager.observeKiloEvent(
+          kiloEvent('permission.asked', { sessionID: KILO_SESSION, id, metadata })
+        );
+        await settle();
+      }
+
+      expect(h.client(spec).permissionAnswers).toMatchObject([
+        { permissionId: 'p1', response: 'reject' },
+        { permissionId: 'p2', response: 'reject' },
+      ]);
+      expect(attempts).toBe(2);
+      expect(h.client(spec).aborts).toEqual([]);
+      expect(outcomeFrames(h.frames)).toEqual([]);
+      expect(eventFrames(h.frames).filter(event => event.type === 'permission.asked')).toEqual([]);
+      expect(h.logs).toContain(
+        `turn: automatic permission already resolved origin=${createdOnPlatform} sessionId=${SESSION_ID} permissionId=p2`
+      );
+
+      h.manager.observeKiloEvent(completedKiloTurn());
+      await settle();
+      expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'completed' }]);
+      expect(h.client(spec).aborts).toEqual([]);
+    }
+  );
+
+  it.each([
     ['code-review', {}, 'Code-review permission rejection failed'],
     ['security-remediation', {}, 'Security-remediation permission rejection failed'],
     ['webhook', { skillShell: true }, 'Webhook permission rejection failed'],
@@ -3563,6 +3628,7 @@ describe('automatic permissions', () => {
         kiloEvent('permission.asked', { sessionID: KILO_SESSION, id: 'p1', metadata })
       );
       await settle();
+      expect(h.client(spec).permissionAnswers).toHaveLength(2);
       expect(h.client(spec).aborts).toEqual([KILO_SESSION]);
       expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'failed', reason }]);
       expect(eventFrames(h.frames).filter(event => event.type === 'permission.asked')).toEqual([]);

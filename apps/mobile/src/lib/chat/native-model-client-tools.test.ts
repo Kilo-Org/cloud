@@ -208,38 +208,76 @@ describe('native on-device model client with tools', () => {
     expect(bridge.cancel).toHaveBeenCalledExactlyOnceWith(waiting);
   });
 
-  it('stops a waiting generation that a new question leaves behind', async () => {
-    let round = 0;
-    const { bridge } = toolBridge((native, send) => {
-      round += 1;
-      if (round === 1) {
-        send({ id: native.id, kind: 'toolCalls', calls: [call] });
-      } else {
-        answerWith({})(native, send);
-      }
-    });
-    const client = nativeModelClient(bridge);
-    await said(client);
-    const waiting = bridge.generate.mock.calls[0]?.[0].id;
-    const next = await said(client);
-    expect(next.at(-1)).toMatchObject({ kind: 'done', stop: 'end' });
-    expect(bridge.cancel).toHaveBeenCalledExactlyOnceWith(waiting);
-    expect(bridge.resume).not.toHaveBeenCalled();
-    expect(bridge.generate).toHaveBeenCalledTimes(2);
-  });
-
-  it('fails explicitly on results that answer no waiting generation', async () => {
-    const { bridge } = toolBridge((native, send) => {
+  it('a second answer does not cancel a generation that is waiting for its tool results', async () => {
+    const { bridge, emit } = toolBridge((native, send) => {
       send({ id: native.id, kind: 'toolCalls', calls: [call] });
     });
     const client = nativeModelClient(bridge);
     await said(client);
     const waiting = bridge.generate.mock.calls[0]?.[0].id;
+
+    // Another chat asks the same on-device model while this one waits between
+    // rounds. It must not cancel the round that owns the generation, and it
+    // must not take its slot.
+    const refused = await collect(bridge, client.stream({ ...request, cacheKey: 'chat-b' }));
+    expect(Result.isFailure(refused) && backendFailureKey(refused.failure)).toBe(
+      'modelChat.localModels.busy'
+    );
+    expect(bridge.cancel).not.toHaveBeenCalled();
+    expect(bridge.generate).toHaveBeenCalledOnce();
+
+    // The waiting round still answers its own results and finishes.
+    bridge.resume.mockImplementation(async resumed => {
+      await Promise.resolve();
+      emit({ id: resumed, kind: 'delta', text: 'It is noon.' });
+      emit({ id: resumed, kind: 'done', stop: 'end', usageSource: 'unavailable' });
+    });
+    const second = await said(client, answered([{ callId: call.id, body: '12:00' }]));
+    expect(bridge.resume).toHaveBeenCalledExactlyOnceWith(waiting, [
+      { callId: call.id, body: '12:00' },
+    ]);
+    expect(second.map(event => event.kind)).toEqual(['delta', 'done']);
+    expect(bridge.generate).toHaveBeenCalledOnce();
+  });
+
+  it('cancels the round that chat abandoned, and starts a fresh generation', async () => {
+    // Stop, a closed chat, or a sign-out interrupts a turn while its tools run:
+    // the round can never be answered, and holding it would leave the shared
+    // on-device model busy for every later ask.
+    let round = 0;
+    const { bridge } = toolBridge((native, send) => {
+      round += 1;
+      if (round === 1) {
+        send({ id: native.id, kind: 'toolCalls', calls: [call] });
+        return;
+      }
+      send({ id: native.id, kind: 'delta', text: 'Fresh answer.' });
+      send({ id: native.id, kind: 'done', stop: 'end', usageSource: 'unavailable' });
+    });
+    const client = nativeModelClient(bridge);
+    await said(client);
+    const waiting = bridge.generate.mock.calls[0]?.[0].id;
+
+    // The same chat asks again, with no results: it is a new exchange.
+    const next = await said(client);
+
+    expect(next.map(event => event.kind)).toEqual(['delta', 'done']);
+    expect(bridge.cancel).toHaveBeenCalledExactlyOnceWith(waiting);
+    expect(bridge.generate).toHaveBeenCalledTimes(2);
+    expect(bridge.generate.mock.calls[1]?.[0].id).not.toBe(waiting);
+  });
+
+  it('refuses results that answer no waiting generation, and leaves that round alone', async () => {
+    const { bridge } = toolBridge((native, send) => {
+      send({ id: native.id, kind: 'toolCalls', calls: [call] });
+    });
+    const client = nativeModelClient(bridge);
+    await said(client);
     const result = await collect(bridge, client.stream(answered([{ callId: 'other', body: 'x' }])));
     expect(Result.isFailure(result) && backendFailureKey(result.failure)).toBe(
-      'modelChat.localModels.failed'
+      'modelChat.localModels.busy'
     );
-    expect(bridge.cancel).toHaveBeenCalledExactlyOnceWith(waiting);
+    expect(bridge.cancel).not.toHaveBeenCalled();
     expect(bridge.resume).not.toHaveBeenCalled();
     expect(bridge.generate).toHaveBeenCalledOnce();
   });

@@ -35,7 +35,6 @@ jest.mock('next/navigation', () => ({
 import { afterEach, beforeEach, describe, test, expect } from '@jest/globals';
 import { isEmailBlacklistedByDomain } from '@kilocode/worker-utils/account-access';
 import {
-  isEmailOnBlockedTld,
   getUserUUID,
   uuidSchema,
   getUserFromAuth,
@@ -54,6 +53,7 @@ import {
   blacklisted_domains,
   device_sessions,
   kilocode_users,
+  organization_memberships,
   organizations,
 } from '@kilocode/db/schema';
 import { clearEmailBlacklistCache } from '@kilocode/web-shared/lib/blacklist-domains-config';
@@ -61,7 +61,7 @@ import type { User } from '@kilocode/db/schema';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { markOrganizationAsDeleted } from '@kilocode/web-shared/lib/organizations/organizations';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { generateApiToken, JWT_TOKEN_VERSION } from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 import { ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
 import { eq } from 'drizzle-orm';
 import { v5 as uuidv5 } from 'uuid';
@@ -70,7 +70,7 @@ import {
   KILO_API_AUDIENCE,
   KILO_GATEWAY_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { signKiloToken } from '@kilocode/worker-utils/kilo-token';
+import { KILO_TOKEN_VERSION, signKiloToken } from '@kilocode/worker-utils/kilo-token';
 import { buildModernKiloTokenPayload } from '@kilocode/worker-utils/kilo-token-policy';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import {
@@ -95,6 +95,35 @@ afterEach(() => {
 
 function signPolicyClaims(claims: Record<string, unknown>, secret = NEXTAUTH_SECRET): string {
   return jwt.sign(claims, secret, { algorithm: 'HS256' });
+}
+
+async function createParentAndChildOrganizations() {
+  const parentOwner = await insertTestUser();
+  const childOwner = await insertTestUser();
+  const parent = await createTestOrganization(
+    `Parent Organization ${crypto.randomUUID()}`,
+    parentOwner.id,
+    0
+  );
+  const child = await createTestOrganization(
+    `Child Organization ${crypto.randomUUID()}`,
+    childOwner.id,
+    0
+  );
+  await db
+    .update(organizations)
+    .set({ parent_organization_id: parent.id })
+    .where(eq(organizations.id, child.id));
+  return { parent, child };
+}
+
+async function deleteOrganizationsWithMemberships(organizationIds: readonly string[]) {
+  for (const organizationId of organizationIds) {
+    await db
+      .delete(organization_memberships)
+      .where(eq(organization_memberships.organization_id, organizationId));
+    await db.delete(organizations).where(eq(organizations.id, organizationId));
+  }
 }
 
 describe('isEmailBlacklistedByDomain', () => {
@@ -173,67 +202,6 @@ describe('isEmailBlacklistedByDomain', () => {
     expect(isEmailBlacklistedByDomain('user.sub.example.com', blacklist)).toBe(true);
     expect(isEmailBlacklistedByDomain('user.SUB.EXAMPLE.COM', blacklist)).toBe(true);
     expect(isEmailBlacklistedByDomain('user.Sub.Example.Com', blacklist)).toBe(true);
-  });
-});
-
-describe('isEmailOnBlockedTld', () => {
-  const defaultTlds = ['shop', 'top'];
-
-  test('should block the default .shop and .top TLDs', () => {
-    expect(isEmailOnBlockedTld('user@example.shop', defaultTlds)).toBe(true);
-    expect(isEmailOnBlockedTld('user@example.top', defaultTlds)).toBe(true);
-  });
-
-  test('should block a TLD added by an admin', () => {
-    expect(isEmailOnBlockedTld('user@example.asia', defaultTlds)).toBe(false);
-    expect(isEmailOnBlockedTld('user@example.asia', [...defaultTlds, 'asia'])).toBe(true);
-  });
-
-  test('should block subdomains under blocked TLDs', () => {
-    expect(isEmailOnBlockedTld('user@sub.domain.shop', defaultTlds)).toBe(true);
-    expect(isEmailOnBlockedTld('user@sub.domain.top', defaultTlds)).toBe(true);
-    expect(isEmailOnBlockedTld('user@sub.domain.asia', ['asia'])).toBe(true);
-  });
-
-  test('should allow .com, .org, .io TLDs', () => {
-    expect(isEmailOnBlockedTld('user@example.com', defaultTlds)).toBe(false);
-    expect(isEmailOnBlockedTld('user@example.org', defaultTlds)).toBe(false);
-    expect(isEmailOnBlockedTld('user@example.io', defaultTlds)).toBe(false);
-  });
-
-  test('should be case insensitive', () => {
-    expect(isEmailOnBlockedTld('user@example.SHOP', defaultTlds)).toBe(true);
-    expect(isEmailOnBlockedTld('user@example.TOP', defaultTlds)).toBe(true);
-    expect(isEmailOnBlockedTld('user@example.ASIA', ['asia'])).toBe(true);
-    expect(isEmailOnBlockedTld('USER@EXAMPLE.Shop', defaultTlds)).toBe(true);
-  });
-
-  test('should not block domains containing blocked TLD as a non-TLD part', () => {
-    expect(isEmailOnBlockedTld('user@shop.example.com', defaultTlds)).toBe(false);
-    expect(isEmailOnBlockedTld('user@top.example.com', defaultTlds)).toBe(false);
-    expect(isEmailOnBlockedTld('user@myshop.com', defaultTlds)).toBe(false);
-    expect(isEmailOnBlockedTld('user@topnotch.com', defaultTlds)).toBe(false);
-    expect(isEmailOnBlockedTld('user@example.shop.com', defaultTlds)).toBe(false);
-    expect(isEmailOnBlockedTld('user@example.top.com', defaultTlds)).toBe(false);
-    expect(isEmailOnBlockedTld('user@example.asia.com', ['asia'])).toBe(false);
-    expect(isEmailOnBlockedTld('user@asia.example.com', ['asia'])).toBe(false);
-    expect(isEmailOnBlockedTld('user@notasia.com', ['asia'])).toBe(false);
-  });
-
-  test('should require a leading dot before the blocked TLD', () => {
-    expect(isEmailOnBlockedTld('user@exampleshop', defaultTlds)).toBe(false);
-    expect(isEmailOnBlockedTld('user@exampletop', defaultTlds)).toBe(false);
-    expect(isEmailOnBlockedTld('user@exampleasia', ['asia'])).toBe(false);
-  });
-
-  test('should allow every TLD when the admin list is empty', () => {
-    expect(isEmailOnBlockedTld('user@example.shop', [])).toBe(false);
-    expect(isEmailOnBlockedTld('user@example.asia', [])).toBe(false);
-  });
-
-  test('should allow other TLDs including multi-part TLDs', () => {
-    expect(isEmailOnBlockedTld('user@example.co.uk', defaultTlds)).toBe(false);
-    expect(isEmailOnBlockedTld('user@example.uk', defaultTlds)).toBe(false);
   });
 });
 
@@ -466,6 +434,40 @@ describe('getUserFromAuth', () => {
     }
   );
 
+  test.each(['bearer', 'bEaReR'])(
+    'authenticates a %s scheme with a valid API token',
+    async scheme => {
+      const user = await insertTestUser({
+        google_user_email: `bearer-scheme-${crypto.randomUUID()}@example.com`,
+        api_token_pepper: 'bearer-scheme-pepper',
+      });
+      mockHeaders.mockResolvedValue(
+        new Headers({ authorization: `${scheme} ${generateApiToken(user)}` })
+      );
+
+      const result = await getUserFromAuth({ adminOnly: false });
+
+      expect(result.authFailedResponse).toBeNull();
+      expect(result.user?.id).toBe(user.id);
+    }
+  );
+
+  test('refuses a valid API token with two spaces after the scheme', async () => {
+    const user = await insertTestUser({
+      google_user_email: `bearer-extra-space-${crypto.randomUUID()}@example.com`,
+      api_token_pepper: 'bearer-extra-space-pepper',
+    });
+    mockHeaders.mockResolvedValue(
+      new Headers({ authorization: `Bearer  ${generateApiToken(user)}` })
+    );
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.user).toBeNull();
+    expect(result.authFailedResponse?.status).toBe(401);
+    expect(result.credentialsRejected).toBe(true);
+  });
+
   test('returns 401 for a token with malformed JSON header', async () => {
     const header = Buffer.from('{').toString('base64url');
     const payload = Buffer.from(JSON.stringify({ kiloUserId: 'malformed-token-user' })).toString(
@@ -519,7 +521,7 @@ describe('getUserFromAuth', () => {
   test('flags an operation-scoped token presented to another endpoint', async () => {
     const user = await insertTestUser({ api_token_pepper: 'audience-fallthrough-pepper' });
     const token = signPolicyClaims({
-      version: JWT_TOKEN_VERSION,
+      version: KILO_TOKEN_VERSION,
       kiloUserId: user.id,
       apiTokenPepper: user.api_token_pepper,
       env: process.env.NODE_ENV,
@@ -544,7 +546,7 @@ describe('getUserFromAuth', () => {
       web_session_pepper: 'current-web-session-pepper',
     });
     const token = signPolicyClaims({
-      version: JWT_TOKEN_VERSION,
+      version: KILO_TOKEN_VERSION,
       kiloUserId: user.id,
       apiTokenPepper: user.api_token_pepper,
       env: process.env.NODE_ENV,
@@ -576,7 +578,7 @@ describe('getUserFromAuth', () => {
   test('accepts a gateway audience only for a gateway operation', async () => {
     const user = await insertTestUser({ api_token_pepper: 'gateway-audience-pepper' });
     const token = signPolicyClaims({
-      version: JWT_TOKEN_VERSION,
+      version: KILO_TOKEN_VERSION,
       kiloUserId: user.id,
       apiTokenPepper: user.api_token_pepper,
       env: process.env.NODE_ENV,
@@ -608,7 +610,7 @@ describe('getUserFromAuth', () => {
       0
     );
     const token = signPolicyClaims({
-      version: JWT_TOKEN_VERSION,
+      version: KILO_TOKEN_VERSION,
       kiloUserId: user.id,
       apiTokenPepper: user.api_token_pepper,
       env: process.env.NODE_ENV,
@@ -639,7 +641,7 @@ describe('getUserFromAuth', () => {
       0
     );
     const token = signPolicyClaims({
-      version: JWT_TOKEN_VERSION,
+      version: KILO_TOKEN_VERSION,
       kiloUserId: user.id,
       apiTokenPepper: user.api_token_pepper,
       env: process.env.NODE_ENV,
@@ -746,6 +748,135 @@ describe('getUserFromAuth', () => {
     expect(result.user).toBeNull();
     expect(result.authFailedResponse?.status).toBe(403);
     expect(result.authorizationRefused).toBe(true);
+  });
+
+  test('accepts a direct member of the organization', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'direct-member-pepper' });
+    const organization = await createTestOrganization(
+      `Direct Organization ${crypto.randomUUID()}`,
+      user.id,
+      0
+    );
+    mockHeaders.mockResolvedValue(
+      new Headers({
+        Authorization: `Bearer ${generateApiToken(user)}`,
+        [ORGANIZATION_ID_HEADER]: organization.id,
+      })
+    );
+
+    try {
+      const result = await getUserFromAuth({ adminOnly: false });
+
+      expect(result.authFailedResponse).toBeNull();
+      expect(result.organizationId).toBe(organization.id);
+    } finally {
+      await deleteOrganizationsWithMemberships([organization.id]);
+    }
+  });
+
+  test.each(['owner', 'admin'] as const)(
+    'accepts a %s of the parent organization for the child organization context',
+    async role => {
+      const user = await insertTestUser({ api_token_pepper: `parent-${role}-pepper` });
+      const { parent, child } = await createParentAndChildOrganizations();
+      try {
+        await db
+          .insert(organization_memberships)
+          .values({ organization_id: parent.id, kilo_user_id: user.id, role });
+        mockHeaders.mockResolvedValue(
+          new Headers({
+            Authorization: `Bearer ${generateApiToken(user)}`,
+            [ORGANIZATION_ID_HEADER]: child.id,
+          })
+        );
+
+        const result = await getUserFromAuth({ adminOnly: false });
+
+        expect(result.authFailedResponse).toBeNull();
+        expect(result.organizationId).toBe(child.id);
+      } finally {
+        await deleteOrganizationsWithMemberships([child.id, parent.id]);
+      }
+    }
+  );
+
+  test('refuses a member of the parent organization for the child organization context', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'parent-member-pepper' });
+    const { parent, child } = await createParentAndChildOrganizations();
+    try {
+      await db
+        .insert(organization_memberships)
+        .values({ organization_id: parent.id, kilo_user_id: user.id, role: 'member' });
+      mockHeaders.mockResolvedValue(
+        new Headers({
+          Authorization: `Bearer ${generateApiToken(user)}`,
+          [ORGANIZATION_ID_HEADER]: child.id,
+        })
+      );
+
+      const result = await getUserFromAuth({ adminOnly: false });
+
+      expect(result.user).toBeNull();
+      expect(result.authFailedResponse?.status).toBe(403);
+      await expect(result.authFailedResponse?.json()).resolves.toEqual({
+        success: false,
+        error: 'Access denied (not a member of the organization)',
+      });
+      expect(result.authorizationRefused).toBe(true);
+    } finally {
+      await deleteOrganizationsWithMemberships([child.id, parent.id]);
+    }
+  });
+
+  test('refuses the child organization context when the parent organization is soft-deleted', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'deleted-parent-pepper' });
+    const { parent, child } = await createParentAndChildOrganizations();
+    try {
+      await db
+        .insert(organization_memberships)
+        .values({ organization_id: parent.id, kilo_user_id: user.id, role: 'owner' });
+      await markOrganizationAsDeleted(parent.id);
+      mockHeaders.mockResolvedValue(
+        new Headers({
+          Authorization: `Bearer ${generateApiToken(user)}`,
+          [ORGANIZATION_ID_HEADER]: child.id,
+        })
+      );
+
+      const result = await getUserFromAuth({ adminOnly: false });
+
+      expect(result.user).toBeNull();
+      expect(result.authFailedResponse?.status).toBe(403);
+      expect(result.authorizationRefused).toBe(true);
+    } finally {
+      await deleteOrganizationsWithMemberships([child.id, parent.id]);
+    }
+  });
+
+  test('refuses an organization context with no membership relation', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'unrelated-organization-pepper' });
+    const owner = await insertTestUser();
+    const organization = await createTestOrganization(
+      `Unrelated Organization ${crypto.randomUUID()}`,
+      owner.id,
+      0
+    );
+    mockHeaders.mockResolvedValue(
+      new Headers({
+        Authorization: `Bearer ${generateApiToken(user)}`,
+        [ORGANIZATION_ID_HEADER]: organization.id,
+      })
+    );
+
+    try {
+      const result = await getUserFromAuth({ adminOnly: false });
+
+      expect(result.user).toBeNull();
+      expect(result.authFailedResponse?.status).toBe(403);
+      expect(result.authorizationRefused).toBe(true);
+    } finally {
+      await deleteOrganizationsWithMemberships([organization.id]);
+    }
   });
 
   test('allows API-token authentication for users from SSO-protected domains', async () => {

@@ -1,7 +1,7 @@
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
-import { memo, type ReactNode, useCallback } from 'react';
+import { memo, type ReactNode, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View, type ViewStyle } from 'react-native';
+import { Pressable, View, type ViewStyle } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { auditActionLabel } from '@/components/organization/audit-log-action-label';
@@ -12,20 +12,26 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
-import { ScrollText } from '@/components/ui/icons';
+import { ChevronDown, ChevronUp, ScrollText } from '@/components/ui/icons';
+import { RefreshControl } from '@/components/ui/refresh-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatClockTime, formatDate } from '@/lib/format';
+import { useManualRefresh } from '@/lib/hooks/use-manual-refresh';
 import { type OrgAuditLogEntry, useOrgAuditLogPage } from '@/lib/hooks/use-org-billing-queries';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
 import { parseTimestamp } from '@/lib/utils';
 
-// FlashList takes `contentContainerStyle` (no className), so the `px-6 pt-4`
-// inset maps to its pixel values; the tab bar's own bottom padding rides on the
-// footer, which `gap` would not cover.
+// FlashList takes `contentContainerStyle` (no className), so the skeleton's and
+// the empty and footer blocks' `px-6 pt-4` inset is spelled in pixels here.
+// NativeWind's native rem is 14, which makes px-6 21 dp and pt-4 14 dp; 24/16 is
+// the web rem and leaves the rows 3 dp inside those blocks. The tab
+// bar's own bottom padding rides on the footer, which `gap` would not cover.
 const listStyle = { flex: 1 } satisfies ViewStyle;
-const listContentContainerStyle = { paddingHorizontal: 24, paddingTop: 16 } satisfies ViewStyle;
+const listContentContainerStyle = { paddingHorizontal: 21, paddingTop: 14 } satisfies ViewStyle;
 
 const AUDIT_DATE = { year: 'numeric', month: 'short', day: 'numeric' } as const;
 
@@ -52,30 +58,62 @@ function formatAuditTime(createdAt: string): string {
 
 const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAuditLogEntry }>) {
   const { t } = useTranslation();
+  const colors = useThemeColors();
+  const [expanded, setExpanded] = useState(false);
   const actor = entry.actor_email ?? entry.actor_name;
   const time = formatAuditTime(entry.created_at);
   const meta = actor ? `${actor} · ${time}` : time;
+  const eventName = auditActionLabel(t, entry.action);
   // The server's message for the creation action is "Organization <name>
   // created", which only restates the event name already shown above it. Every
   // row of this log belongs to this organization, so the row shows neither that
   // English sentence nor a name a later rename would change.
   const showsDetail = entry.action !== 'organization.created';
-  return (
-    <View className="gap-1 rounded-lg bg-secondary p-3">
-      <Text className="text-sm font-medium text-foreground">
-        {auditActionLabel(t, entry.action)}
+  const metaLine =
+    meta.length === 0 ? null : (
+      <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+        {meta}
       </Text>
-      {showsDetail ? (
-        <Text className="text-xs text-muted-foreground" numberOfLines={2}>
-          {entry.message}
-        </Text>
-      ) : null}
-      {meta.length === 0 ? null : (
-        <Text className="text-xs text-muted-foreground" numberOfLines={1}>
-          {meta}
-        </Text>
-      )}
-    </View>
+    );
+  if (!showsDetail) {
+    return (
+      <View className="gap-1 rounded-lg bg-secondary p-3">
+        <Text className="text-sm font-medium text-foreground">{eventName}</Text>
+        {metaLine}
+      </View>
+    );
+  }
+  // The message runs past two lines for most events, and nothing else in the
+  // app carries it, so the row itself is the detail view: it starts clamped and
+  // a press shows the whole sentence. The row cannot know whether the message
+  // fits two lines without measuring it — a clamped text reports only the lines
+  // it drew — so every event row offers the disclosure, and the reader who
+  // needs nothing more loses nothing by ignoring it.
+  return (
+    <Pressable
+      onPress={() => {
+        setExpanded(value => !value);
+      }}
+      accessibilityRole="button"
+      // The clamp is visual only: a reader hears the whole event whether or not
+      // the row is open.
+      accessibilityLabel={[eventName, entry.message, meta].filter(Boolean).join('. ')}
+      accessibilityState={{ expanded }}
+      className="gap-1 rounded-lg bg-secondary p-3 active:opacity-70"
+    >
+      <View className="flex-row items-center gap-2">
+        {expanded ? (
+          <ChevronUp size={16} color={colors.mutedForeground} />
+        ) : (
+          <ChevronDown size={16} color={colors.mutedForeground} />
+        )}
+        <Text className="min-w-0 flex-1 text-sm font-medium text-foreground">{eventName}</Text>
+      </View>
+      <Text className="text-xs text-muted-foreground" numberOfLines={expanded ? undefined : 2}>
+        {entry.message}
+      </Text>
+      {metaLine}
+    </Pressable>
   );
 });
 
@@ -94,6 +132,12 @@ export function OrganizationAuditLogScreen() {
   const { query, entries, hasMore } = useOrgAuditLogPage(organizationId, allowed);
   const paddingBottom = useTabBarBottomPadding();
 
+  // An audit entry can be written while this screen is open (another admin
+  // changes settings on the web), so the pull is the reader's way to ask for
+  // the new events without leaving the list.
+  const [refreshing, onRefresh] = useManualRefresh(query.refetch, t('common.couldNotRefresh'));
+  const refreshControl = <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />;
+
   // `AuditLogRow` is memoized at module scope, so one identity across data
   // updates keeps every unchanged row from re-rendering. The row reads `t`
   // itself instead of taking it as a prop: `useTranslation` subscribes each row
@@ -104,13 +148,21 @@ export function OrganizationAuditLogScreen() {
   );
 
   if (isResolving || organizationId == null || org == null) {
-    return <OrganizationBoundary title={t('organization.auditLog.title')} />;
+    return (
+      <OrganizationBoundary
+        title={t('organization.auditLog.title')}
+        backFallback={ORGANIZATION_HUB_PATH}
+      />
+    );
   }
 
   if (!allowed) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('organization.auditLog.title')} />
+        <ScreenHeader
+          title={t('organization.auditLog.title')}
+          backFallback={ORGANIZATION_HUB_PATH}
+        />
         <PermissionDenied description={t('organization.auditLog.permissionDenied')} />
       </View>
     );
@@ -139,6 +191,7 @@ export function OrganizationAuditLogScreen() {
         icon={ScrollText}
         title={t('organization.auditLog.emptyTitle')}
         description={t('organization.auditLog.emptyDescription')}
+        refreshControl={refreshControl}
       />
     );
   } else {
@@ -189,6 +242,7 @@ export function OrganizationAuditLogScreen() {
         getItemType={() => 'auditLog'}
         ItemSeparatorComponent={RowSeparator}
         contentContainerStyle={listContentContainerStyle}
+        refreshControl={refreshControl}
         ListFooterComponent={footer}
       />
     );
@@ -196,7 +250,7 @@ export function OrganizationAuditLogScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('organization.auditLog.title')} />
+      <ScreenHeader title={t('organization.auditLog.title')} backFallback={ORGANIZATION_HUB_PATH} />
       {body}
     </View>
   );

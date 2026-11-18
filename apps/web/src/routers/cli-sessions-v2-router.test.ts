@@ -1380,7 +1380,7 @@ describe('cli-sessions-v2-router', () => {
       expect(fetchSessionMessagesPage).not.toHaveBeenCalled();
     });
 
-    it('rejects an invalid session id before calling the client', async () => {
+    it('rejects a session id that matches no owned row before calling the client', async () => {
       const caller = await createCallerForUser(regularUser.id);
 
       await expect(
@@ -1391,6 +1391,59 @@ describe('cli-sessions-v2-router', () => {
       ).rejects.toThrow();
       expect(fetchSessionMessagesPage).not.toHaveBeenCalled();
     });
+
+    it.each([
+      'ses_123/other',
+      'ses_123 456',
+      'ses_123\u0000456',
+      'ses_123:456',
+      'a'.repeat(256),
+      '',
+    ])(
+      'rejects the session id %j at the tRPC boundary before calling the client',
+      async session_id => {
+        const caller = await createCallerForUser(regularUser.id);
+
+        await expect(
+          caller.cliSessionsV2.getSessionMessagesPage({ session_id, limit: 50 })
+        ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+        expect(fetchSessionMessagesPage).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each(['xmw2l780h18', '0b6f5a9e-9a0e-4dbb-9a4a-2a0d9c6f5e11'])(
+      'forwards the stored session id %s to the reader and returns its page',
+      async stored_id => {
+        await db.insert(cli_sessions_v2).values({
+          session_id: stored_id,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+        });
+
+        try {
+          fetchSessionMessagesPage.mockResolvedValueOnce({
+            kiloSessionId: stored_id,
+            history: null,
+          });
+          const caller = await createCallerForUser(regularUser.id);
+
+          await expect(
+            caller.cliSessionsV2.getSessionMessagesPage({ session_id: stored_id, limit: 50 })
+          ).resolves.toEqual({
+            kiloSessionId: stored_id,
+            history: null,
+            watermarkEventId: null,
+            parentSessionId: null,
+            preparationAttempts: [],
+          });
+          expect(fetchSessionMessagesPage).toHaveBeenCalledWith(stored_id, regularUser.id, {
+            limit: 50,
+          });
+        } finally {
+          await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, stored_id));
+        }
+      }
+    );
 
     describe('watermark', () => {
       const cloudAgentSessionId = 'agent_wm123456-1234-1234-1234-123456789abc';
@@ -1799,6 +1852,38 @@ describe('cli-sessions-v2-router', () => {
       );
     });
 
+    it('forwards the worker workspace conflict so the client can cascade', async () => {
+      // The ingest client maps the worker's 409 to `CONFLICT` carrying the
+      // worker's error token. The app reads both to delete the workspace next,
+      // so this hop must not replace them with a generic failure.
+      fetchSpy.mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: 'workspace_requires_root_session' }), {
+          status: 409,
+          headers: { 'content-type': 'application/json' },
+        })
+      );
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(caller.cliSessionsV2.delete({ session_id: sessionId })).rejects.toMatchObject({
+        code: 'CONFLICT',
+        message: 'workspace_requires_root_session',
+      });
+    });
+
+    it('maps an ingest delete budget expiry to the retryable answer', async () => {
+      // The ingest delete is the last hop of a mutation the caller already
+      // completed. A worker that never answers must read as retryable upstream,
+      // not as an internal defect. `fetchWithinBudget` rejects with this error
+      // when the hop outlives `CONTROL_PLANE_UPSTREAM_BUDGET_MS`.
+      fetchSpy.mockRejectedValueOnce(new ServiceFetchTimeoutError(8000));
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(caller.cliSessionsV2.delete({ session_id: sessionId })).rejects.toMatchObject({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Failed to delete session',
+      });
+    });
+
     it('deletes a legacy agent session through ingest without a runtime call', async () => {
       await db
         .update(cli_sessions_v2)
@@ -2103,6 +2188,21 @@ describe('cli-sessions-v2-router', () => {
       await expect(
         caller.cliSessionsV2.get({ session_id: organizationSessionId })
       ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    });
+
+    it('get answers a spent mobile budget retryably instead of reading the session', async () => {
+      // The mobile procedure budget must not be consumed by this read: the
+      // caller sees a retryable answer instead of an opaque internal error.
+      const caller = await createCallerForUser(regularUser.id, {
+        controlPlaneStartedAt: performance.now() - 9_900,
+      });
+
+      await expect(
+        caller.cliSessionsV2.get({ session_id: organizationSessionId })
+      ).rejects.toMatchObject({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Session details took too long to load. Try again.',
+      });
     });
 
     it('get distinguishes a session owned by another account from one that does not exist', async () => {
@@ -4426,9 +4526,46 @@ describe('cli-sessions-v2-router', () => {
     });
   });
 
+  describe('share result', () => {
+    const sessionId = 'ses_share_public_id_0001';
+
+    beforeEach(async () => {
+      await db.insert(cli_sessions_v2).values({
+        session_id: sessionId,
+        kilo_user_id: regularUser.id,
+        title: 'Shared session',
+      });
+    });
+
+    afterEach(async () => {
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+    });
+
+    it('returns the public_id the worker wrote beside the token', async () => {
+      const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            success: true,
+            share_token: 'test.share.token',
+            public_id: '22222222-2222-4222-8222-222222222222',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+      try {
+        const caller = await createCallerForUser(regularUser.id);
+        await expect(caller.cliSessionsV2.share({ session_id: sessionId })).resolves.toEqual({
+          share_token: 'test.share.token',
+          public_id: '22222222-2222-4222-8222-222222222222',
+        });
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+  });
+
   describe('share size result', () => {
     const sessionId = 'ses_share_oversized_info_0001';
-
     beforeEach(async () => {
       await db.insert(cli_sessions_v2).values({
         session_id: sessionId,

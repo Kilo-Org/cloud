@@ -3,30 +3,29 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import {
-  formatSeatCount,
   getAutoTopUpLinkLabel,
   getAutoTopUpReadout,
   getOrgSubscriptionState,
   getScheduledSeatChange,
+  seatCountReadout,
 } from '@/components/organization/billing-model';
-import { ExternalBillingLink } from '@/components/organization/external-billing-link';
+import { BillingWebSettings } from '@/components/organization/billing-web-settings';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { getOrgKiloPassRowState } from '@/components/organization/org-kilo-pass-row-state';
 import { OrganizationPlanRefusal } from '@/components/organization/plan-refusal';
 import { PermissionDenied } from '@/components/organization/permission-denied';
+import { SectionLabel } from '@/components/organization/section-label';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { KvRow } from '@/components/ui/kv-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { i18n } from '@/i18n';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { useCanLinkExternalPurchase } from '@/lib/billing/external-purchase-link';
 import { WEB_BASE_URL } from '@/lib/config';
 import { organizationBillingUrl } from '@/lib/credits/add-credits-destination';
-import { externalBillingAction } from '@/lib/external-billing-action';
 import { openExternalUrl } from '@/lib/external-link';
-import { formatNumber } from '@/lib/format';
 import {
   isMoneyRole,
   useOrgBoundary,
@@ -38,6 +37,7 @@ import {
   useOrgSeats,
   useOrgSeatSubscription,
 } from '@/lib/hooks/use-org-billing-queries';
+import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
 
 /** A settings block: the raised surface the hub's own cards paint. */
 function BillingCard({ children }: Readonly<{ children: ReactNode }>) {
@@ -82,22 +82,14 @@ function BillingCardError({
   );
 }
 
-function SectionLabel({ children }: Readonly<{ children: ReactNode }>) {
-  return (
-    <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-      {children}
-    </Text>
-  );
-}
-
 /**
  * The organization's billing readout: the plan and its subscription state, the
  * seats in use, auto top-up, and the organization's Kilo Pass.
  *
  * Nothing here changes a plan. Buying seats, changing the plan and setting up
- * auto top-up exist only on the web, so those controls lead there — a link on
- * Android and plain text on iOS, the App Store rule `ExternalBillingLink`
- * carries.
+ * auto top-up exist only on the web, so those controls lead there — a link only
+ * on an iOS build in the US storefront, a statement of where the setting lives
+ * everywhere else, the rule `useCanLinkExternalPurchase` owns.
  */
 export function OrganizationBillingScreen() {
   const { t } = useTranslation();
@@ -111,15 +103,21 @@ export function OrganizationBillingScreen() {
     organizationId,
     hasBillingRole && parentLink === null
   );
+  // The storefront rule that decides whether the lapsed-plan banner may link to
+  // the web billing page. Read with the other hooks, before the boundary's
+  // early returns.
+  const canLinkBilling = useCanLinkExternalPurchase();
+
+  const screenTitle = t('organization.billing.title');
 
   if (isResolving || organizationId == null || org == null) {
-    return <OrganizationBoundary title={t('organization.billing.title')} />;
+    return <OrganizationBoundary title={screenTitle} backFallback={ORGANIZATION_HUB_PATH} />;
   }
 
   if (!hasBillingRole) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('organization.billing.title')} />
+        <ScreenHeader title={screenTitle} backFallback={ORGANIZATION_HUB_PATH} />
         <PermissionDenied description={t('organization.billing.permissionDenied')} />
       </View>
     );
@@ -132,22 +130,26 @@ export function OrganizationBillingScreen() {
       : t('organization.hub.planTeams');
   const subscriptionsUrl = `${WEB_BASE_URL}/organizations/${organizationId}/subscriptions`;
   const changePlanLabel = t('organization.billing.changePlan');
-  const planChange = externalBillingAction(subscriptionsUrl);
+  // The banner is the one place the change-plan destination belongs while the
+  // plan has lapsed and the surface may link, so the card's copy of it would
+  // only outweigh the banner. One value feeds both, so the two cannot drift.
+  // A surface that gets text only keeps the card's copy: its banner has no
+  // action.
+  const changePlanOnBanner = planEnded && canLinkBilling;
 
   const subscriptionState = subscription.data ? getOrgSubscriptionState(subscription.data) : null;
   const scheduledSeatChange = subscription.data ? getScheduledSeatChange(subscription.data) : null;
   // The list entry already carries the same seat numbers, so the row paints
   // settled on the first frame and the query only corrects it if they moved.
-  // A total is printed only when the organization enforces seats and actually
-  // bought some: `getOrganizationSeatUsage` answers `seat_count || 0`, so a
-  // legacy organization would read `3 / 0`, and the row would also change
-  // shape on the frame the seats read lands.
+  // The shared readout prints a total only when the seats read confirms the
+  // organization bought some, so the row does not change shape when it lands.
   const seatsInUse = seats.data?.usedSeats ?? org.seatCount.used;
   const seatsPurchased = seats.data?.totalSeats ?? org.seatCount.total;
-  const seatCountValue =
-    org.requireSeats && seatsPurchased > 0
-      ? formatSeatCount(seatsInUse, seatsPurchased)
-      : formatNumber(seatsInUse, i18n.language);
+  const seatCountValue = seatCountReadout({
+    seatsEnforced: org.requireSeats,
+    used: seatsInUse,
+    total: seatsPurchased,
+  });
 
   const autoTopUpReadout = autoTopUp.data ? getAutoTopUpReadout(autoTopUp.data) : null;
 
@@ -178,12 +180,7 @@ export function OrganizationBillingScreen() {
     }
     return (
       <BillingCard>
-        <KvRow
-          label={t('organization.hub.plan')}
-          value={planName}
-          valueFace="text"
-          valueTone={planEnded ? 'danger' : 'default'}
-        />
+        <KvRow label={t('organization.hub.plan')} value={planName} valueFace="text" />
         <KvRow
           label={t('organization.billing.state')}
           value={subscriptionState.label}
@@ -243,25 +240,25 @@ export function OrganizationBillingScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('organization.billing.title')} />
+      <ScreenHeader title={screenTitle} backFallback={ORGANIZATION_HUB_PATH} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="px-6 gap-6 pt-4"
         showsVerticalScrollIndicator={false}
       >
         {/* A lapsed plan blocks every new session, so it is stated before the
-            numbers. Only a billing role reaches this screen, and iOS may not
-            link to the billing page, so its action is absent there and the
+            numbers. Only a billing role reaches this screen, and a surface the
+            storefront rule keeps from linking shows no action here: the
             manage-on-web block below carries the destination as text. */}
         {planEnded ? (
           <OrganizationPlanRefusal
             message={t('organization.hub.planEnded')}
             action={
-              planChange.kind === 'link'
+              changePlanOnBanner
                 ? {
                     label: changePlanLabel,
                     onPress: () => {
-                      void openExternalUrl(planChange.url, { label: changePlanLabel });
+                      void openExternalUrl(subscriptionsUrl, { label: changePlanLabel });
                     },
                   }
                 : undefined
@@ -278,7 +275,7 @@ export function OrganizationBillingScreen() {
           <SectionLabel>{t('organization.billing.seats')}</SectionLabel>
           <BillingCard>
             <KvRow
-              label={t('organization.hub.organizationSeats')}
+              label={t('organization.billing.seatsInUse')}
               value={seatCountValue}
               valueFace="numeric"
               last
@@ -323,20 +320,12 @@ export function OrganizationBillingScreen() {
           </View>
         )}
 
-        <View className="gap-2">
-          <SectionLabel>{t('organization.billing.manageOnWeb')}</SectionLabel>
-          <View className="gap-3 rounded-lg bg-secondary p-3">
-            <ExternalBillingLink url={subscriptionsUrl} label={changePlanLabel} />
-            <ExternalBillingLink
-              url={`${subscriptionsUrl}/seats`}
-              label={t('organization.billing.buySeats')}
-            />
-            <ExternalBillingLink
-              url={organizationBillingUrl(organizationId)}
-              label={getAutoTopUpLinkLabel(autoTopUp.data?.enabled)}
-            />
-          </View>
-        </View>
+        <BillingWebSettings
+          subscriptionsUrl={subscriptionsUrl}
+          planLabel={changePlanOnBanner ? null : changePlanLabel}
+          autoTopUpUrl={organizationBillingUrl(organizationId)}
+          autoTopUpLabel={getAutoTopUpLinkLabel(autoTopUp.data?.enabled)}
+        />
       </TabScreenScrollView>
     </View>
   );

@@ -80,4 +80,25 @@ describe('ProfilePickerScreen', () => {
 
     unmount();
   });
+
+  it('dismisses the expired sheet from the header Cancel without reporting a pick', async () => {
+    slot.get.mockReturnValue(undefined);
+    const { renderer, unmount } = await mount();
+
+    const [expiredSheet] = renderer.root.findAllByType('PickerSheet' as never);
+    if (!expiredSheet) {
+      throw new Error('the expired picker sheet did not render');
+    }
+    const props = expiredSheet.props as { onCancel?: () => void };
+    const cancel = props.onCancel;
+    expect(typeof cancel).toBe('function');
+    act(() => {
+      cancel?.();
+    });
+
+    expect(router.back).toHaveBeenCalledTimes(1);
+    expect(slot.clear).not.toHaveBeenCalled();
+
+    unmount();
+  });
 });

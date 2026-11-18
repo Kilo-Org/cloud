@@ -1,10 +1,17 @@
+/* eslint-disable max-lines -- the panel's three tab transports (claim, eval, navigate) share one lease contract; splitting them would hide which call holds the tab. */
 import { browser } from '#imports';
 import type { Browser } from 'wxt/browser';
 import {
   WORKFLOW_NAVIGATION_TIMEOUT_MS,
   WORKFLOW_PAGE_EVAL_TIMEOUT_MS,
 } from '@/src/shared/agent-workflows';
-import { EVAL_TAB_MESSAGE, isTabDebuggerResponse } from '@/src/shared/tab-debugger';
+import type { BrowserCaller } from '@/src/shared/browser-caller';
+import { releaseBrowserCaller } from './browser-tool-runtime';
+import {
+  CLAIM_TAB_MESSAGE,
+  EVAL_TAB_MESSAGE,
+  isTabDebuggerResponse,
+} from '@/src/shared/tab-debugger';
 import type { EvalTabResult } from '@/src/shared/tab-debugger';
 
 /**
@@ -27,13 +34,98 @@ const urlMatches = (left: string, right: string): boolean => {
 };
 
 /**
+ * Take the run's tab lease before its first command. A workflow run navigates
+ * to its start URL before it evaluates anything, so the lease has to be held
+ * from the start: a run started while another caller holds the tab must not
+ * rewrite the page and invalidate that holder's refs. The panel hands over its
+ * own conversation's lease in the same message, so the run does not queue
+ * behind the turn that is waiting for it.
+ *
+ * A stopped turn drops its claim at once instead of holding the queue for the
+ * whole wait window: the abort resolves this call false and releases the run
+ * caller, which drops the queued wait in the background. An `AbortSignal` does
+ * not cross `sendMessage`, so the cancellation travels as that release message.
+ */
+export const claimTab = async (
+  tabId: number,
+  caller: BrowserCaller,
+  { from, signal }: { readonly from?: BrowserCaller; readonly signal?: AbortSignal } = {}
+): Promise<boolean> => {
+  const { promise: cancelled, resolve: markCancelled } = Promise.withResolvers<false>();
+  const onAbort = (): void => {
+    markCancelled(false);
+  };
+  // Read through a call: the signal can also fire while the claim is queued in the background.
+  const stopped = (): boolean => signal !== undefined && signal.aborted;
+
+  // A stopped turn claims nothing: it must not take a lease it will never release.
+  if (stopped()) {
+    return false;
+  }
+
+  signal?.addEventListener('abort', onAbort, { once: true });
+
+  try {
+    const claim = (async (): Promise<boolean> => {
+      const response: unknown = await browser.runtime.sendMessage({
+        caller,
+        ...(from === undefined ? {} : { from }),
+        tabId,
+        type: CLAIM_TAB_MESSAGE,
+      });
+
+      if (!isTabDebuggerResponse(response) || !response.ok) {
+        return false;
+      }
+
+      return response.type === CLAIM_TAB_MESSAGE && response.granted;
+    })();
+
+    const granted = await Promise.race([claim, cancelled]);
+
+    if (!stopped()) {
+      return granted;
+    }
+
+    // The run is gone, so its lease is not needed.
+    // Release now, and again if the grant lands afterwards.
+    // A late grant belongs to a caller whose run never got to use the tab.
+    await releaseBrowserCaller(caller);
+    void (async (): Promise<void> => {
+      try {
+        if (await claim) {
+          await releaseBrowserCaller(caller);
+        }
+      } catch {
+        // The claim itself failed; the release above already covered the queued wait.
+      }
+    })();
+
+    return false;
+  } catch {
+    return false;
+  } finally {
+    signal?.removeEventListener('abort', onAbort);
+  }
+};
+
+/**
  * Evaluate workflow page code in a tab through the background transport.
  * Always sends WORKFLOW_PAGE_EVAL_TIMEOUT_MS (30 s); the default 5 s
  * timeout is too short for multi-action page scripts.
+ *
+ * The caller is required: every page of one run must use the run's own caller,
+ * because the tab lease is held by that caller across the run's pages. A fresh
+ * caller per page would queue behind the first page's lease forever.
  */
-export const evalInTab = async (tabId: number, code: string): Promise<EvalTabResult> => {
+export const evalInTab = async (
+  tabId: number,
+  code: string,
+  caller: BrowserCaller
+): Promise<EvalTabResult> => {
   try {
     const response: unknown = await browser.runtime.sendMessage({
+      caller,
       code,
       tabId,
       timeoutMs: WORKFLOW_PAGE_EVAL_TIMEOUT_MS,

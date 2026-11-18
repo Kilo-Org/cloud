@@ -4,7 +4,6 @@ import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organ
 import {
   addUserToOrganization,
   mutateOrganizationSettings,
-  updateOrganizationSettings,
   getOrganizationById,
 } from '@kilocode/web-shared/lib/organizations/organizations';
 import { KILO_ORGANIZATION_ID } from '@kilocode/web-shared/lib/organizations/constants';
@@ -200,11 +199,11 @@ describe('organizations settings trpc router', () => {
     it('should clear default_model if it is in the new model_deny_list', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      await updateOrganizationSettings(orgWithSettings.id, {
+      await mutateOrganizationSettings(orgWithSettings.id, () => ({
         default_model: 'openai/gpt-4o',
         model_deny_list: [],
         provider_allow_list: ['openai'],
-      });
+      }));
 
       const result = await caller.organizations.settings.updateAllowLists({
         organizationId: orgWithSettings.id,
@@ -220,11 +219,11 @@ describe('organizations settings trpc router', () => {
     it('should clear default_model if its provider is removed from provider_allow_list', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      await updateOrganizationSettings(orgWithSettings.id, {
+      await mutateOrganizationSettings(orgWithSettings.id, () => ({
         default_model: 'openai/gpt-4o',
         model_deny_list: [],
         provider_allow_list: ['openai'],
-      });
+      }));
       mockedGetProviderSlugsForModel.mockResolvedValue(new Set(['openai']));
 
       const result = await caller.organizations.settings.updateAllowLists({
@@ -311,10 +310,10 @@ describe('organizations settings trpc router', () => {
     it('should update partial settings', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      await updateOrganizationSettings(testOrganization.id, {
+      await mutateOrganizationSettings(testOrganization.id, () => ({
         model_deny_list: ['gpt-4', 'gpt-3.5-turbo'],
         provider_allow_list: ['openai'],
-      });
+      }));
 
       const result = await caller.organizations.settings.updateAllowLists({
         organizationId: testOrganization.id,
@@ -696,9 +695,9 @@ describe('organizations settings trpc router', () => {
     it('should update default model when it is not denied', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      await updateOrganizationSettings(orgWithSettings.id, {
+      await mutateOrganizationSettings(orgWithSettings.id, () => ({
         model_deny_list: ['claude-3'],
-      });
+      }));
 
       const result = await caller.organizations.settings.updateDefaultModel({
         organizationId: orgWithSettings.id,
@@ -745,9 +744,9 @@ describe('organizations settings trpc router', () => {
     it('rejects models outside the snapshot when no access policy is configured', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      await updateOrganizationSettings(testOrganization.id, {
+      await mutateOrganizationSettings(testOrganization.id, () => ({
         data_collection: 'allow',
-      });
+      }));
 
       await expect(
         caller.organizations.settings.updateDefaultModel({
@@ -1278,10 +1277,10 @@ describe('organizations settings trpc router', () => {
     it('should preserve other settings when enabling minimum balance alert', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      await updateOrganizationSettings(testOrganization.id, {
+      await mutateOrganizationSettings(testOrganization.id, () => ({
         model_deny_list: ['gpt-4'],
         data_collection: 'allow',
-      });
+      }));
 
       const result = await caller.organizations.settings.updateMinimumBalanceAlert({
         organizationId: testOrganization.id,
@@ -1299,12 +1298,12 @@ describe('organizations settings trpc router', () => {
     it('should preserve other settings when disabling minimum balance alert', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      await updateOrganizationSettings(testOrganization.id, {
+      await mutateOrganizationSettings(testOrganization.id, () => ({
         model_deny_list: ['gpt-4'],
         data_collection: 'allow',
         minimum_balance: 100,
         minimum_balance_alert_email: ['alert@example.com'],
-      });
+      }));
 
       const result = await caller.organizations.settings.updateMinimumBalanceAlert({
         organizationId: testOrganization.id,
@@ -1321,7 +1320,7 @@ describe('organizations settings trpc router', () => {
   describe('updateRecommendationsDigest procedure', () => {
     afterEach(async () => {
       // Reset settings between cases so each starts from a clean slate.
-      await updateOrganizationSettings(testOrganization.id, {});
+      await mutateOrganizationSettings(testOrganization.id, () => ({}));
     });
 
     it('should enable the recommendations digest (enterprise org)', async () => {
@@ -1386,11 +1385,11 @@ describe('organizations settings trpc router', () => {
     it('should preserve other settings when toggling the digest', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      await updateOrganizationSettings(testOrganization.id, {
+      await mutateOrganizationSettings(testOrganization.id, () => ({
         model_deny_list: ['gpt-4'],
         minimum_balance: 100,
         minimum_balance_alert_email: ['alert@example.com'],
-      });
+      }));
 
       const result = await caller.organizations.settings.updateRecommendationsDigest({
         organizationId: testOrganization.id,
@@ -1413,9 +1412,18 @@ describe('organizations settings trpc router', () => {
         .onConflictDoUpdate({ target: ai_gateway_config.id, set: { config } });
     }
 
+    async function setPlan(organizationId: string, plan: 'teams' | 'enterprise') {
+      await db.update(organizations).set({ plan }).where(eq(organizations.id, organizationId));
+    }
+
+    beforeEach(async () => {
+      await setPlan(testOrganization.id, 'enterprise');
+    });
+
     afterEach(async () => {
       await db.delete(ai_gateway_config).where(eq(ai_gateway_config.id, 1));
-      await updateOrganizationSettings(testOrganization.id, {});
+      await mutateOrganizationSettings(testOrganization.id, () => ({}));
+      await setPlan(testOrganization.id, 'teams');
     });
 
     it('reports whether gateway settings are available', async () => {
@@ -1427,7 +1435,6 @@ describe('organizations settings trpc router', () => {
       ).resolves.toEqual({
         available: true,
         disable_openrouter: false,
-        disable_vercel_ai_gateway: false,
         data_region: null,
       });
     });
@@ -1438,16 +1445,15 @@ describe('organizations settings trpc router', () => {
 
       const result = await caller.organizations.settings.updateGatewaySettings({
         organizationId: testOrganization.id,
-        disable_vercel_ai_gateway: true,
+        disable_openrouter: true,
         data_region: 'eu',
       });
 
-      expect(result.settings).toMatchObject({ disable_vercel_ai_gateway: true, data_region: 'eu' });
+      expect(result.settings).toMatchObject({ disable_openrouter: true, data_region: 'eu' });
       await expect(
         caller.organizations.settings.getGatewaySettings({ organizationId: testOrganization.id })
       ).resolves.toMatchObject({
-        disable_openrouter: false,
-        disable_vercel_ai_gateway: true,
+        disable_openrouter: true,
         data_region: 'eu',
       });
       const auditLogs = await db
@@ -1456,8 +1462,83 @@ describe('organizations settings trpc router', () => {
         .where(eq(organization_audit_logs.organization_id, testOrganization.id))
         .orderBy(organization_audit_logs.id);
       expect(auditLogs.map(log => log.message)).toContain(
-        'Updated gateway settings: Vercel AI Gateway disabled; Data region: European Union'
+        'Updated advanced policies: OpenRouter disabled; Inference region: European Union'
       );
+    });
+
+    it('reports gateway settings as unavailable for a non-enterprise organization', async () => {
+      await enableGatewaySettings([testOrganization.id]);
+      await setPlan(testOrganization.id, 'teams');
+      const caller = await createCallerForUser(member.id);
+
+      await expect(
+        caller.organizations.settings.getGatewaySettings({ organizationId: testOrganization.id })
+      ).resolves.toMatchObject({ available: false });
+    });
+
+    it('rejects gateway settings for a non-enterprise organization in the feature', async () => {
+      await enableGatewaySettings([testOrganization.id]);
+      await setPlan(testOrganization.id, 'teams');
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.organizations.settings.updateGatewaySettings({
+          organizationId: testOrganization.id,
+          disable_openrouter: true,
+        })
+      ).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+        message: 'Advanced policies are not available for this organization.',
+      });
+      expect((await getOrganizationById(testOrganization.id))?.settings.disable_openrouter).toBe(
+        undefined
+      );
+    });
+
+    it('reports gateway settings as unavailable for an enterprise organization outside the feature', async () => {
+      await enableGatewaySettings([orgWithSettings.id]);
+      const caller = await createCallerForUser(member.id);
+
+      await expect(
+        caller.organizations.settings.getGatewaySettings({ organizationId: testOrganization.id })
+      ).resolves.toMatchObject({ available: false });
+    });
+
+    it('reports model gateway availability while the feature is enabled', async () => {
+      await enableGatewaySettings([testOrganization.id]);
+      const caller = await createCallerForUser(member.id);
+
+      await expect(
+        caller.organizations.settings.getModelGatewayAvailability({
+          organizationId: testOrganization.id,
+          modelId: 'acme/unknown-model',
+        })
+      ).resolves.toEqual({ gateways: [] });
+    });
+
+    it('rejects model gateway availability while the feature is not enabled', async () => {
+      await enableGatewaySettings([orgWithSettings.id]);
+      const caller = await createCallerForUser(member.id);
+
+      await expect(
+        caller.organizations.settings.getModelGatewayAvailability({
+          organizationId: testOrganization.id,
+          modelId: 'acme/unknown-model',
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
+
+    it('rejects model gateway availability for a non-enterprise organization in the feature', async () => {
+      await enableGatewaySettings([testOrganization.id]);
+      await setPlan(testOrganization.id, 'teams');
+      const caller = await createCallerForUser(member.id);
+
+      await expect(
+        caller.organizations.settings.getModelGatewayAvailability({
+          organizationId: testOrganization.id,
+          modelId: 'acme/unknown-model',
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
     });
 
     it('rejects gateway settings while the feature is not enabled', async () => {
@@ -1543,7 +1624,7 @@ describe('organizations settings trpc router', () => {
     }
 
     async function resetSettings(organizationId: string, settings: object) {
-      await updateOrganizationSettings(organizationId, settings);
+      await mutateOrganizationSettings(organizationId, () => settings);
       await db
         .delete(organization_audit_logs)
         .where(eq(organization_audit_logs.organization_id, organizationId));
@@ -1651,6 +1732,103 @@ describe('organizations settings trpc router', () => {
         expect(log.action).toBe('organization.settings.change');
         expect(log.actor_id).toBe(billingManager.id);
         expect(log.actor_email).toBe('billing-settings@example.com');
+      }
+    });
+  });
+
+  describe('browser control', () => {
+    async function resetBrowserControl() {
+      await mutateOrganizationSettings(testOrganization.id, () => ({}));
+      await db
+        .delete(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, testOrganization.id));
+    }
+
+    it('saves the control mode and normalizes the allowed origins', async () => {
+      await resetBrowserControl();
+      const caller = await createCallerForUser(owner.id);
+
+      const result = await caller.organizations.settings.updateBrowserControl({
+        organizationId: testOrganization.id,
+        browserControl: 'playwright_only',
+        browserAllowedOrigins: [
+          'https://example.com/',
+          'https://EXAMPLE.com',
+          'http://localhost:3000',
+        ],
+      });
+
+      expect(result).toEqual({
+        browserControl: 'playwright_only',
+        browserAllowedOrigins: ['https://example.com', 'http://localhost:3000'],
+      });
+
+      const stored = await getOrganizationById(testOrganization.id);
+      expect(stored?.settings.browserControl).toBe('playwright_only');
+      expect(stored?.settings.browserAllowedOrigins).toEqual([
+        'https://example.com',
+        'http://localhost:3000',
+      ]);
+    });
+
+    it('rejects a stored origin with a path', async () => {
+      await resetBrowserControl();
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.organizations.settings.updateBrowserControl({
+          organizationId: testOrganization.id,
+          browserControl: 'allow',
+          browserAllowedOrigins: ['https://example.com/checkout'],
+        })
+      ).rejects.toThrow();
+    });
+
+    it('rejects changes by members and billing managers', async () => {
+      await resetBrowserControl();
+
+      for (const user of [member, billingManager]) {
+        const caller = await createCallerForUser(user.id);
+        await expect(
+          caller.organizations.settings.updateBrowserControl({
+            organizationId: testOrganization.id,
+            browserControl: 'off',
+            browserAllowedOrigins: [],
+          })
+        ).rejects.toThrow();
+      }
+
+      const stored = await getOrganizationById(testOrganization.id);
+      expect(stored?.settings.browserControl).toBeUndefined();
+    });
+
+    it('records one audit log entry per change', async () => {
+      await resetBrowserControl();
+      const caller = await createCallerForUser(owner.id);
+      const save = (browserControl: 'allow' | 'playwright_only' | 'off') =>
+        caller.organizations.settings.updateBrowserControl({
+          organizationId: testOrganization.id,
+          browserControl,
+          browserAllowedOrigins: ['https://example.com'],
+        });
+
+      await save('off');
+      await save('off');
+      await save('allow');
+
+      const auditLogs = await db
+        .select()
+        .from(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, testOrganization.id))
+        .orderBy(organization_audit_logs.created_at, organization_audit_logs.id);
+
+      expect(auditLogs.map(log => log.message)).toEqual([
+        'Browser control: off (allowed origins: https://example.com)',
+        'Browser control: allow (allowed origins: https://example.com)',
+      ]);
+      for (const log of auditLogs) {
+        expect(log.action).toBe('organization.settings.change');
+        expect(log.actor_id).toBe(owner.id);
       }
     });
   });

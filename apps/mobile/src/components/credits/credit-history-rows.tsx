@@ -109,6 +109,7 @@ export const PurchaseHistoryRow = memo(function PurchaseHistoryRow({
 
   const storeReceiptKey = lookup(STORE_RECEIPT_KEYS, channel);
   const storeReceiptNote = storeReceiptKey ? t(storeReceiptKey) : null;
+  const dateLabel = formatDate(parseTimestamp(entry.date), i18n.language);
   const expiryLabel = entry.expiryDate
     ? keepZoneWithDate(
         t('organization.creditActivity.expiresUtc', {
@@ -139,7 +140,11 @@ export const PurchaseHistoryRow = memo(function PurchaseHistoryRow({
             disabled={isOpeningReceipt}
             accessibilityRole="button"
             accessibilityState={{ busy: isOpeningReceipt }}
-            accessibilityLabel={t('credits.history.receiptA11y', { description: title })}
+            accessibilityLabel={t('credits.history.receiptA11y', {
+              description: title,
+              amount: creditAmountLabel(entry.amount_mUsd),
+              date: dateLabel,
+            })}
             onPress={() => {
               onOpenReceipt(entry.id);
             }}
@@ -153,9 +158,7 @@ export const PurchaseHistoryRow = memo(function PurchaseHistoryRow({
         )}
       </View>
       <View className="flex-row flex-wrap items-center justify-between gap-x-3 gap-y-1">
-        <Text className="text-xs text-muted-foreground">
-          {formatDate(parseTimestamp(entry.date), i18n.language)}
-        </Text>
+        <Text className="text-xs text-muted-foreground">{dateLabel}</Text>
         {/* Both lines, not either: a pack Play sold still expires a year after
             purchase, so its row keeps the expiry beside the store that holds
             the receipt. */}

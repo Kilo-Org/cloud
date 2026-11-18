@@ -1,27 +1,21 @@
 import { type Href, useRouter } from 'expo-router';
-import { FileText, Receipt, Wallet } from '@/components/ui/icons';
+import { FileText, Receipt } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { ConfigureRow } from '@/components/ui/configure-row';
-import { personalBillingUrl } from '@/lib/credits/add-credits-destination';
-import { canOpenExternalBilling } from '@/lib/credits/external-billing-link';
-import { openExternalUrl } from '@/lib/external-link';
 
 /**
  * The rows under the personal Credits section: the person's own credit history
- * and invoices, and the one web destination for everything the app does not
- * manage here.
+ * and invoices.
  *
- * The web billing page is a link on Android only. On iOS the same row stays as
- * plain text saying where billing is managed, with no chevron and no link:
- * pointing an iOS reader at a page that sells credits would be the external
- * purchase link review refuses. `canOpenExternalBilling` owns that split.
+ * The person's credit packs are bought in the app through the store, so this
+ * section has no web billing destination: a link out would offer the same
+ * purchase somewhere the store cannot vet it, which both stores refuse.
  */
 export function PersonalCreditsLinks() {
   const { t } = useTranslation();
   const router = useRouter();
-  const canLinkBilling = canOpenExternalBilling();
 
   return (
     <View className="gap-3">
@@ -41,26 +35,10 @@ export function PersonalCreditsLinks() {
         subtitle={t('profile.invoicesSubtitle')}
         hue="moss"
         className="rounded-lg bg-secondary px-3"
+        last
         onPress={() => {
           router.push('/(app)/(tabs)/(3_profile)/invoices' as Href);
         }}
-      />
-      <ConfigureRow
-        icon={Wallet}
-        title={t('profile.manageBilling')}
-        subtitle={canLinkBilling ? undefined : t('profile.manageBillingIosNote')}
-        hue="moss"
-        className="rounded-lg bg-secondary px-3"
-        last
-        onPress={
-          canLinkBilling
-            ? () => {
-                void openExternalUrl(personalBillingUrl(), {
-                  label: t('profile.manageBilling'),
-                });
-              }
-            : undefined
-        }
       />
     </View>
   );

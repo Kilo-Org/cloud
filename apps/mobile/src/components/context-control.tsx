@@ -2,7 +2,6 @@ import { useQuery } from '@tanstack/react-query';
 import { type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
-import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
@@ -16,8 +15,11 @@ import {
   ROW_TARGET_CLASS,
 } from '@/lib/a11y/tap-target';
 import { type OrgListEntry } from '@/lib/hooks/use-organization-queries';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
+import { isContextPickerPresented } from '@/lib/picker-presentation';
+import { PR_PICKER } from '@/lib/picker-routes';
 import { contextPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
@@ -37,13 +39,17 @@ export type ContextDisplayScope = { organizationId: string | null; isResolved: b
  * that differs from the active one (for example an explicit route scope). It
  * drives the check mark and the no-op comparison; a pick still changes the
  * active account, which is what every other surface reads.
+ *
+ * The opener admits a single push of the shared sheet per press burst, and none
+ * at all while a presented copy of it exists, so neither a double tap nor a
+ * repeated open stacks copies that each need their own Done.
  */
 export function useContextPicker(
   orgs: OrgListEntry[] | undefined,
   onSelectionChange?: (organizationId: string | null) => void,
   shownOrganizationId?: string | null
 ) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const { setOrganizationId, organizationId } = useOrganization();
   const shownId = shownOrganizationId !== undefined ? shownOrganizationId : organizationId;
@@ -79,6 +85,14 @@ export function useContextPicker(
       if (!orgs) {
         return;
       }
+      // While a copy of the sheet is presented, a second open must not write the
+      // slot again or push another copy — one Done then returns to the screen
+      // underneath instead of walking a stack of copies. The presented route
+      // owns that mark, so it holds for every surface that opens this picker,
+      // whichever navigator hosts the control.
+      if (isContextPickerPresented()) {
+        return;
+      }
       // The route reads its rows and its pick from the registry, so the
       // memberships and the selection identity the control shows are the ones
       // the sheet renders.
@@ -87,7 +101,7 @@ export function useContextPicker(
         currentIndex,
         onSelect: select,
       });
-      router.push('/(app)/context-picker' as Href);
+      pushOnce(PR_PICKER);
     },
   };
 }

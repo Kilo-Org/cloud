@@ -8,7 +8,26 @@ import {
   clearAcceptedBack,
   insideLeaveSettle,
   noteAcceptedBack,
+  sceneBelow,
+  type SceneState,
 } from './leave-settle';
+
+/**
+ * A navigator the reveal lookup can read: the routes of its own state, and the
+ * navigator above it.
+ */
+type NavigatorChain = Readonly<{
+  getState(): SceneState | undefined;
+  getParent(): NavigatorChain | undefined;
+}>;
+
+/**
+ * How many navigators a reveal-scene lookup may walk up.
+ *
+ * Real chains are two or three deep, so the bound only stops a navigator that
+ * reports a cycle instead of a root.
+ */
+const NAVIGATOR_CHAIN_LIMIT = 8;
 
 /**
  * A `router.back()` that dismisses the calling route at most once, and never
@@ -73,7 +92,29 @@ export function usePopOnce(): () => void {
     if (!navigation.isFocused() || insideLeaveSettle() || backAcceptedBy(routeId)) {
       return;
     }
-    armLeaveSettle();
+    // The scene this route reveals: the one below it in the stack, whose
+    // appearance transition carries this screen away. A route that is the only
+    // route of its own stack names the scene that stack was pushed over, so the
+    // walk continues into the parent navigator. A chain that names no scene
+    // below this route settles as before, so the leave keeps its protection.
+    const revealKey = () => {
+      let current: NavigatorChain | undefined = navigation;
+      // Bounded, and stopped on a parent that names itself: a navigator that
+      // reports a cycle instead of a root must not hang the dismissal.
+      for (let depth = 0; current !== undefined && depth < NAVIGATOR_CHAIN_LIMIT; depth += 1) {
+        const key = sceneBelow(current.getState());
+        if (key !== undefined) {
+          return key;
+        }
+        const parent = current.getParent();
+        if (parent === current) {
+          return undefined;
+        }
+        current = parent;
+      }
+      return undefined;
+    };
+    armLeaveSettle(revealKey());
     router.back();
   }, [navigation, routeId, router]);
 }

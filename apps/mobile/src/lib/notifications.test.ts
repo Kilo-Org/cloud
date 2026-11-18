@@ -72,11 +72,11 @@ const mocks = vi.hoisted(() => ({
   captureEvent: vi.fn(),
   scheduleNotificationAsync: vi.fn(),
   dismissNotificationAsync: vi.fn(),
+  getPresentedNotificationsAsync: vi.fn(),
   runNeedsInputInteraction: vi.fn(),
   requireOptionalNativeModule: vi.fn(),
   whenLanguagePreferenceLoaded: vi.fn(),
   languageResolved: 'en' as string,
-  openExternalUrl: vi.fn(),
 }));
 
 vi.mock('react-native', () => ({
@@ -105,6 +105,7 @@ vi.mock('expo-notifications', () => ({
   setNotificationHandler: mocks.setNotificationHandler,
   scheduleNotificationAsync: mocks.scheduleNotificationAsync,
   dismissNotificationAsync: mocks.dismissNotificationAsync,
+  getPresentedNotificationsAsync: mocks.getPresentedNotificationsAsync,
   addNotificationResponseReceivedListener: (listener: ResponseListener) => {
     mocks.listeners.add(listener);
     return { remove: () => mocks.listeners.delete(listener) };
@@ -221,7 +222,6 @@ vi.mock('@kilocode/notifications/schemas', async importOriginal => ({
     { id: 'needs-input', name: 'Needs input', importance: 'high', bypassDnd: true },
     { id: 'agent-progress', name: 'Agent progress', importance: 'default', bypassDnd: false },
     { id: 'agent-briefing', name: 'Agent brief', importance: 'default', bypassDnd: false },
-    { id: 'kiloclaw', name: 'KiloClaw activity', importance: 'default', bypassDnd: false },
     { id: 'balance', name: 'Balance alerts', importance: 'default', bypassDnd: false },
     { id: 'security', name: 'Security findings', importance: 'high', bypassDnd: false },
     {
@@ -236,20 +236,6 @@ vi.mock('@kilocode/notifications/schemas', async importOriginal => ({
 vi.mock('@/lib/analytics/posthog', () => ({
   captureEvent: mocks.captureEvent,
 }));
-
-// This suite needs the web origin a KiloClaw tap opens on. The global setup
-// stubs `@/lib/config` with no values at all.
-vi.mock('@/lib/config', () => {
-  const values: Record<string, unknown> = { WEB_BASE_URL: 'https://app.example.com' };
-  return new Proxy(values, {
-    get: (target, key) => target[String(key)],
-    has: () => true,
-  });
-});
-
-// The in-app browser: a KiloClaw tap opens it, and the suite asserts the URL
-// instead of mounting a browser.
-vi.mock('./external-link', () => ({ openExternalUrl: mocks.openExternalUrl }));
 
 // The headless session push only: the follow store and the row delete are
 // observed here; every other export keeps its real implementation.
@@ -328,6 +314,7 @@ beforeEach(() => {
   mocks.setNotificationChannelAsync.mockResolvedValue(undefined);
   mocks.scheduleNotificationAsync.mockResolvedValue(undefined);
   mocks.dismissNotificationAsync.mockResolvedValue(undefined);
+  mocks.getPresentedNotificationsAsync.mockResolvedValue([]);
   mocks.getNotificationChannelAsync.mockResolvedValue(null);
   mocks.deleteNotificationChannelAsync.mockResolvedValue(undefined);
   mocks.getPermissionsAsync.mockResolvedValue({ status: 'denied' });
@@ -347,45 +334,11 @@ beforeEach(() => {
   _setScopeStoreForTests({ getItemAsync: mocks.getItemAsync });
 });
 
-describe('KiloClaw notification payloads', () => {
-  const clawPayloads = [
-    { type: 'chat.message', sandboxId: 's1', conversationId: 'c1', messageId: 'm1' },
-    { type: 'instance-lifecycle', event: 'ready', sandboxId: 's1' },
-    { type: 'scheduled-action', event: 'scheduled_restart_notice', sandboxId: 's1' },
-  ] as const;
-
-  it.each(clawPayloads)('parses $type so a tap can open its web page', async data => {
+describe('a push kind this build does not declare', () => {
+  it('parses to null at the OS boundary, so its tap and banner stay untouched', async () => {
     const loaded = await loadNotifications();
 
-    expect(loaded.parseNotificationData(data)).toEqual(data);
-  });
-
-  it.each(clawPayloads)('keeps $type out of the foreground banner', async data => {
-    // The push was already delivered: a visible banner is the OS's job, and
-    // this handler only decides what a foregrounded app shows. KiloClaw has no
-    // in-app surface, and the push stays reachable from the history list.
-    const loaded = await loadNotifications();
-    loaded.setupNotificationHandler();
-    const handler = mocks.setNotificationHandler.mock.calls[0]?.[0] as {
-      handleNotification: (notification: {
-        request: { content: { data: unknown; title: string; body: string } };
-      }) => Promise<{
-        shouldShowBanner: boolean;
-        shouldShowList: boolean;
-        shouldSetBadge: boolean;
-        shouldPlaySound: boolean;
-      }>;
-    };
-    expect(
-      await handler.handleNotification({
-        request: { content: { data, title: 'Kilo', body: 'Activity update' } },
-      })
-    ).toMatchObject({
-      shouldShowBanner: false,
-      shouldShowList: false,
-      shouldSetBadge: false,
-      shouldPlaySound: false,
-    });
+    expect(loaded.parseNotificationData({ type: 'retired_kind', sandboxId: 's1' })).toBeNull();
   });
 });
 
@@ -516,14 +469,19 @@ describe('ensureAndroidNotificationChannels', () => {
     expect(mocks.deleteNotificationChannelAsync).toHaveBeenCalledTimes(5);
   });
 
-  it('swallows a per-channel failure and still creates the remaining channels', async () => {
+  it('retries a failed pass once and both concurrent callers then post', async () => {
     mocks.setNotificationChannelAsync.mockRejectedValueOnce(new Error('channel failed'));
     const { ensureAndroidNotificationChannels } = await loadNotifications();
 
-    await expect(ensureAndroidNotificationChannels()).resolves.toBeUndefined();
+    const first = ensureAndroidNotificationChannels();
+    const second = ensureAndroidNotificationChannels();
 
-    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(6);
-    expect(mocks.deleteNotificationChannelAsync).toHaveBeenCalledTimes(5);
+    await expect(Promise.all([first, second])).resolves.toEqual([true, true]);
+
+    // The failed pass wrote five channels; the retry wrote all six again.
+    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(12);
+    expect(mocks.deleteNotificationChannelAsync).toHaveBeenCalledTimes(10);
+    expect(mocks.captureException).toHaveBeenCalledTimes(1);
     expect(mocks.captureException).toHaveBeenCalledWith(expect.any(Error), {
       tags: {
         'error.subsystem': 'notifications',
@@ -537,8 +495,9 @@ describe('ensureAndroidNotificationChannels', () => {
     mocks.deleteNotificationChannelAsync.mockRejectedValueOnce(new Error('delete failed'));
     const { ensureAndroidNotificationChannels } = await loadNotifications();
 
-    await expect(ensureAndroidNotificationChannels()).resolves.toBeUndefined();
+    await expect(ensureAndroidNotificationChannels()).resolves.toBe(true);
 
+    // A failed delete never failed the pass, so there is no retry pass.
     expect(mocks.deleteNotificationChannelAsync).toHaveBeenCalledTimes(5);
     expect(mocks.captureException).toHaveBeenCalledWith(expect.any(Error), {
       tags: {
@@ -549,31 +508,25 @@ describe('ensureAndroidNotificationChannels', () => {
     });
   });
 
-  it('retries every channel after a pass that failed one write', async () => {
-    mocks.setNotificationChannelAsync.mockRejectedValueOnce(new Error('channel failed'));
+  it('resolves false and drops the memo when the write fails in both passes', async () => {
+    mocks.setNotificationChannelAsync.mockImplementation((id: string) =>
+      id === 'needs-input' ? Promise.reject(new Error('channel failed')) : Promise.resolve()
+    );
     const { ensureAndroidNotificationChannels } = await loadNotifications();
 
-    await ensureAndroidNotificationChannels();
-    expect(mocks.captureException).toHaveBeenCalledTimes(1);
-    mocks.setNotificationChannelAsync.mockClear();
+    const first = ensureAndroidNotificationChannels();
+    const second = ensureAndroidNotificationChannels();
 
-    // A pass that failed a required channel is not cached: the next start
-    // retries before it posts, and a channel the framework never created would
-    // drop that post.
-    await ensureAndroidNotificationChannels();
-    expect(mocks.setNotificationChannelAsync.mock.calls.map(call => call[0])).toEqual([
-      'needs-input',
-      'agent-progress',
-      'agent-briefing',
-      'balance',
-      'security',
-      'followed-sessions-lock-screen',
-    ]);
+    await expect(Promise.all([first, second])).resolves.toEqual([false, false]);
+    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(12);
+    expect(mocks.captureException).toHaveBeenCalledTimes(2);
 
-    // A fully successful pass is cached again.
+    // The memo is dropped, so the next caller runs a fresh pass once the channel
+    // write works again.
     mocks.setNotificationChannelAsync.mockClear();
-    await ensureAndroidNotificationChannels();
-    expect(mocks.setNotificationChannelAsync).not.toHaveBeenCalled();
+    mocks.setNotificationChannelAsync.mockResolvedValue(undefined);
+    await expect(ensureAndroidNotificationChannels()).resolves.toBe(true);
+    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(6);
   });
 
   it('keeps a fully successful pass cached', async () => {
@@ -833,6 +786,7 @@ describe.each(['cold', 'warm'])('%s notification responses', mode => {
 
   it.each([
     null,
+    { type: 'retired_kind', sandboxId: 's1' },
     { type: 'security_finding', scope: 'personal' },
     { type: 'security_finding', scope: [], findingId: 'finding-invalid' },
     {
@@ -858,42 +812,6 @@ describe.each(['cold', 'warm'])('%s notification responses', mode => {
 
     expect(pending.getPendingDeepLinkSnapshot()).toBe(existing);
     expect(mocks.lastResponse).toBe(mode === 'cold' ? null : response);
-    subscription.remove();
-  });
-});
-
-describe.each(['cold', 'warm'])('%s KiloClaw notification responses', mode => {
-  it.each([
-    [
-      { type: 'chat.message', sandboxId: 's1', conversationId: 'c1', messageId: 'm1' },
-      'https://app.example.com/claw/chat/c1',
-    ],
-    [
-      { type: 'instance-lifecycle', event: 'ready', sandboxId: 's1' },
-      'https://app.example.com/claw',
-    ],
-    [
-      { type: 'scheduled-action', event: 'scheduled_restart_notice', sandboxId: 's1' },
-      'https://app.example.com/claw',
-    ],
-  ] as const)('opens $data.type on the web instead of stashing a route', async (data, url) => {
-    const { setupNotificationResponseHandler, checkInitialNotification, pending } =
-      await loadNotifications();
-    const response = { notification: { request: { content: { data } } } };
-    mocks.lastResponse = response;
-    const subscription = setupNotificationResponseHandler();
-
-    if (mode === 'cold') {
-      checkInitialNotification();
-    } else {
-      deliverWarmResponse(response);
-    }
-
-    await vi.waitFor(() => {
-      expect(mocks.openExternalUrl).toHaveBeenCalledWith(url, { retryOnError: true });
-    });
-    expect(pending.getPendingDeepLinkSnapshot()).toBeNull();
-    expect(mocks.clearLastNotificationResponse).toHaveBeenCalled();
     subscription.remove();
   });
 });
@@ -1395,6 +1313,33 @@ const needsInputPush = {
   cliSessionId: 'session-1',
   category: 'attention',
 };
+
+// Kinds this app retired. A server that has not stopped sending them still
+// delivers them, and their banner is drawn from the server-supplied title and
+// body, so a foreground delivery would draw one whose tap resolves no route.
+const RETIRED_PUSHES: [string, Record<string, unknown>][] = [
+  [
+    'chat.message',
+    { type: 'chat.message', sandboxId: 'sb1', conversationId: 'conv1', messageId: 'm1' },
+  ],
+  ['instance-lifecycle', { type: 'instance-lifecycle', event: 'ready', sandboxId: 'sb1' }],
+  [
+    'scheduled-action',
+    { type: 'scheduled-action', event: 'scheduled_restart_notice', sandboxId: 'sb1' },
+  ],
+];
+
+describe('a push kind this app retired', () => {
+  it.each(RETIRED_PUSHES)('suppresses the %s banner', async (_kind, data) => {
+    const handleNotification = await loadForegroundHandler();
+
+    await expect(
+      handleNotification({
+        request: { content: { title: 'KiloClaw', body: 'Your instance is ready', data } },
+      })
+    ).resolves.toEqual(SUPPRESSED_BEHAVIOR);
+  });
+});
 
 describe('per-Focus agent-progress suppression', () => {
   it('suppresses an agent-progress push on iOS when the active Focus excludes it', async () => {
@@ -2220,7 +2165,9 @@ describe('setupNotificationBackgroundHandler', () => {
     await executor({
       data: {
         notification: null,
-        data: { dataString: JSON.stringify({ type: 'chat.message' }) },
+        data: {
+          dataString: JSON.stringify({ type: 'cloud_agent_session', cliSessionId: 'ses_1' }),
+        },
       },
       error: null,
       executionInfo: { eventId: 'e2', taskName: 'active-agents-glanceable-background-task' },
@@ -2313,7 +2260,9 @@ describe('runBackgroundNotificationTask', () => {
     const result = await loaded.runBackgroundNotificationTask({
       data: {
         notification: null,
-        data: { dataString: JSON.stringify({ type: 'chat.message' }) },
+        data: {
+          dataString: JSON.stringify({ type: 'cloud_agent_session', cliSessionId: 'ses_1' }),
+        },
       },
       error: null,
       executionInfo: {
@@ -2345,7 +2294,9 @@ describe('runBackgroundNotificationTask', () => {
     await loaded.runBackgroundNotificationTask({
       data: {
         notification: null,
-        data: { dataString: JSON.stringify({ type: 'chat.message' }) },
+        data: {
+          dataString: JSON.stringify({ type: 'cloud_agent_session', cliSessionId: 'ses_1' }),
+        },
       },
       error: null,
       executionInfo: {
@@ -2372,7 +2323,9 @@ describe('runBackgroundNotificationTask', () => {
     await loaded.runBackgroundNotificationTask({
       data: {
         notification: null,
-        data: { dataString: JSON.stringify({ type: 'chat.message' }) },
+        data: {
+          dataString: JSON.stringify({ type: 'cloud_agent_session', cliSessionId: 'ses_1' }),
+        },
       },
       error: null,
       executionInfo: {
@@ -2539,6 +2492,7 @@ describe('foreground attention-push suppression', () => {
     // Imported through the same resetModules cycle as './notifications', so the
     // posted marker this test reads is the one the handler reads.
     const needsInput = await import('./needs-input-notification');
+    const presentation = await import('./needs-input-presentation');
     loaded.setupNotificationHandler();
     const registration = mocks.setNotificationHandler.mock.calls[0]?.[0] as {
       handleNotification: (notification: {
@@ -2548,7 +2502,7 @@ describe('foreground attention-push suppression', () => {
         };
       }) => Promise<{ shouldShowBanner: boolean; shouldSetBadge: boolean }>;
     };
-    return { loaded, needsInput, registration };
+    return { loaded, needsInput, presentation, registration };
   }
 
   const attentionPush = {
@@ -2569,13 +2523,17 @@ describe('foreground attention-push suppression', () => {
   } as const;
 
   it('suppresses the server attention push while the app notification for that session is posted', async () => {
-    const { needsInput, registration } = await loadHandler();
+    const { needsInput, presentation, registration } = await loadHandler();
 
     await needsInput.applyNeedsInputNotifications({
       publish: [postedRow],
       dismiss: [],
       updates: [],
     });
+    // The marker is only a fast path; the OS says the notification is on screen.
+    mocks.getPresentedNotificationsAsync.mockResolvedValue([
+      { request: { identifier: presentation.notificationIdentifierForSession('ses_1') } },
+    ]);
 
     const behavior = await registration.handleNotification({
       request: { identifier: 'expo-push-remote-1', content: { data: attentionPush } },
@@ -2584,8 +2542,30 @@ describe('foreground attention-push suppression', () => {
     expect(behavior.shouldSetBadge).toBe(false);
   });
 
-  it('shows the app-owned needs-input notification even while its session is posted', async () => {
+  it('shows a foreground attention push whose app-owned notification the user dismissed', async () => {
     const { needsInput, registration } = await loadHandler();
+
+    await needsInput.applyNeedsInputNotifications({
+      publish: [postedRow],
+      dismiss: [],
+      updates: [],
+    });
+    // The user swiped the notification away: the marker is stale and must not
+    // suppress the only presentation the raise has left.
+    mocks.getPresentedNotificationsAsync.mockResolvedValue([]);
+
+    const behavior = await registration.handleNotification({
+      request: {
+        identifier: 'expo-push-remote-1',
+        content: { title: 'Needs input', body: 'Session ses_1 needs you', data: attentionPush },
+      },
+    });
+    expect(behavior.shouldShowBanner).toBe(true);
+    expect(mocks.getPresentedNotificationsAsync).toHaveBeenCalled();
+  });
+
+  it('shows the app-owned needs-input notification even while its session is posted', async () => {
+    const { needsInput, presentation, registration } = await loadHandler();
 
     await needsInput.applyNeedsInputNotifications({
       publish: [postedRow],
@@ -2597,7 +2577,7 @@ describe('foreground attention-push suppression', () => {
     // suppressing it would drop the only notification the app presents.
     const behavior = await registration.handleNotification({
       request: {
-        identifier: needsInput.notificationIdentifierForSession('ses_1'),
+        identifier: presentation.notificationIdentifierForSession('ses_1'),
         content: { title: 'Needs input', body: 'Session ses_1 needs you', data: attentionPush },
       },
     });
@@ -2631,14 +2611,14 @@ describe('foreground attention-push suppression', () => {
   });
 
   it('shows the server attention push again after the raise is answered headless', async () => {
-    const { needsInput, registration } = await loadHandler();
+    const { needsInput, presentation, registration } = await loadHandler();
     await needsInput.applyNeedsInputNotifications({
       publish: [postedRow],
       dismiss: [],
       updates: [],
     });
 
-    needsInput.clearPostedNeedsInputNotification('ses_1');
+    presentation.clearPostedNeedsInputNotification('ses_1');
 
     const behavior = await registration.handleNotification({
       request: {

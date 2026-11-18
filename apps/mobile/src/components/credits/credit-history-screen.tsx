@@ -22,19 +22,22 @@ import {
   useCreditPurchaseHistory,
   usePersonalCreditBlocks,
 } from '@/lib/hooks/use-personal-credits';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { trpcErrorVariant } from '@/lib/trpc-error';
 import { useTRPC } from '@/lib/trpc';
 
 // FlashList takes `contentContainerStyle` (no className), so the FlatList's
-// `grow gap-3 px-6 pt-4` content classes map to their pixel values. FlashList v2
-// positions every cell absolutely and has no `gap` handling (2.3.2 ships zero
-// `gap` references), so the 12px inter-row gap rides on the measured item
-// separator instead of `contentContainerStyle.gap`.
+// `grow gap-3 px-6 pt-4` content classes map to their pixel values: NativeWind's
+// native rem is 14, so px-6 is 21 dp and pt-4 is 14 dp (24/16 is the web rem and
+// sits 3 dp inside the skeleton it replaces). FlashList v2 positions every cell
+// absolutely and has no `gap` handling (2.3.2 ships zero `gap` references), so
+// the 12px inter-row gap rides on the measured item separator instead of
+// `contentContainerStyle.gap`.
 const listStyle = { flex: 1 } satisfies ViewStyle;
 const listContentContainerStyle = {
   flexGrow: 1,
-  paddingHorizontal: 24,
-  paddingTop: 16,
+  paddingHorizontal: 21,
+  paddingTop: 14,
 } satisfies ViewStyle;
 
 const HistoryRowSeparator = () => <View className="h-3" />;
@@ -240,7 +243,7 @@ export function PersonalCreditHistoryScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('common.creditHistory')} />
+      <ScreenHeader title={t('common.creditHistory')} backFallback={PROFILE_TAB_HREF} />
       {body}
     </View>
   );

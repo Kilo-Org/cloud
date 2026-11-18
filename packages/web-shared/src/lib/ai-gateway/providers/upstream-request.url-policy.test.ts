@@ -136,20 +136,27 @@ describe('upstreamRequest upstream URL policy', () => {
       expect(body.error).toContain('could not resolve the upstream provider host');
     });
 
-    it('releases the request when the client disconnects during a stalled DNS lookup', async () => {
-      lookupMock.mockReturnValue(new Promise(() => {}));
-      const fetchMock = mockFetch();
-      const client = new AbortController();
+    it.each([
+      ['an AbortError', () => new DOMException('client went away', 'AbortError')],
+      // Next.js aborts the request signal with this error when the client goes away.
+      ['a ResponseAborted error', () => Object.assign(new Error(), { name: 'ResponseAborted' })],
+    ])(
+      'releases the request when the client disconnects with %s during a stalled DNS lookup',
+      async (_label, reason) => {
+        lookupMock.mockReturnValue(new Promise(() => {}));
+        const fetchMock = mockFetch();
+        const client = new AbortController();
 
-      const pending = send(directProvider('https://llm.example.com/v1'), client.signal);
-      client.abort(new DOMException('client went away', 'AbortError'));
-      const result = await pending;
+        const pending = send(directProvider('https://llm.example.com/v1'), client.signal);
+        client.abort(reason());
+        const result = await pending;
 
-      expect(fetchMock).not.toHaveBeenCalled();
-      expect(result.type).toBe('error');
-      expect(result.response.status).toBe(499);
-      expect((await result.response.json()).error_type).toBe('client_disconnect');
-    });
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(result.type).toBe('error');
+        expect(result.response.status).toBe(499);
+        expect((await result.response.json()).error_type).toBe('client_disconnect');
+      }
+    );
 
     it('rejects a secure proxy request whose upstream URL is not public', async () => {
       const fetchMock = mockFetch();

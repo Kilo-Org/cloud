@@ -8,19 +8,20 @@ import {
   getDirectByokCatalogModelIds,
   getDirectByokModelsForUser,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
-import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/organizations/organization-models';
+import { organizationMemberCatalog, usableCustomRouters } from './organization-catalog';
 import {
   addDirectByokCatalogAvailability,
   addUserByokAvailability,
   getUserByokProviderIds,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { tagOpenAiChatGptByokModels } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
+import { tagClaudeBillingByokModels } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/byok-models';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import type { ModelStatsLoadClient } from '@kilocode/web-shared/lib/model-stats/model-stats-cache';
 import {
   addAutoRoutingModels,
   addCustomRouterModels,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-models';
-import { listUsableCustomRouters } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
 import { appendLocalFakeDeterministicCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
 import { requestCountryCode } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
 import {
@@ -28,24 +29,12 @@ import {
   publishEnkryptModels,
 } from '@kilocode/web-shared/lib/model-stats/enkrypt';
 
-async function modelResponse(response: OpenRouterModelsResponse) {
-  const snapshot = await getEnkryptBenchmarks({ fromDb: readDb });
+async function modelResponse(response: OpenRouterModelsResponse, fromDb: ModelStatsLoadClient) {
+  const snapshot = await getEnkryptBenchmarks({ fromDb });
   return NextResponse.json({
     ...response,
     data: publishEnkryptModels(response.data, snapshot),
   });
-}
-
-async function usableCustomRouters(params: { userId: string; organizationId: string | null }) {
-  try {
-    return await listUsableCustomRouters(params);
-  } catch (error) {
-    captureException(error, {
-      tags: { endpoint: 'openrouter/models' },
-      extra: { action: 'listing_custom_routers', ...params },
-    });
-    return [];
-  }
 }
 
 async function tryGetUserFromAuth() {
@@ -61,6 +50,58 @@ async function tryGetUserFromAuth() {
 }
 
 /**
+ * The personal catalog for a signed-in caller: the enhanced model list with the
+ * auto-routing entries, that caller's BYOK availability and their usable custom
+ * routers, and the Enkrypt benchmarks folded in.
+ *
+ * Both transports answer from here — this module's REST handler and the
+ * `models.selectorList` query — so a page gets the same list whether it reads
+ * the catalog over `/api/openrouter/models` or over tRPC. The app shell needs
+ * that: its session cookie only covers `/app-shell`, so its pages read the list
+ * through `/app-shell/api/trpc`.
+ */
+export async function getPersonalModelList(params: {
+  user: { id: string };
+  countryCode: string | null;
+  fromDb?: ModelStatsLoadClient;
+  endpoint?: string;
+}): Promise<OpenRouterModelsResponse> {
+  const { user, countryCode, fromDb = readDb, endpoint = 'openrouter/models' } = params;
+  const data = await getEnhancedOpenRouterModels({ countryCode, fromDb });
+  if (!Array.isArray(data.data)) {
+    return data;
+  }
+  const models = await addAutoRoutingModels(data.data);
+
+  const [byokModels, enabledByokProviderIds, directByokCatalogModelIds, customRouters] =
+    await Promise.all([
+      getDirectByokModelsForUser(user.id),
+      getUserByokProviderIds(readDb, user.id),
+      getDirectByokCatalogModelIds({ type: 'user', id: user.id }),
+      usableCustomRouters({ userId: user.id, organizationId: null, endpoint }),
+    ]);
+  const modelsWithByokAvailability = await tagClaudeBillingByokModels(
+    { kind: 'personal', kiloUserId: user.id },
+    await tagOpenAiChatGptByokModels(
+      { kiloUserId: user.id, organizationId: null },
+      addDirectByokCatalogAvailability(
+        await addUserByokAvailability(models, enabledByokProviderIds),
+        directByokCatalogModelIds
+      )
+    )
+  );
+  const snapshot = await getEnkryptBenchmarks({ fromDb });
+  return {
+    data: publishEnkryptModels(
+      appendLocalFakeDeterministicCatalogModels(
+        addCustomRouterModels(modelsWithByokAvailability.concat(byokModels), customRouters)
+      ),
+      snapshot
+    ),
+  };
+}
+
+/**
  * Test using:
  * curl -vvv 'http://localhost:3000/api/openrouter/models'
  */
@@ -70,56 +111,39 @@ export async function handleModelsRequest(
   const auth = await tryGetUserFromAuth();
   const countryCode = requestCountryCode(request.headers);
   try {
-    const result =
-      auth?.organizationId && auth.user
-        ? await getAvailableModelsForOrganization(
-            auth.organizationId,
-            { type: 'member', kiloUserId: auth.user.id },
-            'member',
-            { fromDb: readDb, countryCode }
-          )
-        : null;
-    if (result && auth.user && auth.organizationId) {
-      const [models, customRouters] = await Promise.all([
-        addAutoRoutingModels(result.data),
-        usableCustomRouters({ userId: auth.user.id, organizationId: auth.organizationId }),
-      ]);
-      return await modelResponse({
-        ...result,
-        data: addCustomRouterModels(models, customRouters),
+    if (auth?.organizationId && auth.user) {
+      const catalog = await organizationMemberCatalog({
+        organizationId: auth.organizationId,
+        kiloUserId: auth.user.id,
+        countryCode,
+        endpoint: 'openrouter/models',
       });
+      if (catalog) {
+        return await modelResponse(catalog, readDb);
+      }
     }
 
-    const data = await getEnhancedOpenRouterModels({ countryCode, fromDb: readDb });
-    if (!Array.isArray(data.data)) {
-      return NextResponse.json(data);
-    }
-    const models = await addAutoRoutingModels(data.data);
     if (!auth?.user) {
-      return await modelResponse({
-        data: appendLocalFakeDeterministicCatalogModels(models),
-      });
+      const data = await getEnhancedOpenRouterModels({ countryCode, fromDb: readDb });
+      if (!Array.isArray(data.data)) {
+        return NextResponse.json(data);
+      }
+      const models = await addAutoRoutingModels(data.data);
+      return await modelResponse(
+        {
+          data: appendLocalFakeDeterministicCatalogModels(models),
+        },
+        readDb
+      );
     }
 
-    const [byokModels, enabledByokProviderIds, directByokCatalogModelIds, customRouters] =
-      await Promise.all([
-        getDirectByokModelsForUser(auth.user.id),
-        getUserByokProviderIds(readDb, auth.user.id),
-        getDirectByokCatalogModelIds({ type: 'user', id: auth.user.id }),
-        usableCustomRouters({ userId: auth.user.id, organizationId: null }),
-      ]);
-    const modelsWithByokAvailability = await tagOpenAiChatGptByokModels(
-      { kiloUserId: auth.user.id, organizationId: null },
-      addDirectByokCatalogAvailability(
-        await addUserByokAvailability(models, enabledByokProviderIds),
-        directByokCatalogModelIds
-      )
-    );
-    return await modelResponse({
-      data: appendLocalFakeDeterministicCatalogModels(
-        addCustomRouterModels(modelsWithByokAvailability.concat(byokModels), customRouters)
-      ),
+    const personal = await getPersonalModelList({
+      user: auth.user,
+      countryCode,
+      fromDb: readDb,
+      endpoint: 'openrouter/models',
     });
+    return NextResponse.json(personal);
   } catch (error) {
     captureException(error, {
       tags: { endpoint: 'openrouter/models' },

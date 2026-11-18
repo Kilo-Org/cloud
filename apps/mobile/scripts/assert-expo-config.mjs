@@ -14,18 +14,22 @@ import { SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS } from '../src/lib/android-noti
 const BUNDLE_IDENTIFIER = 'com.kilocode.kiloapp';
 const ANDROID_PACKAGE = 'com.kilocode.kiloapp';
 const SCHEME = 'kiloapp';
-const ASSOCIATED_DOMAIN = 'applinks:app.kilo.ai';
+// The one host this app claims on the web. The universal-link claim, the
+// passkey relying-party claim and the Expo Head origin below derive from it, so
+// the three forms cannot name different hosts.
+const APP_HOST = 'app.kilo.ai';
+const ASSOCIATED_DOMAIN = `applinks:${APP_HOST}`;
 // The passkey relying-party claim on iOS. The claim is split by platform: iOS
 // carries its half here (the Associated Domains entitlement the platform
 // authenticator reads), Android carries its half in the served Digital Asset
 // Links file, whose `delegate_permission/common.get_login_creds` relation
 // apps/web/src/lib/app-site-association.test.ts pins. Both halves name the one
 // relying-party host, app.kilo.ai.
-const PASSKEY_ASSOCIATED_DOMAIN = 'webcredentials:app.kilo.ai';
+const PASSKEY_ASSOCIATED_DOMAIN = `webcredentials:${APP_HOST}`;
 // Expo Head's handoff origin (extra.router.headOrigin). It is the origin of
 // ASSOCIATED_DOMAIN above: the session link the app advertises and the
 // universal link the app claims have to be the same URL.
-const HEAD_ORIGIN = 'https://app.kilo.ai';
+const HEAD_ORIGIN = `https://${APP_HOST}`;
 // Time Sensitive Notifications capability: the iOS half of the needs-input
 // raise's `interruptionLevel: 'timeSensitive'` break-through contract.
 const TIME_SENSITIVE_ENTITLEMENT = 'com.apple.developer.usernotifications.time-sensitive';
@@ -155,6 +159,10 @@ function check(condition, message) {
   }
 }
 
+/** True when `actual` holds exactly the members of `expected`, in any order. */
+const sameMembers = (actual, expected) =>
+  actual.length === expected.length && expected.every(value => actual.includes(value));
+
 check(
   config.ios?.bundleIdentifier === BUNDLE_IDENTIFIER,
   `ios.bundleIdentifier must be "${BUNDLE_IDENTIFIER}"`
@@ -187,9 +195,7 @@ check(
 // browser request falls through to the manifest response instead.
 const PLATFORMS = ['ios', 'android'];
 check(
-  Array.isArray(config.platforms) &&
-    config.platforms.length === PLATFORMS.length &&
-    PLATFORMS.every(platform => config.platforms.includes(platform)),
+  Array.isArray(config.platforms) && sameMembers(config.platforms, PLATFORMS),
   `platforms must be exactly [${PLATFORMS.join(', ')}] (web is not a product target; it bundles an unsupported platform and logs a Metro resolve error into the app console)`
 );
 
@@ -221,11 +227,8 @@ check(
 );
 
 const blockedPermissions = config.android?.blockedPermissions ?? [];
-const blockedPermissionsMatch =
-  blockedPermissions.length === BLOCKED_PERMISSIONS.length &&
-  BLOCKED_PERMISSIONS.every(permission => blockedPermissions.includes(permission));
 check(
-  blockedPermissionsMatch,
+  sameMembers(blockedPermissions, BLOCKED_PERMISSIONS),
   `android.blockedPermissions must equal exactly [${BLOCKED_PERMISSIONS.join(', ')}]`
 );
 
@@ -253,11 +256,14 @@ check(
   'ios.infoPlist.CFBundleLocalizations must list the supported language tags'
 );
 // Exact tags, not a count: swapping one tag for another keeps the length equal
-// while dropping one language's prompts and checking another's.
+// while dropping one language's prompts and checking another's. The two filters
+// only name the offending tags in the failure message. The comparison itself
+// runs on the distinct tags, because a repeat names no extra language: the
+// assertion asks which languages are named, not how often.
 const unlocalizedTags = localeTags.filter(tag => !localizations.includes(tag));
 const unlistedTags = localizations.filter(tag => !localeTags.includes(tag));
 check(
-  unlocalizedTags.length === 0 && unlistedTags.length === 0,
+  sameMembers([...new Set(localizations)], localeTags),
   `ios.infoPlist.CFBundleLocalizations must name exactly the top-level locales tags (without a CFBundleLocalization: [${unlocalizedTags.join(', ')}]; without a locales entry: [${unlistedTags.join(', ')}])`
 );
 for (const tag of localizations) {
@@ -393,9 +399,10 @@ check(
 const extra = config.extra ?? {};
 for (const key of Object.keys(ENV_KEYS)) {
   const value = extra[key];
-  if (value === undefined || value === null || value === '') {
-    failures.push(`extra.${key} must be present and non-empty`);
-  }
+  check(
+    value !== undefined && value !== null && value !== '',
+    `extra.${key} must be present and non-empty`
+  );
 }
 
 // Admission contract: the server issues native credentials only to an attested

@@ -1,6 +1,7 @@
 import {
   createBearerCallerForUser,
   createCallerForUser,
+  createNativeCallerForUser,
   createSessionCallerForUser,
 } from '@/routers/test-utils';
 import { db } from '@kilocode/web-shared/lib/drizzle';
@@ -35,8 +36,8 @@ import { performGdprRemoval } from '@/lib/user/gdpr-removal';
 import { createAccountLinkingSession } from '@/lib/account-linking-session';
 import { AccountLinkingProviders } from '@/lib/auth/provider-metadata';
 import { assertUserCanBeSoftDeleted, SoftDeletePreconditionError } from '@/lib/user';
+import { mintPasskeyManagementAuthorization } from '@/lib/auth/passkey-management';
 import { refreshGlanceableScope } from '@kilocode/web-shared/lib/notifications-worker-client';
-import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 
 jest.mock('@kilocode/web-shared/lib/email', () => {
   const actual = jest.requireActual('@kilocode/web-shared/lib/email');
@@ -57,10 +58,6 @@ jest.mock('@/lib/user/gdpr-removal', () => ({
 jest.mock('@/lib/account-linking-session', () => ({
   ...jest.requireActual('@/lib/account-linking-session'),
   createAccountLinkingSession: jest.fn(),
-}));
-
-jest.mock('@kilocode/web-shared/lib/auth/claude/feature-flag.server', () => ({
-  isClaudePlatformOAuthEnabled: jest.fn(async () => true),
 }));
 
 jest.mock('@/lib/user', () => {
@@ -162,20 +159,6 @@ describe('user router - linkAuthProvider', () => {
       code: 'BAD_REQUEST',
     });
     expect(mockCreateLinkingSession).not.toHaveBeenCalled();
-  });
-
-  it('refuses a Claude link while Sign in with Claude is not launched', async () => {
-    const user = await insertTestUser();
-    const caller = await createCallerForUser(user.id);
-    const mockCreateLinkingSession = jest.mocked(createAccountLinkingSession);
-    jest.mocked(isClaudePlatformOAuthEnabled).mockResolvedValueOnce(false);
-    mockCreateLinkingSession.mockClear();
-
-    await expect(caller.user.linkAuthProvider({ provider: 'claude' })).rejects.toMatchObject({
-      code: 'BAD_REQUEST',
-    });
-    expect(mockCreateLinkingSession).not.toHaveBeenCalled();
-    expect(isClaudePlatformOAuthEnabled).toHaveBeenCalledWith(user.google_user_email);
   });
 });
 
@@ -2282,6 +2265,34 @@ describe('user router - device sessions', () => {
     ).rejects.toThrow();
   });
 
+  it('lists and revokes a session whose id is not a versioned UUID', async () => {
+    // A `uuid` column accepts any 8-4-4-4-12 hex value; this one carries a
+    // version-0 nibble, so the version-strict RFC validator would refuse it.
+    const versionlessSessionId = '1f0d3a52-6a0b-0c4e-0a51-0d1e2b3c4a05';
+    await db.insert(device_sessions).values({
+      id: versionlessSessionId,
+      kilo_user_id: owner.id,
+      user_agent: 'Kilo-Code/1.2.3 (ios)',
+      last_seen_at: '2026-04-25 10:00:00+00',
+    });
+
+    const caller = await createCallerForUser(owner.id);
+
+    const listed = await caller.user.listDeviceSessions();
+    expect(listed.some(row => row.id === versionlessSessionId)).toBe(true);
+
+    await expect(
+      caller.user.revokeDeviceSessionById({ sessionId: versionlessSessionId })
+    ).resolves.toBeDefined();
+
+    const [row] = await db
+      .select()
+      .from(device_sessions)
+      .where(eq(device_sessions.id, versionlessSessionId));
+    expect(row?.revoked_at).not.toBeNull();
+    expect(row?.revoked_reason).toBe('user_revoked');
+  });
+
   it('revokes the current device session with the logout reason', async () => {
     const caller = await createCallerForUser(owner.id, {
       deviceSessionId: revokeCurrentSessionId,
@@ -2898,13 +2909,13 @@ describe('user router - passkeys', () => {
       (caller: Awaited<ReturnType<typeof createSessionCallerForUser>>, id: string) =>
         caller.user.deletePasskey({ id }),
     ],
-  ])('refuses %s through a bearer token', async (_label, invoke) => {
+  ])('refuses %s through an API key bearer', async (_label, invoke) => {
     const row = await insertPasskey(owner.id, 'Work laptop');
     const bearerCaller = await createBearerCallerForUser(owner.id);
 
     await expect(invoke(bearerCaller, row.id)).rejects.toMatchObject({
       code: 'FORBIDDEN',
-      message: 'Browser session required',
+      message: 'PASSKEY_MANAGEMENT_DEVICE_UNSUPPORTED',
     });
 
     const stored = await db
@@ -2912,6 +2923,262 @@ describe('user router - passkeys', () => {
       .from(passkey_credentials)
       .where(eq(passkey_credentials.id, row.id));
     expect(stored).toHaveLength(1);
+  });
+
+  async function insertNativeSession(
+    kiloUserId: string,
+    options: { browserSignIn?: boolean } = {}
+  ): Promise<string> {
+    const [session] = await db
+      .insert(device_sessions)
+      .values({
+        kilo_user_id: kiloUserId,
+        // The app's SSO and OAuth sign-ins run in the browser and record the
+        // device-auth request that minted the session.
+        ...(options.browserSignIn ? { device_auth_request_id: crypto.randomUUID() } : {}),
+      })
+      .returning({ id: device_sessions.id });
+    return session!.id;
+  }
+
+  async function mintGrant(
+    deviceSessionId: string,
+    operation: 'enroll' | 'rename' | 'remove',
+    kiloUserId = owner.id
+  ): Promise<string> {
+    const minted = await mintPasskeyManagementAuthorization({
+      userId: kiloUserId,
+      deviceSessionId,
+      operation,
+    });
+    return minted.token;
+  }
+
+  it.each([
+    [
+      'rename',
+      (caller: Awaited<ReturnType<typeof createNativeCallerForUser>>, id: string) =>
+        caller.user.renamePasskey({ id, name: 'Native rename' }),
+    ],
+    [
+      'delete',
+      (caller: Awaited<ReturnType<typeof createNativeCallerForUser>>, id: string) =>
+        caller.user.deletePasskey({ id }),
+    ],
+  ])('requires a management grant to %s from a native session', async (_label, invoke) => {
+    const row = await insertPasskey(owner.id, 'Work laptop');
+    const deviceSessionId = await insertNativeSession(owner.id);
+    const caller = await createNativeCallerForUser(owner.id, deviceSessionId);
+
+    await expect(invoke(caller, row.id)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'PASSKEY_MANAGEMENT_REQUIRED',
+    });
+
+    const stored = await db
+      .select()
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.id, row.id));
+    expect(stored).toHaveLength(1);
+  });
+
+  it('renames with a rename grant and spends it', async () => {
+    const row = await insertPasskey(owner.id, 'Work laptop');
+    const deviceSessionId = await insertNativeSession(owner.id);
+    const caller = await createNativeCallerForUser(owner.id, deviceSessionId);
+    const grant = await mintGrant(deviceSessionId, 'rename');
+
+    await expect(
+      caller.user.renamePasskey({
+        id: row.id,
+        name: 'Home desktop',
+        managementAuthorization: grant,
+      })
+    ).resolves.toEqual({ success: true });
+
+    const [stored] = await db
+      .select()
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.id, row.id));
+    expect(stored?.name).toBe('Home desktop');
+
+    // The grant is single-use: the same token cannot remove the credential.
+    await expect(
+      caller.user.deletePasskey({ id: row.id, managementAuthorization: grant })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'PASSKEY_MANAGEMENT_AUTHORIZATION_INVALID',
+    });
+    const stillStored = await db
+      .select()
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.id, row.id));
+    expect(stillStored).toHaveLength(1);
+  });
+
+  it('spends a rename grant exactly once when two renames race', async () => {
+    const row = await insertPasskey(owner.id, 'Work laptop');
+    const deviceSessionId = await insertNativeSession(owner.id);
+    const caller = await createNativeCallerForUser(owner.id, deviceSessionId);
+    const grant = await mintGrant(deviceSessionId, 'rename');
+
+    const outcomes = await Promise.allSettled([
+      caller.user.renamePasskey({ id: row.id, name: 'First', managementAuthorization: grant }),
+      caller.user.renamePasskey({ id: row.id, name: 'Second', managementAuthorization: grant }),
+    ]);
+
+    const fulfilled = outcomes.filter(outcome => outcome.status === 'fulfilled');
+    expect(fulfilled).toHaveLength(1);
+    expect(outcomes.find(outcome => outcome.status === 'rejected')).toMatchObject({
+      reason: { code: 'FORBIDDEN', message: 'PASSKEY_MANAGEMENT_AUTHORIZATION_INVALID' },
+    });
+
+    // The stored name is the winning caller's, so the losing mutation wrote
+    // nothing at all.
+    const winningName = outcomes[0]?.status === 'fulfilled' ? 'First' : 'Second';
+    const [stored] = await db
+      .select({ name: passkey_credentials.name })
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.id, row.id));
+    expect(stored?.name).toBe(winningName);
+  });
+
+  it('renames through the session the app signed in with the browser', async () => {
+    const row = await insertPasskey(owner.id, 'Work laptop');
+    const deviceSessionId = await insertNativeSession(owner.id, { browserSignIn: true });
+    const caller = await createNativeCallerForUser(owner.id, deviceSessionId);
+    const grant = await mintGrant(deviceSessionId, 'rename');
+
+    await expect(
+      caller.user.renamePasskey({
+        id: row.id,
+        name: 'SSO account',
+        managementAuthorization: grant,
+      })
+    ).resolves.toEqual({ success: true });
+
+    const [stored] = await db
+      .select({ name: passkey_credentials.name })
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.id, row.id));
+    expect(stored?.name).toBe('SSO account');
+  });
+
+  it('does not let a rename grant authorize a removal', async () => {
+    const row = await insertPasskey(owner.id, 'Work laptop');
+    const deviceSessionId = await insertNativeSession(owner.id);
+    const caller = await createNativeCallerForUser(owner.id, deviceSessionId);
+    const grant = await mintGrant(deviceSessionId, 'rename');
+
+    await expect(
+      caller.user.deletePasskey({ id: row.id, managementAuthorization: grant })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'PASSKEY_MANAGEMENT_AUTHORIZATION_INVALID',
+    });
+
+    const stored = await db
+      .select()
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.id, row.id));
+    expect(stored).toHaveLength(1);
+  });
+
+  it('removes the only passkey with a removal grant', async () => {
+    const row = await insertPasskey(owner.id, 'Only passkey');
+    const deviceSessionId = await insertNativeSession(owner.id);
+    const caller = await createNativeCallerForUser(owner.id, deviceSessionId);
+    const grant = await mintGrant(deviceSessionId, 'remove');
+
+    await expect(
+      caller.user.deletePasskey({ id: row.id, managementAuthorization: grant })
+    ).resolves.toEqual({ success: true });
+
+    const stored = await db
+      .select()
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.id, row.id));
+    expect(stored).toHaveLength(0);
+  });
+
+  it('refuses a grant replayed from another session of the same account', async () => {
+    const row = await insertPasskey(owner.id, 'Work laptop');
+    const mintingSession = await insertNativeSession(owner.id);
+    const otherSession = await insertNativeSession(owner.id);
+    const grant = await mintGrant(mintingSession, 'remove');
+    const caller = await createNativeCallerForUser(owner.id, otherSession);
+
+    await expect(
+      caller.user.deletePasskey({ id: row.id, managementAuthorization: grant })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'PASSKEY_MANAGEMENT_AUTHORIZATION_INVALID',
+    });
+  });
+
+  it('refuses a grant minted for another account', async () => {
+    const row = await insertPasskey(other.id, 'Work laptop');
+    const ownerSession = await insertNativeSession(owner.id);
+    const otherSession = await insertNativeSession(other.id);
+    const grant = await mintGrant(ownerSession, 'remove', owner.id);
+    const caller = await createNativeCallerForUser(other.id, otherSession);
+
+    await expect(
+      caller.user.deletePasskey({ id: row.id, managementAuthorization: grant })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'PASSKEY_MANAGEMENT_AUTHORIZATION_INVALID',
+    });
+
+    const stored = await db
+      .select()
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.id, row.id));
+    expect(stored).toHaveLength(1);
+  });
+
+  it('refuses a grant once its session is revoked', async () => {
+    const row = await insertPasskey(owner.id, 'Work laptop');
+    const deviceSessionId = await insertNativeSession(owner.id);
+    const grant = await mintGrant(deviceSessionId, 'remove');
+    const caller = await createNativeCallerForUser(owner.id, deviceSessionId);
+    await db
+      .update(device_sessions)
+      .set({ revoked_at: new Date().toISOString() })
+      .where(eq(device_sessions.id, deviceSessionId));
+
+    await expect(
+      caller.user.deletePasskey({ id: row.id, managementAuthorization: grant })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'PASSKEY_MANAGEMENT_AUTHORIZATION_INVALID',
+    });
+
+    const stored = await db
+      .select()
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.id, row.id));
+    expect(stored).toHaveLength(1);
+  });
+
+  it('refuses a stolen admin bearer deleting the step-up passkey without a grant', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const row = await insertPasskey(admin.id, 'Admin MFA key');
+    const deviceSessionId = await insertNativeSession(admin.id);
+    const caller = await createNativeCallerForUser(admin.id, deviceSessionId);
+
+    await expect(caller.user.deletePasskey({ id: row.id })).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'PASSKEY_MANAGEMENT_REQUIRED',
+    });
+
+    const stored = await db
+      .select()
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.id, row.id));
+    expect(stored).toHaveLength(1);
+
+    await db.delete(passkey_credentials).where(eq(passkey_credentials.kilo_user_id, admin.id));
   });
 
   it('deleting a passkey removes its step-up proofs', async () => {

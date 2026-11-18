@@ -1,8 +1,13 @@
 import { CONTROL_PLANE_TIMEOUT_MESSAGE } from '@kilocode/app-shared/control-plane';
+import { USAGE_SOURCE_NOT_CONFIGURED_MESSAGE } from '@kilocode/app-shared/usage-source';
 import { RequestDeadlineError } from '@kilocode/event-service';
 import { describe, expect, it } from 'vitest';
 
-import { isControlPlaneTimeout, trpcErrorVariant } from '@/lib/trpc-error';
+import {
+  isControlPlaneTimeout,
+  isUsageSourceUnavailable,
+  trpcErrorVariant,
+} from '@/lib/trpc-error';
 
 /** The shape the tRPC client rejects with once it has a server answer. */
 function trpcCode(code: string): unknown {
@@ -87,5 +92,30 @@ describe('trpcErrorVariant', () => {
     expect(trpcErrorVariant(new Error('network down'))).toBe('server');
     expect(trpcErrorVariant(undefined)).toBe('server');
     expect(trpcErrorVariant(null)).toBe('server');
+  });
+});
+
+describe('isUsageSourceUnavailable', () => {
+  it('recognizes the unconfigured-source message under the tRPC envelope', () => {
+    expect(
+      isUsageSourceUnavailable({ data: { message: USAGE_SOURCE_NOT_CONFIGURED_MESSAGE } })
+    ).toBe(true);
+  });
+
+  it('recognizes the message on a bare Error of the same text', () => {
+    expect(isUsageSourceUnavailable(new Error(USAGE_SOURCE_NOT_CONFIGURED_MESSAGE))).toBe(true);
+  });
+
+  it('refuses the sanitized warehouse-failure message, which stays retryable', () => {
+    expect(
+      isUsageSourceUnavailable({ data: { message: 'Usage data temporarily unavailable' } })
+    ).toBe(false);
+  });
+
+  it('refuses other messages, shaped errors without one, and non-errors', () => {
+    expect(isUsageSourceUnavailable(new Error('network down'))).toBe(false);
+    expect(isUsageSourceUnavailable(trpcCode('INTERNAL_SERVER_ERROR'))).toBe(false);
+    expect(isUsageSourceUnavailable(undefined)).toBe(false);
+    expect(isUsageSourceUnavailable(null)).toBe(false);
   });
 });

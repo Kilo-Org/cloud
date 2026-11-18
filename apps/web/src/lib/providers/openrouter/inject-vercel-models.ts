@@ -11,14 +11,18 @@ import type {
   OpenRouterModel,
   OpenRouterProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
-import type { Endpoint } from '@kilocode/db/schema-types';
+import { OrganizationDataRegionSchema, type Endpoint } from '@kilocode/db/schema-types';
 import type { GatewayModelMap } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
-import { findVercelOnlyModels } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/find-vercel-only-models';
 import {
+  findVercelOnlyModels,
   getVendorNamesByModelPrefix,
   getVercelOnlyModelName,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/vercel-only-models';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/find-vercel-only-models';
+import {
+  getModelDisplayPricing,
+  maxEndpointPricing,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/display-pricing';
 import { normalizePublicInferenceProvider } from '@/lib/public-inference-provider';
 
 type ProviderModelData = Array<{ provider: OpenRouterProvider; models: OpenRouterModel[] }>;
@@ -152,7 +156,38 @@ function addVercelEndpointModel(
 }
 
 /**
- * Lists `model` under a provider OpenRouter knows, unless OpenRouter already lists it there.
+ * Records the regions Vercel can pin the provider's listing of `slug` to. Vercel may serve a model
+ * through several endpoints of one provider (e.g. Vertex), so their regions are combined.
+ */
+function addVercelInferenceRegions(providerData: ProviderData, slug: string, endpoint: Endpoint) {
+  const regions = new Set(endpoint.inference_regions?.flatMap(region => region.geo_region ?? []));
+  const listed = providerData.models.find(m => m.slug === slug)?.endpoint;
+  if (!listed || regions.size === 0) return;
+  for (const region of listed.vercel_inference_regions ?? []) regions.add(region);
+  listed.vercel_inference_regions = OrganizationDataRegionSchema.options.filter(region =>
+    regions.has(region)
+  );
+}
+
+/**
+ * Where OpenRouter and Vercel price a provider's model differently, the listing shows the higher
+ * price. Free and other variants keep their own price, since Vercel serves the standard variant.
+ */
+function raiseToVercelPricing(model: OpenRouterModel, endpoint: Endpoint) {
+  const listed = model.endpoint;
+  const vercelPricing = getModelDisplayPricing(endpoint.pricing);
+  if (!listed || listed.is_free || !vercelPricing) return;
+  if (listed.variant && listed.variant !== 'standard') return;
+  const pricing = maxEndpointPricing(
+    getModelDisplayPricing(listed.pricing) ?? listed.pricing,
+    vercelPricing
+  );
+  listed.pricing = { prompt: pricing.prompt, completion: pricing.completion };
+}
+
+/**
+ * Lists `model` under a provider OpenRouter knows. When OpenRouter already lists it there, the
+ * listing keeps OpenRouter's entry with the higher of both gateways' prices.
  * Snapshot models keep the provider's own data policy. A model only Vercel serves takes the worst
  * of the provider's policy and the Vercel endpoint's guarantees, so that every endpoint of the model
  * under the provider must offer a guarantee before it is reported. A model Kilo serves for free is
@@ -164,7 +199,11 @@ function addToOpenRouterProvider(
   endpoint: Endpoint
 ) {
   if (!offering.isVercelOnly) {
-    if (providerData.models.some(m => m.slug === offering.model.slug)) return;
+    const listed = providerData.models.filter(m => m.slug === offering.model.slug);
+    if (listed.length > 0) {
+      for (const model of listed) raiseToVercelPricing(model, endpoint);
+      return;
+    }
     providerData.models.push(
       toVercelEndpointModel(offering.model, endpoint, providerData.provider.displayName)
     );
@@ -228,6 +267,7 @@ function getVercelOnlyOfferings(
   const vendorNames = getVendorNamesByModelPrefix(openRouterCatalogModels);
   return findVercelOnlyModels({
     openRouterModelIds,
+    openRouterModels: openRouterCatalogModels,
     vercelMetadata: vercelModels,
     overrides: vercelModelIdOverrides,
   }).map(vercelOnlyModel => {
@@ -309,6 +349,7 @@ export function injectVercelModels({
       if (openRouterProviders) {
         for (const providerData of openRouterProviders) {
           addToOpenRouterProvider(providerData, offering, endpoint);
+          addVercelInferenceRegions(providerData, offering.model.slug, endpoint);
         }
         continue;
       }
@@ -326,6 +367,7 @@ export function injectVercelModels({
         vercelOnlyProviders.set(providerId, providerData);
       }
       addToVercelOnlyProvider(providerData, offering, endpoint);
+      addVercelInferenceRegions(providerData, offering.model.slug, endpoint);
     }
   }
 

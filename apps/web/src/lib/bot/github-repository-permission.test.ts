@@ -189,6 +189,7 @@ describe('authorizeGitHubRepository', () => {
       repository: 'acme/rotated-credentials',
       actorLogin: 'octocat',
       fetchPermission,
+      retryDelayMs: 0,
     });
 
     expect(result.allowed).toBe(false);
@@ -207,6 +208,7 @@ describe('authorizeGitHubRepository', () => {
       repository: 'acme/recovered',
       actorLogin: 'octocat',
       fetchPermission,
+      retryDelayMs: 0,
     });
 
     expect(result).toEqual({ allowed: true });
@@ -224,6 +226,7 @@ describe('authorizeGitHubRepository', () => {
       repository: 'acme/stale-token',
       actorLogin: 'octocat',
       fetchPermission,
+      retryDelayMs: 0,
     });
 
     expect(result).toEqual({ allowed: true });
@@ -241,6 +244,7 @@ describe('authorizeGitHubRepository', () => {
       repository: 'acme/stale-token-again',
       actorLogin: 'octocat',
       fetchPermission,
+      retryDelayMs: 0,
     });
 
     expect(result.allowed).toBe(false);

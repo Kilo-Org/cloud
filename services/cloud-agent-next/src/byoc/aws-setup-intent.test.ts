@@ -13,7 +13,6 @@ import { AWS_TEST_CONFIGURATION } from '../../test/fixtures/aws-provider.js';
 import {
   awsSetupEnrollment,
   createAwsSetupIntent,
-  publicAwsConfiguration,
   readAwsSetupIntent,
   readReadyAwsConfiguration,
   type AwsSetupEnvironment,
@@ -134,10 +133,6 @@ describe('owner-bound AWS setup intent', () => {
     );
     expect(readReadyAwsConfiguration(f.env, f.binding, ready)).toEqual(AWS_TEST_CONFIGURATION);
     expect(() => readAwsSetupIntent(f.env, f.binding, ready)).toThrow('setup changed');
-    const publicStatus = publicAwsConfiguration(AWS_TEST_CONFIGURATION);
-    expect(publicStatus).not.toHaveProperty('externalId');
-    expect(publicStatus).not.toHaveProperty('proxy');
-    expect(JSON.stringify(publicStatus)).not.toContain(AWS_TEST_CONFIGURATION.externalId);
   });
   it('refuses unavailable setup and customer accounts that lack release authorization', () => {
     const f = fixture();

@@ -19,8 +19,3 @@ export function awsQuickCreateUrl(value: AwsSetupIntent, signedTemplateUrl: stri
     query.set(`param_${name}`, value);
   return `https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/create/review?${query.toString()}`;
 }
-export function awsStackConsoleUrl(stackId: string): string {
-  if (!/^arn:aws:cloudformation:us-east-1:\d{12}:stack\/[A-Za-z0-9-]+\/[a-f0-9-]+$/.test(stackId))
-    throw new Error('Invalid AWS stack identity');
-  return `https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/stackinfo?stackId=${encodeURIComponent(stackId)}`;
-}

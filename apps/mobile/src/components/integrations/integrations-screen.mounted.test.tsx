@@ -531,9 +531,15 @@ describe('IntegrationsScreen', () => {
       error: { data: { code: 'FORBIDDEN' } },
     });
     const renderer = mount('org-1');
-    expect(findOne(renderer.root, 'PermissionDeniedMock')[0]?.props.description).toBe(
+    const [denied] = findOne(renderer.root, 'PermissionDeniedMock');
+    expect(denied?.props.description).toBe(
       'You do not have permission to manage these integrations.'
     );
+    // The header owns the way out, so the state must not repeat a Back action.
+    expect(denied?.props.showBack).toBe(false);
+    const header = findOne(renderer.root, 'ScreenHeaderMock')[0];
+    expect(header?.props.title).toBe('Integrations');
+    expect(header?.props.subtitle).toBe('Acme');
   });
 
   it('waits for an installed GitHub row’s connection list before choosing its action', () => {

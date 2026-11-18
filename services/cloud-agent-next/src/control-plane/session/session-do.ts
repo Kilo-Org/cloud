@@ -4360,7 +4360,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
             : reason === 'preparation_timeout'
               ? 'timeout'
               : 'failed',
-      reason,
+      reason: reason === 'Preparation did not complete' ? 'preparation_incomplete' : reason,
       durationMs: admittedAt === undefined ? undefined : Math.max(0, timestamp - admittedAt),
       preparationMs:
         preparationStartedAt === undefined

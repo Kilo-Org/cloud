@@ -226,6 +226,64 @@ describe('SandboxSessionV2 reports and callbacks', () => {
     expect(captured.reports[0]?.run).toMatchObject({ status: 'failed', container });
   });
 
+  it('logs a bounded reason when a preparing route becomes unknown', async () => {
+    const { stub, peer } = await setup();
+    const attemptId = peer.attemptId;
+    peer.prepareView = { state: 'preparing', attemptId };
+    await runInDurableObject(stub, async instance => {
+      const fields = vi.spyOn(logger, 'withFields');
+      try {
+        await instance.send(promptPayload('m1'));
+        await instance.onRoute({ state: 'unknown' });
+        expect(
+          fields.mock.calls
+            .map(([record]) => record)
+            .filter(
+              record =>
+                record.diagnosticEvent === 'session_startup_finished' &&
+                record.attemptId === attemptId
+            )
+        ).toEqual([
+          expect.objectContaining({ outcome: 'failed', reason: 'preparation_incomplete' }),
+        ]);
+      } finally {
+        fields.mockRestore();
+      }
+    });
+  });
+
+  it('logs one startup outcome for an immediate failure without a preparation row', async () => {
+    const { sessionId, stub, peer } = await setup();
+    peer.prepareView = {
+      state: 'failed',
+      attemptId: peer.attemptId,
+      reason: 'byoc_credential_missing',
+    };
+    await runInDurableObject(stub, async instance => {
+      const fields = vi.spyOn(logger, 'withFields');
+      try {
+        await instance.send(promptPayload('m1'));
+        await instance.onRoute(peer.prepareView);
+        const startups = fields.mock.calls
+          .map(([record]) => record)
+          .filter(record => record.diagnosticEvent === 'session_startup_finished');
+        expect(startups).toEqual([
+          expect.objectContaining({
+            sessionId,
+            attemptId: peer.attemptId,
+            outcome: 'failed',
+            reason: 'byoc_credential_missing',
+            durationMs: expect.any(Number),
+          }),
+        ]);
+        expect(startups[0]).not.toHaveProperty('preparationMs');
+      } finally {
+        fields.mockRestore();
+      }
+    });
+    expect(await messageStatus(stub, 'm1')).toBe('failed');
+  });
+
   it('captures a new immediate preparation failure after a previously failed attempt', async () => {
     const { stub, peer } = await setup();
     const captured = await installCapturedQueues(stub);

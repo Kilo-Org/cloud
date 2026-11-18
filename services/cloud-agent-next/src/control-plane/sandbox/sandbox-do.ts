@@ -3251,7 +3251,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     };
   }
 
-  private async applyEvent(event: AllocationEvent): Promise<void> {
+  private async applyEvent(event: AllocationEvent): Promise<AllocationState> {
     const previous = await this.readAllocation();
     const timers = { ...this.sandboxTimers() };
     if (
@@ -3327,6 +3327,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     for (const effect of effects) {
       await this.runEffect(effect, state);
     }
+    return state;
   }
 
   /**
@@ -5492,6 +5493,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
       let createdRef: string | null = null;
       let billingAdmissionDeadlineAt: number | undefined;
       let billingAdmissionTimedOut = false;
+      let logSnapshotCreateFailure: ((willRetry: boolean) => void) | undefined;
+      let willRetrySnapshotCreate = false;
       let selectedLaunch:
         | { options: ProviderLaunchOptions; selection: SnapshotStartSelection | null }
         | undefined;
@@ -5587,18 +5590,28 @@ export class SandboxControlV2 extends DurableObject<Env> {
             }
           );
           if (intent.snapshot === undefined) return { result };
-          const log = (outcome: 'restored' | 'failed', reason?: string) =>
-            logControlDiagnostic('snapshot_restore_attempt_finished', {
+          const log = (outcome: 'restored' | 'failed', reason?: string) => {
+            const fields = {
               sandboxId: this.sandboxId,
               allocationId,
               provider: pin.provider,
               stage: 'provider_create',
               snapshotKind: 'environment',
-              attempt: 1,
+              attempt: afterPreflight.createAttempt,
               durationMs: Math.max(0, Date.now() - startedAt),
               outcome,
               reason,
-            });
+            };
+            if (outcome === 'failed') {
+              logSnapshotCreateFailure = willRetry =>
+                logControlDiagnostic('snapshot_restore_attempt_finished', { ...fields, willRetry });
+            } else {
+              logControlDiagnostic('snapshot_restore_attempt_finished', {
+                ...fields,
+                willRetry: false,
+              });
+            }
+          };
           return {
             result: result.then(
               created => {
@@ -5623,7 +5636,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
           billingAdmissionDeadlineAt = undefined;
         }
         if ('unresolved' in created) {
-          await this.dispatchCreateFailed(allocationId);
+          willRetrySnapshotCreate = await this.dispatchCreateFailed(allocationId);
           return;
         }
         // N4: persist the ref before launch so an accepted `hello` never sees null.
@@ -5878,12 +5891,14 @@ export class SandboxControlV2 extends DurableObject<Env> {
             await this.stopRef(createdRef, allocationId);
           }
         }
-        await this.dispatchCreateFailed(
+        willRetrySnapshotCreate = await this.dispatchCreateFailed(
           allocationId,
           error instanceof ProviderCreationError && error.code === 'meter_unavailable'
             ? billingAdmissionDeadlineAt
             : undefined
         );
+      } finally {
+        logSnapshotCreateFailure?.(willRetrySnapshotCreate);
       }
     } finally {
       this.createInFlight = false;
@@ -6721,15 +6736,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private async dispatchCreateFailed(
     allocationId: string,
     retryDeadlineAt?: number
-  ): Promise<void> {
-    await this.dispatchResult({
-      type: 'create-failed',
+  ): Promise<boolean> {
+    const nextAllocationId = crypto.randomUUID();
+    const event = {
+      type: 'create-failed' as const,
       at: Date.now(),
       allocationId,
-      nextAllocationId: crypto.randomUUID(),
+      nextAllocationId,
       retryAllowed: await this.retryAllowed(),
       retryDeadlineAt,
-    });
+    };
+    const next = await this.enqueue(() => this.applyEvent(event));
+    return next.kind === 'creating' && next.allocationId === nextAllocationId;
   }
 
   private async stopRef(

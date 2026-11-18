@@ -90,10 +90,10 @@ const scanOutcomeShape = {
   /** Units with a cached verdict, so not scanned. Absent where `total_units` is. */
   cached_units: z.number().optional(),
   /**
-   * Calls of an input part that failed but whose units are cached as allowed anyway, so they are
-   * not scanned again; only a log-only scan does that. Counts eligibility: whether each write
-   * landed is in `verdict_cache_write`. Absent from reports written before it was counted, and
-   * from per-call and output scan reports.
+   * Calls of an input part that failed but whose units are cached as allowed for the short
+   * failed-scan TTL anyway, so they are not scanned again until it expires. Counts eligibility:
+   * whether each write landed is in `verdict_cache_write`. Absent from reports written before it
+   * was counted, and from per-call and output scan reports.
    */
   failed_calls_cached: z.number().optional(),
   /**

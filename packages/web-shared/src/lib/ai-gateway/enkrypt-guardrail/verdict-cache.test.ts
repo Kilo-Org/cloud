@@ -1735,7 +1735,7 @@ describe('scanRequestWithVerdictCache', () => {
         ? new Response('unavailable', { status: 500 })
         : enkryptResponse({ pii: 0 });
 
-    it('counts a failed call of a log-only scan whose units were cached as allowed', async () => {
+    it('counts a failed call of a log-only scan, whose units are cached as allowed briefly', async () => {
       const dependencies = deps(memoryStore(), failFailing);
 
       const result = await scanConversation(
@@ -1751,7 +1751,8 @@ describe('scanRequestWithVerdictCache', () => {
         chunks: 2,
         failed_calls_cached: 1,
       });
-      expect(result.cacheEntries).toEqual(allowed(keysFor(segments, { config: logOnlyConfig })));
+      const keys = keysFor(segments, { config: logOnlyConfig });
+      expect(result.cacheEntries).toEqual([...allowed([keys[0]!]), ...allowedBriefly([keys[1]!])]);
     });
 
     it('counts none when no call failed', async () => {
@@ -1763,7 +1764,7 @@ describe('scanRequestWithVerdictCache', () => {
       expect(result.report).toMatchObject({ chunks: 2, error: null, failed_calls_cached: 0 });
     });
 
-    it('counts none for a failed call of a blocking scan, which caches nothing for it', async () => {
+    it('counts a blocking call that failed open, whose units are cached as allowed briefly', async () => {
       const dependencies = deps(memoryStore(), text =>
         text === renderSegment(failing)
           ? new Response('unavailable', { status: 500 })
@@ -1772,13 +1773,15 @@ describe('scanRequestWithVerdictCache', () => {
 
       const result = await scanConversation(makeRequest(segments), dependencies);
 
-      expect(result.verdict).toEqual({ action: 'unavailable', reason: 'transient' });
+      expect(result.verdict).toEqual({ action: 'fail_open' });
       expect(result.report).toMatchObject({
-        decision: 'error_fail_closed',
+        decision: 'error_fail_open',
         error: 'http_500',
-        failed_calls_cached: 0,
+        attempts: 2,
+        failed_calls_cached: 1,
       });
-      expect(result.cacheEntries).toEqual(allowed([keysFor(segments)[0]!]));
+      const keys = keysFor(segments);
+      expect(result.cacheEntries).toEqual([...allowed([keys[0]!]), ...allowedBriefly([keys[1]!])]);
     });
 
     it('counts none when there is no verdict cache to cache in', async () => {
@@ -1797,7 +1800,7 @@ describe('scanRequestWithVerdictCache', () => {
       const third = segment('tool result', numbered('c', 60_000));
       const queued = [first, second, third];
 
-      it('counts a log-only call that timed out after it was made, not one that never was', async () => {
+      it('counts a log-only call that timed out after it was made, and one that never was', async () => {
         const dependencies = deps(memoryStore());
         dependencies.limiter = createEnkryptCallLimiter(1);
         dependencies.timeoutMs = 100;
@@ -1817,27 +1820,35 @@ describe('scanRequestWithVerdictCache', () => {
         expect(result.report).toMatchObject({
           error: 'timeout',
           attempts: 2,
-          failed_calls_cached: 1,
+          failed_calls_cached: 2,
         });
         const keys = keysFor(queued, { config: logOnlyConfig });
-        expect(result.cacheEntries).toEqual(allowed([keys[0]!, keys[1]!]));
+        expect(result.cacheEntries).toEqual([
+          ...allowed([keys[0]!]),
+          ...allowedBriefly([keys[1]!, keys[2]!]),
+        ]);
       });
 
-      it('counts none when the deadline passed before any call was made', async () => {
+      it('counts a log-only call whose deadline passed before it was made', async () => {
+        const tools = [tool('ls', 'Lists.')];
         const dependencies = deps(memoryStore());
         dependencies.limiter = createEnkryptCallLimiter(1);
-        dependencies.timeoutMs = 50;
-        dependencies.fetch = hangingFetch();
-        const [only] = [queued[0]!];
+        dependencies.deadline = AbortSignal.abort(new Error('timeout'));
 
-        const [result] = await scanRequestWithVerdictCache(
-          makeRequest([only], { config: logOnlyConfig }, { tools: [tool('ls', 'Lists.')] }),
-          Object.assign(dependencies, { deadline: AbortSignal.abort(new Error('timeout')) })
+        const results = await scanRequestWithVerdictCache(
+          makeRequest([queued[0]!], { config: logOnlyConfig }, { tools }),
+          dependencies
         );
 
         expect(dependencies.fetch).not.toHaveBeenCalled();
-        expect(result?.report).toMatchObject({ failed_calls_cached: 0 });
-        expect(result?.cacheEntries).toEqual([]);
+        expect(results.map(result => result.report)).toEqual([
+          expect.objectContaining({ part: 'tools', attempts: 0, failed_calls_cached: 1 }),
+          expect.objectContaining({ part: 'conversation', attempts: 0, failed_calls_cached: 1 }),
+        ]);
+        expect(results.map(result => result.cacheEntries)).toEqual([
+          allowedBriefly([toolKey(tools[0]!, { config: logOnlyConfig })]),
+          allowedBriefly([keysFor([queued[0]!], { config: logOnlyConfig })[0]!]),
+        ]);
       });
     });
   });
@@ -2916,7 +2927,7 @@ describe('scanRequestWithVerdictCache', () => {
         cached_characters: toolText(cached).length,
         total_units: 4,
         cached_units: 1,
-        failed_calls_cached: 0,
+        failed_calls_cached: 1,
         scanned_characters: characters([noisy, broken, clean]),
         decision: 'blocked',
         error: 'http_500',
@@ -3091,11 +3102,11 @@ describe('scanRequestWithVerdictCache', () => {
       expect(bigKeys).toHaveLength(3);
       const store = memoryStore([toolKey(cachedTool, { config: logOnlyConfig })]);
       const dependencies = deps(store, text =>
-        text === toolText(broken) || text.startsWith('[tool: big, end omitted]')
+        text === toolText(broken) ||
+        text.startsWith('[tool: big, end omitted]') ||
+        text.startsWith('[tool: big, beginning omitted]')
           ? new Response('unavailable', { status: 500 })
-          : text.startsWith('[tool: big, beginning omitted]')
-            ? new Response('unavailable', { status: 500 })
-            : enkryptResponse({ pii: 0 })
+          : enkryptResponse({ pii: 0 })
       );
 
       const results = await scanRequestWithVerdictCache(
@@ -3110,16 +3121,15 @@ describe('scanRequestWithVerdictCache', () => {
         decision: 'error_logged',
         failed_calls_cached: 3,
       });
-      expect(results[0]?.cacheEntries).toEqual(
-        allowed([
-          toolKey(broken, { config: logOnlyConfig }),
-          ...bigKeys,
-          toolKey(tools[0]!, { config: logOnlyConfig }),
-        ])
-      );
+      expect(results[0]?.cacheEntries).toEqual([
+        ...allowedBriefly([toolKey(broken, { config: logOnlyConfig }), bigKeys[0]!]),
+        ...allowed([bigKeys[1]!]),
+        ...allowedBriefly([bigKeys[2]!]),
+        ...allowed([toolKey(tools[0]!, { config: logOnlyConfig })]),
+      ]);
     });
 
-    it('counts no failed calls cached for the tools of a blocking scan', async () => {
+    it('counts the tool calls of a blocking scan that failed open', async () => {
       const broken = tool('broken', 'Breaks the detector.');
       const dependencies = deps(memoryStore(), text =>
         text === toolText(broken)
@@ -3132,10 +3142,16 @@ describe('scanRequestWithVerdictCache', () => {
         dependencies
       );
 
+      expect(results[0]?.verdict).toEqual({ action: 'fail_open' });
       expect(toolsReport(results)).toMatchObject({
+        decision: 'error_fail_open',
         error: 'http_500',
-        failed_calls_cached: 0,
+        failed_calls_cached: 1,
       });
+      expect(results[0]?.cacheEntries).toEqual([
+        ...allowedBriefly([toolKey(broken)]),
+        ...allowed([toolKey(tools[0]!)]),
+      ]);
     });
 
     it('does not flag or cache tools when the client disconnected', async () => {

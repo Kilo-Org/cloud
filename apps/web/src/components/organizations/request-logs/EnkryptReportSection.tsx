@@ -96,26 +96,22 @@ function isPartialHit(scan: EnkryptInputScanReport): boolean {
 }
 
 /**
- * Whether text that failed to scan was cached as allowed, so it is not rescanned: `certain` from
- * the report's count, `possible` for an older report without it, when a log-only scan failed and
- * stored verdicts. See `isCacheableAllow` in the verdict cache.
+ * Whether text that failed to scan was cached as allowed for a short while, so it is not rescanned
+ * until then: `certain` from the report's count, `possible` for an older report without it, when a
+ * scan failed and stored verdicts. See `isFailedAllow` in the verdict cache.
  */
 function storedDespiteError(scan: EnkryptInputScanReport): 'certain' | 'possible' | null {
   if (scan.failed_calls_cached !== undefined) {
     return scan.failed_calls_cached > 0 ? 'certain' : null;
   }
-  return scan.scan === 'log_only' &&
-    scan.decision === 'error_logged' &&
-    scan.verdict_cache_write === 'written'
-    ? 'possible'
-    : null;
+  const failed = scan.decision === 'error_fail_open' || scan.decision === 'error_logged';
+  return failed && scan.verdict_cache_write === 'written' ? 'possible' : null;
 }
 
 const STORED_DESPITE_ERROR_NOTES = {
-  certain:
-    "Text that failed to scan was cached as allowed, so it won't be scanned again for 7 days.",
+  certain: 'Text that failed to scan is treated as allowed for 5 minutes, then scanned again.',
   possible:
-    "Text that failed to scan may have been cached as allowed, in which case it won't be scanned again for 7 days.",
+    "Text that failed to scan may have been cached as allowed, in which case it isn't scanned again until that entry expires.",
 };
 
 function verdictCacheItem(scan: EnkryptInputScanReport): DetailItem {
@@ -130,7 +126,8 @@ function verdictCacheItem(scan: EnkryptInputScanReport): DetailItem {
     value:
       storedDespiteError(scan) === 'certain' ? (
         <>
-          {lookup}, <span className="text-status-warning">stored despite error</span>
+          {lookup},{' '}
+          <span className="text-status-warning">stored (failed content for 5 minutes)</span>
         </>
       ) : (
         `${lookup}${stored ? ', stored' : ''}`
@@ -258,10 +255,11 @@ function scanItems(scan: Scan): DetailItem[] {
   }
 }
 
-function ScanCard({ scan }: { scan: Scan }) {
+/** `failedOpen` hides the scan's note on failed content, which the report's notice already gives. */
+function ScanCard({ scan, failedOpen }: { scan: Scan; failedOpen: boolean }) {
   const decision = DECISIONS[scan.decision];
   const part = PART_LABELS[scan.part];
-  const stored = scan.part === 'response' ? null : storedDespiteError(scan);
+  const stored = scan.part === 'response' || failedOpen ? null : storedDespiteError(scan);
   const storedNote = stored && STORED_DESPITE_ERROR_NOTES[stored];
   return (
     <li className="flex flex-col gap-3 rounded-md border p-3">
@@ -366,7 +364,11 @@ function GuardrailReportBody({
       {scans.length > 0 && (
         <ol className="flex flex-col gap-2" aria-label={`${title} scans`}>
           {scans.map((scan, index) => (
-            <ScanCard key={`${scan.scan}-${index}`} scan={scan} />
+            <ScanCard
+              key={`${scan.scan}-${index}`}
+              scan={scan}
+              failedOpen={report.verdict === 'fail_open'}
+            />
           ))}
         </ol>
       )}

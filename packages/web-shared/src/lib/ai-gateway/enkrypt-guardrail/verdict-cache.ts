@@ -344,15 +344,13 @@ function callCacheEntries(
   });
 }
 
-/** Calls that failed but whose units are cached as allowed anyway; see `isCacheableAllow`. */
+/** Calls that failed but whose units are cached as allowed briefly anyway; see `isFailedAllow`. */
 function failedCallsCached(
   results: EnkryptGuardrailScanResult[],
   cache: VerdictCache | null
 ): number {
   if (!cache) return 0;
-  return results.filter(
-    result => result.report.error !== null && cacheableVerdict(result, cache.config) === 'allow'
-  ).length;
+  return results.filter(isFailedAllow).length;
 }
 
 const DECISION_SEVERITY: readonly EnkryptScanReport['decision'][] = [

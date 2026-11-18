@@ -467,6 +467,33 @@ describe('ConsentCard', () => {
     expect(singleSwitch(renderer.root).props.value).toBe(true);
   });
 
+  it('holds the switch placeholder in the idle render before the load effect commits', async () => {
+    // Between the account arriving and the load effect committing `loading`,
+    // one render carries `userId !== undefined` with `status: 'idle'`. That
+    // render must not paint the default choice: the b911 vr5 pre-load state
+    // read as a completed revoke. The placeholder covers it like `loading`.
+    let resolveLoad: ((v: { mandatory: boolean; optional: boolean }) => void) | undefined =
+      undefined;
+    mockedReadConsent.mockReturnValue(
+      new Promise(resolve => {
+        resolveLoad = resolve;
+      })
+    );
+    const renderer = mountCard('review');
+    // No act flush: assert the very first committed render, before effects.
+    expect(countByType(renderer.root, 'Skeleton')).toBe(1);
+    expect(countByType(renderer.root, 'Switch')).toBe(0);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(countByType(renderer.root, 'Skeleton')).toBe(1);
+    await act(() => {
+      resolveLoad?.({ mandatory: true, optional: true });
+    });
+    await act(flush);
+    expect(countByType(renderer.root, 'Skeleton')).toBe(0);
+  });
+
   it('shows the switch with an error when the stored value fails to load', async () => {
     mockedReadConsent.mockRejectedValue(new Error('keychain read failed'));
     const renderer = mountCard('review');
@@ -512,6 +539,16 @@ describe('ConsentCard', () => {
     expect(texts(renderer.root)).not.toContain(
       'Could not load your consent settings. Please try again.'
     );
+    // Retry belongs to the load attempt: while a later failure owns the slot,
+    // the affordance is gone (retrying the read there would clear a failure
+    // it did not produce).
+    const retryAfterLaterFailure = renderer.root.findAll(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'Pressable' &&
+        (n.props.accessibilityLabel as string | undefined) === i18n.t('common.retry')
+    );
+    expect(retryAfterLaterFailure).toHaveLength(0);
     mockedSignOut.mockResolvedValue(undefined);
   });
 

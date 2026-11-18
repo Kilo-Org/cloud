@@ -54,6 +54,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   const { t } = useTranslation();
   const actions = getConsentActions(mode);
   const {
+    userId,
     pendingAction,
     error,
     optionalToggle,
@@ -85,9 +86,13 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   // until loaded, the switch slot holds a same-size placeholder, so the card
   // never claims a choice the user has not made and a tap cannot flip the
   // wrong way (the full reasoning sits on the load state in
-  // `useConsentCardState`). With no userId there is nothing to load: the
-  // switch renders as before.
-  const optionalControlPending = storedLoad.status === 'loading';
+  // `useConsentCardState`). A resolved account with the phase not yet moved
+  // past `idle` (the render between the account arriving and the load effect
+  // committing `loading`) is exactly that un-loaded window, so it holds the
+  // placeholder too. With no userId there is nothing to load: the switch
+  // renders as before.
+  const optionalControlPending =
+    storedLoad.status === 'loading' || (userId !== undefined && storedLoad.status === 'idle');
 
   return (
     <View className="flex-1 bg-background" style={rootStyle}>

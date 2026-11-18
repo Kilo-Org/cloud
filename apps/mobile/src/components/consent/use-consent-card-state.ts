@@ -2,7 +2,7 @@ import { type Href, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { type ConsentMode } from '@/components/consent/consent-mode';
+import { type ConsentMode, getConsentActions } from '@/components/consent/consent-mode';
 import { type ConsentLoadStatus } from '@/components/consent/consent-load-status';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -82,7 +82,11 @@ export function useConsentCardState(mode: ConsentMode) {
       if (active) {
         active = false;
         setStoredLoad({ status: 'failed' });
-        setError('consent.couldNotLoadConsentSettings');
+        // The bound publishes only while no newer failure owns the slot: a
+        // Decline inside the window that failed its sign-out already wrote
+        // the copy the person is reading, and overwriting it would hide the
+        // newest failure behind the older attempt's default.
+        setError(current => current ?? 'consent.couldNotLoadConsentSettings');
       }
     }, STORED_LOAD_TIMEOUT_MS);
     // eslint-disable-next-line promise/prefer-await-to-then, promise/always-return -- async/await would allow the promise to settle after unmount.
@@ -181,13 +185,14 @@ export function useConsentCardState(mode: ConsentMode) {
   };
 
   const handleSecondaryAction = () => {
+    const actions = getConsentActions(mode);
     const message =
       mode === 'review' ? t('consent.revokeSignOutMessage') : t('consent.declineSignOutMessage');
 
     confirm({
-      title: mode === 'review' ? t('consent.revokeConsentTitle') : t('consent.declineTitle'),
+      title: actions.destructiveTitle,
       message,
-      confirmLabel: mode === 'review' ? t('consent.revokeConsent') : t('consent.declineAndSignOut'),
+      confirmLabel: actions.destructiveLabel,
       onConfirm: () => {
         void runSecondaryAction();
       },

@@ -48,6 +48,12 @@ export function ConsentLoadStatusLine({ load, error, onRetry, t }: ConsentLoadSt
     );
   }
   if (load.status === 'failed') {
+    // Retry belongs to the load attempt: it re-runs the stored read, so it
+    // stays beside the copy only while that copy is still the load failure.
+    // A later action's failure (a failed sign-out, a failed optional-save)
+    // owns the slot with no Retry — retrying the read there would clear a
+    // failure it did not produce while the real problem is still live.
+    const showsLoadFailure = error === null || error === 'consent.couldNotLoadConsentSettings';
     return (
       <View className="flex-row items-center justify-center gap-1">
         {/* The load failure seeds `error` with the load key, but a later
@@ -59,18 +65,20 @@ export function ConsentLoadStatusLine({ load, error, onRetry, t }: ConsentLoadSt
           message={t(error ?? 'consent.couldNotLoadConsentSettings')}
           className="text-sm"
         />
-        <Pressable
-          onPress={onRetry}
-          hitSlop={LINE_ACTION_HIT_SLOP}
-          accessibilityRole="button"
-          accessibilityLabel={t('common.retry')}
-          // The shared line-action box: its `-my-[7px]` keeps the row one line
-          // tall, so a failed load grows the reserved slot by nothing and the
-          // actions below it never move.
-          className={`${LINE_ACTION_BOX_CLASS} flex-row items-center gap-1 px-1 active:opacity-70`}
-        >
-          <Text className="text-sm font-semibold text-primary">{t('common.retry')}</Text>
-        </Pressable>
+        {showsLoadFailure ? (
+          <Pressable
+            onPress={onRetry}
+            hitSlop={LINE_ACTION_HIT_SLOP}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.retry')}
+            // The shared line-action box: its `-my-[7px]` keeps the row one
+            // line tall, so a failed load grows the reserved slot by nothing
+            // and the actions below it never move.
+            className={`${LINE_ACTION_BOX_CLASS} flex-row items-center gap-1 px-1 active:opacity-70`}
+          >
+            <Text className="text-sm font-semibold text-primary">{t('common.retry')}</Text>
+          </Pressable>
+        ) : null}
       </View>
     );
   }

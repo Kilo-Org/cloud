@@ -27,7 +27,7 @@ import {
   getSessionUsageFromBilling,
   updateCodeReviewAttemptForCallback,
   getLatestCodeReviewAttempt,
-  countCodeReviewAttemptsByReason,
+  listCodeReviewAttempts,
   createInfraRetryAttemptIfMissing,
   recordCodeReviewAttemptPublicationStatus,
 } from '@/lib/code-reviews/db/code-reviews';
@@ -425,7 +425,7 @@ const USAGE_UNAVAILABLE_RETRY_REASON = 'usage_unavailable';
 /** Usage-unavailable retries one review may spend while its spend cannot be measured. */
 const MAX_USAGE_UNAVAILABLE_RETRIES = 1;
 /** One lag re-read: billing rows for a session that just failed can trail the callback. */
-const USAGE_LAG_RECHECK_DELAY_MS = 3_000;
+export const USAGE_LAG_RECHECK_DELAY_MS = 3_000;
 
 // Pre-dispatch codes that only mean the session never reached the agent: the
 // sandbox never connected, the workspace never finished, the runtime or the
@@ -548,6 +548,7 @@ async function shouldSkipAutoRetryForFailedSessionUsage(params: {
   failedCliSessionId?: string | null;
   reviewCreatedAt: string;
   failure?: CloudAgentSafeFailure;
+  usageLagRecheckDelayMs?: number;
 }): Promise<FailedSessionUsageGate> {
   if (!params.failedCliSessionId) {
     logExceptInTest('[code-review-status] Auto-retry token guard could not measure usage', {
@@ -560,15 +561,6 @@ async function shouldSkipAutoRetryForFailedSessionUsage(params: {
 
   const failureStage = params.failure?.stage;
   let usage = await getSessionUsageFromBilling(params.failedCliSessionId, params.reviewCreatedAt);
-  if (!usage && failureStage && POST_DISPATCH_FAILURE_STAGES[failureStage]) {
-    // Billing rows trail the callback: the session just failed, and the
-    // microdollar aggregate may not have its rows yet. One bounded re-read
-    // covers that lag before the review is treated as unmeasurable.
-    const lagDelay = Promise.withResolvers<void>();
-    setTimeout(lagDelay.resolve, USAGE_LAG_RECHECK_DELAY_MS);
-    await lagDelay.promise;
-    usage = await getSessionUsageFromBilling(params.failedCliSessionId, params.reviewCreatedAt);
-  }
   if (!usage) {
     // A pre-dispatch failure means the agent never ran, so an unmeasurable
     // attempt cannot have spent model usage and the spend guard must not block
@@ -581,53 +573,91 @@ async function shouldSkipAutoRetryForFailedSessionUsage(params: {
     if (preDispatchSessionless) {
       return { skip: false, retryReason: 'infra_failure' };
     }
+    const postDispatch =
+      failureStage !== undefined && POST_DISPATCH_FAILURE_STAGES[failureStage] === true;
+
+    // A failing spend read must never lose the bound: without it the guard
+    // cannot tell a first retry from a third, so it fails closed and lets the
+    // existing person-needed warning fire instead of billing a blind run.
+    let totalAttempts: number;
+    let usageUnavailableRetries: number;
+    try {
+      const attempts = await listCodeReviewAttempts(params.reviewId);
+      totalAttempts = attempts.length;
+      usageUnavailableRetries = attempts.filter(
+        attempt => attempt.retry_reason === USAGE_UNAVAILABLE_RETRY_REASON
+      ).length;
+    } catch (error) {
+      logExceptInTest(
+        '[code-review-status] Auto-retry token guard could not read the retry bound',
+        {
+          reviewId: params.reviewId,
+          failedAttemptId: params.failedAttemptId,
+          cliSessionId: params.failedCliSessionId,
+          reason: 'usage_unavailable',
+          failureStage,
+          failureCode,
+          error: error instanceof Error ? error.message : String(error),
+        }
+      );
+      return { skip: true, reason: 'usage_unavailable' };
+    }
+
     // A post-dispatch failure whose spend cannot be measured still gets its one
     // infrastructure retry — the same single retry a measurable under-cap
     // failure gets — but the allowance is bounded: the guard counts the tagged
     // attempt rows from the review's own persisted attempts, under the review's
     // automatic retry attempt limit, and a repeat escalates to a person instead
-    // of billing another blind run.
-    const countedRetries = await countCodeReviewAttemptsByReason(
-      params.reviewId,
-      USAGE_UNAVAILABLE_RETRY_REASON
-    );
-    const withinBound =
-      countedRetries < MAX_USAGE_UNAVAILABLE_RETRIES &&
-      countedRetries < AUTOMATIC_RETRY_ATTEMPT_LIMIT;
-    if (withinBound && failureStage !== undefined && POST_DISPATCH_FAILURE_STAGES[failureStage]) {
+    // of billing another blind run. A spent or ineligible bound skips before
+    // any lag wait, so the callback answers without holding it open.
+    const boundSpent =
+      usageUnavailableRetries >= MAX_USAGE_UNAVAILABLE_RETRIES ||
+      totalAttempts >= AUTOMATIC_RETRY_ATTEMPT_LIMIT;
+    if (!postDispatch || boundSpent) {
       logExceptInTest('[code-review-status] Auto-retry token guard could not measure usage', {
         reviewId: params.reviewId,
         failedAttemptId: params.failedAttemptId,
         cliSessionId: params.failedCliSessionId,
         reason: 'usage_unavailable',
         failureStage,
-        failureCode: params.failure?.code,
-        usageUnavailableRetries: countedRetries,
+        failureCode,
+        usageUnavailableRetries,
         maxUsageUnavailableRetries: MAX_USAGE_UNAVAILABLE_RETRIES,
         automaticRetryAttemptLimit: AUTOMATIC_RETRY_ATTEMPT_LIMIT,
+        totalAttempts,
+        allowUnavailableUsage: false,
+      });
+      return {
+        skip: true,
+        reason: postDispatch ? 'usage_unavailable_retries_exhausted' : 'usage_unavailable',
+      };
+    }
+
+    // Billing rows trail the callback: the session just failed, and the
+    // microdollar aggregate may not have its rows yet. One bounded re-read
+    // covers that lag before the review is treated as unmeasurable.
+    const lagDelayMs = params.usageLagRecheckDelayMs ?? USAGE_LAG_RECHECK_DELAY_MS;
+    const lagDelay = Promise.withResolvers<void>();
+    setTimeout(lagDelay.resolve, lagDelayMs);
+    await lagDelay.promise;
+    usage = await getSessionUsageFromBilling(params.failedCliSessionId, params.reviewCreatedAt);
+
+    if (!usage) {
+      logExceptInTest('[code-review-status] Auto-retry token guard could not measure usage', {
+        reviewId: params.reviewId,
+        failedAttemptId: params.failedAttemptId,
+        cliSessionId: params.failedCliSessionId,
+        reason: 'usage_unavailable',
+        failureStage,
+        failureCode,
+        usageUnavailableRetries,
+        maxUsageUnavailableRetries: MAX_USAGE_UNAVAILABLE_RETRIES,
+        automaticRetryAttemptLimit: AUTOMATIC_RETRY_ATTEMPT_LIMIT,
+        totalAttempts,
         allowUnavailableUsage: true,
       });
       return { skip: false, retryReason: USAGE_UNAVAILABLE_RETRY_REASON };
     }
-    const boundReached =
-      countedRetries >= MAX_USAGE_UNAVAILABLE_RETRIES ||
-      countedRetries >= AUTOMATIC_RETRY_ATTEMPT_LIMIT;
-    logExceptInTest('[code-review-status] Auto-retry token guard could not measure usage', {
-      reviewId: params.reviewId,
-      failedAttemptId: params.failedAttemptId,
-      cliSessionId: params.failedCliSessionId,
-      reason: 'usage_unavailable',
-      failureStage,
-      failureCode: params.failure?.code,
-      usageUnavailableRetries: countedRetries,
-      maxUsageUnavailableRetries: MAX_USAGE_UNAVAILABLE_RETRIES,
-      automaticRetryAttemptLimit: AUTOMATIC_RETRY_ATTEMPT_LIMIT,
-      allowUnavailableUsage: false,
-    });
-    return {
-      skip: true,
-      reason: boundReached ? 'usage_unavailable_retries_exhausted' : 'usage_unavailable',
-    };
   }
 
   const failedSessionTokens = failedSessionTokenCount(usage);

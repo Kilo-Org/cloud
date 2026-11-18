@@ -18,6 +18,7 @@ import { sql } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { analytics_event_outbox, operation_ledgers } from '@kilocode/db/schema';
 import { admitOperation } from '@kilocode/db/operation-ledger';
+const AUTOMATIC_RETRY_ATTEMPT_LIMIT = 3; // matches retry-review.ts; local copy avoids header-time route load
 
 // --- Mock functions ---
 
@@ -42,8 +43,8 @@ const mockUpdateCodeReviewAttemptForCallback = jest.fn() as jest.MockedFunction<
 const mockGetLatestCodeReviewAttempt = jest.fn() as jest.MockedFunction<
   typeof codeReviewsDbModule.getLatestCodeReviewAttempt
 >;
-const mockCountCodeReviewAttemptsByReason = jest.fn() as jest.MockedFunction<
-  typeof codeReviewsDbModule.countCodeReviewAttemptsByReason
+const mockListCodeReviewAttempts = jest.fn() as jest.MockedFunction<
+  typeof codeReviewsDbModule.listCodeReviewAttempts
 >;
 const mockCreateInfraRetryAttemptIfMissing = jest.fn() as jest.MockedFunction<
   typeof codeReviewsDbModule.createInfraRetryAttemptIfMissing
@@ -148,7 +149,7 @@ jest.mock('@/lib/code-reviews/db/code-reviews', () => ({
   getSessionUsageFromBilling: mockGetSessionUsageFromBilling,
   updateCodeReviewAttemptForCallback: mockUpdateCodeReviewAttemptForCallback,
   getLatestCodeReviewAttempt: mockGetLatestCodeReviewAttempt,
-  countCodeReviewAttemptsByReason: mockCountCodeReviewAttemptsByReason,
+  listCodeReviewAttempts: mockListCodeReviewAttempts,
   createInfraRetryAttemptIfMissing: mockCreateInfraRetryAttemptIfMissing,
   setCodeReviewCouncilResult: mockSetCodeReviewCouncilResult,
   recordCodeReviewAttemptPublicationStatus: mockRecordCodeReviewAttemptPublicationStatus,
@@ -442,6 +443,7 @@ import type {
 
 let POST: typeof POSTType;
 let isWorkspaceCapacityFailure: typeof isWorkspaceCapacityFailureType;
+let USAGE_LAG_RECHECK_DELAY_MS: number;
 
 beforeEach(async () => {
   jest.clearAllMocks();
@@ -462,7 +464,7 @@ beforeEach(async () => {
     })
   );
   mockGetLatestCodeReviewAttempt.mockResolvedValue(makeAttempt());
-  mockCountCodeReviewAttemptsByReason.mockResolvedValue(0);
+  mockListCodeReviewAttempts.mockResolvedValue([makeAttempt()]);
   mockCreateInfraRetryAttemptIfMissing.mockResolvedValue({
     outcome: 'existing-for-review',
     attempt: makeAttempt({
@@ -510,7 +512,7 @@ beforeEach(async () => {
   );
   mockDisableCodeReviewForActionRequiredFailure.mockResolvedValue(undefined);
   mockDisableCodeReviewForRepeatedCloneTimeoutsToday.mockResolvedValue(null);
-  ({ POST, isWorkspaceCapacityFailure } = await import('./route'));
+  ({ POST, isWorkspaceCapacityFailure, USAGE_LAG_RECHECK_DELAY_MS } = await import('./route'));
 });
 
 describe('isWorkspaceCapacityFailure', () => {
@@ -2184,20 +2186,23 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       {
         name: 'sandbox connection failure after dispatch at the bound',
         failure: { stage: 'agent_activity', code: 'sandbox_connect_failed' },
-        usageUnavailableRetries: 1,
-        reReads: 2,
+        attempts: [makeAttempt({ retry_reason: 'usage_unavailable' }), makeAttempt()],
+        usageReads: 1,
+        warnReason: 'usage_unavailable_retries_exhausted',
       },
       {
         name: 'workspace setup failure after dispatch at the bound',
         failure: { stage: 'post_dispatch_no_activity', code: 'workspace_setup_failed' },
-        usageUnavailableRetries: 1,
-        reReads: 2,
+        attempts: [makeAttempt({ retry_reason: 'usage_unavailable' }), makeAttempt()],
+        usageReads: 1,
+        warnReason: 'usage_unavailable_retries_exhausted',
       },
       {
         name: 'incomplete failure data',
         failure: { stage: 'pre_dispatch' },
-        usageUnavailableRetries: 0,
-        reReads: 1,
+        attempts: [makeAttempt()],
+        usageReads: 1,
+        warnReason: 'usage_unavailable',
       },
       {
         name: 'future-shaped failure data',
@@ -2206,18 +2211,20 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           code: 'sandbox_connect_failed',
           diagnostic: 'future field',
         },
-        usageUnavailableRetries: 0,
-        reReads: 1,
+        attempts: [makeAttempt()],
+        usageReads: 1,
+        warnReason: 'usage_unavailable',
       },
       {
         name: 'an interruption stage failure',
         failure: { stage: 'interruption', code: 'system_interrupt' },
-        usageUnavailableRetries: 0,
-        reReads: 1,
+        attempts: [makeAttempt()],
+        usageReads: 1,
+        warnReason: 'usage_unavailable',
       },
     ])(
       'keeps unavailable usage fail-closed for $name',
-      async ({ failure, usageUnavailableRetries, reReads }) => {
+      async ({ failure, attempts, usageReads, warnReason }) => {
         const retryFlow = mockCreatedInfraRetryFlow({
           sessionId: 'agent-sandbox-connect-near-miss',
           cliSessionId: 'ses_sandbox_connect_near_miss',
@@ -2225,7 +2232,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         mockGetCodeReviewById.mockResolvedValue(
           makeReview({ status: 'running', session_id: retryFlow.sessionId })
         );
-        mockCountCodeReviewAttemptsByReason.mockResolvedValue(usageUnavailableRetries);
+        mockListCodeReviewAttempts.mockResolvedValue(attempts);
         mockGetSessionUsageFromBilling.mockResolvedValue(null);
 
         const response = await POST(
@@ -2241,21 +2248,19 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         );
 
         expect(response.status).toBe(200);
+        expect(mockListCodeReviewAttempts).toHaveBeenCalledWith(REVIEW_ID);
         expect(mockGetSessionUsageFromBilling).toHaveBeenCalledWith(
           'ses_sandbox_connect_near_miss',
           '2025-01-01T00:00:00Z'
         );
-        expect(mockGetSessionUsageFromBilling).toHaveBeenCalledTimes(reReads);
+        expect(mockGetSessionUsageFromBilling).toHaveBeenCalledTimes(usageReads);
         expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
         expect(mockRetryReviewFresh).not.toHaveBeenCalled();
         expect(mockWarnExceptInTest).toHaveBeenCalledWith(
           '[code-review-status] Review needs a manual restart',
           expect.objectContaining({
             reviewId: REVIEW_ID,
-            reason:
-              usageUnavailableRetries >= 1
-                ? 'usage_unavailable_retries_exhausted'
-                : 'usage_unavailable',
+            reason: warnReason,
           })
         );
         expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
@@ -2426,7 +2431,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           cli_session_id: 'ses_assistant_error',
         })
       );
-      mockCountCodeReviewAttemptsByReason.mockResolvedValue(0);
+      mockListCodeReviewAttempts.mockResolvedValue([makeAttempt()]);
       mockCreateInfraRetryAttemptIfMissing.mockResolvedValue({
         outcome: 'created',
         attempt: makeAttempt({
@@ -2438,24 +2443,39 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         }),
       });
       mockGetSessionUsageFromBilling.mockResolvedValue(null);
+      jest.useFakeTimers();
 
-      const response = await POST(
-        makeRequest({
-          status: 'failed',
-          cloudAgentSessionId: 'agent-assistant-error',
-          kiloSessionId: 'ses_assistant_error',
-          errorMessage: 'Assistant request failed',
-          terminalReason: 'assistant_failed',
-          failure: {
-            stage: 'agent_activity',
-            code: 'assistant_error',
-            message: 'Assistant request failed',
-          },
-        }),
-        makeParams(REVIEW_ID)
-      );
+      let response: Response | undefined;
+      let responsePromise: Promise<Response> | undefined;
+      try {
+        responsePromise = POST(
+          makeRequest({
+            status: 'failed',
+            cloudAgentSessionId: 'agent-assistant-error',
+            kiloSessionId: 'ses_assistant_error',
+            errorMessage: 'Assistant request failed',
+            terminalReason: 'assistant_failed',
+            failure: {
+              stage: 'agent_activity',
+              code: 'assistant_error',
+              message: 'Assistant request failed',
+            },
+          }),
+          makeParams(REVIEW_ID)
+        );
 
-      expect(response.status).toBe(200);
+        // Flush the first usage read and the bound read without advancing the
+        // lag timer, so a premature wait would hang the flush below.
+        await jest.advanceTimersByTimeAsync(0);
+        // The bound still allows the retry, so the guard waits out the billing
+        // lag and re-reads before treating the review as unmeasurable.
+        await jest.advanceTimersByTimeAsync(USAGE_LAG_RECHECK_DELAY_MS);
+        response = await responsePromise;
+      } finally {
+        jest.useRealTimers();
+      }
+
+      expect(response?.status).toBe(200);
       // Both the first read and the lag re-read return nothing.
       expect(mockGetSessionUsageFromBilling).toHaveBeenCalledTimes(2);
       expect(mockGetSessionUsageFromBilling).toHaveBeenCalledWith(
@@ -2480,7 +2500,34 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       mockGetCodeReviewById.mockResolvedValue(
         makeReview({ status: 'running', session_id: 'agent-assistant-error' })
       );
-      mockCountCodeReviewAttemptsByReason.mockResolvedValue(1);
+      mockUpdateCodeReviewAttemptForCallback.mockResolvedValue(
+        makeAttempt({
+          id: '00000000-0000-0000-0000-000000000601',
+          status: 'failed',
+          session_id: 'agent-assistant-error',
+          cli_session_id: 'ses_assistant_error',
+        })
+      );
+      mockGetLatestCodeReviewAttempt.mockResolvedValue(
+        makeAttempt({
+          id: '00000000-0000-0000-0000-000000000601',
+          status: 'failed',
+          session_id: 'agent-assistant-error',
+          cli_session_id: 'ses_assistant_error',
+        })
+      );
+      mockListCodeReviewAttempts.mockResolvedValue([
+        makeAttempt({
+          id: '00000000-0000-0000-0000-000000000602',
+          attempt_number: 2,
+          retry_reason: 'usage_unavailable',
+          retry_of_attempt_id: '00000000-0000-0000-0000-000000000601',
+        }),
+        makeAttempt({
+          id: '00000000-0000-0000-0000-000000000603',
+          attempt_number: 3,
+        }),
+      ]);
       mockGetSessionUsageFromBilling.mockResolvedValue(null);
 
       const response = await POST(
@@ -2500,7 +2547,9 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(mockGetSessionUsageFromBilling).toHaveBeenCalledTimes(2);
+      // The bound is read before the lag wait and is spent, so the callback
+      // skips without a second usage read or a 3s wait.
+      expect(mockGetSessionUsageFromBilling).toHaveBeenCalledTimes(1);
       expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
       expect(mockRetryReviewFresh).not.toHaveBeenCalled();
       expect(mockWarnExceptInTest).toHaveBeenCalledWith(
@@ -2514,6 +2563,131 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         REVIEW_ID,
         'failed',
         expect.objectContaining({ terminalReason: 'assistant_failed' })
+      );
+    });
+
+    it('fails closed when the persisted attempt rows for the bound are unreadable', async () => {
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ status: 'running', session_id: 'agent-assistant-error' })
+      );
+      mockUpdateCodeReviewAttemptForCallback.mockResolvedValue(
+        makeAttempt({
+          id: '00000000-0000-0000-0000-000000000601',
+          status: 'failed',
+          session_id: 'agent-assistant-error',
+          cli_session_id: 'ses_assistant_error',
+        })
+      );
+      mockListCodeReviewAttempts.mockRejectedValue(new Error('bound read unavailable'));
+      mockGetSessionUsageFromBilling.mockResolvedValue(null);
+      mockGetLatestCodeReviewAttempt.mockResolvedValue(
+        makeAttempt({
+          id: '00000000-0000-0000-0000-000000000601',
+          status: 'failed',
+          session_id: 'agent-assistant-error',
+          cli_session_id: 'ses_assistant_error',
+        })
+      );
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: 'agent-assistant-error',
+          kiloSessionId: 'ses_assistant_error',
+          errorMessage: 'Assistant request failed',
+          terminalReason: 'assistant_failed',
+          failure: {
+            stage: 'agent_activity',
+            code: 'assistant_error',
+            message: 'Assistant request failed',
+          },
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      // Without a readable bound the callback still fails the review; it must
+      // not create an unbounded retry nor wait out the billing lag.
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({ terminalReason: 'assistant_failed' })
+      );
+      expect(mockGetSessionUsageFromBilling).toHaveBeenCalledTimes(1);
+      expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+      expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+      expect(mockWarnExceptInTest).toHaveBeenCalledWith(
+        '[code-review-status] Review needs a manual restart',
+        expect.objectContaining({
+          reviewId: REVIEW_ID,
+          reason: 'usage_unavailable',
+        })
+      );
+    });
+
+    it('stops the usage-unavailable retry when the attempt count hits the automatic limit', async () => {
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ status: 'running', session_id: 'agent-assistant-error' })
+      );
+      mockUpdateCodeReviewAttemptForCallback.mockResolvedValue(
+        makeAttempt({
+          id: '00000000-0000-0000-0000-000000000601',
+          status: 'failed',
+          session_id: 'agent-assistant-error',
+          cli_session_id: 'ses_assistant_error',
+        })
+      );
+      mockListCodeReviewAttempts.mockResolvedValue(
+        Array.from({ length: AUTOMATIC_RETRY_ATTEMPT_LIMIT }, (_, index) =>
+          makeAttempt({
+            id: `00000000-0000-0000-0000-0000000007${`${index}`.padStart(2, '0')}`,
+            attempt_number: index + 1,
+          })
+        )
+      );
+      mockGetSessionUsageFromBilling.mockResolvedValue(null);
+      mockGetLatestCodeReviewAttempt.mockResolvedValue(
+        makeAttempt({
+          id: '00000000-0000-0000-0000-000000000601',
+          status: 'failed',
+          session_id: 'agent-assistant-error',
+          cli_session_id: 'ses_assistant_error',
+        })
+      );
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: 'agent-assistant-error',
+          kiloSessionId: 'ses_assistant_error',
+          errorMessage: 'Assistant request failed',
+          terminalReason: 'assistant_failed',
+          failure: {
+            stage: 'agent_activity',
+            code: 'assistant_error',
+            message: 'Assistant request failed',
+          },
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({ terminalReason: 'assistant_failed' })
+      );
+      // The attempt limit is spent even though no retry is tagged, so the
+      // callback skips before the lag re-read.
+      expect(mockGetSessionUsageFromBilling).toHaveBeenCalledTimes(1);
+      expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+      expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+      expect(mockWarnExceptInTest).toHaveBeenCalledWith(
+        '[code-review-status] Review needs a manual restart',
+        expect.objectContaining({
+          reviewId: REVIEW_ID,
+          reason: 'usage_unavailable_retries_exhausted',
+        })
       );
     });
 
@@ -2582,7 +2756,9 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       mockGetCodeReviewById.mockResolvedValue(
         makeReview({ status: 'running', session_id: retryFlow.sessionId })
       );
-      mockCountCodeReviewAttemptsByReason.mockResolvedValue(1);
+      mockListCodeReviewAttempts.mockResolvedValue([
+        makeAttempt({ retry_reason: 'usage_unavailable' }),
+      ]);
       mockGetSessionUsageFromBilling.mockResolvedValue(null);
 
       const response = await POST(

@@ -505,38 +505,6 @@ export async function listCodeReviewAttempts(
   }
 }
 
-/**
- * Counts the review's persisted attempts that carry one retry reason.
- *
- * The bound consumers (the usage-unavailable auto-retry cap) read this from the
- * attempt rows, not from memory, so a redelivered status callback or a second
- * route instance sees the same count.
- */
-export async function countCodeReviewAttemptsByReason(
-  codeReviewId: string,
-  retryReason: string
-): Promise<number> {
-  try {
-    const [row] = await db
-      .select({ matched: count() })
-      .from(cloud_agent_code_review_attempts)
-      .where(
-        and(
-          eq(cloud_agent_code_review_attempts.code_review_id, codeReviewId),
-          eq(cloud_agent_code_review_attempts.retry_reason, retryReason)
-        )
-      );
-
-    return row?.matched ?? 0;
-  } catch (error) {
-    captureException(error, {
-      tags: { operation: 'countCodeReviewAttemptsByReason' },
-      extra: { codeReviewId, retryReason },
-    });
-    throw error;
-  }
-}
-
 export async function getLatestCodeReviewAttempt(
   codeReviewId: string
 ): Promise<CloudAgentCodeReviewAttempt | null> {

@@ -66,7 +66,10 @@ export function createBuilderPreparation(deps: PreparationDeps): BuilderPreparat
           if (error instanceof AwsBuildInactiveError) return { refused: 'gone' };
           if (error instanceof ScmCapabilityIssueError && error.kind === 'denied')
             return { refused: 'repository_unauthorized' };
-          if (error instanceof BuilderStateInvalidError || error instanceof BuilderTargetMismatchError)
+          if (
+            error instanceof BuilderStateInvalidError ||
+            error instanceof BuilderTargetMismatchError
+          )
             return { refused: 'input_unavailable', detail: error.message };
           return { refused: 'unavailable' };
         }

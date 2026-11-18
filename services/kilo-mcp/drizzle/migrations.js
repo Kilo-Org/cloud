@@ -12,6 +12,7 @@ import m0009 from './0009_pending_flow_token.sql';
 import m0010 from './0010_pairing_user_code.sql';
 import m0011 from './0011_pending_expires_index.sql';
 import m0012 from './0012_living_blade.sql';
+import m0013 from './0013_backfill_previous_refresh_token.sql';
 
 export default {
   journal,
@@ -29,5 +30,6 @@ export default {
     m0010,
     m0011,
     m0012,
+    m0013,
   },
 };

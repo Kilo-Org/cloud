@@ -7,6 +7,7 @@ import {
   type NewPendingAuthorization,
 } from './oauth-store';
 import { getOAuthApi, type OAuthProviderOptions } from '@cloudflare/workers-oauth-provider';
+import backfillPreviousRefreshTokenSql from '../../drizzle/0013_backfill_previous_refresh_token.sql';
 import { TOKEN_REQUEST_MAX_BYTES, hashRefreshToken } from '../oauth/refresh-reuse';
 
 // `cloudflare:workers` does not exist under plain node vitest; the DO under
@@ -262,6 +263,53 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
         current: true,
         previous: false,
       });
+    });
+
+    it('backfills the previous token of each existing grant, and none for a single-row grant', async () => {
+      // The rows the old guard left behind: every rotation was recorded with
+      // `previous = false`, so the token the provider still accepts after the
+      // last rotation is the second-newest row of the grant.
+      const seeded: Array<[string, string]> = [
+        ['backfill-1', '2026-09-09T10:00:00.000Z'],
+        ['backfill-2', '2026-09-09T11:00:00.000Z'],
+        ['backfill-3', '2026-09-09T12:00:00.000Z'],
+      ];
+      for (const [hash, expiresAt] of seeded) {
+        await store.rememberRefreshToken(
+          hash,
+          { userId: 'backfill', grantId: 'rotated' },
+          expiresAt,
+          null
+        );
+      }
+      await store.rememberRefreshToken(
+        'backfill-single',
+        { userId: 'backfill', grantId: 'single' },
+        LATER,
+        null
+      );
+      expect(
+        db
+          .prepare(
+            'SELECT count(*) AS n FROM oauth_refresh_token_history WHERE user_id = ? AND previous = 1'
+          )
+          .get('backfill')?.n
+      ).toBe(0);
+
+      db.exec(backfillPreviousRefreshTokenSql);
+
+      expect(
+        db
+          .prepare(
+            'SELECT grant_id, previous FROM oauth_refresh_token_history WHERE user_id = ? ORDER BY grant_id, expires_at DESC, rowid DESC'
+          )
+          .all('backfill')
+      ).toEqual([
+        { grant_id: 'rotated', previous: 0 },
+        { grant_id: 'rotated', previous: 1 },
+        { grant_id: 'rotated', previous: 0 },
+        { grant_id: 'single', previous: 0 },
+      ]);
     });
 
     it('rolls back supersession if recording the newly issued hash fails', async () => {

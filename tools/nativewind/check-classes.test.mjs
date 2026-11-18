@@ -188,7 +188,7 @@ test('ignores the classes of an element nested in a prop', () => {
   assert.deepEqual(
     screenProblems(
       screen(
-        '<FlatList renderItem={() => <View className="px-8" />} className="flex-1" data={[]} />'
+        '<FlatList renderItem={() => <View className="px-3" />} className="flex-1" data={[]} />'
       )
     ),
     []
@@ -197,10 +197,10 @@ test('ignores the classes of an element nested in a prop', () => {
 
 test('reports only the container classes when a prop nests a padded element', () => {
   const found = expectProblem(
-    screen('<FlatList renderItem={() => <View className="px-8" />} className="px-2" data={[]} />'),
+    screen('<FlatList renderItem={() => <View className="px-3" />} className="px-2" data={[]} />'),
     /screen\.tsx:3: <FlatList> carries "px-2" on its own className/
   );
-  assert.doesNotMatch(found.join('\n'), /px-8/);
+  assert.doesNotMatch(found.join('\n'), /px-3/);
 });
 
 function themeTokens() {
@@ -996,11 +996,36 @@ test('flags horizontal padding on a CenteredState content container', () => {
     const found = layoutProblems(
       SCREEN_FILE,
       screen(`<CenteredState contentContainerClassName="${classes}" />`)
-    );
+    ).filter(problem => problem.includes('[L2]'));
     assert.equal(found.length, 1, classes);
     assert.match(found[0], /\[L2\] ".+ on <CenteredState> contentContainerClassName"/);
     assert.match(found[0], /SCREEN_BODY_CLASS/);
   }
+});
+
+test('flags a horizontal inset wider than the page gutter', () => {
+  const found = layoutProblems(
+    SCREEN_FILE,
+    screen('<View className="px-6 mx-6 ps-10 pe-8 me-5" />')
+  );
+  assert.equal(found.length, 5);
+  for (const token of ['px-6', 'mx-6', 'ps-10', 'pe-8', 'me-5']) {
+    assert.match(found.join('\n'), new RegExp(`\\[L12\\] "${token}"`));
+  }
+  assert.match(found[0], /SCREEN_GUTTER_CLASS/);
+  // A responsive or negative form is the same inset.
+  const variants = layoutProblems(SCREEN_FILE, screen('<View className="md:px-8 -mx-6" />'));
+  assert.equal(variants.length, 2);
+  assert.match(variants.join('\n'), /\[L12\] "px-8"/);
+  assert.match(variants.join('\n'), /\[L12\] "-mx-6"/);
+});
+
+test('accepts the gutter, a narrower inset and the modules that own one', () => {
+  assert.deepEqual(
+    layoutProblems(SCREEN_FILE, screen('<View className="px-4 gap-x-6 px-3 ps-2 mt-6" />')),
+    []
+  );
+  assert.deepEqual(layoutProblems(ALLOWLISTED, screen('<View className="px-6 mx-8" />')), []);
 });
 
 test('accepts the page gutter and vertical padding on a CenteredState', () => {
@@ -1008,8 +1033,11 @@ test('accepts the page gutter and vertical padding on a CenteredState', () => {
     layoutProblems(SCREEN_FILE, screen('<CenteredState contentContainerClassName="px-4 py-6" />')),
     []
   );
-  // The gutter check is scoped to the centered band, not to every view.
-  assert.deepEqual(layoutProblems(SCREEN_FILE, screen('<View className="px-6" />')), []);
+  // The gutter check (L2) is scoped to the centered band; a plain view is held
+  // to the page inset by the class rule instead.
+  const view = layoutProblems(SCREEN_FILE, screen('<View className="px-6" />'));
+  assert.equal(view.length, 1);
+  assert.match(view[0], /\[L12\] "px-6"/);
 });
 
 /**

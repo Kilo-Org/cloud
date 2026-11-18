@@ -154,6 +154,19 @@ const LAYOUT_RULES = [
     id: 'L11',
     advice: 'render SheetHeader as the first child of every Sheet, so the sheet has its title row',
   },
+  {
+    id: 'L12',
+    patterns: [
+      // A horizontal padding or margin wider than the page gutter. The page
+      // inset is one number; a call site that writes a wider one puts its
+      // content on a column the rest of the app does not share — the 21pt
+      // sheet-header label and 28pt empty-state paragraph the design gate read
+      // as double insets both started as a class wider than the gutter.
+      /(?<![\w-])-?(?:px|ps|pe|pl|pr|mx|ms|me)-(?:[5-9]|\d{2,})(?![\w.\-/])/g,
+    ],
+    advice:
+      'a page inset is the 14pt gutter: use SCREEN_GUTTER_CLASS, or the primitive that owns its own inset (SheetHeader, ScreenHeader, the state and row primitives)',
+  },
 ];
 
 /** One rule from the table above, by id. */

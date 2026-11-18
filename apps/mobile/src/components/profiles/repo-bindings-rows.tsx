@@ -7,7 +7,11 @@ import { ChevronDown, GitBranch, Trash2 } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { COMPACT_CONTROL_BOX_CLASS, COMPACT_CONTROL_HIT_SLOP_DP, ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import {
+  COMPACT_CONTROL_BOX_CLASS,
+  COMPACT_CONTROL_HIT_SLOP_DP,
+  ROW_TARGET_CLASS,
+} from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
 /**

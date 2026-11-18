@@ -6,6 +6,7 @@ import { ScrollView, View } from 'react-native';
 import { MarkdownText } from '@/components/agents/markdown-text';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useLegalDocument } from '@/lib/hooks/use-legal-document';
@@ -107,11 +108,9 @@ export function LegalDocumentScreen({
         showsVerticalScrollIndicator={false}
       >
         {showsEnglishOnlyNotice ? (
-          <View className="mb-4 rounded-lg border border-border bg-secondary p-3">
-            <Text className="text-base text-foreground">
-              {t('common.legalDocumentEnglishOnly')}
-            </Text>
-          </View>
+          <Card className="mb-4">
+            <Text>{t('common.legalDocumentEnglishOnly')}</Text>
+          </Card>
         ) : null}
         <MarkdownText value={state.html} onPressLink={openInContentLink} />
       </ScrollView>

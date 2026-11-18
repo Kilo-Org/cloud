@@ -38,7 +38,6 @@ import { useFormDraftRef, useFormDraftState } from '@/lib/form-draft';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { settleSaveAttempt } from '@/lib/surface-feedback';
 import { cn } from '@/lib/utils';
-import { cn } from '@/lib/utils';
 
 const ERROR_FIELDS = {
   'slug-required': 'slug',
@@ -404,7 +403,9 @@ export function AgentFormSheet({
             })}
           </RowGroup>
           {wholeToolAction !== undefined ? (
-            <Text variant="muted">{t('profiles.agents.wholeToolRule', { rule: wholeToolAction })}</Text>
+            <Text variant="muted">
+              {t('profiles.agents.wholeToolRule', { rule: wholeToolAction })}
+            </Text>
           ) : null}
         </View>
         <View className="h-3" />

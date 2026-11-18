@@ -13,6 +13,7 @@ const layoutDirection = vi.hoisted(() => ({ isRTL: false }));
 vi.mock('react-native', () => ({ I18nManager: layoutDirection, View: 'View' }));
 vi.mock('react-native-svg', () => ({ Rect: 'Rect', default: 'Svg' }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ i18n: { language: 'en' } }) }));
+vi.mock('@/components/ui/card', () => ({ Card: 'Card' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/format', () => ({ formatCalendarDate: (value: string) => value }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({

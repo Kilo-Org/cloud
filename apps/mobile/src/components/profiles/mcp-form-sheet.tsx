@@ -4,6 +4,7 @@ import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
+import { ERROR_KEYS, errorKeyFor, FIELD_FOR_ERROR } from '@/components/profiles/mcp-form-errors';
 import {
   buildMcpServerPayload,
   initialMcpFormState,
@@ -31,44 +32,6 @@ import { useFormDraftRef, useFormDraftState } from '@/lib/form-draft';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { settleSaveAttempt } from '@/lib/surface-feedback';
 import { cn } from '@/lib/utils';
-
-/** Catalog key for each refused field, so the message lands under the input at fault. */
-const ERROR_KEYS = {
-  'name-required': 'profiles.mcp.nameRequired',
-  'name-invalid': 'profiles.mcp.nameInvalid',
-  'name-conflict': 'profiles.mcp.nameConflict',
-  'command-required': 'profiles.mcp.commandRequired',
-  'command-too-long': 'profiles.mcp.commandTooLong',
-  'url-required': 'profiles.mcp.urlRequired',
-  'url-invalid': 'profiles.mcp.urlInvalid',
-  'url-too-long': 'profiles.mcp.urlTooLong',
-  'timeout-invalid': 'profiles.mcp.timeoutInvalid',
-  'json-invalid': 'profiles.mcp.jsonInvalid',
-  'record-too-large': 'profiles.mcp.jsonTooLarge',
-} satisfies Record<McpFormError, string>;
-
-/** The field each refused input belongs to, so Save can scroll it into view. */
-const FIELD_FOR_ERROR = {
-  'name-required': 'name',
-  'name-invalid': 'name',
-  'name-conflict': 'name',
-  'command-required': 'command',
-  'command-too-long': 'command',
-  'url-required': 'url',
-  'url-invalid': 'url',
-  'url-too-long': 'url',
-  'timeout-invalid': 'timeout',
-  'json-invalid': 'config',
-  'record-too-large': 'config',
-} satisfies Record<McpFormError, 'name' | 'command' | 'url' | 'config' | 'timeout'>;
-
-function errorKeyFor(
-  t: (key: string) => string,
-  error: McpFormError | null,
-  match: readonly McpFormError[]
-): string | undefined {
-  return error !== null && match.includes(error) ? t(ERROR_KEYS[error]) : undefined;
-}
 
 /**
  * The save's refusal: the per-profile server cap, a name the server already
@@ -344,7 +307,10 @@ export function McpFormSheet({
 
         <RowGroup>
           <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 px-4 py-3')}>
-            <Text {...HIDDEN_LABEL_PROPS} className="min-w-0 flex-1 text-sm font-medium text-foreground">
+            <Text
+              {...HIDDEN_LABEL_PROPS}
+              className="min-w-0 flex-1 text-sm font-medium text-foreground"
+            >
               {t('common.enabled')}
             </Text>
             <Switch

@@ -35,6 +35,7 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/screen-insets', () => ({
   useSideInsetStyle: () => ({}),
   useScreenInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  useDetailScreenBottomPadding: () => 0,
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({

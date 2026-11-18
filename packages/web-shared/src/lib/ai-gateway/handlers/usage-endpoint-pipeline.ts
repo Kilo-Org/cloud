@@ -37,13 +37,18 @@ import {
 import {
   freeModelRateLimitRejection,
   gatewayAccountRateLimitRejection,
+  gatewaySettingsRejection,
   gatewayUsageContextBase,
-  organizationGatewayPolicy,
   organizationProviderPreferences,
   paidUsageRejection,
   readGatewayBalance,
   resolveGatewayCaller,
+  resolveOrganizationGatewaySettings,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
+import {
+  getRouteInferenceRegion,
+  type OrganizationGatewaySettings,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/organization-gateway-settings';
 import {
   bareIpLiteral,
   bouncerDecideTier,
@@ -89,6 +94,7 @@ type UsageEndpointUpstreamBodyInput<Body> = {
   /** The organization's provider preferences, merged with the request's privacy. */
   organizationProvider: OpenRouterProviderConfig | undefined;
   organizationSettings: OrganizationSettings | undefined;
+  /** The region to pin the route's inference to: set only for Kilo's Vercel AI Gateway route. */
   dataRegion: OrganizationDataRegion | null;
 };
 
@@ -129,14 +135,20 @@ export type UsageEndpoint<Body> = {
     user: User | AnonymousUserContext;
     organizationId: string | undefined;
     organizationDecision: () => Promise<EffectiveModelDecision | undefined>;
+    /** The organization's gateway settings; the pipeline checks the chosen route against them. */
+    gatewaySettings: OrganizationGatewaySettings;
   }): Promise<{ provider: Provider; userByok: BYOKResult[] | null; isFree: boolean }>;
   /** A request rejection after the account checks, before bouncer decides. */
   validate?(body: Body, requestedModelLowerCased: string): NextResponse | null;
-  buildUpstreamBody(input: UsageEndpointUpstreamBodyInput<Body>): Promise<{
-    body: Record<string, unknown> | FormData;
-    /** The data region the upstream request pins inference to, if any. */
-    inferenceRegion?: OrganizationDataRegion | null;
-  }>;
+  buildUpstreamBody(input: UsageEndpointUpstreamBodyInput<Body>): Promise<
+    | {
+        body: Record<string, unknown> | FormData;
+        /** The data region the upstream request pins inference to, if any. */
+        inferenceRegion?: OrganizationDataRegion | null;
+      }
+    /** The route cannot serve the request, such as when no eligible provider remains. */
+    | { rejection: NextResponse }
+  >;
   /** Accounts for a response the upstream error policy let through, and answers the client. */
   accountAndRespond(upstream: UsageEndpointUpstreamResponse): Promise<NextResponseType<unknown>>;
 };
@@ -218,11 +230,23 @@ export async function handleUsageEndpointRequest<Body>(
           }).then(({ decision }) => decision)
         : Promise.resolve(undefined));
 
+  // Anonymous callers can only use free models, so they have no balance or organization to check.
+  const account =
+    caller.kind === 'signed-in'
+      ? await readGatewayBalance(caller.user, organizationId, requestedModelLowerCased)
+      : undefined;
+  const gatewaySettings = await resolveOrganizationGatewaySettings({
+    organizationId,
+    plan: account?.plan,
+    settings: account?.settings,
+  });
+
   const { provider, userByok, isFree } = await endpoint.resolveProvider({
     requestedModelLowerCased,
     user,
     organizationId,
     organizationDecision,
+    gatewaySettings,
   });
 
   const bouncerIp = bareIpLiteral(ipAddress);
@@ -268,18 +292,16 @@ export async function handleUsageEndpointRequest<Body>(
   let accountPayer: BalancePayer | undefined;
   let dataRegion: OrganizationDataRegion | null = null;
 
-  // Anonymous callers can only use free models, so they have no balance or organization to check.
-  if (caller.kind === 'signed-in') {
-    const account = await readGatewayBalance(caller.user, organizationId, requestedModelLowerCased);
+  if (caller.kind === 'signed-in' && account) {
     const { balance, settings, plan, payer } = account;
     accountBalance = balance;
     accountPlan = plan;
     accountPayer = payer;
     organizationSettings = settings;
 
-    const gatewayPolicy = await organizationGatewayPolicy({ organizationId, settings, provider });
-    if (gatewayPolicy.kind === 'rejected') return gatewayPolicy.response;
-    dataRegion = gatewayPolicy.dataRegion;
+    const gatewayRejection = gatewaySettingsRejection(gatewaySettings, { provider, userByok });
+    if (gatewayRejection) return gatewayRejection;
+    dataRegion = getRouteInferenceRegion(gatewaySettings, { provider, userByok });
 
     // Free models are Kilo- or partner-funded: a zero balance never blocks them.
     const creditsBlocked = paidUsageRejection({
@@ -313,6 +335,24 @@ export async function handleUsageEndpointRequest<Body>(
   const validationError = endpoint.validate?.(parsed.body, requestedModelLowerCased);
   if (validationError) return validationError;
 
+  // Built before bouncer decides, so a request the route cannot serve is rejected without a decide
+  // or a usage row: it never reaches the provider.
+  const upstreamBody = await endpoint.buildUpstreamBody({
+    body: parsed.body,
+    requestedModel,
+    requestedModelLowerCased,
+    provider,
+    userByok,
+    // Always set the hashed identifier for upstream abuse attribution / safety scoping.
+    safetyIdentifier: generateProviderSpecificHash(user.id, provider),
+    requestProvider: parsed.requestProvider,
+    organizationProvider,
+    organizationSettings,
+    dataRegion,
+  });
+  if ('rejection' in upstreamBody) return upstreamBody.rejection;
+  usageContext.inference_region = upstreamBody.inferenceRegion ?? null;
+
   // The one decide for this request, awaited just before the upstream call within its 500 ms
   // budget. Only an enforced verdict rejects; every other outcome sends the request.
   const bouncerVerdictPromise =
@@ -327,21 +367,6 @@ export async function handleUsageEndpointRequest<Body>(
     name: `${endpoint.spanPrefix}-request-start`,
     op: 'http.client',
   });
-
-  const upstreamBody = await endpoint.buildUpstreamBody({
-    body: parsed.body,
-    requestedModel,
-    requestedModelLowerCased,
-    provider,
-    userByok,
-    // Always set the hashed identifier for upstream abuse attribution / safety scoping.
-    safetyIdentifier: generateProviderSpecificHash(user.id, provider),
-    requestProvider: parsed.requestProvider,
-    organizationProvider,
-    organizationSettings,
-    dataRegion,
-  });
-  usageContext.inference_region = upstreamBody.inferenceRegion ?? null;
 
   const bouncerVerdict = await bouncerVerdictPromise;
   const bouncerRejection = bouncer.apply(bouncerVerdict, usageContext.bouncer);

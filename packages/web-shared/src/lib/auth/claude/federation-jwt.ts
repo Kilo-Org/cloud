@@ -57,6 +57,16 @@ function loadSigner(): FederationSigner {
   return cachedSigner;
 }
 
+/** Whether a JWT can be signed: every federation value is present and usable. */
+export function isClaudeFederationConfigured(): boolean {
+  try {
+    loadSigner();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export type ClaudeFederationJwtOptions = {
   /** The one audience the receiving OAuth app or federation rule expects. */
   audience: string;

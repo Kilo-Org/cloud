@@ -11,7 +11,8 @@
  * allowlists, wording and exit behavior, including what it does with a key that
  * is not a plural category.
  */
-import { readdirSync } from 'node:fs';
+import { readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 
 /** The plural categories i18next selects from, as they end a catalog key. */
 const PLURAL_SUFFIX = /_(zero|one|two|few|many|other)$/;
@@ -28,11 +29,29 @@ export function pluralParts(key) {
   return { base: key.slice(0, -match[0].length), category: match[1] };
 }
 
-/** The locale tags on disk in `dir`, sorted, without the `.json` extension. */
+/**
+ * The locale tags on disk in `dir`, sorted, without the `.json` extension.
+ *
+ * The tag's path must name a regular file, following symlinks: a directory
+ * named like a catalog is not a catalog, and reading it as one would end the
+ * audit in a stack trace, while a symlink to a real catalog audits like the
+ * file it names.
+ */
 export function catalogTags(dir) {
-  return readdirSync(dir)
-    .filter(name => name.endsWith('.json'))
-    .map(name => name.replace(/\.json$/, ''))
+  return readdirSync(dir, { withFileTypes: true })
+    .filter(entry => {
+      if (!entry.name.endsWith('.json')) {
+        return false;
+      }
+      try {
+        return statSync(join(dir, entry.name)).isFile();
+      } catch {
+        // A link the filesystem cannot follow reaches the audit's own read,
+        // which reports it; the tag set still contains the tag.
+        return true;
+      }
+    })
+    .map(entry => entry.name.replace(/\.json$/, ''))
     .sort();
 }
 

@@ -59,7 +59,9 @@ export function BitbucketSetupRecovery({
         }
       } catch (error) {
         if (attempt.owns()) {
-          attempt.fail(bitbucketConnectionFailure(error, t));
+          // Every failure here comes from a call against the stored token, so
+          // a refusal reads as the expired connection it sits on.
+          attempt.fail(bitbucketConnectionFailure(error, t, 'replace-token'));
         }
       }
     })();

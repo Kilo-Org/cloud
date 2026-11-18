@@ -12,7 +12,6 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
     }
   },
@@ -36,14 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "Парушэнне SLA"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "Праверка бяспекі мае абнаўленне"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "Ваш сеанс Kilo гатовы да кіравання з тэлефона"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

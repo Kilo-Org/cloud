@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Mgbanwe",
     "organizationTrialEnded": "Oge nnwale nke òtù ahụ agwụla na o nweghị atụmatụ na-arụ ọrụ. Onye nwe òtù nwere ike imelite nhazi ụgwọ na kilo.ai, wee nwaa ọzọ.",
-    "privateRepositoryA11y": "{{name}}, ebe nchekwa koodu nkeonwe"
+    "privateRepositoryA11y": "{{name}}, ebe nchekwa koodu nkeonwe",
+    "legalDocumentEnglishOnly": "Akwụkwọ a dị naanị n'asụsụ Bekee."
   },
   "language": {
     "restarting": "Na-amalitegharị iji asụsụ ahọpụtara",
@@ -1354,7 +1355,8 @@
       "managedOnWeb": "A na-elekọta njikọ Bitbucket nke nzukọ a na weebụ site na kọmputa.",
       "description": "Mepụta akara ikike ịnweta oghere ọrụ nwere ikike ndị achọrọ, wee mado ya n'okpuru.",
       "scopes": "Akaụntụ: ịgụ · Ebe nchekwa: ịgụ/ide · Arịrịọ ijikọ koodu: ịgụ · Njikọ ngosi: ịgụ/ide",
-      "tokenPlaceholder": "Akara ikike ịnweta oghere ọrụ"
+      "tokenPlaceholder": "Akara ikike ịnweta oghere ọrụ",
+      "tokenRefused": "Bitbucket anabataghị akara ikike ịnweta oghere ọrụ a. Lelee na o nwere ikike ndị dị n'elu, wee gbalịa ọzọ."
     },
     "scopeList": {
       "personalStillAvailable": "Ebe nchekwa nke gị ka dị n'okpuru.",
@@ -1465,7 +1467,8 @@
       "repositoryLine": "Nyocha: {{reviews}} · Ihe achọpụtara: {{findings}}",
       "empty": "Enweghị nyocha nwere ọnụọgụgụ nyocha",
       "emptyDescription": "Ọnụọgụgụ nyocha na-edekọ nyocha ndị gụchara mgbe agbanyere ya maka nzukọ.",
-      "off": "Agbanyụrụ ọnụọgụgụ nyocha maka nzukọ a.",
+      "offTitle": "Agbanyụrụ ọnụọgụgụ nyocha maka {{platform}}",
+      "offDescription": "Gbanye ya na ntọala òtù na weebụ ka ọ dekọọ nyocha ndị gụchara.",
       "couldNotLoad": "Enweghị ike ibudata ọnụọgụgụ nyocha"
     },
     "council": {
@@ -3462,7 +3465,6 @@
     },
     "settingsOnWeb": {
       "title": "Ntọala òtù na weebụ",
-      "integrations": "Njikọ na weebụ",
       "usageDetails": "Nkọwa ojiji",
       "providersAndModels": "Ndị na-enye ọrụ na model",
       "groups": "Ìgwè",
@@ -3471,9 +3473,19 @@
       "ssoAndDomain": "SSO na domain",
       "dataCollection": "Nchịkọta data",
       "auditLogs": "Ndekọ nyocha",
-      "requestLogs": "Ndekọ arịrịọ",
-      "subOrganizations": "Òtù ndị dị n'okpuru",
-      "distributeFunds": "Kesaa ego"
+      "requestLogs": "Ndekọ arịrịọ"
+    },
+    "requestLogs": {
+      "hint": "Arịrịọ nke otu awa tupu oge a na-egosi agwụ, nke kachasị ọhụrụ bụ mbụ.",
+      "older": "Awa gara aga",
+      "newer": "Awa na-esote",
+      "truncated": "Awa a nwere arịrịọ karịa ndị ndepụta a na-egosi.",
+      "emptyTitle": "Enweghị arịrịọ",
+      "emptyDescription": "Enweghị arịrịọ gateway n'awa a.",
+      "loadError": "Enweghị ike ibudata ndekọ arịrịọ.",
+      "permissionDenied": "Naanị onye nwe òtù, onye nchịkwa ma ọ bụ onye na-ahụ maka ịkwụ ụgwọ nwere ike ịgụ ndekọ arịrịọ ya.",
+      "tokens": "{{input}} batara · {{output}} pụtara",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Tokin ntinye",
@@ -4527,6 +4539,8 @@
     "topModels": "Ụdị a kacha eji",
     "topFeatures": "Njirimara a kacha eji",
     "emptyTitle": "Enweghị ojiji n'oge a",
+    "unavailableTitle": "Ojiji adịghị",
+    "unavailableDescription": "Oghere ọrụ a anaghị akọ ojiji. Ịnwale ọzọ agaghị enyere aka.",
     "orgSelfNotice": "Ị na-ahụ ojiji nke gị n'ime nzukọ a.",
     "viewDetails": "Lee nkọwa ojiji"
   },
@@ -4685,5 +4699,175 @@
     "unavailableDescription": "Njikọ nkesa a agwụla oge ma ọ bụ a kagbuola ya.",
     "transcriptUnavailableTitle": "Enweghị ike ibugo ndekọ a",
     "transcriptUnavailableDescription": "Njikọ ahụ ka na-arụ ọrụ. Nwaa ọzọ n'oge na-adịghị anya."
+  },
+  "organizationGuardrails": {
+    "title": "Ihe nchebe AI",
+    "permissionDenied": "Naanị ndị nwe nzukọ na ndị nchịkwa nwere ike ijikwa Ihe nchebe AI.",
+    "unavailable": "Ihe nchebe AI adịghị maka nzukọ a.",
+    "loadError": "Enweghị ike ibudata Ihe nchebe AI",
+    "statusSaving": "Na-echekwa…",
+    "statusSaved": "Echekwara",
+    "statusFailed": "Enweghị ike ichekwa.",
+    "inputTitle": "Ihe nchebe ntinye",
+    "inputDescription": "Na-enyocha ntinye ọ bụla na Enkrypt AI, gụnyere nsonaazụ ngwaọrụ. Onye nchọpụta na-egbochi na-ajụ arịrịọ mgbe Enkrypt adịghị.",
+    "outputTitle": "Ihe nchebe mmepụta",
+    "outputDescription": "Na-enyocha nzaghachi na Enkrypt AI tupu ndị otu anata ha. Ọ gbanyụrụ ọkụ belụsọ ma ị gbanyere ya.",
+    "detectorsHint": "Igbochi na-ajụ arịrịọ e tinyere akara. Ndekọ naanị na-edekọ ya n'egbughị oge arịrịọ ahụ.",
+    "detectorsHintOutput": "Igbochi na-eme ka nzaghachi e tinyere akara daa. Ndekọ naanị na-edekọ ya n'egbughị oge nzaghachi ahụ.",
+    "choiceLog": "Ndekọ naanị",
+    "applyTo": "Tinye na",
+    "applyToAllMembers": "Ndị otu niile",
+    "applyKiloDefault": "Tinye ndabara Kilo",
+    "invalidSavedTitle": "Enweghị ike ịgụ ntọala onye nchọpụta ntinye echekwara",
+    "invalidSavedBody": "A na-egbochi arịrịọ ruo mgbe echekwara ndị nchọpụta ntinye ọzọ. Ndị nchọpụta dị n'okpuru na-amalite site na ndabara Kilo.",
+    "invalidSavedOutputTitle": "Enweghị ike ịgụ ntọala onye nchọpụta mmepụta echekwara",
+    "invalidSavedOutputBody": "A na-ejide nzaghachi ruo mgbe echekwara ndị nchọpụta mmepụta ọzọ. Họrọ ndị nchọpụta mmepụta n'okpuru.",
+    "blockingOutputNote": "Onye nchọpụta mmepụta na-egbochi na-ejide nzaghachi ruo mgbe Enkrypt nyochara ya niile. Jiri Ndekọ naanị iji zere igbu oge.",
+    "inputDetectorRequired": "Gbanye opekata mpe otu onye nchọpụta ntinye.",
+    "outputDetectorRequired": "Gbanye opekata mpe otu onye nchọpụta mmepụta.",
+    "rulesTooMany": "Tinye ihe ruru {{max}} iwu.",
+    "ruleIdRequired": "Tinye njirimara iwu.",
+    "ruleIdInvalid": "Njirimara iwu nwere ike iji naanị mkpụrụ akwụkwọ, ọnụọgụ, ntụpọ, akara mkpirisi, na akara ala.",
+    "ruleTextRequired": "Kọwaa ihe iwu ahụ na-amachibido ma ọ bụ chọrọ.",
+    "keywordTooLong": "Okwu mkpado ọ bụla nwere ike iru {{max}} mkpụrụ edemede.",
+    "topicTooLong": "Isiokwu ọ bụla nwere ike iru {{max}} mkpụrụ edemede.",
+    "keywordsTooMany": "Tinye ihe ruru {{max}} okwu mkpado.",
+    "topicsTooMany": "Tinye ihe ruru {{max}} isiokwu.",
+    "piiEntityRequired": "Họrọ opekata mpe otu ụdị ozi a ga-achọpụta.",
+    "keywordRequired": "Tinye opekata mpe otu okwu mkpado.",
+    "topicRequired": "Tinye opekata mpe otu isiokwu.",
+    "policyTextRequired": "Tinye edemede amụma.",
+    "ruleRequired": "Tinye opekata mpe otu iwu.",
+    "ruleIdDuplicate": "Iwu ọ bụla chọrọ ID iwu nke ya.",
+    "piiEntities": "Ozi a ga-achọpụta",
+    "keywordsLabel": "Okwu mkpado",
+    "keywordsHint": "Otu okwu mkpado n'ahịrị ọ bụla.",
+    "topicsHint": "Otu isiokwu n'ahịrị ọ bụla.",
+    "policyFormat": "Ụdị amụma",
+    "policyFormatRules": "Iwu ahaziri ahazi",
+    "policyFormatRulesDescription": "Otu iwu maka otu ihe a chọrọ, yana otu ụdị na ogo ịdị njọ. A tụrụ aro ya.",
+    "policyFormatText": "Edemede amụma",
+    "policyFormatTextDescription": "Tinye amụma dị adị dị ka edemede nkịtị.",
+    "rulesEmpty": "Enwebeghị iwu. Iwu ọ bụla na-akọwa otu ihe ntinye agaghị enwe ma ọ bụ rịọ.",
+    "addRule": "Tinye iwu",
+    "ruleNumber": "Iwu {{number}}",
+    "ruleRemove": "Wepụ iwu {{number}}",
+    "ruleIdLabel": "Njirimara iwu",
+    "ruleNameLabel": "Aha (nhọrọ)",
+    "ruleTextLabel": "Iwu",
+    "ruleRiskCategory": "Ụdị ihe egwu",
+    "ruleApplicability": "Oke",
+    "ruleFrameworks": "Usoro",
+    "detector": {
+      "promptInjection": {
+        "label": "Ntinye aro",
+        "description": "Na-achọpụta mbọ iji kagbuo ntụziaka ma ọ bụ gbanarị njide ihe nlere."
+      },
+      "policyViolation": {
+        "label": "Imebi amụma",
+        "description": "Na-egosi ntinye na-emebi amụma nzukọ gị, nke edere dị ka edemede ma ọ bụ iwu.",
+        "descriptionOutput": "Na-egosi nzaghachi na-emebi amụma nzukọ gị, nke edere dị ka edemede ma ọ bụ iwu."
+      },
+      "pii": {
+        "label": "PII na ihe nzuzo",
+        "description": "Na-achọpụta ozi onwe onye, njirimara ntinye, adreesị netwọk, na URL."
+      },
+      "keywords": {
+        "label": "Okwu mkpado amachibidoro",
+        "descriptionOutput": "Na-achọpụta nzaghachi nwere okwu mkpado ọ bụla ị depụtara."
+      },
+      "topics": {
+        "label": "Isiokwu",
+        "descriptionOutput": "Na-egosi nzaghachi gbasara isiokwu ọ bụla ị depụtara."
+      },
+      "toxicity": {
+        "label": "Nsi",
+        "description": "Na-achọpụta asụsụ na-egbu egbu, na-akparị, na-eyi egwu, ma ọ bụ ịkpọasị."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Na-achọpụta ọdịnaya mmekọahụ ma ọ bụ nke na-adịghị mma maka ọrụ."
+      },
+      "bias": {
+        "label": "Ịkpa ókè",
+        "description": "Na-achọpụta asụsụ nwere ịkpa ókè."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Ozi onwe onye",
+        "description": "Aha, adreesị ozi-e, nọmba ekwentị."
+      },
+      "secrets": {
+        "label": "Ihe nzuzo",
+        "description": "Igodo API, akara, okwu nzuzo."
+      },
+      "ipAddress": {
+        "label": "Adreesị netwọk",
+        "description": "Adreesị IPv4 na IPv6."
+      },
+      "url": {
+        "label": "URL",
+        "description": "Adreesị ịntanetị."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Nchekwa na aghụghọ",
+      "safetyHarm": "Nchekwa na mmerụ ahụ",
+      "privacyDataProtection": "Nzuzo na nchekwa ozi",
+      "brandReputationTrust": "Aha ụlọ ọrụ na aha ọma",
+      "biasFairnessEthical": "Ịkpa ókè na ikpe ziri ezi",
+      "legalIpLiability": "Iwu na ụgwọ ikike ọgụgụ isi",
+      "productMisuse": "Iji ngwaahịa eme ihe n'ụzọ na-ezighị ezi",
+      "performanceQuality": "Arụmọrụ na ịdị mma"
+    },
+    "applicability": {
+      "user": "Ntinye onye ọrụ",
+      "userAssistant": "Ntinye onye ọrụ na nzaghachi"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM 10 kacha elu (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "Iwu AI EU",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Atụmatụ ụlọ ọrụ",
+    "enterpriseOnly": "Nke a bụ atụmatụ maka ụlọ ọrụ naanị.",
+    "readOnly": "Naanị ndị nwe nzukọ na ndị nchịkwa nwere ike ịgbanwe ntọala ndị a.",
+    "loadError": "Enweghị ike ibudata ndị na-enye ọrụ na ihe nlere",
+    "tabModels": "Ihe nlere",
+    "tabProviders": "Ndị na-enye ọrụ",
+    "tabGateways": "Ọnụ ụzọ",
+    "modelsDescription": "Gbanyụọ otu ihe nlere iji gbochie ya maka ndị otu niile. Ihe nlere sitere na ndị na-enye ọrụ ekwenyere na-amalite ka agbanyere.",
+    "modelsDeniedOnly": "Naanị ndị a jụrụ",
+    "modelsEmpty": "Ọnweghị ihe nlere dabara na nchọta a.",
+    "providersDescription": "Gbanyụọ onye na-enye ọrụ iji kwụsị Kilo ịga na ya maka nzukọ a.",
+    "providersNeedCatalog": "Mgba ọkụ ndị na-enye ọrụ ga-anọgide naanị maka ịgụ ruo mgbe katalọgụ ụdị niile ebudatara. Nwaa ọzọ n'elu iji dezie ha.",
+    "providersEmpty": "Ọnweghị onye na-enye ọrụ dabara na nchọta a.",
+    "allowAllShown": "Kwe ka ihe niile egosiri",
+    "denyAllShown": "Jụ ihe niile egosiri",
+    "gatewaysDescription": "Kilo na-eziga arịrịọ ihe nlere site na Vercel AI Gateway ma ọ bụ OpenRouter. Ọnụ ụzọ agbanyụrụ na-eme ka arịrịọ ndị ahụ daa.",
+    "emptyProviderList": "Kwe ka ọ dịkarịa ala otu onye na-enye ọrụ. Ndepụta efu na-egbochi ụzọ ihe nlere Kilo niile.",
+    "gatewaysUnavailable": "Ntọala ọnụ ụzọ adịghị maka nzukọ a.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "A naghị agbanye arịrịọ OpenRouter na otu mpaghara.",
+    "inferenceRegion": "Mpaghara ntule",
+    "inferenceRegionDescription": "Na-agbanye arịrịọ Vercel AI Gateway na mpaghara a. Ihe nlere na-adịghị ebe ahụ na-ada.",
+    "disableOpenrouterNote": "Igbochi OpenRouter na-egbochikwa igodo BYOK na-eziga arịrịọ site na ya.",
+    "emptyModelList": "Hapụ ma ọ dịkarịa ala otu ihe nlere ka ọ gbanye. Ịjụ ihe nlere niile na-eme ka ndị otu ghara inwe ihe ọ bụla ha ga-eji.",
+    "catalogUnavailable": "Katalọgụ ihe nlere zuru ezu ebughị, n'ihi ya, ọ bụ naanị ndepụta ndị i chekwara ka egosiri. Nwaa ọzọ ka ibulite ihe nlere niile.",
+    "region": {
+      "global": "Ụwa niile",
+      "us": "Njikọta Steeti",
+      "eu": "Njikọ Yurop",
+      "au": "Ostralịa",
+      "jp": "Japan"
+    }
   }
 }

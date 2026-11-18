@@ -19,7 +19,7 @@
  *
  * Usage: node tools/i18n/check-catalogs.mjs
  */
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative as relativePath, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -70,7 +70,7 @@ function catalogsOf(root) {
       localeRegistry: join(root, 'packages/notifications/src/i18n.ts'),
       sourceRoots: [join(root, 'packages/notifications/src'), join(root, 'services')],
       baseKeyOf: pushBaseKey,
-      englishCopyRules: [checkPushEnglishCopy],
+      englishCopyRules: [checkEnglishCopies, checkPushEnglishCopy],
       calledKeyOf: pushCalledKeyOf,
       keyPrefixOf: pushKeyPrefix,
       collectsDestructiveKeys: false,
@@ -274,6 +274,15 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   // The CLI's product name, a title for a device-sessions row. A product name
   // has nothing to translate, so every catalog keeps the published spelling.
   'deviceSessions.kiloCli',
+  // The request-logs row's marker for a request that spent the reader's own
+  // provider key. `BYOK` is the acronym the provider-key screens and the
+  // gateway's own copy use, so every catalog keeps it rather than transliterating
+  // an initialism.
+  'organization.requestLogs.byok',
+  // The gateway's product name, the label of the switch that routes through it.
+  // A product name has nothing to translate, so every catalog keeps the spelling
+  // the gateway and its documentation publish.
+  'organizationModelAccess.openrouter',
 ]);
 
 /**
@@ -428,13 +437,20 @@ function scanCatalogKeys(text) {
  * keeps the last duplicate silently, so the raw text is the only witness.
  *
  * A catalog this cannot read is reported once and skipped, the way
- * `check-plurals.mjs` treats a locale it cannot audit: an unbalanced scan or a
- * file JSON.parse rejects leaves one problem line instead of a stack trace and a
- * cascade of missing-key findings.
+ * `check-plurals.mjs` treats a locale it cannot audit: a read the filesystem
+ * refuses, an unbalanced scan, or a file JSON.parse rejects leaves one problem
+ * line instead of a stack trace and a cascade of missing-key findings.
  */
 function parseCatalog(file, label) {
   const problems = [];
-  const text = readFileSync(file, 'utf8');
+  let text;
+  try {
+    text = readFileSync(file, 'utf8');
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    problems.push(`${label}: cannot audit catalog: ${message}`);
+    return { catalog: null, problems };
+  }
   const { duplicates, readable } = scanCatalogKeys(text);
   if (!readable) {
     problems.push(`${label}: cannot audit catalog: its strings and braces do not balance`);
@@ -1355,7 +1371,7 @@ function isAdmittedPluralKey(parts, englishFamilies, englishCountedBases) {
 }
 
 /** The catalogs a folder is missing, and the files no supported language names. */
-function checkCatalogMembership({ catalogName, tags, present }) {
+function checkCatalogMembership({ catalogName, tags, present, dir }) {
   const problems = [];
   for (const tag of tags) {
     if (!present.has(tag)) {
@@ -1367,7 +1383,38 @@ function checkCatalogMembership({ catalogName, tags, present }) {
       problems.push(`${catalogName}: catalog "${tag}.json" is not a supported language`);
     }
   }
+  // `catalogTags` counts only regular files, so a directory named like a
+  // catalog would vanish from `present` and from this rule without a trace.
+  // Naming it here keeps the stray entry a reported problem instead.
+  for (const name of nonFileCatalogEntries(dir)) {
+    problems.push(
+      `${catalogName}: catalog "${name}.json" is not a regular file; remove it or make it a catalog`
+    );
+  }
   return problems;
+}
+
+/**
+ * The `.json`-named entries of `dir` that are not regular files, sorted.
+ *
+ * The same stat-based definition `catalogTags` filters by, so an entry can
+ * never fall out of one set without a line in the other: a directory named
+ * like a catalog and a symlink the filesystem cannot follow are named here.
+ */
+function nonFileCatalogEntries(dir) {
+  return readdirSync(dir, { withFileTypes: true })
+    .filter(entry => {
+      if (!entry.name.endsWith('.json')) {
+        return false;
+      }
+      try {
+        return !statSync(join(dir, entry.name)).isFile();
+      } catch {
+        return true;
+      }
+    })
+    .map(entry => entry.name.replace(/\.json$/, ''))
+    .sort();
 }
 
 function checkEnglishCopies({ catalogName, english }) {
@@ -1954,28 +2001,41 @@ function checkPushEnglishCopy({ catalogName, english, localeValues }) {
 
 /**
  * The policy fields a scan reads on one catalog descriptor. Every catalog
- * needs a called-key reader; `keyPrefixOf` stays null when the catalog builds
- * no key from a template head; the destructive collection is a real decision,
- * because an entry that leaves the field out reads as one that chose not to
- * collect. A misconfigured entry is reported as a named problem and the audit
- * skips its scan entirely, instead of dying on the missing reader partway
- * through the tree — the problems the run collected before the scan would
- * never be printed.
+ * needs a called-key reader and a base-key reader, one that names the key the
+ * source calls and one that names the key a consumer appends its part to;
+ * `keyPrefixOf` stays null when the catalog builds no key from a template
+ * head; the copy-rule list holds the checks its English strings must pass, so
+ * it must hold at least one rule and every entry must be one; the destructive
+ * collection is a real decision, because an entry that leaves the field out
+ * reads as one that chose not to collect. A misconfigured entry is reported as
+ * a named problem and the audit skips its scan entirely, instead of dying on
+ * the missing part after the run has collected problems of its own — those
+ * would never be printed.
  */
 function checkScanPolicy(catalog) {
   const missing = [];
   if (typeof catalog.calledKeyOf !== 'function') {
     missing.push('calledKeyOf');
   }
+  if (typeof catalog.baseKeyOf !== 'function') {
+    missing.push('baseKeyOf');
+  }
   if (typeof catalog.keyPrefixOf !== 'function' && catalog.keyPrefixOf !== null) {
     missing.push('keyPrefixOf');
+  }
+  if (
+    !Array.isArray(catalog.englishCopyRules) ||
+    catalog.englishCopyRules.length === 0 ||
+    !catalog.englishCopyRules.every(rule => typeof rule === 'function')
+  ) {
+    missing.push('englishCopyRules');
   }
   if (typeof catalog.collectsDestructiveKeys !== 'boolean') {
     missing.push('collectsDestructiveKeys');
   }
   return missing.map(
     field =>
-      `${catalog.name}: the catalog descriptor declares no ${field}; every entry of catalogsOf declares its scan policy`
+      `${catalog.name}: the catalog descriptor declares no usable ${field}; every entry of catalogsOf declares its scan policy`
   );
 }
 
@@ -2074,7 +2134,7 @@ export function checkCatalogs(root = ROOT) {
     const catalogName = catalog.name;
     const present = new Set(catalogTags(catalog.dir));
 
-    problems.push(...checkCatalogMembership({ catalogName, tags, present }));
+    problems.push(...checkCatalogMembership({ catalogName, tags, present, dir: catalog.dir }));
 
     const parsedEnglish = parseCatalog(join(catalog.dir, 'en.json'), `${catalogName}/en`);
     problems.push(...parsedEnglish.problems);

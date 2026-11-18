@@ -338,9 +338,7 @@ export function ProfileInstructionsScreen({
           saveFailure={saveFailure?.message ?? null}
           saveFailureTone={saveFailure?.tone}
           onClose={handleClose}
-          onSave={submission => {
-            void saveInstruction(form.editing, submission);
-          }}
+          onSave={submission => saveInstruction(form.editing, submission)}
         />
       ) : null}
 

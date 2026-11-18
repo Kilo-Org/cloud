@@ -5,7 +5,7 @@ import {
   buildGlanceableSnapshot,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { EMPTY_HOME_WIDGET_DETAILS } from '@kilocode/app-shared/home-widget';
+import { emptyHomeWidgetDetails } from '@kilocode/app-shared/home-widget';
 
 import {
   type GatedSecureStore,
@@ -152,7 +152,7 @@ describe('the widget store writes with AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY', () 
 
     expect(setItem).toHaveBeenCalledWith(
       HOME_WIDGET_DATA_KEY,
-      JSON.stringify({ snapshot, details: EMPTY_HOME_WIDGET_DETAILS }),
+      JSON.stringify({ snapshot, details: emptyHomeWidgetDetails() }),
       { keychainAccessible: AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY }
     );
   });

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one sentence builder per details kind, each a flat t() call; the maps and detector fragments live next door */
 import { type TFunction } from 'i18next';
 
 import {

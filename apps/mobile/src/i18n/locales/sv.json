@@ -3644,8 +3644,7 @@
     "imagesSectionEmpty": "Inga betrodda bildvärdar",
     "revoke": "Sluta lita på {{host}}",
     "revokeMessage": "Länkar till den här värden kommer att be om bekräftelse igen.",
-    "revokeImageMessage": "Bilder från den här värden kommer att be om bekräftelse igen.",
-    "backToPreferences": "Tillbaka till inställningarna"
+    "revokeImageMessage": "Bilder från den här värden kommer att be om bekräftelse igen."
   },
   "glanceable": {
     "waiting": "Uppdaterar agenter",

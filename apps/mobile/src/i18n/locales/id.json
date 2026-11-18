@@ -3644,8 +3644,7 @@
     "imagesSectionEmpty": "Tidak ada host gambar tepercaya",
     "revoke": "Cabut kepercayaan untuk {{host}}",
     "revokeMessage": "Tautan ke host ini akan meminta konfirmasi lagi.",
-    "revokeImageMessage": "Gambar dari host ini akan meminta konfirmasi lagi.",
-    "backToPreferences": "Kembali ke preferensi"
+    "revokeImageMessage": "Gambar dari host ini akan meminta konfirmasi lagi."
   },
   "glanceable": {
     "waiting": "Memperbarui agen",

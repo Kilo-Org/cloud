@@ -3703,8 +3703,7 @@
     "imagesSectionEmpty": "אין אתרי תמונות מהימנים",
     "revoke": "ביטול האמון באתר {{host}}",
     "revokeMessage": "קישורים לאתר זה יבקשו אישור שוב.",
-    "revokeImageMessage": "תמונות מאתר זה יבקשו אישור שוב.",
-    "backToPreferences": "חזרה להעדפות"
+    "revokeImageMessage": "תמונות מאתר זה יבקשו אישור שוב."
   },
   "glanceable": {
     "waiting": "נתוני הסוכנים מתעדכנים",

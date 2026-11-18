@@ -3644,8 +3644,7 @@
     "imagesSectionEmpty": "Geen vertroude beeldgashere nie",
     "revoke": "Herroep vertroue in {{host}}",
     "revokeMessage": "Skakels na hierdie gasheer sal weer om bevestiging vra.",
-    "revokeImageMessage": "Beelde van hierdie gasheer sal weer om bevestiging vra.",
-    "backToPreferences": "Terug na voorkeure"
+    "revokeImageMessage": "Beelde van hierdie gasheer sal weer om bevestiging vra."
   },
   "glanceable": {
     "waiting": "Besig om agente op te dateer",

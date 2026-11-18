@@ -3068,8 +3068,7 @@
     "imagesSectionEmpty": "No trusted image hosts",
     "revoke": "Revoke {{host}}",
     "revokeMessage": "Links to this host will ask for confirmation again.",
-    "revokeImageMessage": "Images from this host will ask for confirmation again.",
-    "backToPreferences": "Back to preferences"
+    "revokeImageMessage": "Images from this host will ask for confirmation again."
   },
   "forceUpdate": {
     "couldNotOpenStore": "Could not open the app store.",

@@ -3762,8 +3762,7 @@
     "imagesSectionEmpty": "Brak zaufanych hostów obrazów",
     "revoke": "Cofnij zaufanie do {{host}}",
     "revokeMessage": "Linki do tego hosta ponownie poproszą o potwierdzenie.",
-    "revokeImageMessage": "Obrazy z tego hosta ponownie poproszą o potwierdzenie.",
-    "backToPreferences": "Wróć do preferencji"
+    "revokeImageMessage": "Obrazy z tego hosta ponownie poproszą o potwierdzenie."
   },
   "glanceable": {
     "waiting": "Aktualizowanie stanu agentów",

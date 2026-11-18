@@ -3644,8 +3644,7 @@
     "imagesSectionEmpty": "Hakuna tovuti za picha zinazoaminika",
     "revoke": "Ondoa uaminifu kwa {{host}}",
     "revokeMessage": "Viungo vya tovuti hii vitaomba uthibitisho tena.",
-    "revokeImageMessage": "Picha kutoka tovuti hii zitaomba uthibitisho tena.",
-    "backToPreferences": "Rudi kwenye mapendeleo"
+    "revokeImageMessage": "Picha kutoka tovuti hii zitaomba uthibitisho tena."
   },
   "glanceable": {
     "waiting": "Inasasisha mawakala",

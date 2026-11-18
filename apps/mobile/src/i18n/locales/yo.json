@@ -3644,8 +3644,7 @@
     "imagesSectionEmpty": "Kò sí àwọn ojúlé àwòrán tí a gbẹ́kẹ̀ lé",
     "revoke": "Fagilé ìgbẹ́kẹ̀lé {{host}}",
     "revokeMessage": "Àwọn ọ̀nà àsopọ̀ sí ojúlé yìí yóò tún béèrè fún ìjẹ́rìí.",
-    "revokeImageMessage": "Àwọn àwòrán láti ojúlé yìí yóò tún béèrè fún ìjẹ́rìí.",
-    "backToPreferences": "Padà sí àwọn ààyò"
+    "revokeImageMessage": "Àwọn àwòrán láti ojúlé yìí yóò tún béèrè fún ìjẹ́rìí."
   },
   "glanceable": {
     "waiting": "Ń ṣe ìmúdójúìwọ̀n àwọn aṣojú",

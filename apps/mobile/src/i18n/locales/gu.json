@@ -3644,8 +3644,7 @@
     "imagesSectionEmpty": "કોઈ વિશ્વસનીય છબી હોસ્ટ નથી",
     "revoke": "{{host}} માટેની મંજૂરી રદ કરો",
     "revokeMessage": "આ હોસ્ટની લિંક ફરીથી પુષ્ટિ માગશે.",
-    "revokeImageMessage": "આ હોસ્ટની છબીઓ ફરીથી પુષ્ટિ માગશે.",
-    "backToPreferences": "પસંદગીઓ પર પાછા જાઓ"
+    "revokeImageMessage": "આ હોસ્ટની છબીઓ ફરીથી પુષ્ટિ માગશે."
   },
   "glanceable": {
     "waiting": "એજન્ટોની માહિતી અપડેટ થઈ રહી છે",

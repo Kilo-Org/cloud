@@ -3644,8 +3644,7 @@
     "imagesSectionEmpty": "Chưa có máy chủ hình ảnh được tin cậy",
     "revoke": "Bỏ tin cậy {{host}}",
     "revokeMessage": "Liên kết đến máy chủ này sẽ hỏi xác nhận lại.",
-    "revokeImageMessage": "Hình ảnh từ máy chủ này sẽ hỏi xác nhận lại.",
-    "backToPreferences": "Quay lại cài đặt"
+    "revokeImageMessage": "Hình ảnh từ máy chủ này sẽ hỏi xác nhận lại."
   },
   "glanceable": {
     "waiting": "Đang cập nhật tác nhân",

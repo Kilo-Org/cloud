@@ -3709,8 +3709,7 @@
     "imagesSectionEmpty": "Sem servidores de imagens de confiança",
     "revoke": "Deixar de confiar em {{host}}",
     "revokeMessage": "As ligações para este servidor voltarão a pedir confirmação.",
-    "revokeImageMessage": "As imagens deste servidor voltarão a pedir confirmação.",
-    "backToPreferences": "Voltar às preferências"
+    "revokeImageMessage": "As imagens deste servidor voltarão a pedir confirmação."
   },
   "glanceable": {
     "waiting": "A atualizar agentes",

@@ -229,6 +229,8 @@ function toolsReport(overrides: Partial<EnkryptToolScanReport> = {}): EnkryptToo
     tools_flagged: 0,
     total_characters: render(required(partsScan.parts.tools[0]).segments).length,
     cached_characters: 0,
+    total_units: 1,
+    cached_units: 0,
     scanned_characters: scanReport.scanned_characters,
     decision: 'allowed',
     error: null,

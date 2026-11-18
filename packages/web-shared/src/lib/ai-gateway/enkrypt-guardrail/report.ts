@@ -76,7 +76,19 @@ const scanOutcomeShape = {
   detectors_blocking: z.array(DetectorIdSchema),
   verdict_cache: VerdictCacheSchema,
   total_characters: z.number(),
+  /**
+   * Characters the verdict cache covered: whole segments, and the body text of cached slices of a
+   * segment split for being too long for one call. Reports written before slices were counted
+   * cover whole segments only.
+   */
   cached_characters: z.number(),
+  /**
+   * Units whose verdicts are cached on their own: a segment, or a slice of a segment too long for
+   * one call. Absent from reports written before units were counted.
+   */
+  total_units: z.number().optional(),
+  /** Units with a cached verdict, so not scanned. Absent where `total_units` is. */
+  cached_units: z.number().optional(),
   /**
    * Includes the separators between packed segments and the headers of split segments, so it can
    * exceed `total_characters`.

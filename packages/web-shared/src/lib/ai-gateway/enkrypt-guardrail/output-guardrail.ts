@@ -114,6 +114,8 @@ function wholeResponseCoverage(text: string): EnkryptScanCoverage {
     totalSegments: text.length > 0 ? 1 : 0,
     cachedCharacters: 0,
     cachedSegments: 0,
+    totalUnits: text.length > 0 ? 1 : 0,
+    cachedUnits: 0,
     omittedAttachments: 0,
   };
 }

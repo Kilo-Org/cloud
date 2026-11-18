@@ -15,25 +15,25 @@ const buttonVariants = cva(
       variant: {
         default: 'bg-primary active:opacity-80 shadow-sm shadow-[#0000000D]',
         destructive: 'bg-destructive-solid active:opacity-80 shadow-sm shadow-[#0000000D]',
-        // The dark card surface sits a step above the near-black background, and
-        // the default hairline (7% white) is too faint to separate the control
-        // from it, so an outlined control would read as unpainted black-on-black
-        // in dark mode. Same surface/border pair the app's other dark cards use.
-        outline:
-          'border-border bg-card dark:border-neutral-700 dark:bg-secondary active:opacity-80 border shadow-sm shadow-[#0000000D]',
+        // The one secondary control: a surface and a border that carry the same
+        // weight in both schemes, so the light card does not read as raised
+        // while the dark one reads as outlined. `--input` is the palette's
+        // control border (45% ink light, 35% ink dark); `--border`'s 7% white in
+        // dark is too faint to separate the control from the near-black page.
+        outline: 'border-input bg-card dark:bg-secondary active:opacity-80 border',
         // A destructive action that shares a footer with a filled primary must
         // not compete with it for attention: the fill stays with the safe,
         // forward action, so the destructive one keeps its warning ink and
         // outline and paints no fill of its own.
         'outline-destructive':
-          'border-destructive bg-card dark:bg-secondary active:opacity-80 border shadow-sm shadow-[#0000000D]',
+          'border-destructive bg-card dark:bg-secondary active:opacity-80 border',
         // A filled neutral action keeps its own fill rather than the surface
         // token: `--secondary` is also the dark card an outlined control paints
         // (above), so a filled action in that colour reads as the same control
         // as the outlined one beside it, as it did in the discard-draft sheet
         // and the permission card. `--secondary-fill` equals `--secondary` in
         // light and takes a visible step above it in dark.
-        secondary: 'bg-secondary-fill active:opacity-80 shadow-sm shadow-[#0000000D]',
+        secondary: 'bg-secondary-fill active:opacity-80',
         ghost: 'active:opacity-60',
         link: '',
         // A soft accent action is low-emphasis, so it paints a tint of the
@@ -169,19 +169,17 @@ const buttonLabelClasses = Object.fromEntries(
 ) as Record<ButtonVariant, string>;
 
 /**
- * The pair a disabled (not busy) primary action paints: its fill and the label
- * ink that reads on it. The fill is `--primary-disabled-action` in both themes.
- * Light keeps the palette's disabled primary, white label at 5.4:1. Dark takes
- * a dim neutral that still stands off the near-black page (2.6:1) and carries
- * `--foreground` at 6.4:1, because there the palette's `--primary-disabled`
- * (5.3:1 above the page) outshines every other element like an enabled control
- * and the inactive icon surface (`--control-idle`, 1.7:1) leaves a full-width
- * plate without presence. `--primary-disabled` itself stays with the shared
- * Switch's disabled on-track. A caller that paints its own mark on this fill
- * takes `useMutedDisabledInk` from `@/lib/hooks/use-theme-colors`.
+ * The pair a disabled (not busy) primary action paints: the palette's muted
+ * surface and the muted ink that reads on it (4.6:1 light, 4.5:1 dark). A
+ * brand or taupe fill reads as a second colour rather than as an inactive
+ * control; the muted step is the one every disabled row in the app already
+ * uses. The label takes the complete class set rather than overriding the
+ * variant's ink, so no two colour utilities compete. A caller that paints its
+ * own mark on this fill takes `useMutedDisabledInk` from
+ * `@/lib/hooks/use-theme-colors`.
  */
-const MUTED_DISABLED_FILL_CLASS = 'bg-primary-disabled-action';
-const MUTED_DISABLED_LABEL_CLASS = 'dark:text-foreground';
+const MUTED_DISABLED_FILL_CLASS = 'bg-muted';
+const MUTED_DISABLED_LABEL_CLASS = 'text-center text-sm font-semibold text-muted-foreground';
 
 const buttonTextVariants = cva('text-foreground text-center text-sm font-semibold', {
   variants: {
@@ -306,10 +304,11 @@ function Button({
   // oxlint-enable anti-slop/no-runtime-typeof
   return (
     <TextClassContext.Provider
-      value={cn(
-        buttonTextVariants({ variant, size }),
-        isMutedDisabled && MUTED_DISABLED_LABEL_CLASS
-      )}
+      value={
+        isMutedDisabled
+          ? MUTED_DISABLED_LABEL_CLASS
+          : buttonTextVariants({ variant, size })
+      }
     >
       <Pressable
         className={cn(

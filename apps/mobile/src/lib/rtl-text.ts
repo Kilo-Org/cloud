@@ -129,6 +129,17 @@ export function ltrValueTextStyle(): TextStyle {
 }
 
 /**
+ * A field whose value is code (a shell command, a config line): the value keeps
+ * its left-to-right order and its left edge in every interface. Unlike a named
+ * value (`ltrValueTextStyle`), which sits on the label's start edge, a command
+ * reads from the left and must not follow a right-aligned label in a
+ * right-to-left interface.
+ */
+export function codeFieldTextStyle(): TextStyle {
+  return { ...LTR_TEXT_DIRECTION, textAlign: 'left' };
+}
+
+/**
  * The start alignment for a block of prose. A renderer that resolves a
  * paragraph's direction from its first strong character — the native markdown
  * text does — leaves a Latin reply at the left edge of a right-to-left

@@ -210,7 +210,7 @@ export function TriggersListScreen({ organizationId }: TriggersListScreenProps) 
         showsVerticalScrollIndicator={false}
       >
         <Section>
-          <Text variant="caption">{t('cloudAgent.triggers.subtitle')}</Text>
+          <Text variant="muted">{t('cloudAgent.triggers.subtitle')}</Text>
           <View className={BODY_BAND_CLASS}>{body}</View>
           <Button
             variant="outline"

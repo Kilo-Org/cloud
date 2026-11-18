@@ -69,12 +69,10 @@ export function RepositoryActionRow({
 }: RepositoryCardActionsProps & { labelKey: string }) {
   const colors = useThemeColors();
   const { t } = useTranslation();
-  // The label takes the row's remaining width and is pinned to one line: a
-  // label sized to its own content is measured at its longest word's width and
-  // wraps onto a second line the button's min height then clips. The logical
-  // `me-[24px]` inset keeps the centred label clear of the leading glyph in RTL
-  // as well, which a physical `mr-` would not. The explorer captures
-  // new-session-filled and new-session-kb-down both showed that wrap.
+  // The icon and the label share the row's centre as one group, so the glyph
+  // sits beside its text instead of at the start edge. The label stays on one
+  // line; a label wider than the button ellipsizes rather than wrapping into
+  // the button's min height.
   return (
     <View className="flex-row gap-2">
       <Button
@@ -89,7 +87,7 @@ export function RepositoryActionRow({
         loading={isConnecting}
       >
         <ExternalLink size={16} color={colors.foreground} />
-        <Text className="me-6 flex-1 text-center" numberOfLines={1}>
+        <Text className="shrink text-center" numberOfLines={1}>
           {t(labelKey)}
         </Text>
       </Button>

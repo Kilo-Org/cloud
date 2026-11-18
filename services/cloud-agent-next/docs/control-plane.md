@@ -2424,7 +2424,8 @@ per-port hostname. It handles ordinary HTTP and WebSocket upgrades.
   at the top of its default `fetch`, so no route can forward one into a sandbox DO.
   The `transport` in the coordinates selects the upstream (`src/preview/upstreams.ts`):
   `durable-object` for `cloudflare-containers`, and `wrapper-tunnel` for every other provider that
-  supports preview (Vercel). See [Preview tunnel](#preview-tunnel-wrapper-tunnel).
+  supports preview (Vercel, AWS MicroVM and AWS ECS).
+  See [Preview tunnel](#preview-tunnel-wrapper-tunnel).
 - **No start, no wake.** Preview never starts, resumes or wakes an allocation. A request for a
   session whose sandbox is stopped or asleep fails without creating a generation; the user starts
   the session again.
@@ -2510,16 +2511,18 @@ Request and response bodies stream; there is no body-size cap.
   set the Worker `PREVIEW_HOST_SUFFIX` to `<zone>`; redeploy the Worker. The web app needs no
   change: it shows the preview button once the Worker reports preview as enabled. The `kilo serve`
   password is in the wrapper, so ship a sandbox image with it before you enable preview; an older
-  image leaves `kilo serve` open to a preview of its port.
+  image leaves `kilo serve` open to a preview of its port. An AWS ECS runtime image comes from each
+  customer's deployed stack, not from the Worker deploy. Confirm that each enrolled ECS stack's
+  runtime image ships that wrapper before `PREVIEW_HOST_SUFFIX` exposes its previews.
 
 #### Preview tunnel (`wrapper-tunnel`)
 
-A provider without a private network path to its sandbox (today Vercel) reaches the dev server
-through the wrapper. `resolvePreviewTarget` gives such a provider `wrapper-tunnel` coordinates with
-the allocation id as `allocationRef`. The allocation id fences the preview cookie: a cookie for a
-replaced allocation gets 401. All the checks above (host, cookie, access, `Origin`, header caps)
-run first, and the route's response sanitizer runs on every tunnel response, as on the Containers
-path.
+A provider without a private network path to its sandbox (today Vercel, AWS MicroVM and AWS ECS)
+reaches the dev server through the wrapper. `resolvePreviewTarget` gives such a provider
+`wrapper-tunnel` coordinates with the allocation id as `allocationRef`. The allocation id fences
+the preview cookie: a cookie for a replaced allocation gets 401. All the checks above (host,
+cookie, access, `Origin`, header caps) run first, and the route's response sanitizer runs on every
+tunnel response, as on the Containers path.
 
 - **Path.** Browser → Worker preview route → `PreviewTunnel` DO named `<sandboxId>:<allocationId>`
   → one binary WebSocket that the wrapper opened → wrapper → `127.0.0.1:<port>`. The wrapper

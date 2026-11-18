@@ -293,6 +293,38 @@ describe('GET /api/openrouter/models/[provider]/[model]/endpoints', () => {
     ]);
   });
 
+  test('shows the short-context price, ignoring long-context overrides', async () => {
+    const model = {
+      id: 'openai/gpt-6.2-astra',
+      name: 'OpenAI: GPT-6.2 Astra',
+      endpoints: [
+        {
+          tag: 'openai',
+          provider_name: 'OpenAI',
+          pricing: {
+            prompt: '0.000008',
+            completion: '0.00004',
+            overrides: [{ min_prompt_tokens: 272000, prompt: '0.000016', completion: '0.00006' }],
+          },
+        },
+      ],
+    };
+    mockedGetOpenRouterModelsMetadataFromDatabase.mockResolvedValue({ [model.id]: model });
+
+    const response = await handleModelEndpointsRequest(request(model.id), {
+      params: Promise.resolve({ provider: 'openai', model: 'gpt-6.2-astra' }),
+    });
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).data.endpoints).toEqual([
+      {
+        tag: 'openai',
+        provider_name: 'OpenAI',
+        pricing: { prompt: '0.000008', completion: '0.00004' },
+      },
+    ]);
+  });
+
   describe('Vercel-only providers', () => {
     const model = {
       id: 'deepseek/deepseek-v4.1-flash-1017',

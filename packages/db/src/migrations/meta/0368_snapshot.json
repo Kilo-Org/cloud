@@ -1,5 +1,5 @@
 {
-  "id": "cdac84c6-392d-4e1f-8c99-19883f458393",
+  "id": "11a2ce65-96d4-4bf6-a565-29a780abfd9e",
   "prevId": "e7b9957b-099e-45fd-b59f-f302a88d8dae",
   "version": "7",
   "dialect": "postgresql",
@@ -3224,6 +3224,55 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.blacklisted_domains_settings": {
+      "name": "blacklisted_domains_settings",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "default": 1
+        },
+        "blocked_signup_tlds": {
+          "name": "blocked_signup_tlds",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_by_email": {
+          "name": "updated_by_email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "blacklisted_domains_settings_singleton": {
+          "name": "blacklisted_domains_settings_singleton",
+          "value": "\"blacklisted_domains_settings\".\"id\" = 1"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.bot_request_cloud_agent_sessions": {
@@ -35231,33 +35280,6 @@
           ],
           "isUnique": false,
           "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_session_step_up_proofs_user_session_binding": {
-          "name": "idx_session_step_up_proofs_user_session_binding",
-          "columns": [
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "session_id_hash",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "action_binding_hash",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": true,
           "method": "btree",
           "with": {}
         },

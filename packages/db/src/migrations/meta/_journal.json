@@ -2581,8 +2581,15 @@
     {
       "idx": 368,
       "version": "7",
-      "when": 1795013577610,
-      "tag": "0368_step_up_proof_binding_index",
+      "when": 1795013963877,
+      "tag": "0368_blacklisted_domains_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 369,
+      "version": "7",
+      "when": 1795019131973,
+      "tag": "0369_step_up_proof_binding_index",
       "breakpoints": true
     }
   ]

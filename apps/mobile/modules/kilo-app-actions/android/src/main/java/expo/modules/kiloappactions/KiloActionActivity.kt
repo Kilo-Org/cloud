@@ -59,15 +59,22 @@ internal object KiloActionContract {
   )
 
   /**
-   * The contract payload for an intent, in the JSON-object form
-   * `parseAppActionPayload` accepts, or null when the intent names no action.
+   * The resolved form of an intent: the contract slug it names, and its
+   * payload in the JSON-object form `parseAppActionPayload` accepts.
+   * `resolve` returns null when the intent names no action.
    *
    * An extra wins over the query of a VIEW intent. A field the caller did not
    * send is left out: the contract decides whether the request is complete, so
    * the native side never builds a half-validated request of its own.
    */
-  fun payload(intent: Intent): String? {
-    val slug = slugOf(intent) ?: return null
+  data class Resolved(val slug: String, val payload: String) {
+    /** True when the intent asks for `StartAgent`, the action confirmed in the app. */
+    val isStartAgent: Boolean
+      get() = slug == SLUG_BY_ACTION[ACTION_START_AGENT]
+  }
+
+  fun resolve(intent: Intent?): Resolved? {
+    val slug = slugOf(intent ?: return null) ?: return null
     val json = JSONObject().put("action", slug)
     for ((field, extra) in FIELDS) {
       val value = intent.getStringExtra(extra) ?: intent.data?.getQueryParameter(field)
@@ -75,7 +82,7 @@ internal object KiloActionContract {
         json.put(field, value)
       }
     }
-    return json.toString()
+    return Resolved(slug, json.toString())
   }
 
   /** The contract slug of an intent: its custom action, or its action URL. */
@@ -106,10 +113,6 @@ internal object KiloActionContract {
     return slug?.takeIf(SLUG_BY_ACTION::containsValue)
   }
 
-  /** True when the intent asks for `StartAgent`, the action confirmed in the app. */
-  fun isStartAgent(intent: Intent?): Boolean =
-    intent != null && slugOf(intent) == SLUG_BY_ACTION[ACTION_START_AGENT]
-
 }
 
 /**
@@ -135,15 +138,13 @@ class KiloActionActivity : Activity() {
   }
 
   private fun handle(intent: Intent?) {
-    val payload = intent?.let(KiloActionContract::payload)
-    if (payload == null) {
+    val resolved = KiloActionContract.resolve(intent)
+    if (resolved == null) {
       finish()
       return
     }
-    if (KiloActionContract.isStartAgent(intent)) {
-      showInApp()
-    }
-    if (!AppActionDispatcher.dispatch(payload)) {
+    val dispatched = AppActionDispatcher.dispatch(resolved.payload)
+    if (resolved.isStartAgent || !dispatched) {
       showInApp()
     }
     finish()

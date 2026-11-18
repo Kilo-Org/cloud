@@ -762,10 +762,13 @@ export type ControlRuntimeCredentialProxyFence = {
   wrapperInstanceId: string;
 };
 
+/** Why an adopted handle cannot serve the caller's canonical scope view. */
+export type RuntimeProxyScopeViewUnavailableReason = 'scope_mismatch' | 'missing_canonical_grant';
+
 /** The fence plus, for an adopted handle, the current scope view or the reason it is unavailable. */
 export type ControlRuntimeCredentialProxyFenceScope = ControlRuntimeCredentialProxyFence & {
   scopeView?: ScopeGrantView;
-  scopeViewUnavailable?: string;
+  scopeViewUnavailable?: RuntimeProxyScopeViewUnavailableReason;
 };
 
 /** The adopted-handle state a scope is already serving, if any. */
@@ -2582,14 +2585,14 @@ export class SandboxControlV2 extends DurableObject<Env> {
       if (scopeGrantId(grant) !== match.scopeGrantId) {
         return {
           ...fence,
-          scopeViewUnavailable: 'Accepted scope handle does not belong to the caller grant',
+          scopeViewUnavailable: 'scope_mismatch',
         };
       }
       const scopeGrant = readScopeGrant(this.db, match.scopeGrantId);
       if (scopeGrant === null) {
         return {
           ...fence,
-          scopeViewUnavailable: 'Accepted scope handle has no canonical grant',
+          scopeViewUnavailable: 'missing_canonical_grant',
         };
       }
       return { ...fence, scopeView: readScopeGrantView(this.db, scopeGrant) };

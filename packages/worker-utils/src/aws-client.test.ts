@@ -115,7 +115,7 @@ describe('AWS signed transport', () => {
     await expect(client.signedUrl(url, 'GET', 3601)).rejects.toThrow('Invalid AWS URL lifetime');
   });
 
-  it('preserves caller cancellation and refuses a URL beyond credential expiry', async () => {
+  it('forwards the caller abort signal to the fetch and refuses a URL beyond credential expiry', async () => {
     const controller = new AbortController();
     controller.abort();
     const client = createAwsClient({

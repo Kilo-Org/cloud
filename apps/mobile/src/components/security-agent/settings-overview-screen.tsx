@@ -104,29 +104,25 @@ export function SettingsOverviewScreen({
   }
   // The failed read determines the branch, so each failure reads only its own
   // error. A retry of a no-data read downgrades it back to pending and clears
-  // its error (v5, see `use-available-models`), so the classifier would read
-  // an empty list mid-retry and flip the presentation. The variant of the last
-  // settled failure is kept in a ref and re-derived only when a read settles:
-  // the error branch keeps the answer it showed until a settled state replaces
-  // it, for both branches.
-  const configFailure = {
-    errors: config.error ? [config.error] : [],
-    isPaused: config.fetchStatus === 'paused',
-    connectivity,
-  } as const;
-  const capabilityFailure = {
-    errors: capability.error ? [capability.error] : [],
-    isPaused: capability.fetchStatus === 'paused',
-    connectivity,
-  } as const;
+  // its error (v5, see `use-available-models`), so deriving from an in-flight
+  // read would flip the presentation mid-retry. Only a settled failure — an
+  // errored read, or a read paused by a connectivity the app has confirmed —
+  // re-derives the variant; every other state (a retry in flight, a loading
+  // read) keeps the last settled answer, and a first render before any settled
+  // failure paints the server default.
+  const settledFailure = (error: unknown, fetchStatus: string) =>
+    classifyReadFailureVariant({
+      errors: error ? [error] : [],
+      isPaused: fetchStatus === 'paused',
+      connectivity,
+    }) as 'offline' | 'server';
   const settledVariantRef = useRef<'offline' | 'server' | null>(null);
-  const settledVariant =
-    configUnavailable || capability.isError
-      ? (settledVariantRef.current = classifyReadFailureVariant(
-          configUnavailable || config.isError ? configFailure : capabilityFailure
-        ) as 'offline' | 'server')
-      : settledVariantRef.current;
-  const variant = settledVariant ?? 'server';
+  if (config.isError || (config.fetchStatus === 'paused' && isConnectivityKnown)) {
+    settledVariantRef.current = settledFailure(config.error, config.fetchStatus);
+  } else if (capability.isError || (capability.fetchStatus === 'paused' && isConnectivityKnown)) {
+    settledVariantRef.current = settledFailure(capability.error, capability.fetchStatus);
+  }
+  const variant = settledVariantRef.current ?? 'server';
   if (configUnavailable || capabilityUnavailable) {
     return (
       <PlatformErrorScreen

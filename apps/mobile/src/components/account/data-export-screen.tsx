@@ -186,6 +186,7 @@ export function DataExportScreen() {
   } else if (exportsQuery.isError) {
     body = (
       <QueryError
+        placement="top"
         onRetry={() => void exportsQuery.refetch()}
         isRetrying={exportsQuery.isFetching}
       />
@@ -193,6 +194,7 @@ export function DataExportScreen() {
   } else if (exportsQuery.data.exports.length === 0) {
     body = (
       <EmptyState
+        placement="top"
         icon={Archive}
         title={t('profile.dataExport.emptyTitle')}
         description={t('profile.dataExport.emptyDescription')}

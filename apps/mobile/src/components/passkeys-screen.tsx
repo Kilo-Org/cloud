@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, useWindowDimensions, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { PasskeyListRow } from '@/components/passkey-list-row';
 import { PasskeyVerificationPanel } from '@/components/passkey-verification-panel';
 import { QueryError } from '@/components/query-error';
@@ -19,7 +19,6 @@ import { ScreenFooter } from '@/components/ui/screen-footer';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useAuth } from '@/lib/auth/auth-context';
-import { isShortViewport } from '@/lib/centered-state-layout';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
@@ -80,19 +79,20 @@ function InlineFailure({
  * server has ended puts the person back on sign-in.
  *
  * Four list states: loading reserves the final rows' boxes, empty offers
- * creation as its only action, happy lists a row per passkey, and a failure is
- * either retryable in place (the list request or a removal, with whatever the
- * query last rendered kept — the rows or the empty state) or non-retryable.
- * A cancelled creation sheet changed nothing, so the list is left as it was and
- * the toast says so. A retry is single-flight — its control is disabled while
- * the request it starts is pending — and a removal failure is only actionable
- * while that delete runs or its row has rolled back, never after the server
- * list drops it.
+ * creation as its only action in its own state slot, happy lists a row per
+ * passkey, and a failure is either retryable in place (the list request or a
+ * removal, with whatever the query last rendered kept — the rows or the empty
+ * state) or non-retryable. A cancelled creation sheet changed nothing, so the
+ * list is left as it was and the toast says so. A retry is single-flight — its
+ * control is disabled while the request it starts is pending — and a removal
+ * failure is only actionable while that delete runs or its row has rolled back,
+ * never after the server list drops it.
  *
- * The Add control is the screen's one action and sits outside the scrolling
- * list, in the footer above the tab bar: the header and the control then keep
- * the same coordinates whatever the query renders (skeletons, no rows, rows),
- * so data arriving never moves the control the user is reaching for.
+ * An empty list is the whole surface, so its state carries the Add control
+ * inline; a populated list keeps that control in the footer above the tab bar,
+ * where it holds the same coordinates whatever the query renders (skeletons, a
+ * refresh failure, rows), so data arriving never moves the control the user is
+ * reaching for.
  */
 export function PasskeysScreen() {
   const { t } = useTranslation();
@@ -101,11 +101,6 @@ export function PasskeysScreen() {
   const colors = useThemeColors();
   const { token } = useAuth();
   const { userId, email } = useCurrentUserId();
-  // The body sits between the header and a footer that already reserves the
-  // tab bar, so in a phone held sideways its band is only a few dozen points
-  // tall and the full stack starts below the fold. Centered states learn this
-  // from their measured band; this plain body asks the window instead.
-  const windowSize = useWindowDimensions();
 
   const { data, isPending, isError, isFetching, refetch } = useQuery({
     ...trpc.user.getPasskeys.queryOptions(),
@@ -137,13 +132,12 @@ export function PasskeysScreen() {
     });
   };
 
-  // The control is full width in every state, in its own footer slot. Its
-  // label's box takes the row's remaining width, so the one line the platform
-  // lays out always has room to spare: a label sized to its own content
-  // measured at its longest word's width and wrapped onto a second line the
-  // button's min height then clipped (e4/p3 spot check: "Add a / passkey" in a
-  // full-width button). The label's right margin mirrors the glyph and its row
-  // gap, which keeps the centred label on the button's own centre.
+  // The Add control is the screen's one action. An empty list is the whole
+  // surface, so its state carries the control inline as the shared state
+  // action. A list keeps the full-width footer slot, below the rows, where the
+  // control holds the same coordinates whatever the query renders (skeletons,
+  // a refresh failure, rows). The label is sized to its own content inside that
+  // full-width control, so the glyph and the label centre as one group.
   const addControl = management.canCreatePasskeys ? (
     <Button
       variant="outline"
@@ -155,9 +149,17 @@ export function PasskeysScreen() {
       onPress={management.handleAddPasskey}
     >
       <Plus size={16} color={colors.foreground} />
-      <Text className="flex-1 text-center">{t('profile.addPasskey')}</Text>
+      <Text>{t('profile.addPasskey')}</Text>
     </Button>
   ) : null;
+  const addStateAction = management.canCreatePasskeys ? (
+    <StateAction
+      label={t('profile.addPasskey')}
+      icon={Plus}
+      loading={management.isAdding}
+      onPress={management.handleAddPasskey}
+    />
+  ) : undefined;
 
   // On a device that cannot create passkeys the notice is not a reaction to a
   // press: it is the reason no Add control is offered, shown beside the rows.
@@ -202,6 +204,18 @@ export function PasskeysScreen() {
     );
   }
 
+  // A state that is the whole surface — no intro, no list, no panel above it —
+  // renders in the screen body, centred in the band between the header and the
+  // footer. Under the verification panel, or above a failed-refresh notice, the
+  // same state is placed at the top. The empty state's Add action is inline in
+  // its slot and the footer drops its own, so the control does not move.
+  const panelOpen = management.verification.state.phase !== 'closed';
+  let hoistedState = false;
+  if (!panelOpen && !isPending) {
+    hoistedState =
+      (isError && data === undefined) || (passkeys.length === 0 && failureNotice === null);
+  }
+
   let body: ReactNode = null;
   if (isPending) {
     // Loading is checked ahead of error and empty: the first frame of a cold
@@ -217,7 +231,7 @@ export function PasskeysScreen() {
     body = (
       <QueryError
         variant="server"
-        placement="top"
+        placement={hoistedState ? 'center' : 'top'}
         title={t('profile.passkeysCouldNotLoad')}
         message={t('profile.passkeysLoadFailed')}
         onRetry={() => void refetch()}
@@ -232,24 +246,18 @@ export function PasskeysScreen() {
     // A failed background refresh is reported above the empty state, not
     // hidden by it: the cached list is empty, so the notice is the only thing
     // that says the request failed and offers the retry.
-    //
-    // The state carries no action of its own: the Add control it describes
-    // lives in the footer, where it holds the same coordinates whether the
-    // query renders this state or a list of rows.
     body = (
       <>
         {failureNotice}
-        {!management.verifying && (
-          <EmptyState
-            placement="top"
-            compact={isShortViewport(windowSize.width, windowSize.height)}
-            icon={KeyRound}
-            title={t('profile.passkeysEmpty')}
-            description={
-              management.canCreatePasskeys ? t('profile.passkeysEmptyHint') : addFailureNotice
-            }
-          />
-        )}
+        <EmptyState
+          placement={hoistedState ? 'center' : 'top'}
+          icon={KeyRound}
+          title={t('profile.passkeysEmpty')}
+          description={
+            management.canCreatePasskeys ? t('profile.passkeysEmptyHint') : addFailureNotice
+          }
+          action={addStateAction}
+        />
       </>
     );
   } else {
@@ -271,43 +279,52 @@ export function PasskeysScreen() {
     );
   }
 
+  // The footer carries the Add control only while a list or a failure needs it;
+  // the empty state's own action replaced it, and its notice replaced the hint.
+  const showsFooter = !emptyBodyRendered || footerNotice !== null;
+
   return (
     <View testID="passkeys-screen" className="flex-1 bg-background">
       <ScreenHeader title={t('profile.passkeysTitle')} backFallback={PROFILE_TAB_HREF} />
-      <ScrollView
-        className="flex-1"
-        contentContainerClassName={SCREEN_BODY_CLASS}
-        showsVerticalScrollIndicator={false}
-        // The panel's code field lives in this scroller, so the native inset is
-        // what keeps the field and the controls under it above the keyboard.
-        automaticallyAdjustKeyboardInsets
-      >
-        {management.verification.state.phase !== 'closed' && (
-          <PasskeyVerificationPanel
-            state={management.verification.state}
-            onChoosePasskey={management.verification.handleChoosePasskey}
-            onChooseEmail={management.verification.handleChooseEmail}
-            onChooseSso={management.verification.handleChooseSso}
-            onReopenApproval={management.verification.handleReopenApproval}
-            onSubmitCode={management.verification.handleSubmitCode}
-            onResendCode={management.verification.handleResendCode}
-            onCancel={management.verification.handleCancel}
-          />
-        )}
-        {body}
-      </ScrollView>
-
-      {/* The Add control's slot: outside the scrolling body and above the tab
-          bar, it holds the coordinates the empty state first shows it at while
-          the query renders skeletons, no rows, or rows. The notice that
+      {hoistedState ? (
+        body
+      ) : (
+        <ScrollView
+          className="flex-1"
+          contentContainerClassName={SCREEN_BODY_CLASS}
+          showsVerticalScrollIndicator={false}
+          // The panel's code field lives in this scroller, so the native inset is
+          // what keeps the field and the controls under it above the keyboard.
+          automaticallyAdjustKeyboardInsets
+        >
+          {panelOpen && (
+            <PasskeyVerificationPanel
+              state={management.verification.state}
+              onChoosePasskey={management.verification.handleChoosePasskey}
+              onChooseEmail={management.verification.handleChooseEmail}
+              onChooseSso={management.verification.handleChooseSso}
+              onReopenApproval={management.verification.handleReopenApproval}
+              onSubmitCode={management.verification.handleSubmitCode}
+              onResendCode={management.verification.handleResendCode}
+              onCancel={management.verification.handleCancel}
+            />
+          )}
+          {body}
+        </ScrollView>
+      )}
+      {/* The Add control's slot for a populated list: outside the scrolling body
+          and above the tab bar, where it keeps the same coordinates whatever the
+          query renders (skeletons, a refresh failure, rows). The notice that
           explains a failed or unavailable add shares the slot, beside the
-          control it is about. */}
-      <ScreenFooter clearance="tab-bar" keyboard="host">
-        <View className="gap-3">
-          {footerNotice}
-          {addControl}
-        </View>
-      </ScreenFooter>
+          control it is about. An empty list owns its Add action inline instead. */}
+      {showsFooter ? (
+        <ScreenFooter clearance="tab-bar" keyboard="host">
+          <View className="gap-3">
+            {footerNotice}
+            {addControl}
+          </View>
+        </ScreenFooter>
+      ) : null}
 
       {renameTarget && (
         <RenameModal

@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -271,12 +271,26 @@ export function ProviderKeysScreen({ organizationId }: Readonly<{ organizationId
       />
     );
   } else if (keys.data.length === 0) {
+    // An empty list is where the Add action belongs: the state's own slot
+    // carries it, in the shared state-action style, instead of a second
+    // full-width control under the state.
     body = (
       <EmptyState
         placement="top"
         icon={KeyRound}
         title={t('profile.providerKeys.emptyTitle')}
         description={t('profile.providerKeys.emptyDescription')}
+        action={
+          permissions.canEdit ? (
+            <StateAction
+              label={t('profile.providerKeys.add')}
+              icon={Plus}
+              onPress={() => {
+                router.push(providerKeyAddHref(scope));
+              }}
+            />
+          ) : undefined
+        }
       />
     );
   } else {
@@ -326,7 +340,7 @@ export function ProviderKeysScreen({ organizationId }: Readonly<{ organizationId
           <Text variant="muted">{t('profile.providerKeys.viewOnly')}</Text>
         ) : null}
         <View className={BODY_BAND_CLASS}>{body}</View>
-        {permissions.canEdit ? (
+        {permissions.canEdit && keys.data !== undefined && keys.data.length > 0 ? (
           <Button
             variant="outline"
             className={STATE_ACTION_CLASS}

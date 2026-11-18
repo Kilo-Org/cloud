@@ -183,11 +183,17 @@ function KiloPassDetailBody({
   );
 }
 
-function KiloPassMessageBody({ message }: { message: string }) {
+function KiloPassMessageBody({ title, description }: { title: string; description: string }) {
   return (
     <KiloPassFrame>
       <View className="flex-1 justify-center">
-        <EmptyState placement="static" inset="gutter" icon={Crown} title={message} />
+        <EmptyState
+          placement="static"
+          inset="gutter"
+          icon={Crown}
+          title={title}
+          description={description}
+        />
       </View>
     </KiloPassFrame>
   );
@@ -275,13 +281,23 @@ export function KiloPassSubscriptionScreen() {
     );
   }
   if (detail.kind === 'none') {
-    return <KiloPassMessageBody message={t('kiloPass.notAvailableInApp')} />;
+    return (
+      <KiloPassMessageBody
+        title={t('organization.kiloPass.notSubscribed')}
+        description={t('kiloPass.notAvailableInApp')}
+      />
+    );
   }
   if (subscription == null) {
     // A detail — active or ended — is derived from a subscription, so this only
     // narrows the type; the message keeps the screen total rather than throwing
     // on it.
-    return <KiloPassMessageBody message={t('kiloPass.notAvailableInApp')} />;
+    return (
+      <KiloPassMessageBody
+        title={t('organization.kiloPass.notSubscribed')}
+        description={t('kiloPass.notAvailableInApp')}
+      />
+    );
   }
   if (detail.kind === 'ended') {
     return (

@@ -1,21 +1,19 @@
 /* eslint-disable max-lines -- the picker's five presentations (expired, loading, error, zero instances, list) share one sheet chrome and one refetch, and the error and zero-instance actions both carry the shared state-action floor */
 import { FlashList } from '@shopify/flash-list';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { Cloud, Server, Terminal } from '@/components/ui/icons';
+import { Cloud, RefreshCw, RotateCcw, Server, Terminal } from '@/components/ui/icons';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { View, type ViewStyle } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
-import { Button } from '@/components/ui/button';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { SectionHeader } from '@/components/ui/section-header';
 import { Text } from '@/components/ui/text';
 import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { formatList } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
@@ -271,17 +269,14 @@ export default function InstancePickerScreen() {
           title={t('agentChat.instancePicker.couldNotLoad')}
           description={t('organization.boundary.loadErrorMessage')}
           action={
-            <Button
-              className={STATE_ACTION_CLASS}
-              variant="outline"
+            <StateAction
+              label={t('common.retry')}
+              icon={RotateCcw}
               onPress={() => {
                 void refetchInstances();
               }}
               loading={isRefetching}
-              accessibilityLabel={t('common.retry')}
-            >
-              <Text>{t('common.retry')}</Text>
-            </Button>
+            />
           }
         />
       </PickerSheet>
@@ -340,26 +335,29 @@ export default function InstancePickerScreen() {
           </ChoiceRow>
         }
         ListEmptyComponent={
+          // The half detent sizes this sheet to its title row; the full stack
+          // (bubble, copy and action) then ran past the home indicator and left
+          // Refresh off screen. The short form keeps the title, the description
+          // and the action, and the list's own bottom clearance keeps the
+          // action above the bar.
           <EmptyState
             icon={Server}
             placement="top"
             inset="gutter"
+            compact
             title={t('agentChat.instancePicker.noCliInstances')}
             description={stripInlineCodeMarkers(
               t('agentChat.instancePicker.noCliInstancesDescription')
             )}
             action={
-              <Button
-                className={STATE_ACTION_CLASS}
-                variant="outline"
+              <StateAction
+                label={t('common.refresh')}
+                icon={RefreshCw}
                 onPress={() => {
                   void refetchInstances();
                 }}
                 loading={isRefetching}
-                accessibilityLabel={t('common.refresh')}
-              >
-                <Text>{t('common.refresh')}</Text>
-              </Button>
+              />
             }
           />
         }

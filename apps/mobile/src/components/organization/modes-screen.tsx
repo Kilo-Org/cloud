@@ -12,13 +12,10 @@ import { OrgRecordRow } from '@/components/organization/org-record-row';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { RowGroup } from '@/components/ui/row-group';
 import { IconButton } from '@/components/ui/icon-button';
+import { RowGroup } from '@/components/ui/row-group';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useOrgModes } from '@/lib/hooks/use-org-modes-queries';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -72,6 +69,9 @@ export function OrganizationModesScreen() {
 
   const modes = modesQuery.data?.modes ?? [];
   const errorView = modesQuery.isError ? selectOrgListErrorView(modesQuery.error) : null;
+  // An empty or failed list is the whole surface; the header's "+" is its one
+  // create control, so the state carries no button of its own.
+  const wholeSurface = errorView !== null || (!modesQuery.isPending && modes.length === 0);
 
   let body: ReactNode = null;
   if (modesQuery.isPending) {
@@ -88,19 +88,8 @@ export function OrganizationModesScreen() {
     body = (
       <EmptyState
         icon={SlidersHorizontal}
-        placement="top"
         title={t('organization.modes.emptyTitle')}
         description={t('organization.modes.emptyDescription')}
-        action={
-          <Button
-            className={STATE_ACTION_CLASS}
-            onPress={() => {
-              openModeForm();
-            }}
-          >
-            <Text className="text-primary-foreground">{t('organization.modes.create')}</Text>
-          </Button>
-        }
       />
     );
   } else {
@@ -140,15 +129,19 @@ export function OrganizationModesScreen() {
           </IconButton>
         }
       />
-      <TabScreenScrollView
-        className="flex-1"
-        contentContainerClassName={SCREEN_BODY_CLASS}
-        showsVerticalScrollIndicator={false}
-        // The design gate's proof readiness marker for this route.
-        testID="organization-modes-list"
-      >
-        {body}
-      </TabScreenScrollView>
+      {wholeSurface ? (
+        body
+      ) : (
+        <TabScreenScrollView
+          className="flex-1"
+          contentContainerClassName={SCREEN_BODY_CLASS}
+          showsVerticalScrollIndicator={false}
+          // The design gate's proof readiness marker for this route.
+          testID="organization-modes-list"
+        >
+          {body}
+        </TabScreenScrollView>
+      )}
     </View>
   );
 }

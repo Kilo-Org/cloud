@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
 
 import {
   addCommand,
@@ -16,16 +15,15 @@ import {
   variableRows,
 } from '@/components/profiles/profile-variables-model';
 import { VariableEditForm, VariableRowView } from '@/components/profiles/profile-variables-rows';
+import { ReorderableItem, ReorderableItemActions } from '@/components/profiles/reorderable-item';
 import { SetupCommandField } from '@/components/profiles/setup-command-field';
 import { Button } from '@/components/ui/button';
-import { ChevronDown, ChevronUp, Plus, Trash2 } from '@/components/ui/icons';
+import { Plus } from '@/components/ui/icons';
 import { RowGroup } from '@/components/ui/row-group';
 import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { MAX_SESSION_ENV_VAR_VALUE_LENGTH } from '@/lib/agent-profile-forms';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { cn } from '@/lib/utils';
-import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 
 type ManualEnvVarsEditorProps = Readonly<{
   vars: readonly VariableEdit[];
@@ -127,9 +125,10 @@ type ManualSetupCommandsEditorProps = Readonly<{
 }>;
 
 /**
- * The manual setup-commands editor: one plain row per command, reorderable
- * with up/down buttons (never drag) and removable. The list order is the order
- * the commands run in.
+ * The manual setup-commands editor: one reorderable item per command, moved
+ * with up/down controls (never drag) and removable. The list order is the
+ * order the commands run in, and the item is the same one setup and slash
+ * commands share everywhere else.
  */
 export function ManualSetupCommandsEditor({
   commands,
@@ -141,9 +140,6 @@ export function ManualSetupCommandsEditor({
   // Bumped on every reorder so the uncontrolled fields remount seeded in the
   // new order (their text belongs to the position, not the input instance).
   const [generation, setGeneration] = useState(0);
-
-  const controlClass = (controlDisabled: boolean) =>
-    cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70', controlDisabled && 'opacity-40');
 
   return (
     <Section label={t('profiles.commandsTitle')}>
@@ -162,7 +158,39 @@ export function ManualSetupCommandsEditor({
           // position the row's move and delete controls announce.
           const commandLabel = t('profiles.commandLabelPosition', { position });
           return (
-            <View key={`${generation}-${index}`} className="gap-3 px-4 py-3">
+            <ReorderableItem
+              key={`${generation}-${index}`}
+              actions={
+                <ReorderableItemActions
+                  moveUp={{
+                    label: upLabel,
+                    hint: rowHint,
+                    disabled: isFirst,
+                    onPress: () => {
+                      onChange(moveCommand(commands, index, -1));
+                      setGeneration(current => current + 1);
+                    },
+                  }}
+                  moveDown={{
+                    label: downLabel,
+                    hint: rowHint,
+                    disabled: isLast,
+                    onPress: () => {
+                      onChange(moveCommand(commands, index, 1));
+                      setGeneration(current => current + 1);
+                    },
+                  }}
+                  remove={{
+                    label: deleteLabel,
+                    hint: rowHint,
+                    onPress: () => {
+                      onChange(removeCommand(commands, index));
+                      setGeneration(current => current + 1);
+                    },
+                  }}
+                />
+              }
+            >
               <SetupCommandField
                 command={command}
                 label={commandLabel}
@@ -172,47 +200,7 @@ export function ManualSetupCommandsEditor({
                   onChange(replaceCommand(commands, index, value));
                 }}
               />
-              <View className="flex-row items-center justify-end gap-1">
-                <Pressable
-                  className={controlClass(isFirst)}
-                  disabled={isFirst}
-                  accessibilityRole="button"
-                  accessibilityLabel={upLabel}
-                  accessibilityHint={rowHint}
-                  onPress={() => {
-                    onChange(moveCommand(commands, index, -1));
-                    setGeneration(current => current + 1);
-                  }}
-                >
-                  <ChevronUp size={20} color={colors.mutedForeground} />
-                </Pressable>
-                <Pressable
-                  className={controlClass(isLast)}
-                  disabled={isLast}
-                  accessibilityRole="button"
-                  accessibilityLabel={downLabel}
-                  accessibilityHint={rowHint}
-                  onPress={() => {
-                    onChange(moveCommand(commands, index, 1));
-                    setGeneration(current => current + 1);
-                  }}
-                >
-                  <ChevronDown size={20} color={colors.mutedForeground} />
-                </Pressable>
-                <Pressable
-                  className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
-                  accessibilityRole="button"
-                  accessibilityLabel={deleteLabel}
-                  accessibilityHint={rowHint}
-                  onPress={() => {
-                    onChange(removeCommand(commands, index));
-                    setGeneration(current => current + 1);
-                  }}
-                >
-                  <Trash2 size={20} color={colors.destructive} />
-                </Pressable>
-              </View>
-            </View>
+            </ReorderableItem>
           );
         })}
       </RowGroup>

@@ -52,7 +52,7 @@ const metadata = (token?: string): SessionMetadata =>
 describe('runtime authorization persistence', () => {
   it('leaves legacy tokens unchanged and reports legacy without a private record', async () => {
     const stored = metadata('legacy-token');
-    const result = await renewStoredRuntimeAuthorization({
+    const token = await renewStoredRuntimeAuthorization({
       metadata: stored,
       getAuthorization: async () => undefined,
       putAuthorization: async () => {},
@@ -61,7 +61,7 @@ describe('runtime authorization persistence', () => {
       renew: async () => ({ token: 'renewed-token' }),
     });
 
-    expect(result).toEqual({ token: 'legacy-token', renewed: false });
+    expect(token).toBe('legacy-token');
     await expect(
       getRuntimeAuthorizationStatus({ metadata: stored, getAuthorization: async () => undefined })
     ).resolves.toBe('legacy');
@@ -115,7 +115,7 @@ describe('runtime authorization persistence', () => {
         renew,
         now,
       })
-    ).resolves.toEqual({ token, renewed: false });
+    ).resolves.toBe(token);
     expect(renew).not.toHaveBeenCalled();
   });
 
@@ -147,7 +147,7 @@ describe('runtime authorization persistence', () => {
         renew: async () => ({ token: 'renewed-token' }),
         now,
       })
-    ).resolves.toEqual({ token: 'renewed-token', renewed: true });
+    ).resolves.toBe('renewed-token');
     expect(stored.auth.kilocodeToken).toBe('renewed-token');
   });
 

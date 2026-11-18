@@ -125,19 +125,18 @@ export async function getRuntimeAuthorizationRecoveryState(input: {
     : { state: 'active', id: authorization.data.id };
 }
 
-export type RuntimeTokenRenewal = { token: string | null; renewed: boolean };
-
 export async function renewStoredRuntimeAuthorization(input: {
   metadata: SessionMetadata | null;
   getAuthorization: () => Promise<unknown>;
   putAuthorization: (authorization: RuntimeAuthorization) => Promise<void>;
   getMetadata: () => Promise<SessionMetadata | null>;
   putMetadata: (metadata: SessionMetadata) => Promise<void>;
+  beforeRenew?: () => Promise<boolean>;
   renew: (authorization: RuntimeAuthorization) => Promise<{ token: string }>;
   now?: number;
-}): Promise<RuntimeTokenRenewal> {
+}): Promise<string | null> {
   const metadata = input.metadata;
-  if (!metadata) return { token: null, renewed: false };
+  if (!metadata) return null;
   const authorization = RuntimeAuthorizationSchema.safeParse(await input.getAuthorization());
   if (!authorization.success) {
     if (hasModernRuntimeAuthorization(metadata)) {
@@ -148,7 +147,7 @@ export async function renewStoredRuntimeAuthorization(input: {
       );
       throw new RuntimeAuthorizationRevokedError();
     }
-    return { token: metadata.auth.kilocodeToken ?? null, renewed: false };
+    return metadata.auth.kilocodeToken ?? null;
   }
   if (authorization.data.state !== 'active') {
     logRuntimeAuthorizationDiagnostic(
@@ -188,8 +187,9 @@ export async function renewStoredRuntimeAuthorization(input: {
     decoded.exp * 1000 <= Date.parse(authorization.data.delegationExpiresAt) &&
     runtimeAuthorizationId(decoded.runtimeAuthorization) === authorization.data.id
   ) {
-    return { token: token ?? null, renewed: false };
+    return token ?? null;
   }
+  if (input.beforeRenew && !(await input.beforeRenew())) return null;
   let postRenewalStateChanged = false;
   try {
     const renewed = await input.renew(authorization.data);
@@ -215,7 +215,7 @@ export async function renewStoredRuntimeAuthorization(input: {
         auth: { ...currentMetadata.auth, kilocodeToken: renewed.token },
       })
     );
-    return { token: renewed.token, renewed: true };
+    return renewed.token;
   } catch (error) {
     logRuntimeAuthorizationDiagnostic(
       metadata.identity.sessionId,

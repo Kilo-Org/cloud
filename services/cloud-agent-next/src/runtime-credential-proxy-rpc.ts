@@ -20,7 +20,6 @@ import {
   logRuntimeProxyRequestFailed,
   type RuntimeProxyRejectionStage,
 } from './runtime-credential-proxy-diagnostics.js';
-import type { RuntimeTokenRenewal } from './session/runtime-authorization-persistence.js';
 import type { Env } from './types.js';
 
 type Storage = {
@@ -157,7 +156,7 @@ export async function resolvePersistedRuntimeProxyCredential(input: {
   metadata: () => Promise<SessionMetadata | null>;
   authorization: () => Promise<RuntimeAuthorization | null>;
   fence: () => Promise<RuntimeProxyFence | null>;
-  token: (secret: string) => Promise<RuntimeTokenRenewal>;
+  token: (secret: string, beforeRenew: () => Promise<boolean>) => Promise<string | null>;
   now?: number;
 }): Promise<{
   token: string;
@@ -202,24 +201,38 @@ export async function resolvePersistedRuntimeProxyCredential(input: {
   if (!parsedGrant.success || !matchesRuntimeProxyGrantHandle(parsedGrant.data, claims))
     return reject('grant', { metadata, fence: null });
 
-  const fence = await input.fence();
-  const current = fence ? context(metadata, fence) : null;
-  if (!current) return reject('fence', { metadata, fence });
-  if (
-    !matchesRuntimeProxyGrant(grant, claims, {
-      ...current,
-      authorizationId: authorization.id,
-      now,
-    })
-  )
-    return reject('grant', { metadata, fence });
-  let renewed = false;
-  const readToken = async () => {
-    const result = await input.token(secret);
-    renewed ||= result.renewed;
-    return result.token;
+  const readGrantFence = async () => {
+    const fence = await input.fence();
+    const current = fence ? context(metadata, fence) : null;
+    if (!current) return reject('fence', { metadata, fence });
+    if (
+      !matchesRuntimeProxyGrant(grant, claims, {
+        ...current,
+        authorizationId: authorization.id,
+        now,
+      })
+    )
+      return reject('grant', { metadata, fence });
+    return current;
   };
-  const backingToken = await readToken();
+  // Admit against the Sandbox DO after token lookup. Only external renewal needs a preflight fence.
+  let grantFence: ReturnType<typeof readGrantFence> | undefined;
+  let renewalStarted = false;
+  const beforeRenew = async () => {
+    const current = await (grantFence ??= readGrantFence());
+    renewalStarted = current !== null;
+    return renewalStarted;
+  };
+  const readToken = () => input.token(secret, beforeRenew);
+  const backingToken = await readToken().catch(async (error: unknown) => {
+    if (grantFence) throw error;
+    grantFence = readGrantFence();
+    if (await grantFence) throw error;
+    return null;
+  });
+  const current = await (grantFence ??= readGrantFence());
+  if (!current) return null;
+  const { fence } = current;
   if (!backingToken) return reject('token', { metadata, fence });
   const resolved = await resolveRuntimeProxyCredential({
     secret,
@@ -233,8 +246,7 @@ export async function resolvePersistedRuntimeProxyCredential(input: {
   });
   if (!resolved?.token) return reject('resolve', { metadata, fence });
 
-  // Without renewal, everything after the first fence is local to the Session DO.
-  const latestFence = renewed ? await input.fence() : fence;
+  const latestFence = renewalStarted ? await input.fence() : fence;
   const [latestMetadata, latestAuthorization, latestGrant] = await Promise.all([
     input.metadata(),
     input.authorization(),

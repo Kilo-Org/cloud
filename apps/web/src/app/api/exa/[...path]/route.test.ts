@@ -12,7 +12,12 @@ import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@kilocode/web-shared/lib/con
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { captureException } from '@sentry/nextjs';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { EXA_USAGE_TYPE_MAX_LENGTH, ExaUsageRecordSchema } from '@kilocode/usage-contracts';
+import {
+  EXA_MAX_COST_MICRODOLLARS_PER_CALL,
+  EXA_USAGE_TYPE_MAX_LENGTH,
+  ExaUsageRecordSchema,
+} from '@kilocode/usage-contracts';
+import { ExaCostAbovePerCallMaximumError } from '@/lib/exa-usage-record';
 
 // Capture promises scheduled via next/server `after` so tests can await them.
 let afterCallbacks: (() => Promise<void>)[] = [];
@@ -564,6 +569,35 @@ describe('POST /api/exa/[...path]', () => {
 
       expect(mockedRecordExaUsage).not.toHaveBeenCalled();
       expect(mockedCaptureException).toHaveBeenCalledTimes(1);
+    });
+
+    it('records nothing for an upstream cost above the per-call maximum', async () => {
+      setUserAuth();
+      mockedFetch.mockResolvedValue(
+        makeUpstreamResponse({
+          results: [],
+          costDollars: { total: (EXA_MAX_COST_MICRODOLLARS_PER_CALL + 1) / 1_000_000 },
+        })
+      );
+      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      const { POST } = await import('./route');
+      await POST(makeRequest('/search') as never);
+      await expect(flushAfterCallbacks()).resolves.toBeUndefined();
+
+      expect(mockedRecordExaUsage).not.toHaveBeenCalled();
+      expect(mockedCaptureException).toHaveBeenCalledTimes(1);
+      expect(mockedCaptureException.mock.calls[0][0]).toBeInstanceOf(
+        ExaCostAbovePerCallMaximumError
+      );
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
+      expect(consoleError.mock.calls[0][1]).toMatchObject({ stage: 'cost_above_max' });
+      expect(mockedCaptureException).toHaveBeenCalledWith(
+        expect.any(ExaCostAbovePerCallMaximumError),
+        expect.objectContaining({
+          tags: expect.objectContaining({ usage_failure_stage: 'cost_above_max' }),
+        })
+      );
     });
 
     it('passes featureId from header and type from body to recordExaUsage', async () => {

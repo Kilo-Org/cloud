@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import {
   createDeviceAuthRequest,
+  DEVICE_AUTH_REFUSAL_CODES,
   DeviceAuthPendingLimitError,
 } from '@/lib/device-auth/device-auth';
 import {
@@ -57,14 +58,26 @@ export const POST = withRestTiming('/api/device-auth/codes', async (request: Req
 
   const requestingClient = await readRequestingClient(request);
   if (!requestingClient.ok) {
-    return NextResponse.json({ error: 'Invalid requesting client' }, { status: 400 });
+    return NextResponse.json(
+      {
+        error: DEVICE_AUTH_REFUSAL_CODES.invalidRequestingClient,
+        message: 'Invalid requesting client',
+      },
+      { status: 400 }
+    );
   }
 
   if (
     requestingClient.pendingLinkToken &&
     !(await getPendingLinkBySecret(requestingClient.pendingLinkToken))
   ) {
-    return NextResponse.json({ error: 'PENDING_LINK_EXPIRED' }, { status: 400 });
+    return NextResponse.json(
+      {
+        error: DEVICE_AUTH_REFUSAL_CODES.pendingLinkExpired,
+        message: 'This sign-in link has expired. Start the sign-in again.',
+      },
+      { status: 400 }
+    );
   }
 
   try {
@@ -97,7 +110,14 @@ export const POST = withRestTiming('/api/device-auth/codes', async (request: Req
     });
   } catch (error) {
     if (error instanceof DeviceAuthPendingLimitError) {
-      return NextResponse.json({ error: error.message }, { status: 429 });
+      return NextResponse.json(
+        {
+          error: DEVICE_AUTH_REFUSAL_CODES.rateLimited,
+          message: error.message,
+          retryAfterSeconds: error.retryAfterSeconds,
+        },
+        { status: 429, headers: { 'Retry-After': String(error.retryAfterSeconds) } }
+      );
     }
     throw error;
   }

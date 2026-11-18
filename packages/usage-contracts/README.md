@@ -17,6 +17,13 @@ that `/api/internal/exa-usage/record` accepts. It is separate from the LLM
 usage record and rejects unknown keys. `id` and `occurredAt` are the writer's
 idempotency key, so every resend must reuse them.
 
+`costMicrodollars` carries the documented per-call maximum
+`EXA_MAX_COST_MICRODOLLARS_PER_CALL`. One Exa call cannot cost more at the
+published rates, so a larger value is not one call's cost and is refused before
+the write. The writer answers `duplicate` for a replay of an idempotency key and
+`rejected` when it cannot resolve the payer the record names; `rejected` means
+nothing was written and the record must not be sent again.
+
 ## Enkrypt usage
 
 `enkrypt.ts` defines the write that the AI gateway hands to

@@ -33,12 +33,14 @@ const createDebuggerApi = ({
   documentNodeId = 11,
   gate,
   responseBodies,
+  selectorMatches = [42],
   visibilityState = 'visible',
 }: {
   documentNodeId?: number;
   /** When set, `sendCommand` waits on `gate.wait` before resolving the gated method. */
   gate?: { readonly command: string; readonly wait: Promise<void> };
   responseBodies?: Record<string, { base64Encoded?: boolean; body: string }>;
+  selectorMatches?: readonly number[];
   visibilityState?: string;
 } = {}): {
   api: ChromeDebuggerApi;
@@ -101,8 +103,8 @@ const createDebuggerApi = ({
         return { root: { nodeId: currentDocumentNodeId } };
       }
 
-      if (method === 'DOM.querySelector') {
-        return { nodeId: 42 };
+      if (method === 'DOM.querySelectorAll') {
+        return { nodeIds: selectorMatches };
       }
 
       if (method === 'Network.getResponseBody') {
@@ -179,15 +181,18 @@ const createSession = ({
   url = 'https://example.com/',
   gate,
   responseBodies,
+  selectorMatches,
 }: {
   tabId?: number;
   url?: string;
   gate?: { readonly command: string; readonly wait: Promise<void> };
   responseBodies?: Record<string, { base64Encoded?: boolean; body: string }>;
+  selectorMatches?: readonly number[];
 } = {}) => {
   const debuggerApi = createDebuggerApi({
     ...(gate === undefined ? {} : { gate }),
     ...(responseBodies === undefined ? {} : { responseBodies }),
+    ...(selectorMatches === undefined ? {} : { selectorMatches }),
   });
   const tabsApi = createTabsApi({ url });
 
@@ -264,6 +269,21 @@ const createScriptingApi = (
 
   return { api, codes };
 };
+
+/** An injection the browser never answers, for the timeout path. */
+const neverResolves = (): Promise<never[]> =>
+  // eslint-disable-next-line promise/avoid-new -- the fixture is a promise that never settles
+  new Promise<never[]>(() => {});
+
+/** A scripting fake that answers a selector with its match count. */
+const selectorCountScript =
+  (counts: Record<string, number>) =>
+  (details: { readonly args: string[] }): Promise<{ readonly result?: unknown }[]> => {
+    const code = details.args[0] ?? '';
+    const selector = Object.keys(counts).find(key => code.includes(JSON.stringify(key)));
+
+    return Promise.resolve([{ result: selector === undefined ? 0 : counts[selector] }]);
+  };
 
 const createScriptingSession = (options: { readonly result?: (code: string) => unknown } = {}) => {
   const scriptingApi = createScriptingApi(options.result);
@@ -880,8 +900,90 @@ describe('browser tool session', () => {
       selector: '#submit',
     });
     expect(
-      debuggerApi.commands.filter(command => command.method === 'DOM.querySelector')
-    ).toStrictEqual([{ method: 'DOM.querySelector', params: { nodeId: 11, selector: '#submit' } }]);
+      debuggerApi.commands.filter(command => command.method === 'DOM.querySelectorAll')
+    ).toStrictEqual([
+      { method: 'DOM.querySelectorAll', params: { nodeId: 11, selector: '#submit' } },
+    ]);
+  });
+
+  it('refuses a selector that matches zero or several elements', async () => {
+    const none = createSession({ selectorMatches: [] });
+    const many = createSession({ selectorMatches: [42, 43] });
+    const one = createSession({ selectorMatches: [42] });
+
+    await expect(none.session.resolveTarget('#ambiguous')).resolves.toBeUndefined();
+    await expect(many.session.resolveTarget('#ambiguous')).resolves.toStrictEqual({
+      kind: 'ambiguous',
+      matches: 2,
+      selector: '#ambiguous',
+    });
+    await expect(one.session.resolveTarget('#unique')).resolves.toStrictEqual({
+      kind: 'selector',
+      nodeId: 42,
+      selector: '#unique',
+    });
+  });
+
+  it('applies the unique-match rule on the scripting backend too', async () => {
+    const scriptingApi: BrowserScriptingApi = {
+      executeScript: selectorCountScript({ '#many': 3, '#none': 0, '#one': 1 }),
+    };
+    const tabsApi = createTabsApi();
+    const session = createBrowserToolSession({
+      scriptingApi,
+      tabId: 7,
+      tabsApi: tabsApi.api,
+    });
+
+    await expect(session.resolveTarget('#many')).resolves.toStrictEqual({
+      kind: 'ambiguous',
+      matches: 3,
+      selector: '#many',
+    });
+    await expect(session.resolveTarget('#none')).resolves.toBeUndefined();
+    await expect(session.resolveTarget('#one')).resolves.toStrictEqual({
+      kind: 'selector',
+      nodeId: 0,
+      selector: '#one',
+    });
+  });
+
+  it('surfaces a scripting injection error instead of reporting no match', async () => {
+    const scriptingApi: BrowserScriptingApi = {
+      executeScript: () => Promise.resolve([{ error: 'permission denied' }]),
+    };
+    const tabsApi = createTabsApi();
+    const session = createBrowserToolSession({ scriptingApi, tabId: 7, tabsApi: tabsApi.api });
+
+    await expect(session.resolveTarget('#broken')).rejects.toThrow(/permission denied/);
+  });
+
+  it('times out a scripting selector count instead of reporting no match', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const scriptingApi: BrowserScriptingApi = { executeScript: neverResolves };
+      const tabsApi = createTabsApi();
+      const session = createBrowserToolSession({ scriptingApi, tabId: 7, tabsApi: tabsApi.api });
+      // Observe the rejection before the timer fires, so it is never unhandled.
+      const failures: unknown[] = [];
+      const pending = session.resolveTarget('#slow');
+      const settled = (async (): Promise<void> => {
+        try {
+          await pending;
+        } catch (error) {
+          failures.push(error);
+        }
+      })();
+
+      await vi.advanceTimersByTimeAsync(20_000);
+      await settled;
+
+      expect(failures[0]).toBeInstanceOf(Error);
+      expect(String(failures[0])).toContain('timed out');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('replaces the ref registry so an older snapshot ref cannot resolve', async () => {
@@ -1050,7 +1152,7 @@ describe('browser tool session', () => {
     });
     expect(
       debuggerApi.commands
-        .filter(command => command.method === 'DOM.querySelector')
+        .filter(command => command.method === 'DOM.querySelectorAll')
         .map(command => command.params)
     ).toStrictEqual([
       { nodeId: 11, selector: '#first' },
@@ -1095,7 +1197,7 @@ describe('browser tool session', () => {
     ]);
     expect(
       debuggerApi.commands
-        .filter(command => command.method === 'DOM.querySelector')
+        .filter(command => command.method === 'DOM.querySelectorAll')
         .map(command => command.params)
     ).toStrictEqual([
       { nodeId: 11, selector: '#frame' },

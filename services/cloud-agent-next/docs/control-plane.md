@@ -1076,7 +1076,9 @@ the legacy profile restrictions.
   a live user-blocked tree retains its normal idle policy.
   When neither half has arrived and no publication cleanup transport budget applies, the quiet drain
   is bounded by the wrapper's `noProgressMs` (20 minutes). Foreground work clears that timer;
-  a later quiet phase starts a new timer. Expiry fails with the completion-unconfirmed message below.
+  a later quiet phase starts a new timer. On expiry, the wrapper interrupts native work, starts
+  interrupted-turn finalization, and reports `completion_quiet_drain`. Other drain failures still
+  report `completion_unconfirmed`.
   The first half never extends an armed deadline. Feed gaps preserve that deadline and the
   publication cleanup transport bound.
   Drain disables Bun's socket idle timeout for this request only; a quiet HTTP connection does not
@@ -1144,13 +1146,16 @@ the legacy profile restrictions.
   releases dispatch through an uncertain abort. Only known cleanup interruption signals are suppressed.
   Successful cleanup releases the barrier and re-arms confirmation from the original eligible close
   when no newer intake exists.
-- Native deadline failures are reported immediately. When the interrupted batch opted into
-  auto-commit, the wrapper then waits for confirmed cancellation and an idle root before committing
-  and pushing with the normal repository and branch rules. Condense does not run. This cleanup has
-  a three-minute budget, keeps the heartbeat active, and parks later prompts without consuming their
-  delivery deadline. Stop, session release, wrapper shutdown and worktree deletion cancel it.
-  Cancellation failure or a root that is still running skips cleanup with a warning; abrupt sandbox
-  loss cannot guarantee a commit or push. Cleanup never changes the failed outcome.
+- Native deadline and quiet-drain failures are reported immediately. The wrapper parks later prompts
+  while interruption is pending, even without auto-commit, and suppresses cancellation errors from
+  that runtime until a new root turn opens. With auto-commit enabled, the wrapper commits and pushes
+  only after confirmed cancellation, a ready queue and an idle root, using the normal repository and
+  branch rules. Condense does not run. This cleanup has a three-minute budget, keeps the heartbeat
+  active, and does not consume the parked prompts' delivery deadline. Stop, session release, wrapper
+  shutdown and worktree deletion cancel it.
+  Unconfirmed cancellation warns and fails parked prompts without dispatching them. A root that is
+  still running skips auto-commit with a warning; abrupt sandbox loss cannot guarantee a commit or
+  push. Cleanup never changes the original failed outcome.
 
 ### Kilo supervision
 
@@ -2174,7 +2179,7 @@ runtime. Rows created before this record stay `0` until a new delivery records i
 | `sandbox_create_failed` (create attempt budget spent) | `pre_dispatch` / `sandbox_connect_failed` |
 | `agent_unavailable` | queued: `pre_dispatch` / `kilo_server_failed`; accepted: `post_dispatch_no_activity` / `wrapper_disconnected` |
 | `connection_lost`, `sandbox_lost`, `agent_restarted`, `agent_unresponsive`, `sandbox_out_of_memory` | `post_dispatch_no_activity` / `wrapper_disconnected` |
-| `no_progress`, `no_outcome`, `completion_unconfirmed` | `post_dispatch_no_activity` / `wrapper_no_output` |
+| `no_progress`, `no_outcome`, `completion_unconfirmed`, `completion_quiet_drain` | `post_dispatch_no_activity` / `wrapper_no_output` |
 | `prompt_failed` | `post_dispatch_no_activity` / `wrapper_error_before_activity` |
 | `sandbox_stopped` (idle while waiting on the user), `execution_limit`, `preparation_cancelled` | `interruption` / `system_interrupt` |
 | Kilo final error, or `no_progress` during a Kilo model retry | `agent_activity` / `assistant_error`; responsibility from the existing assistant-failure helpers, so Kilo and provider errors stay attributed to them |

@@ -53,6 +53,7 @@ type SnapshotDiff = {
 };
 
 export type RestoreSessionOptions = {
+  timings?: Partial<Record<'downloadMs' | 'importMs' | 'diffsMs', number>>;
   restoreFiles?: boolean;
   /** The git roots of a multi-repository route; without it every diff applies at the workspace path. */
   roots?: RestoreRoots;
@@ -1018,6 +1019,16 @@ export async function restoreSession(
   const downloaded = !filePath;
   const importTimeoutMs = options.importTimeoutMs ?? KILO_IMPORT_TIMEOUT_MS;
   const env = options.env ?? process.env;
+  let phase: 'downloadMs' | 'importMs' | 'diffsMs' = 'downloadMs';
+  let phaseStartedAt = performance.now();
+  const recordPhase = () => {
+    if (options.timings) options.timings[phase] = Math.round(performance.now() - phaseStartedAt);
+  };
+  const beginPhase = (next: typeof phase) => {
+    recordPhase();
+    phase = next;
+    phaseStartedAt = performance.now();
+  };
 
   try {
     log(
@@ -1218,6 +1229,7 @@ export async function restoreSession(
       }
     }
 
+    beginPhase('importMs');
     await sanitizeSnapshot(tmpPath, options.signal, env);
 
     const importStartedAt = Date.now();
@@ -1291,6 +1303,7 @@ export async function restoreSession(
 
     // Extract diffs in a subprocess so the full snapshot JSON is never loaded
     // into this process's heap — only the small diff array crosses the boundary.
+    beginPhase('diffsMs');
     const uniqueDiffs = await extractDiffs(tmpPath, options.signal, env);
     if (uniqueDiffs === null) {
       return fail('failed to parse snapshot JSON', null, 'diffs');
@@ -1430,6 +1443,7 @@ export async function restoreSession(
     }
     return { ok: true, downloaded, imported: true, diffs };
   } finally {
+    recordPhase();
     if (tempDir) {
       fs.rmSync(tempDir, { recursive: true, force: true });
     } else {

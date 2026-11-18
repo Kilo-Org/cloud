@@ -1,6 +1,6 @@
 {
-  "id": "6a0074f0-9e62-4fee-9e94-f014604c8dd9",
-  "prevId": "e89fcb60-a3b0-41b2-9c5b-24a9844cd3b5",
+  "id": "de0af2d0-cdf2-4676-81c6-d2108af20b6f",
+  "prevId": "e2874056-5a3b-4e29-afd4-2c852dcd6d91",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2663,6 +2663,123 @@
             "session_id"
           ],
           "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.app_shell_handoff_tokens": {
+      "name": "app_shell_handoff_tokens",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kilo_user_id": {
+          "name": "kilo_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "target_path": {
+          "name": "target_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "consumed_at": {
+          "name": "consumed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "UQ_app_shell_handoff_tokens_token_hash": {
+          "name": "UQ_app_shell_handoff_tokens_token_hash",
+          "columns": [
+            {
+              "expression": "token_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_app_shell_handoff_tokens_expires_at": {
+          "name": "IDX_app_shell_handoff_tokens_expires_at",
+          "columns": [
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_app_shell_handoff_tokens_kilo_user_id": {
+          "name": "IDX_app_shell_handoff_tokens_kilo_user_id",
+          "columns": [
+            {
+              "expression": "kilo_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "app_shell_handoff_tokens_kilo_user_id_kilocode_users_id_fk": {
+          "name": "app_shell_handoff_tokens_kilo_user_id_kilocode_users_id_fk",
+          "tableFrom": "app_shell_handoff_tokens",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "kilo_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
@@ -8387,6 +8504,13 @@
           "notNull": true,
           "default": "'{}'::jsonb"
         },
+        "model_context_limits": {
+          "name": "model_context_limits",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -8464,6 +8588,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'cloud_agent'"
+        },
+        "cloud_agent_session_id": {
+          "name": "cloud_agent_session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "kiloclaw_instance_id": {
           "name": "kiloclaw_instance_id",
@@ -8700,6 +8830,10 @@
         "CHK_cloud_agent_webhook_triggers_kiloclaw_fields": {
           "name": "CHK_cloud_agent_webhook_triggers_kiloclaw_fields",
           "value": "(\n        \"cloud_agent_webhook_triggers\".\"target_type\" != 'kiloclaw_chat' OR\n        \"cloud_agent_webhook_triggers\".\"kiloclaw_instance_id\" IS NOT NULL\n      )"
+        },
+        "CHK_cloud_agent_webhook_triggers_existing_chat_fields": {
+          "name": "CHK_cloud_agent_webhook_triggers_existing_chat_fields",
+          "value": "(\n        (\"cloud_agent_webhook_triggers\".\"target_type\" = 'cloud_agent_chat' AND \"cloud_agent_webhook_triggers\".\"cloud_agent_session_id\" IS NOT NULL\n          AND \"cloud_agent_webhook_triggers\".\"github_repo\" IS NULL AND \"cloud_agent_webhook_triggers\".\"profile_id\" IS NULL\n          AND \"cloud_agent_webhook_triggers\".\"kiloclaw_instance_id\" IS NULL) OR\n        (\"cloud_agent_webhook_triggers\".\"target_type\" != 'cloud_agent_chat' AND \"cloud_agent_webhook_triggers\".\"cloud_agent_session_id\" IS NULL)\n      )"
         },
         "CHK_cloud_agent_webhook_triggers_scheduled_fields": {
           "name": "CHK_cloud_agent_webhook_triggers_scheduled_fields",

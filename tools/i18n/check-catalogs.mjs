@@ -263,10 +263,13 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   // A placeholder-only accessibility label: the list's name and its open
   // counter joined by a comma, so a catalog may keep English punctuation.
   'todos.lists.rowA11y',
-  // Format-only briefing values: a lower-bound marker and a time range built
-  // from localized placeholders, with no translatable words.
+  // Format-only values with no translatable words: the briefing's lower-bound
+  // marker, and the `{{start}} – {{end}}` join the brief window and the
+  // organization request-logs window both read. The join is a separator
+  // between two placeholders already formatted in the reader's locale, so
+  // every catalog keeps English punctuation here.
   'agentBriefing.atLeast',
-  'agentBriefing.window',
+  'common.timeRange',
   // The organization plan's own tier names. They are product names, so every
   // catalog keeps them as the billing pages and the invoices spell them.
   'organization.hub.planTeams',
@@ -657,10 +660,20 @@ const LOCALE_SEPARATED_KEYS = new Set([
   // The sentence and list joiners are the catalog's own statement about how it
   // closes a sentence and separates two items, so both carry their own edges: a
   // space after the mark nearly everywhere, none where the mark alone separates
-  // ("ja", "zh-Hans", "zh-Hant").
+  // ("ja", "zh-Hans", "zh-Hant"), and none at all where the catalog writes no
+  // mark ("th" separates its sentences with a bare space).
   'common.sentenceJoiner',
   'common.listJoiner',
 ]);
+
+/**
+ * The catalogs that close no sentence with a mark: Thai separates its
+ * sentences with a bare space, so its `common.sentenceJoiner` is that space
+ * and nothing else. Every other catalog's joiner carries its sentence
+ * terminator, so a whitespace-only joiner there stays an untranslated string
+ * the empty-value rule rejects.
+ */
+const MARKLESS_SENTENCE_TAGS = new Set(['th']);
 
 /**
  * The counted clause the review-submit message renders before its stale
@@ -1646,7 +1659,11 @@ function checkTranslatedValue({
   mustTranslateKeys,
 }) {
   const problems = [];
-  if (value.trim() === '') {
+  // A catalog that writes no sentence mark may hold nothing but the space it
+  // separates sentences with; any other whitespace-only value is untranslated.
+  const separatorOnly =
+    key === 'common.sentenceJoiner' && MARKLESS_SENTENCE_TAGS.has(tag) && value !== '';
+  if (value.trim() === '' && !separatorOnly) {
     problems.push(`${label}: "${key}" is empty`);
   }
   if (rejectContainingCancel !== undefined) {

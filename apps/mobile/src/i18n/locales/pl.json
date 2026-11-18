@@ -26,6 +26,7 @@
     "creditHistory": "Historia kredytów",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Anuluj",
     "done": "Gotowe",
     "retry": "Spróbuj ponownie",
@@ -482,7 +483,14 @@
       "viewReceipt": "Wyświetl potwierdzenie"
     },
     "changelog": "Co nowego",
-    "changelogVersionPending": "Opis tej wersji dotrze z kolejną aktualizacją aplikacji."
+    "changelogVersionPending": "Opis wersji {{version}} dotrze z kolejną aktualizacją aplikacji.",
+    "changelogGroupNew": "Nowości",
+    "changelogFixesIn": "Poprawki i ulepszenia w obszarach: {{areas}}.",
+    "changelogFixesPolish": "Poprawki i ulepszenia w całej aplikacji.",
+    "changelogAreas": {
+      "signIn": "Logowanie",
+      "profileOrganizations": "Profil i organizacje"
+    }
   },
   "preferences": {
     "general": "Ogólne",
@@ -2650,7 +2658,6 @@
     "completingPurchase": "Finalizowanie zakupu",
     "subscriptionLoading": "Ładowanie subskrypcji Kilo Pass",
     "retryHint": "Ponownie sprawdza stan Kilo Pass.",
-    "cardAccessibility": "{{title}}. {{description}}. Działanie: {{actionLabel}}",
     "endedOn": "Zakończono {{date}}",
     "notAvailableInApp": "Kilo Pass nie jest dostępny w aplikacji.",
     "statusActive": "Aktywny",
@@ -3434,6 +3441,7 @@
       "manageOnWeb": "Ustawienia rozliczeń w wersji internetowej",
       "changePlan": "Zmień plan",
       "buySeats": "Kup miejsca",
+      "managedOnWeb": "Plan, miejsca i automatyczne doładowanie są zarządzane w wersji internetowej.",
       "setupAutoTopUp": "Skonfiguruj automatyczne doładowanie",
       "manageAutoTopUp": "Zarządzaj automatycznym doładowaniem",
       "opensOnWeb": "Otwiera się w przeglądarce"
@@ -3595,12 +3603,10 @@
       "requestLogs": "Dzienniki żądań"
     },
     "requestLogs": {
-      "hint": "Żądania z godziny przed końcem okna, od najnowszych.",
       "older": "Wcześniejsza godzina",
       "newer": "Późniejsza godzina",
       "truncated": "W tej godzinie jest więcej żądań, niż pokazuje lista.",
       "emptyTitle": "Brak żądań",
-      "emptyDescription": "W tej godzinie nie było żądań do bramy.",
       "loadError": "Nie udało się wczytać dzienników żądań.",
       "permissionDenied": "Dzienniki żądań może przeglądać tylko właściciel, administrator lub menedżer rozliczeń organizacji.",
       "tokens": "{{input}} wej. · {{output}} wyj.",
@@ -4417,8 +4423,7 @@
       "repoValue": "Repozytorium: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Ten profil nie jest już dostępny. Wybierz inny.",
-      "pickerEmptyDescriptionOrganization": "Utwórz profil organizacji, aby ponownie używać zmiennych środowiskowych, poleceń konfiguracyjnych i umiejętności w różnych sesjach.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Właściciel lub administrator organizacji może utworzyć profil organizacji."
+      "pickerEmptyDescriptionOrganization": "Utwórz profil organizacji, aby ponownie używać zmiennych środowiskowych, poleceń konfiguracyjnych i umiejętności w różnych sesjach."
     },
     "variablesDeleteFailed": "Nie udało się usunąć zmiennej",
     "deleteVariable": "Usuń zmienną {{key}}",
@@ -4612,7 +4617,6 @@
     "dismiss": "Odrzuć raport",
     "offline": "Offline · zapisany raport",
     "cached": "Zapisany raport · odświeżanie niedostępne",
-    "window": "{{start}} – {{end}}",
     "summary": "Podsumowanie AI",
     "summaryPending": "Trwa tworzenie podsumowania AI. Pojawi się tutaj, gdy będzie gotowe.",
     "summaryUnavailable": "Podsumowanie AI niedostępne. Raport ustrukturyzowany jest nadal dostępny.",
@@ -4731,6 +4735,7 @@
       "title": "Wyzwalacze i webhooki",
       "subtitle": "Automatyzuj uruchomienia Cloud Agent przez wywołanie webhooka lub harmonogram.",
       "new": "Nowy wyzwalacz",
+      "create": "Utwórz wyzwalacz",
       "emptyTitle": "Brak wyzwalaczy",
       "emptyDescription": "Utwórz wyzwalacz, aby uruchomić Cloud Agent przez wywołanie webhooka lub według harmonogramu.",
       "loadFailedTitle": "Nie udało się wczytać wyzwalaczy",
@@ -4784,6 +4789,8 @@
       "created": "Utworzono wyzwalacz",
       "saved": "Zapisano wyzwalacz",
       "statusArrived": "Dotarło",
+      "defaultPromptWebhook": "Opisz treść żądania webhooka:\n\n{{body}}",
+      "defaultPromptScheduled": "Uruchom zaplanowane zadanie. Wyzwolone o {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Wprowadź nazwę.",
         "nameTooShort": "Użyj co najmniej 8 znaków.",

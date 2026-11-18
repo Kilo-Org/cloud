@@ -24,14 +24,14 @@ import { markdownHtmlSplitCache } from './markdown-parse-cache';
 export type MarkdownTextProps = {
   value: string;
   variant?: MarkdownVariant;
-  selectable?: boolean;
   /**
-   * Body line height in the native renderer's sp units. An inline markdown
-   * link's accessible rectangle and tap region are its text line box, and the
-   * native renderer gives a span no box and no `hitSlop`, so a caller that
-   * needs a larger link target raises the line height.
+   * Base direction of the document body, when it has one of its own: a legal
+   * document is English in every interface language, so its prose keeps a
+   * left-to-right base direction and the left edge while the screen around it
+   * mirrors. Chat omits this and follows the interface.
    */
-  lineHeight?: number;
+  documentDirection?: 'ltr';
+  selectable?: boolean;
   onLongPressLink?: MarkdownLinkLongPressHandler;
   /**
    * Optional tap handler invoked when a rendered link is pressed. When this
@@ -53,8 +53,8 @@ export type MarkdownTextProps = {
 export function MarkdownText({
   value,
   variant = 'assistant',
+  documentDirection,
   selectable = true,
-  lineHeight,
   onLongPressLink,
   onPressLink,
   onCopyCode,
@@ -99,6 +99,7 @@ export function MarkdownText({
             key={`md-html-${index}`}
             html={segment.raw}
             palette={palette}
+            documentDirection={documentDirection}
             selectable={selectable}
             onLongPressLink={onLongPressLink}
             onPressLink={onPressLink}
@@ -108,8 +109,8 @@ export function MarkdownText({
             key={`md-content-${index}`}
             raw={segment.raw}
             palette={palette}
+            documentDirection={documentDirection}
             selectable={selectable}
-            lineHeight={lineHeight}
             onLongPressLink={onLongPressLink}
             onPressLink={onPressLink}
             onCopyCode={onCopyCode}
@@ -123,8 +124,8 @@ export function MarkdownText({
 type MarkdownRunProps = {
   raw: string;
   palette: MarkdownPalette;
+  documentDirection?: 'ltr';
   selectable: boolean;
-  lineHeight?: number;
   onLongPressLink?: MarkdownLinkLongPressHandler;
   onPressLink?: MarkdownLinkPressHandler;
   onCopyCode?: MarkdownCopyCodeHandler;
@@ -140,8 +141,8 @@ type MarkdownRunProps = {
 function MarkdownRun({
   raw,
   palette,
+  documentDirection,
   selectable,
-  lineHeight,
   onLongPressLink,
   onPressLink,
   onCopyCode,
@@ -156,8 +157,8 @@ function MarkdownRun({
               key={`md-text-${index}`}
               value={run.raw}
               palette={palette}
+              documentDirection={documentDirection}
               selectable={selectable}
-              lineHeight={lineHeight}
               onLongPressLink={onLongPressLink}
               onPressLink={onPressLink}
               onCopyCode={onCopyCode}

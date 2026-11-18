@@ -57,6 +57,7 @@ async function admission(
     source?: 'user' | 'automation';
     audience?: string | string[];
     expiresInSeconds?: number;
+    env?: string | undefined;
     deviceSessionId?: string;
   } = {}
 ) {
@@ -75,6 +76,9 @@ async function admission(
           : 'device-access'
         : 'internal-service',
     credentialExchange: false,
+    ...(options.env === undefined && !('env' in options)
+      ? { env: 'production' }
+      : { env: options.env }),
     extra: {
       organizationId: 'org',
       ...(options.deviceSessionId === undefined
@@ -88,6 +92,16 @@ async function admission(
     },
   });
 }
+
+const commonInput = {
+  secret,
+  connectionString: 'postgres://unused',
+  resourceKind: 'cloud-agent-next' as const,
+  resourceId: 'session',
+  organizationId: 'org',
+  environment: 'production' as const,
+  adapters: adapters(),
+};
 
 describe('runtime authorization', () => {
   beforeEach(() => {
@@ -121,13 +135,8 @@ describe('runtime authorization', () => {
   it('creates a bound authorization and issues a runtime-only audience token', async () => {
     const control = await admission();
     const result = await createRuntimeAuthorization({
+      ...commonInput,
       token: control.token,
-      secret,
-      connectionString: 'postgres://unused',
-      resourceKind: 'cloud-agent-next',
-      resourceId: 'session',
-      organizationId: 'org',
-      adapters: adapters(),
     });
 
     expect(result.authorization.bindings.userPepperDigest).not.toContain('user-pepper');
@@ -163,6 +172,7 @@ describe('runtime authorization', () => {
         audience: 'cloud-agent-next',
         tokenPurpose: 'internal-service',
         credentialExchange: false,
+        env: 'production',
         extra: {
           organizationId: 'org',
           runtimeAdmission: {
@@ -188,6 +198,7 @@ describe('runtime authorization', () => {
         resourceKind: 'cloud-agent-next' as const,
         resourceId: 'session',
         organizationId: 'org',
+        environment: 'production' as const,
       };
       const created = await createRuntimeAuthorization(creation);
       expect(created.authorization).toMatchObject({
@@ -232,13 +243,8 @@ describe('runtime authorization', () => {
     const now = new Date('2026-01-01T00:00:00.000Z');
     vi.setSystemTime(now);
     const cloudAgent = await createRuntimeAuthorization({
+      ...commonInput,
       token: (await admission({ expiresInSeconds: 60 })).token,
-      secret,
-      connectionString: 'postgres://unused',
-      resourceKind: 'cloud-agent-next',
-      resourceId: 'session',
-      organizationId: 'org',
-      adapters: adapters(),
       now,
     });
 
@@ -250,13 +256,8 @@ describe('runtime authorization', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
     const created = await createRuntimeAuthorization({
+      ...commonInput,
       token: (await admission()).token,
-      secret,
-      connectionString: 'postgres://unused',
-      resourceKind: 'cloud-agent-next',
-      resourceId: 'session',
-      organizationId: 'org',
-      adapters: adapters(),
     });
     const renewalTime = new Date('2026-01-01T23:40:00.000Z');
     vi.setSystemTime(renewalTime);
@@ -278,13 +279,8 @@ describe('runtime authorization', () => {
     const createdAt = new Date('2026-01-01T00:00:00.000Z');
     vi.setSystemTime(createdAt);
     const created = await createRuntimeAuthorization({
+      ...commonInput,
       token: (await admission()).token,
-      secret,
-      connectionString: 'postgres://unused',
-      resourceKind: 'cloud-agent-next',
-      resourceId: 'session',
-      organizationId: 'org',
-      adapters: adapters(),
       now: createdAt,
     });
     const deadline = new Date(created.authorization.delegationExpiresAt);
@@ -311,20 +307,15 @@ describe('runtime authorization', () => {
 
   it('rejects normal, multi-audience, expired, and mismatched control tokens', async () => {
     const valid = await admission();
-    const common = {
-      secret,
-      connectionString: 'postgres://unused',
-      resourceKind: 'cloud-agent-next' as const,
-      resourceId: 'session',
-      organizationId: 'org',
-      adapters: adapters(),
-    };
     await expect(
-      createRuntimeAuthorization({ ...common, token: valid.token.replace(/[^.]+$/, 'tampered') })
+      createRuntimeAuthorization({
+        ...commonInput,
+        token: valid.token.replace(/[^.]+$/, 'tampered'),
+      })
     ).rejects.toThrow();
     await expect(
       createRuntimeAuthorization({
-        ...common,
+        ...commonInput,
         token: (await admission({ audience: ['cloud-agent-next', 'kilo-api'] })).token,
       })
     ).rejects.toThrow();
@@ -336,32 +327,101 @@ describe('runtime authorization', () => {
       audience: 'cloud-agent-next',
       tokenPurpose: 'human-api',
       credentialExchange: false,
+      env: 'production',
     });
     await expect(
-      createRuntimeAuthorization({ ...common, token: ordinary.token })
+      createRuntimeAuthorization({ ...commonInput, token: ordinary.token })
     ).rejects.toThrow();
     await expect(
       createRuntimeAuthorization({
-        ...common,
+        ...commonInput,
         token: (await admission({ audience: 'kilo-gateway' })).token,
       })
     ).rejects.toThrow();
     const expiring = await admission({ expiresInSeconds: 60 });
     vi.setSystemTime(new Date(Date.now() + 61_000));
     await expect(
-      createRuntimeAuthorization({ ...common, token: expiring.token })
+      createRuntimeAuthorization({ ...commonInput, token: expiring.token })
+    ).rejects.toThrow();
+  });
+
+  it('rejects admission tokens minted for another environment or without an environment', async () => {
+    const foreign = await admission({ env: 'staging' });
+    await expect(
+      createRuntimeAuthorization({ ...commonInput, token: foreign.token })
+    ).rejects.toThrow('Invalid runtime admission');
+    const absent = await admission({ env: undefined });
+    await expect(
+      createRuntimeAuthorization({ ...commonInput, token: absent.token })
+    ).rejects.toThrow('Invalid runtime admission');
+  });
+
+  it('carries the local environment into the record and the issued delegation', async () => {
+    const result = await createRuntimeAuthorization({
+      ...commonInput,
+      environment: 'development',
+      token: (await admission({ env: 'development' })).token,
+    });
+    expect(result.authorization.env).toBe('development');
+    expect(decodeJwt(result.token).env).toBe('development');
+  });
+
+  it('reports an environment mismatch as its own admission diagnostic', async () => {
+    const onAdmissionRejected = vi.fn();
+    await expect(
+      createRuntimeAuthorization({
+        ...commonInput,
+        token: (await admission({ env: 'staging' })).token,
+        onAdmissionRejected,
+      })
+    ).rejects.toThrow('Invalid runtime admission');
+    expect(onAdmissionRejected.mock.calls).toEqual([['environment_mismatch']]);
+  });
+
+  it('survives a diagnostic that throws', async () => {
+    await expect(
+      createRuntimeAuthorization({
+        ...commonInput,
+        token: (await admission({ env: 'staging' })).token,
+        onAdmissionRejected: () => {
+          throw new Error('private-logger-error');
+        },
+      })
+    ).rejects.toThrow('Invalid runtime admission');
+  });
+
+  it('reports no admission diagnostic for an admitted token', async () => {
+    const onAdmissionRejected = vi.fn();
+    await createRuntimeAuthorization({
+      ...commonInput,
+      token: (await admission()).token,
+      onAdmissionRejected,
+    });
+    expect(onAdmissionRejected).not.toHaveBeenCalled();
+  });
+
+  it('refuses an unusable runtime environment input', async () => {
+    const control = await admission();
+    await expect(
+      createRuntimeAuthorization({
+        ...commonInput,
+        environment: 'staging' as unknown as 'production',
+        token: control.token,
+      })
+    ).rejects.toThrow();
+    await expect(
+      createRuntimeAuthorization({
+        ...commonInput,
+        environment: undefined as unknown as 'production',
+        token: control.token,
+      })
     ).rejects.toThrow();
   });
 
   it('binds renewals to current peppers, blocks, and membership identities', async () => {
     const result = await createRuntimeAuthorization({
+      ...commonInput,
       token: (await admission({ userId: 'bot', source: 'automation' })).token,
-      secret,
-      connectionString: 'postgres://unused',
-      resourceKind: 'cloud-agent-next',
-      resourceId: 'session',
-      organizationId: 'org',
-      adapters: adapters(),
     });
     principals.set('bot', {
       id: 'bot',
@@ -403,7 +463,11 @@ describe('runtime authorization', () => {
   it('binds a device-access delegation to its session and renews only while it is live', async () => {
     const deviceSessionId = crypto.randomUUID();
     liveDeviceSessions.add(`${deviceSessionId}:user`);
-    const common = { secret, connectionString: 'postgres://unused' };
+    const common = {
+      secret,
+      connectionString: 'postgres://unused',
+      environment: 'production' as const,
+    };
     const created = await createRuntimeAuthorization({
       ...common,
       token: (await admission({ deviceSessionId })).token,
@@ -438,7 +502,11 @@ describe('runtime authorization', () => {
   it('records the session only while the session belongs to the admitted user', async () => {
     const deviceSessionId = crypto.randomUUID();
     liveDeviceSessions.add(`${deviceSessionId}:bot`);
-    const common = { secret, connectionString: 'postgres://unused' };
+    const common = {
+      secret,
+      connectionString: 'postgres://unused',
+      environment: 'production' as const,
+    };
 
     await expect(
       createRuntimeAuthorization({
@@ -476,6 +544,7 @@ describe('runtime authorization', () => {
         token: control.token,
         secret,
         connectionString: 'postgres://unused',
+        environment: 'production',
         resourceKind: 'cloud-agent-next',
         resourceId: 'session',
         organizationId: 'org',
@@ -485,7 +554,11 @@ describe('runtime authorization', () => {
   });
 
   it('leaves a human-api delegation unbound and renewable without any device session', async () => {
-    const common = { secret, connectionString: 'postgres://unused' };
+    const common = {
+      secret,
+      connectionString: 'postgres://unused',
+      environment: 'production' as const,
+    };
     const created = await createRuntimeAuthorization({
       ...common,
       token: (await admission()).token,
@@ -508,7 +581,11 @@ describe('runtime authorization', () => {
   it('keeps a stored record without a device session binding on its own lifetime', async () => {
     const deviceSessionId = crypto.randomUUID();
     liveDeviceSessions.add(`${deviceSessionId}:user`);
-    const common = { secret, connectionString: 'postgres://unused' };
+    const common = {
+      secret,
+      connectionString: 'postgres://unused',
+      environment: 'production' as const,
+    };
     const created = await createRuntimeAuthorization({
       ...common,
       token: (await admission({ deviceSessionId })).token,
@@ -542,13 +619,8 @@ describe('runtime authorization', () => {
     const deviceSessionId = crypto.randomUUID();
     liveDeviceSessions.add(`${deviceSessionId}:user`);
     const result = await createRuntimeAuthorization({
+      ...commonInput,
       token: (await admission({ deviceSessionId })).token,
-      secret,
-      connectionString: 'postgres://unused',
-      resourceKind: 'cloud-agent-next',
-      resourceId: 'session',
-      organizationId: 'org',
-      adapters: adapters(),
     });
     const onBindingRejected = vi.fn();
     const failingAdapters: RuntimeAuthorizationAdapters = {
@@ -600,13 +672,8 @@ describe('runtime authorization', () => {
 
   it('seals only the exact intended runtime record', async () => {
     const result = await createRuntimeAuthorization({
+      ...commonInput,
       token: (await admission()).token,
-      secret,
-      connectionString: 'postgres://unused',
-      resourceKind: 'cloud-agent-next',
-      resourceId: 'session',
-      organizationId: 'org',
-      adapters: adapters(),
     });
     const sealed = await sealRuntimeAuthorization(result.authorization, secret);
     await expect(

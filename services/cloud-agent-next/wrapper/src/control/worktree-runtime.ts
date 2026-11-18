@@ -74,6 +74,23 @@ export class WorktreeKiloRuntimeError extends Error {
   }
 }
 
+/**
+ * Personal per-model context caps become `provider.kilo.models.<id>.limit.context`
+ * entries, so Kilo compacts the conversation against the lowered window. The
+ * config key is the gateway model id without the `kilo/` provider prefix.
+ */
+function buildModelContextLimitEntries(
+  limits: ControlPlaneRouteSpec['modelContextLimits']
+): Record<string, { limit: { context: number } }> | undefined {
+  if (!limits || Object.keys(limits).length === 0) return undefined;
+  const entries: Record<string, { limit: { context: number } }> = {};
+  for (const [model, context] of Object.entries(limits)) {
+    const id = model.replace(/^kilo\//, '');
+    if (id) entries[id] = { limit: { context } };
+  }
+  return Object.keys(entries).length > 0 ? entries : undefined;
+}
+
 export function buildWorktreeKiloEnvironment(
   directory: string,
   home: string,
@@ -83,7 +100,7 @@ export function buildWorktreeKiloEnvironment(
   mcp?: SessionAttachPayload['mcp'],
   runtimeConfig?: Pick<
     ControlPlaneRouteSpec,
-    'permission' | 'githubReviewTarget' | 'createdOnPlatform'
+    'permission' | 'githubReviewTarget' | 'createdOnPlatform' | 'modelContextLimits'
   > & {
     cloudAgentMcp?: ControlPlaneSessionCredentialsPayload['cloudAgentMcp'];
   }
@@ -114,6 +131,7 @@ export function buildWorktreeKiloEnvironment(
     }
   }
 
+  const modelLimitEntries = buildModelContextLimitEntries(runtimeConfig?.modelContextLimits);
   let config = JSON.stringify({
     autoupdate: false,
     snapshot: false,
@@ -126,6 +144,7 @@ export function buildWorktreeKiloEnvironment(
           ...(kilo.organizationId ? { kilocodeOrganizationId: kilo.organizationId } : {}),
           baseURL: kilo.targets.providerBaseUrl,
         },
+        ...(modelLimitEntries ? { models: modelLimitEntries } : {}),
       },
     },
     ...(mcp || runtimeConfig?.cloudAgentMcp

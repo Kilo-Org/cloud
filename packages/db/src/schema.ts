@@ -5351,8 +5351,8 @@ export const cloud_agent_webhook_triggers = pgTable(
     organization_id: uuid('organization_id').references(() => organizations.id, {
       onDelete: 'cascade',
     }),
-    // Target type: 'cloud_agent' (default) or 'kiloclaw_chat'
     target_type: text('target_type').notNull().default('cloud_agent'),
+    cloud_agent_session_id: text('cloud_agent_session_id'),
     // KiloClaw Chat target: which instance to send messages to
     kiloclaw_instance_id: uuid('kiloclaw_instance_id').references(() => kiloclaw_instances.id),
     // Activation mode: 'webhook' (default) or 'scheduled' (cron-based)
@@ -5412,6 +5412,15 @@ export const cloud_agent_webhook_triggers = pgTable(
       sql`(
         ${table.target_type} != 'kiloclaw_chat' OR
         ${table.kiloclaw_instance_id} IS NOT NULL
+      )`
+    ),
+    check(
+      'CHK_cloud_agent_webhook_triggers_existing_chat_fields',
+      sql`(
+        (${table.target_type} = 'cloud_agent_chat' AND ${table.cloud_agent_session_id} IS NOT NULL
+          AND ${table.github_repo} IS NULL AND ${table.profile_id} IS NULL
+          AND ${table.kiloclaw_instance_id} IS NULL) OR
+        (${table.target_type} != 'cloud_agent_chat' AND ${table.cloud_agent_session_id} IS NULL)
       )`
     ),
     // Scheduled triggers require cron_expression
@@ -9182,6 +9191,10 @@ export type CloudAgentBuiltinAgentOverrides = Record<
   { model?: string | null; variant?: string; disable?: boolean }
 >;
 
+// Map of gateway model id (for example `openai/gpt-6.1-sol`) to a context-window
+// token cap. See ModelContextLimitsSchema in `@kilocode/cloud-agent-profile`.
+export type CloudAgentModelContextLimits = Record<string, number>;
+
 export const cloud_agent_user_settings = pgTable(
   'cloud_agent_user_settings',
   {
@@ -9190,6 +9203,7 @@ export const cloud_agent_user_settings = pgTable(
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
     workspace_order: text().$type<'manual' | 'created' | 'activity'>().notNull().default('manual'),
     builtin_agents: jsonb().$type<CloudAgentBuiltinAgentOverrides>().notNull().default({}),
+    model_context_limits: jsonb().$type<CloudAgentModelContextLimits>().notNull().default({}),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()

@@ -26,6 +26,7 @@
     "creditHistory": "Kredietgeskiedenis",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Kanselleer",
     "done": "Klaar",
     "retry": "Probeer weer",
@@ -482,7 +483,14 @@
       "viewReceipt": "Bekyk ontvangsbewys"
     },
     "changelog": "Wat is nuut",
-    "changelogVersionPending": "Hierdie weergawe se notas kom met die volgende opdatering."
+    "changelogVersionPending": "Die notas vir {{version}} kom met die volgende toepassingsopdatering.",
+    "changelogGroupNew": "Nuut",
+    "changelogFixesIn": "Regstellings en verbeterings in {{areas}}.",
+    "changelogFixesPolish": "Regstellings en verbeterings regdeur die app.",
+    "changelogAreas": {
+      "signIn": "Aanmelding",
+      "profileOrganizations": "Profiel en organisasies"
+    }
   },
   "preferences": {
     "general": "Algemeen",
@@ -3125,7 +3133,6 @@
     "completingPurchase": "Aankoop word voltooi",
     "subscriptionLoading": "Die Kilo Pass-intekening word gelaai",
     "retryHint": "Probeer die Kilo Pass-status weer laai.",
-    "cardAccessibility": "{{title}}: {{description}}. {{actionLabel}}",
     "endedOn": "Geëindig op {{date}}",
     "notAvailableInApp": "Kilo Pass is nie in die app beskikbaar nie.",
     "statusActive": "Aktief",
@@ -3328,6 +3335,7 @@
       "manageOnWeb": "Fakturering-instellings op die web",
       "changePlan": "Verander plan",
       "buySeats": "Koop gebruikersplekke",
+      "managedOnWeb": "Die plan, gebruikersplekke en outomatiese aanvulling word op die web bestuur.",
       "setupAutoTopUp": "Stel outomatiese aanvulling op",
       "manageAutoTopUp": "Bestuur outomatiese aanvulling",
       "opensOnWeb": "Maak op die web oop"
@@ -3476,12 +3484,10 @@
       "requestLogs": "Versoeklogs"
     },
     "requestLogs": {
-      "hint": "Versoeke uit die uur voordat die venster eindig, nuutste eerste.",
       "older": "Vroeër uur",
       "newer": "Later uur",
       "truncated": "Hierdie uur het meer versoeke as wat die lys wys.",
       "emptyTitle": "Geen versoeke nie",
-      "emptyDescription": "Hierdie uur het geen gateway-versoeke nie.",
       "loadError": "Kon nie versoeklogs laai nie.",
       "permissionDenied": "Slegs 'n organisasie-eienaar, -administrateur of -faktuurbestuurder kan die organisasie se versoeklogs lees.",
       "tokens": "{{input}} in · {{output}} uit",
@@ -4285,8 +4291,7 @@
       "repoValue": "Bewaarplek: {{name}}",
       "profileValue": "Profiel: {{name}}",
       "profileUnavailable": "Hierdie profiel is nie meer beskikbaar nie. Kies 'n ander een.",
-      "pickerEmptyDescriptionOrganization": "Skep 'n organisasieprofiel om omgewingsveranderlikes, opstelopdragte en vaardighede oor sessies te hergebruik.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Die eienaar of admin van 'n organisasie kan 'n organisasieprofiel skep."
+      "pickerEmptyDescriptionOrganization": "Skep 'n organisasieprofiel om omgewingsveranderlikes, opstelopdragte en vaardighede oor sessies te hergebruik."
     },
     "variablesDeleteFailed": "Kon nie veranderlike verwyder nie",
     "deleteVariable": "Skrap veranderlike {{key}}",
@@ -4472,7 +4477,6 @@
     "dismiss": "Verwerp verslag",
     "offline": "Vanlyn · gestoorde verslag",
     "cached": "Gestoorde verslag · verfris nie beskikbaar nie",
-    "window": "{{start}} – {{end}}",
     "summary": "AI-opsomming",
     "summaryPending": "AI-opsomming word voorberei. Dit sal hier verskyn wanneer dit gereed is.",
     "summaryUnavailable": "AI-opsomming nie beskikbaar nie. Jou gestruktureerde verslag is steeds beskikbaar.",
@@ -4591,6 +4595,7 @@
       "title": "Snellers en webhake",
       "subtitle": "Automatiseer Cloud Agent-lopies vanaf ’n webhaakoproep of ’n skedule.",
       "new": "Nuwe sneller",
+      "create": "Skep sneller",
       "emptyTitle": "Nog geen snellers nie",
       "emptyDescription": "Skep ’n sneller om ’n Cloud Agent-lopie vanaf ’n webhaakoproep of volgens ’n skedule te begin.",
       "loadFailedTitle": "Kon nie snellers laai nie",
@@ -4644,6 +4649,8 @@
       "created": "Sneller geskep",
       "saved": "Sneller gestoor",
       "statusArrived": "Aangekom",
+      "defaultPromptWebhook": "Beskryf die liggaam van hierdie webhaakversoek:\n\n{{body}}",
+      "defaultPromptScheduled": "Voer die geskeduleerde taak uit. Geaktiveer om {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Voer ’n naam in.",
         "nameTooShort": "Gebruik minstens 8 karakters.",

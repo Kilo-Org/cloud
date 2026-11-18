@@ -1,6 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, test } from '@jest/globals';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { ai_gateway_config } from '@kilocode/db/schema';
+import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import { NextRequest } from 'next/server';
 import {
   getOpenRouterModelsMetadataFromDatabase,
@@ -80,6 +81,31 @@ describe('GET /api/openrouter/models/[provider]/[model]/endpoints', () => {
           },
           { provider_name: 'Unpriced' },
         ],
+      },
+    });
+  });
+
+  test('omits model reasoning metadata from the endpoints response', async () => {
+    const model: GatewayModelWithEndpoints = {
+      id: 'deepseek/deepseek-v4.1-flash-1017',
+      name: 'DeepSeek: DeepSeek V4.1 Flash 1017',
+      architecture: { output_modalities: ['text'] },
+      reasoning: { mandatory: false, supported_efforts: ['max', 'high', 'low', 'none'] },
+      endpoints: [{ provider_name: 'DeepSeek' }],
+    };
+    mockedGetOpenRouterModelsMetadataFromDatabase.mockResolvedValue({ [model.id]: model });
+
+    const response = await handleModelEndpointsRequest(request(model.id), {
+      params: Promise.resolve({ provider: 'deepseek', model: 'deepseek-v4.1-flash-1017' }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      data: {
+        id: model.id,
+        name: model.name,
+        architecture: model.architecture,
+        endpoints: model.endpoints,
       },
     });
   });

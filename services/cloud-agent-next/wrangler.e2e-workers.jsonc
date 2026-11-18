@@ -6,6 +6,7 @@
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
   "vars": {
+    "ENVIRONMENT": "production",
     "NEXTAUTH_SECRET": "cloud-agent-e2e-workers-test-secret",
     "INTERNAL_API_SECRET": "cloud-agent-e2e-workers-test-internal-secret",
   },

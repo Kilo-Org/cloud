@@ -34,21 +34,24 @@ const MASKED_ACTOR_LABEL_KEYS = {
   user: 'securityAgent.auditReport.actorMaskedUser',
 } as const;
 
+// Every timestamp inside the report formats the same way, so one frozen
+// options object serves them all instead of one allocation per rendered row.
+const UTC_TIMESTAMP_FORMAT_OPTIONS: Intl.DateTimeFormatOptions = Object.freeze({
+  timeZone: 'UTC',
+  year: 'numeric',
+  month: 'numeric',
+  day: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
 // The period line is labelled UTC, so every timestamp inside the report carries
 // the same zone: a reader west of UTC must never see a generated date their own
 // calendar has not reached yet. `formatDate` renders the date and clock in the
 // language's own order and 12/24-hour cycle; the zone marker stays invariant,
 // like `periodUtc`'s.
 function formatUtcTimestamp(value: string): string {
-  const formatOptions: Intl.DateTimeFormatOptions = {
-    timeZone: 'UTC',
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  };
-  return `${formatDate(parseTimestamp(value), i18n.language, formatOptions)} UTC`;
+  return `${formatDate(parseTimestamp(value), i18n.language, UTC_TIMESTAMP_FORMAT_OPTIONS)} UTC`;
 }
 
 // A masked actor's displayName is a server-side English label; the localized
@@ -165,24 +168,30 @@ function FindingSection({ finding }: Readonly<{ finding: SecurityFindingAuditSec
 
   return (
     <CollapsibleSection title={finding.title}>
-      <Text variant="muted" className="text-xs">
-        {meta}
-      </Text>
-      <View className="gap-3">
-        {finding.events.map(event => (
-          <View key={event.id} className="gap-0.5">
-            <Text className="text-sm">{eventLabel(event.action, event.label)}</Text>
-            {eventEvidenceLines(event, t).map(line => (
-              <Text key={line} variant="muted" className="text-xs">
-                {line}
-              </Text>
+      {/* The body formats one timestamp and one actor label per event, so it is
+          built only while the section is expanded. */}
+      {() => (
+        <>
+          <Text variant="muted" className="text-xs">
+            {meta}
+          </Text>
+          <View className="gap-3">
+            {finding.events.map(event => (
+              <View key={event.id} className="gap-0.5">
+                <Text className="text-sm">{eventLabel(event.action, event.label)}</Text>
+                {eventEvidenceLines(event, t).map(line => (
+                  <Text key={line} variant="muted" className="text-xs">
+                    {line}
+                  </Text>
+                ))}
+                <Text variant="muted" className="text-xs">
+                  {formatUtcTimestamp(event.occurredAt)} · {actorLabel(event.actor, t)}
+                </Text>
+              </View>
             ))}
-            <Text variant="muted" className="text-xs">
-              {formatUtcTimestamp(event.occurredAt)} · {actorLabel(event.actor, t)}
-            </Text>
           </View>
-        ))}
-      </View>
+        </>
+      )}
     </CollapsibleSection>
   );
 }

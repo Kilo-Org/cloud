@@ -26,6 +26,7 @@
     "creditHistory": "Kredithistorik",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Annuller",
     "done": "Færdig",
     "retry": "Prøv igen",
@@ -482,7 +483,14 @@
       "viewReceipt": "Se kvittering"
     },
     "changelog": "Nyheder",
-    "changelogVersionPending": "Noterne til denne version kommer med næste appopdatering."
+    "changelogVersionPending": "Noterne til version {{version}} kommer med næste appopdatering.",
+    "changelogGroupNew": "Nyt",
+    "changelogFixesIn": "Rettelser og forbedringer i {{areas}}.",
+    "changelogFixesPolish": "Rettelser og forbedringer i hele appen.",
+    "changelogAreas": {
+      "signIn": "Log-ind",
+      "profileOrganizations": "Profil og organisationer"
+    }
   },
   "preferences": {
     "general": "Generelt",
@@ -3125,7 +3133,6 @@
     "completingPurchase": "Fuldfører køb",
     "subscriptionLoading": "Indlæser Kilo Pass-abonnement",
     "retryHint": "Prøver at indlæse status for Kilo Pass igen.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Afsluttet {{date}}",
     "notAvailableInApp": "Kilo Pass er ikke tilgængeligt i appen.",
     "statusActive": "Aktiv",
@@ -3328,6 +3335,7 @@
       "manageOnWeb": "Faktureringsindstillinger på nettet",
       "changePlan": "Skift plan",
       "buySeats": "Køb pladser",
+      "managedOnWeb": "Planen, pladserne og automatisk optankning administreres på nettet.",
       "setupAutoTopUp": "Konfigurer automatisk optankning",
       "manageAutoTopUp": "Administrer automatisk optankning",
       "opensOnWeb": "Åbner på nettet"
@@ -3476,12 +3484,10 @@
       "requestLogs": "Anmodningslogs"
     },
     "requestLogs": {
-      "hint": "Anmodninger fra timen op til vinduets sluttidspunkt, nyeste først.",
       "older": "Forrige time",
       "newer": "Næste time",
       "truncated": "Denne time har flere anmodninger, end listen viser.",
       "emptyTitle": "Ingen anmodninger",
-      "emptyDescription": "Der er ingen gateway-anmodninger i denne time.",
       "loadError": "Anmodningslogs kunne ikke indlæses.",
       "permissionDenied": "Kun en ejer, administrator eller faktureringsansvarlig i organisationen kan se dens anmodningslogs.",
       "tokens": "{{input}} ind · {{output}} ud",
@@ -4285,8 +4291,7 @@
       "repoValue": "Lager: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Denne profil er ikke længere tilgængelig. Vælg en anden.",
-      "pickerEmptyDescriptionOrganization": "Opret en organisationsprofil for at genbruge miljøvariabler, opsætningskommandoer og færdigheder på tværs af sessioner.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "En organisationsejer eller administrator kan oprette en organisationsprofil."
+      "pickerEmptyDescriptionOrganization": "Opret en organisationsprofil for at genbruge miljøvariabler, opsætningskommandoer og færdigheder på tværs af sessioner."
     },
     "variablesDeleteFailed": "Variablen kunne ikke slettes",
     "deleteVariable": "Slet variabel {{key}}",
@@ -4472,7 +4477,6 @@
     "dismiss": "Afvis briefing",
     "offline": "Offline · gemt briefing",
     "cached": "Gemt rapport · kan ikke opdateres",
-    "window": "{{start}} – {{end}}",
     "summary": "AI-resumé",
     "summaryPending": "AI-resuméet er i gang. Det vises her, når det er klar.",
     "summaryUnavailable": "AI-resumé er ikke tilgængeligt. Din strukturerede rapport er stadig tilgængelig.",
@@ -4591,6 +4595,7 @@
       "title": "Udløsere og webhooks",
       "subtitle": "Automatiser Cloud Agent-kørsler fra et webhook-kald eller en tidsplan.",
       "new": "Ny udløser",
+      "create": "Opret udløser",
       "emptyTitle": "Ingen udløsere endnu",
       "emptyDescription": "Opret en udløser for at starte en Cloud Agent-kørsel fra et webhook-kald eller efter en tidsplan.",
       "loadFailedTitle": "Kunne ikke indlæse udløsere",
@@ -4644,6 +4649,8 @@
       "created": "Udløser oprettet",
       "saved": "Udløser gemt",
       "statusArrived": "Ankommet",
+      "defaultPromptWebhook": "Beskriv indholdet af denne webhook-anmodning:\n\n{{body}}",
+      "defaultPromptScheduled": "Kør den planlagte opgave. Udløst kl. {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Indtast et navn.",
         "nameTooShort": "Brug mindst 8 tegn.",

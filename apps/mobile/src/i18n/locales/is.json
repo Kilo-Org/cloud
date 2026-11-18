@@ -26,6 +26,7 @@
     "creditHistory": "Inneignarferill",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Hætta við",
     "done": "Lokið",
     "retry": "Reyna aftur",
@@ -482,7 +483,14 @@
       "viewReceipt": "Skoða kvittun"
     },
     "changelog": "Nýjungar",
-    "changelogVersionPending": "Upplýsingar um þessa útgáfu berast með næstu uppfærslu forritsins."
+    "changelogVersionPending": "Upplýsingar um útgáfu {{version}} berast með næstu uppfærslu forritsins.",
+    "changelogGroupNew": "Nýtt",
+    "changelogFixesIn": "Lagfæringar og endurbætur á eftirfarandi sviðum: {{areas}}.",
+    "changelogFixesPolish": "Lagfæringar og endurbætur í öllu forritinu.",
+    "changelogAreas": {
+      "signIn": "Innskráning",
+      "profileOrganizations": "Prófíll og stofnanir"
+    }
   },
   "preferences": {
     "general": "Almennt",
@@ -3125,7 +3133,6 @@
     "completingPurchase": "Lýk kaupum",
     "subscriptionLoading": "Sæki Kilo Pass-áskrift",
     "retryHint": "Reynir aftur að sækja stöðu Kilo Pass.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Lokið {{date}}",
     "notAvailableInApp": "Kilo Pass er ekki tiltækt í appinu.",
     "statusActive": "Virkt",
@@ -3328,6 +3335,7 @@
       "manageOnWeb": "Greiðslustillingar á vefnum",
       "changePlan": "Breyta áætlun",
       "buySeats": "Kaupa notendasæti",
+      "managedOnWeb": "Áætluninni, notendasætum og sjálfvirkri áfyllingu er stjórnað á vefnum.",
       "setupAutoTopUp": "Setja upp sjálfvirka áfyllingu",
       "manageAutoTopUp": "Stjórna sjálfvirkri áfyllingu",
       "opensOnWeb": "Opnast á vefnum"
@@ -3476,12 +3484,10 @@
       "requestLogs": "Beiðnaskrár"
     },
     "requestLogs": {
-      "hint": "Beiðnir frá klukkustundinni fyrir lok tímabilsins, nýjustu fyrst.",
       "older": "Fyrri klukkustund",
       "newer": "Næsta klukkustund",
       "truncated": "Fleiri beiðnir eru á þessari klukkustund en listinn sýnir.",
       "emptyTitle": "Engar beiðnir",
-      "emptyDescription": "Engar gáttarbeiðnir voru á þessari klukkustund.",
       "loadError": "Ekki tókst að sækja beiðnaskrár.",
       "permissionDenied": "Aðeins eigandi, stjórnandi eða greiðslustjóri félags getur lesið beiðnaskrár þess.",
       "tokens": "{{input}} inn · {{output}} út",
@@ -4285,8 +4291,7 @@
       "repoValue": "Geymsla: {{name}}",
       "profileValue": "Prófíl: {{name}}",
       "profileUnavailable": "Þessi prófíll er ekki lengur tiltækur. Veldu annan.",
-      "pickerEmptyDescriptionOrganization": "Búðu til stofnunarprófíl til að endurnýta umhverfisbreytur, uppsetningarskipanir og færni yfir lotur.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Eigandi stofnunar eða stjórnandi getur búið til stofnunarprófíl."
+      "pickerEmptyDescriptionOrganization": "Búðu til stofnunarprófíl til að endurnýta umhverfisbreytur, uppsetningarskipanir og færni yfir lotur."
     },
     "variablesDeleteFailed": "Ekki tókst að eyða breytunni",
     "deleteVariable": "Eyða breytu {{key}}",
@@ -4472,7 +4477,6 @@
     "dismiss": "Vísa yfirliti frá",
     "offline": "Ótengt · vistað yfirlit",
     "cached": "Vistað yfirlit · ekki hægt að uppfæra",
-    "window": "{{start}} – {{end}}",
     "summary": "AI samantekt",
     "summaryPending": "AI samantekt er í vinnslu. Hún birtist hér þegar hún er tilbúin.",
     "summaryUnavailable": "AI samantekt er ekki tiltæk. Skipulagt yfirlit þitt er enn tiltækt.",
@@ -4591,6 +4595,7 @@
       "title": "Kveikjur og vefkrókar",
       "subtitle": "Gera keyrslur Cloud Agent sjálfvirkar úr vefkrókarkalli eða á áætlun.",
       "new": "Ný kveikja",
+      "create": "Búðu til kveikju",
       "emptyTitle": "Engar kveikjur ennþá",
       "emptyDescription": "Búðu til kveikju til að hefja keyrslu Cloud Agent úr vefkrókarkalli eða á áætlun.",
       "loadFailedTitle": "Gat ekki hlaðið kveikjum",
@@ -4644,6 +4649,8 @@
       "created": "Kveikja búin til",
       "saved": "Kveikja vistuð",
       "statusArrived": "Borist",
+      "defaultPromptWebhook": "Lýstu meginmáli þessarar vefkrókabeiðni:\n\n{{body}}",
+      "defaultPromptScheduled": "Keyrðu tímasettu verkefnið. Kveikt á {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Sláðu inn heiti.",
         "nameTooShort": "Notaðu að minnsta kosti 8 stafi.",

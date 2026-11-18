@@ -26,6 +26,7 @@
     "creditHistory": "Tegoedgeschiedenis",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Annuleren",
     "done": "Klaar",
     "retry": "Opnieuw proberen",
@@ -482,7 +483,14 @@
       "viewReceipt": "Ontvangstbewijs bekijken"
     },
     "changelog": "Nieuw in deze versie",
-    "changelogVersionPending": "Notities voor deze versie komen met de volgende app-update."
+    "changelogVersionPending": "De notities voor {{version}} komen met de volgende app-update.",
+    "changelogGroupNew": "Nieuw",
+    "changelogFixesIn": "Oplossingen en verbeteringen in {{areas}}.",
+    "changelogFixesPolish": "Oplossingen en verbeteringen in de hele app.",
+    "changelogAreas": {
+      "signIn": "Inloggen",
+      "profileOrganizations": "Profiel en organisaties"
+    }
   },
   "preferences": {
     "general": "Algemeen",
@@ -2582,7 +2590,6 @@
     "completingPurchase": "Aankoop wordt voltooid",
     "subscriptionLoading": "Kilo Pass-abonnement wordt geladen",
     "retryHint": "Haalt de Kilo Pass-status opnieuw op.",
-    "cardAccessibility": "{{title}}: {{description}}. {{actionLabel}}",
     "endedOn": "Beëindigd op {{date}}",
     "notAvailableInApp": "Kilo Pass is niet beschikbaar in de app.",
     "statusActive": "Actief",
@@ -3320,6 +3327,7 @@
       "manageOnWeb": "Factureringsinstellingen op het web",
       "changePlan": "Plan wijzigen",
       "buySeats": "Licenties kopen",
+      "managedOnWeb": "Het plan, de licenties en automatisch opwaarderen worden op het web beheerd.",
       "setupAutoTopUp": "Automatisch opwaarderen instellen",
       "manageAutoTopUp": "Automatisch opwaarderen beheren",
       "opensOnWeb": "Opent op het web"
@@ -3481,12 +3489,10 @@
       "requestLogs": "Verzoeklogboeken"
     },
     "requestLogs": {
-      "hint": "Verzoeken uit het uur vóór het einde van het venster, nieuwste eerst.",
       "older": "Eerder uur",
       "newer": "Later uur",
       "truncated": "Dit uur bevat meer verzoeken dan de lijst toont.",
       "emptyTitle": "Geen verzoeken",
-      "emptyDescription": "Er zijn geen gatewayverzoeken in dit uur.",
       "loadError": "Kan verzoeklogboeken niet laden.",
       "permissionDenied": "Alleen een eigenaar, beheerder of factureringsbeheerder van de organisatie kan de verzoeklogboeken bekijken.",
       "tokens": "{{input}} in · {{output}} uit",
@@ -4285,8 +4291,7 @@
       "repoValue": "Opslagplaats: {{name}}",
       "profileValue": "Profiel: {{name}}",
       "profileUnavailable": "Dit profiel is niet meer beschikbaar. Kies een ander profiel.",
-      "pickerEmptyDescriptionOrganization": "Maak een organisatieprofiel aan om omgevingsvariabelen, installatieopdrachten en vaardigheden tijdens sessies opnieuw te gebruiken.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Een organisatie-eigenaar of beheerder kan een organisatieprofiel aanmaken."
+      "pickerEmptyDescriptionOrganization": "Maak een organisatieprofiel aan om omgevingsvariabelen, installatieopdrachten en vaardigheden tijdens sessies opnieuw te gebruiken."
     },
     "variablesDeleteFailed": "Kan variabele niet verwijderen",
     "deleteVariable": "Variabele {{key}} verwijderen",
@@ -4472,7 +4477,6 @@
     "dismiss": "Briefing negeren",
     "offline": "Offline · opgeslagen briefing",
     "cached": "Opgeslagen rapport · vernieuwen niet beschikbaar",
-    "window": "{{start}} – {{end}}",
     "summary": "AI-samenvatting",
     "summaryPending": "AI-samenvatting wordt gemaakt. Deze verschijnt hier zodra hij klaar is.",
     "summaryUnavailable": "AI-samenvatting niet beschikbaar. Je gestructureerde rapport is nog steeds beschikbaar.",
@@ -4591,6 +4595,7 @@
       "title": "Triggers en webhooks",
       "subtitle": "Automatiseer Cloud Agent-uitvoeringen via een webhookaanroep of een planning.",
       "new": "Nieuwe trigger",
+      "create": "Trigger aanmaken",
       "emptyTitle": "Nog geen triggers",
       "emptyDescription": "Maak een trigger om een Cloud Agent-uitvoering te starten via een webhookaanroep of volgens een planning.",
       "loadFailedTitle": "Kan triggers niet laden",
@@ -4644,6 +4649,8 @@
       "created": "Trigger aangemaakt",
       "saved": "Trigger opgeslagen",
       "statusArrived": "Aangekomen",
+      "defaultPromptWebhook": "Beschrijf de inhoud van dit webhookverzoek:\n\n{{body}}",
+      "defaultPromptScheduled": "Voer de geplande taak uit. Geactiveerd om {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Voer een naam in.",
         "nameTooShort": "Gebruik minstens 8 tekens.",

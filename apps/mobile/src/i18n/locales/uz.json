@@ -26,6 +26,7 @@
     "creditHistory": "Kreditlar tarixi",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Bekor qilish",
     "done": "Tayyor",
     "retry": "Qayta urinish",
@@ -482,7 +483,14 @@
       "viewReceipt": "Kvitansiyani ko'rish"
     },
     "changelog": "Yangiliklar",
-    "changelogVersionPending": "Bu versiya yangiliklari ilovaning keyingi yangilanishi bilan keladi."
+    "changelogVersionPending": "{{version}} versiyasi yangiliklari ilovaning keyingi yangilanishi bilan keladi.",
+    "changelogGroupNew": "Yangi",
+    "changelogFixesIn": "Quyidagi bo‘limlarda tuzatishlar va yaxshilanishlar: {{areas}}.",
+    "changelogFixesPolish": "Butun ilova bo‘ylab tuzatishlar va yaxshilanishlar.",
+    "changelogAreas": {
+      "signIn": "Kirish",
+      "profileOrganizations": "Profil va tashkilotlar"
+    }
   },
   "preferences": {
     "general": "Umumiy",
@@ -3125,7 +3133,6 @@
     "completingPurchase": "Xarid yakunlanmoqda",
     "subscriptionLoading": "Kilo Pass obunasi yuklanmoqda",
     "retryHint": "Kilo Pass holatini qayta yuklashga urinadi.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Yakunlandi: {{date}}",
     "notAvailableInApp": "Kilo Pass ilovada mavjud emas.",
     "statusActive": "Faol",
@@ -3328,6 +3335,7 @@
       "manageOnWeb": "Veb-saytdagi to'lovlar sozlamalari",
       "changePlan": "Tarifni o'zgartirish",
       "buySeats": "O'rin sotib olish",
+      "managedOnWeb": "Tarif, o'rinlar va avtomatik to'ldirish veb-saytda boshqariladi.",
       "setupAutoTopUp": "Avtomatik to'ldirishni sozlash",
       "manageAutoTopUp": "Avtomatik to'ldirishni boshqarish",
       "opensOnWeb": "Vebda ochiladi"
@@ -3476,12 +3484,10 @@
       "requestLogs": "So'rovlar jurnallari"
     },
     "requestLogs": {
-      "hint": "Oraliq oxiridan oldingi bir soatdagi so'rovlar, eng yangilari tepada.",
       "older": "Oldingi soat",
       "newer": "Keyingi soat",
       "truncated": "Bu soatda ro'yxatda ko'rsatilganidan ko'proq so'rov bor.",
       "emptyTitle": "So'rovlar yo'q",
-      "emptyDescription": "Bu soatda shlyuz so'rovlari yo'q.",
       "loadError": "So'rovlar jurnallarini yuklab bo'lmadi.",
       "permissionDenied": "So'rovlar jurnallarini faqat tashkilot egasi, administratori yoki to'lovlar menejeri ko'ra oladi.",
       "tokens": "{{input}} kirish · {{output}} chiqish",
@@ -4285,8 +4291,7 @@
       "repoValue": "Repozitoriy: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Bu profil endi mavjud emas. Boshqasini tanlang.",
-      "pickerEmptyDescriptionOrganization": "Seanslar davomida muhit o'zgaruvchilari, sozlash buyruqlari va ko'nikmalarni qayta ishlatish uchun tashkilot profili yarating.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Tashkilot profili tashkilot egasi yoki administratori tomonidan yaratilishi mumkin."
+      "pickerEmptyDescriptionOrganization": "Seanslar davomida muhit o'zgaruvchilari, sozlash buyruqlari va ko'nikmalarni qayta ishlatish uchun tashkilot profili yarating."
     },
     "variablesDeleteFailed": "Oʻzgaruvchi oʻchirilmadi",
     "deleteVariable": "{{key}} oʻzgaruvchisini oʻchiring",
@@ -4472,7 +4477,6 @@
     "dismiss": "Brifingni e’tiborsiz qoldirish",
     "offline": "Oflayn · saqlangan brifing",
     "cached": "Saqlangan hisobot · yangilab bo‘lmaydi",
-    "window": "{{start}} – {{end}}",
     "summary": "AI xulosasi",
     "summaryPending": "AI xulosasi tayyorlanmoqda. Tayyor bo‘lgach shu yerga qo‘shiladi.",
     "summaryUnavailable": "AI xulosasi mavjud emas. Tuzilgan hisobotingiz baribir mavjud.",
@@ -4591,6 +4595,7 @@
       "title": "Ishga tushirgichlar va vebhooklar",
       "subtitle": "Cloud Agent ishga tushirishlarini vebhook chaqiruvi yoki jadval boʻyicha avtomatlashtiring.",
       "new": "Yangi ishga tushirgich",
+      "create": "Ishga tushirgich yarating",
       "emptyTitle": "Hozircha ishga tushirgichlar yoʻq",
       "emptyDescription": "Cloud Agent ishga tushirishini vebhook chaqiruvi yoki jadval boʻyicha boshlash uchun ishga tushirgich yarating.",
       "loadFailedTitle": "Ishga tushirgichlarni yuklab boʻlmadi",
@@ -4644,6 +4649,8 @@
       "created": "Ishga tushirgich yaratildi",
       "saved": "Ishga tushirgich saqlandi",
       "statusArrived": "Yetib keldi",
+      "defaultPromptWebhook": "Ushbu vebhook soʻrovi tanasini tavsiflang:\n\n{{body}}",
+      "defaultPromptScheduled": "Jadval boʻyicha vazifani ishga tushiring. {{scheduledTime}} vaqtida ishga tushirildi.",
       "problems": {
         "nameRequired": "Nom kiriting.",
         "nameTooShort": "Kamida 8 ta belgidan foydalaning.",

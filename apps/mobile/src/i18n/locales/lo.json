@@ -26,6 +26,7 @@
     "creditHistory": "ປະຫວັດເຄຣດິດ",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "ຍົກເລີກ",
     "done": "ສຳເລັດ",
     "retry": "ລອງໃໝ່",
@@ -482,7 +483,14 @@
       "viewReceipt": "ເບິ່ງໃບຮັບ"
     },
     "changelog": "ມີຫຍັງໃໝ່",
-    "changelogVersionPending": "ບັນທຶກສຳລັບເວີຊັນນີ້ຈະມາພ້ອມກັບການອັບເດດແອັບຄັ້ງຕໍ່ໄປ"
+    "changelogVersionPending": "ບັນທຶກສຳລັບເວີຊັນ {{version}} ຈະມາພ້ອມກັບການອັບເດດແອັບຄັ້ງຕໍ່ໄປ",
+    "changelogGroupNew": "ໃໝ່",
+    "changelogFixesIn": "ການແກ້ໄຂ ແລະ ການປັບປຸງໃນ {{areas}}.",
+    "changelogFixesPolish": "ການແກ້ໄຂ ແລະ ການປັບປຸງທົ່ວທັງແອັບ.",
+    "changelogAreas": {
+      "signIn": "ການເຂົ້າສູ່ລະບົບ",
+      "profileOrganizations": "ໂປຣໄຟລ໌ ແລະ ອົງກອນ"
+    }
   },
   "preferences": {
     "general": "ທົ່ວໄປ",
@@ -3125,7 +3133,6 @@
     "completingPurchase": "ກຳລັງດຳເນີນການຊື້",
     "subscriptionLoading": "ກຳລັງໂຫຼດຂໍ້ມູນການສະໝັກ Kilo Pass",
     "retryHint": "ລອງໂຫຼດສະຖານະ Kilo Pass ອີກຄັ້ງ.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "ສິ້ນສຸດວັນທີ {{date}}",
     "notAvailableInApp": "ບໍ່ສາມາດໃຊ້ Kilo Pass ໃນແອັບໄດ້.",
     "statusActive": "ເປີດໃຊ້ງານ",
@@ -3328,6 +3335,7 @@
       "manageOnWeb": "ການຕັ້ງຄ່າການຮຽກເກັບເງິນໃນເວັບ",
       "changePlan": "ປ່ຽນແຜນ",
       "buySeats": "ຊື້ສິດຜູ້ໃຊ້",
+      "managedOnWeb": "ແຜນ, ສິດຜູ້ໃຊ້ ແລະ ການເຕີມເງິນອັດຕະໂນມັດຖືກຈັດການຢູ່ໃນເວັບ.",
       "setupAutoTopUp": "ຕັ້ງຄ່າການເຕີມເງິນອັດຕະໂນມັດ",
       "manageAutoTopUp": "ຈັດການການເຕີມເງິນອັດຕະໂນມັດ",
       "opensOnWeb": "ເປີດໃນເວັບ"
@@ -3476,12 +3484,10 @@
       "requestLogs": "ບັນທຶກຄຳຮ້ອງຂໍ"
     },
     "requestLogs": {
-      "hint": "ຄຳຮ້ອງຂໍໃນໜຶ່ງຊົ່ວໂມງກ່ອນເວລາສິ້ນສຸດຂອງຊ່ວງເວລາ, ລ່າສຸດຢູ່ກ່ອນ.",
       "older": "ຊົ່ວໂມງກ່ອນໜ້າ",
       "newer": "ຊົ່ວໂມງຖັດໄປ",
       "truncated": "ຊົ່ວໂມງນີ້ມີຄຳຮ້ອງຂໍຫຼາຍກວ່າທີ່ລາຍການສະແດງ.",
       "emptyTitle": "ບໍ່ມີຄຳຮ້ອງຂໍ",
-      "emptyDescription": "ຊົ່ວໂມງນີ້ບໍ່ມີຄຳຮ້ອງຂໍຜ່ານ gateway.",
       "loadError": "ບໍ່ສາມາດໂຫຼດບັນທຶກຄຳຮ້ອງຂໍໄດ້.",
       "permissionDenied": "ມີແຕ່ເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ຫຼື ຜູ້ຈັດການການເອີ້ນເກັບເງິນເທົ່ານັ້ນທີ່ສາມາດອ່ານບັນທຶກຄຳຮ້ອງຂໍຂອງອົງກອນໄດ້.",
       "tokens": "ເຂົ້າ {{input}} · ອອກ {{output}}",
@@ -4285,8 +4291,7 @@
       "repoValue": "ບ່ອນເກັບມ້ຽນ: {{name}}",
       "profileValue": "ໂປຣໄຟລ໌: {{name}}",
       "profileUnavailable": "ໂປຣໄຟລ໌ນີ້ບໍ່ມີໃຫ້ໃຊ້ອີກແລ້ວ. ເລືອກໂປຣໄຟລ໌ອື່ນ.",
-      "pickerEmptyDescriptionOrganization": "ສ້າງໂປຣໄຟລ໌ຂອງອົງກອນເພື່ອນຳໃຊ້ຕົວແປສະພາບແວດລ້ອມຄືນໃໝ່, ຕັ້ງຄ່າຄຳສັ່ງ ແລະທັກສະຕ່າງໆໃນທົ່ວເຊດຊັນ.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "ເຈົ້າຂອງອົງກອນ ຫຼືຜູ້ບໍລິຫານສາມາດສ້າງໂປຣໄຟລ໌ຂອງອົງກອນໄດ້."
+      "pickerEmptyDescriptionOrganization": "ສ້າງໂປຣໄຟລ໌ຂອງອົງກອນເພື່ອນຳໃຊ້ຕົວແປສະພາບແວດລ້ອມຄືນໃໝ່, ຕັ້ງຄ່າຄຳສັ່ງ ແລະທັກສະຕ່າງໆໃນທົ່ວເຊດຊັນ."
     },
     "variablesDeleteFailed": "ບໍ່ສາມາດລຶບຕົວແປໄດ້",
     "deleteVariable": "ລຶບຕົວແປ {{key}}",
@@ -4472,7 +4477,6 @@
     "dismiss": "ລະເວັ້ນລາຍງານ",
     "offline": "ອອບລາຍ · ລາຍງານທີ່ບັນທຶກໄວ້",
     "cached": "ລາຍງານທີ່ບັນທຶກໄວ້ · ບໍ່ສາມາດໂຫຼດຄືນໃໝ່",
-    "window": "{{start}} – {{end}}",
     "summary": "ສະຫຼຸບໂດຍ AI",
     "summaryPending": "ກຳລັງສ້າງສະຫຼຸບ AI. ມັນຈະສະແດງຢູ່ນີ້ເມື່ອພ້ອມ.",
     "summaryUnavailable": "ສະຫຼຸບ AI ບໍ່ພ້ອມໃຊ້. ລາຍງານແບບມີໂຄງສ້າງຂອງທ່ານຍັງໃຊ້ໄດ້.",
@@ -4591,6 +4595,7 @@
       "title": "ຕົວກະຕຸ້ນ ແລະ ເວັບຮຸກ",
       "subtitle": "ອັດຕະໂນມັດການຣັນ Cloud Agent ຈາກການເອີ້ນເວັບຮຸກ ຫຼື ຕາຕະລາງເວລາ.",
       "new": "ຕົວກະຕຸ້ນໃໝ່",
+      "create": "ສ້າງຕົວກະຕຸ້ນ",
       "emptyTitle": "ຍັງບໍ່ມີຕົວກະຕຸ້ນ",
       "emptyDescription": "ສ້າງຕົວກະຕຸ້ນເພື່ອເລີ່ມການຣັນ Cloud Agent ຈາກການເອີ້ນເວັບຮຸກ ຫຼື ຕາມຕາຕະລາງເວລາ.",
       "loadFailedTitle": "ໂຫຼດຕົວກະຕຸ້ນບໍ່ໄດ້",
@@ -4644,6 +4649,8 @@
       "created": "ສ້າງຕົວກະຕຸ້ນແລ້ວ",
       "saved": "ບັນທຶກຕົວກະຕຸ້ນແລ້ວ",
       "statusArrived": "ມາຮອດແລ້ວ",
+      "defaultPromptWebhook": "ອະທິບາຍເນື້ອຄວາມຂອງຄຳຮ້ອງເວັບຮຸກນີ້:\n\n{{body}}",
+      "defaultPromptScheduled": "ຣັນວຽກທີ່ກຳນົດເວລາໄວ້. ເລີ່ມດຳເນີນງານເມື່ອ {{scheduledTime}}.",
       "problems": {
         "nameRequired": "ປ້ອນຊື່.",
         "nameTooShort": "ໃຊ້ຢ່າງໜ້ອຍ 8 ຕົວອັກສອນ.",

@@ -5,6 +5,7 @@
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
   "vars": {
+    "ENVIRONMENT": "production",
     "CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED": "true",
     "WORKER_URL": "https://worker.example.com",
     "NEXTAUTH_SECRET": "cloud-agent-integration-test-secret",

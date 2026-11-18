@@ -94,6 +94,12 @@ export interface BrowserTabInfo {
   readonly windowId?: number;
 }
 
+export interface BrowserTabCreatedApi {
+  readonly addListener: (
+    listener: (tab: { readonly id?: number; readonly openerTabId?: number }) => void
+  ) => void;
+}
+
 export interface BrowserTabRemovedApi {
   readonly addListener: (listener: (tabId: number) => void) => void;
   readonly removeListener: (listener: (tabId: number) => void) => void;
@@ -106,6 +112,8 @@ export interface BrowserTabsApi {
   ) => Promise<string> | string;
   readonly get?: (tabId: number) => Promise<BrowserTabInfo> | BrowserTabInfo;
   /** `chrome.tabs.onRemoved` — a browser-tool session disposes when its tab closes. */
+  /** `chrome.tabs.onCreated` — a tab opened from a session's tab joins that session. */
+  readonly onCreated?: BrowserTabCreatedApi;
   readonly onRemoved?: BrowserTabRemovedApi;
   readonly query: (
     queryInfo: Record<string, unknown>
@@ -289,6 +297,11 @@ export type TabDebuggerRequest =
       readonly type: typeof WEB_MCP_EXECUTE_MESSAGE;
     }
   | {
+      /**
+       * Present only for the CLI agent transport: the grant pairs the session
+       * already approved and the sensitive step token a retry carries.
+       */
+      readonly agent?: BrowserToolAgentContext | undefined;
       readonly arguments: Record<string, unknown>;
       readonly caller: BrowserCaller;
       readonly tabId: number;
@@ -296,6 +309,15 @@ export type TabDebuggerRequest =
       readonly tool: string;
       readonly type: typeof BROWSER_TOOL_MESSAGE;
     };
+
+/** The grant pairs and step tokens one CLI agent call carries. */
+export interface BrowserToolAgentContext {
+  readonly authorized: readonly {
+    readonly class: 'act' | 'navigate' | 'read';
+    readonly origin: string;
+  }[];
+  readonly sensitive?: readonly string[] | undefined;
+}
 
 export type TabDebuggerResponse =
   | {
@@ -337,6 +359,27 @@ export type TabDebuggerResponse =
       readonly released: number;
       readonly ok: true;
       readonly type: typeof RELEASE_BROWSER_CALLER_MESSAGE;
+    }
+  | {
+      /** `needs_permission`: the transport maps this to JSON-RPC -32010. */
+      readonly permission?:
+        | {
+            readonly items: readonly Record<string, unknown>[];
+            readonly stepToken?: string | undefined;
+          }
+        | undefined;
+      readonly result: EvalTabResult;
+      readonly ok: true;
+      readonly type: typeof BROWSER_TOOL_MESSAGE;
+      /** Origins whose frames this agent call could not read. */
+      readonly withheldFrames?: readonly string[] | undefined;
+    }
+  | {
+      /** `origin_changed`: the transport maps this to JSON-RPC -32012. */
+      readonly originChanged: { readonly from: string; readonly to: string };
+      readonly result: EvalTabResult;
+      readonly ok: true;
+      readonly type: typeof BROWSER_TOOL_MESSAGE;
     }
   | {
       readonly released: number;
@@ -423,6 +466,14 @@ const tabDebuggerRequestSchema = z.union([
     type: z.literal(DISPOSE_BROWSER_CALLER_MESSAGE),
   }),
   z.object({
+    agent: z
+      .object({
+        authorized: z.array(
+          z.object({ class: z.enum(['act', 'navigate', 'read']), origin: z.string().min(1) })
+        ),
+        sensitive: z.array(z.string()).optional(),
+      })
+      .optional(),
     arguments: z.record(z.string(), z.unknown()),
     caller: browserCallerSchema,
     tabId: z.number(),
@@ -474,6 +525,12 @@ const tabDebuggerResponseSchema = z.union([
   }),
   z.object({
     ok: z.literal(true),
+    originChanged: z.object({ from: z.string(), to: z.string() }),
+    result: evalTabResultSchema,
+    type: z.literal(BROWSER_TOOL_MESSAGE),
+  }),
+  z.object({
+    ok: z.literal(true),
     released: z.number(),
     type: z.literal(DISPOSE_BROWSER_CALLER_MESSAGE),
   }),
@@ -481,6 +538,18 @@ const tabDebuggerResponseSchema = z.union([
     ok: z.literal(true),
     result: evalTabResultSchema,
     type: z.literal(BROWSER_TOOL_MESSAGE),
+  }),
+  z.object({
+    ok: z.literal(true),
+    permission: z
+      .object({
+        items: z.array(z.record(z.string(), z.unknown())),
+        stepToken: z.string().optional(),
+      })
+      .optional(),
+    result: evalTabResultSchema,
+    type: z.literal(BROWSER_TOOL_MESSAGE),
+    withheldFrames: z.array(z.string()).optional(),
   }),
   z.object({
     ok: z.literal(true),

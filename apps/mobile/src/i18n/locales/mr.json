@@ -26,6 +26,7 @@
     "creditHistory": "क्रेडिट इतिहास",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "रद्द करा",
     "done": "झाले",
     "retry": "पुन्हा प्रयत्न करा",
@@ -482,7 +483,14 @@
       "viewReceipt": "पावती पहा"
     },
     "changelog": "नवीन बदल",
-    "changelogVersionPending": "या आवृत्तीच्या नोंदी पुढील ॲप अपडेटसोबत येतील."
+    "changelogVersionPending": "{{version}} आवृत्तीच्या नोंदी पुढील ॲप अपडेटसोबत येतील.",
+    "changelogGroupNew": "नवीन",
+    "changelogFixesIn": "{{areas}} मध्ये दुरुस्त्या आणि सुधारणा.",
+    "changelogFixesPolish": "संपूर्ण अ‍ॅपमध्ये दुरुस्त्या आणि सुधारणा.",
+    "changelogAreas": {
+      "signIn": "साइन इन",
+      "profileOrganizations": "प्रोफाइल आणि संस्था"
+    }
   },
   "preferences": {
     "general": "सामान्य",
@@ -3125,7 +3133,6 @@
     "completingPurchase": "खरेदी पूर्ण करत आहे",
     "subscriptionLoading": "Kilo Pass चे सदस्यत्व लोड होत आहे",
     "retryHint": "Kilo Pass ची स्थिती पुन्हा मिळवण्याचा प्रयत्न करते.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "संपले {{date}}",
     "notAvailableInApp": "Kilo Pass ॲपमध्ये उपलब्ध नाही।",
     "statusActive": "सक्रिय",
@@ -3328,6 +3335,7 @@
       "manageOnWeb": "वेबवरील बिलिंग सेटिंग्ज",
       "changePlan": "प्लॅन बदला",
       "buySeats": "जागा खरेदी करा",
+      "managedOnWeb": "प्लॅन, जागा आणि ऑटो टॉप-अप वेबवर व्यवस्थापित केले जातात.",
       "setupAutoTopUp": "ऑटो टॉप-अप सेट करा",
       "manageAutoTopUp": "ऑटो टॉप-अप व्यवस्थापित करा",
       "opensOnWeb": "वेबवर उघडते"
@@ -3476,12 +3484,10 @@
       "requestLogs": "विनंती लॉग"
     },
     "requestLogs": {
-      "hint": "कालावधी संपण्यापूर्वीच्या तासातील विनंत्या, सर्वात नवीन आधी.",
       "older": "मागील तास",
       "newer": "पुढील तास",
       "truncated": "या तासात यादीत दाखवलेल्यापेक्षा जास्त विनंत्या आहेत.",
       "emptyTitle": "कोणत्याही विनंत्या नाहीत",
-      "emptyDescription": "या तासात कोणत्याही गेटवे विनंत्या नाहीत.",
       "loadError": "विनंती लॉग लोड करता आले नाहीत.",
       "permissionDenied": "संस्थेचा मालक, अ‍ॅडमिन किंवा बिलिंग व्यवस्थापकच तिचे विनंती लॉग पाहू शकतो.",
       "tokens": "{{input}} इनपुट · {{output}} आउटपुट",
@@ -4285,8 +4291,7 @@
       "repoValue": "रेपॉजिटरी: {{name}}",
       "profileValue": "प्रोफाइल: {{name}}",
       "profileUnavailable": "हे प्रोफाइल आता उपलब्ध नाही. दुसरे निवडा.",
-      "pickerEmptyDescriptionOrganization": "संपूर्ण सत्रांमध्ये पर्यावरण व्हेरिएबल्स, सेटअप कमांड आणि कौशल्ये पुन्हा वापरण्यासाठी संस्था प्रोफाइल तयार करा.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "संस्था मालक किंवा प्रशासक संस्था प्रोफाइल तयार करू शकतो."
+      "pickerEmptyDescriptionOrganization": "संपूर्ण सत्रांमध्ये पर्यावरण व्हेरिएबल्स, सेटअप कमांड आणि कौशल्ये पुन्हा वापरण्यासाठी संस्था प्रोफाइल तयार करा."
     },
     "variablesDeleteFailed": "व्हेरिएबल हटवता आले नाही",
     "deleteVariable": "व्हेरिएबल {{key}} हटवा",
@@ -4472,7 +4477,6 @@
     "dismiss": "आढाव्याकडे दुर्लक्ष करा",
     "offline": "ऑफलाइन · जतन केलेला आढावा",
     "cached": "जतन केलेला अहवाल · रिफ्रेश उपलब्ध नाही",
-    "window": "{{start}} – {{end}}",
     "summary": "AI सारांश",
     "summaryPending": "AI सारांश तयार होत आहे. तयार झाल्यावर तो येथे जोडला जाईल.",
     "summaryUnavailable": "AI सारांश उपलब्ध नाही. तुमचा संरचित अहवाल अजूनही उपलब्ध आहे.",
@@ -4591,6 +4595,7 @@
       "title": "ट्रिगर आणि वेबहूक",
       "subtitle": "वेबहूक कॉल किंवा वेळापत्रकावरून Cloud Agent रन स्वयंचलित करा.",
       "new": "नवीन ट्रिगर",
+      "create": "ट्रिगर तयार करा",
       "emptyTitle": "अजून ट्रिगर नाहीत",
       "emptyDescription": "वेबहूक कॉल किंवा वेळापत्रकावरून Cloud Agent रन सुरू करण्यासाठी ट्रिगर तयार करा.",
       "loadFailedTitle": "ट्रिगर लोड करता आले नाहीत",
@@ -4644,6 +4649,8 @@
       "created": "ट्रिगर तयार झाला",
       "saved": "ट्रिगर जतन झाला",
       "statusArrived": "आले",
+      "defaultPromptWebhook": "या वेबहूक विनंतीच्या बॉडीचे वर्णन करा:\n\n{{body}}",
+      "defaultPromptScheduled": "शेड्यूल केलेले कार्य चालवा. {{scheduledTime}} वेळी ट्रिगर झाले.",
       "problems": {
         "nameRequired": "नाव प्रविष्ट करा.",
         "nameTooShort": "कमीत कमी 8 अक्षरे वापरा.",

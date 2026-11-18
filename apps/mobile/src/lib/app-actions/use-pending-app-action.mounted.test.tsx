@@ -220,6 +220,54 @@ describe('usePendingAppAction', () => {
     renderer.unmount();
   });
 
+  it("announces the step's reader copy when the OS path mapped the member sentence", async () => {
+    const openBilling = vi.fn<() => void>();
+    mocks.billingAction = { label: 'Manage billing', onPress: openBilling };
+    // What the OS path reports: it carries no organization, so the create's
+    // refusal arrives member-worded and the hook must re-derive it.
+    mocks.dispatch.mockResolvedValue({
+      ok: false,
+      action: 'StartAgent',
+      retryable: false,
+      code: 'start-failed',
+      message: i18n.t('common.organizationTrialEnded'),
+      trialRefusal: true,
+    });
+    setPendingAppAction({ action: 'StartAgent', prompt: 'fix the build' });
+    const renderer = mount(SETTLED);
+    await update(renderer, SETTLED);
+
+    expect(i18n.t('common.organizationTrialEndedBilling')).not.toBe(
+      i18n.t('common.organizationTrialEnded')
+    );
+    expect(mocks.toastError).toHaveBeenCalledExactlyOnceWith(
+      i18n.t('common.organizationTrialEndedBilling'),
+      { action: { label: 'Manage billing', onClick: expect.any(Function) } }
+    );
+    expect(mocks.navigate).not.toHaveBeenCalled();
+    renderer.unmount();
+  });
+
+  it('announces a failure that is not a trial refusal verbatim with no step', async () => {
+    mocks.billingAction = { label: 'Manage billing', onPress: vi.fn<() => void>() };
+    mocks.dispatch.mockResolvedValue({
+      ok: false,
+      action: 'StartAgent',
+      retryable: true,
+      code: 'start-failed',
+      message: i18n.t('agentChat.session.serviceUnavailable'),
+    });
+    setPendingAppAction({ action: 'StartAgent', prompt: 'fix the build' });
+    const renderer = mount(SETTLED);
+    await update(renderer, SETTLED);
+
+    expect(mocks.toastError).toHaveBeenCalledExactlyOnceWith(
+      i18n.t('agentChat.session.serviceUnavailable')
+    );
+    expect(mocks.navigate).not.toHaveBeenCalled();
+    renderer.unmount();
+  });
+
   it('holds a parked StartAgent until the confirmation is answered', async () => {
     const answer = Promise.withResolvers<boolean>();
     mocks.confirmStart.mockReturnValue(answer.promise);

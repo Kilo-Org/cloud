@@ -462,6 +462,34 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     expect(billingSteps(root.root)).toHaveLength(0);
   });
 
+  it('a refusal mapped before the role settled re-reads as the billing sentence once the reader can change the plan', () => {
+    trialRole.role = 'owner';
+    dismiss.isError = true;
+    // Mapped while the membership list was still unresolved, so the sentence
+    // baked on the error is the member-worded one.
+    dismiss.error = mapSecurityDismissOperationError(trialRefusal(), false);
+    const root = renderScreen();
+    selectReason();
+
+    expect(buttonDisabled(root.root)).toBe(true);
+    expect(renderedTexts(root.root)).toContain(TRIAL_BILLING_COPY);
+    expect(renderedTexts(root.root)).not.toContain(TRIAL_MEMBER_COPY);
+    expect(billingSteps(root.root)).toHaveLength(1);
+  });
+
+  it('a refusal mapped before the role settled re-reads as the owner-naming sentence once the reader loses the plan', () => {
+    trialRole.role = 'member';
+    dismiss.isError = true;
+    // Mapped while the membership list still read as a billing role.
+    dismiss.error = mapSecurityDismissOperationError(trialRefusal(), true);
+    const root = renderScreen();
+    selectReason();
+
+    expect(buttonDisabled(root.root)).toBe(true);
+    expect(renderedTexts(root.root)).toContain(TRIAL_MEMBER_COPY);
+    expect(billingSteps(root.root)).toHaveLength(0);
+  });
+
   it('disables the dismissal CTA while the dismissal is pending', () => {
     dismiss.isPending = true;
     const root = renderScreen();

@@ -83,9 +83,10 @@ describe('Kilo v2 model lookup before native model calls', () => {
         data: [{ providerID: ++reads >= readyOn ? 'kilo' : 'other', id: input.model }],
       });
     });
-    await createHarness(url, async ms => {
+    const harness = createHarness(url, async ms => {
       waits.push(ms);
-    }).submit(input);
+    });
+    await harness.submit(input);
 
     expect(waits).toEqual([...delays]);
     expect(reads).toBe(delays.length + 1);
@@ -96,7 +97,49 @@ describe('Kilo v2 model lookup before native model calls', () => {
     ).toBe(true);
     expect(requests.filter(request => request.pathname.endsWith('/prompt'))).toHaveLength(1);
     expect(requests.at(-1)?.body).toMatchObject({ id: input.messageId, text: input.prompt });
+
+    // The location has started; a later turn neither looks up nor waits again.
+    await harness.submit({ ...input, messageId: `msg_${'c'.repeat(26)}`, model: 'other-model' });
+    expect(waits).toEqual([...delays]);
+    expect(reads).toBe(delays.length + 1);
+    expect(requests.filter(request => request.pathname.endsWith('/prompt'))).toHaveLength(2);
   });
+
+  it.each(['command', 'compact'] as const)(
+    'waits for the model before the native %s call',
+    async operation => {
+      let reads = 0;
+      const waits: number[] = [];
+      const { url, requests } = startStub((_request, url) => {
+        if (url.pathname === '/api/model')
+          return Response.json({
+            data: [{ providerID: ++reads >= 2 ? 'kilo' : 'other', id: input.model }],
+          });
+        if (url.pathname.includes('/message/'))
+          return Response.json({
+            data: { id: input.messageId, type: 'compaction', status: 'completed' },
+          });
+        return new Response(null, { status: 204 });
+      });
+      const harness = createHarness(url, async ms => {
+        waits.push(ms);
+      });
+      const session = {
+        sessionId: input.sessionId,
+        directory,
+        messageId: input.messageId,
+        model: input.model,
+      };
+      if (operation === 'command') await harness.command({ ...session, command: 'review' });
+      else expect(await harness.compact(session)).toBe('executed');
+
+      expect(waits).toEqual([1000]);
+      const paths = requests.map(request => request.pathname);
+      expect(paths.lastIndexOf('/api/model')).toBeLessThan(
+        paths.indexOf(`/api/session/${input.sessionId}/${operation}`)
+      );
+    }
+  );
 
   it('does not retry a catalog request failure or submit a prompt', async () => {
     const { url, requests } = startStub(

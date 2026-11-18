@@ -87,7 +87,8 @@ type PiiEntity = NonNullable<DetectorDetails['entities']>[number];
 // ids where they overlap. An id the map does not name shows the raw id, the way
 // an unmatched key does elsewhere in this file.
 function detectorLabel(t: TFunction, id: string): string {
-  return t(DETECTOR_ID_KEYS[id as keyof typeof DETECTOR_ID_KEYS]);
+  const key = DETECTOR_ID_KEYS[id as keyof typeof DETECTOR_ID_KEYS];
+  return key ? t(key) : id;
 }
 
 function piiEntityLabel(t: TFunction, entity: PiiEntity): string {

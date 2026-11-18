@@ -367,6 +367,14 @@ export const organizationsMembersRouter = createTRPCRouter({
             isNull(organizations.deleted_at)
           )
         );
+      // The audit sentence names the parent organization, so one name lookup
+      // covers both writers below.
+      const [parentOrganization] = await db
+        .select({ name: organizations.name })
+        .from(organizations)
+        .where(eq(organizations.id, organizationId))
+        .limit(1);
+      const parentOrganizationName = parentOrganization?.name ?? organizationId;
       const childOrganizationsById = new Map(childOrganizations.map(child => [child.id, child]));
 
       if (
@@ -425,6 +433,11 @@ export const organizationsMembersRouter = createTRPCRouter({
               actor_id: user.id,
               actor_name: user.google_user_name,
               message: `Added parent organization member ${parentMember.email} as a member from parent organization ${organizationId}`,
+              details: {
+                kind: 'parent_member_added',
+                email: parentMember.email,
+                parentOrganizationName: parentOrganizationName,
+              },
               organization_id: childOrganizationId,
               tx,
             });
@@ -465,6 +478,11 @@ export const organizationsMembersRouter = createTRPCRouter({
             actor_id: user.id,
             actor_name: user.google_user_name,
             message: `Removed parent organization member ${parentMember.email} from child organization via parent organization ${organizationId}`,
+            details: {
+              kind: 'parent_member_removed',
+              email: parentMember.email,
+              parentOrganizationName: parentOrganizationName,
+            },
             organization_id: childOrganizationId,
             tx,
           });

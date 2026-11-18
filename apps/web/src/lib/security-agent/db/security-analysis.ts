@@ -421,8 +421,8 @@ export async function tryReserveAnalysisStartSlot(
       throw new Error('security_analysis_owner_state row missing after upsert');
     }
 
-    // Inflight = findings already flipped to pending/running, plus scheduled
-    // queue claims that reserve a slot while the finding status is still null.
+    // The count runs inside the FOR UPDATE lock taken above; see
+    // countInflightAnalysesUnderOwnerLock for what counts as inflight.
     const currentCount = await countInflightAnalysesUnderOwnerLock(tx, ownerConverted);
     if (currentCount >= maxConcurrent) {
       return { reserved: false, reason: 'cap', currentCount, limit: maxConcurrent } as const;

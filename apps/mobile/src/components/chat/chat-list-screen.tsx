@@ -7,15 +7,12 @@ import { useTranslation } from 'react-i18next';
 
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { ContextControl } from '@/components/context-control';
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
-import { Button } from '@/components/ui/button';
 import { Fab, FAB_GUTTER, FAB_MARGIN, FAB_SIZE } from '@/components/ui/fab';
-import { MessageCircle } from '@/components/ui/icons';
+import { MessageCircle, MessageCirclePlus } from '@/components/ui/icons';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
-import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useAuth } from '@/lib/auth/auth-context';
 import { autoModelLabel } from '@/lib/auto-model-name';
 import { defaultChatModel } from '@/lib/chat/backend-model-options';
@@ -244,15 +241,13 @@ function ScopedChatListScreen() {
           // quickChat.empty.description in the harness-chat rebuild; no other live key carries it.
           description={t('modelChat.empty.description')}
           action={
-            <Button
-              className={STATE_ACTION_CLASS}
+            <StateAction
+              label={t('modelChat.list.new')}
+              icon={MessageCirclePlus}
               onPress={start}
               loading={starting}
               disabled={selectedModel === undefined}
-              accessibilityLabel={t('modelChat.list.new')}
-            >
-              <Text>{t('modelChat.list.new')}</Text>
-            </Button>
+            />
           }
         />
       );

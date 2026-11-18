@@ -90,7 +90,7 @@ export function OrganizationGuardrailsScreen() {
         <EmptyState
           className="bg-background"
           icon={Lock}
-          title={t(TITLE_KEY)}
+          title={t('organizationModelAccess.enterpriseOnlyTitle')}
           description={t('organizationGuardrails.unavailable')}
         />
       </View>

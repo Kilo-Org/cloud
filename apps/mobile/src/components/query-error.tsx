@@ -2,6 +2,7 @@ import {
   AlertCircle,
   Lock,
   type LucideIcon,
+  RotateCcw,
   SearchX,
   ServerCrash,
   WifiOff,
@@ -11,11 +12,8 @@ import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { type ScrollViewProps } from 'react-native';
 
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
-import { Button } from '@/components/ui/button';
-import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 export type QueryErrorVariant =
@@ -143,15 +141,13 @@ export function QueryError({
       action={
         action ??
         (onRetry && (
-          <Button
-            className={STATE_ACTION_CLASS}
-            variant="outline"
+          <StateAction
+            label={retryText}
+            icon={RotateCcw}
             onPress={onRetry}
             loading={isRetrying}
             accessibilityLabel={retryText}
-          >
-            <Text>{retryText}</Text>
-          </Button>
+          />
         ))
       }
     />

@@ -117,6 +117,9 @@ export function UsageContent({ scope }: Readonly<{ scope: UsageScope }>) {
   const retryAll = () => {
     usage.refetch();
   };
+  // No range a reader picks can change a workspace that reports no usage, so
+  // the control is fixed with the state instead of inviting a dead change.
+  const unavailable = summaryErrorView?.name === 'unavailable';
 
   return (
     <View className="gap-6">
@@ -126,6 +129,7 @@ export function UsageContent({ scope }: Readonly<{ scope: UsageScope }>) {
           value={range}
           onChange={setRange}
           accessibilityLabel={t('usage.rangePicker')}
+          disabled={unavailable}
         />
         {scope.kind === 'organization' && !scope.orgWide && (
           <Text variant="caption">{t('usage.orgSelfNotice')}</Text>
@@ -182,7 +186,7 @@ export function UsageContent({ scope }: Readonly<{ scope: UsageScope }>) {
       )}
 
       {!loading && !failed && empty && (
-        <EmptyState icon={LineChart} title={t('usage.emptyTitle')} placement="static" />
+        <EmptyState icon={LineChart} title={t('usage.emptyTitle')} placement="top" />
       )}
 
       {!loading && !failed && summary !== undefined && !empty && (

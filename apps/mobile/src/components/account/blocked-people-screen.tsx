@@ -146,6 +146,14 @@ export function BlockedPeopleScreen() {
     })
   );
 
+  const isEmpty =
+    hidden.data !== undefined &&
+    hidden.data.blockedLogins.length === 0 &&
+    hidden.data.mutedLogins.length === 0;
+  // An empty or failed list is the whole surface: its own state says everything
+  // the intro would, so the intro is hidden there instead of repeating it.
+  const wholeSurface = hidden.isError || isEmpty;
+
   let body: ReactNode = null;
   if (hidden.isPending) {
     body = (
@@ -159,10 +167,9 @@ export function BlockedPeopleScreen() {
     );
   } else if (hidden.isError) {
     body = <QueryError onRetry={() => void hidden.refetch()} isRetrying={hidden.isFetching} />;
-  } else if (hidden.data.blockedLogins.length === 0 && hidden.data.mutedLogins.length === 0) {
+  } else if (isEmpty) {
     body = (
       <EmptyState
-        placement="top"
         icon={Ban}
         title={t('profile.blockedPeople.emptyTitle')}
         description={t('profile.blockedPeople.emptyDescription')}
@@ -202,16 +209,20 @@ export function BlockedPeopleScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('profile.blockedPeople.title')} backFallback={PROFILE_TAB_HREF} />
-      <TabScreenScrollView
-        className="flex-1"
-        contentContainerClassName={SCREEN_BODY_CLASS}
-        showsVerticalScrollIndicator={false}
-      >
-        <Text variant="muted">
-          {t('profile.blockedPeople.description')}
-        </Text>
-        {body}
-      </TabScreenScrollView>
+      {wholeSurface ? (
+        body
+      ) : (
+        <TabScreenScrollView
+          className="flex-1"
+          contentContainerClassName={SCREEN_BODY_CLASS}
+          showsVerticalScrollIndicator={false}
+        >
+          <Text variant="muted">
+            {t('profile.blockedPeople.description')}
+          </Text>
+          {body}
+        </TabScreenScrollView>
+      )}
     </View>
   );
 }

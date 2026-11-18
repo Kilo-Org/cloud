@@ -1,11 +1,9 @@
-import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
-import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Globe, Shield, X } from '@/components/ui/icons';
@@ -14,7 +12,6 @@ import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { revokeImageHost, useTrustedImageHosts } from '@/lib/hooks/use-trusted-image-hosts';
 import { revokeHost, useTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
@@ -86,7 +83,6 @@ function TrustedImageHostList({
 }
 
 export function TrustedHostsScreen() {
-  const router = useRouter();
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const { trustedHosts, hasLoaded } = useTrustedHosts();
@@ -116,21 +112,6 @@ export function TrustedHostsScreen() {
           icon={Shield}
           title={t('trustedHosts.emptyTitle')}
           description={t('trustedHosts.emptyDescription')}
-          action={
-            <Button
-              variant="outline"
-              className={STATE_ACTION_CLASS}
-              onPress={() => {
-                // The only caller pushes this screen from Account, so `back()`
-                // would land one row short of the Preferences hub the label
-                // names. POP_TO pops back to it, or replaces this screen with
-                // it when the stack was entered without it (deep link).
-                router.dismissTo('/(app)/(tabs)/(3_profile)/preferences' as Href);
-              }}
-            >
-              <Text>{t('trustedHosts.backToPreferences')}</Text>
-            </Button>
-          }
         />
       ) : (
         <TabScreenScrollView

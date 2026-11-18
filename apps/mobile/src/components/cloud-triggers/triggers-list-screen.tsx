@@ -136,6 +136,13 @@ export function TriggersListScreen({ organizationId }: TriggersListScreenProps) 
     );
   }
 
+  const isEmpty = !list.isPending && !list.isError && list.data.length === 0;
+  // An empty or failed list is the whole surface. While the list is empty the
+  // header's "+" is the one create control and the intro would repeat the
+  // state's own description, so both the intro and the inline button wait for
+  // rows to exist.
+  const wholeSurface = isEmpty || list.isError;
+
   let body: ReactNode = null;
   if (list.isPending) {
     body = (
@@ -148,7 +155,6 @@ export function TriggersListScreen({ organizationId }: TriggersListScreenProps) 
   } else if (list.isError) {
     body = (
       <QueryError
-        placement="top"
         variant="server"
         title={t('cloudAgent.triggers.loadFailedTitle')}
         message={t('cloudAgent.triggers.loadFailedDescription')}
@@ -156,10 +162,9 @@ export function TriggersListScreen({ organizationId }: TriggersListScreenProps) 
         isRetrying={list.isFetching}
       />
     );
-  } else if (list.data.length === 0) {
+  } else if (isEmpty) {
     body = (
       <EmptyState
-        placement="top"
         icon={Workflow}
         title={t('cloudAgent.triggers.emptyTitle')}
         description={t('cloudAgent.triggers.emptyDescription')}
@@ -204,26 +209,30 @@ export function TriggersListScreen({ organizationId }: TriggersListScreenProps) 
           </IconButton>
         }
       />
-      <TabScreenScrollView
-        className="flex-1"
-        contentContainerClassName={SCREEN_BODY_CLASS}
-        showsVerticalScrollIndicator={false}
-      >
-        <Section>
-          <Text variant="muted">{t('cloudAgent.triggers.subtitle')}</Text>
-          <View className={BODY_BAND_CLASS}>{body}</View>
-          <Button
-            variant="outline"
-            className={STATE_ACTION_CLASS}
-            onPress={() => {
-              router.push(triggerCreateHref(organizationId) as Href);
-            }}
-          >
-            <Plus size={16} color={colors.foreground} />
-            <Text>{t('cloudAgent.triggers.new')}</Text>
-          </Button>
-        </Section>
-      </TabScreenScrollView>
+      {wholeSurface ? (
+        body
+      ) : (
+        <TabScreenScrollView
+          className="flex-1"
+          contentContainerClassName={SCREEN_BODY_CLASS}
+          showsVerticalScrollIndicator={false}
+        >
+          <Section>
+            <Text variant="muted">{t('cloudAgent.triggers.subtitle')}</Text>
+            <View className={BODY_BAND_CLASS}>{body}</View>
+            <Button
+              variant="outline"
+              className={STATE_ACTION_CLASS}
+              onPress={() => {
+                router.push(triggerCreateHref(organizationId) as Href);
+              }}
+            >
+              <Plus size={16} color={colors.foreground} />
+              <Text>{t('cloudAgent.triggers.new')}</Text>
+            </Button>
+          </Section>
+        </TabScreenScrollView>
+      )}
     </View>
   );
 }

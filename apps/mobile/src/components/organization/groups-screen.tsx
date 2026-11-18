@@ -5,21 +5,19 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { Plus, Users } from '@/components/ui/icons';
 
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { selectOrgListErrorView } from '@/components/organization/org-list-error-view';
 import { OrgRecordRow } from '@/components/organization/org-record-row';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { IconButton } from '@/components/ui/icon-button';
 import { RowGroup } from '@/components/ui/row-group';
 import { Section } from '@/components/ui/section';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { formatNumber } from '@/lib/format';
 import { useOrgGroups } from '@/lib/hooks/use-org-groups-queries';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
@@ -70,11 +68,23 @@ export function OrganizationGroupsScreen() {
   const managerGroups = data?.access === 'manager' ? data.groups : null;
   const memberGroups = data?.access === 'member' ? data.groups : null;
   const errorView = groupsQuery.isError ? selectOrgListErrorView(groupsQuery.error) : null;
+  // A plan gate, a failed read, or an empty list is the whole surface; a member
+  // view, a list, or the loading skeleton keeps the scroller.
+  const wholeSurface =
+    !enterprise ||
+    errorView !== null ||
+    (memberGroups === null && (managerGroups === null || managerGroups.length === 0));
 
   let body: ReactNode = null;
   if (!enterprise) {
+    // One plan-gated presentation, shared with Kilo Pass and AI Guardrails: a
+    // title, what the screen would show, and no action the app cannot take.
     body = (
-      <EmptyState icon={Users} placement="top" title={t('organization.groups.enterpriseOnly')} />
+      <EmptyState
+        icon={Users}
+        title={t('organizationModelAccess.enterpriseOnlyTitle')}
+        description={t('organization.groups.enterpriseOnly')}
+      />
     );
   } else if (groupsQuery.isPending) {
     body = <GroupsSkeleton />;
@@ -108,19 +118,17 @@ export function OrganizationGroupsScreen() {
     body = (
       <EmptyState
         icon={Users}
-        placement="top"
         title={t('organization.groups.emptyTitle')}
         description={t('organization.groups.emptyDescription')}
         action={
           canManage ? (
-            <Button
-              className={STATE_ACTION_CLASS}
+            <StateAction
+              label={t('organization.groups.create')}
+              icon={Plus}
               onPress={() => {
                 openGroupForm();
               }}
-            >
-              <Text className="text-primary-foreground">{t('organization.groups.create')}</Text>
-            </Button>
+            />
           ) : undefined
         }
       />
@@ -168,13 +176,17 @@ export function OrganizationGroupsScreen() {
           ) : undefined
         }
       />
-      <TabScreenScrollView
-        className="flex-1"
-        contentContainerClassName={SCREEN_BODY_CLASS}
-        showsVerticalScrollIndicator={false}
-      >
-        {body}
-      </TabScreenScrollView>
+      {wholeSurface ? (
+        body
+      ) : (
+        <TabScreenScrollView
+          className="flex-1"
+          contentContainerClassName={SCREEN_BODY_CLASS}
+          showsVerticalScrollIndicator={false}
+        >
+          {body}
+        </TabScreenScrollView>
+      )}
     </View>
   );
 }

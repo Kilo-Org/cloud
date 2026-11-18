@@ -35,8 +35,6 @@ export function OrganizationInvoicesScreen() {
       // one-line eyebrow while the membership read ran, so the swap to this
       // header cannot move the list.
       eyebrow={t('organization.invoices.title')}
-      // The title keeps the header's default tail ellipsis, so the start of the
-      // organization name always stays readable.
       backFallback={ORGANIZATION_HUB_PATH}
       query={query}
       entries={entries}

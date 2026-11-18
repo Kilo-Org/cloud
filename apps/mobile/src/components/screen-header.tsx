@@ -121,20 +121,6 @@ type ScreenHeaderProps = {
    */
   titleNumberOfLines?: number;
   /**
-   * How the title truncates when it does not fit its line cap. Default `'tail'`,
-   * which is right for a screen's own name: the start of a name is what a
-   * reader scans for.
-   *
-   * A title that carries a scope's name (the organization invoices screen puts
-   * the membership's organization name here) wants `'middle'` instead: the
-   * tail of a name is what tells two names with a shared prefix apart, and a
-   * tail ellipsis clipped exactly that, so "Acme Studio" and "Acme Studio
-   * Nordics" both read as "Acme Studio…". A middle ellipsis keeps both ends
-   * without taking a second line, so the header's height still cannot change
-   * when the name arrives.
-   */
-  titleEllipsizeMode?: 'head' | 'middle' | 'tail' | 'clip';
-  /**
    * One line of context under the title, in the muted body style. The title
    * stays the screen's name and its accessible header; the subtitle is read
    * after it, never instead of it.
@@ -371,8 +357,7 @@ export function ScreenHeader({
   title,
   titleContent,
   titleNumberOfLines = 1,
-  titleEllipsizeMode = 'tail',
-  subtitle,
+    subtitle,
   reserveSubtitle = false,
   subtitlePlaceholder,
   eyebrowNumberOfLines,
@@ -502,7 +487,7 @@ export function ScreenHeader({
       <Text
         className={cn(titleClass, centerTitle && 'text-center')}
         numberOfLines={titleLines}
-        ellipsizeMode={titleEllipsizeMode}
+        ellipsizeMode="tail"
         accessibilityRole="header"
       >
         {title}

@@ -501,7 +501,6 @@ describe('OrganizationInvoicesScreen header', () => {
     expect(screenHeaders.rendered[0]?.reserveEyebrow).toBeUndefined();
     // The title keeps the header's default tail ellipsis, so the start of the
     // organization name stays readable.
-    expect(screenHeaders.rendered[0]).not.toHaveProperty('titleEllipsizeMode');
   });
 
   it('reserves the eyebrow line on the boundary so the header keeps its height before the name arrives', async () => {

@@ -1564,26 +1564,16 @@ describe('ScreenHeader mounted', () => {
     expect(findTitleBand(renderer.root).props.className).toBe(band.props.className);
   });
 
-  it('truncates the title at its tail by default and in the middle when asked', () => {
-    // A scope's name is told apart by its tail, so the organization invoices
-    // header opts into a middle ellipsis; every other header keeps the tail.
-    const byDefault = renderHeader({ title: 'Acme Studio' });
-    expect(byDefault.root.findByProps({ accessibilityRole: 'header' }).props.ellipsizeMode).toBe(
-      'tail'
-    );
-
-    const middle = renderHeader({
-      title: 'Acme Studio Nordics',
-      eyebrow: 'Invoices',
-      titleEllipsizeMode: 'middle',
-    });
-    const title = middle.root.findByProps({ accessibilityRole: 'header' });
-    expect(title.props.ellipsizeMode).toBe('middle');
+  it('keeps the leading column free of text and the two bands on one class', () => {
+    const rendered = renderHeader({ title: 'Acme Studio Nordics', eyebrow: 'Invoices' });
     // The band follows the title's box, not its truncation: the shared class is
     // the same string on both cells, and the column holds no text of its own.
-    expect(findLeadingColumn(middle.root).findAllByType('Text')).toHaveLength(0);
-    expect(findTitleBand(middle.root).props.className).toBe(
-      findCaretBand(middle.root).props.className
+    expect(findLeadingColumn(rendered.root).findAllByType('Text')).toHaveLength(0);
+    expect(findTitleBand(rendered.root).props.className).toBe(
+      findCaretBand(rendered.root).props.className
+    );
+    expect(rendered.root.findByProps({ accessibilityRole: 'header' }).props.ellipsizeMode).toBe(
+      'tail'
     );
   });
 });

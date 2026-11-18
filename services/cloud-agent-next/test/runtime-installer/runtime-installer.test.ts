@@ -266,6 +266,8 @@ void test('optional proxy and CA settings preserve absence and configured values
     SSL_CERT_FILE: '/etc/ssl/certs/ca-certificates.crt',
     SSL_CERT_DIR: '/etc/ssl/certs',
     GIT_SSL_CAINFO: '/workspace/app/custom ca.pem',
+    CURL_CA_BUNDLE: '/etc/ssl/certs/ca-certificates.crt',
+    REQUESTS_CA_BUNDLE: '/etc/ssl/certs/ca-certificates.crt',
   };
   const absent = await succeeds(await setup(), runtime);
   for (const name of Object.keys(settings)) assert.equal(absent.env[name], undefined, name);

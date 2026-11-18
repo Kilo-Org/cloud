@@ -72,6 +72,8 @@ const optionalInheritedEnv = [
   'SSL_CERT_FILE',
   'SSL_CERT_DIR',
   'GIT_SSL_CAINFO',
+  'CURL_CA_BUNDLE',
+  'REQUESTS_CA_BUNDLE',
 ];
 
 const INSTALLER = String.raw`

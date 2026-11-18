@@ -33,6 +33,10 @@ vi.mock('react-native', () => ({
 // above this file's imports, so the form-field factory loads React itself).
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({ ChevronDown: 'ChevronDown' }));
+// The form's failure rows render `QueryError` -> `StateAction`, whose centered
+// variant measures the native surface; that module loads the Sentry RN SDK,
+// which the Node test project cannot resolve react-native through.
+vi.mock('@sentry/react-native', () => ({ captureException: () => undefined }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#6f6a61' }),
 }));

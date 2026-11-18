@@ -190,11 +190,13 @@ function renderSheet(
 }
 
 function findByTestID(root: Instance, testID: string): Instance[] {
-  return root.findAll(node => node.props.testID === testID);
+  return root.findAll(node => typeof node.type === 'string' && node.props.testID === testID);
 }
 
 function indexOfTestID(root: Instance, testID: string): number {
-  return root.findAll(() => true).findIndex(node => node.props.testID === testID);
+  return root
+    .findAll(node => typeof node.type === 'string')
+    .findIndex(node => node.props.testID === testID);
 }
 
 function indexOfType(root: Instance, type: string): number {

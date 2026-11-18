@@ -300,6 +300,7 @@ vi.mock('@/components/ui/icons', () => ({
   X: 'X',
   SlidersHorizontal: 'SlidersHorizontal',
   RotateCcw: 'RotateCcw',
+  ArrowLeft: 'ArrowLeft',
 }));
 vi.mock('@/components/agents/remote-session-row', () => ({ RemoteSessionRow: 'RemoteSessionRow' }));
 vi.mock('@/components/agents/session-list-content', () => ({

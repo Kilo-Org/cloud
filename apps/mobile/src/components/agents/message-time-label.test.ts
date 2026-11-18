@@ -7,9 +7,12 @@ import {
   isValidTranscriptTime,
 } from './message-time-label';
 
-const TIME_ONLY = new Intl.DateTimeFormat(undefined, { timeStyle: 'short' });
+// The label formats in the app's language (`i18n.language`), not the device
+// default, so the expected formatter names that language explicitly: the
+// runner's default locale varies (the Node test runner resolves `und`).
+const TIME_ONLY = new Intl.DateTimeFormat('en', { timeStyle: 'short' });
 
-const DATE_TIME = new Intl.DateTimeFormat(undefined, {
+const DATE_TIME = new Intl.DateTimeFormat('en', {
   dateStyle: 'medium',
   timeStyle: 'short',
 });

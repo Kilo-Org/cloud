@@ -191,7 +191,9 @@ describe('Switch', () => {
     // The thumb keeps the scheme's ink so the grey track still reads as a
     // control in both themes; the position alone says on or off.
     expect(on.thumbColor).toBe(darkColors.foreground);
-    expect(on.thumbColor).not.toBe(darkColors.selectionForeground);
+    // The dark scheme's ink and the accent's grip share one token, so the
+    // readable contrast is against the accent track, not the grip token.
+    expect(on.thumbColor).not.toBe(darkColors.selection);
     expect(off.trackColor).toEqual(on.trackColor);
     expect(off.thumbColor).toBe(on.thumbColor);
     expect(on.trackColor?.true).not.toBe(darkColors.primary);

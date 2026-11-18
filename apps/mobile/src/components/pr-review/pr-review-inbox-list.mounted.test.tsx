@@ -1,186 +1,18 @@
-/* eslint-disable max-lines -- one suite for the PR-review inbox list and its access states */
-import { createElement } from 'react';
-import { act, TestRenderer } from '@/test/renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+// Layout contracts for the PR-review inbox list: the landscape side insets on
+// the list container, and the row's meta line keeping the provider chip whole
+// beside the flexing ref · age text.
 
-import { PrReviewInboxList } from './pr-review-inbox-list';
+import { beforeEach, describe, expect, it } from 'vitest';
 
-// Landscape side-inset coverage for the inbox list (the coverage audit found
-// the FlashList without a contentContainerStyle, so inbox rows and the px-6
-// header/footer content sat under the landscape sensor housing).
-
-const insetsState = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
-const inboxState = vi.hoisted(() => ({
-  query: {
-    isPending: false,
-    isFetching: false,
-    hasNextPage: false,
-    isFetchingNextPage: false,
-    refetch: vi.fn(),
-    fetchNextPage: vi.fn(),
-  },
-  items: [] as {
-    owner: string;
-    repo: string;
-    number: number;
-    title: string;
-    updatedAt: string;
-    isDraft: boolean;
-  }[],
-  firstPageErrorState: null as { kind: string } | null,
-  firstPageErrorPlatform: null as 'github' | 'gitlab' | 'bitbucket' | null,
-  organizationId: null as string | null,
-  laterPageError: false,
-}));
-
-vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
-vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => insetsState,
-}));
-vi.mock('expo-router', () => ({
-  useRouter: () => ({ push: vi.fn() }),
-}));
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
-vi.mock('@shopify/flash-list', async () => {
-  const react = await import('react');
-  // Render the list sections so rows and the empty view mount inside the
-  // content container, like the real FlashList would.
-  return {
-    FlashList: (props: {
-      data?: unknown[];
-      renderItem: (args: { item: unknown }) => React.ReactElement | null;
-      ListHeaderComponent?: React.ReactElement;
-      ListEmptyComponent?: React.ReactElement;
-      ListFooterComponent?: React.ReactElement;
-    }) => {
-      const {
-        data,
-        renderItem,
-        ListHeaderComponent,
-        ListEmptyComponent,
-        ListFooterComponent,
-        ...rest
-      } = props;
-      return react.createElement(
-        'FlashList',
-        rest,
-        ListHeaderComponent ?? null,
-        ...(data ?? []).map(item => renderItem({ item })),
-        (data ?? []).length === 0 ? (ListEmptyComponent ?? null) : null,
-        ListFooterComponent ?? null
-      );
-    },
-  };
-});
-vi.mock('@/components/empty-state', () => ({
-  EmptyState: 'EmptyState',
-  StateAction: 'StateAction',
-}));
-vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/pr-review/pr-review-reconnect-notice', () => ({
-  PrReviewReconnectNotice: 'PrReviewReconnectNotice',
-}));
-vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
-vi.mock('@/components/ui/icons', () => ({
-  Clock: 'Clock',
-  GitPullRequest: 'GitPullRequest',
-  Inbox: 'Inbox',
-}));
-vi.mock('@/components/ui/directional-icons', () => ({
-  DirectionalChevronRight: 'DirectionalChevronRight',
-}));
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ mutedForeground: '#6F6A61' }),
-}));
-vi.mock('@/lib/organization-context', () => ({
-  useOrganization: () => ({ organizationId: inboxState.organizationId }),
-}));
-vi.mock('@/lib/profile-agent-navigation', () => ({
-  getPrReviewPath: (owner: string, repo: string, number: number) => `/${owner}/${repo}/${number}`,
-}));
-// `PrReviewInboxList` reads the provider-aware hook; adapt the GitHub-shaped
-// inboxState rows to the merged `ProviderInboxRow` shape it renders.
-vi.mock('@/lib/pr-review/use-provider-inbox', () => ({
-  useProviderInbox: () => ({
-    ...inboxState.query,
-    githubNeedsReconnect: false,
-    retryFailedPages: vi.fn(),
-    items: inboxState.items.map(item => ({
-      ref: { platform: 'github' as const, owner: item.owner, repo: item.repo, number: item.number },
-      key: `${item.owner}/${item.repo}#${item.number}`,
-      title: item.title,
-      isDraft: item.isDraft,
-      updatedAt: item.updatedAt,
-    })),
-    firstPageErrorState: inboxState.firstPageErrorState,
-    firstPageErrorPlatform: inboxState.firstPageErrorPlatform,
-    laterPageError: inboxState.laterPageError,
-    organizationScopeAccess: 'granted' as const,
-  }),
-}));
-// `@/lib/utils` initializes real i18n; the row only needs timestamp shaping
-// and the class joiner the section header calls.
-vi.mock('@/lib/utils', () => ({
-  cn: (...classes: unknown[]) => classes.flat().filter(Boolean).join(' '),
-  parseTimestamp: (value: string) => new Date(value),
-  timeAgo: () => 'just now',
-}));
-
-function makeItem(
-  overrides: Partial<(typeof inboxState.items)[number]> = {}
-): (typeof inboxState.items)[number] {
-  return {
-    owner: 'octocat',
-    repo: 'hello-world',
-    number: 7,
-    title: 'Fix the thing',
-    updatedAt: '2026-09-01T12:00:00Z',
-    isDraft: false,
-    ...overrides,
-  };
-}
-
-function mountInboxList(): TestRenderer.ReactTestRenderer {
-  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
-  act(() => {
-    ref.current = TestRenderer.create(
-      createElement(PrReviewInboxList, { header: null, recents: null })
-    );
-  });
-  const renderer = ref.current;
-  if (!renderer) {
-    throw new Error('renderer was not created');
-  }
-  return renderer;
-}
-
-function flashListProps(renderer: TestRenderer.ReactTestRenderer): {
-  contentContainerStyle?: Record<string, number | undefined>;
-} {
-  return renderer.root.find(node => String(node.type) === 'FlashList').props as {
-    contentContainerStyle?: Record<string, number | undefined>;
-  };
-}
-
-function metadataText(renderer: TestRenderer.ReactTestRenderer) {
-  return renderer.root.find(
-    node =>
-      String(node.type) === 'Text' &&
-      Array.isArray(node.props.children) &&
-      node.props.children.includes(' · ')
-  );
-}
-
-function inboxChips(renderer: TestRenderer.ReactTestRenderer) {
-  return renderer.root.findAll(
-    node =>
-      String(node.type) === 'View' &&
-      typeof node.props.className === 'string' &&
-      node.props.className.includes('rounded-full bg-secondary')
-  );
-}
+import {
+  flashListProps,
+  inboxChips,
+  inboxState,
+  insetsState,
+  makeItem,
+  metadataText,
+  mountInboxList,
+} from './pr-review-inbox-list.test-helpers';
 
 describe('PrReviewInboxList side insets (landscape)', () => {
   beforeEach(() => {
@@ -230,17 +62,6 @@ describe('PrReviewInboxList side insets (landscape)', () => {
           node.props.accessibilityLabel === 'octocat/hello-world#7'
       )
     ).toHaveLength(1);
-  });
-
-  it('shows the empty state and the retryable failure in their states', () => {
-    inboxState.items = [];
-    let renderer = mountInboxList();
-    expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(1);
-
-    inboxState.laterPageError = true;
-    renderer = mountInboxList();
-    expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
-    expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(1);
   });
 });
 
@@ -300,12 +121,7 @@ describe('InboxRow meta line (a long ref keeps the chip inside the row)', () => 
 // chip off the right edge ("Pull re") because the long repo/time metadata kept
 // its intrinsic width. The row must give that metadata up (single line, shrink)
 // and hold the chips whole (shrink-0).
-// The same explorer saw an organization member's inbox say "Access denied" when
-// the organization's GitLab connection needed reconnecting: the reconnect state
-// must name THAT provider and its organization, because the notice's
-// connection check has no route scope on this provider-neutral surface and
-// would otherwise re-check GitHub, which cannot fix a GitLab connection.
-describe('PrReviewInboxList row metadata and reconnect state', () => {
+describe('InboxRow metadata line', () => {
   beforeEach(() => {
     insetsState.left = 0;
     insetsState.right = 0;
@@ -334,31 +150,5 @@ describe('PrReviewInboxList row metadata and reconnect state', () => {
         node => String(node.type) === 'Text' && node.props.children === 'prReview.terms.pullRequest'
       )
     ).toHaveLength(1);
-  });
-
-  it('passes the failing provider and the organization to the reconnect notice', () => {
-    inboxState.items = [];
-    inboxState.firstPageErrorState = { kind: 'reconnect' };
-    inboxState.firstPageErrorPlatform = 'gitlab';
-    inboxState.organizationId = 'org-1';
-    const renderer = mountInboxList();
-
-    const notices = renderer.root.findAll(node => String(node.type) === 'PrReviewReconnectNotice');
-    expect(notices).toHaveLength(1);
-    expect(notices[0]?.props).toMatchObject({ platform: 'gitlab', organizationId: 'org-1' });
-    // The permission view is the state this fix removes for an organization
-    // member's own inbox.
-    expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
-  });
-
-  // A pending first read that is not fetching (offline, paused, cancelled)
-  // never settles on its own: it takes the retryable body so the user can
-  // restart the read, never the skeleton and never a false empty state.
-  it('gives a first read that cannot progress the retry action', () => {
-    inboxState.items = [];
-    inboxState.query.isPending = true;
-    inboxState.query.isFetching = false;
-    const bodies = mountInboxList().root.findAll(n => String(n.type) === 'QueryError');
-    expect(bodies).toHaveLength(1);
   });
 });

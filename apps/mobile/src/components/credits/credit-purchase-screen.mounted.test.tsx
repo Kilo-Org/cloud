@@ -133,7 +133,15 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 // The row's leading icon and the row-check the frame can draw. The real barrel
 // loads lucide's NativeWind-processed modules, which this project's transform
 // cannot parse; the tests read structure, not icon internals.
-vi.mock('@/components/ui/icons', () => ({ Check: 'Check', Wallet: 'Wallet' }));
+vi.mock('@/components/ui/icons', () => ({
+  Check: 'Check',
+  RotateCcw: 'RotateCcw',
+  Wallet: 'Wallet',
+}));
+// The retry and empty states render through `StateAction`, whose centered
+// variant measures the native surface; that module loads the Sentry RN SDK,
+// which the Node test project cannot resolve react-native through.
+vi.mock('@sentry/react-native', () => ({ captureException: () => undefined }));
 vi.mock('@/lib/a11y/status-announcement', () => ({
   useStatusAnnouncement: statusAnnouncement.useStatusAnnouncement,
 }));

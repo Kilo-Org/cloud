@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
+import { canStepOlderTo, HOUR_MS } from '@/components/organization/request-log-window';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { PermissionDenied } from '@/components/organization/permission-denied';
 import { RequestLogsSkeleton } from '@/components/organization/request-logs-skeleton';
@@ -38,31 +39,11 @@ import { isRetryableTrpcError, trpcErrorVariant, type TrpcErrorVariant } from '@
 import { cn, parseTimestamp } from '@/lib/utils';
 
 /**
- * The hour the procedure lists: `organizations.requestLogs.list` answers the
- * rows created in the hour before `startTime`, so a window end is the screen's
- * paging control and one step is one hour.
- */
-const HOUR_MS = 60 * 60 * 1000;
-
-/**
  * The server caps one window at 100 rows (`REQUEST_LOGS_LIMIT`,
  * `REQUEST_LOGS_WINDOW_HOURS` in apps/web). A full window therefore means older
  * rows inside it exist and the window is the only way to reach them.
  */
 const REQUEST_LOG_LIMIT = 100;
-
-/**
- * The procedure refuses a start time more than `REQUEST_LOGS_START_TIME_MAX_AGE_DAYS`
- * (365, apps/web) before its own clock, which runs later than this screen's
- * mount-time anchor. The stepper keeps an hour of margin, so the oldest window
- * it opens still names a start time the server accepts.
- */
-const HISTORY_DAYS = 365;
-
-/** Whether a window ending at `windowEndMs` is inside the procedure's age bound. */
-export function canStepOlderTo(windowEndMs: number, anchorMs: number): boolean {
-  return windowEndMs >= anchorMs - (HISTORY_DAYS * 24 - 1) * HOUR_MS;
-}
 
 // The cards carry the page gutter themselves. The tab bar's own bottom padding
 // rides on the footer, which `gap` would not cover, and the body's top pad sits

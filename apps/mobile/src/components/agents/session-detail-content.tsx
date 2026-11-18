@@ -17,7 +17,7 @@ import { useAtomValue, useSetAtom, useStore } from 'jotai';
 import { MessageSquare, RotateCcw } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
-import { notificationHaptic, selectionHaptic } from '@/lib/haptics';
+import { notificationHaptic } from '@/lib/haptics';
 import { Platform, type TextInstance, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -3046,9 +3046,6 @@ export function SessionDetailContent({
               cloudStatusType={cloudStatus?.type ?? null}
               autoApproveState={autoApproveState}
               onAutoApproveChange={enabled => {
-                // Selection haptic for the commit: a capability iOS and Android
-                // both have, served here by the one cross-platform call.
-                selectionHaptic();
                 setSessionAutoApproveEnabled(sessionId, enabled);
               }}
               onClose={() => {

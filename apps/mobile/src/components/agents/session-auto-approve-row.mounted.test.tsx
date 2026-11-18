@@ -62,7 +62,9 @@ describe('SessionAutoApproveRow', () => {
     const root = renderRow('on', vi.fn<(value: boolean) => void>());
 
     expect(
-      root.root.findAll(node => node.props.testID === 'session-auto-approve-row')
+      root.root.findAll(
+        node => typeof node.type === 'string' && node.props.testID === 'session-auto-approve-row'
+      )
     ).toHaveLength(1);
     expect(switchProps(root.root)).toEqual({ value: true, disabled: false });
     expect(renderedTexts(root.root)).toContain('Auto-approve');

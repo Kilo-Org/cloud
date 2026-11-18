@@ -14,7 +14,8 @@ import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 import { i18n } from '@/i18n';
-import { canStepOlderTo, OrganizationRequestLogsScreen } from './request-logs-screen';
+import { canStepOlderTo } from './request-log-window';
+import { OrganizationRequestLogsScreen } from './request-logs-screen';
 
 const HOUR_MS = 60 * 60 * 1000;
 

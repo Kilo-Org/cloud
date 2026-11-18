@@ -191,7 +191,7 @@ export const COMPACT_CONTROL_BOX_CLASS = 'h-[32px] w-[32px] items-center justify
  * control that contributes more than this sets the row's height, so it must
  * cancel down to it.
  */
-export const ROW_FRAME_CONTENT_DP = 27;
+const ROW_FRAME_CONTENT_DP = 27;
 
 /**
  * The vertical margin a full {@link TOUCH_TARGET_DP} control cancels per side

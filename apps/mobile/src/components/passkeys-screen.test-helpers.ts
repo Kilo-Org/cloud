@@ -288,6 +288,7 @@ vi.mock('@/components/ui/icons', () => ({
   KeyRound: 'KeyRound',
   Pencil: 'Pencil',
   Plus: 'Plus',
+  RotateCcw: 'RotateCcw',
   Trash2: 'Trash2',
 }));
 

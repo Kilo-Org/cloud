@@ -17,7 +17,9 @@
  * `--changelog` is relative to the current directory (default
  * apps/mobile/CHANGELOG.md). `KILO_CHANGELOG_API_KEY` is required;
  * `KILO_CHANGELOG_BASE_URL` and `KILO_CHANGELOG_TIMEOUT_MS` point the rewrite at
- * a local fake gateway for tests.
+ * a local fake gateway for tests. `KILO_CHANGELOG_VERSION_PAUSE_MS` sets the
+ * pause between two versions (default 3 s) so one run does not burst the
+ * gateway; the tests set it to 0.
  * `.github/workflows/kilo-app-changelog-history.yml` runs this script with a
  * token minted from the existing `MCP_CATALOG_TOKEN_SECRET` shared secret and
  * opens the resulting PR. The file is written even when some versions failed
@@ -43,6 +45,7 @@ import {
   plainSubject,
   requestCuratedNotes,
   rewriteCandidates,
+  versionPauseMs,
 } from './kilo-app-release-notes.mjs';
 
 const CHANGELOG_DEFAULT = 'apps/mobile/CHANGELOG.md';
@@ -115,6 +118,8 @@ async function rewriteSections(parsed, options) {
   const groups = versionGroups(parsed.sections);
   const written = new Map();
   const failures = [];
+  const pauseMs = versionPauseMs();
+  let calls = 0;
   let curated = 0;
   let skipped = 0;
   for (const group of groups) {
@@ -134,6 +139,10 @@ async function rewriteSections(parsed, options) {
       skipped += 1;
       continue;
     }
+    if (calls > 0 && pauseMs > 0) {
+      await new Promise(resolve => setTimeout(resolve, pauseMs));
+    }
+    calls += 1;
     const result = await requestCuratedNotes(rewriteCandidates(subjects), options);
     if (result.error) {
       failures.push(group.version);

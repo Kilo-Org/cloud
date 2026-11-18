@@ -26,7 +26,7 @@ import { type ReviewerPlatform } from '@/lib/code-reviewer-config';
 import { instructionsFieldOverflows } from '@/lib/code-reviewer-instructions-field';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useReviewConfig, useSaveReviewConfig } from '@/lib/hooks/use-code-reviewer';
-import { reviewConfigFailure, useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
+import { queryBodyFailure, useQueryBodyState } from '@/lib/hooks/use-query-body-state';
 import {
   type SettingsBackGuardSaveOutcome,
   useSettingsBackGuard,
@@ -222,9 +222,9 @@ function InstructionsScreen({
 }: Readonly<{ scope: string; platform: ReviewerPlatform }>) {
   const router = useRouter();
   const config = useReviewConfig(scope, platform);
-  const configBody = useReviewConfigBody(config);
+  const configBody = useQueryBodyState(config);
   const { data } = config;
-  const failure = reviewConfigFailure(configBody, config.isFetching);
+  const failure = queryBodyFailure(configBody, config.isFetching);
   const save = useSaveReviewConfig(scope, platform);
   const { confirm, dialog: removalDialog } = useConfirmDialog();
   const { t } = useTranslation();

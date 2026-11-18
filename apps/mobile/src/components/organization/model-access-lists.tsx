@@ -208,6 +208,16 @@ export function ModelDenyList({
     [draft, disabled, onChange, shown.length]
   );
 
+  const emptyLabel = (() => {
+    if (deniedOnly && search.trim()) {
+      return t('organizationModelAccess.modelsDeniedSearchEmpty');
+    }
+    if (deniedOnly) {
+      return t('organizationModelAccess.modelsDeniedEmpty');
+    }
+    return t('organizationModelAccess.modelsEmpty');
+  })();
+
   return (
     <FlashList
       data={shown}
@@ -258,7 +268,7 @@ export function ModelDenyList({
           }
         />
       }
-      ListEmptyComponent={<NoMatch label={t('organizationModelAccess.modelsEmpty')} />}
+      ListEmptyComponent={<NoMatch label={emptyLabel} />}
     />
   );
 }

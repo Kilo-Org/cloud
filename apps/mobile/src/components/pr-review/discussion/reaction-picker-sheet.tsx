@@ -95,12 +95,16 @@ export function ReactionPickerSheet({
       >
         {/* i18n-dup-ok: prReview.discussion.reaction* is a numeral count label
             ('3 reactions'); this key is the picker's title — cs/pl/uk differ. */}
+        {/* The native handle already leaves the room above the title, so the
+            header takes the shared under-handle pair instead of its own top
+            padding. */}
         <SheetHeader
           title={t('common.reactions')}
           onDone={onClose}
           // Same accessible name the picker's own header gave its close control.
           doneLabel={t('common.closeReactions')}
           topInset="never"
+          underHandle
           titleRef={titleRef}
         />
         <View onLayout={focusTitle} className={cn(SCREEN_BODY_CLASS, 'pb-6')}>

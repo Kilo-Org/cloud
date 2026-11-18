@@ -165,7 +165,8 @@ export function SaveDraftAsTodoSheet({
       dismissGestures={false}
       snapPoints={['60%']}
     >
-      <View className="flex-1 pt-4">
+      {/* The title row takes the under-handle padding itself. */}
+      <View className="flex-1">
         <SheetTitleRow title={t('todos.saveSheet.title')} onClose={onClose} />
         <ScrollView nestedScrollEnabled contentContainerStyle={{ paddingBottom: bottomClearance }}>
           {body}

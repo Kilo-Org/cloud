@@ -253,6 +253,41 @@ describe('SheetHeader', () => {
   });
 
   it.each([
+    { os: 'ios', top: 'pt-1.5', bottom: 'pb-4' },
+    { os: 'android', top: 'pt-0', bottom: 'pb-7' },
+  ])('mirrors the native handle padding below the title on $os', async ({ os, top, bottom }) => {
+    // The sheet paints the drag handle above this header, and Material3's
+    // handle already reserves 22dp of padding under the bar (iOS's reserves
+    // 16pt), so the header splits its own padding to even out the gap above
+    // and below the title. The header resolves that split at render, so each
+    // platform is mounted once and its own pair asserted.
+    rn.os = os;
+    const renderer = await mount({
+      title: 'Environment',
+      onDone: () => undefined,
+      underHandle: true,
+    });
+
+    const classes = String(findHeaderContainer(renderer.root).props.className).split(' ');
+    expect(classes).toContain(top);
+    expect(classes).toContain(bottom);
+    expect(classes).not.toContain('pt-4');
+    expect(classes).not.toContain('pb-3');
+
+    renderer.unmount();
+  });
+
+  it('keeps its own top padding when no native handle sits above the header', async () => {
+    const renderer = await mount({ title: 'Environment', onDone: () => undefined });
+
+    const classes = String(findHeaderContainer(renderer.root).props.className).split(' ');
+    expect(classes).toContain('pt-4');
+    expect(classes).toContain('pb-3');
+
+    renderer.unmount();
+  });
+
+  it.each([
     { title: 'Language', doneLabel: 'Done', cancelLabel: 'Cancel' },
     { title: 'اللغة', doneLabel: 'تم', cancelLabel: 'إلغاء' },
   ])('gives $doneLabel and $cancelLabel the same rounded control frame', async labels => {

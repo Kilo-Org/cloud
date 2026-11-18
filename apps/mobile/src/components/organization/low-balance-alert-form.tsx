@@ -6,11 +6,13 @@ import { View } from 'react-native';
 
 import {
   emailsError,
+  emailsErrorMessages,
   parseEmails,
   parseThreshold,
   saveErrorCopy,
   type SaveErrorCopy,
   thresholdError,
+  thresholdErrorMessages,
 } from '@/components/organization/low-balance-alert-validators';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
@@ -208,6 +210,7 @@ export function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAler
             keyboardType="decimal-pad"
             defaultValue={thresholdRef.current || undefined}
             validate={thresholdError}
+            reserveErrorMessages={thresholdErrorMessages()}
             error={thresholdDraftError ?? undefined}
             onChangeText={value => {
               thresholdRef.current = value;
@@ -228,6 +231,8 @@ export function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAler
               autoCorrect={false}
               defaultValue={emailsRef.current || undefined}
               validate={emailsError}
+              validateWhileTyping
+              reserveErrorMessages={emailsErrorMessages()}
               error={emailsDraftError ?? undefined}
               onChangeText={value => {
                 emailsRef.current = value;

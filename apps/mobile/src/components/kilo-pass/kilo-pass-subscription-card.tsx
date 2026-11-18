@@ -84,11 +84,7 @@ export function KiloPassSubscriptionCard({
               the shared row's label-only API cannot express. */}
           <Pressable
             accessibilityHint={t('kiloPass.retryHint')}
-            accessibilityLabel={t('kiloPass.cardAccessibility', {
-              title: contentState.title,
-              description: contentState.description,
-              actionLabel: contentState.actionLabel,
-            })}
+            accessibilityLabel={contentState.accessibilityLabel}
             accessibilityRole="button"
             className="active:opacity-70"
             onPress={handleRetryPress}

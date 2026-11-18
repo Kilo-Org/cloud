@@ -161,8 +161,19 @@ function EnvironmentList({
   const { height: windowHeight } = useWindowDimensions();
   return (
     <>
-      <SheetHeader title={t('agentChat.newSession.environment')} onDone={onClose} />
-      <Text className="px-4 pb-2 text-sm text-muted-foreground" numberOfLines={1}>
+      {/* The sheet sizes to its content and never reaches the window top, so
+          the header reserves no status-bar clearance — the half-detent picker's
+          rule — and it paints the sheet's own card surface, so the header and
+          the list below read as one surface instead of a tinted band over a
+          white body. */}
+      <SheetHeader
+        title={t('agentChat.newSession.environment')}
+        onDone={onClose}
+        topInset="never"
+        underHandle
+        surfaceClassName="bg-card"
+      />
+      <Text className="px-4 py-2 text-sm text-muted-foreground" numberOfLines={1}>
         {t('agentChat.environment.environmentsForRepository', { repository: repositoryLabel })}
       </Text>
       <ScrollView style={{ maxHeight: Math.round(windowHeight * LIST_MAX_WINDOW_FRACTION) }}>

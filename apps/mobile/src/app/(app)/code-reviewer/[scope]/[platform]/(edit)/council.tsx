@@ -4,18 +4,19 @@ import {
   COUNCIL_MIN_SPECIALISTS,
   COUNCIL_REQUIRED_LABEL_MAX_LENGTH,
 } from '@kilocode/app-shared/code-review';
+import { useQuery } from '@tanstack/react-query';
 import { type Href } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
+import { CouncilRefusalScreen } from '@/components/code-reviewer/council-refusal-screen';
 import { CouncilSpecialistsSection } from '@/components/code-reviewer/council-specialists-section';
 import { ReviewerErrorScreen } from '@/components/code-reviewer/reviewer-error-screen';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { InvalidRouteState } from '@/components/invalid-route-state';
-import { EmptyState } from '@/components/empty-state';
 import { ChoiceRow } from '@/components/ui/choice-row';
-import { Lock, Users } from '@/components/ui/icons';
+import { Users } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { PreferenceRow } from '@/components/ui/preference-row';
 import { RadioGroup } from '@/components/ui/radio-group';
@@ -26,8 +27,6 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
-import { formatNumber } from '@/lib/format';
-import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import {
   type CouncilConfig,
   PLATFORM_CAPABILITIES,
@@ -39,19 +38,23 @@ import {
   STRATEGY_DESCRIPTION_KEYS,
   STRATEGY_LABEL_KEYS,
 } from '@/lib/code-reviewer-council';
+import { formatNumber } from '@/lib/format';
 import {
+  isPersonal,
   useGitHubRepositories,
   useGitLabRepositories,
   useReviewConfig,
   useSaveReviewConfig,
 } from '@/lib/hooks/use-code-reviewer';
-import { reviewConfigFailure, useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
+import { queryBodyFailure, useQueryBodyState } from '@/lib/hooks/use-query-body-state';
 import {
   defaultCouncilConfig,
   enabledSpecialistCount,
   useCouncilGate,
 } from '@/lib/hooks/use-reviewer-council';
 import { useReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { useTRPC } from '@/lib/trpc';
 
 export default function CouncilRoute() {
   const params = useReviewerRouteParams();
@@ -66,11 +69,26 @@ function CouncilScreen({
   platform,
 }: Readonly<{ scope: string; platform: ReviewerPlatform }>) {
   const { t } = useTranslation();
+  const trpc = useTRPC();
   // The same gate as the web page: an entitled organization behind the rollout
   // flag. A personal scope, an unentitled org, or a build older than the flag
   // never reaches the rows below. Bitbucket has no council on either client.
   const gate = useCouncilGate(scope);
   const capabilities = PLATFORM_CAPABILITIES[platform];
+  // The personal refusal's action branches on what the account already has:
+  // memberships let it switch to the organization that may unlock council, no
+  // membership makes creating one the only step. Only the personal scope reads
+  // it: the reviewer permission hook already runs this same read for an
+  // organization scope, so that path stays cache-served. It must sit above the
+  // early return below, with every other hook of this screen.
+  const orgs = useQuery({
+    ...trpc.organizations.list.queryOptions(),
+    enabled: isPersonal(scope),
+  });
+  let membershipState: 'none' | 'some' | 'unsettled' = 'unsettled';
+  if (orgs.data !== undefined) {
+    membershipState = orgs.data.length > 0 ? 'some' : 'none';
+  }
   const surface = councilSurface({
     pending: gate.pending,
     allowed: gate.allowed,
@@ -78,7 +96,7 @@ function CouncilScreen({
   });
   const councilUiEnabled = surface === 'editor';
   const config = useReviewConfig(scope, platform, { enabled: councilUiEnabled });
-  const configBody = useReviewConfigBody(config, { restartable: councilUiEnabled });
+  const configBody = useQueryBodyState(config, { restartable: councilUiEnabled });
   const save = useSaveReviewConfig(scope, platform);
   const githubRepos = useGitHubRepositories(scope, councilUiEnabled && platform === 'github');
   const gitlabRepos = useGitLabRepositories(scope, councilUiEnabled && platform === 'gitlab');
@@ -116,8 +134,12 @@ function CouncilScreen({
 
   if (surface !== 'editor') {
     // An in-flight entitlement read keeps the surface blank rather than telling
-    // an entitled organization that council is unavailable while it resolves;
-    // a settled refusal, or a platform without council, shows that message.
+    // an entitled organization that council is unavailable while it resolves.
+    // A settled refusal names the reason the reader can act on: a personal
+    // account never carries council, an organization's plan can lack it, and
+    // Bitbucket has no council on either client. The personal scope offers the
+    // one step that changes the answer: creating the organization.
+    const refusalReason = gate.refusalReason ?? 'flagUnavailable';
     return (
       <View className="flex-1 bg-background">
         <ReviewerHeader
@@ -125,10 +147,11 @@ function CouncilScreen({
           eyebrow={t('common.codeReviewer')}
         />
         {surface === 'unavailable' ? (
-          <EmptyState
-            icon={Lock}
-            title={t('organizationModelAccess.enterpriseOnlyTitle')}
-            description={t('codeReviewer.council.unavailable')}
+          <CouncilRefusalScreen
+            scope={scope}
+            platformSupportsCouncil={capabilities.council}
+            refusalReason={refusalReason}
+            membershipState={membershipState}
           />
         ) : (
           <View className={SCREEN_BODY_CLASS}>
@@ -142,7 +165,7 @@ function CouncilScreen({
     );
   }
 
-  const failure = reviewConfigFailure(configBody, config.isFetching);
+  const failure = queryBodyFailure(configBody, config.isFetching);
   if (failure) {
     return (
       <ReviewerErrorScreen

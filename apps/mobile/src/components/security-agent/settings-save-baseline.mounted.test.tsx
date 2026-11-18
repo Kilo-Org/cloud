@@ -49,6 +49,9 @@ vi.mock('react-native', () => ({
   View: 'View',
   Alert: { alert: vi.fn() },
 }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => 'online',
+}));
 vi.mock('sonner-native', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));

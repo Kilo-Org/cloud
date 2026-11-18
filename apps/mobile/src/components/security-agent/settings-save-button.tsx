@@ -1,10 +1,11 @@
 import { useRouter } from 'expo-router';
-import { type RefObject } from 'react';
+import { type RefObject, useContext, useEffect, useRef } from 'react';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { NavigationContext } from '@/lib/navigation/navigation-context';
 import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 /**
@@ -37,6 +38,30 @@ export function SettingsSaveButton({
   const colors = useThemeColors();
   const mutedDisabledInk = useMutedDisabledInk();
   const { t } = useTranslation();
+  // A save that settles after this screen is gone must not pop the stack from
+  // behind: the discard path of the screen's back guard, or the disabled-config
+  // replace, can unmount this instance while its mutation is still in flight.
+  // The unmount flag covers the pop and the conditional renders; the focus read
+  // covers the route that blurred without unmounting (a screen replaced over
+  // this one). Same context object as `useRouteFocused`, read at settle time —
+  // the route can blur after the last render and before the promise resolves,
+  // so the render-time value is not trustworthy. A caller outside a navigator
+  // (and a harness with a partial expo-router mock) has no navigation object:
+  // the read is `undefined` and degrades to "current".
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+  const navigation = useContext(NavigationContext) as { isFocused?: () => boolean } | undefined;
+  // Admission is not owned here. Every caller's `onSave` runs through
+  // `useSettingsSaveFeedback().run`, whose `surface-feedback.begin()` is the
+  // family's one admission authority — it refuses a save while another is in
+  // flight, whichever surface delivered it (this header press or the back
+  // guard's dialog Save). Keeping a second lock beside it would violate the
+  // surface-feedback contract. The disabled prop stays the visible state.
   // A settings header holds this one action, and a filled primary is the
   // loudest thing on the screen. It should not outshout the content's own way
   // out (the repository picker's "Manage GitHub App access" is exactly that
@@ -61,8 +86,16 @@ export function SettingsSaveButton({
         void (async () => {
           try {
             await onSave();
-            skipNextGuardRef.current = true;
-            router.back();
+            // The save has settled, but its screen may not own the route
+            // anymore: discard-and-leave through the back guard, or the
+            // disabled-config replace, can beat the promise here. Skip both
+            // the guard bypass and the pop — a skip flag set without the
+            // navigation it was armed for would swallow the next genuine
+            // back confirmation on whatever screen is on top now.
+            if (mountedRef.current && (navigation?.isFocused?.() ?? true)) {
+              skipNextGuardRef.current = true;
+              router.back();
+            }
           } catch {
             // The screen's refusal line reports the failure; stay on screen.
           }

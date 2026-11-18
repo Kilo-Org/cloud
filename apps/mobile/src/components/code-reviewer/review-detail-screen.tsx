@@ -14,7 +14,7 @@ import {
   isRetriggerableReviewStatus,
 } from '@kilocode/app-shared/code-review';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
-import { statusMeta } from '@/components/code-reviewer/review-list-screen';
+import { statusMeta } from '@/components/code-reviewer/review-list-rows';
 import {
   findingsEmptyCopyKey,
   flattenCouncilFindings,
@@ -32,9 +32,11 @@ import {
 } from '@/components/code-reviewer/review-detail-sections';
 import { QueryError } from '@/components/query-error';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
+import { type HeaderEyebrow } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Card } from '@/components/ui/card';
+import { eyebrowHeaderProps } from '@/components/ui/eyebrow-placeholder';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
@@ -151,17 +153,19 @@ export function ReviewDetailScreen({
   }
 
   // One header for every state. The eyebrow is the review's repository, which
-  // only the payload knows, so its line is reserved from the first frame: the
-  // title above the body must not move when the review lands — nor when a
-  // refetch drops it back to loading, nor on the error branches that paint the
-  // same header.
-  const header = (
-    <ReviewerHeader
-      title={t('codeReviewer.reviewDetail.title')}
-      eyebrow={loadedReview?.repo_full_name}
-      reserveEyebrow
-    />
-  );
+  // only the payload knows, so its line is reserved while the read is pending —
+  // with the placeholder bar, because the label is on its way — and after the
+  // read stopped, where the same line stays reserved and blank so the title
+  // keeps its place without an animation: a retry re-enters the loading state on
+  // that line, so neither the failure nor the retry moves the title.
+  let eyebrow: HeaderEyebrow = { kind: 'held' };
+  if (loadedReview) {
+    eyebrow = { kind: 'ready', text: loadedReview.repo_full_name };
+  } else if (isLoading) {
+    eyebrow = { kind: 'loading' };
+  }
+  const eyebrowProps = eyebrowHeaderProps(eyebrow);
+  const header = <ReviewerHeader title={t('codeReviewer.reviewDetail.title')} {...eyebrowProps} />;
 
   if (isLoading) {
     return (

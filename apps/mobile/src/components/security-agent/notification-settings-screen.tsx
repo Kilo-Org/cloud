@@ -14,19 +14,22 @@ import { useSettingsSaveFeedback } from '@/components/security-agent/settings-sa
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { FormField } from '@/components/ui/form-field';
+import { Input } from '@/components/ui/input';
 import { PreferenceRow } from '@/components/ui/preference-row';
 import { RowGroup } from '@/components/ui/row-group';
-import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { SettingsScreenSkeleton } from '@/components/security-agent/settings-screen-skeleton';
 import { i18n } from '@/i18n';
 import { formatList, formatNumber, parseLocalizedNumber } from '@/lib/format';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { classifyReadFailureVariant } from '@/lib/query/read-failure-variant';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
 } from '@/lib/hooks/use-settings-back-guard';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import {
   useSaveSecurityAgentConfig,
   useSecurityAgentCapability,
@@ -48,24 +51,6 @@ const NOTIFICATION_SEVERITY_OPTIONS = [
   { value: 'low', labelKey: 'securityAgent.filter.severityLow' },
 ] as const satisfies readonly { value: NotificationSeverity; labelKey: string }[];
 
-function NotificationSettingsSkeleton() {
-  const { t } = useTranslation();
-  return (
-    <View className="flex-1 bg-background">
-      <ScreenHeader title={t('common.notifications')} />
-      <View className={SCREEN_BODY_CLASS}>
-        <RowGroup leadingTile>
-          <RowSkeleton tile subtitle />
-          <RowSkeleton tile subtitle />
-        </RowGroup>
-        <RowGroup leadingTile>
-          <RowSkeleton tile subtitle />
-        </RowGroup>
-      </View>
-    </View>
-  );
-}
-
 export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   const { t } = useTranslation();
   const canManage = useSecurityAgentCapability(scope).canManage;
@@ -74,6 +59,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
   const feedback = useSettingsSaveFeedback();
   const trackInteraction = useTrackSecurityAgentInteraction(scope);
   const personal = isPersonalSecurityScope(scope);
+  const connectivity = useCommittedConnectivityStatus();
 
   const [newFindingNotificationsEnabled, setNewFindingNotificationsEnabled] = useState(false);
   const [newFindingNotificationMinSeverity, setNewFindingNotificationMinSeverity] =
@@ -173,14 +159,18 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
     return (
       <PlatformErrorScreen
         title={t('common.notifications')}
-        variant="offline"
+        variant={classifyReadFailureVariant({
+          errors: [config.error],
+          isPaused: config.fetchStatus === 'paused',
+          connectivity,
+        })}
         message={t('securityAgent.notifications.couldNotLoad')}
         onRetry={() => void config.refetch()}
       />
     );
   }
   if (config.isLoading || !config.data) {
-    return <NotificationSettingsSkeleton />;
+    return <SettingsScreenSkeleton titleKey="common.notifications" />;
   }
   if (!config.data.isEnabled && !dirty) {
     // Keep a dirty draft and its controls usable if the redirect is cancelled.
@@ -190,7 +180,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
   // would show the default toggles and then push every control below them down
   // when their pickers appear.
   if (baseline === null) {
-    return <NotificationSettingsSkeleton />;
+    return <SettingsScreenSkeleton titleKey="common.notifications" />;
   }
 
   return (

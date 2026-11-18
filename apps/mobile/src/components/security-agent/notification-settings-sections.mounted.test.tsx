@@ -115,6 +115,9 @@ vi.mock('@/components/security-agent/settings-save-button', () => ({
   SettingsSaveButton: () => null,
 }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrollView' }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => 'online',
+}));
 
 const PERSONAL_SCOPE = 'personal';
 const ORGANIZATION_SCOPE = '00000000-0000-4000-8000-000000000001';

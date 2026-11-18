@@ -13,7 +13,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
-import { useSettingsSaveFeedback } from './settings-save-feedback';
+import { SettingsSaveAdmissionRefused, useSettingsSaveFeedback } from './settings-save-feedback';
 
 vi.mock('react-native', () => ({
   View: 'View',
@@ -179,6 +179,79 @@ describe('useSettingsSaveFeedback', () => {
     // that room back.
     expect(renderer.root.findAllByType('Text')).toHaveLength(0);
     expect(renderer.root.findAllByType('View')).toHaveLength(0);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('admits only one save: a second run while the first is unsettled rejects with the sentinel', async () => {
+    const renderer = mount();
+
+    const { promise: inFlight, resolve: release } = Promise.withResolvers<undefined>();
+    let calls = 0;
+    const save = vi.fn(() => {
+      calls += 1;
+      return inFlight;
+    });
+
+    const first = run(save);
+    // A second caller in the same frame — the header Save and the back guard's
+    // dialog Save land like this when a save is already in flight — is refused
+    // by admission: no second save invocation, and the refusal is observable
+    // as a sentinel rejection (never as a resolve, which every caller reads as
+    // a successful save).
+    let refused: unknown = null;
+    await act(async () => {
+      await run(save).catch((error: unknown) => {
+        refused = error;
+      });
+    });
+    expect(refused).toBeInstanceOf(SettingsSaveAdmissionRefused);
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(calls).toBe(1);
+    // Nothing was attempted, so no refusal line is parked.
+    expect(renderer.root.findAllByType('Text')).toHaveLength(0);
+
+    release(undefined);
+    await act(async () => {
+      await first;
+    });
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('admits a new save after a settled success and after a settled refusal', async () => {
+    const renderer = mount();
+    const save = vi.fn(() => Promise.resolve());
+
+    await act(async () => {
+      await run(save);
+    });
+    expect(save).toHaveBeenCalledTimes(1);
+
+    // The attempt settled, so the next save is admitted again.
+    await act(async () => {
+      await run(save);
+    });
+    expect(save).toHaveBeenCalledTimes(2);
+
+    // Same after a refused save: the refusal parks the line and rethrows, and
+    // it also releases the admission, so the retry stays possible.
+    const refusal = Object.assign(new Error('Upstream refused the write'), {
+      data: { code: 'INTERNAL_SERVER_ERROR' },
+    });
+    await act(async () => {
+      await expect(run(() => Promise.reject(refusal))).rejects.toBe(refusal);
+    });
+    expect(statusMessage(renderer)).toBe(i18n.t('securityAgent.mutations.actionFailed'));
+
+    await act(async () => {
+      await run(save);
+    });
+    expect(save).toHaveBeenCalledTimes(3);
 
     act(() => {
       renderer.unmount();

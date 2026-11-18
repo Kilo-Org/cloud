@@ -29,6 +29,7 @@ import { useTranslation } from 'react-i18next';
 import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { InputFrame } from '@/components/ui/input-frame';
+import { RemainingCharactersCounter } from '@/components/ui/remaining-characters-counter';
 import { Text } from '@/components/ui/text';
 import {
   type ComposerSelection,
@@ -677,17 +678,7 @@ export function NewSessionPrompt({
           }}
         >
           {showsCounter ? (
-            <View className="flex-row justify-end px-1 pb-1">
-              {/* i18n-dup-ok: 'agentChat.composer.charactersRemaining_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules. */}
-              <Text
-                className="text-xs font-normal text-muted-foreground"
-                accessibilityLabel={t('agentChat.composer.charactersRemaining', {
-                  count: counterRemaining,
-                })}
-              >
-                {counterRemaining}
-              </Text>
-            </View>
+            <RemainingCharactersCounter remaining={counterRemaining} className="px-1 pb-1" />
           ) : null}
           <NewSessionPromptControls
             control={control}

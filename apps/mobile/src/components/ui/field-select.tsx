@@ -1,5 +1,6 @@
 import { Pressable, View } from 'react-native';
 
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { ChevronDown } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
@@ -71,7 +72,7 @@ export function FieldSelect({
           <ChevronDown size={16} color={colors.mutedForeground} />
         </View>
       </Pressable>
-      {error === undefined ? null : <Text className="text-xs text-destructive">{error}</Text>}
+      {error === undefined ? null : <AccessibleStatus message={error} className="text-sm" />}
       {caption === undefined ? null : <Text variant="caption">{caption}</Text>}
     </View>
   );

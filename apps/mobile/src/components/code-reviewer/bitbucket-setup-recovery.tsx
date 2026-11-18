@@ -1,4 +1,3 @@
-import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
@@ -13,6 +12,7 @@ import {
 } from '@/lib/code-reviewer-bitbucket';
 import { bitbucketConnectHref } from '@/lib/bitbucket-connect-navigation';
 import { useRefreshBitbucketRepositories } from '@/lib/hooks/use-bitbucket';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { assertSurfaceFailureHandled } from '@/lib/surface-feedback';
 import { cn } from '@/lib/utils';
@@ -36,7 +36,7 @@ export function BitbucketSetupRecovery({
   message: string;
   className?: string;
 }>) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const refresh = useRefreshBitbucketRepositories(scope);
   const { feedback, begin } = useSurfaceFeedback<BitbucketFailure>();
@@ -68,7 +68,7 @@ export function BitbucketSetupRecovery({
   };
 
   const openConnect = () => {
-    router.push(bitbucketConnectHref(scope));
+    pushOnce(bitbucketConnectHref(scope));
   };
 
   return (

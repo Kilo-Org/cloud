@@ -56,6 +56,7 @@ function ReadOnlyTrigger({ detail }: Readonly<{ detail: CloudTriggerDetail }>) {
             ? t('common.scheduled')
             : t('cloudAgent.triggers.activationWebhook')
         }
+        valueFace="text"
       />
       <KvRow label={t('common.agent')} value={detail.mode ?? t('common.unknown')} />
       <KvRow

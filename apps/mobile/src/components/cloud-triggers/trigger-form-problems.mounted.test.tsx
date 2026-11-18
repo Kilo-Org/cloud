@@ -23,6 +23,7 @@ import { TriggerFormBasics } from './trigger-form-basics';
 import { TriggerFormBehaviour } from './trigger-form-behaviour';
 
 vi.mock('react-native', () => ({
+  Platform: { OS: 'android' },
   Pressable: 'Pressable',
   Switch: 'Switch',
   TextInput: 'TextInput',

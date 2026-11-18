@@ -4,7 +4,7 @@ import { View } from 'react-native';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FormField } from '@/components/ui/form-field';
-import { Text } from '@/components/ui/text';
+import { RemainingCharactersCounter } from '@/components/ui/remaining-characters-counter';
 import { PROFILE_DESCRIPTION_MAX_LENGTH, PROFILE_NAME_MAX_LENGTH } from '@/lib/agent-profile-forms';
 
 /**
@@ -75,18 +75,7 @@ function BoundProfileField({
           onChangeText(value);
         }}
       />
-      {showsCounter ? (
-        <View className="flex-row justify-end">
-          {/* i18n-dup-ok: 'agentChat.composer.charactersRemaining_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules. */}
-          <Text
-            variant="caption"
-            className="font-normal"
-            accessibilityLabel={t('agentChat.composer.charactersRemaining', { count: remaining })}
-          >
-            {remaining}
-          </Text>
-        </View>
-      ) : null}
+      {showsCounter ? <RemainingCharactersCounter remaining={remaining} /> : null}
       {boundMessage === null ? null : (
         <AccessibleStatus message={boundMessage} tone="status" className="text-xs" />
       )}

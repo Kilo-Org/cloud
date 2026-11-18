@@ -446,7 +446,15 @@ export function ModelPickerOptionRow({
               </Text>
             ) : null}
             {option.displayId ? (
-              <Text selectable className="font-mono text-xs text-muted-foreground">
+              // The subtitle names a source, and a repository path can be long, so
+              // it stays one line: a wrapped path would make one row taller than
+              // its neighbours for a value the person reads at a glance.
+              <Text
+                selectable
+                numberOfLines={1}
+                ellipsizeMode="tail"
+                className="font-mono text-xs text-muted-foreground"
+              >
                 {option.displayId}
               </Text>
             ) : null}

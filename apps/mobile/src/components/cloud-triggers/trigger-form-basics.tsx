@@ -90,15 +90,15 @@ export function TriggerFormBasics({
         />
       ) : (
         <View className="gap-1">
-          <Text variant="muted">{t('cloudAgent.triggers.fieldName')}</Text>
+          <FormFieldLabel label={t('cloudAgent.triggers.fieldName')} />
           <Text variant="mono">{draft.name}</Text>
           <Text variant="caption">{t('cloudAgent.triggers.nameLocked')}</Text>
         </View>
       )}
 
-      <View className="gap-2">
-        <FormFieldLabel label={t('cloudAgent.triggers.fieldActivation')} />
-        {mode === 'create' ? (
+      {mode === 'create' ? (
+        <View className="gap-2">
+          <FormFieldLabel label={t('cloudAgent.triggers.fieldActivation')} />
           <SegmentedControl
             options={ACTIVATION_OPTIONS.map(option => ({
               value: option.value,
@@ -108,12 +108,15 @@ export function TriggerFormBasics({
             onChange={activate}
             accessibilityLabel={t('cloudAgent.triggers.fieldActivation')}
           />
-        ) : (
+        </View>
+      ) : (
+        <View className="gap-1">
+          <FormFieldLabel label={t('cloudAgent.triggers.fieldActivation')} />
           <Text>
             {isScheduled ? t('common.scheduled') : t('cloudAgent.triggers.activationWebhook')}
           </Text>
-        )}
-      </View>
+        </View>
+      )}
 
       {isScheduled && (
         <View className="gap-4">
@@ -167,7 +170,7 @@ export function TriggerFormBasics({
           />
         ) : (
           <>
-            <Text variant="muted">{t('common.repository')}</Text>
+            <FormFieldLabel label={t('common.repository')} />
             <Text variant="mono">{draft.repository}</Text>
             <Text variant="caption">{t('cloudAgent.triggers.repositoryLocked')}</Text>
           </>

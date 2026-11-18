@@ -258,6 +258,10 @@ export function OrganizationRequestLogsScreen() {
             inset="gutter"
             icon={DirectionalLogs}
             title={t('organization.requestLogs.emptyTitle')}
+            // The description points at the paging control, so it exists only
+            // while an older hour can still be reached; at the history bound
+            // the scoped title alone is the truth.
+            description={canStepOlder ? t('organization.requestLogs.emptyDescription') : undefined}
             refreshControl={refreshControl}
           />
         );

@@ -16,7 +16,7 @@ export const HOUR_MS = 60 * 60 * 1000;
  * mount-time anchor. The stepper keeps an hour of margin, so the oldest window
  * it opens still names a start time the server accepts.
  */
-const HISTORY_DAYS = 365;
+export const HISTORY_DAYS = 365;
 
 /** Whether a window ending at `windowEndMs` is inside the procedure's age bound. */
 export function canStepOlderTo(windowEndMs: number, anchorMs: number): boolean {

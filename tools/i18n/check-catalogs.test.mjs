@@ -499,6 +499,42 @@ test('rejects an empty translated value', () => {
   assert.match(found.join('\n'), /mobile\/ru: "agents\.title" is empty/);
 });
 
+test('accepts a bare-space sentence joiner in the markless Thai catalog', () => {
+  // Thai closes no sentence with a mark, so its joiner is the space it
+  // separates sentences with; the empty-value rule must not read it as
+  // untranslated.
+  const found = run({
+    language: 'th',
+    english: { common: { sentenceJoiner: '. ' }, agents: ENGLISH.agents },
+    translated: { common: { sentenceJoiner: ' ' }, agents: TRANSLATED.agents },
+    source: `${SOURCE}\nt('common.sentenceJoiner');`,
+  });
+  assert.deepEqual(found, []);
+});
+
+test('rejects a whitespace-only sentence joiner in a catalog that closes sentences', () => {
+  // A catalog whose copy carries sentence marks must name one in its joiner;
+  // a blanked joiner would silently join sentences with nothing.
+  const found = run({
+    english: { common: { sentenceJoiner: '. ' }, agents: ENGLISH.agents },
+    translated: { common: { sentenceJoiner: ' ' }, agents: TRANSLATED.agents },
+    source: `${SOURCE}\nt('common.sentenceJoiner');`,
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(found.join('\n'), /mobile\/ru: "common\.sentenceJoiner" is empty/);
+});
+
+test('rejects an empty sentence joiner in the markless Thai catalog', () => {
+  const found = run({
+    language: 'th',
+    english: { common: { sentenceJoiner: '. ' }, agents: ENGLISH.agents },
+    translated: { common: { sentenceJoiner: '' }, agents: TRANSLATED.agents },
+    source: `${SOURCE}\nt('common.sentenceJoiner');`,
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(found.join('\n'), /mobile\/th: "common\.sentenceJoiner" is empty/);
+});
+
 test('rejects a trailing space that English does not carry', () => {
   const found = run({
     translated: { agents: { ...TRANSLATED.agents, title: 'Localized agents ' } },

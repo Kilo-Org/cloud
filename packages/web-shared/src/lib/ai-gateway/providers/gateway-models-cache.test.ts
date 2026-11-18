@@ -8,7 +8,8 @@ jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   warnExceptInTest: (...args: unknown[]) => mockWarnExceptInTest(...args),
 }));
 
-import { ai_gateway_metadata_cache } from '@kilocode/db/schema';
+import { ai_gateway_config, ai_gateway_metadata_cache } from '@kilocode/db/schema';
+import { eq } from 'drizzle-orm';
 import * as drizzle from '@kilocode/web-shared/lib/drizzle';
 import { db, readDb, sql } from '@kilocode/web-shared/lib/drizzle';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
@@ -25,9 +26,10 @@ import type * as GatewayModelsCache from '@kilocode/web-shared/lib/ai-gateway/pr
 import {
   extractVercelInferenceProviderIdsFromModel,
   getCachedVercelInferenceProviderIdsForModel,
-  getLanguageModelIds,
+  getOpenRouterChatModelIds,
   getOpenRouterModelsMetadataFromDatabase,
   getSystemOneModelIds,
+  getVercelLanguageModelIds,
   getVercelModelsMetadataFromDatabase,
   isValidOpenRouterModelId,
   resolveOpenRouterModelAlias,
@@ -139,10 +141,10 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-describe('getLanguageModelIds', () => {
+describe('getVercelLanguageModelIds', () => {
   it('includes Vercel language models even when they have no endpoints', () => {
     expect(
-      getLanguageModelIds({
+      getVercelLanguageModelIds({
         'vendor/with-endpoints': gatewayModel({ id: 'vendor/with-endpoints', type: 'language' }),
         'vendor/no-endpoints': gatewayModel({
           id: 'vendor/no-endpoints',
@@ -157,14 +159,17 @@ describe('getLanguageModelIds', () => {
         }),
         'vendor/realtime': gatewayModel({ id: 'vendor/realtime', type: 'realtime' }),
         'vendor/evaluation': gatewayModel({ id: 'vendor/evaluation', type: 'evaluation' }),
+        'vendor/image-gen': gatewayModel({ id: 'vendor/image-gen', type: 'image' }),
       })
     ).toEqual(['vendor/with-endpoints', 'vendor/no-endpoints']);
   });
+});
 
-  it('includes only OpenRouter models that output text', () => {
+describe('getOpenRouterChatModelIds', () => {
+  it('includes only OpenRouter models that output text or images', () => {
     const outputs = (output_modalities: string[]) => ({ architecture: { output_modalities } });
     expect(
-      getLanguageModelIds({
+      getOpenRouterChatModelIds({
         'vendor/text': gatewayModel({ id: 'vendor/text', ...outputs(['text']) }),
         'vendor/image-text': gatewayModel({
           id: 'vendor/image-text',
@@ -174,7 +179,7 @@ describe('getLanguageModelIds', () => {
         'vendor/embed': gatewayModel({ id: 'vendor/embed', ...outputs(['embeddings']) }),
         'vendor/image': gatewayModel({ id: 'vendor/image', ...outputs(['image']) }),
       })
-    ).toEqual(['vendor/text', 'vendor/image-text']);
+    ).toEqual(['vendor/text', 'vendor/image-text', 'vendor/image']);
   });
 });
 
@@ -557,6 +562,18 @@ describe('isValidOpenRouterModelId', () => {
     await expect(isValidOpenRouterModelId('openai/gpt-4o')).resolves.toBe(true);
   });
 
+  it('accepts image-only models present in the database catalog', async () => {
+    await storeOpenRouterModels([
+      textModel('openai/gpt-4o'),
+      gatewayModel({
+        id: 'microsoft/mai-image-2.5',
+        architecture: { output_modalities: ['image'] },
+      }),
+    ]);
+
+    await expect(isValidOpenRouterModelId('microsoft/mai-image-2.5')).resolves.toBe(true);
+  });
+
   it('rejects ids missing from a non-empty database catalog', async () => {
     await storeOpenRouterModels([textModel('openai/gpt-4o')]);
 
@@ -676,6 +693,31 @@ describe('isValidOpenRouterModelId', () => {
     await expect(resolveOpenRouterModelAlias('~deepseek/deepseek-pro-latest')).resolves.toBe(
       'deepseek/deepseek-v4-pro-0813'
     );
+  });
+
+  it('resolves an OpenRouter alias to its stored target, falling back to the live target', async () => {
+    const alias = '~vendor/pinned-latest';
+    await storeOpenRouterModels([
+      gatewayModel({ id: alias, alias_target: { slug: 'vendor/pinned-new' } }),
+      gatewayModel({ id: 'vendor/pinned-old' }),
+      gatewayModel({ id: 'vendor/pinned-new' }),
+    ]);
+    await db.insert(ai_gateway_config).values({
+      latest_alias_targets: { aliases: [{ alias, target: 'vendor/pinned-old' }] },
+    });
+    try {
+      await expect(resolveOpenRouterModelAlias(alias)).resolves.toBe('vendor/pinned-old');
+
+      await db
+        .update(ai_gateway_config)
+        .set({ latest_alias_targets: null })
+        .where(eq(ai_gateway_config.id, 1));
+      startNextCacheWindow();
+
+      await expect(resolveOpenRouterModelAlias(alias)).resolves.toBe('vendor/pinned-new');
+    } finally {
+      await db.delete(ai_gateway_config).where(eq(ai_gateway_config.id, 1));
+    }
   });
 
   it('returns an unresolved OpenRouter alias unchanged', async () => {

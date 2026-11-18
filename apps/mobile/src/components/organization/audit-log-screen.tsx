@@ -63,19 +63,36 @@ const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAu
   const [expanded, setExpanded] = useState(false);
   const actor = entry.actor_email ?? entry.actor_name;
   const time = formatAuditTime(entry.created_at);
-  const meta = actor ? `${actor} · ${time}` : time;
   const eventName = auditActionLabel(t, entry.action);
   // The server's message for the creation action is "Organization <name>
   // created", which only restates the event name already shown above it. Every
   // row of this log belongs to this organization, so the row shows neither that
   // English sentence nor a name a later rename would change.
   const showsDetail = entry.action !== 'organization.created';
+  // The actor and the time render as two elements in one row, never one
+  // interpolated string: the row shrinks the actor, not the time, and each
+  // keeps its own reading order. One string put the localized date inside the
+  // left-to-right email run, so under Arabic its parts read out of order, and
+  // the single-line clamp put the ellipsis on the time — the part that tells
+  // the entries apart — while the repeated email stayed whole.
   const metaLine =
-    meta.length === 0 ? null : (
-      <Text variant="caption" numberOfLines={1}>
-        {meta}
-      </Text>
-    );
+    actor || time ? (
+      <View className="flex-row items-center gap-2">
+        {actor ? (
+          // RN defaults `flexShrink` to 0; `min-w-0 shrink` lets the long
+          // repeated email give up width and truncate instead of pushing the
+          // time off the line.
+          <Text variant="caption" className="min-w-0 shrink" numberOfLines={1}>
+            {actor}
+          </Text>
+        ) : null}
+        {time ? (
+          <Text variant="caption" className="shrink-0" numberOfLines={1}>
+            {time}
+          </Text>
+        ) : null}
+      </View>
+    ) : null;
   if (!showsDetail) {
     return (
       <Card className="mx-4">
@@ -98,7 +115,9 @@ const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAu
       accessibilityRole="button"
       // The clamp is visual only: a reader hears the whole event whether or not
       // the row is open.
-      accessibilityLabel={[eventName, entry.message, meta].filter(Boolean).join('. ')}
+      accessibilityLabel={[eventName, entry.message, [actor, time].filter(Boolean).join(', ')]
+        .filter(Boolean)
+        .join('. ')}
       accessibilityState={{ expanded }}
       className="mx-4 active:opacity-70"
     >

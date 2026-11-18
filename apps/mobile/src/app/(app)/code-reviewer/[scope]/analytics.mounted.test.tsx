@@ -29,9 +29,17 @@ type Dashboard = {
     suggestionFindings: number;
   }[];
   settings: { enabled: boolean };
+  coverage: {
+    enrolledCompletedReviews: number;
+    captured: number;
+    missing: number;
+    invalid: number;
+    omitted: number;
+  };
 };
 
 const queries = vi.hoisted(() => ({
+  connectivity: 'online' as 'online' | 'offline' | 'unknown',
   organizations: {
     data: [] as Membership[],
     isFetching: false,
@@ -42,6 +50,7 @@ const queries = vi.hoisted(() => ({
     isPending: false,
     isError: false,
     isFetching: false,
+    fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
     error: undefined as unknown,
     refetch: vi.fn<() => Promise<void>>(),
   },
@@ -56,6 +65,13 @@ const dashboard: Dashboard = {
   },
   repositories: [],
   settings: { enabled: true },
+  coverage: {
+    enrolledCompletedReviews: 13,
+    captured: 12,
+    missing: 1,
+    invalid: 0,
+    omitted: 0,
+  },
 };
 
 const denial = { data: { code: 'UNAUTHORIZED', httpStatus: 401 } };
@@ -93,6 +109,15 @@ vi.mock('@/lib/trpc', () => ({
       },
     },
   }),
+}));
+
+// The screen classifies its read through the shared body-state hook, which
+// subscribes to the probe-backed connectivity store. That store loads NetInfo
+// and therefore react-native's Flow sources, which this node project cannot
+// parse; the committed answer is all the screen needs, so it answers from the
+// per-case `queries.connectivity` instead of a constant `online`.
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => queries.connectivity,
 }));
 
 vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'InvalidRouteState' }));
@@ -185,6 +210,7 @@ function segmentedControl(renderer: TestRenderer.ReactTestRenderer, index: numbe
 }
 
 beforeEach(() => {
+  queries.connectivity = 'online';
   queries.organizations.data = [{ organizationId: 'org-drain', organizationName: 'Drain Labs' }];
   queries.organizations.isFetching = false;
   queries.organizations.refetch.mockReset();
@@ -192,6 +218,7 @@ beforeEach(() => {
   queries.dashboard.isPending = false;
   queries.dashboard.isError = false;
   queries.dashboard.isFetching = false;
+  queries.dashboard.fetchStatus = 'idle';
   queries.dashboard.error = undefined;
   queries.dashboard.refetch.mockReset();
   rememberedNames.clear();
@@ -321,6 +348,127 @@ describe('CodeReviewerAnalytics retryable failure', () => {
   });
 });
 
+describe('CodeReviewerAnalytics first read offline states', () => {
+  it('renders the retryable offline state instead of the skeleton when the first read is paused offline', () => {
+    // A confirmed offline pause never reaches react-query's error branch
+    // (`isPending` stays true), so a body switch keyed on `isError` alone kept
+    // the skeleton forever instead of offering Retry (finding).
+    queries.dashboard.data = undefined;
+    queries.dashboard.isPending = true;
+    queries.dashboard.fetchStatus = 'paused';
+    queries.connectivity = 'offline';
+    const renderer = mountScreen();
+
+    const errors = findByType(renderer.root, 'QueryErrorMock');
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.props.variant).toBe('offline');
+    expect(errors[0]?.props.title).toBe('Failed to load');
+    expect(typeof errors[0]?.props.onRetry).toBe('function');
+    expect(findByType(renderer.root, 'SkeletonMock')).toHaveLength(0);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps the skeleton while a first read is paused with connectivity unsettled', () => {
+    // The pause is real but not yet attributed to offline, so the read stays
+    // inside the classifier's loading state and the screen keeps its skeleton.
+    queries.dashboard.data = undefined;
+    queries.dashboard.isPending = true;
+    queries.dashboard.fetchStatus = 'paused';
+    queries.connectivity = 'unknown';
+    const renderer = mountScreen();
+
+    expect(findByType(renderer.root, 'QueryErrorMock')).toHaveLength(0);
+    expect(findByType(renderer.root, 'SkeletonMock')).not.toHaveLength(0);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('shows the skeleton while the first read is in flight', () => {
+    queries.dashboard.data = undefined;
+    queries.dashboard.isPending = true;
+    queries.dashboard.isFetching = true;
+    queries.dashboard.fetchStatus = 'fetching';
+    const renderer = mountScreen();
+
+    expect(findByType(renderer.root, 'QueryErrorMock')).toHaveLength(0);
+    expect(findByType(renderer.root, 'SkeletonMock')).not.toHaveLength(0);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
+describe('CodeReviewerAnalytics stale cache', () => {
+  it('keeps the metrics and offers Retry on the offline notice when the refresh pauses', () => {
+    queries.dashboard.fetchStatus = 'paused';
+    const renderer = mountScreen();
+
+    const notices = findByType(renderer.root, 'QueryErrorMock');
+    expect(notices).toHaveLength(1);
+    expect(notices[0]?.props.placement).toBe('top');
+    expect(notices[0]?.props.variant).toBe('offline');
+    const retry = notices[0]?.props.onRetry as (() => void) | undefined;
+    expect(typeof retry).toBe('function');
+    retry?.();
+    expect(queries.dashboard.refetch).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps the paused notice mounted while its Retry runs', () => {
+    queries.dashboard.fetchStatus = 'paused';
+    queries.dashboard.isFetching = true;
+    const renderer = mountScreen();
+
+    const notices = findByType(renderer.root, 'QueryErrorMock');
+    expect(notices).toHaveLength(1);
+    expect(notices[0]?.props.variant).toBe('offline');
+    expect(notices[0]?.props.isRetrying).toBe(true);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps the metrics and offers Retry when the refresh fails retryably', () => {
+    queries.dashboard.isError = true;
+    queries.dashboard.error = { data: { code: 'INTERNAL_SERVER_ERROR', httpStatus: 500 } };
+    const renderer = mountScreen();
+
+    const notices = findByType(renderer.root, 'QueryErrorMock');
+    expect(notices).toHaveLength(1);
+    expect(notices[0]?.props.placement).toBe('top');
+    expect(typeof notices[0]?.props.onRetry).toBe('function');
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('withholds Retry from a stale notice whose failure cannot recover', () => {
+    queries.dashboard.isError = true;
+    queries.dashboard.error = { data: { code: 'UNPROCESSABLE_CONTENT', httpStatus: 422 } };
+    const renderer = mountScreen();
+
+    const notices = findByType(renderer.root, 'QueryErrorMock');
+    expect(notices).toHaveLength(1);
+    expect(notices[0]?.props.placement).toBe('top');
+    expect(notices[0]?.props.onRetry).toBeUndefined();
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
 describe('CodeReviewerAnalytics period labels', () => {
   it('labels each period segment with its day unit and selects the 30-day window', () => {
     const renderer = mountScreen();
@@ -363,7 +511,7 @@ describe('CodeReviewerAnalytics empty state', () => {
     const offEmpty = findByType(offRenderer.root, 'EmptyStateMock')[0];
     expect(offEmpty?.props.title).toBe('Analytics is off for GitHub');
     expect(offEmpty?.props.description).toBe(
-      "Turn it on in the organization's settings on the web to record completed reviews."
+      'Organization billing roles can turn analytics on in the settings on the web to record completed reviews.'
     );
     expect(findByType(offRenderer.root, 'TextMock')).toHaveLength(0);
     expect(findByType(offRenderer.root, 'ConfigureRowMock')).toHaveLength(0);
@@ -396,6 +544,49 @@ describe('CodeReviewerAnalytics empty state', () => {
 
     act(() => {
       onRenderer.unmount();
+    });
+  });
+
+  it('explains what tracked reviews counts and names the uncounted amount beside the cards', () => {
+    queries.dashboard.data = dashboard;
+    const onRenderer = mountScreen();
+
+    const captions = findByType(onRenderer.root, 'TextMock')
+      .map(node => node.props.children)
+      .filter(child => typeof child === 'string');
+    expect(captions).toContain(
+      'Completed reviews that finished in this period with analytics turned on. Running and failed reviews are never counted.'
+    );
+    expect(captions).toContain('Not counted: 1 of 13 finished reviews without a captured result.');
+
+    act(() => {
+      onRenderer.unmount();
+    });
+
+    // Every completed review captured, so the caption says what tracked
+    // counts and nothing implies a problem.
+    queries.dashboard.data = {
+      ...dashboard,
+      coverage: {
+        ...dashboard.coverage,
+        captured: dashboard.coverage.enrolledCompletedReviews,
+        missing: 0,
+      },
+    };
+    const completeRenderer = mountScreen();
+
+    const completeCaptions = findByType(completeRenderer.root, 'TextMock')
+      .map(node => node.props.children)
+      .filter(child => typeof child === 'string');
+    expect(completeCaptions).toContain(
+      'Completed reviews that finished in this period with analytics turned on. Running and failed reviews are never counted.'
+    );
+    expect(completeCaptions).toContain(
+      'Not counted: 0 of 13 finished reviews without a captured result.'
+    );
+
+    act(() => {
+      completeRenderer.unmount();
     });
   });
 });

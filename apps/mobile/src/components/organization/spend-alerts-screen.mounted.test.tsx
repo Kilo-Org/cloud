@@ -13,6 +13,8 @@ import { i18n } from '@/i18n';
 import { SpendAlertsScreen } from '@/components/organization/spend-alerts-screen';
 import { thresholdError } from '@/components/organization/spend-alert-validators';
 import { formatList } from '@/lib/format';
+import { MIN_TAP_TARGET_DP, TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
+import { compiledLengthDp } from '@/test/native-dimensions';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
@@ -744,5 +746,28 @@ describe('SpendAlertsScreen push agreement', () => {
 
     expect(channelSwitches(renderer, i18n.t('notifications.push'))).toHaveLength(0);
     expect(pushOffRow(renderer)).toBeDefined();
+  });
+
+  it('carries the store touch target on the off-category push row itself', async () => {
+    const { renderer } = await mountLoaded({ pushCategoryEnabled: false });
+
+    // With the category off, each rule card swaps its push switch for a
+    // RowFrame aimed at Notifications. The row's own node carries the target,
+    // so no `hitSlop` band reaches across the Email switch above it.
+    const caption = i18n.t('spendAlerts.pushOffByCategory');
+    const rows = byType(renderer, 'Pressable').filter(
+      node => node.findAll(child => child.props.children === caption).length > 0
+    );
+    expect(rows).toHaveLength(2);
+
+    // The audit reads the control's laid-out node and `hitSlop` never widens
+    // it, so assert the box the installed Tailwind and react-native-css
+    // compilers emit for the classes, not a hand-written utility map.
+    for (const row of rows) {
+      expect(row.props.hitSlop).toBeUndefined();
+      const frame = await compiledLengthDp(row.props.className as string, 'minHeight');
+      expect(frame).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
+      expect(frame).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    }
   });
 });

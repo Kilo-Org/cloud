@@ -1,14 +1,12 @@
-import { Info, ShieldCheck } from '@/components/ui/icons';
+import { ShieldCheck } from '@/components/ui/icons';
 import { useState } from 'react';
-import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
-import { Text } from '@/components/ui/text';
+import { RoleRefusalNotice } from '@/components/security-agent/role-refusal-notice';
 import { EmptyState, StateAction } from '@/components/empty-state';
 import { GitHubIcon } from '@/components/icons/github-icon';
 import { CenteredState } from '@/components/centered-state';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
 import {
   openAuthorizationAndWaitForReturn,
@@ -50,8 +48,6 @@ export function SecurityAgentSetup<T>({
   resolveUrl,
   onConnected,
 }: Readonly<SecurityAgentSetupProps<T>>) {
-  const colors = useThemeColors();
-  const mutedDisabledInk = useMutedDisabledInk();
   const [connecting, setConnecting] = useState(false);
   /**
    * Why the last press could not continue. Rendered in this body and kept
@@ -110,18 +106,8 @@ export function SecurityAgentSetup<T>({
             // thing left to say. It keeps the action's own slot — the state's
             // one gap, full width — so a refusal that arrives after mount
             // changes what the block says without re-centring it under the
-            // reader's eyes. It is drawn as an info callout at the
-            // description's own size and colour: as a bare line in the action's
-            // gap it read as a footnote, the faintest text on the screen,
-            // leaving the state looking unfinished.
-            <View className="w-full flex-row items-start gap-2.5 rounded-lg border border-info-tile-border bg-info-tile-bg px-4 py-3">
-              <Info size={16} color={colors.mutedForeground} />
-              {/* The sentence takes `foreground`, not the description's muted
-                  token: on the light info tile the composite surface lifts that
-                  token to 4.45:1, under the 4.5 text floor the theme test holds
-                  it to. The size stays the description's. */}
-              <Text className="flex-1 text-sm text-foreground">{readOnlyNotice}</Text>
-            </View>
+            // reader's eyes.
+            <RoleRefusalNotice message={readOnlyNotice} />
           ) : (
             <StateAction
               label={buttonLabel}

@@ -45,7 +45,13 @@ type CollapsibleSectionProps = {
   className?: string;
   titleClassName?: string;
   contentClassName?: string;
-  children: ReactNode;
+  /**
+   * The section body, or a function that builds it. Pass the function when the
+   * body is expensive to build (a long list, per-row formatting): it is
+   * evaluated only inside the expanded branch, so a collapsed section costs
+   * nothing but its header. A plain node is still rendered as given.
+   */
+  children: ReactNode | (() => ReactNode);
 };
 
 /**
@@ -196,7 +202,10 @@ export function CollapsibleSection({
           entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))}
           className={cn('gap-3 pt-3', contentClassName)}
         >
-          {children}
+          {
+            // oxlint-disable-next-line anti-slop/no-runtime-typeof -- the children union has no non-typeof way to tell a body builder from a rendered node
+            typeof children === 'function' ? children() : children
+          }
         </Animated.View>
       )}
     </DisclosureLayout>

@@ -11,7 +11,6 @@ import { useEffectiveAgentProfile } from './use-effective-agent-profile';
 vi.mock('react-native', () => ({ View: 'View' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     agentProfiles: {
@@ -92,19 +91,19 @@ function body(root: TestRenderer.ReactTestInstance) {
 }
 
 describe('new-session environment feedback', () => {
-  it('renders loading feedback immediately without a false default, stale profile, or Retry', () => {
+  it('renders loading feedback immediately without a false default or Retry', () => {
     const root = renderRow({ isProfileLoading: true, profile: PROFILE });
 
-    expect(text(root)).toEqual(['Environment', 'Loading…', '\u00A0\n\u00A0']);
+    // The card is its title line: the loading copy is the one line it shows.
+    expect(text(root)).toEqual(['Environment', 'Loading…']);
     expect(root.findByProps({ children: 'Loading…' }).props).toMatchObject({
       accessibilityLiveRegion: 'polite',
       accessibilityState: { busy: true },
     });
-    expect(root.findAllByType('Skeleton')).toHaveLength(1);
     expect(root.findAllByType('Button')).toHaveLength(0);
   });
 
-  it('shows the resolved profile and summary without a loading indicator or extra action', () => {
+  it('shows the resolved profile and summary without an extra action', () => {
     const root = renderRow({ profile: PROFILE });
 
     expect(text(root)).toEqual([
@@ -112,20 +111,13 @@ describe('new-session environment feedback', () => {
       'Production',
       '2 vars · 1 MCP · 2 skills · 1 cmd · 2 setup cmds · 4 agents',
     ]);
-    expect(root.findAllByType('Skeleton')).toHaveLength(0);
     expect(root.findAllByType('Button')).toHaveLength(0);
   });
 
-  it('shows the default only after the query settles empty and hides the blank slot from accessibility', () => {
+  it('shows the default only after the query settles empty, on its title line alone', () => {
     const root = renderRow();
 
-    expect(text(root)).toEqual(['Environment', 'Default environment', '\u00A0\n\u00A0']);
-    expect(
-      root.findByProps({ importantForAccessibility: 'no-hide-descendants' }).props
-    ).toMatchObject({
-      accessibilityElementsHidden: true,
-    });
-    expect(root.findAllByType('Skeleton')).toHaveLength(0);
+    expect(text(root)).toEqual(['Environment', 'Default environment']);
     expect(root.findAllByType('Button')).toHaveLength(0);
   });
 
@@ -156,19 +148,18 @@ describe('new-session environment feedback', () => {
   });
 
   it.each([{ isProfileLoading: true }, { isProfileError: true }, {}])(
-    'reserves the two-line summary slot before a profile resolves: %j',
+    'renders a title line and no blank summary before a profile resolves: %j',
     next => {
       const root = renderRow(next);
-      const summary = body(root).findAllByType('Text')[1];
-      expect(summary?.props.numberOfLines).toBe(2);
-      // A one-line placeholder would let the row grow when the profile lands.
-      expect(summary?.props.children).toBe('\u00A0\n\u00A0');
-      // A summary that fits one line still occupies the placeholder's height.
-      expect(summary?.props.className).toContain('min-h-10');
+      const lines = body(root).findAllByType('Text');
+
+      expect(lines).toHaveLength(1);
+      expect(lines[0]?.props.numberOfLines).toBe(1);
+      expect(lines[0]?.props.children).not.toBe('');
     }
   );
 
-  it('keeps the placeholder when the profile has nothing configured', () => {
+  it('renders no summary line when the profile has nothing configured', () => {
     const root = renderRow({
       profile: {
         ...PROFILE,
@@ -181,27 +172,26 @@ describe('new-session environment feedback', () => {
       },
     });
 
-    const summary = body(root).findAllByType('Text')[1];
-    expect(summary?.props.children).toBe('\u00A0\n\u00A0');
-    expect(
-      root.findByProps({ importantForAccessibility: 'no-hide-descendants' }).props
-    ).toMatchObject({ accessibilityElementsHidden: true });
+    const lines = body(root).findAllByType('Text');
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.props.children).toBe('Production');
   });
 
   it.each([{ isProfileLoading: true }, { profile: PROFILE }, { isProfileError: true }, {}])(
-    'keeps the summary slot across a state swap: %j',
+    'keeps the body in place across a state swap: %j',
     next => {
       const pending = renderRow({ isProfileLoading: true });
       const slot = body(pending);
-      expect(pending.findByType('Skeleton').props.className).toContain('absolute inset-y-0');
 
       const root = renderRow(next);
       expect(body(root)).toBe(slot);
       const lines = slot.findAllByType('Text');
-      expect(lines).toHaveLength(2);
+      expect(lines.length).toBeGreaterThan(0);
       const [title, summary] = lines;
       expect(title?.props.numberOfLines).toBe(1);
-      expect(summary?.props.numberOfLines).toBe(2);
+      // Only the states that have counts render a summary, and it may wrap to
+      // two lines; a state without counts keeps its title line alone.
+      expect(summary?.props.numberOfLines === 2 || summary === undefined).toBe(true);
       for (const line of lines) {
         expect(line.props.className).toContain('text-sm leading-[1.25rem]');
         expect(line.props.children).not.toBe('');
@@ -249,7 +239,6 @@ describe('new-session environment feedback', () => {
 
         // A normal background refresh must keep the successful cached profile visible.
         expect(text(root)).toContain('Production');
-        expect(root.findAllByType('Skeleton')).toHaveLength(0);
         TestRenderer.act(() => {
           refresh.reject(new Error('Profile request failed'));
         });
@@ -273,7 +262,6 @@ describe('new-session environment feedback', () => {
         expect(text(root)).not.toContain("Couldn't load your environment");
         expect(text(root)).not.toContain('Production');
         expect(root.findAllByType('Button')).toHaveLength(0);
-        expect(root.findAllByType('Skeleton')).toHaveLength(1);
         expect(body(root)).toBe(slot);
 
         TestRenderer.act(() => {
@@ -292,7 +280,6 @@ describe('new-session environment feedback', () => {
           expect(text(root)).toContain(title);
         });
         expect(root.findAllByType('Button')).toHaveLength(outcome === 'error' ? 1 : 0);
-        expect(root.findAllByType('Skeleton')).toHaveLength(0);
         expect(body(root)).toBe(slot);
       }
     );

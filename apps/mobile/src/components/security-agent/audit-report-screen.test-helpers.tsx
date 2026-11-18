@@ -12,7 +12,7 @@
 // branches personal vs. org on the tRPC procedure, mirroring
 // use-security-agent.ts.
 
-import { createElement } from 'react';
+import { createElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { vi } from 'vitest';
 
@@ -66,7 +66,14 @@ vi.mock('@/components/empty-state', () => ({
 }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/security-agent/collapsible-section', () => ({
-  CollapsibleSection: 'CollapsibleSection',
+  // The real section resolves a function child inside its expanded branch; this
+  // suite renders that body (host element kept, so findByType still sees it).
+  CollapsibleSection: (props: { children: ReactNode | (() => ReactNode); title: string }) =>
+    createElement(
+      'CollapsibleSection',
+      { title: props.title },
+      typeof props.children === 'function' ? props.children() : props.children
+    ),
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));

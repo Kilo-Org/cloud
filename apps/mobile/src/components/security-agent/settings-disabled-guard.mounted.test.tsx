@@ -102,6 +102,9 @@ vi.mock('react-native', () => ({
     return props.children ?? null;
   },
 }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => 'online',
+}));
 vi.mock('expo-router', () => ({
   useRouter: () => router,
   useNavigation: () => navigation,

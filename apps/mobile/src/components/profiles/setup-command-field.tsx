@@ -9,8 +9,8 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FormField } from '@/components/ui/form-field';
 import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { INPUT_BOX_SHAPE_CLASS } from '@/components/ui/input';
+import { RemainingCharactersCounter } from '@/components/ui/remaining-characters-counter';
 import { SelectableText } from '@/components/ui/selectable-text';
-import { Text } from '@/components/ui/text';
 import { codeFieldTextStyle, hasRtlScript, withoutMonoFamily } from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
 
@@ -117,18 +117,7 @@ export function SetupCommandField({
         onSubmitEditing={onSubmitEditing}
         onChangeText={onChangeText}
       />
-      {showsCounter ? (
-        <View className="flex-row justify-end">
-          {/* i18n-dup-ok: 'agentChat.composer.charactersRemaining_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules. */}
-          <Text
-            variant="caption"
-            className="font-normal"
-            accessibilityLabel={t('agentChat.composer.charactersRemaining', { count: remaining })}
-          >
-            {remaining}
-          </Text>
-        </View>
-      ) : null}
+      {showsCounter ? <RemainingCharactersCounter remaining={remaining} /> : null}
       {showsBound ? (
         <AccessibleStatus
           message={t('profiles.commandAtLimit', { max: MAX_SETUP_COMMAND_LENGTH })}

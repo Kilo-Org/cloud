@@ -9,7 +9,9 @@
  *   GET|POST /authorize/org. Refresh exchanges stay silent.
  * - `onError` fires for every OAuth error response the provider produces; it
  *   emits `oauthSignIn failed` with the OAuth error code as `reason` and a
- *   fixed-vocabulary `detail` naming the cause behind that code.
+ *   fixed-vocabulary `detail` naming the cause behind that code. A refresh
+ *   exchange adds the account id from the presented token's prefix as a
+ *   property, so the failure is attributable without binding an identity.
  *
  * The reuse guard's own rejection never reaches `onError` (it answers from the
  * Durable Object before the provider runs), so it emits the same failed event
@@ -30,6 +32,16 @@ export type OAuthProviderError = Parameters<NonNullable<OAuthProviderOptions['on
 export type ProviderHookDeps = {
   /** Best-effort sign-in analytics; never awaited and never allowed to throw. */
   analytics?: McpAnalytics;
+  /**
+   * The account a stored hash of the presented refresh token belongs to. Only a
+   * hash match produces it, so it is verified attribution without an identity.
+   */
+  tokenUserId?: string | null;
+  /**
+   * The account named in the presented token's prefix when no stored hash
+   * matched. Caller-controlled, so it is reported as unverified attribution.
+   */
+  unverifiedTokenUserId?: string | null;
 };
 
 /**
@@ -103,7 +115,10 @@ const OAUTH_ERROR_DETAILS: Record<string, OAuthFailureDetail> = {
 /**
  * Emit `oauthSignIn failed` for a provider error response. The `reason` is the
  * OAuth error code and `detail` narrows it to a cause; no identity is known at
- * the error boundary, so it is always anonymous.
+ * the error boundary, so it is always anonymous. A refresh exchange carries the
+ * account a stored hash of the token belongs to as `tokenUserId`, or — when no
+ * hash matched — the caller-controlled prefix as `unverifiedTokenUserId`. Both
+ * are properties only: neither may bind a PostHog person.
  *
  * The own-property check keeps the vocabulary closed: a description of
  * `constructor` or `__proto__` must report `other`, not resolve through
@@ -118,5 +133,7 @@ export function onError(error: OAuthProviderError, deps: ProviderHookDeps = {}):
     identity: null,
     reason: error.code,
     detail,
+    ...(deps.tokenUserId ? { tokenUserId: deps.tokenUserId } : {}),
+    ...(deps.unverifiedTokenUserId ? { unverifiedTokenUserId: deps.unverifiedTokenUserId } : {}),
   });
 }

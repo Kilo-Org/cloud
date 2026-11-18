@@ -43,6 +43,9 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   Alert: { alert: vi.fn() },
 }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => 'online',
+}));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ back: vi.fn(), push: vi.fn(), replace: vi.fn() }),
 }));

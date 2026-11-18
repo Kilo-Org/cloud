@@ -91,6 +91,7 @@ export function SessionChangesReviewSheet({
         title={t('agentChat.sessionChanges.reviewTitle', { count: draft.comments.length })}
         onDone={onClose}
         doneLabel={t('common.close')}
+        underHandle
       />
       <View className="px-4 pb-6">
         <Text variant="caption" className="pb-1">

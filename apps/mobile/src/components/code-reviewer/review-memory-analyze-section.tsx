@@ -123,6 +123,7 @@ export function ReviewMemoryAnalyzeSection({
             }}
             doneLabel={t('common.close')}
             topInset="never"
+            underHandle
           />
           <ScrollView className="flex-1" contentContainerClassName="px-4 pb-6">
             <RowGroup>

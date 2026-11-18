@@ -20,10 +20,12 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
 import { formatList, formatNumber } from '@/lib/format';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { classifyReadFailureVariant } from '@/lib/query/read-failure-variant';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
 } from '@/lib/hooks/use-settings-back-guard';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import {
   useSaveSecurityAgentConfig,
   useSecurityAgentCapability,
@@ -80,6 +82,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
   const remediationSection = t('securityAgent.automation.autoRemediation');
   const canManage = useSecurityAgentCapability(scope).canManage;
   const config = useSecurityAgentConfig(scope);
+  const connectivity = useCommittedConnectivityStatus();
   // This screen announces the outcome itself: the queued count when the save
   // schedules existing findings, the generic confirmation otherwise.
   const save = useSaveSecurityAgentConfig(scope, { announceSaved: false, announceFailed: false });
@@ -205,7 +208,11 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
     return (
       <PlatformErrorScreen
         title={t('securityAgent.automation.title')}
-        variant="offline"
+        variant={classifyReadFailureVariant({
+          errors: [config.error],
+          isPaused: config.fetchStatus === 'paused',
+          connectivity,
+        })}
         message={t('securityAgent.automation.couldNotLoad')}
         onRetry={() => void config.refetch()}
       />

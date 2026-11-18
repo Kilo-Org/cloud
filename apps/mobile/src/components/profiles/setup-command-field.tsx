@@ -18,12 +18,12 @@ type SetupCommandFieldProps = Readonly<{
   label: string;
   /**
    * The gap between the label row and the field. Undefined keeps the ordinary
-   * compact block (`gap-1.5` on the block and inside `FormField`); a card that
-   * renders row controls over the label line passes
-   * `COMMAND_ROW_FIELD_GAP_CLASS`, which lands on both levels: the block's own
-   * root (label to value box) and, in the editable branch, `FormField`'s root
-   * where the label row and the `Input` are siblings — the pair the controls'
-   * 46 dp touch band has to clear.
+   * compact block (`gap-1.5` inside `FormField`); a card that renders row
+   * controls over the label line passes `COMMAND_ROW_FIELD_GAP_CLASS`, which
+   * lands on `FormField`'s root where the label row and the `Input` are
+   * siblings — the pair the controls' 46 dp touch band has to clear. The
+   * block's own root keeps `gap-1.5`, so the counter and at-limit line below
+   * the field keep the ordinary spacing.
    */
   gapClassName?: string;
   /** The viewer cannot manage this row: render the command as read-only text. */
@@ -90,8 +90,12 @@ export function SetupCommandField({
   const showsCounter = !disabled && remaining > 0 && remaining <= COMMAND_COUNTER_VISIBLE_REMAINING;
   const showsBound = !disabled && remaining <= 0;
 
+  // The caller's gap lands only on the label-to-input pair inside `FormField`:
+  // the block's own root keeps its compact `gap-1.5`, so the counter and the
+  // at-limit line below the field keep the ordinary spacing no matter what the
+  // controls' touch band needs above the input.
   return (
-    <View className={gapClassName ?? 'gap-1.5'}>
+    <View className="gap-1.5">
       <FormField
         label={label}
         gapClassName={gapClassName}

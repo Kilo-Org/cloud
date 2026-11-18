@@ -246,14 +246,16 @@ export function ProfileCommandsScreen({
       // The card's 14 dp padding holds the control band's reach into the top
       // edge; see tap-target.ts for the arithmetic. The band renders after the
       // card so it paints on top of the card's opaque background and Android
-      // dispatches its touches last. The field's own block carries the widened
-      // label-to-field gap that keeps the band above the field.
+      // dispatches its touches last. Only a manager's row carries the widened
+      // label-to-field gap, because only it renders the control band that
+      // needs the field's top edge pushed below the band; a viewer's read-only
+      // card keeps the ordinary compact block.
       <View key={`${generation}-${index}`} className="relative">
         <View className="rounded-lg bg-secondary p-4">
           <SetupCommandField
             command={command}
             label={commandLabel}
-            gapClassName={COMMAND_ROW_FIELD_GAP_CLASS}
+            gapClassName={canManage ? COMMAND_ROW_FIELD_GAP_CLASS : undefined}
             accessibilityHint={rowHint}
             readOnly={!canManage}
             onChangeText={value => {

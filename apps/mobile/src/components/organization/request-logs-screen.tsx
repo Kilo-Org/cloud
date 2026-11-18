@@ -336,6 +336,9 @@ export function OrganizationRequestLogsScreen() {
             })}
           </Text>
         </View>
+        {/* A step with no further hour is still readable: it takes the muted
+            fill and ink at full strength, where the outline variant would halve
+            both into the page. */}
         <View className="flex-row gap-2">
           <Button
             variant="outline"

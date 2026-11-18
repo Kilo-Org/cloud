@@ -93,6 +93,7 @@ async function fixture() {
   };
   let returnedStackId = stackId;
   let acceptWrongExternalId = false;
+  let customerRoleStatus: number | undefined;
   let metadataReads = 0;
   const roleExternalIds: Array<string | null> = [];
   const publicCa = 'synthetic-public-ca'.repeat(12);
@@ -126,6 +127,8 @@ async function fixture() {
         expect(body.get('RoleArn')).toBe(roleArn);
         const externalId = body.get('ExternalId');
         roleExternalIds.push(externalId);
+        if (customerRoleStatus !== undefined)
+          return new Response(null, { status: customerRoleStatus });
         return externalId === intent.externalId || acceptWrongExternalId
           ? sts('ASIACUSTOMER00000000')
           : new Response(null, { status: 403 });
@@ -175,6 +178,9 @@ async function fixture() {
     metadataReads: () => metadataReads,
     unsafeTrust() {
       acceptWrongExternalId = true;
+    },
+    failCustomerRole(status: number) {
+      customerRoleStatus = status;
     },
     wrongAccount() {
       returnedStackId = returnedStackId.replace('999999999999', '888888888888');
@@ -237,6 +243,14 @@ describe('AWS onboarding validation service', () => {
       code: 'byoc_aws_external_id_not_enforced',
     });
     expect(f.metadataReads()).toBe(0);
+  });
+  it.each([
+    [503, 'byoc_aws_setup_unavailable'],
+    [403, 'byoc_aws_role_unavailable'],
+  ])('reports a %s customer role assumption as %s', async (status, code) => {
+    const f = await fixture();
+    f.failCustomerRole(status);
+    await expect(f.api.validate(f.binding, f.envelope, roleArn)).rejects.toMatchObject({ code });
   });
   it('checks the expected account after a named lookup', async () => {
     const f = await fixture();

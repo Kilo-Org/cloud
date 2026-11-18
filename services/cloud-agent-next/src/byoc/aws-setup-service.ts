@@ -32,6 +32,12 @@ import {
 } from './aws-stack-validation.js';
 
 const TEMPLATE_LINK_TTL_SECONDS = 900;
+function transient(error: unknown): boolean {
+  return (
+    error instanceof AwsRequestError &&
+    (error.status === 0 || error.status === 429 || error.status >= 500)
+  );
+}
 async function safeRead<T>(read: () => Promise<T>, signal: AbortSignal): Promise<T> {
   for (let attempt = 0; ; attempt++) {
     signal.throwIfAborted();
@@ -39,10 +45,7 @@ async function safeRead<T>(read: () => Promise<T>, signal: AbortSignal): Promise
       return await read();
     } catch (error) {
       signal.throwIfAborted();
-      const transient =
-        error instanceof AwsRequestError &&
-        (error.status === 0 || error.status === 429 || error.status >= 500);
-      if (!transient || attempt >= 2) throw error;
+      if (!transient(error) || attempt >= 2) throw error;
       await new Promise(resolve => setTimeout(resolve, [100, 250][attempt]));
     }
   }
@@ -87,7 +90,9 @@ export function createAwsSetupService(
     let granted: AwsCredentials;
     try {
       granted = await safeRead(() => role(externalId), signal);
-    } catch {
+    } catch (error) {
+      // A timeout or AWS outage is not a trust-policy problem the customer can fix.
+      if (signal.aborted || transient(error)) throw new AwsSetupError('byoc_aws_setup_unavailable');
       throw new AwsSetupError('byoc_aws_role_unavailable');
     }
     const bytes = crypto.getRandomValues(new Uint8Array(64));
@@ -102,6 +107,11 @@ export function createAwsSetupService(
     ]);
     if (probes.some(probe => probe.status === 'fulfilled'))
       throw new AwsSetupError('byoc_aws_external_id_not_enforced');
+    if (
+      signal.aborted ||
+      probes.some(probe => probe.status === 'rejected' && transient(probe.reason))
+    )
+      throw new AwsSetupError('byoc_aws_setup_unavailable');
     if (
       probes.some(
         probe =>

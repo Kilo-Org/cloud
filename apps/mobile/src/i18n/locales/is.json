@@ -175,8 +175,9 @@
     "durationHourShort": "h",
     "changes": "Breytingar",
     "organizationTrialEnded": "Próftímabili fyrirtækisins er lokið og það er ekki með virka áætlun. Eigandi fyrirtækis getur uppfært greiðsluupplýsingar á kilo.ai og reynir síðan aftur.",
-    "organizationTrialEndedBilling": "Próftímabili fyrirtækisins er lokið og það er ekki með virka áætlun. Þú getur uppfært greiðsluupplýsingar og reynir síðan aftur.",
-    "privateRepositoryA11y": "{{name}}, einkakóðasafn"
+    "privateRepositoryA11y": "{{name}}, einkakóðasafn",
+    "legalDocumentEnglishOnly": "Þetta skjal er aðeins tiltækt á ensku.",
+    "organizationTrialEndedBilling": "Próftímabili fyrirtækisins er lokið og það er ekki með virka áætlun. Þú getur uppfært greiðsluupplýsingar og reynir síðan aftur."
   },
   "language": {
     "restarting": "Endurræsi til að virkja valið tungumál",
@@ -1355,7 +1356,8 @@
       "managedOnWeb": "Bitbucket-tengingu þessarar stofnunar er stjórnað á vefnum í tölvu.",
       "description": "Búðu til aðgangstóka fyrir vinnusvæðið með tilskildum heimildum og límdu hann hér fyrir neðan.",
       "scopes": "Reikningur: lestur · Geymslur: lestur/skrift · Samrunabeiðnir: lestur · Vefkrækjur: lestur/skrift",
-      "tokenPlaceholder": "Aðgangstóki vinnusvæðis"
+      "tokenPlaceholder": "Aðgangstóki vinnusvæðis",
+      "tokenRefused": "Bitbucket tók ekki við þessum aðgangstóka vinnusvæðis. Athugaðu að hann hafi heimildirnar hér fyrir ofan og reyndu svo aftur."
     },
     "scopeList": {
       "personalStillAvailable": "Persónulegar geymslur eru enn tiltækar hér fyrir neðan.",
@@ -1466,8 +1468,10 @@
       "repositoryLine": "Yfirferðir: {{reviews}} · Frávik: {{findings}}",
       "empty": "Engar yfirferðir með tölfræði ennþá",
       "emptyDescription": "Tölfræðin skráir yfirferðir sem klárast meðan hún er virk fyrir fyrirtækið.",
-      "off": "Tölfræðin er óvirk fyrir þetta fyrirtæki.",
-      "couldNotLoad": "Tókst ekki að sækja tölfræðina"
+      "offTitle": "Tölfræðin er óvirk fyrir {{platform}}",
+      "offDescription": "Kveiktu á henni í stillingum félags á vefnum til að skrá yfirferðir sem klárast.",
+      "couldNotLoad": "Tókst ekki að sækja tölfræðina",
+      "off": "Tölfræðin er óvirk fyrir þetta fyrirtæki."
     },
     "council": {
       "title": "Ráðsyfirferð",
@@ -3463,7 +3467,6 @@
     },
     "settingsOnWeb": {
       "title": "Stillingar félags á vefnum",
-      "integrations": "Samþættingar á vefnum",
       "usageDetails": "Upplýsingar um notkun",
       "providersAndModels": "Veitur og líkön",
       "groups": "Hópar",
@@ -3473,8 +3476,21 @@
       "dataCollection": "Gagnasöfnun",
       "auditLogs": "Endurskoðunarskrár",
       "requestLogs": "Beiðnaskrár",
+      "integrations": "Samþættingar á vefnum",
       "subOrganizations": "Undirfélög",
       "distributeFunds": "Dreifa fjármunum"
+    },
+    "requestLogs": {
+      "hint": "Beiðnir frá klukkustundinni fyrir lok tímabilsins, nýjustu fyrst.",
+      "older": "Fyrri klukkustund",
+      "newer": "Næsta klukkustund",
+      "truncated": "Fleiri beiðnir eru á þessari klukkustund en listinn sýnir.",
+      "emptyTitle": "Engar beiðnir",
+      "emptyDescription": "Engar gáttarbeiðnir voru á þessari klukkustund.",
+      "loadError": "Ekki tókst að sækja beiðnaskrár.",
+      "permissionDenied": "Aðeins eigandi, stjórnandi eða greiðslustjóri félags getur lesið beiðnaskrár þess.",
+      "tokens": "{{input}} inn · {{output}} út",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Inntakstókar",
@@ -4528,6 +4544,8 @@
     "topModels": "Mest notuðu líkön",
     "topFeatures": "Mest notaðir eiginleikar",
     "emptyTitle": "Engin notkun á þessu tímabili",
+    "unavailableTitle": "Notkun ekki tiltæk",
+    "unavailableDescription": "Þetta vinnusvæði tilkynnir ekki notkun. Að reyna aftur mun ekki hjálpa.",
     "orgSelfNotice": "Þú sérð þína eigin notkun í þessu fyrirtæki.",
     "viewDetails": "Skoða upplýsingar um notkun"
   },

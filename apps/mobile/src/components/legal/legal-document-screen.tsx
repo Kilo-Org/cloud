@@ -7,6 +7,7 @@ import { MarkdownText } from '@/components/agents/markdown-text';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Text } from '@/components/ui/text';
 import { useLegalDocument } from '@/lib/hooks/use-legal-document';
 import { type LegalDocument } from '@/lib/legal-document';
 import { useSideInsetStyle } from '@/lib/screen-insets';
@@ -33,10 +34,14 @@ export function LegalDocumentScreen({
   document,
   group,
 }: Readonly<{ document: LegalDocument; group: LegalDocumentGroup }>) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const router = useRouter();
   const { state, retry } = useLegalDocument(document);
   const sideInsetStyle = useSideInsetStyle();
+
+  // Legal copy ships published English text only, while the app's own copy is
+  // localized, so readers of another app language deserve the heads-up.
+  const showsEnglishOnlyNotice = (i18n.resolvedLanguage ?? i18n.language) !== 'en';
 
   // The documents cross-reference each other. Both stay in the app: opening the
   // web page would hand the reader the marketing site's chrome, pricing links
@@ -99,6 +104,13 @@ export function LegalDocumentScreen({
         contentContainerClassName="px-5 pt-4 pb-10"
         showsVerticalScrollIndicator={false}
       >
+        {showsEnglishOnlyNotice ? (
+          <View className="mb-4 rounded-lg border border-border bg-secondary p-3">
+            <Text className="text-base text-foreground">
+              {t('common.legalDocumentEnglishOnly')}
+            </Text>
+          </View>
+        ) : null}
         <MarkdownText value={state.html} onPressLink={openInContentLink} />
       </ScrollView>
     );

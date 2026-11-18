@@ -175,8 +175,9 @@
     "durationHourShort": "h",
     "changes": "Změny",
     "organizationTrialEnded": "Zkušební období organizace skončilo a organizace nemá žádný aktivní plán. Vlastník organizace může aktualizovat fakturaci na kilo.ai a poté to zkuste znovu.",
-    "organizationTrialEndedBilling": "Zkušební období organizace skončilo a organizace nemá žádný aktivní plán. Fakturaci můžete aktualizovat a poté to zkuste znovu.",
-    "privateRepositoryA11y": "{{name}}, soukromý repozitář"
+    "privateRepositoryA11y": "{{name}}, soukromý repozitář",
+    "legalDocumentEnglishOnly": "Tento dokument je k dispozici pouze v angličtině.",
+    "organizationTrialEndedBilling": "Zkušební období organizace skončilo a organizace nemá žádný aktivní plán. Fakturaci můžete aktualizovat a poté to zkuste znovu."
   },
   "language": {
     "restarting": "Aplikace se restartuje kvůli změně jazyka",
@@ -1401,7 +1402,8 @@
       "managedOnWeb": "Připojení Bitbucket této organizace se spravuje na webu z počítače.",
       "description": "Vytvořte přístupový token pracovního prostoru s požadovanými oprávněními a vložte jej níže.",
       "scopes": "Účet: čtení · Repozitáře: čtení/zápis · PR: čtení · Webhooky: čtení/zápis",
-      "tokenPlaceholder": "Přístupový token pracovního prostoru"
+      "tokenPlaceholder": "Přístupový token pracovního prostoru",
+      "tokenRefused": "Bitbucket tento token pracovního prostoru nepřijal. Zkontrolujte, že má výše uvedená oprávnění, a poté to zkuste znovu."
     },
     "scopeList": {
       "personalStillAvailable": "Osobní repozitáře jsou stále k dispozici níže.",
@@ -1514,8 +1516,10 @@
       "repositoryLine": "Kontroly: {{reviews}} · Nálezy: {{findings}}",
       "empty": "Zatím žádné kontroly s analytikou",
       "emptyDescription": "Analytika zaznamenává dokončené kontroly, pokud je pro organizaci zapnutá.",
-      "off": "Analytika je pro tuto organizaci vypnutá.",
-      "couldNotLoad": "Analytiku se nepodařilo načíst"
+      "offTitle": "Analytika je pro {{platform}} vypnutá",
+      "offDescription": "Zapněte analytiku v nastavení organizace na webu, aby zaznamenávala dokončené kontroly.",
+      "couldNotLoad": "Analytiku se nepodařilo načíst",
+      "off": "Analytika je pro tuto organizaci vypnutá."
     },
     "council": {
       "title": "Kontrola radou",
@@ -3577,7 +3581,6 @@
     },
     "settingsOnWeb": {
       "title": "Nastavení organizace na webu",
-      "integrations": "Integrace na webu",
       "usageDetails": "Podrobnosti o využití",
       "providersAndModels": "Poskytovatelé a modely",
       "groups": "Skupiny",
@@ -3587,8 +3590,21 @@
       "dataCollection": "Shromažďování dat",
       "auditLogs": "Auditní protokoly",
       "requestLogs": "Protokoly požadavků",
+      "integrations": "Integrace na webu",
       "subOrganizations": "Podorganizace",
       "distributeFunds": "Rozdělit prostředky"
+    },
+    "requestLogs": {
+      "hint": "Požadavky z hodiny před koncem časového okna, od nejnovějších.",
+      "older": "Starší hodina",
+      "newer": "Novější hodina",
+      "truncated": "V této hodině je více požadavků, než seznam zobrazuje.",
+      "emptyTitle": "Žádné požadavky",
+      "emptyDescription": "V této hodině nejsou žádné požadavky na bránu.",
+      "loadError": "Protokoly požadavků se nepodařilo načíst.",
+      "permissionDenied": "Protokoly požadavků organizace si může prohlížet jen její vlastník, administrátor nebo správce fakturace.",
+      "tokens": "{{input}} vstup · {{output}} výstup",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Vstupní tokeny",
@@ -4668,6 +4684,8 @@
     "topModels": "Nejpoužívanější modely",
     "topFeatures": "Nejpoužívanější funkce",
     "emptyTitle": "V tomto období žádné využití",
+    "unavailableTitle": "Využití není k dispozici",
+    "unavailableDescription": "Tento pracovní prostor nevykazuje využití. Opakování nepomůže.",
     "orgSelfNotice": "Vidíte své vlastní využití v této organizaci.",
     "viewDetails": "Zobrazit podrobnosti o využití"
   },

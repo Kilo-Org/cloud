@@ -175,8 +175,9 @@
     "durationHourShort": "h",
     "changes": "Muudatused",
     "organizationTrialEnded": "Organisatsiooni prooviperiood on lõppenud ja sellel pole aktiivset paketti. Organisatsiooni omanik saab arveldust kilo.ai keskkonnas uuendada ja seejärel uuesti proovida.",
-    "organizationTrialEndedBilling": "Organisatsiooni prooviperiood on lõppenud ja sellel pole aktiivset paketti. Saad arveldust uuendada ja seejärel uuesti proovida.",
-    "privateRepositoryA11y": "{{name}}, privaatne repositoorium"
+    "privateRepositoryA11y": "{{name}}, privaatne repositoorium",
+    "legalDocumentEnglishOnly": "See dokument on saadaval ainult inglise keeles.",
+    "organizationTrialEndedBilling": "Organisatsiooni prooviperiood on lõppenud ja sellel pole aktiivset paketti. Saad arveldust uuendada ja seejärel uuesti proovida."
   },
   "language": {
     "restarting": "Keele vahetamiseks taaskäivitatakse rakendus",
@@ -1355,7 +1356,8 @@
       "managedOnWeb": "Selle organisatsiooni Bitbucketi ühendust hallatakse arvutis veebi kaudu.",
       "description": "Loo nõutavate õigustega tööruumi juurdepääsutunnus ja kleebi see allolevale väljale.",
       "scopes": "Konto: lugemine · Hoidlad: lugemine/kirjutamine · Tõmbetaotlused: lugemine · Veebihaagid: lugemine/kirjutamine",
-      "tokenPlaceholder": "Tööruumi juurdepääsutunnus"
+      "tokenPlaceholder": "Tööruumi juurdepääsutunnus",
+      "tokenRefused": "Bitbucket ei võtnud seda tööruumi juurdepääsutunnust vastu. Kontrolli, et sellel oleksid ülaltoodud õigused, ja proovi seejärel uuesti."
     },
     "scopeList": {
       "personalStillAvailable": "Isiklikud hoidlad on allpool siiski saadaval.",
@@ -1466,8 +1468,10 @@
       "repositoryLine": "Ülevaatused: {{reviews}} · Leiud: {{findings}}",
       "empty": "Analüütikaga ülevaatusi veel pole",
       "emptyDescription": "Analüütika salvestab lõpetatud ülevaatused, kui see on organisatsioonis lubatud.",
-      "off": "Analüütika on selles organisatsioonis välja lülitatud.",
-      "couldNotLoad": "Analüütikat ei õnnestunud laadida"
+      "offTitle": "Analüütika on platvormil {{platform}} välja lülitatud",
+      "offDescription": "Lülita see sisse organisatsiooni seadetes veebis, et salvestada lõpetatud ülevaatused.",
+      "couldNotLoad": "Analüütikat ei õnnestunud laadida",
+      "off": "Analüütika on selles organisatsioonis välja lülitatud."
     },
     "council": {
       "title": "Nõukogu ülevaatus",
@@ -3463,7 +3467,6 @@
     },
     "settingsOnWeb": {
       "title": "Organisatsiooni seaded veebis",
-      "integrations": "Integratsioonid veebis",
       "usageDetails": "Kasutuse üksikasjad",
       "providersAndModels": "Teenusepakkujad ja mudelid",
       "groups": "Grupid",
@@ -3473,8 +3476,21 @@
       "dataCollection": "Andmete kogumine",
       "auditLogs": "Auditilogid",
       "requestLogs": "Päringulogid",
+      "integrations": "Integratsioonid veebis",
       "subOrganizations": "Alamorganisatsioonid",
       "distributeFunds": "Jaota vahendeid"
+    },
+    "requestLogs": {
+      "hint": "Akna lõpule eelnenud tunni päringud, uusimad eespool.",
+      "older": "Varasem tund",
+      "newer": "Hilisem tund",
+      "truncated": "Selles tunnis on rohkem päringuid, kui loendis kuvatakse.",
+      "emptyTitle": "Päringuid pole",
+      "emptyDescription": "Selles tunnis pole lüüsipäringuid.",
+      "loadError": "Päringulogide laadimine ebaõnnestus.",
+      "permissionDenied": "Päringulogisid saavad lugeda ainult organisatsiooni omanik, administraator või arvelduse haldur.",
+      "tokens": "{{input}} sisse · {{output}} välja",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Sisendtokenid",
@@ -4528,6 +4544,8 @@
     "topModels": "Enimkasutatud mudelid",
     "topFeatures": "Enimkasutatud funktsioonid",
     "emptyTitle": "Sel perioodil kasutust pole",
+    "unavailableTitle": "Kasutus pole saadaval",
+    "unavailableDescription": "See tööruum ei edasta kasutust. Uuesti proovimine ei aita.",
     "orgSelfNotice": "Näed oma kasutust selles organisatsioonis.",
     "viewDetails": "Vaata kasutuse üksikasju"
   },

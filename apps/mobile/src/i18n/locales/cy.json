@@ -175,8 +175,9 @@
     "durationHourShort": "h",
     "changes": "Newidiadau",
     "organizationTrialEnded": "Mae treial y sefydliad wedi dod i ben ac nid oes ganddo gynllun gweithredol. Gall perchennog sefydliad ddiweddaru bilio ar kilo.ai, ac yna rhoi cynnig arall arni.",
-    "organizationTrialEndedBilling": "Mae treial y sefydliad wedi dod i ben ac nid oes ganddo gynllun gweithredol. Gallwch ddiweddaru bilio, ac yna rhoi cynnig arall arni.",
-    "privateRepositoryA11y": "{{name}}, yn repositori preifat"
+    "privateRepositoryA11y": "{{name}}, yn repositori preifat",
+    "legalDocumentEnglishOnly": "Dim ond yn Saesneg y mae'r ddogfen hon ar gael.",
+    "organizationTrialEndedBilling": "Mae treial y sefydliad wedi dod i ben ac nid oes ganddo gynllun gweithredol. Gallwch ddiweddaru bilio, ac yna rhoi cynnig arall arni."
   },
   "language": {
     "restarting": "Yn ailgychwyn i newid yr iaith",
@@ -1447,7 +1448,8 @@
       "managedOnWeb": "Caiff cysylltiad Bitbucket y sefydliad hwn ei reoli ar y we o gyfrifiadur.",
       "description": "Crëwch docyn mynediad gweithle gyda'r cwmpasau gofynnol a'i ludo isod.",
       "scopes": "Cyfrif: darllen · Ystorfeydd: darllen/ysgrifennu · Ceisiadau tynnu: darllen · Bachau gwe: darllen/ysgrifennu",
-      "tokenPlaceholder": "Tocyn mynediad gweithle"
+      "tokenPlaceholder": "Tocyn mynediad gweithle",
+      "tokenRefused": "Ni dderbyniodd Bitbucket y tocyn mynediad gweithle hwn. Gwiriwch fod ganddo'r cwmpasau uchod, yna ceisiwch eto."
     },
     "scopeList": {
       "personalStillAvailable": "Mae ystorfeydd personol yn dal ar gael isod.",
@@ -1562,8 +1564,10 @@
       "repositoryLine": "Adolygiadau: {{reviews}} · Canfyddiadau: {{findings}}",
       "empty": "Dim adolygiadau â dadansoddeg eto",
       "emptyDescription": "Mae dadansoddeg yn cofnodi adolygiadau a gwblhawyd tra bo'r nodwedd wedi'i galluogi ar gyfer y sefydliad.",
-      "off": "Mae dadansoddeg wedi'i diffodd ar gyfer y sefydliad hwn.",
-      "couldNotLoad": "Methwyd llwytho'r dadansoddeg"
+      "offTitle": "Mae dadansoddeg wedi'i diffodd ar gyfer {{platform}}",
+      "offDescription": "Trowch hi ymlaen yng ngosodiadau'r sefydliad ar y we i gofnodi adolygiadau a gwblhawyd.",
+      "couldNotLoad": "Methwyd llwytho'r dadansoddeg",
+      "off": "Mae dadansoddeg wedi'i diffodd ar gyfer y sefydliad hwn."
     },
     "council": {
       "title": "Adolygiad cyngor",
@@ -3691,7 +3695,6 @@
     },
     "settingsOnWeb": {
       "title": "Gosodiadau'r sefydliad ar y we",
-      "integrations": "Integreiddiadau ar y we",
       "usageDetails": "Manylion defnydd",
       "providersAndModels": "Darparwyr a modelau",
       "groups": "Grwpiau",
@@ -3701,8 +3704,21 @@
       "dataCollection": "Casglu data",
       "auditLogs": "Logiau archwilio",
       "requestLogs": "Logiau ceisiadau",
+      "integrations": "Integreiddiadau ar y we",
       "subOrganizations": "Is-sefydliadau",
       "distributeFunds": "Dosbarthu arian"
+    },
+    "requestLogs": {
+      "hint": "Ceisiadau o'r awr cyn i'r ffenestr ddod i ben, y diweddaraf yn gyntaf.",
+      "older": "Awr gynharach",
+      "newer": "Awr ddiweddarach",
+      "truncated": "Mae gan yr awr hon fwy o geisiadau nag y mae'r rhestr yn eu dangos.",
+      "emptyTitle": "Dim ceisiadau",
+      "emptyDescription": "Does dim ceisiadau porth yn yr awr hon.",
+      "loadError": "Methu llwytho logiau ceisiadau.",
+      "permissionDenied": "Dim ond perchennog, gweinyddwr neu reolwr bilio sefydliad all ddarllen ei logiau ceisiadau.",
+      "tokens": "{{input}} i mewn · {{output}} allan",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Tocynnau mewnbwn",
@@ -4808,6 +4824,8 @@
     "topModels": "Prif fodelau",
     "topFeatures": "Prif nodweddion",
     "emptyTitle": "Dim defnydd yn y cyfnod hwn",
+    "unavailableTitle": "Nid yw defnydd ar gael",
+    "unavailableDescription": "Nid yw'r weithfan hon yn adrodd defnydd. Ni fydd ceisio eto yn helpu.",
     "orgSelfNotice": "Rydych chi'n gweld eich defnydd eich hun yn y sefydliad hwn.",
     "viewDetails": "Gweld manylion defnydd"
   },

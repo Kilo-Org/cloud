@@ -175,8 +175,9 @@
     "durationHourShort": "h",
     "changes": "Wysigings",
     "organizationTrialEnded": "Die organisasie se proeftydperk het geëindig en dit het geen aktiewe plan nie. 'n Organisasie-eienaar kan die fakturering by kilo.ai opdateer en dan weer probeer.",
-    "organizationTrialEndedBilling": "Die organisasie se proeftydperk het geëindig en dit het geen aktiewe plan nie. Jy kan die fakturering opdateer en dan weer probeer.",
-    "privateRepositoryA11y": "{{name}}, privaat bewaarplek"
+    "privateRepositoryA11y": "{{name}}, privaat bewaarplek",
+    "legalDocumentEnglishOnly": "Hierdie dokument is slegs in Engels beskikbaar.",
+    "organizationTrialEndedBilling": "Die organisasie se proeftydperk het geëindig en dit het geen aktiewe plan nie. Jy kan die fakturering opdateer en dan weer probeer."
   },
   "language": {
     "restarting": "Herbegin om die taal toe te pas",
@@ -1355,7 +1356,8 @@
       "managedOnWeb": "Hierdie organisasie se Bitbucket-verbinding word op die web vanaf 'n rekenaar bestuur.",
       "description": "Skep 'n toegangstoken vir die werkruimte met die vereiste toestemmings en plak dit hieronder.",
       "scopes": "Rekening: lees · Bewaarplekke: lees/skryf · Trekversoeke: lees · Webhake: lees/skryf",
-      "tokenPlaceholder": "Toegangstoken vir die werkruimte"
+      "tokenPlaceholder": "Toegangstoken vir die werkruimte",
+      "tokenRefused": "Bitbucket het nie hierdie toegangstoken vir die werkruimte aanvaar nie. Kontroleer dat dit die toestemmings hierbo het en probeer dan weer."
     },
     "scopeList": {
       "personalStillAvailable": "Persoonlike bewaarplekke is steeds hieronder beskikbaar.",
@@ -1466,8 +1468,10 @@
       "repositoryLine": "Hersienings: {{reviews}} · Bevindings: {{findings}}",
       "empty": "Nog geen hersienings met ontleding nie",
       "emptyDescription": "Ontleding teken voltooide hersienings aan terwyl dit vir die organisasie geaktiveer is.",
-      "off": "Ontleding is af vir hierdie organisasie.",
-      "couldNotLoad": "Kon nie ontleding laai nie"
+      "offTitle": "Ontleding is af vir {{platform}}",
+      "offDescription": "Skakel dit aan in die organisasie-instellings op die web om voltooide hersienings aan te teken.",
+      "couldNotLoad": "Kon nie ontleding laai nie",
+      "off": "Ontleding is af vir hierdie organisasie."
     },
     "council": {
       "title": "Raadhersiening",
@@ -3463,7 +3467,6 @@
     },
     "settingsOnWeb": {
       "title": "Organisasie-instellings op die web",
-      "integrations": "Integrasies op die web",
       "usageDetails": "Gebruiksbesonderhede",
       "providersAndModels": "Verskaffers en modelle",
       "groups": "Groepe",
@@ -3473,8 +3476,21 @@
       "dataCollection": "Data-insameling",
       "auditLogs": "Ouditlogs",
       "requestLogs": "Versoeklogs",
+      "integrations": "Integrasies op die web",
       "subOrganizations": "Sub-organisasies",
       "distributeFunds": "Versprei fondse"
+    },
+    "requestLogs": {
+      "hint": "Versoeke uit die uur voordat die venster eindig, nuutste eerste.",
+      "older": "Vroeër uur",
+      "newer": "Later uur",
+      "truncated": "Hierdie uur het meer versoeke as wat die lys wys.",
+      "emptyTitle": "Geen versoeke nie",
+      "emptyDescription": "Hierdie uur het geen gateway-versoeke nie.",
+      "loadError": "Kon nie versoeklogs laai nie.",
+      "permissionDenied": "Slegs 'n organisasie-eienaar, -administrateur of -faktuurbestuurder kan die organisasie se versoeklogs lees.",
+      "tokens": "{{input}} in · {{output}} uit",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Invoertekens",
@@ -4528,6 +4544,8 @@
     "topModels": "Topmodelle",
     "topFeatures": "Topfunksies",
     "emptyTitle": "Geen gebruik in hierdie tydperk nie",
+    "unavailableTitle": "Gebruik is nie beskikbaar nie",
+    "unavailableDescription": "Hierdie werkruimte rapporteer nie gebruik nie. Om weer te probeer sal nie help nie.",
     "orgSelfNotice": "Jy sien jou eie gebruik in hierdie organisasie.",
     "viewDetails": "Bekyk gebruiksbesonderhede"
   },

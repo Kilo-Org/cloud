@@ -175,8 +175,9 @@
     "durationHourShort": "h",
     "changes": "Wijzigingen",
     "organizationTrialEnded": "De proefperiode van de organisatie is afgelopen en er is geen actief abonnement. Een eigenaar van de organisatie kan de facturering bijwerken op kilo.ai en het daarna opnieuw proberen.",
-    "organizationTrialEndedBilling": "De proefperiode van de organisatie is afgelopen en er is geen actief abonnement. Je kunt de facturering bijwerken en het daarna opnieuw proberen.",
-    "privateRepositoryA11y": "{{name}}, privé repository"
+    "privateRepositoryA11y": "{{name}}, privé repository",
+    "legalDocumentEnglishOnly": "Dit document is alleen beschikbaar in het Engels.",
+    "organizationTrialEndedBilling": "De proefperiode van de organisatie is afgelopen en er is geen actief abonnement. Je kunt de facturering bijwerken en het daarna opnieuw proberen."
   },
   "language": {
     "restarting": "Opnieuw starten om de taal in te stellen",
@@ -677,7 +678,8 @@
       "managedOnWeb": "De Bitbucket-verbinding van deze organisatie wordt via het web op een computer beheerd.",
       "description": "Maak een toegangstoken voor de werkruimte met de vereiste rechten en plak het hieronder.",
       "scopes": "Vereiste rechten: account lezen, repositories lezen en schrijven, PR's lezen en webhooks lezen en schrijven.",
-      "tokenPlaceholder": "Toegangstoken voor de werkruimte"
+      "tokenPlaceholder": "Toegangstoken voor de werkruimte",
+      "tokenRefused": "Bitbucket heeft dit toegangstoken voor de werkruimte niet geaccepteerd. Controleer of het de rechten hierboven heeft en probeer het daarna opnieuw."
     },
     "followReviewMd": "REVIEW.md volgen",
     "followReviewMdSubtitle": "Volg de REVIEW.md-instructiebestanden per repository",
@@ -923,8 +925,10 @@
       "repositoryLine": "Reviews: {{reviews}} · Bevindingen: {{findings}}",
       "empty": "Nog geen reviews met statistieken",
       "emptyDescription": "Statistieken leggen afgeronde reviews vast zolang ze voor de organisatie zijn ingeschakeld.",
-      "off": "Statistieken staan uit voor deze organisatie.",
-      "couldNotLoad": "Kan statistieken niet laden"
+      "offTitle": "Statistieken staan uit voor {{platform}}",
+      "offDescription": "Schakel de statistieken in bij de organisatie-instellingen op het web om afgeronde reviews vast te leggen.",
+      "couldNotLoad": "Kan statistieken niet laden",
+      "off": "Statistieken staan uit voor deze organisatie."
     },
     "council": {
       "title": "Panelbeoordeling",
@@ -3468,7 +3472,6 @@
     },
     "settingsOnWeb": {
       "title": "Organisatie-instellingen op het web",
-      "integrations": "Integraties op het web",
       "usageDetails": "Gebruiksgegevens",
       "providersAndModels": "Providers en modellen",
       "groups": "Groepen",
@@ -3478,8 +3481,21 @@
       "dataCollection": "Gegevensverzameling",
       "auditLogs": "Auditlogboeken",
       "requestLogs": "Verzoeklogboeken",
+      "integrations": "Integraties op het web",
       "subOrganizations": "Suborganisaties",
       "distributeFunds": "Tegoed verdelen"
+    },
+    "requestLogs": {
+      "hint": "Verzoeken uit het uur vóór het einde van het venster, nieuwste eerst.",
+      "older": "Eerder uur",
+      "newer": "Later uur",
+      "truncated": "Dit uur bevat meer verzoeken dan de lijst toont.",
+      "emptyTitle": "Geen verzoeken",
+      "emptyDescription": "Er zijn geen gatewayverzoeken in dit uur.",
+      "loadError": "Kan verzoeklogboeken niet laden.",
+      "permissionDenied": "Alleen een eigenaar, beheerder of factureringsbeheerder van de organisatie kan de verzoeklogboeken bekijken.",
+      "tokens": "{{input}} in · {{output}} uit",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Invoertokens",
@@ -4528,6 +4544,8 @@
     "topModels": "Topmodellen",
     "topFeatures": "Topfuncties",
     "emptyTitle": "Geen gebruik in deze periode",
+    "unavailableTitle": "Gebruik niet beschikbaar",
+    "unavailableDescription": "Deze workspace rapporteert geen gebruik. Opnieuw proberen helpt niet.",
     "orgSelfNotice": "Je ziet je eigen gebruik in deze organisatie.",
     "viewDetails": "Gebruiksdetails bekijken"
   },

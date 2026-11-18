@@ -175,8 +175,9 @@
     "durationHourShort": "soat",
     "changes": "O'zgarishlar",
     "organizationTrialEnded": "Tashkilotning sinov muddati tugadi va unda faol reja mavjud emas. Tashkilot egasi kilo.ai saytida hisob-kitobni yangilab, so'ng qayta urinib ko'rishi mumkin.",
-    "organizationTrialEndedBilling": "Tashkilotning sinov muddati tugadi va unda faol reja mavjud emas. Siz hisob-kitobni yangilab, so'ng qayta urinib ko'rishingiz mumkin.",
-    "privateRepositoryA11y": "{{name}}, shaxsiy repozitoriya"
+    "privateRepositoryA11y": "{{name}}, shaxsiy repozitoriya",
+    "legalDocumentEnglishOnly": "Ushbu hujjat faqat ingliz tilida mavjud.",
+    "organizationTrialEndedBilling": "Tashkilotning sinov muddati tugadi va unda faol reja mavjud emas. Siz hisob-kitobni yangilab, so'ng qayta urinib ko'rishingiz mumkin."
   },
   "language": {
     "restarting": "Tilni qo'llash uchun qayta ishga tushirilmoqda",
@@ -1355,7 +1356,8 @@
       "managedOnWeb": "Bu tashkilotning Bitbucket ulanishi kompyuterdan veb orqali boshqariladi.",
       "description": "Kerakli ruxsatlarga ega ish maydoniga kirish tokenini yarating va uni quyiga joylashtiring.",
       "scopes": "Hisob: o'qish · Repozitoriyalar: o'qish/yozish · PRlar: o'qish · Vebhuklar: o'qish/yozish",
-      "tokenPlaceholder": "Ish maydoniga kirish tokeni"
+      "tokenPlaceholder": "Ish maydoniga kirish tokeni",
+      "tokenRefused": "Bitbucket bu ish maydoniga kirish tokenini qabul qilmadi. U yuqoridagi ruxsatlarga ega ekanligini tekshirib, qayta urinib ko'ring."
     },
     "scopeList": {
       "personalStillAvailable": "Quyida shaxsiy repozitoriyalaringizdan foydalanishingiz mumkin.",
@@ -1466,8 +1468,10 @@
       "repositoryLine": "Koʻrib chiqishlar: {{reviews}} · Muammolar: {{findings}}",
       "empty": "Statistikasi bor koʻrib chiqishlar hozircha yoʻq",
       "emptyDescription": "Statistika tashkilot uchun yoqilgan boʻlsa, tugallangan koʻrib chiqishlarni qayd etadi.",
-      "off": "Bu tashkilot uchun statistika oʻchirilgan.",
-      "couldNotLoad": "Statistikani yuklab boʻlmadi"
+      "offTitle": "{{platform}} uchun statistika oʻchirilgan",
+      "offDescription": "Tugallangan koʻrib chiqishlarni qayd etish uchun veb-saytdagi tashkilot sozlamalarida statistikani yoqing.",
+      "couldNotLoad": "Statistikani yuklab boʻlmadi",
+      "off": "Bu tashkilot uchun statistika oʻchirilgan."
     },
     "council": {
       "title": "Kengash koʻrib chiqishi",
@@ -3463,7 +3467,6 @@
     },
     "settingsOnWeb": {
       "title": "Veb-saytdagi tashkilot sozlamalari",
-      "integrations": "Veb-saytdagi integratsiyalar",
       "usageDetails": "Foydalanish tafsilotlari",
       "providersAndModels": "Provayderlar va modellar",
       "groups": "Guruhlar",
@@ -3473,8 +3476,21 @@
       "dataCollection": "Ma'lumotlar yig'ish",
       "auditLogs": "Audit jurnallari",
       "requestLogs": "So'rovlar jurnallari",
+      "integrations": "Veb-saytdagi integratsiyalar",
       "subOrganizations": "Quyi tashkilotlar",
       "distributeFunds": "Mablag'larni taqsimlash"
+    },
+    "requestLogs": {
+      "hint": "Oraliq oxiridan oldingi bir soatdagi so'rovlar, eng yangilari tepada.",
+      "older": "Oldingi soat",
+      "newer": "Keyingi soat",
+      "truncated": "Bu soatda ro'yxatda ko'rsatilganidan ko'proq so'rov bor.",
+      "emptyTitle": "So'rovlar yo'q",
+      "emptyDescription": "Bu soatda shlyuz so'rovlari yo'q.",
+      "loadError": "So'rovlar jurnallarini yuklab bo'lmadi.",
+      "permissionDenied": "So'rovlar jurnallarini faqat tashkilot egasi, administratori yoki to'lovlar menejeri ko'ra oladi.",
+      "tokens": "{{input}} kirish · {{output}} chiqish",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Kirish tokenlari",
@@ -4528,6 +4544,8 @@
     "topModels": "Yetakchi modellar",
     "topFeatures": "Yetakchi funksiyalar",
     "emptyTitle": "Bu davrda foydalanish yo'q",
+    "unavailableTitle": "Foydalanish mavjud emas",
+    "unavailableDescription": "Bu Workspace foydalanish haqida xabar bermaydi. Qayta urinish yordam bermaydi.",
     "orgSelfNotice": "Siz ushbu tashkilotdagi o'z foydalanishingizni ko'ryapsiz.",
     "viewDetails": "Foydalanish tafsilotlarini ko'rish"
   },

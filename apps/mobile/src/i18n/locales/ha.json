@@ -175,8 +175,9 @@
     "durationHourShort": "h",
     "changes": "Canje-canje",
     "organizationTrialEnded": "Gwajin ƙungiyar ya ƙare kuma ba ta da wani shiri mai aiki. Mai mallakar ƙungiyar zai iya sabunta lissafin kuɗi a kilo.ai, sannan ya sake gwadawa.",
-    "organizationTrialEndedBilling": "Gwajin ƙungiyar ya ƙare kuma ba ta da wani shiri mai aiki. Za ka iya sabunta lissafin kuɗi, sannan ka sake gwadawa.",
-    "privateRepositoryA11y": "{{name}}, ma'ajiya na sirri"
+    "privateRepositoryA11y": "{{name}}, ma'ajiya na sirri",
+    "legalDocumentEnglishOnly": "Wannan takarda tana samuwa cikin Turanci kawai.",
+    "organizationTrialEndedBilling": "Gwajin ƙungiyar ya ƙare kuma ba ta da wani shiri mai aiki. Za ka iya sabunta lissafin kuɗi, sannan ka sake gwadawa."
   },
   "language": {
     "restarting": "Ana sake kunnawa don amfani da harshen da aka zaɓa",
@@ -1355,7 +1356,8 @@
       "managedOnWeb": "Ana sarrafa haɗin Bitbucket na wannan ƙungiyar a yanar gizo daga kwamfuta.",
       "description": "Ƙirƙiri lambar izinin shiga muhallin aiki da take da izinin da ake buƙata, sannan ka manna ta a ƙasa.",
       "scopes": "Asusu: karantawa · Ma'ajiyoyi: karantawa/rubutawa · Buƙatun haɗa canje-canje: karantawa · Hanyoyin sanarwa ta yanar gizo: karantawa/rubutawa",
-      "tokenPlaceholder": "Lambar izinin shiga muhallin aiki"
+      "tokenPlaceholder": "Lambar izinin shiga muhallin aiki",
+      "tokenRefused": "Bitbucket bai karɓi wannan lambar izinin shiga muhallin aikin ba. Ka duba cewa tana da izinin da ke sama, sannan ka sake gwadawa."
     },
     "scopeList": {
       "personalStillAvailable": "Har yanzu kana iya samun ma'ajiyoyinka na kanka a ƙasa.",
@@ -1466,8 +1468,10 @@
       "repositoryLine": "Bitoci: {{reviews}} · Abubuwan da aka gano: {{findings}}",
       "empty": "Babu bitoci masu nazari tukuna",
       "emptyDescription": "Nazari yana adana bitocin da aka kammala yayin da aka kunna shi ga ƙungiyar.",
-      "off": "An kashe nazari ga wannan ƙungiyar.",
-      "couldNotLoad": "An kasa loda nazari"
+      "offTitle": "An kashe nazari ga {{platform}}",
+      "offDescription": "Kunna ta a cikin saitunan ƙungiya a yanar gizo don nazari ya adana bitocin da aka kammala.",
+      "couldNotLoad": "An kasa loda nazari",
+      "off": "An kashe nazari ga wannan ƙungiyar."
     },
     "council": {
       "title": "Bitar majalisa",
@@ -3463,7 +3467,6 @@
     },
     "settingsOnWeb": {
       "title": "Saitunan ƙungiya a yanar gizo",
-      "integrations": "Haɗe-haɗe a yanar gizo",
       "usageDetails": "Bayanan amfani",
       "providersAndModels": "Masu samar da sabis da samfura",
       "groups": "Rukunoni",
@@ -3473,8 +3476,21 @@
       "dataCollection": "Tattara bayanai",
       "auditLogs": "Rajistun bincike",
       "requestLogs": "Rajistun buƙatu",
+      "integrations": "Haɗe-haɗe a yanar gizo",
       "subOrganizations": "Ƙananan ƙungiyoyi",
       "distributeFunds": "Raba kuɗi"
+    },
+    "requestLogs": {
+      "hint": "Buƙatun awa ɗaya kafin ƙarshen wannan lokaci, sababbi a farko.",
+      "older": "Awa ta baya",
+      "newer": "Awa ta gaba",
+      "truncated": "Wannan awa tana da buƙatu fiye da waɗanda jerin ke nunawa.",
+      "emptyTitle": "Babu buƙatu",
+      "emptyDescription": "Babu buƙatun gateway a wannan awa.",
+      "loadError": "An kasa loda rajistun buƙatu.",
+      "permissionDenied": "Mai ƙungiya, mai gudanarwa ko manajan biyan kuɗi ne kaɗai zai iya karanta rajistun buƙatun ƙungiyar.",
+      "tokens": "{{input}} shigarwa · {{output}} fitarwa",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Guntayen rubutun shigarwa",
@@ -4528,6 +4544,8 @@
     "topModels": "Manyan samfura",
     "topFeatures": "Manyan fasaloli",
     "emptyTitle": "Babu amfani a wannan lokaci",
+    "unavailableTitle": "Amfani ba ya samuwa",
+    "unavailableDescription": "Wannan sararin aiki ba ya bayar da rahoton amfani. Sake gwadawa ba zai taimaka ba.",
     "orgSelfNotice": "Kuna ganin amfaninku na kanku a wannan ƙungiyar.",
     "viewDetails": "Duba bayanan amfani"
   },

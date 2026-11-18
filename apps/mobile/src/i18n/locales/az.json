@@ -175,8 +175,9 @@
     "durationHourShort": "h",
     "changes": "Dəyişikliklər",
     "organizationTrialEnded": "Təşkilatın sınaq müddəti başa çatıb və aktiv planı yoxdur. Təşkilat sahibi kilo.ai ünvanında billinqi yeniləyə və sonra yenidən cəhd edə bilər.",
-    "organizationTrialEndedBilling": "Təşkilatın sınaq müddəti başa çatıb və aktiv planı yoxdur. Billinqi yeniləyə və sonra yenidən cəhd edə bilərsiniz.",
-    "privateRepositoryA11y": "{{name}}, şəxsi repozitoriya"
+    "privateRepositoryA11y": "{{name}}, şəxsi repozitoriya",
+    "legalDocumentEnglishOnly": "Bu sənəd yalnız ingilis dilində mövcuddur.",
+    "organizationTrialEndedBilling": "Təşkilatın sınaq müddəti başa çatıb və aktiv planı yoxdur. Billinqi yeniləyə və sonra yenidən cəhd edə bilərsiniz."
   },
   "language": {
     "restarting": "Dil dəyişikliyini tətbiq etmək üçün yenidən başladılır",
@@ -1355,7 +1356,8 @@
       "managedOnWeb": "Bu təşkilatın Bitbucket bağlantısı kompüterdən vebdə idarə olunur.",
       "description": "Tələb olunan icazələri olan iş sahəsi giriş tokeni yarat və aşağıya yapışdır.",
       "scopes": "Hesab: oxuma · Repozitoriyalar: oxuma/yazma · PR-lər: oxuma · Vebhuklar: oxuma/yazma",
-      "tokenPlaceholder": "İş sahəsinin giriş tokeni"
+      "tokenPlaceholder": "İş sahəsinin giriş tokeni",
+      "tokenRefused": "Bitbucket bu iş sahəsi tokenini qəbul etmədi. Yuxarıdakı icazələrin olduğunu yoxla, sonra yenidən cəhd et."
     },
     "scopeList": {
       "personalStillAvailable": "Şəxsi repozitoriyalar aşağıda hələ də əlçatandır.",
@@ -1466,8 +1468,10 @@
       "repositoryLine": "Yoxlamalar: {{reviews}} · Tapıntılar: {{findings}}",
       "empty": "Analitikası olan yoxlama hələ yoxdur",
       "emptyDescription": "Analitika təşkilat üçün aktiv olduğu müddətdə tamamlanmış yoxlamaları qeydə alır.",
-      "off": "Bu təşkilat üçün analitika deaktivdir.",
-      "couldNotLoad": "Analitikanı yükləmək mümkün olmadı"
+      "offTitle": "{{platform}} üçün analitika deaktivdir",
+      "offDescription": "Tamamlanmış yoxlamaları qeydə almaq üçün analitikanı vebdə təşkilat ayarlarında aktivləşdir.",
+      "couldNotLoad": "Analitikanı yükləmək mümkün olmadı",
+      "off": "Bu təşkilat üçün analitika deaktivdir."
     },
     "council": {
       "title": "Şura yoxlaması",
@@ -3463,7 +3467,6 @@
     },
     "settingsOnWeb": {
       "title": "Vebdə təşkilat ayarları",
-      "integrations": "Vebdə inteqrasiyalar",
       "usageDetails": "İstifadə təfərrüatları",
       "providersAndModels": "Provayderlər və modellər",
       "groups": "Qruplar",
@@ -3473,8 +3476,21 @@
       "dataCollection": "Məlumat toplanması",
       "auditLogs": "Audit jurnalları",
       "requestLogs": "Sorğu jurnalları",
+      "integrations": "Vebdə inteqrasiyalar",
       "subOrganizations": "Alt təşkilatlar",
       "distributeFunds": "Vəsaitləri bölüşdür"
+    },
+    "requestLogs": {
+      "hint": "Pəncərə bitənədək son bir saatın sorğuları, ən yeniləri əvvəldə.",
+      "older": "Əvvəlki saat",
+      "newer": "Sonrakı saat",
+      "truncated": "Bu saatda siyahıda göstəriləndən daha çox sorğu var.",
+      "emptyTitle": "Sorğu yoxdur",
+      "emptyDescription": "Bu saatda şlüz sorğusu yoxdur.",
+      "loadError": "Sorğu jurnallarını yükləmək mümkün olmadı.",
+      "permissionDenied": "Sorğu jurnallarını yalnız təşkilatın sahibi, administratoru və ya ödəniş meneceri oxuya bilər.",
+      "tokens": "{{input}} giriş · {{output}} çıxış",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Giriş tokenləri",
@@ -4528,6 +4544,8 @@
     "topModels": "Əsas modellər",
     "topFeatures": "Əsas funksiyalar",
     "emptyTitle": "Bu dövrdə istifadə yoxdur",
+    "unavailableTitle": "İstifadə mövcud deyil",
+    "unavailableDescription": "Bu iş sahəsi istifadə barədə məlumat vermir. Yenidən cəhd etmək kömək etməyəcək.",
     "orgSelfNotice": "Bu təşkilatda öz istifadənizi görürsünüz.",
     "viewDetails": "İstifadə təfərrüatlarına baxın"
   },

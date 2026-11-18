@@ -175,8 +175,9 @@
     "durationHourShort": "h",
     "changes": "Perubahan",
     "organizationTrialEnded": "Masa percobaan organisasi telah berakhir dan tidak memiliki paket aktif. Pemilik organisasi dapat memperbarui penagihan di kilo.ai, lalu coba lagi.",
-    "organizationTrialEndedBilling": "Masa percobaan organisasi telah berakhir dan tidak memiliki paket aktif. Anda dapat memperbarui penagihan, lalu coba lagi.",
-    "privateRepositoryA11y": "{{name}}, repositori pribadi"
+    "privateRepositoryA11y": "{{name}}, repositori pribadi",
+    "legalDocumentEnglishOnly": "Dokumen ini hanya tersedia dalam bahasa Inggris.",
+    "organizationTrialEndedBilling": "Masa percobaan organisasi telah berakhir dan tidak memiliki paket aktif. Anda dapat memperbarui penagihan, lalu coba lagi."
   },
   "language": {
     "restarting": "Memulai ulang untuk menerapkan bahasa",
@@ -677,7 +678,8 @@
       "managedOnWeb": "Koneksi Bitbucket organisasi ini dikelola di web melalui komputer.",
       "description": "Buat token akses ruang kerja dengan cakupan izin yang diperlukan, lalu tempelkan di bawah.",
       "scopes": "Akun: baca · Repositori: baca/tulis · PR: baca · Webhook: baca/tulis",
-      "tokenPlaceholder": "Token akses ruang kerja"
+      "tokenPlaceholder": "Token akses ruang kerja",
+      "tokenRefused": "Bitbucket tidak menerima token akses ruang kerja ini. Periksa bahwa token tersebut memiliki cakupan izin di atas, lalu coba lagi."
     },
     "followReviewMd": "Ikuti REVIEW.md",
     "followReviewMdSubtitle": "Ikuti instruksi dalam berkas REVIEW.md di setiap repositori",
@@ -923,8 +925,10 @@
       "repositoryLine": "Tinjauan: {{reviews}} · Temuan: {{findings}}",
       "empty": "Belum ada tinjauan dengan analitik",
       "emptyDescription": "Analitik mencatat tinjauan yang selesai selama fitur ini aktif untuk organisasi.",
-      "off": "Analitik nonaktif untuk organisasi ini.",
-      "couldNotLoad": "Tidak dapat memuat analitik"
+      "offTitle": "Analitik nonaktif untuk {{platform}}",
+      "offDescription": "Aktifkan analitik di Pengaturan organisasi di web untuk mencatat tinjauan yang selesai.",
+      "couldNotLoad": "Tidak dapat memuat analitik",
+      "off": "Analitik nonaktif untuk organisasi ini."
     },
     "council": {
       "title": "Tinjauan dewan",
@@ -3468,7 +3472,6 @@
     },
     "settingsOnWeb": {
       "title": "Pengaturan organisasi di web",
-      "integrations": "Integrasi di web",
       "usageDetails": "Detail penggunaan",
       "providersAndModels": "Penyedia dan model",
       "groups": "Grup",
@@ -3478,8 +3481,21 @@
       "dataCollection": "Pengumpulan data",
       "auditLogs": "Log audit",
       "requestLogs": "Log permintaan",
+      "integrations": "Integrasi di web",
       "subOrganizations": "Sub-organisasi",
       "distributeFunds": "Distribusikan dana"
+    },
+    "requestLogs": {
+      "hint": "Permintaan dalam satu jam sebelum akhir rentang waktu, terbaru di atas.",
+      "older": "Jam sebelumnya",
+      "newer": "Jam berikutnya",
+      "truncated": "Jam ini memiliki lebih banyak permintaan daripada yang ditampilkan.",
+      "emptyTitle": "Tidak ada permintaan",
+      "emptyDescription": "Tidak ada permintaan gateway dalam jam ini.",
+      "loadError": "Tidak dapat memuat log permintaan.",
+      "permissionDenied": "Hanya pemilik, admin, atau pengelola penagihan organisasi yang dapat membaca log permintaannya.",
+      "tokens": "{{input}} masuk · {{output}} keluar",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Token masukan",
@@ -4528,6 +4544,8 @@
     "topModels": "Model teratas",
     "topFeatures": "Fitur teratas",
     "emptyTitle": "Tidak ada penggunaan pada periode ini",
+    "unavailableTitle": "Penggunaan tidak tersedia",
+    "unavailableDescription": "Workspace ini tidak melaporkan penggunaan. Mencoba lagi tidak akan membantu.",
     "orgSelfNotice": "Anda melihat penggunaan Anda sendiri di organisasi ini.",
     "viewDetails": "Lihat detail penggunaan"
   },

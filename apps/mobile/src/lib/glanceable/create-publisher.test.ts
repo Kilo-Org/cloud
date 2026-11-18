@@ -5,7 +5,7 @@ import {
   buildOpaqueScopeKey,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { EMPTY_HOME_WIDGET_DETAILS } from '@kilocode/app-shared/home-widget';
+import { emptyHomeWidgetDetails } from '@kilocode/app-shared/home-widget';
 
 import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
 
@@ -217,7 +217,7 @@ describe('createGlanceablePublisher', () => {
     persistGlanceableSink.publish(first);
     rememberHomeWidgetData({
       snapshot: first,
-      details: { ...EMPTY_HOME_WIDGET_DETAILS, primaryTitle: 'Quarterly migration' },
+      details: { ...emptyHomeWidgetDetails(), primaryTitle: 'Quarterly migration' },
     });
     await _flushGlanceableMirrorForTests();
 

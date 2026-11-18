@@ -4,11 +4,11 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import {
-  formatSeatCount,
   getAutoTopUpLinkLabel,
   getAutoTopUpReadout,
   getOrgSubscriptionState,
   getScheduledSeatChange,
+  seatCountReadout,
 } from '@/components/organization/billing-model';
 import { ExternalBillingLink } from '@/components/organization/external-billing-link';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
@@ -21,13 +21,11 @@ import { Button } from '@/components/ui/button';
 import { KvRow } from '@/components/ui/kv-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { i18n } from '@/i18n';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useCanLinkExternalPurchase } from '@/lib/billing/external-purchase-link';
 import { WEB_BASE_URL } from '@/lib/config';
 import { organizationBillingUrl } from '@/lib/credits/add-credits-destination';
 import { openExternalUrl } from '@/lib/external-link';
-import { formatNumber } from '@/lib/format';
 import {
   isMoneyRole,
   useOrgBoundary,
@@ -164,16 +162,15 @@ export function OrganizationBillingScreen({
   const scheduledSeatChange = subscription.data ? getScheduledSeatChange(subscription.data) : null;
   // The list entry already carries the same seat numbers, so the row paints
   // settled on the first frame and the query only corrects it if they moved.
-  // A total is printed only when the organization enforces seats and actually
-  // bought some: `getOrganizationSeatUsage` answers `seat_count || 0`, so a
-  // legacy organization would read `3 / 0`, and the row would also change
-  // shape on the frame the seats read lands.
+  // The shared readout prints a total only when the seats read confirms the
+  // organization bought some, so the row does not change shape when it lands.
   const seatsInUse = seats.data?.usedSeats ?? org.seatCount.used;
   const seatsPurchased = seats.data?.totalSeats ?? org.seatCount.total;
-  const seatCountValue =
-    org.requireSeats && seatsPurchased > 0
-      ? formatSeatCount(seatsInUse, seatsPurchased)
-      : formatNumber(seatsInUse, i18n.language);
+  const seatCountValue = seatCountReadout({
+    seatsEnforced: org.requireSeats,
+    used: seatsInUse,
+    total: seatsPurchased,
+  });
 
   const autoTopUpReadout = autoTopUp.data ? getAutoTopUpReadout(autoTopUp.data) : null;
 

@@ -84,7 +84,7 @@ vi.mock('@kilocode/app-shared/glanceable-agents-snapshot', () => ({
 }));
 
 vi.mock('@kilocode/app-shared/home-widget', () => ({
-  EMPTY_HOME_WIDGET_DETAILS: {},
+  emptyHomeWidgetDetails: () => ({}),
   buildHomeWidgetPresentation: () => ({}),
   buildHomeWidgetPresentationTimeline: () => [],
   homeWidgetDataSchema: { safeParse: () => ({ success: false }) },

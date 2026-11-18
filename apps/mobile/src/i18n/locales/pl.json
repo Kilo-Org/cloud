@@ -175,8 +175,9 @@
     "durationHourShort": "h",
     "changes": "Zmiany",
     "organizationTrialEnded": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Właściciel organizacji może zaktualizować rozliczenia na kilo.ai, a następnie spróbować ponownie.",
-    "organizationTrialEndedBilling": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Możesz zaktualizować rozliczenia, a następnie spróbować ponownie.",
-    "privateRepositoryA11y": "{{name}}, prywatne repozytorium"
+    "privateRepositoryA11y": "{{name}}, prywatne repozytorium",
+    "legalDocumentEnglishOnly": "Ten dokument jest dostępny wyłącznie w języku angielskim.",
+    "organizationTrialEndedBilling": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Możesz zaktualizować rozliczenia, a następnie spróbować ponownie."
   },
   "language": {
     "restarting": "Ponowne uruchamianie po zmianie języka",
@@ -677,7 +678,8 @@
       "managedOnWeb": "Połączeniem tej organizacji z Bitbucket zarządza się w przeglądarce na komputerze.",
       "description": "Utwórz token dostępu do obszaru roboczego z wymaganymi uprawnieniami i wklej go poniżej.",
       "scopes": "Konto: odczyt · Repozytoria: odczyt/zapis · PR: odczyt · Webhooki: odczyt/zapis",
-      "tokenPlaceholder": "Token dostępu do obszaru roboczego"
+      "tokenPlaceholder": "Token dostępu do obszaru roboczego",
+      "tokenRefused": "Bitbucket nie zaakceptował tego tokenu dostępu do obszaru roboczego. Sprawdź, czy ma powyższe uprawnienia, a następnie spróbuj ponownie."
     },
     "followReviewMd": "Postępuj zgodnie z REVIEW.md",
     "followReviewMdSubtitle": "Przestrzegaj instrukcji z pliku REVIEW.md w każdym repozytorium",
@@ -925,8 +927,10 @@
       "repositoryLine": "Przeglądy: {{reviews}} · Problemy: {{findings}}",
       "empty": "Brak przeglądów z analityką",
       "emptyDescription": "Analityka rejestruje ukończone przeglądy, dopóki jest włączona dla organizacji.",
-      "off": "Analityka jest wyłączona dla tej organizacji.",
-      "couldNotLoad": "Nie udało się wczytać analityki"
+      "offTitle": "Analityka jest wyłączona dla {{platform}}",
+      "offDescription": "Włącz ją w ustawieniach organizacji w wersji internetowej, aby rejestrowała ukończone przeglądy.",
+      "couldNotLoad": "Nie udało się wczytać analityki",
+      "off": "Analityka jest wyłączona dla tej organizacji."
     },
     "council": {
       "title": "Przegląd rady",
@@ -3582,7 +3586,6 @@
     },
     "settingsOnWeb": {
       "title": "Ustawienia organizacji w wersji internetowej",
-      "integrations": "Integracje w wersji internetowej",
       "usageDetails": "Szczegóły użycia",
       "providersAndModels": "Dostawcy i modele",
       "groups": "Grupy",
@@ -3592,8 +3595,21 @@
       "dataCollection": "Zbieranie danych",
       "auditLogs": "Dzienniki audytu",
       "requestLogs": "Dzienniki żądań",
+      "integrations": "Integracje w wersji internetowej",
       "subOrganizations": "Organizacje podrzędne",
       "distributeFunds": "Rozdziel środki"
+    },
+    "requestLogs": {
+      "hint": "Żądania z godziny przed końcem okna, od najnowszych.",
+      "older": "Wcześniejsza godzina",
+      "newer": "Późniejsza godzina",
+      "truncated": "W tej godzinie jest więcej żądań, niż pokazuje lista.",
+      "emptyTitle": "Brak żądań",
+      "emptyDescription": "W tej godzinie nie było żądań do bramy.",
+      "loadError": "Nie udało się wczytać dzienników żądań.",
+      "permissionDenied": "Dzienniki żądań może przeglądać tylko właściciel, administrator lub menedżer rozliczeń organizacji.",
+      "tokens": "{{input}} wej. · {{output}} wyj.",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Tokeny wejściowe",
@@ -4668,6 +4684,8 @@
     "topModels": "Najczęściej używane modele",
     "topFeatures": "Najczęściej używane funkcje",
     "emptyTitle": "Brak użycia w tym okresie",
+    "unavailableTitle": "Użycie niedostępne",
+    "unavailableDescription": "Ta przestrzeń robocza nie raportuje użycia. Ponowna próba nie pomoże.",
     "orgSelfNotice": "Widzisz własne użycie w tej organizacji.",
     "viewDetails": "Wyświetl szczegóły użycia"
   },

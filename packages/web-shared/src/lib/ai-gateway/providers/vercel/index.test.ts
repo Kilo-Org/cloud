@@ -1232,7 +1232,7 @@ describe('isVercelRoutingOptOut', () => {
   });
 });
 
-describe('getUsageEndpointGatewayOptions', () => {
+describe('getNonChatGatewayOptions', () => {
   async function loadGetOptions(vercelInferenceProviders: string[] | null) {
     jest.resetModules();
     jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
@@ -1240,7 +1240,7 @@ describe('getUsageEndpointGatewayOptions', () => {
       getVercelModelsFromDatabase: jest.fn(),
     }));
     return (await import('@kilocode/web-shared/lib/ai-gateway/providers/vercel'))
-      .getUsageEndpointGatewayOptions;
+      .getNonChatGatewayOptions;
   }
 
   it("applies the request's ignore list to Kilo's route", async () => {
@@ -1254,11 +1254,14 @@ describe('getUsageEndpointGatewayOptions', () => {
         dataRegion: 'eu',
       })
     ).resolves.toEqual({
-      only: ['azure'],
-      order: ['azure'],
-      zeroDataRetention: undefined,
-      disallowPromptTraining: undefined,
-      inferenceRegion: { scope: 'zone', geoRegion: 'eu' },
+      kind: 'routable',
+      gateway: {
+        only: ['azure'],
+        order: ['azure'],
+        zeroDataRetention: undefined,
+        disallowPromptTraining: undefined,
+        inferenceRegion: { scope: 'zone', geoRegion: 'eu' },
+      },
     });
   });
 
@@ -1272,7 +1275,7 @@ describe('getUsageEndpointGatewayOptions', () => {
         provider: { only: ['typesafe'] },
         dataRegion: null,
       })
-    ).resolves.toMatchObject({ only: ['typesafe-ai'] });
+    ).resolves.toMatchObject({ kind: 'routable', gateway: { only: ['typesafe-ai'] } });
   });
 
   it('drops an ignored provider key unless it is the last one', async () => {
@@ -1288,8 +1291,8 @@ describe('getUsageEndpointGatewayOptions', () => {
       provider: { ignore: ['openai'] },
       dataRegion: 'eu',
     });
-    expect(some.only).toEqual(['mistral']);
-    expect(some).not.toHaveProperty('inferenceRegion');
+    expect(some).toMatchObject({ kind: 'routable', gateway: { only: ['mistral'] } });
+    expect(some).not.toHaveProperty('gateway.inferenceRegion');
 
     const all = await getOptions({
       vercelModelId: 'openai/text-embedding-3-small',
@@ -1297,6 +1300,98 @@ describe('getUsageEndpointGatewayOptions', () => {
       provider: { ignore: ['openai'] },
       dataRegion: null,
     });
-    expect(all.only).toEqual(['openai']);
+    expect(all).toMatchObject({ kind: 'routable', gateway: { only: ['openai'] } });
+  });
+
+  it("rejects Kilo's route when the ignore list excludes every provider of the model", async () => {
+    const getOptions = await loadGetOptions(['azure', 'openai']);
+
+    await expect(
+      getOptions({
+        vercelModelId: 'openai/text-embedding-3-small',
+        userByok: null,
+        provider: { ignore: ['openai', 'azure'] },
+        dataRegion: null,
+      })
+    ).resolves.toEqual({ kind: 'no-eligible-provider', providers: ['azure', 'openai'] });
+  });
+
+  it('matches OpenRouter slugs in the ignore list against Vercel provider ids', async () => {
+    const getOptions = await loadGetOptions(['vertex', 'vertexAnthropic', 'bedrock']);
+
+    await expect(
+      getOptions({
+        vercelModelId: 'anthropic/claude-sonnet-4.5',
+        userByok: null,
+        provider: { ignore: ['google-vertex', 'amazon-bedrock'] },
+        dataRegion: null,
+      })
+    ).resolves.toEqual({ kind: 'no-eligible-provider', providers: ['vertex', 'bedrock'] });
+  });
+
+  it.each([
+    ['without an ignore list', { only: ['mistral'] }],
+    ['with an ignore list', { only: ['mistral'], ignore: ['azure'] }],
+  ])(
+    "rejects Kilo's route when the allow-list names no provider of the model, %s",
+    async (_, provider) => {
+      const getOptions = await loadGetOptions(['azure', 'openai']);
+
+      await expect(
+        getOptions({
+          vercelModelId: 'openai/text-embedding-3-small',
+          userByok: null,
+          provider,
+          dataRegion: null,
+        })
+      ).resolves.toEqual({ kind: 'no-eligible-provider', providers: ['azure', 'openai'] });
+    }
+  );
+
+  it('rejects an empty allow-list even without provider data', async () => {
+    const getOptions = await loadGetOptions(null);
+
+    await expect(
+      getOptions({
+        vercelModelId: 'openai/text-embedding-3-small',
+        userByok: null,
+        provider: { only: [] },
+        dataRegion: null,
+      })
+    ).resolves.toEqual({ kind: 'no-eligible-provider', providers: [] });
+    await expect(
+      getOptions({
+        vercelModelId: 'openai/text-embedding-3-small',
+        userByok: null,
+        provider: { only: ['openai'], ignore: ['openai'] },
+        dataRegion: null,
+      })
+    ).resolves.toEqual({ kind: 'no-eligible-provider', providers: [] });
+  });
+
+  it('keeps an allow-list that names a provider of the model', async () => {
+    const getOptions = await loadGetOptions(['azure', 'openai']);
+
+    await expect(
+      getOptions({
+        vercelModelId: 'openai/text-embedding-3-small',
+        userByok: null,
+        provider: { only: ['openai', 'mistral'] },
+        dataRegion: null,
+      })
+    ).resolves.toMatchObject({ kind: 'routable', gateway: { only: ['openai', 'mistral'] } });
+  });
+
+  it("keeps the last provider key even when the request's provider settings exclude it", async () => {
+    const getOptions = await loadGetOptions(['azure', 'openai']);
+
+    await expect(
+      getOptions({
+        vercelModelId: 'openai/text-embedding-3-small',
+        userByok: [{ decryptedAPIKey: 'sk-openai', providerId: 'openai' }],
+        provider: { ignore: ['openai', 'azure'] },
+        dataRegion: null,
+      })
+    ).resolves.toMatchObject({ kind: 'routable', gateway: { only: ['openai'] } });
   });
 });

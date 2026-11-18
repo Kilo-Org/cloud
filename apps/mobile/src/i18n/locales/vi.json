@@ -175,8 +175,9 @@
     "durationHourShort": "giờ",
     "changes": "Thay đổi",
     "organizationTrialEnded": "Bản dùng thử của tổ chức đã kết thúc và tổ chức không có gói đang hoạt động. Chủ sở hữu tổ chức có thể cập nhật thanh toán tại kilo.ai, sau đó thử lại.",
-    "organizationTrialEndedBilling": "Bản dùng thử của tổ chức đã kết thúc và tổ chức không có gói đang hoạt động. Bạn có thể cập nhật thanh toán, sau đó thử lại.",
-    "privateRepositoryA11y": "{{name}}, kho lưu trữ riêng tư"
+    "privateRepositoryA11y": "{{name}}, kho lưu trữ riêng tư",
+    "legalDocumentEnglishOnly": "Tài liệu này chỉ có sẵn bằng tiếng Anh.",
+    "organizationTrialEndedBilling": "Bản dùng thử của tổ chức đã kết thúc và tổ chức không có gói đang hoạt động. Bạn có thể cập nhật thanh toán, sau đó thử lại."
   },
   "language": {
     "restarting": "Đang khởi động lại để áp dụng ngôn ngữ",
@@ -677,7 +678,8 @@
       "managedOnWeb": "Kết nối Bitbucket của tổ chức này được quản lý trên web từ máy tính.",
       "description": "Tạo mã truy cập không gian làm việc với các quyền cần thiết rồi dán vào bên dưới.",
       "scopes": "Tài khoản: đọc · Kho lưu trữ: đọc/ghi · Yêu cầu hợp nhất: đọc · Webhook: đọc/ghi",
-      "tokenPlaceholder": "Mã truy cập không gian làm việc"
+      "tokenPlaceholder": "Mã truy cập không gian làm việc",
+      "tokenRefused": "Bitbucket không chấp nhận mã truy cập không gian làm việc này. Hãy kiểm tra rằng mã có các quyền ở trên, rồi thử lại."
     },
     "followReviewMd": "Tuân theo REVIEW.md",
     "followReviewMdSubtitle": "Tuân theo tệp hướng dẫn REVIEW.md của từng kho lưu trữ",
@@ -923,8 +925,10 @@
       "repositoryLine": "Rà soát: {{reviews}} · Vấn đề: {{findings}}",
       "empty": "Chưa có lượt rà soát nào có dữ liệu phân tích",
       "emptyDescription": "Phân tích ghi lại các lượt rà soát đã hoàn tất khi tính năng này được bật cho tổ chức.",
-      "off": "Phân tích đang tắt cho tổ chức này.",
-      "couldNotLoad": "Không thể tải dữ liệu phân tích"
+      "offTitle": "Phân tích đang tắt cho {{platform}}",
+      "offDescription": "Bật tính năng Phân tích trong Cài đặt tổ chức trên web để ghi lại các lượt rà soát đã hoàn tất.",
+      "couldNotLoad": "Không thể tải dữ liệu phân tích",
+      "off": "Phân tích đang tắt cho tổ chức này."
     },
     "council": {
       "title": "Rà soát hội đồng",
@@ -3468,7 +3472,6 @@
     },
     "settingsOnWeb": {
       "title": "Cài đặt tổ chức trên web",
-      "integrations": "Tích hợp trên web",
       "usageDetails": "Chi tiết sử dụng",
       "providersAndModels": "Nhà cung cấp và mô hình",
       "groups": "Nhóm",
@@ -3478,8 +3481,21 @@
       "dataCollection": "Thu thập dữ liệu",
       "auditLogs": "Nhật ký kiểm tra",
       "requestLogs": "Nhật ký yêu cầu",
+      "integrations": "Tích hợp trên web",
       "subOrganizations": "Tổ chức con",
       "distributeFunds": "Phân bổ tiền"
+    },
+    "requestLogs": {
+      "hint": "Các yêu cầu trong một giờ tính đến cuối khung thời gian, mới nhất ở trên.",
+      "older": "Giờ cũ hơn",
+      "newer": "Giờ mới hơn",
+      "truncated": "Giờ này có nhiều yêu cầu hơn số hiển thị trong danh sách.",
+      "emptyTitle": "Không có yêu cầu",
+      "emptyDescription": "Không có yêu cầu nào qua gateway trong giờ này.",
+      "loadError": "Không thể tải nhật ký yêu cầu.",
+      "permissionDenied": "Chỉ chủ sở hữu, quản trị viên hoặc người quản lý thanh toán của tổ chức mới có thể xem nhật ký yêu cầu của tổ chức.",
+      "tokens": "{{input}} vào · {{output}} ra",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Token đầu vào",
@@ -4528,6 +4544,8 @@
     "topModels": "Mô hình hàng đầu",
     "topFeatures": "Tính năng hàng đầu",
     "emptyTitle": "Không có mức sử dụng trong kỳ này",
+    "unavailableTitle": "Mức sử dụng không khả dụng",
+    "unavailableDescription": "Vùng làm việc này không báo cáo mức sử dụng. Thử lại sẽ không giúp ích.",
     "orgSelfNotice": "Bạn đang xem mức sử dụng của chính mình trong tổ chức này.",
     "viewDetails": "Xem chi tiết mức sử dụng"
   },

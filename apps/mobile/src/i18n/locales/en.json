@@ -242,8 +242,9 @@
     "durationHourShort": "h",
     "changes": "Changes",
     "organizationTrialEnded": "The organization's trial has ended and it has no active plan. An organization owner can update billing at kilo.ai, then try again.",
-    "organizationTrialEndedBilling": "The organization's trial has ended and it has no active plan. You can update billing, then try again.",
-    "privateRepositoryA11y": "{{name}}, private repository"
+    "privateRepositoryA11y": "{{name}}, private repository",
+    "legalDocumentEnglishOnly": "This document is available in English only.",
+    "organizationTrialEndedBilling": "The organization's trial has ended and it has no active plan. You can update billing, then try again."
   },
   "language": {
     "restarting": "Restarting to apply language",
@@ -1422,7 +1423,8 @@
       "managedOnWeb": "This organization's Bitbucket connection is managed on the web from a computer.",
       "description": "Create a Workspace Access Token with the required scopes and paste it below.",
       "scopes": "Account: read · Repositories: read/write · Pull requests: read · Webhooks: read/write",
-      "tokenPlaceholder": "Workspace access token"
+      "tokenPlaceholder": "Workspace access token",
+      "tokenRefused": "Bitbucket did not accept this workspace token. Check that it has the scopes above, then try again."
     },
     "scopeList": {
       "personalStillAvailable": "Personal repositories are still available below.",
@@ -1533,8 +1535,10 @@
       "repositoryLine": "Reviews: {{reviews}} · Findings: {{findings}}",
       "empty": "No reviews with analytics yet",
       "emptyDescription": "Analytics records completed reviews while it is enabled for the organization.",
-      "off": "Analytics is off for this organization.",
-      "couldNotLoad": "Could not load analytics"
+      "offTitle": "Analytics is off for {{platform}}",
+      "offDescription": "Turn it on in the organization's settings on the web to record completed reviews.",
+      "couldNotLoad": "Could not load analytics",
+      "off": "Analytics is off for this organization."
     },
     "council": {
       "title": "Council review",
@@ -3543,7 +3547,6 @@
     },
     "settingsOnWeb": {
       "title": "Organization settings on the web",
-      "integrations": "Integrations on the web",
       "usageDetails": "Usage details",
       "providersAndModels": "Providers and models",
       "groups": "Groups",
@@ -3553,8 +3556,21 @@
       "dataCollection": "Data collection",
       "auditLogs": "Audit logs",
       "requestLogs": "Request logs",
+      "integrations": "Integrations on the web",
       "subOrganizations": "Sub-organizations",
       "distributeFunds": "Distribute funds"
+    },
+    "requestLogs": {
+      "hint": "Requests from the hour before the window ends, newest first.",
+      "older": "Older hour",
+      "newer": "Newer hour",
+      "truncated": "This hour has more requests than the list shows.",
+      "emptyTitle": "No requests",
+      "emptyDescription": "This hour has no gateway requests.",
+      "loadError": "Couldn't load request logs.",
+      "permissionDenied": "Only an organization owner, admin or billing manager can read its request logs.",
+      "tokens": "{{input}} in · {{output}} out",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Input Tokens",
@@ -4528,6 +4544,8 @@
     "topModels": "Top models",
     "topFeatures": "Top features",
     "emptyTitle": "No usage in this period",
+    "unavailableTitle": "Usage is unavailable",
+    "unavailableDescription": "This workspace isn't reporting usage. Retrying won't help.",
     "orgSelfNotice": "You're seeing your own usage in this organization.",
     "viewDetails": "View usage details"
   },

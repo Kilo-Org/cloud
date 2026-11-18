@@ -9,6 +9,7 @@ import {
   getFirefoxUnsupportedToolError,
 } from './browser-tool-session';
 import { TAB_NOT_INSPECTABLE_ERROR } from './tab-debugger';
+import { TAB_TAKEN_ERROR } from './browser-caller';
 import type {
   BrowserScriptingApi,
   BrowserScriptingInjectionResult,
@@ -32,11 +33,13 @@ const createDebuggerApi = ({
   documentNodeId = 11,
   gate,
   responseBodies,
+  visibilityState = 'visible',
 }: {
   documentNodeId?: number;
   /** When set, `sendCommand` waits on `gate.wait` before resolving the gated method. */
   gate?: { readonly command: string; readonly wait: Promise<void> };
   responseBodies?: Record<string, { base64Encoded?: boolean; body: string }>;
+  visibilityState?: string;
 } = {}): {
   api: ChromeDebuggerApi;
   attachCalls: number[];
@@ -45,6 +48,7 @@ const createDebuggerApi = ({
   emitDetach: (tabId: number, reason?: string) => void;
   emitEvent: (tabId: number, method: string, params?: Record<string, unknown>) => void;
   setDocumentNodeId: (nextDocumentNodeId: number) => void;
+  setVisibilityState: (nextVisibilityState: string) => void;
 } => {
   const attachCalls: number[] = [];
   const detachCalls: number[] = [];
@@ -52,6 +56,7 @@ const createDebuggerApi = ({
   const detachListeners: ChromeDebuggerDetachListener[] = [];
   const eventListeners: ChromeDebuggerEventListener[] = [];
   let currentDocumentNodeId = documentNodeId;
+  let currentVisibilityState = visibilityState;
 
   const api: ChromeDebuggerApi = {
     attach: (target: ChromeDebuggerTarget) => {
@@ -106,6 +111,10 @@ const createDebuggerApi = ({
         return (typeof requestId === 'string' ? responseBodies?.[requestId] : undefined) ?? {};
       }
 
+      if (method === 'Runtime.evaluate' && params?.['expression'] === 'document.visibilityState') {
+        return { result: { value: currentVisibilityState } };
+      }
+
       return {};
     },
   };
@@ -127,6 +136,9 @@ const createDebuggerApi = ({
     },
     setDocumentNodeId: nextDocumentNodeId => {
       currentDocumentNodeId = nextDocumentNodeId;
+    },
+    setVisibilityState: nextVisibilityState => {
+      currentVisibilityState = nextVisibilityState;
     },
   };
 };
@@ -451,7 +463,7 @@ const createFakePageGlobals = (): {
 };
 
 describe('browser tool session', () => {
-  it('attaches once, lazily, and enables every CDP domain before the first send', async () => {
+  it('attaches once, lazily, and enables every CDP domain plus focus emulation before the first send', async () => {
     const { debuggerApi, session } = createSession();
 
     expect(session.isAttached()).toBe(false);
@@ -464,9 +476,102 @@ describe('browser tool session', () => {
     expect(debuggerApi.attachCalls).toStrictEqual([7]);
     expect(debuggerApi.commands).toStrictEqual([
       ...ENABLED_DOMAINS.map(method => ({ method, params: undefined })),
+      { method: 'Emulation.setFocusEmulationEnabled', params: { enabled: true } },
       { method: 'Runtime.evaluate', params: { expression: '1 + 1' } },
       { method: 'Runtime.evaluate', params: { expression: '2 + 2' } },
     ]);
+  });
+
+  it('keeps one ref registry per caller so snapshots do not invalidate each other', async () => {
+    const { session } = createSession();
+    const first = session.bindCaller('panel:panel-1:conversation-1');
+    const second = session.bindCaller('panel:panel-1:conversation-2');
+
+    first.registerRefs([{ backendNodeId: 11, ref: 'e11' }]);
+    second.registerRefs([{ backendNodeId: 99, ref: 'e99' }]);
+
+    await expect(first.resolveTarget('e11')).resolves.toStrictEqual({
+      backendNodeId: 11,
+      kind: 'ref',
+      ref: 'e11',
+    });
+    await expect(second.resolveTarget('e99')).resolves.toStrictEqual({
+      backendNodeId: 99,
+      kind: 'ref',
+      ref: 'e99',
+    });
+    await expect(first.resolveTarget('e99')).resolves.toBeUndefined();
+
+    // A full snapshot from the second caller replaces only its own registry.
+    second.registerRefs([{ backendNodeId: 77, ref: 'e77' }]);
+
+    await expect(first.resolveTarget('e11')).resolves.toStrictEqual({
+      backendNodeId: 11,
+      kind: 'ref',
+      ref: 'e11',
+    });
+    await expect(second.resolveTarget('e99')).resolves.toBeUndefined();
+  });
+
+  it("drops a disposed caller's registry and keeps the other caller's refs", async () => {
+    const { session } = createSession();
+    const first = session.bindCaller('panel:panel-1:conversation-1');
+    const second = session.bindCaller('panel:panel-1:conversation-2');
+
+    first.registerRefs([{ backendNodeId: 11, ref: 'e11' }]);
+    second.registerRefs([{ backendNodeId: 77, ref: 'e77' }]);
+
+    session.disposeCaller('panel:panel-1:conversation-1');
+
+    await expect(first.resolveTarget('e11')).resolves.toBeUndefined();
+    await expect(second.resolveTarget('e77')).resolves.toStrictEqual({
+      backendNodeId: 77,
+      kind: 'ref',
+      ref: 'e77',
+    });
+  });
+
+  it('stops a cancelled caller view from sending its remaining commands', async () => {
+    const { debuggerApi, session } = createSession();
+    let cancelled = false;
+    const view = session.bindCaller('panel:panel-1:conversation-1', {
+      cancelled: () => cancelled,
+    });
+
+    await view.send('Runtime.evaluate', { expression: '1' });
+    const sentBeforeTakeOver = debuggerApi.commands.length;
+
+    cancelled = true;
+
+    // The guard ends the call at its next command, so nothing reaches the page.
+    expect(() => view.send('Runtime.evaluate', { expression: '2' })).toThrow(TAB_TAKEN_ERROR);
+    expect(() => view.callTool('browser_evaluate', { function: '() => 1' })).toThrow(
+      TAB_TAKEN_ERROR
+    );
+    expect(debuggerApi.commands).toHaveLength(sentBeforeTakeOver);
+  });
+
+  it('keeps refs across turns and drops every registry on navigation', async () => {
+    const { debuggerApi, session } = createSession();
+    const first = session.bindCaller('panel:panel-1:conversation-1');
+    const second = session.bindCaller('panel:panel-1:conversation-2');
+
+    first.registerRefs([{ backendNodeId: 11, ref: 'e11' }]);
+    second.registerRefs([{ backendNodeId: 77, ref: 'e77' }]);
+
+    // Nothing a turn does clears a registry: only navigation or disposal does.
+    await expect(first.resolveTarget('e11')).resolves.toStrictEqual({
+      backendNodeId: 11,
+      kind: 'ref',
+      ref: 'e11',
+    });
+
+    debuggerApi.emitEvent(7, 'Page.frameNavigated', {
+      frame: { id: 'main', url: 'https://example.com/next' },
+    });
+
+    await expect(first.resolveTarget('e11')).resolves.toBeUndefined();
+    await expect(second.resolveTarget('e77')).resolves.toBeUndefined();
   });
 
   it('buffers console messages from Runtime and Log events and drops the oldest past the bound', async () => {

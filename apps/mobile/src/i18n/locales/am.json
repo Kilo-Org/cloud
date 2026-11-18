@@ -175,8 +175,9 @@
     "durationHourShort": "h",
     "changes": "ለውጦች",
     "organizationTrialEnded": "የድርጅቱ የሙከራ ጊዜ አልቋል፤ ንቁ ዕቅድም የለውም። የድርጅት ባለቤት በkilo.ai ላይ የክፍያ መረጃን ማዘመን ይችላል፣ ከዚያ እንደገና ይሞክሩ።",
-    "organizationTrialEndedBilling": "የድርጅቱ የሙከራ ጊዜ አልቋል፤ ንቁ ዕቅድም የለውም። የክፍያ መረጃን ማዘመን ይችላሉ፣ ከዚያ እንደገና ይሞክሩ።",
-    "privateRepositoryA11y": "{{name}}፣ የግል ማኅደር"
+    "privateRepositoryA11y": "{{name}}፣ የግል ማኅደር",
+    "legalDocumentEnglishOnly": "ይህ ሰነድ በእንግሊዝኛ ብቻ ይገኛል።",
+    "organizationTrialEndedBilling": "የድርጅቱ የሙከራ ጊዜ አልቋል፤ ንቁ ዕቅድም የለውም። የክፍያ መረጃን ማዘመን ይችላሉ፣ ከዚያ እንደገና ይሞክሩ።"
   },
   "language": {
     "restarting": "ቋንቋውን ለመቀየር እንደገና በመጀመር ላይ",
@@ -1355,7 +1356,8 @@
       "managedOnWeb": "የዚህ ድርጅት የBitbucket ግንኙነት ከኮምፒውተር በድር ላይ ይተዳደራል።",
       "description": "አስፈላጊ ፈቃዶች ያሉት የሥራ ቦታ መዳረሻ ቶከን ይፍጠሩና ከታች ይለጥፉት።",
       "scopes": "መለያ፦ ማንበብ · ማከማቻዎች፦ ማንበብ/መጻፍ · የኮድ ውህደት ጥያቄዎች፦ ማንበብ · ዌብሁኮች፦ ማንበብ/መጻፍ",
-      "tokenPlaceholder": "የሥራ ቦታ መዳረሻ ቶከን"
+      "tokenPlaceholder": "የሥራ ቦታ መዳረሻ ቶከን",
+      "tokenRefused": "Bitbucket ይህን የሥራ ቦታ ቶከን አልተቀበለውም። ከላይ ያሉት አስፈላጊ ፈቃዶች እንዳሉት ያረጋግጡ፣ ከዚያ እንደገና ይሞክሩ።"
     },
     "scopeList": {
       "personalStillAvailable": "የግል ማከማቻዎች አሁንም ከታች ይገኛሉ።",
@@ -1466,8 +1468,10 @@
       "repositoryLine": "ግምገማዎች፦ {{reviews}} · ግኝቶች፦ {{findings}}",
       "empty": "እስካሁን ትንታኔ ያላቸው ግምገማዎች የሉም",
       "emptyDescription": "ትንታኔ ለድርጅቱ ነቅቶ እያለ የተጠናቀቁ ግምገማዎችን ይመዘግባል።",
-      "off": "ለዚህ ድርጅት ትንታኔ ጠፍቷል።",
-      "couldNotLoad": "ትንታኔን መጫን አልተቻለም"
+      "offTitle": "ለ{{platform}} ትንታኔ ጠፍቷል",
+      "offDescription": "የተጠናቀቁ ግምገማዎችን ለመመዝገብ ትንታኔን በድር ላይ ባሉ የድርጅት ቅንብሮች ውስጥ ያንቁት።",
+      "couldNotLoad": "ትንታኔን መጫን አልተቻለም",
+      "off": "ለዚህ ድርጅት ትንታኔ ጠፍቷል።"
     },
     "council": {
       "title": "የጉባኤ ግምገማ",
@@ -3463,7 +3467,6 @@
     },
     "settingsOnWeb": {
       "title": "በድር ላይ ያሉ የድርጅት ቅንብሮች",
-      "integrations": "በድር ላይ ውህደቶች",
       "usageDetails": "የአጠቃቀም ዝርዝሮች",
       "providersAndModels": "አቅራቢዎች እና ሞዴሎች",
       "groups": "ቡድኖች",
@@ -3473,8 +3476,21 @@
       "dataCollection": "የውሂብ አሰባሰብ",
       "auditLogs": "የኦዲት መዝገቦች",
       "requestLogs": "የጥያቄ መዝገቦች",
+      "integrations": "በድር ላይ ውህደቶች",
       "subOrganizations": "ንዑስ ድርጅቶች",
       "distributeFunds": "ገንዘብ ያከፋፍሉ"
+    },
+    "requestLogs": {
+      "hint": "መስኮቱ ከማብቃቱ በፊት ባለው አንድ ሰዓት ውስጥ የተደረጉ ጥያቄዎች፣ አዲሶቹ በመጀመሪያ።",
+      "older": "ቀዳሚ ሰዓት",
+      "newer": "ቀጣይ ሰዓት",
+      "truncated": "በዚህ ሰዓት ዝርዝሩ ከሚያሳየው በላይ ጥያቄዎች አሉ።",
+      "emptyTitle": "ምንም ጥያቄዎች የሉም",
+      "emptyDescription": "በዚህ ሰዓት ውስጥ ምንም የጌትዌይ ጥያቄዎች የሉም።",
+      "loadError": "የጥያቄ መዝገቦችን መጫን አልተቻለም።",
+      "permissionDenied": "የጥያቄ መዝገቦቹን ማንበብ የሚችሉት የድርጅቱ ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ ብቻ ናቸው።",
+      "tokens": "{{input}} ግብዓት · {{output}} ውጤት",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "የግብዓት ቶከኖች",
@@ -4528,6 +4544,8 @@
     "topModels": "ዋና ሞዴሎች",
     "topFeatures": "ዋና ባህሪያት",
     "emptyTitle": "በዚህ ጊዜ ውስጥ ምንም አጠቃቀም የለም",
+    "unavailableTitle": "አጠቃቀም አይገኝም",
+    "unavailableDescription": "ይህ የሥራ አካባቢ አጠቃቀምን አይመዘግብም። እንደገና መሞከር አይረዳም።",
     "orgSelfNotice": "በዚህ ድርጅት ውስጥ የራስዎን አጠቃቀም እያዩ ነው።",
     "viewDetails": "የአጠቃቀም ዝርዝሮችን ይመልከቱ"
   },

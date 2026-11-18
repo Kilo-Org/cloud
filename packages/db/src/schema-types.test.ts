@@ -6,7 +6,9 @@ import {
   VercelModelsSchema,
   OpenRouterPricing,
   OpenRouterProvider,
+  OrganizationBrowserAllowedOriginSchema,
   OrganizationSettingsSchema,
+  normalizeOrganizationBrowserOrigin,
 } from './schema-types';
 import type { GatewayModel } from './schema-types';
 
@@ -288,5 +290,61 @@ describe('OpenRouterPricing', () => {
     });
 
     expect(pricing.discount).toBe(0.5);
+  });
+});
+
+describe('OrganizationBrowserAllowedOriginSchema', () => {
+  it.each([
+    'https://example.com',
+    'https://example.com/',
+    'http://example.com',
+    'http://localhost:3000',
+    'https://app.example.com:8443',
+  ])('accepts the origin %s', origin => {
+    expect(OrganizationBrowserAllowedOriginSchema.safeParse(origin).success).toBe(true);
+  });
+
+  it.each([
+    'example.com',
+    'https://example.com/path',
+    'https://example.com?query=1',
+    'https://example.com#section',
+    'https://user:password@example.com',
+    'ftp://example.com',
+    'https://',
+    '',
+  ])('rejects %s', origin => {
+    expect(OrganizationBrowserAllowedOriginSchema.safeParse(origin).success).toBe(false);
+  });
+
+  it('normalizes a trailing slash to the bare origin', () => {
+    expect(normalizeOrganizationBrowserOrigin('https://Example.com:443/')).toBe(
+      'https://example.com'
+    );
+    expect(normalizeOrganizationBrowserOrigin('https://example.com/path')).toBeNull();
+  });
+});
+
+describe('OrganizationSettingsSchema browser control', () => {
+  it('keeps the browser control policy', () => {
+    const parsed = OrganizationSettingsSchema.parse({
+      browserControl: 'playwright_only',
+      browserAllowedOrigins: ['https://example.com', 'http://localhost:3000'],
+    });
+
+    expect(parsed.browserControl).toBe('playwright_only');
+    expect(parsed.browserAllowedOrigins).toEqual(['https://example.com', 'http://localhost:3000']);
+  });
+
+  it('rejects an unknown browser control mode', () => {
+    const parsed = OrganizationSettingsSchema.safeParse({ browserControl: 'ask' });
+    expect(parsed.success).toBe(false);
+  });
+
+  it('rejects an allowed origin with a path', () => {
+    const parsed = OrganizationSettingsSchema.safeParse({
+      browserAllowedOrigins: ['https://example.com/checkout'],
+    });
+    expect(parsed.success).toBe(false);
   });
 });

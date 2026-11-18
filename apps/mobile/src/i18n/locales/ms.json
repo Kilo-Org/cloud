@@ -175,8 +175,9 @@
     "durationHourShort": "h",
     "changes": "Perubahan",
     "organizationTrialEnded": "Percubaan organisasi telah tamat dan ia tidak mempunyai pelan aktif. Pemilik organisasi boleh mengemas kini bil di kilo.ai, kemudian cuba lagi.",
-    "organizationTrialEndedBilling": "Percubaan organisasi telah tamat dan ia tidak mempunyai pelan aktif. Anda boleh mengemas kini bil, kemudian cuba lagi.",
-    "privateRepositoryA11y": "{{name}}, repositori persendirian"
+    "privateRepositoryA11y": "{{name}}, repositori persendirian",
+    "legalDocumentEnglishOnly": "Dokumen ini hanya tersedia dalam bahasa Inggeris.",
+    "organizationTrialEndedBilling": "Percubaan organisasi telah tamat dan ia tidak mempunyai pelan aktif. Anda boleh mengemas kini bil, kemudian cuba lagi."
   },
   "language": {
     "restarting": "Memulakan semula apl untuk menukar bahasa",
@@ -1355,7 +1356,8 @@
       "managedOnWeb": "Sambungan Bitbucket organisasi ini diurus di web melalui komputer.",
       "description": "Cipta token akses ruang kerja dengan skop yang diperlukan dan tampalkannya di bawah.",
       "scopes": "Akaun: baca · Repositori: baca/tulis · Permintaan penarikan: baca · Webhook: baca/tulis",
-      "tokenPlaceholder": "Token akses ruang kerja"
+      "tokenPlaceholder": "Token akses ruang kerja",
+      "tokenRefused": "Bitbucket tidak menerima token ruang kerja ini. Semak bahawa ia mempunyai skop di atas, kemudian cuba lagi."
     },
     "scopeList": {
       "personalStillAvailable": "Repositori peribadi masih tersedia di bawah.",
@@ -1466,8 +1468,10 @@
       "repositoryLine": "Semakan: {{reviews}} · Penemuan: {{findings}}",
       "empty": "Belum ada semakan dengan analitik",
       "emptyDescription": "Analitik merekodkan semakan yang selesai selagi ciri ini didayakan untuk organisasi.",
-      "off": "Analitik dimatikan untuk organisasi ini.",
-      "couldNotLoad": "Tidak dapat memuatkan analitik"
+      "offTitle": "Analitik dimatikan untuk {{platform}}",
+      "offDescription": "Dayakannya dalam tetapan organisasi di web untuk merekodkan semakan yang selesai.",
+      "couldNotLoad": "Tidak dapat memuatkan analitik",
+      "off": "Analitik dimatikan untuk organisasi ini."
     },
     "council": {
       "title": "Semakan panel",
@@ -3463,7 +3467,6 @@
     },
     "settingsOnWeb": {
       "title": "Tetapan organisasi di web",
-      "integrations": "Integrasi di web",
       "usageDetails": "Butiran penggunaan",
       "providersAndModels": "Penyedia dan model",
       "groups": "Kumpulan",
@@ -3473,8 +3476,21 @@
       "dataCollection": "Pengumpulan data",
       "auditLogs": "Log audit",
       "requestLogs": "Log permintaan",
+      "integrations": "Integrasi di web",
       "subOrganizations": "Suborganisasi",
       "distributeFunds": "Agihkan dana"
+    },
+    "requestLogs": {
+      "hint": "Permintaan dalam sejam sebelum julat masa berakhir, terkini dahulu.",
+      "older": "Jam sebelumnya",
+      "newer": "Jam berikutnya",
+      "truncated": "Jam ini ada lebih banyak permintaan daripada yang dipaparkan.",
+      "emptyTitle": "Tiada permintaan",
+      "emptyDescription": "Tiada permintaan get laluan dalam jam ini.",
+      "loadError": "Tidak dapat memuatkan log permintaan.",
+      "permissionDenied": "Hanya pemilik, pentadbir atau pengurus pengebilan organisasi boleh membaca log permintaannya.",
+      "tokens": "{{input}} masuk · {{output}} keluar",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Token masukan",
@@ -4528,6 +4544,8 @@
     "topModels": "Model teratas",
     "topFeatures": "Ciri teratas",
     "emptyTitle": "Tiada penggunaan dalam tempoh ini",
+    "unavailableTitle": "Penggunaan tidak tersedia",
+    "unavailableDescription": "Ruang kerja ini tidak melaporkan penggunaan. Mencuba semula tidak akan membantu.",
     "orgSelfNotice": "Anda sedang melihat penggunaan anda sendiri dalam organisasi ini.",
     "viewDetails": "Lihat butiran penggunaan"
   },

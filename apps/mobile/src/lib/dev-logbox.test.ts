@@ -33,6 +33,24 @@ describe('applyDevLogBoxFilters', () => {
   });
 });
 
+describe('design-gate probe', () => {
+  it('drops the layout-measure warning only in a design-gate prepared bundle', () => {
+    const probeSource = readFileSync(
+      join(__dirname, '..', 'components', 'design-gate-probe.tsx'),
+      'utf8'
+    );
+    const entrySource = readFileSync(join(__dirname, '..', '..', 'index.js'), 'utf8');
+    const configSource = readFileSync(join(__dirname, 'config.ts'), 'utf8');
+    // The suppression is gated on the prepared-tree receipt (`__kiloDesignProofSource`,
+    // written by `design-gate prepare` into +native-intent.tsx of its two worktrees
+    // only), never applied app-wide: the entry registers no filter for this
+    // message and config carries no gate flag.
+    expect(probeSource).toContain('if (globalThis.__kiloDesignProofSource !== undefined)');
+    expect(entrySource).not.toContain("Can't perform a React state update on a component");
+    expect(configSource).not.toContain('EXPO_PUBLIC_DESIGN_GATE');
+  });
+});
+
 describe('app entry', () => {
   const entrySource = readFileSync(join(__dirname, '..', '..', 'index.js'), 'utf8');
 

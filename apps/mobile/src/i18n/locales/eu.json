@@ -175,8 +175,9 @@
     "durationHourShort": "h",
     "changes": "Aldaketak",
     "organizationTrialEnded": "Erakundearen probaldia amaitu da eta ez du plan aktiborik. Erakundearen jabe batek fakturazioa egunera dezake kilo.ai-n, eta gero berriro saiatu.",
-    "organizationTrialEndedBilling": "Erakundearen probaldia amaitu da eta ez du plan aktiborik. Fakturazioa egunera dezakezu, eta gero berriro saiatu.",
-    "privateRepositoryA11y": "{{name}}, biltegi pribatua"
+    "privateRepositoryA11y": "{{name}}, biltegi pribatua",
+    "legalDocumentEnglishOnly": "Dokumentu hau ingelesez bakarrik dago eskuragarri.",
+    "organizationTrialEndedBilling": "Erakundearen probaldia amaitu da eta ez du plan aktiborik. Fakturazioa egunera dezakezu, eta gero berriro saiatu."
   },
   "language": {
     "restarting": "Hizkuntza aplikatzeko berrabiarazten",
@@ -1355,7 +1356,8 @@
       "managedOnWeb": "Erakunde honen Bitbucket konexioa webean kudeatzen da, ordenagailu batetik.",
       "description": "Sortu lan-eremurako sarbide-token bat beharrezko baimenekin eta itsatsi behean.",
       "scopes": "Kontua: irakurtzea · Biltegiak: irakurtzea/idaztea · Bateratze-eskaerak: irakurtzea · Webhook-ak: irakurtzea/idaztea",
-      "tokenPlaceholder": "Lan-eremurako sarbide-tokena"
+      "tokenPlaceholder": "Lan-eremurako sarbide-tokena",
+      "tokenRefused": "Bitbucketek ez du lan-eremurako sarbide-token hau onartu. Egiaztatu goiko baimenak dituela, eta saiatu berriro."
     },
     "scopeList": {
       "personalStillAvailable": "Biltegi pertsonalak behean daude eskuragarri oraindik.",
@@ -1466,8 +1468,10 @@
       "repositoryLine": "Berrikuspenak: {{reviews}} · Aurkikuntzak: {{findings}}",
       "empty": "Oraindik ez dago analitikadun berrikuspenik",
       "emptyDescription": "Analitikak amaitutako berrikuspenak erregistratzen ditu erakundean gaituta dagoen bitartean.",
-      "off": "Analitika desgaituta dago erakunde honetan.",
-      "couldNotLoad": "Ezin izan da analitika kargatu"
+      "offTitle": "{{platform}} plataformarako analitika desgaituta dago",
+      "offDescription": "Gaitu analitika erakundearen webean dauden ezarpenetan, amaitutako berrikuspenak erregistratzeko.",
+      "couldNotLoad": "Ezin izan da analitika kargatu",
+      "off": "Analitika desgaituta dago erakunde honetan."
     },
     "council": {
       "title": "Kontseilu-berrikuspena",
@@ -3463,7 +3467,6 @@
     },
     "settingsOnWeb": {
       "title": "Erakundearen ezarpenak webean",
-      "integrations": "Integrazioak webean",
       "usageDetails": "Erabileraren xehetasunak",
       "providersAndModels": "Hornitzaileak eta ereduak",
       "groups": "Taldeak",
@@ -3473,8 +3476,21 @@
       "dataCollection": "Datu-bilketa",
       "auditLogs": "Ikuskaritza-erregistroak",
       "requestLogs": "Eskaeren erregistroak",
+      "integrations": "Integrazioak webean",
       "subOrganizations": "Azpierakundeak",
       "distributeFunds": "Banatu funtsak"
+    },
+    "requestLogs": {
+      "hint": "Leihoa amaitu aurreko orduko eskaerak, berrienak lehenik.",
+      "older": "Aurreko ordua",
+      "newer": "Hurrengo ordua",
+      "truncated": "Ordu honetan zerrendak erakusten dituenak baino eskaera gehiago daude.",
+      "emptyTitle": "Ez dago eskaerarik",
+      "emptyDescription": "Ordu honetan ez dago atebideko eskaerarik.",
+      "loadError": "Ezin izan dira eskaeren erregistroak kargatu.",
+      "permissionDenied": "Erakunde baten jabeak, administratzaileak edo fakturazio-kudeatzaileak soilik irakur ditzake haren eskaeren erregistroak.",
+      "tokens": "{{input}} sarrera · {{output}} irteera",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Sarrerako tokenak",
@@ -4528,6 +4544,8 @@
     "topModels": "Eredu erabilienak",
     "topFeatures": "Funtzio erabilienak",
     "emptyTitle": "Ez dago erabilerarik aldi honetan",
+    "unavailableTitle": "Erabilera ez dago erabilgarri",
+    "unavailableDescription": "Lan-eremu honek ez du erabilerarik jakinarazten. Berriro saiatzeak ez du lagunduko.",
     "orgSelfNotice": "Erakunde honetan zure erabilera ikusten ari zara.",
     "viewDetails": "Ikusi erabileraren xehetasunak"
   },

@@ -175,8 +175,9 @@
     "durationHourShort": "h",
     "changes": "Muutokset",
     "organizationTrialEnded": "Organisaation kokeilujakso on päättynyt, eikä sillä ole aktiivista suunnitelmaa. Organisaation omistaja voi päivittää laskutuksen osoitteessa kilo.ai ja yrittää sitten uudelleen.",
-    "organizationTrialEndedBilling": "Organisaation kokeilujakso on päättynyt, eikä sillä ole aktiivista suunnitelmaa. Voit päivittää laskutuksen ja yrittää sitten uudelleen.",
-    "privateRepositoryA11y": "{{name}}, yksityinen tietovarasto"
+    "privateRepositoryA11y": "{{name}}, yksityinen tietovarasto",
+    "legalDocumentEnglishOnly": "Tämä asiakirja on saatavilla vain englanniksi.",
+    "organizationTrialEndedBilling": "Organisaation kokeilujakso on päättynyt, eikä sillä ole aktiivista suunnitelmaa. Voit päivittää laskutuksen ja yrittää sitten uudelleen."
   },
   "language": {
     "restarting": "Käynnistetään uudelleen kielen vaihtamiseksi",
@@ -1355,7 +1356,8 @@
       "managedOnWeb": "Tämän organisaation Bitbucket-yhteyttä hallitaan verkossa tietokoneella.",
       "description": "Luo työtilan käyttöoikeustunnus vaadituilla oikeuksilla ja liitä se alla olevaan kenttään.",
       "scopes": "Tili: luku · Koodivarastot: luku/kirjoitus · Muutospyynnöt: luku · Webhookit: luku/kirjoitus",
-      "tokenPlaceholder": "Työtilan käyttöoikeustunnus"
+      "tokenPlaceholder": "Työtilan käyttöoikeustunnus",
+      "tokenRefused": "Bitbucket ei hyväksynyt tätä työtilan käyttöoikeustunnusta. Tarkista, että siinä on yllä olevat oikeudet, ja yritä sitten uudelleen."
     },
     "scopeList": {
       "personalStillAvailable": "Omat koodivarastosi ovat edelleen käytettävissä alla.",
@@ -1466,8 +1468,10 @@
       "repositoryLine": "Katselmoinnit: {{reviews}} · Havainnot: {{findings}}",
       "empty": "Ei vielä analytiikkaa sisältäviä katselmointeja",
       "emptyDescription": "Analytiikka tallentaa valmiit katselmoinnit, kun se on käytössä organisaatiossa.",
-      "off": "Analytiikka ei ole käytössä tässä organisaatiossa.",
-      "couldNotLoad": "Analytiikan lataaminen epäonnistui"
+      "offTitle": "Analytiikka ei ole käytössä alustalla {{platform}}",
+      "offDescription": "Ota se käyttöön organisaation asetuksissa verkossa, jotta analytiikka tallentaa valmiit katselmoinnit.",
+      "couldNotLoad": "Analytiikan lataaminen epäonnistui",
+      "off": "Analytiikka ei ole käytössä tässä organisaatiossa."
     },
     "council": {
       "title": "Neuvostokatselmointi",
@@ -3463,7 +3467,6 @@
     },
     "settingsOnWeb": {
       "title": "Organisaation asetukset verkossa",
-      "integrations": "Integraatiot verkossa",
       "usageDetails": "Käytön tiedot",
       "providersAndModels": "Palveluntarjoajat ja mallit",
       "groups": "Ryhmät",
@@ -3473,8 +3476,21 @@
       "dataCollection": "Tiedonkeruu",
       "auditLogs": "Tarkastuslokit",
       "requestLogs": "Pyyntölokit",
+      "integrations": "Integraatiot verkossa",
       "subOrganizations": "Alaorganisaatiot",
       "distributeFunds": "Jaa varoja"
+    },
+    "requestLogs": {
+      "hint": "Aikaikkunan päättymistä edeltävän tunnin pyynnöt, uusimmat ensin.",
+      "older": "Edellinen tunti",
+      "newer": "Seuraava tunti",
+      "truncated": "Tällä tunnilla on enemmän pyyntöjä kuin luettelossa näytetään.",
+      "emptyTitle": "Ei pyyntöjä",
+      "emptyDescription": "Tällä tunnilla ei ole yhdyskäytäväpyyntöjä.",
+      "loadError": "Pyyntölokien lataaminen epäonnistui.",
+      "permissionDenied": "Vain organisaation omistaja, ylläpitäjä tai laskutusvastaava voi lukea organisaation pyyntölokeja.",
+      "tokens": "{{input}} sisään · {{output}} ulos",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Syötetokenit",
@@ -4528,6 +4544,8 @@
     "topModels": "Käytetyimmät mallit",
     "topFeatures": "Käytetyimmät ominaisuudet",
     "emptyTitle": "Ei käyttöä tällä aikavälillä",
+    "unavailableTitle": "Käyttö ei ole saatavilla",
+    "unavailableDescription": "Tämä työtila ei raportoi käyttöä. Uudelleen yrittäminen ei auta.",
     "orgSelfNotice": "Näet oman käyttösi tässä organisaatiossa.",
     "viewDetails": "Näytä käytön tiedot"
   },

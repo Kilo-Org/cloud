@@ -175,8 +175,9 @@
     "durationHourShort": "h",
     "changes": "Änderungen",
     "organizationTrialEnded": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan. Ein Inhaber der Organisation kann die Abrechnung unter kilo.ai aktualisieren und es dann erneut versuchen.",
-    "organizationTrialEndedBilling": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan. Sie können die Abrechnung aktualisieren und es dann erneut versuchen.",
-    "privateRepositoryA11y": "{{name}}, privates Repository"
+    "privateRepositoryA11y": "{{name}}, privates Repository",
+    "legalDocumentEnglishOnly": "Dieses Dokument ist nur auf Englisch verfügbar.",
+    "organizationTrialEndedBilling": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan. Sie können die Abrechnung aktualisieren und es dann erneut versuchen."
   },
   "language": {
     "restarting": "Neustart zum Übernehmen der Sprache",
@@ -677,7 +678,8 @@
       "managedOnWeb": "Die Bitbucket-Verbindung dieser Organisation wird im Web über einen Computer verwaltet.",
       "description": "Erstelle ein Workspace-Zugriffstoken mit den erforderlichen Berechtigungen und füge es unten ein.",
       "scopes": "Konto: Lesen · Repositories: Lesen/Schreiben · Pull-Requests: Lesen · Webhooks: Lesen/Schreiben",
-      "tokenPlaceholder": "Workspace-Zugriffstoken"
+      "tokenPlaceholder": "Workspace-Zugriffstoken",
+      "tokenRefused": "Bitbucket hat dieses Workspace-Zugriffstoken nicht akzeptiert. Prüfe, ob es die oben genannten Berechtigungen enthält, und versuche es dann erneut."
     },
     "followReviewMd": "REVIEW.md befolgen",
     "followReviewMdSubtitle": "Anweisungen aus der REVIEW.md-Datei des jeweiligen Repositorys beachten",
@@ -923,8 +925,10 @@
       "repositoryLine": "Reviews: {{reviews}} · Befunde: {{findings}}",
       "empty": "Noch keine Reviews mit Analysen",
       "emptyDescription": "Analysen erfassen abgeschlossene Reviews, solange sie für die Organisation aktiviert sind.",
-      "off": "Analysen sind für diese Organisation deaktiviert.",
-      "couldNotLoad": "Analysen konnten nicht geladen werden"
+      "offTitle": "Analysen sind für {{platform}} deaktiviert",
+      "offDescription": "Aktiviere sie in den Organisationseinstellungen im Web, um abgeschlossene Reviews zu erfassen.",
+      "couldNotLoad": "Analysen konnten nicht geladen werden",
+      "off": "Analysen sind für diese Organisation deaktiviert."
     },
     "council": {
       "title": "Gremium-Review",
@@ -3468,7 +3472,6 @@
     },
     "settingsOnWeb": {
       "title": "Organisationseinstellungen im Web",
-      "integrations": "Integrationen im Web",
       "usageDetails": "Nutzungsdetails",
       "providersAndModels": "Anbieter und Modelle",
       "groups": "Gruppen",
@@ -3478,8 +3481,21 @@
       "dataCollection": "Datenerfassung",
       "auditLogs": "Audit-Logs",
       "requestLogs": "Anfrage-Logs",
+      "integrations": "Integrationen im Web",
       "subOrganizations": "Unterorganisationen",
       "distributeFunds": "Guthaben verteilen"
+    },
+    "requestLogs": {
+      "hint": "Anfragen aus der Stunde vor Ende des Zeitfensters, neueste zuerst.",
+      "older": "Frühere Stunde",
+      "newer": "Spätere Stunde",
+      "truncated": "Diese Stunde enthält mehr Anfragen, als die Liste anzeigt.",
+      "emptyTitle": "Keine Anfragen",
+      "emptyDescription": "In dieser Stunde gab es keine Gateway-Anfragen.",
+      "loadError": "Anfrage-Logs konnten nicht geladen werden.",
+      "permissionDenied": "Nur Inhaber, Admins oder Abrechnungsverantwortliche einer Organisation können deren Anfrage-Logs einsehen.",
+      "tokens": "{{input}} ein · {{output}} aus",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Eingabe-Tokens",
@@ -4528,6 +4544,8 @@
     "topModels": "Top-Modelle",
     "topFeatures": "Top-Funktionen",
     "emptyTitle": "Keine Nutzung in diesem Zeitraum",
+    "unavailableTitle": "Nutzung nicht verfügbar",
+    "unavailableDescription": "Dieser Workspace meldet keine Nutzung. Erneutes Versuchen hilft nicht.",
     "orgSelfNotice": "Du siehst deine eigene Nutzung in dieser Organisation.",
     "viewDetails": "Nutzungsdetails anzeigen"
   },

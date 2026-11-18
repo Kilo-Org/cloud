@@ -39,12 +39,12 @@ import jwt from 'jsonwebtoken';
 import { NextRequest } from 'next/server';
 import { GET as models } from './models/route';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
-import { JWT_TOKEN_VERSION } from '@kilocode/web-shared/lib/tokens';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   KILO_API_AUDIENCE,
   KILO_GATEWAY_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { KILO_TOKEN_VERSION } from '@kilocode/worker-utils/kilo-token';
 
 const { getEnhancedOpenRouterModels } = jest.requireMock(
   '@kilocode/web-shared/lib/ai-gateway/providers/openrouter'
@@ -69,7 +69,7 @@ function signToken(
 ) {
   return jwt.sign(
     {
-      version: JWT_TOKEN_VERSION,
+      version: KILO_TOKEN_VERSION,
       kiloUserId: userId,
       apiTokenPepper,
       env: process.env.NODE_ENV,

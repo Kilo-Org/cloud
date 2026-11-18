@@ -175,8 +175,9 @@
     "durationHourShort": "h",
     "changes": "Chanjman",
     "organizationTrialEnded": "Esè òganizasyon an fini epi li pa gen okenn plan aktif. Yon pwopriyetè òganizasyon ka mete ajou faktirasyon sou kilo.ai, epi eseye ankò.",
-    "organizationTrialEndedBilling": "Esè òganizasyon an fini epi li pa gen okenn plan aktif. Ou ka mete ajou faktirasyon, epi eseye ankò.",
-    "privateRepositoryA11y": "{{name}}, repòsitwa prive"
+    "privateRepositoryA11y": "{{name}}, repòsitwa prive",
+    "legalDocumentEnglishOnly": "Dokiman sa a disponib nan lang angle sèlman.",
+    "organizationTrialEndedBilling": "Esè òganizasyon an fini epi li pa gen okenn plan aktif. Ou ka mete ajou faktirasyon, epi eseye ankò."
   },
   "language": {
     "restarting": "Ap rekòmanse pou itilize lang ou chwazi a",
@@ -1355,7 +1356,8 @@
       "managedOnWeb": "Koneksyon Bitbucket òganizasyon sa a jere sou entènèt la, apati yon òdinatè.",
       "description": "Kreye yon jeton aksè pou espas travay la ak pèmisyon ki nesesè yo, epi kole li anba a.",
       "scopes": "Kont: lekti · Depo: lekti/ekriti · Demann fizyon: lekti · Webhook: lekti/ekriti",
-      "tokenPlaceholder": "Jeton aksè pou espas travay la"
+      "tokenPlaceholder": "Jeton aksè pou espas travay la",
+      "tokenRefused": "Bitbucket pa aksepte jeton aksè pou espas travay sa a. Verifye ke li gen pèmisyon ki anwo a, epi eseye ankò."
     },
     "scopeList": {
       "personalStillAvailable": "Depo pèsonèl yo toujou disponib anba a.",
@@ -1466,8 +1468,10 @@
       "repositoryLine": "Revizyon: {{reviews}} · Konsta: {{findings}}",
       "empty": "Poko gen revizyon ak estatistik",
       "emptyDescription": "Estatistik yo anrejistre revizyon ki fini pandan yo aktive pou òganizasyon an.",
-      "off": "Estatistik yo dezaktive pou òganizasyon sa a.",
-      "couldNotLoad": "Nou pa t ka chaje estatistik yo"
+      "offTitle": "Estatistik yo dezaktive pou {{platform}}",
+      "offDescription": "Aktive Estatistik yo nan paramèt òganizasyon an sou entènèt pou anrejistre revizyon ki fini.",
+      "couldNotLoad": "Nou pa t ka chaje estatistik yo",
+      "off": "Estatistik yo dezaktive pou òganizasyon sa a."
     },
     "council": {
       "title": "Revizyon konsèy",
@@ -3463,7 +3467,6 @@
     },
     "settingsOnWeb": {
       "title": "Paramèt òganizasyon an sou entènèt",
-      "integrations": "Entegrasyon sou entènèt",
       "usageDetails": "Detay itilizasyon",
       "providersAndModels": "Founisè ak modèl",
       "groups": "Gwoup",
@@ -3473,8 +3476,21 @@
       "dataCollection": "Koleksyon done",
       "auditLogs": "Jounal odit",
       "requestLogs": "Jounal demann",
+      "integrations": "Entegrasyon sou entènèt",
       "subOrganizations": "Sou-òganizasyon",
       "distributeFunds": "Distribye lajan"
+    },
+    "requestLogs": {
+      "hint": "Demann nan èdtan anvan fen fenèt la, pi resan yo an premye.",
+      "older": "Èdtan anvan",
+      "newer": "Èdtan apre",
+      "truncated": "Èdtan sa a gen plis demann pase sa lis la montre.",
+      "emptyTitle": "Pa gen demann",
+      "emptyDescription": "Pa gen demann pasrèl nan èdtan sa a.",
+      "loadError": "Nou pa t ka chaje jounal demann yo.",
+      "permissionDenied": "Se sèlman yon pwopriyetè, yon administratè oswa yon jesyonè faktirasyon nan òganizasyon an ki ka li jounal demann li.",
+      "tokens": "{{input}} antre · {{output}} soti",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Jeton antre",
@@ -4528,6 +4544,8 @@
     "topModels": "Modèl ki pi itilize",
     "topFeatures": "Fonksyon ki pi itilize",
     "emptyTitle": "Pa gen itilizasyon nan peryòd sa a",
+    "unavailableTitle": "Itilizasyon pa disponib",
+    "unavailableDescription": "Espas travay sa a pa rapòte itilizasyon. Repare pa pral ede.",
     "orgSelfNotice": "W ap wè pwòp itilizasyon pa w nan òganizasyon sa a.",
     "viewDetails": "Wè detay itilizasyon"
   },

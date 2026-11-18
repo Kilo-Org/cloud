@@ -175,8 +175,9 @@
     "durationHourShort": "h",
     "changes": "Alterações",
     "organizationTrialEnded": "O período de teste da organização terminou e esta não tem um plano ativo. O proprietário da organização pode atualizar a faturação em kilo.ai e, em seguida, tentar novamente.",
-    "organizationTrialEndedBilling": "O período de teste da organização terminou e esta não tem um plano ativo. Pode atualizar a faturação e, em seguida, tentar novamente.",
-    "privateRepositoryA11y": "{{name}}, repositório privado"
+    "privateRepositoryA11y": "{{name}}, repositório privado",
+    "legalDocumentEnglishOnly": "Este documento está disponível apenas em inglês.",
+    "organizationTrialEndedBilling": "O período de teste da organização terminou e esta não tem um plano ativo. Pode atualizar a faturação e, em seguida, tentar novamente."
   },
   "language": {
     "restarting": "A reiniciar para aplicar o idioma",
@@ -1378,7 +1379,8 @@
       "managedOnWeb": "A ligação ao Bitbucket desta organização é gerida na Web, a partir de um computador.",
       "description": "Cria um token de acesso ao espaço de trabalho com as permissões necessárias e cola-o abaixo.",
       "scopes": "Conta: leitura · Repositórios: leitura/escrita · Pedidos de integração: leitura · Webhooks: leitura/escrita",
-      "tokenPlaceholder": "Token de acesso ao espaço de trabalho"
+      "tokenPlaceholder": "Token de acesso ao espaço de trabalho",
+      "tokenRefused": "O Bitbucket não aceitou este token de acesso ao espaço de trabalho. Verifica se tem as permissões acima e tenta novamente."
     },
     "scopeList": {
       "personalStillAvailable": "Os repositórios pessoais ainda estão disponíveis abaixo.",
@@ -1490,8 +1492,10 @@
       "repositoryLine": "Revisões: {{reviews}} · Ocorrências: {{findings}}",
       "empty": "Ainda não há revisões com estatísticas",
       "emptyDescription": "As estatísticas registam revisões concluídas enquanto estão ativadas para a organização.",
-      "off": "As estatísticas estão desativadas para esta organização.",
-      "couldNotLoad": "Não foi possível carregar as estatísticas"
+      "offTitle": "As estatísticas estão desativadas para {{platform}}",
+      "offDescription": "Ativa-as nas definições da organização na Web para registar revisões concluídas.",
+      "couldNotLoad": "Não foi possível carregar as estatísticas",
+      "off": "As estatísticas estão desativadas para esta organização."
     },
     "council": {
       "title": "Revisão do conselho",
@@ -3526,7 +3530,6 @@
     },
     "settingsOnWeb": {
       "title": "Definições da organização na Web",
-      "integrations": "Integrações na Web",
       "usageDetails": "Detalhes de utilização",
       "providersAndModels": "Fornecedores e modelos",
       "groups": "Grupos",
@@ -3536,8 +3539,21 @@
       "dataCollection": "Recolha de dados",
       "auditLogs": "Registos de auditoria",
       "requestLogs": "Registos de pedidos",
+      "integrations": "Integrações na Web",
       "subOrganizations": "Suborganizações",
       "distributeFunds": "Distribuir fundos"
+    },
+    "requestLogs": {
+      "hint": "Pedidos da hora anterior ao fim do intervalo, mais recentes primeiro.",
+      "older": "Hora anterior",
+      "newer": "Hora seguinte",
+      "truncated": "Esta hora tem mais pedidos do que os apresentados na lista.",
+      "emptyTitle": "Sem pedidos",
+      "emptyDescription": "Não há pedidos ao gateway nesta hora.",
+      "loadError": "Não foi possível carregar os registos de pedidos.",
+      "permissionDenied": "Só um proprietário, administrador ou gestor de faturação de uma organização pode consultar os respetivos registos de pedidos.",
+      "tokens": "{{input}} de entrada · {{output}} de saída",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Tokens de entrada",
@@ -4604,6 +4620,8 @@
     "topModels": "Modelos mais usados",
     "topFeatures": "Funcionalidades mais usadas",
     "emptyTitle": "Sem utilização neste período",
+    "unavailableTitle": "Utilização indisponível",
+    "unavailableDescription": "Esta área de trabalho não está a comunicar utilização. Tentar novamente não vai ajudar.",
     "orgSelfNotice": "Está a ver a sua própria utilização nesta organização.",
     "viewDetails": "Ver detalhes de utilização"
   },

@@ -175,8 +175,9 @@
     "durationHourShort": "h",
     "changes": "Zmeny",
     "organizationTrialEnded": "Skúšobné obdobie organizácie sa skončilo a organizácia nemá aktívny plán. Vlastník organizácie môže aktualizovať fakturáciu na kilo.ai a potom to skúsiť znova.",
-    "organizationTrialEndedBilling": "Skúšobné obdobie organizácie sa skončilo a organizácia nemá aktívny plán. Môžete aktualizovať fakturáciu a potom to skúsiť znova.",
-    "privateRepositoryA11y": "{{name}}, súkromné úložisko"
+    "privateRepositoryA11y": "{{name}}, súkromné úložisko",
+    "legalDocumentEnglishOnly": "Tento dokument je dostupný len v angličtine.",
+    "organizationTrialEndedBilling": "Skúšobné obdobie organizácie sa skončilo a organizácia nemá aktívny plán. Môžete aktualizovať fakturáciu a potom to skúsiť znova."
   },
   "language": {
     "restarting": "Aplikácia sa reštartuje na zmenu jazyka",
@@ -1401,7 +1402,8 @@
       "managedOnWeb": "Pripojenie tejto organizácie k Bitbucketu sa spravuje na webe z počítača.",
       "description": "Vytvorte prístupový token pracovného priestoru s požadovanými oprávneniami a vložte ho nižšie.",
       "scopes": "Účet: čítanie · Repozitáre: čítanie/zápis · PR: čítanie · Webhooky: čítanie/zápis",
-      "tokenPlaceholder": "Prístupový token pracovného priestoru"
+      "tokenPlaceholder": "Prístupový token pracovného priestoru",
+      "tokenRefused": "Bitbucket neprijal tento token pracovného priestoru. Skontrolujte, či má oprávnenia uvedené vyššie, a potom to skúste znova."
     },
     "scopeList": {
       "personalStillAvailable": "Osobné repozitáre sú stále dostupné nižšie.",
@@ -1514,8 +1516,10 @@
       "repositoryLine": "Kontroly: {{reviews}} · Nálezy: {{findings}}",
       "empty": "Zatiaľ žiadne kontroly s analytikou",
       "emptyDescription": "Analytika zaznamenáva dokončené kontroly, kým je pre organizáciu zapnutá.",
-      "off": "Analytika je pre túto organizáciu vypnutá.",
-      "couldNotLoad": "Analytiku sa nepodarilo načítať"
+      "offTitle": "Analytika je pre {{platform}} vypnutá",
+      "offDescription": "Zapnite ju v nastaveniach organizácie na webe, aby zaznamenávala dokončené kontroly.",
+      "couldNotLoad": "Analytiku sa nepodarilo načítať",
+      "off": "Analytika je pre túto organizáciu vypnutá."
     },
     "council": {
       "title": "Kontrola rady",
@@ -3577,7 +3581,6 @@
     },
     "settingsOnWeb": {
       "title": "Nastavenia organizácie na webe",
-      "integrations": "Integrácie na webe",
       "usageDetails": "Podrobnosti o využití",
       "providersAndModels": "Poskytovatelia a modely",
       "groups": "Skupiny",
@@ -3587,8 +3590,21 @@
       "dataCollection": "Zber údajov",
       "auditLogs": "Protokoly auditu",
       "requestLogs": "Protokoly požiadaviek",
+      "integrations": "Integrácie na webe",
       "subOrganizations": "Podorganizácie",
       "distributeFunds": "Rozdeliť prostriedky"
+    },
+    "requestLogs": {
+      "hint": "Požiadavky z hodiny pred koncom časového okna, najnovšie prvé.",
+      "older": "Staršia hodina",
+      "newer": "Novšia hodina",
+      "truncated": "V tejto hodine je viac požiadaviek, než zoznam zobrazuje.",
+      "emptyTitle": "Žiadne požiadavky",
+      "emptyDescription": "V tejto hodine nie sú žiadne požiadavky na bránu.",
+      "loadError": "Protokoly požiadaviek sa nepodarilo načítať.",
+      "permissionDenied": "Protokoly požiadaviek si môže prezerať iba vlastník, administrátor alebo správca fakturácie organizácie.",
+      "tokens": "{{input}} vstup · {{output}} výstup",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Vstupné tokeny",
@@ -4668,6 +4684,8 @@
     "topModels": "Najpoužívanejšie modely",
     "topFeatures": "Najpoužívanejšie funkcie",
     "emptyTitle": "V tomto období žiadne využitie",
+    "unavailableTitle": "Využitie nie je k dispozícii",
+    "unavailableDescription": "Tento pracovný priestor nevykazuje využitie. Opakovanie nepomôže.",
     "orgSelfNotice": "Vidíte svoje vlastné využitie v tejto organizácii.",
     "viewDetails": "Zobraziť podrobnosti o využití"
   },

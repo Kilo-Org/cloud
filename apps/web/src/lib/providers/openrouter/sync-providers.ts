@@ -47,6 +47,7 @@ import {
 } from '@/lib/providers/openrouter/free-endpoint-data-policy';
 import { injectVercelModels } from '@/lib/providers/openrouter/inject-vercel-models';
 import { withWorstProviderDataPolicy } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/model-data-policy';
+import { getModelDisplayPricing } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/display-pricing';
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import {
   getVercelModelIdOverrides,
@@ -130,6 +131,22 @@ export async function fetchGatewayModels(
   );
 
   return joined.models;
+}
+
+/**
+ * Stores the price Kilo shows for the listing, its undiscounted peak price, so consumers of the
+ * snapshot never see a discounted or off-peak price.
+ */
+export function withDisplayPricing(model: OpenRouterModel): OpenRouterModel {
+  if (!model.endpoint) return model;
+  const pricing = getModelDisplayPricing(model.endpoint.pricing) ?? model.endpoint.pricing;
+  return {
+    ...model,
+    endpoint: {
+      ...model.endpoint,
+      pricing: { prompt: pricing.prompt, completion: pricing.completion },
+    },
+  };
 }
 
 async function syncProviders(params: {
@@ -235,7 +252,9 @@ async function syncProviders(params: {
     const uniqueModelsMap = new Map<string, OpenRouterModel>();
     data.models.forEach(model => {
       // A model may show a ZDR route even though the same provider also offers data-retaining routes.
-      const normalizedModel = withWorstProviderDataPolicy(model, data.provider.dataPolicy);
+      const normalizedModel = withDisplayPricing(
+        withWorstProviderDataPolicy(model, data.provider.dataPolicy)
+      );
       uniqueModelsMap.set(normalizeModelId(model.slug), normalizedModel);
     });
     const uniqueModels = Array.from(uniqueModelsMap.values());
@@ -293,8 +312,8 @@ async function syncProviders(params: {
   }
 
   // Sort providers by name
-  const sortedProviders = (await injectDirectByokProviders(allProviders)).sort((a, b) =>
-    a.name.localeCompare(b.name)
+  const sortedProviders = (await injectDirectByokProviders(allProviders, openRouterModels)).sort(
+    (a, b) => a.name.localeCompare(b.name)
   );
 
   // Calculate total models across all providers

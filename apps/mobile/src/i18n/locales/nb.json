@@ -175,8 +175,9 @@
     "durationHourShort": "h",
     "changes": "Endringer",
     "organizationTrialEnded": "Organisasjonens prøveperiode er over, og den har ingen aktiv plan. En organisasjonseier kan oppdatere faktureringen på kilo.ai og deretter prøve igjen.",
-    "organizationTrialEndedBilling": "Organisasjonens prøveperiode er over, og den har ingen aktiv plan. Du kan oppdatere faktureringen og deretter prøve igjen.",
-    "privateRepositoryA11y": "{{name}}, privat repository"
+    "privateRepositoryA11y": "{{name}}, privat repository",
+    "legalDocumentEnglishOnly": "Dette dokumentet er kun tilgjengelig på engelsk.",
+    "organizationTrialEndedBilling": "Organisasjonens prøveperiode er over, og den har ingen aktiv plan. Du kan oppdatere faktureringen og deretter prøve igjen."
   },
   "language": {
     "restarting": "Starter på nytt for å bruke språket",
@@ -1355,7 +1356,8 @@
       "managedOnWeb": "Organisasjonens Bitbucket-tilkobling administreres på nettet fra en datamaskin.",
       "description": "Opprett et tilgangstoken for arbeidsområdet med de nødvendige tillatelsene, og lim det inn nedenfor.",
       "scopes": "Konto: lesing · Kodelagre: lesing/skriving · PR-er: lesing · Webhooks: lesing/skriving",
-      "tokenPlaceholder": "Tilgangstoken for arbeidsområdet"
+      "tokenPlaceholder": "Tilgangstoken for arbeidsområdet",
+      "tokenRefused": "Bitbucket godtok ikke dette tilgangstokenet for arbeidsområdet. Kontroller at det har tillatelsene ovenfor, og prøv deretter på nytt."
     },
     "scopeList": {
       "personalStillAvailable": "Personlige kodelagre er fortsatt tilgjengelige nedenfor.",
@@ -1466,8 +1468,10 @@
       "repositoryLine": "Gjennomganger: {{reviews}} · Funn: {{findings}}",
       "empty": "Ingen gjennomganger med statistikk ennå",
       "emptyDescription": "Statistikken registrerer fullførte gjennomganger så lenge den er aktivert for organisasjonen.",
-      "off": "Statistikken er slått av for denne organisasjonen.",
-      "couldNotLoad": "Kunne ikke laste statistikken"
+      "offTitle": "Statistikken er slått av for {{platform}}",
+      "offDescription": "Aktiver den i organisasjonsinnstillingene på nettet for å registrere fullførte gjennomganger.",
+      "couldNotLoad": "Kunne ikke laste statistikken",
+      "off": "Statistikken er slått av for denne organisasjonen."
     },
     "council": {
       "title": "Panelvurdering",
@@ -3463,7 +3467,6 @@
     },
     "settingsOnWeb": {
       "title": "Organisasjonsinnstillinger på nettet",
-      "integrations": "Integrasjoner på nettet",
       "usageDetails": "Bruksdetaljer",
       "providersAndModels": "Leverandører og modeller",
       "groups": "Grupper",
@@ -3473,8 +3476,21 @@
       "dataCollection": "Datainnsamling",
       "auditLogs": "Revisjonslogger",
       "requestLogs": "Forespørselslogger",
+      "integrations": "Integrasjoner på nettet",
       "subOrganizations": "Underorganisasjoner",
       "distributeFunds": "Fordel midler"
+    },
+    "requestLogs": {
+      "hint": "Forespørsler fra timen før vinduet slutter, nyeste først.",
+      "older": "Eldre time",
+      "newer": "Nyere time",
+      "truncated": "Denne timen har flere forespørsler enn listen viser.",
+      "emptyTitle": "Ingen forespørsler",
+      "emptyDescription": "Denne timen har ingen gateway-forespørsler.",
+      "loadError": "Kunne ikke laste inn forespørselslogger.",
+      "permissionDenied": "Bare en eier, administrator eller faktureringsansvarlig i organisasjonen kan lese forespørselsloggene.",
+      "tokens": "{{input}} inn · {{output}} ut",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Inndatatokener",
@@ -4528,6 +4544,8 @@
     "topModels": "Mest brukte modeller",
     "topFeatures": "Mest brukte funksjoner",
     "emptyTitle": "Ikke noe forbruk i denne perioden",
+    "unavailableTitle": "Forbruk er ikke tilgjengelig",
+    "unavailableDescription": "Dette arbeidsområdet rapporterer ikke forbruk. Det hjelper ikke å prøve igjen.",
     "orgSelfNotice": "Du ser ditt eget forbruk i denne organisasjonen.",
     "viewDetails": "Vis forbruksdetaljer"
   },

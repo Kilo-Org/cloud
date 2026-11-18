@@ -175,8 +175,9 @@
     "durationHourShort": "h",
     "changes": "Izmene",
     "organizationTrialEnded": "Probni period organizacije je završen i ona nema aktivan plan. Vlasnik organizacije može da ažurira naplatu na kilo.ai, a zatim pokuša ponovo.",
-    "organizationTrialEndedBilling": "Probni period organizacije je završen i ona nema aktivan plan. Možete da ažurirate naplatu, a zatim pokušajte ponovo.",
-    "privateRepositoryA11y": "{{name}}, privatno spremište"
+    "privateRepositoryA11y": "{{name}}, privatno spremište",
+    "legalDocumentEnglishOnly": "Ovaj dokument je dostupan samo na engleskom jeziku.",
+    "organizationTrialEndedBilling": "Probni period organizacije je završen i ona nema aktivan plan. Možete da ažurirate naplatu, a zatim pokušajte ponovo."
   },
   "language": {
     "restarting": "Ponovno pokretanje radi promene jezika",
@@ -1378,7 +1379,8 @@
       "managedOnWeb": "Bitbucket vezom ove organizacije upravlja se na vebu, sa računara.",
       "description": "Kreiraj token za pristup radnom prostoru sa potrebnim dozvolama i nalepi ga ispod.",
       "scopes": "Nalog: čitanje · Repozitorijumi: čitanje/pisanje · PR-ovi: čitanje · Veb-dojavnici: čitanje/pisanje",
-      "tokenPlaceholder": "Token za pristup radnom prostoru"
+      "tokenPlaceholder": "Token za pristup radnom prostoru",
+      "tokenRefused": "Bitbucket nije prihvatio ovaj token za pristup radnom prostoru. Proveri da li ima dozvole navedene iznad, pa pokušaj ponovo."
     },
     "scopeList": {
       "personalStillAvailable": "Lični repozitorijumi su i dalje dostupni ispod.",
@@ -1490,8 +1492,10 @@
       "repositoryLine": "Pregledi: {{reviews}} · Nalazi: {{findings}}",
       "empty": "Još nema pregleda sa analitikom",
       "emptyDescription": "Analitika beleži završene preglede dok je uključena za organizaciju.",
-      "off": "Analitika je isključena za ovu organizaciju.",
-      "couldNotLoad": "Nije moguće učitati analitiku"
+      "offTitle": "Analitika je isključena za {{platform}}",
+      "offDescription": "Uključi je u podešavanjima organizacije na vebu da beleži završene preglede.",
+      "couldNotLoad": "Nije moguće učitati analitiku",
+      "off": "Analitika je isključena za ovu organizaciju."
     },
     "council": {
       "title": "Pregled veća",
@@ -3520,7 +3524,6 @@
     },
     "settingsOnWeb": {
       "title": "Podešavanja organizacije na vebu",
-      "integrations": "Integracije na vebu",
       "usageDetails": "Detalji potrošnje",
       "providersAndModels": "Provajderi i modeli",
       "groups": "Grupe",
@@ -3530,8 +3533,21 @@
       "dataCollection": "Prikupljanje podataka",
       "auditLogs": "Dnevnici revizije",
       "requestLogs": "Dnevnici zahteva",
+      "integrations": "Integracije na vebu",
       "subOrganizations": "Podorganizacije",
       "distributeFunds": "Raspodela sredstava"
+    },
+    "requestLogs": {
+      "hint": "Zahtevi iz sata pre kraja intervala, počev od najnovijih.",
+      "older": "Prethodni sat",
+      "newer": "Sledeći sat",
+      "truncated": "U ovom satu ima više zahteva nego što lista prikazuje.",
+      "emptyTitle": "Nema zahteva",
+      "emptyDescription": "U ovom satu nema zahteva preko gateway-a.",
+      "loadError": "Učitavanje dnevnika zahteva nije uspelo.",
+      "permissionDenied": "Dnevnike zahteva organizacije mogu da čitaju samo njen vlasnik, administrator ili menadžer za naplatu.",
+      "tokens": "{{input}} ulaz · {{output}} izlaz",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Ulazni tokeni",
@@ -4598,6 +4614,8 @@
     "topModels": "Najčešći modeli",
     "topFeatures": "Najčešće funkcije",
     "emptyTitle": "Nema korišćenja u ovom periodu",
+    "unavailableTitle": "Korišćenje nije dostupno",
+    "unavailableDescription": "Ovaj radni prostor ne prijavljuje korišćenje. Ponovni pokušaj neće pomoći.",
     "orgSelfNotice": "Vidite sopstveno korišćenje u ovoj organizaciji.",
     "viewDetails": "Prikaži detalje korišćenja"
   },

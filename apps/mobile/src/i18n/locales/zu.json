@@ -4866,6 +4866,8 @@
     "modelsDescription": "Cisha imodeli ukuze uyivimbe kuwo wonke amalungu. Amamodeli avela kubahlinzeki abavunyelwe aqala evuliwe.",
     "modelsDeniedOnly": "Okunqatshiwe kuphela",
     "modelsEmpty": "Awekho amamodeli ahambisana nalokhu kusesha.",
+    "modelsDeniedEmpty": "Awukho umodeli onqatshiwe.",
+    "modelsDeniedSearchEmpty": "Awukho umodeli onqatshiwe ohambisana nalokhu kusesha.",
     "providersDescription": "Cisha umhlinzeki ukuze uvimbe i-Kilo ekudluliseleni izicelo kuwo kule nhlangano.",
     "providersNeedCatalog": "Amaswishi abahlinzeki ahlala engokufunda kuphela kuze kulayishwe ikhathalogi ephelele yamamodeli. Thepha Zama futhi ngenhla ukuze uwahlele.",
     "providersEmpty": "Abekho abahlinzeki abahambisana nalokhu kusesha.",

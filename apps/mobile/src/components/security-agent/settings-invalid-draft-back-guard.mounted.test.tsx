@@ -53,6 +53,9 @@ const confirmDialog = vi.hoisted(() => ({
 // useSettingsBackGuard / useConfirmDialog and the real getSettingsDirtyState,
 // and stubs only the native surfaces they render through.
 vi.mock('react-native', () => ({ View: 'View', Alert: { alert: vi.fn() } }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => 'online',
+}));
 vi.mock('expo-router', () => ({
   useRouter: () => router,
   useNavigation: () => navigation,

@@ -20,12 +20,14 @@ import {
   clearContextSandboxAllocation,
   getBuiltinAgentSettings,
   getModelContextLimits,
+  getWebSearchPreference,
   getSandboxAllocationSettings,
   listBindings,
   removeRepositorySettings,
   setBuiltinAgentSettings,
   setContextSandboxAllocation,
   setModelContextLimits,
+  setWebSearchPreference,
   setRepositorySettings,
   type ProfileOwner,
   type RepositoryPlatform,
@@ -38,6 +40,7 @@ import {
 } from '@/lib/cloud-agent-next/sandbox-allocation-offers';
 import { DEFAULT_WORKSPACE_ORDER, workspaceOrderSchema } from '@/lib/cloud-agent/workspace-folders';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { webSearchPreferenceSchema } from '@cloud-agent-shared/web-search-provider';
 
 const RepositoryPlatformSchema = z.enum(['github', 'gitlab']);
 
@@ -68,6 +71,7 @@ const CloudAgentSettingsSchema = z.object({
 });
 
 const WorkspaceOrderSchema = z.object({ workspaceOrder: workspaceOrderSchema });
+const WebSearchSettingsSchema = z.object({ provider: webSearchPreferenceSchema });
 
 function ownerFromInput(organizationId: string | undefined, userId: string): ProfileOwner {
   return organizationId
@@ -306,6 +310,18 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
       .limit(1);
     return { workspaceOrder: settings?.workspaceOrder ?? DEFAULT_WORKSPACE_ORDER };
   }),
+
+  getWebSearch: baseProcedure.output(WebSearchSettingsSchema).query(async ({ ctx }) => ({
+    provider: await getWebSearchPreference(db, ctx.user.id),
+  })),
+
+  setWebSearch: baseProcedure
+    .input(WebSearchSettingsSchema)
+    .output(WebSearchSettingsSchema)
+    .mutation(async ({ ctx, input }) => {
+      await setWebSearchPreference(db, ctx.user.id, input.provider);
+      return input;
+    }),
 
   setWorkspaceOrder: baseProcedure
     .input(WorkspaceOrderSchema)

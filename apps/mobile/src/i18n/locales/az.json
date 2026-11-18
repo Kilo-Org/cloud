@@ -4866,6 +4866,8 @@
     "modelsDescription": "Modeli bütün üzvlər üçün bloklamaq üçün onu söndürün. İcazə verilən provayderlərin modelləri standart olaraq aktivdir.",
     "modelsDeniedOnly": "Yalnız qadağan olunanlar",
     "modelsEmpty": "Bu axtarışa uyğun model yoxdur.",
+    "modelsDeniedEmpty": "Qadağan olunan model yoxdur.",
+    "modelsDeniedSearchEmpty": "Bu axtarışa uyğun qadağan olunan model yoxdur.",
     "providersDescription": "Kilo-nun bu təşkilat üçün sorğuları provayderə yönləndirməsini dayandırmaq üçün onu söndürün.",
     "providersNeedCatalog": "Provayder açarları tam model kataloqu yüklənənə qədər yalnız oxunuş rejimində qalır. Onları redaktə etmək üçün yuxarıdakı Yenidən cəhd et düyməsinə toxunun.",
     "providersEmpty": "Bu axtarışa uyğun provayder yoxdur.",

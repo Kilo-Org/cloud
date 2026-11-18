@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, type TextInstance, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { sheetUnderHandlePaddingClass } from '@/components/sheet-header';
 import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
 import { requestA11yFocus } from '@/lib/a11y/announce';
@@ -98,12 +99,11 @@ export function ReactionPickerSheet({
   return (
     // No snap points: the native sheet sizes to the emoji grid.
     <Sheet visible={visible} onClose={onClose}>
-      <View
-        accessibilityViewIsModal
-        className="gap-4 px-5 pt-4"
-        style={{ paddingBottom: insets.bottom + 24 }}
-      >
-        <View className="flex-row items-center">
+      <View accessibilityViewIsModal className="px-5" style={{ paddingBottom: insets.bottom + 24 }}>
+        {/* The native handle already leaves the room above the title, so the
+            title row takes the shared under-handle pair and supplies the gap to
+            the grid itself. */}
+        <View className={cn('flex-row items-center', sheetUnderHandlePaddingClass('row'))}>
           <View className="size-[48px] shrink-0" />
           <Text
             ref={attachTitle}

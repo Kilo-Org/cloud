@@ -58,7 +58,12 @@ describe('isVercelEndpointOfProvider', () => {
 describe('getProviderDisplayPricing', () => {
   it('returns the OpenRouter price when there is no Vercel model', () => {
     expect(
-      getProviderDisplayPricing('novita', { prompt: '0.000001', completion: '0.000002' }, undefined)
+      getProviderDisplayPricing(
+        'novita',
+        { prompt: '0.000001', completion: '0.000002' },
+        undefined,
+        'shortContext'
+      )
     ).toEqual({ prompt: '0.000001', completion: '0.000002' });
   });
 
@@ -67,7 +72,8 @@ describe('getProviderDisplayPricing', () => {
       getProviderDisplayPricing(
         'novita',
         undefined,
-        vercelModel({ provider: 'novita', pricing: { prompt: '1', completion: '1' } })
+        vercelModel({ provider: 'novita', pricing: { prompt: '1', completion: '1' } }),
+        'shortContext'
       )
     ).toBeUndefined();
   });
@@ -77,7 +83,11 @@ describe('getProviderDisplayPricing', () => {
       getProviderDisplayPricing(
         'novita',
         { prompt: '0.000001', completion: '0.000005' },
-        vercelModel({ provider: 'novita', pricing: { prompt: '0.000002', completion: '0.000004' } })
+        vercelModel({
+          provider: 'novita',
+          pricing: { prompt: '0.000002', completion: '0.000004' },
+        }),
+        'shortContext'
       )
     ).toEqual({ prompt: '0.000002', completion: '0.000005' });
   });
@@ -95,7 +105,8 @@ describe('getProviderDisplayPricing', () => {
         vercelModel({
           provider: vercelProvider,
           pricing: { prompt: '0.000003', completion: '0.000001' },
-        })
+        }),
+        'shortContext'
       )
     ).toEqual({ prompt: '0.000003', completion: '0.000002' });
   });
@@ -108,7 +119,8 @@ describe('getProviderDisplayPricing', () => {
         vercelModel({
           provider: 'novita',
           pricing: { prompt: '0.0000015', completion: '0.000003' },
-        })
+        }),
+        'shortContext'
       )
     ).toEqual({ prompt: '0.000002000000', completion: '0.000004000000' });
   });
@@ -121,7 +133,8 @@ describe('getProviderDisplayPricing', () => {
         vercelModel({
           provider: 'novita',
           pricing: { prompt: '0.0000015', completion: '0.0000005', discount: 0.5 },
-        })
+        }),
+        'shortContext'
       )
     ).toEqual({ prompt: '0.000003000000', completion: '0.000002' });
   });
@@ -134,7 +147,8 @@ describe('getProviderDisplayPricing', () => {
         vercelModel(
           { provider: 'deepinfra', pricing: { prompt: '0.00001', completion: '0.00001' } },
           { provider: 'zai', pricing: { prompt: '0.00001', completion: '0.00001' } }
-        )
+        ),
+        'shortContext'
       )
     ).toEqual({ prompt: '0.000001', completion: '0.000002' });
   });
@@ -144,7 +158,8 @@ describe('getProviderDisplayPricing', () => {
       getProviderDisplayPricing(
         'novita',
         { prompt: '0.000001', completion: '0.000002' },
-        vercelModel({ provider: 'novita' })
+        vercelModel({ provider: 'novita' }),
+        'shortContext'
       )
     ).toEqual({ prompt: '0.000001', completion: '0.000002' });
   });
@@ -157,9 +172,61 @@ describe('getProviderDisplayPricing', () => {
         vercelModel(
           { provider: 'vertex', pricing: { prompt: '0.000002', completion: '0.000001' } },
           { provider: 'vertexAnthropic', pricing: { prompt: '0.000001', completion: '0.000004' } }
-        )
+        ),
+        'shortContext'
       )
     ).toEqual({ prompt: '0.000002', completion: '0.000004' });
+  });
+
+  it('shows the short-context price, ignoring long-context overrides', () => {
+    expect(
+      getProviderDisplayPricing(
+        'openai',
+        {
+          prompt: '0.000008',
+          completion: '0.00004',
+          overrides: [{ min_prompt_tokens: 272000, prompt: '0.000016', completion: '0.00006' }],
+        },
+        vercelModel({ provider: 'openai', pricing: { prompt: '0.000007', completion: '0.00003' } }),
+        'shortContext'
+      )
+    ).toEqual({ prompt: '0.000008', completion: '0.00004' });
+  });
+
+  it('keeps time-of-day windows and the Vercel peak multiplier', () => {
+    expect(
+      getProviderDisplayPricing(
+        'novita',
+        {
+          prompt: '0.000001',
+          completion: '0.000002',
+          overrides: [
+            { utc_start: 0, utc_end: 1400, prompt: '0.0000015', completion: '0.000003' },
+            { min_prompt_tokens: 272000, prompt: '0.00001', completion: '0.00002' },
+          ],
+        },
+        vercelModel({
+          provider: 'novita',
+          pricing: { prompt: '0.000001', completion: '0.000002', peak_pricing: { multiplier: 2 } },
+        }),
+        'shortContext'
+      )
+    ).toEqual({ prompt: '0.000002000000', completion: '0.000004000000' });
+  });
+
+  it('includes long-context overrides in the worst case', () => {
+    expect(
+      getProviderDisplayPricing(
+        'openai',
+        {
+          prompt: '0.000008',
+          completion: '0.00004',
+          overrides: [{ min_prompt_tokens: 272000, prompt: '0.000016', completion: '0.00006' }],
+        },
+        vercelModel({ provider: 'openai', pricing: { prompt: '0.000007', completion: '0.00003' } }),
+        'worstCase'
+      )
+    ).toEqual({ prompt: '0.000016', completion: '0.00006' });
   });
 
   it('returns only the OpenRouter display price without a provider to match', () => {
@@ -167,7 +234,8 @@ describe('getProviderDisplayPricing', () => {
       getProviderDisplayPricing(
         undefined,
         { prompt: '0.000001', completion: '0.000002', discount: 0.5 },
-        vercelModel({ provider: 'novita', pricing: { prompt: '1', completion: '1' } })
+        vercelModel({ provider: 'novita', pricing: { prompt: '1', completion: '1' } }),
+        'shortContext'
       )
     ).toEqual({ prompt: '0.000002000000', completion: '0.000004000000' });
   });

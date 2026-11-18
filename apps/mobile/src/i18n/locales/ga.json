@@ -5079,6 +5079,8 @@
     "modelsDescription": "Múch samhail chun í a bhac do gach comhalta. Tosaíonn samhlacha ó sholáthraithe ceadaithe ar siúl.",
     "modelsDeniedOnly": "Diúltaithe amháin",
     "modelsEmpty": "Níl aon samhail ag teacht leis an gcuardach seo.",
+    "modelsDeniedEmpty": "Níl aon samhail diúltaithe.",
+    "modelsDeniedSearchEmpty": "Níl aon samhail diúltaithe ag teacht leis an gcuardach seo.",
     "providersDescription": "Múch soláthraí chun Kilo a stopadh ó ródú chuige don eagraíocht seo.",
     "providersNeedCatalog": "Fanann lasca na soláthraithe inléite amháin go dtí go lódálfar an catalóg iomlán samhlacha. Bain triail eile as thuas chun iad a chur in eagar.",
     "providersEmpty": "Níl aon soláthraí ag teacht leis an gcuardach seo.",

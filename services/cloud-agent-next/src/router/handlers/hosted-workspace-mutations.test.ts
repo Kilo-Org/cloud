@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => ({
   loadEnvironmentForSession: vi.fn(),
   getBuiltinAgentSettings: vi.fn(),
   getModelContextLimits: vi.fn(),
+  getWebSearchPreference: vi.fn(),
   assertRepositoryAccessBeforeSessionCreation: vi.fn(),
   assertEnvironmentRepositoriesAccess: vi.fn(),
   assertKiloModelAvailable: vi.fn(),
@@ -54,6 +55,7 @@ vi.mock('@kilocode/cloud-agent-profile', async importActual => ({
   loadEnvironmentForSession: mocks.loadEnvironmentForSession,
   getBuiltinAgentSettings: mocks.getBuiltinAgentSettings,
   getModelContextLimits: mocks.getModelContextLimits,
+  getWebSearchPreference: mocks.getWebSearchPreference,
 }));
 
 vi.mock('../../session/validate-repository-access.js', () => ({
@@ -246,6 +248,7 @@ describe('createHostedWorkspace profile preflight', () => {
     mocks.loadEnvironmentForSession.mockResolvedValue({ status: 'none' });
     mocks.getBuiltinAgentSettings.mockResolvedValue({});
     mocks.getModelContextLimits.mockResolvedValue({});
+    mocks.getWebSearchPreference.mockResolvedValue('default');
     mocks.createSessionWithLedger.mockResolvedValue({
       cloudAgentSessionId,
       kiloSessionId,

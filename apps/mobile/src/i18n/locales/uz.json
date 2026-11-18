@@ -4866,6 +4866,8 @@
     "modelsDescription": "Modelni o'chirish orqali uni har bir a'zo uchun bloklang. Ruxsat berilgan provayderlardan olingan modellar yoqilgan holda boshlanadi.",
     "modelsDeniedOnly": "Faqat taqiqlanganlar",
     "modelsEmpty": "Bu qidiruvga mos model topilmadi.",
+    "modelsDeniedEmpty": "Hech bir model taqiqlanmagan.",
+    "modelsDeniedSearchEmpty": "Bu qidiruvga mos taqiqlangan model topilmadi.",
     "providersDescription": "Provayderni o'chirish orqali Kilo bu tashkilot uchun unga yo'naltirishni to'xtatadi.",
     "providersNeedCatalog": "To'liq modellar katalogi yuklanmaguncha provayder kalitlari faqat o'qish uchun bo'ladi. Ularni tahrirlash uchun yuqoridagi Qayta urinish tugmasini bosing.",
     "providersEmpty": "Bu qidiruvga mos provayder topilmadi.",

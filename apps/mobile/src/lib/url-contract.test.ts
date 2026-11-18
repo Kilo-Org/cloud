@@ -11,6 +11,7 @@ import {
   assertUrlScheme,
   LATENCY_INGEST_URL_DEFAULT,
   PRODUCTION_HOSTS,
+  URL_KEY_EXEMPTIONS,
   URL_SCHEMES,
 } from '@/lib/url-contract';
 import { ENV_KEYS, OPTIONAL_ENV_KEYS } from './env-keys';
@@ -310,10 +311,10 @@ describe('URL key → environment variable resolution', () => {
 
   // The reverse direction: a URL-valued env key must be registered in
   // URL_SCHEMES (so the app.config.ts build loop and the config.ts runtime
-  // loop check it) or named in the explicit exemption list below. The test
-  // above iterates URL_SCHEMES and cannot see a URL key missing from it.
+  // loop check it) or named in URL_KEY_EXEMPTIONS. The test above iterates
+  // URL_SCHEMES and cannot see a URL key missing from it.
   it('registers every URL-valued env key in the URL contract', () => {
-    const exempted = new Set<string>();
+    const exempted = new Set(URL_KEY_EXEMPTIONS);
     const urlEnvNames: Record<string, string | undefined> = {
       ...ENV_KEYS,
       ...OPTIONAL_ENV_KEYS,

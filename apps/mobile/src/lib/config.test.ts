@@ -71,7 +71,6 @@ describe('KILO_MCP_URL', () => {
     vi.stubGlobal('__DEV__', true);
     state.extra = {
       ...REQUIRED_EXTRA,
-      isProductionBuild: true,
       kiloMcpUrl: 'http://localhost:8815',
     };
     await expect(mcpUrl()).resolves.toBe('http://localhost:8815');

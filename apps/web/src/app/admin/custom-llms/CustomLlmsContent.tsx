@@ -46,7 +46,7 @@ import type { CustomLlmCredentials, CustomLlmDefinition } from '@kilocode/db/sch
 import { deepStrict } from '@/lib/zod/deep-strict';
 import { formatZodError } from '@/lib/zod/format-zod-error';
 import { toast } from 'sonner';
-import { ChevronRight, Copy as CopyIcon, Globe, Lock, Plus, Pencil } from 'lucide-react';
+import { ChevronRight, Copy as CopyIcon, Globe, Handshake, Lock, Plus, Pencil } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Editor, { type EditorProps } from '@monaco-editor/react';
 
@@ -483,6 +483,11 @@ export function CustomLlmsContent() {
                       <Globe />
                       Public
                     </Badge>
+                  ) : item.definition.partner ? (
+                    <Badge variant="secondary">
+                      <Handshake />
+                      Partner: {item.definition.partner.inference_provider}
+                    </Badge>
                   ) : (
                     <Badge variant="secondary">
                       <Lock />
@@ -504,15 +509,17 @@ export function CustomLlmsContent() {
                     >
                       <Pencil className="h-3 w-3" />
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => openCopy(item.public_id, item.definition)}
-                      aria-label={`Copy ${item.public_id}`}
-                      title="Copy custom LLM"
-                    >
-                      <CopyIcon className="h-3 w-3" />
-                    </Button>
+                    {!item.definition.partner && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openCopy(item.public_id, item.definition)}
+                        aria-label={`Copy ${item.public_id}`}
+                        title="Copy custom LLM"
+                      >
+                        <CopyIcon className="h-3 w-3" />
+                      </Button>
+                    )}
                     <InlineDeleteConfirmation
                       onDelete={() => handleDelete(item.public_id)}
                       isLoading={deleteMutation.isPending}

@@ -78,10 +78,7 @@ export const AGENT_BRIEFING_CHANNEL_APP_VERSION = '1.0.16';
  * `ANDROID_NOTIFICATION_CHANNELS` fails typecheck here until this map
  * classifies it.
  */
-const ANDROID_CHANNEL_MIN_APP_VERSIONS: Record<
-  AndroidNotificationChannelId,
-  string | undefined
-> = {
+const ANDROID_CHANNEL_MIN_APP_VERSIONS: Record<AndroidNotificationChannelId, string | undefined> = {
   'needs-input': AGENT_CHANNEL_SPLIT_APP_VERSION,
   'agent-progress': AGENT_CHANNEL_SPLIT_APP_VERSION,
   'agent-briefing': AGENT_BRIEFING_CHANNEL_APP_VERSION,

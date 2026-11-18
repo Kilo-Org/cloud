@@ -108,7 +108,16 @@ export function getDirectByokModelChatApis(
   provider: DirectByokProvider,
   model: DirectByokModel
 ): ReadonlyArray<GatewayChatApiKind> {
-  return provider.getModelChatApi ? [provider.getModelChatApi(model)] : provider.supportedChatApis;
+  if (!provider.getModelChatApi) return provider.supportedChatApis;
+  return provider.getModelChatApis?.(model) ?? [provider.getModelChatApi(model)];
+}
+
+/** The id the upstream knows `model` of `provider` by. */
+export function getDirectByokUpstreamModelId(
+  provider: DirectByokProvider,
+  model: DirectByokModel
+): string {
+  return provider.upstreamModelId?.(model) ?? model.id;
 }
 
 export function findDirectByokProvider(providerId: string): DirectByokProvider | undefined {

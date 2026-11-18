@@ -68,6 +68,7 @@ import {
   getDirectByokKeyLabel,
   getDirectByokPolicyProviderId,
   getDirectByokPolicyTarget,
+  getDirectByokUpstreamModelId,
   type DirectByokPolicyTarget,
   getDirectByokModelChatApis,
   supportsCatalogMode,
@@ -211,7 +212,7 @@ async function directByokRoute(
       inferenceProviderId: getDirectByokPolicyProviderId(directByok),
       directByokKeyLabel: getDirectByokKeyLabel(directByok),
       async transformRequest(context) {
-        context.request.body.model = directByokModel.id;
+        context.request.body.model = getDirectByokUpstreamModelId(directByok, directByokModel);
         delete context.request.body.provider;
         directByok.transformRequest(context);
       },

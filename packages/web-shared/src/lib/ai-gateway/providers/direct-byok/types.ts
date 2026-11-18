@@ -81,6 +81,8 @@ type DirectByokProviderBase = {
    * A choice is authoritative, including `Chat Completions` stated as `aiSdkProvider: undefined`.
    */
   getAiSdkProvider?(model: string): DirectByokAiSdkProviderChoice | null;
+  /** The id the upstream knows `model` by, when it differs from `model.id`. */
+  upstreamModelId?(model: DirectByokModel): string;
 };
 
 /**
@@ -110,11 +112,14 @@ export type DirectByokProvider = DirectByokProviderBase &
         /** The chat APIs the upstream serves every model over. */
         supportedChatApis: ReadonlyArray<GatewayChatApiKind>;
         getModelChatApi?: undefined;
+        getModelChatApis?: undefined;
       }
     | {
         supportedChatApis?: undefined;
-        /** The chat API a model must be called with, for providers where it varies per model. */
+        /** The chat API clients call a model with, for providers where it varies per model. */
         getModelChatApi(model: DirectByokModel): GatewayChatApiKind;
+        /** Every chat API the upstream serves the model over; only `getModelChatApi` when unset. */
+        getModelChatApis?(model: DirectByokModel): ReadonlyArray<GatewayChatApiKind>;
       }
   );
 

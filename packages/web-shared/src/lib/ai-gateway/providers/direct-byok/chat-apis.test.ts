@@ -1,5 +1,8 @@
 import { describe, expect, test } from '@jest/globals';
-import { getDirectByokModelChatApis } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import {
+  getDirectByokModelChatApis,
+  getDirectByokUpstreamModelId,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import DIRECT_BYOK_PROVIDERS from './direct-byok-definitions';
 import type { DirectByokProvider } from './types';
 import bedrockByok, { AwsBedrockEndpointSchema, resolveAwsBedrockUpstream } from './bedrock-byok';
@@ -64,5 +67,28 @@ describe('getDirectByokModelChatApis', () => {
       false
     );
     expect(upstream.supportedChatApis).toEqual(getDirectByokModelChatApis(vertexByok, model));
+  });
+});
+
+describe('per-model chat APIs and upstream ids', () => {
+  const model = { id: 'public-id', name: 'Model', context_length: 1, max_completion_tokens: 1 };
+
+  test('lists every chat API a provider serves a model over, or only the client API', () => {
+    const multiApi: DirectByokProvider = {
+      ...bedrockByok,
+      getModelChatApi: () => 'messages',
+      getModelChatApis: () => ['messages', 'chat_completions'],
+    };
+    expect(getDirectByokModelChatApis(multiApi, model)).toEqual(['messages', 'chat_completions']);
+    expect(
+      getDirectByokModelChatApis({ ...bedrockByok, getModelChatApi: () => 'responses' }, model)
+    ).toEqual(['responses']);
+  });
+
+  test('sends the model id unless the provider names another upstream id', () => {
+    expect(getDirectByokUpstreamModelId(bedrockByok, model)).toBe('public-id');
+    expect(
+      getDirectByokUpstreamModelId({ ...bedrockByok, upstreamModelId: () => 'Upstream/Id' }, model)
+    ).toBe('Upstream/Id');
   });
 });

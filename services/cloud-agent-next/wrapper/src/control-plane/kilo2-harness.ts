@@ -415,11 +415,14 @@ export function createKilo2Harness(options: {
       );
     },
     async generateCommitMessage(input) {
+      const query = locationQuery(input.path);
+      // Model reads wait for location plugins; RPC dispatch no longer does.
+      await api.request(`/api/model/default?${query}`, { signal: input.signal });
       const result = z
         .object({ output: z.object({ message: z.string() }) })
         .parse(
           await post(
-            `/api/rpc/kilocode.commit-message/generate?${locationQuery(input.path)}`,
+            `/api/rpc/kilocode.commit-message/generate?${query}`,
             { input: { path: input.path } },
             input.signal
           )

@@ -145,6 +145,7 @@ import { egressAllowlistSchema, egressPolicySchema } from '@kilocode/worker-util
 import {
   egressRequestSupported,
   providerSupports,
+  type EgressRequest,
 } from '@kilocode/worker-utils/sandbox-provider-capabilities';
 import { PROVIDER_DESCRIPTORS } from '../shared/sandbox-provider.js';
 import {
@@ -211,14 +212,24 @@ function assertEgressPolicyAllocation(
   const request = input.runtime ?? {};
   const provider = allocation.sandboxProvider;
   if (egressRequestSupported(provider, request)) return;
-  const { label } = PROVIDER_DESCRIPTORS[provider];
   throw new TRPCError({
     code: 'BAD_REQUEST',
-    message:
-      request.egressMode !== 'allowlist' && providerSupports(provider, 'egressProxy')
-        ? `Egress audit needs an allowlist on ${label} sandboxes.`
-        : `Restricted network access is not available for ${label} sandboxes.`,
+    message: unsupportedEgressMessage(request, provider),
   });
+}
+
+function unsupportedEgressMessage(
+  request: EgressRequest,
+  provider: SessionRegistrationResult['sandboxProvider']
+): string {
+  const { label } = PROVIDER_DESCRIPTORS[provider];
+  if (request.egressMode === 'allowlist') {
+    return `Restricted network access is not available for ${label} sandboxes.`;
+  }
+  if (providerSupports(provider, 'egressProxy')) {
+    return `Egress audit needs an allowlist on ${label} sandboxes.`;
+  }
+  return `Egress audit is not available for ${label} sandboxes.`;
 }
 
 export type SessionRegistrationContext = {

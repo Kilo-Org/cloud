@@ -7,7 +7,6 @@ import {
   getOpenRouterModelsMetadataFromDatabase,
   getVercelModelsMetadataFromDatabase,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
-import { getRuntimeGatewayRoutingConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-config';
 import { TEST_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/tests/helpers/custom-pricing.helper';
 import { handleModelEndpointsRequest } from './model-endpoints';
 
@@ -17,11 +16,6 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', 
   resolveOpenRouterModelAlias: jest.fn((modelId: string) => Promise.resolve(modelId)),
 }));
 
-jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/routing-config', () => ({
-  getRuntimeGatewayRoutingConfig: jest.fn(),
-}));
-
-const mockedGetRuntimeGatewayRoutingConfig = jest.mocked(getRuntimeGatewayRoutingConfig);
 const mockedGetOpenRouterModelsMetadataFromDatabase = jest.mocked(
   getOpenRouterModelsMetadataFromDatabase
 );
@@ -29,7 +23,6 @@ const mockedGetVercelModelsMetadataFromDatabase = jest.mocked(getVercelModelsMet
 
 beforeEach(() => {
   mockedGetVercelModelsMetadataFromDatabase.mockResolvedValue({});
-  mockedGetRuntimeGatewayRoutingConfig.mockResolvedValue({ vercelOptOutModels: new Set() });
 });
 
 beforeAll(async () => {
@@ -361,19 +354,6 @@ describe('GET /api/openrouter/models/[provider]/[model]/endpoints', () => {
           },
         },
       ]);
-    });
-
-    test('omits Vercel endpoints for a model opted out of Vercel routing', async () => {
-      mockedGetRuntimeGatewayRoutingConfig.mockResolvedValue({
-        vercelOptOutModels: new Set([model.id]),
-      });
-
-      const response = await handleModelEndpointsRequest(request(model.id), {
-        params: Promise.resolve({ provider: 'deepseek', model: 'deepseek-v4.1-flash-1017' }),
-      });
-
-      expect(response.status).toBe(200);
-      expect((await response.json()).data.endpoints).toEqual(model.endpoints);
     });
   });
 

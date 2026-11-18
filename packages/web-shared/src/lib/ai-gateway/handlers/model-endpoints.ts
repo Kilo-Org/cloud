@@ -9,8 +9,6 @@ import {
   isVercelEndpointOfProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-endpoint-pricing';
 import { getModelDisplayPricing } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/display-pricing';
-import { getRuntimeGatewayRoutingConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-config';
-import { isVercelRoutingOptOut } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import { isUnavailableModel } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import type { Endpoint } from '@kilocode/db/schema-types';
 
@@ -29,10 +27,9 @@ export async function handleModelEndpointsRequest(
     );
   }
 
-  const [models, vercel, routingConfig] = await Promise.all([
+  const [models, vercel] = await Promise.all([
     getOpenRouterModelsMetadataFromDatabase(),
     getVercelPricingMetadata(),
-    getRuntimeGatewayRoutingConfig(),
   ]);
   const storedModel = models[modelId];
 
@@ -52,12 +49,10 @@ export async function handleModelEndpointsRequest(
     const pricing = getProviderDisplayPricing(endpoint.tag, endpoint.pricing, vercelModel);
     return pricing ? { ...endpoint, pricing } : endpoint;
   });
-  const vercelRoutingEnabled = ![modelId, servingModel.id].some(id =>
-    isVercelRoutingOptOut(id, routingConfig.vercelOptOutModels)
+  const vercelOnlyEndpoints = getVercelOnlyProviderEndpoints(
+    servingModel.endpoints,
+    vercelModel?.endpoints ?? []
   );
-  const vercelOnlyEndpoints = vercelRoutingEnabled
-    ? getVercelOnlyProviderEndpoints(servingModel.endpoints, vercelModel?.endpoints ?? [])
-    : [];
 
   return NextResponse.json(
     {

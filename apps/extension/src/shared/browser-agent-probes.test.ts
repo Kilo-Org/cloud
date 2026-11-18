@@ -68,12 +68,13 @@ describe('sensitive probes', () => {
     const { sends, session } = createSession({
       'Page.createIsolatedWorld': () => ({ executionContextId: 9 }),
       'Page.getFrameTree': () => ({ frameTree: { frame: { id: 'main' } } }),
-      'Runtime.evaluate': () => ({ result: { value: PROBE_PASSWORD } }),
+      'Runtime.evaluate': () => ({
+        result: { value: JSON.stringify({ kind: 'probe', ...JSON.parse(PROBE_PASSWORD) }) },
+      }),
     });
 
     await expect(readSensitiveProbeForFocusedElement(session)).resolves.toStrictEqual({
-      fields: [{ kind: 'password' }],
-      paymentFormSubmit: false,
+      probe: { fields: [{ kind: 'password' }], paymentFormSubmit: false },
     });
 
     const evaluate = sends.find(entry => entry.method === 'Runtime.evaluate');

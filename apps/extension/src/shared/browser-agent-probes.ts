@@ -326,36 +326,74 @@ const decodeSensitiveProbe = (value: unknown): BrowserSensitiveProbe => {
  * The probe's verdict on the focused element: `browser_press_key` without a
  * target still types into whatever the page has focused.
  */
+const focusedProbePayloadSchema = z.object({
+  index: z.number().optional(),
+  kind: z.enum(['cross-origin', 'probe']),
+});
+
+export interface FocusedSensitiveProbe {
+  /** True when the focus chain entered an iframe whose document the page cannot read. */
+  readonly crossOriginFrame?: { readonly index?: number | undefined } | undefined;
+  readonly probe: BrowserSensitiveProbe;
+}
+
 export const readSensitiveProbeForFocusedElement = async (
   session: ProbeSession
-): Promise<BrowserSensitiveProbe> => {
+): Promise<FocusedSensitiveProbe> => {
   try {
     const frameId = await mainFrameId(session);
     const contextId =
       frameId === undefined ? undefined : await frameExecutionContext(session, frameId);
 
     if (contextId === undefined) {
-      return { fields: [], paymentFormSubmit: false };
+      return { probe: { fields: [], paymentFormSubmit: false } };
     }
 
-    // Same-origin frames are followed through activeElement; a cross-origin frame's document is unreadable from here.
+    // Same-origin frames are followed through activeElement; a cross-origin frame's document is unreadable here, so the caller resolves that frame and fails closed.
     const expression = `(() => {
       var element = document.activeElement;
+      var depth = 0;
       while (element && (element.tagName === 'IFRAME' || element.tagName === 'FRAME')) {
         var doc = null;
         try { doc = element.contentDocument; } catch (error) { doc = null; }
-        if (!doc) { return JSON.stringify({ fields: [], paymentFormSubmit: false }); }
+        if (!doc) {
+          var frames = Array.prototype.slice.call(document.querySelectorAll('iframe, frame'));
+          return JSON.stringify({ kind: 'cross-origin', index: frames.indexOf(element) });
+        }
+        depth += 1;
         element = doc.activeElement;
       }
-      return element ? (${SENSITIVE_TARGET_PROBE_FUNCTION}).call(element) : JSON.stringify({ fields: [], paymentFormSubmit: false });
+      var probe = element ? (${SENSITIVE_TARGET_PROBE_FUNCTION}).call(element) : JSON.stringify({ fields: [], paymentFormSubmit: false });
+      var parsed = JSON.parse(probe);
+      return JSON.stringify({ kind: 'probe', fields: parsed.fields, paymentFormSubmit: parsed.paymentFormSubmit });
     })()`;
     const response = runtimeEvaluateSchema.safeParse(
       await session.send('Runtime.evaluate', { contextId, expression, returnByValue: true })
     );
+    const raw = probeJsonSchema.safeParse(
+      response.success ? response.data.result?.value : undefined
+    );
 
-    return decodeSensitiveProbe(response.success ? response.data.result?.value : undefined);
+    if (!raw.success) {
+      return { probe: { fields: [], paymentFormSubmit: false } };
+    }
+
+    const payload = focusedProbePayloadSchema.safeParse(JSON.parse(raw.data));
+
+    if (!payload.success) {
+      return { probe: { fields: [], paymentFormSubmit: false } };
+    }
+
+    if (payload.data.kind === 'cross-origin') {
+      return {
+        crossOriginFrame: { index: payload.data.index },
+        probe: { fields: [], paymentFormSubmit: false },
+      };
+    }
+
+    return { probe: decodeSensitiveProbe(raw.data) };
   } catch {
-    return { fields: [], paymentFormSubmit: false };
+    return { probe: { fields: [], paymentFormSubmit: false } };
   }
 };
 

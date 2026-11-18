@@ -57,6 +57,7 @@ const createSession = (
   options: {
     readonly describeNodeFails?: boolean;
     readonly focusedProbe?: Record<string, unknown>;
+    readonly focusedProbeKind?: 'cross-origin' | 'probe';
     readonly frameIdForBackendNode?: (backendNodeId: number) => string;
     readonly mainUrl?: string;
     readonly probe?: Record<string, unknown>;
@@ -70,6 +71,10 @@ const createSession = (
         return;
       }
 
+      if (params?.['nodeId'] !== undefined) {
+        return { node: { backendNodeId: 40 } };
+      }
+
       const backendNodeId = params?.['backendNodeId'];
       const frameId =
         typeof backendNodeId === 'number'
@@ -78,6 +83,9 @@ const createSession = (
 
       return { node: { frameId } };
     },
+    'DOM.getDocument': () => ({ root: { nodeId: 1 } }),
+    'DOM.getFrameOwner': () => ({ backendNodeId: 40 }),
+    'DOM.querySelectorAll': () => ({ nodeIds: [30] }),
     'DOM.resolveNode': params => {
       const id = params?.['backendNodeId'] ?? params?.['nodeId'];
 
@@ -100,7 +108,10 @@ const createSession = (
     },
     'Runtime.evaluate': () => ({
       result: {
-        value: JSON.stringify(options.focusedProbe ?? { fields: [], paymentFormSubmit: false }),
+        value: JSON.stringify({
+          kind: options.focusedProbeKind ?? 'probe',
+          ...(options.focusedProbe ?? { fields: [], paymentFormSubmit: false }),
+        }),
       },
     }),
   };
@@ -471,6 +482,33 @@ describe('sensitive steps', () => {
       element: 'e12',
       origin: 'https://pay.example.com',
       reason: SENSITIVE_REASON.password,
+    });
+  });
+
+  it('fails closed when the focus chain enters a cross-origin frame', async () => {
+    const session = createSession({ focusedProbeKind: 'cross-origin' });
+    const refusedGrant = await run({
+      args: { key: 'Enter' },
+      authorized: [{ class: 'act', origin: 'https://app.example.com' }],
+      session,
+      toolName: 'browser_press_key',
+    });
+
+    expect(failureOf(refusedGrant)).toStrictEqual({
+      items: [{ class: 'act', frame: true, origin: 'https://pay.example.com' }],
+      kind: 'needs_permission',
+    });
+
+    const refusedStep = await run({
+      args: { key: 'Enter' },
+      session,
+      toolName: 'browser_press_key',
+    });
+
+    // With the frame granted the step is still sensitive, labelled with that frame.
+    expect(sensitiveOf(refusedStep)).toStrictEqual({
+      origin: 'https://pay.example.com',
+      reason: 'typing into a field inside https://pay.example.com',
     });
   });
 

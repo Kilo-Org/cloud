@@ -164,6 +164,63 @@ const targetFrameOf = async (
     : { frame: frame.parentId !== undefined, origin: frame.origin };
 };
 
+const documentRootSchema = z.object({ root: z.object({ nodeId: z.number() }) });
+const querySelectorAllSchema = z.object({ nodeIds: z.array(z.number()) });
+const nodeDescriptionSchema = z.object({
+  node: z.object({ backendNodeId: z.number().optional() }).optional(),
+});
+const frameOwnerSchema = z.object({ backendNodeId: z.number().optional() });
+
+/**
+ * The origin of the iframe the focus chain entered but could not read. The page
+ * reports the iframe's index in document order; CDP maps that element to the
+ * frame owner, whose origin comes from the frame tree. Anything unresolved is
+ * the opaque origin, so the press is refused rather than guessed.
+ */
+const crossOriginFrameOrigin = async (
+  session: GateSession,
+  frames: readonly BrowserAgentFrame[],
+  index: number | undefined
+): Promise<string> => {
+  try {
+    const document = documentRootSchema.safeParse(
+      await session.send('DOM.getDocument', { depth: 0 })
+    );
+    const root = document.success ? document.data.root.nodeId : undefined;
+    const elements = querySelectorAllSchema.safeParse(
+      await session.send('DOM.querySelectorAll', { nodeId: root, selector: 'iframe, frame' })
+    );
+    const nodeId = elements.success ? elements.data.nodeIds[index ?? 0] : undefined;
+
+    if (nodeId === undefined) {
+      return OPAQUE_ORIGIN;
+    }
+
+    const described = nodeDescriptionSchema.safeParse(
+      await session.send('DOM.describeNode', { nodeId })
+    );
+    const backendNodeId = described.success ? described.data.node?.backendNodeId : undefined;
+
+    if (backendNodeId === undefined) {
+      return OPAQUE_ORIGIN;
+    }
+
+    const children = frames.filter(frame => frame.parentId !== undefined);
+    const owners = await Promise.all(
+      children.map(child => session.send('DOM.getFrameOwner', { frameId: child.id }))
+    );
+    const match = children.find((_child, position) => {
+      const owner = frameOwnerSchema.safeParse(owners[position]);
+
+      return owner.success && owner.data.backendNodeId === backendNodeId;
+    });
+
+    return match?.origin ?? OPAQUE_ORIGIN;
+  } catch {
+    return OPAQUE_ORIGIN;
+  }
+};
+
 /** The origin a navigate is headed for; a `browser_navigate_back` has no URL to read. */
 const navigationOrigin = (args: Record<string, unknown>): string | undefined => {
   const url = argumentString(args, 'url');
@@ -188,6 +245,7 @@ const firstReasonOf = (probe: BrowserSensitiveProbe): string | undefined => {
  */
 const sensitiveStepFor = async (input: {
   readonly args: Record<string, unknown>;
+  readonly frames: readonly BrowserAgentFrame[];
   readonly origin: string;
   readonly pageUrl: string | undefined;
   readonly session: GateSession;
@@ -205,7 +263,20 @@ const sensitiveStepFor = async (input: {
 
   if (input.toolName === 'browser_press_key' && targets.length === 0) {
     // A press without an element types into whatever the page has focused.
-    const reason = firstReasonOf(await readSensitiveProbeForFocusedElement(input.session));
+    const focused = await readSensitiveProbeForFocusedElement(input.session);
+
+    if (focused.crossOriginFrame !== undefined) {
+      // An unreadable frame is assumed sensitive: its field cannot be classified.
+      const frameOrigin = await crossOriginFrameOrigin(
+        input.session,
+        input.frames,
+        focused.crossOriginFrame.index
+      );
+
+      return { origin: frameOrigin, reason: `typing into a field inside ${frameOrigin}` };
+    }
+
+    const reason = firstReasonOf(focused.probe);
 
     return reason === undefined ? undefined : { origin: input.origin, reason };
   }
@@ -331,6 +402,7 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
   const pageUrl = await pageUrlFor(input.session, targetFrame);
   const sensitive = await sensitiveStepFor({
     args: input.args,
+    frames,
     origin,
     pageUrl,
     session: input.session,
@@ -341,12 +413,30 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
     return { class: grantClass, ok: true, origin, targetOriginFrame };
   }
 
+  if (!isOriginGranted(input.authorized, 'act', sensitive.origin)) {
+    return {
+      failure: {
+        items: [
+          {
+            class: 'act',
+            origin: sensitive.origin,
+            ...(sensitive.origin === mainOrigin ? {} : { frame: true }),
+          },
+        ],
+        kind: 'needs_permission',
+      },
+      ok: false,
+    };
+  }
+
   // The approval is labelled with the sensitive element's own frame origin, not the first target's: a password field may live in another frame than the form.
   const sensitiveFrame =
     sensitive.element === undefined
       ? undefined
       : await targetFrameOf(input.session, frames, sensitive.element);
-  const sensitiveOrigin = sensitiveFrame?.origin ?? origin;
+  // A focused cross-origin press carries its own frame origin and no element.
+  const sensitiveOrigin =
+    sensitive.element === undefined ? sensitive.origin : (sensitiveFrame?.origin ?? origin);
   const sensitiveStep = { ...sensitive, origin: sensitiveOrigin };
   const binding: StepTokenBinding = {
     argumentHash: hashBrowserToolArguments(input.args),

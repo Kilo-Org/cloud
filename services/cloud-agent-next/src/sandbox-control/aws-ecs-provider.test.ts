@@ -3,7 +3,7 @@ import { mintAwsEgressCredentialUntil } from '../egress/aws-credential.js';
 import { ECS_TEST_CONFIG } from '../../test/fixtures/aws-ecs.js';
 import { describe, expect, it } from 'vitest';
 import { ecsDefinition, ecsProviderFixture } from '../../test/fixtures/aws-ecs.js';
-import { AWS_LAUNCH_RECOVERY_MS } from './aws-compute-lifecycle.js';
+import { AWS_ABSENCE_SETTLE_MS, AWS_LAUNCH_RECOVERY_MS } from './aws-compute-lifecycle.js';
 import { decodeAwsProviderRef } from './aws-operation.js';
 import { awsEcsOperationSchema } from './aws-ecs-operation.js';
 
@@ -14,6 +14,7 @@ function proxyUrl(origin: string, password: string): string {
   return url.href;
 }
 const intent = { intentId: '11111111-1111-4111-8111-111111111111', createdAt: 10_000 };
+const settledAt = 10_001 + AWS_LAUNCH_RECOVERY_MS + AWS_ABSENCE_SETTLE_MS;
 const sandboxId = 'ses-abcdef';
 const proxyExpiresAt = Math.floor((Date.now() + 2 * 86_400_000) / 1000) * 1000;
 const proxyToken = mintAwsEgressCredentialUntil(
@@ -298,7 +299,7 @@ describe('ECS through the shared AWS allocation lifecycle', () => {
       const ref = await create(f);
       f.loseNextReply();
       await expect(f.adapter().launch(ref, startup)).rejects.toThrow();
-      f.setNow(10_001 + AWS_LAUNCH_RECOVERY_MS);
+      f.setNow(settledAt);
       const task = [...f.tasks.values()][0];
       if (kind === 'ambiguous')
         f.setDiscoveryResult({ taskArns: [task.taskArn, task.taskArn.replace(/.$/, '2')] });
@@ -354,7 +355,7 @@ describe('ECS through the shared AWS allocation lifecycle', () => {
     expect(task.lastStatus).toBe('STOPPED');
     expect(f.submitted).toHaveLength(1);
   });
-  it('keeps empty discovery uncertain past the replay bound and blocks replacement', async () => {
+  it('blocks empty discovery until a replay can no longer create the task, then retires it', async () => {
     const f = ecsProviderFixture();
     const ref = await create(f);
     f.loseNextReply();
@@ -370,8 +371,47 @@ describe('ECS through the shared AWS allocation lifecycle', () => {
     await expect(
       f.adapter().create({ intentId: 'replacement', createdAt: 20_000 })
     ).rejects.toMatchObject({ permanentReason: 'provider_cleanup_required' });
-    expect(f.submitted).toHaveLength(1);
     expect(f.operations.get(intent.intentId)?.request).toBeDefined();
+    f.setNow(settledAt);
+    expect(await f.adapter().stop(ref)).toBe('terminal');
+    expect(f.operations.get(intent.intentId)?.phase).toBe('terminated');
+    await expect(
+      f.adapter().create({ intentId: 'replacement', createdAt: 20_000 })
+    ).resolves.toHaveProperty('providerRef');
+    expect(f.submitted).toHaveLength(1);
+    expect(f.documents.size).toBe(0);
+  });
+  it('retires a lost launch whose task already stopped and ECS no longer lists', async () => {
+    const f = ecsProviderFixture();
+    const ref = await create(f);
+    f.loseNextReply();
+    await expect(f.adapter().launch(ref, startup)).rejects.toThrow();
+    const task = [...f.tasks.values()][0];
+    task.lastStatus = 'STOPPED';
+    f.setNow(settledAt);
+    await expect(f.adapter().reconcileLaunch(ref)).rejects.toThrow('stopped');
+    await expect(
+      f.adapter().create({ intentId: 'replacement', createdAt: 20_000 })
+    ).resolves.toHaveProperty('providerRef');
+    expect(f.operations.get(intent.intentId)?.phase).toBe('terminated');
+    expect(f.operations.get(intent.intentId)?.taskArn).toBeUndefined();
+    expect(f.submitted).toHaveLength(1);
+    expect(await f.adapter().stop(ref)).toBe('terminal');
+    expect(f.documents.size).toBe(0);
+  });
+  it('confirms termination of an aged task that ECS no longer retains', async () => {
+    const f = ecsProviderFixture();
+    const ref = await create(f);
+    await f.adapter().launch(ref, startup);
+    f.forgetTasks();
+    expect(await f.adapter().stop(ref)).toBe('retryable');
+    expect(f.operations.get(intent.intentId)?.phase).toBe('stopping');
+    f.setNow(settledAt);
+    await expect(
+      f.adapter().create({ intentId: 'replacement', createdAt: 20_000 })
+    ).resolves.toHaveProperty('providerRef');
+    expect(f.operations.get(intent.intentId)?.phase).toBe('terminated');
+    expect(f.documents.size).toBe(0);
   });
   it('rejects persisted request fields that differ from the pinned configuration', async () => {
     const f = ecsProviderFixture();

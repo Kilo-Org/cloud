@@ -157,8 +157,11 @@ export function createAwsEcsProviderAdapter(deps: {
       async discover(value) {
         if (!value.request) return undefined;
         const { client } = await deps.resolveRuntime(value.config);
-        const id = await client.findByStartedBy(value.config.clusterArn, value.request.startedBy);
-        if (!id) return undefined;
+        const ids = await client.findByStartedBy(value.config.clusterArn, value.request.startedBy);
+        // An intent owns exactly one task. An ambiguous page cannot establish its identity.
+        if (!ids || ids.length > 1) return undefined;
+        const id = ids[0];
+        if (!id) return { status: 'absent' };
         const task = await client.get(value.config.clusterArn, id);
         if (!task) return undefined;
         if (
@@ -169,7 +172,7 @@ export function createAwsEcsProviderAdapter(deps: {
         )
           throw new AwsRequestError(0, 'TaskIdentityMismatch');
         // Persist immutable ownership before mutable admission checks so cleanup remains possible.
-        return id;
+        return { status: 'identified', physicalId: id };
       },
       async runner(config) {
         const { client } = await deps.resolveRuntime(config);
@@ -194,7 +197,19 @@ export function createAwsEcsProviderAdapter(deps: {
         // Stop uses only the stored identity, even when runtime admission rejected its metadata.
         const before = await client.get(config.clusterArn, id);
         if (before?.lastStatus === 'STOPPED' || before?.lastStatus === 'DELETED') return 'terminal';
-        await client.stop(config.clusterArn, id);
+        try {
+          await client.stop(config.clusterArn, id);
+        } catch (error) {
+          // ECS forgets stopped tasks after about an hour and then rejects StopTask with a 400.
+          if (
+            !before &&
+            error instanceof AwsRequestError &&
+            error.status === 400 &&
+            ['ClientException', 'InvalidParameterException'].includes(error.code)
+          )
+            return 'absent';
+          throw error;
+        }
         const after = await client.get(config.clusterArn, id);
         return after?.lastStatus === 'STOPPED' || after?.lastStatus === 'DELETED'
           ? 'terminal'

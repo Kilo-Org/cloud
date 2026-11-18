@@ -181,11 +181,15 @@ export function ecsProviderFixture(sandboxId = 'ses-abcdef') {
             .strict()
             .parse(body);
           discoveries.push(lookup);
+          // ListTasks defaults to desired status RUNNING, so it omits stopped tasks.
           return Response.json(
             discoveryResult ?? {
               taskArns: [...tasks.values()]
                 .filter(
-                  task => task.clusterArn === lookup.cluster && task.startedBy === lookup.startedBy
+                  task =>
+                    task.clusterArn === lookup.cluster &&
+                    task.startedBy === lookup.startedBy &&
+                    task.lastStatus !== 'STOPPED'
                 )
                 .map(task => task.taskArn),
             }
@@ -205,7 +209,11 @@ export function ecsProviderFixture(sandboxId = 'ses-abcdef') {
           if (stopError) return new Response(null, { status: 503 });
           const stop = z.object({ task: z.string() }).parse(body);
           const task = [...tasks.values()].find(value => value.taskArn === stop.task);
-          if (!task) return new Response(null, { status: 404 });
+          if (!task)
+            return Response.json(
+              { __type: 'InvalidParameterException' },
+              { status: 400, headers: { 'x-amzn-errortype': 'InvalidParameterException' } }
+            );
           task.lastStatus = 'STOPPED';
           return Response.json({ task });
         }
@@ -277,6 +285,10 @@ export function ecsProviderFixture(sandboxId = 'ses-abcdef') {
     },
     setMissing: (value: boolean) => {
       missing = value;
+    },
+    /** ECS stops returning a stopped task about an hour after it stops. */
+    forgetTasks: () => {
+      tasks.clear();
     },
     gateRun: (value?: Promise<void>) => {
       runGate = value;

@@ -131,7 +131,8 @@ export function createAwsEnvironmentBuildServices(deps: AwsBuildContextDeps) {
                 : [],
             })
           : undefined,
-      audit: input.egressPolicy?.egressAudit === true,
+      // Build input stores no audit setting, so build egress is not audited.
+      audit: false,
     };
   }
   const admissions = new Map<string, ReturnType<typeof createAwsBuildEgressAdmission>>();

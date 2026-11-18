@@ -9,6 +9,10 @@
 // future expo-router change to this one file.
 import { useCallback, useContext, useSyncExternalStore } from 'react';
 
+import {
+  NavigationPendingContext,
+  RoutingQueueApiContext,
+} from 'expo-router/build/global-state/routingQueueContext';
 import { NavigationContext } from 'expo-router/build/react-navigation/core/NavigationContext';
 import { NavigationRouteContext } from 'expo-router/build/react-navigation/core/NavigationProvider';
 
@@ -98,4 +102,18 @@ export function useRouteFocused(): boolean {
 export function useNavigationFocusRead(): () => boolean {
   const navigation = useContext(NavigationContext) as FocusableNavigation | undefined;
   return useCallback(() => navigation?.isFocused?.() ?? true, [navigation]);
+}
+
+/**
+ * Whether the queue that carries dispatched navigation actions has drained.
+ *
+ * Every `dispatch` enqueues an intent the root provider applies in a later
+ * commit, so a read taken before the drain answers from the state the action
+ * was queued against. Outside the provider — a harness that mounts the caller
+ * without the Expo root — no dispatch can be pending, so this reports settled.
+ */
+export function useNavigationQueueSettled(): boolean {
+  const queueApi = useContext(RoutingQueueApiContext);
+  const pending = useContext(NavigationPendingContext);
+  return queueApi === undefined ? true : !pending;
 }

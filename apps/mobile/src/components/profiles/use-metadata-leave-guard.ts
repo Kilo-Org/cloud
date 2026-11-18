@@ -5,7 +5,10 @@ import { useTranslation } from 'react-i18next';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { isLeaveAction } from '@/lib/navigation/leave-actions';
 import { clearAcceptedBack } from '@/lib/navigation/leave-settle';
-import { useNavigationFocusRead } from '@/lib/navigation/route-focus';
+import {
+  useNavigationFocusRead,
+  useNavigationQueueSettled,
+} from '@/lib/navigation/route-focus';
 
 export type MetadataLeaveGuard = Readonly<{
   /** Wire this to the metadata form's `onDirtyChange`. */
@@ -54,6 +57,7 @@ export function useMetadataLeaveGuard({
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const navigationFocusRead = useNavigationFocusRead();
+  const queueSettled = useNavigationQueueSettled();
   const [dirty, setDirty] = useState(false);
   const dirtyRef = useRef(false);
   const [leaveAllowed, setLeaveAllowed] = useState(false);
@@ -78,6 +82,9 @@ export function useMetadataLeaveGuard({
   const pendingLeaveRef = useRef<(() => void) | null>(null);
   const replayRef = useRef<(() => void) | null>(null);
   const [leaveCount, setLeaveCount] = useState(0);
+  // Set by the pass that dispatches a replay, so the following pass judges the
+  // dispatch against state that includes its queued intent.
+  const [replayDraining, setReplayDraining] = useState(false);
 
   const handleDirtyChange = useCallback((next: boolean) => {
     dirtyRef.current = next;
@@ -152,8 +159,9 @@ export function useMetadataLeaveGuard({
         }
         // The disarm render is committed by the time `leave` queues the replay,
         // and the replay effect dispatches the removal after that render and
-        // then takes the disarm back: a screen that survives the replay (its
-        // retire was refused) is guarded again on its next edit.
+        // then takes the disarm back once the queue that carries it has
+        // drained: a screen that survives the replay (its retire was refused)
+        // is guarded again on its next edit.
         dirtyRef.current = false;
         setDirty(false);
         pending();
@@ -171,29 +179,43 @@ export function useMetadataLeaveGuard({
   useEffect(() => {
     const replay = replayRef.current;
     replayRef.current = null;
-    replay?.();
-    // The removal has been dispatched. The disarm that covered the replay —
-    // `leaveAllowed` — stays set from here: re-enabling `usePreventRemove`
-    // while the granted removal is still animating is the option change that
-    // landed after a transition began, the header-remount shape the hook's own
-    // note above records for the leave-without-asking path. The latch releases
-    // only on a post-dispatch focus read that answers for this moment: a
-    // focused route is not the route the pop is carrying away, so a refused
-    // replay re-arms here, while a granted pop reports unfocused the moment
-    // its dispatch runs and never releases the latch — the unmount takes it.
-    // Every consumer releases with the focus evidence — a manual-dirty screen
-    // edits again after a refused leave just as a derived one does — and only
-    // the derived screen's dirty test and ref sync that to the form's own
-    // computation.
-    if (navigationFocusRead()) {
-      setLeaveAllowed(false);
-      if (isDirty !== undefined && !leavingRef.current) {
-        const next = isDirty();
-        dirtyRef.current = next;
-        setDirty(next);
-      }
+    if (replay !== null) {
+      replay();
+      // The dispatch only enqueues an intent, so this pass cannot tell a granted
+      // pop from a refused replay; the flag makes the next pass run even when
+      // nothing else about this screen changed, and that pass reads the queue
+      // state the intent committed.
+      setReplayDraining(true);
+      return;
     }
-  }, [leaveCount, isDirty, navigationFocusRead]);
+    // The replay's dispatch enqueues an intent the root routing queue applies in
+    // a later commit, and a focus read before that drain answers from the state
+    // the dispatch was queued against: a granted pop still reports focused then,
+    // and releasing the latch — re-enabling `usePreventRemove` — on that read
+    // re-arms prevention on a route the pop is carrying away, the option change
+    // that lands after the transition began, the header-remount shape the note
+    // above records. A pass that dispatched never releases; the latch releases
+    // only on a later pass where the queue has settled, and that pass reads
+    // focus with the drained state to answer from: a granted pop unmounts this
+    // screen in the drain commit, so the latch dies with the mount, while a
+    // refused replay settles with this screen still mounted and focused and
+    // re-arms here. A screen a pop buried stays latched until it renders focused
+    // again — its next edit runs this effect and releases the latch then. Every
+    // consumer releases with that focus evidence — a manual-dirty screen edits
+    // again after a refused leave just as a derived one does — and only the
+    // derived screen's dirty test and ref sync that to the form's own
+    // computation.
+    if (!replayDraining || !queueSettled || !navigationFocusRead()) {
+      return;
+    }
+    setReplayDraining(false);
+    setLeaveAllowed(false);
+    if (isDirty !== undefined && !leavingRef.current) {
+      const next = isDirty();
+      dirtyRef.current = next;
+      setDirty(next);
+    }
+  }, [leaveCount, isDirty, navigationFocusRead, queueSettled, replayDraining]);
 
   return { handleDirtyChange, leaveWithoutAsking, dialog };
 }

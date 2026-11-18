@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the screen's guard cases and the routing-queue harness they drive read as one suite. */
 /**
  * The New trigger screen's leave guard.
  *
@@ -8,8 +9,14 @@
  * that succeeded leaves without asking about the draft it just saved.
  */
 
-import { createElement } from 'react';
+import { type Context, createElement, useEffect, useMemo, useState } from 'react';
 
+import {
+  NavigationPendingContext,
+  type RoutingQueueApi,
+  RoutingQueueApiContext,
+} from 'expo-router/build/global-state/routingQueueContext';
+import { NavigationContext as VendoredNavigationContext } from 'expo-router/build/react-navigation/core/NavigationContext';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
@@ -19,6 +26,10 @@ import { resetLeaveSettle } from '@/lib/navigation/leave-settle';
 import { deviceTimeZone } from '@/lib/intl-cache';
 
 import { TriggerCreateScreen } from './trigger-create-screen';
+
+// The harness supplies only the surface the guard reads from navigation, so the
+// context is read through the `unknown` shape the other focus suites use.
+const NavigationContext = VendoredNavigationContext as Context<unknown>;
 
 const h = vi.hoisted(() => ({
   replace: vi.fn(),
@@ -32,6 +43,10 @@ const h = vi.hoisted(() => ({
       | undefined,
   },
   createMutation: { mutateAsync: vi.fn(), isPending: false },
+  queue: {
+    setPending: (_pending: boolean): void => undefined,
+    setFocused: (_focused: boolean): void => undefined,
+  },
 }));
 
 vi.mock('expo-router', () => ({
@@ -57,6 +72,21 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({ replace: h.replace, push: vi.fn(), back: vi.fn() }),
   useLocalSearchParams: () => ({}),
 }));
+
+// `route-focus.ts` reads the vendored contexts directly, so these mocks put the
+// guard's focus and queue reads under this suite's own providers. Mocking the
+// concrete modules keeps a Node test off the navigation stack's build output.
+vi.mock('expo-router/build/react-navigation/core/NavigationContext', async () => {
+  const { createContext } = await import('react');
+  return { NavigationContext: createContext<unknown>(undefined) };
+});
+vi.mock('expo-router/build/global-state/routingQueueContext', async () => {
+  const { createContext } = await import('react');
+  return {
+    NavigationPendingContext: createContext(false),
+    RoutingQueueApiContext: createContext<unknown>(undefined),
+  };
+});
 
 vi.mock('@/lib/navigation/stack-safe-replace', () => ({
   useStackSafeReplace: () => ({ replace: h.replace }),
@@ -119,10 +149,50 @@ function pressBack() {
       data: { action: { type: 'GO_BACK' } },
       repeat: () => {
         h.repeatSawEnabled.push(h.guard.enabled);
+        // The replay's `repeat` dispatches the action, and a dispatch only
+        // enqueues an intent: the harness queue reports pending until a case
+        // has its drain apply the intent.
+        h.queue.setPending(true);
         h.repeat();
       },
     });
   });
+}
+
+/** The routing-queue API the guard only tests for presence. */
+const QUEUE_API = {
+  enqueue: () => undefined,
+  dequeue: () => undefined,
+  startTransition: () => undefined,
+  transitionMode: 'never',
+  setTransitionMode: () => undefined,
+} satisfies RoutingQueueApi;
+
+/**
+ * The screen inside the contexts the guard reads directly: a routing queue whose
+ * pending flag and a navigation object whose focus the case drives through
+ * `h.queue`, so a drain and a granted pop can be replayed one commit at a time.
+ */
+function GuardHarness() {
+  const [pending, setPending] = useState(false);
+  const [focused, setFocused] = useState(true);
+  useEffect(() => {
+    h.queue.setPending = setPending;
+    h.queue.setFocused = setFocused;
+  }, []);
+  const navigation = useMemo(
+    () => ({ isFocused: () => focused, addListener: () => () => undefined }),
+    [focused]
+  );
+  return (
+    <RoutingQueueApiContext.Provider value={QUEUE_API}>
+      <NavigationPendingContext.Provider value={pending}>
+        <NavigationContext.Provider value={navigation}>
+          <TriggerCreateScreen />
+        </NavigationContext.Provider>
+      </NavigationPendingContext.Provider>
+    </RoutingQueueApiContext.Provider>
+  );
 }
 
 /** The draft the form reports, over the base the screen starts on. */
@@ -247,6 +317,55 @@ describe('TriggerCreateScreen leave guard', () => {
     // The second Back runs on a re-armed guard whose draft still differs from
     // the baseline, so it raises the Discard prompt again: one call from the
     // first press, one from this one.
+    pressBack();
+    expect(h.confirm).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the disarm through a granted pop's drain", async () => {
+    const { renderer } = await renderWithProviders(<GuardHarness />);
+
+    editDraft(renderer, { name: 'probe-draft' });
+    pressBack();
+    await act(async () => {
+      discardRequest().onConfirm?.();
+      await Promise.resolve();
+    });
+
+    // The replay went out disarmed, and its dispatch only queued the intent:
+    // this pass cannot tell the pop was granted, so the latch holds while the
+    // queue still carries the intent and the focus read still answers from the
+    // state the dispatch was queued against.
+    expect(h.repeat).toHaveBeenCalledTimes(1);
+    expect(h.guard.enabled).toBe(false);
+
+    // The pop committed: the drained read sees this route unfocused, and a
+    // granted pop never re-arms prevention on the route it carries away.
+    act(() => {
+      h.queue.setPending(false);
+      h.queue.setFocused(false);
+    });
+    expect(h.guard.enabled).toBe(false);
+  });
+
+  it('re-arms after a refused replay settles', async () => {
+    const { renderer } = await renderWithProviders(<GuardHarness />);
+
+    editDraft(renderer, { name: 'probe-draft' });
+    pressBack();
+    await act(async () => {
+      discardRequest().onConfirm?.();
+      await Promise.resolve();
+    });
+    expect(h.guard.enabled).toBe(false);
+
+    // The navigator refused the removal, so the screen survives the drain as
+    // the focused route: the drained read is truthful and the guard re-arms.
+    act(() => {
+      h.queue.setPending(false);
+    });
+    await waitFor(() => h.guard.enabled);
+    expect(h.guard.enabled).toBe(true);
+
     pressBack();
     expect(h.confirm).toHaveBeenCalledTimes(2);
   });

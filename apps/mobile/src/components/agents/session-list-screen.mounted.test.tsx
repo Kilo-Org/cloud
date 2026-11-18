@@ -809,9 +809,10 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(84);
     const createAction = action('New session');
     const label = createAction.findByType(Text);
-    expect(createAction.props.className).toContain('max-w-full');
+    // The state's one action is a `StateAction`: a label-sized control on the
+    // shared 48pt state-action floor, whose label the control itself sizes.
     expect(createAction.props.className).toContain('min-h-[48px]');
-    expect(label.props.className).toBe('shrink text-center');
+    expect(label.props.className).toBeUndefined();
     expect(label.props.numberOfLines).toBeUndefined();
     expect(label.props.allowFontScaling).not.toBe(false);
     expect(label.props.adjustsFontSizeToFit).not.toBe(true);

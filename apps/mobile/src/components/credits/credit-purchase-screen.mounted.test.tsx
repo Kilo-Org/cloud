@@ -852,11 +852,11 @@ describe('CreditPurchaseScreen', () => {
 
     const rows = packRows(renderer);
     const priced = rows[0]?.findAll(node => String(node.type) === 'Text') ?? [];
-    // Title, then the expiry note under it, then the store price in the
-    // trailing slot.
+    // Title, then the store price in the trailing slot. The expiry policy is
+    // stated once for the pack group below the rows, and still rides in each
+    // row's accessibility label.
     expect(priced.map(node => node.props.children)).toEqual([
       `Add ${packAmount('$10.00')} of credits`,
-      'Credits purchased through the App Store do not expire.',
       '$10.99',
     ]);
     const unpriced = rows[3]?.findAll(node => String(node.type) === 'Text') ?? [];
@@ -1305,10 +1305,10 @@ describe('CreditPurchaseScreen', () => {
     const caps = renderer.root
       .findAll(node => typeof node.props.numberOfLines === 'number')
       .map(node => Number(node.props.numberOfLines));
-    // Every row caps its title and its one state line to a line each, so the
-    // store price's own `shrink-0` line stays the only unclamped one and no row
-    // grows when the copy changes.
-    expect(caps.filter(cap => cap === 1)).toHaveLength(8);
+    // Every row caps its one state line to a line, so the store price's own
+    // `shrink-0` line stays the only unclamped one and no row grows when the
+    // copy changes. The expiry policy is a group caption below the rows.
+    expect(caps.filter(cap => cap === 1)).toHaveLength(4);
     unmount();
   });
 

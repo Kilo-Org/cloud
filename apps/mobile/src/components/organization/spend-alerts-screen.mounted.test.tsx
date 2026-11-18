@@ -541,6 +541,11 @@ describe('SpendAlertsScreen non-retryable states', () => {
     const { renderer } = await mountScreen('org-1');
 
     await waitFor(() => byType(renderer, 'PermissionDenied').length === 1);
+    // The header owns the way out, so the state must not repeat a Back action.
+    expect(byType(renderer, 'ScreenHeader')[0]?.props.title).toBe(
+      i18n.t('notifications.channel.spend')
+    );
+    expect(byType(renderer, 'PermissionDenied')[0]?.props.showBack).toBe(false);
     expect(byType(renderer, 'Button')).toHaveLength(0);
     expect(byType(renderer, 'Switch')).toHaveLength(0);
     expect(byType(renderer, 'FormField')).toHaveLength(0);

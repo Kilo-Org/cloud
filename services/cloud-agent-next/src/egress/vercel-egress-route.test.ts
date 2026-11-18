@@ -147,6 +147,7 @@ function harness(
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe('restricted Vercel egress route', () => {
@@ -357,7 +358,6 @@ describe('restricted Vercel egress route', () => {
     });
     expect(error).toHaveBeenCalledExactlyOnceWith('Sandbox egress forwarding failed');
     expect(h.upstream).not.toHaveBeenCalled();
-    withFields.mockRestore();
   });
 
   it('writes no audit row for an allowlist without audit', async () => {

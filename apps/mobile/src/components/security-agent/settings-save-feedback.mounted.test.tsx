@@ -13,10 +13,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
-import {
-  SettingsSaveAdmissionRefused,
-  useSettingsSaveFeedback,
-} from './settings-save-feedback';
+import { SettingsSaveAdmissionRefused, useSettingsSaveFeedback } from './settings-save-feedback';
 
 vi.mock('react-native', () => ({
   View: 'View',

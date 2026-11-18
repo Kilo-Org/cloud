@@ -544,9 +544,8 @@ function OutputGuardrailSection({
           responses no longer stream.
         </li>
         <li>
-          Blocked responses are replaced with an error, and the model&apos;s usage is still
-          charged. If Enkrypt is unavailable, responses are released unscanned rather than
-          withheld.
+          Blocked responses are replaced with an error, and the model&apos;s usage is still charged.
+          If Enkrypt is unavailable, responses are released unscanned rather than withheld.
         </li>
         <li>
           Log only detectors check a copy of the response after it&apos;s sent and never delay it.

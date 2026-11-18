@@ -79,7 +79,7 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import { checkOpenAiChatGptByok } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
 import { checkClaudeBilling } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/routing';
-import { isValidOpenRouterModelId } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { isKiloCatalogModelId } from '@kilocode/web-shared/lib/ai-gateway/byok/servable-catalog-model';
 import * as z from 'zod';
 import {
   CustomLlmCredentialsSchema,
@@ -992,7 +992,7 @@ export async function previewByokRouting({
 }): Promise<ByokRoutingPreview> {
   const model = await classifyRequestedModel(requestedModel);
   if (model.kind === 'custom-llm') return { kind: 'custom-llm' };
-  if (model.kind !== 'catalog' || !(await isValidOpenRouterModelId(requestedModel))) {
+  if (model.kind !== 'catalog' || !(await isKiloCatalogModelId(requestedModel))) {
     return { kind: 'not-catalog-model' };
   }
 

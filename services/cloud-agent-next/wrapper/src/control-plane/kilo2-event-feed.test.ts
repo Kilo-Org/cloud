@@ -667,13 +667,23 @@ it.each([
   ],
   [catalogFailure('HTTP 503'), 'provider_unavailable'],
   ['Model unavailable: kilo/nvidia/nemotron-3-ultra-550b-a55b:free', 'model_unavailable'],
+  [
+    'SessionRunnerModel.ModelUnavailableError: Model unavailable: kilo/example',
+    'model_unavailable',
+  ],
   ['Variant unavailable for kilo/nvidia/nemotron-3.5-super-vl:free: instant', 'invalid_request'],
+  [
+    'SessionRunnerModel.VariantUnavailableError: Variant unavailable for kilo/example: instant',
+    'invalid_request',
+  ],
+  ['Request failed: Model unavailable: kilo/example', 'unknown'],
   [catalogFailure('HTTP 401'), 'provider_authentication'],
   [catalogFailure('network'), 'unknown'],
   ['No model is selected', 'unknown'],
 ] as const)('classifies a native no-route failure %s as %s', (message, reason) => {
   const failure = classifyAssistantFailure(nativeTurnError({ type: 'provider.no-route', message }));
   expect(failure.reason).toBe(reason);
+  if (reason === 'model_unavailable') expect(failure.terminalCode).toBe('model_missing');
   if (reason === 'model_catalog_unavailable') {
     expect(failure.safeMessage).toBe('The Kilo model catalog could not be loaded');
     expect(failure.terminalCode).toBeUndefined();

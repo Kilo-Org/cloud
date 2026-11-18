@@ -113,6 +113,14 @@ describe('session event public projection', () => {
       'Variant unavailable for kilo/nvidia/nemotron-3.5-super-vl:free: instant',
       'Assistant request was invalid',
     ],
+    [
+      'SessionRunnerModel.ModelUnavailableError: Model unavailable: kilo/example',
+      'Assistant request failed: model not found',
+    ],
+    [
+      'SessionRunnerModel.VariantUnavailableError: Variant unavailable for kilo/example: instant',
+      'Assistant request was invalid',
+    ],
   ])(
     'sanitizes the native no-route error %s on the public execution failure event',
     (message, expected) => {

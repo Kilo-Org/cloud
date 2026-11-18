@@ -422,8 +422,18 @@ function classifyAssistantFailureText(message: string): CloudAgentAssistantFailu
   if (/\bfailed to load the kilo model catalog \(http 404\)/.test(message)) {
     return 'model_catalog_unavailable';
   }
-  if (canonicalMessage.startsWith('model unavailable:')) return 'model_unavailable';
-  if (canonicalMessage.startsWith('variant unavailable for')) return 'invalid_request';
+  if (
+    /^(?:sessionrunnermodel\.modelunavailableerror: )?model unavailable:/.test(canonicalMessage)
+  ) {
+    return 'model_unavailable';
+  }
+  if (
+    /^(?:sessionrunnermodel\.variantunavailableerror: )?variant unavailable for /.test(
+      canonicalMessage
+    )
+  ) {
+    return 'invalid_request';
+  }
   if (/\b(payment required|insufficient (?:credits?|balance|funds))\b/.test(message)) {
     return 'insufficient_credits';
   }

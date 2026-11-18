@@ -56,9 +56,11 @@ const frameTree = (mainUrl: string): Record<string, unknown> => ({
 const createSession = (
   options: {
     readonly describeNodeFails?: boolean;
+    readonly focusedProbe?: Record<string, unknown>;
     readonly frameIdForBackendNode?: (backendNodeId: number) => string;
     readonly mainUrl?: string;
     readonly probe?: Record<string, unknown>;
+    readonly probeByObject?: Record<string, Record<string, unknown>>;
     readonly targetFrameId?: string;
   } = {}
 ): FakeGateSession => {
@@ -76,11 +78,28 @@ const createSession = (
 
       return { node: { frameId } };
     },
-    'DOM.resolveNode': () => ({ object: { objectId: 'obj-1' } }),
+    'DOM.resolveNode': params => {
+      const id = params?.['backendNodeId'] ?? params?.['nodeId'];
+
+      return { object: { objectId: `obj-${String(id)}` } };
+    },
     'Page.getFrameTree': () => frameTree(options.mainUrl ?? MAIN_URL),
-    'Runtime.callFunctionOn': () => ({
+    'Runtime.callFunctionOn': params => {
+      const objectId = params?.['objectId'];
+      const probeForObject =
+        typeof objectId === 'string' ? options.probeByObject?.[objectId] : undefined;
+
+      return {
+        result: {
+          value: JSON.stringify(
+            probeForObject ?? options.probe ?? { fields: [], paymentFormSubmit: false }
+          ),
+        },
+      };
+    },
+    'Runtime.evaluate': () => ({
       result: {
-        value: JSON.stringify(options.probe ?? { fields: [], paymentFormSubmit: false }),
+        value: JSON.stringify(options.focusedProbe ?? { fields: [], paymentFormSubmit: false }),
       },
     }),
   };
@@ -238,6 +257,28 @@ describe('origin grants', () => {
     });
   });
 
+  it('gates browser_tabs new on the destination origin', async () => {
+    const result = await run({
+      args: { action: 'new', url: 'https://evil.example.net/login' },
+      toolName: 'browser_tabs',
+    });
+
+    expect(failureOf(result)).toStrictEqual({
+      items: [{ class: 'navigate', origin: 'https://evil.example.net' }],
+      kind: 'needs_permission',
+    });
+  });
+
+  it('lets a tabs list through without act on the current origin', async () => {
+    const result = await run({
+      args: { action: 'list' },
+      authorized: [],
+      toolName: 'browser_tabs',
+    });
+
+    expect(result).toMatchObject({ ok: true });
+  });
+
   it('gates a navigate on the destination origin, not the current one', async () => {
     const refused = await run({
       args: { url: 'https://evil.example.net/login' },
@@ -326,6 +367,76 @@ describe('sensitive steps', () => {
       element: 'e12',
       origin: 'https://app.example.com',
       reason: SENSITIVE_REASON.password,
+    });
+  });
+
+  it('binds the token to the sensitive element, not the first target', async () => {
+    const tokens = createStepTokenStore({ now: () => 1000, random: () => 'token-d' });
+    const args = {
+      fields: [
+        { name: 'Name', target: 'e11', type: 'textbox', value: 'Igor' },
+        { name: 'Password', target: 'e12', type: 'textbox', value: 'hunter2' },
+      ],
+    };
+    const session = createSession({ probeByObject: { 'obj-12': passwordProbe } });
+    const refused = await run({ args, session, toolName: 'browser_fill_form' }, tokens);
+
+    expect(failureOf(refused)).toStrictEqual({
+      items: [
+        {
+          class: 'sensitive',
+          origin: 'https://app.example.com',
+          reason: SENSITIVE_REASON.password,
+        },
+      ],
+      kind: 'needs_permission',
+    });
+    expect(sensitiveOf(refused)).toStrictEqual({
+      element: 'e12',
+      origin: 'https://app.example.com',
+      reason: SENSITIVE_REASON.password,
+    });
+
+    // The runtime issues the token for the element the refusal reports.
+    const token = tokens.issue({
+      argumentHash: hashBrowserToolArguments(args),
+      element: 'e12',
+      origin: 'https://app.example.com',
+      reason: SENSITIVE_REASON.password,
+      tabId: 7,
+      toolName: 'browser_fill_form',
+    });
+    const allowed = await run(
+      { args, session, stepTokens: [token], toolName: 'browser_fill_form' },
+      tokens
+    );
+
+    expect(allowed).toMatchObject({ ok: true, sensitiveToken: token });
+
+    const replay = await run(
+      { args, session, stepTokens: [token], toolName: 'browser_fill_form' },
+      tokens
+    );
+
+    expect(replay.ok).toBe(false);
+  });
+
+  it('probes the focused element for a press without a target', async () => {
+    const result = await run({
+      args: { key: 'Enter' },
+      session: createSession({ focusedProbe: passwordProbe }),
+      toolName: 'browser_press_key',
+    });
+
+    expect(failureOf(result)).toStrictEqual({
+      items: [
+        {
+          class: 'sensitive',
+          origin: 'https://app.example.com',
+          reason: SENSITIVE_REASON.password,
+        },
+      ],
+      kind: 'needs_permission',
     });
   });
 

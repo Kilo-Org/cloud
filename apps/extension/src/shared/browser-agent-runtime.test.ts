@@ -501,6 +501,46 @@ describe('agent browser calls', () => {
     // The download was denied for the call's duration and the browser's default restored afterwards.
     expect(cdp.downloadsDenied()).toBe(1);
     expect(cdp.downloadsRestored()).toBe(1);
+
+    expect(expectStepToken(outcome)).toBeDefined();
+  });
+
+  it('runs a download call unguarded once with the approval token, then burns it', async () => {
+    const { cdp, runtime } = createHarness();
+
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': () => {
+        cdp.emit('Browser.downloadWillBegin', {
+          guid: 'download-9',
+          suggestedFilename: 'invoice.pdf',
+          url: `${MAIN_ORIGIN}/invoice.pdf`,
+        });
+
+        return {};
+      },
+    });
+
+    const click = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+
+    const refused = await click([]);
+    const token = expectStepToken(refused);
+
+    const approved = await click([token]);
+
+    expect(approved.kind).toBe('result');
+    expect(cdp.downloadsDenied()).toBe(1);
+
+    const replay = await click([token]);
+
+    expect(replay.kind).toBe('needs_permission');
+    expect(cdp.downloadsDenied()).toBe(2);
   });
 
   it('does not refuse an act call for a download an earlier call started', async () => {

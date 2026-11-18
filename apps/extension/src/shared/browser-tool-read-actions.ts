@@ -648,6 +648,10 @@ const translateBoxesIntoClip = (
         ];
   });
 
+/** A scroll position of zero, for a caller whose layout metrics could not be read. */
+// eslint-disable-next-line id-length -- the geometry's scroll fields are named x and y
+const NO_SCROLL = { x: 0, y: 0 } as const;
+
 /** The masker re-encodes every masked image as PNG, so a masked capture reports that type. */
 const MASKED_SCREENSHOT_MEDIA_TYPE = 'image/png';
 
@@ -785,7 +789,8 @@ const browserFindHandler: BrowserReadActionHandler = async (arguments_, deps) =>
 
 const readElementClip = async (
   session: BrowserToolPageSession,
-  target: string
+  target: string,
+  options: { readonly failClosedOnGeometryError: boolean }
 ): Promise<z.infer<typeof elementClipSchema>> => {
   const resolved = await session.resolveTarget(target);
 
@@ -807,7 +812,14 @@ const readElementClip = async (
     throw new Error(`Target "${target}" has no layout box to capture.`);
   }
 
-  const geometry = await readAgentScreenshotGeometry(session);
+  // A layout-metrics failure must not take element screenshots away from the panel and workflow callers; an agent caller fails closed instead of guessing.
+  const geometry = await readAgentScreenshotGeometry(session).catch((error: unknown) => {
+    if (options.failClosedOnGeometryError) {
+      throw error instanceof Error ? error : new Error(String(error));
+    }
+
+    return { scale: 1, scroll: NO_SCROLL };
+  });
 
   return elementClipSchema.parse({
     height: model.height ?? 0,
@@ -862,7 +874,11 @@ const browserTakeScreenshotHandler: BrowserReadActionHandler = async (arguments_
   }
 
   const clip =
-    target === undefined || target === '' ? undefined : await readElementClip(deps.session, target);
+    target === undefined || target === ''
+      ? undefined
+      : await readElementClip(deps.session, target, {
+          failClosedOnGeometryError: deps.agentScope !== undefined,
+        });
   // A device-pixel element capture renders the clip at the tab's device pixel ratio; the mask boxes move with it.
   let clipScale = 1;
 

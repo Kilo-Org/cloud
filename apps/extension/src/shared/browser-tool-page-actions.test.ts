@@ -371,6 +371,143 @@ describe('browser-tool-page-actions', () => {
       });
     });
 
+    it('withholds the title and url of a tab the agent may not read', async () => {
+      const tabs = createFakeTabsApi([
+        inspectableTab(1, 'First', 'https://first.example.com/'),
+        inspectableTab(2, 'Second', 'https://second.example.com/'),
+      ]);
+
+      const result = await runPageBrowserTool('kilo_browser_tabs', { action: 'list' }, undefined, {
+        agentAccess: {
+          actOrigins: [],
+          groupTabs: [],
+          navigateOrigins: [],
+          readableOrigins: ['https://first.example.com'],
+        },
+        tabId: 2,
+        tabsApi: tabs.tabsApi,
+      });
+
+      expect(result).toStrictEqual({
+        ok: true,
+        value: {
+          tabs: [
+            { index: 0, selected: false, title: 'First', url: 'https://first.example.com/' },
+            { index: 1, selected: true, title: '', url: '[origin withheld]' },
+          ],
+        },
+      });
+    });
+
+    it('lists a tab in the agent session group even without a read grant', async () => {
+      const tabs = createFakeTabsApi([inspectableTab(2, 'Second', 'https://second.example.com/')]);
+
+      const result = await runPageBrowserTool('kilo_browser_tabs', { action: 'list' }, undefined, {
+        agentAccess: {
+          actOrigins: [],
+          groupTabs: [2],
+          navigateOrigins: [],
+          readableOrigins: [],
+        },
+        tabId: 2,
+        tabsApi: tabs.tabsApi,
+      });
+
+      expect(result).toMatchObject({
+        ok: true,
+        value: { tabs: [{ title: 'Second', url: 'https://second.example.com/' }] },
+      });
+    });
+
+    it('refuses to select a tab outside the group without act on its origin', async () => {
+      const tabs = createFakeTabsApi([
+        inspectableTab(1, 'First', 'https://first.example.com/'),
+        inspectableTab(2, 'Second', 'https://second.example.com/'),
+      ]);
+
+      const result = await runPageBrowserTool(
+        'kilo_browser_tabs',
+        { action: 'select', index: 1 },
+        undefined,
+        {
+          agentAccess: {
+            actOrigins: ['https://first.example.com'],
+            groupTabs: [],
+            navigateOrigins: [],
+            readableOrigins: [],
+          },
+          tabId: 1,
+          tabsApi: tabs.tabsApi,
+        }
+      );
+
+      expect(result.ok).toBe(false);
+      expect(tabs.updates).toHaveLength(0);
+    });
+
+    it('selects a tab in the agent session group', async () => {
+      const tabs = createFakeTabsApi([inspectableTab(2, 'Second', 'https://second.example.com/')]);
+
+      const result = await runPageBrowserTool(
+        'kilo_browser_tabs',
+        { action: 'select', index: 0 },
+        undefined,
+        {
+          agentAccess: { actOrigins: [], groupTabs: [2], navigateOrigins: [], readableOrigins: [] },
+          tabId: 1,
+          tabsApi: tabs.tabsApi,
+        }
+      );
+
+      expect(result.ok).toBe(true);
+      expect(tabs.updates).toStrictEqual([{ active: true, tabId: 2 }]);
+    });
+
+    it('refuses to close a tab outside the group without act on its origin', async () => {
+      const tabs = createFakeTabsApi([
+        inspectableTab(1, 'First', 'https://first.example.com/'),
+        inspectableTab(2, 'Second', 'https://second.example.com/'),
+      ]);
+      const { session } = createFakeSession();
+
+      const result = await runPageBrowserTool(
+        'kilo_browser_tabs',
+        { action: 'close', index: 1 },
+        session,
+        {
+          agentAccess: {
+            actOrigins: ['https://first.example.com'],
+            groupTabs: [],
+            navigateOrigins: [],
+            readableOrigins: [],
+          },
+          tabId: 1,
+          tabsApi: tabs.tabsApi,
+        }
+      );
+
+      expect(result.ok).toBe(false);
+      expect(tabs.removes).toHaveLength(0);
+    });
+
+    it('refuses a new tab whose origin the agent may not navigate to', async () => {
+      const tabs = tabsWithOnePage();
+
+      const result = await runPageBrowserTool(
+        'kilo_browser_tabs',
+        { action: 'new', url: 'https://new.example.com/' },
+        undefined,
+        {
+          agentAccess: { actOrigins: [], groupTabs: [], navigateOrigins: [], readableOrigins: [] },
+          tabId: 1,
+          tabsApi: tabs.tabsApi,
+        }
+      );
+
+      expect(result.ok).toBe(false);
+      expect(tabs.creates).toHaveLength(0);
+    });
+
     it('rejects a select without an index', async () => {
       const tabs = tabsWithOnePage();
 

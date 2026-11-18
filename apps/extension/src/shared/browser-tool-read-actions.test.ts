@@ -42,6 +42,7 @@ const createSession = ({
   consoleMessages = [],
   frameTree,
   layoutMetrics,
+  layoutMetricsError = false,
   requestsSinceLoad = [],
   pageText = () => '',
   responseBody,
@@ -55,6 +56,7 @@ const createSession = ({
   consoleMessages?: BrowserConsoleMessage[];
   frameTree?: Record<string, unknown>;
   layoutMetrics?: Record<string, unknown>;
+  layoutMetricsError?: boolean;
   requestsSinceLoad?: BrowserNetworkRequest[];
   pageText?: () => string;
   responseBody?: { base64Encoded?: boolean; body?: string };
@@ -104,6 +106,10 @@ const createSession = ({
       }
 
       if (method === 'Page.getLayoutMetrics') {
+        if (layoutMetricsError) {
+          throw new Error('layout metrics unavailable');
+        }
+
         return layoutMetrics ?? {};
       }
 
@@ -499,6 +505,31 @@ describe('browser_take_screenshot', () => {
       method: 'Page.captureScreenshot',
       params: { clip: { height: 10, scale: 1, width: 10, x: 3, y: 4 }, format: 'png' },
     });
+  });
+
+  it('keeps a panel element capture working when layout metrics fail', async () => {
+    const { session } = createSession({ layoutMetricsError: true });
+
+    const result = await runReadBrowserTool(
+      'browser_take_screenshot',
+      { scale: 'css', target: 'e12', type: 'png' },
+      session
+    );
+
+    expect(result.ok).toBe(true);
+  });
+
+  it('fails an agent element capture closed when layout metrics fail', async () => {
+    const { session } = createSession({ layoutMetricsError: true });
+
+    const result = await runReadBrowserTool(
+      'browser_take_screenshot',
+      { scale: 'css', target: 'e12', type: 'png' },
+      session,
+      { agentScope: { readableOrigins: ['https://app.example.com'] } }
+    );
+
+    expect(result.ok).toBe(false);
   });
 
   it('rejects fullPage combined with a target', async () => {

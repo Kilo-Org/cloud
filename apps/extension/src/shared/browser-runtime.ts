@@ -437,12 +437,26 @@ export const createBrowserRuntime = ({
           );
         }
 
+        // A download approval is post-action, so the gate cannot classify it on retry; a presented token bound to this tab, tool and argument set disables the guard once.
+        const downloadApproved =
+          agentContext !== undefined && preflight !== undefined && preflight.ok
+            ? (agentContext.sensitive ?? []).some(token =>
+                tokens.consume(token, {
+                  argumentHash: hashBrowserToolArguments(argsRecord),
+                  origin: preflight.origin,
+                  tabId,
+                  toolName,
+                })
+              )
+            : false;
+
         // An unapproved act call runs with downloads denied: a download it starts is cancelled, then reported as a sensitive step.
         const guardDownloads =
           agentContext !== undefined &&
           preflight !== undefined &&
           preflight.class === 'act' &&
-          preflight.sensitiveToken === undefined;
+          preflight.sensitiveToken === undefined &&
+          !downloadApproved;
 
         if (guardDownloads) {
           await setDownloadBehavior(session, 'deny');
@@ -459,6 +473,21 @@ export const createBrowserRuntime = ({
               ...(agentContext === undefined
                 ? {}
                 : {
+                    agentAccess: {
+                      actOrigins: agentContext.authorized
+                        .filter(grant => grant.class === 'act')
+                        .map(grant => grant.origin),
+                      groupTabs:
+                        caller.kind === 'agent'
+                          ? groups.tabsForSession(caller.sessionHandle)
+                          : undefined,
+                      navigateOrigins: agentContext.authorized
+                        .filter(grant => grant.class === 'navigate')
+                        .map(grant => grant.origin),
+                      readableOrigins: agentContext.authorized
+                        .filter(grant => grant.class === 'read')
+                        .map(grant => grant.origin),
+                    },
                     agentScope: {
                       readableOrigins: agentContext.authorized
                         .filter(grant => grant.class === 'read')

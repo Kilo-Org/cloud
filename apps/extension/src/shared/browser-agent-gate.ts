@@ -20,7 +20,11 @@ import type {
 } from './browser-agent-checks';
 import { mainFrameOf, readAgentFrameTree } from './browser-agent-frames';
 import type { BrowserAgentFrame } from './browser-agent-frames';
-import { readSensitiveProbeForTarget, sensitiveTargetsOf } from './browser-agent-probes';
+import {
+  readSensitiveProbeForFocusedElement,
+  readSensitiveProbeForTarget,
+  sensitiveTargetsOf,
+} from './browser-agent-probes';
 import type { BrowserToolPageSession } from './browser-tool-snapshot';
 import type { BrowserToolSession } from './browser-tool-session';
 
@@ -199,6 +203,13 @@ const sensitiveStepFor = async (input: {
 
   const targets = sensitiveTargetsOf(input.toolName, input.args);
 
+  if (input.toolName === 'browser_press_key' && targets.length === 0) {
+    // A press without an element types into whatever the page has focused.
+    const reason = firstReasonOf(await readSensitiveProbeForFocusedElement(input.session));
+
+    return reason === undefined ? undefined : { origin: input.origin, reason };
+  }
+
   for (const target of targets) {
     // eslint-disable-next-line no-await-in-loop -- one probe per targeted element, in argument order
     const probe = await readSensitiveProbeForTarget(input.session, target);
@@ -252,6 +263,25 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
   const grantClass = toolGrantClass(input.toolName);
   const frames = await readAgentFrameTree(input.session);
   const mainOrigin = mainFrameOf(frames)?.origin ?? OPAQUE_ORIGIN;
+
+  // `browser_tabs` is one tool over four actions: list filters per tab and select/close are checked by the handler against the group and `act`; only `new` navigates, so it needs the destination's `navigate` grant here.
+  if (input.toolName === 'browser_tabs') {
+    const destination = navigationOrigin(input.args);
+
+    if (
+      argumentString(input.args, 'action') === 'new' &&
+      destination !== undefined &&
+      !isOriginGranted(input.authorized, 'navigate', destination)
+    ) {
+      return {
+        failure: { items: [{ class: 'navigate', origin: destination }], kind: 'needs_permission' },
+        ok: false,
+      };
+    }
+
+    return { class: 'act', ok: true, origin: destination ?? mainOrigin, targetOriginFrame: false };
+  }
+
   const targetTexts = grantClass === 'navigate' ? [] : targetTextsOf(input.args);
   const targetFrames: TargetFrame[] = [];
 
@@ -265,7 +295,6 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
   }
 
   const destination = grantClass === 'navigate' ? navigationOrigin(input.args) : undefined;
-  const [target] = targetTexts;
   const [primaryTargetFrame] = targetFrames;
   const targetFrame =
     primaryTargetFrame === undefined
@@ -314,7 +343,8 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
 
   const binding: StepTokenBinding = {
     argumentHash: hashBrowserToolArguments(input.args),
-    element: target,
+    // The refusal reports the element that probed sensitive; the runtime issues the token for that element, so the retry must bind exactly it.
+    element: sensitive.element,
     origin,
     tabId: input.tabId,
     toolName: input.toolName,

@@ -260,6 +260,46 @@ const sensitiveProbePayloadSchema = z.object({
   paymentFormSubmit: z.boolean().optional(),
 });
 
+const decodeSensitiveProbe = (value: unknown): BrowserSensitiveProbe => {
+  const raw = probeJsonSchema.safeParse(value);
+
+  if (!raw.success) {
+    return { fields: [], paymentFormSubmit: false };
+  }
+
+  const payload = sensitiveProbePayloadSchema.safeParse(JSON.parse(raw.data));
+
+  if (!payload.success) {
+    return { fields: [], paymentFormSubmit: false };
+  }
+
+  return {
+    fields: payload.data.fields ?? [],
+    paymentFormSubmit: payload.data.paymentFormSubmit === true,
+  };
+};
+
+/**
+ * The probe's verdict on the focused element: `browser_press_key` without a
+ * target still types into whatever the page has focused.
+ */
+export const readSensitiveProbeForFocusedElement = async (
+  session: ProbeSession
+): Promise<BrowserSensitiveProbe> => {
+  try {
+    const response = runtimeEvaluateSchema.safeParse(
+      await session.send('Runtime.evaluate', {
+        expression: `(() => { const element = document.activeElement; return element ? (${SENSITIVE_TARGET_PROBE_FUNCTION}).call(element) : JSON.stringify({ fields: [], paymentFormSubmit: false }); })()`,
+        returnByValue: true,
+      })
+    );
+
+    return decodeSensitiveProbe(response.success ? response.data.result?.value : undefined);
+  } catch {
+    return { fields: [], paymentFormSubmit: false };
+  }
+};
+
 /**
  * Reads the sensitive state of one target element. A target that no longer
  * resolves reads as an empty probe: the tool itself then reports its own

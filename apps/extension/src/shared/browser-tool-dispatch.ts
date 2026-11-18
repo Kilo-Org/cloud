@@ -6,6 +6,7 @@ import {
 } from './browser-tool-interact-actions';
 import { PAGE_BROWSER_TOOL_NAMES, runPageBrowserTool } from './browser-tool-page-actions';
 import type {
+  BrowserAgentAccess,
   BrowserToolPageActionOptions,
   BrowserToolPageActionSession,
   BrowserToolPageTabsApi,
@@ -40,6 +41,8 @@ export type BrowserToolDispatchSession = BrowserToolPageSession &
  * clock override, and the WebMCP runtime hooks for the two WebMCP tools.
  */
 export interface BrowserToolDispatchOptions {
+  /** The agent caller's grants and group, so the tab actions enforce D9; absent for the panel and workflow callers. */
+  readonly agentAccess?: BrowserAgentAccess | undefined;
   /** Frame scoping for a CLI agent caller; absent for the panel and workflow callers. */
   readonly agentScope?: AgentReadScope | undefined;
   readonly now?: () => number;
@@ -71,6 +74,7 @@ const readToolOptions = (options: BrowserToolDispatchOptions): BrowserReadToolOp
 });
 
 const pageToolOptions = (options: BrowserToolDispatchOptions): BrowserToolPageActionOptions => ({
+  ...(options.agentAccess === undefined ? {} : { agentAccess: options.agentAccess }),
   ...(options.now === undefined ? {} : { now: options.now }),
   ...(options.tabId === undefined ? {} : { tabId: options.tabId }),
   ...(options.tabsApi === undefined ? {} : { tabsApi: options.tabsApi }),

@@ -18,6 +18,7 @@ import {
   type ProviderLaunchResult,
 } from './provider.js';
 import { CONTROL_WRAPPER_LOG_PATH } from './container-paths.js';
+import { logger } from '../logger.js';
 import {
   decodeAwsProviderRef,
   encodeAwsProviderRef,
@@ -163,6 +164,18 @@ export function createAwsProviderAdapter(deps: {
         throw new ProviderCreationError('invalid_configuration');
       return transition(current);
     });
+  }
+  /** The bucket's launch document expiry rule is the backstop; a confirmed stop stays terminal. */
+  async function deleteLaunchBestEffort(value: AwsOperation) {
+    try {
+      const { objects } = await deps.resolveRuntime(value.config);
+      await objects.deleteLaunch(`kilo/launch/${value.ref.intentId}.json`);
+    } catch (error) {
+      logger
+        .withTags({ logTag: 'aws_launch_document_cleanup_failed', sandboxId: deps.sandboxId })
+        .withFields({ errorName: error instanceof Error ? error.name : 'unknown' })
+        .warn('AWS launch document cleanup failed after a confirmed stop');
+    }
   }
   function verify(vm: Microvm, value: AwsOperation) {
     const request = value.request;
@@ -390,15 +403,14 @@ export function createAwsProviderAdapter(deps: {
       try {
         let value = await operation(ref);
         if (value.phase === 'terminated') {
-          const { objects } = await deps.resolveRuntime(value.config);
-          await objects.deleteLaunch(`kilo/launch/${value.ref.intentId}.json`);
+          await deleteLaunchBestEffort(value);
           return 'terminal';
         }
         value = await change(value, current =>
           transitionAwsOperation(current, { type: 'stop' }, now())
         );
-        const { client, objects } = await deps.resolveRuntime(value.config);
         if (value.request && value.submission !== 'prepared') {
+          const { client } = await deps.resolveRuntime(value.config);
           value = await recover(value);
           if (!value.microvmId) return 'retryable';
           // Cleanup needs only the owned identity, even when runtime configuration validation failed.
@@ -409,7 +421,7 @@ export function createAwsProviderAdapter(deps: {
         await change(value, current =>
           transitionAwsOperation(current, { type: 'terminated' }, now())
         );
-        await objects.deleteLaunch(`kilo/launch/${value.ref.intentId}.json`);
+        await deleteLaunchBestEffort(value);
         return 'terminal';
       } catch (error) {
         const failure = normalizeAwsProviderFailure(error);

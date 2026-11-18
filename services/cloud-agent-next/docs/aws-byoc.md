@@ -215,7 +215,9 @@ Grant that role `s3:GetObject` on the exact template object. Before authorizing 
 grant its `BuildRole` access to the runtime ZIP and runtime ECR repository.
 Grant its `ProxyExecutionRole` access to the proxy ECR repository.
 These grants require source bucket and repository policies. Customer IAM permissions alone cannot grant cross-account access.
-Onboarding does not modify release policies. It refuses account IDs outside `customerAccounts`.
+Onboarding does not modify release policies. It refuses new drafts for account IDs outside `customerAccounts`.
+An existing draft keeps its sealed release pins, so removing an account from `customerAccounts` does not stop that draft.
+To revoke an account, discard its drafts, or remove its access in the release bucket and repository policies.
 Keep published object keys and image digests immutable. A release variable change does not replace an existing draft's pins.
 
 Also configure the existing `AWS_BYOC_CREDENTIALS`, `AWS_BYOC_KILO_ROLE_ARN`, `AGENT_ENV_VARS_PRIVATE_KEY`,
@@ -223,7 +225,8 @@ HTTPS root `WORKER_URL`, and `BYOC_AWS_IDS` cohort. The web service uses its exi
 and authenticated Worker connection. No new web AWS credentials are required.
 
 The customer enters its account ID, prepares setup, and opens **Launch stack**.
-The AWS identity that launches the stack needs permission to create IAM roles.
+The AWS identity that launches the stack needs permission to create every resource in the template, including IAM roles.
+It must also acknowledge the CloudFormation IAM capabilities.
 Kilo hash-checks the named template object before signing its download link. The link expires within 15 minutes.
 After CloudFormation completes, the customer copies `RoleArn` from Outputs and selects **Validate connection**.
 Validation requires correct-ExternalId success and omitted/wrong-ExternalId denial. It reads only the generated named stack.

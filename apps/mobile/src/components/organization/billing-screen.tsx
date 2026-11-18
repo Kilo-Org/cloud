@@ -9,7 +9,7 @@ import {
   getScheduledSeatChange,
   seatCountReadout,
 } from '@/components/organization/billing-model';
-import { ExternalBillingLink } from '@/components/organization/external-billing-link';
+import { BillingWebSettings } from '@/components/organization/billing-web-settings';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { getOrgKiloPassRowState } from '@/components/organization/org-kilo-pass-row-state';
 import { OrganizationPlanRefusal } from '@/components/organization/plan-refusal';
@@ -84,8 +84,8 @@ function BillingCardError({
  *
  * Nothing here changes a plan. Buying seats, changing the plan and setting up
  * auto top-up exist only on the web, so those controls lead there — a link only
- * on an iOS build in the US storefront, plain text everywhere else, the rule
- * `useCanLinkExternalPurchase` owns.
+ * on an iOS build in the US storefront, a statement of where the setting lives
+ * everywhere else, the rule `useCanLinkExternalPurchase` owns.
  */
 export function OrganizationBillingScreen() {
   const { t } = useTranslation();
@@ -310,21 +310,12 @@ export function OrganizationBillingScreen() {
 
         {renderKiloPassState()}
 
-        <Section label={t('organization.billing.manageOnWeb')}>
-          <Card>
-            {changePlanOnBanner ? null : (
-              <ExternalBillingLink url={subscriptionsUrl} label={changePlanLabel} />
-            )}
-            <ExternalBillingLink
-              url={`${subscriptionsUrl}/seats`}
-              label={t('organization.billing.buySeats')}
-            />
-            <ExternalBillingLink
-              url={organizationBillingUrl(organizationId)}
-              label={getAutoTopUpLinkLabel(autoTopUp.data?.enabled)}
-            />
-          </Card>
-        </Section>
+        <BillingWebSettings
+          subscriptionsUrl={subscriptionsUrl}
+          planLabel={changePlanOnBanner ? null : changePlanLabel}
+          autoTopUpUrl={organizationBillingUrl(organizationId)}
+          autoTopUpLabel={getAutoTopUpLinkLabel(autoTopUp.data?.enabled)}
+        />
       </TabScreenScrollView>
     </View>
   );

@@ -26,6 +26,7 @@
     "creditHistory": "História kreditov",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Zrušiť",
     "done": "Hotovo",
     "retry": "Skúsiť znova",
@@ -482,7 +483,14 @@
       "viewReceipt": "Zobraziť potvrdenie"
     },
     "changelog": "Čo je nové",
-    "changelogVersionPending": "Poznámky k tejto verzii prídu s ďalšou aktualizáciou."
+    "changelogVersionPending": "Poznámky k verzii {{version}} prídu s ďalšou aktualizáciou aplikácie.",
+    "changelogGroupNew": "Novinky",
+    "changelogFixesIn": "Opravy a vylepšenia v oblastiach: {{areas}}.",
+    "changelogFixesPolish": "Opravy a vylepšenia v celej aplikácii.",
+    "changelogAreas": {
+      "signIn": "Prihlásenie",
+      "profileOrganizations": "Profil a organizácie"
+    }
   },
   "preferences": {
     "general": "Všeobecné",
@@ -3442,6 +3450,7 @@
       "manageOnWeb": "Nastavenia fakturácie na webe",
       "changePlan": "Zmeniť plán",
       "buySeats": "Kúpiť miesta",
+      "managedOnWeb": "Plán, miesta a automatické dobíjanie sa spravujú na webe.",
       "setupAutoTopUp": "Nastaviť automatické dobíjanie",
       "manageAutoTopUp": "Spravovať automatické dobíjanie",
       "opensOnWeb": "Otvorí sa na webe"
@@ -3590,12 +3599,10 @@
       "requestLogs": "Protokoly požiadaviek"
     },
     "requestLogs": {
-      "hint": "Požiadavky z hodiny pred koncom časového okna, najnovšie prvé.",
       "older": "Staršia hodina",
       "newer": "Novšia hodina",
       "truncated": "V tejto hodine je viac požiadaviek, než zoznam zobrazuje.",
       "emptyTitle": "Žiadne požiadavky",
-      "emptyDescription": "V tejto hodine nie sú žiadne požiadavky na bránu.",
       "loadError": "Protokoly požiadaviek sa nepodarilo načítať.",
       "permissionDenied": "Protokoly požiadaviek si môže prezerať iba vlastník, administrátor alebo správca fakturácie organizácie.",
       "tokens": "{{input}} vstup · {{output}} výstup",
@@ -4612,7 +4619,6 @@
     "dismiss": "Ignorovať prehľad",
     "offline": "Offline · uložený prehľad",
     "cached": "Uložený prehľad · obnovenie nedostupné",
-    "window": "{{start}} – {{end}}",
     "summary": "AI zhrnutie",
     "summaryPending": "AI zhrnutie sa pripravuje. Keď bude hotové, pripojí sa sem.",
     "summaryUnavailable": "AI zhrnutie nie je dostupné. Štruktúrovaný prehľad je stále k dispozícii.",
@@ -4731,6 +4737,7 @@
       "title": "Spúšťače a webhooky",
       "subtitle": "Automatizujte spustenia Cloud Agent pomocou volania webhooku alebo podľa plánu.",
       "new": "Nový spúšťač",
+      "create": "Vytvorte spúšťač",
       "emptyTitle": "Zatiaľ žiadne spúšťače",
       "emptyDescription": "Vytvorte spúšťač na spustenie Cloud Agent z volania webhooku alebo podľa plánu.",
       "loadFailedTitle": "Nepodarilo sa načítať spúšťače",

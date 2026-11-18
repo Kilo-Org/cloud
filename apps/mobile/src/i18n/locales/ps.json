@@ -26,6 +26,7 @@
     "creditHistory": "د کریډیټ تاریخچه",
     "sentenceJoiner": ". ",
     "listJoiner": "، ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "لغوه کړئ",
     "done": "بشپړ شو",
     "retry": "بیا هڅه وکړئ",
@@ -482,7 +483,14 @@
       "viewReceipt": "رسید وګورئ"
     },
     "changelog": "نوي بدلونونه",
-    "changelogVersionPending": "د دې نسخې یادښتونه د اپ له راتلونکي تازه کېدو سره راځي."
+    "changelogVersionPending": "د {{version}} نسخې یادښتونه د اپ له راتلونکي تازه کېدو سره راځي.",
+    "changelogGroupNew": "نوي",
+    "changelogFixesIn": "په {{areas}} کې سمونې او ښه والی.",
+    "changelogFixesPolish": "په ټول اپ کې سمونې او ښه والی.",
+    "changelogAreas": {
+      "signIn": "ننوتل",
+      "profileOrganizations": "پروفایل او سازمانونه"
+    }
   },
   "preferences": {
     "general": "عمومي",
@@ -3328,6 +3336,7 @@
       "manageOnWeb": "په ویب کې د بیلینګ ترتیبات",
       "changePlan": "پلان بدل کړئ",
       "buySeats": "د غړیتوب ځایونه واخلئ",
+      "managedOnWeb": "پلان، د غړیتوب ځایونه او اتومات بیا ډکول په ویب کې اداره کېږي.",
       "setupAutoTopUp": "اتومات بیا ډکول تنظیم کړئ",
       "manageAutoTopUp": "اتومات بیا ډکول اداره کړئ",
       "opensOnWeb": "په وېب کې پرانیستل کېږي"
@@ -3476,12 +3485,10 @@
       "requestLogs": "د غوښتنو لاګونه"
     },
     "requestLogs": {
-      "hint": "د کړکۍ تر پای وړاندې د یو ساعت غوښتنې، نوې یې لومړی.",
       "older": "پخوانی ساعت",
       "newer": "نوی ساعت",
       "truncated": "په دې ساعت کې له ښودل شویو ډېرې غوښتنې شته.",
       "emptyTitle": "غوښتنې نشته",
-      "emptyDescription": "په دې ساعت کې د ګېټوې غوښتنې نشته.",
       "loadError": "د غوښتنو لاګونه بار نه شول.",
       "permissionDenied": "یوازې د سازمان مالک، اډمین یا د بیلنګ مدیر کولی شي د هغه د غوښتنو لاګونه ولولي.",
       "tokens": "{{input}} ننوتي · {{output}} وتلي",
@@ -4472,7 +4479,6 @@
     "dismiss": "راپور له پامه وغورځوئ",
     "offline": "آفلاین · خوندي شوی راپور",
     "cached": "خوندي شوی راپور · تازه کول شونی نه دی",
-    "window": "{{start}} – {{end}}",
     "summary": "د AI لنډیز",
     "summaryPending": "د AI لنډیز په جریان کې دی. چې چمتو شي، دلته به ونښلول شي.",
     "summaryUnavailable": "د AI لنډیز شتون نه لري. ستاسو منظم راپور لا هم شته.",
@@ -4591,6 +4597,7 @@
       "title": "ټرېګرونه او ویب‌هوکونه",
       "subtitle": "د ویب‌هوک غوښتنې یا مهالویش څخه د Cloud Agent چلېدل اتومات کړئ.",
       "new": "نوی ټرېګر",
+      "create": "ټرېګر جوړ کړئ",
       "emptyTitle": "تر اوسه هېڅ ټرېګر نشته",
       "emptyDescription": "یو ټرېګر جوړ کړئ ترڅو د ویب‌هوک غوښتنې یا مهالویش له مخې د Cloud Agent چل پیل کړئ.",
       "loadFailedTitle": "ټرېګرونه بار نشول",

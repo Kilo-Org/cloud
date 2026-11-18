@@ -26,6 +26,7 @@
     "creditHistory": "Historiku i kredive",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Anulo",
     "done": "U krye",
     "retry": "Riprovo",
@@ -482,7 +483,14 @@
       "viewReceipt": "Shiko dëftesën"
     },
     "changelog": "Çfarë ka të re",
-    "changelogVersionPending": "Shënimet e këtij versioni vijnë me përditësimin e ardhshëm."
+    "changelogVersionPending": "Shënimet për versionin {{version}} vijnë me përditësimin e ardhshëm të aplikacionit.",
+    "changelogGroupNew": "Të reja",
+    "changelogFixesIn": "Rregullime dhe përmirësime në {{areas}}.",
+    "changelogFixesPolish": "Rregullime dhe përmirësime në të gjithë aplikacionin.",
+    "changelogAreas": {
+      "signIn": "Hyrja",
+      "profileOrganizations": "Profili dhe organizatat"
+    }
   },
   "preferences": {
     "general": "Të përgjithshme",
@@ -3328,6 +3336,7 @@
       "manageOnWeb": "Cilësimet e faturimit në ueb",
       "changePlan": "Ndrysho planin",
       "buySeats": "Bli vende",
+      "managedOnWeb": "Plani, vendet dhe rimbushja automatike menaxhohen në ueb.",
       "setupAutoTopUp": "Konfiguro rimbushjen automatike",
       "manageAutoTopUp": "Menaxho rimbushjen automatike",
       "opensOnWeb": "Hapet në ueb"
@@ -3476,12 +3485,10 @@
       "requestLogs": "Regjistrat e kërkesave"
     },
     "requestLogs": {
-      "hint": "Kërkesat e orës para fundit të dritares, më të rejat në krye.",
       "older": "Ora e mëparshme",
       "newer": "Ora pasardhëse",
       "truncated": "Kjo orë ka më shumë kërkesa nga sa shfaq lista.",
       "emptyTitle": "Nuk ka kërkesa",
-      "emptyDescription": "Në këtë orë nuk ka kërkesa në gateway.",
       "loadError": "Regjistrat e kërkesave nuk u ngarkuan.",
       "permissionDenied": "Vetëm pronari, administratori ose menaxheri i faturimit i një organizate mund t'i lexojë regjistrat e saj të kërkesave.",
       "tokens": "{{input}} hyrëse · {{output}} dalëse",
@@ -4472,7 +4479,6 @@
     "dismiss": "Hidh poshtë raportin",
     "offline": "Jashtë linje · raport i ruajtur",
     "cached": "Raport i ruajtur · rifreskimi i padisponueshëm",
-    "window": "{{start}} – {{end}}",
     "summary": "Përmbledhje AI",
     "summaryPending": "Përmbledhja AI është në proces. Do të shtohet këtu kur të jetë gati.",
     "summaryUnavailable": "Përmbledhja AI nuk është e disponueshme. Raporti i strukturuar mbetet i disponueshëm.",
@@ -4591,6 +4597,7 @@
       "title": "Shkaktarët dhe webhook-et",
       "subtitle": "Automatizo ekzekutimet e Cloud Agent nga një thirrje webhook ose një planifikim.",
       "new": "Shkaktar i ri",
+      "create": "Krijo shkaktar",
       "emptyTitle": "Nuk ka shkaktarë ende",
       "emptyDescription": "Krijo një shkaktar për të nisur një ekzekutim të Cloud Agent nga një thirrje webhook ose sipas një planifikimi.",
       "loadFailedTitle": "Shkaktarët nuk mund të ngarkoheshin",

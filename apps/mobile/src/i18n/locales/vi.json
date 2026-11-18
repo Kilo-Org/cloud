@@ -26,6 +26,7 @@
     "creditHistory": "Lịch sử tín dụng",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Hủy",
     "done": "Xong",
     "retry": "Thử lại",
@@ -482,7 +483,14 @@
       "viewReceipt": "Xem biên nhận"
     },
     "changelog": "Có gì mới",
-    "changelogVersionPending": "Ghi chú cho phiên bản này sẽ có trong bản cập nhật sau."
+    "changelogVersionPending": "Ghi chú cho phiên bản {{version}} sẽ có trong bản cập nhật ứng dụng sau.",
+    "changelogGroupNew": "Mới",
+    "changelogFixesIn": "Các bản sửa lỗi và cải tiến trong {{areas}}.",
+    "changelogFixesPolish": "Các bản sửa lỗi và cải tiến trên toàn ứng dụng.",
+    "changelogAreas": {
+      "signIn": "Đăng nhập",
+      "profileOrganizations": "Hồ sơ và tổ chức"
+    }
   },
   "preferences": {
     "general": "Chung",
@@ -3320,6 +3328,7 @@
       "manageOnWeb": "Cài đặt thanh toán trên web",
       "changePlan": "Đổi gói",
       "buySeats": "Mua suất sử dụng",
+      "managedOnWeb": "Gói, suất sử dụng và tự động nạp tiền được quản lý trên web.",
       "setupAutoTopUp": "Thiết lập tự động nạp tiền",
       "manageAutoTopUp": "Quản lý tự động nạp tiền",
       "opensOnWeb": "Mở trên web"
@@ -3481,12 +3490,10 @@
       "requestLogs": "Nhật ký yêu cầu"
     },
     "requestLogs": {
-      "hint": "Các yêu cầu trong một giờ tính đến cuối khung thời gian, mới nhất ở trên.",
       "older": "Giờ cũ hơn",
       "newer": "Giờ mới hơn",
       "truncated": "Giờ này có nhiều yêu cầu hơn số hiển thị trong danh sách.",
       "emptyTitle": "Không có yêu cầu",
-      "emptyDescription": "Không có yêu cầu nào qua gateway trong giờ này.",
       "loadError": "Không thể tải nhật ký yêu cầu.",
       "permissionDenied": "Chỉ chủ sở hữu, quản trị viên hoặc người quản lý thanh toán của tổ chức mới có thể xem nhật ký yêu cầu của tổ chức.",
       "tokens": "{{input}} vào · {{output}} ra",
@@ -4472,7 +4479,6 @@
     "dismiss": "Bỏ qua bản tin",
     "offline": "Ngoại tuyến · bản tin đã lưu",
     "cached": "Báo cáo đã lưu · không thể làm mới",
-    "window": "{{start}} – {{end}}",
     "summary": "Tóm tắt AI",
     "summaryPending": "Đang tạo tóm tắt AI. Tóm tắt sẽ hiển thị tại đây khi sẵn sàng.",
     "summaryUnavailable": "Tóm tắt AI không khả dụng. Báo cáo có cấu trúc vẫn khả dụng.",
@@ -4591,6 +4597,7 @@
       "title": "Trình kích hoạt và webhook",
       "subtitle": "Tự động hóa các lần chạy Cloud Agent từ một lệnh gọi webhook hoặc theo lịch.",
       "new": "Trình kích hoạt mới",
+      "create": "Tạo trình kích hoạt",
       "emptyTitle": "Chưa có trình kích hoạt nào",
       "emptyDescription": "Tạo trình kích hoạt để bắt đầu một lần chạy Cloud Agent từ lệnh gọi webhook hoặc theo lịch.",
       "loadFailedTitle": "Không thể tải trình kích hoạt",

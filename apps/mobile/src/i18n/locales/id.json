@@ -26,6 +26,7 @@
     "creditHistory": "Riwayat kredit",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Batal",
     "done": "Selesai",
     "retry": "Coba lagi",
@@ -482,7 +483,14 @@
       "viewReceipt": "Lihat tanda terima"
     },
     "changelog": "Yang baru",
-    "changelogVersionPending": "Catatan versi ini hadir di pembaruan aplikasi berikutnya."
+    "changelogVersionPending": "Catatan versi {{version}} hadir di pembaruan aplikasi berikutnya.",
+    "changelogGroupNew": "Baru",
+    "changelogFixesIn": "Perbaikan dan peningkatan pada {{areas}}.",
+    "changelogFixesPolish": "Perbaikan dan peningkatan di seluruh aplikasi.",
+    "changelogAreas": {
+      "signIn": "Masuk",
+      "profileOrganizations": "Profil dan organisasi"
+    }
   },
   "preferences": {
     "general": "Umum",
@@ -3320,6 +3328,7 @@
       "manageOnWeb": "Pengaturan penagihan di web",
       "changePlan": "Ubah paket",
       "buySeats": "Beli lisensi",
+      "managedOnWeb": "Paket, lisensi pengguna, dan isi ulang otomatis dikelola di web.",
       "setupAutoTopUp": "Atur isi ulang otomatis",
       "manageAutoTopUp": "Kelola isi ulang otomatis",
       "opensOnWeb": "Dibuka di web"
@@ -3481,12 +3490,10 @@
       "requestLogs": "Log permintaan"
     },
     "requestLogs": {
-      "hint": "Permintaan dalam satu jam sebelum akhir rentang waktu, terbaru di atas.",
       "older": "Jam sebelumnya",
       "newer": "Jam berikutnya",
       "truncated": "Jam ini memiliki lebih banyak permintaan daripada yang ditampilkan.",
       "emptyTitle": "Tidak ada permintaan",
-      "emptyDescription": "Tidak ada permintaan gateway dalam jam ini.",
       "loadError": "Tidak dapat memuat log permintaan.",
       "permissionDenied": "Hanya pemilik, admin, atau pengelola penagihan organisasi yang dapat membaca log permintaannya.",
       "tokens": "{{input}} masuk · {{output}} keluar",
@@ -4472,7 +4479,6 @@
     "dismiss": "Abaikan laporan",
     "offline": "Offline · laporan tersimpan",
     "cached": "Laporan tersimpan · tidak dapat diperbarui",
-    "window": "{{start}} – {{end}}",
     "summary": "Ringkasan AI",
     "summaryPending": "Ringkasan AI sedang diproses. Ringkasan akan muncul di sini setelah siap.",
     "summaryUnavailable": "Ringkasan AI tidak tersedia. Laporan terstruktur Anda tetap tersedia.",
@@ -4591,6 +4597,7 @@
       "title": "Pemicu & webhook",
       "subtitle": "Otomatiskan eksekusi Cloud Agent dari panggilan webhook atau jadwal.",
       "new": "Pemicu baru",
+      "create": "Buat pemicu",
       "emptyTitle": "Belum ada pemicu",
       "emptyDescription": "Buat pemicu untuk memulai eksekusi Cloud Agent dari panggilan webhook atau sesuai jadwal.",
       "loadFailedTitle": "Tidak dapat memuat pemicu",

@@ -26,6 +26,7 @@
     "creditHistory": "Hītori whiwhinga",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Whakakore",
     "done": "Kua oti",
     "retry": "Whakamātau anō",
@@ -482,7 +483,14 @@
       "viewReceipt": "Tirohia te rīhīti"
     },
     "changelog": "Ngā mea hou",
-    "changelogVersionPending": "Ka tae mai ngā tuhipoka o tēnei putanga me te whakahōu taupānga e whai ake."
+    "changelogVersionPending": "Ka tae mai ngā tuhipoka o te putanga {{version}} me te whakahōu taupānga e whai ake.",
+    "changelogGroupNew": "Hou",
+    "changelogFixesIn": "Ngā whakatika me ngā whakapainga i ēnei wāhanga: {{areas}}.",
+    "changelogFixesPolish": "Ngā whakatika me ngā whakapainga puta noa i te taupānga.",
+    "changelogAreas": {
+      "signIn": "Takiuru",
+      "profileOrganizations": "Kōtaha me ngā whakahaere"
+    }
   },
   "preferences": {
     "general": "Whānui",
@@ -3328,6 +3336,7 @@
       "manageOnWeb": "Ngā tautuhinga utu i te ipurangi",
       "changePlan": "Huri mahere",
       "buySeats": "Hoko raihana",
+      "managedOnWeb": "Ka whakahaerehia te mahere, ngā raihana me te whakakī aunoa i te ipurangi.",
       "setupAutoTopUp": "Whakaritea te whakakī aunoa",
       "manageAutoTopUp": "Whakahaerehia te whakakī aunoa",
       "opensOnWeb": "Ka tuwhera i te ipurangi"
@@ -3476,12 +3485,10 @@
       "requestLogs": "Ngā pūkete tono"
     },
     "requestLogs": {
-      "hint": "Ngā tono o te haora i mua i te mutunga o te awhe, ko ngā mea hou rawa ki mua.",
       "older": "Haora o mua",
       "newer": "Haora o muri",
       "truncated": "He maha ake ngā tono o tēnei haora i ērā e whakaaturia ana i te rārangi.",
       "emptyTitle": "Kāore he tono",
-      "emptyDescription": "Kāore he tono tomokanga i tēnei haora.",
       "loadError": "Kāore i taea te uta i ngā pūkete tono.",
       "permissionDenied": "Mā te kaipupuri, te kaiwhakahaere, te kaiwhakahaere pire rānei o tētahi rōpū anake e pānui ōna pūkete tono.",
       "tokens": "{{input}} ki roto · {{output}} ki waho",
@@ -4472,7 +4479,6 @@
     "dismiss": "Whakakorea te pūrongo",
     "offline": "Tuimotu · pūrongo kua tiakina",
     "cached": "Pūrongo kua tiakina · kāore e taea te whakahou",
-    "window": "{{start}} – {{end}}",
     "summary": "Whakarāpopototanga AI",
     "summaryPending": "Kei te mahia te whakarāpopototanga AI. Ka tāpirihia ki konei ina rite.",
     "summaryUnavailable": "Kāore te whakarāpopototanga AI e wātea ana. Kei te wātea tonu tō pūrongo hanganga.",
@@ -4591,6 +4597,7 @@
       "title": "Ngā kaiwhakaara me ngā hononga tukutuku",
       "subtitle": "Whakahaere aunoa i ngā rerenga Cloud Agent mai i tētahi karanga hononga tukutuku, i tētahi hōtaka wā rānei.",
       "new": "Kaiwhakaara hou",
+      "create": "Waihanga kaiwhakaara",
       "emptyTitle": "Kāore anō he kaiwhakaara",
       "emptyDescription": "Waihanga i tētahi kaiwhakaara hei tīmata i tētahi rerenga Cloud Agent mai i tētahi karanga hononga tukutuku, i tētahi hōtaka wā rānei.",
       "loadFailedTitle": "Kāore i taea te uta i ngā kaiwhakaara",

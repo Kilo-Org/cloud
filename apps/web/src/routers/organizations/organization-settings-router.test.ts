@@ -4,7 +4,6 @@ import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organ
 import {
   addUserToOrganization,
   mutateOrganizationSettings,
-  updateOrganizationSettings,
   getOrganizationById,
 } from '@kilocode/web-shared/lib/organizations/organizations';
 import { KILO_ORGANIZATION_ID } from '@kilocode/web-shared/lib/organizations/constants';
@@ -200,11 +199,11 @@ describe('organizations settings trpc router', () => {
     it('should clear default_model if it is in the new model_deny_list', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      await updateOrganizationSettings(orgWithSettings.id, {
+      await mutateOrganizationSettings(orgWithSettings.id, () => ({
         default_model: 'openai/gpt-4o',
         model_deny_list: [],
         provider_allow_list: ['openai'],
-      });
+      }));
 
       const result = await caller.organizations.settings.updateAllowLists({
         organizationId: orgWithSettings.id,
@@ -220,11 +219,11 @@ describe('organizations settings trpc router', () => {
     it('should clear default_model if its provider is removed from provider_allow_list', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      await updateOrganizationSettings(orgWithSettings.id, {
+      await mutateOrganizationSettings(orgWithSettings.id, () => ({
         default_model: 'openai/gpt-4o',
         model_deny_list: [],
         provider_allow_list: ['openai'],
-      });
+      }));
       mockedGetProviderSlugsForModel.mockResolvedValue(new Set(['openai']));
 
       const result = await caller.organizations.settings.updateAllowLists({
@@ -311,10 +310,10 @@ describe('organizations settings trpc router', () => {
     it('should update partial settings', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      await updateOrganizationSettings(testOrganization.id, {
+      await mutateOrganizationSettings(testOrganization.id, () => ({
         model_deny_list: ['gpt-4', 'gpt-3.5-turbo'],
         provider_allow_list: ['openai'],
-      });
+      }));
 
       const result = await caller.organizations.settings.updateAllowLists({
         organizationId: testOrganization.id,
@@ -696,9 +695,9 @@ describe('organizations settings trpc router', () => {
     it('should update default model when it is not denied', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      await updateOrganizationSettings(orgWithSettings.id, {
+      await mutateOrganizationSettings(orgWithSettings.id, () => ({
         model_deny_list: ['claude-3'],
-      });
+      }));
 
       const result = await caller.organizations.settings.updateDefaultModel({
         organizationId: orgWithSettings.id,
@@ -745,9 +744,9 @@ describe('organizations settings trpc router', () => {
     it('rejects models outside the snapshot when no access policy is configured', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      await updateOrganizationSettings(testOrganization.id, {
+      await mutateOrganizationSettings(testOrganization.id, () => ({
         data_collection: 'allow',
-      });
+      }));
 
       await expect(
         caller.organizations.settings.updateDefaultModel({
@@ -1278,10 +1277,10 @@ describe('organizations settings trpc router', () => {
     it('should preserve other settings when enabling minimum balance alert', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      await updateOrganizationSettings(testOrganization.id, {
+      await mutateOrganizationSettings(testOrganization.id, () => ({
         model_deny_list: ['gpt-4'],
         data_collection: 'allow',
-      });
+      }));
 
       const result = await caller.organizations.settings.updateMinimumBalanceAlert({
         organizationId: testOrganization.id,
@@ -1299,12 +1298,12 @@ describe('organizations settings trpc router', () => {
     it('should preserve other settings when disabling minimum balance alert', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      await updateOrganizationSettings(testOrganization.id, {
+      await mutateOrganizationSettings(testOrganization.id, () => ({
         model_deny_list: ['gpt-4'],
         data_collection: 'allow',
         minimum_balance: 100,
         minimum_balance_alert_email: ['alert@example.com'],
-      });
+      }));
 
       const result = await caller.organizations.settings.updateMinimumBalanceAlert({
         organizationId: testOrganization.id,
@@ -1321,7 +1320,7 @@ describe('organizations settings trpc router', () => {
   describe('updateRecommendationsDigest procedure', () => {
     afterEach(async () => {
       // Reset settings between cases so each starts from a clean slate.
-      await updateOrganizationSettings(testOrganization.id, {});
+      await mutateOrganizationSettings(testOrganization.id, () => ({}));
     });
 
     it('should enable the recommendations digest (enterprise org)', async () => {
@@ -1386,11 +1385,11 @@ describe('organizations settings trpc router', () => {
     it('should preserve other settings when toggling the digest', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      await updateOrganizationSettings(testOrganization.id, {
+      await mutateOrganizationSettings(testOrganization.id, () => ({
         model_deny_list: ['gpt-4'],
         minimum_balance: 100,
         minimum_balance_alert_email: ['alert@example.com'],
-      });
+      }));
 
       const result = await caller.organizations.settings.updateRecommendationsDigest({
         organizationId: testOrganization.id,
@@ -1423,7 +1422,7 @@ describe('organizations settings trpc router', () => {
 
     afterEach(async () => {
       await db.delete(ai_gateway_config).where(eq(ai_gateway_config.id, 1));
-      await updateOrganizationSettings(testOrganization.id, {});
+      await mutateOrganizationSettings(testOrganization.id, () => ({}));
       await setPlan(testOrganization.id, 'teams');
     });
 
@@ -1625,7 +1624,7 @@ describe('organizations settings trpc router', () => {
     }
 
     async function resetSettings(organizationId: string, settings: object) {
-      await updateOrganizationSettings(organizationId, settings);
+      await mutateOrganizationSettings(organizationId, () => settings);
       await db
         .delete(organization_audit_logs)
         .where(eq(organization_audit_logs.organization_id, organizationId));
@@ -1739,7 +1738,7 @@ describe('organizations settings trpc router', () => {
 
   describe('browser control', () => {
     async function resetBrowserControl() {
-      await updateOrganizationSettings(testOrganization.id, {});
+      await mutateOrganizationSettings(testOrganization.id, () => ({}));
       await db
         .delete(organization_audit_logs)
         .where(eq(organization_audit_logs.organization_id, testOrganization.id));

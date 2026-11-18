@@ -26,6 +26,7 @@
     "creditHistory": "Historique des crédits",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Annuler",
     "done": "Terminé",
     "retry": "Réessayer",
@@ -482,7 +483,14 @@
       "viewReceipt": "Voir l'accusé de réception"
     },
     "changelog": "Nouveautés",
-    "changelogVersionPending": "Les notes de cette version arriveront avec la prochaine mise à jour."
+    "changelogVersionPending": "Les notes de la version {{version}} arriveront avec la prochaine mise à jour de l'application.",
+    "changelogGroupNew": "Nouveautés",
+    "changelogFixesIn": "Corrections et améliorations dans les sections suivantes : {{areas}}.",
+    "changelogFixesPolish": "Corrections et améliorations dans toute l'application.",
+    "changelogAreas": {
+      "signIn": "Connexion",
+      "profileOrganizations": "Profil et organisations"
+    }
   },
   "notifications": {
     "channel": {
@@ -3377,6 +3385,7 @@
       "manageOnWeb": "Paramètres de facturation sur le web",
       "changePlan": "Changer de formule",
       "buySeats": "Acheter des licences",
+      "managedOnWeb": "La formule, les licences et la recharge automatique sont gérées sur le web.",
       "setupAutoTopUp": "Configurer la recharge automatique",
       "manageAutoTopUp": "Gérer la recharge automatique",
       "opensOnWeb": "S'ouvre sur le web"
@@ -3538,12 +3547,10 @@
       "requestLogs": "Journaux des requêtes"
     },
     "requestLogs": {
-      "hint": "Requêtes de l'heure précédant la fin de la plage, les plus récentes en premier.",
       "older": "Heure précédente",
       "newer": "Heure suivante",
       "truncated": "Cette heure compte plus de requêtes que la liste n'en affiche.",
       "emptyTitle": "Aucune requête",
-      "emptyDescription": "Aucune requête de passerelle pendant cette heure.",
       "loadError": "Impossible de charger les journaux des requêtes.",
       "permissionDenied": "Seuls un propriétaire, un administrateur ou un responsable de la facturation d'une organisation peuvent consulter ses journaux des requêtes.",
       "tokens": "{{input}} en entrée · {{output}} en sortie",
@@ -4542,7 +4549,6 @@
     "dismiss": "Ignorer le briefing",
     "offline": "Hors ligne · briefing enregistré",
     "cached": "Rapport enregistré · actualisation indisponible",
-    "window": "{{start}} – {{end}}",
     "summary": "Résumé IA",
     "summaryPending": "Résumé IA en cours. Il s’affichera ici une fois prêt.",
     "summaryUnavailable": "Résumé IA indisponible. Votre rapport structuré reste disponible.",
@@ -4661,6 +4667,7 @@
       "title": "Déclencheurs et webhooks",
       "subtitle": "Automatisez les exécutions de Cloud Agent à partir d’un appel webhook ou d’une planification.",
       "new": "Nouveau déclencheur",
+      "create": "Créer un déclencheur",
       "emptyTitle": "Aucun déclencheur pour l’instant",
       "emptyDescription": "Créez un déclencheur pour lancer une exécution de Cloud Agent à partir d’un appel webhook ou selon une planification.",
       "loadFailedTitle": "Impossible de charger les déclencheurs",

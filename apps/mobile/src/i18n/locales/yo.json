@@ -26,6 +26,7 @@
     "creditHistory": "Ìtàn kírẹ́dítì",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Fagilé",
     "done": "Ó ti tán",
     "retry": "Tún gbìyànjú",
@@ -482,7 +483,14 @@
       "viewReceipt": "Wo ìwé ẹ̀rí"
     },
     "changelog": "Àwọn ohun tuntun",
-    "changelogVersionPending": "Àkọsílẹ̀ ẹ̀yà yìí yóò dé pẹ̀lú ìmúdójúìwọ̀n áàpù tó kàn."
+    "changelogVersionPending": "Àkọsílẹ̀ ẹ̀yà {{version}} yóò dé pẹ̀lú ìmúdójúìwọ̀n áàpù tó kàn.",
+    "changelogGroupNew": "Tuntun",
+    "changelogFixesIn": "Àtúnṣe àti ìlọsíwájú nínú {{areas}}.",
+    "changelogFixesPolish": "Àtúnṣe àti ìlọsíwájú jákèjádò áàpù.",
+    "changelogAreas": {
+      "signIn": "Wíwọlé",
+      "profileOrganizations": "Àkọsílẹ̀ ara ẹni àti àwọn àjọ"
+    }
   },
   "preferences": {
     "general": "Gbogbogbo",
@@ -3328,6 +3336,7 @@
       "manageOnWeb": "Àtúnṣe ìsanwó lórí wẹ́ẹ̀bù",
       "changePlan": "Yí ètò padà",
       "buySeats": "Ra ààyè",
+      "managedOnWeb": "A ń ṣàkóso ètò náà, àwọn ààyè àti ìfikún owó aládàáṣe lórí wẹ́ẹ̀bù.",
       "setupAutoTopUp": "Ṣètò ìfikún owó aládàáṣe",
       "manageAutoTopUp": "Ṣàkóso ìfikún owó aládàáṣe",
       "opensOnWeb": "Yóò ṣí lórí wẹ́ẹ̀bù"
@@ -3476,12 +3485,10 @@
       "requestLogs": "Àwọn àkọsílẹ̀ ìbéèrè"
     },
     "requestLogs": {
-      "hint": "Àwọn ìbéèrè inú wákàtí kan kí àkókò yìí tó parí, tuntun jùlọ lákọ̀ọ́kọ́.",
       "older": "Wákàtí tó ṣáájú",
       "newer": "Wákàtí tó tẹ̀lé",
       "truncated": "Wákàtí yìí ní ìbéèrè ju èyí tí àtòjọ fi hàn lọ.",
       "emptyTitle": "Kò sí ìbéèrè",
-      "emptyDescription": "Kò sí ìbéèrè sí ẹnu-ọ̀nà AI nínú wákàtí yìí.",
       "loadError": "A kò lè gbé àwọn àkọsílẹ̀ ìbéèrè wọlé.",
       "permissionDenied": "Olùní àjọ, alábòójútó tàbí olùṣàkóso ìsanwó nìkan ló lè ka àkọsílẹ̀ ìbéèrè rẹ̀.",
       "tokens": "{{input}} wọlé · {{output}} jáde",
@@ -4472,7 +4479,6 @@
     "dismiss": "Yọ ìròyìn kúrò",
     "offline": "Kò sí lórí ayélujára · ìròyìn tí a fipamọ́",
     "cached": "Ìròyìn tí a fipamọ́ · kò ṣeé sọ di tuntun",
-    "window": "{{start}} – {{end}}",
     "summary": "Àkópọ̀ AI",
     "summaryPending": "Àkópọ̀ AI ń lọ lọ́wọ́. Yóò so mọ́ ibí nígbà tó bá ṣetán.",
     "summaryUnavailable": "Àkópọ̀ AI kò sí. Ìròyìn onílànà rẹ ṣì wà.",
@@ -4591,6 +4597,7 @@
       "title": "Àwọn ìmúṣiṣẹ́ àti àwọn wẹ́ẹ̀bùhóòkù",
       "subtitle": "Ṣe àdáṣe àwọn ìṣiṣẹ́ Cloud Agent láti ìpè wẹ́ẹ̀bùhóòkù tàbí ìtòlẹ́sẹẹsẹ.",
       "new": "Ìmúṣiṣẹ́ tuntun",
+      "create": "Ṣẹ̀dá ìmúṣiṣẹ́",
       "emptyTitle": "Kò sí ìmúṣiṣẹ́ kankan síbẹ̀",
       "emptyDescription": "Ṣẹ̀dá ìmúṣiṣẹ́ kan láti bẹ̀rẹ̀ ìṣiṣẹ́ Cloud Agent láti ìpè wẹ́ẹ̀bùhóòkù tàbí ní ìtòlẹ́sẹẹsẹ.",
       "loadFailedTitle": "A kò lè gbé àwọn ìmúṣiṣẹ́ wọlé",

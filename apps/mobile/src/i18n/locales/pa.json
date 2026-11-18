@@ -26,6 +26,7 @@
     "creditHistory": "ਕ੍ਰੈਡਿਟ ਇਤਿਹਾਸ",
     "sentenceJoiner": "। ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "ਰੱਦ ਕਰੋ",
     "done": "ਹੋ ਗਿਆ",
     "retry": "ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ",
@@ -482,7 +483,14 @@
       "viewReceipt": "ਰਸੀਦ ਦੇਖੋ"
     },
     "changelog": "ਕੀ ਨਵਾਂ ਹੈ",
-    "changelogVersionPending": "ਇਸ ਵਰਜਨ ਦੇ ਨੋਟਸ ਐਪ ਦੀ ਅਗਲੀ ਅੱਪਡੇਟ ਨਾਲ ਆਉਣਗੇ।"
+    "changelogVersionPending": "{{version}} ਵਰਜਨ ਦੇ ਨੋਟਸ ਐਪ ਦੀ ਅਗਲੀ ਅੱਪਡੇਟ ਨਾਲ ਆਉਣਗੇ।",
+    "changelogGroupNew": "ਨਵਾਂ",
+    "changelogFixesIn": "{{areas}} ਵਿੱਚ ਫਿਕਸ ਅਤੇ ਸੁਧਾਰ।",
+    "changelogFixesPolish": "ਪੂਰੀ ਐਪ ਵਿੱਚ ਫਿਕਸ ਅਤੇ ਸੁਧਾਰ।",
+    "changelogAreas": {
+      "signIn": "ਸਾਈਨ ਇਨ",
+      "profileOrganizations": "ਪ੍ਰੋਫਾਈਲ ਅਤੇ ਸੰਸਥਾਵਾਂ"
+    }
   },
   "preferences": {
     "general": "ਆਮ",
@@ -3328,6 +3336,7 @@
       "manageOnWeb": "ਵੈੱਬ 'ਤੇ ਬਿਲਿੰਗ ਸੈਟਿੰਗਾਂ",
       "changePlan": "ਪਲਾਨ ਬਦਲੋ",
       "buySeats": "ਸੀਟਾਂ ਖਰੀਦੋ",
+      "managedOnWeb": "ਪਲਾਨ, ਸੀਟਾਂ ਅਤੇ ਆਟੋ ਟੌਪ-ਅੱਪ ਦਾ ਪ੍ਰਬੰਧਨ ਵੈੱਬ ਉੱਤੇ ਕੀਤਾ ਜਾਂਦਾ ਹੈ।",
       "setupAutoTopUp": "ਆਟੋ ਟੌਪ-ਅੱਪ ਸੈੱਟ ਕਰੋ",
       "manageAutoTopUp": "ਆਟੋ ਟੌਪ-ਅੱਪ ਪ੍ਰਬੰਧ ਕਰੋ",
       "opensOnWeb": "ਵੈੱਬ 'ਤੇ ਖੁੱਲ੍ਹਦਾ ਹੈ"
@@ -3476,12 +3485,10 @@
       "requestLogs": "ਬੇਨਤੀ ਲੌਗ"
     },
     "requestLogs": {
-      "hint": "ਸਮਾਂ-ਸੀਮਾ ਦੇ ਅੰਤ ਤੋਂ ਪਿਛਲੇ ਇੱਕ ਘੰਟੇ ਦੀਆਂ ਬੇਨਤੀਆਂ, ਸਭ ਤੋਂ ਨਵੀਆਂ ਪਹਿਲਾਂ।",
       "older": "ਪਿਛਲਾ ਘੰਟਾ",
       "newer": "ਅਗਲਾ ਘੰਟਾ",
       "truncated": "ਇਸ ਘੰਟੇ ਵਿੱਚ ਸੂਚੀ ਵਿੱਚ ਦਿਖਾਈਆਂ ਗਈਆਂ ਤੋਂ ਵੱਧ ਬੇਨਤੀਆਂ ਹਨ।",
       "emptyTitle": "ਕੋਈ ਬੇਨਤੀ ਨਹੀਂ",
-      "emptyDescription": "ਇਸ ਘੰਟੇ ਵਿੱਚ ਕੋਈ ਗੇਟਵੇ ਬੇਨਤੀ ਨਹੀਂ ਹੈ।",
       "loadError": "ਬੇਨਤੀ ਲੌਗ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ।",
       "permissionDenied": "ਸੰਸਥਾ ਦੇ ਬੇਨਤੀ ਲੌਗ ਸਿਰਫ਼ ਉਸਦਾ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਹੀ ਪੜ੍ਹ ਸਕਦਾ ਹੈ।",
       "tokens": "{{input}} ਇਨਪੁੱਟ · {{output}} ਆਉਟਪੁੱਟ",
@@ -4472,7 +4479,6 @@
     "dismiss": "ਬ੍ਰੀਫਿੰਗ ਖਾਰਜ ਕਰੋ",
     "offline": "ਆਫਲਾਈਨ · ਸੰਭਾਲੀ ਬ੍ਰੀਫਿੰਗ",
     "cached": "ਸੰਭਾਲੀ ਰਿਪੋਰਟ · ਤਾਜ਼ਾ ਕਰਨਾ ਉਪਲਬਧ ਨਹੀਂ",
-    "window": "{{start}} – {{end}}",
     "summary": "AI ਸਾਰ",
     "summaryPending": "AI ਸਾਰ ਤਿਆਰ ਹੋ ਰਿਹਾ ਹੈ। ਤਿਆਰ ਹੋਣ 'ਤੇ ਇੱਥੇ ਜੁੜ ਜਾਵੇਗਾ।",
     "summaryUnavailable": "AI ਸਾਰ ਉਪਲਬਧ ਨਹੀਂ। ਤੁਹਾਡੀ ਢਾਂਚਾਗਤ ਰਿਪੋਰਟ ਅਜੇ ਵੀ ਉਪਲਬਧ ਹੈ।",
@@ -4591,6 +4597,7 @@
       "title": "ਟ੍ਰਿਗਰ ਅਤੇ ਵੈਬਹੁੱਕ",
       "subtitle": "ਵੈਬਹੁੱਕ ਕਾਲ ਜਾਂ ਸਮਾਂ-ਸੂਚੀ ਤੋਂ Cloud Agent ਦੇ ਰਨ ਆਟੋਮੇਟ ਕਰੋ।",
       "new": "ਨਵਾਂ ਟ੍ਰਿਗਰ",
+      "create": "ਟ੍ਰਿਗਰ ਬਣਾਓ",
       "emptyTitle": "ਹਾਲੇ ਕੋਈ ਟ੍ਰਿਗਰ ਨਹੀਂ",
       "emptyDescription": "ਵੈਬਹੁੱਕ ਕਾਲ ਜਾਂ ਸਮਾਂ-ਸੂਚੀ ਉੱਤੇ Cloud Agent ਰਨ ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਇੱਕ ਟ੍ਰਿਗਰ ਬਣਾਓ।",
       "loadFailedTitle": "ਟ੍ਰਿਗਰ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ",

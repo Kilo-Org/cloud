@@ -8,18 +8,17 @@ import { View, type ViewStyle } from 'react-native';
 import { EmptyState } from '@/components/empty-state';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { PermissionDenied } from '@/components/organization/permission-denied';
+import { RequestLogsSkeleton } from '@/components/organization/request-logs-skeleton';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { DirectionalArrowLeft, DirectionalArrowRight } from '@/components/ui/directional-icons';
-import { FileText } from '@/components/ui/icons';
+import { DirectionalArrowLeft, DirectionalArrowRight, DirectionalLogs } from '@/components/ui/directional-icons';
 import { RefreshControl } from '@/components/ui/refresh-control';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { isolateLtrBidiText } from '@/lib/bidi';
+import { isolateBidiText } from '@/lib/bidi';
 import {
   formatClockTime,
   formatDate,
@@ -71,16 +70,6 @@ const ListTopPad = () => <View className="pt-3" />;
 const WINDOW_DATE = { weekday: 'short', month: 'short', day: 'numeric' } as const;
 
 const RowSeparator = () => <View className="h-3" />;
-
-function RowSkeleton() {
-  return (
-    <Card className="mx-4">
-      <Skeleton className="h-4 w-3/4 rounded bg-muted-soft" />
-      <Skeleton className="h-3 w-1/2 rounded bg-muted-soft" />
-      <Skeleton className="h-3 w-1/3 rounded bg-muted-soft" />
-    </Card>
-  );
-}
 
 /**
  * The body one window paints. A window keeps the rows it already holds while a
@@ -154,14 +143,20 @@ const RequestLogRow = memo(function RequestLogRow({
         </Text>
       </View>
       <View className="flex-row items-center gap-2">
-        <Text variant="caption" className="tabular-nums">
-          {isolateLtrBidiText(time)}
-        </Text>
+        {/* One run, so the time and the token pair keep the catalog's own
+            separators: a `gap` between two `Text`s spaced the first dot
+            differently from the dot inside `in · out`. The time is isolated on
+            its own so the AM/PM marker stays beside its clock in either
+            direction. */}
         <Text variant="caption" className="flex-1 tabular-nums" numberOfLines={1}>
-          {tokens}
+          {`${isolateBidiText(time)} · ${tokens}`}
         </Text>
         {entry.is_user_byok ? (
-          <Text variant="eyebrow" className="shrink-0 rounded bg-muted px-1.5 py-0.5">
+          // Muted text with no box: `bg-muted` is the card's own `bg-secondary`
+          // in both themes, so a filled badge paints nothing, and its padding
+          // pulled the marker inside the right edge that cost and provider
+          // share while adding a line of height the other rows lack.
+          <Text variant="caption" className="shrink-0">
             {t('organization.requestLogs.byok')}
           </Text>
         ) : null}
@@ -239,13 +234,7 @@ export function OrganizationRequestLogsScreen() {
   const renderBody = (current: RequestLogsBody): ReactNode => {
     switch (current.kind) {
       case 'loading': {
-        return (
-          <View className="gap-3 pt-3">
-            <RowSkeleton />
-            <RowSkeleton />
-            <RowSkeleton />
-          </View>
-        );
+        return <RequestLogsSkeleton />;
       }
       case 'retryable': {
         return (
@@ -270,9 +259,8 @@ export function OrganizationRequestLogsScreen() {
       case 'empty': {
         return (
           <EmptyState
-            icon={FileText}
+            icon={DirectionalLogs}
             title={t('organization.requestLogs.emptyTitle')}
-            description={t('organization.requestLogs.emptyDescription')}
             refreshControl={refreshControl}
           />
         );
@@ -324,10 +312,15 @@ export function OrganizationRequestLogsScreen() {
           <Text className="text-sm font-medium text-foreground">
             {formatDate(windowStart, i18n.language, WINDOW_DATE)}
           </Text>
+          {/* Each time is isolated on its own, so the AM/PM marker it carries
+              stays beside its own clock, and the join is the catalog's, so a
+              right-to-left reader gets the pair in that language's order
+              instead of one reversed run. */}
           <Text variant="caption" className="tabular-nums">
-            {isolateLtrBidiText(
-              `${formatClockTime(windowStart, i18n.language)}–${formatClockTime(windowEnd, i18n.language)}`
-            )}
+            {t('common.timeRange', {
+              start: isolateBidiText(formatClockTime(windowStart, i18n.language)),
+              end: isolateBidiText(formatClockTime(windowEnd, i18n.language)),
+            })}
           </Text>
         </View>
         <View className="flex-row gap-2">
@@ -358,7 +351,6 @@ export function OrganizationRequestLogsScreen() {
             <DirectionalArrowRight size={16} className="text-foreground" />
           </Button>
         </View>
-        <Text variant="caption">{t('organization.requestLogs.hint')}</Text>
       </View>
       {renderBody(body)}
     </View>

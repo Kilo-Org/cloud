@@ -26,6 +26,7 @@
     "creditHistory": "Akụkọ kredit",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Kagbuo",
     "done": "Emechara",
     "retry": "Nwaa ọzọ",
@@ -482,7 +483,14 @@
       "viewReceipt": "Lee akwụkwọ nnata"
     },
     "changelog": "Ihe ọhụrụ",
-    "changelogVersionPending": "Ndetu maka ụdị a ga-abịa na mmelite ngwa na-esote."
+    "changelogVersionPending": "Ndetu maka ụdị {{version}} ga-abịa na mmelite ngwa na-esote.",
+    "changelogGroupNew": "Ọhụrụ",
+    "changelogFixesIn": "Ndozi na mmezi na {{areas}}.",
+    "changelogFixesPolish": "Ndozi na mmezi n'ebe niile n'ime ngwa ahụ.",
+    "changelogAreas": {
+      "signIn": "Ịbanye",
+      "profileOrganizations": "Profaịlụ na òtù"
+    }
   },
   "preferences": {
     "general": "Izugbe",
@@ -3328,6 +3336,7 @@
       "manageOnWeb": "Ntọala Ịkwụ ụgwọ na weebụ",
       "changePlan": "Gbanwee atụmatụ",
       "buySeats": "Zụta oghere",
+      "managedOnWeb": "A na-ejikwa atụmatụ, oghere na mgbakwunye akpaaka na weebụ.",
       "setupAutoTopUp": "Hazie mgbakwunye akpaaka",
       "manageAutoTopUp": "Jikwaa mgbakwunye akpaaka",
       "opensOnWeb": "Na-emepe na weebụ"
@@ -3476,12 +3485,10 @@
       "requestLogs": "Ndekọ arịrịọ"
     },
     "requestLogs": {
-      "hint": "Arịrịọ nke otu awa tupu oge a na-egosi agwụ, nke kachasị ọhụrụ bụ mbụ.",
       "older": "Awa gara aga",
       "newer": "Awa na-esote",
       "truncated": "Awa a nwere arịrịọ karịa ndị ndepụta a na-egosi.",
       "emptyTitle": "Enweghị arịrịọ",
-      "emptyDescription": "Enweghị arịrịọ gateway n'awa a.",
       "loadError": "Enweghị ike ibudata ndekọ arịrịọ.",
       "permissionDenied": "Naanị onye nwe òtù, onye nchịkwa ma ọ bụ onye na-ahụ maka ịkwụ ụgwọ nwere ike ịgụ ndekọ arịrịọ ya.",
       "tokens": "{{input}} batara · {{output}} pụtara",
@@ -4472,7 +4479,6 @@
     "dismiss": "Leghara akụkọ anya",
     "offline": "Enweghị ịntanetị · akụkọ echekwara",
     "cached": "Akụkọ echekwara · enweghị ike imegharị",
-    "window": "{{start}} – {{end}}",
     "summary": "Nchịkọta AI",
     "summaryPending": "Nchịkọta AI na-aga n'ihu. Ọ ga-apụta ebe a mgbe ọ dị njikere.",
     "summaryUnavailable": "Nchịkọta AI adịghị. Akụkọ ahaziri ahazi gị ka dị.",
@@ -4591,6 +4597,7 @@
       "title": "Ihe mkpalite na webhook",
       "subtitle": "Mee ka ọsọ Cloud Agent na-akpaghị aka site na oku webhook ma ọ bụ nhazi oge.",
       "new": "Ihe mkpalite ọhụrụ",
+      "create": "Mepụta ihe mkpalite",
       "emptyTitle": "Enwebeghị ihe mkpalite",
       "emptyDescription": "Mepụta ihe mkpalite iji malite ọsọ Cloud Agent site na oku webhook ma ọ bụ na nhazi oge.",
       "loadFailedTitle": "Enweghị ike ibudata ihe mkpalite",

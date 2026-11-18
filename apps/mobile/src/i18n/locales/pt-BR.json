@@ -26,6 +26,7 @@
     "creditHistory": "Histórico de créditos",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Cancelar",
     "done": "Concluir",
     "retry": "Tentar novamente",
@@ -482,7 +483,14 @@
       "viewReceipt": "Ver comprovante"
     },
     "changelog": "Novidades",
-    "changelogVersionPending": "As notas desta versão vêm na próxima atualização do app."
+    "changelogVersionPending": "As notas da versão {{version}} vêm na próxima atualização do app.",
+    "changelogGroupNew": "Novidades",
+    "changelogFixesIn": "Correções e melhorias em {{areas}}.",
+    "changelogFixesPolish": "Correções e melhorias em todo o app.",
+    "changelogAreas": {
+      "signIn": "Acesso",
+      "profileOrganizations": "Perfil e organizações"
+    }
   },
   "notifications": {
     "channel": {
@@ -3383,6 +3391,7 @@
       "manageOnWeb": "Configurações de faturamento na web",
       "changePlan": "Alterar plano",
       "buySeats": "Comprar licenças",
+      "managedOnWeb": "O plano, as licenças e a recarga automática são gerenciados na web.",
       "setupAutoTopUp": "Configurar recarga automática",
       "manageAutoTopUp": "Gerenciar recarga automática",
       "opensOnWeb": "Abre na web"
@@ -3544,12 +3553,10 @@
       "requestLogs": "Registros de solicitações"
     },
     "requestLogs": {
-      "hint": "Solicitações da hora anterior ao fim da janela, mais recentes primeiro.",
       "older": "Hora anterior",
       "newer": "Hora seguinte",
       "truncated": "Esta hora tem mais solicitações do que a lista mostra.",
       "emptyTitle": "Nenhuma solicitação",
-      "emptyDescription": "Esta hora não tem solicitações ao gateway.",
       "loadError": "Não foi possível carregar os registros de solicitações.",
       "permissionDenied": "Somente proprietários, administradores ou gerentes de faturamento de uma organização podem ver os registros de solicitações dela.",
       "tokens": "{{input}} de entrada · {{output}} de saída",
@@ -4548,7 +4555,6 @@
     "dismiss": "Ignorar relatório",
     "offline": "Offline · relatório salvo",
     "cached": "Relatório salvo · atualização indisponível",
-    "window": "{{start}} – {{end}}",
     "summary": "Resumo por IA",
     "summaryPending": "O resumo por IA está em andamento. Ele aparecerá aqui quando estiver pronto.",
     "summaryUnavailable": "Resumo por IA indisponível. Seu relatório estruturado continua disponível.",
@@ -4667,6 +4673,7 @@
       "title": "Gatilhos e webhooks",
       "subtitle": "Automatize execuções do Cloud Agent a partir de uma chamada de webhook ou de um agendamento.",
       "new": "Novo gatilho",
+      "create": "Criar gatilho",
       "emptyTitle": "Ainda não há gatilhos",
       "emptyDescription": "Crie um gatilho para iniciar uma execução do Cloud Agent a partir de uma chamada de webhook ou em um agendamento.",
       "loadFailedTitle": "Não foi possível carregar os gatilhos",

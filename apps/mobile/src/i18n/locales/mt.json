@@ -26,6 +26,7 @@
     "creditHistory": "Storja tal-krediti",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Ikkanċella",
     "done": "Lest",
     "retry": "Erġa' pprova",
@@ -482,7 +483,14 @@
       "viewReceipt": "Ara l-irċevuta"
     },
     "changelog": "X'hemm ġdid",
-    "changelogVersionPending": "In-noti ta' din il-verżjoni jaslu mal-aġġornament li jmiss tal-app."
+    "changelogVersionPending": "In-noti għall-verżjoni {{version}} jaslu mal-aġġornament li jmiss tal-app.",
+    "changelogGroupNew": "Ġdid",
+    "changelogFixesIn": "Tiswijiet u titjib f'dawn l-oqsma: {{areas}}.",
+    "changelogFixesPolish": "Tiswijiet u titjib fl-applikazzjoni kollha.",
+    "changelogAreas": {
+      "signIn": "Dħul",
+      "profileOrganizations": "Profil u organizzazzjonijiet"
+    }
   },
   "preferences": {
     "general": "Ġenerali",
@@ -3499,6 +3507,7 @@
       "manageOnWeb": "Issettjar tal-ħlasijiet fuq il-web",
       "changePlan": "Ibdel il-pjan",
       "buySeats": "Ixtri postijiet",
+      "managedOnWeb": "Il-pjan, il-postijiet u r-rikarika awtomatika jiġu ġestiti fuq il-web.",
       "setupAutoTopUp": "Issettja r-rikarika awtomatika",
       "manageAutoTopUp": "Immaniġġja r-rikarika awtomatika",
       "opensOnWeb": "Jinfetaħ fuq il-web"
@@ -3647,12 +3656,10 @@
       "requestLogs": "Reġistri tat-talbiet"
     },
     "requestLogs": {
-      "hint": "Talbiet tas-siegħa sa tmiem il-perjodu, l-aktar riċenti l-ewwel.",
       "older": "Siegħa qabel",
       "newer": "Siegħa wara",
       "truncated": "Din is-siegħa għandha aktar talbiet milli turi l-lista.",
       "emptyTitle": "L-ebda talba",
-      "emptyDescription": "Din is-siegħa m'għandha l-ebda talba tal-gateway.",
       "loadError": "Ma setgħux jitgħabbew ir-reġistri tat-talbiet.",
       "permissionDenied": "Ir-reġistri tat-talbiet jista' jaqrahom biss sid, amministratur jew maniġer tal-fatturazzjoni tal-organizzazzjoni.",
       "tokens": "{{input}} dħul · {{output}} ħruġ",
@@ -4682,7 +4689,6 @@
     "dismiss": "Warrab il-briefing",
     "offline": "Offline · briefing issejvjat",
     "cached": "Rapport issejvjat · aġġornament mhux disponibbli",
-    "window": "{{start}} – {{end}}",
     "summary": "Sommarju AI",
     "summaryPending": "Is-sommarju AI qed jitħejja. Jitwaħħal hawn meta jkun lest.",
     "summaryUnavailable": "Is-sommarju AI mhux disponibbli. Ir-rapport strutturat tiegħek għadu disponibbli.",
@@ -4801,6 +4807,7 @@
       "title": "Skattaturi u webhooks",
       "subtitle": "Awtomatizza l-eżekuzzjonijiet tal-Cloud Agent minn sejħa webhook jew skeda.",
       "new": "Skattatur ġdid",
+      "create": "Oħloq skattatur",
       "emptyTitle": "Għadhom ma hemmx skattaturi",
       "emptyDescription": "Oħloq skattatur biex tibda eżekuzzjoni tal-Cloud Agent minn sejħa webhook jew fuq skeda.",
       "loadFailedTitle": "Ma setgħux jitgħabbew l-iskattaturi",

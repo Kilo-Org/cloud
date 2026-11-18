@@ -10,7 +10,7 @@ export function BriefingPeriodLabel({ report }: { readonly report: BriefingRepor
   return (
     <View className="gap-1">
       <Text variant="caption">
-        {t('agentBriefing.window', {
+        {t('common.timeRange', {
           start: formatBriefingTimestamp(report.nightStartAt, i18n.language, report.timezone),
           end: formatBriefingTimestamp(report.cutoffAt, i18n.language, report.timezone),
         })}

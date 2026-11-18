@@ -26,6 +26,7 @@
     "creditHistory": "Stair chreidmheasa",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Cealaigh",
     "done": "Déanta",
     "retry": "Bain triail eile as",
@@ -482,7 +483,14 @@
       "viewReceipt": "Féach ar an admháil"
     },
     "changelog": "Na rudaí nua",
-    "changelogVersionPending": "Beidh nótaí an leagain seo sa chéad nuashonrú eile den aip."
+    "changelogVersionPending": "Beidh nótaí an leagain {{version}} sa chéad nuashonrú eile den aip.",
+    "changelogGroupNew": "Nua",
+    "changelogFixesIn": "Ceartúcháin agus feabhsuithe sna réimsí seo: {{areas}}.",
+    "changelogFixesPolish": "Ceartúcháin agus feabhsuithe ar fud na haipe.",
+    "changelogAreas": {
+      "signIn": "Síniú isteach",
+      "profileOrganizations": "Próifíl agus eagraíochtaí"
+    }
   },
   "preferences": {
     "general": "Ginearálta",
@@ -3499,6 +3507,7 @@
       "manageOnWeb": "Socruithe billeála ar an ngréasán",
       "changePlan": "Athraigh an plean",
       "buySeats": "Ceannaigh suíocháin",
+      "managedOnWeb": "Bainistítear an plean, na suíocháin agus an breisiú uathoibríoch ar an ngréasán.",
       "setupAutoTopUp": "Socraigh breisiú uathoibríoch",
       "manageAutoTopUp": "Bainistigh breisiú uathoibríoch",
       "opensOnWeb": "Osclaítear ar an ngréasán"
@@ -3647,12 +3656,10 @@
       "requestLogs": "Logaí iarratas"
     },
     "requestLogs": {
-      "hint": "Iarratais ón uair an chloig roimh dheireadh na fuinneoige, na cinn is déanaí ar dtús.",
       "older": "Uair níos luaithe",
       "newer": "Uair níos déanaí",
       "truncated": "Tá níos mó iarratas san uair seo ná mar a thaispeántar sa liosta.",
       "emptyTitle": "Níl aon iarratais",
-      "emptyDescription": "Níl aon iarratais chuig an ngeata san uair seo.",
       "loadError": "Níorbh fhéidir logaí iarratas a lódáil.",
       "permissionDenied": "Ní féidir ach le húinéir, riarthóir nó bainisteoir billeála eagraíochta a logaí iarratas a léamh.",
       "tokens": "{{input}} isteach · {{output}} amach",
@@ -4682,7 +4689,6 @@
     "dismiss": "Cuir an tuarascáil as an áireamh",
     "offline": "As líne · tuarascáil shábháilte",
     "cached": "Tuarascáil shábháilte · ní féidir athnuachan",
-    "window": "{{start}} – {{end}}",
     "summary": "Achoimre AI",
     "summaryPending": "Tá an achoimre AI á hullmhú. Ceanglófar anseo í nuair a bheidh sí réidh.",
     "summaryUnavailable": "Níl achoimre AI ar fáil. Tá do thuarascáil struchtúrtha ar fáil fós.",
@@ -4801,6 +4807,7 @@
       "title": "Truicir agus crúcaí gréasáin",
       "subtitle": "Uathoibrigh ritheanna Cloud Agent ó ghlao crúca gréasáin nó ó sceideal.",
       "new": "Truicear nua",
+      "create": "Cruthaigh truicear",
       "emptyTitle": "Níl truicir ar bith ann fós",
       "emptyDescription": "Cruthaigh truicear chun rith Cloud Agent a thosú ó ghlao crúca gréasáin nó ar sceideal.",
       "loadFailedTitle": "Níorbh fhéidir truicir a lódáil",

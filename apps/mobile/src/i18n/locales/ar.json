@@ -26,6 +26,7 @@
     "creditHistory": "سجل الرصيد",
     "sentenceJoiner": ". ",
     "listJoiner": "، ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "إلغاء",
     "done": "تم",
     "retry": "إعادة المحاولة",
@@ -482,7 +483,14 @@
       "viewReceipt": "عرض الإيصال"
     },
     "changelog": "ما الجديد",
-    "changelogVersionPending": "ستصل ملاحظات هذا الإصدار مع التحديث القادم للتطبيق."
+    "changelogVersionPending": "ستصل ملاحظات الإصدار {{version}} مع التحديث القادم للتطبيق.",
+    "changelogGroupNew": "جديد",
+    "changelogFixesIn": "إصلاحات وتحسينات في {{areas}}.",
+    "changelogFixesPolish": "إصلاحات وتحسينات في جميع أنحاء التطبيق.",
+    "changelogAreas": {
+      "signIn": "تسجيل الدخول",
+      "profileOrganizations": "الملف الشخصي والمؤسسات"
+    }
   },
   "preferences": {
     "general": "عام",
@@ -3548,6 +3556,7 @@
       "manageOnWeb": "إعدادات الفوترة على الويب",
       "changePlan": "تغيير الخطة",
       "buySeats": "شراء مقاعد",
+      "managedOnWeb": "تتم إدارة الخطة والمقاعد والشحن التلقائي على الويب.",
       "setupAutoTopUp": "إعداد الشحن التلقائي",
       "manageAutoTopUp": "إدارة الشحن التلقائي",
       "opensOnWeb": "يُفتح على الويب"
@@ -3709,12 +3718,10 @@
       "requestLogs": "سجلات الطلبات"
     },
     "requestLogs": {
-      "hint": "طلبات الساعة السابقة لنهاية الفترة المعروضة، الأحدث أولًا.",
       "older": "الساعة الأقدم",
       "newer": "الساعة الأحدث",
       "truncated": "في هذه الساعة طلبات أكثر مما تعرضه القائمة.",
       "emptyTitle": "لا توجد طلبات",
-      "emptyDescription": "لا توجد طلبات عبر البوابة في هذه الساعة.",
       "loadError": "تعذّر تحميل سجلات الطلبات.",
       "permissionDenied": "يمكن فقط لمالك المؤسسة أو مسؤولها أو مدير الفوترة فيها قراءة سجلات الطلبات الخاصة بها.",
       "tokens": "{{input}} إدخال · {{output}} إخراج",
@@ -4752,7 +4759,6 @@
     "dismiss": "استبعاد التقرير",
     "offline": "غير متصل · تقرير محفوظ",
     "cached": "تقرير محفوظ · التحديث غير متاح",
-    "window": "{{start}} – {{end}}",
     "summary": "ملخص AI",
     "summaryPending": "جارٍ إعداد ملخص AI. سيُرفق هنا عند جاهزيته.",
     "summaryUnavailable": "ملخص AI غير متاح. لا يزال تقريرك المنظّم متاحًا.",
@@ -4871,6 +4877,7 @@
       "title": "المشغلات والويب هوك",
       "subtitle": "أتمت تشغيل Cloud Agent من استدعاء ويب هوك أو جدول زمني.",
       "new": "مشغل جديد",
+      "create": "أنشئ مشغلاً",
       "emptyTitle": "لا توجد مشغلات بعد",
       "emptyDescription": "أنشئ مشغلاً لبدء تشغيل Cloud Agent من استدعاء ويب هوك أو وفق جدول زمني.",
       "loadFailedTitle": "تعذر تحميل المشغلات",

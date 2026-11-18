@@ -26,6 +26,7 @@
     "creditHistory": "Krediitide ajalugu",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Tühista",
     "done": "Valmis",
     "retry": "Proovi uuesti",
@@ -482,7 +483,14 @@
       "viewReceipt": "Vaata kinnitust"
     },
     "changelog": "Mis on uut",
-    "changelogVersionPending": "Selle versiooni märkmed saabuvad rakenduse järgmise uuendusega."
+    "changelogVersionPending": "Versiooni {{version}} märkmed saabuvad rakenduse järgmise uuendusega.",
+    "changelogGroupNew": "Uut",
+    "changelogFixesIn": "Parandused ja täiustused järgmistes osades: {{areas}}.",
+    "changelogFixesPolish": "Parandused ja täiustused kogu rakenduses.",
+    "changelogAreas": {
+      "signIn": "Sisselogimine",
+      "profileOrganizations": "Profiil ja organisatsioonid"
+    }
   },
   "preferences": {
     "general": "Üldine",
@@ -3328,6 +3336,7 @@
       "manageOnWeb": "Arvelduse seaded veebis",
       "changePlan": "Muuda plaani",
       "buySeats": "Osta kasutajakohti",
+      "managedOnWeb": "Plaani, kasutajakohti ja automaatset täiendamist hallatakse veebis.",
       "setupAutoTopUp": "Seadista automaatne täiendamine",
       "manageAutoTopUp": "Halda automaatset täiendamist",
       "opensOnWeb": "Avaneb veebis"
@@ -3476,12 +3485,10 @@
       "requestLogs": "Päringulogid"
     },
     "requestLogs": {
-      "hint": "Akna lõpule eelnenud tunni päringud, uusimad eespool.",
       "older": "Varasem tund",
       "newer": "Hilisem tund",
       "truncated": "Selles tunnis on rohkem päringuid, kui loendis kuvatakse.",
       "emptyTitle": "Päringuid pole",
-      "emptyDescription": "Selles tunnis pole lüüsipäringuid.",
       "loadError": "Päringulogide laadimine ebaõnnestus.",
       "permissionDenied": "Päringulogisid saavad lugeda ainult organisatsiooni omanik, administraator või arvelduse haldur.",
       "tokens": "{{input}} sisse · {{output}} välja",
@@ -4472,7 +4479,6 @@
     "dismiss": "Jäta ülevaade kõrvale",
     "offline": "Võrguühenduseta · salvestatud ülevaade",
     "cached": "Salvestatud ülevaade · värskendamine pole saadaval",
-    "window": "{{start}} – {{end}}",
     "summary": "AI kokkuvõte",
     "summaryPending": "AI kokkuvõtet koostatakse. See lisatakse siia, kui on valmis.",
     "summaryUnavailable": "AI kokkuvõte pole saadaval. Struktureeritud ülevaade on endiselt saadaval.",
@@ -4591,6 +4597,7 @@
       "title": "Päästikud ja veebihaagid",
       "subtitle": "Automatiseeri Cloud Agent käivitused veebihaagi kutse või ajakava kaudu.",
       "new": "Uus päästik",
+      "create": "Loo päästik",
       "emptyTitle": "Päästikuid veel pole",
       "emptyDescription": "Loo päästik, et alustada Cloud Agent käivitust veebihaagi kutse või ajakava alusel.",
       "loadFailedTitle": "Päästikute laadimine ebaõnnestus",

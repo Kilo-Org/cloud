@@ -26,6 +26,7 @@
     "creditHistory": "Kredi geçmişi",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "İptal",
     "done": "Bitti",
     "retry": "Tekrar dene",
@@ -482,7 +483,14 @@
       "viewReceipt": "Alındıyı görüntüle"
     },
     "changelog": "Yenilikler",
-    "changelogVersionPending": "Bu sürümün notları sonraki uygulama güncellemesiyle gelir."
+    "changelogVersionPending": "{{version}} sürümünün notları sonraki uygulama güncellemesiyle gelir.",
+    "changelogGroupNew": "Yeni",
+    "changelogFixesIn": "Şu alanlarda düzeltmeler ve iyileştirmeler: {{areas}}.",
+    "changelogFixesPolish": "Uygulama genelinde düzeltmeler ve iyileştirmeler.",
+    "changelogAreas": {
+      "signIn": "Oturum açma",
+      "profileOrganizations": "Profil ve kuruluşlar"
+    }
   },
   "preferences": {
     "general": "Genel",
@@ -3320,6 +3328,7 @@
       "manageOnWeb": "Web'deki faturalandırma ayarları",
       "changePlan": "Planı değiştir",
       "buySeats": "Lisans satın al",
+      "managedOnWeb": "Plan, lisanslar ve otomatik yükleme web'de yönetilir.",
       "setupAutoTopUp": "Otomatik yüklemeyi ayarla",
       "manageAutoTopUp": "Otomatik yüklemeyi yönet",
       "opensOnWeb": "Web'de açılır"
@@ -3481,12 +3490,10 @@
       "requestLogs": "İstek günlükleri"
     },
     "requestLogs": {
-      "hint": "Pencerenin bitişinden önceki bir saatteki istekler, en yeniden eskiye.",
       "older": "Önceki saat",
       "newer": "Sonraki saat",
       "truncated": "Bu saatte listede gösterilenden daha fazla istek var.",
       "emptyTitle": "İstek yok",
-      "emptyDescription": "Bu saatte ağ geçidi isteği yok.",
       "loadError": "İstek günlükleri yüklenemedi.",
       "permissionDenied": "İstek günlüklerini yalnızca kuruluşun sahibi, yöneticisi veya faturalandırma yöneticisi görüntüleyebilir.",
       "tokens": "{{input}} giriş · {{output}} çıkış",
@@ -4472,7 +4479,6 @@
     "dismiss": "Raporu yok say",
     "offline": "Çevrimdışı · kayıtlı rapor",
     "cached": "Kayıtlı rapor · yenileme kullanılamıyor",
-    "window": "{{start}} – {{end}}",
     "summary": "AI özeti",
     "summaryPending": "AI özeti hazırlanıyor. Hazır olduğunda buraya eklenecek.",
     "summaryUnavailable": "AI özeti kullanılamıyor. Yapılandırılmış raporunuz hâlâ mevcut.",
@@ -4591,6 +4597,7 @@
       "title": "Tetikleyiciler ve web kancaları",
       "subtitle": "Cloud Agent çalıştırmalarını web kancası çağrısıyla veya zamanlamayla otomatikleştirin.",
       "new": "Yeni tetikleyici",
+      "create": "Tetikleyici oluştur",
       "emptyTitle": "Henüz tetikleyici yok",
       "emptyDescription": "Bir web kancası çağrısıyla veya bir zamanlamayla Cloud Agent çalıştırması başlatmak için bir tetikleyici oluşturun.",
       "loadFailedTitle": "Tetikleyiciler yüklenemedi",

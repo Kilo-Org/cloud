@@ -26,6 +26,7 @@
     "creditHistory": "Kreditelőzmények",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Mégse",
     "done": "Kész",
     "retry": "Újrapróbálkozás",
@@ -482,7 +483,14 @@
       "viewReceipt": "Visszaigazolás megtekintése"
     },
     "changelog": "Újdonságok",
-    "changelogVersionPending": "E verzió újdonságai a következő frissítéssel érkeznek."
+    "changelogVersionPending": "A(z) {{version}} verzió újdonságai a következő frissítéssel érkeznek.",
+    "changelogGroupNew": "Újdonságok",
+    "changelogFixesIn": "Javítások és fejlesztések a következő területeken: {{areas}}.",
+    "changelogFixesPolish": "Javítások és fejlesztések az egész alkalmazásban.",
+    "changelogAreas": {
+      "signIn": "Bejelentkezés",
+      "profileOrganizations": "Profil és szervezetek"
+    }
   },
   "preferences": {
     "general": "Általános",
@@ -3328,6 +3336,7 @@
       "manageOnWeb": "Számlázási beállítások a weben",
       "changePlan": "Csomag módosítása",
       "buySeats": "Férőhelyek vásárlása",
+      "managedOnWeb": "A csomag, a férőhelyek és az automatikus feltöltés kezelése a weben történik.",
       "setupAutoTopUp": "Automatikus feltöltés beállítása",
       "manageAutoTopUp": "Automatikus feltöltés kezelése",
       "opensOnWeb": "A weben nyílik meg"
@@ -3476,12 +3485,10 @@
       "requestLogs": "Kérésnaplók"
     },
     "requestLogs": {
-      "hint": "Az időablak vége előtti egy óra kérései, a legújabbak elöl.",
       "older": "Korábbi óra",
       "newer": "Későbbi óra",
       "truncated": "Ebben az órában több kérés van, mint amennyi a listán látható.",
       "emptyTitle": "Nincsenek kérések",
-      "emptyDescription": "Ebben az órában nem volt gateway-kérés.",
       "loadError": "Nem sikerült betölteni a kérésnaplókat.",
       "permissionDenied": "A kérésnaplókat csak a szervezet tulajdonosa, adminisztrátora vagy számlázási felelőse olvashatja.",
       "tokens": "{{input}} be · {{output}} ki",
@@ -4472,7 +4479,6 @@
     "dismiss": "Jelentés elvetése",
     "offline": "Offline · mentett jelentés",
     "cached": "Mentett jelentés · frissítés nem érhető el",
-    "window": "{{start}} – {{end}}",
     "summary": "AI-összefoglaló",
     "summaryPending": "Az AI-összefoglaló készül. Elkészülte után itt jelenik meg.",
     "summaryUnavailable": "Az AI-összefoglaló nem érhető el. A strukturált jelentés továbbra is elérhető.",
@@ -4591,6 +4597,7 @@
       "title": "Triggerek és webhookok",
       "subtitle": "Automatizálja a Cloud Agent futtatásait webhookhívásból vagy ütemezésből.",
       "new": "Új trigger",
+      "create": "Hozzon létre triggert",
       "emptyTitle": "Még nincsenek triggerek",
       "emptyDescription": "Hozzon létre egy triggert, amely webhookhívásból vagy ütemezés szerint indít Cloud Agent futtatást.",
       "loadFailedTitle": "Nem sikerült betölteni a triggereket",

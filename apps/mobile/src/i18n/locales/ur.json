@@ -26,6 +26,7 @@
     "creditHistory": "کریڈٹ کی تاریخچہ",
     "sentenceJoiner": "۔ ",
     "listJoiner": "، ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "منسوخ کریں",
     "done": "ہو گیا",
     "retry": "دوبارہ کوشش کریں",
@@ -482,7 +483,14 @@
       "viewReceipt": "رسید دیکھیں"
     },
     "changelog": "نیا کیا ہے",
-    "changelogVersionPending": "اس ورژن کے نوٹس ایپ کی اگلی اپ ڈیٹ کے ساتھ آئیں گے۔"
+    "changelogVersionPending": "ورژن {{version}} کے نوٹس ایپ کی اگلی اپ ڈیٹ کے ساتھ آئیں گے۔",
+    "changelogGroupNew": "نیا",
+    "changelogFixesIn": "ان حصوں میں اصلاحات اور بہتریاں: {{areas}}۔",
+    "changelogFixesPolish": "پوری ایپ میں اصلاحات اور بہتریاں۔",
+    "changelogAreas": {
+      "signIn": "سائن ان",
+      "profileOrganizations": "پروفائل اور تنظیمیں"
+    }
   },
   "preferences": {
     "general": "عمومی",
@@ -3328,6 +3336,7 @@
       "manageOnWeb": "ویب پر بلنگ سیٹنگز",
       "changePlan": "پلان تبدیل کریں",
       "buySeats": "سیٹیں خریدیں",
+      "managedOnWeb": "پلان، سیٹیں اور خودکار ٹاپ اپ ویب پر منظم کیے جاتے ہیں۔",
       "setupAutoTopUp": "خودکار ٹاپ اپ سیٹ اپ کریں",
       "manageAutoTopUp": "خودکار ٹاپ اپ کا انتظام کریں",
       "opensOnWeb": "ویب پر کھلتا ہے"
@@ -3476,12 +3485,10 @@
       "requestLogs": "درخواست لاگز"
     },
     "requestLogs": {
-      "hint": "ونڈو ختم ہونے سے پہلے کے ایک گھنٹے کی درخواستیں، تازہ ترین پہلے۔",
       "older": "پچھلا گھنٹہ",
       "newer": "اگلا گھنٹہ",
       "truncated": "اس گھنٹے میں فہرست میں دکھائی گئی درخواستوں سے زیادہ درخواستیں ہیں۔",
       "emptyTitle": "کوئی درخواست نہیں",
-      "emptyDescription": "اس گھنٹے میں کوئی گیٹ وے درخواست نہیں۔",
       "loadError": "درخواست لاگز لوڈ نہیں ہو سکے۔",
       "permissionDenied": "صرف تنظیم کا مالک، ایڈمن یا بلنگ مینیجر ہی اس کے درخواست لاگز دیکھ سکتا ہے۔",
       "tokens": "ان پٹ {{input}} · آؤٹ پٹ {{output}}",
@@ -4472,7 +4479,6 @@
     "dismiss": "بریفنگ نظر انداز کریں",
     "offline": "آف لائن · محفوظ شدہ بریفنگ",
     "cached": "محفوظ شدہ رپورٹ · ریفریش دستیاب نہیں",
-    "window": "{{start}} – {{end}}",
     "summary": "AI خلاصہ",
     "summaryPending": "AI خلاصہ تیار ہو رہا ہے۔ تیار ہونے پر یہاں منسلک ہو جائے گا۔",
     "summaryUnavailable": "AI خلاصہ دستیاب نہیں۔ آپ کی منظم رپورٹ اب بھی دستیاب ہے۔",
@@ -4591,6 +4597,7 @@
       "title": "ٹرگرز اور ویب ہکس",
       "subtitle": "ویب ہک کال یا شیڈول سے Cloud Agent رنز کو خودکار بنائیں۔",
       "new": "نیا ٹرگر",
+      "create": "ٹرگر بنائیں",
       "emptyTitle": "ابھی کوئی ٹرگر نہیں",
       "emptyDescription": "ویب ہک کال یا شیڈول پر Cloud Agent رن شروع کرنے کے لیے ٹرگر بنائیں۔",
       "loadFailedTitle": "ٹرگرز لوڈ نہیں ہو سکے",

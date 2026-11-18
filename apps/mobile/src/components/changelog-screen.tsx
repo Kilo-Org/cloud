@@ -1,63 +1,148 @@
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import * as Application from 'expo-application';
-import { useCallback, useMemo } from 'react';
+import { type TFunction } from 'i18next';
+import { type ReactElement, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
 
-import { MarkdownText } from '@/components/agents/markdown-text';
 import { ScreenHeader } from '@/components/screen-header';
+import { Eyebrow } from '@/components/ui/eyebrow';
 import { Text } from '@/components/ui/text';
-import { MIN_TAP_TARGET_DP } from '@/lib/a11y/tap-target';
+import { formatList } from '@/lib/format';
 import { useDetailScreenBottomPadding, useSideInsetStyle } from '@/lib/screen-insets';
 
 import changelog from '../../CHANGELOG.md';
-import { changelogNotesArePending, splitChangelogSections } from './changelog-sections';
+import {
+  type ChangelogArea,
+  changelogNotesArePending,
+  type ChangelogSection,
+  changelogSections,
+} from './changelog-sections';
 
 /**
- * The release notes the app ships with. `CHANGELOG.md` is inlined into the
- * bundle as a string by babel-plugin-inline-import. The newest section here is
- * the release before this build: the Release workflow writes a build's section
- * after its submission lands, so the bytes this build compiled cannot carry
- * their own entry (it arrives in the next build's bundle).
+ * The release notes the app ships with, as a reader sees them. `CHANGELOG.md` is
+ * inlined into the bundle as a string by babel-plugin-inline-import, and
+ * `changelogSections` drops the file's maintainer parts, keeps the newest
+ * features and policy changes as sentences, and turns the fixes into the
+ * product areas they touched. The newest section here is the release before
+ * this build: the Release workflow writes a build's section after its
+ * submission lands, so the bytes this build compiled cannot carry their own
+ * entry (it arrives in the next build's bundle).
  */
-const CHANGELOG_SECTIONS = splitChangelogSections(changelog);
+const CHANGELOG_SECTIONS = changelogSections(changelog);
+
+/**
+ * The version the running app was installed as, or null before the platform
+ * answers. The notice below names it, so a reader does not take the newest
+ * section for this build's news.
+ */
+const INSTALLED_VERSION = Application.nativeApplicationVersion;
 
 /**
  * Whether the bundled sections stop short of the running build's version.
  * Read once: the app version is fixed for the life of the process, and the
  * bundled markdown cannot change without a new build.
  */
-const NOTES_PENDING = changelogNotesArePending(changelog, Application.nativeApplicationVersion);
+const NOTES_PENDING = changelogNotesArePending(changelog, INSTALLED_VERSION);
 
 /** The body's 10.5pt top pad, as the pixel value FlashList's style takes. */
 const LIST_TOP_PAD = 12;
 
 const listStyle = { flex: 1 } satisfies ViewStyle;
 
-const keyExtractor = (_section: string, index: number) => String(index);
+const keyExtractor = (section: ChangelogSection) => section.version;
+
+/**
+ * The label one area reads as. The three agent products keep their own names in
+ * Latin in every locale, the way the app names them elsewhere; the rest reuse
+ * the labels the app paints in its own chrome instead of a second wording.
+ */
+const AREA_LABELS = {
+  cloudAgent: () => 'Cloud Agent',
+  securityAgent: () => 'Security Agent',
+  codeReviewer: () => 'Code Reviewer',
+  chat: (t: TFunction) => t('common.chat'),
+  notifications: (t: TFunction) => t('common.notifications'),
+  integrations: (t: TFunction) => t('integrations.title'),
+  signIn: (t: TFunction) => t('profile.changelogAreas.signIn'),
+  profileOrganizations: (t: TFunction) => t('profile.changelogAreas.profileOrganizations'),
+} as const satisfies Record<ChangelogArea, (t: TFunction) => string>;
+
+function NoteRow({ text }: Readonly<{ text: string }>) {
+  return (
+    <View className="flex-row gap-2">
+      <Text className="text-sm text-muted-foreground">•</Text>
+      <Text className="flex-1 text-sm">{text}</Text>
+    </View>
+  );
+}
+
+/**
+ * One version: its heading, the New group, the policy changes, and the line
+ * that names the areas the fixes touched. Bullets sit one 8 dp gap apart, the
+ * groups 16 dp, and the next version starts 24 dp down.
+ */
+function ReleaseSection({ section }: Readonly<{ section: ChangelogSection }>) {
+  const { t, i18n } = useTranslation();
+  const areas = section.fixesAreas.map(area => AREA_LABELS[area](t));
+  const fixesLabel =
+    areas.length === 0
+      ? t('profile.changelogFixesPolish')
+      : t('profile.changelogFixesIn', { areas: formatList(areas, i18n.language) });
+  const fixesClass =
+    section.newNotes.length === 0
+      ? 'text-sm text-muted-foreground'
+      : 'pt-4 text-sm text-muted-foreground';
+  const changesClass = section.newNotes.length === 0 ? 'gap-2' : 'gap-2 pt-4';
+  return (
+    // The list is full-bleed, so each release block draws the 14pt page gutter
+    // itself and keeps one section gap under it.
+    <View className="px-4 pb-6">
+      <Text variant="heading" className="pb-2">
+        {section.version}
+      </Text>
+      {section.newNotes.length === 0 ? null : (
+        <View className="gap-2">
+          <Eyebrow>{t('profile.changelogGroupNew')}</Eyebrow>
+          {section.newNotes.map((note, position) => (
+            <NoteRow key={`${note}-${position}`} text={note} />
+          ))}
+        </View>
+      )}
+      {section.changeNotes.length === 0 ? null : (
+        <View className={changesClass}>
+          <Eyebrow>{t('common.changes')}</Eyebrow>
+          {section.changeNotes.map((note, position) => (
+            <NoteRow key={`${note}-${position}`} text={note} />
+          ))}
+        </View>
+      )}
+      {section.hasFixes ? <Text className={fixesClass}>{fixesLabel}</Text> : null}
+    </View>
+  );
+}
 
 export function ChangelogScreen() {
   const { t } = useTranslation();
   const sideInsetStyle = useSideInsetStyle();
   const bottomPadding = useDetailScreenBottomPadding();
-  // Every release bullet ends in an inline PR link, and the native markdown
-  // renderer exposes that link's rectangle and accepts its tap as the text line
-  // box. A span carries no box and no `hitSlop`, so this screen alone raises
-  // the body line height to the inline-link target floor.
   const renderItem = useCallback(
-    ({ item }: ListRenderItemInfo<string>) => (
-      // The list is full-bleed, so each release block draws the 14pt page gutter
-      // itself and keeps one section gap under it.
-      <View className="px-4 pb-6">
-        <MarkdownText value={item} lineHeight={MIN_TAP_TARGET_DP} />
-      </View>
-    ),
+    ({ item }: ListRenderItemInfo<ChangelogSection>) => <ReleaseSection section={item} />,
     []
   );
   const contentContainerStyle = useMemo(
     () => ({ paddingTop: LIST_TOP_PAD, paddingBottom: bottomPadding }),
     [bottomPadding]
   );
+  // The notice belongs to the notes, not to the screen: as the list's header it
+  // shares the list's page gutter and scrolls away with the first version. It is
+  // a caption — smaller than a bullet and muted — and its 16 dp foot is the gap
+  // above the first version heading.
+  const header: ReactElement | null = NOTES_PENDING ? (
+    <Text variant="caption" className="px-4 pb-4">
+      {t('profile.changelogVersionPending', { version: INSTALLED_VERSION })}
+    </Text>
+  ) : null;
 
   return (
     <View className="flex-1 bg-background">
@@ -68,14 +153,8 @@ export function ChangelogScreen() {
           data={CHANGELOG_SECTIONS}
           keyExtractor={keyExtractor}
           renderItem={renderItem}
+          ListHeaderComponent={header}
           contentContainerStyle={contentContainerStyle}
-          ListHeaderComponent={
-            NOTES_PENDING ? (
-              <Text variant="muted" className="px-4 pb-3">
-                {t('profile.changelogVersionPending')}
-              </Text>
-            ) : null
-          }
           showsVerticalScrollIndicator={false}
         />
       </View>

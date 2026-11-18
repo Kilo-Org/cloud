@@ -26,6 +26,7 @@
     "creditHistory": "Credit-Verlauf",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Abbrechen",
     "done": "Fertig",
     "retry": "Erneut versuchen",
@@ -482,7 +483,14 @@
       "viewReceipt": "Bestätigung anzeigen"
     },
     "changelog": "Neuigkeiten",
-    "changelogVersionPending": "Neuigkeiten zu dieser Version folgen im nächsten Update."
+    "changelogVersionPending": "Neuigkeiten zu Version {{version}} folgen im nächsten Update.",
+    "changelogGroupNew": "Neu",
+    "changelogFixesIn": "Fehlerbehebungen und Verbesserungen in den Bereichen {{areas}}.",
+    "changelogFixesPolish": "Fehlerbehebungen und Verbesserungen in der gesamten App.",
+    "changelogAreas": {
+      "signIn": "Anmeldung",
+      "profileOrganizations": "Profil und Organisationen"
+    }
   },
   "preferences": {
     "general": "Allgemein",
@@ -3320,6 +3328,7 @@
       "manageOnWeb": "Abrechnungseinstellungen im Web",
       "changePlan": "Plan ändern",
       "buySeats": "Nutzerplätze kaufen",
+      "managedOnWeb": "Plan, Nutzerplätze und automatische Aufladung werden im Web verwaltet.",
       "setupAutoTopUp": "Automatische Aufladung einrichten",
       "manageAutoTopUp": "Automatische Aufladung verwalten",
       "opensOnWeb": "Wird im Web geöffnet"
@@ -3481,12 +3490,10 @@
       "requestLogs": "Anfrage-Logs"
     },
     "requestLogs": {
-      "hint": "Anfragen aus der Stunde vor Ende des Zeitfensters, neueste zuerst.",
       "older": "Frühere Stunde",
       "newer": "Spätere Stunde",
       "truncated": "Diese Stunde enthält mehr Anfragen, als die Liste anzeigt.",
       "emptyTitle": "Keine Anfragen",
-      "emptyDescription": "In dieser Stunde gab es keine Gateway-Anfragen.",
       "loadError": "Anfrage-Logs konnten nicht geladen werden.",
       "permissionDenied": "Nur Inhaber, Admins oder Abrechnungsverantwortliche einer Organisation können deren Anfrage-Logs einsehen.",
       "tokens": "{{input}} ein · {{output}} aus",
@@ -4472,7 +4479,6 @@
     "dismiss": "Briefing ausblenden",
     "offline": "Offline · gespeichertes Briefing",
     "cached": "Gespeicherter Bericht · Aktualisierung nicht verfügbar",
-    "window": "{{start}} – {{end}}",
     "summary": "AI-Zusammenfassung",
     "summaryPending": "AI-Zusammenfassung wird erstellt. Sie erscheint hier, sobald sie fertig ist.",
     "summaryUnavailable": "AI-Zusammenfassung nicht verfügbar. Dein strukturierter Bericht ist weiterhin verfügbar.",
@@ -4591,6 +4597,7 @@
       "title": "Auslöser & Webhooks",
       "subtitle": "Automatisiere Läufe von Cloud Agent per Webhook-Aufruf oder Zeitplan.",
       "new": "Neuer Auslöser",
+      "create": "Auslöser erstellen",
       "emptyTitle": "Noch keine Auslöser",
       "emptyDescription": "Erstelle einen Auslöser, um einen Lauf von Cloud Agent per Webhook-Aufruf oder nach Zeitplan zu starten.",
       "loadFailedTitle": "Auslöser konnten nicht geladen werden",

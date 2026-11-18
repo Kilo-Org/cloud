@@ -125,9 +125,15 @@ describe('lookupPinnedUpstreamAddress', () => {
       [null, PUBLIC_IPV4, 4],
     ]);
     expect(lookupMock).toHaveBeenCalledWith('pinned.example', { all: true, verbatim: true });
+    const callsAfterRefresh = lookupMock.mock.calls.length;
 
-    // The refreshed check stored a fresh list for the policy cache, so a new
-    // dispatcher call re-pins the host from that list without another lookup.
+    // The refreshed check registered the fresh list as the host's pin, so the
+    // pool's next connection answers from it without another system lookup.
+    expect(runLookup('pinned.example', { all: false })).toEqual([[null, PUBLIC_IPV4, 4]]);
+    expect(lookupMock.mock.calls.length).toBe(callsAfterRefresh);
+
+    // The refreshed check also stored a fresh list for the policy cache, so a
+    // new dispatcher call re-pins the host from that list without another lookup.
     jest.clearAllMocks();
     lookupMock.mockResolvedValue([{ address: PUBLIC_IPV4, family: 4 }]);
     upstreamDispatcherFor('pinned.example', [PUBLIC_IPV4]);

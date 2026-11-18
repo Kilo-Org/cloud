@@ -226,7 +226,7 @@ describe('upstreamRequest upstream URL policy', () => {
       jest.restoreAllMocks();
     });
 
-    it('reports the second request when the fresh check fails during the connect', async () => {
+    it('reports the second request when a re-check fails after both caches expired', async () => {
       lookupMock
         .mockResolvedValueOnce([{ address: '104.18.2.115', family: 4 }])
         .mockRejectedValue(new Error('getaddrinfo ENOTFOUND'));
@@ -236,8 +236,12 @@ describe('upstreamRequest upstream URL policy', () => {
       jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 60_001);
       const result = await send(directProvider('https://llm.example.com/v1'));
 
-      // The refresh answers the connection's callback with the refusal, so the
-      // fetch never ran and the answer stays the generic upstream failure.
+      // Past both cache windows the request-start check runs again and its
+      // failure answers the caller: the fetch never ran and the answer stays
+      // the generic upstream failure. The connect-time refusal, where the
+      // check succeeds but the connection is not verified, is covered in
+      // `upstream-connection.test.ts` (stale-pin refresh and refusals) and by
+      // the refused-connection reporting test above.
       expect(fetchMock).toHaveBeenCalledTimes(1);
       if (result.type !== 'error') throw new Error('expected an error result');
       expect(result.response.status).toBe(503);

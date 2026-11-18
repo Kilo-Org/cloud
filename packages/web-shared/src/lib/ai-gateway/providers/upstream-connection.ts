@@ -11,8 +11,10 @@
  * behind the per-host connection cap while the budget ran, can outlive the pin
  * TTL. A stale pin still refuses, but the lookup then asks the policy for a
  * fresh check of the same host and answers from it when the fresh answers are
- * public, so a long request reconnects without failing. A fresh check that
- * finds a non-public answer or a failing resolver refuses the connection.
+ * public, so a long request reconnects without failing. It registers the fresh
+ * list as the host's pin again, so the next connection this pool opens answers
+ * from it while it stays fresh. A fresh check that finds a non-public answer
+ * or a failing resolver refuses the connection.
  *
  * The gateway's `fetch` is the Node global built on undici, and Next's server
  * fetch patch rebuilds the init by spreading the fields it did not consume, so
@@ -39,7 +41,9 @@ const UPSTREAM_AGENT_MAX_ENTRIES = 64;
  * Sockets one host's pool may keep open at once. Queued requests hold no
  * socket: undici queues in-process once the cap is reached. 64 is far above the
  * concurrency one gateway instance sends to one upstream host, so the cap
- * bounds only a degenerate single-host pile-up.
+ * bounds only a degenerate single-host pile-up; the exception is the
+ * secure-proxy relay, whose one shared hostname aggregates every proxied
+ * request the instance sends.
  */
 const UPSTREAM_AGENT_CONNECTIONS_PER_HOST = 64;
 
@@ -175,13 +179,16 @@ export const lookupPinnedUpstreamAddress: LookupFunction = (hostname, options, c
 
   // The pin is expired or absent, and the connection needs a fresh check of the
   // host. The lookup answers later, which undici accepts: the connect waits for
-  // the callback until its own connect timeout.
+  // the callback until its own connect timeout. The fresh list is pinned again
+  // so the next connection this pool opens answers from it while it stays
+  // fresh, instead of running another system lookup.
   void refreshUpstreamHostAddresses(normalized, undefined).then(
     addresses => {
       if (!addresses || addresses.length === 0) {
         refuse('the refreshed check found no address');
         return;
       }
+      pinUpstreamAddresses(hostname, addresses);
       answer(addresses);
     },
     error => {

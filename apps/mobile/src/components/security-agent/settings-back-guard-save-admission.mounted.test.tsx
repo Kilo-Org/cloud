@@ -57,6 +57,7 @@ const confirmDialog = vi.hoisted(() => ({
 // and the dialog Save both flow through the real `useSettingsSaveFeedback`.
 // Only the native surfaces render as stubs.
 vi.mock('react-native', () => ({
+  useColorScheme: () => 'light',
   View: 'View',
   Pressable: 'Pressable',
   Text: 'Text',
@@ -105,7 +106,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   }),
 }));
 vi.mock('@/lib/a11y/motion', () => ({ useMotionPolicy: () => ({ reducedMotion: false }) }));
-vi.mock('@/components/ui/icons', () => ({ Loader2: 'Loader2' }));
+vi.mock('@/components/ui/icons', () => ({ Clock: 'Clock', Loader2: 'Loader2' }));
 vi.mock('@rn-primitives/dialog', () => ({
   Action: 'AlertDialog.Action',
   Cancel: 'AlertDialog.Cancel',

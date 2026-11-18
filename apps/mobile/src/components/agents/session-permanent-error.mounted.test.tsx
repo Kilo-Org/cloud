@@ -11,6 +11,7 @@ import { SessionPermanentError } from './session-permanent-error';
 const router = vi.hoisted(() => ({ dismissTo: vi.fn() }));
 
 vi.mock('expo-router', () => ({ useRouter: () => router }));
+vi.mock('react-native', () => ({ View: 'View' }));
 vi.mock('./restored-route-fallback', () => ({ RestoredRouteFallback: 'RestoredRouteFallback' }));
 vi.mock('@/components/ui/directional-icons', () => ({
   DirectionalArrowLeft: 'DirectionalArrowLeft',

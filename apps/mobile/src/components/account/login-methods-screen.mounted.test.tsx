@@ -26,6 +26,7 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   View: 'View',
   useColorScheme: () => 'light',

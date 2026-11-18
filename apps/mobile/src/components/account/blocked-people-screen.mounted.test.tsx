@@ -5,7 +5,7 @@ import {
   BUTTON,
   mount,
   resetState,
-  state,
+  screenState as state,
   texts,
   unmountBlockedPeople,
 } from './blocked-people-screen.test-helpers';

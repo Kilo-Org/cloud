@@ -38,7 +38,7 @@ type ScreenState = {
   lastRefreshControl: { props: { refreshing: boolean; onRefresh: unknown } } | null;
 };
 
-export const state = vi.hoisted((): ScreenState => ({
+const state = vi.hoisted((): ScreenState => ({
   blockedLogins: [],
   mutedLogins: [],
   error: false,
@@ -55,6 +55,8 @@ export const state = vi.hoisted((): ScreenState => ({
   toastError: vi.fn(),
   lastRefreshControl: null as { props: { refreshing: boolean; onRefresh: unknown } } | null,
 }));
+
+export const screenState = state;
 
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',

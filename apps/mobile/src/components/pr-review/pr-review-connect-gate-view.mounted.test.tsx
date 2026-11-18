@@ -450,7 +450,7 @@ describe.each(['ios', 'android'])('PR-review connect gate on %s', os => {
 
   it('opens the app connect sheet once for a double press', () => {
     const renderer = mount('bitbucket');
-    const button = renderer.root.findByType('Button');
+    const button = renderer.root.findByType('StateAction');
 
     act(() => {
       (button.props.onPress as () => void)();

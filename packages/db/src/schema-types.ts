@@ -2063,14 +2063,14 @@ export const OrganizationAuditLogDetailsSchema = z.discriminatedUnion('kind', [
   }),
   z.object({
     kind: z.literal('review_config_changed'),
-    platform: z.string(),
+    platform: z.enum(['github', 'gitlab', 'bitbucket']),
     style: z.string().optional(),
     webhooksCreated: z.number().int().optional(),
     webhooksDeleted: z.number().int().optional(),
   }),
   z.object({
     kind: z.literal('review_agent_toggled'),
-    platform: z.string(),
+    platform: z.enum(['github', 'gitlab', 'bitbucket']),
     enabled: z.boolean(),
   }),
   z.object({

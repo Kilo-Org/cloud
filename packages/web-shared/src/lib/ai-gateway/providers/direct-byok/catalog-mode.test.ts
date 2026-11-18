@@ -16,6 +16,7 @@ import {
   getDirectByokCatalogModelIds,
   getDirectByokModelsForUser,
   supportsCatalogMode,
+  type DirectByokPolicyTarget,
 } from './index';
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ readDb: {} }));
@@ -173,8 +174,8 @@ describe('direct BYOK model lists in catalog mode', () => {
     async (allowedProviderId, expected) => {
       mockedKeys.mockResolvedValueOnce(keys({ synthetic: true, 'zai-coding': true }));
       const isServingAllowed = jest.fn(
-        async (_catalogModelId: string, policyProviderId: string) =>
-          policyProviderId === allowedProviderId
+        async (_catalogModelId: string, target: DirectByokPolicyTarget) =>
+          target.providerSlug === allowedProviderId
       );
 
       const catalogIds = await getDirectByokCatalogModelIds(
@@ -183,8 +184,14 @@ describe('direct BYOK model lists in catalog mode', () => {
       );
 
       expect([...catalogIds]).toEqual(expected);
-      expect(isServingAllowed).toHaveBeenCalledWith('moonshotai/kimi-k2.6', 'synthetic');
-      expect(isServingAllowed).toHaveBeenCalledWith('~z-ai/glm-latest', 'z-ai');
+      expect(isServingAllowed).toHaveBeenCalledWith('moonshotai/kimi-k2.6', {
+        kind: 'provider',
+        providerSlug: 'synthetic',
+      });
+      expect(isServingAllowed).toHaveBeenCalledWith('~z-ai/glm-latest', {
+        kind: 'provider',
+        providerSlug: 'z-ai',
+      });
     }
   );
 

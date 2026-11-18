@@ -17,9 +17,8 @@ import {
 import { getIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
 import {
-  findDirectByokProvider,
   getDirectByokModel,
-  getDirectByokPolicyProviderId,
+  type DirectByokPolicyTarget,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { isInferenceProviderUserByok } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { isVercelUserByokProviderAllowed } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
@@ -184,6 +183,9 @@ export async function resolveProviderAndPolicy(
       !groupPolicy || (await isModelAllowedForProviderKey(groupPolicy, model, policyProviderId))
     );
   };
+  /** Whether the organization policy admits the model served by a catalog-mode direct BYOK key. */
+  const isDirectByokServingAllowed = async (target: DirectByokPolicyTarget) =>
+    isModelAllowedForPolicyProvider(target.providerSlug);
 
   /** Whether the organization model policy admits the model served by a catalog-mode endpoint. */
   const isByokEndpointModelAllowed = async () =>
@@ -213,7 +215,7 @@ export async function resolveProviderAndPolicy(
       request.body.provider,
     getAllowedProviders: async () =>
       isAnonymous ? undefined : (await getAccessCheck()).allowedProviders,
-    isDirectByokProviderAllowed: isModelAllowedForPolicyProvider,
+    isDirectByokProviderAllowed: isDirectByokServingAllowed,
     isByokEndpointModelAllowed,
     kiloIgnoredProviders: getIgnoredProviders(model, isNonTrialEnterprise),
     openRouterDisabled: organizationGatewaySettings.openRouterDisabled,
@@ -356,10 +358,9 @@ export async function resolveProviderAndPolicy(
     if (route.provider.type === 'direct-byok') {
       // A catalog-mode direct BYOK key is the request's only route, so the policy is checked
       // against the key's provider alone. Routing already skips keys it rejects.
-      const directByokProvider = findDirectByokProvider(route.userByok?.[0]?.providerId ?? '');
       if (
-        !directByokProvider ||
-        !(await isModelAllowedForPolicyProvider(getDirectByokPolicyProviderId(directByokProvider)))
+        !route.directByokPolicyTarget ||
+        !(await isDirectByokServingAllowed(route.directByokPolicyTarget))
       ) {
         return poolRouted ? efficientPoolBlockedResponse() : modelNotAllowedResponse();
       }

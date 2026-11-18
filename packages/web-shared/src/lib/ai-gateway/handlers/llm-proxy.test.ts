@@ -2206,10 +2206,14 @@ describe('POST /api/v1/chat/completions request handling', () => {
       | 'a Vercel AI Gateway key'
       | 'a catalog-mode endpoint'
       | 'no BYOK key';
-    const byokRoutes: Record<ByokRoute, Pick<ProviderRoute, 'provider' | 'userByok'>> = {
+    const byokRoutes: Record<
+      ByokRoute,
+      Pick<ProviderRoute, 'provider' | 'userByok' | 'directByokPolicyTarget'>
+    > = {
       'a catalog-mode direct BYOK key': {
         provider: { ...provider, type: 'direct-byok' },
         userByok: [{ decryptedAPIKey: 'key', providerId: 'zai-coding' }],
+        directByokPolicyTarget: { kind: 'provider', providerSlug: 'z-ai' },
       },
       'a Vercel BYOK inference provider key': {
         provider: { ...provider, type: 'vercel' },
@@ -2305,8 +2309,12 @@ describe('POST /api/v1/chat/completions request handling', () => {
 
       const isDirectByokProviderAllowed =
         mockedGetProvider.mock.calls[0]?.[0].isDirectByokProviderAllowed;
-      expect(await isDirectByokProviderAllowed?.('z-ai')).toBe(true);
-      expect(await isDirectByokProviderAllowed?.('synthetic')).toBe(false);
+      expect(await isDirectByokProviderAllowed?.({ kind: 'provider', providerSlug: 'z-ai' })).toBe(
+        true
+      );
+      expect(
+        await isDirectByokProviderAllowed?.({ kind: 'provider', providerSlug: 'synthetic' })
+      ).toBe(false);
       expect(mockedIsModelAllowedForProviderKey).toHaveBeenCalledWith(
         expect.anything(),
         'moonshotai/kimi-k2.6',
@@ -3910,6 +3918,7 @@ describe('kilo-auto/efficient classifier billing', () => {
         userByok: [{ decryptedAPIKey: 'key', providerId: 'synthetic' }],
         isFree: false,
         bypassAccessCheck: false,
+        directByokPolicyTarget: { kind: 'provider', providerSlug: 'synthetic' },
       })
     );
 
@@ -8258,6 +8267,9 @@ describe('BYOK failover', () => {
       userByok: [{ decryptedAPIKey: routeProvider.apiKey, providerId }],
       isFree: false,
       bypassAccessCheck: false,
+      ...(routeProvider.type === 'direct-byok' && {
+        directByokPolicyTarget: { kind: 'provider', providerSlug: providerId },
+      }),
     };
   }
 

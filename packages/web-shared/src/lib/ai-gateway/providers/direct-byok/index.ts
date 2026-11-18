@@ -34,6 +34,17 @@ export function getDirectByokPolicyProviderId(provider: DirectByokProvider): str
   return provider.openrouter_inference_provider_id ?? provider.id;
 }
 
+/** What the organization policy checks for a request a direct BYOK key serves. */
+export type DirectByokPolicyTarget = {
+  kind: 'provider';
+  /** See `getDirectByokPolicyProviderId`. */
+  providerSlug: string;
+};
+
+export function getDirectByokPolicyTarget(provider: DirectByokProvider): DirectByokPolicyTarget {
+  return { kind: 'provider', providerSlug: getDirectByokPolicyProviderId(provider) };
+}
+
 /**
  * Providers for `/api/v1/providers` and the provider policy screens that the general provider list
  * lacks.
@@ -215,13 +226,10 @@ async function addLatestAliasModelIds(providersByModelId: CatalogModeProviders):
   }
 }
 
-/**
- * Whether a catalog-mode key of the provider named by `policyProviderId` (see
- * `getDirectByokPolicyProviderId`) may serve `catalogModelId`.
- */
+/** Whether a catalog-mode key with policy target `target` may serve `catalogModelId`. */
 export type DirectByokCatalogServingCheck = (
   catalogModelId: string,
-  policyProviderId: string
+  target: DirectByokPolicyTarget
 ) => Promise<boolean>;
 
 const allowEveryCatalogProvider: DirectByokCatalogServingCheck = async () => true;
@@ -243,7 +251,7 @@ async function getCatalogModeModelIds(
   const modelIds = new Set<string>();
   for (const [modelId, providers] of providersByModelId) {
     for (const provider of providers) {
-      if (await isServingAllowed(modelId, getDirectByokPolicyProviderId(provider))) {
+      if (await isServingAllowed(modelId, getDirectByokPolicyTarget(provider))) {
         modelIds.add(modelId);
         break;
       }

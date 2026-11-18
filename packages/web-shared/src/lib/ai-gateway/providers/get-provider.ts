@@ -67,6 +67,8 @@ import {
   getDirectByokCatalogModelId,
   getDirectByokKeyLabel,
   getDirectByokPolicyProviderId,
+  getDirectByokPolicyTarget,
+  type DirectByokPolicyTarget,
   getDirectByokModelChatApis,
   supportsCatalogMode,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
@@ -125,6 +127,8 @@ export type ProviderRoute = {
    *  outside Kilo credits pays for the request, such as the ChatGPT
    *  subscription, while abuse and organization policy checks still apply. */
   skipBalanceCheck?: boolean;
+  /** What the organization policy checks when a direct BYOK key serves a catalog id. */
+  directByokPolicyTarget?: DirectByokPolicyTarget;
 };
 
 /** Resolves a route. A BYOK key is decrypted only when its route is resolved. */
@@ -217,6 +221,7 @@ async function directByokRoute(
     // Organization model and provider policies cover catalog ids. A bespoke id is only served by a
     // key outside catalog mode, which stays exempt as before.
     bypassAccessCheck: !servesCatalogId,
+    directByokPolicyTarget: getDirectByokPolicyTarget(directByok),
   };
 }
 
@@ -501,10 +506,10 @@ export type GetProviderInput = {
    * when it does not restrict providers. Provider keys sent through Vercel must honor it (see
    * `isVercelUserByokProviderAllowed`). */
   getAllowedProviders: () => Promise<ReadonlySet<string> | undefined>;
-  /** Whether the organization policy admits the model served by a catalog-mode direct BYOK key of
-   * the provider it names (see `getDirectByokPolicyProviderId` and
-   * `isModelAllowedForProviderKey`). Keys it rejects are skipped. */
-  isDirectByokProviderAllowed: (policyProviderId: string) => Promise<boolean>;
+  /** Whether the organization policy admits the model served by a catalog-mode direct BYOK key
+   * with this policy target (see `getDirectByokPolicyTarget` and `isModelAllowedForProviderKey`).
+   * Keys it rejects are skipped. */
+  isDirectByokProviderAllowed: (target: DirectByokPolicyTarget) => Promise<boolean>;
   /** Whether the organization model policy admits the model served by a catalog-mode endpoint, as
    * for provider keys the provider allow-list cannot name (see `allowsInferenceProviderUserByok`).
    * Endpoints it rejects are skipped. */

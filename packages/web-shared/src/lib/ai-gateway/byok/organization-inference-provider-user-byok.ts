@@ -23,9 +23,9 @@ export async function getAllowedDirectByokCatalogModelIds(
 ): Promise<ReadonlySet<string>> {
   return getDirectByokCatalogModelIds(
     { type: 'organization', id: organizationId },
-    async (catalogModelId, policyProviderId) =>
+    async (catalogModelId, target) =>
       !(await isCustomLlm(catalogModelId)) &&
-      (await isModelAllowedForProviderKey(policy, catalogModelId, policyProviderId))
+      (await isModelAllowedForProviderKey(policy, catalogModelId, target.providerSlug))
   );
 }
 

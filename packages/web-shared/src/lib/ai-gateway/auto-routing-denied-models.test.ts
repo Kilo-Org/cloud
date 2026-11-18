@@ -208,7 +208,9 @@ describe('deniedAutoRoutingCandidates with organization inference provider keys'
       .mockImplementation(async (_owner, isServingAllowed) => {
         const served = new Set<string>();
         for (const [modelId, providerId] of catalogServingProviders) {
-          if (await isServingAllowed?.(modelId, providerId)) served.add(modelId);
+          if (await isServingAllowed?.(modelId, { kind: 'provider', providerSlug: providerId })) {
+            served.add(modelId);
+          }
         }
         return served;
       });

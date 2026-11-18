@@ -20,7 +20,8 @@ import {
   findDirectByokCatalogModels,
   getDirectByokModel,
   getDirectByokModelChatApis,
-  getDirectByokPolicyProviderId,
+  getDirectByokPolicyTarget,
+  type DirectByokPolicyTarget,
   type DirectByokCatalogModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import type {
@@ -130,7 +131,7 @@ export type RoutePlanInputs = {
    * only when a key could serve the model.
    */
   loadKeys: (() => Promise<readonly ByokKeyState[]>) | null;
-  isDirectByokProviderAllowed: (policyProviderId: string) => Promise<boolean>;
+  isDirectByokProviderAllowed: (target: DirectByokPolicyTarget) => Promise<boolean>;
   isByokEndpointModelAllowed: () => Promise<boolean>;
   getAllowedProviders: () => Promise<ReadonlySet<string> | undefined>;
   getRoutingProviderConfig: () => Promise<OpenRouterProviderConfig | undefined>;
@@ -190,7 +191,7 @@ async function getAllowedDirectByokCatalogModels(
   const excludedProviderIds: string[] = [];
   for (const catalogModel of await findDirectByokCatalogModels(inputs.requestedModel)) {
     if (
-      await inputs.isDirectByokProviderAllowed(getDirectByokPolicyProviderId(catalogModel.provider))
+      await inputs.isDirectByokProviderAllowed(getDirectByokPolicyTarget(catalogModel.provider))
     ) {
       allowed.push(catalogModel);
     } else {

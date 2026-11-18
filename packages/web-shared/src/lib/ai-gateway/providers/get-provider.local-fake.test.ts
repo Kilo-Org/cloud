@@ -37,6 +37,7 @@ import {
   findDirectByokCatalogModels,
   getDirectByokCatalogModelId,
   getDirectByokModel,
+  type DirectByokPolicyTarget,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import {
   apiKeyUpstream,
@@ -998,7 +999,7 @@ describe('getProvider direct BYOK routing', () => {
       serveCatalogModels: true,
     });
     const isDirectByokProviderAllowed = jest.fn(
-      async (policyProviderId: string) => policyProviderId === 'z-ai'
+      async (target: DirectByokPolicyTarget) => target.providerSlug === 'z-ai'
     );
 
     const result = await getProvider(
@@ -1009,7 +1010,10 @@ describe('getProvider direct BYOK routing', () => {
       })
     );
 
-    expect(isDirectByokProviderAllowed.mock.calls).toEqual([['synthetic'], ['z-ai']]);
+    expect(isDirectByokProviderAllowed.mock.calls).toEqual([
+      [{ kind: 'provider', providerSlug: 'synthetic' }],
+      [{ kind: 'provider', providerSlug: 'z-ai' }],
+    ]);
     expect(getStoredByokKeys).toHaveBeenLastCalledWith(expect.anything(), {
       type: 'organization',
       id: ORG_ID,

@@ -4597,6 +4597,7 @@
       "title": "Trình kích hoạt và webhook",
       "subtitle": "Tự động hóa các lần chạy Cloud Agent từ một lệnh gọi webhook hoặc theo lịch.",
       "new": "Trình kích hoạt mới",
+      "create": "Tạo trình kích hoạt",
       "emptyTitle": "Chưa có trình kích hoạt nào",
       "emptyDescription": "Tạo trình kích hoạt để bắt đầu một lần chạy Cloud Agent từ lệnh gọi webhook hoặc theo lịch.",
       "loadFailedTitle": "Không thể tải trình kích hoạt",

@@ -4597,6 +4597,7 @@
       "title": "Ishga tushirgichlar va vebhooklar",
       "subtitle": "Cloud Agent ishga tushirishlarini vebhook chaqiruvi yoki jadval boʻyicha avtomatlashtiring.",
       "new": "Yangi ishga tushirgich",
+      "create": "Ishga tushirgich yarating",
       "emptyTitle": "Hozircha ishga tushirgichlar yoʻq",
       "emptyDescription": "Cloud Agent ishga tushirishini vebhook chaqiruvi yoki jadval boʻyicha boshlash uchun ishga tushirgich yarating.",
       "loadFailedTitle": "Ishga tushirgichlarni yuklab boʻlmadi",

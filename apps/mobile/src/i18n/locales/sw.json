@@ -4597,6 +4597,7 @@
       "title": "Vichocheo na ndoano za wavuti",
       "subtitle": "Endesha utekelezaji wa Cloud Agent kiotomatiki kutoka kwa mwito wa ndoano ya wavuti au kwa ratiba.",
       "new": "Kichocheo kipya",
+      "create": "Unda kichocheo",
       "emptyTitle": "Hakuna vichocheo bado",
       "emptyDescription": "Unda kichocheo ili kuanzisha utekelezaji wa Cloud Agent kutoka mwito wa ndoano ya wavuti au kwa ratiba.",
       "loadFailedTitle": "Imeshindwa kupakia vichocheo",

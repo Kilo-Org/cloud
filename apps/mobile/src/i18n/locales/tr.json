@@ -4597,6 +4597,7 @@
       "title": "Tetikleyiciler ve web kancaları",
       "subtitle": "Cloud Agent çalıştırmalarını web kancası çağrısıyla veya zamanlamayla otomatikleştirin.",
       "new": "Yeni tetikleyici",
+      "create": "Tetikleyici oluştur",
       "emptyTitle": "Henüz tetikleyici yok",
       "emptyDescription": "Bir web kancası çağrısıyla veya bir zamanlamayla Cloud Agent çalıştırması başlatmak için bir tetikleyici oluşturun.",
       "loadFailedTitle": "Tetikleyiciler yüklenemedi",

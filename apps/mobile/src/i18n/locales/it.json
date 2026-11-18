@@ -4667,6 +4667,7 @@
       "title": "Attivatori e webhook",
       "subtitle": "Automatizza le esecuzioni di Cloud Agent da una chiamata webhook o da una pianificazione.",
       "new": "Nuovo attivatore",
+      "create": "Crea attivatore",
       "emptyTitle": "Nessun attivatore per ora",
       "emptyDescription": "Crea un attivatore per avviare un'esecuzione di Cloud Agent da una chiamata webhook o in base a una pianificazione.",
       "loadFailedTitle": "Impossibile caricare gli attivatori",

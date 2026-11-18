@@ -4737,6 +4737,7 @@
       "title": "Wyzwalacze i webhooki",
       "subtitle": "Automatyzuj uruchomienia Cloud Agent przez wywołanie webhooka lub harmonogram.",
       "new": "Nowy wyzwalacz",
+      "create": "Utwórz wyzwalacz",
       "emptyTitle": "Brak wyzwalaczy",
       "emptyDescription": "Utwórz wyzwalacz, aby uruchomić Cloud Agent przez wywołanie webhooka lub według harmonogramu.",
       "loadFailedTitle": "Nie udało się wczytać wyzwalaczy",

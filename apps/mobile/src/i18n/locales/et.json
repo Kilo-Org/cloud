@@ -4597,6 +4597,7 @@
       "title": "Päästikud ja veebihaagid",
       "subtitle": "Automatiseeri Cloud Agent käivitused veebihaagi kutse või ajakava kaudu.",
       "new": "Uus päästik",
+      "create": "Loo päästik",
       "emptyTitle": "Päästikuid veel pole",
       "emptyDescription": "Loo päästik, et alustada Cloud Agent käivitust veebihaagi kutse või ajakava alusel.",
       "loadFailedTitle": "Päästikute laadimine ebaõnnestus",

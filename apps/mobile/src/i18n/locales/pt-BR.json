@@ -4673,6 +4673,7 @@
       "title": "Gatilhos e webhooks",
       "subtitle": "Automatize execuções do Cloud Agent a partir de uma chamada de webhook ou de um agendamento.",
       "new": "Novo gatilho",
+      "create": "Criar gatilho",
       "emptyTitle": "Ainda não há gatilhos",
       "emptyDescription": "Crie um gatilho para iniciar uma execução do Cloud Agent a partir de uma chamada de webhook ou em um agendamento.",
       "loadFailedTitle": "Não foi possível carregar os gatilhos",

@@ -4737,6 +4737,7 @@
       "title": "Spouštěče a webhooky",
       "subtitle": "Automatizujte spouštění Cloud Agent voláním webhooku nebo podle plánu.",
       "new": "Nový spouštěč",
+      "create": "Vytvořit spouštěč",
       "emptyTitle": "Zatím žádné spouštěče",
       "emptyDescription": "Vytvořte spouštěč pro spuštění Cloud Agent voláním webhooku nebo podle plánu.",
       "loadFailedTitle": "Spouštěče se nepodařilo načíst",

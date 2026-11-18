@@ -4597,6 +4597,7 @@
       "title": "Triggere og webhooker",
       "subtitle": "Automatiser Cloud Agent-kjøringer fra et webhook-kall eller en tidsplan.",
       "new": "Ny trigger",
+      "create": "Opprett trigger",
       "emptyTitle": "Ingen triggere ennå",
       "emptyDescription": "Opprett en trigger for å starte en Cloud Agent-kjøring fra et webhook-kall eller etter en tidsplan.",
       "loadFailedTitle": "Kunne ikke laste inn triggere",

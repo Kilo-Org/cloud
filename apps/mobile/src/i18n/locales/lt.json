@@ -4737,6 +4737,7 @@
       "title": "Trigeriai ir žiniatinklio kabliukai",
       "subtitle": "Automatizuokite Cloud Agent paleidimus pagal žiniatinklio kabliuko iškvietimą arba grafiką.",
       "new": "Naujas trigeris",
+      "create": "Sukurti trigerį",
       "emptyTitle": "Trigerių dar nėra",
       "emptyDescription": "Sukurkite trigerį, kad Cloud Agent būtų paleistas pagal žiniatinklio kabliuko iškvietimą arba pagal grafiką.",
       "loadFailedTitle": "Nepavyko įkelti trigerių",

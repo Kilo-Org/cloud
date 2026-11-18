@@ -4597,6 +4597,7 @@
       "title": "触发器和 Webhook",
       "subtitle": "通过 Webhook 调用或计划自动运行 Cloud Agent。",
       "new": "新建触发器",
+      "create": "创建触发器",
       "emptyTitle": "还没有触发器",
       "emptyDescription": "创建触发器，以便通过 Webhook 调用或按计划启动 Cloud Agent 运行。",
       "loadFailedTitle": "无法加载触发器",

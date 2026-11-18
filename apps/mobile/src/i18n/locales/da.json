@@ -4597,6 +4597,7 @@
       "title": "Udløsere og webhooks",
       "subtitle": "Automatiser Cloud Agent-kørsler fra et webhook-kald eller en tidsplan.",
       "new": "Ny udløser",
+      "create": "Opret udløser",
       "emptyTitle": "Ingen udløsere endnu",
       "emptyDescription": "Opret en udløser for at starte en Cloud Agent-kørsel fra et webhook-kald eller efter en tidsplan.",
       "loadFailedTitle": "Kunne ikke indlæse udløsere",

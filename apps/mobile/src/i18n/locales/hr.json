@@ -4667,6 +4667,7 @@
       "title": "Okidači i webhookovi",
       "subtitle": "Automatizirajte pokretanja Cloud Agent iz webhook poziva ili po rasporedu.",
       "new": "Novi okidač",
+      "create": "Stvorite okidač",
       "emptyTitle": "Još nema okidača",
       "emptyDescription": "Stvorite okidač za pokretanje Cloud Agent iz webhook poziva ili po rasporedu.",
       "loadFailedTitle": "Nije moguće učitati okidače",

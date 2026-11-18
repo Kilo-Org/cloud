@@ -4667,6 +4667,7 @@
       "title": "Déclencheurs et webhooks",
       "subtitle": "Automatisez les exécutions de Cloud Agent à partir d’un appel webhook ou d’une planification.",
       "new": "Nouveau déclencheur",
+      "create": "Créer un déclencheur",
       "emptyTitle": "Aucun déclencheur pour l’instant",
       "emptyDescription": "Créez un déclencheur pour lancer une exécution de Cloud Agent à partir d’un appel webhook ou selon une planification.",
       "loadFailedTitle": "Impossible de charger les déclencheurs",

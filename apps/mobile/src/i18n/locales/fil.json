@@ -4597,6 +4597,7 @@
       "title": "Mga pampapagana at webhook",
       "subtitle": "Gawing awtomatiko ang mga pagtakbo ng Cloud Agent mula sa tawag na webhook o iskedyul.",
       "new": "Bagong pampapagana",
+      "create": "Gumawa ng pampapagana",
       "emptyTitle": "Wala pang pampapagana",
       "emptyDescription": "Gumawa ng pampapagana para magsimula ng pagtakbo ng Cloud Agent mula sa tawag na webhook o sa isang iskedyul.",
       "loadFailedTitle": "Hindi makuha ang mga pampapagana",

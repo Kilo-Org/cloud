@@ -4597,6 +4597,7 @@
       "title": "Pemicu & webhook",
       "subtitle": "Otomatiskan eksekusi Cloud Agent dari panggilan webhook atau jadwal.",
       "new": "Pemicu baru",
+      "create": "Buat pemicu",
       "emptyTitle": "Belum ada pemicu",
       "emptyDescription": "Buat pemicu untuk memulai eksekusi Cloud Agent dari panggilan webhook atau sesuai jadwal.",
       "loadFailedTitle": "Tidak dapat memuat pemicu",

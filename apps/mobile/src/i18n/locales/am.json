@@ -4597,6 +4597,7 @@
       "title": "ቀስቅሴዎች እና ዌብሁኮች",
       "subtitle": "የCloud Agent ሩጫዎችን ከዌብሁክ ጥሪ ወይም ከመርሐ ግብር በራስ-ሰር ያድርጉ።",
       "new": "አዲስ ቀስቅሴ",
+      "create": "ቀስቅሴ ፍጠር",
       "emptyTitle": "እስካሁን ቀስቅሴዎች የሉም",
       "emptyDescription": "የCloud Agent ሩጫን ከዌብሁክ ጥሪ ወይም በመርሐ ግብር ለመጀመር ቀስቅሴ ይፍጠሩ።",
       "loadFailedTitle": "ቀስቅሴዎችን መጫን አልተቻለም",

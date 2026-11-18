@@ -4597,6 +4597,7 @@
       "title": "Liipaisimet ja verkkokoukut",
       "subtitle": "Automatisoi Cloud Agent -ajot verkkokoukun kutsusta tai aikataulusta.",
       "new": "Uusi liipaisin",
+      "create": "Luo liipaisin",
       "emptyTitle": "Ei liipaisimia vielä",
       "emptyDescription": "Luo liipaisin, joka käynnistää Cloud Agent -ajon verkkokoukun kutsusta tai aikataulusta.",
       "loadFailedTitle": "Liipaisimien lataus epäonnistui",

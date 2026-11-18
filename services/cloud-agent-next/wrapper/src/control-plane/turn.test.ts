@@ -9,6 +9,8 @@ import { DrainSessionError, type WrapperKiloClient } from '../kilo-api.js';
 import { DEFAULT_CONDENSE_TIMEOUT_MS } from '../condense-on-complete.js';
 import type { Harness } from './harness.js';
 import { createKiloHarness } from './kilo-harness.js';
+import { kilo2MessageSchema } from './kilo2-api.js';
+import { kilo2MessageActivity } from './kilo2-message-activity.js';
 import type { ControlDiagnosticFields } from '../../../src/shared/control-diagnostics.js';
 import type { KiloFeedEvent } from './kilo-event-feed.js';
 import { runtimeKey } from './prepare.js';
@@ -3871,6 +3873,45 @@ describe('GitHub review publication recovery', () => {
     expect(h.client(spec).prompts).toHaveLength(1);
     expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'completed' }]);
   });
+
+  it.each([
+    [{ type: 'provider.quota', message: 'Request failed', status: 402 }, 'insufficient_credits'],
+    [{ type: 'provider.quota', message: 'Request failed', status: 402.5 }, 'insufficient_credits'],
+    [{ type: 'provider.rate-limit', message: 'Request failed' }, 'rate_limited'],
+    [{ type: 'provider.future-error', message: 'Request failed' }, 'unknown'],
+  ] as const)(
+    'reports Kilo v2 assistant error %j as %s when the root closes completed',
+    async (error, assistantReason) => {
+      const h = createHarness();
+      const spec = reviewSpec();
+      h.registerRoute(spec);
+      h.manager.submit(SESSION_ID, promptPayload('m1'));
+      await settle();
+
+      const message = kilo2MessageActivity(
+        KILO_SESSION,
+        kilo2MessageSchema.parse({
+          id: 'msg_assistant',
+          type: 'assistant',
+          time: { created: 1, completed: 2 },
+          error,
+        })
+      );
+      if (!message) throw new Error('Expected assistant activity');
+      h.manager.observeActivity({
+        activity: { type: 'message', message },
+        nativeRuntimeId: 'rt',
+        runtimeKey: runtimeKey(spec),
+      });
+      h.manager.observeKiloEvent(completedKiloTurn());
+      await settle();
+
+      expect(outcomeFrames(h.frames)).toMatchObject([
+        { status: 'failed', assistantReason, lastMessageId: 'm1' },
+      ]);
+      expect(h.client(spec).prompts).toHaveLength(1);
+    }
+  );
 
   it('settles recovery only after native proof when its close precedes reconciliation', async () => {
     const h = createHarness();

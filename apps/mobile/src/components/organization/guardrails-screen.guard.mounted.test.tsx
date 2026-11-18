@@ -113,8 +113,8 @@ function payload(): OrgGuardrails {
       enabled: false,
       detectors: {
         pii: { enabled: false, action: 'block', entities: ['secrets'] },
-        toxicity: { enabled: false },
-        nsfw: { enabled: false },
+        toxicity: { enabled: false, action: 'block' },
+        nsfw: { enabled: false, action: 'block' },
         bias: { enabled: false, action: 'log' },
         keyword_detector: { enabled: false, action: 'block', banned_keywords: [] },
         topic_detector: { enabled: false, action: 'block', topic: [] },

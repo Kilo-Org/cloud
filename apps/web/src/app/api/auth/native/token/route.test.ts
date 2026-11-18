@@ -1473,6 +1473,14 @@ describe('POST /api/auth/native/token', () => {
       // Code must NOT be committed — ownership check happens before commit.
       expect(mockCommitSignInCode).not.toHaveBeenCalled();
       expect(mockReleaseSignInCode).toHaveBeenCalled();
+      // The ownership mismatch is an expected refusal: counted beside the
+      // per-event report, like the collision refusals.
+      now.mockReturnValue(6_181_000);
+      countAdmissionCondition('native_admission_missing');
+      expect(
+        aggregateLines().filter(line => line.metric === 'native_admission_refused')
+      ).toHaveLength(1);
+      mockReleaseSignInCode.mockClear();
     });
 
     // ── Fix 1: KeyCollisionError is not swallowed ─────────────────────
@@ -1507,6 +1515,14 @@ describe('POST /api/auth/native/token', () => {
       // Code must NOT be committed — attestation ownership is checked pre-commit.
       expect(mockCommitSignInCode).not.toHaveBeenCalled();
       expect(mockReleaseSignInCode).toHaveBeenCalled();
+      // The ownership mismatch is an expected refusal: counted beside the
+      // per-event report, like the collision refusals.
+      now.mockReturnValue(6_241_000);
+      countAdmissionCondition('native_admission_missing');
+      expect(
+        aggregateLines().filter(line => line.metric === 'native_admission_refused')
+      ).toHaveLength(1);
+      mockReleaseSignInCode.mockClear();
     });
 
     // ── Fix 3: KeyCollisionError during persistence does not burn the code ─

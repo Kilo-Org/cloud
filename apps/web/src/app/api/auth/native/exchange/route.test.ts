@@ -7,6 +7,12 @@ jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromSessionForCredentialIssuance: jest.fn(),
 }));
 jest.mock('@/lib/auth/device-sessions');
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  logExceptInTest: jest.fn(),
+  warnExceptInTest: jest.fn(),
+  errorExceptInTest: jest.fn(),
+  sentryLogger: jest.fn(() => jest.fn()),
+}));
 jest.mock('@/lib/auth/native-admission', () => ({
   ...jest.requireActual('@/lib/auth/native-admission'),
   requireAdmissionPayload: jest.fn(),
@@ -27,7 +33,10 @@ import {
   KeyCollisionError,
   requireAdmissionPayload,
   verifyAdmissionAsync,
+  countAdmissionCondition,
+  resetAdmissionCountersForTests,
 } from '@/lib/auth/native-admission';
+import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import type { User } from '@kilocode/db/schema';
 
 const mockGetUserFromBearer = jest.mocked(getUserFromBearerForCredentialExchange);
@@ -39,6 +48,20 @@ const mockRequireAdmissionPayload = jest.mocked(requireAdmissionPayload);
 const mockVerifyAdmissionAsync = jest.mocked(verifyAdmissionAsync);
 
 const fakeUser = { id: 'user-1', api_token_pepper: 'pepper' } as User;
+
+/** The aggregate telemetry line the counter writes once per closed window. */
+type AggregateLine = {
+  event: 'native_admission_aggregate';
+  metric: string;
+  count: number;
+};
+
+function aggregateLines(): AggregateLine[] {
+  return jest.mocked(warnExceptInTest).mock.calls.flatMap(([message]: unknown[]) => {
+    const parsed = JSON.parse(String(message)) as { event?: string };
+    return parsed.event === 'native_admission_aggregate' ? [parsed as AggregateLine] : [];
+  });
+}
 
 describe('POST /api/auth/native/exchange', () => {
   const createRequest = (headers: Record<string, string> = {}) =>
@@ -53,6 +76,7 @@ describe('POST /api/auth/native/exchange', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    resetAdmissionCountersForTests();
     mockCreateDeviceSessionWithAttestedKey.mockReset();
     mockRequireAdmissionPayload.mockReturnValue({
       platform: 'android',
@@ -228,6 +252,14 @@ describe('POST /api/auth/native/exchange', () => {
     expect(mockCreateDeviceSessionWithAttestedKey).not.toHaveBeenCalled();
     expect(mockCreateDeviceSession).not.toHaveBeenCalled();
     expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+    // The ownership mismatch is an expected refusal: it is counted.
+    jest.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    countAdmissionCondition('native_admission_missing');
+    jest.spyOn(Date, 'now').mockReturnValue(1_061_000);
+    countAdmissionCondition('native_admission_missing');
+    expect(
+      aggregateLines().filter(line => line.metric === 'native_admission_refused')
+    ).toHaveLength(1);
   });
 
   it('refuses when the key row collides with another account', async () => {

@@ -543,6 +543,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
         admissionVerification.existingKeyUserId !== result.user.id
       ) {
         captureMessage('native_attested_key_ownership_mismatch');
+        countAdmissionCondition('native_admission_refused');
         phase = 'release';
         return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
       }
@@ -701,6 +702,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
     admissionVerification.existingKeyUserId !== result.user.id
   ) {
     captureMessage('native_attested_key_ownership_mismatch');
+    countAdmissionCondition('native_admission_refused');
     return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
   }
 

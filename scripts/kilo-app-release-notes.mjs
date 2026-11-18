@@ -139,22 +139,34 @@ const BOT_NAME = 'github-actions[bot]';
 const BOT_EMAIL = '41898282+github-actions[bot]@users.noreply.github.com';
 const MAX_LAND_RETRIES = 3;
 
-// Where a version's notes are rewritten. The Kilo gateway serves the
-// OpenAI-compatible chat completions shape under `/api/gateway/v1`, at the base
-// URL the harness SDK's live runs use (`packages/harness-sdk/e2e/setup.ts`).
+// Where a version's notes are rewritten. The app serves the OpenAI-compatible
+// chat completions shape under `/api/openrouter`, the same route and body the
+// agent briefing calls (`apps/web/src/lib/agent-briefing/summary.ts`); both
+// prefixes rewrite to the AI gateway's `/api/v1/chat/completions`
+// (`apps/web/ai-gateway-rewrites.mjs`).
 //
 // The model is the gateway alias the app already ships as the agent briefing's
 // default (`DEFAULT_BRIEFING_MODEL` in
-// apps/web/src/lib/agent-briefing/store.ts:25), routed through the same chat
-// completions shape, so no model is introduced here that production does not
-// already serve.
+// apps/web/src/lib/agent-briefing/store.ts:25), so no model is introduced here
+// that production does not already serve.
 const NOTES_BASE_URL_DEFAULT = 'https://app.kilo.ai';
-const NOTES_PATH = '/api/gateway/v1/chat/completions';
+const NOTES_PATH = '/api/openrouter/chat/completions';
 const NOTES_MODEL = '~deepseek/deepseek-flash-latest';
 
+// The completion budget. The alias resolves to a DeepSeek Flash build that
+// reasons by default (`deepseek/deepseek-v4.1-flash-1017`: reasoning enabled at
+// high effort), and the reasoning tokens are charged to this same cap before
+// the answer starts. The briefing grants a reasoning model 16k
+// (`REASONING_MAX_OUTPUT_TOKENS` in
+// apps/web/src/lib/agent-briefing/summary.ts); a smaller cap is spent on
+// thinking, and the empty or half-written content is not JSON.
+const NOTES_MAX_TOKENS = 16_384;
+
 // Notes are never worth a delayed release: a call that does not answer within
-// this window is abandoned and the deterministic block is written instead.
-const NOTES_TIMEOUT_DEFAULT_MS = 20_000;
+// this window is abandoned and the deterministic block is written instead. The
+// model thinks before it answers, so the window covers a reasoning pass and the
+// answer, not one short generation.
+const NOTES_TIMEOUT_DEFAULT_MS = 60_000;
 
 // The caps a validated answer has to meet, the same shape the deterministic
 // composer and the bundled screen write and read.
@@ -445,7 +457,15 @@ function readAnswer(payload) {
   return { answer: { new: payload.new, changes: payload.changes, areas: payload.areas } };
 }
 
-/** The message content of a chat completion, or null when it carries none. */
+/**
+ * The first choice of a chat completion: its message content, and the details a
+ * failure diagnostic names. `null` when the body carries no first choice with a
+ * message at all.
+ *
+ * A reasoning model reports its thinking beside the answer, under `reasoning`,
+ * `reasoning_content` or `reasoning_details`; those are never the answer and are
+ * read only to say whether they were there.
+ */
 function readCompletion(payload) {
   if (payload === null || typeof payload !== 'object') {
     return null;
@@ -454,11 +474,38 @@ function readCompletion(payload) {
   if (!Array.isArray(choices) || choices.length === 0) {
     return null;
   }
-  const message = choices[0] && choices[0].message;
+  const choice = choices[0];
+  if (choice === null || typeof choice !== 'object') {
+    return null;
+  }
+  const message = choice.message;
   if (message === null || typeof message !== 'object') {
     return null;
   }
-  return typeof message.content === 'string' ? message.content : null;
+  return {
+    content: typeof message.content === 'string' ? message.content : null,
+    finishReason: typeof choice.finish_reason === 'string' ? choice.finish_reason : null,
+    reasoning:
+      typeof message.reasoning === 'string' ||
+      typeof message.reasoning_content === 'string' ||
+      (Array.isArray(message.reasoning_details) && message.reasoning_details.length > 0),
+  };
+}
+
+/**
+ * The model's answer as the reader gets it, for a failure log: the finish reason,
+ * how much content arrived, whether a reasoning field was beside it, and the first
+ * 120 characters of that content, JSON-quoted so line breaks cannot split the log
+ * line. Model output only.
+ */
+function answerDiagnostic(completion) {
+  const content = completion.content ?? '';
+  return [
+    `finish_reason ${completion.finishReason ?? 'absent'}`,
+    `${content.length} content characters`,
+    completion.reasoning ? 'a reasoning field present' : 'no reasoning field',
+    `content starts ${JSON.stringify(content.slice(0, 120))}`,
+  ].join(', ');
 }
 
 // A line that names code rather than an outcome: a code span, snake_case,
@@ -585,10 +632,56 @@ export function curatedBodyLines(notes) {
   return lines;
 }
 
-/** The JSON object in a model answer, with an optional markdown fence around it. */
-function parseAnswerJson(content) {
-  const fenced = /```(?:json)?\s*([\s\S]*?)```/.exec(content);
-  return JSON.parse((fenced ? fenced[1] : content).trim());
+/**
+ * Every JSON object in a model answer, in the order it wrote them. Scans for
+ * balanced `{...}` rather than accepting only a bare body or a fenced block: a
+ * reasoning model may put a sentence, a heading or a fence in front of the
+ * object it was asked for, and trailing prose must not hide it either. It may
+ * also echo the prompt's placeholder shape before its real answer, so the
+ * caller checks each object until one passes. Only top-level objects count: a
+ * scan resumes after an object that parsed, so an object nested inside an
+ * answer is never collected as a later answer.
+ */
+function parseAnswers(content) {
+  const answers = [];
+  let start = content.indexOf('{');
+  while (start !== -1) {
+    let next = start + 1;
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    for (let index = start; index < content.length; index += 1) {
+      const character = content[index];
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+        } else if (character === '\\') {
+          escaped = true;
+        } else if (character === '"') {
+          inString = false;
+        }
+        continue;
+      }
+      if (character === '"') {
+        inString = true;
+      } else if (character === '{') {
+        depth += 1;
+      } else if (character === '}') {
+        depth -= 1;
+        if (depth === 0) {
+          try {
+            answers.push(JSON.parse(content.slice(start, index + 1)));
+            next = index + 1;
+          } catch {
+            // Not JSON here; a later `{` may open the object instead.
+          }
+          break;
+        }
+      }
+    }
+    start = content.indexOf('{', next);
+  }
+  return answers;
 }
 
 /**
@@ -628,8 +721,10 @@ export async function requestCuratedNotes(candidates, options = {}) {
       },
       body: JSON.stringify({
         model: NOTES_MODEL,
-        temperature: 0,
-        max_tokens: 900,
+        // No temperature: the briefing's working call sends none, and a
+        // reasoning model's own sampling is not what fixes this answer's shape.
+        max_tokens: NOTES_MAX_TOKENS,
+        stream: false,
         messages: [
           { role: 'system', content: NOTES_PROMPT },
           { role: 'user', content: notesPrompt(candidates) },
@@ -652,21 +747,29 @@ export async function requestCuratedNotes(candidates, options = {}) {
   } catch {
     return { error: 'the notes model returned a body that is not JSON' };
   }
-  const content = readCompletion(payload);
-  if (content === null) {
+  const completion = readCompletion(payload);
+  if (completion === null || completion.content === null) {
     return { error: 'the notes model returned no message content' };
   }
-  let answer;
-  try {
-    answer = parseAnswerJson(content);
-  } catch {
-    return { error: 'the notes model returned invalid JSON' };
+  const answers = parseAnswers(completion.content);
+  if (answers.length === 0) {
+    return {
+      error: `the notes model returned invalid JSON (${answerDiagnostic(completion)})`,
+    };
   }
-  const validated = validateCuratedNotes(answer, candidates);
-  if (validated.error) {
-    return validated;
+  // The model may quote the prompt's placeholder object before it writes the
+  // real answer, so the first object that parses is not the answer to read: the
+  // first that passes is. When none passes, the last object's error is the one
+  // that describes the final answer the model wrote.
+  let invalid = null;
+  for (const answer of answers) {
+    const validated = validateCuratedNotes(answer, candidates);
+    if (!validated.error) {
+      return { lines: curatedBodyLines(validated.notes) };
+    }
+    invalid = validated;
   }
-  return { lines: curatedBodyLines(validated.notes) };
+  return invalid;
 }
 
 /**

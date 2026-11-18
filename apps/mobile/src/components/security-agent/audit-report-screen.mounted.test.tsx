@@ -284,6 +284,8 @@ describe('AuditReportScreen states', () => {
     expect(empty).toHaveLength(1);
     expect(empty[0]?.props.title).toBe('No recorded activity');
     expect(empty[0]?.props.placement).toBe('static');
+    // The owner line the centered state used to carry is the header's subtitle.
+    expect(findByType(root.root, 'ScreenHeader')[0]?.props.subtitle).toBe('Personal owner');
     expect(findByType(root.root, 'TabScreenScrollView')).toHaveLength(1);
   });
 
@@ -329,6 +331,8 @@ describe('AuditReportScreen states', () => {
     expect(findByType(root.root, 'CollapsibleSection')).toHaveLength(1);
     expect(findByType(root.root, 'EmptyState')).toHaveLength(0);
     expect(findByType(root.root, 'QueryError')).toHaveLength(0);
+    // A report with findings names its owner in its own first line.
+    expect(findByType(root.root, 'ScreenHeader')[0]?.props.subtitle).toBeUndefined();
   });
 });
 

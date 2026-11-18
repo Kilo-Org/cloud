@@ -171,7 +171,12 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
       />
     );
   } else {
-    const { summary, repositories, settings } = dashboard.data;
+    const { summary, repositories, settings, coverage } = dashboard.data;
+    // Tracked counts only captured results, so the amount the reader's review
+    // list shows but the dashboard does not count is every captured miss: the
+    // capture is missing, its result failed validation, or it was omitted.
+    const uncapturedReviews =
+      coverage.missing + coverage.invalid + coverage.omitted;
     body = !settings.enabled ? (
       // Analytics is enabled per platform, so a disabled one is a state, not an
       // empty dataset: the zero stat cards and the generic empty state would
@@ -214,6 +219,17 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
               value={number(summary.estimatedImpactPoints)}
             />
           </View>
+          <Text variant="muted" className="text-xs">
+            {t('codeReviewer.analytics.trackedReviewsCaption')}
+          </Text>
+          {uncapturedReviews > 0 ? (
+            <Text variant="muted" className="text-xs">
+              {t('codeReviewer.analytics.trackedReviewsUncounted', {
+                count: uncapturedReviews,
+                total: coverage.enrolledCompletedReviews,
+              })}
+            </Text>
+          ) : null}
         </View>
 
         {repositories.length === 0 ? (

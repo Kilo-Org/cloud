@@ -435,11 +435,8 @@ export function createAwsComputeLifecycle<
       if (ref === null && intent) {
         const raw = await deps.storage.get(intent.intentId);
         if (raw === undefined) return 'terminal';
-        try {
-          ref = codec.encodeRef(read(raw).ref);
-        } catch {
-          return 'retryable';
-        }
+        // An unreadable record is permanent. Report it as stop(ref) does, not as retryable.
+        ref = codec.encodeRef(read(raw).ref);
       }
       if (ref === null || !owned(ref)) return 'retryable';
       try {

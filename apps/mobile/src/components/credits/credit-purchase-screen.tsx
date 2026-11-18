@@ -198,13 +198,14 @@ export function CreditPurchaseScreen() {
   const packsEmpty = !isLoading && catalogEmpty;
   // The pack area holds at most one card at a time — the account read's
   // failure, the store's notice or the empty catalogue — and the priced rows
-  // render under it whenever the catalogue answered, also while the store is
-  // unavailable or timed out: the store's notice names that failure, and the
-  // rows stay on screen unpriced and disabled. The account read gates the
-  // catalogue, so its failure replaces the whole pack area.
+  // render only when no card stands in for them. The store's notice names why
+  // the packs cannot be bought, so the rows it would leave unpriced and
+  // disabled stay off the screen instead of repeating that failure. The
+  // account read gates the catalogue, so its failure replaces the whole pack
+  // area.
   const storeUnavailableAlone = storeUnavailable && !identityUnavailable;
   const showPlaceholders = isLoading && !identityUnavailable && !storeUnavailable;
-  const showRows = !isLoading && !identityUnavailable && !packsEmpty;
+  const showRows = !isLoading && !identityUnavailable && !packsEmpty && !storeUnavailable;
   // The store's credit-expiry policy belongs to the pack group, so the screen
   // states it once under the rows instead of repeating the same sentence under
   // every pack. A catalogue whose packs differ (one expiring, the rest not)
@@ -457,9 +458,10 @@ export function CreditPurchaseScreen() {
                   // truncated.
                   const storePrice = hasStorePrice ? pack.displayPrice : null;
                   // The row's subtitle holds one state phrase, in place of the
-                  // expiry note. The store-unavailable card above already names
-                  // the failure, so only the partly priced state, where the store
-                  // answered and left this pack out, needs the row to say it.
+                  // expiry note. The store-unavailable card replaces the rows,
+                  // so the only phrase a live row can carry is the partly
+                  // priced state, where the store answered and left this pack
+                  // out.
                   const rowWaiting = purchaseWait?.productId === pack.storeProductId;
                   let completingLabel: string | null = null;
                   if (rowWaiting) {
@@ -468,9 +470,7 @@ export function CreditPurchaseScreen() {
                     completingLabel = t('kiloPass.completingPurchase');
                   }
                   const statusLabel =
-                    !rowCompleting && !hasStorePrice && !storeUnavailable
-                      ? t('credits.priceUnavailable')
-                      : null;
+                    !rowCompleting && !hasStorePrice ? t('credits.priceUnavailable') : null;
                   // Exactly one state phrase shows: the purchase in flight, or the
                   // reason this row is inactive.
                   const stateLabel = completingLabel ?? statusLabel;

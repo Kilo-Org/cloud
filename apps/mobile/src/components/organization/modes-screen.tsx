@@ -89,6 +89,7 @@ export function OrganizationModesScreen() {
       <EmptyState
         icon={SlidersHorizontal}
         placement="top"
+        className="px-0"
         title={t('organization.modes.emptyTitle')}
         description={t('organization.modes.emptyDescription')}
         action={

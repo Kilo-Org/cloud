@@ -110,10 +110,9 @@ export function connectCardOffer(
       // The workspace is connected but cannot list: the step is a fresh
       // selection or credentials, so the reconnect sentence applies. Both notes
       // carry the one provider-neutral reconnect sentence the GitLab surfaces
-      // share, so the two providers cannot drift apart; neither note has a
-      // header to explain which connect step is left, and the compact row
-      // states the provider name above it, since that sentence's only subject
-      // is a pronoun.
+      // share, so the two providers cannot drift apart. The sentence names no
+      // provider, so the expanded card's reconnect title supplies the name and
+      // the headerless compact row states it itself above the note.
       return {
         offersAction: false,
         noteKey: 'prReview.connect.reconnectAdminOnlyDescription',

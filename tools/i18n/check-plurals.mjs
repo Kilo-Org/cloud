@@ -167,10 +167,6 @@ export const NO_AGREEMENT = new Map([
     'carried count, no inflected word: "Sign in to use this server"',
   ],
   ['profiles.counts.mcp', 'initialism, not agreement: "{{count}} MCP" names no inflected word'],
-  [
-    'codeReviewer.analytics.trackedReviewsUncounted',
-    'possessive read-out: "Not counted: N of M finished reviews without a captured result" ends in one sound',
-  ],
 ]);
 
 /**

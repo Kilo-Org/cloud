@@ -719,16 +719,11 @@ export function ScreenHeader({
       <View className="min-w-0 flex-1">{titleNode}</View>
     </View>
   );
-  // The heading is one block. With a back control every line of it starts on
-  // that control's column — 34dp of the 48dp target plus the row gap — from the
-  // block's own edge, not from the page. Its surface is the header's own
-  // background, so nothing changes on screen, and the page column is the block
-  // itself, which starts on the 14dp gutter: a header with no control paints
-  // nothing and keeps each of its lines measured against the page.
-  const headingBlockClassName = cn(
-    'min-w-0 flex-1 justify-center',
-    canGoBack && stackedTitleLines && 'bg-background'
-  );
+  // The heading is one block on the 14dp page gutter. Inside it every line
+  // starts on the title's column — 34dp of the 48dp target plus the row gap —
+  // which the `gutter` rule reads as the header's own column rather than a page
+  // column, so the block needs no surface of its own.
+  const headingBlockClassName = 'min-w-0 flex-1 justify-center';
   const titledHeading = (
     <View className={headingBlockClassName}>
       {eyebrowSlot ? (

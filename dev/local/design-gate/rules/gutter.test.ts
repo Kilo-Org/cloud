@@ -552,6 +552,196 @@ test('gutter: a pushed screen whose body column starts at 21 dp still fails', ()
 });
 
 /**
+ * A pushed screen's two-line header as the device measured it: the 48 dp back
+ * target is pulled into the gutter, and the eyebrow above, the title and the
+ * subtitle below all start on the title's column at 51.43 dp.
+ */
+function twoLineHeaderScreen(subtitleInset = 51.43, named = true): ProbeNode[] {
+  const column = 51.43;
+  const owner = (...names: string[]): Pick<ProbeNode, 'owners'> =>
+    named ? { owners: ['View', ...names] } : {};
+  return [
+    { parent: 0, tag: 'View', rect: [0, 0, WIDTH, 800] },
+    {
+      parent: 1,
+      tag: 'View',
+      rect: [0, 0, WIDTH, 140],
+      ...owner('ScreenHeader', 'View'),
+      style: {
+        backgroundColor: '#fbfaf5',
+        paddingBottom: 10.5,
+        paddingInline: 14,
+        paddingTop: 40,
+      },
+    },
+    {
+      parent: 2,
+      tag: 'View',
+      rect: [14, 40, WIDTH - 28, 74],
+      ...owner('View', 'ScreenHeader'),
+      style: { alignItems: 'center', flexDirection: 'row' },
+    },
+    // The heading block on the page gutter: an eyebrow row, the title row and a
+    // subtitle row, each carrying the back target's column as a spacer.
+    { parent: 3, tag: 'View', rect: [14, 40, WIDTH - 28, 74] },
+    { parent: 4, tag: 'View', rect: [14, 40, WIDTH - 28, 21], style: { flexDirection: 'row' } },
+    { parent: 5, tag: 'View', rect: [0, 40, 48, 0] },
+    { parent: 5, tag: 'View', rect: [column, 40, WIDTH - 14 - column, 21] },
+    {
+      parent: 7,
+      tag: 'Paragraph',
+      rect: [column, 42, WIDTH - 14 - column, 16],
+      text: 'Code reviewer',
+    },
+    {
+      parent: 4,
+      tag: 'View',
+      rect: [14, 61, WIDTH - 28, 32],
+      style: { alignItems: 'center', flexDirection: 'row' },
+    },
+    { parent: 9, tag: 'View', rect: [0, 61, 48, 48], style: { overflow: 'hidden' } },
+    {
+      parent: 10,
+      tag: 'View',
+      rect: [0, 61, 48, 48],
+      pressable: true,
+      role: 'button',
+      label: 'Go back',
+      style: { alignItems: 'center', justifyContent: 'center' },
+    },
+    { parent: 11, tag: 'Image', rect: [12.19, 73, 24, 24] },
+    { parent: 9, tag: 'View', rect: [column, 61, WIDTH - 14 - column, 24.76] },
+    {
+      parent: 13,
+      tag: 'Paragraph',
+      rect: [column, 61, WIDTH - 14 - column, 24.76],
+      text: 'Session',
+    },
+    { parent: 4, tag: 'View', rect: [14, 93, WIDTH - 28, 21], style: { flexDirection: 'row' } },
+    { parent: 15, tag: 'View', rect: [0, 93, 48, 0] },
+    { parent: 15, tag: 'View', rect: [subtitleInset, 93, WIDTH - 14 - subtitleInset, 21] },
+    {
+      parent: 17,
+      tag: 'Paragraph',
+      rect: [subtitleInset, 95, WIDTH - 14 - subtitleInset, 16],
+      text: 'Feb 3, 2026',
+    },
+    { parent: 1, tag: 'ScrollView', rect: [0, 140, WIDTH, 660], style: { overflow: 'scroll' } },
+    { parent: 19, tag: 'View', rect: [0, 140, WIDTH, 660], style: { paddingHorizontal: 14 } },
+    { parent: 20, tag: 'Paragraph', rect: [14, 152, 300, 16], text: 'Body line' },
+  ];
+}
+
+test('gutter: the eyebrow and subtitle of a pushed header follow the title column', () => {
+  assert.deepEqual(run(twoLineHeaderScreen()), []);
+  assert.deepEqual(run(mirrored(twoLineHeaderScreen()), { isRTL: true }), []);
+});
+
+test('gutter: a header line that starts off the title column still fails', () => {
+  const [finding, ...rest] = run(twoLineHeaderScreen(60));
+  assert.equal(rest.length, 0);
+  assert.equal(finding?.measured, 60);
+  assert.equal(finding?.element.text, 'Feb 3, 2026');
+  assert.equal(finding?.expected, '51.4 dp from the page edge');
+});
+
+test('gutter: only the header the title belongs to owns the column its lines follow', () => {
+  const [finding, ...rest] = run(twoLineHeaderScreen(51.43, false));
+  assert.equal(rest.length, 0);
+  assert.equal(finding?.measured, 51.43);
+  assert.equal(finding?.element.text, 'Code reviewer');
+});
+
+/**
+ * A header whose 48 dp back target sits on the gutter itself, the shape the
+ * app's modal screens measured: the title starts at 62.1 dp, between that target
+ * and the mirroring one after it.
+ */
+function gutterTargetHeaderScreen(): ProbeNode[] {
+  return [
+    { parent: 0, tag: 'View', rect: [0, 0, WIDTH, 800] },
+    {
+      parent: 1,
+      tag: 'View',
+      rect: [0, 0, WIDTH, 128],
+      owners: ['View', 'ScreenHeader', 'View'],
+      style: { backgroundColor: '#fbfaf5', paddingInline: 14, paddingTop: 26 },
+    },
+    {
+      parent: 2,
+      tag: 'View',
+      rect: [14, 26, WIDTH - 28, 48],
+      owners: ['View', 'View', 'ScreenHeader'],
+      style: { alignItems: 'center', flexDirection: 'row' },
+    },
+    { parent: 3, tag: 'View', rect: [14, 26, 48, 48], style: { overflow: 'hidden' } },
+    {
+      parent: 4,
+      tag: 'View',
+      rect: [14, 26, 48, 48],
+      pressable: true,
+      role: 'button',
+      label: 'Close',
+    },
+    { parent: 5, tag: 'Image', rect: [26, 38, 24, 24] },
+    { parent: 3, tag: 'View', rect: [62.1, 38, 275.9, 24.76] },
+    { parent: 7, tag: 'Paragraph', rect: [62.1, 38, 276.66, 24.76], text: 'Kilo Pass' },
+    { parent: 3, tag: 'View', rect: [338, 26, 48, 48] },
+    { parent: 1, tag: 'ScrollView', rect: [0, 128, WIDTH, 672], style: { overflow: 'scroll' } },
+    { parent: 9, tag: 'View', rect: [0, 128, WIDTH, 672], style: { paddingHorizontal: 14 } },
+    { parent: 10, tag: 'Paragraph', rect: [14, 140, 300, 16], text: 'Body line' },
+  ];
+}
+
+test('gutter: a title between two gutter-side targets is not the page column', () => {
+  assert.deepEqual(run(gutterTargetHeaderScreen()), []);
+});
+
+/**
+ * A tab root's header: no back control, so every line it paints is the page's
+ * to place. The title sits on the gutter and the subtitle is padded past it.
+ */
+function rootHeaderScreen(subtitleInset = 21): ProbeNode[] {
+  return [
+    { parent: 0, tag: 'View', rect: [0, 0, WIDTH, 800] },
+    {
+      parent: 1,
+      tag: 'View',
+      rect: [0, 0, WIDTH, 128],
+      owners: ['View', 'ScreenHeader', 'View'],
+      style: { backgroundColor: '#fbfaf5', paddingInline: 14, paddingTop: 40 },
+    },
+    {
+      parent: 2,
+      tag: 'View',
+      rect: [14, 40, WIDTH - 28, 68],
+      owners: ['View', 'View', 'ScreenHeader'],
+    },
+    { parent: 3, tag: 'View', rect: [14, 40, WIDTH - 28, 24.76] },
+    { parent: 4, tag: 'Paragraph', rect: [14, 40, 320, 24.76], text: 'Profile' },
+    {
+      parent: 3,
+      tag: 'View',
+      rect: [14, 68, WIDTH - 28, 21],
+      style: { paddingInline: subtitleInset - 14 },
+    },
+    { parent: 6, tag: 'Paragraph', rect: [subtitleInset, 70, 300, 16], text: 'Kestrel Studio' },
+    { parent: 1, tag: 'ScrollView', rect: [0, 128, WIDTH, 672], style: { overflow: 'scroll' } },
+    { parent: 8, tag: 'View', rect: [0, 128, WIDTH, 672], style: { paddingHorizontal: 14 } },
+    { parent: 9, tag: 'Paragraph', rect: [14, 140, 300, 16], text: 'Body line' },
+  ];
+}
+
+test('gutter: a root header has no title column and is measured against the page', () => {
+  assert.deepEqual(run(rootHeaderScreen(14)), []);
+  const [finding, ...rest] = run(rootHeaderScreen());
+  assert.equal(rest.length, 0);
+  assert.equal(finding?.measured, 21);
+  assert.equal(finding?.element.text, 'Kestrel Studio');
+  assert.equal(finding?.expected, '14 dp from the page edge');
+});
+
+/**
  * The empty state as the device measured it: a body that pads 21 dp and centres
  * a 205 dp stack, whose own text starts with the stack at 103.24 dp.
  */

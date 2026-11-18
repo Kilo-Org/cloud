@@ -17,6 +17,13 @@ const fmt = (value: number) => `${Math.round(value * 10) / 10} dp`;
 const ICON_TARGET_MAX_DP = 56;
 
 /**
+ * The component that renders a screen header. Its title, eyebrow and subtitle
+ * lines all sit inside it, and the probe's short owner chain names the header's
+ * outermost box rather than each line's own.
+ */
+const SCREEN_HEADER_OWNER = 'ScreenHeader';
+
+/**
  * React Navigation's bottom tab bar components, from the probe's owner stack.
  *
  * The bar is navigation chrome the screen does not place: each tab item
@@ -219,6 +226,66 @@ function followsGutterSibling(
 }
 
 /**
+ * Whether the node is the square a row leads with, on or before the gutter: the
+ * header's 48 dp back target. A pushed header pulls it into the gutter with
+ * `-ms-4`; a centred header keeps it on the gutter and centres the title
+ * between two such targets. Either way the box after it — the title, and the
+ * eyebrow and subtitle rows that cancel the same column — belongs to that
+ * target's column, not to the page's.
+ */
+function leadingFrame(node: LayoutNode, page: Page, touch: number): boolean {
+  const rect = layoutRect(node);
+  return (
+    startOffset(rect, page.box, page) <= SCREEN_GUTTER_DP + GUTTER_TOLERANCE_DP &&
+    rect[2] >= touch &&
+    rect[2] <= ICON_TARGET_MAX_DP &&
+    rect[3] >= touch &&
+    rect[3] <= ICON_TARGET_MAX_DP
+  );
+}
+
+/** The outermost box of the screen header a node's chain sits in. */
+function headerRoot(nodes: readonly LayoutNode[]): LayoutNode | undefined {
+  let header: LayoutNode | undefined = undefined;
+  for (const node of nodes) {
+    if ((node.probe.owners ?? []).includes(SCREEN_HEADER_OWNER)) header = node;
+  }
+  return header;
+}
+
+/**
+ * The columns the screen header places its own lines on: a row that leads with
+ * the 48 dp back target puts the box after it — the title — on that target's
+ * column, and the eyebrow above and subtitle below start on the same x because
+ * they carry the same pull as a spacer. Those lines are the header's block, not
+ * a page column. A header with no control has no such column, so every line it
+ * paints stays the page's to place. Undefined when the node is not in a header.
+ */
+function screenHeaderColumns(
+  nodes: readonly LayoutNode[],
+  page: Page,
+  touch: number
+): number[] | undefined {
+  const header = headerRoot(nodes);
+  if (!header) return undefined;
+  const columns: number[] = [];
+  const pending = [header];
+  for (let row = pending.pop(); row !== undefined; row = pending.pop()) {
+    const frame = row.children.findIndex(
+      child => !child.absolute && leadingFrame(child, page, touch)
+    );
+    const next =
+      frame < 0 ? undefined : row.children.slice(frame + 1).find(child => !child.absolute);
+    if (next) {
+      const offset = startOffset(layoutRect(next), page.box, page);
+      if (offset > SCREEN_GUTTER_DP + GUTTER_TOLERANCE_DP) columns.push(offset);
+    }
+    pending.push(...row.children);
+  }
+  return columns;
+}
+
+/**
  * Whether the box has a painted block between it and the page: a card the
  * screen placed on the gutter. Its own padding is an inner inset, which the
  * contract leaves to the block, so the gutter is not measured inside it. A
@@ -333,6 +400,38 @@ export function checkGutter(tree: LayoutTree): Finding[] {
     if (insidePaintedBlock(nodes, page)) continue;
     if (!alignedToContentStart(node, page)) continue;
     if (insideCenteredBlock(nodes, page)) continue;
+    // A screen header's lines share one x: the title's, after the back control,
+    // or the page gutter when the header has no control. They are that header's
+    // column, not the page's — a line anywhere else is the page's, off its
+    // column. A control's own label is placed by the control.
+    if (
+      offset > SCREEN_GUTTER_DP + GUTTER_TOLERANCE_DP &&
+      node.isText &&
+      !nodes.some(candidate => candidate.isControl)
+    ) {
+      const headerColumns = screenHeaderColumns(nodes, page, env.tapTarget.touch);
+      if (headerColumns) {
+        const column = headerColumns.reduce(
+          (best, candidate) =>
+            Math.abs(candidate - offset) < Math.abs(best - offset) ? candidate : best,
+          SCREEN_GUTTER_DP
+        );
+        if (Math.abs(column - offset) <= GUTTER_TOLERANCE_DP) continue;
+        findings.push(
+          finding({
+            rule: 'gutter',
+            severity: 'error',
+            element: node.ref,
+            related: node.parent ? [node.parent.ref] : [],
+            measured: offset,
+            expected: `${fmt(column)} from the page edge`,
+            unit: 'dp',
+            message: `${node.path} starts ${fmt(offset)} from the page edge; a screen header's eyebrow, title and subtitle all start on one column, at ${fmt(column)}.`,
+          })
+        );
+        continue;
+      }
+    }
     if (followsGutterSibling(node, page, nodes, env.tapTarget.touch)) continue;
 
     const scroller = nodes.find(candidate => candidate.scroll.y && !candidate.scroll.x);

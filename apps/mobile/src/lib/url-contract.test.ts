@@ -24,6 +24,7 @@ describe('assertUrlScheme', () => {
     { key: 'sessionIngestWsUrl', value: 'wss://session-ingest.kilo.ai' },
     { key: 'eventServiceUrl', value: 'https://events.kilo.ai' },
     { key: 'latencyIngestUrl', value: 'https://latency.kiloapps.io' },
+    { key: 'kiloMcpUrl', value: 'https://mcp.kiloapps.io' },
   ];
 
   it('accepts each URL key with its production scheme', () => {
@@ -167,10 +168,15 @@ function parseEnv(source: string): Record<string, string> {
 }
 
 const committedEnv = parseEnv(envSource);
-// Every URL key except the optional latency ingest endpoint is a required
-// ENV_KEYS entry committed in apps/mobile/.env.
+// Every URL key except the two optional ones is a required ENV_KEYS entry
+// committed in apps/mobile/.env. The optional latency ingest endpoint's
+// committed default is LATENCY_INGEST_URL_DEFAULT; the optional Kilo MCP
+// endpoint's committed default is KILO_MCP_URL_PRODUCTION in lib/config.ts
+// (mcp.kiloapps.io, inside PRODUCTION_HOSTS) — a non-production build without
+// an override leaves it undefined and the feature hides itself, so no .env
+// value is required for either.
 const requiredUrlKeys = (Object.keys(URL_SCHEMES) as (keyof typeof URL_SCHEMES)[]).filter(
-  key => key !== 'latencyIngestUrl'
+  key => key !== 'latencyIngestUrl' && key !== 'kiloMcpUrl'
 );
 
 describe('committed production URL defaults (host contract)', () => {
@@ -299,6 +305,26 @@ describe('URL key → environment variable resolution', () => {
     };
     for (const key of Object.keys(URL_SCHEMES)) {
       expect(urlEnvNames[key], `${key} must resolve to an env var name`).toBeTruthy();
+    }
+  });
+
+  // The reverse direction: a URL-valued env key must be registered in
+  // URL_SCHEMES (so the app.config.ts build loop and the config.ts runtime
+  // loop check it) or named in the explicit exemption list below. The test
+  // above iterates URL_SCHEMES and cannot see a URL key missing from it.
+  it('registers every URL-valued env key in the URL contract', () => {
+    const exempted = new Set<string>();
+    const urlEnvNames: Record<string, string | undefined> = {
+      ...ENV_KEYS,
+      ...OPTIONAL_ENV_KEYS,
+    };
+    for (const [key, envName] of Object.entries(urlEnvNames)) {
+      if (envName?.endsWith('_URL') === true) {
+        expect(
+          key in URL_SCHEMES || exempted.has(key),
+          `${key} (${envName}) is URL-valued but is missing from URL_SCHEMES; register it or add it to the exemption list`
+        ).toBe(true);
+      }
     }
   });
 

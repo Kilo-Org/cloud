@@ -18,6 +18,10 @@ export const URL_SCHEMES = {
   // Optional: client-observed latency ingest. The committed production default
   // is LATENCY_INGEST_URL_DEFAULT below; an explicit value overrides it.
   latencyIngestUrl: ['https:'],
+  // Optional: the Kilo MCP server the chat reaches with the signed-in
+  // session's own token (lib/chat/kilo-mcp.ts). An explicit value overrides
+  // the committed production default in lib/config.ts.
+  kiloMcpUrl: ['https:'],
 };
 
 /** Production host allowlist, seeded from the committed mobile production
@@ -37,6 +41,7 @@ export const PRODUCTION_HOSTS = [
   'events.kiloapps.io',
   'ingest.kilosessions.ai',
   'latency.kiloapps.io',
+  'mcp.kiloapps.io',
   'notifications.kiloapps.io',
 ];
 

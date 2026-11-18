@@ -157,6 +157,8 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 vi.mock('@/components/ui/icons', () => ({
   RotateCcw: 'RotateCcw',
+  ArrowLeft: 'ArrowLeft',
+  ArrowRight: 'ArrowRight',
   AlertCircle: 'AlertCircle',
   ChevronDown: 'ChevronDown',
   Clock: 'Clock',
@@ -801,7 +803,7 @@ describe('SessionDetailScreen display scope', () => {
         const buttonLabels = findByType(renderer.root, 'Button').flatMap(button =>
           findByType(button, 'Text').flatMap(node => node.children)
         );
-        expect(buttonLabels).toEqual(['Copy', 'Back to sessions']);
+        expect(buttonLabels).toEqual(['Back to sessions']);
       }
       expect(globalContext.organizationId).toBe('global-org');
       expect(globalContext.setOrganizationId).not.toHaveBeenCalled();

@@ -185,12 +185,10 @@ import { PartRenderer } from '@/components/agents/part-renderer';
 import { CondensedToolRunRow } from '@/components/agents/tool-run-rows';
 import { ToolRunSheetHost } from '@/components/agents/tool-run-sheet-host';
 import {
-  buildTerminalErrorCopyText,
   resolveSessionTerminalError,
   type SessionTerminalError,
   statusIndicatorDuplicatesMessageFailure,
 } from '@/components/agents/session-terminal-error';
-import { performCopy } from '@/components/agents/use-message-copy';
 import { QueryError } from '@/components/query-error';
 import { RenameModal } from '@/components/rename-modal';
 import { type ContextDisplayScope } from '@/components/context-control';
@@ -3396,12 +3394,6 @@ export function SessionDetailContent({
 
   function renderContent() {
     if (shownTerminalError) {
-      const copyText = buildTerminalErrorCopyText({
-        sessionId,
-        title: shownTerminalError.title,
-        message: shownTerminalError.message,
-        detail: shownTerminalError.detail,
-      });
       return (
         <CenteredState>
           <View className="items-center gap-3 px-4">
@@ -3421,40 +3413,27 @@ export function SessionDetailContent({
               isRetrying={terminalRetryPending}
             />
             {/* One primary action per surface (DESIGN.md): Back is the recovery
-                action, so it fills; Copy stays outlined as the utility. A
-                read-only transcript keeps its footer beside this card, and that
-                footer's Continue in a new session is the surface's filled
-                primary, so Back steps back to the outline there instead. Dark
-                takes the lifted olive `--selection` with its own label tone
-                instead of the glare of #ffdd00, so both themes give the control
-                the light mode's weight. */}
-            <View className="flex-row gap-3">
-              <Button
-                variant="outline"
-                size="action"
-                accessibilityLabel={t('agentChat.session.copyErrorDetails')}
-                onPress={() => {
-                  void performCopy(copyText);
-                }}
+                action, so it fills. A read-only transcript keeps its footer
+                beside this card, and that footer's Continue in a new session is
+                the surface's filled primary, so Back steps back to the outline
+                there instead. Dark takes the lifted olive `--selection` with its
+                own label tone instead of the glare of #ffdd00, so both themes
+                give the control the light mode's weight. */}
+            <Button
+              variant={isReadOnlyContinueVisible ? 'outline' : undefined}
+              size="action"
+              className={cn(!isReadOnlyContinueVisible && 'bg-primary dark:bg-selection')}
+              onPress={handleBackToSessions}
+            >
+              <Text
+                className={cn(
+                  !isReadOnlyContinueVisible &&
+                    'text-primary-foreground dark:text-selection-foreground'
+                )}
               >
-                <Text>{t('common.copy')}</Text>
-              </Button>
-              <Button
-                variant={isReadOnlyContinueVisible ? 'outline' : undefined}
-                size="action"
-                className={cn(!isReadOnlyContinueVisible && 'bg-primary dark:bg-selection')}
-                onPress={handleBackToSessions}
-              >
-                <Text
-                  className={cn(
-                    !isReadOnlyContinueVisible &&
-                      'text-primary-foreground dark:text-selection-foreground'
-                  )}
-                >
-                  {t('agentChat.session.backToSessions')}
-                </Text>
-              </Button>
-            </View>
+                {t('agentChat.session.backToSessions')}
+              </Text>
+            </Button>
           </View>
         </CenteredState>
       );

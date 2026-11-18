@@ -2,6 +2,7 @@ import 'server-only';
 
 import { openai_chatgpt_connections } from '@kilocode/db/schema';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
+import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
 import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import {
   OPENAI_CLIENT_ID,
@@ -169,23 +170,31 @@ async function readResponseBody(response: Response): Promise<unknown> {
   }
 }
 
+/**
+ * Field of an untyped JSON token response. Arrays are not bodies, so they read
+ * as missing: the current object checks also accepted arrays, but a token
+ * response is always a JSON object, so an array body reading as missing is
+ * behavior-preserving for every real response, and it matches the package's
+ * `isRecord` convention that arrays are not records.
+ */
+function readField(body: unknown, field: string): unknown {
+  return isRecord(body) ? body[field] : undefined;
+}
+
 function readStringField(source: unknown, field: string): string | undefined {
-  if (typeof source !== 'object' || source === null) return undefined;
-  const value = (source as Record<string, unknown>)[field];
+  const value = readField(source, field);
   return typeof value === 'string' && value !== '' ? value : undefined;
 }
 
 /** Extracts the OAuth `error` code, tolerating both the string and object forms. */
 function readOAuthErrorCode(body: unknown): string | undefined {
-  if (typeof body !== 'object' || body === null) return undefined;
-  const error = (body as Record<string, unknown>).error;
+  const error = readField(body, 'error');
   if (typeof error === 'string') return error;
   return readStringField(error, 'code');
 }
 
 function readExpiresIn(body: unknown): number | undefined {
-  if (typeof body !== 'object' || body === null) return undefined;
-  const value = (body as Record<string, unknown>).expires_in;
+  const value = readField(body, 'expires_in');
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
 }
 
@@ -196,8 +205,7 @@ function readExpiresIn(body: unknown): number | undefined {
  * rather than guessed.
  */
 function readEarliestRefreshAt(body: unknown): number | undefined {
-  if (typeof body !== 'object' || body === null) return undefined;
-  const value = (body as Record<string, unknown>).earliest_refresh_at;
+  const value = readField(body, 'earliest_refresh_at');
   if (typeof value === 'number' && Number.isFinite(value) && value > 0) return value;
   if (typeof value === 'string' && value.trim() !== '') {
     const parsed = Date.parse(value);

@@ -3,6 +3,7 @@ import type {
   ProviderType,
   TransformRequestContext,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { GatewayChatApiKindSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { dropThinkingBlocksOnPrefixMismatch } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/thinking-block-binding';
 
 export function defineGatewayProvider<
@@ -16,7 +17,7 @@ export function defineGatewayProvider<
     disableUrlSuffix: false,
     apiKey: definition.apiKey,
     apiKeyHeader: null,
-    supportedChatApis: ['chat_completions', 'messages', 'responses'],
+    supportedChatApis: GatewayChatApiKindSchema.options,
     responseTransforms: null,
     async transformRequest(context: TransformRequestContext) {
       dropThinkingBlocksOnPrefixMismatch(context);

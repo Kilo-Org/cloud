@@ -257,9 +257,12 @@ describe('FormField label-to-input gap', () => {
     return { root, wrapper };
   }
 
-  it('keeps the compact default on the block root between label and input', () => {
-    // An ordinary field's label row and input sit one small gap apart.
-    expect(String(mountField().root.props.className)).toContain('gap-1.5');
+  it('keeps the compact default on the label-to-input pair', () => {
+    // An ordinary field's label row and input sit one small gap apart: the
+    // wrapper's own default is the compact gap, same as the block root's.
+    const { root, wrapper } = mountField();
+    expect(String(wrapper.props.className)).toContain('gap-1.5');
+    expect(String(root.props.className)).toContain('gap-1.5');
   });
 
   it('puts the caller gap on the label-to-input pair only', () => {

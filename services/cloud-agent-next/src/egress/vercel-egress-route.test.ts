@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { HonoContext } from '../hono-context.js';
+import { logger } from '../logger.js';
 import { createControlPlaneCredential } from '../sandbox-control/managed-credential.js';
 import type { VercelAdmissionContext } from '../scm-broker/vercel-admission.js';
 import { createVercelJwksCache } from '../scm-broker/vercel-jwks.js';
@@ -338,6 +339,25 @@ describe('restricted Vercel egress route', () => {
     expect(response.status).toBe(502);
     expect(await response.text()).toBe('Egress audit unavailable');
     expect(h.upstream).not.toHaveBeenCalled();
+  });
+
+  it('logs an unexpected failure without the token and returns 503', async () => {
+    const h = harness();
+    h.admitEgressForward.mockRejectedValueOnce(new Error('synthetic control outage'));
+    const error = vi.fn();
+    const withFields = vi
+      .spyOn(logger, 'withFields')
+      .mockReturnValue(Object.assign(Object.create(logger), { error }));
+    const response = await h.send({ host: 'example.com' });
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ code: 'forwarding_unavailable' });
+    expect(withFields).toHaveBeenCalledExactlyOnceWith({
+      sandboxId: logicalId,
+      error: 'synthetic control outage',
+    });
+    expect(error).toHaveBeenCalledExactlyOnceWith('Sandbox egress forwarding failed');
+    expect(h.upstream).not.toHaveBeenCalled();
+    withFields.mockRestore();
   });
 
   it('writes no audit row for an allowlist without audit', async () => {

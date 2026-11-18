@@ -1,5 +1,6 @@
 import type { Hono } from 'hono';
 import type { HonoContext } from '../hono-context.js';
+import { logger } from '../logger.js';
 import { classifyScmAuthorization } from '../scm-broker/authorization.js';
 import { admitVercelScmForwardAtLocator } from '../scm-broker/vercel-admission.js';
 import {
@@ -146,7 +147,11 @@ export async function handleVercelEgressForward(
       admission.policy,
       deps.admitScm
     );
-  } catch {
+  } catch (error) {
+    // The message only: the request headers hold the token and the target path can hold a secret.
+    logger
+      .withFields({ sandboxId, error: error instanceof Error ? error.message : String(error) })
+      .error('Sandbox egress forwarding failed');
     return Response.json({ code: 'forwarding_unavailable' }, { status: 503 });
   }
 }

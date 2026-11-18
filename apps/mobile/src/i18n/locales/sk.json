@@ -3567,7 +3567,10 @@
         "fundsDistributed_one": "Rozdelených {{amount}} do {{count}} podriadených organizácií",
         "fundsDistributed_few": "Rozdelených {{amount}} do {{count}} podriadených organizácií",
         "fundsDistributed_many": "Rozdelených {{amount}} do {{count}} podriadených organizácií",
-        "fundsDistributed_other": "Rozdelených {{amount}} do {{count}} podriadených organizácií"
+        "fundsDistributed_other": "Rozdelených {{amount}} do {{count}} podriadených organizácií",
+        "modeCreated": "Vytvorený režim {{name}}",
+        "modeDeleted": "Odstránený režim {{name}}",
+        "organizationRenamed": "Premenovaná organizácia z {{oldName}} na {{newName}}"
       }
     },
     "billing": {

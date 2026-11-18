@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "An saita ƙungiyoyi {{count}} ga memban ƙungiya",
         "groupMemberGroupsSet_other": "An saita ƙungiyoyi {{count}} ga memban ƙungiya",
         "fundsDistributed_one": "An rarraba {{amount}} ga ƙananan ƙungiyoyi {{count}}",
-        "fundsDistributed_other": "An rarraba {{amount}} ga ƙananan ƙungiyoyi {{count}}"
+        "fundsDistributed_other": "An rarraba {{amount}} ga ƙananan ƙungiyoyi {{count}}",
+        "modeCreated": "An ƙirƙiri yanayi {{name}}",
+        "modeDeleted": "An goge yanayi {{name}}",
+        "organizationRenamed": "An canza sunan ƙungiya daga {{oldName}} zuwa {{newName}}"
       }
     },
     "billing": {

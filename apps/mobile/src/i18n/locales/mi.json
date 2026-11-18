@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "I tautuhia {{count}} rōpū mō te mema o te whakahaere",
         "groupMemberGroupsSet_other": "I tautuhia {{count}} rōpū mō te mema o te whakahaere",
         "fundsDistributed_one": "I tohatoha {{amount}} ki {{count}} whakahaere tamariki",
-        "fundsDistributed_other": "I tohatoha {{amount}} ki {{count}} whakahaere tamariki"
+        "fundsDistributed_other": "I tohatoha {{amount}} ki {{count}} whakahaere tamariki",
+        "modeCreated": "I waihangatia te aratau {{name}}",
+        "modeDeleted": "I mukua te aratau {{name}}",
+        "organizationRenamed": "I whakaingoatia anō te whakahaere mai i {{oldName}} ki {{newName}}"
       }
     },
     "billing": {

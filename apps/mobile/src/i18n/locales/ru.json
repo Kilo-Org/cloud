@@ -3559,7 +3559,10 @@
         "fundsDistributed_one": "Распределено {{amount}} среди {{count}} дочерних организаций",
         "fundsDistributed_few": "Распределено {{amount}} среди {{count}} дочерних организаций",
         "fundsDistributed_many": "Распределено {{amount}} среди {{count}} дочерних организаций",
-        "fundsDistributed_other": "Распределено {{amount}} среди {{count}} дочерних организаций"
+        "fundsDistributed_other": "Распределено {{amount}} среди {{count}} дочерних организаций",
+        "modeCreated": "Создан режим {{name}}",
+        "modeDeleted": "Удалён режим {{name}}",
+        "organizationRenamed": "Организация переименована с {{oldName}} на {{newName}}"
       }
     },
     "billing": {

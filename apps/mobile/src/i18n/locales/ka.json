@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "ორგანიზაციის წევრისთვის დაყენდა {{count}} ჯგუფი",
         "groupMemberGroupsSet_other": "ორგანიზაციის წევრისთვის დაყენდა {{count}} ჯგუფი",
         "fundsDistributed_one": "განაწილდა {{amount}} {{count}} შვილობილ ორგანიზაციაზე",
-        "fundsDistributed_other": "განაწილდა {{amount}} {{count}} შვილობილ ორგანიზაციაზე"
+        "fundsDistributed_other": "განაწილდა {{amount}} {{count}} შვილობილ ორგანიზაციაზე",
+        "modeCreated": "რეჟიმი {{name}} შეიქმნა",
+        "modeDeleted": "რეჟიმი {{name}} წაიშალა",
+        "organizationRenamed": "ორგანიზაციის სახელი შეიცვალა {{oldName}}-დან {{newName}}-ზე"
       }
     },
     "billing": {

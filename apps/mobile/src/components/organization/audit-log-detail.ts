@@ -417,13 +417,21 @@ export function auditLogDetailFor(t: TFunction, details: unknown): string | null
     case 'bitbucket_workspace_changed': {
       return t(BITBUCKET_WORKSPACE_KEYS[d.verb], { workspace: d.workspaceSlug });
     }
-    // mode_created / mode_deleted / organization_created / organization_renamed /
-    // sso_logged_in carry facts the row's event name and actor line already
-    // state, or (org names) copy the screen's own title, so no detail line.
-    case 'mode_created':
-    case 'mode_deleted':
+    case 'organization_renamed': {
+      return t('organization.auditLog.detail.organizationRenamed', {
+        oldName: d.oldName,
+        newName: d.newName,
+      });
+    }
+    case 'mode_created': {
+      return t('organization.auditLog.detail.modeCreated', { name: d.name });
+    }
+    case 'mode_deleted': {
+      return t('organization.auditLog.detail.modeDeleted', { name: d.name });
+    }
+    // organization_created's detail restates the event name, and sso_logged_in
+    // carries no facts beyond the actor columns, so neither row shows one.
     case 'organization_created':
-    case 'organization_renamed':
     case 'sso_logged_in': {
       return null;
     }

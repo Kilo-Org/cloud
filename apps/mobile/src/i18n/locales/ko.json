@@ -3433,7 +3433,10 @@
         "groupMembersSet_one": "그룹 {{name}}의 멤버 {{count}}명 설정됨",
         "keywordsCount_one": "키워드 {{count}}개",
         "rulesCount_one": "규칙 {{count}}개",
-        "topicsCount_one": "주제 {{count}}개"
+        "topicsCount_one": "주제 {{count}}개",
+        "modeCreated": "모드 {{name}} 생성됨",
+        "modeDeleted": "모드 {{name}} 삭제됨",
+        "organizationRenamed": "조직 이름이 {{oldName}}에서 {{newName}}(으)로 변경됨"
       }
     },
     "billing": {

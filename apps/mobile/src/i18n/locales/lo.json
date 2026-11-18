@@ -3441,7 +3441,10 @@
         "groupMembersSet_one": "ຕັ້ງສະມາຊິກ {{count}} ຄົນສຳລັບກຸ່ມ {{name}}",
         "keywordsCount_one": "ຄຳສຳຄັນ {{count}} ຄຳ",
         "rulesCount_one": "ກົດ {{count}} ກົດ",
-        "topicsCount_one": "ຫົວຂໍ້ {{count}} ຫົວຂໍ້"
+        "topicsCount_one": "ຫົວຂໍ້ {{count}} ຫົວຂໍ້",
+        "modeCreated": "ສ້າງໂໝດ {{name}} ແລ້ວ",
+        "modeDeleted": "ລຶບໂໝດ {{name}} ແລ້ວ",
+        "organizationRenamed": "ປ່ຽນຊື່ອົງກອນຈາກ {{oldName}} ເປັນ {{newName}}"
       }
     },
     "billing": {

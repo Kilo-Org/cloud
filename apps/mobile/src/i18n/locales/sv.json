@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "Angav {{count}} grupper för organisationsmedlem",
         "groupMemberGroupsSet_other": "Angav {{count}} grupper för organisationsmedlem",
         "fundsDistributed_one": "Distribuerade {{amount}} till {{count}} underorganisationer",
-        "fundsDistributed_other": "Distribuerade {{amount}} till {{count}} underorganisationer"
+        "fundsDistributed_other": "Distribuerade {{amount}} till {{count}} underorganisationer",
+        "modeCreated": "Skapade läget {{name}}",
+        "modeDeleted": "Tog bort läget {{name}}",
+        "organizationRenamed": "Bytte namn på organisationen från {{oldName}} till {{newName}}"
       }
     },
     "billing": {

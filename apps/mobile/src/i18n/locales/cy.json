@@ -3693,7 +3693,10 @@
         "fundsDistributed_two": "Dosbarthwyd {{amount}} i {{count}} o sefydliadau plant",
         "fundsDistributed_few": "Dosbarthwyd {{amount}} i {{count}} o sefydliadau plant",
         "fundsDistributed_many": "Dosbarthwyd {{amount}} i {{count}} o sefydliadau plant",
-        "fundsDistributed_other": "Dosbarthwyd {{amount}} i {{count}} o sefydliadau plant"
+        "fundsDistributed_other": "Dosbarthwyd {{amount}} i {{count}} o sefydliadau plant",
+        "modeCreated": "Wedi creu modd {{name}}",
+        "modeDeleted": "Wedi dileu modd {{name}}",
+        "organizationRenamed": "Wedi ailenwi sefydliad o {{oldName}} i {{newName}}"
       }
     },
     "billing": {

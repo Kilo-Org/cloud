@@ -3567,7 +3567,10 @@
         "fundsDistributed_one": "Размеркавана {{amount}} паміж {{count}} даччынымі арганізацыямі",
         "fundsDistributed_few": "Размеркавана {{amount}} паміж {{count}} даччынымі арганізацыямі",
         "fundsDistributed_many": "Размеркавана {{amount}} паміж {{count}} даччынымі арганізацыямі",
-        "fundsDistributed_other": "Размеркавана {{amount}} паміж {{count}} даччынымі арганізацыямі"
+        "fundsDistributed_other": "Размеркавана {{amount}} паміж {{count}} даччынымі арганізацыямі",
+        "modeCreated": "Створаны рэжым {{name}}",
+        "modeDeleted": "Выдалены рэжым {{name}}",
+        "organizationRenamed": "Арганізацыя перайменавана з {{oldName}} на {{newName}}"
       }
     },
     "billing": {

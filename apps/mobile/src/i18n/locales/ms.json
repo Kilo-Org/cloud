@@ -3441,7 +3441,10 @@
         "groupMembersSet_one": "{{count}} ahli ditetapkan untuk kumpulan {{name}}",
         "keywordsCount_one": "{{count}} kata kunci",
         "rulesCount_one": "{{count}} peraturan",
-        "topicsCount_one": "{{count}} topik"
+        "topicsCount_one": "{{count}} topik",
+        "modeCreated": "Mod dicipta {{name}}",
+        "modeDeleted": "Mod dipadam {{name}}",
+        "organizationRenamed": "Organisasi dinamakan semula daripada {{oldName}} kepada {{newName}}"
       }
     },
     "billing": {

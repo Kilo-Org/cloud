@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "Asetettu {{count}} ryhmää organisaation jäsenelle",
         "groupMemberGroupsSet_other": "Asetettu {{count}} ryhmää organisaation jäsenelle",
         "fundsDistributed_one": "Jaettu {{amount}} {{count}} aliorganisaatiolle",
-        "fundsDistributed_other": "Jaettu {{amount}} {{count}} aliorganisaatiolle"
+        "fundsDistributed_other": "Jaettu {{amount}} {{count}} aliorganisaatiolle",
+        "modeCreated": "Luotu tila {{name}}",
+        "modeDeleted": "Poistettu tila {{name}}",
+        "organizationRenamed": "Organisaatio uudelleennimetty: {{oldName}} → {{newName}}"
       }
     },
     "billing": {

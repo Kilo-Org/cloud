@@ -3510,7 +3510,10 @@
         "groupMemberGroupsSet_other": "Definidos {{count}} grupos para o membro da organização",
         "fundsDistributed_one": "Distribuído {{amount}} para {{count}} organizações filhas",
         "fundsDistributed_many": "Distribuído {{amount}} para {{count}} organizações filhas",
-        "fundsDistributed_other": "Distribuído {{amount}} para {{count}} organizações filhas"
+        "fundsDistributed_other": "Distribuído {{amount}} para {{count}} organizações filhas",
+        "modeCreated": "Modo criado {{name}}",
+        "modeDeleted": "Modo eliminado {{name}}",
+        "organizationRenamed": "Organização renomeada de {{oldName}} para {{newName}}"
       }
     },
     "billing": {

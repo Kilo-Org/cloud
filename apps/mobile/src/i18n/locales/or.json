@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "ସଂସ୍ଥା ସଦସ୍ୟ ପାଇଁ {{count}} ଗୋଷ୍ଠୀ ସେଟ୍ କରାଗଲା",
         "groupMemberGroupsSet_other": "ସଂସ୍ଥା ସଦସ୍ୟ ପାଇଁ {{count}} ଗୋଷ୍ଠୀ ସେଟ୍ କରାଗଲା",
         "fundsDistributed_one": "{{count}} ଚାଇଲ୍ଡ ସଂସ୍ଥାକୁ {{amount}} ବଣ୍ଟନ କରାଗଲା",
-        "fundsDistributed_other": "{{count}} ଚାଇଲ୍ଡ ସଂସ୍ଥାକୁ {{amount}} ବଣ୍ଟନ କରାଗଲା"
+        "fundsDistributed_other": "{{count}} ଚାଇଲ୍ଡ ସଂସ୍ଥାକୁ {{amount}} ବଣ୍ଟନ କରାଗଲା",
+        "modeCreated": "ମୋଡ୍ {{name}} ସୃଷ୍ଟି କରାଯାଇଛି",
+        "modeDeleted": "ମୋଡ୍ {{name}} ବିଲୋପ କରାଯାଇଛି",
+        "organizationRenamed": "ସଂସ୍ଥାର ନାମ {{oldName}} ରୁ {{newName}} କୁ ପରିବର୍ତ୍ତନ କରାଯାଇଛି"
       }
     },
     "billing": {

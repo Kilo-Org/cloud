@@ -3433,7 +3433,10 @@
         "groupMembersSet_one": "已为组 {{name}} 设置 {{count}} 个成员",
         "keywordsCount_one": "{{count}} 个关键词",
         "rulesCount_one": "{{count}} 条规则",
-        "topicsCount_one": "{{count}} 个主题"
+        "topicsCount_one": "{{count}} 个主题",
+        "modeCreated": "已创建模式 {{name}}",
+        "modeDeleted": "已删除模式 {{name}}",
+        "organizationRenamed": "已将组织名称从 {{oldName}} 更改为 {{newName}}"
       }
     },
     "billing": {

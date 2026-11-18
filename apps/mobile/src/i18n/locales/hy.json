@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "Կազմակերպության անդամի համար սահմանվել է {{count}} խումբ",
         "groupMemberGroupsSet_other": "Կազմակերպության անդամի համար սահմանվել է {{count}} խումբ",
         "fundsDistributed_one": "Բաշխվել է {{amount}} {{count}} դուստր կազմակերպությունների միջև",
-        "fundsDistributed_other": "Բաշխվել է {{amount}} {{count}} դուստր կազմակերպությունների միջև"
+        "fundsDistributed_other": "Բաշխվել է {{amount}} {{count}} դուստր կազմակերպությունների միջև",
+        "modeCreated": "Ստեղծվել է {{name}} ռեժիմը",
+        "modeDeleted": "Ջնջվել է {{name}} ռեժիմը",
+        "organizationRenamed": "Կազմակերպությունը վերանվանվել է {{oldName}}-ից {{newName}}"
       }
     },
     "billing": {

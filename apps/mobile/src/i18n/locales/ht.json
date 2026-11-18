@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "Mete {{count}} gwoup pou manm òganizasyon",
         "groupMemberGroupsSet_other": "Mete {{count}} gwoup pou manm òganizasyon",
         "fundsDistributed_one": "Distribiye {{amount}} bay {{count}} òganizasyon pitit",
-        "fundsDistributed_other": "Distribiye {{amount}} bay {{count}} òganizasyon pitit"
+        "fundsDistributed_other": "Distribiye {{amount}} bay {{count}} òganizasyon pitit",
+        "modeCreated": "Mòd kreye {{name}}",
+        "modeDeleted": "Mòd efase {{name}}",
+        "organizationRenamed": "Òganizasyon chanje non soti {{oldName}} pou {{newName}}"
       }
     },
     "billing": {

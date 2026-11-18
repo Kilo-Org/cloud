@@ -3441,7 +3441,10 @@
         "groupMembersSet_one": "Ti ṣeto àwọn ọmọ ẹgbẹ́ {{count}} fún ẹgbẹ́ {{name}}",
         "keywordsCount_one": "{{count}} àwọn kókó-ọ̀rọ̀",
         "rulesCount_one": "{{count}} àwọn òfin",
-        "topicsCount_one": "{{count}} àwọn àkòrí"
+        "topicsCount_one": "{{count}} àwọn àkòrí",
+        "modeCreated": "Ṣẹ̀dá ipo {{name}}",
+        "modeDeleted": "Paarẹ ipo {{name}}",
+        "organizationRenamed": "Yí orúkọ àjọ padà láti {{oldName}} sí {{newName}}"
       }
     },
     "billing": {

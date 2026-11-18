@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "{{count}} csoport beállítva a szervezeti tag számára",
         "groupMemberGroupsSet_other": "{{count}} csoport beállítva a szervezeti tag számára",
         "fundsDistributed_one": "{{amount}} elosztva {{count}} alszervezet között",
-        "fundsDistributed_other": "{{amount}} elosztva {{count}} alszervezet között"
+        "fundsDistributed_other": "{{amount}} elosztva {{count}} alszervezet között",
+        "modeCreated": "{{name}} mód létrehozva",
+        "modeDeleted": "{{name}} mód törölve",
+        "organizationRenamed": "Szervezet átnevezve: {{oldName}} → {{newName}}"
       }
     },
     "billing": {

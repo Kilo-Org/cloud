@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "Gareewwan {{count}} miseensa dhaabbataaf qindeeffame",
         "groupMemberGroupsSet_other": "Gareewwan {{count}} miseensa dhaabbataaf qindeeffame",
         "fundsDistributed_one": "Maallaqa {{amount}} dhaabbattoota ijoollee {{count}}f qoodame",
-        "fundsDistributed_other": "Maallaqa {{amount}} dhaabbattoota ijoollee {{count}}f qoodame"
+        "fundsDistributed_other": "Maallaqa {{amount}} dhaabbattoota ijoollee {{count}}f qoodame",
+        "modeCreated": "Haala uumame {{name}}",
+        "modeDeleted": "Haala haqame {{name}}",
+        "organizationRenamed": "Maqaan dhaabbataa {{oldName}} irraa gara {{newName}}tti jijjiirame"
       }
     },
     "billing": {

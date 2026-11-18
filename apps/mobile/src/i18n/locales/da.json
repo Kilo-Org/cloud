@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "Angav {{count}} grupper for organisationsmedlem",
         "groupMemberGroupsSet_other": "Angav {{count}} grupper for organisationsmedlem",
         "fundsDistributed_one": "Fordelte {{amount}} til {{count}} underordnede organisationer",
-        "fundsDistributed_other": "Fordelte {{amount}} til {{count}} underordnede organisationer"
+        "fundsDistributed_other": "Fordelte {{amount}} til {{count}} underordnede organisationer",
+        "modeCreated": "Oprettet tilstand {{name}}",
+        "modeDeleted": "Slettet tilstand {{name}}",
+        "organizationRenamed": "Omdøbt organisation fra {{oldName}} til {{newName}}"
       }
     },
     "billing": {

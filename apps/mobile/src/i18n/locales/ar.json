@@ -3685,7 +3685,10 @@
         "fundsDistributed_two": "تم توزيع {{amount}} على {{count}} مؤسسات تابعة",
         "fundsDistributed_few": "تم توزيع {{amount}} على {{count}} مؤسسات تابعة",
         "fundsDistributed_many": "تم توزيع {{amount}} على {{count}} مؤسسات تابعة",
-        "fundsDistributed_other": "تم توزيع {{amount}} على {{count}} مؤسسات تابعة"
+        "fundsDistributed_other": "تم توزيع {{amount}} على {{count}} مؤسسات تابعة",
+        "modeCreated": "تم إنشاء الوضع {{name}}",
+        "modeDeleted": "تم حذف الوضع {{name}}",
+        "organizationRenamed": "تمت إعادة تسمية المؤسسة من {{oldName}} إلى {{newName}}"
       }
     },
     "billing": {

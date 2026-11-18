@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "ഓർഗനൈസേഷൻ അംഗത്തിനായി {{count}} ഗ്രൂപ്പുകൾ സജ്ജമാക്കി",
         "groupMemberGroupsSet_other": "ഓർഗനൈസേഷൻ അംഗത്തിനായി {{count}} ഗ്രൂപ്പുകൾ സജ്ജമാക്കി",
         "fundsDistributed_one": "{{count}} ചൈൽഡ് ഓർഗനൈസേഷനുകൾക്ക് {{amount}} വിതരണം ചെയ്തു",
-        "fundsDistributed_other": "{{count}} ചൈൽഡ് ഓർഗനൈസേഷനുകൾക്ക് {{amount}} വിതരണം ചെയ്തു"
+        "fundsDistributed_other": "{{count}} ചൈൽഡ് ഓർഗനൈസേഷനുകൾക്ക് {{amount}} വിതരണം ചെയ്തു",
+        "modeCreated": "മോഡ് {{name}} സൃഷ്ടിച്ചു",
+        "modeDeleted": "മോഡ് {{name}} ഇല്ലാതാക്കി",
+        "organizationRenamed": "ഓർഗനൈസേഷന്റെ പേര് {{oldName}} എന്നതിൽ നിന്ന് {{newName}} എന്നാക്കി മാറ്റി"
       }
     },
     "billing": {

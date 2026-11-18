@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "Itinakda ang {{count}} grupo para sa miyembro ng organisasyon",
         "groupMemberGroupsSet_other": "Itinakda ang {{count}} grupo para sa miyembro ng organisasyon",
         "fundsDistributed_one": "Ipinamahagi ang {{amount}} sa {{count}} child na organisasyon",
-        "fundsDistributed_other": "Ipinamahagi ang {{amount}} sa {{count}} child na organisasyon"
+        "fundsDistributed_other": "Ipinamahagi ang {{amount}} sa {{count}} child na organisasyon",
+        "modeCreated": "Ginawa ang mode na {{name}}",
+        "modeDeleted": "Binura ang mode na {{name}}",
+        "organizationRenamed": "Pinalitan ang pangalan ng organisasyon mula sa {{oldName}} patungong {{newName}}"
       }
     },
     "billing": {

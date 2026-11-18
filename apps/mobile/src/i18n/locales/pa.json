@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "ਸੰਸਥਾ ਮੈਂਬਰ ਲਈ {{count}} ਸਮੂਹ ਸੈੱਟ ਕੀਤੇ",
         "groupMemberGroupsSet_other": "ਸੰਸਥਾ ਮੈਂਬਰ ਲਈ {{count}} ਸਮੂਹ ਸੈੱਟ ਕੀਤੇ",
         "fundsDistributed_one": "{{count}} ਚਾਈਲਡ ਸੰਸਥਾਵਾਂ ਨੂੰ {{amount}} ਵੰਡਿਆ",
-        "fundsDistributed_other": "{{count}} ਚਾਈਲਡ ਸੰਸਥਾਵਾਂ ਨੂੰ {{amount}} ਵੰਡਿਆ"
+        "fundsDistributed_other": "{{count}} ਚਾਈਲਡ ਸੰਸਥਾਵਾਂ ਨੂੰ {{amount}} ਵੰਡਿਆ",
+        "modeCreated": "ਮੋਡ ਬਣਾਇਆ ਗਿਆ {{name}}",
+        "modeDeleted": "ਮੋਡ ਮਿਟਾਇਆ ਗਿਆ {{name}}",
+        "organizationRenamed": "ਸੰਗਠਨ ਦਾ ਨਾਮ {{oldName}} ਤੋਂ {{newName}} ਕਰ ਦਿੱਤਾ ਗਿਆ"
       }
     },
     "billing": {

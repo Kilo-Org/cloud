@@ -3567,7 +3567,10 @@
         "fundsDistributed_one": "Razporejenih {{amount}} v {{count}} podrejenih organizacij",
         "fundsDistributed_two": "Razporejenih {{amount}} v {{count}} podrejenih organizacij",
         "fundsDistributed_few": "Razporejenih {{amount}} v {{count}} podrejenih organizacij",
-        "fundsDistributed_other": "Razporejenih {{amount}} v {{count}} podrejenih organizacij"
+        "fundsDistributed_other": "Razporejenih {{amount}} v {{count}} podrejenih organizacij",
+        "modeCreated": "Ustvarjen način {{name}}",
+        "modeDeleted": "Izbrisan način {{name}}",
+        "organizationRenamed": "Organizacija preimenovana iz {{oldName}} v {{newName}}"
       }
     },
     "billing": {

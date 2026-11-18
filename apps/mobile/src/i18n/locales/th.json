@@ -3441,7 +3441,10 @@
         "groupMembersSet_one": "ตั้งสมาชิก {{count}} คนสำหรับกลุ่ม {{name}}",
         "keywordsCount_one": "{{count}} คำค้น",
         "rulesCount_one": "{{count}} กฎ",
-        "topicsCount_one": "{{count}} หัวข้อ"
+        "topicsCount_one": "{{count}} หัวข้อ",
+        "modeCreated": "สร้างโหมด {{name}} แล้ว",
+        "modeDeleted": "ลบโหมด {{name}} แล้ว",
+        "organizationRenamed": "เปลี่ยนชื่อองค์กรจาก {{oldName}} เป็น {{newName}} แล้ว"
       }
     },
     "billing": {

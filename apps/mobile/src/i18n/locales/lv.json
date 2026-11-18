@@ -3504,7 +3504,10 @@
         "groupMemberGroupsSet_other": "Organizācijas dalībniekam iestatītas {{count}} grupas",
         "fundsDistributed_zero": "Sadalīti {{amount}} starp {{count}} meitasorganizācijām",
         "fundsDistributed_one": "Sadalīti {{amount}} starp {{count}} meitasorganizācijām",
-        "fundsDistributed_other": "Sadalīti {{amount}} starp {{count}} meitasorganizācijām"
+        "fundsDistributed_other": "Sadalīti {{amount}} starp {{count}} meitasorganizācijām",
+        "modeCreated": "Izveidots režīms {{name}}",
+        "modeDeleted": "Dzēsts režīms {{name}}",
+        "organizationRenamed": "Organizācija pārdēvēta no {{oldName}} uz {{newName}}"
       }
     },
     "billing": {

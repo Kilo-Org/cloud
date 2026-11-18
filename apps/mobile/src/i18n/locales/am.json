@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "ለድርጅት አባል {{count}} ቡድኖች ተቀናብረዋል",
         "groupMemberGroupsSet_other": "ለድርጅት አባል {{count}} ቡድኖች ተቀናብረዋል",
         "fundsDistributed_one": "{{amount}} ለ{{count}} ቅርንጫፍ ድርጅቶች ተከፋፍሏል",
-        "fundsDistributed_other": "{{amount}} ለ{{count}} ቅርንጫፍ ድርጅቶች ተከፋፍሏል"
+        "fundsDistributed_other": "{{amount}} ለ{{count}} ቅርንጫፍ ድርጅቶች ተከፋፍሏል",
+        "modeCreated": "ሁነታ {{name}} ተፈጥሯል",
+        "modeDeleted": "ሁነታ {{name}} ተሰርዟል",
+        "organizationRenamed": "ድርጅቱ ስሙ ከ{{oldName}} ወደ {{newName}} ተቀይሯል"
       }
     },
     "billing": {

@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "Kusethwe amaqembu angu-{{count}} elungwini lenhlangano",
         "groupMemberGroupsSet_other": "Kusethwe amaqembu angu-{{count}} elungwini lenhlangano",
         "fundsDistributed_one": "Kusatshalaliswe {{amount}} ezinhlanganweni ezingaphansi ezingu-{{count}}",
-        "fundsDistributed_other": "Kusatshalaliswe {{amount}} ezinhlanganweni ezingaphansi ezingu-{{count}}"
+        "fundsDistributed_other": "Kusatshalaliswe {{amount}} ezinhlanganweni ezingaphansi ezingu-{{count}}",
+        "modeCreated": "Imodi {{name}} idaliwe",
+        "modeDeleted": "Imodi {{name}} isusiwe",
+        "organizationRenamed": "Igama lenhlangano lishintshiwe lisuka ku-{{oldName}} laya ku-{{newName}}"
       }
     },
     "billing": {

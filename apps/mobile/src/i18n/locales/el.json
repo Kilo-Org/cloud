@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "Ορίστηκαν {{count}} ομάδες για μέλος οργανισμού",
         "groupMemberGroupsSet_other": "Ορίστηκαν {{count}} ομάδες για μέλος οργανισμού",
         "fundsDistributed_one": "Διανεμήθηκαν {{amount}} σε {{count}} θυγατρικούς οργανισμούς",
-        "fundsDistributed_other": "Διανεμήθηκαν {{amount}} σε {{count}} θυγατρικούς οργανισμούς"
+        "fundsDistributed_other": "Διανεμήθηκαν {{amount}} σε {{count}} θυγατρικούς οργανισμούς",
+        "modeCreated": "Δημιουργήθηκε λειτουργία {{name}}",
+        "modeDeleted": "Διαγράφηκε λειτουργία {{name}}",
+        "organizationRenamed": "Μετονομάστηκε ο οργανισμός από {{oldName}} σε {{newName}}"
       }
     },
     "billing": {

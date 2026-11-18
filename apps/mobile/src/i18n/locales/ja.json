@@ -3433,7 +3433,10 @@
         "groupMembersSet_one": "グループ {{name}} のメンバーを {{count}} 名に設定しました",
         "keywordsCount_one": "キーワード {{count}} 件",
         "rulesCount_one": "ルール {{count}} 件",
-        "topicsCount_one": "トピック {{count}} 件"
+        "topicsCount_one": "トピック {{count}} 件",
+        "modeCreated": "モード {{name}} を作成しました",
+        "modeDeleted": "モード {{name}} を削除しました",
+        "organizationRenamed": "組織名を {{oldName}} から {{newName}} に変更しました"
       }
     },
     "billing": {

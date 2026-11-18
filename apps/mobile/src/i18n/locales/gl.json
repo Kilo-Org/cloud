@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "Establecéronse {{count}} grupos para o membro da organización",
         "groupMemberGroupsSet_other": "Establecéronse {{count}} grupos para o membro da organización",
         "fundsDistributed_one": "Distribuíronse {{amount}} a {{count}} organizacións fillas",
-        "fundsDistributed_other": "Distribuíronse {{amount}} a {{count}} organizacións fillas"
+        "fundsDistributed_other": "Distribuíronse {{amount}} a {{count}} organizacións fillas",
+        "modeCreated": "Modo {{name}} creado",
+        "modeDeleted": "Modo {{name}} eliminado",
+        "organizationRenamed": "Organización renomeada de {{oldName}} a {{newName}}"
       }
     },
     "billing": {

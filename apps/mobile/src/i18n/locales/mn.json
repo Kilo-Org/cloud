@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "Байгууллагын гишүүнд {{count}} бүлэг томилов",
         "groupMemberGroupsSet_other": "Байгууллагын гишүүнд {{count}} бүлэг томилов",
         "fundsDistributed_one": "{{count}} охин байгууллагад {{amount}} хуваарилав",
-        "fundsDistributed_other": "{{count}} охин байгууллагад {{amount}} хуваарилав"
+        "fundsDistributed_other": "{{count}} охин байгууллагад {{amount}} хуваарилав",
+        "modeCreated": "{{name}} горимыг үүсгэлээ",
+        "modeDeleted": "{{name}} горимыг устгалаа",
+        "organizationRenamed": "Байгууллагын нэрийг {{oldName}}-аас {{newName}} болгон өөрчиллөө"
       }
     },
     "billing": {

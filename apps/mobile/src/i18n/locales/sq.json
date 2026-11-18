@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "Caktoi {{count}} grupe për anëtarin e organizatës",
         "groupMemberGroupsSet_other": "Caktoi {{count}} grupe për anëtarin e organizatës",
         "fundsDistributed_one": "Shpërndau {{amount}} te {{count}} organizata bija",
-        "fundsDistributed_other": "Shpërndau {{amount}} te {{count}} organizata bija"
+        "fundsDistributed_other": "Shpërndau {{amount}} te {{count}} organizata bija",
+        "modeCreated": "U krijua modaliteti {{name}}",
+        "modeDeleted": "U fshi modaliteti {{name}}",
+        "organizationRenamed": "Organizata u riemërtua nga {{oldName}} në {{newName}}"
       }
     },
     "billing": {

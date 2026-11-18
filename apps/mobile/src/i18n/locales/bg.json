@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "Зададени {{count}} групи за член на организацията",
         "groupMemberGroupsSet_other": "Зададени {{count}} групи за член на организацията",
         "fundsDistributed_one": "Разпределена сума {{amount}} към {{count}} дъщерни организации",
-        "fundsDistributed_other": "Разпределена сума {{amount}} към {{count}} дъщерни организации"
+        "fundsDistributed_other": "Разпределена сума {{amount}} към {{count}} дъщерни организации",
+        "modeCreated": "Създаден режим {{name}}",
+        "modeDeleted": "Изтрит режим {{name}}",
+        "organizationRenamed": "Преименувана организация от {{oldName}} на {{newName}}"
       }
     },
     "billing": {

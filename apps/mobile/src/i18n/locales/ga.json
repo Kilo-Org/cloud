@@ -3630,7 +3630,10 @@
         "fundsDistributed_two": "Dáileadh {{amount}} ar {{count}} fho-eagraíocht",
         "fundsDistributed_few": "Dáileadh {{amount}} ar {{count}} fho-eagraíocht",
         "fundsDistributed_many": "Dáileadh {{amount}} ar {{count}} fho-eagraíocht",
-        "fundsDistributed_other": "Dáileadh {{amount}} ar {{count}} fho-eagraíocht"
+        "fundsDistributed_other": "Dáileadh {{amount}} ar {{count}} fho-eagraíocht",
+        "modeCreated": "Cruthaíodh mód {{name}}",
+        "modeDeleted": "Scriosadh mód {{name}}",
+        "organizationRenamed": "Athainmníodh an eagraíocht ó {{oldName}} go {{newName}}"
       }
     },
     "billing": {

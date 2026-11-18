@@ -3433,7 +3433,10 @@
         "groupMemberGroupsSet_one": "संगठन सदस्य के लिए {{count}} समूह सेट किए",
         "groupMemberGroupsSet_other": "संगठन सदस्य के लिए {{count}} समूह सेट किए",
         "fundsDistributed_one": "{{count}} चाइल्ड संगठनों को {{amount}} वितरित किए",
-        "fundsDistributed_other": "{{count}} चाइल्ड संगठनों को {{amount}} वितरित किए"
+        "fundsDistributed_other": "{{count}} चाइल्ड संगठनों को {{amount}} वितरित किए",
+        "modeCreated": "मोड {{name}} बनाया गया",
+        "modeDeleted": "मोड {{name}} हटाया गया",
+        "organizationRenamed": "संगठन का नाम {{oldName}} से {{newName}} कर दिया गया"
       }
     },
     "billing": {

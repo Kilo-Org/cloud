@@ -3441,7 +3441,10 @@
         "groupMembersSet_one": "အဖွဲ့ {{name}} အတွက် အဖွဲ့ဝင် {{count}} ဦး သတ်မှတ်ခဲ့သည်",
         "keywordsCount_one": "သော့ချက်စကားလုံး {{count}} ခု",
         "rulesCount_one": "စည်းမျဉ်း {{count}} ခု",
-        "topicsCount_one": "အကြောင်းအရာ {{count}} ခု"
+        "topicsCount_one": "အကြောင်းအရာ {{count}} ခု",
+        "modeCreated": "မုဒ် {{name}} ကို ဖန်တီးပြီး",
+        "modeDeleted": "မုဒ် {{name}} ကို ဖျက်ပြီး",
+        "organizationRenamed": "အဖွဲ့အစည်းကို {{oldName}} မှ {{newName}} သို့ အမည်ပြောင်းပြီး"
       }
     },
     "billing": {

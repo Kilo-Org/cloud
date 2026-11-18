@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "Ұйым мүшесі үшін {{count}} топ орнатылды",
         "groupMemberGroupsSet_other": "Ұйым мүшесі үшін {{count}} топ орнатылды",
         "fundsDistributed_one": "{{count}} еншілес ұйымға {{amount}} бөлінді",
-        "fundsDistributed_other": "{{count}} еншілес ұйымға {{amount}} бөлінді"
+        "fundsDistributed_other": "{{count}} еншілес ұйымға {{amount}} бөлінді",
+        "modeCreated": "{{name}} режимі жасалды",
+        "modeDeleted": "{{name}} режимі жойылды",
+        "organizationRenamed": "Ұйымның атауы {{oldName}} → {{newName}} болып өзгертілді"
       }
     },
     "billing": {

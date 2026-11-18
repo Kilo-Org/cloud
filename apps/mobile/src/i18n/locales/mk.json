@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "Поставени {{count}} групи за член на организацијата",
         "groupMemberGroupsSet_other": "Поставени {{count}} групи за член на организацијата",
         "fundsDistributed_one": "Распределени {{amount}} на {{count}} подорганизации",
-        "fundsDistributed_other": "Распределени {{amount}} на {{count}} подорганизации"
+        "fundsDistributed_other": "Распределени {{amount}} на {{count}} подорганизации",
+        "modeCreated": "Создаден режим {{name}}",
+        "modeDeleted": "Избришан режим {{name}}",
+        "organizationRenamed": "Преименувана организација од {{oldName}} во {{newName}}"
       }
     },
     "billing": {

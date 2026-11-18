@@ -3496,7 +3496,10 @@
         "groupMemberGroupsSet_other": "הוגדרו {{count}} קבוצות עבור חבר ארגון",
         "fundsDistributed_one": "הופצו {{amount}} ל-{{count}} ארגוני בת",
         "fundsDistributed_two": "הופצו {{amount}} ל-{{count}} ארגוני בת",
-        "fundsDistributed_other": "הופצו {{amount}} ל-{{count}} ארגוני בת"
+        "fundsDistributed_other": "הופצו {{amount}} ל-{{count}} ארגוני בת",
+        "modeCreated": "נוצר מצב {{name}}",
+        "modeDeleted": "נמחק מצב {{name}}",
+        "organizationRenamed": "שם הארגון שונה מ-{{oldName}} ל-{{newName}}"
       }
     },
     "billing": {

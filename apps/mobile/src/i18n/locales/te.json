@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "సంస్థ సభ్యునికి {{count}} గ్రూపులు సెట్ చేయబడ్డాయి",
         "groupMemberGroupsSet_other": "సంస్థ సభ్యునికి {{count}} గ్రూపులు సెట్ చేయబడ్డాయి",
         "fundsDistributed_one": "{{count}} చైల్డ్ సంస్థలకు {{amount}} పంపిణీ చేయబడింది",
-        "fundsDistributed_other": "{{count}} చైల్డ్ సంస్థలకు {{amount}} పంపిణీ చేయబడింది"
+        "fundsDistributed_other": "{{count}} చైల్డ్ సంస్థలకు {{amount}} పంపిణీ చేయబడింది",
+        "modeCreated": "మోడ్ {{name}} సృష్టించబడింది",
+        "modeDeleted": "మోడ్ {{name}} తొలగించబడింది",
+        "organizationRenamed": "సంస్థ పేరు {{oldName}} నుండి {{newName}}కి మార్చబడింది"
       }
     },
     "billing": {

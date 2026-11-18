@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "د سازمان غړي لپاره {{count}} ګروپونه وټاکل شول",
         "groupMemberGroupsSet_other": "د سازمان غړي لپاره {{count}} ګروپونه وټاکل شول",
         "fundsDistributed_one": "{{amount}} د {{count}} فرعي سازمانونو ترمنځ ووېشل شو",
-        "fundsDistributed_other": "{{amount}} د {{count}} فرعي سازمانونو ترمنځ ووېشل شو"
+        "fundsDistributed_other": "{{amount}} د {{count}} فرعي سازمانونو ترمنځ ووېشل شو",
+        "modeCreated": "جوړ شو موډ {{name}}",
+        "modeDeleted": "ړنګ شو موډ {{name}}",
+        "organizationRenamed": "د سازمان نوم له {{oldName}} څخه {{newName}} ته بدل شو"
       }
     },
     "billing": {

@@ -3567,7 +3567,10 @@
         "fundsDistributed_one": "Rozděleno {{amount}} do {{count}} dceřiných organizací",
         "fundsDistributed_few": "Rozděleno {{amount}} do {{count}} dceřiných organizací",
         "fundsDistributed_many": "Rozděleno {{amount}} do {{count}} dceřiných organizací",
-        "fundsDistributed_other": "Rozděleno {{amount}} do {{count}} dceřiných organizací"
+        "fundsDistributed_other": "Rozděleno {{amount}} do {{count}} dceřiných organizací",
+        "modeCreated": "Vytvořen režim {{name}}",
+        "modeDeleted": "Smazán režim {{name}}",
+        "organizationRenamed": "Organizace přejmenována z {{oldName}} na {{newName}}"
       }
     },
     "billing": {

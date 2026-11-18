@@ -3504,7 +3504,10 @@
         "groupMemberGroupsSet_other": "Setate {{count}} grupuri pentru membrul organizației",
         "fundsDistributed_one": "Distribuit {{amount}} către {{count}} organizații copil",
         "fundsDistributed_few": "Distribuit {{amount}} către {{count}} organizații copil",
-        "fundsDistributed_other": "Distribuit {{amount}} către {{count}} organizații copil"
+        "fundsDistributed_other": "Distribuit {{amount}} către {{count}} organizații copil",
+        "modeCreated": "Mod creat {{name}}",
+        "modeDeleted": "Mod șters {{name}}",
+        "organizationRenamed": "Redenumit organizația din {{oldName}} în {{newName}}"
       }
     },
     "billing": {

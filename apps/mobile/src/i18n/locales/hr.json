@@ -3504,7 +3504,10 @@
         "groupMemberGroupsSet_other": "Postavljeno {{count}} grupa za člana organizacije",
         "fundsDistributed_one": "Raspodijeljeno {{amount}} na {{count}} podređenih organizacija",
         "fundsDistributed_few": "Raspodijeljeno {{amount}} na {{count}} podređenih organizacija",
-        "fundsDistributed_other": "Raspodijeljeno {{amount}} na {{count}} podređenih organizacija"
+        "fundsDistributed_other": "Raspodijeljeno {{amount}} na {{count}} podređenih organizacija",
+        "modeCreated": "Stvoren način {{name}}",
+        "modeDeleted": "Izbrisan način {{name}}",
+        "organizationRenamed": "Organizacija preimenovana iz {{oldName}} u {{newName}}"
       }
     },
     "billing": {

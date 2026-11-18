@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "Stillti {{count}} hópum fyrir meðlim stofnunar",
         "groupMemberGroupsSet_other": "Stillti {{count}} hópum fyrir meðlim stofnunar",
         "fundsDistributed_one": "Úthlutaði {{amount}} til {{count}} dótturstofnana",
-        "fundsDistributed_other": "Úthlutaði {{amount}} til {{count}} dótturstofnana"
+        "fundsDistributed_other": "Úthlutaði {{amount}} til {{count}} dótturstofnana",
+        "modeCreated": "Stofnaði ham {{name}}",
+        "modeDeleted": "Eyddi ham {{name}}",
+        "organizationRenamed": "Endurnefndi stofnun úr {{oldName}} í {{newName}}"
       }
     },
     "billing": {

@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "ಸಂಸ್ಥೆ ಸದಸ್ಯರಿಗೆ {{count}} ಗುಂಪುಗಳನ್ನು ಹೊಂದಿಸಲಾಗಿದೆ",
         "groupMemberGroupsSet_other": "ಸಂಸ್ಥೆ ಸದಸ್ಯರಿಗೆ {{count}} ಗುಂಪುಗಳನ್ನು ಹೊಂದಿಸಲಾಗಿದೆ",
         "fundsDistributed_one": "{{count}} ಅಂಗಸಂಸ್ಥೆಗಳಿಗೆ {{amount}} ವಿತರಿಸಲಾಗಿದೆ",
-        "fundsDistributed_other": "{{count}} ಅಂಗಸಂಸ್ಥೆಗಳಿಗೆ {{amount}} ವಿತರಿಸಲಾಗಿದೆ"
+        "fundsDistributed_other": "{{count}} ಅಂಗಸಂಸ್ಥೆಗಳಿಗೆ {{amount}} ವಿತರಿಸಲಾಗಿದೆ",
+        "modeCreated": "ಮೋಡ್ {{name}} ರಚಿಸಲಾಗಿದೆ",
+        "modeDeleted": "ಮೋಡ್ {{name}} ಅಳಿಸಲಾಗಿದೆ",
+        "organizationRenamed": "ಸಂಸ್ಥೆಯ ಹೆಸರನ್ನು {{oldName}} ನಿಂದ {{newName}} ಗೆ ಬದಲಾಯಿಸಲಾಗಿದೆ"
       }
     },
     "billing": {

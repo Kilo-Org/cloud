@@ -3441,7 +3441,10 @@
         "groupMembersSet_one": "Edobere ndị otu {{count}} maka otu {{name}}",
         "keywordsCount_one": "{{count}} okwu isi",
         "rulesCount_one": "{{count}} iwu",
-        "topicsCount_one": "{{count}} isiokwu"
+        "topicsCount_one": "{{count}} isiokwu",
+        "modeCreated": "Emepụtara ụdị {{name}}",
+        "modeDeleted": "Ehichapụrụ ụdị {{name}}",
+        "organizationRenamed": "Agbanweela aha òtù site na {{oldName}} gaa na {{newName}}"
       }
     },
     "billing": {

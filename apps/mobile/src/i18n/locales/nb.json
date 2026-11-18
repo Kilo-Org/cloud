@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "Anga {{count}} grupper for organisasjonsmedlem",
         "groupMemberGroupsSet_other": "Anga {{count}} grupper for organisasjonsmedlem",
         "fundsDistributed_one": "Distribuerte {{amount}} til {{count}} underorganisasjoner",
-        "fundsDistributed_other": "Distribuerte {{amount}} til {{count}} underorganisasjoner"
+        "fundsDistributed_other": "Distribuerte {{amount}} til {{count}} underorganisasjoner",
+        "modeCreated": "Opprettet modus {{name}}",
+        "modeDeleted": "Slettet modus {{name}}",
+        "organizationRenamed": "Endret navn på organisasjon fra {{oldName}} til {{newName}}"
       }
     },
     "billing": {

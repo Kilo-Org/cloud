@@ -3433,7 +3433,10 @@
         "groupMemberGroupsSet_one": "Kuruluş üyesi için {{count}} grup ayarlandı",
         "groupMemberGroupsSet_other": "Kuruluş üyesi için {{count}} grup ayarlandı",
         "fundsDistributed_one": "{{count}} alt kuruluşa {{amount}} dağıtıldı",
-        "fundsDistributed_other": "{{count}} alt kuruluşa {{amount}} dağıtıldı"
+        "fundsDistributed_other": "{{count}} alt kuruluşa {{amount}} dağıtıldı",
+        "modeCreated": "{{name}} modu oluşturuldu",
+        "modeDeleted": "{{name}} modu silindi",
+        "organizationRenamed": "Kuruluş adı {{oldName}} iken {{newName}} olarak değiştirildi"
       }
     },
     "billing": {

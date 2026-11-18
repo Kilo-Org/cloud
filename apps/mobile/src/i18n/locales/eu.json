@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "Erakundeko kiderako {{count}} talde ezarri dira",
         "groupMemberGroupsSet_other": "Erakundeko kiderako {{count}} talde ezarri dira",
         "fundsDistributed_one": "{{amount}} {{count}} erakunde mendekoren artean banatu da",
-        "fundsDistributed_other": "{{amount}} {{count}} erakunde mendekoren artean banatu da"
+        "fundsDistributed_other": "{{amount}} {{count}} erakunde mendekoren artean banatu da",
+        "modeCreated": "{{name}} modua sortuta",
+        "modeDeleted": "{{name}} modua ezabatuta",
+        "organizationRenamed": "Erakundea {{oldName}}-tik {{newName}}-ra berrizendatuta"
       }
     },
     "billing": {

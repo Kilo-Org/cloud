@@ -3433,7 +3433,10 @@
         "groupMembersSet_one": "已為群組 {{name}} 設定 {{count}} 位成員",
         "keywordsCount_one": "{{count}} 個關鍵字",
         "rulesCount_one": "{{count}} 條規則",
-        "topicsCount_one": "{{count}} 個主題"
+        "topicsCount_one": "{{count}} 個主題",
+        "modeCreated": "已建立模式 {{name}}",
+        "modeDeleted": "已刪除模式 {{name}}",
+        "organizationRenamed": "已將組織名稱從 {{oldName}} 重新命名為 {{newName}}"
       }
     },
     "billing": {

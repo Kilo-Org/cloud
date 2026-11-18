@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "நிறுவன உறுப்பினருக்கு {{count}} குழுக்கள் அமைக்கப்பட்டன",
         "groupMemberGroupsSet_other": "நிறுவன உறுப்பினருக்கு {{count}} குழுக்கள் அமைக்கப்பட்டன",
         "fundsDistributed_one": "{{count}} துணை நிறுவனங்களுக்கு {{amount}} வழங்கப்பட்டது",
-        "fundsDistributed_other": "{{count}} துணை நிறுவனங்களுக்கு {{amount}} வழங்கப்பட்டது"
+        "fundsDistributed_other": "{{count}} துணை நிறுவனங்களுக்கு {{amount}} வழங்கப்பட்டது",
+        "modeCreated": "பயன்முறை {{name}} உருவாக்கப்பட்டது",
+        "modeDeleted": "பயன்முறை {{name}} நீக்கப்பட்டது",
+        "organizationRenamed": "நிறுவனம் {{oldName}} இலிருந்து {{newName}} ஆக மறுபெயரிடப்பட்டது"
       }
     },
     "billing": {

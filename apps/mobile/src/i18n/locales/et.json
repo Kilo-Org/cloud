@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "Määrati organisatsiooni liikmele {{count}} gruppi",
         "groupMemberGroupsSet_other": "Määrati organisatsiooni liikmele {{count}} gruppi",
         "fundsDistributed_one": "Jaotati {{amount}} {{count}} tütarorganisatsioonile",
-        "fundsDistributed_other": "Jaotati {{amount}} {{count}} tütarorganisatsioonile"
+        "fundsDistributed_other": "Jaotati {{amount}} {{count}} tütarorganisatsioonile",
+        "modeCreated": "Loodi režiim {{name}}",
+        "modeDeleted": "Kustutati režiim {{name}}",
+        "organizationRenamed": "Organisatsioon nimetati ümber: {{oldName}}-st {{newName}}-ks"
       }
     },
     "billing": {

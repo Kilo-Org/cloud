@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "{{count}} groepe vir organisasielid gestel",
         "groupMemberGroupsSet_other": "{{count}} groepe vir organisasielid gestel",
         "fundsDistributed_one": "{{amount}} aan {{count}} dogterorganisasies verdeel",
-        "fundsDistributed_other": "{{amount}} aan {{count}} dogterorganisasies verdeel"
+        "fundsDistributed_other": "{{amount}} aan {{count}} dogterorganisasies verdeel",
+        "modeCreated": "Modus {{name}} geskep",
+        "modeDeleted": "Modus {{name}} verwyder",
+        "organizationRenamed": "Organisasie hernoem van {{oldName}} na {{newName}}"
       }
     },
     "billing": {

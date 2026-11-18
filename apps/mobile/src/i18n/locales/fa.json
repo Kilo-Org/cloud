@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "{{count}} گروه برای عضو سازمان تنظیم شد",
         "groupMemberGroupsSet_other": "{{count}} گروه برای عضو سازمان تنظیم شد",
         "fundsDistributed_one": "{{amount}} به {{count}} سازمان زیرمجموعه توزیع شد",
-        "fundsDistributed_other": "{{amount}} به {{count}} سازمان زیرمجموعه توزیع شد"
+        "fundsDistributed_other": "{{amount}} به {{count}} سازمان زیرمجموعه توزیع شد",
+        "modeCreated": "حالت ساخته شد {{name}}",
+        "modeDeleted": "حالت حذف شد {{name}}",
+        "organizationRenamed": "نام سازمان از {{oldName}} به {{newName}} تغییر کرد"
       }
     },
     "billing": {

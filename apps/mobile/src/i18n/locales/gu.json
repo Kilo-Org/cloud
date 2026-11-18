@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "સંસ્થા સભ્ય માટે {{count}} જૂથો સેટ કર્યા",
         "groupMemberGroupsSet_other": "સંસ્થા સભ્ય માટે {{count}} જૂથો સેટ કર્યા",
         "fundsDistributed_one": "{{count}} ચાઇલ્ડ સંસ્થાઓને {{amount}} વિતરિત કર્યા",
-        "fundsDistributed_other": "{{count}} ચાઇલ્ડ સંસ્થાઓને {{amount}} વિતરિત કર્યા"
+        "fundsDistributed_other": "{{count}} ચાઇલ્ડ સંસ્થાઓને {{amount}} વિતરિત કર્યા",
+        "modeCreated": "મોડ {{name}} બનાવ્યો",
+        "modeDeleted": "મોડ {{name}} કાઢી નાખ્યો",
+        "organizationRenamed": "સંસ્થાનું નામ {{oldName}} થી {{newName}} કર્યું"
       }
     },
     "billing": {

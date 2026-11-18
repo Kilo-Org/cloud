@@ -3499,6 +3499,9 @@
         "recommendationsDigestOff": "Recommendations digest disabled",
         "browserControl": "Browser control: {{mode}} (allowed origins {{origins}})",
         "originsNone": "none",
+        "modeCreated": "Created mode {{name}}",
+        "modeDeleted": "Deleted mode {{name}}",
+        "organizationRenamed": "Renamed organization from {{oldName}} to {{newName}}",
         "mcpType": {
           "mcp": "MCP server",
           "skill": "skill"

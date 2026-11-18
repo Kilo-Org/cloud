@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "Napetraka {{count}} vondrona ho an'ny mpikambana ao amin'ny fikambanana",
         "groupMemberGroupsSet_other": "Napetraka {{count}} vondrona ho an'ny mpikambana ao amin'ny fikambanana",
         "fundsDistributed_one": "Nozaraina {{amount}} ho an'ny fikambanana zanaka {{count}}",
-        "fundsDistributed_other": "Nozaraina {{amount}} ho an'ny fikambanana zanaka {{count}}"
+        "fundsDistributed_other": "Nozaraina {{amount}} ho an'ny fikambanana zanaka {{count}}",
+        "modeCreated": "Noforonina ny fomba {{name}}",
+        "modeDeleted": "Voafafa ny fomba {{name}}",
+        "organizationRenamed": "Novaina anarana ny fikambanana avy amin'ny {{oldName}} ho {{newName}}"
       }
     },
     "billing": {

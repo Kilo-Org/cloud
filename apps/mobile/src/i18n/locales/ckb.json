@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "{{count}} گروپ بۆ ئەندامی ڕێکخراو دانرا",
         "groupMemberGroupsSet_other": "{{count}} گروپ بۆ ئەندامی ڕێکخراو دانرا",
         "fundsDistributed_one": "{{amount}} بۆ {{count}} ڕێکخراوی منداڵ دابەشکرا",
-        "fundsDistributed_other": "{{amount}} بۆ {{count}} ڕێکخراوی منداڵ دابەشکرا"
+        "fundsDistributed_other": "{{amount}} بۆ {{count}} ڕێکخراوی منداڵ دابەشکرا",
+        "modeCreated": "دۆخی {{name}} دروستکرا",
+        "modeDeleted": "دۆخی {{name}} سڕدرایەوە",
+        "organizationRenamed": "ناوی ڕێکخراو لە {{oldName}}ەوە بۆ {{newName}} گۆڕدرا"
       }
     },
     "billing": {

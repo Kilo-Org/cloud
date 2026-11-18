@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "संस्था सदस्यका लागि {{count}} समूहहरू सेट गरियो",
         "groupMemberGroupsSet_other": "संस्था सदस्यका लागि {{count}} समूहहरू सेट गरियो",
         "fundsDistributed_one": "{{count}} सहायक संस्थाहरूलाई {{amount}} वितरण गरियो",
-        "fundsDistributed_other": "{{count}} सहायक संस्थाहरूलाई {{amount}} वितरण गरियो"
+        "fundsDistributed_other": "{{count}} सहायक संस्थाहरूलाई {{amount}} वितरण गरियो",
+        "modeCreated": "मोड {{name}} सिर्जना गरियो",
+        "modeDeleted": "मोड {{name}} मेटाइयो",
+        "organizationRenamed": "संस्थाको नाम {{oldName}} बाट {{newName}} मा परिवर्तन गरियो"
       }
     },
     "billing": {

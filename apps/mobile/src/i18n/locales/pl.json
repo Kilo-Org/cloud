@@ -3559,7 +3559,10 @@
         "fundsDistributed_one": "Rozdzielono {{amount}} do {{count}} organizacji podrzędnych",
         "fundsDistributed_few": "Rozdzielono {{amount}} do {{count}} organizacji podrzędnych",
         "fundsDistributed_many": "Rozdzielono {{amount}} do {{count}} organizacji podrzędnych",
-        "fundsDistributed_other": "Rozdzielono {{amount}} do {{count}} organizacji podrzędnych"
+        "fundsDistributed_other": "Rozdzielono {{amount}} do {{count}} organizacji podrzędnych",
+        "modeCreated": "Utworzono tryb {{name}}",
+        "modeDeleted": "Usunięto tryb {{name}}",
+        "organizationRenamed": "Zmieniono nazwę organizacji z {{oldName}} na {{newName}}"
       }
     },
     "billing": {

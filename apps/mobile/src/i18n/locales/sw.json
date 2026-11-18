@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "Vikundi {{count}} vimewekwa kwa mwanachama wa shirika",
         "groupMemberGroupsSet_other": "Vikundi {{count}} vimewekwa kwa mwanachama wa shirika",
         "fundsDistributed_one": "{{amount}} imesambazwa kwa mashirika tanzu {{count}}",
-        "fundsDistributed_other": "{{amount}} imesambazwa kwa mashirika tanzu {{count}}"
+        "fundsDistributed_other": "{{amount}} imesambazwa kwa mashirika tanzu {{count}}",
+        "modeCreated": "Hali iliyoundwa {{name}}",
+        "modeDeleted": "Hali iliyofutwa {{name}}",
+        "organizationRenamed": "Shirika limebadilishwa jina kutoka {{oldName}} hadi {{newName}}"
       }
     },
     "billing": {

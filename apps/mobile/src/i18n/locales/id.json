@@ -3433,7 +3433,10 @@
         "groupMembersSet_one": "Menetapkan {{count}} anggota untuk grup {{name}}",
         "keywordsCount_one": "{{count}} kata kunci",
         "rulesCount_one": "{{count}} aturan",
-        "topicsCount_one": "{{count}} topik"
+        "topicsCount_one": "{{count}} topik",
+        "modeCreated": "Mode {{name}} dibuat",
+        "modeDeleted": "Mode {{name}} dihapus",
+        "organizationRenamed": "Nama organisasi diubah dari {{oldName}} menjadi {{newName}}"
       }
     },
     "billing": {

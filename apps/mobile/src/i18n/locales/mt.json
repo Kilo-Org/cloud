@@ -3630,7 +3630,10 @@
         "fundsDistributed_two": "Qassam {{amount}} lil {{count}} organizzazzjonijiet sussidjarji",
         "fundsDistributed_few": "Qassam {{amount}} lil {{count}} organizzazzjonijiet sussidjarji",
         "fundsDistributed_many": "Qassam {{amount}} lil {{count}} organizzazzjonijiet sussidjarji",
-        "fundsDistributed_other": "Qassam {{amount}} lil {{count}} organizzazzjonijiet sussidjarji"
+        "fundsDistributed_other": "Qassam {{amount}} lil {{count}} organizzazzjonijiet sussidjarji",
+        "modeCreated": "Il-modalità {{name}} nħolqot",
+        "modeDeleted": "Il-modalità {{name}} tħassret",
+        "organizationRenamed": "L-organizzazzjoni ngħatat isem ġdid minn {{oldName}} għal {{newName}}"
       }
     },
     "billing": {

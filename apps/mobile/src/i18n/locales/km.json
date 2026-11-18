@@ -3441,7 +3441,10 @@
         "groupMembersSet_one": "បានកំណត់សមាជិក {{count}} នាក់សម្រាប់ក្រុម {{name}}",
         "keywordsCount_one": "ពាក្យគន្លឹះ {{count}}",
         "rulesCount_one": "វិធាន {{count}}",
-        "topicsCount_one": "ប្រធានបទ {{count}}"
+        "topicsCount_one": "ប្រធានបទ {{count}}",
+        "modeCreated": "បានបង្កើតរបៀប {{name}}",
+        "modeDeleted": "បានលុបរបៀប {{name}}",
+        "organizationRenamed": "បានប្តូរឈ្មោះអង្គការពី {{oldName}} ទៅ {{newName}}"
       }
     },
     "billing": {

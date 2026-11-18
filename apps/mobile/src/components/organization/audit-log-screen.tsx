@@ -55,7 +55,10 @@ function formatAuditTime(createdAt: string): string {
   return `${day} · ${formatClockTime(date, i18n.language)}`;
 }
 
-const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAuditLogEntry }>) {
+/** Exported for the design gate's diagnostic fixture, which mounts the row alone. */
+export const AuditLogRow = memo(function AuditLogRow({
+  entry,
+}: Readonly<{ entry: OrgAuditLogEntry }>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const [expanded, setExpanded] = useState(false);

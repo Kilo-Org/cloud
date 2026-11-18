@@ -3504,7 +3504,10 @@
         "groupMemberGroupsSet_other": "S'han definit {{count}} grups per al membre de l'organització",
         "fundsDistributed_one": "S'han distribuït {{amount}} a {{count}} organitzacions filles",
         "fundsDistributed_many": "S'han distribuït {{amount}} a {{count}} organitzacions filles",
-        "fundsDistributed_other": "S'han distribuït {{amount}} a {{count}} organitzacions filles"
+        "fundsDistributed_other": "S'han distribuït {{amount}} a {{count}} organitzacions filles",
+        "modeCreated": "S'ha creat el mode {{name}}",
+        "modeDeleted": "S'ha suprimit el mode {{name}}",
+        "organizationRenamed": "S'ha canviat el nom de l'organització de {{oldName}} a {{newName}}"
       }
     },
     "billing": {

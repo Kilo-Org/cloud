@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "Tashkilot a'zosi uchun {{count}} ta guruh belgilandi",
         "groupMemberGroupsSet_other": "Tashkilot a'zosi uchun {{count}} ta guruh belgilandi",
         "fundsDistributed_one": "{{count}} ta sho'ba tashkilotga {{amount}} taqsimlandi",
-        "fundsDistributed_other": "{{count}} ta sho'ba tashkilotga {{amount}} taqsimlandi"
+        "fundsDistributed_other": "{{count}} ta sho'ba tashkilotga {{amount}} taqsimlandi",
+        "modeCreated": "{{name}} rejimi yaratildi",
+        "modeDeleted": "{{name}} rejimi o‘chirildi",
+        "organizationRenamed": "Tashkilot nomi {{oldName}} dan {{newName}} ga o‘zgartirildi"
       }
     },
     "billing": {

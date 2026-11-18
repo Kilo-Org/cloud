@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "সংস্থার সদস্যের জন্য {{count}}টি গ্রুপ নির্ধারণ করা হয়েছে",
         "groupMemberGroupsSet_other": "সংস্থার সদস্যের জন্য {{count}}টি গ্রুপ নির্ধারণ করা হয়েছে",
         "fundsDistributed_one": "{{count}}টি অধীনস্থ সংস্থায় {{amount}} বিতরণ করা হয়েছে",
-        "fundsDistributed_other": "{{count}}টি অধীনস্থ সংস্থায় {{amount}} বিতরণ করা হয়েছে"
+        "fundsDistributed_other": "{{count}}টি অধীনস্থ সংস্থায় {{amount}} বিতরণ করা হয়েছে",
+        "modeCreated": "মোড তৈরি হয়েছে {{name}}",
+        "modeDeleted": "মোড মুছে ফেলা হয়েছে {{name}}",
+        "organizationRenamed": "সংস্থার নাম {{oldName}} থেকে {{newName}}-এ পরিবর্তিত হয়েছে"
       }
     },
     "billing": {

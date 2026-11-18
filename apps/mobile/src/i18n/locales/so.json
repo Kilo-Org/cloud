@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "La dejiyay {{count}} kooxood xubin ururka",
         "groupMemberGroupsSet_other": "La dejiyay {{count}} kooxood xubin ururka",
         "fundsDistributed_one": "La qaybiyay {{amount}} ururada carruurta ah {{count}}",
-        "fundsDistributed_other": "La qaybiyay {{amount}} ururada carruurta ah {{count}}"
+        "fundsDistributed_other": "La qaybiyay {{amount}} ururada carruurta ah {{count}}",
+        "modeCreated": "La abuuray habka {{name}}",
+        "modeDeleted": "La tirtiray habka {{name}}",
+        "organizationRenamed": "Magaca ururka waxaa laga beddelay {{oldName}} loona beddelay {{newName}}"
       }
     },
     "billing": {

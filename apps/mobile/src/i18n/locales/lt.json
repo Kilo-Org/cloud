@@ -3567,7 +3567,10 @@
         "fundsDistributed_one": "Paskirstyta {{amount}} {{count}} dukterinėms organizacijoms",
         "fundsDistributed_few": "Paskirstyta {{amount}} {{count}} dukterinėms organizacijoms",
         "fundsDistributed_many": "Paskirstyta {{amount}} {{count}} dukterinėms organizacijoms",
-        "fundsDistributed_other": "Paskirstyta {{amount}} {{count}} dukterinėms organizacijoms"
+        "fundsDistributed_other": "Paskirstyta {{amount}} {{count}} dukterinėms organizacijoms",
+        "modeCreated": "Sukurtas režimas {{name}}",
+        "modeDeleted": "Ištrintas režimas {{name}}",
+        "organizationRenamed": "Organizacija pervadinta iš {{oldName}} į {{newName}}"
       }
     },
     "billing": {

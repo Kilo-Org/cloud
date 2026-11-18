@@ -3441,7 +3441,10 @@
         "groupMemberGroupsSet_one": "Təşkilat üzvü üçün {{count}} qrup təyin edildi",
         "groupMemberGroupsSet_other": "Təşkilat üzvü üçün {{count}} qrup təyin edildi",
         "fundsDistributed_one": "{{count}} törəmə təşkilata {{amount}} paylanıldı",
-        "fundsDistributed_other": "{{count}} törəmə təşkilata {{amount}} paylanıldı"
+        "fundsDistributed_other": "{{count}} törəmə təşkilata {{amount}} paylanıldı",
+        "modeCreated": "Rejim yaradıldı: {{name}}",
+        "modeDeleted": "Rejim silindi: {{name}}",
+        "organizationRenamed": "Təşkilatın adı {{oldName}} adından {{newName}} adına dəyişdirildi"
       }
     },
     "billing": {

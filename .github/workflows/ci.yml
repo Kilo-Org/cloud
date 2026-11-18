@@ -1015,7 +1015,9 @@ jobs:
       fail-fast: false
       matrix:
         shard: [1, 2, 3, 4]
-    runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
+    # Jest is capped at four workers, so a shard gains little from eight cores;
+    # four cores keep the same worker count at half the vCPU-minutes.
+    runs-on: ${{ vars.RUNNER_MEDIUM_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
 
     services:
@@ -1435,7 +1437,12 @@ jobs:
         # its own part.
         part: ${{ fromJSON(needs.changes.outputs.cloud_agent_next_parts) }}
     name: cloud-agent-next (${{ matrix.part }})
-    runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
+    # The wrapper-process part runs one Bun test file, so it cannot use eight
+    # cores; the other parts keep the large runner.
+    runs-on: >-
+      ${{ matrix.part == 'wrapper-process'
+      && (vars.RUNNER_MEDIUM_LABEL || 'ubuntu-latest')
+      || (vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core') }}
     timeout-minutes: 15
 
     env:

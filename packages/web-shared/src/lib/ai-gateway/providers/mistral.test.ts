@@ -71,6 +71,7 @@ describe('applyMistralThinkingRequestTransform', () => {
     ['reasoning_effort none', { reasoning_effort: 'none' }],
     ['enable_thinking false', { enable_thinking: false }],
     ['a disabled thinking toggle', { thinking: { type: 'disabled' } }],
+    ['a disabled reasoning object', { reasoning: { enabled: false } }],
   ])('sends none for %s', (_name, extra) => {
     const request = chatRequest(undefined, extra);
 

@@ -186,15 +186,15 @@ describe('verifyAppleJwtWithJwks', () => {
     const unknownToken = signToken('rotated-away-key');
     // The first unknown-kid token starts the refresh; its failure falls back
     // to the cached key set, so the failed-refresh fallback propagates the
-    // fetch error as a server fault while the held kid still verifies. The
-    // swallowed failure is still reported.
+    // fetch error as a server fault while the held kid still verifies. A
+    // propagated failure is reported by the receiving route, not the module.
     await expect(verifyAppleJwtWithJwks(unknownToken, 'com.kilocode.kiloapp')).rejects.toThrow(
       'Failed to fetch Apple JWKS: 503'
     );
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(
       jest.requireMock<{ captureException: jest.Mock }>('@sentry/nextjs').captureException
-    ).toHaveBeenCalledTimes(1);
+    ).not.toHaveBeenCalled();
 
     await expect(verifyAppleJwtWithJwks(unknownToken, 'com.kilocode.kiloapp')).rejects.toThrow(
       'Failed to fetch Apple JWKS: 503'
@@ -202,10 +202,14 @@ describe('verifyAppleJwtWithJwks', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
 
     // Within the TTL and the refresh cooldown, the cached key set still
-    // verifies tokens whose kid it holds.
+    // verifies tokens whose kid it holds, consuming the swallowed failure:
+    // the module reports it once here.
     const payload = await verifyAppleJwtWithJwks(goodToken, 'com.kilocode.kiloapp');
     expect(payload.sub).toBe('user-1');
     expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(
+      jest.requireMock<{ captureException: jest.Mock }>('@sentry/nextjs').captureException
+    ).toHaveBeenCalledTimes(1);
 
     // After the cache TTL expires with refreshes still failing, the cached key
     // set keeps verifying the kid it holds while the retry stays bounded.

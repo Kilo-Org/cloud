@@ -29,6 +29,10 @@ let cachedKeys: { keys: AppleJWK[]; fetchedAt: number } | null = null;
 let refreshInFlight: Promise<AppleJWK[]> | null = null;
 let lastRefreshStartedAt = 0;
 let lastRefreshError: unknown = null;
+// Whether the recorded failure has already reached Sentry: a swallowed
+// failure is reported once, by the request that verifies against the
+// fallback set; a propagated failure is reported by the receiving route.
+let lastRefreshErrorReported = false;
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 // Upper bound on how long a failed refresh may keep serving the cached key
 // set: past this age, verification fails closed until a refresh succeeds.
@@ -69,17 +73,18 @@ async function refreshAppleKeys(): Promise<AppleJWK[]> {
       const keys = await fetchApplePublicKeys();
       cachedKeys = { keys, fetchedAt: Date.now() };
       lastRefreshError = null;
+      lastRefreshErrorReported = false;
       return keys;
     } catch (error) {
       lastRefreshError = error;
+      lastRefreshErrorReported = false;
       if (cachedKeys && Date.now() - cachedKeys.fetchedAt <= STALE_CACHE_MAX_AGE_MS) {
         // Serve the still-present key set, at most STALE_CACHE_MAX_AGE_MS
         // after the last successful fetch; the next attempt stays on the
         // refresh cooldown while lastRefreshError records the failure. The
-        // error never reaches a caller in this case, so report it here to
-        // keep an Apple JWKS outage visible. Past the stale bound the error
-        // rethrows instead, and the caller-side reporting covers it.
-        captureException(error, { tags: { source: 'apple_jwks_refresh' } });
+        // failure is reported by whoever finally disposes of this attempt:
+        // verification reports it once when it consumes the fallback set,
+        // and a propagated failure is reported by the receiving route.
         return cachedKeys.keys;
       }
       throw error;
@@ -151,6 +156,15 @@ export async function verifyAppleJwtWithJwks(
       }
       throw new AppleJwtClientError('No matching Apple public key');
     }
+  }
+
+  // The key set in use may come from a failed refresh whose error was
+  // swallowed. Report it here, exactly once per failed attempt, so the
+  // outage stays visible even when every token still verifies; a failure
+  // that propagates instead is reported once by the receiving route.
+  if (lastRefreshError !== null && !lastRefreshErrorReported) {
+    lastRefreshErrorReported = true;
+    captureException(lastRefreshError, { tags: { source: 'apple_jwks_refresh' } });
   }
 
   const pem = jwkToPem(matchingKey);

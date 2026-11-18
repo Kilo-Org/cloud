@@ -903,7 +903,7 @@
       "unavailablePersonally": "Gremium-Review ist nicht Teil eines persönlichen Kontos. Es wird eine Enterprise-Organisation benötigt.",
       "unavailablePersonallyAction": "Organisation erstellen",
       "unavailablePersonallySwitchAction": "Organisation wechseln",
-      "unavailableOrganizationTitle": "Council review ist nicht verfügbar",
+      "unavailableOrganizationTitle": "{\"value\": \"Gremium-Review ist derzeit nicht verfügbar\"}",
       "unavailableForOrganization": "Gremium-Review benötigt den Enterprise-Plan mit einem aktiven Abo oder einer Testphase. Diese Organisation hat es derzeit nicht.",
       "unavailableForOrganizationNeutral": "Gremium-Review ist derzeit für diese Organisation nicht verfügbar. Versuchen Sie es später erneut.",
       "unavailableOnBitbucket": "Gremium-Review ist für Bitbucket-Repositories nicht verfügbar.",

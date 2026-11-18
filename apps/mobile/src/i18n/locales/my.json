@@ -1446,7 +1446,7 @@
       "unavailablePersonally": "စစ်ဆေးရေးအဖွဲ့ စစ်ဆေးမှုသည် ကိုယ်ပိုင်အကောင့်တွင် မပါဝင်ပါ။ ၎င်းသည် Enterprise အဖွဲ့အစည်း တစ်ခု လိုအပ်ပါသည်။",
       "unavailablePersonallyAction": "အဖွဲ့အစည်း ဖန်တီးရန်",
       "unavailablePersonallySwitchAction": "အဖွဲ့အစည်း ပြောင်းရန်",
-      "unavailableOrganizationTitle": "Council review ကို မရရှိနိုင်ပါ",
+      "unavailableOrganizationTitle": "{\"value\": \"စစ်ဆေးရေးအဖွဲ့ စစ်ဆေးမှု ယခုအချိန်တွင် မရနိုင်ပါ\"}",
       "unavailableForOrganization": "စစ်ဆေးရေးအဖွဲ့ စစ်ဆေးမှုသည် သက်ဝင်သော စာရင်းသွင်းမှု သို့မဟုတ် အစမ်းသုံးကာလ ရှိသော Enterprise အစီအစဉ် လိုအပ်ပါသည်။ ဤအဖွဲ့အစည်းတွင် ယခုအချိန်တွင် ၎င်း မရှိပါ။",
       "unavailableForOrganizationNeutral": "ဤအဖွဲ့အစည်းအတွက် စစ်ဆေးရေးအဖွဲ့ စစ်ဆေးမှုကို ယခုအချိန်တွင် မရနိုင်ပါ။ နောက်မှ ထပ်မံကြိုးစားပါ။",
       "unavailableOnBitbucket": "စစ်ဆေးရေးအဖွဲ့ စစ်ဆေးမှုသည် Bitbucket ကုဒ်သိုလှောင်ရာများအတွက် မရနိုင်ပါ။",

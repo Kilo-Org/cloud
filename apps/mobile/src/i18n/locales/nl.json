@@ -903,7 +903,7 @@
       "unavailablePersonally": "Panelbeoordeling maakt geen deel uit van een persoonlijk account. Hiervoor is een Enterprise-organisatie nodig.",
       "unavailablePersonallyAction": "Organisatie maken",
       "unavailablePersonallySwitchAction": "Wisselen van organisatie",
-      "unavailableOrganizationTitle": "Council review is niet beschikbaar",
+      "unavailableOrganizationTitle": "{\"value\": \"Panelbeoordeling is op dit moment niet beschikbaar\"}",
       "unavailableForOrganization": "Panelbeoordeling vereist het Enterprise-plan met een actief abonnement of proefperiode. Deze organisatie heeft het op dit moment niet.",
       "unavailableForOrganizationNeutral": "Panelbeoordeling is op dit moment niet beschikbaar voor deze organisatie. Probeer het later opnieuw.",
       "unavailableOnBitbucket": "Panelbeoordeling is niet beschikbaar voor Bitbucket-repositories.",

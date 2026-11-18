@@ -1446,7 +1446,7 @@
       "unavailablePersonally": "Прегледът от съвет не е част от личен акаунт. Нужен е Enterprise организация.",
       "unavailablePersonallyAction": "Създай организация",
       "unavailablePersonallySwitchAction": "Превключване на организация",
-      "unavailableOrganizationTitle": "Council review не е наличен",
+      "unavailableOrganizationTitle": "{\"value\": \"Преглед от съвет не е наличен\"}",
       "unavailableForOrganization": "Прегледът от съвет изисква план Enterprise с активен абонамент или пробен период. Тази организация не разполага с него в момента.",
       "unavailableForOrganizationNeutral": "Прегледът от съвет не е наличен за тази организация в момента. Опитайте отново по-късно.",
       "unavailableOnBitbucket": "Прегледът от съвет не е наличен за хранилища в Bitbucket.",

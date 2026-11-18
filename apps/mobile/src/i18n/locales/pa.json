@@ -1446,7 +1446,7 @@
       "unavailablePersonally": "ਕੌਂਸਲ ਸਮੀਖਿਆ ਨਿੱਜੀ ਖਾਤੇ ਦਾ ਹਿੱਸਾ ਨਹੀਂ ਹੈ। ਇਸ ਲਈ Enterprise ਸੰਸਥਾ ਚਾਹੀਦੀ ਹੈ।",
       "unavailablePersonallyAction": "ਸੰਸਥਾ ਬਣਾਓ",
       "unavailablePersonallySwitchAction": "ਸੰਸਥਾ ਬਦਲੋ",
-      "unavailableOrganizationTitle": "Council review ਉਪਲਬਧ ਨਹੀਂ ਹੈ",
+      "unavailableOrganizationTitle": "{\"value\": \"ਕੌਂਸਲ ਸਮੀਖਿਆ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ\"}",
       "unavailableForOrganization": "ਕੌਂਸਲ ਸਮੀਖਿਆ ਲਈ ਸਰਗਰਮ ਸਬਸਕ੍ਰਿਪਸ਼ਨ ਜਾਂ ਟ੍ਰਾਇਲ ਵਾਲੀ Enterprise ਯੋਜਨਾ ਦੀ ਲੋੜ ਹੈ। ਇਸ ਸੰਸਥਾ ਕੋਲ ਇਹ ਹੁਣ ਨਹੀਂ ਹੈ।",
       "unavailableForOrganizationNeutral": "ਕੌਂਸਲ ਸਮੀਖਿਆ ਇਸ ਸੰਸਥਾ ਲਈ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਬਾਅਦ ਵਿੱਚ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "unavailableOnBitbucket": "ਕੌਂਸਲ ਸਮੀਖਿਆ Bitbucket ਰਿਪੋਜ਼ਿਟਰੀਆਂ ਲਈ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",

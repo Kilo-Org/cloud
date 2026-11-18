@@ -1446,7 +1446,7 @@
       "unavailablePersonally": "A revisión en consello non forma parte dunha conta persoal. Precisa dunha organización Enterprise.",
       "unavailablePersonallyAction": "Crear unha organización",
       "unavailablePersonallySwitchAction": "Cambiar de organización",
-      "unavailableOrganizationTitle": "Council review non está dispoñible",
+      "unavailableOrganizationTitle": "{\"value\": \"Revisión en consello non está dispoñible\"}",
       "unavailableForOrganization": "A revisión en consello precisa do plan Enterprise cunha subscrición ou un período de proba activos. Esta organización non o ten neste momento.",
       "unavailableForOrganizationNeutral": "A revisión en consello non está dispoñible para esta organización neste momento. Téntao de novo máis tarde.",
       "unavailableOnBitbucket": "A revisión en consello non está dispoñible para repositorios de Bitbucket.",

@@ -871,7 +871,7 @@
       "unavailablePersonally": "La revue en conseil ne fait pas partie d'un compte personnel. Elle nécessite une organisation Enterprise.",
       "unavailablePersonallyAction": "Créer une organisation",
       "unavailablePersonallySwitchAction": "Changer d'organisation",
-      "unavailableOrganizationTitle": "Council review n'est pas disponible",
+      "unavailableOrganizationTitle": "{\"value\": \"La revue en conseil n'est pas disponible pour le moment\"}",
       "unavailableForOrganization": "La revue en conseil nécessite le plan Enterprise avec un abonnement ou un essai actif. Cette organisation ne l'a pas actuellement.",
       "unavailableForOrganizationNeutral": "La revue en conseil n'est pas disponible pour cette organisation pour le moment. Veuillez réessayer plus tard.",
       "unavailableOnBitbucket": "La revue en conseil n'est pas disponible pour les dépôts Bitbucket.",

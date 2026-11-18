@@ -1446,7 +1446,7 @@
       "unavailablePersonally": "ସମୀକ୍ଷକ ମଣ୍ଡଳୀ ଏକ ବ୍ୟକ୍ତିଗତ ଆକାଉଣ୍ଟର ଅଂଶ ନୁହେଁ। ଏହା ପାଇଁ ଏକ Enterprise ସଂଗଠନ ଆବଶ୍ୟକ।",
       "unavailablePersonallyAction": "ସଂଗଠନ ସୃଷ୍ଟି କରନ୍ତୁ",
       "unavailablePersonallySwitchAction": "ସଂଗଠନ ବଦଳାନ୍ତୁ",
-      "unavailableOrganizationTitle": "Council review ଉପଲବ୍ଧ ନାହିଁ",
+      "unavailableOrganizationTitle": "{\"value\": \"ସମୀକ୍ଷକ ମଣ୍ଡଳୀ ବର୍ତ୍ତମାନ ଉପଲବ୍ଧ ନାହିଁ\"}",
       "unavailableForOrganization": "ସମୀକ୍ଷକ ମଣ୍ଡଳୀ ପାଇଁ ସକ୍ରିୟ ସବସ୍କ୍ରିପ୍ସନ୍ କିମ୍ବା ଟ୍ରାଏଲ୍ ସହିତ ଏଣ୍ଟରପ୍ରାଇଜ୍ ଯୋଜନା ଆବଶ୍ୟକ। ଏହି ସଂଗଠନ ପାଖରେ ଏହା ବର୍ତ୍ତମାନ ନାହିଁ।",
       "unavailableForOrganizationNeutral": "ସମୀକ୍ଷକ ମଣ୍ଡଳୀ ଏହି ସଂଗଠନ ପାଖରେ ବର୍ତ୍ତମାନ ଉପଲବ୍ଧ ନାହିଁ। ପରେ ପୁନର୍ବାର ଚେଷ୍ଟା କରନ୍ତୁ।",
       "unavailableOnBitbucket": "ସମୀକ୍ଷକ ମଣ୍ଡଳୀ Bitbucket ରିପୋଜିଟୋରୀ ପାଇଁ ଉପଲବ୍ଧ ନାହିଁ।",

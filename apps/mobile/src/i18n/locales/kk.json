@@ -1446,7 +1446,7 @@
       "unavailablePersonally": "Кеңес тексеруі жеке тіркелгінің бөлігі емес. Оған Enterprise ұйымы қажет.",
       "unavailablePersonallyAction": "Ұйым құру",
       "unavailablePersonallySwitchAction": "Ұйымды ауыстыру",
-      "unavailableOrganizationTitle": "Council review қолжетімсіз",
+      "unavailableOrganizationTitle": "{\"value\": \"Кеңес тексеруі қазір қолжетімді емес\"}",
       "unavailableForOrganization": "Кеңес тексеруі белсенді жазылымы немесе сынақ кезеңі бар Enterprise жоспарын қажет етеді. Бұл ұйымда ол қазір жоқ.",
       "unavailableForOrganizationNeutral": "Бұл ұйымда кеңес тексеруі қазір қолжетімді емес. Кейінірек қайталап көріңіз.",
       "unavailableOnBitbucket": "Кеңес тексеруі Bitbucket репозиторийлері үшін қолжетімсіз.",

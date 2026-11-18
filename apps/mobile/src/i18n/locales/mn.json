@@ -1446,7 +1446,7 @@
       "unavailablePersonally": "Зөвлөлийн шалгалт нь хувийн дансны хэсэг биш юм. Үүнд Enterprise байгууллага шаардлагатай.",
       "unavailablePersonallyAction": "Байгууллага үүсгэх",
       "unavailablePersonallySwitchAction": "Байгууллага солих",
-      "unavailableOrganizationTitle": "Council review боломжгүй",
+      "unavailableOrganizationTitle": "{\"value\": \"Зөвлөлийн шалгалт одоогоор боломжгүй байна\"}",
       "unavailableForOrganization": "Зөвлөлийн шалгалт нь идэвхтэй захиалга эсвэл туршилтын хугацаатай Enterprise төлөвлөгөө шаарддаг. Энэ байгууллагад энэ нь одоогоор байхгүй.",
       "unavailableForOrganizationNeutral": "Зөвлөлийн шалгалт нь энэ байгууллагад одоогоор боломжгүй байна. Дараа дахин оролдоно уу.",
       "unavailableOnBitbucket": "Зөвлөлийн шалгалт Bitbucket репозиторид ашиглах боломжгүй.",

@@ -903,7 +903,7 @@
       "unavailablePersonally": "评审团审查不包含在个人账户中。它需要 Enterprise 组织。",
       "unavailablePersonallyAction": "创建组织",
       "unavailablePersonallySwitchAction": "切换组织",
-      "unavailableOrganizationTitle": "Council review 不可用",
+      "unavailableOrganizationTitle": "评审团审查目前无法使用",
       "unavailableForOrganization": "评审团审查需要具备生效订阅或试用期的企业套餐。此组织目前不具备此项。",
       "unavailableForOrganizationNeutral": "此组织目前无法使用评审团审查。请稍后再试。",
       "unavailableOnBitbucket": "评审团审查不适用于 Bitbucket 仓库。",

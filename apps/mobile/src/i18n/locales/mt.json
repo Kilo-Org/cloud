@@ -1518,7 +1518,7 @@
       "unavailablePersonally": "Ir-reviżjoni tal-kunsill m'hijiex parti minn kont personali. Tirrikjedi organizazzjoni Enterprise.",
       "unavailablePersonallyAction": "Oħloq organizazzjoni",
       "unavailablePersonallySwitchAction": "Ibdel organizzazzjoni",
-      "unavailableOrganizationTitle": "Council review mhux disponibbli",
+      "unavailableOrganizationTitle": "{\"value\": \"Reviżjoni tal-kunsill mhix disponibbli\"}",
       "unavailableForOrganization": "Ir-reviżjoni tal-kunsill tirrikjedi l-pjan Enterprise b'sottoskrizzjoni jew perjodu ta' prova attiv. Din l-organizzazzjoni m'għandhiex bħalissa.",
       "unavailableForOrganizationNeutral": "Ir-reviżjoni tal-kunsill mhix disponibbli għal din l-organizzazzjoni bħalissa. Erġa' pprova aktar tard.",
       "unavailableOnBitbucket": "Ir-reviżjoni tal-kunsill mhijiex disponibbli għal repożitorji Bitbucket.",

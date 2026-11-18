@@ -1446,7 +1446,7 @@
       "unavailablePersonally": "การตรวจสอบโดยคณะไม่รวมอยู่ในบัญชีส่วนตัว จำเป็นต้องมีองค์กร Enterprise",
       "unavailablePersonallyAction": "สร้างองค์กร",
       "unavailablePersonallySwitchAction": "สลับองค์กร",
-      "unavailableOrganizationTitle": "Council review ไม่พร้อมใช้งาน",
+      "unavailableOrganizationTitle": "{\"value\": \"การตรวจสอบโดยคณะไม่พร้อมใช้งานในขณะนี้\"}",
       "unavailableForOrganization": "การตรวจสอบโดยคณะต้องใช้แผน Enterprise ที่มีการสมัครใช้หรือการทดลองใช้งานที่ยังมีผลอยู่ องค์กรนี้ยังไม่มีสิ่งนี้ในขณะนี้",
       "unavailableForOrganizationNeutral": "การตรวจสอบโดยคณะไม่พร้อมใช้งานสำหรับองค์กรนี้ในขณะนี้ โปรดลองอีกครั้งในภายหลัง",
       "unavailableOnBitbucket": "การตรวจสอบโดยคณะไม่พร้อมใช้งานสำหรับคลังโค้ด Bitbucket",

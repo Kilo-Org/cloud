@@ -903,7 +903,7 @@
       "unavailablePersonally": "Konsey incelemesi kişisel hesabın bir parçası değildir. Bunun için bir Enterprise kuruluşu gerekir.",
       "unavailablePersonallyAction": "Kuruluş oluştur",
       "unavailablePersonallySwitchAction": "Kuruluş değiştir",
-      "unavailableOrganizationTitle": "Council review kullanılamıyor",
+      "unavailableOrganizationTitle": "{\"value\": \"Konsey incelemesi şu anda mevcut değil\"}",
       "unavailableForOrganization": "Konsey incelemesi, etkin bir abonelik veya deneme süresi olan Enterprise planını gerektirir. Bu kuruluşta şu anda mevcut değil.",
       "unavailableForOrganizationNeutral": "Konsey incelemesi şu anda bu kuruluş için mevcut değil. Daha sonra tekrar deneyin.",
       "unavailableOnBitbucket": "Konsey incelemesi Bitbucket depoları için kullanılamıyor.",

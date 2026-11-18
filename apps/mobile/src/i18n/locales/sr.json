@@ -1470,7 +1470,7 @@
       "unavailablePersonally": "Pregled veća nije deo ličnog naloga. Potrebno je Enterprise organizacija.",
       "unavailablePersonallyAction": "Napravi organizaciju",
       "unavailablePersonallySwitchAction": "Promeni organizaciju",
-      "unavailableOrganizationTitle": "Council review nije dostupan",
+      "unavailableOrganizationTitle": "{\"value\": \"Pregled veća trenutno nije dostupan\"}",
       "unavailableForOrganization": "Pregled veća zahteva Enterprise plan sa aktivnom pretplatom ili probnim periodom. Ova organizacija ga trenutno ne poseduje.",
       "unavailableForOrganizationNeutral": "Pregled veća trenutno nije dostupan za ovu organizaciju. Pokušajte ponovo kasnije.",
       "unavailableOnBitbucket": "Pregled veća nije dostupan za Bitbucket repozitorijume.",

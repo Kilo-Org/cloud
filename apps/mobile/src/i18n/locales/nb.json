@@ -1446,7 +1446,7 @@
       "unavailablePersonally": "Panelvurdering er ikke en del av en personlig konto. Den krever en Enterprise-organisasjon.",
       "unavailablePersonallyAction": "Opprett organisasjon",
       "unavailablePersonallySwitchAction": "Bytt organisasjon",
-      "unavailableOrganizationTitle": "Council review er utilgjengelig",
+      "unavailableOrganizationTitle": "{\"value\": \"Panelvurdering er ikke tilgjengelig\"}",
       "unavailableForOrganization": "Panelvurdering krever Enterprise-planen med et aktivt abonnement eller en prøveperiode. Denne organisasjonen har det ikke akkurat nå.",
       "unavailableForOrganizationNeutral": "Panelvurdering er ikke tilgjengelig for denne organisasjonen akkurat nå. Prøv igjen senere.",
       "unavailableOnBitbucket": "Panelvurdering er ikke tilgjengelig for Bitbucket-kodelagre.",

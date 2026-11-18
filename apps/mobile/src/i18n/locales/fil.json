@@ -1446,7 +1446,7 @@
       "unavailablePersonally": "Hindi bahagi ng personal na account ang pagsusuri ng konseho. Kailangan nito ang isang Enterprise na organisasyon.",
       "unavailablePersonallyAction": "Gumawa ng organisasyon",
       "unavailablePersonallySwitchAction": "Lumipat ng organisasyon",
-      "unavailableOrganizationTitle": "Hindi available ang Council review",
+      "unavailableOrganizationTitle": "Hindi magagamit ang pagsusuri ng konseho",
       "unavailableForOrganization": "Ang pagsusuri ng konseho ay nangangailangan ng Enterprise plan na may aktibong subscription o trial. Wala ito sa organisasyong ito sa ngayon.",
       "unavailableForOrganizationNeutral": "Ang pagsusuri ng konseho ay hindi magagamit para sa organisasyong ito sa ngayon. Subukan muli mamaya.",
       "unavailableOnBitbucket": "Hindi available ang pagsusuri ng konseho para sa mga Bitbucket repositoryo.",

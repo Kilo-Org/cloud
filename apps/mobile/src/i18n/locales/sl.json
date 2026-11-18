@@ -1494,7 +1494,7 @@
       "unavailablePersonally": "Kolegijski pregled ni del osebnega računa. Potrebuje Enterprise organizacijo.",
       "unavailablePersonallyAction": "Ustvari organizacijo",
       "unavailablePersonallySwitchAction": "Preklopi organizacijo",
-      "unavailableOrganizationTitle": "Council review ni na voljo",
+      "unavailableOrganizationTitle": "{\"value\": \"Kolegijski pregled trenutno ni na voljo\"}",
       "unavailableForOrganization": "Kolegijski pregled zahteva paket Enterprise z aktivno naročnino ali preizkusnim obdobjem. Ta organizacija ga trenutno nima.",
       "unavailableForOrganizationNeutral": "Kolegijski pregled za to organizacijo trenutno ni na voljo. Poskusite znova pozneje.",
       "unavailableOnBitbucket": "Kolegijski pregled ni na voljo za skladišča Bitbucket.",

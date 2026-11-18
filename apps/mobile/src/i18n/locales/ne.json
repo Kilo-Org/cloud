@@ -1446,7 +1446,7 @@
       "unavailablePersonally": "समीक्षक मण्डल व्यक्तिगत खाताको भाग होइन। यसका लागि Enterprise संस्था चाहिन्छ।",
       "unavailablePersonallyAction": "संस्था सिर्जना गर्नुहोस्",
       "unavailablePersonallySwitchAction": "संस्था परिवर्तन गर्नुहोस्",
-      "unavailableOrganizationTitle": "Council review उपलब्ध छैन",
+      "unavailableOrganizationTitle": "{\"value\": \"समीक्षक मण्डल अहिले उपलब्ध छैन\"}",
       "unavailableForOrganization": "समीक्षक मण्डलका लागि सक्रिय सदस्यता वा परीक्षण अवधि भएको Enterprise योजना चाहिन्छ। यो संस्थासँग अहिले यो छैन।",
       "unavailableForOrganizationNeutral": "यो संस्थाका लागि अहिले समीक्षक मण्डल उपलब्ध छैन। कृपया पछि फेरि प्रयास गर्नुहोस्।",
       "unavailableOnBitbucket": "समीक्षक मण्डल Bitbucket रिपोजिटरीका लागि उपलब्ध छैन।",

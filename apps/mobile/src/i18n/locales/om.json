@@ -1446,7 +1446,7 @@
       "unavailablePersonally": "Sakatta'aan gumii waan hisaabii dhuunirraa ta'e miti. Isheetiin dhaabbata Enterprise barbaachisa.",
       "unavailablePersonallyAction": "Dhaabbata uumi",
       "unavailablePersonallySwitchAction": "Dhaabbata jijjiiruu",
-      "unavailableOrganizationTitle": "Council review hin argamu",
+      "unavailableOrganizationTitle": "{\"value\": \"Sakatta'a gumii yeroo ammaa hin jiru\"}",
       "unavailableForOrganization": "Sakatta'aan gumii karooraa Enterprise qabaachuu qaba, kan Galmee tajaajilaa sochuu qabu ykn yeroo dhayaabaa qabu. Dhaabbanni kun yeroo ammaa isa hin qabu.",
       "unavailableForOrganizationNeutral": "Sakatta'aan gumii dhaabbata kanaaf yeroo ammaa hin jiru. Booda irra deebi'ii yaali.",
       "unavailableOnBitbucket": "Sakatta'aan gumii kuusaa koodii Bitbucket tiif hin argamu.",

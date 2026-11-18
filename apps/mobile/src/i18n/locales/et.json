@@ -1446,7 +1446,7 @@
       "unavailablePersonally": "Nõukogu ülevaatus ei kuulu isikliku konto juurde. Selleks on vaja Enterprise'i organisatsiooni.",
       "unavailablePersonallyAction": "Loo organisatsioon",
       "unavailablePersonallySwitchAction": "Vaheta organisatsiooni",
-      "unavailableOrganizationTitle": "Council review pole saadaval",
+      "unavailableOrganizationTitle": "{\"value\": \"Nõukogu ülevaatus ei ole praegu saadaval\"}",
       "unavailableForOrganization": "Nõukogu ülevaatuseks on vaja Enterprise'i paketti koos aktiivse tellimuse või prooviperioodiga. Sellel organisatsioonil ei ole seda praegu.",
       "unavailableForOrganizationNeutral": "Nõukogu ülevaatus ei ole sellel organisatsioonil praegu saadaval. Proovige hiljem uuesti.",
       "unavailableOnBitbucket": "Nõukogu ülevaatus ei ole saadaval Bitbucketi hoidlate jaoks.",

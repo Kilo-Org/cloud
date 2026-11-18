@@ -1446,7 +1446,7 @@
       "unavailablePersonally": "Raadhersiening is nie deel van 'n persoonlike rekening nie. Dit verg 'n Enterprise-organisasie.",
       "unavailablePersonallyAction": "Skep organisasie",
       "unavailablePersonallySwitchAction": "Wissel organisasie",
-      "unavailableOrganizationTitle": "Council review is nie beskikbaar nie",
+      "unavailableOrganizationTitle": "{\"value\": \"Raadhersiening is nie op die oomblik beskikbaar nie\"}",
       "unavailableForOrganization": "Raadhersiening verg die Enterprise-plan met 'n aktiewe intekening of proefperiode. Hierdie organisasie het dit nie op die oomblik nie.",
       "unavailableForOrganizationNeutral": "Raadhersiening is nie op die oomblik vir hierdie organisasie beskikbaar nie. Probeer later weer.",
       "unavailableOnBitbucket": "Raadhersiening is nie beskikbaar vir Bitbucket-bewaarplekke nie.",

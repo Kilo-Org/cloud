@@ -1446,7 +1446,7 @@
       "unavailablePersonally": "సమీక్ష మండలి వ్యక్తిగత ఖాతాలో భాగం కాదు. దీనికి ఎంటర్‌ప్రైజ్ సంస్థ అవసరం.",
       "unavailablePersonallyAction": "సంస్థను సృష్టించండి",
       "unavailablePersonallySwitchAction": "సంస్థను మార్చండి",
-      "unavailableOrganizationTitle": "కౌన్సిల్ సమీక్ష అందుబాటులో లేదు",
+      "unavailableOrganizationTitle": "{\"value\": \"సమీక్ష మండలి అందుబాటులో లేదు\"}",
       "unavailableForOrganization": "సమీక్ష మండలికి సక్రియ సబ్‌స్క్రిప్షన్ లేదా ట్రయల్ ఉన్న ఎంటర్‌ప్రైజ్ ప్లాన్ అవసరం. ఈ సంస్థకు ప్రస్తుతం అది లేదు.",
       "unavailableForOrganizationNeutral": "ఈ సంస్థకు ప్రస్తుతం సమీక్ష మండలి అందుబాటులో లేదు. తర్వాత మళ్లీ ప్రయత్నించండి.",
       "unavailableOnBitbucket": "సమీక్ష మండలి Bitbucket రిపోజిటరీలకు అందుబాటులో లేదు.",

@@ -1446,7 +1446,7 @@
       "unavailablePersonally": "Shqyrtimi nga këshilli nuk është pjesë e një llogarie personale. Ai kërkon një organizatë Enterprise.",
       "unavailablePersonallyAction": "Krijo një organizatë",
       "unavailablePersonallySwitchAction": "Ndërro organizatën",
-      "unavailableOrganizationTitle": "Council review nuk është i disponueshëm",
+      "unavailableOrganizationTitle": "{\"value\": \"Shqyrtimi nga këshilli nuk është i disponueshëm tani\"}",
       "unavailableForOrganization": "Shqyrtimi nga këshilli kërkon planin Enterprise me një pajtim ose një periudhë provë aktive. Kjo organizatë nuk e ka atë tani.",
       "unavailableForOrganizationNeutral": "Shqyrtimi nga këshilli nuk është i disponueshëm për këtë organizatë tani. Provoni përsëri më vonë.",
       "unavailableOnBitbucket": "Shqyrtimi nga këshilli nuk është i disponueshëm për depot e Bitbucket.",

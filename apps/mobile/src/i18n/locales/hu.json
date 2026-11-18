@@ -1446,7 +1446,7 @@
       "unavailablePersonally": "A tanácsellenőrzés nem része a személyes fióknak. Enterprise szervezetet igényel.",
       "unavailablePersonallyAction": "Szervezet létrehozása",
       "unavailablePersonallySwitchAction": "Szervezet váltása",
-      "unavailableOrganizationTitle": "Council review nem érhető el",
+      "unavailableOrganizationTitle": "A tanácsellenőrzés jelenleg nem érhető el",
       "unavailableForOrganization": "A tanácsellenőrzéshez aktív előfizetéssel vagy próbaidőszakkal rendelkező Enterprise csomag szükséges. Ez a szervezet jelenleg nem rendelkezik vele.",
       "unavailableForOrganizationNeutral": "A tanácsellenőrzés jelenleg nem érhető el ennél a szervezetnél. Kérjük, próbálja újra később.",
       "unavailableOnBitbucket": "A tanácsellenőrzés nem érhető el Bitbucket-adattárakhoz.",

@@ -1446,7 +1446,7 @@
       "unavailablePersonally": "Rådsgranskning ingår inte i ett personligt konto. Den kräver en Enterprise-organisation.",
       "unavailablePersonallyAction": "Skapa organisation",
       "unavailablePersonallySwitchAction": "Byt organisation",
-      "unavailableOrganizationTitle": "Council review är inte tillgänglig",
+      "unavailableOrganizationTitle": "{\"value\": \"Rådsgranskning är inte tillgänglig\"}",
       "unavailableForOrganization": "Rådsgranskning kräver Enterprise-planen med ett aktivt abonnemang eller en provperiod. Den här organisationen har det inte just nu.",
       "unavailableForOrganizationNeutral": "Rådsgranskning är inte tillgänglig för den här organisationen just nu. Försök igen senare.",
       "unavailableOnBitbucket": "Rådsgranskning är inte tillgänglig för Bitbucket-kodarkiv.",

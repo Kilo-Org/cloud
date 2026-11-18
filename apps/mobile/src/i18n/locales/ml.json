@@ -1446,7 +1446,7 @@
       "unavailablePersonally": "അവലോകന സമിതി ഒരു വ്യക്തിഗത അക്കൗണ്ടിന്റെ ഭാഗമല്ല. ഇതിന് ഒരു Enterprise സ്ഥാപനം ആവശ്യമാണ്.",
       "unavailablePersonallyAction": "സ്ഥാപനം സൃഷ്ടിക്കുക",
       "unavailablePersonallySwitchAction": "സ്ഥാപനം മാറ്റുക",
-      "unavailableOrganizationTitle": "Council review ലഭ്യമല്ല",
+      "unavailableOrganizationTitle": "{\"value\": \"അവലോകന സമിതി ഇപ്പോൾ ലഭ്യമല്ല\"}",
       "unavailableForOrganization": "അവലോകന സമിതിക്ക് സജീവമായ സബ്സ്ക്രിപ്ഷൻ അല്ലെങ്കിൽ ട്രയലുള്ള എന്റർപ്രൈസ് പ്ലാൻ ആവശ്യമാണ്. ഈ സ്ഥാപനത്തിന് അത് ഇപ്പോൾ ഇല്ല.",
       "unavailableForOrganizationNeutral": "ഈ സ്ഥാപനത്തിന് അവലോകന സമിതി ഇപ്പോൾ ലഭ്യമല്ല. പിന്നീട് വീണ്ടും ശ്രമിക്കുക.",
       "unavailableOnBitbucket": "അവലോകന സമിതി Bitbucket റിപ്പോസിറ്ററികൾക്കായി ലഭ്യമല്ല.",

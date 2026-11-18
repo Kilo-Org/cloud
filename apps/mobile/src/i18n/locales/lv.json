@@ -1470,7 +1470,7 @@
       "unavailablePersonally": "Padomes pārskatīšana nav daļa no personīga konta. Tai ir nepieciešama Enterprise organizācija.",
       "unavailablePersonallyAction": "Izveidot organizāciju",
       "unavailablePersonallySwitchAction": "Pārslēgt organizāciju",
-      "unavailableOrganizationTitle": "Council review nav pieejams",
+      "unavailableOrganizationTitle": "{\"value\": \"Padomes pārskatīšana šobrīd nav pieejama\"}",
       "unavailableForOrganization": "Padomes pārskatīšanai ir nepieciešams Enterprise plāns ar aktīvu abonementu vai izmēģinājuma periodu. Šai organizācijai tas šobrīd nav pieejams.",
       "unavailableForOrganizationNeutral": "Padomes pārskatīšana šai organizācijai šobrīd nav pieejama. Mēģiniet vēlreiz vēlāk.",
       "unavailableOnBitbucket": "Padomes pārskatīšana nav pieejama Bitbucket repozitorijiem.",

@@ -905,7 +905,7 @@
       "unavailablePersonally": "Przegląd rady nie jest częścią konta osobistego. Wymaga organizacji Enterprise.",
       "unavailablePersonallyAction": "Utwórz organizację",
       "unavailablePersonallySwitchAction": "Przełącz organizację",
-      "unavailableOrganizationTitle": "Council review jest niedostępny",
+      "unavailableOrganizationTitle": "{\"value\": \"Przegląd rady nie jest obecnie dostępny\"}",
       "unavailableForOrganization": "Przegląd rady wymaga planu Enterprise z aktywną subskrypcją lub okresem próbnym. Ta organizacja obecnie go nie ma.",
       "unavailableForOrganizationNeutral": "Przegląd rady nie jest obecnie dostępny dla tej organizacji. Spróbuj ponownie później.",
       "unavailableOnBitbucket": "Przegląd rady nie jest dostępny dla repozytoriów Bitbucket.",

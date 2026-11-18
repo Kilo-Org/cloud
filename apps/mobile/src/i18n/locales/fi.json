@@ -1446,7 +1446,7 @@
       "unavailablePersonally": "Neuvostokatselmointi ei sisälly henkilökohtaiseen tiliin. Se vaatii Enterprise-organisaation.",
       "unavailablePersonallyAction": "Luo organisaatio",
       "unavailablePersonallySwitchAction": "Vaihda organisaatio",
-      "unavailableOrganizationTitle": "Council review ei ole saatavilla",
+      "unavailableOrganizationTitle": "{\"value\": \"Neuvostokatselmointi ei ole saatavilla juuri nyt\"}",
       "unavailableForOrganization": "Neuvostokatselmointi vaatii Enterprise-tilauksen, jossa on aktiivinen tilaus tai kokeilujakso. Tällä organisaatiolla ei ole sitä juuri nyt.",
       "unavailableForOrganizationNeutral": "Neuvostokatselmointi ei ole saatavilla tälle organisaatiolle juuri nyt. Yritä uudelleen myöhemmin.",
       "unavailableOnBitbucket": "Neuvostokatselmointi ei ole käytettävissä Bitbucket-koodivarastoille.",

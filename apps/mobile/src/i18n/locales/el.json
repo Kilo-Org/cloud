@@ -1446,7 +1446,7 @@
       "unavailablePersonally": "Ο έλεγχος από συμβούλιο δεν αποτελεί μέρος ενός προσωπικού λογαριασμού. Χρειάζεται έναν οργανισμό Enterprise.",
       "unavailablePersonallyAction": "Δημιουργία οργανισμού",
       "unavailablePersonallySwitchAction": "Αλλαγή οργανισμού",
-      "unavailableOrganizationTitle": "Το Council review δεν είναι διαθέσιμο",
+      "unavailableOrganizationTitle": "{\"value\": \"Ο έλεγχος από συμβούλιο δεν είναι διαθέσιμος αυτή τη στιγμή\"}",
       "unavailableForOrganization": "Ο έλεγχος από συμβούλιο απαιτεί το πλάνο Enterprise με ενεργή συνδρομή ή δοκιμαστική περίοδο. Αυτός ο οργανισμός δεν το έχει αυτή τη στιγμή.",
       "unavailableForOrganizationNeutral": "Ο έλεγχος από συμβούλιο δεν είναι διαθέσιμος για αυτόν τον οργανισμό αυτή τη στιγμή. Δοκιμάστε ξανά αργότερα.",
       "unavailableOnBitbucket": "Ο έλεγχος από συμβούλιο δεν είναι διαθέσιμος για αποθετήρια Bitbucket.",

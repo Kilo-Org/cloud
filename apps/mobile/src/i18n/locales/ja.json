@@ -903,7 +903,7 @@
       "unavailablePersonally": "合議レビューは個人アカウントには含まれません。エンタープライズ組織が必要です。",
       "unavailablePersonallyAction": "組織を作成",
       "unavailablePersonallySwitchAction": "組織を切り替え",
-      "unavailableOrganizationTitle": "Council review は利用できません",
+      "unavailableOrganizationTitle": "{\"value\": \"合議レビューはご利用いただけません\"}",
       "unavailableForOrganization": "合議レビューには、有効なサブスクリプションまたはトライアル付きのエンタープライズプランが必要です。この組織には現在それがありません。",
       "unavailableForOrganizationNeutral": "この組織では現在、合議レビューはご利用いただけません。後でもう一度お試しください。",
       "unavailableOnBitbucket": "合議レビューは Bitbucket リポジトリでは利用できません。",

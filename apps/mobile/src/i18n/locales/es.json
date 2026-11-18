@@ -904,7 +904,7 @@
       "unavailablePersonally": "La revisión por consejo no forma parte de una cuenta personal. Requiere una organización Enterprise.",
       "unavailablePersonallyAction": "Crear una organización",
       "unavailablePersonallySwitchAction": "Cambiar de organización",
-      "unavailableOrganizationTitle": "Council review no está disponible",
+      "unavailableOrganizationTitle": "{\"value\": \"Revisión por consejo no está disponible en este momento\"}",
       "unavailableForOrganization": "La revisión por consejo requiere el plan Enterprise con una suscripción o un período de prueba activos. Esta organización no lo tiene en este momento.",
       "unavailableForOrganizationNeutral": "La revisión por consejo no está disponible para esta organización en este momento. Inténtalo de nuevo más tarde.",
       "unavailableOnBitbucket": "La revisión por consejo no está disponible para repositorios de Bitbucket.",

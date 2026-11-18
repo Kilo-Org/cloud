@@ -1446,7 +1446,7 @@
       "unavailablePersonally": "Bitar majalisa ba wani ɓangare na asusun sirri ba. Tana buƙatar ƙungiya ta Enterprise.",
       "unavailablePersonallyAction": "Ƙirƙiri ƙungiya",
       "unavailablePersonallySwitchAction": "Canza ƙungiya",
-      "unavailableOrganizationTitle": "Bitar majalisa ba ta samuwa",
+      "unavailableOrganizationTitle": "{\"value\": \"Bitar majalisa ba ta samuwa a halin yanzu ba\"}",
       "unavailableForOrganization": "Bitar majalisa na buƙatar shirin Enterprise mai biyan kuɗi mai aiki ko lokacin gwaji. Wannan ƙungiyar ba ta da shi a halin yanzu.",
       "unavailableForOrganizationNeutral": "Bitar majalisa ba ta samuwa ga wannan ƙungiyar a halin yanzu ba. Sake gwadawa daga baya.",
       "unavailableOnBitbucket": "Bitar majalisa ba ta samuwa ga ma'ajiyoyin Bitbucket.",

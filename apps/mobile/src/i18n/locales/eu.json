@@ -1446,7 +1446,7 @@
       "unavailablePersonally": "Kontseilu-berrikuspena ez da kontu pertsonal baten parte. Enterprise erakunde bat behar du.",
       "unavailablePersonallyAction": "Sortu erakundea",
       "unavailablePersonallySwitchAction": "Aldatu erakundea",
-      "unavailableOrganizationTitle": "Council review ez dago erabilgarri",
+      "unavailableOrganizationTitle": "{\"value\": \"Kontseilu-berrikuspena ez dago erabilgarri\"}",
       "unavailableForOrganization": "Kontseilu-berrikuspenak Enterprise plana behar du, harpidetza edo probaldi aktibo batekin. Erakunde honek ez du hura orain.",
       "unavailableForOrganizationNeutral": "Kontseilu-berrikuspena ez dago erabilgarri erakunde honentzat orain. Saiatu berriro geroago.",
       "unavailableOnBitbucket": "Kontseilu-berrikuspena ez dago erabilgarri Bitbucket biltegietarako.",

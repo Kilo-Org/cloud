@@ -1518,7 +1518,7 @@
       "unavailablePersonally": "Níl athbhreithniú comhairle mar chuid de chuntas pearsanta. Teastaíonn eagraíocht Enterprise uait.",
       "unavailablePersonallyAction": "Cruthaigh eagraíocht",
       "unavailablePersonallySwitchAction": "Athraigh eagraíocht",
-      "unavailableOrganizationTitle": "Níl Council review ar fáil",
+      "unavailableOrganizationTitle": "{\"value\": \"Níl athbhreithniú comhairle ar fáil faoi láthair\"}",
       "unavailableForOrganization": "Teastaíonn an plean Enterprise ó athbhreithniú comhairle le síntiús gníomhach nó le triail. Níl sé ag an eagraíocht seo faoi láthair.",
       "unavailableForOrganizationNeutral": "Níl athbhreithniú comhairle ar fáil don eagraíocht seo faoi láthair. Bain triail eile as níos déanaí.",
       "unavailableOnBitbucket": "Níl athbhreithniú comhairle ar fáil do stóir Bitbucket.",

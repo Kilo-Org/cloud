@@ -1446,7 +1446,7 @@
       "unavailablePersonally": "Rådsgennemgang er ikke en del af en personlig konto. Den kræver en Enterprise-organisation.",
       "unavailablePersonallyAction": "Opret organisation",
       "unavailablePersonallySwitchAction": "Skift organisation",
-      "unavailableOrganizationTitle": "Council review er ikke tilgængelig",
+      "unavailableOrganizationTitle": "{\"value\": \"Rådsgennemgang er ikke tilgængelig\"}",
       "unavailableForOrganization": "Rådsgennemgang kræver Enterprise-planen med et aktivt abonnement eller en prøveperiode. Denne organisation har det ikke lige nu.",
       "unavailableForOrganizationNeutral": "Rådsgennemgang er ikke tilgængelig for denne organisation lige nu. Prøv igen senere.",
       "unavailableOnBitbucket": "Rådsgennemgang er ikke tilgængelig for Bitbucket-kodelagre.",

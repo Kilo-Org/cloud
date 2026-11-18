@@ -1470,7 +1470,7 @@
       "unavailablePersonally": "Pregled vijeća nije dio osobnog računa. Potrebna je Enterprise organizacija.",
       "unavailablePersonallyAction": "Stvori organizaciju",
       "unavailablePersonallySwitchAction": "Promijeni organizaciju",
-      "unavailableOrganizationTitle": "Council review nije dostupan",
+      "unavailableOrganizationTitle": "{\"value\": \"Pregled vijeća nije dostupan\"}",
       "unavailableForOrganization": "Pregled vijeća zahtijeva Enterprise plan s aktivnom pretplatom ili probnim razdobljem. Ova organizacija ga trenutačno nema.",
       "unavailableForOrganizationNeutral": "Pregled vijeća trenutačno nije dostupan za ovu organizaciju. Pokušajte ponovno kasnije.",
       "unavailableOnBitbucket": "Pregled vijeća nije dostupan za Bitbucket repozitorije.",

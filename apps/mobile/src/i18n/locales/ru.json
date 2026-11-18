@@ -905,7 +905,7 @@
       "unavailablePersonally": "Коллегиальная проверка не входит в личный аккаунт. Для неё нужна организация Enterprise.",
       "unavailablePersonallyAction": "Создать организацию",
       "unavailablePersonallySwitchAction": "Сменить организацию",
-      "unavailableOrganizationTitle": "Council review недоступен",
+      "unavailableOrganizationTitle": "{\"value\": \"Коллегиальная проверка сейчас недоступна\"}",
       "unavailableForOrganization": "Коллегиальная проверка требует план Enterprise с активной подпиской или пробным периодом. Сейчас у этой организации его нет.",
       "unavailableForOrganizationNeutral": "Коллегиальная проверка сейчас недоступна для этой организации. Попробуйте позже.",
       "unavailableOnBitbucket": "Коллегиальная проверка недоступна для репозиториев Bitbucket.",

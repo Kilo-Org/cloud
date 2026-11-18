@@ -1494,7 +1494,7 @@
       "unavailablePersonally": "Калегіяльная праверка не ўваходзіць у склад асабістага акаўнта. Для яе патрэбная арганізацыя Enterprise.",
       "unavailablePersonallyAction": "Стварыць арганізацыю",
       "unavailablePersonallySwitchAction": "Пераключыць арганізацыю",
-      "unavailableOrganizationTitle": "Council review недаступны",
+      "unavailableOrganizationTitle": "{\"value\": \"Калегіяльная праверка зараз недаступная\"}",
       "unavailableForOrganization": "Калегіяльная праверка патрабуе план Enterprise з актыўнай падпіскай або пробным перыядам. Зараз у гэтай арганізацыі яго няма.",
       "unavailableForOrganizationNeutral": "Калегіяльная праверка зараз недаступная для гэтай арганізацыі. Паспрабуйце пазней.",
       "unavailableOnBitbucket": "Калегіяльная праверка недаступная для рэпазіторыяў Bitbucket.",

@@ -1446,7 +1446,7 @@
       "unavailablePersonally": "بازبینی شورایی بخشی از حساب شخصی نیست. به یک سازمان Enterprise نیاز دارد.",
       "unavailablePersonallyAction": "ایجاد سازمان",
       "unavailablePersonallySwitchAction": "تغییر سازمان",
-      "unavailableOrganizationTitle": "Council review در دسترس نیست",
+      "unavailableOrganizationTitle": "{\"value\": \"بازبینی شورایی در حال حاضر در دسترس نیست\"}",
       "unavailableForOrganization": "بازبینی شورایی به طرح Enterprise با اشتراک فعال یا دوره آزمایشی نیاز دارد. این سازمان در حال حاضر آن را ندارد.",
       "unavailableForOrganizationNeutral": "بازبینی شورایی برای این سازمان در حال حاضر در دسترس نیست. لطفاً بعداً دوباره تلاش کنید.",
       "unavailableOnBitbucket": "بازبینی شورایی برای مخازن Bitbucket در دسترس نیست.",

@@ -1446,7 +1446,7 @@
       "unavailablePersonally": "የጉባኤ ግምገማ የግል መለያ አካል አይደለም። የEnterprise ድርጅት ያስፈልገዋል።",
       "unavailablePersonallyAction": "ድርጅት ፍጠር",
       "unavailablePersonallySwitchAction": "ድርጅት ይቀይሩ",
-      "unavailableOrganizationTitle": "Council review አይገኝም",
+      "unavailableOrganizationTitle": "{\"value\": \"የጉባኤ ግምገማ አሁን አይገኝም\"}",
       "unavailableForOrganization": "የጉባኤ ግምገማ ንቁ የደንበኝነት ምዝገባ ወይም የሙከራ ጊዜ ያለው የEnterprise ዕቅድ ይፈልጋል። ይህ ድርጅት አሁን የለውም።",
       "unavailableForOrganizationNeutral": "የጉባኤ ግምገማ ለዚህ ድርጅት አሁን አይገኝም። በኋላ እንደገና ይሞክሩ።",
       "unavailableOnBitbucket": "የጉባኤ ግምገማ ለBitbucket ማከማቻዎች አይገኝም።",

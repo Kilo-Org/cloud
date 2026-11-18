@@ -1446,7 +1446,7 @@
       "unavailablePersonally": "Revizyon konsèy se pa yon kont pèsonèl. Li bezwen yon òganizasyon Enterprise.",
       "unavailablePersonallyAction": "Kreye yon òganizasyon",
       "unavailablePersonallySwitchAction": "Chanje òganizasyon",
-      "unavailableOrganizationTitle": "Council review pa disponib",
+      "unavailableOrganizationTitle": "{\"value\": \"Revizyon konsèy pa disponib\"}",
       "unavailableForOrganization": "Revizyon konsèy bezwen plan Enterprise a ak yon abònman oswa yon peryòd esè aktif. Òganizasyon sa a pa gen li kounye a.",
       "unavailableForOrganizationNeutral": "Revizyon konsèy pa disponib pou òganizasyon sa a kounye a. Eseye ankò pita.",
       "unavailableOnBitbucket": "Revizyon konsèy pa disponib pou depo Bitbucket.",

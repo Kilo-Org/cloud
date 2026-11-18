@@ -904,7 +904,7 @@
       "unavailablePersonally": "סקירת מועצה אינה חלק מחשבון אישי. היא דורשת ארגון Enterprise.",
       "unavailablePersonallyAction": "יצירת ארגון",
       "unavailablePersonallySwitchAction": "החלף ארגון",
-      "unavailableOrganizationTitle": "Council review אינו זמין",
+      "unavailableOrganizationTitle": "{\"value\": \"סקירת מועצה אינה זמינה\"}",
       "unavailableForOrganization": "סקירת מועצה דורשת את תוכנית Enterprise עם מינוי פעיל או תקופת ניסיון. אין לארגון הזה אותה כרגע.",
       "unavailableForOrganizationNeutral": "סקירת מועצה אינה זמינה לארגון הזה כרגע. נסו שוב מאוחר יותר.",
       "unavailableOnBitbucket": "סקירת מועצה אינה זמינה עבור מאגרי Bitbucket.",

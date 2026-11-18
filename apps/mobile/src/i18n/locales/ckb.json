@@ -1446,7 +1446,7 @@
       "unavailablePersonally": "پێداچوونەوەی ئەنجومەن بەشێک نییە لە هەژماری کەسی. پێویستی بە ڕێکخراوێکی Enterprise هەیە.",
       "unavailablePersonallyAction": "ڕێکخراو دروست بکە",
       "unavailablePersonallySwitchAction": "ڕێکخراو بگۆڕە",
-      "unavailableOrganizationTitle": "Council review بەردەست نییە",
+      "unavailableOrganizationTitle": "{\"value\": \"پێداچوونەوەی ئەنجومەن ئێستا بەردەست نییە\"}",
       "unavailableForOrganization": "پێداچوونەوەی ئەنجومەن پێویستی بە پلانی Enterprise هەیە کە ئەندامێتی چالاک یان ماوەی تاقیکردنەوەی هەبێت. ئەم ڕێکخراوە ئێستا ئەوەی نییە.",
       "unavailableForOrganizationNeutral": "پێداچوونەوەی ئەنجومەن بۆ ئەم ڕێکخراوە ئێستا بەردەست نییە. تکایە دواتر هەوڵ بدەرەوە.",
       "unavailableOnBitbucket": "پێداچوونەوەی ئەنجومەن بۆ کۆگاکانی Bitbucket بەردەست نییە.",

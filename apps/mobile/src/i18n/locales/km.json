@@ -1446,7 +1446,7 @@
       "unavailablePersonally": "ការត្រួតពិនិត្យដោយក្រុមប្រឹក្សាមិនរួមបញ្ចូលក្នុងគណនីផ្ទាល់ខ្លួនទេ។ វាត្រូវការអង្គការ Enterprise ។",
       "unavailablePersonallyAction": "បង្កើតអង្គការ",
       "unavailablePersonallySwitchAction": "ប្តូរអង្គការ",
-      "unavailableOrganizationTitle": "Council review មិនអាចប្រើបាន",
+      "unavailableOrganizationTitle": "{\"value\": \"ការត្រួតពិនិត្យដោយក្រុមប្រឹក្សាមិនមាននៅពេលនេះទេ\"}",
       "unavailableForOrganization": "ការត្រួតពិនិត្យដោយក្រុមប្រឹក្សាត្រូវការគម្រោង Enterprise ដែលមានការជាវសកម្ម ឬការសាកល្បង។ អង្គការនេះមិនមានវានៅពេលនេះទេ។",
       "unavailableForOrganizationNeutral": "ការត្រួតពិនិត្យដោយក្រុមប្រឹក្សាមិនមានសម្រាប់អង្គការនេះនៅពេលនេះទេ។ សូមព្យាយាមម្តងទៀតនៅពេលក្រោយ។",
       "unavailableOnBitbucket": "ការត្រួតពិនិត្យដោយក្រុមប្រឹក្សាមិនមានសម្រាប់ឃ្លាំងកូដ Bitbucket ទេ។",

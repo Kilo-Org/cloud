@@ -1446,7 +1446,7 @@
       "unavailablePersonally": "Советниот преглед не е дел од лична сметка. Потребна е Enterprise организација.",
       "unavailablePersonallyAction": "Креирај организација",
       "unavailablePersonallySwitchAction": "Префрли организација",
-      "unavailableOrganizationTitle": "Council review не е достапно",
+      "unavailableOrganizationTitle": "{\"value\": \"Советен преглед не е достапен\"}",
       "unavailableForOrganization": "Советниот преглед бара Enterprise план со активна претплата или пробен период. Оваа организација во моментов го нема.",
       "unavailableForOrganizationNeutral": "Советниот преглед не е достапен за оваа организација во моментов. Обидете се повторно подоцна.",
       "unavailableOnBitbucket": "Советниот преглед не е достапен за Bitbucket складишта.",

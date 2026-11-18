@@ -37,6 +37,10 @@ describe('Tabs layout with the keyboard raised', () => {
   });
 
   afterEach(() => {
+    // Module-level state: the wiring test installs the sheet segments and must
+    // return the holder to its default however the test exits, or the remaining
+    // suites render the layout in a state they were not written for.
+    segments.current = ['(app)', '(tabs)', '(0_home)'];
     for (const result of mounts) {
       result.unmount();
     }
@@ -70,8 +74,6 @@ describe('Tabs layout with the keyboard raised', () => {
     const coveredOptions = screenOptions(covered.renderer);
     const coveredEntry = coveredOptions.tabBarButton({});
     expect(coveredEntry.props.hiddenFromA11y).toBe(true);
-
-    segments.current = ['(app)', '(tabs)', '(0_home)'];
   });
 
   it('steps the whole bar out of the IME’s way instead of leaving a clipped icon strip', async () => {

@@ -57,6 +57,7 @@ export function TabBarButton({
   // bar marks that entry as selected; the window is armed as a same-tab one so
   // the scene keeps the claim for its own bounded settle.
   const sameTab = ariaSelected === true;
+  const hidden = hiddenFromA11y === true;
   return (
     <Pressable
       {...props}
@@ -66,8 +67,8 @@ export function TabBarButton({
       // content is what a reader reaches (see the tabs layout, which passes
       // `hiddenFromA11y` while a form sheet route is presented). The entry keeps
       // taking sighted touches — only the accessibility tree changes.
-      accessibilityElementsHidden={hiddenFromA11y === true}
-      importantForAccessibility={hiddenFromA11y ? 'no-hide-descendants' : 'auto'}
+      accessibilityElementsHidden={hidden}
+      importantForAccessibility={hidden ? 'no-hide-descendants' : 'auto'}
       onPressIn={event => {
         pressed.current = true;
         markTabSwitchPending(Date.now(), { sameTab });

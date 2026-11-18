@@ -61,10 +61,12 @@ import { kv } from './schema';
  * succeeds clears the count. A busy or locked failure is the third case. A
  * lock is evidence about another connection, not about the file, so it is
  * reported under the open operation and rethrown with the file and the key
- * intact — including a lock that surfaces inside the migration, which is
- * reported there under the open operation instead of the migration one. The
- * memo is dropped for it, so the next caller retries the open after the lock
- * clears.
+ * intact — including a lock or an engine limit that surfaces inside the
+ * migration, which is reported there under the open operation instead of the
+ * migration one. The memo is dropped for both, so the next caller retries
+ * the open once the lock clears or the limit lifts; a monotonic cooldown
+ * bounds the retries after the first one, and a clean open or a locked
+ * device ends the episode and its cooldown.
  */
 
 const DATABASE_NAME = 'kilo-persist.db';
@@ -622,10 +624,13 @@ async function openWhenProtectedDataAvailable(): Promise<KVDatabase> {
       endBusyEpisode();
     }
     // A busy failure is transient: the lock clears, so the open must retry
-    // instead of rejecting for the rest of the process. The cooldown bounds
-    // the retry: inside the window the memoized rejection fails fast, and a
-    // longer lock costs one open per window instead of one per store call.
-    if (isBusySignal(error)) {
+    // instead of rejecting for the rest of the process. An engine limit behaves
+    // the same way from the caller's side — the person frees disk space or the
+    // permission is restored while the app keeps running — so it reuses this
+    // retry instead of staying memoized until relaunch. The cooldown bounds the
+    // retry: inside the window the memoized rejection fails fast, and a longer
+    // lock or limit costs one open per window instead of one per store call.
+    if (isBusySignal(error) || isEnvironmentSignal(error)) {
       if (cooldownNow() >= busyRetryNotBefore) {
         // Drop the memo and start the window. The flag stays false: nothing
         // is memoized now, and the guard must not fire on the reopen this
@@ -653,11 +658,12 @@ async function openDatabase(): Promise<KVDatabase> {
   // is transient: a wrong key, a corrupt file, and a build without SQLCipher
   // all need a relaunch or a rebuild. Two exceptions drop the memo and retry
   // on the next call: a locked device (see `openWhenProtectedDataAvailable`)
-  // and a busy or locked engine failure, which the same function clears.
-  // The busy retry is bounded by a cooldown: inside the window the memoized
-  // busy rejection fails fast, and once the window passes the memo is
-  // dropped, so the next caller reopens after the lock cleared. This branch
-  // also claims the retry by clearing the flag, so concurrent callers that
+  // and a busy, locked, or engine-limit failure, which the same function
+  // clears. The retry is bounded by a cooldown: inside the window the
+  // memoized rejection fails fast, and once the window passes the memo is
+  // dropped, so the next caller reopens after the lock cleared or the limit
+  // lifted. This branch also claims the retry by clearing the flag, so
+  // concurrent callers that
   // arrive while the reopen is in flight await the same promise instead of
   // each starting another open.
   if (openPromise && busyMemoRejected && cooldownNow() >= busyRetryNotBefore) {

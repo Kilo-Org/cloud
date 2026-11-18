@@ -1284,6 +1284,55 @@ describe('busy open failure keeps the database', () => {
 
     vi.useRealTimers();
   });
+
+  it('an_engine_limit_drops_the_open_memo_and_retries_like_a_lock', async () => {
+    // Unlike a lock, an engine limit can clear while the app keeps running:
+    // disk space is freed or a permission is restored. The memo must not hold
+    // the rejection until relaunch, so the limit reuses the busy retry and its
+    // cooldown instead of disabling the store for the rest of the process.
+    useMonotonicTestTimers();
+    await setItem('draft:u1', 'k', 'v');
+    const storedKey = store.get(PERSIST_DB_KEY);
+
+    // A full disk fails the probe: the memo drops and the cooldown starts.
+    failEveryProbe = true;
+    nextProbeMessage = 'SQLITE_FULL: database or disk is full';
+    resetEncryptedKvOpenForTests();
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('database or disk is full');
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(store.get(PERSIST_DB_KEY)).toBe(storedKey);
+
+    // The second caller retries the open at once: the first failure dropped
+    // the memo instead of holding the rejection until relaunch.
+    const opensAfterFirstFailure = vi.mocked(SQLite.openDatabaseSync).mock.calls.length;
+    const reportsAfterFirstFailure = vi.mocked(Sentry.captureException).mock.calls.length;
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('database or disk is full');
+    expect(vi.mocked(SQLite.openDatabaseSync).mock.calls.length).toBe(opensAfterFirstFailure + 1);
+    expect(vi.mocked(Sentry.captureException).mock.calls.length).toBe(reportsAfterFirstFailure + 1);
+
+    // A caller inside the window gets the memoized rejection: no second open
+    // attempt blocks the JS thread and no second event files.
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('database or disk is full');
+    expect(vi.mocked(SQLite.openDatabaseSync).mock.calls.length).toBe(opensAfterFirstFailure + 1);
+    expect(vi.mocked(Sentry.captureException).mock.calls.length).toBe(reportsAfterFirstFailure + 1);
+
+    // The window passes: one open per window. The limit is still in force.
+    vi.advanceTimersByTime(11_000);
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('database or disk is full');
+    expect(vi.mocked(SQLite.openDatabaseSync).mock.calls.length).toBeGreaterThan(
+      opensAfterFirstFailure
+    );
+
+    // The limit lifts inside the new window: the next caller reopens the same
+    // file and reads the value the failed opens never touched.
+    failEveryProbe = false;
+    vi.advanceTimersByTime(11_000);
+    await expect(getItem('draft:u1', 'k')).resolves.toBe('v');
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(Crypto.getRandomBytesAsync).toHaveBeenCalledTimes(1);
+
+    vi.useRealTimers();
+  });
 });
 
 describe('database key validation', () => {

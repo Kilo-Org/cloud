@@ -6,7 +6,10 @@ import {
   type CollaboratorPermission,
   type GitHubAppType,
 } from '@/lib/integrations/platforms/github/adapter';
-import { assertGitHubInstallationRuntimeAuthorized } from '@/lib/integrations/github/runtime-authorization';
+import {
+  assertGitHubInstallationRuntimeAuthorized,
+  GitHubRuntimeAuthorizationError,
+} from '@/lib/integrations/github/runtime-authorization';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 
 export const GITHUB_REPOSITORY_PERMISSION_CACHE_TTL_MS = 5 * 60_000;
@@ -134,6 +137,19 @@ function rateLimitedAccessRequiredMarkdown(repository: string): string {
   );
 }
 
+/**
+ * Not a permission refusal: the installation's runtime authorization is
+ * rejected (disconnected, suspended, or removed), so the question could not be
+ * asked at all.
+ */
+function installationUnavailableMarkdown(repository: string): string {
+  return (
+    `I couldn't check \`${repository}\` because its GitHub connection is currently ` +
+    "unavailable, so I didn't start any work. Ask an organization admin to reconnect the " +
+    'GitHub app, then mention me again.'
+  );
+}
+
 function notAllowed(repository: string | null): GitHubRepositoryAuthorization {
   return { allowed: false, markdown: writeAccessRequiredMarkdown(repository) };
 }
@@ -142,7 +158,12 @@ function isSameRepository(left: string, right: string): boolean {
   return left.trim().toLowerCase() === right.trim().toLowerCase();
 }
 
-type WriteAccessResult = 'allowed' | 'denied' | 'transient' | 'rate_limited';
+type WriteAccessResult =
+  | 'allowed'
+  | 'denied'
+  | 'transient'
+  | 'rate_limited'
+  | 'installation_unavailable';
 
 type PermissionLookup =
   | { status: 'answered'; permission: CollaboratorPermission | null }
@@ -150,34 +171,35 @@ type PermissionLookup =
   | { status: 'rate_limited'; error: GitHubRateLimitError };
 
 /**
- * Asks GitHub for the collaborator permission at most twice: a single failure
- * must not end the action, and neither must a definitive null on the first ask
- * (the adapter returns null for a 404, and one retry covers a lookup that raced
- * an installation change). A null on the retry is answered: GitHub said no.
- * Two thrown failures in a row mean GitHub stayed unreachable. A typed
- * rate-limit failure is not retried: another request before `resetAt` cannot
- * succeed and extends GitHub's penalty, so that attempt ends the lookup.
+ * Asks GitHub for the collaborator permission at most twice: a single thrown
+ * failure must not end the action. A null settles the lookup as the definitive
+ * no-answer (unknown actor or removed installation), so it is never retried;
+ * only thrown failures take the second attempt. Two thrown failures in a row
+ * mean GitHub stayed unreachable. A typed rate-limit failure is not retried:
+ * another request before `resetAt` cannot succeed and extends GitHub's
+ * penalty, so that attempt ends the lookup.
  */
 async function lookupRepositoryPermission(
   permissionInput: GitHubRepositoryPermissionInput,
   fetchPermission: FetchRepositoryPermission | undefined
 ): Promise<PermissionLookup> {
-  let lastError: unknown = null;
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const permission = await getGitHubRepositoryPermission(permissionInput, fetchPermission);
-      if (permission !== null) return { status: 'answered', permission };
-      lastError = null;
-    } catch (error) {
-      if (error instanceof GitHubRateLimitError) return { status: 'rate_limited', error };
-      lastError = error;
-    }
+  try {
+    const permission = await getGitHubRepositoryPermission(permissionInput, fetchPermission);
+    return { status: 'answered', permission };
+  } catch (error) {
+    if (error instanceof GitHubRateLimitError) return { status: 'rate_limited', error };
   }
-  if (lastError === null) return { status: 'answered', permission: null };
-  return {
-    status: 'unreachable',
-    error: lastError instanceof Error ? lastError.message : String(lastError),
-  };
+  // Retry once for a thrown failure; a null answer never reaches here.
+  try {
+    const permission = await getGitHubRepositoryPermission(permissionInput, fetchPermission);
+    return { status: 'answered', permission };
+  } catch (error) {
+    if (error instanceof GitHubRateLimitError) return { status: 'rate_limited', error };
+    return {
+      status: 'unreachable',
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 async function hasRepositoryWriteAccess(params: {
@@ -207,12 +229,20 @@ async function hasRepositoryWriteAccess(params: {
       params.platformIntegrationId
     );
   } catch (error) {
+    if (error instanceof GitHubRuntimeAuthorizationError) {
+      console.warn('[KiloBot] GitHub installation is unavailable for runtime use:', {
+        repository: params.repository,
+        platformIntegrationId: params.platformIntegrationId,
+        reason: error.reason,
+      });
+      return 'installation_unavailable';
+    }
     console.warn('[KiloBot] Failed to verify GitHub repository access:', {
       repository: params.repository,
       platformIntegrationId: params.platformIntegrationId,
       error: error instanceof Error ? error.message : String(error),
     });
-    return 'denied';
+    return 'transient';
   }
 
   const lookup = await lookupRepositoryPermission(permissionInput, params.fetchPermission);
@@ -286,7 +316,10 @@ export async function authorizeGitHubRepository(params: {
   if (writeAccess === 'transient') {
     return { allowed: false, markdown: transientAccessRequiredMarkdown(repository) };
   }
-  if (writeAccess === 'rate_limited' && repository !== null) {
+  if (writeAccess === 'installation_unavailable') {
+    return { allowed: false, markdown: installationUnavailableMarkdown(repository) };
+  }
+  if (writeAccess === 'rate_limited') {
     return { allowed: false, markdown: rateLimitedAccessRequiredMarkdown(repository) };
   }
   return notAllowed(repository);

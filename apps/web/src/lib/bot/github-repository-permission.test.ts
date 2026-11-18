@@ -1,9 +1,13 @@
 jest.mock('@/lib/integrations/github/runtime-authorization', () => ({
+  GitHubRuntimeAuthorizationError: class GitHubRuntimeAuthorizationError extends Error {},
   assertGitHubInstallationRuntimeAuthorized: jest.fn(async () => undefined),
 }));
 
 import type { PlatformIntegration } from '@kilocode/db';
-import { assertGitHubInstallationRuntimeAuthorized } from '@/lib/integrations/github/runtime-authorization';
+import {
+  assertGitHubInstallationRuntimeAuthorized,
+  GitHubRuntimeAuthorizationError,
+} from '@/lib/integrations/github/runtime-authorization';
 import {
   authorizeGitHubRepository,
   getGitHubRepositoryPermission,
@@ -82,33 +86,18 @@ describe('authorizeGitHubRepository', () => {
     expect(result).toEqual({ allowed: false, markdown: expect.stringContaining('write access') });
   });
 
-  test('a repeatedly failing permission lookup is denied after one retry', async () => {
+  test('a definitive no-permission answer is not retried', async () => {
     const fetchPermission = createFetchPermission(null);
 
     const result = await authorizeGitHubRepository({
       platformIntegration: createIntegration(),
-      repository: 'acme/lookup-failure',
+      repository: 'acme/no-answer',
       actorLogin: 'octocat',
       fetchPermission,
     });
 
     expect(result.allowed).toBe(false);
-    expect(fetchPermission).toHaveBeenCalledTimes(2);
-  });
-
-  test('a transient permission lookup failure recovers on the retry', async () => {
-    const fetchPermission = createFetchPermission(null);
-    fetchPermission.mockResolvedValueOnce(null).mockResolvedValueOnce('write');
-
-    const result = await authorizeGitHubRepository({
-      platformIntegration: createIntegration(),
-      repository: 'acme/transient',
-      actorLogin: 'octocat',
-      fetchPermission,
-    });
-
-    expect(result).toEqual({ allowed: true });
-    expect(fetchPermission).toHaveBeenCalledTimes(2);
+    expect(fetchPermission).toHaveBeenCalledTimes(1);
   });
 
   test('an unreachable GitHub is reported as temporary, not as a denial', async () => {
@@ -153,7 +142,7 @@ describe('authorizeGitHubRepository', () => {
 
   test('a permission lookup that fails once is retried and allowed', async () => {
     const fetchPermission = createFetchPermission('write');
-    fetchPermission.mockRejectedValueOnce(new Error('Bad gateway')).mockResolvedValueOnce('write');
+    fetchPermission.mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce('write');
 
     const result = await authorizeGitHubRepository({
       platformIntegration: createIntegration(),
@@ -274,18 +263,40 @@ describe('authorizeGitHubRepository', () => {
     expect(fetchPermission).not.toHaveBeenCalled();
   });
 
-  test('a rejected installation authorization denies the action', async () => {
-    mockedAssertAuthorized.mockRejectedValueOnce(new Error('integration suspended'));
+  test('a rejected installation authorization reports the connection unavailable', async () => {
+    mockedAssertAuthorized.mockRejectedValueOnce(new GitHubRuntimeAuthorizationError());
     const fetchPermission = createFetchPermission('write');
 
     const result = await authorizeGitHubRepository({
       platformIntegration: createIntegration(),
-      repository: 'acme/suspended',
+      repository: 'acme/disconnected',
       actorLogin: 'octocat',
       fetchPermission,
     });
 
     expect(result.allowed).toBe(false);
+    if (result.allowed) throw new Error('expected a refusal');
+    expect(result.markdown).toContain('`acme/disconnected`');
+    expect(result.markdown).toContain('reconnect');
+    expect(result.markdown).toContain('organization admin');
+    expect(fetchPermission).not.toHaveBeenCalled();
+  });
+
+  test('an unexpected pre-check failure is reported as temporary, not as a denial', async () => {
+    mockedAssertAuthorized.mockRejectedValueOnce(new Error('database unavailable'));
+    const fetchPermission = createFetchPermission('write');
+
+    const result = await authorizeGitHubRepository({
+      platformIntegration: createIntegration(),
+      repository: 'acme/precheck-failure',
+      actorLogin: 'octocat',
+      fetchPermission,
+    });
+
+    expect(result.allowed).toBe(false);
+    if (result.allowed) throw new Error('expected a refusal');
+    expect(result.markdown).toContain('`acme/precheck-failure`');
+    expect(result.markdown).toContain('temporary');
     expect(fetchPermission).not.toHaveBeenCalled();
   });
 });

@@ -9,7 +9,10 @@ import { MAX_INLINE_COMMENT_BODY_CHARS } from '@/lib/code-reviews/core/constants
 import { type GitHubAppType, getGitHubAppCredentials } from './app-selector';
 import { isGitHubOwnerName, isGitHubRepositoryName } from './repository-coordinates';
 import { lastLinkedPage } from './link-header';
-import { assertGitHubInstallationRuntimeAuthorized } from '../../github/runtime-authorization';
+import {
+  assertGitHubInstallationRuntimeAuthorized,
+  GitHubRuntimeAuthorizationError,
+} from '../../github/runtime-authorization';
 
 export type { GitHubAppType } from './app-selector';
 
@@ -441,10 +444,12 @@ export async function hasPRCommentWithMarker(
 /**
  * Returns the permission string ('admin' | 'maintain' | 'write' | 'read' | 'none') or null
  * when GitHub gives a definitive non-answer: the collaborator is unknown (404), GitHub
- * reports a permission outside the known set, or the installation is gone (the token mint
- * answers 404). Rate limits, server errors and network failures — from the token mint or
- * the lookup itself — are thrown so callers can decide whether to retry rather than
- * treating a temporary failure as a denial.
+ * reports a permission outside the known set, any other non-rate-limit 4xx from the token
+ * mint or the lookup, or the installation is unavailable (the mint answers 404 or the
+ * runtime authorization rejects the installation). Rate limits are thrown as typed
+ * {@link GitHubRateLimitError}s so callers can surface the reset time; server errors and
+ * network failures are thrown so callers can decide whether to retry rather than treating
+ * a temporary failure as a denial.
  */
 export type CollaboratorPermission = 'admin' | 'maintain' | 'write' | 'read' | 'none';
 
@@ -468,16 +473,26 @@ export async function getCollaboratorPermissionLevel(
   } catch (error) {
     // GitHub answers the token mint for an installation it no longer exposes
     // (removed or suspended) with a 404; without a token this App cannot query
-    // collaborators at all, so that is a definitive null. Everything else is a
-    // temporary failure and propagates like a lookup failure.
+    // collaborators at all, so that is a definitive null.
     if (isHttpError(error) && error.status === 404) return null;
+    // A rejected installation runtime authorization means no installation is
+    // connected for this request — a definitive "no installation connected"
+    // answer, not something to retry.
+    if (error instanceof GitHubRuntimeAuthorizationError) return null;
+    // 429 and rate-shaped 403s are typed rate-limit failures so callers can
+    // surface the reset time.
+    const rateLimit = toGitHubRateLimitError(error);
+    if (rateLimit) throw rateLimit;
+    // Any other 4xx (401/403 the installation cannot query collaborators, 422)
+    // is a definitive non-answer, not something to retry.
+    if (isHttpError(error) && error.status >= 400 && error.status < 500) return null;
     warnExceptInTest('[getCollaboratorPermissionLevel] Installation token mint failed', {
       installationId,
       owner,
       repo,
       error: error instanceof Error ? error.message : String(error),
     });
-    throw toGitHubRateLimitError(error) ?? error;
+    throw error;
   }
   const octokit = new Octokit({ auth: tokenData.token });
 
@@ -494,14 +509,23 @@ export async function getCollaboratorPermissionLevel(
     }
     return null;
   } catch (error) {
+    // GitHub answers for an unknown collaborator (or a repository the
+    // installation cannot reach) with a 404; that is a definitive null.
     if (isHttpError(error) && error.status === 404) return null;
+    // 429 and rate-shaped 403s are typed rate-limit failures so callers can
+    // surface the reset time.
+    const rateLimit = toGitHubRateLimitError(error);
+    if (rateLimit) throw rateLimit;
+    // Any other 4xx (401/403 the installation cannot query collaborators, 422)
+    // is a definitive non-answer, not something to retry.
+    if (isHttpError(error) && error.status >= 400 && error.status < 500) return null;
     warnExceptInTest('[getCollaboratorPermissionLevel] Collaborator lookup failed', {
       owner,
       repo,
       username,
       error: error instanceof Error ? error.message : String(error),
     });
-    throw toGitHubRateLimitError(error) ?? error;
+    throw error;
   }
 }
 

@@ -8,6 +8,7 @@ jest.mock('@octokit/rest', () => ({
 }));
 jest.mock('./app-selector', () => ({ getGitHubAppCredentials: jest.fn() }));
 jest.mock('../../github/runtime-authorization', () => ({
+  GitHubRuntimeAuthorizationError: class GitHubRuntimeAuthorizationError extends Error {},
   assertGitHubInstallationRuntimeAuthorized: (...args: unknown[]) => mockAuthorize(...args),
 }));
 
@@ -17,6 +18,7 @@ import {
   getCollaboratorPermissionLevel,
   GitHubRateLimitError,
 } from './adapter';
+import { GitHubRuntimeAuthorizationError } from '../../github/runtime-authorization';
 
 describe('GitHub installation authorization', () => {
   beforeEach(() => {
@@ -105,6 +107,33 @@ describe('GitHub installation authorization', () => {
     ).resolves.toBeNull();
   });
 
+  it('treats a lookup 401 as no answer', async () => {
+    mockPermission.mockRejectedValueOnce({ status: 401, message: 'Bad credentials' });
+
+    await expect(
+      getCollaboratorPermissionLevel('installation-1', 'acme', 'widgets', 'octocat')
+    ).resolves.toBeNull();
+  });
+
+  it('treats a lookup 403 without rate-limit headers as no answer', async () => {
+    mockPermission.mockRejectedValueOnce({
+      status: 403,
+      message: 'Resource not accessible by integration',
+    });
+
+    await expect(
+      getCollaboratorPermissionLevel('installation-1', 'acme', 'widgets', 'octocat')
+    ).resolves.toBeNull();
+  });
+
+  it('treats a lookup 422 as no answer', async () => {
+    mockPermission.mockRejectedValueOnce({ status: 422, message: 'Validation Failed' });
+
+    await expect(
+      getCollaboratorPermissionLevel('installation-1', 'acme', 'widgets', 'octocat')
+    ).resolves.toBeNull();
+  });
+
   it('throws a rate-limit failure instead of reporting no answer', async () => {
     mockPermission.mockRejectedValueOnce({
       status: 429,
@@ -128,6 +157,46 @@ describe('GitHub installation authorization', () => {
 
   it('returns no answer when the token mint answers 404 for the installation', async () => {
     mockAuth.mockRejectedValueOnce({ status: 404, message: 'Not Found' });
+
+    await expect(
+      getCollaboratorPermissionLevel('installation-1', 'acme', 'widgets', 'octocat')
+    ).resolves.toBeNull();
+    expect(mockPermission).not.toHaveBeenCalled();
+  });
+
+  it('returns no answer when the token mint rejects the runtime authorization', async () => {
+    mockAuthorize.mockRejectedValueOnce(new GitHubRuntimeAuthorizationError('suspended'));
+
+    await expect(
+      getCollaboratorPermissionLevel('installation-1', 'acme', 'widgets', 'octocat')
+    ).resolves.toBeNull();
+    expect(mockAuth).not.toHaveBeenCalled();
+    expect(mockPermission).not.toHaveBeenCalled();
+  });
+
+  it('returns no answer when the token mint answers 401 for the installation', async () => {
+    mockAuth.mockRejectedValueOnce({ status: 401, message: 'Bad credentials' });
+
+    await expect(
+      getCollaboratorPermissionLevel('installation-1', 'acme', 'widgets', 'octocat')
+    ).resolves.toBeNull();
+    expect(mockPermission).not.toHaveBeenCalled();
+  });
+
+  it('returns no answer when the token mint answers 403 without rate-limit headers', async () => {
+    mockAuth.mockRejectedValueOnce({
+      status: 403,
+      message: 'Resource not accessible by integration',
+    });
+
+    await expect(
+      getCollaboratorPermissionLevel('installation-1', 'acme', 'widgets', 'octocat')
+    ).resolves.toBeNull();
+    expect(mockPermission).not.toHaveBeenCalled();
+  });
+
+  it('returns no answer when the token mint answers 422 for the installation', async () => {
+    mockAuth.mockRejectedValueOnce({ status: 422, message: 'Validation Failed' });
 
     await expect(
       getCollaboratorPermissionLevel('installation-1', 'acme', 'widgets', 'octocat')

@@ -1,17 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  BYOK_MODEL_LABEL,
   hasUserByokAvailable,
   isFreeModelOption,
   mayTrainOnYourPrompts,
 } from './model-data-disclosure';
 
 describe('model data disclosure', () => {
-  it('keeps the BYOK acronym identical across platforms', () => {
-    expect(BYOK_MODEL_LABEL).toBe('BYOK');
-  });
-
   it('detects explicit and known free model options', () => {
     expect(isFreeModelOption({ id: 'anthropic/claude', isFree: true })).toBe(true);
     expect(isFreeModelOption({ id: 'openrouter/free', isFree: true })).toBe(true);

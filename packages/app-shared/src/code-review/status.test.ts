@@ -4,7 +4,6 @@ import {
   CODE_REVIEW_STATUS_LABELS,
   CODE_REVIEW_STATUSES,
   hasInFlightReview,
-  isCancellableReviewStatus,
   isInFlightReviewStatus,
   isRetriggerableReviewStatus,
 } from './status';
@@ -21,7 +20,7 @@ describe('CODE_REVIEW_STATUS_LABELS', () => {
   });
 });
 
-describe('isInFlightReviewStatus / isCancellableReviewStatus', () => {
+describe('isInFlightReviewStatus', () => {
   it('matches pending, queued, running', () => {
     expect(isInFlightReviewStatus('pending')).toBe(true);
     expect(isInFlightReviewStatus('queued')).toBe(true);
@@ -30,12 +29,6 @@ describe('isInFlightReviewStatus / isCancellableReviewStatus', () => {
     expect(isInFlightReviewStatus('failed')).toBe(false);
     expect(isInFlightReviewStatus('cancelled')).toBe(false);
     expect(isInFlightReviewStatus('interrupted')).toBe(false);
-  });
-
-  it('agrees with isCancellableReviewStatus for every status', () => {
-    for (const status of CODE_REVIEW_STATUSES) {
-      expect(isCancellableReviewStatus(status)).toBe(isInFlightReviewStatus(status));
-    }
   });
 });
 

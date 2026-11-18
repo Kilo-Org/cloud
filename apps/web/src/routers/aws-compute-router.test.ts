@@ -244,6 +244,22 @@ describe('AWS compute owner and persistence contracts', () => {
     await expect(caller.validate({ roleArn })).rejects.toThrow('release update');
     expect((await row()).credentials_encrypted).toEqual(ready.credentials_encrypted);
   });
+  it('ready revalidation keeps runtime keys written during the AWS check', async () => {
+    const caller = personalCaller({ user });
+    await caller.prepare({ accountId });
+    await caller.validate({ roleArn });
+    beforeReply = async input => {
+      if (input.action === 'revalidate')
+        await db
+          .update(byoc_connections)
+          .set({ runtime: { last_verified_at: '2000-01-01T00:00:00.000Z', concurrent: 'kept' } })
+          .where(eq(byoc_connections.user_id, user.id));
+    };
+    await caller.validate({ roleArn });
+    const runtime = (await row()).runtime;
+    expect(runtime.concurrent).toBe('kept');
+    expect(runtime.last_verified_at).not.toBe('2000-01-01T00:00:00.000Z');
+  });
   it('normalizes production PostgreSQL verification timestamps', async () => {
     const caller = personalCaller({ user });
     await caller.prepare({ accountId });

@@ -1,7 +1,7 @@
 import 'server-only';
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { byoc_connections, type ByocConnection } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { AGENT_ENV_VARS_PUBLIC_KEY } from '@kilocode/web-shared/lib/config.server';
@@ -181,7 +181,9 @@ export async function validateAwsCompute(owner: AwsSetupOwner, roleArn: string) 
     await awsSetupRequest({ action: 'revalidate', ...input }, awsVerificationSchema);
     const updated = await db
       .update(byoc_connections)
-      .set({ runtime: { ...row.runtime, last_verified_at: now() } })
+      .set({
+        runtime: sql`${byoc_connections.runtime} || ${JSON.stringify({ last_verified_at: now() })}::jsonb`,
+      })
       .where(
         and(
           ownerCondition(owner),

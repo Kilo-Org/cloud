@@ -633,12 +633,15 @@ export function curatedBodyLines(notes) {
 }
 
 /**
- * The JSON object in a model answer, or null when it carries none. Scans for the
- * first balanced `{...}` rather than accepting only a bare body or a fenced
- * block: a reasoning model may put a sentence, a heading or a fence in front of
- * the object it was asked for, and trailing prose must not hide it either.
+ * Every JSON object in a model answer, in the order it wrote them. Scans for
+ * balanced `{...}` rather than accepting only a bare body or a fenced block: a
+ * reasoning model may put a sentence, a heading or a fence in front of the
+ * object it was asked for, and trailing prose must not hide it either. It may
+ * also echo the prompt's placeholder shape before its real answer, so the
+ * caller checks each object until one passes.
  */
-function parseAnswerJson(content) {
+function parseAnswers(content) {
+  const answers = [];
   for (let start = content.indexOf('{'); start !== -1; start = content.indexOf('{', start + 1)) {
     let depth = 0;
     let inString = false;
@@ -663,15 +666,16 @@ function parseAnswerJson(content) {
         depth -= 1;
         if (depth === 0) {
           try {
-            return JSON.parse(content.slice(start, index + 1));
+            answers.push(JSON.parse(content.slice(start, index + 1)));
           } catch {
-            break; // Not JSON here; a later `{` may open the object instead.
+            // Not JSON here; a later `{` may open the object instead.
           }
+          break;
         }
       }
     }
   }
-  return null;
+  return answers;
 }
 
 /**
@@ -741,17 +745,25 @@ export async function requestCuratedNotes(candidates, options = {}) {
   if (completion === null || completion.content === null) {
     return { error: 'the notes model returned no message content' };
   }
-  const answer = parseAnswerJson(completion.content);
-  if (answer === null) {
+  const answers = parseAnswers(completion.content);
+  if (answers.length === 0) {
     return {
       error: `the notes model returned invalid JSON (${answerDiagnostic(completion)})`,
     };
   }
-  const validated = validateCuratedNotes(answer, candidates);
-  if (validated.error) {
-    return validated;
+  // The model may quote the prompt's placeholder object before it writes the
+  // real answer, so the first object that parses is not the answer to read: the
+  // first that passes is. When none passes, the last object's error is the one
+  // that describes the final answer the model wrote.
+  let invalid = null;
+  for (const answer of answers) {
+    const validated = validateCuratedNotes(answer, candidates);
+    if (!validated.error) {
+      return { lines: curatedBodyLines(validated.notes) };
+    }
+    invalid = validated;
   }
-  return { lines: curatedBodyLines(validated.notes) };
+  return invalid;
 }
 
 /**

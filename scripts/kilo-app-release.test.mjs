@@ -659,6 +659,53 @@ test('body reads the answer past a reasoning field, a preamble and a fence', asy
   }
 });
 
+test('body skips an echoed placeholder shape and reads the answer after it', async () => {
+  const dir = rewriteRepo('kilo-notes-placeholder-');
+  const placeholder = '{"new":["..."],"changes":["..."],"areas":["..."]}';
+  const answer = JSON.stringify({
+    new: ['Keep the composer visible while you read older messages'],
+    changes: [],
+    areas: ['chat'],
+  });
+  const gateway = await fakeGateway(response =>
+    reply(response, {
+      choices: [
+        {
+          finish_reason: 'stop',
+          message: {
+            role: 'assistant',
+            content: `I will reply in the requested shape:\n${placeholder}\n\n${answer}`,
+          },
+        },
+      ],
+    })
+  );
+  try {
+    const result = await runScriptAsync(NOTES, ['body', '--from', 'base'], {
+      cwd: dir,
+      env: { KILO_CHANGELOG_API_KEY: 'test-key', KILO_CHANGELOG_BASE_URL: gateway.baseUrl },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stderr, '');
+    assert.equal(
+      result.stdout,
+      [
+        '### New',
+        '',
+        '- Keep the composer visible while you read older messages',
+        '',
+        '### Fixes',
+        '',
+        '- areas: chat',
+        '',
+      ].join('\n')
+    );
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
 test('body names a reasoning-only answer, and does not log its reasoning', async () => {
   const dir = rewriteRepo('kilo-notes-reasoning-only-');
   const gateway = await fakeGateway(response =>

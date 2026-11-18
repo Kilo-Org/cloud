@@ -16,7 +16,7 @@ it('bounds production EU processing to 450 direct Frankfurt writer calls, 475 wi
   expect(production.vars.USAGE_INGEST_PARALLELISM).toBe('2');
   expect(production.vars.USAGE_INGEST_HEDGE_MODE).toBe('on');
   expect(production.vars.USAGE_INGEST_HEDGE_DELAY_MS).toBe('1000');
-  expect(production.vars.USAGE_INGEST_HEDGE_PERCENT).toBe('50');
+  expect(production.vars.USAGE_INGEST_HEDGE_PERCENT).toBe('100');
   expect(production.vars).not.toHaveProperty('USAGE_INGEST_DIAGNOSTICS');
   expect(production.vars.USAGE_WRITER_SECRET).toBeUndefined();
   expect(production.queues.consumers).toEqual([

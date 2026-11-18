@@ -943,7 +943,14 @@
     "council": {
       "title": "Panelbeoordeling",
       "subtitle": "Meerdere deskundigen beoordelen elke PR en hun stemmen komen samen tot één beslissing.",
-      "unavailable": "Panelbeoordeling is niet beschikbaar voor deze organisatie.",
+      "unavailablePersonallyTitle": "Vereist een Enterprise-organisatie",
+      "unavailablePersonally": "Panelbeoordeling maakt geen deel uit van een persoonlijk account.",
+      "unavailablePersonallyAction": "Organisatie maken",
+      "unavailablePersonallySwitchAction": "Wisselen van organisatie",
+      "unavailableOrganizationTitle": "Panelbeoordeling is op dit moment niet beschikbaar",
+      "unavailableForOrganization": "Panelbeoordeling vereist het Enterprise-plan met een actief abonnement of proefperiode. Deze organisatie heeft het op dit moment niet.",
+      "unavailableForOrganizationNeutral": "Panelbeoordeling is op dit moment niet beschikbaar voor deze organisatie. Probeer het later opnieuw.",
+      "unavailableOnBitbucket": "Panelbeoordeling is niet beschikbaar voor Bitbucket-repositories.",
       "noRepositories": "Nog geen repositories geselecteerd. Kies eerst repositories in de repository-instellingen.",
       "specialists": "Deskundigen",
       "labels": "Tags die panelbeoordeling activeren",
@@ -4703,6 +4710,7 @@
     "superseded": "Deze link is elders vervangen en werkt daarom niet meer."
   },
   "sharedSession": {
+    "startedAt": "Gestart om {{time}}",
     "title": "Gedeelde sessie",
     "someone": "Iemand",
     "sharedBy": "Gedeeld door {{owner}}",
@@ -4858,6 +4866,8 @@
     "modelsDescription": "Schakel een model uit om het voor elk lid te blokkeren. Modellen van toegestane aanbieders staan standaard aan.",
     "modelsDeniedOnly": "Alleen geweigerd",
     "modelsEmpty": "Geen modellen komen overeen met deze zoekopdracht.",
+    "modelsDeniedEmpty": "Geen model is geweigerd.",
+    "modelsDeniedSearchEmpty": "Geen geweigerd model komt overeen met deze zoekopdracht.",
     "providersDescription": "Schakel een aanbieder uit om te voorkomen dat Kilo voor deze organisatie naar die aanbieder routeert.",
     "providersNeedCatalog": "De schakelaars voor aanbieders blijven alleen-lezen totdat de volledige modelcatalogus is geladen. Tik hierboven op Opnieuw proberen om ze te bewerken.",
     "providersEmpty": "Geen aanbieders komen overeen met deze zoekopdracht.",

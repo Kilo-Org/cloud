@@ -947,7 +947,14 @@
     "council": {
       "title": "Przegląd rady",
       "subtitle": "Każdy pull request przegląda kilku specjalistów, a ich głosy łączą się w jedną decyzję.",
-      "unavailable": "Przegląd rady nie jest dostępny dla tej organizacji.",
+      "unavailablePersonallyTitle": "Wymaga organizacji Enterprise",
+      "unavailablePersonally": "Przegląd rady nie jest częścią konta osobistego.",
+      "unavailablePersonallyAction": "Utwórz organizację",
+      "unavailablePersonallySwitchAction": "Przełącz organizację",
+      "unavailableOrganizationTitle": "Przegląd rady nie jest obecnie dostępny",
+      "unavailableForOrganization": "Przegląd rady wymaga planu Enterprise z aktywną subskrypcją lub okresem próbnym. Ta organizacja obecnie go nie ma.",
+      "unavailableForOrganizationNeutral": "Przegląd rady nie jest obecnie dostępny dla tej organizacji. Spróbuj ponownie później.",
+      "unavailableOnBitbucket": "Przegląd rady nie jest dostępny dla repozytoriów Bitbucket.",
       "noRepositories": "Nie wybrano jeszcze żadnego repozytorium. Najpierw wybierz repozytoria w ustawieniach repozytoriów.",
       "specialists": "Specjaliści",
       "labels": "Etykiety uruchamiające przegląd rady",
@@ -4845,6 +4852,7 @@
     "superseded": "Ten link został zastąpiony na innym urządzeniu, więc już nie działa."
   },
   "sharedSession": {
+    "startedAt": "Rozpoczęto o {{time}}",
     "title": "Udostępniona sesja",
     "someone": "Ktoś",
     "sharedBy": "Udostępnione przez: {{owner}}",
@@ -5000,6 +5008,8 @@
     "modelsDescription": "Wyłącz model, aby zablokować go dla wszystkich członków. Modele od dozwolonych dostawców są domyślnie włączone.",
     "modelsDeniedOnly": "Tylko zablokowane",
     "modelsEmpty": "Żadne modele nie pasują do tego wyszukiwania.",
+    "modelsDeniedEmpty": "Żaden model nie jest zablokowany.",
+    "modelsDeniedSearchEmpty": "Żaden zablokowany model nie pasuje do tego wyszukiwania.",
     "providersDescription": "Wyłącz dostawcę, aby Kilo przestało kierować do niego żądania w tej organizacji.",
     "providersNeedCatalog": "Przełączniki dostawców pozostają tylko do odczytu, dopóki nie wczyta się pełny katalog modeli. Aby je edytować, dotknij przycisku Spróbuj ponownie powyżej.",
     "providersEmpty": "Żaden dostawca nie pasuje do tego wyszukiwania.",

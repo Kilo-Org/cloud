@@ -943,7 +943,14 @@
     "council": {
       "title": "Konsey incelemesi",
       "subtitle": "Birkaç uzman her çekme isteğini inceler ve oyları tek bir kararda birleşir.",
-      "unavailable": "Konsey incelemesi bu kuruluş için kullanılamıyor.",
+      "unavailablePersonallyTitle": "Enterprise kuruluşu gerekli",
+      "unavailablePersonally": "Konsey incelemesi kişisel hesabın bir parçası değildir.",
+      "unavailablePersonallyAction": "Kuruluş oluştur",
+      "unavailablePersonallySwitchAction": "Kuruluş değiştir",
+      "unavailableOrganizationTitle": "Konsey incelemesi şu anda mevcut değil",
+      "unavailableForOrganization": "Konsey incelemesi, etkin bir abonelik veya deneme süresi olan Enterprise planını gerektirir. Bu kuruluşta şu anda mevcut değil.",
+      "unavailableForOrganizationNeutral": "Konsey incelemesi şu anda bu kuruluş için mevcut değil. Daha sonra tekrar deneyin.",
+      "unavailableOnBitbucket": "Konsey incelemesi Bitbucket depoları için kullanılamıyor.",
       "noRepositories": "Henüz depo seçilmedi. Önce depo ayarlarından depo seç.",
       "specialists": "Uzmanlar",
       "labels": "Konsey incelemesini tetikleyen etiketler",
@@ -4703,6 +4710,7 @@
     "superseded": "Bu bağlantı başka bir cihazdan yenisiyle değiştirildiği için artık çalışmıyor."
   },
   "sharedSession": {
+    "startedAt": "{{time}}'de başladı",
     "title": "Paylaşılan oturum",
     "someone": "Biri",
     "sharedBy": "Paylaşan: {{owner}}",
@@ -4858,6 +4866,8 @@
     "modelsDescription": "Bir modeli her üye için engellemek üzere kapatın. İzin verilen sağlayıcılardan gelen modeller açık başlar.",
     "modelsDeniedOnly": "Yalnızca engellenenler",
     "modelsEmpty": "Bu aramayla eşleşen model yok.",
+    "modelsDeniedEmpty": "Engellenen model yok.",
+    "modelsDeniedSearchEmpty": "Bu aramayla eşleşen engellenen model yok.",
     "providersDescription": "Kilo'nun bu kuruluş için o sağlayıcıya yönlendirme yapmasını durdurmak üzere bir sağlayıcıyı kapatın.",
     "providersNeedCatalog": "Tam model kataloğu yüklenene kadar sağlayıcı anahtarları salt okunur kalır. Bunları düzenlemek için yukarıdaki Tekrar dene düğmesine dokunun.",
     "providersEmpty": "Bu aramayla eşleşen sağlayıcı yok.",

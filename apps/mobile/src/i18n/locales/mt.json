@@ -1561,7 +1561,14 @@
     "council": {
       "title": "Reviżjoni tal-kunsill",
       "subtitle": "Diversi speċjalisti jirrevedu kull PR, u l-voti tagħhom jingħaqdu f'deċiżjoni waħda.",
-      "unavailable": "Ir-reviżjoni tal-kunsill mhijiex disponibbli għal din l-organizzazzjoni.",
+      "unavailablePersonallyTitle": "Jeħtieġ organizzazzjoni Enterprise",
+      "unavailablePersonally": "Ir-reviżjoni tal-kunsill m'hijiex parti minn kont personali.",
+      "unavailablePersonallyAction": "Oħloq organizazzjoni",
+      "unavailablePersonallySwitchAction": "Ibdel organizzazzjoni",
+      "unavailableOrganizationTitle": "Reviżjoni tal-kunsill mhix disponibbli",
+      "unavailableForOrganization": "Ir-reviżjoni tal-kunsill tirrikjedi l-pjan Enterprise b'sottoskrizzjoni jew perjodu ta' prova attiv. Din l-organizzazzjoni m'għandhiex bħalissa.",
+      "unavailableForOrganizationNeutral": "Ir-reviżjoni tal-kunsill mhix disponibbli għal din l-organizzazzjoni bħalissa. Erġa' pprova aktar tard.",
+      "unavailableOnBitbucket": "Ir-reviżjoni tal-kunsill mhijiex disponibbli għal repożitorji Bitbucket.",
       "noRepositories": "Għad m'hemm l-ebda repożitorju magħżul. Agħżel repożitorji fl-issettjar tar-repożitorji l-ewwel.",
       "specialists": "Speċjalisti",
       "labels": "Tikketti li jattivaw ir-reviżjoni tal-kunsill",
@@ -4916,6 +4923,7 @@
     "superseded": "Dan il-link ġie sostitwit minn post ieħor, għalhekk m'għadux jaħdem."
   },
   "sharedSession": {
+    "startedAt": "Bdiet {{time}}",
     "title": "Sessjoni kondiviża",
     "someone": "Xi ħadd",
     "sharedBy": "Kondiviża minn {{owner}}",
@@ -5071,6 +5079,8 @@
     "modelsDescription": "Itfi mudell biex timblokkjah għal kull membru. Il-mudelli mill-fornituri permessi jibdew attivi.",
     "modelsDeniedOnly": "Miċħuda biss",
     "modelsEmpty": "Ebda mudell ma jaqbel ma' din it-tfittxija.",
+    "modelsDeniedEmpty": "Ebda mudell mhu miċħud.",
+    "modelsDeniedSearchEmpty": "Ebda mudell miċħud ma jaqbel ma' din it-tfittxija.",
     "providersDescription": "Itfi fornitur biex twaqqaf lil Kilo milli jidderieġi lejh għal din l-organizzazzjoni.",
     "providersNeedCatalog": "Is-swiċċijiet tal-fornituri jibqgħu biss għall-qari sakemm jitgħabba l-katalgu sħiħ tal-mudelli. Agħfas Erġa' pprova hawn fuq biex teditjahom.",
     "providersEmpty": "Ebda fornitur ma jaqbel ma' din it-tfittxija.",

@@ -1486,7 +1486,14 @@
     "council": {
       "title": "Fandinihan'ny filankevitra",
       "subtitle": "Manam-pahaizana maro no mandinika ny PR tsirairay, ary mitambatra ho fanapahan-kevitra iray ny latsa-batony.",
-      "unavailable": "Tsy misy ny fandinihan'ny filankevitra ho an'ity fikambanana ity.",
+      "unavailablePersonallyTitle": "Mila fikambanana Enterprise",
+      "unavailablePersonally": "Tsy tafiditra ao amin'ny kaonty manokana ny fandinihan'ny filankevitra.",
+      "unavailablePersonallyAction": "Hamorona fikambanana",
+      "unavailablePersonallySwitchAction": "Mifindra fikambanana",
+      "unavailableOrganizationTitle": "Tsy misy ny Fandinihan'ny filankevitra",
+      "unavailableForOrganization": "Mila drafitra Enterprise misy famandrihana na andrana miasa ny fandinihan'ny filankevitra. Tsy manana izany ity fikambanana ity amin'izao fotoana izao.",
+      "unavailableForOrganizationNeutral": "Tsy misy ny fandinihan'ny filankevitra ho an'ity fikambanana ity amin'izao fotoana izao. Andramo indray aoriana.",
+      "unavailableOnBitbucket": "Tsy misy ny fandinihan'ny filankevitra ho an'ny tahirin-kaody Bitbucket.",
       "noRepositories": "Tsy mbola misy tahirin-kaody voafidy. Misafidiana tahirin-kaody ao amin'ny fikirana tahirin-kaody aloha.",
       "specialists": "Manam-pahaizana",
       "labels": "Marika mampandeha ny fandinihan'ny filankevitra",
@@ -4703,6 +4710,7 @@
     "superseded": "Nosoloina tany an-kafa ity rohy ity, ka tsy miasa intsony."
   },
   "sharedSession": {
+    "startedAt": "Nanomboka tamin'ny {{time}}",
     "title": "Fotoam-piasana nozaraina",
     "someone": "Olona iray",
     "sharedBy": "Nozarain'i {{owner}}",
@@ -4858,6 +4866,8 @@
     "modelsDescription": "Vonoy ny modely iray mba hanakanana azy ho an'ny mpikambana rehetra. Ny modely avy amin'ny mpamatsy avela dia mandeha avy hatrany.",
     "modelsDeniedOnly": "Nolavina fotsiny",
     "modelsEmpty": "Tsy misy modely mifanaraka amin'ity fikarohana ity.",
+    "modelsDeniedEmpty": "Tsy misy modely nolavina.",
+    "modelsDeniedSearchEmpty": "Tsy misy modely nolavina mifanaraka amin'ity fikarohana ity.",
     "providersDescription": "Vonoy ny mpamatsy iray mba hampitsahatra ny fandefasan'ny Kilo ny fangatahana ho azy ho an'ity fikambanana ity.",
     "providersNeedCatalog": "Tsy azo ovaina ny bokotra famonoana sy fandrehitra ny mpamatsy mandra-pahavitan'ny fampidirana ny katalaogin'ny modely feno. Tsindrio ny Andramo indray etsy ambony mba hanovana azy ireo.",
     "providersEmpty": "Tsy misy mpamatsy mifanaraka amin'ity fikarohana ity.",

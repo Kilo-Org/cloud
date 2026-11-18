@@ -28,6 +28,9 @@ vi.mock('react-native', () => ({
   Alert: { alert: vi.fn() },
   I18nManager: { isRTL: false },
 }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => 'online',
+}));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ back: vi.fn(), replace: vi.fn(), push: vi.fn() }),
   useNavigation: () => ({ dispatch: vi.fn(), goBack: vi.fn() }),

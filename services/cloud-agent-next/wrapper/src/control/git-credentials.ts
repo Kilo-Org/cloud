@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { CONTROL_GIT_CREDENTIAL_RECORD_PATH } from '../../../src/shared/runtime-environment.js';
 import type { ExecResult } from '../utils.js';
 
 /** Managed Git providers the platform can address a repository URL for. */
@@ -12,14 +13,6 @@ type RepositoryCredential = {
   token: string | undefined;
   platform: GitCredentialPlatform | undefined;
 };
-
-/**
- * Where the image's read-only credential helper reads a per-session record:
- * `scripts/kilo-git-credential` resolves `$SESSION_HOME`, else `$HOME`, and matches
- * one `protocol`/`host` pair. The record lives in the runtime home, never in a
- * worktree, so no clone, checkout, diff capture or repository snapshot can carry it.
- */
-import { CONTROL_GIT_CREDENTIAL_RECORD_PATH } from '../../../src/shared/runtime-environment.js';
 
 /**
  * The URL a worktree may hold. Git stores `remote.origin.url` verbatim, so the
@@ -64,6 +57,12 @@ export function gitCredentialUsername(platform: GitCredentialPlatform | undefine
   }
 }
 
+/**
+ * Where the image's read-only credential helper reads a per-session record:
+ * `scripts/kilo-git-credential` resolves `$SESSION_HOME`, else `$HOME`, and matches
+ * one `protocol`/`host` pair. The record lives in the runtime home, never in a
+ * worktree, so no clone, checkout, diff capture or repository snapshot can carry it.
+ */
 export function gitCredentialRecordPath(home: string): string {
   return path.join(home, CONTROL_GIT_CREDENTIAL_RECORD_PATH);
 }

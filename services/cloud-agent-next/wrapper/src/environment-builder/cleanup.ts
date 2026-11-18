@@ -7,6 +7,7 @@ import {
   truncateWrapperLog,
   type WorkspaceGit,
 } from '../control-plane/workspace-adoption.js';
+import { HOME_CREDENTIAL_FILES } from '../../../src/shared/runtime-environment.js';
 
 /**
  * Pre-capture cleanup (plan "Build admission and execution", steps 6 and 7).
@@ -19,9 +20,6 @@ import {
  * are all that cleanup can prove. Snapshot contents stay sensitive environment
  * data (plan "Credentials and snapshot contents").
  */
-
-import { HOME_CREDENTIAL_FILES } from '../../../src/shared/runtime-environment.js';
-export { HOME_CREDENTIAL_FILES };
 
 const STOP_GRACE_MS = 2_000;
 

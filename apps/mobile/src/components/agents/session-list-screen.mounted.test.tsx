@@ -371,6 +371,7 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
   }),
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#777777',
   useThemeColors: () => ({
     primaryForeground: '#ffffff',
     foreground: '#000000',

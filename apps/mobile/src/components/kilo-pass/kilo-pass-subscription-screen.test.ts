@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 
 import { KiloPassSubscriptionScreen } from './kilo-pass-subscription-screen';
+import { i18n } from '@/i18n';
 import { type KiloPassSubscription } from '@/lib/kilo-pass/state';
 
 const mockRouter = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn() }));
@@ -196,7 +197,8 @@ describe('KiloPassSubscriptionScreen', () => {
     const renderer = await renderScreen();
     const emptyState = nodesOfType(renderer, 'EmptyState');
     expect(emptyState).toHaveLength(1);
-    expect(emptyState[0]?.props.title).toBe("Kilo Pass isn't available in the app.");
+    expect(emptyState[0]?.props.title).toBe(i18n.t('organization.kiloPass.notSubscribed'));
+    expect(emptyState[0]?.props.description).toBe(i18n.t('kiloPass.notAvailableInApp'));
     // A finished message with no action: the app sells nothing here.
     expect(emptyState[0]?.props.action).toBeUndefined();
     renderer.unmount();

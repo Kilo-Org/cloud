@@ -69,7 +69,7 @@ vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 // The real clearance reads the tab bar and the keyboard, neither of which this
 // suite models: the surface still renders its body as the ScrollView host.
 vi.mock('@/components/tab-screen', () => ({ SheetScrollView: 'ScrollView' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState', StateAction: 'StateAction' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
@@ -83,7 +83,11 @@ vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/ui/dialog', () => ({
   useConfirmDialog: () => ({ confirm: vi.fn(), dialog: null }),
 }));
-vi.mock('@/components/ui/icons', () => ({ Check: 'Check', Lock: 'Lock' }));
+vi.mock('@/components/ui/icons', () => ({
+  ArrowLeft: 'ArrowLeft',
+  Check: 'Check',
+  Lock: 'Lock',
+}));
 vi.mock('@/lib/a11y/announcing-toast', () => ({ announcingToast: { success: vi.fn() } }));
 vi.mock('@/lib/analytics/posthog', () => ({
   captureEvent: vi.fn(),

@@ -29,10 +29,11 @@ vi.mock('react-i18next', async importOriginal => {
   };
 });
 vi.mock('expo-router', () => ({ useRouter: () => router }));
-vi.mock('@/components/ui/icons', () => ({ SearchX: 'SearchX' }));
+vi.mock('@/components/ui/icons', () => ({ ArrowLeft: 'ArrowLeft', SearchX: 'SearchX' }));
 vi.mock('@/components/empty-state', () => ({
   EmptyState: (props: { action?: React.ReactNode }) =>
     React.createElement('EmptyState', props, props.action),
+  StateAction: 'StateAction',
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));

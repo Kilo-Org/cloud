@@ -55,10 +55,15 @@ async function mount() {
       action={action}
     />
   );
-  // The `CenteredState` mock renders its children; the state's own body is the
-  // outermost host it renders, and it carries the gap classes.
+  // The `CenteredState` mock renders its children; the state's body is the
+  // surface, and the stack inside it carries the gap classes the short band
+  // tightens.
   const content = mounted.renderer.root.findAll(
-    node => typeof node.type === 'string' && (node.type as string) === 'View'
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'View' &&
+      typeof node.props.className === 'string' &&
+      /(?:^|\s)gap-[24](?:\s|$)/.test(node.props.className)
   )[0] as Host | undefined;
   if (!content) {
     throw new Error('the empty state body did not render');

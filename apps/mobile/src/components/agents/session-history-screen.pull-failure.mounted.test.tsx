@@ -71,6 +71,17 @@ vi.mock('react-native', () => ({
   useWindowDimensions: () => ({ fontScale: 1 }),
   AppState: appState,
 }));
+// The real native module loads the RN package in Node, which the suite's
+// `react-native` mock cannot reach: a static keyboard answers instead.
+vi.mock('react-native-keyboard-controller', () => {
+  const snapshot = { height: 0, isVisible: false, progress: 0, duration: 0 };
+  return {
+    KeyboardProvider: 'KeyboardProvider',
+    KeyboardAvoidingView: 'KeyboardAvoidingView',
+    useKeyboardState: (selector?: (state: typeof snapshot) => unknown) =>
+      selector ? selector(snapshot) : snapshot,
+  };
+});
 vi.mock('@/lib/query/schedule-cache-maintenance', () => ({
   scheduleCacheMaintenance: (run: () => void) => {
     run();

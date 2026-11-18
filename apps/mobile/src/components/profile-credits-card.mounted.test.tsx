@@ -149,6 +149,7 @@ vi.mock('react-native', () => ({
   // Sheet registers the app-level Android Back listener while it is visible.
   BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
   ActivityIndicator: 'ActivityIndicator',
+  I18nManager: { isRTL: false },
   // The account picker's sheet is a native modal; honored like the real one so
   // the closed sheet renders nothing.
   Modal: (props: { visible?: boolean; children?: ReactNode }) =>
@@ -185,7 +186,10 @@ vi.mock('@/components/ui/skeleton', () => ({
   Skeleton: () => 'SKELETON',
 }));
 
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/text', () => ({
+  Text: 'Text',
+  EYEBROW_LATIN_DISPLAY: 'font-mono-medium text-[11px]',
+}));
 
 const addCreditsRowProps = vi.hoisted(() => ({
   latest: undefined as { url?: string; onPress?: () => void } | undefined,

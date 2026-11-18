@@ -31,6 +31,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 // the clear region carries, which is the New session entry under test.
 vi.mock('@/components/empty-state', () => ({
   EmptyState: ({ action }: { action?: ReactElement }) => action ?? null,
+  StateAction: 'StateAction',
 }));
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;

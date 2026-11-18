@@ -23,7 +23,11 @@ vi.mock('@shopify/flash-list', () => ({
     ListEmptyComponent: ReactElement;
   }) => createElement('FlashList', props, props.data.length === 0 ? ListEmptyComponent : null),
 }));
-vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
+vi.mock('react-native', () => ({
+  Pressable: 'Pressable',
+  View: 'View',
+  useColorScheme: () => 'light',
+}));
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: requests.push }) }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));

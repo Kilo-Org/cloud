@@ -134,6 +134,8 @@ vi.mock('@/components/ui/activity-indicator', () => ({
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/icons', () => ({
+  SlidersHorizontal: 'SlidersHorizontal',
+  RotateCcw: 'RotateCcw',
   History: 'History',
   SearchX: 'SearchX',
   AlertCircle: 'AlertCircle',

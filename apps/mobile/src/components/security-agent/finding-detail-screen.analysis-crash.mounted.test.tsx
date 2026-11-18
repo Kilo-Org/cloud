@@ -46,6 +46,7 @@ vi.mock('react-native', () => ({
   useWindowDimensions: () => ({ width: 390, fontScale: 1, height: 844 }),
 }));
 vi.mock('@/components/ui/icons', () => ({
+  RotateCcw: 'RotateCcw',
   Ban: 'Ban',
   ShieldOff: 'ShieldOff',
   ChevronDown: 'ChevronDown',
@@ -72,6 +73,7 @@ vi.mock('expo-router', () => ({
   useFocusEffect: focusEffect,
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#666',
   useThemeColors: () => ({ foreground: '#000', mutedForeground: '#666' }),
 }));
 vi.mock('@/lib/hooks/use-security-agent', () => ({

@@ -137,6 +137,7 @@ vi.mock('@/components/ui/text', async () => {
   return { Text: 'Text', TextClassContext: createContext(''), EYEBROW_LATIN_DISPLAY: '' };
 });
 vi.mock('@/components/ui/icons', () => ({
+  RotateCcw: 'RotateCcw',
   AlertCircle: 'AlertCircle',
   Bot: 'Bot',
   ChevronDown: 'ChevronDown',
@@ -166,6 +167,7 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
   useOrgBoundary: () => ({ ...state.boundary, refetch: state.boundaryRefetch }),
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#777777',
   useThemeColors: () => ({ foreground: '#000000', mutedForeground: '#777777' }),
 }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({

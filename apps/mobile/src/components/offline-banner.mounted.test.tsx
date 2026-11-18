@@ -46,6 +46,7 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 47, right: 0, bottom: 34, left: 0 }),
 }));
 vi.mock('@/components/ui/icons', () => ({
+  RotateCcw: 'RotateCcw',
   AlertCircle: 'AlertCircle',
   Bell: 'Bell',
   Clock: 'Clock',
@@ -60,6 +61,7 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#FFFFFF',
   useThemeColors: () => ({ warnForeground: '#FFFFFF' }),
 }));
 vi.mock('@/lib/a11y/announce', () => ({ announceForA11y }));

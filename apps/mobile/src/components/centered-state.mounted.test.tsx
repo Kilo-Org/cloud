@@ -72,6 +72,7 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/icons', () => ({
+  ArrowLeft: () => null,
   AlertCircle: () => null,
   Lock: () => null,
   SearchX: () => null,
@@ -79,6 +80,7 @@ vi.mock('@/components/ui/icons', () => ({
   WifiOff: () => null,
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#777777',
   useThemeColors: () => ({ mutedForeground: '#777777' }),
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));

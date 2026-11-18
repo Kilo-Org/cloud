@@ -22,11 +22,13 @@ type EmptyStateProps = {
 vi.mock('@/components/empty-state', () => ({
   EmptyState: (props: EmptyStateProps) =>
     createElement('EmptyState', props, props.description, props.action),
+  StateAction: 'StateAction',
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/icons', () => ({
+  RotateCcw: () => null,
   AlertCircle: () => null,
   Lock: () => null,
   SearchX: () => null,

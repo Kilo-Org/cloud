@@ -91,7 +91,10 @@ vi.mock('@/lib/billing/external-purchase-link', () => ({
 
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 
-vi.mock('@/lib/a11y/tap-target', () => ({ STATE_ACTION_CLASS: 'state-action' }));
+vi.mock('@/lib/a11y/tap-target', () => ({
+  COMPACT_CONTROL_BOX_DP: 32,
+  STATE_ACTION_CLASS: 'state-action',
+}));
 
 vi.mock('@/components/organization/external-billing-link', async () => {
   const { createElement: h } = await import('react');

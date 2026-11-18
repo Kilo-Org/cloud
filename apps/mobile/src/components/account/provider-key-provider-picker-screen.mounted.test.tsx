@@ -76,6 +76,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#888888' }),
 }));
 vi.mock('@/lib/a11y/tap-target', () => ({
+  COMPACT_CONTROL_BOX_DP: 32,
   COMPACT_CONTROL_HIT_SLOP_DP: 8,
   FIELD_CLEAR_BOX_CLASS: 'h-[48px] w-[48px] -my-[7px] items-center justify-center',
   ROW_TARGET_CLASS: 'min-h-11',

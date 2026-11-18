@@ -93,6 +93,7 @@ vi.mock('@/components/ui/dialog', () => ({
   }),
 }));
 vi.mock('@/components/ui/icons', () => ({
+  Terminal: 'Terminal',
   Globe: 'Globe',
   Smartphone: 'Smartphone',
   Shield: 'Shield',

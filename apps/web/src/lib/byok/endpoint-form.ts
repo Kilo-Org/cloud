@@ -1,5 +1,7 @@
 import {
   BYOK_ENDPOINT_MAX_MODELS,
+  CustomLlmApiKindSchema,
+  getCustomLlmClientApiKind,
   ByokEndpointCredentialsSchema,
   ByokEndpointDefinitionSchema,
   type ByokEndpointCredentials,
@@ -12,22 +14,23 @@ import {
 } from '@kilocode/db/schema-types';
 import type * as z from 'zod';
 import { formatZodIssues } from '@/lib/zod/format-zod-error';
+import { API_KIND_LABELS } from '@/lib/api-kind-labels';
 
 export type ByokEndpointCredentialsType = ByokEndpointCredentials['type'];
 
-export const ENDPOINT_API_KIND_LABELS = {
-  chat_completions: 'Chat Completions',
-  messages: 'Messages',
-  responses: 'Responses',
-} as const satisfies Record<CustomLlmApiKind, string>;
+export const ENDPOINT_API_KINDS = CustomLlmApiKindSchema.options;
 
-export const ENDPOINT_API_KINDS = Object.keys(ENDPOINT_API_KIND_LABELS) as CustomLlmApiKind[];
+/** The AI SDK providers clients may use, in the order of the APIs they call. */
+export const ENDPOINT_CLIENT_PROVIDERS = [
+  'openrouter',
+  'anthropic',
+  'openai',
+] as const satisfies readonly CustomLlmProvider[];
 
-export const ENDPOINT_CLIENT_PROVIDER_LABELS = {
-  openrouter: 'Chat Completions',
-  anthropic: 'Messages',
-  openai: 'Responses',
-} as const satisfies Record<CustomLlmProvider, string>;
+/** A client provider is named after the API it calls. */
+export function endpointClientProviderLabel(provider: CustomLlmProvider): string {
+  return API_KIND_LABELS[getCustomLlmClientApiKind(provider)];
+}
 
 export const ENDPOINT_REASONING_FORMAT_LABELS = {
   'reasoning-details': 'OpenRouter reasoning_details',

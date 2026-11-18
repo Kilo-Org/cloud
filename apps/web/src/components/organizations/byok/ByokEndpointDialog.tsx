@@ -38,8 +38,8 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   EMPTY_ENDPOINT_CREDENTIALS_FORM,
   ENDPOINT_API_KINDS,
-  ENDPOINT_API_KIND_LABELS,
-  ENDPOINT_CLIENT_PROVIDER_LABELS,
+  ENDPOINT_CLIENT_PROVIDERS,
+  endpointClientProviderLabel,
   ENDPOINT_CREDENTIALS_TYPE_LABELS,
   ENDPOINT_REASONING_FORMAT_LABELS,
   buildEndpointCredentials,
@@ -55,6 +55,7 @@ import {
   type EndpointModelRow,
 } from '@/lib/byok/endpoint-form';
 import { endpointOriginChanged } from '@/lib/byok/endpoint-origin';
+import { API_KIND_LABELS } from '@/lib/api-kind-labels';
 import { ByokEndpointImportDialog } from './ByokEndpointImportDialog';
 import {
   useEndpointCatalogModelIds,
@@ -96,7 +97,7 @@ function ApiKindCheckboxes({
             checked={value.includes(kind)}
             onCheckedChange={checked => onChange(toggleApiKind(value, kind, checked))}
           />
-          {ENDPOINT_API_KIND_LABELS[kind]}
+          {API_KIND_LABELS[kind]}
         </label>
       ))}
     </div>
@@ -124,9 +125,9 @@ function ClientProviderSelect({
       </SelectTrigger>
       <SelectContent>
         {inheritLabel ? <SelectItem value={INHERIT}>{inheritLabel}</SelectItem> : null}
-        {Object.entries(ENDPOINT_CLIENT_PROVIDER_LABELS).map(([provider, label]) => (
+        {ENDPOINT_CLIENT_PROVIDERS.map(provider => (
           <SelectItem key={provider} value={provider}>
-            {label}
+            {endpointClientProviderLabel(provider)}
           </SelectItem>
         ))}
       </SelectContent>

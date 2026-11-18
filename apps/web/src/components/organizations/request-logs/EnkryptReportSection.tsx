@@ -109,9 +109,8 @@ function storedDespiteError(scan: EnkryptInputScanReport): 'certain' | 'possible
 }
 
 const STORED_DESPITE_ERROR_NOTES = {
-  certain: 'Text that failed to scan is treated as allowed for 5 minutes, then scanned again.',
-  possible:
-    "Text that failed to scan may have been cached as allowed, in which case it isn't scanned again until that entry expires.",
+  certain: 'Failed text counts as allowed for 5 minutes, then is rescanned.',
+  possible: 'Failed text may be cached as allowed until its entry expires.',
 };
 
 function verdictCacheItem(scan: EnkryptInputScanReport): DetailItem {
@@ -121,13 +120,12 @@ function verdictCacheItem(scan: EnkryptInputScanReport): DetailItem {
     label: 'Verdict cache',
     hint:
       scan.total_units === undefined
-        ? 'Hit when at least one unit had a cached verdict. Stored when this scan cached new verdicts.'
-        : 'Hit when every unit had a cached verdict, partial hit when only some did. Stored when this scan cached new verdicts.',
+        ? 'Hit: at least one unit cached. Stored: new verdicts cached.'
+        : 'Hit: every unit cached. Partial hit: some. Stored: new verdicts cached.',
     value:
       storedDespiteError(scan) === 'certain' ? (
         <>
-          {lookup},{' '}
-          <span className="text-status-warning">stored (failed content for 5 minutes)</span>
+          {lookup}, <span className="text-status-warning">stored (failed, 5 min)</span>
         </>
       ) : (
         `${lookup}${stored ? ', stored' : ''}`
@@ -140,7 +138,7 @@ function unitsCached(scan: EnkryptInputScanReport): DetailItem[] {
   return [
     {
       label: 'Units cached',
-      hint: 'A unit is a segment, or a slice of a segment longer than 100,000 characters. Each unit has its verdict cached on its own, and only uncached units are sent to Enkrypt.',
+      hint: 'A segment, or a slice of one over 100k characters. Only uncached units are sent.',
       value: `${formatCount(scan.cached_units)} of ${formatCount(scan.total_units)}`,
     },
   ];
@@ -183,7 +181,7 @@ function charactersSent(scan: Scan): DetailItem {
   }
   return {
     label: 'Characters sent',
-    hint: 'Includes the separators between packed units and the headers of slices, so it can exceed the total.',
+    hint: 'Includes separators and slice headers, so it can exceed the total.',
     value: `${formatCount(scan.scanned_characters)} of ${formatCount(scan.total_characters)}`,
   };
 }
@@ -193,13 +191,13 @@ function charactersCached(scan: EnkryptInputScanReport): DetailItem {
   if (scan.total_units === undefined) {
     return {
       label: 'Characters cached',
-      hint: 'Counts fully cached segments only. Cached slices of a long segment are not counted in this older report.',
+      hint: 'Fully cached segments only (older report).',
       value,
     };
   }
   return {
     label: 'Characters cached',
-    hint: 'Fully cached segments, plus the text of cached slices of segments longer than 100,000 characters.',
+    hint: 'Fully cached segments, plus cached slices of long ones.',
     value,
   };
 }
@@ -207,7 +205,7 @@ function charactersCached(scan: EnkryptInputScanReport): DetailItem {
 function attempts(scan: Scan): DetailItem {
   return {
     label: 'Attempts',
-    hint: 'Enkrypt calls made, including retries.',
+    hint: 'Enkrypt calls made.',
     value: formatCount(scan.attempts),
   };
 }
@@ -237,7 +235,7 @@ function scanItems(scan: Scan): DetailItem[] {
           ? [
               {
                 label: 'Segments fully cached',
-                hint: 'Segments whose units all had a cached verdict. A segment is the text of a message, a tool call, or a tool result.',
+                hint: 'Segments with every unit cached. A segment is a message, tool call, or tool result.',
                 value: `${formatCount(scan.cached_segments)} of ${formatCount(scan.total_segments)}`,
               },
               { label: 'Attachments omitted', value: formatCount(scan.omitted_attachments) },
@@ -245,7 +243,7 @@ function scanItems(scan: Scan): DetailItem[] {
           : []),
         {
           label: 'Calls needed',
-          hint: 'Uncached units, packed into Enkrypt calls of up to 100,000 characters each. 0 when the cache covered everything.',
+          hint: 'Uncached units, packed into calls of up to 100k characters.',
           value: formatCount(scan.chunks),
         },
         attempts(scan),

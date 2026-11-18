@@ -75,7 +75,8 @@ describe('Kilo v2 model lookup before native model calls', () => {
   it.each([
     { readyOn: 1, delays: [] },
     { readyOn: 3, delays: [1000, 2000] },
-    { readyOn: Infinity, delays: [1000, 2000, 2000, 2000, 2000] },
+    { readyOn: 7, delays: [1000, 2000, 2000, 2000, 2000, 3000] },
+    { readyOn: Infinity, delays: [1000, 2000, 2000, 2000, 2000, 3000, 3000, 5000, 5000, 5000] },
   ])('submits once after model lookup (ready on $readyOn)', async ({ readyOn, delays }) => {
     let reads = 0;
     const waits: number[] = [];

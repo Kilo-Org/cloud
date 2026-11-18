@@ -314,7 +314,7 @@ export function WorkspaceArtifactsView({
 
         <div className="flex shrink-0 items-center justify-between gap-2 border-t px-4 py-2">
           <p className="text-muted-foreground text-xs">
-            Kept until the session or workspace is deleted.
+            Kept until the workspace or standalone session is deleted.
           </p>
           <Button
             type="button"

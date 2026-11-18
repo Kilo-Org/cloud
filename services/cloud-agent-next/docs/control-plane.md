@@ -838,10 +838,10 @@ the in-flight slot and leaves the orphan row for the sweep.
   entry, removes the index rows and lets the same alarm sweep the objects.
 
 **Storage lifetime.** Saved artifacts survive sandbox stops and individual chat deletions in a
-workspace. There is no upload-age expiry or automatic Cloud Agent session expiry. The old 15-day
-R2 object expiration rule must be removed separately from deployment. Limits are 50 MiB per file,
-500 MiB and 1,000 files per workspace, 1,024 path bytes
-and 16 segments. Dot segments, `node_modules`, `__pycache__` and `venv` are excluded.
+workspace. There is no application-level upload-age expiry or automatic Cloud Agent session expiry.
+See the [rollout gate](../../../ENVIRONMENT.md#cloud-agent-services) before removing the old R2 rule.
+Limits are 50 MiB per file, 500 MiB and 1,000 files per workspace, 1,024 path bytes and 16 segments.
+Dot segments, `node_modules`, `__pycache__` and `venv` are excluded.
 
 **Change notification.** After a real revision change, the Sandbox DO dispatcher enqueues
 `{ kind: 'workspace_artifacts', payload: { revision } }` for every route in the workspace. The

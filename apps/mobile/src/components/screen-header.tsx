@@ -97,6 +97,18 @@ export function shouldStackHeaderActions(
 const MAX_TITLE_LINES = 3;
 
 /**
+ * The default header title's typography: 15.75pt semibold in the header's text
+ * colour, shrinking inside its column. A caller that paints the same title
+ * outside `ScreenHeader` (the chat's renameable name) reads this instead of
+ * re-spelling it.
+ */
+export const SCREEN_HEADER_TITLE_CLASS = 'shrink text-lg font-semibold text-foreground';
+
+/** The large root title, for a tab root's own name. */
+const SCREEN_HEADER_LARGE_TITLE_CLASS =
+  'shrink text-[30px] font-bold tracking-tight text-foreground';
+
+/**
  * What a reserved band's eyebrow twin lays out with: a space, so the twin
  * holds one eyebrow line without painting a label that is not on screen.
  */
@@ -415,10 +427,7 @@ export function ScreenHeader({
   // where iOS modals get a ChevronDown and everything else gets a ChevronLeft.
   const resolvedBackIcon = backIcon ?? (modal && Platform.OS === 'ios' ? 'close' : 'back');
 
-  const titleClass =
-    size === 'large'
-      ? 'shrink text-[30px] font-bold tracking-tight text-foreground'
-      : 'shrink text-lg font-semibold text-foreground';
+  const titleClass = size === 'large' ? SCREEN_HEADER_LARGE_TITLE_CLASS : SCREEN_HEADER_TITLE_CLASS;
 
   // One cap for the Text and the reserved box: a title capped deeper than the
   // reserve would shift the body the moment it reached the extra line.

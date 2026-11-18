@@ -5,7 +5,6 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SectionHeader } from '@/components/ui/section-header';
 import { QueryError } from '@/components/query-error';
@@ -22,6 +21,7 @@ import { selectableRowA11y } from '@/lib/a11y/selectable-row';
 import { useNowTicker } from '@/lib/hooks/use-now-ticker';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTodoItem, useTodoItemMutations } from '@/lib/hooks/use-todos';
+import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { TODO_TITLE_MAX_LENGTH } from '@/lib/todos/todo-model';
 import { selectTodoQueryErrorView } from '@/lib/todos/todo-query-error';
 import { type TodoItemDetail } from '@/lib/todos/todo-types';
@@ -85,7 +85,7 @@ function TodoDonePrompt({ todo }: Readonly<{ todo: TodoItemDetail }>) {
 
 function TodoDetailBody({ todo }: Readonly<{ todo: TodoItemDetail }>) {
   const { t } = useTranslation();
-  const { bottom } = useSafeAreaInsets();
+  const bottomClearance = useDetailScreenBottomPadding();
   const { update, unlinkSession } = useTodoItemMutations(todo.listId);
   const now = useNowTicker(60_000);
   const [renaming, setRenaming] = useState(false);
@@ -108,7 +108,7 @@ function TodoDetailBody({ todo }: Readonly<{ todo: TodoItemDetail }>) {
       <KeyboardAvoidingView className="flex-1" behavior="padding">
         <ScrollView
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ paddingBottom: bottom + 24 }}
+          contentContainerStyle={{ paddingBottom: bottomClearance }}
         >
           <TodoDonePrompt todo={todo} />
           <TodoNotesSection todo={todo} />

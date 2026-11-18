@@ -104,7 +104,7 @@ export function SessionComputeSection({
       return null;
     }
     return (
-      <View className="mt-2 gap-2 border-t border-border pt-3">
+      <View className="mt-2 gap-2 border-t-[0.5px] border-hair-soft pt-3">
         <View className="flex-row items-center justify-between gap-3">
           <Text className="text-sm font-semibold text-foreground">
             {t('cloudAgent.compute.title')}
@@ -140,7 +140,7 @@ export function SessionComputeSection({
   );
 
   return (
-    <View className="mt-2 gap-2 border-t border-border pt-3" testID="session-compute-section">
+    <View className="mt-2 gap-2 border-t-[0.5px] border-hair-soft pt-3" testID="session-compute-section">
       <View className="flex-row items-center justify-between gap-3">
         <Text className="text-sm font-semibold text-foreground">
           {t('cloudAgent.compute.title')}

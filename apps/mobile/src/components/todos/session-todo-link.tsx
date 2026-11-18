@@ -3,7 +3,6 @@ import { useRouter } from 'expo-router';
 import { type ReactNode, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
 import { QueryError } from '@/components/query-error';
@@ -17,6 +16,7 @@ import { Text } from '@/components/ui/text';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { invalidateTodoQueries, useSessionTodo, useTodoCandidates } from '@/lib/hooks/use-todos';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { todoItemPath } from '@/lib/todos/todo-routes';
 import { type TodoCandidate } from '@/lib/todos/todo-types';
 import { useTRPC } from '@/lib/trpc';
@@ -76,7 +76,7 @@ function SessionTodoCandidatesSheet({
   const { t } = useTranslation();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const { bottom } = useSafeAreaInsets();
+  const bottomClearance = useDetailScreenBottomPadding();
   const candidates = useTodoCandidates(sessionId, visible);
   const linkSession = useMutation(
     trpc.todos.items.linkSession.mutationOptions({
@@ -154,7 +154,7 @@ function SessionTodoCandidatesSheet({
     >
       <View className="flex-1 pt-4">
         <SheetTitleRow title={t('todos.linkToTodo')} onClose={onClose} />
-        <ScrollView nestedScrollEnabled contentContainerStyle={{ paddingBottom: bottom + 16 }}>
+        <ScrollView nestedScrollEnabled contentContainerStyle={{ paddingBottom: bottomClearance }}>
           {body}
         </ScrollView>
       </View>

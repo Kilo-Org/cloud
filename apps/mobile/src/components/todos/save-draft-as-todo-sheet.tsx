@@ -5,7 +5,6 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { type ReactNode, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
 import { QueryError } from '@/components/query-error';
@@ -20,6 +19,7 @@ import { NEUTRAL_TINT } from '@/lib/agent-color';
 import { i18n } from '@/i18n';
 import { invalidateTodoQueries, useTodoLists } from '@/lib/hooks/use-todos';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { todoFromDraft } from '@/lib/todos/todo-model';
 import { todoListSettingsPath } from '@/lib/todos/todo-routes';
 import { type TodoList } from '@/lib/todos/todo-types';
@@ -53,7 +53,7 @@ export function SaveDraftAsTodoSheet({
   const router = useRouter();
   const queryClient = useQueryClient();
   const colors = useThemeColors();
-  const { bottom } = useSafeAreaInsets();
+  const bottomClearance = useDetailScreenBottomPadding();
   const lists = useTodoLists(organizationId, visible);
   const [savingListId, setSavingListId] = useState<string | null>(null);
   // The create-list route is a formSheet, and the native sheet stacks above a
@@ -166,7 +166,7 @@ export function SaveDraftAsTodoSheet({
     >
       <View className="flex-1 pt-4">
         <SheetTitleRow title={t('todos.saveSheet.title')} onClose={onClose} />
-        <ScrollView nestedScrollEnabled contentContainerStyle={{ paddingBottom: bottom + 16 }}>
+        <ScrollView nestedScrollEnabled contentContainerStyle={{ paddingBottom: bottomClearance }}>
           {body}
         </ScrollView>
       </View>

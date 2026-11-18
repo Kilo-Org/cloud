@@ -35,7 +35,7 @@ export function NativeRemoteTranscript({
   const commandStatus = state?.commands[remote.commandID];
   const loading = !state || conversation?.loading;
   return (
-    <View className="gap-3 border-t border-border pt-4">
+    <View className="gap-3 border-t-[0.5px] border-hair-soft pt-4">
       <Text accessibilityRole="header" selectable className="font-mono text-sm">
         {sessionID}
       </Text>

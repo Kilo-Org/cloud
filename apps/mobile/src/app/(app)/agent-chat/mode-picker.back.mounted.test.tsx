@@ -57,6 +57,7 @@ const flashListMock = vi.hoisted(
 
 vi.mock('@shopify/flash-list', () => ({ FlashList: flashListMock }));
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',

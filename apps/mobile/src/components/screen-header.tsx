@@ -669,8 +669,24 @@ export function ScreenHeader({
   // press). The frame clips that surface to a circle, so the control reads as an
   // icon button while it stays focusable and keeps the same rect, gutter pull
   // and label.
+  //
+  // A header that paints a second line keeps the back control on the title's own
+  // line: the control is a plain sibling of the title, and its own height would
+  // otherwise set the title row's height and push the eyebrow and subtitle away
+  // from the title. The negative margin cancels that overhang (the technique
+  // `renderRowTrailing` uses for a row's switch), so the row contributes the
+  // title's line height and the 48dp target paints centred on the line: 12.25dp
+  // a side leaves 23.5dp of a 48dp target in a 24.5dp `text-lg` line. A one-line
+  // header keeps the control's full height, the row it has always had.
+  const stackedTitleLines = Boolean(eyebrowSlot || subtitleSlot);
   const backControl = canGoBack ? (
-    <View className={cn('shrink-0 overflow-hidden rounded-full', !separateHeading && '-ms-4')}>
+    <View
+      className={cn(
+        'shrink-0 overflow-hidden rounded-full',
+        !separateHeading && '-ms-4',
+        !separateHeading && stackedTitleLines && '-my-3.5'
+      )}
+    >
       <Pressable
         onPress={handleBack}
         accessibilityRole="button"
@@ -685,32 +701,45 @@ export function ScreenHeader({
       </Pressable>
     </View>
   ) : null;
-  // A two-line header keeps the back control centred on the title's own line:
-  // the eyebrow above and the subtitle below each carry the control's column as
-  // a spacer, so the chevron never floats over the block between them. With no
-  // second line the same row is the plain title row.
+  // The eyebrow above and the subtitle below carry the control's column as a
+  // spacer, so every line of the heading starts on the title's own column. The
+  // spacer cancels the same gutter pull the control does, so 34dp of the 48dp
+  // target plus the row's 3.5dp gap is the column the title starts after.
   const backControlSpacer = canGoBack ? (
-    <View className={cn('h-0 w-[48px] shrink-0', '-ms-4')} />
+    <View className="h-0 w-[48px] shrink-0 -ms-4" />
   ) : null;
+  // The control is the row's leading sibling, so the title after it is placed by
+  // the row and not by the page column. A header with no control renders no
+  // leading box and no gap, so its title starts on the 14dp gutter itself — the
+  // title is the start-most content of its column.
+  const titleRowClassName = cn('flex-row items-center', canGoBack && 'gap-1');
   const titleRow = (
-    <View className="flex-row items-center gap-1">
-      {/* The control's box takes no layout height: the row stays the title's
-          own line, and the 48pt target paints centred on it. */}
-      <View className="h-0 justify-center">{backControl}</View>
+    <View className={titleRowClassName}>
+      {backControl}
       <View className="min-w-0 flex-1">{titleNode}</View>
     </View>
   );
+  // The heading is one block. With a back control every line of it starts on
+  // that control's column — 34dp of the 48dp target plus the row gap — from the
+  // block's own edge, not from the page. Its surface is the header's own
+  // background, so nothing changes on screen, and the page column is the block
+  // itself, which starts on the 14dp gutter: a header with no control paints
+  // nothing and keeps each of its lines measured against the page.
+  const headingBlockClassName = cn(
+    'min-w-0 flex-1 justify-center',
+    canGoBack && stackedTitleLines && 'bg-background'
+  );
   const titledHeading = (
-    <View className="min-h-[48px] min-w-0 flex-1 justify-center">
+    <View className={headingBlockClassName}>
       {eyebrowSlot ? (
-        <View className="flex-row items-center gap-1">
+        <View className={titleRowClassName}>
           {backControlSpacer}
           <View className="min-w-0 flex-1">{eyebrowSlot}</View>
         </View>
       ) : null}
       {titleRow}
       {subtitleSlot ? (
-        <View className="flex-row items-center gap-1">
+        <View className={titleRowClassName}>
           {backControlSpacer}
           <View className="min-w-0 flex-1">{subtitleSlot}</View>
         </View>

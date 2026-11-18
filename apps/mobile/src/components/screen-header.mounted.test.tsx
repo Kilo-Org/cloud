@@ -841,13 +841,67 @@ describe('ScreenHeader mounted', () => {
       className: 'pt-3',
     });
     const title = renderer.root.findByProps({ accessibilityRole: 'header' });
-    // The control and the title share one row, so the chevron centres on the
-    // title's own line while the eyebrow keeps its line above both.
+    // The control is the row's own leading sibling, so the chevron centres on
+    // the title's own line while the eyebrow keeps its line above both.
     const titleRow = title.parent?.parent;
+    const control = findBackFrame(renderer.root);
     expect(titleRow?.props.className).toContain('flex-row items-center');
-    expect(findBackFrame(renderer.root).parent?.parent).toBe(titleRow);
+    expect(control.parent).toBe(titleRow);
+    expect(titleRow?.children[0]).toBe(control);
     expect(renderer.root.props.style).toBeUndefined();
     expect(renderer.root.props.className).toContain('pt-3');
+  });
+
+  it('starts a root header title on the gutter with no leading gap', () => {
+    routerState.canGoBack.mockReturnValue(false);
+    const renderer = renderHeader({ title: 'Agents', size: 'large' });
+
+    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+    const titleRow = title.parent?.parent;
+    // No back control: no leading box and no row gap, so the title is the
+    // start-most content of its column on the 14dp gutter.
+    expect(titleRow?.props.className).toBe('flex-row items-center');
+    expect(titleRow?.children).toHaveLength(1);
+    expect(titleRow?.children[0]).toBe(title.parent);
+  });
+
+  it("keeps a one-line header on the control target's own row height", () => {
+    const renderer = renderHeader({ title: 'Sessions' });
+
+    const control = findBackFrame(renderer.root);
+    // A single line has no second line to pull the control onto: the row is the
+    // 48dp target it has always been.
+    expect(control.props.className).not.toContain('-my-');
+    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+    expect(title.parent?.parent?.children).toHaveLength(2);
+  });
+
+  it('aligns the eyebrow and subtitle with the title line the control centres on', () => {
+    const renderer = renderHeader({
+      title: 'Profile agents',
+      eyebrow: 'KILO-ORG/CLOUD',
+      subtitle: 'Shared Agency Review Profile',
+    });
+
+    const control = findBackFrame(renderer.root);
+    // The control cancels its own overhang, so the row contributes the title's
+    // line height and the 48dp target paints centred on that line.
+    expect(control.props.className).toContain('-my-3.5');
+
+    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+    const titleRow = title.parent?.parent;
+    expect(titleRow?.children[0]).toBe(control);
+    expect(titleRow?.props.className).toContain('gap-1');
+
+    // The eyebrow above and the subtitle below carry the control's column plus
+    // the row gap as a spacer, so all three lines start on one column.
+    const headingRows = titleRow?.parent?.children ?? [];
+    expect(headingRows).toHaveLength(3);
+    const [eyebrowRow, , subtitleRow] = headingRows;
+    expect(eyebrowRow?.props.className).toBe(titleRow?.props.className);
+    expect(subtitleRow?.props.className).toBe(titleRow?.props.className);
+    expect(eyebrowRow?.children[0]?.props.className).toBe('h-0 w-[48px] shrink-0 -ms-4');
+    expect(subtitleRow?.children[0]?.props.className).toBe('h-0 w-[48px] shrink-0 -ms-4');
   });
 
   it('keeps the modal close control on the centered title row with a mirroring spacer', () => {
@@ -982,9 +1036,11 @@ describe('ScreenHeader mounted', () => {
 
     // The two-line heading is the block that carries the title row and the
     // subtitle row the back control stays centred on.
-    const heading = renderer.root.findByProps({
-      className: 'min-h-[48px] min-w-0 flex-1 justify-center',
-    });
+    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+    const heading = title.parent?.parent?.parent;
+    if (!heading) {
+      throw new Error('heading block not found');
+    }
     const texts = heading.findAllByType('Text');
     expect(texts[0]?.children).toEqual(['Profile agents']);
     const subtitle = texts[1];
@@ -1335,7 +1391,7 @@ describe('header actions row', () => {
     ).toHaveLength(0);
     // The title still shares its row with the back control; only the actions moved.
     const title = renderer.root.findByProps({ accessibilityRole: 'header' });
-    expect(title.parent?.parent).toBe(findBackFrame(renderer.root).parent?.parent);
+    expect(title.parent?.parent).toBe(findBackFrame(renderer.root).parent);
   });
 
   it('reflows a centered modal header the same way', () => {

@@ -87,28 +87,27 @@ export function TriggerDetailScreen({
   }
 
   let body: ReactNode = null;
+  const errorVariant = query.isError && query.data == null ? trpcErrorVariant(query.error) : null;
+  const notFound = errorVariant === 'not-found';
   if (query.isPending) {
     body = <TriggerDetailSkeleton />;
   } else if (query.isError && query.data == null) {
-    const variant = trpcErrorVariant(query.error);
-    body =
-      variant === 'not-found' ? (
-        <QueryError
-          placement="top"
-          variant="not-found"
-          title={t('cloudAgent.triggers.detailNotFoundTitle')}
-          message={triggerId}
-        />
-      ) : (
-        <QueryError
-          placement="top"
-          variant="server"
-          title={t('cloudAgent.triggers.detailLoadFailedTitle')}
-          message={t('cloudAgent.triggers.loadFailedDescription')}
-          onRetry={() => void query.refetch()}
-          isRetrying={query.isFetching}
-        />
-      );
+    body = notFound ? (
+      <QueryError
+        variant="not-found"
+        title={t('cloudAgent.triggers.detailNotFoundTitle')}
+        message={triggerId}
+      />
+    ) : (
+      <QueryError
+        placement="top"
+        variant="server"
+        title={t('cloudAgent.triggers.detailLoadFailedTitle')}
+        message={t('cloudAgent.triggers.loadFailedDescription')}
+        onRetry={() => void query.refetch()}
+        isRetrying={query.isFetching}
+      />
+    );
   } else if (query.data.canEdit && query.data.targetType === 'cloud_agent') {
     body = <TriggerEditPanel detail={query.data} organizationId={organizationId} />;
   } else {
@@ -145,15 +144,19 @@ export function TriggerDetailScreen({
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={triggerId} />
-      <TabScreenScrollView
-        className="flex-1"
-        contentContainerClassName={SCREEN_BODY_CLASS}
-        automaticallyAdjustKeyboardInsets
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        {body}
-      </TabScreenScrollView>
+      {notFound ? (
+        body
+      ) : (
+        <TabScreenScrollView
+          className="flex-1"
+          contentContainerClassName={SCREEN_BODY_CLASS}
+          automaticallyAdjustKeyboardInsets
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {body}
+        </TabScreenScrollView>
+      )}
     </View>
   );
 }

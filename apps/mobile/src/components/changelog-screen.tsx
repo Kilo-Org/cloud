@@ -136,10 +136,11 @@ export function ChangelogScreen() {
   );
   // The notice belongs to the notes, not to the screen: as the list's header it
   // shares the list's page gutter and scrolls away with the first version. It is
-  // a caption — smaller than a bullet and muted — and its 16 dp foot is the gap
-  // above the first version heading.
+  // the screen's intro, so it reads as a muted body line rather than a caption —
+  // the one intro size a screen carries — and its 16 dp foot is the gap above
+  // the first version heading.
   const header: ReactElement | null = NOTES_PENDING ? (
-    <Text variant="caption" className="px-4 pb-4">
+    <Text variant="muted" className="px-4 pb-4">
       {t('profile.changelogVersionPending', { version: INSTALLED_VERSION })}
     </Text>
   ) : null;

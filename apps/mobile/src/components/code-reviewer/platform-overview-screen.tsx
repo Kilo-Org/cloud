@@ -333,30 +333,37 @@ export function PlatformOverviewScreen({
               {/* Every platform that reaches this body offers the review-md
                   setting; the bot-detection row exists on GitHub only, whose
                   webhooks carry the user type GitLab's do not. */}
-              <RowGroup leadingTile>
-                <PreferenceRow
-                  icon={ScrollText}
-                  title={t('codeReviewer.followReviewMd')}
-                  subtitle={t('codeReviewer.followReviewMdSubtitle')}
-                  value={!data.disableReviewMd}
-                  disabled={!canEdit || save.isPending}
-                  onValueChange={value => {
-                    save.mutate({ disableReviewMd: !value });
-                  }}
-                />
-                {capabilities.skipBotPullRequests && (
+              <View className="gap-3">
+                <RowGroup leadingTile>
                   <PreferenceRow
-                    icon={Bot}
-                    title={t('codeReviewer.skipBotPullRequests.title')}
-                    subtitle={t('codeReviewer.skipBotPullRequests.subtitle')}
-                    value={data.skipBotPullRequests}
+                    icon={ScrollText}
+                    title={t('codeReviewer.followReviewMd')}
+                    subtitle={t('codeReviewer.followReviewMdSubtitle')}
+                    value={!data.disableReviewMd}
                     disabled={!canEdit || save.isPending}
                     onValueChange={value => {
-                      save.mutate({ skipBotPullRequests: value });
+                      save.mutate({ disableReviewMd: !value });
                     }}
                   />
+                  {capabilities.skipBotPullRequests && (
+                    <PreferenceRow
+                      icon={Bot}
+                      title={t('codeReviewer.skipBotPullRequests.title')}
+                      value={data.skipBotPullRequests}
+                      disabled={!canEdit || save.isPending}
+                      onValueChange={value => {
+                        save.mutate({ skipBotPullRequests: value });
+                      }}
+                    />
+                  )}
+                </RowGroup>
+                {/* The explanation is the caption the card answers to, so the
+                    bot row keeps its two-line subtitle budget whatever the
+                    width, as Voice input does in Preferences. */}
+                {capabilities.skipBotPullRequests && (
+                  <Text variant="caption">{t('codeReviewer.skipBotPullRequests.subtitle')}</Text>
                 )}
-              </RowGroup>
+              </View>
 
               {!canEdit && (
                 <Text className="text-center text-xs text-muted-foreground">

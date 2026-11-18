@@ -13,10 +13,11 @@
 import { createElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { act } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { SearchX } from '@/components/ui/icons';
 
-import { EmptyState } from './empty-state';
+import { EmptyState, StateAction } from './empty-state';
 
 type Mounted = Awaited<ReturnType<typeof renderWithProviders>>;
 
@@ -37,8 +38,20 @@ vi.mock('@/components/centered-state-band', () => ({
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({ SearchX: 'SearchX' }));
+vi.mock('@/components/ui/button', () => ({
+  Button: (props: {
+    accessibilityLabel?: string;
+    accessibilityState?: { busy?: boolean };
+    onPress?: () => void;
+    children?: ReactNode;
+  }) => createElement('Button', props),
+}));
+vi.mock('@/components/ui/activity-indicator', () => ({
+  ActivityIndicator: 'ActivityIndicator',
+}));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ mutedForeground: '#777777' }),
+  useThemeColors: () => ({ mutedForeground: '#777777', primaryForeground: '#ffffff' }),
+  useMutedDisabledInk: () => '#777777',
 }));
 
 const action = createElement('Button', null, 'Clear search');
@@ -254,6 +267,72 @@ describe('EmptyState presentation', () => {
     expect(band.short).toBe(false);
     expect(mounted.renderer.root.findAllByType(SearchX)).toHaveLength(0);
     assertKeptContent(mounted);
+    mounted.unmount();
+  });
+});
+
+// A state action's busy state is the same action mid-flight: the label stays
+// drawn and only the leading icon becomes the spinner, so a retry never
+// collapses to a ring and the reader can still tell what is running. The
+// control announces the wait and admits no press until it clears.
+async function mountAction(loading?: boolean) {
+  const onPress = vi.fn();
+  const mounted = await renderWithProviders(
+    <StateAction label="Try again" icon={SearchX} onPress={onPress} loading={loading} />
+  );
+  const button = mounted.renderer.root.findAllByType('Button')[0];
+  if (!button) {
+    throw new Error('the state action rendered no button');
+  }
+  const accessibilityState = button.props.accessibilityState as unknown;
+  return {
+    mounted,
+    button,
+    onPress,
+    busy:
+      typeof accessibilityState === 'object' &&
+      accessibilityState !== null &&
+      'busy' in accessibilityState &&
+      accessibilityState.busy === true,
+    drawsLabel: mounted.renderer.root.findAllByType('Text').some(node => {
+      const { children } = node.props;
+      return typeof children === 'string' && children === 'Try again';
+    }),
+  };
+}
+
+describe('StateAction busy', () => {
+  it('draws its icon and label and admits the press while it is idle', async () => {
+    const { mounted, button, onPress, busy, drawsLabel } = await mountAction();
+
+    expect(mounted.renderer.root.findAllByType(SearchX)).toHaveLength(1);
+    expect(mounted.renderer.root.findAllByType('ActivityIndicator')).toHaveLength(0);
+    expect(drawsLabel).toBe(true);
+    expect(busy).toBe(false);
+
+    const props = button.props as { onPress?: () => void };
+    act(() => {
+      props.onPress?.();
+    });
+    expect(onPress).toHaveBeenCalledOnce();
+    mounted.unmount();
+  });
+
+  it('keeps the label and replaces only the icon while it is busy', async () => {
+    const { mounted, button, onPress, busy, drawsLabel } = await mountAction(true);
+
+    expect(mounted.renderer.root.findAllByType(SearchX)).toHaveLength(0);
+    expect(mounted.renderer.root.findAllByType('ActivityIndicator')).toHaveLength(1);
+    expect(drawsLabel).toBe(true);
+    expect(busy).toBe(true);
+    // The busy control keeps its face: nothing dims or hides the label.
+    expect(String(button.props.className)).not.toContain('opacity');
+
+    const props = button.props as { onPress?: () => void };
+    act(() => {
+      props.onPress?.();
+    });
+    expect(onPress).not.toHaveBeenCalled();
     mounted.unmount();
   });
 });

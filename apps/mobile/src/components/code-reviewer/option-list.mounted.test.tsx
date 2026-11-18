@@ -49,7 +49,7 @@ vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/ui/button', () => ({
   Button: (props: {
     accessibilityLabel?: string;
-    loading?: boolean;
+    accessibilityState?: { busy?: boolean };
     onPress?: () => void;
     children?: ReactNode;
   }) =>
@@ -57,7 +57,7 @@ vi.mock('@/components/ui/button', () => ({
       'View',
       {
         accessibilityLabel: props.accessibilityLabel,
-        loading: props.loading,
+        accessibilityState: props.accessibilityState,
         onPress: props.onPress,
       },
       props.children
@@ -149,7 +149,11 @@ function texts(root: TestRenderer.ReactTestRenderer): string[] {
     .filter((child): child is string => typeof child === 'string');
 }
 
-type RetryProps = { accessibilityLabel?: string; loading?: boolean; onPress: () => void };
+type RetryProps = {
+  accessibilityLabel?: string;
+  accessibilityState?: { busy?: boolean };
+  onPress: () => void;
+};
 
 function retryButtons(root: TestRenderer.ReactTestRenderer): RetryProps[] {
   return root.root
@@ -252,7 +256,7 @@ describe('OptionList failed save', () => {
 
     expect(row(renderer, 'All').busy).toBe(true);
     expect(rows(renderer).every(props => props.disabled)).toBe(true);
-    expect(retry(renderer).loading).toBe(true);
+    expect(retry(renderer).accessibilityState?.busy).toBe(true);
     expect(texts(renderer)).toContain(i18n.t('codeReviewer.configSaveFailed'));
 
     await act(async () => {
@@ -262,7 +266,7 @@ describe('OptionList failed save', () => {
     });
 
     expect(routerBack).not.toHaveBeenCalled();
-    expect(retry(renderer).loading).toBe(false);
+    expect(retry(renderer).accessibilityState?.busy).toBe(false);
     expect(row(renderer, 'All').busy).toBe(false);
     expect(rows(renderer).every(props => props.disabled)).toBe(false);
     expect(texts(renderer)).toContain(i18n.t('codeReviewer.configSaveFailed'));

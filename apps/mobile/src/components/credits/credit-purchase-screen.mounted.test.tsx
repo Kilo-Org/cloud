@@ -315,6 +315,12 @@ function tryAgainButton(
   )[0];
 }
 
+/** A state action's busy state, as its button announces it; its label never leaves. */
+function busy(node: TestRenderer.ReactTestInstance | undefined): boolean {
+  const state = node?.props.accessibilityState as unknown;
+  return typeof state === 'object' && state !== null && 'busy' in state && state.busy === true;
+}
+
 /**
  * Flush effects and microtasks while fake timers are installed: `waitFor` polls
  * with a real `setTimeout`, which never fires under fake timers, so advance the
@@ -718,13 +724,14 @@ describe('CreditPurchaseScreen', () => {
     );
     expect(allText(renderer)).not.toContain('Price unavailable');
     expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(0);
-    // The button that started the retry stays on screen, busy (the shared
-    // state action's busy state also disables it) — see `StateAction`.
+    // The button that started the retry stays on screen, busy and still
+    // labelled (a busy state action swaps only its leading icon for a
+    // spinner) — see `StateAction`.
     const pendingRetry = tryAgainButton(renderer);
     if (!pendingRetry) {
       throw new Error('expected the Try again button to stay on screen');
     }
-    expect((pendingRetry.props as { loading?: boolean }).loading).toBe(true);
+    expect(busy(pendingRetry)).toBe(true);
     unmount();
   });
 

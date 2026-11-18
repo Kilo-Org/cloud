@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Input, INPUT_BOX_SHAPE_CLASS } from './input';
 import { act, TestRenderer } from '@/test/renderer';
 import { lightColors } from '@/lib/hooks/theme-colors.generated';
+import { codeFieldTextStyle } from '@/lib/rtl-text';
 
 const rtl = vi.hoisted(() => ({ isRTL: false }));
 // Mutable so a suite can prove the placeholder follows the active palette. The
@@ -82,6 +83,35 @@ describe('Input single-line box', () => {
     rtl.isRTL = false;
 
     expect(flattenStyle(mountInput({ textAlign: 'center' }).props.style).textAlign).toBe('center');
+  });
+
+  it('keeps a code field’s own style and family on the native input', () => {
+    // A setup command is code: the value stays left to right on its own left
+    // edge with the family's ligatures off, so `--frozen-lockfile` draws as two
+    // hyphens. The style reaches the native `TextInput` through this box, not
+    // through a caller's own copy of it.
+    const input = mountInput({ className: 'font-mono', style: codeFieldTextStyle() });
+
+    expect(flattenStyle(input.props.style)).toMatchObject({
+      direction: 'ltr',
+      writingDirection: 'ltr',
+      textAlign: 'left',
+      fontVariant: ['no-common-ligatures', 'no-discretionary-ligatures', 'no-contextual'],
+    });
+    expect(String(input.props.className).split(' ')).toContain('font-mono');
+  });
+
+  it('keeps a code field on its left edge in a right-to-left interface', () => {
+    // The shared RTL alignment is a patch in front of the caller's style, so a
+    // command keeps the edge it was given instead of following a right-aligned
+    // label.
+    rtl.isRTL = true;
+
+    const textAlign = flattenStyle(
+      mountInput({ style: codeFieldTextStyle() }).props.style
+    ).textAlign;
+
+    expect(textAlign).toBe('left');
   });
 
   it('carries the exported single-line shape, so a preview box can swap with it', () => {

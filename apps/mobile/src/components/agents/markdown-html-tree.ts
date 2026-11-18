@@ -216,18 +216,15 @@ export function parseMarkdownHtml(value: string, masks: readonly MaskRange[]): H
     } else if (!implied && HTML_BLOCK_TAGS.has(name) && stack.at(-1)?.name === 'p') {
       closeFrom(stack.length - 1, start);
     }
+    // Void and self-closing tags never grow the stack, so the bound does not
+    // apply to them; they take the element path and their early return below
+    // skips the push. Only stack-growing tags fold into the parent: `pushText`
+    // above already emitted the text before the tag, so the copy starts at
+    // `end`, not at the stale `textStart`.
     if (stack.length >= MAX_ELEMENT_DEPTH) {
-      // Past the bound the element's tags are dropped and its content flows
-      // inline into the parent, the same treatment an unclosed tag gets at
-      // the end of a message, so nesting past the bound reads as the text it
-      // holds instead of the markup it names. `pushText` above already
-      // emitted the text before the tag, so the copy starts at `end`, not at
-      // the stale `textStart`.
-      if (open[3] !== '/' && !VOID_TAGS.has(name)) {
-        textStart = start;
-        pushText(end);
-        textStart = end;
-      }
+      textStart = start;
+      pushText(end);
+      textStart = end;
       return end;
     }
     const element: HtmlElement = {

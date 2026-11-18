@@ -18,7 +18,6 @@ import * as convertModule from './markdown-html-convert';
 import { convertHtmlToMarkdown } from './markdown-html-convert';
 import {
   type MarkdownHtmlIncrementalConverted,
-  type MarkdownHtmlIncrementalInput,
   type MarkdownHtmlSnapshot,
   splitMarkdownHtml,
   splitMarkdownHtmlIncremental,
@@ -27,7 +26,7 @@ import {
 import { isMarkdownImageLoadAllowed, requestMarkdownImageTrust } from './markdown-image-confirm';
 import { confirmAndOpenMarkdownLink } from './markdown-link-confirm';
 import { clearMarkdownParseCachesForTests } from './markdown-parse-cache';
-import { extendsPreviousRaw, MarkdownText, type TailRecord } from './markdown-text';
+import { extendsPreviousRaw, incrementalInput, MarkdownText } from './markdown-text';
 
 const EMPTY_SNAPSHOT: MarkdownHtmlSnapshot = {
   value: '',
@@ -35,26 +34,6 @@ const EMPTY_SNAPSHOT: MarkdownHtmlSnapshot = {
   headSegments: [],
   hasDefinition: false,
 };
-
-/**
- * The input the component would build for one publish: the extends-previous
- * record's shape picks the reuse form, and a declined or absent record
- * re-converts the whole value beside the previous snapshot.
- */
-function componentInput(
-  value: string,
-  whole: string,
-  publish: { record: TailRecord | null; prior: MarkdownHtmlIncrementalConverted | undefined }
-): MarkdownHtmlIncrementalInput {
-  const { record, prior } = publish;
-  if (record === null || prior === undefined) {
-    return { value: whole, snapshot: prior?.tail };
-  }
-  if (record.appended !== undefined) {
-    return { value, previous: prior, appended: record.appended };
-  }
-  return { value, previous: prior, wholeConverted: record.wholeConverted };
-}
 
 const rnStub = vi.hoisted(() => {
   const stub = {
@@ -1051,7 +1030,7 @@ describe('splitMarkdownHtmlIncremental', () => {
       const value = INCREMENTAL_CORPUS.slice(0, index);
       const whole = convertHtmlToMarkdown(value);
       const record = extendsPreviousRaw(value, prior);
-      const input = componentInput(value, whole, { record, prior });
+      const input = incrementalInput(value, record, prior);
       const composed =
         record?.appended !== undefined && prior !== undefined
           ? prior.convert(record.appended, prior.tail.value)
@@ -1279,6 +1258,28 @@ describe('splitMarkdownHtmlIncremental', () => {
     // tag's characters is the stale-offset replay the bound branch must not
     // produce.
     expect(converted).toContain(String.raw`x\<b>tail`);
+    expect(converted).not.toContain('xx');
+  });
+
+  it('emits text before a depth-bound void tag once, not twice', () => {
+    // A void tag never grows the stack, so the depth bound does not apply to
+    // it: it takes the element path, and the text that precedes it must be
+    // emitted exactly once — a replayed copy before the tag's own characters
+    // (`xx<img>y`) is the stale-offset bug this pins down.
+    const deep = `${'<b>'.repeat(64)}x<img>y`;
+    const converted = convertHtmlToMarkdown(deep);
+    expect(converted.startsWith('*'.repeat(64))).toBe(true);
+    expect(converted).toContain(String.raw`x\<img>y`);
+    expect(converted).not.toContain('xx');
+  });
+
+  it('emits text before a depth-bound self-closing tag once, not twice', () => {
+    // A self-closing tag also never grows the stack, so past the bound it
+    // keeps the element path and the preceding text must not replay.
+    const deep = `${'<b>'.repeat(64)}x<br/>y`;
+    const converted = convertHtmlToMarkdown(deep);
+    expect(converted.startsWith('*'.repeat(64))).toBe(true);
+    expect(converted).toContain(String.raw`x\<br/>y`);
     expect(converted).not.toContain('xx');
   });
 

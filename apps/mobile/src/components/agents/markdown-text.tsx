@@ -27,7 +27,7 @@ import { markdownHtmlSplitCache } from './markdown-parse-cache';
  * picks the reuse form, and a declined or absent record re-converts the whole
  * value beside the previous snapshot so the head reuse still applies.
  */
-function incrementalInput(
+export function incrementalInput(
   value: string,
   record: TailRecord | null,
   prior: MarkdownHtmlIncrementalConverted | undefined

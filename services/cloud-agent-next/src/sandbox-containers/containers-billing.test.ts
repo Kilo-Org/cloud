@@ -1810,6 +1810,122 @@ describe('ContainersBilling durable alarm dispatch', () => {
   });
 });
 
+describe('ContainersBilling heartbeat timeout resilience', () => {
+  it('keeps a transient heartbeat timeout off the alarm and redelivers the same segment on recovery', async () => {
+    const { instance, storage, meter, pendingTasks } = setup();
+    await admit(instance, 'standard-4');
+    await launch(instance, REF_A, 'standard-4');
+    await flushPending(pendingTasks);
+    const heartbeatDue = readSchedules(storage)?.billingHeartbeatTick?.dueAtMs as number;
+
+    let heartbeatHangs = true;
+    vi.spyOn(meter, 'recordHeartbeat').mockImplementation(async input => {
+      meter.recordHeartbeatInputs.push(input);
+      if (heartbeatHangs) return new Promise<HeartbeatAck>(() => {});
+      return { ...recordAck(), budget: { verdict: 'continue' } };
+    });
+
+    vi.setSystemTime(heartbeatDue);
+    const alarmRun = instance.alarm();
+    await vi.advanceTimersByTimeAsync(31_000);
+    await expect(alarmRun).resolves.toBeUndefined();
+    await flushPending(pendingTasks);
+
+    const pending = storage.map.get(BILLING_CONTEXT_KEY) as {
+      pendingHeartbeat?: { seq: number; usageSinceLast: number };
+    };
+    expect(pending.pendingHeartbeat).toMatchObject({ seq: 1, usageSinceLast: 300 });
+    expect(meter.recordHeartbeatInputs).toHaveLength(3);
+    const nextDue = readSchedules(storage)?.billingHeartbeatTick?.dueAtMs as number;
+    expect(readSchedules(storage)?.billingHeartbeatTick).toMatchObject({
+      payload: readGeneration(storage),
+    });
+    expect(nextDue).toBeGreaterThan(heartbeatDue);
+
+    heartbeatHangs = false;
+    vi.setSystemTime(nextDue);
+    await instance.alarm();
+    await flushPending(pendingTasks);
+
+    expect(meter.recordHeartbeatInputs).toHaveLength(4);
+    const first = meter.recordHeartbeatInputs[0];
+    const redelivery = meter.recordHeartbeatInputs[3];
+    expect(redelivery.seq).toBe(first.seq);
+    expect(redelivery.usageSinceLast).toBe(first.usageSinceLast);
+    expect(redelivery.idempotencyKey).toBe(first.idempotencyKey);
+    const advanced = storage.map.get(BILLING_CONTEXT_KEY) as {
+      pendingHeartbeat?: unknown;
+      nextSeq: number;
+    };
+    expect(advanced.pendingHeartbeat).toBeUndefined();
+    expect(advanced.nextSeq).toBe(2);
+  });
+
+  it('bounds a persistent heartbeat timeout across ticks without abandoning the running generation', async () => {
+    const { instance, storage, meter, pendingTasks } = setup();
+    await admit(instance, 'standard-4');
+    await launch(instance, REF_A, 'standard-4');
+    await flushPending(pendingTasks);
+    vi.spyOn(meter, 'recordHeartbeat').mockImplementation(async input => {
+      meter.recordHeartbeatInputs.push(input);
+      return new Promise<HeartbeatAck>(() => {});
+    });
+
+    for (let tick = 0; tick < 3; tick += 1) {
+      const due = readSchedules(storage)?.billingHeartbeatTick?.dueAtMs as number;
+      vi.setSystemTime(due);
+      const alarmRun = instance.alarm();
+      await vi.advanceTimersByTimeAsync(31_000);
+      await expect(alarmRun).resolves.toBeUndefined();
+      await flushPending(pendingTasks);
+    }
+
+    expect(meter.recordHeartbeatInputs).toHaveLength(9);
+    expect(meter.recordHeartbeatInputs.every(input => input.seq === 1)).toBe(true);
+    expect(meter.recordHeartbeatInputs.every(input => input.usageSinceLast === 300)).toBe(true);
+    const context = storage.map.get(BILLING_CONTEXT_KEY) as {
+      pendingHeartbeat?: { seq: number };
+      nextSeq: number;
+    };
+    expect(context.pendingHeartbeat).toMatchObject({ seq: 1 });
+    expect(context.nextSeq).toBe(1);
+    expect(readGeneration(storage)).toBeDefined();
+    expect(readSchedules(storage)?.billingHeartbeatTick).toBeDefined();
+  });
+
+  it('abandons a stopped generation through the alarm after persistent stop timeouts', async () => {
+    const { instance, container, storage, meter, pendingTasks } = setup();
+    await admit(instance, 'standard-4');
+    await launch(instance, REF_A, 'standard-4');
+    await flushPending(pendingTasks);
+    vi.spyOn(meter, 'recordStop').mockImplementation(async input => {
+      meter.recordStopInputs.push(input);
+      return new Promise<RecordAck>(() => {});
+    });
+
+    container.running = false;
+    let abandoned = false;
+    for (let tick = 0; tick < 20 && !abandoned; tick += 1) {
+      const due = readSchedules(storage)?.billingHeartbeatTick?.dueAtMs;
+      if (due === undefined) {
+        abandoned = true;
+        break;
+      }
+      vi.setSystemTime(due);
+      const alarmRun = instance.alarm();
+      await vi.advanceTimersByTimeAsync(31_000);
+      await expect(alarmRun).resolves.toBeUndefined();
+      await flushPending(pendingTasks);
+      abandoned = readGeneration(storage) === undefined;
+    }
+
+    expect(abandoned).toBe(true);
+    expect(readSchedules(storage)?.billingHeartbeatTick).toBeUndefined();
+    expect(meter.recordStopInputs.length).toBeGreaterThan(0);
+    expect(meter.recordStopInputs.every(input => input.seq === 1)).toBe(true);
+  });
+});
+
 describe('ContainersBilling schedule cancellation', () => {
   it('cancels synchronously in memory and durably, leaving other callbacks scheduled', async () => {
     const { instance, container, storage, meter, pendingTasks } = setup();

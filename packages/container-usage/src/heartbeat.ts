@@ -193,10 +193,7 @@ export function installBillingHeartbeat(
   const recoverDeliveryFailure = async (
     context: BillingContext,
     error: unknown,
-    options: {
-      abandonAfterStoppedTimeout: boolean;
-      rethrowAfterReschedule: boolean;
-    }
+    options: { abandonAfterStoppedTimeout: boolean }
   ): Promise<void> => {
     if (isNonRetryableAdmissionError(error)) {
       const abandoned = await abandonIfCurrent(context, {
@@ -219,8 +216,18 @@ export function installBillingHeartbeat(
       await abandonIfCurrent(context);
       return;
     }
+    // A retryable delivery failure keeps the durable pending segment and arms
+    // the next tick, which redelivers it under the same idempotency key. It must
+    // not escape as an alarm error while the generation is still active; a
+    // failed reschedule or abandon still propagates as a genuine failure.
     const rescheduled = await rescheduleIfCurrent(context);
-    if (options.rethrowAfterReschedule || rescheduled) throw error;
+    if (rescheduled) {
+      console.warn('Billing usage delivery deferred after a retryable failure', {
+        error: error instanceof Error ? error.message : String(error),
+        generation: context.generation,
+        instanceId: context.instanceId,
+      });
+    }
   };
 
   const computeStopSegment = (context: BillingContext, usageEndedAtMs: number) => {
@@ -333,10 +340,7 @@ export function installBillingHeartbeat(
       try {
         await recordStopForGeneration(context.pendingStop, context.generation);
       } catch (error) {
-        await recoverDeliveryFailure(context, error, {
-          abandonAfterStoppedTimeout: true,
-          rethrowAfterReschedule: false,
-        });
+        await recoverDeliveryFailure(context, error, { abandonAfterStoppedTimeout: true });
       }
       return;
     }
@@ -379,10 +383,7 @@ export function installBillingHeartbeat(
           context.stoppedObservedAtMs
         );
       } catch (error) {
-        await recoverDeliveryFailure(context, error, {
-          abandonAfterStoppedTimeout: true,
-          rethrowAfterReschedule: false,
-        });
+        await recoverDeliveryFailure(context, error, { abandonAfterStoppedTimeout: true });
       }
       return;
     }
@@ -486,10 +487,7 @@ export function installBillingHeartbeat(
       }
       await rescheduleIfCurrent(context);
     } catch (error) {
-      await recoverDeliveryFailure(context, error, {
-        abandonAfterStoppedTimeout: false,
-        rethrowAfterReschedule: true,
-      });
+      await recoverDeliveryFailure(context, error, { abandonAfterStoppedTimeout: false });
     }
   };
   const billingHeartbeatTick = (generation?: string) =>

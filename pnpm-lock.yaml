@@ -237,6 +237,9 @@ importers:
       '@expo/fingerprint':
         specifier: ~0.21.5
         version: 0.21.5
+      '@kilocode/app-shared':
+        specifier: workspace:*
+        version: link:packages/app-shared
       '@kilocode/db':
         specifier: workspace:*
         version: link:packages/db

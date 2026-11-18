@@ -203,6 +203,7 @@ export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'no_progress',
   'no_outcome',
   'completion_unconfirmed',
+  'completion_quiet_drain',
   'prompt_failed',
   'sandbox_stopped',
   'execution_limit',

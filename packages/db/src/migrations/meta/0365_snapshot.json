@@ -1,5 +1,5 @@
 {
-  "id": "76fe84ec-c9b6-47ef-8462-26a6ca37c608",
+  "id": "de0af2d0-cdf2-4676-81c6-d2108af20b6f",
   "prevId": "e2874056-5a3b-4e29-afd4-2c852dcd6d91",
   "version": "7",
   "dialect": "postgresql",
@@ -8589,6 +8589,12 @@
           "notNull": true,
           "default": "'cloud_agent'"
         },
+        "cloud_agent_session_id": {
+          "name": "cloud_agent_session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "kiloclaw_instance_id": {
           "name": "kiloclaw_instance_id",
           "type": "uuid",
@@ -8824,6 +8830,10 @@
         "CHK_cloud_agent_webhook_triggers_kiloclaw_fields": {
           "name": "CHK_cloud_agent_webhook_triggers_kiloclaw_fields",
           "value": "(\n        \"cloud_agent_webhook_triggers\".\"target_type\" != 'kiloclaw_chat' OR\n        \"cloud_agent_webhook_triggers\".\"kiloclaw_instance_id\" IS NOT NULL\n      )"
+        },
+        "CHK_cloud_agent_webhook_triggers_existing_chat_fields": {
+          "name": "CHK_cloud_agent_webhook_triggers_existing_chat_fields",
+          "value": "(\n        (\"cloud_agent_webhook_triggers\".\"target_type\" = 'cloud_agent_chat' AND \"cloud_agent_webhook_triggers\".\"cloud_agent_session_id\" IS NOT NULL\n          AND \"cloud_agent_webhook_triggers\".\"github_repo\" IS NULL AND \"cloud_agent_webhook_triggers\".\"profile_id\" IS NULL\n          AND \"cloud_agent_webhook_triggers\".\"kiloclaw_instance_id\" IS NULL) OR\n        (\"cloud_agent_webhook_triggers\".\"target_type\" != 'cloud_agent_chat' AND \"cloud_agent_webhook_triggers\".\"cloud_agent_session_id\" IS NULL)\n      )"
         },
         "CHK_cloud_agent_webhook_triggers_scheduled_fields": {
           "name": "CHK_cloud_agent_webhook_triggers_scheduled_fields",
@@ -35202,33 +35212,6 @@
           ],
           "isUnique": false,
           "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_session_step_up_proofs_user_session_binding": {
-          "name": "idx_session_step_up_proofs_user_session_binding",
-          "columns": [
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "session_id_hash",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "action_binding_hash",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": true,
           "method": "btree",
           "with": {}
         },

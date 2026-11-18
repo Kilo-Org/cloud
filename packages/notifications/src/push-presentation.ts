@@ -196,10 +196,7 @@ const AGENT_KIND_CHANNEL: Record<AgentNotificationKind, AndroidNotificationChann
 
 /** The reverse of `AGENT_KIND_CHANNEL`: the kind each agent channel carries. */
 const AGENT_CHANNEL_KIND: ReadonlyMap<string, AgentNotificationKind> = new Map(
-  Object.entries(AGENT_KIND_CHANNEL).map(
-    ([kind, channelId]) =>
-      [channelId, kind] as [AndroidNotificationChannelId, AgentNotificationKind]
-  )
+  AGENT_NOTIFICATION_KINDS.map(kind => [AGENT_KIND_CHANNEL[kind], kind] as const)
 );
 
 /** The Android channel that carries a kind. */

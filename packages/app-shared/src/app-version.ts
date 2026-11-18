@@ -34,9 +34,10 @@ function toSegment(value: number | undefined): number {
  * Compare dotted numeric version strings (`1.10.0` > `1.9.9`, missing
  * segments count as zero). Returns <0, 0, or >0 like `strcmp`.
  *
- * Unlike `isVersionBelow`, this walks every segment with no cap, so a
- * four-segment or suffixed version never silently matches a three-segment
- * one. Used by the feature-flag and Android channel gates, which classify
+ * Unlike `isVersionBelow`, this has no three-segment cap, so a longer
+ * version cannot silently match a shorter one. Each segment is read as its
+ * leading integer: a suffix like `-beta` is truncated away, not compared.
+ * Used by the feature-flag and Android channel gates, which classify
  * recorded client builds rather than store minimums.
  */
 export function compareAppVersions(a: string, b: string): number {

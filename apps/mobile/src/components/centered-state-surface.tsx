@@ -151,27 +151,33 @@ export function NativeStateSurface({ children, navigation, options }: ScreenLayo
   const { capture, measure, node: nativeNode } = measurement;
   const installedPropsRef = useRef<ScreenLayoutProps['options']['unstable_nativeProps']>(undefined);
   const observedPropsRef = useRef(options.unstable_nativeProps);
-  const [propsState, setPropsState] = useState({
+  // The props the navigator hands over, with the ref and layout handler the
+  // installed set already owns. Derived in a ref, not state: the value is read
+  // in the same render, and setting state during render is the update React
+  // rejects on a scene that has not mounted yet (`setThemePreference` orders
+  // its writes around the same warning).
+  const derivedPropsRef = useRef({
     incoming: options.unstable_nativeProps,
     external: options.unstable_nativeProps,
   });
-  if (
-    options.unstable_nativeProps !== installedPropsRef.current &&
-    options.unstable_nativeProps !== propsState.incoming
-  ) {
-    const incoming = options.unstable_nativeProps;
+  const incomingProps = options.unstable_nativeProps;
+  if (incomingProps !== derivedPropsRef.current.incoming) {
     const installed = installedPropsRef.current;
-    const external = incoming && {
-      ...incoming,
-      ref: installed && incoming.ref === installed.ref ? propsState.external?.ref : incoming.ref,
-      onLayout:
-        installed && incoming.onLayout === installed.onLayout
-          ? propsState.external?.onLayout
-          : incoming.onLayout,
+    const previous = derivedPropsRef.current.external;
+    derivedPropsRef.current = {
+      incoming: incomingProps,
+      external: incomingProps && {
+        ...incomingProps,
+        ref:
+          installed && incomingProps.ref === installed.ref ? previous?.ref : incomingProps.ref,
+        onLayout:
+          installed && incomingProps.onLayout === installed.onLayout
+            ? previous?.onLayout
+            : incomingProps.onLayout,
+      },
     };
-    setPropsState({ incoming, external });
   }
-  const externalProps = propsState.external;
+  const externalProps = derivedPropsRef.current.external;
   useImperativeHandle<ViewInstance | null, ViewInstance | null>(
     externalProps?.ref,
     () => nativeNode,

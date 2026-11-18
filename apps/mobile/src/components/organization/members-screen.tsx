@@ -125,7 +125,7 @@ export function OrganizationMembersScreen() {
   // fetch has isLoading false but no data — it must keep the list skeleton
   // instead of rendering a settled body, until the read answers (reconnect)
   // or the person retries, while a real error still reaches QueryError (the
-  // invariant low-balance-alert-sheet states for the same read).
+  // invariant low-balance-alert-screen states for the same read).
   const isMembersPending = orgWithMembers.isPending;
   const isError = orgWithMembers.isError && !orgWithMembers.data;
   const enableUsageLimits = orgWithMembers.data?.settings.enable_usage_limits !== false;

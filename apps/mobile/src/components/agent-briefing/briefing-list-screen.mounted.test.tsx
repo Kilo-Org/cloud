@@ -44,7 +44,8 @@ vi.mock('@/components/screen-header', () => ({
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/card', () => ({ Card: 'Card' }));
-vi.mock('@/components/ui/icons', () => ({ Newspaper: 'Newspaper' }));
+vi.mock('@/components/ui/icon-button', () => ({ IconButton: 'IconButton' }));
+vi.mock('@/components/ui/icons', () => ({ Newspaper: 'Newspaper', Settings: 'Settings' }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -93,11 +94,14 @@ const report = {
 };
 
 function pressSettings(root: ReactTestInstance): void {
-  const [button] = root.findAllByType('Button' as ElementType);
+  const [button] = [
+    ...root.findAllByType('IconButton' as ElementType),
+    ...root.findAllByType('Button' as ElementType),
+  ];
   if (!button) {
     throw new Error('Briefing settings control is missing');
   }
-  // The Button stub keeps the caller's onPress; the renderer exposes props untyped.
+  // The control stub keeps the caller's onPress; the renderer exposes props untyped.
   const props: { onPress: () => void } = button.props as { onPress: () => void };
   act(() => {
     props.onPress();
@@ -209,7 +213,7 @@ it('renders the shared empty state with its settings action when no context is e
   expect(texts).toContain('agentBriefing.allContexts');
   // The empty state's own button is the only settings entry point while it shows.
   const header = mounted.root.findByType('ScreenHeader' as ElementType);
-  expect(header.findAllByType('Button' as ElementType)).toHaveLength(0);
+  expect(header.findAllByType('IconButton' as ElementType)).toHaveLength(0);
   const buttons = mounted.root.findAllByType('Button' as ElementType);
   expect(buttons).toHaveLength(1);
   pressSettings(mounted.root);
@@ -226,7 +230,7 @@ it('explains the empty window and keeps the header action when a context is enab
   expect(
     mounted.root
       .findAllByType('ScreenHeader' as ElementType)[0]
-      ?.findAllByType('Button' as ElementType)
+      ?.findAllByType('IconButton' as ElementType)
   ).toHaveLength(1);
 });
 
@@ -247,8 +251,8 @@ it('keeps the settings action in the header while the list has reports', () => {
   const mounted = mountBriefings([report]);
   expect(mounted.root.findAllByType('EmptyState' as ElementType)).toHaveLength(0);
   const header = mounted.root.findByType('ScreenHeader' as ElementType);
-  expect(header.findAllByType('Button' as ElementType)).toHaveLength(1);
-  expect(mounted.root.findAllByType('Button' as ElementType)).toHaveLength(1);
+  expect(header.findAllByType('IconButton' as ElementType)).toHaveLength(1);
+  expect(mounted.root.findAllByType('Button' as ElementType)).toHaveLength(0);
   pressSettings(header);
   expect(requests.push).toHaveBeenCalledWith('/(app)/agent-briefing/settings');
 });

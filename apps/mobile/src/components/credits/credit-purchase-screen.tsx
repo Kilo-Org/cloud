@@ -333,7 +333,7 @@ export function CreditPurchaseScreen() {
 
   return (
     <View className="flex-1 bg-background" testID="credit-purchase-screen">
-      <ScreenHeader title={t('credits.title')} modal />
+      <ScreenHeader title={t('credits.title')} modal centerTitle={false} backIcon="back" />
       <View className="flex-1">
         <DetailScreenScrollView
           className="flex-1"

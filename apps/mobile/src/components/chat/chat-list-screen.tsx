@@ -23,10 +23,8 @@ import { useChatBackends } from '@/lib/chat/backend-store';
 import { useLocalModels } from '@/lib/chat/local-models';
 import { useChatModelOptions } from '@/lib/chat/use-chat-model-options';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
-import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
-import { useOrganization } from '@/lib/organization-context';
 import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
-import { cn } from '@/lib/utils';
+import { useOrganization } from '@/lib/organization-context';
 
 import { BetaPill } from './beta-pill';
 import { ChatRow } from './chat-row';
@@ -274,22 +272,9 @@ function ScopedChatListScreen() {
           size="large"
           showBackButton={false}
           headerRight={<BackendSettingsControl />}
+          inlineActions={<ContextControl />}
+          allowInlineActionsStacking={false}
         />
-        {/* The account every read on this screen is scoped to: the chat list
-            (`useChatPlace`), the model catalogue, and the empty state below.
-            Switching it remounts the scoped screen, so without the name here a
-            person in two workspaces watches their conversations disappear with
-            nothing saying which workspace they are now in. It is the same
-            switchable control Home and the new-session screen put in their
-            header — the active account's name and the account picker sheet, no
-            copy of its own — and it holds one row in every scope (Personal and
-            a single membership included), so the list never moves when the
-            account list resolves or changes. It sits at the header's own
-            gutter and on its own row: the 30px title already fills the title
-            row, so a trailing cluster would paint over it on a phone. */}
-        <View className={cn(SCREEN_GUTTER_CLASS, 'pb-1')}>
-          <ContextControl />
-        </View>
         <View className="flex-1">{renderBody()}</View>
         {showFab && (
           <Fab

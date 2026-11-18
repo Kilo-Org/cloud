@@ -3,14 +3,13 @@ import { selectionHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
-import { ChevronDown, Eye, EyeOff } from '@/components/ui/icons';
-import { Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
+import { Eye, EyeOff } from '@/components/ui/icons';
+import { Pressable, ScrollView, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 
-import { AddCreditsButton, AddCreditsRow } from '@/components/add-credits-row';
+import { AddCreditsRow } from '@/components/add-credits-row';
 import { BalanceBlock, type BalanceBlockState } from '@/components/profile-balance-block';
-import { useContextPicker } from '@/components/context-control';
 import { CreditExpiryNote } from '@/components/credits/credit-expiry-note';
 import { PersonalCreditsLinks } from '@/components/credits/credits-links';
 import { KiloPassSubscriptionCard } from '@/components/kilo-pass/kilo-pass-subscription-card';
@@ -19,18 +18,12 @@ import { SectionHeader } from '@/components/ui/section-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { organizationBillingUrl } from '@/lib/credits/add-credits-destination';
-import {
-  ICON_TARGET_BOX_CLASS,
-  LINE_ACTION_BOX_CLASS,
-  LINE_ACTION_HIT_SLOP,
-  STATE_ACTION_CLASS,
-} from '@/lib/a11y/tap-target';
+import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { formatPrefixedMoney } from '@/lib/format';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { isMoneyRole, type OrgListEntry } from '@/lib/hooks/use-organization-queries';
-import { isNarrowLayout } from '@/lib/narrow-layout';
 import { useOrganization } from '@/lib/organization-context';
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
@@ -53,7 +46,6 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const trpc = useTRPC();
   const colors = useThemeColors();
   const router = useRouter();
-  const { width } = useWindowDimensions();
   const fontScale = useLiveFontScale();
   const [availableWidth, setAvailableWidth] = useState<number | null>(null);
   // Stack the balance unless the expiry note keeps its two lines beside the
@@ -64,13 +56,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   // dp. The threshold stacks below 370 of them and uses the card's width rather
   // than the display's; below it the note takes a row of its own at full width.
   const stackBalance = availableWidth === null || availableWidth / fontScale < 370;
-  // Below NARROW_LAYOUT_WIDTH the account picker's 65% share leaves the
-  // "CREDITS" eyebrow too little room for one word and Android breaks it
-  // mid-word ("CREDIT S", 160 dp, e1, 2026-09-21). Stacking gives each line the
-  // row's full width.
-  const narrow = isNarrowLayout(width);
   const { t, i18n } = useTranslation();
-  const { openPicker } = useContextPicker(orgs);
   const { organizationId, error, isSaving, retry } = useOrganization();
   const selectedOrgId = organizationId ?? undefined;
 
@@ -164,13 +150,6 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
     (balanceLoading || balancePending || balancePlaceholder || !hideBalanceLoaded) &&
     !balanceFailed;
 
-  const selectedLabel = selectedOrgId
-    ? (orgs?.find(o => o.organizationId === selectedOrgId)?.organizationName ??
-      t('common.organization'))
-    : t('common.personal');
-
-  const canPickContext = orgs !== undefined;
-
   // Personal credits are a consumable bought in-app, so the personal row is
   // shown on every platform and at any balance — a funded user must still be
   // able to top up. Org billing stays a web flow and only members who can
@@ -235,44 +214,16 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
     </Pressable>
   );
 
-  // The purchase action: in the trailing control column with the visibility
-  // toggle. No in-progress indicator sits beside it, because this row paints a
-  // balance that belongs to the selected account and a background refresh may
-  // legitimately take a while or never finish. The first load and a context
-  // switch own the skeleton above; a refresh that fails owns the retry surface.
-  // An indicator tied to every in-flight refresh spun for as long as a stalled
-  // one lasted (and announced itself as "In progress").
-  //
   // An organization's top-up is the external billing page, so it carries the
-  // row's App Store gate and opens for a member who can manage billing. It uses
-  // the same trailing slot as the personal purchase, and it is offered at any
-  // balance, exactly like the personal action beside it. The balance read no
-  // longer decides whether it exists: mounting the control once that read
-  // answered moved every section below the card with it (design gate, Profile,
-  // 2026-11-06), and the slot it takes is reserved in the card's other states.
-  //
-  // A stacked card holds the action on its own end-aligned row inside the
-  // balance block, so it takes the inline form: the button keeps its natural
-  // size there instead of the block width `AddCreditsRow` gives a window under
-  // the narrow threshold.
+  // row's App Store gate and opens for a member who can manage billing. The
+  // personal purchase is this section's header action, so it never drops to a
+  // row of its own in a narrow card.
   const orgAddCreditsAction =
     selectedOrgId != null && canManageOrgBilling ? (
       <AddCreditsRow url={organizationBillingUrl(selectedOrgId)} inline={stackBalance} />
     ) : null;
 
-  const addCreditsAction =
-    selectedOrgId == null ? (
-      <View className="max-w-full flex-row flex-wrap items-center justify-end gap-2">
-        <AddCreditsButton
-          className="h-auto max-w-full py-2"
-          onPress={() => {
-            router.push('/(app)/credits' as Href);
-          }}
-        />
-      </View>
-    ) : (
-      orgAddCreditsAction
-    );
+  const addCreditsAction = selectedOrgId == null ? null : orgAddCreditsAction;
 
   // The balance slot's state: one shell paints all three, so the card never
   // moves as the read answers, fails or retries.
@@ -295,37 +246,16 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         setAvailableWidth(event.nativeEvent.layout.width);
       }}
     >
-      {/* The account picker shares the label's line; a narrow window wraps it
-          under the label. It keeps its touch target on the shared line-action
-          box: a 28dp frame that floats over the line and reaches past 44dp with
-          hitSlop, without growing the row. */}
       <SectionHeader
         label={t('profile.credits')}
-        notice={
-          canPickContext ? (
-            <Pressable
-              className={cn(
-                LINE_ACTION_BOX_CLASS,
-                // A short account or org name must still carry the 44pt reach.
-                'min-w-11 flex-row items-center gap-1 active:opacity-70',
-                narrow ? 'max-w-full justify-start' : 'max-w-[65%] shrink justify-end'
-              )}
-              hitSlop={LINE_ACTION_HIT_SLOP}
-              onPress={openPicker}
-              accessibilityRole="button"
-              accessibilityLabel={selectedLabel}
-              accessibilityHint={t('profile.selectAccount')}
-            >
-              <Text
-                className="min-w-0 shrink text-xs font-medium text-muted-foreground"
-                numberOfLines={1}
-                ellipsizeMode="tail"
-              >
-                {selectedLabel}
-              </Text>
-              <ChevronDown size={14} color={colors.mutedForeground} />
-            </Pressable>
-          ) : null
+        reserveLabelAir
+        actionLabel={selectedOrgId == null ? t('addCredits.cta') : undefined}
+        onActionPress={
+          selectedOrgId == null
+            ? () => {
+                router.push('/(app)/credits' as Href);
+              }
+            : undefined
         }
       />
       {error === 'save' && (

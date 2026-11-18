@@ -27,7 +27,6 @@ export const FORM_SHEET_ROUTE_SUFFIXES: readonly (readonly string[])[] = [
   ['voice-language-picker'],
   ['organization', 'invite-member'],
   ['organization', 'member-limit'],
-  ['organization', 'low-balance-alert'],
   ['dismiss', '[id]'],
   ['filter'],
   ['comment-composer'],

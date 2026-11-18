@@ -354,26 +354,30 @@ describe('mirrored tab label metrics', () => {
 });
 
 describe('shouldHideTabBar', () => {
-  it('hides tabs for full-screen nested routes', () => {
-    expect(shouldHideTabBar('/security-agent/personal/filter', [])).toBe(true);
-    expect(shouldHideTabBar('/security-agent/org-1/filter', [])).toBe(true);
+  it.each([
+    ['(0_home)'],
+    ['(2_agents)'],
+    ['(4_chat)'],
+    ['(3_profile)'],
+  ] as const)('keeps the bar on the %s tab root', group => {
+    expect(shouldHideTabBar('/', ['(app)', '(tabs)', group])).toBe(false);
+    expect(shouldHideTabBar('/', ['(app)', '(tabs)', group, 'index'])).toBe(false);
   });
 
-  it('keeps tabs on normal tab screens', () => {
-    expect(shouldHideTabBar('/security-agent/personal', [])).toBe(false);
-    expect(shouldHideTabBar('/security-agent/personal/findings', [])).toBe(false);
+  it('hides the bar on a pushed screen inside a tab group', () => {
+    expect(shouldHideTabBar('/history', ['(app)', '(tabs)', '(2_agents)', 'history'])).toBe(true);
+    expect(shouldHideTabBar('/spend-alerts', ['(app)', '(tabs)', '(3_profile)', 'spend-alerts'])).toBe(
+      true
+    );
   });
 
-  it('hides tabs inside a chat, whose composer sits where the bar would be', () => {
+  it('hides the bar inside a chat, whose composer sits where the bar would be', () => {
     expect(shouldHideTabBar('/abc123', ['(app)', '(tabs)', '(4_chat)', '[id]'])).toBe(true);
   });
 
-  it('keeps tabs on the chat list', () => {
-    expect(shouldHideTabBar('/', ['(app)', '(tabs)', '(4_chat)', 'index'])).toBe(false);
-  });
-
-  it('keeps tabs on a one-segment route outside the chat tab', () => {
-    expect(shouldHideTabBar('/abc123', ['(app)', '(tabs)', '(2_agents)', '[id]'])).toBe(false);
+  it('hides the bar on a root-stack screen', () => {
+    expect(shouldHideTabBar('/usage', ['(app)', 'usage'])).toBe(true);
+    expect(shouldHideTabBar('/credits', ['(app)', 'credits'])).toBe(true);
   });
 });
 

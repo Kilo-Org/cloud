@@ -14,17 +14,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { CreditsCard } from './profile-credits-card';
-import {
-  ICON_TARGET_BOX_CLASS,
-  LINE_ACTION_BOX_CLASS,
-  LINE_ACTION_HIT_SLOP,
-  MIN_TAP_TARGET_DP,
-  tapTargetReachDp,
-  TOUCH_TARGET_DP,
-} from '@/lib/a11y/tap-target';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { type OrgListEntry } from '@/lib/hooks/use-organization-queries';
-import { contextPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
-import { OrganizationProvider } from '@/lib/organization-context';
+import { OrganizationProvider, useOrganization } from '@/lib/organization-context';
 import { ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import { createTestQueryClient, renderWithProviders, waitFor } from '@/test/render-with-providers';
 
@@ -199,10 +191,6 @@ const addCreditsRowProps = vi.hoisted(() => ({
   latest: undefined as { url?: string; onPress?: () => void } | undefined,
 }));
 vi.mock('@/components/add-credits-row', () => ({
-  AddCreditsButton: (props: { url?: string; onPress?: () => void }) => {
-    addCreditsRowProps.latest = props;
-    return 'ADD_CREDITS_BUTTON';
-  },
   AddCreditsRow: (props: { url?: string; onPress?: () => void }) => {
     addCreditsRowProps.latest = props;
     return 'ADD_CREDITS_ROW';
@@ -245,11 +233,24 @@ const organizationName = 'A very long organization name that must leave the cred
 const savedMetadata = new Map<string, string>();
 let saveCompletion: Promise<undefined> | undefined = undefined;
 
+const organizationSwitch = { set: (_id: string | null) => undefined as void };
+
+/**
+ * The card plus the provider's own switch, which the header's account control
+ * drives on screen. A test that switches accounts calls it directly, so the
+ * card's balance behavior is observed without the picker owning the card.
+ */
+function CardHarness({ orgs }: Readonly<{ orgs?: OrgListEntry[] }>) {
+  const organization = useOrganization();
+  organizationSwitch.set = organization.setOrganizationId;
+  return createElement(CreditsCard, { enabled: true, orgs });
+}
+
 async function mountCard(
   queryClient: QueryClient = createTestQueryClient(),
   orgs?: OrgListEntry[]
 ) {
-  const ui = await renderWithProviders(createElement(CreditsCard, { enabled: true, orgs }), {
+  const ui = await renderWithProviders(createElement(CardHarness, { orgs }), {
     queryClient,
     wrapper: OrganizationProvider,
   });
@@ -267,27 +268,18 @@ async function mountCard(
   };
 }
 
-async function openSheet(renderer: ReactTestRenderer) {
-  const control = renderer.root.find(
-    node => node.type === Pressable && node.props.accessibilityHint === 'Select account'
+/** The credits section's purchase action: the header control the card renders. */
+function addCreditsAction(renderer: ReactTestRenderer): ReactTestInstance {
+  return renderer.root.find(
+    node => node.type === Pressable && node.props.accessibilityLabel === i18n.t('addCredits.cta')
   );
+}
+
+/** Switches the active account through the provider, as the header control does. */
+async function switchAccountTo(organizationId: string | null) {
   await act(() => {
-    (control.props.onPress as () => void)();
+    organizationSwitch.set(organizationId);
   });
-}
-
-/** The bridge the card handed the shared account picker route. */
-function pickerBridge() {
-  const bridge = contextPickerSlot.get(UNFENCED_ROUTE_KEY);
-  if (bridge === undefined) {
-    throw new Error('the account picker route was not handed a bridge');
-  }
-  return bridge;
-}
-
-/** The account labels the picker route would render, in option order. */
-function accountLabels() {
-  return pickerBridge().options;
 }
 
 /** Presses a plain control of the card by its visible label. */
@@ -298,43 +290,6 @@ async function pressLabel(renderer: ReactTestRenderer, label: string) {
   await act(() => {
     (target.props.onPress as () => void)();
   });
-}
-
-/**
- * Applies one account choice, or dismisses without one for `Cancel`: the card
- * presses the choice the route reports, exactly as a row press would.
- */
-async function choose(label: string) {
-  if (label === 'Cancel') {
-    contextPickerSlot.clear(UNFENCED_ROUTE_KEY);
-    return;
-  }
-  const bridge = pickerBridge();
-  const index = bridge.options.indexOf(label);
-  if (index === -1) {
-    throw new Error(`${label} is not one of the picker's rows`);
-  }
-  await act(() => {
-    bridge.onSelect(index);
-  });
-}
-
-/**
- * The header container's classes: the label line that carries the credits
- * eyebrow and the account picker. The section header is the one row that packs
- * its children to the end and wraps them when they cannot share a line.
- */
-function headerClasses(renderer: ReactTestRenderer): string[] {
-  const header = renderer.root.find(node => {
-    if (!Object.is(node.type, 'View')) {
-      return false;
-    }
-    const tokens = classesOf(node);
-    return (
-      tokens.includes('flex-wrap') && tokens.includes('justify-end') && tokens.includes('items-end')
-    );
-  });
-  return String(header.props.className).split(' ');
 }
 
 /** A node's class tokens, so a class assertion never depends on their order. */
@@ -399,7 +354,6 @@ beforeEach(() => {
   // stage a stored selection set their own payload.
   listState.payload = [];
   routerPush.mockReset();
-  contextPickerSlot.clearAll();
   storage.read.mockReset().mockImplementation(async (key: string) => {
     await Promise.resolve();
     return savedMetadata.get(key) ?? null;
@@ -431,11 +385,11 @@ describe('CreditsCard balance state', () => {
     personalCreditBlocksQueryFn.mockResolvedValue({
       creditBlocks: [{ balance_mUsd: 2_000_000, expiry_date: '2099-12-17T12:00:00Z' }],
     });
-    const { texts, unmount } = await mountCard();
+    const { renderer, texts, unmount } = await mountCard();
     try {
       await waitFor(() => texts().some(text => text.includes('$2.00')));
       expect(texts()).toContain('SKELETON');
-      expect(texts()).toContain('ADD_CREDITS_BUTTON');
+      expect(addCreditsAction(renderer).props.accessibilityRole).toBe('button');
       expect(texts()).not.toContain('$0.00');
       await act(async () => {
         pendingBalance.resolve({ balance: 7 });
@@ -520,8 +474,7 @@ describe('CreditsCard balance state', () => {
     // amount must not stay on the row under the new account's name.
     const stalled = Promise.withResolvers<undefined>();
     getContextBalanceQueryFn.mockReturnValue(stalled.promise);
-    await openSheet(renderer);
-    await choose('Beta');
+    await switchAccountTo('org-b');
 
     await waitFor(() => texts().includes('SKELETON'));
     expect(texts()).not.toContain('$10.00');
@@ -644,8 +597,7 @@ describe('CreditsCard balance state', () => {
     );
     const pending = Promise.withResolvers<{ creditBlocks: [] }>();
     orgCreditBlocksQueryFn.mockReturnValue(pending.promise);
-    await openSheet(renderer);
-    await choose('Beta');
+    await switchAccountTo('org-b');
     await waitFor(() => texts().includes('$10.00') && texts().includes('SKELETON'));
 
     expect(texts()).not.toContain(previousNote);
@@ -754,112 +706,14 @@ describe('CreditsCard balance state', () => {
     }
   });
 
-  it.each([
-    { orgs: [], options: ['Personal', 'Cancel'], choice: 0, expected: null, label: 'Personal' },
-    {
-      orgs: [{ organizationId: 'org-a', organizationName, role: 'owner' }],
-      options: ['Personal', organizationName, 'Cancel'],
-      choice: 1,
-      expected: 'org-a',
-      label: organizationName,
-    },
-  ])('uses supplied memberships for the picker: $expected', async state => {
-    // The staged stored selection is missing from the supplied list, so the
-    // provider recovers before the card renders: give the shared list the
-    // same payload the card receives, so the recovery lands on the selection
-    // the assertions then drive.
-    listState.payload = state.orgs as OrgListEntry[];
-    const seededSelection = (state.orgs as OrgListEntry[])[0]?.organizationId;
-    savedMetadata.set(ORGANIZATION_STORAGE_KEY, seededSelection ?? 'missing-org');
-    const { renderer, unmount } = await mountCard(
-      createTestQueryClient(),
-      state.orgs as OrgListEntry[]
-    );
-    await openSheet(renderer);
-    expect(accountLabels()).toEqual(state.options.filter(label => label !== 'Cancel'));
-    await choose('Cancel');
-    expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe(
-      (state.orgs as OrgListEntry[])[0]?.organizationId ?? undefined
-    );
-    await openSheet(renderer);
-    await choose(state.label);
-    expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe(state.expected ?? undefined);
-    const label = renderer.root.findByProps({ children: state.label });
-    expect(label.props).toMatchObject({ numberOfLines: 1, ellipsizeMode: 'tail' });
-    unmount();
-  });
-
-  it.each(['org-b', null])(
-    'retries the latest Profile selection %s after save failures',
-    async id => {
-      Platform.OS = 'android';
-      savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'previous-org');
-      const orgs = [
-        { organizationId: 'org-a', organizationName: 'Supplied organization', role: 'owner' },
-        { organizationId: 'org-b', organizationName: 'Latest organization', role: 'owner' },
-      ] as OrgListEntry[];
-      // The staged 'previous-org' selection must stay in the fetched list, or
-      // the provider's lost-membership recovery switches it away before the
-      // save-failure flow under test runs.
-      listState.payload = orgs;
-      storage.write.mockRejectedValueOnce(new Error('write failed'));
-      const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), orgs);
-      await openSheet(renderer);
-      await choose('Supplied organization');
-      expect(texts()).toContain('Could not save setting');
-      expect(texts()).toContain('Supplied organization');
-      expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe('previous-org');
-      const retryButton = renderer.root.findByProps({ accessibilityLabel: 'Retry' });
-      expect(retryButton.props.accessibilityRole).toBe('button');
-      expect(retryButton.props.accessibilityHint).toBe('Could not save setting');
-      // Keep the rendered handler to catch a retry that captures the earlier failed choice.
-      const retry = retryButton.props.onPress as () => void;
-      (id === null ? storage.remove : storage.write).mockRejectedValueOnce(
-        new Error('latest save failed')
-      );
-      await openSheet(renderer);
-      await choose(id === null ? 'Personal' : 'Latest organization');
-      const label = id === null ? 'Personal' : 'Latest organization';
-      expect(texts()).toContain(label);
-      expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe('previous-org');
-      const status = renderer.root.find(
-        node => (node.type as string) === 'Text' && node.props.accessibilityLiveRegion === 'polite'
-      );
-      expect(status.children).toContain('Could not save setting');
-      const save = Promise.withResolvers<undefined>();
-      saveCompletion = save.promise;
-      await act(() => {
-        retry();
-      });
-      expect(texts()).toContain(label);
-      expect(texts()).toContain('Could not save setting');
-      const busyRetry = renderer.root.findByProps({ accessibilityLabel: 'Retry' });
-      expect(busyRetry.props.accessibilityState).toEqual({ busy: true, disabled: true });
-      expect(busyRetry.props.disabled).toBe(true);
-      expect(busyRetry.findAllByType('ActivityIndicator' as ElementType)).toHaveLength(1);
-      expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe('previous-org');
-      await act(() => {
-        save.resolve(undefined);
-      });
-      expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe(id ?? undefined);
-      expect(texts()).toContain(label);
-      expect(texts()).not.toContain('Could not save setting');
-      expect(texts()).not.toContain('Retry');
-      unmount();
-      const reopened = await mountCard(createTestQueryClient(), orgs);
-      expect(reopened.texts()).toContain(label);
-      reopened.unmount();
-    }
-  );
-
   it('shows a skeleton (not $0) when no signed-in user is resolved yet', async () => {
-    const { texts, unmount } = await mountCard();
+    const { renderer, texts, unmount } = await mountCard();
 
     expect(texts()).toContain('SKELETON');
     expect(texts()).not.toContain('$0.00');
-    // The personal purchase holds its slot while the balance loads, so it never
-    // pops in when the read answers.
-    expect(texts()).toContain('ADD_CREDITS_BUTTON');
+    // The personal purchase is the section action, so it never pops in when
+    // the balance read answers.
+    expect(addCreditsAction(renderer).props.accessibilityRole).toBe('button');
 
     unmount();
   });
@@ -931,7 +785,7 @@ describe('CreditsCard balance state', () => {
 
     const { renderer, texts, unmount } = await mountCard();
 
-    expect(texts()).toContain('ADD_CREDITS_BUTTON');
+    expect(addCreditsAction(renderer).props.accessibilityRole).toBe('button');
     expect(texts()).not.toContain('$0.00');
 
     const errorPressable = renderer.root.find(
@@ -1108,22 +962,20 @@ describe('CreditsCard add-credits entry point', () => {
     ['android', 0],
     ['android', 10],
   ] as const)(
-    'renders the personal in-app CTA in the balance card on %s at a %i balance',
+    'renders the personal in-app CTA as the credits section action on %s at a %i balance',
     async (os, balance) => {
       Platform.OS = os;
       currentUser.userId = 'user-1';
       const queryClient = createTestQueryClient();
       queryClient.setQueryData([...BALANCE_KEY], { balance });
 
-      const { texts, unmount } = await mountCard(queryClient);
+      const { renderer, texts, unmount } = await mountCard(queryClient);
       await waitFor(() => texts().includes(`$${balance.toFixed(2)}`));
 
-      expect(texts()).toContain('ADD_CREDITS_BUTTON');
-      expect(addCreditsRowProps.latest?.url).toBeUndefined();
-      expect(addCreditsRowProps.latest?.onPress).toBeTypeOf('function');
-
+      const action = addCreditsAction(renderer);
+      expect(action.props.accessibilityRole).toBe('button');
       act(() => {
-        addCreditsRowProps.latest?.onPress?.();
+        (action.props.onPress as () => void)();
       });
       expect(routerPush).toHaveBeenCalledWith('/(app)/credits');
 
@@ -1167,14 +1019,13 @@ describe('CreditsCard add-credits entry point', () => {
     currentUser.userId = 'user-1';
     getContextBalanceQueryFn.mockRejectedValue(new Error('Balance unavailable'));
 
-    const { labels, texts, unmount } = await mountCard();
+    const { renderer, labels, texts, unmount } = await mountCard();
     await waitFor(() => labels().includes('Failed to load balance. Tap to retry.'));
 
-    expect(texts()).toContain('ADD_CREDITS_BUTTON');
+    expect(addCreditsAction(renderer).props.accessibilityRole).toBe('button');
     expect(texts()).not.toContain('$0.00');
-    expect(addCreditsRowProps.latest?.onPress).toBeTypeOf('function');
     act(() => {
-      addCreditsRowProps.latest?.onPress?.();
+      (addCreditsAction(renderer).props.onPress as () => void)();
     });
     expect(routerPush).toHaveBeenCalledWith('/(app)/credits');
 
@@ -1187,13 +1038,13 @@ describe('CreditsCard add-credits entry point', () => {
     const queryClient = createTestQueryClient();
     queryClient.setQueryData([...BALANCE_KEY], { balance: 0 });
 
-    const { texts, unmount } = await mountCard(queryClient);
+    const { renderer, texts, unmount } = await mountCard(queryClient);
     await waitFor(() => texts().includes('$0.00'));
 
     expect(texts()).not.toContain(
       'Your credit balance is empty. Credits are managed outside the iOS app for this account.'
     );
-    expect(texts()).toContain('ADD_CREDITS_BUTTON');
+    expect(addCreditsAction(renderer).props.accessibilityRole).toBe('button');
 
     unmount();
   });
@@ -1301,60 +1152,6 @@ describe('CreditsCard add-credits entry point', () => {
   });
 });
 
-describe('CreditsCard credits header', () => {
-  const headerOrgs = [
-    { organizationId: 'org-a', organizationName, role: 'owner' },
-  ] as OrgListEntry[];
-
-  it('keeps the credits eyebrow and the account picker on one row at phone widths', async () => {
-    const { renderer, unmount } = await mountCard(createTestQueryClient(), headerOrgs);
-
-    // The 160 dp window of the e1 round squeezed the eyebrow until Android
-    // broke it mid-word ("CREDIT S"); a phone-width window must not.
-    expect(headerClasses(renderer)).toContain('flex-row');
-    unmount();
-  });
-
-  it('wraps the account picker under the label in a narrow window', async () => {
-    windowDims.width = 160;
-    const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), headerOrgs);
-
-    const classes = headerClasses(renderer);
-    // One wrapping row: the picker takes its own line when the label cannot
-    // share it, instead of squeezing the eyebrow into a broken column.
-    expect(classes).toContain('flex-wrap');
-    expect(classes).not.toContain('flex-col');
-    // The eyebrow keeps its full copy instead of breaking mid-word.
-    expect(texts()).toContain('Credits');
-    unmount();
-  });
-
-  it('keeps the header one text line tall and reaches the picker target with hitSlop', async () => {
-    const { renderer, unmount } = await mountCard(createTestQueryClient(), headerOrgs);
-
-    // The header is the eyebrow's line, so "Credits" starts at the screen's top
-    // padding like the other Profile section headings; a taller row pushes it
-    // down and opens a hole under the screen title.
-    expect(headerClasses(renderer)).not.toContain('min-h-[44px]');
-    expect(headerClasses(renderer)).toContain('items-end');
-    const picker = renderer.root.find(
-      node => Object.is(node.type, Pressable) && node.props.accessibilityHint === 'Select account'
-    );
-    // The picker floats the shared 28dp line-action box over the line and
-    // reaches the 44pt target with its slop instead of growing the row.
-    for (const token of LINE_ACTION_BOX_CLASS.split(' ')) {
-      expect(String(picker.props.className)).toContain(token);
-    }
-    expect(picker.props.hitSlop).toBe(LINE_ACTION_HIT_SLOP);
-    expect(tapTargetReachDp(MIN_TAP_TARGET_DP, LINE_ACTION_HIT_SLOP.top)).toBeGreaterThanOrEqual(
-      TOUCH_TARGET_DP
-    );
-    // A short account or org name must not shrink the target below 44pt.
-    expect(String(picker.props.className)).toContain('min-w-11');
-    unmount();
-  });
-});
-
 describe('CreditsCard balance row', () => {
   /** The card's outer box: the only View the card gives `gap-3` and a layout reader. */
   function cardBox(renderer: ReactTestRenderer) {
@@ -1392,13 +1189,13 @@ describe('CreditsCard balance row', () => {
     return current;
   }
 
-  it('keeps the note in the amount column on a wide card, with the purchase action in its own column', async () => {
+  it('keeps the note in the amount column on a wide card', async () => {
     const { renderer, unmount } = await mountAtCardWidth(383);
 
     const column = noteColumn(renderer);
     expect(renders(column, '$12.34')).toBe(true);
     expect(renders(column, 'ADD_CREDITS_BUTTON')).toBe(false);
-    expect(renders(balanceBlock(renderer), 'ADD_CREDITS_BUTTON')).toBe(true);
+    expect(renders(balanceBlock(renderer), 'ADD_CREDITS_BUTTON')).toBe(false);
     unmount();
   });
 
@@ -1409,15 +1206,13 @@ describe('CreditsCard balance row', () => {
     ['the compact cell', 332],
     ['a 390 dp screen', 362],
   ])(
-    'gives the note its own line under the amount and the purchase action its own row on %s',
+    'gives the note its own line under the amount on %s',
     async (_name, width) => {
       const { renderer, unmount } = await mountAtCardWidth(width);
 
       // A stacked card keeps the value and its caption together: the amount and
-      // its visibility toggle share the value line, the note takes the column's
-      // next line at the column's own gap, and the purchase action takes its
-      // own row under the pair, so no control sits beside the toggle at another
-      // height and the note keeps the card's full width.
+      // its visibility toggle share the value line, and the note takes the
+      // column's next line, so the note keeps the card's full width.
       const shell = balanceBlock(renderer);
       expect(classesOf(shell)).not.toContain('flex-row');
       const column = valueColumn(renderer);
@@ -1443,12 +1238,9 @@ describe('CreditsCard balance row', () => {
       expect(wrapper.children.at(-1)).toBe(column);
       expect(renders(column, 'No expiring credits.')).toBe(true);
       expect(renders(column, 'ADD_CREDITS_BUTTON')).toBe(false);
-      const actionRow = shell.children.at(-1);
-      if (actionRow === undefined || typeof actionRow === 'string') {
-        throw new Error('The stacked card has no purchase row');
-      }
-      expect(actionRow).not.toBe(wrapper);
-      expect(renders(actionRow, 'ADD_CREDITS_BUTTON')).toBe(true);
+      // The purchase action is the section header's, so the card ends at its
+      // value column and paints no empty action row.
+      expect(shell.children.at(-1)).toBe(wrapper);
       unmount();
     }
   );

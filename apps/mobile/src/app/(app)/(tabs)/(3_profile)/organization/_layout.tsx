@@ -48,7 +48,6 @@ export default function OrganizationLayout() {
         }}
       />
       <Stack.Screen name="member-limit" options={organizationSheetOptions} />
-      <Stack.Screen name="low-balance-alert" options={organizationSheetOptions} />
     </Stack>
   );
 }

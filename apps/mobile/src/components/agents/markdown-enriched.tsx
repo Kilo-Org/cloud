@@ -30,6 +30,8 @@ import { rtlListItems } from './markdown-rtl-list-items';
 type MarkdownEnrichedProps = {
   value: string;
   palette: MarkdownPalette;
+  /** Base direction of the document body; see `MarkdownTextProps`. */
+  documentDirection?: 'ltr';
   selectable: boolean;
   /**
    * Body line height in the library's sp units. The line box is what a native
@@ -48,7 +50,7 @@ const BODY_LINE_HEIGHT = 24;
 
 function enrichedStyle(
   palette: MarkdownPalette,
-  isRtl: boolean,
+  alignBlocksWithInterface: boolean,
   lineHeight = BODY_LINE_HEIGHT
 ): MarkdownStyle {
   const { textColor, mutedTextColor, codeBackground, borderColor } = palette;
@@ -58,8 +60,10 @@ function enrichedStyle(
   // strong character, so an English reply stays at the left edge of a
   // right-to-left interface while the Thought row and the failure block around
   // it sit on the start edge. Naming the interface start keeps the assistant
-  // turn in one column; the run inside the line still reads left to right.
-  const blockTextAlign = rtlBlockTextAlign(isRtl);
+  // turn in one column; the run inside the line still reads left to right. A
+  // body with its own base direction passes `false` and keeps the renderer's
+  // natural alignment.
+  const blockTextAlign = rtlBlockTextAlign(alignBlocksWithInterface);
   const heading = (level: keyof typeof headings) => {
     const style = headings[level];
     return {
@@ -165,6 +169,7 @@ function enrichedStyle(
 export function MarkdownEnriched({
   value,
   palette,
+  documentDirection,
   selectable,
   lineHeight,
   onLongPressLink,
@@ -173,9 +178,12 @@ export function MarkdownEnriched({
 }: Readonly<MarkdownEnrichedProps>) {
   const { t } = useTranslation();
   const [viewer, setViewer] = useState<{ uri: string; filename: string } | null>(null);
+  // A document body that names its own direction keeps the renderer's natural
+  // alignment, so the English legal text stays left aligned in a right-to-left
+  // interface; chat keeps naming the interface start edge.
   const markdownStyle = useMemo(
-    () => enrichedStyle(palette, I18nManager.isRTL, lineHeight),
-    [palette, lineHeight]
+    () => enrichedStyle(palette, I18nManager.isRTL && documentDirection !== 'ltr', lineHeight),
+    [palette, lineHeight, documentDirection]
   );
   const images = useMemo(() => findMarkdownImages(value), [value]);
   // One flag per image, so trusting a host or confirming a URI re-renders
@@ -196,10 +204,15 @@ export function MarkdownEnriched({
   // gives a list no alignment, so a bullet's marker and text stay on the
   // physical left while the heading and every other block name the interface
   // start edge. The iOS renderer indents a list from the paragraph's own
-  // direction, so only Android needs the mark.
+  // direction, so only Android needs the mark. A body with its own base
+  // direction wants its markers on the physical left, where it already puts
+  // them.
   const renderedMarkdown = useMemo(
-    () => (Platform.OS === 'android' && I18nManager.isRTL ? rtlListItems(markdown) : markdown),
-    [markdown]
+    () =>
+      Platform.OS === 'android' && I18nManager.isRTL && documentDirection !== 'ltr'
+        ? rtlListItems(markdown)
+        : markdown,
+    [markdown, documentDirection]
   );
   return (
     <>

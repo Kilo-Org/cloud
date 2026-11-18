@@ -521,9 +521,16 @@ const HTML_ELEMENT_MODELS = {
 
 const CODE_FONT = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
 
+// The engine's base style is CSS-like: `direction` names a block's base
+// direction, and its `MixedStyleDeclaration` has no `writingDirection` (that is
+// the native `Text` spelling, `LTR_TEXT_DIRECTION`).
+const LTR_BASE_DIRECTION = { direction: 'ltr' } as const;
+
 type MarkdownHtmlProps = {
   html: string;
   palette: MarkdownPalette;
+  /** Base direction of the document body; see `MarkdownTextProps`. */
+  documentDirection?: 'ltr';
   selectable: boolean;
   onLongPressLink?: MarkdownLinkLongPressHandler;
   onPressLink?: MarkdownLinkPressHandler;
@@ -532,6 +539,7 @@ type MarkdownHtmlProps = {
 export function MarkdownHtml({
   html,
   palette,
+  documentDirection,
   selectable,
   onLongPressLink,
   onPressLink,
@@ -539,8 +547,16 @@ export function MarkdownHtml({
   const { width } = useWindowDimensions();
   const source = useMemo(() => ({ html }), [html]);
   const baseStyle = useMemo(
-    () => ({ color: palette.textColor, fontSize: 16, lineHeight: 24 }),
-    [palette]
+    () => ({
+      color: palette.textColor,
+      fontSize: 16,
+      lineHeight: 24,
+      // Naming the body's own direction makes the engine resolve every block
+      // left to right and left aligned; chat leaves the interface's direction
+      // in place.
+      ...(documentDirection === 'ltr' ? LTR_BASE_DIRECTION : {}),
+    }),
+    [palette, documentDirection]
   );
   // Most keys, subscripts and superscripts become markdown before they reach
   // this renderer (`markdown-html-inline.ts`). What is left draws as smaller
@@ -606,6 +622,8 @@ export function MarkdownHtml({
       const src = tnode.attributes.src ?? '';
       if (!isSupportedScheme(src)) {
         return (
+          // Alt text is document content: the interface mark goes behind
+          // `baseStyle`, so a body with its own direction keeps it here too.
           <Text selectable={selectable} style={withRtlWritingDirection(baseStyle)}>
             {tnode.attributes.alt ?? ''}
           </Text>

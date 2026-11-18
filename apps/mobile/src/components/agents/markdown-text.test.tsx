@@ -154,7 +154,11 @@ function codeFences(renderer: TestRenderer.ReactTestRenderer): CodeFenceProps[] 
 
 type EnrichedHostProps = {
   markdown: string;
-  markdownStyle: { paragraph: { lineHeight: number }; list: { lineHeight: number } };
+  markdownStyle: {
+    paragraph: { lineHeight: number; textAlign?: 'right' };
+    h1: { textAlign?: 'right' };
+    list: { lineHeight: number };
+  };
   onLinkPress: (event: { url: string }) => void;
   onLinkLongPress?: (event: { url: string }) => void;
   onImagePress: (event: { url: string; altText: string }) => void;
@@ -1162,5 +1166,67 @@ describe('MarkdownText body line height', () => {
 
     expect(paragraph.lineHeight).toBe(24);
     expect(list.lineHeight).toBe(24);
+  });
+});
+
+describe('MarkdownText document direction', () => {
+  const value = '# Heading\n\nBody text\n\n- one\n- two';
+
+  it('aligns chat blocks with a right-to-left interface and marks its list items', async () => {
+    rnStub.I18nManager.isRTL = true;
+    // Only Android resolves a list item from its own first strong character.
+    rnStub.Platform.OS = 'android';
+    try {
+      const renderer = await mount(<MarkdownText value={value} />);
+      const props = enrichedProps(renderer);
+
+      expect(props.markdownStyle.paragraph.textAlign).toBe('right');
+      expect(props.markdownStyle.h1).toMatchObject({ textAlign: 'right' });
+      // `rtlListItems` names the start edge and isolates the item's own text.
+      expect(props.markdown).toContain('\u200F\u2068one\u2069');
+    } finally {
+      rnStub.I18nManager.isRTL = false;
+      rnStub.Platform.OS = 'ios';
+    }
+  });
+
+  it('keeps a document body at the left edge without the list-item mark', async () => {
+    rnStub.I18nManager.isRTL = true;
+    rnStub.Platform.OS = 'android';
+    try {
+      const renderer = await mount(<MarkdownText value={value} documentDirection="ltr" />);
+      const props = enrichedProps(renderer);
+
+      expect(props.markdownStyle.paragraph).not.toHaveProperty('textAlign');
+      expect(props.markdownStyle.h1).not.toHaveProperty('textAlign');
+      expect(props.markdown).toBe(value);
+    } finally {
+      rnStub.I18nManager.isRTL = false;
+      rnStub.Platform.OS = 'ios';
+    }
+  });
+
+  it('leaves a left-to-right interface unchanged', async () => {
+    const renderer = await mount(<MarkdownText value={value} documentDirection="ltr" />);
+    const props = enrichedProps(renderer);
+
+    expect(props.markdownStyle.paragraph).not.toHaveProperty('textAlign');
+    expect(props.markdownStyle.h1).not.toHaveProperty('textAlign');
+    expect(props.markdown).toBe(value);
+  });
+
+  it('names the base direction of an HTML body only for a document', async () => {
+    rnStub.I18nManager.isRTL = true;
+    try {
+      const chat = await mount(<MarkdownText value="> <u>quoted</u>" />);
+      expect(htmlProps(chat).baseStyle).not.toHaveProperty('direction');
+
+      const document = await mount(
+        <MarkdownText value="> <u>quoted</u>" documentDirection="ltr" />
+      );
+      expect(htmlProps(document).baseStyle).toMatchObject({ direction: 'ltr' });
+    } finally {
+      rnStub.I18nManager.isRTL = false;
+    }
   });
 });

@@ -2,7 +2,7 @@ import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
-import { ArrowLeft, Users } from '@/components/ui/icons';
+import { ArrowLeft, Lock, Users } from '@/components/ui/icons';
 
 import { EmptyState, StateAction } from '@/components/empty-state';
 import { GroupForm } from '@/components/organization/group-form';
@@ -51,10 +51,9 @@ export function OrganizationGroupFormScreen() {
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('organization.settingsOnWeb.groups')} />
         <EmptyState
-          icon={Users}
-          placement="top"
-          inset="gutter"
-          title={t('organization.groups.enterpriseOnly')}
+          icon={Lock}
+          title={t('organizationModelAccess.enterpriseOnlyTitle')}
+          description={t('organization.groups.enterpriseOnly')}
         />
       </View>
     );
@@ -112,8 +111,6 @@ function GroupNotFound() {
       <ScreenHeader title={t('organization.settingsOnWeb.groups')} />
       <EmptyState
         icon={Users}
-        placement="top"
-        inset="gutter"
         title={t('organization.groups.notFound')}
         action={
           <StateAction

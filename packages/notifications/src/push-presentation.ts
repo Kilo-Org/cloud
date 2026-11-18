@@ -72,11 +72,22 @@ export const AGENT_CHANNEL_SPLIT_APP_VERSION = '1.0.12';
  */
 export const AGENT_BRIEFING_CHANNEL_APP_VERSION = '1.0.16';
 
-/** Channels that only a build at or above the given version creates. */
-const ANDROID_CHANNEL_MIN_APP_VERSIONS: Partial<Record<AndroidNotificationChannelId, string>> = {
+/**
+ * The minimum app version that creates each channel, or `undefined` when every
+ * build creates it. Total over the channel ids, so a channel added to
+ * `ANDROID_NOTIFICATION_CHANNELS` fails typecheck here until this map
+ * classifies it.
+ */
+const ANDROID_CHANNEL_MIN_APP_VERSIONS: Record<
+  AndroidNotificationChannelId,
+  string | undefined
+> = {
   'needs-input': AGENT_CHANNEL_SPLIT_APP_VERSION,
   'agent-progress': AGENT_CHANNEL_SPLIT_APP_VERSION,
   'agent-briefing': AGENT_BRIEFING_CHANNEL_APP_VERSION,
+  balance: undefined,
+  security: undefined,
+  'followed-sessions-lock-screen': undefined,
 };
 
 /**

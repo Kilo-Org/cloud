@@ -3,6 +3,7 @@ import {
   type AnalyticsEventMap,
   redactProhibitedProperties,
 } from '@kilocode/app-shared/analytics';
+import { isAppVersionAtLeast } from '@kilocode/app-shared/app-version';
 import { type FeatureFlagKey } from '@kilocode/app-shared/feature-flags';
 import * as Application from 'expo-application';
 import * as Device from 'expo-device';
@@ -11,7 +12,6 @@ import { useCallback, useSyncExternalStore } from 'react';
 
 import { POSTHOG_API_KEY } from '@/lib/config';
 import { currentAppVersion, getFeatureFlagDefinition } from '@/lib/feature-flags';
-import { isAppVersionAtLeast } from '@kilocode/app-shared/app-version';
 import { allowsMandatory, allowsOptional, currentGeneration } from '@/lib/telemetry/controller';
 import {
   posthogCustomStorage,

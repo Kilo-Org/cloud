@@ -9,13 +9,14 @@ import { getDirectoryName, getFilename, truncateText } from './tool-card-utils';
 import { listPatchFilePaths } from './tool-patch-model';
 import { buildResultRowsModel } from './tool-list-model';
 import { suggestionToolMetadataSchema } from './suggestion-card-state';
-import { searchToolDisplay, summaryToolDisplay, type ToolDisplay } from './tool-display-rows';
+import {
+  agentNoticeDisplay,
+  searchToolDisplay,
+  summaryToolDisplay,
+  type ToolDisplay,
+} from './tool-display-rows';
 
 export type { ToolDisplay } from './tool-display-rows';
-
-function countResultRows(output: string, kind: 'grep' | 'glob'): number {
-  return buildResultRowsModel(output, kind).rows.length;
-}
 
 /** Zod's validation `.catch()` fallback, not a Promise catch. */
 function tolerant<T>(schema: z.ZodType<T>, fallback: T): z.ZodType<T> {
@@ -122,7 +123,7 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
     case 'glob': {
       const pattern = fields.pattern ?? '';
       const output = status === 'completed' ? part.state.output : undefined;
-      const matchCount = output ? countResultRows(output, 'glob') : undefined;
+      const matchCount = output ? buildResultRowsModel(output, 'glob').rows.length : undefined;
       // i18n-dup-ok: 'agentChat.toolCard.filesBadge_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules.
       const badge =
         matchCount !== undefined && matchCount > 0
@@ -146,7 +147,7 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
         subtitle += ` (${include})`;
       }
       const output = status === 'completed' ? part.state.output : undefined;
-      const matchCount = output ? countResultRows(output, 'grep') : undefined;
+      const matchCount = output ? buildResultRowsModel(output, 'grep').rows.length : undefined;
       // i18n-dup-ok: 'agentChat.toolCard.matchesBadge_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules.
       const badge =
         matchCount !== undefined && matchCount > 0
@@ -306,6 +307,9 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
     }
     case 'question': {
       return summaryToolDisplay(part, i18n.t('agentChat.toolCard.toolQuestion'));
+    }
+    case 'agent_notice': {
+      return agentNoticeDisplay(part);
     }
     default: {
       return summaryToolDisplay(part, part.tool);

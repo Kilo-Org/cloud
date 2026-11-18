@@ -33,9 +33,11 @@ const ENVIRONMENT_ROW_CARD = cn(
 
 /**
  * The new-session Environment row: a tappable summary of the effective profile.
- * Loading, failure and every settled profile occupy the same card and reserve
- * the same two-line summary slot, so the row never changes height as the query
- * settles or as the counts change length.
+ * Loading, failure and every settled profile occupy the same card, and the card
+ * is only as tall as what it shows: the default environment is its title line,
+ * centred against the chevron with the card's own padding, and a configured
+ * profile adds its summary line. The card grows once, when that summary
+ * arrives; a one-line summary keeps one line instead of reserving a second.
  */
 export function NewSessionProfileRow({
   profile,
@@ -93,17 +95,11 @@ export function NewSessionProfileRow({
             <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>
               {profile?.name ?? t('agentChat.newSession.defaultEnvironment')}
             </Text>
-            <View
-              accessibilityElementsHidden={!hasSummary}
-              importantForAccessibility={hasSummary ? 'auto' : 'no-hide-descendants'}
-            >
-              {/* A one-line summary still fills both matching lines through
-                  `min-h-10`, and an unconfigured profile keeps the two-line
-                  placeholder, so the card never shrinks as counts load. */}
-              <Text className="min-h-10 text-sm text-muted-foreground" numberOfLines={2}>
-                {hasSummary ? profileSummary : '\u00A0\n\u00A0'}
+            {hasSummary ? (
+              <Text className="text-sm text-muted-foreground" numberOfLines={2}>
+                {profileSummary}
               </Text>
-            </View>
+            ) : null}
           </View>
           <ChevronDown size={18} color={colors.mutedForeground} />
         </Pressable>

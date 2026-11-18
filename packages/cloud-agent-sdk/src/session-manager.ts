@@ -2,6 +2,7 @@ import type { ToolDisplayMode } from './tool-detail-marker';
 import type { BackgroundActivityState } from './background-activity';
 import type { CloudAgentAttachments } from '@kilocode/app-shared/cloud-agent';
 import { readCloudAgentErrorFields } from '@kilocode/app-shared/cloud-agent-error';
+import { WORKSPACE_DELETING } from '@kilocode/session-ingest-contracts';
 import {
   errorShapeSchema,
   cloudSessionMetadataSchema,
@@ -100,6 +101,11 @@ type CloudAgentModelOverride = {
   variant?: string;
 };
 type WorktreeChangesRefresh = {
+  cloudSessionId: string;
+  revision?: number;
+  connectionVersion: number;
+};
+type WorkspaceArtifactsRefresh = {
   cloudSessionId: string;
   revision?: number;
   connectionVersion: number;
@@ -617,6 +623,7 @@ type SessionManagerAtoms = {
    */
   availableCommandsCatalogStatus: W<SlashCommandCatalogStatus | null>;
   worktreeChangesRefresh: W<WorktreeChangesRefresh | null>;
+  workspaceArtifactsRefresh: W<WorkspaceArtifactsRefresh | null>;
   messagesList: Atom<StoredMessage[]>;
   staticMessages: Atom<StoredMessage[]>;
   dynamicMessages: Atom<StoredMessage[]>;
@@ -856,11 +863,14 @@ function formatErrorDetail(err: unknown): FormattedErrorDetail {
         message: 'Service is unavailable right now. Please try again.',
         code: 'service-unavailable',
       };
-    if (code === 'CONFLICT' || httpStatus === 409)
+    if (code === 'CONFLICT' || httpStatus === 409) {
+      if (r.data.message === WORKSPACE_DELETING)
+        return { message: 'This workspace is being deleted.', code: 'workspace-deleting' };
       return {
         message: 'Previous task is still finishing up. Please wait a moment.',
         code: 'previous-task-in-progress',
       };
+    }
     if (code === 'SERVICE_UNAVAILABLE' || httpStatus === 503)
       return {
         message: 'Service is temporarily unavailable. Please retry in a moment.',
@@ -1242,6 +1252,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    */
   const availableCommandsCatalogStatusAtom = atom<SlashCommandCatalogStatus | null>(null);
   const worktreeChangesRefreshAtom = atom<WorktreeChangesRefresh | null>(null);
+  const workspaceArtifactsRefreshAtom = atom<WorkspaceArtifactsRefresh | null>(null);
   const childSessionHydrationStatesAtom = atom<Map<string, ChildSessionHydrationState>>(new Map());
   const childSessionErrorsAtom = atom<Map<string, string>>(new Map());
   const childSessionStatusesAtom = atom<ReadonlyMap<string, SessionStatus>>(new Map());
@@ -1770,6 +1781,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(availableCommandsAtom, []);
     store.set(availableCommandsCatalogStatusAtom, null);
     store.set(worktreeChangesRefreshAtom, null);
+    store.set(workspaceArtifactsRefreshAtom, null);
     if (!preserveTranscript) {
       store.set(hasOlderMessagesAtom, false);
       store.set(olderMessagesOmittedItemCountAtom, 0);
@@ -3628,11 +3640,30 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         if (eventSessionId !== null) {
           clearStaleChildSessionHydrationError(session.storage, eventSessionId);
         }
-        if (event.type === 'worktree.changes.ready' || event.type === 'connected') {
+        if (
+          event.type === 'worktree.changes.ready' ||
+          event.type === 'workspace.artifacts.changed' ||
+          event.type === 'connected'
+        ) {
           const cloudSessionId = store.get(sessionIdAtom);
           if (!cloudSessionId || event.cloudSessionId !== cloudSessionId) return;
-          const previous = store.get(worktreeChangesRefreshAtom);
+          if (event.type === 'connected') {
+            const previousWorktree = store.get(worktreeChangesRefreshAtom);
+            store.set(worktreeChangesRefreshAtom, {
+              ...previousWorktree,
+              cloudSessionId,
+              connectionVersion: (previousWorktree?.connectionVersion ?? 0) + 1,
+            });
+            const previousArtifacts = store.get(workspaceArtifactsRefreshAtom);
+            store.set(workspaceArtifactsRefreshAtom, {
+              ...previousArtifacts,
+              cloudSessionId,
+              connectionVersion: (previousArtifacts?.connectionVersion ?? 0) + 1,
+            });
+            return;
+          }
           if (event.type === 'worktree.changes.ready') {
+            const previous = store.get(worktreeChangesRefreshAtom);
             if (event.revision <= (previous?.revision ?? 0)) return;
             store.set(worktreeChangesRefreshAtom, {
               cloudSessionId,
@@ -3640,10 +3671,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
               connectionVersion: previous?.connectionVersion ?? 0,
             });
           } else {
-            store.set(worktreeChangesRefreshAtom, {
-              ...previous,
+            const previous = store.get(workspaceArtifactsRefreshAtom);
+            if (event.revision <= (previous?.revision ?? 0)) return;
+            store.set(workspaceArtifactsRefreshAtom, {
               cloudSessionId,
-              connectionVersion: (previous?.connectionVersion ?? 0) + 1,
+              revision: event.revision,
+              connectionVersion: previous?.connectionVersion ?? 0,
             });
           }
           return;
@@ -4649,6 +4682,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       availableCommands: availableCommandsAtom,
       availableCommandsCatalogStatus: availableCommandsCatalogStatusAtom,
       worktreeChangesRefresh: worktreeChangesRefreshAtom,
+      workspaceArtifactsRefresh: workspaceArtifactsRefreshAtom,
       messagesList: messagesListAtom,
       staticMessages: staticMessagesAtom,
       dynamicMessages: dynamicMessagesAtom,
@@ -4677,6 +4711,7 @@ export type {
   SessionManagerConfig,
   SessionManagerAtoms,
   WorktreeChangesRefresh,
+  WorkspaceArtifactsRefresh,
   SessionStatusIndicator,
   SessionConfig,
   StandalonePermission,

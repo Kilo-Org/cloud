@@ -20,6 +20,8 @@ import {
   countAndStoreTranscriptionUsage,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import { getStoredByokKeys } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import type { ByokKeyState } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { UPSTREAM_DURATION_BUDGET_MS } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import {
@@ -79,6 +81,10 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
   >),
   isFreeModel: jest.fn(),
 }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
+  ...jest.requireActual<Record<string, unknown>>('@kilocode/web-shared/lib/ai-gateway/byok'),
+  getStoredByokKeys: jest.fn(),
+}));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers', () => {
   const actual = jest.requireActual('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers');
   return {
@@ -94,6 +100,7 @@ const mockedIsFreeModel = jest.mocked(isFreeModel);
 const mockedIsAutoTopUpInFlight = jest.mocked(isAutoTopUpInFlight);
 const mockedEmitApiMetricsForResponse = jest.mocked(emitApiMetricsForResponse);
 const mockedResolveModelDecision = jest.mocked(resolveOrganizationMemberModelDecision);
+const mockedGetStoredByokKeys = jest.mocked(getStoredByokKeys);
 const mockedFetch = jest.fn() as jest.MockedFunction<typeof globalThis.fetch>;
 const originalFetch = globalThis.fetch;
 
@@ -163,11 +170,35 @@ function setOrganizationMemberAuth(eligibleProviderRoutes: ReadonlySet<string>) 
   });
 }
 
+/** Stores the owner's keys; a key decrypts to `sk-<providerId>`. */
+function storeKeys(...keys: Pick<ByokKeyState, 'providerId' | 'isEnabled'>[]) {
+  mockedGetStoredByokKeys.mockResolvedValue({
+    keys: keys.map(key => ({ ...key, serveCatalogModels: false })),
+    decrypt: async providerId => ({ providerId, decryptedAPIKey: `sk-${providerId}` }),
+  });
+}
+
 function makeUpstreamResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
     headers: { 'content-type': 'application/json', 'request-id': 'req-123' },
   });
+}
+
+function enableGatewaySettings() {
+  jest
+    .mocked(getRuntimeOrganizationFeatures)
+    .mockResolvedValue({ ...DEFAULT_ORGANIZATION_FEATURES, gateway_settings: ['org-123'] });
+}
+
+async function transcribe() {
+  const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+  return await handleAudioTranscriptionsRequest(
+    makeRequest({
+      model: 'openai/gpt-4o-mini-transcribe',
+      input_audio: { data: 'UklGRiQA', format: 'wav' },
+    }) as never
+  );
 }
 
 describe('POST /api/gateway/v1/audio/transcriptions', () => {
@@ -177,6 +208,7 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     mockedIsFreeModel.mockReturnValue(false);
     mockedIsAutoTopUpInFlight.mockResolvedValue(false);
     jest.mocked(getRuntimeOrganizationFeatures).mockResolvedValue(DEFAULT_ORGANIZATION_FEATURES);
+    storeKeys();
     jest.mocked(countAndStoreTranscriptionUsage).mockReturnValue({
       // Metrics are mocked, so the parsed stats never need to settle.
       statsPromise: new Promise<MicrodollarUsageStats>(() => {}),
@@ -283,6 +315,183 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
       error_type: ProxyErrorType.provider_not_allowed,
     });
     expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects a transcription when the organization set an inference region', async () => {
+    setOrganizationMemberAuth(new Set(['openai']));
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: { data_region: 'eu' } satisfies OrganizationSettings,
+      plan: 'enterprise',
+    });
+    enableGatewaySettings();
+
+    const response = await transcribe();
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({
+      error: expect.stringContaining('region'),
+      error_type: ProxyErrorType.provider_not_allowed,
+    });
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it('ignores the gateway settings of an organization that is not on the enterprise plan', async () => {
+    setOrganizationMemberAuth(new Set(['openai']));
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: { disable_openrouter: true, data_region: 'eu' } satisfies OrganizationSettings,
+      plan: 'teams',
+    });
+    enableGatewaySettings();
+    mockedFetch.mockResolvedValue(makeUpstreamResponse({ text: 'hello world' }));
+
+    const response = await transcribe();
+
+    expect(response.status).toBe(200);
+    expect(mockedFetch.mock.calls[0]?.[0]).toBe(`${OPENROUTER.apiUrl}/audio/transcriptions`);
+  });
+
+  describe('owner OpenRouter key', () => {
+    it('transcribes on the owner’s OpenRouter key', async () => {
+      setUserAuth();
+      storeKeys({ providerId: 'openrouter', isEnabled: true });
+      mockedFetch.mockResolvedValue(makeUpstreamResponse({ text: 'hello world' }));
+
+      const response = await transcribe();
+
+      expect(response.status).toBe(200);
+      expect(mockedGetStoredByokKeys).toHaveBeenCalledWith(expect.anything(), {
+        type: 'user',
+        id: 'user-123',
+      });
+      expect(mockedFetch.mock.calls[0]?.[0]).toBe(`${OPENROUTER.apiUrl}/audio/transcriptions`);
+      const headers = mockedFetch.mock.calls[0]?.[1]?.headers as Headers;
+      expect(headers.get('Authorization')).toBe('Bearer sk-openrouter');
+      expect(jest.mocked(countAndStoreTranscriptionUsage).mock.calls[0]?.[1]).toMatchObject({
+        user_byok: true,
+      });
+      expect(jest.mocked(countAndStoreTranscriptionUsage).mock.calls[0]?.[3]).toMatchObject({
+        type: 'openrouter',
+        apiKey: 'sk-openrouter',
+      });
+    });
+
+    it('reads the organization’s keys for an organization member', async () => {
+      setOrganizationMemberAuth(new Set(['openai']));
+      storeKeys({ providerId: 'openrouter', isEnabled: true });
+      mockedFetch.mockResolvedValue(makeUpstreamResponse({ text: 'hello world' }));
+
+      const response = await transcribe();
+
+      expect(response.status).toBe(200);
+      expect(mockedGetStoredByokKeys).toHaveBeenCalledWith(expect.anything(), {
+        type: 'organization',
+        id: 'org-123',
+      });
+      const headers = mockedFetch.mock.calls[0]?.[1]?.headers as Headers;
+      expect(headers.get('Authorization')).toBe('Bearer sk-openrouter');
+    });
+
+    it('does not block a zero balance when the owner pays', async () => {
+      setUserAuth();
+      mockedGetBalanceAndOrgSettings.mockResolvedValue({
+        balance: 0,
+        settings: undefined,
+        plan: undefined,
+      });
+      storeKeys({ providerId: 'openrouter', isEnabled: true });
+      mockedFetch.mockResolvedValue(makeUpstreamResponse({ text: 'hello world' }));
+
+      const response = await transcribe();
+
+      expect(response.status).toBe(200);
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('still blocks a zero balance when the key is disabled', async () => {
+      setUserAuth();
+      mockedGetBalanceAndOrgSettings.mockResolvedValue({
+        balance: 0,
+        settings: undefined,
+        plan: undefined,
+      });
+      storeKeys({ providerId: 'openrouter', isEnabled: false });
+
+      const response = await transcribe();
+
+      expect(response.status).toBe(402);
+      expect(mockedFetch).not.toHaveBeenCalled();
+    });
+
+    it('is exempt when the organization disabled OpenRouter', async () => {
+      setOrganizationMemberAuth(new Set(['openai']));
+      mockedGetBalanceAndOrgSettings.mockResolvedValue({
+        balance: 1000,
+        settings: { disable_openrouter: true } satisfies OrganizationSettings,
+        plan: 'enterprise',
+      });
+      enableGatewaySettings();
+      storeKeys({ providerId: 'openrouter', isEnabled: true });
+      mockedFetch.mockResolvedValue(makeUpstreamResponse({ text: 'hello world' }));
+
+      const response = await transcribe();
+
+      expect(response.status).toBe(200);
+      const headers = mockedFetch.mock.calls[0]?.[1]?.headers as Headers;
+      expect(headers.get('Authorization')).toBe('Bearer sk-openrouter');
+    });
+
+    it('is exempt when the organization set an inference region', async () => {
+      setOrganizationMemberAuth(new Set(['openai']));
+      mockedGetBalanceAndOrgSettings.mockResolvedValue({
+        balance: 1000,
+        settings: { data_region: 'eu' } satisfies OrganizationSettings,
+        plan: 'enterprise',
+      });
+      enableGatewaySettings();
+      storeKeys({ providerId: 'openrouter', isEnabled: true });
+      mockedFetch.mockResolvedValue(makeUpstreamResponse({ text: 'hello world' }));
+
+      const response = await transcribe();
+
+      expect(response.status).toBe(200);
+      expect(jest.mocked(countAndStoreTranscriptionUsage).mock.calls[0]?.[1]).toMatchObject({
+        user_byok: true,
+        inference_region: null,
+      });
+    });
+
+    it('does not exempt Kilo’s route when the key is disabled', async () => {
+      setOrganizationMemberAuth(new Set(['openai']));
+      mockedGetBalanceAndOrgSettings.mockResolvedValue({
+        balance: 1000,
+        settings: { disable_openrouter: true } satisfies OrganizationSettings,
+        plan: 'enterprise',
+      });
+      enableGatewaySettings();
+      storeKeys({ providerId: 'openrouter', isEnabled: false });
+
+      const response = await transcribe();
+
+      expect(response.status).toBe(403);
+      expect(mockedFetch).not.toHaveBeenCalled();
+    });
+
+    it('is not used for a free model', async () => {
+      setUserAuth();
+      mockedIsFreeModel.mockReturnValue(true);
+      storeKeys({ providerId: 'openrouter', isEnabled: true });
+      mockedFetch.mockResolvedValue(makeUpstreamResponse({ text: 'hello world' }));
+
+      const response = await transcribe();
+
+      expect(response.status).toBe(200);
+      expect(mockedGetStoredByokKeys).not.toHaveBeenCalled();
+      expect(jest.mocked(countAndStoreTranscriptionUsage).mock.calls[0]?.[1]).toMatchObject({
+        user_byok: false,
+      });
+    });
   });
 
   it('never forwards a custom LLM id to a transcription upstream', async () => {
@@ -598,7 +807,7 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
       makeRequest({
         model: 'openai/gpt-4o-mini-transcribe',
         input_audio: { data: 'UklGRiQA', format: 'wav' },
-        provider: { only: ['azure'], zdr: true },
+        provider: { only: ['openai', 'azure'], zdr: true },
       }) as never
     );
 
@@ -610,6 +819,28 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
       zdr: true,
     });
   });
+
+  it.each([{ provider: { only: ['azure'], zdr: true } }, { provider: { ignore: ['openai'] } }])(
+    'rejects a request whose providers the member routes exclude: %j',
+    async ({ provider }) => {
+      setOrganizationMemberAuth(new Set(['openai']));
+
+      const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+      const response = await handleAudioTranscriptionsRequest(
+        makeRequest({
+          model: 'openai/gpt-4o-mini-transcribe',
+          input_audio: { data: 'UklGRiQA', format: 'wav' },
+          provider,
+        }) as never
+      );
+
+      expect(response.status).toBe(404);
+      await expect(response.json()).resolves.toMatchObject({
+        error_type: ProxyErrorType.model_not_allowed,
+      });
+      expect(mockedFetch).not.toHaveBeenCalled();
+    }
+  );
 
   it('limits a multipart request to the organization member provider routes', async () => {
     setOrganizationMemberAuth(new Set(['openai']));

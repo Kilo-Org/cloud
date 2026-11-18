@@ -324,6 +324,35 @@ describe('SandboxSessionV2 child registry', () => {
     ).resolves.toContain('Cloud Agent parent authority denied');
   });
 
+  it('returns no optional MCP grant over RPC when the workspace anchor is expired or revoked', async () => {
+    const parentSessionId = workspaceSessionId();
+    const worktreeId = parentSessionId.replace('workspace_', 'worktree_');
+    const stub = await registerParent(
+      parentSessionId,
+      true,
+      { id: uuid(), delegationExpiresAt: new Date(Date.now() + 3600_000).toISOString() },
+      worktreeId
+    );
+
+    const workspace = { worktreeId, ownerId: USER_ID, organizationId: null };
+    const stored = await runInDurableObject(stub, (instance, state) => {
+      Object.assign(instance.env, {
+        HYPERDRIVE: { connectionString: 'postgres://127.0.0.1:1/unused' },
+      });
+      return state.storage.get<Record<string, unknown>>(RUNTIME_AUTHORIZATION_KEY);
+    });
+    expect(stored).toBeDefined();
+    for (const change of [
+      { delegationExpiresAt: new Date(Date.now() - 1_000).toISOString() },
+      { state: 'revoked' },
+    ]) {
+      await runInDurableObject(stub, (_instance, state) =>
+        state.storage.put(RUNTIME_AUTHORIZATION_KEY, { ...stored, ...change })
+      );
+      await expect(stub.issueCloudAgentMcpGrant(workspace)).resolves.toBeUndefined();
+    }
+  });
+
   it('checks the current parent authorization on every management assertion', async () => {
     const parentSessionId = workspaceSessionId();
     const authorizationId = uuid();

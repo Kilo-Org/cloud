@@ -47,6 +47,8 @@ type ModelSelectorProps = {
   /** Whether this chip's `onSelect` stores the picked thinking effort. */
   acceptsVariant: boolean;
   onSelect: (modelId: string, variant: string, pickerSelection?: ModelPickerSelection) => void;
+  /** Called as the chip opens the picker, so a caller can mark the field as visited. */
+  onOpen?: () => void;
   disabled?: boolean;
   isLoading?: boolean;
   /** Agent name that pins the model; when set with `disabled`, the chip is locked. */
@@ -146,6 +148,7 @@ export function ModelSelector({
   options,
   acceptsVariant,
   onSelect,
+  onOpen,
   disabled = false,
   isLoading = false,
   lockLabel,
@@ -219,6 +222,7 @@ export function ModelSelector({
     if (effectivelyDisabled) {
       return;
     }
+    onOpen?.();
     openModelPicker(pushOnce, {
       options: pickerOptions,
       value,
@@ -373,7 +377,15 @@ export function ModelPickerOptionRow({
               </Text>
             ) : null}
             {option.displayId ? (
-              <Text selectable className="font-mono text-xs text-muted-foreground">
+              // The subtitle names a source, and a repository path can be long, so
+              // it stays one line: a wrapped path would make one row taller than
+              // its neighbours for a value the person reads at a glance.
+              <Text
+                selectable
+                numberOfLines={1}
+                ellipsizeMode="tail"
+                className="font-mono text-xs text-muted-foreground"
+              >
                 {option.displayId}
               </Text>
             ) : null}

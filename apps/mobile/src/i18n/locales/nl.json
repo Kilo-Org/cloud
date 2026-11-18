@@ -26,6 +26,7 @@
     "creditHistory": "Tegoedgeschiedenis",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Annuleren",
     "done": "Klaar",
     "retry": "Opnieuw proberen",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "Wijzigingen",
     "organizationTrialEnded": "De proefperiode van de organisatie is afgelopen en er is geen actief abonnement. Een eigenaar van de organisatie kan de facturering bijwerken op kilo.ai en het daarna opnieuw proberen.",
-    "privateRepositoryA11y": "{{name}}, privé repository"
+    "privateRepositoryA11y": "{{name}}, privé repository",
+    "legalDocumentEnglishOnly": "Dit document is alleen beschikbaar in het Engels."
   },
   "language": {
     "restarting": "Opnieuw starten om de taal in te stellen",
@@ -481,7 +483,14 @@
       "viewReceipt": "Ontvangstbewijs bekijken"
     },
     "changelog": "Nieuw in deze versie",
-    "changelogVersionPending": "Notities voor deze versie komen met de volgende app-update."
+    "changelogVersionPending": "De notities voor {{version}} komen met de volgende app-update.",
+    "changelogGroupNew": "Nieuw",
+    "changelogFixesIn": "Oplossingen en verbeteringen in {{areas}}.",
+    "changelogFixesPolish": "Oplossingen en verbeteringen in de hele app.",
+    "changelogAreas": {
+      "signIn": "Inloggen",
+      "profileOrganizations": "Profiel en organisaties"
+    }
   },
   "preferences": {
     "general": "Algemeen",
@@ -676,7 +685,8 @@
       "managedOnWeb": "De Bitbucket-verbinding van deze organisatie wordt via het web op een computer beheerd.",
       "description": "Maak een toegangstoken voor de werkruimte met de vereiste rechten en plak het hieronder.",
       "scopes": "Vereiste rechten: account lezen, repositories lezen en schrijven, PR's lezen en webhooks lezen en schrijven.",
-      "tokenPlaceholder": "Toegangstoken voor de werkruimte"
+      "tokenPlaceholder": "Toegangstoken voor de werkruimte",
+      "tokenRefused": "Bitbucket heeft dit toegangstoken voor de werkruimte niet geaccepteerd. Controleer of het de rechten hierboven heeft en probeer het daarna opnieuw."
     },
     "followReviewMd": "REVIEW.md volgen",
     "followReviewMdSubtitle": "Volg de REVIEW.md-instructiebestanden per repository",
@@ -777,6 +787,7 @@
     },
     "reviewList": {
       "configureProvider": "Platform instellen",
+      "connectOwnerOnly": "Vraag een organisatie-eigenaar of beheerder om een platform te koppelen.",
       "couldNotLoad": "De reviews konden niet worden geladen.",
       "noReviews": "Nog geen reviews",
       "noReviewsDescription": "Reviews verschijnen hier zodra Code Reviewer een PR beoordeelt.",
@@ -921,13 +932,25 @@
       "repositoryLine": "Reviews: {{reviews}} · Bevindingen: {{findings}}",
       "empty": "Nog geen reviews met statistieken",
       "emptyDescription": "Statistieken leggen afgeronde reviews vast zolang ze voor de organisatie zijn ingeschakeld.",
-      "off": "Statistieken staan uit voor deze organisatie.",
-      "couldNotLoad": "Kan statistieken niet laden"
+      "offTitle": "Statistieken staan uit voor {{platform}}",
+      "offDescription": "De facturatierollen van de organisatie (eigenaren, beheerders en facturatiemanagers) kunnen statistieken inschakelen in de organisatie-instellingen op het web om afgeronde reviews vast te leggen.",
+      "couldNotLoad": "Kan statistieken niet laden",
+      "trackedReviewsCaption": "Reviews die in deze periode zijn afgerond terwijl statistieken waren ingeschakeld. Lopende en mislukte reviews worden nooit meegeteld.",
+      "trackedReviewsUncounted": "Niet meegeteld: {{displayCount}} van de {{displayTotal}} afgeronde reviews van de organisatie, zonder vastgelegd resultaat.",
+      "trackedReviewsUncounted_one": "Niet meegeteld: {{displayCount}} van de {{displayTotal}} afgeronde reviews van de organisatie, zonder vastgelegd resultaat.",
+      "trackedReviewsUncounted_other": "Niet meegeteld: {{displayCount}} van de {{displayTotal}} afgeronde reviews van de organisatie, zonder vastgelegd resultaat."
     },
     "council": {
       "title": "Panelbeoordeling",
       "subtitle": "Meerdere deskundigen beoordelen elke PR en hun stemmen komen samen tot één beslissing.",
-      "unavailable": "Panelbeoordeling is niet beschikbaar voor deze organisatie.",
+      "unavailablePersonallyTitle": "Vereist een Enterprise-organisatie",
+      "unavailablePersonally": "Panelbeoordeling maakt geen deel uit van een persoonlijk account.",
+      "unavailablePersonallyAction": "Organisatie maken",
+      "unavailablePersonallySwitchAction": "Wisselen van organisatie",
+      "unavailableOrganizationTitle": "Panelbeoordeling is op dit moment niet beschikbaar",
+      "unavailableForOrganization": "Panelbeoordeling vereist het Enterprise-plan met een actief abonnement of proefperiode. Deze organisatie heeft het op dit moment niet.",
+      "unavailableForOrganizationNeutral": "Panelbeoordeling is op dit moment niet beschikbaar voor deze organisatie. Probeer het later opnieuw.",
+      "unavailableOnBitbucket": "Panelbeoordeling is niet beschikbaar voor Bitbucket-repositories.",
       "noRepositories": "Nog geen repositories geselecteerd. Kies eerst repositories in de repository-instellingen.",
       "specialists": "Deskundigen",
       "labels": "Tags die panelbeoordeling activeren",
@@ -2430,6 +2453,7 @@
     "signOutThisDevice": "Dit apparaat afmelden",
     "signOutSessionLabel": "{{device}} afmelden, aangemeld {{signedIn}}, laatst gezien {{lastSeen}}",
     "sessionSignedOut": "Sessie afgemeld.",
+    "sessionSignOutFailed": "Kon deze sessie niet afmelden. Probeer het opnieuw.",
     "signOutThisDeviceTitle": "Dit apparaat afmelden?",
     "signOutThisSessionTitle": "Deze sessie afmelden?",
     "signOutThisSessionMessage": "{{device}} wordt afgemeld. Laatst gezien {{lastSeen}}. Het apparaat kan daarna nog maximaal een uur toegang tot de API hebben.",
@@ -2553,12 +2577,14 @@
     "manage": {
       "billingHistory": "Factuurgeschiedenis",
       "billingHistoryEmpty": "Nog geen factuurgeschiedenis.",
+      "billingHistoryError": "Kan factuurgeschiedenis niet laden",
       "cancel": "Abonnement opzeggen",
       "cancelDescription": "Je Kilo Pass blijft actief tot het einde van de factuurperiode en wordt niet verlengd.",
       "cancelScheduled": "Eindigt op {{date}}",
       "cancelScheduledChange": "Geplande wijziging annuleren",
       "cancelled": "Abonnement opgezegd",
       "creditHistoryEmpty": "Nog geen Kilo Pass-tegoed.",
+      "creditHistoryError": "Kan Kilo Pass-tegoedgeschiedenis niet laden",
       "resume": "Abonnement hervatten",
       "resumeCancelledDescription": "Je Kilo Pass wordt weer automatisch verlengd.",
       "resumePausedDescription": "Je Kilo Pass wordt nu hervat, vóór de geplande hervattingsdatum.",
@@ -2575,7 +2601,6 @@
     "completingPurchase": "Aankoop wordt voltooid",
     "subscriptionLoading": "Kilo Pass-abonnement wordt geladen",
     "retryHint": "Haalt de Kilo Pass-status opnieuw op.",
-    "cardAccessibility": "{{title}}: {{description}}. {{actionLabel}}",
     "endedOn": "Beëindigd op {{date}}",
     "notAvailableInApp": "Kilo Pass is niet beschikbaar in de app.",
     "statusActive": "Actief",
@@ -3313,6 +3338,7 @@
       "manageOnWeb": "Factureringsinstellingen op het web",
       "changePlan": "Plan wijzigen",
       "buySeats": "Licenties kopen",
+      "managedOnWeb": "Het plan, de licenties en automatisch opwaarderen worden op het web beheerd.",
       "setupAutoTopUp": "Automatisch opwaarderen instellen",
       "manageAutoTopUp": "Automatisch opwaarderen beheren",
       "opensOnWeb": "Opent op het web"
@@ -3330,7 +3356,7 @@
       "selectOrganization": "Een organisatie selecteren",
       "unavailableDescription": "Deze organisatie is niet meer beschikbaar. Kies er een uit je profiel om door te gaan.",
       "unavailableSessionsDescription": "Deze organisatie is niet meer beschikbaar. De sessies ervan kunnen niet worden geladen.",
-      "accessDeniedDescription": "Je hebt geen toegang tot deze organisatie."
+      "accessDeniedDescription": "Vraag een eigenaar of beheerder van de organisatie om je toegang te verlenen."
     },
     "create": {
       "title": "Organisatie aanmaken",
@@ -3463,16 +3489,26 @@
     },
     "settingsOnWeb": {
       "title": "Organisatie-instellingen op het web",
-      "integrations": "Integraties op het web",
       "usageDetails": "Gebruiksgegevens",
       "providersAndModels": "Providers en modellen",
       "groups": "Groepen",
       "guardrails": "Guardrails",
       "byok": "Eigen sleutel gebruiken",
+      "ssoAndDomain": "SSO en domein",
+      "dataCollection": "Gegevensverzameling",
       "auditLogs": "Auditlogboeken",
-      "requestLogs": "Verzoeklogboeken",
-      "subOrganizations": "Suborganisaties",
-      "distributeFunds": "Tegoed verdelen"
+      "requestLogs": "Verzoeklogboeken"
+    },
+    "requestLogs": {
+      "older": "Eerder uur",
+      "newer": "Later uur",
+      "truncated": "Dit uur bevat meer verzoeken dan de lijst toont.",
+      "emptyTitle": "Geen verzoeken in dit uur",
+      "emptyDescription": "Gebruik Eerder uur om eerdere verzoeken te bekijken.",
+      "loadError": "Kan verzoeklogboeken niet laden.",
+      "permissionDenied": "Alleen een eigenaar, beheerder of factureringsbeheerder van de organisatie kan de verzoeklogboeken bekijken.",
+      "tokens": "{{input}} in · {{output}} uit",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Invoertokens",
@@ -4267,8 +4303,7 @@
       "repoValue": "Opslagplaats: {{name}}",
       "profileValue": "Profiel: {{name}}",
       "profileUnavailable": "Dit profiel is niet meer beschikbaar. Kies een ander profiel.",
-      "pickerEmptyDescriptionOrganization": "Maak een organisatieprofiel aan om omgevingsvariabelen, installatieopdrachten en vaardigheden tijdens sessies opnieuw te gebruiken.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Een organisatie-eigenaar of beheerder kan een organisatieprofiel aanmaken."
+      "pickerEmptyDescriptionOrganization": "Maak een organisatieprofiel aan om omgevingsvariabelen, installatieopdrachten en vaardigheden tijdens sessies opnieuw te gebruiken."
     },
     "variablesDeleteFailed": "Kan variabele niet verwijderen",
     "deleteVariable": "Variabele {{key}} verwijderen",
@@ -4454,7 +4489,6 @@
     "dismiss": "Briefing negeren",
     "offline": "Offline · opgeslagen briefing",
     "cached": "Opgeslagen rapport · vernieuwen niet beschikbaar",
-    "window": "{{start}} – {{end}}",
     "summary": "AI-samenvatting",
     "summaryPending": "AI-samenvatting wordt gemaakt. Deze verschijnt hier zodra hij klaar is.",
     "summaryUnavailable": "AI-samenvatting niet beschikbaar. Je gestructureerde rapport is nog steeds beschikbaar.",
@@ -4521,6 +4555,8 @@
     "topModels": "Topmodellen",
     "topFeatures": "Topfuncties",
     "emptyTitle": "Geen gebruik in deze periode",
+    "unavailableTitle": "Gebruik niet beschikbaar",
+    "unavailableDescription": "Deze workspace rapporteert geen gebruik. Opnieuw proberen helpt niet.",
     "orgSelfNotice": "Je ziet je eigen gebruik in deze organisatie.",
     "viewDetails": "Gebruiksdetails bekijken"
   },
@@ -4571,6 +4607,7 @@
       "title": "Triggers en webhooks",
       "subtitle": "Automatiseer Cloud Agent-uitvoeringen via een webhookaanroep of een planning.",
       "new": "Nieuwe trigger",
+      "create": "Trigger aanmaken",
       "emptyTitle": "Nog geen triggers",
       "emptyDescription": "Maak een trigger om een Cloud Agent-uitvoering te starten via een webhookaanroep of volgens een planning.",
       "loadFailedTitle": "Kan triggers niet laden",
@@ -4592,7 +4629,7 @@
       "fieldCron": "Cron-expressie",
       "fieldCronHelp": "Vijf velden: minuut, uur, dag, maand en weekdag. Het kortste interval is één minuut.",
       "fieldTimezone": "Tijdzone",
-      "nameLocked": "De naam maakt deel uit van de webhook-URL en kan niet worden gewijzigd.",
+      "nameLocked": "De naam kan niet worden gewijzigd nadat de trigger is aangemaakt.",
       "repositoryLocked": "De repository kan niet worden gewijzigd nadat de trigger is aangemaakt.",
       "environmentAutomatic": "Automatisch per repository",
       "notSelected": "Niet geselecteerd",
@@ -4607,6 +4644,7 @@
       "authHeaderLabel": "Headernaam",
       "authSecretLabel": "Gedeeld geheim",
       "authSecretKeep": "Laat leeg om het opgeslagen geheim te behouden.",
+      "authSecretSet": "Verplicht. Kies een sterke willekeurige tekenreeks.",
       "authSecretCreator": "Gebruik minstens 16 tekens wanneer de trigger als de maker wordt uitgevoerd.",
       "autoCommit": "Wijzigingen committen wanneer de uitvoering eindigt",
       "condenseOnComplete": "De context inkorten wanneer de uitvoering eindigt",
@@ -4617,11 +4655,14 @@
       "saveFailedTitle": "Kan de trigger niet opslaan",
       "deleteTitle": "Deze trigger verwijderen?",
       "deleteMessage": "Aanroepen naar {{name}} mislukken. Dit kan niet ongedaan worden gemaakt.",
+      "deleteMessageScheduled": "Geplande uitvoeringen van {{name}} stoppen. Dit kan niet ongedaan worden gemaakt.",
       "runNow": "Nu uitvoeren",
       "runStarted": "Uitvoering gestart",
       "created": "Trigger aangemaakt",
       "saved": "Trigger opgeslagen",
       "statusArrived": "Aangekomen",
+      "defaultPromptWebhook": "Beschrijf de inhoud van dit webhookverzoek:\n\n{{body}}",
+      "defaultPromptScheduled": "Voer de geplande taak uit. Geactiveerd om {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Voer een naam in.",
         "nameTooShort": "Gebruik minstens 8 tekens.",
@@ -4656,8 +4697,9 @@
     "create": "Link maken",
     "createFailed": "Kan de link niet maken.",
     "existingTitle": "Bestaande link",
-    "existingDescription": "Deze sessie heeft al een deellink. Als je een nieuwe maakt, wordt die vervangen en werkt de oude link niet meer.",
+    "existingDescription": "Deze sessie heeft al een deellink. Als je een nieuwe link met deze instellingen maakt, wordt die vervangen en werkt de oude link niet meer.",
     "rotate": "Nieuwe link maken",
+    "replacementSettings": "Deze instellingen gelden voor de nieuwe link.",
     "revoke": "Link intrekken",
     "revokeTitle": "Link intrekken?",
     "revokeMessage": "De huidige link werkt direct niet meer.",
@@ -4669,6 +4711,7 @@
     "superseded": "Deze link is elders vervangen en werkt daarom niet meer."
   },
   "sharedSession": {
+    "startedAt": "Gestart om {{time}}",
     "title": "Gedeelde sessie",
     "someone": "Iemand",
     "sharedBy": "Gedeeld door {{owner}}",
@@ -4676,5 +4719,177 @@
     "unavailableDescription": "Deze deellink is verlopen of ingetrokken.",
     "transcriptUnavailableTitle": "Kan dit transcript niet laden",
     "transcriptUnavailableDescription": "De link werkt nog. Probeer het zo opnieuw."
+  },
+  "organizationGuardrails": {
+    "title": "AI-beveiligingsmaatregelen",
+    "permissionDenied": "Alleen eigenaren en beheerders van de organisatie kunnen AI-beveiligingsmaatregelen beheren.",
+    "unavailable": "AI-beveiligingsmaatregelen zijn niet beschikbaar voor deze organisatie.",
+    "loadError": "AI-beveiligingsmaatregelen konden niet worden geladen",
+    "statusSaving": "Bezig met opslaan…",
+    "statusSaved": "Opgeslagen",
+    "statusFailed": "Opslaan is mislukt.",
+    "inputTitle": "Beveiligingsmaatregelen voor invoer",
+    "inputDescription": "Scant elke invoer met Enkrypt AI, inclusief resultaten van hulpmiddelen. Een blokkerende detector wijst een verzoek af wanneer Enkrypt niet beschikbaar is.",
+    "outputTitle": "Beveiligingsmaatregelen voor uitvoer",
+    "outputDescription": "Scant antwoorden met Enkrypt AI voordat leden ze ontvangen. Staat uit tenzij u het inschakelt.",
+    "detectorsHint": "Blokkeren wijst een gemarkeerd verzoek af. Alleen loggen registreert het zonder het verzoek te vertragen.",
+    "detectorsHintOutput": "Blokkeren laat een gemarkeerd antwoord mislukken. Alleen loggen registreert het zonder het antwoord te vertragen.",
+    "choiceLog": "Alleen loggen",
+    "applyTo": "Toepassen op",
+    "applyToAllMembers": "Alle leden",
+    "applyKiloDefault": "Kilo-standaard toepassen",
+    "invalidSavedTitle": "Opgeslagen instellingen voor invoerdetectoren kunnen niet worden gelezen",
+    "invalidSavedBody": "Verzoeken worden geblokkeerd totdat de invoerdetectoren opnieuw zijn opgeslagen. De onderstaande detectoren starten met Kilo-standaard.",
+    "invalidSavedOutputTitle": "Opgeslagen instellingen voor uitvoerdetectoren kunnen niet worden gelezen",
+    "invalidSavedOutputBody": "Antwoorden worden achtergehouden totdat de uitvoerdetectoren opnieuw zijn opgeslagen. Kies hieronder uitvoerdetectoren.",
+    "blockingOutputNote": "Een blokkerende uitvoerdetector houdt een antwoord tegen totdat Enkrypt het volledig heeft gecontroleerd. Gebruik Alleen loggen om de vertraging te voorkomen.",
+    "inputDetectorRequired": "Schakel ten minste één invoerdetector in.",
+    "outputDetectorRequired": "Schakel ten minste één uitvoerdetector in.",
+    "rulesTooMany": "Voeg maximaal {{max}} regels toe.",
+    "ruleIdRequired": "Voer een regel-ID in.",
+    "ruleIdInvalid": "Een regel-ID mag alleen letters, cijfers, punten, streepjes en liggende streepjes bevatten.",
+    "ruleTextRequired": "Beschrijf wat de regel verbiedt of vereist.",
+    "keywordTooLong": "Elk trefwoord mag maximaal {{max}} tekens bevatten.",
+    "topicTooLong": "Elk onderwerp mag maximaal {{max}} tekens bevatten.",
+    "keywordsTooMany": "Voeg maximaal {{max}} trefwoorden toe.",
+    "topicsTooMany": "Voeg maximaal {{max}} onderwerpen toe.",
+    "piiEntityRequired": "Selecteer ten minste één type gegevens om te detecteren.",
+    "keywordRequired": "Voeg ten minste één trefwoord toe.",
+    "topicRequired": "Voeg ten minste één onderwerp toe.",
+    "policyTextRequired": "Voer de beleidstekst in.",
+    "ruleRequired": "Voeg ten minste één regel toe.",
+    "ruleIdDuplicate": "Elke regel heeft een eigen regel-ID nodig.",
+    "piiEntities": "Te detecteren gegevens",
+    "keywordsLabel": "Trefwoorden",
+    "keywordsHint": "Eén trefwoord per regel.",
+    "topicsHint": "Eén onderwerp per regel.",
+    "policyFormat": "Beleidsformaat",
+    "policyFormatRules": "Gestructureerde regels",
+    "policyFormatRulesDescription": "Eén regel per vereiste, met een categorie en ernst. Aanbevolen.",
+    "policyFormatText": "Beleidstekst",
+    "policyFormatTextDescription": "Plak een bestaand beleid als platte tekst.",
+    "rulesEmpty": "Nog geen regels. Elke regel beschrijft één ding dat invoer niet mag bevatten of waar niet om mag worden gevraagd.",
+    "addRule": "Regel toevoegen",
+    "ruleNumber": "Regel {{number}}",
+    "ruleRemove": "Regel {{number}} verwijderen",
+    "ruleIdLabel": "Regel-ID",
+    "ruleNameLabel": "Naam (optioneel)",
+    "ruleTextLabel": "Regel",
+    "ruleRiskCategory": "Risicocategorie",
+    "ruleApplicability": "Bereik",
+    "ruleFrameworks": "Raamwerken",
+    "detector": {
+      "promptInjection": {
+        "label": "Promptinjectie",
+        "description": "Detecteert pogingen om instructies te overschrijven of het model te omzeilen."
+      },
+      "policyViolation": {
+        "label": "Beleidsschending",
+        "description": "Markeert invoer die het beleid van uw organisatie schendt, of dat beleid nu als tekst of als regels is opgesteld.",
+        "descriptionOutput": "Markeert antwoorden die het beleid van uw organisatie schenden, of dat beleid nu als tekst of als regels is opgesteld."
+      },
+      "pii": {
+        "label": "PII en geheimen",
+        "description": "Detecteert persoonsgegevens, inloggegevens, IP-adressen en URL's."
+      },
+      "keywords": {
+        "label": "Verboden trefwoorden",
+        "descriptionOutput": "Detecteert antwoorden die een van de trefwoorden bevatten die u opgeeft."
+      },
+      "topics": {
+        "label": "Onderwerpen",
+        "descriptionOutput": "Markeert antwoorden over elk onderwerp dat u opgeeft."
+      },
+      "toxicity": {
+        "label": "Toxiciteit",
+        "description": "Detecteert toxische, beledigende, bedreigende of haatdragende taal."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Detecteert seksuele of andere inhoud die niet geschikt is voor werk."
+      },
+      "bias": {
+        "label": "Vooringenomenheid",
+        "description": "Detecteert vooringenomen of discriminerende taal."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Persoonsgegevens",
+        "description": "Namen, e-mailadressen, telefoonnummers."
+      },
+      "secrets": {
+        "label": "Geheimen",
+        "description": "API-sleutels, toegangstokens, wachtwoorden."
+      },
+      "ipAddress": {
+        "label": "IP-adressen",
+        "description": "IPv4- en IPv6-adressen."
+      },
+      "url": {
+        "label": "URL's",
+        "description": "Webadressen."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Beveiliging en fraude",
+      "safetyHarm": "Veiligheid en schade",
+      "privacyDataProtection": "Privacy en gegevensbescherming",
+      "brandReputationTrust": "Merk en reputatie",
+      "biasFairnessEthical": "Vooringenomenheid en eerlijkheid",
+      "legalIpLiability": "Juridische en IE-aansprakelijkheid",
+      "productMisuse": "Productmisbruik",
+      "performanceQuality": "Prestaties en kwaliteit"
+    },
+    "applicability": {
+      "user": "Gebruikersinvoer",
+      "userAssistant": "Gebruikersinvoer en antwoorden"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "AVG",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Top 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "EU-AI-verordening",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Functie voor ondernemingen",
+    "enterpriseOnly": "Deze functie is alleen beschikbaar voor ondernemingen.",
+    "readOnly": "Alleen eigenaren en beheerders van de organisatie kunnen deze instellingen wijzigen.",
+    "loadError": "Aanbieders en modellen konden niet worden geladen",
+    "tabModels": "Modellen",
+    "tabProviders": "Aanbieders",
+    "tabGateways": "Toegangspoorten",
+    "modelsDescription": "Schakel een model uit om het voor elk lid te blokkeren. Modellen van toegestane aanbieders staan standaard aan.",
+    "modelsDeniedOnly": "Alleen geweigerd",
+    "modelsEmpty": "Geen modellen komen overeen met deze zoekopdracht.",
+    "modelsDeniedEmpty": "Geen model is geweigerd.",
+    "modelsDeniedSearchEmpty": "Geen geweigerd model komt overeen met deze zoekopdracht.",
+    "providersDescription": "Schakel een aanbieder uit om te voorkomen dat Kilo voor deze organisatie naar die aanbieder routeert.",
+    "providersNeedCatalog": "De schakelaars voor aanbieders blijven alleen-lezen totdat de volledige modelcatalogus is geladen. Tik hierboven op Opnieuw proberen om ze te bewerken.",
+    "providersEmpty": "Geen aanbieders komen overeen met deze zoekopdracht.",
+    "allowAllShown": "Alle getoonde toestaan",
+    "denyAllShown": "Alle getoonde weigeren",
+    "gatewaysDescription": "Kilo routeert modelverzoeken via Vercel AI Gateway of OpenRouter. Een uitgeschakelde toegangspoort laat die verzoeken mislukken.",
+    "emptyProviderList": "Sta minstens één aanbieder toe. Met een lege lijst worden alle modelroutes van Kilo geblokkeerd.",
+    "gatewaysUnavailable": "Instellingen voor toegangspoorten zijn niet beschikbaar voor deze organisatie.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "Verzoeken via OpenRouter worden niet aan een regio gekoppeld.",
+    "inferenceRegion": "Inferentieregio",
+    "inferenceRegionDescription": "Koppelt verzoeken via Vercel AI Gateway vast aan deze regio. Een model dat daar niet beschikbaar is, mislukt.",
+    "disableOpenrouterNote": "Als u OpenRouter uitschakelt, worden ook BYOK-sleutels geblokkeerd die verzoeken erdoorheen routeren.",
+    "emptyModelList": "Laat minstens één model ingeschakeld. Als je alle modellen weigert, hebben leden niets meer om te gebruiken.",
+    "catalogUnavailable": "De volledige modelcatalogus is niet geladen, dus alleen je opgeslagen lijsten worden getoond. Probeer het opnieuw om alle modellen te laden.",
+    "region": {
+      "global": "Wereldwijd",
+      "us": "Verenigde Staten",
+      "eu": "Europese Unie",
+      "au": "Australië",
+      "jp": "Japan"
+    }
   }
 }

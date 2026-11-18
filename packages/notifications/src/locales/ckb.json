@@ -12,7 +12,6 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
     }
   },
@@ -36,14 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "پێشێلکردنی SLA"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "پشکنینێکی ئاسایش نوێکارییەکی هەیە"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "دانیشتنی Kiloـی تۆ ئامادەیە بۆ کۆنترۆڵکردن لە مۆبایلەکەتەوە"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

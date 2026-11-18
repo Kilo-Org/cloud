@@ -1,9 +1,25 @@
 import { z } from 'zod';
 
+import {
+  aboveMaximumError,
+  readAmountAtMost,
+} from '@/components/organization/amount-field-validators';
 import { i18n } from '@/i18n';
-import { parseLocalizedNumber } from '@/lib/format';
 import { knownServerErrorMessage } from '@/lib/server-error-copy';
 import { readTrpcErrorField } from '@/lib/trpc-error';
+
+/**
+ * The largest amount the balance alert form accepts. The settings schema stores
+ * any positive number, so this ceiling belongs to the form: an amount above it
+ * is past any balance the alert would watch, and the field reports the ceiling
+ * instead of storing the amount.
+ */
+const MAX_THRESHOLD_USD = 1_000_000_000;
+
+/** Parse a USD balance: out-of-range values are `null`, never clamped. */
+export function parseThreshold(value: string): number | null {
+  return readAmountAtMost(value, MAX_THRESHOLD_USD).amount;
+}
 
 /**
  * The procedure's own address rule (`z.string().email()` in
@@ -14,15 +30,6 @@ import { readTrpcErrorField } from '@/lib/trpc-error';
  */
 const EMAIL_SCHEMA = z.email();
 
-export function parseThreshold(value: string): number | null {
-  const trimmed = value.trim();
-  const parsed = parseLocalizedNumber(trimmed, i18n.language);
-  if (trimmed === '' || parsed === null || parsed <= 0) {
-    return null;
-  }
-  return parsed;
-}
-
 export function parseEmails(value: string): string[] {
   return value
     .split(',')
@@ -30,10 +37,33 @@ export function parseEmails(value: string): string[] {
     .filter(email => email !== '');
 }
 
+/** The reserve set for `FormField`'s `reserveErrorMessages`: every message the threshold rule can show. */
+export function thresholdErrorMessages(): readonly [aboveMaximum: string, invalid: string] {
+  return [
+    aboveMaximumError(MAX_THRESHOLD_USD),
+    i18n.t('organization.lowBalanceAlert.thresholdError'),
+  ];
+}
+
+/** Inline error for the balance field, or `null` while the value is valid. */
 export function thresholdError(value: string): string | null {
-  return parseThreshold(value) == null
-    ? i18n.t('organization.lowBalanceAlert.thresholdError')
-    : null;
+  const [aboveMaximum, invalid] = thresholdErrorMessages();
+  const { problem } = readAmountAtMost(value, MAX_THRESHOLD_USD);
+  if (problem === null) {
+    return null;
+  }
+  return problem === 'aboveMaximum' ? aboveMaximum : invalid;
+}
+
+/**
+ * The reserve set for `FormField`'s `reserveErrorMessages`: every message the
+ * recipient rule can show.
+ */
+export function emailsErrorMessages(): readonly [required: string, invalid: string] {
+  return [
+    i18n.t('organization.lowBalanceAlert.emailsRequired'),
+    i18n.t('organization.lowBalanceAlert.emailsInvalid'),
+  ];
 }
 
 /**
@@ -43,13 +73,12 @@ export function thresholdError(value: string): string | null {
  * separate addresses, so neither repeats it.
  */
 export function emailsError(value: string): string | null {
+  const [required, invalid] = emailsErrorMessages();
   const emails = parseEmails(value);
   if (emails.length === 0) {
-    return i18n.t('organization.lowBalanceAlert.emailsRequired');
+    return required;
   }
-  return emails.some(email => !EMAIL_SCHEMA.safeParse(email).success)
-    ? i18n.t('organization.lowBalanceAlert.emailsInvalid')
-    : null;
+  return emails.some(email => !EMAIL_SCHEMA.safeParse(email).success) ? invalid : null;
 }
 
 /** Where a failed save belongs and what it says, both localized. */

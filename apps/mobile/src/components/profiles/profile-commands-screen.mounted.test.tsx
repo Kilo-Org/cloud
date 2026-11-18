@@ -237,8 +237,8 @@ describe('ProfileCommandsScreen', () => {
     const counterTexts = () =>
       findAll(renderer.root, 'Text').filter(
         node =>
-          typeof node.props.accessibilityLabel === 'string' &&
-          node.props.accessibilityLabel.includes('characters remaining')
+          typeof node.props.children === 'string' &&
+          node.props.children.endsWith('characters remaining')
       );
     const hintTexts = () =>
       findAll(renderer.root, 'Text')
@@ -248,12 +248,11 @@ describe('ProfileCommandsScreen', () => {
     // An ordinary command is far from the server bound, so the row stays quiet.
     expect(counterTexts()).toEqual([]);
 
-    // Near the bound the row counts the room left, as the bare numeral the chat
-    // composer and the new-session prompt show, with the counted sentence as its
-    // accessible name.
+    // Near the bound the row counts the room left, in the same visible phrase
+    // the chat composer and the new-session prompt show.
     changeRowText(renderer.root, 0, 'a'.repeat(470));
-    expect(counterTexts().map(node => node.props.children)).toEqual([30]);
-    expect(counterTexts()[0]?.props.accessibilityLabel).toBe('30 characters remaining');
+    expect(counterTexts().map(node => node.props.children)).toEqual(['30 characters remaining']);
+    expect(counterTexts()[0]?.props.accessibilityLabel).toBeUndefined();
     expect(hintTexts()).not.toContain('The command is limited to 500 characters');
 
     // At the bound the sentence replaces the count: a zero count would restate it.

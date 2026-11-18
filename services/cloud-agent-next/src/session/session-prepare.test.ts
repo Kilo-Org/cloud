@@ -14,8 +14,10 @@ import { TRPCError } from '@trpc/server';
 import { generateBranchSlugFromSeed } from '@kilocode/worker-utils/deployment-slug';
 import {
   createRuntimeAuthorization,
+  RuntimeAuthorizationRevokedError,
   sealRuntimeAuthorization,
 } from '@kilocode/worker-utils/runtime-authorization';
+import type * as RuntimeAuthorizationModule from '@kilocode/worker-utils/runtime-authorization';
 import { assertKiloModelAvailable } from '../model-validation.js';
 import type { WorkerDb } from '@kilocode/db/client';
 import {
@@ -92,7 +94,8 @@ const {
   fetchByocVercelEnrollmentForUserMock: vi.fn(),
 }));
 
-vi.mock('@kilocode/worker-utils/runtime-authorization', () => ({
+vi.mock('@kilocode/worker-utils/runtime-authorization', async importOriginal => ({
+  ...(await importOriginal<typeof RuntimeAuthorizationModule>()),
   createRuntimeAuthorization: vi.fn(),
   sealRuntimeAuthorization: vi.fn(),
 }));
@@ -108,6 +111,7 @@ function modernContext(
   organizationId?: string
 ): SessionRegistrationContext {
   ctx.env.NEXTAUTH_SECRET = 'registration-test-secret';
+  ctx.env.ENVIRONMENT = 'development';
   ctx.authToken = jwt.sign(
     {
       kiloUserId: ctx.userId,
@@ -5854,13 +5858,37 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
       } else {
         vi.mocked(assertKiloModelAvailable).mockRejectedValueOnce(new Error('Model unavailable'));
       }
-      await expect(runCreate(ctx, input)).rejects.toThrow();
+      await expect(runCreate(ctx, input)).rejects.toThrow(
+        failure === 'admission' ? 'Invalid runtime admission' : 'Model unavailable'
+      );
       expect(stub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
       expect(createCliSessionMock).not.toHaveBeenCalled();
       expect(deleteCliSessionMock).not.toHaveBeenCalled();
       expect(settleOperationMock).not.toHaveBeenCalled();
     }
   );
+
+  it('maps a refused runtime delegation to a FORBIDDEN authorization denial', async () => {
+    const input = request();
+    const stub = makeDoStub({ getMetadata: vi.fn().mockResolvedValue(null) });
+    const ctx = modernContext(context(stub));
+    const progress = await canonicalProgress(input);
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_pending',
+      row: makeLedgerRow({ status: 'reconcile_pending', canonical_result: progress }),
+    });
+    getPgDbMock.mockReturnValue(makeDb([[ownershipRow()], [{ email: 'test@example.com' }]]));
+    vi.mocked(createRuntimeAuthorization).mockRejectedValueOnce(
+      new RuntimeAuthorizationRevokedError()
+    );
+    const rejection = await runCreate(ctx, input).catch((error: unknown) => error);
+    expect(rejection).toBeInstanceOf(TRPCError);
+    expect(rejection).toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Runtime authorization denied',
+    });
+    expect(stub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+  });
 
   it('reconciles the original BYOC worktree binding after enrollment changes without reallocating', async () => {
     const organizationId = 'f47ac10b-58cc-4372-a567-0e02b2c3d488';
@@ -7871,7 +7899,10 @@ describe('createSessionWithLedger clone reconciliation', () => {
         connectionString: ctx.env.HYPERDRIVE.connectionString,
         resourceKind: 'cloud-agent-next',
         resourceId: SANDBOX_SESSION_ID,
+        environment: 'development',
+        onAdmissionRejected: expect.any(Function),
         ...(organizationId ? { organizationId } : {}),
+        onBindingRejected: expect.any(Function),
       });
       expect(stub.registerSessionFromMetadata).toHaveBeenCalledWith(
         expect.objectContaining({

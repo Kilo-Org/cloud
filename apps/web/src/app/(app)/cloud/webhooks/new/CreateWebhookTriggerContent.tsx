@@ -27,6 +27,7 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
   const router = useRouter();
   const queryClient = useQueryClient();
   const [githubRepo, setGithubRepo] = useState('');
+  const [isExistingChat, setIsExistingChat] = useState(false);
 
   // Build URLs based on context
   const routes = getWebhookRoutes(organizationId);
@@ -126,6 +127,12 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
     async (formData: TriggerFormData) => {
       await createTrigger({
         triggerId: formData.triggerId,
+        ...(formData.targetType === 'cloud_agent_chat'
+          ? {
+              targetType: formData.targetType,
+              cloudAgentSessionId: formData.cloudAgentSessionId,
+            }
+          : {}),
         runAsCreator: formData.runAsCreator,
         activationMode: formData.activationMode,
         cronExpression: formData.cronExpression,
@@ -184,7 +191,7 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
       {headerContent}
 
       {/* GitHub integration missing - non-blocking banner */}
-      {isGitHubIntegrationMissing && (
+      {isGitHubIntegrationMissing && !isExistingChat && (
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -225,6 +232,7 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
         canSetSandboxAllocation={capabilities?.canSetSandboxAllocation ?? false}
         sandboxSelection={capabilities?.sandboxSelection}
         onRepositoryChange={setGithubRepo}
+        onTargetTypeChange={target => setIsExistingChat(target === 'cloud_agent_chat')}
         isLoadingCapabilities={isLoadingCapabilities}
         hasCapabilitiesError={hasCapabilitiesError}
         onRetryCapabilities={() => void refetchCapabilities()}

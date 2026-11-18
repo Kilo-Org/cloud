@@ -19,7 +19,21 @@ export const RuntimeAdmissionSchema = z.object({
   authorizationUserId: z.string().min(1),
   authorizationPepper: z.string().nullable(),
 });
+
+/** Deployment environments that can mint and admit runtime authorization tokens. */
+export const RuntimeEnvironmentSchema = z.enum(['production', 'development']);
+export type RuntimeEnvironment = z.infer<typeof RuntimeEnvironmentSchema>;
 export type RuntimeAdmission = z.infer<typeof RuntimeAdmissionSchema>;
+
+/**
+ * The deployment environment every runtime-token minter writes into the `env`
+ * claim and the runtime compares it with. A missing or unrecognized value
+ * resolves to `production`, so a mistyped configuration refuses
+ * development-labelled tokens instead of admitting them.
+ */
+export function resolveRuntimeEnvironment(value: string | undefined): RuntimeEnvironment {
+  return value === 'development' ? 'development' : 'production';
+}
 
 const pepperDigest = z.string().regex(/^[a-f0-9]{64}$/);
 const nullablePepperDigest = z.union([pepperDigest, z.literal('null')]);
@@ -42,6 +56,12 @@ export const RuntimeAuthorizationSchema = z
         authorizationPepperDigest: nullablePepperDigest,
         userMembershipId: z.string().min(1).optional(),
         authorizationUserMembershipId: z.string().min(1).optional(),
+        /**
+         * The device session that admitted a `device-access` credential, when
+         * one did. A record minted before this field existed has none and
+         * keeps its own lifetime; see `requireBindings`.
+         */
+        deviceSessionId: z.string().min(1).optional(),
       })
       .strict(),
     source: z

@@ -26,6 +26,7 @@
     "creditHistory": "クレジット履歴",
     "sentenceJoiner": "。",
     "listJoiner": "、",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "キャンセル",
     "done": "完了",
     "retry": "再試行",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "変更内容",
     "organizationTrialEnded": "組織のトライアルは終了し、有効なプランがありません。組織のオーナーは kilo.ai で請求情報を更新してから、もう一度お試しください。",
-    "privateRepositoryA11y": "{{name}}、プライベートリポジトリ"
+    "privateRepositoryA11y": "{{name}}、プライベートリポジトリ",
+    "legalDocumentEnglishOnly": "この文書は英語でのみご利用いただけます。"
   },
   "language": {
     "restarting": "言語設定を適用するために再起動中",
@@ -481,7 +483,14 @@
       "viewReceipt": "受付確認を表示"
     },
     "changelog": "新着情報",
-    "changelogVersionPending": "このバージョンのリリースノートは、次回のアプリアップデートで届きます。"
+    "changelogVersionPending": "バージョン{{version}}のリリースノートは、次回のアプリアップデートで届きます。",
+    "changelogGroupNew": "新機能",
+    "changelogFixesIn": "{{areas}}に関する修正と改善を行いました。",
+    "changelogFixesPolish": "アプリ全体の修正と改善を行いました。",
+    "changelogAreas": {
+      "signIn": "サインイン",
+      "profileOrganizations": "プロフィールと組織"
+    }
   },
   "preferences": {
     "general": "一般",
@@ -676,7 +685,8 @@
       "managedOnWeb": "この組織のBitbucket接続は、パソコンからWebで管理されています。",
       "description": "必要なスコープを指定してワークスペースアクセストークンを作成し、下に貼り付けてください。",
       "scopes": "アカウント：読み取り、リポジトリ：読み取り・書き込み、プルリクエスト：読み取り、Webhook：読み取り・書き込み",
-      "tokenPlaceholder": "ワークスペースアクセストークン"
+      "tokenPlaceholder": "ワークスペースアクセストークン",
+      "tokenRefused": "Bitbucketはこのワークスペースアクセストークンを受け付けませんでした。上記のスコープが付与されていることを確認してから、もう一度お試しください。"
     },
     "followReviewMd": "REVIEW.mdに従う",
     "followReviewMdSubtitle": "各リポジトリのREVIEW.mdに記載された指示に従う",
@@ -777,6 +787,7 @@
     },
     "reviewList": {
       "configureProvider": "プロバイダーを設定",
+      "connectOwnerOnly": "組織のオーナーまたは管理者にプロバイダーの接続を依頼してください。",
       "couldNotLoad": "レビューを読み込めませんでした。",
       "noReviews": "まだレビューはありません",
       "noReviewsDescription": "コードレビュアーがプルリクエストをレビューすると、その結果がここに表示されます。",
@@ -921,13 +932,25 @@
       "repositoryLine": "レビュー: {{reviews}} · 指摘: {{findings}}",
       "empty": "分析データのあるレビューはまだありません",
       "emptyDescription": "分析機能は、組織で有効になっている間に完了したレビューを記録します。",
-      "off": "この組織では分析がオフになっています。",
-      "couldNotLoad": "分析を読み込めませんでした"
+      "offTitle": "{{platform}}の分析がオフになっています",
+      "offDescription": "分析をオンにできるのは、組織のオーナー、管理者、請求マネージャーといった請求ロールです。Web 上の組織設定からオンにすると、完了したレビューが記録されます。",
+      "couldNotLoad": "分析を読み込めませんでした",
+      "trackedReviewsCaption": "分析が有効な状態でこの期間内に完了したレビューです。実行中のレビューと失敗したレビューは決してカウントされません。",
+      "trackedReviewsUncounted": "カウント対象外：この組織の終了済みレビュー {{displayTotal}} 件のうち {{displayCount}} 件は、結果が記録されていません。",
+      "trackedReviewsUncounted_one": "カウント対象外：この組織の終了済みレビュー {{displayTotal}} 件のうち {{displayCount}} 件は、結果が記録されていません。",
+      "trackedReviewsUncounted_other": "カウント対象外：この組織の終了済みレビュー {{displayTotal}} 件のうち {{displayCount}} 件は、結果が記録されていません。"
     },
     "council": {
       "title": "合議レビュー",
       "subtitle": "複数のスペシャリストが各プルリクエストをレビューし、その投票が1つの判定にまとめられます。",
-      "unavailable": "この組織では合議レビューを利用できません。",
+      "unavailablePersonallyTitle": "Enterprise 組織が必要です",
+      "unavailablePersonally": "合議レビューは個人アカウントには含まれません。",
+      "unavailablePersonallyAction": "組織を作成",
+      "unavailablePersonallySwitchAction": "組織を切り替え",
+      "unavailableOrganizationTitle": "合議レビューはご利用いただけません",
+      "unavailableForOrganization": "合議レビューには、有効なサブスクリプションまたはトライアル付きのエンタープライズプランが必要です。この組織には現在それがありません。",
+      "unavailableForOrganizationNeutral": "この組織では現在、合議レビューはご利用いただけません。後でもう一度お試しください。",
+      "unavailableOnBitbucket": "合議レビューは Bitbucket リポジトリでは利用できません。",
       "noRepositories": "リポジトリがまだ選択されていません。先にリポジトリ設定で選択してください。",
       "specialists": "スペシャリスト",
       "labels": "合議レビューを開始するラベル",
@@ -2430,6 +2453,7 @@
     "signOutThisDevice": "このデバイスからサインアウト",
     "signOutSessionLabel": "{{device}}からサインアウト、サインイン：{{signedIn}}、最終アクセス：{{lastSeen}}",
     "sessionSignedOut": "セッションからサインアウトしました。",
+    "sessionSignOutFailed": "このセッションからサインアウトできませんでした。もう一度お試しください。",
     "signOutThisDeviceTitle": "このデバイスからサインアウトしますか？",
     "signOutThisSessionTitle": "このセッションからサインアウトしますか？",
     "signOutThisSessionMessage": "{{device}}からサインアウトします。最終アクセス：{{lastSeen}}。ただし、最大1時間はAPIにアクセスできる状態が続くことがあります。",
@@ -2553,12 +2577,14 @@
     "manage": {
       "billingHistory": "請求履歴",
       "billingHistoryEmpty": "請求履歴はまだありません。",
+      "billingHistoryError": "請求履歴を読み込めませんでした",
       "cancel": "サブスクリプションを解約",
       "cancelDescription": "Kilo Pass は請求期間の終了まで有効で、その後は更新されません。",
       "cancelScheduled": "{{date}} に解約予定",
       "cancelScheduledChange": "予定された変更を取り消す",
       "cancelled": "サブスクリプションを解約しました",
       "creditHistoryEmpty": "Kilo Pass のクレジットはまだありません。",
+      "creditHistoryError": "クレジット履歴を読み込めませんでした",
       "resume": "サブスクリプションを再開",
       "resumeCancelledDescription": "Kilo Pass の自動更新が再び有効になります。",
       "resumePausedDescription": "Kilo Pass は予定の再開日を待たずに今すぐ再開されます。",
@@ -2575,7 +2601,6 @@
     "completingPurchase": "購入手続き中",
     "subscriptionLoading": "Kilo Passのサブスクリプションを読み込み中",
     "retryHint": "Kilo Passの状態の取得を再試行します。",
-    "cardAccessibility": "{{title}}。{{description}}。{{actionLabel}}",
     "endedOn": "{{date}}に終了しました",
     "notAvailableInApp": "Kilo Passはアプリでは利用できません。",
     "statusActive": "有効",
@@ -3313,6 +3338,7 @@
       "manageOnWeb": "Webでの請求設定",
       "changePlan": "プランを変更",
       "buySeats": "シートを購入",
+      "managedOnWeb": "プラン、シート数、自動チャージはWebで管理されています。",
       "setupAutoTopUp": "自動チャージを設定",
       "manageAutoTopUp": "自動チャージを管理",
       "opensOnWeb": "Webで開きます"
@@ -3330,7 +3356,7 @@
       "selectOrganization": "組織を選択",
       "unavailableDescription": "この組織は利用できなくなりました。続行するには、プロフィールから組織を選択してください。",
       "unavailableSessionsDescription": "この組織は利用できなくなりました。セッションを読み込めません。",
-      "accessDeniedDescription": "この組織にアクセスする権限がありません。"
+      "accessDeniedDescription": "組織のオーナーまたは管理者にアクセス権の付与を依頼してください。"
     },
     "create": {
       "title": "組織を作成",
@@ -3463,16 +3489,26 @@
     },
     "settingsOnWeb": {
       "title": "Webでの組織設定",
-      "integrations": "Webでの連携",
       "usageDetails": "使用状況の詳細",
       "providersAndModels": "プロバイダーとモデル",
       "groups": "グループ",
       "guardrails": "ガードレール",
       "byok": "独自のキーを使用",
+      "ssoAndDomain": "SSOとドメイン",
+      "dataCollection": "データ収集",
       "auditLogs": "監査ログ",
-      "requestLogs": "リクエストログ",
-      "subOrganizations": "サブ組織",
-      "distributeFunds": "資金の配分"
+      "requestLogs": "リクエストログ"
+    },
+    "requestLogs": {
+      "older": "前の1時間",
+      "newer": "次の1時間",
+      "truncated": "この1時間には、一覧に表示しきれないリクエストがあります。",
+      "emptyTitle": "この1時間のリクエストはありません",
+      "emptyDescription": "「前の1時間」をタップすると、それより前のリクエストが表示されます。",
+      "loadError": "リクエストログを読み込めませんでした。",
+      "permissionDenied": "リクエストログを閲覧できるのは、組織のオーナー、管理者、または請求管理者のみです。",
+      "tokens": "入力 {{input}} · 出力 {{output}}",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "入力トークン",
@@ -4267,8 +4303,7 @@
       "repoValue": "リポジトリ: {{name}}",
       "profileValue": "プロフィール: {{name}}",
       "profileUnavailable": "このプロフィールは使用できなくなりました。別のプロフィールを選択してください。",
-      "pickerEmptyDescriptionOrganization": "組織プロフィールを作成して、セッション間で環境変数、セットアップコマンド、スキルを再利用します。",
-      "pickerEmptyDescriptionOrganizationReadOnly": "組織のオーナーまたは管理者が組織プロフィールを作成できます。"
+      "pickerEmptyDescriptionOrganization": "組織プロフィールを作成して、セッション間で環境変数、セットアップコマンド、スキルを再利用します。"
     },
     "variablesDeleteFailed": "変数を削除できませんでした",
     "deleteVariable": "変数{{key}}を削除",
@@ -4454,7 +4489,6 @@
     "dismiss": "ブリーフィングを非表示にする",
     "offline": "オフライン · 保存済みブリーフィング",
     "cached": "保存済みレポート · 更新できません",
-    "window": "{{start}} – {{end}}",
     "summary": "AI要約",
     "summaryPending": "AI要約を作成中です。完了するとここに追加されます。",
     "summaryUnavailable": "AI要約は利用できません。構造化レポートは引き続き利用できます。",
@@ -4521,6 +4555,8 @@
     "topModels": "上位のモデル",
     "topFeatures": "上位の機能",
     "emptyTitle": "この期間の使用はありません",
+    "unavailableTitle": "使用状況を利用できません",
+    "unavailableDescription": "このワークスペースは使用状況を報告していません。再試行しても解決しません。",
     "orgSelfNotice": "この組織でのあなた自身の使用状況を表示しています。",
     "viewDetails": "使用状況の詳細を表示"
   },
@@ -4571,6 +4607,7 @@
       "title": "トリガーとウェブフック",
       "subtitle": "ウェブフック呼び出しまたはスケジュールからCloud Agentの実行を自動化します。",
       "new": "新規トリガー",
+      "create": "トリガーを作成",
       "emptyTitle": "トリガーはまだありません",
       "emptyDescription": "ウェブフック呼び出しまたはスケジュールでCloud Agentの実行を開始するトリガーを作成します。",
       "loadFailedTitle": "トリガーを読み込めませんでした",
@@ -4592,7 +4629,7 @@
       "fieldCron": "Cron式",
       "fieldCronHelp": "5つのフィールド：分、時、日、月、曜日。最短間隔は1分です。",
       "fieldTimezone": "タイムゾーン",
-      "nameLocked": "名前はウェブフックURLの一部であるため、変更できません。",
+      "nameLocked": "名前はトリガーの作成後に変更できません。",
       "repositoryLocked": "リポジトリはトリガーの作成後に変更できません。",
       "environmentAutomatic": "リポジトリに応じて自動",
       "notSelected": "未選択",
@@ -4607,6 +4644,7 @@
       "authHeaderLabel": "ヘッダー名",
       "authSecretLabel": "共有シークレット",
       "authSecretKeep": "保存されているシークレットを保持するには空欄にします。",
+      "authSecretSet": "必須。強力なランダムな文字列を選択してください。",
       "authSecretCreator": "トリガーが作成者として実行される場合は、16文字以上を使用してください。",
       "autoCommit": "実行完了時に変更をコミットする",
       "condenseOnComplete": "実行完了時にコンテキストを圧縮する",
@@ -4617,11 +4655,14 @@
       "saveFailedTitle": "トリガーを保存できませんでした",
       "deleteTitle": "このトリガーを削除しますか？",
       "deleteMessage": "{{name}}への呼び出しは失敗します。この操作は元に戻せません。",
+      "deleteMessageScheduled": "{{name}}の予定された実行は停止します。この操作は元に戻せません。",
       "runNow": "今すぐ実行",
       "runStarted": "実行を開始しました",
       "created": "トリガーを作成しました",
       "saved": "トリガーを保存しました",
       "statusArrived": "到着",
+      "defaultPromptWebhook": "このウェブフックリクエストの本文を説明してください。\n\n{{body}}",
+      "defaultPromptScheduled": "スケジュールされたタスクを実行してください。{{scheduledTime}} に実行を開始しました。",
       "problems": {
         "nameRequired": "名前を入力してください。",
         "nameTooShort": "8文字以上使用してください。",
@@ -4656,8 +4697,9 @@
     "create": "リンクを作成",
     "createFailed": "リンクを作成できませんでした。",
     "existingTitle": "既存のリンク",
-    "existingDescription": "このセッションにはすでに共有リンクがあります。新しいリンクを作成すると既存のリンクが置き換えられ、古いリンクは使用できなくなります。",
+    "existingDescription": "このセッションにはすでに共有リンクがあります。この設定で新しいリンクを作成すると既存のリンクが置き換えられ、古いリンクは使用できなくなります。",
     "rotate": "新しいリンクを作成",
+    "replacementSettings": "この設定は新しいリンクに適用されます。",
     "revoke": "リンクを無効化",
     "revokeTitle": "リンクを無効化しますか？",
     "revokeMessage": "現在のリンクはすぐに使用できなくなります。",
@@ -4669,6 +4711,7 @@
     "superseded": "このリンクは別のデバイスで置き換えられたため、使用できなくなりました。"
   },
   "sharedSession": {
+    "startedAt": "{{time}} に開始",
     "title": "共有セッション",
     "someone": "不明なユーザー",
     "sharedBy": "共有者：{{owner}}",
@@ -4676,5 +4719,177 @@
     "unavailableDescription": "この共有リンクは期限切れか、無効化されています。",
     "transcriptUnavailableTitle": "このトランスクリプトを読み込めませんでした",
     "transcriptUnavailableDescription": "リンクは引き続き有効です。しばらくしてからもう一度お試しください。"
+  },
+  "organizationGuardrails": {
+    "title": "AIガードレール",
+    "permissionDenied": "AIガードレールを管理できるのは組織の所有者と管理者のみです。",
+    "unavailable": "AIガードレールはこの組織では利用できません。",
+    "loadError": "AIガードレールを読み込めませんでした",
+    "statusSaving": "保存中…",
+    "statusSaved": "保存しました",
+    "statusFailed": "保存できませんでした。",
+    "inputTitle": "入力ガードレール",
+    "inputDescription": "Enkrypt AIで、ツールの結果を含むすべての入力をスキャンします。Enkryptが利用できない場合、ブロック検出器はリクエストを拒否します。",
+    "outputTitle": "出力ガードレール",
+    "outputDescription": "メンバーが受け取る前に、Enkrypt AIで応答をスキャンします。オンにしない限りオフです。",
+    "detectorsHint": "ブロックは、フラグが付いたリクエストを拒否します。ログのみは、リクエストを遅延させずに記録だけを行います。",
+    "detectorsHintOutput": "ブロックは、フラグが付いた応答を失敗させます。ログのみは、応答を遅延させずに記録だけを行います。",
+    "choiceLog": "ログのみ",
+    "applyTo": "適用先",
+    "applyToAllMembers": "すべてのメンバー",
+    "applyKiloDefault": "Kiloのデフォルトを適用",
+    "invalidSavedTitle": "保存された入力検出器の設定を読み取れません",
+    "invalidSavedBody": "入力検出器が再度保存されるまで、リクエストはブロックされます。以下の検出器はKiloのデフォルトから開始します。",
+    "invalidSavedOutputTitle": "保存された出力検出器の設定を読み取れません",
+    "invalidSavedOutputBody": "出力検出器が再度保存されるまで、応答は保留されます。以下から出力検出器を選択してください。",
+    "blockingOutputNote": "ブロックする出力検出器は、Enkryptが応答全体をチェックするまで応答を保留します。遅延を避けるにはログのみを使用してください。",
+    "inputDetectorRequired": "少なくとも1つの入力検出器をオンにしてください。",
+    "outputDetectorRequired": "少なくとも1つの出力検出器をオンにしてください。",
+    "rulesTooMany": "ルールは最大{{max}}件まで追加できます。",
+    "ruleIdRequired": "ルールIDを入力してください。",
+    "ruleIdInvalid": "ルールIDには英字、数字、ドット、ハイフン、アンダースコアのみ使用できます。",
+    "ruleTextRequired": "ルールが禁止または要求する内容を記述してください。",
+    "keywordTooLong": "各キーワードは最大{{max}}文字です。",
+    "topicTooLong": "各トピックは最大{{max}}文字です。",
+    "keywordsTooMany": "キーワードは最大{{max}}件まで追加できます。",
+    "topicsTooMany": "トピックは最大{{max}}件まで追加できます。",
+    "piiEntityRequired": "検出するデータを少なくとも1つ選択してください。",
+    "keywordRequired": "キーワードを少なくとも1つ追加してください。",
+    "topicRequired": "トピックを少なくとも1つ追加してください。",
+    "policyTextRequired": "ポリシーテキストを入力してください。",
+    "ruleRequired": "ルールを少なくとも1つ追加してください。",
+    "ruleIdDuplicate": "各ルールには固有のルールIDが必要です。",
+    "piiEntities": "検出するデータ",
+    "keywordsLabel": "キーワード",
+    "keywordsHint": "1行に1つのキーワード。",
+    "topicsHint": "1行に1つのトピック。",
+    "policyFormat": "ポリシー形式",
+    "policyFormatRules": "構造化ルール",
+    "policyFormatRulesDescription": "要件ごとに1つのルールを、カテゴリと重大度を付けて指定します。推奨。",
+    "policyFormatText": "ポリシーテキスト",
+    "policyFormatTextDescription": "既存のポリシーをプレーンテキストとして貼り付けます。",
+    "rulesEmpty": "ルールはまだありません。各ルールは、入力に含めてはならない、または要求してはならない内容を1つ記述します。",
+    "addRule": "ルールを追加",
+    "ruleNumber": "ルール{{number}}",
+    "ruleRemove": "ルール{{number}}を削除",
+    "ruleIdLabel": "ルールID",
+    "ruleNameLabel": "名前（任意）",
+    "ruleTextLabel": "ルール",
+    "ruleRiskCategory": "リスクカテゴリ",
+    "ruleApplicability": "スコープ",
+    "ruleFrameworks": "フレームワーク",
+    "detector": {
+      "promptInjection": {
+        "label": "プロンプトインジェクション",
+        "description": "指示を上書きしたりモデルをジェイルブレイクしたりする試みを検出します。"
+      },
+      "policyViolation": {
+        "label": "ポリシー違反",
+        "description": "テキストまたはルールで記述された組織ポリシーに違反する入力を検出します。",
+        "descriptionOutput": "テキストまたはルールで記述された組織ポリシーに違反する応答を検出します。"
+      },
+      "pii": {
+        "label": "PIIとシークレット",
+        "description": "個人データ、認証情報、IPアドレス、URLを検出します。"
+      },
+      "keywords": {
+        "label": "禁止キーワード",
+        "descriptionOutput": "指定したキーワードのいずれかを含む応答を検出します。"
+      },
+      "topics": {
+        "label": "トピック",
+        "descriptionOutput": "指定したトピックのいずれかに関する応答を検出します。"
+      },
+      "toxicity": {
+        "label": "有害性",
+        "description": "有害、侮辱的、脅迫的、または憎悪的な表現を検出します。"
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "性的な内容、またはその他の職場閲覧に適さない内容を検出します。"
+      },
+      "bias": {
+        "label": "バイアス",
+        "description": "偏見のある、または差別的な表現を検出します。"
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "個人データ",
+        "description": "氏名、メールアドレス、電話番号。"
+      },
+      "secrets": {
+        "label": "シークレット",
+        "description": "APIキー、トークン、パスワード。"
+      },
+      "ipAddress": {
+        "label": "IPアドレス",
+        "description": "IPv4およびIPv6アドレス。"
+      },
+      "url": {
+        "label": "URL",
+        "description": "ウェブアドレス。"
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "セキュリティと詐欺",
+      "safetyHarm": "安全性と危害",
+      "privacyDataProtection": "プライバシーとデータ保護",
+      "brandReputationTrust": "ブランドと評判",
+      "biasFairnessEthical": "バイアスと公平性",
+      "legalIpLiability": "法務および知的財産責任",
+      "productMisuse": "製品の誤用",
+      "performanceQuality": "パフォーマンスと品質"
+    },
+    "applicability": {
+      "user": "ユーザー入力",
+      "userAssistant": "ユーザー入力と応答"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLMトップ10（2025）",
+      "nist": "NIST AI RMF",
+      "euAiAct": "EU AI法",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "エンタープライズ機能",
+    "enterpriseOnly": "これはエンタープライズ限定の機能です。",
+    "readOnly": "これらの設定を変更できるのは組織の所有者と管理者のみです。",
+    "loadError": "プロバイダーとモデルを読み込めませんでした",
+    "tabModels": "モデル",
+    "tabProviders": "プロバイダー",
+    "tabGateways": "ゲートウェイ",
+    "modelsDescription": "モデルをオフにすると、すべてのメンバーに対してそのモデルをブロックします。許可されたプロバイダーのモデルはオンで開始します。",
+    "modelsDeniedOnly": "拒否のみ",
+    "modelsEmpty": "この検索に一致するモデルはありません。",
+    "modelsDeniedEmpty": "拒否されたモデルはありません。",
+    "modelsDeniedSearchEmpty": "この検索に一致する拒否されたモデルはありません。",
+    "providersDescription": "プロバイダーをオフにすると、この組織でKiloがそのプロバイダーへルーティングするのを停止します。",
+    "providersNeedCatalog": "モデルカタログ全体が読み込まれるまで、プロバイダーのスイッチは読み取り専用です。編集するには、上の再試行をタップしてください。",
+    "providersEmpty": "この検索に一致するプロバイダーはありません。",
+    "allowAllShown": "表示されているすべてを許可",
+    "denyAllShown": "表示されているすべてを拒否",
+    "gatewaysDescription": "KiloはモデルリクエストをVercel AI GatewayまたはOpenRouter経由でルーティングします。無効なゲートウェイはそれらのリクエストを失敗させます。",
+    "emptyProviderList": "少なくとも1つのプロバイダーを許可してください。リストが空の場合、Kiloのすべてのモデルルーティングがブロックされます。",
+    "gatewaysUnavailable": "この組織ではゲートウェイ設定を利用できません。",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "OpenRouterのリクエストはリージョンに固定されません。",
+    "inferenceRegion": "推論リージョン",
+    "inferenceRegionDescription": "Vercel AI Gatewayのリクエストをこのリージョンに固定します。そこで利用できないモデルは失敗します。",
+    "disableOpenrouterNote": "OpenRouterを無効にすると、それを経由してリクエストをルーティングするBYOKキーもブロックされます。",
+    "emptyModelList": "少なくとも1つのモデルをオンのままにしてください。すべてのモデルを拒否すると、メンバーが使用できるものがなくなります。",
+    "catalogUnavailable": "モデルカタログ全体を読み込めなかったため、保存済みのリストのみを表示しています。すべてのモデルを読み込むには再試行してください。",
+    "region": {
+      "global": "グローバル",
+      "us": "アメリカ合衆国",
+      "eu": "欧州連合",
+      "au": "オーストラリア",
+      "jp": "日本"
+    }
   }
 }

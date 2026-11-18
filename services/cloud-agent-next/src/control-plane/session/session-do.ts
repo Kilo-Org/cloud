@@ -60,6 +60,7 @@ import {
   issuePersistedRuntimeProxyGrant,
   resolvePersistedRuntimeProxyCredential,
 } from '../../runtime-credential-proxy-rpc.js';
+import { classifyRuntimeProxyFenceError, readRuntimeProxyFence } from './runtime-proxy-fence.js';
 import type { ScopeHandleResolution } from '../sandbox/accepted-handles.js';
 import {
   getRuntimeAuthorizationRecoveryState as readRuntimeAuthorizationRecoveryState,
@@ -130,6 +131,7 @@ import {
   type ControlPlaneRouteUpdate,
   type ControlPlaneRouteView,
   type ControlPlaneSessionRefPayload,
+  type ControlPlaneReleasePayload,
   type ControlPlaneSetupCommandKind,
   type ControlPlaneSetupEvent,
   type ControlPlaneStatusResult,
@@ -203,6 +205,10 @@ import {
   worktreeChangesReadySchema,
   type WorktreeChangesReady,
 } from '../worktree-changes-ready.js';
+import {
+  WORKSPACE_ARTIFACTS_CHANGED_EVENT,
+  type WorkspaceArtifactsChanged,
+} from '../sandbox/notifications.js';
 import { createControlPlaneTerminals, type ControlPlaneTerminals } from './terminals.js';
 import { createControlPlanePreview, type ControlPlanePreview } from './preview.js';
 import type {
@@ -281,6 +287,7 @@ import type {
 } from '../sandbox/sandbox-do.js';
 import type { ScopeGrantView } from '../sandbox/scope-view.js';
 import { diagnosticCause, logControlDiagnostic } from '../../sandbox-control/diagnostics.js';
+import { readSentryIdentity } from '../../sentry-identity.js';
 
 /** Where a committed message transition came from (legacy diagnostic field). */
 type ControlPlaneMessageSource = 'coordinator' | 'wrapper_outcome' | 'operation_result';
@@ -318,6 +325,11 @@ const EVENT_RECEIPT_RETENTION_MS = 5 * 60_000;
  */
 const rootStatusSchema = z.object({ type: z.string(), settled: z.boolean() });
 type RootStatus = z.infer<typeof rootStatusSchema>;
+
+const workspaceArtifactsChangedSchema = z
+  .object({ revision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER) })
+  .strict();
+
 const rootStatusEventSchema = z.object({
   sessionID: z.string(),
   status: z.object({ type: z.string() }),
@@ -561,7 +573,7 @@ export type ControlPlaneSandboxPeer = SharedWorktreeChangesPeer & {
     payload: ControlPlaneCancelWorkspacePayload
   ): Promise<ControlPlaneCancelWorkspaceResult>;
   answer(payload: ControlPlaneAnswerPayload): Promise<ControlPlaneDispatchResult>;
-  release(payload: ControlPlaneSessionRefPayload): Promise<void>;
+  release(payload: ControlPlaneReleasePayload): Promise<void>;
   /** H4: the Sandbox DO returns the connected allocation fence for a bound handle. */
   getRuntimeCredentialProxyFence(input: {
     ownerId: string;
@@ -899,6 +911,17 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       resolveTarget: (sandboxId, scope) => this.previewTargetFor(sandboxId, scope),
     });
     this.initialized = ctx.blockConcurrencyWhile(() => this.initializeStorage());
+  }
+
+  [readSentryIdentity]() {
+    if (!this.metadata) return undefined;
+    const { userId, orgId, sessionId } = this.metadata.identity;
+    return {
+      userId,
+      orgId: orgId ?? '(personal)',
+      sessionId,
+      sandboxId: this.metadata.workspace?.sandboxId,
+    };
   }
 
   private async terminalRequest(
@@ -1676,28 +1699,28 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           const sandboxId = metadata?.workspace?.sandboxId;
           const directory = this.registration?.spec.directory ?? metadata?.workspace?.workspacePath;
           if (!metadata || !kiloSessionId || !sandboxId || !directory) return null;
-          const peer = this.sandboxPeerFor(sandboxId);
-          if (peer === null) {
-            localScopeView = undefined;
-            return null;
-          }
-          const resolution = await peer.getRuntimeCredentialProxyFence({
-            ownerId: metadata.identity.userId,
-            sessionId: metadata.identity.sessionId,
-            kiloSessionId,
-            directory,
-            handle,
+          const result = await readRuntimeProxyFence({
+            getPeer: () => this.sandboxPeerFor(sandboxId),
+            request: {
+              ownerId: metadata.identity.userId,
+              sessionId: metadata.identity.sessionId,
+              kiloSessionId,
+              directory,
+              handle,
+            },
+            correlation: { sessionId: metadata.identity.sessionId, kiloSessionId, sandboxId },
           });
-          if (resolution?.scopeViewUnavailable !== undefined) {
-            localScopeView = undefined;
-            throw new Error(resolution.scopeViewUnavailable);
-          }
-          localScopeView = resolution?.scopeView;
-          return resolution;
+          localScopeView = result?.scopeView;
+          return result?.fence ?? null;
         },
-        token: () => this.getRuntimeToken(),
+        token: (secret, beforeRenew) => this.getStoredRuntimeToken(secret, beforeRenew),
       });
     } catch (error) {
+      const fenceOutcome = classifyRuntimeProxyFenceError(error);
+      // A stale accepted handle is a 401 denial; never serve the scope view or
+      // fall back. A fence transport failure rethrows the retryable 503.
+      if (fenceOutcome === 'deny') return null;
+      if (fenceOutcome === 'retry') throw error;
       // A revoked/expired authorization threw. Fall through to scope resolution
       // so a surviving member can still serve; if none can, the original outcome
       // (a 503) is preserved below.
@@ -1776,11 +1799,16 @@ export class SandboxSessionV2 extends DurableObject<Env> {
 
   /** C1c model preflight: renew and return the backing runtime token. */
   async getRuntimeToken(): Promise<string | null> {
-    const metadata = await this.getMetadata();
     const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
     if (!secret) throw new Error('NEXTAUTH_SECRET is not configured on the worker');
+    return this.getStoredRuntimeToken(secret);
+  }
+
+  private async getStoredRuntimeToken(secret: string, beforeRenew?: () => Promise<boolean>) {
+    const metadata = await this.getMetadata();
     return renewStoredRuntimeAuthorization({
       metadata,
+      beforeRenew,
       getAuthorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
       putAuthorization: authorization =>
         this.ctx.storage.put(RUNTIME_AUTHORIZATION_KEY, authorization),
@@ -2645,6 +2673,32 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     });
   }
 
+  async onWorkspaceArtifactsChanged(notification: WorkspaceArtifactsChanged): Promise<void> {
+    await this.initialized;
+    const parsed = workspaceArtifactsChangedSchema.parse(notification);
+    return this.enqueue(async () => {
+      const payload = JSON.stringify({ revision: parsed.revision });
+      const timestamp = Date.now();
+      const id = this.eventQueries.insertUnique({
+        executionId: '',
+        sessionId: this.sessionId,
+        streamEventType: WORKSPACE_ARTIFACTS_CHANGED_EVENT,
+        payload,
+        timestamp,
+        entityId: `workspace-artifacts/${parsed.revision}`,
+      });
+      if (id === null) return;
+      this.broadcast({
+        id,
+        execution_id: '',
+        session_id: this.sessionId,
+        stream_event_type: WORKSPACE_ARTIFACTS_CHANGED_EVENT,
+        payload,
+        timestamp,
+      });
+    });
+  }
+
   async getWorktreeChanges(): Promise<GetWorktreeChangesOutput> {
     await this.initialized;
     return this.worktreeChanges.get();
@@ -3292,9 +3346,16 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.enqueue(async () => {
       const peer = this.sandboxPeer();
       if (peer !== null) {
+        const standalone =
+          this.metadata !== null && this.metadata.workspace?.worktreeId === undefined;
         await withDORetry(
           () => peer,
-          current => current.release({ sessionId: this.sessionId }),
+          current =>
+            current.release(
+              standalone
+                ? { sessionId: this.sessionId, reason: 'standalone_session_deleted' }
+                : { sessionId: this.sessionId }
+            ),
           'release'
         );
       }
@@ -3730,6 +3791,23 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
     const route = persistedRouteView(view, previous);
     await this.persistRoute(route);
+    if (
+      (route.state === 'ready' || route.state === 'failed') &&
+      previousAttemptId !== route.attemptId &&
+      readPreparationAttempt(this.eventQueries, route.attemptId) === null
+    ) {
+      const trigger = oldestOpenMessage(this.messages, 'queued');
+      if (trigger !== undefined) {
+        this.logStartupFinished(
+          route.attemptId,
+          route.state === 'ready'
+            ? { status: 'completed' }
+            : { status: 'failed', safeError: route.reason },
+          Date.now(),
+          trigger.createdAt
+        );
+      }
+    }
     if (route.state === 'preparing' || route.state === 'reconnecting') {
       await this.clearTransportRecovery();
     }
@@ -4268,12 +4346,53 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   /** Close one route attempt's open row by persisted identity, never by a scan. */
   private finalizeAttempt(attemptId: string, outcome: PreparationOutcome): void {
     this.preparationRecorders.delete(attemptId);
-    for (const event of finalizePreparationAttempt(this.eventQueries, attemptId, {
+    const attempt = readPreparationAttempt(this.eventQueries, attemptId);
+    const timestamp = Date.now();
+    const events = finalizePreparationAttempt(this.eventQueries, attemptId, {
       ...outcome,
-      timestamp: Date.now(),
-    })) {
-      this.broadcast(event);
+      timestamp,
+    });
+    if (events.length > 0 && attempt !== null) {
+      const trigger = this.messages.find(message => message.messageId === attempt.triggerMessageId);
+      this.logStartupFinished(attemptId, outcome, timestamp, trigger?.createdAt, attempt.startedAt);
     }
+    for (const event of events) this.broadcast(event);
+  }
+
+  private logStartupFinished(
+    attemptId: string,
+    outcome: PreparationOutcome,
+    timestamp: number,
+    admittedAt: number | undefined,
+    preparationStartedAt?: number
+  ): void {
+    const container =
+      this.route.state !== 'unknown' && this.route.attemptId === attemptId
+        ? this.route.container
+        : undefined;
+    const reason = outcome.status === 'failed' ? outcome.safeError : undefined;
+    logControlDiagnostic('session_startup_finished', {
+      sessionId: this.sessionId,
+      sandboxId: this.registration?.sandboxId,
+      allocationId: container?.allocationId,
+      attemptId,
+      provider: container?.provider ?? this.registration?.sandboxSelection?.provider,
+      startSource: container?.startSource,
+      outcome:
+        outcome.status === 'completed'
+          ? 'ready'
+          : reason === 'preparation_cancelled'
+            ? 'cancelled'
+            : reason === 'preparation_timeout'
+              ? 'timeout'
+              : 'failed',
+      reason: reason === 'Preparation did not complete' ? 'preparation_incomplete' : reason,
+      durationMs: admittedAt === undefined ? undefined : Math.max(0, timestamp - admittedAt),
+      preparationMs:
+        preparationStartedAt === undefined
+          ? undefined
+          : Math.max(0, timestamp - preparationStartedAt),
+    });
   }
 
   /** The route attempt a notification must name (the route-view fence). */

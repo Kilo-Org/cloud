@@ -12,7 +12,6 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
     }
   },
@@ -36,14 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "Încălcare SLA"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "O verificare de securitate are o actualizare"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "Sesiunea ta Kilo este gata să fie controlată de pe telefon"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

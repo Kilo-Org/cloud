@@ -1,10 +1,12 @@
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
+import { sheetUnderHandlePaddingClass } from '@/components/sheet-header';
 import { Button } from '@/components/ui/button';
 import { X } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { cn } from '@/lib/utils';
 
 /**
  * A half-detent sheet's title bar: the title, and the close control that every
@@ -16,6 +18,10 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
  * The title stays a header, and the close control keeps the shared 48dp icon
  * target the `icon` button size renders, labelled with the shared `common.close`
  * copy so every catalog announces it in the reader's language.
+ *
+ * Every sheet that uses it presents the native drag handle, whose own padding
+ * already leaves the room above the row: the row takes the under-handle pair
+ * instead of its own top padding, and its caller does not add a `pt-*` above it.
  */
 export function SheetTitleRow({
   title,
@@ -25,7 +31,12 @@ export function SheetTitleRow({
   const colors = useThemeColors();
 
   return (
-    <View className="min-h-11 flex-row items-center gap-x-2 px-5 pb-2">
+    <View
+      className={cn(
+        'min-h-11 flex-row items-center gap-x-2 px-5',
+        sheetUnderHandlePaddingClass('row')
+      )}
+    >
       <Text accessibilityRole="header" className="min-w-0 flex-1 text-base font-semibold">
         {title}
       </Text>

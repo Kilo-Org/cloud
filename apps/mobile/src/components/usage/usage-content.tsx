@@ -38,6 +38,22 @@ const METRIC_OPTIONS = [
   { value: 'tokens', labelKey: 'codeReviewer.reviewDetail.tokens' },
 ] as const;
 
+/**
+ * One tile of the totals grid: a value, its caption directly under it, then the
+ * optional detail below the caption, each pair one small gap apart.
+ *
+ * The content is top-aligned, so every tile of a row starts its value at the
+ * same padding as the row above, and spare height falls below the content
+ * instead of pushing the value and caption down.
+ *
+ * The detail holds a two-line floor, never a cap, so a detail that needs more
+ * lines still grows the tile, and every locale whose detail fits two lines
+ * loads at one height that its loading skeleton matches. A one-line detail
+ * starts at the top of that floor, so the caption keeps the same small gap
+ * whether the detail is short or long, and its spare line falls below.
+ *
+ * A larger font scale grows the tile with its text.
+ */
 function StatTile({
   label,
   value,
@@ -50,12 +66,12 @@ function StatTile({
   return (
     <View className="flex-1 gap-1 rounded-lg bg-secondary px-3 py-3">
       <Text className="text-lg font-bold text-foreground">{value}</Text>
-      {subtext !== undefined && (
-        <Text className="text-xs text-muted-foreground" numberOfLines={1}>
-          {subtext}
-        </Text>
-      )}
       <Text className="text-xs text-muted-foreground">{label}</Text>
+      {subtext !== undefined && (
+        <View className="min-h-[28px]">
+          <Text className="text-xs text-muted-foreground">{subtext}</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -115,6 +131,10 @@ export function UsageContent({ scope }: Readonly<{ scope: UsageScope }>) {
       {summaryErrorView !== null && (
         <QueryError
           variant={summaryErrorView.variant}
+          title={summaryErrorView.name === 'unavailable' ? t('usage.unavailableTitle') : undefined}
+          message={
+            summaryErrorView.name === 'unavailable' ? t('usage.unavailableDescription') : undefined
+          }
           onRetry={summaryErrorView.showRetry ? retryAll : undefined}
           isRetrying={usage.isFetching}
           placement="top"
@@ -125,12 +145,12 @@ export function UsageContent({ scope }: Readonly<{ scope: UsageScope }>) {
         <View className="gap-6">
           <View className="gap-3">
             <View className="flex-row gap-3">
-              <Skeleton className="h-[76px] flex-1 rounded-lg bg-muted-soft" />
-              <Skeleton className="h-[76px] flex-1 rounded-lg bg-muted-soft" />
+              <Skeleton className="h-[63px] flex-1 rounded-lg bg-muted-soft" />
+              <Skeleton className="h-[63px] flex-1 rounded-lg bg-muted-soft" />
             </View>
             <View className="flex-row gap-3">
-              <Skeleton className="h-[76px] flex-1 rounded-lg bg-muted-soft" />
-              <Skeleton className="h-[76px] flex-1 rounded-lg bg-muted-soft" />
+              <Skeleton className="h-[95px] flex-1 rounded-lg bg-muted-soft" />
+              <Skeleton className="h-[95px] flex-1 rounded-lg bg-muted-soft" />
             </View>
           </View>
           <Skeleton className="h-[148px] w-full rounded-lg bg-muted-soft" />
@@ -191,6 +211,14 @@ export function UsageContent({ scope }: Readonly<{ scope: UsageScope }>) {
             {seriesErrorView !== null ? (
               <QueryError
                 variant={seriesErrorView.variant}
+                title={
+                  seriesErrorView.name === 'unavailable' ? t('usage.unavailableTitle') : undefined
+                }
+                message={
+                  seriesErrorView.name === 'unavailable'
+                    ? t('usage.unavailableDescription')
+                    : undefined
+                }
                 onRetry={seriesErrorView.showRetry ? retryAll : undefined}
                 isRetrying={usage.isFetching}
               />
@@ -205,6 +233,14 @@ export function UsageContent({ scope }: Readonly<{ scope: UsageScope }>) {
           {breakdownErrorView !== null ? (
             <QueryError
               variant={breakdownErrorView.variant}
+              title={
+                breakdownErrorView.name === 'unavailable' ? t('usage.unavailableTitle') : undefined
+              }
+              message={
+                breakdownErrorView.name === 'unavailable'
+                  ? t('usage.unavailableDescription')
+                  : undefined
+              }
               onRetry={breakdownErrorView.showRetry ? retryAll : undefined}
               isRetrying={usage.isFetching}
             />

@@ -43,10 +43,12 @@ function emptyQueryResult(): Record<string, unknown> {
 
 vi.mock('react-native', () => ({ Platform: { OS: 'ios' } }));
 
-// The hook reads `useRouter` to open the Bitbucket connect sheet; the real
-// module's expo-runtime import cannot load in the pure project.
+// The hook pushes the Bitbucket connect sheet through `useSinglePushRoute`,
+// which reads `useRouter` and resets its guard on focus; the real module's
+// expo-runtime import cannot load in the pure project.
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: mocks.routerPush }),
+  useFocusEffect: () => undefined,
 }));
 
 vi.mock('sonner-native', () => ({ toast: { error: mocks.toastError } }));
@@ -89,9 +91,8 @@ vi.mock('@/lib/hooks/use-agent-sessions', () => ({
   useRecentAgentRepositories: () => ({ data: undefined }),
 }));
 
-vi.mock('@/lib/integration-urls', () => ({
-  getGitLabIntegrationUrl: vi.fn(() => 'gitlab-url'),
-  getBitbucketIntegrationUrl: vi.fn(() => 'bitbucket-url'),
+vi.mock('@/lib/app-shell-handoff', () => ({
+  appShellHandoffUrl: vi.fn(() => Promise.resolve('gitlab-handoff-url')),
 }));
 
 vi.mock('@/lib/pr-review/connect-gate-platform', () => ({
@@ -485,7 +486,7 @@ describe('useNewSessionRepos connect busy state', () => {
     expect(requireResult(resultRef).connectingProvider).toBeNull();
   });
 
-  it('reports a GitLab flow, which opens the browser without a mint first', async () => {
+  it('reports a GitLab flow, which mints the shell hand-off before opening the browser', async () => {
     const pending = deferred();
     mocks.openAuthorization.mockImplementation(async () => pending.promise);
     const resultRef = mountRepos('org-1');
@@ -494,12 +495,12 @@ describe('useNewSessionRepos connect busy state', () => {
       requireResult(resultRef).openIntegration('gitlab');
     });
     expect(requireResult(resultRef).connectingProvider).toBe('gitlab');
-    expect(mocks.openAuthorization).toHaveBeenCalledWith('gitlab-url');
 
     await act(async () => {
       pending.resolve();
       await pending.promise;
     });
+    expect(mocks.openAuthorization).toHaveBeenCalledWith('gitlab-handoff-url');
     expect(requireResult(resultRef).connectingProvider).toBeNull();
   });
 
@@ -518,6 +519,21 @@ describe('useNewSessionRepos connect busy state', () => {
     });
     expect(mocks.openAuthorization).not.toHaveBeenCalled();
     expect(requireResult(resultRef).connectingProvider).toBeNull();
+  });
+
+  it('opens the Bitbucket connect sheet once for a double tap', () => {
+    const resultRef = mountRepos('org-1');
+
+    act(() => {
+      requireResult(resultRef).openIntegration('bitbucket');
+      requireResult(resultRef).openIntegration('bitbucket');
+    });
+
+    expect(mocks.routerPush).toHaveBeenCalledTimes(1);
+    expect(mocks.routerPush).toHaveBeenCalledWith({
+      pathname: '/(app)/bitbucket-connect',
+      params: { scope: 'org-1' },
+    });
   });
 
   it('ignores a second tap while a connect flow runs', () => {

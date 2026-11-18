@@ -12,7 +12,6 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
     }
   },
@@ -36,14 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA-overschrijding"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "Een beveiligingscontrole heeft een update"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "Je Kilo-sessie is klaar om vanaf je telefoon te bedienen"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

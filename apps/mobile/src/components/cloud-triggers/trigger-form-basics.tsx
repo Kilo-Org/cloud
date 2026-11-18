@@ -12,9 +12,10 @@ import { View } from 'react-native';
 
 import { RepoPickerSheet } from '@/components/profiles/repo-picker-sheet';
 import { FormField } from '@/components/ui/form-field';
+import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
-import { triggerProblemMessage } from '@/lib/cloud-triggers/trigger-problem-copy';
+import { triggerProblemText } from '@/lib/cloud-triggers/trigger-problem-copy';
 import { TRIGGER_FIELD_EXAMPLES } from '@/lib/cloud-triggers/trigger-field-examples';
 import {
   defaultPrompt,
@@ -22,7 +23,9 @@ import {
   type TriggerDraft,
   type TriggerDraftProblems,
 } from '@/lib/cloud-triggers/trigger-draft';
+import { useTouchedProblems } from '@/lib/cloud-triggers/use-touched-problems';
 import { useTriggerRepositories } from '@/lib/cloud-triggers/use-trigger-options';
+import { ltrValueTextStyle } from '@/lib/rtl-text';
 
 import { TriggerSelectRow } from './trigger-form-rows';
 
@@ -53,7 +56,7 @@ export function TriggerFormBasics({
   const { t } = useTranslation();
   const repositories = useTriggerRepositories(organizationId, repositoryPickerOpen);
   const isScheduled = draft.activation === 'scheduled';
-  const nameError = problems.name === undefined ? undefined : triggerProblemMessage(problems.name);
+  const { markTouched, shownProblem } = useTouchedProblems(problems);
   const activate = (activation: TriggerActivation) => {
     // A prompt still on the other activation's default follows the choice, so a
     // scheduled trigger does not start out describing a webhook body.
@@ -74,7 +77,10 @@ export function TriggerFormBasics({
           onChangeText={name => {
             onDraftChange({ ...draft, name });
           }}
-          error={nameError}
+          error={triggerProblemText(shownProblem('name'))}
+          onBlur={() => {
+            markTouched('name');
+          }}
           autoCapitalize="none"
           autoCorrect={false}
           spellCheck={false}
@@ -82,9 +88,7 @@ export function TriggerFormBasics({
         />
       ) : (
         <View className="gap-1">
-          <Text className="text-sm text-muted-foreground">
-            {t('cloudAgent.triggers.fieldName')}
-          </Text>
+          <FormFieldLabel label={t('cloudAgent.triggers.fieldName')} />
           <Text variant="mono">{draft.name}</Text>
           <Text variant="muted" className="text-xs">
             {t('cloudAgent.triggers.nameLocked')}
@@ -92,11 +96,9 @@ export function TriggerFormBasics({
         </View>
       )}
 
-      <View className="gap-2">
-        <Text className="text-sm text-muted-foreground">
-          {t('cloudAgent.triggers.fieldActivation')}
-        </Text>
-        {mode === 'create' ? (
+      {mode === 'create' ? (
+        <View className="gap-2">
+          <FormFieldLabel label={t('cloudAgent.triggers.fieldActivation')} />
           <SegmentedControl
             options={ACTIVATION_OPTIONS.map(option => ({
               value: option.value,
@@ -106,15 +108,21 @@ export function TriggerFormBasics({
             onChange={activate}
             accessibilityLabel={t('cloudAgent.triggers.fieldActivation')}
           />
-        ) : (
+        </View>
+      ) : (
+        <View className="gap-1">
+          <FormFieldLabel label={t('cloudAgent.triggers.fieldActivation')} />
           <Text>
             {isScheduled ? t('common.scheduled') : t('cloudAgent.triggers.activationWebhook')}
           </Text>
-        )}
-      </View>
+        </View>
+      )}
 
       {isScheduled && (
         <View className="gap-4">
+          {/* A cron expression is a value that reads left to right, so the
+              field pins its own base direction; without it the bidi algorithm
+              reorders `0 3 * * *` under a right-to-left interface. */}
           <FormField
             label={t('cloudAgent.triggers.fieldCron')}
             required
@@ -122,11 +130,15 @@ export function TriggerFormBasics({
             onChangeText={cron => {
               onDraftChange({ ...draft, cron });
             }}
-            error={problems.cron === undefined ? undefined : triggerProblemMessage(problems.cron)}
+            error={triggerProblemText(shownProblem('cron'))}
+            onBlur={() => {
+              markTouched('cron');
+            }}
             autoCapitalize="none"
             autoCorrect={false}
             spellCheck={false}
             placeholder={TRIGGER_FIELD_EXAMPLES.cron}
+            style={ltrValueTextStyle()}
           />
           <Text variant="muted" className="text-xs">
             {t('cloudAgent.triggers.fieldCronHelp')}
@@ -156,13 +168,10 @@ export function TriggerFormBasics({
                   : draft.repository
               }
               onPress={() => {
+                markTouched('repository');
                 onRepositoryPickerOpenChange(true);
               }}
-              error={
-                problems.repository === undefined
-                  ? undefined
-                  : triggerProblemMessage(problems.repository)
-              }
+              error={triggerProblemText(shownProblem('repository'))}
             />
             <Text variant="muted" className="text-xs">
               {t('cloudAgent.triggers.repositoryLocked')}
@@ -170,7 +179,7 @@ export function TriggerFormBasics({
           </>
         ) : (
           <>
-            <Text className="text-sm text-muted-foreground">{t('common.repository')}</Text>
+            <FormFieldLabel label={t('common.repository')} />
             <Text variant="mono">{draft.repository}</Text>
             <Text variant="muted" className="text-xs">
               {t('cloudAgent.triggers.repositoryLocked')}

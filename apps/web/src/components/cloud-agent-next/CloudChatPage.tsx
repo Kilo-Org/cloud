@@ -15,7 +15,7 @@ import dynamic from 'next/dynamic';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
 import { toast } from 'sonner';
-import { ArrowDown, MessageSquare } from 'lucide-react';
+import { ArrowDown, MessageSquare, RotateCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -78,6 +78,7 @@ import { WorkspaceSnapshotRecovery } from './WorkspaceSnapshotRecovery';
 import { EnvironmentBuildRecovery } from './EnvironmentBuildRecovery';
 import { environmentBuildRecoveryOffered } from './environment-build-recovery';
 import { workspaceSnapshotRecoveryOffered } from './workspace-snapshot-recovery';
+import { failedMessageRetryTarget, type FailedMessageRetryTarget } from './failed-message-retry';
 import { QuestionToolCard } from './QuestionToolCard';
 import { QuestionContextProvider } from './QuestionContext';
 import { PermissionCard, PermissionContextProvider } from './PermissionCard';
@@ -91,8 +92,8 @@ import { resolveTranscriptPhase, transcriptReadyForEffects } from './transcript-
 import { billingPayerPresentation } from './billing-payer-presentation';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { CloudAgentWorkspaceTabs } from './CloudAgentWorkspaceTabs';
-import { PreviewPortDialog } from './PreviewPortDialog';
 import { WorktreeChangesView } from './WorktreeChanges';
+import { WorkspaceArtifactsView } from './WorkspaceArtifacts';
 import { commitsByMessageAnchor, isCommitSummaryRepresented } from './message-presentation';
 import { WorktreeReviewDialog } from './WorktreeReviewDialog';
 import { useWorktreeReview } from './useWorktreeReview';
@@ -267,11 +268,19 @@ export default function CloudChatPage({
   const [changesViewScope, setChangesViewScope] = useState<string | null>(null);
   const changesViewFocusTargetRef = useRef<HTMLElement | null>(null);
   const changesViewOpenedTabRef = useRef<WorkspaceTabId | null>(null);
+  const [artifactsViewScope, setArtifactsViewScope] = useState<string | null>(null);
+  const artifactsViewFocusTargetRef = useRef<HTMLElement | null>(null);
+  const artifactsViewOpenedTabRef = useRef<WorkspaceTabId | null>(null);
   const activeWorkspaceTabRef = useRef<HTMLButtonElement | null>(null);
   const closeChangesView = useCallback(() => {
     changesViewOpenedTabRef.current = null;
     changesViewFocusTargetRef.current = null;
     setChangesViewScope(null);
+  }, []);
+  const closeArtifactsView = useCallback(() => {
+    artifactsViewOpenedTabRef.current = null;
+    artifactsViewFocusTargetRef.current = null;
+    setArtifactsViewScope(null);
   }, []);
 
   const sessionIdFromParams = searchParams?.get('sessionId') ?? null;
@@ -289,7 +298,8 @@ export default function CloudChatPage({
     preparationDrawerFocusTargetRef.current = null;
     setPreparationDrawerAttemptId(null);
     closeChangesView();
-  }, [sessionIdFromParams, closeChangesView]);
+    closeArtifactsView();
+  }, [sessionIdFromParams, closeChangesView, closeArtifactsView]);
 
   const isStreaming = useAtomValue(manager.atoms.isStreaming);
   const isLoading = useAtomValue(manager.atoms.isLoading);
@@ -513,6 +523,8 @@ export default function CloudChatPage({
     Boolean(currentUserId) && canOpenWorktreeChanges(changesCloudSessionId, isReadOnly);
   const fileScope = JSON.stringify([currentUserId, organizationId, workspaceTabScope]);
   const changesViewOpen = canOpenChanges && changesViewScope === fileScope;
+  const canOpenArtifacts = canOpenChanges;
+  const artifactsViewOpen = canOpenArtifacts && artifactsViewScope === fileScope;
   const [resolvedFileScope, setResolvedFileScope] = useState(fileScope);
   const filesVisible = canOpenChanges && resolvedFileScope === fileScope;
   // Commits come from the loaded chat, so they follow its own access, not the workspace's.
@@ -594,13 +606,20 @@ export default function CloudChatPage({
 
   useEffect(() => {
     closeChangesView();
-  }, [fileScope, canOpenChanges, closeChangesView]);
+    closeArtifactsView();
+  }, [fileScope, canOpenChanges, closeChangesView, closeArtifactsView]);
 
   useEffect(() => {
     const openedTab = changesViewOpenedTabRef.current;
     if (!changesViewOpen || openedTab === null || activeWorkspaceTabId === openedTab) return;
     closeChangesView();
   }, [activeWorkspaceTabId, changesViewOpen, closeChangesView]);
+
+  useEffect(() => {
+    const openedTab = artifactsViewOpenedTabRef.current;
+    if (!artifactsViewOpen || openedTab === null || activeWorkspaceTabId === openedTab) return;
+    closeArtifactsView();
+  }, [activeWorkspaceTabId, artifactsViewOpen, closeArtifactsView]);
 
   const previousChangesViewOpenRef = useRef(false);
   useEffect(() => {
@@ -614,6 +633,7 @@ export default function CloudChatPage({
 
   const [modelCatalogRequested, setModelCatalogRequested] = useState(false);
   const requestModelCatalog = useCallback(() => setModelCatalogRequested(true), []);
+
   const sessionModels = useSessionModels({
     activeSessionType,
     remoteModelState,
@@ -655,7 +675,7 @@ export default function CloudChatPage({
   );
   const { availableCommands } = useSlashCommandSets();
 
-  const { play: playCelebrationSound, soundEnabled, setSoundEnabled } = useCelebrationSound();
+  const { play: playCelebrationSound } = useCelebrationSound();
   const { collapseTools } = useCollapseToolsPreference();
 
   const prevActivityRef = useRef<string | null>(null);
@@ -737,7 +757,7 @@ export default function CloudChatPage({
   }, [canCreateWorktreeChat, createWorktreeChat, newChatComposer, sessionIdFromParams]);
 
   const handleSendMessage = useCallback(
-    async (prompt: string, attachments?: CloudAgentAttachments) => {
+    async (prompt: string, attachments?: CloudAgentAttachments, onOptimisticSend?: () => void) => {
       // Sending takes the position over only once the send is accepted: end a
       // resume that is still looking for its anchor, or its effect re-pauses
       // follow and cancels this scroll when the message lands. A rejected send
@@ -757,6 +777,7 @@ export default function CloudChatPage({
           variant: selection.variant,
         },
         attachments: supportsAttachments ? attachments : undefined,
+        onOptimisticSend,
       });
       // Pins the tail when the list already follows. While a resume has the
       // follow off this is a no-op, so a refused send never moves the reader
@@ -785,6 +806,29 @@ export default function CloudChatPage({
       captureSendPosition,
       followAcceptedSend,
     ]
+  );
+
+  const handleRetryFailedMessage = useCallback(
+    async (target: FailedMessageRetryTarget) => {
+      // Captured before the await: the user can switch chats while the re-send
+      // is in flight, and the resolution belongs to the chat that owns the row.
+      const ownerSessionId = fetchedSessionData?.kiloSessionId;
+      if (!ownerSessionId) return;
+      let accepted = false;
+      try {
+        // The re-send is a new user turn with its own optimistic row. Hide the
+        // failed row in the same tap, or the prompt shows twice for the whole
+        // round-trip. Once accepted, the failed row and its error are resolved.
+        accepted = await handleSendMessage(target.prompt, undefined, () =>
+          manager.markMessageSuperseded(target.messageId, ownerSessionId)
+        );
+        if (accepted) manager.clearFailedMessage(target.messageId, ownerSessionId);
+      } finally {
+        // A rejected re-send delivered nothing: show the failed row and its Retry again.
+        if (!accepted) manager.unmarkMessageSuperseded(target.messageId, ownerSessionId);
+      }
+    },
+    [fetchedSessionData?.kiloSessionId, handleSendMessage, manager]
   );
 
   const handleSendSlashCommand = useCallback(
@@ -836,10 +880,6 @@ export default function CloudChatPage({
   const handleStopExecution = useCallback(() => {
     void manager.interrupt();
   }, [manager]);
-
-  const handleToggleSound = useCallback(() => {
-    setSoundEnabled(prev => !prev);
-  }, [setSoundEnabled]);
 
   const fetchRouteReady = useCallback(
     async (kiloSessionId: string): Promise<boolean | undefined> => {
@@ -961,10 +1001,11 @@ export default function CloudChatPage({
   const handleReviewAccepted = useCallback(
     (destinationKiloSessionId: string) => {
       closeChangesView();
+      closeArtifactsView();
       setWorkspaceTabs(state => selectWorkspaceTab(state, CHAT_TAB_ID));
       openSession(destinationKiloSessionId);
     },
-    [closeChangesView, openSession, setWorkspaceTabs]
+    [closeArtifactsView, closeChangesView, openSession, setWorkspaceTabs]
   );
   const review = useWorktreeReview({
     userId: currentUserId,
@@ -1023,6 +1064,7 @@ export default function CloudChatPage({
     review.setOpen(false);
     if (source.sessionId === sessionIdFromParams && canOpenChanges) {
       closeChangesView();
+      closeArtifactsView();
       setWorkspaceTabs(state =>
         setFileTabMode(
           openFileTab(state, comment.anchor.path, comment.anchor.capture.scope),
@@ -1168,9 +1210,10 @@ export default function CloudChatPage({
       preparationDrawerFocusTargetRef.current = null;
       setPreparationDrawerAttemptId(null);
       closeChangesView();
+      closeArtifactsView();
       setChildSessionStack([entry]);
     },
-    [closeChangesView]
+    [closeArtifactsView, closeChangesView]
   );
 
   const handleOpenNestedChildSession = useCallback((entry: ChildSessionDrawerEntry) => {
@@ -1201,9 +1244,10 @@ export default function CloudChatPage({
       childSessionDrawerFocusTargetRef.current = null;
       setChildSessionStack([]);
       closeChangesView();
+      closeArtifactsView();
       setPreparationDrawerAttemptId(attemptId);
     },
-    [closeChangesView]
+    [closeArtifactsView, closeChangesView]
   );
 
   const handlePreparationDrawerOpenChange = useCallback((open: boolean) => {
@@ -1225,6 +1269,7 @@ export default function CloudChatPage({
       setChildSessionStack([]);
       preparationDrawerFocusTargetRef.current = null;
       setPreparationDrawerAttemptId(null);
+      closeArtifactsView();
       if (changesViewOpen) {
         changesViewOpenedTabRef.current = null;
         setChangesViewScope(null);
@@ -1233,8 +1278,41 @@ export default function CloudChatPage({
         setChangesViewScope(fileScope);
       }
     },
-    [activeWorkspaceTabId, changesViewOpen, fileScope]
+    [activeWorkspaceTabId, changesViewOpen, closeArtifactsView, fileScope]
   );
+
+  const handleToggleArtifacts = useCallback(
+    (event: MouseEvent<HTMLButtonElement>) => {
+      artifactsViewFocusTargetRef.current = event.currentTarget;
+      childSessionDrawerFocusTargetRef.current = null;
+      setChildSessionStack([]);
+      preparationDrawerFocusTargetRef.current = null;
+      setPreparationDrawerAttemptId(null);
+      closeChangesView();
+      if (artifactsViewOpen) {
+        artifactsViewOpenedTabRef.current = null;
+        setArtifactsViewScope(null);
+      } else {
+        artifactsViewOpenedTabRef.current = activeWorkspaceTabId;
+        setArtifactsViewScope(fileScope);
+      }
+    },
+    [activeWorkspaceTabId, artifactsViewOpen, closeChangesView, fileScope]
+  );
+
+  const handleArtifactsDrawerOpenChange = useCallback((open: boolean) => {
+    if (open) return;
+    artifactsViewOpenedTabRef.current = null;
+    setArtifactsViewScope(null);
+  }, []);
+
+  const handleArtifactsDrawerCloseAutoFocus = useCallback((event: Event) => {
+    const focusTarget = artifactsViewFocusTargetRef.current;
+    artifactsViewFocusTargetRef.current = null;
+    if (!focusTarget?.isConnected) return;
+    event.preventDefault();
+    focusTarget.focus();
+  }, []);
 
   const runtimeCustomOptions: CustomModeOption[] = (composerSettings?.runtimeAgents ?? []).map(
     a => ({
@@ -1409,10 +1487,26 @@ export default function CloudChatPage({
       billingFailure,
     },
   });
-  const shownMessages = useMemo(
-    () => [...shownTranscript.staticMessages, ...shownTranscript.dynamicMessages],
-    [shownTranscript.staticMessages, shownTranscript.dynamicMessages]
-  );
+  // A failed row that a Retry re-sent stays hidden while the re-send is in
+  // flight and after it is accepted, also across a chat switch and a relaunch.
+  const resolvedDeliveryFailures = useAtomValue(manager.atoms.resolvedDeliveryFailures);
+  const supersededInFlightMessageIds = useAtomValue(manager.atoms.supersededInFlightMessageIds);
+  const shownMessages = useMemo(() => {
+    const messages = [...shownTranscript.staticMessages, ...shownTranscript.dynamicMessages];
+    if (resolvedDeliveryFailures.size === 0 && supersededInFlightMessageIds.size === 0) {
+      return messages;
+    }
+    return messages.filter(
+      message =>
+        !resolvedDeliveryFailures.has(message.info.id) &&
+        !supersededInFlightMessageIds.has(message.info.id)
+    );
+  }, [
+    shownTranscript.staticMessages,
+    shownTranscript.dynamicMessages,
+    resolvedDeliveryFailures,
+    supersededInFlightMessageIds,
+  ]);
   const currentChatProgress =
     statusIndicator?.type === 'progress' && isCurrentSession && sessionIdFromParams
       ? { sessionId: sessionIdFromParams, message: statusIndicator.message }
@@ -1421,6 +1515,10 @@ export default function CloudChatPage({
   const sessionErrorMessage =
     transcriptPhase !== 'opening' && !billingFailure && statusIndicator?.type === 'error'
       ? readableSessionError(statusIndicator.message)
+      : null;
+  const failedMessageRetry =
+    sessionErrorMessage !== null && !isReadOnly && canSend
+      ? failedMessageRetryTarget(shownMessages, shownTranscript.pendingMessages)
       : null;
   const failedPreparationAttemptId =
     cloudStatus?.type === 'error'
@@ -1458,7 +1556,11 @@ export default function CloudChatPage({
     sessionIdFromParams,
     transcriptPhase === 'local' ||
       (isCurrentSession && !isLoading && transcriptPhase !== 'opening'),
-    isReadOnly || Boolean(activeQuestion || activePermission) || !chatTabActive || changesViewOpen,
+    isReadOnly ||
+      Boolean(activeQuestion || activePermission) ||
+      !chatTabActive ||
+      changesViewOpen ||
+      artifactsViewOpen,
     composerTextareaDisabled
   );
 
@@ -1522,10 +1624,11 @@ export default function CloudChatPage({
       sessionInfoOpen={sessionInfoOpen}
       onSessionInfoOpenChange={setSessionInfoOpen}
       sessionInfoTriggerRef={sessionInfoTriggerRef}
-      soundEnabled={soundEnabled}
-      onToggleSound={handleToggleSound}
+      preview={preview}
       changesOpen={changesViewOpen}
       onToggleChanges={canOpenChanges ? handleToggleChanges : undefined}
+      artifactsOpen={artifactsViewOpen}
+      onToggleArtifacts={canOpenArtifacts ? handleToggleArtifacts : undefined}
       sessionActive={
         !workspaceControlSession &&
         (isStreaming || activity.type === 'busy' || activity.type === 'retrying')
@@ -1689,12 +1792,13 @@ export default function CloudChatPage({
                             terminals={workspaceTabs.terminals}
                             terminalStatuses={terminalStatuses}
                             canCreateTerminal={canOpenTerminal}
-                            canOpenPreview={preview.links !== null}
                             onSelectTab={handleSelectWorkspaceTab}
                             onCreateTerminal={handleCreateTerminalTab}
-                            onOpenPreview={preview.openDialog}
                             onCloseTerminal={handleCloseTerminalTab}
-                            onActivateTab={closeChangesView}
+                            onActivateTab={() => {
+                              closeChangesView();
+                              closeArtifactsView();
+                            }}
                             selectionSuppressed={changesViewOpen}
                           />
                         )}
@@ -1703,17 +1807,8 @@ export default function CloudChatPage({
                         review={review}
                         onOpenComment={handleOpenReviewComment}
                       />
-                      {preview.dialog !== null && <PreviewPortDialog {...preview.dialog} />}
-                      {(sessionIdFromParams || workspaceControlSession) && (
-                        <div
-                          className={cn(
-                            // Reserve the late-loading Changes and sandbox controls, which are
-                            // touch-sized below `sm`, so they do not resize the header row.
-                            'ml-auto flex min-h-11 shrink-0 items-center justify-end sm:min-h-8',
-                            (sessionIdFromParams || selectedWorktreeId) &&
-                              'min-w-[188px] sm:min-w-0'
-                          )}
-                        >
+                      {(sessionIdFromParams || workspaceControlSession || preview.dialog) && (
+                        <div className="ml-auto flex min-h-8 shrink-0 items-center justify-end pointer-coarse:min-h-11">
                           {sessionActions}
                         </div>
                       )}
@@ -1724,7 +1819,11 @@ export default function CloudChatPage({
                       className="relative flex min-h-0 flex-1 flex-col"
                     >
                       <div
-                        inert={childSessionStack.length > 0 || preparationDrawerAttemptId !== null}
+                        inert={
+                          childSessionStack.length > 0 ||
+                          preparationDrawerAttemptId !== null ||
+                          artifactsViewOpen
+                        }
                         className={changesViewOpen ? 'hidden' : 'flex min-h-0 flex-1 flex-col'}
                       >
                         <TabsContent
@@ -1929,16 +2028,31 @@ export default function CloudChatPage({
                                       message={sessionErrorMessage}
                                       hint={
                                         workspaceSnapshotRecoveryState !== null
-                                          ? 'Start fresh to discard the snapshot, or send your message again to retry.'
+                                          ? failedMessageRetry !== null
+                                            ? 'Retry usually fixes this. Start fresh discards the snapshot.'
+                                            : 'Send your message again to retry. Start fresh discards the snapshot.'
                                           : environmentBuildRecoveryId !== null
                                             ? 'Send your message again once the environment snapshot is ready.'
                                             : undefined
                                       }
                                       actions={
+                                        failedMessageRetry !== null ||
                                         environmentBuildRecoveryId !== null ||
                                         workspaceSnapshotRecoveryState !== null ||
                                         failedPreparationAttemptId !== null ? (
                                           <>
+                                            {failedMessageRetry !== null && (
+                                              <Button
+                                                type="button"
+                                                size="sm"
+                                                onClick={() =>
+                                                  void handleRetryFailedMessage(failedMessageRetry)
+                                                }
+                                              >
+                                                <RotateCw className="size-4" />
+                                                Retry
+                                              </Button>
+                                            )}
                                             {environmentBuildRecoveryId !== null && (
                                               <EnvironmentBuildRecovery
                                                 environmentId={environmentBuildRecoveryId}
@@ -2047,6 +2161,7 @@ export default function CloudChatPage({
                                       organization: orgUploadUrl,
                                     },
                                   }}
+                                  favorites
                                 />
                                 <ComposerContextLine
                                   userId={currentUserId}
@@ -2139,6 +2254,19 @@ export default function CloudChatPage({
                 onCloseAutoFocus={handlePreparationDrawerCloseAutoFocus}
                 portalContainer={childSessionDrawerContainer}
               />
+              {canOpenArtifacts && changesCloudSessionId && (
+                <WorkspaceArtifactsView
+                  key={`workspace-artifacts:${fileScope}`}
+                  userId={currentUserId}
+                  cloudAgentSessionId={changesCloudSessionId}
+                  organizationId={organizationId}
+                  open={artifactsViewOpen}
+                  readOnly={isReadOnly}
+                  onOpenChange={handleArtifactsDrawerOpenChange}
+                  onCloseAutoFocus={handleArtifactsDrawerCloseAutoFocus}
+                  portalContainer={childSessionDrawerContainer}
+                />
+              )}
             </div>
           </ToolDetailScopeProvider>
         </SuggestionContextProvider>

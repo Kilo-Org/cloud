@@ -1382,3 +1382,93 @@ test('the ordered production path takes both workers out of the parallel matrix'
     'every other deployment path keeps both workers in the matrix'
   );
 });
+
+test('a Pages pin move deploys the output shell beside Pages', t => {
+  const detect = workers.jobs['detect-changes'];
+  const script = detect.steps.find(step => step.id === 'set-matrix').run;
+  const start = script.indexOf('CHANGED=()');
+  const end = script.indexOf('DEPLOY_CLOUD_AGENT_AFTER_SESSION_INGEST=false');
+  assert.ok(start >= 0 && end > start, 'the change loop must exist');
+  const loop = script.slice(start, end);
+
+  const directory = mkdtempSync(join(tmpdir(), 'pages-pin-detection-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const git = (...args) => execFileSync('git', args, { cwd: directory, encoding: 'utf8' }).trim();
+  const commit = (files, message) => {
+    for (const [file, contents] of Object.entries(files)) {
+      mkdirSync(join(directory, file, '..'), { recursive: true });
+      writeFileSync(join(directory, file), contents);
+    }
+    git('add', '.');
+    git('-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-qm', message);
+    return git('rev-parse', 'HEAD');
+  };
+  git('init', '-q');
+  const base = commit(
+    {
+      'services/pages/source.json': '{"tag":"pages-000000000000"}',
+      'services/pages/README.md': 'Pages',
+      'services/pages-output/wrangler.jsonc': '{}',
+    },
+    'base'
+  );
+
+  // Detection on `branch` against `base`. `narrow` stands for the workspace
+  // rule: what scripts/affected-workspaces.mjs selected. Without it the broad
+  // rule runs, as when that detection is unavailable.
+  const detected = (branch, narrow) => {
+    git('checkout', '-q', branch);
+    return execFileSync(
+      'bash',
+      [
+        '--noprofile',
+        '--norc',
+        '-eo',
+        'pipefail',
+        '-c',
+        [
+          'TARGET_ENVIRONMENT=production',
+          `BASE_SHA=${base}`,
+          'DEPLOYABLE=(services/pages services/pages-output)',
+          `NARROW=${narrow === undefined ? 'false' : 'true'}`,
+          'WORKSPACE_DIRS=$(printf "%s\\n" services/pages services/pages-output)',
+          `AFFECTED_DIRS=$(printf "%s\\n" ${(narrow ?? []).join(' ')})`,
+          'has_named_environment() { return 1; }',
+          loop,
+          'printf "%s\\n" "${CHANGED[@]}"',
+        ].join('\n'),
+      ],
+      { cwd: directory, encoding: 'utf8' }
+    )
+      .trim()
+      .split('\n')
+      .filter(Boolean);
+  };
+
+  git('checkout', '-q', '-b', 'pin', base);
+  commit({ 'services/pages/source.json': '{"tag":"pages-111111111111"}' }, 'pin');
+  const both = ['services/pages', 'services/pages-output'];
+  // The source.json rule selects the shell whatever the workspace rule says.
+  assert.deepEqual(
+    detected('pin'),
+    both,
+    'a pin move deploys the shell when workspace detection is unavailable'
+  );
+  assert.deepEqual(
+    detected('pin', ['services/pages']),
+    both,
+    'a pin move deploys the shell when the workspace rule selected only Pages'
+  );
+
+  // A change to the shared archive code reaches the shell through the
+  // workspace rule alone: the shell's build imports ../pages/scripts/, so
+  // affected-workspaces.mjs selects it as a reader of services/pages.
+  git('checkout', '-q', '-b', 'loader', base);
+  commit({ 'services/pages/scripts/pinned.mjs': 'export {};' }, 'loader');
+  assert.deepEqual(detected('loader', both), both, 'the workspace rule selects the reader');
+  assert.deepEqual(detected('loader', ['services/pages']), ['services/pages']);
+
+  git('checkout', '-q', '-b', 'docs', base);
+  commit({ 'services/pages/README.md': 'Pages, again' }, 'docs');
+  assert.deepEqual(detected('docs'), ['services/pages'], 'another Pages change leaves the shell');
+});

@@ -10,8 +10,6 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
   byokOwner,
-  getBYOKforOrganization,
-  getBYOKforUser,
   getByokCredentials,
   getByokKeyStates,
   getStoredByokKeys,
@@ -27,7 +25,6 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-decision';
 import {
   classifyRequestedModel,
-  getAllowedGatewayRoutedByokProviders,
   isKeyPlanStep,
   planRoutes,
   type GatewayByokPlanStep,
@@ -87,6 +84,10 @@ import { isCustomLlmDeniedInCountry } from '@kilocode/web-shared/lib/ai-gateway/
 import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import {
+  resolveEmbeddingOrDecisionRoute,
+  resolveTranscriptionRoute,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/non-chat-routes';
 import { removePaidServerFeatures } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-paid-server-features';
 import {
   getLocalFakeLlmProvider,
@@ -368,6 +369,8 @@ export type GetProviderInput = {
   /** Kilo's own provider exclusions for the model (see `getIgnoredProviders`).
    * They apply to routes Kilo pays for, never to a user's own gateway key. */
   kiloIgnoredProviders?: string[];
+  /** The organization's gateway settings disable OpenRouter; see `VercelRoutingInput`. */
+  openRouterDisabled?: boolean;
   /** The request carries a spend ceiling. Only a provider that can cap the
    * price of the route it serves may take it. */
   boundedSpending?: boolean;
@@ -463,7 +466,6 @@ async function selectProvider(
     request,
     requestedModel,
     userId: isAnonymousContext(user) ? null : user.id,
-    requesterEmail: isAnonymousContext(user) ? null : user.google_user_email,
     organizationId,
   });
   if (claudeBilling?.kind === 'reconnect') {
@@ -636,9 +638,13 @@ async function selectProvider(
       }
       case 'kilo': {
         recordNoKeyServed();
-        const { kiloIgnoredProviders = [], boundedSpending = false } = input;
+        const {
+          kiloIgnoredProviders = [],
+          boundedSpending = false,
+          openRouterDisabled = false,
+        } = input;
         const routesToVercel = await shouldRouteToVercel(
-          { requestedModel, boundedSpending },
+          { requestedModel, boundedSpending, openRouterDisabled },
           async () =>
             withIgnoredProviders(await input.getRoutingProviderConfig(), kiloIgnoredProviders)
         );
@@ -827,48 +833,33 @@ export async function previewByokRouting({
   return { kind: 'routes', steps: markUnreachedSteps(steps.flat()) };
 }
 
-async function getGatewayRoutedByokKeys(
-  user: User | AnonymousUserContext,
-  requestedModel: string,
-  organizationId: string | undefined,
-  allowedProviders: ReadonlySet<string> | undefined
-): Promise<BYOKResult[]> {
-  if (isAnonymousContext(user)) return [];
-  const providerIds = await getAllowedGatewayRoutedByokProviders(requestedModel, {
-    includeGatewayKeys: false,
-    getAllowedProviders: async () => allowedProviders,
-  });
-  if (providerIds.length === 0) return [];
-  return (
-    (organizationId
-      ? await getBYOKforOrganization(readDb, organizationId, providerIds)
-      : await getBYOKforUser(readDb, user.id, providerIds)) ?? []
-  );
-}
-
+/**
+ * The route of an embeddings request; see `resolveEmbeddingOrDecisionRoute`. `allowedProviders`
+ * holds the OpenRouter provider slugs the organization policy allows, or is undefined for any.
+ */
 export async function getEmbeddingProvider(
   requestedModel: string,
   user: User | AnonymousUserContext,
   organizationId: string | undefined,
-  allowedProviders?: ReadonlySet<string>
+  options: { allowedProviders?: ReadonlySet<string>; openRouterDisabled?: boolean } = {}
 ): Promise<{ provider: Provider; userByok: BYOKResult[] | null; isFree: boolean }> {
-  const isFree = isFreeModel(requestedModel);
-  // 1. BYOK check — route through Vercel AI Gateway when user has their own key
-  const inference = await getGatewayRoutedByokKeys(
-    user,
+  const route = await resolveEmbeddingOrDecisionRoute({
     requestedModel,
+    modelType: 'embedding',
+    user,
     organizationId,
-    allowedProviders
-  );
-  if (inference.length > 0) {
-    return { provider: VERCEL_AI_GATEWAY, userByok: inference, isFree };
-  }
-
-  // 2. All non-BYOK embedding requests go through OpenRouter
-  return { provider: OPENROUTER, userByok: null, isFree };
+    allowedProviders: options.allowedProviders,
+    openRouterDisabled: options.openRouterDisabled ?? false,
+  });
+  return { ...route, isFree: isFreeModel(requestedModel) };
 }
 
-export async function getTranscriptionProvider(): Promise<{
+/** The route of a transcription request; see `resolveTranscriptionRoute`. */
+export async function getTranscriptionProvider(input: {
+  requestedModel: string;
+  user: User | AnonymousUserContext;
+  organizationId: string | undefined;
+}): Promise<{
   provider: Provider;
   userByok: BYOKResult[] | null;
 }> {
@@ -878,5 +869,5 @@ export async function getTranscriptionProvider(): Promise<{
       return { provider: localFakeProvider, userByok: null };
     }
   }
-  return { provider: OPENROUTER, userByok: null };
+  return await resolveTranscriptionRoute(input);
 }

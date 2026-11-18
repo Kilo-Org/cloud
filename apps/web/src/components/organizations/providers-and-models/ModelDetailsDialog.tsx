@@ -20,7 +20,6 @@ import {
   ByokOnlyTag,
   PolicyPill,
 } from '@/components/organizations/providers-and-models/PolicyPills';
-import { DiscountedPrice } from '@/components/organizations/providers-and-models/DiscountedPrice';
 import { GatewayAvailabilityList } from '@/components/organizations/providers-and-models/GatewayAvailabilityList';
 import { InferenceRegionFlags } from '@/components/organizations/providers-and-models/InferenceRegionFlags';
 import type {
@@ -168,20 +167,8 @@ export function ModelDetailsDialog({
                       </TableCell>
                     ) : (
                       <>
-                        <TableCell>
-                          <DiscountedPrice
-                            price={offering.promptPrice}
-                            originalPrice={offering.originalPromptPrice}
-                            formatPrice={formatPriceCompact}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <DiscountedPrice
-                            price={offering.completionPrice}
-                            originalPrice={offering.originalCompletionPrice}
-                            formatPrice={formatPriceCompact}
-                          />
-                        </TableCell>
+                        <TableCell>{formatPriceCompact(offering.promptPrice)}</TableCell>
+                        <TableCell>{formatPriceCompact(offering.completionPrice)}</TableCell>
                       </>
                     )}
                     <TableCell>

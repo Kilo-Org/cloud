@@ -58,8 +58,10 @@ import { generateBranchSlugFromSeed } from '@kilocode/worker-utils/deployment-sl
 import type { CloudAgentAuthority } from '@kilocode/worker-utils/cloud-agent-authority';
 import {
   createRuntimeAuthorization,
+  RuntimeAuthorizationRevokedError,
   sealRuntimeAuthorization,
 } from '@kilocode/worker-utils/runtime-authorization';
+import { resolveRuntimeEnvironment } from '@kilocode/worker-utils/runtime-authorization-contract';
 
 import { agentSandboxProviderSchema, type Env, type SandboxId } from '../types.js';
 import {
@@ -110,6 +112,7 @@ import { generateKiloSessionId } from '../utils/kilo-session-id.js';
 import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import { assertKiloModelAvailable } from '../model-validation.js';
 import { initialAdmissionFailure } from './admission-failure.js';
+import { logRuntimeAuthorizationDiagnostic } from './runtime-authorization-diagnostics.js';
 import {
   createCloudAgentSessionReport,
   recordCloudAgentSandboxIdentity,
@@ -933,7 +936,17 @@ async function issueSessionRuntimeAuthorization(
       connectionString: ctx.env.HYPERDRIVE.connectionString,
       resourceKind: 'cloud-agent-next',
       resourceId: cloudAgentSessionId,
+      environment: resolveRuntimeEnvironment(ctx.env.ENVIRONMENT),
+      onAdmissionRejected: reason =>
+        logRuntimeAuthorizationDiagnostic(cloudAgentSessionId, 'admission', reason),
       ...(orgId ? { organizationId: orgId } : {}),
+      onBindingRejected: reason =>
+        logRuntimeAuthorizationDiagnostic(cloudAgentSessionId, 'binding_check', reason),
+    }).catch((error: unknown) => {
+      if (error instanceof RuntimeAuthorizationRevokedError) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Runtime authorization denied' });
+      }
+      throw error;
     });
     runtimeAuthorization = {
       token: created.token,
@@ -2115,6 +2128,9 @@ function profileCreateIntent(
     runtimeSkills: resolved.runtimeSkills,
     runtimeAgents: resolved.runtimeAgents,
     builtinAgents: resolved.builtinAgents,
+    modelContextLimits: resolved.modelContextLimits,
+    webSearchDisabled: resolved.webSearchDisabled,
+    webSearchProvider: resolved.webSearchProvider,
     kiloCommands: resolved.kiloCommands,
     runtimeInstructions: resolved.runtimeInstructions,
   };

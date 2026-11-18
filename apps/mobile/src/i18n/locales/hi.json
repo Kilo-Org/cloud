@@ -26,6 +26,7 @@
     "creditHistory": "क्रेडिट इतिहास",
     "sentenceJoiner": "। ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "रद्द करें",
     "done": "हो गया",
     "retry": "फिर से कोशिश करें",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "बदलाव",
     "organizationTrialEnded": "संगठन का परीक्षण समाप्त हो गया है और इसकी कोई सक्रिय योजना नहीं है। एक संगठन मालिक kilo.ai पर बिलिंग अपडेट कर सकता है, फिर दोबारा प्रयास करें।",
-    "privateRepositoryA11y": "{{name}}, निजी रिपॉज़िटरी"
+    "privateRepositoryA11y": "{{name}}, निजी रिपॉज़िटरी",
+    "legalDocumentEnglishOnly": "यह दस्तावेज़ केवल अंग्रेज़ी में उपलब्ध है।"
   },
   "language": {
     "restarting": "भाषा बदलने के लिए ऐप फिर से शुरू हो रहा है",
@@ -481,7 +483,14 @@
       "viewReceipt": "रसीद देखें"
     },
     "changelog": "नया क्या है",
-    "changelogVersionPending": "इस वर्शन के नोट्स अगले ऐप अपडेट के साथ आएंगे।"
+    "changelogVersionPending": "वर्शन {{version}} के नोट्स अगले ऐप अपडेट के साथ आएंगे।",
+    "changelogGroupNew": "नया",
+    "changelogFixesIn": "{{areas}} में त्रुटि-सुधार और बेहतरी।",
+    "changelogFixesPolish": "पूरे ऐप में त्रुटि-सुधार और बेहतरी।",
+    "changelogAreas": {
+      "signIn": "साइन-इन",
+      "profileOrganizations": "प्रोफ़ाइल और संगठन"
+    }
   },
   "preferences": {
     "general": "सामान्य",
@@ -676,7 +685,8 @@
       "managedOnWeb": "इस संगठन का Bitbucket कनेक्शन कंप्यूटर से वेब पर प्रबंधित किया जाता है.",
       "description": "आवश्यक स्कोप के साथ एक वर्कस्पेस एक्सेस टोकन बनाएँ और उसे नीचे पेस्ट करें।",
       "scopes": "खाता: पढ़ना · रिपॉज़िटरी: पढ़ना/लिखना · पुल रिक्वेस्ट: पढ़ना · वेबहुक: पढ़ना/लिखना",
-      "tokenPlaceholder": "वर्कस्पेस एक्सेस टोकन"
+      "tokenPlaceholder": "वर्कस्पेस एक्सेस टोकन",
+      "tokenRefused": "Bitbucket ने इस वर्कस्पेस टोकन को स्वीकार नहीं किया। जाँचें कि इसमें ऊपर दिए गए स्कोप हैं, फिर पुनः प्रयास करें।"
     },
     "followReviewMd": "REVIEW.md का पालन करें",
     "followReviewMdSubtitle": "हर रिपॉज़िटरी की REVIEW.md फ़ाइल के निर्देशों का पालन करें",
@@ -777,6 +787,7 @@
     },
     "reviewList": {
       "configureProvider": "प्रदाता कॉन्फ़िगर करें",
+      "connectOwnerOnly": "संगठन के मालिक या एडमिन से प्रदाता कनेक्ट करने का अनुरोध करें।",
       "couldNotLoad": "समीक्षाएँ लोड नहीं हो सकीं।",
       "noReviews": "अभी कोई समीक्षा नहीं",
       "noReviewsDescription": "कोड समीक्षक के किसी पुल रिक्वेस्ट की समीक्षा करने के बाद समीक्षाएँ यहाँ दिखाई देंगी।",
@@ -921,13 +932,25 @@
       "repositoryLine": "समीक्षाएँ: {{reviews}} · निष्कर्ष: {{findings}}",
       "empty": "अभी तक एनालिटिक्स वाली कोई समीक्षा नहीं",
       "emptyDescription": "संगठन के लिए चालू रहने पर एनालिटिक्स पूरी हो चुकी समीक्षाएँ दर्ज करता है।",
-      "off": "इस संगठन के लिए एनालिटिक्स बंद है।",
-      "couldNotLoad": "एनालिटिक्स लोड नहीं हो सका"
+      "offTitle": "{{platform}} के लिए एनालिटिक्स बंद है",
+      "offDescription": "संगठन की बिलिंग भूमिकाएँ (मालिक, एडमिन और बिलिंग मैनेजर) वेब पर संगठन की सेटिंग्स में एनालिटिक्स चालू कर सकती हैं, जिससे पूरी हो चुकी समीक्षाएँ दर्ज हो सकें।",
+      "couldNotLoad": "एनालिटिक्स लोड नहीं हो सका",
+      "trackedReviewsCaption": "इस अवधि में एनालिटिक्स चालू रहने पर पूरी हो चुकी समीक्षाएँ। चल रही और विफल समीक्षाएँ कभी नहीं गिनी जातीं।",
+      "trackedReviewsUncounted": "गिने नहीं गए: संगठन की {{displayTotal}} पूरी हो चुकी समीक्षाओं में से {{displayCount}} समीक्षाएँ जिनका परिणाम कैप्चर नहीं किया गया था।",
+      "trackedReviewsUncounted_one": "गिने नहीं गए: संगठन की {{displayTotal}} पूरी हो चुकी समीक्षाओं में से {{displayCount}} समीक्षाएँ जिनका परिणाम कैप्चर नहीं किया गया था।",
+      "trackedReviewsUncounted_other": "गिने नहीं गए: संगठन की {{displayTotal}} पूरी हो चुकी समीक्षाओं में से {{displayCount}} समीक्षाएँ जिनका परिणाम कैप्चर नहीं किया गया था।"
     },
     "council": {
       "title": "काउंसिल समीक्षा",
       "subtitle": "कई विशेषज्ञ हर पुल रिक्वेस्ट की समीक्षा करते हैं, और उनके वोट मिलकर एक फ़ैसला बनाते हैं।",
-      "unavailable": "इस संगठन के लिए काउंसिल समीक्षा उपलब्ध नहीं है।",
+      "unavailablePersonallyTitle": "Enterprise संगठन आवश्यक है",
+      "unavailablePersonally": "काउंसिल समीक्षा व्यक्तिगत खाते का हिस्सा नहीं है।",
+      "unavailablePersonallyAction": "संगठन बनाएँ",
+      "unavailablePersonallySwitchAction": "संगठन बदलें",
+      "unavailableOrganizationTitle": "काउंसिल समीक्षा अभी उपलब्ध नहीं है",
+      "unavailableForOrganization": "काउंसिल समीक्षा के लिए सक्रिय सब्सक्रिप्शन या ट्रायल वाला Enterprise प्लान चाहिए। इस संगठन के पास यह अभी नहीं है।",
+      "unavailableForOrganizationNeutral": "इस संगठन के लिए काउंसिल समीक्षा अभी उपलब्ध नहीं है। कृपया बाद में पुनः प्रयास करें।",
+      "unavailableOnBitbucket": "काउंसिल समीक्षा Bitbucket रिपॉज़िटरी के लिए उपलब्ध नहीं है।",
       "noRepositories": "अभी तक कोई रिपॉज़िटरी नहीं चुनी गई है। पहले रिपॉज़िटरी सेटिंग में रिपॉज़िटरी चुनें।",
       "specialists": "विशेषज्ञ",
       "labels": "काउंसिल समीक्षा शुरू करने वाले लेबल",
@@ -2430,6 +2453,7 @@
     "signOutThisDevice": "इस डिवाइस से साइन आउट करें",
     "signOutSessionLabel": "{{device}} से साइन आउट करें, साइन इन: {{signedIn}}, आखिरी बार सक्रिय: {{lastSeen}}",
     "sessionSignedOut": "इस सत्र से साइन आउट हो गया।",
+    "sessionSignOutFailed": "इस सत्र से साइन आउट नहीं हो सका। फिर से कोशिश करें।",
     "signOutThisDeviceTitle": "इस डिवाइस से साइन आउट करें?",
     "signOutThisSessionTitle": "इस सत्र से साइन आउट करें?",
     "signOutThisSessionMessage": "{{device}} से साइन आउट हो जाएगा। आखिरी बार सक्रिय: {{lastSeen}}। वह एक घंटे तक API की पहुँच बनाए रख सकता है।",
@@ -2553,12 +2577,14 @@
     "manage": {
       "billingHistory": "बिलिंग इतिहास",
       "billingHistoryEmpty": "अभी कोई बिलिंग इतिहास नहीं है।",
+      "billingHistoryError": "बिलिंग इतिहास लोड नहीं हो सका",
       "cancel": "सब्सक्रिप्शन रद्द करें",
       "cancelDescription": "आपका Kilo Pass बिलिंग अवधि खत्म होने तक चालू रहेगा और रिन्यू नहीं होगा।",
       "cancelScheduled": "{{date}} को रद्द होगा",
       "cancelScheduledChange": "शेड्यूल किया गया बदलाव रद्द करें",
       "cancelled": "सब्सक्रिप्शन रद्द हो गया",
       "creditHistoryEmpty": "अभी कोई Kilo Pass क्रेडिट नहीं है।",
+      "creditHistoryError": "क्रेडिट इतिहास लोड नहीं हो सका",
       "resume": "सब्सक्रिप्शन फिर से शुरू करें",
       "resumeCancelledDescription": "आपका Kilo Pass फिर से अपने-आप रिन्यू होने लगेगा।",
       "resumePausedDescription": "आपका Kilo Pass अपनी तय तारीख से पहले, अभी फिर से शुरू हो जाएगा।",
@@ -2575,7 +2601,6 @@
     "completingPurchase": "खरीदारी पूरी हो रही है",
     "subscriptionLoading": "Kilo Pass की सदस्यता लोड हो रही है",
     "retryHint": "Kilo Pass की स्थिति फिर से लोड करता है।",
-    "cardAccessibility": "{{title}}। {{description}}। {{actionLabel}}",
     "endedOn": "{{date}} को समाप्त",
     "notAvailableInApp": "Kilo Pass ऐप में उपलब्ध नहीं है।",
     "statusActive": "सक्रिय",
@@ -3313,6 +3338,7 @@
       "manageOnWeb": "वेब पर बिलिंग सेटिंग्स",
       "changePlan": "प्लान बदलें",
       "buySeats": "सीटें खरीदें",
+      "managedOnWeb": "प्लान, सीटें और ऑटो टॉप-अप वेब पर प्रबंधित किए जाते हैं।",
       "setupAutoTopUp": "ऑटो टॉप-अप सेट करें",
       "manageAutoTopUp": "ऑटो टॉप-अप प्रबंधित करें",
       "opensOnWeb": "वेब पर खुलता है"
@@ -3330,7 +3356,7 @@
       "selectOrganization": "एक संगठन चुनें",
       "unavailableDescription": "यह संगठन अब उपलब्ध नहीं है। जारी रखने के लिए अपनी प्रोफ़ाइल से दूसरा संगठन चुनें।",
       "unavailableSessionsDescription": "यह संगठन अब उपलब्ध नहीं है। इसके सत्र लोड नहीं किए जा सकते।",
-      "accessDeniedDescription": "आपको इस संगठन की पहुँच नहीं है।"
+      "accessDeniedDescription": "संगठन के मालिक या एडमिन से आपको ऐक्सेस देने के लिए कहें।"
     },
     "create": {
       "title": "संगठन बनाएँ",
@@ -3463,16 +3489,26 @@
     },
     "settingsOnWeb": {
       "title": "वेब पर संगठन की सेटिंग्स",
-      "integrations": "वेब पर इंटीग्रेशन",
       "usageDetails": "इस्तेमाल का विवरण",
       "providersAndModels": "प्रदाता और मॉडल",
       "groups": "ग्रुप",
       "guardrails": "गार्डरेल",
-      "byok": "अपनी खुद की की (key) इस्तेमाल करें",
+      "byok": "अपनी खुद की कुंजी इस्तेमाल करें",
+      "ssoAndDomain": "SSO और डोमेन",
+      "dataCollection": "डेटा कलेक्शन",
       "auditLogs": "ऑडिट लॉग",
-      "requestLogs": "रिक्वेस्ट लॉग",
-      "subOrganizations": "सब-संगठन",
-      "distributeFunds": "फ़ंड बाँटें"
+      "requestLogs": "रिक्वेस्ट लॉग"
+    },
+    "requestLogs": {
+      "older": "पिछला घंटा",
+      "newer": "अगला घंटा",
+      "truncated": "इस घंटे की सभी रिक्वेस्ट सूची में नहीं दिख रही हैं।",
+      "emptyTitle": "इस घंटे में कोई रिक्वेस्ट नहीं",
+      "emptyDescription": "पहले की रिक्वेस्ट देखने के लिए 'पिछला घंटा' का उपयोग करें।",
+      "loadError": "रिक्वेस्ट लॉग लोड नहीं हो सके।",
+      "permissionDenied": "सिर्फ़ संगठन के मालिक, एडमिन या बिलिंग प्रबंधक ही इसके रिक्वेस्ट लॉग देख सकते हैं।",
+      "tokens": "{{input}} इनपुट · {{output}} आउटपुट",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "इनपुट टोकन",
@@ -4267,8 +4303,7 @@
       "repoValue": "रिपॉज़िटरी: {{name}}",
       "profileValue": "प्रोफ़ाइल: {{name}}",
       "profileUnavailable": "यह प्रोफ़ाइल अब उपलब्ध नहीं है। कोई दूसरी प्रोफ़ाइल चुनें।",
-      "pickerEmptyDescriptionOrganization": "सभी सत्रों में एनवायरनमेंट चर, सेटअप आदेश और कौशल का पुन: उपयोग करने के लिए एक संगठन प्रोफ़ाइल बनाएं।",
-      "pickerEmptyDescriptionOrganizationReadOnly": "संगठन मालिक या एडमिन एक संगठन प्रोफ़ाइल बना सकता है।"
+      "pickerEmptyDescriptionOrganization": "सभी सत्रों में एनवायरनमेंट चर, सेटअप आदेश और कौशल का पुन: उपयोग करने के लिए एक संगठन प्रोफ़ाइल बनाएं।"
     },
     "variablesDeleteFailed": "चर हटाया नहीं जा सका",
     "deleteVariable": "चर {{key}} हटाएँ",
@@ -4454,7 +4489,6 @@
     "dismiss": "ब्रीफ़िंग खारिज करें",
     "offline": "ऑफ़लाइन · सहेजी गई ब्रीफ़िंग",
     "cached": "सहेजी गई रिपोर्ट · रीफ़्रेश उपलब्ध नहीं",
-    "window": "{{start}} – {{end}}",
     "summary": "AI सारांश",
     "summaryPending": "AI सारांश बन रहा है। तैयार होने पर यहाँ जुड़ जाएगा।",
     "summaryUnavailable": "AI सारांश उपलब्ध नहीं है। आपकी संरचित रिपोर्ट अभी भी उपलब्ध है।",
@@ -4521,6 +4555,8 @@
     "topModels": "शीर्ष मॉडल",
     "topFeatures": "शीर्ष सुविधाएँ",
     "emptyTitle": "इस अवधि में कोई उपयोग नहीं",
+    "unavailableTitle": "उपयोग उपलब्ध नहीं है",
+    "unavailableDescription": "यह वर्कस्पेस उपयोग की जानकारी नहीं दे रहा है। फिर से कोशिश करने से मदद नहीं मिलेगी।",
     "orgSelfNotice": "आप इस संगठन में अपना उपयोग देख रहे हैं।",
     "viewDetails": "उपयोग विवरण देखें"
   },
@@ -4571,6 +4607,7 @@
       "title": "ट्रिगर और वेबहुक",
       "subtitle": "वेबहुक कॉल या शेड्यूल से Cloud Agent रन स्वचालित करें।",
       "new": "नया ट्रिगर",
+      "create": "ट्रिगर बनाएँ",
       "emptyTitle": "अभी कोई ट्रिगर नहीं है",
       "emptyDescription": "वेबहुक कॉल या शेड्यूल पर Cloud Agent रन शुरू करने के लिए ट्रिगर बनाएँ।",
       "loadFailedTitle": "ट्रिगर लोड नहीं हो सके",
@@ -4592,7 +4629,7 @@
       "fieldCron": "क्रॉन एक्सप्रेशन",
       "fieldCronHelp": "पाँच फ़ील्ड: मिनट, घंटा, दिन, महीना और साप्ताहिक दिन। सबसे छोटा अंतराल एक मिनट है।",
       "fieldTimezone": "समय क्षेत्र",
-      "nameLocked": "नाम वेबहुक यूआरएल का हिस्सा है और इसे बदला नहीं जा सकता।",
+      "nameLocked": "ट्रिगर बनने के बाद नाम नहीं बदला जा सकता।",
       "repositoryLocked": "ट्रिगर बनने के बाद रिपॉज़िटरी नहीं बदली जा सकती।",
       "environmentAutomatic": "रिपॉज़िटरी के अनुसार स्वचालित",
       "notSelected": "चयनित नहीं",
@@ -4607,6 +4644,7 @@
       "authHeaderLabel": "हेडर का नाम",
       "authSecretLabel": "साझा सीक्रेट",
       "authSecretKeep": "सहेजा गया सीक्रेट रखने के लिए खाली छोड़ें।",
+      "authSecretSet": "आवश्यक। मज़बूत रैंडम स्ट्रिंग चुनें।",
       "authSecretCreator": "जब ट्रिगर अपने निर्माता के रूप में चले, तो कम से कम 16 अक्षर उपयोग करें।",
       "autoCommit": "रन पूरा होने पर बदलाव कमिट करें",
       "condenseOnComplete": "रन पूरा होने पर संदर्भ संक्षिप्त करें",
@@ -4617,11 +4655,14 @@
       "saveFailedTitle": "ट्रिगर सहेजा नहीं जा सका",
       "deleteTitle": "क्या यह ट्रिगर हटाएँ?",
       "deleteMessage": "{{name}} पर कॉल विफल होंगी। इसे पूर्ववत नहीं किया जा सकता।",
+      "deleteMessageScheduled": "{{name}} ट्रिगर के निर्धारित रन रुक जाएँगे। इसे पूर्ववत नहीं किया जा सकता।",
       "runNow": "अभी चलाएँ",
       "runStarted": "रन शुरू हो गया",
       "created": "ट्रिगर बनाया गया",
       "saved": "ट्रिगर सहेजा गया",
       "statusArrived": "पहुँच गया",
+      "defaultPromptWebhook": "इस वेबहुक अनुरोध के बॉडी का वर्णन करें:\n\n{{body}}",
+      "defaultPromptScheduled": "निर्धारित कार्य चलाएँ। रन {{scheduledTime}} पर शुरू हुआ।",
       "problems": {
         "nameRequired": "नाम दर्ज करें।",
         "nameTooShort": "कम से कम 8 अक्षर उपयोग करें।",
@@ -4656,8 +4697,9 @@
     "create": "लिंक बनाएं",
     "createFailed": "लिंक नहीं बनाया जा सका।",
     "existingTitle": "मौजूदा लिंक",
-    "existingDescription": "इस सत्र का शेयर लिंक पहले से मौजूद है। नया लिंक बनाने पर यह उसकी जगह ले लेगा और पुराना लिंक काम करना बंद कर देगा।",
+    "existingDescription": "इस सत्र का शेयर लिंक पहले से मौजूद है। इन सेटिंग्स के साथ नया लिंक बनाने पर यह उसकी जगह ले लेगा और पुराना लिंक काम करना बंद कर देगा।",
     "rotate": "नया लिंक बनाएं",
+    "replacementSettings": "ये सेटिंग्स नए लिंक पर लागू होंगी।",
     "revoke": "लिंक वापस लें",
     "revokeTitle": "लिंक वापस लें?",
     "revokeMessage": "मौजूदा लिंक तुरंत काम करना बंद कर देगा।",
@@ -4669,6 +4711,7 @@
     "superseded": "इस लिंक को किसी दूसरे डिवाइस से बदल दिया गया है, इसलिए यह अब काम नहीं करता।"
   },
   "sharedSession": {
+    "startedAt": "{{time}} पर शुरू हुआ",
     "title": "शेयर किया गया सत्र",
     "someone": "कोई व्यक्ति",
     "sharedBy": "{{owner}} द्वारा शेयर किया गया",
@@ -4676,5 +4719,177 @@
     "unavailableDescription": "यह शेयर लिंक समाप्त हो चुका है या रद्द कर दिया गया है।",
     "transcriptUnavailableTitle": "यह ट्रांसक्रिप्ट लोड नहीं हो सकी",
     "transcriptUnavailableDescription": "लिंक अब भी काम कर रहा है। कुछ देर बाद फिर से कोशिश करें।"
+  },
+  "organizationGuardrails": {
+    "title": "एआई गार्डरेल्स",
+    "permissionDenied": "केवल संगठन के स्वामी और व्यवस्थापक ही एआई गार्डरेल्स प्रबंधित कर सकते हैं।",
+    "unavailable": "एआई गार्डरेल्स इस संगठन के लिए उपलब्ध नहीं है।",
+    "loadError": "एआई गार्डरेल्स लोड नहीं हो सके",
+    "statusSaving": "सहेजा जा रहा है…",
+    "statusSaved": "सहेजा गया",
+    "statusFailed": "सहेजा नहीं जा सका।",
+    "inputTitle": "इनपुट गार्डरेल्स",
+    "inputDescription": "Enkrypt AI के साथ हर इनपुट को स्कैन करता है, जिसमें टूल परिणाम भी शामिल हैं। Enkrypt उपलब्ध न होने पर एक ब्लॉकिंग डिटेक्टर अनुरोध को अस्वीकार कर देता है।",
+    "outputTitle": "आउटपुट गार्डरेल्स",
+    "outputDescription": "सदस्यों को प्राप्त होने से पहले प्रतिक्रियाओं को Enkrypt AI के साथ स्कैन करता है। जब तक आप इसे चालू नहीं करते, यह बंद रहता है।",
+    "detectorsHint": "ब्लॉक करें विकल्प फ़्लैग किए गए अनुरोध को अस्वीकार करता है। केवल लॉग करें विकल्प उसे बिना अनुरोध में देरी किए रिकॉर्ड करता है।",
+    "detectorsHintOutput": "ब्लॉक करें विकल्प फ़्लैग की गई प्रतिक्रिया को विफल करता है। केवल लॉग करें विकल्प उसे बिना प्रतिक्रिया में देरी किए रिकॉर्ड करता है।",
+    "choiceLog": "केवल लॉग करें",
+    "applyTo": "लागू करें",
+    "applyToAllMembers": "सभी सदस्य",
+    "applyKiloDefault": "Kilo डिफ़ॉल्ट लागू करें",
+    "invalidSavedTitle": "सहेजी गई इनपुट डिटेक्टर सेटिंग्स पढ़ी नहीं जा सकतीं",
+    "invalidSavedBody": "जब तक इनपुट डिटेक्टर दोबारा सहेजे नहीं जाते, अनुरोध ब्लॉक रहते हैं। नीचे दिए गए डिटेक्टर Kilo डिफ़ॉल्ट से शुरू होते हैं।",
+    "invalidSavedOutputTitle": "सहेजी गई आउटपुट डिटेक्टर सेटिंग्स पढ़ी नहीं जा सकतीं",
+    "invalidSavedOutputBody": "जब तक आउटपुट डिटेक्टर दोबारा सहेजे नहीं जाते, प्रतिक्रियाएँ रोकी रहती हैं। नीचे आउटपुट डिटेक्टर चुनें।",
+    "blockingOutputNote": "एक ब्लॉकिंग आउटपुट डिटेक्टर प्रतिक्रिया को तब तक रोकता है जब तक Enkrypt उसकी पूरी जाँच नहीं कर लेता। देरी से बचने के लिए केवल लॉग करें विकल्प का उपयोग करें।",
+    "inputDetectorRequired": "कम से कम एक इनपुट डिटेक्टर चालू करें।",
+    "outputDetectorRequired": "कम से कम एक आउटपुट डिटेक्टर चालू करें।",
+    "rulesTooMany": "अधिकतम {{max}} नियम जोड़ें।",
+    "ruleIdRequired": "नियम आईडी दर्ज करें।",
+    "ruleIdInvalid": "नियम आईडी में केवल अक्षर, संख्याएँ, बिंदु, डैश और अंडरस्कोर का उपयोग हो सकता है।",
+    "ruleTextRequired": "बताएँ कि नियम क्या मना करता है या क्या आवश्यक करता है।",
+    "keywordTooLong": "प्रत्येक कीवर्ड अधिकतम {{max}} वर्णों का हो सकता है।",
+    "topicTooLong": "प्रत्येक विषय अधिकतम {{max}} वर्णों का हो सकता है।",
+    "keywordsTooMany": "अधिकतम {{max}} कीवर्ड जोड़ें।",
+    "topicsTooMany": "अधिकतम {{max}} विषय जोड़ें।",
+    "piiEntityRequired": "पता लगाने के लिए कम से कम एक प्रकार का डेटा चुनें।",
+    "keywordRequired": "कम से कम एक कीवर्ड जोड़ें।",
+    "topicRequired": "कम से कम एक विषय जोड़ें।",
+    "policyTextRequired": "नीति पाठ दर्ज करें।",
+    "ruleRequired": "कम से कम एक नियम जोड़ें।",
+    "ruleIdDuplicate": "प्रत्येक नियम का अपना नियम ID होना चाहिए।",
+    "piiEntities": "पता लगाने के लिए डेटा",
+    "keywordsLabel": "कीवर्ड",
+    "keywordsHint": "प्रति पंक्ति एक कीवर्ड।",
+    "topicsHint": "प्रति पंक्ति एक विषय।",
+    "policyFormat": "नीति प्रारूप",
+    "policyFormatRules": "संरचित नियम",
+    "policyFormatRulesDescription": "प्रत्येक आवश्यकता के लिए एक नियम, श्रेणी और गंभीरता के साथ। अनुशंसित।",
+    "policyFormatText": "नीति पाठ",
+    "policyFormatTextDescription": "मौजूदा नीति को सादे पाठ के रूप में पेस्ट करें।",
+    "rulesEmpty": "अभी कोई नियम नहीं है। प्रत्येक नियम एक ऐसी बात बताता है जो इनपुट में नहीं होनी चाहिए या जिसके लिए इनपुट अनुरोध नहीं कर सकते।",
+    "addRule": "नियम जोड़ें",
+    "ruleNumber": "नियम {{number}}",
+    "ruleRemove": "नियम {{number}} हटाएँ",
+    "ruleIdLabel": "नियम आईडी",
+    "ruleNameLabel": "नाम (वैकल्पिक)",
+    "ruleTextLabel": "नियम",
+    "ruleRiskCategory": "जोखिम श्रेणी",
+    "ruleApplicability": "दायरा",
+    "ruleFrameworks": "फ़्रेमवर्क",
+    "detector": {
+      "promptInjection": {
+        "label": "प्रॉम्प्ट इंजेक्शन",
+        "description": "निर्देशों को ओवरराइड करने या मॉडल को जेलब्रेक करने के प्रयासों का पता लगाता है।"
+      },
+      "policyViolation": {
+        "label": "नीति उल्लंघन",
+        "description": "पाठ या नियमों के रूप में लिखी गई आपके संगठन की नीति का उल्लंघन करने वाले इनपुट को फ़्लैग करता है।",
+        "descriptionOutput": "पाठ या नियमों के रूप में लिखी गई आपके संगठन की नीति का उल्लंघन करने वाली प्रतिक्रियाओं को फ़्लैग करता है।"
+      },
+      "pii": {
+        "label": "PII और गोपनीय जानकारी",
+        "description": "व्यक्तिगत डेटा, क्रेडेंशियल, आईपी पते और URL का पता लगाता है।"
+      },
+      "keywords": {
+        "label": "प्रतिबंधित कीवर्ड",
+        "descriptionOutput": "आपके द्वारा सूचीबद्ध किसी भी कीवर्ड वाली प्रतिक्रियाओं का पता लगाता है।"
+      },
+      "topics": {
+        "label": "विषय",
+        "descriptionOutput": "आपके द्वारा सूचीबद्ध किसी भी विषय पर प्रतिक्रियाओं को फ़्लैग करता है।"
+      },
+      "toxicity": {
+        "label": "विषाक्तता",
+        "description": "विषाक्त, अपमानजनक, धमकी भरी या घृणास्पद भाषा का पता लगाता है।"
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "यौन या अन्यथा कार्यस्थल के लिए असुरक्षित सामग्री का पता लगाता है।"
+      },
+      "bias": {
+        "label": "पूर्वाग्रह",
+        "description": "पूर्वाग्रही या भेदभावपूर्ण भाषा का पता लगाता है।"
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "व्यक्तिगत डेटा",
+        "description": "नाम, ईमेल पते, फ़ोन नंबर।"
+      },
+      "secrets": {
+        "label": "गोपनीय जानकारी",
+        "description": "API कुंजियाँ, टोकन, पासवर्ड।"
+      },
+      "ipAddress": {
+        "label": "आईपी पते",
+        "description": "IPv4 और IPv6 पते।"
+      },
+      "url": {
+        "label": "URL पते",
+        "description": "वेब पते।"
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "सुरक्षा और धोखाधड़ी",
+      "safetyHarm": "संरक्षा और हानि",
+      "privacyDataProtection": "गोपनीयता और डेटा संरक्षण",
+      "brandReputationTrust": "ब्रांड और प्रतिष्ठा",
+      "biasFairnessEthical": "पूर्वाग्रह और निष्पक्षता",
+      "legalIpLiability": "कानूनी और बौद्धिक संपदा दायित्व",
+      "productMisuse": "उत्पाद का दुरुपयोग",
+      "performanceQuality": "प्रदर्शन और गुणवत्ता"
+    },
+    "applicability": {
+      "user": "उपयोगकर्ता इनपुट",
+      "userAssistant": "उपयोगकर्ता इनपुट और प्रतिक्रियाएँ"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM शीर्ष 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "यूरोपीय संघ एआई अधिनियम",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "एंटरप्राइज़ सुविधा",
+    "enterpriseOnly": "यह केवल एंटरप्राइज़ के लिए उपलब्ध सुविधा है।",
+    "readOnly": "केवल संगठन के स्वामी और व्यवस्थापक ही इन सेटिंग्स को बदल सकते हैं।",
+    "loadError": "प्रदाता और मॉडल लोड नहीं हो सके",
+    "tabModels": "मॉडल",
+    "tabProviders": "प्रदाता",
+    "tabGateways": "गेटवे",
+    "modelsDescription": "किसी मॉडल को हर सदस्य के लिए ब्लॉक करने हेतु उसे बंद करें। अनुमत प्रदाताओं के मॉडल डिफ़ॉल्ट रूप से चालू रहते हैं।",
+    "modelsDeniedOnly": "केवल अस्वीकृत",
+    "modelsEmpty": "इस खोज से कोई मॉडल मेल नहीं खाता।",
+    "modelsDeniedEmpty": "कोई मॉडल अस्वीकृत नहीं है।",
+    "modelsDeniedSearchEmpty": "इस खोज से कोई अस्वीकृत मॉडल मेल नहीं खाता।",
+    "providersDescription": "इस संगठन के लिए Kilo का उस प्रदाता की ओर रूटिंग रोकने हेतु किसी प्रदाता को बंद करें।",
+    "providersNeedCatalog": "पूरा मॉडल कैटलॉग लोड होने तक प्रदाता स्विच केवल पढ़ने योग्य रहते हैं। उन्हें संपादित करने के लिए ऊपर फिर से कोशिश करें।",
+    "providersEmpty": "इस खोज से कोई प्रदाता मेल नहीं खाता।",
+    "allowAllShown": "दिखाए गए सभी को अनुमति दें",
+    "denyAllShown": "दिखाए गए सभी को अस्वीकार करें",
+    "gatewaysDescription": "Kilo मॉडल अनुरोधों को Vercel AI Gateway या OpenRouter के माध्यम से रूट करता है। अक्षम गेटवे उन अनुरोधों को विफल कर देता है।",
+    "emptyProviderList": "कम से कम एक प्रदाता को अनुमति दें। खाली सूची Kilo के सभी मॉडल रूट रोक देती है।",
+    "gatewaysUnavailable": "इस संगठन के लिए गेटवे सेटिंग्स उपलब्ध नहीं हैं।",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "OpenRouter अनुरोध किसी क्षेत्र पर पिन नहीं किए जाते।",
+    "inferenceRegion": "इन्फ़रेंस क्षेत्र",
+    "inferenceRegionDescription": "Vercel AI Gateway अनुरोधों को इस क्षेत्र पर पिन करता है। जो मॉडल वहाँ उपलब्ध नहीं है, वह विफल हो जाता है।",
+    "disableOpenrouterNote": "OpenRouter को अक्षम करने से BYOK कुंजियाँ भी ब्लॉक हो जाती हैं जो उसके माध्यम से अनुरोध रूट करती हैं।",
+    "emptyModelList": "कम से कम एक मॉडल चालू रखें। सभी मॉडल अस्वीकार करने पर सदस्यों के पास उपयोग के लिए कुछ नहीं बचता।",
+    "catalogUnavailable": "पूरा मॉडल कैटलॉग लोड नहीं हुआ, इसलिए केवल आपकी सहेजी गई सूचियाँ दिखाई जा रही हैं। सभी मॉडल लोड करने के लिए फिर से प्रयास करें।",
+    "region": {
+      "global": "वैश्विक",
+      "us": "संयुक्त राज्य अमेरिका",
+      "eu": "यूरोपीय संघ",
+      "au": "ऑस्ट्रेलिया",
+      "jp": "जापान"
+    }
   }
 }

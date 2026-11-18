@@ -1,7 +1,8 @@
-import { captureException, captureMessage } from '@sentry/nextjs';
+import { captureException, captureMessage, startInactiveSpan } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import { z } from 'zod';
+import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@kilocode/web-shared/lib/ai-gateway/processUsage.constants';
@@ -60,6 +61,15 @@ export function contentPartSchema(textType: string) {
   return z
     .looseObject({ type: z.string(), text: z.string().optional() })
     .refine(part => part.type !== textType || part.text !== undefined);
+}
+
+export const nonEmptyStringSchema = z.string().min(1);
+
+/** An array with at least one item matching `itemSchema`; other items are ignored. */
+export function arrayContainingSchema(itemSchema: z.ZodType) {
+  return z
+    .array(z.unknown())
+    .refine(items => items.some(item => itemSchema.safeParse(item).success));
 }
 
 export const upstreamStreamErrorSchema = z.object({
@@ -505,73 +515,90 @@ export async function parseUsageWithRecovery(
 }
 
 /**
- * Records when the first and final chunks of an upstream response arrive. The
- * gateway measures this itself, rather than trusting upstream-reported timings,
- * so `latency` and `generation_time` mean the same thing for every provider:
- * - `latency`: from `requestStartedAt` (a `performance.now()` value) until the
- *   first chunk, or null when the start is unknown.
- * - `generation_time`: from the first chunk until the final chunk, so the two
- *   add up to the total response time.
- * Both are null when no chunk arrived.
+ * The gateway measures response timing itself, rather than trusting
+ * upstream-reported timings, so `latency` and `generation_time` mean the same
+ * thing for every provider:
+ * - `latency`: from `requestStartedAt` (a `performance.now()` value) until
+ *   `firstAt`, or null when the start is unknown.
+ * - `generation_time`: from `firstAt` until `finalAt`, so the two add up to the
+ *   total response time.
+ * Both are null when `firstAt` was never observed.
  */
-function createChunkTimer() {
-  let firstChunkAt: number | null = null;
-  let finalChunkAt: number | null = null;
+function responseTiming(
+  firstAt: number | null,
+  finalAt: number | null,
+  requestStartedAt: number | undefined
+): ResponseTiming {
+  if (firstAt === null || finalAt === null) {
+    return { latency: null, generation_time: null };
+  }
   return {
-    markChunk() {
-      const now = performance.now();
-      firstChunkAt ??= now;
-      finalChunkAt = now;
-    },
-    receivedChunk: () => firstChunkAt !== null,
-    timing(requestStartedAt: number | undefined): ResponseTiming {
-      if (firstChunkAt === null || finalChunkAt === null) {
-        return { latency: null, generation_time: null };
-      }
-      return {
-        latency:
-          requestStartedAt === undefined
-            ? null
-            : Math.max(0, Math.round(firstChunkAt - requestStartedAt)),
-        generation_time: Math.round(finalChunkAt - firstChunkAt),
-      };
-    },
+    latency:
+      requestStartedAt === undefined ? null : Math.max(0, Math.round(firstAt - requestStartedAt)),
+    generation_time: Math.round(finalAt - firstAt),
   };
 }
 
 const isWhitespace = (text: string) => text.trim() === '';
+
+function reportTimeToFirstToken(
+  attribute: string,
+  requestStartedAt: number | undefined,
+  firstTokenAt: number
+) {
+  if (requestStartedAt === undefined) return;
+  sentryRootSpan()?.setAttribute(attribute, firstTokenAt - requestStartedAt);
+  startInactiveSpan({
+    name: 'time-to-first-token',
+    op: 'performance',
+    startTime: performance.timeOrigin + requestStartedAt,
+  }).end(performance.timeOrigin + firstTokenAt);
+}
 
 /**
  * Drains an SSE response body, calling `onEvent` for each parsed event. Handles
  * stream processing failures gracefully and always cleans up the reader and
  * ends `streamProcessingSpan`.
  *
- * Each SSE event is a chunk for the response timing, so keep-alive comments such
- * as OpenRouter's `: OPENROUTER PROCESSING` do not count as the first chunk. A
- * body without any event, such as a JSON error, is timed by its non-whitespace
- * chunks instead.
+ * `onEvent` returns whether the event carried generated output, such as text,
+ * reasoning, or a tool call. Lifecycle, role-only, usage-only, error, and
+ * malformed events, and keep-alive comments, do not. `latency` and the
+ * `timeToFirstTokenAttribute` on the Sentry root span run from the request
+ * start until the first generated output; `generation_time` runs from there
+ * until the final SSE event. Both are null when no output was generated.
  *
  * Malformed events are skipped so later events can still supply usage.
  */
 export async function drainSseStream(
   stream: ReadableStream<Uint8Array>,
-  onEvent: (event: EventSourceMessage) => void,
+  onEvent: (event: EventSourceMessage) => boolean,
   streamProcessingSpan: Span,
   requestStartedAt: number | undefined,
+  timeToFirstTokenAttribute: string,
   getIds?: () => Record<string, string | null | undefined>
 ): Promise<{ wasAborted: boolean; malformedEventCount: number; timing: ResponseTiming }> {
-  const eventTimer = createChunkTimer();
-  const chunkTimer = createChunkTimer();
+  let firstOutputAt: number | null = null;
+  let finalEventAt: number | null = null;
   let malformedEventCount = 0;
   let firstMalformedEventError: unknown;
   const sseStreamParser = createParser({
     onEvent(event) {
-      eventTimer.markChunk();
+      const now = performance.now();
+      finalEventAt = now;
+      let generatedOutput = false;
       try {
-        onEvent(event);
+        generatedOutput = onEvent(event);
       } catch (error) {
         if (malformedEventCount === 0) firstMalformedEventError = error;
         malformedEventCount++;
+      }
+      if (generatedOutput && firstOutputAt === null) {
+        firstOutputAt = now;
+        try {
+          reportTimeToFirstToken(timeToFirstTokenAttribute, requestStartedAt, now);
+        } catch (error) {
+          errorExceptInTest('[processUsage] unable to report time to first token', error);
+        }
       }
     },
   });
@@ -586,9 +613,7 @@ export async function drainSseStream(
         reachedEof = true;
         break;
       }
-      const text = decoder.decode(value, { stream: true });
-      if (!isWhitespace(text)) chunkTimer.markChunk();
-      sseStreamParser.feed(text);
+      sseStreamParser.feed(decoder.decode(value, { stream: true }));
     }
   } catch (error) {
     errorExceptInTest('[processUsage] treating stream processing error as aborted', error);
@@ -618,8 +643,11 @@ export async function drainSseStream(
       },
     });
   }
-  const timer = eventTimer.receivedChunk() ? eventTimer : chunkTimer;
-  return { wasAborted, malformedEventCount, timing: timer.timing(requestStartedAt) };
+  return {
+    wasAborted,
+    malformedEventCount,
+    timing: responseTiming(firstOutputAt, finalEventAt, requestStartedAt),
+  };
 }
 
 /** The parsed JSON of a response body, or why the body is not JSON. */
@@ -644,7 +672,8 @@ export async function readResponseText(
   stream: ReadableStream<Uint8Array>,
   requestStartedAt: number | undefined
 ): Promise<{ text: string; timing: ResponseTiming }> {
-  const chunkTimer = createChunkTimer();
+  let firstChunkAt: number | null = null;
+  let finalChunkAt: number | null = null;
   const reader = stream.getReader();
   const decoder = new TextDecoder();
   let text = '';
@@ -653,12 +682,15 @@ export async function readResponseText(
       const { done, value } = await reader.read();
       if (done) break;
       const chunk = decoder.decode(value, { stream: true });
-      if (!isWhitespace(chunk)) chunkTimer.markChunk();
+      if (!isWhitespace(chunk)) {
+        finalChunkAt = performance.now();
+        firstChunkAt ??= finalChunkAt;
+      }
       text += chunk;
     }
     text += decoder.decode();
   } finally {
     reader.releaseLock();
   }
-  return { text, timing: chunkTimer.timing(requestStartedAt) };
+  return { text, timing: responseTiming(firstChunkAt, finalChunkAt, requestStartedAt) };
 }

@@ -633,6 +633,7 @@
     "dismissed",
     "files",
     "manual review",
+    "merge",
     "no changes needed",
     "open",
     "open pull request",
@@ -862,6 +863,7 @@
     "token"
   ],
   "pt-BR": [
+    "choose a repository",
     "comment",
     "created",
     "critical",

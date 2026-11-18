@@ -20,7 +20,10 @@ import {
 import { applyVercelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import { applyAnthropicModelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/model-settings';
 import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
-import { isOpenAiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
+import {
+  applyOpenAiModelSettings,
+  isOpenAiModel,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
 import {
   isGatewayUserByokProviderId,
   OpenRouterInferenceProviderIdSchema,
@@ -31,6 +34,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/moonshotai';
 import { resolvePreferredProviderOrder } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order';
 import { getPreferredProviderOrderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config';
+import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type { PreferredProviderOrderConfig } from '@kilocode/db/schema-types';
 import {
   ReasoningDetailsTransform,
@@ -384,9 +388,18 @@ export async function applyProviderSpecificLogic(
   if (isAutoSmallFreeModel(requestedModel)) {
     requestToMutate.body.model = AUTO_SMALL_FREE_MODEL_UPSTREAM_ID;
   }
+  if (provider.type === 'openrouter' && requestedModel.startsWith('~')) {
+    // Kilo pins a latest alias to its stored target, so OpenRouter serves that target rather than
+    // the newest model it would pick.
+    requestToMutate.body.model = await resolveOpenRouterModelAlias(requestedModel);
+  }
 
   if (isClaudeModel(requestedModel)) {
     applyAnthropicModelSettings(requestToMutate, extraHeaders);
+  }
+
+  if (isOpenAiModel(requestedModel)) {
+    applyOpenAiModelSettings(requestToMutate);
   }
 
   // Kilo's provider order and exclusions only shape routes Kilo pays for, never a user's own keys.
@@ -418,11 +431,12 @@ export async function applyProviderSpecificLogic(
   if (provider.type === 'vercel') {
     // A user's own Vercel AI Gateway key is shaped like a managed request: the
     // user's account pays and the provider routing settings still apply.
+    // The inference region pins only a route Kilo pays for; a user's own key is exempt.
     await applyVercelSettings(
       requestedModel,
       requestToMutate,
       usesUserGatewayKey ? null : userByok,
-      dataRegion
+      userByok === null ? dataRegion : null
     );
   }
 

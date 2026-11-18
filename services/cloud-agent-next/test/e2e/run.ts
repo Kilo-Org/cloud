@@ -32,6 +32,7 @@
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { z } from 'zod';
 import {
   sandboxAllocationSchema,
   type SandboxAllocation,
@@ -44,7 +45,12 @@ import {
   DRIVER_USER_EMAIL_SUFFIX,
 } from './auth.js';
 import { DEFAULT_CONFIG, type ApiVersion, type DriverConfig } from './client.js';
-import { bootstrapDeployedProfile, fetchStreamTicket, type DeployedAuth } from './deployed-auth.js';
+import {
+  bootstrapDeployedProfile,
+  createControlTokenProvider,
+  fetchStreamTicket,
+  type DeployedAuth,
+} from './deployed-auth.js';
 import type { LifecycleResult } from './lifecycle.js';
 import {
   runSharedScenario,
@@ -380,6 +386,7 @@ async function runLocal(parsed: ParsedArgs): Promise<void> {
   loadRepoEnvFiles(SERVICE_PACKAGE_DIR);
   const devVars = loadDevVars(SERVICE_PACKAGE_DIR);
   const seededEmail = process.env.E2E_USER_EMAIL?.trim();
+  const kilocodeOrganizationId = z.uuid().optional().parse(process.env.E2E_ORG_ID);
   // Parallel matrix children start in the same millisecond, so the clock alone
   // collides on the unique email.
   const email =
@@ -398,6 +405,7 @@ async function runLocal(parsed: ParsedArgs): Promise<void> {
   const config: DriverConfig = {
     ...DEFAULT_CONFIG,
     user,
+    kilocodeOrganizationId,
     nextAuthSecret: devVars.NEXTAUTH_SECRET ?? '',
     internalApiSecret: devVars.INTERNAL_API_SECRET,
     workerUrl: process.env.WORKER_URL ?? DEFAULT_CONFIG.workerUrl,
@@ -456,10 +464,16 @@ async function runLocalHttp(parsed: ParsedArgs): Promise<void> {
 
   const env = bootstrapDeployedProfile();
   const auth = env.auth;
+  const controlTokens = createControlTokenProvider({
+    backendUrl: env.backendUrl,
+    sourceToken: auth.token,
+  });
+  await controlTokens.getToken();
   const config = {
     ...buildDeployedConfig(env, auth, {
       ...(process.env.E2E_GIT_URL ? { gitUrl: process.env.E2E_GIT_URL } : {}),
       ...(process.env.E2E_MODEL ? { model: process.env.E2E_MODEL } : {}),
+      getBearerToken: controlTokens.getToken,
     }),
     ...(allocation === undefined ? {} : { sandboxAllocation: allocation }),
   };
@@ -491,7 +505,11 @@ async function runLocalHttp(parsed: ParsedArgs): Promise<void> {
 export function buildDeployedConfig(
   env: DeployedProfileEnv,
   auth: DeployedAuth,
-  overrides: { gitUrl?: string; model?: string } = {}
+  overrides: {
+    gitUrl?: string;
+    model?: string;
+    getBearerToken?: () => Promise<string>;
+  } = {}
 ): DriverConfig {
   return {
     ...DEFAULT_CONFIG,
@@ -500,6 +518,7 @@ export function buildDeployedConfig(
       ...(auth.identity.email === undefined ? {} : { email: auth.identity.email }),
     },
     bearerToken: auth.token,
+    ...(overrides.getBearerToken === undefined ? {} : { getBearerToken: overrides.getBearerToken }),
     fetchStreamTicket: sessionId =>
       fetchStreamTicket({ backendUrl: env.backendUrl, token: auth.token, sessionId }),
     skipBalanceCheck: true,
@@ -513,9 +532,9 @@ export function buildDeployedConfig(
 
 /**
  * Deployed profile. Never loads `.dev.vars`/root env files, never touches
- * Postgres, and never mints JWTs or stream tickets: it authenticates with a
- * real personal API token from the auth file and fetches tickets from the live
- * backend. It dispatches only from `SHARED_SCENARIOS`.
+ * Postgres, and never mints JWTs or stream tickets: it exchanges a real
+ * personal API token for short-lived control tokens and fetches tickets from
+ * the live backend. It dispatches only from `SHARED_SCENARIOS`.
  */
 async function runDeployed(parsed: ParsedArgs): Promise<void> {
   const { lifecycle, conversation, verbose, timeoutMs, allocation } = parsed;
@@ -541,10 +560,16 @@ async function runDeployed(parsed: ParsedArgs): Promise<void> {
 
   const env = bootstrapDeployedProfile();
   const auth = env.auth;
+  const controlTokens = createControlTokenProvider({
+    backendUrl: env.backendUrl,
+    sourceToken: auth.token,
+  });
+  await controlTokens.getToken();
   const config = {
     ...buildDeployedConfig(env, auth, {
       ...(process.env.E2E_GIT_URL ? { gitUrl: process.env.E2E_GIT_URL } : {}),
       ...(process.env.E2E_MODEL ? { model: process.env.E2E_MODEL } : {}),
+      getBearerToken: controlTokens.getToken,
     }),
     ...(allocation === undefined ? {} : { sandboxAllocation: allocation }),
   };

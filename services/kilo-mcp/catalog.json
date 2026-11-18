@@ -6965,6 +6965,37 @@
     ],
     "searchBlob": "cloudAgentNext.getStackedWorkspaceSource Look up an existing workspace's branch, repository, and PR details so it can be used as the parent for creating a stacked workspace. Returns read-only source info, including whether the branch has been pushed and which provider/integration it belongs to. cloudagentnext getstackedworkspacesource worktreeid worktreeId"
   },
+  "cloudAgentNext.getWorkspaceArtifactDownloadUrl": {
+    "path": "cloudAgentNext.getWorkspaceArtifactDownloadUrl",
+    "kind": "query",
+    "summary": "Get a short-lived download link for a file saved in a Cloud Agent workspace's /artifacts directory. Pass the relative path from the artifact listing.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cloudAgentSessionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "relativePath": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "cloudAgentSessionId",
+        "relativePath"
+      ],
+      "additionalProperties": false
+    },
+    "tags": [
+      "cloudagentnext",
+      "getworkspaceartifactdownloadurl",
+      "cloudagentsessionid",
+      "relativepath"
+    ],
+    "searchBlob": "cloudAgentNext.getWorkspaceArtifactDownloadUrl Get a short-lived download link for a file saved in a Cloud Agent workspace's /artifacts directory. Pass the relative path from the artifact listing. cloudagentnext getworkspaceartifactdownloadurl cloudagentsessionid relativepath cloudAgentSessionId relativePath"
+  },
   "cloudAgentNext.getWorkspaceSnapshotRecovery": {
     "path": "cloudAgentNext.getWorkspaceSnapshotRecovery",
     "kind": "query",
@@ -7272,6 +7303,31 @@
       "repository"
     ],
     "searchBlob": "cloudAgentNext.listRepositoryBranches Lists a repository's branches and its default branch for the new-session flow in personal context; GitHub and GitLab use the caller's own connection, and Bitbucket reports the explicit organization-only unavailable state. cloudagentnext listrepositorybranches platform repository platform repository"
+  },
+  "cloudAgentNext.listWorkspaceArtifacts": {
+    "path": "cloudAgentNext.listWorkspaceArtifacts",
+    "kind": "query",
+    "summary": "List the files saved from a Cloud Agent workspace's /artifacts directory, shared by sibling chats and retained after the sandbox stops. Returns the artifact revision and each file's path, size, content type, and expiry.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cloudAgentSessionId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "cloudAgentSessionId"
+      ],
+      "additionalProperties": false
+    },
+    "tags": [
+      "cloudagentnext",
+      "listworkspaceartifacts",
+      "cloudagentsessionid"
+    ],
+    "searchBlob": "cloudAgentNext.listWorkspaceArtifacts List the files saved from a Cloud Agent workspace's /artifacts directory, shared by sibling chats and retained after the sandbox stops. Returns the artifact revision and each file's path, size, content type, and expiry. cloudagentnext listworkspaceartifacts cloudagentsessionid cloudAgentSessionId"
   },
   "cloudAgentNext.prepareSession": {
     "path": "cloudAgentNext.prepareSession",
@@ -9306,6 +9362,28 @@
     ],
     "searchBlob": "cloudAgentSettings.getBuiltinAgents Get the current user's personal built-in agent settings, including disabled modes and per-agent model overrides. cloudagentsettings getbuiltinagents"
   },
+  "cloudAgentSettings.getModelContextLimits": {
+    "path": "cloudAgentSettings.getModelContextLimits",
+    "kind": "query",
+    "summary": "Get the current user's personal Cloud Agent context caps, as a map from gateway model IDs to token counts.",
+    "inputSchema": {},
+    "tags": [
+      "cloudagentsettings",
+      "getmodelcontextlimits"
+    ],
+    "searchBlob": "cloudAgentSettings.getModelContextLimits Get the current user's personal Cloud Agent context caps, as a map from gateway model IDs to token counts. cloudagentsettings getmodelcontextlimits"
+  },
+  "cloudAgentSettings.getWebSearch": {
+    "path": "cloudAgentSettings.getWebSearch",
+    "kind": "query",
+    "summary": "Get the current user's web search provider preference for Cloud Agent sessions. Use to check which search provider is configured.",
+    "inputSchema": {},
+    "tags": [
+      "cloudagentsettings",
+      "getwebsearch"
+    ],
+    "searchBlob": "cloudAgentSettings.getWebSearch Get the current user's web search provider preference for Cloud Agent sessions. Use to check which search provider is configured. cloudagentsettings getwebsearch"
+  },
   "cloudAgentSettings.getWorkspaceOrder": {
     "path": "cloudAgentSettings.getWorkspaceOrder",
     "kind": "query",
@@ -9460,6 +9538,39 @@
     ],
     "searchBlob": "cloudAgentSettings.setContextAllocation Set or clear the default sandbox allocation used for Cloud Agent context, for the current user or their organization. cloudagentsettings setcontextallocation organizationid allocation organizationId allocation"
   },
+  "cloudAgentSettings.setModelContextLimits": {
+    "path": "cloudAgentSettings.setModelContextLimits",
+    "kind": "mutation",
+    "summary": "Replace the current user's personal Cloud Agent context caps for new workspaces. Pass gateway model IDs mapped to token counts, or an empty map to clear all caps.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "limits": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 1000,
+            "maximum": 10000000
+          }
+        }
+      },
+      "required": [
+        "limits"
+      ]
+    },
+    "tags": [
+      "cloudagentsettings",
+      "setmodelcontextlimits",
+      "limits"
+    ],
+    "searchBlob": "cloudAgentSettings.setModelContextLimits Replace the current user's personal Cloud Agent context caps for new workspaces. Pass gateway model IDs mapped to token counts, or an empty map to clear all caps. cloudagentsettings setmodelcontextlimits limits limits"
+  },
   "cloudAgentSettings.setRepositorySettings": {
     "path": "cloudAgentSettings.setRepositorySettings",
     "kind": "mutation",
@@ -9529,6 +9640,48 @@
       "allocation"
     ],
     "searchBlob": "cloudAgentSettings.setRepositorySettings Save Cloud Agent sandbox settings for a specific repository, setting or clearing its assigned profile and allocation. cloudagentsettings setrepositorysettings organizationid repofullname platform profileid allocation organizationId repoFullName platform profileId allocation"
+  },
+  "cloudAgentSettings.setWebSearch": {
+    "path": "cloudAgentSettings.setWebSearch",
+    "kind": "mutation",
+    "summary": "Update the user's web search provider preference for Cloud Agent sessions, choosing which provider is used for searching the web.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "provider": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "default"
+            },
+            {
+              "type": "string",
+              "enum": [
+                "exa",
+                "firecrawl",
+                "parallel",
+                "tavily",
+                "tinyfish"
+              ]
+            },
+            {
+              "type": "string",
+              "const": "off"
+            }
+          ]
+        }
+      },
+      "required": [
+        "provider"
+      ]
+    },
+    "tags": [
+      "cloudagentsettings",
+      "setwebsearch",
+      "provider"
+    ],
+    "searchBlob": "cloudAgentSettings.setWebSearch Update the user's web search provider preference for Cloud Agent sessions, choosing which provider is used for searching the web. cloudagentsettings setwebsearch provider provider"
   },
   "cloudAgentSettings.setWorkspaceOrder": {
     "path": "cloudAgentSettings.setWorkspaceOrder",
@@ -16747,17 +16900,6 @@
     ],
     "searchBlob": "modelPreferences.setLastSelected Save the model and variant a user selected most recently, so the app can preselect it next time. modelpreferences setlastselected model variant model variant"
   },
-  "models.customPricing": {
-    "path": "models.customPricing",
-    "kind": "query",
-    "summary": "Get the configured custom model pricing, such as discounted or overridden model prices used by the AI gateway. Use to look up current custom price settings per model.",
-    "inputSchema": {},
-    "tags": [
-      "models",
-      "custompricing"
-    ],
-    "searchBlob": "models.customPricing Get the configured custom model pricing, such as discounted or overridden model prices used by the AI gateway. Use to look up current custom price settings per model. models custompricing"
-  },
   "models.list": {
     "path": "models.list",
     "kind": "query",
@@ -16779,6 +16921,37 @@
       "preferred"
     ],
     "searchBlob": "models.preferred Return the ordered list of preferred AI models for the app, including free/auto models and top paid models. Use it to populate model pickers or determine default model selection order. models preferred"
+  },
+  "models.selectorList": {
+    "path": "models.selectorList",
+    "kind": "query",
+    "summary": "List the models available for a model selector: returns the personal model list for a user, or the models available to a specific organization filtered by audience (member or shared services). Use when an agent needs to populate a model picker or check which models a user or organization can access.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "audience": {
+          "default": "member",
+          "type": "string",
+          "enum": [
+            "member",
+            "shared_services"
+          ]
+        }
+      }
+    },
+    "tags": [
+      "models",
+      "selectorlist",
+      "organizationid",
+      "audience"
+    ],
+    "searchBlob": "models.selectorList List the models available for a model selector: returns the personal model list for a user, or the models available to a specific organization filtered by audience (member or shared services). Use when an agent needs to populate a model picker or check which models a user or organization can access. models selectorlist organizationid audience organizationId audience"
   },
   "moderation.acceptTerms": {
     "path": "moderation.acceptTerms",
@@ -18866,6 +19039,62 @@
     ],
     "searchBlob": "organizations.cloudAgentNext.getStackedWorkspaceSource Look up an existing workspace to stack a new workspace on top of it, returning its repository, branch, pull request number, and whether its branch has been pushed. Use this to preview the parent source before starting a stacked Cloud Agent session. organizations cloudagentnext getstackedworkspacesource organizationid worktreeid organizationId worktreeId"
   },
+  "organizations.cloudAgentNext.getWorkspaceArtifactDownloadUrl": {
+    "path": "organizations.cloudAgentNext.getWorkspaceArtifactDownloadUrl",
+    "kind": "query",
+    "summary": "Get a short-lived download link for a file saved in an organization Cloud Agent workspace's /artifacts directory. Pass the relative path from the artifact listing.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "allOf": [
+        {
+          "type": "object",
+          "properties": {
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "organizationId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "cloudAgentSessionId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "relativePath": {
+              "type": "string",
+              "minLength": 1
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "cloudAgentSessionId",
+            "relativePath",
+            "organizationId"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "tags": [
+      "organizations",
+      "cloudagentnext",
+      "getworkspaceartifactdownloadurl",
+      "organizationid",
+      "cloudagentsessionid",
+      "relativepath"
+    ],
+    "searchBlob": "organizations.cloudAgentNext.getWorkspaceArtifactDownloadUrl Get a short-lived download link for a file saved in an organization Cloud Agent workspace's /artifacts directory. Pass the relative path from the artifact listing. organizations cloudagentnext getworkspaceartifactdownloadurl organizationid cloudagentsessionid relativepath organizationId cloudAgentSessionId relativePath"
+  },
   "organizations.cloudAgentNext.getWorkspaceSnapshotRecovery": {
     "path": "organizations.cloudAgentNext.getWorkspaceSnapshotRecovery",
     "kind": "query",
@@ -19415,6 +19644,56 @@
       "repository"
     ],
     "searchBlob": "organizations.cloudAgentNext.listRepositoryBranches Lists a repository's branches and its default branch for the new-session flow in organization context, using the organization's connected GitHub, GitLab, or Bitbucket integration. organizations cloudagentnext listrepositorybranches organizationid platform repository organizationId platform repository"
+  },
+  "organizations.cloudAgentNext.listWorkspaceArtifacts": {
+    "path": "organizations.cloudAgentNext.listWorkspaceArtifacts",
+    "kind": "query",
+    "summary": "List the files saved from an organization Cloud Agent workspace's /artifacts directory, shared by sibling chats and retained after the sandbox stops. Returns the artifact revision and each file's path, size, content type, and expiry.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "allOf": [
+        {
+          "type": "object",
+          "properties": {
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "organizationId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "cloudAgentSessionId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "cloudAgentSessionId",
+            "organizationId"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "tags": [
+      "organizations",
+      "cloudagentnext",
+      "listworkspaceartifacts",
+      "organizationid",
+      "cloudagentsessionid"
+    ],
+    "searchBlob": "organizations.cloudAgentNext.listWorkspaceArtifacts List the files saved from an organization Cloud Agent workspace's /artifacts directory, shared by sibling chats and retained after the sandbox stops. Returns the artifact revision and each file's path, size, content type, and expiry. organizations cloudagentnext listworkspaceartifacts organizationid cloudagentsessionid organizationId cloudAgentSessionId"
   },
   "organizations.cloudAgentNext.prepareSession": {
     "path": "organizations.cloudAgentNext.prepareSession",
@@ -35146,18 +35425,6 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 200
-        },
-        "organizationId": {
-          "anyOf": [
-            {
-              "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-            },
-            {
-              "type": "null"
-            }
-          ]
         }
       },
       "required": [
@@ -35168,10 +35435,9 @@
       "todos",
       "items",
       "candidatesforsession",
-      "sessionid",
-      "organizationid"
+      "sessionid"
     ],
-    "searchBlob": "todos.items.candidatesForSession List open to-do items that could be linked to a session, prioritizing ones in the same repository. todos items candidatesforsession sessionid organizationid sessionId organizationId"
+    "searchBlob": "todos.items.candidatesForSession List open to-do items that could be linked to a session, prioritizing ones in the same repository. todos items candidatesforsession sessionid sessionId"
   },
   "todos.items.create": {
     "path": "todos.items.create",
@@ -36152,6 +36418,14 @@
             "maxLength": 256
           }
         },
+        "autoModels": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
         "modes": {
           "maxItems": 500,
           "type": "array",
@@ -36169,6 +36443,14 @@
           }
         },
         "providers": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "inferenceProviders": {
           "maxItems": 500,
           "type": "array",
           "items": {
@@ -36200,6 +36482,14 @@
             "maxLength": 256
           }
         },
+        "excludedAutoModels": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
         "excludedModes": {
           "maxItems": 500,
           "type": "array",
@@ -36224,6 +36514,14 @@
             "maxLength": 256
           }
         },
+        "excludedInferenceProviders": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
         "excludedProjects": {
           "maxItems": 500,
           "type": "array",
@@ -36241,6 +36539,8 @@
             "user",
             "provider",
             "project",
+            "autoModel",
+            "inferenceProvider",
             "organization"
           ]
         },
@@ -36280,21 +36580,25 @@
       "viewas",
       "features",
       "models",
+      "automodels",
       "modes",
       "userids",
       "providers",
+      "inferenceproviders",
       "projects",
       "excludedfeatures",
       "excludedmodels",
+      "excludedautomodels",
       "excludedmodes",
       "excludeduserids",
       "excludedproviders",
+      "excludedinferenceproviders",
       "excludedprojects",
       "dimension",
       "metric",
       "limit"
     ],
-    "searchBlob": "usageAnalytics.getBreakdown Rank a dimension (model, feature, project, provider, user, mode) by an aggregate metric to show top contributors and their percentages. usageanalytics getbreakdown startdate enddate granularity costsource organizationid organizationids personalscope viewas features models modes userids providers projects excludedfeatures excludedmodels excludedmodes excludeduserids excludedproviders excludedprojects dimension metric limit startDate endDate granularity costSource organizationId organizationIds personalScope viewAs features models modes userIds providers projects excludedFeatures excludedModels excludedModes excludedUserIds excludedProviders excludedProjects dimension metric limit"
+    "searchBlob": "usageAnalytics.getBreakdown Rank a dimension (model, feature, project, provider, user, mode) by an aggregate metric to show top contributors and their percentages. usageanalytics getbreakdown startdate enddate granularity costsource organizationid organizationids personalscope viewas features models automodels modes userids providers inferenceproviders projects excludedfeatures excludedmodels excludedautomodels excludedmodes excludeduserids excludedproviders excludedinferenceproviders excludedprojects dimension metric limit startDate endDate granularity costSource organizationId organizationIds personalScope viewAs features models autoModels modes userIds providers inferenceProviders projects excludedFeatures excludedModels excludedAutoModels excludedModes excludedUserIds excludedProviders excludedInferenceProviders excludedProjects dimension metric limit"
   },
   "usageAnalytics.getScopeOrganizations": {
     "path": "usageAnalytics.getScopeOrganizations",
@@ -36402,6 +36706,14 @@
             "maxLength": 256
           }
         },
+        "autoModels": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
         "modes": {
           "maxItems": 500,
           "type": "array",
@@ -36419,6 +36731,14 @@
           }
         },
         "providers": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "inferenceProviders": {
           "maxItems": 500,
           "type": "array",
           "items": {
@@ -36450,6 +36770,14 @@
             "maxLength": 256
           }
         },
+        "excludedAutoModels": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
         "excludedModes": {
           "maxItems": 500,
           "type": "array",
@@ -36467,6 +36795,14 @@
           }
         },
         "excludedProviders": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "excludedInferenceProviders": {
           "maxItems": 500,
           "type": "array",
           "items": {
@@ -36502,18 +36838,22 @@
       "viewas",
       "features",
       "models",
+      "automodels",
       "modes",
       "userids",
       "providers",
+      "inferenceproviders",
       "projects",
       "excludedfeatures",
       "excludedmodels",
+      "excludedautomodels",
       "excludedmodes",
       "excludeduserids",
       "excludedproviders",
+      "excludedinferenceproviders",
       "excludedprojects"
     ],
-    "searchBlob": "usageAnalytics.getSummary Fetch aggregate usage totals (cost, requests, tokens, errors, latency, active users) over a date range for a user or organization, optionally filtered by model/feature/project/provider. usageanalytics getsummary startdate enddate granularity costsource organizationid organizationids personalscope viewas features models modes userids providers projects excludedfeatures excludedmodels excludedmodes excludeduserids excludedproviders excludedprojects startDate endDate granularity costSource organizationId organizationIds personalScope viewAs features models modes userIds providers projects excludedFeatures excludedModels excludedModes excludedUserIds excludedProviders excludedProjects"
+    "searchBlob": "usageAnalytics.getSummary Fetch aggregate usage totals (cost, requests, tokens, errors, latency, active users) over a date range for a user or organization, optionally filtered by model/feature/project/provider. usageanalytics getsummary startdate enddate granularity costsource organizationid organizationids personalscope viewas features models automodels modes userids providers inferenceproviders projects excludedfeatures excludedmodels excludedautomodels excludedmodes excludeduserids excludedproviders excludedinferenceproviders excludedprojects startDate endDate granularity costSource organizationId organizationIds personalScope viewAs features models autoModels modes userIds providers inferenceProviders projects excludedFeatures excludedModels excludedAutoModels excludedModes excludedUserIds excludedProviders excludedInferenceProviders excludedProjects"
   },
   "usageAnalytics.getTable": {
     "path": "usageAnalytics.getTable",
@@ -36596,6 +36936,14 @@
             "maxLength": 256
           }
         },
+        "autoModels": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
         "modes": {
           "maxItems": 500,
           "type": "array",
@@ -36613,6 +36961,14 @@
           }
         },
         "providers": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "inferenceProviders": {
           "maxItems": 500,
           "type": "array",
           "items": {
@@ -36644,6 +37000,14 @@
             "maxLength": 256
           }
         },
+        "excludedAutoModels": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
         "excludedModes": {
           "maxItems": 500,
           "type": "array",
@@ -36661,6 +37025,14 @@
           }
         },
         "excludedProviders": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "excludedInferenceProviders": {
           "maxItems": 500,
           "type": "array",
           "items": {
@@ -36687,7 +37059,9 @@
               "mode",
               "user",
               "provider",
-              "project"
+              "project",
+              "autoModel",
+              "inferenceProvider"
             ]
           }
         },
@@ -36718,20 +37092,24 @@
       "viewas",
       "features",
       "models",
+      "automodels",
       "modes",
       "userids",
       "providers",
+      "inferenceproviders",
       "projects",
       "excludedfeatures",
       "excludedmodels",
+      "excludedautomodels",
       "excludedmodes",
       "excludeduserids",
       "excludedproviders",
+      "excludedinferenceproviders",
       "excludedprojects",
       "groupby",
       "limit"
     ],
-    "searchBlob": "usageAnalytics.getTable Return a tabular grid of usage rows (cost, tokens, errors) grouped by any combination of feature, model, mode, user, provider, and project dimensions over time. usageanalytics gettable startdate enddate granularity costsource organizationid organizationids personalscope viewas features models modes userids providers projects excludedfeatures excludedmodels excludedmodes excludeduserids excludedproviders excludedprojects groupby limit startDate endDate granularity costSource organizationId organizationIds personalScope viewAs features models modes userIds providers projects excludedFeatures excludedModels excludedModes excludedUserIds excludedProviders excludedProjects groupBy limit"
+    "searchBlob": "usageAnalytics.getTable Return a tabular grid of usage rows (cost, tokens, errors) grouped by any combination of feature, model, mode, user, provider, and project dimensions over time. usageanalytics gettable startdate enddate granularity costsource organizationid organizationids personalscope viewas features models automodels modes userids providers inferenceproviders projects excludedfeatures excludedmodels excludedautomodels excludedmodes excludeduserids excludedproviders excludedinferenceproviders excludedprojects groupby limit startDate endDate granularity costSource organizationId organizationIds personalScope viewAs features models autoModels modes userIds providers inferenceProviders projects excludedFeatures excludedModels excludedAutoModels excludedModes excludedUserIds excludedProviders excludedInferenceProviders excludedProjects groupBy limit"
   },
   "usageAnalytics.getTimeseries": {
     "path": "usageAnalytics.getTimeseries",
@@ -36814,6 +37192,14 @@
             "maxLength": 256
           }
         },
+        "autoModels": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
         "modes": {
           "maxItems": 500,
           "type": "array",
@@ -36831,6 +37217,14 @@
           }
         },
         "providers": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "inferenceProviders": {
           "maxItems": 500,
           "type": "array",
           "items": {
@@ -36862,6 +37256,14 @@
             "maxLength": 256
           }
         },
+        "excludedAutoModels": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
         "excludedModes": {
           "maxItems": 500,
           "type": "array",
@@ -36879,6 +37281,14 @@
           }
         },
         "excludedProviders": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "excludedInferenceProviders": {
           "maxItems": 500,
           "type": "array",
           "items": {
@@ -36919,7 +37329,9 @@
             "mode",
             "user",
             "provider",
-            "project"
+            "project",
+            "autoModel",
+            "inferenceProvider"
           ]
         }
       },
@@ -36943,20 +37355,24 @@
       "viewas",
       "features",
       "models",
+      "automodels",
       "modes",
       "userids",
       "providers",
+      "inferenceproviders",
       "projects",
       "excludedfeatures",
       "excludedmodels",
+      "excludedautomodels",
       "excludedmodes",
       "excludeduserids",
       "excludedproviders",
+      "excludedinferenceproviders",
       "excludedprojects",
       "metric",
       "splitby"
     ],
-    "searchBlob": "usageAnalytics.getTimeseries Get a metric (requests, cost, tokens, latency, etc.) bucketed over time for a date range, optionally split into per-dimension series. usageanalytics gettimeseries startdate enddate granularity costsource organizationid organizationids personalscope viewas features models modes userids providers projects excludedfeatures excludedmodels excludedmodes excludeduserids excludedproviders excludedprojects metric splitby startDate endDate granularity costSource organizationId organizationIds personalScope viewAs features models modes userIds providers projects excludedFeatures excludedModels excludedModes excludedUserIds excludedProviders excludedProjects metric splitBy"
+    "searchBlob": "usageAnalytics.getTimeseries Get a metric (requests, cost, tokens, latency, etc.) bucketed over time for a date range, optionally split into per-dimension series. usageanalytics gettimeseries startdate enddate granularity costsource organizationid organizationids personalscope viewas features models automodels modes userids providers inferenceproviders projects excludedfeatures excludedmodels excludedautomodels excludedmodes excludeduserids excludedproviders excludedinferenceproviders excludedprojects metric splitby startDate endDate granularity costSource organizationId organizationIds personalScope viewAs features models autoModels modes userIds providers inferenceProviders projects excludedFeatures excludedModels excludedAutoModels excludedModes excludedUserIds excludedProviders excludedInferenceProviders excludedProjects metric splitBy"
   },
   "usageAnalytics.resolveOrgUsers": {
     "path": "usageAnalytics.resolveOrgUsers",
@@ -37710,7 +38126,7 @@
         "sessionId": {
           "type": "string",
           "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$"
         }
       },
       "required": [
@@ -38316,8 +38732,13 @@
           "type": "string",
           "enum": [
             "cloud_agent",
+            "cloud_agent_chat",
             "kiloclaw_chat"
           ]
+        },
+        "cloudAgentSessionId": {
+          "type": "string",
+          "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         },
         "kiloclawInstanceId": {
           "type": "string",
@@ -38445,6 +38866,7 @@
       "organizationid",
       "runascreator",
       "targettype",
+      "cloudagentsessionid",
       "kiloclawinstanceid",
       "githubrepo",
       "mode",
@@ -38462,7 +38884,7 @@
       "cronexpression",
       "crontimezone"
     ],
-    "searchBlob": "webhookTriggers.create Create a new webhook or scheduled trigger that runs a Cloud Agent or KiloClaw Chat on an incoming request or cron schedule. Use this to set up an automation that fires when a GitHub event or webhook arrives. webhooktriggers create triggerid organizationid runascreator targettype kiloclawinstanceid githubrepo mode model variant sandboxallocation environmentid profileid bodyschema prompttemplate autocommit condenseoncomplete webhookauth activationmode cronexpression crontimezone triggerId organizationId runAsCreator targetType kiloclawInstanceId githubRepo mode model variant sandboxAllocation environmentId profileId bodySchema promptTemplate autoCommit condenseOnComplete webhookAuth activationMode cronExpression cronTimezone"
+    "searchBlob": "webhookTriggers.create Create a new webhook or scheduled trigger that runs a Cloud Agent or KiloClaw Chat on an incoming request or cron schedule. Use this to set up an automation that fires when a GitHub event or webhook arrives. webhooktriggers create triggerid organizationid runascreator targettype cloudagentsessionid kiloclawinstanceid githubrepo mode model variant sandboxallocation environmentid profileid bodyschema prompttemplate autocommit condenseoncomplete webhookauth activationmode cronexpression crontimezone triggerId organizationId runAsCreator targetType cloudAgentSessionId kiloclawInstanceId githubRepo mode model variant sandboxAllocation environmentId profileId bodySchema promptTemplate autoCommit condenseOnComplete webhookAuth activationMode cronExpression cronTimezone"
   },
   "webhookTriggers.delete": {
     "path": "webhookTriggers.delete",
@@ -38618,6 +39040,7 @@
           "type": "string",
           "enum": [
             "cloud_agent",
+            "cloud_agent_chat",
             "kiloclaw_chat"
           ]
         },
@@ -38642,6 +39065,28 @@
       "witheditability"
     ],
     "searchBlob": "webhookTriggers.list List webhook triggers owned by the current user or organization, with optional filtering by target type or activation mode, including their inbound webhook URLs. webhooktriggers list organizationid targettype activationmode witheditability organizationId targetType activationMode withEditability"
+  },
+  "webhookTriggers.listChatTargets": {
+    "path": "webhookTriggers.listChatTargets",
+    "kind": "query",
+    "summary": "List the chats and Cloud Agent sessions a user can pick as the target of a webhook trigger, optionally scoped to one organization; returns recent chats with titles and workspace names.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      }
+    },
+    "tags": [
+      "webhooktriggers",
+      "listchattargets",
+      "organizationid"
+    ],
+    "searchBlob": "webhookTriggers.listChatTargets List the chats and Cloud Agent sessions a user can pick as the target of a webhook trigger, optionally scoped to one organization; returns recent chats with titles and workspace names. webhooktriggers listchattargets organizationid organizationId"
   },
   "webhookTriggers.listRequests": {
     "path": "webhookTriggers.listRequests",
@@ -38700,6 +39145,9 @@
           "type": "string",
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "cloudAgentSessionId": {
+          "not": {}
         },
         "mode": {
           "type": "string",
@@ -38839,6 +39287,7 @@
       "update",
       "triggerid",
       "organizationid",
+      "cloudagentsessionid",
       "mode",
       "model",
       "variant",
@@ -38854,7 +39303,7 @@
       "cronexpression",
       "crontimezone"
     ],
-    "searchBlob": "webhookTriggers.update Update an existing trigger's settings, such as its model, prompt template, profile, active state, webhook authentication, or cron schedule. Use this to change or disable a trigger. webhooktriggers update triggerid organizationid mode model variant sandboxallocation environmentid prompttemplate profileid bodyschema autocommit condenseoncomplete isactive webhookauth cronexpression crontimezone triggerId organizationId mode model variant sandboxAllocation environmentId promptTemplate profileId bodySchema autoCommit condenseOnComplete isActive webhookAuth cronExpression cronTimezone"
+    "searchBlob": "webhookTriggers.update Update an existing trigger's settings, such as its model, prompt template, profile, active state, webhook authentication, or cron schedule. Use this to change or disable a trigger. webhooktriggers update triggerid organizationid cloudagentsessionid mode model variant sandboxallocation environmentid prompttemplate profileid bodyschema autocommit condenseoncomplete isactive webhookauth cronexpression crontimezone triggerId organizationId cloudAgentSessionId mode model variant sandboxAllocation environmentId promptTemplate profileId bodySchema autoCommit condenseOnComplete isActive webhookAuth cronExpression cronTimezone"
   },
   "workspaceFolders.create": {
     "path": "workspaceFolders.create",

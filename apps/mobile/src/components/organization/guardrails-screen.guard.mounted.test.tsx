@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- One suite drives the shared leave guard through every edit path of one form (edit, Cancel, a settled save, a rebasing refetch); splitting it would duplicate the mocked data layer and fixture. */
 // The guardrails form computes its dirty draft but left Back ungated: one press
 // dropped the draft and returned to the Profile tab root. This suite drives the
 // shared leave guard through the form's own edit paths — a detector edit,
@@ -385,21 +386,22 @@ describe('GuardrailsForm leave guard', () => {
   });
 
   it('keeps the guard armed through a rebase when the draft holds edits', async () => {
-    const renderer = await mountForm();
+    await mountForm();
 
     editInputToggle();
     expect(h.guard.enabled).toBe(true);
 
     // The saved configuration moves while the form holds edits that differ
     // from the new payload: the edits win and stay dirty against the new
-    // baseline.
+    // baseline. The group id moves from null to a set value, which the
+    // toggled draft does not carry.
     if (!h.setData) {
       throw new Error('the harness did not mount');
     }
     h.setData({
       ...payload(),
       enabled: false,
-      detectors: { ...payload().detectors, injection_attack: { enabled: false, action: 'log' } },
+      group_id: '11111111-1111-4111-8111-111111111111',
     });
     await act(async () => {
       await Promise.resolve();

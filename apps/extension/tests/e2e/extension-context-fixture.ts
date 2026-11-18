@@ -1,6 +1,7 @@
 /* eslint-disable import/no-nodejs-modules, max-lines, promise/avoid-new, promise/prefer-await-to-callbacks */
 import { chromium, expect } from '@playwright/test';
 import type { BrowserContext, Page } from '@playwright/test';
+import { rmSync } from 'node:fs';
 import { access, cp, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
@@ -120,7 +121,7 @@ const manifestSchema = z.looseObject({
  * permission in its granted state loads this copy. The shipped manifest is not
  * touched, and the extension code under test is byte-identical.
  */
-const copyExtensionWithGrantedPermissions = async (granted: readonly string[]): Promise<string> => {
+const buildGrantedExtensionCopy = async (granted: readonly string[]): Promise<string> => {
   const target = await mkdtemp(join(tmpdir(), 'kilo-extension-granted-'));
   await cp(extensionPath, target, { recursive: true });
   const manifestPath = join(target, 'manifest.json');
@@ -144,6 +145,40 @@ const copyExtensionWithGrantedPermissions = async (granted: readonly string[]): 
   );
 
   return target;
+};
+
+/**
+ * One copy per permission set for the whole worker: a launch reuses it instead
+ * of copying the build again, and the copies are removed when the worker exits,
+ * so a run leaves none of them behind.
+ */
+const grantedExtensionCopies = new Map<string, Promise<string>>();
+const extensionCopiesOnDisk = new Set<string>();
+
+process.once('exit', () => {
+  for (const copy of extensionCopiesOnDisk) {
+    try {
+      rmSync(copy, { force: true, recursive: true });
+    } catch {
+      // A temporary directory the system already reclaimed needs no cleanup.
+    }
+  }
+});
+
+const copyExtensionWithGrantedPermissions = async (granted: readonly string[]): Promise<string> => {
+  const key = [...granted].toSorted().join(',');
+  const existing = grantedExtensionCopies.get(key);
+
+  if (existing !== undefined) {
+    return existing;
+  }
+
+  const copy = buildGrantedExtensionCopy(granted);
+
+  grantedExtensionCopies.set(key, copy);
+  extensionCopiesOnDisk.add(await copy);
+
+  return copy;
 };
 
 export const launchExtensionContext = async (

@@ -20,7 +20,7 @@ type FakeRuntime = {
   readonly disposed: string[];
   readonly disposedTabs: number[];
   readonly opened: { controllerId: string; sessionHandle: string; title: string }[];
-  readonly ownTabs: { sessionHandle: string; url?: string | undefined }[];
+  readonly ownTabs: { sessionHandle: string }[];
   readonly released: string[];
   readonly releasedTabs: { caller: string; tabId: number }[];
   readonly run: BrowserToolRunInput[];
@@ -44,7 +44,7 @@ const createFakeRuntime = (
   const released: string[] = [];
   const releasedTabs: { caller: string; tabId: number }[] = [];
   const run: BrowserToolRunInput[] = [];
-  const ownTabs: { sessionHandle: string; url?: string | undefined }[] = [];
+  const ownTabs: { sessionHandle: string }[] = [];
   const disposedTabs: number[] = [];
 
   const summaries = (): BrowserTabGroupSessionSummary[] =>
@@ -112,12 +112,7 @@ const createFakeRuntime = (
 
       sessions.get(input.sessionHandle)?.tabs.push(tabId);
 
-      return {
-        groupId: 42,
-        tabId,
-        title: '',
-        url: input.url ?? 'about:blank',
-      };
+      return { groupId: 42, tabId, title: '', url: 'about:blank' };
     },
     releaseCaller: (caller: BrowserCaller) => {
       released.push(callerKey(caller));
@@ -141,6 +136,7 @@ const createFakeRuntime = (
         ...(shared.groupId === undefined ? {} : { groupId: shared.groupId }),
       };
     },
+    tabInfo: async () => ({ title: 'Started', url: 'https://app.example.com/next' }),
   };
 
   return {
@@ -277,15 +273,13 @@ describe('local agent browser bridge', () => {
 
     const result = await bridge.callTool(CONTROLLER, navigateParams());
 
-    // The tab loads the target itself: `about:blank` is not an inspectable tab, so it could never navigate.
-    expect(fake.ownTabs).toStrictEqual([
-      { sessionHandle: HANDLE, url: 'https://app.example.com/next' },
-    ]);
+    // The tab opens blank and grouped, and the call navigates it.
+    // A tab opened at the destination would let Chrome start a download before the gate ran.
+    expect(fake.ownTabs).toStrictEqual([{ sessionHandle: HANDLE }]);
     expect(fake.run).toHaveLength(1);
     expect(fake.run[0]).toMatchObject({
+      arguments: { url: 'https://app.example.com/next' },
       caller: { sessionHandle: HANDLE },
-      // The tab was opened at the destination: the tool reads the settled page instead of requesting the same URL twice.
-      navigationCommitted: true,
       tabId: 77,
       toolName: 'browser_navigate',
     });
@@ -362,19 +356,23 @@ describe('local agent browser bridge', () => {
       sessionHandle: HANDLE,
     });
 
-    expect(fake.ownTabs).toStrictEqual([
-      { sessionHandle: HANDLE, url: 'https://app.example.com/start' },
-    ]);
-    // The tab is the tool's result; no page-action tab is created on top of it.
-    expect(fake.run).toStrictEqual([]);
+    // The tab opens blank and grouped, and the requested url loads through the guarded navigate path.
+    expect(fake.ownTabs).toStrictEqual([{ sessionHandle: HANDLE }]);
+    expect(fake.run).toHaveLength(1);
+    expect(fake.run[0]).toMatchObject({
+      arguments: { url: 'https://app.example.com/start' },
+      tabId: 77,
+      toolName: 'browser_navigate',
+    });
     expect(result).toStrictEqual({
       content: [
         {
+          // The payload describes the tab after its navigation.
           text: JSON.stringify({
             selected: true,
             tabId: 77,
-            title: '',
-            url: 'https://app.example.com/start',
+            title: 'Started',
+            url: 'https://app.example.com/next',
           }),
           type: 'text',
         },

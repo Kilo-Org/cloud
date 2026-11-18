@@ -1409,6 +1409,7 @@ interface MutableNetworkRequest {
 
 export const createBrowserToolSession = ({
   debuggerApi,
+  ownedTab,
   scriptingApi,
   tabId,
   tabsApi,
@@ -1418,6 +1419,13 @@ export const createBrowserToolSession = ({
    * which selects the scripting backend.
    */
   readonly debuggerApi?: ChromeDebuggerApi | undefined;
+  /**
+   * The runtime opened this tab for a session. Such a tab starts at
+   * `about:blank`, whose url the browser withholds without the `tabs`
+   * permission, so the precheck cannot judge it and the attach reports an
+   * unreachable page instead.
+   */
+  readonly ownedTab?: boolean | undefined;
   /** `chrome.scripting`/`browser.scripting`; the scripting backend's way to reach the page. */
   readonly scriptingApi?: BrowserScriptingApi | undefined;
   readonly tabId: number;
@@ -1932,7 +1940,12 @@ export const createBrowserToolSession = ({
   };
 
   const doAttach = async (): Promise<void> => {
-    const resolution = await getInspectableTab({ tabId, tabsApi });
+    // A tab this runtime opened for a session starts blank, and a blank url is unreadable without the `tabs` permission.
+    // Its caller vouched for it, so the attach reports what it cannot reach.
+    const resolution =
+      ownedTab === true
+        ? ({ ok: true, tab: undefined } as const)
+        : await getInspectableTab({ tabId, tabsApi });
 
     if (!resolution.ok) {
       throw new Error(resolution.error);

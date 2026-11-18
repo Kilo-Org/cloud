@@ -39,6 +39,7 @@ export type LocalAgentBrowserRuntime = Pick<
   | 'releaseTab'
   | 'runTool'
   | 'shareActiveTab'
+  | 'tabInfo'
 >;
 
 export type LocalAgentBrowserSessionRef = {
@@ -275,12 +276,8 @@ export const createRuntimeBrowserBridge = ({
   const runOnTab = async (
     parsed: z.infer<typeof toolCallSchema>,
     input: LocalAgentBrowserSessionRef,
-    /**
-     * The tab the call runs on. `navigationCommitted` means the caller opened
-     * that tab at this call's destination and it has committed, so the tool
-     * must read the settled page instead of navigating again.
-     */
-    tab: { readonly navigationCommitted?: boolean; readonly tabId: number }
+    /** The tab the call runs on. */
+    tab: { readonly tabId: number }
   ): Promise<JsonRpcResult> => {
     const { tabId } = tab;
     const caller = sessionCaller(input);
@@ -292,7 +289,6 @@ export const createRuntimeBrowserBridge = ({
         },
         arguments: parsed.arguments,
         caller,
-        ...(tab.navigationCommitted === true ? { navigationCommitted: true } : {}),
         tabId,
         toolName: parsed.name,
       })
@@ -392,22 +388,31 @@ export const createRuntimeBrowserBridge = ({
       }
 
       const url = argumentStringSchema.safeParse(parsed.arguments['url']);
-      const opened = await runtime().openSessionTab({
-        sessionHandle: input.sessionHandle,
-        ...(url.success ? { url: url.data } : {}),
-      });
+      const opened = await runtime().openSessionTab({ sessionHandle: input.sessionHandle });
 
       if (opened === undefined) {
         throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.blocked, NO_TAB_ERROR);
       }
+
+      // A tab opened *at* the destination would let Chrome start a download the gate never saw.
+      // The url therefore loads through the guarded navigate path; a refused navigate leaves the tab in the session, as an after-action refusal must.
+      if (url.success && url.data !== '') {
+        await runOnTab(
+          { ...parsed, arguments: { url: url.data }, name: 'browser_navigate' },
+          input,
+          { tabId: opened.tabId }
+        );
+      }
+
+      const info = await runtime().tabInfo(opened.tabId);
 
       // The same payload `browser_tabs new` returns from the page path.
       return textContent(
         JSON.stringify({
           selected: true,
           tabId: opened.tabId,
-          title: opened.title,
-          url: opened.url,
+          title: info?.title ?? opened.title,
+          url: info?.url ?? opened.url,
         })
       );
     }
@@ -437,18 +442,15 @@ export const createRuntimeBrowserBridge = ({
       );
     }
 
-    // The tab loads the page itself: `about:blank` is not an inspectable tab, so a navigate could never run on it.
-    const opened = await runtime().openSessionTab({
-      sessionHandle: input.sessionHandle,
-      url: url.data,
-    });
+    // The tab opens blank and is grouped first, then the call navigates it under the download guard.
+    // A tab opened at the destination would let Chrome start a download before the gate ran, and an attachment never loads a document.
+    const opened = await runtime().openSessionTab({ sessionHandle: input.sessionHandle });
 
     if (opened === undefined) {
       throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.blocked, NO_TAB_ERROR);
     }
 
-    // The navigation already happened: the tab was opened at this URL and committed, so the tool only reads the settled page. Requesting the same URL twice would spend a single-use destination (a reset link, an OAuth callback) before the call that was approved.
-    return runOnTab(parsed, input, { navigationCommitted: true, tabId: opened.tabId });
+    return runOnTab(parsed, input, { tabId: opened.tabId });
   };
 
   return {

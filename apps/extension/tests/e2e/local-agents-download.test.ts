@@ -14,8 +14,14 @@ import {
 import { launchExtensionContext } from './extension-context-fixture';
 import { mockKiloApi } from './kilo-api-fixture';
 import { startFakeHub } from './local-agents-hub-fixture';
-import { activateTab, openPairedAgentSession } from './local-agents-fixture';
-import type { LocalAgentSession } from './local-agents-fixture';
+import {
+  activateTab,
+  enableLocalAgents,
+  openPairedAgentSession,
+  pairAndHandshake,
+  sendAgentRpc,
+} from './local-agents-fixture';
+import type { LocalAgentSession, LocalAgentToolResponse } from './local-agents-fixture';
 
 /*
  * SPEC "Permission flow" step 6 and the wire contract §3: an agent `act` call
@@ -125,13 +131,20 @@ test('a guarded click cancels the download, and the approved retry keeps it', as
     expect(items).toStrictEqual([{ class: 'sensitive', origin, reason: 'downloading a file' }]);
     expect(fixture.hits()).toBeGreaterThan(0);
 
-    // The browser created the download and the guard cancelled it, so nothing reached the directory,
-    // The one download the page started reports a cancelled failure rather than a completed file.
+    // The browser created the download and the guard cancelled it, so nothing reached the directory.
     await expect.poll(() => readdir(downloadsPath), { timeout: 15_000 }).toStrictEqual([]);
     await expect.poll(() => downloads.length, { timeout: 15_000 }).toBe(1);
-    expect(await Promise.all(downloads.map(download => download.failure()))).toStrictEqual([
-      expect.stringContaining('canceled'),
-    ]);
+    // `cancel` may lose a race with a file this small, in which case the guard deletes the completed file instead.
+    // Either way the item may not leave a file behind, so no particular failure string is required.
+    for (const download of downloads) {
+      // eslint-disable-next-line no-await-in-loop -- one item, and the read depends on where it landed
+      const saved = await download.path().catch(() => null);
+
+      if (saved !== null) {
+        // eslint-disable-next-line no-await-in-loop -- see above
+        await expect(readFile(saved, 'utf8')).rejects.toThrow();
+      }
+    }
 
     // 2. The human approved: the identical call with the token runs with the guard off once.
     const approved = await session.callTool(
@@ -262,6 +275,153 @@ test('a navigate to an attachment asks first, then keeps the file once approved'
     // The success text names the file the browser wrote, which Playwright stores under its own name here.
     expect(approved.kind === 'result' ? approved.text : '').toContain(basename(saved));
     expect(approved.kind === 'result' ? approved.isError : true).toBe(false);
+  } finally {
+    await context.close();
+    await hub.close();
+    await fixture.close();
+    await rm(downloadsPath, { force: true, recursive: true });
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+/** A session with no tab at all: the CLI opens one and sends only `tools.call`, as its first call does. */
+const openEmptyAgentSession = async ({
+  context,
+  extensionId,
+  hub,
+  sidePanel,
+  title,
+}: Parameters<typeof openPairedAgentSession>[0]): Promise<{
+  readonly callTool: (
+    name: string,
+    args: Record<string, unknown>,
+    call: {
+      readonly authorized: readonly Record<string, unknown>[];
+      readonly sensitive?: readonly string[] | undefined;
+    }
+  ) => Promise<LocalAgentToolResponse>;
+}> => {
+  await enableLocalAgents(sidePanel, extensionId);
+  await pairAndHandshake({ context, extensionId, hub, sidePanel });
+
+  const controllerId = crypto.randomUUID();
+
+  hub.send({ controllerId, type: 'controller.connected' });
+
+  const opened = await sendAgentRpc(hub, controllerId, 1, 'session.open', {
+    cliVersion: '1.4.0',
+    cwd: '/Users/igor/Projects/kilo-bridge-e2e',
+    sessionId: `session-${controllerId}`,
+    title,
+  });
+  const { sessionHandle } = z.object({ sessionHandle: z.string() }).parse(opened.result);
+  let nextId = 10;
+
+  return {
+    callTool: async (name, args, { authorized, sensitive }) => {
+      nextId += 1;
+
+      const answer = await sendAgentRpc(hub, controllerId, nextId, 'tools.call', {
+        arguments: args,
+        authorized,
+        name,
+        ...(sensitive === undefined || sensitive.length === 0 ? {} : { sensitive }),
+        sessionHandle,
+      });
+
+      if (answer['error'] !== undefined) {
+        const error = z
+          .object({
+            code: z.number(),
+            data: z.record(z.string(), z.unknown()).optional(),
+            message: z.string(),
+          })
+          .parse(answer['error']);
+        const data = error.data ?? {};
+        const items = z.array(z.record(z.string(), z.unknown())).safeParse(data['items']);
+        const stepToken = z.string().safeParse(data['stepToken']);
+
+        return {
+          code: error.code,
+          kind: 'error',
+          message: error.message,
+          ...(items.success ? { items: items.data } : {}),
+          ...(stepToken.success ? { stepToken: stepToken.data } : {}),
+          ...(data['afterAction'] === true ? { afterAction: true } : {}),
+        };
+      }
+
+      const result = z
+        .object({
+          content: z.array(z.record(z.string(), z.unknown())),
+          isError: z.boolean().optional(),
+        })
+        .parse(answer['result']);
+
+      return {
+        isError: result.isError === true,
+        kind: 'result',
+        text: result.content
+          .map(part => (typeof part['text'] === 'string' ? part['text'] : ''))
+          .join('\n'),
+        withheldFrames: [],
+      };
+    },
+  };
+};
+
+test('a session\u2019s first navigate to an attachment asks first and keeps one file after approval', async () => {
+  test.setTimeout(120_000);
+  const downloadsPath = await mkdtemp(join(tmpdir(), 'kilo-downloads-'));
+  const fixture = await startDownloadFixture();
+  const hub = await startFakeHub();
+  const { context, extensionId, userDataDir } = await launchExtensionContext({ downloadsPath });
+  await mockKiloApi(context, {});
+  await context.addInitScript({
+    content:
+      "Object.defineProperty(chrome.permissions, 'request', { value: () => Promise.resolve(true) });",
+  });
+
+  try {
+    const sidePanel = await context.newPage();
+    const downloads: Download[] = [];
+
+    context.on('page', page => page.on('download', download => downloads.push(download)));
+
+    const grants = grant(fixture.url);
+    // No tab is shared: the session's first call opens one, and an attachment never loads a document.
+    const session = await openEmptyAgentSession({
+      context,
+      extensionId,
+      hub,
+      sidePanel,
+      title: 'Empty session download',
+    });
+    const navigate = (sensitive?: readonly string[]) =>
+      session.callTool(
+        'browser_navigate',
+        { url: `${fixture.url}${DOWNLOAD_PATH}` },
+        { authorized: grants, ...(sensitive === undefined ? {} : { sensitive }) }
+      );
+
+    const guarded = await navigate();
+
+    expect(guarded).toMatchObject({ afterAction: true, code: -32_010, kind: 'error' });
+    await expect.poll(() => readdir(downloadsPath), { timeout: 20_000 }).toStrictEqual([]);
+
+    const approved = await navigate([guarded.kind === 'error' ? (guarded.stepToken ?? '') : '']);
+
+    expect(approved).toMatchObject({ isError: false, kind: 'result' });
+    expect(approved.kind === 'result' ? approved.text : '').toContain(
+      'The file was downloaded; the page did not change.'
+    );
+    await expect.poll(() => readdir(downloadsPath), { timeout: 20_000 }).toHaveLength(1);
+
+    // The token is burned: the same call again is guarded, and no second file appears.
+    const again = await navigate([guarded.kind === 'error' ? (guarded.stepToken ?? '') : '']);
+
+    expect(again).toMatchObject({ afterAction: true, code: -32_010, kind: 'error' });
+    await expect.poll(() => readdir(downloadsPath), { timeout: 20_000 }).toHaveLength(1);
   } finally {
     await context.close();
     await hub.close();

@@ -421,11 +421,9 @@ describe('opening a session tab', () => {
       tabsApi,
     });
 
-    const opened = await runtime.openSessionTab({
-      sessionHandle: 'session-1',
-      url: 'https://once.example/reset?t=1',
-    });
+    const opened = await runtime.openSessionTab({ sessionHandle: 'session-1' });
 
-    expect(opened?.url).toBe('https://once.example/reset?t=1');
+    // A tab opened at the destination would spend a single-use url before the guarded call ran.
+    expect(opened?.url).toBe('about:blank');
   });
 });

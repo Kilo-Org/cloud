@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyAgentSnapshotLine,
+  canStartDownload,
   classifyFormField,
   createStepTokenStore,
   hashBrowserToolArguments,
@@ -60,6 +61,39 @@ describe('tool class mapping', () => {
 
   it('falls back to act for an unknown tool', () => {
     expect(toolGrantClass('browser_teleport')).toBe('act');
+  });
+});
+
+describe('download-capable tools', () => {
+  it('covers every tool whose page action can start one', () => {
+    for (const name of [
+      'browser_click',
+      'browser_drag',
+      'browser_drop',
+      'browser_evaluate',
+      'browser_navigate',
+      'browser_navigate_back',
+      'browser_navigate_forward',
+      'browser_press_key',
+      'browser_reload',
+      'browser_run_code_unsafe',
+      // An export-style `change` handler and page-registered WebMCP code can each answer with an attachment.
+      'browser_select_option',
+      'browser_webmcp_call',
+    ]) {
+      expect(canStartDownload(name)).toBe(true);
+    }
+  });
+
+  it('counts a tab only for the action that opens a page', () => {
+    expect(canStartDownload('browser_tabs', { action: 'new' })).toBe(true);
+    expect(canStartDownload('browser_tabs', { action: 'list' })).toBe(false);
+    expect(canStartDownload('browser_tabs', { action: 'close' })).toBe(false);
+  });
+
+  it('leaves a tool that only reads the page alone', () => {
+    expect(canStartDownload('browser_snapshot')).toBe(false);
+    expect(canStartDownload('browser_take_screenshot')).toBe(false);
   });
 });
 

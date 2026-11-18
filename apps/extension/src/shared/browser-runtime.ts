@@ -57,12 +57,6 @@ export interface BrowserToolRunInput {
   readonly agent?: BrowserAgentCallContext | undefined;
   readonly arguments: unknown;
   readonly caller: BrowserCaller;
-  /**
-   * The caller opened this tab at the call's destination and the tab has
-   * committed: a `browser_navigate` reads the settled page instead of
-   * requesting the same URL again.
-   */
-  readonly navigationCommitted?: boolean | undefined;
   readonly options?:
     | Pick<BrowserToolDispatchOptions, 'now' | 'webMcpDiscover' | 'webMcpExecute'>
     | undefined;
@@ -110,8 +104,6 @@ export interface BrowserEvalRunInput {
 /** One tab a session opens for itself, after the gate allowed the call that needed it. */
 export interface BrowserSessionTabInput {
   readonly sessionHandle: string;
-  /** The page the tool asked for; absent opens `about:blank` for a navigate to land on. */
-  readonly url?: string | undefined;
 }
 
 export interface BrowserSessionTabResult {
@@ -219,6 +211,10 @@ export interface BrowserRuntime {
   readonly openSessionTab: (
     input: BrowserSessionTabInput
   ) => Promise<BrowserSessionTabResult | undefined>;
+  /** One tab's current title and url, for the payload an opened tab reports. */
+  readonly tabInfo: (
+    tabId: number
+  ) => Promise<{ readonly title: string; readonly url: string } | undefined>;
   /** Ends the caller's tab leases. Its refs survive, so the next turn can click by an earlier ref. */
   readonly releaseCaller: (caller: BrowserCaller) => number;
   /** Drops this caller's lease on one tab only: one finished call must not free its session's other tabs. */
@@ -402,18 +398,26 @@ const discardDownload = async (
  * own schedule: a navigation that became a download never reaches its
  * destination, so this only runs for that case.
  */
-const findNavigateDownloads = async (
-  api: BrowserDownloadsApi,
-  navigation: { readonly destination: string },
-  startedAt: number
-): Promise<readonly BrowserDownloadItem[]> => {
+const findNavigateDownloads = async ({
+  api,
+  navigation,
+  owned,
+  startedAt,
+}: {
+  readonly api: BrowserDownloadsApi;
+  readonly navigation: { readonly destination: string };
+  readonly owned: (item: BrowserDownloadItem) => boolean;
+  readonly startedAt: number;
+}): Promise<readonly BrowserDownloadItem[]> => {
   for (let attempt = 0; attempt < NAVIGATE_DOWNLOAD_POLLS; attempt += 1) {
     try {
       // eslint-disable-next-line no-await-in-loop -- one search per bounded attempt
       const found = await api.search?.({ startedAfter: startedAt, url: navigation.destination });
+      // The search matches by url alone, so the same file another tab started is not this navigate's.
+      const mine = (found ?? []).filter(item => owned(item));
 
-      if ((found ?? []).length > 0) {
-        return found ?? [];
+      if (mine.length > 0) {
+        return mine;
       }
     } catch {
       // A search that fails leaves the listener's own window as the only evidence.
@@ -445,9 +449,11 @@ const armDownloadGuard = (
   const discards: Promise<boolean>[] = [];
   const firstDownload = Promise.withResolvers<void>();
   const listener = (item: BrowserDownloadItem): void => {
-    // A navigate answers with the file it asked for, which is the call's own even when the browser reports no tab.
+    // A navigate answers with the file it asked for even when the browser reports no tab for it.
+    // An item the browser ties to another tab is that tab's download, so the same url in a second tab is left alone.
     const requested =
       navigation !== undefined &&
+      item.tabId === undefined &&
       (pageOf(item.url) === pageOf(navigation.destination) ||
         pageOf(item.finalUrl) === pageOf(navigation.destination));
 
@@ -469,7 +475,15 @@ const armDownloadGuard = (
       if (navigation === undefined || api.search === undefined) {
         await Promise.race([firstDownload.promise, after(DOWNLOAD_GUARD_SETTLE_MS)]);
       } else if (!(await navigation.landed().catch(() => true))) {
-        for (const item of await findNavigateDownloads(api, navigation, startedAt)) {
+        const owned = (item: BrowserDownloadItem): boolean =>
+          item.tabId === undefined || tabIds().includes(item.tabId);
+
+        for (const item of await findNavigateDownloads({
+          api,
+          navigation,
+          owned,
+          startedAt,
+        })) {
           discards.push(discardDownload(api, item));
         }
       }
@@ -537,6 +551,9 @@ export const createBrowserRuntime = ({
       },
     });
   const sessions = new Map<number, BrowserToolSession>();
+  // Tabs this runtime opened for an agent session. They start blank, and a blank url is unreadable without the
+  // `tabs` permission, so the inspectability precheck cannot judge them; the debugger attach does.
+  const sessionOwnedTabs = new Set<number>();
   // One tail promise per tab: calls run in the order they were admitted.
   const chains = new Map<number, Promise<void>>();
   // The abort hook of the call currently running in the tab, keyed by tab.
@@ -549,7 +566,13 @@ export const createBrowserRuntime = ({
       return existing;
     }
 
-    const created = createBrowserToolSession({ debuggerApi, scriptingApi, tabId, tabsApi });
+    const created = createBrowserToolSession({
+      debuggerApi,
+      ...(sessionOwnedTabs.has(tabId) ? { ownedTab: true } : {}),
+      scriptingApi,
+      tabId,
+      tabsApi,
+    });
 
     sessions.set(tabId, created);
     return created;
@@ -559,6 +582,7 @@ export const createBrowserRuntime = ({
     chains.delete(tabId);
     inFlight.delete(tabId);
     autoAttachedTabs.delete(tabId);
+    sessionOwnedTabs.delete(tabId);
     groups.noteTabRemoved(tabId);
     leases.releaseTab(tabId);
     await disposeBrowserToolSession(sessions, tabId);
@@ -670,6 +694,12 @@ export const createBrowserRuntime = ({
   };
 
   const reachable = async (tabId: number): Promise<EvalTabResult | undefined> => {
+    // A session's own tab starts blank, and the precheck exists to protect the user's browser-internal pages.
+    // It cannot judge this tab, so the attach reports what it cannot reach.
+    if (sessionOwnedTabs.has(tabId)) {
+      return undefined;
+    }
+
     const reach = await getInspectableTab({ tabId, tabsApi });
 
     if (reach.ok) {
@@ -772,7 +802,6 @@ export const createBrowserRuntime = ({
     agent,
     arguments: toolArguments,
     caller,
-    navigationCommitted,
     options,
     tabId,
     takeOver,
@@ -821,17 +850,7 @@ export const createBrowserRuntime = ({
       const tabSession = sessionFor(tabId).bindCaller(browserCallerKey(caller), {
         cancelled: () => taken,
       });
-      // The tab was opened at this call's destination and has committed, so the navigate must read the settled page rather than request the URL a second time: a single-use destination would be spent by the first load. Everything else the tool does (identity, redirect check, withheld frames) runs unchanged.
-      const session =
-        navigationCommitted === true
-          ? {
-              ...tabSession,
-              send: (method: string, params?: Record<string, unknown>, sessionId?: string) =>
-                method === 'Page.navigate'
-                  ? Promise.resolve<Record<string, unknown> | undefined>({})
-                  : tabSession.send(method, params, sessionId),
-            }
-          : tabSession;
+      const session = tabSession;
 
       // One frame read per call: the grant check, the tool (a screenshot masks from the same tree) and the withheld report share it.
       const readFrames = createAgentFrameReader(session);
@@ -918,9 +937,28 @@ export const createBrowserRuntime = ({
         // Read the optional permission at call time: it can be granted or revoked while this worker lives.
         const guardApi = downloadsApi?.();
         const guardTab = guardDownloads ? await guardTabOf(tabsApi, tabId) : undefined;
-        // A tab this call opens (a first navigate, `browser_tabs new`) owns its downloads too.
-        const guardTabIds = (): readonly number[] =>
-          caller.kind === 'agent' ? groups.tabsForSession(caller.sessionHandle) : [tabId];
+        // The tabs this call owns: its own plus any it opens (`browser_tabs new`, a link with a target).
+        // The session's other tabs belong to the user or to another call, so a download there is not this call's.
+        const callTabs = new Set<number>([tabId]);
+        const noteOwnedTab = (openedTabId: number, openerTabId: number | undefined): void => {
+          if (openerTabId === tabId) {
+            callTabs.add(openedTabId);
+          }
+        };
+        const noteBrowserOpenedTab = (opened: {
+          readonly id?: number;
+          readonly openerTabId?: number;
+        }): void => {
+          if (opened.id !== undefined) {
+            noteOwnedTab(opened.id, opened.openerTabId);
+          }
+        };
+
+        if (guardTab !== undefined) {
+          tabsApi.onCreated?.addListener(noteBrowserOpenedTab);
+        }
+
+        const guardTabIds = (): readonly number[] => [...callTabs];
         // A navigate names the document it asked for, so a download that starts after the call returns can still be found.
         const destination =
           preflight?.class === 'navigate' ? argumentText(argsRecord['url']) : undefined;
@@ -985,7 +1023,11 @@ export const createBrowserRuntime = ({
                         .filter(grant => grant.class === 'read')
                         .map(grant => grant.origin),
                     },
-                    noteTabCreated,
+                    noteTabCreated: (openedTabId, openerTabId) => {
+                      noteOwnedTab(openedTabId, openerTabId);
+
+                      return noteTabCreated(openedTabId, openerTabId);
+                    },
                   }),
               readFrames,
               ...(options?.now === undefined ? {} : { now: options.now }),
@@ -1010,6 +1052,7 @@ export const createBrowserRuntime = ({
           if (downloadGuard !== undefined) {
             // A download the guard saw: the browser named it before the guard stopped and deleted its file.
             guardedDownloads = await downloadGuard.settle();
+            tabsApi.onCreated?.removeListener?.(noteBrowserOpenedTab);
           }
         }
 
@@ -1019,14 +1062,6 @@ export const createBrowserRuntime = ({
         }
 
         const settled = result ?? { error: 'The browser tool returned no result.', ok: false };
-
-        if (preflight !== undefined && preflight.class === 'navigate') {
-          const changed = await postAgentNavigate(session, preflight.origin);
-
-          if (changed !== undefined) {
-            return { from: changed.from, kind: 'origin_changed', result: settled, to: changed.to };
-          }
-        }
 
         // The tab's own target may also have reported one (`Page.downloadWillBegin`), where that is allowed.
         if (guardDownloads && takeStartedDownloads(session) + guardedDownloads > 0) {
@@ -1050,6 +1085,17 @@ export const createBrowserRuntime = ({
           settled.error.includes('ERR_ABORTED')
             ? await keptDownloadText(guardApi, destination, callStartedAt)
             : undefined;
+
+        // A download is not a document, so a navigate that became one never moved the tab.
+        // An opaque or older origin there is the file's answer, not the redirect this check looks for.
+        if (preflight !== undefined && preflight.class === 'navigate' && keptText === undefined) {
+          const changed = await postAgentNavigate(session, preflight.origin);
+
+          if (changed !== undefined) {
+            return { from: changed.from, kind: 'origin_changed', result: settled, to: changed.to };
+          }
+        }
+
         const finalResult: EvalTabResult =
           keptText === undefined ? settled : { ok: true, value: keptText };
 
@@ -1116,6 +1162,9 @@ export const createBrowserRuntime = ({
       return;
     }
 
+    // The tab joins this session, and a tab the session opens may start blank: the attach judges it, not the precheck.
+    sessionOwnedTabs.add(tabId);
+
     const groupId = groups
       .listSessions()
       .find(session => session.sessionHandle === openerSession)?.groupId;
@@ -1138,10 +1187,14 @@ export const createBrowserRuntime = ({
    * Opens the session's own tab: inactive, in the last focused window, and in
    * the session's `Kilo · <title>` group. The user's current tab keeps focus,
    * which is the whole point of an agent never taking a tab it did not make.
+   *
+   * The tab opens at `about:blank` and the caller navigates it afterwards
+   * through `runTool`, so the download guard is armed before any request
+   * leaves: a tab opened *at* a URL would let Chrome start a download the gate
+   * never saw.
    */
   const openSessionTab = async ({
     sessionHandle,
-    url,
   }: BrowserSessionTabInput): Promise<BrowserSessionTabResult | undefined> => {
     const create = tabsApi.create?.bind(tabsApi);
 
@@ -1152,7 +1205,7 @@ export const createBrowserRuntime = ({
     const [active] = await tabsApi.query({ active: true, lastFocusedWindow: true });
     const created = await create({
       active: false,
-      ...(url === undefined ? {} : { url }),
+      url: 'about:blank',
       ...(active?.windowId === undefined ? {} : { windowId: active.windowId }),
     });
 
@@ -1160,18 +1213,25 @@ export const createBrowserRuntime = ({
       return undefined;
     }
 
+    sessionOwnedTabs.add(created.id);
+
     // Sharing the tab is what titles and colours the group; the tab is not activated by it.
     const shared = await groups.shareActiveTab({ sessionHandle, tabId: created.id });
-    // `tabs.create` resolves with `url: ''` while the navigation is pending, so an empty url is absent and the requested one is the honest fallback.
-    const requestedUrl = created.url === undefined || created.url === '' ? url : created.url;
-    const settledUrl = await committedTabUrl(created.id);
 
     return {
       tabId: created.id,
       title: created.title ?? '',
-      url: settledUrl ?? requestedUrl ?? 'about:blank',
+      url: 'about:blank',
       ...(shared.groupId === undefined ? {} : { groupId: shared.groupId }),
     };
+  };
+
+  const tabInfo = async (
+    tabId: number
+  ): Promise<{ readonly title: string; readonly url: string } | undefined> => {
+    const tab = await tabsApi.get?.(tabId);
+
+    return tab === undefined ? undefined : { title: tab.title ?? '', url: tab.url ?? '' };
   };
 
   return {
@@ -1194,5 +1254,6 @@ export const createBrowserRuntime = ({
     },
     runTool,
     shareActiveTab: input => groups.shareActiveTab(input),
+    tabInfo,
   };
 };

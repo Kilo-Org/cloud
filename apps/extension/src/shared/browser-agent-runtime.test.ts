@@ -786,6 +786,118 @@ describe('agent browser calls', () => {
     expect([downloads.cancelled, downloads.erased]).toStrictEqual([[], []]);
   });
 
+  it('leaves another tab\u2019s download of the navigate\u2019s destination alone', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+
+    cdp.setHandlers({
+      'Page.navigate': () => {
+        // The same attachment in the user's own tab: the url matches this navigate's destination, the tab does not.
+        downloads.emit({
+          finalUrl: `${MAIN_ORIGIN}/invoice.pdf`,
+          id: 79,
+          tabId: TAB_ID + 1,
+          url: `${MAIN_ORIGIN}/invoice.pdf`,
+        });
+
+        return {};
+      },
+    });
+
+    const outcome = await runtime.runTool({
+      agent: { authorized: [readGrant, { class: 'navigate', origin: MAIN_ORIGIN }] },
+      arguments: { url: `${MAIN_ORIGIN}/invoice.pdf` },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_navigate',
+    });
+
+    // The url alone is not ownership: nothing of another tab's is cancelled or reported as this call's.
+    expect(outcome.kind).toBe('result');
+    expect([downloads.cancelled, downloads.erased]).toStrictEqual([[], []]);
+  });
+
+  it('cancels a download a tab this call opened started, and leaves the session\u2019s other tabs alone', async () => {
+    const downloads = createFakeDownloads();
+    const openedListeners: ((tab: {
+      readonly id?: number;
+      readonly openerTabId?: number;
+    }) => void)[] = [];
+    const tab: BrowserTabInfo = { id: TAB_ID, title: 'Example', url: `${MAIN_ORIGIN}/dashboard` };
+    const tabsApi: BrowserTabsApi = {
+      get: async () => tab,
+      onCreated: {
+        addListener: listener => {
+          openedListeners.push(listener);
+        },
+        removeListener: listener => {
+          const index = openedListeners.indexOf(listener);
+
+          if (index !== -1) {
+            openedListeners.splice(index, 1);
+          }
+        },
+      },
+      query: async () => [tab],
+    };
+    const { controller } = createGroups();
+    const { cdp, runtime } = await createHarness({
+      downloadsApi: downloads.api,
+      tabGroups: controller,
+      tabsApi,
+    });
+    // A second tab the session holds before the call: the user shared it, so its downloads are the user's.
+    await runtime.shareActiveTab({ sessionHandle: 'session-1', tabId: TAB_ID + 4 });
+    const opened = (id: number, openerTabId?: number): void => {
+      for (const listener of openedListeners) {
+        listener(openerTabId === undefined ? { id } : { id, openerTabId });
+      }
+    };
+    let emitting = true;
+
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': () => {
+        // A click is a press and a release; the browser opens the tab and names each download once.
+        if (emitting) {
+          emitting = false;
+          // A link with a target opens a tab this call owns; the session's own tab is not this call's.
+          opened(TAB_ID + 3, TAB_ID);
+          downloads.emit({ id: 64, tabId: TAB_ID + 3 });
+          downloads.emit({ id: 65, tabId: TAB_ID + 4 });
+        }
+
+        return {};
+      },
+    });
+
+    const outcome = await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant] },
+      arguments: { target: '#pay' },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_click',
+    });
+
+    expect(outcome).toMatchObject({ afterAction: true, kind: 'needs_permission' });
+    // Only the tab this call opened is the call's; the listener does not outlive the call either.
+    expect([downloads.cancelled, openedListeners.length]).toStrictEqual([[64], 0]);
+  });
+
+  it('arms the download guard for a select-option call', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant] },
+      arguments: { target: '#export', values: ['pdf'] },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_select_option',
+    });
+
+    // The call runs with downloads denied: an export-style `change` handler is cancelled like a click.
+    expect([cdp.downloadsDenied(), cdp.downloadsRestored()]).toStrictEqual([1, 1]);
+  });
+
   it('cancels the download whose referrer is this tab\u2019s page', async () => {
     const downloads = createFakeDownloads();
     const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
@@ -1011,6 +1123,8 @@ describe('agent browser calls', () => {
     const guarded = await navigate([]);
     const approved = await navigate([expectStepToken(guarded)]);
 
+    // The token was consumed: the approved repeat runs unguarded, so no second guard was armed to hide a broken approval.
+    expect(cdp.downloadsDenied()).toBe(1);
     // No download was found, so the browser's own failure stands: an aborted load for another reason is not a success.
     expect(approved).toMatchObject({ kind: 'result', result: { ok: false } });
     expect(
@@ -1205,23 +1319,67 @@ describe('agent browser calls', () => {
       title: 'Work',
     });
 
-    await expect(
-      runtime.openSessionTab({ sessionHandle: 'session-1', url: `${MAIN_ORIGIN}/start` })
-    ).resolves.toStrictEqual({
+    // The tab opens blank: the call navigates it, so the download guard is armed before any request leaves.
+    await expect(runtime.openSessionTab({ sessionHandle: 'session-1' })).resolves.toStrictEqual({
       groupId: 42,
       tabId: 88,
       title: '',
-      url: `${MAIN_ORIGIN}/start`,
+      url: 'about:blank',
     });
 
     // Inactive, in the window the user is looking at: the agent never takes the foreground tab.
-    expect(created).toStrictEqual([{ active: false, url: `${MAIN_ORIGIN}/start`, windowId: 1 }]);
+    expect(created).toStrictEqual([{ active: false, url: 'about:blank', windowId: 1 }]);
     expect(controller.tabsForSession('session-1')).toStrictEqual([88]);
     expect(controller.listSessions()[0]?.groupId).toBe(42);
     expect(updates).toContainEqual({
       groupId: 42,
       props: { color: 'grey', title: 'Kilo · Work' },
     });
+  });
+
+  it('reaches the blank tab a session opened, which no host permission covers', async () => {
+    const cdp = createFakeCdp();
+    const controller = createBrowserTabGroupController({
+      api: {
+        group: async () => 42,
+        tabQuery: async () => [{ active: true, id: TAB_ID, windowId: 1 }],
+        update: async () => {},
+      },
+    });
+    // A tab no host permission covers reports no url at all, which is every `about:blank` tab an agent opens.
+    const blank: BrowserTabInfo = { id: 88, title: '' };
+    const runtime = createBrowserRuntime({
+      debuggerApi: cdp.api,
+      leases: createTabLeaseRegistry({}),
+      scriptingApi: undefined,
+      tabGroups: controller,
+      tabsApi: {
+        create: async () => blank,
+        get: async () => blank,
+        query: async () => [{ active: true, id: TAB_ID, windowId: 1 }],
+      },
+    });
+
+    await runtime.openSession({
+      controllerId: 'controller-1',
+      sessionHandle: 'session-1',
+      title: 'Work',
+    });
+    await expect(runtime.openSessionTab({ sessionHandle: 'session-1' })).resolves.toMatchObject({
+      tabId: 88,
+    });
+
+    const outcome = await runtime.runTool({
+      agent: { authorized: [readGrant] },
+      arguments: {},
+      caller: agent(),
+      tabId: 88,
+      toolName: 'browser_snapshot',
+    });
+
+    // The precheck would refuse a tab with no readable url as browser-internal; the attach runs instead.
+    expect(cdp.commands().length).toBeGreaterThan(0);
+    expect(JSON.stringify(outcome)).not.toContain('not inspectable');
   });
 
   it('reports no session tab when the browser cannot create tabs', async () => {

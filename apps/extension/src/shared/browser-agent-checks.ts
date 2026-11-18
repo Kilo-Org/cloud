@@ -90,7 +90,11 @@ const DOWNLOAD_CAPABLE_TOOLS: ReadonlySet<string> = new Set([
   'browser_press_key',
   'browser_reload',
   'browser_run_code_unsafe',
+  // Dispatches `change` on the element, and an export-style handler can answer with an attachment.
+  'browser_select_option',
   'browser_tabs',
+  // Runs page-registered code, which can start a download like any other page action.
+  'browser_webmcp_call',
 ]);
 
 /** `browser_tabs` opens a page only for `new`; list, select and close touch no document. */

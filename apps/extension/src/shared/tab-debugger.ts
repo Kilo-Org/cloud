@@ -108,6 +108,9 @@ export interface BrowserTabCreatedApi {
   readonly addListener: (
     listener: (tab: { readonly id?: number; readonly openerTabId?: number }) => void
   ) => void;
+  readonly removeListener?: (
+    listener: (tab: { readonly id?: number; readonly openerTabId?: number }) => void
+  ) => void;
 }
 
 export interface BrowserTabRemovedApi {

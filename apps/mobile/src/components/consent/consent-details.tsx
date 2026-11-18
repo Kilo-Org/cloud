@@ -11,6 +11,7 @@ import { type ConsentMode } from '@/components/consent/consent-mode';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { renderRowTrailing } from '@/components/ui/row-trailing';
+import { SectionHeader } from '@/components/ui/section-header';
 import { Text } from '@/components/ui/text';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
@@ -293,9 +294,11 @@ export function ConsentDetails({ mode = 'onboarding' }: ConsentDetailsProps) {
             who={t('consent.featureFlagsWho')}
           />
 
-          <Text className="mt-6 text-sm font-semibold text-foreground">
-            {mode === 'review' ? t('consent.optionalReview') : t('consent.optionalOnboarding')}
-          </Text>
+          <SectionHeader
+            label={
+              mode === 'review' ? t('consent.optionalReview') : t('consent.optionalOnboarding')
+            }
+          />
 
           <Section
             title={t('consent.productAnalyticsTitle')}

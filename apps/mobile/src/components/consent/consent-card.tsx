@@ -251,10 +251,17 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
             disclosure and the Accept button, floating the line away from the
             block it qualifies). The slot keeps its one-line height whenever
             it is mounted (the same reserve as the credits expiry line and
-            the guardrails and spend-alerts save status), and the negative
-            bottom margin gives that height back to the footer's bottom
-            padding, so the footer's own height and the buttons above never
-            move when a status appears, clears, or swaps. */}
+            the guardrails and spend-alerts save status). The negative
+            bottom margin gives the slot's height back to the footer's
+            bottom padding, so the footer's total height, the buttons, and
+            the clearance between the secondary button and the screen edge
+            stay exactly what the padding rules require (the `Math.max`
+            in `footerStyle` is never reduced below its floor by this
+            margin): the status line draws inside space the bottom padding
+            already reserved for the home-indicator band, where no content
+            sits in the default phases, and the footer's content edge — the
+            line the padding rule measures against — is the secondary
+            button's bottom, unchanged. */}
         <View className="min-h-5 -mb-5 justify-center">
           <ConsentLoadStatusLine load={storedLoad} error={error} onRetry={retryStoredLoad} t={t} />
         </View>

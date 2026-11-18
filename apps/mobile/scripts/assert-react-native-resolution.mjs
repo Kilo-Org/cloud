@@ -84,7 +84,7 @@ const context = {
   allowHaste: false,
   assetExts: new Set(config.resolver.assetExts),
   customResolverOptions: {},
-  doesFileExist: (filePath) => {
+  doesFileExist: filePath => {
     try {
       return fs.statSync(filePath).isFile();
     } catch {
@@ -92,13 +92,13 @@ const context = {
     }
   },
   fileSystemLookup,
-  getPackage: (packageJsonPath) => readPackageJson(packageJsonPath),
+  getPackage: packageJsonPath => readPackageJson(packageJsonPath),
   getPackageForModule,
   mainFields: config.resolver.resolverMainFields,
   platforms: new Set(config.resolver.platforms ?? ['ios', 'android', 'native', 'web']),
   preferNativePlatform: true,
   projectRoot: config.projectRoot,
-  redirectModulePath: (modulePath) => modulePath,
+  redirectModulePath: modulePath => modulePath,
   resolveAsset: () => null,
   sourceExts: new Set(config.resolver.sourceExts),
   unstable_logWarning: () => {},
@@ -124,13 +124,13 @@ function check(label, condition, detail) {
 // The React Native surface a package can reach through the proxy. `AssetRegistry` is the
 // export expo-asset reads; the components stand for the proxy's own styled versions.
 function stubReactNative() {
-  const component = (name) => ({ name });
+  const component = name => ({ name });
   const reactNative = {
-    AssetRegistry: { getAssetByID: (id) => ({ id }) },
+    AssetRegistry: { getAssetByID: id => ({ id }) },
     Dimensions: { get: () => ({ width: 411, height: 914 }) },
     NativeModules: {},
     Platform: { OS: 'android' },
-    StyleSheet: { create: (styles) => styles },
+    StyleSheet: { create: styles => styles },
     Text: component('Text'),
     View: component('View'),
   };
@@ -147,7 +147,7 @@ function evaluateProxyExports(proxyPath) {
   const sandbox = {
     module: { exports: {} },
     exports: {},
-    require: (id) => (id === 'react-native' ? reactNative : stubModule()),
+    require: id => (id === 'react-native' ? reactNative : stubModule()),
   };
   sandbox.exports = sandbox.module.exports;
   vm.runInNewContext(fs.readFileSync(proxyPath, 'utf8'), sandbox, { filename: proxyPath });
@@ -165,15 +165,27 @@ const expoAsset = path.join(packageRoot('expo-asset'), 'build', 'Asset.js');
 const proxyPath = resolveFrom(expoAsset, 'react-native');
 const resolved = `${path.relative(appDir, expoAsset)} -> 'react-native' => ${proxyPath ?? '(unresolved)'}`;
 
-check('a package resolves the styled `react-native` proxy', proxyPath !== null && proxyPath.includes(STYLED_PROXY), resolved);
+check(
+  'a package resolves the styled `react-native` proxy',
+  proxyPath !== null && proxyPath.includes(STYLED_PROXY),
+  resolved
+);
 
 if (proxyPath !== null && proxyPath.includes(STYLED_PROXY)) {
   const { exports: proxyExports, reactNative } = evaluateProxyExports(proxyPath);
   for (const name of ['AssetRegistry', 'Dimensions', 'NativeModules', 'Platform']) {
-    check(`the proxy forwards \`${name}\``, proxyExports[name] === reactNative[name], `\`${name}\` is ${proxyExports[name] === undefined ? 'undefined' : 'a different value'} through the proxy`);
+    check(
+      `the proxy forwards \`${name}\``,
+      proxyExports[name] === reactNative[name],
+      `\`${name}\` is ${proxyExports[name] === undefined ? 'undefined' : 'a different value'} through the proxy`
+    );
   }
   for (const name of ['Text', 'View']) {
-    check(`the proxy keeps its styled \`${name}\``, proxyExports[name] !== undefined && proxyExports[name] !== reactNative[name], `\`${name}\` is ${proxyExports[name] === undefined ? 'undefined' : 'the real component, not the styled one'} through the proxy`);
+    check(
+      `the proxy keeps its styled \`${name}\``,
+      proxyExports[name] !== undefined && proxyExports[name] !== reactNative[name],
+      `\`${name}\` is ${proxyExports[name] === undefined ? 'undefined' : 'the real component, not the styled one'} through the proxy`
+    );
   }
 }
 

@@ -4858,6 +4858,8 @@
     "modelsDescription": "Gbanyụọ otu ihe nlere iji gbochie ya maka ndị otu niile. Ihe nlere sitere na ndị na-enye ọrụ ekwenyere na-amalite ka agbanyere.",
     "modelsDeniedOnly": "Naanị ndị a jụrụ",
     "modelsEmpty": "Ọnweghị ihe nlere dabara na nchọta a.",
+    "modelsDeniedEmpty": "Ọnweghị ihe nlere a jụrụ.",
+    "modelsDeniedSearchEmpty": "Ọnweghị ihe nlere a jụrụ dabara na nchọta a.",
     "providersDescription": "Gbanyụọ onye na-enye ọrụ iji kwụsị Kilo ịga na ya maka nzukọ a.",
     "providersNeedCatalog": "Mgba ọkụ ndị na-enye ọrụ ga-anọgide naanị maka ịgụ ruo mgbe katalọgụ ụdị niile ebudatara. Nwaa ọzọ n'elu iji dezie ha.",
     "providersEmpty": "Ọnweghị onye na-enye ọrụ dabara na nchọta a.",

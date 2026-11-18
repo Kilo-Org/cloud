@@ -4858,6 +4858,8 @@
     "modelsDescription": "Poista malli käytöstä estääksesi sen kaikilta jäseniltä. Sallittujen palveluntarjoajien mallit ovat oletuksena käytössä.",
     "modelsDeniedOnly": "Vain estetyt",
     "modelsEmpty": "Haulla ei löytynyt malleja.",
+    "modelsDeniedEmpty": "Yhtään mallia ei ole estetty.",
+    "modelsDeniedSearchEmpty": "Haulla ei löytynyt estettyjä malleja.",
     "providersDescription": "Poista palveluntarjoaja käytöstä, niin Kilo ei enää reititä pyyntöjä sille tässä organisaatiossa.",
     "providersNeedCatalog": "Palveluntarjoajien kytkimet ovat vain luku -tilassa, kunnes koko mallikatalogi on ladattu. Muokkaa niitä napauttamalla yllä Yritä uudelleen.",
     "providersEmpty": "Haulla ei löytynyt palveluntarjoajia.",

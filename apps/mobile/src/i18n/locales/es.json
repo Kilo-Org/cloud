@@ -4929,6 +4929,8 @@
     "modelsDescription": "Desactiva un modelo para bloquearlo para todos los miembros. Los modelos de proveedores permitidos empiezan activados.",
     "modelsDeniedOnly": "Solo denegados",
     "modelsEmpty": "Ningún modelo coincide con esta búsqueda.",
+    "modelsDeniedEmpty": "Ningún modelo está denegado.",
+    "modelsDeniedSearchEmpty": "Ningún modelo denegado coincide con esta búsqueda.",
     "providersDescription": "Desactiva un proveedor para que Kilo deje de enrutar solicitudes a él en esta organización.",
     "providersNeedCatalog": "Los interruptores de proveedores son de solo lectura hasta que se cargue el catálogo completo de modelos. Toca Reintentar arriba para editarlos.",
     "providersEmpty": "Ningún proveedor coincide con esta búsqueda.",

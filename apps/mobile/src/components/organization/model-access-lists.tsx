@@ -241,7 +241,17 @@ export function ModelDenyList({
           }
         />
       }
-      ListEmptyComponent={<NoMatch label={t('organizationModelAccess.modelsEmpty')} />}
+      ListEmptyComponent={
+        <NoMatch
+          label={
+            deniedOnly && search
+              ? t('organizationModelAccess.modelsDeniedSearchEmpty')
+              : deniedOnly
+                ? t('organizationModelAccess.modelsDeniedEmpty')
+                : t('organizationModelAccess.modelsEmpty')
+          }
+        />
+      }
     />
   );
 }

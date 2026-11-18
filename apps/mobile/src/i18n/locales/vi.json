@@ -4858,6 +4858,8 @@
     "modelsDescription": "Tắt một mô hình để chặn mô hình đó với mọi thành viên. Các mô hình từ nhà cung cấp được phép sẽ được bật sẵn.",
     "modelsDeniedOnly": "Chỉ bị từ chối",
     "modelsEmpty": "Không có mô hình nào khớp với tìm kiếm này.",
+    "modelsDeniedEmpty": "Không có mô hình nào bị từ chối.",
+    "modelsDeniedSearchEmpty": "Không có mô hình bị từ chối nào khớp với tìm kiếm này.",
     "providersDescription": "Tắt một nhà cung cấp để ngăn Kilo định tuyến đến nhà cung cấp đó cho tổ chức này.",
     "providersNeedCatalog": "Các công tắc nhà cung cấp sẽ ở chế độ chỉ đọc cho đến khi danh mục mô hình đầy đủ được tải. Nhấn Thử lại ở trên để chỉnh sửa.",
     "providersEmpty": "Không có nhà cung cấp nào khớp với tìm kiếm này.",

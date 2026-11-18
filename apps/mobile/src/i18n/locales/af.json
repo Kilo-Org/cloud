@@ -4858,6 +4858,8 @@
     "modelsDescription": "Skakel 'n model af om dit vir alle lede te blokkeer. Modelle van toegelate verskaffers is by verstek aan.",
     "modelsDeniedOnly": "Slegs geweierdes",
     "modelsEmpty": "Geen modelle pas by hierdie soektog nie.",
+    "modelsDeniedEmpty": "Geen model word geweier nie.",
+    "modelsDeniedSearchEmpty": "Geen geweierde model pas by hierdie soektog nie.",
     "providersDescription": "Skakel 'n verskaffer af sodat Kilo nie meer vir hierdie organisasie daarheen roeteer nie.",
     "providersNeedCatalog": "Verskafferskakelaars bly leesalleen totdat die volledige modelkatalogus gelaai het. Tik hierbo op Probeer weer om hulle te wysig.",
     "providersEmpty": "Geen verskaffers pas by hierdie soektog nie.",

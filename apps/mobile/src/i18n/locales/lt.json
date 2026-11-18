@@ -5000,6 +5000,8 @@
     "modelsDescription": "Išjunkite modelį, kad jis būtų užblokuotas kiekvienam nariui. Leidžiamų teikėjų modeliai įjungiami pagal numatytuosius nustatymus.",
     "modelsDeniedOnly": "Tik draudžiami",
     "modelsEmpty": "Nė vienas modelis neatitinka šios paieškos.",
+    "modelsDeniedEmpty": "Nė vienas modelis nėra draudžiamas.",
+    "modelsDeniedSearchEmpty": "Nė vienas draudžiamas modelis neatitinka šios paieškos.",
     "providersDescription": "Išjunkite teikėją, kad Kilo nebesiųstų jam užklausų šioje organizacijoje.",
     "providersNeedCatalog": "Teikėjų jungikliai lieka tik skaitomi, kol neįkeliamas visas modelių katalogas. Norėdami juos redaguoti, viršuje bakstelėkite Bandyti dar kartą.",
     "providersEmpty": "Nė vienas teikėjas neatitinka šios paieškos.",

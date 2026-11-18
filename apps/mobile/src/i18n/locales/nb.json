@@ -4858,6 +4858,8 @@
     "modelsDescription": "Slå av en modell for å blokkere den for alle medlemmer. Modeller fra tillatte leverandører er slått på som standard.",
     "modelsDeniedOnly": "Kun nektet",
     "modelsEmpty": "Ingen modeller samsvarer med dette søket.",
+    "modelsDeniedEmpty": "Ingen modell er nektet.",
+    "modelsDeniedSearchEmpty": "Ingen nektet modell samsvarer med dette søket.",
     "providersDescription": "Slå av en leverandør for å hindre at Kilo ruter til den for denne organisasjonen.",
     "providersNeedCatalog": "Leverandørbryterne er skrivebeskyttet til hele modellkatalogen er lastet inn. Trykk på Prøv igjen ovenfor for å endre dem.",
     "providersEmpty": "Ingen leverandører samsvarer med dette søket.",

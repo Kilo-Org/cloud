@@ -4858,6 +4858,8 @@
     "modelsDescription": "Dami moodeel si aad u xannibto xubin kasta. Moodeellada ka yimaada bixiyeyaasha la oggolaaday waxay bilaabmaan iyagoo shidan.",
     "modelsDeniedOnly": "Kaliya kuwa la diiday",
     "modelsEmpty": "Ma jiraan moodeello u dhigma raadintan.",
+    "modelsDeniedEmpty": "Ma jiraan moodeello la diiday.",
+    "modelsDeniedSearchEmpty": "Ma jiraan moodeello la diiday u dhigma raadintan.",
     "providersDescription": "Dami bixiye si aad u joojiso Kilo inuu u jiheeyo bixiyahan ururkan.",
     "providersNeedCatalog": "Furayaasha bixiyeyaasha waa akhris-kaliya ilaa liiska moodellada oo dhan uu soo dego. Si aad u beddesho, taabo Mar kale isku day ee korka ku yaal.",
     "providersEmpty": "Ma jiraan bixiyeyaal u dhigma raadintan.",

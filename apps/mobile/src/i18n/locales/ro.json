@@ -4929,6 +4929,8 @@
     "modelsDescription": "Dezactivați un model pentru a-l bloca pentru fiecare membru. Modelele de la furnizorii permiși pornesc activate.",
     "modelsDeniedOnly": "Doar interzise",
     "modelsEmpty": "Niciun model nu corespunde acestei căutări.",
+    "modelsDeniedEmpty": "Niciun model nu este interzis.",
+    "modelsDeniedSearchEmpty": "Niciun model interzis nu corespunde acestei căutări.",
     "providersDescription": "Dezactivați un furnizor pentru a opri rutarea Kilo către acesta pentru această organizație.",
     "providersNeedCatalog": "Comutatoarele furnizorilor rămân doar pentru citire până la încărcarea catalogului complet de modele. Atingeți Reîncearcă mai sus pentru a le edita.",
     "providersEmpty": "Niciun furnizor nu corespunde acestei căutări.",

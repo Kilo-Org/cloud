@@ -4929,6 +4929,8 @@
     "modelsDescription": "Isključite model da biste ga blokirali za svakog člana. Modeli dopuštenih pružatelja počinju uključeni.",
     "modelsDeniedOnly": "Samo zabranjeni",
     "modelsEmpty": "Nijedan model ne odgovara ovom pretraživanju.",
+    "modelsDeniedEmpty": "Nijedan model nije zabranjen.",
+    "modelsDeniedSearchEmpty": "Nijedan zabranjeni model ne odgovara ovom pretraživanju.",
     "providersDescription": "Isključite pružatelja kako Kilo za ovu organizaciju ne bi usmjeravao zahtjeve na njega.",
     "providersNeedCatalog": "Prekidači pružatelja ostaju samo za čitanje dok se ne učita cijeli katalog modela. Dodirnite Pokušaj ponovno iznad kako biste ih mogli uređivati.",
     "providersEmpty": "Nijedan pružatelj ne odgovara ovom pretraživanju.",

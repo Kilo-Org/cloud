@@ -4929,6 +4929,8 @@
     "modelsDescription": "Disattiva un modello per bloccarlo per ogni membro. I modelli dei fornitori consentiti partono attivi.",
     "modelsDeniedOnly": "Solo negati",
     "modelsEmpty": "Nessun modello corrisponde a questa ricerca.",
+    "modelsDeniedEmpty": "Nessun modello è negato.",
+    "modelsDeniedSearchEmpty": "Nessun modello negato corrisponde a questa ricerca.",
     "providersDescription": "Disattiva un fornitore per impedire a Kilo di instradare verso di esso per questa organizzazione.",
     "providersNeedCatalog": "Gli interruttori dei fornitori restano in sola lettura finché non viene caricato il catalogo completo dei modelli. Tocca Riprova qui sopra per modificarli.",
     "providersEmpty": "Nessun fornitore corrisponde a questa ricerca.",

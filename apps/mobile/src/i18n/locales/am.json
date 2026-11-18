@@ -4858,6 +4858,8 @@
     "modelsDescription": "ሞዴልን ለሁሉም አባላት ለማገድ ያጥፉት። ከተፈቀዱ አቅራቢዎች የሚመጡ ሞዴሎች በርተው ይጀምራሉ።",
     "modelsDeniedOnly": "የተከለከሉ ብቻ",
     "modelsEmpty": "ከዚህ ፍለጋ ጋር የሚዛመዱ ሞዴሎች የሉም።",
+    "modelsDeniedEmpty": "የተከለከለ ሞዴል የለም።",
+    "modelsDeniedSearchEmpty": "ከዚህ ፍለጋ ጋር የሚዛመድ የተከለከለ ሞዴል የለም።",
     "providersDescription": "Kilo ለዚህ ድርጅት ወደ አንድ አቅራቢ ማዘዋወሩን እንዲያቆም አቅራቢውን ያጥፉት።",
     "providersNeedCatalog": "ሙሉው የሞዴል ካታሎግ እስኪጫን ድረስ የአቅራቢ ማብሪያ/ማጥፊያዎች ሊቀየሩ አይችሉም። እነሱን ለማርትዕ ከላይ ያለውን እንደገና ሞክር ይንኩ።",
     "providersEmpty": "ከዚህ ፍለጋ ጋር የሚዛመዱ አቅራቢዎች የሉም።",

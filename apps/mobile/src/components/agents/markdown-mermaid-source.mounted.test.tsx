@@ -204,6 +204,29 @@ describe('MarkdownMermaid source changes', () => {
     });
   });
 
+  it('retries immediately when the device clock moves backwards', async () => {
+    let clockNow = 0;
+    const { MERMAID_HOST_RETRY_MS, __setMermaidHostClockForTests } =
+      await import('./markdown-mermaid');
+    __setMermaidHostClockForTests(() => clockNow);
+    hostMock.downloadAsync.mockRejectedValueOnce(new Error('copy failed'));
+    const renderer = await mount('flowchart TD\n  a --> b');
+    expect(countOf(renderer.root, FenceType)).toBe(1);
+    expect(hostMock.downloadAsync).toHaveBeenCalledTimes(1);
+
+    // A backwards jump does not extend the failed window: the next source runs
+    // its attempt instead of holding the old failure forever.
+    clockNow = -MERMAID_HOST_RETRY_MS;
+    await rerender(renderer, 'flowchart TD\n  c --> d');
+    expect(countOf(renderer.root, WebViewType)).toBe(1);
+    expect(countOf(renderer.root, FenceType)).toBe(0);
+    expect(hostMock.downloadAsync).toHaveBeenCalledTimes(2);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
   it('ignores a page failure the superseded diagram reports late', async () => {
     const renderer = await mount('flowchart TD\n  a --> b');
     await loadPage(renderer);

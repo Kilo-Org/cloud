@@ -61,15 +61,19 @@ async function prepareMermaidHost(): Promise<MermaidHost> {
  * record, so a later failure waits a fresh window.
  */
 async function loadMermaidHost(): Promise<MermaidHost> {
+  const elapsed = now() - (lastFailedAt ?? 0);
   if (
     mermaidHost === null &&
     lastFailedAt !== null &&
-    now() - lastFailedAt < MERMAID_HOST_RETRY_MS
+    elapsed >= 0 &&
+    elapsed < MERMAID_HOST_RETRY_MS
   ) {
     // The last preparation attempt just failed, so re-running the whole asset
     // copy this soon repeats work a broken cache device cannot finish. Every
     // diagram in the window draws its fence from the rejection instead, and a
-    // diagram after the window starts the next attempt.
+    // diagram after the window starts the next attempt. A negative elapsed
+    // time means the device clock moved backwards, which is not an elapsed
+    // wait, so the next attempt runs rather than holding the old window.
     throw new Error('mermaid host preparation is cooling down');
   }
   mermaidHost ??= prepareMermaidHost();

@@ -31,12 +31,6 @@ type MarkdownEnrichedProps = {
   value: string;
   palette: MarkdownPalette;
   selectable: boolean;
-  /**
-   * Body line height in the library's sp units. The line box is what a native
-   * inline link exposes as its tappable target, so a caller that needs a taller
-   * link target raises it here.
-   */
-  lineHeight?: number;
   onLongPressLink?: MarkdownLinkLongPressHandler;
   onPressLink?: MarkdownLinkPressHandler;
   onCopyCode?: MarkdownCopyCodeHandler;
@@ -46,11 +40,7 @@ const CODE_FONT = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
 
 const BODY_LINE_HEIGHT = 24;
 
-function enrichedStyle(
-  palette: MarkdownPalette,
-  isRtl: boolean,
-  lineHeight = BODY_LINE_HEIGHT
-): MarkdownStyle {
+function enrichedStyle(palette: MarkdownPalette, isRtl: boolean): MarkdownStyle {
   const { textColor, mutedTextColor, codeBackground, borderColor } = palette;
   const half = palette.codeTokenScheme === 'onLight' ? 'light' : 'dark';
   const headings = getMarkdownHeadingStyles(palette);
@@ -79,7 +69,7 @@ function enrichedStyle(
     paragraph: {
       color: textColor,
       fontSize: 16,
-      lineHeight,
+      lineHeight: BODY_LINE_HEIGHT,
       marginTop: 0,
       marginBottom: 4,
       ...blockTextAlign,
@@ -138,7 +128,7 @@ function enrichedStyle(
     list: {
       color: textColor,
       fontSize: 16,
-      lineHeight,
+      lineHeight: BODY_LINE_HEIGHT,
       markerColor: textColor,
       bulletColor: textColor,
     },
@@ -166,17 +156,13 @@ export function MarkdownEnriched({
   value,
   palette,
   selectable,
-  lineHeight,
   onLongPressLink,
   onPressLink,
   onCopyCode,
 }: Readonly<MarkdownEnrichedProps>) {
   const { t } = useTranslation();
   const [viewer, setViewer] = useState<{ uri: string; filename: string } | null>(null);
-  const markdownStyle = useMemo(
-    () => enrichedStyle(palette, I18nManager.isRTL, lineHeight),
-    [palette, lineHeight]
-  );
+  const markdownStyle = useMemo(() => enrichedStyle(palette, I18nManager.isRTL), [palette]);
   const images = useMemo(() => findMarkdownImages(value), [value]);
   // One flag per image, so trusting a host or confirming a URI re-renders
   // with the real image and a revoke gates it again.

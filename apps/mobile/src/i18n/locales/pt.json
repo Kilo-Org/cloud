@@ -483,7 +483,14 @@
       "viewReceipt": "Ver comprovativo"
     },
     "changelog": "Novidades",
-    "changelogVersionPending": "As notas desta versão vêm na próxima atualização da app."
+    "changelogVersionPending": "As notas da versão {{version}} vêm na próxima atualização da app.",
+    "changelogGroupNew": "Novidades",
+    "changelogFixesIn": "Correções e melhorias em {{areas}}.",
+    "changelogFixesPolish": "Correções e melhorias em toda a aplicação.",
+    "changelogAreas": {
+      "signIn": "Início de sessão",
+      "profileOrganizations": "Perfil e organizações"
+    }
   },
   "preferences": {
     "general": "Geral",
@@ -3392,6 +3399,7 @@
       "manageOnWeb": "Definições de faturação na Web",
       "changePlan": "Alterar plano",
       "buySeats": "Comprar lugares",
+      "managedOnWeb": "O plano, os lugares e o carregamento automático são geridos na Web.",
       "setupAutoTopUp": "Configurar carregamento automático",
       "manageAutoTopUp": "Gerir carregamento automático",
       "opensOnWeb": "Abre na web"

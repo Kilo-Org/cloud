@@ -483,7 +483,14 @@
       "viewReceipt": "Duba rasidi"
     },
     "changelog": "Sabbin abubuwa",
-    "changelogVersionPending": "Bayanan wannan siga za su zo da sabuntawar manhaja ta gaba."
+    "changelogVersionPending": "Bayanan siga {{version}} za su zo da sabuntawar manhaja ta gaba.",
+    "changelogGroupNew": "Sabbi",
+    "changelogFixesIn": "Gyare-gyare da ingantawa a {{areas}}.",
+    "changelogFixesPolish": "Gyare-gyare da ingantawa a duk faɗin manhajar.",
+    "changelogAreas": {
+      "signIn": "Shiga",
+      "profileOrganizations": "Bayanan martaba da ƙungiyoyi"
+    }
   },
   "preferences": {
     "general": "Gaba ɗaya",
@@ -3329,6 +3336,7 @@
       "manageOnWeb": "Saitunan biyan kuɗi a yanar gizo",
       "changePlan": "Canza tsari",
       "buySeats": "Sayi gurabe",
+      "managedOnWeb": "Ana sarrafa tsari, gurabe da ƙara kuɗi ta atomatik a yanar gizo.",
       "setupAutoTopUp": "Saita ƙara kuɗi ta atomatik",
       "manageAutoTopUp": "Sarrafa ƙara kuɗi ta atomatik",
       "opensOnWeb": "Yana buɗewa a yanar gizo"

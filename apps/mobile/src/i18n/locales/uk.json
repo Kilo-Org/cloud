@@ -483,7 +483,14 @@
       "viewReceipt": "Переглянути підтвердження"
     },
     "changelog": "Що нового",
-    "changelogVersionPending": "Примітки до цієї версії з’являться з наступним оновленням."
+    "changelogVersionPending": "Примітки до версії {{version}} з’являться з наступним оновленням застосунку.",
+    "changelogGroupNew": "Нове",
+    "changelogFixesIn": "Виправлення та покращення в розділах: {{areas}}.",
+    "changelogFixesPolish": "Виправлення та покращення в усьому застосунку.",
+    "changelogAreas": {
+      "signIn": "Вхід",
+      "profileOrganizations": "Профіль і організації"
+    }
   },
   "preferences": {
     "general": "Загальні",
@@ -3435,6 +3442,7 @@
       "manageOnWeb": "Налаштування оплати у вебверсії",
       "changePlan": "Змінити план",
       "buySeats": "Купити місця",
+      "managedOnWeb": "Планом, місцями та автопоповненням керують у вебверсії.",
       "setupAutoTopUp": "Налаштувати автопоповнення",
       "manageAutoTopUp": "Керувати автопоповненням",
       "opensOnWeb": "Відкривається у вебверсії"

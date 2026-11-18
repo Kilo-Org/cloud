@@ -483,7 +483,14 @@
       "viewReceipt": "पावती पहा"
     },
     "changelog": "नवीन बदल",
-    "changelogVersionPending": "या आवृत्तीच्या नोंदी पुढील ॲप अपडेटसोबत येतील."
+    "changelogVersionPending": "{{version}} आवृत्तीच्या नोंदी पुढील ॲप अपडेटसोबत येतील.",
+    "changelogGroupNew": "नवीन",
+    "changelogFixesIn": "{{areas}} मध्ये दुरुस्त्या आणि सुधारणा.",
+    "changelogFixesPolish": "संपूर्ण अ‍ॅपमध्ये दुरुस्त्या आणि सुधारणा.",
+    "changelogAreas": {
+      "signIn": "साइन इन",
+      "profileOrganizations": "प्रोफाइल आणि संस्था"
+    }
   },
   "preferences": {
     "general": "सामान्य",
@@ -3329,6 +3336,7 @@
       "manageOnWeb": "वेबवरील बिलिंग सेटिंग्ज",
       "changePlan": "प्लॅन बदला",
       "buySeats": "जागा खरेदी करा",
+      "managedOnWeb": "प्लॅन, जागा आणि ऑटो टॉप-अप वेबवर व्यवस्थापित केले जातात.",
       "setupAutoTopUp": "ऑटो टॉप-अप सेट करा",
       "manageAutoTopUp": "ऑटो टॉप-अप व्यवस्थापित करा",
       "opensOnWeb": "वेबवर उघडते"

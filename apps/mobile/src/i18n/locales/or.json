@@ -483,7 +483,14 @@
       "viewReceipt": "ରସିଦ ଦେଖନ୍ତୁ"
     },
     "changelog": "ନୂଆ କ'ଣ",
-    "changelogVersionPending": "ଏହି ସଂସ୍କରଣର ନୋଟ୍ସ ପରବର୍ତ୍ତୀ ଆପ୍ ଅପଡେଟ୍ ସହିତ ଆସିବ।"
+    "changelogVersionPending": "{{version}} ସଂସ୍କରଣର ନୋଟ୍ସ ପରବର୍ତ୍ତୀ ଆପ୍ ଅପଡେଟ୍ ସହିତ ଆସିବ।",
+    "changelogGroupNew": "ନୂଆ",
+    "changelogFixesIn": "{{areas}}ରେ ସମାଧାନ ଓ ଉନ୍ନତି।",
+    "changelogFixesPolish": "ସମଗ୍ର ଆପରେ ସମାଧାନ ଓ ଉନ୍ନତି।",
+    "changelogAreas": {
+      "signIn": "ସାଇନ୍ ଇନ୍",
+      "profileOrganizations": "ପ୍ରୋଫାଇଲ୍ ଓ ସଂଗଠନ"
+    }
   },
   "preferences": {
     "general": "ସାଧାରଣ",
@@ -3329,6 +3336,7 @@
       "manageOnWeb": "ୱେବରେ ବିଲିଂ ସେଟିଂସ୍",
       "changePlan": "ଯୋଜନା ବଦଳାନ୍ତୁ",
       "buySeats": "ସିଟ୍ କିଣନ୍ତୁ",
+      "managedOnWeb": "ଯୋଜନା, ସିଟ୍ ଏବଂ ସ୍ୱୟଂଚାଳିତ ଟପ୍-ଅପ୍ ୱେବରେ ପରିଚାଳନା କରାଯାଏ।",
       "setupAutoTopUp": "ସ୍ୱୟଂଚାଳିତ ଟପ୍-ଅପ୍ ସେଟ୍ ଅପ୍ କରନ୍ତୁ",
       "manageAutoTopUp": "ସ୍ୱୟଂଚାଳିତ ଟପ୍-ଅପ୍ ପରିଚାଳନା କରନ୍ତୁ",
       "opensOnWeb": "ୱେବ୍‌ରେ ଖୋଲେ"

@@ -483,7 +483,14 @@
       "viewReceipt": "Wyświetl potwierdzenie"
     },
     "changelog": "Co nowego",
-    "changelogVersionPending": "Opis tej wersji dotrze z kolejną aktualizacją aplikacji."
+    "changelogVersionPending": "Opis wersji {{version}} dotrze z kolejną aktualizacją aplikacji.",
+    "changelogGroupNew": "Nowości",
+    "changelogFixesIn": "Poprawki i ulepszenia w obszarach: {{areas}}.",
+    "changelogFixesPolish": "Poprawki i ulepszenia w całej aplikacji.",
+    "changelogAreas": {
+      "signIn": "Logowanie",
+      "profileOrganizations": "Profil i organizacje"
+    }
   },
   "preferences": {
     "general": "Ogólne",
@@ -3435,6 +3442,7 @@
       "manageOnWeb": "Ustawienia rozliczeń w wersji internetowej",
       "changePlan": "Zmień plan",
       "buySeats": "Kup miejsca",
+      "managedOnWeb": "Plan, miejsca i automatyczne doładowanie są zarządzane w wersji internetowej.",
       "setupAutoTopUp": "Skonfiguruj automatyczne doładowanie",
       "manageAutoTopUp": "Zarządzaj automatycznym doładowaniem",
       "opensOnWeb": "Otwiera się w przeglądarce"

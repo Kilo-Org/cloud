@@ -483,7 +483,14 @@
       "viewReceipt": "Προβολή απόδειξης"
     },
     "changelog": "Τι νέο υπάρχει",
-    "changelogVersionPending": "Οι σημειώσεις αυτής της έκδοσης θα έρθουν με την επόμενη ενημέρωση της εφαρμογής."
+    "changelogVersionPending": "Οι σημειώσεις της έκδοσης {{version}} θα έρθουν με την επόμενη ενημέρωση της εφαρμογής.",
+    "changelogGroupNew": "Νέα",
+    "changelogFixesIn": "Διορθώσεις και βελτιώσεις στα εξής: {{areas}}.",
+    "changelogFixesPolish": "Διορθώσεις και βελτιώσεις σε όλη την εφαρμογή.",
+    "changelogAreas": {
+      "signIn": "Σύνδεση",
+      "profileOrganizations": "Προφίλ και οργανισμοί"
+    }
   },
   "preferences": {
     "general": "Γενικά",
@@ -3329,6 +3336,7 @@
       "manageOnWeb": "Ρυθμίσεις χρέωσης στον ιστό",
       "changePlan": "Αλλαγή πλάνου",
       "buySeats": "Αγορά θέσεων",
+      "managedOnWeb": "Το πλάνο, οι θέσεις και η αυτόματη αναπλήρωση διαχειρίζονται στον ιστό.",
       "setupAutoTopUp": "Ρύθμιση αυτόματης αναπλήρωσης",
       "manageAutoTopUp": "Διαχείριση αυτόματης αναπλήρωσης",
       "opensOnWeb": "Ανοίγει στον ιστότοπο"

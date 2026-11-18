@@ -483,7 +483,14 @@
       "viewReceipt": "रसीद देखें"
     },
     "changelog": "नया क्या है",
-    "changelogVersionPending": "इस वर्शन के नोट्स अगले ऐप अपडेट के साथ आएंगे।"
+    "changelogVersionPending": "वर्शन {{version}} के नोट्स अगले ऐप अपडेट के साथ आएंगे।",
+    "changelogGroupNew": "नया",
+    "changelogFixesIn": "{{areas}} में त्रुटि-सुधार और बेहतरी।",
+    "changelogFixesPolish": "पूरे ऐप में त्रुटि-सुधार और बेहतरी।",
+    "changelogAreas": {
+      "signIn": "साइन-इन",
+      "profileOrganizations": "प्रोफ़ाइल और संगठन"
+    }
   },
   "preferences": {
     "general": "सामान्य",
@@ -3321,6 +3328,7 @@
       "manageOnWeb": "वेब पर बिलिंग सेटिंग्स",
       "changePlan": "प्लान बदलें",
       "buySeats": "सीटें खरीदें",
+      "managedOnWeb": "प्लान, सीटें और ऑटो टॉप-अप वेब पर प्रबंधित किए जाते हैं।",
       "setupAutoTopUp": "ऑटो टॉप-अप सेट करें",
       "manageAutoTopUp": "ऑटो टॉप-अप प्रबंधित करें",
       "opensOnWeb": "वेब पर खुलता है"

@@ -483,7 +483,14 @@
       "viewReceipt": "Gweld y dderbynneb"
     },
     "changelog": "Beth sy'n newydd",
-    "changelogVersionPending": "Daw nodiadau'r fersiwn hon gyda'r diweddariad nesaf i'r ap."
+    "changelogVersionPending": "Daw nodiadau fersiwn {{version}} gyda'r diweddariad nesaf i'r ap.",
+    "changelogGroupNew": "Newydd",
+    "changelogFixesIn": "Atgyweiriadau a gwelliannau i'r canlynol: {{areas}}.",
+    "changelogFixesPolish": "Atgyweiriadau a gwelliannau ar draws yr ap.",
+    "changelogAreas": {
+      "signIn": "Mewngofnodi",
+      "profileOrganizations": "Proffil a sefydliadau"
+    }
   },
   "preferences": {
     "general": "Cyffredinol",
@@ -3557,6 +3564,7 @@
       "manageOnWeb": "Gosodiadau bilio ar y we",
       "changePlan": "Newid cynllun",
       "buySeats": "Prynu seddau",
+      "managedOnWeb": "Caiff y cynllun, y seddau ac ail-lenwi awtomatig eu rheoli ar y we.",
       "setupAutoTopUp": "Gosod ail-lenwi awtomatig",
       "manageAutoTopUp": "Rheoli ail-lenwi awtomatig",
       "opensOnWeb": "Yn agor ar y we"

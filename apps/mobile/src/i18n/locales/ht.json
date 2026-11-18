@@ -483,7 +483,14 @@
       "viewReceipt": "Wè resi a"
     },
     "changelog": "Sa ki nouvo",
-    "changelogVersionPending": "Nòt vèsyon sa a ap vini ak pwochen mizajou aplikasyon an."
+    "changelogVersionPending": "Nòt vèsyon {{version}} an ap vini ak pwochen mizajou aplikasyon an.",
+    "changelogGroupNew": "Nouvo",
+    "changelogFixesIn": "Koreksyon ak amelyorasyon nan {{areas}}.",
+    "changelogFixesPolish": "Koreksyon ak amelyorasyon nan tout aplikasyon an.",
+    "changelogAreas": {
+      "signIn": "Koneksyon",
+      "profileOrganizations": "Pwofil ak òganizasyon"
+    }
   },
   "preferences": {
     "general": "Jeneral",
@@ -3329,6 +3336,7 @@
       "manageOnWeb": "Paramèt faktirasyon sou entènèt",
       "changePlan": "Chanje plan",
       "buySeats": "Achte plas",
+      "managedOnWeb": "Se sou entènèt yo jere plan an, plas yo ak rechaj otomatik la.",
       "setupAutoTopUp": "Konfigire rechaj otomatik",
       "manageAutoTopUp": "Jere rechaj otomatik",
       "opensOnWeb": "Ap louvri sou entènèt la"

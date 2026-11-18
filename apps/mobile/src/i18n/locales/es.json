@@ -483,7 +483,14 @@
       "viewReceipt": "Ver comprobante"
     },
     "changelog": "Novedades",
-    "changelogVersionPending": "Las notas de esta versión llegan con la próxima actualización."
+    "changelogVersionPending": "Las notas de la versión {{version}} llegan con la próxima actualización.",
+    "changelogGroupNew": "Novedades",
+    "changelogFixesIn": "Correcciones y mejoras en {{areas}}.",
+    "changelogFixesPolish": "Correcciones y mejoras en toda la aplicación.",
+    "changelogAreas": {
+      "signIn": "Inicio de sesión",
+      "profileOrganizations": "Perfil y organizaciones"
+    }
   },
   "preferences": {
     "general": "General",
@@ -3378,6 +3385,7 @@
       "manageOnWeb": "Ajustes de facturación en la web",
       "changePlan": "Cambiar plan",
       "buySeats": "Comprar licencias",
+      "managedOnWeb": "El plan, las licencias y la recarga automática se gestionan en la web.",
       "setupAutoTopUp": "Configurar recarga automática",
       "manageAutoTopUp": "Gestionar recarga automática",
       "opensOnWeb": "Se abre en la web"

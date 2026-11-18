@@ -483,7 +483,14 @@
       "viewReceipt": "رسید دیکھیں"
     },
     "changelog": "نیا کیا ہے",
-    "changelogVersionPending": "اس ورژن کے نوٹس ایپ کی اگلی اپ ڈیٹ کے ساتھ آئیں گے۔"
+    "changelogVersionPending": "ورژن {{version}} کے نوٹس ایپ کی اگلی اپ ڈیٹ کے ساتھ آئیں گے۔",
+    "changelogGroupNew": "نیا",
+    "changelogFixesIn": "ان حصوں میں اصلاحات اور بہتریاں: {{areas}}۔",
+    "changelogFixesPolish": "پوری ایپ میں اصلاحات اور بہتریاں۔",
+    "changelogAreas": {
+      "signIn": "سائن ان",
+      "profileOrganizations": "پروفائل اور تنظیمیں"
+    }
   },
   "preferences": {
     "general": "عمومی",
@@ -3329,6 +3336,7 @@
       "manageOnWeb": "ویب پر بلنگ سیٹنگز",
       "changePlan": "پلان تبدیل کریں",
       "buySeats": "سیٹیں خریدیں",
+      "managedOnWeb": "پلان، سیٹیں اور خودکار ٹاپ اپ ویب پر منظم کیے جاتے ہیں۔",
       "setupAutoTopUp": "خودکار ٹاپ اپ سیٹ اپ کریں",
       "manageAutoTopUp": "خودکار ٹاپ اپ کا انتظام کریں",
       "opensOnWeb": "ویب پر کھلتا ہے"

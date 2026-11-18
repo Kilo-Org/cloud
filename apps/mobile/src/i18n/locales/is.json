@@ -483,7 +483,14 @@
       "viewReceipt": "Skoða kvittun"
     },
     "changelog": "Nýjungar",
-    "changelogVersionPending": "Upplýsingar um þessa útgáfu berast með næstu uppfærslu forritsins."
+    "changelogVersionPending": "Upplýsingar um útgáfu {{version}} berast með næstu uppfærslu forritsins.",
+    "changelogGroupNew": "Nýtt",
+    "changelogFixesIn": "Lagfæringar og endurbætur á eftirfarandi sviðum: {{areas}}.",
+    "changelogFixesPolish": "Lagfæringar og endurbætur í öllu forritinu.",
+    "changelogAreas": {
+      "signIn": "Innskráning",
+      "profileOrganizations": "Prófíll og stofnanir"
+    }
   },
   "preferences": {
     "general": "Almennt",
@@ -3329,6 +3336,7 @@
       "manageOnWeb": "Greiðslustillingar á vefnum",
       "changePlan": "Breyta áætlun",
       "buySeats": "Kaupa notendasæti",
+      "managedOnWeb": "Áætluninni, notendasætum og sjálfvirkri áfyllingu er stjórnað á vefnum.",
       "setupAutoTopUp": "Setja upp sjálfvirka áfyllingu",
       "manageAutoTopUp": "Stjórna sjálfvirkri áfyllingu",
       "opensOnWeb": "Opnast á vefnum"

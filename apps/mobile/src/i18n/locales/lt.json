@@ -483,7 +483,14 @@
       "viewReceipt": "Peržiūrėti patvirtinimą"
     },
     "changelog": "Kas naujo",
-    "changelogVersionPending": "Šios versijos pastabos pasirodys su kitu programėlės atnaujinimu."
+    "changelogVersionPending": "{{version}} versijos pastabos pasirodys su kitu programėlės atnaujinimu.",
+    "changelogGroupNew": "Nauja",
+    "changelogFixesIn": "Pataisymai ir patobulinimai šiose srityse: {{areas}}.",
+    "changelogFixesPolish": "Pataisymai ir patobulinimai visoje programėlėje.",
+    "changelogAreas": {
+      "signIn": "Prisijungimas",
+      "profileOrganizations": "Profilis ir organizacijos"
+    }
   },
   "preferences": {
     "general": "Bendra",
@@ -3443,6 +3450,7 @@
       "manageOnWeb": "Atsiskaitymo nustatymai žiniatinklyje",
       "changePlan": "Keisti planą",
       "buySeats": "Pirkti vietų",
+      "managedOnWeb": "Planas, vietos ir automatinis papildymas valdomi žiniatinklyje.",
       "setupAutoTopUp": "Nustatyti automatinį papildymą",
       "manageAutoTopUp": "Tvarkyti automatinį papildymą",
       "opensOnWeb": "Atidaroma žiniatinklyje"

@@ -483,7 +483,14 @@
       "viewReceipt": "रसिद हेर्नुहोस्"
     },
     "changelog": "नयाँ कुराहरू",
-    "changelogVersionPending": "यस संस्करणका नोटहरू अर्को एप अपडेटसँगै आउनेछन्।"
+    "changelogVersionPending": "संस्करण {{version}} का नोटहरू अर्को एप अपडेटसँगै आउनेछन्।",
+    "changelogGroupNew": "नयाँ",
+    "changelogFixesIn": "{{areas}} मा समाधान र सुधारहरू।",
+    "changelogFixesPolish": "सम्पूर्ण एपमा समाधान र सुधारहरू।",
+    "changelogAreas": {
+      "signIn": "साइन इन",
+      "profileOrganizations": "प्रोफाइल र संस्थाहरू"
+    }
   },
   "preferences": {
     "general": "सामान्य",
@@ -3329,6 +3336,7 @@
       "manageOnWeb": "वेबमा बिलिङ सेटिङहरू",
       "changePlan": "प्लान बदल्नुहोस्",
       "buySeats": "सिटहरू किन्नुहोस्",
+      "managedOnWeb": "प्लान, सिटहरू र स्वतः टप-अप वेबमा व्यवस्थापन गरिन्छन्।",
       "setupAutoTopUp": "स्वतः टप-अप सेट अप गर्नुहोस्",
       "manageAutoTopUp": "स्वतः टप-अप व्यवस्थापन गर्नुहोस्",
       "opensOnWeb": "वेबमा खुल्छ"

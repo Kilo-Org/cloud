@@ -483,7 +483,14 @@
       "viewReceipt": "ደረሰኙን ይመልከቱ"
     },
     "changelog": "አዲስ ነገር",
-    "changelogVersionPending": "የዚህ ስሪት ማስታወሻዎች ከሚቀጥለው የመተግበሪያ ዝማኔ ጋር ይመጣሉ።"
+    "changelogVersionPending": "የስሪት {{version}} ማስታወሻዎች ከሚቀጥለው የመተግበሪያ ዝማኔ ጋር ይመጣሉ።",
+    "changelogGroupNew": "አዲስ",
+    "changelogFixesIn": "በእነዚህ ክፍሎች ጥገናዎች እና ማሻሻያዎች ተደርገዋል፦ {{areas}}።",
+    "changelogFixesPolish": "በመተግበሪያው ውስጥ በሙሉ ጥገናዎች እና ማሻሻያዎች ተደርገዋል።",
+    "changelogAreas": {
+      "signIn": "መግቢያ",
+      "profileOrganizations": "መገለጫ እና ድርጅቶች"
+    }
   },
   "preferences": {
     "general": "አጠቃላይ",
@@ -3329,6 +3336,7 @@
       "manageOnWeb": "የክፍያ ቅንብሮች በድር ላይ",
       "changePlan": "ዕቅድ ይቀይሩ",
       "buySeats": "የተጠቃሚ ፈቃዶችን ይግዙ",
+      "managedOnWeb": "ዕቅዱ፣ የተጠቃሚ ፈቃዶች እና ራስ-ሰር መሙላት የሚተዳደሩት በድር ላይ ነው።",
       "setupAutoTopUp": "ራስ-ሰር መሙላትን ያዋቅሩ",
       "manageAutoTopUp": "ራስ-ሰር መሙላትን አስተዳድር",
       "opensOnWeb": "በድር ላይ ይከፈታል"

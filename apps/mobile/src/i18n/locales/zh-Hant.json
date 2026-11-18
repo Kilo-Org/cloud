@@ -483,7 +483,14 @@
       "viewReceipt": "檢視回執"
     },
     "changelog": "最新消息",
-    "changelogVersionPending": "此版本的說明將隨下次應用程式更新提供。"
+    "changelogVersionPending": "{{version}} 版的說明將隨下次應用程式更新提供。",
+    "changelogGroupNew": "新功能",
+    "changelogFixesIn": "{{areas}}的修正與改進。",
+    "changelogFixesPolish": "整個應用程式的修正與改進。",
+    "changelogAreas": {
+      "signIn": "登入",
+      "profileOrganizations": "個人資料與組織"
+    }
   },
   "preferences": {
     "general": "一般",
@@ -3321,6 +3328,7 @@
       "manageOnWeb": "網頁版帳單設定",
       "changePlan": "變更套餐",
       "buySeats": "購買席次",
+      "managedOnWeb": "套餐、席次和自動儲值是在網頁版上管理。",
       "setupAutoTopUp": "設定自動儲值",
       "manageAutoTopUp": "管理自動儲值",
       "opensOnWeb": "在網頁上開啟"

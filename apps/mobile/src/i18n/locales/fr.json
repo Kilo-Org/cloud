@@ -483,7 +483,14 @@
       "viewReceipt": "Voir l'accusé de réception"
     },
     "changelog": "Nouveautés",
-    "changelogVersionPending": "Les notes de cette version arriveront avec la prochaine mise à jour."
+    "changelogVersionPending": "Les notes de la version {{version}} arriveront avec la prochaine mise à jour de l'application.",
+    "changelogGroupNew": "Nouveautés",
+    "changelogFixesIn": "Corrections et améliorations dans les sections suivantes : {{areas}}.",
+    "changelogFixesPolish": "Corrections et améliorations dans toute l'application.",
+    "changelogAreas": {
+      "signIn": "Connexion",
+      "profileOrganizations": "Profil et organisations"
+    }
   },
   "notifications": {
     "channel": {
@@ -3378,6 +3385,7 @@
       "manageOnWeb": "Paramètres de facturation sur le web",
       "changePlan": "Changer de formule",
       "buySeats": "Acheter des licences",
+      "managedOnWeb": "La formule, les licences et la recharge automatique sont gérées sur le web.",
       "setupAutoTopUp": "Configurer la recharge automatique",
       "manageAutoTopUp": "Gérer la recharge automatique",
       "opensOnWeb": "S'ouvre sur le web"

@@ -483,7 +483,14 @@
       "viewReceipt": "Түбіртекті көру"
     },
     "changelog": "Жаңалықтар",
-    "changelogVersionPending": "Бұл нұсқаның жазбалары қолданбаның келесі жаңартуымен келеді."
+    "changelogVersionPending": "{{version}} нұсқасының жазбалары қолданбаның келесі жаңартуымен келеді.",
+    "changelogGroupNew": "Жаңа",
+    "changelogFixesIn": "Келесі бөлімдердегі түзетулер мен жақсартулар: {{areas}}.",
+    "changelogFixesPolish": "Бүкіл қолданбадағы түзетулер мен жақсартулар.",
+    "changelogAreas": {
+      "signIn": "Кіру",
+      "profileOrganizations": "Профиль және ұйымдар"
+    }
   },
   "preferences": {
     "general": "Жалпы",
@@ -3329,6 +3336,7 @@
       "manageOnWeb": "Вебтегі төлемдер параметрлері",
       "changePlan": "Жоспарды өзгерту",
       "buySeats": "Орын сатып алу",
+      "managedOnWeb": "Жоспар, орындар және автотолықтыру вебте басқарылады.",
       "setupAutoTopUp": "Автотолықтыруды баптау",
       "manageAutoTopUp": "Автотолықтыруды басқару",
       "opensOnWeb": "Вебте ашылады"

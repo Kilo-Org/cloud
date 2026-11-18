@@ -483,7 +483,14 @@
       "viewReceipt": "Qəbzə bax"
     },
     "changelog": "Yeniliklər",
-    "changelogVersionPending": "Bu versiyanın qeydləri tətbiqin növbəti yeniləməsi ilə gələcək."
+    "changelogVersionPending": "{{version}} versiyasının qeydləri tətbiqin növbəti yeniləməsi ilə gələcək.",
+    "changelogGroupNew": "Yeni",
+    "changelogFixesIn": "{{areas}} bölmələrində düzəlişlər və təkmilləşdirmələr.",
+    "changelogFixesPolish": "Bütün tətbiqdə düzəlişlər və təkmilləşdirmələr.",
+    "changelogAreas": {
+      "signIn": "Giriş",
+      "profileOrganizations": "Profil və təşkilatlar"
+    }
   },
   "preferences": {
     "general": "Ümumi",
@@ -3329,6 +3336,7 @@
       "manageOnWeb": "Vebdə ödənişlər ayarları",
       "changePlan": "Planı dəyiş",
       "buySeats": "İstifadəçi yerləri al",
+      "managedOnWeb": "Plan, istifadəçi yerləri və avtomatik artırma vebdə idarə olunur.",
       "setupAutoTopUp": "Avtomatik artırmanı qur",
       "manageAutoTopUp": "Avtomatik artırmanı idarə et",
       "opensOnWeb": "Vebdə açılır"

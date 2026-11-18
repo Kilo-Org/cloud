@@ -483,7 +483,14 @@
       "viewReceipt": "Visszaigazolás megtekintése"
     },
     "changelog": "Újdonságok",
-    "changelogVersionPending": "E verzió újdonságai a következő frissítéssel érkeznek."
+    "changelogVersionPending": "A(z) {{version}} verzió újdonságai a következő frissítéssel érkeznek.",
+    "changelogGroupNew": "Újdonságok",
+    "changelogFixesIn": "Javítások és fejlesztések a következő területeken: {{areas}}.",
+    "changelogFixesPolish": "Javítások és fejlesztések az egész alkalmazásban.",
+    "changelogAreas": {
+      "signIn": "Bejelentkezés",
+      "profileOrganizations": "Profil és szervezetek"
+    }
   },
   "preferences": {
     "general": "Általános",
@@ -3329,6 +3336,7 @@
       "manageOnWeb": "Számlázási beállítások a weben",
       "changePlan": "Csomag módosítása",
       "buySeats": "Férőhelyek vásárlása",
+      "managedOnWeb": "A csomag, a férőhelyek és az automatikus feltöltés kezelése a weben történik.",
       "setupAutoTopUp": "Automatikus feltöltés beállítása",
       "manageAutoTopUp": "Automatikus feltöltés kezelése",
       "opensOnWeb": "A weben nyílik meg"

@@ -483,7 +483,14 @@
       "viewReceipt": "Bestätigung anzeigen"
     },
     "changelog": "Neuigkeiten",
-    "changelogVersionPending": "Neuigkeiten zu dieser Version folgen im nächsten Update."
+    "changelogVersionPending": "Neuigkeiten zu Version {{version}} folgen im nächsten Update.",
+    "changelogGroupNew": "Neu",
+    "changelogFixesIn": "Fehlerbehebungen und Verbesserungen in den Bereichen {{areas}}.",
+    "changelogFixesPolish": "Fehlerbehebungen und Verbesserungen in der gesamten App.",
+    "changelogAreas": {
+      "signIn": "Anmeldung",
+      "profileOrganizations": "Profil und Organisationen"
+    }
   },
   "preferences": {
     "general": "Allgemein",
@@ -3321,6 +3328,7 @@
       "manageOnWeb": "Abrechnungseinstellungen im Web",
       "changePlan": "Plan ändern",
       "buySeats": "Nutzerplätze kaufen",
+      "managedOnWeb": "Plan, Nutzerplätze und automatische Aufladung werden im Web verwaltet.",
       "setupAutoTopUp": "Automatische Aufladung einrichten",
       "manageAutoTopUp": "Automatische Aufladung verwalten",
       "opensOnWeb": "Wird im Web geöffnet"

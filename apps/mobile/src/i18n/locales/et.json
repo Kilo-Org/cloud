@@ -483,7 +483,14 @@
       "viewReceipt": "Vaata kinnitust"
     },
     "changelog": "Mis on uut",
-    "changelogVersionPending": "Selle versiooni märkmed saabuvad rakenduse järgmise uuendusega."
+    "changelogVersionPending": "Versiooni {{version}} märkmed saabuvad rakenduse järgmise uuendusega.",
+    "changelogGroupNew": "Uut",
+    "changelogFixesIn": "Parandused ja täiustused järgmistes osades: {{areas}}.",
+    "changelogFixesPolish": "Parandused ja täiustused kogu rakenduses.",
+    "changelogAreas": {
+      "signIn": "Sisselogimine",
+      "profileOrganizations": "Profiil ja organisatsioonid"
+    }
   },
   "preferences": {
     "general": "Üldine",
@@ -3329,6 +3336,7 @@
       "manageOnWeb": "Arvelduse seaded veebis",
       "changePlan": "Muuda plaani",
       "buySeats": "Osta kasutajakohti",
+      "managedOnWeb": "Plaani, kasutajakohti ja automaatset täiendamist hallatakse veebis.",
       "setupAutoTopUp": "Seadista automaatne täiendamine",
       "manageAutoTopUp": "Halda automaatset täiendamist",
       "opensOnWeb": "Avaneb veebis"

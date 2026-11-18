@@ -483,7 +483,14 @@
       "viewReceipt": "Skatīt apstiprinājumu"
     },
     "changelog": "Kas jauns",
-    "changelogVersionPending": "Šīs versijas piezīmes pienāks ar nākamo atjauninājumu."
+    "changelogVersionPending": "Versijas {{version}} piezīmes pienāks ar nākamo atjauninājumu.",
+    "changelogGroupNew": "Jaunumi",
+    "changelogFixesIn": "Labojumi un uzlabojumi šajās jomās: {{areas}}.",
+    "changelogFixesPolish": "Labojumi un uzlabojumi visā lietotnē.",
+    "changelogAreas": {
+      "signIn": "Pierakstīšanās",
+      "profileOrganizations": "Profils un organizācijas"
+    }
   },
   "preferences": {
     "general": "Vispārīgi",
@@ -3386,6 +3393,7 @@
       "manageOnWeb": "Norēķinu iestatījumi tīmeklī",
       "changePlan": "Mainīt plānu",
       "buySeats": "Pirkt vietas",
+      "managedOnWeb": "Plāns, vietas un automātiskā papildināšana tiek pārvaldīti tīmeklī.",
       "setupAutoTopUp": "Iestatīt automātisko papildināšanu",
       "manageAutoTopUp": "Pārvaldi automātisko papildināšanu",
       "opensOnWeb": "Tiek atvērts tīmeklī"

@@ -483,7 +483,14 @@
       "viewReceipt": "ರಸೀದಿ ವೀಕ್ಷಿಸಿ"
     },
     "changelog": "ಹೊಸತೇನಿದೆ",
-    "changelogVersionPending": "ಈ ಆವೃತ್ತಿಯ ಟಿಪ್ಪಣಿಗಳು ಮುಂದಿನ ಆ್ಯಪ್ ಅಪ್‌ಡೇಟ್‌ನೊಂದಿಗೆ ಬರುತ್ತವೆ."
+    "changelogVersionPending": "{{version}} ಆವೃತ್ತಿಯ ಟಿಪ್ಪಣಿಗಳು ಮುಂದಿನ ಆ್ಯಪ್ ಅಪ್‌ಡೇಟ್‌ನೊಂದಿಗೆ ಬರುತ್ತವೆ.",
+    "changelogGroupNew": "ಹೊಸದು",
+    "changelogFixesIn": "ಈ ವಿಭಾಗಗಳಲ್ಲಿ ದೋಷ ಪರಿಹಾರಗಳು ಮತ್ತು ಸುಧಾರಣೆಗಳು: {{areas}}.",
+    "changelogFixesPolish": "ಆ್ಯಪ್‌ನಾದ್ಯಂತ ದೋಷ ಪರಿಹಾರಗಳು ಮತ್ತು ಸುಧಾರಣೆಗಳು.",
+    "changelogAreas": {
+      "signIn": "ಸೈನ್ ಇನ್",
+      "profileOrganizations": "ಪ್ರೊಫೈಲ್ ಮತ್ತು ಸಂಸ್ಥೆಗಳು"
+    }
   },
   "preferences": {
     "general": "ಸಾಮಾನ್ಯ",
@@ -3329,6 +3336,7 @@
       "manageOnWeb": "ವೆಬ್‌ನಲ್ಲಿ ಬಿಲ್ಲಿಂಗ್ ಸೆಟ್ಟಿಂಗ್‌ಗಳು",
       "changePlan": "ಯೋಜನೆ ಬದಲಾಯಿಸಿ",
       "buySeats": "ಸೀಟ್‌ಗಳನ್ನು ಖರೀದಿಸಿ",
+      "managedOnWeb": "ಯೋಜನೆ, ಸೀಟ್‌ಗಳು ಮತ್ತು ಸ್ವಯಂ ಟಾಪ್-ಅಪ್ ಅನ್ನು ವೆಬ್‌ನಲ್ಲಿ ನಿರ್ವಹಿಸಲಾಗುತ್ತದೆ.",
       "setupAutoTopUp": "ಸ್ವಯಂ ಟಾಪ್-ಅಪ್ ಹೊಂದಿಸಿ",
       "manageAutoTopUp": "ಸ್ವಯಂ ಟಾಪ್-ಅಪ್ ನಿರ್ವಹಿಸಿ",
       "opensOnWeb": "ವೆಬ್‌ನಲ್ಲಿ ತೆರೆಯುತ್ತದೆ"

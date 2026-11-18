@@ -483,7 +483,14 @@
       "viewReceipt": "بینینی پسوولە"
     },
     "changelog": "تازەکان",
-    "changelogVersionPending": "تێبینییەکانی ئەم وەشانە لەگەڵ نوێکردنەوەی داهاتووی ئەپەکە دێن."
+    "changelogVersionPending": "تێبینییەکانی وەشانی {{version}} لەگەڵ نوێکردنەوەی داهاتووی ئەپەکە دێن.",
+    "changelogGroupNew": "نوێ",
+    "changelogFixesIn": "چاککردن و باشترکردن لەم بەشانەدا: {{areas}}.",
+    "changelogFixesPolish": "چاککردن و باشترکردن لە سەرتاسەری ئەپەکەدا.",
+    "changelogAreas": {
+      "signIn": "چوونەژوورەوە",
+      "profileOrganizations": "پرۆفایل و ڕێکخراوەکان"
+    }
   },
   "preferences": {
     "general": "گشتی",
@@ -3329,6 +3336,7 @@
       "manageOnWeb": "ڕێکخستنەکانی پارەدان لە وێب",
       "changePlan": "گۆڕینی پلان",
       "buySeats": "کڕینی شوێن",
+      "managedOnWeb": "پلانەکە، شوێنەکان و پڕکردنەوەی خۆکار لە وێب بەڕێوە دەبرێن.",
       "setupAutoTopUp": "ڕێکخستنی پڕکردنەوەی خۆکار",
       "manageAutoTopUp": "بەڕێوەبردنی پڕکردنەوەی خۆکار",
       "opensOnWeb": "لە وێب دەکرێتەوە"

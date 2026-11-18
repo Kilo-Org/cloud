@@ -483,7 +483,14 @@
       "viewReceipt": "عرض الإيصال"
     },
     "changelog": "ما الجديد",
-    "changelogVersionPending": "ستصل ملاحظات هذا الإصدار مع التحديث القادم للتطبيق."
+    "changelogVersionPending": "ستصل ملاحظات الإصدار {{version}} مع التحديث القادم للتطبيق.",
+    "changelogGroupNew": "جديد",
+    "changelogFixesIn": "إصلاحات وتحسينات في {{areas}}.",
+    "changelogFixesPolish": "إصلاحات وتحسينات في جميع أنحاء التطبيق.",
+    "changelogAreas": {
+      "signIn": "تسجيل الدخول",
+      "profileOrganizations": "الملف الشخصي والمؤسسات"
+    }
   },
   "preferences": {
     "general": "عام",
@@ -3549,6 +3556,7 @@
       "manageOnWeb": "إعدادات الفوترة على الويب",
       "changePlan": "تغيير الخطة",
       "buySeats": "شراء مقاعد",
+      "managedOnWeb": "تتم إدارة الخطة والمقاعد والشحن التلقائي على الويب.",
       "setupAutoTopUp": "إعداد الشحن التلقائي",
       "manageAutoTopUp": "إدارة الشحن التلقائي",
       "opensOnWeb": "يُفتح على الويب"

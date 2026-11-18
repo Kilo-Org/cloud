@@ -483,7 +483,14 @@
       "viewReceipt": "Баримт харах"
     },
     "changelog": "Шинэ зүйлс",
-    "changelogVersionPending": "Энэ хувилбарын тэмдэглэл аппын дараагийн шинэчлэлтээр ирнэ."
+    "changelogVersionPending": "{{version}} хувилбарын тэмдэглэл аппын дараагийн шинэчлэлтээр ирнэ.",
+    "changelogGroupNew": "Шинэ",
+    "changelogFixesIn": "Дараах хэсгүүдэд засвар, сайжруулалт хийгдсэн: {{areas}}.",
+    "changelogFixesPolish": "Апп даяар засвар, сайжруулалт хийгдсэн.",
+    "changelogAreas": {
+      "signIn": "Нэвтрэх",
+      "profileOrganizations": "Профайл ба байгууллагууд"
+    }
   },
   "preferences": {
     "general": "Ерөнхий",
@@ -3329,6 +3336,7 @@
       "manageOnWeb": "Вэб дээрх төлбөр тооцооны тохиргоо",
       "changePlan": "Төлөвлөгөө өөрчлөх",
       "buySeats": "Хэрэглэгчийн эрх авах",
+      "managedOnWeb": "Төлөвлөгөө, хэрэглэгчийн эрх болон автомат цэнэглэлт вэб дээр удирдагддаг.",
       "setupAutoTopUp": "Автомат цэнэглэлт тохируулах",
       "manageAutoTopUp": "Автомат цэнэглэлт удирдах",
       "opensOnWeb": "Вэб дээр нээгдэнэ"

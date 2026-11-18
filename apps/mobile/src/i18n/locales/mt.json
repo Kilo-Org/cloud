@@ -483,7 +483,14 @@
       "viewReceipt": "Ara l-irċevuta"
     },
     "changelog": "X'hemm ġdid",
-    "changelogVersionPending": "In-noti ta' din il-verżjoni jaslu mal-aġġornament li jmiss tal-app."
+    "changelogVersionPending": "In-noti għall-verżjoni {{version}} jaslu mal-aġġornament li jmiss tal-app.",
+    "changelogGroupNew": "Ġdid",
+    "changelogFixesIn": "Tiswijiet u titjib f'dawn l-oqsma: {{areas}}.",
+    "changelogFixesPolish": "Tiswijiet u titjib fl-applikazzjoni kollha.",
+    "changelogAreas": {
+      "signIn": "Dħul",
+      "profileOrganizations": "Profil u organizzazzjonijiet"
+    }
   },
   "preferences": {
     "general": "Ġenerali",
@@ -3500,6 +3507,7 @@
       "manageOnWeb": "Issettjar tal-ħlasijiet fuq il-web",
       "changePlan": "Ibdel il-pjan",
       "buySeats": "Ixtri postijiet",
+      "managedOnWeb": "Il-pjan, il-postijiet u r-rikarika awtomatika jiġu ġestiti fuq il-web.",
       "setupAutoTopUp": "Issettja r-rikarika awtomatika",
       "manageAutoTopUp": "Immaniġġja r-rikarika awtomatika",
       "opensOnWeb": "Jinfetaħ fuq il-web"

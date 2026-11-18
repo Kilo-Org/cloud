@@ -483,7 +483,14 @@
       "viewReceipt": "Ver comprovante"
     },
     "changelog": "Novidades",
-    "changelogVersionPending": "As notas desta versão vêm na próxima atualização do app."
+    "changelogVersionPending": "As notas da versão {{version}} vêm na próxima atualização do app.",
+    "changelogGroupNew": "Novidades",
+    "changelogFixesIn": "Correções e melhorias em {{areas}}.",
+    "changelogFixesPolish": "Correções e melhorias em todo o app.",
+    "changelogAreas": {
+      "signIn": "Acesso",
+      "profileOrganizations": "Perfil e organizações"
+    }
   },
   "notifications": {
     "channel": {
@@ -3384,6 +3391,7 @@
       "manageOnWeb": "Configurações de faturamento na web",
       "changePlan": "Alterar plano",
       "buySeats": "Comprar licenças",
+      "managedOnWeb": "O plano, as licenças e a recarga automática são gerenciados na web.",
       "setupAutoTopUp": "Configurar recarga automática",
       "manageAutoTopUp": "Gerenciar recarga automática",
       "opensOnWeb": "Abre na web"

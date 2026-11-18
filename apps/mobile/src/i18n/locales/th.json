@@ -483,7 +483,14 @@
       "viewReceipt": "ดูใบรับ"
     },
     "changelog": "มีอะไรใหม่",
-    "changelogVersionPending": "บันทึกของเวอร์ชันนี้จะมาพร้อมการอัปเดตแอปครั้งถัดไป"
+    "changelogVersionPending": "บันทึกของเวอร์ชัน {{version}} จะมาพร้อมการอัปเดตแอปครั้งถัดไป",
+    "changelogGroupNew": "ใหม่",
+    "changelogFixesIn": "การแก้ไขและปรับปรุงใน {{areas}}",
+    "changelogFixesPolish": "การแก้ไขและปรับปรุงทั่วทั้งแอป",
+    "changelogAreas": {
+      "signIn": "การลงชื่อเข้าใช้",
+      "profileOrganizations": "โปรไฟล์และองค์กร"
+    }
   },
   "preferences": {
     "general": "ทั่วไป",
@@ -3329,6 +3336,7 @@
       "manageOnWeb": "การตั้งค่าการเรียกเก็บเงินบนเว็บ",
       "changePlan": "เปลี่ยนแผน",
       "buySeats": "ซื้อสิทธิ์ใช้งาน",
+      "managedOnWeb": "แผน สิทธิ์ใช้งาน และการเติมเงินอัตโนมัติได้รับการจัดการบนเว็บ",
       "setupAutoTopUp": "ตั้งค่าการเติมเงินอัตโนมัติ",
       "manageAutoTopUp": "จัดการการเติมเงินอัตโนมัติ",
       "opensOnWeb": "เปิดบนเว็บ"

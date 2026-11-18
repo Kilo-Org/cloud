@@ -483,7 +483,14 @@
       "viewReceipt": "Wo ìwé ẹ̀rí"
     },
     "changelog": "Àwọn ohun tuntun",
-    "changelogVersionPending": "Àkọsílẹ̀ ẹ̀yà yìí yóò dé pẹ̀lú ìmúdójúìwọ̀n áàpù tó kàn."
+    "changelogVersionPending": "Àkọsílẹ̀ ẹ̀yà {{version}} yóò dé pẹ̀lú ìmúdójúìwọ̀n áàpù tó kàn.",
+    "changelogGroupNew": "Tuntun",
+    "changelogFixesIn": "Àtúnṣe àti ìlọsíwájú nínú {{areas}}.",
+    "changelogFixesPolish": "Àtúnṣe àti ìlọsíwájú jákèjádò áàpù.",
+    "changelogAreas": {
+      "signIn": "Wíwọlé",
+      "profileOrganizations": "Àkọsílẹ̀ ara ẹni àti àwọn àjọ"
+    }
   },
   "preferences": {
     "general": "Gbogbogbo",
@@ -3329,6 +3336,7 @@
       "manageOnWeb": "Àtúnṣe ìsanwó lórí wẹ́ẹ̀bù",
       "changePlan": "Yí ètò padà",
       "buySeats": "Ra ààyè",
+      "managedOnWeb": "A ń ṣàkóso ètò náà, àwọn ààyè àti ìfikún owó aládàáṣe lórí wẹ́ẹ̀bù.",
       "setupAutoTopUp": "Ṣètò ìfikún owó aládàáṣe",
       "manageAutoTopUp": "Ṣàkóso ìfikún owó aládàáṣe",
       "opensOnWeb": "Yóò ṣí lórí wẹ́ẹ̀bù"

@@ -483,7 +483,14 @@
       "viewReceipt": "Ragaa ilaali"
     },
     "changelog": "Waan haaraa",
-    "changelogVersionPending": "Yaadannoon gulaala kanaa haaromsa appii itti aanu waliin dhufa."
+    "changelogVersionPending": "Yaadannoon {{version}} haaromsa appii itti aanu waliin dhufa.",
+    "changelogGroupNew": "Haaraa",
+    "changelogFixesIn": "Sirreeffamaa fi fooyya'iinsota {{areas}} keessatti.",
+    "changelogFixesPolish": "Sirreeffamaa fi fooyya'iinsota appii guutuu keessatti.",
+    "changelogAreas": {
+      "signIn": "Seenuu",
+      "profileOrganizations": "Piroofaayilii fi dhaabbilee"
+    }
   },
   "preferences": {
     "general": "Waliigalaa",
@@ -3329,6 +3336,7 @@
       "manageOnWeb": "Qindaa'ina kaffaltii weebii irratti",
       "changePlan": "Karoora jijjiiri",
       "buySeats": "Bakka miseensotaa bitadhu",
+      "managedOnWeb": "Karoorri, bakki miseensotaa fi guutuun ofumaan weebii irratti bulchamu.",
       "setupAutoTopUp": "Guutuu ofumaan qindeessi",
       "manageAutoTopUp": "Guutuu ofumaan bulchi",
       "opensOnWeb": "Weebii irratti bana"

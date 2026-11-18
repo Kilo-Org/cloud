@@ -483,7 +483,14 @@
       "viewReceipt": "Ikusi agiria"
     },
     "changelog": "Berritasunak",
-    "changelogVersionPending": "Bertsio honen oharrak aplikazioaren hurrengo eguneratzearekin iritsiko dira."
+    "changelogVersionPending": "{{version}} bertsioaren oharrak aplikazioaren hurrengo eguneratzearekin iritsiko dira.",
+    "changelogGroupNew": "Berrikuntzak",
+    "changelogFixesIn": "Zuzenketak eta hobekuntzak atal hauetan: {{areas}}.",
+    "changelogFixesPolish": "Zuzenketak eta hobekuntzak aplikazio osoan.",
+    "changelogAreas": {
+      "signIn": "Saioa hastea",
+      "profileOrganizations": "Profila eta erakundeak"
+    }
   },
   "preferences": {
     "general": "Orokorra",
@@ -3329,6 +3336,7 @@
       "manageOnWeb": "Fakturazio-ezarpenak webean",
       "changePlan": "Aldatu plana",
       "buySeats": "Erosi lizentziak",
+      "managedOnWeb": "Plana, lizentziak eta birkarga automatikoa webean kudeatzen dira.",
       "setupAutoTopUp": "Konfiguratu birkarga automatikoa",
       "manageAutoTopUp": "Kudeatu birkarga automatikoa",
       "opensOnWeb": "Webean irekitzen da"

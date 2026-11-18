@@ -483,7 +483,14 @@
       "viewReceipt": "ເບິ່ງໃບຮັບ"
     },
     "changelog": "ມີຫຍັງໃໝ່",
-    "changelogVersionPending": "ບັນທຶກສຳລັບເວີຊັນນີ້ຈະມາພ້ອມກັບການອັບເດດແອັບຄັ້ງຕໍ່ໄປ"
+    "changelogVersionPending": "ບັນທຶກສຳລັບເວີຊັນ {{version}} ຈະມາພ້ອມກັບການອັບເດດແອັບຄັ້ງຕໍ່ໄປ",
+    "changelogGroupNew": "ໃໝ່",
+    "changelogFixesIn": "ການແກ້ໄຂ ແລະ ການປັບປຸງໃນ {{areas}}.",
+    "changelogFixesPolish": "ການແກ້ໄຂ ແລະ ການປັບປຸງທົ່ວທັງແອັບ.",
+    "changelogAreas": {
+      "signIn": "ການເຂົ້າສູ່ລະບົບ",
+      "profileOrganizations": "ໂປຣໄຟລ໌ ແລະ ອົງກອນ"
+    }
   },
   "preferences": {
     "general": "ທົ່ວໄປ",
@@ -3329,6 +3336,7 @@
       "manageOnWeb": "ການຕັ້ງຄ່າການຮຽກເກັບເງິນໃນເວັບ",
       "changePlan": "ປ່ຽນແຜນ",
       "buySeats": "ຊື້ສິດຜູ້ໃຊ້",
+      "managedOnWeb": "ແຜນ, ສິດຜູ້ໃຊ້ ແລະ ການເຕີມເງິນອັດຕະໂນມັດຖືກຈັດການຢູ່ໃນເວັບ.",
       "setupAutoTopUp": "ຕັ້ງຄ່າການເຕີມເງິນອັດຕະໂນມັດ",
       "manageAutoTopUp": "ຈັດການການເຕີມເງິນອັດຕະໂນມັດ",
       "opensOnWeb": "ເປີດໃນເວັບ"

@@ -483,7 +483,14 @@
       "viewReceipt": "Näytä kuitti"
     },
     "changelog": "Mitä uutta",
-    "changelogVersionPending": "Tämän version julkaisutiedot tulevat seuraavan päivityksen mukana."
+    "changelogVersionPending": "Version {{version}} julkaisutiedot tulevat sovelluksen seuraavan päivityksen mukana.",
+    "changelogGroupNew": "Uutta",
+    "changelogFixesIn": "Korjauksia ja parannuksia seuraaviin osioihin: {{areas}}.",
+    "changelogFixesPolish": "Korjauksia ja parannuksia koko sovellukseen.",
+    "changelogAreas": {
+      "signIn": "Kirjautuminen",
+      "profileOrganizations": "Profiili ja organisaatiot"
+    }
   },
   "preferences": {
     "general": "Yleiset",
@@ -3329,6 +3336,7 @@
       "manageOnWeb": "Laskutusasetukset verkossa",
       "changePlan": "Vaihda pakettia",
       "buySeats": "Osta käyttäjäpaikkoja",
+      "managedOnWeb": "Pakettia, käyttäjäpaikkoja ja automaattista täydennystä hallitaan verkossa.",
       "setupAutoTopUp": "Ota automaattinen täydennys käyttöön",
       "manageAutoTopUp": "Hallinnoi automaattista täydennystä",
       "opensOnWeb": "Avautuu verkossa"

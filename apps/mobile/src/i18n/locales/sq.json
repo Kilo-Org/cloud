@@ -483,7 +483,14 @@
       "viewReceipt": "Shiko dëftesën"
     },
     "changelog": "Çfarë ka të re",
-    "changelogVersionPending": "Shënimet e këtij versioni vijnë me përditësimin e ardhshëm."
+    "changelogVersionPending": "Shënimet për versionin {{version}} vijnë me përditësimin e ardhshëm të aplikacionit.",
+    "changelogGroupNew": "Të reja",
+    "changelogFixesIn": "Rregullime dhe përmirësime në {{areas}}.",
+    "changelogFixesPolish": "Rregullime dhe përmirësime në të gjithë aplikacionin.",
+    "changelogAreas": {
+      "signIn": "Hyrja",
+      "profileOrganizations": "Profili dhe organizatat"
+    }
   },
   "preferences": {
     "general": "Të përgjithshme",
@@ -3329,6 +3336,7 @@
       "manageOnWeb": "Cilësimet e faturimit në ueb",
       "changePlan": "Ndrysho planin",
       "buySeats": "Bli vende",
+      "managedOnWeb": "Plani, vendet dhe rimbushja automatike menaxhohen në ueb.",
       "setupAutoTopUp": "Konfiguro rimbushjen automatike",
       "manageAutoTopUp": "Menaxho rimbushjen automatike",
       "opensOnWeb": "Hapet në ueb"

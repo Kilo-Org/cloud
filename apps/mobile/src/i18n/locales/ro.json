@@ -483,7 +483,14 @@
       "viewReceipt": "Vezi confirmarea"
     },
     "changelog": "Noutăți",
-    "changelogVersionPending": "Notele acestei versiuni vin cu următoarea actualizare."
+    "changelogVersionPending": "Notele versiunii {{version}} vin cu următoarea actualizare a aplicației.",
+    "changelogGroupNew": "Noutăți",
+    "changelogFixesIn": "Remedieri și îmbunătățiri în {{areas}}.",
+    "changelogFixesPolish": "Remedieri și îmbunătățiri în întreaga aplicație.",
+    "changelogAreas": {
+      "signIn": "Autentificare",
+      "profileOrganizations": "Profil și organizații"
+    }
   },
   "preferences": {
     "general": "General",
@@ -3386,6 +3393,7 @@
       "manageOnWeb": "Setările de facturare pe web",
       "changePlan": "Schimbă planul",
       "buySeats": "Cumpără locuri",
+      "managedOnWeb": "Planul, locurile și reîncărcarea automată sunt gestionate pe web.",
       "setupAutoTopUp": "Configurează reîncărcarea automată",
       "manageAutoTopUp": "Gestionează reîncărcarea automată",
       "opensOnWeb": "Se deschide pe web"

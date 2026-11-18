@@ -483,7 +483,14 @@
       "viewReceipt": "查看回执"
     },
     "changelog": "更新内容",
-    "changelogVersionPending": "此版本的更新说明将随下次应用更新提供。"
+    "changelogVersionPending": "{{version}} 版本的更新说明将随下次应用更新提供。",
+    "changelogGroupNew": "新增",
+    "changelogFixesIn": "{{areas}}方面的修复与改进。",
+    "changelogFixesPolish": "全应用范围的修复与改进。",
+    "changelogAreas": {
+      "signIn": "登录",
+      "profileOrganizations": "个人资料和组织"
+    }
   },
   "preferences": {
     "general": "通用",
@@ -3321,6 +3328,7 @@
       "manageOnWeb": "网页版账单设置",
       "changePlan": "更改套餐",
       "buySeats": "购买席位",
+      "managedOnWeb": "套餐、席位和自动充值在网页版中管理。",
       "setupAutoTopUp": "设置自动充值",
       "manageAutoTopUp": "管理自动充值",
       "opensOnWeb": "在网页中打开"

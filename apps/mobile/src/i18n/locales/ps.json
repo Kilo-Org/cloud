@@ -483,7 +483,14 @@
       "viewReceipt": "رسید وګورئ"
     },
     "changelog": "نوي بدلونونه",
-    "changelogVersionPending": "د دې نسخې یادښتونه د اپ له راتلونکي تازه کېدو سره راځي."
+    "changelogVersionPending": "د {{version}} نسخې یادښتونه د اپ له راتلونکي تازه کېدو سره راځي.",
+    "changelogGroupNew": "نوي",
+    "changelogFixesIn": "په {{areas}} کې سمونې او ښه والی.",
+    "changelogFixesPolish": "په ټول اپ کې سمونې او ښه والی.",
+    "changelogAreas": {
+      "signIn": "ننوتل",
+      "profileOrganizations": "پروفایل او سازمانونه"
+    }
   },
   "preferences": {
     "general": "عمومي",
@@ -3329,6 +3336,7 @@
       "manageOnWeb": "په ویب کې د بیلینګ ترتیبات",
       "changePlan": "پلان بدل کړئ",
       "buySeats": "د غړیتوب ځایونه واخلئ",
+      "managedOnWeb": "پلان، د غړیتوب ځایونه او اتومات بیا ډکول په ویب کې اداره کېږي.",
       "setupAutoTopUp": "اتومات بیا ډکول تنظیم کړئ",
       "manageAutoTopUp": "اتومات بیا ډکول اداره کړئ",
       "opensOnWeb": "په وېب کې پرانیستل کېږي"

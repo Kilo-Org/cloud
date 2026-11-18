@@ -483,7 +483,14 @@
       "viewReceipt": "Посмотреть квитанцию"
     },
     "changelog": "Что нового",
-    "changelogVersionPending": "Заметки к этой версии появятся в следующем обновлении."
+    "changelogVersionPending": "Заметки к версии {{version}} появятся в следующем обновлении приложения.",
+    "changelogGroupNew": "Новое",
+    "changelogFixesIn": "Исправления и улучшения в разделах: {{areas}}.",
+    "changelogFixesPolish": "Исправления и улучшения во всём приложении.",
+    "changelogAreas": {
+      "signIn": "Вход",
+      "profileOrganizations": "Профиль и организации"
+    }
   },
   "preferences": {
     "general": "Общие",
@@ -3435,6 +3442,7 @@
       "manageOnWeb": "Настройки оплаты в веб-версии",
       "changePlan": "Сменить план",
       "buySeats": "Купить места",
+      "managedOnWeb": "План, места и автопополнение управляются в веб-версии.",
       "setupAutoTopUp": "Настроить автопополнение",
       "manageAutoTopUp": "Управлять автопополнением",
       "opensOnWeb": "Открывается в браузере"

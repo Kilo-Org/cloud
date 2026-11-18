@@ -483,7 +483,14 @@
       "viewReceipt": "Tirohia te rīhīti"
     },
     "changelog": "Ngā mea hou",
-    "changelogVersionPending": "Ka tae mai ngā tuhipoka o tēnei putanga me te whakahōu taupānga e whai ake."
+    "changelogVersionPending": "Ka tae mai ngā tuhipoka o te putanga {{version}} me te whakahōu taupānga e whai ake.",
+    "changelogGroupNew": "Hou",
+    "changelogFixesIn": "Ngā whakatika me ngā whakapainga i ēnei wāhanga: {{areas}}.",
+    "changelogFixesPolish": "Ngā whakatika me ngā whakapainga puta noa i te taupānga.",
+    "changelogAreas": {
+      "signIn": "Takiuru",
+      "profileOrganizations": "Kōtaha me ngā whakahaere"
+    }
   },
   "preferences": {
     "general": "Whānui",
@@ -3329,6 +3336,7 @@
       "manageOnWeb": "Ngā tautuhinga utu i te ipurangi",
       "changePlan": "Huri mahere",
       "buySeats": "Hoko raihana",
+      "managedOnWeb": "Ka whakahaerehia te mahere, ngā raihana me te whakakī aunoa i te ipurangi.",
       "setupAutoTopUp": "Whakaritea te whakakī aunoa",
       "manageAutoTopUp": "Whakahaerehia te whakakī aunoa",
       "opensOnWeb": "Ka tuwhera i te ipurangi"

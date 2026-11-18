@@ -483,7 +483,14 @@
       "viewReceipt": "Buka irisidi"
     },
     "changelog": "Okusha",
-    "changelogVersionPending": "Amanothi ale nguqulo azofika nesibuyekezo esilandelayo."
+    "changelogVersionPending": "Amanothi enguqulo {{version}} azofika nesibuyekezo esilandelayo sohlelo lokusebenza.",
+    "changelogGroupNew": "Okusha",
+    "changelogFixesIn": "Ukulungiswa nokuthuthukiswa kulezi zingxenye: {{areas}}.",
+    "changelogFixesPolish": "Ukulungiswa nokuthuthukiswa kulo lonke uhlelo lokusebenza.",
+    "changelogAreas": {
+      "signIn": "Ukungena ngemvume",
+      "profileOrganizations": "Iphrofayela nezinhlangano"
+    }
   },
   "preferences": {
     "general": "Okujwayelekile",
@@ -3329,6 +3336,7 @@
       "manageOnWeb": "Izilungiselelo zokukhokha kuwebhu",
       "changePlan": "Shintsha uhlelo",
       "buySeats": "Thenga izikhala",
+      "managedOnWeb": "Uhlelo, izikhala kanye nokugcwalisa okuzenzakalelayo kuphathwa kuwebhu.",
       "setupAutoTopUp": "Setha ukugcwalisa okuzenzakalelayo",
       "manageAutoTopUp": "Phatha ukugcwalisa okuzenzakalelayo",
       "opensOnWeb": "Kuvuleka kuwebhu"

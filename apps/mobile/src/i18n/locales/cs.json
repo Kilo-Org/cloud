@@ -483,7 +483,14 @@
       "viewReceipt": "Zobrazit potvrzení"
     },
     "changelog": "Co je nového",
-    "changelogVersionPending": "Poznámky k této verzi přijdou s další aktualizací aplikace."
+    "changelogVersionPending": "Poznámky k verzi {{version}} přijdou s další aktualizací aplikace.",
+    "changelogGroupNew": "Novinky",
+    "changelogFixesIn": "Opravy a vylepšení v oblastech: {{areas}}.",
+    "changelogFixesPolish": "Opravy a vylepšení v celé aplikaci.",
+    "changelogAreas": {
+      "signIn": "Přihlášení",
+      "profileOrganizations": "Profil a organizace"
+    }
   },
   "preferences": {
     "general": "Obecné",
@@ -3443,6 +3450,7 @@
       "manageOnWeb": "Nastavení fakturace na webu",
       "changePlan": "Změnit plán",
       "buySeats": "Koupit uživatelská místa",
+      "managedOnWeb": "Plán, uživatelská místa a automatické dobití se spravují na webu.",
       "setupAutoTopUp": "Nastavit automatické dobití",
       "manageAutoTopUp": "Spravovat automatické dobití",
       "opensOnWeb": "Otevře se na webu"

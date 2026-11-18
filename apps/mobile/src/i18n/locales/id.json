@@ -483,7 +483,14 @@
       "viewReceipt": "Lihat tanda terima"
     },
     "changelog": "Yang baru",
-    "changelogVersionPending": "Catatan versi ini hadir di pembaruan aplikasi berikutnya."
+    "changelogVersionPending": "Catatan versi {{version}} hadir di pembaruan aplikasi berikutnya.",
+    "changelogGroupNew": "Baru",
+    "changelogFixesIn": "Perbaikan dan peningkatan pada {{areas}}.",
+    "changelogFixesPolish": "Perbaikan dan peningkatan di seluruh aplikasi.",
+    "changelogAreas": {
+      "signIn": "Masuk",
+      "profileOrganizations": "Profil dan organisasi"
+    }
   },
   "preferences": {
     "general": "Umum",
@@ -3321,6 +3328,7 @@
       "manageOnWeb": "Pengaturan penagihan di web",
       "changePlan": "Ubah paket",
       "buySeats": "Beli lisensi",
+      "managedOnWeb": "Paket, lisensi pengguna, dan isi ulang otomatis dikelola di web.",
       "setupAutoTopUp": "Atur isi ulang otomatis",
       "manageAutoTopUp": "Kelola isi ulang otomatis",
       "opensOnWeb": "Dibuka di web"

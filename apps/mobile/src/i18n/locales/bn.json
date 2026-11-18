@@ -483,7 +483,14 @@
       "viewReceipt": "রসিদ দেখুন"
     },
     "changelog": "নতুন কী",
-    "changelogVersionPending": "এই সংস্করণের নোটগুলো অ্যাপের পরবর্তী আপডেটের সাথে আসবে।"
+    "changelogVersionPending": "{{version}} সংস্করণের নোটগুলো অ্যাপের পরবর্তী আপডেটের সাথে আসবে।",
+    "changelogGroupNew": "নতুন",
+    "changelogFixesIn": "{{areas}} বিভাগে সংশোধন ও উন্নতি।",
+    "changelogFixesPolish": "পুরো অ্যাপ জুড়ে সংশোধন ও উন্নতি।",
+    "changelogAreas": {
+      "signIn": "সাইন-ইন",
+      "profileOrganizations": "প্রোফাইল ও সংস্থা"
+    }
   },
   "preferences": {
     "general": "সাধারণ",
@@ -3329,6 +3336,7 @@
       "manageOnWeb": "ওয়েবে বিলিং সেটিংস",
       "changePlan": "প্ল্যান পরিবর্তন করুন",
       "buySeats": "সিট কিনুন",
+      "managedOnWeb": "প্ল্যান, সিট এবং অটো টপ-আপ ওয়েবে পরিচালিত হয়।",
       "setupAutoTopUp": "অটো টপ-আপ সেট আপ করুন",
       "manageAutoTopUp": "অটো টপ-আপ পরিচালনা করুন",
       "opensOnWeb": "ওয়েবে খোলে"

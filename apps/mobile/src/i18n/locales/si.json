@@ -483,7 +483,14 @@
       "viewReceipt": "රිසිට්පත බලන්න"
     },
     "changelog": "අලුත් දේ",
-    "changelogVersionPending": "මේ අනුවාදයේ සටහන් ඊළඟ යෙදුම් යාවත්කාලීනය සමඟ ලැබේ."
+    "changelogVersionPending": "{{version}} අනුවාදයේ සටහන් ඊළඟ යෙදුම් යාවත්කාලීනය සමඟ ලැබේ.",
+    "changelogGroupNew": "නව",
+    "changelogFixesIn": "{{areas}} හි නිවැරදි කිරීම් සහ වැඩිදියුණු කිරීම්.",
+    "changelogFixesPolish": "සම්පූර්ණ යෙදුම පුරා නිවැරදි කිරීම් සහ වැඩිදියුණු කිරීම්.",
+    "changelogAreas": {
+      "signIn": "පුරනය වීම",
+      "profileOrganizations": "පැතිකඩ සහ සංවිධාන"
+    }
   },
   "preferences": {
     "general": "සාමාන්‍ය",
@@ -3329,6 +3336,7 @@
       "manageOnWeb": "වෙබයේ බිල්පත් සැකසීම්",
       "changePlan": "සැලැස්ම වෙනස් කරන්න",
       "buySeats": "සාමාජික ස්ථාන මිලදී ගන්න",
+      "managedOnWeb": "සැලැස්ම, සාමාජික ස්ථාන සහ ස්වයංක්‍රීය ටොප්-අප් වෙබයේ කළමනාකරණය කෙරේ.",
       "setupAutoTopUp": "ස්වයංක්‍රීය ටොප්-අප් සකසන්න",
       "manageAutoTopUp": "ස්වයංක්‍රීය ටොප්-අප් කළමනාකරණය කරන්න",
       "opensOnWeb": "වෙබයේ විවෘත වේ"

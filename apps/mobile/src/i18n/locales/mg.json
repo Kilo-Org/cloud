@@ -483,7 +483,14 @@
       "viewReceipt": "Jereo ny porofo"
     },
     "changelog": "Ny vaovao",
-    "changelogVersionPending": "Ny naotin'ity kinova ity dia ho avy amin'ny fanavaozana manaraka."
+    "changelogVersionPending": "Ny naotin'ny kinova {{version}} dia ho avy amin'ny fanavaozana manaraka.",
+    "changelogGroupNew": "Vaovao",
+    "changelogFixesIn": "Fanitsiana sy fanatsarana amin'ireto sehatra ireto: {{areas}}.",
+    "changelogFixesPolish": "Fanitsiana sy fanatsarana manerana ny fampiharana.",
+    "changelogAreas": {
+      "signIn": "Fidirana",
+      "profileOrganizations": "Mombamomba sy fikambanana"
+    }
   },
   "preferences": {
     "general": "Ankapobeny",
@@ -3329,6 +3336,7 @@
       "manageOnWeb": "Fikirakiran'ny faktiora amin'ny tranonkala",
       "changePlan": "Ovao ny drafitra",
       "buySeats": "Mividiana toerana",
+      "managedOnWeb": "Tantanina amin'ny tranonkala ny drafitra, ny toerana ary ny famenoana ho azy.",
       "setupAutoTopUp": "Alamino ny famenoana ho azy",
       "manageAutoTopUp": "Tantano ny famenoana ho azy",
       "opensOnWeb": "Misokatra ao amin'ny tranonkala"

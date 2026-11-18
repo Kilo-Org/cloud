@@ -502,6 +502,68 @@ describe('isEligibleGlanceableWork and revision discard', () => {
     expect(shouldDiscardGlanceableRevision(olderAtEqualRevision, current)).toBe(true);
     expect(shouldDiscardGlanceableRevision(newerAtEqualRevision, current)).toBe(false);
   });
+
+  it('orders a same-revision offset-form timestamp chronologically, not lexicographically', () => {
+    const current = {
+      ...buildGlanceableSnapshot({
+        sessions: [{ status: 'busy' }],
+        userId: 'u1',
+        organizationId: null,
+        now: NOW,
+        previousRevision: 4,
+      }),
+      updatedAt: '2026-11-18T09:00:00.000Z',
+    };
+    // 01:00-11:00 parses to 12:00Z — 3 h NEWER than the current 09:00Z — yet
+    // its string sorts before. The parsed-instant tie must keep it; the old
+    // raw-string tie discarded it, and the reverse comparison had the same
+    // bug the other way round.
+    const incoming = {
+      ...buildGlanceableSnapshot({
+        sessions: [{ status: 'busy' }],
+        userId: 'u1',
+        organizationId: null,
+        now: NOW,
+        previousRevision: 4,
+      }),
+      updatedAt: '2026-11-18T01:00:00.000-11:00',
+    };
+    expect(incoming.revision).toBe(current.revision);
+    // Guard the fixture: the incoming instant really is later.
+    expect(Date.parse(incoming.updatedAt)).toBe(Date.parse('2026-11-18T12:00:00.000Z'));
+    expect(incoming.updatedAt < current.updatedAt).toBe(true);
+    expect(shouldDiscardGlanceableRevision(incoming, current)).toBe(false);
+    expect(shouldDiscardGlanceableRevision(current, incoming)).toBe(true);
+  });
+
+  it('falls back to the raw string comparison when either updatedAt does not parse', () => {
+    const current = {
+      ...buildGlanceableSnapshot({
+        sessions: [{ status: 'busy' }],
+        userId: 'u1',
+        organizationId: null,
+        now: NOW,
+        previousRevision: 4,
+      }),
+      updatedAt: '2026-11-18T09:00:00.000Z',
+    };
+    // 'garbage' parses to no instant, so the raw strings decide. 'g' (0x67)
+    // sorts after '2' (0x32), so the fallback reads 'garbage' as newer in
+    // both directions, the same verdict the old rule returned.
+    const unparseable = {
+      ...buildGlanceableSnapshot({
+        sessions: [{ status: 'busy' }],
+        userId: 'u1',
+        organizationId: null,
+        now: NOW,
+        previousRevision: 4,
+      }),
+      updatedAt: 'garbage',
+    };
+    expect(unparseable.revision).toBe(current.revision);
+    expect(shouldDiscardGlanceableRevision(unparseable, current)).toBe(false);
+    expect(shouldDiscardGlanceableRevision(current, unparseable)).toBe(true);
+  });
 });
 
 describe('oldestNeedsInputSince', () => {

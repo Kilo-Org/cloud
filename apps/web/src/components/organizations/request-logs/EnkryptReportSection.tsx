@@ -125,7 +125,8 @@ function verdictCacheItem(scan: EnkryptInputScanReport): DetailItem {
     value:
       storedDespiteError(scan) === 'certain' ? (
         <>
-          {lookup}, <span className="text-status-warning">stored (failed, 5 min)</span>
+          {lookup},{' '}
+          <span className="text-status-warning whitespace-nowrap">stored (failed, 5 min)</span>
         </>
       ) : (
         `${lookup}${stored ? ', stored' : ''}`

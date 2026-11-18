@@ -13,17 +13,6 @@ index 05d6a9c..2634e58 100644
      Class("Widget", WidgetObject::class) {
        Constructor { name: String, layout: String, initialProps: Map<String, Any?>? ->
          WidgetObject(context, name, layout, initialProps)
-@@ -85,6 +89,10 @@ class WidgetsModule : Module() {
-     }
- 
-     Class("CustomNotification", CustomNotification::class) {
-+      Constructor {
-+        throw IllegalStateException("CustomNotification instances are created by CustomNotificationFactory")
-+      }
-+
-       Constructor { ->
-         throw CustomNotificationCreationException()
-       }
 diff --git a/build/ExpoWidgets.d.ts b/build/ExpoWidgets.d.ts
 index a34b14d..76150b4 100644
 --- a/build/ExpoWidgets.d.ts

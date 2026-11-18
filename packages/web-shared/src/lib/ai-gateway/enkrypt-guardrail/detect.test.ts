@@ -9,7 +9,6 @@ import {
   type EnkryptDetectDependencies,
   type EnkryptGuardrailScan,
 } from './detect';
-import type { EnkryptUnavailableReason } from './report';
 import { createEnkryptCallLimiter, type EnkryptCallLimiter } from './call-limiter';
 import { MAX_ENKRYPT_CREDITS_PER_CALL } from '@kilocode/usage-contracts';
 import type { EnkryptRequestLog } from '@kilocode/web-shared/lib/r2/api-request-log';
@@ -374,7 +373,7 @@ describe('scanRequest', () => {
         'detector_error:topic_detector,policy_violation',
       ],
     ])(
-      'fails closed without retrying when it is reported %s',
+      'fails open without retrying when it is reported %s',
       async (_name, summary, expectedError) => {
         const dependencies = deps(async () =>
           detectResponse(
@@ -396,7 +395,7 @@ describe('scanRequest', () => {
         const result = await scanRequest(makeScan({ config: policyConfig }), dependencies);
 
         expect(dependencies.fetch).toHaveBeenCalledTimes(1);
-        expect(result.verdict).toEqual({ action: 'unavailable', reason: 'failed' });
+        expect(result.verdict).toEqual({ action: 'fail_open' });
         expect(result.usageRecords).toEqual([
           expect.objectContaining({ decision: 'error', creditsCost: 4 }),
         ]);
@@ -404,7 +403,7 @@ describe('scanRequest', () => {
           '[enkrypt-guardrail] decision',
           expect.objectContaining({
             scan: 'blocking',
-            decision: 'error_fail_closed',
+            decision: 'error_fail_open',
             error: expectedError,
             attempts: 1,
             credits_cost: 4,
@@ -436,6 +435,7 @@ describe('scanRequest', () => {
       verdict: { action: 'unavailable', reason: 'failed' },
       usageRecords: [],
     });
+    expect(result.report).toMatchObject({ decision: 'error_fail_closed', attempts: 0 });
     expect(dependencies.fetch).not.toHaveBeenCalled();
   });
 
@@ -467,24 +467,16 @@ describe('scanRequest', () => {
     ]);
   });
 
-  it('records the detectors that fired only on the attempt that returned them', async () => {
-    let calls = 0;
+  it('records no detectors fired for a failed call', async () => {
     const result = await scanRequest(
       makeScan(),
-      deps(async () =>
-        ++calls === 1
-          ? new Response('unavailable', { status: 503 })
-          : detectResponse({ summary: { pii: 1 } })
-      )
+      deps(async () => new Response('unavailable', { status: 503 }))
     );
 
-    expect(result.usageRecords).toHaveLength(2);
+    expect(result.usageRecords).toHaveLength(1);
     expect(result.usageRecords[0]).not.toHaveProperty('detectorsFired');
     expect(result.usageRecords[0]).toEqual(
-      expect.objectContaining({ scannedCharacters: 11, totalCharacters: 11 })
-    );
-    expect(result.usageRecords[1]).toEqual(
-      expect.objectContaining({ decision: 'allowed', detectorsFired: ['pii'] })
+      expect.objectContaining({ decision: 'error', scannedCharacters: 11, totalCharacters: 11 })
     );
   });
 
@@ -620,31 +612,22 @@ describe('scanRequest', () => {
     expect(REQUEST_TOO_LARGE_MESSAGE).toContain('Retrying the unchanged request will not help.');
   });
 
-  it('preserves the inference association on both usage records after a transient failure', async () => {
+  it('preserves the inference association on the usage record of a failed call', async () => {
     const microdollarUsageId = '00000000-0000-4000-8000-000000000003';
-    const responses = [
-      detectResponse({ summary: {} }, { status: 502 }),
-      detectResponse({ summary: { injection_attack: 0 } }, { credits: '2' }),
-    ];
-    const dependencies = deps(async () => responses.shift() ?? Response.error());
+    const dependencies = deps(async () => detectResponse({ summary: {} }, { status: 502 }));
 
     const result = await scanRequest(makeScan({ microdollarUsageId }), dependencies);
 
-    expect(dependencies.fetch).toHaveBeenCalledTimes(2);
-    expect(result.verdict).toEqual({ action: 'allow' });
+    expect(dependencies.fetch).toHaveBeenCalledTimes(1);
+    expect(result.verdict).toEqual({ action: 'fail_open' });
     expect(result.usageRecords).toEqual([
       expect.objectContaining({ microdollarUsageId, decision: 'error', creditsCost: null }),
-      expect.objectContaining({ microdollarUsageId, decision: 'allowed', creditsCost: 2 }),
     ]);
   });
 
-  it('shares a single 60-second deadline across retry attempts', async () => {
+  it('starts a single 60-second deadline for the scan', async () => {
     const timeout = jest.spyOn(AbortSignal, 'timeout');
-    const responses = [
-      detectResponse({ summary: {} }, { status: 502 }),
-      detectResponse({ summary: {} }),
-    ];
-    const dependencies = deps(async () => responses.shift() ?? Response.error(), {
+    const dependencies = deps(async () => detectResponse({ summary: {} }), {
       timeoutMs: ENKRYPT_GUARDRAIL_TIMEOUT_MS,
     });
 
@@ -653,66 +636,78 @@ describe('scanRequest', () => {
 
       expect(timeout).toHaveBeenCalledTimes(1);
       expect(timeout).toHaveBeenCalledWith(60_000);
-      const calls = fetchCalls(dependencies);
-      expect(calls).toHaveLength(2);
-      expect(calls[0][1].signal).toBe(calls[1][1].signal);
+      expect(fetchCalls(dependencies)).toHaveLength(1);
     } finally {
       timeout.mockRestore();
     }
   });
 
-  it.each([402, 503])(
-    'does not wait for a slow HTTP %i body before deciding or retrying',
-    async status => {
-      const body = Promise.withResolvers<ReadableStreamDefaultController<Uint8Array>>();
-      const response = new Response(
-        new ReadableStream<Uint8Array>({
-          start(controller) {
-            body.resolve(controller);
-          },
-        }),
-        { status }
-      );
-      const calls: Promise<EnkryptRequestLog>[] = [];
-      let attempts = 0;
-      const dependencies = deps(
-        async () => (attempts++ === 0 ? response : detectResponse({ summary: {} })),
-        {
-          requestLog: {
-            guardrail: 'input',
-            capture: entry => {
-              calls.push(entry);
-            },
-          },
-        }
-      );
+  it.each([
+    ['a server error', () => detectResponse({ summary: {} }, { status: 503 })],
+    ['a bad gateway', () => detectResponse({ summary: {} }, { status: 502 })],
+    ['a rate limit', () => detectResponse({ summary: {} }, { status: 429 })],
+    ['a network error', () => Promise.reject(new TypeError('fetch failed'))],
+  ])('does not retry after %s, even when the next call would succeed', async (_name, failure) => {
+    const responses = [failure, () => detectResponse({ summary: {} }, { credits: '2' })];
+    const dependencies = deps(async () => {
+      const next = responses.shift();
+      if (!next) throw new Error('unexpected call');
+      return next();
+    });
 
-      try {
-        const result = await scanRequest(makeScan(), dependencies);
+    const result = await scanRequest(makeScan(), dependencies);
 
-        expect(result.verdict.action).toBe(status === 503 ? 'allow' : 'unavailable');
-        expect(dependencies.fetch).toHaveBeenCalledTimes(status === 503 ? 2 : 1);
-        let captured = false;
-        void calls[0].then(() => {
-          captured = true;
-        });
-        await Promise.resolve();
-        expect(captured).toBe(false);
-        const controller = await body.promise;
-        controller.enqueue(new TextEncoder().encode('{ "detail": "raw error body" }'));
-        controller.close();
-        expect((await Promise.all(calls))[0]).toMatchObject({
-          guardrail: 'input',
-          scan: 'blocking',
-          response: '{ "detail": "raw error body" }',
-          status_code: status,
-          error: `http_${status}`,
-        });
-      } finally {
-        await response.body?.cancel().catch(() => {});
-      }
+    expect(dependencies.fetch).toHaveBeenCalledTimes(1);
+    expect(result.verdict).toEqual({ action: 'fail_open' });
+    expect(result.usageRecords).toEqual([expect.objectContaining({ decision: 'error' })]);
+    expect(result.report).toMatchObject({ decision: 'error_fail_open', attempts: 1 });
+  });
+
+  it.each([402, 503])('does not wait for a slow HTTP %i body before deciding', async status => {
+    const body = Promise.withResolvers<ReadableStreamDefaultController<Uint8Array>>();
+    const response = new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          body.resolve(controller);
+        },
+      }),
+      { status }
+    );
+    const calls: Promise<EnkryptRequestLog>[] = [];
+    const dependencies = deps(async () => response, {
+      requestLog: {
+        guardrail: 'input',
+        capture: entry => {
+          calls.push(entry);
+        },
+      },
+    });
+
+    try {
+      const result = await scanRequest(makeScan(), dependencies);
+
+      expect(result.verdict.action).toBe('fail_open');
+      expect(dependencies.fetch).toHaveBeenCalledTimes(1);
+      let captured = false;
+      void calls[0].then(() => {
+        captured = true;
+      });
+      await Promise.resolve();
+      expect(captured).toBe(false);
+      const controller = await body.promise;
+      controller.enqueue(new TextEncoder().encode('{ "detail": "raw error body" }'));
+      controller.close();
+      expect((await Promise.all(calls))[0]).toMatchObject({
+        guardrail: 'input',
+        scan: 'blocking',
+        response: '{ "detail": "raw error body" }',
+        status_code: status,
+        error: `http_${status}`,
+      });
+    } finally {
+      await response.body?.cancel().catch(() => {});
     }
-  );
+  });
 
   it('caps captured HTTP error bodies at 64 KiB and cancels the remainder', async () => {
     const cancel = jest.fn();
@@ -805,7 +800,7 @@ describe('scanRequest', () => {
         })
       );
 
-      expect(result.verdict.action).toBe('unavailable');
+      expect(result.verdict.action).toBe('fail_open');
       await jest.advanceTimersByTimeAsync(1_000);
       expect((await Promise.all(calls))[0]).toMatchObject({
         response: 'partial body',
@@ -841,7 +836,7 @@ describe('scanRequest', () => {
         })
       );
 
-      expect(result.verdict.action).toBe('unavailable');
+      expect(result.verdict.action).toBe('fail_open');
       expect(pull).not.toHaveBeenCalled();
       expect(cancel).not.toHaveBeenCalled();
       if (reason === 'discard') captureResponse.resolve(false);
@@ -916,9 +911,7 @@ describe('scanRequest', () => {
     );
 
     const captured = await Promise.all(calls);
-    expect(captured).toHaveLength(2);
     expect(captured).toEqual([
-      expect.objectContaining({ response: null, status_code: null, error: 'network' }),
       expect.objectContaining({ response: null, status_code: null, error: 'network' }),
     ]);
     expect(JSON.stringify(captured)).not.toContain('test-enkrypt-key');
@@ -1016,39 +1009,32 @@ describe('scanRequest', () => {
     });
   });
 
-  it('does not retry a rate-limited call', async () => {
-    const dependencies = deps(async () => detectResponse({ summary: {} }, { status: 429 }));
-
-    const result = await scanRequest(makeScan(), dependencies);
-
-    expect(dependencies.fetch).toHaveBeenCalledTimes(1);
-    expect(result.verdict).toEqual({ action: 'unavailable', reason: 'transient' });
-  });
-
-  describe('when Enkrypt is unavailable', () => {
-    const failures: [string, () => Promise<Response>, EnkryptUnavailableReason][] = [
+  describe('when Enkrypt fails', () => {
+    const failures: [string, () => Promise<Response>, string][] = [
       [
         'a persistent server error',
         async () => detectResponse({ summary: {} }, { status: 503 }),
-        'transient',
+        'http_503',
       ],
-      ['a network error', async () => Promise.reject(new TypeError('fetch failed')), 'transient'],
-      ['a client error', async () => detectResponse({ summary: {} }, { status: 402 }), 'failed'],
+      ['a rate limit', async () => detectResponse({ summary: {} }, { status: 429 }), 'http_429'],
+      ['a network error', async () => Promise.reject(new TypeError('fetch failed')), 'network'],
+      ['a client error', async () => detectResponse({ summary: {} }, { status: 402 }), 'http_402'],
       [
         'an invalid response',
         async () => new Response('not json', { headers: { 'content-type': 'application/json' } }),
-        'failed',
+        'invalid_response',
       ],
     ];
 
-    it.each(failures)('rejects the request on %s', async (_name, failure, reason) => {
+    it.each(failures)('fails open on %s', async (_name, failure, error) => {
       const result = await scanRequest(makeScan(), deps(failure));
 
-      expect(result.verdict).toEqual({ action: 'unavailable', reason });
+      expect(result.verdict).toEqual({ action: 'fail_open' });
+      expect(result.report).toMatchObject({ decision: 'error_fail_open', error, attempts: 1 });
       expect(result.usageRecords.every(usageRecord => usageRecord.decision === 'error')).toBe(true);
     });
 
-    it('rejects the request when Enkrypt does not answer within the timeout', async () => {
+    it('fails open when Enkrypt does not answer within the timeout', async () => {
       const hang = (_input: string, init: RequestInit) =>
         new Promise<Response>((_resolve, reject) => {
           init.signal?.addEventListener('abort', () => reject(init.signal?.reason));
@@ -1057,12 +1043,13 @@ describe('scanRequest', () => {
 
       const result = await scanRequest(makeScan(), dependencies);
 
-      expect(result.verdict).toEqual({ action: 'unavailable', reason: 'timeout' });
+      expect(result.verdict).toEqual({ action: 'fail_open' });
+      expect(result.report).toMatchObject({ decision: 'error_fail_open', error: 'timeout' });
       expect(dependencies.fetch).toHaveBeenCalledTimes(1);
       expect(result.usageRecords).toEqual([expect.objectContaining({ decision: 'error' })]);
       expect(mockedWarnExceptInTest).toHaveBeenCalledWith(
         '[enkrypt-guardrail] decision',
-        expect.objectContaining({ error: 'timeout' })
+        expect.objectContaining({ error: 'timeout', decision: 'error_fail_open' })
       );
     });
 
@@ -1077,6 +1064,11 @@ describe('scanRequest', () => {
         report: expect.any(Object),
         verdict: { action: 'unavailable', reason: 'failed' },
         usageRecords: [],
+      });
+      expect(result.report).toMatchObject({
+        decision: 'error_fail_closed',
+        error: 'missing_api_key',
+        attempts: 0,
       });
       expect(dependencies.fetch).not.toHaveBeenCalled();
     });
@@ -1100,25 +1092,13 @@ describe('scanRequest', () => {
       const result = await scanRequest(makeScan(), dependencies);
 
       expect(timeout).not.toHaveBeenCalled();
-      expect(result.verdict).toEqual({ action: 'unavailable', reason: 'timeout' });
+      expect(result.verdict).toEqual({ action: 'fail_open' });
       expect(result.usageRecords).toEqual([expect.objectContaining({ decision: 'error' })]);
-      expect(result.report).toMatchObject({ error: 'timeout', attempts: 1 });
-    });
-
-    it('does not retry after the deadline passed', async () => {
-      const deadline = new AbortController();
-      const dependencies = deps(
-        async () => {
-          deadline.abort();
-          return detectResponse({ summary: {} }, { status: 503 });
-        },
-        { deadline: deadline.signal }
-      );
-
-      const result = await scanRequest(makeScan(), dependencies);
-
-      expect(dependencies.fetch).toHaveBeenCalledTimes(1);
-      expect(result.verdict).toEqual({ action: 'unavailable', reason: 'transient' });
+      expect(result.report).toMatchObject({
+        decision: 'error_fail_open',
+        error: 'timeout',
+        attempts: 1,
+      });
     });
   });
 
@@ -1147,7 +1127,23 @@ describe('scanRequest', () => {
       await new Promise(resolve => setImmediate(resolve));
     }
 
-    it('holds a slot for each attempt, retry included, and releases it after each', async () => {
+    it('holds a slot for the call and releases it after', async () => {
+      const events: string[] = [];
+      const dependencies = deps(
+        async () => {
+          events.push('fetch');
+          return detectResponse({ summary: {} });
+        },
+        { limiter: recordingLimiter(events) }
+      );
+
+      const result = await scanRequest(makeScan(), dependencies);
+
+      expect(result.verdict).toEqual({ action: 'allow' });
+      expect(events).toEqual(['acquire:blocking', 'fetch', 'release']);
+    });
+
+    it('takes one slot for a failed call and does not retry it', async () => {
       const events: string[] = [];
       const responses = [
         detectResponse({ summary: {} }, { status: 503 }),
@@ -1163,15 +1159,8 @@ describe('scanRequest', () => {
 
       const result = await scanRequest(makeScan(), dependencies);
 
-      expect(result.verdict).toEqual({ action: 'allow' });
-      expect(events).toEqual([
-        'acquire:blocking',
-        'fetch',
-        'release',
-        'acquire:blocking',
-        'fetch',
-        'release',
-      ]);
+      expect(result.verdict).toEqual({ action: 'fail_open' });
+      expect(events).toEqual(['acquire:blocking', 'fetch', 'release']);
     });
 
     it('asks for a log-only slot for a log-only scan', async () => {
@@ -1203,15 +1192,8 @@ describe('scanRequest', () => {
 
       const result = await scanRequest(makeScan(), dependencies);
 
-      expect(result.verdict).toEqual({ action: 'unavailable', reason: 'transient' });
-      expect(events).toEqual([
-        'acquire:blocking',
-        'fetch',
-        'release',
-        'acquire:blocking',
-        'fetch',
-        'release',
-      ]);
+      expect(result.verdict).toEqual({ action: 'fail_open' });
+      expect(events).toEqual(['acquire:blocking', 'fetch', 'release']);
     });
 
     it('releases the slot when the attempt throws unexpectedly', async () => {
@@ -1231,12 +1213,7 @@ describe('scanRequest', () => {
     });
 
     it.each([
-      [
-        'the deadline passes',
-        'timeout',
-        { action: 'unavailable', reason: 'timeout' },
-        'error_fail_closed',
-      ],
+      ['the deadline passes', 'timeout', { action: 'fail_open' }, 'error_fail_open'],
       [
         'the client disconnects',
         'client_aborted',
@@ -1270,36 +1247,6 @@ describe('scanRequest', () => {
         expect(await limiter.acquire('blocking', new AbortController().signal)).not.toBeNull();
       }
     );
-
-    it('keeps the first attempt’s usage when the retry runs out of time waiting for a slot', async () => {
-      const limiter = createEnkryptCallLimiter(1);
-      const deadline = new AbortController();
-      const other = Promise.withResolvers<void>();
-      const dependencies = deps(
-        async () => {
-          // Another call queues while this attempt holds the only slot, so it gets the slot next.
-          void limiter.acquire('blocking', new AbortController().signal).then(async slot => {
-            await other.promise;
-            slot?.();
-          });
-          return detectResponse({ summary: {} }, { status: 503, credits: '1' });
-        },
-        { limiter, deadline: deadline.signal }
-      );
-
-      const pending = scanRequest(makeScan(), dependencies);
-      await flush();
-      deadline.abort();
-      const result = await pending;
-      other.resolve();
-
-      expect(dependencies.fetch).toHaveBeenCalledTimes(1);
-      expect(result.verdict).toEqual({ action: 'unavailable', reason: 'timeout' });
-      expect(result.usageRecords).toEqual([
-        expect.objectContaining({ decision: 'error', creditsCost: 1 }),
-      ]);
-      expect(result.report).toMatchObject({ error: 'timeout', attempts: 1, credits_cost: 1 });
-    });
 
     it('starts a second scan’s call only after the first scan’s call finished with one slot', async () => {
       const limiter = createEnkryptCallLimiter(1);
@@ -1378,7 +1325,7 @@ describe('scanRequest', () => {
         'a persistent server error',
         async () => detectResponse({ summary: {} }, { status: 503, credits: '1' }),
         'http_503',
-        2,
+        1,
       ],
       [
         'a timeout',

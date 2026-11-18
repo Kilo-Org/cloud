@@ -18,6 +18,7 @@ import {
   type RequestToolDefinition,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
 import {
+  ENKRYPT_FAILED_SCAN_CACHE_TTL_SECONDS,
   ENKRYPT_VERDICT_CACHE_TTL_SECONDS,
   mostSevereVerdict,
   verdictCacheKey,
@@ -190,8 +191,8 @@ function toolKey(request: EnkryptGuardrailRequest, definition: RequestToolDefini
   return required(unitKeys(request, 'tools', definition.segments)[0]);
 }
 
-function allowWrites(keys: string[]) {
-  return keys.map(key => [key, 'allow', { ex: ENKRYPT_VERDICT_CACHE_TTL_SECONDS, nx: true }]);
+function allowWrites(keys: string[], ttlSeconds = ENKRYPT_VERDICT_CACHE_TTL_SECONDS) {
+  return keys.map(key => [key, 'allow', { ex: ttlSeconds, nx: true }]);
 }
 
 const scanReport: EnkryptScanReport = {
@@ -359,7 +360,7 @@ describe('startEnkryptInputGuardrail', () => {
 
   it.each<[string, EnkryptGuardrailScanResult['verdict']]>([
     ['locally blocked without a detector verdict', { action: 'block', message: 'too large' }],
-    ['unavailable', { action: 'unavailable', reason: 'timeout' }],
+    ['unavailable', { action: 'unavailable', reason: 'failed' }],
   ])('does not cache a %s request', async (_name, verdict) => {
     mockedScanRequest.mockResolvedValue({ verdict, report: scanReport, usageRecords: [call()] });
 
@@ -368,6 +369,31 @@ describe('startEnkryptInputGuardrail', () => {
     await runAfterTasks();
 
     expect(mockedRedisSet).not.toHaveBeenCalled();
+  });
+
+  it('sends a request on when Enkrypt failed, caching its content as allowed only for 5 minutes', async () => {
+    mockedScanRequest.mockResolvedValue({
+      verdict: { action: 'fail_open' },
+      report: { ...scanReport, decision: 'error_fail_open', error: 'http_503' },
+      usageRecords: [call({ decision: 'error', creditsCost: null })],
+    });
+
+    const guardrail = startEnkryptInputGuardrail(Promise.resolve(scan), signal);
+
+    expect(await guardrail.awaitVerdict()).toEqual({ action: 'fail_open' });
+    await runAfterTasks();
+    expect(mockedRedisSet.mock.calls).toEqual(
+      allowWrites(partKeys(scan), ENKRYPT_FAILED_SCAN_CACHE_TTL_SECONDS)
+    );
+    expect(ENKRYPT_FAILED_SCAN_CACHE_TTL_SECONDS).toBe(300);
+    expect(await guardrail.report()).toMatchObject({
+      verdict: 'fail_open',
+      unavailable_reason: null,
+      scans: [{ decision: 'error_fail_open', error: 'http_503', verdict_cache_write: 'written' }],
+    });
+    expect(mockedRecordUsage.mock.calls).toEqual([
+      [{ ...call({ decision: 'error', creditsCost: null }), addedLatencyMs: expect.any(Number) }],
+    ]);
   });
 
   it('persists a detector block before returning its verdict', async () => {
@@ -497,7 +523,7 @@ describe('startEnkryptInputGuardrail', () => {
     expect(mockedRecordUsage.mock.calls).toEqual([[{ ...call(), addedLatencyMs: null }]]);
   });
 
-  it('preserves the inference association across blocking retries and a nonblocking log-only scan', async () => {
+  it('preserves the inference association across a failed blocking scan and a nonblocking log-only scan', async () => {
     const microdollarUsageId = '00000000-0000-4000-8000-000000000003';
     const request = { ...mixedScan, microdollarUsageId };
     const logOnlyResult = Promise.withResolvers<EnkryptGuardrailScanResult>();
@@ -505,19 +531,16 @@ describe('startEnkryptInputGuardrail', () => {
       isLogOnly(resolved)
         ? logOnlyResult.promise
         : {
-            verdict: { action: 'allow' },
-            report: scanReport,
-            usageRecords: [
-              call({ microdollarUsageId, decision: 'error', creditsCost: null }),
-              call({ microdollarUsageId }),
-            ],
+            verdict: { action: 'fail_open' },
+            report: { ...scanReport, decision: 'error_fail_open', error: 'http_503' },
+            usageRecords: [call({ microdollarUsageId, decision: 'error', creditsCost: null })],
           }
     );
     jest.spyOn(performance, 'now').mockReturnValueOnce(1_000).mockReturnValueOnce(1_237.4);
 
     const guardrail = startEnkryptInputGuardrail(Promise.resolve(request), signal);
 
-    expect(await guardrail.awaitVerdict()).toEqual({ action: 'allow' });
+    expect(await guardrail.awaitVerdict()).toEqual({ action: 'fail_open' });
     expect(mockedScanRequest.mock.calls).toEqual([
       [
         scanOf({ ...request, config: scan.config }),
@@ -530,8 +553,8 @@ describe('startEnkryptInputGuardrail', () => {
     ]);
 
     logOnlyResult.resolve({
-      verdict: { action: 'unavailable', reason: 'timeout' },
-      report: scanReport,
+      verdict: { action: 'allow' },
+      report: { ...scanReport, scan: 'log_only', decision: 'error_logged', error: 'timeout' },
       usageRecords: [call({ microdollarUsageId, decision: 'error', creditsCost: 1 })],
     });
     await runAfterTasks();
@@ -540,10 +563,9 @@ describe('startEnkryptInputGuardrail', () => {
       [
         {
           ...call({ microdollarUsageId, decision: 'error', creditsCost: null }),
-          addedLatencyMs: null,
+          addedLatencyMs: 237,
         },
       ],
-      [{ ...call({ microdollarUsageId }), addedLatencyMs: 237 }],
       [
         {
           ...call({ microdollarUsageId, decision: 'error', creditsCost: 1 }),
@@ -611,15 +633,16 @@ describe('startEnkryptInputGuardrail', () => {
     logOnlyResult.resolve({
       verdict: { action: 'allow' },
       report: { ...scanReport, scan: 'log_only', decision: 'error_logged', error: 'http_503' },
-      usageRecords: [call({ decision: 'error', creditsCost: null }), call({ decision: 'error' })],
+      usageRecords: [call({ decision: 'error', creditsCost: null })],
     });
     await runAfterTasks();
 
     expect(mockedRecordUsage.mock.calls).toEqual([
-      [{ ...call({ decision: 'error', creditsCost: null }), addedLatencyMs: null }],
-      [{ ...call({ decision: 'error' }), addedLatencyMs: 0 }],
+      [{ ...call({ decision: 'error', creditsCost: null }), addedLatencyMs: 0 }],
     ]);
-    expect(mockedRedisSet.mock.calls).toEqual(allowWrites(partKeys(logOnlyScan)));
+    expect(mockedRedisSet.mock.calls).toEqual(
+      allowWrites(partKeys(logOnlyScan), ENKRYPT_FAILED_SCAN_CACHE_TTL_SECONDS)
+    );
   });
 
   it('reports the settings, verdict, wait, and each scan with its cache write', async () => {
@@ -830,8 +853,39 @@ describe('startEnkryptInputGuardrail', () => {
       mockedScanRequest.mockImplementation(async resolved =>
         partOf(resolved) === 'conversation'
           ? {
-              verdict: { action: 'unavailable', reason: 'timeout' },
-              report: { ...scanReport, decision: 'error_fail_closed', error: 'timeout' },
+              verdict: { action: 'unavailable', reason: 'failed' },
+              report: { ...scanReport, decision: 'error_fail_closed', error: 'invalid_config' },
+              usageRecords: [],
+            }
+          : {
+              verdict: { action: 'allow' },
+              report: { ...scanReport, part: partOf(resolved) },
+              usageRecords: [call()],
+            }
+      );
+
+      const guardrail = startEnkryptInputGuardrail(Promise.resolve(partsScan), signal);
+
+      expect(await guardrail.awaitVerdict()).toEqual({ action: 'unavailable', reason: 'failed' });
+      const report = await guardrail.report();
+      expect(report).toMatchObject({ verdict: 'unavailable', unavailable_reason: 'failed' });
+      expect(report?.scans.map(each => [each.part, each.verdict_cache_write])).toEqual([
+        ['tools', 'written'],
+        ['system', 'written'],
+        ['conversation', 'skipped'],
+      ]);
+      expect(mockedRedisSet.mock.calls.map(([key]) => key)).toEqual([
+        ...partKeys(partsScan, 'tools'),
+        ...partKeys(partsScan, 'system'),
+      ]);
+    });
+
+    it('fails open when Enkrypt failed for one part and the others allow, caching that part briefly', async () => {
+      mockedScanRequest.mockImplementation(async resolved =>
+        partOf(resolved) === 'conversation'
+          ? {
+              verdict: { action: 'fail_open' },
+              report: { ...scanReport, decision: 'error_fail_open', error: 'timeout' },
               usageRecords: [call({ decision: 'error' })],
             }
           : {
@@ -843,18 +897,48 @@ describe('startEnkryptInputGuardrail', () => {
 
       const guardrail = startEnkryptInputGuardrail(Promise.resolve(partsScan), signal);
 
-      expect(await guardrail.awaitVerdict()).toEqual({ action: 'unavailable', reason: 'timeout' });
+      expect(await guardrail.awaitVerdict()).toEqual({ action: 'fail_open' });
       const report = await guardrail.report();
-      expect(report).toMatchObject({ verdict: 'unavailable', unavailable_reason: 'timeout' });
+      expect(report).toMatchObject({ verdict: 'fail_open', unavailable_reason: null });
       expect(report?.scans.map(each => [each.part, each.verdict_cache_write])).toEqual([
         ['tools', 'written'],
         ['system', 'written'],
-        ['conversation', 'skipped'],
+        ['conversation', 'written'],
       ]);
-      expect(mockedRedisSet.mock.calls.map(([key]) => key)).toEqual([
-        ...partKeys(partsScan, 'tools'),
-        ...partKeys(partsScan, 'system'),
+      expect(mockedRedisSet.mock.calls).toEqual([
+        ...allowWrites(partKeys(partsScan, 'tools')),
+        ...allowWrites(partKeys(partsScan, 'system')),
+        ...allowWrites(partKeys(partsScan, 'conversation'), ENKRYPT_FAILED_SCAN_CACHE_TTL_SECONDS),
       ]);
+    });
+
+    it('blocks over a failed-open part', async () => {
+      mockedScanRequest.mockImplementation(async resolved =>
+        partOf(resolved) === 'conversation'
+          ? {
+              verdict: { action: 'fail_open' },
+              report: { ...scanReport, decision: 'error_fail_open', error: 'timeout' },
+              usageRecords: [call({ decision: 'error' })],
+            }
+          : partOf(resolved) === 'system'
+            ? {
+                verdict: { action: 'block', message: 'system prompt blocked' },
+                report: { ...systemReport, decision: 'blocked' },
+                usageRecords: [call({ decision: 'blocked' })],
+              }
+            : {
+                verdict: { action: 'allow' },
+                report: { ...scanReport, part: partOf(resolved) },
+                usageRecords: [call()],
+              }
+      );
+
+      const guardrail = startEnkryptInputGuardrail(Promise.resolve(partsScan), signal);
+
+      expect(await guardrail.awaitVerdict()).toEqual({
+        action: 'block',
+        message: 'system prompt blocked',
+      });
     });
 
     it('reports blocking scans, then log-only scans, each with its own cache write', async () => {
@@ -1019,21 +1103,25 @@ describe('startEnkryptInputGuardrail with many tool definitions', () => {
     const calls = deferredFetch();
 
     const guardrail = startEnkryptInputGuardrail(Promise.resolve(request), signal);
-    // The first call fails transiently, so it is retried within the same limit.
-    await answerUntil(guardrail.report(), calls, index =>
-      index === 0 ? detectResponse(503) : detectResponse()
-    );
+    // The first blocking call fails transiently; it is not retried, and its content fails open.
+    let failed = false;
+    await answerUntil(guardrail.report(), calls, index => {
+      if (calls.started[index] !== 'blocking' || failed) return detectResponse();
+      failed = true;
+      return detectResponse(503);
+    });
 
     expect(ENKRYPT_MAX_CONCURRENT_CALLS).toBe(4);
     expect(calls.maxInFlight).toBe(ENKRYPT_MAX_CONCURRENT_CALLS);
-    expect(calls.started).toHaveLength(2 * callsPerScanKind + 1);
-    expect(await guardrail.awaitVerdict()).toEqual({ action: 'allow' });
+    expect(calls.started).toHaveLength(2 * callsPerScanKind);
+    expect(await guardrail.awaitVerdict()).toEqual({ action: 'fail_open' });
 
     await runAfterTasks();
-    expect(mockedRecordUsage).toHaveBeenCalledTimes(2 * callsPerScanKind + 1);
+    expect(mockedRecordUsage).toHaveBeenCalledTimes(2 * callsPerScanKind);
     const report = await guardrail.report();
+    expect(report?.verdict).toBe('fail_open');
     expect(report?.scans.reduce((total, each) => total + each.attempts, 0)).toBe(
-      2 * callsPerScanKind + 1
+      2 * callsPerScanKind
     );
   });
 
@@ -1300,36 +1388,39 @@ describe('startEnkryptInputGuardrail with many tool definitions', () => {
       ]);
     });
 
-    it('is unavailable when one chunk fails although the others allow', async () => {
+    it('fails open when one chunk fails although the others allow', async () => {
       respondingFetch(text =>
         text.includes('[end of file 2]') ? detectResponse(400) : detectResponse()
       );
 
       const guardrail = startEnkryptInputGuardrail(Promise.resolve(longRequest), signal);
 
-      expect(await guardrail.awaitVerdict()).toEqual({ action: 'unavailable', reason: 'failed' });
+      expect(await guardrail.awaitVerdict()).toEqual({ action: 'fail_open' });
       const logs = await guardrail.requestLogs();
       expect(logs.find(log => log.status_code === 400)?.chunk).toEqual({
         index: 1,
         count: conversationChunks,
       });
       const report = await guardrail.report();
-      expect(report).toMatchObject({ verdict: 'unavailable', unavailable_reason: 'failed' });
+      expect(report).toMatchObject({ verdict: 'fail_open', unavailable_reason: null });
       expect(report?.scans).toEqual([
         expect.objectContaining({
           part: 'conversation',
-          decision: 'error_fail_closed',
+          decision: 'error_fail_open',
           error: 'http_400',
           chunks: conversationChunks,
           attempts: conversationChunks,
           verdict_cache_write: 'written',
         }),
       ]);
-      // The segments of the allowed chunks are cached, so the next request rescans only the failed one.
+      // The segments of the allowed chunks are cached for the full lifetime, and those of the
+      // failed chunk only briefly, so the next request rescans only the failed one once that expires.
       const keys = conversationKeys(scan.config);
-      expect(mockedRedisSet.mock.calls).toEqual(
-        allowWrites([...keys.slice(0, 2), ...keys.slice(4)])
-      );
+      expect(mockedRedisSet.mock.calls).toEqual([
+        ...allowWrites(keys.slice(0, 2)),
+        ...allowWrites(keys.slice(2, 4), ENKRYPT_FAILED_SCAN_CACHE_TTL_SECONDS),
+        ...allowWrites(keys.slice(4)),
+      ]);
     });
 
     it.each<[string, ('OK' | null | Error)[], string]>([
@@ -1403,7 +1494,8 @@ describe('recordEnkryptUsageRecords', () => {
 
 describe('mostSevereVerdict', () => {
   const block = { action: 'block', message: 'blocked' } as const;
-  const unavailable = { action: 'unavailable', reason: 'transient' } as const;
+  const unavailable = { action: 'unavailable', reason: 'failed' } as const;
+  const failOpen = { action: 'fail_open' } as const;
   const allow = { action: 'allow' } as const;
 
   it.each<[string, EnkryptGuardrailScanResult['verdict'][], EnkryptGuardrailScanResult['verdict']]>(
@@ -1412,7 +1504,11 @@ describe('mostSevereVerdict', () => {
       ['only skips', [{ action: 'skip' }], { action: 'skip' }],
       ['an allow over a skip', [{ action: 'skip' }, allow], allow],
       ['an unavailable scan over an allow', [allow, unavailable], unavailable],
+      ['a failed-open scan over an allow', [allow, failOpen], failOpen],
+      ['a failed-open scan over a skip', [{ action: 'skip' }, failOpen], failOpen],
+      ['an unavailable scan over a failed-open scan', [failOpen, unavailable], unavailable],
       ['a block over an unavailable scan', [unavailable, block], block],
+      ['a block over a failed-open scan', [failOpen, block], block],
       ['a block over an allow', [block, allow], block],
     ]
   )('acts on %s', (_name, verdicts, expected) => {

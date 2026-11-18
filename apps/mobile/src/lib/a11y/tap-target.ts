@@ -148,28 +148,31 @@ export const DENSE_ROW_HIT_SLOP = {
 } as const;
 
 /**
- * The box a Home section header's text action renders, in dp. It matches the
- * header's label box, so a row with an action is no taller than a row without
- * one, and every Home section keeps one gap to the block above it.
+ * The box a section header's text action renders, in dp. It carries the target
+ * on its own node, and its vertical margins cancel the box back down to the
+ * header's one-line content band, so a header with an action is exactly as tall
+ * as one without and every section keeps the same gap to the block above it.
  */
 export const SECTION_ACTION_FRAME_DP = 28;
 
-/** The box a Home section header's text action renders, as {@link SECTION_ACTION_FRAME_DP}. */
-export const SECTION_ACTION_BOX_CLASS = 'min-h-[28px] min-w-[48px]';
+/**
+ * The box a section header's text action renders, as {@link SECTION_ACTION_FRAME_DP}:
+ * `-my-[8px]` is `-(28 - 12) / 2`, the eyebrow's line. The box then holds no
+ * height of its own — it overlaps the header row's own `py-2`, which is tall
+ * enough to hold it — and the label keeps its line and its padding.
+ */
+export const SECTION_ACTION_BOX_CLASS = 'min-h-[28px] min-w-[48px] -my-[8px]';
 
 /**
  * Per-side vertical `hitSlop` of a {@link SECTION_ACTION_FRAME_DP} action:
- * `28 + 9 + 9 = 46 dp`, past the `DESIGN.md:364` 44 dp target even after the
- * box renders a fraction of a dp short. The header row pads the box by the same
- * amount ({@link SECTION_HEADER_ROW_PADDING_CLASS}), so the whole reach stays
- * inside the row and Android delivers every touch in it.
+ * `28 + 9 + 9 = 46 dp`, past the `DESIGN.md:364` 44 dp target. React Native does
+ * not deliver a touch outside the view that holds it, so the delivered area is
+ * the box the row carries (28 dp, exactly the audit floor) and the slop is the
+ * declared reach the control-size audit reads.
  */
 export const SECTION_ACTION_HIT_SLOP_DP = 9;
 
-/** The vertical padding of a Home section header row, as {@link SECTION_ACTION_HIT_SLOP_DP}. */
-export const SECTION_HEADER_ROW_PADDING_CLASS = 'py-[9px]';
-
-/** The `hitSlop` a Home section header action renders, as {@link SECTION_ACTION_HIT_SLOP_DP}. */
+/** The `hitSlop` a section header action renders, as {@link SECTION_ACTION_HIT_SLOP_DP}. */
 export const SECTION_ACTION_HIT_SLOP = {
   top: SECTION_ACTION_HIT_SLOP_DP,
   bottom: SECTION_ACTION_HIT_SLOP_DP,

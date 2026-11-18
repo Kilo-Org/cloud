@@ -4,11 +4,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Text } from '@/components/ui/text';
-import {
-  SECTION_ACTION_BOX_CLASS,
-  SECTION_HEADER_ROW_PADDING_CLASS,
-  textActionTargetClass,
-} from '@/lib/a11y/tap-target';
+import { SECTION_ACTION_BOX_CLASS, SECTION_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { SectionHeader } from './section-header';
 import { SectionHeaderSkeleton } from './section-header-skeleton';
 
@@ -123,11 +119,11 @@ describe('SectionHeader mounted layout', () => {
     expect(actionBoxClasses).toContain('ms-auto');
     expect(actionBoxClasses).not.toContain('grow');
     expect(actionBoxClasses).not.toContain('justify-end');
-    // Label and action copy sit on the row's content bottom edge, not its
-    // centre: a 48 dp action box would otherwise hold the label half a box away
-    // from the rows it names (home section-label gap).
+    // The row keeps its one-line content edge, and the action box is centred on
+    // that line: the box cancels its own height, so its copy sits on the label's
+    // line without the row growing for it (home section-label gap).
     expect(rowClasses.filter(name => name.startsWith('items-'))).toEqual(['items-end']);
-    expect(actionBoxClasses).toContain('items-end');
+    expect(actionBoxClasses).toContain('items-center');
     const actionTextClasses = (text.props.className as string).split(' ');
     expect(actionTextClasses).toEqual(expect.arrayContaining(ACTION_TEXT_CLASSES));
     expect(actionTextClasses.filter(name => PHYSICAL_ALIGNMENT_CLASSES.has(name))).toEqual([]);
@@ -291,9 +287,11 @@ describe('SectionHeader mounted layout', () => {
     const root = mount(createElement(Destination));
     const action = root.findByProps({ accessibilityRole: 'button' });
     expect(action.props.accessibilityLabel).toBe('See all');
-    expect(action.props.className).toContain('min-h-[44px]');
+    for (const token of SECTION_ACTION_BOX_CLASS.split(' ')) {
+      expect(action.props.className).toContain(token);
+    }
     expect(action.props.className).toContain('active:opacity-70');
-    expect(action.props.hitSlop).toBeUndefined();
+    expect(action.props.hitSlop).toBe(SECTION_ACTION_HIT_SLOP);
 
     act(() => {
       (action.props.onPress as () => void)();
@@ -320,33 +318,34 @@ describe('SectionHeader mounted layout', () => {
     expect(root.findAllByProps({ testID: 'live-now-see-all' })).toHaveLength(1);
   });
 
-  it.each([
-    ['ios', 'min-h-[44px]', 'min-w-[44px]'],
-    ['android', 'min-h-[48px]', 'min-w-[48px]'],
-  ])(
-    'gives the action its own %s touch-target frame on both axes, visible or hidden',
-    (os, height, width) => {
+  it.each(['ios', 'android'])(
+    'keeps the action on the compact box, visible or hidden, on %s',
+    os => {
       // Field defect: the action's only child is one 11px label line, so its own
       // rect was that line (~15pt on device) and a size audit reads exactly that
-      // rect — hitSlop never widens it. The width floor matters too because the
-      // hit slop is gone: a short label is a couple of glyphs wide. The hidden
-      // action keeps the same box, so hiding the action still cannot resize the
-      // header.
+      // rect — hitSlop never widens it. The box is the audit floor and the
+      // header row's own height on every platform: a taller frame set the row's
+      // height and pushed this label further from the block above it than a
+      // header without an action. The hidden action keeps the same box, so
+      // hiding the action still cannot resize the header.
       platform.OS = os;
       const props = { label: 'Live now', actionLabel: 'See all', onActionPress: () => undefined };
       const action = mount(createElement(SectionHeader, props)).findByProps({
         accessibilityRole: 'button',
       });
-      const frame = `${height} ${width}`;
-      expect(action.props.className).toContain(frame);
+      for (const token of SECTION_ACTION_BOX_CLASS.split(' ')) {
+        expect(action.props.className).toContain(token);
+      }
       expect(action.props.className).toContain('justify-center');
-      expect(action.props.hitSlop).toBeUndefined();
+      expect(action.props.hitSlop).toBe(SECTION_ACTION_HIT_SLOP);
       act(() => renderer?.unmount());
       renderer = undefined;
       const hidden = mount(createElement(SectionHeader, { ...props, actionHidden: true })).find(
         node => Object.is(node.type, 'Pressable')
       );
-      expect(hidden.props.className).toContain(frame);
+      for (const token of SECTION_ACTION_BOX_CLASS.split(' ')) {
+        expect(hidden.props.className).toContain(token);
+      }
     }
   );
 
@@ -474,9 +473,6 @@ describe('SectionHeader mounted layout', () => {
       const row = root.find(node => Object.is(node.type, 'View'));
       const result = {
         row: String(row.props.className).split(' '),
-        views: root
-          .findAll(node => Object.is(node.type, 'View'))
-          .map(node => String(node.props.className).split(' ')),
         bars: root
           .findAll(node => Object.is(node.type, 'Skeleton'))
           .map(node => String(node.props.className).split(' ')),
@@ -501,29 +497,12 @@ describe('SectionHeader mounted layout', () => {
     const withActionSkeleton = shape(createElement(SectionHeaderSkeleton, { action: true }));
     expect(withActionSkeleton.row).toEqual(withActionHeader.row);
     expect(withActionSkeleton.bars).toHaveLength(2);
-    // The action bar reserves the same frame the real action renders, so the
+    // The action reserves the label's own line, so it holds no height of its
+    // own: a header with an action keeps the plain header's row exactly, and the
     // action cannot grow the header when it arrives.
-    expect(withActionSkeleton.bars[1]).toEqual(
-      expect.arrayContaining(textActionTargetClass().split(' '))
-    );
-
-    const airHeader = shape(
-      createElement(SectionHeader, { label: 'Explore', reserveLabelAir: true })
-    );
-    const airSkeleton = shape(createElement(SectionHeaderSkeleton, { reserveLabelAir: true }));
-    expect(airSkeleton.row).toEqual(airHeader.row);
-    expect(airSkeleton.row).toContain(SECTION_HEADER_ROW_PADDING_CLASS);
-    // The label air box is the header's own height on both sides of the swap.
-    for (const loadingOrLoaded of [airHeader, airSkeleton]) {
-      expect(loadingOrLoaded.views.some(classes => classes.includes('min-h-[28px]'))).toBe(true);
-    }
-
-    const actionAirSkeleton = shape(
-      createElement(SectionHeaderSkeleton, { action: true, reserveLabelAir: true })
-    );
-    expect(actionAirSkeleton.bars[1]).toEqual(
-      expect.arrayContaining(SECTION_ACTION_BOX_CLASS.split(' '))
-    );
+    expect(withActionHeader.row).toEqual(plainHeader.row);
+    expect(withActionSkeleton.row).toEqual(plainSkeleton.row);
+    expect(withActionSkeleton.bars[1]).toEqual(expect.arrayContaining(['h-3.5', 'w-12']));
 
     const insetSkeleton = shape(createElement(SectionHeaderSkeleton, { inset: true }));
     expect(insetSkeleton.row).toContain('px-4');

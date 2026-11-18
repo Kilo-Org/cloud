@@ -223,9 +223,26 @@ export default function AppLayout() {
             <Stack.Screen name="context-picker" options={pickerSheetOptions} />
             <Stack.Screen name="todos/[list-id]" />
             <Stack.Screen name="todos/item/[item-id]" />
+            {/* The form auto-focuses its name field, and a two-detent Android
+                  formSheet switches to its expanded state when the IME opens,
+                  measuring the sheet by its content instead of the detent it
+                  presented at: the form is taller than the detent cap, so its
+                  sheet edge (and the header under it) ended up inside the status
+                  bar - 13.7 dp into the 51.8 dp inset at the base capture. One
+                  full detent keeps the edge on the safe-area cap, where the
+                  header reserves nothing and the focused field still sits above
+                  the keyboard: the same single-detent layout the invite member
+                  form carries. iOS keeps both detents; its native sheet sizes
+                  itself and never enters the status bar. */}
             <Stack.Screen
               name="todos/list-settings"
-              options={{ ...sheetOptions, gestureEnabled: false }}
+              options={{
+                ...sheetOptions,
+                gestureEnabled: false,
+                ...(Platform.OS === 'android'
+                  ? { sheetAllowedDetents: [sheetOptions.sheetAllowedDetents[1]] }
+                  : {}),
+              }}
             />
             <Stack.Screen name="agent-briefing/index" />
             <Stack.Screen name="agent-briefing/[report-id]" />

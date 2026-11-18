@@ -26,6 +26,7 @@
     "creditHistory": "크레딧 내역",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "취소",
     "done": "완료",
     "retry": "다시 시도",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "변경 사항",
     "organizationTrialEnded": "조직의 체험이 종료되었으며 활성 요금제가 없습니다. 조직 소유자는 kilo.ai에서 결제 정보를 업데이트한 후 다시 시도하세요.",
-    "privateRepositoryA11y": "{{name}}, 비공개 저장소"
+    "privateRepositoryA11y": "{{name}}, 비공개 저장소",
+    "legalDocumentEnglishOnly": "이 문서는 영어로만 제공됩니다."
   },
   "language": {
     "restarting": "언어 적용을 위해 다시 시작 중",
@@ -481,7 +483,14 @@
       "viewReceipt": "접수증 보기"
     },
     "changelog": "새로운 기능",
-    "changelogVersionPending": "이 버전의 릴리스 노트는 다음 앱 업데이트에 포함됩니다."
+    "changelogVersionPending": "{{version}} 버전의 릴리스 노트는 다음 앱 업데이트에 포함됩니다.",
+    "changelogGroupNew": "새로운 기능",
+    "changelogFixesIn": "{{areas}} 관련 수정 및 개선 사항.",
+    "changelogFixesPolish": "앱 전반의 수정 및 개선 사항.",
+    "changelogAreas": {
+      "signIn": "로그인",
+      "profileOrganizations": "프로필 및 조직"
+    }
   },
   "preferences": {
     "general": "일반",
@@ -676,7 +685,8 @@
       "managedOnWeb": "이 조직의 Bitbucket 연결은 컴퓨터에서 웹으로 관리됩니다.",
       "description": "필요한 권한이 포함된 작업 영역 액세스 토큰을 생성하여 아래에 붙여넣으세요.",
       "scopes": "계정: 읽기 · 저장소: 읽기/쓰기 · 풀 리퀘스트: 읽기 · 웹훅: 읽기/쓰기",
-      "tokenPlaceholder": "작업 영역 액세스 토큰"
+      "tokenPlaceholder": "작업 영역 액세스 토큰",
+      "tokenRefused": "Bitbucket에서 이 작업 영역 토큰을 수락하지 않았습니다. 위의 권한이 포함되어 있는지 확인한 후 다시 시도하세요."
     },
     "followReviewMd": "REVIEW.md 따르기",
     "followReviewMdSubtitle": "저장소별 REVIEW.md 파일의 지침을 따릅니다.",
@@ -922,8 +932,13 @@
       "repositoryLine": "리뷰: {{reviews}} · 문제: {{findings}}",
       "empty": "아직 분석 데이터가 있는 리뷰가 없습니다",
       "emptyDescription": "분석은 조직에서 이 기능이 켜져 있는 동안 완료된 리뷰를 기록합니다.",
-      "off": "이 조직에서는 분석이 꺼져 있습니다.",
-      "couldNotLoad": "분석을 불러오지 못했습니다"
+      "offTitle": "{{platform}}의 분석이 꺼져 있습니다",
+      "offDescription": "소유자, 관리자, 결제 관리자 등 조직의 결제 권한이 있는 역할은 웹의 조직 설정에서 분석을 켤 수 있으며, 이때 완료된 리뷰가 기록됩니다.",
+      "couldNotLoad": "분석을 불러오지 못했습니다",
+      "trackedReviewsCaption": "이 기간 동안 분석이 켜진 상태에서 완료된 리뷰입니다. 실행 중이거나 실패한 리뷰는 계산에 포함되지 않습니다.",
+      "trackedReviewsUncounted": "미집계: 조직의 완료된 리뷰 {{displayTotal}}개 중 {{displayCount}}개는 결과가 캡처되지 않았습니다.",
+      "trackedReviewsUncounted_one": "미집계: 조직의 완료된 리뷰 {{displayTotal}}개 중 {{displayCount}}개는 결과가 캡처되지 않았습니다.",
+      "trackedReviewsUncounted_other": "미집계: 조직의 완료된 리뷰 {{displayTotal}}개 중 {{displayCount}}개는 결과가 캡처되지 않았습니다."
     },
     "council": {
       "title": "협의체 리뷰",
@@ -2579,7 +2594,6 @@
     "completingPurchase": "구매 처리 중",
     "subscriptionLoading": "Kilo Pass 구독 정보 불러오는 중",
     "retryHint": "Kilo Pass 상태를 다시 확인합니다.",
-    "cardAccessibility": "{{title}}: {{description}}. {{actionLabel}}",
     "endedOn": "{{date}}에 종료됨",
     "notAvailableInApp": "Kilo Pass는 앱에서 사용할 수 없습니다.",
     "statusActive": "활성",
@@ -3317,6 +3331,7 @@
       "manageOnWeb": "웹에서 결제 설정",
       "changePlan": "요금제 변경",
       "buySeats": "라이선스 구매",
+      "managedOnWeb": "요금제, 라이선스 및 자동 충전은 웹에서 관리됩니다.",
       "setupAutoTopUp": "자동 충전 설정",
       "manageAutoTopUp": "자동 충전 관리",
       "opensOnWeb": "웹에서 열림"
@@ -3478,12 +3493,10 @@
       "requestLogs": "요청 로그"
     },
     "requestLogs": {
-      "hint": "선택한 시간대가 끝나기 전 1시간의 요청을 최신순으로 표시합니다.",
       "older": "이전 1시간",
       "newer": "다음 1시간",
       "truncated": "이 시간대에는 목록에 표시된 것보다 많은 요청이 있습니다.",
       "emptyTitle": "요청 없음",
-      "emptyDescription": "이 시간대에는 게이트웨이 요청이 없습니다.",
       "loadError": "요청 로그를 불러오지 못했습니다.",
       "permissionDenied": "조직의 소유자, 관리자 또는 결제 관리자만 요청 로그를 볼 수 있습니다.",
       "tokens": "입력 {{input}} · 출력 {{output}}",
@@ -4282,8 +4295,7 @@
       "repoValue": "저장소: {{name}}",
       "profileValue": "프로필: {{name}}",
       "profileUnavailable": "이 프로필은 더 이상 사용할 수 없습니다. 다른 프로필을 선택하세요.",
-      "pickerEmptyDescriptionOrganization": "세션 전체에서 환경 변수, 설정 명령 및 기술을 재사용하기 위한 조직 프로필을 만듭니다.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "조직 소유자 또는 관리자는 조직 프로필을 만들 수 있습니다."
+      "pickerEmptyDescriptionOrganization": "세션 전체에서 환경 변수, 설정 명령 및 기술을 재사용하기 위한 조직 프로필을 만듭니다."
     },
     "variablesDeleteFailed": "변수를 삭제할 수 없습니다",
     "deleteVariable": "변수 {{key}}을(를) 삭제",
@@ -4469,7 +4481,6 @@
     "dismiss": "브리핑 무시",
     "offline": "오프라인 · 저장된 브리핑",
     "cached": "저장된 보고서 · 새로고침 불가",
-    "window": "{{start}} – {{end}}",
     "summary": "AI 요약",
     "summaryPending": "AI 요약을 생성 중입니다. 준비되면 여기에 첨부됩니다.",
     "summaryUnavailable": "AI 요약을 사용할 수 없습니다. 구조화된 보고서는 계속 확인할 수 있습니다.",
@@ -4588,6 +4599,7 @@
       "title": "트리거 및 웹훅",
       "subtitle": "웹훅 호출 또는 일정으로 Cloud Agent 실행을 자동화하세요.",
       "new": "새 트리거",
+      "create": "트리거 만들기",
       "emptyTitle": "아직 트리거가 없습니다",
       "emptyDescription": "웹훅 호출 또는 일정에 따라 Cloud Agent 실행을 시작하려면 트리거를 만드세요.",
       "loadFailedTitle": "트리거를 불러오지 못했습니다",
@@ -4641,6 +4653,8 @@
       "created": "트리거가 생성됨",
       "saved": "트리거가 저장됨",
       "statusArrived": "도착함",
+      "defaultPromptWebhook": "이 웹훅 요청의 본문을 설명하세요:\n\n{{body}}",
+      "defaultPromptScheduled": "예약된 작업을 실행하세요. {{scheduledTime}}에 실행을 시작했습니다.",
       "problems": {
         "nameRequired": "이름을 입력하세요.",
         "nameTooShort": "8자 이상 사용하세요.",

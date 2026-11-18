@@ -24,6 +24,21 @@ type SessionStorage = {
   applyPartDelta(messageId: string, partId: string, field: string, delta: string): void;
   deletePart(messageId: string, partId: string): void;
   getParts(messageId: string): readonly ReadonlyPart[];
+  /**
+   * Look up one stored part by id inside the message. Reading several parts in
+   * one pass is `getParts`; this call must answer from the stored parts
+   * without rebuilding the `getParts` snapshot. Seeing the deltas
+   * `applyPartDelta` already accepted is required, matching `getParts`. The
+   * returned view aliases storage, including nested values inside the part:
+   * copy a field before writing it elsewhere.
+   */
+  getPart(messageId: string, partId: string): ReadonlyPart | undefined;
+  /**
+   * Ids of the message's stored parts in storage order, without rebuilding the
+   * `getParts` snapshot. The array is a copy, safe to iterate while storage
+   * mutates. Same visibility of already accepted deltas as `getParts`.
+   */
+  getPartIds(messageId: string): readonly string[];
 
   // Granular subscriptions. Channels: "messageIds", "message:{id}",
   // "parts:{messageId}" (`SessionSubscriptionKey`).

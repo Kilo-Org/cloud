@@ -13,6 +13,10 @@ jest.mock('@/components/auth/sign-in/AuthProviderButtons', () => ({
   AuthProviderButtons: () => null,
 }));
 
+jest.mock('@/lib/auth/claude/use-claude-sign-in-configured', () => ({
+  useClaudeSignInConfigured: () => true,
+}));
+
 jest.mock('@/components/AnimatedLogoMark', () => ({
   AnimatedLogoMark: () => null,
 }));

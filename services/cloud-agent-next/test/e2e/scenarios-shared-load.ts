@@ -199,7 +199,16 @@ async function runLargeStream(
         LARGE_STREAM_TURN_BUDGET_MS
       );
     } catch (error) {
-      return fail(`coverage=blocked; reason=seed read failed: ${errorMessage(error)}`);
+      const status = await fetchFakeScenarioStatus(
+        scenarioConfig.fakeLlmUrl,
+        readTag,
+        AbortSignal.timeout(5_000)
+      ).catch(() => null);
+      const evidence =
+        status === null
+          ? 'fake read evidence unavailable'
+          : `readToolCalls=${status.toolCalls.read}; readToolResults=${status.toolResults.read}; unsupportedToolSchema=${status.unsupportedToolSchema}`;
+      return fail(`coverage=blocked; reason=seed read failed: ${errorMessage(error)}; ${evidence}`);
     }
     streams.push(read.stream);
     events.push(...read.stream.events);

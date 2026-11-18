@@ -1,6 +1,7 @@
 import {
   glanceableStatusKind,
   LIVE_ACTIVITY_MAX_LIFETIME_MS,
+  type GlanceableSessionRow,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { glanceableSessionTitle } from '@kilocode/app-shared/home-widget';
 import { timestampMs, timestampToIso } from '@kilocode/app-shared/utils';
@@ -15,7 +16,7 @@ import {
   type SessionLiveStep,
 } from '@kilocode/session-ingest-contracts/session-live-summary';
 
-import { LIVE_ACTIVITY_RELEVANCE } from './push-presentation';
+import { LIVE_ACTIVITY_RELEVANCE, LIVE_ACTIVITY_TIE_BREAK_LIMIT } from './push-presentation';
 import {
   isFinishedSessionCardStatus,
   SESSION_CARD_QUIET_AFTER_MS,
@@ -35,22 +36,20 @@ export function sessionLiveActivityTitle(raw: string | null | undefined): string
 }
 
 /**
- * The facts of one session row that the session card shows. Every fact the
+ * The facts of one session row that the session card shows: the shared
+ * active-session row (`GlanceableSessionRow`, whose nullability policy this
+ * row follows) plus the identity and the card-only facts. Every fact the
  * card carries forward from the previous build follows one absence policy: a
  * row that does not carry the fact omits it, and the card then keeps the value
  * it already shows, because a tray rebuild carries only what the tray knows.
  * `failure` is the one such fact whose explicit `null` means something,
- * because it reports that nothing failed. `title`, `statusUpdatedAt` and
- * `scheduledAt` are read only from the row, so they accept `null` from
- * producers that serialize an absent value and never fall back to the
- * previous build.
+ * because it reports that nothing failed. `title` is read only from the row,
+ * so it accepts `null` from producers that serialize an absent value and never
+ * falls back to the previous build.
  */
-export type SessionLiveActivityRow = {
+export type SessionLiveActivityRow = GlanceableSessionRow & {
   id: string;
   title?: string | null;
-  status: string;
-  statusUpdatedAt?: string | null;
-  scheduledAt?: string | null;
   /** The stored summary the ingest service derived, when the row carries it. */
   currentStep?: SessionLiveStep;
   plan?: SessionLivePlan;
@@ -202,13 +201,17 @@ const RECENCY_HALF_MS = 365 * 24 * 60 * 60_000;
 
 /**
  * A tie-break inside one relevance band (spec "Presentation order" rule 3):
- * a newer change first, and a bounded term so no tie-break can leave its band.
+ * a newer change first, and a bounded term so no tie-break can leave its
+ * band — the bound is `LIVE_ACTIVITY_TIE_BREAK_LIMIT`, one below the smallest
+ * gap between adjacent `LIVE_ACTIVITY_RELEVANCE` bands, so the term and the
+ * table state that invariant together.
  */
 function recencyTerm(changedAt: string | null): number {
   const at = timestampMs(changedAt);
   if (at === null) return 0;
   const elapsed = Math.max(0, at - RECENCY_ORIGIN_MS);
-  return Math.min(19, (19 * elapsed) / (elapsed + RECENCY_HALF_MS));
+  const limit = LIVE_ACTIVITY_TIE_BREAK_LIMIT;
+  return Math.min(limit, (limit * elapsed) / (elapsed + RECENCY_HALF_MS));
 }
 
 /**

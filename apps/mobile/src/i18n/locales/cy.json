@@ -26,6 +26,7 @@
     "creditHistory": "Hanes credydau",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Canslo",
     "done": "Gorffen",
     "retry": "Rhoi cynnig eto",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "Newidiadau",
     "organizationTrialEnded": "Mae treial y sefydliad wedi dod i ben ac nid oes ganddo gynllun gweithredol. Gall perchennog sefydliad ddiweddaru bilio ar kilo.ai, ac yna rhoi cynnig arall arni.",
-    "privateRepositoryA11y": "{{name}}, yn repositori preifat"
+    "privateRepositoryA11y": "{{name}}, yn repositori preifat",
+    "legalDocumentEnglishOnly": "Dim ond yn Saesneg y mae'r ddogfen hon ar gael."
   },
   "language": {
     "restarting": "Yn ailgychwyn i newid yr iaith",
@@ -481,7 +483,14 @@
       "viewReceipt": "Gweld y dderbynneb"
     },
     "changelog": "Beth sy'n newydd",
-    "changelogVersionPending": "Daw nodiadau'r fersiwn hon gyda'r diweddariad nesaf i'r ap."
+    "changelogVersionPending": "Daw nodiadau fersiwn {{version}} gyda'r diweddariad nesaf i'r ap.",
+    "changelogGroupNew": "Newydd",
+    "changelogFixesIn": "Atgyweiriadau a gwelliannau i'r canlynol: {{areas}}.",
+    "changelogFixesPolish": "Atgyweiriadau a gwelliannau ar draws yr ap.",
+    "changelogAreas": {
+      "signIn": "Mewngofnodi",
+      "profileOrganizations": "Proffil a sefydliadau"
+    }
   },
   "preferences": {
     "general": "Cyffredinol",
@@ -1446,7 +1455,8 @@
       "managedOnWeb": "Caiff cysylltiad Bitbucket y sefydliad hwn ei reoli ar y we o gyfrifiadur.",
       "description": "Crëwch docyn mynediad gweithle gyda'r cwmpasau gofynnol a'i ludo isod.",
       "scopes": "Cyfrif: darllen · Ystorfeydd: darllen/ysgrifennu · Ceisiadau tynnu: darllen · Bachau gwe: darllen/ysgrifennu",
-      "tokenPlaceholder": "Tocyn mynediad gweithle"
+      "tokenPlaceholder": "Tocyn mynediad gweithle",
+      "tokenRefused": "Ni dderbyniodd Bitbucket y tocyn mynediad gweithle hwn. Gwiriwch fod ganddo'r cwmpasau uchod, yna ceisiwch eto."
     },
     "scopeList": {
       "personalStillAvailable": "Mae ystorfeydd personol yn dal ar gael isod.",
@@ -1561,8 +1571,17 @@
       "repositoryLine": "Adolygiadau: {{reviews}} · Canfyddiadau: {{findings}}",
       "empty": "Dim adolygiadau â dadansoddeg eto",
       "emptyDescription": "Mae dadansoddeg yn cofnodi adolygiadau a gwblhawyd tra bo'r nodwedd wedi'i galluogi ar gyfer y sefydliad.",
-      "off": "Mae dadansoddeg wedi'i diffodd ar gyfer y sefydliad hwn.",
-      "couldNotLoad": "Methwyd llwytho'r dadansoddeg"
+      "offTitle": "Mae dadansoddeg wedi'i diffodd ar gyfer {{platform}}",
+      "offDescription": "Gall rolau bilio'r sefydliad droi'r dadansoddeg ymlaen yng ngosodiadau'r sefydliad ar y we i gofnodi adolygiadau a gwblhawyd.",
+      "couldNotLoad": "Methwyd llwytho'r dadansoddeg",
+      "trackedReviewsCaption": "Adolygiadau a gwblhawyd yn y cyfnod hwn gyda'r dadansoddeg wedi'i troi ymlaen. Ni chyfrir adolygiadau sy'n rhedeg neu wedi methu erioed.",
+      "trackedReviewsUncounted": "Heb ei chyfrif: {{displayCount}} o’r {{displayTotal}} adolygiadau a gwblhawyd y sefydliad heb eu canlyniad.",
+      "trackedReviewsUncounted_few": "Heb ei chyfrif: {{displayCount}} o’r {{displayTotal}} adolygiadau a gwblhawyd y sefydliad heb eu canlyniad.",
+      "trackedReviewsUncounted_many": "Heb ei chyfrif: {{displayCount}} o’r {{displayTotal}} adolygiadau a gwblhawyd y sefydliad heb eu canlyniad.",
+      "trackedReviewsUncounted_one": "Heb ei chyfrif: {{displayCount}} o’r {{displayTotal}} adolygiadau a gwblhawyd y sefydliad heb eu canlyniad.",
+      "trackedReviewsUncounted_other": "Heb ei chyfrif: {{displayCount}} o’r {{displayTotal}} adolygiadau a gwblhawyd y sefydliad heb eu canlyniad.",
+      "trackedReviewsUncounted_two": "Heb ei chyfrif: {{displayCount}} o’r {{displayTotal}} adolygiadau a gwblhawyd y sefydliad heb eu canlyniad.",
+      "trackedReviewsUncounted_zero": "Heb ei chyfrif: {{displayCount}} o’r {{displayTotal}} adolygiadau a gwblhawyd y sefydliad heb eu canlyniad."
     },
     "council": {
       "title": "Adolygiad cyngor",
@@ -3350,7 +3369,6 @@
     "completingPurchase": "Yn cwblhau'r pryniant",
     "subscriptionLoading": "Yn llwytho tanysgrifiad Kilo Pass",
     "retryHint": "Mae hwn yn ceisio llwytho statws Kilo Pass eto.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Wedi dod i ben {{date}}",
     "notAvailableInApp": "Nid yw Kilo Pass ar gael yn yr ap.",
     "statusActive": "Gweithredol",
@@ -3553,6 +3571,7 @@
       "manageOnWeb": "Gosodiadau bilio ar y we",
       "changePlan": "Newid cynllun",
       "buySeats": "Prynu seddau",
+      "managedOnWeb": "Caiff y cynllun, y seddau ac ail-lenwi awtomatig eu rheoli ar y we.",
       "setupAutoTopUp": "Gosod ail-lenwi awtomatig",
       "manageAutoTopUp": "Rheoli ail-lenwi awtomatig",
       "opensOnWeb": "Yn agor ar y we"
@@ -3701,12 +3720,10 @@
       "requestLogs": "Logiau ceisiadau"
     },
     "requestLogs": {
-      "hint": "Ceisiadau o'r awr cyn i'r ffenestr ddod i ben, y diweddaraf yn gyntaf.",
       "older": "Awr gynharach",
       "newer": "Awr ddiweddarach",
       "truncated": "Mae gan yr awr hon fwy o geisiadau nag y mae'r rhestr yn eu dangos.",
       "emptyTitle": "Dim ceisiadau",
-      "emptyDescription": "Does dim ceisiadau porth yn yr awr hon.",
       "loadError": "Methu llwytho logiau ceisiadau.",
       "permissionDenied": "Dim ond perchennog, gweinyddwr neu reolwr bilio sefydliad all ddarllen ei logiau ceisiadau.",
       "tokens": "{{input}} i mewn · {{output}} allan",
@@ -4546,8 +4563,7 @@
       "repoValue": "Ystorfa: {{name}}",
       "profileValue": "Proffil: {{name}}",
       "profileUnavailable": "Nid yw'r proffil hwn ar gael mwyach. Dewiswch un arall.",
-      "pickerEmptyDescriptionOrganization": "Creu proffil sefydliad i ailddefnyddio newidynnau amgylchedd, gorchmynion gosod, a sgiliau ar draws sesiynau.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Gall perchennog sefydliad neu weinyddwr greu proffil sefydliad."
+      "pickerEmptyDescriptionOrganization": "Creu proffil sefydliad i ailddefnyddio newidynnau amgylchedd, gorchmynion gosod, a sgiliau ar draws sesiynau."
     },
     "variablesDeleteFailed": "Ni fu modd dileu'r newidyn",
     "deleteVariable": "Dileu newidyn {{key}}",
@@ -4749,7 +4765,6 @@
     "dismiss": "Diystyru'r briff",
     "offline": "All-lein · briff wedi'i gadw",
     "cached": "Adroddiad wedi'i gadw · methu adnewyddu",
-    "window": "{{start}} – {{end}}",
     "summary": "Crynodeb AI",
     "summaryPending": "Mae'r crynodeb AI ar y gweill. Bydd yn ymddangos yma pan fydd yn barod.",
     "summaryUnavailable": "Crynodeb AI ddim ar gael. Mae eich adroddiad strwythuredig yn dal ar gael.",
@@ -4868,6 +4883,7 @@
       "title": "Sbardunau a bachynnau gwe",
       "subtitle": "Awtomeiddio rhediadau Cloud Agent o alwad bachyn gwe neu o atodlen.",
       "new": "Sbardun newydd",
+      "create": "Crëwch sbardun",
       "emptyTitle": "Dim sbardunau eto",
       "emptyDescription": "Crëwch sbardun i ddechrau rhediad Cloud Agent o alwad bachyn gwe neu ar atodlen.",
       "loadFailedTitle": "Methwyd llwytho sbardunau",
@@ -4921,6 +4937,8 @@
       "created": "Crëwyd sbardun",
       "saved": "Cadwyd y sbardun",
       "statusArrived": "Wedi cyrraedd",
+      "defaultPromptWebhook": "Disgrifiwch gorff y cais bachyn gwe hwn:\n\n{{body}}",
+      "defaultPromptScheduled": "Rhedwch y dasg ar atodlen. Wedi’i sbarduno am {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Rhowch enw.",
         "nameTooShort": "Defnyddiwch o leiaf 8 nod.",

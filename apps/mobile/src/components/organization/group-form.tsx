@@ -23,6 +23,7 @@ import { useConfirmDialog } from '@/components/ui/dialog';
 import { FormField } from '@/components/ui/form-field';
 import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { Input } from '@/components/ui/input';
+import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
 import { type OrgGroup, useOrgGroupMutations } from '@/lib/hooks/use-org-groups-queries';
 import {
   type ActiveOrgMember,
@@ -71,6 +72,7 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
   const [memberQuery, setMemberQuery] = useState('');
   const [nameError, setNameError] = useState<'required' | 'tooLong' | null>(null);
   const [dirty, setDirty] = useState(false);
+  const { scrollRef, fieldLayout, scrollToField } = useFormFieldScroll<'name'>();
   const guard = useMetadataLeaveGuard({ enabled: true });
   const { confirm, dialog } = useConfirmDialog();
   const initial =
@@ -135,6 +137,7 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
     const found = orgGroupNameError(name);
     setNameError(found);
     if (found !== null) {
+      scrollToField('name');
       return;
     }
     const payload = { name, description: description.length === 0 ? null : description };
@@ -184,6 +187,7 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
     <View className="flex-1 bg-background">
       <ScreenHeader title={group === undefined ? t('organization.groups.create') : group.name} />
       <TabScreenScrollView
+        ref={scrollRef}
         className="flex-1"
         contentContainerClassName="gap-5 px-6 pb-10 pt-4"
         keyboardShouldPersistTaps="handled"
@@ -193,6 +197,7 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
         <FormField
           label={t('organization.groups.nameLabel')}
           required
+          containerOnLayout={fieldLayout('name')}
           defaultValue={nameRef.current}
           maxLength={ORG_GROUP_NAME_MAX_LENGTH}
           disabled={busy}

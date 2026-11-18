@@ -10,7 +10,6 @@ import {
   getAnthropicProviderOptionsForVercel,
   getVercelInferenceProvidersExcludingIgnored,
   hasCompatibleVercelInferenceProvider,
-  isVercelRoutingOptOut,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import type {
   GatewayRequest,
@@ -286,7 +285,7 @@ describe('convertProviderOptions', () => {
     };
 
     expect(() => convertProviderOptions(request, null)).toThrow(
-      'Vercel inference provider data became unavailable during request transform'
+      'Vercel inference provider data is unavailable to apply provider.ignore'
     );
   });
 });
@@ -297,16 +296,35 @@ const unrestrictedRouting = {
 };
 
 describe('shouldRouteToVercel', () => {
-  async function loadShouldRouteToVercel(options?: { optOut?: boolean }) {
+  async function loadShouldRouteToVercel(
+    options: {
+      model?: string;
+      optOut?: boolean;
+      /** The model's stored OpenRouter endpoint tags, or null when OpenRouter does not list it. */
+      openRouterEndpointTags?: string[] | null;
+      vercelInferenceProviders?: string[] | null;
+    } = {}
+  ) {
+    const {
+      model = 'anthropic/claude-sonnet-4.5',
+      optOut = false,
+      openRouterEndpointTags = ['anthropic'],
+      vercelInferenceProviders = ['anthropic'],
+    } = options;
     jest.resetModules();
     jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/routing-config', () => ({
       getRuntimeGatewayRoutingConfig: jest.fn(async () => ({
-        vercelOptOutModels: new Set(options?.optOut ? ['anthropic/claude-sonnet-4.5'] : []),
+        vercelOptOutModels: new Set(optOut ? [model] : []),
       })),
     }));
     jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
-      getVercelModelsFromDatabase: jest.fn(async () => new Set(['anthropic/claude-sonnet-4.5'])),
-      getCachedVercelInferenceProviderIdsForModel: jest.fn(async () => ['anthropic']),
+      getVercelModelsFromDatabase: jest.fn(async () => new Set([model])),
+      getCachedVercelInferenceProviderIdsForModel: jest.fn(async () => vercelInferenceProviders),
+      getOpenRouterModelsMetadataFromDatabase: jest.fn(async () =>
+        openRouterEndpointTags
+          ? { [model]: { id: model, endpoints: openRouterEndpointTags.map(tag => ({ tag })) } }
+          : {}
+      ),
     }));
     return (await import('@kilocode/web-shared/lib/ai-gateway/providers/vercel'))
       .shouldRouteToVercel;
@@ -352,14 +370,90 @@ describe('shouldRouteToVercel', () => {
     );
   });
 
-  it('does not resolve provider policy for models opted out of Vercel routing', async () => {
-    const shouldRouteToVercel = await loadShouldRouteToVercel({ optOut: true });
-    const getRoutingProviderConfig = jest.fn(async () => ({ only: ['anthropic'] }));
+  describe('with a model opted out of Vercel routing', () => {
+    // Telnyx serves this model on Vercel but not on OpenRouter.
+    const model = 'deepseek/deepseek-v4.1-flash-1017';
+    const routing = { requestedModel: model, boundedSpending: false };
+    const providerData = {
+      model,
+      openRouterEndpointTags: ['deepseek', 'deepinfra/fp8'],
+      vercelInferenceProviders: ['deepseek', 'telnyx'],
+    };
 
-    await expect(shouldRouteToVercel(unrestrictedRouting, getRoutingProviderConfig)).resolves.toBe(
-      false
+    it('stays on OpenRouter without provider routing settings', async () => {
+      const shouldRouteToVercel = await loadShouldRouteToVercel({ ...providerData, optOut: true });
+
+      await expect(shouldRouteToVercel(routing, async () => undefined)).resolves.toBe(false);
+    });
+
+    it('routes to Vercel when only Vercel serves the providers `only` allows', async () => {
+      const shouldRouteToVercel = await loadShouldRouteToVercel({ ...providerData, optOut: true });
+
+      await expect(shouldRouteToVercel(routing, async () => ({ only: ['telnyx'] }))).resolves.toBe(
+        true
+      );
+    });
+
+    it('stays on OpenRouter when `only` allows a provider OpenRouter serves', async () => {
+      const shouldRouteToVercel = await loadShouldRouteToVercel({ ...providerData, optOut: true });
+
+      await expect(
+        shouldRouteToVercel(routing, async () => ({ only: ['telnyx', 'deepinfra'] }))
+      ).resolves.toBe(false);
+    });
+
+    it.each([true, false])(
+      'stays on OpenRouter when `only` names providers on neither gateway (opted out: %s)',
+      async optOut => {
+        const shouldRouteToVercel = await loadShouldRouteToVercel({ ...providerData, optOut });
+
+        await expect(
+          shouldRouteToVercel(routing, async () => ({ only: ['unknown-provider'] }))
+        ).resolves.toBe(false);
+      }
     );
-    expect(getRoutingProviderConfig).not.toHaveBeenCalled();
+
+    it('routes to Vercel when ignored providers leave only Vercel providers', async () => {
+      const shouldRouteToVercel = await loadShouldRouteToVercel({ ...providerData, optOut: true });
+
+      await expect(
+        shouldRouteToVercel(routing, async () => ({ ignore: ['deepseek', 'deepinfra'] }))
+      ).resolves.toBe(true);
+    });
+
+    it('stays on OpenRouter when its endpoints for the model are unknown', async () => {
+      const shouldRouteToVercel = await loadShouldRouteToVercel({
+        ...providerData,
+        optOut: true,
+        openRouterEndpointTags: null,
+      });
+
+      await expect(shouldRouteToVercel(routing, async () => ({ only: ['telnyx'] }))).resolves.toBe(
+        false
+      );
+    });
+
+    it('stays on OpenRouter when Vercel inference provider data is unavailable', async () => {
+      const shouldRouteToVercel = await loadShouldRouteToVercel({
+        ...providerData,
+        optOut: true,
+        vercelInferenceProviders: null,
+      });
+
+      await expect(shouldRouteToVercel(routing, async () => ({ only: ['telnyx'] }))).resolves.toBe(
+        false
+      );
+    });
+
+    it('leaves a spend-bounded request on OpenRouter', async () => {
+      const shouldRouteToVercel = await loadShouldRouteToVercel({ ...providerData, optOut: true });
+
+      await expect(
+        shouldRouteToVercel({ ...routing, boundedSpending: true }, async () => ({
+          only: ['telnyx'],
+        }))
+      ).resolves.toBe(false);
+    });
   });
 
   it('leaves a spend-bounded request on OpenRouter without resolving provider policy', async () => {
@@ -1220,15 +1314,6 @@ describe('applyVercelSettings session affinity', () => {
       expect(request.body.providerOptions?.gateway?.sessionAffinity).toBe(true);
       expect(request.body.providerOptions?.gateway).not.toHaveProperty('sessionId');
     }
-  });
-});
-
-describe('isVercelRoutingOptOut', () => {
-  it('only opts out exact model ID matches', () => {
-    const optOutModels = new Set(['moonshotai/kimi-k3']);
-
-    expect(isVercelRoutingOptOut('moonshotai/kimi-k3', optOutModels)).toBe(true);
-    expect(isVercelRoutingOptOut('moonshotai/kimi-k3-fast', optOutModels)).toBe(false);
   });
 });
 

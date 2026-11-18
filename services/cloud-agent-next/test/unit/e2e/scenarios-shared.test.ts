@@ -2065,6 +2065,55 @@ describe('converted load and fault scenarios', () => {
     }
   });
 
+  it('large-stream reports fake read counters after the scenario deadline expires', async ({
+    onTestFinished,
+  }) => {
+    vi.useFakeTimers();
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    mocks.prepareBrowserSession.mockImplementationOnce(
+      async (_config: DriverConfig, { prompt }: { prompt: string }) => {
+        const seedPath = /file:seed:[^:]+:([^:]+)/.exec(prompt)?.[1];
+        mocks.openConnectedStream
+          .mockResolvedValueOnce(
+            fakeStream(coldEchoEvents(`file-write:${seedPath}`), completedEvent(COLD_MESSAGE_ID))
+          )
+          .mockResolvedValueOnce(fakeStream([], completedEvent('message_read')));
+        return { cloudAgentSessionId: SESSION_ID, kiloSessionId: KILO_SESSION_ID };
+      }
+    );
+    mocks.getSessionSnapshot.mockResolvedValueOnce({ initialMessageId: COLD_MESSAGE_ID });
+    mocks.getMessageResult.mockResolvedValueOnce({ status: 'completed' });
+    mocks.sendMessage.mockImplementationOnce(() => new Promise(() => {}));
+    mocks.fetchFakeScenarioStatus.mockResolvedValueOnce({
+      toolCalls: { read: 1 },
+      toolResults: { read: 0 },
+      unsupportedToolSchema: 0,
+    });
+    const definition = SHARED_SCENARIOS['large-stream'];
+    const result = runSharedScenario(definition, {
+      config,
+      conversation: definition.defaultConversation,
+      timeoutMs: 1_000,
+      env: {
+        ...deployedEnvironment(),
+        sessionSandbox: {
+          waitForContainer: async () => 'container_1',
+          currentContainer: async () => 'container_1',
+        },
+      },
+    });
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    await expect(result).resolves.toMatchObject({
+      ok: false,
+      message:
+        'coverage=blocked; reason=seed read failed: scenario deadline exceeded during read turn send; ' +
+        'readToolCalls=1; readToolResults=0; unsupportedToolSchema=0',
+    });
+  });
+
   it('kill-mid-flight requires the new-plane fault capabilities plus gates', () => {
     expect(SHARED_SCENARIOS['kill-mid-flight']?.requires).toEqual([
       'sessionSandbox',

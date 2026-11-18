@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import { approvalKeySchema } from '@kilocode/app-shared/approval-key';
-import { GLANCEABLE_STATUS_KINDS } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { HOME_WIDGET_TITLE_LIMIT } from '@kilocode/app-shared/home-widget';
+import {
+  GLANCEABLE_STATUS_KINDS,
+  GLANCEABLE_TITLE_LIMIT,
+} from '@kilocode/app-shared/glanceable-agents-snapshot';
 import {
   SESSION_LIVE_COMMAND_LIMIT,
   sessionLiveChangesSchema,
@@ -64,7 +66,7 @@ export const sessionLiveOutcomeSchema = z.object({
 export const sessionLiveActivityContentStateSchema = z.object({
   sessionId: nonEmptyStringSchema,
   /** Trimmed and capped display title; null for an untitled session. */
-  title: z.string().max(HOME_WIDGET_TITLE_LIMIT).nullable(),
+  title: z.string().max(GLANCEABLE_TITLE_LIMIT).nullable(),
   statusKind: z.enum(SESSION_CARD_STATUS_KINDS),
   /** ISO 8601; when the current status kind began. */
   statusSince: z.string(),

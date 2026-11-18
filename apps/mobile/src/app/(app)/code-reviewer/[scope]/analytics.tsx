@@ -19,7 +19,11 @@ import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
 import { useCodeReviewerAnalyticsFilters } from '@/lib/hooks/use-code-reviewer-analytics-filters';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { PERSONAL_SCOPE, PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
+import {
+  PERSONAL_SCOPE,
+  PLATFORM_CAPABILITIES,
+  reviewerPlatformLabel,
+} from '@/lib/code-reviewer-config';
 import { reviewerScopeTitle } from '@/lib/code-reviewer-scope-title';
 import { useReviewerScopeName } from '@/lib/hooks/use-reviewer-scope-title';
 import { classifyOrganizationScopeAccess } from '@/lib/organization-scope-access';
@@ -167,14 +171,28 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
       />
     );
   } else {
-    const { summary, repositories, settings } = dashboard.data;
-    body = (
+    const { summary, repositories, settings, coverage } = dashboard.data;
+    // Tracked counts only captured results, so the amount the reader's review
+    // list shows but the dashboard does not count is every captured miss: the
+    // capture is missing, its result failed validation, or it was omitted.
+    const uncapturedReviews = coverage.missing + coverage.invalid + coverage.omitted;
+    body = !settings.enabled ? (
+      // Analytics is enabled per platform, so a disabled one is a state, not an
+      // empty dataset: the zero stat cards and the generic empty state would
+      // read as data the organization has none of. One EmptyState names the
+      // platform whose setting is off and says where to turn it on; the
+      // segment controls above stay so the reader can flip to the other
+      // platform without leaving the screen.
+      <EmptyState
+        placement="center"
+        icon={LineChart}
+        title={t('codeReviewer.analytics.offTitle', {
+          platform: reviewerPlatformLabel(settings.platform),
+        })}
+        description={t('codeReviewer.analytics.offDescription')}
+      />
+    ) : (
       <View className="gap-6 pt-4">
-        {!settings.enabled ? (
-          <Text variant="muted" className="text-xs">
-            {t('codeReviewer.analytics.off')}
-          </Text>
-        ) : null}
         <View className="gap-3">
           <View className="flex-row gap-3">
             <MetricCard
@@ -200,18 +218,27 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
               value={number(summary.estimatedImpactPoints)}
             />
           </View>
+          <Text variant="muted" className="text-xs">
+            {t('codeReviewer.analytics.trackedReviewsCaption')}
+          </Text>
+          {/* The line always renders, so a period or platform change never
+          moves the list below it; at zero the count names the problem none. */}
+          <Text variant="muted" className="text-xs">
+            {t('codeReviewer.analytics.trackedReviewsUncounted', {
+              count: uncapturedReviews,
+              displayCount: number(uncapturedReviews),
+              total: coverage.enrolledCompletedReviews,
+              displayTotal: number(coverage.enrolledCompletedReviews),
+            })}
+          </Text>
         </View>
 
         {repositories.length === 0 ? (
-          // The muted note above already says analytics is off, so the generic
-          // description would restate it.
           <EmptyState
             placement="static"
             icon={LineChart}
             title={t('codeReviewer.analytics.empty')}
-            description={
-              settings.enabled ? t('codeReviewer.analytics.emptyDescription') : undefined
-            }
+            description={t('codeReviewer.analytics.emptyDescription')}
           />
         ) : (
           <View className="gap-2">

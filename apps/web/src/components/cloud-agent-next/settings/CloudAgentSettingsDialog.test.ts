@@ -20,6 +20,7 @@ jest.mock('@/hooks/useVercelComputeEnrollment', () => ({
 jest.mock('@/hooks/useCloudAgentSettings', () => ({
   useCloudAgentSettings: () => mockUseCloudAgentSettings(),
   useSetBuiltinAgentsMutation: () => ({ isPending: false, mutate: jest.fn() }),
+  useSetModelContextLimitsMutation: () => ({ isPending: false, mutate: jest.fn() }),
 }));
 
 jest.mock('@/hooks/use-mobile', () => ({ useIsMobile: () => false }));
@@ -35,6 +36,9 @@ jest.mock('@/components/shared/ModelCombobox', () => ({
 jest.mock('@/components/shared/VariantCombobox', () => ({ VariantCombobox: () => null }));
 
 jest.mock('@kilocode/cloud-agent-profile', () => ({
+  MAX_MODEL_CONTEXT_LIMITS: 50,
+  MAX_MODEL_CONTEXT_TOKENS: 10_000_000,
+  MIN_MODEL_CONTEXT_TOKENS: 1_000,
   CLOUD_AGENT_BUILTIN_AGENTS: [
     {
       slug: 'code',
@@ -178,7 +182,7 @@ const { CloudAgentSettingsDialog } = require('./CloudAgentSettingsDialog') as {
 };
 
 function settings(canManage: boolean): CloudAgentSettingsData {
-  return { canManage, builtinAgents: {} } as CloudAgentSettingsData;
+  return { canManage, builtinAgents: {}, modelContextLimits: {} } as CloudAgentSettingsData;
 }
 
 function queryResult(result: { data?: CloudAgentSettingsData; isError?: boolean }) {
@@ -424,6 +428,7 @@ describe('CloudAgentSettingsDialog scope grouping', () => {
     expect(organizationSection.textContent).toContain('Repository overrides');
     expect(organizationSection.textContent).not.toContain('Collapse tool calls');
     expect(organizationSection.textContent).not.toContain('Background models');
+    expect(organizationSection.textContent).not.toContain('Model context limits');
     expect(organizationSection.closest('[role="tabpanel"]')?.getAttribute('data-state')).toBe(
       'active'
     );
@@ -439,6 +444,7 @@ describe('CloudAgentSettingsDialog scope grouping', () => {
     expect(personalText).toContain('Collapse tool calls');
     expect(personalText).toContain('Modes');
     expect(personalText).toContain('Background models');
+    expect(personalText).toContain('Model context limits');
     expect(personalText).not.toContain('Default sandbox');
     expect(personalText).not.toContain('Repository overrides');
     expect(personalText.indexOf('Display')).toBeLessThan(personalText.indexOf('Modes'));

@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- the state, branching, and denial suites share one query/mock harness in this file */
+
 // Audit-report screen state contract: loading shows a skeleton; a network
 // error and a `query_failed` response are retryable (inline error + Retry);
 // the org billing-gate denial (FORBIDDEN/UNAUTHORIZED) is non-retryable with
@@ -5,7 +7,7 @@
 // branches personal vs. org on the tRPC procedure, mirroring
 // use-security-agent.ts.
 
-import { createElement } from 'react';
+import { createElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -49,7 +51,14 @@ vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/security-agent/collapsible-section', () => ({
-  CollapsibleSection: 'CollapsibleSection',
+  // The real section resolves a function child inside its expanded branch; this
+  // suite renders that body (host element kept, so findByType still sees it).
+  CollapsibleSection: (props: { children: ReactNode | (() => ReactNode); title: string }) =>
+    createElement(
+      'CollapsibleSection',
+      { title: props.title },
+      typeof props.children === 'function' ? props.children() : props.children
+    ),
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));

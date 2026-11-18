@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
+import { type LayoutChangeEvent, View } from 'react-native';
 
 import {
   MODE_TOOL_GROUPS,
@@ -25,6 +25,8 @@ type ModeToolsFieldsProps = Readonly<{
   editRestrictionLabel: string;
   /** The identifier field's refusal message, already translated. */
   filePatternError: string | undefined;
+  /** The restriction block's top inside the form's scroll content. */
+  filePatternLayout?: (event: LayoutChangeEvent) => void;
   disabled: boolean;
   onToggleGroup: (group: ModeToolGroup, checked: boolean) => void;
   onChangeFilePattern: (value: string) => void;
@@ -42,6 +44,7 @@ export function ModeToolsFields({
   editFileRegex,
   editRestrictionLabel,
   filePatternError,
+  filePatternLayout,
   disabled,
   onToggleGroup,
   onChangeFilePattern,
@@ -76,7 +79,7 @@ export function ModeToolsFields({
       </View>
 
       {groups.includes('edit') ? (
-        <View className="gap-4 rounded-lg border border-border p-4">
+        <View className="gap-4 rounded-lg border border-border p-4" onLayout={filePatternLayout}>
           <FormField
             label={t('organization.modes.restrictionPattern')}
             defaultValue={editFileRegex}

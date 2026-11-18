@@ -540,13 +540,18 @@ export function normalizeToolResult(raw: string): ToolResultNormalization {
 
 export type ReadResultPath = { ok: true; path: string | null } | { ok: false; message: string };
 
+// Kilo v2-104 renders the path and selected line range as a plain-text header.
+const NATIVE_READ_FILE_HEADER = /^Read file (.+), (?:0 lines|lines \d+-\d+)(?:\r?\n|$)/;
+
 /**
- * The read tool's reported path: an envelope field or a `<path>` element in the
- * unwrapped output. The two sources must agree; a conflicting pair is rejected
- * rather than silently preferring one, so a result can never be relabelled.
+ * The read tool reports its path in a native header or a legacy XML element.
+ * If the envelope also has a path, the two sources must agree.
  */
 function readResultPath(normalized: NormalizedToolResult): ReadResultPath {
-  const inner = normalized.output.match(/<path>\s*([^<]+?)\s*<\/path>/)?.[1] ?? null;
+  const inner =
+    normalized.output.match(NATIVE_READ_FILE_HEADER)?.[1] ??
+    normalized.output.match(/<path>\s*([^<]+?)\s*<\/path>/)?.[1] ??
+    null;
   if (normalized.envelopePath !== null && inner !== null && normalized.envelopePath !== inner) {
     return { ok: false, message: 'conflicting read result path metadata' };
   }
@@ -919,8 +924,14 @@ function readFileContents(result: string): string {
   } catch {
     content = result;
   }
-  const enclosed = content.match(/<(?:content|file)>\s*\n?([\s\S]*?)\n?<\/(?:content|file)>/);
-  if (enclosed?.[1] !== undefined) content = enclosed[1];
+  if (NATIVE_READ_FILE_HEADER.test(content)) {
+    content = content
+      .replace(NATIVE_READ_FILE_HEADER, '')
+      .replace(/\r?\n\[Output truncated\. Continue reading with offset: \d+\]\s*$/, '');
+  } else {
+    const enclosed = content.match(/<(?:content|file)>\s*\n?([\s\S]*?)\n?<\/(?:content|file)>/);
+    if (enclosed?.[1] !== undefined) content = enclosed[1];
+  }
   return content
     .split(/\r?\n/)
     .filter(line => !/^\s*\((?:End of file|Showing lines)/.test(line))

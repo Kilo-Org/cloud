@@ -26,6 +26,7 @@
     "creditHistory": "Kredītu vēsture",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Atcelt",
     "done": "Gatavs",
     "retry": "Mēģināt vēlreiz",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "Izmaiņas",
     "organizationTrialEnded": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna. Organizācijas īpašnieks var atjaunināt norēķinu informāciju vietnē kilo.ai un pēc tam mēģināt vēlreiz.",
-    "privateRepositoryA11y": "{{name}}, privāts repozitorijs"
+    "privateRepositoryA11y": "{{name}}, privāts repozitorijs",
+    "legalDocumentEnglishOnly": "Šis dokuments ir pieejams tikai angļu valodā."
   },
   "language": {
     "restarting": "Notiek restartēšana, lai lietotu izvēlēto valodu",
@@ -481,7 +483,14 @@
       "viewReceipt": "Skatīt apstiprinājumu"
     },
     "changelog": "Kas jauns",
-    "changelogVersionPending": "Šīs versijas piezīmes pienāks ar nākamo atjauninājumu."
+    "changelogVersionPending": "Versijas {{version}} piezīmes pienāks ar nākamo atjauninājumu.",
+    "changelogGroupNew": "Jaunumi",
+    "changelogFixesIn": "Labojumi un uzlabojumi šajās jomās: {{areas}}.",
+    "changelogFixesPolish": "Labojumi un uzlabojumi visā lietotnē.",
+    "changelogAreas": {
+      "signIn": "Pierakstīšanās",
+      "profileOrganizations": "Profils un organizācijas"
+    }
   },
   "preferences": {
     "general": "Vispārīgi",
@@ -1377,7 +1386,8 @@
       "managedOnWeb": "Šīs organizācijas Bitbucket savienojums tiek pārvaldīts tīmeklī no datora.",
       "description": "Izveido darbvietas piekļuves pilnvaru ar vajadzīgajām atļaujām un ielīmē to zemāk.",
       "scopes": "Konts: lasīšana · Repozitoriji: lasīšana/rakstīšana · Izmaiņu pieprasījumi: lasīšana · Tīmekļa aizķeres: lasīšana/rakstīšana",
-      "tokenPlaceholder": "Darbvietas piekļuves pilnvara"
+      "tokenPlaceholder": "Darbvietas piekļuves pilnvara",
+      "tokenRefused": "Bitbucket nepieņēma šo darbvietas piekļuves pilnvaru. Pārbaudi, vai tai ir iepriekš norādītās atļaujas, un pēc tam mēģini vēlreiz."
     },
     "scopeList": {
       "personalStillAvailable": "Personīgie repozitoriji joprojām ir pieejami zemāk.",
@@ -1489,8 +1499,14 @@
       "repositoryLine": "Pārskatīšanas: {{reviews}} · Konstatējumi: {{findings}}",
       "empty": "Vēl nav pārskatīšanu ar analītiku",
       "emptyDescription": "Analītika reģistrē pabeigtas pārskatīšanas, kamēr tā ir iespējota organizācijai.",
-      "off": "Analītika šai organizācijai ir izslēgta.",
-      "couldNotLoad": "Neizdevās ielādēt analītiku"
+      "offTitle": "{{platform}} platformā analītika ir izslēgta",
+      "offDescription": "Organizācijas norēķinu lomas (īpašnieki, administratori un norēķinu pārvaldnieki) var ieslēgt analītiku organizācijas iestatījumos tīmeklī, lai reģistrētu pabeigtas pārskatīšanas.",
+      "couldNotLoad": "Neizdevās ielādēt analītiku",
+      "trackedReviewsCaption": "Pabeigtas pārskatīšanas, kas noslēgušās šajā periodā, kamēr analītika bija ieslēgta. Notiekošās un neveiksmīgās pārskatīšanas nekad netiek ieskaitītas.",
+      "trackedReviewsUncounted": "Netiek ieskaitītas: {{displayCount}} no {{displayTotal}} organizācijas pabeigtajām pārskatīšanām, kuru rezultāts netika reģistrēts.",
+      "trackedReviewsUncounted_one": "Netiek ieskaitītas: {{displayCount}} no {{displayTotal}} organizācijas pabeigtajām pārskatīšanām, kuru rezultāts netika reģistrēts.",
+      "trackedReviewsUncounted_other": "Netiek ieskaitītas: {{displayCount}} no {{displayTotal}} organizācijas pabeigtajām pārskatīšanām, kuru rezultāts netika reģistrēts.",
+      "trackedReviewsUncounted_zero": "Netiek ieskaitītas: {{displayCount}} no {{displayTotal}} organizācijas pabeigtajām pārskatīšanām, kuru rezultāts netika reģistrēts."
     },
     "council": {
       "title": "Padomes pārskatīšana",
@@ -3179,7 +3195,6 @@
     "completingPurchase": "Tiek pabeigts pirkums",
     "subscriptionLoading": "Kilo Pass abonements tiek ielādēts",
     "retryHint": "Atkārtoti ielādē Kilo Pass stāvokli.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Beidzies {{date}}",
     "notAvailableInApp": "Kilo Pass lietotnē nav pieejams.",
     "statusActive": "Aktīvs",
@@ -3382,6 +3397,7 @@
       "manageOnWeb": "Norēķinu iestatījumi tīmeklī",
       "changePlan": "Mainīt plānu",
       "buySeats": "Pirkt vietas",
+      "managedOnWeb": "Plāns, vietas un automātiskā papildināšana tiek pārvaldīti tīmeklī.",
       "setupAutoTopUp": "Iestatīt automātisko papildināšanu",
       "manageAutoTopUp": "Pārvaldi automātisko papildināšanu",
       "opensOnWeb": "Tiek atvērts tīmeklī"
@@ -3530,12 +3546,10 @@
       "requestLogs": "Pieprasījumu žurnāli"
     },
     "requestLogs": {
-      "hint": "Pieprasījumi stundā līdz laika loga beigām, jaunākie vispirms.",
       "older": "Iepriekšējā stunda",
       "newer": "Nākamā stunda",
       "truncated": "Šajā stundā ir vairāk pieprasījumu, nekā parādīts sarakstā.",
       "emptyTitle": "Nav pieprasījumu",
-      "emptyDescription": "Šajā stundā nav vārtejas pieprasījumu.",
       "loadError": "Neizdevās ielādēt pieprasījumu žurnālus.",
       "permissionDenied": "Organizācijas pieprasījumu žurnālus var skatīt tikai tās īpašnieks, administrators vai norēķinu pārvaldnieks.",
       "tokens": "{{input}} ievade · {{output}} izvade",
@@ -4348,8 +4362,7 @@
       "repoValue": "Repozitorijs: {{name}}",
       "profileValue": "Profils: {{name}}",
       "profileUnavailable": "Šis profils vairs nav pieejams. Izvēlieties citu.",
-      "pickerEmptyDescriptionOrganization": "Izveidojiet organizācijas profilu, lai sesijās atkārtoti izmantotu vides mainīgos, iestatīšanas komandas un prasmes.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Organizācijas īpašnieks vai administrators var izveidot organizācijas profilu."
+      "pickerEmptyDescriptionOrganization": "Izveidojiet organizācijas profilu, lai sesijās atkārtoti izmantotu vides mainīgos, iestatīšanas komandas un prasmes."
     },
     "variablesDeleteFailed": "Nevarēja izdzēst mainīgo",
     "deleteVariable": "Dzēst mainīgo {{key}}",
@@ -4539,7 +4552,6 @@
     "dismiss": "Noraidīt atskaiti",
     "offline": "Bezsaistē · saglabāta atskaite",
     "cached": "Saglabāta atskaite · atsvaidzināšana nav pieejama",
-    "window": "{{start}} – {{end}}",
     "summary": "AI kopsavilkums",
     "summaryPending": "AI kopsavilkums tiek veidots. Tas parādīsies šeit, kad būs gatavs.",
     "summaryUnavailable": "AI kopsavilkums nav pieejams. Jūsu strukturētā atskaite joprojām ir pieejama.",
@@ -4658,6 +4670,7 @@
       "title": "Trigeri un tīmekļa āķi",
       "subtitle": "Automatizējiet Cloud Agent palaišanu ar tīmekļa āķa izsaukumu vai pēc grafika.",
       "new": "Jauns trigeris",
+      "create": "Izveidot trigeri",
       "emptyTitle": "Vēl nav trigeru",
       "emptyDescription": "Izveidojiet trigeri, lai sāktu Cloud Agent palaišanu ar tīmekļa āķa izsaukumu vai pēc grafika.",
       "loadFailedTitle": "Neizdevās ielādēt trigerus",
@@ -4711,6 +4724,8 @@
       "created": "Trigeris izveidots",
       "saved": "Trigeris saglabāts",
       "statusArrived": "Saņemts",
+      "defaultPromptWebhook": "Aprakstiet šī tīmekļa āķa pieprasījuma pamattekstu:\n\n{{body}}",
+      "defaultPromptScheduled": "Palaidiet ieplānoto uzdevumu. Palaišanas laiks: {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Ievadiet nosaukumu.",
         "nameTooShort": "Izmantojiet vismaz 8 rakstzīmes.",

@@ -26,6 +26,7 @@
     "creditHistory": "Kreditthistorikk",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Avbryt",
     "done": "Ferdig",
     "retry": "Prøv igjen",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "Endringer",
     "organizationTrialEnded": "Organisasjonens prøveperiode er over, og den har ingen aktiv plan. En organisasjonseier kan oppdatere faktureringen på kilo.ai og deretter prøve igjen.",
-    "privateRepositoryA11y": "{{name}}, privat repository"
+    "privateRepositoryA11y": "{{name}}, privat repository",
+    "legalDocumentEnglishOnly": "Dette dokumentet er kun tilgjengelig på engelsk."
   },
   "language": {
     "restarting": "Starter på nytt for å bruke språket",
@@ -481,7 +483,14 @@
       "viewReceipt": "Vis kvittering"
     },
     "changelog": "Nyheter",
-    "changelogVersionPending": "Merknadene for denne versjonen kommer med neste appoppdatering."
+    "changelogVersionPending": "Merknadene for versjon {{version}} kommer med neste appoppdatering.",
+    "changelogGroupNew": "Nytt",
+    "changelogFixesIn": "Feilrettinger og forbedringer i {{areas}}.",
+    "changelogFixesPolish": "Feilrettinger og forbedringer i hele appen.",
+    "changelogAreas": {
+      "signIn": "Innlogging",
+      "profileOrganizations": "Profil og organisasjoner"
+    }
   },
   "preferences": {
     "general": "Generelt",
@@ -1354,7 +1363,8 @@
       "managedOnWeb": "Organisasjonens Bitbucket-tilkobling administreres på nettet fra en datamaskin.",
       "description": "Opprett et tilgangstoken for arbeidsområdet med de nødvendige tillatelsene, og lim det inn nedenfor.",
       "scopes": "Konto: lesing · Kodelagre: lesing/skriving · PR-er: lesing · Webhooks: lesing/skriving",
-      "tokenPlaceholder": "Tilgangstoken for arbeidsområdet"
+      "tokenPlaceholder": "Tilgangstoken for arbeidsområdet",
+      "tokenRefused": "Bitbucket godtok ikke dette tilgangstokenet for arbeidsområdet. Kontroller at det har tillatelsene ovenfor, og prøv deretter på nytt."
     },
     "scopeList": {
       "personalStillAvailable": "Personlige kodelagre er fortsatt tilgjengelige nedenfor.",
@@ -1465,8 +1475,13 @@
       "repositoryLine": "Gjennomganger: {{reviews}} · Funn: {{findings}}",
       "empty": "Ingen gjennomganger med statistikk ennå",
       "emptyDescription": "Statistikken registrerer fullførte gjennomganger så lenge den er aktivert for organisasjonen.",
-      "off": "Statistikken er slått av for denne organisasjonen.",
-      "couldNotLoad": "Kunne ikke laste statistikken"
+      "offTitle": "Statistikken er slått av for {{platform}}",
+      "offDescription": "Organisasjonens faktureringsroller (eiere, administratorer og faktureringsansvarlige) kan slå på statistikken i organisasjonens innstillinger på nettet for å registrere fullførte gjennomganger.",
+      "couldNotLoad": "Kunne ikke laste statistikken",
+      "trackedReviewsCaption": "Fullførte gjennomganger som ble avsluttet i denne perioden med statistikken slått på. Gjennomganger som pågår eller feiler, telles aldri med.",
+      "trackedReviewsUncounted": "Ikke talt med: {{displayCount}} av de {{displayTotal}} fullførte gjennomgangene organisasjonen har, uten registrert resultat.",
+      "trackedReviewsUncounted_one": "Ikke talt med: {{displayCount}} av de {{displayTotal}} fullførte gjennomgangene organisasjonen har, uten registrert resultat.",
+      "trackedReviewsUncounted_other": "Ikke talt med: {{displayCount}} av de {{displayTotal}} fullførte gjennomgangene organisasjonen har, uten registrert resultat."
     },
     "council": {
       "title": "Panelvurdering",
@@ -3122,7 +3137,6 @@
     "completingPurchase": "Fullfører kjøp",
     "subscriptionLoading": "Laster inn Kilo Pass-abonnementet",
     "retryHint": "Prøver å hente statusen for Kilo Pass på nytt.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Avsluttet {{date}}",
     "notAvailableInApp": "Kilo Pass er ikke tilgjengelig i appen.",
     "statusActive": "Aktiv",
@@ -3325,6 +3339,7 @@
       "manageOnWeb": "Faktureringsinnstillinger på nettet",
       "changePlan": "Endre plan",
       "buySeats": "Kjøp brukerplasser",
+      "managedOnWeb": "Planen, brukerplassene og automatisk påfylling administreres på nettet.",
       "setupAutoTopUp": "Sett opp automatisk påfylling",
       "manageAutoTopUp": "Administrer automatisk påfylling",
       "opensOnWeb": "Åpnes på nettet"
@@ -3473,12 +3488,10 @@
       "requestLogs": "Forespørselslogger"
     },
     "requestLogs": {
-      "hint": "Forespørsler fra timen før vinduet slutter, nyeste først.",
       "older": "Eldre time",
       "newer": "Nyere time",
       "truncated": "Denne timen har flere forespørsler enn listen viser.",
       "emptyTitle": "Ingen forespørsler",
-      "emptyDescription": "Denne timen har ingen gateway-forespørsler.",
       "loadError": "Kunne ikke laste inn forespørselslogger.",
       "permissionDenied": "Bare en eier, administrator eller faktureringsansvarlig i organisasjonen kan lese forespørselsloggene.",
       "tokens": "{{input}} inn · {{output}} ut",
@@ -4282,8 +4295,7 @@
       "repoValue": "Depot: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Denne profilen er ikke lenger tilgjengelig. Velg en annen.",
-      "pickerEmptyDescriptionOrganization": "Opprett en organisasjonsprofil for å gjenbruke miljøvariabler, oppsettkommandoer og ferdigheter på tvers av økter.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "En organisasjonseier eller administrator kan opprette en organisasjonsprofil."
+      "pickerEmptyDescriptionOrganization": "Opprett en organisasjonsprofil for å gjenbruke miljøvariabler, oppsettkommandoer og ferdigheter på tvers av økter."
     },
     "variablesDeleteFailed": "Kunne ikke slette variabelen",
     "deleteVariable": "Slett variabel {{key}}",
@@ -4469,7 +4481,6 @@
     "dismiss": "Avvis brief",
     "offline": "Frakoblet · lagret brief",
     "cached": "Lagret rapport · kan ikke oppdateres",
-    "window": "{{start}} – {{end}}",
     "summary": "AI-sammendrag",
     "summaryPending": "AI-sammendraget lages. Det legges til her når det er klart.",
     "summaryUnavailable": "AI-sammendrag er ikke tilgjengelig. Den strukturerte rapporten er fortsatt tilgjengelig.",
@@ -4588,6 +4599,7 @@
       "title": "Triggere og webhooker",
       "subtitle": "Automatiser Cloud Agent-kjøringer fra et webhook-kall eller en tidsplan.",
       "new": "Ny trigger",
+      "create": "Opprett trigger",
       "emptyTitle": "Ingen triggere ennå",
       "emptyDescription": "Opprett en trigger for å starte en Cloud Agent-kjøring fra et webhook-kall eller etter en tidsplan.",
       "loadFailedTitle": "Kunne ikke laste inn triggere",
@@ -4641,6 +4653,8 @@
       "created": "Trigger opprettet",
       "saved": "Trigger lagret",
       "statusArrived": "Ankommet",
+      "defaultPromptWebhook": "Beskriv innholdet i webhook-forespørselen:\n\n{{body}}",
+      "defaultPromptScheduled": "Kjør den planlagte oppgaven. Utløst ved {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Skriv inn et navn.",
         "nameTooShort": "Bruk minst 8 tegn.",

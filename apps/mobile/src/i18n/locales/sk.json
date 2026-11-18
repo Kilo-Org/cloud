@@ -26,6 +26,7 @@
     "creditHistory": "História kreditov",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Zrušiť",
     "done": "Hotovo",
     "retry": "Skúsiť znova",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "Zmeny",
     "organizationTrialEnded": "Skúšobné obdobie organizácie sa skončilo a organizácia nemá aktívny plán. Vlastník organizácie môže aktualizovať fakturáciu na kilo.ai a potom to skúsiť znova.",
-    "privateRepositoryA11y": "{{name}}, súkromné úložisko"
+    "privateRepositoryA11y": "{{name}}, súkromné úložisko",
+    "legalDocumentEnglishOnly": "Tento dokument je dostupný len v angličtine."
   },
   "language": {
     "restarting": "Aplikácia sa reštartuje na zmenu jazyka",
@@ -481,7 +483,14 @@
       "viewReceipt": "Zobraziť potvrdenie"
     },
     "changelog": "Čo je nové",
-    "changelogVersionPending": "Poznámky k tejto verzii prídu s ďalšou aktualizáciou."
+    "changelogVersionPending": "Poznámky k verzii {{version}} prídu s ďalšou aktualizáciou aplikácie.",
+    "changelogGroupNew": "Novinky",
+    "changelogFixesIn": "Opravy a vylepšenia v oblastiach: {{areas}}.",
+    "changelogFixesPolish": "Opravy a vylepšenia v celej aplikácii.",
+    "changelogAreas": {
+      "signIn": "Prihlásenie",
+      "profileOrganizations": "Profil a organizácie"
+    }
   },
   "preferences": {
     "general": "Všeobecné",
@@ -1400,7 +1409,8 @@
       "managedOnWeb": "Pripojenie tejto organizácie k Bitbucketu sa spravuje na webe z počítača.",
       "description": "Vytvorte prístupový token pracovného priestoru s požadovanými oprávneniami a vložte ho nižšie.",
       "scopes": "Účet: čítanie · Repozitáre: čítanie/zápis · PR: čítanie · Webhooky: čítanie/zápis",
-      "tokenPlaceholder": "Prístupový token pracovného priestoru"
+      "tokenPlaceholder": "Prístupový token pracovného priestoru",
+      "tokenRefused": "Bitbucket neprijal tento token pracovného priestoru. Skontrolujte, či má oprávnenia uvedené vyššie, a potom to skúste znova."
     },
     "scopeList": {
       "personalStillAvailable": "Osobné repozitáre sú stále dostupné nižšie.",
@@ -1513,8 +1523,15 @@
       "repositoryLine": "Kontroly: {{reviews}} · Nálezy: {{findings}}",
       "empty": "Zatiaľ žiadne kontroly s analytikou",
       "emptyDescription": "Analytika zaznamenáva dokončené kontroly, kým je pre organizáciu zapnutá.",
-      "off": "Analytika je pre túto organizáciu vypnutá.",
-      "couldNotLoad": "Analytiku sa nepodarilo načítať"
+      "offTitle": "Analytika je pre {{platform}} vypnutá",
+      "offDescription": "Fakturačné roly organizácie – vlastníci, správcovia a manažéri fakturácie – môžu zapnúť analytiku v nastaveniach organizácie na webe, aby sa zaznamenávali dokončené kontroly.",
+      "couldNotLoad": "Analytiku sa nepodarilo načítať",
+      "trackedReviewsCaption": "Dokončené kontroly, ktoré sa skončili v tomto období so zapnutou analytikou. Prebiehajúce a neúspešné kontroly sa nikdy nezapočítavajú.",
+      "trackedReviewsUncounted": "Nezapočítané: {{displayCount}} z {{displayTotal}} dokončených kontrol organizácie, ktorých výsledok nebol zachytený.",
+      "trackedReviewsUncounted_few": "Nezapočítané: {{displayCount}} z {{displayTotal}} dokončených kontrol organizácie, ktorých výsledok nebol zachytený.",
+      "trackedReviewsUncounted_many": "Nezapočítané: {{displayCount}} z {{displayTotal}} dokončených kontrol organizácie, ktorých výsledok nebol zachytený.",
+      "trackedReviewsUncounted_one": "Nezapočítané: {{displayCount}} z {{displayTotal}} dokončených kontrol organizácie, ktorých výsledok nebol zachytený.",
+      "trackedReviewsUncounted_other": "Nezapočítané: {{displayCount}} z {{displayTotal}} dokončených kontrol organizácie, ktorých výsledok nebol zachytený."
     },
     "council": {
       "title": "Kontrola rady",
@@ -3236,7 +3253,6 @@
     "completingPurchase": "Dokončuje sa nákup",
     "subscriptionLoading": "Načítava sa predplatné Kilo Pass",
     "retryHint": "Znova načíta stav Kilo Pass.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Skončené {{date}}",
     "notAvailableInApp": "Kilo Pass nie je dostupný v aplikácii.",
     "statusActive": "Aktívne",
@@ -3439,6 +3455,7 @@
       "manageOnWeb": "Nastavenia fakturácie na webe",
       "changePlan": "Zmeniť plán",
       "buySeats": "Kúpiť miesta",
+      "managedOnWeb": "Plán, miesta a automatické dobíjanie sa spravujú na webe.",
       "setupAutoTopUp": "Nastaviť automatické dobíjanie",
       "manageAutoTopUp": "Spravovať automatické dobíjanie",
       "opensOnWeb": "Otvorí sa na webe"
@@ -3587,12 +3604,10 @@
       "requestLogs": "Protokoly požiadaviek"
     },
     "requestLogs": {
-      "hint": "Požiadavky z hodiny pred koncom časového okna, najnovšie prvé.",
       "older": "Staršia hodina",
       "newer": "Novšia hodina",
       "truncated": "V tejto hodine je viac požiadaviek, než zoznam zobrazuje.",
       "emptyTitle": "Žiadne požiadavky",
-      "emptyDescription": "V tejto hodine nie sú žiadne požiadavky na bránu.",
       "loadError": "Protokoly požiadaviek sa nepodarilo načítať.",
       "permissionDenied": "Protokoly požiadaviek si môže prezerať iba vlastník, administrátor alebo správca fakturácie organizácie.",
       "tokens": "{{input}} vstup · {{output}} výstup",
@@ -4414,8 +4429,7 @@
       "repoValue": "Úložisko: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Tento profil už nie je k dispozícii. Vyberte iný.",
-      "pickerEmptyDescriptionOrganization": "Vytvorte profil organizácie na opätovné použitie premenných prostredia, príkazov nastavenia a zručností v rámci relácií.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Profil organizácie môže vytvoriť vlastník alebo správca organizácie."
+      "pickerEmptyDescriptionOrganization": "Vytvorte profil organizácie na opätovné použitie premenných prostredia, príkazov nastavenia a zručností v rámci relácií."
     },
     "variablesDeleteFailed": "Premennú sa nepodarilo vymazať",
     "deleteVariable": "Odstrániť premennú {{key}}",
@@ -4609,7 +4623,6 @@
     "dismiss": "Ignorovať prehľad",
     "offline": "Offline · uložený prehľad",
     "cached": "Uložený prehľad · obnovenie nedostupné",
-    "window": "{{start}} – {{end}}",
     "summary": "AI zhrnutie",
     "summaryPending": "AI zhrnutie sa pripravuje. Keď bude hotové, pripojí sa sem.",
     "summaryUnavailable": "AI zhrnutie nie je dostupné. Štruktúrovaný prehľad je stále k dispozícii.",
@@ -4728,6 +4741,7 @@
       "title": "Spúšťače a webhooky",
       "subtitle": "Automatizujte spustenia Cloud Agent pomocou volania webhooku alebo podľa plánu.",
       "new": "Nový spúšťač",
+      "create": "Vytvorte spúšťač",
       "emptyTitle": "Zatiaľ žiadne spúšťače",
       "emptyDescription": "Vytvorte spúšťač na spustenie Cloud Agent z volania webhooku alebo podľa plánu.",
       "loadFailedTitle": "Nepodarilo sa načítať spúšťače",
@@ -4781,6 +4795,8 @@
       "created": "Spúšťač vytvorený",
       "saved": "Spúšťač uložený",
       "statusArrived": "Dorazilo",
+      "defaultPromptWebhook": "Opíšte telo požiadavky tohto webhooku:\n\n{{body}}",
+      "defaultPromptScheduled": "Spustite naplánovanú úlohu. Spustené o {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Zadajte názov.",
         "nameTooShort": "Použite aspoň 8 znakov.",

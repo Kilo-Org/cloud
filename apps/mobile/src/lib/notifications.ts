@@ -24,7 +24,7 @@ import {
   type GlanceableAgentsSnapshot,
   isEligibleGlanceableWork,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { EMPTY_HOME_WIDGET_DETAILS } from '@kilocode/app-shared/home-widget';
+import { emptyHomeWidgetDetails } from '@kilocode/app-shared/home-widget';
 
 import { captureEvent } from '@/lib/analytics/posthog';
 import { refreshActiveSessionsFromPush } from '@/lib/active-sessions-live-sync';
@@ -255,7 +255,7 @@ export async function applyGlanceablePushData(
     revision: current === null ? fields.revision : current.revision + 1,
     accountEpoch: authEpoch,
   };
-  setHomeWidgetDetails(homeWidgetDetails ?? EMPTY_HOME_WIDGET_DETAILS);
+  setHomeWidgetDetails(homeWidgetDetails ?? emptyHomeWidgetDetails());
   rememberHomeWidgetSnapshot(snapshot);
 
   const ctx = { userId, organizationId };

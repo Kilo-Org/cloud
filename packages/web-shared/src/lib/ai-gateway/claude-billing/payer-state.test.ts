@@ -6,8 +6,34 @@ jest.mock('./store', () => ({ getGrantedClaudeBillingConnection: jest.fn() }));
 
 import { afterEach, describe, expect, it } from '@jest/globals';
 import { getGrantedClaudeBillingConnection } from './store';
-import { getAuthoritativeClaudeBillingState } from './payer-state';
+import {
+  getAuthoritativeClaudeBillingState,
+  ClaudeBillingPayerStateParseError,
+} from './payer-state';
 import { readJsonBody } from '@kilocode/web-shared/tests/helpers/request-body.helper';
+
+// A test that needs a different APP_URL loads the module again under
+// jest.resetModules() with a doMock factory, because the static import above is
+// bound to the real constants module.
+const withOverriddenAppUrl = async (
+  run: (
+    load: () => Promise<{
+      getAuthoritativeClaudeBillingState: typeof getAuthoritativeClaudeBillingState;
+    }>
+  ) => Promise<void>
+): Promise<void> => {
+  jest.resetModules();
+  jest.doMock('@kilocode/web-shared/lib/constants', () => ({
+    ...jest.requireActual<object>('@kilocode/web-shared/lib/constants'),
+    APP_URL: 'http://app.example.com',
+  }));
+  try {
+    await run(() => import('./payer-state'));
+  } finally {
+    jest.dontMock('@kilocode/web-shared/lib/constants');
+    jest.resetModules();
+  }
+};
 
 const owner = { kind: 'personal', kiloUserId: 'owner' } as const;
 const ORGANIZATION_ID = '00000000-0000-4000-8000-000000000002';
@@ -62,9 +88,11 @@ describe('Cross-region Claude payer state', () => {
     }
   );
 
-  it('rejects a malformed successful lookup instead of switching payer', async () => {
+  it('rejects a malformed successful lookup with the protocol error instead of switching payer', async () => {
     jest.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({ connection: {} }));
-    await expect(getAuthoritativeClaudeBillingState(owner)).rejects.toThrow();
+    await expect(getAuthoritativeClaudeBillingState(owner)).rejects.toThrow(
+      ClaudeBillingPayerStateParseError
+    );
   });
 
   it('asks with the owner shape the web app reads', async () => {
@@ -141,6 +169,25 @@ describe('Cross-region Claude payer state', () => {
     ).resolves.toMatchObject({ user_profile_id: 'uprof_org' });
   });
 
+  it('round-trips a stored organization id in the column shape through the read', async () => {
+    // The `organizations.id` column is a Postgres uuid, whose shape is any 8-4-4-4-12 hex GUID.
+    const storedId = '0d5c2f1e-0000-0000-0000-000000000000';
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+      Response.json({
+        connection: {
+          status: 'connected',
+          user_profile_id: 'uprof_org',
+          connected_at: null,
+          kilo_user_id: null,
+          organization_id: storedId,
+        },
+      })
+    );
+    await expect(
+      getAuthoritativeClaudeBillingState({ kind: 'organization', organizationId: storedId })
+    ).resolves.toMatchObject({ user_profile_id: 'uprof_org', organization_id: storedId });
+  });
+
   it('returns an organization row when the requested organization differs only in case', async () => {
     jest.spyOn(globalThis, 'fetch').mockResolvedValue(
       Response.json({
@@ -186,4 +233,15 @@ describe('Cross-region Claude payer state', () => {
       ).resolves.toBeNull();
     }
   );
+
+  it('requires an https or loopback app endpoint', async () => {
+    const fetchSpy = jest.spyOn(globalThis, 'fetch');
+    await withOverriddenAppUrl(async load => {
+      const { getAuthoritativeClaudeBillingState: loadState } = await load();
+      await expect(loadState(owner)).rejects.toThrow(
+        'Claude payer-state endpoint is not configured'
+      );
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+  });
 });

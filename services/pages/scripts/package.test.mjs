@@ -12,6 +12,7 @@ import {
   printable,
   readArchive,
 } from './package.mjs';
+import { archiveOf, goodMembers } from './test-archive.mjs';
 
 const committed = parse(readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8'));
 
@@ -83,39 +84,6 @@ test('a release tag names its archive', () => {
   assert.throws(() => archiveName('v2.10.0-nightly.202611112112'), /not a Pages release tag/);
 });
 
-/** A gzipped ustar archive of `members`: [path, contents, typeflag?, size field?]. */
-function archiveOf(members) {
-  const blocks = [];
-  for (const [name, contents, type = '0', sizeField] of members) {
-    const bytes = Buffer.from(contents);
-    const header = Buffer.alloc(512);
-    header.write(name, 0);
-    header.write('0000644\0', 100);
-    header.write('0000000\0', 108);
-    header.write('0000000\0', 116);
-    header.write((sizeField ?? bytes.length.toString(8).padStart(11, '0')) + '\0', 124);
-    header.write('00000000000\0', 136);
-    header.fill(' ', 148, 156);
-    header.write(type, 156);
-    header.write('ustar\0', 257);
-    header.write('00', 263);
-    const sum = header.reduce((total, byte) => total + byte, 0);
-    header.write(sum.toString(8).padStart(6, '0') + '\0 ', 148);
-    blocks.push(header, bytes, Buffer.alloc((512 - (bytes.length % 512)) % 512));
-  }
-  blocks.push(Buffer.alloc(1024));
-  return gzipSync(Buffer.concat(blocks));
-}
-
-const goodMembers = [
-  ['build-receipt.json', '{}'],
-  ['public/chunks/editor.js', 'x'],
-  ['public/index.html', '<!doctype html>'],
-  ['worker/automerge.wasm', 'w'],
-  ['worker/index.js', 'export default {}'],
-  ['wrangler.json', '{}'],
-];
-
 test('reads the members of a Pages package', () => {
   const { files, problems } = readArchive(archiveOf(goodMembers));
   assert.deepEqual(problems, []);
@@ -131,6 +99,10 @@ const refusedMembers = {
   'a dot component': ['public/./index.html', 'x'],
   'an absolute path': ['/etc/hosts', 'x'],
   'a nested module': ['worker/sub/index.js', 'x'],
+  'another file under output': ['output/index.html', 'x'],
+  'a nested output file': ['output/frame/worker.js', 'x'],
+  'an output file in another case': ['output/Worker.js', 'x'],
+  'a symlinked output module': ['output/worker.js', '', '2'],
   'a file outside the layout': ['.env', 'x'],
   'a symlink': ['public/hosts.js', '', '2'],
   'a hard link': ['public/hosts.js', '', '1'],
@@ -147,6 +119,11 @@ for (const [name, member] of Object.entries(refusedMembers)) {
 test('refuses a member that appears twice', () => {
   const { problems } = readArchive(archiveOf([...goodMembers, ['worker/index.js', 'again']]));
   assert.deepEqual(problems, ['worker/index.js appears twice']);
+});
+
+test('refuses an output file that appears twice', () => {
+  const { problems } = readArchive(archiveOf([...goodMembers, ['output/worker.js', 'again']]));
+  assert.deepEqual(problems, ['output/worker.js appears twice']);
 });
 
 test('refuses a member that differs from another only in case', () => {
@@ -190,6 +167,7 @@ function packageDirectory(t) {
   const directory = mkdtempSync(path.join(tmpdir(), 'pages-package-test-'));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
   mkdirSync(path.join(directory, 'worker'));
+  mkdirSync(path.join(directory, 'output'));
   mkdirSync(path.join(directory, 'public', 'chunks'), { recursive: true });
   for (const [file] of goodMembers) writeFileSync(path.join(directory, file), '');
   return directory;
@@ -209,6 +187,22 @@ const refusedFiles = {
     symlinkSync('/etc/hosts', path.join(directory, 'worker/hosts.js')),
   'a symlinked asset': directory =>
     symlinkSync('/etc/hosts', path.join(directory, 'public/chunks/hosts.js')),
+  'a missing output directory': directory =>
+    rmSync(path.join(directory, 'output'), { recursive: true }),
+  'a missing output module': directory => rmSync(path.join(directory, 'output/worker.js')),
+  'a missing output configuration': directory =>
+    rmSync(path.join(directory, 'output/wrangler.json')),
+  'another file under output': directory =>
+    writeFileSync(path.join(directory, 'output/index.html'), ''),
+  'a directory under output': directory => mkdirSync(path.join(directory, 'output/frame')),
+  'a symlinked output module': directory => {
+    rmSync(path.join(directory, 'output/worker.js'));
+    symlinkSync('/etc/hosts', path.join(directory, 'output/worker.js'));
+  },
+  'an output directory that is a file': directory => {
+    rmSync(path.join(directory, 'output'), { recursive: true });
+    writeFileSync(path.join(directory, 'output'), '');
+  },
 };
 
 for (const [name, change] of Object.entries(refusedFiles)) {

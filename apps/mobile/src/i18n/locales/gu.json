@@ -26,6 +26,7 @@
     "creditHistory": "ક્રેડિટ ઇતિહાસ",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "રદ કરો",
     "done": "પૂર્ણ",
     "retry": "ફરી પ્રયાસ કરો",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "ફેરફારો",
     "organizationTrialEnded": "સંસ્થાનો ટ્રાયલ સમાપ્ત થઈ ગયો છે અને તેની પાસે કોઈ સક્રિય પ્લાન નથી. સંસ્થાનો માલિક kilo.ai પર બિલિંગ અપડેટ કરી શકે છે, પછી ફરીથી પ્રયાસ કરો.",
-    "privateRepositoryA11y": "{{name}}, ખાનગી રિપોઝિટરી"
+    "privateRepositoryA11y": "{{name}}, ખાનગી રિપોઝિટરી",
+    "legalDocumentEnglishOnly": "આ દસ્તાવેજ ફક્ત અંગ્રેજીમાં ઉપલબ્ધ છે."
   },
   "language": {
     "restarting": "ભાષા લાગુ કરવા ઍપ ફરી શરૂ થઈ રહી છે",
@@ -481,7 +483,14 @@
       "viewReceipt": "રસીદ જુઓ"
     },
     "changelog": "નવું શું છે",
-    "changelogVersionPending": "આ સંસ્કરણની નોંધો આગામી ઍપ અપડેટ સાથે આવશે."
+    "changelogVersionPending": "{{version}} સંસ્કરણની નોંધો આગામી ઍપ અપડેટ સાથે આવશે.",
+    "changelogGroupNew": "નવું",
+    "changelogFixesIn": "{{areas}} માં ભૂલ સુધારા અને સુધારણાઓ.",
+    "changelogFixesPolish": "સમગ્ર એપમાં ભૂલ સુધારા અને સુધારણાઓ.",
+    "changelogAreas": {
+      "signIn": "સાઇન-ઇન",
+      "profileOrganizations": "પ્રોફાઇલ અને સંસ્થાઓ"
+    }
   },
   "preferences": {
     "general": "સામાન્ય",
@@ -1354,7 +1363,8 @@
       "managedOnWeb": "આ સંસ્થાનું Bitbucket કનેક્શન કમ્પ્યુટર પરથી વેબ પર મેનેજ કરવામાં આવે છે.",
       "description": "જરૂરી પરવાનગીઓ સાથે વર્કસ્પેસ ઍક્સેસ ટોકન બનાવો અને નીચે પેસ્ટ કરો.",
       "scopes": "એકાઉન્ટ: વાંચવાની · રિપોઝિટરીઓ: વાંચવાની/લખવાની · પુલ રિક્વેસ્ટ: વાંચવાની · વેબહુક: વાંચવાની/લખવાની પરવાનગી.",
-      "tokenPlaceholder": "વર્કસ્પેસ ઍક્સેસ ટોકન"
+      "tokenPlaceholder": "વર્કસ્પેસ ઍક્સેસ ટોકન",
+      "tokenRefused": "Bitbucket એ આ વર્કસ્પેસ ઍક્સેસ ટોકન સ્વીકાર્યું નથી. ચકાસો કે તેમાં ઉપરની પરવાનગીઓ છે, પછી ફરી પ્રયાસ કરો."
     },
     "scopeList": {
       "personalStillAvailable": "વ્યક્તિગત રિપોઝિટરીઓ હજી નીચે ઉપલબ્ધ છે.",
@@ -1366,7 +1376,8 @@
       "noReviews": "હજી કોઈ સમીક્ષા નથી",
       "noReviewsDescription": "કોડ સમીક્ષક પુલ રિક્વેસ્ટની સમીક્ષા કરે પછી તે અહીં દેખાશે.",
       "startManualReview": "સમીક્ષા જાતે શરૂ કરો",
-      "configureProvider": "સેવા પ્રદાતા ગોઠવો"
+      "configureProvider": "સેવા પ્રદાતા ગોઠવો",
+      "connectOwnerOnly": "સંસ્થાના માલિક અથવા એડમિનને સેવા પ્રદાતા જોડવા માટે વિનંતી કરો."
     },
     "platformList": {
       "checking": "તપાસ થઈ રહી છે…",
@@ -1464,13 +1475,25 @@
       "repositoryLine": "સમીક્ષાઓ: {{reviews}} · તારણો: {{findings}}",
       "empty": "હજી એનાલિટિક્સવાળી કોઈ સમીક્ષા નથી",
       "emptyDescription": "સંસ્થા માટે એનાલિટિક્સ ચાલુ હોય ત્યારે તે પૂર્ણ થયેલી સમીક્ષાઓ નોંધે છે.",
-      "off": "આ સંસ્થા માટે એનાલિટિક્સ બંધ છે.",
-      "couldNotLoad": "એનાલિટિક્સ લોડ કરી શકાયું નથી"
+      "offTitle": "{{platform}} માટે એનાલિટિક્સ બંધ છે",
+      "offDescription": "સંસ્થાની બિલિંગ ભૂમિકાઓ (માલિકો, એડમિન અને બિલિંગ મેનેજર) વેબ પરની સંસ્થાની સેટિંગ્સમાં એનાલિટિક્સ ચાલુ કરી શકે છે જેથી પૂર્ણ થયેલી સમીક્ષાઓ નોંધવામાં આવે.",
+      "couldNotLoad": "એનાલિટિક્સ લોડ કરી શકાયું નથી",
+      "trackedReviewsCaption": "આ સમયગાળામાં એનાલિટિક્સ ચાલુ હોય ત્યારે પૂર્ણ થયેલી સમીક્ષાઓ. ચાલી રહેલી અને નિષ્ફળ થયેલી સમીક્ષાઓ ક્યારેય ગણવામાં આવતી નથી.",
+      "trackedReviewsUncounted": "ગણવામાં આવતી નથી: સંસ્થા પાસેની પૂર્ણ થયેલી {{displayTotal}} સમીક્ષાઓમાંથી {{displayCount}} સમીક્ષાઓનું પરિણામ કૅપ્ચર થયું ન હતું.",
+      "trackedReviewsUncounted_one": "ગણવામાં આવતી નથી: સંસ્થા પાસેની પૂર્ણ થયેલી {{displayTotal}} સમીક્ષાઓમાંથી {{displayCount}} સમીક્ષાઓનું પરિણામ કૅપ્ચર થયું ન હતું.",
+      "trackedReviewsUncounted_other": "ગણવામાં આવતી નથી: સંસ્થા પાસેની પૂર્ણ થયેલી {{displayTotal}} સમીક્ષાઓમાંથી {{displayCount}} સમીક્ષાઓનું પરિણામ કૅપ્ચર થયું ન હતું."
     },
     "council": {
       "title": "કાઉન્સિલ સમીક્ષા",
       "subtitle": "દરેક પુલ રિક્વેસ્ટની સમીક્ષા ઘણા નિષ્ણાતો કરે છે, અને તેમના મત મળીને એક નિર્ણય બને છે.",
-      "unavailable": "આ સંસ્થા માટે કાઉન્સિલ સમીક્ષા ઉપલબ્ધ નથી.",
+      "unavailablePersonallyTitle": "એન્ટરપ્રાઇઝ સંસ્થાની જરૂર છે",
+      "unavailablePersonally": "કાઉન્સિલ સમીક્ષા વ્યક્તિગત ખાતાનો ભાગ નથી.",
+      "unavailablePersonallyAction": "સંસ્થા બનાવો",
+      "unavailablePersonallySwitchAction": "સંસ્થા બદલો",
+      "unavailableOrganizationTitle": "કાઉન્સિલ સમીક્ષા ઉપલબ્ધ નથી",
+      "unavailableForOrganization": "કાઉન્સિલ સમીક્ષા માટે સક્રિય સબ્સ્ક્રિપ્શન અથવા ટ્રાયલ સાથેનો Enterprise પ્લાન જરૂરી છે. આ સંસ્થા પાસે હાલમાં તે નથી.",
+      "unavailableForOrganizationNeutral": "કાઉન્સિલ સમીક્ષા હાલમાં આ સંસ્થા માટે ઉપલબ્ધ નથી. પછી ફરી પ્રયાસ કરો.",
+      "unavailableOnBitbucket": "કાઉન્સિલ સમીક્ષા Bitbucket રિપોઝિટરી માટે ઉપલબ્ધ નથી.",
       "noRepositories": "હજી કોઈ રિપોઝિટરી પસંદ કરી નથી. પહેલાં રિપોઝિટરી સેટિંગ્સમાં રિપોઝિટરીઓ પસંદ કરો.",
       "specialists": "નિષ્ણાતો",
       "labels": "કાઉન્સિલ સમીક્ષા શરૂ કરતાં લેબલ્સ",
@@ -2973,6 +2996,7 @@
     "signOutThisDevice": "આ ઉપકરણમાંથી સાઇન આઉટ કરો",
     "signOutSessionLabel": "{{device}}માંથી સાઇન આઉટ કરો, સાઇન ઇન: {{signedIn}}, છેલ્લે સક્રિય: {{lastSeen}}",
     "sessionSignedOut": "સત્રમાંથી સાઇન આઉટ થયું.",
+    "sessionSignOutFailed": "આ સત્રમાંથી સાઇન આઉટ કરી શકાયું નહીં. ફરી પ્રયાસ કરો.",
     "signOutThisDeviceTitle": "આ ઉપકરણમાંથી સાઇન આઉટ કરવું છે?",
     "signOutThisSessionTitle": "આ સત્રમાંથી સાઇન આઉટ કરવું છે?",
     "signOutThisSessionMessage": "{{device}}માંથી સાઇન આઉટ થશે. છેલ્લે સક્રિય: {{lastSeen}}. તેનો API ઍક્સેસ એક કલાક સુધી ચાલુ રહી શકે છે.",
@@ -3096,12 +3120,14 @@
     "manage": {
       "billingHistory": "બિલિંગ ઇતિહાસ",
       "billingHistoryEmpty": "હજી સુધી કોઈ બિલિંગ ઇતિહાસ નથી.",
+      "billingHistoryError": "બિલિંગ ઇતિહાસ લોડ કરી શકાયું નથી",
       "cancel": "સબ્સ્ક્રિપ્શન રદ કરો",
       "cancelDescription": "તમારો Kilo Pass બિલિંગ સમયગાળાના અંત સુધી સક્રિય રહેશે અને રિન્યૂ થશે નહીં.",
       "cancelScheduled": "{{date}}ના રોજ રદ થશે",
       "cancelScheduledChange": "શેડ્યૂલ કરેલો ફેરફાર રદ કરો",
       "cancelled": "સબ્સ્ક્રિપ્શન રદ કર્યું",
       "creditHistoryEmpty": "હજી સુધી કોઈ Kilo Pass ક્રેડિટ નથી.",
+      "creditHistoryError": "ક્રેડિટ ઇતિહાસ લોડ કરી શકાયું નથી",
       "resume": "સબ્સ્ક્રિપ્શન ફરી શરૂ કરો",
       "resumeCancelledDescription": "તમારો Kilo Pass ફરીથી ઑટોમેટિક રીતે રિન્યૂ થવા લાગશે.",
       "resumePausedDescription": "તમારો Kilo Pass તેની શેડ્યૂલ કરેલી ફરી શરૂ થવાની તારીખ પહેલાં, હમણાં જ ફરી શરૂ થશે.",
@@ -3118,7 +3144,6 @@
     "completingPurchase": "ખરીદી પૂર્ણ થઈ રહી છે",
     "subscriptionLoading": "Kilo Pass નું સબસ્ક્રિપ્શન લોડ થઈ રહ્યું છે",
     "retryHint": "Kilo Pass ની સ્થિતિ ફરી મેળવવાનો પ્રયાસ કરે છે.",
-    "cardAccessibility": "{{title}}: {{description}}. {{actionLabel}}",
     "endedOn": "{{date}}ના રોજ સમાપ્ત થયું",
     "notAvailableInApp": "Kilo Pass એપમાં ઉપલબ્ધ નથી.",
     "statusActive": "સક્રિય",
@@ -3321,6 +3346,7 @@
       "manageOnWeb": "વેબ પર બિલિંગ સેટિંગ્સ",
       "changePlan": "પ્લાન બદલો",
       "buySeats": "સીટો ખરીદો",
+      "managedOnWeb": "પ્લાન, સીટો અને ઑટો ટોપ-અપનું સંચાલન વેબ પર થાય છે.",
       "setupAutoTopUp": "ઑટો ટોપ-અપ સેટ કરો",
       "manageAutoTopUp": "ઑટો ટોપ-અપ મેનેજ કરો",
       "opensOnWeb": "વેબ પર ખુલે છે"
@@ -3338,7 +3364,7 @@
       "selectOrganization": "સંસ્થા પસંદ કરો",
       "unavailableDescription": "આ સંસ્થા હવે ઉપલબ્ધ નથી. આગળ વધવા માટે તમારી પ્રોફાઇલમાંથી બીજી સંસ્થા પસંદ કરો.",
       "unavailableSessionsDescription": "આ સંસ્થા હવે ઉપલબ્ધ નથી. તેના સત્રો લોડ કરી શકાતા નથી.",
-      "accessDeniedDescription": "તમારી પાસે આ સંસ્થાનો ઍક્સેસ નથી."
+      "accessDeniedDescription": "તમને ઍક્સેસ આપવા માટે સંસ્થાના માલિક અથવા એડમિનને વિનંતી કરો."
     },
     "create": {
       "title": "સંસ્થા બનાવો",
@@ -3458,16 +3484,26 @@
     },
     "settingsOnWeb": {
       "title": "વેબ પર સંસ્થાના સેટિંગ્સ",
-      "integrations": "વેબ પર ઇન્ટિગ્રેશન્સ",
       "usageDetails": "વપરાશની વિગતો",
       "providersAndModels": "પ્રોવાઇડર અને મોડેલ",
       "groups": "ગ્રુપ",
       "guardrails": "ગાર્ડરેલ્સ",
       "byok": "તમારી પોતાની કી વાપરો",
+      "ssoAndDomain": "SSO અને ડોમેન",
+      "dataCollection": "ડેટા સંગ્રહ",
       "auditLogs": "ઑડિટ લૉગ",
-      "requestLogs": "રિક્વેસ્ટ લૉગ",
-      "subOrganizations": "પેટા-સંસ્થાઓ",
-      "distributeFunds": "ભંડોળ વહેંચો"
+      "requestLogs": "રિક્વેસ્ટ લૉગ"
+    },
+    "requestLogs": {
+      "older": "પહેલાંનો કલાક",
+      "newer": "પછીનો કલાક",
+      "truncated": "આ કલાકમાં સૂચિમાં બતાવેલી કરતાં વધુ રિક્વેસ્ટ છે.",
+      "emptyTitle": "આ કલાકમાં કોઈ રિક્વેસ્ટ નથી",
+      "emptyDescription": "પહેલાંના રિક્વેસ્ટ જોવા માટે ‘પહેલાંનો કલાક’નો ઉપયોગ કરો.",
+      "loadError": "રિક્વેસ્ટ લૉગ લોડ કરી શકાયા નહીં.",
+      "permissionDenied": "સંસ્થાના રિક્વેસ્ટ લૉગ ફક્ત તેના માલિક, એડમિન અથવા બિલિંગ મેનેજર જ જોઈ શકે છે.",
+      "tokens": "{{input}} ઇનપુટ · {{output}} આઉટપુટ",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "ઇનપુટ ટોકન",
@@ -4267,8 +4303,7 @@
       "repoValue": "રિપોઝિટરી: {{name}}",
       "profileValue": "પ્રોફાઇલ: {{name}}",
       "profileUnavailable": "આ પ્રોફાઇલ હવે ઉપલબ્ધ નથી. બીજી પસંદ કરો.",
-      "pickerEmptyDescriptionOrganization": "સમગ્ર સત્રોમાં પર્યાવરણ ચલો, સેટઅપ આદેશ અને કૌશલ્યોનો ફરીથી ઉપયોગ કરવા માટે સંસ્થા પ્રોફાઇલ બનાવો.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "સંસ્થા માલિક અથવા એડમિન સંસ્થા પ્રોફાઇલ બનાવી શકે છે."
+      "pickerEmptyDescriptionOrganization": "સમગ્ર સત્રોમાં પર્યાવરણ ચલો, સેટઅપ આદેશ અને કૌશલ્યોનો ફરીથી ઉપયોગ કરવા માટે સંસ્થા પ્રોફાઇલ બનાવો."
     },
     "variablesDeleteFailed": "ચલ કાઢી શકાયું નથી",
     "deleteVariable": "ચલ {{key}} કાઢી નાખો",
@@ -4454,7 +4489,6 @@
     "dismiss": "રિપોર્ટ ખારિજ કરો",
     "offline": "ઑફલાઇન · સાચવેલ રિપોર્ટ",
     "cached": "સાચવેલ રિપોર્ટ · રિફ્રેશ ઉપલબ્ધ નથી",
-    "window": "{{start}} – {{end}}",
     "summary": "AI સારાંશ",
     "summaryPending": "AI સારાંશ તૈયાર થઈ રહ્યો છે. તૈયાર થયે અહીં જોડાશે.",
     "summaryUnavailable": "AI સારાંશ ઉપલબ્ધ નથી. તમારો માળખાગત રિપોર્ટ હજુ ઉપલબ્ધ છે.",
@@ -4521,6 +4555,8 @@
     "topModels": "ટોચના મોડેલ",
     "topFeatures": "ટોચની સુવિધાઓ",
     "emptyTitle": "આ સમયગાળામાં કોઈ વપરાશ નથી",
+    "unavailableTitle": "વપરાશ ઉપલબ્ધ નથી",
+    "unavailableDescription": "આ વર્કસ્પેસ વપરાશની જાણ કરતું નથી. ફરી પ્રયાસ કરવાથી મદદ મળશે નહીં.",
     "orgSelfNotice": "તમે આ સંસ્થામાં તમારો પોતાનો વપરાશ જોઈ રહ્યા છો.",
     "viewDetails": "વપરાશની વિગતો જુઓ"
   },
@@ -4571,6 +4607,7 @@
       "title": "ટ્રિગર્સ અને વેબહૂક્સ",
       "subtitle": "વેબહૂક કૉલ અથવા શેડ્યૂલમાંથી Cloud Agent રન્સને ઑટોમેટ કરો।",
       "new": "નવું ટ્રિગર",
+      "create": "ટ્રિગર બનાવો",
       "emptyTitle": "હજી કોઈ ટ્રિગર નથી",
       "emptyDescription": "વેબહૂક કૉલથી અથવા શેડ્યૂલ પર Cloud Agent રન શરૂ કરવા માટે ટ્રિગર બનાવો।",
       "loadFailedTitle": "ટ્રિગર્સ લોડ કરી શકાયા નથી",
@@ -4592,7 +4629,7 @@
       "fieldCron": "ક્રોન એક્સપ્રેશન",
       "fieldCronHelp": "પાંચ ફીલ્ડ્સ: મિનિટ, કલાક, દિવસ, મહિનો અને અઠવાડિયાનો દિવસ. સૌથી ટૂંકો અંતરાલ એક મિનિટ છે।",
       "fieldTimezone": "સમય ક્ષેત્ર",
-      "nameLocked": "નામ વેબહૂક યુઆરએલનો ભાગ છે અને બદલી શકાતું નથી।",
+      "nameLocked": "ટ્રિગર બન્યા પછી નામ બદલી શકાતું નથી।",
       "repositoryLocked": "ટ્રિગર બન્યા પછી રિપોઝિટરી બદલી શકાતી નથી।",
       "environmentAutomatic": "રિપોઝિટરી મુજબ આપોઆપ",
       "notSelected": "પસંદ કરેલું નથી",
@@ -4607,6 +4644,7 @@
       "authHeaderLabel": "હેડરનું નામ",
       "authSecretLabel": "શેર કરેલો સીક્રેટ",
       "authSecretKeep": "સાચવેલો સીક્રેટ રાખવા માટે ખાલી છોડો।",
+      "authSecretSet": "જરૂરી। મજબૂત રેન્ડમ સ્ટ્રિંગ પસંદ કરો।",
       "authSecretCreator": "જ્યારે ટ્રિગર તેના સર્જક તરીકે ચાલે ત્યારે ઓછામાં ઓછા 16 અક્ષરો વાપરો।",
       "autoCommit": "રન પૂરી થાય ત્યારે ફેરફારો કમિટ કરો",
       "condenseOnComplete": "રન પૂરી થાય ત્યારે સંદર્ભને સંક્ષિપ્ત કરો",
@@ -4617,11 +4655,14 @@
       "saveFailedTitle": "ટ્રિગર સાચવી શકાયો નથી",
       "deleteTitle": "આ ટ્રિગર કાઢી નાખવો છે?",
       "deleteMessage": "{{name}} પરના કૉલ્સ નિષ્ફળ થશે. આ પૂર્વવત્ કરી શકાતું નથી।",
+      "deleteMessageScheduled": "{{name}}ના નિર્ધારિત રન બંધ થશે. આ પૂર્વવત્ કરી શકાતું નથી।",
       "runNow": "હમણાં ચલાવો",
       "runStarted": "રન શરૂ થયું",
       "created": "ટ્રિગર બન્યો",
       "saved": "ટ્રિગર સાચવ્યો",
       "statusArrived": "આવ્યું",
+      "defaultPromptWebhook": "આ વેબહૂક વિનંતીની બોડીનું વર્ણન કરો:\n\n{{body}}",
+      "defaultPromptScheduled": "નિર્ધારિત કાર્ય ચલાવો. રન {{scheduledTime}} પર શરૂ થયું.",
       "problems": {
         "nameRequired": "નામ દાખલ કરો।",
         "nameTooShort": "ઓછામાં ઓછા 8 અક્ષરો વાપરો।",
@@ -4656,8 +4697,9 @@
     "create": "લિંક બનાવો",
     "createFailed": "લિંક બનાવી શકાઈ નથી.",
     "existingTitle": "હાલની લિંક",
-    "existingDescription": "આ સત્ર માટે પહેલેથી જ શેર લિંક છે. નવી લિંક બનાવવાથી તે બદલાઈ જશે અને જૂની લિંક કામ કરવાનું બંધ કરશે.",
+    "existingDescription": "આ સત્ર માટે પહેલેથી જ શેર લિંક છે. આ ગોઠવણીઓ સાથે નવી લિંક બનાવવાથી તે બદલાઈ જશે અને જૂની લિંક કામ કરવાનું બંધ કરશે.",
     "rotate": "નવી લિંક બનાવો",
+    "replacementSettings": "આ ગોઠવણીઓ નવી લિંક પર લાગુ થશે.",
     "revoke": "લિંક દૂર કરો",
     "revokeTitle": "લિંક રદ કરવી છે?",
     "revokeMessage": "વર્તમાન લિંક તરત જ કામ કરવાનું બંધ કરશે.",
@@ -4669,6 +4711,7 @@
     "superseded": "આ લિંક અન્યત્ર બદલવામાં આવી છે, તેથી તે હવે કામ કરતી નથી."
   },
   "sharedSession": {
+    "startedAt": "શરૂ થયું {{time}} વાગ્યે",
     "title": "શેર કરેલું સત્ર",
     "someone": "કોઈક",
     "sharedBy": "{{owner}} દ્વારા શેર કરેલું",
@@ -4676,5 +4719,177 @@
     "unavailableDescription": "આ શેર લિંકની સમયસીમા સમાપ્ત થઈ ગઈ છે અથવા તેને રદ કરવામાં આવી છે.",
     "transcriptUnavailableTitle": "આ ટ્રાન્સક્રિપ્ટ લોડ કરી શકાઈ નથી",
     "transcriptUnavailableDescription": "લિંક હજી પણ કામ કરે છે. થોડી વાર પછી ફરી પ્રયાસ કરો."
+  },
+  "organizationGuardrails": {
+    "title": "કૃત્રિમ બુદ્ધિ ગાર્ડરેલ્સ",
+    "permissionDenied": "ફક્ત સંસ્થાના માલિકો અને એડમિન જ કૃત્રિમ બુદ્ધિ ગાર્ડરેલ્સનું સંચાલન કરી શકે છે.",
+    "unavailable": "આ સંસ્થા માટે કૃત્રિમ બુદ્ધિ ગાર્ડરેલ્સ ઉપલબ્ધ નથી.",
+    "loadError": "કૃત્રિમ બુદ્ધિ ગાર્ડરેલ્સ લોડ થઈ શક્યા નહીં",
+    "statusSaving": "સાચવી રહ્યું છે…",
+    "statusSaved": "સાચવ્યું",
+    "statusFailed": "સાચવી શકાયું નહીં.",
+    "inputTitle": "ઇનપુટ ગાર્ડરેલ્સ",
+    "inputDescription": "Enkrypt AI સાથે દરેક ઇનપુટ સ્કેન કરે છે, જેમાં ટૂલ પરિણામોનો સમાવેશ થાય છે. Enkrypt ઉપલબ્ધ ન હોય ત્યારે બ્લોકિંગ ડિટેક્ટર વિનંતીને અસ્વીકારે છે.",
+    "outputTitle": "આઉટપુટ ગાર્ડરેલ્સ",
+    "outputDescription": "સભ્યોને મળતા પહેલાં Enkrypt AI સાથે પ્રતિસાદ સ્કેન કરે છે. તમે તેને ચાલુ ન કરો ત્યાં સુધી બંધ.",
+    "detectorsHint": "બ્લોક ફ્લેગ કરેલી વિનંતીને અસ્વીકારે છે. ફક્ત લોગ તેને વિનંતીમાં વિલંબ કર્યા વિના નોંધે છે.",
+    "detectorsHintOutput": "બ્લોક ફ્લેગ કરેલા પ્રતિસાદને નિષ્ફળ કરે છે. ફક્ત લોગ તેને પ્રતિસાદમાં વિલંબ કર્યા વિના નોંધે છે.",
+    "choiceLog": "ફક્ત લોગ",
+    "applyTo": "લાગુ કરો",
+    "applyToAllMembers": "બધા સભ્યો",
+    "applyKiloDefault": "Kilo ડિફોલ્ટ લાગુ કરો",
+    "invalidSavedTitle": "સાચવેલા ઇનપુટ ડિટેક્ટર સેટિંગ્સ વાંચી શકાતા નથી",
+    "invalidSavedBody": "ઇનપુટ ડિટેક્ટર્સ ફરી સાચવાય ત્યાં સુધી વિનંતીઓ બ્લોક થાય છે. નીચેના ડિટેક્ટર્સ Kilo ડિફોલ્ટથી શરૂ થાય છે.",
+    "invalidSavedOutputTitle": "સાચવેલા આઉટપુટ ડિટેક્ટર સેટિંગ્સ વાંચી શકાતા નથી",
+    "invalidSavedOutputBody": "આઉટપુટ ડિટેક્ટર્સ ફરી સાચવાય ત્યાં સુધી પ્રતિસાદ રોકી રાખવામાં આવે છે. નીચે આઉટપુટ ડિટેક્ટર્સ પસંદ કરો.",
+    "blockingOutputNote": "બ્લોકિંગ આઉટપુટ ડિટેક્ટર Enkrypt દ્વારા તેનું બધું તપાસાય ત્યાં સુધી પ્રતિસાદને રોકી રાખે છે. વિલંબ ટાળવા માટે ફક્ત લોગ વાપરો.",
+    "inputDetectorRequired": "ઓછામાં ઓછું એક ઇનપુટ ડિટેક્ટર ચાલુ કરો.",
+    "outputDetectorRequired": "ઓછામાં ઓછું એક આઉટપુટ ડિટેક્ટર ચાલુ કરો.",
+    "rulesTooMany": "{{max}} સુધીના નિયમો ઉમેરો.",
+    "ruleIdRequired": "નિયમ ઓળખાંક દાખલ કરો.",
+    "ruleIdInvalid": "નિયમ ઓળખાંકમાં ફક્ત અક્ષરો, અંકો, બિંદુઓ, ડેશ અને અંડરસ્કોરનો ઉપયોગ થઈ શકે છે.",
+    "ruleTextRequired": "નિયમ શું પ્રતિબંધિત કરે છે અથવા જરૂરી છે તેનું વર્ણન કરો.",
+    "keywordTooLong": "દરેક કીવર્ડ {{max}} અક્ષરો સુધીનો હોઈ શકે છે.",
+    "topicTooLong": "દરેક વિષય {{max}} અક્ષરો સુધીનો હોઈ શકે છે.",
+    "keywordsTooMany": "{{max}} સુધીના કીવર્ડ્સ ઉમેરો.",
+    "topicsTooMany": "{{max}} સુધીના વિષયો ઉમેરો.",
+    "piiEntityRequired": "શોધવા માટે ઓછામાં ઓછો એક ડેટા પ્રકાર પસંદ કરો.",
+    "keywordRequired": "ઓછામાં ઓછો એક કીવર્ડ ઉમેરો.",
+    "topicRequired": "ઓછામાં ઓછો એક વિષય ઉમેરો.",
+    "policyTextRequired": "નીતિ ટેક્સ્ટ દાખલ કરો.",
+    "ruleRequired": "ઓછામાં ઓછો એક નિયમ ઉમેરો.",
+    "ruleIdDuplicate": "દરેક નિયમનું પોતાનું નિયમ ID હોવું જરૂરી છે.",
+    "piiEntities": "શોધવાનો ડેટા",
+    "keywordsLabel": "કીવર્ડ્સ",
+    "keywordsHint": "એક લાઇનમાં એક કીવર્ડ.",
+    "topicsHint": "એક લાઇનમાં એક વિષય.",
+    "policyFormat": "નીતિ ફોર્મેટ",
+    "policyFormatRules": "સંરચિત નિયમો",
+    "policyFormatRulesDescription": "દરેક જરૂરિયાત માટે એક નિયમ, કેટેગરી અને ગંભીરતા સાથે. આગ્રહણીય.",
+    "policyFormatText": "નીતિ ટેક્સ્ટ",
+    "policyFormatTextDescription": "હાલની નીતિને સાદા ટેક્સ્ટ તરીકે પેસ્ટ કરો.",
+    "rulesEmpty": "હજુ કોઈ નિયમ નથી. દરેક નિયમ એક વસ્તુ વર્ણવે છે જે ઇનપુટમાં હોવી ન જોઈએ અથવા માંગવી ન જોઈએ.",
+    "addRule": "નિયમ ઉમેરો",
+    "ruleNumber": "નિયમ {{number}}",
+    "ruleRemove": "નિયમ {{number}} દૂર કરો",
+    "ruleIdLabel": "નિયમ ઓળખાંક",
+    "ruleNameLabel": "નામ (વૈકલ્પિક)",
+    "ruleTextLabel": "નિયમ",
+    "ruleRiskCategory": "જોખમ કેટેગરી",
+    "ruleApplicability": "દાયરો",
+    "ruleFrameworks": "ફ્રેમવર્ક્સ",
+    "detector": {
+      "promptInjection": {
+        "label": "પ્રોમ્પ્ટ ઇન્જેક્શન",
+        "description": "સૂચનાઓને ઓવરરાઇડ કરવાના અથવા મોડેલને જેલબ્રેક કરવાના પ્રયાસો શોધે છે."
+      },
+      "policyViolation": {
+        "label": "નીતિ ઉલ્લંઘન",
+        "description": "તમારી સંસ્થાની નીતિનું ઉલ્લંઘન કરતા ઇનપુટને ફ્લેગ કરે છે; નીતિ ટેક્સ્ટ અથવા નિયમો તરીકે લખાયેલી હોય છે.",
+        "descriptionOutput": "તમારી સંસ્થાની નીતિનું ઉલ્લંઘન કરતા પ્રતિસાદને ફ્લેગ કરે છે; નીતિ ટેક્સ્ટ અથવા નિયમો તરીકે લખાયેલી હોય છે."
+      },
+      "pii": {
+        "label": "PII અને ગુપ્ત માહિતી",
+        "description": "વ્યક્તિગત ડેટા, ઓળખપત્રો, આઈપી સરનામાં અને URL શોધે છે."
+      },
+      "keywords": {
+        "label": "પ્રતિબંધિત કીવર્ડ્સ",
+        "descriptionOutput": "તમે સૂચિમાં આપેલ કોઈપણ કીવર્ડ ધરાવતા પ્રતિસાદ શોધે છે."
+      },
+      "topics": {
+        "label": "વિષયો",
+        "descriptionOutput": "તમે સૂચિમાં આપેલ કોઈપણ વિષય વિશેના પ્રતિસાદને ફ્લેગ કરે છે."
+      },
+      "toxicity": {
+        "label": "ઝેરીપણું",
+        "description": "ઝેરી, અપમાનજનક, ધમકીભરી અથવા દ્વેષપૂર્ણ ભાષા શોધે છે."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "જાતીય અથવા અન્યથા કાર્યસ્થળ માટે સુરક્ષિત ન હોય તેવી સામગ્રી શોધે છે."
+      },
+      "bias": {
+        "label": "પક્ષપાત",
+        "description": "પક્ષપાતી અથવા ભેદભાવપૂર્ણ ભાષા શોધે છે."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "વ્યક્તિગત ડેટા",
+        "description": "નામો, ઇમેઇલ સરનામાં, ફોન નંબરો."
+      },
+      "secrets": {
+        "label": "ગુપ્ત માહિતી",
+        "description": "API કી, ટોકન, પાસવર્ડ."
+      },
+      "ipAddress": {
+        "label": "આઈપી સરનામાં",
+        "description": "IPv4 અને IPv6 સરનામાં."
+      },
+      "url": {
+        "label": "URL",
+        "description": "વેબ સરનામાં."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "સુરક્ષા અને છેતરપિંડી",
+      "safetyHarm": "સલામતી અને નુકસાન",
+      "privacyDataProtection": "ગોપનીયતા અને ડેટા સુરક્ષા",
+      "brandReputationTrust": "બ્રાન્ડ અને પ્રતિષ્ઠા",
+      "biasFairnessEthical": "પક્ષપાત અને ન્યાયપૂર્ણતા",
+      "legalIpLiability": "કાનૂની અને બૌદ્ધિક સંપત્તિ જવાબદારી",
+      "productMisuse": "ઉત્પાદનનો દુરુપયોગ",
+      "performanceQuality": "કામગીરી અને ગુણવત્તા"
+    },
+    "applicability": {
+      "user": "વપરાશકર્તા ઇનપુટ",
+      "userAssistant": "વપરાશકર્તા ઇનપુટ અને પ્રતિસાદ"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Top 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "EU AI Act",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "એન્ટરપ્રાઇઝ સુવિધા",
+    "enterpriseOnly": "આ ફક્ત એન્ટરપ્રાઇઝ માટેની સુવિધા છે.",
+    "readOnly": "ફક્ત સંસ્થાના માલિકો અને એડમિન જ આ સેટિંગ્સ બદલી શકે છે.",
+    "loadError": "પ્રદાતાઓ અને મોડેલો લોડ થઈ શક્યા નથી",
+    "tabModels": "મોડેલો",
+    "tabProviders": "પ્રદાતાઓ",
+    "tabGateways": "ગેટવે",
+    "modelsDescription": "દરેક સભ્ય માટે મોડેલને બ્લોક કરવા તેને બંધ કરો. મંજૂર પ્રદાતાઓના મોડેલો ચાલુ સ્થિતિમાં શરૂ થાય છે.",
+    "modelsDeniedOnly": "ફક્ત નકારેલા",
+    "modelsEmpty": "આ શોધ સાથે કોઈ મોડેલ મેળ ખાતું નથી.",
+    "modelsDeniedEmpty": "કોઈ મોડેલ નકારેલો નથી.",
+    "modelsDeniedSearchEmpty": "આ શોધ સાથે કોઈ નકારેલો મોડેલ મેળ ખાતું નથી.",
+    "providersDescription": "આ સંસ્થા માટે Kilo તેના તરફ રૂટ કરવાનું બંધ કરવા પ્રદાતાને બંધ કરો.",
+    "providersNeedCatalog": "સંપૂર્ણ મૉડલ કૅટલૉગ લોડ ન થાય ત્યાં સુધી પ્રદાતા સ્વિચ ફક્ત વાંચવા માટે રહે છે. તેમને સંપાદિત કરવા ઉપર ફરી પ્રયાસ કરો.",
+    "providersEmpty": "આ શોધ સાથે કોઈ પ્રદાતા મેળ ખાતા નથી.",
+    "allowAllShown": "બતાવેલા બધાને મંજૂર કરો",
+    "denyAllShown": "બતાવેલા બધાને નકારો",
+    "gatewaysDescription": "Kilo મોડેલ વિનંતીઓને Vercel AI Gateway અથવા OpenRouter દ્વારા રૂટ કરે છે. નિષ્ક્રિય ગેટવે તે વિનંતીઓને નિષ્ફળ કરે છે.",
+    "emptyProviderList": "ઓછામાં ઓછા એક પ્રદાતાને મંજૂરી આપો. ખાલી સૂચિ દરેક Kilo મોડેલ રૂટને અવરોધિત કરે છે.",
+    "gatewaysUnavailable": "આ સંસ્થા માટે ગેટવે સેટિંગ્સ ઉપલબ્ધ નથી.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "OpenRouter વિનંતીઓ કોઈ પ્રદેશ સાથે પિન થયેલી નથી.",
+    "inferenceRegion": "ઇન્ફરન્સ પ્રદેશ",
+    "inferenceRegionDescription": "Vercel AI Gateway વિનંતીઓને આ પ્રદેશ સાથે પિન કરે છે. ત્યાં ઉપલબ્ધ ન હોય તેવું મોડેલ નિષ્ફળ જાય છે.",
+    "disableOpenrouterNote": "OpenRouter નિષ્ક્રિય કરવાથી તેના દ્વારા વિનંતીઓ રૂટ કરતી BYOK કી પણ બ્લોક થાય છે.",
+    "emptyModelList": "ઓછામાં ઓછું એક મોડેલ ચાલુ રાખો. દરેક મોડેલને નકારવાથી સભ્યો પાસે ઉપયોગ કરવા માટે કંઈ રહેતું નથી.",
+    "catalogUnavailable": "સંપૂર્ણ મોડેલ કેટલોગ લોડ થયો નથી, તેથી ફક્ત તમારી સાચવેલી સૂચિઓ જ બતાવવામાં આવી છે. દરેક મોડેલ લોડ કરવા માટે ફરી પ્રયાસ કરો.",
+    "region": {
+      "global": "વૈશ્વિક",
+      "us": "યુનાઇટેડ સ્ટેટ્સ",
+      "eu": "યુરોપિયન યુનિયન",
+      "au": "ઓસ્ટ્રેલિયા",
+      "jp": "જાપાન"
+    }
   }
 }

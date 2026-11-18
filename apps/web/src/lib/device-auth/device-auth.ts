@@ -1,31 +1,19 @@
 import 'server-only';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { device_auth_requests, device_sessions, kilocode_users } from '@kilocode/db/schema';
-import { eq, and, lt, lte, gt, isNull, isNotNull, sql } from 'drizzle-orm';
+import { eq, and, gt, isNull, isNotNull, not, sql, type SQL } from 'drizzle-orm';
 import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 import { randomInt, createHash, randomBytes } from 'node:crypto';
 import { createDeviceSession, issueSessionCredentials } from '@/lib/auth/device-sessions';
 import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import { requestingClientOfRow, type RequestingClient } from './requesting-client';
 import {
-  completePendingLinkByHash,
   getLivePendingLinkByHash,
   hashPendingLinkSecret,
+  resolveStoredPendingLinkForUser,
   type PendingLinkResult,
 } from '@/lib/auth/pending-link';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
-
-async function completeStoredPendingLink(
-  secretHash: string | null,
-  userId: string
-): Promise<PendingLinkResult | undefined> {
-  if (!secretHash) return undefined;
-  try {
-    return await completePendingLinkByHash(secretHash, userId);
-  } catch {
-    return { status: 'failed', reason: 'LINKING-FAILED' };
-  }
-}
 
 export type { RequestingClient } from './requesting-client';
 
@@ -75,6 +63,8 @@ export async function getDeviceAuthPendingLink(
 
 const CODE_LENGTH = 8;
 const CODE_EXPIRATION_MINUTES = 10;
+/** The whole life of a device authorization code, in seconds. */
+export const DEVICE_AUTH_CODE_LIFETIME_SECONDS = CODE_EXPIRATION_MINUTES * 60;
 const MAX_PENDING_REQUESTS_PER_IP = 5;
 const MAX_USER_CODE_ATTEMPTS = 5;
 /** Advisory-lock namespace for the per-address pending count and insert. */
@@ -91,15 +81,42 @@ export const DEVICE_AUTH_PENDING_LOCK_WAIT_MS = 5_000;
 /** SQLSTATE of a statement cancelled because it waited for a lock too long. */
 const LOCK_NOT_AVAILABLE = '55P03';
 
+/**
+ * The stable machine-readable codes the clients match on the device-auth
+ * refusals. A code never changes meaning; copy is carried separately.
+ */
+export const DEVICE_AUTH_REFUSAL_CODES = {
+  invalidRequestingClient: 'INVALID_REQUESTING_CLIENT',
+  pendingLinkExpired: 'PENDING_LINK_EXPIRED',
+  rateLimited: 'RATE_LIMITED',
+} as const;
+
 export const DEVICE_AUTH_PENDING_LIMIT_MESSAGE =
-  'Too many sign-in attempts from this network. Wait a few minutes and try again.';
+  'Too many sign-in attempts from this network. Try again later.';
 
 /** Rate-limit error thrown when an IP has too many live pending requests. */
 export class DeviceAuthPendingLimitError extends Error {
-  constructor() {
+  /** Seconds until the address's oldest live pending row expires. */
+  readonly retryAfterSeconds: number;
+
+  constructor(retryAfterSeconds: number = DEVICE_AUTH_CODE_LIFETIME_SECONDS) {
     super(DEVICE_AUTH_PENDING_LIMIT_MESSAGE);
     this.name = 'DeviceAuthPendingLimitError';
+    this.retryAfterSeconds = retryAfterSeconds;
   }
+}
+
+/**
+ * The retry advisory a pending-limit refusal reports, in seconds. A count that
+ * cannot report the address's oldest live row (so the block's real end is not
+ * known) falls back to the full code lifetime, so the copy never promises a
+ * shorter wait than the block lasts. A known remaining life is clamped to
+ * `1..DEVICE_AUTH_CODE_LIFETIME_SECONDS`, rounded up, for the same reason: a
+ * second-long remainder is still a wait the client must respect.
+ */
+function pendingRetryAfterSeconds(remaining: number | null): number {
+  if (remaining === null || !Number.isFinite(remaining)) return DEVICE_AUTH_CODE_LIFETIME_SECONDS;
+  return Math.min(Math.max(Math.ceil(remaining), 1), DEVICE_AUTH_CODE_LIFETIME_SECONDS);
 }
 
 /**
@@ -144,9 +161,11 @@ export function hashDeviceSecret(secret: string): string {
  * device-code flow.
  *
  * A request that already has `MAX_PENDING_REQUESTS_PER_IP` live pending rows from
- * the same address is refused before any row is written. The count and the insert
- * run inside one transaction that holds a per-address advisory lock, so the limit
- * is evaluated against the rows committed by the requests that came before.
+ * the same address is refused before any row is written, with a
+ * `retryAfterSeconds` advisory read from its oldest live row. The count and the
+ * insert run inside one transaction that holds a per-address advisory lock, so
+ * the limit is evaluated against the rows committed by the requests that came
+ * before.
  * `pg_advisory_xact_lock` releases on commit or rollback, so the lock never
  * outlives the transaction. The wait for that lock is bounded by
  * {@link DEVICE_AUTH_PENDING_LOCK_WAIT_MS}; a request that cannot take the lock
@@ -179,6 +198,9 @@ export async function createDeviceAuthRequest(params: {
   try {
     return await db.transaction(async tx => {
       if (ipAddress) {
+        // One instant for both the live-row predicate and the retry advisory, so
+        // the counted rows and the reported wait always describe one set of rows.
+        const now = new Date().toISOString();
         await tx.execute(sql.raw(`SET LOCAL lock_timeout = '${DEVICE_AUTH_PENDING_LOCK_WAIT_MS}'`));
 
         // The count and the insert below are one serialized unit for this
@@ -189,18 +211,26 @@ export async function createDeviceAuthRequest(params: {
         );
 
         const [result] = await tx
-          .select({ count: sql<number>`count(*)::int` })
+          .select({
+            count: sql<number>`count(*)::int`,
+            // Remaining seconds of the OLDEST live counted row, by the same clock
+            // as the count: when the count is at the limit, this is when the
+            // block ends.
+            retryAfterSeconds: sql<
+              number | null
+            >`ceil(extract(epoch from min(${device_auth_requests.expires_at}) - ${now}::timestamptz))::int`,
+          })
           .from(device_auth_requests)
           .where(
             and(
               eq(device_auth_requests.ip_address, ipAddress),
               eq(device_auth_requests.status, 'pending'),
-              gt(device_auth_requests.expires_at, new Date().toISOString())
+              requestIsLiveAt(now)
             )
           );
 
         if (result && result.count >= MAX_PENDING_REQUESTS_PER_IP) {
-          throw new DeviceAuthPendingLimitError();
+          throw new DeviceAuthPendingLimitError(pendingRetryAfterSeconds(result.retryAfterSeconds));
         }
       }
 
@@ -289,14 +319,40 @@ export async function getDeviceAuthRequest(userCode: string) {
   return request;
 }
 
+type DeviceAuthRequestRow = typeof device_auth_requests.$inferSelect;
+type DeviceAuthUserRow = typeof kilocode_users.$inferSelect;
+type DeviceAuthRequestStatus = DeviceAuthRequestRow['status'];
+
 /**
- * Check if a device auth request has expired.
+ * The one device-request expiry rule: a request is live while its deadline is
+ * after the instant, so it expires at the deadline. The approval action, the
+ * pending-request count, both redemption predicates, the approval page and
+ * cleanup compare with it.
  */
-export function isDeviceAuthRequestExpired(request: {
-  expires_at: string;
-  status: string;
-}): boolean {
-  return new Date(request.expires_at) < new Date() || request.status === 'expired';
+function isExpiredAt(expiresAt: string, now = new Date().toISOString()): boolean {
+  return new Date(expiresAt).getTime() <= Date.parse(now);
+}
+
+/** The same rule as a query condition: the rows that are still live. */
+function requestIsLiveAt(now: string): SQL {
+  return gt(device_auth_requests.expires_at, now);
+}
+
+/**
+ * Check if a device auth request has expired. This is the expiry rule.
+ *
+ * `now` is the instant the caller acts on, so a caller that also writes with a
+ * captured instant decides liveness against that same instant and a request it
+ * refuses is never approved later in the same call.
+ */
+export function isDeviceAuthRequestExpired(
+  request: {
+    expires_at: string;
+    status: DeviceAuthRequestStatus;
+  },
+  now = new Date().toISOString()
+): boolean {
+  return request.status === 'expired' || isExpiredAt(request.expires_at, now);
 }
 
 /**
@@ -310,8 +366,7 @@ export async function approveDeviceAuthRequest(
   const now = new Date().toISOString();
   const existing = await getDeviceAuthRequest(userCode);
   const requestingClientId = existing?.requesting_client_id ?? null;
-  const actionable =
-    existing?.status === 'pending' && new Date(existing.expires_at).getTime() > Date.parse(now);
+  const actionable = existing?.status === 'pending' && !isDeviceAuthRequestExpired(existing, now);
   // An actionable row that names a client requires its confirmation before any
   // other outcome is considered; an expired row reports its expiry below.
   const confirmed =
@@ -346,7 +401,7 @@ export async function approveDeviceAuthRequest(
       and(
         eq(device_auth_requests.user_code, userCode),
         eq(device_auth_requests.status, 'pending'),
-        gt(device_auth_requests.expires_at, now)
+        requestIsLiveAt(now)
       )
     )
     .returning({ id: device_auth_requests.id });
@@ -372,7 +427,7 @@ export async function approveDeviceAuthRequest(
       and(
         eq(device_auth_requests.user_code, userCode),
         eq(device_auth_requests.status, 'pending'),
-        lte(device_auth_requests.expires_at, now)
+        not(requestIsLiveAt(now))
       )
     )
     .returning({ id: device_auth_requests.id });
@@ -452,25 +507,61 @@ export async function cancelDeviceAuthRequest(code: string): Promise<void> {
 }
 
 /**
- * Atomically consume an approved request by device code.
- * Returns the appropriate status and mints a token only once per row.
- *
- * If credential issuance fails after the atomic consume succeeds, the row is
- * restored to `approved` so the request remains redeemable.
+ * The outcome of the shared redemption pipeline. Each redeemer maps it into its
+ * own response, because their status vocabularies and extra fields differ.
  */
-export async function consumeDeviceAuthByDeviceCode(
-  deviceCode: string,
-  options?: { supportsRefresh?: boolean }
-): Promise<{
-  status: 'pending' | 'approved' | 'denied' | 'expired' | 'consumed';
-  token?: string;
-  refreshToken?: string;
-  expiresIn?: number;
-  userId?: string;
-  userEmail?: string;
-  pendingLink?: PendingLinkResult;
-}> {
-  const deviceCodeHash = hashDeviceSecret(deviceCode);
+type RedeemOutcome<TCredentials> =
+  | {
+      outcome: 'redeemed';
+      credentials: TCredentials;
+      request: DeviceAuthRequestRow;
+      pendingLink?: PendingLinkResult;
+    }
+  | { outcome: 'denied' }
+  | { outcome: 'not-redeemed'; status: DeviceAuthRequestStatus };
+
+/**
+ * The current status of a request a caller could not consume. A request past
+ * its deadline is marked expired here, so both redeemers leave the same state.
+ */
+async function describeNotRedeemed(identity: SQL): Promise<RedeemOutcome<never>> {
+  const [request] = await db.select().from(device_auth_requests).where(identity).limit(1);
+
+  // A missing row reports expired too, so a caller cannot enumerate requests.
+  if (!request) return { outcome: 'not-redeemed', status: 'expired' };
+
+  if (!isDeviceAuthRequestExpired(request)) {
+    return { outcome: 'not-redeemed', status: request.status };
+  }
+
+  if (request.status !== 'expired') {
+    await db
+      .update(device_auth_requests)
+      .set({ status: 'expired' })
+      .where(eq(device_auth_requests.id, request.id));
+  }
+  return { outcome: 'not-redeemed', status: 'expired' };
+}
+
+/**
+ * The one redemption pipeline both redeemers use. It owns the atomic consume,
+ * the current-status fallback, the user lookup, the blocked-account denial, the
+ * restore on throw and the pending-link completion. Each caller supplies the
+ * row it redeems, how it mints its credentials, and what to release if minting
+ * throws.
+ */
+async function redeemApprovedRequest<TCredentials>(params: {
+  /** Identifies the single row this caller redeems: its device-code hash, or its poll secret. */
+  identity: SQL;
+  /** Extra consume condition; the legacy poll redeems only a request that names its user. */
+  consumeGuard?: SQL;
+  mint: (context: {
+    user: DeviceAuthUserRow;
+    request: DeviceAuthRequestRow;
+  }) => Promise<TCredentials>;
+  /** Releases what the mint created, before the row becomes redeemable again. */
+  discard?: () => Promise<void>;
+}): Promise<RedeemOutcome<TCredentials>> {
   const now = new Date().toISOString();
 
   // Atomic consume — UPDATE … RETURNING guarantees at most one caller succeeds.
@@ -479,35 +570,19 @@ export async function consumeDeviceAuthByDeviceCode(
     .set({ status: 'consumed', consumed_at: now })
     .where(
       and(
-        eq(device_auth_requests.device_code_hash, deviceCodeHash),
+        params.identity,
+        params.consumeGuard,
         eq(device_auth_requests.status, 'approved'),
-        gt(device_auth_requests.expires_at, now),
+        requestIsLiveAt(now),
         isNull(device_auth_requests.consumed_at)
       )
     )
     .returning();
 
   if (!consumed) {
-    // Look up current status for the same hash.
-    const [row] = await db
-      .select({
-        status: device_auth_requests.status,
-        expires_at: device_auth_requests.expires_at,
-      })
-      .from(device_auth_requests)
-      .where(eq(device_auth_requests.device_code_hash, deviceCodeHash))
-      .limit(1);
-
-    if (!row) return { status: 'expired' };
-
-    if (row.status === 'expired' || new Date(row.expires_at) < new Date()) {
-      return { status: 'expired' };
-    }
-
-    return { status: row.status as 'pending' | 'denied' | 'consumed' };
+    return describeNotRedeemed(params.identity);
   }
 
-  let sessionId: string | undefined;
   try {
     if (!consumed.kilo_user_id) {
       throw new Error('Approved request has no user');
@@ -527,52 +602,28 @@ export async function consumeDeviceAuthByDeviceCode(
       await db
         .update(device_auth_requests)
         .set({ status: 'denied' })
-        .where(eq(device_auth_requests.code, consumed.code));
-      return { status: 'denied' };
+        .where(eq(device_auth_requests.id, consumed.id));
+      return { outcome: 'denied' };
     }
 
-    const token = options?.supportsRefresh
-      ? undefined
-      : generateApiToken(user, { deviceAuthRequestCode: consumed.code });
+    const credentials = await params.mint({ user, request: consumed });
 
-    if (options?.supportsRefresh) {
-      sessionId = await createDeviceSession({
-        userId: user.id,
-        userAgent: consumed.user_agent ?? undefined,
-        deviceAuthRequestId: consumed.id,
-      });
-      const pair = await issueSessionCredentials(user, sessionId);
-      // The pending link completes only after credentials exist, so a
-      // restored row never reports a link result for an attach that the
-      // retry would then find already consumed.
-      const pendingLink = await completeStoredPendingLink(
-        consumed.pending_link_secret_hash,
-        user.id
-      );
-      return {
-        status: 'approved',
-        token: pair.token,
-        refreshToken: pair.refreshToken,
-        expiresIn: pair.expiresIn,
-        userId: user.id,
-        userEmail: user.google_user_email,
-        ...(pendingLink ? { pendingLink } : {}),
-      };
-    }
+    // The pending link completes only after credentials exist, so a restored
+    // row never reports a link result for an attach that the retry would then
+    // find already consumed.
+    const pendingLink = await resolveStoredPendingLinkForUser(
+      consumed.pending_link_secret_hash,
+      user.id
+    );
 
-    const pendingLink = await completeStoredPendingLink(consumed.pending_link_secret_hash, user.id);
     return {
-      status: 'approved',
-      token,
-      userId: user.id,
-      userEmail: user.google_user_email,
+      outcome: 'redeemed',
+      credentials,
+      request: consumed,
       ...(pendingLink ? { pendingLink } : {}),
     };
   } catch (err) {
-    // If a device session was created, delete it to avoid orphans.
-    if (sessionId) {
-      await db.delete(device_sessions).where(eq(device_sessions.id, sessionId));
-    }
+    await params.discard?.();
     // Restore the row so the request remains redeemable.
     await db
       .update(device_auth_requests)
@@ -585,12 +636,82 @@ export async function consumeDeviceAuthByDeviceCode(
 }
 
 /**
+ * Atomically consume an approved request by device code.
+ * Returns the appropriate status and mints a token only once per row.
+ *
+ * Redemption goes through the shared pipeline, so a failed mint restores the
+ * row to `approved` and the request remains redeemable.
+ */
+export async function consumeDeviceAuthByDeviceCode(
+  deviceCode: string,
+  options?: { supportsRefresh?: boolean }
+): Promise<{
+  status: 'pending' | 'approved' | 'denied' | 'expired' | 'consumed';
+  token?: string;
+  refreshToken?: string;
+  expiresIn?: number;
+  userId?: string;
+  userEmail?: string;
+  pendingLink?: PendingLinkResult;
+}> {
+  let sessionId: string | undefined;
+
+  const outcome = await redeemApprovedRequest<{
+    token: string;
+    refreshToken?: string;
+    expiresIn?: number;
+    userId: string;
+    userEmail: string;
+  }>({
+    identity: eq(device_auth_requests.device_code_hash, hashDeviceSecret(deviceCode)),
+    mint: async ({ user, request }) => {
+      if (!options?.supportsRefresh) {
+        return {
+          token: generateApiToken(user, { deviceAuthRequestCode: request.code }),
+          userId: user.id,
+          userEmail: user.google_user_email,
+        };
+      }
+      sessionId = await createDeviceSession({
+        userId: user.id,
+        userAgent: request.user_agent ?? undefined,
+        deviceAuthRequestId: request.id,
+      });
+      const pair = await issueSessionCredentials(user, sessionId);
+      return {
+        token: pair.token,
+        refreshToken: pair.refreshToken,
+        expiresIn: pair.expiresIn,
+        userId: user.id,
+        userEmail: user.google_user_email,
+      };
+    },
+    discard: async () => {
+      if (sessionId) {
+        await db.delete(device_sessions).where(eq(device_sessions.id, sessionId));
+      }
+    },
+  });
+
+  switch (outcome.outcome) {
+    case 'redeemed':
+      return {
+        status: 'approved',
+        ...outcome.credentials,
+        ...(outcome.pendingLink ? { pendingLink: outcome.pendingLink } : {}),
+      };
+    case 'denied':
+      return { status: 'denied' };
+    case 'not-redeemed':
+      return { status: outcome.status };
+  }
+}
+
+/**
  * Poll for device authorization status and return token if approved.
  * Legacy path — keyed on the high-entropy poll secret stored in `code`.
- * Uses atomic consume to prevent double-spend.
- *
- * If credential issuance fails after the atomic consume succeeds, the row is
- * restored to `approved` so the request remains redeemable.
+ * Redeems through the shared pipeline, which consumes atomically to prevent
+ * double-spend and restores the row to `approved` when minting fails.
  */
 export async function pollDeviceAuthRequest(code: string): Promise<{
   status: 'pending' | 'approved' | 'denied' | 'expired';
@@ -603,106 +724,35 @@ export async function pollDeviceAuthRequest(code: string): Promise<{
   clientConfirmed?: boolean;
   pendingLink?: PendingLinkResult;
 }> {
-  const now = new Date().toISOString();
+  const outcome = await redeemApprovedRequest<{
+    token: string;
+    userId: string;
+    userEmail: string;
+  }>({
+    identity: eq(device_auth_requests.code, code),
+    consumeGuard: isNotNull(device_auth_requests.kilo_user_id),
+    mint: async ({ user, request }) => ({
+      token: generateApiToken(user, { deviceAuthRequestCode: request.code }),
+      userId: user.id,
+      userEmail: user.google_user_email,
+    }),
+  });
 
-  // Atomic consume — UPDATE … RETURNING guarantees at most one caller succeeds.
-  const [consumed] = await db
-    .update(device_auth_requests)
-    .set({ status: 'consumed', consumed_at: now })
-    .where(
-      and(
-        eq(device_auth_requests.code, code),
-        eq(device_auth_requests.status, 'approved'),
-        isNotNull(device_auth_requests.kilo_user_id),
-        gt(device_auth_requests.expires_at, now),
-        isNull(device_auth_requests.consumed_at)
-      )
-    )
-    .returning();
-
-  if (consumed) {
-    try {
-      const kiloUserId = consumed.kilo_user_id;
-      if (!kiloUserId) {
-        throw new Error('Approved request has no user');
-      }
-
-      const [user] = await db
-        .select()
-        .from(kilocode_users)
-        .where(eq(kilocode_users.id, kiloUserId))
-        .limit(1);
-
-      if (!user) {
-        throw new Error('User not found');
-      }
-
-      if (isBlockedAccount(user)) {
-        await db
-          .update(device_auth_requests)
-          .set({ status: 'denied' })
-          .where(eq(device_auth_requests.code, code));
-        return { status: 'denied' };
-      }
-
-      const token = generateApiToken(user, {
-        deviceAuthRequestCode: consumed.code,
-      });
-      const pendingLink = await completeStoredPendingLink(
-        consumed.pending_link_secret_hash,
-        user.id
-      );
-
+  switch (outcome.outcome) {
+    case 'redeemed':
       return {
         status: 'approved',
-        token,
-        userId: user.id,
-        userEmail: user.google_user_email,
-        requestingClient: requestingClientOfRow(consumed),
-        clientConfirmed: consumed.client_confirmed_at !== null,
-        ...(pendingLink ? { pendingLink } : {}),
+        ...outcome.credentials,
+        requestingClient: requestingClientOfRow(outcome.request),
+        clientConfirmed: outcome.request.client_confirmed_at !== null,
+        ...(outcome.pendingLink ? { pendingLink: outcome.pendingLink } : {}),
       };
-    } catch (err) {
-      // Restore the row so the request remains redeemable.
-      await db
-        .update(device_auth_requests)
-        .set({ status: 'approved', consumed_at: null })
-        .where(
-          and(eq(device_auth_requests.id, consumed.id), eq(device_auth_requests.status, 'consumed'))
-        );
-      throw err;
-    }
+    case 'denied':
+      return { status: 'denied' };
+    case 'not-redeemed':
+      // A consumed request is spent, so the legacy response reports it expired.
+      return { status: outcome.status === 'consumed' ? 'expired' : outcome.status };
   }
-
-  // Fall through: not consumed, look up current status.
-  const [request] = await db
-    .select()
-    .from(device_auth_requests)
-    .where(eq(device_auth_requests.code, code))
-    .limit(1);
-
-  // Normalize response: return 'expired' for non-existent codes to prevent enumeration
-  if (!request) {
-    return { status: 'expired' };
-  }
-
-  // Check expiration
-  if (isDeviceAuthRequestExpired(request)) {
-    if (request.status !== 'expired') {
-      await db
-        .update(device_auth_requests)
-        .set({ status: 'expired' })
-        .where(eq(device_auth_requests.code, code));
-    }
-    return { status: 'expired' };
-  }
-
-  // Return status for non-approved requests (or already-consumed)
-  if (request.status === 'consumed') {
-    return { status: 'expired' };
-  }
-
-  return { status: request.status as 'pending' | 'denied' };
 }
 
 /**
@@ -712,7 +762,7 @@ export async function pollDeviceAuthRequest(code: string): Promise<{
 export async function cleanupExpiredDeviceAuthRequests(): Promise<number> {
   const result = await db
     .delete(device_auth_requests)
-    .where(lt(device_auth_requests.expires_at, new Date().toISOString()))
+    .where(not(requestIsLiveAt(new Date().toISOString())))
     .returning({ id: device_auth_requests.id });
 
   return result.length;

@@ -153,6 +153,71 @@ describe('submitManualAnalysisStart', () => {
       'Manual analysis Worker routing is disabled'
     );
   });
+
+  it('keeps the known disabled-routing 503 definitive even with success true (no success requirement)', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 503,
+      json: () =>
+        Promise.resolve({
+          error: 'Manual analysis Worker routing is disabled',
+          success: true,
+        }),
+    });
+
+    await expect(submitManualAnalysisStart(startParams())).rejects.toThrow(
+      'Manual analysis Worker routing is disabled'
+    );
+  });
+});
+
+describe('submitManualAnalysisStart env configuration', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+  // `jest.doMock` only affects modules loaded after it, and the top-level
+  // static import already loaded the subject, so each test re-imports it
+  // dynamically to exercise the mocked-env loading boundary.
+
+  it('throws a stable PRECONDITION_FAILED TRPCError when SECURITY_AUTO_ANALYSIS_WORKER_URL is empty (not a raw Error)', async () => {
+    jest.resetModules();
+    jest.doMock('@kilocode/web-shared/lib/config.server', () => ({
+      INTERNAL_API_SECRET: 'test-internal-secret',
+      SECURITY_AUTO_ANALYSIS_WORKER_URL: '',
+    }));
+    const mod = await import('./manual-analysis-client');
+    let captured: unknown;
+    try {
+      await mod.submitManualAnalysisStart(startParams());
+    } catch (e) {
+      captured = e;
+    }
+    expect(captured).toBeDefined();
+    expect((captured as { name?: string }).name).toBe('TRPCError');
+    expect((captured as { code?: string }).code).toBe('PRECONDITION_FAILED');
+    expect((captured as Error).message).toBe('Security service is not configured');
+    expect((captured as Error).message).not.toContain('test-internal-secret');
+  });
+
+  it('throws a stable PRECONDITION_FAILED TRPCError when INTERNAL_API_SECRET is empty (not a raw Error)', async () => {
+    jest.resetModules();
+    jest.doMock('@kilocode/web-shared/lib/config.server', () => ({
+      INTERNAL_API_SECRET: '',
+      SECURITY_AUTO_ANALYSIS_WORKER_URL: 'https://security-auto-analysis.test',
+    }));
+    const mod = await import('./manual-analysis-client');
+    let captured: unknown;
+    try {
+      await mod.submitManualAnalysisStart(startParams());
+    } catch (e) {
+      captured = e;
+    }
+    expect(captured).toBeDefined();
+    expect((captured as { name?: string }).name).toBe('TRPCError');
+    expect((captured as { code?: string }).code).toBe('PRECONDITION_FAILED');
+    expect((captured as Error).message).toBe('Security service is not configured');
+    expect((captured as Error).message).not.toContain('test-internal-secret');
+  });
 });
 
 function startParams() {

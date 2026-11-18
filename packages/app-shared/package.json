@@ -21,6 +21,7 @@
     "./feature-flags": "./src/feature-flags.ts",
     "./app-version": "./src/app-version.ts",
     "./control-plane": "./src/control-plane.ts",
+    "./usage-source": "./src/usage-source.ts",
     "./pr-review": "./src/pr-review/index.ts",
     "./provider-review": "./src/provider-review/index.ts",
     "./commerce": "./src/commerce/index.ts",

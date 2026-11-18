@@ -46,6 +46,7 @@ const calls = vi.hoisted(() => ({
   confirm: vi.fn<(request: { title: string; onConfirm: () => void }) => void>(),
   refetch: vi.fn<() => void>(),
   openExternal: vi.fn<(url: string) => void>(),
+  handoff: vi.fn<(target: unknown) => void>(),
   push: vi.fn<(href: unknown) => void>(),
   bitbucketRefetch: vi.fn<() => void>(),
 }));
@@ -130,6 +131,12 @@ vi.mock('@/lib/trpc-error', () => ({
   trpcErrorVariant: () => 'server',
 }));
 
+vi.mock('@/lib/app-shell-handoff', () => ({
+  openAppShellHandoff: (target: unknown) => {
+    calls.handoff(target);
+    return Promise.resolve();
+  },
+}));
 vi.mock('@/lib/external-link', () => ({
   openExternalUrl: (url: string) => {
     calls.openExternal(url);
@@ -319,6 +326,15 @@ describe('IntegrationsScreen', () => {
     expect(actionOf(rowTitled(root, 'GitHub'))?.props.accessibilityLabel).toBe(
       'Manage on the web. GitHub'
     );
+    // The GitHub row's web management link is the shell's integration page,
+    // reached through a one-time hand-off rather than a full-web URL.
+    press(actionOf(rowTitled(root, 'GitHub')));
+    expect(calls.handoff).toHaveBeenCalledWith({
+      page: 'integration',
+      platform: 'github',
+      organizationId: 'org-1',
+    });
+    expect(calls.openExternal).not.toHaveBeenCalled();
     // Bitbucket's connection is changed in the app, so an owner's installed row
     // disconnects instead of opening the web page.
     const bitbucket = actionOf(rowTitled(root, 'Bitbucket'));
@@ -339,6 +355,18 @@ describe('IntegrationsScreen', () => {
       pathname: '/(app)/bitbucket-connect',
       params: { scope: 'org-1' },
     });
+  });
+
+  it('opens the Bitbucket connect sheet once for a double press', () => {
+    state.role = 'owner';
+    state.statuses.data = [{ platform: 'bitbucket', installed: false, installation: null }];
+    const renderer = mount('org-1');
+    const connect = actionOf(rowTitled(renderer.root, 'Bitbucket'));
+
+    press(connect);
+    press(connect);
+
+    expect(calls.push).toHaveBeenCalledTimes(1);
   });
 
   it('disconnects the Bitbucket integration the status read names', () => {
@@ -520,6 +548,7 @@ const routeParams = vi.hoisted(() => ({ org: undefined as string | string[] | un
 vi.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ org: routeParams.org }),
   useRouter: () => ({ push: calls.push }),
+  useFocusEffect: () => undefined,
 }));
 
 let mountedRoute: TestRenderer.ReactTestRenderer | undefined = undefined;

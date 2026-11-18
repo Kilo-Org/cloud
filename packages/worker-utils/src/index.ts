@@ -6,6 +6,7 @@ export type { DORetryConfig, DORetryScope } from './do-retry.js';
 export {
   isTransientDurableObjectFailure,
   isDurableObjectRetryDeadline,
+  isNetworkConnectionLost,
 } from './durable-object-failure.js';
 
 export { backendAuthMiddleware } from './backend-auth-middleware.js';
@@ -260,8 +261,10 @@ export type {
 export {
   activeOrganizationAccessSql,
   activeOrganizationJoinCondition,
-  hasInheritedOrganizationAccess,
+  findEffectiveOrganizationMemberRole,
+  hasEffectiveOrganizationAccess,
   hasOrganizationAccess,
+  inheritedParentMembershipJoinCondition,
   organizationMembershipJoinCondition,
   parentOrganizationJoinCondition,
   parentOrganizationMembershipJoinCondition,
@@ -269,6 +272,10 @@ export {
   parentOrganizationMembershipsTable,
   personalOrActiveOrganizationCondition,
   personalOrInheritedOrganizationCondition,
+} from './organization-membership.js';
+export type {
+  OrganizationColumns,
+  OrganizationMembershipColumns,
 } from './organization-membership.js';
 
 export {

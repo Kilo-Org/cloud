@@ -10,10 +10,11 @@ import {
   kilo_pass_org_issuance_snapshots,
   kilo_pass_org_qualifying_spend_events,
   kilocode_users,
+  organization_memberships,
   organization_user_usage,
   organizations,
 } from '@kilocode/db/schema';
-import { eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { getExaMonthlyUsage, getExaFreeAllowanceMicrodollars, recordExaUsage } from './exa-usage';
 import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@kilocode/web-shared/lib/constants';
@@ -36,13 +37,25 @@ jest.mock('next/server', () => ({
 // Suppress Sentry in tests
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
+  captureMessage: jest.fn(),
 }));
+
+// sentryLogger is console-silent in automated tests; capture its calls for the rejection assertions.
+// Keep every other export real, so a success-path log cannot fail with a missing-function error.
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  ...jest.requireActual<object>('@kilocode/web-shared/lib/utils.server'),
+  sentryLogger: jest.fn(() => jest.fn()),
+}));
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
+const mockedSentryLogger = jest.mocked(sentryLogger);
 
 describe('Exa Usage Tracking', () => {
   const passFixtureOrganizationIds: string[] = [];
   const passFixtureAgreementIds: string[] = [];
 
   afterEach(async () => {
+    jest.restoreAllMocks();
+    mockedSentryLogger.mockClear();
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(exa_monthly_usage);
 
@@ -336,12 +349,13 @@ describe('Exa Usage Tracking', () => {
       });
     });
 
-    test('rolls back charged Exa source and monthly rows when the user row is missing', async () => {
+    test('rejects a record naming an unknown user and writes no rows', async () => {
       const missingUserId = `missing-exa-user-${crypto.randomUUID()}`;
+      const identity = usageIdentity();
 
       await expect(
         recordExaUsage({
-          ...usageIdentity(),
+          ...identity,
           userId: missingUserId,
           organizationId: null,
           path: '/search',
@@ -349,7 +363,7 @@ describe('Exa Usage Tracking', () => {
           chargedToBalance: true,
           freeAllowanceMicrodollars: 10_000_000,
         })
-      ).rejects.toThrow('user disappeared during Exa consumption');
+      ).resolves.toBe('rejected');
 
       const sourceRows = await db
         .select()
@@ -361,6 +375,300 @@ describe('Exa Usage Tracking', () => {
         .where(eq(exa_monthly_usage.kilo_user_id, missingUserId));
       expect(sourceRows).toHaveLength(0);
       expect(monthlyRows).toHaveLength(0);
+      expect(mockedSentryLogger).toHaveBeenCalledTimes(1);
+      expect(mockedSentryLogger.mock.results[0].value).toHaveBeenCalledWith(
+        'usage record rejected: payer could not be resolved',
+        { usage_id: identity.id, reason: 'user_not_found' }
+      );
+    });
+
+    test('rejects the same unresolvable record on every submission and writes no rows', async () => {
+      const missingUserId = `missing-exa-user-${crypto.randomUUID()}`;
+      const input: ExaUsageRecord = {
+        ...usageIdentity(),
+        userId: missingUserId,
+        organizationId: null,
+        path: '/search',
+        costMicrodollars: 1000,
+        chargedToBalance: true,
+        freeAllowanceMicrodollars: 10_000_000,
+      };
+
+      await expect(recordExaUsage(input)).resolves.toBe('rejected');
+      await expect(recordExaUsage(input)).resolves.toBe('rejected');
+
+      const sourceRows = await db
+        .select()
+        .from(exa_usage_log)
+        .where(eq(exa_usage_log.kilo_user_id, missingUserId));
+      const monthlyRows = await db
+        .select()
+        .from(exa_monthly_usage)
+        .where(eq(exa_monthly_usage.kilo_user_id, missingUserId));
+      expect(sourceRows).toHaveLength(0);
+      expect(monthlyRows).toHaveLength(0);
+      expect(mockedSentryLogger).toHaveBeenCalledTimes(2);
+    });
+
+    test('rejects an organization record for a user outside that organization', async () => {
+      const user = await insertTestUser({
+        microdollars_used: 0,
+        total_microdollars_acquired: 100_000_000,
+      });
+      const otherOwner = await insertTestUser();
+      const otherOrganization = await createTestOrganization(
+        `exa-non-member-${crypto.randomUUID()}`,
+        otherOwner.id,
+        50_000
+      );
+      passFixtureOrganizationIds.push(otherOrganization.id);
+      const identity = usageIdentity();
+
+      await expect(
+        recordExaUsage({
+          ...identity,
+          userId: user.id,
+          organizationId: otherOrganization.id,
+          path: '/contents',
+          costMicrodollars: 9000,
+          chargedToBalance: true,
+          freeAllowanceMicrodollars: 10_000_000,
+        })
+      ).resolves.toBe('rejected');
+
+      const sourceRows = await db
+        .select()
+        .from(exa_usage_log)
+        .where(eq(exa_usage_log.kilo_user_id, user.id));
+      const monthlyRows = await db
+        .select()
+        .from(exa_monthly_usage)
+        .where(eq(exa_monthly_usage.kilo_user_id, user.id));
+      const memberUsageRows = await db
+        .select()
+        .from(organization_user_usage)
+        .where(eq(organization_user_usage.organization_id, otherOrganization.id));
+      const [chargedOrganization] = await db
+        .select({ microdollars_used: organizations.microdollars_used })
+        .from(organizations)
+        .where(eq(organizations.id, otherOrganization.id));
+
+      expect(sourceRows).toHaveLength(0);
+      expect(monthlyRows).toHaveLength(0);
+      expect(memberUsageRows).toHaveLength(0);
+      expect(chargedOrganization.microdollars_used).toBe(0);
+      expect(mockedSentryLogger).toHaveBeenCalledTimes(1);
+      expect(mockedSentryLogger.mock.results[0].value).toHaveBeenCalledWith(
+        'usage record rejected: payer could not be resolved',
+        { usage_id: identity.id, reason: 'organization_membership_missing' }
+      );
+    });
+
+    test('charges an organization the user reaches only through a parent-organization role', async () => {
+      const user = await insertTestUser({
+        microdollars_used: 0,
+        total_microdollars_acquired: 100_000_000,
+      });
+      const parent = await createTestOrganization(
+        `exa-parent-${crypto.randomUUID()}`,
+        user.id,
+        50_000
+      );
+      passFixtureOrganizationIds.push(parent.id);
+      const [child] = await db
+        .insert(organizations)
+        .values({
+          name: `exa-child-${crypto.randomUUID()}`,
+          parent_organization_id: parent.id,
+          total_microdollars_acquired: 50_000,
+          microdollars_balance: 50_000,
+        })
+        .returning();
+      passFixtureOrganizationIds.push(child.id);
+
+      await expect(
+        recordExaUsage({
+          ...usageIdentity(),
+          userId: user.id,
+          organizationId: child.id,
+          path: '/contents',
+          costMicrodollars: 9000,
+          chargedToBalance: true,
+          freeAllowanceMicrodollars: 10_000_000,
+        })
+      ).resolves.toBe('recorded');
+
+      const [chargedChild] = await db
+        .select({ microdollars_used: organizations.microdollars_used })
+        .from(organizations)
+        .where(eq(organizations.id, child.id));
+      expect(chargedChild.microdollars_used).toBe(9000);
+    });
+
+    test('rejects a record the parent-role holder cannot resolve and a plain parent member inherits nothing', async () => {
+      const parentOwner = await insertTestUser();
+      const parent = await createTestOrganization(
+        `exa-parent-${crypto.randomUUID()}`,
+        parentOwner.id,
+        50_000
+      );
+      passFixtureOrganizationIds.push(parent.id);
+      const plainParentMember = await insertTestUser();
+      await db.insert(organization_memberships).values({
+        organization_id: parent.id,
+        kilo_user_id: plainParentMember.id,
+        role: 'member',
+      });
+      const [child] = await db
+        .insert(organizations)
+        .values({ name: `exa-child-${crypto.randomUUID()}`, parent_organization_id: parent.id })
+        .returning();
+      passFixtureOrganizationIds.push(child.id);
+      const identity = usageIdentity();
+
+      await expect(
+        recordExaUsage({
+          ...identity,
+          userId: plainParentMember.id,
+          organizationId: child.id,
+          path: '/contents',
+          costMicrodollars: 9000,
+          chargedToBalance: true,
+          freeAllowanceMicrodollars: 10_000_000,
+        })
+      ).resolves.toBe('rejected');
+
+      const sourceRows = await db
+        .select()
+        .from(exa_usage_log)
+        .where(eq(exa_usage_log.organization_id, child.id));
+      expect(sourceRows).toHaveLength(0);
+      expect(mockedSentryLogger).toHaveBeenCalledTimes(1);
+      expect(mockedSentryLogger.mock.results[0].value).toHaveBeenCalledWith(
+        'usage record rejected: payer could not be resolved',
+        { usage_id: identity.id, reason: 'organization_membership_missing' }
+      );
+    });
+
+    test('rejects an organization record once the organization is marked deleted', async () => {
+      const user = await insertTestUser({
+        microdollars_used: 0,
+        total_microdollars_acquired: 100_000_000,
+      });
+      const organization = await createTestOrganization(
+        `exa-deleted-org-${crypto.randomUUID()}`,
+        user.id,
+        50_000
+      );
+      passFixtureOrganizationIds.push(organization.id);
+      await db
+        .update(organizations)
+        .set({ deleted_at: new Date().toISOString() })
+        .where(eq(organizations.id, organization.id));
+      const identity = usageIdentity();
+
+      await expect(
+        recordExaUsage({
+          ...identity,
+          userId: user.id,
+          organizationId: organization.id,
+          path: '/contents',
+          costMicrodollars: 9000,
+          chargedToBalance: true,
+          freeAllowanceMicrodollars: 10_000_000,
+        })
+      ).resolves.toBe('rejected');
+
+      const membershipRows = await db
+        .select()
+        .from(organization_memberships)
+        .where(
+          and(
+            eq(organization_memberships.organization_id, organization.id),
+            eq(organization_memberships.kilo_user_id, user.id)
+          )
+        );
+      const sourceRows = await db
+        .select()
+        .from(exa_usage_log)
+        .where(eq(exa_usage_log.organization_id, organization.id));
+      const monthlyRows = await db
+        .select()
+        .from(exa_monthly_usage)
+        .where(eq(exa_monthly_usage.kilo_user_id, user.id));
+      const memberUsageRows = await db
+        .select()
+        .from(organization_user_usage)
+        .where(eq(organization_user_usage.organization_id, organization.id));
+      const [chargedOrganization] = await db
+        .select({ microdollars_used: organizations.microdollars_used })
+        .from(organizations)
+        .where(eq(organizations.id, organization.id));
+
+      expect(membershipRows).toHaveLength(1);
+      expect(sourceRows).toHaveLength(0);
+      expect(monthlyRows).toHaveLength(0);
+      expect(memberUsageRows).toHaveLength(0);
+      expect(chargedOrganization.microdollars_used).toBe(0);
+      expect(mockedSentryLogger).toHaveBeenCalledTimes(1);
+      expect(mockedSentryLogger.mock.results[0].value).toHaveBeenCalledWith(
+        'usage record rejected: payer could not be resolved',
+        { usage_id: identity.id, reason: 'organization_membership_missing' }
+      );
+    });
+
+    test('answers duplicate when a committed record is replayed after its membership is removed', async () => {
+      const user = await insertTestUser({
+        microdollars_used: 0,
+        total_microdollars_acquired: 100_000_000,
+      });
+      const organization = await createTestOrganization(
+        `exa-replay-${crypto.randomUUID()}`,
+        user.id,
+        50_000
+      );
+      passFixtureOrganizationIds.push(organization.id);
+      const record: ExaUsageRecord = {
+        ...usageIdentity(),
+        userId: user.id,
+        organizationId: organization.id,
+        path: '/contents',
+        costMicrodollars: 9000,
+        chargedToBalance: true,
+        freeAllowanceMicrodollars: 10_000_000,
+      };
+
+      await expect(recordExaUsage(record)).resolves.toBe('recorded');
+
+      await db
+        .delete(organization_memberships)
+        .where(
+          and(
+            eq(organization_memberships.organization_id, organization.id),
+            eq(organization_memberships.kilo_user_id, user.id)
+          )
+        );
+
+      await expect(recordExaUsage(record)).resolves.toBe('duplicate');
+
+      const sourceRows = await db
+        .select()
+        .from(exa_usage_log)
+        .where(eq(exa_usage_log.organization_id, organization.id));
+      const memberUsageRows = await db
+        .select()
+        .from(organization_user_usage)
+        .where(eq(organization_user_usage.organization_id, organization.id));
+      const [chargedOrganization] = await db
+        .select({ microdollars_used: organizations.microdollars_used })
+        .from(organizations)
+        .where(eq(organizations.id, organization.id));
+
+      expect(sourceRows).toHaveLength(1);
+      expect(memberUsageRows).toHaveLength(1);
+      expect(memberUsageRows[0].microdollar_usage).toBe(9000);
+      expect(chargedOrganization.microdollars_used).toBe(9000);
+      expect(mockedSentryLogger).not.toHaveBeenCalled();
     });
 
     test('does not deduct from balance when chargedToBalance is false', async () => {
@@ -386,7 +694,13 @@ describe('Exa Usage Tracking', () => {
 
     test('creates separate counter rows for personal and org usage', async () => {
       const user = await insertTestUser();
-      const orgId = crypto.randomUUID();
+      const organization = await createTestOrganization(
+        `exa-personal-and-org-${crypto.randomUUID()}`,
+        user.id,
+        0
+      );
+      passFixtureOrganizationIds.push(organization.id);
+      const orgId = organization.id;
 
       // Personal request
       await recordExaUsage({

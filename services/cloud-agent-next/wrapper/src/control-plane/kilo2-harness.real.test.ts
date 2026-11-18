@@ -19,14 +19,78 @@ import {
 } from './runtime-profile.js';
 import { buildWorktreeKiloEnvironment } from '../control/worktree-runtime.js';
 import { buildCloudAgentRules } from '../../../src/shared/cloud-agent-rules.js';
+import {
+  CLOUD_WEB_SEARCH_DISABLED_ENV,
+  CLOUD_WEB_SEARCH_PROVIDER_ENV,
+} from '../../../src/shared/runtime-environment.js';
 import { createTurnManager } from './turn.js';
 import { runtimeKey } from './prepare.js';
+import { prepareKilo2RuntimeEnvironment } from './runtime-harness.js';
 import type { ControlPlaneWrapperFrame } from '../../../src/shared/control-plane-protocol.js';
 
 const binary = process.env.KILO2_BINARY;
 const suite = binary ? describe : describe.skip;
 
 suite('real Kilo v2 harness', () => {
+  it('accepts web search config in file, repository, and inline precedence order', async () => {
+    if (!binary) throw new Error('KILO2_BINARY is required');
+    const version = Bun.spawnSync([binary, '--version']);
+    expect(version.stdout.toString().trim()).toBe(PINNED_CLIS.kilo2.reportedVersion);
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'kilo2-web-search-'));
+    try {
+      const cwd = path.join(home, 'workspace');
+      await fs.mkdir(cwd);
+      const repositoryConfig = path.join(cwd, 'kilo.json');
+      const sources = z.array(
+        z.object({ path: z.string().optional(), info: z.unknown().optional() })
+      );
+      const readWebSearchSources = async (overrides: Record<string, string> = {}) => {
+        const env = await prepareKilo2RuntimeEnvironment({
+          HOME: home,
+          PATH: process.env.PATH ?? '/usr/bin:/bin',
+          KILO_DISABLE_MODELS_FETCH: '1',
+          ...overrides,
+        });
+        const result = Bun.spawnSync([binary, 'debug', 'config', '--standalone'], {
+          cwd,
+          env,
+          timeout: 7000,
+        });
+        expect(result.exitCode).toBe(0);
+        return sources.parse(JSON.parse(result.stdout.toString())).flatMap(source => {
+          const info = z.object({ websearch: z.unknown() }).safeParse(source.info);
+          return info.success && info.data.websearch !== undefined
+            ? [{ path: source.path, value: info.data.websearch }]
+            : [];
+        });
+      };
+
+      const defaults = [
+        {
+          path: path.join(home, '.config', 'kilo', 'cloud-agent-v2.json'),
+          value: { provider: 'exa' },
+        },
+      ];
+      expect(await readWebSearchSources()).toEqual(defaults);
+      await fs.writeFile(repositoryConfig, JSON.stringify({ websearch: { provider: 'parallel' } }));
+      const withRepository = [
+        ...defaults,
+        { path: repositoryConfig, value: { provider: 'parallel' } },
+      ];
+      expect(await readWebSearchSources()).toEqual(withRepository);
+      expect(await readWebSearchSources({ [CLOUD_WEB_SEARCH_PROVIDER_ENV]: 'tavily' })).toEqual([
+        ...withRepository,
+        { path: undefined, value: { provider: 'tavily' } },
+      ]);
+      expect(await readWebSearchSources({ [CLOUD_WEB_SEARCH_DISABLED_ENV]: '1' })).toEqual([
+        ...withRepository,
+        { path: undefined, value: false },
+      ]);
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  }, 35_000);
+
   it('accepts the pinned empty compaction error and replays the same compact ID after a restart', async () => {
     if (!binary) throw new Error('KILO2_BINARY is required');
     if (process.env.KILO_RUNTIME_HARNESS !== 'kilo2')
@@ -538,6 +602,23 @@ suite('real Kilo v2 harness', () => {
         })
       ).toBe(true);
       await toolTurn;
+      if (!server) throw new Error('Kilo v2 server is not started');
+      const staleReply: unknown = await createKilo2Api(server)
+        .request(`${kilo2SessionPath(sessionId)}/permission/${permission.id}/reply`, {
+          method: 'POST',
+          body: { decision: 'reject' },
+          signal,
+        })
+        .catch(error => error);
+      expect(staleReply).toBeInstanceOf(Error);
+      expect(staleReply).toMatchObject({ status: 404 });
+      expect(
+        await harness.answer({
+          directory,
+          signal,
+          reply: { action: 'permission', permissionId: permission.id, response: 'reject' },
+        })
+      ).toBe(false);
       expect(latestContextUpdate()).toBeDefined();
       expect(latestContextUpdate()).not.toContain('workspace_callback-marker');
       expect(

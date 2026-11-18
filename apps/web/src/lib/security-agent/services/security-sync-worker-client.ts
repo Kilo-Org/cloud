@@ -4,7 +4,11 @@ import {
   INTERNAL_API_SECRET,
   SECURITY_SYNC_WORKER_URL,
 } from '@kilocode/web-shared/lib/config.server';
-import { postSecurityWorkerJson } from './security-worker-request';
+import { SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE } from '@kilocode/app-shared/security-agent';
+import {
+  isDefinitiveSecurityWorkerRejection,
+  postSecurityWorkerJson,
+} from './security-worker-request';
 
 export type AcceptedSecurityWorkerCommand = {
   accepted: true;
@@ -21,10 +25,6 @@ type SecurityWorkerResponse = {
   messageId?: string;
   error?: string;
 };
-
-// Mirrored by the mobile security mutation classifier: a stable non-retryable
-// code, not the generic 500 the classifier treats as retryable transport.
-const CONFIG_ERROR_MESSAGE = 'Security service is not configured';
 
 /**
  * Posts a security-sync Worker command and classifies the outcome for the
@@ -44,7 +44,15 @@ export async function postSecurityWorkerCommand(params: {
   body: Record<string, unknown>;
 }): Promise<AcceptedSecurityWorkerCommand> {
   if (!SECURITY_SYNC_WORKER_URL || !INTERNAL_API_SECRET) {
-    throw new TRPCError({ code: 'PRECONDITION_FAILED', message: CONFIG_ERROR_MESSAGE });
+    // Mirrored by the mobile security mutation classifier: a stable
+    // non-retryable code (PRECONDITION_FAILED), not the generic 500 the
+    // classifier treats as retryable transport. The sentence is the shared
+    // SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE, which the mobile ledger maps
+    // by exact match (stable-error-messages).
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE,
+    });
   }
   // Bounded, and `BAD_GATEWAY` on a stalled or non-JSON response (see
   // `postSecurityWorkerJson`): a gateway HTML body and a Worker that never
@@ -61,11 +69,12 @@ export async function postSecurityWorkerCommand(params: {
     // The known disabled-routing 503 is returned before enqueueing, so it is a
     // definitive rejection. Any other 5xx (including a gateway 503) may have
     // been accepted and stays ambiguous transport.
-    const definitive =
-      response.status < 500 ||
-      (response.status === 503 &&
-        workerBody?.success === false &&
-        workerBody?.error === params.disabledRoutingError);
+    const definitive = isDefinitiveSecurityWorkerRejection({
+      status: response.status,
+      body: workerBody,
+      disabledRoutingError: params.disabledRoutingError,
+      requireSuccessFalse: true,
+    });
     throw new TRPCError({
       code: definitive ? 'PRECONDITION_FAILED' : 'BAD_GATEWAY',
       message: definitive ? failed : `${failed} Try again.`,

@@ -23,6 +23,7 @@ import {
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
 import { publishRenderedTabBarHeight, TabBarLabelContext } from '@/lib/tab-bar-clearance';
+import { isFormSheetRoute } from '@/lib/form-sheet-routes';
 import { profileTabPressListeners, tabPressListeners } from '@/lib/tab-press-listeners';
 import {
   getEffectiveTabBarHeight,
@@ -61,6 +62,15 @@ export default function TabsLayout() {
   const { width } = useWindowDimensions();
   const fontScale = useLiveFontScale();
   const hideTabs = shouldHideTabBar(pathname, segments);
+  // A form sheet presented inside a tab stack (the organization sheets, the
+  // pickers) covers this tab's screen. The covered scene hides itself through
+  // the stack's screen layout gate, but the bar is rendered by this navigator
+  // beside the scenes, outside every scene gate, so its entries stay in the
+  // accessibility tree and a reader reaches them before the sheet's content.
+  // While a form sheet route is presented, the entries carry the same hiding
+  // presentation the covered scene uses. The bar stays visible and tappable for
+  // a sighted user; only the accessibility tree changes.
+  const sheetOverTabs = isFormSheetRoute(segments);
   const tabCount = VISIBLE_TAB_COUNT;
   // The label box is the tab item minus the bar's side safe areas and the
   // tab item's own padding (subtracted inside `tabLabelFits`). A window whose
@@ -175,7 +185,7 @@ export default function TabsLayout() {
           // leaving that clipped strip. The content clearance below the bar does
           // not change, so hiding and restoring it moves nothing.
           tabBarHideOnKeyboard: true,
-          tabBarButton: TabBarButton,
+          tabBarButton: props => <TabBarButton hiddenFromA11y={sheetOverTabs} {...props} />,
           tabBarIconStyle: TAB_BAR_ICON_STYLE,
           tabBarLabelPosition: 'below-icon',
           tabBarStyle: {

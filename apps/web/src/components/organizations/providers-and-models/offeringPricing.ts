@@ -1,38 +1,12 @@
-import type { CustomPricingConfig, OpenRouterPricing } from '@kilocode/db/schema-types';
-import {
-  formatPricePerToken,
-  getCustomPricing,
-} from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
+import type { OpenRouterPricing } from '@kilocode/db/schema-types';
 import { getModelDisplayPricing } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/display-pricing';
 import type { OfferingPricing } from '@/components/organizations/providers-and-models/providersAndModels.types';
 
-function listPriceIfDiscounted(listPrice: string, billedPrice: string): string | undefined {
-  return Number.parseFloat(billedPrice) < Number.parseFloat(listPrice) ? listPrice : undefined;
-}
-
 /**
- * Prices for one provider endpoint as Kilo bills them. `modelVariantId` must be
- * the exact gateway id (e.g. `x/y:free`), matching how usage looks up custom
- * pricing by requested model.
+ * Prices for one provider endpoint: its default list price, with OpenRouter
+ * discounts undone. Custom pricing never applies to a single provider's price.
  */
-export function getOfferingPricing(
-  customPricingConfig: CustomPricingConfig,
-  modelVariantId: string,
-  endpointPricing: OpenRouterPricing
-): OfferingPricing {
+export function getOfferingPricing(endpointPricing: OpenRouterPricing): OfferingPricing {
   const listPricing = getModelDisplayPricing(endpointPricing) ?? endpointPricing;
-  const customPricing = getCustomPricing(customPricingConfig, modelVariantId);
-  if (!customPricing || customPricing.fallbackOnly) {
-    return { promptPrice: listPricing.prompt, completionPrice: listPricing.completion };
-  }
-
-  const billedPricing = customPricing.pricing[0].pricing;
-  const promptPrice = formatPricePerToken(billedPricing.prompt_per_million);
-  const completionPrice = formatPricePerToken(billedPricing.completion_per_million);
-  return {
-    promptPrice,
-    completionPrice,
-    originalPromptPrice: listPriceIfDiscounted(listPricing.prompt, promptPrice),
-    originalCompletionPrice: listPriceIfDiscounted(listPricing.completion, completionPrice),
-  };
+  return { promptPrice: listPricing.prompt, completionPrice: listPricing.completion };
 }

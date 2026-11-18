@@ -4,6 +4,7 @@
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
 
+import { sheetUnderHandlePaddingClass } from '@/components/sheet-header';
 import { Button } from '@/components/ui/button';
 import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
@@ -12,6 +13,7 @@ import {
   type SessionChangesDraft,
   type SessionChangesReviewBlock,
 } from '@/lib/session-changes-review';
+import { cn } from '@/lib/utils';
 
 function CommentRow({
   path,
@@ -80,7 +82,14 @@ export function SessionChangesReviewSheet({
   return (
     <Sheet visible={visible} onClose={onClose} dismissGestures={false}>
       <View className="px-4 pb-6">
-        <View className="flex-row items-center justify-between gap-3 pb-2">
+        {/* The native handle already leaves the room above the title, so the
+            title row takes the shared under-handle pair instead of its own. */}
+        <View
+          className={cn(
+            'flex-row items-center justify-between gap-3',
+            sheetUnderHandlePaddingClass('row')
+          )}
+        >
           <Text className="text-base font-semibold text-foreground">
             {t('agentChat.sessionChanges.reviewTitle', { count: draft.comments.length })}
           </Text>

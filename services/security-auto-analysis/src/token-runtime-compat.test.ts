@@ -45,6 +45,7 @@ describe('automation issuer to runtime compatibility', () => {
         token: control,
         resourceKind: 'cloud-agent-next',
         resourceId: 'session-1',
+        environment: 'production',
         organizationId,
       });
       const authenticate = (token: string, audience: string) =>

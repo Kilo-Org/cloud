@@ -26,6 +26,7 @@
     "creditHistory": "Zgodovina kreditov",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Prekliči",
     "done": "Končano",
     "retry": "Poskusi znova",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "Spremembe",
     "organizationTrialEnded": "Preizkusna doba organizacije se je končala in nima aktivnega načrta. Lastnik organizacije lahko posodobi obračun na kilo.ai, nato poskusi znova.",
-    "privateRepositoryA11y": "{{name}}, zasebno skladišče"
+    "privateRepositoryA11y": "{{name}}, zasebno skladišče",
+    "legalDocumentEnglishOnly": "Ta dokument je na voljo samo v angleščini."
   },
   "language": {
     "restarting": "Ponovni zagon za spremembo jezika",
@@ -481,7 +483,14 @@
       "viewReceipt": "Prikaži potrdilo"
     },
     "changelog": "Kaj je novega",
-    "changelogVersionPending": "Opombe za to različico prinese naslednja posodobitev aplikacije."
+    "changelogVersionPending": "Opombe za različico {{version}} prinese naslednja posodobitev aplikacije.",
+    "changelogGroupNew": "Novosti",
+    "changelogFixesIn": "Popravki in izboljšave na področjih: {{areas}}.",
+    "changelogFixesPolish": "Popravki in izboljšave v celotni aplikaciji.",
+    "changelogAreas": {
+      "signIn": "Prijava",
+      "profileOrganizations": "Profil in organizacije"
+    }
   },
   "preferences": {
     "general": "Splošno",
@@ -1400,7 +1409,8 @@
       "managedOnWeb": "Povezava Bitbucket za to organizacijo se upravlja v spletu z računalnika.",
       "description": "Ustvari žeton za dostop do delovnega prostora z zahtevanimi dovoljenji in ga prilepi spodaj.",
       "scopes": "Račun: branje · Skladišča: branje/pisanje · Zahteve za združitev: branje · Spletni povratni klici: branje/pisanje",
-      "tokenPlaceholder": "Žeton za dostop do delovnega prostora"
+      "tokenPlaceholder": "Žeton za dostop do delovnega prostora",
+      "tokenRefused": "Bitbucket ni sprejel tega žetona za dostop do delovnega prostora. Preveri, ali ima zgoraj navedena dovoljenja, nato poskusi znova."
     },
     "scopeList": {
       "personalStillAvailable": "Osebna skladišča so še vedno na voljo spodaj.",
@@ -1412,7 +1422,8 @@
       "noReviews": "Še ni pregledov",
       "noReviewsDescription": "Pregledi se prikažejo tukaj, ko pregledovalnik kode pregleda zahtevo za združitev.",
       "startManualReview": "Začni ročni pregled",
-      "configureProvider": "Nastavi ponudnika"
+      "configureProvider": "Nastavi ponudnika",
+      "connectOwnerOnly": "Prosite lastnika organizacije ali skrbnika, da poveže ponudnika."
     },
     "platformList": {
       "checking": "Preverjanje…",
@@ -1512,13 +1523,27 @@
       "repositoryLine": "Pregledi: {{reviews}} · Ugotovitve: {{findings}}",
       "empty": "Še ni pregledov z analitiko",
       "emptyDescription": "Analitika beleži dokončane preglede, dokler je omogočena za organizacijo.",
-      "off": "Analitika je za to organizacijo izklopljena.",
-      "couldNotLoad": "Analitike ni bilo mogoče naložiti"
+      "offTitle": "Analitika je za {{platform}} izklopljena",
+      "offDescription": "Lastniki, skrbniki in upravitelji obračunavanja v organizaciji lahko vklopijo analitiko v nastavitvah organizacije na spletu, da se beležijo dokončani pregledi.",
+      "couldNotLoad": "Analitike ni bilo mogoče naložiti",
+      "trackedReviewsCaption": "Dokončani pregledi, ki so se zaključili v tem obdobju z vklopljeno analitiko. Pregledi v teku in neuspešni pregledi se nikoli ne štejejo.",
+      "trackedReviewsUncounted": "Ni preštetih: {{displayCount}} od {{displayTotal}} dokončanih pregledov organizacije, njihov rezultat ni bil zajet.",
+      "trackedReviewsUncounted_few": "Ni preštetih: {{displayCount}} od {{displayTotal}} dokončanih pregledov organizacije, njihov rezultat ni bil zajet.",
+      "trackedReviewsUncounted_one": "Ni preštetih: {{displayCount}} od {{displayTotal}} dokončanih pregledov organizacije, njihov rezultat ni bil zajet.",
+      "trackedReviewsUncounted_other": "Ni preštetih: {{displayCount}} od {{displayTotal}} dokončanih pregledov organizacije, njihov rezultat ni bil zajet.",
+      "trackedReviewsUncounted_two": "Ni preštetih: {{displayCount}} od {{displayTotal}} dokončanih pregledov organizacije, njihov rezultat ni bil zajet."
     },
     "council": {
       "title": "Kolegijski pregled",
       "subtitle": "Vsak zahtevek za združitev pregleda več strokovnjakov, njihovi glasovi pa se združijo v eno odločitev.",
-      "unavailable": "Kolegijski pregled za to organizacijo ni na voljo.",
+      "unavailablePersonallyTitle": "Potrebuje organizacijo Enterprise",
+      "unavailablePersonally": "Kolegijski pregled ni del osebnega računa.",
+      "unavailablePersonallyAction": "Ustvari organizacijo",
+      "unavailablePersonallySwitchAction": "Preklopi organizacijo",
+      "unavailableOrganizationTitle": "Kolegijski pregled trenutno ni na voljo",
+      "unavailableForOrganization": "Kolegijski pregled zahteva paket Enterprise z aktivno naročnino ali preizkusnim obdobjem. Ta organizacija ga trenutno nima.",
+      "unavailableForOrganizationNeutral": "Kolegijski pregled za to organizacijo trenutno ni na voljo. Poskusite znova pozneje.",
+      "unavailableOnBitbucket": "Kolegijski pregled ni na voljo za skladišča Bitbucket.",
       "noRepositories": "Nobeno skladišče še ni izbrano. Najprej izberi skladišča v nastavitvah skladišč.",
       "specialists": "Strokovnjaki",
       "labels": "Oznake, ki sprožijo kolegijski pregled",
@@ -3083,6 +3108,7 @@
     "signOutThisDevice": "Odjavi to napravo",
     "signOutSessionLabel": "Odjavi napravo {{device}}, prijava: {{signedIn}}, zadnja dejavnost: {{lastSeen}}",
     "sessionSignedOut": "Seja je odjavljena.",
+    "sessionSignOutFailed": "Te seje ni bilo mogoče odjaviti. Poskusi znova.",
     "signOutThisDeviceTitle": "Želiš odjaviti to napravo?",
     "signOutThisSessionTitle": "Želiš odjaviti to sejo?",
     "signOutThisSessionMessage": "Naprava {{device}} bo odjavljena. Zadnja dejavnost: {{lastSeen}}. Dostop do API lahko ohrani še največ eno uro.",
@@ -3210,12 +3236,14 @@
     "manage": {
       "billingHistory": "Zgodovina obračunov",
       "billingHistoryEmpty": "Zgodovine obračunov še ni.",
+      "billingHistoryError": "Ni mogoče naložiti zgodovine obračunov",
       "cancel": "Prekliči naročnino",
       "cancelDescription": "Vaš Kilo Pass ostane aktiven do konca obračunskega obdobja in se ne bo podaljšal.",
       "cancelScheduled": "Preklic dne {{date}}",
       "cancelScheduledChange": "Prekliči načrtovano spremembo",
       "cancelled": "Naročnina je preklicana",
       "creditHistoryEmpty": "Kreditov Kilo Pass še ni.",
+      "creditHistoryError": "Ni mogoče naložiti zgodovine kreditov",
       "resume": "Nadaljuj naročnino",
       "resumeCancelledDescription": "Vaš Kilo Pass se bo znova samodejno podaljševal.",
       "resumePausedDescription": "Vaš Kilo Pass se nadaljuje zdaj, pred načrtovanim datumom nadaljevanja.",
@@ -3232,7 +3260,6 @@
     "completingPurchase": "Dokončevanje nakupa",
     "subscriptionLoading": "Nalaganje naročnine Kilo Pass",
     "retryHint": "Znova poskusi naložiti stanje naročnine Kilo Pass.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Končano {{date}}",
     "notAvailableInApp": "Kilo Pass v aplikaciji ni na voljo.",
     "statusActive": "Aktiven",
@@ -3435,6 +3462,7 @@
       "manageOnWeb": "Nastavitve obračunavanja na spletu",
       "changePlan": "Spremeni načrt",
       "buySeats": "Kupi uporabniška mesta",
+      "managedOnWeb": "Načrt, uporabniška mesta in samodejno polnjenje se upravljajo na spletu.",
       "setupAutoTopUp": "Nastavi samodejno polnjenje",
       "manageAutoTopUp": "Upravljaj samodejno polnjenje",
       "opensOnWeb": "Odpre se v spletu"
@@ -3452,7 +3480,7 @@
       "selectOrganization": "Izberi organizacijo",
       "unavailableDescription": "Ta organizacija ni več na voljo. Za nadaljevanje na svojem profilu izberi drugo.",
       "unavailableSessionsDescription": "Ta organizacija ni več na voljo. Njenih sej ni mogoče naložiti.",
-      "accessDeniedDescription": "Nimaš dostopa do te organizacije."
+      "accessDeniedDescription": "Prosi lastnika ali skrbnika organizacije, naj ti odobri dostop."
     },
     "create": {
       "title": "Ustvari organizacijo",
@@ -3572,16 +3600,26 @@
     },
     "settingsOnWeb": {
       "title": "Nastavitve organizacije na spletu",
-      "integrations": "Integracije na spletu",
       "usageDetails": "Podrobnosti porabe",
       "providersAndModels": "Ponudniki in modeli",
       "groups": "Skupine",
       "guardrails": "Varovala",
       "byok": "Uporaba lastnega ključa",
+      "ssoAndDomain": "SSO in domena",
+      "dataCollection": "Zbiranje podatkov",
       "auditLogs": "Revizijski dnevniki",
-      "requestLogs": "Dnevniki zahtev",
-      "subOrganizations": "Podorganizacije",
-      "distributeFunds": "Razdeli sredstva"
+      "requestLogs": "Dnevniki zahtev"
+    },
+    "requestLogs": {
+      "older": "Prejšnja ura",
+      "newer": "Naslednja ura",
+      "truncated": "V tej uri je več zahtev, kot jih prikazuje seznam.",
+      "emptyTitle": "V tej uri ni zahtev",
+      "emptyDescription": "Uporabite Prejšnja ura za ogled prejšnjih zahtev.",
+      "loadError": "Dnevnikov zahtev ni bilo mogoče naložiti.",
+      "permissionDenied": "Dnevnike zahtev organizacije lahko bere samo njen lastnik, skrbnik ali upravitelj obračunavanja.",
+      "tokens": "{{input}} vhod · {{output}} izhod",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Vhodni žetoni",
@@ -4399,8 +4437,7 @@
       "repoValue": "Repozitorij: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Ta profil ni več na voljo. Izberi drugega.",
-      "pickerEmptyDescriptionOrganization": "Ustvarite organizacijski profil za ponovno uporabo spremenljivk okolja, nastavitvenih ukazov in veščin med sejami.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Organizacijski profil lahko ustvari lastnik organizacije ali skrbnik."
+      "pickerEmptyDescriptionOrganization": "Ustvarite organizacijski profil za ponovno uporabo spremenljivk okolja, nastavitvenih ukazov in veščin med sejami."
     },
     "variablesDeleteFailed": "Spremenljivke ni bilo mogoče izbrisati",
     "deleteVariable": "Izbriši spremenljivko {{key}}",
@@ -4594,7 +4631,6 @@
     "dismiss": "Zavrzi poročilo",
     "offline": "Brez povezave · shranjeno poročilo",
     "cached": "Shranjeno poročilo · osvežitev ni na voljo",
-    "window": "{{start}} – {{end}}",
     "summary": "AI povzetek",
     "summaryPending": "AI povzetek je v pripravi. Ko bo pripravljen, bo priložen tukaj.",
     "summaryUnavailable": "AI povzetek ni na voljo. Strukturirano poročilo je še vedno na voljo.",
@@ -4661,6 +4697,8 @@
     "topModels": "Najpogostejši modeli",
     "topFeatures": "Najpogostejše funkcije",
     "emptyTitle": "V tem obdobju ni porabe",
+    "unavailableTitle": "Poraba ni na voljo",
+    "unavailableDescription": "Ta delovni prostor ne poroča o porabi. Ponovni poskus ne bo pomagal.",
     "orgSelfNotice": "Prikazana je vaša lastna poraba v tej organizaciji.",
     "viewDetails": "Ogled podrobnosti porabe"
   },
@@ -4711,6 +4749,7 @@
       "title": "Sprožilci in spletni kavlji",
       "subtitle": "Avtomatizirajte izvajanja Cloud Agent s klicem spletnega kavlja ali po urniku.",
       "new": "Nov sprožilec",
+      "create": "Ustvari sprožilec",
       "emptyTitle": "Ni še nobenega sprožilca",
       "emptyDescription": "Ustvarite sprožilec za zagon Cloud Agent s klicem spletnega kavlja ali po urniku.",
       "loadFailedTitle": "Sprožilcev ni bilo mogoče naložiti",
@@ -4732,7 +4771,7 @@
       "fieldCron": "Izraz cron",
       "fieldCronHelp": "Pet polj: minuta, ura, dan, mesec in dan v tednu. Najkrajši interval je ena minuta.",
       "fieldTimezone": "Časovni pas",
-      "nameLocked": "Ime je del URL spletnega kavlja in se ne more spremeniti.",
+      "nameLocked": "Ime se po ustvaritvi sprožilca ne more spremeniti.",
       "repositoryLocked": "Repozitorij se po ustvaritvi sprožilca ne more spremeniti.",
       "environmentAutomatic": "Samodejno glede na repozitorij",
       "notSelected": "Ni izbrano",
@@ -4747,6 +4786,7 @@
       "authHeaderLabel": "Ime zaglavja",
       "authSecretLabel": "Skupna skrivnost",
       "authSecretKeep": "Pustite prazno, da obdržite shranjeno skrivnost.",
+      "authSecretSet": "Obvezno. Izberite močan naključen niz.",
       "authSecretCreator": "Uporabite vsaj 16 znakov, ko se sprožilec izvaja kot njegov ustvarjalec.",
       "autoCommit": "Potrdi spremembe, ko se izvajanje konča",
       "condenseOnComplete": "Zgošči kontekst, ko se izvajanje konča",
@@ -4757,11 +4797,14 @@
       "saveFailedTitle": "Sprožilca ni bilo mogoče shraniti",
       "deleteTitle": "Želite izbrisati ta sprožilec?",
       "deleteMessage": "Klici na {{name}} ne bodo uspeli. Tega ni mogoče razveljaviti.",
+      "deleteMessageScheduled": "Načrtovani zagoni sprožilca {{name}} se bodo ustavili. Tega ni mogoče razveljaviti.",
       "runNow": "Zaženi zdaj",
       "runStarted": "Izvajanje se je začelo",
       "created": "Sprožilec je ustvarjen",
       "saved": "Sprožilec je shranjen",
       "statusArrived": "Prispelo",
+      "defaultPromptWebhook": "Opišite telo zahteve tega spletnega kavlja:\n\n{{body}}",
+      "defaultPromptScheduled": "Zaženite načrtovano opravilo. Sproženo ob {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Vnesite ime.",
         "nameTooShort": "Uporabite vsaj 8 znakov.",
@@ -4796,8 +4839,9 @@
     "create": "Ustvari povezavo",
     "createFailed": "Povezave ni bilo mogoče ustvariti.",
     "existingTitle": "Obstoječa povezava",
-    "existingDescription": "Ta seja že ima povezavo za deljenje. Če ustvarite novo, bo nadomestila obstoječo in stara povezava ne bo več delovala.",
+    "existingDescription": "Ta seja že ima povezavo za deljenje. Če ustvarite novo povezavo s temi nastavitvami, bo nadomestila obstoječo in stara povezava ne bo več delovala.",
     "rotate": "Ustvari novo povezavo",
+    "replacementSettings": "Te nastavitve veljajo za novo povezavo.",
     "revoke": "Odstrani povezavo",
     "revokeTitle": "Preklicati povezavo?",
     "revokeMessage": "Trenutna povezava bo takoj prenehala delovati.",
@@ -4809,6 +4853,7 @@
     "superseded": "Ta povezava je bila zamenjana drugje, zato ne deluje več."
   },
   "sharedSession": {
+    "startedAt": "Začeto ob {{time}}",
     "title": "Deljena seja",
     "someone": "Nekdo",
     "sharedBy": "Deli: {{owner}}",
@@ -4816,5 +4861,177 @@
     "unavailableDescription": "Ta povezava za deljenje je potekla ali je bila preklicana.",
     "transcriptUnavailableTitle": "Prepisa ni bilo mogoče naložiti",
     "transcriptUnavailableDescription": "Povezava še vedno deluje. Poskusite znova čez trenutek."
+  },
+  "organizationGuardrails": {
+    "title": "AI varovala",
+    "permissionDenied": "Samo lastniki in skrbniki organizacije lahko upravljajo AI varovala.",
+    "unavailable": "AI varovala niso na voljo za to organizacijo.",
+    "loadError": "AI varoval ni bilo mogoče naložiti",
+    "statusSaving": "Shranjevanje…",
+    "statusSaved": "Shranjeno",
+    "statusFailed": "Shranjevanje ni uspelo.",
+    "inputTitle": "Vhodna varovala",
+    "inputDescription": "Pregleda vsak vhod z Enkrypt AI, vključno z rezultati orodij. Blokirni detektor zavrne zahtevo, ko Enkrypt ni na voljo.",
+    "outputTitle": "Izhodna varovala",
+    "outputDescription": "Pregleda odgovore z Enkrypt AI, preden jih prejmejo člani. Izklopljeno, razen če jih vklopite.",
+    "detectorsHint": "Blokiranje zavrne označeno zahtevo. Samo beleženje jo zabeleži, ne da bi zahtevo zakasnilo.",
+    "detectorsHintOutput": "Blokiranje zavrne označeni odgovor. Samo beleženje ga zabeleži, ne da bi odgovor zakasnilo.",
+    "choiceLog": "Samo beleženje",
+    "applyTo": "Uporabi za",
+    "applyToAllMembers": "Vsi člani",
+    "applyKiloDefault": "Uporabi privzeto nastavitev Kilo",
+    "invalidSavedTitle": "Shranjenih nastavitev vhodnih detektorjev ni mogoče prebrati",
+    "invalidSavedBody": "Zahteve so blokirane, dokler vhodni detektorji niso znova shranjeni. Spodnji detektorji se začnejo s privzeto nastavitvijo Kilo.",
+    "invalidSavedOutputTitle": "Shranjenih nastavitev izhodnih detektorjev ni mogoče prebrati",
+    "invalidSavedOutputBody": "Odgovori so zadržani, dokler izhodni detektorji niso znova shranjeni. Spodaj izberite izhodne detektorje.",
+    "blockingOutputNote": "Blokirni izhodni detektor zadrži odgovor, dokler ga Enkrypt ne preveri v celoti. Za izogibanje zakasnitvi uporabite Samo beleženje.",
+    "inputDetectorRequired": "Vklopite vsaj en vhodni detektor.",
+    "outputDetectorRequired": "Vklopite vsaj en izhodni detektor.",
+    "rulesTooMany": "Dodajte do {{max}} pravil.",
+    "ruleIdRequired": "Vnesite oznako pravila.",
+    "ruleIdInvalid": "Oznaka pravila lahko vsebuje samo črke, številke, pike, pomišljaje in podčrtaje.",
+    "ruleTextRequired": "Opišite, kaj pravilo prepoveduje ali zahteva.",
+    "keywordTooLong": "Vsaka ključna beseda ima lahko največ {{max}} znakov.",
+    "topicTooLong": "Vsaka tema ima lahko največ {{max}} znakov.",
+    "keywordsTooMany": "Dodajte do {{max}} ključnih besed.",
+    "topicsTooMany": "Dodajte do {{max}} tem.",
+    "piiEntityRequired": "Izberite vsaj eno vrsto podatkov za zaznavanje.",
+    "keywordRequired": "Dodajte vsaj eno ključno besedo.",
+    "topicRequired": "Dodajte vsaj eno temo.",
+    "policyTextRequired": "Vnesite besedilo pravilnika.",
+    "ruleRequired": "Dodajte vsaj eno pravilo.",
+    "ruleIdDuplicate": "Vsako pravilo mora imeti svoj ID pravila.",
+    "piiEntities": "Podatki za zaznavanje",
+    "keywordsLabel": "Ključne besede",
+    "keywordsHint": "Ena ključna beseda na vrstico.",
+    "topicsHint": "Ena tema na vrstico.",
+    "policyFormat": "Oblika pravilnika",
+    "policyFormatRules": "Strukturirana pravila",
+    "policyFormatRulesDescription": "Eno pravilo na zahtevo, s kategorijo in resnostjo. Priporočeno.",
+    "policyFormatText": "Besedilo pravilnika",
+    "policyFormatTextDescription": "Prilepite obstoječi pravilnik kot navadno besedilo.",
+    "rulesEmpty": "Pravil še ni. Vsako pravilo opisuje eno stvar, ki jo vhodi ne smejo vsebovati ali zahtevati.",
+    "addRule": "Dodaj pravilo",
+    "ruleNumber": "Pravilo {{number}}",
+    "ruleRemove": "Odstrani pravilo {{number}}",
+    "ruleIdLabel": "Oznaka pravila",
+    "ruleNameLabel": "Ime (neobvezno)",
+    "ruleTextLabel": "Pravilo",
+    "ruleRiskCategory": "Kategorija tveganja",
+    "ruleApplicability": "Obseg",
+    "ruleFrameworks": "Okviri",
+    "detector": {
+      "promptInjection": {
+        "label": "Vbrizgavanje pozivov",
+        "description": "Zazna poskuse prepisovanja navodil ali izogibanja omejitvam modela."
+      },
+      "policyViolation": {
+        "label": "Kršitev pravilnika",
+        "description": "Označi vhode, ki kršijo pravilnik vaše organizacije, zapisan kot besedilo ali pravila.",
+        "descriptionOutput": "Označi odgovore, ki kršijo pravilnik vaše organizacije, zapisan kot besedilo ali pravila."
+      },
+      "pii": {
+        "label": "PII in skrivnosti",
+        "description": "Zazna osebne podatke, poverilnice, naslove IP in URL-je."
+      },
+      "keywords": {
+        "label": "Prepovedane ključne besede",
+        "descriptionOutput": "Zazna odgovore, ki vsebujejo katero koli ključno besedo, ki jo navedete."
+      },
+      "topics": {
+        "label": "Teme",
+        "descriptionOutput": "Označi odgovore o kateri koli temi, ki jo navedete."
+      },
+      "toxicity": {
+        "label": "Toksičnost",
+        "description": "Zazna toksičen, žaljiv, grozeč ali sovražen jezik."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Zazna spolne ali druge vsebine, neprimerne za delovno okolje."
+      },
+      "bias": {
+        "label": "Pristranskost",
+        "description": "Zazna pristranski ali diskriminatoren jezik."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Osebni podatki",
+        "description": "Imena, e-poštni naslovi, telefonske številke."
+      },
+      "secrets": {
+        "label": "Skrivnosti",
+        "description": "Ključi API, žetoni, gesla."
+      },
+      "ipAddress": {
+        "label": "Naslovi IP",
+        "description": "Naslovi IPv4 in IPv6."
+      },
+      "url": {
+        "label": "URL-ji",
+        "description": "Spletni naslovi."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Varnost in goljufije",
+      "safetyHarm": "Varnost in škoda",
+      "privacyDataProtection": "Zasebnost in varstvo podatkov",
+      "brandReputationTrust": "Blagovna znamka in ugled",
+      "biasFairnessEthical": "Pristranskost in pravičnost",
+      "legalIpLiability": "Pravna odgovornost in odgovornost glede intelektualne lastnine",
+      "productMisuse": "Zloraba izdelka",
+      "performanceQuality": "Delovanje in kakovost"
+    },
+    "applicability": {
+      "user": "Uporabniški vnos",
+      "userAssistant": "Uporabniški vnos in odgovori"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM 10 najpomembnejših tveganj (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "Akt EU o umetni inteligenci",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Funkcija za podjetja",
+    "enterpriseOnly": "To je funkcija samo za podjetja.",
+    "readOnly": "Samo lastniki in skrbniki organizacije lahko spremenijo te nastavitve.",
+    "loadError": "Ponudnikov in modelov ni bilo mogoče naložiti",
+    "tabModels": "Modeli",
+    "tabProviders": "Ponudniki",
+    "tabGateways": "Prehodi",
+    "modelsDescription": "Izklopite model, da ga blokirate za vse člane. Modeli dovoljenih ponudnikov so privzeto vklopljeni.",
+    "modelsDeniedOnly": "Samo zavrnjeni",
+    "modelsEmpty": "Noben model ne ustreza temu iskanju.",
+    "modelsDeniedEmpty": "Noben model ni zavrnjen.",
+    "modelsDeniedSearchEmpty": "Noben zavrnjen model ne ustreza temu iskanju.",
+    "providersDescription": "Izklopite ponudnika, da Kilo za to organizacijo preneha usmerjati vanj.",
+    "providersNeedCatalog": "Stikala ponudnikov ostanejo samo za branje, dokler se ne naloži celoten katalog modelov. Če jih želite urejati, zgoraj tapnite Poskusi znova.",
+    "providersEmpty": "Noben ponudnik ne ustreza temu iskanju.",
+    "allowAllShown": "Dovoli vse prikazane",
+    "denyAllShown": "Zavrni vse prikazane",
+    "gatewaysDescription": "Kilo usmerja zahteve modelov prek Vercel AI Gateway ali OpenRouter. Če je prehod onemogočen, te zahteve ne uspejo.",
+    "emptyProviderList": "Dovolite vsaj enega ponudnika. Prazen seznam blokira vse poti modelov Kilo.",
+    "gatewaysUnavailable": "Nastavitve prehodov za to organizacijo niso na voljo.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "Zahteve OpenRouter niso vezane na regijo.",
+    "inferenceRegion": "Regija sklepanja",
+    "inferenceRegionDescription": "Veže zahteve Vercel AI Gateway na to regijo. Model, ki tam ni na voljo, ne uspe.",
+    "disableOpenrouterNote": "Onemogočanje storitve OpenRouter blokira tudi ključe BYOK, ki usmerjajo zahteve prek nje.",
+    "emptyModelList": "Pustite vklopljen vsaj en model. Če zavrnete vse modele, člani ne bodo imeli ničesar za uporabo.",
+    "catalogUnavailable": "Celoten katalog modelov se ni naložil, zato so prikazani le vaši shranjeni seznami. Poskusite znova, da naložite vse modele.",
+    "region": {
+      "global": "Globalno",
+      "us": "Združene države",
+      "eu": "Evropska unija",
+      "au": "Avstralija",
+      "jp": "Japonska"
+    }
   }
 }

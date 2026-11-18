@@ -13,6 +13,7 @@ import type { CloudChatPage as CloudChatPageComponent } from './CloudChatPage';
 import type { ChatHeader } from './ChatHeader';
 import type { SetPageTitle } from '@/components/SetPageTitle';
 import type { WorktreeChangesView } from './WorktreeChanges';
+import type { WorkspaceArtifactsView } from './WorkspaceArtifacts';
 import type { ConversationMessages } from './assistant-ui/test-renderers';
 import type { StoredMessage, StoredSession } from './types';
 import type { SessionCommit } from '@kilocode/cloud-agent-sdk';
@@ -46,6 +47,7 @@ let mockTabs: ComponentProps<typeof CloudAgentWorkspaceTabs>;
 let mockReview: Partial<ReturnType<typeof useWorktreeReview>> = { scope: null };
 let mockReviewDialog: ComponentProps<typeof WorktreeReviewDialog>;
 let mockChanges: ComponentProps<typeof WorktreeChangesView>;
+let mockArtifacts: ComponentProps<typeof WorkspaceArtifactsView>;
 let mockConversation: ComponentProps<typeof ConversationMessages>;
 let mockAtomValues: Record<string, unknown>;
 let mockPageTitle: ComponentProps<typeof SetPageTitle>;
@@ -123,7 +125,8 @@ jest.mock('@tanstack/react-query', () => ({
   queryOptions: (options: unknown) => options,
   useMutation: () => ({ mutateAsync: jest.fn() }),
   useQuery: (options: { queryKey: unknown[] }) => {
-    if ((options.queryKey[0] as unknown[] | undefined)?.[0] === 'getWorkspaceSnapshotRecovery') {
+    const queryScope = options.queryKey[0];
+    if ((queryScope as unknown[] | undefined)?.[0] === 'getWorkspaceSnapshotRecovery') {
       return { data: undefined };
     }
     mockParentQuery(options);
@@ -226,14 +229,41 @@ jest.mock('./older-messages-scroll', () => ({
 }));
 jest.mock('./MobileSidebarToggle', () => ({ MobileSidebarToggle: () => null }));
 jest.mock('./ChatHeader', () => ({
-  ChatHeader: ({ onToggleChanges, changesOpen }: ComponentProps<typeof ChatHeader>) =>
-    onToggleChanges
-      ? createElement('button', {
-          'data-changes-trigger': true,
-          'aria-expanded': changesOpen,
-          onClick: onToggleChanges,
+  ChatHeader: ({
+    onToggleChanges,
+    changesOpen,
+    onToggleArtifacts,
+    artifactsOpen,
+  }: ComponentProps<typeof ChatHeader>) =>
+    createElement(
+      'div',
+      null,
+      onToggleChanges
+        ? createElement('button', {
+            'data-changes-trigger': true,
+            'aria-expanded': changesOpen,
+            onClick: onToggleChanges,
+          })
+        : null,
+      onToggleArtifacts
+        ? createElement('button', {
+            'data-artifacts-trigger': true,
+            'aria-expanded': artifactsOpen,
+            onClick: onToggleArtifacts,
+          })
+        : null
+    ),
+}));
+jest.mock('./WorkspaceArtifacts', () => ({
+  WorkspaceArtifactsView: (props: ComponentProps<typeof WorkspaceArtifactsView>) => {
+    mockArtifacts = props;
+    return props.open
+      ? createElement('aside', {
+          'data-artifacts-owner': props.cloudAgentSessionId,
+          id: 'workspace-artifacts-panel',
         })
-      : null,
+      : null;
+  },
 }));
 jest.mock('./WorktreeChanges', () => ({
   WorktreeChangesView: (props: ComponentProps<typeof WorktreeChangesView>) => {
@@ -594,6 +624,8 @@ describe('CloudChatPage terminal ownership across navigation', () => {
       staticMessages: [],
       dynamicMessages: [],
       pendingMessages: new Map(),
+      resolvedDeliveryFailures: new Set(),
+      supersededInFlightMessageIds: new Set(),
       preparationAttempts: [],
       commits: [],
       unreadablePermissions: [],
@@ -723,6 +755,15 @@ describe('CloudChatPage terminal ownership across navigation', () => {
     act(() => trigger.click());
     const drawer = dom.container.querySelector<HTMLElement>('[data-changes-owner]');
     expect(drawer?.hidden).toBe(false);
+    return drawer;
+  }
+
+  function openArtifacts() {
+    const trigger = dom.container.querySelector<HTMLButtonElement>('[data-artifacts-trigger]');
+    if (!trigger) throw new Error('Missing artifacts trigger');
+    act(() => trigger.click());
+    const drawer = dom.container.querySelector<HTMLElement>('[data-artifacts-owner]');
+    expect(drawer).not.toBeNull();
     return drawer;
   }
 
@@ -1065,6 +1106,50 @@ describe('CloudChatPage terminal ownership across navigation', () => {
     expect(dom.container.querySelector<HTMLElement>('[data-changes-owner]')?.hidden).toBe(true);
     expect(mockTabs.selectionSuppressed).toBe(false);
     expect(mockTabs.activeTabId).toBe(activeTabId);
+  });
+
+  it('shows artifacts in a drawer over the transcript without suppressing tab selection', () => {
+    render();
+    const conversation = dom.container.querySelector('[data-conversation]');
+    const composer = dom.container.querySelector('[data-composer]');
+    const activeTabId = mockTabs.activeTabId;
+    expect(mockTabs.selectionSuppressed).toBe(false);
+
+    openArtifacts();
+    expect(dom.container.querySelector('[data-conversation]')).toBe(conversation);
+    expect(dom.container.querySelector('[data-composer]')).toBe(composer);
+    expect(conversation?.closest('[inert]')).not.toBeNull();
+    expect(mockTabs.selectionSuppressed).toBe(false);
+    expect(mockTabs.activeTabId).toBe(activeTabId);
+
+    const trigger = dom.container.querySelector<HTMLButtonElement>('[data-artifacts-trigger]');
+    act(() => trigger?.click());
+    expect(dom.container.querySelector('[data-artifacts-owner]')).toBeNull();
+    expect(conversation?.closest('[inert]')).toBeNull();
+  });
+
+  it('swaps between the changes view and the artifacts drawer', () => {
+    render();
+    openChanges();
+    expect(mockChanges.open).toBe(true);
+
+    openArtifacts();
+    expect(mockChanges.open).toBe(false);
+    expect(mockArtifacts.open).toBe(true);
+
+    const trigger = dom.container.querySelector<HTMLButtonElement>('[data-changes-trigger]');
+    act(() => trigger?.click());
+    expect(mockArtifacts.open).toBe(false);
+    expect(mockChanges.open).toBe(true);
+  });
+
+  it('closes the artifacts drawer when a terminal becomes the active tab', () => {
+    render();
+    openArtifacts();
+
+    openTerminal();
+
+    expect(dom.container.querySelector('[data-artifacts-owner]')).toBeNull();
   });
 
   function receiveCommit() {

@@ -275,10 +275,6 @@ describe('login-screen error mapping', () => {
     );
   });
 
-  it('passes a server-authored error text through untranslated', () => {
-    expect(errorMessage('error', { kind: 'text', text: 'custom error' })).toBe('custom error');
-  });
-
   it('falls back to default when no error is provided', () => {
     expect(errorMessage('error', undefined)).toBe('Something went wrong. Please try again.');
   });

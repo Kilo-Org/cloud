@@ -1,5 +1,6 @@
 import { isUnauthorizedTrpcError } from '@/lib/auth/trpc-unauthorized';
 import { type BannerState } from '@/lib/offline-banner-state';
+import { classifyReadFailureVariant } from '@/lib/query/read-failure-variant';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
 export type ScopeEntryView =
@@ -73,24 +74,28 @@ export function selectScopeEntryView({
 }
 
 /**
- * Whether the install state was refused for this caller's organization role.
+ * Whether the hand-off mint was refused for this caller's organization access.
  *
- * `githubApps.mintInstallState` authorizes through `resolveAuthorizedOwner(...,
- * ORGANIZATION_MANAGE_ROLES)` (`apps/web/src/lib/integrations/resolve-owner.ts`)
- * before it writes anything, and `ensureOrganizationAccess` answers
- * `UNAUTHORIZED` for a role below that. That answer is the server's own role
- * decision, so the entry reads it instead of inferring the role on the device: a
- * local membership read cannot see the server's Kilo-admin elevation or a
- * parent-organization role, and withholding the press on it would deny callers
- * the server admits. Any other failure is a retryable error, not a role answer.
+ * `appShell.mintHandoff` authorizes through `ensureMemberOrganizationAccess`
+ * before it mints anything, and answers `UNAUTHORIZED` for a caller that is not
+ * a member. That answer is the server's own decision, so the entry reads it
+ * instead of inferring access on the device: a local membership read cannot see
+ * the server's Kilo-admin elevation or a parent-organization role, and
+ * withholding the press on it would deny callers the server admits. Any other
+ * failure is a retryable error, not a refusal.
+ *
+ * The install itself is narrower: the shell page's start route mints its
+ * install state through `resolveAuthorizedOwner(..., ORGANIZATION_MANAGE_ROLES)`
+ * (`apps/web/src/lib/integrations/resolve-owner.ts`) and reports a narrower
+ * role on that page, so the app leaves that decision there.
  *
  * A context-level auth failure — an invalid or missing session — is also
  * `UNAUTHORIZED`, but it is flagged `data.authRequired`, the same way
- * `isPermissionDeniedError` tells it apart. It is not a role answer: the app
- * signs the reader out on it, and a personal scope has no organization whose
- * owner could be asked to connect.
+ * `isPermissionDeniedError` tells it apart. It is not a refusal: the app signs
+ * the reader out on it, and a personal scope has no organization whose owner
+ * could be asked to connect.
  */
-export function isInstallStateRefusal(error: unknown): boolean {
+export function isHandoffRefusal(error: unknown): boolean {
   return readTrpcErrorField(error, 'code') === 'UNAUTHORIZED' && !isUnauthorizedTrpcError(error);
 }
 
@@ -142,10 +147,8 @@ export function selectScopeEntryLoadFailure({
   connectivity,
   lastAttemptFailed,
 }: SelectScopeEntryLoadFailureInput): ScopeEntryLoadFailure {
-  const serverAnswered = errors.some(error => readTrpcErrorField(error, 'code') !== undefined);
-  const isConnection =
-    isPaused || connectivity === 'offline' || (errors.length > 0 && !serverAnswered);
-  if (!isConnection) {
+  const variant = classifyReadFailureVariant({ errors, isPaused, connectivity });
+  if (variant !== 'offline') {
     return { variant: 'server', descriptionKey: null };
   }
   return {

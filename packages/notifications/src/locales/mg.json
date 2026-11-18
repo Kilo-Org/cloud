@@ -12,7 +12,6 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
     }
   },
@@ -36,14 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "Fanitsakitsahana SLA"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "Misy fanavaozana ny fisavana fiarovana"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "Vonona fehezina avy amin'ny findainao ny session Kilo anao"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

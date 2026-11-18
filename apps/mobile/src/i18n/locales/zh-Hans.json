@@ -26,6 +26,7 @@
     "creditHistory": "积分记录",
     "sentenceJoiner": "。",
     "listJoiner": "、",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "取消",
     "done": "完成",
     "retry": "重试",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "更改",
     "organizationTrialEnded": "组织的试用期已结束，且没有生效的套餐。组织所有者可以在 kilo.ai 更新账单信息，然后重试。",
-    "privateRepositoryA11y": "{{name}}，私有仓库"
+    "privateRepositoryA11y": "{{name}}，私有仓库",
+    "legalDocumentEnglishOnly": "本文件仅提供英文版本。"
   },
   "language": {
     "restarting": "正在重启以应用语言设置",
@@ -481,7 +483,14 @@
       "viewReceipt": "查看回执"
     },
     "changelog": "更新内容",
-    "changelogVersionPending": "此版本的更新说明将随下次应用更新提供。"
+    "changelogVersionPending": "{{version}} 版本的更新说明将随下次应用更新提供。",
+    "changelogGroupNew": "新增",
+    "changelogFixesIn": "{{areas}}方面的修复与改进。",
+    "changelogFixesPolish": "全应用范围的修复与改进。",
+    "changelogAreas": {
+      "signIn": "登录",
+      "profileOrganizations": "个人资料和组织"
+    }
   },
   "preferences": {
     "general": "通用",
@@ -676,7 +685,8 @@
       "managedOnWeb": "此组织的 Bitbucket 连接需在电脑上通过网页版进行管理。",
       "description": "创建具有所需权限范围的工作区访问令牌，并粘贴到下方。",
       "scopes": "账户：读取 · 仓库：读/写 · 拉取请求：读取 · Webhook：读/写",
-      "tokenPlaceholder": "工作区访问令牌"
+      "tokenPlaceholder": "工作区访问令牌",
+      "tokenRefused": "Bitbucket 未接受此工作区访问令牌。请检查其是否具有上述权限范围，然后重试。"
     },
     "followReviewMd": "遵循 REVIEW.md",
     "followReviewMdSubtitle": "遵循各仓库 REVIEW.md 文件中的说明",
@@ -777,6 +787,7 @@
     },
     "reviewList": {
       "configureProvider": "配置代码托管平台",
+      "connectOwnerOnly": "请让组织所有者或管理员连接代码托管平台。",
       "couldNotLoad": "无法加载审查记录。",
       "noReviews": "暂无审查记录",
       "noReviewsDescription": "代码审查器审查拉取请求后，这里将显示审查记录。",
@@ -921,13 +932,25 @@
       "repositoryLine": "审查：{{reviews}} · 问题：{{findings}}",
       "empty": "还没有带分析数据的审查",
       "emptyDescription": "在组织启用分析期间，系统会记录已完成的审查。",
-      "off": "此组织已关闭分析。",
-      "couldNotLoad": "无法加载分析数据"
+      "offTitle": "已关闭 {{platform}} 的分析",
+      "offDescription": "组织账单角色（所有者、管理员和账单管理员）可以在网页版组织设置中启用分析，以记录已完成的审查。",
+      "couldNotLoad": "无法加载分析数据",
+      "trackedReviewsCaption": "本时间段内启用分析后完成的审查。运行中和失败的审查永不计入。",
+      "trackedReviewsUncounted": "未计入：组织已有 {{displayTotal}} 个已完成的审查，其中 {{displayCount}} 个未捕获结果。",
+      "trackedReviewsUncounted_one": "未计入：组织已有 {{displayTotal}} 个已完成的审查，其中 {{displayCount}} 个未捕获结果。",
+      "trackedReviewsUncounted_other": "未计入：组织已有 {{displayTotal}} 个已完成的审查，其中 {{displayCount}} 个未捕获结果。"
     },
     "council": {
       "title": "评审团审查",
       "subtitle": "多位专家分别审查每个拉取请求，他们的投票汇总为一个决定。",
-      "unavailable": "此组织无法使用评审团审查。",
+      "unavailablePersonallyTitle": "需要 Enterprise 组织",
+      "unavailablePersonally": "评审团审查不包含在个人账户中。",
+      "unavailablePersonallyAction": "创建组织",
+      "unavailablePersonallySwitchAction": "切换组织",
+      "unavailableOrganizationTitle": "评审团审查目前无法使用",
+      "unavailableForOrganization": "评审团审查需要具备生效订阅或试用期的企业套餐。此组织目前不具备此项。",
+      "unavailableForOrganizationNeutral": "此组织目前无法使用评审团审查。请稍后再试。",
+      "unavailableOnBitbucket": "评审团审查不适用于 Bitbucket 仓库。",
       "noRepositories": "尚未选择任何仓库。请先在仓库设置中选择仓库。",
       "specialists": "专家",
       "labels": "触发评审团审查的标签",
@@ -2431,6 +2454,7 @@
     "signOutThisDevice": "在此设备上退出登录",
     "signOutSessionLabel": "在{{device}}上退出登录，登录于 {{signedIn}}，最后在线 {{lastSeen}}",
     "sessionSignedOut": "会话已退出登录。",
+    "sessionSignOutFailed": "无法退出此登录会话。请重试。",
     "signOutThisDeviceTitle": "在此设备上退出登录？",
     "signOutThisSessionTitle": "退出此登录会话？",
     "signOutThisSessionMessage": "{{device}} 将退出登录，最后在线 {{lastSeen}}。其 API 访问权限最多仍可保留一小时。",
@@ -2553,12 +2577,14 @@
     "manage": {
       "billingHistory": "账单记录",
       "billingHistoryEmpty": "暂无账单记录。",
+      "billingHistoryError": "无法加载账单记录",
       "cancel": "取消订阅",
       "cancelDescription": "你的 Kilo Pass 将保持有效至当前计费周期结束，之后不再续订。",
       "cancelScheduled": "将于 {{date}} 取消",
       "cancelScheduledChange": "取消计划变更",
       "cancelled": "已取消订阅",
       "creditHistoryEmpty": "暂无 Kilo Pass 积分。",
+      "creditHistoryError": "无法加载 Kilo Pass 积分记录",
       "resume": "恢复订阅",
       "resumeCancelledDescription": "你的 Kilo Pass 将重新开始自动续订。",
       "resumePausedDescription": "你的 Kilo Pass 将立即恢复，早于原定的恢复日期。",
@@ -2575,7 +2601,6 @@
     "completingPurchase": "正在完成购买流程",
     "subscriptionLoading": "Kilo Pass 订阅加载中",
     "retryHint": "重新获取 Kilo Pass 状态。",
-    "cardAccessibility": "{{title}}。{{description}}。{{actionLabel}}",
     "endedOn": "{{date}} 已结束",
     "notAvailableInApp": "Kilo Pass 在应用中不可用。",
     "statusActive": "生效中",
@@ -3313,6 +3338,7 @@
       "manageOnWeb": "网页版账单设置",
       "changePlan": "更改套餐",
       "buySeats": "购买席位",
+      "managedOnWeb": "套餐、席位和自动充值在网页版中管理。",
       "setupAutoTopUp": "设置自动充值",
       "manageAutoTopUp": "管理自动充值",
       "opensOnWeb": "在网页中打开"
@@ -3330,7 +3356,7 @@
       "selectOrganization": "选择组织",
       "unavailableDescription": "此组织已不可用。请从账户选择器中选择其他账户后继续。",
       "unavailableSessionsDescription": "此组织已不可用。无法加载其会话。",
-      "accessDeniedDescription": "你无权访问此组织。"
+      "accessDeniedDescription": "请让组织所有者或管理员授予你访问权限。"
     },
     "create": {
       "title": "创建组织",
@@ -3463,16 +3489,26 @@
     },
     "settingsOnWeb": {
       "title": "网页版组织设置",
-      "integrations": "网页版集成",
       "usageDetails": "用量详情",
       "providersAndModels": "提供商和模型",
       "groups": "群组",
       "guardrails": "防护规则",
       "byok": "自带密钥",
+      "ssoAndDomain": "SSO 和域名",
+      "dataCollection": "数据收集",
       "auditLogs": "审计日志",
-      "requestLogs": "请求日志",
-      "subOrganizations": "子组织",
-      "distributeFunds": "分配资金"
+      "requestLogs": "请求日志"
+    },
+    "requestLogs": {
+      "older": "上一小时",
+      "newer": "下一小时",
+      "truncated": "该小时的请求数超出列表可显示的数量。",
+      "emptyTitle": "该小时暂无请求",
+      "emptyDescription": "使用“上一小时”查看更早的请求。",
+      "loadError": "无法加载请求日志。",
+      "permissionDenied": "只有组织的所有者、管理员或账单管理员才能查看其请求日志。",
+      "tokens": "输入 {{input}} · 输出 {{output}}",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "输入词元",
@@ -4267,8 +4303,7 @@
       "repoValue": "仓库: {{name}}",
       "profileValue": "配置文件: {{name}}",
       "profileUnavailable": "此配置文件已不可用。请选择其他配置文件。",
-      "pickerEmptyDescriptionOrganization": "创建组织配置文件，以跨会话重复使用环境变量、设置命令和技能。",
-      "pickerEmptyDescriptionOrganizationReadOnly": "组织所有者或管理员可以创建组织配置文件。"
+      "pickerEmptyDescriptionOrganization": "创建组织配置文件，以跨会话重复使用环境变量、设置命令和技能。"
     },
     "variablesDeleteFailed": "无法删除变量",
     "deleteVariable": "删除变量 {{key}}",
@@ -4454,7 +4489,6 @@
     "dismiss": "忽略简报",
     "offline": "离线 · 已保存的简报",
     "cached": "已保存的报告 · 无法刷新",
-    "window": "{{start}} – {{end}}",
     "summary": "AI 摘要",
     "summaryPending": "AI 摘要生成中，完成后将附在此处。",
     "summaryUnavailable": "AI 摘要不可用。结构化报告仍可查看。",
@@ -4521,6 +4555,8 @@
     "topModels": "常用模型",
     "topFeatures": "常用功能",
     "emptyTitle": "此期间无用量",
+    "unavailableTitle": "用量不可用",
+    "unavailableDescription": "此工作区未报告用量。重试不会有帮助。",
     "orgSelfNotice": "你看到的是你自己在此组织中的用量。",
     "viewDetails": "查看用量详情"
   },
@@ -4571,6 +4607,7 @@
       "title": "触发器和 Webhook",
       "subtitle": "通过 Webhook 调用或计划自动运行 Cloud Agent。",
       "new": "新建触发器",
+      "create": "创建触发器",
       "emptyTitle": "还没有触发器",
       "emptyDescription": "创建触发器，以便通过 Webhook 调用或按计划启动 Cloud Agent 运行。",
       "loadFailedTitle": "无法加载触发器",
@@ -4592,7 +4629,7 @@
       "fieldCron": "Cron 表达式",
       "fieldCronHelp": "五个字段：分钟、小时、日、月和星期。最短间隔为一分钟。",
       "fieldTimezone": "时区",
-      "nameLocked": "名称是 Webhook 地址的一部分，无法更改。",
+      "nameLocked": "创建触发器后，名称无法更改。",
       "repositoryLocked": "创建触发器后，仓库无法更改。",
       "environmentAutomatic": "按仓库自动选择",
       "notSelected": "未选择",
@@ -4607,6 +4644,7 @@
       "authHeaderLabel": "请求头名称",
       "authSecretLabel": "共享密钥",
       "authSecretKeep": "留空以保留已保存的密钥。",
+      "authSecretSet": "必填。请选择足够强的随机字符串。",
       "authSecretCreator": "当触发器以创建者身份运行时，请使用至少 16 个字符。",
       "autoCommit": "运行结束时提交更改",
       "condenseOnComplete": "运行结束时压缩上下文",
@@ -4617,11 +4655,14 @@
       "saveFailedTitle": "无法保存触发器",
       "deleteTitle": "删除此触发器？",
       "deleteMessage": "对 {{name}} 的调用将失败。此操作无法撤销。",
+      "deleteMessageScheduled": "{{name}} 的已计划运行将停止。此操作无法撤销。",
       "runNow": "立即运行",
       "runStarted": "运行已开始",
       "created": "触发器已创建",
       "saved": "触发器已保存",
       "statusArrived": "已到达",
+      "defaultPromptWebhook": "描述此 Webhook 请求的请求体：\n\n{{body}}",
+      "defaultPromptScheduled": "运行计划任务。触发时间为 {{scheduledTime}}。",
       "problems": {
         "nameRequired": "请输入名称。",
         "nameTooShort": "请使用至少 8 个字符。",
@@ -4656,8 +4697,9 @@
     "create": "创建链接",
     "createFailed": "无法创建链接。",
     "existingTitle": "现有链接",
-    "existingDescription": "此会话已有分享链接。创建新链接将替换现有链接，旧链接将随即失效。",
+    "existingDescription": "此会话已有分享链接。使用这些设置创建新链接将替换现有链接，旧链接将随即失效。",
     "rotate": "创建新链接",
+    "replacementSettings": "这些设置将应用于新链接。",
     "revoke": "撤销链接",
     "revokeTitle": "撤销链接？",
     "revokeMessage": "当前链接将立即失效。",
@@ -4669,6 +4711,7 @@
     "superseded": "此链接已在其他设备上被替换，现已失效。"
   },
   "sharedSession": {
+    "startedAt": "开始于 {{time}}",
     "title": "已分享的会话",
     "someone": "某人",
     "sharedBy": "由{{owner}}分享",
@@ -4676,5 +4719,177 @@
     "unavailableDescription": "此分享链接已过期或已被撤销。",
     "transcriptUnavailableTitle": "无法加载此对话记录",
     "transcriptUnavailableDescription": "链接仍然有效。请稍后重试。"
+  },
+  "organizationGuardrails": {
+    "title": "人工智能护栏",
+    "permissionDenied": "只有组织所有者和管理员可以管理人工智能护栏。",
+    "unavailable": "此组织无法使用人工智能护栏。",
+    "loadError": "人工智能护栏加载失败",
+    "statusSaving": "正在保存…",
+    "statusSaved": "已保存",
+    "statusFailed": "保存失败。",
+    "inputTitle": "输入护栏",
+    "inputDescription": "使用 Enkrypt AI 扫描每个输入，包括工具结果。当 Enkrypt 不可用时，阻断型检测器会拒绝请求。",
+    "outputTitle": "输出护栏",
+    "outputDescription": "在成员收到响应之前，使用 Enkrypt AI 扫描响应。除非你将其开启，否则处于关闭状态。",
+    "detectorsHint": "阻止会拒绝被标记的请求。仅记录会将其记录下来，但不会延迟请求。",
+    "detectorsHintOutput": "阻止会让被标记的响应失败。仅记录会将其记录下来，但不会延迟响应。",
+    "choiceLog": "仅记录",
+    "applyTo": "应用于",
+    "applyToAllMembers": "所有成员",
+    "applyKiloDefault": "应用 Kilo 默认设置",
+    "invalidSavedTitle": "无法读取已保存的输入检测器设置",
+    "invalidSavedBody": "在重新保存输入检测器之前，请求会被阻止。下面的检测器将从 Kilo 默认设置开始。",
+    "invalidSavedOutputTitle": "无法读取已保存的输出检测器设置",
+    "invalidSavedOutputBody": "在重新保存输出检测器之前，响应会被扣留。请在下方选择输出检测器。",
+    "blockingOutputNote": "阻断型输出检测器会暂扣响应，直到 Enkrypt 检查完整个响应。使用“仅记录”可避免延迟。",
+    "inputDetectorRequired": "至少开启一个输入检测器。",
+    "outputDetectorRequired": "至少开启一个输出检测器。",
+    "rulesTooMany": "最多添加 {{max}} 条规则。",
+    "ruleIdRequired": "输入规则标识符。",
+    "ruleIdInvalid": "规则标识符只能使用字母、数字、点、短横线和下划线。",
+    "ruleTextRequired": "描述该规则禁止或要求的内容。",
+    "keywordTooLong": "每个关键词最多可包含 {{max}} 个字符。",
+    "topicTooLong": "每个主题最多可包含 {{max}} 个字符。",
+    "keywordsTooMany": "最多添加 {{max}} 个关键词。",
+    "topicsTooMany": "最多添加 {{max}} 个主题。",
+    "piiEntityRequired": "至少选择一种要检测的数据类型。",
+    "keywordRequired": "至少添加一个关键词。",
+    "topicRequired": "至少添加一个主题。",
+    "policyTextRequired": "输入策略文本。",
+    "ruleRequired": "至少添加一条规则。",
+    "ruleIdDuplicate": "每条规则都需要有各自的规则 ID。",
+    "piiEntities": "要检测的数据",
+    "keywordsLabel": "关键词",
+    "keywordsHint": "每行一个关键词。",
+    "topicsHint": "每行一个主题。",
+    "policyFormat": "策略格式",
+    "policyFormatRules": "结构化规则",
+    "policyFormatRulesDescription": "每项要求对应一条规则，并包含类别和严重程度。推荐。",
+    "policyFormatText": "策略文本",
+    "policyFormatTextDescription": "将现有策略粘贴为纯文本。",
+    "rulesEmpty": "尚无规则。每条规则描述输入不得包含或询问的一项内容。",
+    "addRule": "添加规则",
+    "ruleNumber": "规则 {{number}}",
+    "ruleRemove": "删除规则 {{number}}",
+    "ruleIdLabel": "规则标识符",
+    "ruleNameLabel": "名称（可选）",
+    "ruleTextLabel": "规则",
+    "ruleRiskCategory": "风险类别",
+    "ruleApplicability": "范围",
+    "ruleFrameworks": "框架",
+    "detector": {
+      "promptInjection": {
+        "label": "提示词注入",
+        "description": "检测试图覆盖指令或越狱模型的行为。"
+      },
+      "policyViolation": {
+        "label": "违反策略",
+        "description": "标记违反组织策略的输入；策略以文本或规则形式编写。",
+        "descriptionOutput": "标记违反组织策略的响应；策略以文本或规则形式编写。"
+      },
+      "pii": {
+        "label": "PII 和机密信息",
+        "description": "检测个人数据、凭证、互联网协议地址和 URL。"
+      },
+      "keywords": {
+        "label": "禁用关键词",
+        "descriptionOutput": "检测包含你列出的任意关键词的响应。"
+      },
+      "topics": {
+        "label": "主题",
+        "descriptionOutput": "标记涉及你列出的任意主题的响应。"
+      },
+      "toxicity": {
+        "label": "毒性",
+        "description": "检测有毒、侮辱、威胁或仇恨性语言。"
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "检测色情或其他不适合工作场所的内容。"
+      },
+      "bias": {
+        "label": "偏见",
+        "description": "检测带有偏见或歧视性的语言。"
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "个人数据",
+        "description": "姓名、电子邮件地址、电话号码。"
+      },
+      "secrets": {
+        "label": "机密信息",
+        "description": "API 密钥、令牌、密码。"
+      },
+      "ipAddress": {
+        "label": "互联网协议地址",
+        "description": "IPv4 和 IPv6 地址。"
+      },
+      "url": {
+        "label": "URL",
+        "description": "网址。"
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "安全与欺诈",
+      "safetyHarm": "安全与危害",
+      "privacyDataProtection": "隐私与数据保护",
+      "brandReputationTrust": "品牌与声誉",
+      "biasFairnessEthical": "偏见与公平",
+      "legalIpLiability": "法律与知识产权责任",
+      "productMisuse": "产品滥用",
+      "performanceQuality": "性能与质量"
+    },
+    "applicability": {
+      "user": "用户输入",
+      "userAssistant": "用户输入和响应"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM 十大风险（2025）",
+      "nist": "NIST AI RMF",
+      "euAiAct": "欧盟人工智能法案",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "企业版功能",
+    "enterpriseOnly": "这是仅限企业版使用的功能。",
+    "readOnly": "只有组织所有者和管理员可以更改这些设置。",
+    "loadError": "提供商和模型加载失败",
+    "tabModels": "模型",
+    "tabProviders": "提供商",
+    "tabGateways": "网关",
+    "modelsDescription": "关闭某个模型即可为所有成员阻止该模型。来自已允许提供商的模型初始为开启。",
+    "modelsDeniedOnly": "仅显示已拒绝",
+    "modelsEmpty": "没有匹配此搜索的模型。",
+    "modelsDeniedEmpty": "没有已拒绝的模型。",
+    "modelsDeniedSearchEmpty": "没有匹配此搜索的已拒绝模型。",
+    "providersDescription": "关闭某个提供商即可阻止 Kilo 为此组织路由到该提供商。",
+    "providersNeedCatalog": "在完整模型目录加载完成前，提供商开关为只读状态。点按上方的重试即可编辑。",
+    "providersEmpty": "没有匹配此搜索的提供商。",
+    "allowAllShown": "允许所有显示的项",
+    "denyAllShown": "拒绝所有显示的项",
+    "gatewaysDescription": "Kilo 通过 Vercel AI Gateway 或 OpenRouter 路由模型请求。已禁用的网关会使这些请求失败。",
+    "emptyProviderList": "请至少允许一个提供商。列表为空会阻止所有 Kilo 模型路由。",
+    "gatewaysUnavailable": "此组织无法使用网关设置。",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "OpenRouter 请求不会固定到某个区域。",
+    "inferenceRegion": "推理区域",
+    "inferenceRegionDescription": "将 Vercel AI Gateway 请求固定到此区域。在该区域不可用的模型会失败。",
+    "disableOpenrouterNote": "禁用 OpenRouter 也会阻止通过其路由请求的 BYOK 密钥。",
+    "emptyModelList": "请至少保留一个已启用的模型。拒绝所有模型会导致成员没有可用的模型。",
+    "catalogUnavailable": "未能加载完整的模型目录，因此仅显示已保存的列表。请重试以加载所有模型。",
+    "region": {
+      "global": "全球",
+      "us": "美国",
+      "eu": "欧盟",
+      "au": "澳大利亚",
+      "jp": "日本"
+    }
   }
 }

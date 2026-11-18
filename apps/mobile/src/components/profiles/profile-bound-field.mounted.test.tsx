@@ -55,8 +55,11 @@ function enter(renderer: TestRenderer.ReactTestRenderer, value: string): void {
   });
 }
 
+/** The remaining-characters row, found by the counted phrase it shows. */
 function counter(renderer: TestRenderer.ReactTestRenderer): ReactTestInstance | undefined {
-  return nodes(renderer.root, 'Text').find(node => /^\d+$/.test(String(node.props.children)));
+  return nodes(renderer.root, 'Text').find(node =>
+    String(node.props.children).endsWith('characters remaining')
+  );
 }
 
 function boundMessages(renderer: TestRenderer.ReactTestRenderer): unknown[] {
@@ -103,8 +106,8 @@ describe('profile bound field', () => {
     enter(renderer, 'x'.repeat(PROFILE_DESCRIPTION_MAX_LENGTH - 20));
 
     const remaining = counter(renderer);
-    expect(remaining?.props.children).toBe(20);
-    expect(remaining?.props.accessibilityLabel).toBe('20 characters remaining');
+    expect(remaining?.props.children).toBe('20 characters remaining');
+    expect(remaining?.props.accessibilityLabel).toBeUndefined();
     expect(boundMessages(renderer)).toHaveLength(0);
   });
 

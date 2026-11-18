@@ -99,11 +99,16 @@ function isSecurityAnalysisActive(data: SecurityAnalysis | undefined): boolean {
   return data.remediationAttempts.some(attempt => isActiveRemediationStatus(attempt.status));
 }
 
-export function useSecurityAnalysis(scope: string, findingId: string) {
+/**
+ * The finding's analysis. Pass `enabled: false` while no surface reads it: the
+ * query polls every `ANALYSIS_POLL_INTERVAL_MS` while a run is active, so an
+ * idle tab must not keep it awake.
+ */
+export function useSecurityAnalysis(scope: string, findingId: string, enabled = true) {
   const trpc = useTRPC();
   const personal = useQuery({
     ...trpc.securityAgent.getAnalysis.queryOptions({ findingId }),
-    enabled: isPersonalSecurityScope(scope),
+    enabled: enabled && isPersonalSecurityScope(scope),
     refetchInterval: query =>
       isSecurityAnalysisActive(query.state.data) ? ANALYSIS_POLL_INTERVAL_MS : false,
   });
@@ -112,7 +117,7 @@ export function useSecurityAnalysis(scope: string, findingId: string) {
       organizationId: scope,
       findingId,
     }),
-    enabled: !isPersonalSecurityScope(scope),
+    enabled: enabled && !isPersonalSecurityScope(scope),
     refetchInterval: query =>
       isSecurityAnalysisActive(query.state.data) ? ANALYSIS_POLL_INTERVAL_MS : false,
   });

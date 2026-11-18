@@ -130,6 +130,128 @@ describe('readToolPartDetail', () => {
       part: { id: projected.id, state: { output: 'complete native output' } },
     });
   });
+
+  test('degrades a native detail with an unresolved attachment to absent', () => {
+    const source = {
+      version: 'v2' as const,
+      session: {
+        id: 'ses_native',
+        location: { directory: '/workspace/app' },
+        time: { created: 1, updated: 2 },
+      },
+    };
+    const message = {
+      id: 'msg_unresolved_detail',
+      type: 'assistant',
+      time: { created: 1 },
+      content: [
+        {
+          type: 'tool',
+          id: 'call_unresolved',
+          name: 'browser',
+          state: {
+            status: 'completed',
+            input: {},
+            content: [
+              { type: 'file', uri: 'media:///private/shot.png', mime: 'image/png' },
+              { type: 'text', text: 'browser result' },
+            ],
+          },
+        },
+      ],
+    };
+    const projectedPreview = cloudSessionMessagesPageSchema.parse({
+      kind: 'success',
+      source,
+      info: { id: 'ses_native' },
+      messages: [{ message }],
+      nextCursor: null,
+      omittedItemCount: 1,
+      updateCursor: 12,
+      totalCostMicrodollars: 0,
+    });
+    // The history page already omits this message, so the detail request is
+    // exercised with the same message a page would have projected when the
+    // attachment resolved; the unresolved detail response must stay absent.
+    expect(projectedPreview?.messages).toHaveLength(0);
+    expect(
+      readToolPartDetail({ kind: 'found', source, revision: 12, message }, {
+        id: 'msg_unresolved_detail',
+        messageID: 'msg_unresolved_detail',
+        sessionID: 'ses_native',
+        type: 'tool',
+        callID: 'call_unresolved',
+        tool: 'browser',
+        state: {
+          status: 'completed',
+          input: {},
+          output: 'browser preview',
+          title: 'browser',
+          metadata: {},
+          time: { start: 1, end: 2 },
+        },
+        cloudDetail: {
+          version: 1,
+          revision: 12,
+          omitted: ['output'],
+          omittedCount: 1,
+          omittedBytes: 10,
+        },
+      } as Part)
+    ).toEqual({ kind: 'not_found' });
+  });
+
+  test('degrades a native detail whose user file is storage-free to absent', () => {
+    const source = {
+      version: 'v2' as const,
+      session: {
+        id: 'ses_native',
+        location: { directory: '/workspace/app' },
+        time: { created: 1, updated: 2 },
+      },
+    };
+    // A user file with neither bytes nor a uri cannot project, and the
+    // per-message schema rejects it before the guard: the detail response must
+    // still stay absent instead of failing the caller.
+    const detail = readToolPartDetail(
+      {
+        kind: 'found',
+        source,
+        revision: 12,
+        message: {
+          id: 'msg_storage_free_detail',
+          type: 'user',
+          time: { created: 1 },
+          text: 'attached',
+          files: [{ mime: 'image/png', source: { type: 'inline' } }],
+        },
+      },
+      {
+        id: 'msg_storage_free_detail',
+        messageID: 'msg_storage_free_detail',
+        sessionID: 'ses_native',
+        type: 'tool',
+        callID: 'call_storage_free',
+        tool: 'browser',
+        state: {
+          status: 'completed',
+          input: {},
+          output: 'browser preview',
+          title: 'browser',
+          metadata: {},
+          time: { start: 1, end: 2 },
+        },
+        cloudDetail: {
+          version: 1,
+          revision: 12,
+          omitted: ['output'],
+          omittedCount: 1,
+          omittedBytes: 10,
+        },
+      } as Part
+    );
+    expect(detail).toEqual({ kind: 'not_found' });
+  });
 });
 
 describe('preview merge guard', () => {

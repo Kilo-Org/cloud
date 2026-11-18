@@ -218,6 +218,23 @@ describe('browser_click', () => {
     }
   });
 
+  it('reports a selector that matches several elements', async () => {
+    const { session } = createFakeSession({
+      targets: {
+        '#many': { kind: 'ambiguous', matches: 3, selector: '#many' },
+      },
+    });
+
+    const result = await runInteractBrowserTool('browser_click', { target: '#many' }, session);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain(
+        'The selector matches 3 elements. Use a snapshot ref or a selector that matches one element.'
+      );
+    }
+  });
+
   it('reports a stale ref when the node is gone before the box model call', async () => {
     const { session } = createFakeSession({
       boxModelError: 'Could not find node with given id',

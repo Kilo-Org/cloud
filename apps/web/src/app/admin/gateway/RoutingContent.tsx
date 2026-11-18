@@ -78,8 +78,9 @@ export function RoutingContent() {
           <CardTitle>Vercel Routing</CardTitle>
           <CardDescription>
             Non-BYOK chat traffic for models in the Vercel AI Gateway catalog goes to Vercel;
-            otherwise it goes to OpenRouter. Opt-out models, requests with a spend ceiling, and
-            provider preferences Vercel cannot satisfy always use OpenRouter.
+            otherwise it goes to OpenRouter. Requests with a spend ceiling and provider preferences
+            Vercel cannot satisfy always use OpenRouter. Opt-out models use OpenRouter unless the
+            provider preferences allow only providers that serve the model on Vercel alone.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">

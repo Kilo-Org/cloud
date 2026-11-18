@@ -16,9 +16,9 @@ const contextSchema = z.discriminatedUnion('enabled', [
   }),
 ]);
 const sdkSchema = z.object({
-  initialize: z.custom<(options: { org_id: string; safety_identifier: string }) => unknown>(
-    value => typeof value === 'function'
-  ),
+  initialize: z.custom<
+    (options: { org_id: string; safety_identifier: string; force_ipv4: boolean }) => unknown
+  >(value => typeof value === 'function'),
   getToken: z.custom<() => unknown>(value => typeof value === 'function'),
 });
 const tokenSchema = z.object({
@@ -88,7 +88,9 @@ async function performWatchwoodSignup(signal: AbortSignal, submit: boolean): Pro
   const sdk = await loadSdk(signal);
   signal.throwIfAborted();
   if (!sdk) return;
-  await sdk.initialize({ org_id, safety_identifier });
+  // Watchwood binds each token to the client IP, and our backend sees IPv4. Without this flag,
+  // dual-stack browsers can create the token over IPv6, so the assessment reports an IP mismatch.
+  await sdk.initialize({ org_id, safety_identifier, force_ipv4: true });
   signal.throwIfAborted();
   if (!submit) return;
 

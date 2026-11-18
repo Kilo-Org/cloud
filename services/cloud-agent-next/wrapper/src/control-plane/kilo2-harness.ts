@@ -6,13 +6,7 @@ import { DrainSessionError, isKiloServerUnreachableError } from '../kilo-api.js'
 import { logToFile } from '../utils.js';
 import type { Harness, HarnessSession } from './harness.js';
 import { readSessionSnapshot } from './session-snapshot.js';
-import {
-  createKilo2Api,
-  Kilo2HttpError,
-  kilo2FormSchema,
-  kilo2PermissionSchema,
-  kilo2SessionPath,
-} from './kilo2-api.js';
+import { createKilo2Api, Kilo2HttpError, kilo2FormSchema, kilo2SessionPath } from './kilo2-api.js';
 import { createKilo2Reads, kilo2LocationQuery as locationQuery } from './kilo2-reads.js';
 import { restoreKilo2History } from './kilo2-history.js';
 import type { Kilo2Lifecycle } from './kilo2-lifecycle.js';
@@ -173,7 +167,7 @@ export function createKilo2Harness(options: {
         });
         const servers = z
           .array(mcpServerSchema)
-          .parse(await api.request(`/api/mcp?${query}`, { signal }));
+          .parse(await api.data(`/api/mcp?${query}`, { signal }));
         if (servers.find(server => server.name === MCP_SERVER_NAME)?.status.status === 'connected')
           return;
       } catch {
@@ -289,16 +283,22 @@ export function createKilo2Harness(options: {
     },
     async answer({ reply, directory, signal }) {
       if (reply.action === 'permission') {
-        const pending = z
-          .array(kilo2PermissionSchema)
-          .parse(await api.data(`/api/permission/request?${locationQuery(directory)}`, { signal }));
+        const pending = await reads.getPermissions(directory, signal);
         const request = pending.find(item => item.id === reply.permissionId);
         if (!request) return false;
-        await post(
-          `${kilo2SessionPath(request.sessionID)}/permission/${encodeURIComponent(request.id)}/reply`,
-          { decision: reply.response, ...(reply.message ? { message: reply.message } : {}) },
-          signal
-        );
+        try {
+          await post(
+            `${kilo2SessionPath(request.sessionID)}/permission/${encodeURIComponent(request.id)}/reply`,
+            { decision: reply.response, ...(reply.message ? { message: reply.message } : {}) },
+            signal
+          );
+        } catch (error) {
+          if (error instanceof Kilo2HttpError && error.status === 404) {
+            const pending = await reads.getPermissions(directory, signal);
+            if (!pending.some(item => item.id === reply.permissionId)) return false;
+          }
+          throw error;
+        }
       } else {
         const pending = z
           .array(kilo2FormSchema)
@@ -415,11 +415,14 @@ export function createKilo2Harness(options: {
       );
     },
     async generateCommitMessage(input) {
+      const query = locationQuery(input.path);
+      // Model reads wait for location plugins; RPC dispatch no longer does.
+      await api.request(`/api/model/default?${query}`, { signal: input.signal });
       const result = z
         .object({ output: z.object({ message: z.string() }) })
         .parse(
           await post(
-            `/api/rpc/kilocode.commit-message/generate?${locationQuery(input.path)}`,
+            `/api/rpc/kilocode.commit-message/generate?${query}`,
             { input: { path: input.path } },
             input.signal
           )

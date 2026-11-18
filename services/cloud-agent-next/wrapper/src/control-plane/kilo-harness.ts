@@ -80,6 +80,8 @@ export function createKiloHarness(options: KiloHarnessOptions): Harness {
         return true;
       }
       input.onRestore();
+      const telemetry = input.snapshotRestore;
+      if (telemetry) telemetry.startedAt = performance.now();
       const restored = await (options.restore ?? restoreSession)(
         input.sessionId,
         input.directory,
@@ -88,9 +90,18 @@ export function createKiloHarness(options: KiloHarnessOptions): Harness {
           env: input.env,
           signal,
           restoreFiles: input.restoreFiles,
+          ...(telemetry === undefined ? {} : { timings: telemetry.timings }),
           ...(input.roots === undefined ? {} : { roots: input.roots }),
         }
       );
+      if (telemetry?.startedAt !== undefined) {
+        telemetry.durationMs = Math.round(performance.now() - telemetry.startedAt);
+        telemetry.result = restored.ok
+          ? { outcome: restored.diffs.skipped > 0 ? 'partial' : 'restored' }
+          : restored.code === 404 || restored.emptySnapshot
+            ? { outcome: 'fallback', reason: restored.emptySnapshot ? 'empty' : 'not_found' }
+            : { outcome: 'failed', reason: restored.step };
+      }
       if (restored.ok) {
         if (restored.diffs.skipped > 0) {
           await reportRestoreIncomplete({

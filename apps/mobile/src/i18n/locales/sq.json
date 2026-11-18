@@ -26,6 +26,7 @@
     "creditHistory": "Historiku i kredive",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Anulo",
     "done": "U krye",
     "retry": "Riprovo",
@@ -175,7 +176,8 @@
     "durationHourShort": "orë",
     "changes": "Ndryshimet",
     "organizationTrialEnded": "Periudha e provës e organizatës ka përfunduar dhe nuk ka asnjë plan aktiv. Një pronar i organizatës mund të përditësojë faturimin në kilo.ai dhe më pas të provojë përsëri.",
-    "privateRepositoryA11y": "{{name}}, repozitor privat"
+    "privateRepositoryA11y": "{{name}}, repozitor privat",
+    "legalDocumentEnglishOnly": "Ky dokument është në dispozicion vetëm në anglisht."
   },
   "language": {
     "restarting": "Po riniset për të zbatuar ndryshimin e gjuhës",
@@ -481,7 +483,14 @@
       "viewReceipt": "Shiko dëftesën"
     },
     "changelog": "Çfarë ka të re",
-    "changelogVersionPending": "Shënimet e këtij versioni vijnë me përditësimin e ardhshëm."
+    "changelogVersionPending": "Shënimet për versionin {{version}} vijnë me përditësimin e ardhshëm të aplikacionit.",
+    "changelogGroupNew": "Të reja",
+    "changelogFixesIn": "Rregullime dhe përmirësime në {{areas}}.",
+    "changelogFixesPolish": "Rregullime dhe përmirësime në të gjithë aplikacionin.",
+    "changelogAreas": {
+      "signIn": "Hyrja",
+      "profileOrganizations": "Profili dhe organizatat"
+    }
   },
   "preferences": {
     "general": "Të përgjithshme",
@@ -1354,7 +1363,8 @@
       "managedOnWeb": "Lidhja me Bitbucket e kësaj organizate menaxhohet në ueb nga një kompjuter.",
       "description": "Krijo një token qasjeje për hapësirën e punës me lejet e nevojshme dhe ngjite më poshtë.",
       "scopes": "Llogaria: lexim · Depot: lexim/shkrim · PR: lexim · Webhook-et: lexim/shkrim",
-      "tokenPlaceholder": "Token qasjeje për hapësirën e punës"
+      "tokenPlaceholder": "Token qasjeje për hapësirën e punës",
+      "tokenRefused": "Bitbucket nuk e pranoi këtë token qasjeje për hapësirën e punës. Kontrollo që ai t'i ketë lejet më sipër, pastaj provo përsëri."
     },
     "scopeList": {
       "personalStillAvailable": "Depot personale janë ende të disponueshme më poshtë.",
@@ -1366,7 +1376,8 @@
       "noReviews": "Ende pa shqyrtime",
       "noReviewsDescription": "Shqyrtimet shfaqen këtu pasi shqyrtuesi i kodit të ketë shqyrtuar një PR.",
       "startManualReview": "Fillo një shqyrtim manual",
-      "configureProvider": "Konfiguro ofruesin"
+      "configureProvider": "Konfiguro ofruesin",
+      "connectOwnerOnly": "Kërkoni nga një pronar ose administrator i organizatës të lidhë një ofrues."
     },
     "platformList": {
       "checking": "Duke kontrolluar…",
@@ -1464,13 +1475,25 @@
       "repositoryLine": "Shqyrtime: {{reviews}} · Gjetje: {{findings}}",
       "empty": "Ende nuk ka shqyrtime me statistika",
       "emptyDescription": "Statistikat regjistrojnë shqyrtimet e përfunduara sa kohë që janë aktive për organizatën.",
-      "off": "Statistikat janë çaktivizuar për këtë organizatë.",
-      "couldNotLoad": "Statistikat nuk mund të ngarkoheshin"
+      "offTitle": "Statistikat janë çaktivizuar për {{platform}}",
+      "offDescription": "Pronarët, administratorët dhe menaxherët e faturimit të organizatës mund t'i aktivizojnë statistikat te cilësimet e organizatës në web për të regjistruar shqyrtimet e përfunduara.",
+      "couldNotLoad": "Statistikat nuk mund të ngarkoheshin",
+      "trackedReviewsCaption": "Shqyrtimet e përfunduara gjatë kësaj periudhe me statistikat aktive. Shqyrtimet në zhvillim dhe të dështuarat nuk numërohen kurrë.",
+      "trackedReviewsUncounted": "Nuk numërohen: {{displayCount}} nga {{displayTotal}} shqyrtimet e përfunduara të organizatës, rezultati i tyre nuk u regjistrua.",
+      "trackedReviewsUncounted_one": "Nuk numërohen: {{displayCount}} nga {{displayTotal}} shqyrtimet e përfunduara të organizatës, rezultati i tyre nuk u regjistrua.",
+      "trackedReviewsUncounted_other": "Nuk numërohen: {{displayCount}} nga {{displayTotal}} shqyrtimet e përfunduara të organizatës, rezultati i tyre nuk u regjistrua."
     },
     "council": {
       "title": "Shqyrtimi nga këshilli",
       "subtitle": "Disa ekspertë shqyrtojnë çdo PR dhe votat e tyre bashkohen në një vendim të vetëm.",
-      "unavailable": "Shqyrtimi nga këshilli nuk është i disponueshëm për këtë organizatë.",
+      "unavailablePersonallyTitle": "Kërkon një organizatë Enterprise",
+      "unavailablePersonally": "Shqyrtimi nga këshilli nuk është pjesë e një llogarie personale.",
+      "unavailablePersonallyAction": "Krijo një organizatë",
+      "unavailablePersonallySwitchAction": "Ndërro organizatën",
+      "unavailableOrganizationTitle": "Shqyrtimi nga këshilli nuk është i disponueshëm tani",
+      "unavailableForOrganization": "Shqyrtimi nga këshilli kërkon planin Enterprise me një pajtim ose një periudhë provë aktive. Kjo organizatë nuk e ka atë tani.",
+      "unavailableForOrganizationNeutral": "Shqyrtimi nga këshilli nuk është i disponueshëm për këtë organizatë tani. Provoni përsëri më vonë.",
+      "unavailableOnBitbucket": "Shqyrtimi nga këshilli nuk është i disponueshëm për depot e Bitbucket.",
       "noRepositories": "Ende nuk është zgjedhur asnjë depo. Zgjidh fillimisht depot te cilësimet e depove.",
       "specialists": "Ekspertë",
       "labels": "Etiketa që aktivizojnë shqyrtimin nga këshilli",
@@ -2973,6 +2996,7 @@
     "signOutThisDevice": "Dil nga kjo pajisje",
     "signOutSessionLabel": "Dil nga {{device}}, hyrja: {{signedIn}}, aktiviteti i fundit: {{lastSeen}}",
     "sessionSignedOut": "Seanca u mbyll.",
+    "sessionSignOutFailed": "Nuk mund të mbyllej kjo seancë. Provo përsëri.",
     "signOutThisDeviceTitle": "Do të dalësh nga kjo pajisje?",
     "signOutThisSessionTitle": "Të mbyllet kjo seancë?",
     "signOutThisSessionMessage": "Seanca në {{device}} do të mbyllet. Aktiviteti i fundit: {{lastSeen}}. Pajisja mund të ruajë qasjen në API deri në një orë.",
@@ -3096,12 +3120,14 @@
     "manage": {
       "billingHistory": "Historiku i faturimit",
       "billingHistoryEmpty": "Ende nuk ka historik faturimi.",
+      "billingHistoryError": "Nuk mundi të ngarkohet historiku i faturimit",
       "cancel": "Anulo abonimin",
       "cancelDescription": "Kilo Pass mbetet aktiv deri në fund të periudhës së faturimit dhe nuk do të rinovohet.",
       "cancelScheduled": "Anulohet më {{date}}",
       "cancelScheduledChange": "Anulo ndryshimin e planifikuar",
       "cancelled": "Abonimi u anulua",
       "creditHistoryEmpty": "Ende nuk ka kredite nga Kilo Pass.",
+      "creditHistoryError": "Nuk mundi të ngarkohet historiku i krediteve",
       "resume": "Rifillo abonimin",
       "resumeCancelledDescription": "Kilo Pass fillon sërish të rinovohet automatikisht.",
       "resumePausedDescription": "Kilo Pass rifillon tani, përpara datës së planifikuar të rifillimit.",
@@ -3118,7 +3144,6 @@
     "completingPurchase": "Po përfundon blerja",
     "subscriptionLoading": "Po ngarkohet abonimi Kilo Pass",
     "retryHint": "Riprovohet ngarkimi i gjendjes së Kilo Pass.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Përfundoi më {{date}}",
     "notAvailableInApp": "Kilo Pass nuk është i disponueshëm në aplikacion.",
     "statusActive": "Aktiv",
@@ -3321,6 +3346,7 @@
       "manageOnWeb": "Cilësimet e faturimit në ueb",
       "changePlan": "Ndrysho planin",
       "buySeats": "Bli vende",
+      "managedOnWeb": "Plani, vendet dhe rimbushja automatike menaxhohen në ueb.",
       "setupAutoTopUp": "Konfiguro rimbushjen automatike",
       "manageAutoTopUp": "Menaxho rimbushjen automatike",
       "opensOnWeb": "Hapet në ueb"
@@ -3338,7 +3364,7 @@
       "selectOrganization": "Zgjidh një organizatë",
       "unavailableDescription": "Kjo organizatë nuk është më e disponueshme. Zgjidh një tjetër nga profili yt për të vazhduar.",
       "unavailableSessionsDescription": "Kjo organizatë nuk është më e disponueshme. Sesionet e saj nuk mund të ngarkohen.",
-      "accessDeniedDescription": "Nuk ke qasje në këtë organizatë."
+      "accessDeniedDescription": "Kërko nga një pronar ose administrator i organizatës të të japë qasje."
     },
     "create": {
       "title": "Krijo organizatë",
@@ -3458,16 +3484,26 @@
     },
     "settingsOnWeb": {
       "title": "Cilësimet e organizatës në ueb",
-      "integrations": "Integrimet në ueb",
       "usageDetails": "Detajet e përdorimit",
       "providersAndModels": "Ofruesit dhe modelet",
       "groups": "Grupet",
       "guardrails": "Masat mbrojtëse",
       "byok": "Përdor çelësin tënd",
+      "ssoAndDomain": "SSO dhe domeni",
+      "dataCollection": "Mbledhja e të dhënave",
       "auditLogs": "Regjistrat e auditimit",
-      "requestLogs": "Regjistrat e kërkesave",
-      "subOrganizations": "Nënorganizatat",
-      "distributeFunds": "Shpërndaj fondet"
+      "requestLogs": "Regjistrat e kërkesave"
+    },
+    "requestLogs": {
+      "older": "Ora e mëparshme",
+      "newer": "Ora pasardhëse",
+      "truncated": "Kjo orë ka më shumë kërkesa nga sa shfaq lista.",
+      "emptyTitle": "Nuk ka kërkesa në këtë orë",
+      "emptyDescription": "Përdorni Ora e mëparshme për të parë kërkesat e mëparshme.",
+      "loadError": "Regjistrat e kërkesave nuk u ngarkuan.",
+      "permissionDenied": "Vetëm pronari, administratori ose menaxheri i faturimit i një organizate mund t'i lexojë regjistrat e saj të kërkesave.",
+      "tokens": "{{input}} hyrëse · {{output}} dalëse",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Tokenët hyrës",
@@ -4267,8 +4303,7 @@
       "repoValue": "Depoja: {{name}}",
       "profileValue": "Profili: {{name}}",
       "profileUnavailable": "Ky profil nuk është më i disponueshëm. Zgjidh një tjetër.",
-      "pickerEmptyDescriptionOrganization": "Krijo një profil organizate për të ripërdorur variablat e mjedisit, komandat e konfigurimit dhe aftësitë nëpër sesione.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Pronari i organizatës ose një administrator mund të krijojë një profil organizate."
+      "pickerEmptyDescriptionOrganization": "Krijo një profil organizate për të ripërdorur variablat e mjedisit, komandat e konfigurimit dhe aftësitë nëpër sesione."
     },
     "variablesDeleteFailed": "Variabla nuk mund të fshihej",
     "deleteVariable": "Fshi variablin {{key}}",
@@ -4454,7 +4489,6 @@
     "dismiss": "Hidh poshtë raportin",
     "offline": "Jashtë linje · raport i ruajtur",
     "cached": "Raport i ruajtur · rifreskimi i padisponueshëm",
-    "window": "{{start}} – {{end}}",
     "summary": "Përmbledhje AI",
     "summaryPending": "Përmbledhja AI është në proces. Do të shtohet këtu kur të jetë gati.",
     "summaryUnavailable": "Përmbledhja AI nuk është e disponueshme. Raporti i strukturuar mbetet i disponueshëm.",
@@ -4521,6 +4555,8 @@
     "topModels": "Modelet kryesore",
     "topFeatures": "Veçoritë kryesore",
     "emptyTitle": "Asnjë përdorim në këtë periudhë",
+    "unavailableTitle": "Përdorimi nuk është i disponueshëm",
+    "unavailableDescription": "Kjo hapësirë pune nuk raporton përdorim. Riprovimi nuk do të ndihmojë.",
     "orgSelfNotice": "Po shihni përdorimin tuaj në këtë organizatë.",
     "viewDetails": "Shiko detajet e përdorimit"
   },
@@ -4571,6 +4607,7 @@
       "title": "Shkaktarët dhe webhook-et",
       "subtitle": "Automatizo ekzekutimet e Cloud Agent nga një thirrje webhook ose një planifikim.",
       "new": "Shkaktar i ri",
+      "create": "Krijo shkaktar",
       "emptyTitle": "Nuk ka shkaktarë ende",
       "emptyDescription": "Krijo një shkaktar për të nisur një ekzekutim të Cloud Agent nga një thirrje webhook ose sipas një planifikimi.",
       "loadFailedTitle": "Shkaktarët nuk mund të ngarkoheshin",
@@ -4592,7 +4629,7 @@
       "fieldCron": "Shprehje cron",
       "fieldCronHelp": "Pesë fusha: minutë, orë, ditë, muaj dhe ditë e javës. Intervali më i shkurtër është një minutë.",
       "fieldTimezone": "Zona kohore",
-      "nameLocked": "Emri është pjesë e URL-së së webhook-ut dhe nuk mund të ndryshojë.",
+      "nameLocked": "Emri nuk mund të ndryshojë pas krijimit të shkaktarit.",
       "repositoryLocked": "Repozitori nuk mund të ndryshojë pas krijimit të shkaktarit.",
       "environmentAutomatic": "Automatik sipas repozitorit",
       "notSelected": "Nuk është zgjedhur",
@@ -4607,6 +4644,7 @@
       "authHeaderLabel": "Emri i kokës",
       "authSecretLabel": "Sekret i përbashkët",
       "authSecretKeep": "Lëre bosh për të mbajtur sekretin e ruajtur.",
+      "authSecretSet": "E detyrueshme. Zgjidh një varg të rastësishëm të fortë.",
       "authSecretCreator": "Përdor të paktën 16 karaktere kur shkaktari ekzekutohet si krijuesi i tij.",
       "autoCommit": "Regjistro ndryshimet kur përfundon ekzekutimi",
       "condenseOnComplete": "Përmblidh kontekstin kur përfundon ekzekutimi",
@@ -4617,11 +4655,14 @@
       "saveFailedTitle": "Shkaktari nuk mund të ruhej",
       "deleteTitle": "Ta fshij këtë shkaktar?",
       "deleteMessage": "Thirrjet drejtuar {{name}} do të dështojnë. Ky veprim nuk mund të zhbëhet.",
+      "deleteMessageScheduled": "Ekzekutimet e planifikuara të {{name}} do të ndalojnë. Ky veprim nuk mund të zhbëhet.",
       "runNow": "Ekzekuto tani",
       "runStarted": "Ekzekutimi filloi",
       "created": "Shkaktari u krijua",
       "saved": "Shkaktari u ruajt",
       "statusArrived": "Mbërriti",
+      "defaultPromptWebhook": "Përshkruaj trupin e kërkesës së kësaj thirrjeje webhook:\n\n{{body}}",
+      "defaultPromptScheduled": "Ekzekuto detyrën e planifikuar. Nisur në {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Vendos një emër.",
         "nameTooShort": "Përdor të paktën 8 karaktere.",
@@ -4656,8 +4697,9 @@
     "create": "Krijo lidhjen",
     "createFailed": "Lidhja nuk u krijua.",
     "existingTitle": "Lidhja ekzistuese",
-    "existingDescription": "Kjo seancë ka tashmë një lidhje ndarjeje. Krijimi i një lidhjeje të re e zëvendëson atë dhe e bën lidhjen e vjetër të pavlefshme.",
+    "existingDescription": "Kjo seancë ka tashmë një lidhje ndarjeje. Krijimi i një lidhjeje të re me këto cilësime e zëvendëson atë dhe e bën lidhjen e vjetër të pavlefshme.",
     "rotate": "Krijo një lidhje të re",
+    "replacementSettings": "Këto cilësime vlejnë për lidhjen e re.",
     "revoke": "Revoko lidhjen",
     "revokeTitle": "Të revokohet lidhja?",
     "revokeMessage": "Lidhja aktuale ndalon së funksionuari menjëherë.",
@@ -4669,6 +4711,7 @@
     "superseded": "Kjo lidhje u zëvendësua nga një pajisje tjetër, ndaj nuk funksionon më."
   },
   "sharedSession": {
+    "startedAt": "Filloi në {{time}}",
     "title": "Seancë e ndarë",
     "someone": "Dikush",
     "sharedBy": "Ndarë nga {{owner}}",
@@ -4676,5 +4719,177 @@
     "unavailableDescription": "Kjo lidhje ndarjeje ka skaduar ose është revokuar.",
     "transcriptUnavailableTitle": "Ky transkript nuk u ngarkua",
     "transcriptUnavailableDescription": "Lidhja funksionon ende. Provo përsëri pas pak."
+  },
+  "organizationGuardrails": {
+    "title": "Mbrojtëset e IA-së",
+    "permissionDenied": "Vetëm pronarët dhe administratorët e organizatës mund të menaxhojnë Mbrojtëset e IA-së.",
+    "unavailable": "Mbrojtëset e IA-së nuk janë të disponueshme për këtë organizatë.",
+    "loadError": "Mbrojtëset e IA-së nuk u ngarkuan dot",
+    "statusSaving": "Po ruhet…",
+    "statusSaved": "U ruajt",
+    "statusFailed": "Nuk u ruajt dot.",
+    "inputTitle": "Mbrojtëset e hyrjes",
+    "inputDescription": "Skanon çdo hyrje me Enkrypt AI, duke përfshirë rezultatet e mjeteve. Një detektor bllokues e refuzon një kërkesë kur Enkrypt nuk është i disponueshëm.",
+    "outputTitle": "Mbrojtëset e daljes",
+    "outputDescription": "Skanon përgjigjet me Enkrypt AI përpara se anëtarët t'i marrin ato. Është e fikur nëse nuk e aktivizoni.",
+    "detectorsHint": "Bllokimi e refuzon një kërkesë të sinjalizuar. Vetëm regjistrimi e shënon atë pa e vonuar kërkesën.",
+    "detectorsHintOutput": "Bllokimi e dështon një përgjigje të sinjalizuar. Vetëm regjistrimi e shënon atë pa e vonuar përgjigjen.",
+    "choiceLog": "Vetëm regjistro",
+    "applyTo": "Zbato për",
+    "applyToAllMembers": "Të gjithë anëtarët",
+    "applyKiloDefault": "Zbato parazgjedhjen Kilo",
+    "invalidSavedTitle": "Cilësimet e ruajtura të detektorëve të hyrjes nuk mund të lexohen",
+    "invalidSavedBody": "Kërkesat bllokohen derisa detektorët e hyrjes të ruhen përsëri. Detektorët më poshtë nisin nga parazgjedhja Kilo.",
+    "invalidSavedOutputTitle": "Cilësimet e ruajtura të detektorëve të daljes nuk mund të lexohen",
+    "invalidSavedOutputBody": "Përgjigjet mbahen derisa detektorët e daljes të ruhen përsëri. Zgjidhni detektorët e daljes më poshtë.",
+    "blockingOutputNote": "Një detektor bllokues i daljes e mban përgjigjen derisa Enkrypt të ketë kontrolluar të gjithë përmbajtjen e saj. Përdorni Vetëm regjistro për të shmangur vonesën.",
+    "inputDetectorRequired": "Aktivizoni të paktën një detektor të hyrjes.",
+    "outputDetectorRequired": "Aktivizoni të paktën një detektor të daljes.",
+    "rulesTooMany": "Shtoni deri në {{max}} rregulla.",
+    "ruleIdRequired": "Jepni një ID rregulli.",
+    "ruleIdInvalid": "Një ID rregulli mund të përdorë vetëm shkronja, numra, pika, viza dhe nënviza.",
+    "ruleTextRequired": "Përshkruani çfarë ndalon ose kërkon rregulli.",
+    "keywordTooLong": "Çdo fjalë kyçe mund të jetë deri në {{max}} karaktere.",
+    "topicTooLong": "Çdo temë mund të jetë deri në {{max}} karaktere.",
+    "keywordsTooMany": "Shtoni deri në {{max}} fjalë kyçe.",
+    "topicsTooMany": "Shtoni deri në {{max}} tema.",
+    "piiEntityRequired": "Zgjidhni të paktën një lloj të dhënash për t'u zbuluar.",
+    "keywordRequired": "Shtoni të paktën një fjalë kyçe.",
+    "topicRequired": "Shtoni të paktën një temë.",
+    "policyTextRequired": "Jepni tekstin e politikës.",
+    "ruleRequired": "Shtoni të paktën një rregull.",
+    "ruleIdDuplicate": "Çdo rregull ka nevojë për ID-në e vet të rregullit.",
+    "piiEntities": "Të dhëna për t'u zbuluar",
+    "keywordsLabel": "Fjalë kyçe",
+    "keywordsHint": "Një fjalë kyçe për rresht.",
+    "topicsHint": "Një temë për rresht.",
+    "policyFormat": "Formati i politikës",
+    "policyFormatRules": "Rregulla të strukturuara",
+    "policyFormatRulesDescription": "Një rregull për kërkesë, me kategori dhe ashpërsi. Rekomandohet.",
+    "policyFormatText": "Tekst i politikës",
+    "policyFormatTextDescription": "Ngjitni një politikë ekzistuese si tekst i thjeshtë.",
+    "rulesEmpty": "Nuk ka ende rregulla. Çdo rregull përshkruan një gjë që hyrjet nuk duhet të përmbajnë ose të kërkojnë.",
+    "addRule": "Shto rregull",
+    "ruleNumber": "Rregulli {{number}}",
+    "ruleRemove": "Hiq rregullin {{number}}",
+    "ruleIdLabel": "ID e rregullit",
+    "ruleNameLabel": "Emri (opsional)",
+    "ruleTextLabel": "Rregulli",
+    "ruleRiskCategory": "Kategoria e rrezikut",
+    "ruleApplicability": "Shtrirja",
+    "ruleFrameworks": "Kornizat",
+    "detector": {
+      "promptInjection": {
+        "label": "Injeksion prompti",
+        "description": "Zbulon përpjekjet për të anashkaluar udhëzimet ose kufizimet e modelit."
+      },
+      "policyViolation": {
+        "label": "Shkelje e politikës",
+        "description": "Shënon hyrjet që shkelin politikën e organizatës tuaj, e cila është shkruar si tekst ose rregulla.",
+        "descriptionOutput": "Shënon përgjigjet që shkelin politikën e organizatës tuaj, e cila është shkruar si tekst ose rregulla."
+      },
+      "pii": {
+        "label": "PII dhe sekrete",
+        "description": "Zbulon të dhëna personale, kredenciale, adresa IP dhe URL."
+      },
+      "keywords": {
+        "label": "Fjalë kyçe të ndaluara",
+        "descriptionOutput": "Zbulon përgjigjet që përmbajnë çdo fjalë kyçe që listoni."
+      },
+      "topics": {
+        "label": "Tema",
+        "descriptionOutput": "Shënon përgjigjet për çdo temë që listoni."
+      },
+      "toxicity": {
+        "label": "Toksiciteti",
+        "description": "Zbulon gjuhë toksike, fyese, kërcënuese ose urrejtëse."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Zbulon përmbajtje seksuale ose ndryshe të papërshtatshme për punë."
+      },
+      "bias": {
+        "label": "Paragjykim",
+        "description": "Zbulon gjuhë të paragjykuar ose diskriminuese."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Të dhëna personale",
+        "description": "Emra, adresa të postës elektronike, numra telefoni."
+      },
+      "secrets": {
+        "label": "Sekrete",
+        "description": "Çelësa API, tokena, fjalëkalime."
+      },
+      "ipAddress": {
+        "label": "Adresa IP",
+        "description": "Adresa IPv4 dhe IPv6."
+      },
+      "url": {
+        "label": "URL",
+        "description": "Adresa uebi."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Siguria dhe mashtrimi",
+      "safetyHarm": "Siguria dhe dëmtimi",
+      "privacyDataProtection": "Privatësia dhe mbrojtja e të dhënave",
+      "brandReputationTrust": "Marka dhe reputacioni",
+      "biasFairnessEthical": "Paragjykimi dhe drejtësia",
+      "legalIpLiability": "Përgjegjësia ligjore dhe e pronësisë intelektuale",
+      "productMisuse": "Keqpërdorimi i produktit",
+      "performanceQuality": "Performanca dhe cilësia"
+    },
+    "applicability": {
+      "user": "Hyrja e përdoruesit",
+      "userAssistant": "Hyrja e përdoruesit dhe përgjigjet"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Top 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "Akti i BE-së për IA",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Veçori e ndërmarrjes",
+    "enterpriseOnly": "Kjo është një veçori vetëm për ndërmarrjet.",
+    "readOnly": "Vetëm pronarët dhe administratorët e organizatës mund t'i ndryshojnë këto cilësime.",
+    "loadError": "Ofruesit dhe modelet nuk u ngarkuan dot",
+    "tabModels": "Modelet",
+    "tabProviders": "Ofruesit",
+    "tabGateways": "Portat",
+    "modelsDescription": "Fikni një model për ta bllokuar për çdo anëtar. Modelet nga ofruesit e lejuar nisin të aktivizuara.",
+    "modelsDeniedOnly": "Vetëm të ndaluarat",
+    "modelsEmpty": "Nuk ka modele që përputhen me këtë kërkim.",
+    "modelsDeniedEmpty": "Nuk ka asnjë model të ndaluar.",
+    "modelsDeniedSearchEmpty": "Nuk ka asnjë model të ndaluar që përputhet me këtë kërkim.",
+    "providersDescription": "Fikni një ofrues për të ndaluar Kilo që të rrugëzojë drejt tij për këtë organizatë.",
+    "providersNeedCatalog": "Çelësat e ofruesve mbeten vetëm për lexim derisa të ngarkohet i gjithë katalogu i modeleve. Për t'i ndryshuar, prekni Riprovo më lart.",
+    "providersEmpty": "Nuk ka ofrues që përputhen me këtë kërkim.",
+    "allowAllShown": "Lejo çdo gjë të shfaqur",
+    "denyAllShown": "Ndal çdo gjë të shfaqur",
+    "gatewaysDescription": "Kilo i rrugëzon kërkesat e modeleve përmes Vercel AI Gateway ose OpenRouter. Një portë e çaktivizuar i bën ato kërkesa të dështojnë.",
+    "emptyProviderList": "Lejoni të paktën një ofrues. Një listë bosh bllokon çdo rrugëzim të modeleve të Kilo.",
+    "gatewaysUnavailable": "Cilësimet e portave nuk janë të disponueshme për këtë organizatë.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "Kërkesat e OpenRouter nuk fiksohen në një rajon.",
+    "inferenceRegion": "Rajoni i inferencës",
+    "inferenceRegionDescription": "Fikson kërkesat e Vercel AI Gateway në këtë rajon. Një model që nuk është i disponueshëm atje dështon.",
+    "disableOpenrouterNote": "Çaktivizimi i OpenRouter bllokon gjithashtu çelësat BYOK që i rrugëzojnë kërkesat përmes tij.",
+    "emptyModelList": "Lini të aktivizuar të paktën një model. Nëse refuzoni çdo model, anëtarët nuk do të kenë asgjë për të përdorur.",
+    "catalogUnavailable": "Katalogu i plotë i modeleve nuk u ngarkua, prandaj shfaqen vetëm listat tuaja të ruajtura. Provoni përsëri për të ngarkuar të gjitha modelet.",
+    "region": {
+      "global": "Botëror",
+      "us": "Shtetet e Bashkuara",
+      "eu": "Bashkimi Europian",
+      "au": "Australi",
+      "jp": "Japoni"
+    }
   }
 }

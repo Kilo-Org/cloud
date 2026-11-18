@@ -42,6 +42,8 @@ import {
 } from './helpers/fake-credentials.js';
 import { createRuntimeProxyMintingPeer, FakeSessionPeer } from './helpers/fake-session-peer.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
+import { pendingNativeStart } from './helpers/pending-native-start.js';
+import { supervisorStartup } from '../fixtures/supervisor-startup.js';
 import { waitFor } from './wait-for.js';
 
 const SANDBOX_ID = 'sbx__control_v2_routes';
@@ -162,6 +164,7 @@ function configuredPrepareInput(
         { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
       ],
       runtimeAgents: [{ slug: 'helper', name: 'Helper', config: {} }],
+      modelContextLimits: { 'example/model': 50_000 },
       kiloCommands: [{ name: 'review', template: 'Review the change' }],
     },
     credentials: { ...input.credentials, scopeId: 'shared-worktree' },
@@ -300,6 +303,7 @@ async function connectAndHello(
   options: {
     workspaceConfiguration?: boolean;
     runtimeInstructions?: boolean;
+    runtimeWebSearch?: boolean;
     runtimeHarness?: string;
   } = {}
 ): Promise<{ wrapper: FakeWrapper; credential: string; allocationId: string }> {
@@ -1291,6 +1295,7 @@ describe('SandboxControlV2 routes and forwarding', () => {
     expect(first.spec).not.toHaveProperty('setupCommands');
     expect(first.spec).not.toHaveProperty('runtimeAgents');
     expect(first.spec).not.toHaveProperty('runtimeInstructions');
+    expect(first.spec).not.toHaveProperty('modelContextLimits');
     expect(first.spec).not.toHaveProperty('kiloCommands');
     expect(first.spec).not.toHaveProperty('env');
     expect(first.workspace).toMatchObject({
@@ -1299,6 +1304,7 @@ describe('SandboxControlV2 routes and forwarding', () => {
       ],
       setupCommands: ['echo shared'],
       runtimeAgents: [{ slug: 'helper', name: 'Helper', config: {} }],
+      modelContextLimits: { 'example/model': 50_000 },
       kiloCommands: [{ name: 'review', template: 'Review the change' }],
     });
 
@@ -1346,6 +1352,57 @@ describe('SandboxControlV2 routes and forwarding', () => {
         expect(JSON.parse(row?.spec ?? '{}').runtimeInstructions).toEqual([
           { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
         ]);
+        wrapper.send({ type: 'session.ready', sessionId: SESSION });
+        await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+      } finally {
+        wrapper.close();
+      }
+    }
+  );
+
+  it.each([
+    { workspaceConfiguration: false, runtimeWebSearch: false, off: false },
+    { workspaceConfiguration: false, runtimeWebSearch: false, off: true },
+    { workspaceConfiguration: true, runtimeWebSearch: false, off: false },
+    { workspaceConfiguration: true, runtimeWebSearch: false, off: true },
+    { workspaceConfiguration: true, runtimeWebSearch: true, off: false },
+    { workspaceConfiguration: true, runtimeWebSearch: true, off: true },
+  ])(
+    'negotiates web search (attach: $workspaceConfiguration, capability: $runtimeWebSearch, off: $off)',
+    async ({ off, ...options }) => {
+      const preference = off
+        ? { webSearchDisabled: true as const }
+        : { webSearchProvider: 'parallel' as const };
+      const provider = createFakeProvider();
+      const { stub } = await setup(provider);
+      const input = configuredPrepareInput(SESSION, SHARED_DIRECTORY);
+      await stub.prepare({ ...input, spec: { ...input.spec, ...preference } });
+      const { wrapper } = await connectAndHello(provider, 'wr_search', {
+        ...options,
+        runtimeHarness: 'kilo2',
+      });
+      try {
+        const frame = await wrapper.next();
+        expect(frame?.type).toBe(
+          options.workspaceConfiguration ? 'session.attach' : 'session.prepare'
+        );
+        if (frame?.type !== 'session.attach' && frame?.type !== 'session.prepare') {
+          throw new Error('expected a preparation frame');
+        }
+        const workspace = frame.type === 'session.attach' ? frame.workspace : frame.spec;
+        if (options.runtimeWebSearch) {
+          expect(workspace).toMatchObject(preference);
+        } else {
+          expect(workspace).not.toHaveProperty('webSearchDisabled');
+          expect(workspace).not.toHaveProperty('webSearchProvider');
+        }
+        if (frame.type === 'session.attach') {
+          expect(frame.spec).not.toHaveProperty('webSearchDisabled');
+          expect(frame.spec).not.toHaveProperty('webSearchProvider');
+        }
+        expect(frame.spec.permission?.websearch).toBe(
+          !options.runtimeWebSearch && off ? 'deny' : undefined
+        );
         wrapper.send({ type: 'session.ready', sessionId: SESSION });
         await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
       } finally {
@@ -1668,6 +1725,7 @@ describe('SandboxControlV2 routes and forwarding', () => {
       { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
     ]);
     expect(frame.spec.runtimeAgents).toEqual([{ slug: 'helper', name: 'Helper', config: {} }]);
+    expect(frame.spec.modelContextLimits).toEqual({ 'example/model': 50_000 });
     expect(frame.spec.kiloCommands).toEqual([{ name: 'review', template: 'Review the change' }]);
   });
 
@@ -2776,6 +2834,60 @@ describe('SandboxControlV2 routes and forwarding', () => {
       workspaceStopEpoch: 0,
       workspaceStopAt: 0,
     });
+  });
+
+  it('interrupts native preparation before its probe completes and waits only for destroy', async () => {
+    const fields = vi.spyOn(logger, 'withFields');
+    const native = await pendingNativeStart();
+    const provider = createFakeProvider();
+    provider.adapter.launch = async (ref, { env: launchEnv }) => {
+      provider.launchEnvs.push({ ...launchEnv });
+      await native.stub.launchWrapper({
+        allocationRef: ref,
+        command: supervisorStartup(),
+        env: {},
+        instance: 'standard-4',
+        nativeImage: 'runtime-free',
+      });
+      return { startSource: 'image' };
+    };
+    provider.adapter.stop = async ref => {
+      provider.stopCalls.push(ref);
+      return ref === null ? 'terminal' : native.stub.stop(ref);
+    };
+    const { stub } = await setup(provider);
+    try {
+      await stub.prepare(prepareInput(SESSION));
+      await waitFor(() => expect(native.container.probes).toBe(1));
+      expect((await readState(stub)).kind).toBe('creating');
+
+      await stub.cancelWorkspace({ sessionId: SESSION, requestedAt: Date.now() });
+      await stub.prepare({ ...prepareInput(SESSION), stopEpoch: 1 });
+
+      // The readiness read is still blocked. Destroy must already have started.
+      await waitFor(() => expect(native.container.destroys).toBe(1));
+      expect((await readState(stub)).kind).toBe('stopping');
+      expect(native.container.starts).toBe(1);
+      expect(provider.createCalls).toBe(1);
+
+      native.releaseDestroy();
+      await waitFor(async () => expect((await readState(stub)).kind).toBe('starting'));
+      expect(native.container.starts).toBe(2);
+      const replacement = await readState(stub);
+      expect(replacement.providerRef).toBe(provider.refs[1]);
+
+      native.releaseProbe();
+      await new Promise(resolve => setTimeout(resolve, 25));
+      expect((await readState(stub)).allocationId).toBe(replacement.allocationId);
+      expect(native.container.starts).toBe(2);
+      const diagnostics = fields.mock.calls.map(([record]) => record.diagnosticEvent);
+      expect(diagnostics).toContain('launch_interrupted');
+      expect(diagnostics).not.toContain('create_failed');
+      expect(diagnostics).not.toContain('snapshot_launch_failed');
+    } finally {
+      native.releaseProbe();
+      native.releaseDestroy();
+    }
   });
 
   it('returns at once and stores a new route when prepare runs during stopping', async () => {

@@ -3,16 +3,26 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { User } from '@kilocode/db/schema';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
-import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type {
+  OrganizationPlan,
+  OrganizationSettings,
+} from '@kilocode/web-shared/lib/organizations/organization-types';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import { getEmbeddingProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
-import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
-import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
+import {
+  createUserOpenRouterProvider,
+  OPENROUTER,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import {
+  createUserVercelAiGatewayProvider,
+  VERCEL_AI_GATEWAY,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import {
   deleteCustomLlmForTest,
   insertCustomLlmForTest,
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import { getCachedVercelInferenceProviderIdsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { getKiloEmbeddingModelCatalogFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/embeddings/openrouter-embedding-models';
 import { countAndStoreEmbeddingUsage } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import {
@@ -67,6 +77,12 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/get-provider', () => ({
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel', () => ({
   mapModelIdToVercel: jest.fn(),
 }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
+  ...jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache'
+  ),
+  getCachedVercelInferenceProviderIdsForModel: jest.fn(),
+}));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/embeddings/openrouter-embedding-models', () => ({
   getKiloEmbeddingModelCatalogFromDatabase: jest.fn(),
 }));
@@ -108,6 +124,7 @@ const mockedGetBalanceAndOrgSettings = jest.mocked(getBalanceAndOrgSettings);
 const mockedResolveModelDecision = jest.mocked(resolveOrganizationMemberModelDecision);
 const mockedGetEmbeddingProvider = jest.mocked(getEmbeddingProvider);
 const mockedMapModelIdToVercel = jest.mocked(mapModelIdToVercel);
+const mockedGetVercelInferenceProviders = jest.mocked(getCachedVercelInferenceProviderIdsForModel);
 const mockedGetKiloEmbeddingModelCatalogFromDatabase = jest.mocked(
   getKiloEmbeddingModelCatalogFromDatabase
 );
@@ -138,7 +155,10 @@ function makeRequest(fields: Record<string, unknown> = {}) {
   });
 }
 
-function setUserAuth(settings?: OrganizationSettings) {
+function setUserAuth(
+  settings?: OrganizationSettings,
+  plan: OrganizationPlan | undefined = settings ? 'enterprise' : undefined
+) {
   mockedGetUserFromAuth.mockResolvedValue({
     user,
     authFailedResponse: null,
@@ -147,7 +167,7 @@ function setUserAuth(settings?: OrganizationSettings) {
   mockedGetBalanceAndOrgSettings.mockResolvedValue({
     balance: 1000,
     settings,
-    plan: settings ? 'enterprise' : undefined,
+    plan,
   });
 }
 
@@ -191,6 +211,7 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
       isFree: false,
     });
     mockedMapModelIdToVercel.mockResolvedValue(model);
+    mockedGetVercelInferenceProviders.mockResolvedValue(null);
     jest.mocked(getRuntimeOrganizationFeatures).mockResolvedValue(DEFAULT_ORGANIZATION_FEATURES);
     mockedGetKiloEmbeddingModelCatalogFromDatabase.mockResolvedValue(null);
     jest
@@ -672,7 +693,7 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(getUpstreamBody().provider).toEqual({ data_collection: 'deny' });
+      expect(getUpstreamBody().provider).toEqual({ only: ['azure'], data_collection: 'deny' });
     }
   );
 
@@ -703,7 +724,7 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
       expect.any(String),
       expect.anything(),
       expect.any(String),
-      eligibleProviderRoutes
+      { allowedProviders: eligibleProviderRoutes, openRouterDisabled: false }
     );
   });
 
@@ -715,7 +736,7 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
     });
     const { handleEmbeddingsRequest } = await import('./embeddings');
     const response = await handleEmbeddingsRequest(
-      makeRequest({ provider: { zdr: false, only: ['azure'] } })
+      makeRequest({ provider: { zdr: false, only: ['openai', 'azure'] } })
     );
 
     expect(response.status).toBe(200);
@@ -724,6 +745,46 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
       data_collection: 'allow',
       zdr: false,
     });
+  });
+
+  it('forwards the request provider lists alongside the organization data collection policy', async () => {
+    setUserAuth({ data_collection: 'deny', provider_allow_list: ['openai', 'azure'] });
+    const { handleEmbeddingsRequest } = await import('./embeddings');
+    const response = await handleEmbeddingsRequest(
+      makeRequest({
+        provider: {
+          only: ['openai', 'azure'],
+          ignore: ['azure'],
+          order: ['openai', 'azure'],
+        },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(getUpstreamBody().provider).toEqual({
+      only: ['openai', 'azure'],
+      ignore: ['azure'],
+      order: ['openai', 'azure'],
+      data_collection: 'deny',
+    });
+  });
+
+  it('rejects a request whose providers the group routes exclude', async () => {
+    setUserAuth({ data_collection: 'allow', provider_allow_list: ['openai'] });
+    mockedResolveModelDecision.mockResolvedValue({
+      ...allowedModelDecision,
+      decision: { allowed: true, eligibleProviderRoutes: new Set(['openai']) },
+    });
+    const { handleEmbeddingsRequest } = await import('./embeddings');
+    const response = await handleEmbeddingsRequest(
+      makeRequest({ provider: { only: ['azure'], zdr: true } })
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({
+      error_type: ProxyErrorType.model_not_allowed,
+    });
+    expect(mockedFetch).not.toHaveBeenCalled();
   });
 
   it('answers malformed JSON without reporting the body to Sentry', async () => {
@@ -834,7 +895,133 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
       expect(mockedFetch).toHaveBeenCalledTimes(1);
     });
 
-    it('serves Vercel BYOK requests when OpenRouter is disabled, pinned to the data region', async () => {
+    it('ignores the settings of an organization that is not on the enterprise plan', async () => {
+      setUserAuth({ disable_openrouter: true, data_region: 'eu' }, 'teams');
+      enableGatewaySettings();
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(200);
+      expect(mockedGetEmbeddingProvider).toHaveBeenCalledWith(model, expect.anything(), 'org-123', {
+        allowedProviders: undefined,
+        openRouterDisabled: false,
+      });
+      expect(getUpstreamBody().providerOptions).toBeUndefined();
+      expect(
+        jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[1].inference_region
+      ).toBeNull();
+    });
+
+    it.each([
+      { label: 'OpenRouter is disabled', settings: { disable_openrouter: true } },
+      { label: 'an inference region is set', settings: { data_region: 'eu' } },
+    ] as const)(
+      'tells the provider that OpenRouter is disabled when $label',
+      async ({ settings }) => {
+        setUserAuth(settings);
+        enableGatewaySettings();
+
+        const { handleEmbeddingsRequest } = await import('./embeddings');
+        await handleEmbeddingsRequest(makeRequest());
+
+        expect(mockedGetEmbeddingProvider).toHaveBeenCalledWith(
+          model,
+          expect.anything(),
+          'org-123',
+          { allowedProviders: undefined, openRouterDisabled: true }
+        );
+      }
+    );
+
+    it('rejects an OpenRouter-routed request when an inference region is set', async () => {
+      setUserAuth({ data_region: 'eu' });
+      enableGatewaySettings();
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({
+        error: expect.stringContaining('region'),
+        error_type: ProxyErrorType.provider_not_allowed,
+      });
+      expect(mockedFetch).not.toHaveBeenCalled();
+    });
+
+    it('serves Kilo’s Vercel route with the mapped model, pinned to the inference region', async () => {
+      setUserAuth({ data_region: 'eu' });
+      enableGatewaySettings();
+      mockedGetEmbeddingProvider.mockResolvedValue({
+        provider: VERCEL_AI_GATEWAY,
+        userByok: null,
+        isFree: false,
+      });
+      mockedMapModelIdToVercel.mockResolvedValue('openai/vercel-embedding-model');
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(200);
+      expect(mockedFetch.mock.calls[0]?.[0]).toBe(`${VERCEL_AI_GATEWAY.apiUrl}/embeddings`);
+      const upstreamBody = getUpstreamBody();
+      expect(upstreamBody.model).toBe('openai/vercel-embedding-model');
+      expect(upstreamBody).not.toHaveProperty('provider');
+      expect(upstreamBody.providerOptions).toEqual({
+        gateway: { inferenceRegion: { scope: 'zone', geoRegion: 'eu' } },
+      });
+      expect(jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[1]).toMatchObject({
+        inference_region: 'eu',
+        user_byok: false,
+      });
+    });
+
+    it('serves Kilo’s Vercel route when only OpenRouter is disabled, without a region', async () => {
+      setUserAuth({ disable_openrouter: true });
+      enableGatewaySettings();
+      mockedGetEmbeddingProvider.mockResolvedValue({
+        provider: VERCEL_AI_GATEWAY,
+        userByok: null,
+        isFree: false,
+      });
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(200);
+      expect(getUpstreamBody().providerOptions).toEqual({ gateway: {} });
+      expect(
+        jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[1].inference_region
+      ).toBeNull();
+    });
+
+    it('translates the organization provider allow-list for Kilo’s Vercel route', async () => {
+      setUserAuth({ data_region: 'eu', data_collection: 'deny', provider_allow_list: ['openai'] });
+      enableGatewaySettings();
+      mockedResolveModelDecision.mockResolvedValue({
+        ...allowedModelDecision,
+        decision: { allowed: true, eligibleProviderRoutes: new Set(['openai']) },
+      });
+      mockedGetEmbeddingProvider.mockResolvedValue({
+        provider: VERCEL_AI_GATEWAY,
+        userByok: null,
+        isFree: false,
+      });
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(200);
+      expect(getUpstreamBody().providerOptions).toEqual({
+        gateway: {
+          only: ['openai'],
+          disallowPromptTraining: true,
+          inferenceRegion: { scope: 'zone', geoRegion: 'eu' },
+        },
+      });
+    });
+
+    it('serves provider-key BYOK requests when OpenRouter is disabled, without a region', async () => {
       setUserAuth({ disable_openrouter: true, data_region: 'eu' });
       enableGatewaySettings();
       mockedGetEmbeddingProvider.mockResolvedValue(vercelByok);
@@ -847,17 +1034,45 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
         gateway: {
           only: ['openai'],
           byok: { openai: [{ apiKey: 'test-byok-key' }] },
-          inferenceRegion: { scope: 'zone', geoRegion: 'eu' },
         },
       });
-      expect(jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[1].inference_region).toBe(
-        'eu'
-      );
+      expect(jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[1]).toMatchObject({
+        inference_region: null,
+        user_byok: true,
+      });
     });
 
-    it('keeps OpenRouter requests unpinned when a data region is set', async () => {
+    it('accepts the owner’s OpenRouter key when OpenRouter is disabled', async () => {
+      setUserAuth({ disable_openrouter: true });
+      enableGatewaySettings();
+      mockedGetEmbeddingProvider.mockResolvedValue({
+        provider: createUserOpenRouterProvider('sk-owner-openrouter'),
+        userByok: [{ providerId: 'openrouter', decryptedAPIKey: 'sk-owner-openrouter' }],
+        isFree: false,
+      });
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(200);
+      expect(mockedFetch.mock.calls[0]?.[0]).toBe(`${OPENROUTER.apiUrl}/embeddings`);
+      const headers = mockedFetch.mock.calls[0]?.[1]?.headers as Headers;
+      expect(headers.get('Authorization')).toBe('Bearer sk-owner-openrouter');
+      expect(getUpstreamBody().providerOptions).toBeUndefined();
+      expect(jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[1]).toMatchObject({
+        inference_region: null,
+        user_byok: true,
+      });
+    });
+
+    it('accepts the owner’s OpenRouter key under an inference region, unpinned', async () => {
       setUserAuth({ data_region: 'eu' });
       enableGatewaySettings();
+      mockedGetEmbeddingProvider.mockResolvedValue({
+        provider: createUserOpenRouterProvider('sk-owner-openrouter'),
+        userByok: [{ providerId: 'openrouter', decryptedAPIKey: 'sk-owner-openrouter' }],
+        isFree: false,
+      });
 
       const { handleEmbeddingsRequest } = await import('./embeddings');
       const response = await handleEmbeddingsRequest(makeRequest());
@@ -867,6 +1082,143 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
       expect(
         jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[1].inference_region
       ).toBeNull();
+    });
+
+    it('sends the owner’s Vercel AI Gateway key without byok or a region', async () => {
+      setUserAuth({ disable_openrouter: true, data_region: 'eu', data_collection: 'deny' });
+      enableGatewaySettings();
+      mockedGetEmbeddingProvider.mockResolvedValue({
+        provider: createUserVercelAiGatewayProvider('vck-owner'),
+        userByok: [{ providerId: 'vercel-ai-gateway', decryptedAPIKey: 'vck-owner' }],
+        isFree: false,
+      });
+      mockedMapModelIdToVercel.mockResolvedValue('openai/vercel-embedding-model');
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(200);
+      expect(mockedFetch.mock.calls[0]?.[0]).toBe(`${VERCEL_AI_GATEWAY.apiUrl}/embeddings`);
+      const headers = mockedFetch.mock.calls[0]?.[1]?.headers as Headers;
+      expect(headers.get('Authorization')).toBe('Bearer vck-owner');
+      const upstreamBody = getUpstreamBody();
+      expect(upstreamBody.model).toBe('openai/vercel-embedding-model');
+      expect(upstreamBody.providerOptions).toEqual({
+        gateway: { disallowPromptTraining: true },
+      });
+      expect(jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[1]).toMatchObject({
+        inference_region: null,
+        user_byok: true,
+      });
+    });
+
+    it('keeps the caller’s provider routing on a personal Vercel AI Gateway key', async () => {
+      setUserAuth();
+      mockedGetEmbeddingProvider.mockResolvedValue({
+        provider: createUserVercelAiGatewayProvider('vck-owner'),
+        userByok: [{ providerId: 'vercel-ai-gateway', decryptedAPIKey: 'vck-owner' }],
+        isFree: false,
+      });
+      mockedMapModelIdToVercel.mockResolvedValue('openai/vercel-embedding-model');
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(
+        makeRequest({ provider: { only: ['azure'], order: ['azure'] } })
+      );
+
+      expect(response.status).toBe(200);
+      expect(getUpstreamBody().providerOptions).toEqual({
+        gateway: { only: ['azure'], order: ['azure'] },
+      });
+    });
+
+    describe('provider settings that leave no Vercel provider', () => {
+      const kiloVercel = { provider: VERCEL_AI_GATEWAY, userByok: null, isFree: false };
+      const ownerVercelKey = {
+        provider: createUserVercelAiGatewayProvider('vck-owner'),
+        userByok: [{ providerId: 'vercel-ai-gateway' as const, decryptedAPIKey: 'vck-owner' }],
+        isFree: false,
+      };
+
+      beforeEach(() => {
+        setUserAuth({ disable_openrouter: true });
+        enableGatewaySettings();
+        mockedGetVercelInferenceProviders.mockResolvedValue(['azure', 'openai']);
+      });
+
+      it.each([
+        {
+          label: 'an ignore list of every provider',
+          route: kiloVercel,
+          ignore: ['openai', 'azure'],
+        },
+        { label: 'an allow-list without a match', route: kiloVercel, only: ['mistral'] },
+        {
+          label: 'an ignore list of every provider on the owner’s Vercel key',
+          route: ownerVercelKey,
+          ignore: ['openai', 'azure'],
+        },
+        {
+          label: 'an allow-list without a match on the owner’s Vercel key',
+          route: ownerVercelKey,
+          only: ['mistral'],
+          ignore: ['azure'],
+        },
+      ])('rejects $label without calling the provider', async ({ route, only, ignore }) => {
+        mockedGetEmbeddingProvider.mockResolvedValue(route);
+
+        const { handleEmbeddingsRequest } = await import('./embeddings');
+        const response = await handleEmbeddingsRequest(makeRequest({ provider: { only, ignore } }));
+
+        expect(response.status).toBe(403);
+        await expect(response.json()).resolves.toMatchObject({
+          error:
+            'No eligible provider can serve the selected model. Please enable provider: azure, openai',
+          error_type: ProxyErrorType.provider_not_allowed,
+        });
+        expect(mockedFetch).not.toHaveBeenCalled();
+        expect(jest.mocked(decide)).not.toHaveBeenCalled();
+        expect(countAndStoreEmbeddingUsage).not.toHaveBeenCalled();
+        expect(logMicrodollarUsageAndReportToBouncer).not.toHaveBeenCalled();
+      });
+
+      it('keeps the last provider key when the ignore list names every provider', async () => {
+        mockedGetEmbeddingProvider.mockResolvedValue(vercelByok);
+
+        const { handleEmbeddingsRequest } = await import('./embeddings');
+        const response = await handleEmbeddingsRequest(
+          makeRequest({ provider: { ignore: ['openai', 'azure'] } })
+        );
+
+        expect(response.status).toBe(200);
+        expect(getUpstreamBody().providerOptions).toEqual({
+          gateway: { only: ['openai'], byok: { openai: [{ apiKey: 'test-byok-key' }] } },
+        });
+      });
+    });
+  });
+
+  describe('client providerOptions', () => {
+    it.each([
+      { label: 'OpenRouter', route: { provider: OPENROUTER, userByok: null, isFree: false } },
+      {
+        label: 'Kilo’s Vercel AI Gateway',
+        route: { provider: VERCEL_AI_GATEWAY, userByok: null, isFree: false },
+      },
+    ])('rejects providerOptions on the $label route', async ({ route }) => {
+      mockedGetEmbeddingProvider.mockResolvedValue(route);
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(
+        makeRequest({ providerOptions: { gateway: { only: ['openai'], byok: {} } } })
+      );
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toMatchObject({
+        error: 'The providerOptions field is not supported. Use provider instead.',
+        error_type: ProxyErrorType.unsupported_field,
+      });
+      expect(mockedFetch).not.toHaveBeenCalled();
     });
   });
 

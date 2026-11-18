@@ -83,6 +83,7 @@ describe('scoped CloudFormation reads', () => {
   ] as const)('rejects %s response data', async (kind, body) => {
     const identity = kind === 'another account ARN' ? id : 'customer';
     await expect(client(body()).describeStack(identity)).rejects.toMatchObject({
+      status: 422,
       code: 'InvalidStackResponse',
     });
   });

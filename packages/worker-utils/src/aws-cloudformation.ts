@@ -8,8 +8,9 @@ import {
 } from './aws-client';
 
 type XmlNode = { name: string; text: string; children: XmlNode[] };
+/** A contract violation is deterministic. Status 0 stays reserved for transport failures that may retry. */
 function invalid(): never {
-  throw new AwsRequestError(0, 'InvalidStackResponse');
+  throw new AwsRequestError(422, 'InvalidStackResponse');
 }
 function text(value: string): string {
   if (/&(?!(?:amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);)/.test(value)) invalid();

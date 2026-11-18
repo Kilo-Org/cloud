@@ -59,6 +59,15 @@ const NATIVE_ONLY_PATHS: Record<string, true> = {
   'organizations.vercelCompute.remove': true,
   'organizations.vercelCompute.retrySetup': true,
   'organizations.vercelCompute.upgradeRuntime': true,
+  // AWS onboarding issues signed launch links and binds a customer role in the app only.
+  'awsCompute.prepare': true,
+  'awsCompute.instructions': true,
+  'awsCompute.validate': true,
+  'awsCompute.discardDraft': true,
+  'organizations.awsCompute.prepare': true,
+  'organizations.awsCompute.instructions': true,
+  'organizations.awsCompute.validate': true,
+  'organizations.awsCompute.discardDraft': true,
   // Org admins set MCP guardrail policy in the app only. Clients read the policy and report
   // connections through /api/organizations/[id]/guardrails, which is not part of the tRPC catalog.
   'organizations.mcpGuardrails.add': true,

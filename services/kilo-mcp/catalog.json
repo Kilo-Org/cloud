@@ -3815,32 +3815,6 @@
     ],
     "searchBlob": "appReportedMessages.createReport Report a problematic app or extension message for review, such as an unparsed or unstyled message from a CLI session. Submit the message content, mode, model, and report type to store it for investigation. appreportedmessages createreport message cli_session_id mode model report_type message cli_session_id mode model report_type"
   },
-  "awsCompute.discardDraft": {
-    "path": "awsCompute.discardDraft",
-    "kind": "mutation",
-    "summary": "Discard an unfinished AWS BYOC compute setup draft so the user can start over with a different account. Does not delete any resources in the customer's AWS account.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "generation": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "generation"
-      ],
-      "additionalProperties": false
-    },
-    "tags": [
-      "awscompute",
-      "discarddraft",
-      "generation"
-    ],
-    "searchBlob": "awsCompute.discardDraft Discard an unfinished AWS BYOC compute setup draft so the user can start over with a different account. Does not delete any resources in the customer's AWS account. awscompute discarddraft generation generation"
-  },
   "awsCompute.getEnrollment": {
     "path": "awsCompute.getEnrollment",
     "kind": "query",
@@ -3862,67 +3836,6 @@
       "getstatus"
     ],
     "searchBlob": "awsCompute.getStatus Get the current AWS BYOC compute connection status for the user, such as pending setup or ready, with the linked account and last verification time. Returns null when no connection exists. awscompute getstatus"
-  },
-  "awsCompute.instructions": {
-    "path": "awsCompute.instructions",
-    "kind": "mutation",
-    "summary": "Get the step-by-step setup instructions, including the CloudFormation stack to deploy, for connecting the user's pending AWS account to Kilo compute. Requires an unfinished draft.",
-    "inputSchema": {},
-    "tags": [
-      "awscompute",
-      "instructions"
-    ],
-    "searchBlob": "awsCompute.instructions Get the step-by-step setup instructions, including the CloudFormation stack to deploy, for connecting the user's pending AWS account to Kilo compute. Requires an unfinished draft. awscompute instructions"
-  },
-  "awsCompute.prepare": {
-    "path": "awsCompute.prepare",
-    "kind": "mutation",
-    "summary": "Start AWS BYOC compute setup for the user's own AWS account by submitting a 12-digit account ID, creating a pending setup draft. Fails if a different account is already in use.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "accountId": {
-          "type": "string",
-          "pattern": "^\\d{12}$"
-        }
-      },
-      "required": [
-        "accountId"
-      ],
-      "additionalProperties": false
-    },
-    "tags": [
-      "awscompute",
-      "prepare",
-      "accountid"
-    ],
-    "searchBlob": "awsCompute.prepare Start AWS BYOC compute setup for the user's own AWS account by submitting a 12-digit account ID, creating a pending setup draft. Fails if a different account is already in use. awscompute prepare accountid accountId"
-  },
-  "awsCompute.validate": {
-    "path": "awsCompute.validate",
-    "kind": "mutation",
-    "summary": "Verify the AWS IAM role ARN from the setup stack to finish onboarding, or re-check an already connected account and refresh its verification time.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "roleArn": {
-          "type": "string",
-          "pattern": "^arn:aws:iam::\\d{12}:role\\/[A-Za-z0-9+=,.@_/-]+$"
-        }
-      },
-      "required": [
-        "roleArn"
-      ],
-      "additionalProperties": false
-    },
-    "tags": [
-      "awscompute",
-      "validate",
-      "rolearn"
-    ],
-    "searchBlob": "awsCompute.validate Verify the AWS IAM role ARN from the setup stack to finish onboarding, or re-check an already connected account and refresh its verification time. awscompute validate rolearn roleArn"
   },
   "byok.create": {
     "path": "byok.create",
@@ -17958,39 +17871,6 @@
     ],
     "searchBlob": "organizations.autoTopUp.updateThreshold Set the balance threshold that triggers automatic top-up for an organization, so credit is refilled when it falls below the configured amount. Use to change when auto-recharge kicks in for a team or organization account. organizations autotopup updatethreshold organizationid thresholdcents organizationId thresholdCents"
   },
-  "organizations.awsCompute.discardDraft": {
-    "path": "organizations.awsCompute.discardDraft",
-    "kind": "mutation",
-    "summary": "Discard an unfinished or failed AWS compute setup draft so onboarding can restart or use a different AWS account. This does not delete any resources in the customer's AWS account.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "generation": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "organizationId",
-        "generation"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "awscompute",
-      "discarddraft",
-      "organizationid",
-      "generation"
-    ],
-    "searchBlob": "organizations.awsCompute.discardDraft Discard an unfinished or failed AWS compute setup draft so onboarding can restart or use a different AWS account. This does not delete any resources in the customer's AWS account. organizations awscompute discarddraft organizationid generation organizationId generation"
-  },
   "organizations.awsCompute.getEnrollment": {
     "path": "organizations.awsCompute.getEnrollment",
     "kind": "query",
@@ -18042,96 +17922,6 @@
       "organizationid"
     ],
     "searchBlob": "organizations.awsCompute.getStatus Get the current AWS compute connection status: whether no setup exists, a setup draft is pending, or the AWS account role is ready, including account and verification details. organizations awscompute getstatus organizationid organizationId"
-  },
-  "organizations.awsCompute.instructions": {
-    "path": "organizations.awsCompute.instructions",
-    "kind": "mutation",
-    "summary": "Get the AWS setup instructions and CloudFormation launch URL needed to deploy the required IAM role and stack for the pending AWS compute connection.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "organizationId"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "awscompute",
-      "instructions",
-      "organizationid"
-    ],
-    "searchBlob": "organizations.awsCompute.instructions Get the AWS setup instructions and CloudFormation launch URL needed to deploy the required IAM role and stack for the pending AWS compute connection. organizations awscompute instructions organizationid organizationId"
-  },
-  "organizations.awsCompute.prepare": {
-    "path": "organizations.awsCompute.prepare",
-    "kind": "mutation",
-    "summary": "Start AWS compute onboarding for a 12-digit AWS account ID by creating a setup draft, returning the pending setup status. Fails if setup already uses a different AWS account.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "accountId": {
-          "type": "string",
-          "pattern": "^\\d{12}$"
-        }
-      },
-      "required": [
-        "organizationId",
-        "accountId"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "awscompute",
-      "prepare",
-      "organizationid",
-      "accountid"
-    ],
-    "searchBlob": "organizations.awsCompute.prepare Start AWS compute onboarding for a 12-digit AWS account ID by creating a setup draft, returning the pending setup status. Fails if setup already uses a different AWS account. organizations awscompute prepare organizationid accountid organizationId accountId"
-  },
-  "organizations.awsCompute.validate": {
-    "path": "organizations.awsCompute.validate",
-    "kind": "mutation",
-    "summary": "Validate a submitted AWS IAM role ARN to finish AWS compute onboarding and mark the connection ready, or re-verify an already connected AWS account.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "roleArn": {
-          "type": "string",
-          "pattern": "^arn:aws:iam::\\d{12}:role\\/[A-Za-z0-9+=,.@_/-]+$"
-        }
-      },
-      "required": [
-        "organizationId",
-        "roleArn"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "awscompute",
-      "validate",
-      "organizationid",
-      "rolearn"
-    ],
-    "searchBlob": "organizations.awsCompute.validate Validate a submitted AWS IAM role ARN to finish AWS compute onboarding and mark the connection ready, or re-verify an already connected AWS account. organizations awscompute validate organizationid rolearn organizationId roleArn"
   },
   "organizations.bitbucket.connect": {
     "path": "organizations.bitbucket.connect",

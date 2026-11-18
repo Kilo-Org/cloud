@@ -4651,6 +4651,8 @@
       "created": "ቀስቅሴ ተፈጥሯል",
       "saved": "ቀስቅሴ ተቀምጧል",
       "statusArrived": "ደርሷል",
+      "defaultPromptWebhook": "የዚህን የዌብሁክ ጥያቄ አካል ይግለጹ፦\n\n{{body}}",
+      "defaultPromptScheduled": "የተያዘውን ተግባር ያስኪዱ። በ{{scheduledTime}} ተጀምሯል።",
       "problems": {
         "nameRequired": "ስም ያስገቡ።",
         "nameTooShort": "ቢያንስ 8 ቁምፊዎችን ይጠቀሙ።",

@@ -4651,6 +4651,8 @@
       "created": "ट्रिगर बनाया गया",
       "saved": "ट्रिगर सहेजा गया",
       "statusArrived": "पहुँच गया",
+      "defaultPromptWebhook": "इस वेबहुक अनुरोध के बॉडी का वर्णन करें:\n\n{{body}}",
+      "defaultPromptScheduled": "निर्धारित कार्य चलाएँ। रन {{scheduledTime}} पर शुरू हुआ।",
       "problems": {
         "nameRequired": "नाम दर्ज करें।",
         "nameTooShort": "कम से कम 8 अक्षर उपयोग करें।",

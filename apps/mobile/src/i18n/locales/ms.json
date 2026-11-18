@@ -4651,6 +4651,8 @@
       "created": "Pencetus dicipta",
       "saved": "Pencetus disimpan",
       "statusArrived": "Tiba",
+      "defaultPromptWebhook": "Huraikan badan permintaan webhook ini:\n\n{{body}}",
+      "defaultPromptScheduled": "Jalankan tugas berjadual. Dicetuskan pada {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Masukkan nama.",
         "nameTooShort": "Gunakan sekurang-kurangnya 8 aksara.",

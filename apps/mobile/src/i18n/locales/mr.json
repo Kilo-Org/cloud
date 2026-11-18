@@ -4651,6 +4651,8 @@
       "created": "ट्रिगर तयार झाला",
       "saved": "ट्रिगर जतन झाला",
       "statusArrived": "आले",
+      "defaultPromptWebhook": "या वेबहूक विनंतीच्या बॉडीचे वर्णन करा:\n\n{{body}}",
+      "defaultPromptScheduled": "शेड्यूल केलेले कार्य चालवा. {{scheduledTime}} वेळी ट्रिगर झाले.",
       "problems": {
         "nameRequired": "नाव प्रविष्ट करा.",
         "nameTooShort": "कमीत कमी 8 अक्षरे वापरा.",

@@ -4651,6 +4651,8 @@
       "created": "Триггер үүслээ",
       "saved": "Триггер хадгалагдлаа",
       "statusArrived": "Ирсэн",
+      "defaultPromptWebhook": "Вебхук хүсэлтийн биеийг тайлбарлана уу:\n\n{{body}}",
+      "defaultPromptScheduled": "Хуваарийн даалгаврыг ажиллуулна уу. Триггер {{scheduledTime}} цагт ажилласан.",
       "problems": {
         "nameRequired": "Нэр оруулна уу.",
         "nameTooShort": "Дор хаяж 8 тэмдэгт ашиглана уу.",

@@ -4651,6 +4651,8 @@
       "created": "ਟ੍ਰਿਗਰ ਬਣਾਇਆ ਗਿਆ",
       "saved": "ਟ੍ਰਿਗਰ ਸੰਭਾਲਿਆ ਗਿਆ",
       "statusArrived": "ਪਹੁੰਚਿਆ",
+      "defaultPromptWebhook": "ਇਸ ਵੈਬਹੁੱਕ ਬੇਨਤੀ ਦੀ ਬਾਡੀ ਦਾ ਵਰਣਨ ਕਰੋ:\n\n{{body}}",
+      "defaultPromptScheduled": "ਸਮਾਂ-ਸੂਚੀ ਵਾਲਾ ਕੰਮ ਚਲਾਓ। {{scheduledTime}} ਵਜੇ ਟ੍ਰਿਗਰ ਹੋਇਆ।",
       "problems": {
         "nameRequired": "ਨਾਮ ਦਰਜ ਕਰੋ।",
         "nameTooShort": "ਘੱਟੋ-ਘੱਟ 8 ਅੱਖਰ ਵਰਤੋ।",

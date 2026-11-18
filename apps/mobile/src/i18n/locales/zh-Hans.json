@@ -4651,6 +4651,8 @@
       "created": "触发器已创建",
       "saved": "触发器已保存",
       "statusArrived": "已到达",
+      "defaultPromptWebhook": "描述此 Webhook 请求的请求体：\n\n{{body}}",
+      "defaultPromptScheduled": "运行计划任务。触发时间为 {{scheduledTime}}。",
       "problems": {
         "nameRequired": "请输入名称。",
         "nameTooShort": "请使用至少 8 个字符。",

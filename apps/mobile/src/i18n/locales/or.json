@@ -4651,6 +4651,8 @@
       "created": "ଟ୍ରିଗର୍ ସୃଷ୍ଟି ହୋଇଛି",
       "saved": "ଟ୍ରିଗର୍ ସଞ୍ଚିତ ହୋଇଛି",
       "statusArrived": "ଆସିଛି",
+      "defaultPromptWebhook": "ଏହି ୱେବହୁକ୍ ଅନୁରୋଧର ବଡିର ବର୍ଣ୍ଣନା କରନ୍ତୁ:\n\n{{body}}",
+      "defaultPromptScheduled": "ନିର୍ଧାରିତ କାର୍ଯ୍ୟ ଚଲାନ୍ତୁ। {{scheduledTime}} ସମୟରେ ଟ୍ରିଗର୍ ହୋଇଛି।",
       "problems": {
         "nameRequired": "ଏକ ନାମ ଦିଅନ୍ତୁ।",
         "nameTooShort": "ଅତିକମରେ ୮ଟି ଅକ୍ଷର ବ୍ୟବହାର କରନ୍ତୁ।",

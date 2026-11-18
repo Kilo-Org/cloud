@@ -4721,6 +4721,8 @@
       "created": "Attivatore creato",
       "saved": "Attivatore salvato",
       "statusArrived": "Arrivata",
+      "defaultPromptWebhook": "Descrivi il corpo di questa richiesta webhook:\n\n{{body}}",
+      "defaultPromptScheduled": "Esegui l'attività pianificata. Attivato alle {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Inserisci un nome.",
         "nameTooShort": "Usa almeno 8 caratteri.",

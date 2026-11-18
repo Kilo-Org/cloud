@@ -4651,6 +4651,8 @@
       "created": "ಟ್ರಿಗರ್ ರಚಿಸಲಾಗಿದೆ",
       "saved": "ಟ್ರಿಗರ್ ಉಳಿಸಲಾಗಿದೆ",
       "statusArrived": "ಬಂದಿದೆ",
+      "defaultPromptWebhook": "ಈ ವೆಬ್ಹುಕ್ ವಿನಂತಿಯ ಬಾಡಿಯನ್ನು ವಿವರಿಸಿ:\n\n{{body}}",
+      "defaultPromptScheduled": "ನಿಗದಿತ ಕಾರ್ಯವನ್ನು ರನ್ ಮಾಡಿ. ರನ್ {{scheduledTime}} ಕ್ಕೆ ಪ್ರಾರಂಭವಾಗಿದೆ.",
       "problems": {
         "nameRequired": "ಹೆಸರನ್ನು ನಮೂದಿಸಿ।",
         "nameTooShort": "ಕನಿಷ್ಠ 8 ಅಕ್ಷರಗಳನ್ನು ಬಳಸಿ।",

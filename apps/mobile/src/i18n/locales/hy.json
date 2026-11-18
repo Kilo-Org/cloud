@@ -4651,6 +4651,8 @@
       "created": "Գործարկիչը ստեղծվեց",
       "saved": "Գործարկիչը պահպանվեց",
       "statusArrived": "Հասել է",
+      "defaultPromptWebhook": "Նկարագրեք այս վեբհուկի հարցման մարմինը՝\n\n{{body}}",
+      "defaultPromptScheduled": "Գործարկեք պլանավորված առաջադրանքը։ Գործարկումը սկսվել է {{scheduledTime}}-ին։",
       "problems": {
         "nameRequired": "Մուտքագրեք անվանում։",
         "nameTooShort": "Օգտագործեք առնվազն 8 նիշ։",

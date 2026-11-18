@@ -4651,6 +4651,8 @@
       "created": "ٹرگر بن گیا",
       "saved": "ٹرگر محفوظ ہو گیا",
       "statusArrived": "پہنچ گیا",
+      "defaultPromptWebhook": "اس ویب ہک درخواست کے باڈی کی وضاحت کریں:\n\n{{body}}",
+      "defaultPromptScheduled": "شیڈول شدہ کام چلائیں۔ {{scheduledTime}} پر ٹرگر ہوا۔",
       "problems": {
         "nameRequired": "نام درج کریں۔",
         "nameTooShort": "کم از کم 8 حروف استعمال کریں۔",

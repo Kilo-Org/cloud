@@ -4651,6 +4651,8 @@
       "created": "Abiarazlea sortu da",
       "saved": "Abiarazlea gorde da",
       "statusArrived": "Iritsi da",
+      "defaultPromptWebhook": "Deskribatu webhook eskaera honen gorputza:\n\n{{body}}",
+      "defaultPromptScheduled": "Exekutatu programatutako zeregina. Abiarazita: {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Sartu izen bat.",
         "nameTooShort": "Erabili gutxienez 8 karaktere.",

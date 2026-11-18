@@ -4651,6 +4651,8 @@
       "created": "Trigger aangemaakt",
       "saved": "Trigger opgeslagen",
       "statusArrived": "Aangekomen",
+      "defaultPromptWebhook": "Beschrijf de inhoud van dit webhookverzoek:\n\n{{body}}",
+      "defaultPromptScheduled": "Voer de geplande taak uit. Geactiveerd om {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Voer een naam in.",
         "nameTooShort": "Gebruik minstens 8 tekens.",

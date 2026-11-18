@@ -4727,6 +4727,8 @@
       "created": "Acionador criado",
       "saved": "Acionador guardado",
       "statusArrived": "Recebido",
+      "defaultPromptWebhook": "Descreve o corpo do pedido desta chamada de webhook:\n\n{{body}}",
+      "defaultPromptScheduled": "Executa a tarefa agendada. Acionada às {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Introduza um nome.",
         "nameTooShort": "Utilize pelo menos 8 caracteres.",

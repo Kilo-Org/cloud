@@ -4651,6 +4651,8 @@
       "created": "Sneller geskep",
       "saved": "Sneller gestoor",
       "statusArrived": "Aangekom",
+      "defaultPromptWebhook": "Beskryf die liggaam van hierdie webhaakversoek:\n\n{{body}}",
+      "defaultPromptScheduled": "Voer die geskeduleerde taak uit. Geaktiveer om {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Voer ’n naam in.",
         "nameTooShort": "Gebruik minstens 8 karakters.",

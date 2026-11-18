@@ -4651,6 +4651,8 @@
       "created": "Kiciye waa la abuuray",
       "saved": "Kiciye waa la kaydiyay",
       "statusArrived": "Waa yimid",
+      "defaultPromptWebhook": "Qeex jirka codsiga wicitaankan web:\n\n{{body}}",
+      "defaultPromptScheduled": "Socodsii hawsha jadwalka. La kiciyay {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Geli magac.",
         "nameTooShort": "Isticmaal ugu yaraan 8 xaraf.",

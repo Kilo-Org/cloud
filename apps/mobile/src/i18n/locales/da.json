@@ -4651,6 +4651,8 @@
       "created": "Udløser oprettet",
       "saved": "Udløser gemt",
       "statusArrived": "Ankommet",
+      "defaultPromptWebhook": "Beskriv indholdet af denne webhook-anmodning:\n\n{{body}}",
+      "defaultPromptScheduled": "Kør den planlagte opgave. Udløst kl. {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Indtast et navn.",
         "nameTooShort": "Brug mindst 8 tegn.",

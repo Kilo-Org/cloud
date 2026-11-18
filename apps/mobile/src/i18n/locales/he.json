@@ -4721,6 +4721,8 @@
       "created": "הטריגר נוצר",
       "saved": "הטריגר נשמר",
       "statusArrived": "הגיע",
+      "defaultPromptWebhook": "תארו את גוף בקשת הוובהוק הזו:\n\n{{body}}",
+      "defaultPromptScheduled": "הריצו את המשימה המתוזמנת. ההרצה החלה בשעה {{scheduledTime}}.",
       "problems": {
         "nameRequired": "הזינו שם.",
         "nameTooShort": "השתמשו בלפחות 8 תווים.",

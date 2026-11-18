@@ -4651,6 +4651,8 @@
       "created": "ට්‍රිගර් සාදන ලදි",
       "saved": "ට්‍රිගර් සුරකින ලදි",
       "statusArrived": "පැමිණියා",
+      "defaultPromptWebhook": "මෙම වෙබ්හුක් ඉල්ලීමේ බොඩිය විස්තර කරන්න:\n\n{{body}}",
+      "defaultPromptScheduled": "කාලසටහන්ගත කාර්යය ධාවනය කරන්න෴ {{scheduledTime}} වේලාවේ ට්‍රිගර් විය෴",
       "problems": {
         "nameRequired": "නමක් ඇතුළත් කරන්න෴",
         "nameTooShort": "අවම වශයෙන් අක්ෂර 8ක් භාවිත කරන්න෴",

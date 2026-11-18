@@ -99,8 +99,11 @@ function formattedPeriodEnd(input: OrgSeatSubscription): string | null {
  * a running trial. Both surfaces that name the plan state read this one
  * function, so the copy and the criteria cannot drift between them. The
  * running-stage set is the server's own predicate
- * (`isRunningTrialStage` in `@kilocode/app-shared/organizations`), not a local
- * mirror, so a stage added server-side is picked up here by type.
+ * (`isRunningTrialStage` in `@kilocode/app-shared/organizations`, defined in
+ * `@kilocode/organization-entitlement` beside the day-boundary classifier), so
+ * a renamed stage fails there at type time, and the entitlement suite ties the
+ * set to the classifier's output day by day, which fails if a new stage is
+ * added without joining the set.
  *
  * The date is parsed with `parseTimestamp`: `new Date()` throws on the
  * PostgreSQL timestamps Hermes cannot read, and the server sends the trial end

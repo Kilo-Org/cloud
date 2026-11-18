@@ -35,15 +35,13 @@ import {
   deniedAutoRoutingCandidates,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-denied-models';
 import { AUTO_ROUTING_DECISION_SECRET } from '@kilocode/web-shared/lib/config.server';
-import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
   createDirectByokReferenceResolver,
   getDirectByokModel,
   supportsCatalogMode,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
-import { byokOwner, getEnabledByokProviders } from '@kilocode/web-shared/lib/ai-gateway/byok';
-import { parseByokEndpointModelId } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
-import { isByokEndpointCatalogModelCandidate } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint/catalog';
+import { byokOwner } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { isByokEndpointModelId } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
 import type { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import { isDataCollectionExplicitlyDisallowed } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
@@ -331,22 +329,6 @@ async function resolveAutoModelId(
   }
 }
 
-/** Like `catalogModeModelForRoutedModel`, for an endpoint model id. */
-async function catalogModeModelForRoutedEndpointModel(
-  endpointModelId: { providerId: string; modelId: string },
-  callerPromise: ModelResolutionContext['callerPromise']
-): Promise<string | null> {
-  const caller = await callerPromise;
-  if (caller.kind !== 'signed-in' || !caller.organizationId) return null;
-  const key = (
-    await getEnabledByokProviders(readDb, { type: 'organization', id: caller.organizationId })
-  ).find(candidate => candidate.providerId === endpointModelId.providerId);
-  const model = key?.serveCatalogModels
-    ? key.endpoint?.models.find(candidate => candidate.id === endpointModelId.modelId)
-    : undefined;
-  return model && (await isByokEndpointCatalogModelCandidate(model.id)) ? model.id : null;
-}
-
 /**
  * The catalog id that replaces an auto-routed bespoke direct BYOK or endpoint id when the caller's
  * key for it is in catalog mode. Null when the id needs no replacement or has no catalog id; an
@@ -356,12 +338,11 @@ async function catalogModeModelForRoutedModel(
   model: string,
   callerPromise: ModelResolutionContext['callerPromise']
 ): Promise<string | null> {
-  const endpointModelId = parseByokEndpointModelId(model.toLowerCase());
-  if (endpointModelId) {
-    return catalogModeModelForRoutedEndpointModel(endpointModelId, callerPromise);
+  // Only the caller's keys know its endpoints, which can all serve catalog ids.
+  if (!isByokEndpointModelId(model.toLowerCase())) {
+    const { provider } = await getDirectByokModel(model.toLowerCase());
+    if (!provider || !supportsCatalogMode(provider)) return null;
   }
-  const { provider } = await getDirectByokModel(model.toLowerCase());
-  if (!provider || !supportsCatalogMode(provider)) return null;
   const caller = await callerPromise;
   if (caller.kind !== 'signed-in') return null;
   const resolveReference = await createDirectByokReferenceResolver(

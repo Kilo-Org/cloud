@@ -14,17 +14,18 @@ import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-util
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
   formatDirectByokModelId,
+  getByokEndpointProviders,
   getDirectByokCatalogModelId,
+  getDirectByokKeyLabel,
   getDirectByokModel,
   getDirectByokModelChatApis,
   supportsCatalogMode,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
-import { getEnabledByokProviders } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import {
-  getByokEndpointModelApiKinds,
-  parseByokEndpointModelId,
-} from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
-import { isByokEndpointCatalogModelCandidate } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint/catalog';
+  getEnabledByokProviders,
+  type EnabledByokProvider,
+} from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { isByokEndpointModelId } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
 import { readDb, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   KILO_AUTO_BALANCED_MODEL,
@@ -211,64 +212,28 @@ export async function validateOrganizationAutoTarget(
     return { kind: 'ok', modelId: rawModelId };
   }
 
-  const endpointTarget = parseByokEndpointModelId(rawModelId);
-  if (endpointTarget) {
-    const key = (
-      await getEnabledByokProviders(options.dbClient ?? readDb, {
-        type: 'organization',
-        id: organization.id,
-      })
-    ).find(candidate => candidate.providerId === endpointTarget.providerId);
-    const model = key?.endpoint?.models.find(candidate => candidate.id === endpointTarget.modelId);
-    if (!key?.endpoint || !model) {
-      return {
-        kind: 'error',
-        message: `Organization Auto route target '${targetModelId}' is unavailable because no enabled endpoint of this organization serves it.`,
-      };
-    }
-    if (
-      options.apiKind &&
-      !getByokEndpointModelApiKinds(key.endpoint, model).includes(options.apiKind)
-    ) {
-      return {
-        kind: 'error',
-        message: `Organization Auto route target '${targetModelId}' does not support the ${options.apiKind} API.`,
-      };
-    }
-    // Like a catalog-mode direct BYOK key, a catalog-mode endpoint serves the model only under its
-    // catalog id, which organization model policies cover.
-    if (key.serveCatalogModels) {
-      if (!(await isByokEndpointCatalogModelCandidate(model.id))) {
-        return {
-          kind: 'error',
-          message: `Organization Auto route target '${targetModelId}' is unavailable because the ${key.endpoint.name} endpoint uses Kilo catalog model IDs and this model has no catalog ID.`,
-        };
-      }
-      return validateOrganizationAutoTarget(organization, model.id, options);
-    }
-    return { kind: 'ok', modelId: rawModelId };
-  }
-
-  const directByokTarget = await getDirectByokModel(rawModelId);
+  let enabledKeys: Promise<EnabledByokProvider[]> | undefined;
+  const loadEnabledKeys = () =>
+    (enabledKeys ??= getEnabledByokProviders(options.dbClient ?? readDb, {
+      type: 'organization',
+      id: organization.id,
+    }));
+  const isEndpointTarget = isByokEndpointModelId(rawModelId);
+  // Only the organization's keys know its endpoints, whose model ids nobody else can use.
+  const directByokTarget = await getDirectByokModel(
+    rawModelId,
+    isEndpointTarget ? getByokEndpointProviders(await loadEnabledKeys()) : undefined
+  );
   if (directByokTarget.provider && directByokTarget.model) {
-    const key = (
-      await getEnabledByokProviders(options.dbClient ?? readDb, {
-        type: 'organization',
-        id: organization.id,
-      })
-    ).find(candidate => candidate.providerId === directByokTarget.provider?.id);
+    const { provider, model } = directByokTarget;
+    const key = (await loadEnabledKeys()).find(candidate => candidate.providerId === provider.id);
     if (!key) {
       return {
         kind: 'error',
-        message: `Organization Auto route target '${targetModelId}' is unavailable because this organization does not have an enabled BYOK credential for ${directByokTarget.provider.id}.`,
+        message: `Organization Auto route target '${targetModelId}' is unavailable because this organization does not have an enabled BYOK credential for ${provider.id}.`,
       };
     }
-    if (
-      options.apiKind &&
-      !getDirectByokModelChatApis(directByokTarget.provider, directByokTarget.model).includes(
-        options.apiKind
-      )
-    ) {
+    if (options.apiKind && !getDirectByokModelChatApis(provider, model).includes(options.apiKind)) {
       return {
         kind: 'error',
         message: `Organization Auto route target '${targetModelId}' does not support the ${options.apiKind} API.`,
@@ -276,19 +241,22 @@ export async function validateOrganizationAutoTarget(
     }
     // A catalog-mode key serves the model only under its catalog id, which organization model and
     // provider policies cover, so a stored bespoke target resolves to that id.
-    if (key.serveCatalogModels && supportsCatalogMode(directByokTarget.provider)) {
-      const catalogModelId = await getDirectByokCatalogModelId(directByokTarget.model);
+    if (key.serveCatalogModels && supportsCatalogMode(provider)) {
+      const catalogModelId = await getDirectByokCatalogModelId(model);
       if (!catalogModelId) {
         return {
           kind: 'error',
-          message: `Organization Auto route target '${targetModelId}' is unavailable because this organization's ${directByokTarget.provider.id} key uses Kilo catalog model IDs and this model has no catalog ID.`,
+          message: `Organization Auto route target '${targetModelId}' is unavailable because this organization's ${getDirectByokKeyLabel(provider)} uses Kilo catalog model IDs and this model has no catalog ID.`,
         };
       }
       return validateOrganizationAutoTarget(organization, catalogModelId, options);
     }
+    return { kind: 'ok', modelId: formatDirectByokModelId(provider, model) };
+  }
+  if (isEndpointTarget) {
     return {
-      kind: 'ok',
-      modelId: formatDirectByokModelId(directByokTarget.provider, directByokTarget.model),
+      kind: 'error',
+      message: `Organization Auto route target '${targetModelId}' is unavailable because no enabled endpoint of this organization serves it.`,
     };
   }
 

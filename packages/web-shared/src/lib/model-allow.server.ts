@@ -8,9 +8,14 @@ import {
   getPublicCustomLlmInferenceProviders,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { hasCustomLlmAccess } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/access';
-import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import {
+  getByokEndpointProviders,
+  getDirectByokModel,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import type { DirectByokProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import { isByokEndpointModelId } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
-import { isByokEndpointModelListedForOrganization } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint/models';
+import { getEnabledByokProviders } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 
 export type ProviderAwareAllowPredicate = (modelId: string) => Promise<boolean>;
@@ -32,6 +37,22 @@ export type ModelRestrictions = {
  * distinguish variants that are served by different providers.
  */
 export type ProviderLookup = (modelId: string) => Promise<ReadonlySet<string>>;
+
+/**
+ * The grantee organization's enabled endpoints outside catalog mode, which serve their models
+ * under the endpoint model ids. A catalog-mode endpoint serves only catalog ids, which the policy
+ * covers.
+ */
+async function getBespokeEndpointProviders(
+  customLlmGrantee: CustomLlmGrantee | undefined
+): Promise<DirectByokProvider[]> {
+  if (!customLlmGrantee) return [];
+  const keys = await getEnabledByokProviders(readDb, {
+    type: 'organization',
+    id: customLlmGrantee.organizationId,
+  });
+  return getByokEndpointProviders(keys.filter(key => !key.serveCatalogModels));
+}
 
 /**
  * A custom LLM is exempt only for a grantee it is granted to: a Kilo admin
@@ -57,17 +78,12 @@ export async function isModelRestrictionExempt(
       )
     );
   }
-  // An endpoint model the organization's own endpoint lists is one it configured itself.
-  if (isByokEndpointModelId(requestedModelId)) {
-    return (
-      customLlmGrantee !== undefined &&
-      (await isByokEndpointModelListedForOrganization(
-        customLlmGrantee.organizationId,
-        requestedModelId
-      ))
-    );
-  }
-  const directByokModel = await getDirectByokModel(requestedModelId);
+  const directByokModel = await getDirectByokModel(
+    requestedModelId,
+    isByokEndpointModelId(requestedModelId)
+      ? await getBespokeEndpointProviders(customLlmGrantee)
+      : undefined
+  );
   return directByokModel.provider !== null && directByokModel.model !== null;
 }
 

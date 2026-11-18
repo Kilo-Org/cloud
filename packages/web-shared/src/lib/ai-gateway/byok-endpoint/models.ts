@@ -13,9 +13,8 @@ import {
   formatByokEndpointModelId,
   getByokEndpointModelClientProvider,
   isByokEndpointProviderId,
-  parseByokEndpointModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
-import { isByokEndpointCatalogModelCandidate } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint/catalog';
+import { isByokServableCatalogModelId } from '@kilocode/web-shared/lib/ai-gateway/byok/servable-catalog-model';
 import { getFallbackReasoningOptions } from '@kilocode/web-shared/lib/ai-gateway/providers/reasoning-options';
 import { toByokListedModel } from '@kilocode/web-shared/lib/ai-gateway/providers/byok-listed-model';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
@@ -77,7 +76,7 @@ export async function getByokEndpointCatalogModelIds(
     for (const model of endpoint.models) {
       if (
         !modelIds.has(model.id) &&
-        (await isByokEndpointCatalogModelCandidate(model.id)) &&
+        (await isByokServableCatalogModelId(model.id)) &&
         !(await isCustomLlm(model.id))
       ) {
         modelIds.add(model.id);
@@ -104,22 +103,5 @@ export async function getByokEndpointCatalogModelIdsForOrganization(
 ): Promise<ReadonlySet<string>> {
   return getByokEndpointCatalogModelIds(
     await getEnabledByokProviders(fromDb, { type: 'organization', id: organizationId })
-  );
-}
-
-/** Whether an enabled endpoint of the organization outside catalog mode lists `modelId`. */
-export async function isByokEndpointModelListedForOrganization(
-  organizationId: string,
-  modelId: string,
-  fromDb: ByokSourceDb = readDb
-): Promise<boolean> {
-  const parsed = parseByokEndpointModelId(modelId);
-  if (!parsed) return false;
-  const keys = await getEnabledByokProviders(fromDb, { type: 'organization', id: organizationId });
-  return getByokEndpointKeys(keys).some(
-    key =>
-      key.providerId === parsed.providerId &&
-      !key.serveCatalogModels &&
-      key.endpoint.models.some(model => model.id === parsed.modelId)
   );
 }

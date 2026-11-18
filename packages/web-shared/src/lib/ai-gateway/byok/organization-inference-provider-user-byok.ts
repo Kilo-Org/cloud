@@ -1,9 +1,8 @@
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
-  getEnabledByokProviders,
+  getOrganizationByokProviderIds,
   hasInferenceProviderUserByokForModel,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
-import { getByokEndpointCatalogModelIds } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint/models';
 import {
   getDirectByokCatalogModelIds,
   type DirectByokPolicyTarget,
@@ -33,9 +32,9 @@ export async function isModelAllowedForDirectByokKey(
 }
 
 /**
- * The catalog ids the organization's catalog-mode direct BYOK keys serve under `policy`, as
- * `getProvider` routes them: an id counts when the policy admits it for the provider of a key that
- * serves it (see `isModelAllowedForProviderKey`), whatever it decides for Kilo's routes. An id a
+ * The catalog ids the organization's catalog-mode direct BYOK keys and endpoints serve under
+ * `policy`, as `getProvider` routes them: an id counts when the policy admits it for a key that
+ * serves it (see `isModelAllowedForDirectByokKey`), whatever it decides for Kilo's routes. An id a
  * custom LLM owns does not count, because `getProvider` serves the custom LLM first.
  */
 export async function getAllowedDirectByokCatalogModelIds(
@@ -51,25 +50,18 @@ export async function getAllowedDirectByokCatalogModelIds(
 }
 
 /**
- * The models among `modelIds` that the organization's own keys serve although the provider
- * allow-list admits none of their providers: provider keys sent through Vercel (see
- * `hasInferenceProviderUserByokForModel`) and catalog-mode endpoints, which the allow-list never
- * restricts.
+ * The models among `modelIds` that the organization's provider keys sent through Vercel serve
+ * although the provider allow-list admits none of their providers (see
+ * `hasInferenceProviderUserByokForModel`).
  */
 export async function modelsServedByOrganizationInferenceProviderUserByok(
   organizationId: string,
   modelIds: readonly string[]
 ): Promise<string[]> {
   if (modelIds.length === 0) return [];
-  const keys = await getEnabledByokProviders(readDb, { type: 'organization', id: organizationId });
-  const providerIds = keys.map(key => key.providerId);
-  const endpointCatalogModelIds = await getByokEndpointCatalogModelIds(keys);
+  const providerIds = await getOrganizationByokProviderIds(readDb, organizationId);
   const served = await Promise.all(
-    modelIds.map(
-      async modelId =>
-        endpointCatalogModelIds.has(modelId) ||
-        (await hasInferenceProviderUserByokForModel(modelId, providerIds))
-    )
+    modelIds.map(modelId => hasInferenceProviderUserByokForModel(modelId, providerIds))
   );
   return modelIds.filter((_modelId, index) => served[index]);
 }

@@ -100,7 +100,7 @@ import {
   isByokEndpointProviderId,
   parseByokEndpointCredentials,
 } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
-import { isByokEndpointCatalogModelCandidate } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint/catalog';
+import { isByokServableCatalogModelId } from '@kilocode/web-shared/lib/ai-gateway/byok/servable-catalog-model';
 import { BYOK_ENDPOINT_MAX_MODELS, type ByokEndpointCredentials } from '@kilocode/db/schema-types';
 import {
   ByokEndpointRequestError,
@@ -1095,7 +1095,7 @@ export const byokRouter = createTRPCRouter({
     .query(async ({ input, ctx }) => {
       await ensureOrganizationAccess(ctx, input.organizationId, ORGANIZATION_BILLING_ROLES);
       const modelIds = [...new Set(input.modelIds)];
-      const served = await Promise.all(modelIds.map(isByokEndpointCatalogModelCandidate));
+      const served = await Promise.all(modelIds.map(isByokServableCatalogModelId));
       return modelIds.filter((_, index) => served[index]);
     }),
 

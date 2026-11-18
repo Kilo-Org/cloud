@@ -11,6 +11,7 @@ const LIVE_CATALOG_IDS = new Set(['anthropic/claude-sonnet-4.6', 'openai/gpt-5.5
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   isValidOpenRouterModelId: jest.fn(async (modelId: string) => LIVE_CATALOG_IDS.has(modelId)),
+  getVercelModelsFromDatabase: jest.fn(async () => new Set()),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog', () => ({
   isCustomLlm: jest.fn(async (modelId: string) => modelId === 'openai/gpt-5.5'),

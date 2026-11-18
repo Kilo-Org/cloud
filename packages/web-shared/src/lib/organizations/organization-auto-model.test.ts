@@ -51,6 +51,9 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModel: jest.fn(async () => ({ provider: null, model: null })),
   getDirectByokCatalogModelId: jest.fn(),
   getDirectByokModelChatApis: () => ['chat_completions'],
+  getDirectByokKeyLabel: (provider: { id: string }) => `${provider.id} key`,
+  getByokEndpointProviders: (keys: { providerId: string; endpoint?: unknown }[]) =>
+    keys.flatMap(key => (key.endpoint ? [{ id: key.providerId }] : [])),
   supportsCatalogMode: (provider: { id: string }) => provider.id === 'synthetic',
 }));
 
@@ -163,6 +166,39 @@ describe('validateOrganizationAutoTarget with direct BYOK targets', () => {
       kind: 'error',
       message:
         "Organization Auto route target 'synthetic/hf:example/finetune' is unavailable because this organization's synthetic key uses Kilo catalog model IDs and this model has no catalog ID.",
+    });
+  });
+});
+
+describe('validateOrganizationAutoTarget with endpoint targets', () => {
+  const ENDPOINT_MODEL = 'endpoint-a1b2c3d4e5/acme/coder';
+
+  beforeEach(() => {
+    mockedGetDirectByokModel.mockImplementation(async (modelId, providers) => {
+      const provider = providers?.find(candidate => modelId.startsWith(`${candidate.id}/`));
+      return provider
+        ? { provider, model: { id: modelId.slice(provider.id.length + 1) } as never }
+        : { provider: null, model: null };
+    });
+  });
+
+  test("keeps a bespoke target of the organization's endpoint", async () => {
+    mockedGetEnabledByokProviders.mockResolvedValue([
+      { providerId: 'endpoint-a1b2c3d4e5', serveCatalogModels: false, endpoint: {} as never },
+    ]);
+
+    await expect(validateOrganizationAutoTarget(organization(), ENDPOINT_MODEL)).resolves.toEqual({
+      kind: 'ok',
+      modelId: ENDPOINT_MODEL,
+    });
+  });
+
+  test('rejects a target no enabled endpoint of the organization serves', async () => {
+    mockedGetEnabledByokProviders.mockResolvedValue([]);
+
+    await expect(validateOrganizationAutoTarget(organization(), ENDPOINT_MODEL)).resolves.toEqual({
+      kind: 'error',
+      message: `Organization Auto route target '${ENDPOINT_MODEL}' is unavailable because no enabled endpoint of this organization serves it.`,
     });
   });
 });

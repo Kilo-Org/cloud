@@ -29,6 +29,8 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog', (
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModel: (...args: unknown[]) => mockGetDirectByokModel(...args),
   findDirectByokProvider: (providerId: string) => ({ id: providerId }),
+  getByokEndpointProviders: (keys: { providerId: string; endpoint?: unknown }[]) =>
+    keys.flatMap(key => (key.endpoint ? [{ id: key.providerId }] : [])),
   supportsCatalogMode: (...args: unknown[]) => mockSupportsCatalogMode(...args),
   getDirectByokCatalogModelIds: (...args: unknown[]) => mockGetDirectByokCatalogModelIds(...args),
 }));
@@ -368,6 +370,27 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
       expect(await eligibility(DIRECT_MODEL)).toEqual({
         isFree: false,
         hasUserByokAvailable: false,
+      });
+    });
+
+    it("counts an endpoint model of the organization's enabled endpoint", async () => {
+      const endpointModel = 'endpoint-a1b2c3d4e5/acme/coder';
+      mockGetOrganizationByokProviderIds.mockResolvedValue(['endpoint-a1b2c3d4e5']);
+      mockGetEnabledByokProviders.mockResolvedValue([
+        { providerId: 'endpoint-a1b2c3d4e5', serveCatalogModels: false, endpoint: {} },
+      ]);
+      mockGetDirectByokModel.mockImplementation(
+        async (_modelId: string, providers?: { id: string }[]) =>
+          providers?.length ? { provider: providers[0], model: { id: 'acme/coder' } } : {}
+      );
+
+      expect(await eligibility(endpointModel, 'org-1')).toEqual({
+        isFree: false,
+        hasUserByokAvailable: true,
+      });
+      expect(mockGetEnabledByokProviders).toHaveBeenCalledWith(fakeDb, {
+        type: 'organization',
+        id: 'org-1',
       });
     });
 

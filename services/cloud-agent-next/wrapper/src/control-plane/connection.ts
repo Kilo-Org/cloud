@@ -22,6 +22,7 @@ import type {
   NativeConnectionPhase,
 } from '../../../src/shared/control-diagnostics.js';
 import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
+import { redactSecrets } from '../redact-output.js';
 
 /** Spec §7 Connection: the bounded outbound buffer holds at most this many frames. */
 export const CONTROL_PLANE_OUTBOX_MAX_FRAMES = 1_000;
@@ -132,6 +133,10 @@ export function controlPlaneReconnectDelayMs(
   const base = Math.min(max, min * 2 ** Math.max(0, attempt - 1));
   const jitter = Math.floor(random() * Math.max(1, Math.floor(min / RECONNECT_JITTER_DIVISOR)));
   return base + jitter;
+}
+
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function toText(data: unknown): string | undefined {
@@ -450,8 +455,9 @@ export function createControlPlaneConnection(
             : {}),
         },
       });
-    } catch {
-      log('control-plane connection failed');
+    } catch (error) {
+      // The reason can embed the proxy URL, so strip its credentials first.
+      log(`control-plane connection failed: ${redactSecrets(messageOf(error))}`);
       reportDisconnectEpisode('connect_attempt');
       phase = 'idle';
       scheduleReconnect();

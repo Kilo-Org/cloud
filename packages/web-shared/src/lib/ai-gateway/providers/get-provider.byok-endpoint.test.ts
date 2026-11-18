@@ -22,6 +22,7 @@ import { isValidOpenRouterModelId } from '@kilocode/web-shared/lib/ai-gateway/pr
 import { shouldRouteToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import type { ByokEndpointDefinition } from '@kilocode/db/schema-types';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { byok_api_keys, type User } from '@kilocode/db/schema';
@@ -48,6 +49,9 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', 
     '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache'
   ),
   isValidOpenRouterModelId: jest.fn(),
+  resolveOpenRouterModelAlias: jest.fn(async (modelId: string) =>
+    modelId === LATEST_ALIAS ? 'moonshotai/kimi-k2.6' : modelId
+  ),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel', () => ({
   canRouteToVercel: jest.fn(async () => false),
@@ -60,6 +64,7 @@ const actualDirectByok = jest.requireActual<typeof directByokModule>(
 );
 
 const CATALOG_MODEL = 'moonshotai/kimi-k2.6';
+const LATEST_ALIAS = '~moonshotai/kimi-latest';
 const ENDPOINT_ID = 'endpoint-a1b2c3d4e5';
 const OTHER_ENDPOINT_ID = 'endpoint-f6g7h8i9j0';
 const CREDENTIALS = JSON.stringify({ type: 'api_key', api_key: 'endpoint-secret' });
@@ -398,6 +403,35 @@ describe('getProvider for a catalog id an endpoint serves in catalog mode', () =
     });
   });
 
+  test("serves a latest alias with the endpoint model of the alias's target", async () => {
+    const user = await insertTestUser();
+    const organizationId = await organizationWithKeys(user, [
+      { providerId: ENDPOINT_ID, endpoint: endpoint(), catalogMode: true },
+    ]);
+    jest.mocked(getModelGatewayUserByokProviders).mockResolvedValue([]);
+    jest
+      .mocked(isValidOpenRouterModelId)
+      .mockImplementation(async id => id === CATALOG_MODEL || id === LATEST_ALIAS);
+
+    const { result } = await route(user, organizationId, LATEST_ALIAS);
+
+    const served = await onlyRoute(result);
+    expect(served).toMatchObject({ userByok: [{ providerId: ENDPOINT_ID }] });
+    const body = { model: LATEST_ALIAS, messages: [] };
+    await served.provider.transformRequest({
+      provider: served.provider,
+      model: LATEST_ALIAS,
+      request: { kind: 'chat_completions', body },
+      originalHeaders: EmptyFraudDetectionHeaders,
+      extraHeaders: {},
+      userByok: served.userByok,
+      kilo_user_id: user.id,
+      organization_id: organizationId,
+      session_id: null,
+    });
+    expect(body.model).toBe('kimi');
+  });
+
   test('never applies to a personal request', async () => {
     const user = await insertTestUser();
     await organizationWithKeys(user, [
@@ -436,6 +470,29 @@ describe('previewByokRouting with endpoints', () => {
       outcome,
       providerId: ENDPOINT_ID,
       reason,
+      supportedApiKinds: ['chat_completions'],
+    });
+  });
+
+  test('explains an endpoint outside catalog mode that lists the catalog id', async () => {
+    const user = await insertTestUser();
+    const organizationId = await organizationWithKeys(user, [
+      { providerId: ENDPOINT_ID, endpoint: endpoint() },
+    ]);
+
+    const preview = await previewByokRouting({
+      fromDb: db,
+      owner: { type: 'organization', id: organizationId },
+      requestedModel: CATALOG_MODEL,
+      apiKind: 'chat_completions',
+    });
+
+    if (preview.kind !== 'routes') throw new Error('expected routes');
+    expect(preview.steps[0]).toEqual({
+      route: 'direct-byok',
+      outcome: 'skipped',
+      providerId: ENDPOINT_ID,
+      reason: 'not-catalog-mode',
       supportedApiKinds: ['chat_completions'],
     });
   });

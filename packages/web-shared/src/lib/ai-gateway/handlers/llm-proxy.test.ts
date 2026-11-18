@@ -3712,6 +3712,42 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
+  it('names an Organization Auto endpoint target its endpoint cannot serve', async () => {
+    const target = 'endpoint-a1b2c3d4e5/acme/coder';
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: {
+        id: 'user-123',
+        google_user_email: 'test@example.com',
+        microdollars_used: 0,
+      } as User,
+      authFailedResponse: null,
+      organizationId: 'org-1',
+    });
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: {
+        default_model: 'kilo-auto/org',
+        org_auto_model: { routes: {}, fallback_model: 'kilo-auto/balanced' },
+      },
+      plan: 'enterprise',
+    });
+    mockedApplyResolvedAutoModel.mockImplementation(async (_params, request) => {
+      request.body.model = target;
+      return { kind: 'ok', resolved: { model: target }, routingTarget: target };
+    });
+    mockedGetProvider.mockResolvedValue({ kind: 'byok-endpoint-unavailable' });
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/org')) as never);
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error_type: 'organization_auto_configuration',
+      message: `Organization Auto route target '${target}' is unavailable because no enabled endpoint of this organization serves it.`,
+    });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
   it('rejects a bespoke direct BYOK id whose key serves catalog ids, naming the catalog id', async () => {
     mockedGetProvider.mockResolvedValue({
       kind: 'direct-byok-catalog-only',

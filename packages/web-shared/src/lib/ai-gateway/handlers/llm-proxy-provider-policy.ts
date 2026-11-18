@@ -237,6 +237,14 @@ export async function resolveProviderAndPolicy(
       claudeBillingUnavailableResponse(getProviderResult.message, getProviderResult.retryable)
     );
   }
+  if (getProviderResult.kind === 'byok-endpoint-unavailable' && orgAutoRouteTarget) {
+    // The organization chose the target itself, so it may learn why its endpoint cannot serve it.
+    return reject(
+      organizationAutoConfigurationResponse(
+        `Organization Auto route target '${orgAutoRouteTarget}' is unavailable because no enabled endpoint of this organization serves it.`
+      )
+    );
+  }
   if (
     getProviderResult.kind === 'custom-llm-unavailable' ||
     getProviderResult.kind === 'byok-endpoint-unavailable'

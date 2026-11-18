@@ -24,4 +24,11 @@ describe('isDirectByokModelId', () => {
     expect(isDirectByokModelId('synthetic/hf:zai-org/GLM-5.1')).toBe(true);
     expect(isDirectByokModelId('synthetic-new/whatever')).toBe(false);
   });
+
+  it("matches organization endpoint model ids, which only the endpoint's key serves", () => {
+    expect(isDirectByokModelId('endpoint-a1b2c3d4e5/acme/coder')).toBe(true);
+    expect(isDirectByokModelId('Endpoint-A1B2C3D4E5/Acme/Coder')).toBe(true);
+    expect(isDirectByokModelId('endpoint-short/acme/coder')).toBe(false);
+    expect(isDirectByokModelId('endpoint/acme/coder')).toBe(false);
+  });
 });

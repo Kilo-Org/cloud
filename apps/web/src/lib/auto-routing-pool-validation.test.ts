@@ -75,4 +75,19 @@ describe('buildEligibleCatalog', () => {
     expect([...catalog.ownerCatalogIds]).toEqual(['anthropic/claude-sonnet-4']);
     expect(catalog.organizationId).toBe('org-1');
   });
+
+  test("excludes the organization's endpoint models, which only its endpoints serve", async () => {
+    const endpointModel = model('endpoint-a1b2c3d4e5/acme/coder');
+    mockedGetEnhanced.mockResolvedValue({ data: [model('anthropic/claude-sonnet-4')] });
+    mockedGetOrgModels.mockResolvedValue({
+      data: [model('anthropic/claude-sonnet-4'), endpointModel],
+    });
+    // Direct BYOK model lists include the organization's endpoint models.
+    mockedGetByokOrg.mockResolvedValue([endpointModel]);
+
+    const catalog = await buildEligibleCatalog({ userId: 'user-1', organizationId: 'org-1' });
+
+    expect([...catalog.byId.keys()]).toEqual(['anthropic/claude-sonnet-4']);
+    expect([...catalog.byokOnlyIds]).toEqual(['endpoint-a1b2c3d4e5/acme/coder']);
+  });
 });

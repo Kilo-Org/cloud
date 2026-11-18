@@ -61,10 +61,11 @@ export function CouncilRefusalScreen({
   const { t } = useTranslation();
   const router = useRouter();
   const personal = isPersonal(scope);
+  const hasMemberships = membershipState === 'some';
   // An unsettled list says nothing about memberships, so its action copy stays
   // neutral: "Create an organization" names a step that exists either way,
   // while "Switch organization" names one only a member can take.
-  const actionKey = membershipState === 'some' ? personalActionKey(true) : personalActionKey(false);
+  const actionKey = personalActionKey(hasMemberships);
   return (
     <CenteredState contentContainerClassName="px-6">
       <View className="items-center gap-4">
@@ -75,7 +76,7 @@ export function CouncilRefusalScreen({
           <Button
             className={STATE_ACTION_CLASS}
             onPress={() => {
-              if (membershipState === 'some') {
+              if (hasMemberships) {
                 // The reviewer scope list is the account switcher: every
                 // membership on one screen, and a pick there opens the picked
                 // account's platform list — where the switch reads.

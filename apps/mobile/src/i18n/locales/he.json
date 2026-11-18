@@ -934,13 +934,25 @@
       "empty": "עדיין אין סקירות עם נתוני אנליטיקה",
       "emptyDescription": "האנליטיקה מתעדת סקירות שהושלמו כל עוד היא מופעלת עבור הארגון.",
       "offTitle": "האנליטיקה כבויה עבור {{platform}}",
-      "offDescription": "הפעל אותה בהגדרות הארגון באתר כדי לתעד סקירות שהושלמו.",
-      "couldNotLoad": "לא ניתן לטעון את האנליטיקה"
+      "offDescription": "תפקידי החיוב בארגון יכולים להפעיל את האנליטיקה בהגדרות הארגון באתר כדי לתעד סקירות שהושלמו.",
+      "couldNotLoad": "לא ניתן לטעון את האנליטיקה",
+      "trackedReviewsCaption": "סקירות שהושלמו והסתיימו בתקופה זו כשהאנליטיקה מופעלת. סקירות שמתנהלות או שנכשלו לעולם אינן נספרות.",
+      "trackedReviewsUncounted": "לא נספרות: {{displayCount}} מתוך {{displayTotal}} הסקירות שהסתיימו בארגון שלהן התוצאה לא נשמרה.",
+      "trackedReviewsUncounted_one": "לא נספרות: {{displayCount}} מתוך {{displayTotal}} הסקירות שהסתיימו בארגון שלהן התוצאה לא נשמרה.",
+      "trackedReviewsUncounted_other": "לא נספרות: {{displayCount}} מתוך {{displayTotal}} הסקירות שהסתיימו בארגון שלהן התוצאה לא נשמרה.",
+      "trackedReviewsUncounted_two": "לא נספרות: {{displayCount}} מתוך {{displayTotal}} הסקירות שהסתיימו בארגון שלהן התוצאה לא נשמרה."
     },
     "council": {
       "title": "סקירת מועצה",
       "subtitle": "כמה מומחים סוקרים כל בקשת משיכה, והקולות שלהם מצטרפים להחלטה אחת.",
-      "unavailable": "סקירת מועצה אינה זמינה עבור הארגון הזה.",
+      "unavailablePersonallyTitle": "נדרש ארגון Enterprise",
+      "unavailablePersonally": "סקירת מועצה אינה חלק מחשבון אישי.",
+      "unavailablePersonallyAction": "יצירת ארגון",
+      "unavailablePersonallySwitchAction": "החלף ארגון",
+      "unavailableOrganizationTitle": "סקירת מועצה אינה זמינה",
+      "unavailableForOrganization": "סקירת מועצה דורשת את תוכנית Enterprise עם מינוי פעיל או תקופת ניסיון. אין לארגון הזה אותה כרגע.",
+      "unavailableForOrganizationNeutral": "סקירת מועצה אינה זמינה לארגון הזה כרגע. נסו שוב מאוחר יותר.",
+      "unavailableOnBitbucket": "סקירת מועצה אינה זמינה עבור מאגרי Bitbucket.",
       "noRepositories": "עדיין לא נבחרו מאגרים. בחר קודם מאגרים בהגדרות המאגרים.",
       "specialists": "מומחים",
       "labels": "תוויות שמפעילות סקירת מועצה",
@@ -4769,6 +4781,7 @@
     "superseded": "הקישור הזה הוחלף במכשיר אחר, ולכן הוא כבר לא עובד."
   },
   "sharedSession": {
+    "startedAt": "התחילה בשעה {{time}}",
     "title": "סשן משותף",
     "someone": "מישהו",
     "sharedBy": "שותף על ידי {{owner}}",

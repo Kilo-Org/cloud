@@ -1476,13 +1476,24 @@
       "empty": "እስካሁን ትንታኔ ያላቸው ግምገማዎች የሉም",
       "emptyDescription": "ትንታኔ ለድርጅቱ ነቅቶ እያለ የተጠናቀቁ ግምገማዎችን ይመዘግባል።",
       "offTitle": "ለ{{platform}} ትንታኔ ጠፍቷል",
-      "offDescription": "የተጠናቀቁ ግምገማዎችን ለመመዝገብ ትንታኔን በድር ላይ ባሉ የድርጅት ቅንብሮች ውስጥ ያንቁት።",
-      "couldNotLoad": "ትንታኔን መጫን አልተቻለም"
+      "offDescription": "የተጠናቀቁ ግምገማዎችን ለመመዝገብ፣ ድርጅቱ የክፍያ ኃላፊነት ያላቸው ሚናዎች ትንታኔን በድር ላይ ባሉት የድርጅት ቅንብሮች ውስጥ ማብራት ይችላሉ።",
+      "couldNotLoad": "ትንታኔን መጫን አልተቻለም",
+      "trackedReviewsCaption": "ትንታኔ ለድርጅቱ ነቅቶ እያለ በዚህ ጊዜ ውስጥ የተጠናቀቁ ግምገማዎች። እየተከናወኑ ያሉ እና ያልተሳኩ ግምገማዎች በጭራሽ አይቆጠሩም።",
+      "trackedReviewsUncounted": "አልተቆጠሩም: ከድርጅቱ ያሉት {{displayTotal}} የተጠናቀቁ ግምገማዎች ውስጥ {{displayCount}} ውጤታቸው አልተመዘገበም።",
+      "trackedReviewsUncounted_one": "አልተቆጠሩም: ከድርጅቱ ያሉት {{displayTotal}} የተጠናቀቁ ግምገማዎች ውስጥ {{displayCount}} ውጤታቸው አልተመዘገበም።",
+      "trackedReviewsUncounted_other": "አልተቆጠሩም: ከድርጅቱ ያሉት {{displayTotal}} የተጠናቀቁ ግምገማዎች ውስጥ {{displayCount}} ውጤታቸው አልተመዘገበም።"
     },
     "council": {
       "title": "የጉባኤ ግምገማ",
       "subtitle": "በርካታ ባለሙያዎች እያንዳንዱን የመሳብ ጥያቄ ይገመግማሉ፤ ድምፆቻቸውም ወደ አንድ ውሳኔ ይጣመራሉ።",
-      "unavailable": "የጉባኤ ግምገማ ለዚህ ድርጅት አይገኝም።",
+      "unavailablePersonallyTitle": "Enterprise ድርጅት ያስፈልጋል",
+      "unavailablePersonally": "የጉባኤ ግምገማ የግል መለያ አካል አይደለም።",
+      "unavailablePersonallyAction": "ድርጅት ፍጠር",
+      "unavailablePersonallySwitchAction": "ድርጅት ይቀይሩ",
+      "unavailableOrganizationTitle": "የጉባኤ ግምገማ አሁን አይገኝም",
+      "unavailableForOrganization": "የጉባኤ ግምገማ ንቁ የደንበኝነት ምዝገባ ወይም የሙከራ ጊዜ ያለው የEnterprise ዕቅድ ይፈልጋል። ይህ ድርጅት አሁን የለውም።",
+      "unavailableForOrganizationNeutral": "የጉባኤ ግምገማ ለዚህ ድርጅት አሁን አይገኝም። በኋላ እንደገና ይሞክሩ።",
+      "unavailableOnBitbucket": "የጉባኤ ግምገማ ለBitbucket ማከማቻዎች አይገኝም።",
       "noRepositories": "እስካሁን ምንም ማከማቻ አልተመረጠም። መጀመሪያ በማከማቻ ቅንብሮች ውስጥ ማከማቻዎችን ይምረጡ።",
       "specialists": "ባለሙያዎች",
       "labels": "የጉባኤ ግምገማን የሚያስጀምሩ መለያዎች",
@@ -4699,6 +4710,7 @@
     "superseded": "ይህ ሊንክ በሌላ ቦታ ተተክቷል፣ ስለዚህ ከእንግዲህ ወዲህ አይሰራም።"
   },
   "sharedSession": {
+    "startedAt": "የተጀመረው በ{{time}}",
     "title": "የተጋራ ክፍለ ጊዜ",
     "someone": "አንድ ሰው",
     "sharedBy": "በ{{owner}} የተጋራ",

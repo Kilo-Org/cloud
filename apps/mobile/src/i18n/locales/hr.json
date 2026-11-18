@@ -1500,13 +1500,25 @@
       "empty": "Još nema pregleda s analitikom",
       "emptyDescription": "Analitika bilježi dovršene preglede dok je uključena za organizaciju.",
       "offTitle": "Analitika je isključena za {{platform}}",
-      "offDescription": "Uključi je u postavkama organizacije na webu kako bi bilježila dovršene preglede.",
-      "couldNotLoad": "Nije moguće učitati analitiku"
+      "offDescription": "Uloge naplate u organizaciji (vlasnici, administratori i upravitelji naplate) mogu uključiti analitiku u postavkama organizacije na webu kako bi se bilježili dovršeni pregledi.",
+      "couldNotLoad": "Nije moguće učitati analitiku",
+      "trackedReviewsCaption": "Dovršeni pregledi koji su završili u ovom razdoblju dok je analitika bila uključena. Pregledi u tijeku i neuspjeli pregledi se nikada ne računaju.",
+      "trackedReviewsUncounted": "Nije uračunato: {{displayCount}} od {{displayTotal}} dovršenih pregleda koje organizacija ima, čiji rezultat nije bio zabilježen.",
+      "trackedReviewsUncounted_few": "Nije uračunato: {{displayCount}} od {{displayTotal}} dovršenih pregleda koje organizacija ima, čiji rezultat nije bio zabilježen.",
+      "trackedReviewsUncounted_one": "Nije uračunato: {{displayCount}} od {{displayTotal}} dovršenih pregleda koje organizacija ima, čiji rezultat nije bio zabilježen.",
+      "trackedReviewsUncounted_other": "Nije uračunato: {{displayCount}} od {{displayTotal}} dovršenih pregleda koje organizacija ima, čiji rezultat nije bio zabilježen."
     },
     "council": {
       "title": "Pregled vijeća",
       "subtitle": "Nekoliko stručnjaka pregledava svaki zahtjev za povlačenje, a njihovi se glasovi spajaju u jednu odluku.",
-      "unavailable": "Pregled vijeća nije dostupan za ovu organizaciju.",
+      "unavailablePersonallyTitle": "Potrebna je Enterprise organizacija",
+      "unavailablePersonally": "Pregled vijeća nije dio osobnog računa.",
+      "unavailablePersonallyAction": "Stvori organizaciju",
+      "unavailablePersonallySwitchAction": "Promijeni organizaciju",
+      "unavailableOrganizationTitle": "Pregled vijeća nije dostupan",
+      "unavailableForOrganization": "Pregled vijeća zahtijeva Enterprise plan s aktivnom pretplatom ili probnim razdobljem. Ova organizacija ga trenutačno nema.",
+      "unavailableForOrganizationNeutral": "Pregled vijeća trenutačno nije dostupan za ovu organizaciju. Pokušajte ponovno kasnije.",
+      "unavailableOnBitbucket": "Pregled vijeća nije dostupan za Bitbucket repozitorije.",
       "noRepositories": "Još nije odabran nijedan repozitorij. Najprije odaberi repozitorije u postavkama repozitorija.",
       "specialists": "Stručnjaci",
       "labels": "Oznake koje pokreću pregled vijeća",
@@ -4769,6 +4781,7 @@
     "superseded": "Ova je poveznica zamijenjena na drugom uređaju pa više ne radi."
   },
   "sharedSession": {
+    "startedAt": "Započeto u {{time}}",
     "title": "Dijeljena sesija",
     "someone": "Netko",
     "sharedBy": "Dijeli {{owner}}",

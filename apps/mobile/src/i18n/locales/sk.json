@@ -1524,13 +1524,26 @@
       "empty": "Zatiaľ žiadne kontroly s analytikou",
       "emptyDescription": "Analytika zaznamenáva dokončené kontroly, kým je pre organizáciu zapnutá.",
       "offTitle": "Analytika je pre {{platform}} vypnutá",
-      "offDescription": "Zapnite ju v nastaveniach organizácie na webe, aby zaznamenávala dokončené kontroly.",
-      "couldNotLoad": "Analytiku sa nepodarilo načítať"
+      "offDescription": "Fakturačné roly organizácie – vlastníci, správcovia a manažéri fakturácie – môžu zapnúť analytiku v nastaveniach organizácie na webe, aby sa zaznamenávali dokončené kontroly.",
+      "couldNotLoad": "Analytiku sa nepodarilo načítať",
+      "trackedReviewsCaption": "Dokončené kontroly, ktoré sa skončili v tomto období so zapnutou analytikou. Prebiehajúce a neúspešné kontroly sa nikdy nezapočítavajú.",
+      "trackedReviewsUncounted": "Nezapočítané: {{displayCount}} z {{displayTotal}} dokončených kontrol organizácie, ktorých výsledok nebol zachytený.",
+      "trackedReviewsUncounted_few": "Nezapočítané: {{displayCount}} z {{displayTotal}} dokončených kontrol organizácie, ktorých výsledok nebol zachytený.",
+      "trackedReviewsUncounted_many": "Nezapočítané: {{displayCount}} z {{displayTotal}} dokončených kontrol organizácie, ktorých výsledok nebol zachytený.",
+      "trackedReviewsUncounted_one": "Nezapočítané: {{displayCount}} z {{displayTotal}} dokončených kontrol organizácie, ktorých výsledok nebol zachytený.",
+      "trackedReviewsUncounted_other": "Nezapočítané: {{displayCount}} z {{displayTotal}} dokončených kontrol organizácie, ktorých výsledok nebol zachytený."
     },
     "council": {
       "title": "Kontrola rady",
       "subtitle": "Každý pull request kontroluje niekoľko špecialistov a ich hlasy sa spájajú do jedného rozhodnutia.",
-      "unavailable": "Kontrola rady nie je pre túto organizáciu dostupná.",
+      "unavailablePersonallyTitle": "Potrebuje organizáciu Enterprise",
+      "unavailablePersonally": "Kontrola rady nie je súčasťou osobného účtu.",
+      "unavailablePersonallyAction": "Vytvoriť organizáciu",
+      "unavailablePersonallySwitchAction": "Prepnúť organizáciu",
+      "unavailableOrganizationTitle": "Kontrola rady momentálne nie je dostupná",
+      "unavailableForOrganization": "Kontrola rady vyžaduje plán Enterprise s aktívnym predplatným alebo skúšobnou lehotou. Táto organizácia ho momentálne nemá.",
+      "unavailableForOrganizationNeutral": "Kontrola rady nie je pre túto organizáciu momentálne dostupná. Skúste to znova neskôr.",
+      "unavailableOnBitbucket": "Kontrola rady nie je dostupná pre repozitáre Bitbucket.",
       "noRepositories": "Zatiaľ nie je vybraný žiadny repozitár. Najprv vyberte repozitáre v nastaveniach repozitárov.",
       "specialists": "Špecialisti",
       "labels": "Štítky, ktoré spúšťajú kontrolu rady",
@@ -4839,6 +4852,7 @@
     "superseded": "Tento odkaz bol nahradený na inom zariadení, preto už nefunguje."
   },
   "sharedSession": {
+    "startedAt": "Začaté o {{time}}",
     "title": "Zdieľaná relácia",
     "someone": "Niekto",
     "sharedBy": "Zdieľal(a) {{owner}}",

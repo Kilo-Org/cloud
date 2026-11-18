@@ -37,11 +37,23 @@ function ActivityEntry({
   item: BackgroundActivityItem;
   onOpenChildSession: OpenChildSession;
 }) {
-  const label = item.kind === 'shell' ? item.title || item.command : item.description || item.agent;
+  const shellTitle = item.kind === 'shell' ? item.title?.trim() : undefined;
+  const showCommandBelow =
+    item.kind === 'shell' && shellTitle && shellTitle !== item.command.trim();
+  const label =
+    item.kind === 'shell'
+      ? showCommandBelow
+        ? shellTitle
+        : item.command
+      : item.description || item.agent;
   const row = (
     <>
       <span
-        className="min-w-0 flex-1 truncate"
+        className={
+          item.kind === 'shell' && !showCommandBelow
+            ? 'max-h-24 min-w-0 flex-1 overflow-auto font-mono whitespace-pre-wrap break-all'
+            : 'min-w-0 flex-1 truncate'
+        }
         title={item.descendant ? `${label} · From ${item.parentLabel}` : label}
       >
         {label}
@@ -79,7 +91,7 @@ function ActivityEntry({
       ) : (
         <div className="flex items-center gap-2 px-2 py-1">{row}</div>
       )}
-      {item.kind === 'shell' && item.title && (
+      {item.kind === 'shell' && showCommandBelow && (
         <pre className="max-h-24 overflow-auto px-2 font-mono text-xs whitespace-pre-wrap break-all">
           {item.command}
         </pre>

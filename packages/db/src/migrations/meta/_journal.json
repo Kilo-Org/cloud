@@ -2567,8 +2567,15 @@
     {
       "idx": 366,
       "version": "7",
-      "when": 1794997141945,
-      "tag": "0366_workspace_read_model",
+      "when": 1794998083411,
+      "tag": "0366_latest_alias_targets",
+      "breakpoints": true
+    },
+    {
+      "idx": 367,
+      "version": "7",
+      "when": 1795011067710,
+      "tag": "0367_workspace_read_model",
       "breakpoints": true
     }
   ]

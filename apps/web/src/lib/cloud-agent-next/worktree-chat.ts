@@ -5,7 +5,7 @@ import {
   activeOrganizationJoinCondition,
   organizationMembershipJoinCondition,
 } from '@kilocode/worker-utils/organization-membership';
-import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
+import { cloudAgentWorktreeIdSchema, WORKSPACE_DELETING } from '@kilocode/session-ingest-contracts';
 import { TRPCClientError } from '@trpc/client';
 import { TRPCError } from '@trpc/server';
 import type { TRPC_ERROR_CODE_KEY } from '@trpc/server/rpc';
@@ -45,6 +45,7 @@ const WORKTREE_TRPC_CODES = new Set<TRPC_ERROR_CODE_KEY>([
 
 const safeWorktreeErrorMessages = new Set([
   'creation_in_progress',
+  WORKSPACE_DELETING,
   'operation_key_reuse_mismatch',
   'worktree_source_not_eligible',
   'worktree_chat_creation_failed',

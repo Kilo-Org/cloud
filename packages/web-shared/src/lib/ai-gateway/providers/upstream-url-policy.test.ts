@@ -1,5 +1,4 @@
-import { lookup } from 'node:dns/promises';
-import type { LookupAddress } from 'node:dns';
+import { Resolver } from 'node:dns/promises';
 import { captureMessage } from '@sentry/nextjs';
 import {
   clearUpstreamUrlPolicyCache,
@@ -10,22 +9,16 @@ import {
   type UpstreamUrlViolation,
 } from './upstream-url-policy';
 
-jest.mock('node:dns/promises', () => ({ lookup: jest.fn() }));
+jest.mock('node:dns/promises', () => ({ Resolver: jest.fn() }));
 
 jest.mock('@sentry/nextjs', () => ({ captureMessage: jest.fn() }));
 
 function resolvesTo(...addresses: string[]) {
-  return jest.fn(async (_hostname: string) => addresses);
+  return jest.fn(async (_hostname: string, _signal: AbortSignal) => addresses);
 }
 
 function neverResolves() {
-  return jest.fn((_hostname: string) => new Promise<string[]>(() => {}));
-}
-
-function pendingResolution() {
-  const { promise, resolve } = Promise.withResolvers<string[]>();
-  const resolveHostAddresses = jest.fn((_hostname: string) => promise);
-  return { resolveHostAddresses, resolve };
+  return jest.fn((_hostname: string, _signal: AbortSignal) => new Promise<string[]>(() => {}));
 }
 
 function after(ms: number): Promise<void> {
@@ -34,23 +27,39 @@ function after(ms: number): Promise<void> {
   return promise;
 }
 
+function dnsError(code: string): Error {
+  return Object.assign(new Error(`queryA ${code}`), { code });
+}
+
 function check(url: string, resolveHostAddresses: ResolveHostAddresses, signal?: AbortSignal) {
   return findUpstreamUrlViolation(url, { resolveHostAddresses, signal });
 }
 
 function allowedUrl(hostname: string, addresses: string[]) {
-  return { allowed: true, hostname, addresses };
+  return { allowed: true, hostname, addresses, expiresAt: expect.any(Number) };
 }
 
 function rejectedUrl(violation: UpstreamUrlViolation) {
   return { allowed: false, violation };
 }
 
-type LookupAll = (hostname: string, options: { all: true }) => Promise<LookupAddress[]>;
+type ResolverAnswers = {
+  resolve4?: () => Promise<string[]>;
+  resolve6?: () => Promise<string[]>;
+};
 
-// The policy awaits the `{ all: true }` overload, so the mock is typed for that
-// one; `jest.mocked` would otherwise pick a single-address overload.
-const lookupMock = jest.mocked(lookup as unknown as LookupAll);
+/** Makes `new Resolver()` return a fake whose queries answer as given. */
+function mockResolver({ resolve4, resolve6 }: ResolverAnswers) {
+  const instance = {
+    resolve4: jest.fn(resolve4 ?? (async () => [])),
+    resolve6: jest.fn(resolve6 ?? (async () => [])),
+    cancel: jest.fn(),
+  };
+  jest.mocked(Resolver).mockImplementation(function () {
+    return instance;
+  } as unknown as () => Resolver);
+  return instance;
+}
 
 describe('findUpstreamUrlViolation', () => {
   beforeEach(() => {
@@ -63,7 +72,7 @@ describe('findUpstreamUrlViolation', () => {
     await expect(check('https://llm.example.com/v1/chat/completions', resolve)).resolves.toEqual(
       allowedUrl('llm.example.com', ['104.18.2.115', '2606:4700::6812:273'])
     );
-    expect(resolve).toHaveBeenCalledWith('llm.example.com');
+    expect(resolve).toHaveBeenCalledWith('llm.example.com', expect.any(AbortSignal));
   });
 
   it.each<[string, UpstreamUrlViolation]>([
@@ -81,6 +90,7 @@ describe('findUpstreamUrlViolation', () => {
     ['https://[::1]/v1', 'non_public_host'],
     ['https://[::ffff:127.0.0.1]/v1', 'non_public_host'],
     ['https://[fd00::1]/v1', 'non_public_host'],
+    ['https://[2002:7f00:1::]/v1', 'non_public_host'],
   ])('rejects %s as %s without resolving it', async (url, violation) => {
     const resolve = resolvesTo('104.18.2.115');
 
@@ -103,25 +113,47 @@ describe('findUpstreamUrlViolation', () => {
     ).resolves.toEqual(rejectedUrl('non_public_address'));
   });
 
-  it('rejects a host that still does not resolve after one retry', async () => {
+  it('does not retry an empty address list', async () => {
     const empty = resolvesTo();
+
     await expect(check('https://missing.example.com/v1', empty)).resolves.toEqual(
       rejectedUrl('dns_lookup_failed')
     );
-    expect(empty).toHaveBeenCalledTimes(2);
+    expect(empty).toHaveBeenCalledTimes(1);
+  });
 
-    const failing = jest.fn(async (_hostname: string): Promise<string[]> => {
-      throw new Error('getaddrinfo ENOTFOUND');
+  it('retries a failure that is not a definitive no-records answer once', async () => {
+    const failing = jest.fn(async (_hostname: string, _signal: AbortSignal): Promise<string[]> => {
+      throw new Error('getaddrinfo EAI_AGAIN');
     });
     await expect(check('https://broken.example.com/v1', failing)).resolves.toEqual(
       rejectedUrl('dns_lookup_failed')
     );
     expect(failing).toHaveBeenCalledTimes(2);
+
+    const servfail = jest.fn(async (_hostname: string, _signal: AbortSignal): Promise<string[]> => {
+      throw dnsError('ESERVFAIL');
+    });
+    await expect(check('https://servfail.example.com/v1', servfail)).resolves.toEqual(
+      rejectedUrl('dns_lookup_failed')
+    );
+    expect(servfail).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(['ENOTFOUND', 'ENODATA'])('does not retry a %s failure', async code => {
+    const failing = jest.fn(async (_hostname: string, _signal: AbortSignal): Promise<string[]> => {
+      throw dnsError(code);
+    });
+
+    await expect(check('https://missing.example.com/v1', failing)).resolves.toEqual(
+      rejectedUrl('dns_lookup_failed')
+    );
+    expect(failing).toHaveBeenCalledTimes(1);
   });
 
   it('retries a resolver that throws before returning a promise', async () => {
     let calls = 0;
-    const resolve = jest.fn((_hostname: string): Promise<string[]> => {
+    const resolve = jest.fn((_hostname: string, _signal: AbortSignal): Promise<string[]> => {
       calls += 1;
       if (calls === 1) throw new Error('getaddrinfo EAI_AGAIN');
       return Promise.resolve(['104.18.2.115']);
@@ -134,9 +166,9 @@ describe('findUpstreamUrlViolation', () => {
   });
 
   it('accepts a host whose first lookup fails transiently', async () => {
-    const resolve = jest
-      .fn(async (_hostname: string) => ['104.18.2.115'])
-      .mockRejectedValueOnce(new Error('getaddrinfo EAI_AGAIN'));
+    const resolve = resolvesTo('104.18.2.115').mockRejectedValueOnce(
+      new Error('getaddrinfo EAI_AGAIN')
+    );
 
     await expect(check('https://llm.example.com/v1', resolve)).resolves.toEqual(
       allowedUrl('llm.example.com', ['104.18.2.115'])
@@ -144,29 +176,59 @@ describe('findUpstreamUrlViolation', () => {
     expect(resolve).toHaveBeenCalledTimes(2);
   });
 
-  it('reports dns_lookup_failed after one deadline for a stalled resolver', async () => {
+  it('resolves each validation on its own, without sharing a lookup', async () => {
+    const resolve = resolvesTo('10.1.2.3');
+    await expect(check('https://internal.example.com/v1', resolve)).resolves.toEqual(
+      rejectedUrl('non_public_address')
+    );
+
+    const publicResolve = resolvesTo('104.18.2.115');
+    await expect(check('https://internal.example.com/v1', publicResolve)).resolves.toEqual(
+      allowedUrl('internal.example.com', ['104.18.2.115'])
+    );
+    expect(publicResolve).toHaveBeenCalledTimes(1);
+
+    const stalled = neverResolves();
+    const other = resolvesTo('104.18.3.5');
+    const pending = check('https://stalled.example.com/v1', stalled);
+    await expect(check('https://stalled.example.com/v1', other)).resolves.toEqual(
+      allowedUrl('stalled.example.com', ['104.18.3.5'])
+    );
+    expect(stalled).toHaveBeenCalledTimes(1);
+    expect(other).toHaveBeenCalledTimes(1);
+    void pending;
+  });
+
+  it('reports dns_lookup_failed once the deadline passes for a stalled resolver', async () => {
     const resolve = neverResolves();
     const startedAt = performance.now();
 
     await expect(check('https://stalled.example.com/v1', resolve)).resolves.toEqual(
       rejectedUrl('dns_lookup_failed')
     );
+    const elapsed = performance.now() - startedAt;
     expect(resolve).toHaveBeenCalledTimes(1);
-    expect(performance.now() - startedAt).toBeLessThan(3_000);
-  }, 10_000);
+    expect(elapsed).toBeGreaterThanOrEqual(4_900);
+    expect(elapsed).toBeLessThan(6_500);
+    const [, signal] = resolve.mock.calls[0];
+    expect(signal.aborted).toBe(true);
+  }, 15_000);
 
-  it('keeps a single attempt when the resolution settles after its deadline', async () => {
-    const resolve = jest.fn(async (_hostname: string) => {
-      await after(2_600);
-      return ['104.18.2.115'];
-    });
+  it('reports dns_lookup_failed when the retry runs into the deadline', async () => {
+    const resolve = jest
+      .fn((_hostname: string, _signal: AbortSignal) => new Promise<string[]>(() => {}))
+      .mockImplementationOnce(async () => {
+        await after(4_800);
+        throw new Error('getaddrinfo EAI_AGAIN');
+      });
+    const startedAt = performance.now();
 
-    await expect(check('https://late.example.com/v1', resolve)).resolves.toEqual(
+    await expect(check('https://slow.example.com/v1', resolve)).resolves.toEqual(
       rejectedUrl('dns_lookup_failed')
     );
-    await after(1_000);
-    expect(resolve).toHaveBeenCalledTimes(1);
-  }, 10_000);
+    expect(resolve).toHaveBeenCalledTimes(2);
+    expect(performance.now() - startedAt).toBeLessThan(6_500);
+  }, 15_000);
 
   it('rejects with the abort reason as soon as the signal aborts during a lookup', async () => {
     const resolve = neverResolves();
@@ -181,6 +243,20 @@ describe('findUpstreamUrlViolation', () => {
     expect(resolve).toHaveBeenCalledTimes(1);
   });
 
+  it('rejects with the abort reason when the signal aborts between attempts', async () => {
+    const controller = new AbortController();
+    const reason = new Error('budget exceeded');
+    const resolve = jest.fn(async (_hostname: string, _signal: AbortSignal): Promise<string[]> => {
+      setTimeout(() => controller.abort(reason), 20);
+      throw new Error('getaddrinfo EAI_AGAIN');
+    });
+
+    await expect(check('https://llm.example.com/v1', resolve, controller.signal)).rejects.toBe(
+      reason
+    );
+    expect(resolve).toHaveBeenCalledTimes(1);
+  });
+
   it('does not start a lookup when the signal has already aborted', async () => {
     const resolve = resolvesTo('104.18.2.115');
     const reason = new Error('budget exceeded');
@@ -191,261 +267,44 @@ describe('findUpstreamUrlViolation', () => {
     expect(resolve).not.toHaveBeenCalled();
   });
 
-  it('applies each caller its own deadline to a shared resolution', async () => {
-    const stalled = neverResolves();
-    const startedAt = performance.now();
-
-    const verdicts = await Promise.all([
-      check('https://pending.example.com/v1', stalled),
-      check('https://pending.example.com/v1', stalled),
-      check('https://pending.example.com/v1', stalled),
-    ]);
-
-    expect(verdicts).toEqual([
-      rejectedUrl('dns_lookup_failed'),
-      rejectedUrl('dns_lookup_failed'),
-      rejectedUrl('dns_lookup_failed'),
-    ]);
-    expect(stalled).toHaveBeenCalledTimes(1);
-    expect(performance.now() - startedAt).toBeLessThan(3_000);
-  }, 10_000);
-
-  it('submits one lookup across several caller deadlines', async () => {
+  it('gives the resolver a signal that aborts when the caller aborts', async () => {
     const resolve = neverResolves();
-
-    const verdicts = [];
-    for (const _ of [0, 1, 2]) {
-      verdicts.push(await check('https://stalled.example.com/v1', resolve));
-    }
-
-    expect(verdicts).toEqual([
-      rejectedUrl('dns_lookup_failed'),
-      rejectedUrl('dns_lookup_failed'),
-      rejectedUrl('dns_lookup_failed'),
-    ]);
-    expect(resolve).toHaveBeenCalledTimes(1);
-  }, 15_000);
-
-  it('fails fast once the process runs the maximum number of lookups', async () => {
-    const first = pendingResolution();
-    const second = pendingResolution();
-    const third = neverResolves();
-
-    const outstanding = [
-      check('https://a.example.com/v1', first.resolveHostAddresses),
-      check('https://b.example.com/v1', second.resolveHostAddresses),
-    ];
-    await after(10);
-
-    const startedAt = performance.now();
-    await expect(check('https://c.example.com/v1', third)).resolves.toEqual(
-      rejectedUrl('dns_lookup_failed')
-    );
-    expect(performance.now() - startedAt).toBeLessThan(100);
-    expect(third).not.toHaveBeenCalled();
-
-    first.resolve(['104.18.2.115']);
-    second.resolve(['104.18.2.115']);
-    await expect(Promise.all(outstanding)).resolves.toEqual([
-      allowedUrl('a.example.com', ['104.18.2.115']),
-      allowedUrl('b.example.com', ['104.18.2.115']),
-    ]);
-  });
-
-  it('keeps lookup capacity when the settle deadline forgets the entry before the resolver settles', async () => {
-    jest.useFakeTimers();
-    try {
-      const first = pendingResolution();
-      const second = pendingResolution();
-      const third = neverResolves();
-
-      const pending = Promise.all([
-        check('https://a.example.com/v1', first.resolveHostAddresses),
-        check('https://b.example.com/v1', second.resolveHostAddresses),
-      ]);
-      await jest.advanceTimersByTimeAsync(10);
-      expect(first.resolveHostAddresses).toHaveBeenCalledTimes(1);
-      expect(second.resolveHostAddresses).toHaveBeenCalledTimes(1);
-
-      // The settle deadline stops further reuse of the two entries, and each
-      // resolver keeps its place in the limit until it settles.
-      await jest.advanceTimersByTimeAsync(30_000);
-
-      await expect(check('https://c.example.com/v1', third)).resolves.toEqual(
-        rejectedUrl('dns_lookup_failed')
-      );
-      expect(third).not.toHaveBeenCalled();
-
-      first.resolve(['104.18.2.115']);
-      second.resolve(['104.18.2.115']);
-      await expect(pending).resolves.toEqual([
-        allowedUrl('a.example.com', ['104.18.2.115']),
-        allowedUrl('b.example.com', ['104.18.2.115']),
-      ]);
-
-      // A settled resolver releases its capacity for the next host.
-      const fourth = resolvesTo('104.18.2.115');
-      await expect(check('https://d.example.com/v1', fourth)).resolves.toEqual(
-        allowedUrl('d.example.com', ['104.18.2.115'])
-      );
-      expect(fourth).toHaveBeenCalledTimes(1);
-    } finally {
-      jest.useRealTimers();
-    }
-  }, 10_000);
-
-  it('keeps the shared resolution when the only caller aborts', async () => {
-    const { resolveHostAddresses, resolve } = pendingResolution();
     const controller = new AbortController();
+    const pending = check('https://stalled.example.com/v1', resolve, controller.signal);
+    await after(10);
+
+    const [, signal] = resolve.mock.calls[0];
+    expect(signal).toBeInstanceOf(AbortSignal);
+    expect(signal.aborted).toBe(false);
+
     const reason = new DOMException('client went away', 'AbortError');
-
-    const aborted = check(
-      'https://stalled.example.com/v1',
-      resolveHostAddresses,
-      controller.signal
-    );
-    await after(10);
     controller.abort(reason);
-    await expect(aborted).rejects.toBe(reason);
 
-    // The next validation waits on the same pending lookup.
-    const next = check('https://stalled.example.com/v1', resolveHostAddresses);
-    await after(10);
-    expect(resolveHostAddresses).toHaveBeenCalledTimes(1);
-
-    resolve(['104.18.2.115']);
-    await expect(next).resolves.toEqual(allowedUrl('stalled.example.com', ['104.18.2.115']));
+    expect(signal.aborted).toBe(true);
+    await expect(pending).rejects.toBe(reason);
   });
 
-  it('keeps one lookup when a resolution settles after its callers finished', async () => {
-    const stalled = Promise.withResolvers<string[]>();
-    const resolve = jest.fn((_hostname: string): Promise<string[]> => stalled.promise);
+  it('gives the resolver a deadline signal when the caller passes none', async () => {
+    const resolve = resolvesTo('104.18.2.115');
 
-    await expect(check('https://stalled.example.com/v1', resolve)).resolves.toEqual(
-      rejectedUrl('dns_lookup_failed')
-    );
+    await check('https://llm.example.com/v1', resolve);
 
-    // The next validation waits on the same pending lookup.
-    const second = check('https://stalled.example.com/v1', resolve);
-    await after(10);
-    expect(resolve).toHaveBeenCalledTimes(1);
-
-    stalled.resolve(['104.18.2.115']);
-    await expect(second).resolves.toEqual(allowedUrl('stalled.example.com', ['104.18.2.115']));
-  }, 10_000);
-
-  it('starts a new lookup once the shared one settles', async () => {
-    const first = Promise.withResolvers<string[]>();
-    const second = Promise.withResolvers<string[]>();
-    let calls = 0;
-    const resolve = jest.fn((_hostname: string): Promise<string[]> => {
-      calls += 1;
-      return calls === 1 ? first.promise : second.promise;
-    });
-
-    const pendingFirst = check('https://internal.example.com/v1', resolve);
-    await after(10);
-    first.resolve(['10.1.2.3']);
-    await expect(pendingFirst).resolves.toEqual(rejectedUrl('non_public_address'));
-
-    const pendingSecond = check('https://internal.example.com/v1', resolve);
-    await after(10);
-    expect(resolve).toHaveBeenCalledTimes(2);
-
-    second.resolve(['104.18.2.115']);
-    await expect(pendingSecond).resolves.toEqual(
-      allowedUrl('internal.example.com', ['104.18.2.115'])
-    );
-  });
-
-  it('keeps a shared resolution for a caller that outlives the first deadline', async () => {
-    const { resolveHostAddresses, resolve } = pendingResolution();
-
-    const first = check('https://pending.example.com/v1', resolveHostAddresses);
-    await after(1_500);
-    const second = check('https://pending.example.com/v1', resolveHostAddresses);
-
-    await expect(first).resolves.toEqual(rejectedUrl('dns_lookup_failed'));
-    resolve(['104.18.2.115']);
-    await expect(second).resolves.toEqual(allowedUrl('pending.example.com', ['104.18.2.115']));
-    expect(resolveHostAddresses).toHaveBeenCalledTimes(1);
-  }, 10_000);
-
-  it('resolves again for a later validation after the resolution settled', async () => {
-    const privateResolve = resolvesTo('10.1.2.3');
-    await expect(check('https://internal.example.com/v1', privateResolve)).resolves.toEqual(
-      rejectedUrl('non_public_address')
-    );
-
-    const publicResolve = resolvesTo('104.18.2.115');
-    await expect(check('https://internal.example.com/v1', publicResolve)).resolves.toEqual(
-      allowedUrl('internal.example.com', ['104.18.2.115'])
-    );
-    expect(publicResolve).toHaveBeenCalledWith('internal.example.com');
-  });
-
-  it('shares one resolution among validations of the same host that overlap', async () => {
-    const { resolveHostAddresses, resolve } = pendingResolution();
-
-    const pending = Promise.all(
-      [0, 1, 2, 3, 4].map(() => check('https://llm.example.com/v1', resolveHostAddresses))
-    );
-    await after(10);
-    expect(resolveHostAddresses).toHaveBeenCalledTimes(1);
-
-    resolve(['104.18.2.115']);
-    await expect(pending).resolves.toEqual(
-      Array.from({ length: 5 }, () => allowedUrl('llm.example.com', ['104.18.2.115']))
-    );
-    expect(resolveHostAddresses).toHaveBeenCalledTimes(1);
-    expect(resolveHostAddresses).toHaveBeenCalledWith('llm.example.com');
-  });
-
-  it('keeps the shared resolution for the callers that remain when one caller stops', async () => {
-    const { resolveHostAddresses, resolve } = pendingResolution();
-    const controller = new AbortController();
-    const reason = new DOMException('client went away', 'AbortError');
-
-    const aborted = check('https://llm.example.com/v1', resolveHostAddresses, controller.signal);
-    const other = check('https://llm.example.com/v1', resolveHostAddresses);
-
-    controller.abort(reason);
-    await expect(aborted).rejects.toBe(reason);
-    expect(resolveHostAddresses).toHaveBeenCalledTimes(1);
-
-    resolve(['104.18.2.115']);
-    await expect(other).resolves.toEqual(allowedUrl('llm.example.com', ['104.18.2.115']));
-  });
-
-  it('retries once for overlapping validations of a host whose resolution fails once', async () => {
-    const resolve = jest.fn(async (_hostname: string): Promise<string[]> => {
-      await after(0);
-      throw new Error('getaddrinfo EAI_AGAIN');
-    });
-
-    const verdicts = await Promise.all(
-      [0, 1, 2, 3].map(() => check('https://broken.example.com/v1', resolve))
-    );
-
-    expect(verdicts).toEqual(Array.from({ length: 4 }, () => rejectedUrl('dns_lookup_failed')));
-    expect(resolve).toHaveBeenCalledTimes(2);
+    const [, signal] = resolve.mock.calls[0];
+    expect(signal).toBeInstanceOf(AbortSignal);
+    expect(signal.aborted).toBe(false);
   });
 
   it('resolves each hostname separately', async () => {
-    const first = pendingResolution();
-    const second = pendingResolution();
+    const resolve = jest.fn(async (hostname: string, _signal: AbortSignal) =>
+      hostname === 'a.example.com' ? ['104.18.2.115'] : ['10.1.2.3']
+    );
 
-    const pending = Promise.all([
-      check('https://a.example.com/v1', first.resolveHostAddresses),
-      check('https://b.example.com/v1', second.resolveHostAddresses),
-    ]);
-    await after(10);
-    expect(first.resolveHostAddresses).toHaveBeenCalledTimes(1);
-    expect(second.resolveHostAddresses).toHaveBeenCalledTimes(1);
-
-    first.resolve(['104.18.2.115']);
-    second.resolve(['10.1.2.3']);
-    await expect(pending).resolves.toEqual([
+    await expect(
+      Promise.all([
+        check('https://a.example.com/v1', resolve),
+        check('https://b.example.com/v1', resolve),
+      ])
+    ).resolves.toEqual([
       allowedUrl('a.example.com', ['104.18.2.115']),
       rejectedUrl('non_public_address'),
     ]);
@@ -455,7 +314,7 @@ describe('findUpstreamUrlViolation', () => {
     jest.useFakeTimers();
     try {
       let calls = 0;
-      const resolve = jest.fn(async (_hostname: string) =>
+      const resolve = jest.fn(async (_hostname: string, _signal: AbortSignal) =>
         calls++ === 0 ? ['104.18.2.115'] : ['104.18.3.5']
       );
 
@@ -475,6 +334,42 @@ describe('findUpstreamUrlViolation', () => {
         allowedUrl('llm.example.com', ['104.18.3.5'])
       );
       expect(resolve).toHaveBeenCalledTimes(2);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('stamps an allowed decision with the check time plus the cache TTL', async () => {
+    jest.useFakeTimers();
+    try {
+      const now = Date.now();
+
+      await expect(check('https://llm.example.com/a', resolvesTo('104.18.2.115'))).resolves.toEqual(
+        {
+          allowed: true,
+          hostname: 'llm.example.com',
+          addresses: ['104.18.2.115'],
+          expiresAt: now + 60_000,
+        }
+      );
+      await expect(check('https://104.18.2.115/a', resolvesTo())).resolves.toMatchObject({
+        expiresAt: now + 60_000,
+      });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('returns the original expiresAt on a cache hit', async () => {
+    jest.useFakeTimers();
+    try {
+      const first = await check('https://llm.example.com/a', resolvesTo('104.18.2.115'));
+      await jest.advanceTimersByTimeAsync(20_000);
+      const second = await check('https://llm.example.com/b', resolvesTo('104.18.3.5'));
+
+      if (!first.allowed || !second.allowed) throw new Error('expected allowed decisions');
+      expect(second.addresses).toEqual(['104.18.2.115']);
+      expect(second.expiresAt).toBe(first.expiresAt);
     } finally {
       jest.useRealTimers();
     }
@@ -507,17 +402,146 @@ describe('findUpstreamUrlViolation', () => {
   });
 });
 
+describe('the default resolver', () => {
+  beforeEach(() => {
+    clearUpstreamUrlPolicyCache();
+    jest.mocked(Resolver).mockReset();
+  });
+
+  it('creates a resolver with bounded query timeouts', async () => {
+    mockResolver({ resolve4: async () => ['104.18.2.115'] });
+
+    await findUpstreamUrlViolation('https://llm.example.com/v1');
+
+    expect(Resolver).toHaveBeenCalledWith({ timeout: 1_000, tries: 2 });
+  });
+
+  it('merges the A and AAAA answers', async () => {
+    const resolver = mockResolver({
+      resolve4: async () => ['104.18.2.115'],
+      resolve6: async () => ['2606:4700::6812:273'],
+    });
+
+    await expect(findUpstreamUrlViolation('https://llm.example.com/v1')).resolves.toEqual(
+      allowedUrl('llm.example.com', ['104.18.2.115', '2606:4700::6812:273'])
+    );
+    expect(resolver.resolve4).toHaveBeenCalledWith('llm.example.com');
+    expect(resolver.resolve6).toHaveBeenCalledWith('llm.example.com');
+  });
+
+  it('rejects when the AAAA answer holds a non-public address', async () => {
+    mockResolver({
+      resolve4: async () => ['104.18.2.115'],
+      resolve6: async () => ['fd00::1'],
+    });
+
+    await expect(findUpstreamUrlViolation('https://llm.example.com/v1')).resolves.toEqual(
+      rejectedUrl('non_public_address')
+    );
+  });
+
+  it('succeeds when only the A query answers', async () => {
+    mockResolver({
+      resolve4: async () => ['104.18.2.115'],
+      resolve6: async () => Promise.reject(dnsError('ENODATA')),
+    });
+
+    await expect(findUpstreamUrlViolation('https://llm.example.com/v1')).resolves.toEqual(
+      allowedUrl('llm.example.com', ['104.18.2.115'])
+    );
+  });
+
+  it('succeeds when only the AAAA query answers', async () => {
+    mockResolver({
+      resolve4: async () => Promise.reject(dnsError('ENODATA')),
+      resolve6: async () => ['2606:4700::6812:273'],
+    });
+
+    await expect(findUpstreamUrlViolation('https://llm.example.com/v1')).resolves.toEqual(
+      allowedUrl('llm.example.com', ['2606:4700::6812:273'])
+    );
+  });
+
+  it('reports dns_lookup_failed without a retry when both queries answer ENODATA', async () => {
+    mockResolver({
+      resolve4: async () => Promise.reject(dnsError('ENODATA')),
+      resolve6: async () => Promise.reject(dnsError('ENODATA')),
+    });
+
+    await expect(findUpstreamUrlViolation('https://missing.example.com/v1')).resolves.toEqual(
+      rejectedUrl('dns_lookup_failed')
+    );
+    expect(Resolver).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports dns_lookup_failed without a retry when both queries answer empty lists', async () => {
+    mockResolver({});
+
+    await expect(findUpstreamUrlViolation('https://empty.example.com/v1')).resolves.toEqual(
+      rejectedUrl('dns_lookup_failed')
+    );
+    expect(Resolver).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries once when a query fails transiently and none answered', async () => {
+    mockResolver({
+      resolve4: async () => Promise.reject(dnsError('ENODATA')),
+      resolve6: async () => Promise.reject(dnsError('ESERVFAIL')),
+    });
+
+    await expect(findUpstreamUrlViolation('https://flaky.example.com/v1')).resolves.toEqual(
+      rejectedUrl('dns_lookup_failed')
+    );
+    expect(Resolver).toHaveBeenCalledTimes(2);
+  });
+
+  it('cancels the queries when the caller aborts', async () => {
+    const resolver = mockResolver({
+      resolve4: () => new Promise<string[]>(() => {}),
+      resolve6: () => new Promise<string[]>(() => {}),
+    });
+    const controller = new AbortController();
+    const reason = new DOMException('client went away', 'AbortError');
+    const pending = findUpstreamUrlViolation('https://stalled.example.com/v1', {
+      signal: controller.signal,
+    });
+    await after(10);
+    expect(resolver.cancel).not.toHaveBeenCalled();
+
+    controller.abort(reason);
+
+    await expect(pending).rejects.toBe(reason);
+    expect(resolver.cancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not create a resolver when the signal has already aborted', async () => {
+    mockResolver({ resolve4: async () => ['104.18.2.115'] });
+    const reason = new Error('budget exceeded');
+
+    await expect(
+      findUpstreamUrlViolation('https://llm.example.com/v1', { signal: AbortSignal.abort(reason) })
+    ).rejects.toBe(reason);
+    expect(Resolver).not.toHaveBeenCalled();
+  });
+});
+
 describe('rejectDisallowedUpstreamUrls', () => {
   beforeEach(() => {
     clearUpstreamUrlPolicyCache();
-    lookupMock.mockReset();
+    jest.mocked(Resolver).mockReset();
     jest.mocked(captureMessage).mockReset();
   });
 
-  it('returns the dialled URL with its checked addresses', async () => {
-    lookupMock.mockImplementation(async hostname => [
-      { address: hostname === 'second.example.com' ? '104.18.3.5' : '104.18.2.115', family: 4 },
-    ]);
+  it('returns the dialled URL with its checked addresses and their expiry', async () => {
+    jest.mocked(Resolver).mockImplementation(function () {
+      return {
+        resolve4: jest.fn(async (name: string) => [
+          name === 'second.example.com' ? '104.18.3.5' : '104.18.2.115',
+        ]),
+        resolve6: jest.fn(async () => []),
+        cancel: jest.fn(),
+      };
+    } as unknown as () => Resolver);
 
     await expect(
       rejectDisallowedUpstreamUrls({
@@ -532,12 +556,13 @@ describe('rejectDisallowedUpstreamUrls', () => {
         url: 'https://first.example.com/v1',
         hostname: 'first.example.com',
         addresses: ['104.18.2.115'],
+        expiresAt: expect.any(Number),
       },
     });
   });
 
   it('returns the response for the first violating URL with its host', async () => {
-    lookupMock.mockImplementation(async () => [{ address: '10.1.2.3', family: 4 }]);
+    mockResolver({ resolve4: async () => ['10.1.2.3'] });
 
     const result = await rejectDisallowedUpstreamUrls({
       urls: ['https://first.example.com/v1', 'https://second.example.com/v1'],
@@ -562,23 +587,44 @@ describe('rejectDisallowedUpstreamUrls', () => {
 });
 
 describe('isUpstreamUrlPolicyEnforced', () => {
-  const originalTargetEnv = process.env.VERCEL_TARGET_ENV;
+  const original = {
+    NODE_ENV: process.env.NODE_ENV,
+    VERCEL_TARGET_ENV: process.env.VERCEL_TARGET_ENV,
+  };
+
+  function setEnv(name: keyof typeof original, value: string | undefined) {
+    const env: Record<string, string | undefined> = process.env;
+    if (value === undefined) delete env[name];
+    else env[name] = value;
+  }
 
   afterEach(() => {
-    if (originalTargetEnv === undefined) delete process.env.VERCEL_TARGET_ENV;
-    else process.env.VERCEL_TARGET_ENV = originalTargetEnv;
+    setEnv('NODE_ENV', original.NODE_ENV);
+    setEnv('VERCEL_TARGET_ENV', original.VERCEL_TARGET_ENV);
   });
 
   it.each([
-    ['staging', true],
     ['production', true],
-    ['preview', false],
+    [undefined, true],
     ['development', false],
-    [undefined, false],
-  ])('VERCEL_TARGET_ENV=%s enforces the policy: %s', (targetEnv, enforced) => {
-    if (targetEnv === undefined) delete process.env.VERCEL_TARGET_ENV;
-    else process.env.VERCEL_TARGET_ENV = targetEnv;
+    ['test', false],
+  ])('NODE_ENV=%s enforces the policy: %s', (nodeEnv, enforced) => {
+    setEnv('NODE_ENV', nodeEnv);
 
     expect(isUpstreamUrlPolicyEnforced()).toBe(enforced);
+  });
+
+  it('enforces the policy on a preview deployment', () => {
+    setEnv('NODE_ENV', 'production');
+    setEnv('VERCEL_TARGET_ENV', 'preview');
+
+    expect(isUpstreamUrlPolicyEnforced()).toBe(true);
+  });
+
+  it('ignores VERCEL_TARGET_ENV', () => {
+    setEnv('NODE_ENV', 'test');
+    setEnv('VERCEL_TARGET_ENV', 'production');
+
+    expect(isUpstreamUrlPolicyEnforced()).toBe(false);
   });
 });

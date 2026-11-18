@@ -1476,13 +1476,24 @@
       "empty": "Enweghị nyocha nwere ọnụọgụgụ nyocha",
       "emptyDescription": "Ọnụọgụgụ nyocha na-edekọ nyocha ndị gụchara mgbe agbanyere ya maka nzukọ.",
       "offTitle": "Agbanyụrụ ọnụọgụgụ nyocha maka {{platform}}",
-      "offDescription": "Gbanye ya na ntọala òtù na weebụ ka ọ dekọọ nyocha ndị gụchara.",
-      "couldNotLoad": "Enweghị ike ibudata ọnụọgụgụ nyocha"
+      "offDescription": "Ndị nọ n'ọrụ ụgwọ nke nzukọ (ndị nwe ya, ndị nchịkwa na ndị njikwa ụgwọ) nwere ike ịgbanye ọnụọgụgụ nyocha n'ime ntọala nzukọ dị na weebụ iji dekọ nyocha ndị gụchara.",
+      "couldNotLoad": "Enweghị ike ibudata ọnụọgụgụ nyocha",
+      "trackedReviewsCaption": "Nyocha ndị gụchara n'oge a mgbe agbanyere ọnụọgụgụ nyocha. Ọ dịghị mgbe a na-agụta nyocha ndị na-agba ma ọ bụ ndị dara.",
+      "trackedReviewsUncounted": "Agụtaghị ọnụ: {{displayCount}} n’ime {{displayTotal}} nyocha ndị gụchara nke nzukọ, e jideghị mmasị ha.",
+      "trackedReviewsUncounted_one": "Agụtaghị ọnụ: {{displayCount}} n’ime {{displayTotal}} nyocha ndị gụchara nke nzukọ, e jideghị mmasị ha.",
+      "trackedReviewsUncounted_other": "Agụtaghị ọnụ: {{displayCount}} n’ime {{displayTotal}} nyocha ndị gụchara nke nzukọ, e jideghị mmasị ha."
     },
     "council": {
       "title": "Nyocha otu ndị nyocha",
       "subtitle": "Ọtụtụ ndị ọkachamara na-enyocha PR ọ bụla, ntuli aka ha na-ejikọta ọnụ wee bụrụ otu mkpebi.",
-      "unavailable": "Nyocha otu ndị nyocha adịghị maka nzukọ a.",
+      "unavailablePersonallyTitle": "Ọ chọrọ ọgbakọ Enterprise",
+      "unavailablePersonally": "Nyocha otu ndị nyocha abụghị akụkụ nke akaụntụ onwe onye.",
+      "unavailablePersonallyAction": "Mepụta nzukọ",
+      "unavailablePersonallySwitchAction": "Gbanwee otu",
+      "unavailableOrganizationTitle": "Nyocha otu ndị nyocha adịghị ugbu a",
+      "unavailableForOrganization": "Nyocha otu ndị nyocha chọrọ atụmatụ Enterprise nwere ndebanye aha na-arụ ọrụ ma ọ bụ oge ule. Nzukọ a enweghị ya ugbu a.",
+      "unavailableForOrganizationNeutral": "Nyocha otu ndị nyocha adịghị maka nzukọ a ugbu a. Nwaa ọzọ ma emechaa.",
+      "unavailableOnBitbucket": "Nyocha otu ndị nyocha adịghị maka ebe nchekwa Bitbucket.",
       "noRepositories": "Ahọrọbeghị ebe nchekwa ọ bụla. Buru ụzọ họrọ ebe nchekwa na ntọala ebe nchekwa.",
       "specialists": "Ndị ọkachamara",
       "labels": "Mkpado na-akpalite nyocha otu ndị nyocha",
@@ -4699,6 +4710,7 @@
     "superseded": "E dochiela njikọ a n'ebe ọzọ, ya mere ọ naghịzi arụ ọrụ."
   },
   "sharedSession": {
+    "startedAt": "Malitere na {{time}}",
     "title": "Nnọkọ ekesara",
     "someone": "Otu onye",
     "sharedBy": "{{owner}} kesara ya",

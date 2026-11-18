@@ -1476,13 +1476,24 @@
       "empty": "Hakuna ukaguzi wenye takwimu bado",
       "emptyDescription": "Takwimu hurekodi ukaguzi uliokamilika wakati imewashwa kwa shirika.",
       "offTitle": "Takwimu zimezimwa kwa {{platform}}",
-      "offDescription": "Ziwashe takwimu katika mipangilio ya shirika kwenye wavuti ili kurekodi ukaguzi uliokamilika.",
-      "couldNotLoad": "Imeshindwa kupakia takwimu"
+      "offDescription": "Majukumu ya bili ya shirika — wamiliki, wasimamizi na mameneja wa bili — yanaweza kuwasha takwimu katika mipangilio ya shirika kwenye wavuti ili kurekodi ukaguzi uliokamilika.",
+      "couldNotLoad": "Imeshindwa kupakia takwimu",
+      "trackedReviewsCaption": "Ukaguzi uliokamilika ulioisha katika kipindi hiki wakati takwimu zilikuwa zimewashwa. Ukaguzi unaoendelea na ulioshindikana hauhesabiwi kamwe.",
+      "trackedReviewsUncounted": "Hauhesabiwi: {{displayCount}} kati ya ukaguzi {{displayTotal}} uliokamilika wa shirika, matokeo yake hayakurekodiwa.",
+      "trackedReviewsUncounted_one": "Hauhesabiwi: {{displayCount}} kati ya ukaguzi {{displayTotal}} uliokamilika wa shirika, matokeo yake hayakurekodiwa.",
+      "trackedReviewsUncounted_other": "Hauhesabiwi: {{displayCount}} kati ya ukaguzi {{displayTotal}} uliokamilika wa shirika, matokeo yake hayakurekodiwa."
     },
     "council": {
       "title": "Ukaguzi wa baraza",
       "subtitle": "Wataalamu kadhaa hukagua kila PR, na kura zao huunganika kuwa uamuzi mmoja.",
-      "unavailable": "Ukaguzi wa baraza haupatikani kwa shirika hili.",
+      "unavailablePersonallyTitle": "Inahitaji shirika la Enterprise",
+      "unavailablePersonally": "Ukaguzi wa baraza si sehemu ya akaunti ya binafsi.",
+      "unavailablePersonallyAction": "Unda shirika",
+      "unavailablePersonallySwitchAction": "Badilisha shirika",
+      "unavailableOrganizationTitle": "Ukaguzi wa baraza haupatikani",
+      "unavailableForOrganization": "Ukaguzi wa baraza unahitaji mpango wa Enterprise unaofanya kazi na usajili au kipindi cha majaribio. Shirika hili halina hiyo kwa sasa.",
+      "unavailableForOrganizationNeutral": "Ukaguzi wa baraza haupatikani kwa shirika hili kwa sasa. Jaribu tena baadaye.",
+      "unavailableOnBitbucket": "Ukaguzi wa baraza haupatikani kwa hazina za Bitbucket.",
       "noRepositories": "Hakuna hazina zilizochaguliwa bado. Chagua hazina katika mipangilio ya hazina kwanza.",
       "specialists": "Wataalamu",
       "labels": "Lebo zinazowasha ukaguzi wa baraza",
@@ -4699,6 +4710,7 @@
     "superseded": "Kiungo hiki kilibadilishwa na kingine mahali pengine, kwa hivyo hakifanyi kazi tena."
   },
   "sharedSession": {
+    "startedAt": "Ilianza saa {{time}}",
     "title": "Kipindi kilichoshirikiwa",
     "someone": "Mtu fulani",
     "sharedBy": "Kimeshirikiwa na {{owner}}",

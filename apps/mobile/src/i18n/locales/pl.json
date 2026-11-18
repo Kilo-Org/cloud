@@ -935,13 +935,26 @@
       "empty": "Brak przeglądów z analityką",
       "emptyDescription": "Analityka rejestruje ukończone przeglądy, dopóki jest włączona dla organizacji.",
       "offTitle": "Analityka jest wyłączona dla {{platform}}",
-      "offDescription": "Włącz ją w ustawieniach organizacji w wersji internetowej, aby rejestrowała ukończone przeglądy.",
-      "couldNotLoad": "Nie udało się wczytać analityki"
+      "offDescription": "Analitykę mogą włączyć w ustawieniach organizacji w wersji internetowej role związane z rozliczeniami — właściciele, administratorzy i menedżerowie rozliczeń — aby rejestrować ukończone przeglądy.",
+      "couldNotLoad": "Nie udało się wczytać analityki",
+      "trackedReviewsCaption": "Ukończone przeglądy, które zakończyły się w tym okresie przy włączonej analityce. Przeglądy w toku i zakończone niepowodzeniem nigdy nie są zliczane.",
+      "trackedReviewsUncounted": "Nie zliczono: {{displayCount}} z {{displayTotal}} ukończonych przeglądów organizacji, których wynik nie został zapisany.",
+      "trackedReviewsUncounted_few": "Nie zliczono: {{displayCount}} z {{displayTotal}} ukończonych przeglądów organizacji, których wynik nie został zapisany.",
+      "trackedReviewsUncounted_many": "Nie zliczono: {{displayCount}} z {{displayTotal}} ukończonych przeglądów organizacji, których wynik nie został zapisany.",
+      "trackedReviewsUncounted_one": "Nie zliczono: {{displayCount}} z {{displayTotal}} ukończonych przeglądów organizacji, których wynik nie został zapisany.",
+      "trackedReviewsUncounted_other": "Nie zliczono: {{displayCount}} z {{displayTotal}} ukończonych przeglądów organizacji, których wynik nie został zapisany."
     },
     "council": {
       "title": "Przegląd rady",
       "subtitle": "Każdy pull request przegląda kilku specjalistów, a ich głosy łączą się w jedną decyzję.",
-      "unavailable": "Przegląd rady nie jest dostępny dla tej organizacji.",
+      "unavailablePersonallyTitle": "Wymaga organizacji Enterprise",
+      "unavailablePersonally": "Przegląd rady nie jest częścią konta osobistego.",
+      "unavailablePersonallyAction": "Utwórz organizację",
+      "unavailablePersonallySwitchAction": "Przełącz organizację",
+      "unavailableOrganizationTitle": "Przegląd rady nie jest obecnie dostępny",
+      "unavailableForOrganization": "Przegląd rady wymaga planu Enterprise z aktywną subskrypcją lub okresem próbnym. Ta organizacja obecnie go nie ma.",
+      "unavailableForOrganizationNeutral": "Przegląd rady nie jest obecnie dostępny dla tej organizacji. Spróbuj ponownie później.",
+      "unavailableOnBitbucket": "Przegląd rady nie jest dostępny dla repozytoriów Bitbucket.",
       "noRepositories": "Nie wybrano jeszcze żadnego repozytorium. Najpierw wybierz repozytoria w ustawieniach repozytoriów.",
       "specialists": "Specjaliści",
       "labels": "Etykiety uruchamiające przegląd rady",
@@ -4839,6 +4852,7 @@
     "superseded": "Ten link został zastąpiony na innym urządzeniu, więc już nie działa."
   },
   "sharedSession": {
+    "startedAt": "Rozpoczęto o {{time}}",
     "title": "Udostępniona sesja",
     "someone": "Ktoś",
     "sharedBy": "Udostępnione przez: {{owner}}",

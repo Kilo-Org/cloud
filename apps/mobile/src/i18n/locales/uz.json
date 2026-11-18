@@ -1476,13 +1476,24 @@
       "empty": "Statistikasi bor koʻrib chiqishlar hozircha yoʻq",
       "emptyDescription": "Statistika tashkilot uchun yoqilgan boʻlsa, tugallangan koʻrib chiqishlarni qayd etadi.",
       "offTitle": "{{platform}} uchun statistika oʻchirilgan",
-      "offDescription": "Tugallangan koʻrib chiqishlarni qayd etish uchun veb-saytdagi tashkilot sozlamalarida statistikani yoqing.",
-      "couldNotLoad": "Statistikani yuklab boʻlmadi"
+      "offDescription": "Tashkilotning billing rollari — egalar, administratorlar va billing menejerlari — tugallangan koʻrib chiqishlarni qayd etish uchun statistikani vebdagi tashkilot sozlamalarida yoqishi mumkin.",
+      "couldNotLoad": "Statistikani yuklab boʻlmadi",
+      "trackedReviewsCaption": "Bu davrda statistika yoqilgan holda tugallangan koʻrib chiqishlar. Jarayondagi va muvaffaqiyatsiz yakunlangan koʻrib chiqishlar hech qachon hisobga olinmaydi.",
+      "trackedReviewsUncounted": "Hisobga olinmagan: {{displayCount}} / {{displayTotal}} tashkilotdagi tugallangan ko’rib chiqishning, ularning natijasi qayd etilmagan.",
+      "trackedReviewsUncounted_one": "Hisobga olinmagan: {{displayCount}} / {{displayTotal}} tashkilotdagi tugallangan ko’rib chiqishning, ularning natijasi qayd etilmagan.",
+      "trackedReviewsUncounted_other": "Hisobga olinmagan: {{displayCount}} / {{displayTotal}} tashkilotdagi tugallangan ko’rib chiqishning, ularning natijasi qayd etilmagan."
     },
     "council": {
       "title": "Kengash koʻrib chiqishi",
       "subtitle": "Bir nechta mutaxassis har bir PRni koʻrib chiqadi va ularning ovozlari bitta qarorga birlashadi.",
-      "unavailable": "Kengash koʻrib chiqishi bu tashkilot uchun mavjud emas.",
+      "unavailablePersonallyTitle": "Enterprise tashkiloti talab qilinadi",
+      "unavailablePersonally": "Kengash koʻrib chiqishi shaxsiy hisobning bir qismi emas.",
+      "unavailablePersonallyAction": "Tashkilot yaratish",
+      "unavailablePersonallySwitchAction": "Tashkilotni almashtirish",
+      "unavailableOrganizationTitle": "Kengash koʻrib chiqishi hozir mavjud emas",
+      "unavailableForOrganization": "Kengash koʻrib chiqishi faol obuna yoki sinov muddati bor Enterprise tarifini talab qiladi. Bu tashkilotda hozir bu mavjud emas.",
+      "unavailableForOrganizationNeutral": "Kengash koʻrib chiqishi bu tashkilotda hozir mavjud emas. Keyinroq qayta urinib koʻring.",
+      "unavailableOnBitbucket": "Kengash koʻrib chiqishi Bitbucket repozitoriyalari uchun mavjud emas.",
       "noRepositories": "Hozircha repozitoriyalar tanlanmagan. Avval repozitoriya sozlamalarida repozitoriyalarni tanlang.",
       "specialists": "Mutaxassislar",
       "labels": "Kengash koʻrib chiqishini ishga tushiruvchi yorliqlar",
@@ -4699,6 +4710,7 @@
     "superseded": "Bu havola boshqa joyda almashtirilgani uchun endi ishlamaydi."
   },
   "sharedSession": {
+    "startedAt": "{{time}} da boshlandi",
     "title": "Ulashilgan seans",
     "someone": "Kimdir",
     "sharedBy": "Ulashgan: {{owner}}",

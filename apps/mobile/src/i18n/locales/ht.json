@@ -1476,13 +1476,24 @@
       "empty": "Poko gen revizyon ak estatistik",
       "emptyDescription": "Estatistik yo anrejistre revizyon ki fini pandan yo aktive pou òganizasyon an.",
       "offTitle": "Estatistik yo dezaktive pou {{platform}}",
-      "offDescription": "Aktive Estatistik yo nan paramèt òganizasyon an sou entènèt pou anrejistre revizyon ki fini.",
-      "couldNotLoad": "Nou pa t ka chaje estatistik yo"
+      "offDescription": "Wòl faktirasyon òganizasyon an (pwopriyetè, administratè ak manadjè faktirasyon) ka aktive estatistik nan paramèt òganizasyon an sou wèb la pou anrejistre revizyon ki fini.",
+      "couldNotLoad": "Nou pa t ka chaje estatistik yo",
+      "trackedReviewsCaption": "Revizyon ki fini nan peryòd sa a pandan estatistik yo te aktive. Revizyon k ap kouri ak revizyon ki echwe pa janm konte.",
+      "trackedReviewsUncounted": "Pa konte: {{displayCount}} sou {{displayTotal}} revizyon ki fini òganizasyon an genyen, rezilta yo pa te kaptire.",
+      "trackedReviewsUncounted_one": "Pa konte: {{displayCount}} sou {{displayTotal}} revizyon ki fini òganizasyon an genyen, rezilta yo pa te kaptire.",
+      "trackedReviewsUncounted_other": "Pa konte: {{displayCount}} sou {{displayTotal}} revizyon ki fini òganizasyon an genyen, rezilta yo pa te kaptire."
     },
     "council": {
       "title": "Revizyon konsèy",
       "subtitle": "Plizyè espesyalis revize chak demann fizyon, epi vòt yo mete ansanm pou fè yon sèl desizyon.",
-      "unavailable": "Revizyon konsèy pa disponib pou òganizasyon sa a.",
+      "unavailablePersonallyTitle": "Bezwen yon òganizasyon Enterprise",
+      "unavailablePersonally": "Revizyon konsèy se pa yon kont pèsonèl.",
+      "unavailablePersonallyAction": "Kreye yon òganizasyon",
+      "unavailablePersonallySwitchAction": "Chanje òganizasyon",
+      "unavailableOrganizationTitle": "Revizyon konsèy pa disponib",
+      "unavailableForOrganization": "Revizyon konsèy bezwen plan Enterprise a ak yon abònman oswa yon peryòd esè aktif. Òganizasyon sa a pa gen li kounye a.",
+      "unavailableForOrganizationNeutral": "Revizyon konsèy pa disponib pou òganizasyon sa a kounye a. Eseye ankò pita.",
+      "unavailableOnBitbucket": "Revizyon konsèy pa disponib pou depo Bitbucket.",
       "noRepositories": "Poko gen depo ki chwazi. Chwazi depo nan paramèt depo yo anvan.",
       "specialists": "Espesyalis",
       "labels": "Etikèt ki deklanche revizyon konsèy",
@@ -4699,6 +4710,7 @@
     "superseded": "Yo te ranplase lyen sa a yon lòt kote, kidonk li pa mache ankò."
   },
   "sharedSession": {
+    "startedAt": "Kòmanse a {{time}}",
     "title": "Sesyon pataje",
     "someone": "Yon moun",
     "sharedBy": "Pataje pa {{owner}}",

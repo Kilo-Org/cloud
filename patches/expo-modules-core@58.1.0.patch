@@ -1,5 +1,5 @@
 diff --git a/android/src/main/java/expo/modules/adapters/react/apploader/RNHeadlessAppLoader.kt b/android/src/main/java/expo/modules/adapters/react/apploader/RNHeadlessAppLoader.kt
-index 2e44253..90277ee 100644
+index 3560935..fcb2a21 100644
 --- a/android/src/main/java/expo/modules/adapters/react/apploader/RNHeadlessAppLoader.kt
 +++ b/android/src/main/java/expo/modules/adapters/react/apploader/RNHeadlessAppLoader.kt
 @@ -1,11 +1,9 @@

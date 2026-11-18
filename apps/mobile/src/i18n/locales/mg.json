@@ -1476,13 +1476,24 @@
       "empty": "Tsy mbola misy fandinihana misy antontan'isa",
       "emptyDescription": "Mirakitra ny fandinihana vita ny antontan'isa rehefa velona ho an'ny fikambanana izy.",
       "offTitle": "Maty ny antontan'isa ho an'i {{platform}}",
-      "offDescription": "Alefaso ny antontan'isa ao amin'ny fikirakiran'ny fikambanana amin'ny tranonkala mba hirakitra ny fandinihana vita.",
-      "couldNotLoad": "Tsy afaka nampiditra ny antontan'isa"
+      "offDescription": "Ny andraikitra momba ny faktiora ao amin'ny fikambanana (tompony, mpitantana ary mpitantana ny faktiora) no afaka mamelona ny antontan'isa ao amin'ny fandrindrana ny fikambanana eo amin'ny tranonkala, mba hirakitra ny fandinihana vita.",
+      "couldNotLoad": "Tsy afaka nampiditra ny antontan'isa",
+      "trackedReviewsCaption": "Ny fandinihana vita nifarana tao anatin'io vanim-potoana io rehefa velona ny antontan'isa. Ny fandinihana mandeha sy ny fandinihana tsy nahomby dia tsy isaina mihitsy.",
+      "trackedReviewsUncounted": "Tsy isaina: {{displayCount}} amin’ny {{displayTotal}} fandinihana vitan’ny fikambanana, no tsy voarakitra ny antontan’isany.",
+      "trackedReviewsUncounted_one": "Tsy isaina: {{displayCount}} amin’ny {{displayTotal}} fandinihana vitan’ny fikambanana, no tsy voarakitra ny antontan’isany.",
+      "trackedReviewsUncounted_other": "Tsy isaina: {{displayCount}} amin’ny {{displayTotal}} fandinihana vitan’ny fikambanana, no tsy voarakitra ny antontan’isany."
     },
     "council": {
       "title": "Fandinihan'ny filankevitra",
       "subtitle": "Manam-pahaizana maro no mandinika ny PR tsirairay, ary mitambatra ho fanapahan-kevitra iray ny latsa-batony.",
-      "unavailable": "Tsy misy ny fandinihan'ny filankevitra ho an'ity fikambanana ity.",
+      "unavailablePersonallyTitle": "Mila fikambanana Enterprise",
+      "unavailablePersonally": "Tsy tafiditra ao amin'ny kaonty manokana ny fandinihan'ny filankevitra.",
+      "unavailablePersonallyAction": "Hamorona fikambanana",
+      "unavailablePersonallySwitchAction": "Mifindra fikambanana",
+      "unavailableOrganizationTitle": "Tsy misy ny Fandinihan'ny filankevitra",
+      "unavailableForOrganization": "Mila drafitra Enterprise misy famandrihana na andrana miasa ny fandinihan'ny filankevitra. Tsy manana izany ity fikambanana ity amin'izao fotoana izao.",
+      "unavailableForOrganizationNeutral": "Tsy misy ny fandinihan'ny filankevitra ho an'ity fikambanana ity amin'izao fotoana izao. Andramo indray aoriana.",
+      "unavailableOnBitbucket": "Tsy misy ny fandinihan'ny filankevitra ho an'ny tahirin-kaody Bitbucket.",
       "noRepositories": "Tsy mbola misy tahirin-kaody voafidy. Misafidiana tahirin-kaody ao amin'ny fikirana tahirin-kaody aloha.",
       "specialists": "Manam-pahaizana",
       "labels": "Marika mampandeha ny fandinihan'ny filankevitra",
@@ -4699,6 +4710,7 @@
     "superseded": "Nosoloina tany an-kafa ity rohy ity, ka tsy miasa intsony."
   },
   "sharedSession": {
+    "startedAt": "Nanomboka tamin'ny {{time}}",
     "title": "Fotoam-piasana nozaraina",
     "someone": "Olona iray",
     "sharedBy": "Nozarain'i {{owner}}",

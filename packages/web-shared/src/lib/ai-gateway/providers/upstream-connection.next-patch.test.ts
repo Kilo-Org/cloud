@@ -10,12 +10,21 @@ import type { AddressInfo } from 'node:net';
 import type { LookupFunction } from 'node:net';
 import type * as NextWork from 'next/dist/server/app-render/work-async-storage.external';
 import type * as NextUnit from 'next/dist/server/app-render/work-unit-async-storage.external';
-import { lookup } from 'node:dns/promises';
 import type { Agent as UndiciAgent, Dispatcher, RequestInit as UndiciRequestInit } from 'undici';
 import { Agent } from 'undici';
 import { clearUpstreamConnectionCache, lookupPinnedUpstreamAddress } from './upstream-connection';
 
-jest.mock('node:dns/promises', () => ({ lookup: jest.fn() }));
+const mockResolve4 = jest.fn<Promise<string[]>, [string]>();
+
+jest.mock('node:dns/promises', () => ({
+  Resolver: jest.fn(function () {
+    return {
+      resolve4: (hostname: string) => mockResolve4(hostname),
+      resolve6: async () => [],
+      cancel: jest.fn(),
+    };
+  }),
+}));
 
 jest.resetModules();
 const { createPatchedFetcher } = jest.requireActual<{
@@ -32,13 +41,6 @@ const { workAsyncStorage } = jest.requireActual<typeof NextWork>(
 );
 const { workUnitAsyncStorage } = jest.requireActual<typeof NextUnit>(
   'next/dist/server/app-render/work-unit-async-storage.external'
-);
-
-const lookupMock = jest.mocked(
-  lookup as unknown as (
-    hostname: string,
-    options: { all: true; verbatim: true }
-  ) => Promise<Array<{ address: string; family: number }>>
 );
 
 /** Next's server fetch patch, built the way Next builds it over the global fetch. */
@@ -72,7 +74,7 @@ function agentFor(lookup: LookupFunction): UndiciAgent {
 describe('the Next patched fetch forwards the pinned dispatcher to undici', () => {
   beforeEach(() => {
     clearUpstreamConnectionCache();
-    lookupMock.mockReset();
+    mockResolve4.mockReset();
   });
 
   it('serves a request through the dispatcher its init carries', async () => {
@@ -124,7 +126,7 @@ describe('the Next patched fetch forwards the pinned dispatcher to undici', () =
     // The refresh of the absent pin fails, which is the refusal the production
     // lookup answers with. The dispatcher leaves with the error through its
     // connect lookup, so a silent fallback cannot substitute platform DNS.
-    lookupMock.mockRejectedValue(new Error('getaddrinfo ENOTFOUND refused-pin.test'));
+    mockResolve4.mockRejectedValue(new Error('getaddrinfo ENOTFOUND refused-pin.test'));
 
     const error = await inRequestStore(() =>
       patchedFetch('https://refused-pin.test:9443/v1', {

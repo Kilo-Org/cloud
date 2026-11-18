@@ -933,13 +933,24 @@
       "empty": "Noch keine Reviews mit Analysen",
       "emptyDescription": "Analysen erfassen abgeschlossene Reviews, solange sie für die Organisation aktiviert sind.",
       "offTitle": "Analysen sind für {{platform}} deaktiviert",
-      "offDescription": "Aktiviere sie in den Organisationseinstellungen im Web, um abgeschlossene Reviews zu erfassen.",
-      "couldNotLoad": "Analysen konnten nicht geladen werden"
+      "offDescription": "Personen mit Abrechnungsrollen der Organisation (Owner, Admins und Billing-Manager) können Analysen in den Organisationseinstellungen im Web aktivieren, um abgeschlossene Reviews zu erfassen.",
+      "couldNotLoad": "Analysen konnten nicht geladen werden",
+      "trackedReviewsCaption": "Reviews, die in diesem Zeitraum bei aktivierten Analysen abgeschlossen wurden. Laufende und fehlgeschlagene Reviews werden nie gezählt.",
+      "trackedReviewsUncounted": "Nicht gezählt: {{displayCount}} von {{displayTotal}} abgeschlossenen Reviews der Organisation ohne erfasstes Ergebnis.",
+      "trackedReviewsUncounted_one": "Nicht gezählt: {{displayCount}} von {{displayTotal}} abgeschlossenen Reviews der Organisation ohne erfasstes Ergebnis.",
+      "trackedReviewsUncounted_other": "Nicht gezählt: {{displayCount}} von {{displayTotal}} abgeschlossenen Reviews der Organisation ohne erfasstes Ergebnis."
     },
     "council": {
       "title": "Gremium-Review",
       "subtitle": "Mehrere Spezialisten prüfen jeden Pull-Request, und ihre Stimmen ergeben eine gemeinsame Entscheidung.",
-      "unavailable": "Gremium-Review ist für diese Organisation nicht verfügbar.",
+      "unavailablePersonallyTitle": "Erfordert eine Enterprise-Organisation",
+      "unavailablePersonally": "Gremium-Review ist nicht Teil eines persönlichen Kontos.",
+      "unavailablePersonallyAction": "Organisation erstellen",
+      "unavailablePersonallySwitchAction": "Organisation wechseln",
+      "unavailableOrganizationTitle": "Gremium-Review ist derzeit nicht verfügbar",
+      "unavailableForOrganization": "Gremium-Review benötigt den Enterprise-Plan mit einem aktiven Abo oder einer Testphase. Diese Organisation hat es derzeit nicht.",
+      "unavailableForOrganizationNeutral": "Gremium-Review ist derzeit für diese Organisation nicht verfügbar. Versuchen Sie es später erneut.",
+      "unavailableOnBitbucket": "Gremium-Review ist für Bitbucket-Repositories nicht verfügbar.",
       "noRepositories": "Noch keine Code-Repositories ausgewählt. Wähle zuerst Code-Repositories in den Repository-Einstellungen aus.",
       "specialists": "Spezialisten",
       "labels": "Labels, die ein Gremium-Review auslösen",
@@ -4699,6 +4710,7 @@
     "superseded": "Dieser Link wurde an anderer Stelle ersetzt und funktioniert daher nicht mehr."
   },
   "sharedSession": {
+    "startedAt": "Gestartet um {{time}}",
     "title": "Geteilte Sitzung",
     "someone": "Jemand",
     "sharedBy": "Geteilt von {{owner}}",

@@ -933,13 +933,24 @@
       "empty": "Nog geen reviews met statistieken",
       "emptyDescription": "Statistieken leggen afgeronde reviews vast zolang ze voor de organisatie zijn ingeschakeld.",
       "offTitle": "Statistieken staan uit voor {{platform}}",
-      "offDescription": "Schakel de statistieken in bij de organisatie-instellingen op het web om afgeronde reviews vast te leggen.",
-      "couldNotLoad": "Kan statistieken niet laden"
+      "offDescription": "De facturatierollen van de organisatie (eigenaren, beheerders en facturatiemanagers) kunnen statistieken inschakelen in de organisatie-instellingen op het web om afgeronde reviews vast te leggen.",
+      "couldNotLoad": "Kan statistieken niet laden",
+      "trackedReviewsCaption": "Reviews die in deze periode zijn afgerond terwijl statistieken waren ingeschakeld. Lopende en mislukte reviews worden nooit meegeteld.",
+      "trackedReviewsUncounted": "Niet meegeteld: {{displayCount}} van de {{displayTotal}} afgeronde reviews van de organisatie, zonder vastgelegd resultaat.",
+      "trackedReviewsUncounted_one": "Niet meegeteld: {{displayCount}} van de {{displayTotal}} afgeronde reviews van de organisatie, zonder vastgelegd resultaat.",
+      "trackedReviewsUncounted_other": "Niet meegeteld: {{displayCount}} van de {{displayTotal}} afgeronde reviews van de organisatie, zonder vastgelegd resultaat."
     },
     "council": {
       "title": "Panelbeoordeling",
       "subtitle": "Meerdere deskundigen beoordelen elke PR en hun stemmen komen samen tot één beslissing.",
-      "unavailable": "Panelbeoordeling is niet beschikbaar voor deze organisatie.",
+      "unavailablePersonallyTitle": "Vereist een Enterprise-organisatie",
+      "unavailablePersonally": "Panelbeoordeling maakt geen deel uit van een persoonlijk account.",
+      "unavailablePersonallyAction": "Organisatie maken",
+      "unavailablePersonallySwitchAction": "Wisselen van organisatie",
+      "unavailableOrganizationTitle": "Panelbeoordeling is op dit moment niet beschikbaar",
+      "unavailableForOrganization": "Panelbeoordeling vereist het Enterprise-plan met een actief abonnement of proefperiode. Deze organisatie heeft het op dit moment niet.",
+      "unavailableForOrganizationNeutral": "Panelbeoordeling is op dit moment niet beschikbaar voor deze organisatie. Probeer het later opnieuw.",
+      "unavailableOnBitbucket": "Panelbeoordeling is niet beschikbaar voor Bitbucket-repositories.",
       "noRepositories": "Nog geen repositories geselecteerd. Kies eerst repositories in de repository-instellingen.",
       "specialists": "Deskundigen",
       "labels": "Tags die panelbeoordeling activeren",
@@ -4699,6 +4710,7 @@
     "superseded": "Deze link is elders vervangen en werkt daarom niet meer."
   },
   "sharedSession": {
+    "startedAt": "Gestart om {{time}}",
     "title": "Gedeelde sessie",
     "someone": "Iemand",
     "sharedBy": "Gedeeld door {{owner}}",

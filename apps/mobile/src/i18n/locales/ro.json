@@ -1500,13 +1500,25 @@
       "empty": "Nicio revizuire cu statistici deocamdată",
       "emptyDescription": "Statisticile înregistrează revizuirile finalizate cât timp sunt activate pentru organizație.",
       "offTitle": "Statisticile sunt dezactivate pentru {{platform}}",
-      "offDescription": "Activează statisticile în setările organizației pe web pentru a înregistra revizuirile finalizate.",
-      "couldNotLoad": "Statisticile nu au putut fi încărcate"
+      "offDescription": "Proprietarii, administratorii și managerii de facturare ai organizației pot activa statisticile în setările organizației de pe web, pentru a înregistra revizuirile finalizate.",
+      "couldNotLoad": "Statisticile nu au putut fi încărcate",
+      "trackedReviewsCaption": "Revizuirile finalizate în această perioadă, cât timp statisticile erau activate. Revizuirile în derulare și cele eșuate nu se numără niciodată.",
+      "trackedReviewsUncounted": "Nenumărate: {{displayCount}} din cele {{displayTotal}} revizuiri finalizate pe care le are organizația, cu rezultatul neînregistrat.",
+      "trackedReviewsUncounted_few": "Nenumărate: {{displayCount}} din cele {{displayTotal}} revizuiri finalizate pe care le are organizația, cu rezultatul neînregistrat.",
+      "trackedReviewsUncounted_one": "Nenumărate: {{displayCount}} din cele {{displayTotal}} revizuiri finalizate pe care le are organizația, cu rezultatul neînregistrat.",
+      "trackedReviewsUncounted_other": "Nenumărate: {{displayCount}} din cele {{displayTotal}} revizuiri finalizate pe care le are organizația, cu rezultatul neînregistrat."
     },
     "council": {
       "title": "Revizuire în consiliu",
       "subtitle": "Mai mulți experți revizuiesc fiecare PR, iar voturile lor se combină într-o singură decizie.",
-      "unavailable": "Revizuirea în consiliu nu este disponibilă pentru această organizație.",
+      "unavailablePersonallyTitle": "Necesită o organizație Enterprise",
+      "unavailablePersonally": "Revizuirea în consiliu nu face parte dintr-un cont personal.",
+      "unavailablePersonallyAction": "Creează organizația",
+      "unavailablePersonallySwitchAction": "Schimbă organizația",
+      "unavailableOrganizationTitle": "Revizuire în consiliu nu este disponibilă",
+      "unavailableForOrganization": "Revizuirea în consiliu are nevoie de planul Enterprise cu un abonament sau o perioadă de probă activă. Această organizație nu îl are în acest moment.",
+      "unavailableForOrganizationNeutral": "Revizuirea în consiliu nu este disponibilă pentru această organizație în acest moment. Încearcă din nou mai târziu.",
+      "unavailableOnBitbucket": "Revizuirea în consiliu nu este disponibilă pentru depozitele Bitbucket.",
       "noRepositories": "Niciun depozit selectat deocamdată. Alege mai întâi depozitele din setările depozitelor.",
       "specialists": "Experți",
       "labels": "Etichete care declanșează revizuirea în consiliu",
@@ -4769,6 +4781,7 @@
     "superseded": "Acest link a fost înlocuit de pe alt dispozitiv, așa că nu mai funcționează."
   },
   "sharedSession": {
+    "startedAt": "Începută la {{time}}",
     "title": "Sesiune partajată",
     "someone": "Cineva",
     "sharedBy": "Partajată de {{owner}}",

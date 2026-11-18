@@ -19,11 +19,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
-import '@/i18n';
-// The screen reaches this adapter through `use-manual-refresh`; importing the
-// mocked module here is how the test reads its spy.
-import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { i18n } from '@/i18n';
+// The side-effect registration of the i18n module rides on the named import
+// above; the screen reaches this adapter through `use-manual-refresh`, and
+// importing the mocked module here is how the test reads its spy.
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { OrganizationAuditLogScreen } from './audit-log-screen';
 
 const pageQuery = {
@@ -188,12 +188,12 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 
 vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
 
-function entries(count: number, action = 'organization.settings.change') {
+function entries(count: number, action = 'organization.settings.change', actorEmail?: string) {
   return Array.from({ length: count }, (_, index) => ({
     id: `audit-${index}`,
     action,
     actor_id: 'user-1',
-    actor_email: 'owner@example.com',
+    actor_email: actorEmail ?? 'owner@example.com',
     actor_name: 'Owner',
     message: `Audit event ${index}`,
     created_at: '2026-01-01T00:00:00.000Z',
@@ -224,6 +224,24 @@ function longEntry() {
 
 function mount() {
   return renderWithProviders(createElement(OrganizationAuditLogScreen));
+}
+
+// The row formats the entry with the device-local clock, so the expected meta
+// string is derived through the same formatter instead of a hardcoded
+// wall-clock that breaks in a CI timezone east or west of UTC.
+const FIXED_INSTANT = new Date('2026-01-01T00:00:00.000Z');
+function expectedMetaTime(locale: string): string {
+  const day = new Intl.DateTimeFormat(locale, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  }).format(FIXED_INSTANT);
+  const clock = new Intl.DateTimeFormat(locale, {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(FIXED_INSTANT);
+  return `${day} · ${clock}`;
 }
 
 beforeEach(() => {
@@ -363,7 +381,7 @@ describe('OrganizationAuditLogScreen', () => {
     expect(messages.some(text => text.includes('organization.settings.change'))).toBe(false);
     // The actor and the time are separate texts now; the actor comes first.
     expect(messages).toContain('owner@example.com');
-    expect(messages.some(text => text.startsWith('Jan 1, 2026 · 12:00 AM'))).toBe(true);
+    expect(messages.some(text => text.startsWith(expectedMetaTime('en')))).toBe(true);
 
     const loadMore = renderer.root
       .findAllByType('Button')
@@ -381,16 +399,14 @@ describe('OrganizationAuditLogScreen', () => {
   it('lets the actor truncate in its own text and keeps the whole time', async () => {
     // The wire address an actual long actor email fills the row with: the time
     // must survive it, because the time is what tells the entries apart.
-    pageHook.entries = entries(1, 'organization.settings.change').map(entry => ({
-      ...entry,
-      actor_email: LONG_ACTOR_EMAIL,
-    }));
+    pageHook.entries = entries(1, 'organization.settings.change', LONG_ACTOR_EMAIL);
     const { renderer, unmount } = await mount();
 
     const texts = renderer.root.findAllByType('Text');
     const actorText = texts.find(node => node.props.children === LONG_ACTOR_EMAIL);
+    const expectedTime = expectedMetaTime('en');
     const timeText = texts.find(
-      node => typeof node.props.children === 'string' && node.props.children.includes('12:00 AM')
+      node => typeof node.props.children === 'string' && node.props.children === expectedTime
     );
     expect(actorText).toBeDefined();
     expect(timeText).toBeDefined();
@@ -403,7 +419,7 @@ describe('OrganizationAuditLogScreen', () => {
     // The time never yields its width, so the whole reading stays on screen
     // whatever the actor does.
     expect(timeText?.props.className).toContain('shrink-0');
-    expect(timeText?.props.children).toBe('Jan 1, 2026 · 12:00 AM');
+    expect(timeText?.props.children).toBe(expectedTime);
     unmount();
   });
 
@@ -427,7 +443,7 @@ describe('OrganizationAuditLogScreen', () => {
       // The date carries the Arabic month in its own element, so its parts
       // keep the language's reading order instead of running inside the email
       // line's direction; the email stays beside it as plain Latin text.
-      expect(timeText?.props.children).toContain('يناير 2026');
+      expect(timeText?.props.children).toBe(expectedMetaTime('ar'));
       expect(actorText?.props.children).toBe('owner@example.com');
       // The reader hears actor and time in one sentence, with the date parts
       // in the order the catalog writes them.
@@ -462,7 +478,7 @@ describe('OrganizationAuditLogScreen', () => {
     expect(messages).toContain('Organization created');
     // The actor and the time are separate texts; the actor comes first.
     expect(messages).toContain('owner@example.com');
-    expect(messages.some(text => text.startsWith('Jan 1, 2026 · 12:00 AM'))).toBe(true);
+    expect(messages.some(text => text.startsWith(expectedMetaTime('en')))).toBe(true);
     // The row keeps the translated event name and drops the server sentence,
     // which only restates that name and would age into a stale one.
     expect(messages).not.toContain('Organization Acme created');

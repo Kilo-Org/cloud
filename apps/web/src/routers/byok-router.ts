@@ -8,6 +8,7 @@ import {
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import {
   BYOK_PROVIDER_UNAVAILABLE_MESSAGE,
+  MANAGED_KEY_PROVIDER_OCCUPIED_MESSAGE,
   MANAGED_KEY_READ_ONLY_MESSAGE,
 } from '@kilocode/app-shared/byok-errors';
 import { TRPCError } from '@trpc/server';
@@ -634,8 +635,7 @@ export const byokRouter = createTRPCRouter({
           if (existingKey?.management_source === 'coding_plan') {
             throw new TRPCError({
               code: 'PRECONDITION_FAILED',
-              message:
-                "Your coding plan manages this provider's key and it is read-only. Cancel the coding plan to add your own.",
+              message: MANAGED_KEY_PROVIDER_OCCUPIED_MESSAGE,
             });
           }
           throw new TRPCError({

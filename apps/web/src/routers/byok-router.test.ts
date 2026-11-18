@@ -47,7 +47,10 @@ import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/typ
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
-import { BYOK_PROVIDER_UNAVAILABLE_MESSAGE } from '@kilocode/app-shared/byok-errors';
+import {
+  BYOK_PROVIDER_UNAVAILABLE_MESSAGE,
+  MANAGED_KEY_PROVIDER_OCCUPIED_MESSAGE,
+} from '@kilocode/app-shared/byok-errors';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   ai_gateway_config,
@@ -954,8 +957,7 @@ describe('BYOK Router', () => {
         caller.byok.create({ provider_id: 'anthropic', api_key: 'personal-anthropic-key' })
       ).rejects.toMatchObject({
         code: 'PRECONDITION_FAILED',
-        message:
-          "Your coding plan manages this provider's key and it is read-only. Cancel the coding plan to add your own.",
+        message: MANAGED_KEY_PROVIDER_OCCUPIED_MESSAGE,
       });
 
       const personalRows = await db
@@ -993,8 +995,7 @@ describe('BYOK Router', () => {
         })
       ).rejects.toMatchObject({
         code: 'PRECONDITION_FAILED',
-        message:
-          "Your coding plan manages this provider's key and it is read-only. Cancel the coding plan to add your own.",
+        message: MANAGED_KEY_PROVIDER_OCCUPIED_MESSAGE,
       });
 
       const organizationRows = await db

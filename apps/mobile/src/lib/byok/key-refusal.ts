@@ -1,5 +1,6 @@
 import {
   BYOK_PROVIDER_UNAVAILABLE_MESSAGE,
+  MANAGED_KEY_PROVIDER_OCCUPIED_MESSAGE,
   MANAGED_KEY_READ_ONLY_MESSAGE,
 } from '@kilocode/app-shared/byok-errors';
 import { isRetryableTrpcError, readTrpcErrorField } from '@/lib/trpc-error';
@@ -21,9 +22,10 @@ export type KeySaveFailure =
  * does not translate, so the code decides the copy. The unavailable-provider
  * refusal is the one exception: `FORBIDDEN` alone also covers other denials, so
  * it is recognised by the code and the sentence together, where the sentence is
- * the constant both sides import. The managed-key refusal from an update is the
- * other exception: `CONFLICT` alone also covers an ordinary duplicate, so it is
- * recognised by the code and the shared sentence together for the same reason.
+ * the constant both sides import. The managed-key refusals are the other two
+ * exceptions for the same reason: `CONFLICT` alone also covers an ordinary
+ * duplicate, and `PRECONDITION_FAILED` alone covers other refusals, so each is
+ * recognised by the code and the shared sentence together.
  */
 export function refusedKeyMessage(error: unknown): string | null {
   const code = readTrpcErrorField(error, 'code');
@@ -39,8 +41,19 @@ export function refusedKeyMessage(error: unknown): string | null {
   if (code === 'CONFLICT') {
     return i18n.t('profile.providerKeys.keyAlreadyExists');
   }
-  if (code === 'PRECONDITION_FAILED') {
+  // The create route refuses a provider a coding plan's key already owns with
+  // this exact sentence; other precondition refusals carry a different one, so
+  // this must be matched before the bare `PRECONDITION_FAILED` branch.
+  if (
+    code === 'PRECONDITION_FAILED' &&
+    readTrpcErrorField(error, 'message') === MANAGED_KEY_PROVIDER_OCCUPIED_MESSAGE
+  ) {
     return i18n.t('profile.providerKeys.keyManagedByCodingPlan');
+  }
+  // Any other precondition the server will repeat for the same value: it has
+  // settled the verdict, so the copy must not ask for a retry.
+  if (code === 'PRECONDITION_FAILED') {
+    return i18n.t('profile.providerKeys.keyStoreFailed');
   }
   if (code === 'UNPROCESSABLE_CONTENT') {
     return i18n.t('profile.providerKeys.invalidCredentials');
@@ -56,6 +69,6 @@ export function refusedKeyMessage(error: unknown): string | null {
   }
   // Any other verdict the server will repeat for the same value: a duplicate, a
   // malformed credential or another denial. The reader can only fix the value,
-  // so the generic store copy asks for that rather than for a retry.
+  // so the generic store copy states the failure without offering a retry.
   return isRetryableTrpcError(error) ? null : i18n.t('profile.providerKeys.keyStoreFailed');
 }

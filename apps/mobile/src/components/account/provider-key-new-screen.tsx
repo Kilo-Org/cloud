@@ -201,10 +201,11 @@ export function ProviderKeyNewScreen() {
       }
       attempt.fail({
         kind: 'refused',
-        // A structured form names the empty field above, so its summary is the
-        // general refusal; a one-value key has no field to point at.
+        // A structured form names the empty field above, so its summary stays
+        // generic about the missing value; a one-value key has no field to
+        // point at, so it names the key itself.
         message: form
-          ? t('profile.providerKeys.invalidCredentials')
+          ? t('profile.providerKeys.keyIncomplete')
           : t('profile.providerKeys.apiKeyRequired'),
       });
       return;

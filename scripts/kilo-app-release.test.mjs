@@ -22,6 +22,7 @@ import {
   isVersionBumpCommit,
   linkPullRequest,
   noteLineProblem,
+  notesRetryBaseMs,
   notesRetryDelayMs,
   parseConfigVersion,
   readerFacingSubject,
@@ -990,6 +991,52 @@ test('body falls back after three retries of a rate-limited gateway', async () =
     await gateway.close();
     cleanup(dir);
   }
+});
+
+test('body retries while the gateway sheds load and then writes the curated answer', async () => {
+  const dir = rewriteRepo('kilo-notes-503-');
+  let calls = 0;
+  const gateway = await fakeGateway(response => {
+    calls += 1;
+    if (calls === 1) {
+      replyStatus(response, 503);
+      return;
+    }
+    reply(
+      response,
+      completion({
+        new: ['Keep the composer visible while you read older messages'],
+        changes: [],
+        areas: ['chat'],
+      })
+    );
+  });
+  try {
+    const result = await runScriptAsync(NOTES, ['body', '--from', 'base'], {
+      cwd: dir,
+      env: {
+        KILO_CHANGELOG_API_KEY: 'test-key',
+        KILO_CHANGELOG_BASE_URL: gateway.baseUrl,
+        KILO_CHANGELOG_RETRY_BASE_MS: '1',
+      },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(gateway.requests.length, 2, 'one retry after the 503');
+    assert.match(result.stderr, /answered HTTP 503; retrying in \d+ms \(retry 1 of 3\)/);
+    assert.match(result.stdout, /^- Keep the composer visible while you read older messages$/m);
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('the retry base defaults to 5 s unless it is a number', () => {
+  assert.equal(notesRetryBaseMs(''), 5000, 'a blank override is unset');
+  assert.equal(notesRetryBaseMs('   '), 5000);
+  assert.equal(notesRetryBaseMs('not-a-number'), 5000);
+  assert.equal(notesRetryBaseMs('-1'), 5000);
+  assert.equal(notesRetryBaseMs('1'), 1);
+  assert.equal(notesRetryBaseMs('0'), 0);
 });
 
 test('body honors a short Retry-After before retrying', async () => {

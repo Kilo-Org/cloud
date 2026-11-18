@@ -744,6 +744,16 @@ export function notesRetryDelayMs(attempt, retryAfter, baseMs = NOTES_RETRY_BASE
   return backoff + Math.floor(Math.random() * (backoff / 4 + 1));
 }
 
+/** The backoff base; `KILO_CHANGELOG_RETRY_BASE_MS` overrides it (~1 in tests), and a blank or invalid value means the default. */
+export function notesRetryBaseMs(configured = process.env.KILO_CHANGELOG_RETRY_BASE_MS) {
+  const text = typeof configured === 'string' ? configured.trim() : configured;
+  const value = Number(text);
+  if (text === undefined || text === '' || !Number.isFinite(value) || value < 0) {
+    return NOTES_RETRY_BASE_DEFAULT_MS;
+  }
+  return value;
+}
+
 /** How long the history rewrite waits between two versions; `KILO_CHANGELOG_VERSION_PAUSE_MS` overrides it. */
 export function versionPauseMs(configured = process.env.KILO_CHANGELOG_VERSION_PAUSE_MS) {
   const value = Number(configured);
@@ -779,11 +789,7 @@ export async function requestCuratedNotes(candidates, options = {}) {
     Number.isFinite(configuredTimeout) && configuredTimeout > 0
       ? configuredTimeout
       : NOTES_TIMEOUT_DEFAULT_MS;
-  const configuredBase = Number(options.retryBaseMs ?? process.env.KILO_CHANGELOG_RETRY_BASE_MS);
-  const retryBaseMs =
-    Number.isFinite(configuredBase) && configuredBase >= 0
-      ? configuredBase
-      : NOTES_RETRY_BASE_DEFAULT_MS;
+  const retryBaseMs = notesRetryBaseMs(options.retryBaseMs);
   const fetchImpl = options.fetchImpl ?? fetch;
 
   let waited = 0;

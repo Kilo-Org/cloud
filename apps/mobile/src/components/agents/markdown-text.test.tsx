@@ -1229,4 +1229,40 @@ describe('MarkdownText document direction', () => {
       rnStub.I18nManager.isRTL = false;
     }
   });
+
+  it('renders an image alt fallback in the body direction on both platforms', async () => {
+    // A scheme the image view cannot draw leaves the alt text as plain text.
+    rnStub.I18nManager.isRTL = true;
+    try {
+      const chatHost = await mount(<MarkdownText value="> <u>quoted</u>" />);
+      const chatImage = requiredRenderer(htmlProps(chatHost).renderers, 'img');
+      const chatAlt = await renderCustom(chatImage, {
+        attributes: { src: 'ftp://example.com/a.png', alt: 'shot' },
+        parent: null,
+      });
+      const chatProps = chatAlt.root.findByType(TextType).props as {
+        style?: { writingDirection?: string; direction?: string };
+      };
+      expect(chatProps.style).toMatchObject({ writingDirection: 'rtl' });
+      expect(chatProps.style).not.toHaveProperty('direction');
+
+      const documentHost = await mount(
+        <MarkdownText value="> <u>quoted</u>" documentDirection="ltr" />
+      );
+      const documentImage = requiredRenderer(htmlProps(documentHost).renderers, 'img');
+      const documentAlt = await renderCustom(documentImage, {
+        attributes: { src: 'ftp://example.com/a.png', alt: 'shot' },
+        parent: null,
+      });
+      const documentProps = documentAlt.root.findByType(TextType).props as {
+        style?: { writingDirection?: string; direction?: string };
+      };
+      expect(documentProps.style).toMatchObject({
+        direction: 'ltr',
+        writingDirection: 'ltr',
+      });
+    } finally {
+      rnStub.I18nManager.isRTL = false;
+    }
+  });
 });

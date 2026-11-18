@@ -621,10 +621,15 @@ export function MarkdownHtml({
     const HtmlImage: CustomBlockRenderer = ({ tnode }) => {
       const src = tnode.attributes.src ?? '';
       if (!isSupportedScheme(src)) {
+        // Alt text is document content: a body with its own direction names
+        // both halves of the direction — the interface mark would keep it
+        // mirrored on iOS, where `writingDirection` is the paragraph's base.
+        const altStyle =
+          documentDirection === 'ltr'
+            ? { ...baseStyle, writingDirection: 'ltr' as const }
+            : withRtlWritingDirection(baseStyle);
         return (
-          // Alt text is document content: the interface mark goes behind
-          // `baseStyle`, so a body with its own direction keeps it here too.
-          <Text selectable={selectable} style={withRtlWritingDirection(baseStyle)}>
+          <Text selectable={selectable} style={altStyle}>
             {tnode.attributes.alt ?? ''}
           </Text>
         );
@@ -664,7 +669,7 @@ export function MarkdownHtml({
       img: HtmlImage,
       details: HtmlDetails,
     };
-  }, [baseStyle, onLongPressLink, onPressLink, selectable]);
+  }, [baseStyle, documentDirection, onLongPressLink, onPressLink, selectable]);
 
   return (
     <RenderHTML

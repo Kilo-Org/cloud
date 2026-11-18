@@ -12,7 +12,7 @@ const session = {
   version: 2,
 };
 const path = `/v1/sessions/${session.sessionId}`;
-const fetchMock = jest.fn<typeof fetch>();
+const fetchMock = jest.fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>();
 
 beforeEach(() => {
   jest.resetAllMocks();

@@ -82,8 +82,9 @@ public egress, an execution role and another image. Cross-account verification r
 The trusted adapter always selects the configured VPC connector and `NO_INGRESS`, with no execution role or idle policy.
 It verifies the networking and role fields returned by AWS before accepting an allocation.
 
-The bucket keeps prepared archives. Only launch objects expire after one day. The launch and archive client cannot
-read proxy-private prefixes. Launch PUT uses `If-None-Match: *`. Admission deletes the launch object; expiration is a backstop.
+Launch objects expire after one day. Prepared archives expire 30 days after upload.
+Kilo stops selecting an archive 29 days after capture, so rebuild the prepared environment before then.
+The launch and archive client cannot read proxy-private prefixes. Launch PUT uses `If-None-Match: *`. Admission deletes the launch object; expiration is a backstop.
 Signed URLs cannot outlive the assumed role credentials. AWS responses and transport errors never enter logs verbatim.
 
 The AWS API client reuses `aws4fetch`, an existing JavaScript dependency of worker-utils.
@@ -184,8 +185,12 @@ Interrupted extraction or runtime handoff uses the same retry advice.
 A missing object, checksum failure, oversized response, or invalid archive produces `environment_restore_failed`.
 The session asks the user to rebuild the prepared environment.
 Failed restoration never starts the fresh runtime. The callback records a fixed code and does not expose URLs or credentials.
-Local Linux process tests cover download retries, restore deadlines, integrity failures and successful reuse of the same archive.
-These tests use a local HTTPS server; they do not prove live customer S3 or VPC behavior.
+`test/runtime-installer/aws-archive-bootstrap.test.ts` covers download retries, restore deadlines, integrity failures
+and successful reuse of the same archive. These tests are opt-in and CI does not run them.
+They need Linux, root (the local HTTPS server uses port 443), `/usr/local/bin/node`, `/usr/bin/python3`, `openssl`, and
+`customer-artifacts.s3.us-east-1.amazonaws.com` mapped to `127.0.0.1`. Run them with
+`KILO_AWS_ARCHIVE_BOOTSTRAP_TEST=1 pnpm --filter cloud-agent-next test:runtime-installer`.
+They use a local HTTPS server; they do not prove live customer S3 or VPC behavior.
 
 ## SCM forwarding boundary
 

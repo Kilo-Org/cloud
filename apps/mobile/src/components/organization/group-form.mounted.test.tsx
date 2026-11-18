@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the form's create swap, both leave exits and the delete path share one mock harness. */
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -135,23 +136,32 @@ const PRESSABLE: unknown = 'Pressable';
 const GROUPS_LIST_PATH = '/(app)/(tabs)/(3_profile)/organization/groups';
 const GROUP_FORM_PATH = '/(app)/(tabs)/(3_profile)/organization/group-form';
 
+const storedGroupBase: OrgGroup = {
+  id: 'group-1',
+  organization_id: 'org-1',
+  name: 'Workshop',
+  description: 'The workshop group',
+  memberIds: [],
+  policies: [],
+  created_at: '2026-01-01T00:00:00.000Z',
+  created_by_kilo_user_id: null,
+  updated_at: '2026-01-01T00:00:00.000Z',
+};
+
 function storedGroup(overrides: Partial<OrgGroup> = {}): OrgGroup {
-  return {
-    id: 'group-1',
-    organization_id: 'org-1',
-    name: 'Workshop',
-    description: 'The workshop group',
-    memberIds: [],
-    policyIds: [],
-    ...overrides,
-  } as OrgGroup;
+  return { ...storedGroupBase, ...overrides };
 }
 
 async function mountForm(group: OrgGroup | undefined) {
   const mounted = await renderWithProviders(
     createElement(GroupForm, { organizationId: 'org-1', group })
   );
-  return { ...mounted, unmountOnce: () => mounted.unmount() };
+  return {
+    ...mounted,
+    unmountOnce: () => {
+      mounted.unmount();
+    },
+  };
 }
 
 type WidgetProps = Record<string, unknown>;
@@ -206,7 +216,7 @@ function theLeave(): () => void {
 /** Run the mutation's success callback, the way a landed save does. */
 function settleSave(
   mutation: { mutate: { mock: { calls: unknown[][] } } },
-  result: unknown = undefined
+  result?: unknown
 ): void {
   const call = mutation.mutate.mock.calls.at(-1);
   if (call === undefined) {
@@ -271,15 +281,6 @@ function listThenForm(...formRoutes: { key: string; name: string }[]): void {
   nav.index = nav.routes.length - 1;
 }
 
-/** The route key the form's leave-settle window must name for this stack. */
-function listRouteKey(): string {
-  const key = nav.routes[2]?.key;
-  if (key === undefined) {
-    throw new Error('the stack has no groups route');
-  }
-  return key;
-}
-
 beforeEach(() => {
   mutations.create.mutate.mockReset();
   mutations.updateDetails.mutate.mockReset();
@@ -307,8 +308,7 @@ describe('GroupForm create path', () => {
       expect.anything()
     );
     act(() => {
-      (mutations.create.mutate.mock.calls[0]?.[1] as { onSuccess: (r: { result: { id: string } }) => void })
-        .onSuccess({ result: { id: 'group-9' } });
+      settleSave(mutations.create, { result: { id: 'group-9' } });
     });
     theLeave()();
 

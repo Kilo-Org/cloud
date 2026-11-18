@@ -105,7 +105,11 @@ export function isOrgGroupFormDirty(
 
 /** How a group form leaves to the Groups list. */
 export type OrgGroupFormExit =
-  | { kind: 'list'; /** The key of the list route the pop-to truncates to. */ listRouteKey: string }
+  | {
+      kind: 'list';
+      /** The key of the list route the pop-to truncates to. */
+      listRouteKey: string;
+    }
   | { kind: 'back' }
   | { kind: 'push-list' };
 

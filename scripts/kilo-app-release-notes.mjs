@@ -10,9 +10,11 @@
  * --land) pushes it onto a branch.
  *
  * The rewrite is optional. `KILO_CHANGELOG_API_KEY` carries the gateway
- * credential, and without it - or when the call fails or its answer does not
- * pass `validateCuratedNotes` - `body` prints the deterministic block and warns
- * on stderr. A release never fails because its notes could not be rewritten.
+ * credential (the release workflow mints a one-hour token for it from the
+ * existing `MCP_CATALOG_TOKEN_SECRET` shared secret), and without it - or when
+ * the call fails or its answer does not pass `validateCuratedNotes` - `body`
+ * prints the deterministic block and warns on stderr. A release never fails
+ * because its notes could not be rewritten.
  * `KILO_CHANGELOG_BASE_URL` and `KILO_CHANGELOG_TIMEOUT_MS` exist for tests.
  *
  * Usage:
@@ -138,13 +140,17 @@ const BOT_EMAIL = '41898282+github-actions[bot]@users.noreply.github.com';
 const MAX_LAND_RETRIES = 3;
 
 // Where a version's notes are rewritten. The Kilo gateway serves the
-// OpenAI-compatible chat completions shape under `/api/gateway/v1`, and both
-// the base URL and the model are the ones the harness SDK's live runs use:
-// `packages/harness-sdk/e2e/setup.ts` points at `https://app.kilo.ai` and lists
-// `anthropic/claude-haiku-4.5` first among the cheap models it sweeps.
+// OpenAI-compatible chat completions shape under `/api/gateway/v1`, at the base
+// URL the harness SDK's live runs use (`packages/harness-sdk/e2e/setup.ts`).
+//
+// The model is the gateway alias the app already ships as the agent briefing's
+// default (`DEFAULT_BRIEFING_MODEL` in
+// apps/web/src/lib/agent-briefing/store.ts:25), routed through the same chat
+// completions shape, so no model is introduced here that production does not
+// already serve.
 const NOTES_BASE_URL_DEFAULT = 'https://app.kilo.ai';
 const NOTES_PATH = '/api/gateway/v1/chat/completions';
-const NOTES_MODEL = 'anthropic/claude-haiku-4.5';
+const NOTES_MODEL = '~deepseek/deepseek-flash-latest';
 
 // Notes are never worth a delayed release: a call that does not answer within
 // this window is abandoned and the deterministic block is written instead.

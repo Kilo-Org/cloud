@@ -17,8 +17,11 @@
  * `--changelog` is relative to the current directory (default
  * apps/mobile/CHANGELOG.md). `KILO_CHANGELOG_API_KEY` is required;
  * `KILO_CHANGELOG_BASE_URL` and `KILO_CHANGELOG_TIMEOUT_MS` point the rewrite at
- * a local fake gateway for tests. The file is written even when some versions
- * failed validation, so a second run retries only those, and the run exits 1.
+ * a local fake gateway for tests.
+ * `.github/workflows/kilo-app-changelog-history.yml` runs this script with a
+ * token minted from the existing `MCP_CATALOG_TOKEN_SECRET` shared secret and
+ * opens the resulting PR. The file is written even when some versions failed
+ * validation, so a second run retries only those, and the run exits 1.
  *
  * Exit codes:
  *   0 - every reader-facing version is curated

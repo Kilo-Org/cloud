@@ -1,0 +1,125 @@
+name: kilo-app Changelog History
+
+# Rewrite the already-shipped changelog sections with the same notes rewrite the
+# Release workflow runs for a new build, and land the result through a PR.
+#
+# Manual because it spends model calls on history: the app already renders those
+# versions, and only a human decides that the curated wording is worth the diff.
+# The script is idempotent and writes no file when every version is already
+# curated, so a re-dispatch after a partial failure retries only the versions
+# that still carry commit subjects. `apps/mobile/CHANGELOG.md` is otherwise the
+# Release workflow's file; this is the one job allowed to rewrite it.
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: kilo-app-changelog-history
+  cancel-in-progress: false
+
+permissions:
+  contents: write # push the rewrite branch
+  pull-requests: write # open or refresh its PR
+
+jobs:
+  rewrite:
+    # The mint below uses a repository secret; only the canonical repo may run
+    # this workflow at all.
+    if: github.repository == 'Kilo-Org/cloud'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    steps:
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+
+      # The same mint the MCP catalog job runs: the shared
+      # `MCP_CATALOG_TOKEN_SECRET` is exchanged for a one-hour token that
+      # belongs to the internal benchmarking bot account, never a maintainer's
+      # login. continue-on-error: the rewrite step below fails on its own when
+      # the token is empty, with a message that names the missing credential.
+      - name: Mint changelog token
+        id: mint
+        continue-on-error: true
+        env:
+          MCP_CATALOG_TOKEN_SECRET: ${{ secrets.MCP_CATALOG_TOKEN_SECRET }}
+          WEB_API_BASE_URL: https://app.kilo.ai
+        run: |
+          set -euo pipefail
+          # Capture the status so a failed mint names its cause instead of a
+          # bare "curl: (22)".
+          status="$(curl -sS -o /tmp/notes-mint.json -w '%{http_code}' \
+            -X POST "$WEB_API_BASE_URL/api/internal/mcp-catalog/token" \
+            -H "Authorization: Bearer $MCP_CATALOG_TOKEN_SECRET" \
+            -H 'content-type: application/json' \
+            -d '{}')"
+          if [ "$status" != "200" ]; then
+            echo "::error::The changelog token mint returned HTTP $status: $(cat /tmp/notes-mint.json)"
+            exit 1
+          fi
+          token="$(jq -r '.token' /tmp/notes-mint.json)"
+          if [ -z "$token" ] || [ "$token" = "null" ]; then
+            echo "::error::The changelog token mint returned no token"
+            exit 1
+          fi
+          echo "::add-mask::$token"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+
+      - name: Rewrite the shipped sections
+        env:
+          KILO_CHANGELOG_API_KEY: ${{ steps.mint.outputs.token }}
+        run: node scripts/kilo-app-changelog-rewrite-history.mjs
+
+      - name: Open or refresh the changelog PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- apps/mobile/CHANGELOG.md; then
+            echo "The shipped notes are already curated; nothing to land."
+            exit 0
+          fi
+          BRANCH=kilo-app-changelog-history
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git checkout -B "$BRANCH"
+          git add apps/mobile/CHANGELOG.md
+          git commit -m 'docs(kilo-app): curate the shipped changelog notes'
+          # The rewrite is idempotent, so the branch is replaced rather than
+          # appended: a re-dispatch after a partial failure lands the whole file
+          # once, not the failed versions twice.
+          git push --force origin "$BRANCH"
+          cat > "$RUNNER_TEMP/kilo-app-changelog-pr.md" <<EOF
+          ## What
+
+          Rewrites the shipped sections of apps/mobile/CHANGELOG.md as the release
+          notes the app renders: user outcomes under \`### New\`, policy changes under
+          \`### Changes\`, and the fix areas \`### Fixes\` names.
+
+          ## Why
+
+          The Release workflow now asks the gateway to rewrite a build's notes, so
+          history carries commit subjects while new builds carry outcomes. This is
+          the one-time rewrite of the versions that already shipped (run:
+          $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID).
+
+          ## What to do
+
+          1. Required checks show as pending: PRs opened with the default GITHUB_TOKEN
+             do not trigger workflow runs. Close and reopen this PR to start CI.
+          2. Review and merge. Only apps/mobile/CHANGELOG.md changed; the app renders
+             the same two blocks either way, and a version whose rewrite failed kept
+             its commit subjects.
+          EOF
+          # A fork PR can name its head branch kilo-app-changelog-history too; only
+          # a PR from this repository is the changelog PR.
+          PR=$(gh pr list --head "$BRANCH" --state open --json number,isCrossRepository \
+            --jq '[.[] | select(.isCrossRepository | not)][0].number // empty')
+          if [ -n "$PR" ]; then
+            gh pr edit "$PR" --body-file "$RUNNER_TEMP/kilo-app-changelog-pr.md"
+            echo "Refreshed the changelog PR #$PR"
+          else
+            gh pr create --base main \
+              --head "$BRANCH" \
+              --title "docs(kilo-app): curate the shipped changelog notes" \
+              --body-file "$RUNNER_TEMP/kilo-app-changelog-pr.md" \
+              --assignee iscekic
+          fi

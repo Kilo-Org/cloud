@@ -520,7 +520,7 @@ test('body writes the model rewrite when the gateway answers with valid notes', 
     assert.equal(gateway.requests.length, 1, 'one rewrite per version');
     const request = gateway.requests[0];
     assert.equal(request.authorization, 'Bearer test-key');
-    assert.equal(request.body.model, 'anthropic/claude-haiku-4.5');
+    assert.equal(request.body.model, '~deepseek/deepseek-flash-latest');
     const prompt = request.body.messages.map(message => message.content).join('\n');
     assert.match(prompt, /new \| chat \| feat\(chat\): keep the composer visible/);
     assert.match(prompt, /fix \| signIn \| fix\(auth\): link same-email sign-ins/);

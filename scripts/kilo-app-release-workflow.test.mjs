@@ -162,8 +162,33 @@ function validate(workflow) {
   );
   assert.equal(
     notes.env?.KILO_CHANGELOG_API_KEY,
-    '${{ secrets.KILO_CHANGELOG_API_KEY }}',
-    'the notes step must receive the release-notes gateway key'
+    '${{ steps.mint-notes.outputs.token }}',
+    'the notes step must receive the minted gateway token'
+  );
+
+  // The credential is minted from the shared secret the MCP catalog job
+  // already holds: a failed mint must leave the notes step on the deterministic
+  // block instead of failing the release, and the token must never be printed.
+  const mint = step(workflow, 'check-changes', 'mint-notes');
+  assert.ok(mint, 'check-changes: the notes token mint step (id mint-notes) is missing');
+  assert.equal(mint['continue-on-error'], true, 'a failed mint must not fail the release');
+  assert.equal(
+    mint.env?.MCP_CATALOG_TOKEN_SECRET,
+    '${{ secrets.MCP_CATALOG_TOKEN_SECRET }}',
+    'the mint must authenticate with the shared MCP catalog secret'
+  );
+  assert.match(
+    mint.run,
+    /\/api\/internal\/mcp-catalog\/token/,
+    'the mint must call the internal token endpoint'
+  );
+  assert.match(mint.run, /::add-mask::\$token/, 'the minted token must be masked');
+  assert.doesNotMatch(mint.run, /echo "\$token"/, 'the minted token must never be printed');
+  assert.match(mint.run, /token=\$token" >> "\$GITHUB_OUTPUT"/, 'the mint must publish the token');
+  const checkChangesSteps = workflow.jobs['check-changes'].steps;
+  assert.ok(
+    checkChangesSteps.indexOf(mint) < checkChangesSteps.indexOf(notes),
+    'the mint must run before the notes step'
   );
 
   const cap = step(workflow, 'check-changes', 'cap');
@@ -1787,3 +1812,39 @@ for (const [name, mutate] of Object.entries(toolchainMutations)) {
     );
   });
 }
+
+test('the changelog history workflow rewrites through the mint and opens a PR', () => {
+  const history = load(
+    readFileSync(
+      new URL('../.github/workflows/kilo-app-changelog-history.yml', import.meta.url),
+      'utf8'
+    )
+  );
+  assert.ok(history.on.workflow_dispatch !== undefined, 'the rewrite must be manual only');
+  assert.equal(history.on.push, undefined, 'a push must never rewrite the shipped notes');
+  assert.equal(history.permissions.contents, 'write');
+  assert.equal(history.permissions['pull-requests'], 'write');
+
+  const jobSteps = history.jobs.rewrite.steps;
+  const mint = jobSteps.find(item => item.id === 'mint');
+  assert.ok(mint, 'the history workflow must mint its own token');
+  assert.equal(mint['continue-on-error'], true);
+  assert.equal(mint.env.MCP_CATALOG_TOKEN_SECRET, '${{ secrets.MCP_CATALOG_TOKEN_SECRET }}');
+  assert.match(mint.run, /::add-mask::\$token/);
+
+  const rewrite = jobSteps.find(item =>
+    item.run?.includes('kilo-app-changelog-rewrite-history.mjs')
+  );
+  assert.ok(rewrite, 'the history workflow must run the rewrite script');
+  assert.equal(rewrite.env.KILO_CHANGELOG_API_KEY, '${{ steps.mint.outputs.token }}');
+
+  const open = jobSteps.find(item => item.run?.includes('gh pr create'));
+  assert.ok(open, 'the history workflow must open the changelog PR');
+  assert.equal(open.env.GH_TOKEN, '${{ secrets.GITHUB_TOKEN }}');
+  assert.match(open.run, /apps\/mobile\/CHANGELOG\.md/);
+  assert.ok(
+    jobSteps.indexOf(mint) < jobSteps.indexOf(rewrite) &&
+      jobSteps.indexOf(rewrite) < jobSteps.indexOf(open),
+    'the history workflow must mint, rewrite, then open the PR'
+  );
+});

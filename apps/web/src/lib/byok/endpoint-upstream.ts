@@ -25,8 +25,8 @@ const URL_VIOLATION_MESSAGES = {
 
 async function findUrlViolationMessage(url: string): Promise<string | null> {
   if (!isUpstreamUrlPolicyEnforced()) return null;
-  const violation = await findUpstreamUrlViolation(url);
-  return violation ? URL_VIOLATION_MESSAGES[violation] : null;
+  const decision = await findUpstreamUrlViolation(url);
+  return decision.allowed ? null : URL_VIOLATION_MESSAGES[decision.violation];
 }
 
 /** Why `baseUrl` may not be used for an endpoint. */

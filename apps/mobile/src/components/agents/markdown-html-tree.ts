@@ -216,11 +216,12 @@ export function parseMarkdownHtml(value: string, masks: readonly MaskRange[]): H
     } else if (!implied && HTML_BLOCK_TAGS.has(name) && stack.at(-1)?.name === 'p') {
       closeFrom(stack.length - 1, start);
     }
-    // Void and self-closing tags never grow the stack, so the bound does not
-    // apply to them; they take the element path and their early return below
-    // skips the push. Only stack-growing tags fold into the parent: `pushText`
-    // above already emitted the text before the tag, so the copy starts at
-    // `end`, not at the stale `textStart`.
+    // Every tag that reaches this branch — void, self-closing, stack-growing —
+    // folds into the parent the same way: no element is built and the stack
+    // never grows. `pushText` above already emitted whatever text preceded
+    // the tag while `textStart` still holds that run's start, so the branch
+    // resets `textStart` to `start` and a second push emits the tag's own
+    // characters as text.
     if (stack.length >= MAX_ELEMENT_DEPTH) {
       textStart = start;
       pushText(end);

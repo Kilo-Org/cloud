@@ -138,8 +138,10 @@ export function decodeEntities(source: string): string | null {
   });
 }
 
-// An element nested this deep keeps its HTML form: its parent holds the tags
-// as text content instead of the conversion walking the subtree recursively.
+// When the walk is already this deep, any further element node has no
+// lossless inline form: `inlineContent` refuses by returning null and the
+// caller falls back to the element's raw HTML slice, rather than the walk
+// recursing into the subtree.
 const MAX_INLINE_DEPTH = 128;
 
 // CommonMark's flanking rules: `**x**` is emphasis only when the opening run is

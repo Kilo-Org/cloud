@@ -1262,10 +1262,11 @@ describe('splitMarkdownHtmlIncremental', () => {
   });
 
   it('emits text before a depth-bound void tag once, not twice', () => {
-    // A void tag never grows the stack, so the depth bound does not apply to
-    // it: it takes the element path, and the text that precedes it must be
-    // emitted exactly once — a replayed copy before the tag's own characters
-    // (`xx<img>y`) is the stale-offset bug this pins down.
+    // An `<img>` at and past the depth bound folds into its parent as text,
+    // exactly like a stack-growing tag: the parent ends up holding the raw
+    // `x<img>y` run. The assertion that the preceding `x` was emitted exactly
+    // once — never replayed as a second copy before `<img>` — is the
+    // stale-offset bug this pins down.
     const deep = `${'<b>'.repeat(64)}x<img>y`;
     const converted = convertHtmlToMarkdown(deep);
     expect(converted.startsWith('*'.repeat(64))).toBe(true);
@@ -1274,8 +1275,10 @@ describe('splitMarkdownHtmlIncremental', () => {
   });
 
   it('emits text before a depth-bound self-closing tag once, not twice', () => {
-    // A self-closing tag also never grows the stack, so past the bound it
-    // keeps the element path and the preceding text must not replay.
+    // A self-closing `<br/>` past the bound folds into its parent as text
+    // like any other over-depth tag, so the raw markup survives in the
+    // converted value; only a replayed copy of the preceding `x` would
+    // distinguish a stale-offset bug from the intended fold.
     const deep = `${'<b>'.repeat(64)}x<br/>y`;
     const converted = convertHtmlToMarkdown(deep);
     expect(converted.startsWith('*'.repeat(64))).toBe(true);

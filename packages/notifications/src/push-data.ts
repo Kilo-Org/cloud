@@ -3,7 +3,10 @@ import { glanceableAgentsSnapshotSchema } from '@kilocode/app-shared/glanceable-
 import { homeWidgetDetailsSchema } from '@kilocode/app-shared/home-widget';
 
 import { NEEDS_INPUT_ATTENTION_KINDS } from './needs-input-actions';
-import { securityLifecyclePayloadShape } from './notification-events';
+import {
+  securityFindingPayloadShape,
+  securityLifecyclePayloadShape,
+} from './notification-events';
 import { sessionLiveActivityContentStateSchema } from './session-live-content';
 import { nonEmptyStringSchema } from './non-empty-string';
 import { refineSpendAlertScope, spendAlertScopeShape } from './spend-alert-scope';
@@ -67,8 +70,7 @@ export const pushDataSchema = z.discriminatedUnion('type', [
     .superRefine(refineSpendAlertScope),
   z.object({
     type: z.literal('security_finding'),
-    findingId: nonEmptyStringSchema,
-    scope: nonEmptyStringSchema,
+    ...securityFindingPayloadShape,
   }),
   // 1:1 map to SecurityAuditLogAction, shared with the internal dispatch
   // request schema: see SECURITY_LIFECYCLE_EVENTS in `notification-events.ts`

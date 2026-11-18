@@ -88,7 +88,7 @@ export const homeWidgetPresentationSchema = z.object({
   primaryCount: z.number().int().min(0),
   secondaryCounts: z
     .array(z.object({ kind: kindSchema, count: z.number().int().positive() }))
-    .max(3),
+    .max(GLANCEABLE_STATUS_KINDS.length - 1),
   checkedAt: z.string().nullable(),
   stale: z.boolean(),
   scheduledAt: z.string().nullable(),

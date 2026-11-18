@@ -84,11 +84,19 @@ describe('buildFocusFilterStringsFiles', () => {
   });
 
   it('keys the catalog by the literals the Swift intent declares', () => {
-    const title = swiftLiteral(/static var title: LocalizedStringResource = "([^"]*)"/);
+    const title = swiftLiteral(
+      /static let agentNotificationsTitle: LocalizedStringResource = "([^"]*)"/
+    );
     const description = swiftLiteral(/IntentDescription\(\s*"([^"]*)"/);
     const agentProgress = swiftLiteral(/@Parameter\(title: "([^"]*)"\)/);
-    // `DisplayRepresentation` repeats the title, so it resolves to the same entry.
-    expect(swiftLiteral(/DisplayRepresentation\(title: "([^"]*)"\)/)).toBe(title);
+    // Both the intent title and the display representation read the one
+    // constant, so they resolve to the same catalog entry.
+    expect(
+      swift.match(/static var title: LocalizedStringResource \{ agentNotificationsTitle \}/)
+    ).not.toBeNull();
+    expect(swift.match(/DisplayRepresentation\(title: Self\.agentNotificationsTitle\)/)).not.toBe(
+      null
+    );
     for (const tag of SUPPORTED_LANGUAGES) {
       expect(keysFor(tag), tag).toEqual([title, description, agentProgress]);
     }

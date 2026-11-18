@@ -40,3 +40,13 @@ export const securityLifecyclePayloadShape = {
   remediationId: nonEmptyStringSchema.optional(),
   prUrl: nonEmptyStringSchema.optional(),
 };
+
+// The payload one security-finding event carries, whatever envelope transports
+// it: the visible push in `push-data.ts` and the internal dispatch request in
+// `rpc-schemas.ts` differ only by their envelope (`type` vs `kind` plus the
+// recipient fields). Declared once so a field cannot be added to one path and
+// silently dropped by the other.
+export const securityFindingPayloadShape = {
+  findingId: nonEmptyStringSchema,
+  scope: nonEmptyStringSchema,
+};

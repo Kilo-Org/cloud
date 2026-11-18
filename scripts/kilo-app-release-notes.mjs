@@ -15,7 +15,9 @@
  * the call fails or its answer does not pass `validateCuratedNotes` - `body`
  * prints the deterministic block and warns on stderr. A release never fails
  * because its notes could not be rewritten.
- * `KILO_CHANGELOG_BASE_URL` and `KILO_CHANGELOG_TIMEOUT_MS` exist for tests.
+ * `KILO_CHANGELOG_BASE_URL` and `KILO_CHANGELOG_TIMEOUT_MS` exist for tests, as
+ * does `KILO_CHANGELOG_RETRY_BASE_MS`, which shortens the wait before a
+ * rate-limited call (HTTP 429/503) is retried up to three times.
  *
  * Usage:
  *   node scripts/kilo-app-release-notes.mjs body [--from <ref>] [--to <ref>]
@@ -167,6 +169,20 @@ const NOTES_MAX_TOKENS = 16_384;
 // model thinks before it answers, so the window covers a reasoning pass and the
 // answer, not one short generation.
 const NOTES_TIMEOUT_DEFAULT_MS = 60_000;
+
+// The gateway rate-limits a burst of rewrites (429, and 503 while it sheds
+// load). A version's notes are worth a few short waits: three more calls, each
+// after the gateway's own `Retry-After` (capped) or an exponential backoff, and
+// never more than the total budget below. Anything longer falls back to the
+// deterministic block as before.
+const NOTES_RETRY_LIMIT = 3;
+const NOTES_RETRY_BASE_DEFAULT_MS = 5_000;
+const NOTES_RETRY_AFTER_CAP_MS = 30_000;
+const NOTES_RETRY_BUDGET_MS = 60_000;
+
+// The history rewrite sends one call per shipped version; without a pause the
+// gateway sees the whole file at once and rate-limits it.
+const VERSION_PAUSE_DEFAULT_MS = 3_000;
 
 // The caps a validated answer has to meet, the same shape the deterministic
 // composer and the bundled screen write and read.
@@ -693,6 +709,60 @@ function parseAnswers(content) {
   return answers;
 }
 
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+/** The gateway statuses another call may succeed against. */
+function isRetryableStatus(status) {
+  return status === 429 || status === 503;
+}
+
+/** `Retry-After` as the milliseconds to wait, or null when it is absent or unreadable. */
+function parseRetryAfterMs(value) {
+  if (value === null || value === undefined || value.trim() === '') {
+    return null;
+  }
+  const seconds = Number(value);
+  if (Number.isFinite(seconds)) {
+    return Math.max(0, Math.round(seconds * 1000));
+  }
+  const at = Date.parse(value);
+  return Number.isNaN(at) ? null : Math.max(0, at - Date.now());
+}
+
+/**
+ * The wait before retry `attempt` (1-based): the gateway's own `Retry-After`
+ * when it sent one - seconds or an HTTP date, capped so one header cannot stall
+ * a release - else the base doubled per attempt, with a little jitter so
+ * parallel jobs do not retry in step.
+ */
+export function notesRetryDelayMs(attempt, retryAfter, baseMs = NOTES_RETRY_BASE_DEFAULT_MS) {
+  const fromHeader = parseRetryAfterMs(retryAfter);
+  if (fromHeader !== null) {
+    return Math.min(fromHeader, NOTES_RETRY_AFTER_CAP_MS);
+  }
+  const backoff = baseMs * 2 ** (attempt - 1);
+  return backoff + Math.floor(Math.random() * (backoff / 4 + 1));
+}
+
+/** The backoff base; `KILO_CHANGELOG_RETRY_BASE_MS` overrides it (~1 in tests), and a blank or invalid value means the default. */
+export function notesRetryBaseMs(configured = process.env.KILO_CHANGELOG_RETRY_BASE_MS) {
+  const text = typeof configured === 'string' ? configured.trim() : configured;
+  const value = Number(text);
+  if (text === undefined || text === '' || !Number.isFinite(value) || value < 0) {
+    return NOTES_RETRY_BASE_DEFAULT_MS;
+  }
+  return value;
+}
+
+/** How long the history rewrite waits between two versions; `KILO_CHANGELOG_VERSION_PAUSE_MS` overrides it. */
+export function versionPauseMs(configured = process.env.KILO_CHANGELOG_VERSION_PAUSE_MS) {
+  const value = Number(configured);
+  if (configured === undefined || configured === '' || !Number.isFinite(value) || value < 0) {
+    return VERSION_PAUSE_DEFAULT_MS;
+  }
+  return value;
+}
+
 /**
  * Ask the gateway to rewrite one version's candidates. `{ lines }` when the
  * answer passed every check, `{ error }` otherwise: the caller writes the
@@ -700,8 +770,9 @@ function parseAnswers(content) {
  *
  * `KILO_CHANGELOG_API_KEY` carries the credential, `KILO_CHANGELOG_BASE_URL`
  * points at another gateway (a local fake in tests), and
- * `KILO_CHANGELOG_TIMEOUT_MS` shortens the wait. The key is read here and sent
- * only as the bearer token; nothing logs it.
+ * `KILO_CHANGELOG_TIMEOUT_MS` shortens the wait.
+ * `KILO_CHANGELOG_RETRY_BASE_MS` shortens the backoff (tests set it to ~1).
+ * The key is read here and sent only as the bearer token; nothing logs it.
  */
 export async function requestCuratedNotes(candidates, options = {}) {
   const apiKey = options.apiKey ?? process.env.KILO_CHANGELOG_API_KEY;
@@ -718,37 +789,57 @@ export async function requestCuratedNotes(candidates, options = {}) {
     Number.isFinite(configuredTimeout) && configuredTimeout > 0
       ? configuredTimeout
       : NOTES_TIMEOUT_DEFAULT_MS;
+  const retryBaseMs = notesRetryBaseMs(options.retryBaseMs);
   const fetchImpl = options.fetchImpl ?? fetch;
 
+  let waited = 0;
   let response;
-  try {
-    response = await fetchImpl(`${baseUrl}${NOTES_PATH}`, {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${apiKey}`,
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: NOTES_MODEL,
-        // No temperature: the briefing's working call sends none, and a
-        // reasoning model's own sampling is not what fixes this answer's shape.
-        max_tokens: NOTES_MAX_TOKENS,
-        stream: false,
-        messages: [
-          { role: 'system', content: NOTES_PROMPT },
-          { role: 'user', content: notesPrompt(candidates) },
-        ],
-      }),
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-  } catch (error) {
-    if (error && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
-      return { error: `the notes model did not answer within ${timeoutMs}ms` };
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      response = await fetchImpl(`${baseUrl}${NOTES_PATH}`, {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${apiKey}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: NOTES_MODEL,
+          // No temperature: the briefing's working call sends none, and a
+          // reasoning model's own sampling is not what fixes this answer's shape.
+          max_tokens: NOTES_MAX_TOKENS,
+          stream: false,
+          messages: [
+            { role: 'system', content: NOTES_PROMPT },
+            { role: 'user', content: notesPrompt(candidates) },
+          ],
+        }),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (error) {
+      if (error && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
+        return { error: `the notes model did not answer within ${timeoutMs}ms` };
+      }
+      return { error: `the notes model could not be reached (${reasonOf(error)})` };
     }
-    return { error: `the notes model could not be reached (${reasonOf(error)})` };
-  }
-  if (!response.ok) {
-    return { error: `the notes model answered HTTP ${response.status}` };
+    if (response.ok) {
+      break;
+    }
+    const status = response.status;
+    const remaining = NOTES_RETRY_BUDGET_MS - waited;
+    if (!isRetryableStatus(status) || attempt > NOTES_RETRY_LIMIT || remaining <= 0) {
+      return { error: `the notes model answered HTTP ${status}` };
+    }
+    const wait = Math.min(
+      notesRetryDelayMs(attempt, response.headers.get('retry-after'), retryBaseMs),
+      remaining
+    );
+    waited += wait;
+    console.error(
+      `changelog: the notes model answered HTTP ${status}; retrying in ${wait}ms (retry ${attempt} of ${NOTES_RETRY_LIMIT})`
+    );
+    // Free the rate-limited response's socket before the next call.
+    await response.body?.cancel().catch(() => {});
+    await sleep(wait);
   }
   let payload;
   try {

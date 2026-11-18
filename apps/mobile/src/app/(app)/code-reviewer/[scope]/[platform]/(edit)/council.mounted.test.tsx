@@ -290,9 +290,9 @@ describe('council route gate', () => {
     expect(renderedTexts(renderer)).toContain(
       'Council review is not available for Bitbucket repositories.'
     );
-    // The refusal is the shared plan gate: a title naming the tier and the
-    // sentence saying what this organization cannot use.
-    expect(renderedTexts(renderer)).toContain('Enterprise feature');
+    // The refusal is the shared empty state: a title saying what is
+    // unavailable above the sentence naming the platform.
+    expect(renderedTexts(renderer)).toContain('Council review is unavailable');
     expect(renderer.root.findAll(node => String(node.type) === 'PreferenceRow')).toHaveLength(0);
     // The config read is what the editor needs; a refused platform never asks.
     expect(state.configEnabled).toEqual([false]);

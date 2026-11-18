@@ -1891,7 +1891,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
 
     it.each([
       {
-        name: 'cost and tokens exceed retry thresholds',
+        name: 'cost exceeds the retry threshold',
         usage: {
           model: 'anthropic/claude-sonnet-4.6',
           totalTokensIn: 100_001,
@@ -1899,11 +1899,11 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           tokensIn: 100_001,
           tokensOut: 0,
           cachedTokens: 0,
-          totalCostMusd: 200_000,
+          totalCostMusd: 200_001,
         },
       },
       {
-        name: 'cost and tokens are exactly at retry thresholds',
+        name: 'cost is exactly at the retry threshold',
         usage: {
           model: 'anthropic/claude-sonnet-4.6',
           totalTokensIn: 60_000,
@@ -1912,18 +1912,6 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           tokensOut: 40_000,
           cachedTokens: 0,
           totalCostMusd: 200_000,
-        },
-      },
-      {
-        name: 'cost is below the threshold but tokens exceed it',
-        usage: {
-          model: 'anthropic/claude-sonnet-4.6',
-          totalTokensIn: 100_001,
-          totalTokensOut: 0,
-          tokensIn: 100_001,
-          tokensOut: 0,
-          cachedTokens: 0,
-          totalCostMusd: 199_999,
         },
       },
       {
@@ -2315,6 +2303,30 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           tokensOut: 0,
           cachedTokens: 0,
           totalCostMusd: 199_999,
+        },
+      },
+      {
+        name: 'cost is below the threshold but tokens exceed it',
+        usage: {
+          model: 'anthropic/claude-sonnet-4.6',
+          totalTokensIn: 100_001,
+          totalTokensOut: 0,
+          tokensIn: 100_001,
+          tokensOut: 0,
+          cachedTokens: 0,
+          totalCostMusd: 199_999,
+        },
+      },
+      {
+        name: 'cached tokens dominate and cost is below the cap',
+        usage: {
+          model: 'anthropic/claude-sonnet-4.6',
+          totalTokensIn: 1_198_763,
+          totalTokensOut: 50_000,
+          tokensIn: 32_166,
+          tokensOut: 50_000,
+          cachedTokens: 1_166_597,
+          totalCostMusd: 55_000,
         },
       },
     ])('allows infra retry when failed session $name', async ({ usage }) => {

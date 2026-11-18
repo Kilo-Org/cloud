@@ -247,7 +247,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
         </Button>
         {/* The reserved status slot renders below the actions: its reserve
             must not sit between the disclosure and the buttons it qualifies
-            (an empty spacer with two gap edges put 44dp between the
+            (an empty spacer with two gap edges sat between the
             disclosure and the Accept button, floating the line away from the
             block it qualifies). The slot keeps its one-line height whenever
             it is mounted (the same reserve as the credits expiry line and
@@ -258,7 +258,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
             gap above the row and the footer's bottom padding below it to
             land inside the footer — a negative margin here would put the
             Retry's upper hit band under the secondary button's edge and its
-            lower band past the footer's bottom. The 17.5dp band below the
+            lower band past the footer's bottom. The band below the
             secondary button is the reserve; the footer's height changes by
             nothing across the default phases because the slot never mounts
             or unmounts. */}

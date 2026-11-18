@@ -1519,7 +1519,9 @@
       "offDescription": "Analitiką gali įjungti organizacijos atsiskaitymo vaidmenys – savininkai, administratoriai ir atsiskaitymo tvarkytojai – organizacijos nustatymuose žiniatinklyje, kad būtų fiksuojamos užbaigtos peržiūros.",
       "couldNotLoad": "Nepavyko įkelti analitikos",
       "trackedReviewsCaption": "Užbaigtos peržiūros, kurios baigėsi šiame laikotarpyje su įjungta analitika. Vykstančios ir nepavykusios peržiūros niekada neskaičiuojamos.",
-      "trackedReviewsUncounted": "{{count}} iš {{total}} organizacijos užbaigtų peržiūrų neskaičiuojamos: jų rezultatas nebuvo užfiksuotas."
+      "trackedReviewsUncounted": "{{displayCount}} iš {{displayTotal}} organizacijos užbaigtų peržiūrų neskaičiuojamos: jų rezultatas nebuvo užfiksuotas.",
+      "trackedReviewsUncounted_one": "{{displayCount}} iš {{displayTotal}} organizacijos užbaigtų peržiūrų neskaičiuojama: jos rezultatas nebuvo užfiksuotas.",
+      "trackedReviewsUncounted_other": "{{displayCount}} iš {{displayTotal}} organizacijos užbaigtų peržiūrų neskaičiuojamos: jų rezultatas nebuvo užfiksuotas."
     },
     "council": {
       "title": "Tarybos peržiūra",

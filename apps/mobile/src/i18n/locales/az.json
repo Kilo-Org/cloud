@@ -1471,7 +1471,9 @@
       "offDescription": "Təşkilatın ödəniş rolları analitikanı vebdəki tənzimləmələrdə aktivləşdirib tamamlanmış yoxlamaları qeydə ala bilər.",
       "couldNotLoad": "Analitikanı yükləmək mümkün olmadı",
       "trackedReviewsCaption": "Bu dövrdə analitika aktiv olduğu halda tamamlanmış yoxlamalar. Davam edən və uğursuz yoxlamalar heç vaxt hesaba alınmır.",
-      "trackedReviewsUncounted": "Təşkilatın {{total}} tamamlanmış yoxlamasından {{count}} ədədi hesaba alınmır: onların nəticəsi qeyd olunmayıb."
+      "trackedReviewsUncounted": "Təşkilatın {{displayTotal}} tamamlanmış yoxlamasından {{displayCount}} ədədi hesaba alınmır: onların nəticəsi qeyd olunmayıb.",
+      "trackedReviewsUncounted_one": "Təşkilatın {{displayTotal}} tamamlanmış yoxlamasından {{displayCount}} ədədi hesaba alınmır: onun nəticəsi qeyd olunmayıb.",
+      "trackedReviewsUncounted_other": "Təşkilatın {{displayTotal}} tamamlanmış yoxlamasından {{displayCount}} ədədi hesaba alınmır: onların nəticəsi qeyd olunmayıb."
     },
     "council": {
       "title": "Şura yoxlaması",

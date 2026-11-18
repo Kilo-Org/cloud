@@ -1471,7 +1471,9 @@
       "offDescription": "Organisasjonens faktureringsroller (eiere, administratorer og faktureringsansvarlige) kan slå på statistikken i organisasjonens innstillinger på nettet for å registrere fullførte gjennomganger.",
       "couldNotLoad": "Kunne ikke laste statistikken",
       "trackedReviewsCaption": "Fullførte gjennomganger som ble avsluttet i denne perioden med statistikken slått på. Gjennomganger som pågår eller feiler, telles aldri med.",
-      "trackedReviewsUncounted": "{{count}} av de {{total}} fullførte gjennomgangene organisasjonen har, telles ikke med: resultatet deres ble ikke registrert."
+      "trackedReviewsUncounted": "{{displayCount}} av de {{displayTotal}} fullførte gjennomgangene organisasjonen har, telles ikke med: resultatet deres ble ikke registrert.",
+      "trackedReviewsUncounted_one": "{{displayCount}} av de {{displayTotal}} fullførte gjennomgangene organisasjonen har, telles ikke med: resultatet dens ble ikke registrert.",
+      "trackedReviewsUncounted_other": "{{displayCount}} av de {{displayTotal}} fullførte gjennomgangene organisasjonen har, telles ikke med: resultatet deres ble ikke registrert."
     },
     "council": {
       "title": "Panelvurdering",

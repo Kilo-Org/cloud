@@ -929,7 +929,9 @@
       "offDescription": "תפקידי החיוב בארגון יכולים להפעיל את האנליטיקה בהגדרות הארגון באתר כדי לתעד סקירות שהושלמו.",
       "couldNotLoad": "לא ניתן לטעון את האנליטיקה",
       "trackedReviewsCaption": "סקירות שהושלמו והסתיימו בתקופה זו כשהאנליטיקה מופעלת. סקירות שמתנהלות או שנכשלו לעולם אינן נספרות.",
-      "trackedReviewsUncounted": "{{count}} מתוך {{total}} הסקירות שהסתיימו בארגון אינן נספרות: התוצאה שלהן לא נשמרה."
+      "trackedReviewsUncounted": "{{displayCount}} מתוך {{displayTotal}} הסקירות שהסתיימו בארגון אינן נספרות: התוצאה שלהן לא נשמרה.",
+      "trackedReviewsUncounted_one": "{{displayCount}} מתוך {{displayTotal}} הסקירות שהסתיימו בארגון אינה נספרת: התוצאה שלה לא נשמרה.",
+      "trackedReviewsUncounted_other": "{{displayCount}} מתוך {{displayTotal}} הסקירות שהסתיימו בארגון אינן נספרות: התוצאה שלהן לא נשמרה."
     },
     "council": {
       "title": "סקירת מועצה",

@@ -896,7 +896,9 @@
       "offDescription": "Les rôles de facturation de l'organisation peuvent activer les statistiques dans les paramètres sur le web pour enregistrer les revues terminées.",
       "couldNotLoad": "Impossible de charger les statistiques",
       "trackedReviewsCaption": "Revues terminées qui se sont achevées au cours de cette période avec les statistiques activées. Les revues en cours et en échec ne sont jamais comptées.",
-      "trackedReviewsUncounted": "{{count}} des {{total}} revues terminées de l'organisation ne sont pas comptées : leur résultat n'a pas été capturé."
+      "trackedReviewsUncounted": "{{displayCount}} des {{displayTotal}} revues terminées de l'organisation ne sont pas comptées : leur résultat n'a pas été capturé.",
+      "trackedReviewsUncounted_one": "{{displayCount}} des {{displayTotal}} revues terminées de l'organisation n'est pas comptée : son résultat n'a pas été capturé.",
+      "trackedReviewsUncounted_other": "{{displayCount}} des {{displayTotal}} revues terminées de l'organisation ne sont pas comptées : leur résultat n'a pas été capturé."
     },
     "council": {
       "title": "Revue en conseil",

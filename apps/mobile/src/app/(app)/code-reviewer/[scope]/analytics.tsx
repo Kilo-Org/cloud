@@ -221,14 +221,21 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
           <Text variant="muted" className="text-xs">
             {t('codeReviewer.analytics.trackedReviewsCaption')}
           </Text>
-          {uncapturedReviews > 0 ? (
-            <Text variant="muted" className="text-xs">
-              {t('codeReviewer.analytics.trackedReviewsUncounted', {
+          {/* The space stays reserved either way: the line always renders so a
+          period or platform change never moves the list below it. */}
+          <Text variant="muted" className="text-xs">
+            {t(
+              uncapturedReviews === 1
+                ? 'codeReviewer.analytics.trackedReviewsUncounted_one'
+                : 'codeReviewer.analytics.trackedReviewsUncounted_other',
+              {
                 count: uncapturedReviews,
+                displayCount: number(uncapturedReviews),
                 total: coverage.enrolledCompletedReviews,
-              })}
-            </Text>
-          ) : null}
+                displayTotal: number(coverage.enrolledCompletedReviews),
+              }
+            )}
+          </Text>
         </View>
 
         {repositories.length === 0 ? (

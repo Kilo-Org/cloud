@@ -1471,7 +1471,9 @@
       "offDescription": "Organisasie-faktureringsrolle kan ontleding in die organisasie-instellings op die web aanskakel om voltooide hersienings aan te teken.",
       "couldNotLoad": "Kon nie ontleding laai nie",
       "trackedReviewsCaption": "Voltooide hersienings wat in hierdie periode afgehandel is terwyl ontleding geaktiveer was. Lopende en mislukte hersienings word nooit getel nie.",
-      "trackedReviewsUncounted": "{{count}} van die {{total}} voltooide hersienings wat die organisasie het, word nie getel nie: hul uitslag is nie vasgelê nie."
+      "trackedReviewsUncounted": "{{displayCount}} van die {{displayTotal}} voltooide hersienings wat die organisasie het, word nie getel nie: hul uitslag is nie vasgelê nie.",
+      "trackedReviewsUncounted_one": "{{displayCount}} van die {{displayTotal}} voltooide hersiening wat die organisasie het, word nie getel nie: sy uitslag is nie vasgelê nie.",
+      "trackedReviewsUncounted_other": "{{displayCount}} van die {{displayTotal}} voltooide hersienings wat die organisasie het, word nie getel nie: hul uitslag is nie vasgelê nie."
     },
     "council": {
       "title": "Raadhersiening",

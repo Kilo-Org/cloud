@@ -1471,7 +1471,9 @@
       "offDescription": "Taayitoonni kaffaltii dhaabbataa — abbootii, adminoota fi mannijaroota kaffaltii — istaatiksii banuu danda'u; kunis web irratti, qindeessa dhaabbataa keessatti, akka sakatto'awwan xumuraman galmeessaniitan.",
       "couldNotLoad": "Istaatiksii fe'uun hin danda'amne",
       "trackedReviewsCaption": "Sakatto'awwan xumuraman yeroo kana keessatti istaatiksii banan xumuraman. Sakatto'awwan itti fufaanii fi sakatto'awwan hanqatan hin lakkaa'amanII.,",
-      "trackedReviewsUncounted": "Sakatto'awwan xumuraman dhaabbataan qabu {{total}} keessaa {{count}} hin lakkaa'aman; bu'aan isaa qabamee hin boolla."
+      "trackedReviewsUncounted": "Sakatto'awwan xumuraman dhaabbataan qabu {{displayTotal}} keessaa {{displayCount}} hin lakkaa'aman; bu'aan isaa qabamee hin boolla.",
+      "trackedReviewsUncounted_one": "Sakatto'aan xumurame dhaabbataan qabu {{displayTotal}} keessaa {{displayCount}} hin lakkaa'amne; bu'aan isaa qabamee hin boolla.",
+      "trackedReviewsUncounted_other": "Sakatto'awwan xumuraman dhaabbataan qabu {{displayTotal}} keessaa {{displayCount}} hin lakkaa'aman; bu'aan isaa qabamee hin boolla."
     },
     "council": {
       "title": "Sakatta'a gumii",

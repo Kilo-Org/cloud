@@ -410,7 +410,7 @@ describe('CodeReviewerAnalytics empty state', () => {
       'Completed reviews that finished in this period with analytics turned on. Running and failed reviews are never counted.'
     );
     expect(captions).toContain(
-      '1 of the 13 finished reviews the organization has are not counted: their result was not captured.'
+      '1 of the 13 finished reviews the organization has is not counted: its result was not captured.'
     );
 
     act(() => {
@@ -421,7 +421,11 @@ describe('CodeReviewerAnalytics empty state', () => {
     // counts and nothing implies a problem.
     queries.dashboard.data = {
       ...dashboard,
-      coverage: { ...dashboard.coverage, missing: 0 },
+      coverage: {
+        ...dashboard.coverage,
+        captured: dashboard.coverage.enrolledCompletedReviews,
+        missing: 0,
+      },
     };
     const completeRenderer = mountScreen();
 
@@ -431,9 +435,9 @@ describe('CodeReviewerAnalytics empty state', () => {
     expect(completeCaptions).toContain(
       'Completed reviews that finished in this period with analytics turned on. Running and failed reviews are never counted.'
     );
-    expect(
-      completeCaptions.some(child => typeof child === 'string' && child.includes('not counted'))
-    ).toBe(false);
+    expect(completeCaptions).toContain(
+      '0 of the 13 finished reviews the organization has are not counted: their results were not captured.'
+    );
 
     act(() => {
       completeRenderer.unmount();

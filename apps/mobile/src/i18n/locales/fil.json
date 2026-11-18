@@ -1471,7 +1471,9 @@
       "offDescription": "Maaaring paganahin ng mga role sa pagbabayad ng organisasyon ang analitika sa mga setting ng organisasyon sa web para itala ang mga natapos na pagsusuri.",
       "couldNotLoad": "Hindi ma-load ang analitika",
       "trackedReviewsCaption": "Mga natapos na pagsusuri sa panahong ito habang naka-on ang analitika. Hindi kailanman binibilang ang mga pagsusuring tumatakbo o nabigo.",
-      "trackedReviewsUncounted": "Hindi binibilang ang {{count}} sa {{total}} natapos na pagsusuri ng organisasyon: hindi nakalap ang resulta ng mga ito."
+      "trackedReviewsUncounted": "Hindi binibilang ang {{displayCount}} sa {{displayTotal}} natapos na pagsusuri ng organisasyon: hindi nakalap ang resulta ng mga ito.",
+      "trackedReviewsUncounted_one": "Hindi binibilang ang {{displayCount}} sa {{displayTotal}} natapos na pagsusuri ng organisasyon: hindi nakalap ang resulta nito.",
+      "trackedReviewsUncounted_other": "Hindi binibilang ang {{displayCount}} sa {{displayTotal}} natapos na pagsusuri ng organisasyon: hindi nakalap ang resulta ng mga ito."
     },
     "council": {
       "title": "Pagsusuri ng konseho",

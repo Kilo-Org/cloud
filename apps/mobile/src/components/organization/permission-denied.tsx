@@ -1,11 +1,8 @@
 import { useRouter } from 'expo-router';
-import { Lock } from '@/components/ui/icons';
+import { ArrowLeft, Lock } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
 
-import { EmptyState } from '@/components/empty-state';
-import { Button } from '@/components/ui/button';
-import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { EmptyState, StateAction } from '@/components/empty-state';
 
 type PermissionDeniedProps = Readonly<{
   description: string;
@@ -27,15 +24,13 @@ export function PermissionDenied({ description }: PermissionDeniedProps) {
       title={t('common.accessDenied')}
       description={description}
       action={
-        <Button
-          variant="outline"
-          className={STATE_ACTION_CLASS}
+        <StateAction
+          label={t('common.back')}
+          icon={ArrowLeft}
           onPress={() => {
             router.back();
           }}
-        >
-          <Text>{t('common.back')}</Text>
-        </Button>
+        />
       }
     />
   );

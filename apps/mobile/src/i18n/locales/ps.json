@@ -1476,8 +1476,12 @@
       "empty": "تر اوسه د احصایو لرونکې بیاکتنې نشته",
       "emptyDescription": "احصایې بشپړې شوې بیاکتنې ثبتوي، تر هغې چې د سازمان لپاره فعالې وي.",
       "offTitle": "د {{platform}} احصایې غیرفعالې دي",
-      "offDescription": "په ویب کې د سازمان په ترتیباتو کې احصایې فعالې کړئ، څو بشپړې شوې بیاکتنې ثبت شي.",
-      "couldNotLoad": "احصایې بار نه شوې"
+      "offDescription": "د سازمان د تادیې اړوندې ونډې (مالکان، ادمینان او د تادیې مدیران) کولای شي احصایې په ویب کې د سازمان د تنظیماتو له لارې فعالې کړي، ترڅو بشپړې شوې بیاکتنې ثبت شي.",
+      "couldNotLoad": "احصایې بار نه شوې",
+      "trackedReviewsCaption": "بشپړې شوې بیاکتنې چې احصایې پرې فعالې وې او په دې موده کې پای ته ورسېدلې. جاري او ناکامې شوې بیاکتنې هېڅکله نه شمېرل کېږي.",
+      "trackedReviewsUncounted": "نه شمېرل کېږي: {{displayCount}} له {{displayTotal}} بشپړو شوو بیاکتنو چې سازمان یې لري، د دوی پایله ثبت نشوه.",
+      "trackedReviewsUncounted_one": "نه شمېرل کېږي: {{displayCount}} له {{displayTotal}} بشپړو شوو بیاکتنو چې سازمان یې لري، د دوی پایله ثبت نشوه.",
+      "trackedReviewsUncounted_other": "نه شمېرل کېږي: {{displayCount}} له {{displayTotal}} بشپړو شوو بیاکتنو چې سازمان یې لري، د دوی پایله ثبت نشوه."
     },
     "council": {
       "title": "د شورا بیاکتنه",
@@ -3133,7 +3137,6 @@
     "completingPurchase": "پېرود بشپړېږي",
     "subscriptionLoading": "د Kilo Pass ګډون بارېږي",
     "retryHint": "د Kilo Pass د حالت ترلاسه کولو بیا هڅه کوي.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "په {{date}} پای ته رسېدلی",
     "notAvailableInApp": "Kilo Pass په اپ کې شتون نلري.",
     "statusActive": "فعال",

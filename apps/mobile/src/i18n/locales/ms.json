@@ -1476,8 +1476,12 @@
       "empty": "Belum ada semakan dengan analitik",
       "emptyDescription": "Analitik merekodkan semakan yang selesai selagi ciri ini didayakan untuk organisasi.",
       "offTitle": "Analitik dimatikan untuk {{platform}}",
-      "offDescription": "Dayakannya dalam tetapan organisasi di web untuk merekodkan semakan yang selesai.",
-      "couldNotLoad": "Tidak dapat memuatkan analitik"
+      "offDescription": "Pemilik, pentadbir dan pengurus pengebilan organisasi boleh menghidupkan analitik dalam tetapan organisasi di web untuk merekodkan semakan yang selesai.",
+      "couldNotLoad": "Tidak dapat memuatkan analitik",
+      "trackedReviewsCaption": "Semakan yang selesai dalam tempoh ini semasa analitik dihidupkan. Semakan yang sedang berjalan dan yang gagal tidak pernah dikira.",
+      "trackedReviewsUncounted": "Tidak dikira: {{displayCount}} daripada {{displayTotal}} semakan yang selesai milik organisasi, hasilnya tidak direkodkan.",
+      "trackedReviewsUncounted_one": "Tidak dikira: {{displayCount}} daripada {{displayTotal}} semakan yang selesai milik organisasi, hasilnya tidak direkodkan.",
+      "trackedReviewsUncounted_other": "Tidak dikira: {{displayCount}} daripada {{displayTotal}} semakan yang selesai milik organisasi, hasilnya tidak direkodkan."
     },
     "council": {
       "title": "Semakan panel",
@@ -3133,7 +3137,6 @@
     "completingPurchase": "Menyelesaikan pembelian",
     "subscriptionLoading": "Sedang memuatkan langganan Kilo Pass",
     "retryHint": "Mencuba semula untuk mendapatkan status Kilo Pass.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Berakhir pada {{date}}",
     "notAvailableInApp": "Kilo Pass tidak tersedia dalam aplikasi.",
     "statusActive": "Aktif",

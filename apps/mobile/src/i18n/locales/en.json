@@ -1535,6 +1535,10 @@
     "analytics": {
       "title": "Analytics",
       "trackedReviews": "Reviews tracked",
+      "trackedReviewsCaption": "Completed reviews that finished in this period with analytics turned on. Running and failed reviews are never counted.",
+      "trackedReviewsUncounted": "Not counted: {{displayCount}} of {{displayTotal}} finished reviews without a captured result.",
+      "trackedReviewsUncounted_one": "Not counted: {{displayCount}} of {{displayTotal}} finished reviews without a captured result.",
+      "trackedReviewsUncounted_other": "Not counted: {{displayCount}} of {{displayTotal}} finished reviews without a captured result.",
       "findingsRaised": "Findings raised",
       "highImpactChanges": "High-impact changes",
       "impactPoints": "Impact points",
@@ -1542,7 +1546,7 @@
       "empty": "No reviews with analytics yet",
       "emptyDescription": "Analytics records completed reviews while it is enabled for the organization.",
       "offTitle": "Analytics is off for {{platform}}",
-      "offDescription": "Turn it on in the organization's settings on the web to record completed reviews.",
+      "offDescription": "Organization billing roles can turn analytics on in the settings on the web to record completed reviews.",
       "couldNotLoad": "Could not load analytics"
     },
     "council": {
@@ -3212,7 +3216,6 @@
     "completingPurchase": "Completing purchase",
     "subscriptionLoading": "Kilo Pass subscription loading",
     "retryHint": "Retries Kilo Pass state.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Ended {{date}}",
     "notAvailableInApp": "Kilo Pass isn't available in the app.",
     "statusActive": "Active",

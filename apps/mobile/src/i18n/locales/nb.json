@@ -1476,8 +1476,12 @@
       "empty": "Ingen gjennomganger med statistikk ennå",
       "emptyDescription": "Statistikken registrerer fullførte gjennomganger så lenge den er aktivert for organisasjonen.",
       "offTitle": "Statistikken er slått av for {{platform}}",
-      "offDescription": "Aktiver den i organisasjonsinnstillingene på nettet for å registrere fullførte gjennomganger.",
-      "couldNotLoad": "Kunne ikke laste statistikken"
+      "offDescription": "Organisasjonens faktureringsroller (eiere, administratorer og faktureringsansvarlige) kan slå på statistikken i organisasjonens innstillinger på nettet for å registrere fullførte gjennomganger.",
+      "couldNotLoad": "Kunne ikke laste statistikken",
+      "trackedReviewsCaption": "Fullførte gjennomganger som ble avsluttet i denne perioden med statistikken slått på. Gjennomganger som pågår eller feiler, telles aldri med.",
+      "trackedReviewsUncounted": "Ikke talt med: {{displayCount}} av de {{displayTotal}} fullførte gjennomgangene organisasjonen har, uten registrert resultat.",
+      "trackedReviewsUncounted_one": "Ikke talt med: {{displayCount}} av de {{displayTotal}} fullførte gjennomgangene organisasjonen har, uten registrert resultat.",
+      "trackedReviewsUncounted_other": "Ikke talt med: {{displayCount}} av de {{displayTotal}} fullførte gjennomgangene organisasjonen har, uten registrert resultat."
     },
     "council": {
       "title": "Panelvurdering",
@@ -3133,7 +3137,6 @@
     "completingPurchase": "Fullfører kjøp",
     "subscriptionLoading": "Laster inn Kilo Pass-abonnementet",
     "retryHint": "Prøver å hente statusen for Kilo Pass på nytt.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Avsluttet {{date}}",
     "notAvailableInApp": "Kilo Pass er ikke tilgjengelig i appen.",
     "statusActive": "Aktiv",

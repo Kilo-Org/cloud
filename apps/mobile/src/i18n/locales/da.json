@@ -1476,8 +1476,12 @@
       "empty": "Ingen gennemgange med analysedata endnu",
       "emptyDescription": "Analyse registrerer afsluttede gennemgange, mens funktionen er slået til for organisationen.",
       "offTitle": "Analyse er slået fra for {{platform}}",
-      "offDescription": "Slå den til i organisationsindstillingerne på nettet for at registrere afsluttede gennemgange.",
-      "couldNotLoad": "Kunne ikke indlæse analysedata"
+      "offDescription": "Organisationens faktureringsroller kan slå analysen til i organisationsindstillingerne på nettet for at registrere afsluttede gennemgange.",
+      "couldNotLoad": "Kunne ikke indlæse analysedata",
+      "trackedReviewsCaption": "Afsluttede gennemgange, der blev færdige i denne periode, mens analysen var slået til. Igangværende og mislykkede gennemgange tælles aldrig med.",
+      "trackedReviewsUncounted": "Ikke talt med: {{displayCount}} af organisationens {{displayTotal}} afsluttede gennemgange med uregistreret resultat.",
+      "trackedReviewsUncounted_one": "Ikke talt med: {{displayCount}} af organisationens {{displayTotal}} afsluttede gennemgange med uregistreret resultat.",
+      "trackedReviewsUncounted_other": "Ikke talt med: {{displayCount}} af organisationens {{displayTotal}} afsluttede gennemgange med uregistreret resultat."
     },
     "council": {
       "title": "Rådsgennemgang",
@@ -3133,7 +3137,6 @@
     "completingPurchase": "Fuldfører køb",
     "subscriptionLoading": "Indlæser Kilo Pass-abonnement",
     "retryHint": "Prøver at indlæse status for Kilo Pass igen.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Afsluttet {{date}}",
     "notAvailableInApp": "Kilo Pass er ikke tilgængeligt i appen.",
     "statusActive": "Aktiv",

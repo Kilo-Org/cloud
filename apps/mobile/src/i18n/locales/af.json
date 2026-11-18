@@ -1476,8 +1476,12 @@
       "empty": "Nog geen hersienings met ontleding nie",
       "emptyDescription": "Ontleding teken voltooide hersienings aan terwyl dit vir die organisasie geaktiveer is.",
       "offTitle": "Ontleding is af vir {{platform}}",
-      "offDescription": "Skakel dit aan in die organisasie-instellings op die web om voltooide hersienings aan te teken.",
-      "couldNotLoad": "Kon nie ontleding laai nie"
+      "offDescription": "Organisasie-faktureringsrolle kan ontleding in die organisasie-instellings op die web aanskakel om voltooide hersienings aan te teken.",
+      "couldNotLoad": "Kon nie ontleding laai nie",
+      "trackedReviewsCaption": "Voltooide hersienings wat in hierdie periode afgehandel is terwyl ontleding geaktiveer was. Lopende en mislukte hersienings word nooit getel nie.",
+      "trackedReviewsUncounted": "Nie getel nie: {{displayCount}} van die {{displayTotal}} voltooide hersienings het geen vasgelê uitslag nie.",
+      "trackedReviewsUncounted_one": "Nie getel nie: {{displayCount}} van die {{displayTotal}} voltooide hersienings het geen vasgelê uitslag nie.",
+      "trackedReviewsUncounted_other": "Nie getel nie: {{displayCount}} van die {{displayTotal}} voltooide hersienings het geen vasgelê uitslag nie."
     },
     "council": {
       "title": "Raadhersiening",
@@ -3133,7 +3137,6 @@
     "completingPurchase": "Aankoop word voltooi",
     "subscriptionLoading": "Die Kilo Pass-intekening word gelaai",
     "retryHint": "Probeer die Kilo Pass-status weer laai.",
-    "cardAccessibility": "{{title}}: {{description}}. {{actionLabel}}",
     "endedOn": "Geëindig op {{date}}",
     "notAvailableInApp": "Kilo Pass is nie in die app beskikbaar nie.",
     "statusActive": "Aktief",

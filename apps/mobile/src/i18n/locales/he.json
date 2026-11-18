@@ -934,8 +934,13 @@
       "empty": "עדיין אין סקירות עם נתוני אנליטיקה",
       "emptyDescription": "האנליטיקה מתעדת סקירות שהושלמו כל עוד היא מופעלת עבור הארגון.",
       "offTitle": "האנליטיקה כבויה עבור {{platform}}",
-      "offDescription": "הפעל אותה בהגדרות הארגון באתר כדי לתעד סקירות שהושלמו.",
-      "couldNotLoad": "לא ניתן לטעון את האנליטיקה"
+      "offDescription": "תפקידי החיוב בארגון יכולים להפעיל את האנליטיקה בהגדרות הארגון באתר כדי לתעד סקירות שהושלמו.",
+      "couldNotLoad": "לא ניתן לטעון את האנליטיקה",
+      "trackedReviewsCaption": "סקירות שהושלמו והסתיימו בתקופה זו כשהאנליטיקה מופעלת. סקירות שמתנהלות או שנכשלו לעולם אינן נספרות.",
+      "trackedReviewsUncounted": "לא נספרות: {{displayCount}} מתוך {{displayTotal}} הסקירות שהסתיימו בארגון שלהן התוצאה לא נשמרה.",
+      "trackedReviewsUncounted_one": "לא נספרות: {{displayCount}} מתוך {{displayTotal}} הסקירות שהסתיימו בארגון שלהן התוצאה לא נשמרה.",
+      "trackedReviewsUncounted_other": "לא נספרות: {{displayCount}} מתוך {{displayTotal}} הסקירות שהסתיימו בארגון שלהן התוצאה לא נשמרה.",
+      "trackedReviewsUncounted_two": "לא נספרות: {{displayCount}} מתוך {{displayTotal}} הסקירות שהסתיימו בארגון שלהן התוצאה לא נשמרה."
     },
     "council": {
       "title": "סקירת מועצה",
@@ -2624,7 +2629,6 @@
     "completingPurchase": "הרכישה מתבצעת",
     "subscriptionLoading": "פרטי המינוי ל-Kilo Pass בטעינה",
     "retryHint": "טעינת המצב של Kilo Pass שוב.",
-    "cardAccessibility": "{{title}}. {{description}}. פעולה: {{actionLabel}}",
     "endedOn": "הסתיים ב-{{date}}",
     "notAvailableInApp": "Kilo Pass אינו זמין באפליקציה.",
     "statusActive": "פעיל",

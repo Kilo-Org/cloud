@@ -1500,8 +1500,13 @@
       "empty": "Ainda não há revisões com estatísticas",
       "emptyDescription": "As estatísticas registam revisões concluídas enquanto estão ativadas para a organização.",
       "offTitle": "As estatísticas estão desativadas para {{platform}}",
-      "offDescription": "Ativa-as nas definições da organização na Web para registar revisões concluídas.",
-      "couldNotLoad": "Não foi possível carregar as estatísticas"
+      "offDescription": "As funções de faturação da organização (proprietários, administradores e gestores de faturação) podem ativar as estatísticas nas definições da organização na Web para registar revisões concluídas.",
+      "couldNotLoad": "Não foi possível carregar as estatísticas",
+      "trackedReviewsCaption": "Revisões concluídas que terminaram neste período com as estatísticas ativadas. As revisões em execução e as falhadas nunca são contadas.",
+      "trackedReviewsUncounted": "Não contadas: {{displayCount}} das {{displayTotal}} revisões concluídas da organização sem resultado capturado.",
+      "trackedReviewsUncounted_many": "Não contadas: {{displayCount}} das {{displayTotal}} revisões concluídas da organização sem resultado capturado.",
+      "trackedReviewsUncounted_one": "Não contadas: {{displayCount}} das {{displayTotal}} revisões concluídas da organização sem resultado capturado.",
+      "trackedReviewsUncounted_other": "Não contadas: {{displayCount}} das {{displayTotal}} revisões concluídas da organização sem resultado capturado."
     },
     "council": {
       "title": "Revisão do conselho",
@@ -3196,7 +3201,6 @@
     "completingPurchase": "A concluir a compra",
     "subscriptionLoading": "A carregar a subscrição do Kilo Pass",
     "retryHint": "Tenta obter novamente o estado do Kilo Pass.",
-    "cardAccessibility": "{{title}}: {{description}}. {{actionLabel}}",
     "endedOn": "Terminado em {{date}}",
     "notAvailableInApp": "O Kilo Pass não está disponível na app.",
     "statusActive": "Ativo",

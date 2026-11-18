@@ -1524,8 +1524,14 @@
       "empty": "Пакуль няма праверак з аналітыкай",
       "emptyDescription": "Аналітыка запісвае завершаныя праверкі, пакуль яна ўключана для арганізацыі.",
       "offTitle": "Аналітыка для {{platform}} выключана",
-      "offDescription": "Уключыце яе ў наладах арганізацыі ў вэб-версіі, каб запісваць завершаныя праверкі.",
-      "couldNotLoad": "Не ўдалося загрузіць аналітыку"
+      "offDescription": "Уключыць аналітыку могуць ролі арганізацыі, адказныя за аплату, — у наладах арганізацыі ў вэб-версіі, каб запісваць завершаныя праверкі.",
+      "couldNotLoad": "Не ўдалося загрузіць аналітыку",
+      "trackedReviewsCaption": "Завершаныя праверкі, якія скончыліся ў гэтым перыядзе пры ўключанай аналітыцы. Праверкі, якія выконваюцца або праваліліся, ніколі не ўлічваюцца.",
+      "trackedReviewsUncounted": "Не ўлічана: {{displayCount}} з {{displayTotal}} завершаных праверак арганізацыі, вынік якіх не быў зафіксаваны.",
+      "trackedReviewsUncounted_few": "Не ўлічана: {{displayCount}} з {{displayTotal}} завершаных праверак арганізацыі, вынік якіх не быў зафіксаваны.",
+      "trackedReviewsUncounted_many": "Не ўлічана: {{displayCount}} з {{displayTotal}} завершаных праверак арганізацыі, вынік якіх не быў зафіксаваны.",
+      "trackedReviewsUncounted_one": "Не ўлічана: {{displayCount}} з {{displayTotal}} завершаных праверак арганізацыі, вынік якіх не быў зафіксаваны.",
+      "trackedReviewsUncounted_other": "Не ўлічана: {{displayCount}} з {{displayTotal}} завершаных праверак арганізацыі, вынік якіх не быў зафіксаваны."
     },
     "council": {
       "title": "Калегіяльная праверка",
@@ -3247,7 +3253,6 @@
     "completingPurchase": "Завяршэнне пакупкі",
     "subscriptionLoading": "Загрузка падпіскі Kilo Pass",
     "retryHint": "Паўторна загружае стан Kilo Pass.",
-    "cardAccessibility": "{{title}} — {{description}}. {{actionLabel}}",
     "endedOn": "Завершана {{date}}",
     "notAvailableInApp": "Kilo Pass недаступны ў праграме.",
     "statusActive": "Актыўны",

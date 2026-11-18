@@ -1476,8 +1476,12 @@
       "empty": "Poko gen revizyon ak estatistik",
       "emptyDescription": "Estatistik yo anrejistre revizyon ki fini pandan yo aktive pou òganizasyon an.",
       "offTitle": "Estatistik yo dezaktive pou {{platform}}",
-      "offDescription": "Aktive Estatistik yo nan paramèt òganizasyon an sou entènèt pou anrejistre revizyon ki fini.",
-      "couldNotLoad": "Nou pa t ka chaje estatistik yo"
+      "offDescription": "Wòl faktirasyon òganizasyon an (pwopriyetè, administratè ak manadjè faktirasyon) ka aktive estatistik nan paramèt òganizasyon an sou wèb la pou anrejistre revizyon ki fini.",
+      "couldNotLoad": "Nou pa t ka chaje estatistik yo",
+      "trackedReviewsCaption": "Revizyon ki fini nan peryòd sa a pandan estatistik yo te aktive. Revizyon k ap kouri ak revizyon ki echwe pa janm konte.",
+      "trackedReviewsUncounted": "Pa konte: {{displayCount}} sou {{displayTotal}} revizyon ki fini òganizasyon an genyen, rezilta yo pa te kaptire.",
+      "trackedReviewsUncounted_one": "Pa konte: {{displayCount}} sou {{displayTotal}} revizyon ki fini òganizasyon an genyen, rezilta yo pa te kaptire.",
+      "trackedReviewsUncounted_other": "Pa konte: {{displayCount}} sou {{displayTotal}} revizyon ki fini òganizasyon an genyen, rezilta yo pa te kaptire."
     },
     "council": {
       "title": "Revizyon konsèy",
@@ -3133,7 +3137,6 @@
     "completingPurchase": "Ap finalize acha a",
     "subscriptionLoading": "Abònman Kilo Pass ap chaje",
     "retryHint": "Eseye chaje eta Kilo Pass la ankò.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Fini {{date}}",
     "notAvailableInApp": "Kilo Pass pa disponib nan aplikasyon an.",
     "statusActive": "Aktif",

@@ -1476,8 +1476,12 @@
       "empty": "Ammatti sakatta'a istaatiksii qabu hin jiru",
       "emptyDescription": "Istaatiksiin sakatta'awwan xumuraman yeroo dhaabbataaf banamu galmeessa.",
       "offTitle": "Istaatiksiin {{platform}} cufameera",
-      "offDescription": "Sakatta'awwan xumuraman galmeessuuf Istaatiksiin Qindaa'ina dhaabbataa weebii irratti isa bani.",
-      "couldNotLoad": "Istaatiksii fe'uun hin danda'amne"
+      "offDescription": "Taayitoonni kaffaltii dhaabbataa — abbootii, adminoota fi mannijaroota kaffaltii — istaatiksii banuu danda'u; kunis web irratti, qindeessa dhaabbataa keessatti, akka sakatto'awwan xumuraman galmeessaniitan.",
+      "couldNotLoad": "Istaatiksii fe'uun hin danda'amne",
+      "trackedReviewsCaption": "Sakatto'awwan xumuraman yeroo kana keessatti istaatiksii banan xumuraman. Sakatto'awwan itti fufaanii fi sakatto'awwan hanqatan hin lakkaa'amanII.,",
+      "trackedReviewsUncounted": "Hin lakkaa’aman: {{displayCount}} / {{displayTotal}} dhaabbataan qabu xumuraman bu’aan qabamee hin boolu.",
+      "trackedReviewsUncounted_one": "Hin lakkaa’aman: {{displayCount}} / {{displayTotal}} dhaabbataan qabu xumuraman bu’aan qabamee hin boolu.",
+      "trackedReviewsUncounted_other": "Hin lakkaa’aman: {{displayCount}} / {{displayTotal}} dhaabbataan qabu xumuraman bu’aan qabamee hin boolu."
     },
     "council": {
       "title": "Sakatta'a gumii",
@@ -3133,7 +3137,6 @@
     "completingPurchase": "Bittaa xumuraa jira",
     "subscriptionLoading": "Maamilummaa Kilo Pass fe'aa jira",
     "retryHint": "Haala Kilo Pass fe'uu irra deebi'ee yaala.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "{{date}} xumurameera",
     "notAvailableInApp": "Kilo Pass appii keessatti hin argamu.",
     "statusActive": "Socho'aa",

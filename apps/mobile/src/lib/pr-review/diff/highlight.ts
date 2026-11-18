@@ -173,7 +173,7 @@ const HLJS_CLASS_PALETTE: ReadonlyMap<string, string> = new Map([
 // rest of the app session. Weight is the entry's key plus the characters its
 // tokens hold, so the budget bounds what the map actually retains; eviction
 // drops the least recently used entry, like `fenceWalkCache` in
-// `components/agents/code-block-model.ts`.
+// `components/agents/code-block-fence-walk.ts`.
 const HIGHLIGHT_CACHE_LIMIT = 5000;
 const HIGHLIGHT_CACHE_CHARACTERS = 1_000_000;
 // A longer line is highlighted and returned but never cached: it cannot be

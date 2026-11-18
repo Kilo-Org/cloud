@@ -1,5 +1,5 @@
 {
-  "id": "9adda91c-b49e-4644-b1ea-cee0fb1e5749",
+  "id": "2045b350-4045-4dbd-bb5d-19d62eb5770f",
   "prevId": "de0af2d0-cdf2-4676-81c6-d2108af20b6f",
   "version": "7",
   "dialect": "postgresql",
@@ -2091,6 +2091,12 @@
         },
         "vercel_model_id_overrides": {
           "name": "vercel_model_id_overrides",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "latest_alias_targets": {
+          "name": "latest_alias_targets",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false
@@ -35212,33 +35218,6 @@
           ],
           "isUnique": false,
           "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_session_step_up_proofs_user_session_binding": {
-          "name": "idx_session_step_up_proofs_user_session_binding",
-          "columns": [
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "session_id_hash",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "action_binding_hash",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": true,
           "method": "btree",
           "with": {}
         },

@@ -935,8 +935,14 @@
       "empty": "Brak przeglądów z analityką",
       "emptyDescription": "Analityka rejestruje ukończone przeglądy, dopóki jest włączona dla organizacji.",
       "offTitle": "Analityka jest wyłączona dla {{platform}}",
-      "offDescription": "Włącz ją w ustawieniach organizacji w wersji internetowej, aby rejestrowała ukończone przeglądy.",
-      "couldNotLoad": "Nie udało się wczytać analityki"
+      "offDescription": "Analitykę mogą włączyć w ustawieniach organizacji w wersji internetowej role związane z rozliczeniami — właściciele, administratorzy i menedżerowie rozliczeń — aby rejestrować ukończone przeglądy.",
+      "couldNotLoad": "Nie udało się wczytać analityki",
+      "trackedReviewsCaption": "Ukończone przeglądy, które zakończyły się w tym okresie przy włączonej analityce. Przeglądy w toku i zakończone niepowodzeniem nigdy nie są zliczane.",
+      "trackedReviewsUncounted": "Nie zliczono: {{displayCount}} z {{displayTotal}} ukończonych przeglądów organizacji, których wynik nie został zapisany.",
+      "trackedReviewsUncounted_few": "Nie zliczono: {{displayCount}} z {{displayTotal}} ukończonych przeglądów organizacji, których wynik nie został zapisany.",
+      "trackedReviewsUncounted_many": "Nie zliczono: {{displayCount}} z {{displayTotal}} ukończonych przeglądów organizacji, których wynik nie został zapisany.",
+      "trackedReviewsUncounted_one": "Nie zliczono: {{displayCount}} z {{displayTotal}} ukończonych przeglądów organizacji, których wynik nie został zapisany.",
+      "trackedReviewsUncounted_other": "Nie zliczono: {{displayCount}} z {{displayTotal}} ukończonych przeglądów organizacji, których wynik nie został zapisany."
     },
     "council": {
       "title": "Przegląd rady",
@@ -2658,7 +2664,6 @@
     "completingPurchase": "Finalizowanie zakupu",
     "subscriptionLoading": "Ładowanie subskrypcji Kilo Pass",
     "retryHint": "Ponownie sprawdza stan Kilo Pass.",
-    "cardAccessibility": "{{title}}. {{description}}. Działanie: {{actionLabel}}",
     "endedOn": "Zakończono {{date}}",
     "notAvailableInApp": "Kilo Pass nie jest dostępny w aplikacji.",
     "statusActive": "Aktywny",

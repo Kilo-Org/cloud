@@ -1476,8 +1476,12 @@
       "empty": "Kāore anō he arotake whai tātaritanga",
       "emptyDescription": "Ka tuhia e ngā tātaritanga ngā arotake kua oti i te wā e whakahohea ana mō te rōpū.",
       "offTitle": "Kua weto ngā tātaritanga mō {{platform}}",
-      "offDescription": "Whakahohea ngā tātaritanga i ngā tautuhinga rōpū i te ipurangi ki te tuhi i ngā arotake kua oti.",
-      "couldNotLoad": "Kāore i taea te uta i ngā tātaritanga"
+      "offDescription": "Ka taea e ngā tūranga utu o te rōpū (arā, ngā kaipupuri, ngā kaiwhakahaere me ngā kaiwhakahaere utu) te whakahohe i ngā tātaritanga i te tautohutohu o te rōpū i te tukatuku, kia tuhia ai ngā arotake kua oti.",
+      "couldNotLoad": "Kāore i taea te uta i ngā tātaritanga",
+      "trackedReviewsCaption": "Ngā arotake kua oti i roto i tēnei wā i te wā e whakahohea ana te tātaritanga. Kāore ngā arotake e haere ana, me ērā kua taka, e tatauhia rawa.",
+      "trackedReviewsUncounted": "Kāore e tatauhia: {{displayCount}} o te {{displayTotal}} arotake kua oti o te rōpū, kāore te hua o ērā i hopukia.",
+      "trackedReviewsUncounted_one": "Kāore e tatauhia: {{displayCount}} o te {{displayTotal}} arotake kua oti o te rōpū, kāore te hua o ērā i hopukia.",
+      "trackedReviewsUncounted_other": "Kāore e tatauhia: {{displayCount}} o te {{displayTotal}} arotake kua oti o te rōpū, kāore te hua o ērā i hopukia."
     },
     "council": {
       "title": "Arotake kaunihera",
@@ -3133,7 +3137,6 @@
     "completingPurchase": "Kei te whakaoti i te hokonga",
     "subscriptionLoading": "Kei te uta i te ohaurunga Kilo Pass",
     "retryHint": "Ka whakamātau anō ki te tiki i te tūnga Kilo Pass.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Kua mutu i te {{date}}",
     "notAvailableInApp": "Kāore a Kilo Pass e wātea ana i te taupānga.",
     "statusActive": "Hohe",

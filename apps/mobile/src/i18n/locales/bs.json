@@ -1500,8 +1500,13 @@
       "empty": "Još nema pregleda s analitikom",
       "emptyDescription": "Analitika bilježi završene preglede dok je uključena za organizaciju.",
       "offTitle": "Analitika je isključena za {{platform}}",
-      "offDescription": "Uključi je u postavkama organizacije na webu da bilježi završene preglede.",
-      "couldNotLoad": "Učitavanje analitike nije uspjelo"
+      "offDescription": "Uloge za naplatu u organizaciji mogu uključiti analitiku u postavkama organizacije na webu da bilježi završene preglede.",
+      "couldNotLoad": "Učitavanje analitike nije uspjelo",
+      "trackedReviewsCaption": "Završeni pregledi koji su okončani u ovom periodu dok je analitika bila uključena. Pregledi u toku i neuspjeli pregledi nikada se ne računaju.",
+      "trackedReviewsUncounted": "Nije uračunato: {{displayCount}} od {{displayTotal}} završenih pregleda koje organizacija ima nije zabilježilo svoj rezultat.",
+      "trackedReviewsUncounted_few": "Nije uračunato: {{displayCount}} od {{displayTotal}} završenih pregleda koje organizacija ima nije zabilježilo svoj rezultat.",
+      "trackedReviewsUncounted_one": "Nije uračunato: {{displayCount}} od {{displayTotal}} završenih pregleda koje organizacija ima nije zabilježilo svoj rezultat.",
+      "trackedReviewsUncounted_other": "Nije uračunato: {{displayCount}} od {{displayTotal}} završenih pregleda koje organizacija ima nije zabilježilo svoj rezultat."
     },
     "council": {
       "title": "Pregled vijeća",
@@ -3190,7 +3195,6 @@
     "completingPurchase": "Završavanje kupovine",
     "subscriptionLoading": "Učitavanje pretplate na Kilo Pass",
     "retryHint": "Ponovo učitava stanje pretplate na Kilo Pass.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Završeno {{date}}",
     "notAvailableInApp": "Kilo Pass nije dostupan u aplikaciji.",
     "statusActive": "Aktivan",

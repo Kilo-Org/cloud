@@ -48,7 +48,6 @@ type InvoiceListQuery = {
 const listStyle = { flex: 1 } satisfies ViewStyle;
 const listContentContainerStyle = {
   flexGrow: 1,
-
 } satisfies ViewStyle;
 
 const SKELETON_ROW_COUNT = 3;

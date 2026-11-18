@@ -94,7 +94,7 @@ describe('BillingWebSettings', () => {
       { url: AUTO_TOP_UP_URL, label: 'Manage auto top-up' },
     ]);
     const [section] = renderer.root.findAllByType('Section' as never);
-    expect(section.props.label).toBe('Billing settings on the web');
+    expect(section?.props.label).toBe('Billing settings on the web');
     unmount();
   });
 

@@ -35,6 +35,7 @@ const harness = vi.hoisted(() => ({
 }));
 
 vi.mock('react-native', () => ({
+  I18nManager: { isRTL: false },
   Platform: { OS: 'android' },
   Pressable: 'Pressable',
   View: 'View',

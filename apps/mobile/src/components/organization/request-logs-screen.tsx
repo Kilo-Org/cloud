@@ -14,7 +14,11 @@ import { ScreenHeader } from '@/components/screen-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { DirectionalArrowLeft, DirectionalArrowRight, DirectionalLogs } from '@/components/ui/directional-icons';
+import {
+  DirectionalArrowLeft,
+  DirectionalArrowRight,
+  DirectionalLogs,
+} from '@/components/ui/directional-icons';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';

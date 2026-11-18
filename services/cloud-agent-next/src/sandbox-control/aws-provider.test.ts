@@ -393,4 +393,15 @@ describe('AWS durable allocation lifecycle', () => {
     await expect(adapter.launch(foreign, startup)).rejects.toBeInstanceOf(ProviderCreationError);
     expect(await adapter.stop(foreign)).toBe('retryable');
   });
+  it('reports an unreadable stored record as permanent when stopping by intent', async () => {
+    const f = awsProviderFixture();
+    const ref = await create(f.adapter());
+    const broken = { ...f.operations.get(intent.intentId), phase: 'unknown-phase' };
+    f.operations.set(intent.intentId, broken as never);
+    const expected = { permanentReason: 'invalid_configuration' };
+    await expect(f.adapter().stop(ref)).rejects.toMatchObject(expected);
+    await expect(
+      f.adapter().stop(null, { ...intent, allocationName: 'ses-abcdef' })
+    ).rejects.toMatchObject(expected);
+  });
 });

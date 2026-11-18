@@ -515,6 +515,32 @@ describe('CreateOrganizationScreen', () => {
     unmount();
   });
 
+  it('settles the form while offline when the create itself succeeds', async () => {
+    // Radio off with the create still reaching the server (an edge server
+    // accepts it): the list refetch the completion awaits must not pause, or
+    // the submit stays busy with a created-but-unaddressable organization.
+    onlineManager.setOnline(false);
+    mocks.createMutate.mockResolvedValue({ organization: { id: 'org-new' } });
+    const { renderer, queryClient, unmount } = await mount();
+    // The refetch behind the invalidation could not be served; the list still
+    // says the membership is missing, so the screen reports it and moves on
+    // instead of holding the busy state.
+    queryClient.setQueryData(['organizations.list'], []);
+
+    await type(renderer, 'Acme');
+    await act(() => {
+      handlerOf(submitOf(renderer), 'onPress')?.();
+    });
+    expect(mocks.setOrganizationId).not.toHaveBeenCalled();
+    expect(mocks.replace).not.toHaveBeenCalled();
+    expect(submitOf(renderer).props.disabled).toBe(false);
+    expect(texts(renderer)).toContain(
+      'Organization created. It will appear in the picker shortly.'
+    );
+    unmount();
+    backOnline();
+  });
+
   it('drops taps while the create is in flight but not after the failure', async () => {
     const pending = Promise.withResolvers<{ organization: { id: string } }>();
     mocks.createMutate.mockReturnValue(pending.promise);

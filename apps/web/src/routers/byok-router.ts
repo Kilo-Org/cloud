@@ -84,6 +84,7 @@ import { getOpenRouterTranscriptionModels } from '@kilocode/web-shared/lib/ai-ga
 import DIRECT_BYOK_PROVIDERS from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
 import {
   createAiSdkProvider,
+  findDirectByokProvider,
   formatDirectByokModelId,
   listDirectByokCatalogModels,
   offersCatalogMode,
@@ -219,7 +220,9 @@ function canReadEndpointDefinition(organizationRole: OrganizationRole | null) {
 }
 
 async function supportsCatalogMode(providerId: string) {
-  return isByokEndpointProviderId(providerId) || offersCatalogMode(providerId);
+  if (isByokEndpointProviderId(providerId)) return true;
+  const provider = findDirectByokProvider(providerId);
+  return provider !== undefined && offersCatalogMode(provider);
 }
 
 async function toBYOKApiKeyResponse(
@@ -341,7 +344,7 @@ async function fetchCatalogModeSupportedModels(): Promise<Record<string, string[
   const openRouterModelMetadata = await getOpenRouterModelsMetadataFromDatabase();
   const result: Record<string, string[]> = {};
   for (const provider of DIRECT_BYOK_PROVIDERS) {
-    const entries = await listDirectByokCatalogModels(provider.id);
+    const entries = await listDirectByokCatalogModels(provider);
     if (entries.length === 0) continue;
     result[provider.id] = entries
       .map(({ catalogModelId, model }) => {

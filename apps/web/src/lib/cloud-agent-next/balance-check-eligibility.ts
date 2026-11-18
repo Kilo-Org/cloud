@@ -12,6 +12,7 @@ import { hasEnabledUserByokForModel } from '@kilocode/web-shared/lib/ai-gateway/
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { getAllowedDirectByokCatalogModelIds } from '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-user-byok';
 import {
+  findDirectByokProvider,
   getDirectByokCatalogModelIds,
   getDirectByokModel,
   supportsCatalogMode,
@@ -185,10 +186,14 @@ async function hasDirectByokForModel(params: {
   if (provider && model) {
     const enabledProviders = await getEnabledByokProviders(params.fromDb, params.owner);
     const key = enabledProviders.find(enabled => enabled.providerId === provider.id);
-    return key !== undefined && !(key.serveCatalogModels && supportsCatalogMode(provider.id));
+    return key !== undefined && !(key.serveCatalogModels && supportsCatalogMode(provider));
   }
 
-  if (![...params.enabledProviderIds].some(providerId => supportsCatalogMode(providerId))) {
+  const catalogModeCapable = [...params.enabledProviderIds].some(providerId => {
+    const provider = findDirectByokProvider(providerId);
+    return provider !== undefined && supportsCatalogMode(provider);
+  });
+  if (!catalogModeCapable) {
     return false;
   }
   const catalogModelIds =

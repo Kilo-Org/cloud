@@ -261,7 +261,7 @@ export async function resolveProviderAndPolicy(
     // Falling through to the managed gateway would fail later with a misleading unknown-model error.
     const message = directByokCatalogOnlyMessage({
       model,
-      providerId: getProviderResult.providerId,
+      keyLabel: getProviderResult.keyLabel,
       catalogModelId: getProviderResult.catalogModelId,
     });
     return reject(
@@ -311,7 +311,7 @@ export async function resolveProviderAndPolicy(
       return apiKindNotSupportedResponse(
         request.kind,
         route.provider.supportedChatApis,
-        route.provider.type === 'direct-byok' ? route.userByok?.[0]?.providerId : undefined,
+        route.provider.directByokKeyLabel,
         route.provider.byokEndpointName
       );
     }

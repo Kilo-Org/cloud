@@ -9,6 +9,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import {
   createDirectByokReferenceResolver,
+  findDirectByokProvider,
   listDirectByokCatalogModels,
   offersCatalogMode,
   findDirectByokCatalogModels,
@@ -86,6 +87,12 @@ const ALIAS_TARGETS: Record<string, string> = {
   '~example/unknown-latest': 'example/unknown',
 };
 
+function provider(id: string) {
+  const found = findDirectByokProvider(id);
+  if (!found) throw new Error(`no provider ${id}`);
+  return found;
+}
+
 function keys(entries: Record<string, boolean>): EnabledByokProvider[] {
   return Object.entries(entries).map(([providerId, serveCatalogModels]) => ({
     providerId: providerId as EnabledByokProvider['providerId'],
@@ -106,16 +113,16 @@ beforeEach(() => {
 
 describe('catalog mode support', () => {
   test('requires a models.dev id and at least one current catalog mapping', async () => {
-    expect(supportsCatalogMode('synthetic')).toBe(true);
-    expect(supportsCatalogMode('martian')).toBe(false);
-    await expect(offersCatalogMode('synthetic')).resolves.toBe(true);
-    await expect(offersCatalogMode('morph-byok')).resolves.toBe(false);
-    await expect(offersCatalogMode('chutes-byok')).resolves.toBe(false);
-    await expect(offersCatalogMode('martian')).resolves.toBe(false);
+    expect(supportsCatalogMode(provider('synthetic'))).toBe(true);
+    expect(supportsCatalogMode(provider('martian'))).toBe(false);
+    await expect(offersCatalogMode(provider('synthetic'))).resolves.toBe(true);
+    await expect(offersCatalogMode(provider('morph-byok'))).resolves.toBe(false);
+    await expect(offersCatalogMode(provider('chutes-byok'))).resolves.toBe(false);
+    await expect(offersCatalogMode(provider('martian'))).resolves.toBe(false);
   });
 
   test('lists the current catalog ids a provider serves with their primary model', async () => {
-    const entries = await listDirectByokCatalogModels('synthetic');
+    const entries = await listDirectByokCatalogModels(provider('synthetic'));
 
     expect(entries.map(({ catalogModelId, model }) => [catalogModelId, model.id])).toEqual([
       ['moonshotai/kimi-k2.6', 'hf:moonshotai/Kimi-K2.6'],

@@ -65,6 +65,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import {
   getDirectByokCatalogModelId,
+  getDirectByokKeyLabel,
   getDirectByokPolicyProviderId,
   getDirectByokModelChatApis,
   supportsCatalogMode,
@@ -147,7 +148,8 @@ function servedBy(route: ProviderRoute): GetProviderProviderResult {
 /** A bespoke direct BYOK id whose key serves only catalog ids. */
 export type DirectByokCatalogOnlyResult = {
   kind: 'direct-byok-catalog-only';
-  providerId: DirectByokProvider['id'];
+  /** The caller's key, as `getDirectByokKeyLabel` names it. */
+  keyLabel: string;
   /** The catalog id that serves the same model through the key, when one exists. */
   catalogModelId: string | null;
 };
@@ -203,6 +205,7 @@ async function directByokRoute(
       type: 'direct-byok',
       ...upstream,
       inferenceProviderId: getDirectByokPolicyProviderId(directByok),
+      directByokKeyLabel: getDirectByokKeyLabel(directByok),
       async transformRequest(context) {
         context.request.body.model = directByokModel.id;
         delete context.request.body.provider;
@@ -241,7 +244,7 @@ async function resolveDirectByokModel(
     });
     return null;
   }
-  if (credential.serveCatalogModels && supportsCatalogMode(providerId)) {
+  if (credential.serveCatalogModels && supportsCatalogMode(directByok)) {
     const catalogModelId = await getDirectByokCatalogModelId(directByokModel);
     decision.step({
       step: 'direct-byok-model',
@@ -250,7 +253,11 @@ async function resolveDirectByokModel(
       reason: 'catalog-only',
       catalog_model_id: catalogModelId,
     });
-    return { kind: 'direct-byok-catalog-only', providerId, catalogModelId };
+    return {
+      kind: 'direct-byok-catalog-only',
+      keyLabel: getDirectByokKeyLabel(directByok),
+      catalogModelId,
+    };
   }
   decision.step({ step: 'direct-byok-model', outcome: 'selected', provider_id: providerId });
   return servedBy(

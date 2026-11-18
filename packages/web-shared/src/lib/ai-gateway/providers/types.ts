@@ -83,6 +83,8 @@ export type Provider = {
   /** Anthropic's user profile for `claudeBillingOwner`; every billed request names it. */
   claudeBillingUserProfileId?: string;
   claudeBillingConnectedAt?: string;
+  /** The caller's key that serves a direct BYOK provider (`getDirectByokKeyLabel`). */
+  directByokKeyLabel?: string;
   /** The organization's name for the endpoint that serves a `byok-endpoint` provider. */
   byokEndpointName?: string;
   apiUrl: string;

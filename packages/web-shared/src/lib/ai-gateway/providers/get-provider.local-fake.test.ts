@@ -53,11 +53,10 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => {
     '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok'
   );
   return {
+    ...actual,
     getDirectByokModel: jest.fn().mockResolvedValue({ provider: null, model: null }),
     findDirectByokCatalogModels: jest.fn().mockResolvedValue([]),
     getDirectByokCatalogModelId: jest.fn().mockResolvedValue(null),
-    getDirectByokModelChatApis: actual.getDirectByokModelChatApis,
-    getDirectByokPolicyProviderId: actual.getDirectByokPolicyProviderId,
     supportsCatalogMode: jest.fn(() => true),
   };
 });
@@ -927,7 +926,7 @@ describe('getProvider direct BYOK routing', () => {
 
       expect(result).toEqual({
         kind: 'direct-byok-catalog-only',
-        providerId: 'synthetic',
+        keyLabel: 'Synthetic key',
         catalogModelId,
       });
     }

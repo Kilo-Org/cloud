@@ -66,10 +66,6 @@ import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/cust
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
-  DIRECT_BYOK_PROVIDERS_META,
-  type DirectByokProviderMetaId,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
-import {
   AUTO_DECISION_HEADER,
   CUSTOM_ROUTER_ERROR_HTTP_STATUS,
   type CustomRouterErrorCode,
@@ -320,22 +316,15 @@ export function inferenceRegionRefusedResponse(region: OrganizationDataRegion) {
   );
 }
 
-const DIRECT_BYOK_PROVIDER_NAMES = new Map<string, string>(
-  Object.entries(DIRECT_BYOK_PROVIDERS_META)
-);
-
-/** `directByokProviderId` names the caller's direct BYOK key that serves the model. */
+/** `directByokKeyLabel` names the caller's direct BYOK key that serves the model. */
 export function apiKindNotSupportedResponse(
   apiKind: GatewayChatApiKind,
   supportedApiKinds: ReadonlyArray<GatewayChatApiKind>,
-  directByokProviderId?: string,
+  directByokKeyLabel?: string,
   byokEndpointName?: string
 ) {
-  const providerName =
-    directByokProviderId &&
-    (DIRECT_BYOK_PROVIDER_NAMES.get(directByokProviderId) ?? directByokProviderId);
-  const through = providerName
-    ? ` through your ${providerName} key`
+  const through = directByokKeyLabel
+    ? ` through your ${directByokKeyLabel}`
     : byokEndpointName
       ? ` through your ${byokEndpointName} endpoint`
       : '';
@@ -669,13 +658,13 @@ export function noFreeModelsAvailableResponse() {
 
 export function directByokCatalogOnlyMessage(params: {
   model: string;
-  providerId: DirectByokProviderMetaId;
+  keyLabel: string;
   catalogModelId: string | null;
 }) {
-  const reason = `'${params.model}' is disabled because the ${DIRECT_BYOK_PROVIDERS_META[params.providerId]} key uses Kilo catalog model IDs.`;
+  const reason = `'${params.model}' is disabled because the ${params.keyLabel} uses Kilo catalog model IDs.`;
   return params.catalogModelId
     ? `${reason} Use '${params.catalogModelId}' instead.`
-    : `${reason} This model has no catalog ID; turn off catalog mode for the key to use it.`;
+    : `${reason} This model has no catalog ID; turn off catalog mode for the ${params.keyLabel} to use it.`;
 }
 
 export function byokEndpointCatalogOnlyMessage(params: {

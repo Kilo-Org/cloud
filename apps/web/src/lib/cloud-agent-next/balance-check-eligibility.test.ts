@@ -28,6 +28,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog', (
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModel: (...args: unknown[]) => mockGetDirectByokModel(...args),
+  findDirectByokProvider: (providerId: string) => ({ id: providerId }),
   supportsCatalogMode: (...args: unknown[]) => mockSupportsCatalogMode(...args),
   getDirectByokCatalogModelIds: (...args: unknown[]) => mockGetDirectByokCatalogModelIds(...args),
 }));
@@ -330,7 +331,9 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
 
     beforeEach(() => {
       mockGetUserByokProviderIds.mockResolvedValue(['opencode-go']);
-      mockSupportsCatalogMode.mockImplementation(providerId => providerId === 'opencode-go');
+      mockSupportsCatalogMode.mockImplementation(
+        provider => (provider as { id: string }).id === 'opencode-go'
+      );
     });
 
     it('counts an enabled key for its bespoke model', async () => {

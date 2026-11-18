@@ -3706,7 +3706,7 @@ describe('kilo-auto/efficient classifier billing', () => {
   it('rejects a bespoke direct BYOK id whose key serves catalog ids, naming the catalog id', async () => {
     mockedGetProvider.mockResolvedValue({
       kind: 'direct-byok-catalog-only',
-      providerId: 'synthetic',
+      keyLabel: 'Synthetic key',
       catalogModelId: 'moonshotai/kimi-k2.6',
     });
 
@@ -3789,7 +3789,12 @@ describe('kilo-auto/efficient classifier billing', () => {
   it('names the BYOK key when it cannot serve the API kind', async () => {
     mockedGetProvider.mockResolvedValue(
       providerResult({
-        provider: { ...provider, type: 'direct-byok', supportedChatApis: ['responses'] },
+        provider: {
+          ...provider,
+          type: 'direct-byok',
+          supportedChatApis: ['responses'],
+          directByokKeyLabel: 'Synthetic key',
+        },
         userByok: [{ decryptedAPIKey: 'key', providerId: 'synthetic' }],
         isFree: false,
         bypassAccessCheck: false,
@@ -3813,7 +3818,7 @@ describe('kilo-auto/efficient classifier billing', () => {
   it('explains an unmapped bespoke id when the key serves catalog ids', async () => {
     mockedGetProvider.mockResolvedValue({
       kind: 'direct-byok-catalog-only',
-      providerId: 'synthetic',
+      keyLabel: 'Synthetic key',
       catalogModelId: null,
     });
 
@@ -3857,7 +3862,7 @@ describe('kilo-auto/efficient classifier billing', () => {
     });
     mockedGetProvider.mockResolvedValue({
       kind: 'direct-byok-catalog-only',
-      providerId: 'synthetic',
+      keyLabel: 'Synthetic key',
       catalogModelId: null,
     });
 

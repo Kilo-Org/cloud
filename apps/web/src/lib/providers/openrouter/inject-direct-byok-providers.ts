@@ -1,6 +1,7 @@
 import { captureException } from '@sentry/nextjs';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import {
+  findDirectByokProvider,
   getDirectByokProviderListings,
   listDirectByokCatalogModels,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
@@ -69,10 +70,11 @@ export async function injectDirectByokProviders(
   const snapshotSlugs = new Set(providers.map(provider => provider.slug));
   const injected: NormalizedProvider[] = [];
   for (const listing of getDirectByokProviderListings()) {
-    if (snapshotSlugs.has(listing.slug)) continue;
+    const provider = findDirectByokProvider(listing.slug);
+    if (!provider || snapshotSlugs.has(listing.slug)) continue;
     let catalogModels;
     try {
-      catalogModels = await listDirectByokCatalogModels(listing.slug);
+      catalogModels = await listDirectByokCatalogModels(provider);
     } catch (error) {
       // One provider's model list must not fail the whole sync; it reappears on the next one.
       captureException(error, {

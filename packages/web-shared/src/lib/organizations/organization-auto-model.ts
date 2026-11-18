@@ -279,7 +279,7 @@ export async function validateOrganizationAutoTarget(
     }
     // A catalog-mode key serves the model only under its catalog id, which organization model and
     // provider policies cover, so a stored bespoke target resolves to that id.
-    if (credential.serveCatalogModels && supportsCatalogMode(directByokTarget.provider.id)) {
+    if (credential.serveCatalogModels && supportsCatalogMode(directByokTarget.provider)) {
       const catalogModelId = await getDirectByokCatalogModelId(directByokTarget.model);
       if (!catalogModelId) {
         return {

@@ -361,7 +361,7 @@ async function catalogModeModelForRoutedModel(
     return catalogModeModelForRoutedEndpointModel(endpointModelId, callerPromise);
   }
   const { provider } = await getDirectByokModel(model.toLowerCase());
-  if (!provider || !supportsCatalogMode(provider.id)) return null;
+  if (!provider || !supportsCatalogMode(provider)) return null;
   const caller = await callerPromise;
   if (caller.kind !== 'signed-in') return null;
   const resolveReference = await createDirectByokReferenceResolver(

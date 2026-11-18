@@ -48,7 +48,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
     `${provider.id}/${model.id}`.toLowerCase(),
   getDirectByokModel: jest.fn(async () => ({ provider: null, model: null })),
   getDirectByokCatalogModelId: jest.fn(),
-  supportsCatalogMode: (providerId: string) => providerId === 'synthetic',
+  supportsCatalogMode: (provider: { id: string }) => provider.id === 'synthetic',
 }));
 
 const mockedPolicyContext = jest.fn();

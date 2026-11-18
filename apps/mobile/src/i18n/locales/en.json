@@ -4713,6 +4713,7 @@
     "title": "Shared session",
     "someone": "Someone",
     "sharedBy": "Shared by {{owner}}",
+    "startedAt": "Started at {{time}}",
     "unavailableTitle": "Link unavailable",
     "unavailableDescription": "This share link has expired or been revoked.",
     "transcriptUnavailableTitle": "Couldn't load this transcript",

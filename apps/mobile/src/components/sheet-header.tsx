@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { Platform, Pressable, View } from 'react-native';
 
 import { Share } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
@@ -20,6 +20,7 @@ export function SheetHeader({
   disabled = false,
   doneDisabled = false,
   topInset = 'always',
+  underHandle = false,
   surfaceClassName = 'bg-background',
 }: {
   title: string;
@@ -48,6 +49,15 @@ export function SheetHeader({
   doneDisabled?: boolean;
   topInset?: SheetHeaderTopInset;
   /**
+   * The header is the first content of a `Sheet` that paints its native drag
+   * handle above the React content (`showHandle`, the default). The host
+   * already spends the handle's own padding on the gap above the title
+   * (Material3's is 22dp), so the header drops the `pt-4` it would add on top
+   * of that padding and gives the same room below the title instead. The title
+   * then sits under the handle no farther than it sits above its divider.
+   */
+  underHandle?: boolean;
+  /**
    * The surface the sheet paints behind the header. A sheet that sits on the
    * raised dark surface passes `bg-card` so its top edge separates from the
    * near-black window behind it; the app canvas colour is the default.
@@ -65,6 +75,10 @@ export function SheetHeader({
   // clears the status bar. It is known before the first frame, so the header
   // paints once, already settled, instead of moving by the inset.
   const topInsetHeight = useSheetHeaderTopClearance(topInset);
+  // Resolved at render, not at import: the split depends on the platform the
+  // header paints on, and a module-level read freezes whatever platform the
+  // first import happened under.
+  const underHandlePadding = Platform.OS === 'ios' ? 'pb-4 pt-1.5' : 'pb-7 pt-0';
   const safeAreaStyle =
     topInsetHeight > 0 || insets.left > 0 || insets.right > 0
       ? {
@@ -81,7 +95,20 @@ export function SheetHeader({
     // flattened header breaks that native pass and the list paints over it.
     <View
       collapsable={false}
-      className={cn('border-b border-border px-4 pb-3 pt-4', surfaceClassName)}
+      className={cn(
+        'border-b border-border px-4',
+        // The centred 48dp action row leaves ~10dp of leading above the title's
+        // line box and the same below it; `pb-3` puts the divider ~21dp under
+        // the title. A native handle already leaves room above the content, so
+        // `pt-4` made the gap over the title about twice the gap below it.
+        // The handle's own gap differs by platform (Material3 ~22dp, iOS 16pt),
+        // so each platform gets its own split: measured 33.9dp above and
+        // 35.9dp below on the Android emulator, and 26.3pt above and 33.7pt
+        // below on iOS with `pb-5 pt-1`. `pb-4 pt-1.5` predicts 28.3pt and
+        // 29.7pt, so the gap over the title is no larger than the gap below it.
+        underHandle ? underHandlePadding : 'pb-3 pt-4',
+        surfaceClassName
+      )}
     >
       <View style={safeAreaStyle}>
         <View className="min-h-[48px] flex-row items-center gap-x-3">

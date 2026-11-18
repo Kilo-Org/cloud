@@ -4710,6 +4710,7 @@
     "superseded": "Nosoloina tany an-kafa ity rohy ity, ka tsy miasa intsony."
   },
   "sharedSession": {
+    "startedAt": "Nanomboka tamin'ny {{time}}",
     "title": "Fotoam-piasana nozaraina",
     "someone": "Olona iray",
     "sharedBy": "Nozarain'i {{owner}}",

@@ -4710,6 +4710,7 @@
     "superseded": "E dochiela njikọ a n'ebe ọzọ, ya mere ọ naghịzi arụ ọrụ."
   },
   "sharedSession": {
+    "startedAt": "Malitere na {{time}}",
     "title": "Nnọkọ ekesara",
     "someone": "Otu onye",
     "sharedBy": "{{owner}} kesara ya",

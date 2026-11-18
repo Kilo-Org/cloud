@@ -4710,6 +4710,7 @@
     "superseded": "Dieser Link wurde an anderer Stelle ersetzt und funktioniert daher nicht mehr."
   },
   "sharedSession": {
+    "startedAt": "Gestartet um {{time}}",
     "title": "Geteilte Sitzung",
     "someone": "Jemand",
     "sharedBy": "Geteilt von {{owner}}",

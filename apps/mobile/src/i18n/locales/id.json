@@ -4710,6 +4710,7 @@
     "superseded": "Tautan ini telah diganti dari perangkat lain, sehingga tidak lagi berfungsi."
   },
   "sharedSession": {
+    "startedAt": "Dimulai pukul {{time}}",
     "title": "Sesi yang dibagikan",
     "someone": "Seseorang",
     "sharedBy": "Dibagikan oleh {{owner}}",

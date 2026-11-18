@@ -4710,6 +4710,7 @@
     "superseded": "다른 기기에서 이 링크가 교체되어 더 이상 작동하지 않습니다."
   },
   "sharedSession": {
+    "startedAt": "{{time}}에 시작됨",
     "title": "공유된 세션",
     "someone": "알 수 없는 사용자",
     "sharedBy": "공유자: {{owner}}",

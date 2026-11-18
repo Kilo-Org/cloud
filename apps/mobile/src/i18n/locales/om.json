@@ -4710,6 +4710,7 @@
     "superseded": "Liinkiin kun bakka biraatti bakka buufameera, kanaaf kana booda hin hojjetu."
   },
   "sharedSession": {
+    "startedAt": "Yeroo {{time}} jalqabame",
     "title": "Seshinii qoodame",
     "someone": "Nama tokko",
     "sharedBy": "Kan qoode {{owner}}",

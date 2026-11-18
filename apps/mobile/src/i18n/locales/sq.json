@@ -4710,6 +4710,7 @@
     "superseded": "Kjo lidhje u zëvendësua nga një pajisje tjetër, ndaj nuk funksionon më."
   },
   "sharedSession": {
+    "startedAt": "Filloi në {{time}}",
     "title": "Seancë e ndarë",
     "someone": "Dikush",
     "sharedBy": "Ndarë nga {{owner}}",

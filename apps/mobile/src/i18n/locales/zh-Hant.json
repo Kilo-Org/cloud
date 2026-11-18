@@ -4710,6 +4710,7 @@
     "superseded": "此連結已在其他裝置上被取代，因此已失效。"
   },
   "sharedSession": {
+    "startedAt": "開始於 {{time}}",
     "title": "已分享的工作階段",
     "someone": "某位使用者",
     "sharedBy": "由 {{owner}} 分享",

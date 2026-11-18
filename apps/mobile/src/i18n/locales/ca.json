@@ -4781,6 +4781,7 @@
     "superseded": "Aquest enllaç s'ha substituït des d'un altre dispositiu i ja no funciona."
   },
   "sharedSession": {
+    "startedAt": "Iniciat a les {{time}}",
     "title": "Sessió compartida",
     "someone": "Algú",
     "sharedBy": "Compartida per {{owner}}",

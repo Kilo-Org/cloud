@@ -4710,6 +4710,7 @@
     "superseded": "Kiungo hiki kilibadilishwa na kingine mahali pengine, kwa hivyo hakifanyi kazi tena."
   },
   "sharedSession": {
+    "startedAt": "Ilianza saa {{time}}",
     "title": "Kipindi kilichoshirikiwa",
     "someone": "Mtu fulani",
     "sharedBy": "Kimeshirikiwa na {{owner}}",

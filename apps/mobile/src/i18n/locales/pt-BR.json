@@ -4787,6 +4787,7 @@
     "superseded": "Este link foi substituído em outro dispositivo e não funciona mais."
   },
   "sharedSession": {
+    "startedAt": "Iniciada às {{time}}",
     "title": "Sessão compartilhada",
     "someone": "Alguém",
     "sharedBy": "Compartilhada por {{owner}}",

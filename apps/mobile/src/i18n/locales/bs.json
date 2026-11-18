@@ -4781,6 +4781,7 @@
     "superseded": "Ovaj link je zamijenjen na drugom uređaju, pa više ne radi."
   },
   "sharedSession": {
+    "startedAt": "Započeto u {{time}}",
     "title": "Podijeljena sesija",
     "someone": "Neko",
     "sharedBy": "Podijelio/la {{owner}}",

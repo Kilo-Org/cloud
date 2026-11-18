@@ -4710,6 +4710,7 @@
     "superseded": "ይህ ሊንክ በሌላ ቦታ ተተክቷል፣ ስለዚህ ከእንግዲህ ወዲህ አይሰራም።"
   },
   "sharedSession": {
+    "startedAt": "የተጀመረው በ{{time}}",
     "title": "የተጋራ ክፍለ ጊዜ",
     "someone": "አንድ ሰው",
     "sharedBy": "በ{{owner}} የተጋራ",

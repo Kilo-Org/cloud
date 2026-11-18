@@ -4710,6 +4710,7 @@
     "superseded": "See link asendati mujal, mistõttu see enam ei tööta."
   },
   "sharedSession": {
+    "startedAt": "Alustatud kell {{time}}",
     "title": "Jagatud seanss",
     "someone": "Keegi",
     "sharedBy": "Jagas {{owner}}",

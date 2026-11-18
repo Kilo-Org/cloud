@@ -4710,6 +4710,7 @@
     "superseded": "Bu link başqa yerdə əvəzləndiyi üçün artıq işləmir."
   },
   "sharedSession": {
+    "startedAt": "Başlama vaxtı {{time}}",
     "title": "Paylaşılan sessiya",
     "someone": "Kimsə",
     "sharedBy": "Paylaşan: {{owner}}",

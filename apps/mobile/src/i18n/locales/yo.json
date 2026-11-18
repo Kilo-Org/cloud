@@ -4710,6 +4710,7 @@
     "superseded": "A ti rọ́pò ìjápọ̀ yìí ní ibòmíràn, nítorí náà kò ṣiṣẹ́ mọ́."
   },
   "sharedSession": {
+    "startedAt": "Bẹ̀rẹ̀ ní {{time}}",
     "title": "Ìgbà iṣẹ́ tí a pín",
     "someone": "Ẹnìkan",
     "sharedBy": "{{owner}} ló pín in",

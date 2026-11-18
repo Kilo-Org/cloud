@@ -4710,6 +4710,7 @@
     "superseded": "Tämä linkki on korvattu muualla, joten se ei enää toimi."
   },
   "sharedSession": {
+    "startedAt": "Aloitettu klo {{time}}",
     "title": "Jaettu istunto",
     "someone": "Joku",
     "sharedBy": "Jakaja: {{owner}}",

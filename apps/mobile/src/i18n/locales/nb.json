@@ -4710,6 +4710,7 @@
     "superseded": "Denne lenken ble erstattet et annet sted, så den virker ikke lenger."
   },
   "sharedSession": {
+    "startedAt": "Startet kl. {{time}}",
     "title": "Delt økt",
     "someone": "Noen",
     "sharedBy": "Delt av {{owner}}",

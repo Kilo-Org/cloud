@@ -4923,6 +4923,7 @@
     "superseded": "Cuireadh nasc nua in ionad an naisc seo in áit eile, mar sin ní oibríonn sé a thuilleadh."
   },
   "sharedSession": {
+    "startedAt": "Tosaíodh ag {{time}}",
     "title": "Seisiún comhroinnte",
     "someone": "Duine éigin",
     "sharedBy": "Comhroinnte ag {{owner}}",

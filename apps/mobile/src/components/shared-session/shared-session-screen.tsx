@@ -6,11 +6,13 @@ import { View } from 'react-native';
 import { SessionPreviewTranscript } from '@/components/agents/session-preview-transcript';
 import { formatGitUrlProject } from '@/components/agents/session-list-helpers';
 import { QueryError } from '@/components/query-error';
-import { ScreenHeader } from '@/components/screen-header';
+import { type HeaderEyebrow, ScreenHeader } from '@/components/screen-header';
+import { eyebrowHeaderProps } from '@/components/ui/eyebrow-placeholder';
 import { i18n } from '@/i18n';
 import { formatDate } from '@/lib/format';
 import { trpcErrorVariant } from '@/lib/trpc-error';
 import { useTRPC } from '@/lib/trpc';
+import { parseTimestamp } from '@/lib/utils';
 
 /**
  * Scroll identity for the shared transcript. The list only uses it to key its
@@ -20,15 +22,12 @@ import { useTRPC } from '@/lib/trpc';
  */
 const SHARED_TRANSCRIPT_ID = 'shared-session';
 
-function sharedDateLabel(createdAt: string | null | undefined): string | null {
+function sharedCreatedDate(createdAt: string | null | undefined): Date | null {
   if (!createdAt) {
     return null;
   }
-  const date = new Date(createdAt);
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-  return formatDate(date, i18n.language, { month: 'short', day: 'numeric' });
+  const date = parseTimestamp(createdAt);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 /**
@@ -56,7 +55,20 @@ export function SharedSessionScreen({ shareToken }: Readonly<{ shareToken: strin
   const metadata = query.data?.metadata;
   const ownerName = metadata?.ownerName ?? t('sharedSession.someone');
   const repoLabel = metadata?.gitUrl ? formatGitUrlProject(metadata.gitUrl) : null;
-  const dateLabel = sharedDateLabel(metadata?.createdAt);
+  const createdDate = sharedCreatedDate(metadata?.createdAt);
+  const dateLabel = createdDate
+    ? formatDate(createdDate, i18n.language, { month: 'short', day: 'numeric' })
+    : null;
+  // The share time is not part of the public read: the payload carries the
+  // session's own `createdAt`, and the link's `shared_at` stays inside the
+  // token the server resolves. So the line names the session start, and the
+  // subtitle's date above gives it a day — this prints the time alone rather
+  // than repeating that date under a "shared" label the payload cannot back.
+  const startedAtLabel = createdDate
+    ? t('sharedSession.startedAt', {
+        time: formatDate(createdDate, i18n.language, { timeStyle: 'short' }),
+      })
+    : null;
   const subtitle = [
     t('sharedSession.sharedBy', { owner: ownerName }),
     metadata?.gitBranch ?? null,
@@ -68,6 +80,21 @@ export function SharedSessionScreen({ shareToken }: Readonly<{ shareToken: strin
   const retry = () => {
     void query.refetch();
   };
+
+  // The eyebrow names the session: its repository, which the payload carries
+  // only when the session had a git URL, and otherwise the time it started.
+  // A read that is pending reserves the line with the placeholder bar; a read
+  // that failed, and a payload with neither a repository nor a usable
+  // timestamp, keep the same line blank — the title holds its place and
+  // nothing pulses on a header whose label can no longer arrive.
+  let eyebrow: HeaderEyebrow = { kind: 'held' };
+  if (repoLabel !== null) {
+    eyebrow = { kind: 'ready', text: repoLabel };
+  } else if (startedAtLabel !== null) {
+    eyebrow = { kind: 'ready', text: startedAtLabel };
+  } else if (query.isPending) {
+    eyebrow = { kind: 'loading' };
+  }
 
   let body: ReactNode = null;
   if (query.isError) {
@@ -112,8 +139,7 @@ export function SharedSessionScreen({ shareToken }: Readonly<{ shareToken: strin
     <View className="flex-1 bg-background" testID="shared-session-screen">
       <ScreenHeader
         title={metadata?.title ?? t('sharedSession.title')}
-        eyebrow={repoLabel ?? undefined}
-        reserveEyebrow
+        {...eyebrowHeaderProps(eyebrow)}
         subtitle={query.data ? subtitle : undefined}
         reserveSubtitle
         titleNumberOfLines={2}

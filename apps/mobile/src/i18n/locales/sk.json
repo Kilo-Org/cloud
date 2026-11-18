@@ -4852,6 +4852,7 @@
     "superseded": "Tento odkaz bol nahradený na inom zariadení, preto už nefunguje."
   },
   "sharedSession": {
+    "startedAt": "Začaté o {{time}}",
     "title": "Zdieľaná relácia",
     "someone": "Niekto",
     "sharedBy": "Zdieľal(a) {{owner}}",

@@ -4710,6 +4710,7 @@
     "superseded": "Deze link is elders vervangen en werkt daarom niet meer."
   },
   "sharedSession": {
+    "startedAt": "Gestart om {{time}}",
     "title": "Gedeelde sessie",
     "someone": "Iemand",
     "sharedBy": "Gedeeld door {{owner}}",

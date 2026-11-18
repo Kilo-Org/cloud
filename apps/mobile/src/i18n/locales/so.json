@@ -4710,6 +4710,7 @@
     "superseded": "Xiriirkan meel kale ayaa lagu beddelay, sidaas darteed hadda ma shaqaynayo."
   },
   "sharedSession": {
+    "startedAt": "Waxay bilaabatay {{time}}",
     "title": "Fadhi la wadaagay",
     "someone": "Qof",
     "sharedBy": "Waxaa wadaagay {{owner}}",

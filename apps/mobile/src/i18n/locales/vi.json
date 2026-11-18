@@ -4710,6 +4710,7 @@
     "superseded": "Liên kết này đã được thay thế trên thiết bị khác nên không còn hoạt động."
   },
   "sharedSession": {
+    "startedAt": "Bắt đầu lúc {{time}}",
     "title": "Phiên được chia sẻ",
     "someone": "Ai đó",
     "sharedBy": "Được chia sẻ bởi {{owner}}",

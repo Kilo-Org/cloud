@@ -313,6 +313,21 @@ describe('low balance alert screen', () => {
     unmount();
   });
 
+  it('names a stored amount above the ceiling before any interaction', async () => {
+    query.data = {
+      settings: {
+        minimum_balance: 2_000_000_000,
+        minimum_balance_alert_email: ['one@example.com'],
+      },
+    };
+    const { renderer, unmount } = await mountScreen();
+    expect(thresholdFieldOf(renderer).props.error).toBe(capSentence());
+    // Nothing to commit at the mount: the seeded draft is the stored one, and
+    // it is not written back until the person asks.
+    expect(saveMutate).not.toHaveBeenCalled();
+    unmount();
+  });
+
   it('keeps the draft and offers Retry after a rejected write', async () => {
     const { renderer, unmount } = await mountScreen();
     await act(() => {

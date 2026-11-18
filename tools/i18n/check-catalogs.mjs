@@ -648,12 +648,13 @@ const LOCALE_SEPARATED_KEYS = new Set([
 ]);
 
 /**
- * The keys whose whole value may be the separator the catalog writes. Thai
- * closes no sentence with a mark, so its `common.sentenceJoiner` is a single
- * space: that space is the value, not an untranslated string, and the
- * empty-value rule has to let it through.
+ * The catalogs that close no sentence with a mark: Thai separates its
+ * sentences with a bare space, so its `common.sentenceJoiner` is that space
+ * and nothing else. Every other catalog's joiner carries its sentence
+ * terminator, so a whitespace-only joiner there stays an untranslated string
+ * the empty-value rule rejects.
  */
-const SEPARATOR_ONLY_KEYS = new Set(['common.sentenceJoiner']);
+const MARKLESS_SENTENCE_TAGS = new Set(['th']);
 
 /**
  * The counted clause the review-submit message renders before its stale
@@ -1610,7 +1611,8 @@ function checkTranslatedValue({
   const problems = [];
   // A catalog that writes no sentence mark may hold nothing but the space it
   // separates sentences with; any other whitespace-only value is untranslated.
-  const separatorOnly = SEPARATOR_ONLY_KEYS.has(key) && value !== '' && value.trim() === '';
+  const separatorOnly =
+    key === 'common.sentenceJoiner' && MARKLESS_SENTENCE_TAGS.has(tag) && value !== '';
   if (value.trim() === '' && !separatorOnly) {
     problems.push(`${label}: "${key}" is empty`);
   }

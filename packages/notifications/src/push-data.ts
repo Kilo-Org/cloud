@@ -15,6 +15,18 @@ import { refineSpendAlertScope, spendAlertScopeShape } from './spend-alert-scope
 export const cloudAgentSessionCategorySchema = z.enum(['attention', 'status']);
 export type CloudAgentSessionCategory = z.infer<typeof cloudAgentSessionCategorySchema>;
 
+// The needs-input raise fields every cloud-agent-session contract carries,
+// whatever envelope transports it: the visible push in this module and the
+// send request in `./rpc-schemas`. Declared once so a field cannot be added
+// to one path and silently dropped by the other.
+export const cloudAgentSessionRaiseShape = {
+  category: cloudAgentSessionCategorySchema.optional(),
+  // Needs-input raise detail: which answer the waiting agent wants, and the
+  // PR that can be opened from the notification. Absent on status pushes.
+  attentionKind: z.enum(NEEDS_INPUT_ATTENTION_KINDS).optional(),
+  prUrl: nonEmptyStringSchema.optional(),
+};
+
 /**
  * Schema for the `data` blob attached to Expo push notifications.
  * This crosses the OS boundary as untyped JSON, so it MUST be
@@ -24,10 +36,7 @@ export const pushDataSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('cloud_agent_session'),
     cliSessionId: nonEmptyStringSchema,
-    category: cloudAgentSessionCategorySchema.optional(),
-    // Needs-input raise detail: which answer the waiting agent wants, and the
-    // PR that can be opened from the notification. Absent on status pushes.
-    attentionKind: z.enum(NEEDS_INPUT_ATTENTION_KINDS).optional(),
+    ...cloudAgentSessionRaiseShape,
     /**
      * The one raise this attention push presents: the waiting session's own
      * status time (`cli_sessions_v2.status_updated_at`), in the payload's ISO
@@ -38,7 +47,6 @@ export const pushDataSchema = z.discriminatedUnion('type', [
      * existed — the app then keeps its previous behaviour.
      */
     raiseId: nonEmptyStringSchema.optional(),
-    prUrl: nonEmptyStringSchema.optional(),
     // The session's organization, so a tap can land the app in the context
     // the session belongs to. Optional so a push from an older producer in a
     // rolling deploy still validates; absent means Personal.

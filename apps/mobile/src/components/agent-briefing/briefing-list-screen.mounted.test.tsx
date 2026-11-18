@@ -40,7 +40,7 @@ vi.mock('@/components/empty-state', () => ({
   }: {
     title: string;
     description?: string;
-    refreshControl?: ReactElement;
+    placement?: 'center' | 'top' | 'static';
     action?: ReactElement;
   }) => createElement('EmptyState', props, action),
 }));
@@ -52,7 +52,6 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/card', () => ({ Card: 'Card' }));
 vi.mock('@/components/ui/icon-button', () => ({ IconButton: 'IconButton' }));
 vi.mock('@/components/ui/icons', () => ({ Newspaper: 'Newspaper', Settings: 'Settings' }));
-vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('./briefing-card', () => ({ BriefingScorecard: 'BriefingScorecard' }));
@@ -205,15 +204,19 @@ it('keeps background updates silent and shows progress only for a pull until it 
 
 it('renders the shared empty state with its settings action when no context is enabled', () => {
   const mounted = mountBriefings([]);
+  const list = mounted.root.findByType('FlashList' as ElementType);
   const emptyState = mounted.root.findByType('EmptyState' as ElementType);
   expect(emptyState.props.title).toBe('agentBriefing.noEnabledContexts');
   // Nothing is scheduled here, so the empty-window hint would be a wrong claim;
   // the filter hint stays on screen instead.
   expect(emptyState.props.description).toBeUndefined();
   expect(emptyState.props.icon).toBe('Newspaper');
-  // Pull to refresh moved with the body: the state owns the gesture now.
-  expect((emptyState.props.refreshControl as ReactElement).type).toBe('RefreshControl');
-  expect(mounted.root.findAllByType('FlashList' as ElementType)).toHaveLength(0);
+  // The state sits under the filter controls, inside the list that owns the
+  // pull-to-refresh gesture.
+  expect(emptyState.props.placement).toBe('top');
+  expect(emptyState.props.refreshControl).toBeUndefined();
+  const listProps: { onRefresh: unknown } = list.props as { onRefresh: unknown };
+  expect(typeof listProps.onRefresh).toBe('function');
   const texts = mounted.root
     .findAllByType('Text' as ElementType)
     .map(node => String(node.props.children));

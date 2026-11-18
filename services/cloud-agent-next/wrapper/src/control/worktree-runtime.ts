@@ -19,6 +19,8 @@ import {
   type SessionRequestIdentity,
 } from '../../../src/shared/sandbox-control-protocol.js';
 import {
+  CLOUD_WEB_SEARCH_DISABLED_ENV,
+  CLOUD_WEB_SEARCH_PROVIDER_ENV,
   CONTROL_RUNTIME_RESERVED_ENV_VARS,
   RESERVED_ENV_VAR_PREFIXES,
   SYSTEM_GIT_CONFIG_ENV,
@@ -100,7 +102,12 @@ export function buildWorktreeKiloEnvironment(
   mcp?: SessionAttachPayload['mcp'],
   runtimeConfig?: Pick<
     ControlPlaneRouteSpec,
-    'permission' | 'githubReviewTarget' | 'createdOnPlatform' | 'modelContextLimits'
+    | 'permission'
+    | 'githubReviewTarget'
+    | 'createdOnPlatform'
+    | 'modelContextLimits'
+    | 'webSearchDisabled'
+    | 'webSearchProvider'
   > & {
     cloudAgentMcp?: ControlPlaneSessionCredentialsPayload['cloudAgentMcp'];
   }
@@ -197,6 +204,10 @@ export function buildWorktreeKiloEnvironment(
     XDG_STATE_HOME: path.join(home, '.local', 'state'),
     XDG_RUNTIME_DIR: path.join(home, '.run'),
     KILO_PLATFORM: 'cloud-agent',
+    ...(runtimeConfig?.webSearchDisabled ? { [CLOUD_WEB_SEARCH_DISABLED_ENV]: '1' } : {}),
+    ...(runtimeConfig?.webSearchProvider
+      ? { [CLOUD_WEB_SEARCH_PROVIDER_ENV]: runtimeConfig.webSearchProvider }
+      : {}),
     ...(runtimeConfig?.githubReviewTarget
       ? {
           [GITHUB_REVIEW_TARGET_ENV]: serializeGitHubReviewTarget(runtimeConfig.githubReviewTarget),

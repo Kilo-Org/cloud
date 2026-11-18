@@ -13,6 +13,7 @@ import type {
   WorkspaceFailureSubtype,
 } from '@kilocode/worker-utils/cloud-agent-failure';
 import { z } from 'zod';
+import { webSearchProviderSchema } from './web-search-provider.js';
 import { customerBillingFailureSchema } from './cloud-agent-billing.js';
 import type { CloudAgentRunContainer } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import { RUNTIME_HARNESSES } from './control-plane-runtime-contract.js';
@@ -486,6 +487,8 @@ const routeSpecObjectSchema = z
     runtimeAgents: RuntimeAgentsSchema.optional(),
     builtinAgents: RuntimeBuiltinAgentsSchema.optional(),
     modelContextLimits: RuntimeModelContextLimitsSchema.optional(),
+    webSearchDisabled: z.literal(true).optional(),
+    webSearchProvider: webSearchProviderSchema.optional(),
     kiloCommands: RuntimeKiloCommandsSchema.optional(),
     /**
      * Preserves the runtime key and HOME of existing allocations. The Sandbox
@@ -543,6 +546,8 @@ export const workspaceConfigSchema = routeSpecObjectSchema
     runtimeAgents: true,
     builtinAgents: true,
     modelContextLimits: true,
+    webSearchDisabled: true,
+    webSearchProvider: true,
     kiloCommands: true,
   })
   .strict();
@@ -561,6 +566,8 @@ export const attachmentSpecSchema = routeSpecObjectSchema
     runtimeAgents: true,
     builtinAgents: true,
     modelContextLimits: true,
+    webSearchDisabled: true,
+    webSearchProvider: true,
     kiloCommands: true,
   })
   .strict()

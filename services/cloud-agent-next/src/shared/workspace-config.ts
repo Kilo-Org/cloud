@@ -17,6 +17,8 @@ type RuntimeProfileFields = Pick<
   | 'runtimeAgents'
   | 'builtinAgents'
   | 'modelContextLimits'
+  | 'webSearchDisabled'
+  | 'webSearchProvider'
   | 'kiloCommands'
 >;
 
@@ -31,6 +33,8 @@ export function projectRuntimeProfileFields(spec: RuntimeProfileFields): Runtime
     ...(spec.modelContextLimits === undefined
       ? {}
       : { modelContextLimits: spec.modelContextLimits }),
+    ...(spec.webSearchDisabled ? { webSearchDisabled: spec.webSearchDisabled } : {}),
+    ...(spec.webSearchProvider ? { webSearchProvider: spec.webSearchProvider } : {}),
     ...(spec.kiloCommands === undefined ? {} : { kiloCommands: spec.kiloCommands }),
   };
 }
@@ -69,6 +73,8 @@ export function attachmentSpecFromRouteSpec(spec: ControlPlaneRouteSpec): Attach
     runtimeAgents: _runtimeAgents,
     builtinAgents: _builtinAgents,
     modelContextLimits: _modelContextLimits,
+    webSearchDisabled: _webSearchDisabled,
+    webSearchProvider: _webSearchProvider,
     kiloCommands: _kiloCommands,
     ...attachment
   } = spec;

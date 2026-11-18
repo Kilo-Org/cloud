@@ -61,18 +61,15 @@ const mockInferenceProviderUserByok = jest.fn(
   async (modelId: string, _providers: readonly string[]) =>
     INFERENCE_PROVIDER_BYOK_MODELS.has(modelId)
 );
-const mockByok = jest.fn<Promise<OpenRouterModel[]>, [string]>();
+type MockByokKey = { providerId: string; serveCatalogModels: boolean };
+const mockByok = jest.fn<Promise<OpenRouterModel[]>, [readonly MockByokKey[]]>();
 const mockCustom = jest.fn<
   Promise<OpenRouterModel[]>,
   [string, readonly string[], string | null]
 >();
-type MockByokKey = { providerId: string; serveCatalogModels: boolean };
 const mockEnabledKeys = jest.fn(async (_db: unknown, _owner: unknown): Promise<MockByokKey[]> => [
   { providerId: 'openai', serveCatalogModels: false },
 ]);
-const mockEndpointCatalogModelIds = jest.fn(
-  async (_keys: readonly MockByokKey[]): Promise<ReadonlySet<string>> => new Set()
-);
 /** Replica snapshot loads a test expects; anything else fails the test teardown. */
 let expectedReplicaLoads = 0;
 const mockCatalogModelIds = new Set(['provider/allowed']);
@@ -133,7 +130,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/listAvailableCustomLlm
   listAvailableCustomLlms: mockCustom,
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
-  getDirectByokModelsForOrganization: mockByok,
+  getDirectByokModels: mockByok,
 }));
 jest.mock(
   '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-user-byok',
@@ -151,9 +148,6 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
   addUserByokAvailability: mockAvailability,
   getEnabledByokProviders: mockEnabledKeys,
   hasInferenceProviderUserByokForModel: mockInferenceProviderUserByok,
-}));
-jest.mock('@kilocode/web-shared/lib/ai-gateway/byok-endpoint/models', () => ({
-  getByokEndpointCatalogModelIds: mockEndpointCatalogModelIds,
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing', () => ({
   tagOpenAiChatGptByokModels: mockTagChatGpt,
@@ -430,7 +424,7 @@ describe('organization model producer publication', () => {
     );
     expect(mockEvaluatePolicy).toHaveBeenCalledWith(mockContext);
     expect(mockCustom).toHaveBeenCalledWith('fixture-org', ['fixture-group'], null);
-    expect(mockByok).toHaveBeenCalledWith('fixture-org');
+    expect(mockByok).toHaveBeenCalledWith([{ providerId: 'openai', serveCatalogModels: false }]);
     expect(mockEnabledKeys).toHaveBeenCalledWith(expect.anything(), {
       type: 'organization',
       id: 'fixture-org',
@@ -676,52 +670,27 @@ describe('organization model producer publication', () => {
     expect(getAllowedProviders?.('provider/ceiling-inference')).toBeUndefined();
   });
 
-  it("lists the organization's endpoint models and the catalog models its endpoints serve", async () => {
+  it("lists the models of the organization's direct BYOK keys and endpoints from its keys", async () => {
     const keys = [
+      { providerId: 'morph-byok', serveCatalogModels: false },
       { providerId: 'endpoint-aaaaaaaaaa', serveCatalogModels: false },
-      { providerId: 'endpoint-bbbbbbbbbb', serveCatalogModels: true },
     ];
     mockEnabledKeys.mockResolvedValueOnce(keys);
-    const endpointCatalogModelIds = new Set([
-      'provider/ceiling-gateway',
-      'provider/deny-listed-inference',
-      'provider/ungranted-catalog',
-    ]);
-    mockEndpointCatalogModelIds.mockResolvedValueOnce(endpointCatalogModelIds);
-    // Direct BYOK model lists include the organization's endpoint models.
     mockByok.mockResolvedValueOnce([
       catalogModel('morph-byok/private'),
       catalogModel('endpoint-aaaaaaaaaa/my-model'),
     ]);
-    mockCatalog = {
-      ...mockCatalog,
-      data: [
-        catalogModel('provider/allowed'),
-        catalogModel('provider/ceiling-gateway'),
-        catalogModel('provider/deny-listed-inference'),
-        catalogModel('provider/ungranted-catalog'),
-      ],
-    };
 
     const result = await resultFor();
 
-    // An endpoint serves a model the policy denies only for its providers, never one it denies.
     expect(result.data.map(model => model.id)).toEqual([
       'provider/allowed',
-      'provider/ceiling-gateway',
+      'provider/training',
       'morph-byok/private',
       'endpoint-aaaaaaaaaa/my-model',
       'kilo-internal/private',
     ]);
-    expect(mockEndpointCatalogModelIds).toHaveBeenCalledWith(keys);
-    expect(mockCatalogAvailability).toHaveBeenCalledWith(
-      expect.any(Array),
-      endpointCatalogModelIds
-    );
-    expect(mockInferenceProviderUserByok).not.toHaveBeenCalledWith(
-      'provider/ceiling-gateway',
-      expect.anything()
-    );
+    expect(mockByok).toHaveBeenCalledWith(keys);
   });
 
   it('logs one aggregated record for a catalog wider than the allowed models', async () => {

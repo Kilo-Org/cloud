@@ -2889,19 +2889,13 @@ export const DirectByokModelEndpointSchema = z.enum([
 
 export type DirectByokModelEndpoint = z.infer<typeof DirectByokModelEndpointSchema>;
 
-/** What model lists show about a BYOK model, shared by direct BYOK providers and endpoints. */
-export const ByokModelBaseSchema = z.object({
+export const DirectByokModelSchema = z.object({
+  id: z.string(),
   name: z.string(),
   description: z.string().optional(),
   flags: z.array(DirectByokModelFlagSchema).readonly().optional(),
   context_length: z.number(),
   max_completion_tokens: z.number(),
-});
-
-export type ByokModelBase = z.infer<typeof ByokModelBaseSchema>;
-
-export const DirectByokModelSchema = ByokModelBaseSchema.extend({
-  id: z.string(),
   reasoning_options: z.array(ReasoningOptionSchema).optional(),
   /** The OpenRouter catalog model ID that models.dev identifies as the same model. */
   catalog_model_id: z.string().optional(),
@@ -3113,7 +3107,7 @@ const ByokEndpointModelOverridesSchema = z.object({
   reasoning_format: ByokEndpointReasoningFormatSchema.optional(),
 });
 
-export const ByokEndpointModelSchema = ByokModelBaseSchema.omit({ description: true })
+export const ByokEndpointModelSchema = DirectByokModelSchema.pick({ flags: true })
   .extend({
     /** The id clients use after the provider id; in catalog mode, the Kilo catalog id it serves. */
     id: ByokEndpointModelIdSchema,

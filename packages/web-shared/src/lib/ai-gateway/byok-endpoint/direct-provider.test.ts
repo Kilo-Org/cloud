@@ -6,6 +6,7 @@ import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/typ
 import { applyTrackingIds } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import {
   getDirectByokKeyLabel,
+  getDirectByokModels,
   getDirectByokModelChatApis,
   getDirectByokPolicyTarget,
   getDirectByokUpstreamModelId,
@@ -212,5 +213,33 @@ describe('createByokEndpointDirectProvider', () => {
     );
 
     expect(model.reasoning_options?.length).toBeGreaterThan(0);
+  });
+});
+
+describe('endpoint model lists', () => {
+  it('lists the models of endpoints outside catalog mode like direct BYOK models', async () => {
+    const base = definition();
+    const bespoke = definition({
+      client_provider: 'anthropic',
+      models: [
+        { ...base.models[0], id: 'anthropic/claude-sonnet-4.6', name: 'Sonnet', flags: ['vision'] },
+      ],
+    });
+
+    const models = await getDirectByokModels([
+      { providerId: PROVIDER_ID, serveCatalogModels: false, endpoint: bespoke },
+      { providerId: 'endpoint-bbbbbbbbbb', serveCatalogModels: true, endpoint: definition() },
+    ]);
+
+    expect(models).toEqual([
+      expect.objectContaining({
+        id: `${PROVIDER_ID}/anthropic/claude-sonnet-4.6`,
+        name: 'Acme: Sonnet',
+        architecture: expect.objectContaining({ input_modalities: ['text', 'image'] }),
+        hasUserByokAvailable: true,
+        isFree: false,
+        opencode: expect.objectContaining({ ai_sdk_provider: 'anthropic' }),
+      }),
+    ]);
   });
 });

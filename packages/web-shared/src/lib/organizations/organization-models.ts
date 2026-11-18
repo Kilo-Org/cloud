@@ -14,7 +14,7 @@ import {
 } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { listAvailableCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/listAvailableCustomLlms';
-import { getDirectByokModelsForOrganization } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import { getDirectByokModels } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { getAllowedDirectByokCatalogModelIds } from '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-user-byok';
 import { ORG_AUTO_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { isOrganizationAutoEnabled } from '@kilocode/web-shared/lib/organizations/organization-auto-model';
@@ -24,7 +24,6 @@ import {
   getEnabledByokProviders,
   hasInferenceProviderUserByokForModel,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
-import { getByokEndpointCatalogModelIds } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint/models';
 import { appendLocalFakeDeterministicCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
 import { tagOpenAiChatGptByokModels } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
 import { tagClaudeBillingByokModels } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/byok-models';
@@ -83,25 +82,20 @@ export async function getAvailableModelsForOrganization(
     getAllowedDirectByokCatalogModelIds(organizationId, policy),
   ]);
   const byokProviderIds = byokKeys.map(key => key.providerId);
-  const endpointCatalogModelIds = await getByokEndpointCatalogModelIds(byokKeys);
   const restrictionCandidates = [...responseData.data];
 
   const { filteredModels, allowedProvidersByModel } = await applyModelPolicyToCatalog(
     policy,
     restrictionCandidates,
     byokProviderIds,
-    directByokCatalogModelIds,
-    endpointCatalogModelIds
+    directByokCatalogModelIds
   );
 
   let availableModels = addDirectByokCatalogAvailability(
-    addDirectByokCatalogAvailability(
-      await addUserByokAvailability(filteredModels, byokProviderIds, modelId =>
-        allowedProvidersByModel.get(modelId)
-      ),
-      directByokCatalogModelIds
+    await addUserByokAvailability(filteredModels, byokProviderIds, modelId =>
+      allowedProvidersByModel.get(modelId)
     ),
-    endpointCatalogModelIds
+    directByokCatalogModelIds
   );
 
   if (organization.plan === 'teams' && organization.settings.data_collection === 'deny') {
@@ -112,7 +106,7 @@ export async function getAvailableModelsForOrganization(
     availableModels.push(buildAutoModelCatalogEntry(ORG_AUTO_MODEL));
   }
 
-  availableModels.push(...(await getDirectByokModelsForOrganization(organizationId)));
+  availableModels.push(...(await getDirectByokModels(byokKeys)));
   availableModels.push(
     ...(await listAvailableCustomLlms(organizationId, context.groupIds, countryCode))
   );
@@ -146,8 +140,7 @@ async function applyModelPolicyToCatalog(
   policy: EffectiveOrganizationModelPolicy,
   candidates: readonly OpenRouterModel[],
   byokProviderIds: readonly UserByokProviderId[],
-  directByokCatalogModelIds: ReadonlySet<string>,
-  endpointCatalogModelIds: ReadonlySet<string>
+  directByokCatalogModelIds: ReadonlySet<string>
 ): Promise<{
   filteredModels: OpenRouterModel[];
   allowedProvidersByModel: Map<string, ReadonlySet<string>>;
@@ -164,12 +157,6 @@ async function applyModelPolicyToCatalog(
     const decision = await getEffectiveModelDecision(policy, model.id);
     if (!decision.allowed && !directByokCatalogModelIds.has(model.id)) {
       if (!allowsInferenceProviderUserByok(decision)) {
-        continue;
-      }
-      // Like provider keys the allow-list cannot name, the organization's own endpoints are
-      // subject only to its model policy.
-      if (endpointCatalogModelIds.has(model.id)) {
-        filteredModels.push(model);
         continue;
       }
       inferenceCheck.checked += 1;

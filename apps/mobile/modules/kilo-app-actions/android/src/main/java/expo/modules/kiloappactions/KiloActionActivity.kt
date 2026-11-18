@@ -60,8 +60,8 @@ internal object KiloActionContract {
 
   /**
    * The resolved form of an intent: the contract slug it names, and its
-   * payload in the JSON-object form `parseAppActionPayload` accepts. The
-   * payload is null when the intent names no action.
+   * payload in the JSON-object form `parseAppActionPayload` accepts.
+   * `resolve` returns null when the intent names no action.
    *
    * An extra wins over the query of a VIEW intent. A field the caller did not
    * send is left out: the contract decides whether the request is complete, so

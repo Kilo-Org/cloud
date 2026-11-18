@@ -4144,12 +4144,18 @@ describe('kilo-auto/efficient classifier billing', () => {
       name: 'organization data collection deny',
       settings: { data_collection: 'deny' },
       provider: undefined,
+      zdr: false,
     },
-    { name: 'request data collection deny', settings: {}, provider: { data_collection: 'deny' } },
-    { name: 'request ZDR', settings: {}, provider: { zdr: true } },
+    {
+      name: 'request data collection deny',
+      settings: {},
+      provider: { data_collection: 'deny' },
+      zdr: false,
+    },
+    { name: 'request ZDR', settings: {}, provider: { zdr: true }, zdr: true },
   ] as const)(
     'denies models that require data collection to the efficient decision worker for $name',
-    async ({ settings, provider: requestProvider }) => {
+    async ({ settings, provider: requestProvider, zdr }) => {
       mockedGetUserFromAuth.mockResolvedValue({
         user: { id: 'user-123', microdollars_used: 0 } as User,
         authFailedResponse: null,
@@ -4171,7 +4177,8 @@ describe('kilo-auto/efficient classifier billing', () => {
 
       expect(response.status).toBe(200);
       expect(mockedCollectDataCollectionRequiredAutoRoutingModelIds).toHaveBeenCalledWith(
-        'efficient'
+        'efficient',
+        { zdr }
       );
       expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledWith(
         expect.objectContaining({ deniedModelIds: ['meta/muse-spark-1.3-contributor'] })

@@ -3195,7 +3195,8 @@ export const CustomLlmDefinitionSchema = z
     pricing: CustomPricingTiersSchema.optional(),
     /** Whether the upstream may train on prompts. Only allowed with pricing; without it,
      * or when unset, the model is assumed to train on prompts. Set it to false only for
-     * an upstream with zero data retention. */
+     * an upstream that does not train on prompts. It never makes a custom LLM eligible
+     * for zero data retention (`provider.zdr`), which excludes every custom LLM. */
     may_train_on_prompts: z.boolean().optional(),
   })
   .superRefine((definition, ctx) => {

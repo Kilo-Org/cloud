@@ -362,11 +362,9 @@ function providerSettingsAllowPartner(
   }
   // The partner bills its own pricing, which a price ceiling does not cover.
   if (provider.max_price) return false;
-  // `may_train_on_prompts: false` is set only for zero data retention upstreams.
-  if (
-    (provider.zdr === true || provider.data_collection === 'deny') &&
-    partner.definition.may_train_on_prompts !== false
-  ) {
+  // Kilo does not vouch for zero data retention on any custom LLM, partners included.
+  if (provider.zdr === true) return false;
+  if (provider.data_collection === 'deny' && partner.definition.may_train_on_prompts !== false) {
     return false;
   }
   return true;

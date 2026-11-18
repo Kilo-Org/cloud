@@ -664,8 +664,20 @@ export function CustomLlmsContent() {
                   </li>
                   <li>
                     With <code>pricing</code>, set{' '}
-                    <code>&quot;may_train_on_prompts&quot;: false</code> only for zero data
-                    retention upstreams.
+                    <code>&quot;may_train_on_prompts&quot;: false</code> only for upstreams that do
+                    not train on prompts. Custom LLMs never serve requests that ask for zero data
+                    retention.
+                  </li>
+                  <li>
+                    A partner sets{' '}
+                    <code>
+                      &quot;partner&quot;: {'{'} &quot;inference_provider&quot;: &quot;acme&quot;{' '}
+                      {'}'}
+                    </code>{' '}
+                    and uses the catalog model ID it serves as its public ID. It needs{' '}
+                    <code>pricing</code> and must not set grants, <code>public</code>, or{' '}
+                    <code>country_deny_list</code>. Kilo-paid requests try it first and fall back to
+                    the gateway on an error.
                   </li>
                   <li>
                     Grant access with <code>organization_ids</code> or <code>group_ids</code>, or

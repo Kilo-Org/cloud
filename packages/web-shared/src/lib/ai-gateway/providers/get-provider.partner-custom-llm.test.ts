@@ -484,16 +484,21 @@ describe('getProvider skips the partner', () => {
     );
   });
 
-  test.each<[string, OpenRouterProviderConfig]>([
-    ['zero data retention', { zdr: true }],
-    ['denied data collection', { data_collection: 'deny' }],
-  ])('not for %s when the partner does not train on prompts', async (_name, provider) => {
+  test('not for denied data collection when the partner does not train on prompts', async () => {
     await insertPartner({ may_train_on_prompts: false });
 
-    const { result } = await routeAndRecord({ request: chatRequest(provider) });
+    const { result } = await routeAndRecord({
+      request: chatRequest({ data_collection: 'deny' }),
+    });
 
     expect(result.routes).toHaveLength(2);
     expect((await result.routes[0]()).provider.type).toBe('partner');
+  });
+
+  test('for zero data retention even when the partner does not train on prompts', async () => {
+    await insertPartner({ may_train_on_prompts: false });
+
+    await expectKiloRouteOnly({ request: chatRequest({ zdr: true }) }, 'provider-settings');
   });
 
   test('when the partner has no usable credentials', async () => {

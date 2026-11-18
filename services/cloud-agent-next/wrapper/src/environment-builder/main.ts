@@ -162,29 +162,44 @@ async function main(): Promise<void> {
       inherited,
       logPath,
     });
-  try {
-    if (input.filesystemArchive) {
-      archive = await createAwsFilesystemBuildArchive({
-        identity: input,
-        baseImage: input.filesystemArchive.baseImage,
-        root: '/',
-        signal: controller.signal,
-        client,
-      });
-    }
-    result = await (ownedScope === undefined ? run() : ownedScope.run(run));
-    if (result.outcome === 'ready' && archive) {
-      // Setup descendants are stopped and credentials are removed. Capture runs outside their sealed scope.
-      reporter.setStep('archive');
-      await archive.captureAndUpload();
-    }
-  } catch (error) {
-    if (!input.filesystemArchive) throw error;
-    result = {
+  // Only archive calls map to archive_failed. Other errors keep their cause and propagate.
+  const archiveFailure = (error: unknown): EnvironmentBuildResult => {
+    log(
+      `environment builder archive failed: ${error instanceof Error ? error.message : 'unknown'}`
+    );
+    return {
       outcome: 'failed',
       step: 'archive',
       reason: controller.signal.aborted ? 'canceled' : 'archive_failed',
     };
+  };
+  const build = async (): Promise<EnvironmentBuildResult> => {
+    if (input.filesystemArchive) {
+      try {
+        archive = await createAwsFilesystemBuildArchive({
+          identity: input,
+          baseImage: input.filesystemArchive.baseImage,
+          root: '/',
+          signal: controller.signal,
+          client,
+        });
+      } catch (error) {
+        return archiveFailure(error);
+      }
+    }
+    const built = await (ownedScope === undefined ? run() : ownedScope.run(run));
+    if (built.outcome !== 'ready' || !archive) return built;
+    // Setup descendants are stopped and credentials are removed. Capture runs outside their sealed scope.
+    reporter.setStep('archive');
+    try {
+      await archive.captureAndUpload();
+      return built;
+    } catch (error) {
+      return archiveFailure(error);
+    }
+  };
+  try {
+    result = await build();
   } finally {
     clearTimeout(deadline);
     await archive?.dispose().catch(() => undefined);

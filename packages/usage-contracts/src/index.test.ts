@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
+import type { KiloOrganizationId } from './schema-types';
 import { UsageRecordRequestSchema, UsageRecordResponseSchema } from './index';
 
 function validCore() {
@@ -18,7 +19,9 @@ function validCore() {
     cache_discount: null,
     has_error: false,
     abuse_classification: 0,
-    organization_id: null,
+    // Typed wider than the literal so tests can exercise accepted and rejected
+    // organization_id shapes.
+    organization_id: null as KiloOrganizationId | null,
     inference_provider: null,
     project_id: null,
   };

@@ -30,6 +30,9 @@ let refreshInFlight: Promise<AppleJWK[]> | null = null;
 let lastRefreshStartedAt = 0;
 let lastRefreshError: unknown = null;
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+// Upper bound on how long a failed refresh may keep serving the cached key
+// set: past this age, verification fails closed until a refresh succeeds.
+const STALE_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
 const REFRESH_COOLDOWN_MS = 30 * 1000;
 const JWKS_FETCH_TIMEOUT_MS = 10_000;
 
@@ -52,7 +55,7 @@ async function refreshAppleKeys(): Promise<AppleJWK[]> {
 
   const now = Date.now();
   if (now - lastRefreshStartedAt < REFRESH_COOLDOWN_MS) {
-    if (cachedKeys) {
+    if (cachedKeys && now - cachedKeys.fetchedAt <= STALE_CACHE_MAX_AGE_MS) {
       return cachedKeys.keys;
     }
     throw lastRefreshError instanceof Error
@@ -69,11 +72,13 @@ async function refreshAppleKeys(): Promise<AppleJWK[]> {
       return keys;
     } catch (error) {
       lastRefreshError = error;
-      if (cachedKeys) {
-        // Serve the still-present key set; the next attempt stays on the
+      if (cachedKeys && Date.now() - cachedKeys.fetchedAt <= STALE_CACHE_MAX_AGE_MS) {
+        // Serve the still-present key set, at most STALE_CACHE_MAX_AGE_MS
+        // after the last successful fetch; the next attempt stays on the
         // refresh cooldown while lastRefreshError records the failure. The
         // error never reaches a caller in this case, so report it here to
-        // keep an Apple JWKS outage visible.
+        // keep an Apple JWKS outage visible. Past the stale bound the error
+        // rethrows instead, and the caller-side reporting covers it.
         captureException(error, { tags: { source: 'apple_jwks_refresh' } });
         return cachedKeys.keys;
       }
@@ -102,8 +107,9 @@ function jwkToPem(jwk: AppleJWK): string {
  * Verifies a JWT signed by Apple against Apple's JWKS, with a bounded refresh:
  * if the token's `kid` isn't in the cached key set, the module refreshes the key
  * set at most once per cooldown through a single shared in-flight fetch, keeping
- * the current cached keys until a refresh succeeds. Tokens whose `kid` remains
- * absent after that refresh are rejected.
+ * the current cached keys for at most 24 hours after the last successful fetch;
+ * past that bound, or when no cached set exists, a failed refresh propagates to
+ * the caller. Tokens whose `kid` remains absent after that refresh are rejected.
  *
  * @param token - The Apple-signed JWT to verify
  * @param audience - Expected `aud` claim (Apple client ID(s))

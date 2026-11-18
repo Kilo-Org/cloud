@@ -162,6 +162,14 @@ describe('AWS immutable prepared archive', () => {
     await expect(f.api.completeUpload()).rejects.toMatchObject({ code: 'build_inactive' });
     expect(f.context().archive?.verifiedAt).toBeUndefined();
   });
+  it('refuses capture with a stable code when no archive was reserved', async () => {
+    const f = fixture();
+    f.replace({ state: 'capturing', captureId });
+    await expect(f.api.capture(captureId)).rejects.toMatchObject({
+      name: 'AwsBuildArchiveError',
+      code: 'archive_missing',
+    });
+  });
   it('requires the coordinator capture ID and the exact pinned base', async () => {
     const f = fixture();
     await expect(

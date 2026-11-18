@@ -1,8 +1,8 @@
 diff --git a/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt b/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt
-index 7bb48f44c5415f7c6b914934db90705825bfea13..efb2fcd825fe021a613d3f91d8a64d37e0c750ce 100644
+index 7bb48f44c5415f7c6b914934db90705825bfea13..7ddd388cd3e0747d72717a321a42eaaed036b120 100644
 --- a/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt
 +++ b/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt
-@@ -50,6 +50,13 @@ import kotlin.math.ceil
+@@ -50,6 +50,43 @@ import kotlin.math.ceil
  object MeasurementStore {
    private const val TAG = "MeasurementStore"
  
@@ -13,10 +13,48 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..efb2fcd825fe021a613d3f91d8a64d37
 +   */
 +  private const val WIDEN_SLACK_PX = 8
 +
++  /**
++   * Whether the text contains code points whose rendering usually needs
++   * per-run font fallback: everything outside the basic multilingual plane
++   * (emoji, CJK extensions), variation selectors, zero-width joiners, and all
++   * combining marks. A single TextPaint can understate the advance of those
++   * runs, so the extra reserve-height pass exists for them; plain BMP text
++   * does not need it.
++   */
++  private fun textNeedsFontFallback(text: CharSequence): Boolean {
++    var i = 0
++    val n = text.length
++    while (i < n) {
++      val c = text[i]
++      if (Character.isHighSurrogate(c)) {
++        return true
++      }
++      val type = Character.getType(c)
++      if (
++        type == Character.NON_SPACING_MARK ||
++        type == Character.COMBINING_SPACING_MARK ||
++        type == Character.ENCLOSING_MARK ||
++        c == '\uFE0E' || c == '\uFE0F' || c == '\u200D'
++      ) {
++        return true
++      }
++      i++
++    }
++    return false
++  }
++
    private data class PaintParams(
      val typeface: Typeface,
      val fontSize: Float,
-@@ -120,7 +127,9 @@ object MeasurementStore {
+@@ -57,6 +94,7 @@ object MeasurementStore {
+ 
+   private data class MeasurementParams(
+     val cachedWidth: Float,
++    val cachedExactWidth: Boolean,
+     val cachedSize: Long,
+     val spannable: CharSequence?,
+     val paintParams: PaintParams,
+@@ -120,7 +158,9 @@ object MeasurementStore {
      val existingHash = cached?.markdownHash ?: 0
      val paintParams = PaintParams(paint.typeface ?: Typeface.DEFAULT, paint.textSize)
  
@@ -27,7 +65,16 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..efb2fcd825fe021a613d3f91d8a64d37
      if (trailingMarginBottomPx > 0f) {
        newSize =
          YogaMeasureOutput.make(
-@@ -177,7 +186,8 @@ object MeasurementStore {
+@@ -128,7 +168,7 @@ object MeasurementStore {
+           YogaMeasureOutput.getHeight(newSize) + PixelUtil.toDIPFromPixel(trailingMarginBottomPx),
+         )
+     }
+-    data[id] = MeasurementParams(width, newSize, spannable, paintParams, existingHash)
++    data[id] = MeasurementParams(width, true, newSize, spannable, paintParams, existingHash)
+     return oldSize != newSize
+   }
+ 
+@@ -177,7 +217,8 @@ object MeasurementStore {
        }
      }
  
@@ -37,7 +84,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..efb2fcd825fe021a613d3f91d8a64d37
  
      // Honor the Yoga width contract. When the parent assigns an exact width
      // (flex child, alignItems: stretch, explicit width / width: "100%"), fill it
-@@ -273,6 +283,7 @@ object MeasurementStore {
+@@ -273,6 +314,7 @@ object MeasurementStore {
      context: Context,
      id: Int?,
      width: Float,
@@ -45,7 +92,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..efb2fcd825fe021a613d3f91d8a64d37
      props: ReadableMap?,
      splitTableSegments: Boolean,
    ): Long {
-@@ -282,21 +293,21 @@ object MeasurementStore {
+@@ -282,22 +324,22 @@ object MeasurementStore {
  
      // Split measurement always goes through the full measure path (no spannable caching)
      if (splitTableSegments) {
@@ -65,14 +112,18 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..efb2fcd825fe021a613d3f91d8a64d37
 +      return measureAndCache(context, safeId, width, exactWidth, props, allowFontScaling, fontScale, maxFontSizeMultiplier)
      }
  
-     // Width changed - re-measure with cached spannable
-     if (cached.cachedWidth != width) {
+-    // Width changed - re-measure with cached spannable
+-    if (cached.cachedWidth != width) {
 -      val newSize = measure(width, cached.spannable, cached.paintParams, safeId)
+-      data[safeId] = cached.copy(cachedWidth = width, cachedSize = newSize)
++    // Width or its measure mode changed - re-measure with cached spannable
++    if (cached.cachedWidth != width || cached.cachedExactWidth != exactWidth) {
 +      val newSize = measure(width, exactWidth, cached.spannable, cached.paintParams, safeId)
-       data[safeId] = cached.copy(cachedWidth = width, cachedSize = newSize)
++      data[safeId] = cached.copy(cachedWidth = width, cachedExactWidth = exactWidth, cachedSize = newSize)
        return newSize
      }
-@@ -368,6 +379,7 @@ object MeasurementStore {
+ 
+@@ -368,6 +410,7 @@ object MeasurementStore {
      context: Context,
      id: Int?,
      width: Float,
@@ -80,7 +131,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..efb2fcd825fe021a613d3f91d8a64d37
      props: ReadableMap?,
      allowFontScaling: Boolean,
      fontScale: Float,
-@@ -408,7 +420,7 @@ object MeasurementStore {
+@@ -408,7 +451,7 @@ object MeasurementStore {
        )
      spannable?.replaceMathSpansWithPlaceholders(context)
      val textToMeasure = spannable ?: markdown
@@ -89,7 +140,17 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..efb2fcd825fe021a613d3f91d8a64d37
  
      // 3. Calculate Margin
      val allowTrailingMargin = props.getBooleanOrDefault("allowTrailingMargin", false)
-@@ -435,6 +447,7 @@ object MeasurementStore {
+@@ -425,7 +468,8 @@ object MeasurementStore {
+     val adjustedSize = YogaMeasureOutput.make(currentWidth, currentHeight + marginBottom)
+ 
+     if (id != null) {
+-      data[id] = MeasurementParams(width, adjustedSize, textToMeasure, PaintParams(Typeface.DEFAULT, fontSize), propsHash)
++      data[id] =
++        MeasurementParams(width, exactWidth, adjustedSize, textToMeasure, PaintParams(Typeface.DEFAULT, fontSize), propsHash)
+     }
+ 
+     return adjustedSize
+@@ -435,6 +479,7 @@ object MeasurementStore {
      context: Context,
      id: Int?,
      width: Float,
@@ -97,7 +158,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..efb2fcd825fe021a613d3f91d8a64d37
      props: ReadableMap?,
      allowFontScaling: Boolean,
      fontScale: Float,
-@@ -543,10 +556,39 @@ object MeasurementStore {
+@@ -543,10 +588,41 @@ object MeasurementStore {
              segment.styledText.replaceMathSpansWithPlaceholders(context)
  
              val layout = createStaticLayout(segment.styledText, fontSize, widthPx, id)
@@ -125,7 +186,9 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..efb2fcd825fe021a613d3f91d8a64d37
 +              }
 +            val fillsReportedWidth = segmentMaxLineWidth > contentWidthPx - WIDEN_SLACK_PX
 +            val reserveWidth = maxOf(1, contentWidthPx - WIDEN_SLACK_PX)
-+            if (fillsReportedWidth) {
++            // This extra pass matters only for text whose runs resolve fallback
++            // glyphs; plain text is laid out once.
++            if (fillsReportedWidth && textNeedsFontFallback(segment.styledText)) {
 +              val reserveLayout =
 +                createStaticLayout(segment.styledText, fontSize, reserveWidth, id)
 +              if (reserveLayout.height > layout.height) {
@@ -139,7 +202,13 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..efb2fcd825fe021a613d3f91d8a64d37
  
              if (includeBottomMargin) {
                totalHeightPx += segment.lastElementMarginBottom
-@@ -610,7 +652,7 @@ object MeasurementStore {
+@@ -605,12 +681,12 @@ object MeasurementStore {
+       val result = YogaMeasureOutput.make(measuredWidthDip, totalHeightDip)
+ 
+       if (id != null) {
+-        data[id] = MeasurementParams(width, result, null, PaintParams(Typeface.DEFAULT, fontSize), propsHash)
++        data[id] = MeasurementParams(width, exactWidth, result, null, PaintParams(Typeface.DEFAULT, fontSize), propsHash)
+       }
        result
      } catch (e: Exception) {
        Log.w(TAG, "Split measurement failed, falling back", e)
@@ -148,7 +217,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..efb2fcd825fe021a613d3f91d8a64d37
      }
    }
  
-@@ -698,6 +740,7 @@ object MeasurementStore {
+@@ -698,6 +774,7 @@ object MeasurementStore {
  
    private fun measure(
      maxWidth: Float,
@@ -156,7 +225,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..efb2fcd825fe021a613d3f91d8a64d37
      text: CharSequence?,
      paintParams: PaintParams,
      viewId: Int?,
-@@ -705,11 +748,12 @@ object MeasurementStore {
+@@ -705,11 +782,12 @@ object MeasurementStore {
      measurePaint.reset()
      measurePaint.typeface = paintParams.typeface
      measurePaint.textSize = paintParams.fontSize
@@ -170,7 +239,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..efb2fcd825fe021a613d3f91d8a64d37
      text: CharSequence?,
      paint: TextPaint,
      viewId: Int?,
-@@ -737,17 +781,64 @@ object MeasurementStore {
+@@ -737,17 +815,66 @@ object MeasurementStore {
  
      val layout = builder.build()
      val visibleLineCount = visibleLineCount(layout, viewId)
@@ -189,11 +258,13 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..efb2fcd825fe021a613d3f91d8a64d37
 +    // line already fills the available width), keep the reported width and
 +    // re-measure the height a hair narrower instead, adopting the taller
 +    // height only if that layout actually comes out taller.
++    // This extra pass matters only for text whose runs resolve fallback
++    // glyphs; plain text is laid out once.
 +    val contentWidthPx =
 +      if (exactWidth) safeWidth else minOf(safeWidth, ceil(measuredWidth).toInt() + WIDEN_SLACK_PX)
 +    val fillsReportedWidth = measuredWidth > contentWidthPx - WIDEN_SLACK_PX
 +    val reserveWidth = maxOf(1, contentWidthPx - WIDEN_SLACK_PX)
-+    if (fillsReportedWidth) {
++    if (fillsReportedWidth && textNeedsFontFallback(content)) {
 +      val reserveLayout = buildLayout(text = content, paint = paint, widthPx = reserveWidth, viewId = viewId)
 +      val reserveHeight = truncatedHeight(reserveLayout, visibleLineCount(reserveLayout, viewId), content)
 +      if (reserveHeight > measuredHeight) {
@@ -237,7 +308,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..efb2fcd825fe021a613d3f91d8a64d37
    // Applies the per-view numberOfLines / ellipsizeMode clamp to a builder, matching
    // RN's TextLayoutManager.buildLayout: only when a line limit is set.
    private fun applyLineLimit(
-@@ -816,6 +907,7 @@ object MeasurementStore {
+@@ -816,6 +943,7 @@ object MeasurementStore {
     */
    private fun measureWithLayout(
      maxWidth: Float,
@@ -245,7 +316,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..efb2fcd825fe021a613d3f91d8a64d37
      text: CharSequence?,
      paint: TextPaint,
      viewId: Int?,
-@@ -847,10 +939,28 @@ object MeasurementStore {
+@@ -847,10 +975,30 @@ object MeasurementStore {
        (0 until visibleLineCount)
          .maxOfOrNull { layout.getLineWidth(it) } ?: 0f
  
@@ -259,7 +330,9 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..efb2fcd825fe021a613d3f91d8a64d37
 +    val fillsReportedWidth = maxLineWidth > contentWidthPx - WIDEN_SLACK_PX
 +    val reserveWidth = maxOf(1, contentWidthPx - WIDEN_SLACK_PX)
 +    var height = truncatedHeight(layout, visibleLineCount, content)
-+    if (fillsReportedWidth) {
++    // This extra pass matters only for text whose runs resolve fallback
++    // glyphs; plain text is laid out once.
++    if (fillsReportedWidth && textNeedsFontFallback(content)) {
 +      val reserveLayout = buildLayout(content, paint, reserveWidth, viewId)
 +      val reserveHeight = truncatedHeight(reserveLayout, visibleLineCount(reserveLayout, viewId), content)
 +      if (reserveHeight > height) {
@@ -277,9 +350,10 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..efb2fcd825fe021a613d3f91d8a64d37
  
      return size to layout
 diff --git a/android/src/main/java/com/swmansion/enriched/markdown/accessibility/MarkdownAccessibilityHelper.kt b/android/src/main/java/com/swmansion/enriched/markdown/accessibility/MarkdownAccessibilityHelper.kt
+index 423ab10f53d43295fd52363cb87348e3e3410007..34c4954a037e9a3d7ee48982ca9d6fc32e960b6d 100644
 --- a/android/src/main/java/com/swmansion/enriched/markdown/accessibility/MarkdownAccessibilityHelper.kt
 +++ b/android/src/main/java/com/swmansion/enriched/markdown/accessibility/MarkdownAccessibilityHelper.kt
-@@ -447,7 +447,7 @@
+@@ -447,7 +447,7 @@ class MarkdownAccessibilityHelper(
        return singleLineBounds(vs, ve, startLine)
      }
  
@@ -288,7 +362,7 @@ diff --git a/android/src/main/java/com/swmansion/enriched/markdown/accessibility
    }
  
    private fun singleLineBounds(
-@@ -456,9 +456,22 @@
+@@ -456,9 +456,22 @@ class MarkdownAccessibilityHelper(
      line: Int,
    ): Rect {
      val layout = textView.layout
@@ -314,7 +388,7 @@ diff --git a/android/src/main/java/com/swmansion/enriched/markdown/accessibility
  
      return Rect(
        left,
-@@ -469,25 +482,24 @@
+@@ -469,25 +482,24 @@ class MarkdownAccessibilityHelper(
    }
  
    private fun multiLineBounds(

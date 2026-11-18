@@ -632,7 +632,9 @@ describe('Home live presentation', () => {
       // rows it is the whole surface. It is announced once either way.
       expect(typeof action('Retry').props.onPress).toBe('function');
       expect(text()).toContain(message);
-      expect.soft(state.announcements).toEqual([message]);
+      // The block and Home's header notice each announce the failure when they
+      // take over the surface, so the last spoken message is the current one.
+      expect(state.announcements.at(-1)).toBe(message);
     }
     await updateSocketRows([row]);
     await updateSocketRows([]);

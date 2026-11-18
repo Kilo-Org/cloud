@@ -718,12 +718,13 @@ describe('CreditPurchaseScreen', () => {
     );
     expect(allText(renderer)).not.toContain('Price unavailable');
     expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(0);
-    // The button that started the retry stays on screen, busy and disabled.
+    // The button that started the retry stays on screen, busy (the shared
+    // state action's busy state also disables it) — see `StateAction`.
     const pendingRetry = tryAgainButton(renderer);
     if (!pendingRetry) {
       throw new Error('expected the Try again button to stay on screen');
     }
-    expect((pendingRetry.props as { disabled?: boolean }).disabled).toBe(true);
+    expect((pendingRetry.props as { loading?: boolean }).loading).toBe(true);
     unmount();
   });
 

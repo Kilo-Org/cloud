@@ -32,7 +32,15 @@ vi.mock('react-native', () => ({
 // while the test host reads the props they carry (`vi.mock` factories hoist
 // above this file's imports, so the form-field factory loads React itself).
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/components/ui/icons', () => ({ ChevronDown: 'ChevronDown' }));
+vi.mock('@/components/ui/icons', () => ({
+  AlertCircle: 'AlertCircle',
+  ChevronDown: 'ChevronDown',
+  Lock: 'Lock',
+  RotateCcw: 'RotateCcw',
+  SearchX: 'SearchX',
+  ServerCrash: 'ServerCrash',
+  WifiOff: 'WifiOff',
+}));
 // The form's failure rows render `QueryError` -> `StateAction`, whose centered
 // variant measures the native surface; that module loads the Sentry RN SDK,
 // which the Node test project cannot resolve react-native through.

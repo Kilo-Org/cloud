@@ -11,30 +11,34 @@ import { vi } from 'vitest';
 
 import { PrReviewInboxList } from './pr-review-inbox-list';
 
-export const insetsState = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
-
-export const inboxState = vi.hoisted(() => ({
-  query: {
-    isPending: false,
-    isFetching: false,
-    hasNextPage: false,
-    isFetchingNextPage: false,
-    refetch: vi.fn(),
-    fetchNextPage: vi.fn(),
+const hoisted = vi.hoisted(() => ({
+  insets: { top: 0, bottom: 0, left: 0, right: 0 },
+  inbox: {
+    query: {
+      isPending: false,
+      isFetching: false,
+      hasNextPage: false,
+      isFetchingNextPage: false,
+      refetch: vi.fn(),
+      fetchNextPage: vi.fn(),
+    },
+    items: [] as {
+      owner: string;
+      repo: string;
+      number: number;
+      title: string;
+      updatedAt: string;
+      isDraft: boolean;
+    }[],
+    firstPageErrorState: null as { kind: string } | null,
+    firstPageErrorPlatform: null as 'github' | 'gitlab' | 'bitbucket' | null,
+    organizationId: null as string | null,
+    laterPageError: false,
   },
-  items: [] as {
-    owner: string;
-    repo: string;
-    number: number;
-    title: string;
-    updatedAt: string;
-    isDraft: boolean;
-  }[],
-  firstPageErrorState: null as { kind: string } | null,
-  firstPageErrorPlatform: null as 'github' | 'gitlab' | 'bitbucket' | null,
-  organizationId: null as string | null,
-  laterPageError: false,
 }));
+
+export const insetsState = hoisted.insets;
+export const inboxState = hoisted.inbox;
 
 vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
 vi.mock('react-native-safe-area-context', () => ({

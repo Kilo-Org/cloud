@@ -19,9 +19,15 @@ import { vi } from 'vitest';
 import '@/i18n';
 import { AuditReportScreen } from './audit-report-screen';
 
-export const personalQueryOptions = vi.hoisted(() => vi.fn());
-export const orgQueryOptions = vi.hoisted(() => vi.fn());
-export const useQuery = vi.hoisted(() => vi.fn());
+const hoisted = vi.hoisted(() => ({
+  personalQueryOptions: vi.fn(),
+  orgQueryOptions: vi.fn(),
+  useQuery: vi.fn(),
+}));
+
+export const personalQueryOptions = hoisted.personalQueryOptions;
+export const orgQueryOptions = hoisted.orgQueryOptions;
+export const useQuery = hoisted.useQuery;
 
 vi.mock('react-native', () => ({
   View: 'View',
@@ -37,7 +43,7 @@ vi.mock('@/lib/trpc', () => ({
     organizations: { securityAgent: { getAuditReport: { queryOptions: orgQueryOptions } } },
   }),
 }));
-vi.mock('@tanstack/react-query', () => ({ useQuery }));
+vi.mock('@tanstack/react-query', () => ({ useQuery: hoisted.useQuery }));
 // Faithful mirror of the real classifier (covered by its own suite): only the
 // literal 'personal' scope is personal.
 vi.mock('@kilocode/app-shared/security-agent', () => ({

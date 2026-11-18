@@ -16,6 +16,7 @@ import { getGitHubAppCredentials } from './app-selector';
 import {
   generateGitHubInstallationToken,
   getCollaboratorPermissionLevel,
+  GitHubCredentialRejectionError,
   GitHubRateLimitError,
 } from './adapter';
 import { GitHubRuntimeAuthorizationError } from '../../github/runtime-authorization';
@@ -181,7 +182,7 @@ describe('GitHub installation authorization', () => {
 
     await expect(
       getCollaboratorPermissionLevel('installation-1', 'acme', 'widgets', 'octocat')
-    ).rejects.toBe(credentialError);
+    ).rejects.toThrow(GitHubCredentialRejectionError);
     expect(mockPermission).not.toHaveBeenCalled();
   });
 

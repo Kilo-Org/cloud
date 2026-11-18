@@ -447,9 +447,11 @@ export async function hasPRCommentWithMarker(
  * reports a permission outside the known set, a 403 or 422 from the token mint or the
  * lookup, or the installation is unavailable (the mint answers 404 or the runtime
  * authorization rejects the installation). Rate limits are thrown as typed
- * {@link GitHubRateLimitError}s so callers can surface the reset time; rejected App or
- * installation credentials (401), server errors, and network failures are thrown so
- * callers can decide whether to retry rather than treating a temporary failure as a
+ * {@link GitHubRateLimitError}s so callers can surface the reset time; other thrown
+ * failures — App-credential rejections (typed
+ * {@link GitHubCredentialRejectionError}), installation-token rejections on the
+ * lookup (raw 401), server errors, and network failures — are thrown so callers
+ * can decide whether to retry rather than treating a temporary failure as a
  * denial.
  */
 export type CollaboratorPermission = 'admin' | 'maintain' | 'write' | 'read' | 'none';
@@ -485,7 +487,9 @@ export async function getCollaboratorPermissionLevel(
     const rateLimit = toGitHubRateLimitError(error);
     if (rateLimit) throw rateLimit;
     // A 401 means the App credentials were rejected — Kilo's own failure, not
-    // a permission answer — so it must not settle the check as a denial.
+    // a permission answer — so it must not settle the check as a denial. A
+    // fresh mint cannot clear it (the same credentials are sent again), so it
+    // is typed as a persistent configuration failure callers do not retry.
     if (isHttpError(error) && error.status === 401) {
       warnExceptInTest('[getCollaboratorPermissionLevel] Installation token mint failed', {
         installationId,
@@ -493,7 +497,7 @@ export async function getCollaboratorPermissionLevel(
         repo,
         error: error instanceof Error ? error.message : String(error),
       });
-      throw error;
+      throw new GitHubCredentialRejectionError(error);
     }
     // Any other 4xx (403 the installation cannot query collaborators, 422) is
     // a definitive non-answer, not something to retry.
@@ -529,7 +533,10 @@ export async function getCollaboratorPermissionLevel(
     const rateLimit = toGitHubRateLimitError(error);
     if (rateLimit) throw rateLimit;
     // A 401 means the installation token was rejected — the permission was
-    // never evaluated, so it must not settle the check as a denial.
+    // never evaluated, so it must not settle the check as a denial. Unlike the
+    // mint 401 this is not a credential-rejection class: a fresh mint can
+    // clear it (the installation token, not the App credentials, was
+    // refused), so the raw error is rethrown and stays retryable.
     if (isHttpError(error) && error.status === 401) {
       warnExceptInTest('[getCollaboratorPermissionLevel] Collaborator lookup failed', {
         owner,
@@ -1256,6 +1263,28 @@ export class GitHubRateLimitError extends Error {
     this.name = 'GitHubRateLimitError';
     this.resetAt = resetAt;
   }
+}
+
+/**
+ * Thrown when GitHub rejects the App credentials with a 401 on the
+ * installation-token mint in {@link getCollaboratorPermissionLevel}. A mint
+ * 401 means the App ID or private key Kilo configured is not accepted, a
+ * persistent Kilo-side configuration failure that no retry or fresh mint can
+ * clear, so callers classify it as configuration instead of retrying. A 401 on
+ * the collaborator lookup is NOT wrapped: there a fresh mint can clear the
+ * rejection (the installation token was refused, not the App credentials), so
+ * the lookup rethrows the raw error and callers may retry.
+ */
+export class GitHubCredentialRejectionError extends Error {
+  constructor(cause: unknown) {
+    super(cause instanceof Error ? cause.message : String(cause));
+    this.name = 'GitHubCredentialRejectionError';
+    this.cause = cause;
+  }
+}
+
+export function isGitHubCredentialRejection(error: unknown): boolean {
+  return error instanceof GitHubCredentialRejectionError;
 }
 
 function getResponseHeader(error: unknown, name: string): string | undefined {

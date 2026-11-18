@@ -430,6 +430,18 @@ describe.each(['ios', 'android'])('PR-review connect gate on %s', os => {
     expect(toast.error).not.toHaveBeenCalled();
   });
 
+  it('opens the app connect sheet once for a double press', () => {
+    const renderer = mount('bitbucket');
+    const button = renderer.root.findByType('Button');
+
+    act(() => {
+      (button.props.onPress as () => void)();
+      (button.props.onPress as () => void)();
+    });
+
+    expect(router.push).toHaveBeenCalledTimes(1);
+  });
+
   it('explains the personal Bitbucket restriction without a Connect CTA', () => {
     const renderer = mount('bitbucket', null);
     expect(renderer.root.findByType('EmptyState').props.description).toBeTruthy();

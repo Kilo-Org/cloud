@@ -160,7 +160,5 @@ describe('PersonalInvoicesScreen header', () => {
     expect(screenHeaders.rendered[0]?.title).toBe(i18n.t('organization.invoices.title'));
     expect(screenHeaders.rendered[0]?.eyebrow).toBeUndefined();
     expect(screenHeaders.rendered[0]?.reserveEyebrow).toBeUndefined();
-    // The personal header keeps the header's default tail ellipsis and paints
-    // no eyebrow.
   });
 });

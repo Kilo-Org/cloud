@@ -499,8 +499,6 @@ describe('OrganizationInvoicesScreen header', () => {
     expect(screenHeaders.rendered[0]?.title).toBe('Acme Corp');
     expect(screenHeaders.rendered[0]?.eyebrow).toBe(i18n.t('organization.invoices.title'));
     expect(screenHeaders.rendered[0]?.reserveEyebrow).toBeUndefined();
-    // The title keeps the header's default tail ellipsis, so the start of the
-    // organization name stays readable.
   });
 
   it('reserves the eyebrow line on the boundary so the header keeps its height before the name arrives', async () => {

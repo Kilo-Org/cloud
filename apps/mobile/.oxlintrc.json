@@ -363,6 +363,8 @@
     "rn-modal-backdrop/require-backdrop": "error",
     "no-destructive-alert/no-destructive-alert": "error",
     "no-literal-copy/no-literal-copy": "error",
+    // Prose lives in comments; code whitespace is still reported.
+    "no-irregular-whitespace": ["error", { "skipComments": true }],
 
     // oxlint 1.88 implements many of the rules the categories above select and
     // tightens detection in others, so this upgrade alone reports about 30,000
@@ -378,8 +380,6 @@
     "func-name-matching": "off",
     "import/newline-after-import": "off",
     "logical-assignment-operators": "off",
-    // Prose lives in comments; code whitespace is still reported.
-    "no-irregular-whitespace": ["error", { "skipComments": true }],
     "no-multi-assign": "off",
     "no-redeclare": "off",
     "no-underscore-dangle": "off",

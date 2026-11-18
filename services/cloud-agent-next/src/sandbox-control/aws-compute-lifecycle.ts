@@ -48,6 +48,11 @@ export type AwsPrepareSnapshot<Config, Ref> = (input: {
   snapshot: ProviderSnapshotStart;
   deadlineAt: number;
 }) => Promise<ProviderStartup>;
+/**
+ * Engine observation of the identified compute. `active` records `running`. `pending` (accepted,
+ * not yet running) and `unknown` (no evidence) keep `launching`: launch returns success, and
+ * wrapper admission rejects until a later inspection is `active`. `stopping` and `terminal` stop.
+ */
 export type AwsComputeStatus = 'active' | 'pending' | 'stopping' | 'terminal' | 'unknown';
 
 const PHASE_TRANSITIONS: Record<

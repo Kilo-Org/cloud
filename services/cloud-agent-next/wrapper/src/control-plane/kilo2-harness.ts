@@ -25,7 +25,7 @@ const ptySchema = z.object({
 
 const MCP_SERVER_NAME = 'kilo-cloud-agent';
 const MODEL_NOT_FOUND_RETRY_DELAYS_MS = [
-  1_000, 2_000, 2_000, 2_000, 2_000, 3_000, 3_000, 5_000, 5_000, 5_000,
+  1_000, 2_000, 2_000, 2_000, 2_000, 3_000, 3_000, 3_000, 3_000, 3_000, 3_000, 3_000,
 ];
 const modelCatalogSchema = z.array(z.object({ id: z.string(), providerID: z.string() }));
 const mcpServerSchema = z.object({

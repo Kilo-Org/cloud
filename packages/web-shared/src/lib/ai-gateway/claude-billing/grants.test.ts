@@ -296,6 +296,8 @@ describe('Claude billing grants', () => {
         // The retirement write must clear them, not only flip the status.
         connection_id: `ocon_${crypto.randomUUID()}`,
         connected_at: new Date().toISOString(),
+        last_refusal_code: 'linked_organization_spend_limit_reached',
+        last_refusal_at: new Date().toISOString(),
         status: 'pending',
         created_by: user.id,
       })

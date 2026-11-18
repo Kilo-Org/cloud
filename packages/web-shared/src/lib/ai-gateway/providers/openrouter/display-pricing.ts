@@ -54,18 +54,41 @@ export function getPeakPricing(pricing: EndpointPricing): EndpointPricing {
 }
 
 /**
- * The highest price at any time of day, including OpenRouter's long-context overrides: like
- * {@link getPeakPricing}, but also the higher of each long-context override. Spending safeguards
- * must use this price. Vercel's tiered long-context prices are not stored (the schema drops
- * `*_tiers`), so only its first-tier price counts here.
+ * The highest price at any time of day, including long-context prices: like
+ * {@link getPeakPricing}, but also the higher of each OpenRouter long-context override and each
+ * Vercel `*_tiers` price. Spending safeguards must use this price. Vercel's tier costs are compared
+ * as stored, so a discount, which applies to the base price, is undone on them too, which can only
+ * raise the result.
  */
 export function getWorstCasePeakPricing(pricing: EndpointPricing): EndpointPricing {
   return peakPricing(pricing, true);
 }
 
+/** Vercel's context-length price tiers, by the base price field each one tiers. */
+const TIER_FIELDS = [
+  ['prompt_tiers', 'prompt'],
+  ['completion_tiers', 'completion'],
+  ['input_cache_read_tiers', 'input_cache_read'],
+  ['input_cache_write_tiers', 'input_cache_write'],
+] as const satisfies readonly (readonly [keyof EndpointPricing, PriceKey])[];
+
 function peakPricing(pricing: EndpointPricing, includeLongContext: boolean): EndpointPricing {
-  const { overrides, peak_pricing, ...prices } = pricing;
-  if (overrides === undefined && peak_pricing === undefined) return pricing;
+  const {
+    overrides,
+    peak_pricing,
+    prompt_tiers,
+    completion_tiers,
+    input_cache_read_tiers,
+    input_cache_write_tiers,
+    ...prices
+  } = pricing;
+  const tiers = { prompt_tiers, completion_tiers, input_cache_read_tiers, input_cache_write_tiers };
+  if (
+    overrides === undefined &&
+    peak_pricing === undefined &&
+    Object.values(tiers).every(tier => tier === undefined)
+  )
+    return pricing;
   let result: EndpointPricing = prices;
   for (const override of overrides ?? []) {
     if (!includeLongContext && isLongContextOverride(override)) continue;
@@ -76,6 +99,13 @@ function peakPricing(pricing: EndpointPricing, includeLongContext: boolean): End
       input_cache_read,
       input_cache_write,
     });
+  }
+  if (includeLongContext) {
+    for (const [tiersKey, priceKey] of TIER_FIELDS) {
+      for (const { cost } of tiers[tiersKey] ?? []) {
+        result = maxEndpointPricing(result, { [priceKey]: cost });
+      }
+    }
   }
   const multiplier = peak_pricing?.multiplier ?? 1;
   if (multiplier > 1) {
@@ -102,7 +132,7 @@ export function getModelDisplayPricing(
   return undoPricingDiscount(getPeakPricing(pricing));
 }
 
-/** The highest stored price an endpoint can charge, long-context overrides included, without a discount. */
+/** The highest price an endpoint can charge, long-context prices included, without a discount. */
 export function getWorstCaseModelPricing(
   pricing: EndpointPricing | undefined
 ): EndpointPricing | undefined {

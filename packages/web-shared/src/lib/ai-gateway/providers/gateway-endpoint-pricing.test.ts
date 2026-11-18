@@ -229,6 +229,36 @@ describe('getProviderDisplayPricing', () => {
     ).toEqual({ prompt: '0.000016', completion: '0.00006' });
   });
 
+  it("shows Vercel's first price tier and, in the worst case, its highest", () => {
+    const vercel = vercelModel({
+      provider: 'alibaba',
+      pricing: {
+        prompt: '0.0000005',
+        completion: '0.000003',
+        prompt_tiers: [
+          { cost: '0.0000005', min: 0, max: 256000 },
+          { cost: '0.000002', min: 256000 },
+        ],
+        completion_tiers: [
+          { cost: '0.000003', min: 0, max: 256000 },
+          { cost: '0.000006', min: 256000 },
+        ],
+      },
+    });
+    const openRouterPricing = { prompt: '0.0000004', completion: '0.0000025' };
+
+    expect(getProviderDisplayPricing('alibaba', openRouterPricing, vercel, 'shortContext')).toEqual(
+      {
+        prompt: '0.0000005',
+        completion: '0.000003',
+      }
+    );
+    expect(getProviderDisplayPricing('alibaba', openRouterPricing, vercel, 'worstCase')).toEqual({
+      prompt: '0.000002',
+      completion: '0.000006',
+    });
+  });
+
   it('returns only the OpenRouter display price without a provider to match', () => {
     expect(
       getProviderDisplayPricing(

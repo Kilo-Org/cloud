@@ -9,7 +9,7 @@ describe('organizationSheetDetents', () => {
     ).toEqual([0.94]);
   });
 
-  // 914 dp sits below the 960 dp threshold: the tallest organization form with
+  // 914 dp sits below the 1000 dp threshold: the tallest organization form with
   // its refusal row cannot fit the half detent there, so the sheet opens at the
   // full detent alone.
   it('offers the full detent alone in a 914 dp Android window', () => {
@@ -18,12 +18,20 @@ describe('organizationSheetDetents', () => {
     ).toEqual([0.97]);
   });
 
+  // 985 dp is just under twice the 415pt content plus the 78pt bar band (986),
+  // so the half detent would still clip the refusal row.
+  it('offers the full detent alone just below the doubled budget', () => {
+    expect(
+      organizationSheetDetents({ platform: 'android', windowHeight: 985, fullSheetDetent: 0.97 })
+    ).toEqual([0.97]);
+  });
+
   it('keeps the half detent in a window at and above the threshold', () => {
     expect(
-      organizationSheetDetents({ platform: 'android', windowHeight: 960, fullSheetDetent: 0.97 })
+      organizationSheetDetents({ platform: 'android', windowHeight: 1000, fullSheetDetent: 0.97 })
     ).toEqual([0.5, 0.97]);
     expect(
-      organizationSheetDetents({ platform: 'android', windowHeight: 1000, fullSheetDetent: 0.97 })
+      organizationSheetDetents({ platform: 'android', windowHeight: 1200, fullSheetDetent: 0.97 })
     ).toEqual([0.5, 0.97]);
   });
 

@@ -138,10 +138,11 @@ export function decodeEntities(source: string): string | null {
   });
 }
 
-// When the walk is already this deep, any further element node has no
-// lossless inline form: `inlineContent` refuses by returning null and the
-// caller falls back to the element's raw HTML slice, rather than the walk
-// recursing into the subtree.
+// When the walk is already this deep, it stops recursing: `inlineContent`
+// refuses any further element node by returning null and the caller falls
+// back to the element's raw HTML slice. The bound keeps message-controlled
+// nesting from consuming a stack frame per level, whether or not the next
+// element would have a lossless markdown form.
 const MAX_INLINE_DEPTH = 128;
 
 // CommonMark's flanking rules: `**x**` is emphasis only when the opening run is

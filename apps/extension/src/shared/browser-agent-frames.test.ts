@@ -483,8 +483,7 @@ const oopifSession = (
         params?.['backendNodeId'] === 5
           ? { model: { content: [40, 120, 440, 120, 440, 320, 40, 320], height: 200, width: 400 } }
           : { model: { content: [0, 0, 10, 0, 10, 10, 0, 10], height: 10, width: 10 } },
-      'DOM.getFrameOwner': params =>
-        params?.['frameId'] === OOPIF_ID ? { backendNodeId: 5 } : {},
+      'DOM.getFrameOwner': params => (params?.['frameId'] === OOPIF_ID ? { backendNodeId: 5 } : {}),
       'Page.createIsolatedWorld': () => ({ executionContextId: 7 }),
       'Page.getFrameTree': (_params, sessionId) =>
         sessionId === OOPIF_SESSION

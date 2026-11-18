@@ -133,11 +133,17 @@ export interface BrowserTabsApi {
     readonly addListener: (
       listener: (
         tabId: number,
-        changeInfo: { readonly pendingUrl?: string; readonly status?: string; readonly url?: string },
+        changeInfo: {
+          readonly pendingUrl?: string;
+          readonly status?: string;
+          readonly url?: string;
+        },
         tab?: { readonly url?: string }
       ) => void
     ) => void;
-    readonly removeListener: (listener: (tabId: number, changeInfo: never, tab?: never) => void) => void;
+    readonly removeListener: (
+      listener: (tabId: number, changeInfo: never, tab?: never) => void
+    ) => void;
   };
   readonly query: (
     queryInfo: Record<string, unknown>

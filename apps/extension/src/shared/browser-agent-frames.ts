@@ -149,7 +149,10 @@ export interface AgentFrameInventory {
 }
 
 export type AgentFrameSession = Pick<BrowserToolPageSession, 'send'> & {
-  readonly childFrames?: () => ReadonlyMap<string, { readonly url: string; readonly sessionId: string }>;
+  readonly childFrames?: () => ReadonlyMap<
+    string,
+    { readonly url: string; readonly sessionId: string }
+  >;
 };
 
 /**
@@ -184,8 +187,7 @@ export const readAgentFrames = async (session: AgentFrameSession): Promise<Agent
     return { childSessions, complete: false, frames };
   }
 
-  const attached: ReadonlyMap<string, BrowserToolChildFrame> =
-    session.childFrames?.() ?? new Map();
+  const attached: ReadonlyMap<string, BrowserToolChildFrame> = session.childFrames?.() ?? new Map();
 
   for (const [frameId, child] of attached) {
     if (!frames.some(frame => frame.id === frameId)) {
@@ -364,6 +366,12 @@ export interface ScopedSnapshotInput {
   readonly readableTrees: ReadonlyMap<string, readonly AxNode[]>;
   /** Withheld frame id → origin. */
   readonly withheld: ReadonlyMap<string, string>;
+  /**
+   * Frames whose tree comes from their own CDP session. Backend node ids are
+   * per agent, so an out-of-process document's ids are unrelated to the tab's:
+   * matching them against the owner map would splice the wrong tree.
+   */
+  readonly childSessionFrameIds?: ReadonlySet<string>;
   readonly depth?: number | undefined;
 }
 
@@ -373,6 +381,15 @@ export interface ScopedSnapshot {
   readonly truncated: boolean;
   /** Withheld frames whose owner element produced a line of their own. */
   readonly renderedWithheldFrameIds: ReadonlySet<string>;
+}
+
+/** No owner nodes live in this tree: used for a frame document read through its own session. */
+const EMPTY_OWNERS: ReadonlyMap<number, string> = new Map();
+
+/** One tree the walk renders, with the owner map that describes its own node ids. */
+interface WalkTree {
+  readonly nodes: readonly AxNode[];
+  readonly owners: ReadonlyMap<number, string>;
 }
 
 /**
@@ -388,7 +405,8 @@ export const buildScopedSnapshot = (input: ScopedSnapshotInput): ScopedSnapshot 
   const renderedWithheldFrameIds = new Set<string>();
   let truncated = false;
 
-  const walk = (nodes: readonly AxNode[], depthBudget: number | undefined, depth: number): void => {
+  const walk = (tree: WalkTree, depthBudget: number | undefined, depth: number): void => {
+    const { nodes, owners } = tree;
     const byId = new Map<string, AxNode>();
 
     for (const node of nodes) {
@@ -413,10 +431,7 @@ export const buildScopedSnapshot = (input: ScopedSnapshotInput): ScopedSnapshot 
       const role = collapseWhitespace(axText(node.role));
       const name = collapseWhitespace(axText(node.name)).slice(0, MAX_BROWSER_TOOL_NAME_LENGTH);
       const backendNodeId = node.backendDOMNodeId;
-      const ownerFrameId =
-        backendNodeId === undefined
-          ? undefined
-          : input.ownerFrameByBackendNodeId.get(backendNodeId);
+      const ownerFrameId = backendNodeId === undefined ? undefined : owners.get(backendNodeId);
       const withheldOrigin =
         ownerFrameId === undefined ? undefined : input.withheld.get(ownerFrameId);
       const interactive = INTERACTIVE_ROLES.has(role);
@@ -470,7 +485,16 @@ export const buildScopedSnapshot = (input: ScopedSnapshotInput): ScopedSnapshot 
         const readableTree = input.readableTrees.get(ownerFrameId);
 
         if (readableTree !== undefined) {
-          walk(readableTree, depthBudget, atDepth + 1);
+          // A frame read through its own session has its own node-id space, so only the tab's owner map describes this document.
+          walk(
+            {
+              nodes: readableTree,
+              owners:
+                input.childSessionFrameIds?.has(ownerFrameId) === true ? EMPTY_OWNERS : owners,
+            },
+            depthBudget,
+            atDepth + 1
+          );
           return;
         }
       }
@@ -491,7 +515,7 @@ export const buildScopedSnapshot = (input: ScopedSnapshotInput): ScopedSnapshot 
     }
   };
 
-  walk(input.topNodes, input.depth, 0);
+  walk({ nodes: input.topNodes, owners: input.ownerFrameByBackendNodeId }, input.depth, 0);
 
   return { lines, refs, renderedWithheldFrameIds, truncated };
 };
@@ -504,9 +528,10 @@ export const buildScopedSnapshot = (input: ScopedSnapshotInput): ScopedSnapshot 
 interface FrameChannel {
   /** True when `send` addresses a child session rather than the tab. */
   readonly child: boolean;
-  readonly send: (method: string, params?: Record<string, unknown>) => Promise<
-    Record<string, unknown> | undefined
-  >;
+  readonly send: (
+    method: string,
+    params?: Record<string, unknown>
+  ) => Promise<Record<string, unknown> | undefined>;
 }
 
 const frameChannel = (
@@ -809,6 +834,7 @@ export const captureAgentAriaSnapshot = async (
   }
 
   const snapshot = buildScopedSnapshot({
+    childSessionFrameIds: new Set(inventory.childSessions.keys()),
     depth: options.depth,
     ownerFrameByBackendNodeId,
     readableTrees,
@@ -835,7 +861,9 @@ export const captureAgentAriaSnapshot = async (
   }
 
   const body =
-    lines.length === 0 ? '(no accessibility nodes)' : lines.map(line => renderLine(line)).join('\n');
+    lines.length === 0
+      ? '(no accessibility nodes)'
+      : lines.map(line => renderLine(line)).join('\n');
   const text = snapshot.truncated
     ? `${body}\n... (snapshot truncated at ${String(MAX_BROWSER_TOOL_SNAPSHOT_LINES)} lines)`
     : body;

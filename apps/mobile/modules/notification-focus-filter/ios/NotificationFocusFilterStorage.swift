@@ -29,15 +29,18 @@ enum NotificationFocusFilterStorage {
     return store.bool(forKey: agentProgressAllowedKey)
   }
 
-  /// Persist the choice for the active Focus. A `nil` value is the system
-  /// clearing the filter (Focus deactivation), which restores the default:
-  /// agent progress allowed.
+  /// Persist the choice for the active Focus. Only an active Focus that
+  /// excludes agent progress stores a value (`false`); both a `nil` value
+  /// (the system clearing the filter) and `true` (progress allowed) remove
+  /// the key, restoring the documented default: agent progress allowed. This
+  /// keeps one stored representation per state — key present means the
+  /// choice exists and excludes progress.
   static func store(agentProgress: Bool?) {
     guard let store = UserDefaults(suiteName: appGroupIdentifier) else {
       return
     }
-    if let agentProgress {
-      store.set(agentProgress, forKey: agentProgressAllowedKey)
+    if agentProgress == false {
+      store.set(false, forKey: agentProgressAllowedKey)
     } else {
       store.removeObject(forKey: agentProgressAllowedKey)
     }

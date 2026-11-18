@@ -47,7 +47,7 @@
     "jose": "catalog:",
     "jsonwebtoken": "catalog:",
     "mailgun.js": "12.7.1",
-    "next": "16.4.2",
+    "next": "16.4.5",
     "next-auth": "4.24.15",
     "openai": "6.49.0",
     "p-limit": "catalog:",

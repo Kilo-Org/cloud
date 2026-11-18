@@ -129,6 +129,7 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 
 vi.mock('@/components/empty-state', () => ({
+  StateAction: 'StateAction',
   EmptyState: (props: { title: string; placement?: string; action?: ReactNode }) =>
     createElement('EmptyState', props, `EMPTY_STATE:${props.title}`, props.action),
 }));

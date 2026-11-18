@@ -145,7 +145,7 @@ vi.mock('@shopify/flash-list', () => ({ FlashList: 'FlashList' }));
 vi.mock('@/components/centered-state-surface', () => ({
   StateSurfaceInsets: 'StateSurfaceInsets',
 }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState', StateAction: 'StateAction' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));

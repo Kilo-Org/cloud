@@ -44,7 +44,7 @@ vi.mock('@/lib/utils', () => ({
   parseTimestamp: (value: unknown) => value,
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState', StateAction: 'StateAction' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/security-agent/collapsible-section', () => ({
   CollapsibleSection: 'CollapsibleSection',

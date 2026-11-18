@@ -123,7 +123,7 @@ vi.mock('@/components/security-agent/orphaned-findings-card', () => ({
 vi.mock('@/components/platform-error-screen', () => ({
   PlatformErrorScreen: 'PlatformErrorScreen',
 }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState', StateAction: 'StateAction' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 // `headerRight` is a prop, not a child: the stub renders it so the Save button
 // (the screen's only save path) actually mounts.

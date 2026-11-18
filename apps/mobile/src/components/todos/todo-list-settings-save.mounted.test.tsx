@@ -129,6 +129,7 @@ vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/empty-state', async () => {
   const React = await import('react');
   return {
+    StateAction: 'StateAction',
     EmptyState: ({ title, description }: Readonly<{ title: string; description?: string }>) =>
       React.createElement('EmptyState', { title }, description ?? null),
   };

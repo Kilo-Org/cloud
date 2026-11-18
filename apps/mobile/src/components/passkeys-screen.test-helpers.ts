@@ -176,6 +176,7 @@ vi.mock('@/lib/format', () => ({
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/tab-screen', () => ({ useTabBarBottomPadding: () => 0 }));
 vi.mock('@/components/empty-state', () => ({
+  StateAction: 'StateAction',
   // Renders the action so a test can reach the CTA that lives inside it.
   EmptyState: (props: { action?: ReactNode }) => createElement('EmptyState', props, props.action),
 }));
@@ -387,8 +388,9 @@ export function buttonByLabel(view: PasskeysView, label: string): ReactTestInsta
 }
 
 export function hasButtonLabel(view: PasskeysView, label: string): boolean {
-  return nodes(view, 'Button').some(
+  return [...nodes(view, 'Button'), ...nodes(view, 'StateAction')].some(
     node =>
+      node.props.label === label ||
       node.findAll(inner => String(inner.type) === 'Text' && inner.props.children === label)
         .length > 0
   );

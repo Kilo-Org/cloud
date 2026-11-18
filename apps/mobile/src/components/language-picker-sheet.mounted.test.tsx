@@ -116,7 +116,7 @@ vi.mock('@/i18n/direction-attempt', () => ({
   // relaunches once for the language it names.
   readDirectionAttemptAsync: vi.fn(() => Promise.resolve(null)),
 }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState', StateAction: 'StateAction' }));
 vi.mock('@/components/picker-sheet', () => ({
   // Mirrors the shell: `headerContent` is pinned chrome unless the caller put
   // it in its own body (`headerInBody`), and the prop is exposed for assertions.

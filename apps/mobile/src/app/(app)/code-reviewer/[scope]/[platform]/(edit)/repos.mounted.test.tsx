@@ -91,6 +91,7 @@ vi.mock('@/components/query-error', () => ({
   },
 }));
 vi.mock('@/components/empty-state', () => ({
+  StateAction: 'StateAction',
   EmptyState: (props: { title: string; action?: ReactNode; className?: string }) => {
     state.emptyStateClassNames.push(props.className);
     return createElement('EmptyState', { title: props.title }, props.action);
@@ -274,13 +275,15 @@ type Mounted = RenderWithProvidersResult;
 
 function buttons(renderer: Mounted['renderer']) {
   return renderer.root
-    .findAll(node => String(node.type) === 'Button')
+    .findAll(node => String(node.type) === 'Button' || String(node.type) === 'StateAction')
     .map(node => {
+      // A state action keeps its copy in `label`; a plain button renders it as text.
+      const props = node.props as ButtonPressProps & { label?: unknown };
       const [text] = node.findAll(child => String(child.type) === 'Text');
-      const label = text?.props.children;
+      const label = text?.props.children ?? props.label;
       return {
         label: typeof label === 'string' ? label : '',
-        props: node.props as ButtonPressProps,
+        props,
       };
     });
 }

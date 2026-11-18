@@ -585,9 +585,7 @@ vi.mock('@/components/agents/tool-run-rows', () => ({
 vi.mock('@/components/agents/part-renderer', () => ({
   PartRenderer: 'PartRenderer',
 }));
-vi.mock('@/components/empty-state', () => ({
-  EmptyState: 'EmptyState',
-}));
+vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState', StateAction: 'StateAction' }));
 vi.mock('@/components/query-error', () => ({
   QueryError: 'QueryError',
 }));

@@ -31,6 +31,7 @@ vi.mock('react-i18next', async importOriginal => {
 vi.mock('expo-router', () => ({ useRouter: () => router }));
 vi.mock('@/components/ui/icons', () => ({ SearchX: 'SearchX' }));
 vi.mock('@/components/empty-state', () => ({
+  StateAction: 'StateAction',
   EmptyState: (props: { action?: React.ReactNode }) =>
     React.createElement('EmptyState', props, props.action),
 }));
@@ -56,7 +57,7 @@ function mount() {
 
 function pressBack(renderer: TestRenderer.ReactTestRenderer) {
   act(() => {
-    (renderer.root.findByType('Button').props.onPress as () => void)();
+    (renderer.root.findByType('StateAction').props.onPress as () => void)();
   });
 }
 

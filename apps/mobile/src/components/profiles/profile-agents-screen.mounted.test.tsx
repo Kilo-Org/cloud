@@ -54,6 +54,7 @@ vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/empty-state', () => ({
+  StateAction: 'StateAction',
   // The real state renders its action inside its body, so the slot that stands in
   // for the add action belongs to the tree; the stub keeps only that slot.
   EmptyState: (props: { action?: ReactNode }) => props.action,

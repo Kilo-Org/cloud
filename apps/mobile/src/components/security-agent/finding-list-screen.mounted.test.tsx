@@ -93,7 +93,7 @@ vi.mock('@/components/ui/icons', () => ({
   SlidersHorizontal: 'SlidersHorizontal',
   Info: 'Info',
 }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState', StateAction: 'StateAction' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/picker-sheet', () => ({ PickerSheet: 'PickerSheet' }));

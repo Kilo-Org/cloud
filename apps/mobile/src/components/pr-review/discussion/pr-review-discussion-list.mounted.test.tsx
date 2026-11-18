@@ -124,7 +124,7 @@ vi.mock('@/components/pr-review/discussion/discussion-thread', () => ({
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState', StateAction: 'StateAction' }));
 vi.mock('@/components/ui/icons', () => ({ MessageSquarePlus: 'MessageSquarePlus' }));
 vi.mock('@/lib/screen-insets', () => ({ useDetailScreenBottomPadding: () => 0 }));
 

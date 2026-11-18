@@ -97,6 +97,7 @@ vi.mock('@/components/empty-state', async () => {
   // helpers must be loaded inside the factory.
   const { createElement: createMockElement } = await import('react');
   return {
+    StateAction: 'StateAction',
     // The real state renders its `action` below the title, so the manage slot's
     // sentence or the manager's CTA reaches the tree the way the screen hands it over.
     EmptyState: (props: { action?: ReactNode }) =>

@@ -105,6 +105,7 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/empty-state', async () => {
   const { createElement: create } = await import('react');
   return {
+    StateAction: 'StateAction',
     EmptyState: (props: { icon: unknown; title: string; description?: ReactNode }) =>
       create(
         'EmptyState',

@@ -16,18 +16,20 @@ export async function validateAwsStartupStack(input: {
     try {
       stack = await input.read(AbortSignal.timeout(5000));
       if (stack.status.endsWith('_IN_PROGRESS')) {
-        if (attempt === 2) throw new ByocAwsProviderError('byoc_aws_not_ready');
+        if (attempt === 2) throw new ByocAwsProviderError('byoc_aws_stack_unavailable');
         await pause([1000, 2000][attempt]);
         continue;
       }
       break;
     } catch (error) {
+      if (error instanceof ByocAwsProviderError) throw error;
       if (error instanceof AwsRequestError && error.status === 403)
         throw new ByocAwsProviderError('byoc_aws_forbidden');
       const transient =
         error instanceof AwsRequestError &&
         (error.status === 0 || error.status === 429 || error.status >= 500);
-      if (!transient || attempt === 2) throw new ByocAwsProviderError('byoc_aws_not_ready');
+      if (!transient) throw new ByocAwsProviderError('byoc_aws_not_ready');
+      if (attempt === 2) throw new ByocAwsProviderError('byoc_aws_stack_unavailable');
       await pause([100, 250][attempt]);
     }
   }

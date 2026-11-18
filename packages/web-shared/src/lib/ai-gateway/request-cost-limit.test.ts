@@ -332,6 +332,49 @@ describe('request cost admission', () => {
       pickerModelPricing(discounted, {}, { rules: [] }, EMPTY_VERCEL_PRICING_METADATA)
     ).toEqual({ prompt: '0.000001000000', completion: '0.000002000000' });
   });
+  it('shows the short-context price but bounds spending at the long-context price', async () => {
+    const id = 'test/long-context';
+    const routeModel: GatewayModelWithEndpoints = {
+      id,
+      name: 'Long context model',
+      endpoints: [
+        {
+          tag: 'only-route',
+          pricing: {
+            prompt: '0.000001',
+            completion: '0.000002',
+            overrides: [{ min_prompt_tokens: 272000, prompt: '0.000004', completion: '0.000008' }],
+          },
+        },
+      ],
+    };
+    const catalogEntry = catalogModel(id, { prompt: '0.000001', completion: '0.000002' });
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({ [id]: routeModel });
+    jest.mocked(getRawOpenRouterModels).mockResolvedValue({ data: [catalogEntry] });
+
+    expect(
+      pickerModelPricing(
+        catalogEntry,
+        { [id]: routeModel },
+        { rules: [] },
+        EMPTY_VERCEL_PRICING_METADATA
+      )
+    ).toEqual({ prompt: '0.000001', completion: '0.000002' });
+    expect(
+      pickerModelPricing(
+        catalogEntry,
+        { [id]: routeModel },
+        { rules: [] },
+        EMPTY_VERCEL_PRICING_METADATA,
+        true
+      )
+    ).toEqual({ prompt: '0.000004', completion: '0.000008' });
+    // The bound is about 2200 microdollars at the short-context price and about 8700 at the long one
+    await expect(enforceRequestCostLimit('4000', id, body, 2_000_000)).resolves.toMatch(
+      /spend safeguard/
+    );
+    await expect(enforceRequestCostLimit('10000', id, body, 2_000_000)).resolves.toBeNull();
+  });
   it('refuses a managed provider that cannot enforce the quoted route price', async () => {
     const decision = await enforceRequestCostLimitDecision(
       '2000000',

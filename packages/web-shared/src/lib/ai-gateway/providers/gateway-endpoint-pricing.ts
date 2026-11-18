@@ -5,6 +5,7 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import {
   getModelDisplayPricing,
+  getWorstCaseModelPricing,
   maxEndpointPricing,
   type EndpointPricing,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/display-pricing';
@@ -32,17 +33,20 @@ export function isVercelEndpointOfProvider(vercelEndpoint: Endpoint, openRouterP
 /**
  * The default price of the provider `openRouterProvider` (an OpenRouter endpoint tag or provider
  * slug): the higher of OpenRouter's `pricing` and the prices of Vercel's endpoints for that
- * provider. Custom pricing does not apply to a single provider's price.
+ * provider. Custom pricing does not apply to a single provider's price. Both are short-context
+ * peak prices, or worst-case prices (including long-context surcharges) when `worstCase` is set.
  */
 export function getProviderDisplayPricing(
   openRouterProvider: string | undefined,
   pricing: EndpointPricing | undefined,
-  vercelModel: Pick<GatewayModelWithEndpoints, 'endpoints'> | undefined
+  vercelModel: Pick<GatewayModelWithEndpoints, 'endpoints'> | undefined,
+  worstCase = false
 ): EndpointPricing | undefined {
-  const displayPricing = getModelDisplayPricing(pricing);
+  const priceOf = worstCase ? getWorstCaseModelPricing : getModelDisplayPricing;
+  const displayPricing = priceOf(pricing);
   if (!displayPricing || !openRouterProvider || !vercelModel) return displayPricing;
   return vercelModel.endpoints.reduce((max, vercelEndpoint) => {
-    const vercelPricing = getModelDisplayPricing(vercelEndpoint.pricing);
+    const vercelPricing = priceOf(vercelEndpoint.pricing);
     return vercelPricing && isVercelEndpointOfProvider(vercelEndpoint, openRouterProvider)
       ? maxEndpointPricing(max, vercelPricing)
       : max;

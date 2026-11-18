@@ -162,6 +162,55 @@ describe('getProviderDisplayPricing', () => {
     ).toEqual({ prompt: '0.000002', completion: '0.000004' });
   });
 
+  it('shows the short-context price, ignoring long-context overrides', () => {
+    expect(
+      getProviderDisplayPricing(
+        'openai',
+        {
+          prompt: '0.000008',
+          completion: '0.00004',
+          overrides: [{ min_prompt_tokens: 272000, prompt: '0.000016', completion: '0.00006' }],
+        },
+        vercelModel({ provider: 'openai', pricing: { prompt: '0.000007', completion: '0.00003' } })
+      )
+    ).toEqual({ prompt: '0.000008', completion: '0.00004' });
+  });
+
+  it('keeps time-of-day windows and the Vercel peak multiplier', () => {
+    expect(
+      getProviderDisplayPricing(
+        'novita',
+        {
+          prompt: '0.000001',
+          completion: '0.000002',
+          overrides: [
+            { utc_start: 0, utc_end: 1400, prompt: '0.0000015', completion: '0.000003' },
+            { min_prompt_tokens: 272000, prompt: '0.00001', completion: '0.00002' },
+          ],
+        },
+        vercelModel({
+          provider: 'novita',
+          pricing: { prompt: '0.000001', completion: '0.000002', peak_pricing: { multiplier: 2 } },
+        })
+      )
+    ).toEqual({ prompt: '0.000002000000', completion: '0.000004000000' });
+  });
+
+  it('includes long-context overrides in the worst case', () => {
+    expect(
+      getProviderDisplayPricing(
+        'openai',
+        {
+          prompt: '0.000008',
+          completion: '0.00004',
+          overrides: [{ min_prompt_tokens: 272000, prompt: '0.000016', completion: '0.00006' }],
+        },
+        vercelModel({ provider: 'openai', pricing: { prompt: '0.000007', completion: '0.00003' } }),
+        true
+      )
+    ).toEqual({ prompt: '0.000016', completion: '0.00006' });
+  });
+
   it('returns only the OpenRouter display price without a provider to match', () => {
     expect(
       getProviderDisplayPricing(

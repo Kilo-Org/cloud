@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { OrganizationRole } from '@kilocode/app-shared/organizations';
 import {
   canConnectAnyProvider,
   classifyConfigBody,

@@ -314,6 +314,7 @@ describe('Watchwood browser signup', () => {
     expect(initialize).toHaveBeenCalledWith({
       org_id: enabledContext.org_id,
       safety_identifier: enabledContext.safety_identifier,
+      force_ipv4: true,
     });
   });
 

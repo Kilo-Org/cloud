@@ -60,6 +60,7 @@ export type EndpointModelRow = {
   api_kinds: CustomLlmApiKind[] | null;
   client_provider: CustomLlmProvider | null;
   reasoning_format: ByokEndpointReasoningFormat | null;
+  send_prompt_cache_key: boolean | null;
 };
 
 export type EndpointForm = {
@@ -68,8 +69,14 @@ export type EndpointForm = {
   api_kinds: CustomLlmApiKind[];
   client_provider: CustomLlmProvider;
   reasoning_format: ByokEndpointReasoningFormat;
+  send_prompt_cache_key: boolean;
   models: EndpointModelRow[];
 };
+
+/** Only Chat Completions and Responses requests carry a `prompt_cache_key`. */
+export function sendsPromptCacheKeyOver(apiKinds: readonly CustomLlmApiKind[]): boolean {
+  return apiKinds.some(apiKind => apiKind === 'chat_completions' || apiKind === 'responses');
+}
 
 export type EndpointCredentialsForm = {
   type: ByokEndpointCredentialsType;
@@ -106,6 +113,7 @@ export function toEndpointModelRow(model?: ByokEndpointModel): EndpointModelRow 
     api_kinds: model?.api_kinds ?? null,
     client_provider: model?.client_provider ?? null,
     reasoning_format: model?.reasoning_format ?? null,
+    send_prompt_cache_key: model?.send_prompt_cache_key ?? null,
   };
 }
 
@@ -117,6 +125,7 @@ export function toEndpointForm(definition: ByokEndpointDefinition | null): Endpo
       api_kinds: ['chat_completions'],
       client_provider: 'openrouter',
       reasoning_format: 'reasoning-details',
+      send_prompt_cache_key: false,
       models: [toEndpointModelRow()],
     };
   }
@@ -126,6 +135,7 @@ export function toEndpointForm(definition: ByokEndpointDefinition | null): Endpo
     api_kinds: definition.api_kinds,
     client_provider: definition.client_provider,
     reasoning_format: definition.reasoning_format,
+    send_prompt_cache_key: definition.send_prompt_cache_key ?? false,
     models: definition.models.map(toEndpointModelRow),
   };
 }
@@ -154,6 +164,7 @@ function toEndpointModel(row: EndpointModelRow): Record<string, unknown> {
     ...(row.api_kinds && { api_kinds: row.api_kinds }),
     ...(row.client_provider && { client_provider: row.client_provider }),
     ...(row.reasoning_format && { reasoning_format: row.reasoning_format }),
+    ...(row.send_prompt_cache_key !== null && { send_prompt_cache_key: row.send_prompt_cache_key }),
   };
 }
 
@@ -163,6 +174,7 @@ const FIELD_LABELS: Record<string, string> = {
   api_kinds: 'Supported APIs',
   client_provider: 'Preferred client API',
   reasoning_format: 'Reasoning format',
+  send_prompt_cache_key: 'Send prompt cache key',
   models: 'Models',
   id: 'Model ID',
   internal_id: 'Upstream model ID',
@@ -193,6 +205,7 @@ export function buildEndpointDefinition(form: EndpointForm): BuildResult<ByokEnd
     api_kinds: form.api_kinds,
     client_provider: form.client_provider,
     reasoning_format: form.reasoning_format,
+    ...(form.send_prompt_cache_key && { send_prompt_cache_key: true }),
     models: form.models.map(toEndpointModel),
   });
   if (result.success) return result;

@@ -46,6 +46,7 @@ import {
   buildEndpointDefinition,
   getImportCapacity,
   mergeImportedModels,
+  sendsPromptCacheKeyOver,
   setEndpointModelFlag,
   toEndpointForm,
   toEndpointModelRow,
@@ -163,6 +164,35 @@ function ReasoningFormatSelect({
             {label}
           </SelectItem>
         ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+const SEND = 'send';
+const OMIT = 'omit';
+
+function PromptCacheKeySelect({
+  id,
+  value,
+  onChange,
+}: {
+  id: string;
+  value: boolean | null;
+  onChange: (value: boolean | null) => void;
+}) {
+  return (
+    <Select
+      value={value === null ? INHERIT : value ? SEND : OMIT}
+      onValueChange={next => onChange(next === INHERIT ? null : next === SEND)}
+    >
+      <SelectTrigger id={id}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={INHERIT}>Endpoint setting</SelectItem>
+        <SelectItem value={SEND}>Send</SelectItem>
+        <SelectItem value={OMIT}>Do not send</SelectItem>
       </SelectContent>
     </Select>
   );
@@ -387,12 +417,27 @@ function ModelOverrides({
           inheritLabel="Endpoint setting"
         />
       </div>
+      {sendsPromptCacheKeyOver(row.api_kinds ?? endpointApiKinds) ? (
+        <div className="space-y-2">
+          <Label htmlFor={`${idPrefix}-prompt-cache-key`}>Prompt cache key</Label>
+          <PromptCacheKeySelect
+            id={`${idPrefix}-prompt-cache-key`}
+            value={row.send_prompt_cache_key}
+            onChange={send_prompt_cache_key => onChange({ send_prompt_cache_key })}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }
 
 function hasOverrides(row: EndpointModelRow) {
-  return row.api_kinds !== null || row.client_provider !== null || row.reasoning_format !== null;
+  return (
+    row.api_kinds !== null ||
+    row.client_provider !== null ||
+    row.reasoning_format !== null ||
+    row.send_prompt_cache_key !== null
+  );
 }
 
 function ModelsTable({
@@ -786,6 +831,28 @@ function ByokEndpointForm({
               </p>
             </div>
           </div>
+          {sendsPromptCacheKeyOver(form.api_kinds) ? (
+            <div className="space-y-1">
+              <label
+                htmlFor="endpoint-prompt-cache-key"
+                className="flex items-center gap-2 text-sm"
+              >
+                <Checkbox
+                  id="endpoint-prompt-cache-key"
+                  checked={form.send_prompt_cache_key}
+                  onCheckedChange={checked =>
+                    updateForm({ send_prompt_cache_key: checked === true })
+                  }
+                />
+                Send prompt cache key
+              </label>
+              <p className="text-muted-foreground text-xs">
+                Sends <code>prompt_cache_key</code> with Chat Completions and Responses requests,
+                which helps the endpoint reuse cached prompts. Leave it off if the endpoint rejects
+                unknown fields.
+              </p>
+            </div>
+          ) : null}
         </fieldset>
 
         <section className="space-y-3" aria-labelledby="endpoint-models-heading">

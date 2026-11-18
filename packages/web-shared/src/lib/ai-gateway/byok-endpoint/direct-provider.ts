@@ -8,6 +8,7 @@ import {
   getByokEndpointModelApiKinds,
   getByokEndpointModelClientApiKind,
   getByokEndpointModelResponseTransform,
+  getByokEndpointModelSendsPromptCacheKey,
   parseByokEndpointCredentials,
 } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
 import { getGoogleServiceAccountAccessToken } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/google-service-account';
@@ -29,7 +30,7 @@ export class InvalidByokEndpointCredentialsError extends Error {
   }
 }
 
-/** The request fields `applyTrackingIds` sets; `prompt_cache_key` stays because it only aids caching. */
+/** The user and session ids `applyTrackingIds` sets; `prompt_cache_key` is decided separately. */
 function removeTrackingIds(body: Record<string, unknown>) {
   delete body.user;
   delete body.safety_identifier;
@@ -115,9 +116,13 @@ function createProvider(
         responseTransforms: getByokEndpointModelResponseTransform(definition, served),
       };
     },
-    transformRequest({ request, extraHeaders }) {
+    transformRequest({ request, extraHeaders }, model) {
+      const body = request.body as Record<string, unknown>;
       // An organization's upstream has no use for the user and session ids Kilo adds.
-      removeTrackingIds(request.body as Record<string, unknown>);
+      removeTrackingIds(body);
+      if (!getByokEndpointModelSendsPromptCacheKey(definition, endpointModel(model))) {
+        delete body.prompt_cache_key;
+      }
       // Anthropic's own API rejects Messages requests without it; compatible upstreams ignore it.
       if (request.kind === 'messages') extraHeaders['anthropic-version'] ??= ANTHROPIC_VERSION;
     },

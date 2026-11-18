@@ -50,17 +50,20 @@ async function transform(endpoint: ByokEndpointDefinition, request: GatewayReque
   const gatewayProvider = { type: 'direct-byok' } as Provider;
   applyTrackingIds(request, gatewayProvider, 'user-1', 'task-1');
   const extraHeaders: Record<string, string> = {};
-  provider.transformRequest({
-    provider: gatewayProvider,
-    model: `${PROVIDER_ID}/acme/coder`,
-    request,
-    originalHeaders: EmptyFraudDetectionHeaders,
-    extraHeaders,
-    userByok: null,
-    kilo_user_id: 'user-1',
-    organization_id: 'org-1',
-    session_id: null,
-  });
+  provider.transformRequest(
+    {
+      provider: gatewayProvider,
+      model: `${PROVIDER_ID}/acme/coder`,
+      request,
+      originalHeaders: EmptyFraudDetectionHeaders,
+      extraHeaders,
+      userByok: null,
+      kilo_user_id: 'user-1',
+      organization_id: 'org-1',
+      session_id: null,
+    },
+    await firstModel(endpoint)
+  );
   return { body: request.body as Record<string, unknown>, extraHeaders };
 }
 
@@ -177,12 +180,28 @@ describe('createByokEndpointDirectProvider', () => {
     ).rejects.toBeInstanceOf(InvalidByokEndpointCredentialsError);
   });
 
-  it('removes the tracking ids Kilo adds, keeping the prompt cache key', async () => {
+  it('removes the tracking ids Kilo adds', async () => {
     const { body } = await transform(definition(), chatRequest());
 
     expect(body).not.toHaveProperty('user');
     expect(body).not.toHaveProperty('safety_identifier');
-    expect(body.prompt_cache_key).toEqual(expect.any(String));
+  });
+
+  it('sends the prompt cache key only where the endpoint or model turns it on', async () => {
+    const base = definition();
+    const withModel = (send_prompt_cache_key: boolean | undefined) =>
+      definition({
+        send_prompt_cache_key: true,
+        models: [{ ...base.models[0], send_prompt_cache_key }],
+      });
+
+    expect((await transform(base, chatRequest())).body).not.toHaveProperty('prompt_cache_key');
+    expect((await transform(withModel(undefined), chatRequest())).body.prompt_cache_key).toEqual(
+      expect.any(String)
+    );
+    expect((await transform(withModel(false), chatRequest())).body).not.toHaveProperty(
+      'prompt_cache_key'
+    );
   });
 
   it('drops metadata.user_id and the metadata it leaves empty', async () => {

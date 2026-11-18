@@ -176,7 +176,7 @@ export function createDirectByokGatewayProvider(
     async transformRequest(context) {
       context.request.body.model = getDirectByokUpstreamModelId(directByok, model);
       delete context.request.body.provider;
-      directByok.transformRequest(context);
+      directByok.transformRequest(context, model);
     },
   };
 }

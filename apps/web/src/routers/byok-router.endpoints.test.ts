@@ -694,6 +694,18 @@ describe('BYOK endpoints', () => {
       // Transformed like a gateway request to the endpoint.
       expect(body).not.toHaveProperty('user');
       expect(body).not.toHaveProperty('safety_identifier');
+      expect(body).not.toHaveProperty('prompt_cache_key');
+    });
+
+    test('sends the prompt cache key when the endpoint turns it on', async () => {
+      const created = await createEndpoint({ ...DEFINITION, send_prompt_cache_key: true });
+      const upstream = mockUpstream(() => Response.json({ choices: [] }));
+      restoreFetch = upstream.restore;
+      const caller = await createCallerForUser(owner.id);
+
+      await caller.byok.testApiKey({ organizationId: organization.id, id: created.id });
+
+      expect(bodyOf(upstream.calls[0]).prompt_cache_key).toEqual(expect.any(String));
     });
 
     test('retries with max_completion_tokens when the upstream asks for it', async () => {

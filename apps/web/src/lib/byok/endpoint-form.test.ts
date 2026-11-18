@@ -7,6 +7,7 @@ import {
   buildEndpointDefinition,
   getImportCapacity,
   mergeImportedModels,
+  sendsPromptCacheKeyOver,
   setEndpointModelFlag,
   toEndpointForm,
   toEndpointModelRow,
@@ -18,6 +19,14 @@ const MODEL = {
   context_length: 100000,
   max_completion_tokens: 8000,
 };
+
+describe('sendsPromptCacheKeyOver', () => {
+  test('applies to Chat Completions and Responses only', () => {
+    expect(sendsPromptCacheKeyOver(['messages', 'responses'])).toBe(true);
+    expect(sendsPromptCacheKeyOver(['chat_completions'])).toBe(true);
+    expect(sendsPromptCacheKeyOver(['messages'])).toBe(false);
+  });
+});
 
 describe('buildEndpointDefinition', () => {
   test('builds a definition and leaves unset overrides out', () => {
@@ -48,6 +57,7 @@ describe('buildEndpointDefinition', () => {
       api_kinds: ['chat_completions' as const, 'messages' as const],
       client_provider: 'anthropic' as const,
       reasoning_format: 'reasoning-content' as const,
+      send_prompt_cache_key: true,
       models: [
         {
           ...MODEL,
@@ -55,6 +65,7 @@ describe('buildEndpointDefinition', () => {
           flags: ['vision' as const, 'recommended' as const],
           api_kinds: ['chat_completions' as const],
           client_provider: 'openrouter' as const,
+          send_prompt_cache_key: false,
         },
       ],
     };

@@ -67,7 +67,8 @@ type DirectByokProviderBase = {
   /** models.dev provider key; omitted for providers models.dev does not list. */
   models_dev_id?: string;
   models: () => Promise<ReadonlyArray<DirectByokModel>>;
-  transformRequest(context: TransformRequestContext): void;
+  /** Adapts a request for `model` after the gateway set its upstream id. */
+  transformRequest(context: TransformRequestContext, model: DirectByokModel): void;
   /**
    * Builds the upstream for a request from the stored credential. Most providers
    * use `apiKeyUpstream`; cloud providers can derive regions or signed requests.

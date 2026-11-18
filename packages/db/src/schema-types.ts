@@ -3105,6 +3105,11 @@ const ByokEndpointModelOverridesSchema = z.object({
   api_kinds: z.array(CustomLlmApiKindSchema).min(1).optional(),
   client_provider: CustomLlmProviderSchema.optional(),
   reasoning_format: ByokEndpointReasoningFormatSchema.optional(),
+  /**
+   * Whether Chat Completions and Responses requests keep the `prompt_cache_key` the gateway sets.
+   * Some upstreams reject the field, so it is sent only when turned on.
+   */
+  send_prompt_cache_key: z.boolean().optional(),
 });
 
 export const ByokEndpointModelSchema = DirectByokModelSchema.pick({ flags: true })
@@ -3147,6 +3152,7 @@ export const ByokEndpointDefinitionSchema = z
     /** The API clients use: `anthropic` Messages, `openai` Responses, `openrouter` Chat Completions. */
     client_provider: CustomLlmProviderSchema,
     reasoning_format: ByokEndpointReasoningFormatSchema,
+    send_prompt_cache_key: ByokEndpointModelOverridesSchema.shape.send_prompt_cache_key,
     models: z.array(ByokEndpointModelSchema).min(1).max(BYOK_ENDPOINT_MAX_MODELS),
   })
   .superRefine((definition, ctx) => {

@@ -78,6 +78,14 @@ export function getByokEndpointModelResponseTransform(
   return format === 'reasoning-details' ? null : format;
 }
 
+/** Whether requests for `model` keep the `prompt_cache_key` the gateway sets; off unless set. */
+export function getByokEndpointModelSendsPromptCacheKey(
+  definition: ByokEndpointDefinition,
+  model: ByokEndpointModel
+): boolean {
+  return model.send_prompt_cache_key ?? definition.send_prompt_cache_key ?? false;
+}
+
 export function parseByokEndpointCredentials(decrypted: string): ByokEndpointCredentials | null {
   let json: unknown;
   try {

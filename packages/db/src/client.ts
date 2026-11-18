@@ -61,15 +61,73 @@ export function createDrizzleClient(options: CreateDrizzleClientOptions) {
 }
 
 /**
+ * Bounds for every transaction that a Worker DB client starts. Hyperdrive pools in transaction
+ * mode and resets `SET` state when it returns a connection to its pool, and its documentation does
+ * not list settings sent at connection startup as supported. So the bounds are `SET LOCAL`
+ * statements in the same message as `BEGIN`, and a Worker that stops right after `BEGIN` still
+ * leaves a transaction that PostgreSQL ends. `lock_timeout` bounds row-lock waits such as
+ * `FOR UPDATE`. The idle bound stays above the longest awaited non-database step inside a Worker
+ * transaction: two consecutive 10 s GitHub requests in the git-token-service disconnect flow.
+ */
+export const workerTransactionBoundsSql =
+  "SET LOCAL lock_timeout = '10s'; SET LOCAL idle_in_transaction_session_timeout = '30s'";
+
+const transactionStart = /^begin\b/i;
+
+function isTextQueryConfig(config: unknown): config is pg.QueryConfig {
+  return (
+    typeof config === 'object' &&
+    config !== null &&
+    'text' in config &&
+    typeof config.text === 'string' &&
+    !('submit' in config)
+  );
+}
+
+function withTransactionBounds(config: unknown): unknown {
+  if (typeof config === 'string') {
+    return transactionStart.test(config) ? `${config}; ${workerTransactionBoundsSql}` : config;
+  }
+  if (isTextQueryConfig(config) && transactionStart.test(config.text)) {
+    return { ...config, text: `${config.text}; ${workerTransactionBoundsSql}` };
+  }
+  return config;
+}
+
+function boundTransactionStarts(client: pg.PoolClient): void {
+  // pg types `query` as overloads. This forwarder changes only the text of a transaction start.
+  const query = client.query.bind(client) as (config: unknown, ...rest: unknown[]) => unknown;
+  client.query = ((config: unknown, ...rest: unknown[]) =>
+    query(withTransactionBounds(config), ...rest)) as typeof client.query;
+}
+
+/**
+ * pg emits `error` on a checked-out connection that fails between statements, for example when
+ * PostgreSQL ends an idle transaction. Without a listener the event is an uncaught exception. pg
+ * still rejects the queries that use the failed connection.
+ */
+function reportConnectionErrors(client: pg.PoolClient): void {
+  client.on('error', error => {
+    console.warn('Worker database connection failed', { error: error.message });
+  });
+}
+
+/**
  * Settings `getWorkerDb` fixes for every pool it creates: the connection string, `max: 1` because
  * Hyperdrive owns pooling, `maxUses: 1` so a released connection closes instead of staying open
  * in a pool that nothing ends, and `types` because the pool is created with the module's int8
- * parser. The type reserves all of these, and `getWorkerDb` applies its values after the caller's
- * options.
+ * parser. The transaction bounds in `workerTransactionBoundsSql` replace the startup settings for
+ * lock and idle-in-transaction timeouts. The type reserves all of these, and `getWorkerDb` applies
+ * its values after the caller's options.
  */
 export type GetWorkerDbOptions = Omit<
   pg.PoolConfig,
-  'connectionString' | 'max' | 'maxUses' | 'types'
+  | 'connectionString'
+  | 'max'
+  | 'maxUses'
+  | 'types'
+  | 'lock_timeout'
+  | 'idle_in_transaction_session_timeout'
 >;
 
 /**
@@ -87,6 +145,8 @@ export function getWorkerDb(connectionString: string, options: GetWorkerDbOption
     maxUses: 1,
     types: databaseTypeParsers,
   });
+  pool.on('connect', boundTransactionStarts);
+  pool.on('connect', reportConnectionErrors);
   return drizzle(pool, { schema });
 }
 

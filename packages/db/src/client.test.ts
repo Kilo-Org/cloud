@@ -8,7 +8,8 @@ import type { jest as JestGlobal } from '@jest/globals';
 declare const jest: typeof JestGlobal;
 
 jest.mock('pg', () => {
-  const Pool = jest.fn(function Pool(this: object) {
+  const Pool = jest.fn(function Pool(this: { on: unknown }) {
+    this.on = jest.fn();
     return this;
   });
 
@@ -77,6 +78,8 @@ type PoolConfigOption = NonNullable<Parameters<typeof createDrizzleClient>[0]['p
 const acceptsWorkerSetting: WorkerOptions = { application_name: 'worker', statement_timeout: 1000 };
 // @ts-expect-error getWorkerDb installs databaseTypeParsers on its pool.
 const workerTypes: WorkerOptions = { types: databaseTypeParsers };
+// @ts-expect-error getWorkerDb owns the lock bound of each transaction.
+const workerLockTimeout: WorkerOptions = { lock_timeout: 1000 };
 // @ts-expect-error getWorkerDb closes each connection after one use.
 const workerMaxUses: WorkerOptions = { maxUses: 10 };
 const acceptsPoolSetting: PoolConfigOption = {
@@ -89,6 +92,7 @@ const poolTypes: PoolConfigOption = { types: databaseTypeParsers };
 void acceptsWorkerSetting;
 void acceptsPoolSetting;
 void workerTypes;
+void workerLockTimeout;
 void workerMaxUses;
 void poolTypes;
 

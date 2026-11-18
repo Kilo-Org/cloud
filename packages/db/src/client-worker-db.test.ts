@@ -1,8 +1,8 @@
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { EventEmitter } from 'node:events';
 import { sql } from 'drizzle-orm';
 import type pg from 'pg';
-import { getWorkerDb } from './client';
+import { getWorkerDb, workerTransactionBoundsSql } from './client';
 
 type QueryCallback = (error: Error | null, result: unknown) => void;
 
@@ -58,6 +58,43 @@ beforeEach(() => {
   RecordingClient.created = [];
 });
 
+describe('getWorkerDb transaction bounds', () => {
+  it('sends the lock and idle bounds in the same statement as BEGIN', async () => {
+    const db = recordingWorkerDb();
+
+    await db.transaction(async tx => {
+      await tx.execute(sql`select 1`);
+    });
+
+    expect(RecordingClient.created).toHaveLength(1);
+    expect(RecordingClient.created[0]?.queries).toEqual([
+      `begin; ${workerTransactionBoundsSql}`,
+      'select 1',
+      'commit',
+    ]);
+  });
+
+  it('keeps the transaction options that drizzle adds to BEGIN', async () => {
+    const db = recordingWorkerDb();
+
+    await db.transaction(async tx => tx.execute(sql`select 1`), {
+      isolationLevel: 'read committed',
+    });
+
+    expect(RecordingClient.created[0]?.queries[0]).toBe(
+      `begin isolation level read committed; ${workerTransactionBoundsSql}`
+    );
+  });
+
+  it('leaves statements outside a transaction unchanged', async () => {
+    const db = recordingWorkerDb();
+
+    await db.execute(sql`select 1`);
+
+    expect(RecordingClient.created[0]?.queries).toEqual(['select 1']);
+  });
+});
+
 describe('getWorkerDb connection lifetime', () => {
   it('closes the connection when a query releases it', async () => {
     const db = recordingWorkerDb();
@@ -90,6 +127,21 @@ describe('getWorkerDb connection lifetime', () => {
     expect(RecordingClient.created[0]?.queries.at(-1)).toBe('rollback');
     expect(RecordingClient.created.map(client => client.ended)).toEqual([true]);
     expect(db.$client.totalCount).toBe(0);
+  });
+
+  it('reports a connection failure inside a transaction instead of throwing it', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const db = recordingWorkerDb();
+    const failure = new Error('terminating connection due to idle-in-transaction timeout');
+
+    await db.transaction(async () => {
+      expect(() => RecordingClient.created[0]?.emit('error', failure)).not.toThrow();
+    });
+
+    expect(warn).toHaveBeenCalledWith('Worker database connection failed', {
+      error: failure.message,
+    });
+    warn.mockRestore();
   });
 
   it('uses a new connection for each later query on the same client', async () => {

@@ -171,7 +171,8 @@ export function OrganizationMembersScreen() {
 
   // A member's or invite's rounded corners follow its run inside one group: the
   // rows after a section header start the run, and the last row of the group
-  // closes it.
+  // closes it. The group is a card, so it keeps the 14pt page gutter inside the
+  // full-bleed list rather than running to the screen edge.
   const rowPosition = (index: number, last: boolean) => {
     const isFirst = index === 0 || items[index - 1]?.kind === 'section';
     if (last) {
@@ -190,7 +191,7 @@ export function OrganizationMembersScreen() {
       }
       case 'member': {
         return (
-          <RowGroupItem position={rowPosition(index, item.last)}>
+          <RowGroupItem position={rowPosition(index, item.last)} className="mx-4">
             <MemberRow
               member={item.member}
               canManage={
@@ -212,7 +213,7 @@ export function OrganizationMembersScreen() {
       }
       case 'invite': {
         return (
-          <RowGroupItem position={rowPosition(index, item.last)}>
+          <RowGroupItem position={rowPosition(index, item.last)} className="mx-4">
             <InvitedMemberRow
               invite={item.invite}
               canManage={canManageMembers && (item.invite.role !== 'owner' || canManageOwners)}

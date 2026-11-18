@@ -51,7 +51,7 @@ export function SessionPermanentError({
     <>
       {restoredRouteOpen ? <RestoredRouteFallback /> : null}
       <CenteredState>
-        <View className="items-center gap-3 px-6">
+        <View className="items-center gap-3 px-4">
           <QueryError
             variant={variant}
             placement="top"

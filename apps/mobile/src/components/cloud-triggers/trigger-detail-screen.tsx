@@ -21,6 +21,7 @@ import { Text } from '@/components/ui/text';
 import { type CloudTriggerDetail } from '@/lib/cloud-triggers/trigger-draft';
 import { useCloudTrigger } from '@/lib/cloud-triggers/use-cloud-triggers';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { trpcErrorVariant } from '@/lib/trpc-error';
 
 import { TriggerDeliveries } from './trigger-deliveries';
@@ -146,7 +147,7 @@ export function TriggerDetailScreen({
       <ScreenHeader title={triggerId} />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-4 px-4 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}

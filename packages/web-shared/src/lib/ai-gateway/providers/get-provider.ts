@@ -395,19 +395,22 @@ async function resolvePartnerRoute(
   if (!providerSettingsAllowPartner(partner, providerConfig, await input.getAllowedProviders())) {
     return 'provider-settings';
   }
-  const credentials = readCustomLlmCredentials(partner);
-  if (!credentials) {
-    console.error('Partner custom LLM credentials are missing or invalid', partner.public_id);
+  // Unlike a custom LLM that owns its id, a partner has a fallback, so unusable
+  // credentials skip it instead of failing the request.
+  let auth: DirectUpstreamAuth;
+  try {
+    const credentials = readCustomLlmCredentials(partner);
+    if (!credentials) throw new Error('missing or unparseable');
+    auth = await resolveCustomLlmAuth(credentials);
+  } catch (error) {
+    console.error('Partner custom LLM credentials are unusable', partner.public_id, {
+      errorType: error instanceof Error ? error.name : 'unknown',
+    });
     return 'invalid-credentials';
   }
   return {
     provider: {
-      ...buildDirectProvider(
-        'partner',
-        getCustomLlmApiKinds(definition),
-        definition,
-        await resolveCustomLlmAuth(credentials)
-      ),
+      ...buildDirectProvider('partner', getCustomLlmApiKinds(definition), definition, auth),
       inferenceProviderId: definition.partner.inference_provider,
     },
     userByok: null,

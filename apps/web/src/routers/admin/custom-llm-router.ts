@@ -123,7 +123,8 @@ export const adminCustomLlmRouter = createTRPCRouter({
     });
 
     if (input.definition.partner) {
-      await assertPartnerPublicIdIsCatalogModel(input.public_id);
+      // An existing partner stays editable after its model leaves the catalog.
+      if (!existing?.definition.partner) await assertPartnerPublicIdIsCatalogModel(input.public_id);
     } else if (!existing || existing.definition.partner) {
       // A former partner's id names a catalog model, which a custom LLM must not hide.
       await assertPublicIdIsClaimable(input.public_id);

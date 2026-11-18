@@ -8504,7 +8504,7 @@ describe('BYOK failover', () => {
     expect(failovers[1]).toHaveBeenCalledTimes(1);
     expect(sentApiKeys()).toEqual(['primary-byok-key', 'next-byok-key']);
     expect(console.warn).toHaveBeenCalledWith(
-      '[byok-failover] Skipping a BYOK key the policy refuses',
+      '[byok-failover] Skipping a failover route the policy refuses',
       { providerIds: ['anthropic'] }
     );
   });
@@ -8534,7 +8534,7 @@ describe('BYOK failover', () => {
     expect(next).toHaveBeenCalledTimes(1);
     expect(sentApiKeys()).toEqual(['primary-byok-key', 'next-byok-key']);
     expect(consoleError).toHaveBeenCalledWith(
-      '[byok-failover] Skipping a BYOK key that could not be resolved',
+      '[byok-failover] Skipping a failover route that could not be resolved',
       { errorType: 'TypeError' }
     );
     expect(JSON.stringify(consoleError.mock.calls)).not.toMatch(/byok-key/);

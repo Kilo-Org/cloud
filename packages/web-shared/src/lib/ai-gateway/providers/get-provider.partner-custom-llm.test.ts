@@ -519,14 +519,26 @@ describe('getProvider skips the partner', () => {
 
     await expectKiloRouteOnly({}, 'invalid-credentials');
     expect(console.error).toHaveBeenCalledWith(
-      'Partner custom LLM credentials are missing or invalid',
-      MODEL
+      'Partner custom LLM credentials are unusable',
+      MODEL,
+      { errorType: 'Error' }
     );
   });
 
   test('when the partner credentials are not valid JSON', async () => {
     jest.spyOn(console, 'error').mockImplementation(() => {});
     await insertPartner({}, 'not json');
+
+    await expectKiloRouteOnly({}, 'invalid-credentials');
+  });
+
+  test('when the partner credentials cannot be decrypted', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    await insertCustomLlmForTest(
+      MODEL,
+      partnerCustomLlmDefinition(PARTNER_PROVIDER, { base_url: PARTNER_URL, pricing }),
+      { iv: 'AAAAAAAAAAAAAAAA', data: 'AAAA', authTag: 'AAAAAAAAAAAAAAAAAAAAAA==' }
+    );
 
     await expectKiloRouteOnly({}, 'invalid-credentials');
   });

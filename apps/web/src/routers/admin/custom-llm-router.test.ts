@@ -929,6 +929,23 @@ describe('adminCustomLlmRouter', () => {
       expect(result.definition.display_name).toBe('Renamed partner');
     });
 
+    it('keeps an existing partner editable after its model leaves the OpenRouter model list', async () => {
+      const caller = await createCallerForUser(admin.id);
+      await caller.admin.customLlm.upsert({
+        public_id: catalogPublicId,
+        definition: partnerDefinition,
+        credentials,
+      });
+      jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({});
+
+      const result = await caller.admin.customLlm.upsert({
+        public_id: catalogPublicId,
+        definition: { ...partnerDefinition, display_name: 'Renamed partner' },
+      });
+
+      expect(result.definition.display_name).toBe('Renamed partner');
+    });
+
     it('rejects a partner whose id is not in the OpenRouter model list', async () => {
       const caller = await createCallerForUser(admin.id);
 

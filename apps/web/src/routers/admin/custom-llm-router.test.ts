@@ -946,6 +946,39 @@ describe('adminCustomLlmRouter', () => {
       expect(result.definition.display_name).toBe('Renamed partner');
     });
 
+    it('rejects a partner whose id differs only in case from an existing custom LLM', async () => {
+      await db
+        .insert(custom_llm2)
+        .values({ public_id: 'OpenAI/GPT-4o', definition: validDefinition });
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(
+        caller.admin.customLlm.upsert({
+          public_id: catalogPublicId,
+          definition: partnerDefinition,
+          credentials,
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('differs only in case'),
+      });
+    });
+
+    it('rejects a partner whose id the public id schema reserves', async () => {
+      jest
+        .mocked(getOpenRouterModelsMetadataFromDatabase)
+        .mockResolvedValue({ '~openai/gpt-latest': {} as GatewayModelWithEndpoints });
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(
+        caller.admin.customLlm.upsert({
+          public_id: '~openai/gpt-latest',
+          definition: partnerDefinition,
+          credentials,
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: expect.stringContaining('~') });
+    });
+
     it('rejects a partner whose id is not in the OpenRouter model list', async () => {
       const caller = await createCallerForUser(admin.id);
 

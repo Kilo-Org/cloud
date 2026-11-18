@@ -431,6 +431,7 @@ describe('getProvider skips the partner', () => {
   test.each<[string, OpenRouterProviderConfig]>([
     ['only excludes the partner', { only: ['other'] }],
     ['ignore lists the partner', { ignore: [PARTNER_PROVIDER] }],
+    ['ignore lists the partner in another case', { ignore: [PARTNER_PROVIDER.toUpperCase()] }],
     ['order excludes the partner without fallbacks', { order: ['other'], allow_fallbacks: false }],
     ['a price ceiling is set', { max_price: { prompt: 1 } }],
     ['zero data retention is required', { zdr: true }],
@@ -482,6 +483,16 @@ describe('getProvider skips the partner', () => {
       { getAllowedProviders: async () => new Set(['other']) },
       'provider-settings'
     );
+  });
+
+  test('not when only lists the partner in another case', async () => {
+    await insertPartner();
+
+    const { result } = await routeAndRecord({
+      request: chatRequest({ only: [PARTNER_PROVIDER.toUpperCase()] }),
+    });
+
+    expect((await result.routes[0]()).provider.type).toBe('partner');
   });
 
   test('not for denied data collection when the partner does not train on prompts', async () => {

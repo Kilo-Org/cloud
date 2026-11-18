@@ -106,7 +106,7 @@ function reasoningTextOf(message: Record<string, unknown>): string {
   // Details without text, such as only summaries, fall back to the legacy reasoning strings.
   for (const field of ['reasoning_content', 'reasoning']) {
     const value = message[field];
-    if (typeof value === 'string') return value;
+    if (typeof value === 'string' && value) return value;
   }
   return '';
 }

@@ -173,6 +173,19 @@ describe('applyMistralThinkingRequestTransform', () => {
     ]);
   });
 
+  it('skips an empty reasoning_content and replays the reasoning string', () => {
+    const request = chatRequest([
+      { role: 'assistant', content: 'answer', reasoning_content: '', reasoning: 'from reasoning' },
+    ]);
+
+    applyMistralThinkingRequestTransform(request);
+
+    expect(messagesOf(request)[0]?.content).toEqual([
+      thinkingChunk('from reasoning'),
+      { type: 'text', text: 'answer' },
+    ]);
+  });
+
   it('leaves assistant and non-assistant messages without reasoning untouched', () => {
     const request = chatRequest([
       { role: 'user', content: 'hello', reasoning_content: 'ignored on user messages' },

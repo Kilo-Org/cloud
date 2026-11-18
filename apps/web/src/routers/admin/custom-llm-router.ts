@@ -42,27 +42,14 @@ function assertBaseUrlUsesHttps(definition: CustomLlmDefinition) {
   }
 }
 
-/**
- * Routing resolves custom LLMs before any other upstream, so a new id must not
- * hide an OpenRouter or direct BYOK model. Existing rows keep their id, so this
- * only runs when an id is claimed.
- */
-async function assertPublicIdIsClaimable(publicId: string) {
+/** A valid public id, unique ignoring case. Custom LLM lookups ignore case, so a case
+ * variant of an existing row would shadow it or be shadowed by it. */
+async function assertPublicIdIsValidAndUnique(publicId: string): Promise<string> {
   const parsedPublicId = CustomLlmPublicIdSchema.safeParse(publicId);
   if (!parsedPublicId.success) {
     badRequest(parsedPublicId.error.issues.map(issue => issue.message).join('; '));
   }
   const modelId = parsedPublicId.data;
-  const directByokProvider = DirectUserByokInferenceProviderIdSchema.options.find(providerId =>
-    modelId.startsWith(`${providerId}/`)
-  );
-  if (directByokProvider) {
-    badRequest(`public_id must not use the direct BYOK prefix "${directByokProvider}/"`);
-  }
-  if (Object.hasOwn(await getOpenRouterModelsMetadataFromDatabase(), modelId)) {
-    badRequest(`public_id "${modelId}" already exists in the OpenRouter model list`);
-  }
-  // Custom LLM lookups ignore case, so a case variant would shadow the other row.
   const [caseVariant] = await db
     .select({ public_id: custom_llm2.public_id })
     .from(custom_llm2)
@@ -75,13 +62,33 @@ async function assertPublicIdIsClaimable(publicId: string) {
       `public_id "${modelId}" differs only in case from the existing custom LLM "${caseVariant.public_id}"`
     );
   }
+  return modelId;
+}
+
+/**
+ * Routing resolves custom LLMs before any other upstream, so a new id must not
+ * hide an OpenRouter or direct BYOK model. Existing rows keep their id, so this
+ * only runs when an id is claimed.
+ */
+async function assertPublicIdIsClaimable(publicId: string) {
+  const modelId = await assertPublicIdIsValidAndUnique(publicId);
+  const directByokProvider = DirectUserByokInferenceProviderIdSchema.options.find(providerId =>
+    modelId.startsWith(`${providerId}/`)
+  );
+  if (directByokProvider) {
+    badRequest(`public_id must not use the direct BYOK prefix "${directByokProvider}/"`);
+  }
+  if (Object.hasOwn(await getOpenRouterModelsMetadataFromDatabase(), modelId)) {
+    badRequest(`public_id "${modelId}" already exists in the OpenRouter model list`);
+  }
 }
 
 /** A partner serves a catalog model, so its id must name one. */
 async function assertPartnerPublicIdIsCatalogModel(publicId: string) {
-  if (!Object.hasOwn(await getOpenRouterModelsMetadataFromDatabase(), publicId)) {
+  const modelId = await assertPublicIdIsValidAndUnique(publicId);
+  if (!Object.hasOwn(await getOpenRouterModelsMetadataFromDatabase(), modelId)) {
     badRequest(
-      `public_id "${publicId}" must exist in the OpenRouter model list when partner is set`
+      `public_id "${modelId}" must exist in the OpenRouter model list when partner is set`
     );
   }
 }

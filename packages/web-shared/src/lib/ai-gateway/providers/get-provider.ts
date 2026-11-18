@@ -352,12 +352,15 @@ function providerSettingsAllowPartner(
   provider: OpenRouterProviderConfig | undefined,
   allowedProviders: ReadonlySet<string> | undefined
 ): boolean {
+  // The slug schema keeps partner slugs lowercase; callers may send provider ids in any case.
   const slug = partner.definition.partner.inference_provider;
-  if (allowedProviders && !allowedProviders.has(slug)) return false;
+  const names = (providerIds: Iterable<string>) =>
+    [...providerIds].some(providerId => providerId.toLowerCase() === slug);
+  if (allowedProviders && !names(allowedProviders)) return false;
   if (!provider) return true;
-  if (provider.only && !provider.only.includes(slug)) return false;
-  if (provider.ignore?.includes(slug)) return false;
-  if (provider.allow_fallbacks === false && provider.order && !provider.order.includes(slug)) {
+  if (provider.only && !names(provider.only)) return false;
+  if (provider.ignore && names(provider.ignore)) return false;
+  if (provider.allow_fallbacks === false && provider.order && !names(provider.order)) {
     return false;
   }
   // The partner bills its own pricing, which a price ceiling does not cover.

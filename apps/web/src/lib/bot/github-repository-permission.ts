@@ -3,6 +3,7 @@ import type { PlatformIntegration } from '@kilocode/db';
 import {
   getCollaboratorPermissionLevel,
   GitHubRateLimitError,
+  isGitHubCredentialRejection,
   type CollaboratorPermission,
   type GitHubAppType,
 } from '@/lib/integrations/platforms/github/adapter';
@@ -13,6 +14,13 @@ import {
 import { PLATFORM } from '@/lib/integrations/core/constants';
 
 export const GITHUB_REPOSITORY_PERMISSION_CACHE_TTL_MS = 5 * 60_000;
+
+/**
+ * Pause before the single retry of a thrown permission lookup. A transient
+ * DNS or 5xx failure retried within milliseconds usually fails again; a short
+ * pause gives it a chance to clear. Tests pass 0 to keep them fast.
+ */
+const DEFAULT_LOOKUP_RETRY_DELAY_MS = 500;
 
 type GitHubRepositoryPermissionInput = {
   installationId: string;
@@ -138,15 +146,21 @@ function credentialRejectedMarkdown(repository: string): string {
 }
 
 /**
- * The permission check was rate limited. The retry window stretches as long as
- * GitHub's rate-limit window (up to an hour), so the copy names it instead of
- * overpromising a moment.
+ * The permission check was rate limited, so the copy names the retry deadline:
+ * GitHub resets the limit at `resetAt`, which the check observed from the
+ * rate-limit response. Minutes remaining are clamped at 0 for a deadline that
+ * has already passed.
  */
-function rateLimitedAccessRequiredMarkdown(repository: string): string {
+function rateLimitedAccessRequiredMarkdown(repository: string, resetAt: Date): string {
+  const resetHours = `${String(resetAt.getUTCHours()).padStart(2, '0')}:${String(
+    resetAt.getUTCMinutes()
+  ).padStart(2, '0')} UTC`;
+  const minutesRemaining = Math.max(0, Math.floor((resetAt.getTime() - Date.now()) / 60_000));
   return (
     `GitHub is rate limiting my checks right now, so I couldn't confirm whether your account ` +
     `has permission on \`${repository}\`, and I didn't start any work. Try again after the ` +
-    'rate-limit window passes — usually within the hour.'
+    `rate-limit window passes — GitHub resets it at ${resetHours} (in ${minutesRemaining} ` +
+    `${minutesRemaining === 1 ? 'minute' : 'minutes'}).`
   );
 }
 
@@ -172,28 +186,18 @@ function isSameRepository(left: string, right: string): boolean {
 }
 
 type WriteAccessResult =
-  | 'allowed'
-  | 'denied'
-  | 'transient'
-  | 'rate_limited'
-  | 'installation_unavailable'
-  | 'credential_rejected';
+  | { status: 'allowed' }
+  | { status: 'denied' }
+  | { status: 'transient' }
+  | { status: 'rate_limited'; resetAt: Date }
+  | { status: 'installation_unavailable' }
+  | { status: 'credential_rejected' };
 
 type PermissionLookup =
   | { status: 'answered'; permission: CollaboratorPermission | null }
   | { status: 'unreachable'; error: string }
-  | { status: 'rate_limited'; error: GitHubRateLimitError }
+  | { status: 'rate_limited'; resetAt: Date }
   | { status: 'credential_rejected'; error: string };
-
-/**
- * The adapter rethrows a GitHub 401 as a Kilo-side configuration failure: the
- * App credentials were rejected, so neither a retry nor a user-side remedy can
- * clear it. Anything with a 401 status and a message field matches the shape
- * the mint and the lookup rethrow.
- */
-function isCredentialRejection(error: unknown): error is { status: 401; message?: string } {
-  return typeof error === 'object' && error !== null && 'status' in error && error.status === 401;
-}
 
 /**
  * Asks GitHub for the collaborator permission at most twice: a single thrown
@@ -204,21 +208,29 @@ function isCredentialRejection(error: unknown): error is { status: 401; message?
  * another request before `resetAt` cannot succeed and extends GitHub's
  * penalty, so that attempt ends the lookup. A rejected App credential (401) is
  * not retried either: the second request cannot succeed, and the failure is
- * Kilo-side configuration, not an outage.
+ * Kilo-side configuration, not an outage. When `retryDelayMs` is positive, the
+ * second attempt waits that long first: a transient DNS or 5xx failure retried
+ * within milliseconds usually fails again, a short pause gives the failure a
+ * chance to clear.
  */
 async function lookupRepositoryPermission(
   permissionInput: GitHubRepositoryPermissionInput,
-  fetchPermission: FetchRepositoryPermission | undefined
+  fetchPermission: FetchRepositoryPermission | undefined,
+  retryDelayMs: number
 ): Promise<PermissionLookup> {
   try {
     const permission = await getGitHubRepositoryPermission(permissionInput, fetchPermission);
     return { status: 'answered', permission };
   } catch (error) {
-    if (error instanceof GitHubRateLimitError) return { status: 'rate_limited', error };
-    // A 401 from the adapter means the App credentials were rejected. The
-    // second request cannot succeed, so the lookup ends here instead of
-    // burning the retry budget on a persistent configuration failure.
-    if (isCredentialRejection(error)) {
+    if (error instanceof GitHubRateLimitError) {
+      return { status: 'rate_limited', resetAt: error.resetAt };
+    }
+    // A typed rejection from the adapter means the App credentials were
+    // rejected (the mint 401). The second request cannot succeed, so the
+    // lookup ends here instead of burning the retry budget on a persistent
+    // configuration failure. A lookup 401 is not typed this way: a fresh mint
+    // can clear it, so it stays retryable.
+    if (isGitHubCredentialRejection(error)) {
       return {
         status: 'credential_rejected',
         error: error instanceof Error ? error.message : String(error),
@@ -226,15 +238,22 @@ async function lookupRepositoryPermission(
     }
   }
   // Retry once for a thrown failure; a null answer never reaches here.
+  if (retryDelayMs > 0) {
+    const { promise, resolve } = Promise.withResolvers<void>();
+    setTimeout(resolve, retryDelayMs);
+    await promise;
+  }
   try {
     const permission = await getGitHubRepositoryPermission(permissionInput, fetchPermission);
     return { status: 'answered', permission };
   } catch (error) {
-    if (error instanceof GitHubRateLimitError) return { status: 'rate_limited', error };
+    if (error instanceof GitHubRateLimitError) {
+      return { status: 'rate_limited', resetAt: error.resetAt };
+    }
     // Credentials can be rejected (or rotated) between the attempts: the same
     // persistent Kilo-side failure applies, so the second attempt must not
     // report it as a GitHub outage.
-    if (isCredentialRejection(error)) {
+    if (isGitHubCredentialRejection(error)) {
       return {
         status: 'credential_rejected',
         error: error instanceof Error ? error.message : String(error),
@@ -254,9 +273,10 @@ async function hasRepositoryWriteAccess(params: {
   repository: string;
   username: string;
   fetchPermission?: FetchRepositoryPermission;
+  retryDelayMs?: number;
 }): Promise<WriteAccessResult> {
   const [owner, repo] = params.repository.split('/');
-  if (!owner || !repo) return 'denied';
+  if (!owner || !repo) return { status: 'denied' };
 
   const permissionInput = {
     installationId: params.installationId,
@@ -280,32 +300,36 @@ async function hasRepositoryWriteAccess(params: {
         platformIntegrationId: params.platformIntegrationId,
         reason: error.reason,
       });
-      return 'installation_unavailable';
+      return { status: 'installation_unavailable' };
     }
     console.warn('[KiloBot] Failed to verify GitHub repository access:', {
       repository: params.repository,
       platformIntegrationId: params.platformIntegrationId,
       error: error instanceof Error ? error.message : String(error),
     });
-    return 'transient';
+    return { status: 'transient' };
   }
 
-  const lookup = await lookupRepositoryPermission(permissionInput, params.fetchPermission);
+  const lookup = await lookupRepositoryPermission(
+    permissionInput,
+    params.fetchPermission,
+    params.retryDelayMs ?? DEFAULT_LOOKUP_RETRY_DELAY_MS
+  );
   if (lookup.status === 'unreachable') {
     console.warn('[KiloBot] Could not reach GitHub to verify repository access:', {
       repository: params.repository,
       platformIntegrationId: params.platformIntegrationId,
       error: lookup.error,
     });
-    return 'transient';
+    return { status: 'transient' };
   }
   if (lookup.status === 'rate_limited') {
     console.warn('[KiloBot] GitHub rate limited the repository access check:', {
       repository: params.repository,
       platformIntegrationId: params.platformIntegrationId,
-      error: lookup.error.message,
+      resetAt: lookup.resetAt.toISOString(),
     });
-    return 'rate_limited';
+    return { status: 'rate_limited', resetAt: lookup.resetAt };
   }
   if (lookup.status === 'credential_rejected') {
     console.warn('[KiloBot] GitHub rejected the App credentials during the access check:', {
@@ -313,13 +337,13 @@ async function hasRepositoryWriteAccess(params: {
       platformIntegrationId: params.platformIntegrationId,
       error: lookup.error,
     });
-    return 'credential_rejected';
+    return { status: 'credential_rejected' };
   }
 
   const { permission } = lookup;
   return permission === 'admin' || permission === 'maintain' || permission === 'write'
-    ? 'allowed'
-    : 'denied';
+    ? { status: 'allowed' }
+    : { status: 'denied' };
 }
 
 /**
@@ -338,6 +362,7 @@ export async function authorizeGitHubRepository(params: {
   threadRepository?: string | null;
   actorLogin?: string;
   fetchPermission?: FetchRepositoryPermission;
+  retryDelayMs?: number;
 }): Promise<GitHubRepositoryAuthorization> {
   const { platformIntegration, repository, threadRepository, actorLogin } = params;
 
@@ -364,19 +389,23 @@ export async function authorizeGitHubRepository(params: {
     repository,
     username: actorLogin,
     fetchPermission: params.fetchPermission,
+    retryDelayMs: params.retryDelayMs,
   });
-  if (writeAccess === 'allowed') return { allowed: true };
-  if (writeAccess === 'transient') {
-    return { allowed: false, markdown: transientAccessRequiredMarkdown(repository) };
+  switch (writeAccess.status) {
+    case 'allowed':
+      return { allowed: true };
+    case 'transient':
+      return { allowed: false, markdown: transientAccessRequiredMarkdown(repository) };
+    case 'installation_unavailable':
+      return { allowed: false, markdown: installationUnavailableMarkdown(repository) };
+    case 'credential_rejected':
+      return { allowed: false, markdown: credentialRejectedMarkdown(repository) };
+    case 'rate_limited':
+      return {
+        allowed: false,
+        markdown: rateLimitedAccessRequiredMarkdown(repository, writeAccess.resetAt),
+      };
+    case 'denied':
+      return notAllowed(repository);
   }
-  if (writeAccess === 'installation_unavailable') {
-    return { allowed: false, markdown: installationUnavailableMarkdown(repository) };
-  }
-  if (writeAccess === 'credential_rejected') {
-    return { allowed: false, markdown: credentialRejectedMarkdown(repository) };
-  }
-  if (writeAccess === 'rate_limited') {
-    return { allowed: false, markdown: rateLimitedAccessRequiredMarkdown(repository) };
-  }
-  return notAllowed(repository);
 }

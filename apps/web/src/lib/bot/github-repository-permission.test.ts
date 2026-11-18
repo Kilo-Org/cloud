@@ -14,7 +14,10 @@ import {
   GITHUB_REPOSITORY_PERMISSION_CACHE_TTL_MS,
   MAX_CACHED_REPOSITORY_PERMISSIONS,
 } from './github-repository-permission';
-import { GitHubRateLimitError } from '@/lib/integrations/platforms/github/adapter';
+import {
+  GitHubCredentialRejectionError,
+  GitHubRateLimitError,
+} from '@/lib/integrations/platforms/github/adapter';
 
 const mockedAssertAuthorized = jest.mocked(assertGitHubInstallationRuntimeAuthorized);
 
@@ -34,6 +37,11 @@ function createIntegration(overrides: Partial<PlatformIntegration> = {}): Platfo
 
 function createFetchPermission(permission: Permission) {
   return jest.fn(async () => permission as 'admin' | 'maintain' | 'write' | 'read' | 'none' | null);
+}
+
+/** A lookup 401: GitHub rejected the installation token, not the App credentials. */
+function httpStatusError(status: number, message: string): Error {
+  return Object.assign(new Error(message), { status });
 }
 
 beforeEach(() => {
@@ -124,25 +132,33 @@ describe('authorizeGitHubRepository', () => {
     const fetchPermission = createFetchPermission('write');
     const rateLimitError = new GitHubRateLimitError(new Date('2026-11-17T01:00:00.000Z'));
     fetchPermission.mockRejectedValue(rateLimitError);
+    jest.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-11-17T00:48:00.000Z'));
 
-    const result = await authorizeGitHubRepository({
-      platformIntegration: createIntegration(),
-      repository: 'acme/rate-limited',
-      actorLogin: 'octocat',
-      fetchPermission,
-    });
+    try {
+      const result = await authorizeGitHubRepository({
+        platformIntegration: createIntegration(),
+        repository: 'acme/rate-limited',
+        actorLogin: 'octocat',
+        fetchPermission,
+      });
 
-    expect(result.allowed).toBe(false);
-    if (result.allowed) throw new Error('expected a refusal');
-    expect(result.markdown).toContain('rate limit');
-    expect(result.markdown).toContain('`acme/rate-limited`');
-    expect(result.markdown).not.toContain('write access');
-    expect(fetchPermission).toHaveBeenCalledTimes(1);
+      expect(result.allowed).toBe(false);
+      if (result.allowed) throw new Error('expected a refusal');
+      expect(result.markdown).toContain('rate limit');
+      expect(result.markdown).toContain('`acme/rate-limited`');
+      expect(result.markdown).toContain('GitHub resets it at 01:00 UTC (in 12 minutes)');
+      expect(result.markdown).not.toContain('write access');
+      expect(fetchPermission).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.restoreAllMocks();
+    }
   });
 
   test('rejected App credentials are reported as a configuration failure, not as temporary', async () => {
     const fetchPermission = createFetchPermission('write');
-    fetchPermission.mockRejectedValue({ status: 401, message: 'Bad credentials' });
+    fetchPermission.mockRejectedValue(
+      new GitHubCredentialRejectionError(httpStatusError(401, 'Bad credentials'))
+    );
 
     const result = await authorizeGitHubRepository({
       platformIntegration: createIntegration(),
@@ -164,7 +180,9 @@ describe('authorizeGitHubRepository', () => {
     const fetchPermission = createFetchPermission('write');
     fetchPermission
       .mockRejectedValueOnce(new Error('boom'))
-      .mockRejectedValueOnce({ status: 401, message: 'Bad credentials' });
+      .mockRejectedValueOnce(
+        new GitHubCredentialRejectionError(httpStatusError(401, 'Bad credentials'))
+      );
 
     const result = await authorizeGitHubRepository({
       platformIntegration: createIntegration(),
@@ -193,6 +211,71 @@ describe('authorizeGitHubRepository', () => {
 
     expect(result).toEqual({ allowed: true });
     expect(fetchPermission).toHaveBeenCalledTimes(2);
+  });
+
+  test('a lookup 401 on the first attempt is retried and allowed', async () => {
+    const fetchPermission = createFetchPermission('write');
+    fetchPermission
+      .mockRejectedValueOnce(httpStatusError(401, 'Bad credentials'))
+      .mockResolvedValueOnce('write');
+
+    const result = await authorizeGitHubRepository({
+      platformIntegration: createIntegration(),
+      repository: 'acme/stale-token',
+      actorLogin: 'octocat',
+      fetchPermission,
+    });
+
+    expect(result).toEqual({ allowed: true });
+    expect(fetchPermission).toHaveBeenCalledTimes(2);
+  });
+
+  test('a lookup 401 on the second attempt reads as temporary, not as a credential failure', async () => {
+    const fetchPermission = createFetchPermission('write');
+    fetchPermission
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockRejectedValueOnce(httpStatusError(401, 'Bad credentials'));
+
+    const result = await authorizeGitHubRepository({
+      platformIntegration: createIntegration(),
+      repository: 'acme/stale-token-again',
+      actorLogin: 'octocat',
+      fetchPermission,
+    });
+
+    expect(result.allowed).toBe(false);
+    if (result.allowed) throw new Error('expected a refusal');
+    expect(result.markdown).toContain('temporary');
+    expect(result.markdown).not.toContain('credentials were rejected');
+    expect(fetchPermission).toHaveBeenCalledTimes(2);
+  });
+
+  test('the retry waits the injected delay before the second attempt', async () => {
+    jest.useFakeTimers();
+    const fetchPermission = createFetchPermission('write');
+    fetchPermission.mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce('write');
+
+    const resultPromise = authorizeGitHubRepository({
+      platformIntegration: createIntegration(),
+      repository: 'acme/retry-delay',
+      actorLogin: 'octocat',
+      fetchPermission,
+      retryDelayMs: 500,
+    });
+
+    // The second attempt happens only after the timer advances past the delay.
+    // The first flush lets the first attempt's awaited promises settle.
+    await jest.advanceTimersByTimeAsync(0);
+    expect(fetchPermission).toHaveBeenCalledTimes(1);
+    try {
+      await jest.advanceTimersByTimeAsync(499);
+      expect(fetchPermission).toHaveBeenCalledTimes(1);
+      await jest.advanceTimersByTimeAsync(1);
+      await expect(resultPromise).resolves.toEqual({ allowed: true });
+      expect(fetchPermission).toHaveBeenCalledTimes(2);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   test('personally owned integrations do not consult repository permissions', async () => {

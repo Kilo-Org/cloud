@@ -4829,7 +4829,7 @@
     "superseded": "Ta povezava je bila zamenjana drugje, zato ne deluje več."
   },
   "sharedSession": {
-    "startedAt": "Začnjeno ob {{time}}",
+    "startedAt": "Začeto ob {{time}}",
     "title": "Deljena seja",
     "someone": "Nekdo",
     "sharedBy": "Deli: {{owner}}",

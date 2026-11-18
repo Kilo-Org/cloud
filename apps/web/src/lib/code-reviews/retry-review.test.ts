@@ -58,6 +58,7 @@ import {
   AUTOMATIC_RETRY_ATTEMPT_LIMIT,
   isAutomaticallyRetryableFailure,
   isAutomaticallyRetryableReview,
+  isUnknownFailureCause,
   retryFailedCodeReview,
 } from './retry-review';
 
@@ -148,13 +149,19 @@ describe('isAutomaticallyRetryableReview', () => {
     ['repository_clone_failed', 'failed', 1, true],
     ['assistant_unauthorized', 'failed', 1, true],
     ['assistant_unauthorized', 'failed', AUTOMATIC_RETRY_ATTEMPT_LIMIT, false],
+    // A cause nobody classified restarts under the attempt cap...
+    [null, 'failed', 1, true],
+    ['unknown', 'failed', 1, true],
+    ['reason_nobody_enumerated', 'failed', 1, true],
+    // ...but the cap still bounds an unknown cause that keeps failing.
+    [null, 'failed', AUTOMATIC_RETRY_ATTEMPT_LIMIT, false],
+    ['unknown', 'failed', AUTOMATIC_RETRY_ATTEMPT_LIMIT, false],
     ['billing', 'failed', 1, false],
     ['repository_auth_failed', 'failed', 1, false],
     ['repository_checkout_failed', 'failed', 1, false],
     ['account_blocked', 'failed', 1, false],
     ['user_cancelled', 'failed', 1, false],
     ['assistant_content_filter', 'failed', 1, false],
-    [null, 'failed', 1, false],
     ['assistant_timeout', 'cancelled', 1, false],
     ['assistant_timeout', 'completed', 1, false],
     ['assistant_timeout', 'failed', AUTOMATIC_RETRY_ATTEMPT_LIMIT, false],
@@ -180,9 +187,12 @@ describe('isAutomaticallyRetryableFailure', () => {
     ['workspace_capacity', 'failed', true],
     ['repository_clone_failed', 'failed', true],
     ['assistant_unauthorized', 'failed', true],
+    // Unknown causes retry under the cap; the cap decides when they stop.
+    [null, 'failed', true],
+    ['unknown', 'failed', true],
+    ['reason_nobody_enumerated', 'failed', true],
     ['billing', 'failed', false],
     ['repository_auth_failed', 'failed', false],
-    [null, 'failed', false],
     ['assistant_timeout', 'cancelled', false],
     ['assistant_timeout', 'queued', false],
   ])('reason %s and status %s answers %s', (reason, status, expected) => {
@@ -192,6 +202,22 @@ describe('isAutomaticallyRetryableFailure', () => {
         terminal_reason: reason,
       } as Pick<CloudAgentCodeReview, 'status' | 'terminal_reason'>)
     ).toBe(expected);
+  });
+});
+
+describe('isUnknownFailureCause', () => {
+  it('answers true for a null, an unknown, and an off-schema reason', () => {
+    expect(isUnknownFailureCause(null)).toBe(true);
+    expect(isUnknownFailureCause('unknown')).toBe(true);
+    expect(isUnknownFailureCause('reason_nobody_enumerated')).toBe(true);
+  });
+
+  it('answers false for a documented cause, whatever its retryability', () => {
+    // Documented transient causes are known even though they retry.
+    expect(isUnknownFailureCause('assistant_timeout')).toBe(false);
+    // Documented needs-a-person causes are known even though they do not retry.
+    expect(isUnknownFailureCause('billing')).toBe(false);
+    expect(isUnknownFailureCause('repository_auth_failed')).toBe(false);
   });
 });
 

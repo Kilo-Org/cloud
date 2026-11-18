@@ -9,11 +9,16 @@ import {
   cancelSupersededReviewsForPR,
   findExistingReview,
   findActiveReviewsForPR,
+  listCodeReviewAttempts,
   updateReviewHeadShaAndCheckRun,
   type CancelledReviewRow,
   type ReviewScope,
 } from '@/lib/code-reviews/db/code-reviews';
 import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-pending-reviews';
+import {
+  isAutomaticallyRetryableReview,
+  retryFailedCodeReview,
+} from '@/lib/code-reviews/retry-review';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import type { Owner } from '@/lib/code-reviews/core';
@@ -243,6 +248,40 @@ export async function handleMergeRequestCodeReview(
     const existingReview = await findExistingReview(reviewScope, headSha);
 
     if (existingReview) {
+      // A review whose unattended attempts are spent stays a duplicate, so a
+      // persistent fault is not billed run after run by the webhook on its own.
+      const attempts = await listCodeReviewAttempts(existingReview.id);
+      if (
+        existingReview.status === 'failed' &&
+        isAutomaticallyRetryableReview(existingReview, attempts.length)
+      ) {
+        logExceptInTest(
+          `Retrying failed code review for ${project.path_with_namespace}!${mr.iid} @ ${headSha}`
+        );
+        const retryOutcome = await retryFailedCodeReview({
+          review: existingReview,
+          owner,
+          retryReason: 'webhook_retry',
+        });
+        if (retryOutcome.outcome === 'already_in_flight') {
+          return NextResponse.json(
+            {
+              message: 'Review already exists for this commit',
+              reviewId: existingReview.id,
+              sessionId: existingReview.session_id,
+            },
+            { status: 200 }
+          );
+        }
+        return NextResponse.json(
+          {
+            message: 'Retrying code review for this commit',
+            reviewId: existingReview.id,
+            outcome: retryOutcome.outcome,
+          },
+          { status: 202 }
+        );
+      }
       logExceptInTest(
         `Duplicate code review detected for ${project.path_with_namespace}!${mr.iid} @ ${headSha}`
       );

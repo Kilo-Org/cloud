@@ -124,6 +124,11 @@ jest.mock('@sentry/nextjs', () => ({
   captureMessage: jest.fn(),
 }));
 
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  logExceptInTest: jest.fn(),
+  warnExceptInTest: jest.fn(),
+}));
+
 jest.mock('@/lib/code-reviews/action-required', () => ({
   getCodeReviewActionRequiredState: () => false,
 }));
@@ -135,6 +140,7 @@ jest.mock('@/lib/code-reviews/review-memory/github-feedback', () => ({
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import type { SQL } from 'drizzle-orm';
 import { PgDialect } from 'drizzle-orm/pg-core';
+import { logExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import type { OpenPullRequest } from '@/lib/integrations/platforms/github/adapter';
 import {
   RECOVER_CONCURRENCY,
@@ -601,6 +607,43 @@ describe('recoverMissedReviews', () => {
     }
   });
 
+  it('restarts a review whose failure nobody classified, under the attempt cap', async () => {
+    mockFindExistingReview.mockResolvedValue({
+      id: 'review-1',
+      status: 'failed',
+      terminal_reason: 'unknown',
+    });
+    mockListAttempts.mockResolvedValue([{ id: 'attempt-1' }]);
+
+    const summary = await recoverMissedReviews({ now: FROZEN_NOW });
+
+    expect(summary).toMatchObject({
+      reviewsRetried: 1,
+      reviewsStarted: 0,
+      skippedExisting: 0,
+      retriesExhausted: 0,
+    });
+    expect(mockRetryFailedCodeReview).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops restarting an unknown-cause review that used all of its unattended attempts', async () => {
+    mockFindExistingReview.mockResolvedValue({
+      id: 'review-1',
+      status: 'failed',
+      terminal_reason: 'unknown',
+    });
+    mockListAttempts.mockResolvedValue([
+      { id: 'attempt-1' },
+      { id: 'attempt-2' },
+      { id: 'attempt-3' },
+    ]);
+
+    const summary = await recoverMissedReviews({ now: FROZEN_NOW });
+
+    expect(summary).toMatchObject({ retriesExhausted: 1, reviewsRetried: 0, reviewsStarted: 0 });
+    expect(mockRetryFailedCodeReview).not.toHaveBeenCalled();
+  });
+
   it('restarts a review that stopped on a transient failure instead of treating the head as done', async () => {
     const storedConfig = { config: { model_slug: 'kilo/test' }, is_enabled: true };
     mockGetAgentConfig.mockResolvedValue(storedConfig);
@@ -642,6 +685,28 @@ describe('recoverMissedReviews', () => {
 
     expect(summary).toMatchObject({ skippedExisting: 1, reviewsRetried: 0, reviewsStarted: 0 });
     expect(mockRetryFailedCodeReview).not.toHaveBeenCalled();
+    // The skip names the review and the reason it was not restarted.
+    expect(logExceptInTest).toHaveBeenCalledWith(
+      '[recoverMissedReviews] Skipped the review at the head',
+      { reviewId: 'review-1', reason: 'terminal_reason_billing' }
+    );
+  });
+
+  it('logs the status it skipped a finished review for', async () => {
+    mockFindExistingReview.mockResolvedValue({
+      id: 'review-1',
+      status: 'completed',
+      terminal_reason: null,
+    });
+
+    const summary = await recoverMissedReviews({ now: FROZEN_NOW });
+
+    expect(summary).toMatchObject({ skippedExisting: 1, reviewsStarted: 0 });
+    expect(mockListAttempts).not.toHaveBeenCalled();
+    expect(logExceptInTest).toHaveBeenCalledWith(
+      '[recoverMissedReviews] Skipped the review at the head',
+      { reviewId: 'review-1', reason: 'status_completed' }
+    );
   });
 
   it('stops restarting a review that used all of its unattended attempts', async () => {
@@ -664,6 +729,10 @@ describe('recoverMissedReviews', () => {
       reviewsStarted: 0,
     });
     expect(mockRetryFailedCodeReview).not.toHaveBeenCalled();
+    expect(warnExceptInTest).toHaveBeenCalledWith(
+      '[recoverMissedReviews] Review needs a manual restart',
+      expect.objectContaining({ reviewId: 'review-1', reason: 'attempts_exhausted' })
+    );
   });
 
   it('reports a review whose unattended restarts are spent once the run spent its starts', async () => {

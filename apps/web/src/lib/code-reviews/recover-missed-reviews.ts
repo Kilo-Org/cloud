@@ -613,6 +613,16 @@ async function recoverPullRequest(params: {
     // so a persistent fault settles instead of billing a run every sweep.
     if (!isAutomaticallyRetryableFailure(existingReview)) {
       summary.skippedExisting += 1;
+      // The counter says a review exists; the log says why one was not
+      // restarted under the policy, so a skip is attributable from the run
+      // record instead of reconstructed from the row's state.
+      logExceptInTest('[recoverMissedReviews] Skipped the review at the head', {
+        reviewId: existingReview.id,
+        reason:
+          existingReview.status !== 'failed'
+            ? `status_${existingReview.status}`
+            : `terminal_reason_${existingReview.terminal_reason ?? 'none'}`,
+      });
       return;
     }
     // A cause this sweep can restart, with no attempts left: the next restart is
@@ -624,6 +634,7 @@ async function recoverPullRequest(params: {
       summary.retriesExhausted += 1;
       warnExceptInTest('[recoverMissedReviews] Review needs a manual restart', {
         reviewId: existingReview.id,
+        reason: 'attempts_exhausted',
         terminalReason: existingReview.terminal_reason,
         attempts: attempts.length,
       });

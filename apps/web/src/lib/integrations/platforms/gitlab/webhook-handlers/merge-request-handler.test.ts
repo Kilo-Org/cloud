@@ -14,6 +14,9 @@ const mockIsMergeCommit = jest.fn();
 const mockGetIntegrationById = jest.fn();
 const mockGetOrCreateProjectAccessToken = jest.fn();
 const mockGetValidGitLabToken = jest.fn();
+const mockIsAutomaticallyRetryable = jest.fn();
+const mockRetryFailedCodeReview = jest.fn();
+const mockListCodeReviewAttempts = jest.fn();
 
 jest.mock('@/lib/bot-users/bot-user-service', () => ({
   getBotUserId: (...args: unknown[]) => mockGetBotUserId(...args),
@@ -29,12 +32,23 @@ jest.mock('@/lib/code-reviews/db/code-reviews', () => ({
   cancelSupersededReviewsForPR: (...args: unknown[]) => mockCancelSupersededReviewsForPR(...args),
   findExistingReview: (...args: unknown[]) => mockFindExistingReview(...args),
   findActiveReviewsForPR: (...args: unknown[]) => mockFindActiveReviewsForPR(...args),
+  listCodeReviewAttempts: (...args: unknown[]) => mockListCodeReviewAttempts(...args),
   updateReviewHeadShaAndCheckRun: (...args: unknown[]) =>
     mockUpdateReviewHeadShaAndCheckRun(...args),
 }));
 
 jest.mock('@/lib/code-reviews/dispatch/dispatch-pending-reviews', () => ({
   tryDispatchPendingReviews: (...args: unknown[]) => mockTryDispatchPendingReviews(...args),
+}));
+
+jest.mock('@/lib/code-reviews/retry-review', () => ({
+  AUTOMATIC_RETRY_ATTEMPT_LIMIT: 3,
+  isAutomaticallyRetryableReview: (...args: unknown[]) => mockIsAutomaticallyRetryable(...args),
+  retryFailedCodeReview: (...args: unknown[]) => mockRetryFailedCodeReview(...args),
+}));
+
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  logExceptInTest: jest.fn(),
 }));
 
 jest.mock('@/lib/code-reviews/client/code-review-worker-client', () => ({
@@ -62,6 +76,7 @@ import {
   handleMergeRequestCodeReview,
   shouldSkipUpdateForMergeCommit,
 } from '@/lib/integrations/platforms/gitlab/webhook-handlers/merge-request-handler';
+import { AUTOMATIC_RETRY_ATTEMPT_LIMIT } from '@/lib/code-reviews/retry-review';
 import type { MergeRequestPayload } from '@/lib/integrations/platforms/gitlab/webhook-schemas';
 import type { GitLabWebhookIntegration } from '@/lib/integrations/db/platform-integrations';
 
@@ -146,6 +161,10 @@ beforeEach(() => {
   });
   mockGetOrCreateProjectAccessToken.mockResolvedValue('prat-token');
   mockGetValidGitLabToken.mockResolvedValue('gitlab-token');
+  // True duplicates (running/queued/completed) never reach the retry gate.
+  mockIsAutomaticallyRetryable.mockReturnValue(false);
+  mockRetryFailedCodeReview.mockResolvedValue({ outcome: 'retried' });
+  mockListCodeReviewAttempts.mockResolvedValue([{ id: 'attempt-1' }]);
 });
 
 describe('shouldSkipUpdateForMergeCommit', () => {
@@ -515,5 +534,121 @@ describe('handleMergeRequestCodeReview', () => {
         platformProjectId: 123,
       })
     );
+  });
+
+  it('retries a duplicate head whose only review failed on a restartable cause', async () => {
+    mockGetBotUserId.mockResolvedValue('bot-user-1');
+    mockGetAgentConfigForOwner.mockResolvedValue({
+      is_enabled: true,
+      config: {
+        repository_selection_mode: 'selected',
+        selected_repository_ids: [123],
+      },
+    });
+    mockFindExistingReview.mockResolvedValue({
+      id: 'failed-review-1',
+      status: 'failed',
+      terminal_reason: 'assistant_timeout',
+      session_id: 'session-1',
+    });
+    // One spent attempt: the cap is not reached, so the retry is bounded.
+    mockListCodeReviewAttempts.mockResolvedValue([{ id: 'attempt-1' }]);
+    mockIsAutomaticallyRetryable.mockReturnValue(true);
+    mockRetryFailedCodeReview.mockResolvedValue({ outcome: 'retried' });
+
+    const response = await handleMergeRequestCodeReview(
+      mergeRequestPayload(),
+      platformIntegration()
+    );
+
+    expect(response.status).toBe(202);
+    expect(await response.json()).toMatchObject({
+      message: 'Retrying code review for this commit',
+      reviewId: 'failed-review-1',
+      outcome: 'retried',
+    });
+    expect(mockListCodeReviewAttempts).toHaveBeenCalledWith('failed-review-1');
+    expect(mockRetryFailedCodeReview).toHaveBeenCalledWith({
+      review: expect.objectContaining({ id: 'failed-review-1' }),
+      owner: {
+        type: 'org',
+        id: 'f2aa36d7-9c1b-4db9-ae4a-a4492618796d',
+        userId: 'bot-user-1',
+      },
+      retryReason: 'webhook_retry',
+    });
+    expect(mockCreateCodeReview).not.toHaveBeenCalled();
+  });
+
+  it('still skips a duplicate whose review is in flight or whose attempts are spent', async () => {
+    mockGetBotUserId.mockResolvedValue('bot-user-1');
+    mockGetAgentConfigForOwner.mockResolvedValue({
+      is_enabled: true,
+      config: {
+        repository_selection_mode: 'selected',
+        selected_repository_ids: [123],
+      },
+    });
+    mockIsAutomaticallyRetryable.mockReturnValue(false);
+    mockFindExistingReview.mockResolvedValue({
+      id: 'running-review-1',
+      status: 'running',
+      terminal_reason: null,
+      session_id: 'session-running',
+    });
+
+    const response = await handleMergeRequestCodeReview(
+      mergeRequestPayload(),
+      platformIntegration()
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      message: 'Review already exists for this commit',
+      reviewId: 'running-review-1',
+    });
+    expect(mockRetryFailedCodeReview).not.toHaveBeenCalled();
+    expect(mockCreateCodeReview).not.toHaveBeenCalled();
+  });
+
+  it('skips a duplicate failed review that has used all of its unattended attempts', async () => {
+    mockGetBotUserId.mockResolvedValue('bot-user-1');
+    mockGetAgentConfigForOwner.mockResolvedValue({
+      is_enabled: true,
+      config: {
+        repository_selection_mode: 'selected',
+        selected_repository_ids: [123],
+      },
+    });
+    mockFindExistingReview.mockResolvedValue({
+      id: 'failed-review-1',
+      status: 'failed',
+      terminal_reason: 'assistant_timeout',
+      session_id: 'session-1',
+    });
+    // The stored cap's worth of rows: the webhook must not spend another run.
+    mockListCodeReviewAttempts.mockResolvedValue(
+      Array.from({ length: AUTOMATIC_RETRY_ATTEMPT_LIMIT }, (_, index) => ({
+        id: `attempt-${index + 1}`,
+      }))
+    );
+    mockIsAutomaticallyRetryable.mockImplementation(
+      (review: { status: string }, attemptCount: number) =>
+        review.status === 'failed' && attemptCount < (AUTOMATIC_RETRY_ATTEMPT_LIMIT as number)
+    );
+
+    const response = await handleMergeRequestCodeReview(
+      mergeRequestPayload(),
+      platformIntegration()
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      message: 'Review already exists for this commit',
+      reviewId: 'failed-review-1',
+    });
+    expect(mockListCodeReviewAttempts).toHaveBeenCalledWith('failed-review-1');
+    expect(mockRetryFailedCodeReview).not.toHaveBeenCalled();
+    expect(mockCreateCodeReview).not.toHaveBeenCalled();
   });
 });

@@ -12,6 +12,7 @@ import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import type { CloudAgentCodeReview } from '@kilocode/db/schema';
 import type { CodeReviewTerminalReason } from '@kilocode/db/schema-types';
+import { CODE_REVIEW_TERMINAL_REASONS } from '@kilocode/db/schema-types';
 import { getAgentConfigForOwner, type AgentConfigRow } from '@/lib/agent-config/db/agent-configs';
 import {
   getCodeReviewActionRequiredCopy,
@@ -44,66 +45,111 @@ import {
 import { PLATFORM } from '@/lib/integrations/core/constants';
 
 /**
- * Failure causes that cost one agent run to retry and nothing to diagnose,
- * because the same request has a real chance of finishing the next time.
+ * Failure causes known to need a person before a retry can succeed: a retry
+ * for one of these produces the same failure, so it is withheld from every
+ * unattended caller and the next restart is left to them.
  *
- * An allow-list rather than a deny-list: a retry for a cause that needs the
- * customer, a credential, or a settings change produces the same failure and
- * bills a second run. A cause added later stays out of this set until someone
- * decides it is transient.
+ * This is a deny-list rather than the allow-list it replaced: a failed review
+ * whose cause is unclassified, or which this list does not name, restarts
+ * under the attempt cap. A cause that fails the same way is stopped by the cap
+ * after its second run, while an unclassified transient failure gets the new
+ * attempt an unmanaged list used to deny it — so a cause nobody has decided
+ * on yet no longer strands its pull request until someone enumerates it here.
  *
- * `repository_clone_failed` covers the clone and checkout timeouts, rate limits
- * and network faults that one attempt can hit; `repository_auth_failed` needs a
- * credential or permission change, so it stays out.
+ * The transient causes the allow-list curated stay retryable exactly as
+ * before, by simply not being listed here.
  */
-const AUTOMATIC_RETRY_TERMINAL_REASON_LIST = [
-  'timeout',
-  'assistant_timeout',
-  'assistant_unavailable',
-  'assistant_unauthorized',
-  'assistant_gateway_unavailable',
-  'assistant_provider_disconnect',
-  'upstream_error',
-  'sandbox_error',
-  'sandbox_connection',
-  'container_shutdown',
-  'workspace_capacity',
-  'workspace_setup_failed',
-  'runtime_startup_failed',
-  'repository_clone_failed',
-  'wrapper_failed',
-  'delivery_failed',
-  'session_import_failed',
-  // An upstream refusal is incident-scoped: the same request has a real chance
-  // of finishing once the incident clears. The reason covers a managed and an
-  // unattributed refusal alike, and the attempt cap bounds how many runs a
-  // refusal that keeps repeating can spend.
-  'assistant_unauthorized',
+const RETRY_BLOCKING_TERMINAL_REASON_LIST = [
+  // The customer's account, billing, or chosen model.
+  'billing',
+  'account_blocked',
+  'model_not_found',
+  'selected_model_unavailable',
+  'byok_invalid_key',
+  // Rate limits that a customer's own key or quota owns: the same request
+  // fails the same way until the customer raises the quota. The managed and
+  // unattributed values stay out too; the sweep reads no attempt rows for
+  // them, and the attempt cap is not a reason to spend runs on a fault that
+  // cannot clear between sweeps by itself.
+  'assistant_rate_limited',
+  'assistant_rate_limited_byok',
+  'assistant_rate_limited_managed',
+  // Platform access the customer must grant or lift.
+  'github_installation_required',
+  'github_ip_allow_list',
+  'gitlab_project_access_required',
+  // The repository's own credentials, sparse checkout, or setup script.
+  'repository_auth_failed',
+  'repository_checkout_failed',
+  'repeated_repository_clone_timeout',
+  'setup_command_failed',
+  // The request itself, or a guardrail: the next run repeats it, or a person
+  // must change what is asked.
+  'assistant_invalid_request',
+  'assistant_invalid_request_byok',
+  'assistant_context_limit',
+  'assistant_output_limit',
+  'assistant_content_filter',
+  'assistant_structured_output',
+  'assistant_no_reply',
+  // The generic derived failure: without a recognized code there is nothing
+  // that says the next run differs from the last one.
+  'assistant_failed',
+  // Ends nobody restarts: a person's stop, a newer push, an interrupted
+  // session (also persisted with status `cancelled`, which this policy never
+  // retries anyway), and the stale-sweep cleanup.
+  'user_cancelled',
+  'superseded',
+  'interrupted',
+  'abandoned',
 ] as const satisfies readonly CodeReviewTerminalReason[];
 
 /**
- * Note on a user-driven stop: an interrupted session is persisted with status
- * `cancelled`, which this policy never retries, so it needs no entry here.
+ * Failed reviews carrying one of these reasons are never restarted unattended;
+ * every other reason is, under `AUTOMATIC_RETRY_ATTEMPT_LIMIT`.
  */
-export const AUTOMATIC_RETRY_TERMINAL_REASONS: ReadonlySet<string> = new Set(
-  AUTOMATIC_RETRY_TERMINAL_REASON_LIST
+export const NON_RETRYABLE_TERMINAL_REASONS: ReadonlySet<string> = new Set(
+  RETRY_BLOCKING_TERMINAL_REASON_LIST
 );
 
 /** Attempts a review may carry: its first run plus two unattended retries. */
 export const AUTOMATIC_RETRY_ATTEMPT_LIMIT = 3;
 
+/** Every terminal reason the database schema can persist. */
+const KNOWN_TERMINAL_REASON_SET: ReadonlySet<string> = new Set(CODE_REVIEW_TERMINAL_REASONS);
+
+/**
+ * Whether a failed review's cause is still unclassified, so a restart is the
+ * cheapest diagnosis anyone can run on it.
+ *
+ * The stored column answers null for review rows that failed before any reason
+ * was derived and 'unknown' for payloads whose cause nobody recognised. Both
+ * name the same fact for this policy: the failure's cause is not one of the
+ * documented needs-a-person causes, so it is as good a candidate for one retry
+ * under the cap as any known transient cause. Also true for a value that is
+ * neither null, 'unknown', nor a documented reason, because a reason this
+ * module has not seen is as likely to be transient as not.
+ */
+export function isUnknownFailureCause(reason: CloudAgentCodeReview['terminal_reason']): boolean {
+  return reason === null || reason === 'unknown' || !KNOWN_TERMINAL_REASON_SET.has(reason);
+}
+
 /**
  * Whether the failure itself can be retried, before the attempt count is read.
  *
- * A caller that has the row can answer this without another query, so the sweep
- * pays for the attempt rows only for a review it can restart.
+ * The policy is a deny-list of terminal reasons (`NON_RETRYABLE_TERMINAL_REASONS`)
+ * rather than an allow-list: a documented cause that needs the customer, a
+ * credential, or a settings change stays out, and a failure whose cause is
+ * unknown (`isUnknownFailureCause`) stays in, under the attempt cap. A caller
+ * that has the row can answer this without another query, so the sweep pays for
+ * the attempt rows only for a review it can restart.
  */
 export function isAutomaticallyRetryableFailure(
   review: Pick<CloudAgentCodeReview, 'status' | 'terminal_reason'>
 ): boolean {
   if (review.status !== 'failed') return false;
-  const reason = review.terminal_reason;
-  return reason !== null && AUTOMATIC_RETRY_TERMINAL_REASONS.has(reason);
+  if (isUnknownFailureCause(review.terminal_reason)) return true;
+  return !NON_RETRYABLE_TERMINAL_REASONS.has(review.terminal_reason ?? '');
 }
 
 /**

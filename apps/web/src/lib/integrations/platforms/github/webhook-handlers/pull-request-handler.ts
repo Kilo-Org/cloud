@@ -9,6 +9,7 @@ import {
   findExistingReview,
   findActiveReviewsForPR,
   findReviewCoveringHeads,
+  listCodeReviewAttempts,
   updateReviewHeadShaAndCheckRun,
   type CoveringReview,
   type ReviewScope,
@@ -37,6 +38,10 @@ import {
   updateCheckRun,
 } from '@/lib/integrations/platforms/github/adapter';
 import { isNonTerminalCodeReviewStatus } from '@/lib/code-reviews/dispatch/dispatch-constants';
+import {
+  isAutomaticallyRetryableReview,
+  retryFailedCodeReview,
+} from '@/lib/code-reviews/retry-review';
 import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-worker-client';
 import { updateCheckRunId } from '@/lib/code-reviews/db/code-reviews';
 import { resolvePullRequestCheckoutRef } from './pull-request-checkout-ref';
@@ -338,6 +343,41 @@ export async function handlePullRequestCodeReview(
     const existingReview = await findExistingReview(reviewScope, pull_request.head.sha);
 
     if (existingReview) {
+      // A review whose unattended attempts are spent stays a duplicate, or one
+      // daemon (the webhook and the sweep separately restart this head) would
+      // chase a persistent fault and bill it run after run.
+      const attempts = await listCodeReviewAttempts(existingReview.id);
+      if (
+        existingReview.status === 'failed' &&
+        isAutomaticallyRetryableReview(existingReview, attempts.length)
+      ) {
+        logExceptInTest(
+          `Retrying failed code review for ${repository.full_name}#${pull_request.number} @ ${pull_request.head.sha}`
+        );
+        const retryOutcome = await retryFailedCodeReview({
+          review: existingReview,
+          owner,
+          retryReason: 'webhook_retry',
+        });
+        if (retryOutcome.outcome === 'already_in_flight') {
+          return NextResponse.json(
+            {
+              message: 'Review already exists for this commit',
+              reviewId: existingReview.id,
+              sessionId: existingReview.session_id,
+            },
+            { status: 200 }
+          );
+        }
+        return NextResponse.json(
+          {
+            message: 'Retrying code review for this commit',
+            reviewId: existingReview.id,
+            outcome: retryOutcome.outcome,
+          },
+          { status: 202 }
+        );
+      }
       logExceptInTest(
         `Duplicate code review detected for ${repository.full_name}#${pull_request.number} @ ${pull_request.head.sha}`
       );

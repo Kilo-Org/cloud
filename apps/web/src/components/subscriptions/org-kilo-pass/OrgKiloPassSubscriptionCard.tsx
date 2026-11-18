@@ -22,6 +22,7 @@ export function OrgKiloPassSubscriptionCard({
   availableActionLabel = 'Add Kilo Pass',
   availableDetails,
   conditionAlert,
+  seatSubscriptionRequired = false,
 }: {
   organizationId: string;
   paidSeatCount: number;
@@ -29,6 +30,7 @@ export function OrgKiloPassSubscriptionCard({
   availableActionLabel?: string;
   availableDetails?: ReactNode;
   conditionAlert?: ReactNode;
+  seatSubscriptionRequired?: boolean;
 }) {
   if (agreement) {
     return (
@@ -68,11 +70,27 @@ export function OrgKiloPassSubscriptionCard({
         'Manage all passes from one subscription',
         'Seat and Kilo Pass charges on one invoice',
       ]}
-      cta={{
-        label: availableActionLabel,
-        href: `/organizations/${organizationId}/subscriptions/kilo-pass/setup`,
-      }}
-      details={availableDetails}
+      cta={
+        seatSubscriptionRequired
+          ? { label: availableActionLabel, disabled: true }
+          : {
+              label: availableActionLabel,
+              href: `/organizations/${organizationId}/subscriptions/kilo-pass/setup`,
+            }
+      }
+      details={
+        seatSubscriptionRequired ? (
+          <div className="space-y-2">
+            <p className="type-label text-muted-foreground">
+              Kilo Pass for Organizations is added to a paid seat subscription. Subscribe to seats
+              first, then add Kilo Pass.
+            </p>
+            {availableDetails}
+          </div>
+        ) : (
+          availableDetails
+        )
+      }
     />
   );
 }

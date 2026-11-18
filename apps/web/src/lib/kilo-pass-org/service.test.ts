@@ -772,6 +772,19 @@ describe('Kilo Pass organization agreement service', () => {
     );
   });
 
+  it('requires an active seat subscription before setup', async () => {
+    const owner = await insertTestUser();
+    const parent = await createOrganization(`kpo-no-seats-${crypto.randomUUID()}`, owner.id);
+    organizationIds.push(parent.id);
+
+    await expect(
+      organizationKiloPassService.getSetup({ organizationId: parent.id })
+    ).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: expect.stringContaining('paid seat subscription'),
+    });
+  });
+
   it('creates a new agreement on the same provider subscription after the earlier one ends', async () => {
     const owner = await insertTestUser();
     const parent = await createOrganization(`kpo-repurchase-${crypto.randomUUID()}`, owner.id);

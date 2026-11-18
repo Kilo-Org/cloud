@@ -89,7 +89,16 @@ export function OrgKiloPassSetup({
   const setup = setupQuery.data;
 
   if (setupQuery.isError)
-    return <OrgKiloPassSetupError onRetry={() => void setupQuery.refetch()} />;
+    return (
+      <OrgKiloPassSetupError
+        message={
+          setupQuery.error.data?.code === 'PRECONDITION_FAILED'
+            ? setupQuery.error.message
+            : 'Kilo Pass setup could not be loaded.'
+        }
+        onRetry={() => void setupQuery.refetch()}
+      />
+    );
   if (setupQuery.isPending || !setup) return <OrgKiloPassSetupLoading />;
 
   const terms = toSetupTerms(setup);
@@ -141,10 +150,10 @@ function OrgKiloPassSetupLoading() {
   );
 }
 
-function OrgKiloPassSetupError({ onRetry }: { onRetry: () => void }) {
+function OrgKiloPassSetupError({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
     <div className="space-y-3 p-6">
-      <p className="type-body">Kilo Pass setup could not be loaded.</p>
+      <p className="type-body">{message}</p>
       <Button type="button" variant="outline" onClick={onRetry}>
         Retry
       </Button>

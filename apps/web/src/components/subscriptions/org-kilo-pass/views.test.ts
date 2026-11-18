@@ -20,6 +20,7 @@ const starterTerms: OrgKiloPassTerms = {
 import { isPassAssignmentSaveDisabled } from './allocation-dialog-state';
 import { OrgKiloPassDetailView } from './OrgKiloPassDetailView';
 import { OrgKiloPassSetupView } from './OrgKiloPassSetupView';
+import { OrgKiloPassSubscriptionCard } from './OrgKiloPassSubscriptionCard';
 
 Object.assign(globalThis, { React });
 
@@ -581,5 +582,32 @@ describe('OrgKiloPassSetupView', () => {
     expect(html).toContain('Processing payment');
     expect(html).not.toContain('Purchase Kilo Pass');
     expect(buttonTag(html, 'Processing payment')).toContain('disabled=""');
+  });
+});
+
+describe('OrgKiloPassSubscriptionCard', () => {
+  function render(seatSubscriptionRequired: boolean) {
+    return renderToStaticMarkup(
+      React.createElement(OrgKiloPassSubscriptionCard, {
+        organizationId: 'org-parent',
+        paidSeatCount: 3,
+        seatSubscriptionRequired,
+      })
+    );
+  }
+
+  it('links to setup when a seat subscription is active', () => {
+    const html = render(false);
+
+    expect(html).toContain('/organizations/org-parent/subscriptions/kilo-pass/setup');
+    expect(html).not.toContain('disabled=""');
+  });
+
+  it('disables the action and explains the seat requirement without one', () => {
+    const html = render(true);
+
+    expect(html).not.toContain('/subscriptions/kilo-pass/setup');
+    expect(html).toContain('disabled=""');
+    expect(html).toContain('Subscribe to seats first, then add Kilo Pass.');
   });
 });

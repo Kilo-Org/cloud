@@ -28,6 +28,12 @@ export function OrgKiloPassGroup({
       { enabled: Boolean(organizationId) }
     )
   );
+  const seatSubscriptionQuery = useQuery(
+    trpc.organizations.subscription.get.queryOptions(
+      { organizationId },
+      { enabled: Boolean(organizationId) }
+    )
+  );
   const organization = organizationQuery.data;
   const summary = summaryQuery.data;
   const agreement = summary?.agreement;
@@ -38,13 +44,16 @@ export function OrgKiloPassGroup({
 
   return (
     <OrgKiloPassGroupShell
-      isLoading={summaryQuery.isPending || organizationQuery.isPending}
-      isError={summaryQuery.isError || organizationQuery.isError}
-      error={summaryQuery.error ?? organizationQuery.error}
+      isLoading={
+        summaryQuery.isPending || organizationQuery.isPending || seatSubscriptionQuery.isPending
+      }
+      isError={summaryQuery.isError || organizationQuery.isError || seatSubscriptionQuery.isError}
+      error={summaryQuery.error ?? organizationQuery.error ?? seatSubscriptionQuery.error}
       unframed={unframed}
       onRetry={() => {
         void summaryQuery.refetch();
         void organizationQuery.refetch();
+        void seatSubscriptionQuery.refetch();
       }}
     >
       <OrgKiloPassSubscriptionCard
@@ -74,6 +83,7 @@ export function OrgKiloPassGroup({
               }
             : undefined
         }
+        seatSubscriptionRequired={seatSubscriptionQuery.data?.latestSeatPurchaseStatus !== 'active'}
         availableActionLabel={isEnded ? 'Add Kilo Pass again' : 'Add Kilo Pass'}
         availableDetails={
           isEnded && agreement ? (

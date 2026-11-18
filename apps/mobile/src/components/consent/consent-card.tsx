@@ -47,6 +47,18 @@ type ConsentCardProps = {
  */
 export const CONSENT_DISCLOSURE_MAX_FONT_SCALE = 1.4;
 
+/**
+ * The bound on the stored-consent read before the card gives up on it.
+ *
+ * The read is a keychain call, not a network request, so it has no deadline of
+ * its own; without one a stalled read held the primary action disabled for as
+ * long as the stall, with no visible reason (the explorer's dead-button
+ * report). The value matches the app's control-plane request budget
+ * (`CONTROL_PLANE_DEADLINE_MS`), so a read slower than a request that failed on
+ * the same budget is treated as a failure, not as a longer wait.
+ */
+const STORED_LOAD_TIMEOUT_MS = 15_000;
+
 export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   const router = useRouter();
   const colors = useThemeColors();
@@ -88,8 +100,23 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   // never claims a choice the user has not made and a tap cannot flip the wrong
   // way. With no userId there is nothing to load: the switch renders as before
   // and its toggle path shows the account error.
-  const [storedValueLoaded, setStoredValueLoaded] = useState(false);
-  const optionalControlPending = userId !== undefined && !storedValueLoaded;
+  //
+  // One union owns the whole load phase. `loading` is the state the finding
+  // reported: with no bound the primary button sat disabled through it with no
+  // visible difference from a settled card, so repeated taps read as a dead
+  // button. Now the reserved footer status line names the wait, the read
+  // itself is bounded (see STORED_LOAD_TIMEOUT_MS), and a timeout or a failed
+  // read becomes `failed`, which renders the load error with its own Retry —
+  // the card never shows a disabled-looking primary without a reason on
+  // screen. `failed` never re-enables the primary: accepting would write the
+  // default over a stored decision the read could not see.
+  type StoredLoad =
+    | { readonly status: 'idle' }
+    | { readonly status: 'loading' }
+    | { readonly status: 'ready' }
+    | { readonly status: 'failed' };
+  const [storedLoad, setStoredLoad] = useState<StoredLoad>({ status: 'idle' });
+  const optionalControlPending = storedLoad.status === 'loading';
   const [savingOptional, setSavingOptional] = useState(false);
   const loadedRef = useRef(false);
   const userToggledRef = useRef(false);
@@ -100,38 +127,79 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   // re-enable analytics for someone who turned it off. With nothing to carry,
   // onboarding keeps its on-by-default. The active flag stops a late resolve
   // from overwriting a value the user just toggled.
+  //
+  // `retryKey` is the Retry affordance's own state: the failed card re-runs
+  // the same read for the same account when the person asks for it. The bound
+  // races the read against a timer; the loser's write is dropped, so only the
+  // first settle of one attempt reaches the state.
+  const [storedLoadRetryKey, setStoredLoadRetryKey] = useState(0);
   useEffect(() => {
-    if (!userId || loadedRef.current) {
+    if (!userId) {
+      // Nothing to load: the switch renders as before and its toggle path
+      // shows the account error.
+      setStoredLoad({ status: 'idle' });
       return undefined;
     }
+    if (loadedRef.current) {
+      // The stored value already settled for this account (the effect re-runs
+      // on a mode change after a successful load). Stay `ready`: an `idle`
+      // with a resolved account would disable the primary with no status
+      // line and no Retry — a new silent dead state.
+      setStoredLoad({ status: 'ready' });
+      return undefined;
+    }
+    // One attempt owns the card at a time: the timeout's failed state and a
+    // late read resolution race for the same card. The first settle — bound
+    // or read, whichever lands first — takes ownership by clearing `active`,
+    // so a read that settles after its own bound cannot flip the failed card
+    // back to ready, and a settle after unmount or a Retry re-run publishes
+    // nothing.
     let active = true;
+    setStoredLoad({ status: 'loading' });
+    const timeout = setTimeout(() => {
+      if (active) {
+        active = false;
+        setStoredLoad({ status: 'failed' });
+        setError('consent.couldNotLoadConsentSettings');
+      }
+    }, STORED_LOAD_TIMEOUT_MS);
     // eslint-disable-next-line promise/prefer-await-to-then, promise/always-return -- async/await would allow the promise to settle after unmount.
     void readConsent(userId).then(
       // eslint-disable-next-line promise/always-return
       stored => {
-        if (active) {
-          if (!userToggledRef.current) {
-            setOptionalToggle(
-              mode === 'review' ? stored.optional : (stored.previousOptional ?? true)
-            );
-            loadedRef.current = true;
-          }
-          setStoredValueLoaded(true);
+        if (!active) {
+          return;
         }
+        active = false;
+        clearTimeout(timeout);
+        if (!userToggledRef.current) {
+          setOptionalToggle(
+            mode === 'review' ? stored.optional : (stored.previousOptional ?? true)
+          );
+          loadedRef.current = true;
+        }
+        setStoredLoad({ status: 'ready' });
+        setError(null);
       },
       () => {
-        if (active) {
-          // The error names the unreliability, so the switch may show its
-          // default; the placeholder only covers the silent loading window.
-          setStoredValueLoaded(true);
-          setError('consent.couldNotLoadConsentSettings');
+        if (!active) {
+          return;
         }
+        active = false;
+        clearTimeout(timeout);
+        // The error names the unreliability, so the switch may show its
+        // default; the placeholder only covers the loading window. The
+        // primary stays disabled: an accept here would write the default over
+        // a stored decision the read could not see.
+        setStoredLoad({ status: 'failed' });
+        setError('consent.couldNotLoadConsentSettings');
       }
     );
     return () => {
       active = false;
+      clearTimeout(timeout);
     };
-  }, [mode, userId]);
+  }, [mode, userId, storedLoadRetryKey]);
 
   const handlePrimaryAction = async () => {
     if (mode === 'review') {
@@ -141,6 +209,15 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
 
     if (!userId) {
       setError('consent.couldNotLoadAccount');
+      return;
+    }
+
+    // Defense in depth beside the disabled state: with a resolved account, a
+    // primary press before the stored read has answered must never write the
+    // default over a stored decline. The failed state re-runs the read
+    // through its Retry instead. Without an account there is nothing to
+    // write; the error below names the problem.
+    if (userId !== undefined && storedLoad.status !== 'ready') {
       return;
     }
 
@@ -233,6 +310,40 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
     },
     [mode, userId]
   );
+
+  const renderStoredLoadStatus = (): React.ReactNode => {
+    if (storedLoad.status === 'loading') {
+      return (
+        <AccessibleStatus
+          message={t('consent.loadingConsentSettings')}
+          tone="status"
+          className="text-sm"
+        />
+      );
+    }
+    if (storedLoad.status === 'failed') {
+      return (
+        <View className="flex-row items-center justify-center gap-1">
+          <AccessibleStatus
+            message={t('consent.couldNotLoadConsentSettings')}
+            className="text-sm"
+          />
+          <Pressable
+            onPress={() => {
+              setStoredLoadRetryKey(key => key + 1);
+            }}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.retry')}
+            className="min-h-[28px] flex-row items-center gap-1 px-1 active:opacity-70"
+          >
+            <Text className="text-sm font-semibold text-primary">{t('common.retry')}</Text>
+          </Pressable>
+        </View>
+      );
+    }
+    return <AccessibleStatus message={error ? t(error) : null} className="text-sm" />;
+  };
 
   return (
     <View className="flex-1 bg-background" style={rootStyle}>
@@ -341,7 +452,13 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
           onOpenPolicy={handleOpenPrivacy}
         />
         <View className="min-h-5 justify-center">
-          <AccessibleStatus message={error ? t(error) : null} className="text-sm" />
+          {/* The reserved slot carries the load phase the finding reported:
+              while the stored read is in flight the line names the wait, so a
+              disabled-looking primary has its reason on screen instead of
+              reading as a dead control; when the read fails or times out the
+              line becomes the load error with its own Retry, because the
+              primary must stay disabled until the read answers. */}
+          {renderStoredLoadStatus()}
         </View>
         <Button
           onPress={() => {
@@ -350,8 +467,21 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
           size="lg"
           accessibilityLabel={actions.primaryLabel}
           // Accepting before the stored (or carried) choice has loaded would
-          // write the default over a decision the user already made.
-          disabled={pendingAction === 'secondary' || optionalControlPending}
+          // write the default over a decision the user already made, so the
+          // primary answers only once the read is ready. A failed or timed-out
+          // read keeps it disabled beside its Retry; in review mode the
+          // primary is Back, which needs no stored choice and always works.
+          disabled={
+            // Onboarding with no resolved account keeps the primary operable:
+            // there is nothing to load, and the guard reports the account
+            // error (main's behaviour). Once an account exists, the stored
+            // read must answer before an accept can write a choice over it —
+            // a failed or timed-out read stays disabled beside its Retry. In
+            // review mode the primary is Back, which needs no stored choice
+            // and always works.
+            (mode === 'onboarding' && userId !== undefined && storedLoad.status !== 'ready') ||
+            pendingAction === 'secondary'
+          }
           loading={pendingAction === 'primary'}
         >
           <Text>{actions.primaryLabel}</Text>

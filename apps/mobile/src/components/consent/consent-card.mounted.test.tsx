@@ -1,7 +1,7 @@
 /* oxlint-disable eslint/max-lines -- loading and error state coverage grows the file past 300 lines */
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import {
   INLINE_LINK_BOX_CLASS,
   MIN_TAP_TARGET_DP,
@@ -116,8 +116,13 @@ function countByType(root: I, type: string): number {
 }
 
 function findButton(root: I, label: string): I {
-  const buttons = root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Button');
-  const btn = buttons.find(b => (b.props.accessibilityLabel as string) === label);
+  const nodes = root.findAll(
+    n =>
+      typeof n.type === 'string' &&
+      (n.type === 'Button' || n.type === 'Pressable') &&
+      (n.props.accessibilityLabel as string | undefined) === label
+  );
+  const btn = nodes[0];
   if (!btn) {
     throw new Error(`button "${label}" not found`);
   }
@@ -395,6 +400,7 @@ describe('ConsentCard', () => {
   it('shows error when acceptConsent fails and does not navigate', async () => {
     mockedAcceptConsent.mockRejectedValue(new Error('write failed'));
     const renderer = mountCard('onboarding');
+    await act(flush);
     const btn = findButton(renderer.root, 'Accept and continue');
     await act(async () => {
       await Promise.resolve();
@@ -453,6 +459,174 @@ describe('ConsentCard', () => {
     // The placeholder is gone: the error names the unreliability, so the
     // control is at least operable (a failed toggle reverts with its error).
     expect(singleSwitch(renderer.root)).toBeTruthy();
+  });
+
+  it('names the wait in the reserved status line while the stored read is in flight', async () => {
+    let resolveLoad: ((v: { mandatory: boolean; optional: boolean }) => void) | undefined =
+      undefined;
+    mockedReadConsent.mockReturnValue(
+      new Promise(resolve => {
+        resolveLoad = resolve;
+      })
+    );
+    const renderer = mountCard('onboarding');
+    await act(async () => {
+      await Promise.resolve();
+    });
+    // The dead-button finding: the pending card used to differ from a settled
+    // one by nothing a reader could see. The status line names the wait, so a
+    // disabled primary has its reason on screen.
+    expect(texts(renderer.root)).toContain(i18n.t('consent.loadingConsentSettings'));
+    expect(findButton(renderer.root, 'Accept and continue').props.disabled).toBe(true);
+
+    await act(() => {
+      resolveLoad?.({ mandatory: false, optional: false });
+    });
+    await act(flush);
+    expect(texts(renderer.root)).not.toContain(i18n.t('consent.loadingConsentSettings'));
+    expect(findButton(renderer.root, 'Accept and continue').props.disabled).toBeFalsy();
+  });
+
+  it('keeps the no-account primary operable and reports the account error on tap', async () => {
+    currentUserId.value = undefined;
+    const renderer = mountCard('onboarding');
+    await act(flush);
+    expect(mockedReadConsent).not.toHaveBeenCalled();
+    const btn = findButton(renderer.root, 'Accept and continue');
+    expect(btn.props.disabled).toBeFalsy();
+    await act(async () => {
+      (btn.props.onPress as () => void)();
+    });
+    await act(flush);
+    expect(texts(renderer.root)).toContain('Could not load your account. Please try again.');
+    expect(mockedAcceptConsent).not.toHaveBeenCalled();
+  });
+
+  it('offers Retry on the load failure and re-runs the read when pressed', async () => {
+    // The failed card renders the load error beside its Retry affordance.
+    // Pressing Retry re-runs the read for the same account and clears the
+    // failure once it answers.
+    mockedReadConsent.mockRejectedValueOnce(new Error('keychain read failed'));
+    const second = Promise.withResolvers<{ mandatory: boolean; optional: boolean }>();
+    const renderer = mountCard('onboarding');
+    await act(flush);
+    expect(texts(renderer.root)).toContain(
+      'Could not load your consent settings. Please try again.'
+    );
+    expect(findButton(renderer.root, 'Accept and continue').props.disabled).toBe(true);
+
+    mockedReadConsent.mockReturnValueOnce(second.promise);
+    await act(async () => {
+      (findButton(renderer.root, i18n.t('common.retry')).props.onPress as () => void)();
+    });
+    expect(mockedReadConsent).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      second.resolve({ mandatory: false, optional: false });
+      await Promise.resolve();
+    });
+    await act(flush);
+    expect(texts(renderer.root)).not.toContain(
+      'Could not load your consent settings. Please try again.'
+    );
+    expect(findButton(renderer.root, 'Accept and continue').props.disabled).toBeFalsy();
+  });
+
+  it('holds the pending status while a stalled read keeps the card waiting', async () => {
+    // The pre-bound state the finding reported: the read has not settled, so
+    // the card names the wait and keeps the primary disabled until the bound
+    // or the read settles it (the bound itself is the timeout test above).
+    const first = Promise.withResolvers<{ mandatory: boolean; optional: boolean }>();
+    mockedReadConsent.mockReturnValueOnce(first.promise);
+    const renderer = mountCard('onboarding');
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(texts(renderer.root)).toContain(i18n.t('consent.loadingConsentSettings'));
+    expect(findButton(renderer.root, 'Accept and continue').props.disabled).toBe(true);
+    // The read owns the wait: a Retry affordance is not offered while the
+    // attempt is still in flight.
+    const retryNodes = renderer.root.findAll(
+      n =>
+        typeof n.type === 'string' &&
+        n.type === 'Pressable' &&
+        (n.props.accessibilityLabel as string | undefined) === i18n.t('common.retry')
+    );
+    expect(retryNodes).toHaveLength(0);
+  });
+
+  it('settles a stalled stored read as the load error at the timeout bound', async () => {
+    vi.useFakeTimers();
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    const first = Promise.withResolvers<{ mandatory: boolean; optional: boolean }>();
+    mockedReadConsent.mockReturnValueOnce(first.promise);
+    const renderer = mountCard('onboarding');
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(findButton(renderer.root, 'Accept and continue').props.disabled).toBe(true);
+
+    // The read stalls past the bound: the card settles as failed, names the
+    // failure and offers Retry instead of holding a silent disabled button.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15_000);
+    });
+    expect(texts(renderer.root)).toContain(
+      'Could not load your consent settings. Please try again.'
+    );
+    expect(findButton(renderer.root, 'Accept and continue').props.disabled).toBe(true);
+    expect(findButton(renderer.root, i18n.t('common.retry'))).toBeTruthy();
+
+    // A late resolve from the abandoned attempt must not publish over the
+    // failed state: the read only answers for the attempt that still owns the
+    // load, so the card keeps its failure and Retry. Real timers come back
+    // first: `flush` uses a setTimeout, which fake timers would never fire.
+    vi.useRealTimers();
+    await act(async () => {
+      first.resolve({ mandatory: true, optional: false });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await act(flush);
+    expect(texts(renderer.root)).toContain(
+      'Could not load your consent settings. Please try again.'
+    );
+    expect(findButton(renderer.root, 'Accept and continue').props.disabled).toBe(true);
+  });
+
+  it('does not accept while the stored read is unresolved', async () => {
+    let resolveLoad: ((v: { mandatory: boolean; optional: boolean }) => void) | undefined =
+      undefined;
+    mockedReadConsent.mockReturnValue(
+      new Promise(resolve => {
+        resolveLoad = resolve;
+      })
+    );
+    const renderer = mountCard('onboarding');
+    await act(async () => {
+      await Promise.resolve();
+    });
+    // Defense in depth beside the disabled state: a primary press that slips
+    // past the disabled flag must not write the default over a stored decline
+    // the read has not answered.
+    await act(async () => {
+      (findButton(renderer.root, 'Accept and continue').props.onPress as () => void)();
+    });
+    await act(flush);
+    expect(mockedAcceptConsent).not.toHaveBeenCalled();
+    expect(mockedReplace).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveLoad?.({ mandatory: false, optional: false });
+      await Promise.resolve();
+    });
+    await act(flush);
+    const btn = findButton(renderer.root, 'Accept and continue');
+    await act(async () => {
+      (btn.props.onPress as () => void)();
+    });
+    expect(mockedAcceptConsent).toHaveBeenCalledWith('test-user-1', true);
   });
 
   it('writes optional choice immediately without sign-out on toggle', async () => {

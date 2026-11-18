@@ -20,7 +20,7 @@ next build appends its section above the newest one.
 - New paid credits now expire one year after purchase.
 - Only managers can change organization profiles.
 - Approving a request on Android now requires an unlocked device.
-- Sign-in sessions now expire after a set period.
+- Signing in on a new device after reaching the device limit signs out your oldest app session.
 
 ### Fixes
 
@@ -783,7 +783,7 @@ _Its notes are on the newest 1.0.14 section above._
 
 ### New
 
-- An alert about a session that failed to start now tells you what you can do next.
+- Push notifications that fail to send are now easier for us to diagnose and fix.
 - You can now move between pull requests in a session and use smaller review controls.
 - Home now shows one card that summarizes your agents.
 - Profile now has a What's New row that opens the changelog.

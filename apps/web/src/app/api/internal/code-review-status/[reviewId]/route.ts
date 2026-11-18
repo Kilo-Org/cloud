@@ -548,7 +548,6 @@ async function shouldSkipAutoRetryForFailedSessionUsage(params: {
   failedCliSessionId?: string | null;
   reviewCreatedAt: string;
   failure?: CloudAgentSafeFailure;
-  usageLagRecheckDelayMs?: number;
 }): Promise<FailedSessionUsageGate> {
   if (!params.failedCliSessionId) {
     logExceptInTest('[code-review-status] Auto-retry token guard could not measure usage', {
@@ -636,9 +635,8 @@ async function shouldSkipAutoRetryForFailedSessionUsage(params: {
     // Billing rows trail the callback: the session just failed, and the
     // microdollar aggregate may not have its rows yet. One bounded re-read
     // covers that lag before the review is treated as unmeasurable.
-    const lagDelayMs = params.usageLagRecheckDelayMs ?? USAGE_LAG_RECHECK_DELAY_MS;
     const lagDelay = Promise.withResolvers<void>();
-    setTimeout(lagDelay.resolve, lagDelayMs);
+    setTimeout(lagDelay.resolve, USAGE_LAG_RECHECK_DELAY_MS);
     await lagDelay.promise;
     usage = await getSessionUsageFromBilling(params.failedCliSessionId, params.reviewCreatedAt);
 

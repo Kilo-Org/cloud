@@ -18,7 +18,6 @@ import { sql } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { analytics_event_outbox, operation_ledgers } from '@kilocode/db/schema';
 import { admitOperation } from '@kilocode/db/operation-ledger';
-const AUTOMATIC_RETRY_ATTEMPT_LIMIT = 3; // matches retry-review.ts; local copy avoids header-time route load
 
 // --- Mock functions ---
 
@@ -444,6 +443,7 @@ import type {
 let POST: typeof POSTType;
 let isWorkspaceCapacityFailure: typeof isWorkspaceCapacityFailureType;
 let USAGE_LAG_RECHECK_DELAY_MS: number;
+let AUTOMATIC_RETRY_ATTEMPT_LIMIT: number;
 
 beforeEach(async () => {
   jest.clearAllMocks();
@@ -513,6 +513,7 @@ beforeEach(async () => {
   mockDisableCodeReviewForActionRequiredFailure.mockResolvedValue(undefined);
   mockDisableCodeReviewForRepeatedCloneTimeoutsToday.mockResolvedValue(null);
   ({ POST, isWorkspaceCapacityFailure, USAGE_LAG_RECHECK_DELAY_MS } = await import('./route'));
+  ({ AUTOMATIC_RETRY_ATTEMPT_LIMIT } = await import('@/lib/code-reviews/retry-review'));
 });
 
 describe('isWorkspaceCapacityFailure', () => {

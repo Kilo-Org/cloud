@@ -8,6 +8,8 @@ import {
 } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { OrganizationPermissionPolicy } from '@kilocode/web-shared/lib/organizations/group-policies/permission-policy/permission-policy.schema';
+import { OrganizationPermissionPolicySchema } from '@kilocode/web-shared/lib/organizations/group-policies/permission-policy/permission-policy.schema';
+import { getOrganizationPermissionPolicy } from '@kilocode/web-shared/lib/organizations/group-policies/permission-policy/permission-policy.server';
 import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import { createOrganizationGroup } from '@kilocode/web-shared/lib/organizations/organization-groups';
 import { createCallerFactory } from '@kilocode/web-shared/lib/trpc/init';
@@ -29,6 +31,24 @@ const clientPolicy = {
 } satisfies OrganizationPermissionPolicy;
 const modelPolicy = { type: 'model_access', data: { mode: 'none' } } as const;
 const originalWriteSwitch = process.env.ORG_PERMISSION_POLICY_WRITES_ENABLED;
+
+function largePolicy(index: number): OrganizationPermissionPolicy {
+  const padding = 'x'.repeat(480);
+  return {
+    type: 'agent_permissions',
+    data: {
+      schema_version: 1,
+      tools: {
+        webfetch: {
+          rules: Array.from({ length: 60 }, (_, rule) => ({
+            pattern: `${padding}-${index}-${rule}`,
+            action: 'allow' as const,
+          })),
+        },
+      },
+    },
+  };
+}
 
 async function enableFor(...organizationIds: string[]) {
   const config = { organization_features: { org_permission_policy: organizationIds } };
@@ -423,6 +443,73 @@ describe('organization groups permission-policy administration', () => {
     await expect(
       bearer.organizations.groups.adminPermissionPolicy.diagnostics(input)
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  it('normalizes member group assignments to canonical lowercase UUIDs', async () => {
+    const { groups, organizationId, groupId } = await fixture();
+
+    await expect(
+      groups.setMemberGroups({
+        organizationId,
+        userId: owner.id,
+        groupIds: [groupId.toUpperCase()],
+      })
+    ).resolves.toMatchObject({ result: [groupId] });
+  });
+
+  it('deduplicates identical stored layers so a valid configuration is still served', async () => {
+    const { organizationId } = await fixture();
+    await enableFor(organizationId);
+    const large = largePolicy(1);
+    expect(OrganizationPermissionPolicySchema.safeParse(large).success).toBe(true);
+    const created = await db
+      .insert(organization_groups)
+      .values(
+        Array.from({ length: 9 }, (_, index) => ({
+          organization_id: organizationId,
+          name: `Large ${index}`,
+          policies: [large],
+        }))
+      )
+      .returning({ id: organization_groups.id });
+    await db.insert(organization_group_memberships).values(
+      created.map(group => ({
+        organization_id: organizationId,
+        group_id: group.id,
+        kilo_user_id: owner.id,
+        assigned_by_kilo_user_id: owner.id,
+      }))
+    );
+
+    const { response } = await getOrganizationPermissionPolicy(organizationId, owner.id);
+    if (!response.managed) throw new Error('Expected a managed policy response');
+    expect(response.policy.agent_permissions?.layers).toEqual([large.data]);
+  });
+
+  it('rejects a permission-policy write that would make the member payload unservable', async () => {
+    const { groups, organizationId } = await fixture();
+    await enableFor(organizationId);
+    const { result: target } = await groups.create({ organizationId, name: 'Target' });
+    await db.insert(organization_groups).values(
+      Array.from({ length: 8 }, (_, index) => ({
+        organization_id: organizationId,
+        name: `Budget ${index}`,
+        policies: [largePolicy(index)],
+      }))
+    );
+    const previous = await policyState(organizationId);
+
+    await expect(
+      groups.adminPermissionPolicy.set({
+        organizationId,
+        groupId: target.id,
+        policy: largePolicy(9),
+      })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: expect.stringContaining('maximum size'),
+    });
+    expect(await policyState(organizationId)).toEqual(previous);
   });
 
   it('keeps dedicated permission-policy operations out of the agent-facing MCP catalog', () => {

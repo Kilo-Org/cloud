@@ -43,11 +43,100 @@ function permissionPolicies(policies: OrganizationGroupPolicy[]) {
   return policies.filter(policy => policy.type !== 'model_access');
 }
 
+function dedupeLayers<T>(layers: T[]): T[] {
+  const seen = new Set<string>();
+  return layers.filter(layer => {
+    const key = JSON.stringify(layer);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function orderLayers<T>(layers: T[]): T[] {
   return layers
     .map(layer => ({ layer, key: JSON.stringify(layer) }))
     .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
     .map(({ layer }) => layer);
+}
+
+function collectPermissionLayers(policies: OrganizationGroupPolicy[]) {
+  const agentLayers: OrganizationGroupAgentPermissionsPolicy['data'][] = [];
+  const clientLayers: OrganizationGroupClientAccessPolicy['data'][] = [];
+  for (const policy of permissionPolicies(policies)) {
+    if (policy.type === 'agent_permissions') agentLayers.push(policy.data);
+    else clientLayers.push(policy.data);
+  }
+  return { agentLayers, clientLayers };
+}
+
+function buildMemberPolicyResponse(params: {
+  organizationId: string;
+  managed: boolean;
+  revision: number;
+  agentLayers: OrganizationGroupAgentPermissionsPolicy['data'][];
+  clientLayers: OrganizationGroupClientAccessPolicy['data'][];
+}) {
+  const agentLayers = orderLayers(dedupeLayers(params.agentLayers));
+  const clientLayers = orderLayers(dedupeLayers(params.clientLayers));
+  return {
+    schema_version: 1 as const,
+    organization_id: params.organizationId,
+    managed: params.managed,
+    revision: params.revision,
+    max_age_seconds: PERMISSION_POLICY_MAX_AGE_SECONDS,
+    policy: {
+      ...(agentLayers.length ? { agent_permissions: { layers: agentLayers } } : {}),
+      ...(clientLayers.length ? { client_access: { layers: clientLayers } } : {}),
+    },
+  };
+}
+
+/**
+ * Reject a definition write whose accepted result could never be served to a
+ * member. The member payload is capped, so enforcing the cap at write time
+ * keeps a valid stored configuration from producing a permanent 500.
+ */
+export async function assertOrganizationPermissionPolicyFits(
+  organizationId: string,
+  tx: DrizzleTransaction
+): Promise<void> {
+  const context = await getOrganizationGroupPolicyContext({
+    tx,
+    organizationId,
+    subject: { type: 'defaultAccess' },
+  });
+  const groups = await tx
+    .select({ id: organization_groups.id, policies: organization_groups.policies })
+    .from(organization_groups)
+    .where(eq(organization_groups.organization_id, organizationId));
+  const policies = [
+    ...context.defaultPolicies,
+    ...groups.flatMap(group =>
+      parseOrganizationGroupPolicies(group.policies, {
+        organizationId,
+        groupId: group.id,
+        source: 'group',
+      })
+    ),
+  ];
+  const { agentLayers, clientLayers } = collectPermissionLayers(policies);
+  const parsed = MemberPermissionPolicySchema.safeParse(
+    buildMemberPolicyResponse({
+      organizationId,
+      managed: true,
+      revision: context.policyRevision,
+      agentLayers,
+      clientLayers,
+    })
+  );
+  if (!parsed.success) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message:
+        'Organization permission policy exceeds the maximum size that can be served to members. Remove or shorten policies before saving.',
+    });
+  }
 }
 
 export async function getStoredOrganizationPermissionPolicy(
@@ -121,25 +210,19 @@ export async function getOrganizationPermissionPolicy(organizationId: string, ki
             return policies.length ? [{ groupId, policies }] : [];
           })
         : [];
-      const agentLayers: OrganizationGroupAgentPermissionsPolicy['data'][] = [];
-      const clientLayers: OrganizationGroupClientAccessPolicy['data'][] = [];
-      for (const policy of [...defaultPolicies, ...groups.flatMap(group => group.policies)]) {
-        if (policy.type === 'agent_permissions') agentLayers.push(policy.data);
-        else clientLayers.push(policy.data);
-      }
-      const validated = MemberPermissionPolicySchema.safeParse({
-        schema_version: 1,
-        organization_id: context.organization.id,
-        managed,
-        revision: context.policyRevision,
-        max_age_seconds: PERMISSION_POLICY_MAX_AGE_SECONDS,
-        policy: {
-          ...(agentLayers.length
-            ? { agent_permissions: { layers: orderLayers(agentLayers) } }
-            : {}),
-          ...(clientLayers.length ? { client_access: { layers: orderLayers(clientLayers) } } : {}),
-        },
-      });
+      const { agentLayers, clientLayers } = collectPermissionLayers([
+        ...defaultPolicies,
+        ...groups.flatMap(group => group.policies),
+      ]);
+      const validated = MemberPermissionPolicySchema.safeParse(
+        buildMemberPolicyResponse({
+          organizationId: context.organization.id,
+          managed,
+          revision: context.policyRevision,
+          agentLayers,
+          clientLayers,
+        })
+      );
       if (!validated.success) {
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',

@@ -18,7 +18,10 @@ import {
   type OrganizationGroupPolicy,
   type OrganizationGroupPolicyType,
 } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
-import { assertOrganizationPermissionPolicyWriteEnabled } from '@kilocode/web-shared/lib/organizations/group-policies/permission-policy/permission-policy.server';
+import {
+  assertOrganizationPermissionPolicyFits,
+  assertOrganizationPermissionPolicyWriteEnabled,
+} from '@kilocode/web-shared/lib/organizations/group-policies/permission-policy/permission-policy.server';
 import { and, asc, count, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
@@ -507,6 +510,9 @@ export async function createOrganizationGroup(params: {
           created_by_kilo_user_id: params.actor.id,
         })
         .returning();
+      if (policyTypes.length > 0) {
+        await assertOrganizationPermissionPolicyFits(params.organizationId, tx);
+      }
       await createAuditLog({
         action: 'organization.group.create',
         ...actorAudit(params.actor),
@@ -652,6 +658,9 @@ export async function setOrganizationGroupPolicy(params: {
             eq(organization_groups.id, params.groupId)
           )
         );
+      if (params.policy.type !== 'model_access') {
+        await assertOrganizationPermissionPolicyFits(params.organizationId, tx);
+      }
       await createAuditLog({
         action: 'organization.group.policy.set',
         ...actorAudit(params.actor),
@@ -754,8 +763,8 @@ export async function setOrganizationMemberGroups(params: {
     params.organizationId,
     params.actor.id,
     async ({ tx, policyRevision }) => {
-      const nextGroupIds = new Set(params.groupIds);
-      const groupIds = [...nextGroupIds];
+      const groupIds = [...new Set(params.groupIds.map(groupId => groupId.toLowerCase()))];
+      const nextGroupIds = new Set(groupIds);
       await assertDirectMembers(tx, params.organizationId, [params.userId]);
       const groups = await tx
         .select({
@@ -928,6 +937,9 @@ export async function setDefaultOrganizationGroupPolicy(params: {
         .update(organization_group_policy_settings)
         .set({ default_policies: defaultPolicies, updated_at: sql`now()` })
         .where(eq(organization_group_policy_settings.organization_id, params.organizationId));
+      if (params.policy.type !== 'model_access') {
+        await assertOrganizationPermissionPolicyFits(params.organizationId, tx);
+      }
       await createAuditLog({
         action: 'organization.group.default_policy.set',
         ...actorAudit(params.actor),

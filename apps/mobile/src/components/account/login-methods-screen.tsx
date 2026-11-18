@@ -12,15 +12,14 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
-import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { KeyRound, Plus } from '@/components/ui/icons';
 import { RowGroup } from '@/components/ui/row-group';
+import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { openAppShellHandoff } from '@/lib/app-shell-handoff';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
@@ -89,19 +88,14 @@ function ProviderRow({
       title={label}
       subtitle={email}
       subtitleNumberOfLines={1}
-      trailing={
-        <Button
-          variant="outline"
-          size="sm"
-          className={STATE_ACTION_CLASS}
-          disabled={disabled || !canUnlink}
-          accessibilityLabel={t('profile.signInMethods.unlinkProvider', { provider: label })}
-          accessibilityHint={canUnlink ? undefined : t('profile.signInMethods.lastMethod')}
-          onPress={onUnlink}
-        >
-          <Text>{t('profile.signInMethods.unlink')}</Text>
-        </Button>
-      }
+      trailing={renderRowTrailing({
+        kind: 'action',
+        label: t('profile.signInMethods.unlink'),
+        accessibilityLabel: t('profile.signInMethods.unlinkProvider', { provider: label }),
+        accessibilityHint: canUnlink ? undefined : t('profile.signInMethods.lastMethod'),
+        disabled: disabled || !canUnlink,
+        onPress: onUnlink,
+      })}
     />
   );
 }

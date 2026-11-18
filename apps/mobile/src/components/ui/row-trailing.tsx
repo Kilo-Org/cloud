@@ -60,6 +60,7 @@ export type RowTrailingSpec =
       onPress: () => void;
       disabled?: boolean;
       accessibilityLabel?: string;
+      accessibilityHint?: string;
       testID?: string;
     }>
   | Readonly<{ kind: 'node'; node: ReactNode }>
@@ -139,6 +140,7 @@ export function renderRowTrailing(trailing: RowTrailingSpec | undefined): ReactN
         testID: trailing.testID,
         accessibilityRole: 'button' as const,
         accessibilityLabel: trailing.accessibilityLabel ?? trailing.label,
+        accessibilityHint: trailing.accessibilityHint,
         accessibilityState: { disabled: Boolean(trailing.disabled) },
       };
       return (

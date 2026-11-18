@@ -1079,6 +1079,99 @@ test('an unprojectable live event quarantines and converges from a covering snap
   connection.close();
 });
 
+test('a quarantine clears once any snapshot read covers it, even after the recovery window closed', async () => {
+  snapshot.mockResolvedValue(complete(5));
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello(), 3);
+  await flush();
+  socket.frame('session.step.started', { data: { data: { id: 'invalid' } } }, 4, 'events');
+  await flush();
+  expect(state?.error).toContain('skipped an event it could not read');
+  await jest.advanceTimersByTimeAsync(4000);
+  await flush();
+  expect(state?.error).toContain('recovery is incomplete');
+  snapshot.mockResolvedValue({ ...complete(6), revision: 3 });
+  socket.frame('session.execution.succeeded', { syncPosition: 6, data: { data: {} } }, 5, 'events');
+  await flush();
+  await jest.advanceTimersByTimeAsync(250);
+  await flush();
+  expect(state?.error).toBeUndefined();
+  expect(state?.pendingSnapshotMessageIDs ?? []).toEqual([]);
+  expect(state?.messages[0]?.message.content).toEqual([{ type: 'text', text: 'done' }]);
+  expect(FakeSocket.sockets).toHaveLength(1);
+  connection.close();
+});
+
+test('a canonical snapshot publish prunes a quarantine instead of waiting for another recovery', async () => {
+  snapshot.mockResolvedValue(complete(5));
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello(), 3);
+  await flush();
+  socket.frame('session.step.started', { data: { data: { id: 'invalid' } } }, 4, 'events');
+  await flush();
+  await jest.advanceTimersByTimeAsync(4000);
+  await flush();
+  expect(state?.error).toContain('recovery is incomplete');
+  const reads = snapshot.mock.calls.length;
+  snapshot.mockResolvedValue({ ...complete(7), revision: 4 });
+  socket.frame('reset_required', { seq: 6 }, 6);
+  await flush();
+  expect(snapshot.mock.calls.length).toBe(reads + 1);
+  await jest.advanceTimersByTimeAsync(500);
+  await flush();
+  expect(snapshot.mock.calls.length).toBe(reads + 1);
+  expect(state?.pendingSnapshotMessageIDs ?? []).toEqual([]);
+  connection.close();
+});
+
+test('a throwing state listener is not treated as an unreadable frame', async () => {
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const observed: NativeSessionState[] = [];
+  let thrown = false;
+  const connection = client.connectSession('ses_a', value => {
+    observed.push(value);
+    state = value;
+    const previous = observed[observed.length - 2];
+    if (!thrown && previous && value.messages.length > previous.messages.length) {
+      thrown = true;
+      throw new Error('consumer failure');
+    }
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello(), 3);
+  await flush();
+  socket.frame(
+    'session.step.started',
+    { syncPosition: 1, data: { data: { assistantMessageID: 'msg_m1' } } },
+    4,
+    'events'
+  );
+  await flush();
+  expect(thrown).toBe(true);
+  expect(state?.error).toBe('consumer failure');
+  expect(observed.some(value => value.error?.includes('skipped an event it could not read'))).toBe(
+    false
+  );
+  await jest.advanceTimersByTimeAsync(2001);
+  await flush();
+  expect(FakeSocket.sockets).toHaveLength(2);
+  connection.close();
+});
+
 test('per-frame gap detection stays first-match and additive for changed message references', async () => {
   const canonical: NativeSnapshot = {
     position: 5,

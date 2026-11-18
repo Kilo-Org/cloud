@@ -360,7 +360,7 @@ describe('GuardrailsForm leave guard', () => {
   });
 
   it('keeps the guard disarmed when a refetch rebases a clean draft', async () => {
-    const renderer = await mountForm();
+    await mountForm();
 
     expect(h.guard.enabled).toBe(false);
 

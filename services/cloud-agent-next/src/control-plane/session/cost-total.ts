@@ -1,5 +1,6 @@
-import { and, asc, eq, gt, gte, inArray, lt, lte, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, gte, lt, lte, sql } from 'drizzle-orm';
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
+import { logger } from '../../logger.js';
 import { costBackfillState, events, sessionCostTotals } from './sqlite-schema.js';
 
 export const COST_BACKFILL_ROW_LIMIT = 2048;
@@ -172,9 +173,8 @@ export function createSessionCostTotals(
       const window = db
         .select({
           id: events.id,
-          entity_id: events.entity_id,
-          stream_event_type: events.stream_event_type,
-          bytes: sql<number>`length(cast(${events.payload} as blob))`,
+          // SQLite can read the byte length of a text column from record metadata.
+          bytes: sql<number>`octet_length(${events.payload})`,
         })
         .from(events)
         .where(gt(events.id, state.cursor))
@@ -187,32 +187,33 @@ export function createSessionCostTotals(
       }
       let bytes = 0;
       let cutoff = state.cursor;
-      const candidateIds: number[] = [];
       for (const row of window) {
-        if (row.stream_event_type === 'kilocode' && row.entity_id?.startsWith('message/')) {
-          if (bytes + row.bytes > COST_BACKFILL_BYTE_BUDGET && cutoff !== state.cursor) break;
-          bytes += row.bytes;
-          candidateIds.push(row.id);
-        }
+        if (cutoff !== state.cursor && bytes + row.bytes > COST_BACKFILL_BYTE_BUDGET) break;
+        bytes += row.bytes;
         cutoff = row.id;
       }
-      // Keyed lookups read exactly the budgeted message rows; a range scan
-      // would visit every row between the bounds, including large part rows.
+      // Use the budgeted rowid range, not an index scan over all message rows.
+      const candidates = db
+        .select(costColumns)
+        .from(events)
+        .where(
+          and(
+            gt(events.id, state.cursor),
+            lte(events.id, cutoff),
+            sql`+${events.stream_event_type} = 'kilocode'`,
+            sql`+${events.entity_id} >= 'message/' and +${events.entity_id} < 'message0'`
+          )
+        )
+        .orderBy(asc(events.id))
+        .all();
       const deltas = new Map<string, CostKey & { dollars: number }>();
-      for (let index = 0; index < candidateIds.length; index += 100) {
-        const candidates = db
-          .select(costColumns)
-          .from(events)
-          .where(inArray(events.id, candidateIds.slice(index, index + 100)))
-          .all();
-        for (const row of candidates) {
-          const contribution = messageCostContribution(row);
-          if (contribution === null || contribution.dollars === 0) continue;
-          const key = JSON.stringify([contribution.sessionId, contribution.kiloSessionId]);
-          const existing = deltas.get(key);
-          if (existing === undefined) deltas.set(key, contribution);
-          else existing.dollars += contribution.dollars;
-        }
+      for (const row of candidates) {
+        const contribution = messageCostContribution(row);
+        if (contribution === null || contribution.dollars === 0) continue;
+        const key = JSON.stringify([contribution.sessionId, contribution.kiloSessionId]);
+        const existing = deltas.get(key);
+        if (existing === undefined) deltas.set(key, contribution);
+        else existing.dollars += contribution.dollars;
       }
       for (const delta of deltas.values())
         addDollars(delta, delta.dollars, { cursor: cutoff, complete: false });
@@ -258,7 +259,13 @@ export function createSessionCostTotals(
         addDollars(afterContribution, afterContribution.dollars, state);
     },
     totalCostMicrodollars(sessionId: string, kiloSessionId: string): number {
-      backfillStep();
+      try {
+        backfillStep();
+      } catch (error) {
+        logger
+          .withFields({ sessionId, error: error instanceof Error ? error.message : String(error) })
+          .error('Session cost backfill failed');
+      }
       const dollars = readDollars({ sessionId, kiloSessionId });
       return Number.isFinite(dollars)
         ? Math.min(Number.MAX_SAFE_INTEGER, Math.max(0, Math.round(dollars * 1_000_000)))

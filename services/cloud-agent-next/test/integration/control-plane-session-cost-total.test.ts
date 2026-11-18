@@ -6,7 +6,10 @@ import type {
   SandboxSessionV2,
 } from '../../src/control-plane/session/session-do.js';
 import { createSessionEventQueries } from '../../src/control-plane/session/event-queries.js';
-import { COST_BACKFILL_ROW_LIMIT } from '../../src/control-plane/session/cost-total.js';
+import {
+  COST_BACKFILL_BYTE_BUDGET,
+  COST_BACKFILL_ROW_LIMIT,
+} from '../../src/control-plane/session/cost-total.js';
 import {
   costBackfillState,
   events,
@@ -99,7 +102,8 @@ async function seedStoredHistory(
   sessionId: string,
   kiloSessionId: string,
   assistantCount: number,
-  partCount = 0
+  partCount = 0,
+  partText = 'x'.repeat(2048)
 ) {
   await runInDurableObject(stub, (_instance, state) => {
     const db = drizzle(state.storage);
@@ -133,7 +137,7 @@ async function seedStoredHistory(
               sessionID: kiloSessionId,
               messageID: `msg_a_${index}`,
               type: 'text',
-              text: 'x'.repeat(2048),
+              text: partText,
             },
           },
         }),
@@ -228,9 +232,7 @@ describe('durable session cost total', () => {
     const first = await runInDurableObject(stub, (instance, state) =>
       measureEventReads(state, () => instance.getSession())
     );
-    // One step reads its row window, then the window's message rows by key
-    // (workerd counts two reads per primary-key lookup).
-    expect(first.rowsRead).toBeLessThanOrEqual(3 * COST_BACKFILL_ROW_LIMIT + 64);
+    expect(first.rowsRead).toBeLessThanOrEqual(2 * COST_BACKFILL_ROW_LIMIT + 64);
     expect(first.result).toMatchObject({
       totalCostMicrodollars: COST_BACKFILL_ROW_LIMIT * 250_000,
     });
@@ -268,6 +270,57 @@ describe('durable session cost total', () => {
     );
     expect(page.result?.totalCostMicrodollars).toBe(fullTotal);
     expect(page.queries.some(query => query.includes('$.properties.info.cost'))).toBe(false);
+  });
+
+  it('stops at the byte budget for part rows and resumes without losing message cost', async () => {
+    const { stub, sessionId, kiloSessionId } = await fixture();
+    const partText = 'é'.repeat((COST_BACKFILL_BYTE_BUDGET * 3) / 16);
+    await seedStoredHistory(stub, sessionId, kiloSessionId, 0, 3, partText);
+    await seedStoredHistory(stub, sessionId, kiloSessionId, 1);
+
+    expect(await stub.getSession()).toMatchObject({ totalCostMicrodollars: 0 });
+    expect(await backfillOf(stub)).toMatchObject({ cursor: 2, complete: 0 });
+
+    const { summary, reference } = await runInDurableObject(stub, async (instance, state) => ({
+      summary: await instance.getSessionMetadataSummary(),
+      reference: referenceTotalMicrodollars(state, sessionId, kiloSessionId),
+    }));
+    expect(reference).toBe(250_000);
+    expect(summary.snapshot).toMatchObject({ totalCostMicrodollars: reference });
+    expect(await backfillOf(stub)).toMatchObject({ cursor: 4, complete: 1 });
+  });
+
+  it('serves the committed total when backfill fails and retries the same rows', async () => {
+    const { stub, sessionId, kiloSessionId } = await fixture();
+    await seedStoredHistory(stub, sessionId, kiloSessionId, COST_BACKFILL_ROW_LIMIT + 1);
+    const partialTotal = COST_BACKFILL_ROW_LIMIT * 250_000;
+    expect(await stub.getSession()).toMatchObject({ totalCostMicrodollars: partialTotal });
+    const cursorBeforeFailure = await backfillOf(stub);
+
+    const summary = await runInDurableObject(stub, async (instance, state) => {
+      const exec = state.storage.sql.exec.bind(state.storage.sql);
+      state.storage.sql.exec = ((query: string, ...params: unknown[]) => {
+        if (query.startsWith('insert into "cost_backfill_state"')) {
+          throw new Error('Backfill cursor write failed');
+        }
+        return exec(query, ...params);
+      }) as SqlExec;
+      try {
+        return await instance.getSessionMetadataSummary();
+      } finally {
+        state.storage.sql.exec = exec;
+      }
+    });
+    expect(summary.snapshot).toMatchObject({ totalCostMicrodollars: partialTotal });
+    expect(await backfillOf(stub)).toEqual(cursorBeforeFailure);
+
+    expect(await stub.getSession()).toMatchObject({
+      totalCostMicrodollars: partialTotal + 250_000,
+    });
+    expect(await backfillOf(stub)).toMatchObject({
+      cursor: COST_BACKFILL_ROW_LIMIT + 1,
+      complete: 1,
+    });
   });
 
   it('resumes the backfill after eviction and counts writes made while it runs', async () => {
@@ -404,7 +457,9 @@ describe('durable session cost total', () => {
     expect(await expectParity('clamp released')).toBe(1_625_000);
 
     const snapshot = await stub.getSession();
-    const summary = await stub.getSessionMetadataSummary();
+    const summary = await runInDurableObject(stub, instance =>
+      instance.getSessionMetadataSummary()
+    );
     expect(snapshot).toMatchObject({ totalCostMicrodollars: 1_625_000 });
     expect(summary.snapshot).toMatchObject({ totalCostMicrodollars: 1_625_000 });
   });

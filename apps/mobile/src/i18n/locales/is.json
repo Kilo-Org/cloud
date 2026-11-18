@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Breytingar",
     "organizationTrialEnded": "Próftímabili fyrirtækisins er lokið og það er ekki með virka áætlun. Eigandi fyrirtækis getur uppfært greiðsluupplýsingar á kilo.ai og reynir síðan aftur.",
-    "privateRepositoryA11y": "{{name}}, einkakóðasafn"
+    "privateRepositoryA11y": "{{name}}, einkakóðasafn",
+    "legalDocumentEnglishOnly": "Þetta skjal er aðeins tiltækt á ensku."
   },
   "language": {
     "restarting": "Endurræsi til að virkja valið tungumál",
@@ -1473,7 +1474,8 @@
       "repositoryLine": "Yfirferðir: {{reviews}} · Frávik: {{findings}}",
       "empty": "Engar yfirferðir með tölfræði ennþá",
       "emptyDescription": "Tölfræðin skráir yfirferðir sem klárast meðan hún er virk fyrir fyrirtækið.",
-      "off": "Tölfræðin er óvirk fyrir þetta fyrirtæki.",
+      "offTitle": "Tölfræðin er óvirk fyrir {{platform}}",
+      "offDescription": "Kveiktu á henni í stillingum félags á vefnum til að skrá yfirferðir sem klárast.",
       "couldNotLoad": "Tókst ekki að sækja tölfræðina"
     },
     "council": {

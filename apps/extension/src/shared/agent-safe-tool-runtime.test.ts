@@ -27,7 +27,16 @@ vi.mock('@/src/shared/agent-memories-storage', () => ({
 }));
 
 // eslint-disable-next-line import/first
-import { executeSafeToolCall } from '../../entrypoints/sidepanel/agent-safe-tool-runtime';
+import { createSafeToolExecutor } from '../../entrypoints/sidepanel/agent-safe-tool-runtime';
+// eslint-disable-next-line import/first
+import type { BrowserCaller } from './browser-caller';
+
+const browserCaller: BrowserCaller = {
+  conversationId: 'conversation-1',
+  kind: 'panel',
+  panelId: 'panel-1',
+};
+const executeSafeToolCall = createSafeToolExecutor(browserCaller);
 
 const sampleMemory = (overrides: Partial<AgentMemory> = {}): AgentMemory => ({
   createdAt: 1_700_000_000_000,
@@ -209,7 +218,9 @@ describe('safe tool runtime browser dispatch', () => {
     });
     expect(mocks.sendMessage).toHaveBeenCalledWith({
       arguments: { target: 'e5' },
+      caller: browserCaller,
       tabId: 7,
+      takeOver: false,
       tool: 'kilo_browser_click',
       type: BROWSER_TOOL_MESSAGE,
     });

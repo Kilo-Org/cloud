@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Newidiadau",
     "organizationTrialEnded": "Mae treial y sefydliad wedi dod i ben ac nid oes ganddo gynllun gweithredol. Gall perchennog sefydliad ddiweddaru bilio ar kilo.ai, ac yna rhoi cynnig arall arni.",
-    "privateRepositoryA11y": "{{name}}, yn repositori preifat"
+    "privateRepositoryA11y": "{{name}}, yn repositori preifat",
+    "legalDocumentEnglishOnly": "Dim ond yn Saesneg y mae'r ddogfen hon ar gael."
   },
   "language": {
     "restarting": "Yn ailgychwyn i newid yr iaith",
@@ -1569,7 +1570,8 @@
       "repositoryLine": "Adolygiadau: {{reviews}} · Canfyddiadau: {{findings}}",
       "empty": "Dim adolygiadau â dadansoddeg eto",
       "emptyDescription": "Mae dadansoddeg yn cofnodi adolygiadau a gwblhawyd tra bo'r nodwedd wedi'i galluogi ar gyfer y sefydliad.",
-      "off": "Mae dadansoddeg wedi'i diffodd ar gyfer y sefydliad hwn.",
+      "offTitle": "Mae dadansoddeg wedi'i diffodd ar gyfer {{platform}}",
+      "offDescription": "Trowch hi ymlaen yng ngosodiadau'r sefydliad ar y we i gofnodi adolygiadau a gwblhawyd.",
       "couldNotLoad": "Methwyd llwytho'r dadansoddeg"
     },
     "council": {

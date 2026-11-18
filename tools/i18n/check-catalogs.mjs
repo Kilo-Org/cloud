@@ -19,7 +19,7 @@
  *
  * Usage: node tools/i18n/check-catalogs.mjs
  */
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative as relativePath, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -437,13 +437,20 @@ function scanCatalogKeys(text) {
  * keeps the last duplicate silently, so the raw text is the only witness.
  *
  * A catalog this cannot read is reported once and skipped, the way
- * `check-plurals.mjs` treats a locale it cannot audit: an unbalanced scan or a
- * file JSON.parse rejects leaves one problem line instead of a stack trace and a
- * cascade of missing-key findings.
+ * `check-plurals.mjs` treats a locale it cannot audit: a read the filesystem
+ * refuses, an unbalanced scan, or a file JSON.parse rejects leaves one problem
+ * line instead of a stack trace and a cascade of missing-key findings.
  */
 function parseCatalog(file, label) {
   const problems = [];
-  const text = readFileSync(file, 'utf8');
+  let text;
+  try {
+    text = readFileSync(file, 'utf8');
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    problems.push(`${label}: cannot audit catalog: ${message}`);
+    return { catalog: null, problems };
+  }
   const { duplicates, readable } = scanCatalogKeys(text);
   if (!readable) {
     problems.push(`${label}: cannot audit catalog: its strings and braces do not balance`);
@@ -1364,7 +1371,7 @@ function isAdmittedPluralKey(parts, englishFamilies, englishCountedBases) {
 }
 
 /** The catalogs a folder is missing, and the files no supported language names. */
-function checkCatalogMembership({ catalogName, tags, present }) {
+function checkCatalogMembership({ catalogName, tags, present, dir }) {
   const problems = [];
   for (const tag of tags) {
     if (!present.has(tag)) {
@@ -1376,7 +1383,38 @@ function checkCatalogMembership({ catalogName, tags, present }) {
       problems.push(`${catalogName}: catalog "${tag}.json" is not a supported language`);
     }
   }
+  // `catalogTags` counts only regular files, so a directory named like a
+  // catalog would vanish from `present` and from this rule without a trace.
+  // Naming it here keeps the stray entry a reported problem instead.
+  for (const name of nonFileCatalogEntries(dir)) {
+    problems.push(
+      `${catalogName}: catalog "${name}.json" is not a regular file; remove it or make it a catalog`
+    );
+  }
   return problems;
+}
+
+/**
+ * The `.json`-named entries of `dir` that are not regular files, sorted.
+ *
+ * The same stat-based definition `catalogTags` filters by, so an entry can
+ * never fall out of one set without a line in the other: a directory named
+ * like a catalog and a symlink the filesystem cannot follow are named here.
+ */
+function nonFileCatalogEntries(dir) {
+  return readdirSync(dir, { withFileTypes: true })
+    .filter(entry => {
+      if (!entry.name.endsWith('.json')) {
+        return false;
+      }
+      try {
+        return !statSync(join(dir, entry.name)).isFile();
+      } catch {
+        return true;
+      }
+    })
+    .map(entry => entry.name.replace(/\.json$/, ''))
+    .sort();
 }
 
 function checkEnglishCopies({ catalogName, english }) {
@@ -2096,7 +2134,7 @@ export function checkCatalogs(root = ROOT) {
     const catalogName = catalog.name;
     const present = new Set(catalogTags(catalog.dir));
 
-    problems.push(...checkCatalogMembership({ catalogName, tags, present }));
+    problems.push(...checkCatalogMembership({ catalogName, tags, present, dir: catalog.dir }));
 
     const parsedEnglish = parseCatalog(join(catalog.dir, 'en.json'), `${catalogName}/en`);
     problems.push(...parsedEnglish.problems);

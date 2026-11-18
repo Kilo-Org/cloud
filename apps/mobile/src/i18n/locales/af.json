@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Wysigings",
     "organizationTrialEnded": "Die organisasie se proeftydperk het geëindig en dit het geen aktiewe plan nie. 'n Organisasie-eienaar kan die fakturering by kilo.ai opdateer en dan weer probeer.",
-    "privateRepositoryA11y": "{{name}}, privaat bewaarplek"
+    "privateRepositoryA11y": "{{name}}, privaat bewaarplek",
+    "legalDocumentEnglishOnly": "Hierdie dokument is slegs in Engels beskikbaar."
   },
   "language": {
     "restarting": "Herbegin om die taal toe te pas",
@@ -1473,7 +1474,8 @@
       "repositoryLine": "Hersienings: {{reviews}} · Bevindings: {{findings}}",
       "empty": "Nog geen hersienings met ontleding nie",
       "emptyDescription": "Ontleding teken voltooide hersienings aan terwyl dit vir die organisasie geaktiveer is.",
-      "off": "Ontleding is af vir hierdie organisasie.",
+      "offTitle": "Ontleding is af vir {{platform}}",
+      "offDescription": "Skakel dit aan in die organisasie-instellings op die web om voltooide hersienings aan te teken.",
       "couldNotLoad": "Kon nie ontleding laai nie"
     },
     "council": {

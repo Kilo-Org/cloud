@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Ändringar",
     "organizationTrialEnded": "Organisationens provperiod har löpt ut och den har ingen aktiv plan. En organisationsägare kan uppdatera faktureringen på kilo.ai och sedan försöka igen.",
-    "privateRepositoryA11y": "{{name}}, privat kodarkiv"
+    "privateRepositoryA11y": "{{name}}, privat kodarkiv",
+    "legalDocumentEnglishOnly": "Det här dokumentet finns endast på engelska."
   },
   "language": {
     "restarting": "Startar om för att byta språk",
@@ -1473,7 +1474,8 @@
       "repositoryLine": "Granskningar: {{reviews}} · Fynd: {{findings}}",
       "empty": "Inga granskningar med statistik än",
       "emptyDescription": "Statistiken registrerar slutförda granskningar så länge den är aktiverad för organisationen.",
-      "off": "Statistiken är avstängd för denna organisation.",
+      "offTitle": "Statistiken är avstängd för {{platform}}",
+      "offDescription": "Aktivera den i organisationsinställningarna på webben för att registrera slutförda granskningar.",
       "couldNotLoad": "Det gick inte att läsa in statistiken"
     },
     "council": {

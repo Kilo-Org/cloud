@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Zmiany",
     "organizationTrialEnded": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Właściciel organizacji może zaktualizować rozliczenia na kilo.ai, a następnie spróbować ponownie.",
-    "privateRepositoryA11y": "{{name}}, prywatne repozytorium"
+    "privateRepositoryA11y": "{{name}}, prywatne repozytorium",
+    "legalDocumentEnglishOnly": "Ten dokument jest dostępny wyłącznie w języku angielskim."
   },
   "language": {
     "restarting": "Ponowne uruchamianie po zmianie języka",
@@ -932,7 +933,8 @@
       "repositoryLine": "Przeglądy: {{reviews}} · Problemy: {{findings}}",
       "empty": "Brak przeglądów z analityką",
       "emptyDescription": "Analityka rejestruje ukończone przeglądy, dopóki jest włączona dla organizacji.",
-      "off": "Analityka jest wyłączona dla tej organizacji.",
+      "offTitle": "Analityka jest wyłączona dla {{platform}}",
+      "offDescription": "Włącz ją w ustawieniach organizacji w wersji internetowej, aby rejestrowała ukończone przeglądy.",
       "couldNotLoad": "Nie udało się wczytać analityki"
     },
     "council": {

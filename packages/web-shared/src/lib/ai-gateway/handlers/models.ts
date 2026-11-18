@@ -8,7 +8,7 @@ import {
   getDirectByokCatalogModelIds,
   getDirectByokModelsForUser,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
-import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/organizations/organization-models';
+import { organizationMemberCatalog, usableCustomRouters } from './organization-catalog';
 import {
   addDirectByokCatalogAvailability,
   addUserByokAvailability,
@@ -22,7 +22,6 @@ import {
   addAutoRoutingModels,
   addCustomRouterModels,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-models';
-import { listUsableCustomRouters } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
 import { appendLocalFakeDeterministicCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
 import { requestCountryCode } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
 import {
@@ -36,18 +35,6 @@ async function modelResponse(response: OpenRouterModelsResponse, fromDb: ModelSt
     ...response,
     data: publishEnkryptModels(response.data, snapshot),
   });
-}
-
-async function usableCustomRouters(params: { userId: string; organizationId: string | null }) {
-  try {
-    return await listUsableCustomRouters(params);
-  } catch (error) {
-    captureException(error, {
-      tags: { endpoint: 'openrouter/models' },
-      extra: { action: 'listing_custom_routers', ...params },
-    });
-    return [];
-  }
 }
 
 async function tryGetUserFromAuth() {
@@ -77,8 +64,9 @@ export async function getPersonalModelList(params: {
   user: { id: string };
   countryCode: string | null;
   fromDb?: ModelStatsLoadClient;
+  endpoint?: string;
 }): Promise<OpenRouterModelsResponse> {
-  const { user, countryCode, fromDb = readDb } = params;
+  const { user, countryCode, fromDb = readDb, endpoint = 'openrouter/models' } = params;
   const data = await getEnhancedOpenRouterModels({ countryCode, fromDb });
   if (!Array.isArray(data.data)) {
     return data;
@@ -90,7 +78,7 @@ export async function getPersonalModelList(params: {
       getDirectByokModelsForUser(user.id),
       getUserByokProviderIds(readDb, user.id),
       getDirectByokCatalogModelIds({ type: 'user', id: user.id }),
-      usableCustomRouters({ userId: user.id, organizationId: null }),
+      usableCustomRouters({ userId: user.id, organizationId: null, endpoint }),
     ]);
   const modelsWithByokAvailability = await tagClaudeBillingByokModels(
     { kind: 'personal', kiloUserId: user.id },
@@ -123,27 +111,16 @@ export async function handleModelsRequest(
   const auth = await tryGetUserFromAuth();
   const countryCode = requestCountryCode(request.headers);
   try {
-    const result =
-      auth?.organizationId && auth.user
-        ? await getAvailableModelsForOrganization(
-            auth.organizationId,
-            { type: 'member', kiloUserId: auth.user.id },
-            'member',
-            { fromDb: readDb, countryCode }
-          )
-        : null;
-    if (result && auth.user && auth.organizationId) {
-      const [models, customRouters] = await Promise.all([
-        addAutoRoutingModels(result.data),
-        usableCustomRouters({ userId: auth.user.id, organizationId: auth.organizationId }),
-      ]);
-      return await modelResponse(
-        {
-          ...result,
-          data: addCustomRouterModels(models, customRouters),
-        },
-        readDb
-      );
+    if (auth?.organizationId && auth.user) {
+      const catalog = await organizationMemberCatalog({
+        organizationId: auth.organizationId,
+        kiloUserId: auth.user.id,
+        countryCode,
+        endpoint: 'openrouter/models',
+      });
+      if (catalog) {
+        return await modelResponse(catalog, readDb);
+      }
     }
 
     if (!auth?.user) {
@@ -164,6 +141,7 @@ export async function handleModelsRequest(
       user: auth.user,
       countryCode,
       fromDb: readDb,
+      endpoint: 'openrouter/models',
     });
     return NextResponse.json(personal);
   } catch (error) {

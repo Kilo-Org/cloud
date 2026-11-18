@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "変更内容",
     "organizationTrialEnded": "組織のトライアルは終了し、有効なプランがありません。組織のオーナーは kilo.ai で請求情報を更新してから、もう一度お試しください。",
-    "privateRepositoryA11y": "{{name}}、プライベートリポジトリ"
+    "privateRepositoryA11y": "{{name}}、プライベートリポジトリ",
+    "legalDocumentEnglishOnly": "この文書は英語でのみご利用いただけます。"
   },
   "language": {
     "restarting": "言語設定を適用するために再起動中",
@@ -930,7 +931,8 @@
       "repositoryLine": "レビュー: {{reviews}} · 指摘: {{findings}}",
       "empty": "分析データのあるレビューはまだありません",
       "emptyDescription": "分析機能は、組織で有効になっている間に完了したレビューを記録します。",
-      "off": "この組織では分析がオフになっています。",
+      "offTitle": "{{platform}}の分析がオフになっています",
+      "offDescription": "Webでの組織設定で分析を有効にすると、完了したレビューが記録されます。",
       "couldNotLoad": "分析を読み込めませんでした"
     },
     "council": {

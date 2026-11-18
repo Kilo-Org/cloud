@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Alterações",
     "organizationTrialEnded": "O período de teste da organização terminou e esta não tem um plano ativo. O proprietário da organização pode atualizar a faturação em kilo.ai e, em seguida, tentar novamente.",
-    "privateRepositoryA11y": "{{name}}, repositório privado"
+    "privateRepositoryA11y": "{{name}}, repositório privado",
+    "legalDocumentEnglishOnly": "Este documento está disponível apenas em inglês."
   },
   "language": {
     "restarting": "A reiniciar para aplicar o idioma",
@@ -1497,7 +1498,8 @@
       "repositoryLine": "Revisões: {{reviews}} · Ocorrências: {{findings}}",
       "empty": "Ainda não há revisões com estatísticas",
       "emptyDescription": "As estatísticas registam revisões concluídas enquanto estão ativadas para a organização.",
-      "off": "As estatísticas estão desativadas para esta organização.",
+      "offTitle": "As estatísticas estão desativadas para {{platform}}",
+      "offDescription": "Ativa-as nas definições da organização na Web para registar revisões concluídas.",
       "couldNotLoad": "Não foi possível carregar as estatísticas"
     },
     "council": {

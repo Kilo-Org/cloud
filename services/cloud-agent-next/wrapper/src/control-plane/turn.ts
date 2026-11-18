@@ -1379,7 +1379,15 @@ export function createTurnManager(deps: TurnManagerDeps) {
             ...(reply.response === 'reject' ? { message: reply.message } : {}),
           },
         });
-        if (!success) throw new Error('Permission reply was not accepted');
+        if (!success) {
+          if (reply.response === 'reject') {
+            log(
+              `turn: automatic permission already resolved origin=${route.createdOnPlatform} sessionId=${route.sessionId} permissionId=${permissionId}`
+            );
+            return;
+          }
+          throw new Error('Permission reply was not accepted');
+        }
         return;
       } catch (error) {
         log(

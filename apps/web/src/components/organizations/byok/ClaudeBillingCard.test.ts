@@ -3,10 +3,6 @@ jest.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
-jest.mock('posthog-js/react', () => ({
-  useFeatureFlagEnabled: () => false,
-}));
-
 import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { parseHTML } from 'linkedom';
@@ -35,6 +31,7 @@ function status(state: ClaudeBillingStatus['state']): ClaudeBillingStatus {
     providerId: CLAUDE_BILLING_PROVIDER_ID,
     providerName: CLAUDE_BILLING_PROVIDER_NAME,
     canManage: true,
+    linkingAvailable: true,
     canSharePersonal: false,
     shareableLinks: [],
     sharedWith: [],
@@ -76,6 +73,47 @@ describe('ClaudeBillingCardView', () => {
 
   it('offers no linking action when the release gate omits it', () => {
     expect(buttons({ status: status('not_connected') })).toHaveLength(0);
+  });
+
+  it('hides an unlinked card when linking is unavailable', () => {
+    expect(render({ status: { ...status('not_connected'), linkingAvailable: false } })).toBe('');
+  });
+
+  it('hides the connect action when linking is unavailable', () => {
+    expect(
+      buttons({
+        status: { ...status('not_connected'), linkingAvailable: false },
+        onConnect: () => undefined,
+      })
+    ).toHaveLength(0);
+  });
+
+  it('keeps sharing and removal when linking is unavailable', () => {
+    const shareable = buttons({
+      status: {
+        ...status('not_connected'),
+        linkingAvailable: false,
+        shareableLinks: [
+          {
+            payerId: '00000000-0000-4000-8000-000000000001',
+            source: { organizationId: '00000000-0000-4000-8000-000000000010' },
+            label: 'Acme',
+            connectedAt: '2026-09-16T12:00:00.000Z',
+          },
+        ],
+      },
+      scope: 'personal',
+      onConnect: () => undefined,
+      onShare: () => undefined,
+    });
+    expect(shareable.map(button => button.textContent)).toEqual(['Use Claude link from Acme']);
+
+    const connected = buttons({
+      status: { ...status('connected'), linkingAvailable: false },
+      onConnect: () => undefined,
+      onRemove: () => undefined,
+    });
+    expect(connected.map(button => button.textContent)).toEqual(['Remove from Kilo']);
   });
 
   it('retains removal when an existing link has no linking action', () => {
@@ -225,9 +263,13 @@ describe('ClaudeBillingCardView', () => {
         ],
       },
       scope: 'personal',
+      onConnect: () => undefined,
       onShare: () => undefined,
     });
-    expect(rendered.map(button => button.textContent)).toEqual(['Use Claude link from Acme']);
+    expect(rendered.map(button => button.textContent)).toEqual([
+      'Link your Claude organization',
+      'Use Claude link from Acme',
+    ]);
   });
 
   it('renders a link selector when multiple Claude accounts are available', () => {
@@ -269,6 +311,7 @@ describe('ClaudeBillingCardView', () => {
           sharedWith: ['Personal account', 'Acme'],
         },
         scope: 'organization',
+        onConnect: () => undefined,
       })
     );
     expect(html).toContain('Shared with Personal account, Acme.');

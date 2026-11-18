@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Pakeitimai",
     "organizationTrialEnded": "Organizacijos bandomasis laikotarpis baigėsi ir ji neturi aktyvaus plano. Organizacijos savininkas gali atnaujinti atsiskaitymo duomenis adresu kilo.ai, tada bandykite dar kartą.",
-    "privateRepositoryA11y": "{{name}}, privati saugykla"
+    "privateRepositoryA11y": "{{name}}, privati saugykla",
+    "legalDocumentEnglishOnly": "Šis dokumentas prieinamas tik anglų kalba."
   },
   "language": {
     "restarting": "Paleidžiama iš naujo, kad būtų pakeista kalba",
@@ -1521,7 +1522,8 @@
       "repositoryLine": "Peržiūros: {{reviews}} · Radiniai: {{findings}}",
       "empty": "Dar nėra peržiūrų su analitika",
       "emptyDescription": "Analitika fiksuoja užbaigtas peržiūras, kol ji įjungta organizacijai.",
-      "off": "Šiai organizacijai analitika išjungta.",
+      "offTitle": "Analitika išjungta platformai {{platform}}",
+      "offDescription": "Įjunk ją organizacijos nustatymuose žiniatinklyje, kad fiksuotų užbaigtas peržiūras.",
       "couldNotLoad": "Nepavyko įkelti analitikos"
     },
     "council": {

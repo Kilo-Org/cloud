@@ -6,9 +6,27 @@ import { RowChevron } from '@/components/ui/row-chevron';
 import { RowValue, type RowValueSpec } from '@/components/ui/row-value';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
-import { textActionTargetClass } from '@/lib/a11y/tap-target';
+import {
+  COMPACT_CONTROL_BOX_CLASS,
+  COMPACT_CONTROL_BOX_DP,
+  COMPACT_CONTROL_HIT_SLOP,
+  textActionTargetClass,
+} from '@/lib/a11y/tap-target';
 import { selectionHaptic } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
+
+/**
+ * The box a row's `Switch` paints. The native control carries `TOUCH_TARGET_DP`
+ * as its own `minHeight` (see `switch.tsx`), so hosting it made the control, not
+ * `ROW_FRAME_CLASS`, set the row's height: a one-line switch row measured 65.1pt
+ * beside the 54.1pt of a two-line chevron row in the 2026-11-18 gate dump. The
+ * row hands the switch the shared compact box instead, and `hitSlop` carries its
+ * touch region to 48pt without growing the row.
+ */
+const SWITCH_BOX_STYLE = {
+  minHeight: COMPACT_CONTROL_BOX_DP,
+  minWidth: COMPACT_CONTROL_BOX_DP,
+} as const;
 
 /**
  * The trailing cell of a row. Every variant shares the row's height, so a mark,
@@ -85,6 +103,8 @@ export function renderRowTrailing(trailing: RowTrailingSpec | undefined): ReactN
         },
         thumbColor: trailing.thumbColor,
         trackColor: trailing.trackColor,
+        style: SWITCH_BOX_STYLE,
+        hitSlop: COMPACT_CONTROL_HIT_SLOP,
       };
       return <Switch {...props} />;
     }
@@ -137,8 +157,11 @@ export function renderRowTrailing(trailing: RowTrailingSpec | undefined): ReactN
       return trailing.node;
     }
     case 'nodes': {
+      // The controls sit 17.5pt apart, so the 8pt reach each side of the
+      // neighbouring hit slops (16pt together) stay clear of one another: a tap
+      // between two controls belongs to the gap, never to one of them.
       return (
-        <View className="shrink-0 flex-row items-center gap-2">
+        <View className="shrink-0 flex-row items-center gap-5">
           {trailing.nodes.map((node, index) => (
             <Fragment key={index}>{node}</Fragment>
           ))}
@@ -149,4 +172,44 @@ export function renderRowTrailing(trailing: RowTrailingSpec | undefined): ReactN
       return null;
     }
   }
+}
+
+type RowIconActionProps = Readonly<{
+  /** The control's spoken name; the icon carries no text of its own. */
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  /** Test handle for native E2E scripts. */
+  testID?: string;
+  children: ReactNode;
+}>;
+
+/**
+ * An icon-only control for a row's trailing cell: the shared compact box, whose
+ * touch region reaches 48pt through `hitSlop` rather than through its frame, so
+ * an edit, reorder or delete control never makes its row taller than the chevron
+ * row beside it (`RowFrame`'s one geometry).
+ */
+export function RowIconAction({ label, onPress, disabled, testID, children }: RowIconActionProps) {
+  const props = {
+    onPress,
+    disabled,
+    testID,
+    accessibilityRole: 'button' as const,
+    accessibilityLabel: label,
+    accessibilityState: disabled === undefined ? undefined : { disabled },
+  };
+  return (
+    <Pressable
+      {...props}
+      className={cn(
+        COMPACT_CONTROL_BOX_CLASS,
+        'shrink-0 active:opacity-70',
+        disabled === true && 'opacity-40'
+      )}
+      hitSlop={COMPACT_CONTROL_HIT_SLOP}
+    >
+      {children}
+    </Pressable>
+  );
 }

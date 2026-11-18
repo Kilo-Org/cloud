@@ -12,8 +12,8 @@ import { cn } from '@/lib/utils';
 
 /** The label's line, held by the loading twin so the swap to the real label cannot move the block. */
 const LABEL_BAR_CLASS = 'h-3.5 w-16 max-w-full shrink rounded bg-muted-soft';
-/** The action's box, at the frame the text action itself renders. */
-const ACTION_BAR_CLASS = 'w-12 shrink-0 rounded bg-muted-soft';
+/** The action's box, at the frame the text action itself renders, and at the same outer edge. */
+const ACTION_BAR_CLASS = 'ms-auto w-12 shrink-0 rounded bg-muted-soft';
 
 type SectionHeaderSkeletonProps = {
   /**
@@ -54,7 +54,7 @@ export function SectionHeaderSkeleton({
   return (
     <View
       className={cn(
-        'flex-row flex-wrap items-end justify-end gap-2',
+        'flex-row flex-wrap items-end gap-2',
         inset && SCREEN_GUTTER_CLASS,
         reserveLabelAir ? SECTION_HEADER_ROW_PADDING_CLASS : 'py-2'
       )}

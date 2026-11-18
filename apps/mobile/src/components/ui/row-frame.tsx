@@ -74,9 +74,19 @@ type RowFrameProps = Readonly<{
   /**
    * Where the press lives. `row` (the default) makes the whole row the control.
    * `content` presses only the leading cell and the text, so a trailing control
-   * (a switch) owns its own touch and its own accessible node.
+   * (a switch) owns its own touch and its own accessible node. A `content` press
+   * is hidden from assistive technology unless `contentAccessibilityLabel`
+   * names it, because a preference row's trailing switch already carries the
+   * row's name.
    */
   pressTarget?: 'row' | 'content';
+  /**
+   * The content press's spoken name. Set it when the content opens something of
+   * its own (an edit sheet) beside the row's trailing controls, so a screen
+   * reader reaches it as a control rather than passing the row by.
+   */
+  contentAccessibilityLabel?: string;
+  contentAccessibilityHint?: string;
   accessibilityRole?: AccessibilityRole;
   accessibilityLabel?: string;
   /** The action's hint, for the extra context a label cannot carry. */
@@ -135,6 +145,8 @@ export function RowFrame({
   trailing,
   onPress,
   pressTarget = 'row',
+  contentAccessibilityLabel,
+  contentAccessibilityHint,
   accessibilityRole,
   accessibilityLabel,
   accessibilityHint,
@@ -211,20 +223,31 @@ export function RowFrame({
   const frameClass = cn(stack ? ROW_FRAME_STACK_CLASS : ROW_FRAME_CLASS, className);
 
   if (pressTarget === 'content') {
+    // The trailing control owns the row's name when the content is only its
+    // label (a preference row). A content press that opens a surface of its own
+    // is named instead, so a reader reaches both controls.
+    const contentOwnsName = contentAccessibilityLabel !== undefined;
+    const contentProps = {
+      onPress,
+      disabled,
+      accessible: contentOwnsName,
+      importantForAccessibility: contentOwnsName
+        ? ('yes' as const)
+        : ('no-hide-descendants' as const),
+      accessibilityRole: contentOwnsName ? (accessibilityRole ?? 'button') : undefined,
+      accessibilityLabel: contentAccessibilityLabel,
+      accessibilityHint: contentAccessibilityHint,
+      accessibilityState: contentOwnsName ? { disabled } : undefined,
+    };
     return (
       <View testID={testID} className={frameClass} onLayout={onLayout}>
         <Pressable
+          {...contentProps}
           className={cn(
             ROW_TARGET_CLASS,
             'min-w-0 flex-1 flex-row items-center gap-3',
             !disabled && 'active:opacity-70'
           )}
-          onPress={onPress}
-          disabled={disabled}
-          // The trailing control is the row's accessible node; the content
-          // beside it is its label, not a second control a reader stops on.
-          accessible={false}
-          importantForAccessibility="no-hide-descendants"
         >
           {leadingNode}
           {textBlock}

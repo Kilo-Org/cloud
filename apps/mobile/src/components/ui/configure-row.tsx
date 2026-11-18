@@ -27,6 +27,12 @@ const CONFIGURE_ROW_STACK_FONT_SCALE = 1.8;
 type ConfigureRowProps = {
   icon: ComponentType<LucideProps>;
   title: string;
+  /**
+   * A pill or glyph beside the title, on the title's own line — the "this
+   * device" mark and the default profile's star. It never takes the width the
+   * subtitle needs.
+   */
+  titleBadge?: ReactNode;
   subtitle?: string;
   /**
    * Line cap for the subtitle. A subtitle that is one unbreakable token (an
@@ -82,6 +88,7 @@ type ConfigureRowProps = {
 export function ConfigureRow({
   icon,
   title,
+  titleBadge,
   subtitle,
   subtitleNumberOfLines,
   subtitlePlaceholder,
@@ -149,6 +156,7 @@ export function ConfigureRow({
       icon={icon}
       iconTint={iconTint}
       title={title}
+      titleBadge={titleBadge}
       titleClassName={titleClassName}
       subtitle={
         subtitle === undefined

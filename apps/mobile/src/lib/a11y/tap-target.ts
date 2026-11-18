@@ -186,6 +186,13 @@ export const SECTION_ACTION_HIT_SLOP = {
 export const COMPACT_CONTROL_BOX_CLASS = 'h-[32px] w-[32px] items-center justify-center';
 
 /**
+ * The side of {@link COMPACT_CONTROL_BOX_CLASS} in dp. A native control whose
+ * size is a `style` object rather than a class — the `Switch` a row hosts —
+ * reads the same box from here, so the row keeps its frame whatever it ends in.
+ */
+export const COMPACT_CONTROL_BOX_DP = 32;
+
+/**
  * Per-side `hitSlop` for {@link COMPACT_CONTROL_BOX_CLASS}, so the touch region
  * is 32 + 16 = 48pt. 48, not 44: Android lays a target out in whole physical
  * pixels, and a 44dp box at density 420 measured 43.81dp in the run behind
@@ -193,6 +200,18 @@ export const COMPACT_CONTROL_BOX_CLASS = 'h-[32px] w-[32px] items-center justify
  * `DESIGN.md:364`'s 44pt rather than landing on it.
  */
 export const COMPACT_CONTROL_HIT_SLOP_DP = 8;
+
+/**
+ * The `hitSlop` a {@link COMPACT_CONTROL_BOX_CLASS} control renders, as
+ * {@link COMPACT_CONTROL_HIT_SLOP_DP}. A control that takes its box as a
+ * `style` object takes the slop as this object.
+ */
+export const COMPACT_CONTROL_HIT_SLOP = {
+  top: COMPACT_CONTROL_HIT_SLOP_DP,
+  bottom: COMPACT_CONTROL_HIT_SLOP_DP,
+  left: COMPACT_CONTROL_HIT_SLOP_DP,
+  right: COMPACT_CONTROL_HIT_SLOP_DP,
+} as const;
 
 /**
  * The box an in-field clear control renders at the end of a search field.

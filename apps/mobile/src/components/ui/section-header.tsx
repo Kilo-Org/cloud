@@ -123,12 +123,16 @@ export function SectionHeader({
     // sits above the line instead of between the label and its content, which
     // is the header's own `pb-2` everywhere.
     //
+    // The main axis runs from the gutter, so the label keeps the line's start
+    // whatever it grows to; the action takes the free space in front of itself
+    // (`ms-auto`) instead of the row packing its lines to the end.
+    //
     // With `reserveLabelAir` the label and the action share one compact box
     // height, and the row's padding holds the action's hit slop inside the row,
     // so every full-bleed section header has one height.
     <View
       className={cn(
-        'flex-row flex-wrap items-end justify-end gap-2',
+        'flex-row flex-wrap items-end gap-2',
         inset && SCREEN_GUTTER_CLASS,
         reserveLabelAir ? SECTION_HEADER_ROW_PADDING_CLASS : 'py-2'
       )}
@@ -158,15 +162,15 @@ export function SectionHeader({
           accessibilityState={actionDisabled ? { disabled: true } : undefined}
           accessibilityElementsHidden={actionHidden}
           importantForAccessibility={actionHidden ? 'no-hide-descendants' : undefined}
-          // The row packs each flex line to its end (`justify-end`) and only the
-          // label grows, so this box lands on the row's outer edge: the physical
-          // right in LTR, the physical left in RTL. `justify-between` would put a
-          // single item on its own wrapped line at the line start — when a long
-          // label pushes this box onto the next line it must still sit at the
-          // row end, not the margin it wrapped away from. It must NOT grow too:
-          // when both children grew the row split in half, and the action then
-          // sat at the inner edge of its half (the screen centre in Arabic), so
-          // it never reached the margin while the tab bar, cards and rows below
+          // This box lands on the row's outer edge through `ms-auto`: the
+          // physical right in LTR, the physical left in RTL, because the auto
+          // margin is direction-relative. A wrapped line keeps that placement
+          // too — when a long label pushes this box onto the next line, the auto
+          // margin takes that line's free space, so it sits at the row end
+          // rather than the margin it wrapped away from. It must NOT grow: when
+          // both children grew the row split in half, and the action then sat at
+          // the inner edge of its half (the screen centre in Arabic), so it
+          // never reached the margin while the tab bar, cards and rows below
           // were fully mirrored (home-arabic-rtl, home). Never a physical
           // `text-left`/`text-right`: React Native swaps those two under RTL
           // (Android maps `textAlign: 'left'` to `Gravity.RIGHT` when the layout
@@ -186,7 +190,13 @@ export function SectionHeader({
           hitSlop={reserveLabelAir ? SECTION_ACTION_HIT_SLOP : undefined}
           className={cn(
             reserveLabelAir ? SECTION_ACTION_BOX_CLASS : textActionTargetClass(),
-            'max-w-full shrink-0 flex-row items-end justify-center active:opacity-70',
+            // The row's main axis starts at the gutter, so the label always
+            // begins there; this box takes the free space in front of it instead
+            // of the row packing every line to its end (the wide-window
+            // "CATEGORIES" / "PERSONAL" labels that sat at the right edge,
+            // 2026-11-18). On a wrapped line the auto margin still puts the
+            // action on that line's end, never at its start.
+            'ms-auto max-w-full shrink-0 flex-row items-end justify-center active:opacity-70',
             actionHidden && 'opacity-0'
           )}
         >

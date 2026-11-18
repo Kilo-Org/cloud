@@ -102,22 +102,25 @@ describe('SectionHeader mounted layout', () => {
       expect(text.props.style).toBeUndefined();
     }
 
-    // The action copy must sit at the row's end in both directions: the row
-    // packs every flex line to its end (`justify-end`) and only the label grows,
-    // so a lone action box on a wrapped line still lands on the row's outer edge
-    // instead of the line start that `justify-between` gives it. The box must
-    // not grow too — when both children grew the row split in half and the
+    // The action copy must sit at the row's end in both directions: the row's
+    // main axis starts at the gutter, so the label always begins there, and the
+    // action box takes the free space in front of itself (`ms-auto`) — a lone
+    // action box on a wrapped line still lands on the row's outer edge. The box
+    // must not grow: when both children grew the row split in half and the
     // action sat at the inner edge of its half (the screen centre in Arabic)
     // instead of the margin the tab bar, cards and rows below share
     // (home-arabic-rtl, home). The layout is direction-relative and identical
-    // under RTL, and the row's outer edge comes from the row's own main-axis
-    // placement, never from a physical text alignment.
+    // under RTL: the auto margin resolves to the row's end in either direction,
+    // never through a physical text alignment. The row must not pack its lines
+    // to the end (`justify-end`), or a label that is not the growing item lands
+    // at the outer edge — the wide-window "CATEGORIES" and "PERSONAL" labels.
     const rowClasses = ((action.parent?.props.className as string | undefined) ?? '').split(' ');
     expect(rowClasses).toContain('flex-wrap');
-    expect(rowClasses).toContain('justify-end');
+    expect(rowClasses).not.toContain('justify-end');
     expect(rowClasses).not.toContain('justify-between');
     const actionBoxClasses = (action.props.className as string).split(' ');
     expect(actionBoxClasses).toEqual(expect.arrayContaining(ACTION_BOX_CLASSES));
+    expect(actionBoxClasses).toContain('ms-auto');
     expect(actionBoxClasses).not.toContain('grow');
     expect(actionBoxClasses).not.toContain('justify-end');
     // Label and action copy sit on the row's content bottom edge, not its

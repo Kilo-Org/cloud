@@ -2,7 +2,7 @@ import { View } from 'react-native';
 
 import { ROW_FRAME_CLASS, ROW_FRAME_STACK_CLASS, ROW_TILE_CLASS } from '@/components/ui/row-frame';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { COMPACT_CONTROL_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
 /** The hue strip, at the 3pt bar the session row draws. */
@@ -13,7 +13,7 @@ const SUBTITLE_BAR_CLASS = 'h-4 w-56 max-w-full rounded bg-muted-soft';
 const SECOND_SUBTITLE_BAR_CLASS = 'h-4 w-32 max-w-full rounded bg-muted-soft';
 const EYEBROW_BAR_CLASS = 'h-2 w-24 max-w-full rounded bg-muted-soft';
 const META_BAR_CLASS = 'h-3 w-20 shrink-0 rounded bg-muted-soft';
-/** The 48pt box a row's trailing icon control occupies. */
+/** The compact box a row's trailing icon control occupies, so the loaded row is no taller than its placeholder. */
 const TRAILING_CONTROL_CLASS = 'shrink-0 rounded-lg bg-muted-soft';
 /** The switch's own pill, so the loaded control does not move the row it sits in. */
 const TRAILING_SWITCH_CLASS = 'h-[31px] w-[51px] shrink-0 rounded-full bg-muted-soft';
@@ -104,7 +104,7 @@ export function RowSkeleton({
           )}
           {trailing === 'switch' ? <Skeleton className={TRAILING_SWITCH_CLASS} /> : null}
           {trailingControl ? (
-            <Skeleton className={cn(ICON_TARGET_BOX_CLASS, TRAILING_CONTROL_CLASS)} />
+            <Skeleton className={cn(COMPACT_CONTROL_BOX_CLASS, TRAILING_CONTROL_CLASS)} />
           ) : null}
         </View>
         <View className="min-w-0 w-full gap-1">
@@ -126,7 +126,7 @@ export function RowSkeleton({
       </View>
       {trailing === 'switch' ? <Skeleton className={TRAILING_SWITCH_CLASS} /> : null}
       {trailingControl ? (
-        <Skeleton className={cn(ICON_TARGET_BOX_CLASS, TRAILING_CONTROL_CLASS)} />
+        <Skeleton className={cn(COMPACT_CONTROL_BOX_CLASS, TRAILING_CONTROL_CLASS)} />
       ) : null}
     </View>
   );

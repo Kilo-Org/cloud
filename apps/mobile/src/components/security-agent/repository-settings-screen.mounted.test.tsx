@@ -352,7 +352,9 @@ describe('RepositorySettingsScreen repository picker', () => {
     expect(empty.props as { action: unknown }).toHaveProperty('action');
     // The grant is the only way out of this state, so it is the state's one
     // primary action, named by its own label.
-    expect(emptyStateActionLabel(renderer)).toBe('securityAgent.repositories.manageAccess');
+    expect(emptyStateActionLabel(renderer)).toBe(
+      i18n.t('securityAgent.repositories.manageAccess')
+    );
     expect(repoRows(renderer)).toHaveLength(0);
   });
 

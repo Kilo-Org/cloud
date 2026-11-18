@@ -144,7 +144,8 @@ function button(root: ReactTestRenderer['root'], label: string) {
   const found = root.findAll(
     node =>
       (Object.is(node.type, BUTTON) || Object.is(node.type, STATE_ACTION)) &&
-      node.findAll(child => child.props.children === label).length > 0
+      (node.props.label === label ||
+        node.findAll(child => child.props.children === label).length > 0)
   );
   const [first] = found;
   if (!first) {

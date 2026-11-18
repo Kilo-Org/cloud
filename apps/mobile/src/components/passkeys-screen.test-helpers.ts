@@ -95,7 +95,7 @@ const toastError = vi.hoisted(() => vi.fn());
 const confirmSpy = vi.hoisted(() => vi.fn());
 // `vi.hoisted` results cannot be exported at their declaration (vitest hoists
 // them above the export), so they are exported after the declaration instead.
-export { browser, confirmSpy, list, store, toastError, toastSuccess, windowSize };
+export { browser, confirmSpy, list, store, toastError, toastSuccess };
 
 /**
  * The confirmation the stubbed `useConfirmDialog` captured; mirrors the

@@ -24,7 +24,7 @@ const query = vi.hoisted(() => ({
   isFetching: false,
   refetch: vi.fn(),
 }));
-export type SaveCall = {
+type SaveCall = {
   input: {
     enabled: boolean;
     minimum_balance?: number;
@@ -137,7 +137,7 @@ export function mountScreen() {
   return renderWithProviders(createElement(LowBalanceAlertScreen));
 }
 
-export function fieldByLabel(renderer: ReactTestRenderer, label: string): ReactTestInstance {
+function fieldByLabel(renderer: ReactTestRenderer, label: string): ReactTestInstance {
   const field = renderer.root
     .findAll(node => String(node.type) === 'FormField')
     .find(node => node.props.label === label);

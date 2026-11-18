@@ -247,22 +247,18 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
         </Button>
         {/* The reserved status slot renders below the actions: its reserve
             must not sit between the disclosure and the buttons it qualifies
-            (an empty 20dp spacer with two gap edges put 44dp between the
+            (an empty spacer with two gap edges put 44dp between the
             disclosure and the Accept button, floating the line away from the
             block it qualifies). The slot keeps its one-line height whenever
             it is mounted (the same reserve as the credits expiry line and
-            the guardrails and spend-alerts save status). The negative
-            bottom margin gives the slot's height back to the footer's
-            bottom padding, so the footer's total height, the buttons, and
-            the clearance between the secondary button and the screen edge
-            stay exactly what the padding rules require (the `Math.max`
-            in `footerStyle` is never reduced below its floor by this
-            margin): the status line draws inside space the bottom padding
-            already reserved for the home-indicator band, where no content
-            sits in the default phases, and the footer's content edge — the
-            line the padding rule measures against — is the secondary
-            button's bottom, unchanged. */}
-        <View className="min-h-5 -mb-5 justify-center">
+            the guardrails and spend-alerts save status), and the negative
+            top margin cancels the container's `gap-3` above it so the band
+            it occupies ends at the footer's bottom edge: the status line
+            draws in the space the bottom padding already reserves for the
+            home-indicator band, and the footer's content edge — the line the
+            padding rules measure against — is the secondary button's bottom,
+            unchanged. */}
+        <View className="min-h-5 -mt-3 justify-center">
           <ConsentLoadStatusLine load={storedLoad} error={error} onRetry={retryStoredLoad} t={t} />
         </View>
       </View>

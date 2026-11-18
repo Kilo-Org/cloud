@@ -20,6 +20,7 @@ import { useOrganization } from '@/lib/organization-context';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { organizationErrorMessage } from '@/lib/server-error-copy';
 import { trpcClient, useTRPC } from '@/lib/trpc';
+import { REWRITTEN_INPUT_AUTO_CORRECT } from '@/lib/input-suggestions';
 
 import { staleOrganizationScopeExit } from './organization-scope-model';
 
@@ -193,6 +194,11 @@ export function CreateOrganizationScreen() {
             className="min-h-[44px] rounded-md border border-input bg-background pl-3 pr-3 text-sm leading-[normal] text-foreground"
             placeholder={t('organization.hub.renamePlaceholder')}
             maxLength={ORGANIZATION_NAME_MAX_LENGTH}
+            // The screen writes the controlled value per keystroke on
+            // Android, so the framework suggestion popup stays off — it
+            // crashes against rewritten text (see
+            // REWRITTEN_INPUT_AUTO_CORRECT).
+            autoCorrect={REWRITTEN_INPUT_AUTO_CORRECT}
             {...textProps}
             autoFocus={Platform.OS !== 'android'}
             editable={!pending}

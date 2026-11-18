@@ -250,7 +250,7 @@ describe('cloudflare-containers creation causes', () => {
       code: 'container_limit_reached',
       message: 'Meter capacity rejection',
     });
-    const warn = vi.spyOn(logger, 'warn');
+    const withFields = vi.spyOn(logger, 'withFields');
     try {
       const error = await cloudflareProvider(admit)
         .create(intent)
@@ -266,9 +266,9 @@ describe('cloudflare-containers creation causes', () => {
         'Container limit reached. Stop an existing container before starting another.'
       );
       expect(admit).toHaveBeenCalledOnce();
-      expect(warn).not.toHaveBeenCalled();
+      expect(withFields).not.toHaveBeenCalled();
     } finally {
-      warn.mockRestore();
+      withFields.mockRestore();
     }
   });
 

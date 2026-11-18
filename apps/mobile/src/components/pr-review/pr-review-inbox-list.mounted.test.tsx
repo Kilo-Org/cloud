@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one suite for the PR-review inbox list and its access states */
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';

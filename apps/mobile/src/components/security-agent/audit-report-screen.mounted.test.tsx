@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one suite for the audit-report screen's loading, retryable and non-retryable states */
 // Audit-report screen state contract: loading shows a skeleton; a network
 // error and a `query_failed` response are retryable (inline error + Retry);
 // the org billing-gate denial (FORBIDDEN/UNAUTHORIZED) is non-retryable with

@@ -251,14 +251,18 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
             disclosure and the Accept button, floating the line away from the
             block it qualifies). The slot keeps its one-line height whenever
             it is mounted (the same reserve as the credits expiry line and
-            the guardrails and spend-alerts save status), and the negative
-            top margin cancels the container's `gap-3` above it so the band
-            it occupies ends at the footer's bottom edge: the status line
-            draws in the space the bottom padding already reserves for the
-            home-indicator band, and the footer's content edge — the line the
-            padding rules measure against — is the secondary button's bottom,
-            unchanged. */}
-        <View className="min-h-5 -mt-3 justify-center">
+            the guardrails and spend-alerts save status), in flow after the
+            container's `gap-3`: the failed phase's Retry overflows its
+            17.5dp line by 5.25dp on each side (`LINE_ACTION_BOX_CLASS`'s
+            `-my-[7px]` on a 28dp box), and that overflow needs the container
+            gap above the row and the footer's bottom padding below it to
+            land inside the footer — a negative margin here would put the
+            Retry's upper hit band under the secondary button's edge and its
+            lower band past the footer's bottom. The 17.5dp band below the
+            secondary button is the reserve; the footer's height changes by
+            nothing across the default phases because the slot never mounts
+            or unmounts. */}
+        <View className="min-h-5 justify-center">
           <ConsentLoadStatusLine load={storedLoad} error={error} onRetry={retryStoredLoad} t={t} />
         </View>
       </View>

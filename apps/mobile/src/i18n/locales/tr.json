@@ -928,9 +928,9 @@
       "offDescription": "Kuruluşun faturalama rollerine sahip kişiler (sahipler, yöneticiler ve faturalama yöneticileri), tamamlanan incelemeleri kaydetmek için istatistikleri web'deki kuruluş ayarlarından açabilir.",
       "couldNotLoad": "İstatistikler yüklenemedi",
       "trackedReviewsCaption": "Bu dönemde istatistikler açıkken tamamlanan incelemeler. Devam eden ve başarısız olan incelemeler hiçbir zaman sayılmaz.",
-      "trackedReviewsUncounted": "Sayılmadı: {{displayCount}} / {{displayTotal}} kuruluşun tamamlanan incelemesi, sonuçları kaydedilmedi.",
-      "trackedReviewsUncounted_one": "Sayılmadı: {{displayCount}} / {{displayTotal}} kuruluşun tamamlanan incelemesi, sonuçları kaydedilmedi.",
-      "trackedReviewsUncounted_other": "Sayılmadı: {{displayCount}} / {{displayTotal}} kuruluşun tamamlanan incelemesi, sonuçları kaydedilmedi."
+      "trackedReviewsUncounted": "Sayılmadı: kuruluşun tamamlanan {{displayTotal}} incelemesinden {{displayCount}} tanesinin sonucu kaydedilmedi.",
+      "trackedReviewsUncounted_one": "Sayılmadı: kuruluşun tamamlanan {{displayTotal}} incelemesinden {{displayCount}} tanesinin sonucu kaydedilmedi.",
+      "trackedReviewsUncounted_other": "Sayılmadı: kuruluşun tamamlanan {{displayTotal}} incelemesinden {{displayCount}} tanesinin sonucu kaydedilmedi."
     },
     "council": {
       "title": "Konsey incelemesi",

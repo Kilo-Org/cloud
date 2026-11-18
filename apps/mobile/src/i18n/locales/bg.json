@@ -1471,9 +1471,9 @@
       "offDescription": "Ролите за фактуриране на организацията могат да активират анализите в настройките на организацията в уеб, за да записват завършените прегледи.",
       "couldNotLoad": "Анализите не можаха да се заредят",
       "trackedReviewsCaption": "Завършени прегледи, приключили в този период, докато анализите бяха активирани. Текущите и неуспешните прегледи никога не се броят.",
-      "trackedReviewsUncounted": "Непреброени: {{displayCount}} от {{displayTotal}} приключили прегледа на организацията с незаписан резултат.",
-      "trackedReviewsUncounted_one": "Непреброени: {{displayCount}} от {{displayTotal}} приключили прегледа на организацията с незаписан резултат.",
-      "trackedReviewsUncounted_other": "Непреброени: {{displayCount}} от {{displayTotal}} приключили прегледа на организацията с незаписан резултат."
+      "trackedReviewsUncounted": "Непреброени: {{displayCount}} от {{displayTotal}} приключили прегледи на организацията без записан резултат.",
+      "trackedReviewsUncounted_one": "Непреброени: {{displayCount}} от {{displayTotal}} приключили прегледи на организацията без записан резултат.",
+      "trackedReviewsUncounted_other": "Непреброени: {{displayCount}} от {{displayTotal}} приключили прегледи на организацията без записан резултат."
     },
     "council": {
       "title": "Преглед от съвет",

@@ -6416,12 +6416,29 @@
             "sessionId": {
               "type": "string",
               "minLength": 1
+            },
+            "position": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
             }
           },
           "required": [
             "createdAt",
             "sessionId"
           ]
+        },
+        "tabState": {
+          "type": "string",
+          "enum": [
+            "open",
+            "closed"
+          ]
+        },
+        "sessionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
         }
       },
       "required": [
@@ -6435,9 +6452,11 @@
       "worktreeid",
       "organizationid",
       "limit",
-      "cursor"
+      "cursor",
+      "tabstate",
+      "sessionid"
     ],
-    "searchBlob": "cliSessionsV2.workspaceChats List the chat sessions belonging to a single workspace with cursor-based pagination for older chats. clisessionsv2 workspacechats worktreeid organizationid limit cursor worktreeId organizationId limit cursor"
+    "searchBlob": "cliSessionsV2.workspaceChats List the chat sessions belonging to a single workspace with cursor-based pagination for older chats. clisessionsv2 workspacechats worktreeid organizationid limit cursor tabstate sessionid worktreeId organizationId limit cursor tabState sessionId"
   },
   "cliSessionsV2.workspaceSummaries": {
     "path": "cliSessionsV2.workspaceSummaries",

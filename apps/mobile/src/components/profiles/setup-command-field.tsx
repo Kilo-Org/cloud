@@ -12,6 +12,7 @@ import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { INPUT_BOX_SHAPE_CLASS } from '@/components/ui/input';
 import { SelectableText } from '@/components/ui/selectable-text';
 import { Text } from '@/components/ui/text';
+import { codeFieldTextStyle, hasRtlScript, withoutMonoFamily } from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
 
 type SetupCommandFieldProps = Readonly<{
@@ -75,7 +76,8 @@ export function SetupCommandField({
           <SelectableText
             accessibilityLabel={label}
             accessibilityHint={accessibilityHint}
-            className="text-sm leading-[1.25rem] text-foreground"
+            className="font-mono text-sm leading-[1.25rem] text-foreground"
+            style={codeFieldTextStyle()}
           >
             {command}
           </SelectableText>
@@ -89,6 +91,12 @@ export function SetupCommandField({
   // is none. At zero the count would only restate the sentence below it.
   const showsCounter = !disabled && remaining > 0 && remaining <= COMMAND_COUNTER_VISIBLE_REMAINING;
   const showsBound = !disabled && remaining <= 0;
+  // A shell command is code: mono, on its own left edge, whatever the interface
+  // direction. The mono family ships no right-to-left glyphs, so a localized
+  // placeholder in that script keeps the interface font (the rule `Text` uses);
+  // the command a person types is Latin either way.
+  const placeholder = t('profiles.commandPlaceholder');
+  const monoClass = hasRtlScript(placeholder) ? withoutMonoFamily('font-mono') : 'font-mono';
 
   return (
     <View className="gap-1.5">
@@ -96,7 +104,9 @@ export function SetupCommandField({
         label={label}
         labelAccessory={trailing}
         defaultValue={command}
-        placeholder={t('profiles.commandPlaceholder')}
+        placeholder={placeholder}
+        className={monoClass}
+        style={codeFieldTextStyle()}
         maxLength={MAX_SETUP_COMMAND_LENGTH}
         autoCapitalize="none"
         autoCorrect={false}

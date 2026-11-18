@@ -103,7 +103,13 @@ describe('BYOK endpoints', () => {
   let organization: Organization;
   let otherOrganization: Organization;
   let restoreFetch: (() => void) | undefined;
-  const originalTargetEnv = process.env.VERCEL_TARGET_ENV;
+  const originalNodeEnv = process.env.NODE_ENV;
+  /** The upstream URL policy applies outside development and tests (`isUpstreamUrlPolicyEnforced`). */
+  const setNodeEnv = (value: string | undefined) => {
+    const env: Record<string, string | undefined> = process.env;
+    if (value === undefined) delete env.NODE_ENV;
+    else env.NODE_ENV = value;
+  };
 
   beforeAll(async () => {
     owner = await insertTestUser({ google_user_email: 'byok-endpoint-owner@example.com' });
@@ -120,13 +126,13 @@ describe('BYOK endpoints', () => {
     restoreFetch?.();
     restoreFetch = undefined;
     afterEndpointUrlCheck = undefined;
-    process.env.VERCEL_TARGET_ENV = originalTargetEnv;
+    setNodeEnv(originalNodeEnv);
     await db.delete(byok_api_keys).where(eq(byok_api_keys.organization_id, organization.id));
     await db.delete(byok_api_keys).where(eq(byok_api_keys.organization_id, otherOrganization.id));
   });
 
   afterAll(async () => {
-    process.env.VERCEL_TARGET_ENV = originalTargetEnv;
+    setNodeEnv(originalNodeEnv);
     await db.delete(ai_gateway_config).where(eq(ai_gateway_config.id, 1));
   });
 
@@ -282,7 +288,7 @@ describe('BYOK endpoints', () => {
       ['http://llm.example.com/v1', 'The endpoint URL must use HTTPS.'],
       ['https://127.0.0.1/v1', 'The endpoint URL must point to a public host.'],
     ])('rejects %s where the URL policy applies', async (base_url, message) => {
-      process.env.VERCEL_TARGET_ENV = 'production';
+      setNodeEnv('production');
       await expect(createEndpoint({ ...DEFINITION, base_url })).rejects.toThrow(message);
     });
 

@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { skipToken, useInfiniteQuery } from '@tanstack/react-query';
+import { TRPCClientError } from '@trpc/client';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
 import type { StoredSession } from '../types';
@@ -16,11 +17,20 @@ export type ChatTabPages = {
   loadMore: () => void;
 };
 
+function tabOrderChanged(error: unknown): boolean {
+  return error instanceof TRPCClientError && error.data?.code === 'CONFLICT';
+}
+
+function retryChatPage(failureCount: number, error: unknown): boolean {
+  return !tabOrderChanged(error) && failureCount < 3;
+}
+
 function useChatTabPages(
   {
     hasNextPage,
     isFetching,
     isError,
+    error,
     data,
     fetchNextPage,
     refetch,
@@ -28,11 +38,12 @@ function useChatTabPages(
   enabled = true
 ): ChatTabPages {
   const hasData = data !== undefined;
+  const restartPaging = tabOrderChanged(error);
   const loadMore = useCallback(() => {
     if (!enabled || isFetching) return;
-    if (hasData && hasNextPage) void fetchNextPage();
+    if (hasData && hasNextPage && !restartPaging) void fetchNextPage();
     else void refetch();
-  }, [enabled, fetchNextPage, hasData, hasNextPage, isFetching, refetch]);
+  }, [enabled, fetchNextPage, hasData, hasNextPage, isFetching, refetch, restartPaging]);
 
   return useMemo(
     () => ({ hasMore: hasNextPage, loading: !enabled || isFetching, error: isError, loadMore }),
@@ -77,6 +88,7 @@ export function useWorkspaceChats({
       { getNextPageParam: page => page.nextCursor ?? undefined }
     ),
     staleTime: 5_000,
+    retry: retryChatPage,
   });
   const closed = useInfiniteQuery({
     ...trpc.cliSessionsV2.workspaceChats.infiniteQueryOptions(
@@ -85,6 +97,7 @@ export function useWorkspaceChats({
     ),
     enabled: historyRequested,
     staleTime: 5_000,
+    retry: retryChatPage,
   });
   const currentInOpen = open.data?.pages.some(page =>
     page.chats.some(chat => chat.sessionId === currentSessionId)

@@ -968,6 +968,50 @@ describe('cliSessionsV2 workspace read model', () => {
     expect(tabs.chats[0]?.sessionStatusUpdatedAt).toBe('2026-04-29T01:16:12.945Z');
   });
 
+  it('rejects stale tab cursors after a close or reopen and pages in the new order', async () => {
+    const worktree = worktreeId();
+    const [a, b, c, d] = ['ses_a', 'ses_b', 'ses_c', 'ses_d'] as const;
+    await insertWorkspace(
+      [a, b, c, d].map(id => makeSession(id, worktree)),
+      {
+        tab_order: [a, b],
+        closed_session_ids: [c, d],
+      }
+    );
+    const caller = sessionCaller();
+    const scope = { organizationId: null, worktreeId: worktree, limit: 1 };
+    const open = { ...scope, tabState: 'open' as const };
+    const closed = { ...scope, tabState: 'closed' as const };
+    const initialClosed = await caller.workspaceChats(closed);
+    expect(initialClosed.nextCursor).not.toBeNull();
+
+    await caller.closeWorkspaceTab({ ...scope, sessionId: b });
+    await expect(
+      caller.workspaceChats({ ...closed, cursor: initialClosed.nextCursor ?? undefined })
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
+
+    const afterClose = await caller.workspaceChats(closed);
+    expect(afterClose.chats.map(chat => chat.sessionId)).toEqual([b]);
+    const next = await caller.workspaceChats({
+      ...closed,
+      cursor: afterClose.nextCursor ?? undefined,
+    });
+    expect(next.chats.map(chat => chat.sessionId)).toEqual([c]);
+
+    await caller.reopenWorkspaceTab({ ...scope, sessionId: b });
+    await expect(
+      caller.workspaceChats({ ...closed, cursor: next.nextCursor ?? undefined })
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
+
+    const initialOpen = await caller.workspaceChats(open);
+    expect(initialOpen.nextCursor).not.toBeNull();
+    await caller.reorderWorkspaceTab({ ...scope, sessionId: b, beforeSessionId: a });
+    await expect(
+      caller.workspaceChats({ ...open, cursor: initialOpen.nextCursor ?? undefined })
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
+    expect((await caller.workspaceChats(open)).chats.map(chat => chat.sessionId)).toEqual([b]);
+  });
+
   it('pages all open and closed tabs independently without changing persisted tab state', async () => {
     const worktree = worktreeId();
     const openIds = Array.from(
@@ -995,7 +1039,10 @@ describe('cliSessionsV2 workspace read model', () => {
         tabState: 'open',
         cursor: { createdAt: '2026-04-29T01:16:12.945Z', sessionId: openIds[0] },
       })
-    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: expect.stringContaining('position') });
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: expect.stringContaining('tabOrderVersion'),
+    });
     const more = await caller.workspaceChats({
       ...scope,
       tabState: 'open',

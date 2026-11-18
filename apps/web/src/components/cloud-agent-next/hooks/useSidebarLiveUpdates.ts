@@ -252,21 +252,26 @@ export function useSidebarLiveUpdates(options: Options): void {
 
   useEffect(() => {
     if (!connection) return;
-    const refreshTabs = (worktreeId: string) => {
-      void queryClient.invalidateQueries(
-        {
-          ...trpc.cliSessionsV2.workspaceChats.pathFilter(),
-          predicate: query => {
-            const input = sidebarQueryInput(query.queryKey);
-            return (
-              input?.organizationId === current.current.organizationId &&
-              input?.worktreeId === worktreeId
-            );
+    const tabRefresh = createWorkspaceRefreshCoordinator(
+      async ids => {
+        const worktreeIds = new Set(ids);
+        await queryClient.invalidateQueries(
+          {
+            ...trpc.cliSessionsV2.workspaceChats.pathFilter(),
+            predicate: query => {
+              const input = sidebarQueryInput(query.queryKey);
+              return (
+                input?.organizationId === options.organizationId &&
+                typeof input?.worktreeId === 'string' &&
+                worktreeIds.has(input.worktreeId)
+              );
+            },
           },
-        },
-        { cancelRefetch: false }
-      );
-    };
+          { cancelRefetch: false }
+        );
+      },
+      () => undefined
+    );
     const refreshSessionWorkspace = (sessionId: string, worktreeId?: string | null) => {
       const scope = current.current;
       const hasSession = (workspace: WorkspaceSummary) =>
@@ -400,7 +405,7 @@ export function useSidebarLiveUpdates(options: Options): void {
     const unsubscribe = [
       connection.onSessionEvent('workspace.updated', event => {
         refresh.current?.schedule(event.worktreeId);
-        refreshTabs(event.worktreeId);
+        tabRefresh.schedule(event.worktreeId);
       }),
       connection.onSessionEvent('session.created', event => {
         patchRow(event.session, true);
@@ -409,7 +414,7 @@ export function useSidebarLiveUpdates(options: Options): void {
           event.session.worktreeId &&
           !event.session.parentSessionId
         )
-          refreshTabs(event.session.worktreeId);
+          tabRefresh.schedule(event.session.worktreeId);
         if (matchesRow(event.session, current.current)) refreshRepositories();
       }),
       connection.onSessionEvent('session.updated', event => {
@@ -524,7 +529,7 @@ export function useSidebarLiveUpdates(options: Options): void {
         if (event.organizationId !== scope.organizationId) return;
         if (!event.parentSessionId) {
           const worktreeId = refreshSessionWorkspace(event.sessionId, event.worktreeId);
-          if (worktreeId) refreshTabs(worktreeId);
+          if (worktreeId) tabRefresh.schedule(worktreeId);
         }
         queryClient.setQueryData<Outputs['list']>(
           trpc.cliSessionsV2.list.queryKey(scope.listInput),
@@ -589,8 +594,11 @@ export function useSidebarLiveUpdates(options: Options): void {
           );
       }),
     ];
-    return () => unsubscribe.forEach(dispose => dispose());
-  }, [connection, queryClient, refresh, trpc]);
+    return () => {
+      tabRefresh.dispose();
+      unsubscribe.forEach(dispose => dispose());
+    };
+  }, [connection, options.organizationId, queryClient, refresh, trpc]);
 
   const pollAt = useRef(new Map<string, number>());
   useEffect(() => {

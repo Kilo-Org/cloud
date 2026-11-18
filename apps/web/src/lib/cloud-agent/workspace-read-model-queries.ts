@@ -4,6 +4,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { cloud_agent_worktrees } from '@kilocode/db/schema';
 import { activeOrganizationAccessSql } from '@kilocode/worker-utils/organization-membership';
 import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
+import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { normalizeGitUrl } from '@/lib/integrations/platforms/github/normalize-git-url';
 import { MAX_STACK_ANCESTRY } from '@/components/cloud-agent-next/workspace-stacks';
@@ -418,37 +419,62 @@ export async function readWorkspaceChatPage(
   input: {
     worktreeId: string;
     limit: number;
-    cursor?: { createdAt: string; sessionId: string; position?: number };
+    cursor?: { createdAt: string; sessionId: string; tabOrderVersion?: string };
     tabState?: 'open' | 'closed';
     sessionId?: string;
   }
 ) {
-  const position =
-    input.tabState === 'closed'
-      ? sql`array_position(w.closed_session_ids, s.session_id)`
-      : input.tabState === 'open'
-        ? sql`coalesce(array_position(w.tab_order, s.session_id), 2147483647)`
+  const { cursor, tabState } = input;
+  const tabPosition = (sessionId: SQL) =>
+    tabState === 'closed'
+      ? sql`array_position(w.closed_session_ids, ${sessionId})`
+      : tabState === 'open'
+        ? sql`coalesce(array_position(w.tab_order, ${sessionId}), 2147483647)`
         : sql`0`;
+  const position = tabPosition(sql`s.session_id`);
+  const tabOrderVersion =
+    tabState === 'closed'
+      ? sql`md5(jsonb_build_array(w.worktree_id, w.closed_session_ids)::text)`
+      : tabState === 'open'
+        ? sql`md5(jsonb_build_array(w.worktree_id, w.closed_session_ids, w.tab_order)::text)`
+        : sql`NULL::text`;
   const { rows } = await db.execute(sql`WITH scoped_workspaces AS (${scopedDirectory(scope)})
-    SELECT ${chatJson} || jsonb_build_object('tabClosed', ${chatIsClosed}) AS chat,
-      ${position} AS position,
-      to_char(s.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS "cursorCreatedAt"
-    FROM cli_sessions_v2 s
-    INNER JOIN scoped_workspaces w ON ${workspaceChatMembership}
+    SELECT ${tabOrderVersion} AS "tabOrderVersion", to_jsonb(page) AS item
+    FROM scoped_workspaces w
+    LEFT JOIN LATERAL (
+      SELECT ${chatJson} || jsonb_build_object('tabClosed', ${chatIsClosed}) AS chat,
+        ${position} AS position, s.created_at, s.session_id,
+        to_char(s.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS "cursorCreatedAt"
+      FROM cli_sessions_v2 s
+      WHERE ${workspaceChatMembership}
+        AND ${tabState === 'closed' ? chatIsClosed : tabState === 'open' ? sql`NOT (${chatIsClosed})` : sql`true`}
+        AND ${input.sessionId ? sql`s.session_id = ${input.sessionId}` : sql`true`}
+        AND ${cursor ? sql`(${position}, s.created_at, s.session_id) > (${tabPosition(sql`${cursor.sessionId}::text`)}, ${cursor.createdAt}::timestamptz, ${cursor.sessionId})` : sql`true`}
+      ORDER BY position, s.created_at, s.session_id LIMIT ${input.limit + 1}
+    ) page ON true
     WHERE w.worktree_id = ${input.worktreeId}
-      AND ${input.tabState === 'closed' ? chatIsClosed : input.tabState === 'open' ? sql`NOT (${chatIsClosed})` : sql`true`}
-      AND ${input.sessionId ? sql`s.session_id = ${input.sessionId}` : sql`true`}
-      AND ${input.cursor ? sql`(${position}, s.created_at, s.session_id) > (${input.cursor.position ?? 0}::int, ${input.cursor.createdAt}::timestamptz, ${input.cursor.sessionId})` : sql`true`}
-    ORDER BY position, s.created_at, s.session_id LIMIT ${input.limit + 1}`);
-  const parsed = z
+    ORDER BY page.position, page.created_at, page.session_id`);
+  const parsedRows = z
     .array(
       z.object({
-        chat: workspaceChatSummarySchema.extend({ tabClosed: z.boolean() }),
-        cursorCreatedAt: z.iso.datetime(),
-        position: z.number(),
+        tabOrderVersion: z.string().nullable(),
+        item: z
+          .object({
+            chat: workspaceChatSummarySchema.extend({ tabClosed: z.boolean() }),
+            cursorCreatedAt: z.iso.datetime(),
+          })
+          .nullable(),
       })
     )
     .parse(rows);
+  const version = parsedRows[0]?.tabOrderVersion;
+  if (tabState && cursor && version && cursor.tabOrderVersion !== version) {
+    throw new TRPCError({
+      code: 'CONFLICT',
+      message: 'Workspace tabs changed. Start paging again without a cursor.',
+    });
+  }
+  const parsed = parsedRows.flatMap(row => (row.item ? [row.item] : []));
   const hasMore = parsed.length > input.limit;
   const page = hasMore ? parsed.slice(0, input.limit) : parsed;
   const last = page.at(-1);
@@ -459,7 +485,7 @@ export async function readWorkspaceChatPage(
         ? {
             createdAt: last.cursorCreatedAt,
             sessionId: last.chat.sessionId,
-            ...(input.tabState ? { position: last.position } : {}),
+            ...(version ? { tabOrderVersion: version } : {}),
           }
         : null,
   };

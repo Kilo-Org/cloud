@@ -407,6 +407,15 @@ describe('useSidebarLiveUpdates', () => {
     };
     const lookupKey = mockTrpc.cliSessionsV2.workspaceSummaries.queryKey(lookupInput);
     queryClient.setQueryData(lookupKey, { workspaces: [first] });
+    const chatsInput = { organizationId: ORGANIZATION, worktreeId: WORKTREE_A };
+    observe('workspaceChats', chatsInput, chatPages(), true);
+    observe(
+      'workspaceChats',
+      { ...chatsInput, organizationId: OTHER_ORGANIZATION },
+      chatPages(),
+      true
+    );
+    mockNetwork.workspaceChats.mockResolvedValue(chatPages());
     mockNetwork.workspaceSummaries.mockResolvedValue({
       workspaces: [
         { ...first, name: 'Updated first' },
@@ -417,14 +426,20 @@ describe('useSidebarLiveUpdates', () => {
     await act(async () => {
       emitStatus('full', 'busy', NEWER);
       emit('workspace.updated', { worktreeId: WORKTREE_A });
+    });
+    await advance(50);
+    await act(async () => {
       emit('workspace.updated', { worktreeId: WORKTREE_A });
       emit('workspace.updated', { worktreeId: WORKTREE_B });
     });
     expect(queryClient.getQueryData(listKey)).toMatchObject({ cliSessions: [{ status: 'busy' }] });
-    await advance(299);
+    await advance(249);
     expect(mockNetwork.workspaceSummaries).not.toHaveBeenCalled();
+    expect(mockNetwork.workspaceChats).not.toHaveBeenCalled();
     await advance(1);
     expect(mockNetwork.workspaceSummaries).toHaveBeenCalledTimes(1);
+    expect(mockNetwork.workspaceChats).toHaveBeenCalledTimes(1);
+    expect(mockNetwork.workspaceChats).toHaveBeenCalledWith(chatsInput);
     expect(mockNetwork.workspaceSummaries).toHaveBeenCalledWith({
       organizationId: ORGANIZATION,
       worktreeIds: [WORKTREE_A, WORKTREE_B],

@@ -596,14 +596,20 @@ const WorkspaceChatsInputSchema = WorktreeInputSchema.extend({
     .object({
       createdAt: z.iso.datetime(),
       sessionId: z.string().min(1),
-      position: z.number().int().min(1).max(2147483647).optional(),
+      tabOrderVersion: z
+        .string()
+        .regex(/^[a-f0-9]{32}$/)
+        .optional(),
     })
+    .describe(
+      'Pass nextCursor unchanged. With tabState, tabOrderVersion is required. On CONFLICT, restart without a cursor.'
+    )
     .optional(),
   tabState: z.enum(['open', 'closed']).optional(),
   sessionId: z.string().min(1).max(200).optional(),
-}).refine(({ tabState, cursor }) => !tabState || !cursor || cursor.position !== undefined, {
-  path: ['cursor', 'position'],
-  message: 'Tab pagination requires the position from nextCursor',
+}).refine(({ tabState, cursor }) => !tabState || !cursor || cursor.tabOrderVersion !== undefined, {
+  path: ['cursor', 'tabOrderVersion'],
+  message: 'Tab pagination requires the tabOrderVersion from nextCursor',
 });
 const ListSessionsInputSchema = z.object({
   cursor: z.iso.datetime().optional(),

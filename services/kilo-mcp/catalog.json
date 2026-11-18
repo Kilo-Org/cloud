@@ -6378,7 +6378,7 @@
   "cliSessionsV2.workspaceChats": {
     "path": "cliSessionsV2.workspaceChats",
     "kind": "query",
-    "summary": "List the chat sessions belonging to a single workspace with cursor-based pagination for older chats.",
+    "summary": "List chats in a workspace. Pass nextCursor unchanged when requesting another page; tabState requires the cursor's tabOrderVersion. On CONFLICT, restart without a cursor.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -6417,16 +6417,16 @@
               "type": "string",
               "minLength": 1
             },
-            "position": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 2147483647
+            "tabOrderVersion": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{32}$"
             }
           },
           "required": [
             "createdAt",
             "sessionId"
-          ]
+          ],
+          "description": "Pass nextCursor unchanged. With tabState, tabOrderVersion is required. On CONFLICT, restart without a cursor."
         },
         "tabState": {
           "type": "string",
@@ -6456,7 +6456,7 @@
       "tabstate",
       "sessionid"
     ],
-    "searchBlob": "cliSessionsV2.workspaceChats List the chat sessions belonging to a single workspace with cursor-based pagination for older chats. clisessionsv2 workspacechats worktreeid organizationid limit cursor tabstate sessionid worktreeId organizationId limit cursor tabState sessionId"
+    "searchBlob": "cliSessionsV2.workspaceChats List chats in a workspace. Pass nextCursor unchanged when requesting another page; tabState requires the cursor's tabOrderVersion. On CONFLICT, restart without a cursor. clisessionsv2 workspacechats worktreeid organizationid limit cursor tabstate sessionid worktreeId organizationId limit cursor tabState sessionId"
   },
   "cliSessionsV2.workspaceSummaries": {
     "path": "cliSessionsV2.workspaceSummaries",

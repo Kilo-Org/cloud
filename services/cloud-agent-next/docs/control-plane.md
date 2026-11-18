@@ -804,6 +804,7 @@ keep environment snapshots and existing history/worktree recovery.
   always restore on demand, so history-only warmup cannot suppress their saved file patches.
   Cancelling a caller stops its wait immediately, but its import lock remains until the underlying
   harness open settles. A queued requested open keeps its own inputs and cancellation deadline.
+
 - **Diagnostics and retention.** Existing diagnostics report workspace, requesting session,
   allocation, capture time, selected source and skip/fallback reason. They never log handles,
   credentials or file contents. Replacing a descriptor makes the previous artifact unselectable;
@@ -2186,6 +2187,7 @@ Request and response bodies stream; there is no body-size cap.
   change: it shows the preview button once the Worker reports preview as enabled. The `kilo serve`
   password is in the wrapper, so ship a sandbox image with it before you enable preview; an older
   image leaves `kilo serve` open to a preview of its port.
+
 #### Preview tunnel (`wrapper-tunnel`)
 
 A provider without a private network path to its sandbox (today Vercel) reaches the dev server
@@ -2563,6 +2565,7 @@ A new preparation after stop creates a contained allocation. Sessions retain the
 Earlier branch work recorded live Vercel identity and GitHub checks.
 The shared admission refactor has local tests only; those earlier checks do not verify this change.
 Maximum payload and duration compatibility still require verification before production rollout.
+
 ## Customer billing schema maintenance
 
 The customer billing schema owner is `packages/session-ingest-contracts/src/cloud-agent-billing.ts`.
@@ -2574,3 +2577,15 @@ cp packages/session-ingest-contracts/src/cloud-agent-billing.ts services/cloud-a
 ```
 
 The mirror test requires exact source equality. Verify the standalone Docker wrapper build after schema changes.
+
+### Containers allowlist and runtime facade
+
+New Containers allowlist allocations include the Worker runtime facade, Session Sync, and required repository hosts.
+Model, backend, and ingest upstreams remain behind the Worker facade. The wrapper receives a bound proxy handle before preparation.
+A legacy grant fails with `credential_upgrade_required`. A failed handle mint sends no prepare frame and fails workspace preparation.
+
+An active allocation keeps its exact persisted allowlist. `matchesActiveEgressPolicy` recognizes the previous direct-upstream baseline
+only when the requested destinations and audit setting are unchanged. It never broadens or rewrites the active pin.
+The next allocation uses the facade baseline after the previous allocation stops.
+Remove this compatibility comparison only after every pre-facade allocation is confirmed stopped, including hibernated Durable Objects.
+A release age or a successful new allocation does not prove that condition.

@@ -3,6 +3,11 @@
  *
  * A missing segment is 0. A non-numeric segment is also 0 (NaN coerced to 0).
  * Returns true when `current` is below `minimum`; false when equal or above.
+ *
+ * This cap at three segments is deliberate: its callers compare store minimums
+ * (`force-update-policy`, `min-version`), which are always three-segment
+ * release versions. For the unbounded comparator used by the feature-flag and
+ * Android channel gates, see `compareAppVersions` below.
  */
 export function isVersionBelow(current: string, minimum: string): boolean {
   const currentParts = current.split('.').map(Number);
@@ -28,6 +33,11 @@ function toSegment(value: number | undefined): number {
 /**
  * Compare dotted numeric version strings (`1.10.0` > `1.9.9`, missing
  * segments count as zero). Returns <0, 0, or >0 like `strcmp`.
+ *
+ * Unlike `isVersionBelow`, this walks every segment with no cap, so a
+ * four-segment or suffixed version never silently matches a three-segment
+ * one. Used by the feature-flag and Android channel gates, which classify
+ * recorded client builds rather than store minimums.
  */
 export function compareAppVersions(a: string, b: string): number {
   const left = a.split('.').map(segment => Number.parseInt(segment, 10) || 0);

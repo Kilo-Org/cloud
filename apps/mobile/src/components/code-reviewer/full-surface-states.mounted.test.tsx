@@ -41,6 +41,7 @@ const state = vi.hoisted(() => ({
   insets: { left: 0, right: 0 },
   platform: 'gitlab',
   connected: false,
+  connectivity: 'online' as 'online' | 'offline' | 'unknown',
   githubError: false,
   githubStaleError: false,
   gitlabError: false,
@@ -220,7 +221,7 @@ vi.mock('@/lib/trpc', () => ({
   }),
 }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
-  useCommittedConnectivityStatus: () => 'online',
+  useCommittedConnectivityStatus: () => state.connectivity,
 }));
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   isPersonal: (scope: string) => scope === 'personal',
@@ -301,6 +302,7 @@ beforeEach(() => {
   state.insets.right = 0;
   state.platform = 'gitlab';
   state.connected = false;
+  state.connectivity = 'online';
   state.githubError = false;
   state.githubStaleError = false;
   state.gitlabError = false;
@@ -718,6 +720,59 @@ describe('Recent review bodies', () => {
     const header = listHeaderNotice(renderer);
     expect(header.props.variant).toBe('offline');
     expect(header.props.isRetrying).toBe(true);
+    unmount();
+  });
+
+  it('shows the retryable offline state instead of an empty list when the first read is paused', async () => {
+    // A paused read settles into no branch of a body switch keyed on
+    // `isLoading`/`isError`/`data`: the screen painted an empty FlashList
+    // forever (finding). Connectivity confirmed names the pause offline with
+    // Retry instead of a list with no rows.
+    state.reviews.data = undefined;
+    state.reviews.fetchStatus = 'paused';
+    state.connectivity = 'offline';
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: 'personal' })
+    );
+    const error = renderer.root.find(node => String(node.type) === 'QueryError');
+    expect(error.props.variant).toBe('offline');
+    expect(error.props.title).toBe('Failed to load');
+    expect(typeof error.props.onRetry).toBe('function');
+    expect(renderer.root.findAll(node => String(node.type) === 'FlashList')).toHaveLength(0);
+    unmount();
+  });
+
+  it('keeps the skeleton while a first read is paused with connectivity unsettled', async () => {
+    // The pause is real but the probe has not confirmed offline yet, so the
+    // shared classifier keeps it in loading and the screen keeps its skeleton.
+    state.reviews.data = undefined;
+    state.reviews.fetchStatus = 'paused';
+    state.connectivity = 'unknown';
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: 'personal' })
+    );
+    expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).not.toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'FlashList')).toHaveLength(0);
+    unmount();
+  });
+
+  it('raises the offline notice above the empty state of a cached empty list', async () => {
+    // Data present with zero rows is a settled answer, so the empty state
+    // paints — but the refresh that would fill it is paused, and "no reviews"
+    // must not pose as current without the notice and its Retry above it.
+    state.reviews.data = { pages: [{ success: true, reviews: [] }], pageParams: [0] };
+    state.reviews.fetchStatus = 'paused';
+    state.connectivity = 'offline';
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: 'personal' })
+    );
+    const empty = renderer.root.find(node => String(node.type) === 'EmptyState');
+    expect(empty.props.title).toBe('No reviews yet');
+    const notices = renderer.root.findAll(node => String(node.type) === 'QueryError');
+    expect(notices).toHaveLength(1);
+    expect(notices[0]?.props.variant).toBe('offline');
+    expect(notices[0]?.props.placement).toBe('top');
     unmount();
   });
 

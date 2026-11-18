@@ -306,7 +306,7 @@ test(
 test(
   'breakPane creates the window in the requested session when a real foreign client is attached',
   { skip: !hasTmux || !hasScript },
-  () => {
+  async t => {
     const sessionName = `kilo-tmux-test-${process.pid}-${Date.now()}`;
     const decoySession = `kilo-tmux-test-decoy-${process.pid}-${Date.now()}`;
     const serviceName = 'nextjs';
@@ -325,22 +325,40 @@ test(
     const {
       TMUX: _childTmux,
       TMUX_PANE: _childTmuxPane,
+      TERM: _childTerm,
       ...childEnv
     } = process.env as Record<string, string | undefined>;
-    childEnv.TERM = process.env.TERM ?? 'xterm-256color';
+    // tmux refuses to attach over a terminal without the `clear` capability
+    // ("open terminal failed: terminal does not support clear"), and CI
+    // runners hand this process values such as `dumb` that cannot show it.
+    // The pty script(1) opens is the test's own terminal, so it declares one
+    // tmux always knows instead of inheriting the caller's.
+    childEnv.TERM = 'xterm-256color';
 
     const clientProc =
       process.platform === 'darwin'
         ? spawn(
             'script',
             ['-q', '/dev/null', 'tmux', 'new-session', '-s', decoySession, 'sleep', '999'],
-            { stdio: 'ignore', env: childEnv }
+            { stdio: ['ignore', 'pipe', 'pipe'], env: childEnv }
           )
         : spawn(
             'script',
             ['-q', '-c', `tmux new-session -s ${decoySession} sleep 999`, '/dev/null'],
-            { stdio: 'ignore', env: childEnv }
+            { stdio: ['ignore', 'pipe', 'pipe'], env: childEnv }
           );
+
+    // The tmux client writes its refusal to the pty it could not open, which
+    // script(1) forwards on its stdout, so both streams are read here: a client
+    // that never attaches then names its reason instead of leaving the wait
+    // below silent.
+    let clientOutput = '';
+    for (const stream of [clientProc.stdout, clientProc.stderr]) {
+      stream?.setEncoding('utf-8');
+      stream?.on('data', (chunk: string) => {
+        clientOutput += chunk;
+      });
+    }
 
     const savedTmux = process.env.TMUX;
     try {
@@ -359,9 +377,20 @@ test(
         } catch {
           // Session not yet visible.
         }
-        if (!clientReady) execFileSync('sleep', ['0.1']);
+        if (!clientReady) await sleep(100);
       }
-      assert.ok(clientReady, 'decoy session must have an attached client');
+      if (!clientReady) {
+        // Give the client's pending output one tick to arrive before quoting it.
+        await sleep(50);
+        // The scenario needs an actually attached client; a host that cannot
+        // give tmux one through script(1) (no pty, or a terminal tmux cannot
+        // open) cannot pose it.  Skip with what the client said rather than
+        // failing every branch on such a runner.
+        t.skip(
+          `no tmux client attached through script(1): ${clientOutput.trim() || 'no output from script'}`
+        );
+        return;
+      }
 
       // Point child tmux commands at the decoy session.  The trailing colon
       // is required: display-message -t =<session> without it returns no ID.

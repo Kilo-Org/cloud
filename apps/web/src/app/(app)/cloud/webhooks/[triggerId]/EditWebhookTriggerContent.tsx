@@ -457,6 +457,9 @@ export function EditWebhookTriggerContent({
               size="sm"
               disabled={isActionPending}
               onClick={() => {
+                if (!window.confirm('Pause this trigger? Unsaved changes will be discarded.')) {
+                  return;
+                }
                 void updateTrigger({ triggerId, organizationId, isActive: false }).catch(
                   () => undefined
                 );

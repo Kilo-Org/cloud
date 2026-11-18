@@ -218,7 +218,20 @@ describe('EditWebhookTriggerContent save and invoke', () => {
       element => element.textContent === 'Pause trigger'
     );
     if (!button) throw new Error('Pause trigger button missing');
-    await act(async () => button.click());
+    const confirm = jest.fn().mockReturnValueOnce(false).mockReturnValueOnce(true);
+    const originalConfirm = Object.getOwnPropertyDescriptor(window, 'confirm');
+    Object.defineProperty(window, 'confirm', { configurable: true, value: confirm });
+    try {
+      await act(async () => button.click());
+      expect(updateMutation).not.toHaveBeenCalled();
+      expect(confirm).toHaveBeenCalledWith(
+        'Pause this trigger? Unsaved changes will be discarded.'
+      );
+      await act(async () => button.click());
+    } finally {
+      if (originalConfirm) Object.defineProperty(window, 'confirm', originalConfirm);
+      else Reflect.deleteProperty(window, 'confirm');
+    }
     expect(updateMutation).toHaveBeenCalledWith({
       triggerId: 'daily-report',
       organizationId: 'org-1',

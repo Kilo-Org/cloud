@@ -189,7 +189,19 @@ export type BrowserToolResolvedTarget =
       readonly kind: 'selector';
       readonly nodeId: number;
       readonly selector: string;
+    }
+  | {
+      /** The selector parses, but matches several elements: a target must be unique. */
+      readonly kind: 'ambiguous';
+      readonly matches: number;
+      readonly selector: string;
     };
+
+/** A target that can be acted on: an ambiguous selector has no element to act on. */
+export type BrowserToolUniqueTarget = Exclude<
+  BrowserToolResolvedTarget,
+  { readonly kind: 'ambiguous' }
+>;
 
 export type BrowserToolBackend = 'debugger' | 'scripting';
 
@@ -2035,8 +2047,16 @@ export const createBrowserToolSession = ({
       selector,
     });
     const parsed = domQuerySelectorAllResponseSchema.safeParse(response);
-    const nodeId =
-      parsed.success && parsed.data.nodeIds.length === 1 ? parsed.data.nodeIds[0] : undefined;
+
+    if (!parsed.success) {
+      return undefined;
+    }
+
+    if (parsed.data.nodeIds.length > 1) {
+      return { kind: 'ambiguous', matches: parsed.data.nodeIds.length, selector };
+    }
+
+    const [nodeId] = parsed.data.nodeIds;
 
     if (nodeId === undefined || nodeId === 0) {
       return undefined;

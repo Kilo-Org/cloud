@@ -167,6 +167,10 @@ export interface BrowserOriginChanged {
 /** The tool error text a refused call carries when the bridge is not in the loop (E2E, panel). */
 export const NEEDS_PERMISSION_ERROR =
   'The browser action needs permission for this origin. Nothing was changed.';
+/** A CSS selector that names more than one element: a call that cannot run must not ask for permission. */
+export const ambiguousSelectorError = (matches: number): string =>
+  `The selector matches ${String(matches)} elements. Use a snapshot ref or a selector that matches one element.`;
+
 export const ORIGIN_CHANGED_ERROR =
   'The page redirected to a different origin than the one this navigation was approved for.';
 

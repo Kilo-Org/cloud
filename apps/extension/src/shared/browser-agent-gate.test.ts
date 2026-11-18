@@ -71,6 +71,7 @@ const createSession = (
     readonly mainUrl?: string;
     readonly probe?: Record<string, unknown>;
     readonly probeByObject?: Record<string, Record<string, unknown>>;
+    readonly ambiguousSelectors?: Record<string, number>;
     readonly selectors?: Record<string, { readonly frameId: string; readonly nodeId: number }>;
     readonly targetFrameId?: string;
   } = {}
@@ -185,6 +186,12 @@ const createSession = (
 
   return {
     resolveTarget: async (target: string) => {
+      const matches = options.ambiguousSelectors?.[target];
+
+      if (matches !== undefined) {
+        return { kind: 'ambiguous', matches, selector: target };
+      }
+
       const selector = options.selectors?.[target];
 
       if (selector !== undefined) {
@@ -627,6 +634,25 @@ describe('sensitive steps', () => {
       items: [{ class: 'act', frame: true, origin: 'https://pay.example.com' }],
       kind: 'needs_permission',
     });
+  });
+
+  it('refuses an ambiguous selector before asking for any permission', async () => {
+    const result = await run({
+      args: { target: '#many' },
+      session: createSession({ ambiguousSelectors: { '#many': 3 } }),
+      toolName: 'browser_click',
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result).toMatchObject({
+      failure: {
+        error:
+          'The selector matches 3 elements. Use a snapshot ref or a selector that matches one element.',
+        kind: 'blocked',
+      },
+    });
+    // A call that cannot run never becomes a permission ask.
+    expect(failureOf(result)).not.toHaveProperty('items');
   });
 
   it('counts a selector that resolves nothing as sensitive', async () => {

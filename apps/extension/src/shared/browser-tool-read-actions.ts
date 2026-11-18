@@ -17,6 +17,7 @@ import type {
   BrowserSnapshotArguments,
   BrowserToolPageSession,
 } from './browser-tool-snapshot';
+import { ambiguousSelectorError } from './browser-agent-checks';
 import type { EvalTabResult } from './tab-debugger';
 import type { BrowserConsoleMessage, BrowserNetworkRequest } from './browser-tool-session';
 import type { AgentReadScope, WithheldFrame } from './browser-agent-frames';
@@ -793,6 +794,10 @@ const readElementClip = async (
   options: { readonly failClosedOnGeometryError: boolean }
 ): Promise<z.infer<typeof elementClipSchema>> => {
   const resolved = await session.resolveTarget(target);
+
+  if (resolved?.kind === 'ambiguous') {
+    throw new Error(ambiguousSelectorError(resolved.matches));
+  }
 
   if (resolved === undefined) {
     throw new Error(

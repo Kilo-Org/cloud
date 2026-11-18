@@ -424,6 +424,10 @@ export const createBrowserRuntime = ({
               });
 
         if (preflight !== undefined && !preflight.ok) {
+          if (preflight.failure.kind === 'blocked') {
+            return { kind: 'result', result: { error: preflight.failure.error, ok: false } };
+          }
+
           if (preflight.failure.kind === 'origin_changed') {
             return {
               from: preflight.failure.from,

@@ -1,12 +1,17 @@
 /* eslint-disable max-lines -- One module owns the page and lifecycle browser tools; the shared CDP helpers keep their shapes consistent. */
 import { z } from 'zod';
 import { createWebMcpToolCall } from './agent-conversation';
-import { originPatternMatches, toBrowserOrigin } from './browser-agent-checks';
+import {
+  ambiguousSelectorError,
+  originPatternMatches,
+  toBrowserOrigin,
+} from './browser-agent-checks';
 import { KILO_BROWSER_TOOL_PREFIX } from './browser-tool-contract';
 import { pressKeyChord } from './browser-tool-interact-actions';
 import type {
   BrowserToolDialog,
   BrowserToolResolvedTarget,
+  BrowserToolUniqueTarget,
   BrowserToolViewportState,
 } from './browser-tool-session';
 import { listInspectableTabsWithTabsApi } from './tab-debugger';
@@ -382,7 +387,7 @@ const navigateToUrl = async (
 
 const resolveElementObjectId = async (
   session: BrowserToolPageActionSession,
-  resolved: BrowserToolResolvedTarget
+  resolved: BrowserToolUniqueTarget
 ): Promise<string | undefined> => {
   const response = await session.send(
     'DOM.resolveNode',
@@ -411,6 +416,10 @@ const evaluateFunctionInPage = async (
   }
 
   const resolved = await session.resolveTarget(target);
+
+  if (resolved?.kind === 'ambiguous') {
+    return fail(ambiguousSelectorError(resolved.matches));
+  }
 
   if (resolved === undefined) {
     return fail(`Element was not found for target: ${target}`);

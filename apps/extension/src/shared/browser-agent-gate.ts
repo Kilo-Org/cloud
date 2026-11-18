@@ -1,6 +1,7 @@
 /* eslint-disable max-lines -- The gate owns grant matching, frame target resolution, sensitive classification and the post-navigate check; splitting it would scatter the pre-action contract. */
 import { z } from 'zod';
 import {
+  ambiguousSelectorError,
   hashBrowserToolArguments,
   isOAuthConsentUrl,
   isOriginGranted,
@@ -54,7 +55,10 @@ export type AgentPreflight =
       readonly targetOriginFrame: boolean;
     }
   | {
-      readonly failure: BrowserNeedsPermission | BrowserOriginChanged;
+      readonly failure:
+        | BrowserNeedsPermission
+        | BrowserOriginChanged
+        | { readonly error: string; readonly kind: 'blocked' };
       readonly ok: false;
       /** Present when the refusal is a sensitive step: the runtime issues the token. */
       readonly sensitive?: BrowserSensitiveStep | undefined;
@@ -135,6 +139,10 @@ const targetFrameOf = async (
 
   if (resolved === undefined) {
     return undefined;
+  }
+
+  if (resolved.kind === 'ambiguous') {
+    return { frame: true, origin: OPAQUE_ORIGIN };
   }
 
   const response = await session.send(
@@ -330,6 +338,20 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
   }
 
   const targetTexts = grantClass === 'navigate' ? [] : targetTextsOf(input.args);
+
+  // A selector that names several elements cannot run: refuse it plainly before any grant or step-token ask, so the user is never asked to approve it.
+  for (const text of targetTexts) {
+    // eslint-disable-next-line no-await-in-loop -- one resolution per target text, in argument order
+    const resolved = await input.session.resolveTarget(text);
+
+    if (resolved?.kind === 'ambiguous') {
+      return {
+        failure: { error: ambiguousSelectorError(resolved.matches), kind: 'blocked' },
+        ok: false,
+      };
+    }
+  }
+
   const targetFrames: TargetFrame[] = [];
 
   for (const text of targetTexts) {

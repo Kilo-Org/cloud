@@ -897,7 +897,11 @@ describe('browser tool session', () => {
     const one = createSession({ selectorMatches: [42] });
 
     await expect(none.session.resolveTarget('#ambiguous')).resolves.toBeUndefined();
-    await expect(many.session.resolveTarget('#ambiguous')).resolves.toBeUndefined();
+    await expect(many.session.resolveTarget('#ambiguous')).resolves.toStrictEqual({
+      kind: 'ambiguous',
+      matches: 2,
+      selector: '#ambiguous',
+    });
     await expect(one.session.resolveTarget('#unique')).resolves.toStrictEqual({
       kind: 'selector',
       nodeId: 42,

@@ -477,6 +477,10 @@ export const classifyTargetElement = async (
       return { cause: 'the target did not resolve', kind: 'unknown' };
     }
 
+    if (resolved.kind === 'ambiguous') {
+      return { cause: 'the selector matches several elements', kind: 'unknown' };
+    }
+
     const frameId = await targetFrameId(session, resolved);
 
     if (frameId === undefined) {

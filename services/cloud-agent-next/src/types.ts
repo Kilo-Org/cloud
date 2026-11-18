@@ -470,6 +470,12 @@ export type GitTokenService = {
 
 export type Env = {
   AI?: Ai;
+  /**
+   * Deployment environment for runtime-token admission checks; the web app
+   * mints control tokens with the same value (`process.env.NODE_ENV`),
+   * production with the top-level config and development with `env.dev`.
+   */
+  ENVIRONMENT?: string;
   CLOUD_AGENT_SENTRY_DSN?: string;
   CLOUD_AGENT_SENTRY_ENVIRONMENT?: string;
   CF_VERSION_METADATA?: { id: string };

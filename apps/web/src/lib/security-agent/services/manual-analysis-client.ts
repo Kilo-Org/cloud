@@ -5,14 +5,11 @@ import {
   SECURITY_AUTO_ANALYSIS_WORKER_URL,
 } from '@kilocode/web-shared/lib/config.server';
 import { postSecurityWorkerJson } from './security-worker-request';
-
-type ManualAnalysisOwner =
-  | { organizationId: string; userId?: never }
-  | { userId: string; organizationId?: never };
+import type { SecurityReviewOwner } from '../core/types';
 
 type ManualAnalysisStartParams = {
   findingId: string;
-  owner: ManualAnalysisOwner;
+  owner: SecurityReviewOwner;
   actorUserId: string;
   requestedModels?: {
     model?: string;

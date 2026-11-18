@@ -26,6 +26,7 @@
     "creditHistory": "د کریډیټ تاریخچه",
     "sentenceJoiner": ". ",
     "listJoiner": "، ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "لغوه کړئ",
     "done": "بشپړ شو",
     "retry": "بیا هڅه وکړئ",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "بدلونونه",
     "organizationTrialEnded": "د سازمان آزموینه پای ته رسېدلې ده او هغه هیچ فعال پلان نه لري. د سازمان مالک کولی شي په kilo.ai کې بیلنګ تازه کړي، بیا یو ځل بیا هڅه وکړي.",
-    "privateRepositoryA11y": "{{name}}، شخصي زېرمتون"
+    "privateRepositoryA11y": "{{name}}، شخصي زېرمتون",
+    "legalDocumentEnglishOnly": "دا سند یوازې په انګلیسي ژبه کې د لاسرسي وړ دی."
   },
   "language": {
     "restarting": "د ژبې د پلي کولو لپاره بیا پیلېږي",
@@ -481,7 +483,14 @@
       "viewReceipt": "رسید وګورئ"
     },
     "changelog": "نوي بدلونونه",
-    "changelogVersionPending": "د دې نسخې یادښتونه د اپ له راتلونکي تازه کېدو سره راځي."
+    "changelogVersionPending": "د {{version}} نسخې یادښتونه د اپ له راتلونکي تازه کېدو سره راځي.",
+    "changelogGroupNew": "نوي",
+    "changelogFixesIn": "په {{areas}} کې سمونې او ښه والی.",
+    "changelogFixesPolish": "په ټول اپ کې سمونې او ښه والی.",
+    "changelogAreas": {
+      "signIn": "ننوتل",
+      "profileOrganizations": "پروفایل او سازمانونه"
+    }
   },
   "preferences": {
     "general": "عمومي",
@@ -1354,7 +1363,8 @@
       "managedOnWeb": "د دې سازمان د Bitbucket اړیکه له کمپیوټر څخه په وېب کې اداره کېږي.",
       "description": "د کاري چاپېریال لپاره د اړینو اجازو لرونکی لاسرسي ټوکن جوړ کړئ او لاندې یې پیسټ کړئ.",
       "scopes": "حساب: لوستل · زېرمتونونه: لوستل/لیکل · PR: لوستل · وېب هوکونه: لوستل/لیکل",
-      "tokenPlaceholder": "د کاري چاپېریال د لاسرسي ټوکن"
+      "tokenPlaceholder": "د کاري چاپېریال د لاسرسي ټوکن",
+      "tokenRefused": "Bitbucket دا د کاري چاپېریال د لاسرسي ټوکن ونه منل. وګورئ چې پورتنۍ اجازې لري، بیاځلي هڅه وکړئ."
     },
     "scopeList": {
       "personalStillAvailable": "شخصي زېرمتونونه لا هم لاندې د لاسرسي وړ دي.",
@@ -1465,13 +1475,25 @@
       "repositoryLine": "بیاکتنې: {{reviews}} · موندنې: {{findings}}",
       "empty": "تر اوسه د احصایو لرونکې بیاکتنې نشته",
       "emptyDescription": "احصایې بشپړې شوې بیاکتنې ثبتوي، تر هغې چې د سازمان لپاره فعالې وي.",
-      "off": "د دې سازمان لپاره احصایې غیرفعالې دي.",
-      "couldNotLoad": "احصایې بار نه شوې"
+      "offTitle": "د {{platform}} احصایې غیرفعالې دي",
+      "offDescription": "د سازمان د تادیې اړوندې ونډې (مالکان، ادمینان او د تادیې مدیران) کولای شي احصایې په ویب کې د سازمان د تنظیماتو له لارې فعالې کړي، ترڅو بشپړې شوې بیاکتنې ثبت شي.",
+      "couldNotLoad": "احصایې بار نه شوې",
+      "trackedReviewsCaption": "بشپړې شوې بیاکتنې چې احصایې پرې فعالې وې او په دې موده کې پای ته ورسېدلې. جاري او ناکامې شوې بیاکتنې هېڅکله نه شمېرل کېږي.",
+      "trackedReviewsUncounted": "نه شمېرل کېږي: {{displayCount}} له {{displayTotal}} بشپړو شوو بیاکتنو چې سازمان یې لري، د دوی پایله ثبت نشوه.",
+      "trackedReviewsUncounted_one": "نه شمېرل کېږي: {{displayCount}} له {{displayTotal}} بشپړو شوو بیاکتنو چې سازمان یې لري، د دوی پایله ثبت نشوه.",
+      "trackedReviewsUncounted_other": "نه شمېرل کېږي: {{displayCount}} له {{displayTotal}} بشپړو شوو بیاکتنو چې سازمان یې لري، د دوی پایله ثبت نشوه."
     },
     "council": {
       "title": "د شورا بیاکتنه",
       "subtitle": "څو متخصصین هر پل ریکویسټ بیاکتنه کوي او د هغوی رایې په یوه پرېکړه کې یوځای کېږي.",
-      "unavailable": "د شورا بیاکتنه د دې سازمان لپاره د لاسرسي وړ نه ده.",
+      "unavailablePersonallyTitle": "یو Enterprise سازمان ته اړتیا ده",
+      "unavailablePersonally": "د شورا بیاکتنه د شخصي حساب برخه نه ده.",
+      "unavailablePersonallyAction": "سازمان جوړ کړئ",
+      "unavailablePersonallySwitchAction": "سازمان بدل کړئ",
+      "unavailableOrganizationTitle": "د شورا بیاکتنه اوس نشته",
+      "unavailableForOrganization": "د شورا بیاکتنې ته د فعال سبسکرېپشن یا ازمویښتې مودې سره Enterprise پلان ته اړتیا لري. دا سازمان دا اوس نه لري.",
+      "unavailableForOrganizationNeutral": "د شورا بیاکتنې ته د دې سازمان لپاره اوس لاسرسی نشته. وروسته بیا هڅه وکړئ.",
+      "unavailableOnBitbucket": "د شورا بیاکتنه د Bitbucket زېرمتونونو لپاره شتون نه لري.",
       "noRepositories": "تر اوسه هېڅ زېرمتون نه دی ټاکل شوی. لومړی په زېرمتون تنظیماتو کې زېرمتونونه وټاکئ.",
       "specialists": "متخصصین",
       "labels": "هغه نښې چې د شورا بیاکتنه پیلوي",
@@ -3122,7 +3144,6 @@
     "completingPurchase": "پېرود بشپړېږي",
     "subscriptionLoading": "د Kilo Pass ګډون بارېږي",
     "retryHint": "د Kilo Pass د حالت ترلاسه کولو بیا هڅه کوي.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "په {{date}} پای ته رسېدلی",
     "notAvailableInApp": "Kilo Pass په اپ کې شتون نلري.",
     "statusActive": "فعال",
@@ -3325,6 +3346,7 @@
       "manageOnWeb": "په ویب کې د بیلینګ ترتیبات",
       "changePlan": "پلان بدل کړئ",
       "buySeats": "د غړیتوب ځایونه واخلئ",
+      "managedOnWeb": "پلان، د غړیتوب ځایونه او اتومات بیا ډکول په ویب کې اداره کېږي.",
       "setupAutoTopUp": "اتومات بیا ډکول تنظیم کړئ",
       "manageAutoTopUp": "اتومات بیا ډکول اداره کړئ",
       "opensOnWeb": "په وېب کې پرانیستل کېږي"
@@ -3473,12 +3495,10 @@
       "requestLogs": "د غوښتنو لاګونه"
     },
     "requestLogs": {
-      "hint": "د کړکۍ تر پای وړاندې د یو ساعت غوښتنې، نوې یې لومړی.",
       "older": "پخوانی ساعت",
       "newer": "نوی ساعت",
       "truncated": "په دې ساعت کې له ښودل شویو ډېرې غوښتنې شته.",
       "emptyTitle": "غوښتنې نشته",
-      "emptyDescription": "په دې ساعت کې د ګېټوې غوښتنې نشته.",
       "loadError": "د غوښتنو لاګونه بار نه شول.",
       "permissionDenied": "یوازې د سازمان مالک، اډمین یا د بیلنګ مدیر کولی شي د هغه د غوښتنو لاګونه ولولي.",
       "tokens": "{{input}} ننوتي · {{output}} وتلي",
@@ -4282,8 +4302,7 @@
       "repoValue": "زېرمتون: {{name}}",
       "profileValue": "پروفایل: {{name}}",
       "profileUnavailable": "دا پروفایل نور شتون نه لري. بل پروفایل غوره کړئ.",
-      "pickerEmptyDescriptionOrganization": "د چاپېریال متغیرونو، تنظیم کولو امرونو، او په ناستو کې مهارتونه د بیا کارولو لپاره د سازمان پروفایل رامینځته کړئ.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "د سازمان خاوند یا مدیر کولی شي د سازمان پروفایل رامینځته کړي."
+      "pickerEmptyDescriptionOrganization": "د چاپېریال متغیرونو، تنظیم کولو امرونو، او په ناستو کې مهارتونه د بیا کارولو لپاره د سازمان پروفایل رامینځته کړئ."
     },
     "variablesDeleteFailed": "متغیر ړنګول نشو کړای",
     "deleteVariable": "د {{key}} متغیر ړنګ کړئ",
@@ -4469,7 +4488,6 @@
     "dismiss": "راپور له پامه وغورځوئ",
     "offline": "آفلاین · خوندي شوی راپور",
     "cached": "خوندي شوی راپور · تازه کول شونی نه دی",
-    "window": "{{start}} – {{end}}",
     "summary": "د AI لنډیز",
     "summaryPending": "د AI لنډیز په جریان کې دی. چې چمتو شي، دلته به ونښلول شي.",
     "summaryUnavailable": "د AI لنډیز شتون نه لري. ستاسو منظم راپور لا هم شته.",
@@ -4588,6 +4606,7 @@
       "title": "ټرېګرونه او ویب‌هوکونه",
       "subtitle": "د ویب‌هوک غوښتنې یا مهالویش څخه د Cloud Agent چلېدل اتومات کړئ.",
       "new": "نوی ټرېګر",
+      "create": "ټرېګر جوړ کړئ",
       "emptyTitle": "تر اوسه هېڅ ټرېګر نشته",
       "emptyDescription": "یو ټرېګر جوړ کړئ ترڅو د ویب‌هوک غوښتنې یا مهالویش له مخې د Cloud Agent چل پیل کړئ.",
       "loadFailedTitle": "ټرېګرونه بار نشول",
@@ -4641,6 +4660,8 @@
       "created": "ټرېګر جوړ شو",
       "saved": "ټرېګر خوندي شو",
       "statusArrived": "ورسېد",
+      "defaultPromptWebhook": "د دې ویب‌هوک غوښتنې د بدن تشریح وکړئ:\n\n{{body}}",
+      "defaultPromptScheduled": "مهالویز کار وچلوئ. {{scheduledTime}} کې ټرېګر شو.",
       "problems": {
         "nameRequired": "نوم ولیکئ.",
         "nameTooShort": "لږ تر لږه 8 توري وکاروئ.",

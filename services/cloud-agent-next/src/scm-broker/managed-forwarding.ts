@@ -140,7 +140,6 @@ async function handleManagedGitHubOutbound(
     capabilityVersion: getCapabilityVersion(capability.capability),
     outboundContainerId,
   };
-  logDiagnostic('debug', logFields, 'Redeeming managed GitHub outbound request');
 
   if (!supportsGitHubSessionCapabilityRedemption(tokenService)) {
     logDiagnostic(
@@ -223,11 +222,6 @@ async function handleManagedGitHubOutbound(
     return new Response('GitHub authorization unavailable', { status: 502 });
   }
 
-  logDiagnostic(
-    'info',
-    { ...logFields, upstreamStatus: response.status },
-    'Managed GitHub outbound request forwarded'
-  );
   if (response.status === 403 || response.status === 429) {
     let rateLimitDiagnostic;
     try {
@@ -258,6 +252,12 @@ async function handleManagedGitHubOutbound(
       },
       'Managed GitHub upstream rate-limit response'
     );
+  } else if (response.status >= 400) {
+    logDiagnostic(
+      'warn',
+      { ...logFields, upstreamStatus: response.status },
+      'Managed SCM upstream error response'
+    );
   }
   return response;
 }
@@ -274,7 +274,6 @@ async function handleManagedGitLabOutbound(
     capabilityVersion: getCapabilityVersion(capability.capability),
     outboundContainerId,
   };
-  logDiagnostic('debug', logFields, 'Redeeming managed GitLab outbound request');
 
   if (!supportsGitLabSessionCapabilityRedemption(tokenService)) {
     logDiagnostic(
@@ -331,11 +330,13 @@ async function handleManagedGitLabOutbound(
     return new Response('GitLab authorization unavailable', { status: 502 });
   }
 
-  logDiagnostic(
-    'info',
-    { ...logFields, upstreamStatus: response.status },
-    'Managed GitLab outbound request forwarded'
-  );
+  if (response.status >= 400) {
+    logDiagnostic(
+      'warn',
+      { ...logFields, upstreamStatus: response.status },
+      'Managed SCM upstream error response'
+    );
+  }
   return response;
 }
 
@@ -351,7 +352,6 @@ async function handleManagedBitbucketOutbound(
     capabilityVersion: getCapabilityVersion(capability.capability),
     outboundContainerId,
   };
-  logDiagnostic('debug', logFields, 'Redeeming managed Bitbucket outbound request');
 
   if (!supportsBitbucketSessionCapabilityRedemption(tokenService)) {
     logDiagnostic(
@@ -406,11 +406,13 @@ async function handleManagedBitbucketOutbound(
     return new Response('Bitbucket authorization unavailable', { status: 502 });
   }
 
-  logDiagnostic(
-    'info',
-    { ...logFields, upstreamStatus: response.status },
-    'Managed Bitbucket outbound request forwarded'
-  );
+  if (response.status >= 400) {
+    logDiagnostic(
+      'warn',
+      { ...logFields, upstreamStatus: response.status },
+      'Managed SCM upstream error response'
+    );
+  }
   return response;
 }
 

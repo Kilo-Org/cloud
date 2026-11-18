@@ -3,6 +3,7 @@ import {
   RuntimeSkillsSchema,
   RuntimeAgentsSchema,
   RuntimeBuiltinAgentsSchema,
+  RuntimeModelContextLimitsSchema,
   RuntimeKiloCommandsSchema,
   RuntimeInstructionsSchema,
 } from './runtime-profile.js';
@@ -202,6 +203,7 @@ export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'no_progress',
   'no_outcome',
   'completion_unconfirmed',
+  'completion_quiet_drain',
   'prompt_failed',
   'sandbox_stopped',
   'execution_limit',
@@ -483,6 +485,7 @@ const routeSpecObjectSchema = z
     runtimeInstructions: RuntimeInstructionsSchema.optional(),
     runtimeAgents: RuntimeAgentsSchema.optional(),
     builtinAgents: RuntimeBuiltinAgentsSchema.optional(),
+    modelContextLimits: RuntimeModelContextLimitsSchema.optional(),
     kiloCommands: RuntimeKiloCommandsSchema.optional(),
     /**
      * Preserves the runtime key and HOME of existing allocations. The Sandbox
@@ -539,6 +542,7 @@ export const workspaceConfigSchema = routeSpecObjectSchema
     runtimeInstructions: true,
     runtimeAgents: true,
     builtinAgents: true,
+    modelContextLimits: true,
     kiloCommands: true,
   })
   .strict();
@@ -556,6 +560,7 @@ export const attachmentSpecSchema = routeSpecObjectSchema
     runtimeInstructions: true,
     runtimeAgents: true,
     builtinAgents: true,
+    modelContextLimits: true,
     kiloCommands: true,
   })
   .strict()
@@ -973,6 +978,10 @@ export const controlPlaneSessionRefPayloadSchema = z
   .object({ sessionId: z.string().min(1) })
   .strict();
 
+export const controlPlaneReleasePayloadSchema = controlPlaneSessionRefPayloadSchema.extend({
+  reason: z.literal('standalone_session_deleted').optional(),
+});
+
 /**
  * Workspace Stop during environment preparation. One sandbox serves one
  * workspace, so the Sandbox DO retires every route on it. `requestedAt` is when
@@ -1213,6 +1222,24 @@ const controlPlaneSessionReadyFrameSchema = z
       .array(controlPlaneCommandFailureSchema)
       .max(CONTROL_PLANE_COMMAND_FAILURES_MAX)
       .optional(),
+  })
+  .strict();
+
+const restoreDurationSchema = z.number().int().nonnegative().max(86_400_000);
+const controlPlaneSessionRestoreFrameSchema = z
+  .object({
+    type: z.literal('session.restore_attempt'),
+    sessionId: z.string().min(1).max(128),
+    attempt: z.number().int().min(1).max(2),
+    durationMs: restoreDurationSchema,
+    downloadMs: restoreDurationSchema.optional(),
+    importMs: restoreDurationSchema.optional(),
+    diffsMs: restoreDurationSchema.optional(),
+    outcome: z.enum(['restored', 'partial', 'fallback', 'failed', 'cancelled']),
+    reason: z
+      .enum(['download', 'import', 'diffs', 'not_found', 'empty', 'restore_error'])
+      .optional(),
+    willRetry: z.boolean(),
   })
   .strict();
 
@@ -1703,6 +1730,7 @@ export const controlPlaneWrapperFrameSchema = z.discriminatedUnion('type', [
   controlPlaneSessionPrepareFrameSchema,
   controlPlaneSessionAttachFrameSchema,
   controlPlaneSessionProgressFrameSchema,
+  controlPlaneSessionRestoreFrameSchema,
   controlPlaneSessionReadyFrameSchema,
   controlPlaneWorkspaceCaptureFrameSchema,
   controlPlaneWorkspaceCapturedFrameSchema,
@@ -1750,6 +1778,7 @@ export type ControlPlaneOutcome = z.infer<typeof controlPlaneOutcomeSchema>;
 export type ControlPlaneDeliverPayload = z.infer<typeof controlPlaneDeliverPayloadSchema>;
 export type ControlPlaneDeliverResult = z.infer<typeof controlPlaneDeliverResultSchema>;
 export type ControlPlaneSessionRefPayload = z.infer<typeof controlPlaneSessionRefPayloadSchema>;
+export type ControlPlaneReleasePayload = z.infer<typeof controlPlaneReleasePayloadSchema>;
 export type ControlPlaneAnswerReply = z.infer<typeof controlPlaneAnswerReplySchema>;
 export type ControlPlaneAnswerPayload = z.infer<typeof controlPlaneAnswerPayloadSchema>;
 export type ControlPlaneDispatchResult = z.infer<typeof controlPlaneDispatchResultSchema>;

@@ -26,6 +26,7 @@
     "creditHistory": "Lịch sử tín dụng",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Hủy",
     "done": "Xong",
     "retry": "Thử lại",
@@ -175,7 +176,8 @@
     "durationHourShort": "giờ",
     "changes": "Thay đổi",
     "organizationTrialEnded": "Bản dùng thử của tổ chức đã kết thúc và tổ chức không có gói đang hoạt động. Chủ sở hữu tổ chức có thể cập nhật thanh toán tại kilo.ai, sau đó thử lại.",
-    "privateRepositoryA11y": "{{name}}, kho lưu trữ riêng tư"
+    "privateRepositoryA11y": "{{name}}, kho lưu trữ riêng tư",
+    "legalDocumentEnglishOnly": "Tài liệu này chỉ có sẵn bằng tiếng Anh."
   },
   "language": {
     "restarting": "Đang khởi động lại để áp dụng ngôn ngữ",
@@ -481,7 +483,14 @@
       "viewReceipt": "Xem biên nhận"
     },
     "changelog": "Có gì mới",
-    "changelogVersionPending": "Ghi chú cho phiên bản này sẽ có trong bản cập nhật sau."
+    "changelogVersionPending": "Ghi chú cho phiên bản {{version}} sẽ có trong bản cập nhật ứng dụng sau.",
+    "changelogGroupNew": "Mới",
+    "changelogFixesIn": "Các bản sửa lỗi và cải tiến trong {{areas}}.",
+    "changelogFixesPolish": "Các bản sửa lỗi và cải tiến trên toàn ứng dụng.",
+    "changelogAreas": {
+      "signIn": "Đăng nhập",
+      "profileOrganizations": "Hồ sơ và tổ chức"
+    }
   },
   "preferences": {
     "general": "Chung",
@@ -676,7 +685,8 @@
       "managedOnWeb": "Kết nối Bitbucket của tổ chức này được quản lý trên web từ máy tính.",
       "description": "Tạo mã truy cập không gian làm việc với các quyền cần thiết rồi dán vào bên dưới.",
       "scopes": "Tài khoản: đọc · Kho lưu trữ: đọc/ghi · Yêu cầu hợp nhất: đọc · Webhook: đọc/ghi",
-      "tokenPlaceholder": "Mã truy cập không gian làm việc"
+      "tokenPlaceholder": "Mã truy cập không gian làm việc",
+      "tokenRefused": "Bitbucket không chấp nhận mã truy cập không gian làm việc này. Hãy kiểm tra rằng mã có các quyền ở trên, rồi thử lại."
     },
     "followReviewMd": "Tuân theo REVIEW.md",
     "followReviewMdSubtitle": "Tuân theo tệp hướng dẫn REVIEW.md của từng kho lưu trữ",
@@ -922,13 +932,25 @@
       "repositoryLine": "Rà soát: {{reviews}} · Vấn đề: {{findings}}",
       "empty": "Chưa có lượt rà soát nào có dữ liệu phân tích",
       "emptyDescription": "Phân tích ghi lại các lượt rà soát đã hoàn tất khi tính năng này được bật cho tổ chức.",
-      "off": "Phân tích đang tắt cho tổ chức này.",
-      "couldNotLoad": "Không thể tải dữ liệu phân tích"
+      "offTitle": "Phân tích đang tắt cho {{platform}}",
+      "offDescription": "Những người có vai trò thanh toán của tổ chức (chủ sở hữu, quản trị viên và quản lý thanh toán) có thể bật tính năng phân tích trong phần cài đặt của tổ chức trên web để ghi lại các lượt rà soát đã hoàn tất.",
+      "couldNotLoad": "Không thể tải dữ liệu phân tích",
+      "trackedReviewsCaption": "Các lượt rà soát đã hoàn tất kết thúc trong kỳ này khi tính năng phân tích được bật. Các lượt rà soát đang chạy hoặc thất bại không bao giờ được tính.",
+      "trackedReviewsUncounted": "Chưa tính: {{displayCount}} trong tổng số {{displayTotal}} lượt rà soát đã hoàn tất của tổ chức chưa được ghi kết quả.",
+      "trackedReviewsUncounted_one": "Chưa tính: {{displayCount}} trong tổng số {{displayTotal}} lượt rà soát đã hoàn tất của tổ chức chưa được ghi kết quả.",
+      "trackedReviewsUncounted_other": "Chưa tính: {{displayCount}} trong tổng số {{displayTotal}} lượt rà soát đã hoàn tất của tổ chức chưa được ghi kết quả."
     },
     "council": {
       "title": "Rà soát hội đồng",
       "subtitle": "Nhiều chuyên gia rà soát từng yêu cầu hợp nhất và phiếu của họ được tổng hợp thành một quyết định.",
-      "unavailable": "Rà soát hội đồng không khả dụng cho tổ chức này.",
+      "unavailablePersonallyTitle": "Cần một tổ chức Enterprise",
+      "unavailablePersonally": "Rà soát hội đồng không thuộc tài khoản cá nhân.",
+      "unavailablePersonallyAction": "Tạo tổ chức",
+      "unavailablePersonallySwitchAction": "Chuyển tổ chức",
+      "unavailableOrganizationTitle": "Rà soát hội đồng hiện không khả dụng",
+      "unavailableForOrganization": "Rà soát hội đồng cần gói Enterprise có gói đăng ký hoặc bản dùng thử đang hoạt động. Tổ chức này hiện không có gói này.",
+      "unavailableForOrganizationNeutral": "Rà soát hội đồng hiện không khả dụng cho tổ chức này. Vui lòng thử lại sau.",
+      "unavailableOnBitbucket": "Rà soát hội đồng không khả dụng cho kho lưu trữ Bitbucket.",
       "noRepositories": "Chưa chọn kho lưu trữ nào. Hãy chọn kho lưu trữ trong cài đặt kho lưu trữ trước.",
       "specialists": "Chuyên gia",
       "labels": "Nhãn kích hoạt rà soát hội đồng",
@@ -2579,7 +2601,6 @@
     "completingPurchase": "Đang hoàn tất giao dịch mua",
     "subscriptionLoading": "Đang tải gói đăng ký Kilo Pass",
     "retryHint": "Thử tải lại trạng thái Kilo Pass.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Đã kết thúc {{date}}",
     "notAvailableInApp": "Kilo Pass không khả dụng trong ứng dụng.",
     "statusActive": "Đang hoạt động",
@@ -3317,6 +3338,7 @@
       "manageOnWeb": "Cài đặt thanh toán trên web",
       "changePlan": "Đổi gói",
       "buySeats": "Mua suất sử dụng",
+      "managedOnWeb": "Gói, suất sử dụng và tự động nạp tiền được quản lý trên web.",
       "setupAutoTopUp": "Thiết lập tự động nạp tiền",
       "manageAutoTopUp": "Quản lý tự động nạp tiền",
       "opensOnWeb": "Mở trên web"
@@ -3478,12 +3500,10 @@
       "requestLogs": "Nhật ký yêu cầu"
     },
     "requestLogs": {
-      "hint": "Các yêu cầu trong một giờ tính đến cuối khung thời gian, mới nhất ở trên.",
       "older": "Giờ cũ hơn",
       "newer": "Giờ mới hơn",
       "truncated": "Giờ này có nhiều yêu cầu hơn số hiển thị trong danh sách.",
       "emptyTitle": "Không có yêu cầu",
-      "emptyDescription": "Không có yêu cầu nào qua gateway trong giờ này.",
       "loadError": "Không thể tải nhật ký yêu cầu.",
       "permissionDenied": "Chỉ chủ sở hữu, quản trị viên hoặc người quản lý thanh toán của tổ chức mới có thể xem nhật ký yêu cầu của tổ chức.",
       "tokens": "{{input}} vào · {{output}} ra",
@@ -4282,8 +4302,7 @@
       "repoValue": "Kho lưu trữ: {{name}}",
       "profileValue": "Hồ sơ: {{name}}",
       "profileUnavailable": "Hồ sơ này không còn khả dụng. Hãy chọn hồ sơ khác.",
-      "pickerEmptyDescriptionOrganization": "Tạo hồ sơ tổ chức để sử dụng lại các biến môi trường, lệnh thiết lập và kỹ năng trong các phiên.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Chủ sở hữu hoặc quản trị viên của tổ chức có thể tạo hồ sơ tổ chức."
+      "pickerEmptyDescriptionOrganization": "Tạo hồ sơ tổ chức để sử dụng lại các biến môi trường, lệnh thiết lập và kỹ năng trong các phiên."
     },
     "variablesDeleteFailed": "Không thể xóa biến",
     "deleteVariable": "Xóa biến {{key}}",
@@ -4469,7 +4488,6 @@
     "dismiss": "Bỏ qua bản tin",
     "offline": "Ngoại tuyến · bản tin đã lưu",
     "cached": "Báo cáo đã lưu · không thể làm mới",
-    "window": "{{start}} – {{end}}",
     "summary": "Tóm tắt AI",
     "summaryPending": "Đang tạo tóm tắt AI. Tóm tắt sẽ hiển thị tại đây khi sẵn sàng.",
     "summaryUnavailable": "Tóm tắt AI không khả dụng. Báo cáo có cấu trúc vẫn khả dụng.",
@@ -4588,6 +4606,7 @@
       "title": "Trình kích hoạt và webhook",
       "subtitle": "Tự động hóa các lần chạy Cloud Agent từ một lệnh gọi webhook hoặc theo lịch.",
       "new": "Trình kích hoạt mới",
+      "create": "Tạo trình kích hoạt",
       "emptyTitle": "Chưa có trình kích hoạt nào",
       "emptyDescription": "Tạo trình kích hoạt để bắt đầu một lần chạy Cloud Agent từ lệnh gọi webhook hoặc theo lịch.",
       "loadFailedTitle": "Không thể tải trình kích hoạt",
@@ -4641,6 +4660,8 @@
       "created": "Đã tạo trình kích hoạt",
       "saved": "Đã lưu trình kích hoạt",
       "statusArrived": "Đã đến",
+      "defaultPromptWebhook": "Mô tả nội dung yêu cầu webhook này:\n\n{{body}}",
+      "defaultPromptScheduled": "Chạy tác vụ theo lịch. Được kích hoạt lúc {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Nhập tên.",
         "nameTooShort": "Dùng ít nhất 8 ký tự.",

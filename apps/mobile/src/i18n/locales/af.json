@@ -26,6 +26,7 @@
     "creditHistory": "Kredietgeskiedenis",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Kanselleer",
     "done": "Klaar",
     "retry": "Probeer weer",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "Wysigings",
     "organizationTrialEnded": "Die organisasie se proeftydperk het geëindig en dit het geen aktiewe plan nie. 'n Organisasie-eienaar kan die fakturering by kilo.ai opdateer en dan weer probeer.",
-    "privateRepositoryA11y": "{{name}}, privaat bewaarplek"
+    "privateRepositoryA11y": "{{name}}, privaat bewaarplek",
+    "legalDocumentEnglishOnly": "Hierdie dokument is slegs in Engels beskikbaar."
   },
   "language": {
     "restarting": "Herbegin om die taal toe te pas",
@@ -481,7 +483,14 @@
       "viewReceipt": "Bekyk ontvangsbewys"
     },
     "changelog": "Wat is nuut",
-    "changelogVersionPending": "Hierdie weergawe se notas kom met die volgende opdatering."
+    "changelogVersionPending": "Die notas vir {{version}} kom met die volgende toepassingsopdatering.",
+    "changelogGroupNew": "Nuut",
+    "changelogFixesIn": "Regstellings en verbeterings in {{areas}}.",
+    "changelogFixesPolish": "Regstellings en verbeterings regdeur die app.",
+    "changelogAreas": {
+      "signIn": "Aanmelding",
+      "profileOrganizations": "Profiel en organisasies"
+    }
   },
   "preferences": {
     "general": "Algemeen",
@@ -1354,7 +1363,8 @@
       "managedOnWeb": "Hierdie organisasie se Bitbucket-verbinding word op die web vanaf 'n rekenaar bestuur.",
       "description": "Skep 'n toegangstoken vir die werkruimte met die vereiste toestemmings en plak dit hieronder.",
       "scopes": "Rekening: lees · Bewaarplekke: lees/skryf · Trekversoeke: lees · Webhake: lees/skryf",
-      "tokenPlaceholder": "Toegangstoken vir die werkruimte"
+      "tokenPlaceholder": "Toegangstoken vir die werkruimte",
+      "tokenRefused": "Bitbucket het nie hierdie toegangstoken vir die werkruimte aanvaar nie. Kontroleer dat dit die toestemmings hierbo het en probeer dan weer."
     },
     "scopeList": {
       "personalStillAvailable": "Persoonlike bewaarplekke is steeds hieronder beskikbaar.",
@@ -1465,13 +1475,25 @@
       "repositoryLine": "Hersienings: {{reviews}} · Bevindings: {{findings}}",
       "empty": "Nog geen hersienings met ontleding nie",
       "emptyDescription": "Ontleding teken voltooide hersienings aan terwyl dit vir die organisasie geaktiveer is.",
-      "off": "Ontleding is af vir hierdie organisasie.",
-      "couldNotLoad": "Kon nie ontleding laai nie"
+      "offTitle": "Ontleding is af vir {{platform}}",
+      "offDescription": "Organisasie-faktureringsrolle kan ontleding in die organisasie-instellings op die web aanskakel om voltooide hersienings aan te teken.",
+      "couldNotLoad": "Kon nie ontleding laai nie",
+      "trackedReviewsCaption": "Voltooide hersienings wat in hierdie periode afgehandel is terwyl ontleding geaktiveer was. Lopende en mislukte hersienings word nooit getel nie.",
+      "trackedReviewsUncounted": "Nie getel nie: {{displayCount}} van die {{displayTotal}} voltooide hersienings het geen vasgelê uitslag nie.",
+      "trackedReviewsUncounted_one": "Nie getel nie: {{displayCount}} van die {{displayTotal}} voltooide hersienings het geen vasgelê uitslag nie.",
+      "trackedReviewsUncounted_other": "Nie getel nie: {{displayCount}} van die {{displayTotal}} voltooide hersienings het geen vasgelê uitslag nie."
     },
     "council": {
       "title": "Raadhersiening",
       "subtitle": "Verskeie spesialiste hersien elke trekversoek, en hul stemme word tot een besluit saamgevoeg.",
-      "unavailable": "Raadhersiening is nie vir hierdie organisasie beskikbaar nie.",
+      "unavailablePersonallyTitle": "Benodig 'n Enterprise-organisasie",
+      "unavailablePersonally": "Raadhersiening is nie deel van 'n persoonlike rekening nie.",
+      "unavailablePersonallyAction": "Skep organisasie",
+      "unavailablePersonallySwitchAction": "Wissel organisasie",
+      "unavailableOrganizationTitle": "Raadhersiening is nie op die oomblik beskikbaar nie",
+      "unavailableForOrganization": "Raadhersiening verg die Enterprise-plan met 'n aktiewe intekening of proefperiode. Hierdie organisasie het dit nie op die oomblik nie.",
+      "unavailableForOrganizationNeutral": "Raadhersiening is nie op die oomblik vir hierdie organisasie beskikbaar nie. Probeer later weer.",
+      "unavailableOnBitbucket": "Raadhersiening is nie beskikbaar vir Bitbucket-bewaarplekke nie.",
       "noRepositories": "Nog geen bewaarplekke gekies nie. Kies eers bewaarplekke in die bewaarplekinstellings.",
       "specialists": "Spesialiste",
       "labels": "Etikette wat raadhersiening aktiveer",
@@ -3122,7 +3144,6 @@
     "completingPurchase": "Aankoop word voltooi",
     "subscriptionLoading": "Die Kilo Pass-intekening word gelaai",
     "retryHint": "Probeer die Kilo Pass-status weer laai.",
-    "cardAccessibility": "{{title}}: {{description}}. {{actionLabel}}",
     "endedOn": "Geëindig op {{date}}",
     "notAvailableInApp": "Kilo Pass is nie in die app beskikbaar nie.",
     "statusActive": "Aktief",
@@ -3325,6 +3346,7 @@
       "manageOnWeb": "Fakturering-instellings op die web",
       "changePlan": "Verander plan",
       "buySeats": "Koop gebruikersplekke",
+      "managedOnWeb": "Die plan, gebruikersplekke en outomatiese aanvulling word op die web bestuur.",
       "setupAutoTopUp": "Stel outomatiese aanvulling op",
       "manageAutoTopUp": "Bestuur outomatiese aanvulling",
       "opensOnWeb": "Maak op die web oop"
@@ -3473,12 +3495,10 @@
       "requestLogs": "Versoeklogs"
     },
     "requestLogs": {
-      "hint": "Versoeke uit die uur voordat die venster eindig, nuutste eerste.",
       "older": "Vroeër uur",
       "newer": "Later uur",
       "truncated": "Hierdie uur het meer versoeke as wat die lys wys.",
       "emptyTitle": "Geen versoeke nie",
-      "emptyDescription": "Hierdie uur het geen gateway-versoeke nie.",
       "loadError": "Kon nie versoeklogs laai nie.",
       "permissionDenied": "Slegs 'n organisasie-eienaar, -administrateur of -faktuurbestuurder kan die organisasie se versoeklogs lees.",
       "tokens": "{{input}} in · {{output}} uit",
@@ -4282,8 +4302,7 @@
       "repoValue": "Bewaarplek: {{name}}",
       "profileValue": "Profiel: {{name}}",
       "profileUnavailable": "Hierdie profiel is nie meer beskikbaar nie. Kies 'n ander een.",
-      "pickerEmptyDescriptionOrganization": "Skep 'n organisasieprofiel om omgewingsveranderlikes, opstelopdragte en vaardighede oor sessies te hergebruik.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Die eienaar of admin van 'n organisasie kan 'n organisasieprofiel skep."
+      "pickerEmptyDescriptionOrganization": "Skep 'n organisasieprofiel om omgewingsveranderlikes, opstelopdragte en vaardighede oor sessies te hergebruik."
     },
     "variablesDeleteFailed": "Kon nie veranderlike verwyder nie",
     "deleteVariable": "Skrap veranderlike {{key}}",
@@ -4469,7 +4488,6 @@
     "dismiss": "Verwerp verslag",
     "offline": "Vanlyn · gestoorde verslag",
     "cached": "Gestoorde verslag · verfris nie beskikbaar nie",
-    "window": "{{start}} – {{end}}",
     "summary": "AI-opsomming",
     "summaryPending": "AI-opsomming word voorberei. Dit sal hier verskyn wanneer dit gereed is.",
     "summaryUnavailable": "AI-opsomming nie beskikbaar nie. Jou gestruktureerde verslag is steeds beskikbaar.",
@@ -4588,6 +4606,7 @@
       "title": "Snellers en webhake",
       "subtitle": "Automatiseer Cloud Agent-lopies vanaf ’n webhaakoproep of ’n skedule.",
       "new": "Nuwe sneller",
+      "create": "Skep sneller",
       "emptyTitle": "Nog geen snellers nie",
       "emptyDescription": "Skep ’n sneller om ’n Cloud Agent-lopie vanaf ’n webhaakoproep of volgens ’n skedule te begin.",
       "loadFailedTitle": "Kon nie snellers laai nie",
@@ -4641,6 +4660,8 @@
       "created": "Sneller geskep",
       "saved": "Sneller gestoor",
       "statusArrived": "Aangekom",
+      "defaultPromptWebhook": "Beskryf die liggaam van hierdie webhaakversoek:\n\n{{body}}",
+      "defaultPromptScheduled": "Voer die geskeduleerde taak uit. Geaktiveer om {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Voer ’n naam in.",
         "nameTooShort": "Gebruik minstens 8 karakters.",

@@ -26,6 +26,7 @@
     "creditHistory": "Kasaysayan ng credit",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Kanselahin",
     "done": "Tapos",
     "retry": "Subukan muli",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "Mga pagbabago",
     "organizationTrialEnded": "Natapos na ang trial ng organisasyon at wala itong aktibong plano. Maaaring i-update ng may-ari ng organisasyon ang billing sa kilo.ai, pagkatapos ay subukan muli.",
-    "privateRepositoryA11y": "{{name}}, pribadong repositoryo"
+    "privateRepositoryA11y": "{{name}}, pribadong repositoryo",
+    "legalDocumentEnglishOnly": "Ang dokumentong ito ay makukuha lamang sa Ingles."
   },
   "language": {
     "restarting": "Ini-restart para ilapat ang wika",
@@ -481,7 +483,14 @@
       "viewReceipt": "Tingnan ang resibo"
     },
     "changelog": "Mga bago",
-    "changelogVersionPending": "Nasa susunod na update ng app ang mga tala ng bersyong ito."
+    "changelogVersionPending": "Nasa susunod na update ng app ang mga tala ng bersyong {{version}}.",
+    "changelogGroupNew": "Bago",
+    "changelogFixesIn": "Mga pag-aayos at pagpapahusay sa {{areas}}.",
+    "changelogFixesPolish": "Mga pag-aayos at pagpapahusay sa buong aplikasyon.",
+    "changelogAreas": {
+      "signIn": "Pagpasok",
+      "profileOrganizations": "Propayl at mga organisasyon"
+    }
   },
   "preferences": {
     "general": "Pangkalahatan",
@@ -1354,7 +1363,8 @@
       "managedOnWeb": "Pinamamahalaan sa web gamit ang computer ang koneksyon sa Bitbucket ng organisasyong ito.",
       "description": "Gumawa ng token para sa access sa workspace na may mga kinakailangang saklaw ng pahintulot at i-paste ito sa ibaba.",
       "scopes": "Account: pagbasa · Mga repository: pagbasa/pagsulat · Mga pull request: pagbasa · Mga webhook: pagbasa/pagsulat",
-      "tokenPlaceholder": "Token para sa access sa workspace"
+      "tokenPlaceholder": "Token para sa access sa workspace",
+      "tokenRefused": "Hindi tinanggap ng Bitbucket ang token para sa access sa workspace na ito. Tiyakin na taglay nito ang mga saklaw ng pahintulot sa itaas, pagkatapos ay subukan muli."
     },
     "scopeList": {
       "personalStillAvailable": "Magagamit pa rin sa ibaba ang mga personal na repository.",
@@ -1465,13 +1475,25 @@
       "repositoryLine": "Mga pagsusuri: {{reviews}} · Mga natuklasan: {{findings}}",
       "empty": "Wala pang pagsusuring may analitika",
       "emptyDescription": "Itinatala ng analitika ang mga natapos na pagsusuri habang pinagana ito para sa organisasyon.",
-      "off": "Naka-off ang analitika para sa organisasyong ito.",
-      "couldNotLoad": "Hindi ma-load ang analitika"
+      "offTitle": "Naka-off ang analitika para sa {{platform}}",
+      "offDescription": "Maaaring paganahin ng mga role sa pagbabayad ng organisasyon ang analitika sa mga setting ng organisasyon sa web para itala ang mga natapos na pagsusuri.",
+      "couldNotLoad": "Hindi ma-load ang analitika",
+      "trackedReviewsCaption": "Mga natapos na pagsusuri sa panahong ito habang naka-on ang analitika. Hindi kailanman binibilang ang mga pagsusuring tumatakbo o nabigo.",
+      "trackedReviewsUncounted": "Hindi binibilang: {{displayCount}} sa {{displayTotal}} natapos na pagsusuri ng organisasyon na walang naitalang resulta.",
+      "trackedReviewsUncounted_one": "Hindi binibilang: {{displayCount}} sa {{displayTotal}} natapos na pagsusuri ng organisasyon na walang naitalang resulta.",
+      "trackedReviewsUncounted_other": "Hindi binibilang: {{displayCount}} sa {{displayTotal}} natapos na pagsusuri ng organisasyon na walang naitalang resulta."
     },
     "council": {
       "title": "Pagsusuri ng konseho",
       "subtitle": "Sinusuri ng ilang espesyalista ang bawat pull request, at pinagsasama ang kanilang mga boto sa iisang desisyon.",
-      "unavailable": "Hindi magagamit ang pagsusuri ng konseho sa organisasyong ito.",
+      "unavailablePersonallyTitle": "Kailangan ng Enterprise na organisasyon",
+      "unavailablePersonally": "Hindi bahagi ng personal na account ang pagsusuri ng konseho.",
+      "unavailablePersonallyAction": "Gumawa ng organisasyon",
+      "unavailablePersonallySwitchAction": "Lumipat ng organisasyon",
+      "unavailableOrganizationTitle": "Hindi magagamit ang pagsusuri ng konseho",
+      "unavailableForOrganization": "Ang pagsusuri ng konseho ay nangangailangan ng Enterprise plan na may aktibong subscription o trial. Wala ito sa organisasyong ito sa ngayon.",
+      "unavailableForOrganizationNeutral": "Ang pagsusuri ng konseho ay hindi magagamit para sa organisasyong ito sa ngayon. Subukan muli mamaya.",
+      "unavailableOnBitbucket": "Hindi available ang pagsusuri ng konseho para sa mga Bitbucket repositoryo.",
       "noRepositories": "Wala pang napiling repositoryo. Pumili muna ng mga repositoryo sa mga setting ng repositoryo.",
       "specialists": "Mga espesyalista",
       "labels": "Mga label na nagpapasimula ng pagsusuri ng konseho",
@@ -3122,7 +3144,6 @@
     "completingPurchase": "Kinukumpleto ang pagbili",
     "subscriptionLoading": "Nilo-load ang subscription sa Kilo Pass",
     "retryHint": "Sinusubukang kunin muli ang katayuan ng Kilo Pass.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Natapos {{date}}",
     "notAvailableInApp": "Hindi magagamit ang Kilo Pass sa app.",
     "statusActive": "Aktibo",
@@ -3325,6 +3346,7 @@
       "manageOnWeb": "Mga setting ng pagsingil sa web",
       "changePlan": "Palitan ang plano",
       "buySeats": "Bumili ng mga puwesto",
+      "managedOnWeb": "Ang plano, ang mga puwesto at ang auto top-up ay pinamamahalaan sa web.",
       "setupAutoTopUp": "I-set up ang auto top-up",
       "manageAutoTopUp": "Pamahalaan ang auto top-up",
       "opensOnWeb": "Bubuksan sa web"
@@ -3473,12 +3495,10 @@
       "requestLogs": "Mga request log"
     },
     "requestLogs": {
-      "hint": "Mga request sa loob ng isang oras bago magtapos ang window, pinakabago muna.",
       "older": "Mas lumang oras",
       "newer": "Mas bagong oras",
       "truncated": "Mas marami ang request sa oras na ito kaysa sa ipinapakita ng listahan.",
       "emptyTitle": "Walang request",
-      "emptyDescription": "Walang gateway request sa oras na ito.",
       "loadError": "Hindi ma-load ang mga request log.",
       "permissionDenied": "Ang may-ari, admin o billing manager lang ng organisasyon ang puwedeng magbasa ng mga request log nito.",
       "tokens": "{{input}} input · {{output}} output",
@@ -4282,8 +4302,7 @@
       "repoValue": "Repositoryo: {{name}}",
       "profileValue": "Profile: {{name}}",
       "profileUnavailable": "Hindi na available ang profile na ito. Pumili ng iba.",
-      "pickerEmptyDescriptionOrganization": "Gumawa ng profile ng organisasyon para magamit muli ang mga variable ng kapaligiran, mga utos sa pag-setup, at mga kasanayan sa mga session.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Ang may-ari ng organisasyon o admin ang makakagawa ng profile ng organisasyon."
+      "pickerEmptyDescriptionOrganization": "Gumawa ng profile ng organisasyon para magamit muli ang mga variable ng kapaligiran, mga utos sa pag-setup, at mga kasanayan sa mga session."
     },
     "variablesDeleteFailed": "Hindi ma-delete ang variable",
     "deleteVariable": "Burahin ang variable {{key}}",
@@ -4469,7 +4488,6 @@
     "dismiss": "Balewalain ang briefing",
     "offline": "Offline · naka-save na briefing",
     "cached": "Naka-save na ulat · hindi ma-refresh",
-    "window": "{{start}} – {{end}}",
     "summary": "Buod ng AI",
     "summaryPending": "Ginagawa pa ang buod ng AI. Ilalakip ito rito kapag handa na.",
     "summaryUnavailable": "Hindi available ang buod ng AI. Available pa rin ang iyong nakaayos na ulat.",
@@ -4588,6 +4606,7 @@
       "title": "Mga pampapagana at webhook",
       "subtitle": "Gawing awtomatiko ang mga pagtakbo ng Cloud Agent mula sa tawag na webhook o iskedyul.",
       "new": "Bagong pampapagana",
+      "create": "Gumawa ng pampapagana",
       "emptyTitle": "Wala pang pampapagana",
       "emptyDescription": "Gumawa ng pampapagana para magsimula ng pagtakbo ng Cloud Agent mula sa tawag na webhook o sa isang iskedyul.",
       "loadFailedTitle": "Hindi makuha ang mga pampapagana",
@@ -4641,6 +4660,8 @@
       "created": "Nagawa ang pampapagana",
       "saved": "Naimbak ang pampapagana",
       "statusArrived": "Dumating",
+      "defaultPromptWebhook": "Ilarawan ang katawan ng kahilingang webhook na ito:\n\n{{body}}",
+      "defaultPromptScheduled": "Patakbuhin ang naka-iskedyul na gawain. Sinimulan noong {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Maglagay ng pangalan.",
         "nameTooShort": "Gumamit ng hindi bababa sa 8 karakter.",

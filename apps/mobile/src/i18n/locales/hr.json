@@ -26,6 +26,7 @@
     "creditHistory": "Povijest kredita",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Odustani",
     "done": "Gotovo",
     "retry": "Pokušaj ponovno",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "Izmjene",
     "organizationTrialEnded": "Probno razdoblje organizacije je završilo i organizacija nema aktivan plan. Vlasnik organizacije može ažurirati naplatu na kilo.ai i zatim pokušati ponovno.",
-    "privateRepositoryA11y": "{{name}}, privatni repozitorij"
+    "privateRepositoryA11y": "{{name}}, privatni repozitorij",
+    "legalDocumentEnglishOnly": "Ovaj je dokument dostupan samo na engleskom jeziku."
   },
   "language": {
     "restarting": "Ponovno pokretanje radi promjene jezika",
@@ -481,7 +483,14 @@
       "viewReceipt": "Prikaži potvrdu"
     },
     "changelog": "Novosti",
-    "changelogVersionPending": "Novosti ove verzije stižu s idućim ažuriranjem aplikacije."
+    "changelogVersionPending": "Novosti verzije {{version}} stižu s idućim ažuriranjem aplikacije.",
+    "changelogGroupNew": "Novo",
+    "changelogFixesIn": "Ispravci i poboljšanja u područjima: {{areas}}.",
+    "changelogFixesPolish": "Ispravci i poboljšanja u cijeloj aplikaciji.",
+    "changelogAreas": {
+      "signIn": "Prijava",
+      "profileOrganizations": "Profil i organizacije"
+    }
   },
   "preferences": {
     "general": "Općenito",
@@ -1377,7 +1386,8 @@
       "managedOnWeb": "Bitbucket vezom ove organizacije upravlja se na webu s računala.",
       "description": "Stvori token za pristup radnom prostoru s potrebnim dopuštenjima i zalijepi ga u nastavku.",
       "scopes": "Račun: čitanje · Repozitoriji: čitanje/pisanje · Zahtjevi za spajanje: čitanje · Webhookovi: čitanje/pisanje",
-      "tokenPlaceholder": "Token za pristup radnom prostoru"
+      "tokenPlaceholder": "Token za pristup radnom prostoru",
+      "tokenRefused": "Bitbucket nije prihvatio ovaj token za pristup radnom prostoru. Provjeri ima li gore navedena dopuštenja, pa pokušaj ponovno."
     },
     "scopeList": {
       "personalStillAvailable": "Osobni repozitoriji i dalje su dostupni u nastavku.",
@@ -1489,13 +1499,26 @@
       "repositoryLine": "Pregledi: {{reviews}} · Nalazi: {{findings}}",
       "empty": "Još nema pregleda s analitikom",
       "emptyDescription": "Analitika bilježi dovršene preglede dok je uključena za organizaciju.",
-      "off": "Analitika je isključena za ovu organizaciju.",
-      "couldNotLoad": "Nije moguće učitati analitiku"
+      "offTitle": "Analitika je isključena za {{platform}}",
+      "offDescription": "Uloge naplate u organizaciji (vlasnici, administratori i upravitelji naplate) mogu uključiti analitiku u postavkama organizacije na webu kako bi se bilježili dovršeni pregledi.",
+      "couldNotLoad": "Nije moguće učitati analitiku",
+      "trackedReviewsCaption": "Dovršeni pregledi koji su završili u ovom razdoblju dok je analitika bila uključena. Pregledi u tijeku i neuspjeli pregledi se nikada ne računaju.",
+      "trackedReviewsUncounted": "Nije uračunato: {{displayCount}} od {{displayTotal}} dovršenih pregleda koje organizacija ima, čiji rezultat nije bio zabilježen.",
+      "trackedReviewsUncounted_few": "Nije uračunato: {{displayCount}} od {{displayTotal}} dovršenih pregleda koje organizacija ima, čiji rezultat nije bio zabilježen.",
+      "trackedReviewsUncounted_one": "Nije uračunato: {{displayCount}} od {{displayTotal}} dovršenih pregleda koje organizacija ima, čiji rezultat nije bio zabilježen.",
+      "trackedReviewsUncounted_other": "Nije uračunato: {{displayCount}} od {{displayTotal}} dovršenih pregleda koje organizacija ima, čiji rezultat nije bio zabilježen."
     },
     "council": {
       "title": "Pregled vijeća",
       "subtitle": "Nekoliko stručnjaka pregledava svaki zahtjev za povlačenje, a njihovi se glasovi spajaju u jednu odluku.",
-      "unavailable": "Pregled vijeća nije dostupan za ovu organizaciju.",
+      "unavailablePersonallyTitle": "Potrebna je Enterprise organizacija",
+      "unavailablePersonally": "Pregled vijeća nije dio osobnog računa.",
+      "unavailablePersonallyAction": "Stvori organizaciju",
+      "unavailablePersonallySwitchAction": "Promijeni organizaciju",
+      "unavailableOrganizationTitle": "Pregled vijeća nije dostupan",
+      "unavailableForOrganization": "Pregled vijeća zahtijeva Enterprise plan s aktivnom pretplatom ili probnim razdobljem. Ova organizacija ga trenutačno nema.",
+      "unavailableForOrganizationNeutral": "Pregled vijeća trenutačno nije dostupan za ovu organizaciju. Pokušajte ponovno kasnije.",
+      "unavailableOnBitbucket": "Pregled vijeća nije dostupan za Bitbucket repozitorije.",
       "noRepositories": "Još nije odabran nijedan repozitorij. Najprije odaberi repozitorije u postavkama repozitorija.",
       "specialists": "Stručnjaci",
       "labels": "Oznake koje pokreću pregled vijeća",
@@ -3179,7 +3202,6 @@
     "completingPurchase": "Dovršavanje kupnje",
     "subscriptionLoading": "Učitavanje pretplate na Kilo Pass",
     "retryHint": "Ponovno učitava stanje Kilo Passa.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Završeno {{date}}",
     "notAvailableInApp": "Kilo Pass nije dostupan u aplikaciji.",
     "statusActive": "Aktivno",
@@ -3382,6 +3404,7 @@
       "manageOnWeb": "Postavke naplate na webu",
       "changePlan": "Promijeni plan",
       "buySeats": "Kupi korisnička mjesta",
+      "managedOnWeb": "Planom, korisničkim mjestima i automatskom nadoplatom upravlja se na webu.",
       "setupAutoTopUp": "Postavi automatsku nadoplatu",
       "manageAutoTopUp": "Upravljaj automatskom nadoplatom",
       "opensOnWeb": "Otvara se na webu"
@@ -3530,12 +3553,10 @@
       "requestLogs": "Zapisnici zahtjeva"
     },
     "requestLogs": {
-      "hint": "Zahtjevi iz sata prije kraja razdoblja, najnoviji prvi.",
       "older": "Prethodni sat",
       "newer": "Sljedeći sat",
       "truncated": "U ovom satu ima više zahtjeva nego što je prikazano.",
       "emptyTitle": "Nema zahtjeva",
-      "emptyDescription": "U ovom satu nema zahtjeva prema pristupniku.",
       "loadError": "Učitavanje zapisnika zahtjeva nije uspjelo.",
       "permissionDenied": "Zapisnike zahtjeva organizacije mogu čitati samo vlasnik, administrator ili upravitelj naplate.",
       "tokens": "ulaz: {{input}} · izlaz: {{output}}",
@@ -4348,8 +4369,7 @@
       "repoValue": "Spremište: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Ovaj profil više nije dostupan. Odaberite drugi.",
-      "pickerEmptyDescriptionOrganization": "Izradite profil organizacije za ponovno korištenje varijabli okoline, naredbi za postavljanje i vještina u više sesija.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Vlasnik ili administrator organizacije može izraditi profil organizacije."
+      "pickerEmptyDescriptionOrganization": "Izradite profil organizacije za ponovno korištenje varijabli okoline, naredbi za postavljanje i vještina u više sesija."
     },
     "variablesDeleteFailed": "Nije moguće izbrisati varijablu",
     "deleteVariable": "Obriši varijablu {{key}}",
@@ -4539,7 +4559,6 @@
     "dismiss": "Odbaci izvješće",
     "offline": "Izvan mreže · spremljeno izvješće",
     "cached": "Spremljeno izvješće · osvježavanje nije dostupno",
-    "window": "{{start}} – {{end}}",
     "summary": "AI sažetak",
     "summaryPending": "AI sažetak je u izradi. Pojavit će se ovdje kad bude spreman.",
     "summaryUnavailable": "AI sažetak nije dostupan. Strukturirano izvješće i dalje je dostupno.",
@@ -4658,6 +4677,7 @@
       "title": "Okidači i webhookovi",
       "subtitle": "Automatizirajte pokretanja Cloud Agent iz webhook poziva ili po rasporedu.",
       "new": "Novi okidač",
+      "create": "Stvorite okidač",
       "emptyTitle": "Još nema okidača",
       "emptyDescription": "Stvorite okidač za pokretanje Cloud Agent iz webhook poziva ili po rasporedu.",
       "loadFailedTitle": "Nije moguće učitati okidače",
@@ -4711,6 +4731,8 @@
       "created": "Okidač je stvoren",
       "saved": "Okidač je spremljen",
       "statusArrived": "Stiglo",
+      "defaultPromptWebhook": "Opišite tijelo ovog webhook zahtjeva:\n\n{{body}}",
+      "defaultPromptScheduled": "Pokrenite zakazani zadatak. Pokrenuto u {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Unesite naziv.",
         "nameTooShort": "Upotrijebite najmanje 8 znakova.",

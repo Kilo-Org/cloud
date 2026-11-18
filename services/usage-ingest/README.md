@@ -199,7 +199,7 @@ The consumer reads the tag before anything else:
 |---|---|---|---|
 | Untagged | Existing LLM writer at `USAGE_WRITER_URL` | Unchanged | Unchanged |
 | `enkrypt_usage`, `v: 1`, valid record | `/api/internal/enkrypt-usage/record` with `x-usage-write-source: queue` | `recorded` or `duplicate` whose `usageId` equals `record.id` | Any other response, including a wrong or missing id echo, HTTP 429 and 503 |
-| `exa_usage`, `v: 1`, valid record | `/api/internal/exa-usage/record` with `x-usage-write-source: queue` | `recorded` or `duplicate` whose `usageId` equals `record.id` | Any other response, including a wrong or missing id echo, HTTP 429 and 503 |
+| `exa_usage`, `v: 1`, valid record | `/api/internal/exa-usage/record` with `x-usage-write-source: queue` | `recorded` or `duplicate` whose `usageId` equals `record.id`, or `rejected` for the same id, which means the writer resolved no payer, recorded nothing, and the message is not redelivered | Any other response, including a wrong or missing id echo, HTTP 429 and 503 |
 | `enkrypt_usage` or `exa_usage`, `v: 1`, invalid record or extra key | None | Never | Conservative retry (`invalid_event`) |
 | Any other `kind`, or another `v` | None | Never | Conservative retry (`unsupported_kind`) |
 
@@ -913,7 +913,7 @@ unchanged. Authentication, body reads and schema and size checks run first, as b
 | `USAGE_INGEST_HEDGE_DELAY_MS` | Whole milliseconds, clamped to 250–10000 | `1000` when missing or not a whole number |
 | `USAGE_INGEST_HEDGE_PERCENT` | Whole number 0–100; only read when the mode is `on` | `100` when missing or invalid |
 
-Production config sets `on`, delay 1000 and percent 50. Staging sets `on`, delay
+Production config sets `on`, delay 1000 and percent 100. Staging sets `on`, delay
 1000 and percent 100.
 
 - `off`, or an event that is not eligible: the single-queue path and its logs, unchanged.
@@ -1008,8 +1008,12 @@ EU and the hedge protocol/settings intact; verify readback and recovery afterwar
 
 Change the variable in `wrangler.jsonc` in a small PR and redeploy the Worker through
 the normal workflow. `wrangler deploy` replaces dashboard-edited variables, so a
-dashboard change does not last. For the first production trial, set
-`USAGE_INGEST_HEDGE_MODE` to `on` and keep `USAGE_INGEST_HEDGE_PERCENT` at `50`.
+dashboard change does not last. The first production trial set
+`USAGE_INGEST_HEDGE_MODE` to `on` and kept `USAGE_INGEST_HEDGE_PERCENT` at `50`;
+production has since expanded to percent 100. Rolling production back to the
+earlier bounded 50% is a separate follow-up PR that restores
+`USAGE_INGEST_HEDGE_PERCENT` to `50` and redeploys the Worker; it is not an
+automatic or live action.
 
 ### Merge prerequisite
 
@@ -1041,20 +1045,27 @@ first, then remove forward.
 ### Measuring
 
 The Worker's `usage_ingest_hedge` event and `batch.queue` are not in Axiom, but the
-usage ID is. At percent 50, last hex digits `0`–`7` of `usage_id` are the treatment
-and `8`–`f` the control, inside the same stalls. The primary measurement splits by
-that digit within the same hours:
+usage ID is. Production now runs at percent 100, so every eligible LLM usage ID is
+hedged and there is no simultaneous non-eligible control arm. The historical
+treatment/control split — at percent 50, last hex digits `0`–`7` of `usage_id` were
+the treatment and `8`–`f` the control inside the same stalls — no longer describes an
+active arm; those earlier digit-based comparisons are history after activation. The
+primary measurement is a before/after comparison of:
 
 - `usage_record_completion`: age and the over-5 s share of recorded completions,
   especially in stall hours.
 - `usage_publisher_attempt`: `duration_ms` of publisher attempts, and the share of
   5 s or more.
 
-The treatment should show fewer attempts of 5 s or more and a lower over-5 s share,
-with duplicate completions rising by roughly the hedged share. In Cloudflare Workers
-Logs, `usage_ingest_hedge` winner counts show whether the second queue accepts while
-the first is blocked. A before/after comparison is only supporting evidence, because
-stalls vary a lot from day to day. No benefit is claimed before that measurement.
+Expanding 50→100 can roughly double eligible hedge attempts at equal workload; it
+does not double all publications, because a fast EU send still never hedges and
+off-mode or non-hex-digit events are unchanged. Duplicate completions can rise by
+roughly the newly eligible share. The hedge consumer cap of 25 is unchanged and does
+not by itself guarantee the extra traffic is harmless to speed or load. In
+Cloudflare Workers Logs, `usage_ingest_hedge` winner counts show whether the second
+queue accepts while the first is blocked. A before/after comparison is only
+supporting evidence, because stalls vary a lot from day to day. No benefit is
+claimed before that measurement.
 
 ## First writer-admission retry spread
 

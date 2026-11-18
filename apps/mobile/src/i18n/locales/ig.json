@@ -26,6 +26,7 @@
     "creditHistory": "Akụkọ kredit",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Kagbuo",
     "done": "Emechara",
     "retry": "Nwaa ọzọ",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "Mgbanwe",
     "organizationTrialEnded": "Oge nnwale nke òtù ahụ agwụla na o nweghị atụmatụ na-arụ ọrụ. Onye nwe òtù nwere ike imelite nhazi ụgwọ na kilo.ai, wee nwaa ọzọ.",
-    "privateRepositoryA11y": "{{name}}, ebe nchekwa koodu nkeonwe"
+    "privateRepositoryA11y": "{{name}}, ebe nchekwa koodu nkeonwe",
+    "legalDocumentEnglishOnly": "Akwụkwọ a dị naanị n'asụsụ Bekee."
   },
   "language": {
     "restarting": "Na-amalitegharị iji asụsụ ahọpụtara",
@@ -481,7 +483,14 @@
       "viewReceipt": "Lee akwụkwọ nnata"
     },
     "changelog": "Ihe ọhụrụ",
-    "changelogVersionPending": "Ndetu maka ụdị a ga-abịa na mmelite ngwa na-esote."
+    "changelogVersionPending": "Ndetu maka ụdị {{version}} ga-abịa na mmelite ngwa na-esote.",
+    "changelogGroupNew": "Ọhụrụ",
+    "changelogFixesIn": "Ndozi na mmezi na {{areas}}.",
+    "changelogFixesPolish": "Ndozi na mmezi n'ebe niile n'ime ngwa ahụ.",
+    "changelogAreas": {
+      "signIn": "Ịbanye",
+      "profileOrganizations": "Profaịlụ na òtù"
+    }
   },
   "preferences": {
     "general": "Izugbe",
@@ -1354,7 +1363,8 @@
       "managedOnWeb": "A na-elekọta njikọ Bitbucket nke nzukọ a na weebụ site na kọmputa.",
       "description": "Mepụta akara ikike ịnweta oghere ọrụ nwere ikike ndị achọrọ, wee mado ya n'okpuru.",
       "scopes": "Akaụntụ: ịgụ · Ebe nchekwa: ịgụ/ide · Arịrịọ ijikọ koodu: ịgụ · Njikọ ngosi: ịgụ/ide",
-      "tokenPlaceholder": "Akara ikike ịnweta oghere ọrụ"
+      "tokenPlaceholder": "Akara ikike ịnweta oghere ọrụ",
+      "tokenRefused": "Bitbucket anabataghị akara ikike ịnweta oghere ọrụ a. Lelee na o nwere ikike ndị dị n'elu, wee gbalịa ọzọ."
     },
     "scopeList": {
       "personalStillAvailable": "Ebe nchekwa nke gị ka dị n'okpuru.",
@@ -1465,13 +1475,25 @@
       "repositoryLine": "Nyocha: {{reviews}} · Ihe achọpụtara: {{findings}}",
       "empty": "Enweghị nyocha nwere ọnụọgụgụ nyocha",
       "emptyDescription": "Ọnụọgụgụ nyocha na-edekọ nyocha ndị gụchara mgbe agbanyere ya maka nzukọ.",
-      "off": "Agbanyụrụ ọnụọgụgụ nyocha maka nzukọ a.",
-      "couldNotLoad": "Enweghị ike ibudata ọnụọgụgụ nyocha"
+      "offTitle": "Agbanyụrụ ọnụọgụgụ nyocha maka {{platform}}",
+      "offDescription": "Ndị nọ n'ọrụ ụgwọ nke nzukọ (ndị nwe ya, ndị nchịkwa na ndị njikwa ụgwọ) nwere ike ịgbanye ọnụọgụgụ nyocha n'ime ntọala nzukọ dị na weebụ iji dekọ nyocha ndị gụchara.",
+      "couldNotLoad": "Enweghị ike ibudata ọnụọgụgụ nyocha",
+      "trackedReviewsCaption": "Nyocha ndị gụchara n'oge a mgbe agbanyere ọnụọgụgụ nyocha. Ọ dịghị mgbe a na-agụta nyocha ndị na-agba ma ọ bụ ndị dara.",
+      "trackedReviewsUncounted": "Agụtaghị ọnụ: {{displayCount}} n’ime {{displayTotal}} nyocha ndị gụchara nke nzukọ, e jideghị mmasị ha.",
+      "trackedReviewsUncounted_one": "Agụtaghị ọnụ: {{displayCount}} n’ime {{displayTotal}} nyocha ndị gụchara nke nzukọ, e jideghị mmasị ha.",
+      "trackedReviewsUncounted_other": "Agụtaghị ọnụ: {{displayCount}} n’ime {{displayTotal}} nyocha ndị gụchara nke nzukọ, e jideghị mmasị ha."
     },
     "council": {
       "title": "Nyocha otu ndị nyocha",
       "subtitle": "Ọtụtụ ndị ọkachamara na-enyocha PR ọ bụla, ntuli aka ha na-ejikọta ọnụ wee bụrụ otu mkpebi.",
-      "unavailable": "Nyocha otu ndị nyocha adịghị maka nzukọ a.",
+      "unavailablePersonallyTitle": "Ọ chọrọ ọgbakọ Enterprise",
+      "unavailablePersonally": "Nyocha otu ndị nyocha abụghị akụkụ nke akaụntụ onwe onye.",
+      "unavailablePersonallyAction": "Mepụta nzukọ",
+      "unavailablePersonallySwitchAction": "Gbanwee otu",
+      "unavailableOrganizationTitle": "Nyocha otu ndị nyocha adịghị ugbu a",
+      "unavailableForOrganization": "Nyocha otu ndị nyocha chọrọ atụmatụ Enterprise nwere ndebanye aha na-arụ ọrụ ma ọ bụ oge ule. Nzukọ a enweghị ya ugbu a.",
+      "unavailableForOrganizationNeutral": "Nyocha otu ndị nyocha adịghị maka nzukọ a ugbu a. Nwaa ọzọ ma emechaa.",
+      "unavailableOnBitbucket": "Nyocha otu ndị nyocha adịghị maka ebe nchekwa Bitbucket.",
       "noRepositories": "Ahọrọbeghị ebe nchekwa ọ bụla. Buru ụzọ họrọ ebe nchekwa na ntọala ebe nchekwa.",
       "specialists": "Ndị ọkachamara",
       "labels": "Mkpado na-akpalite nyocha otu ndị nyocha",
@@ -3122,7 +3144,6 @@
     "completingPurchase": "Na-emecha ịzụrụ ihe",
     "subscriptionLoading": "Na-ebudata ndenye aha Kilo Pass",
     "retryHint": "Na-anwale ịnweta ọnọdụ Kilo Pass ọzọ.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Agwụla na {{date}}",
     "notAvailableInApp": "Kilo Pass adịghị na ngwa a.",
     "statusActive": "Na-arụ ọrụ",
@@ -3325,6 +3346,7 @@
       "manageOnWeb": "Ntọala Ịkwụ ụgwọ na weebụ",
       "changePlan": "Gbanwee atụmatụ",
       "buySeats": "Zụta oghere",
+      "managedOnWeb": "A na-ejikwa atụmatụ, oghere na mgbakwunye akpaaka na weebụ.",
       "setupAutoTopUp": "Hazie mgbakwunye akpaaka",
       "manageAutoTopUp": "Jikwaa mgbakwunye akpaaka",
       "opensOnWeb": "Na-emepe na weebụ"
@@ -3473,12 +3495,10 @@
       "requestLogs": "Ndekọ arịrịọ"
     },
     "requestLogs": {
-      "hint": "Arịrịọ nke otu awa tupu oge a na-egosi agwụ, nke kachasị ọhụrụ bụ mbụ.",
       "older": "Awa gara aga",
       "newer": "Awa na-esote",
       "truncated": "Awa a nwere arịrịọ karịa ndị ndepụta a na-egosi.",
       "emptyTitle": "Enweghị arịrịọ",
-      "emptyDescription": "Enweghị arịrịọ gateway n'awa a.",
       "loadError": "Enweghị ike ibudata ndekọ arịrịọ.",
       "permissionDenied": "Naanị onye nwe òtù, onye nchịkwa ma ọ bụ onye na-ahụ maka ịkwụ ụgwọ nwere ike ịgụ ndekọ arịrịọ ya.",
       "tokens": "{{input}} batara · {{output}} pụtara",
@@ -4282,8 +4302,7 @@
       "repoValue": "Ebe nchekwa: {{name}}",
       "profileValue": "Profaịlụ: {{name}}",
       "profileUnavailable": "Enweghịzi profaịlụ a. Họrọ nke ọzọ.",
-      "pickerEmptyDescriptionOrganization": "Mepụta profaịlụ otumobi iji megharịa mgbanwe gburugburu ebe obibi, iwu ntọlite na nka n'ofe nnọkọ.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Onye nwe otumobi ma ọ bụ onye nchịkwa nwere ike mepụta profaịlụ otumobi."
+      "pickerEmptyDescriptionOrganization": "Mepụta profaịlụ otumobi iji megharịa mgbanwe gburugburu ebe obibi, iwu ntọlite na nka n'ofe nnọkọ."
     },
     "variablesDeleteFailed": "Enweghị ike ihichapụ mgbanwe",
     "deleteVariable": "Hichapụ mgbanwe {{key}}",
@@ -4469,7 +4488,6 @@
     "dismiss": "Leghara akụkọ anya",
     "offline": "Enweghị ịntanetị · akụkọ echekwara",
     "cached": "Akụkọ echekwara · enweghị ike imegharị",
-    "window": "{{start}} – {{end}}",
     "summary": "Nchịkọta AI",
     "summaryPending": "Nchịkọta AI na-aga n'ihu. Ọ ga-apụta ebe a mgbe ọ dị njikere.",
     "summaryUnavailable": "Nchịkọta AI adịghị. Akụkọ ahaziri ahazi gị ka dị.",
@@ -4588,6 +4606,7 @@
       "title": "Ihe mkpalite na webhook",
       "subtitle": "Mee ka ọsọ Cloud Agent na-akpaghị aka site na oku webhook ma ọ bụ nhazi oge.",
       "new": "Ihe mkpalite ọhụrụ",
+      "create": "Mepụta ihe mkpalite",
       "emptyTitle": "Enwebeghị ihe mkpalite",
       "emptyDescription": "Mepụta ihe mkpalite iji malite ọsọ Cloud Agent site na oku webhook ma ọ bụ na nhazi oge.",
       "loadFailedTitle": "Enweghị ike ibudata ihe mkpalite",
@@ -4641,6 +4660,8 @@
       "created": "Emepụtara ihe mkpalite",
       "saved": "Echekwara ihe mkpalite",
       "statusArrived": "Rutere",
+      "defaultPromptWebhook": "Kọwaa ahụ arịrịọ webhook a:\n\n{{body}}",
+      "defaultPromptScheduled": "Gbaa ọrụ a haziri. Ọsọ malitere na {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Tinye aha.",
         "nameTooShort": "Jiri opekata mpe mkpụrụedemede 8.",

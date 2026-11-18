@@ -15,15 +15,18 @@ const { DurableObjectMock } = vi.hoisted(() => ({
 
 vi.mock('cloudflare:workers', () => ({ DurableObject: DurableObjectMock }));
 
-import type {
-  BudgetVerdict,
-  ContainerUsageRpcMethods,
-  HeartbeatAck,
-  RecordAck,
-  RecordStartResult,
+import {
+  createContainerUsageClient,
+  type BudgetVerdict,
+  type ContainerUsageRpcMethods,
+  type HeartbeatAck,
+  type RecordAck,
+  type RecordStartResult,
 } from '@kilocode/container-usage';
 import type { Env } from '../types.js';
 import { containerLimitError } from '../container-limit-test-helpers.js';
+import { containersBillingIdentity } from '../container-usage-context.js';
+import { MeteredBillingLifecycle } from '../metered-billing-lifecycle.js';
 import { ContainersBillingScheduler } from './containers-billing.js';
 import { CONTROL_SUPERVISOR_PATH } from '../sandbox-control/container-paths.js';
 import { SandboxContainers, type ContainerInstanceSize } from './SandboxContainers.js';
@@ -464,7 +467,7 @@ describe('ContainersBilling identity and admission', () => {
     expect(storage.map.get(START_ACK_KEY)).toBeUndefined();
   });
 
-  it('sends the capacity marker and drops the generation at the container limit', async () => {
+  it('returns a capacity rejection without retrying or leaving a generation', async () => {
     const admitted = setup();
     await expect(admit(admitted.instance, 'standard-4')).resolves.toEqual({ success: true });
     expect(admitted.meter.recordStartInputs).toEqual([
@@ -478,11 +481,54 @@ describe('ContainersBilling identity and admission', () => {
       error: { code: 'container_limit_reached', message: limit.message },
     };
 
-    await expect(admit(limited.instance, 'standard-4')).rejects.toMatchObject({
+    await expect(admit(limited.instance, 'standard-4')).resolves.toEqual({
+      success: false,
       code: 'container_limit_reached',
       message: limit.message,
     });
+    expect(limited.meter.recordStartInputs).toEqual([
+      expect.objectContaining({ enforceCapacity: true }),
+    ]);
     expect(limited.storage.map.get(BILLING_CONTEXT_KEY)).toBeUndefined();
+    expect(limited.storage.map.get(START_ACK_KEY)).toBeUndefined();
+    expect(limited.storage.alarm).toBeUndefined();
+    expect(limited.container.startCalls).toHaveLength(0);
+  });
+
+  it('returns the same capacity rejection when admitting directly before a start', async () => {
+    const storage = new FakeStorage();
+    const meter = new FakeMeter();
+    const limit = containerLimitError('user', 3);
+    meter.startResult = {
+      success: false,
+      error: { code: 'container_limit_reached', message: limit.message },
+    };
+    const { className: sandboxClassName, service } = containersBillingIdentity('standard-4');
+    const identity = { sandboxClassName };
+    const schedule = vi.fn();
+    const lifecycle = new MeteredBillingLifecycle({
+      storage,
+      usageClient: createContainerUsageClient(meter, { service }),
+      enforceContainerCapacity: true,
+      schedule,
+      deleteSchedules: vi.fn(),
+      getState: async () => ({ status: 'stopped' }),
+      isContainerRunning: () => false,
+      stopContainer: vi.fn(),
+      destroyContainer: vi.fn(),
+      waitUntil: vi.fn(),
+      durableObjectId: 'do-id',
+    });
+    await lifecycle.configureBilling(identity, BILLING_INPUT);
+
+    await expect(lifecycle.admitBeforeStart(identity)).resolves.toEqual({
+      success: false,
+      code: 'container_limit_reached',
+      message: limit.message,
+    });
+    expect(meter.recordStartInputs).toHaveLength(1);
+    expect(schedule).not.toHaveBeenCalled();
+    expect(storage.map.get(BILLING_CONTEXT_KEY)).toBeUndefined();
   });
 
   it('does not skip an unmeasured context that carries a pending stop', async () => {

@@ -1,6 +1,8 @@
 import { describe, expect, it } from '@jest/globals';
 import {
   getModelDisplayPricing,
+  getPeakPricing,
+  maxEndpointPricing,
   undoPricingDiscount,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/display-pricing';
 
@@ -59,7 +61,133 @@ describe('getModelDisplayPricing', () => {
     });
   });
 
+  it('shows the undiscounted peak price', () => {
+    expect(
+      getModelDisplayPricing({
+        prompt: '0.00000005',
+        completion: '0.0000001',
+        discount: 0.5,
+        overrides: [{ prompt: '0.0000001', completion: '0.0000002' }],
+      })
+    ).toEqual({ prompt: '0.000000200000', completion: '0.000000400000' });
+  });
+
   it('returns undefined when there is no pricing', () => {
     expect(getModelDisplayPricing(undefined)).toBeUndefined();
+  });
+});
+
+describe('getPeakPricing', () => {
+  it('takes the highest OpenRouter time-of-day window and drops the windows', () => {
+    expect(
+      getPeakPricing({
+        prompt: '0.00000009',
+        completion: '0.00000036',
+        input_cache_read: '0.0000000018',
+        discount: 0,
+        overrides: [
+          {
+            utc_start: 0,
+            utc_end: 1400,
+            prompt: '0.00000018',
+            completion: '0.00000072',
+            input_cache_read: '0.0000000036',
+          },
+          { utc_start: 1400, utc_end: 0, prompt: '0.00000009', completion: '0.00000036' },
+        ],
+      })
+    ).toEqual({
+      prompt: '0.00000018',
+      completion: '0.00000072',
+      input_cache_read: '0.0000000036',
+      discount: 0,
+    });
+  });
+
+  it("multiplies Vercel's token prices by the peak multiplier and drops the multiplier", () => {
+    expect(
+      getPeakPricing({
+        prompt: '0.00000015',
+        completion: '0.0000006',
+        input_cache_read: '0.000000015',
+        image: '0.01',
+        web_search: '0.005',
+        peak_pricing: {
+          multiplier: 2,
+          windows: [{ start_minute_utc: 0, end_minute_utc: 840 }],
+        },
+      })
+    ).toEqual({
+      prompt: '0.000000300000',
+      completion: '0.000001200000',
+      input_cache_read: '0.000000030000',
+      image: '0.01',
+      web_search: '0.005',
+    });
+  });
+
+  it('leaves pricing without time-of-day prices untouched', () => {
+    const pricing = { prompt: '0.000001', completion: '0.000002' };
+    expect(getPeakPricing(pricing)).toBe(pricing);
+  });
+});
+
+describe('maxEndpointPricing', () => {
+  it('takes the higher of each price', () => {
+    expect(
+      maxEndpointPricing(
+        { prompt: '0.000002', completion: '0.000003', input_cache_read: '0.0000002' },
+        { prompt: '0.000001', completion: '0.000005', input_cache_read: '0.0000001' }
+      )
+    ).toEqual({ prompt: '0.000002', completion: '0.000005', input_cache_read: '0.0000002' });
+  });
+
+  it('compares prices numerically rather than as strings', () => {
+    expect(
+      maxEndpointPricing(
+        { prompt: '0.0000009', completion: '0.00001' },
+        { prompt: '0.000001', completion: '0.000009' }
+      )
+    ).toEqual({ prompt: '0.000001', completion: '0.00001' });
+  });
+
+  it('keeps prices only one side has', () => {
+    expect(
+      maxEndpointPricing(
+        { prompt: '0.000001', completion: '0.000002', request: '0.01' },
+        { prompt: '0.000001', completion: '0.000002', input_cache_write: '0.000003' }
+      )
+    ).toEqual({
+      prompt: '0.000001',
+      completion: '0.000002',
+      request: '0.01',
+      input_cache_write: '0.000003',
+    });
+  });
+
+  it('ignores an unparsable price on the other side', () => {
+    expect(
+      maxEndpointPricing(
+        { prompt: '0.000001', completion: '0.000002' },
+        { prompt: 'n/a', completion: '0.000003', input_cache_read: 'n/a' }
+      )
+    ).toEqual({ prompt: '0.000001', completion: '0.000003' });
+  });
+
+  it('does not add zero prices the first side lacks', () => {
+    expect(
+      maxEndpointPricing(
+        { prompt: '0.000001', completion: '0.000002' },
+        { prompt: '0.000001', completion: '0.000002', image: '0', web_search: '0' }
+      )
+    ).toEqual({ prompt: '0.000001', completion: '0.000002' });
+  });
+
+  it('does not modify its arguments', () => {
+    const a = { prompt: '0.000001', completion: '0.000002' };
+    const b = { prompt: '0.000002', completion: '0.000001' };
+    maxEndpointPricing(a, b);
+    expect(a).toEqual({ prompt: '0.000001', completion: '0.000002' });
+    expect(b).toEqual({ prompt: '0.000002', completion: '0.000001' });
   });
 });

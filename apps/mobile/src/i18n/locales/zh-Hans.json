@@ -26,6 +26,7 @@
     "creditHistory": "积分记录",
     "sentenceJoiner": "。",
     "listJoiner": "、",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "取消",
     "done": "完成",
     "retry": "重试",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "更改",
     "organizationTrialEnded": "组织的试用期已结束，且没有生效的套餐。组织所有者可以在 kilo.ai 更新账单信息，然后重试。",
-    "privateRepositoryA11y": "{{name}}，私有仓库"
+    "privateRepositoryA11y": "{{name}}，私有仓库",
+    "legalDocumentEnglishOnly": "本文件仅提供英文版本。"
   },
   "language": {
     "restarting": "正在重启以应用语言设置",
@@ -481,7 +483,14 @@
       "viewReceipt": "查看回执"
     },
     "changelog": "更新内容",
-    "changelogVersionPending": "此版本的更新说明将随下次应用更新提供。"
+    "changelogVersionPending": "{{version}} 版本的更新说明将随下次应用更新提供。",
+    "changelogGroupNew": "新增",
+    "changelogFixesIn": "{{areas}}方面的修复与改进。",
+    "changelogFixesPolish": "全应用范围的修复与改进。",
+    "changelogAreas": {
+      "signIn": "登录",
+      "profileOrganizations": "个人资料和组织"
+    }
   },
   "preferences": {
     "general": "通用",
@@ -676,7 +685,8 @@
       "managedOnWeb": "此组织的 Bitbucket 连接需在电脑上通过网页版进行管理。",
       "description": "创建具有所需权限范围的工作区访问令牌，并粘贴到下方。",
       "scopes": "账户：读取 · 仓库：读/写 · 拉取请求：读取 · Webhook：读/写",
-      "tokenPlaceholder": "工作区访问令牌"
+      "tokenPlaceholder": "工作区访问令牌",
+      "tokenRefused": "Bitbucket 未接受此工作区访问令牌。请检查其是否具有上述权限范围，然后重试。"
     },
     "followReviewMd": "遵循 REVIEW.md",
     "followReviewMdSubtitle": "遵循各仓库 REVIEW.md 文件中的说明",
@@ -922,13 +932,25 @@
       "repositoryLine": "审查：{{reviews}} · 问题：{{findings}}",
       "empty": "还没有带分析数据的审查",
       "emptyDescription": "在组织启用分析期间，系统会记录已完成的审查。",
-      "off": "此组织已关闭分析。",
-      "couldNotLoad": "无法加载分析数据"
+      "offTitle": "已关闭 {{platform}} 的分析",
+      "offDescription": "组织账单角色（所有者、管理员和账单管理员）可以在网页版组织设置中启用分析，以记录已完成的审查。",
+      "couldNotLoad": "无法加载分析数据",
+      "trackedReviewsCaption": "本时间段内启用分析后完成的审查。运行中和失败的审查永不计入。",
+      "trackedReviewsUncounted": "未计入：组织已有 {{displayTotal}} 个已完成的审查，其中 {{displayCount}} 个未捕获结果。",
+      "trackedReviewsUncounted_one": "未计入：组织已有 {{displayTotal}} 个已完成的审查，其中 {{displayCount}} 个未捕获结果。",
+      "trackedReviewsUncounted_other": "未计入：组织已有 {{displayTotal}} 个已完成的审查，其中 {{displayCount}} 个未捕获结果。"
     },
     "council": {
       "title": "评审团审查",
       "subtitle": "多位专家分别审查每个拉取请求，他们的投票汇总为一个决定。",
-      "unavailable": "此组织无法使用评审团审查。",
+      "unavailablePersonallyTitle": "需要 Enterprise 组织",
+      "unavailablePersonally": "评审团审查不包含在个人账户中。",
+      "unavailablePersonallyAction": "创建组织",
+      "unavailablePersonallySwitchAction": "切换组织",
+      "unavailableOrganizationTitle": "评审团审查目前无法使用",
+      "unavailableForOrganization": "评审团审查需要具备生效订阅或试用期的企业套餐。此组织目前不具备此项。",
+      "unavailableForOrganizationNeutral": "此组织目前无法使用评审团审查。请稍后再试。",
+      "unavailableOnBitbucket": "评审团审查不适用于 Bitbucket 仓库。",
       "noRepositories": "尚未选择任何仓库。请先在仓库设置中选择仓库。",
       "specialists": "专家",
       "labels": "触发评审团审查的标签",
@@ -2579,7 +2601,6 @@
     "completingPurchase": "正在完成购买流程",
     "subscriptionLoading": "Kilo Pass 订阅加载中",
     "retryHint": "重新获取 Kilo Pass 状态。",
-    "cardAccessibility": "{{title}}。{{description}}。{{actionLabel}}",
     "endedOn": "{{date}} 已结束",
     "notAvailableInApp": "Kilo Pass 在应用中不可用。",
     "statusActive": "生效中",
@@ -3317,6 +3338,7 @@
       "manageOnWeb": "网页版账单设置",
       "changePlan": "更改套餐",
       "buySeats": "购买席位",
+      "managedOnWeb": "套餐、席位和自动充值在网页版中管理。",
       "setupAutoTopUp": "设置自动充值",
       "manageAutoTopUp": "管理自动充值",
       "opensOnWeb": "在网页中打开"
@@ -3478,12 +3500,10 @@
       "requestLogs": "请求日志"
     },
     "requestLogs": {
-      "hint": "显示时段结束前一小时内的请求，最新的在前。",
       "older": "上一小时",
       "newer": "下一小时",
       "truncated": "该小时的请求数超出列表可显示的数量。",
       "emptyTitle": "暂无请求",
-      "emptyDescription": "该小时内没有网关请求。",
       "loadError": "无法加载请求日志。",
       "permissionDenied": "只有组织的所有者、管理员或账单管理员才能查看其请求日志。",
       "tokens": "输入 {{input}} · 输出 {{output}}",
@@ -4282,8 +4302,7 @@
       "repoValue": "仓库: {{name}}",
       "profileValue": "配置文件: {{name}}",
       "profileUnavailable": "此配置文件已不可用。请选择其他配置文件。",
-      "pickerEmptyDescriptionOrganization": "创建组织配置文件，以跨会话重复使用环境变量、设置命令和技能。",
-      "pickerEmptyDescriptionOrganizationReadOnly": "组织所有者或管理员可以创建组织配置文件。"
+      "pickerEmptyDescriptionOrganization": "创建组织配置文件，以跨会话重复使用环境变量、设置命令和技能。"
     },
     "variablesDeleteFailed": "无法删除变量",
     "deleteVariable": "删除变量 {{key}}",
@@ -4469,7 +4488,6 @@
     "dismiss": "忽略简报",
     "offline": "离线 · 已保存的简报",
     "cached": "已保存的报告 · 无法刷新",
-    "window": "{{start}} – {{end}}",
     "summary": "AI 摘要",
     "summaryPending": "AI 摘要生成中，完成后将附在此处。",
     "summaryUnavailable": "AI 摘要不可用。结构化报告仍可查看。",
@@ -4588,6 +4606,7 @@
       "title": "触发器和 Webhook",
       "subtitle": "通过 Webhook 调用或计划自动运行 Cloud Agent。",
       "new": "新建触发器",
+      "create": "创建触发器",
       "emptyTitle": "还没有触发器",
       "emptyDescription": "创建触发器，以便通过 Webhook 调用或按计划启动 Cloud Agent 运行。",
       "loadFailedTitle": "无法加载触发器",
@@ -4641,6 +4660,8 @@
       "created": "触发器已创建",
       "saved": "触发器已保存",
       "statusArrived": "已到达",
+      "defaultPromptWebhook": "描述此 Webhook 请求的请求体：\n\n{{body}}",
+      "defaultPromptScheduled": "运行计划任务。触发时间为 {{scheduledTime}}。",
       "problems": {
         "nameRequired": "请输入名称。",
         "nameTooShort": "请使用至少 8 个字符。",

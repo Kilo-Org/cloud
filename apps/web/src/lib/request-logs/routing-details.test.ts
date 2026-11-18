@@ -541,7 +541,7 @@ describe('parseRoutingDetails for a partner', () => {
       {
         step: 'partner',
         outcome: 'skipped',
-        inference_provider: 'acme-ai',
+        partner_inference_provider: 'acme-ai',
         reason: 'provider-settings',
       },
       {

@@ -43,21 +43,29 @@ describe('describeStep', () => {
   });
 
   test.each([
-    ['unsupported-api-kind', 'The partner does not support this API.'],
-    ['bounded-spending', 'The request carries a spend ceiling.'],
-    ['openrouter-disabled', 'The organization gateway settings exclude the partner.'],
-    ['country-denied', 'The partner is not available in the country the request came from.'],
-    ['provider-settings', 'Excluded by provider settings.'],
-    ['invalid-credentials', 'The partner is temporarily unavailable.'],
+    ['unsupported-api-kind', 'the partner does not support this API.'],
+    ['bounded-spending', 'the request carries a spend ceiling.'],
+    ['openrouter-disabled', 'the organization gateway settings exclude the partner.'],
+    ['provider-settings', 'excluded by provider settings.'],
   ])('explains a partner skipped for %s', (reason, detail) => {
     expect(
       describeStep({
         step: 'partner',
         outcome: 'skipped',
-        inference_provider: 'acme-ai',
+        partner_inference_provider: 'acme-ai',
         reason,
       })
-    ).toEqual({ title: 'Partner provider', detail, tone: 'skipped' });
+    ).toEqual({
+      title: 'Partner provider',
+      detail: `Acme Ai was skipped: ${detail}`,
+      tone: 'skipped',
+    });
+  });
+
+  test('explains a partner skip without naming a partner that was not recorded', () => {
+    expect(
+      describeStep({ step: 'partner', outcome: 'skipped', reason: 'provider-settings' }).detail
+    ).toBe('Excluded by provider settings.');
   });
 
   test('shows an unknown partner skip reason as recorded', () => {

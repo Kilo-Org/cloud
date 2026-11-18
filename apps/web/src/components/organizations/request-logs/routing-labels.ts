@@ -227,10 +227,16 @@ const PARTNER_SKIP_REASON_LABELS: Record<string, string> = {
   'unsupported-api-kind': 'The partner does not support this API.',
   'bounded-spending': 'The request carries a spend ceiling.',
   'openrouter-disabled': 'The organization gateway settings exclude the partner.',
-  'country-denied': 'The partner is not available in the country the request came from.',
   'provider-settings': 'Excluded by provider settings.',
-  'invalid-credentials': 'The partner is temporarily unavailable.',
 };
+
+function describePartnerSkip(step: RequestLogRoutingStep): string {
+  const reason = step.reason ? lookup(PARTNER_SKIP_REASON_LABELS, step.reason) : '';
+  if (!step.partner_inference_provider) return reason;
+  const partner = inferenceProviderNames([step.partner_inference_provider]);
+  const lowered = reason.charAt(0).toLowerCase() + reason.slice(1);
+  return `${partner} was skipped: ${lowered}`;
+}
 
 function describeKilo(step: RequestLogRoutingStep): string {
   const gateway = (step.gateway ? gatewayName(step.gateway) : null) ?? 'a Kilo gateway';
@@ -297,11 +303,7 @@ export function describeStep(
       };
     }
     case 'partner':
-      return {
-        title: 'Partner provider',
-        detail: step.reason ? lookup(PARTNER_SKIP_REASON_LABELS, step.reason) : '',
-        tone,
-      };
+      return { title: 'Partner provider', detail: describePartnerSkip(step), tone };
     case 'kilo':
       return { title: 'Kilo credits', detail: describeKilo(step), tone };
     default:

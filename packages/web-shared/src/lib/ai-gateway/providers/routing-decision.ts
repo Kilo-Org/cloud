@@ -50,7 +50,6 @@ const PartnerSkipReasonSchema = z.enum([
   'unsupported-api-kind',
   'bounded-spending',
   'openrouter-disabled',
-  'country-denied',
   'provider-settings',
   'invalid-credentials',
 ]);
@@ -154,7 +153,7 @@ const RoutingDecisionStepSchema = z.union([
   z.object({
     step: z.literal('partner'),
     outcome: z.literal('skipped'),
-    inference_provider: z.string(),
+    partner_inference_provider: z.string(),
     reason: PartnerSkipReasonSchema,
   }),
   z.object({

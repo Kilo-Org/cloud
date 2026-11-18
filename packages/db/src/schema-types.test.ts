@@ -385,13 +385,12 @@ describe('CustomLlmDefinitionSchema partner', () => {
     expect(result.data?.partner).toEqual(partner);
   });
 
-  it('parses a partner definition with a reasoning details transform and country deny list', () => {
+  it('parses a partner definition with a reasoning details transform', () => {
     const result = CustomLlmDefinitionSchema.safeParse({
       ...baseDefinition,
       partner,
       pricing,
       may_train_on_prompts: false,
-      country_deny_list: ['CU'],
       reasoning_details_transform: 'mistral-thinking',
     });
 
@@ -407,6 +406,8 @@ describe('CustomLlmDefinitionSchema partner', () => {
     ['organization_ids', { organization_ids: [uuid] }],
     ['organization_ids', { organization_ids: [] }],
     ['group_ids', { group_ids: [uuid] }],
+    ['country_deny_list', { country_deny_list: ['CU'] }],
+    ['country_deny_list', { country_deny_list: [] }],
   ])('rejects %s', (key, extra) => {
     expect(issuePaths({ partner, pricing, ...extra })).toEqual([key]);
   });

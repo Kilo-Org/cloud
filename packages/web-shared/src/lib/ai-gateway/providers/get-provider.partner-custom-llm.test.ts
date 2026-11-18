@@ -161,7 +161,7 @@ function skippedPartnerStep(reason: string) {
   return {
     step: 'partner',
     outcome: 'skipped',
-    inference_provider: PARTNER_PROVIDER,
+    partner_inference_provider: PARTNER_PROVIDER,
     reason,
   } as const;
 }
@@ -426,23 +426,6 @@ describe('getProvider skips the partner', () => {
     await insertPartner();
 
     await expectKiloRouteOnly({ openRouterDisabled: true }, 'openrouter-disabled');
-  });
-
-  test('for a caller from a denied country', async () => {
-    await insertPartner({ country_deny_list: ['CU', 'KP'] });
-
-    await expectKiloRouteOnly({ countryCode: 'CU' }, 'country-denied');
-  });
-
-  test.each([
-    ['another country', 'US'],
-    ['an unknown country', null],
-  ])('does not skip it for %s', async (_name, countryCode) => {
-    await insertPartner({ country_deny_list: ['CU'] });
-
-    const { result } = await routeAndRecord({ countryCode });
-
-    expect(result.routes).toHaveLength(2);
   });
 
   test.each<[string, OpenRouterProviderConfig]>([

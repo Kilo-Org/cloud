@@ -387,7 +387,6 @@ async function resolvePartnerRoute(
   if (input.boundedSpending) return 'bounded-spending';
   // Implied by an inference region, which admits only Kilo's Vercel AI Gateway route.
   if (input.openRouterDisabled) return 'openrouter-disabled';
-  if (isCustomLlmDeniedInCountry(definition, input.countryCode ?? null)) return 'country-denied';
   const providerConfig = withIgnoredProviders(
     await input.getRoutingProviderConfig(),
     input.kiloIgnoredProviders ?? []
@@ -755,7 +754,7 @@ async function selectProvider(
           decision.step({
             step: 'partner',
             outcome: 'skipped',
-            inference_provider: inferenceProvider,
+            partner_inference_provider: inferenceProvider,
             reason: partnerRoute,
           });
           decision.step(kiloStep);

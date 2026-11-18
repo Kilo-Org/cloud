@@ -42,7 +42,6 @@ const RoutingStepSchema = z.object({
   gateway: optionalString,
   bounded_spending: optionalBoolean,
   kilo_ignored_providers: optionalStrings,
-  inference_provider: optionalString,
   partner_inference_provider: optionalString,
 });
 

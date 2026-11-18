@@ -256,6 +256,26 @@ describe('RoutingSections partner fallback', () => {
     expect(text).not.toContain('Every BYOK key');
   });
 
+  it.each([
+    ['invalid-credentials', false],
+    ['provider-settings', true],
+  ])('renders a partner step skipped for %s: %s', (reason, rendered) => {
+    const base = partnerRouting([]);
+    const document = render({
+      ...base,
+      steps: [
+        { step: 'partner', outcome: 'skipped', partner_inference_provider: 'mistral', reason },
+        ...base.steps,
+      ],
+    });
+
+    const steps = [...document.querySelectorAll('[aria-label="Provider selection steps"] > li')];
+    const text = document.body.textContent ?? '';
+    expect(text.includes('Mistral was skipped')).toBe(rendered);
+    expect(steps.some(step => step.textContent?.includes('Partner provider'))).toBe(rendered);
+    expect(text).toContain('Kilo credits');
+  });
+
   it('reports the partner that served the request without a fallback', () => {
     const text = render(partnerRouting([])).body.textContent ?? '';
 

@@ -3185,7 +3185,7 @@ export const CustomLlmDefinitionSchema = z
     organization_ids: z.array(z.uuid()).optional(),
     group_ids: z.array(z.uuid()).optional(),
     public: CustomLlmPublicSchema.optional(),
-    /** Requires pricing, and excludes public, organization_ids, and group_ids. */
+    /** Requires pricing, and excludes public, organization_ids, group_ids, and country_deny_list. */
     partner: CustomLlmPartnerSchema.optional(),
     /** Hidden from model lists and refused by the gateway for requests from these countries.
      * A request without a known country is not restricted. */
@@ -3222,7 +3222,7 @@ export const CustomLlmDefinitionSchema = z
           message: 'pricing must be set when partner is set',
         });
       }
-      for (const key of ['public', 'organization_ids', 'group_ids'] as const) {
+      for (const key of ['public', 'organization_ids', 'group_ids', 'country_deny_list'] as const) {
         if (definition[key] !== undefined) {
           ctx.addIssue({
             code: 'custom',

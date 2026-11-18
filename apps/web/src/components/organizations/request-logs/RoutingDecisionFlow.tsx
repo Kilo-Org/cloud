@@ -250,14 +250,20 @@ function ResultNode({ routing }: { routing: RequestLogRoutingDetails }) {
 }
 
 export function RoutingDecisionFlow({ routing }: { routing: RequestLogRoutingDetails }) {
-  const byokStepIndex = routing.steps.findIndex(step => step.step === 'byok-key');
+  // `invalid-credentials` means Kilo's own stored partner credentials are unusable. That is an
+  // internal misconfiguration the customer can neither see nor fix, so the request log shows the
+  // normal Kilo route instead. The routing decision still records it for internal use.
+  const steps = routing.steps.filter(
+    step => !(step.step === 'partner' && step.reason === 'invalid-credentials')
+  );
+  const byokStepIndex = steps.findIndex(step => step.step === 'byok-key');
   const candidates = withFailoverOutcomes(routing.byok_candidates, routing.byok_failover_attempts);
   const showCandidatesSeparately = byokStepIndex === -1 && candidates.length > 0;
   const failedOver = routing.byok_failover_attempts.length > 0;
 
   return (
     <ol className="flex flex-col" aria-label="Provider selection steps">
-      {routing.steps.map((step, index) => {
+      {steps.map((step, index) => {
         const described = describeStep(step, { failedOver });
         return (
           <FlowNode

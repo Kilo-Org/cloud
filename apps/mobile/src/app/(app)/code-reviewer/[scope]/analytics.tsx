@@ -175,8 +175,7 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
     // Tracked counts only captured results, so the amount the reader's review
     // list shows but the dashboard does not count is every captured miss: the
     // capture is missing, its result failed validation, or it was omitted.
-    const uncapturedReviews =
-      coverage.missing + coverage.invalid + coverage.omitted;
+    const uncapturedReviews = coverage.missing + coverage.invalid + coverage.omitted;
     body = !settings.enabled ? (
       // Analytics is enabled per platform, so a disabled one is a state, not an
       // empty dataset: the zero stat cards and the generic empty state would

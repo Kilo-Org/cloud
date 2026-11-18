@@ -192,7 +192,7 @@ if (proxyPath !== null && proxyPath.includes(STYLED_PROXY)) {
 if (failures.length > 0) {
   console.error(`\nreact-native resolution is wrong in ${failures.length} case(s):\n`);
   for (const failure of failures) console.error(`  ${failure}`);
-  console.error('\nSee the proxy patch in patches/react-native-css.patch.\n');
+  console.error('\nSee the proxy patch in patches/react-native-css@3.1.0-rc.1.patch.\n');
   process.exit(1);
 }
 

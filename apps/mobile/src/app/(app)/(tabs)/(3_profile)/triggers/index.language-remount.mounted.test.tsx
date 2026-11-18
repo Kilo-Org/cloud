@@ -17,6 +17,11 @@ import TriggersRoute from './index';
  * that re-renders translated copy also remounts the screen, so a stale scene
  * re-paints without a navigation edge.
  *
+ * Only the list route carries the key. The create and detail screens hold
+ * unsaved form state in their own `useState`, and an in-place language change
+ * (the direction stays the same, so no reload runs) would silently discard it.
+ * The list holds no such state, so it remounts safely.
+ *
  * The remount is made observable through a screen that records its mounts: a
  * `useTranslation` re-render alone would keep the same mounted element.
  */

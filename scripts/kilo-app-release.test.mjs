@@ -706,6 +706,43 @@ test('body skips an echoed placeholder shape and reads the answer after it', asy
   }
 });
 
+test('body keeps a URL reason when the answer carries an object of its own', async () => {
+  const dir = rewriteRepo('kilo-notes-nested-object-');
+  // The only answer: one line quotes an empty object and one carries a URL, so
+  // validation fails for the URL. A scan that resumes inside the answer collects
+  // the `{}` as a later answer and reports its shape error instead.
+  const gateway = await fakeGateway(response =>
+    reply(response, {
+      choices: [
+        {
+          finish_reason: 'stop',
+          message: {
+            role: 'assistant',
+            content: JSON.stringify({
+              new: ['Tap {} to collapse a group', 'Download at https://example.com'],
+              changes: [],
+              areas: ['chat'],
+            }),
+          },
+        },
+      ],
+    })
+  );
+  try {
+    const result = await runScriptAsync(NOTES, ['body', '--from', 'base'], {
+      cwd: dir,
+      env: { KILO_CHANGELOG_API_KEY: 'test-key', KILO_CHANGELOG_BASE_URL: gateway.baseUrl },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, DETERMINISTIC_BODY);
+    assert.match(result.stderr, /contained a URL/);
+    assert.doesNotMatch(result.stderr, /expected shape/);
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
 test('body names a reasoning-only answer, and does not log its reasoning', async () => {
   const dir = rewriteRepo('kilo-notes-reasoning-only-');
   const gateway = await fakeGateway(response =>

@@ -638,11 +638,15 @@ export function curatedBodyLines(notes) {
  * reasoning model may put a sentence, a heading or a fence in front of the
  * object it was asked for, and trailing prose must not hide it either. It may
  * also echo the prompt's placeholder shape before its real answer, so the
- * caller checks each object until one passes.
+ * caller checks each object until one passes. Only top-level objects count: a
+ * scan resumes after an object that parsed, so an object nested inside an
+ * answer is never collected as a later answer.
  */
 function parseAnswers(content) {
   const answers = [];
-  for (let start = content.indexOf('{'); start !== -1; start = content.indexOf('{', start + 1)) {
+  let start = content.indexOf('{');
+  while (start !== -1) {
+    let next = start + 1;
     let depth = 0;
     let inString = false;
     let escaped = false;
@@ -667,6 +671,7 @@ function parseAnswers(content) {
         if (depth === 0) {
           try {
             answers.push(JSON.parse(content.slice(start, index + 1)));
+            next = index + 1;
           } catch {
             // Not JSON here; a later `{` may open the object instead.
           }
@@ -674,6 +679,7 @@ function parseAnswers(content) {
         }
       }
     }
+    start = content.indexOf('{', next);
   }
   return answers;
 }

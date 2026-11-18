@@ -93,7 +93,11 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   const rootStyle = { paddingTop: top, ...sideInsetStyle };
   const contentContainerStyle = {
     paddingTop: 24,
-    paddingBottom: 24,
+    // The footer's top border marks the scroll edge, but the last row still
+    // needs clearance past it: without this extra tail, the Feature rollout
+    // description stops flush at the border and the scroll extent reads as
+    // "one row short" instead of "one scroll away".
+    paddingBottom: 40,
   };
   // The action buttons sit in a pinned footer below the ScrollView, not in
   // the scroll content: the review modal is shorter than the card, and the
@@ -191,7 +195,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
         </View>
       </ScrollView>
 
-      <View className="gap-3 bg-background px-6 pt-3" style={footerStyle}>
+      <View className="gap-3 border-t border-border bg-background px-6 pt-3" style={footerStyle}>
         {/* The error lives in the pinned footer, not the scroll content: the
             footer draws over the scroll tail, so a content-placed error was
             invisible behind the buttons (b911 vr2 device repro — staging

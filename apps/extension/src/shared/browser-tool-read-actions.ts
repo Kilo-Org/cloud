@@ -27,6 +27,7 @@ import {
   filterAgentConsoleMessages,
   filterAgentNetworkRequests,
   frameWithOwnerNode,
+  readAgentFrames,
   readAgentFrameTree,
   readAgentScreenshotGeometry,
   readSensitiveFieldBoxes,
@@ -701,7 +702,17 @@ const maskAgentScreenshot = async (
     return { dataUrl: input.dataUrl, mediaType: input.mediaType };
   }
 
-  const frames = await readAgentFrameTree(deps.session);
+  const inventory = await readAgentFrames(deps.session);
+
+  if (!inventory.complete) {
+    // An unread frame list cannot be masked: blacking out nothing would ship the very pixels scoping exists to hide.
+    return {
+      error:
+        'The tab’s frames could not be read, so no screenshot was returned. Try again once the page has loaded.',
+    };
+  }
+
+  const { frames } = inventory;
   const withheld = withheldFramesOf(frames, deps.agentScope.readableOrigins);
   const geometry = await readAgentScreenshotGeometry(deps.session);
   // `DOM.getBoxModel` quads are viewport-relative; adding the page's scroll puts every box in document space, the space an element clip and a full-page capture both use.
@@ -717,7 +728,7 @@ const maskAgentScreenshot = async (
     deps.session,
     frames,
     deps.agentScope.readableOrigins,
-    { offset: geometry.scroll }
+    { childSessions: inventory.childSessions, offset: geometry.scroll }
   );
 
   if ('error' in fields) {

@@ -250,6 +250,19 @@ export interface BrowserToolCallGuard {
   readonly cancelled: () => boolean;
 }
 
+/**
+ * One out-of-process iframe auto-attached under the tab's debugger. Chrome
+ * leaves these out of `Page.getFrameTree`, so `Target.attachedToTarget` is the
+ * only place the tab learns the frame exists, its URL (hence its origin), and
+ * the flattened child session that can read it.
+ */
+export interface BrowserToolChildFrame {
+  /** The frame's URL, as the target reported it when it attached. */
+  readonly url: string;
+  /** The flattened child session; commands addressed to it read the frame's own document. */
+  readonly sessionId: string;
+}
+
 export interface BrowserToolSession {
   /**
    * Attaches the debugger and enables the CDP domains, once. Idempotent, and
@@ -267,6 +280,13 @@ export interface BrowserToolSession {
    * cancelled.
    */
   readonly bindCaller: (callerKey: string, guard?: BrowserToolCallGuard) => BrowserToolSession;
+  /**
+   * Out-of-process iframes attached under this tab, keyed by their frame id
+   * (for an OOPIF the frame id is the target id). Auto-attach populates it;
+   * on a platform without `chrome.debugger` there are none, so it is absent.
+   * A caller that cannot see a frame here must treat it as unreadable.
+   */
+  readonly childFrames?: () => ReadonlyMap<string, BrowserToolChildFrame>;
   /**
    * Which platform the session drives. `scripting` means `chrome.debugger` is
    * unavailable (Firefox) and the page is driven through
@@ -332,9 +352,15 @@ export interface BrowserToolSession {
    */
   readonly disposeCaller: (callerKey: string) => void;
   readonly resolveTarget: (target: string) => Promise<BrowserToolResolvedTarget | undefined>;
+  /**
+   * One CDP command on the tab's session. `sessionId` addresses a flattened
+   * child session (an out-of-process iframe) instead, so a caller holding one
+   * reads that frame's own document.
+   */
   readonly send: (
     method: string,
-    params?: Record<string, unknown>
+    params?: Record<string, unknown>,
+    sessionId?: string
   ) => Promise<Record<string, unknown> | undefined>;
   /** Returns the pending dialog and clears it, so a second call cannot re-answer it. */
   readonly takeDialog: () => BrowserToolDialog | undefined;
@@ -424,6 +450,18 @@ const frameNavigatedParamsSchema = z.object({
     parentId: z.string().optional(),
     url: z.string().optional(),
   }),
+});
+const attachedToTargetParamsSchema = z.object({
+  sessionId: z.string(),
+  targetInfo: z.object({
+    targetId: z.string(),
+    type: z.string().optional(),
+    url: z.string().optional(),
+  }),
+});
+const detachedFromTargetParamsSchema = z.object({
+  sessionId: z.string(),
+  targetId: z.string().optional(),
 });
 const domGetDocumentResponseSchema = z.object({
   root: z.object({ nodeId: z.number() }).optional(),
@@ -1413,6 +1451,8 @@ export const createBrowserToolSession = ({
   let consoleMessagesSinceNavigation = 0;
   // `Runtime.executionContextId` → frame id, so a console entry can be attributed to its frame.
   const frameIdByExecutionContext = new Map<number, string>();
+  // Out-of-process iframes auto-attached under this tab, keyed by frame id (for an OOPIF the frame id is the target id). `Page.getFrameTree` omits them, so this map is the tab's only record of them.
+  const childFrames = new Map<string, BrowserToolChildFrame>();
   // The tab's main frame id, learned from `Page.frameNavigated`. A `Document` request in this frame is a page load.
   let mainFrameId: string | undefined = undefined;
   let webMcpDiscovery: { documentId: string; tools: readonly WebMcpToolDescriptor[] } | undefined =
@@ -1444,6 +1484,7 @@ export const createBrowserToolSession = ({
     consoleMessagesSinceNavigation = 0;
     networkById.clear();
     mainFrameId = undefined;
+    childFrames.clear();
     clearRefs();
     documentNodeId = undefined;
     dialog = undefined;
@@ -1703,6 +1744,41 @@ export const createBrowserToolSession = ({
     invalidateDocument();
   };
 
+  // Flattened auto-attach reports every related target: the OOPIFs are the ones typed `iframe`. Their target id is their frame id.
+  const handleAttachedToTarget = (params: Record<string, unknown> | undefined): void => {
+    const parsed = attachedToTargetParamsSchema.safeParse(params);
+
+    if (!parsed.success || parsed.data.targetInfo.type !== 'iframe') {
+      return;
+    }
+
+    childFrames.set(parsed.data.targetInfo.targetId, {
+      sessionId: parsed.data.sessionId,
+      url: parsed.data.targetInfo.url ?? '',
+    });
+  };
+
+  const handleDetachedFromTarget = (params: Record<string, unknown> | undefined): void => {
+    const parsed = detachedFromTargetParamsSchema.safeParse(params);
+
+    if (!parsed.success) {
+      return;
+    }
+
+    if (parsed.data.targetId !== undefined) {
+      childFrames.delete(parsed.data.targetId);
+      return;
+    }
+
+    // An older protocol reports only the session; drop the frame that held it.
+    for (const [frameId, frame] of childFrames) {
+      if (frame.sessionId === parsed.data.sessionId) {
+        childFrames.delete(frameId);
+        return;
+      }
+    }
+  };
+
   const handleEvent: ChromeDebuggerEventListener = (source, method, params) => {
     if (disposed || (source.tabId !== undefined && source.tabId !== tabId)) {
       return;
@@ -1765,6 +1841,16 @@ export const createBrowserToolSession = ({
 
     if (method === 'Page.frameNavigated') {
       handleFrameNavigated(params);
+      return;
+    }
+
+    if (method === 'Target.attachedToTarget') {
+      handleAttachedToTarget(params);
+      return;
+    }
+
+    if (method === 'Target.detachedFromTarget') {
+      handleDetachedFromTarget(params);
       return;
     }
 
@@ -1985,7 +2071,8 @@ export const createBrowserToolSession = ({
 
   const send = async (
     method: string,
-    params?: Record<string, unknown>
+    params?: Record<string, unknown>,
+    sessionId?: string
   ): Promise<Record<string, unknown> | undefined> => {
     if (debuggerApi === undefined) {
       // Never a silent answer: without CDP the caller must use `callTool`, and a method that backs a tool Firefox cannot express fails by that tool's name.
@@ -2004,7 +2091,10 @@ export const createBrowserToolSession = ({
       return sendInputCommand(method, params);
     }
 
-    return debuggerApi.sendCommand(target, method, params);
+    // A child session runs in its own process, so the tab's input timing rules do not apply to it.
+    return sessionId === undefined
+      ? debuggerApi.sendCommand(target, method, params)
+      : debuggerApi.sendCommand({ ...target, sessionId }, method, params);
   };
 
   const getDocumentNodeId = async (): Promise<number | undefined> => {
@@ -3023,6 +3113,7 @@ export const createBrowserToolSession = ({
         throwIfCancelled();
         return runCallTool(toolName, args ?? {}, refs);
       },
+      childFrames: () => new Map(childFrames),
       consoleMessages: () => [...consoleBuffer],
       // A caller view owns only its ref registry: disposing it must not detach the tab's shared attachment.
       dispose: () => {
@@ -3047,9 +3138,9 @@ export const createBrowserToolSession = ({
         throwIfCancelled();
         return resolveTarget(targetText, refs);
       },
-      send: (method, params) => {
+      send: (method, params, sessionId) => {
         throwIfCancelled();
-        return send(method, params);
+        return send(method, params, sessionId);
       },
       takeDialog,
       takeDownloads,
@@ -3067,6 +3158,7 @@ export const createBrowserToolSession = ({
     backend,
     bindCaller: (callerKey, guard) => createCallerView(callerKey, callerRefs(callerKey), guard),
     callTool: (toolName, args) => runCallTool(toolName, args ?? {}, defaultRefs),
+    childFrames: () => new Map(childFrames),
     consoleMessages: () => [...consoleBuffer],
     dispose,
     disposeCaller: callerKey => {

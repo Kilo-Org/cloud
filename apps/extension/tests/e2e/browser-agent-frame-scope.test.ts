@@ -12,11 +12,18 @@ import {
 import type { LocalAgentToolResponse } from './local-agents-fixture';
 
 /*
- * The end-to-end proof for agent frame scoping (SPEC "Frame scoping"): a
- * cross-origin iframe holds a marker string, and an agent session — opened and
- * shared through the hub exactly as the CLI does — sees the marker nowhere:
- * not in the snapshot, not in find, not in the screenshot's pixels, until the
- * iframe's origin gets its own `read` grant.
+ * The end-to-end proof for agent frame scoping (SPEC "Frame scoping"): an
+ * iframe holds a marker string, and an agent session — opened and shared
+ * through the hub exactly as the CLI does — sees the marker nowhere: not in the
+ * snapshot, not in find, not in the screenshot's pixels, until the iframe's
+ * origin gets its own `read` grant.
+ *
+ * Two cases, because Chrome treats them differently:
+ * - a same-site iframe (both servers on 127.0.0.1) shares the page's process
+ *   and appears in `Page.getFrameTree`;
+ * - a cross-site iframe (127.0.0.2 inside a 127.0.0.1 page) runs out of
+ *   process: Chrome leaves it out of `Page.getFrameTree`, so it is only
+ *   reachable through the tab's auto-attached child session.
  */
 
 const MARKER = 'KILO_FRAME_MARKER_42';
@@ -89,145 +96,161 @@ const openExtensionPage = async (context: BrowserContext, extensionId: string): 
   return page;
 };
 
+/**
+ * One full scoping run against a page served from 127.0.0.1 whose iframe comes
+ * from `frameHost`. `127.0.0.1` makes the frame same-site (same process);
+ * `127.0.0.2` makes it cross-site, which Chromium renders out of process.
+ */
+const expectFrameScope = async (frameHost: string): Promise<void> => {
+  test.setTimeout(120_000);
+
+  const inner = await startFixtureServer({
+    bodyHtml: `<p id="secret">${MARKER}</p>`,
+    host: frameHost,
+    title: 'Payment frame',
+  });
+  const outer = await startFixtureServer({
+    bodyHtml: [
+      '<h1>Checkout host</h1>',
+      `<iframe id="pay" src="${inner.url}/frame" style="border:0;height:${String(IFRAME_BOX.height)}px;left:${String(IFRAME_BOX.left)}px;position:fixed;top:${String(IFRAME_BOX.top)}px;width:${String(IFRAME_BOX.width)}px"></iframe>`,
+    ].join(''),
+    title: 'Checkout host',
+  });
+  const hub = await startFakeHub();
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  try {
+    const page = await context.newPage();
+    await page.goto(outer.url);
+    await page.waitForSelector('#pay');
+
+    const frame = page.frameLocator('#pay');
+
+    await expect(frame.locator('#secret')).toHaveText(MARKER);
+
+    const extensionPage = await openExtensionPage(context, extensionId);
+    // The session owns the tab the user is on; the transport and the D9 group are the real ones.
+    const tabId = await activateTab(extensionPage, outer.url);
+
+    expect(tabId).toBeGreaterThan(0);
+    const session = await openPairedAgentSession({
+      context,
+      enableSwitch: () => seedLocalAgentsEnabled(extensionPage),
+      extensionId,
+      hub,
+      sidePanel: extensionPage,
+      title: 'Frame scope',
+    });
+    const outerOrigin = originOf(outer.url);
+    const innerOrigin = originOf(inner.url);
+
+    expect(session.tabId).toBe(tabId);
+
+    // Nothing granted: the read itself is refused.
+    const refused = await session.callTool('browser_snapshot', {}, []);
+
+    expect(refused).toMatchObject({
+      code: -32_010,
+      items: [{ class: 'read', origin: outerOrigin }],
+      kind: 'error',
+    });
+
+    // The tab's own origin is granted, the iframe's is not.
+    const scoped = resultOf(
+      await session.callTool('browser_snapshot', {}, [{ class: 'read', origin: outerOrigin }])
+    );
+
+    expect(scoped.isError).toBe(false);
+    // The page the agent may read still renders: a frame it cannot read must not blank the snapshot.
+    expect(scoped.text).toContain('Checkout host');
+    expect(scoped.text).toContain(`[origin withheld: ${innerOrigin}]`);
+    expect(scoped.text).not.toContain(MARKER);
+    expect(scoped.withheldFrames).toEqual([innerOrigin]);
+
+    // The withheld iframe carries a ref, like the Playwright backend's `- iframe [ref=eN] [origin withheld: ...]`.
+    const withheldRef = withheldRefOf(scoped.text);
+
+    expect(withheldRef).toMatch(/^e\d+$/u);
+
+    // Targeting that ref addresses the hosted frame: the ref alone must not release it.
+    const targetedRefused = await session.callTool('browser_snapshot', { target: withheldRef }, [
+      { class: 'read', origin: outerOrigin },
+    ]);
+
+    expect(targetedRefused).toMatchObject({
+      code: -32_010,
+      items: [{ class: 'read', frame: true, origin: innerOrigin }],
+      kind: 'error',
+    });
+
+    const bothGrants = [
+      { class: 'read', origin: outerOrigin },
+      { class: 'read', origin: innerOrigin },
+    ];
+    const targeted = resultOf(
+      await session.callTool('browser_snapshot', { target: withheldRef }, bothGrants)
+    );
+
+    expect(targeted.text).toContain(MARKER);
+    expect(targeted.text).not.toContain('origin withheld');
+
+    const found = resultOf(
+      await session.callTool('browser_find', { text: MARKER }, [
+        { class: 'read', origin: outerOrigin },
+      ])
+    );
+
+    // The withheld frame's text never becomes a match; only the echoed query names the marker.
+    expect(found.text).toContain('No matches for');
+    expect(found.text).not.toContain('Path:');
+
+    const shot = screenshotDataUrl(
+      await session.callTool('browser_take_screenshot', { scale: 'css', type: 'png' }, [
+        { class: 'read', origin: outerOrigin },
+      ])
+    );
+    const insidePixel = await readPixel(extensionPage, {
+      dataUrl: shot,
+      pixelX: IFRAME_BOX.left + IFRAME_BOX.width / 2,
+      pixelY: IFRAME_BOX.top + IFRAME_BOX.height / 2,
+    });
+    const outsidePixel = await readPixel(extensionPage, {
+      dataUrl: shot,
+      pixelX: 8,
+      pixelY: 8,
+    });
+
+    expect(insidePixel.slice(0, 3)).toEqual([0, 0, 0]);
+    expect(insidePixel[3]).toBe(255);
+    expect(outsidePixel.slice(0, 3)).not.toEqual([0, 0, 0]);
+
+    // Granting the frame's origin releases the content, and only then.
+    const granted = resultOf(await session.callTool('browser_snapshot', {}, bothGrants));
+
+    expect(granted.text).toContain(MARKER);
+    expect(granted.withheldFrames).toEqual([]);
+
+    const grantedFind = resultOf(
+      await session.callTool('browser_find', { text: MARKER }, bothGrants)
+    );
+
+    expect(grantedFind.text).toContain(MARKER);
+    expect(grantedFind.text).toContain('Path:');
+  } finally {
+    await context.close();
+    await hub.close();
+    await inner.close();
+    await outer.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+};
+
 test.describe('agent frame scoping', () => {
-  test('a cross-origin iframe marker stays unreadable until its origin is granted', async () => {
-    test.setTimeout(120_000);
+  test('a same-site iframe marker stays unreadable until its origin is granted', async () => {
+    await expectFrameScope('127.0.0.1');
+  });
 
-    const inner = await startFixtureServer({
-      bodyHtml: `<p id="secret">${MARKER}</p>`,
-      title: 'Payment frame',
-    });
-    const outer = await startFixtureServer({
-      bodyHtml: [
-        '<h1>Checkout host</h1>',
-        `<iframe id="pay" src="${inner.url}/frame" style="border:0;height:${String(IFRAME_BOX.height)}px;left:${String(IFRAME_BOX.left)}px;position:fixed;top:${String(IFRAME_BOX.top)}px;width:${String(IFRAME_BOX.width)}px"></iframe>`,
-      ].join(''),
-      title: 'Checkout host',
-    });
-    const hub = await startFakeHub();
-    const { context, extensionId, userDataDir } = await launchExtensionContext();
-
-    try {
-      const page = await context.newPage();
-      await page.goto(outer.url);
-      await page.waitForSelector('#pay');
-
-      const frame = page.frameLocator('#pay');
-
-      await expect(frame.locator('#secret')).toHaveText(MARKER);
-
-      const extensionPage = await openExtensionPage(context, extensionId);
-      // The session owns the tab the user is on; the transport and the D9 group are the real ones.
-      const tabId = await activateTab(extensionPage, outer.url);
-
-      expect(tabId).toBeGreaterThan(0);
-      const session = await openPairedAgentSession({
-        context,
-        enableSwitch: () => seedLocalAgentsEnabled(extensionPage),
-        extensionId,
-        hub,
-        sidePanel: extensionPage,
-        title: 'Frame scope',
-      });
-      const outerOrigin = originOf(outer.url);
-      const innerOrigin = originOf(inner.url);
-
-      expect(session.tabId).toBe(tabId);
-
-      // Nothing granted: the read itself is refused.
-      const refused = await session.callTool('browser_snapshot', {}, []);
-
-      expect(refused).toMatchObject({
-        code: -32_010,
-        items: [{ class: 'read', origin: outerOrigin }],
-        kind: 'error',
-      });
-
-      // The tab's own origin is granted, the iframe's is not.
-      const scoped = resultOf(
-        await session.callTool('browser_snapshot', {}, [{ class: 'read', origin: outerOrigin }])
-      );
-
-      expect(scoped.isError).toBe(false);
-      expect(scoped.text).toContain(`[origin withheld: ${innerOrigin}]`);
-      expect(scoped.text).not.toContain(MARKER);
-      expect(scoped.withheldFrames).toEqual([innerOrigin]);
-
-      // The withheld iframe carries a ref, like the Playwright backend's `- iframe [ref=eN] [origin withheld: ...]`.
-      const withheldRef = withheldRefOf(scoped.text);
-
-      expect(withheldRef).toMatch(/^e\d+$/u);
-
-      // Targeting that ref addresses the hosted frame: the ref alone must not release it.
-      const targetedRefused = await session.callTool('browser_snapshot', { target: withheldRef }, [
-        { class: 'read', origin: outerOrigin },
-      ]);
-
-      expect(targetedRefused).toMatchObject({
-        code: -32_010,
-        items: [{ class: 'read', frame: true, origin: innerOrigin }],
-        kind: 'error',
-      });
-
-      const bothGrants = [
-        { class: 'read', origin: outerOrigin },
-        { class: 'read', origin: innerOrigin },
-      ];
-      const targeted = resultOf(
-        await session.callTool('browser_snapshot', { target: withheldRef }, bothGrants)
-      );
-
-      expect(targeted.text).toContain(MARKER);
-      expect(targeted.text).not.toContain('origin withheld');
-
-      const found = resultOf(
-        await session.callTool('browser_find', { text: MARKER }, [
-          { class: 'read', origin: outerOrigin },
-        ])
-      );
-
-      // The withheld frame's text never becomes a match; only the echoed query names the marker.
-      expect(found.text).toContain('No matches for');
-      expect(found.text).not.toContain('Path:');
-
-      const shot = screenshotDataUrl(
-        await session.callTool('browser_take_screenshot', { scale: 'css', type: 'png' }, [
-          { class: 'read', origin: outerOrigin },
-        ])
-      );
-      const insidePixel = await readPixel(extensionPage, {
-        dataUrl: shot,
-        pixelX: IFRAME_BOX.left + IFRAME_BOX.width / 2,
-        pixelY: IFRAME_BOX.top + IFRAME_BOX.height / 2,
-      });
-      const outsidePixel = await readPixel(extensionPage, {
-        dataUrl: shot,
-        pixelX: 8,
-        pixelY: 8,
-      });
-
-      expect(insidePixel.slice(0, 3)).toEqual([0, 0, 0]);
-      expect(insidePixel[3]).toBe(255);
-      expect(outsidePixel.slice(0, 3)).not.toEqual([0, 0, 0]);
-
-      // Granting the frame's origin releases the content, and only then.
-      const granted = resultOf(await session.callTool('browser_snapshot', {}, bothGrants));
-
-      expect(granted.text).toContain(MARKER);
-      expect(granted.withheldFrames).toEqual([]);
-
-      const grantedFind = resultOf(
-        await session.callTool('browser_find', { text: MARKER }, bothGrants)
-      );
-
-      expect(grantedFind.text).toContain(MARKER);
-      expect(grantedFind.text).toContain('Path:');
-    } finally {
-      await context.close();
-      await hub.close();
-      await inner.close();
-      await outer.close();
-      await rm(userDataDir, { force: true, recursive: true });
-    }
+  test('a cross-site (out-of-process) iframe marker stays unreadable until its origin is granted', async () => {
+    await expectFrameScope('127.0.0.2');
   });
 });

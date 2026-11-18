@@ -23,12 +23,14 @@ export interface FixtureServer {
 
 export const startFixtureServer = async ({
   bodyHtml,
+  host = '127.0.0.1',
   pathHtml,
   pathJson,
   pathText,
   title = 'Kilo extension fixture',
 }: {
   bodyHtml?: string;
+  host?: string;
   pathHtml?: Record<string, string>;
   pathJson?: Record<string, string>;
   pathText?: Record<string, string>;
@@ -71,7 +73,7 @@ export const startFixtureServer = async ({
 
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
-    server.listen(0, '127.0.0.1', () => {
+    server.listen(0, host, () => {
       server.off('error', reject);
       resolve();
     });
@@ -101,7 +103,7 @@ export const startFixtureServer = async ({
           resolve();
         });
       }),
-    url: `http://127.0.0.1:${address.port}`,
+    url: `http://${host}:${address.port}`,
   };
 };
 

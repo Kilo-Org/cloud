@@ -16,6 +16,7 @@ import {
 import type {
   BrowserConsoleMessage,
   BrowserNetworkRequest,
+  BrowserToolChildFrame,
   BrowserToolRefEntry,
 } from './browser-tool-session';
 import type { BrowserToolPageSession } from './browser-tool-snapshot';
@@ -80,13 +81,22 @@ const frameOriginOf = (frame: z.infer<typeof framePayloadSchema>): string => {
  * declared `securityOrigin` (an `about:`/`data:`/sandboxed frame is reported
  * as `opaque:null`, which no grant can match).
  */
-export const readAgentFrameTree = async (
+const readSameProcessFrames = async (
   session: Pick<BrowserToolPageSession, 'send'>
-): Promise<readonly BrowserAgentFrame[]> => {
-  const parsed = frameTreePayloadSchema.safeParse(await session.send('Page.getFrameTree'));
+): Promise<readonly BrowserAgentFrame[] | undefined> => {
+  let payload: Record<string, unknown> | undefined = undefined;
+
+  try {
+    payload = await session.send('Page.getFrameTree');
+  } catch {
+    // The tab may be gone, or a protocol implementation may refuse the call; the caller then has no same-process frame list.
+    return undefined;
+  }
+
+  const parsed = frameTreePayloadSchema.safeParse(payload);
 
   if (!parsed.success) {
-    return [];
+    return undefined;
   }
 
   const frames: BrowserAgentFrame[] = [];
@@ -115,6 +125,98 @@ export const readAgentFrameTree = async (
   visit(parsed.data.frameTree);
 
   return frames;
+};
+
+/**
+ * The tab's frame inventory. Chrome keeps out-of-process iframes out of
+ * `Page.getFrameTree`, so the tab's auto-attached child frames — which carry
+ * their URL as well as the child session that can read them — are appended as
+ * children of the main frame and re-parented onto the document that really
+ * holds their owner element.
+ */
+export interface AgentFrameInventory {
+  /** Main frame first; every frame the tab knows about, OOPIFs included. */
+  readonly frames: readonly BrowserAgentFrame[];
+  /** Flattened child session per out-of-process iframe frame id. */
+  readonly childSessions: ReadonlyMap<string, string>;
+  /**
+   * False when the browser reported no same-process frame tree at all. A
+   * snapshot can still render the main frame's own tree then, but no capture
+   * can prove which regions belong to frames it never saw — so a screenshot
+   * must fail closed instead of shipping pixels.
+   */
+  readonly complete: boolean;
+}
+
+export type AgentFrameSession = Pick<BrowserToolPageSession, 'send'> & {
+  readonly childFrames?: () => ReadonlyMap<string, { readonly url: string; readonly sessionId: string }>;
+};
+
+/**
+ * An out-of-process iframe's own frame tree names the frame that owns it, which
+ * is how a nested OOPIF is attached to its real parent instead of the main
+ * frame. `DOM.describeNode` cannot answer this: on an iframe element its
+ * `frameId` is the hosted frame, not the document holding the element.
+ */
+const readChildFrameParent = async (
+  session: Pick<BrowserToolPageSession, 'send'>,
+  sessionId: string
+): Promise<string | undefined> => {
+  try {
+    const parsed = frameTreePayloadSchema.safeParse(
+      await session.send('Page.getFrameTree', undefined, sessionId)
+    );
+
+    return parsed.success ? parsed.data.frameTree.frame.parentId : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+export const readAgentFrames = async (session: AgentFrameSession): Promise<AgentFrameInventory> => {
+  const sameProcess = await readSameProcessFrames(session);
+  const frames: BrowserAgentFrame[] = [...(sameProcess ?? [])];
+  const main = mainFrameOf(frames);
+  const childSessions = new Map<string, string>();
+
+  if (main === undefined) {
+    // Without a main frame there is no anchor for an OOPIF and no way to tell the tab's own origin: report no frames so every caller withholds.
+    return { childSessions, complete: false, frames };
+  }
+
+  const attached: ReadonlyMap<string, BrowserToolChildFrame> =
+    session.childFrames?.() ?? new Map();
+
+  for (const [frameId, child] of attached) {
+    if (!frames.some(frame => frame.id === frameId)) {
+      childSessions.set(frameId, child.sessionId);
+      // eslint-disable-next-line no-await-in-loop -- one child-session read per attached frame
+      const parentFrameId = await readChildFrameParent(session, child.sessionId);
+
+      frames.push({
+        id: frameId,
+        // A URL no origin can be read from is opaque, so no grant matches it.
+        origin: toBrowserOrigin(child.url) ?? 'opaque:null',
+        parentId: parentFrameId ?? main.id,
+        url: child.url,
+      });
+    }
+  }
+
+  return { childSessions, complete: sameProcess !== undefined, frames };
+};
+
+/**
+ * The frames a snapshot, mask or grant check works from. Every caller that
+ * only needs the frame list uses this; the child sessions stay internal to the
+ * snapshot that splices their trees.
+ */
+export const readAgentFrameTree = async (
+  session: AgentFrameSession
+): Promise<readonly BrowserAgentFrame[]> => {
+  const inventory = await readAgentFrames(session);
+
+  return inventory.frames;
 };
 
 /**
@@ -269,6 +371,8 @@ export interface ScopedSnapshot {
   readonly lines: readonly AgentSnapshotLine[];
   readonly refs: readonly BrowserToolRefEntry[];
   readonly truncated: boolean;
+  /** Withheld frames whose owner element produced a line of their own. */
+  readonly renderedWithheldFrameIds: ReadonlySet<string>;
 }
 
 /**
@@ -281,6 +385,7 @@ export interface ScopedSnapshot {
 export const buildScopedSnapshot = (input: ScopedSnapshotInput): ScopedSnapshot => {
   const lines: AgentSnapshotLine[] = [];
   const refs: BrowserToolRefEntry[] = [];
+  const renderedWithheldFrameIds = new Set<string>();
   let truncated = false;
 
   const walk = (nodes: readonly AxNode[], depthBudget: number | undefined, depth: number): void => {
@@ -354,6 +459,10 @@ export const buildScopedSnapshot = (input: ScopedSnapshotInput): ScopedSnapshot 
 
         lines.push(withheldFrameLine(withheldOrigin, atDepth, emittedRef));
 
+        if (ownerFrameId !== undefined) {
+          renderedWithheldFrameIds.add(ownerFrameId);
+        }
+
         return;
       }
 
@@ -384,23 +493,56 @@ export const buildScopedSnapshot = (input: ScopedSnapshotInput): ScopedSnapshot 
 
   walk(input.topNodes, input.depth, 0);
 
-  return { lines, refs, truncated };
+  return { lines, refs, renderedWithheldFrameIds, truncated };
 };
 
-/** Reads one frame's accessibility tree; an unavailable frame reads as empty. */
-const readFrameAxTree = async (
+/**
+ * One frame's CDP channel: the tab's own session for a same-process frame, or
+ * the flattened child session of an out-of-process iframe, which is the only
+ * way to read that frame's document.
+ */
+interface FrameChannel {
+  /** True when `send` addresses a child session rather than the tab. */
+  readonly child: boolean;
+  readonly send: (method: string, params?: Record<string, unknown>) => Promise<
+    Record<string, unknown> | undefined
+  >;
+}
+
+const frameChannel = (
   session: Pick<BrowserToolPageSession, 'send'>,
+  childSessions: ReadonlyMap<string, string>,
   frameId: string
-): Promise<readonly AxNode[]> => {
+): FrameChannel => {
+  const sessionId = childSessions.get(frameId);
+
+  return sessionId === undefined
+    ? { child: false, send: (method, params) => session.send(method, params) }
+    : { child: true, send: (method, params) => session.send(method, params, sessionId) };
+};
+
+/**
+ * Reads one frame's accessibility tree. `undefined` means the frame could not
+ * be read at all — the caller then withholds it instead of splicing an empty
+ * document, which would hide the frame from the snapshot.
+ * A child session reads its own document, so it takes no `frameId`.
+ */
+const readFrameAxTree = async (
+  channel: FrameChannel,
+  frameId?: string
+): Promise<readonly AxNode[] | undefined> => {
   try {
     const parsed = axTreePayloadSchema.safeParse(
-      await session.send('Accessibility.getFullAXTree', { frameId })
+      await channel.send(
+        'Accessibility.getFullAXTree',
+        frameId === undefined || channel.child ? {} : { frameId }
+      )
     );
 
-    return parsed.success ? (parsed.data.nodes ?? []) : [];
+    return parsed.success ? (parsed.data.nodes ?? []) : undefined;
   } catch {
-    // A frame that navigated or detached mid-capture contributes no nodes.
-    return [];
+    // A frame that navigated, detached, or never had a readable session.
+    return undefined;
   }
 };
 
@@ -408,6 +550,23 @@ const frameOwnerResultSchema = z.object({
   backendNodeId: z.number().optional(),
   nodeId: z.number().optional(),
 });
+
+/** One frame's owner element backend node id, or undefined when the frame has no readable owner. */
+const readFrameOwner = async (
+  session: Pick<BrowserToolPageSession, 'send'>,
+  frameId: string
+): Promise<number | undefined> => {
+  try {
+    const parsed = frameOwnerResultSchema.safeParse(
+      await session.send('DOM.getFrameOwner', { frameId })
+    );
+
+    return parsed.success ? parsed.data.backendNodeId : undefined;
+  } catch {
+    // A frame without an owner node (racing navigation) contributes no anchor.
+    return undefined;
+  }
+};
 
 /**
  * Owner iframe backend node id per child frame (`DOM.getFrameOwner`), the
@@ -420,17 +579,11 @@ export const readFrameOwners = async (
   const owners = new Map<string, number>();
 
   for (const frameId of frameIds) {
-    try {
-      const parsed = frameOwnerResultSchema.safeParse(
-        // eslint-disable-next-line no-await-in-loop -- CDP is a sequential request/response channel per frame
-        await session.send('DOM.getFrameOwner', { frameId })
-      );
+    // eslint-disable-next-line no-await-in-loop -- CDP is a sequential request/response channel per frame
+    const owner = await readFrameOwner(session, frameId);
 
-      if (parsed.success && parsed.data.backendNodeId !== undefined) {
-        owners.set(frameId, parsed.data.backendNodeId);
-      }
-    } catch {
-      // A frame without an owner node (racing navigation) contributes no anchor.
+    if (owner !== undefined) {
+      owners.set(frameId, owner);
     }
   }
 
@@ -498,6 +651,8 @@ export interface AgentSnapshotCapture {
   readonly withheldFrames: readonly string[];
   /** Frames whose content this capture included, for the probes that follow it. */
   readonly readableFrameIds: readonly string[];
+  /** Flattened child session per out-of-process iframe, so probes read the frame's own process. */
+  readonly childSessions?: ReadonlyMap<string, string>;
 }
 
 export interface AgentReadScope {
@@ -530,22 +685,16 @@ export const renderAgentSnapshotLine = renderLine;
  * granted iframe), whose document then becomes the snapshot.
  */
 export const captureAgentAriaSnapshot = async (
-  session: Pick<BrowserToolPageSession, 'send'>,
+  session: AgentFrameSession,
   scope: AgentReadScope,
   options: { readonly depth?: number | undefined; readonly rootFrameId?: string | undefined } = {}
 ): Promise<AgentSnapshotCapture> => {
-  const frames = await readAgentFrameTree(session);
-
-  if (frames.length === 0) {
-    return {
-      lines: [],
-      readableFrameIds: [],
-      refs: [],
-      text: '(no accessibility nodes)',
-      truncated: false,
-      withheldFrames: [],
-    };
-  }
+  const inventory = await readAgentFrames(session);
+  const { frames } = inventory;
+  const tabChannel: FrameChannel = {
+    child: false,
+    send: (method, params) => session.send(method, params),
+  };
 
   const root =
     options.rootFrameId === undefined
@@ -553,12 +702,35 @@ export const captureAgentAriaSnapshot = async (
       : frames.find(frame => frame.id === options.rootFrameId);
 
   if (root === undefined) {
+    // Fail closed on a targeted frame the tab does not know. Without any frame list the tab's own document is still readable: its tree is the one `Accessibility.getFullAXTree` returns for the target, and it never carries a child frame's content, so rendering it leaks nothing.
+    const topNodes = frames.length === 0 ? ((await readFrameAxTree(tabChannel)) ?? []) : [];
+
+    if (topNodes.length === 0) {
+      return {
+        childSessions: inventory.childSessions,
+        lines: [],
+        readableFrameIds: [],
+        refs: [],
+        text: '(no accessibility nodes)',
+        truncated: false,
+        withheldFrames: [],
+      };
+    }
+
+    const unframed = buildScopedSnapshot({
+      ownerFrameByBackendNodeId: new Map(),
+      readableTrees: new Map(),
+      topNodes,
+      withheld: new Map(),
+    });
+
     return {
-      lines: [],
+      childSessions: inventory.childSessions,
+      lines: unframed.lines,
       readableFrameIds: [],
-      refs: [],
-      text: '(no accessibility nodes)',
-      truncated: false,
+      refs: unframed.refs,
+      text: unframed.lines.map(renderLine).join('\n'),
+      truncated: unframed.truncated,
       withheldFrames: [],
     };
   }
@@ -569,6 +741,7 @@ export const captureAgentAriaSnapshot = async (
   if (withheldByFrameId.has(root.id)) {
     // Fail closed: a root the caller may not read is not read at all.
     return {
+      childSessions: inventory.childSessions,
       lines: [],
       readableFrameIds: [],
       refs: [],
@@ -581,13 +754,49 @@ export const captureAgentAriaSnapshot = async (
   const descendants = descendantFramesOf(frames, root.id);
   const readableTreeFrames = descendants.filter(frame => !withheldByFrameId.has(frame.id));
 
-  const topNodes = await readFrameAxTree(session, root.id);
+  const rootChannel = frameChannel(session, inventory.childSessions, root.id);
+  let topNodes = await readFrameAxTree(rootChannel, root.id);
+
+  if (topNodes === undefined && !rootChannel.child) {
+    // A failed frame-addressed read falls back to the target's own tree, so a protocol that refuses the parameter cannot blank the page the agent may read.
+    topNodes = await readFrameAxTree(rootChannel);
+  }
+
+  if (topNodes === undefined) {
+    return {
+      childSessions: inventory.childSessions,
+      lines: [],
+      readableFrameIds: [],
+      refs: [],
+      text: '(no accessibility nodes)',
+      truncated: false,
+      withheldFrames: withheld.map(frame => frame.origin),
+    };
+  }
+
   const readableTrees = new Map<string, readonly AxNode[]>();
+  const unreadableFrameIds = new Set<string>();
 
   for (const frame of readableTreeFrames) {
+    const channel = frameChannel(session, inventory.childSessions, frame.id);
     // eslint-disable-next-line no-await-in-loop -- one CDP read per frame, in document order
-    readableTrees.set(frame.id, await readFrameAxTree(session, frame.id));
+    const tree = await readFrameAxTree(channel, frame.id);
+
+    if (tree === undefined) {
+      // A granted frame that cannot be read is withheld, exactly like an ungranted one: the agent must not infer content from its absence.
+      unreadableFrameIds.add(frame.id);
+      withheldByFrameId.set(frame.id, frame.origin);
+    } else {
+      readableTrees.set(frame.id, tree);
+    }
   }
+
+  const scopedWithheld = frames
+    .filter(frame => withheldByFrameId.has(frame.id))
+    .map(frame => ({
+      frameId: frame.id,
+      origin: withheldByFrameId.get(frame.id) ?? frame.origin,
+    }));
 
   const owners = await readFrameOwners(
     session,
@@ -606,21 +815,44 @@ export const captureAgentAriaSnapshot = async (
     topNodes,
     withheld: withheldByFrameId,
   });
+  const lines = [...snapshot.lines];
+  const refs = [...snapshot.refs];
+  // An out-of-process iframe's owner node need not appear in the tab's own AX tree. Its line still has to name the origin, so the agent learns the frame exists and can target it for `read:<origin>`.
+  const unrendered = scopedWithheld.filter(
+    frame => !snapshot.renderedWithheldFrameIds.has(frame.frameId)
+  );
+
+  for (const frame of unrendered) {
+    const owner = owners.get(frame.frameId);
+
+    if (owner !== undefined) {
+      refs.push({ backendNodeId: owner, ref: `e${String(owner)}` });
+    }
+
+    lines.push(
+      withheldFrameLine(frame.origin, 0, owner === undefined ? undefined : `e${String(owner)}`)
+    );
+  }
+
   const body =
-    snapshot.lines.length === 0
-      ? '(no accessibility nodes)'
-      : snapshot.lines.map(renderLine).join('\n');
+    lines.length === 0 ? '(no accessibility nodes)' : lines.map(line => renderLine(line)).join('\n');
   const text = snapshot.truncated
     ? `${body}\n... (snapshot truncated at ${String(MAX_BROWSER_TOOL_SNAPSHOT_LINES)} lines)`
     : body;
 
   return {
-    lines: snapshot.lines,
-    readableFrameIds: [root.id, ...readableTreeFrames.map(frame => frame.id)],
-    refs: snapshot.refs,
+    childSessions: inventory.childSessions,
+    lines,
+    readableFrameIds: [
+      root.id,
+      ...readableTreeFrames
+        .filter(frame => !unreadableFrameIds.has(frame.id))
+        .map(frame => frame.id),
+    ],
+    refs,
     text,
     truncated: snapshot.truncated,
-    withheldFrames: withheld.map(frame => frame.origin),
+    withheldFrames: scopedWithheld.map(frame => frame.origin),
   };
 };
 
@@ -674,6 +906,40 @@ const intersectBox = (outer: ScreenshotBox, inner: ScreenshotBox): ScreenshotBox
 };
 
 /**
+ * The frames whose boxes clip one frame's region, innermost first. `undefined`
+ * when an ancestor is missing from the frame list: its box is then unknown,
+ * and blacking out the wrong region would leave the frame visible, so the
+ * capture fails instead.
+ */
+const frameChain = (
+  frames: readonly BrowserAgentFrame[],
+  frameId: string
+): readonly string[] | undefined => {
+  const parents = new Map<string, string | undefined>();
+
+  for (const frame of frames) {
+    parents.set(frame.id, frame.parentId);
+  }
+
+  const chain: string[] = [];
+  let current: string | undefined = frameId;
+
+  while (current !== undefined) {
+    const parent = parents.get(current);
+
+    if (parent === undefined) {
+      // The main frame ends the chain; a frame the list never saw cannot be measured.
+      return parents.has(current) ? chain : undefined;
+    }
+
+    chain.push(current);
+    current = parent;
+  }
+
+  return undefined;
+};
+
+/**
  * The boxes to black out, in the coordinate space the screenshot was captured
  * in. A nested frame's box is clipped by each ancestor frame's box, and
  * `offset` translates document coordinates onto a viewport screenshot.
@@ -689,12 +955,6 @@ export const readWithheldFrameBoxes = async (
     return { boxes: [] };
   }
 
-  const parents = new Map<string, string | undefined>();
-
-  for (const frame of frames) {
-    parents.set(frame.id, frame.parentId);
-  }
-
   const owners = await readFrameOwners(
     session,
     frames.filter(frame => frame.parentId !== undefined).map(frame => frame.id)
@@ -703,12 +963,12 @@ export const readWithheldFrameBoxes = async (
   const offset = options.offset ?? { x: 0, y: 0 };
 
   for (const frame of withheld) {
-    const chain: string[] = [];
-    let current: string | undefined = frame.frameId;
+    const chain = frameChain(frames, frame.frameId);
 
-    while (current !== undefined && parents.get(current) !== undefined) {
-      chain.push(current);
-      current = parents.get(current);
+    if (chain === undefined) {
+      return {
+        error: `The region of the ${frame.origin} frame could not be measured, so no screenshot was returned.`,
+      };
     }
 
     let accumulated: ScreenshotBox | undefined = undefined;
@@ -845,15 +1105,17 @@ export const captureAgentSnapshotView = async (
   const sensitiveValues = new Set<string>();
 
   for (const frameId of capture.readableFrameIds) {
+    const channel = frameChannel(session, capture.childSessions ?? new Map(), frameId);
+
     // eslint-disable-next-line no-await-in-loop -- one probe pair per frame; a frame probe is two CDP round trips
-    const hidden = await readFrameHiddenText(session, frameId);
+    const hidden = await readFrameHiddenText({ send: channel.send }, frameId);
 
     for (const text of hidden) {
       hiddenText.add(text);
     }
 
     // eslint-disable-next-line no-await-in-loop -- see above: probes run per frame
-    const values = await readFrameSensitiveValues(session, frameId);
+    const values = await readFrameSensitiveValues({ send: channel.send }, frameId);
 
     for (const value of values) {
       sensitiveValues.add(value);
@@ -881,6 +1143,7 @@ export const captureAgentSnapshotView = async (
     : body;
 
   return {
+    ...(capture.childSessions === undefined ? {} : { childSessions: capture.childSessions }),
     hasWithheldFrames: capture.withheldFrames.length > 0,
     lines,
     readableFrameIds: capture.readableFrameIds,
@@ -945,7 +1208,11 @@ export const readSensitiveFieldBoxes = async (
   session: Pick<BrowserToolPageSession, 'send'>,
   frames: readonly BrowserAgentFrame[],
   readableOrigins: readonly string[],
-  options: { readonly offset?: { readonly x: number; readonly y: number } } = {}
+  options: {
+    readonly offset?: { readonly x: number; readonly y: number };
+    /** Flattened child session per out-of-process iframe, so its own document is probed. */
+    readonly childSessions?: ReadonlyMap<string, string>;
+  } = {}
 ): Promise<{ readonly boxes: readonly ScreenshotBox[] } | { readonly error: string }> => {
   const readable = frames.filter(frame =>
     readableOrigins.some(pattern => originPatternMatches(pattern, frame.origin))
@@ -953,12 +1220,6 @@ export const readSensitiveFieldBoxes = async (
 
   if (readable.length === 0) {
     return { boxes: [] };
-  }
-
-  const parents = new Map<string, string | undefined>();
-
-  for (const frame of frames) {
-    parents.set(frame.id, frame.parentId);
   }
 
   const owners = await readFrameOwners(
@@ -969,15 +1230,16 @@ export const readSensitiveFieldBoxes = async (
   const boxes: ScreenshotBox[] = [];
 
   for (const frame of readable) {
+    const channel = frameChannel(session, options.childSessions ?? new Map(), frame.id);
     // eslint-disable-next-line no-await-in-loop -- one probe per frame, in document order
-    const probe = await readFrameSensitiveBoxes(session, frame.id);
+    const probe = await readFrameSensitiveBoxes({ send: channel.send }, frame.id);
 
-    const chain: string[] = [];
-    let current: string | undefined = frame.id;
+    const chain = frameChain(frames, frame.id);
 
-    while (current !== undefined && parents.get(current) !== undefined) {
-      chain.push(current);
-      current = parents.get(current);
+    if (chain === undefined) {
+      return {
+        error: `The region of a ${frame.origin} form field could not be measured, so no screenshot was returned.`,
+      };
     }
 
     let frameOriginX = 0;

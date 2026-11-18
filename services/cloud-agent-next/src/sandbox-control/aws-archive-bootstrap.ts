@@ -17,12 +17,15 @@ import { createWriteStream } from 'node:fs';
 import fs from 'node:fs/promises';
 import { Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
+import { setTimeout as delay } from 'node:timers/promises';
 const [serialized, python] = process.argv.slice(1);
 const C = JSON.parse(serialized);
 const signal = AbortSignal.timeout(Math.max(1, C.deadlineAt - Date.now()));
 let scratch;
 async function download(file) {
   for (let attempt = 0; attempt < 3; attempt++) {
+    // Back off before a retry so a throttle or short S3 fault can clear within the deadline.
+    if (attempt > 0) await delay(1000 * attempt, undefined, { signal }).catch(() => { throw new Error('download_failed'); });
     await fs.rm(file, { force: true });
     let response;
     try {
@@ -87,6 +90,8 @@ async function restore(file) {
 }
 async function report(code) {
   for (let attempt = 0; attempt < 3; attempt++) {
+    // The report often runs after the deadline, so its short backoff does not use the deadline signal.
+    if (attempt > 0) await delay(250 * attempt);
     try {
       const response = await fetch(C.reportUrl, {
         method: 'POST', redirect: 'error', signal: AbortSignal.timeout(3000),

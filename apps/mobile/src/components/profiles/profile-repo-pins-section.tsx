@@ -161,6 +161,7 @@ export function ProfileRepoPinsSection({
     <Section
       label={t('profiles.repoBindings.pinnedTitle')}
       actionLabel={t('profiles.repoBindings.pinRepo')}
+      reserveLabelAir
       actionHidden={!canManage}
       actionDisabled={bind.isPending}
       onActionPress={() => {

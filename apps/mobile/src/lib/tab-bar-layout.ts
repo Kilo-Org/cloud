@@ -266,22 +266,22 @@ export function tabLabelNumberOfLines(label: string): 1 | 2 {
   return label.includes('\n') ? 2 : 1;
 }
 
-/**
- * The route group of the Chat tab, and the one screen in it that is not the
- * list. A conversation puts its composer where the tab bar sits, so the bar
- * goes while one is open. The group is read from the segments rather than the
- * path, because a conversation's path is the session id and nothing else.
- */
-const CHAT_TAB_GROUP = '(4_chat)';
-const CHAT_CONVERSATION = '[id]';
+/** The four tab roots: the only routes that draw the bar. */
+const TAB_ROOT_GROUPS = new Set(['(0_home)', '(2_agents)', '(4_chat)', '(3_profile)']);
 
-export function shouldHideTabBar(pathname: string, segments: readonly string[]): boolean {
-  const parts = pathname.split('/').filter(Boolean);
-  const isSecurityFindingFilter =
-    parts[0] === 'security-agent' && parts.length === 3 && parts[2] === 'filter';
-  const isChatConversation =
-    segments.includes(CHAT_TAB_GROUP) && segments.at(-1) === CHAT_CONVERSATION;
-  return isSecurityFindingFilter || isChatConversation;
+/**
+ * The bar belongs to the four tab roots. Every pushed route hides it, whether
+ * it sits inside a tab group (Past sessions, Spend alerts, Triggers, Billing)
+ * or on the root stack (Usage, Notifications, Buy credits, Kilo Pass), so a
+ * Profile sub-screen and an Agents sub-screen carry the same chrome. Read from
+ * the segments, because a chat conversation's path is the session id alone.
+ */
+export function shouldHideTabBar(_pathname: string, segments: readonly string[]): boolean {
+  const leaf = segments.at(-1);
+  if (leaf !== undefined && TAB_ROOT_GROUPS.has(leaf)) {
+    return false;
+  }
+  return !(leaf === 'index' && TAB_ROOT_GROUPS.has(segments.at(-2) ?? ''));
 }
 
 export type TabBarTab = 'home' | 'agents' | 'chat' | 'profile';

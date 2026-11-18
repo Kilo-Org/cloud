@@ -109,7 +109,7 @@ export function HomeScreen() {
               />
             }
           >
-            <Animated.View layout={LinearTransition} className="gap-6">
+            <Animated.View layout={LinearTransition}>
               <AgentSessionsSection
                 context={context}
                 sessions={sessions}

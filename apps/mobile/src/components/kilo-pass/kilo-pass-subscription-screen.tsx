@@ -56,6 +56,8 @@ function KiloPassFrame({ children }: { children: ReactNode }) {
         <ScreenHeader
           title={t('kiloPass.title')}
           modal
+          centerTitle={false}
+          backIcon="back"
           safeAreaTop={!surfaceOwnsWindowTop}
           className={surfaceOwnsWindowTop ? 'pt-2' : undefined}
         />

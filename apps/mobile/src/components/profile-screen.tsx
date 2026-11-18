@@ -27,7 +27,7 @@ import { type LayoutChangeEvent, type ScrollViewInstance, View } from 'react-nat
 import Animated, { FadeOut } from 'react-native-reanimated';
 
 import { useConfirmDialog } from '@/components/ui/dialog';
-import { useContextPicker } from '@/components/context-control';
+import { ContextControl, useContextPicker } from '@/components/context-control';
 import { CreditsCard } from '@/components/profile-credits-card';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -273,7 +273,13 @@ export function ProfileScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('common.profile')} size="large" showBackButton={false} />
+      <ScreenHeader
+        title={t('common.profile')}
+        size="large"
+        showBackButton={false}
+        inlineActions={<ContextControl />}
+        allowInlineActionsStacking={false}
+      />
       <TabScreenScrollView
         ref={deleteScrollRef}
         className="flex-1"

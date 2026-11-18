@@ -48,15 +48,15 @@ export function SessionListHeader({
     <>
       <ScreenHeader
         title={title}
-        size="large"
+        size={showBackButton ? 'default' : 'large'}
         showBackButton={showBackButton}
         backFallback={backFallback}
         inlineActions={
           <View className="min-w-0 shrink flex-row items-center">
+            {headerAction}
             <View className="min-w-0 shrink">
               <ContextControl />
             </View>
-            {headerAction}
           </View>
         }
         allowInlineActionsStacking={false}

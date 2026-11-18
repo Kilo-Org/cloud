@@ -270,7 +270,7 @@ export default function TabsLayout() {
     </StateSurfaceInsets>
   );
   return (
-    <TabBarLabelContext value={labelState}>
+    <TabBarLabelContext value={hideTabs ? null : labelState}>
       {tabsLayout}
       <SessionPreviewOverlay />
     </TabBarLabelContext>

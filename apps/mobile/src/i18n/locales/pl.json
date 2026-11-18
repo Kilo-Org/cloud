@@ -2736,6 +2736,7 @@
     "revokeConsent": "Cofnij zgodę",
     "revokeConsentTitle": "Cofnąć zgodę na udostępnianie danych?",
     "acceptAndContinue": "Zaakceptuj i kontynuuj",
+    "loadingConsentSettings": "Wczytywanie ustawień zgody…",
     "decline": "Nie wyrażaj zgody",
     "declineAndSignOut": "Odmów i wyloguj się",
     "declineTitle": "Odmówić udostępniania danych?",

@@ -3325,6 +3325,7 @@
     "revokeConsent": "Адклікаць згоду",
     "revokeConsentTitle": "Адклікаць згоду на перадачу даных?",
     "acceptAndContinue": "Прыняць і працягнуць",
+    "loadingConsentSettings": "Загрузка налад згоды…",
     "decline": "Адмовіцца",
     "declineAndSignOut": "Адмовіцца і выйсці",
     "declineTitle": "Адмовіцца ад перадачы даных?",

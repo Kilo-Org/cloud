@@ -3325,6 +3325,7 @@
     "revokeConsent": "Odstrani privolitev",
     "revokeConsentTitle": "Želiš preklicati privolitev za deljenje podatkov?",
     "acceptAndContinue": "Sprejmi in nadaljuj",
+    "loadingConsentSettings": "Nalaganje tvojih nastavitev privolitve…",
     "decline": "Zavrni",
     "declineAndSignOut": "Zavrni in se odjavi",
     "declineTitle": "Želiš zavrniti deljenje podatkov?",

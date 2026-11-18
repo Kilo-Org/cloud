@@ -2666,6 +2666,7 @@
     "revokeConsent": "Toestemming intrekken",
     "revokeConsentTitle": "Toestemming voor het delen van gegevens intrekken?",
     "acceptAndContinue": "Accepteren en doorgaan",
+    "loadingConsentSettings": "Je toestemmingsinstellingen worden geladen…",
     "decline": "Weigeren",
     "declineAndSignOut": "Weigeren en afmelden",
     "declineTitle": "Gegevens delen weigeren?",

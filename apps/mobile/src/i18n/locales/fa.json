@@ -3209,6 +3209,7 @@
     "revokeConsent": "حذف رضایت",
     "revokeConsentTitle": "رضایت به اشتراک‌گذاری داده‌ها لغو شود؟",
     "acceptAndContinue": "پذیرش و ادامه",
+    "loadingConsentSettings": "در حال بارگذاری تنظیمات رضایت شما…",
     "decline": "رد",
     "declineAndSignOut": "رد و خروج از حساب",
     "declineTitle": "اشتراک‌گذاری داده‌ها را رد می‌کنید؟",

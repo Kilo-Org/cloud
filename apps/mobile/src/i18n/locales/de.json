@@ -2666,6 +2666,7 @@
     "revokeConsent": "Einwilligung widerrufen",
     "revokeConsentTitle": "Einwilligung zur Datenweitergabe widerrufen?",
     "acceptAndContinue": "Akzeptieren und fortfahren",
+    "loadingConsentSettings": "Deine Einwilligungseinstellungen werden geladen…",
     "decline": "Ablehnen",
     "declineAndSignOut": "Ablehnen und abmelden",
     "declineTitle": "Datenweitergabe ablehnen?",

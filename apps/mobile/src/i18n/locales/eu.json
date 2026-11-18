@@ -3209,6 +3209,7 @@
     "revokeConsent": "Baliogabetu baimena",
     "revokeConsentTitle": "Baliogabetu datuak partekatzeko baimena?",
     "acceptAndContinue": "Onartu eta jarraitu",
+    "loadingConsentSettings": "Zure baimen-ezarpenak kargatzen…",
     "decline": "Ukatu",
     "declineAndSignOut": "Ukatu eta itxi saioa",
     "declineTitle": "Ukatu datuak partekatzea?",

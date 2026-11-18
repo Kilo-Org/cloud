@@ -3267,6 +3267,7 @@
     "revokeConsent": "Opozovi privolu",
     "revokeConsentTitle": "Opozvati privolu za dijeljenje podataka?",
     "acceptAndContinue": "Prihvati i nastavi",
+    "loadingConsentSettings": "Učitavanje tvojih postavki privole…",
     "decline": "Odbij",
     "declineAndSignOut": "Odbij i odjavi se",
     "declineTitle": "Odbiti dijeljenje podataka?",

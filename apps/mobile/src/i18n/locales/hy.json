@@ -3209,6 +3209,7 @@
     "revokeConsent": "Հեռացնել համաձայնությունը",
     "revokeConsentTitle": "Չեղարկե՞լ տվյալների փոխանցման համաձայնությունը",
     "acceptAndContinue": "Ընդունել և շարունակել",
+    "loadingConsentSettings": "Ձեր համաձայնության կարգավորումները բեռնվում են…",
     "decline": "Մերժել",
     "declineAndSignOut": "Մերժել և դուրս գալ",
     "declineTitle": "Մերժե՞լ տվյալների փոխանցումը",

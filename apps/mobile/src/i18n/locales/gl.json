@@ -3209,6 +3209,7 @@
     "revokeConsent": "Revogar o consentimento",
     "revokeConsentTitle": "Revogar o consentimento para compartir datos?",
     "acceptAndContinue": "Aceptar e continuar",
+    "loadingConsentSettings": "Cargando as túas opcións de consentimento…",
     "decline": "Rexeitar",
     "declineAndSignOut": "Rexeitar e pechar sesión",
     "declineTitle": "Rexeitar o uso compartido de datos?",

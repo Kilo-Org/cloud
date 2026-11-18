@@ -3325,6 +3325,7 @@
     "revokeConsent": "Odvolat souhlas",
     "revokeConsentTitle": "Odvolat souhlas se sdílením dat?",
     "acceptAndContinue": "Přijmout a pokračovat",
+    "loadingConsentSettings": "Načítání nastavení souhlasu…",
     "decline": "Odmítnout",
     "declineAndSignOut": "Odmítnout a odhlásit se",
     "declineTitle": "Odmítnout sdílení dat?",

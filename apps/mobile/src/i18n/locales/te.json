@@ -3209,6 +3209,7 @@
     "revokeConsent": "సమ్మతిని ఉపసంహరించండి",
     "revokeConsentTitle": "డేటా భాగస్వామ్య సమ్మతిని ఉపసంహరించాలా?",
     "acceptAndContinue": "అంగీకరించి కొనసాగించండి",
+    "loadingConsentSettings": "మీ సమ్మతి సెట్టింగ్‌లు లోడ్ అవుతున్నాయి…",
     "decline": "తిరస్కరించండి",
     "declineAndSignOut": "తిరస్కరించి సైన్ అవుట్ చేయండి",
     "declineTitle": "డేటా భాగస్వామ్యాన్ని తిరస్కరించాలా?",

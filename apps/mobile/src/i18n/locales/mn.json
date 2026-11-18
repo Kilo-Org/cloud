@@ -3209,6 +3209,7 @@
     "revokeConsent": "Зөвшөөрлийг хүчингүй болгох",
     "revokeConsentTitle": "Өгөгдөл хуваалцах зөвшөөрлийг хүчингүй болгох уу?",
     "acceptAndContinue": "Зөвшөөрч үргэлжлүүлэх",
+    "loadingConsentSettings": "Зөвшөөрлийн тохиргоог ачаалж байна…",
     "decline": "Татгалзах",
     "declineAndSignOut": "Татгалзаж гарах",
     "declineTitle": "Өгөгдөл хуваалцахаас татгалзах уу?",

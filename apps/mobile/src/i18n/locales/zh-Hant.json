@@ -2666,6 +2666,7 @@
     "revokeConsent": "撤銷同意",
     "revokeConsentTitle": "要撤銷分享資料的同意嗎？",
     "acceptAndContinue": "同意並繼續",
+    "loadingConsentSettings": "正在載入你的同意設定…",
     "decline": "拒絕",
     "declineAndSignOut": "拒絕並登出",
     "declineTitle": "要拒絕分享資料嗎？",

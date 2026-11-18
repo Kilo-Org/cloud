@@ -3209,6 +3209,7 @@
     "revokeConsent": "সম্মতি প্রত্যাহার করুন",
     "revokeConsentTitle": "ডেটা শেয়ার করার সম্মতি প্রত্যাহার করবেন?",
     "acceptAndContinue": "সম্মতি দিয়ে এগিয়ে যান",
+    "loadingConsentSettings": "আপনার সম্মতির সেটিংস লোড হচ্ছে…",
     "decline": "প্রত্যাখ্যান করুন",
     "declineAndSignOut": "প্রত্যাখ্যান করে সাইন আউট করুন",
     "declineTitle": "ডেটা শেয়ার করতে অসম্মতি জানাবেন?",

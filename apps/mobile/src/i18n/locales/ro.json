@@ -3267,6 +3267,7 @@
     "revokeConsent": "Retrage consimțământul",
     "revokeConsentTitle": "Retragi consimțământul pentru partajarea datelor?",
     "acceptAndContinue": "Acceptă și continuă",
+    "loadingConsentSettings": "Se încarcă setările tale de consimțământ…",
     "decline": "Refuză",
     "declineAndSignOut": "Refuză și deconectează-te",
     "declineTitle": "Refuzi partajarea datelor?",

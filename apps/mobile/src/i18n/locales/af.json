@@ -3209,6 +3209,7 @@
     "revokeConsent": "Herroep toestemming",
     "revokeConsentTitle": "Toestemming vir datadeling herroep?",
     "acceptAndContinue": "Aanvaar en gaan voort",
+    "loadingConsentSettings": "Jou toestemmingsinstellings word gelaai…",
     "decline": "Weier",
     "declineAndSignOut": "Weier en teken uit",
     "declineTitle": "Datadeling weier?",

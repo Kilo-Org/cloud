@@ -3209,6 +3209,7 @@
     "revokeConsent": "Tërhiq pëlqimin",
     "revokeConsentTitle": "Të tërhiqet pëlqimi për ndarjen e të dhënave?",
     "acceptAndContinue": "Prano dhe vazhdo",
+    "loadingConsentSettings": "Po ngarkohen cilësimet e tua të pëlqimit…",
     "decline": "Refuzo",
     "declineAndSignOut": "Refuzo dhe dil",
     "declineTitle": "Të refuzohet ndarja e të dhënave?",

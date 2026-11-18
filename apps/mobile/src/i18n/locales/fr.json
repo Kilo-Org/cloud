@@ -2627,6 +2627,7 @@
     "why": "Finalité",
     "who": "Destinataires",
     "acceptAndContinue": "Accepter et continuer",
+    "loadingConsentSettings": "Chargement de vos réglages de consentement…",
     "decline": "Refuser",
     "declineAndSignOut": "Refuser et se déconnecter",
     "declineTitle": "Refuser le partage de données ?",

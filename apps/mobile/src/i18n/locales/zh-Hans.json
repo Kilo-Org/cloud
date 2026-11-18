@@ -2666,6 +2666,7 @@
     "revokeConsent": "撤销授权",
     "revokeConsentTitle": "撤销数据共享授权？",
     "acceptAndContinue": "同意并继续",
+    "loadingConsentSettings": "正在加载你的授权设置…",
     "decline": "拒绝",
     "declineAndSignOut": "拒绝并退出登录",
     "declineTitle": "拒绝数据共享？",

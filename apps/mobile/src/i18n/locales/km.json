@@ -3209,6 +3209,7 @@
     "revokeConsent": "ដកហូតការយល់ព្រម",
     "revokeConsentTitle": "ដកហូតការយល់ព្រមចែករំលែកទិន្នន័យ?",
     "acceptAndContinue": "ទទួលយក និងបន្ត",
+    "loadingConsentSettings": "កំពុងផ្ទុកការកំណត់ការយល់ព្រមរបស់អ្នក…",
     "decline": "បដិសេធ",
     "declineAndSignOut": "បដិសេធ និងចេញពីគណនី",
     "declineTitle": "បដិសេធការចែករំលែកទិន្នន័យ?",

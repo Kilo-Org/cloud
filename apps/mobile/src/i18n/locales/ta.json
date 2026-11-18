@@ -3209,6 +3209,7 @@
     "revokeConsent": "ஒப்புதலை அகற்றவும்",
     "revokeConsentTitle": "தரவுப் பகிர்வுக்கான ஒப்புதலை ரத்து செய்யவா?",
     "acceptAndContinue": "ஏற்றுக்கொண்டு தொடரவும்",
+    "loadingConsentSettings": "உங்கள் ஒப்புதல் அமைப்புகள் ஏற்றப்படுகின்றன…",
     "decline": "மறுக்கவும்",
     "declineAndSignOut": "மறுத்து வெளியேறவும்",
     "declineTitle": "தரவுப் பகிர்வை மறுக்கவா?",

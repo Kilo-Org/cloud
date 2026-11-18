@@ -3209,6 +3209,7 @@
     "revokeConsent": "එකඟතාව ඉවත් කරගන්න",
     "revokeConsentTitle": "දත්ත බෙදාගැනීමට දුන් එකඟතාව ඉවත් කරගන්නද?",
     "acceptAndContinue": "පිළිගෙන ඉදිරියට යන්න",
+    "loadingConsentSettings": "ඔබේ එකඟතා සැකසුම් පූරණය වෙමින්…",
     "decline": "ප්‍රතික්ෂේප කරන්න",
     "declineAndSignOut": "ප්‍රතික්ෂේප කර පිටවන්න",
     "declineTitle": "දත්ත බෙදාගැනීම ප්‍රතික්ෂේප කරන්නද?",

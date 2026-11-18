@@ -3209,6 +3209,7 @@
     "revokeConsent": "เพิกถอนความยินยอม",
     "revokeConsentTitle": "เพิกถอนความยินยอมในการแชร์ข้อมูลหรือไม่?",
     "acceptAndContinue": "ยอมรับและดำเนินการต่อ",
+    "loadingConsentSettings": "กำลังโหลดการตั้งค่าความยินยอมของคุณ…",
     "decline": "ปฏิเสธ",
     "declineAndSignOut": "ปฏิเสธและออกจากระบบ",
     "declineTitle": "ปฏิเสธการแชร์ข้อมูลหรือไม่?",

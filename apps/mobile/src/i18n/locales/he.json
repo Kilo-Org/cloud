@@ -2701,6 +2701,7 @@
     "revokeConsent": "הסרת ההסכמה",
     "revokeConsentTitle": "לבטל את ההסכמה לשיתוף נתונים?",
     "acceptAndContinue": "אישור והמשך",
+    "loadingConsentSettings": "טוען את הגדרות ההסכמה שלך…",
     "decline": "סירוב",
     "declineAndSignOut": "סירוב והתנתקות",
     "declineTitle": "לסרב לשיתוף נתונים?",

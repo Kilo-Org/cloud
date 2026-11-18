@@ -3209,6 +3209,7 @@
     "revokeConsent": "ຖອນຄວາມຍິນຍອມ",
     "revokeConsentTitle": "ຖອນຄວາມຍິນຍອມໃນການແບ່ງປັນຂໍ້ມູນບໍ?",
     "acceptAndContinue": "ຍອມຮັບ ແລະ ສືບຕໍ່",
+    "loadingConsentSettings": "ກຳລັງໂຫຼດການຕັ້ງຄ່າຄວາມຍິນຍອມຂອງທ່ານ…",
     "decline": "ປະຕິເສດ",
     "declineAndSignOut": "ປະຕິເສດ ແລະ ອອກຈາກລະບົບ",
     "declineTitle": "ປະຕິເສດການແບ່ງປັນຂໍ້ມູນບໍ?",

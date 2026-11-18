@@ -3209,6 +3209,7 @@
     "revokeConsent": "Tarik balik persetujuan",
     "revokeConsentTitle": "Tarik balik persetujuan perkongsian data?",
     "acceptAndContinue": "Terima dan teruskan",
+    "loadingConsentSettings": "Memuatkan tetapan persetujuan anda…",
     "decline": "Tolak",
     "declineAndSignOut": "Tolak dan log keluar",
     "declineTitle": "Tolak perkongsian data?",

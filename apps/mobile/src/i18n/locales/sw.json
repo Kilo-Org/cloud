@@ -3209,6 +3209,7 @@
     "revokeConsent": "Batilisha idhini",
     "revokeConsentTitle": "Ungependa kubatilisha idhini ya kushiriki data?",
     "acceptAndContinue": "Kubali na uendelee",
+    "loadingConsentSettings": "Inapakia mipangilio yako ya idhini…",
     "decline": "Kataa",
     "declineAndSignOut": "Kataa na utoke kwenye akaunti",
     "declineTitle": "Ungependa kukataa kushiriki data?",

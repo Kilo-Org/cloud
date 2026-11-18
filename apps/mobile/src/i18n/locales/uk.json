@@ -2736,6 +2736,7 @@
     "revokeConsent": "Відкликати згоду",
     "revokeConsentTitle": "Відкликати згоду на передавання даних?",
     "acceptAndContinue": "Погодитися й продовжити",
+    "loadingConsentSettings": "Завантаження налаштувань згоди…",
     "decline": "Відмовитися",
     "declineAndSignOut": "Відмовитися й вийти",
     "declineTitle": "Відмовитися від передавання даних?",

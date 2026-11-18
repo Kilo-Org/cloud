@@ -3209,6 +3209,7 @@
     "revokeConsent": "Келісімді қайтарып алу",
     "revokeConsentTitle": "Деректерді беруге келісіміңізді қайтарып аласыз ба?",
     "acceptAndContinue": "Қабылдап жалғастыру",
+    "loadingConsentSettings": "Келісім баптаулары жүктелуде…",
     "decline": "Бас тарту",
     "declineAndSignOut": "Бас тартып, жүйеден шығу",
     "declineTitle": "Деректерді беруден бас тартасыз ба?",

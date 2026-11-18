@@ -2666,6 +2666,7 @@
     "revokeConsent": "सहमति वापस लें",
     "revokeConsentTitle": "डेटा साझा करने की सहमति वापस लें?",
     "acceptAndContinue": "स्वीकार करें और जारी रखें",
+    "loadingConsentSettings": "आपकी सहमति सेटिंग लोड हो रही हैं…",
     "decline": "अस्वीकार करें",
     "declineAndSignOut": "अस्वीकार करें और साइन आउट करें",
     "declineTitle": "डेटा साझा करने से मना करें?",

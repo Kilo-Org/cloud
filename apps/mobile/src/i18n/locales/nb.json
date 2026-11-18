@@ -3209,6 +3209,7 @@
     "revokeConsent": "Tilbakekall samtykke",
     "revokeConsentTitle": "Tilbakekalle samtykke til datadeling?",
     "acceptAndContinue": "Godta og fortsett",
+    "loadingConsentSettings": "Laster inn samtykkeinnstillingene dine…",
     "decline": "Avslå",
     "declineAndSignOut": "Avslå og logg ut",
     "declineTitle": "Avslå datadeling?",

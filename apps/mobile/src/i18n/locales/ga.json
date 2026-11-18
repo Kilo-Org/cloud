@@ -3383,6 +3383,7 @@
     "revokeConsent": "Cúlghair an toiliú",
     "revokeConsentTitle": "An bhfuil tú ag iarraidh do thoiliú le sonraí a roinnt a chúlghairm?",
     "acceptAndContinue": "Glac agus lean ar aghaidh",
+    "loadingConsentSettings": "Do shocruithe toilithe á lódáil…",
     "decline": "Diúltaigh",
     "declineAndSignOut": "Diúltaigh agus sínigh amach",
     "declineTitle": "An bhfuil tú ag iarraidh diúltú do roinnt sonraí?",

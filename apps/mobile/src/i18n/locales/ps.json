@@ -3209,6 +3209,7 @@
     "revokeConsent": "رضایت لرې کړئ",
     "revokeConsentTitle": "د معلوماتو د شریکولو رضایت لغوه کړم؟",
     "acceptAndContinue": "ومنئ او دوام ورکړئ",
+    "loadingConsentSettings": "ستاسو د رضایت تنظیمات بارېږي…",
     "decline": "رد کړئ",
     "declineAndSignOut": "رد کړئ او ووځئ",
     "declineTitle": "د معلوماتو شریکول رد کړم؟",

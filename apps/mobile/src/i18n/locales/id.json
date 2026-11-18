@@ -2666,6 +2666,7 @@
     "revokeConsent": "Cabut persetujuan",
     "revokeConsentTitle": "Cabut persetujuan berbagi data?",
     "acceptAndContinue": "Setujui dan lanjutkan",
+    "loadingConsentSettings": "Memuat pengaturan persetujuanmu…",
     "decline": "Tolak",
     "declineAndSignOut": "Tolak dan keluar",
     "declineTitle": "Tolak berbagi data?",

@@ -3209,6 +3209,7 @@
     "revokeConsent": "Hozzájárulás visszavonása",
     "revokeConsentTitle": "Visszavonod az adatmegosztási hozzájárulást?",
     "acceptAndContinue": "Elfogadás és folytatás",
+    "loadingConsentSettings": "Hozzájárulási beállításaid betöltése…",
     "decline": "Elutasítás",
     "declineAndSignOut": "Elutasítás és kijelentkezés",
     "declineTitle": "Elutasítod az adatmegosztást?",

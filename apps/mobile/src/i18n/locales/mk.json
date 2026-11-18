@@ -3209,6 +3209,7 @@
     "revokeConsent": "Повлечи ја согласноста",
     "revokeConsentTitle": "Да се повлече согласноста за споделување податоци?",
     "acceptAndContinue": "Прифати и продолжи",
+    "loadingConsentSettings": "Се вчитуваат твоите поставки за согласност…",
     "decline": "Одбиј",
     "declineAndSignOut": "Одбиј и одјави се",
     "declineTitle": "Да се одбие споделувањето податоци?",

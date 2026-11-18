@@ -3209,6 +3209,7 @@
     "revokeConsent": "Bawiin ang pahintulot",
     "revokeConsentTitle": "Bawiin ang pahintulot sa pagbabahagi ng datos?",
     "acceptAndContinue": "Tanggapin at magpatuloy",
+    "loadingConsentSettings": "Naglo-load ang iyong mga setting ng pahintulot…",
     "decline": "Tanggihan",
     "declineAndSignOut": "Tanggihan at mag-sign out",
     "declineTitle": "Tanggihan ang pagbabahagi ng datos?",

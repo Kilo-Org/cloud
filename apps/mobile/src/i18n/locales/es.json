@@ -2701,6 +2701,7 @@
     "revokeConsent": "Revocar consentimiento",
     "revokeConsentTitle": "¿Revocar el consentimiento para compartir datos?",
     "acceptAndContinue": "Aceptar y continuar",
+    "loadingConsentSettings": "Cargando tus ajustes de consentimiento…",
     "decline": "Rechazar",
     "declineAndSignOut": "Rechazar y cerrar sesión",
     "declineTitle": "¿Rechazar que se compartan datos?",

@@ -3209,6 +3209,7 @@
     "revokeConsent": "संमती काढा",
     "revokeConsentTitle": "डेटा शेअर करण्याची संमती रद्द करायची?",
     "acceptAndContinue": "स्वीकारा आणि पुढे जा",
+    "loadingConsentSettings": "तुमच्या संमती सेटिंग्ज लोड होत आहेत…",
     "decline": "नकार द्या",
     "declineAndSignOut": "नकार द्या आणि साइन आउट करा",
     "declineTitle": "डेटा शेअर करण्यास नकार द्यायचा?",

@@ -2666,6 +2666,7 @@
     "revokeConsent": "Onayı geri al",
     "revokeConsentTitle": "Veri paylaşım onayı geri alınsın mı?",
     "acceptAndContinue": "Kabul et ve devam et",
+    "loadingConsentSettings": "Onay ayarların yükleniyor…",
     "decline": "Reddet",
     "declineAndSignOut": "Reddet ve oturumu kapat",
     "declineTitle": "Veri paylaşımı reddedilsin mi?",

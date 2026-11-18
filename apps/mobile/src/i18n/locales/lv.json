@@ -3267,6 +3267,7 @@
     "revokeConsent": "Atsaukt piekrišanu",
     "revokeConsentTitle": "Atsaukt piekrišanu datu kopīgošanai?",
     "acceptAndContinue": "Pieņemt un turpināt",
+    "loadingConsentSettings": "Notiek tavu piekrišanas iestatījumu ielāde…",
     "decline": "Noraidīt",
     "declineAndSignOut": "Noraidīt un izrakstīties",
     "declineTitle": "Noraidīt datu kopīgošanu?",

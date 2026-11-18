@@ -2666,6 +2666,7 @@
     "revokeConsent": "동의 철회",
     "revokeConsentTitle": "데이터 공유 동의를 철회할까요?",
     "acceptAndContinue": "동의하고 계속하기",
+    "loadingConsentSettings": "동의 설정을 불러오는 중…",
     "decline": "거부",
     "declineAndSignOut": "거부하고 로그아웃",
     "declineTitle": "데이터 공유를 거부할까요?",

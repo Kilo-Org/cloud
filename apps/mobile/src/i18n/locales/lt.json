@@ -3325,6 +3325,7 @@
     "revokeConsent": "Pašalinti sutikimą",
     "revokeConsentTitle": "Atšaukti sutikimą bendrinti duomenis?",
     "acceptAndContinue": "Sutikti ir tęsti",
+    "loadingConsentSettings": "Įkeliami jūsų sutikimo nustatymai…",
     "decline": "Nesutikti",
     "declineAndSignOut": "Nesutikti ir atsijungti",
     "declineTitle": "Nesutikti bendrinti duomenų?",

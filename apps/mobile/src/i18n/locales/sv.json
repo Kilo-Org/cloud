@@ -3209,6 +3209,7 @@
     "revokeConsent": "Återkalla samtycke",
     "revokeConsentTitle": "Återkalla samtycke till datadelning?",
     "acceptAndContinue": "Acceptera och fortsätt",
+    "loadingConsentSettings": "Läser in dina samtyckesinställningar…",
     "decline": "Avböj",
     "declineAndSignOut": "Avböj och logga ut",
     "declineTitle": "Avböj datadelning?",

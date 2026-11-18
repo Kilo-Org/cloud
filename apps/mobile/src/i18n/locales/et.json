@@ -3209,6 +3209,7 @@
     "revokeConsent": "Võta nõusolek tagasi",
     "revokeConsentTitle": "Kas võtta andmete jagamise nõusolek tagasi?",
     "acceptAndContinue": "Nõustu ja jätka",
+    "loadingConsentSettings": "Nõusoleku seadete laadimine…",
     "decline": "Keeldu",
     "declineAndSignOut": "Keeldu ja logi välja",
     "declineTitle": "Kas keelduda andmete jagamisest?",

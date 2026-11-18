@@ -3209,6 +3209,7 @@
     "revokeConsent": "Rozilikni olib tashlash",
     "revokeConsentTitle": "Ma'lumot ulashishga berilgan rozilik bekor qilinsinmi?",
     "acceptAndContinue": "Qabul qilish va davom etish",
+    "loadingConsentSettings": "Rozilik sozlamalari yuklanmoqda…",
     "decline": "Rad etish",
     "declineAndSignOut": "Rad etish va tizimdan chiqish",
     "declineTitle": "Ma'lumot ulashish rad etilsinmi?",

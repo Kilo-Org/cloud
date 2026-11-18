@@ -2666,6 +2666,7 @@
     "revokeConsent": "同意を取り消す",
     "revokeConsentTitle": "データ共有の同意を取り消しますか？",
     "acceptAndContinue": "同意して続行",
+    "loadingConsentSettings": "同意設定を読み込み中…",
     "decline": "拒否",
     "declineAndSignOut": "拒否してサインアウト",
     "declineTitle": "データ共有を拒否しますか？",

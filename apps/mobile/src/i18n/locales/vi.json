@@ -2666,6 +2666,7 @@
     "revokeConsent": "Thu hồi sự đồng ý",
     "revokeConsentTitle": "Thu hồi sự đồng ý chia sẻ dữ liệu?",
     "acceptAndContinue": "Chấp nhận và tiếp tục",
+    "loadingConsentSettings": "Đang tải cài đặt đồng ý chia sẻ dữ liệu của bạn…",
     "decline": "Từ chối",
     "declineAndSignOut": "Từ chối và đăng xuất",
     "declineTitle": "Từ chối chia sẻ dữ liệu?",

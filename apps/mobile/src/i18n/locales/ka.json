@@ -3209,6 +3209,7 @@
     "revokeConsent": "თანხმობის ამოღება",
     "revokeConsentTitle": "გავაუქმოთ მონაცემების გაზიარების თანხმობა?",
     "acceptAndContinue": "თანხმობა და გაგრძელება",
+    "loadingConsentSettings": "თქვენი თანხმობის პარამეტრები იტვირთება…",
     "decline": "უარყოფა",
     "declineAndSignOut": "უარყოფა და გასვლა",
     "declineTitle": "უარვყოთ მონაცემების გაზიარება?",

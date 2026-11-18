@@ -3209,6 +3209,7 @@
     "revokeConsent": "Poista suostumus",
     "revokeConsentTitle": "Peruutetaanko suostumus tietojen jakamiseen?",
     "acceptAndContinue": "Hyväksy ja jatka",
+    "loadingConsentSettings": "Suostumusasetuksiasi ladataan…",
     "decline": "Hylkää",
     "declineAndSignOut": "Hylkää ja kirjaudu ulos",
     "declineTitle": "Hylätäänkö tietojen jakaminen?",

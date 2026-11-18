@@ -3441,6 +3441,7 @@
     "revokeConsent": "Dirymu cydsyniad",
     "revokeConsentTitle": "Dirymu cydsyniad i rannu data?",
     "acceptAndContinue": "Derbyn a pharhau",
+    "loadingConsentSettings": "Yn llwytho eich gosodiadau cydsyniad…",
     "decline": "Gwrthod",
     "declineAndSignOut": "Gwrthod ac allgofnodi",
     "declineTitle": "Gwrthod rhannu data?",

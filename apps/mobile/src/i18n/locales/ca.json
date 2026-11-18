@@ -3267,6 +3267,7 @@
     "revokeConsent": "Revoca el consentiment",
     "revokeConsentTitle": "Vols revocar el consentiment per compartir dades?",
     "acceptAndContinue": "Accepta i continua",
+    "loadingConsentSettings": "S'estan carregant les teves opcions de consentiment…",
     "decline": "Rebutja",
     "declineAndSignOut": "Rebutja i tanca la sessió",
     "declineTitle": "Vols rebutjar l'opció de compartir dades?",

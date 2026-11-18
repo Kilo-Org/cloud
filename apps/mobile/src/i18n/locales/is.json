@@ -3209,6 +3209,7 @@
     "revokeConsent": "Afturkalla samþykki",
     "revokeConsentTitle": "Afturkalla samþykki fyrir gagnadeilingu?",
     "acceptAndContinue": "Samþykkja og halda áfram",
+    "loadingConsentSettings": "Hleð samþykkisstillingum þínum…",
     "decline": "Hafna",
     "declineAndSignOut": "Hafna og skrá út",
     "declineTitle": "Hafna gagnadeilingu?",

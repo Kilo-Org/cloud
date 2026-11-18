@@ -2736,6 +2736,7 @@
     "revokeConsent": "Отозвать согласие",
     "revokeConsentTitle": "Отозвать согласие на передачу данных?",
     "acceptAndContinue": "Согласиться и продолжить",
+    "loadingConsentSettings": "Загрузка настроек согласия…",
     "decline": "Отказаться",
     "declineAndSignOut": "Отказаться и выйти",
     "declineTitle": "Отказаться от передачи данных?",

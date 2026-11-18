@@ -93,10 +93,11 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   const rootStyle = { paddingTop: top, ...sideInsetStyle };
   const contentContainerStyle = {
     paddingTop: 24,
-    // The footer's top border marks the scroll edge, but the last row still
-    // needs clearance past it: without this extra tail, the Feature rollout
-    // description stops flush at the border and the scroll extent reads as
-    // "one row short" instead of "one scroll away".
+    // The footer's top border marks the scroll edge, and this tail keeps the
+    // last child ("See full details", the scroll content's final pressable)
+    // clear of it when the list is scrolled to its end: without the extra
+    // tail that row stops flush against the border and the scroll extent
+    // reads as "one row short" instead of "one scroll away".
     paddingBottom: 40,
   };
   // The action buttons sit in a pinned footer below the ScrollView, not in

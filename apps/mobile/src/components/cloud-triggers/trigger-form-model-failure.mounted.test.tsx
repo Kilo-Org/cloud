@@ -24,6 +24,7 @@ vi.mock('react-native', () => ({
   View: 'View',
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/icons', () => ({ RotateCcw: 'RotateCcw' }));
 vi.mock('@/components/ui/form-field', async () => {
   const { createElement: h } = await import('react');
   return {
@@ -42,6 +43,7 @@ vi.mock('@/lib/cloud-triggers/use-trigger-options', () => ({
   useTriggerProfiles: () => emptyOptions(),
 }));
 vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
+vi.mock('@/components/empty-state', () => ({ StateAction: 'StateAction' }));
 // The catalogue read each test describes; the mock reads the object live, so a
 // test sets the state it renders instead of remocking the hook.
 const availableModels = vi.hoisted(() => ({
@@ -75,7 +77,7 @@ const emptyOptions = () => ({
 });
 
 const MODEL_SELECTOR = 'ModelSelector' as ElementType;
-const PRESSABLE = 'Pressable' as ElementType;
+const STATE_ACTION = 'StateAction' as ElementType;
 
 const CACHED_MODEL = {
   id: 'anthropic/claude-sonnet-4',
@@ -121,11 +123,11 @@ describe('trigger form model list failure', () => {
         i18n.t('common.couldNotLoadModels'),
       ]);
 
-      const [retry] = root.findAll(node => Object.is(node.type, PRESSABLE));
+      const [retry] = root.findAll(node => Object.is(node.type, STATE_ACTION));
       if (!retry) {
         throw new Error('expected a retry action');
       }
-      expect(retry.props.disabled).toBe(false);
+      expect(retry.props.loading).toBe(false);
       act(() => {
         (retry.props.onPress as () => void)();
       });
@@ -152,12 +154,12 @@ describe('trigger form model list failure', () => {
     const view = await mountAgent();
     const root = view.renderer.root;
     try {
-      const [retry] = root.findAll(node => Object.is(node.type, PRESSABLE));
+      const [retry] = root.findAll(node => Object.is(node.type, STATE_ACTION));
       if (!retry) {
         throw new Error('expected a retry action');
       }
       expect(failureAlert(root)).toHaveLength(1);
-      expect(retry.props.disabled).toBe(true);
+      expect(retry.props.loading).toBe(true);
     } finally {
       act(() => {
         view.renderer.unmount();
@@ -176,7 +178,7 @@ describe('trigger form model list failure', () => {
     try {
       // A populated catalogue is usable whatever the last read answered, so no
       // failure row shows for it; the retry only serves a model-less block.
-      const retryCount = root.findAll(node => Object.is(node.type, PRESSABLE)).length;
+      const retryCount = root.findAll(node => Object.is(node.type, STATE_ACTION)).length;
       expect(retryCount).toBe(0);
       expect(failureAlert(root).length).toBe(0);
       expect(root.findAll(node => Object.is(node.type, MODEL_SELECTOR))[0]?.props.disabled).toBe(

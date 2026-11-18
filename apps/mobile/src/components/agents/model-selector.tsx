@@ -15,6 +15,7 @@ import { Keyboard, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { i18n } from '@/i18n';
+import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { SectionHeader } from '@/components/ui/section-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -22,6 +23,8 @@ import {
   CHIP_HIT_SLOP,
   COMPACT_CONTROL_BOX_CLASS,
   COMPACT_CONTROL_HIT_SLOP_DP,
+  FIELD_TRIGGER_BODY_CLASS,
+  FIELD_TRIGGER_FRAME_CLASS,
 } from '@/lib/a11y/tap-target';
 import { autoModelLabel } from '@/lib/auto-model-name';
 import { formatList } from '@/lib/format';
@@ -58,6 +61,12 @@ type ModelSelectorProps = {
   isLoading?: boolean;
   /** Agent name that pins the model; when set with `disabled`, the chip is locked. */
   lockLabel?: string;
+  /**
+   * `chip` is the composer's inline pill, beside the mode chip. `field` is the
+   * form's picker: a label above the 48pt select box, on the field-label
+   * column the text fields use, for a form that lists its picks as fields.
+   */
+  presentation?: 'chip' | 'field';
 };
 
 type ModelPickerSelectionScopeContextValue = {
@@ -164,6 +173,7 @@ export function ModelSelector({
   disabled = false,
   isLoading = false,
   lockLabel,
+  presentation = 'chip',
 }: Readonly<ModelSelectorProps>) {
   const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
@@ -171,13 +181,17 @@ export function ModelSelector({
   const selectionContext = useContext(ModelPickerSelectionScopeContext);
 
   if (isLoading) {
-    return (
+    const loadingBar = (
       <View
         accessible
         accessibilityRole="button"
         accessibilityState={{ busy: true, disabled: true }}
         accessibilityLabel={t('common.model')}
-        className="min-w-0 shrink flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5"
+        className={
+          presentation === 'field'
+            ? undefined
+            : 'min-w-0 shrink flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5'
+        }
       >
         {/* The bar stands in for the label line and takes that line's own box:
             `text-sm` sets one 17.5 dp line, which is the scale's `h-5`, so the
@@ -191,10 +205,21 @@ export function ModelSelector({
             assistive tech without a text node that reads as a resolved value. */}
         <Skeleton className="h-5 w-20 bg-muted-soft" />
         <View className="opacity-50">
-          <ChevronDown size={14} color={colors.mutedForeground} />
+          <ChevronDown size={presentation === 'field' ? 16 : 14} color={colors.mutedForeground} />
         </View>
       </View>
     );
+    if (presentation === 'field') {
+      return (
+        <View className="gap-2">
+          <FormFieldLabel label={t('common.model')} />
+          <View className={FIELD_TRIGGER_FRAME_CLASS}>
+            <View className={cn(FIELD_TRIGGER_BODY_CLASS, 'justify-between')}>{loadingBar}</View>
+          </View>
+        </View>
+      );
+    }
+    return loadingBar;
   }
 
   const pickerOptions = options.map(option => toSessionModelOption(option));
@@ -247,43 +272,73 @@ export function ModelSelector({
     });
   }
 
+  const selectorBody = (
+    <View className="min-w-0 shrink flex-row items-center gap-1.5">
+      <Text className="shrink text-sm font-medium text-foreground" numberOfLines={1}>
+        {label}
+      </Text>
+      {byok ? (
+        <View className="rounded-full bg-neutral-200 px-1.5 py-0.5 dark:bg-neutral-700">
+          <Text className="text-xs font-medium text-foreground" numberOfLines={1}>
+            {BYOK_MODEL_LABEL}
+          </Text>
+        </View>
+      ) : null}
+      {collectsData ? <BookOpenCheck size={12} color={colors.warn} /> : null}
+      {showVariantBadge ? (
+        <View className="flex-row items-center gap-1 rounded-full bg-neutral-200 px-1.5 py-0.5 dark:bg-neutral-800">
+          <Brain size={12} color={colors.mutedForeground} />
+          {/* The label is text, not the chip's chevron/icon, so it keeps
+           * full theme contrast against the badge surface. The muted token
+           * falls below 4.5:1 on `neutral-200`/`neutral-800`, which the
+           * dim-only-chevron/icon rule does not cover (D2). */}
+          <Text className="text-xs font-medium text-foreground" numberOfLines={1}>
+            {variantLabel}
+          </Text>
+        </View>
+      ) : null}
+    </View>
+  );
+  const pressableProps = {
+    onPress: handlePress,
+    disabled: effectivelyDisabled,
+    accessibilityRole: 'button' as const,
+    accessibilityLabel,
+    accessibilityState: { disabled: effectivelyDisabled },
+  };
+
+  if (presentation === 'field') {
+    // The form's picker: the label above the shared 48pt select box, the way
+    // the text fields above it name their inputs. The pill belongs to the
+    // composer, where it sits beside the mode chip; inside a field column it
+    // read as a third control type (design review, 2026-11-18).
+    return (
+      <View className="gap-2">
+        <FormFieldLabel label={t('common.model')} />
+        <Pressable
+          {...pressableProps}
+          className={cn(FIELD_TRIGGER_FRAME_CLASS, !effectivelyDisabled && 'active:opacity-70')}
+        >
+          <View className={cn(FIELD_TRIGGER_BODY_CLASS, 'justify-between')}>
+            {selectorBody}
+            <View className={cn(effectivelyDisabled && 'opacity-50')}>
+              <ChevronDown size={16} color={colors.mutedForeground} />
+            </View>
+          </View>
+        </Pressable>
+      </View>
+    );
+  }
+
   return (
     <Pressable
-      onPress={handlePress}
-      disabled={effectivelyDisabled}
+      {...pressableProps}
       // The chip's own 27.81pt frame is the visual; the vertical slop carries
       // its touch region past the 44pt design target without growing the row.
       hitSlop={CHIP_HIT_SLOP}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      accessibilityState={{ disabled: effectivelyDisabled }}
       className="min-w-0 shrink flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 active:opacity-70"
     >
-      <View className="min-w-0 shrink flex-row items-center gap-1.5">
-        <Text className="shrink text-sm font-medium text-foreground" numberOfLines={1}>
-          {label}
-        </Text>
-        {byok ? (
-          <View className="rounded-full bg-neutral-200 px-1.5 py-0.5 dark:bg-neutral-700">
-            <Text className="text-xs font-medium text-foreground" numberOfLines={1}>
-              {BYOK_MODEL_LABEL}
-            </Text>
-          </View>
-        ) : null}
-        {collectsData ? <BookOpenCheck size={12} color={colors.warn} /> : null}
-        {showVariantBadge ? (
-          <View className="flex-row items-center gap-1 rounded-full bg-neutral-200 px-1.5 py-0.5 dark:bg-neutral-800">
-            <Brain size={12} color={colors.mutedForeground} />
-            {/* The label is text, not the chip's chevron/icon, so it keeps
-             * full theme contrast against the badge surface. The muted token
-             * falls below 4.5:1 on `neutral-200`/`neutral-800`, which the
-             * dim-only-chevron/icon rule does not cover (D2). */}
-            <Text className="text-xs font-medium text-foreground" numberOfLines={1}>
-              {variantLabel}
-            </Text>
-          </View>
-        ) : null}
-      </View>
+      {selectorBody}
       {/* The label stays at full theme contrast; a disabled chip dims only its
        * chevron so the pill text keeps the WCAG AA 4.5:1 ratio (D2). */}
       <View className={cn(effectivelyDisabled && 'opacity-50')}>

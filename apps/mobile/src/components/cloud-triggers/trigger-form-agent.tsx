@@ -9,7 +9,7 @@
  */
 
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
 import {
   getBuiltinModeDescriptionKey,
@@ -17,10 +17,10 @@ import {
 } from '@/components/agents/mode-options';
 import { BUILTIN_AGENT_MODES } from '@/components/agents/mode-normalize';
 import { ModelSelector } from '@/components/agents/model-selector';
-import { cn } from '@/lib/utils';
+import { StateAction } from '@/components/empty-state';
 import { FormField } from '@/components/ui/form-field';
+import { RotateCcw } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
-import { LINE_ACTION_BOX_CLASS, LINE_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { triggerProblemText } from '@/lib/cloud-triggers/trigger-problem-copy';
 import { type TriggerDraft, type TriggerDraftProblems } from '@/lib/cloud-triggers/trigger-draft';
 import { TRIGGER_FIELD_EXAMPLES } from '@/lib/cloud-triggers/trigger-field-examples';
@@ -120,38 +120,32 @@ export function TriggerFormAgent({
       )}
 
       <View className="gap-2">
-        <View className="flex-row items-center gap-2">
-          <ModelSelector
-            value={draft.model}
-            variant={draft.variant}
-            options={models.models}
-            acceptsVariant
-            onSelect={(model, variant) => {
-              onDraftChange({ ...draft, model, variant });
-            }}
-            onOpen={() => {
-              markTouched('model');
-            }}
-            isLoading={models.isLoading}
-            disabled={catalogueFailed}
-          />
-        </View>
+        <ModelSelector
+          value={draft.model}
+          variant={draft.variant}
+          options={models.models}
+          acceptsVariant
+          presentation="field"
+          onSelect={(model, variant) => {
+            onDraftChange({ ...draft, model, variant });
+          }}
+          onOpen={() => {
+            markTouched('model');
+          }}
+          isLoading={models.isLoading}
+          disabled={catalogueFailed}
+        />
         {catalogueFailed ? (
           <View className="flex-row items-center gap-2">
             <Text accessibilityRole="alert" className="min-w-0 flex-1 text-xs text-destructive">
               {t('common.couldNotLoadModels')}
             </Text>
-            <Pressable
-              accessibilityLabel={t('common.retry')}
-              accessibilityRole="button"
-              accessibilityState={{ disabled: models.isFetching }}
-              className={cn(LINE_ACTION_BOX_CLASS, 'min-w-10 justify-center active:opacity-70')}
-              disabled={models.isFetching}
-              hitSlop={LINE_ACTION_HIT_SLOP}
+            <StateAction
+              label={t('common.retry')}
+              icon={RotateCcw}
               onPress={() => void models.refetch()}
-            >
-              <Text className="text-xs font-medium text-destructive">{t('common.retry')}</Text>
-            </Pressable>
+              loading={models.isFetching}
+            />
           </View>
         ) : null}
         {modelProblemText === undefined ? null : (

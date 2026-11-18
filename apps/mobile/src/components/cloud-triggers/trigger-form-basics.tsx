@@ -8,15 +8,14 @@
  */
 
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
 import { RepoPickerSheet } from '@/components/profiles/repo-picker-sheet';
+import { FieldSelect } from '@/components/ui/field-select';
 import { FormField } from '@/components/ui/form-field';
 import { FormFieldLabel } from '@/components/ui/form-field-label';
-import { ChevronDown } from '@/components/ui/icons';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
-import { FIELD_TRIGGER_BODY_CLASS, FIELD_TRIGGER_FRAME_CLASS } from '@/lib/a11y/tap-target';
 import { triggerProblemText } from '@/lib/cloud-triggers/trigger-problem-copy';
 import { TRIGGER_FIELD_EXAMPLES } from '@/lib/cloud-triggers/trigger-field-examples';
 import {
@@ -27,9 +26,7 @@ import {
 } from '@/lib/cloud-triggers/trigger-draft';
 import { useTouchedProblems } from '@/lib/cloud-triggers/use-touched-problems';
 import { useTriggerRepositories } from '@/lib/cloud-triggers/use-trigger-options';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { ltrValueTextStyle } from '@/lib/rtl-text';
-import { cn } from '@/lib/utils';
 
 const ACTIVATION_OPTIONS = [
   { value: 'webhook' as const, labelKey: 'cloudAgent.triggers.activationWebhook' },
@@ -59,7 +56,6 @@ export function TriggerFormBasics({
   const repositories = useTriggerRepositories(organizationId, repositoryPickerOpen);
   const isScheduled = draft.activation === 'scheduled';
   const { markTouched, shownProblem } = useTouchedProblems(problems);
-  const colors = useThemeColors();
   const repositoryError = triggerProblemText(shownProblem('repository'));
   const repositoryValue =
     draft.repository.length === 0 ? t('cloudAgent.triggers.notSelected') : draft.repository;
@@ -101,7 +97,7 @@ export function TriggerFormBasics({
       )}
 
       <View className="gap-2">
-        <Text variant="muted">{t('cloudAgent.triggers.fieldActivation')}</Text>
+        <FormFieldLabel label={t('cloudAgent.triggers.fieldActivation')} />
         {mode === 'create' ? (
           <SegmentedControl
             options={ACTIVATION_OPTIONS.map(option => ({
@@ -158,39 +154,17 @@ export function TriggerFormBasics({
 
       <View className="gap-2">
         {mode === 'create' ? (
-          <>
-            <FormFieldLabel label={t('common.repository')} />
-            {/* The same label-above select box the New session form uses:
-                the label starts on the field column, and the value sits in the
-                shared 48pt field trigger rather than in an inset row. */}
-            <Pressable
-              accessibilityLabel={t('common.repository')}
-              accessibilityValue={{ text: repositoryValue }}
-              accessibilityRole="button"
-              className={cn(FIELD_TRIGGER_FRAME_CLASS, 'active:opacity-70')}
-              onPress={() => {
-                markTouched('repository');
-                onRepositoryPickerOpenChange(true);
-              }}
-            >
-              <View className={cn(FIELD_TRIGGER_BODY_CLASS, 'justify-between')}>
-                <Text
-                  className={cn(
-                    'min-w-0 flex-1 text-base',
-                    draft.repository.length === 0 ? 'text-muted-foreground' : 'text-foreground'
-                  )}
-                  numberOfLines={1}
-                >
-                  {repositoryValue}
-                </Text>
-                <ChevronDown size={16} color={colors.mutedForeground} />
-              </View>
-            </Pressable>
-            {repositoryError === undefined ? null : (
-              <Text className="text-xs text-destructive">{repositoryError}</Text>
-            )}
-            <Text variant="caption">{t('cloudAgent.triggers.repositoryLocked')}</Text>
-          </>
+          <FieldSelect
+            label={t('common.repository')}
+            value={repositoryValue}
+            placeholder={draft.repository.length === 0}
+            onPress={() => {
+              markTouched('repository');
+              onRepositoryPickerOpenChange(true);
+            }}
+            error={repositoryError}
+            caption={t('cloudAgent.triggers.repositoryLocked')}
+          />
         ) : (
           <>
             <Text variant="muted">{t('common.repository')}</Text>

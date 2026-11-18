@@ -166,19 +166,17 @@ export function TodoDetailScreen({ itemId }: Readonly<{ itemId: string }>) {
   }
 
   // The loaded screen draws the to-do's list on the eyebrow line. A to-do that
-  // loads always carries its list, so the reserve belongs to the read that can
-  // still answer with it; a failed read never gains a label, and its header
-  // drops the line so the empty title centres on the back control alone.
-  const reserveEyebrow = !query.isError;
-
+  // loads always carries its list, so this shell keeps the line reserved while
+  // the read runs and after it fails: the title holds the position the payload
+  // gives it, instead of dropping up into a gap the retry would reopen.
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
         title=""
         titleNumberOfLines={2}
         reserveTitleSpace
-        reserveEyebrow={reserveEyebrow}
-        eyebrowPlaceholder={reserveEyebrow ? <EyebrowPlaceholder /> : undefined}
+        reserveEyebrow
+        eyebrowPlaceholder={<EyebrowPlaceholder />}
         backFallback={LISTS_HREF}
       />
       {query.isError ? (

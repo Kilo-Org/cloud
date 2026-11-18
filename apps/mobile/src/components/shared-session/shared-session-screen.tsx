@@ -12,6 +12,7 @@ import { i18n } from '@/i18n';
 import { formatDate } from '@/lib/format';
 import { trpcErrorVariant } from '@/lib/trpc-error';
 import { useTRPC } from '@/lib/trpc';
+import { parseTimestamp } from '@/lib/utils';
 
 /**
  * Scroll identity for the shared transcript. The list only uses it to key its
@@ -21,15 +22,12 @@ import { useTRPC } from '@/lib/trpc';
  */
 const SHARED_TRANSCRIPT_ID = 'shared-session';
 
-function sharedDateLabel(createdAt: string | null | undefined): string | null {
+function sharedCreatedDate(createdAt: string | null | undefined): Date | null {
   if (!createdAt) {
     return null;
   }
-  const date = new Date(createdAt);
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-  return formatDate(date, i18n.language, { month: 'short', day: 'numeric' });
+  const date = parseTimestamp(createdAt);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 /**
@@ -57,7 +55,15 @@ export function SharedSessionScreen({ shareToken }: Readonly<{ shareToken: strin
   const metadata = query.data?.metadata;
   const ownerName = metadata?.ownerName ?? t('sharedSession.someone');
   const repoLabel = metadata?.gitUrl ? formatGitUrlProject(metadata.gitUrl) : null;
-  const dateLabel = sharedDateLabel(metadata?.createdAt);
+  const createdDate = sharedCreatedDate(metadata?.createdAt);
+  const dateLabel = createdDate
+    ? formatDate(createdDate, i18n.language, { month: 'short', day: 'numeric' })
+    : null;
+  const asOfLabel = createdDate
+    ? t('agentChat.sessionChanges.asOf', {
+        time: formatDate(createdDate, i18n.language, { timeStyle: 'short' }),
+      })
+    : null;
   const subtitle = [
     t('sharedSession.sharedBy', { owner: ownerName }),
     metadata?.gitBranch ?? null,
@@ -70,15 +76,17 @@ export function SharedSessionScreen({ shareToken }: Readonly<{ shareToken: strin
     void query.refetch();
   };
 
-  // The eyebrow is the shared session's repository, which the payload carries
-  // only when the session had a git URL. The line is reserved while the read can
-  // still answer with one and dropped when it settled without, so a session with
-  // no repository centres its title alone.
-  let eyebrow: HeaderEyebrow = { kind: 'none' };
+  // The eyebrow names the session: its repository, which the payload carries
+  // only when the session had a git URL, and otherwise the time it was created.
+  // Every state keeps the line — while the read is pending, after it fails, and
+  // when the payload has no usable timestamp the reserved line with the
+  // placeholder bar holds its place — so the shared header never opens a gap
+  // that then closes under the title.
+  let eyebrow: HeaderEyebrow = { kind: 'reserved' };
   if (repoLabel !== null) {
     eyebrow = { kind: 'ready', text: repoLabel };
-  } else if (query.isPending) {
-    eyebrow = { kind: 'loading' };
+  } else if (asOfLabel !== null) {
+    eyebrow = { kind: 'ready', text: asOfLabel };
   }
 
   let body: ReactNode = null;
@@ -125,8 +133,8 @@ export function SharedSessionScreen({ shareToken }: Readonly<{ shareToken: strin
       <ScreenHeader
         title={metadata?.title ?? t('sharedSession.title')}
         eyebrow={eyebrow.kind === 'ready' ? eyebrow.text : undefined}
-        reserveEyebrow={eyebrow.kind === 'loading'}
-        eyebrowPlaceholder={eyebrow.kind === 'loading' ? <EyebrowPlaceholder /> : undefined}
+        reserveEyebrow={eyebrow.kind === 'reserved'}
+        eyebrowPlaceholder={eyebrow.kind === 'reserved' ? <EyebrowPlaceholder /> : undefined}
         subtitle={query.data ? subtitle : undefined}
         reserveSubtitle
         titleNumberOfLines={2}

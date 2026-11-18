@@ -152,21 +152,18 @@ export function ReviewDetailScreen({
   // One header for every state. The eyebrow is the review's repository, which
   // only the payload knows, so its line is reserved while the read can still
   // answer with it: the title above the body must not move when the review
-  // lands, nor when a refetch drops it back to loading. A read that settled
-  // without a review — the failure and permission branches — paints the same
-  // header without the line, so the title centres on the back control.
-  let eyebrow: HeaderEyebrow = { kind: 'none' };
-  if (loadedReview) {
-    eyebrow = { kind: 'ready', text: loadedReview.repo_full_name };
-  } else if (isLoading) {
-    eyebrow = { kind: 'loading' };
-  }
+  // lands, nor when a refetch drops it back to loading. A read that fails — the
+  // failure, not-found and permission branches — keeps the same line it drew
+  // while loading, so the title stays where the retry will land it.
+  const eyebrow: HeaderEyebrow = loadedReview
+    ? { kind: 'ready', text: loadedReview.repo_full_name }
+    : { kind: 'reserved' };
   const header = (
     <ReviewerHeader
       title={t('codeReviewer.reviewDetail.title')}
       eyebrow={eyebrow.kind === 'ready' ? eyebrow.text : undefined}
-      reserveEyebrow={eyebrow.kind === 'loading'}
-      eyebrowPlaceholder={eyebrow.kind === 'loading' ? <EyebrowPlaceholder /> : undefined}
+      reserveEyebrow={eyebrow.kind === 'reserved'}
+      eyebrowPlaceholder={eyebrow.kind === 'reserved' ? <EyebrowPlaceholder /> : undefined}
     />
   );
 

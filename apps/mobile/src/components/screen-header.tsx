@@ -258,15 +258,17 @@ type ScreenHeaderProps = {
 
 /**
  * The eyebrow line a header paints when its label comes from a read: the label
- * itself once the read answers, the reserved line with a placeholder bar while
- * the read can still answer with one, or no line at all once it settled without
- * a label — the title then centres on the leading control alone. A caller keeps
- * one of these values as its single source of truth, so the line it reserves is
- * always a line it can fill.
+ * itself once the read answers, a reserved line (with the caller's placeholder
+ * bar) while the read can still answer with one or after it failed — the title
+ * then holds the position the label will take instead of moving — or no line at
+ * all once the read settled without a label, where the title centres on the
+ * leading control alone. A caller keeps one of these values as its single source
+ * of truth, so the line is reserved exactly while a label exists or a read can
+ * still produce one.
  */
 export type HeaderEyebrow =
   | { readonly kind: 'ready'; readonly text: string }
-  | { readonly kind: 'loading' }
+  | { readonly kind: 'reserved' }
   | { readonly kind: 'none' };
 
 /**

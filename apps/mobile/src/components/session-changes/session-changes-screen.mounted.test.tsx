@@ -1,8 +1,9 @@
 // The session changes header draws the capture time on its eyebrow line. This
 // suite pins where that line comes from: reserved with a placeholder bar while
-// a read can still answer with a time, the label once it does, and no line at
-// all when the session settles without a capture and without a session diff —
-// a reserved line there would leave the title above a gap no label ever fills.
+// a read can still answer with a time and after a read fails, the label once it
+// answers, and no line at all only when the session settles without a capture
+// and without a session diff — a reserved line there would leave the title above
+// a gap no label ever fills.
 
 import { type ComponentProps, createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
@@ -92,24 +93,28 @@ const CAPTURE: Capture = {
  */
 function changesData({
   sessionPending = false,
+  sessionError = false,
   cloudAgentSessionId = null,
   readOnly = false,
   changesPending = false,
+  changesError = false,
   snapshot = null,
   legacy = {},
 }: {
   sessionPending?: boolean;
+  sessionError?: boolean;
   cloudAgentSessionId?: string | null;
   readOnly?: boolean;
   changesPending?: boolean;
+  changesError?: boolean;
   snapshot?: Capture | null;
   legacy?: { isSuccess?: boolean; isPending?: boolean; isError?: boolean };
 }): Record<string, unknown> {
   return {
-    sessionQuery: { isPending: sessionPending, isError: false, refetch: vi.fn() },
+    sessionQuery: { isPending: sessionPending, isError: sessionError, refetch: vi.fn() },
     cloudAgentSessionId,
     readOnly,
-    changesQuery: { isPending: changesPending, isError: false, refetch: vi.fn() },
+    changesQuery: { isPending: changesPending, isError: changesError, refetch: vi.fn() },
     snapshot,
     legacyDiffQuery: {
       isSuccess: legacy.isSuccess ?? false,
@@ -210,10 +215,45 @@ describe('session changes header eyebrow', () => {
     renderer.unmount();
   });
 
+  it('keeps the reserved line when the session read fails', () => {
+    state.data = changesData({ sessionError: true });
+    const renderer = renderScreen();
+    const header = headerProps(renderer);
+
+    // The retry re-enters the loading state on this same line, so dropping it
+    // on the failure would move the title twice.
+    expect(header.eyebrow).toBeUndefined();
+    expect(header.reserveEyebrow).toBe(true);
+    expect(header.eyebrowPlaceholder).toBeTruthy();
+    renderer.unmount();
+  });
+
+  it('keeps the reserved line when the Cloud Agent capture read fails', () => {
+    state.data = changesData({ cloudAgentSessionId: 'ca-1', changesError: true });
+    const renderer = renderScreen();
+    const header = headerProps(renderer);
+
+    expect(header.eyebrow).toBeUndefined();
+    expect(header.reserveEyebrow).toBe(true);
+    expect(header.eyebrowPlaceholder).toBeTruthy();
+    renderer.unmount();
+  });
+
+  it('keeps the reserved line when the read-only session diff fails', () => {
+    state.data = changesData({ readOnly: true, legacy: { isPending: false, isError: true } });
+    const renderer = renderScreen();
+    const header = headerProps(renderer);
+
+    expect(header.eyebrow).toBeUndefined();
+    expect(header.reserveEyebrow).toBe(true);
+    expect(header.eyebrowPlaceholder).toBeTruthy();
+    renderer.unmount();
+  });
+
   it('reserves no eyebrow when the session settled without a capture and without a diff', () => {
     state.data = changesData({
       readOnly: true,
-      legacy: { isPending: false, isError: true },
+      legacy: { isPending: false, isError: false },
     });
     const renderer = renderScreen();
     const header = headerProps(renderer);

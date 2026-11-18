@@ -35,6 +35,10 @@ const buttons = vi.hoisted(() => ({
   rendered: [] as { children?: unknown; onPress?: () => void }[],
 }));
 
+const screenHeaders = vi.hoisted(() => ({
+  rendered: [] as { eyebrow?: string; reserveEyebrow?: boolean }[],
+}));
+
 const viewRenders = vi.hoisted(() => ({
   list: [] as { style?: unknown; className?: string; children?: unknown }[],
 }));
@@ -143,7 +147,12 @@ vi.mock('@/components/query-error', () => ({
     return null;
   },
 }));
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
+vi.mock('@/components/screen-header', () => ({
+  ScreenHeader: (props: { eyebrow?: string; reserveEyebrow?: boolean }) => {
+    screenHeaders.rendered.push(props);
+    return null;
+  },
+}));
 vi.mock('@/components/ui/button', () => ({
   Button: (props: { children?: unknown; onPress?: () => void }) => {
     buttons.rendered.push(props);
@@ -322,6 +331,7 @@ beforeEach(() => {
   detail.refetch.mockClear();
   queryErrors.errors = [];
   buttons.rendered = [];
+  screenHeaders.rendered = [];
   viewRenders.list = [];
   reviewConfig.query = { isPending: false, data: undefined };
   reviewConfig.calls = [];
@@ -1020,6 +1030,43 @@ describe('ReviewDetailScreen error states', () => {
     expect(queryErrors.errors).toHaveLength(1);
     expect(queryErrors.errors[0]?.variant).toBe('server');
     expect(queryErrors.errors[0]?.onRetry).toBeDefined();
+  });
+
+  it('keeps the eyebrow line it reserved while loading through a failed read', () => {
+    detail.isError = true;
+    detail.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
+    detail.data = null;
+
+    renderScreen();
+
+    // A retry re-enters the loading state on this same line, so dropping it on
+    // the failure would move the title on the way in and on the way back out.
+    expect(screenHeaders.rendered).toHaveLength(1);
+    expect(screenHeaders.rendered[0]?.eyebrow).toBeUndefined();
+    expect(screenHeaders.rendered[0]?.reserveEyebrow).toBe(true);
+  });
+
+  it('keeps the eyebrow line through a not-found answer', () => {
+    detail.isError = true;
+    detail.error = { data: { code: 'NOT_FOUND' } };
+    detail.data = null;
+
+    renderScreen();
+
+    expect(screenHeaders.rendered[0]?.reserveEyebrow).toBe(true);
+  });
+
+  it('paints the review repository on the eyebrow line once the read answers', () => {
+    detail.data = {
+      success: true,
+      review: makeReview(),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    renderScreen();
+
+    expect(screenHeaders.rendered[0]?.eyebrow).toBe('org/repo');
+    expect(screenHeaders.rendered[0]?.reserveEyebrow).toBe(false);
   });
 });
 

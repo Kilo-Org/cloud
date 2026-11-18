@@ -142,32 +142,39 @@ export function SessionChangesScreen({ sessionId }: Readonly<{ sessionId: string
     return undefined;
   }, [snapshot, legacyDiffQuery.isSuccess, legacyDiffQuery.dataUpdatedAt, t]);
 
-  // The eyebrow is the capture time above the title. Reserve its line only
-  // while a read can still answer with one: the session decides whether this
-  // screen has a Cloud Agent capture or a read-only session diff, and a read
-  // that settled without either leaves the title to centre alone instead of
+  // The eyebrow is the capture time above the title. Its line is reserved while
+  // a read can still answer with one and after a read fails — a retry paints the
+  // same line, so the title never moves — and dropped only when a read settled
+  // successfully without a capture time: the title then centres alone instead of
   // keeping a line no label fills.
   const eyebrow = useMemo<HeaderEyebrow>(() => {
     if (asOf !== undefined) {
       return { kind: 'ready', text: asOf };
     }
-    if (sessionQuery.isPending) {
-      return { kind: 'loading' };
+    if (sessionQuery.isPending || sessionQuery.isError) {
+      return { kind: 'reserved' };
     }
     if (cloudAgentSessionId !== null) {
-      return changesQuery.isPending ? { kind: 'loading' } : { kind: 'none' };
+      return changesQuery.isPending || changesQuery.isError
+        ? { kind: 'reserved' }
+        : { kind: 'none' };
     }
     if (readOnly) {
-      return legacyDiffQuery.isPending ? { kind: 'loading' } : { kind: 'none' };
+      return legacyDiffQuery.isPending || legacyDiffQuery.isError
+        ? { kind: 'reserved' }
+        : { kind: 'none' };
     }
     return { kind: 'none' };
   }, [
     asOf,
     sessionQuery.isPending,
+    sessionQuery.isError,
     cloudAgentSessionId,
     changesQuery.isPending,
+    changesQuery.isError,
     readOnly,
     legacyDiffQuery.isPending,
+    legacyDiffQuery.isError,
   ]);
 
   return (
@@ -175,8 +182,8 @@ export function SessionChangesScreen({ sessionId }: Readonly<{ sessionId: string
       <ScreenHeader
         title={openFile === null ? t('common.changes') : openFile.path}
         eyebrow={eyebrow.kind === 'ready' ? eyebrow.text : undefined}
-        reserveEyebrow={eyebrow.kind === 'loading'}
-        eyebrowPlaceholder={eyebrow.kind === 'loading' ? <EyebrowPlaceholder /> : undefined}
+        reserveEyebrow={eyebrow.kind === 'reserved'}
+        eyebrowPlaceholder={eyebrow.kind === 'reserved' ? <EyebrowPlaceholder /> : undefined}
         titleNumberOfLines={1}
         onBack={
           openFile === null

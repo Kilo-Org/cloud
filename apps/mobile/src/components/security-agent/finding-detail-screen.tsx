@@ -155,28 +155,14 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   }, [loadFailed, findingId]);
   const showLoadFailure = !findingQuery.data && (loadFailed || failedFindingId === findingId);
 
-  // The not-found and load-failure states share a header without an eyebrow
-  // line. Neither ever gains a repository, so the title belongs on the back
-  // control's row, centred on the chevron, rather than half a line below it
-  // above a gap no label ever fills.
+  // The not-found, load-failure and loading states share one header with its
+  // eyebrow line reserved. The payload draws the finding's repository on that
+  // line, and neither a not-found nor a failed read can be known before the
+  // first paint — the first frame is always the loading one — so dropping the
+  // line afterwards would pull the title up out of the position the loading
+  // frame gave it. Keeping the reserved line and its placeholder bar holds the
+  // title still through the whole state machine.
   const pendingHeader = (
-    <ScreenHeader
-      className="px-6"
-      title={t('securityAgent.findingDetail.title')}
-      showBackButton
-      onBack={handleBack}
-    />
-  );
-
-  // Loading does gain the repository: the loaded header draws it on an eyebrow
-  // line above the title. The row centres the heading column against the back
-  // control, so that line moves the title down by half its height — 7.6 dp
-  // measured on the Android emulator — in the frame the payload lands. Reserving
-  // the line here puts the title where the payload will leave it, so it holds
-  // still from the first paint instead of being pushed down later, and the
-  // placeholder bar occupies the line instead of leaving it reading as a slot
-  // the screen forgot to fill.
-  const loadingHeader = (
     <ScreenHeader
       className="px-6"
       title={t('securityAgent.findingDetail.title')}
@@ -216,7 +202,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   if (findingQuery.isLoading || !findingQuery.data) {
     return (
       <View className="flex-1 bg-background">
-        {loadingHeader}
+        {pendingHeader}
         <View className="flex-1 gap-3 px-6 pt-4">
           <Skeleton className="h-6 w-2/3 rounded" />
           <Skeleton className="h-4 w-1/3 rounded" />

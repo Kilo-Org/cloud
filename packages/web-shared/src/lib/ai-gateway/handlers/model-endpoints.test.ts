@@ -7,6 +7,7 @@ import {
   getOpenRouterModelsMetadataFromDatabase,
   getVercelModelsMetadataFromDatabase,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { getRuntimeGatewayRoutingConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-config';
 import { TEST_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/tests/helpers/custom-pricing.helper';
 import { handleModelEndpointsRequest } from './model-endpoints';
 
@@ -16,6 +17,11 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', 
   resolveOpenRouterModelAlias: jest.fn((modelId: string) => Promise.resolve(modelId)),
 }));
 
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/routing-config', () => ({
+  getRuntimeGatewayRoutingConfig: jest.fn(),
+}));
+
+const mockedGetRuntimeGatewayRoutingConfig = jest.mocked(getRuntimeGatewayRoutingConfig);
 const mockedGetOpenRouterModelsMetadataFromDatabase = jest.mocked(
   getOpenRouterModelsMetadataFromDatabase
 );
@@ -23,6 +29,7 @@ const mockedGetVercelModelsMetadataFromDatabase = jest.mocked(getVercelModelsMet
 
 beforeEach(() => {
   mockedGetVercelModelsMetadataFromDatabase.mockResolvedValue({});
+  mockedGetRuntimeGatewayRoutingConfig.mockResolvedValue({ vercelOptOutModels: new Set() });
 });
 
 beforeAll(async () => {
@@ -231,6 +238,8 @@ describe('GET /api/openrouter/models/[provider]/[model]/endpoints', () => {
       { prompt: '0.0000021', completion: '0.000006000000', input_cache_read: '0.000000400000' },
       { prompt: '0.0000025', completion: '0.000004' },
       { prompt: '0.000003', completion: '0.000005' },
+      // DeepInfra serves the model through Vercel only
+      { prompt: '0.00001', completion: '0.00001' },
     ]);
   });
 
@@ -289,6 +298,83 @@ describe('GET /api/openrouter/models/[provider]/[model]/endpoints', () => {
         },
       },
     ]);
+  });
+
+  describe('Vercel-only providers', () => {
+    const model = {
+      id: 'deepseek/deepseek-v4.1-flash-1017',
+      name: 'DeepSeek: DeepSeek V4.1 Flash 1017',
+      endpoints: [
+        {
+          tag: 'together',
+          provider_name: 'Together',
+          pricing: { prompt: '0.0000002', completion: '0.0000008' },
+        },
+      ],
+    };
+
+    beforeEach(() => {
+      mockedGetOpenRouterModelsMetadataFromDatabase.mockResolvedValue({ [model.id]: model });
+      mockedGetVercelModelsMetadataFromDatabase.mockResolvedValue({
+        [model.id]: {
+          id: model.id,
+          name: 'DeepSeek V4.1 Flash 1017',
+          endpoints: [
+            {
+              provider_name: 'togetherai',
+              pricing: { prompt: '0.0000001', completion: '0.0000004' },
+            },
+            {
+              provider_name: 'telnyx',
+              context_length: 1_048_576,
+              has_zdr: false,
+              pricing: {
+                prompt: '0.0000003',
+                completion: '0.0000012',
+                input_cache_read: '0.000000006',
+                discount: 0,
+              },
+            },
+          ],
+        },
+      });
+    });
+
+    test('lists the Vercel endpoints of providers OpenRouter does not list', async () => {
+      const response = await handleModelEndpointsRequest(request(model.id), {
+        params: Promise.resolve({ provider: 'deepseek', model: 'deepseek-v4.1-flash-1017' }),
+      });
+
+      expect(response.status).toBe(200);
+      expect((await response.json()).data.endpoints).toEqual([
+        model.endpoints[0],
+        {
+          tag: 'telnyx',
+          provider_name: 'telnyx',
+          context_length: 1_048_576,
+          has_zdr: false,
+          pricing: {
+            prompt: '0.0000003',
+            completion: '0.0000012',
+            input_cache_read: '0.000000006',
+            discount: 0,
+          },
+        },
+      ]);
+    });
+
+    test('omits Vercel endpoints for a model opted out of Vercel routing', async () => {
+      mockedGetRuntimeGatewayRoutingConfig.mockResolvedValue({
+        vercelOptOutModels: new Set([model.id]),
+      });
+
+      const response = await handleModelEndpointsRequest(request(model.id), {
+        params: Promise.resolve({ provider: 'deepseek', model: 'deepseek-v4.1-flash-1017' }),
+      });
+
+      expect(response.status).toBe(200);
+      expect((await response.json()).data.endpoints).toEqual(model.endpoints);
+    });
   });
 
   test('lists the endpoints and prices of the model a latest alias resolves to', async () => {

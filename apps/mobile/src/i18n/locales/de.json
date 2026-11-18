@@ -3424,7 +3424,7 @@
           "skill": "Skill"
         },
         "mcpGuardrailAdded": "{{type}} {{name}} hinzugefügt",
-        "mcpGuardrailApproved": "\"{{type}} {{name}} genehmigt\"",
+        "mcpGuardrailApproved": "{{type}} {{name}} genehmigt",
         "mcpGuardrailUpdated": "{{type}} {{name}} aktualisiert",
         "mcpGuardrailEnabled": "{{type}} {{name}} aktiviert",
         "mcpGuardrailDisabled": "{{type}} {{name}} deaktiviert",

@@ -3489,7 +3489,7 @@
           "skill": "skill"
         },
         "mcpGuardrailAdded": "{{type}} {{name}} adicionado",
-        "mcpGuardrailApproved": "\"{{type}} {{name}} aprovado\"",
+        "mcpGuardrailApproved": "{{type}} {{name}} aprovado",
         "mcpGuardrailUpdated": "{{type}} {{name}} atualizado",
         "mcpGuardrailEnabled": "{{type}} {{name}} ativado",
         "mcpGuardrailDisabled": "{{type}} {{name}} desativado",

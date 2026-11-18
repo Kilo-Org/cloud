@@ -3432,7 +3432,7 @@
           "skill": "ကျွမ်းကျင်မှု"
         },
         "mcpGuardrailAdded": "{{type}} {{name}} ထည့်သွင်းခဲ့သည်",
-        "mcpGuardrailApproved": "\"{{type}} {{name}} အတည်ပြုခဲ့သည်\"",
+        "mcpGuardrailApproved": "{{type}} {{name}} အတည်ပြုခဲ့သည်",
         "mcpGuardrailUpdated": "{{type}} {{name}} မွမ်းမံခဲ့သည်",
         "mcpGuardrailEnabled": "{{type}} {{name}} ဖွင့်ခဲ့သည်",
         "mcpGuardrailDisabled": "{{type}} {{name}} ပိတ်ခဲ့သည်",

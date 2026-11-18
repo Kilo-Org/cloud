@@ -3329,7 +3329,7 @@
         "policyText": "beleidstekst",
         "groupCreated": "Groep {{name}} aangemaakt",
         "groupUpdated": "Groep {{name}} bijgewerkt",
-        "groupUpdatedMembers_one": "Groep {{name}} bijgewerkt met {{count}} leden",
+        "groupUpdatedMembers_one": "Groep {{name}} bijgewerkt met {{count}} lid",
         "groupUpdatedMembers_other": "Groep {{name}} bijgewerkt met {{count}} leden",
         "groupDeleted": "Groep {{name}} verwijderd",
         "groupPolicySet": "{{policy}}-beleid ingesteld voor groep {{name}}",

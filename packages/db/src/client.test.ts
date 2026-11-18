@@ -44,11 +44,13 @@ describe('getWorkerDb', () => {
     expect(pg.Pool).toHaveBeenNthCalledWith(1, {
       connectionString: workerConnectionString,
       max: 1,
+      maxUses: 1,
       types: databaseTypeParsers,
     });
     expect(pg.Pool).toHaveBeenNthCalledWith(2, {
       connectionString: workerConnectionString,
       max: 1,
+      maxUses: 1,
       types: databaseTypeParsers,
     });
     expect(drizzleMock.mock.calls[0]?.[0]).not.toBe(drizzleMock.mock.calls[1]?.[0]);
@@ -75,6 +77,8 @@ type PoolConfigOption = NonNullable<Parameters<typeof createDrizzleClient>[0]['p
 const acceptsWorkerSetting: WorkerOptions = { application_name: 'worker', statement_timeout: 1000 };
 // @ts-expect-error getWorkerDb installs databaseTypeParsers on its pool.
 const workerTypes: WorkerOptions = { types: databaseTypeParsers };
+// @ts-expect-error getWorkerDb closes each connection after one use.
+const workerMaxUses: WorkerOptions = { maxUses: 10 };
 const acceptsPoolSetting: PoolConfigOption = {
   application_name: 'local-kilo-script',
   max: 10,
@@ -85,6 +89,7 @@ const poolTypes: PoolConfigOption = { types: databaseTypeParsers };
 void acceptsWorkerSetting;
 void acceptsPoolSetting;
 void workerTypes;
+void workerMaxUses;
 void poolTypes;
 
 describe('databaseTypeParsers', () => {

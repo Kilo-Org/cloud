@@ -62,24 +62,30 @@ export function createDrizzleClient(options: CreateDrizzleClientOptions) {
 
 /**
  * Settings `getWorkerDb` fixes for every pool it creates: the connection string, `max: 1` because
- * Hyperdrive owns pooling, and `types` because the pool is created with the module's int8 parser.
- * The type reserves all three. Structural typing still accepts a value that a caller widened to
- * `pg.PoolConfig`, so this reservation is a type-level guard rather than a runtime one.
+ * Hyperdrive owns pooling, `maxUses: 1` so a released connection closes instead of staying open
+ * in a pool that nothing ends, and `types` because the pool is created with the module's int8
+ * parser. The type reserves all of these, and `getWorkerDb` applies its values after the caller's
+ * options.
  */
-export type GetWorkerDbOptions = Omit<pg.PoolConfig, 'connectionString' | 'max' | 'types'>;
+export type GetWorkerDbOptions = Omit<
+  pg.PoolConfig,
+  'connectionString' | 'max' | 'maxUses' | 'types'
+>;
 
 /**
  * Convenience wrapper for Cloudflare Workers using Hyperdrive.
  * Hyperdrive handles connection pooling at the infrastructure level,
  * so we use max: 1 here. Pass env.HYPERDRIVE.connectionString directly.
  * Return a fresh wrapper per call so request/DO-bound I/O state never crosses contexts.
+ * Each query or transaction uses its own connection, which closes when the pool releases it.
  */
 export function getWorkerDb(connectionString: string, options: GetWorkerDbOptions = {}) {
   const pool = new pg.Pool({
+    ...options,
     connectionString,
     max: 1,
+    maxUses: 1,
     types: databaseTypeParsers,
-    ...options,
   });
   return drizzle(pool, { schema });
 }

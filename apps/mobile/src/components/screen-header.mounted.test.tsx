@@ -897,11 +897,19 @@ describe('ScreenHeader mounted', () => {
     // the row gap as a spacer, so all three lines start on one column.
     const headingRows = titleRow?.parent?.children ?? [];
     expect(headingRows).toHaveLength(3);
-    const [eyebrowRow, , subtitleRow] = headingRows;
-    expect(eyebrowRow?.props.className).toBe(titleRow?.props.className);
-    expect(subtitleRow?.props.className).toBe(titleRow?.props.className);
-    expect(eyebrowRow?.children[0]?.props.className).toBe('h-0 w-[48px] shrink-0 -ms-4');
-    expect(subtitleRow?.children[0]?.props.className).toBe('h-0 w-[48px] shrink-0 -ms-4');
+    const instanceAt = (nodes: typeof headingRows, index: number) => {
+      const node = nodes[index];
+      if (node === undefined || typeof node === 'string') {
+        throw new Error(`expected an element at ${String(index)}`);
+      }
+      return node;
+    };
+    const eyebrowRow = instanceAt(headingRows, 0);
+    const subtitleRow = instanceAt(headingRows, 2);
+    expect(eyebrowRow.props.className).toBe(titleRow?.props.className);
+    expect(subtitleRow.props.className).toBe(titleRow?.props.className);
+    expect(instanceAt(eyebrowRow.children, 0).props.className).toBe('h-0 w-[48px] shrink-0 -ms-4');
+    expect(instanceAt(subtitleRow.children, 0).props.className).toBe('h-0 w-[48px] shrink-0 -ms-4');
   });
 
   it('keeps the modal close control on the centered title row with a mirroring spacer', () => {

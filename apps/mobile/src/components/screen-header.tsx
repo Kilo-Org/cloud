@@ -678,7 +678,7 @@ export function ScreenHeader({
   // title's line height and the 48dp target paints centred on the line: 12.25dp
   // a side leaves 23.5dp of a 48dp target in a 24.5dp `text-lg` line. A one-line
   // header keeps the control's full height, the row it has always had.
-  const stackedTitleLines = Boolean(eyebrowSlot || subtitleSlot);
+  const stackedTitleLines = eyebrowSlot !== null || subtitleSlot !== null;
   const backControl = canGoBack ? (
     <View
       className={cn(
@@ -705,9 +705,7 @@ export function ScreenHeader({
   // spacer, so every line of the heading starts on the title's own column. The
   // spacer cancels the same gutter pull the control does, so 34dp of the 48dp
   // target plus the row's 3.5dp gap is the column the title starts after.
-  const backControlSpacer = canGoBack ? (
-    <View className="h-0 w-[48px] shrink-0 -ms-4" />
-  ) : null;
+  const backControlSpacer = canGoBack ? <View className="h-0 w-[48px] shrink-0 -ms-4" /> : null;
   // The control is the row's leading sibling, so the title after it is placed by
   // the row and not by the page column. A header with no control renders no
   // leading box and no gap, so its title starts on the 14dp gutter itself — the

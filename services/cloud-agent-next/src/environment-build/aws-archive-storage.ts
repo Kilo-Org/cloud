@@ -128,7 +128,10 @@ export function createAwsBuildArchiveStorage(deps: {
         const context = await deps.readContext();
         await current(context, 'capturing');
         if (context.captureId !== captureId) throw new AwsBuildArchiveError('archive_conflict');
-        const archive = awsBuildArchiveStateSchema.parse(context.archive);
+        if (!context.archive) throw new AwsBuildArchiveError('archive_missing');
+        const parsed = awsBuildArchiveStateSchema.safeParse(context.archive);
+        if (!parsed.success) throw new AwsBuildArchiveError('archive_invalid');
+        const archive = parsed.data;
         const verifiedAt = archive.verifiedAt;
         if (verifiedAt === undefined) throw new AwsBuildArchiveError('archive_unverified');
         if (archive.descriptor.baseImage !== context.baseImage)

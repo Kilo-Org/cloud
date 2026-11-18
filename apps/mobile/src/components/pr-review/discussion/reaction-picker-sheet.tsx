@@ -103,7 +103,7 @@ export function ReactionPickerSheet({
         {/* The native handle already leaves the room above the title, so the
             title row takes the shared under-handle pair and supplies the gap to
             the grid itself. */}
-        <View className={cn('flex-row items-center', sheetUnderHandlePaddingClass())}>
+        <View className={cn('flex-row items-center', sheetUnderHandlePaddingClass('row'))}>
           <View className="size-[48px] shrink-0" />
           <Text
             ref={attachTitle}

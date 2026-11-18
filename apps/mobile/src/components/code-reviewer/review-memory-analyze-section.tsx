@@ -115,7 +115,9 @@ export function ReviewMemoryAnalyzeSection({
       >
         <View className="flex-1">
           {/* The native handle already leaves the room above the title. */}
-          <Text className={cn('px-6 text-base font-semibold', sheetUnderHandlePaddingClass())}>
+          <Text
+            className={cn('px-6 text-base font-semibold', sheetUnderHandlePaddingClass('row'))}
+          >
             {t('common.repository')}
           </Text>
           <ScrollView className="flex-1" contentContainerClassName="px-6 pb-6">

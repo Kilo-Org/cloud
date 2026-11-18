@@ -32,7 +32,10 @@ export function SheetTitleRow({
 
   return (
     <View
-      className={cn('min-h-11 flex-row items-center gap-x-2 px-5', sheetUnderHandlePaddingClass())}
+      className={cn(
+        'min-h-11 flex-row items-center gap-x-2 px-5',
+        sheetUnderHandlePaddingClass('row')
+      )}
     >
       <Text accessibilityRole="header" className="min-w-0 flex-1 text-base font-semibold">
         {title}

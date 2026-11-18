@@ -87,7 +87,7 @@ export function SessionChangesReviewSheet({
         <View
           className={cn(
             'flex-row items-center justify-between gap-3',
-            sheetUnderHandlePaddingClass()
+            sheetUnderHandlePaddingClass('row')
           )}
         >
           <Text className="text-base font-semibold text-foreground">

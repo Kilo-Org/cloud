@@ -167,30 +167,34 @@ describe.skipIf(process.platform !== 'linux')('shared root filesystem archives',
       'new contents'
     );
   });
-  it('restores an executable capability and its behavior for an unprivileged process', async () => {
-    const f = await fixture();
-    await baselineRootFilesystem(f);
-    await mkdir(path.join(f.root, 'usr/bin'), { recursive: true });
-    const executable = path.join(f.root, 'usr/bin/capability-probe');
-    await copyFile(await realpath('/usr/bin/python3'), executable);
-    await chmod(executable, 0o755);
-    const setCapability =
-      "import os,struct,sys;os.setxattr(sys.argv[1],'security.capability',struct.pack('<IIIII',0x02000001,1<<10,0,0,0))";
-    await python('/usr/bin/python3', ['-c', setCapability, executable]);
-    const descriptor = await captureRootFilesystem(f);
-    await restoreRootFilesystem({ ...f, root: f.restored, expected: descriptor });
-    await chmod(f.directory, 0o755);
-    const target = path.join(f.restored, 'usr/bin/capability-probe');
-    const result = await python('/usr/bin/python3', [
-      '-c',
-      `import os,subprocess,sys
+  // Setting a file capability and dropping to an unprivileged user both require root.
+  it.skipIf(process.getuid?.() !== 0)(
+    'restores an executable capability and its behavior for an unprivileged process',
+    async () => {
+      const f = await fixture();
+      await baselineRootFilesystem(f);
+      await mkdir(path.join(f.root, 'usr/bin'), { recursive: true });
+      const executable = path.join(f.root, 'usr/bin/capability-probe');
+      await copyFile(await realpath('/usr/bin/python3'), executable);
+      await chmod(executable, 0o755);
+      const setCapability =
+        "import os,struct,sys;os.setxattr(sys.argv[1],'security.capability',struct.pack('<IIIII',0x02000001,1<<10,0,0,0))";
+      await python('/usr/bin/python3', ['-c', setCapability, executable]);
+      const descriptor = await captureRootFilesystem(f);
+      await restoreRootFilesystem({ ...f, root: f.restored, expected: descriptor });
+      await chmod(f.directory, 0o755);
+      const target = path.join(f.restored, 'usr/bin/capability-probe');
+      const result = await python('/usr/bin/python3', [
+        '-c',
+        `import os,subprocess,sys
 p=subprocess.run([sys.argv[1],'-c',"print(next(x.split()[1] for x in open('/proc/self/status') if x.startswith('CapEff:')))"],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,preexec_fn=lambda:(os.setgid(65534),os.setuid(65534)))
 assert p.returncode==0
 print(p.stdout.strip())`,
-      target,
-    ]);
-    expect(result.stdout.trim()).toBe('0000000000000400');
-  });
+        target,
+      ]);
+      expect(result.stdout.trim()).toBe('0000000000000400');
+    }
+  );
   it('removes a default ACL instead of inheriting it into restored files', async () => {
     const f = await fixture();
     const source = path.join(f.root, 'usr/lib/package');

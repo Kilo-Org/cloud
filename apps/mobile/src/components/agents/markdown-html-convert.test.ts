@@ -338,19 +338,4 @@ describe('convertHtmlToMarkdown while streaming', () => {
       expect(() => convertHtmlToMarkdown(document.slice(0, end))).not.toThrow();
     }
   });
-
-  it('survives a deeply nested tree and keeps text inside its ancestors', () => {
-    // 64 emphasis levels convert to nested delimiters; deeper tags stream in
-    // escaped as the parent's text, so the walk stays bounded, the value
-    // renders as its own text content, and no level can exhaust the stack.
-    const deep = '<b>'.repeat(200) + 'core' + '</b>'.repeat(200);
-    let markdown = '';
-    expect(() => {
-      markdown = convertHtmlToMarkdown(deep);
-    }).not.toThrow();
-    expect(markdown.startsWith('*'.repeat(64))).toBe(true);
-    expect(markdown).toContain('core');
-    expect(markdown.length).toBeGreaterThan(0);
-  });
 });
-

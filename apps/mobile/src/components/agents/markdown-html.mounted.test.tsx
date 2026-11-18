@@ -269,7 +269,9 @@ describe('MarkdownHtml details', () => {
   });
 
   it('re-syncs the expanded state when the node\u2019s open attribute arrives in a streaming publish', async () => {
-    const renderer = await mountHtml('<details><summary>More</summary><p>Hidden body</p></details>');
+    const renderer = await mountHtml(
+      '<details><summary>More</summary><p>Hidden body</p></details>'
+    );
     const row = renderer.root.findByType('Pressable' as never);
 
     expect(row.props.accessibilityState).toEqual({ expanded: false });
@@ -286,9 +288,9 @@ describe('MarkdownHtml details', () => {
       );
     });
 
-    expect(
-      renderer.root.findByType('Pressable' as never).props.accessibilityState
-    ).toEqual({ expanded: true });
+    expect(renderer.root.findByType('Pressable' as never).props.accessibilityState).toEqual({
+      expanded: true,
+    });
     expect(allText(renderer)).toContain('Hidden body');
   });
 });

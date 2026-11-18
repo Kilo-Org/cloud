@@ -1,4 +1,4 @@
-import { createElement } from 'react';
+import { createElement, useEffect } from 'react';
 import { act } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -31,11 +31,17 @@ vi.mock('expo-router', () => ({
 }));
 
 let mountedOrganizationId: string | null | undefined = undefined;
+// Real mounts, not renders: a plain re-render must keep this flat, or the
+// remount assertion below would pass without the key. A `useEffect` with an
+// empty dependency array runs once per mounted instance, so a re-render of
+// the same element does not bump it while a key swap does.
 let mounts = 0;
 
 vi.mock('@/components/cloud-triggers/triggers-list-screen', () => ({
   TriggersListScreen: (props: { organizationId?: string }) => {
-    mounts += 1;
+    useEffect(() => {
+      mounts += 1;
+    }, []);
     mountedOrganizationId = props.organizationId ?? null;
     return createElement(
       'TriggersListScreen',

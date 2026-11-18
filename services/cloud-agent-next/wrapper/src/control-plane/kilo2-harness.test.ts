@@ -42,7 +42,9 @@ function startStub(handle: (request: Request, url: URL, requests: RecordedReques
   return { url: server.url.toString(), requests };
 }
 
-function withModelCatalog(handle: Parameters<typeof startStub>[0]): Parameters<typeof startStub>[0] {
+function withModelCatalog(
+  handle: Parameters<typeof startStub>[0]
+): Parameters<typeof startStub>[0] {
   return (request, url, requests) =>
     url.pathname === '/api/model'
       ? Response.json({ data: [{ providerID: 'kilo', id: 'test-model' }] })

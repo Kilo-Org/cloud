@@ -62,7 +62,10 @@ export function createKilo2Harness(options: {
       const catalog = modelCatalogSchema.parse(await api.data(path, { signal: input.signal }));
       const delay = MODEL_NOT_FOUND_RETRY_DELAYS_MS[attempt];
       // The native call owns the eventual model error and its transcript entry.
-      if (delay === undefined || catalog.some(entry => entry.providerID === 'kilo' && entry.id === model)) {
+      if (
+        delay === undefined ||
+        catalog.some(entry => entry.providerID === 'kilo' && entry.id === model)
+      ) {
         startedModelLocations.add(input.directory);
         return;
       }

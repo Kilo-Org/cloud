@@ -35,10 +35,6 @@ jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
   createStripeCustomer: jest.fn(async () => ({ id: 'cus_test' })),
   deleteStripeCustomer: jest.fn(async () => {}),
 }));
-jest.mock('@kilocode/web-shared/lib/auth/claude/feature-flag.server', () => ({
-  isClaudePlatformOAuthEnabled: jest.fn(async () => true),
-}));
-
 import jwt from 'jsonwebtoken';
 import { encode, type JWT } from 'next-auth/jwt';
 import { authOptions } from '@/lib/user/next-auth-options';
@@ -51,7 +47,6 @@ import {
   getOrganizationById,
   getUserOrgMemberships,
 } from '@kilocode/web-shared/lib/organizations/organizations';
-import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 import { CLAUDE_OIDC_ISSUER } from '@kilocode/web-shared/lib/auth/claude/config';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { db } from '@kilocode/web-shared/lib/drizzle';
@@ -642,27 +637,15 @@ describe('authOptions.callbacks.signIn for Claude', () => {
     });
     mockLinkAccountToExistingUser.mockReset();
     mockGetAccountLinkingSession.mockReset().mockResolvedValue(null);
-    jest.mocked(isClaudePlatformOAuthEnabled).mockClear().mockResolvedValue(true);
     mockResolveSsoAuthorityForDomain.mockReset().mockResolvedValue({
       status: 'not_required',
       domain: 'example.com',
     });
   });
 
-  it('refuses a Claude sign-in before settlement while it is not launched', async () => {
-    jest.mocked(isClaudePlatformOAuthEnabled).mockResolvedValueOnce(false);
-    setValidTurnstileCookie();
-
-    const result = await claudeSignIn({});
-
-    expect(result).toEqual(expect.stringContaining('error=UNKNOWN-ERROR'));
-    expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
-  });
-
   it('settles an issuer-qualified Claude account from a token without email_verified', async () => {
     setValidTurnstileCookie();
     await expect(claudeSignIn({})).resolves.toBe(true);
-    expect(isClaudePlatformOAuthEnabled).toHaveBeenCalledWith('claude-cb@example.com');
     expect(mockCreateOrUpdateUser.mock.calls[0]?.[0]).toMatchObject({
       provider: 'claude',
       provider_account_id: `${CLAUDE_OIDC_ISSUER}#pairwise-sub`,
@@ -716,17 +699,13 @@ describe('authOptions.callbacks.signIn for Claude', () => {
     { email: 'not-an-email' },
     { email: 'different@kilocode.ai' },
     { email_verified: false },
-  ])(
-    'refuses a missing, unverified, or mismatched Claude email before flag evaluation: %s',
-    async profile => {
-      setValidTurnstileCookie();
-      await expect(claudeSignIn(profile)).resolves.toEqual(
-        expect.stringContaining('error=UNKNOWN-ERROR')
-      );
-      expect(isClaudePlatformOAuthEnabled).not.toHaveBeenCalled();
-      expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
-    }
-  );
+  ])('refuses a missing, unverified, or mismatched Claude email: %s', async profile => {
+    setValidTurnstileCookie();
+    await expect(claudeSignIn(profile)).resolves.toEqual(
+      expect.stringContaining('error=UNKNOWN-ERROR')
+    );
+    expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+  });
 });
 
 describe('Claude explicit linking persistence', () => {
@@ -739,7 +718,6 @@ describe('Claude explicit linking persistence', () => {
         jest.requireActual<typeof UserModule>('@/lib/user').linkAccountToExistingUser
       );
     mockGetAccountLinkingSession.mockReset().mockResolvedValue(null);
-    jest.mocked(isClaudePlatformOAuthEnabled).mockReset().mockResolvedValue(true);
     mockResolveSsoAuthorityForDomain.mockReset().mockResolvedValue({
       status: 'required',
       domain: 'example.com',
@@ -782,9 +760,6 @@ describe('Claude explicit linking persistence', () => {
 
   it('attaches a claim-omitting subject to the authenticated SSO owner', async () => {
     const link = await prepareLink();
-    jest
-      .mocked(isClaudePlatformOAuthEnabled)
-      .mockImplementation(async email => email === link.owner.google_user_email);
 
     await expect(link.complete()).resolves.toBe('/connected-accounts?linked=claude');
     expect(await link.providers()).toEqual([
@@ -817,13 +792,6 @@ describe('Claude explicit linking persistence', () => {
       expect(await link.providers()).toEqual([]);
     }
   );
-
-  it('refuses attachment when the initiating account loses release eligibility', async () => {
-    const link = await prepareLink();
-    jest.mocked(isClaudePlatformOAuthEnabled).mockResolvedValue(false);
-    await expect(link.complete()).resolves.toEqual(expect.stringContaining('error=LINKING-FAILED'));
-    expect(await link.providers()).toEqual([]);
-  });
 
   it.each(['absent', 'different'])(
     'treats an %s link intent as a plain sign-in that cannot attach the subject',

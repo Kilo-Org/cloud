@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Cambios",
     "organizationTrialEnded": "La prueba de la organización ha finalizado y no tiene ningún plan activo. El propietario de la organización puede actualizar la facturación en kilo.ai y, después, volver a intentarlo.",
-    "privateRepositoryA11y": "{{name}}, repositorio privado"
+    "privateRepositoryA11y": "{{name}}, repositorio privado",
+    "legalDocumentEnglishOnly": "Este documento solo está disponible en inglés."
   },
   "language": {
     "restarting": "Reiniciando para aplicar el idioma",
@@ -924,7 +925,8 @@
       "repositoryLine": "Revisiones: {{reviews}} · Hallazgos: {{findings}}",
       "empty": "Aún no hay revisiones con analíticas",
       "emptyDescription": "Las analíticas registran las revisiones completadas mientras estén activadas para la organización.",
-      "off": "Las analíticas están desactivadas para esta organización.",
+      "offTitle": "Las analíticas están desactivadas para {{platform}}",
+      "offDescription": "Actívalas en los ajustes de la organización en la web para registrar las revisiones completadas.",
       "couldNotLoad": "No se pudieron cargar las analíticas"
     },
     "council": {

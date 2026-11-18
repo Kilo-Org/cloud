@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "שינויים",
     "organizationTrialEnded": "הסתיימה תקופת הניסיון של הארגון ואין לו תוכנית פעילה. בעל הארגון יכול לעדכן את החיוב ב-kilo.ai, ואז לנסות שוב.",
-    "privateRepositoryA11y": "{{name}}, מאגר פרטי"
+    "privateRepositoryA11y": "{{name}}, מאגר פרטי",
+    "legalDocumentEnglishOnly": "מסמך זה זמין באנגלית בלבד."
   },
   "language": {
     "restarting": "האפליקציה מופעלת מחדש לשינוי השפה",
@@ -924,7 +925,8 @@
       "repositoryLine": "סקירות: {{reviews}} · ממצאים: {{findings}}",
       "empty": "עדיין אין סקירות עם נתוני אנליטיקה",
       "emptyDescription": "האנליטיקה מתעדת סקירות שהושלמו כל עוד היא מופעלת עבור הארגון.",
-      "off": "האנליטיקה כבויה עבור הארגון הזה.",
+      "offTitle": "האנליטיקה כבויה עבור {{platform}}",
+      "offDescription": "הפעל אותה בהגדרות הארגון באתר כדי לתעד סקירות שהושלמו.",
       "couldNotLoad": "לא ניתן לטעון את האנליטיקה"
     },
     "council": {

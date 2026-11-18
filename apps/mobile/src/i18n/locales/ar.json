@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "التغييرات",
     "organizationTrialEnded": "انتهت الفترة التجريبية للمؤسسة ولم تعد لديها خطة نشطة. يمكن لمالك المؤسسة تحديث الفوترة على kilo.ai، ثم المحاولة مرة أخرى.",
-    "privateRepositoryA11y": "{{name}}، مستودع خاص"
+    "privateRepositoryA11y": "{{name}}، مستودع خاص",
+    "legalDocumentEnglishOnly": "هذا المستند متوفر باللغة الإنجليزية فقط."
   },
   "language": {
     "restarting": "جارٍ إعادة التشغيل لتطبيق اللغة",
@@ -927,7 +928,8 @@
       "repositoryLine": "المراجعات: {{reviews}} · النتائج: {{findings}}",
       "empty": "لا توجد مراجعات بتحليلات بعد",
       "emptyDescription": "تسجّل التحليلات المراجعات المكتملة ما دامت مفعّلة للمؤسسة.",
-      "off": "التحليلات متوقفة لهذه المؤسسة.",
+      "offTitle": "التحليلات متوقفة لمنصة {{platform}}",
+      "offDescription": "فعّلها في إعدادات المؤسسة على الويب لتسجّل المراجعات المكتملة.",
       "couldNotLoad": "تعذّر تحميل التحليلات"
     },
     "council": {

@@ -242,7 +242,8 @@
     "durationHourShort": "h",
     "changes": "Changes",
     "organizationTrialEnded": "The organization's trial has ended and it has no active plan. An organization owner can update billing at kilo.ai, then try again.",
-    "privateRepositoryA11y": "{{name}}, private repository"
+    "privateRepositoryA11y": "{{name}}, private repository",
+    "legalDocumentEnglishOnly": "This document is available in English only."
   },
   "language": {
     "restarting": "Restarting to apply language",
@@ -1533,7 +1534,8 @@
       "repositoryLine": "Reviews: {{reviews}} · Findings: {{findings}}",
       "empty": "No reviews with analytics yet",
       "emptyDescription": "Analytics records completed reviews while it is enabled for the organization.",
-      "off": "Analytics is off for this organization.",
+      "offTitle": "Analytics is off for {{platform}}",
+      "offDescription": "Turn it on in the organization's settings on the web to record completed reviews.",
       "couldNotLoad": "Could not load analytics"
     },
     "council": {

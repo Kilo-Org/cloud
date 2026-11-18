@@ -38,7 +38,6 @@ import { AccountLinkingProviders } from '@/lib/auth/provider-metadata';
 import { assertUserCanBeSoftDeleted, SoftDeletePreconditionError } from '@/lib/user';
 import { mintPasskeyManagementAuthorization } from '@/lib/auth/passkey-management';
 import { refreshGlanceableScope } from '@kilocode/web-shared/lib/notifications-worker-client';
-import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 
 jest.mock('@kilocode/web-shared/lib/email', () => {
   const actual = jest.requireActual('@kilocode/web-shared/lib/email');
@@ -59,10 +58,6 @@ jest.mock('@/lib/user/gdpr-removal', () => ({
 jest.mock('@/lib/account-linking-session', () => ({
   ...jest.requireActual('@/lib/account-linking-session'),
   createAccountLinkingSession: jest.fn(),
-}));
-
-jest.mock('@kilocode/web-shared/lib/auth/claude/feature-flag.server', () => ({
-  isClaudePlatformOAuthEnabled: jest.fn(async () => true),
 }));
 
 jest.mock('@/lib/user', () => {
@@ -164,20 +159,6 @@ describe('user router - linkAuthProvider', () => {
       code: 'BAD_REQUEST',
     });
     expect(mockCreateLinkingSession).not.toHaveBeenCalled();
-  });
-
-  it('refuses a Claude link while Sign in with Claude is not launched', async () => {
-    const user = await insertTestUser();
-    const caller = await createCallerForUser(user.id);
-    const mockCreateLinkingSession = jest.mocked(createAccountLinkingSession);
-    jest.mocked(isClaudePlatformOAuthEnabled).mockResolvedValueOnce(false);
-    mockCreateLinkingSession.mockClear();
-
-    await expect(caller.user.linkAuthProvider({ provider: 'claude' })).rejects.toMatchObject({
-      code: 'BAD_REQUEST',
-    });
-    expect(mockCreateLinkingSession).not.toHaveBeenCalled();
-    expect(isClaudePlatformOAuthEnabled).toHaveBeenCalledWith(user.google_user_email);
   });
 });
 

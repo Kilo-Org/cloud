@@ -1,5 +1,5 @@
 'use client';
-import { useId, useState, type FormEvent } from 'react';
+import { useEffect, useId, useState, type FormEvent } from 'react';
 import { ExternalLink, Loader2 } from 'lucide-react';
 import { useAwsComputeData } from '@/hooks/useAwsComputeData';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -48,7 +48,19 @@ function AwsComputeForm({ organizationId }: { organizationId?: string }) {
     candidate.accountId === status.accountId
       ? candidate
       : undefined;
-  const launchExpired = launch ? Date.parse(launch.expiresAt) <= Date.now() : false;
+  const [expiredLaunchUrl, setExpiredLaunchUrl] = useState<string | null>(null);
+  const launchExpired = launch ? expiredLaunchUrl === launch.launchUrl : false;
+  // The signed template link expires. Re-render at expiry so the browser never offers a stale link.
+  const launchUrl = launch?.launchUrl;
+  const launchExpiresAt = launch?.expiresAt;
+  useEffect(() => {
+    if (!launchUrl || !launchExpiresAt) return;
+    const timer = setTimeout(
+      () => setExpiredLaunchUrl(launchUrl),
+      Math.max(0, Date.parse(launchExpiresAt) - Date.now())
+    );
+    return () => clearTimeout(timer);
+  }, [launchUrl, launchExpiresAt]);
 
   async function prepare(event: FormEvent) {
     event.preventDefault();
@@ -168,8 +180,8 @@ function AwsComputeForm({ organizationId }: { organizationId?: string }) {
                   Stack: <span className="min-h-11 font-mono sm:min-h-9">{status.stackName}</span>
                 </p>
                 <p className="text-muted-foreground text-sm">
-                  Launch the stack with an AWS identity that can create IAM roles. Wait for
-                  completion, then copy its RoleArn output.
+                  Launch the stack with an AWS identity that can create every resource in the
+                  template, including IAM roles. Wait for completion, then copy its RoleArn output.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {launch && !launchExpired ? (
@@ -216,7 +228,7 @@ function AwsComputeForm({ organizationId }: { organizationId?: string }) {
                       placeholder="arn:aws:iam::123456789012:role/…"
                       required
                       disabled={busy || !enrolled}
-                      aria-describedby={data.validate.error ? `${id}-error` : undefined}
+                      aria-describedby={error ? `${id}-error` : undefined}
                     />
                   </div>
                   <Button
@@ -257,8 +269,8 @@ function AwsComputeForm({ organizationId }: { organizationId?: string }) {
             ) : enrolled && data.enrollment.data?.available ? (
               <form onSubmit={prepare} className="space-y-3">
                 <p className="text-muted-foreground text-sm">
-                  Enter the AWS account enabled for this preview. You need permission to create IAM
-                  roles.
+                  Enter the AWS account enabled for this preview. You need permission to create the
+                  stack resources, including IAM roles.
                 </p>
                 <div className="space-y-1.5">
                   <Label htmlFor={`${id}-account`}>AWS account ID</Label>

@@ -112,6 +112,14 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   // `optionalIsPending` owns the rule (its doc carries the reasoning and the
   // cases).
   const optionalControlPending = optionalIsPending(userId !== undefined, storedLoad);
+  // The status slot renders only when the reserved line has content: with no
+  // line the `min-h-5` reserve plus its two gap edges would separate the
+  // privacy disclosure from the actions by three gaps instead of one (see
+  // the slot comment below the disclosure).
+  const statusLineVisible =
+    storedLoad.status === 'loading' ||
+    storedLoad.status === 'failed' ||
+    error !== null;
 
   return (
     <View className="flex-1 bg-background" style={rootStyle}>
@@ -215,11 +223,19 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
           maxFontSizeMultiplier={CONSENT_DISCLOSURE_MAX_FONT_SCALE}
           onOpenPolicy={handleOpenPrivacy}
         />
-        <View className="min-h-5 justify-center">
-          {/* The reserved slot carries the load phase the finding reported;
-              ConsentLoadStatusLine owns what each phase renders. */}
-          <ConsentLoadStatusLine load={storedLoad} error={error} onRetry={retryStoredLoad} t={t} />
-        </View>
+        {/* The slot's View must not mount while it has no line to show: a
+            `min-h-5` View with a null child still occupies its reserve and
+            its two gap edges, which measured 44dp between the privacy line
+            and the Accept button and left the line floating between the
+            divider and the actions. The reserved height only matters when a
+            status renders, so the reserve stays on the mounted branch — an
+            appearing status line keeps the actions still — and the unmounted
+            branch collapses to a single 12dp gap on each side. */}
+        {statusLineVisible ? (
+          <View className="min-h-5 justify-center">
+            <ConsentLoadStatusLine load={storedLoad} error={error} onRetry={retryStoredLoad} t={t} />
+          </View>
+        ) : null}
         <Button
           onPress={() => {
             void handlePrimaryAction();

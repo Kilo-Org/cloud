@@ -112,7 +112,7 @@ export function BalanceBlock({
         </View>
         {!stacked && visibilityControl}
       </Animated.View>
-      {stacked ? (action == null ? null : <View className="items-end">{action}</View>) : action}
+      {stacked ? action == null ? null : <View className="items-end">{action}</View> : action}
     </Card>
   );
 }

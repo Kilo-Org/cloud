@@ -217,9 +217,7 @@ export function BlockedPeopleScreen() {
           contentContainerClassName={SCREEN_BODY_CLASS}
           showsVerticalScrollIndicator={false}
         >
-          <Text variant="muted">
-            {t('profile.blockedPeople.description')}
-          </Text>
+          <Text variant="muted">{t('profile.blockedPeople.description')}</Text>
           {body}
         </TabScreenScrollView>
       )}

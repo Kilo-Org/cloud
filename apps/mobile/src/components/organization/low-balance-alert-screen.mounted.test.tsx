@@ -405,18 +405,14 @@ describe('low balance alert screen', () => {
     await act(() => {
       calls.list[0]?.options.onSuccess?.();
     });
-    expect(statusMessages(renderer)).not.toContain(
-      i18n.t('organizationGuardrails.statusSaved')
-    );
+    expect(statusMessages(renderer)).not.toContain(i18n.t('organizationGuardrails.statusSaved'));
     expect(calls.list).toHaveLength(2);
     expect(calls.list[1]?.input.minimum_balance).toBe(40);
 
     await act(() => {
       calls.list[1]?.options.onSuccess?.();
     });
-    expect(statusMessages(renderer)).toContain(
-      i18n.t('organizationGuardrails.statusSaved')
-    );
+    expect(statusMessages(renderer)).toContain(i18n.t('organizationGuardrails.statusSaved'));
     unmount();
   });
 
@@ -424,9 +420,7 @@ describe('low balance alert screen', () => {
     boundary.organizationId = null;
     boundary.org = null;
     const { renderer, unmount } = await mountScreen();
-    const boundaryNode = renderer.root.find(
-      node => String(node.type) === 'OrganizationBoundary'
-    );
+    const boundaryNode = renderer.root.find(node => String(node.type) === 'OrganizationBoundary');
     expect(boundaryNode.props.title).toBe(i18n.t('organization.lowBalanceAlert.title'));
     unmount();
   });

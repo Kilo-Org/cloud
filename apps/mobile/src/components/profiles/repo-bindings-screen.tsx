@@ -233,7 +233,9 @@ export function RepoBindingsScreen({
 
           {!bindingsQuery.isError && bindingsQuery.isLoading ? <RepoBindingsSkeleton /> : null}
 
-          {!bindingsQuery.isError && !bindingsQuery.isLoading && bindingsQuery.bindings.length > 0 ? (
+          {!bindingsQuery.isError &&
+          !bindingsQuery.isLoading &&
+          bindingsQuery.bindings.length > 0 ? (
             <RowGroup leadingTile>
               {bindingsQuery.bindings.map(binding => (
                 <RepoBindingRow

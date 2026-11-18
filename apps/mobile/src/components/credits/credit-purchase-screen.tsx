@@ -213,9 +213,7 @@ export function CreditPurchaseScreen() {
     ? [
         ...new Set(
           products
-            .map(
-              pack => getStoreCreditExpiryMessageKey(pack.backend, storefront) ?? undefined
-            )
+            .map(pack => getStoreCreditExpiryMessageKey(pack.backend, storefront) ?? undefined)
             .filter((key): key is string => key !== undefined)
         ),
       ].map(key => t(key))

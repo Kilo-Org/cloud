@@ -283,10 +283,7 @@ export function NotificationHistoryScreen() {
           // horizontal scroller hid a filter rather than offering it. Wrapping
           // keeps every chip whole, with the page gutter on both ends in either
           // direction.
-          <View
-            accessibilityRole="tablist"
-            className="flex-row flex-wrap gap-2 px-4"
-          >
+          <View accessibilityRole="tablist" className="flex-row flex-wrap gap-2 px-4">
             {filters.map(filter => (
               <FilterChip
                 key={filter.category ?? 'all'}

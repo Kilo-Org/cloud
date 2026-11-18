@@ -304,11 +304,7 @@ function Button({
   // oxlint-enable anti-slop/no-runtime-typeof
   return (
     <TextClassContext.Provider
-      value={
-        isMutedDisabled
-          ? MUTED_DISABLED_LABEL_CLASS
-          : buttonTextVariants({ variant, size })
-      }
+      value={isMutedDisabled ? MUTED_DISABLED_LABEL_CLASS : buttonTextVariants({ variant, size })}
     >
       <Pressable
         className={cn(

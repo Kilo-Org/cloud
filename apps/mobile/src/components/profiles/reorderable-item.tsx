@@ -39,7 +39,12 @@ export function ReorderableItemActions({
   remove,
 }: ReorderableItemActionsProps) {
   const colors = useThemeColors();
-  if (moveUp === undefined && moveDown === undefined && edit === undefined && remove === undefined) {
+  if (
+    moveUp === undefined &&
+    moveDown === undefined &&
+    edit === undefined &&
+    remove === undefined
+  ) {
     return null;
   }
   return (

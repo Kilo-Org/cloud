@@ -354,21 +354,19 @@ describe('mirrored tab label metrics', () => {
 });
 
 describe('shouldHideTabBar', () => {
-  it.each([
-    ['(0_home)'],
-    ['(2_agents)'],
-    ['(4_chat)'],
-    ['(3_profile)'],
-  ] as const)('keeps the bar on the %s tab root', group => {
-    expect(shouldHideTabBar('/', ['(app)', '(tabs)', group])).toBe(false);
-    expect(shouldHideTabBar('/', ['(app)', '(tabs)', group, 'index'])).toBe(false);
-  });
+  it.each([['(0_home)'], ['(2_agents)'], ['(4_chat)'], ['(3_profile)']] as const)(
+    'keeps the bar on the %s tab root',
+    group => {
+      expect(shouldHideTabBar('/', ['(app)', '(tabs)', group])).toBe(false);
+      expect(shouldHideTabBar('/', ['(app)', '(tabs)', group, 'index'])).toBe(false);
+    }
+  );
 
   it('hides the bar on a pushed screen inside a tab group', () => {
     expect(shouldHideTabBar('/history', ['(app)', '(tabs)', '(2_agents)', 'history'])).toBe(true);
-    expect(shouldHideTabBar('/spend-alerts', ['(app)', '(tabs)', '(3_profile)', 'spend-alerts'])).toBe(
-      true
-    );
+    expect(
+      shouldHideTabBar('/spend-alerts', ['(app)', '(tabs)', '(3_profile)', 'spend-alerts'])
+    ).toBe(true);
   });
 
   it('hides the bar inside a chat, whose composer sits where the bar would be', () => {

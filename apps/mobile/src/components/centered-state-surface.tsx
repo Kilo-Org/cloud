@@ -168,8 +168,7 @@ export function NativeStateSurface({ children, navigation, options }: ScreenLayo
       incoming: incomingProps,
       external: incomingProps && {
         ...incomingProps,
-        ref:
-          installed && incomingProps.ref === installed.ref ? previous?.ref : incomingProps.ref,
+        ref: installed && incomingProps.ref === installed.ref ? previous?.ref : incomingProps.ref,
         onLayout:
           installed && incomingProps.onLayout === installed.onLayout
             ? previous?.onLayout

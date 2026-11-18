@@ -1205,43 +1205,40 @@ describe('CreditsCard balance row', () => {
     // three lines, so both stack instead.
     ['the compact cell', 332],
     ['a 390 dp screen', 362],
-  ])(
-    'gives the note its own line under the amount on %s',
-    async (_name, width) => {
-      const { renderer, unmount } = await mountAtCardWidth(width);
+  ])('gives the note its own line under the amount on %s', async (_name, width) => {
+    const { renderer, unmount } = await mountAtCardWidth(width);
 
-      // A stacked card keeps the value and its caption together: the amount and
-      // its visibility toggle share the value line, and the note takes the
-      // column's next line, so the note keeps the card's full width.
-      const shell = balanceBlock(renderer);
-      expect(classesOf(shell)).not.toContain('flex-row');
-      const column = valueColumn(renderer);
-      const wrapper = column.parent;
-      expect(wrapper?.parent).toBe(shell);
-      // The column's wrapper is a row, so its child's `flex-1` is a width
-      // share. In a column wrapper it would be a 0 vertical basis, and the
-      // 48 dp floor would pin the column: a longer note would paint outside
-      // the card instead of growing it.
-      if (wrapper === null) {
-        throw new Error('The stacked value column has no wrapper');
-      }
-      expect(classesOf(wrapper)).toContain('flex-row');
-
-      const row = amountRow(renderer);
-      expect(row.parent).toBe(column);
-      expect(renders(row, 'No expiring credits.')).toBe(false);
-      expect(renders(row, 'ADD_CREDITS_BUTTON')).toBe(false);
-      // The toggle shares the amount's line, so the note under it keeps the
-      // column's full width instead of the width left beside a toggle column.
-      const toggle = renderer.root.findByProps({ accessibilityLabel: 'Hide balance' });
-      expect(row.findAll(node => node === toggle)).toHaveLength(1);
-      expect(wrapper.children.at(-1)).toBe(column);
-      expect(renders(column, 'No expiring credits.')).toBe(true);
-      expect(renders(column, 'ADD_CREDITS_BUTTON')).toBe(false);
-      // The purchase action is the section header's, so the card ends at its
-      // value column and paints no empty action row.
-      expect(shell.children.at(-1)).toBe(wrapper);
-      unmount();
+    // A stacked card keeps the value and its caption together: the amount and
+    // its visibility toggle share the value line, and the note takes the
+    // column's next line, so the note keeps the card's full width.
+    const shell = balanceBlock(renderer);
+    expect(classesOf(shell)).not.toContain('flex-row');
+    const column = valueColumn(renderer);
+    const wrapper = column.parent;
+    expect(wrapper?.parent).toBe(shell);
+    // The column's wrapper is a row, so its child's `flex-1` is a width
+    // share. In a column wrapper it would be a 0 vertical basis, and the
+    // 48 dp floor would pin the column: a longer note would paint outside
+    // the card instead of growing it.
+    if (wrapper === null) {
+      throw new Error('The stacked value column has no wrapper');
     }
-  );
+    expect(classesOf(wrapper)).toContain('flex-row');
+
+    const row = amountRow(renderer);
+    expect(row.parent).toBe(column);
+    expect(renders(row, 'No expiring credits.')).toBe(false);
+    expect(renders(row, 'ADD_CREDITS_BUTTON')).toBe(false);
+    // The toggle shares the amount's line, so the note under it keeps the
+    // column's full width instead of the width left beside a toggle column.
+    const toggle = renderer.root.findByProps({ accessibilityLabel: 'Hide balance' });
+    expect(row.findAll(node => node === toggle)).toHaveLength(1);
+    expect(wrapper.children.at(-1)).toBe(column);
+    expect(renders(column, 'No expiring credits.')).toBe(true);
+    expect(renders(column, 'ADD_CREDITS_BUTTON')).toBe(false);
+    // The purchase action is the section header's, so the card ends at its
+    // value column and paints no empty action row.
+    expect(shell.children.at(-1)).toBe(wrapper);
+    unmount();
+  });
 });

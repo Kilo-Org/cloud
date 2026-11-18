@@ -40,6 +40,9 @@ function withStatus(status: string, cancelAtPeriodEnd = false): OrgSeatSubscript
   });
 }
 
+/** A running trial the boundary row publishes beside a stopped-paying Stripe record. */
+const TRIAL = { trialStatus: 'trial_active', trialEndsAt: '2026-11-24T00:00:00.000Z' } as const;
+
 describe('getOrgSubscriptionState', () => {
   it('reports an active subscription renewing on the paid period end', () => {
     const state = getOrgSubscriptionState(subscription());
@@ -197,12 +200,27 @@ describe('getOrgSubscriptionState', () => {
     // subscription exists, so this combination is a `canceled` Stripe record
     // beside a live trial: the record has stopped billing, and the trial is
     // what governs the organization.
-    const state = getOrgSubscriptionState(withStatus('canceled'), {
-      trialStatus: 'trial_active',
-      trialEndsAt: '2026-11-24T00:00:00.000Z',
-    });
+    const state = getOrgSubscriptionState(withStatus('canceled'), TRIAL);
     expect(state.tone).toBe('default');
     expect(state.label.startsWith('Trial ends on ')).toBe(true);
+  });
+
+  it('keeps the payment failure visible while a trial is published', () => {
+    // None of these statuses pays for seats, so the server still publishes the
+    // trial beside them — but the failure is the one row on the screen that
+    // needs the billing manager's action, so it speaks over the trial's end
+    // date. `past_due` pays, so its trial would be suppressed server-side; the
+    // row is unchanged either way.
+    expect(getOrgSubscriptionState(withStatus('unpaid'), TRIAL)).toEqual({
+      label: 'Past due',
+      tone: 'danger',
+    });
+    expect(getOrgSubscriptionState(withStatus('past_due'), TRIAL)).toEqual({
+      label: 'Past due',
+      tone: 'danger',
+    });
+    expect(getOrgSubscriptionState(withStatus('incomplete'), TRIAL).tone).toBe('warn');
+    expect(getOrgSubscriptionState(withStatus('paused'), TRIAL).tone).toBe('warn');
   });
 
   it('lets a paying subscription own the row when the payload carries no trial', () => {

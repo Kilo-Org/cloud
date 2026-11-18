@@ -130,15 +130,34 @@ export function getOrgTrialStatusPill(trial: OrgTrialState): BillingState | null
 }
 
 /**
+ * The subscription's own payment trouble: the past-due row for a card Stripe
+ * is still or has stopped retrying, the checkout warning for an incomplete
+ * first payment, the pause notice for a suspended plan.
+ */
+function subscriptionFailureState(status: string): BillingState {
+  if (status === 'past_due' || status === 'unpaid') {
+    return { label: i18n.t('organization.billing.statePastDue'), tone: 'danger' };
+  }
+  if (status === 'incomplete') {
+    return { label: i18n.t('kiloPass.statusIncomplete'), tone: 'warn' };
+  }
+  return { label: i18n.t('kiloPass.statusPaused'), tone: 'warn' };
+}
+
+/**
  * What the subscription is doing, in the words the reader needs: whether it
  * renews, when it stops, or that it is past due. Nothing here re-derives the
  * plan gate — `isTrialExpiredForEnforcement` owns that.
  *
- * `trial` is the boundary row's trial readout, and it speaks first: the server
- * publishes a running trial only when no paying seat subscription exists, so a
- * Stripe row that has stopped paying (`canceled`, `unpaid`, `paused`) can sit
- * beside a trial that still governs the organization, and the server's verdict
- * outranks a record that exists but does not pay. A `null` readout leaves the
+ * `trial` is the boundary row's trial readout. The server publishes a running
+ * trial only when no paying seat subscription exists, so a Stripe record that
+ * has stopped paying (`canceled`, `incomplete_expired`) can sit beside a trial
+ * that still governs the organization, and the server's verdict outranks a
+ * record that exists but does not pay. One exception speaks first: payment
+ * trouble (`past_due`, `unpaid`, `incomplete`, `paused`) keeps its own row even
+ * while the trial is published, because the trial would otherwise hide the
+ * screen's only failure signal — the money problem needs the billing manager's
+ * action, the trial's end date does not. A `null` readout leaves the
  * subscription to own the row exactly as before, including its own `trialing`
  * status.
  */
@@ -146,29 +165,27 @@ export function getOrgSubscriptionState(
   input: OrgSeatSubscription,
   trial?: OrgTrialState
 ): BillingState {
+  const subscription = input.subscription;
+  const status = subscription?.status;
+  // Payment trouble outranks the trial readout: `past_due`/`unpaid` is a
+  // paying status the server treats as paid, and `incomplete`/`paused` is a
+  // checkout or billing pause the trial must not swallow — each is the one
+  // failure signal on this screen, and each is fixable now.
+  if (
+    subscription != null &&
+    (status === 'past_due' || status === 'unpaid' || status === 'incomplete' || status === 'paused')
+  ) {
+    return subscriptionFailureState(status);
+  }
   const trialState = trial == null ? null : getOrgTrialStatusPill(trial);
   if (trialState != null) {
     return trialState;
   }
-  const subscription = input.subscription;
   if (subscription == null) {
     return { label: i18n.t('organization.billing.stateNone'), tone: 'muted' };
   }
-  const { status } = subscription;
   const periodEnd = formattedPeriodEnd(input);
-  // `unpaid` is the same money problem one step further on — Stripe stopped
-  // retrying the card and left the invoice open — so it carries the past-due
-  // row, as the web's `subscriptionStatusConfig` paints both red.
-  if (status === 'past_due' || status === 'unpaid') {
-    return { label: i18n.t('organization.billing.statePastDue'), tone: 'danger' };
-  }
-  if (status === 'incomplete') {
-    return { label: i18n.t('kiloPass.statusIncomplete'), tone: 'warn' };
-  }
-  if (status === 'paused') {
-    return { label: i18n.t('kiloPass.statusPaused'), tone: 'warn' };
-  }
-  if (Object.hasOwn(TERMINAL_STATUSES, status)) {
+  if (status != null && Object.hasOwn(TERMINAL_STATUSES, status)) {
     return { label: i18n.t('organization.kiloPass.ended'), tone: 'muted' };
   }
   if (subscription.cancel_at_period_end === true) {

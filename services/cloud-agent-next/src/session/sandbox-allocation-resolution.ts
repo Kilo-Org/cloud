@@ -52,9 +52,10 @@ function profileOwner(owner: SelectionOwner): ProfileOwner {
 }
 
 /**
- * Whether a create needs a sandbox that enforces an egress policy: an allowlist
- * or an egress audit. The start check and the saved-allocation resolution read
- * this one rule.
+ * Whether a create asks for an egress policy: an allowlist or an egress audit.
+ * Session registration reads it for the intent fingerprint and to require a
+ * selectable allocation. Whether a provider can enforce the policy is a
+ * separate question: `egressRequestSupported` answers it for every gate.
  */
 export function requestNeedsEgressPolicy(runtime: SessionRuntimeIntent | undefined): boolean {
   return runtime?.egressMode === 'allowlist' || runtime?.egressAudit === true;

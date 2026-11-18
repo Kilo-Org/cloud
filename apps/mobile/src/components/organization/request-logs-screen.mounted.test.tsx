@@ -262,9 +262,36 @@ describe('OrganizationRequestLogsScreen', () => {
     const { renderer, unmount } = await mount();
 
     const [empty] = renderer.root.findAllByType('EmptyState');
-    expect(empty?.props.title).toBe('No requests');
-    // The window line above already names the hour, so a description here would
-    // only restate the title.
+    expect(empty?.props.title).toBe('No requests in this hour');
+    // The window header names the hour; the description points at the paging
+    // control, so it is here while an older hour still exists.
+    expect(empty?.props.description).toBe('Use Older hour to see earlier requests.');
+    unmount();
+  });
+
+  it('drops the Older-hour pointer once the history bound stops the step', async () => {
+    logsQuery.data = [];
+    const { renderer, unmount } = await mount();
+
+    const buttons = renderer.root.findAllByType('Button');
+    const older = buttons.find(node => node.props.accessibilityLabel === 'Older hour');
+    expect(older).toBeDefined();
+    // Drive the window to the bound: the step's own guard is exercised in the
+    // stepper test, so go back until the button disables.
+    for (let steps = 0; steps < 365 * 24; steps += 1) {
+      if (older?.props.disabled) {
+        break;
+      }
+      await act(() => {
+        handlerOf(older!, 'onPress')?.();
+      });
+    }
+    expect(older?.props.disabled).toBe(true);
+
+    const [empty] = renderer.root.findAllByType('EmptyState');
+    expect(empty?.props.title).toBe('No requests in this hour');
+    // A pointer at a disabled control would be a dead end; the scoped title
+    // alone is the truth here.
     expect(empty?.props.description).toBeUndefined();
     unmount();
   });

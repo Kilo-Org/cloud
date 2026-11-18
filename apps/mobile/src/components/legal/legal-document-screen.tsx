@@ -111,7 +111,7 @@ export function LegalDocumentScreen({
             </Text>
           </View>
         ) : null}
-        <MarkdownText value={state.html} onPressLink={openInContentLink} />
+        <MarkdownText value={state.html} documentDirection="ltr" onPressLink={openInContentLink} />
       </ScrollView>
     );
   }

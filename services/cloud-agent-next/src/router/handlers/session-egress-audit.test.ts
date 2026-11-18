@@ -359,7 +359,6 @@ describe('Worker getEgressAudit', () => {
     { limit: 101 },
     { limit: 1.5 },
     { sandboxId: sharedSandboxId },
-    { organizationId },
   ])(
     'rejects invalid pagination or untrusted routing input %j before access lookup',
     async input => {
@@ -372,6 +371,27 @@ describe('Worker getEgressAudit', () => {
       expect(harness.containers.getByName).not.toHaveBeenCalled();
     }
   );
+
+  it('pins the access lookup to the supplied organization', async () => {
+    const harness = setup();
+    queryAccess.mockResolvedValue({ ...access, organizationId });
+    harness.sessionStub.getMetadata.mockResolvedValue({
+      ...harness.metadata,
+      identity: { ...harness.metadata.identity, orgId: organizationId },
+    });
+
+    await expect(
+      harness.caller.getEgressAudit({ cloudAgentSessionId: sessionId, organizationId })
+    ).resolves.toEqual(audit);
+
+    await expect(
+      harness.caller.getEgressAudit({
+        cloudAgentSessionId: sessionId,
+        organizationId: '22222222-2222-4222-8222-222222222222',
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(harness.containers.getByName).toHaveBeenCalledTimes(1);
+  });
 
   it.each([
     { records: audit.records },

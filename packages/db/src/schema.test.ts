@@ -1607,6 +1607,189 @@ describe('database schema', () => {
           .where(eq(schema.kilocode_users.id, userId));
       }
     });
+
+    it('rejects a draft target on an environment that is not a draft', async () => {
+      const userId = `schema-env-draft-target-${crypto.randomUUID()}`;
+      await schemaTestDb.db.insert(schema.kilocode_users).values({
+        id: userId,
+        google_user_email: `${userId}@example.com`,
+        google_user_name: 'Schema env draft test',
+        google_user_image_url: '',
+        stripe_customer_id: `cus_${crypto.randomUUID()}`,
+      });
+
+      try {
+        const [target] = await schemaTestDb.db
+          .insert(schema.cloud_agent_environments)
+          .values({
+            owned_by_user_id: userId,
+            name: 'target',
+            platform: 'github',
+            repo_full_name: 'acme/widgets',
+          })
+          .returning({ id: schema.cloud_agent_environments.id });
+
+        await expect(
+          schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+            owned_by_user_id: userId,
+            name: 'not-a-draft',
+            platform: 'github',
+            repo_full_name: 'acme/other',
+            draft_for_environment_id: target.id,
+          })
+        ).rejects.toMatchObject({
+          cause: { constraint: 'cloud_agent_environments_draft_target_check' },
+        });
+
+        await schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+          owned_by_user_id: userId,
+          name: 'draft',
+          repositories: [{ platform: 'github', repoFullName: 'acme/widgets' }],
+          is_draft: true,
+          draft_for_environment_id: target.id,
+        });
+      } finally {
+        await schemaTestDb.db
+          .delete(schema.cloud_agent_environments)
+          .where(eq(schema.cloud_agent_environments.owned_by_user_id, userId));
+        await schemaTestDb.db
+          .delete(schema.kilocode_users)
+          .where(eq(schema.kilocode_users.id, userId));
+      }
+    });
+  });
+
+  describe('cloud agent environment setup runs', () => {
+    it('enforces exactly one owner and a known status', async () => {
+      const userId = `schema-setup-owner-${crypto.randomUUID()}`;
+      await schemaTestDb.db.insert(schema.kilocode_users).values({
+        id: userId,
+        google_user_email: `${userId}@example.com`,
+        google_user_name: 'Schema setup run test',
+        google_user_image_url: '',
+        stripe_customer_id: `cus_${crypto.randomUUID()}`,
+      });
+      const [organization] = await schemaTestDb.db
+        .insert(schema.organizations)
+        .values({ name: `Schema setup org ${crypto.randomUUID()}` })
+        .returning({ id: schema.organizations.id });
+
+      const runValues = {
+        created_by_user_id: userId,
+        data: schema.environmentSetupRunDataSchema.parse({
+          requirements: 'Set up the local dev stack.',
+          model: 'anthropic/claude-sonnet-4',
+          launch_repo_full_name: 'acme/widgets',
+        }),
+      } satisfies Partial<typeof schema.cloud_agent_environment_setup_runs.$inferInsert>;
+
+      try {
+        await expect(
+          schemaTestDb.db.insert(schema.cloud_agent_environment_setup_runs).values({
+            ...runValues,
+            owned_by_user_id: userId,
+            owned_by_organization_id: organization.id,
+          })
+        ).rejects.toMatchObject({
+          cause: { constraint: 'env_setup_runs_owner_check' },
+        });
+
+        await expect(
+          schemaTestDb.db.insert(schema.cloud_agent_environment_setup_runs).values(runValues)
+        ).rejects.toMatchObject({
+          cause: { constraint: 'env_setup_runs_owner_check' },
+        });
+
+        await expect(
+          schemaTestDb.db.execute(sql`
+            INSERT INTO cloud_agent_environment_setup_runs
+              (owned_by_user_id, created_by_user_id, data, status)
+            VALUES
+              (${userId}, ${userId}, ${JSON.stringify(runValues.data)}::jsonb, 'unknown')
+          `)
+        ).rejects.toMatchObject({
+          cause: { constraint: 'env_setup_runs_status_check' },
+        });
+      } finally {
+        await schemaTestDb.db
+          .delete(schema.cloud_agent_environment_setup_runs)
+          .where(
+            eq(schema.cloud_agent_environment_setup_runs.owned_by_organization_id, organization.id)
+          );
+        await schemaTestDb.db
+          .delete(schema.cloud_agent_environment_setup_runs)
+          .where(eq(schema.cloud_agent_environment_setup_runs.owned_by_user_id, userId));
+        await schemaTestDb.db
+          .delete(schema.organizations)
+          .where(eq(schema.organizations.id, organization.id));
+        await schemaTestDb.db
+          .delete(schema.kilocode_users)
+          .where(eq(schema.kilocode_users.id, userId));
+      }
+    });
+
+    it('allows one open run per target and any number of finished runs', async () => {
+      const userId = `schema-setup-open-${crypto.randomUUID()}`;
+      await schemaTestDb.db.insert(schema.kilocode_users).values({
+        id: userId,
+        google_user_email: `${userId}@example.com`,
+        google_user_name: 'Schema setup open test',
+        google_user_image_url: '',
+        stripe_customer_id: `cus_${crypto.randomUUID()}`,
+      });
+
+      try {
+        const [target] = await schemaTestDb.db
+          .insert(schema.cloud_agent_environments)
+          .values({
+            owned_by_user_id: userId,
+            name: 'target',
+            platform: 'github',
+            repo_full_name: 'acme/widgets',
+          })
+          .returning({ id: schema.cloud_agent_environments.id });
+
+        const runValues = {
+          owned_by_user_id: userId,
+          created_by_user_id: userId,
+          target_environment_id: target.id,
+          data: schema.environmentSetupRunDataSchema.parse({
+            requirements: 'Set up the local dev stack.',
+            model: 'anthropic/claude-sonnet-4',
+            launch_repo_full_name: 'acme/widgets',
+          }),
+        } satisfies Partial<typeof schema.cloud_agent_environment_setup_runs.$inferInsert>;
+
+        await schemaTestDb.db
+          .insert(schema.cloud_agent_environment_setup_runs)
+          .values({ ...runValues, status: 'running' });
+
+        await expect(
+          schemaTestDb.db
+            .insert(schema.cloud_agent_environment_setup_runs)
+            .values({ ...runValues, status: 'verifying' })
+        ).rejects.toMatchObject({
+          cause: { constraint: 'UQ_env_setup_runs_open_target' },
+        });
+
+        await schemaTestDb.db
+          .insert(schema.cloud_agent_environment_setup_runs)
+          .values({ ...runValues, status: 'published' });
+        await schemaTestDb.db
+          .insert(schema.cloud_agent_environment_setup_runs)
+          .values({ ...runValues, status: 'cancelled' });
+      } finally {
+        await schemaTestDb.db
+          .delete(schema.cloud_agent_environment_setup_runs)
+          .where(eq(schema.cloud_agent_environment_setup_runs.owned_by_user_id, userId));
+        await schemaTestDb.db
+          .delete(schema.cloud_agent_environments)
+          .where(eq(schema.cloud_agent_environments.owned_by_user_id, userId));
+        await schemaTestDb.db
+          .delete(schema.kilocode_users)
+          .where(eq(schema.kilocode_users.id, userId));
+      }
+    });
   });
 
   /**

@@ -10,7 +10,6 @@ import {
   getAnthropicProviderOptionsForVercel,
   getVercelInferenceProvidersExcludingIgnored,
   hasCompatibleVercelInferenceProvider,
-  isVercelRoutingOptOut,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import type {
   GatewayRequest,
@@ -286,7 +285,7 @@ describe('convertProviderOptions', () => {
     };
 
     expect(() => convertProviderOptions(request, null)).toThrow(
-      'Vercel inference provider data became unavailable during request transform'
+      'Vercel inference provider data is unavailable to apply provider.ignore'
     );
   });
 });
@@ -1315,15 +1314,6 @@ describe('applyVercelSettings session affinity', () => {
       expect(request.body.providerOptions?.gateway?.sessionAffinity).toBe(true);
       expect(request.body.providerOptions?.gateway).not.toHaveProperty('sessionId');
     }
-  });
-});
-
-describe('isVercelRoutingOptOut', () => {
-  it('only opts out exact model ID matches', () => {
-    const optOutModels = new Set(['moonshotai/kimi-k3']);
-
-    expect(isVercelRoutingOptOut('moonshotai/kimi-k3', optOutModels)).toBe(true);
-    expect(isVercelRoutingOptOut('moonshotai/kimi-k3-fast', optOutModels)).toBe(false);
   });
 });
 

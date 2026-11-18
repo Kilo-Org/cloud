@@ -4292,8 +4292,7 @@
       "repoValue": "Adattár: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Ez a profil már nem érhető el. Válasszon másikat.",
-      "pickerEmptyDescriptionOrganization": "Hozzon létre egy szervezeti profilt a környezeti változók, a beállítási parancsok és a készségek munkamenetek közötti újrafelhasználásához.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Szervezeti profilt a szervezet tulajdonosa vagy rendszergazdája hozhat létre."
+      "pickerEmptyDescriptionOrganization": "Hozzon létre egy szervezeti profilt a környezeti változók, a beállítási parancsok és a készségek munkamenetek közötti újrafelhasználásához."
     },
     "variablesDeleteFailed": "Nem sikerült törölni a változót",
     "deleteVariable": "{{key}} változó törlése",

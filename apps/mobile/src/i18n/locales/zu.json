@@ -4292,8 +4292,7 @@
       "repoValue": "Inqolobane: {{name}}",
       "profileValue": "Iphrofayela: {{name}}",
       "profileUnavailable": "Le phrofayela ayisatholakali. Khetha enye.",
-      "pickerEmptyDescriptionOrganization": "Dala iphrofayela yenhlangano ukuze usebenzise kabusha okuguquguqukayo kwendawo, imiyalo yokusetha, namakhono kuzo zonke izikhathi.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Umnikazi wenhlangano noma umlawuli angadala iphrofayela yenhlangano."
+      "pickerEmptyDescriptionOrganization": "Dala iphrofayela yenhlangano ukuze usebenzise kabusha okuguquguqukayo kwendawo, imiyalo yokusetha, namakhono kuzo zonke izikhathi."
     },
     "variablesDeleteFailed": "Ayikwazanga ukususa okuguquguqukayo",
     "deleteVariable": "Susa okuguquguqukayo {{key}}",

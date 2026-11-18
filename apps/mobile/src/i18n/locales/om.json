@@ -4292,8 +4292,7 @@
       "repoValue": "Kuusaa: {{name}}",
       "profileValue": "Profaayilii: {{name}}",
       "profileUnavailable": "Profaayiliin kun kana booda hin argamu. Kan biraa filadhu.",
-      "pickerEmptyDescriptionOrganization": "Jijjiiramoota naannoo, ajajoota saaguu, fi dandeettiiwwan turtii hunda irra deebi'ee fayyadamuuf piroofaayilii dhaabbataa uumi.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Abbaan dhaabbataa yookiin bulchaan dhaabbataa piroofaayilii dhaabbataa uumuu danda'a."
+      "pickerEmptyDescriptionOrganization": "Jijjiiramoota naannoo, ajajoota saaguu, fi dandeettiiwwan turtii hunda irra deebi'ee fayyadamuuf piroofaayilii dhaabbataa uumi."
     },
     "variablesDeleteFailed": "Jijjiiramaa haquu hin dandeenye",
     "deleteVariable": "Jijjiiramaa {{key}} balleessi",

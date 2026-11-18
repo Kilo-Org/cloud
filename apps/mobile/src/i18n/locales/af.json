@@ -4292,8 +4292,7 @@
       "repoValue": "Bewaarplek: {{name}}",
       "profileValue": "Profiel: {{name}}",
       "profileUnavailable": "Hierdie profiel is nie meer beskikbaar nie. Kies 'n ander een.",
-      "pickerEmptyDescriptionOrganization": "Skep 'n organisasieprofiel om omgewingsveranderlikes, opstelopdragte en vaardighede oor sessies te hergebruik.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Die eienaar of admin van 'n organisasie kan 'n organisasieprofiel skep."
+      "pickerEmptyDescriptionOrganization": "Skep 'n organisasieprofiel om omgewingsveranderlikes, opstelopdragte en vaardighede oor sessies te hergebruik."
     },
     "variablesDeleteFailed": "Kon nie veranderlike verwyder nie",
     "deleteVariable": "Skrap veranderlike {{key}}",

@@ -4292,8 +4292,7 @@
       "repoValue": "คลังโค้ด: {{name}}",
       "profileValue": "โปรไฟล์: {{name}}",
       "profileUnavailable": "โปรไฟล์นี้ใช้งานไม่ได้แล้ว. เลือกโปรไฟล์อื่น.",
-      "pickerEmptyDescriptionOrganization": "สร้างโปรไฟล์องค์กรเพื่อนำตัวแปรสภาพแวดล้อม คำสั่งการตั้งค่า และทักษะมาใช้ซ้ำในเซสชันต่างๆ",
-      "pickerEmptyDescriptionOrganizationReadOnly": "เจ้าขององค์กรหรือผู้ดูแลระบบสามารถสร้างโปรไฟล์องค์กรได้"
+      "pickerEmptyDescriptionOrganization": "สร้างโปรไฟล์องค์กรเพื่อนำตัวแปรสภาพแวดล้อม คำสั่งการตั้งค่า และทักษะมาใช้ซ้ำในเซสชันต่างๆ"
     },
     "variablesDeleteFailed": "ไม่สามารถลบตัวแปรได้",
     "deleteVariable": "ลบตัวแปร {{key}}",

@@ -4292,8 +4292,7 @@
       "repoValue": "Repozitoriy: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Bu profil endi mavjud emas. Boshqasini tanlang.",
-      "pickerEmptyDescriptionOrganization": "Seanslar davomida muhit o'zgaruvchilari, sozlash buyruqlari va ko'nikmalarni qayta ishlatish uchun tashkilot profili yarating.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Tashkilot profili tashkilot egasi yoki administratori tomonidan yaratilishi mumkin."
+      "pickerEmptyDescriptionOrganization": "Seanslar davomida muhit o'zgaruvchilari, sozlash buyruqlari va ko'nikmalarni qayta ishlatish uchun tashkilot profili yarating."
     },
     "variablesDeleteFailed": "Oʻzgaruvchi oʻchirilmadi",
     "deleteVariable": "{{key}} oʻzgaruvchisini oʻchiring",

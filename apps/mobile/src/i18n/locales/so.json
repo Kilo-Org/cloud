@@ -4292,8 +4292,7 @@
       "repoValue": "Kaydka: {{name}}",
       "profileValue": "Astaanta: {{name}}",
       "profileUnavailable": "Astaantan hadda lama heli karo. Dooro mid kale.",
-      "pickerEmptyDescriptionOrganization": "Abuur profile urur si dib loogu isticmaalo doorsoomayaasha deegaanka, amarrada dejinta, iyo xirfadaha kalfadhiyada oo dhan.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Milkiilaha ururka ama maamulaha ayaa abuuri kara profile urur."
+      "pickerEmptyDescriptionOrganization": "Abuur profile urur si dib loogu isticmaalo doorsoomayaasha deegaanka, amarrada dejinta, iyo xirfadaha kalfadhiyada oo dhan."
     },
     "variablesDeleteFailed": "Way tirtiran kari wayday doorsoomaha",
     "deleteVariable": "Tirtir doorsoomaha {{key}}",

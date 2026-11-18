@@ -4292,8 +4292,7 @@
       "repoValue": "Hazina: {{name}}",
       "profileValue": "Wasifu: {{name}}",
       "profileUnavailable": "Wasifu huu haupatikani tena. Chagua mwingine.",
-      "pickerEmptyDescriptionOrganization": "Unda wasifu wa shirika ili kutumia tena vigezo vya mazingira, amri za usanidi na ujuzi katika vipindi vyote.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Mmiliki au msimamizi wa shirika anaweza kuunda wasifu wa shirika."
+      "pickerEmptyDescriptionOrganization": "Unda wasifu wa shirika ili kutumia tena vigezo vya mazingira, amri za usanidi na ujuzi katika vipindi vyote."
     },
     "variablesDeleteFailed": "Haikuweza kufuta kigeu",
     "deleteVariable": "Futa kigeu {{key}}",

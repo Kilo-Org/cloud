@@ -1,5 +1,4 @@
 import { type RepoOption } from '@/components/profiles/repo-bindings-model';
-import { type OrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 
 /** A profile as one of the Add form's pickers lists it. */
 type ProfileChoice = Readonly<{ id: string; name: string }>;
@@ -20,31 +19,25 @@ export type ChosenProfile =
   | { readonly kind: 'missing'; readonly profileId: string };
 
 /**
- * The picker's empty-state copy. It names the profile a user could select in
- * this context: a personal one, an organization one, or — without the manage
- * role — who can create an organization profile, since the server rejects the
- * create itself. While the role is still resolving it names the organization
- * profile the context lists: the read-only copy would tell an owner or admin
- * they cannot act on what they can.
+ * The picker's empty-state copy. It names the profile a user can select in this
+ * context: a personal one or an organization one. The picker opens only from
+ * the Add control, which the manage slot withholds from a caller without the
+ * manage role, so who may create an organization profile is never this copy's
+ * to say — the slot states it.
  */
 const PICKER_EMPTY_DESCRIPTION_KEYS = {
   personal: 'profiles.emptyDescription',
   organization: 'profiles.repoBindings.pickerEmptyDescriptionOrganization',
-  organizationReadOnly: 'profiles.repoBindings.pickerEmptyDescriptionOrganizationReadOnly',
 } as const;
 
 type PickerEmptyDescriptionKey =
   (typeof PICKER_EMPTY_DESCRIPTION_KEYS)[keyof typeof PICKER_EMPTY_DESCRIPTION_KEYS];
 
 export function pickerEmptyDescriptionKey(
-  organizationId: string | undefined,
-  permission: OrganizationProfilePermission
+  organizationId: string | undefined
 ): PickerEmptyDescriptionKey {
-  if (organizationId === undefined) {
-    return PICKER_EMPTY_DESCRIPTION_KEYS.personal;
-  }
-  return permission === 'read-only'
-    ? PICKER_EMPTY_DESCRIPTION_KEYS.organizationReadOnly
+  return organizationId === undefined
+    ? PICKER_EMPTY_DESCRIPTION_KEYS.personal
     : PICKER_EMPTY_DESCRIPTION_KEYS.organization;
 }
 

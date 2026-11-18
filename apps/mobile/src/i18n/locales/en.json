@@ -4358,8 +4358,7 @@
       "repoValue": "Repository: {{name}}",
       "profileValue": "Profile: {{name}}",
       "profileUnavailable": "This profile is no longer available. Choose another one.",
-      "pickerEmptyDescriptionOrganization": "Create an organization profile to reuse environment variables, setup commands, and skills across sessions.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "An organization owner or admin can create an organization profile."
+      "pickerEmptyDescriptionOrganization": "Create an organization profile to reuse environment variables, setup commands, and skills across sessions."
     },
     "variablesDeleteFailed": "Couldn't delete variable",
     "deleteVariable": "Delete variable {{key}}",

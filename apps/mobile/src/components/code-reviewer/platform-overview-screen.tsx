@@ -5,7 +5,6 @@ import { View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 
-import { CenteredState } from '@/components/centered-state';
 import { openModelPicker } from '@/components/agents/model-selector';
 import { ActionRequiredBanner } from '@/components/code-reviewer/action-required-banner';
 import { BitbucketOverview } from '@/components/code-reviewer/bitbucket-overview';
@@ -14,7 +13,7 @@ import {
   buildOverviewRows,
   resolveRowOnPress,
 } from '@/components/code-reviewer/platform-overview-rows';
-import { ProviderConnectCard } from '@/components/code-reviewer/provider-connect-card';
+import { ProviderConnectState } from '@/components/code-reviewer/provider-connect-state';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { ReviewerErrorScreen } from '@/components/code-reviewer/reviewer-error-screen';
 import { PlatformOverviewSkeleton } from '@/components/code-reviewer/platform-overview-skeleton';
@@ -31,7 +30,7 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
 import { canConnectProvider } from '@/lib/code-reviewer-status';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
-import { SCREEN_BODY_CLASS, SCREEN_GUTTER_CLASS } from '@/lib/layout';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { cn } from '@/lib/utils';
 import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
 import { useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
@@ -153,22 +152,24 @@ export function PlatformOverviewScreen({
 
   const handleConnected = status.refetch;
   if (!isLoading && !connected) {
-    // The connect card installs the provider's app for the scope, which is a
+    // The connect state installs the provider's app for the scope, which is a
     // narrower capability than editing the reviewer settings (see
-    // `canConnectProvider`): the card must follow the install rule, not `canEdit`.
+    // `canConnectProvider`): the state must follow the install rule, not
+    // `canEdit`.
     const canConnect = canConnectProvider(platform, permission);
     return (
       <View className="flex-1 bg-background">
         <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
-        <CenteredState contentContainerClassName={SCREEN_GUTTER_CLASS}>
-          {canConnect ? (
-            <ProviderConnectCard scope={scope} platform={platform} onConnected={handleConnected} />
-          ) : (
-            <Text className="text-center text-xs text-muted-foreground">
-              {t(connectNoticeKey(platform), { platform: capabilities.label })}
-            </Text>
-          )}
-        </CenteredState>
+        <ProviderConnectState
+          scope={scope}
+          platform={platform}
+          notice={
+            canConnect
+              ? undefined
+              : t(connectNoticeKey(platform), { platform: capabilities.label })
+          }
+          onConnected={handleConnected}
+        />
       </View>
     );
   }

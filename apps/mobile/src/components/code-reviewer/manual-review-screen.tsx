@@ -322,7 +322,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
           action={
             canConnect ? (
               // The near-identical PR-review connect gate and the Code Reviewer
-              // ProviderConnectCard use the same `StateAction`, so the same
+              // ProviderConnectState use the same `StateAction`, so the same
               // Connect GitHub action looks the same wherever it appears.
               <StateAction
                 label={t('common.connectGithub')}

@@ -121,9 +121,7 @@ vi.mock('@/components/code-reviewer/platform-overview-rows', () => ({
   buildOverviewRows: () => [],
   resolveRowOnPress: () => undefined,
 }));
-vi.mock('@/components/code-reviewer/provider-connect-card', () => ({
-  ProviderConnectCard: 'ProviderConnectCard',
-}));
+vi.mock('@/components/icons/github-icon', () => ({ GitHubIcon: 'GitHubIcon' }));
 vi.mock('@/components/platform-error-screen', () => ({
   PlatformErrorScreen: (props: {
     variant?: string;
@@ -145,7 +143,12 @@ vi.mock('@/components/ui/preference-row', () => ({
   PreferenceRow: () => null,
 }));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: () => null }));
-vi.mock('@/components/ui/icons', () => ({ Bot: 'Bot', ScrollText: 'ScrollText' }));
+vi.mock('@/components/ui/icons', () => ({
+  Bot: 'Bot',
+  GitBranch: 'GitBranch',
+  GitMerge: 'GitMerge',
+  ScrollText: 'ScrollText',
+}));
 vi.mock('@/components/ui/skeleton', () => ({
   Skeleton: () => {
     skeletonRenders.count += 1;
@@ -202,6 +205,7 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#666' }),
+  useMutedDisabledInk: () => '#999',
 }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   useCommittedConnectivityStatus: () => (connectivity.known ? 'offline' : 'unknown'),
@@ -343,7 +347,7 @@ describe('PlatformOverviewScreen disconnected setup', () => {
 
       expect(centeredState).toHaveBeenCalledOnce();
       expect(scrollView).not.toHaveBeenCalled();
-      expect(renderer.root.findAllByType('ProviderConnectCard')).toHaveLength(showsCard ? 1 : 0);
+      expect(texts).toContain('Connect GitHub');
       const notice = "GitHub isn't connected. Only organization owners and admins can connect it.";
       expect(texts.includes(notice)).toBe(!showsCard);
     }
@@ -356,7 +360,7 @@ describe('PlatformOverviewScreen disconnected setup', () => {
 
     const renderer = await render('org-1', 'gitlab');
 
-    expect(renderer.root.findAllByType('ProviderConnectCard')).toHaveLength(1);
+    expect(collectText(renderer.toJSON())).toContain('Connect GitLab');
   });
 
   it.each([

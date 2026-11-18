@@ -1,15 +1,12 @@
 import { GitBranch, GitMerge } from '@/components/ui/icons';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { toast } from 'sonner-native';
 
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Text } from '@/components/ui/text';
+import { EmptyState, StateAction } from '@/components/empty-state';
+import { GitHubIcon } from '@/components/icons/github-icon';
 import { appShellHandoffUrl } from '@/lib/app-shell-handoff';
 import { PERSONAL_SCOPE } from '@/lib/hooks/use-code-reviewer';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   openAuthorizationAndWaitForReturn,
   reportLateLaunchFailure,
@@ -18,31 +15,43 @@ import {
 const PLATFORM_CONFIG = {
   github: {
     icon: GitBranch,
+    actionIcon: GitHubIcon,
     label: 'codeReviewer.providerConnect.githubApp',
-    buttonLabel: 'common.connectGithub',
+    title: 'common.connectGithub',
     errorMessage: 'codeReviewer.providerConnect.githubError',
   },
   gitlab: {
     icon: GitMerge,
+    actionIcon: GitMerge,
     label: 'codeReviewer.providerConnect.gitlabAccount',
-    buttonLabel: 'common.connectGitlab',
+    title: 'common.connectGitlab',
     errorMessage: 'codeReviewer.providerConnect.gitlabError',
   },
 } as const;
 
-export function ProviderConnectCard<T>({
+/**
+ * The disconnected provider's one state: the icon circle, the platform's
+ * connect heading, what the connection asks for, and the one action that
+ * starts it. A reader the install rule refuses gets the sentence naming who
+ * may connect in the description and no action, so the screen never offers a
+ * press its role cannot finish.
+ */
+export function ProviderConnectState<T>({
   scope,
   platform,
+  notice,
   onConnected,
 }: Readonly<{
   scope: string;
   platform: 'github' | 'gitlab';
+  /** Why this reader cannot connect; replaces the action when present. */
+  notice?: string;
   onConnected: () => Promise<T>;
 }>) {
   const { t } = useTranslation();
-  const colors = useThemeColors();
   const [connecting, setConnecting] = useState(false);
-  const { icon: Icon, label, buttonLabel, errorMessage } = PLATFORM_CONFIG[platform];
+  const { icon: Icon, actionIcon: ActionIcon, label, title, errorMessage } =
+    PLATFORM_CONFIG[platform];
 
   const connect = async () => {
     setConnecting(true);
@@ -70,21 +79,24 @@ export function ProviderConnectCard<T>({
   };
 
   return (
-    <Card className="items-center">
-      <Icon size={28} color={colors.secondaryForeground} />
-      <Text className="text-center text-sm text-muted-foreground">
-        {t('codeReviewer.providerConnect.description', { label: t(label) })}
-      </Text>
-      <Button
-        className="w-full flex-row gap-2"
-        disabled={connecting}
-        onPress={() => {
-          void connect();
-        }}
-      >
-        {connecting ? <ActivityIndicator size="small" /> : null}
-        <Text>{t(buttonLabel)}</Text>
-      </Button>
-    </Card>
+    <EmptyState
+      icon={Icon}
+      iconSize={28}
+      title={t(title)}
+      description={notice ?? t('codeReviewer.providerConnect.description', { label: t(label) })}
+      action={
+        notice ? undefined : (
+          <StateAction
+            label={t('common.connect')}
+            icon={ActionIcon}
+            loading={connecting}
+            disabled={connecting}
+            onPress={() => {
+              void connect();
+            }}
+          />
+        )
+      }
+    />
   );
 }

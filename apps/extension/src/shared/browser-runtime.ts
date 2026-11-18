@@ -609,8 +609,13 @@ export const createBrowserRuntime = ({
       return;
     }
 
-    // No group yet: this tab creates it, titled and coloured like a shared tab.
-    await groups.shareActiveTab({ sessionHandle: openerSession, tabId });
+    // No group yet: create it from the session's tabs plus this one, titled and coloured like a shared tab (D9: the group is what the agent may act on).
+    const owned = [...new Set([...groups.tabsForSession(openerSession), tabId])];
+
+    for (const ownedTab of owned) {
+      // eslint-disable-next-line no-await-in-loop -- grouping one tab per call, order matters for the first group
+      await groups.shareActiveTab({ sessionHandle: openerSession, tabId: ownedTab });
+    }
   };
 
   return {

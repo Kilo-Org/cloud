@@ -323,13 +323,24 @@ const createGroups = () => {
 };
 
 /** The first grouping attempt fails (so a share leaves no group), later ones succeed. */
-const failFirstGroupCall = (): (() => Promise<number>) => {
-  let calls = 0;
+const failFirstGroupCall = (
+  calls: { readonly groupId?: number; readonly tabIds: readonly number[] }[]
+): ((options: {
+  readonly groupId?: number;
+  readonly tabIds: readonly number[];
+}) => Promise<number>) => {
+  let attempts = 0;
 
-  return () => {
-    calls += 1;
+  return options => {
+    attempts += 1;
 
-    return calls === 1 ? Promise.reject(new Error('group failed')) : Promise.resolve(42);
+    if (attempts === 1) {
+      return Promise.reject(new Error('group failed'));
+    }
+
+    calls.push(options);
+
+    return Promise.resolve(42);
   };
 };
 
@@ -647,9 +658,10 @@ describe('agent browser calls', () => {
 
   it('creates the session group with a tab opened before any tab was shared', async () => {
     const updates: { readonly groupId: number; readonly props: Record<string, unknown> }[] = [];
+    const groupCalls: { readonly groupId?: number; readonly tabIds: readonly number[] }[] = [];
     const controller = createBrowserTabGroupController({
       api: {
-        group: failFirstGroupCall(),
+        group: failFirstGroupCall(groupCalls),
         tabQuery: async () => [{ active: true, id: TAB_ID }],
         update: async (groupId, props) => {
           updates.push({ groupId, props });
@@ -669,7 +681,8 @@ describe('agent browser calls', () => {
 
     await runtime.noteTabCreated(8, TAB_ID);
 
-    // The opened tab created the group, titled and coloured like a shared tab.
+    // The group was created from the session's own tab plus the opened one.
+    expect(groupCalls).toStrictEqual([{ tabIds: [TAB_ID] }, { groupId: 42, tabIds: [8] }]);
     expect(controller.tabsForSession('session-1')).toStrictEqual([TAB_ID, 8]);
     expect(controller.listSessions()[0]?.groupId).toBe(42);
     expect(updates).toContainEqual({ groupId: 42, props: { color: 'grey', title: 'Kilo · Work' } });

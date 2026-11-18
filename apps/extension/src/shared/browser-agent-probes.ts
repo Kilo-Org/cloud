@@ -294,6 +294,10 @@ export const SENSITIVE_TARGET_PROBE_FUNCTION = `function () {
   return JSON.stringify({ fields: fields, paymentFormSubmit: paymentFormSubmit });
 }`;
 
+const evaluatedObjectSchema = z.object({
+  result: z.object({ objectId: z.string().optional() }).optional(),
+});
+
 const resolveObjectSchema = z.object({
   object: z.object({ objectId: z.string().optional() }).optional(),
 });
@@ -326,85 +330,70 @@ const decodeSensitiveProbe = (value: unknown): BrowserSensitiveProbe => {
  * The probe's verdict on the focused element: `browser_press_key` without a
  * target still types into whatever the page has focused.
  */
-const focusedProbePayloadSchema = z.object({
-  kind: z.enum(['cross-origin', 'probe']),
-  path: z.array(z.number()).optional(),
-});
+/** Classifies an element already held as a remote object; undefined when the probe cannot run. */
+export const readSensitiveProbeForObject = async (
+  session: ProbeSession,
+  objectId: string
+): Promise<BrowserSensitiveProbe | undefined> => {
+  try {
+    const probe = await session.send('Runtime.callFunctionOn', {
+      functionDeclaration: SENSITIVE_TARGET_PROBE_FUNCTION,
+      objectId,
+      returnByValue: true,
+    });
+    const response = runtimeEvaluateSchema.safeParse(probe);
 
-export interface FocusedSensitiveProbe {
-  /** The iframe path (one index per level) when the focus chain entered a frame the page cannot read. */
-  readonly crossOriginFrame?: { readonly path: readonly number[] } | undefined;
-  readonly probe: BrowserSensitiveProbe;
-  /** True when the probe itself could not run; the caller must treat the press as sensitive. */
-  readonly unknown?: boolean | undefined;
-}
+    return response.success ? decodeSensitiveProbe(response.data.result?.value) : undefined;
+  } catch {
+    return undefined;
+  }
+};
 
-export const readSensitiveProbeForFocusedElement = async (
+/**
+ * The focused element's remote object, read in the main frame's isolated world.
+ * The walk follows same-origin documents; it stops at the first iframe it cannot
+ * read and returns that iframe element, so the caller identifies the frame from
+ * the object handle instead of a page-supplied index. `undefined` when the read
+ * itself failed, which the caller treats as sensitive.
+ */
+export const readFocusedElementObject = async (
   session: ProbeSession
-): Promise<FocusedSensitiveProbe> => {
+): Promise<string | undefined> => {
   try {
     const frameId = await mainFrameId(session);
     const contextId =
       frameId === undefined ? undefined : await frameExecutionContext(session, frameId);
 
     if (contextId === undefined) {
-      return { probe: { fields: [], paymentFormSubmit: false }, unknown: true };
+      return undefined;
     }
 
-    // Same-origin frames are followed through activeElement; a cross-origin frame's document is unreadable here, so the caller resolves that frame and fails closed.
     const expression = `(() => {
       var doc = document;
       var element = doc.activeElement;
-      var path = [];
       while (element && (element.tagName === 'IFRAME' || element.tagName === 'FRAME')) {
-        var frames = Array.prototype.slice.call(doc.querySelectorAll('iframe, frame'));
-        path.push(frames.indexOf(element));
         var child = null;
         try { child = element.contentDocument; } catch (error) { child = null; }
-        if (!child) {
-          return JSON.stringify({ kind: 'cross-origin', path: path });
-        }
+        if (!child) { return element; }
         doc = child;
         element = doc.activeElement;
       }
-      var probe = element ? (${SENSITIVE_TARGET_PROBE_FUNCTION}).call(element) : JSON.stringify({ fields: [], paymentFormSubmit: false });
-      var parsed = JSON.parse(probe);
-      return JSON.stringify({ kind: 'probe', fields: parsed.fields, paymentFormSubmit: parsed.paymentFormSubmit });
+      return element;
     })()`;
-    const response = runtimeEvaluateSchema.safeParse(
-      await session.send('Runtime.evaluate', { contextId, expression, returnByValue: true })
-    );
-    const raw = probeJsonSchema.safeParse(
-      response.success ? response.data.result?.value : undefined
+    const evaluated = evaluatedObjectSchema.safeParse(
+      await session.send('Runtime.evaluate', { contextId, expression, returnByValue: false })
     );
 
-    if (!raw.success) {
-      return { probe: { fields: [], paymentFormSubmit: false }, unknown: true };
-    }
-
-    const payload = focusedProbePayloadSchema.safeParse(JSON.parse(raw.data));
-
-    if (!payload.success) {
-      return { probe: { fields: [], paymentFormSubmit: false }, unknown: true };
-    }
-
-    if (payload.data.kind === 'cross-origin') {
-      return {
-        crossOriginFrame: { path: payload.data.path ?? [] },
-        probe: { fields: [], paymentFormSubmit: false },
-      };
-    }
-
-    return { probe: decodeSensitiveProbe(raw.data) };
+    return evaluated.success ? evaluated.data.result?.objectId : undefined;
   } catch {
-    return { probe: { fields: [], paymentFormSubmit: false }, unknown: true };
+    return undefined;
   }
 };
 
 /**
- * Reads the sensitive state of one target element. A target that no longer
- * resolves reads as an empty probe: the tool itself then reports its own
- * "no element" error, which is the accurate outcome.
+ * Reads the sensitive state of one target element. `undefined` means the probe
+ * could not resolve or classify the target; callers must treat that as a
+ * sensitive step (fail closed), never as "not sensitive".
  */
 export const readSensitiveProbeForTarget = async (
   session: ProbeSession,

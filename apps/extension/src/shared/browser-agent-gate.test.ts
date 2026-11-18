@@ -56,9 +56,8 @@ const frameTree = (mainUrl: string): Record<string, unknown> => ({
 const createSession = (
   options: {
     readonly describeNodeFails?: boolean;
-    readonly focusedProbe?: Record<string, unknown>;
-    readonly focusedProbeKind?: 'cross-origin' | 'probe';
-    readonly focusedPath?: readonly number[];
+    readonly focusedNodeName?: string;
+    readonly forbidQuerySelectorAll?: boolean;
     readonly frameOwnerFailsFor?: readonly string[];
     readonly nestedPathBackendIds?: readonly number[];
     readonly nestedFrames?: readonly {
@@ -91,7 +90,7 @@ const createSession = (
         const backendNodeId = options.nestedPathBackendIds?.[describeObjectCalls] ?? 40;
         describeObjectCalls += 1;
 
-        return { node: { backendNodeId } };
+        return { node: { backendNodeId, nodeName: options.focusedNodeName ?? 'INPUT' } };
       }
 
       const backendNodeId = params?.['backendNodeId'];
@@ -116,7 +115,13 @@ const createSession = (
           options.nestedFrames?.find(frame => frame.frameId === frameId)?.ownerBackendNodeId ?? 40,
       };
     },
-    'DOM.querySelectorAll': () => ({ nodeIds: [30] }),
+    'DOM.querySelectorAll': () => {
+      if (options.forbidQuerySelectorAll === true) {
+        throw new Error('index lookup must not identify a frame');
+      }
+
+      return { nodeIds: [30] };
+    },
     'DOM.resolveNode': params => {
       const id = params?.['backendNodeId'] ?? params?.['nodeId'];
 
@@ -169,16 +174,7 @@ const createSession = (
         },
       };
     },
-    'Runtime.evaluate': () => ({
-      result: {
-        objectId: 'obj-iframe',
-        value: JSON.stringify({
-          kind: options.focusedProbeKind ?? 'probe',
-          ...(options.focusedProbe ?? { fields: [], paymentFormSubmit: false }),
-          ...(options.focusedPath === undefined ? {} : { path: options.focusedPath }),
-        }),
-      },
-    }),
+    'Runtime.evaluate': () => ({ result: { objectId: 'obj-focused' } }),
   };
 
   return {
@@ -501,7 +497,7 @@ describe('sensitive steps', () => {
   it('probes the focused element for a press without a target', async () => {
     const result = await run({
       args: { key: 'Enter' },
-      session: createSession({ focusedProbe: passwordProbe }),
+      session: createSession({ probe: passwordProbe }),
       toolName: 'browser_press_key',
     });
 
@@ -551,7 +547,7 @@ describe('sensitive steps', () => {
   });
 
   it('fails closed when the focus chain enters a cross-origin frame', async () => {
-    const session = createSession({ focusedPath: [0], focusedProbeKind: 'cross-origin' });
+    const session = createSession({ focusedNodeName: 'IFRAME' });
     const refusedGrant = await run({
       args: { key: 'Enter' },
       authorized: [{ class: 'act', origin: 'https://app.example.com' }],
@@ -600,13 +596,13 @@ describe('sensitive steps', () => {
     });
   });
 
-  it('resolves a nested cross-origin frame from its per-level path', async () => {
+  it('names the frame from the focused element handle, not a page index', async () => {
     const result = await run({
       args: { key: 'Enter' },
       authorized: [{ class: 'act', origin: 'https://app.example.com' }],
       session: createSession({
-        focusedPath: [0, 0],
-        focusedProbeKind: 'cross-origin',
+        focusedNodeName: 'IFRAME',
+        forbidQuerySelectorAll: true,
         nestedFrames: [
           {
             frameId: 'f1',
@@ -622,7 +618,7 @@ describe('sensitive steps', () => {
             url: 'https://inner.example.org/form',
           },
         ],
-        nestedPathBackendIds: [40, 41],
+        nestedPathBackendIds: [41],
       }),
       toolName: 'browser_press_key',
     });
@@ -638,8 +634,7 @@ describe('sensitive steps', () => {
       args: { key: 'Enter' },
       authorized: [{ class: 'act', origin: 'https://app.example.com' }],
       session: createSession({
-        focusedPath: [0],
-        focusedProbeKind: 'cross-origin',
+        focusedNodeName: 'IFRAME',
         frameOwnerFailsFor: ['f1'],
         nestedFrames: [
           {

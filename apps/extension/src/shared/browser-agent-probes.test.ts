@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  readSensitiveProbeForFocusedElement,
+  readFocusedElementObject,
+  readSensitiveProbeForObject,
   readSensitiveProbeForTarget,
 } from './browser-agent-probes';
 import type { BrowserToolPageSession } from './browser-tool-snapshot';
@@ -64,22 +65,29 @@ describe('sensitive probes', () => {
     expect(resolve?.params).toMatchObject({ backendNodeId: 12, executionContextId: 9 });
   });
 
-  it('runs the focused probe in the isolated world and follows same-origin frames', async () => {
+  it('reads the focused element as a remote object in the isolated world', async () => {
     const { sends, session } = createSession({
       'Page.createIsolatedWorld': () => ({ executionContextId: 9 }),
       'Page.getFrameTree': () => ({ frameTree: { frame: { id: 'main' } } }),
-      'Runtime.evaluate': () => ({
-        result: { value: JSON.stringify({ kind: 'probe', ...JSON.parse(PROBE_PASSWORD) }) },
-      }),
+      'Runtime.evaluate': () => ({ result: { objectId: 'obj-focused' } }),
     });
 
-    await expect(readSensitiveProbeForFocusedElement(session)).resolves.toStrictEqual({
-      probe: { fields: [{ kind: 'password' }], paymentFormSubmit: false },
-    });
+    await expect(readFocusedElementObject(session)).resolves.toBe('obj-focused');
 
     const evaluate = sends.find(entry => entry.method === 'Runtime.evaluate');
 
-    expect(evaluate?.params).toMatchObject({ contextId: 9 });
+    expect(evaluate?.params).toMatchObject({ contextId: 9, returnByValue: false });
     expect(String(evaluate?.params?.['expression'])).toContain('IFRAME');
+  });
+
+  it('classifies an element object in the same isolated world', async () => {
+    const { session } = createSession({
+      'Runtime.callFunctionOn': () => ({ result: { value: PROBE_PASSWORD } }),
+    });
+
+    await expect(readSensitiveProbeForObject(session, 'obj-focused')).resolves.toStrictEqual({
+      fields: [{ kind: 'password' }],
+      paymentFormSubmit: false,
+    });
   });
 });

@@ -21,8 +21,8 @@ import type {
 import { mainFrameOf, readAgentFrameTree } from './browser-agent-frames';
 import type { BrowserAgentFrame } from './browser-agent-frames';
 import {
-  frameExecutionContext,
-  readSensitiveProbeForFocusedElement,
+  readFocusedElementObject,
+  readSensitiveProbeForObject,
   readSensitiveProbeForTarget,
   sensitiveTargetsOf,
 } from './browser-agent-probes';
@@ -166,13 +166,14 @@ const targetFrameOf = async (
 };
 
 const nodeDescriptionSchema = z.object({
-  node: z.object({ backendNodeId: z.number().optional() }).optional(),
+  node: z
+    .object({
+      backendNodeId: z.number().optional(),
+      nodeName: z.string().optional(),
+    })
+    .optional(),
 });
 const frameOwnerSchema = z.object({ backendNodeId: z.number().optional() });
-
-const evaluateObjectSchema = z.object({
-  result: z.object({ objectId: z.string().optional() }).optional(),
-});
 
 /** One frame's owner backendNodeId, or undefined when the frame's owner cannot be read. */
 const frameOwnerBackendNodeId = async (
@@ -188,88 +189,23 @@ const frameOwnerBackendNodeId = async (
   }
 };
 
-/** The iframe element at `index` in a frame's own document, as a backendNodeId. */
-const frameChildBackendNodeId = async (
-  session: GateSession,
-  frameId: string,
-  index: number
-): Promise<number | undefined> => {
-  try {
-    const contextId = await frameExecutionContext(session, frameId);
-
-    if (contextId === undefined) {
-      return undefined;
-    }
-
-    const evaluated = evaluateObjectSchema.safeParse(
-      await session.send('Runtime.evaluate', {
-        contextId,
-        expression: `document.querySelectorAll('iframe, frame')[${String(index)}] ?? null`,
-        returnByValue: false,
-      })
-    );
-    const objectId = evaluated.success ? evaluated.data.result?.objectId : undefined;
-
-    if (objectId === undefined) {
-      return undefined;
-    }
-
-    const described = nodeDescriptionSchema.safeParse(
-      await session.send('DOM.describeNode', { objectId })
-    );
-
-    return described.success ? described.data.node?.backendNodeId : undefined;
-  } catch {
-    return undefined;
-  }
-};
-
 /**
- * The origin of the iframe the focus chain entered but could not read. The page
- * reports one index per frame level; CDP walks the owner chain down from the
- * main frame, matching each level's iframe element against the frame tree. A
- * level that cannot be resolved yields the opaque origin, so the press is
- * refused rather than guessed.
+ * The origin of the frame whose owner element is this node. The handle comes from
+ * the same read that found focus, so a page mutating its DOM cannot redirect it
+ * to another frame; an unmatched frame is opaque and the others keep their origins.
  */
-const crossOriginFrameOrigin = async (
+const frameOriginForOwner = async (
   session: GateSession,
   frames: readonly BrowserAgentFrame[],
-  path: readonly number[]
+  backendNodeId: number
 ): Promise<string> => {
-  const childFrames = frames.filter(frame => frame.parentId !== undefined);
-  // Every frame's owner is read once per level; a failing owner only loses its own frame.
-  const owners = new Map(
-    await Promise.all(
-      childFrames.map(async (frame): Promise<[string, number | undefined]> => [
-        frame.id,
-        await frameOwnerBackendNodeId(session, frame.id),
-      ])
-    )
+  const children = frames.filter(frame => frame.parentId !== undefined);
+  const owners = await Promise.all(
+    children.map(child => frameOwnerBackendNodeId(session, child.id))
   );
-  let currentFrame = frames.find(frame => frame.parentId === undefined)?.id;
+  const match = children.find((_child, position) => owners[position] === backendNodeId);
 
-  for (const index of path) {
-    if (currentFrame === undefined) {
-      return OPAQUE_ORIGIN;
-    }
-
-    // eslint-disable-next-line no-await-in-loop -- each level needs the previous level's frame
-    const backendNodeId = await frameChildBackendNodeId(session, currentFrame, index);
-
-    if (backendNodeId === undefined) {
-      return OPAQUE_ORIGIN;
-    }
-
-    const match = childFrames.find(frame => owners.get(frame.id) === backendNodeId);
-
-    if (match === undefined) {
-      return OPAQUE_ORIGIN;
-    }
-
-    currentFrame = match.id;
-  }
-
-  return frames.find(frame => frame.id === currentFrame)?.origin ?? OPAQUE_ORIGIN;
+  return match?.origin ?? OPAQUE_ORIGIN;
 };
 
 /** The origin a navigate is headed for; a `browser_navigate_back` has no URL to read. */
@@ -313,25 +249,36 @@ const sensitiveStepFor = async (input: {
   const targets = sensitiveTargetsOf(input.toolName, input.args);
 
   if (input.toolName === 'browser_press_key' && targets.length === 0) {
-    // A press without an element types into whatever the page has focused.
-    const focused = await readSensitiveProbeForFocusedElement(input.session);
+    // A press without an element types into whatever the page has focused; the object handle comes from the same read, so it cannot be redirected later.
+    const objectId = await readFocusedElementObject(input.session);
 
-    if (focused.crossOriginFrame !== undefined) {
-      // An unreadable frame is assumed sensitive: its field cannot be classified.
-      const frameOrigin = await crossOriginFrameOrigin(
-        input.session,
-        input.frames,
-        focused.crossOriginFrame.path
-      );
+    if (objectId === undefined) {
+      return { origin: input.origin, reason: SENSITIVE_REASON.unknownField };
+    }
+
+    const described = nodeDescriptionSchema.safeParse(
+      await input.session.send('DOM.describeNode', { objectId })
+    );
+    const nodeName = described.success ? described.data.node?.nodeName?.toUpperCase() : undefined;
+
+    if (nodeName === 'IFRAME' || nodeName === 'FRAME') {
+      // Typing into a frame the page cannot read is assumed sensitive.
+      const backendNodeId = described.success ? described.data.node?.backendNodeId : undefined;
+      const frameOrigin =
+        backendNodeId === undefined
+          ? OPAQUE_ORIGIN
+          : await frameOriginForOwner(input.session, input.frames, backendNodeId);
 
       return { origin: frameOrigin, reason: `typing into a field inside ${frameOrigin}` };
     }
 
-    if (focused.unknown === true) {
+    const focused = await readSensitiveProbeForObject(input.session, objectId);
+
+    if (focused === undefined) {
       return { origin: input.origin, reason: SENSITIVE_REASON.unknownField };
     }
 
-    const reason = firstReasonOf(focused.probe);
+    const reason = firstReasonOf(focused);
 
     return reason === undefined ? undefined : { origin: input.origin, reason };
   }

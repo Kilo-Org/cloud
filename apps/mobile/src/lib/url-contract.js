@@ -30,8 +30,11 @@ export const URL_SCHEMES = {
  *  events.kiloapps.io, notifications.kiloapps.io), the latency ingest
  *  default committed in LATENCY_INGEST_URL_DEFAULT below, and the Kilo MCP
  *  default committed in lib/config.ts (KILO_MCP_URL_PRODUCTION).
- *  url-contract.test.ts asserts every committed default against this list, so
- *  a missing host fails the test before any build. Preflight is the runtime
+ *  url-contract.test.ts asserts the committed .env values and the latency
+ *  default through assertProductionHost directly; the MCP default has no
+ *  url-contract case — config.test.ts's production-resolution case imports
+ *  config.ts, so its module-load assertProductionHost is the check. Preflight
+ *  is the runtime
  *  safety net: the release preflight runs assertProductionHost against the
  *  real production values, so an incomplete allowlist fails preflight before
  *  any build, never at runtime in a store build. */

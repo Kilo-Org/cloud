@@ -26,6 +26,7 @@
     "creditHistory": "Tantaran'ny kredita",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Foano",
     "done": "Vita",
     "retry": "Andramo indray",
@@ -482,7 +483,14 @@
       "viewReceipt": "Jereo ny porofo"
     },
     "changelog": "Ny vaovao",
-    "changelogVersionPending": "Ny naotin'ity kinova ity dia ho avy amin'ny fanavaozana manaraka."
+    "changelogVersionPending": "Ny naotin'ny kinova {{version}} dia ho avy amin'ny fanavaozana manaraka.",
+    "changelogGroupNew": "Vaovao",
+    "changelogFixesIn": "Fanitsiana sy fanatsarana amin'ireto sehatra ireto: {{areas}}.",
+    "changelogFixesPolish": "Fanitsiana sy fanatsarana manerana ny fampiharana.",
+    "changelogAreas": {
+      "signIn": "Fidirana",
+      "profileOrganizations": "Mombamomba sy fikambanana"
+    }
   },
   "preferences": {
     "general": "Ankapobeny",
@@ -3328,6 +3336,7 @@
       "manageOnWeb": "Fikirakiran'ny faktiora amin'ny tranonkala",
       "changePlan": "Ovao ny drafitra",
       "buySeats": "Mividiana toerana",
+      "managedOnWeb": "Tantanina amin'ny tranonkala ny drafitra, ny toerana ary ny famenoana ho azy.",
       "setupAutoTopUp": "Alamino ny famenoana ho azy",
       "manageAutoTopUp": "Tantano ny famenoana ho azy",
       "opensOnWeb": "Misokatra ao amin'ny tranonkala"
@@ -3476,12 +3485,10 @@
       "requestLogs": "Rakitry ny fangatahana"
     },
     "requestLogs": {
-      "hint": "Fangatahana nandritra ny ora iray talohan'ny fiafaran'ny fe-potoana, ny vaovao indrindra aloha.",
       "older": "Ora teo aloha",
       "newer": "Ora manaraka",
       "truncated": "Mihoatra noho izay aseho ao amin'ny lisitra ny fangatahana tamin'ity ora ity.",
       "emptyTitle": "Tsy misy fangatahana",
-      "emptyDescription": "Tsy nisy fangatahana tamin'ny vavahady nandritra ity ora ity.",
       "loadError": "Tsy afaka nampiditra ny rakitry ny fangatahana.",
       "permissionDenied": "Ny tompon'ny fikambanana, ny mpitantana na ny mpitantana ny faktiora ihany no afaka mamaky ny rakitry ny fangatahana.",
       "tokens": "{{input}} miditra · {{output}} mivoaka",
@@ -4285,8 +4292,7 @@
       "repoValue": "Tahiry: {{name}}",
       "profileValue": "Mombamomba: {{name}}",
       "profileUnavailable": "Tsy misy intsony ity mombamomba ity. Misafidiana iray hafa.",
-      "pickerEmptyDescriptionOrganization": "Mamorona mombamomba momba ny fikambanana hampiasaina indray ny fari-piainan'ny tontolo iainana, baiko fanamboarana ary fahaiza-manao mandritra ny fotoam-pivoriana.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Ny tompon'ny fikambanana na ny mpandrindra dia afaka mamorona mombamomba momba ny fikambanana."
+      "pickerEmptyDescriptionOrganization": "Mamorona mombamomba momba ny fikambanana hampiasaina indray ny fari-piainan'ny tontolo iainana, baiko fanamboarana ary fahaiza-manao mandritra ny fotoam-pivoriana."
     },
     "variablesDeleteFailed": "Tsy afaka namafa ny ova",
     "deleteVariable": "Fafao miovaova {{key}}",
@@ -4472,7 +4478,6 @@
     "dismiss": "Esory ny tatitra",
     "offline": "Tsy misy tambajotra · tatitra voatahiry",
     "cached": "Tatitra voatahiry · tsy azo havaozina",
-    "window": "{{start}} – {{end}}",
     "summary": "Famintinana AI",
     "summaryPending": "Eo am-panomanana ny famintinana AI. Hiseho eto izy rehefa vita.",
     "summaryUnavailable": "Tsy misy ny famintinana AI. Mbola azo jerena ny tatitra voalamina.",
@@ -4591,6 +4596,7 @@
       "title": "Fanentanana sy fiantsoana",
       "subtitle": "Ataovy ho azy ny fanatanterahana Cloud Agent avy amin'ny fiantsoana na fandaharam-potoana.",
       "new": "Fanentanana vaovao",
+      "create": "Mamorona fanentanana",
       "emptyTitle": "Mbola tsy misy fanentanana",
       "emptyDescription": "Mamorona fanentanana hanombohana fanatanterahana Cloud Agent avy amin'ny fiantsoana na araka ny fandaharam-potoana.",
       "loadFailedTitle": "Tsy afaka nampiditra ny fanentanana",
@@ -4644,6 +4650,8 @@
       "created": "Voaforona ny fanentanana",
       "saved": "Voatahiry ny fanentanana",
       "statusArrived": "Tonga",
+      "defaultPromptWebhook": "Lazao ny votoatin'ny fangatahana avy amin'ity fiantsoana ity:\n\n{{body}}",
+      "defaultPromptScheduled": "Hazakazaho ny asa voalahatra. Natomboka tamin'ny {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Ampidiro ny anarana.",
         "nameTooShort": "Mampiasà farafahakeliny 8 tarehintsoratra.",

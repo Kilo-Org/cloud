@@ -26,6 +26,7 @@
     "creditHistory": "Hanes credydau",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Canslo",
     "done": "Gorffen",
     "retry": "Rhoi cynnig eto",
@@ -482,7 +483,14 @@
       "viewReceipt": "Gweld y dderbynneb"
     },
     "changelog": "Beth sy'n newydd",
-    "changelogVersionPending": "Daw nodiadau'r fersiwn hon gyda'r diweddariad nesaf i'r ap."
+    "changelogVersionPending": "Daw nodiadau fersiwn {{version}} gyda'r diweddariad nesaf i'r ap.",
+    "changelogGroupNew": "Newydd",
+    "changelogFixesIn": "Atgyweiriadau a gwelliannau i'r canlynol: {{areas}}.",
+    "changelogFixesPolish": "Atgyweiriadau a gwelliannau ar draws yr ap.",
+    "changelogAreas": {
+      "signIn": "Mewngofnodi",
+      "profileOrganizations": "Proffil a sefydliadau"
+    }
   },
   "preferences": {
     "general": "Cyffredinol",
@@ -3556,6 +3564,7 @@
       "manageOnWeb": "Gosodiadau bilio ar y we",
       "changePlan": "Newid cynllun",
       "buySeats": "Prynu seddau",
+      "managedOnWeb": "Caiff y cynllun, y seddau ac ail-lenwi awtomatig eu rheoli ar y we.",
       "setupAutoTopUp": "Gosod ail-lenwi awtomatig",
       "manageAutoTopUp": "Rheoli ail-lenwi awtomatig",
       "opensOnWeb": "Yn agor ar y we"
@@ -3704,12 +3713,10 @@
       "requestLogs": "Logiau ceisiadau"
     },
     "requestLogs": {
-      "hint": "Ceisiadau o'r awr cyn i'r ffenestr ddod i ben, y diweddaraf yn gyntaf.",
       "older": "Awr gynharach",
       "newer": "Awr ddiweddarach",
       "truncated": "Mae gan yr awr hon fwy o geisiadau nag y mae'r rhestr yn eu dangos.",
       "emptyTitle": "Dim ceisiadau",
-      "emptyDescription": "Does dim ceisiadau porth yn yr awr hon.",
       "loadError": "Methu llwytho logiau ceisiadau.",
       "permissionDenied": "Dim ond perchennog, gweinyddwr neu reolwr bilio sefydliad all ddarllen ei logiau ceisiadau.",
       "tokens": "{{input}} i mewn · {{output}} allan",
@@ -4549,8 +4556,7 @@
       "repoValue": "Ystorfa: {{name}}",
       "profileValue": "Proffil: {{name}}",
       "profileUnavailable": "Nid yw'r proffil hwn ar gael mwyach. Dewiswch un arall.",
-      "pickerEmptyDescriptionOrganization": "Creu proffil sefydliad i ailddefnyddio newidynnau amgylchedd, gorchmynion gosod, a sgiliau ar draws sesiynau.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Gall perchennog sefydliad neu weinyddwr greu proffil sefydliad."
+      "pickerEmptyDescriptionOrganization": "Creu proffil sefydliad i ailddefnyddio newidynnau amgylchedd, gorchmynion gosod, a sgiliau ar draws sesiynau."
     },
     "variablesDeleteFailed": "Ni fu modd dileu'r newidyn",
     "deleteVariable": "Dileu newidyn {{key}}",
@@ -4752,7 +4758,6 @@
     "dismiss": "Diystyru'r briff",
     "offline": "All-lein · briff wedi'i gadw",
     "cached": "Adroddiad wedi'i gadw · methu adnewyddu",
-    "window": "{{start}} – {{end}}",
     "summary": "Crynodeb AI",
     "summaryPending": "Mae'r crynodeb AI ar y gweill. Bydd yn ymddangos yma pan fydd yn barod.",
     "summaryUnavailable": "Crynodeb AI ddim ar gael. Mae eich adroddiad strwythuredig yn dal ar gael.",
@@ -4871,6 +4876,7 @@
       "title": "Sbardunau a bachynnau gwe",
       "subtitle": "Awtomeiddio rhediadau Cloud Agent o alwad bachyn gwe neu o atodlen.",
       "new": "Sbardun newydd",
+      "create": "Crëwch sbardun",
       "emptyTitle": "Dim sbardunau eto",
       "emptyDescription": "Crëwch sbardun i ddechrau rhediad Cloud Agent o alwad bachyn gwe neu ar atodlen.",
       "loadFailedTitle": "Methwyd llwytho sbardunau",
@@ -4924,6 +4930,8 @@
       "created": "Crëwyd sbardun",
       "saved": "Cadwyd y sbardun",
       "statusArrived": "Wedi cyrraedd",
+      "defaultPromptWebhook": "Disgrifiwch gorff y cais bachyn gwe hwn:\n\n{{body}}",
+      "defaultPromptScheduled": "Rhedwch y dasg ar atodlen. Wedi’i sbarduno am {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Rhowch enw.",
         "nameTooShort": "Defnyddiwch o leiaf 8 nod.",

@@ -32,13 +32,6 @@ export type MarkdownTextProps = {
    */
   documentDirection?: 'ltr';
   selectable?: boolean;
-  /**
-   * Body line height in the native renderer's sp units. An inline markdown
-   * link's accessible rectangle and tap region are its text line box, and the
-   * native renderer gives a span no box and no `hitSlop`, so a caller that
-   * needs a larger link target raises the line height.
-   */
-  lineHeight?: number;
   onLongPressLink?: MarkdownLinkLongPressHandler;
   /**
    * Optional tap handler invoked when a rendered link is pressed. When this
@@ -62,7 +55,6 @@ export function MarkdownText({
   variant = 'assistant',
   documentDirection,
   selectable = true,
-  lineHeight,
   onLongPressLink,
   onPressLink,
   onCopyCode,
@@ -119,7 +111,6 @@ export function MarkdownText({
             palette={palette}
             documentDirection={documentDirection}
             selectable={selectable}
-            lineHeight={lineHeight}
             onLongPressLink={onLongPressLink}
             onPressLink={onPressLink}
             onCopyCode={onCopyCode}
@@ -135,7 +126,6 @@ type MarkdownRunProps = {
   palette: MarkdownPalette;
   documentDirection?: 'ltr';
   selectable: boolean;
-  lineHeight?: number;
   onLongPressLink?: MarkdownLinkLongPressHandler;
   onPressLink?: MarkdownLinkPressHandler;
   onCopyCode?: MarkdownCopyCodeHandler;
@@ -153,7 +143,6 @@ function MarkdownRun({
   palette,
   documentDirection,
   selectable,
-  lineHeight,
   onLongPressLink,
   onPressLink,
   onCopyCode,
@@ -170,7 +159,6 @@ function MarkdownRun({
               palette={palette}
               documentDirection={documentDirection}
               selectable={selectable}
-              lineHeight={lineHeight}
               onLongPressLink={onLongPressLink}
               onPressLink={onPressLink}
               onCopyCode={onCopyCode}

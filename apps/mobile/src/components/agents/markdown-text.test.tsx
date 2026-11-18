@@ -1150,18 +1150,10 @@ describe('splitMarkdownHtmlIncremental', () => {
 });
 
 describe('MarkdownText body line height', () => {
-  const value = 'See [#10334](https://github.com/Kilo-Org/cloud/pull/10334)';
-
-  it('raises the paragraph and list body line height to the given value', async () => {
-    const renderer = await mount(<MarkdownText value={value} lineHeight={28} />);
-    const { paragraph, list } = enrichedProps(renderer).markdownStyle;
-
-    expect(paragraph.lineHeight).toBe(28);
-    expect(list.lineHeight).toBe(28);
-  });
-
-  it('keeps the 24 dp body line height without the prop', async () => {
-    const renderer = await mount(<MarkdownText value={value} />);
+  it('uses the 24 dp body line height', async () => {
+    const renderer = await mount(
+      <MarkdownText value="See [#10334](https://github.com/Kilo-Org/cloud/pull/10334)" />
+    );
     const { paragraph, list } = enrichedProps(renderer).markdownStyle;
 
     expect(paragraph.lineHeight).toBe(24);

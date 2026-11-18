@@ -3,6 +3,7 @@ import { getKiloEmbeddingModelCatalogFromDatabase } from '@kilocode/web-shared/l
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { CATALOG_CACHE_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/handlers/catalog-cache-headers';
 import {
   getEffectiveModelDecision,
   resolveOrganizationMemberModelPolicy,
@@ -45,12 +46,15 @@ export async function handleEmbeddingModelsRequest(): Promise<NextResponse> {
     const aliases = Object.fromEntries(
       Object.entries(catalog.aliases).filter(([, modelId]) => modelIds.has(modelId))
     );
-    return NextResponse.json({
-      ...catalog,
-      defaultModel: modelIds.has(catalog.defaultModel) ? catalog.defaultModel : models[0].id,
-      models,
-      aliases,
-    });
+    return NextResponse.json(
+      {
+        ...catalog,
+        defaultModel: modelIds.has(catalog.defaultModel) ? catalog.defaultModel : models[0].id,
+        models,
+        aliases,
+      },
+      { headers: CATALOG_CACHE_HEADERS.perCaller }
+    );
   }
-  return NextResponse.json(catalog);
+  return NextResponse.json(catalog, { headers: CATALOG_CACHE_HEADERS.shared });
 }

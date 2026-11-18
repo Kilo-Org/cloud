@@ -33,12 +33,6 @@ type MarkdownEnrichedProps = {
   /** Base direction of the document body; see `MarkdownTextProps`. */
   documentDirection?: 'ltr';
   selectable: boolean;
-  /**
-   * Body line height in the library's sp units. The line box is what a native
-   * inline link exposes as its tappable target, so a caller that needs a taller
-   * link target raises it here.
-   */
-  lineHeight?: number;
   onLongPressLink?: MarkdownLinkLongPressHandler;
   onPressLink?: MarkdownLinkPressHandler;
   onCopyCode?: MarkdownCopyCodeHandler;
@@ -48,11 +42,7 @@ const CODE_FONT = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
 
 const BODY_LINE_HEIGHT = 24;
 
-function enrichedStyle(
-  palette: MarkdownPalette,
-  alignBlocksWithInterface: boolean,
-  lineHeight = BODY_LINE_HEIGHT
-): MarkdownStyle {
+function enrichedStyle(palette: MarkdownPalette, alignBlocksWithInterface: boolean): MarkdownStyle {
   const { textColor, mutedTextColor, codeBackground, borderColor } = palette;
   const half = palette.codeTokenScheme === 'onLight' ? 'light' : 'dark';
   const headings = getMarkdownHeadingStyles(palette);
@@ -83,7 +73,7 @@ function enrichedStyle(
     paragraph: {
       color: textColor,
       fontSize: 16,
-      lineHeight,
+      lineHeight: BODY_LINE_HEIGHT,
       marginTop: 0,
       marginBottom: 4,
       ...blockTextAlign,
@@ -142,7 +132,7 @@ function enrichedStyle(
     list: {
       color: textColor,
       fontSize: 16,
-      lineHeight,
+      lineHeight: BODY_LINE_HEIGHT,
       markerColor: textColor,
       bulletColor: textColor,
     },
@@ -171,7 +161,6 @@ export function MarkdownEnriched({
   palette,
   documentDirection,
   selectable,
-  lineHeight,
   onLongPressLink,
   onPressLink,
   onCopyCode,
@@ -182,8 +171,8 @@ export function MarkdownEnriched({
   // alignment, so the English legal text stays left aligned in a right-to-left
   // interface; chat keeps naming the interface start edge.
   const markdownStyle = useMemo(
-    () => enrichedStyle(palette, I18nManager.isRTL && documentDirection !== 'ltr', lineHeight),
-    [palette, lineHeight, documentDirection]
+    () => enrichedStyle(palette, I18nManager.isRTL && documentDirection !== 'ltr'),
+    [palette, documentDirection]
   );
   const images = useMemo(() => findMarkdownImages(value), [value]);
   // One flag per image, so trusting a host or confirming a URI re-renders

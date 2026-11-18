@@ -1,6 +1,7 @@
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider, skipToken } from '@tanstack/react-query';
+import { TRPCClientError } from '@trpc/client';
 import { parseHTML } from 'linkedom';
 import { useWorkspaceSummaryLookup, type WorkspaceSummary } from './useWorkspaceSummaries';
 import { useWorkspaceChats } from './useWorkspaceChats';
@@ -11,7 +12,7 @@ const mockSummaries = jest.fn<Promise<{ workspaces: WorkspaceSummary[] }>, [unkn
 const mockChats = jest.fn<
   Promise<{
     chats: (ReturnType<typeof workspaceChatFixture> & { tabClosed: boolean })[];
-    nextCursor: { createdAt: string; sessionId: string } | null;
+    nextCursor: { createdAt: string; sessionId: string; tabOrderVersion?: string } | null;
   }>,
   [unknown]
 >();
@@ -246,6 +247,77 @@ it('loads open tabs immediately and only requests 20 closed tabs at a time after
       limit: 20,
       cursor,
     });
+  } finally {
+    await cleanup();
+  }
+});
+
+it('restarts closed tab paging without a cursor after CONFLICT and uses the fresh cursor', async () => {
+  const client = new QueryClient({
+    defaultOptions: { queries: { gcTime: Infinity, retry: false } },
+  });
+  const workspace = workspaceSummaryFixture();
+  const worktreeId = cloudAgentWorktreeIdSchema.parse(workspace.worktreeId);
+  const closedInput = { organizationId: null, worktreeId, tabState: 'closed', limit: 20 };
+  const oldChat = { ...workspaceChatFixture({ sessionId: 'ses_old' }), tabClosed: true };
+  const newestChat = { ...workspaceChatFixture({ sessionId: 'ses_newest' }), tabClosed: true };
+  const staleCursor = {
+    createdAt: oldChat.createdAt,
+    sessionId: oldChat.sessionId,
+    tabOrderVersion: 'a'.repeat(32),
+  };
+  const freshCursor = {
+    createdAt: newestChat.createdAt,
+    sessionId: newestChat.sessionId,
+    tabOrderVersion: 'b'.repeat(32),
+  };
+  const conflict = TRPCClientError.from({
+    error: {
+      message: 'Workspace tabs changed',
+      code: -32009,
+      data: { code: 'CONFLICT', httpStatus: 409 },
+    },
+  });
+  mockChats
+    .mockResolvedValueOnce({ chats: [], nextCursor: null })
+    .mockResolvedValueOnce({ chats: [oldChat], nextCursor: staleCursor })
+    .mockRejectedValueOnce(conflict)
+    .mockResolvedValueOnce({ chats: [newestChat], nextCursor: freshCursor })
+    .mockResolvedValueOnce({ chats: [oldChat], nextCursor: null });
+
+  let result: ReturnType<typeof useWorkspaceChats> | undefined;
+  const cleanup = await mount(client, function Probe() {
+    result = useWorkspaceChats({
+      organizationId: null,
+      worktreeId,
+      workspace,
+      currentSessionId: null,
+    });
+    return null;
+  });
+  const settle = () => act(async () => new Promise(resolve => setTimeout(resolve, 0)));
+  try {
+    await act(async () => result?.requestClosedHistory());
+    await settle();
+    expect(result?.closedPages.hasMore).toBe(true);
+
+    await act(async () => result?.closedPages.loadMore());
+    await settle();
+    expect(mockChats).toHaveBeenNthCalledWith(3, { ...closedInput, cursor: staleCursor });
+    expect(result?.closedPages.error).toBe(true);
+
+    await act(async () => result?.closedPages.loadMore());
+    await settle();
+    expect(mockChats).toHaveBeenNthCalledWith(4, { ...closedInput, cursor: undefined });
+    expect(result?.closedPages.error).toBe(false);
+    expect(result?.closedChats.map(chat => chat.sessionId)).toEqual(['ses_newest']);
+
+    await act(async () => result?.closedPages.loadMore());
+    await settle();
+    expect(mockChats).toHaveBeenNthCalledWith(5, { ...closedInput, cursor: freshCursor });
+    expect(mockChats).toHaveBeenCalledTimes(5);
+    expect(result?.closedChats.map(chat => chat.sessionId)).toEqual(['ses_newest', 'ses_old']);
+    expect(result?.closedPages.hasMore).toBe(false);
   } finally {
     await cleanup();
   }

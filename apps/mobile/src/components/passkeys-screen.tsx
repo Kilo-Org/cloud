@@ -137,13 +137,10 @@ export function PasskeysScreen() {
     });
   };
 
-  // The control is full width in every state, in its own footer slot. Its
-  // label's box takes the row's remaining width, so the one line the platform
-  // lays out always has room to spare: a label sized to its own content
-  // measured at its longest word's width and wrapped onto a second line the
-  // button's min height then clipped (e4/p3 spot check: "Add a / passkey" in a
-  // full-width button). The label's right margin mirrors the glyph and its row
-  // gap, which keeps the centred label on the button's own centre.
+  // The control is full width in every state, in its own footer slot. The
+  // glyph and the label are centred as one group: the label keeps its own
+  // width (and truncates rather than wrapping) so it never stretches the row
+  // and pushes the glyph to the start edge.
   const addControl = management.canCreatePasskeys ? (
     <Button
       variant="outline"
@@ -155,7 +152,9 @@ export function PasskeysScreen() {
       onPress={management.handleAddPasskey}
     >
       <Plus size={16} color={colors.foreground} />
-      <Text className="flex-1 text-center">{t('profile.addPasskey')}</Text>
+      <Text className="shrink text-center" numberOfLines={1}>
+        {t('profile.addPasskey')}
+      </Text>
     </Button>
   ) : null;
 

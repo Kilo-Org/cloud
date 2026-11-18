@@ -26,7 +26,7 @@ Private clone, push and model facade behavior require the full provider mileston
 The forced-proxy archive test used incompressible payloads in uncompressed tar files:
 
 | Payload | Upload | Download | Extract | Integrity |
-| --- | --- | --- | --- | --- |
+|---|---|---|---|---|
 | 1 GB | 11.164 s | 10.023 s | 0.633 s | SHA256 matched |
 | 5 GB | 44.432 s | 55.971 s | 4.779 s | SHA256 matched |
 

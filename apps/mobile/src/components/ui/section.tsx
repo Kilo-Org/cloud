@@ -17,7 +17,6 @@ type SectionProps = {
   /** Keeps the action visible and inert, with the disabled read and state. */
   actionDisabled?: boolean;
   notice?: ReactNode;
-  reserveLabelAir?: boolean;
   /** The section sits in a full-bleed list, so its label draws the page gutter. */
   inset?: boolean;
   className?: string;
@@ -34,7 +33,6 @@ export function Section({
   actionHidden,
   actionDisabled,
   notice,
-  reserveLabelAir,
   inset,
   className,
   children,
@@ -51,7 +49,6 @@ export function Section({
           actionHidden={actionHidden}
           actionDisabled={actionDisabled}
           notice={notice}
-          reserveLabelAir={reserveLabelAir}
           inset={inset}
         />
       )}

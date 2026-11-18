@@ -57,7 +57,7 @@ export function ProductChoices({ organizationId, contextReady }: Readonly<Produc
   ];
 
   return (
-    <Section label={t('home.explore')} reserveLabelAir>
+    <Section label={t('home.explore')}>
       <RowGroup leadingTile>{rows}</RowGroup>
     </Section>
   );

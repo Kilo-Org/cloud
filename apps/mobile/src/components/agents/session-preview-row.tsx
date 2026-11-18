@@ -249,7 +249,6 @@ function SessionPreviewSheet({
             // of removing it, so the label row never reflows mid-open.
             actionDisabled={openingPort !== null}
             actionTestID="session-preview-refresh"
-            reserveLabelAir
           />
           <View className="pt-2">{body}</View>
         </View>

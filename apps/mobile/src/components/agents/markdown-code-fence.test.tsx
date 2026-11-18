@@ -8,7 +8,6 @@ import {
   SECTION_ACTION_FRAME_DP,
   SECTION_ACTION_HIT_SLOP,
   SECTION_ACTION_HIT_SLOP_DP,
-  SECTION_HEADER_ROW_PADDING_CLASS,
   tapTargetReachDp,
   TOUCH_TARGET_DP,
 } from '@/lib/a11y/tap-target';
@@ -129,13 +128,11 @@ describe('MarkdownCodeFence', () => {
     expect(mocks.performCopy).toHaveBeenCalledWith(LONG_LINE);
   });
 
-  it('reaches the copy target through a slop its own row reserves', async () => {
+  it('reaches the copy target through the shared compact box', async () => {
     const renderer = await mount(fence());
 
-    // The control keeps a compact box and the row reserves its hit slop as
-    // padding, so the whole touch target lies inside the row that delivers it.
-    // A row that clipped the slop would deliver only the box, which is why the
-    // row's own padding is part of the assertion.
+    // The control keeps the section header's compact box: the box is never
+    // larger than one text line, and the fence header stays one line tall.
     const button = hostProps(renderer, 'Pressable');
     for (const token of SECTION_ACTION_BOX_CLASS.split(' ')) {
       expect(String(button.className)).toContain(token);
@@ -145,9 +142,7 @@ describe('MarkdownCodeFence', () => {
     const rowClasses = renderer.root
       .findAllByType('View' as unknown as React.ComponentType<unknown>)
       .map(node => String(node.props.className));
-    expect(rowClasses.some(className => className.includes(SECTION_HEADER_ROW_PADDING_CLASS))).toBe(
-      true
-    );
+    expect(rowClasses.some(className => className.split(' ').includes('py-2'))).toBe(true);
     expect(
       tapTargetReachDp(SECTION_ACTION_FRAME_DP, SECTION_ACTION_HIT_SLOP_DP)
     ).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);

@@ -63,7 +63,6 @@ export function DesignSystemFixture() {
           actionLabel="Action"
           actionTestID="fixture-section-action"
           onActionPress={() => undefined}
-          reserveLabelAir
         >
           <Card>
             <Text>Card: one surface, inner gap, never nested.</Text>
@@ -298,7 +297,6 @@ export function DesignSystemFixture() {
         </Section>
 
         <Section label="Loading header">
-          <SectionHeaderSkeleton action reserveLabelAir />
           <SectionHeaderSkeleton action />
         </Section>
 

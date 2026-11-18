@@ -4937,6 +4937,8 @@
     "modelsDescription": "Desactiva un model per bloquejar-lo per a tots els membres. Els models dels proveïdors permesos estan activats d'entrada.",
     "modelsDeniedOnly": "Només denegats",
     "modelsEmpty": "Cap model coincideix amb aquesta cerca.",
+    "modelsDeniedEmpty": "Cap model està denegat.",
+    "modelsDeniedSearchEmpty": "Cap model denegat coincideix amb aquesta cerca.",
     "providersDescription": "Desactiva un proveïdor perquè Kilo hi deixi d'encaminar sol·licituds en aquesta organització.",
     "providersNeedCatalog": "Els interruptors dels proveïdors són de només lectura fins que es carregui el catàleg complet de models. Toca Torna-ho a provar a dalt per editar-los.",
     "providersEmpty": "Cap proveïdor coincideix amb aquesta cerca.",

@@ -12,6 +12,7 @@ if (
   throw new Error('Usage: node scripts/prepare-kilo2-local.mjs <organization-uuid>');
 const config = parse(await fs.readFile(path.join(root, 'wrangler.jsonc'), 'utf8'));
 config.env.dev.vars.RUNTIME_KILO2_ORG_IDS = orgId;
+config.env.dev.vars.RUNTIME_KILO2_ALL_SESSION_ORG_IDS = orgId;
 await fs.writeFile(
   path.join(root, 'wrangler.kilo2-local.json'),
   JSON.stringify(config, null, 2) + '\n'

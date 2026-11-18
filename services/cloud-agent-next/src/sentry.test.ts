@@ -67,6 +67,23 @@ describe('Cloud Agent exception policy', () => {
     expect(shouldCaptureCloudAgentException(new TypeError('Unexpected bug'))).toBe(true);
   });
 
+  it('does not report a lost client or Durable Object connection', () => {
+    expect(shouldCaptureCloudAgentException(new Error('Network connection lost.'))).toBe(false);
+  });
+
+  it('still reports server faults that resemble a connection loss', () => {
+    expect(shouldCaptureCloudAgentException(new Error('Network connection lost'))).toBe(true);
+    expect(shouldCaptureCloudAgentException(new Error('Network connection lost. Details'))).toBe(
+      true
+    );
+    expect(
+      shouldCaptureCloudAgentException(
+        new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Network connection lost.' })
+      )
+    ).toBe(true);
+    expect(shouldCaptureCloudAgentException(new HTTPException(500))).toBe(true);
+  });
+
   it('disables reporting when configuration is missing or malformed', () => {
     expect(cloudAgentSentryOptions({})).toMatchObject({ enabled: false, dsn: '' });
     expect(cloudAgentSentryOptions({ CLOUD_AGENT_SENTRY_DSN: 'not-a-dsn' })).toMatchObject({
@@ -318,6 +335,29 @@ describe('Cloud Agent Worker SDK capture', () => {
     expect(JSON.stringify(events)).not.toContain('private-');
     expect(JSON.stringify(events)).not.toContain('203.0.113.14');
   });
+
+  it.each([
+    ['Network connection lost.', 0],
+    ['Internal defect', 1],
+  ] as const)(
+    'sends %j through the handled and unhandled capture paths only for a server fault',
+    async (message, expectedEvents) => {
+      const { events, options } = memoryOptions();
+      const error = new Error(message);
+      const worker = Sentry.withSentry((_env: Env) => options, {
+        async fetch(_request: Request, _env: Env, _ctx: ExecutionContext) {
+          captureCloudAgentException(error, { operation: 'http' });
+          throw error;
+        },
+      });
+      const { ctx, pending } = executionContext();
+      await expect(
+        worker.fetch(new Request('https://worker.example/trpc/send'), telemetryEnv as Env, ctx)
+      ).rejects.toThrow(message);
+      await Promise.all(pending);
+      expect(events).toHaveLength(expectedEvents);
+    }
+  );
 
   it('captures handled internal failures once and excludes expected tRPC failures', async () => {
     const { events, options } = memoryOptions();

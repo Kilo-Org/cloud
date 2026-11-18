@@ -4866,6 +4866,8 @@
     "modelsDescription": "Kashe samfuri don toshe shi ga kowane memba. Samfura daga masu bayarwa da aka ba izini suna farawa a kunne.",
     "modelsDeniedOnly": "Waɗanda aka hana kawai",
     "modelsEmpty": "Babu samfuran da suka dace da wannan bincike.",
+    "modelsDeniedEmpty": "Babu samfuri da aka hana.",
+    "modelsDeniedSearchEmpty": "Babu samfuran da aka hana da suka dace da wannan bincike.",
     "providersDescription": "Kashe mai bayarwa don hana Kilo tura buƙatu zuwa gare shi ga wannan ƙungiya.",
     "providersNeedCatalog": "Maɓallan masu bayarwa za su kasance na karatu kawai har sai cikakken kundin samfura ya loda. Danna Sake gwadawa a sama don gyara su.",
     "providersEmpty": "Babu masu bayarwa da suka dace da wannan bincike.",

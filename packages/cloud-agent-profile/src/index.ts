@@ -257,6 +257,12 @@ export {
   type ModelContextLimits,
 } from './model-context-limits';
 export { getModelContextLimits, setModelContextLimits } from './model-context-limits-service';
+export {
+  getWebSearchPreference,
+  setWebSearchPreference,
+  webSearchPreferenceSchema,
+  type WebSearchPreference,
+} from './web-search-settings-service';
 
 // Local config import (preview diff + selective upsert)
 export {

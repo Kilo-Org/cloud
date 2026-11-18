@@ -20,6 +20,18 @@ function isLegalDocumentName(value: string): value is LegalDocumentName {
   return value === 'terms' || value === 'privacy';
 }
 
+// The mobile reader renders the document title in its own header, so the served
+// body starts after the source page's title heading. The web fallback pages keep
+// their H1; only this API response drops it. A document that does not open with
+// an H1 element is served unchanged.
+const LEADING_TITLE_HEADING = /^\s*<h1\b[^>]*>[\s\S]*?<\/h1>/i;
+
+export function stripLeadingTitleHeading(html: string): string {
+  // Non-greedy is safe: sanitize-html escapes `<` in text and attribute values,
+  // so `</h1>` cannot occur inside the element and the first one closes it.
+  return html.replace(LEADING_TITLE_HEADING, '');
+}
+
 export const GET = withRestTiming(
   '/api/legal',
   async (_request: Request, context?: { params: Promise<{ document: string }> }) => {
@@ -30,8 +42,9 @@ export const GET = withRestTiming(
     }
 
     try {
+      const html = await LEGAL_DOCUMENTS[document]();
       return NextResponse.json(
-        { html: await LEGAL_DOCUMENTS[document]() },
+        { html: stripLeadingTitleHeading(html) },
         { headers: { 'Cache-Control': 'public, max-age=300' } }
       );
     } catch (error) {

@@ -4866,6 +4866,8 @@
     "modelsDescription": "Vonoy ny modely iray mba hanakanana azy ho an'ny mpikambana rehetra. Ny modely avy amin'ny mpamatsy avela dia mandeha avy hatrany.",
     "modelsDeniedOnly": "Nolavina fotsiny",
     "modelsEmpty": "Tsy misy modely mifanaraka amin'ity fikarohana ity.",
+    "modelsDeniedEmpty": "Tsy misy modely nolavina.",
+    "modelsDeniedSearchEmpty": "Tsy misy modely nolavina mifanaraka amin'ity fikarohana ity.",
     "providersDescription": "Vonoy ny mpamatsy iray mba hampitsahatra ny fandefasan'ny Kilo ny fangatahana ho azy ho an'ity fikambanana ity.",
     "providersNeedCatalog": "Tsy azo ovaina ny bokotra famonoana sy fandrehitra ny mpamatsy mandra-pahavitan'ny fampidirana ny katalaogin'ny modely feno. Tsindrio ny Andramo indray etsy ambony mba hanovana azy ireo.",
     "providersEmpty": "Tsy misy mpamatsy mifanaraka amin'ity fikarohana ity.",

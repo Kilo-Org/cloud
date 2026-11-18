@@ -4866,6 +4866,8 @@
     "modelsDescription": "Turn a model off to block it for every member. Models from allowed providers are on by default.",
     "modelsDeniedOnly": "Denied only",
     "modelsEmpty": "No models match this search.",
+    "modelsDeniedEmpty": "No model is denied.",
+    "modelsDeniedSearchEmpty": "No denied model matches this search.",
     "providersDescription": "Turn a provider off to stop Kilo routing to it for this organization.",
     "providersNeedCatalog": "Provider switches stay read-only until the full model catalog loads. Retry above to edit them.",
     "providersEmpty": "No providers match this search.",

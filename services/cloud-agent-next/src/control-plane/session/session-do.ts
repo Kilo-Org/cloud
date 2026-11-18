@@ -60,6 +60,7 @@ import {
   issuePersistedRuntimeProxyGrant,
   resolvePersistedRuntimeProxyCredential,
 } from '../../runtime-credential-proxy-rpc.js';
+import { classifyRuntimeProxyFenceError, readRuntimeProxyFence } from './runtime-proxy-fence.js';
 import type { ScopeHandleResolution } from '../sandbox/accepted-handles.js';
 import {
   getRuntimeAuthorizationRecoveryState as readRuntimeAuthorizationRecoveryState,
@@ -1698,28 +1699,28 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           const sandboxId = metadata?.workspace?.sandboxId;
           const directory = this.registration?.spec.directory ?? metadata?.workspace?.workspacePath;
           if (!metadata || !kiloSessionId || !sandboxId || !directory) return null;
-          const peer = this.sandboxPeerFor(sandboxId);
-          if (peer === null) {
-            localScopeView = undefined;
-            return null;
-          }
-          const resolution = await peer.getRuntimeCredentialProxyFence({
-            ownerId: metadata.identity.userId,
-            sessionId: metadata.identity.sessionId,
-            kiloSessionId,
-            directory,
-            handle,
+          const result = await readRuntimeProxyFence({
+            getPeer: () => this.sandboxPeerFor(sandboxId),
+            request: {
+              ownerId: metadata.identity.userId,
+              sessionId: metadata.identity.sessionId,
+              kiloSessionId,
+              directory,
+              handle,
+            },
+            correlation: { sessionId: metadata.identity.sessionId, kiloSessionId, sandboxId },
           });
-          if (resolution?.scopeViewUnavailable !== undefined) {
-            localScopeView = undefined;
-            throw new Error(resolution.scopeViewUnavailable);
-          }
-          localScopeView = resolution?.scopeView;
-          return resolution;
+          localScopeView = result?.scopeView;
+          return result?.fence ?? null;
         },
         token: (secret, beforeRenew) => this.getStoredRuntimeToken(secret, beforeRenew),
       });
     } catch (error) {
+      const fenceOutcome = classifyRuntimeProxyFenceError(error);
+      // A stale accepted handle is a 401 denial; never serve the scope view or
+      // fall back. A fence transport failure rethrows the retryable 503.
+      if (fenceOutcome === 'deny') return null;
+      if (fenceOutcome === 'retry') throw error;
       // A revoked/expired authorization threw. Fall through to scope resolution
       // so a surviving member can still serve; if none can, the original outcome
       // (a 503) is preserved below.

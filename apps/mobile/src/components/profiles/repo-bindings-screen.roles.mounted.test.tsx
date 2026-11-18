@@ -2,6 +2,7 @@
 // so the screen offers Add and per-row Unbind only to a caller it would accept
 // them from, and a member reads the sentence that names who may act. A role
 // still resolving claims neither.
+import { createElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
@@ -92,12 +93,14 @@ vi.mock('@/components/agents/session-page-sheet', () => ({
   SessionPageSheet: 'SessionPageSheet',
 }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/screen-header', () => ({
+  ScreenHeader: ({ headerRight }: { headerRight?: ReactNode }) =>
+    createElement('ScreenHeader', null, headerRight),
+}));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/empty-state', () => ({
   EmptyState: 'EmptyState',
-  StateAction: 'StateAction',
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
@@ -169,7 +172,9 @@ describe('RepoBindingsScreen roles', () => {
   it('allowed: offers Add and per-row Unbind, and Add opens the form', async () => {
     const { renderer, unmount } = await mountScreen('org-1');
 
-    expect(buttonLabels(renderer.root)).toContain(ADD_LABEL);
+    // The header's `+` is the screen's one create control.
+    expect(pressableLabels(renderer.root)).toContain(ADD_LABEL);
+    expect(buttonLabels(renderer.root)).not.toContain(ADD_LABEL);
     expect(pressableLabels(renderer.root)).toContain('Unbind acme/api');
     expect(textContents(renderer.root)).not.toContain(ROLE_SENTENCE);
 
@@ -184,7 +189,7 @@ describe('RepoBindingsScreen roles', () => {
 
     const { renderer, unmount } = await mountScreen('org-1');
 
-    expect(buttonLabels(renderer.root)).not.toContain(ADD_LABEL);
+    expect(pressableLabels(renderer.root)).not.toContain(ADD_LABEL);
     expect(pressableLabels(renderer.root)).not.toContain('Unbind acme/api');
     expect(textContents(renderer.root)).not.toContain(ROLE_SENTENCE);
     expect(textContents(renderer.root)).toContain('acme/api');
@@ -198,7 +203,7 @@ describe('RepoBindingsScreen roles', () => {
 
     const { renderer, unmount } = await mountScreen('org-1');
 
-    expect(buttonLabels(renderer.root)).not.toContain(ADD_LABEL);
+    expect(pressableLabels(renderer.root)).not.toContain(ADD_LABEL);
     expect(pressableLabels(renderer.root)).not.toContain('Unbind acme/api');
     expect(textContents(renderer.root).filter(text => text === ROLE_SENTENCE)).toHaveLength(1);
 
@@ -215,7 +220,7 @@ describe('RepoBindingsScreen roles', () => {
     // names the withheld action nowhere else.
     expect(findOne(renderer.root, 'EmptyState').props.description).toBe(ROLE_SENTENCE);
     expect(textContents(renderer.root).filter(text => text === ROLE_SENTENCE)).toHaveLength(0);
-    expect(buttonLabels(renderer.root)).not.toContain(ADD_LABEL);
+    expect(pressableLabels(renderer.root)).not.toContain(ADD_LABEL);
     expect(
       pressableLabels(renderer.root).filter(label => label.startsWith('Unbind '))
     ).toHaveLength(0);
@@ -226,7 +231,7 @@ describe('RepoBindingsScreen roles', () => {
   it('personal scope: keeps Add and per-row Unbind', async () => {
     const { renderer, unmount } = await mountScreen();
 
-    expect(buttonLabels(renderer.root)).toContain(ADD_LABEL);
+    expect(pressableLabels(renderer.root)).toContain(ADD_LABEL);
     expect(pressableLabels(renderer.root)).toContain('Unbind acme/api');
 
     unmount();
@@ -245,7 +250,7 @@ describe('RepoBindingsScreen roles', () => {
 
     expect(pressableLabels(renderer.root)).not.toContain('Select repository…');
     expect(textContents(renderer.root).filter(text => text === ROLE_SENTENCE)).toHaveLength(1);
-    expect(buttonLabels(renderer.root)).not.toContain(ADD_LABEL);
+    expect(pressableLabels(renderer.root)).not.toContain(ADD_LABEL);
 
     permissionState.permission = 'allowed';
     act(() => {
@@ -253,7 +258,7 @@ describe('RepoBindingsScreen roles', () => {
     });
 
     // A permission that allows the flow again opens it from the start.
-    expect(buttonLabels(renderer.root)).toContain(ADD_LABEL);
+    expect(pressableLabels(renderer.root)).toContain(ADD_LABEL);
     expect(pressableLabels(renderer.root)).not.toContain('Select repository…');
 
     unmount();

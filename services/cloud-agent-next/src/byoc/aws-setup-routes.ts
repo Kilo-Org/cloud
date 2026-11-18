@@ -1,6 +1,7 @@
 import type { Context, Hono } from 'hono';
 import { awsSetupRequestSchema } from '@kilocode/worker-utils/aws-onboarding-api';
 import type { HonoContext } from '../hono-context.js';
+import { logger } from '../logger.js';
 import { readBoundedBody } from '../utils/read-bounded-body.js';
 import { awsSetupEnrollment, createAwsSetupIntent } from './aws-setup-intent.js';
 import { createAwsSetupService } from './aws-setup-service.js';
@@ -46,11 +47,16 @@ export function registerAwsSetupRoutes(
           return c.json({ verified: true });
       }
     } catch (error) {
-      // AWS and encryption errors can include sensitive request data. Return only fixed codes.
-      return c.json(
-        { error: error instanceof AwsSetupError ? error.code : 'byoc_aws_setup_unavailable' },
-        422
-      );
+      // AWS and encryption errors can include sensitive request data. Record and return only fixed codes.
+      const code = error instanceof AwsSetupError ? error.code : 'byoc_aws_setup_unavailable';
+      logger
+        .withFields({
+          action: input.action,
+          code,
+          errorName: error instanceof Error ? error.name : 'unknown',
+        })
+        .warn('AWS setup request failed');
+      return c.json({ error: code }, 422);
     }
   });
 }

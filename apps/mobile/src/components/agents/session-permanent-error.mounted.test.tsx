@@ -12,6 +12,9 @@ const router = vi.hoisted(() => ({ dismissTo: vi.fn() }));
 
 vi.mock('expo-router', () => ({ useRouter: () => router }));
 vi.mock('./restored-route-fallback', () => ({ RestoredRouteFallback: 'RestoredRouteFallback' }));
+vi.mock('@/components/ui/directional-icons', () => ({
+  DirectionalArrowLeft: 'DirectionalArrowLeft',
+}));
 vi.mock('@/components/empty-state', () => ({ StateAction: 'StateAction' }));
 // The body of the shared state is another suite's; this one reads the state it
 // asks for, so the stub forwards the recovery slot it was handed.

@@ -114,14 +114,6 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   // `optionalIsPending` owns the rule (its doc carries the reasoning and the
   // cases).
   const optionalControlPending = optionalIsPending(userId !== undefined, storedLoad);
-  // The status slot renders only when the reserved line has content: with no
-  // line the `min-h-5` reserve plus its two gap edges would separate the
-  // privacy disclosure from the actions by three gaps instead of one (see
-  // the slot comment below the disclosure).
-  const statusLineVisible =
-    storedLoad.status === 'loading' ||
-    storedLoad.status === 'failed' ||
-    error !== null;
 
   return (
     <View className="flex-1 bg-background" style={rootStyle}>
@@ -211,33 +203,36 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
             footer draws over the scroll tail, so a content-placed error was
             invisible behind the buttons (b911 vr2 device repro — staging
             error measured at y=792 under the Back/Revoke footer). The
-            one-line slot is always reserved, so an error appears without
-            moving the actions. The privacy disclosure is pinned here too,
-            because at the foot of the scrolling body the footer edge cut the
-            sentence in half. Its font scale is capped so the pinned height
-            stays bounded (see CONSENT_DISCLOSURE_MAX_FONT_SCALE). The policy
-            link's 28dp box overflows its 17.5dp line by 5.25dp, which stays
-            inside this footer's `pt-3` top padding rather than reaching the
-            scroll region above it. */}
+            one-line slot below is always reserved, so an error appears
+            without moving the actions. The privacy disclosure is pinned here
+            too, because at the foot of the scrolling body the footer edge
+            cut the sentence in half. Its font scale is capped so the pinned
+            height stays bounded (see CONSENT_DISCLOSURE_MAX_FONT_SCALE). The
+            policy link's 28dp box overflows its 17.5dp line by 5.25dp, which
+            stays inside this footer's `pt-3` top padding rather than
+            reaching the scroll region above it. */}
         <ConsentPolicySentence
           prefix={t('consent.privacyPolicyPrefix')}
           linkLabel={t('consent.privacyPolicy')}
           maxFontSizeMultiplier={CONSENT_DISCLOSURE_MAX_FONT_SCALE}
           onOpenPolicy={handleOpenPrivacy}
         />
-        {/* The slot's View must not mount while it has no line to show: a
-            `min-h-5` View with a null child still occupies its reserve and
-            its two gap edges, which measured 44dp between the privacy line
-            and the Accept button and left the line floating between the
-            divider and the actions. The reserved height only matters when a
-            status renders, so the reserve stays on the mounted branch — an
-            appearing status line keeps the actions still — and the unmounted
-            branch collapses to a single 12dp gap on each side. */}
-        {statusLineVisible ? (
-          <View className="min-h-5 justify-center">
-            <ConsentLoadStatusLine load={storedLoad} error={error} onRetry={retryStoredLoad} t={t} />
-          </View>
-        ) : null}
+        {/* The reserved status slot keeps its one-line height whether or not
+            a line shows (see the footer comment above): the space is there
+            so an appearing status replaces blank space instead of pushing
+            the buttons down, the same reserve the other status slots use
+            (`min-h-5` on the credits expiry line, the guardrails and
+            spend-alerts save status, and the live tab's refresh line). The
+            reserve is what previously held the line apart from the actions
+            it qualifies — an empty 20dp spacer with two gap edges put 44dp
+            between the disclosure and the Accept button — so the reserve is
+            folded into the button spacing instead of a separate spacer row:
+            the line centers over the space the layout already gives it, and
+            the divider-to-line and line-to-button distances stay equal
+            whether the line shows or not. */}
+        <View className="min-h-5 justify-center">
+          <ConsentLoadStatusLine load={storedLoad} error={error} onRetry={retryStoredLoad} t={t} />
+        </View>
         <Button
           onPress={() => {
             void handlePrimaryAction();

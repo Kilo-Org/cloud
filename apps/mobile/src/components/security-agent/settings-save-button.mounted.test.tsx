@@ -352,8 +352,12 @@ describe('SettingsSaveButton current save', () => {
   });
 
   it('admits a retry after the first save settled', async () => {
-    const refused = vi.fn<() => Promise<void>>().mockRejectedValue(new Error('refused'));
-    const { element } = mountThroughRealFeedback(refused);
+    // The save implementation swaps behind one mock while the harness stays
+    // mounted, so the retry runs against the SAME `useSurfaceFeedback` store
+    // the refused save used — a remount would mint a fresh store and prove
+    // nothing about `run` releasing the first attempt.
+    const saveImpl = vi.fn<() => Promise<void>>().mockRejectedValue(new Error('refused'));
+    const { element, onSave } = mountThroughRealFeedback(saveImpl);
     const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
     act(() => {
       ref.current = TestRenderer.create(element);
@@ -369,15 +373,13 @@ describe('SettingsSaveButton current save', () => {
     await flushSave();
     await flushSave();
     await flushSave();
-    expect(refused).toHaveBeenCalledOnce();
+    expect(onSave).toHaveBeenCalledOnce();
     expect(routerState.back).not.toHaveBeenCalled();
 
-    // The retry is a second instance of the same save: it must be admitted.
+    // The retry is a second instance of the same save on the same store: it
+    // must be admitted.
     const retry = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
-    const retryMount = mountThroughRealFeedback(retry);
-    act(() => {
-      renderer.update(retryMount.element);
-    });
+    saveImpl.mockImplementation(retry);
     pressSave(renderer);
     await flushSave();
 

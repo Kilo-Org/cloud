@@ -239,6 +239,9 @@ vi.mock('expo-secure-store', () => ({
   setItemAsync: vi.fn(async (key: string, value: string) => {
     store.set(key, value);
   }),
+  deleteItemAsync: vi.fn(async (key: string) => {
+    store.delete(key);
+  }),
 }));
 
 vi.mock('expo-crypto', () => ({
@@ -272,7 +275,7 @@ vi.mock('@sentry/react-native', () => ({
 /* eslint-disable import/first */
 import * as SecureStore from 'expo-secure-store';
 import * as SQLite from 'expo-sqlite';
-import { PERSIST_DB_KEY } from '@/lib/storage-keys';
+import { PERSIST_DB_KEY, PERSIST_MIGRATION_FAILURES_KEY } from '@/lib/storage-keys';
 import { ProtectedDataUnavailableError, setProtectedDataAvailable } from '@/lib/protected-data';
 import {
   clearScope,
@@ -875,6 +878,9 @@ describe('migration failure keeps the database', () => {
     expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
     expect(Crypto.getRandomBytesAsync).toHaveBeenCalledTimes(1);
     expect(store.get(PERSIST_DB_KEY)).toBe(storedKey);
+    // A lock is transient, so it never spends one of the bounded recovery
+    // attempts: the counter item is untouched.
+    expect(store.get(PERSIST_MIGRATION_FAILURES_KEY)).toBeUndefined();
     expect(Sentry.captureException).toHaveBeenCalledTimes(1);
     expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
       level: 'warning',
@@ -895,6 +901,96 @@ describe('migration failure keeps the database', () => {
       level: 'error',
       tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'migration' },
     });
+  });
+
+  it('consecutive_migration_failures_fall_back_to_the_reset_recovery', async () => {
+    // A healthy launch opens and writes.
+    await setItem('draft:u1', 'k', 'v');
+    const storedKey = store.get(PERSIST_DB_KEY);
+    expect(storedKey).toBeDefined();
+    const openCalls = vi.mocked(SQLite.openDatabaseSync).mock.calls.length;
+
+    // Three launches whose migration fails the same non-transient way. The
+    // file keeps until the threshold; each `resetEncryptedKvOpenForTests`
+    // models a relaunch, so every launch starts from the stored count.
+    failNextMigration = true;
+    resetEncryptedKvOpenForTests();
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('migration failed: disk I/O error');
+    expect(vi.mocked(SQLite.openDatabaseSync).mock.calls.length).toBe(openCalls + 1);
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(store.get(PERSIST_MIGRATION_FAILURES_KEY)).toBe('1');
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      level: 'error',
+      tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'migration' },
+    });
+
+    failNextMigration = true;
+    resetEncryptedKvOpenForTests();
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('migration failed: disk I/O error');
+    expect(vi.mocked(SQLite.openDatabaseSync).mock.calls.length).toBe(openCalls + 2);
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(store.get(PERSIST_MIGRATION_FAILURES_KEY)).toBe('2');
+    expect(store.get(PERSIST_DB_KEY)).toBe(storedKey);
+
+    // Each failed launch files its own migration report; drop those so the
+    // reset launch below is judged on its own captures.
+    vi.mocked(Sentry.captureException).mockClear();
+
+    // The third consecutive failure reaches the threshold: delete-and-recreate.
+    // The recovery opens a fresh empty file, so this call resolves — a null
+    // read from the recreated store — instead of rejecting.
+    failNextMigration = true;
+    resetEncryptedKvOpenForTests();
+    await expect(getItem('draft:u1', 'k')).resolves.toBeNull();
+    expect(vi.mocked(SQLite.openDatabaseSync).mock.calls.length).toBe(openCalls + 4);
+    expect(SQLite.deleteDatabaseAsync).toHaveBeenCalledWith('kilo-persist.db');
+    expect(Crypto.getRandomBytesAsync).toHaveBeenCalledTimes(2);
+    expect(store.get(PERSIST_DB_KEY)).toMatch(/^02[0-9a-f]{62}$/);
+    expect(store.get(PERSIST_MIGRATION_FAILURES_KEY)).toBeUndefined();
+    // One report for the whole launch: the reset. No further migration
+    // capture for the same failure, and no capture for the clean reopen.
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      level: 'warning',
+      tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'reset' },
+    });
+
+    // The reset wiped the recreated file, so this write lands on empty rows.
+    // It also proves the fresh file serves reads: the pre-failure value is
+    // gone with the file it lived in.
+    failNextMigration = false;
+    resetEncryptedKvOpenForTests();
+    await setItem('draft:u1', 'k', 'after');
+    await expect(getItem('draft:u1', 'k')).resolves.toBe('after');
+  });
+
+  it('a_successful_migration_clears_the_failure_count', async () => {
+    // Two failed launches keep the file and count up.
+    failNextMigration = true;
+    resetEncryptedKvOpenForTests();
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('migration failed: disk I/O error');
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(store.get(PERSIST_MIGRATION_FAILURES_KEY)).toBe('1');
+
+    failNextMigration = true;
+    resetEncryptedKvOpenForTests();
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('migration failed: disk I/O error');
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(store.get(PERSIST_MIGRATION_FAILURES_KEY)).toBe('2');
+    const storedKey = store.get(PERSIST_DB_KEY);
+
+    // A launch that migrates cleanly clears the count.
+    resetEncryptedKvOpenForTests();
+    await expect(getItem('draft:u1', 'k')).resolves.toBeNull();
+    expect(store.get(PERSIST_MIGRATION_FAILURES_KEY)).toBeUndefined();
+
+    // Counting starts over: one more failed launch keeps the file and the key.
+    failNextMigration = true;
+    resetEncryptedKvOpenForTests();
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('migration failed: disk I/O error');
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(store.get(PERSIST_DB_KEY)).toBe(storedKey);
+    expect(store.get(PERSIST_MIGRATION_FAILURES_KEY)).toBe('1');
   });
 });
 

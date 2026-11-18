@@ -1,7 +1,7 @@
 import {
+  createOrEnableAgentConfigForOwner,
   getAgentConfigForOwner,
   setAgentEnabledForOwner,
-  upsertAgentConfigForOwner,
   type AgentConfigOwner,
 } from '@/lib/agent-config/db/agent-configs';
 import { createDefaultCodeReviewConfig } from './core/default-config';
@@ -32,11 +32,10 @@ export async function setCodeReviewEnabled(params: {
 
   if (!params.isEnabled) return { changed: false };
 
-  await upsertAgentConfigForOwner({
+  await createOrEnableAgentConfigForOwner({
     owner: params.owner,
     agentType: 'code_review',
     platform: params.platform,
-    isEnabled: true,
     createdBy: params.createdBy,
     config: createDefaultCodeReviewConfig(),
   });

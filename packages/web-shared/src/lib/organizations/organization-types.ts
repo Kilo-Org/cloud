@@ -4,7 +4,7 @@ import {
   ORGANIZATION_ROLES,
 } from '@kilocode/app-shared/organizations';
 import type { Organization, organization_invitations } from '@kilocode/db/schema';
-import type { OrganizationTrialStage } from '@kilocode/organization-entitlement';
+import type { RunningTrialStage } from '@kilocode/organization-entitlement';
 import { hasVisibleText } from '@kilocode/app-shared/text';
 import type { Result } from '@kilocode/web-shared/lib/maybe-result';
 import { CompanyDomainSchema, normalizeSsoDomain } from './company-domain';
@@ -114,15 +114,18 @@ export type UserOrganizationWithSeats = {
   isTrialExpiredForEnforcement: boolean;
   /**
    * The stage of a trial that is still running, from the same
-   * `classifyOrganizationEntitlement` verdict as the gate above: one of
-   * `trial_active`, `trial_ending_soon`, `trial_ending_very_soon`, or
-   * `trial_expires_today`. It is `null` whenever the trial is not the
-   * organization's operative state — a paid seat subscription, a sponsorship,
-   * suppressed trial messaging, or a disabled seat requirement replaced it, or
-   * the trial has already expired — so a client can render "on trial" from this
-   * field alone instead of re-deriving it on the device.
+   * `classifyOrganizationEntitlement` verdict as the gate above: one of the
+   * `RunningTrialStage` set (`trial_active`, `trial_ending_soon`,
+   * `trial_ending_very_soon`, or `trial_expires_today`). It is `null` whenever
+   * the trial is not the organization's operative state — a paying seat
+   * subscription, a sponsorship, suppressed trial messaging, or a disabled
+   * seat requirement replaced it, or the trial has already expired — so a
+   * client can render "on trial" from this field alone instead of re-deriving
+   * it on the device. The declared type is the set the server actually
+   * publishes: the expired stages and `subscribed` never appear here, so a
+   * consumer cannot render a stage the wire never sends.
    */
-  trialStatus: OrganizationTrialStage | null;
+  trialStatus: RunningTrialStage | null;
   /**
    * The ISO instant the running trial ends, carrying
    * `getOrganizationTrialEndDate`'s answer (`free_trial_end_at`, or creation

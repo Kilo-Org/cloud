@@ -150,12 +150,16 @@ export async function getUserOrganizationsWithSeats(
     });
     // A bypass (`displayStatus === 'subscribed'`) means the trial is not what
     // governs the organization, and the expired stages are the trial's past, so
-    // only the four running stages are published. The date rides along with
-    // them: a client renders "trial ends on <date>" from the payload instead of
+    // only the four running stages are published. The guard reads the published
+    // value itself — `trialStatus` stays a running stage through a bypass, so
+    // the bypass check names `bypassReason` alongside it, and the narrowed type
+    // is the set the wire actually carries. The date rides along with them: a
+    // client renders "trial ends on <date>" from the payload instead of
     // re-deriving `free_trial_end_at ?? created_at + 14d` on the device.
-    const trialStatus = isRunningTrialStage(entitlement.displayStatus)
-      ? entitlement.trialStatus
-      : null;
+    const trialStatus =
+      entitlement.bypassReason == null && isRunningTrialStage(entitlement.trialStatus)
+        ? entitlement.trialStatus
+        : null;
     return {
       organizationName: result.organizationName,
       organizationId: result.organizationId,

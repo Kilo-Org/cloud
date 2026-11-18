@@ -192,10 +192,23 @@ describe('getOrgSubscriptionState', () => {
     ).toEqual({ label: 'No subscription', tone: 'muted' });
   });
 
-  it('lets a real subscription own the row even while a trial is running', () => {
-    const state = getOrgSubscriptionState(subscription(), {
+  it('lets the server trial verdict own the row over a subscription that stopped paying', () => {
+    // The server publishes a running trial exactly when no paying seat
+    // subscription exists, so this combination is a `canceled` Stripe record
+    // beside a live trial: the record has stopped billing, and the trial is
+    // what governs the organization.
+    const state = getOrgSubscriptionState(withStatus('canceled'), {
       trialStatus: 'trial_active',
       trialEndsAt: '2026-11-24T00:00:00.000Z',
+    });
+    expect(state.tone).toBe('default');
+    expect(state.label.startsWith('Trial ends on ')).toBe(true);
+  });
+
+  it('lets a paying subscription own the row when the payload carries no trial', () => {
+    const state = getOrgSubscriptionState(subscription(), {
+      trialStatus: null,
+      trialEndsAt: null,
     });
     expect(state.tone).toBe('good');
     expect(state.label.startsWith('Renews on ')).toBe(true);

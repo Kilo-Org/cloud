@@ -134,20 +134,25 @@ export function getOrgTrialStatusPill(trial: OrgTrialState): BillingState | null
  * renews, when it stops, or that it is past due. Nothing here re-derives the
  * plan gate — `isTrialExpiredForEnforcement` owns that.
  *
- * `trial` is the boundary row's trial readout. An organization inside its
- * Enterprise trial has bought no seats, so Stripe answers `null` and the row
- * would claim there is no subscription while the trial is running; the trial
- * branch speaks first in exactly that case. A subscription that does exist owns
- * the row, including its own `trialing` status.
+ * `trial` is the boundary row's trial readout, and it speaks first: the server
+ * publishes a running trial only when no paying seat subscription exists, so a
+ * Stripe row that has stopped paying (`canceled`, `unpaid`, `paused`) can sit
+ * beside a trial that still governs the organization, and the server's verdict
+ * outranks a record that exists but does not pay. A `null` readout leaves the
+ * subscription to own the row exactly as before, including its own `trialing`
+ * status.
  */
 export function getOrgSubscriptionState(
   input: OrgSeatSubscription,
   trial?: OrgTrialState
 ): BillingState {
+  const trialState = trial == null ? null : getOrgTrialStatusPill(trial);
+  if (trialState != null) {
+    return trialState;
+  }
   const subscription = input.subscription;
   if (subscription == null) {
-    const trialState = trial == null ? null : getOrgTrialStatusPill(trial);
-    return trialState ?? { label: i18n.t('organization.billing.stateNone'), tone: 'muted' };
+    return { label: i18n.t('organization.billing.stateNone'), tone: 'muted' };
   }
   const { status } = subscription;
   const periodEnd = formattedPeriodEnd(input);

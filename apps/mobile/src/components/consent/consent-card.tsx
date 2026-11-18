@@ -198,41 +198,30 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
         </View>
       </ScrollView>
 
-      <View className="gap-3 border-t border-border bg-background px-6 pt-3" style={footerStyle}>
+      <View className="gap-3 border-t border-border bg-background px-6 pt-4" style={footerStyle}>
         {/* The error lives in the pinned footer, not the scroll content: the
             footer draws over the scroll tail, so a content-placed error was
             invisible behind the buttons (b911 vr2 device repro — staging
             error measured at y=792 under the Back/Revoke footer). The
-            one-line slot below is always reserved, so an error appears
-            without moving the actions. The privacy disclosure is pinned here
-            too, because at the foot of the scrolling body the footer edge
-            cut the sentence in half. Its font scale is capped so the pinned
-            height stays bounded (see CONSENT_DISCLOSURE_MAX_FONT_SCALE). The
-            policy link's 28dp box overflows its 17.5dp line by 5.25dp, which
-            stays inside this footer's `pt-3` top padding rather than
-            reaching the scroll region above it. */}
+            one-line status slot below is always reserved, so an error
+            appears without moving the actions. The privacy disclosure is
+            pinned here too, because at the foot of the scrolling body the
+            footer edge cut the sentence in half. Its font scale is capped so
+            the pinned height stays bounded (see
+            CONSENT_DISCLOSURE_MAX_FONT_SCALE). The policy link's 28dp box
+            overflows its 17.5dp line by 5.25dp, which stays inside this
+            footer's top padding rather than reaching the scroll region above
+            it. The disclosure and the actions sit in one equal rhythm: the
+            footer's top padding matches the `gap-3` between the disclosure
+            and the primary button, so the line reads as part of the block it
+            qualifies instead of floating between the divider and the
+            buttons. */}
         <ConsentPolicySentence
           prefix={t('consent.privacyPolicyPrefix')}
           linkLabel={t('consent.privacyPolicy')}
           maxFontSizeMultiplier={CONSENT_DISCLOSURE_MAX_FONT_SCALE}
           onOpenPolicy={handleOpenPrivacy}
         />
-        {/* The reserved status slot keeps its one-line height whether or not
-            a line shows (see the footer comment above): the space is there
-            so an appearing status replaces blank space instead of pushing
-            the buttons down, the same reserve the other status slots use
-            (`min-h-5` on the credits expiry line, the guardrails and
-            spend-alerts save status, and the live tab's refresh line). The
-            reserve is what previously held the line apart from the actions
-            it qualifies — an empty 20dp spacer with two gap edges put 44dp
-            between the disclosure and the Accept button — so the reserve is
-            folded into the button spacing instead of a separate spacer row:
-            the line centers over the space the layout already gives it, and
-            the divider-to-line and line-to-button distances stay equal
-            whether the line shows or not. */}
-        <View className="min-h-5 justify-center">
-          <ConsentLoadStatusLine load={storedLoad} error={error} onRetry={retryStoredLoad} t={t} />
-        </View>
         <Button
           onPress={() => {
             void handlePrimaryAction();
@@ -256,6 +245,19 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
         >
           <Text>{actions.secondaryLabel}</Text>
         </Button>
+        {/* The reserved status slot renders below the actions: its reserve
+            must not sit between the disclosure and the buttons it qualifies
+            (an empty 20dp spacer with two gap edges put 44dp between the
+            disclosure and the Accept button, floating the line away from the
+            block it qualifies). The slot keeps its one-line height whenever
+            it is mounted (the same reserve as the credits expiry line and
+            the guardrails and spend-alerts save status), and the negative
+            bottom margin gives that height back to the footer's bottom
+            padding, so the footer's own height and the buttons above never
+            move when a status appears, clears, or swaps. */}
+        <View className="min-h-5 -mb-5 justify-center">
+          <ConsentLoadStatusLine load={storedLoad} error={error} onRetry={retryStoredLoad} t={t} />
+        </View>
       </View>
       {dialog}
     </View>

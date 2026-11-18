@@ -66,7 +66,7 @@ export function TabBarButton({
       // content is what a reader reaches (see the tabs layout, which passes
       // `hiddenFromA11y` while a form sheet route is presented). The entry keeps
       // taking sighted touches — only the accessibility tree changes.
-      accessibilityElementsHidden={hiddenFromA11y}
+      accessibilityElementsHidden={hiddenFromA11y === true}
       importantForAccessibility={hiddenFromA11y ? 'no-hide-descendants' : 'auto'}
       onPressIn={event => {
         pressed.current = true;

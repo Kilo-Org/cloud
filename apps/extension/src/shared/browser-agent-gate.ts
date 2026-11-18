@@ -143,7 +143,7 @@ const targetFrameOf = async (
   );
 
   if (response === undefined) {
-    return undefined;
+    return { frame: true, origin: OPAQUE_ORIGIN };
   }
 
   const parsed = describeNodeSchema.safeParse(response);

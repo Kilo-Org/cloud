@@ -152,8 +152,8 @@ describe('sensitive form fields', () => {
     expect(
       sensitiveTargetsOf('browser_fill_form', {
         fields: [
-          { name: 'Email', ref: 'e1' },
-          { name: 'Card', selector: '#cc' },
+          { name: 'Email', target: 'e1', type: 'textbox', value: 'a@b.c' },
+          { name: 'Card', target: '#cc', type: 'textbox', value: '4111' },
         ],
       })
     ).toStrictEqual(['e1', '#cc']);

@@ -55,6 +55,7 @@ const frameTree = (mainUrl: string): Record<string, unknown> => ({
 
 const createSession = (
   options: {
+    readonly describeNodeFails?: boolean;
     readonly frameIdForBackendNode?: (backendNodeId: number) => string;
     readonly mainUrl?: string;
     readonly probe?: Record<string, unknown>;
@@ -63,6 +64,10 @@ const createSession = (
 ): FakeGateSession => {
   const handlers: Record<string, CdpHandler> = {
     'DOM.describeNode': params => {
+      if (options.describeNodeFails === true) {
+        return;
+      }
+
       const backendNodeId = params?.['backendNodeId'];
       const frameId =
         typeof backendNodeId === 'number'
@@ -206,6 +211,19 @@ describe('origin grants', () => {
     });
   });
 
+  it('refuses a target whose frame cannot be read', async () => {
+    const result = await run({
+      args: { element: 'e12' },
+      session: createSession({ describeNodeFails: true }),
+      toolName: 'browser_click',
+    });
+
+    expect(failureOf(result)).toStrictEqual({
+      items: [{ class: 'act', frame: true, origin: 'opaque:null' }],
+      kind: 'needs_permission',
+    });
+  });
+
   it('requires act for both ends of a drag', async () => {
     const result = await run({
       args: { endTarget: 'e12', startTarget: 'e13' },
@@ -266,6 +284,32 @@ describe('sensitive steps', () => {
       args: { element: 'e12', text: 'hunter2' },
       probe: passwordProbe,
       toolName: 'browser_type',
+    });
+
+    expect(failureOf(result)).toStrictEqual({
+      items: [
+        {
+          class: 'sensitive',
+          origin: 'https://app.example.com',
+          reason: SENSITIVE_REASON.password,
+        },
+      ],
+      kind: 'needs_permission',
+    });
+    expect(sensitiveOf(result)).toStrictEqual({
+      element: 'e12',
+      origin: 'https://app.example.com',
+      reason: SENSITIVE_REASON.password,
+    });
+  });
+
+  it('refuses filling a password field without a step token', async () => {
+    const result = await run({
+      args: {
+        fields: [{ name: 'Password', target: 'e12', type: 'textbox', value: 'hunter2' }],
+      },
+      probe: passwordProbe,
+      toolName: 'browser_fill_form',
     });
 
     expect(failureOf(result)).toStrictEqual({

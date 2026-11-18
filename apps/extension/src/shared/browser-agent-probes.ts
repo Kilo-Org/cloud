@@ -324,10 +324,14 @@ export const readSensitiveProbeForTarget = async (
 };
 
 const argumentTextSchema = z.string().min(1);
+/** A `browser_fill_form` field as the vendored contract carries it: `target` is the element reference. */
 const fillFormFieldsSchema = z.array(
   z.object({
-    ref: z.string().optional(),
-    selector: z.string().optional(),
+    element: z.string().optional(),
+    name: z.string().optional(),
+    target: z.string().optional(),
+    type: z.string().optional(),
+    value: z.string().optional(),
   })
 );
 
@@ -355,7 +359,7 @@ export const sensitiveTargetsOf = (
 
   const targets: string[] = [];
 
-  for (const key of ['element', 'target', 'ref', 'selector']) {
+  for (const key of ['element', 'target', 'ref', 'selector', 'startTarget', 'endTarget']) {
     const target = argumentTextSchema.safeParse(args[key]);
 
     if (target.success) {
@@ -366,7 +370,7 @@ export const sensitiveTargetsOf = (
   const fields = fillFormFieldsSchema.safeParse(args['fields']);
 
   for (const field of fields.success ? fields.data : []) {
-    const target = argumentTextSchema.safeParse(field.ref ?? field.selector);
+    const target = argumentTextSchema.safeParse(field.target);
 
     if (target.success) {
       targets.push(target.data);

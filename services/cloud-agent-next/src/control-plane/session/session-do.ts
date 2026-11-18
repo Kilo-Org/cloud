@@ -285,6 +285,7 @@ import type {
 } from '../sandbox/sandbox-do.js';
 import type { ScopeGrantView } from '../sandbox/scope-view.js';
 import { diagnosticCause, logControlDiagnostic } from '../../sandbox-control/diagnostics.js';
+import { readSentryIdentity } from '../../sentry-identity.js';
 
 /** Where a committed message transition came from (legacy diagnostic field). */
 type ControlPlaneMessageSource = 'coordinator' | 'wrapper_outcome' | 'operation_result';
@@ -908,6 +909,17 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       resolveTarget: (sandboxId, scope) => this.previewTargetFor(sandboxId, scope),
     });
     this.initialized = ctx.blockConcurrencyWhile(() => this.initializeStorage());
+  }
+
+  [readSentryIdentity]() {
+    if (!this.metadata) return undefined;
+    const { userId, orgId, sessionId } = this.metadata.identity;
+    return {
+      userId,
+      orgId: orgId ?? '(personal)',
+      sessionId,
+      sandboxId: this.metadata.workspace?.sandboxId,
+    };
   }
 
   private async terminalRequest(

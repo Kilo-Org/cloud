@@ -8144,13 +8144,17 @@ describe('BYOK failover', () => {
     return { ...provider, apiKey, transformRequest: jest.fn(async () => {}), ...overrides };
   }
 
-  function byokRoute(providerId: UserByokProviderId, routeProvider: Provider): ProviderRoute {
+  function byokRoute(
+    providerId: UserByokProviderId,
+    routeProvider: Provider,
+    directByokPolicyProviderId?: string
+  ): ProviderRoute {
     return {
       provider: routeProvider,
       userByok: [{ decryptedAPIKey: routeProvider.apiKey, providerId }],
       isFree: false,
       bypassAccessCheck: false,
-      ...(routeProvider.type === 'direct-byok' && { directByokPolicyProviderId: providerId }),
+      ...(directByokPolicyProviderId && { directByokPolicyProviderId }),
     };
   }
 
@@ -8211,7 +8215,7 @@ describe('BYOK failover', () => {
         }),
       });
       const failoverProvider = byokProvider('failover-byok-key', { type: 'direct-byok' });
-      const failoverRoute = byokRoute('zai-coding', failoverProvider);
+      const failoverRoute = byokRoute('zai-coding', failoverProvider, 'z-ai');
       const { result, failovers } = withFailover(
         byokRoute('openai', primaryProvider),
         failoverRoute

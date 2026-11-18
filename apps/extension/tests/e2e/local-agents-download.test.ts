@@ -18,6 +18,10 @@ import type { LocalAgentSession } from './local-agents-fixture';
  * `afterAction: true`; the identical call re-sent with that step token runs
  * once with the guard off. The downloads directory is a real directory, so
  * "the file did not land" is a directory read rather than an event count.
+ *
+ * `downloads` is an optional permission and this run does not have it, which is
+ * the state every existing user starts in: the guard is the response-stage
+ * interception, and the page's file never becomes a download.
  */
 
 const grant = (origin: string) => [

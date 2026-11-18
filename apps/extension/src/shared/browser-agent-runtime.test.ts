@@ -9,6 +9,7 @@ import { createBrowserRuntime } from './browser-runtime';
 import type { BrowserDownloadsApi, BrowserToolRunOutcome } from './browser-runtime';
 import {
   AGENT_TAB_OUTSIDE_GROUP_ERROR,
+  DOWNLOAD_PERMISSION_MISSING_ERROR,
   NEEDS_PERMISSION_ERROR,
   ORIGIN_CHANGED_ERROR,
   SENSITIVE_REASON,
@@ -639,6 +640,95 @@ describe('agent browser calls', () => {
     expect(approved.kind).toBe('result');
     const { cancelled } = downloads;
     expect(cancelled).toStrictEqual([41]);
+  });
+
+  it('cancels the download at the response when the optional permission is missing', async () => {
+    const { cdp, runtime } = await createHarness();
+    let emitting = true;
+
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': () => {
+        // A navigation whose response is the file: the tab pauses it before any body moves.
+        if (emitting) {
+          emitting = false;
+          cdp.emit('Fetch.requestPaused', {
+            requestId: 'r1',
+            resourceType: 'Document',
+            responseHeaders: [
+              { name: 'Content-Disposition', value: 'attachment; filename="a.txt"' },
+            ],
+          });
+        }
+
+        return {};
+      },
+    });
+
+    const outcome = await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant] },
+      arguments: { target: '#pay' },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_click',
+    });
+
+    expect(outcome).toMatchObject({ afterAction: true, kind: 'needs_permission' });
+    expect(cdp.commands()).toContain('Fetch.failRequest');
+    expect(cdp.commands()).toContain('Fetch.disable');
+  });
+
+  it('continues an ordinary response so a plain click still works without the permission', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': () => {
+        cdp.emit('Fetch.requestPaused', {
+          requestId: 'r2',
+          resourceType: 'Document',
+          responseHeaders: [{ name: 'content-type', value: 'text/html' }],
+        });
+
+        return {};
+      },
+    });
+
+    const outcome = await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant] },
+      arguments: { target: '#pay' },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_click',
+    });
+
+    // The click ran, nothing was refused, and the page's own response was released.
+    expect(outcome.kind).toBe('result');
+    expect(cdp.commands()).toContain('Fetch.continueResponse');
+    expect(cdp.commands()).not.toContain('Fetch.failRequest');
+  });
+
+  it('refuses a download-capable call when neither guard can run', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    cdp.setHandlers({
+      'Fetch.enable': () => {
+        throw new Error('interception unavailable');
+      },
+    });
+
+    const outcome = await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant] },
+      arguments: { target: '#pay' },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_click',
+    });
+
+    // Fail closed: no file can be started because the click never ran.
+    expect(outcome).toMatchObject({
+      kind: 'result',
+      result: { error: DOWNLOAD_PERMISSION_MISSING_ERROR, ok: false },
+    });
+    expect(cdp.commands()).not.toContain('Input.dispatchMouseEvent');
   });
 
   it('runs a download call unguarded once with the approval token, then burns it', async () => {

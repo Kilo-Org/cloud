@@ -2,6 +2,7 @@
 import { z } from 'zod';
 import {
   AGENT_TAB_OUTSIDE_GROUP_ERROR,
+  DOWNLOAD_PERMISSION_MISSING_ERROR,
   authorizedGrantsSchema,
   NEEDS_PERMISSION_ERROR,
   ORIGIN_CHANGED_ERROR,
@@ -346,7 +347,8 @@ export const createRuntimeBrowserBridge = ({
       case TAB_TAKEN_ERROR: {
         throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.tabTaken, outcome.result.error);
       }
-      case AGENT_TAB_OUTSIDE_GROUP_ERROR: {
+      case AGENT_TAB_OUTSIDE_GROUP_ERROR:
+      case DOWNLOAD_PERMISSION_MISSING_ERROR: {
         throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.blocked, outcome.result.error);
       }
       default: {

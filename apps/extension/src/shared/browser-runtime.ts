@@ -1,8 +1,10 @@
-/* eslint-disable max-lines -- One runtime owns the serial chain, leases, tab groups and the agent gate; splitting it would scatter the per-tab ordering contract. */
+/* eslint-disable import/max-dependencies, max-lines -- One runtime owns the serial chain, leases, tab groups and the agent gate; splitting it would scatter the per-tab ordering contract. */
+import { z } from 'zod';
 import {
   AGENT_TAB_OUTSIDE_GROUP_ERROR,
   canStartDownload,
   createStepTokenStore,
+  DOWNLOAD_PERMISSION_MISSING_ERROR,
   hashBrowserToolArguments,
   NEEDS_PERMISSION_ERROR,
   ORIGIN_CHANGED_ERROR,
@@ -41,6 +43,7 @@ import type {
   BrowserScriptingApi,
   BrowserTabsApi,
   ChromeDebuggerApi,
+  ChromeDebuggerEventListener,
   EvalTabResult,
 } from './tab-debugger';
 
@@ -215,6 +218,118 @@ const TAB_COMMIT_POLL_MS = 50;
  * this only covers a response whose headers arrive late.
  */
 const DOWNLOAD_GUARD_SETTLE_MS = 120;
+
+/**
+ * The guard for a browser without the optional `downloads` permission. A tab
+ * cannot refuse a download itself — chrome.debugger blocks the download domain
+ * — but it can intercept the response that would become one: a navigation whose
+ * response carries `Content-Disposition: attachment` is aborted before its body
+ * is delivered, so no file is ever created. Every other response is continued,
+ * so an ordinary click pays one round trip. `undefined` when the target cannot
+ * intercept, so the caller can refuse instead.
+ */
+const FETCH_PAUSED_METHOD = 'Fetch.requestPaused';
+const ATTACHMENT_DISPOSITION = /attachment/iu;
+
+/** One response the tab paused at its response stage. */
+const fetchPausedSchema = z.object({
+  requestId: z.string(),
+  responseHeaders: z.array(z.object({ name: z.string(), value: z.string().optional() })).optional(),
+});
+
+/** Releases a paused response untouched; if the stage refuses it, `Fetch.disable` releases it. */
+const releasePausedResponse = async (
+  session: BrowserToolSession,
+  requestId: string
+): Promise<void> => {
+  try {
+    await session.send('Fetch.continueResponse', { requestId });
+
+    return;
+  } catch {
+    // Older targets continue a paused response through the request method.
+  }
+
+  try {
+    await session.send('Fetch.continueRequest', { requestId });
+  } catch {
+    // Disabling interception at the end of the call resumes whatever is left.
+  }
+};
+
+/** Drops a paused response, so the navigation ends without a download and no file exists. */
+const abortPausedResponse = async (
+  session: BrowserToolSession,
+  requestId: string
+): Promise<void> => {
+  try {
+    await session.send('Fetch.failRequest', { errorReason: 'Aborted', requestId });
+  } catch {
+    // A response that already left the interceptor started no file this guard could stop.
+  }
+};
+
+const armFetchGuard = async (
+  session: BrowserToolSession,
+  debuggerApi: ChromeDebuggerApi | undefined,
+  tabId: number
+): Promise<{ readonly settle: () => Promise<number> } | undefined> => {
+  const aborted: string[] = [];
+  const firstDownload = Promise.withResolvers<void>();
+  const listener: ChromeDebuggerEventListener = (source, method, params) => {
+    if (method !== FETCH_PAUSED_METHOD || (source.tabId !== undefined && source.tabId !== tabId)) {
+      return;
+    }
+
+    const paused = fetchPausedSchema.safeParse(params ?? {});
+
+    if (!paused.success) {
+      return;
+    }
+
+    const { requestId, responseHeaders } = paused.data;
+    const attachment = (responseHeaders ?? []).some(
+      header =>
+        header.name.toLowerCase() === 'content-disposition' &&
+        ATTACHMENT_DISPOSITION.test(header.value ?? '')
+    );
+
+    if (!attachment) {
+      void releasePausedResponse(session, requestId);
+
+      return;
+    }
+
+    aborted.push(requestId);
+    firstDownload.resolve();
+    void abortPausedResponse(session, requestId);
+  };
+
+  try {
+    await session.send('Fetch.enable', {
+      patterns: [{ requestStage: 'Response', resourceType: 'Document', urlPattern: '*' }],
+    });
+  } catch {
+    return undefined;
+  }
+
+  debuggerApi?.onEvent.addListener(listener);
+
+  return {
+    settle: async () => {
+      await Promise.race([firstDownload.promise, after(DOWNLOAD_GUARD_SETTLE_MS)]);
+      debuggerApi?.onEvent.removeListener(listener);
+      // Disabling resumes every request this call left paused.
+      try {
+        await session.send('Fetch.disable');
+      } catch {
+        // The target is gone; nothing is left paused.
+      }
+
+      return aborted.length;
+    },
+  };
+};
 
 /** Cancels one download and drops it from the shelf; a completion race changes nothing, the file is gone. */
 const discardDownload = async (api: BrowserDownloadsApi, downloadId: number): Promise<void> => {
@@ -482,6 +597,15 @@ export const createBrowserRuntime = ({
     };
   };
 
+  /** The guard one guarded call runs: the download stream when the optional permission is granted, response interception when it is not. */
+  const armGuard = (
+    session: BrowserToolSession,
+    tabId: number
+  ): Promise<{ readonly settle: () => Promise<number> } | undefined> =>
+    downloadsApi === undefined
+      ? armFetchGuard(session, debuggerApi, tabId)
+      : Promise.resolve(armDownloadGuard());
+
   // Tabs whose flattened frame auto-attach is on, so out-of-process iframes are reachable for scoping.
   const autoAttachedTabs = new Set<number>();
 
@@ -679,9 +803,18 @@ export const createBrowserRuntime = ({
           preflight.sensitiveToken === undefined &&
           !downloadApproved;
 
-        const downloadGuard = guardDownloads ? armDownloadGuard() : undefined;
+        // The optional `downloads` permission gives the browser's own stream; without it the tab intercepts the response that would become a file.
+        const downloadGuard = guardDownloads ? await armGuard(session, tabId) : undefined;
 
-        if (guardDownloads) {
+        // Neither guard can run: no file may be started, so the call is refused instead of run unguarded.
+        if (guardDownloads && downloadGuard === undefined) {
+          return {
+            kind: 'result',
+            result: { error: DOWNLOAD_PERMISSION_MISSING_ERROR, ok: false },
+          };
+        }
+
+        if (downloadGuard !== undefined) {
           await setDownloadBehavior(session, 'deny');
         }
 

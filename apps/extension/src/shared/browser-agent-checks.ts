@@ -89,6 +89,15 @@ const DOWNLOAD_CAPABLE_TOOLS: ReadonlySet<string> = new Set([
 
 export const canStartDownload = (toolName: string): boolean => DOWNLOAD_CAPABLE_TOOLS.has(toolName);
 
+/**
+ * A refusal for a download-capable call when neither guard can run: the
+ * optional `downloads` permission is missing and the tab's target cannot
+ * intercept responses either. The switch re-requests the permission, so the
+ * message names the one action that fixes it.
+ */
+export const DOWNLOAD_PERMISSION_MISSING_ERROR =
+  'The browser cannot cancel downloads for this agent call: the optional Downloads permission is not granted (blocked). Turn "Allow local agents" off and on again to grant it, then retry.';
+
 const DEFAULT_PORTS = { 'http:': '80', 'https:': '443' } as const;
 
 const parseUrl = (url: string): URL | undefined => {

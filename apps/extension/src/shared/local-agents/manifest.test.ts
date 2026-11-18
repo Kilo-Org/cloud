@@ -59,4 +59,14 @@ describe('extension manifest', () => {
       expect(manifest.optional_permissions).toContain('nativeMessaging');
     }
   });
+
+  it('keeps downloads optional, so an update never disables the extension', () => {
+    for (const browser of ['chrome', 'firefox'] as const) {
+      const manifest = readManifest(browser);
+
+      // A required permission that adds a warning turns the extension off for every existing user until they accept it.
+      expect(manifest.permissions).not.toContain('downloads');
+      expect(manifest.optional_permissions).toContain('downloads');
+    }
+  });
 });

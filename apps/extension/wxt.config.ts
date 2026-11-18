@@ -42,20 +42,12 @@ export default defineConfig({
     ],
     name: 'Kilo Code',
     // Optional permissions never disable installs; Chrome prompts when the switch turns on.
-    optional_permissions: ['nativeMessaging'],
+    // `downloads` is optional on purpose: a required permission that adds a warning disables the extension for every existing user until they accept it.
+    optional_permissions: ['downloads', 'nativeMessaging'],
     permissions:
       browser === 'firefox'
-        ? ['alarms', 'contextMenus', 'downloads', 'identity', 'scripting', 'storage', 'tabs']
-        : [
-            'alarms',
-            'contextMenus',
-            'debugger',
-            'downloads',
-            'identity',
-            'scripting',
-            'storage',
-            'tabGroups',
-          ],
+        ? ['alarms', 'contextMenus', 'identity', 'scripting', 'storage', 'tabs']
+        : ['alarms', 'contextMenus', 'debugger', 'identity', 'scripting', 'storage', 'tabGroups'],
   }),
   modules: ['@wxt-dev/module-react'],
   vite: () => ({

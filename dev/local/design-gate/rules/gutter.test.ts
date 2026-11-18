@@ -370,7 +370,7 @@ function messageActionsScreen(marked = true): ProbeNode[] {
       tag: 'View',
       rect: [211, 96, 175, 32],
       style: { flexDirection: 'row' },
-      ...(marked ? { testID: 'message-failure-actions' } : {}),
+      ...(marked ? { testID: 'message-failure-footer' } : {}),
     },
     {
       parent: 3,

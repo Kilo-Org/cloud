@@ -32,13 +32,13 @@ const TAB_BAR_OWNERS: Record<string, true> = {
 };
 
 /**
- * A chat turn's failure actions (`Retry`, `Copy to composer`) are placed by the
- * message's own column, not by the page: the user's turn is end-aligned, so its
- * action row starts wherever that bubble ends. The marker on the row's
- * container names it in the probe, and its descendants are measured by the
- * message, not against the page gutter.
+ * A chat turn's failure footer (its status line, detail and `Retry` / `Copy to
+ * composer` actions) is placed by the message's own column, not by the page:
+ * the user's turn is end-aligned, so the footer starts wherever that bubble
+ * ends. The marker on the footer's container names it in the probe, and its
+ * descendants are measured by the message, not against the page gutter.
  */
-const MESSAGE_ACTIONS_TEST_ID = 'message-failure-actions';
+const MESSAGE_FOOTER_TEST_ID = 'message-failure-footer';
 
 /**
  * The boxes a page gutter is measured inside.
@@ -303,9 +303,9 @@ export function checkGutter(tree: LayoutTree): Finding[] {
     if (nodes.some(candidate => candidate.scroll.x)) continue;
     if (nodes.some(candidate => iconTarget(candidate, page, env.tapTarget.touch))) continue;
     if (insideTabBar(nodes, page)) continue;
-    // A chat turn's failure actions are placed by the message's own
-    // end-aligned column, not the page; the row's container names the subtree.
-    if (nodes.some(candidate => candidate.probe.testID?.includes(MESSAGE_ACTIONS_TEST_ID) === true))
+    // A chat turn's failure footer is placed by the message's own column, not
+    // the page; the footer's container names the subtree.
+    if (nodes.some(candidate => candidate.probe.testID?.includes(MESSAGE_FOOTER_TEST_ID) === true))
       continue;
     if (fullBleed(node, page)) continue;
     const offset = startOffset(layoutRect(node), page.box, page);

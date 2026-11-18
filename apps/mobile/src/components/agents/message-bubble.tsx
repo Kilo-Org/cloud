@@ -253,7 +253,10 @@ function MessageBubbleImpl({
          bubble and its own status line, which is what keeps a turn's status and
          actions in its own group. `items-end` is logical, so the status stays
          with the end-aligned bubble in either direction. */
-      <View className={cn('gap-2 px-4 pt-1 pb-7', trailingFailure && 'items-end')}>
+      <View
+        className={cn('gap-2 px-4 pt-1 pb-7', trailingFailure && 'items-end')}
+        testID="message-failure-footer"
+      >
         {statedByPreparation ? null : (
           <>
             <View className={cn('flex-row items-center gap-1.5', trailingFailure && 'justify-end')}>
@@ -293,7 +296,7 @@ function MessageBubbleImpl({
             ) : null}
           </>
         )}
-        <View className="flex-row gap-2" testID="message-failure-actions">
+        <View className="flex-row gap-2">
           {retryAction ? (
             <Button
               variant="outline"

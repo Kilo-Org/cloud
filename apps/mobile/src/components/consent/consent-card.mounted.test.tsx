@@ -461,8 +461,13 @@ describe('ConsentCard', () => {
         n.props.title === 'Help improve Kilo'
     );
     expect(placeholderRows).toHaveLength(1);
+    const placeholderRow = placeholderRows[0];
+    if (!placeholderRow) {
+      throw new Error('missing placeholder row');
+    }
     // The trailing slot holds the loading bar until the consent record lands.
-    const trailing: unknown = (placeholderRows[0]?.props as { trailing?: unknown }).trailing;
+    const trailing: unknown =
+      'trailing' in placeholderRow.props ? placeholderRow.props.trailing : undefined;
     expect(
       typeof trailing === 'object' && trailing !== null && 'type' in trailing
         ? trailing.type

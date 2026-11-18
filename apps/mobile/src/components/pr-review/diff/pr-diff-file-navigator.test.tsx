@@ -374,8 +374,11 @@ describe('PrDiffFileNavigator stable row callbacks (finding 2)', () => {
       if (kind === 'retryable' || kind === 'reconnect') {
         expect(retries).toHaveLength(1);
         const retry = retries[0];
+        if (!retry) {
+          throw new Error('missing retry');
+        }
         act(() => {
-          (retry?.props.onPress as () => void)();
+          (retry.props.onPress as () => void)();
         });
         expect(listQueryResult.query.refetch).toHaveBeenCalledOnce();
       } else {

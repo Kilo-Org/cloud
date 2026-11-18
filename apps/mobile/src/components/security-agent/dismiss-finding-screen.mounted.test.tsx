@@ -77,9 +77,7 @@ const dismissDraft = vi.hoisted(() => ({
 }));
 // The sheet's commit is its header's Done control, so the harness records the
 // header props the screen passes instead of looking for an inline button.
-const sheetHeader = vi.hoisted(() => ({
-  props: {} as Record<string, unknown>,
-}));
+const sheetHeader = vi.hoisted((): { props: Record<string, unknown> } => ({ props: {} }));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
@@ -333,7 +331,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
   });
 
   it('keeps the dismissal CTA enabled once a reason is chosen', () => {
-    const root = renderScreen();
+    renderScreen();
     selectReason();
 
     expect(doneDisabled()).toBe(false);
@@ -405,14 +403,14 @@ describe('DismissFindingScreen dismissal CTA states', () => {
 
   it('marks the dismissal CTA busy while the dismissal is pending', () => {
     dismiss.isPending = true;
-    const root = renderScreen();
+    renderScreen();
     selectReason();
 
     expect(doneBusy()).toBe(true);
   });
 
   it('submits the dismissal and pops the screen only on success', () => {
-    const root = renderScreen();
+    renderScreen();
     selectReason();
 
     submit();
@@ -424,7 +422,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
   });
 
   it('records the intent as a draft before submitting', () => {
-    const root = renderScreen();
+    renderScreen();
     selectReason();
 
     submit();
@@ -439,7 +437,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
   });
 
   it('clears the draft and pops on authoritative accept', () => {
-    const root = renderScreen();
+    renderScreen();
     selectReason();
 
     submit();
@@ -456,7 +454,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
   });
 
   it('persists lastError and retryable on a retryable failure', () => {
-    const root = renderScreen();
+    renderScreen();
     selectReason();
 
     submit();
@@ -478,7 +476,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
   });
 
   it('persists retry copy and a retryable draft when the Worker was unreachable', () => {
-    const root = renderScreen();
+    renderScreen();
     selectReason();
 
     submit();
@@ -500,7 +498,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
   });
 
   it('persists the configuration copy and non-retryable on a missing-configuration failure', () => {
-    const root = renderScreen();
+    renderScreen();
     selectReason();
 
     submit();

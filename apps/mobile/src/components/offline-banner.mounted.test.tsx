@@ -54,6 +54,7 @@ vi.mock('@/components/ui/icons', () => ({
   Lock: 'Lock',
   SearchX: 'SearchX',
   ServerCrash: 'ServerCrash',
+  ShieldCheck: 'ShieldCheck',
   WifiOff: 'WifiOff',
   Zap: 'Zap',
 }));

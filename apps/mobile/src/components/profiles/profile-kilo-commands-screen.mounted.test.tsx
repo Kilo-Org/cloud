@@ -57,6 +57,7 @@ vi.mock('react-native', async () => {
   } = await import('react');
   return {
     Platform: { OS: 'ios' },
+    useColorScheme: () => 'light',
     View: 'View',
     Pressable: 'Pressable',
     Switch: 'Switch',

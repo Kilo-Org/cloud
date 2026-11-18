@@ -24,6 +24,8 @@ vi.mock('react-native', () => ({
     },
   },
   Pressable: 'Pressable',
+  StatusBar: { currentHeight: 0 },
+  useColorScheme: () => 'light',
   View: 'View',
 }));
 
@@ -156,6 +158,7 @@ vi.mock('@/components/ui/icons', () => ({
   Trash2: 'Trash2',
   Users: 'Users',
   Workflow: 'Workflow',
+  X: 'X',
 }));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));

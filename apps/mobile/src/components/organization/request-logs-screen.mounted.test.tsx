@@ -96,6 +96,7 @@ vi.mock('@/components/ui/icons', () => ({ FileText: 'FileText' }));
 
 vi.mock('@/components/ui/directional-icons', () => ({
   DirectionalArrowLeft: 'DirectionalArrowLeft',
+  DirectionalArrowRight: 'DirectionalArrowRight',
   DirectionalChevronLeft: 'DirectionalChevronLeft',
   DirectionalChevronRight: 'DirectionalChevronRight',
 }));

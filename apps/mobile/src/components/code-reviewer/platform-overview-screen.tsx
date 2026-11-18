@@ -333,34 +333,33 @@ export function PlatformOverviewScreen({
                 ))}
               </RowGroup>
 
-              {capabilities.reviewMd || capabilities.skipBotPullRequests ? (
-                <RowGroup leadingTile>
-                  {capabilities.reviewMd && (
-                    <PreferenceRow
-                      icon={ScrollText}
-                      title={t('codeReviewer.followReviewMd')}
-                      subtitle={t('codeReviewer.followReviewMdSubtitle')}
-                      value={!data.disableReviewMd}
-                      disabled={!canEdit || save.isPending}
-                      onValueChange={value => {
-                        save.mutate({ disableReviewMd: !value });
-                      }}
-                    />
-                  )}
-                  {capabilities.skipBotPullRequests && (
-                    <PreferenceRow
-                      icon={Bot}
-                      title={t('codeReviewer.skipBotPullRequests.title')}
-                      subtitle={t('codeReviewer.skipBotPullRequests.subtitle')}
-                      value={data.skipBotPullRequests}
-                      disabled={!canEdit || save.isPending}
-                      onValueChange={value => {
-                        save.mutate({ skipBotPullRequests: value });
-                      }}
-                    />
-                  )}
-                </RowGroup>
-              ) : null}
+              {/* Every platform that reaches this body offers the review-md
+                  setting; the bot-detection row exists on GitHub only, whose
+                  webhooks carry the user type GitLab's do not. */}
+              <RowGroup leadingTile>
+                <PreferenceRow
+                  icon={ScrollText}
+                  title={t('codeReviewer.followReviewMd')}
+                  subtitle={t('codeReviewer.followReviewMdSubtitle')}
+                  value={!data.disableReviewMd}
+                  disabled={!canEdit || save.isPending}
+                  onValueChange={value => {
+                    save.mutate({ disableReviewMd: !value });
+                  }}
+                />
+                {capabilities.skipBotPullRequests && (
+                  <PreferenceRow
+                    icon={Bot}
+                    title={t('codeReviewer.skipBotPullRequests.title')}
+                    subtitle={t('codeReviewer.skipBotPullRequests.subtitle')}
+                    value={data.skipBotPullRequests}
+                    disabled={!canEdit || save.isPending}
+                    onValueChange={value => {
+                      save.mutate({ skipBotPullRequests: value });
+                    }}
+                  />
+                )}
+              </RowGroup>
 
               {!canEdit && (
                 <Text className="text-center text-xs text-muted-foreground">

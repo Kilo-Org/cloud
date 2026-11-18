@@ -29,7 +29,7 @@ export function ProviderKeySaveFailure({
     return null;
   }
   switch (failure.kind) {
-    case 'retryable':
+    case 'retryable': {
       return (
         <View className="gap-2">
           <AccessibleStatus message={failure.message} className="text-sm" />
@@ -38,9 +38,12 @@ export function ProviderKeySaveFailure({
           </Button>
         </View>
       );
-    case 'refused':
+    }
+    case 'refused': {
       return <AccessibleStatus message={failure.message} className="text-sm" />;
-    default:
+    }
+    default: {
       return assertSurfaceFailureHandled(failure);
+    }
   }
 }

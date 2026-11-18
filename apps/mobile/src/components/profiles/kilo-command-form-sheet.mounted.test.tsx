@@ -419,10 +419,16 @@ describe('KiloCommandFormSheet subtask row', () => {
     const label = i18n.t('profiles.slashCommands.subtask');
     const labels = findAll(renderer.root, 'Text').filter(node => node.props.children === label);
     expect(labels).toHaveLength(1);
-    expect(labels[0]?.props).toMatchObject({
-      accessible: false,
-      importantForAccessibility: 'no',
-    });
+    // The row's text column is the switch's label, not a second stop: the
+    // control that wraps it hides its descendants from the reader.
+    let labelColumnHidden = false;
+    for (let node = labels[0]?.parent; node; node = node.parent) {
+      if (node.props.importantForAccessibility === 'no-hide-descendants') {
+        labelColumnHidden = true;
+        break;
+      }
+    }
+    expect(labelColumnHidden).toBe(true);
 
     const toggles = findAll(renderer.root, 'Switch');
     expect(toggles.map(node => node.props.accessibilityLabel)).toEqual([label]);

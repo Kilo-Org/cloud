@@ -1,18 +1,16 @@
 import { sessionLiveText } from '@kilocode/session-ingest-contracts';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
-import { ChevronDown, ChevronUp, Pencil, Terminal, Trash2 } from '@/components/ui/icons';
+import { ReorderableItem, ReorderableItemActions } from '@/components/profiles/reorderable-item';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { IconTile } from '@/components/ui/icon-tile';
-import { Switch } from '@/components/ui/switch';
+import { Terminal } from '@/components/ui/icons';
+import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Text } from '@/components/ui/text';
 import { NEUTRAL_TINT } from '@/lib/agent-color';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { cn } from '@/lib/utils';
 import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
-import { COMPACT_CONTROL_BOX_CLASS, COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
 
 type KiloCommandRowProps = Readonly<{
   name: string;
@@ -84,13 +82,43 @@ export function KiloCommandRowView({
   onDelete,
 }: KiloCommandRowProps) {
   const { t } = useTranslation();
-  const colors = useThemeColors();
   const preview = useMemo(() => templatePreview(template), [template]);
-  const controlClass = (disabled: boolean) =>
-    cn(COMPACT_CONTROL_BOX_CLASS, 'active:opacity-70', disabled && 'opacity-40');
   const visibleName = `/${name}`;
   return (
-    <View className="gap-1 px-4 py-3">
+    <ReorderableItem
+      actions={
+        <ReorderableItemActions
+          moveUp={
+            onMoveUp === undefined
+              ? undefined
+              : {
+                  label: t('profiles.slashCommands.moveUp', { name }),
+                  disabled: isFirst,
+                  onPress: onMoveUp,
+                }
+          }
+          moveDown={
+            onMoveDown === undefined
+              ? undefined
+              : {
+                  label: t('profiles.slashCommands.moveDown', { name }),
+                  disabled: isLast,
+                  onPress: onMoveDown,
+                }
+          }
+          edit={
+            onEdit === undefined
+              ? undefined
+              : { label: t('profiles.slashCommands.edit', { name }), onPress: onEdit }
+          }
+          remove={
+            onDelete === undefined
+              ? undefined
+              : { label: t('profiles.slashCommands.delete', { name }), onPress: onDelete }
+          }
+        />
+      }
+    >
       <View className="flex-row items-center gap-3">
         <IconTile icon={Terminal} tint={NEUTRAL_TINT} />
         <View className="min-w-0 flex-1 gap-0.5">
@@ -122,68 +150,20 @@ export function KiloCommandRowView({
             </Text>
           ) : null}
         </View>
-        <Switch
-          value={enabled}
-          // The row's only element carrying the name, so it takes the visible
-          // form: the announced name matches the label on screen.
-          accessibilityLabel={visibleName}
-          disabled={onToggle === undefined}
-          onValueChange={onToggle}
-        />
-      </View>
-      {onMoveUp !== undefined ||
-      onMoveDown !== undefined ||
-      onEdit !== undefined ||
-      onDelete !== undefined ? (
-        <View className="flex-row items-center justify-end gap-5">
-          {onMoveUp !== undefined ? (
-            <Pressable
-              className={controlClass(isFirst)}
-              disabled={isFirst}
-              accessibilityRole="button"
-              accessibilityLabel={t('profiles.slashCommands.moveUp', { name })}
-              hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
-              onPress={onMoveUp}
-            >
-              <ChevronUp size={20} color={colors.mutedForeground} />
-            </Pressable>
-          ) : null}
-          {onMoveDown !== undefined ? (
-            <Pressable
-              className={controlClass(isLast)}
-              disabled={isLast}
-              accessibilityRole="button"
-              accessibilityLabel={t('profiles.slashCommands.moveDown', { name })}
-              hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
-              onPress={onMoveDown}
-            >
-              <ChevronDown size={20} color={colors.mutedForeground} />
-            </Pressable>
-          ) : null}
-          {onEdit !== undefined ? (
-            <Pressable
-              className={cn(COMPACT_CONTROL_BOX_CLASS, 'active:opacity-70')}
-              accessibilityRole="button"
-              accessibilityLabel={t('profiles.slashCommands.edit', { name })}
-              hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
-              onPress={onEdit}
-            >
-              <Pencil size={18} color={colors.mutedForeground} />
-            </Pressable>
-          ) : null}
-          {onDelete !== undefined ? (
-            <Pressable
-              className={cn(COMPACT_CONTROL_BOX_CLASS, 'active:opacity-70')}
-              accessibilityRole="button"
-              accessibilityLabel={t('profiles.slashCommands.delete', { name })}
-              hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
-              onPress={onDelete}
-            >
-              <Trash2 size={18} color={colors.mutedForeground} />
-            </Pressable>
-          ) : null}
+        <View className="shrink-0">
+          {renderRowTrailing({
+            kind: 'switch',
+            value: enabled,
+            // The row's only element carrying the name, so it takes the visible
+            // form: the announced name matches the label on screen.
+            accessibilityLabel: visibleName,
+            disabled: onToggle === undefined,
+            onValueChange: next => {
+              onToggle?.(next);
+            },
+          })}
         </View>
-      ) : null}
-    </View>
+      </View>
+    </ReorderableItem>
   );
 }

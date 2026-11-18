@@ -1,4 +1,3 @@
-import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -19,8 +18,6 @@ type SetupCommandFieldProps = Readonly<{
   command: string;
   /** The field's label, which is also its accessible name. */
   label: string;
-  /** Controls that belong to this command's own row, at the end of its label line. */
-  trailing?: ReactNode;
   /** The viewer cannot manage this row: render the command as read-only text. */
   readOnly?: boolean;
   /** The row is busy, not unmanageable: the field stays a field, dimmed. */
@@ -52,7 +49,6 @@ type SetupCommandFieldProps = Readonly<{
 export function SetupCommandField({
   command,
   label,
-  trailing,
   readOnly = false,
   disabled = false,
   accessibilityHint,
@@ -65,7 +61,7 @@ export function SetupCommandField({
   if (readOnly) {
     return (
       <View className="gap-1.5">
-        <FormFieldLabel label={label} labelAccessory={trailing} />
+        <FormFieldLabel label={label} />
         <View
           className={cn(
             INPUT_BOX_SHAPE_CLASS,
@@ -94,7 +90,6 @@ export function SetupCommandField({
     <View className="gap-1.5">
       <FormField
         label={label}
-        labelAccessory={trailing}
         defaultValue={command}
         placeholder={t('profiles.commandPlaceholder')}
         maxLength={MAX_SETUP_COMMAND_LENGTH}

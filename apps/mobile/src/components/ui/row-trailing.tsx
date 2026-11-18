@@ -177,6 +177,8 @@ export function renderRowTrailing(trailing: RowTrailingSpec | undefined): ReactN
 type RowIconActionProps = Readonly<{
   /** The control's spoken name; the icon carries no text of its own. */
   label: string;
+  /** Extra context a name cannot carry, e.g. the item's place in a list. */
+  hint?: string;
   onPress: () => void;
   disabled?: boolean;
   /** Test handle for native E2E scripts. */
@@ -190,13 +192,21 @@ type RowIconActionProps = Readonly<{
  * an edit, reorder or delete control never makes its row taller than the chevron
  * row beside it (`RowFrame`'s one geometry).
  */
-export function RowIconAction({ label, onPress, disabled, testID, children }: RowIconActionProps) {
+export function RowIconAction({
+  label,
+  hint,
+  onPress,
+  disabled,
+  testID,
+  children,
+}: RowIconActionProps) {
   const props = {
     onPress,
     disabled,
     testID,
     accessibilityRole: 'button' as const,
     accessibilityLabel: label,
+    accessibilityHint: hint,
     accessibilityState: disabled === undefined ? undefined : { disabled },
   };
   return (

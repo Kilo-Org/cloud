@@ -6,29 +6,36 @@
 
 import { View } from 'react-native';
 
-import { Card } from '@/components/ui/card';
 import { INPUT_BOX_SHAPE_CLASS } from '@/components/ui/input';
+import { RowGroup } from '@/components/ui/row-group';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { COMPACT_CONTROL_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
 /**
- * Content-shaped blocks in the same slots and card surface as a loaded command
- * slot: the label line with its row of 48pt controls, and the field's own 44pt
- * box.
+ * Content-shaped blocks in the same slots and grouped surface as a loaded
+ * command slot: the label line with its field box, then the action line the
+ * item ends with.
  */
 export function CommandsSkeleton() {
   return (
-    <View className="gap-3">
+    <RowGroup>
       {[0, 1, 2].map(index => (
-        <Card key={index}>
-          <View className="flex-row items-center justify-between gap-3">
+        <View key={index} className="gap-3 px-4 py-3">
+          <View className="gap-1.5">
             <Skeleton className="h-4 w-20 rounded bg-muted-soft" />
-            <Skeleton className={cn(ICON_TARGET_BOX_CLASS, 'rounded-lg bg-muted-soft')} />
+            <Skeleton className={cn(INPUT_BOX_SHAPE_CLASS, 'w-full rounded-md bg-muted-soft')} />
           </View>
-          <Skeleton className={cn(INPUT_BOX_SHAPE_CLASS, 'w-full rounded-md bg-muted-soft')} />
-        </Card>
+          <View className="flex-row items-center justify-end gap-5">
+            {[0, 1, 2].map(control => (
+              <Skeleton
+                key={control}
+                className={cn(COMPACT_CONTROL_BOX_CLASS, 'rounded-lg bg-muted-soft')}
+              />
+            ))}
+          </View>
+        </View>
       ))}
-    </View>
+    </RowGroup>
   );
 }

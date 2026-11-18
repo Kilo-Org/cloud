@@ -653,9 +653,9 @@ test('gutter: only the header the title belongs to owns the column its lines fol
 });
 
 /**
- * A header whose 48 dp back target sits on the gutter itself, the shape the
- * app's modal screens measured: the title starts at 62.1 dp, between that target
- * and the mirroring one after it.
+ * A header whose 48 dp close target sits on the gutter itself, the shape the
+ * app's modal screens measured, with a title that fills its box after it at
+ * 62.1 dp.
  */
 function gutterTargetHeaderScreen(): ProbeNode[] {
   return [
@@ -684,16 +684,15 @@ function gutterTargetHeaderScreen(): ProbeNode[] {
       label: 'Close',
     },
     { parent: 5, tag: 'Image', rect: [26, 38, 24, 24] },
-    { parent: 3, tag: 'View', rect: [62.1, 38, 275.9, 24.76] },
-    { parent: 7, tag: 'Paragraph', rect: [62.1, 38, 276.66, 24.76], text: 'Kilo Pass' },
-    { parent: 3, tag: 'View', rect: [338, 26, 48, 48] },
+    { parent: 3, tag: 'View', rect: [62.1, 38, 320, 24.76] },
+    { parent: 7, tag: 'Paragraph', rect: [62.1, 38, 320, 24.76], text: 'Kilo Pass' },
     { parent: 1, tag: 'ScrollView', rect: [0, 128, WIDTH, 672], style: { overflow: 'scroll' } },
     { parent: 9, tag: 'View', rect: [0, 128, WIDTH, 672], style: { paddingHorizontal: 14 } },
     { parent: 10, tag: 'Paragraph', rect: [14, 140, 300, 16], text: 'Body line' },
   ];
 }
 
-test('gutter: a title between two gutter-side targets is not the page column', () => {
+test('gutter: a title after a gutter-side close target is not the page column', () => {
   assert.deepEqual(run(gutterTargetHeaderScreen()), []);
 });
 

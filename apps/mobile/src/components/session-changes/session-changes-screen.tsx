@@ -147,12 +147,14 @@ export function SessionChangesScreen({ sessionId }: Readonly<{ sessionId: string
   // same line, so the title never moves — and dropped only when a read settled
   // successfully without a capture time: the title then centres alone instead of
   // keeping a line no label fills.
-  const captureReadSettled =
-    cloudAgentSessionId !== null ? changesQuery.isSuccess : !readOnly || legacyDiffQuery.isSuccess;
+  const unsettled = (read: { isPending: boolean; isError: boolean }) =>
+    read.isPending || read.isError;
+  const captureReadUnsettled =
+    cloudAgentSessionId === null ? readOnly && unsettled(legacyDiffQuery) : unsettled(changesQuery);
   let eyebrow: HeaderEyebrow = { kind: 'none' };
   if (asOf !== undefined) {
     eyebrow = { kind: 'ready', text: asOf };
-  } else if (!sessionQuery.isSuccess || !captureReadSettled) {
+  } else if (unsettled(sessionQuery) || captureReadUnsettled) {
     eyebrow = { kind: 'reserved' };
   }
 

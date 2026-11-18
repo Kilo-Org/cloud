@@ -7372,6 +7372,38 @@
                           "properties": {
                             "id": {
                               "type": "string",
+                              "const": "aws"
+                            },
+                            "account": {
+                              "type": "string",
+                              "const": "byoc"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "account"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "instanceType": {
+                          "type": "string",
+                          "const": "microvm-8g"
+                        }
+                      },
+                      "required": [
+                        "provider",
+                        "instanceType"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
                               "const": "vercel"
                             },
                             "account": {
@@ -7442,7 +7474,8 @@
                     "cloudflare-containers-standard-3",
                     "cloudflare-containers-standard-4",
                     "vercel-small",
-                    "vercel-large"
+                    "vercel-large",
+                    "aws-microvm-8g"
                   ]
                 }
               ]
@@ -8111,6 +8144,38 @@
                           "properties": {
                             "id": {
                               "type": "string",
+                              "const": "aws"
+                            },
+                            "account": {
+                              "type": "string",
+                              "const": "byoc"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "account"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "instanceType": {
+                          "type": "string",
+                          "const": "microvm-8g"
+                        }
+                      },
+                      "required": [
+                        "provider",
+                        "instanceType"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
                               "const": "vercel"
                             },
                             "account": {
@@ -8181,7 +8246,8 @@
                     "cloudflare-containers-standard-3",
                     "cloudflare-containers-standard-4",
                     "vercel-small",
-                    "vercel-large"
+                    "vercel-large",
+                    "aws-microvm-8g"
                   ]
                 }
               ]
@@ -9516,7 +9582,8 @@
                 "cloudflare-containers-standard-3",
                 "cloudflare-containers-standard-4",
                 "vercel-small",
-                "vercel-large"
+                "vercel-large",
+                "aws-microvm-8g"
               ]
             },
             {
@@ -9615,7 +9682,8 @@
                 "cloudflare-containers-standard-3",
                 "cloudflare-containers-standard-4",
                 "vercel-small",
-                "vercel-large"
+                "vercel-large",
+                "aws-microvm-8g"
               ]
             },
             {
@@ -10081,7 +10149,8 @@
                 "cloudflare-containers-standard-3",
                 "cloudflare-containers-standard-4",
                 "vercel-small",
-                "vercel-large"
+                "vercel-large",
+                "aws-microvm-8g"
               ]
             },
             {
@@ -10487,7 +10556,8 @@
                 "cloudflare-containers-standard-3",
                 "cloudflare-containers-standard-4",
                 "vercel-small",
-                "vercel-large"
+                "vercel-large",
+                "aws-microvm-8g"
               ]
             },
             {
@@ -19758,6 +19828,38 @@
                               "properties": {
                                 "id": {
                                   "type": "string",
+                                  "const": "aws"
+                                },
+                                "account": {
+                                  "type": "string",
+                                  "const": "byoc"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "account"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "instanceType": {
+                              "type": "string",
+                              "const": "microvm-8g"
+                            }
+                          },
+                          "required": [
+                            "provider",
+                            "instanceType"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "provider": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
                                   "const": "vercel"
                                 },
                                 "account": {
@@ -19828,7 +19930,8 @@
                         "cloudflare-containers-standard-3",
                         "cloudflare-containers-standard-4",
                         "vercel-small",
-                        "vercel-large"
+                        "vercel-large",
+                        "aws-microvm-8g"
                       ]
                     }
                   ]
@@ -20503,6 +20606,38 @@
                               "properties": {
                                 "id": {
                                   "type": "string",
+                                  "const": "aws"
+                                },
+                                "account": {
+                                  "type": "string",
+                                  "const": "byoc"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "account"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "instanceType": {
+                              "type": "string",
+                              "const": "microvm-8g"
+                            }
+                          },
+                          "required": [
+                            "provider",
+                            "instanceType"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "provider": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
                                   "const": "vercel"
                                 },
                                 "account": {
@@ -20573,7 +20708,8 @@
                         "cloudflare-containers-standard-3",
                         "cloudflare-containers-standard-4",
                         "vercel-small",
-                        "vercel-large"
+                        "vercel-large",
+                        "aws-microvm-8g"
                       ]
                     }
                   ]
@@ -38772,7 +38908,8 @@
             "cloudflare-containers-standard-3",
             "cloudflare-containers-standard-4",
             "vercel-small",
-            "vercel-large"
+            "vercel-large",
+            "aws-microvm-8g"
           ]
         },
         "environmentId": {
@@ -39186,7 +39323,8 @@
                 "cloudflare-containers-standard-3",
                 "cloudflare-containers-standard-4",
                 "vercel-small",
-                "vercel-large"
+                "vercel-large",
+                "aws-microvm-8g"
               ]
             },
             {

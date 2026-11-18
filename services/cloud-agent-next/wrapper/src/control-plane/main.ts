@@ -511,6 +511,7 @@ async function main(
     onDiagnostic: diagnostics.onDiagnostic,
     projector,
   });
+  const proxyUrl = env.HTTPS_PROXY || env.https_proxy;
   delete env.SANDBOX_CONTROL_CREDENTIAL;
   delete env.CONTROL_LOG_UPLOAD_URL;
   delete env.CONTROL_LOG_UPLOAD_GRANT;
@@ -620,6 +621,7 @@ async function main(
   const connection = createControlPlaneConnection({
     url,
     credential,
+    proxyUrl,
     allocationId,
     runtimeHarness: harness.kind,
     runtimeVersions: { kiloCliVersion, wrapperVersion: WRAPPER_VERSION },
@@ -779,6 +781,7 @@ async function main(
   previewTunnelRef.current = createPreviewTunnelClient({
     url: previewTunnelUrl(url),
     credential,
+    proxyUrl,
     forwarder: createPreviewForwarder({
       refusedPorts: () => [
         ...(sandboxProvider === undefined ? [] : reservedPreviewPorts(sandboxProvider)),

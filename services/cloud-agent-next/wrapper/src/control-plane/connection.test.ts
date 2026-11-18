@@ -62,6 +62,7 @@ class TestSocket {
   static OPEN = 1;
   static CONNECTING = 0;
   static instances: TestSocket[] = [];
+  static constructorError: Error | undefined;
   readyState = 1;
   onopen?: () => void;
   onmessage?: (event: { data: string }) => void;
@@ -75,6 +76,7 @@ class TestSocket {
     _url: string,
     readonly options?: { headers?: Record<string, string> }
   ) {
+    if (TestSocket.constructorError) throw TestSocket.constructorError;
     TestSocket.instances.push(this);
   }
   send(text: string): void {
@@ -182,6 +184,26 @@ async function withTestSocket(
     Object.assign(globalThis, { WebSocket: original });
   }
 }
+
+it('does not log proxy credentials when socket construction fails', () => {
+  const proxy = new URL('http://proxy.test:3128');
+  proxy.username = 'kilo';
+  proxy.password = 'not-a-real-proxy-token';
+  const proxyUrl = proxy.href;
+  withControlledConnection(
+    ({ connection, logs }) => {
+      TestSocket.constructorError = new Error(`Cannot connect through ${proxyUrl}`);
+      try {
+        connection.recycle();
+        expect(logs).toContain('control-plane connection failed');
+        expect(logs.join('\n')).not.toContain('not-a-real-proxy-token');
+      } finally {
+        TestSocket.constructorError = undefined;
+      }
+    },
+    { proxyUrl }
+  );
+});
 
 it('advertises worktree support without changing the strict legacy hello', () => {
   withControlledConnection(({ connection }) => {

@@ -64,7 +64,7 @@ export function ByokFailoverSection({
       title={partner ? 'Partner fallback' : 'BYOK failover'}
       description={
         partner
-          ? 'The partner provider returned an error, so Kilo sent the request through its own gateway instead. Both are paid with Kilo credits; only the attempt that served is charged.'
+          ? `${partnerInferenceProvider ? partnerName(partnerInferenceProvider) : 'The partner provider'} returned an error, so Kilo sent the request through its own gateway instead. Both are paid with Kilo credits; only the attempt that served is charged.`
           : 'The upstream provider returned an error, so Kilo retried with the next BYOK key in route order. Failover never uses Kilo credits.'
       }
     >

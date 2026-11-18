@@ -224,6 +224,7 @@ describe('RoutingSections partner fallback', () => {
     expect(text).toContain('Paid by: Kilo credits');
     expect(text).toContain('Mistral failed before this attempt');
     expect(text).toContain('Partner fallback');
+    expect(text).toContain('Mistral returned an error, so Kilo sent the request');
     expect(text).not.toContain('BYOK failover');
     expect(text).not.toContain('Failover never uses Kilo credits');
     const attempts = [

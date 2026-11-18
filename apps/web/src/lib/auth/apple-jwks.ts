@@ -29,10 +29,13 @@ let cachedKeys: { keys: AppleJWK[]; fetchedAt: number } | null = null;
 let refreshInFlight: Promise<AppleJWK[]> | null = null;
 let lastRefreshStartedAt = 0;
 let lastRefreshError: unknown = null;
-// Whether the recorded failure has already reached Sentry: a swallowed
-// failure is reported once, by the request that verifies against the
-// fallback set; a propagated failure is reported by the receiving route.
-let lastRefreshErrorReported = false;
+// Whether the recorded failure has already reached Sentry. The flag covers the
+// whole outage: the first request that disposes of the failure reports it — the
+// module when verification consumes the fallback set, the receiving route when
+// the error propagates — and only a successful refresh clears it. Leaving it
+// set across attempts keeps a long outage at one module report instead of one
+// per attempt.
+let refreshOutageReported = false;
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 // Upper bound on how long a failed refresh may keep serving the cached key
 // set: past this age, verification fails closed until a refresh succeeds.
@@ -62,9 +65,10 @@ async function refreshAppleKeys(): Promise<AppleJWK[]> {
     if (cachedKeys && now - cachedKeys.fetchedAt <= STALE_CACHE_MAX_AGE_MS) {
       return cachedKeys.keys;
     }
-    // Propagating hands the error to a route or the framework handler,
-    // which reports it; the attempt must not be reported again.
-    lastRefreshErrorReported = true;
+    // Propagating hands the error to a route or the framework handler, which
+    // reports it; marking the outage reported keeps a later verification of
+    // the same failure from reporting it again.
+    refreshOutageReported = true;
     throw lastRefreshError instanceof Error
       ? lastRefreshError
       : new Error('Apple JWKS is unavailable');
@@ -76,18 +80,16 @@ async function refreshAppleKeys(): Promise<AppleJWK[]> {
       const keys = await fetchApplePublicKeys();
       cachedKeys = { keys, fetchedAt: Date.now() };
       lastRefreshError = null;
-      lastRefreshErrorReported = false;
+      refreshOutageReported = false;
       return keys;
     } catch (error) {
       lastRefreshError = error;
-      lastRefreshErrorReported = false;
       if (cachedKeys && Date.now() - cachedKeys.fetchedAt <= STALE_CACHE_MAX_AGE_MS) {
         // Serve the still-present key set, at most STALE_CACHE_MAX_AGE_MS
         // after the last successful fetch; the next attempt stays on the
         // refresh cooldown while lastRefreshError records the failure. The
-        // failure is reported by whoever finally disposes of this attempt:
-        // verification reports it once when it consumes the fallback set,
-        // and a propagated failure is reported by the receiving route.
+        // report state is not reset here: one outage reports once, not once
+        // per failed attempt.
         return cachedKeys.keys;
       }
       throw error;
@@ -121,6 +123,11 @@ function jwkToPem(jwk: AppleJWK): string {
  * refresh failed, the refresh error propagates too: a fetch failure is a server
  * fault, while a kid absent from a successfully fetched set is rejected as a
  * client error.
+ * A failed refresh that still serves the cached key set is reported to Sentry
+ * once per outage: the first request that disposes of the failure reports it —
+ * the module when a token verifies against the fallback set, the receiving route
+ * when the error propagates — and later attempts in the same outage add no
+ * module report.
  *
  * @param token - The Apple-signed JWT to verify
  * @param audience - Expected `aud` claim (Apple client ID(s))
@@ -152,9 +159,9 @@ export async function verifyAppleJwtWithJwks(
       // kid may be a rotated one that a healthy fetch would resolve. A fetch
       // failure is a server fault, not a caller error, so it propagates and
       // routes answer 500 instead of misreporting an invalid token. The
-      // receiving route reports it, so the attempt is marked reported here.
+      // receiving route reports it, so the outage is marked reported here.
       if (lastRefreshError !== null) {
-        lastRefreshErrorReported = true;
+        refreshOutageReported = true;
         throw lastRefreshError instanceof Error
           ? lastRefreshError
           : new Error('Apple JWKS is unavailable');
@@ -163,12 +170,12 @@ export async function verifyAppleJwtWithJwks(
     }
   }
 
-  // The key set in use may come from a failed refresh whose error was
-  // swallowed. Report it here, exactly once per failed attempt, so the
-  // outage stays visible even when every token still verifies; a failure
-  // that propagates instead is reported once by the receiving route.
-  if (lastRefreshError !== null && !lastRefreshErrorReported) {
-    lastRefreshErrorReported = true;
+  // Report the outage once, the first time a verification consumes the
+  // fallback key set, unless an earlier request already handed this failure to
+  // a route. A failure that propagates instead is reported by the receiving
+  // route.
+  if (lastRefreshError !== null && !refreshOutageReported) {
+    refreshOutageReported = true;
     captureException(lastRefreshError, { tags: { source: 'apple_jwks_refresh' } });
   }
 

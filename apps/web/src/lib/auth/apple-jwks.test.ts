@@ -202,8 +202,9 @@ describe('verifyAppleJwtWithJwks', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
 
     // Within the TTL and the refresh cooldown, the cached key set still
-    // verifies tokens whose kid it holds. The propagating throws above
-    // already marked this attempt reported, so nothing is reported here.
+    // verifies tokens whose kid it holds. The outage was already reported when
+    // the failure was handed to the route, so this verification of the fallback
+    // set adds no second report.
     const payload = await verifyAppleJwtWithJwks(goodToken, 'com.kilocode.kiloapp');
     expect(payload.sub).toBe('user-1');
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -212,8 +213,9 @@ describe('verifyAppleJwtWithJwks', () => {
     ).not.toHaveBeenCalled();
 
     // After the cache TTL expires with refreshes still failing, the cached key
-    // set keeps verifying the kid it holds while the retry stays bounded.
-    // Each new failed attempt is consumed here and reported once.
+    // set keeps verifying the kid it holds while the retry stays bounded. The
+    // outage was already reported when the failure was handed to the route, so
+    // this later verification of the fallback set adds no second report.
     now += 60 * 60 * 1000;
     await verifyAppleJwtWithJwks(
       signToken('current-key', { sub: 'user-1' }),
@@ -222,7 +224,9 @@ describe('verifyAppleJwtWithJwks', () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(
       jest.requireMock<{ captureException: jest.Mock }>('@sentry/nextjs').captureException
-    ).toHaveBeenCalledTimes(1);
+    ).not.toHaveBeenCalled();
+    // The outage was already reported; a later failed attempt in the same
+    // outage adds no second report and no report per attempt.
     now += 31_000;
     await verifyAppleJwtWithJwks(
       signToken('current-key', { sub: 'user-1' }),
@@ -231,7 +235,7 @@ describe('verifyAppleJwtWithJwks', () => {
     expect(fetchMock).toHaveBeenCalledTimes(4);
     expect(
       jest.requireMock<{ captureException: jest.Mock }>('@sentry/nextjs').captureException
-    ).toHaveBeenCalledTimes(2);
+    ).not.toHaveBeenCalled();
   });
 
   it('fails closed once the cached key set is past the stale bound', async () => {
@@ -269,6 +273,9 @@ describe('verifyAppleJwtWithJwks', () => {
 
   it('resets the stale window after a successful refresh', async () => {
     const { verifyAppleJwtWithJwks } = await loadFreshModule();
+    const captureException = jest.requireMock<{ captureException: jest.Mock }>(
+      '@sentry/nextjs'
+    ).captureException;
     let now = 1_700_000_000_000;
     jest.spyOn(Date, 'now').mockImplementation(() => now);
     const fetchMock = jest
@@ -281,11 +288,13 @@ describe('verifyAppleJwtWithJwks', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     // Past the bound with refreshes still failing, verification fails closed.
+    // The failure propagates, so the receiving route reports it, not the module.
     now += STALE_CACHE_MAX_AGE_MS + 31_000;
     await expect(verifyAppleJwtWithJwks(token, 'com.kilocode.kiloapp')).rejects.toThrow(
       'Failed to fetch Apple JWKS: 503'
     );
     expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(captureException).not.toHaveBeenCalled();
 
     // A successful refresh stores a new fetchedAt and clears the failure.
     now += 31_000;
@@ -299,8 +308,10 @@ describe('verifyAppleJwtWithJwks', () => {
     now += 60 * 60 * 1000;
     await verifyAppleJwtWithJwks(token, 'com.kilocode.kiloapp');
     expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(captureException).toHaveBeenCalledTimes(1);
     now += 31_000;
     await verifyAppleJwtWithJwks(token, 'com.kilocode.kiloapp');
     expect(fetchMock).toHaveBeenCalledTimes(5);
+    expect(captureException).toHaveBeenCalledTimes(1);
   });
 });

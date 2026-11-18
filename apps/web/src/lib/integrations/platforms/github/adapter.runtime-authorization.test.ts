@@ -107,12 +107,13 @@ describe('GitHub installation authorization', () => {
     ).resolves.toBeNull();
   });
 
-  it('treats a lookup 401 as no answer', async () => {
-    mockPermission.mockRejectedValueOnce({ status: 401, message: 'Bad credentials' });
+  it('throws a credential-rejected lookup instead of reporting no answer', async () => {
+    const credentialError = { status: 401, message: 'Bad credentials' };
+    mockPermission.mockRejectedValueOnce(credentialError);
 
     await expect(
       getCollaboratorPermissionLevel('installation-1', 'acme', 'widgets', 'octocat')
-    ).resolves.toBeNull();
+    ).rejects.toBe(credentialError);
   });
 
   it('treats a lookup 403 without rate-limit headers as no answer', async () => {
@@ -174,12 +175,13 @@ describe('GitHub installation authorization', () => {
     expect(mockPermission).not.toHaveBeenCalled();
   });
 
-  it('returns no answer when the token mint answers 401 for the installation', async () => {
-    mockAuth.mockRejectedValueOnce({ status: 401, message: 'Bad credentials' });
+  it('throws a credential-rejected token mint instead of reporting no answer', async () => {
+    const credentialError = { status: 401, message: 'Bad credentials' };
+    mockAuth.mockRejectedValueOnce(credentialError);
 
     await expect(
       getCollaboratorPermissionLevel('installation-1', 'acme', 'widgets', 'octocat')
-    ).resolves.toBeNull();
+    ).rejects.toBe(credentialError);
     expect(mockPermission).not.toHaveBeenCalled();
   });
 

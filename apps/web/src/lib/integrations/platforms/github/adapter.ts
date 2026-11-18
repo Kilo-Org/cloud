@@ -483,8 +483,19 @@ export async function getCollaboratorPermissionLevel(
     // surface the reset time.
     const rateLimit = toGitHubRateLimitError(error);
     if (rateLimit) throw rateLimit;
-    // Any other 4xx (401/403 the installation cannot query collaborators, 422)
-    // is a definitive non-answer, not something to retry.
+    // A 401 means the App credentials were rejected — Kilo's own failure, not
+    // a permission answer — so it must not settle the check as a denial.
+    if (isHttpError(error) && error.status === 401) {
+      warnExceptInTest('[getCollaboratorPermissionLevel] Installation token mint failed', {
+        installationId,
+        owner,
+        repo,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+    // Any other 4xx (403 the installation cannot query collaborators, 422) is
+    // a definitive non-answer, not something to retry.
     if (isHttpError(error) && error.status >= 400 && error.status < 500) return null;
     warnExceptInTest('[getCollaboratorPermissionLevel] Installation token mint failed', {
       installationId,
@@ -516,8 +527,19 @@ export async function getCollaboratorPermissionLevel(
     // surface the reset time.
     const rateLimit = toGitHubRateLimitError(error);
     if (rateLimit) throw rateLimit;
-    // Any other 4xx (401/403 the installation cannot query collaborators, 422)
-    // is a definitive non-answer, not something to retry.
+    // A 401 means the installation token was rejected — the permission was
+    // never evaluated, so it must not settle the check as a denial.
+    if (isHttpError(error) && error.status === 401) {
+      warnExceptInTest('[getCollaboratorPermissionLevel] Collaborator lookup failed', {
+        owner,
+        repo,
+        username,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+    // Any other 4xx (403 the installation cannot query collaborators, 422) is
+    // a definitive non-answer, not something to retry.
     if (isHttpError(error) && error.status >= 400 && error.status < 500) return null;
     warnExceptInTest('[getCollaboratorPermissionLevel] Collaborator lookup failed', {
       owner,

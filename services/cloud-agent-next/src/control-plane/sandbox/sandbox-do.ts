@@ -7785,7 +7785,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const reconcile = this.provider.reconcileLaunch?.bind(this.provider);
     if (this.createInFlight || !reconcile) return;
     const state = await this.readAllocation();
+    // Re-check after the await: the constructor and alarm paths can both reach this point.
     if (
+      this.createInFlight ||
       state.providerRef === null ||
       state.allocationId === null ||
       state.kind === 'stopped' ||

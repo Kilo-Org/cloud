@@ -4913,7 +4913,9 @@
   "organizationGuardrails": {
     "title": "Gwardjani tal-IA",
     "permissionDenied": "Sidien u amministraturi tal-organizzazzjoni biss jistgħu jimmaniġġjaw il-Gwardjani tal-IA.",
-    "unavailable": "Il-Gwardjani tal-IA mhumiex disponibbli għal din l-organizzazzjoni.",
+    "unavailableTitle": "Il-Gwardjani tal-IA mhumiex attivati",
+    "unavailable": "Kilo jattiva l-Gwardjani tal-IA għal organizzazzjoni fuq talba. Ikkuntattja lil {{supportEmail}}, u sid tal-organizzazzjoni jista' jattivahom mill-impostazzjonijiet fuq il-web.",
+    "contactSupport": "Ikkuntattja l-appoġġ",
     "loadError": "Il-Gwardjani tal-IA ma setgħux jitgħabbew",
     "statusSaving": "Qed jiġi salvat…",
     "statusSaved": "Salvat",

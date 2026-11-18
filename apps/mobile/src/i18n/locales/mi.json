@@ -4703,7 +4703,9 @@
   "organizationGuardrails": {
     "title": "Ara Tiaki Atamai",
     "permissionDenied": "Ka taea e ngā kaipupuri me ngā kaiwhakahaere o te whakahaere anake te whakahaere i ngā Ara Tiaki Atamai.",
-    "unavailable": "Kāore ngā Ara Tiaki Atamai e wātea ana mō tēnei whakahaere.",
+    "unavailableTitle": "Kāore anō ngā Ara Tiaki Atamai kia whakahohea",
+    "unavailable": "Ka taea e Kilo te whakahohe i ngā Ara Tiaki Atamai mō tētahi whakahaere ina tonohia. Whakapā atu ki {{supportEmail}}, ā, ka taea e tētahi kaipupuri o te whakahaere te whakakā mai i ngā tautuhinga i runga i te ipurangi.",
+    "contactSupport": "Whakapā ki te rōpū tautoko",
     "loadError": "Kāore i taea te uta i ngā Ara Tiaki Atamai",
     "statusSaving": "E tiaki ana…",
     "statusSaved": "Kua tiakina",

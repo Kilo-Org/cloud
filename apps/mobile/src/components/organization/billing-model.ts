@@ -130,17 +130,39 @@ export function getOrgTrialStatusPill(trial: OrgTrialState): BillingState | null
 }
 
 /**
+ * The Stripe statuses that are payment trouble, and outrank the trial readout.
+ * One record feeds both the guard's `Object.hasOwn` test and the helper's
+ * parameter type, so a status can join one side without the other.
+ */
+const FAILURE_SET = {
+  past_due: true,
+  unpaid: true,
+  incomplete: true,
+  paused: true,
+} as const;
+
+type FailureStatus = keyof typeof FAILURE_SET;
+
+/**
  * The subscription's own payment trouble: the past-due row for a card Stripe
  * is still or has stopped retrying, the checkout warning for an incomplete
- * first payment, the pause notice for a suspended plan.
+ * first payment, the pause notice for a suspended plan. The parameter is the
+ * exact union the caller's guard narrows to through `FAILURE_SET`, so a status
+ * joining that set without a row here fails to compile only when the union
+ * stops covering it — and a row added without joining the set is unreachable
+ * by the guard. The two lists are one record.
  */
-function subscriptionFailureState(status: string): BillingState {
+function subscriptionFailureState(status: FailureStatus): BillingState {
   if (status === 'past_due' || status === 'unpaid') {
     return { label: i18n.t('organization.billing.statePastDue'), tone: 'danger' };
   }
   if (status === 'incomplete') {
     return { label: i18n.t('kiloPass.statusIncomplete'), tone: 'warn' };
   }
+  // The parameter type leaves no other value: the guard that calls this
+  // narrows to `FailureStatus` through the same `FAILURE_SET` the union is
+  // keyed from, so a status added there lands in this branch only when the
+  // cases above have not claimed it.
   return { label: i18n.t('kiloPass.statusPaused'), tone: 'warn' };
 }
 
@@ -171,11 +193,8 @@ export function getOrgSubscriptionState(
   // paying status the server treats as paid, and `incomplete`/`paused` is a
   // checkout or billing pause the trial must not swallow — each is the one
   // failure signal on this screen, and each is fixable now.
-  if (
-    subscription != null &&
-    (status === 'past_due' || status === 'unpaid' || status === 'incomplete' || status === 'paused')
-  ) {
-    return subscriptionFailureState(status);
+  if (subscription != null && status != null && Object.hasOwn(FAILURE_SET, status)) {
+    return subscriptionFailureState(status as FailureStatus);
   }
   const trialState = trial == null ? null : getOrgTrialStatusPill(trial);
   if (trialState != null) {

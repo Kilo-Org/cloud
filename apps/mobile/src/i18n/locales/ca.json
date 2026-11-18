@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Canvis",
     "organizationTrialEnded": "El període de prova de l'organització ha finalitzat i no té cap pla actiu. El propietari de l'organització pot actualitzar la facturació a kilo.ai i tornar-ho a provar.",
-    "privateRepositoryA11y": "{{name}}, repositori privat"
+    "privateRepositoryA11y": "{{name}}, repositori privat",
+    "legalDocumentEnglishOnly": "Aquest document només està disponible en anglès."
   },
   "language": {
     "restarting": "S'està reiniciant per aplicar l'idioma",
@@ -1490,7 +1491,8 @@
       "repositoryLine": "Revisions: {{reviews}} · Troballes: {{findings}}",
       "empty": "Encara no hi ha revisions amb analítica",
       "emptyDescription": "L'analítica registra les revisions completades mentre està activada per a l'organització.",
-      "off": "L'analítica està desactivada per a aquesta organització.",
+      "offTitle": "L'analítica està desactivada per a {{platform}}",
+      "offDescription": "Activa-la a la configuració de l'organització al web per registrar les revisions completades.",
       "couldNotLoad": "No s'ha pogut carregar l'analítica"
     },
     "council": {

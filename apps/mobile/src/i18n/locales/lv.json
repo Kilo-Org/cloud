@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Izmaiņas",
     "organizationTrialEnded": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna. Organizācijas īpašnieks var atjaunināt norēķinu informāciju vietnē kilo.ai un pēc tam mēģināt vēlreiz.",
-    "privateRepositoryA11y": "{{name}}, privāts repozitorijs"
+    "privateRepositoryA11y": "{{name}}, privāts repozitorijs",
+    "legalDocumentEnglishOnly": "Šis dokuments ir pieejams tikai angļu valodā."
   },
   "language": {
     "restarting": "Notiek restartēšana, lai lietotu izvēlēto valodu",
@@ -1490,7 +1491,8 @@
       "repositoryLine": "Pārskatīšanas: {{reviews}} · Konstatējumi: {{findings}}",
       "empty": "Vēl nav pārskatīšanu ar analītiku",
       "emptyDescription": "Analītika reģistrē pabeigtas pārskatīšanas, kamēr tā ir iespējota organizācijai.",
-      "off": "Analītika šai organizācijai ir izslēgta.",
+      "offTitle": "{{platform}} platformā analītika ir izslēgta",
+      "offDescription": "Ieslēdz to organizācijas iestatījumos tīmeklī, lai reģistrētu pabeigtas pārskatīšanas.",
       "couldNotLoad": "Neizdevās ielādēt analītiku"
     },
     "council": {

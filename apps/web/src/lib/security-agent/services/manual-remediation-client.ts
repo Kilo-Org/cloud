@@ -10,27 +10,24 @@ import {
 } from '@kilocode/worker-utils/security-remediation-policy';
 import { z } from 'zod';
 import { postSecurityWorkerJson } from './security-worker-request';
-
-type RemediationOwner =
-  | { organizationId: string; userId?: never }
-  | { userId: string; organizationId?: never };
+import type { SecurityReviewOwner } from '../core/types';
 
 type ManualRemediationStartParams = {
   findingId: string;
-  owner: RemediationOwner;
+  owner: SecurityReviewOwner;
   actorUserId: string;
   retry?: boolean;
 };
 
 type RemediationCancellationParams = {
   attemptId: string;
-  owner: RemediationOwner;
+  owner: SecurityReviewOwner;
   actorUserId: string;
 };
 
 type ApplyAutoRemediationParams = {
   commandId: string;
-  owner: RemediationOwner;
+  owner: SecurityReviewOwner;
   actorUserId: string;
 };
 

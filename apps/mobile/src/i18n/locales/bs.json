@@ -175,7 +175,8 @@
     "durationHourShort": "h",
     "changes": "Izmjene",
     "organizationTrialEnded": "Probni period organizacije je završen i ona nema aktivan plan. Vlasnik organizacije može ažurirati naplatu na kilo.ai, a zatim pokušati ponovo.",
-    "privateRepositoryA11y": "{{name}}, privatno spremište"
+    "privateRepositoryA11y": "{{name}}, privatno spremište",
+    "legalDocumentEnglishOnly": "Ovaj dokument je dostupan samo na engleskom jeziku."
   },
   "language": {
     "restarting": "Ponovno pokretanje radi primjene jezika",
@@ -1490,7 +1491,8 @@
       "repositoryLine": "Pregledi: {{reviews}} · Nalazi: {{findings}}",
       "empty": "Još nema pregleda s analitikom",
       "emptyDescription": "Analitika bilježi završene preglede dok je uključena za organizaciju.",
-      "off": "Analitika je isključena za ovu organizaciju.",
+      "offTitle": "Analitika je isključena za {{platform}}",
+      "offDescription": "Uključi je u postavkama organizacije na webu da bilježi završene preglede.",
       "couldNotLoad": "Učitavanje analitike nije uspjelo"
     },
     "council": {

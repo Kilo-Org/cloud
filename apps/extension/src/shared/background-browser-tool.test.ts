@@ -149,6 +149,7 @@ const browserToolRequest = (
   args: Record<string, unknown>
 ): TabDebuggerRequest => ({
   arguments: args,
+  caller: { conversationId: 'conversation-1', kind: 'panel', panelId: 'panel-1' },
   tabId,
   tool,
   type: BROWSER_TOOL_MESSAGE,

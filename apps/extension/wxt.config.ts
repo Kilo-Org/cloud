@@ -25,6 +25,13 @@ export default defineConfig({
         id: 'browser-agent@kilo.ai',
       },
     },
+    commands: {
+      'stop-all-local-agents': {
+        // Chrome refuses to start the background worker when a command has no description.
+        description: 'Stop all local agents',
+        suggested_key: { default: 'Alt+Shift+K' },
+      },
+    },
     description: 'Side-panel AI chat agent. Use open-weight or frontier models.',
     host_permissions: [
       '<all_urls>',
@@ -34,10 +41,12 @@ export default defineConfig({
       'http://localhost/*',
     ],
     name: 'Kilo Code',
+    // Optional permissions never disable installs; Chrome prompts when the switch turns on.
+    optional_permissions: ['nativeMessaging'],
     permissions:
       browser === 'firefox'
-        ? ['contextMenus', 'identity', 'scripting', 'storage', 'tabs']
-        : ['contextMenus', 'debugger', 'identity', 'scripting', 'storage'],
+        ? ['alarms', 'contextMenus', 'identity', 'scripting', 'storage', 'tabs']
+        : ['alarms', 'contextMenus', 'debugger', 'identity', 'scripting', 'storage'],
   }),
   modules: ['@wxt-dev/module-react'],
   vite: () => ({

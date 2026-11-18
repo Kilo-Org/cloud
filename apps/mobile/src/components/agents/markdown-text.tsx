@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { View } from 'react-native';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -16,6 +16,8 @@ import {
   MarkdownHtml,
   type MarkdownHtmlIncrementalConverted,
   type MarkdownHtmlIncrementalInput,
+  type MarkdownHtmlSegment,
+  type MarkdownHtmlSplit,
   splitMarkdownHtmlIncremental,
 } from './markdown-html';
 import { MarkdownMermaid } from './markdown-mermaid';
@@ -69,6 +71,37 @@ export type TailRecord =
       wholeConverted?: undefined;
     }
   | { appended?: undefined; wholeConverted: string };
+
+/**
+ * What one publish hands its effect: the segments to render, and the seed the
+ * effect installs — the cached/derived split keyed by its raw value plus the
+ * previous-publish record the next publish reuses.
+ */
+type PublishSeed = {
+  rawValue: string;
+  split: MarkdownHtmlSplit;
+  record: MarkdownHtmlIncrementalConverted;
+};
+
+/**
+ * The previous-publish record the next publish reuses: the split's snapshot as
+ * the tail, the raw value the split segmented, and the conversion closure that
+ * folds an appended region after the previous converted source. The cache-hit
+ * and miss paths build it over the same shape, so a remounted row that reuses
+ * a cached split still extends it instead of re-converting whole.
+ */
+function buildTailRecord(rawValue: string, split: MarkdownHtmlSplit): PublishSeed {
+  return {
+    rawValue,
+    split,
+    record: {
+      tail: split.snapshot,
+      rawValue,
+      convert: (suffix, previous) =>
+        suffix === '' ? previous : `${previous}${convertHtmlToMarkdown(suffix)}`,
+    },
+  };
+}
 
 /**
  * Whether `value` extends `prior`'s raw value, and what the publish passes to
@@ -165,16 +198,21 @@ export function MarkdownText({
   // split's converted markdown and converts only the appended region, so the
   // conversion step is tail-bounded like the lexing step.
   const previousRef = useRef<MarkdownHtmlIncrementalConverted | undefined>(undefined);
-  const { segments } = useMemo(() => {
+  const publish = useMemo<{
+    segments: MarkdownHtmlSegment[];
+    seed: PublishSeed;
+  }>(() => {
     // A remount (a FlashList row re-entering the window) starts without a
     // previous publish, so the parser can only rebuild the whole value.
     // Completed values were cached on the previous mount — including the last
     // streaming publish, which is the value a remount sees — so reuse that
-    // parse instead of lexing and segmenting the same source again.
+    // parse instead of lexing and segmenting the same source again, and seed
+    // the previous-publish record from the cache so the next value still
+    // extends the remounted row's snapshot instead of re-converting whole.
     const cached =
       previousRef.current === undefined ? markdownHtmlSplitCache.get(value) : undefined;
     if (cached !== undefined) {
-      return cached;
+      return { segments: cached.segments, seed: buildTailRecord(value, cached) };
     }
     const prior = previousRef.current;
     // The split inherits the previous publish's work only when the value
@@ -190,15 +228,19 @@ export function MarkdownText({
     const record = extendsPreviousRaw(value, prior);
     const input = incrementalInput(value, record, prior);
     const result = splitMarkdownHtmlIncremental(input);
-    markdownHtmlSplitCache.set(value, result);
-    previousRef.current = {
-      tail: result.snapshot,
-      rawValue: value,
-      convert: (suffix, previous) =>
-        suffix === '' ? previous : `${previous}${convertHtmlToMarkdown(suffix)}`,
-    };
-    return result;
+    return { segments: result.segments, seed: buildTailRecord(value, result) };
   }, [value]);
+
+  // The record the next publish reuses is written after render, so a render
+  // React discards never installs it, and the cache keeps completed values
+  // across remounts. Both derive from the memoized result alone.
+  useEffect(() => {
+    const seed = publish.seed;
+    markdownHtmlSplitCache.set(seed.rawValue, seed.split);
+    previousRef.current = seed.record;
+    // `publish` changes only when the memo recomputed for a new value; an
+    // unrelated re-render reuses the same object and skips the write.
+  }, [publish]);
 
   // Always render through the same wrapping View with index keys: switching to
   // a bare markdown element when no HTML token exists would change the root
@@ -206,7 +248,7 @@ export function MarkdownText({
   // token streams in.
   return (
     <View>
-      {segments.map((segment, index) =>
+      {publish.segments.map((segment, index) =>
         segment.type === 'html' ? (
           <MarkdownHtml
             key={`md-html-${index}`}

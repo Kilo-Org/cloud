@@ -1437,6 +1437,59 @@ describe('MarkdownText streaming conversion tail', () => {
       spy.mockRestore();
     }
   });
+
+  it('reuses the cached tail after a remount of a streaming row', async () => {
+    // A FlashList row that leaves the window mid-stream remounts with the
+    // last publish's value: the record the previous mount wrote is gone, so
+    // without the cache-hit seed the first publish of the remounted row
+    // re-converts the whole value. With the seed, the publish that appends to
+    // the remounted value folds only the appended region, like a mount that
+    // never left the window.
+    const step = '<span>chunk</span> and <b>more</b> text\n\n';
+    const before = step.repeat(3);
+    const after = before + step;
+
+    const calls: string[] = [];
+    const original = convertModule.convertHtmlToMarkdown;
+    const spy = vi.spyOn(convertModule, 'convertHtmlToMarkdown').mockImplementation(value => {
+      calls.push(value);
+      return original(value);
+    });
+    try {
+      // The first mount publishes the value that stays in the cache.
+      const first = await mount(<MarkdownText value={before} />);
+      expectWholeValueRender(first, before, 'first mount');
+
+      // The remount: a fresh instance starts without the previous record and
+      // reads the cached split, so its effect seeds the record instead of
+      // re-deriving it from a whole conversion. The spy window closes before
+      // `expectWholeValueRender`'s own whole-value conversion reaches it.
+      calls.length = 0;
+      const second = await mount(<MarkdownText value={before} />);
+      const remountCalls = [...calls];
+      expectWholeValueRender(second, before, 'remount');
+
+      // The publish after the remount must extend the seeded record: the
+      // conversion work stays bounded to the appended region, not the whole
+      // value. The snapshot is taken before `expectWholeValueRender`, whose
+      // own whole-value conversion also flows through the spy.
+      calls.length = 0;
+      await act(async () => {
+        await Promise.resolve();
+        second.update(<MarkdownText value={after} />);
+      });
+      const publishCalls = [...calls];
+      const convertedCharacters = publishCalls.reduce((total, source) => total + source.length, 0);
+      expect(convertedCharacters, 'post-remount publish work').toBeLessThanOrEqual(3 * step.length);
+      expect(publishCalls, 'post-remount publish').not.toContain(after);
+      expectWholeValueRender(second, after, 'post-remount publish');
+      // The remount itself must not have re-converted the whole value either:
+      // the cache hit segments nothing and converts nothing.
+      expect(remountCalls, 'remount conversions').not.toContain(before);
+    } finally {
+      spy.mockRestore();
+    }
+  });
 });
 
 describe('MarkdownText document direction', () => {

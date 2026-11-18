@@ -145,6 +145,53 @@ vi.mock('../../session/session-registration.js', () => ({
 vi.mock('../../sandbox-session/session-stub.js', () => ({
   getSandboxSessionStub: getSandboxSessionStubMock,
 }));
+// The fake workspace has adopted its authority from the creating chat's
+// metadata, so these tests keep describing workspaces through that chat.
+vi.mock('../../control-plane/workspace/workspace-stub.js', async () => {
+  const { isWorkspaceAnchorMetadata, workspaceEgressFromMetadata } =
+    await import('../../cloud-agent-authority.js');
+  const { CurrentSessionMetadataSchema } = await import('../../persistence/session-metadata.js');
+  const anchor = async (env: unknown, ownerId: string, sessionId: string) =>
+    (await getSandboxSessionStubMock(
+      env,
+      ownerId,
+      sessionId
+    ).getMetadata()) as SessionMetadata | null;
+  return {
+    getWorkspaceStub: (env: unknown, ownerId: string, sessionId: string) => ({
+      getSpawnContext: async (authority: unknown) => {
+        const context = await getSandboxSessionStubMock(
+          env,
+          ownerId,
+          sessionId
+        ).getCloudAgentSpawnContext(authority);
+        const metadata = await anchor(env, ownerId, sessionId);
+        return {
+          ...context,
+          egress: metadata
+            ? workspaceEgressFromMetadata(CurrentSessionMetadataSchema.parse(metadata))
+            : undefined,
+        };
+      },
+      describe: async () => {
+        const metadata = await anchor(env, ownerId, sessionId);
+        return metadata?.allowSubagentSessions === true && isWorkspaceAnchorMetadata(metadata)
+          ? {
+              state: 'active',
+              authorizationId: '12345678-1234-4234-8234-123456789abc',
+              worktreeId: metadata.workspace?.worktreeId ?? null,
+              organizationId: metadata.identity.orgId ?? null,
+            }
+          : {
+              state: 'unestablished',
+              authorizationId: null,
+              worktreeId: null,
+              organizationId: null,
+            };
+      },
+    }),
+  };
+});
 vi.mock('../../balance-validation.js', () => ({
   validateBalanceOnly: vi.fn(async () => ({ success: true })),
 }));
@@ -428,7 +475,7 @@ describe('prepareSession operation-ledger admission gate', () => {
     expect(createSessionWithLedgerMock).not.toHaveBeenCalled();
   });
 
-  it('rejects a workspace session callback when the authority parent metadata is unavailable', async () => {
+  it('rejects a workspace session callback when the workspace authority is unavailable', async () => {
     useSessionMetadata([
       [
         WORKSPACE_TARGET_ID,

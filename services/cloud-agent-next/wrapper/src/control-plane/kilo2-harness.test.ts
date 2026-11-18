@@ -221,9 +221,11 @@ describe('Kilo v2 harness commit messages', () => {
   it('does not call the RPC when the default model request fails', async () => {
     const { url, requests } = startStub(() => new Response(null, { status: 503 }));
 
-    await expect(createHarness(url).generateCommitMessage({ path: directory })).rejects.toThrow(
-      'HTTP 503'
-    );
+    const error: unknown = await createHarness(url)
+      .generateCommitMessage({ path: directory })
+      .catch(cause => cause);
+    expect(error).toBeInstanceOf(Error);
+    expect(String(error)).toContain('HTTP 503');
     expect(requests.map(request => request.pathname)).toEqual([modelPath]);
   });
 

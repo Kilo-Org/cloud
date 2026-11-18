@@ -49,15 +49,23 @@ export function createKilo2Harness(options: {
       `/api/experimental/session/${encodeURIComponent(input.sessionId)}/instructions/entries/cloud-agent-context`,
       { method: 'PUT', body: { value: context }, signal: input.signal }
     );
+  // A harness lives for one runtime. After a location's catalog matched or its
+  // retries ran out, its plugins have started; later turns skip the lookup.
+  const startedModelLocations = new Set<string>();
+  // The catalog can be incomplete while location plugins start. Retry the
+  // lookup, not the native call, which Kilo accepts before reporting a missing model.
   async function waitForModel(input: HarnessSession, model: string): Promise<void> {
+    if (startedModelLocations.has(input.directory)) return;
     const path = `/api/model?${locationQuery(input.directory)}`;
     for (let attempt = 0; ; attempt++) {
       input.signal?.throwIfAborted();
       const catalog = modelCatalogSchema.parse(await api.data(path, { signal: input.signal }));
-      if (catalog.some(entry => entry.providerID === 'kilo' && entry.id === model)) return;
       const delay = MODEL_NOT_FOUND_RETRY_DELAYS_MS[attempt];
-      // The native prompt owns the eventual model error and its transcript entry.
-      if (delay === undefined) return;
+      // The native call owns the eventual model error and its transcript entry.
+      if (delay === undefined || catalog.some(entry => entry.providerID === 'kilo' && entry.id === model)) {
+        startedModelLocations.add(input.directory);
+        return;
+      }
       options.log?.(
         `kilo2 model_not_found sessionId=${input.sessionId} attempt=${attempt + 1} retryInMs=${delay}`
       );
@@ -74,7 +82,7 @@ export function createKilo2Harness(options: {
         { agent: input.agent },
         input.signal
       );
-    if (input.model)
+    if (input.model) {
       await post(
         `${kilo2SessionPath(input.sessionId)}/model`,
         {
@@ -86,6 +94,8 @@ export function createKilo2Harness(options: {
         },
         input.signal
       );
+      await waitForModel(input, input.model);
+    }
   }
   async function interrupt(input: HarnessSession) {
     const signal = input.signal ?? AbortSignal.timeout(10_000);
@@ -260,9 +270,6 @@ export function createKilo2Harness(options: {
       await select(input);
       await options.lifecycle.waitForInterrupt(input.sessionId, input.signal);
       await replaceCloudAgentContext(input, input.context);
-      // The catalog can be incomplete while location plugins start. Retry the
-      // lookup, not the prompt, which Kilo accepts before reporting a missing model.
-      if (input.model) await waitForModel(input, input.model);
       await post(
         `${kilo2SessionPath(input.sessionId)}/prompt`,
         {

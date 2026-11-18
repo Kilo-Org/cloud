@@ -3,6 +3,7 @@ import {
   RuntimeSkillsSchema,
   RuntimeAgentsSchema,
   RuntimeBuiltinAgentsSchema,
+  RuntimeModelContextLimitsSchema,
   RuntimeKiloCommandsSchema,
   RuntimeInstructionsSchema,
 } from './runtime-profile.js';
@@ -483,6 +484,7 @@ const routeSpecObjectSchema = z
     runtimeInstructions: RuntimeInstructionsSchema.optional(),
     runtimeAgents: RuntimeAgentsSchema.optional(),
     builtinAgents: RuntimeBuiltinAgentsSchema.optional(),
+    modelContextLimits: RuntimeModelContextLimitsSchema.optional(),
     kiloCommands: RuntimeKiloCommandsSchema.optional(),
     /**
      * Preserves the runtime key and HOME of existing allocations. The Sandbox
@@ -539,6 +541,7 @@ export const workspaceConfigSchema = routeSpecObjectSchema
     runtimeInstructions: true,
     runtimeAgents: true,
     builtinAgents: true,
+    modelContextLimits: true,
     kiloCommands: true,
   })
   .strict();
@@ -556,6 +559,7 @@ export const attachmentSpecSchema = routeSpecObjectSchema
     runtimeInstructions: true,
     runtimeAgents: true,
     builtinAgents: true,
+    modelContextLimits: true,
     kiloCommands: true,
   })
   .strict()

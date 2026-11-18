@@ -226,6 +226,7 @@ import {
 } from '../../mcp-config.js';
 import {
   attachmentSpecFromRouteSpec,
+  projectRuntimeProfileFields,
   workspaceConfigFromSpec,
 } from '../../shared/workspace-config.js';
 import {
@@ -3784,13 +3785,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       ...(spec.baseBranch === undefined ? {} : { baseBranch: spec.baseBranch }),
       ...(spec.baseSha === undefined ? {} : { baseSha: spec.baseSha }),
       ...(spec.worktreeRecovery === undefined ? {} : { worktreeRecovery: spec.worktreeRecovery }),
-      ...(spec.runtimeSkills === undefined ? {} : { runtimeSkills: spec.runtimeSkills }),
-      ...(spec.runtimeInstructions === undefined
-        ? {}
-        : { runtimeInstructions: spec.runtimeInstructions }),
-      ...(spec.runtimeAgents === undefined ? {} : { runtimeAgents: spec.runtimeAgents }),
-      ...(spec.builtinAgents === undefined ? {} : { builtinAgents: spec.builtinAgents }),
-      ...(spec.kiloCommands === undefined ? {} : { kiloCommands: spec.kiloCommands }),
+      ...projectRuntimeProfileFields(spec),
       ...(spec.permission === undefined ? {} : { permission: spec.permission }),
       ...(spec.runtimeIsolation === undefined ? {} : { runtimeIsolation: spec.runtimeIsolation }),
       ...(payload.githubReviewTarget === undefined

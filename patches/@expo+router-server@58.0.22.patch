@@ -1,5 +1,5 @@
 diff --git a/build/typed-routes/generate.js b/build/typed-routes/generate.js
-index 7ba8d50..9e156c9 100644
+index 007af84..992dfe4 100644
 --- a/build/typed-routes/generate.js
 +++ b/build/typed-routes/generate.js
 @@ -27,7 +27,8 @@ function getTypedRoutesDeclarationFile(ctx, { partialTypedGroups = false, testIg

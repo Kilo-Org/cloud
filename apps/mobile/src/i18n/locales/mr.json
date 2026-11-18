@@ -1486,7 +1486,14 @@
     "council": {
       "title": "पुनरावलोकन मंडळ",
       "subtitle": "अनेक तज्ज्ञ प्रत्येक पुल रिक्वेस्टचे पुनरावलोकन करतात आणि त्यांची मते एका निर्णयात एकत्र येतात.",
-      "unavailable": "या संस्थेसाठी पुनरावलोकन मंडळ उपलब्ध नाही.",
+      "unavailablePersonallyTitle": "Enterprise संस्था आवश्यक आहे",
+      "unavailablePersonally": "पुनरावलोकन मंडळ हे वैयक्तिक खात्याचा भाग नाही.",
+      "unavailablePersonallyAction": "संस्था तयार करा",
+      "unavailablePersonallySwitchAction": "संस्था बदला",
+      "unavailableOrganizationTitle": "पुनरावलोकन मंडळ सध्या उपलब्ध नाही",
+      "unavailableForOrganization": "पुनरावलोकन मंडळासाठी सक्रिय सदस्यता किंवा चाचणी असलेला Enterprise प्लॅन आवश्यक आहे. या संस्थेकडे सध्या तो नाही.",
+      "unavailableForOrganizationNeutral": "पुनरावलोकन मंडळ या संस्थेसाठी सध्या उपलब्ध नाही. कृपया नंतर पुन्हा प्रयत्न करा.",
+      "unavailableOnBitbucket": "पुनरावलोकन मंडळ Bitbucket रिपॉझिटरीसाठी उपलब्ध नाही.",
       "noRepositories": "अद्याप कोणत्याही रिपॉझिटरी निवडल्या नाहीत. प्रथम रिपॉझिटरी सेटिंग्जमध्ये रिपॉझिटरी निवडा.",
       "specialists": "तज्ज्ञ",
       "labels": "पुनरावलोकन मंडळ सुरू करणारी लेबले",
@@ -4703,6 +4710,7 @@
     "superseded": "ही लिंक इतरत्र बदलण्यात आली आहे, त्यामुळे ती आता काम करत नाही."
   },
   "sharedSession": {
+    "startedAt": "{{time}} वाजता सुरू झाले",
     "title": "शेअर केलेले सत्र",
     "someone": "कोणीतरी",
     "sharedBy": "{{owner}} द्वारे शेअर केले",

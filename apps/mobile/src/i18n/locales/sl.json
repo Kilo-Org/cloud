@@ -1536,7 +1536,14 @@
     "council": {
       "title": "Kolegijski pregled",
       "subtitle": "Vsak zahtevek za združitev pregleda več strokovnjakov, njihovi glasovi pa se združijo v eno odločitev.",
-      "unavailable": "Kolegijski pregled za to organizacijo ni na voljo.",
+      "unavailablePersonallyTitle": "Potrebuje organizacijo Enterprise",
+      "unavailablePersonally": "Kolegijski pregled ni del osebnega računa.",
+      "unavailablePersonallyAction": "Ustvari organizacijo",
+      "unavailablePersonallySwitchAction": "Preklopi organizacijo",
+      "unavailableOrganizationTitle": "Kolegijski pregled trenutno ni na voljo",
+      "unavailableForOrganization": "Kolegijski pregled zahteva paket Enterprise z aktivno naročnino ali preizkusnim obdobjem. Ta organizacija ga trenutno nima.",
+      "unavailableForOrganizationNeutral": "Kolegijski pregled za to organizacijo trenutno ni na voljo. Poskusite znova pozneje.",
+      "unavailableOnBitbucket": "Kolegijski pregled ni na voljo za skladišča Bitbucket.",
       "noRepositories": "Nobeno skladišče še ni izbrano. Najprej izberi skladišča v nastavitvah skladišč.",
       "specialists": "Strokovnjaki",
       "labels": "Oznake, ki sprožijo kolegijski pregled",
@@ -4845,6 +4852,7 @@
     "superseded": "Ta povezava je bila zamenjana drugje, zato ne deluje več."
   },
   "sharedSession": {
+    "startedAt": "Začeto ob {{time}}",
     "title": "Deljena seja",
     "someone": "Nekdo",
     "sharedBy": "Deli: {{owner}}",

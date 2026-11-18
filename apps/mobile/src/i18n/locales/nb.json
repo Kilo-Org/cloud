@@ -1486,7 +1486,14 @@
     "council": {
       "title": "Panelvurdering",
       "subtitle": "Flere spesialister vurderer hver PR, og stemmene deres kombineres til én avgjørelse.",
-      "unavailable": "Panelvurdering er ikke tilgjengelig for denne organisasjonen.",
+      "unavailablePersonallyTitle": "Trenger en Enterprise-organisasjon",
+      "unavailablePersonally": "Panelvurdering er ikke en del av en personlig konto.",
+      "unavailablePersonallyAction": "Opprett organisasjon",
+      "unavailablePersonallySwitchAction": "Bytt organisasjon",
+      "unavailableOrganizationTitle": "Panelvurdering er ikke tilgjengelig",
+      "unavailableForOrganization": "Panelvurdering krever Enterprise-planen med et aktivt abonnement eller en prøveperiode. Denne organisasjonen har det ikke akkurat nå.",
+      "unavailableForOrganizationNeutral": "Panelvurdering er ikke tilgjengelig for denne organisasjonen akkurat nå. Prøv igjen senere.",
+      "unavailableOnBitbucket": "Panelvurdering er ikke tilgjengelig for Bitbucket-kodelagre.",
       "noRepositories": "Ingen kodelagre er valgt ennå. Velg kodelagre i kodelagerinnstillingene først.",
       "specialists": "Spesialister",
       "labels": "Etiketter som utløser panelvurdering",
@@ -4703,6 +4710,7 @@
     "superseded": "Denne lenken ble erstattet et annet sted, så den virker ikke lenger."
   },
   "sharedSession": {
+    "startedAt": "Startet kl. {{time}}",
     "title": "Delt økt",
     "someone": "Noen",
     "sharedBy": "Delt av {{owner}}",

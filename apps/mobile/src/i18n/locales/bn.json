@@ -1486,7 +1486,14 @@
     "council": {
       "title": "কাউন্সিল রিভিউ",
       "subtitle": "একাধিক বিশেষজ্ঞ প্রতিটি পুল রিকোয়েস্ট রিভিউ করেন, এবং তাঁদের ভোট মিলে একটি সিদ্ধান্ত হয়।",
-      "unavailable": "এই প্রতিষ্ঠানের জন্য কাউন্সিল রিভিউ উপলভ্য নয়।",
+      "unavailablePersonallyTitle": "Enterprise সংস্থা প্রয়োজন",
+      "unavailablePersonally": "কাউন্সিল রিভিউ ব্যক্তিগত অ্যাকাউন্টের অংশ নয়।",
+      "unavailablePersonallyAction": "সংস্থা তৈরি করুন",
+      "unavailablePersonallySwitchAction": "সংস্থা পরিবর্তন করুন",
+      "unavailableOrganizationTitle": "কাউন্সিল রিভিউ এখন উপলব্ধ নয়",
+      "unavailableForOrganization": "কাউন্সিল রিভিউয়ের জন্য সক্রিয় সাবস্ক্রিপশন বা ট্রায়ালসহ এন্টারপ্রাইজ প্ল্যান প্রয়োজন। এই সংস্থার কাছে এটি এখন নেই।",
+      "unavailableForOrganizationNeutral": "কাউন্সিল রিভিউ এই সংস্থার জন্য এখন উপলব্ধ নয়। পরে আবার চেষ্টা করুন।",
+      "unavailableOnBitbucket": "কাউন্সিল রিভিউ Bitbucket রিপোজিটরির জন্য উপলভ্য নয়।",
       "noRepositories": "এখনও কোনো রিপোজিটরি নির্বাচিত হয়নি। প্রথমে রিপোজিটরি সেটিংসে রিপোজিটরি বেছে নিন।",
       "specialists": "বিশেষজ্ঞ",
       "labels": "যে লেবেলগুলো কাউন্সিল রিভিউ চালু করে",
@@ -4703,6 +4710,7 @@
     "superseded": "এই লিংকটি অন্য কোথাও থেকে বদলে দেওয়া হয়েছে, তাই এটি আর কাজ করছে না।"
   },
   "sharedSession": {
+    "startedAt": "শুরু হয়েছে {{time}}",
     "title": "শেয়ার করা সেশন",
     "someone": "কেউ একজন",
     "sharedBy": "{{owner}} শেয়ার করেছেন",

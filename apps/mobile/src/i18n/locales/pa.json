@@ -1486,7 +1486,14 @@
     "council": {
       "title": "ਕੌਂਸਲ ਸਮੀਖਿਆ",
       "subtitle": "ਕਈ ਮਾਹਰ ਹਰ ਪੁੱਲ ਰਿਕਵੈਸਟ ਦੀ ਸਮੀਖਿਆ ਕਰਦੇ ਹਨ ਅਤੇ ਉਨ੍ਹਾਂ ਦੀਆਂ ਵੋਟਾਂ ਇੱਕ ਫੈਸਲੇ ਵਿੱਚ ਜੁੜ ਜਾਂਦੀਆਂ ਹਨ।",
-      "unavailable": "ਇਸ ਸੰਸਥਾ ਲਈ ਕੌਂਸਲ ਸਮੀਖਿਆ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
+      "unavailablePersonallyTitle": "Enterprise ਸੰਗਠਨ ਦੀ ਲੋੜ ਹੈ",
+      "unavailablePersonally": "ਕੌਂਸਲ ਸਮੀਖਿਆ ਨਿੱਜੀ ਖਾਤੇ ਦਾ ਹਿੱਸਾ ਨਹੀਂ ਹੈ।",
+      "unavailablePersonallyAction": "ਸੰਸਥਾ ਬਣਾਓ",
+      "unavailablePersonallySwitchAction": "ਸੰਸਥਾ ਬਦਲੋ",
+      "unavailableOrganizationTitle": "ਕੌਂਸਲ ਸਮੀਖਿਆ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ",
+      "unavailableForOrganization": "ਕੌਂਸਲ ਸਮੀਖਿਆ ਲਈ ਸਰਗਰਮ ਸਬਸਕ੍ਰਿਪਸ਼ਨ ਜਾਂ ਟ੍ਰਾਇਲ ਵਾਲੀ Enterprise ਯੋਜਨਾ ਦੀ ਲੋੜ ਹੈ। ਇਸ ਸੰਸਥਾ ਕੋਲ ਇਹ ਹੁਣ ਨਹੀਂ ਹੈ।",
+      "unavailableForOrganizationNeutral": "ਕੌਂਸਲ ਸਮੀਖਿਆ ਇਸ ਸੰਸਥਾ ਲਈ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਬਾਅਦ ਵਿੱਚ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "unavailableOnBitbucket": "ਕੌਂਸਲ ਸਮੀਖਿਆ Bitbucket ਰਿਪੋਜ਼ਿਟਰੀਆਂ ਲਈ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
       "noRepositories": "ਹਾਲੇ ਕੋਈ ਰਿਪੋਜ਼ਿਟਰੀ ਨਹੀਂ ਚੁਣੀ ਗਈ। ਪਹਿਲਾਂ ਰਿਪੋਜ਼ਿਟਰੀ ਸੈਟਿੰਗਾਂ ਵਿੱਚ ਰਿਪੋਜ਼ਿਟਰੀਆਂ ਚੁਣੋ।",
       "specialists": "ਮਾਹਰ",
       "labels": "ਕੌਂਸਲ ਸਮੀਖਿਆ ਸ਼ੁਰੂ ਕਰਨ ਵਾਲੇ ਲੇਬਲ",
@@ -4703,6 +4710,7 @@
     "superseded": "ਇਹ ਲਿੰਕ ਕਿਸੇ ਹੋਰ ਥਾਂ ਤੋਂ ਬਦਲ ਦਿੱਤਾ ਗਿਆ ਸੀ, ਇਸ ਲਈ ਇਹ ਹੁਣ ਕੰਮ ਨਹੀਂ ਕਰਦਾ।"
   },
   "sharedSession": {
+    "startedAt": "{{time}} ਵਜੇ ਸ਼ੁਰੂ ਹੋਇਆ",
     "title": "ਸਾਂਝਾ ਕੀਤਾ ਸੈਸ਼ਨ",
     "someone": "ਕੋਈ",
     "sharedBy": "{{owner}} ਵੱਲੋਂ ਸਾਂਝਾ ਕੀਤਾ ਗਿਆ",

@@ -912,7 +912,14 @@
     "council": {
       "title": "Revisão do conselho",
       "subtitle": "Vários especialistas revisam cada PR e os votos deles se combinam em uma única decisão.",
-      "unavailable": "A revisão do conselho não está disponível para esta organização.",
+      "unavailablePersonallyTitle": "Precisa de uma organização Enterprise",
+      "unavailablePersonally": "A revisão do conselho não faz parte de uma conta pessoal.",
+      "unavailablePersonallyAction": "Criar organização",
+      "unavailablePersonallySwitchAction": "Trocar de organização",
+      "unavailableOrganizationTitle": "Revisão do conselho não está disponível",
+      "unavailableForOrganization": "A revisão do conselho precisa do plano Enterprise com uma assinatura ou um período de teste ativos. Esta organização não tem isso no momento.",
+      "unavailableForOrganizationNeutral": "A revisão do conselho não está disponível para esta organização no momento. Tente novamente mais tarde.",
+      "unavailableOnBitbucket": "A revisão do conselho não está disponível para repositórios Bitbucket.",
       "noRepositories": "Nenhum repositório selecionado ainda. Escolha repositórios nas configurações de repositórios primeiro.",
       "specialists": "Especialistas",
       "labels": "Etiquetas que acionam a revisão do conselho",
@@ -4780,6 +4787,7 @@
     "superseded": "Este link foi substituído em outro dispositivo e não funciona mais."
   },
   "sharedSession": {
+    "startedAt": "Iniciada às {{time}}",
     "title": "Sessão compartilhada",
     "someone": "Alguém",
     "sharedBy": "Compartilhada por {{owner}}",

@@ -1486,7 +1486,14 @@
     "council": {
       "title": "Neuvostokatselmointi",
       "subtitle": "Useampi asiantuntija katselmoi jokaisen vetopyynnön, ja heidän äänensä yhdistetään yhdeksi päätökseksi.",
-      "unavailable": "Neuvostokatselmointi ei ole käytettävissä tässä organisaatiossa.",
+      "unavailablePersonallyTitle": "Vaatii Enterprise-organisaation",
+      "unavailablePersonally": "Neuvostokatselmointi ei sisälly henkilökohtaiseen tiliin.",
+      "unavailablePersonallyAction": "Luo organisaatio",
+      "unavailablePersonallySwitchAction": "Vaihda organisaatio",
+      "unavailableOrganizationTitle": "Neuvostokatselmointi ei ole saatavilla juuri nyt",
+      "unavailableForOrganization": "Neuvostokatselmointi vaatii Enterprise-tilauksen, jossa on aktiivinen tilaus tai kokeilujakso. Tällä organisaatiolla ei ole sitä juuri nyt.",
+      "unavailableForOrganizationNeutral": "Neuvostokatselmointi ei ole saatavilla tälle organisaatiolle juuri nyt. Yritä uudelleen myöhemmin.",
+      "unavailableOnBitbucket": "Neuvostokatselmointi ei ole käytettävissä Bitbucket-koodivarastoille.",
       "noRepositories": "Koodivarastoja ei ole vielä valittu. Valitse ensin koodivarastot koodivarastoasetuksista.",
       "specialists": "Asiantuntijat",
       "labels": "Neuvostokatselmoinnin käynnistävät tunnisteet",
@@ -4703,6 +4710,7 @@
     "superseded": "Tämä linkki on korvattu muualla, joten se ei enää toimi."
   },
   "sharedSession": {
+    "startedAt": "Aloitettu klo {{time}}",
     "title": "Jaettu istunto",
     "someone": "Joku",
     "sharedBy": "Jakaja: {{owner}}",

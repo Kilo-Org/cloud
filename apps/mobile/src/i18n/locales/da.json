@@ -1486,7 +1486,14 @@
     "council": {
       "title": "Rådsgennemgang",
       "subtitle": "Flere specialister gennemgår hver pull request, og deres stemmer samles til én beslutning.",
-      "unavailable": "Rådsgennemgang er ikke tilgængelig for denne organisation.",
+      "unavailablePersonallyTitle": "Kræver en Enterprise-organisation",
+      "unavailablePersonally": "Rådsgennemgang er ikke en del af en personlig konto.",
+      "unavailablePersonallyAction": "Opret organisation",
+      "unavailablePersonallySwitchAction": "Skift organisation",
+      "unavailableOrganizationTitle": "Rådsgennemgang er ikke tilgængelig",
+      "unavailableForOrganization": "Rådsgennemgang kræver Enterprise-planen med et aktivt abonnement eller en prøveperiode. Denne organisation har det ikke lige nu.",
+      "unavailableForOrganizationNeutral": "Rådsgennemgang er ikke tilgængelig for denne organisation lige nu. Prøv igen senere.",
+      "unavailableOnBitbucket": "Rådsgennemgang er ikke tilgængelig for Bitbucket-kodelagre.",
       "noRepositories": "Der er endnu ikke valgt nogen kodelagre. Vælg først kodelagre i indstillingerne for kodelagre.",
       "specialists": "Specialister",
       "labels": "Etiketter, der udløser rådsgennemgang",
@@ -4703,6 +4710,7 @@
     "superseded": "Dette link blev erstattet et andet sted, så det virker ikke længere."
   },
   "sharedSession": {
+    "startedAt": "Startet kl. {{time}}",
     "title": "Delt session",
     "someone": "Nogen",
     "sharedBy": "Delt af {{owner}}",

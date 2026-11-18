@@ -912,7 +912,14 @@
     "council": {
       "title": "Revue en conseil",
       "subtitle": "Plusieurs spécialistes examinent chaque pull request, et leurs votes sont combinés en une seule décision.",
-      "unavailable": "La revue en conseil n'est pas disponible pour cette organisation.",
+      "unavailablePersonallyTitle": "Nécessite une organisation Enterprise",
+      "unavailablePersonally": "La revue en conseil ne fait pas partie d'un compte personnel.",
+      "unavailablePersonallyAction": "Créer une organisation",
+      "unavailablePersonallySwitchAction": "Changer d'organisation",
+      "unavailableOrganizationTitle": "La revue en conseil n'est pas disponible pour le moment",
+      "unavailableForOrganization": "La revue en conseil nécessite le plan Enterprise avec un abonnement ou un essai actif. Cette organisation ne l'a pas actuellement.",
+      "unavailableForOrganizationNeutral": "La revue en conseil n'est pas disponible pour cette organisation pour le moment. Veuillez réessayer plus tard.",
+      "unavailableOnBitbucket": "La revue en conseil n'est pas disponible pour les dépôts Bitbucket.",
       "noRepositories": "Aucun dépôt sélectionné pour l'instant. Choisissez d'abord des dépôts dans les paramètres des dépôts.",
       "specialists": "Spécialistes",
       "labels": "Étiquettes qui déclenchent la revue en conseil",
@@ -4774,6 +4781,7 @@
     "superseded": "Ce lien a été remplacé depuis un autre appareil et ne fonctionne plus."
   },
   "sharedSession": {
+    "startedAt": "Démarrée à {{time}}",
     "title": "Session partagée",
     "someone": "Quelqu’un",
     "sharedBy": "Partagée par {{owner}}",

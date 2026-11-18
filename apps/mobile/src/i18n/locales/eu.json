@@ -1486,7 +1486,14 @@
     "council": {
       "title": "Kontseilu-berrikuspena",
       "subtitle": "Hainbat espezialistak berrikusten dute bateratze-eskaera bakoitza, eta haien botoak erabaki bakarrean batzen dira.",
-      "unavailable": "Kontseilu-berrikuspena ez dago erabilgarri erakunde honetan.",
+      "unavailablePersonallyTitle": "Enterprise erakundea behar du",
+      "unavailablePersonally": "Kontseilu-berrikuspena ez da kontu pertsonal baten parte.",
+      "unavailablePersonallyAction": "Sortu erakundea",
+      "unavailablePersonallySwitchAction": "Aldatu erakundea",
+      "unavailableOrganizationTitle": "Kontseilu-berrikuspena ez dago erabilgarri",
+      "unavailableForOrganization": "Kontseilu-berrikuspenak Enterprise plana behar du, harpidetza edo probaldi aktibo batekin. Erakunde honek ez du hura orain.",
+      "unavailableForOrganizationNeutral": "Kontseilu-berrikuspena ez dago erabilgarri erakunde honentzat orain. Saiatu berriro geroago.",
+      "unavailableOnBitbucket": "Kontseilu-berrikuspena ez dago erabilgarri Bitbucket biltegietarako.",
       "noRepositories": "Oraindik ez da biltegirik hautatu. Lehenik, aukeratu biltegiak biltegien ezarpenetan.",
       "specialists": "Espezialistak",
       "labels": "Kontseilu-berrikuspena abiarazten duten etiketak",
@@ -4703,6 +4710,7 @@
     "superseded": "Esteka hau beste nonbait ordeztu da, beraz, jada ez du funtzionatzen."
   },
   "sharedSession": {
+    "startedAt": "Hasiera: {{time}}",
     "title": "Partekatutako saioa",
     "someone": "Norbait",
     "sharedBy": "Partekatzailea: {{owner}}",

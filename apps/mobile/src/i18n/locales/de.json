@@ -943,7 +943,14 @@
     "council": {
       "title": "Gremium-Review",
       "subtitle": "Mehrere Spezialisten prüfen jeden Pull-Request, und ihre Stimmen ergeben eine gemeinsame Entscheidung.",
-      "unavailable": "Gremium-Review ist für diese Organisation nicht verfügbar.",
+      "unavailablePersonallyTitle": "Erfordert eine Enterprise-Organisation",
+      "unavailablePersonally": "Gremium-Review ist nicht Teil eines persönlichen Kontos.",
+      "unavailablePersonallyAction": "Organisation erstellen",
+      "unavailablePersonallySwitchAction": "Organisation wechseln",
+      "unavailableOrganizationTitle": "Gremium-Review ist derzeit nicht verfügbar",
+      "unavailableForOrganization": "Gremium-Review benötigt den Enterprise-Plan mit einem aktiven Abo oder einer Testphase. Diese Organisation hat es derzeit nicht.",
+      "unavailableForOrganizationNeutral": "Gremium-Review ist derzeit für diese Organisation nicht verfügbar. Versuchen Sie es später erneut.",
+      "unavailableOnBitbucket": "Gremium-Review ist für Bitbucket-Repositories nicht verfügbar.",
       "noRepositories": "Noch keine Code-Repositories ausgewählt. Wähle zuerst Code-Repositories in den Repository-Einstellungen aus.",
       "specialists": "Spezialisten",
       "labels": "Labels, die ein Gremium-Review auslösen",
@@ -4703,6 +4710,7 @@
     "superseded": "Dieser Link wurde an anderer Stelle ersetzt und funktioniert daher nicht mehr."
   },
   "sharedSession": {
+    "startedAt": "Gestartet um {{time}}",
     "title": "Geteilte Sitzung",
     "someone": "Jemand",
     "sharedBy": "Geteilt von {{owner}}",

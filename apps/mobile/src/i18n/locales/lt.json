@@ -1536,7 +1536,14 @@
     "council": {
       "title": "Tarybos peržiūra",
       "subtitle": "Kiekvieną PR peržiūri keli specialistai, o jų balsai sujungiami į vieną sprendimą.",
-      "unavailable": "Tarybos peržiūra šiai organizacijai nepasiekiama.",
+      "unavailablePersonallyTitle": "Reikia Enterprise organizacijos",
+      "unavailablePersonally": "Tarybos peržiūra neįeina į asmeninę paskyrą.",
+      "unavailablePersonallyAction": "Sukurti organizaciją",
+      "unavailablePersonallySwitchAction": "Perjungti organizaciją",
+      "unavailableOrganizationTitle": "Tarybos peržiūra neprieinama",
+      "unavailableForOrganization": "Tarybos peržiūrai reikia Enterprise plano su aktyviu prenumerata ar bandomuoju laikotarpiu. Ši organizacija jo šiuo metu neturi.",
+      "unavailableForOrganizationNeutral": "Tarybos peržiūra šiai organizacijai šiuo metu neprieinama. Bandykite dar kartą vėliau.",
+      "unavailableOnBitbucket": "Tarybos peržiūra nepasiekiama Bitbucket saugykloms.",
       "noRepositories": "Dar nepasirinkta nė viena saugykla. Pirmiausia pasirink saugyklas saugyklų nustatymuose.",
       "specialists": "Specialistai",
       "labels": "Žymos, kurios įjungia tarybos peržiūrą",
@@ -4845,6 +4852,7 @@
     "superseded": "Ši nuoroda buvo pakeista kitame įrenginyje, todėl nebeveikia."
   },
   "sharedSession": {
+    "startedAt": "Pradėta {{time}}",
     "title": "Bendrinama sesija",
     "someone": "Kažkas",
     "sharedBy": "Pasidalijo {{owner}}",

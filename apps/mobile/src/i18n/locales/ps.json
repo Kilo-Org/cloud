@@ -1486,7 +1486,14 @@
     "council": {
       "title": "د شورا بیاکتنه",
       "subtitle": "څو متخصصین هر پل ریکویسټ بیاکتنه کوي او د هغوی رایې په یوه پرېکړه کې یوځای کېږي.",
-      "unavailable": "د شورا بیاکتنه د دې سازمان لپاره د لاسرسي وړ نه ده.",
+      "unavailablePersonallyTitle": "یو Enterprise سازمان ته اړتیا ده",
+      "unavailablePersonally": "د شورا بیاکتنه د شخصي حساب برخه نه ده.",
+      "unavailablePersonallyAction": "سازمان جوړ کړئ",
+      "unavailablePersonallySwitchAction": "سازمان بدل کړئ",
+      "unavailableOrganizationTitle": "د شورا بیاکتنه اوس نشته",
+      "unavailableForOrganization": "د شورا بیاکتنې ته د فعال سبسکرېپشن یا ازمویښتې مودې سره Enterprise پلان ته اړتیا لري. دا سازمان دا اوس نه لري.",
+      "unavailableForOrganizationNeutral": "د شورا بیاکتنې ته د دې سازمان لپاره اوس لاسرسی نشته. وروسته بیا هڅه وکړئ.",
+      "unavailableOnBitbucket": "د شورا بیاکتنه د Bitbucket زېرمتونونو لپاره شتون نه لري.",
       "noRepositories": "تر اوسه هېڅ زېرمتون نه دی ټاکل شوی. لومړی په زېرمتون تنظیماتو کې زېرمتونونه وټاکئ.",
       "specialists": "متخصصین",
       "labels": "هغه نښې چې د شورا بیاکتنه پیلوي",
@@ -4703,6 +4710,7 @@
     "superseded": "دا لینک په بل ځای کې بدل شوی دی، نو نور کار نه کوي."
   },
   "sharedSession": {
+    "startedAt": "په {{time}} کې پیل شو",
     "title": "شریکه شوې ناسته",
     "someone": "یو څوک",
     "sharedBy": "د {{owner}} لخوا شریک شوې",

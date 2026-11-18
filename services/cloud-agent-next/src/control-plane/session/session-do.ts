@@ -130,6 +130,7 @@ import {
   type ControlPlaneRouteUpdate,
   type ControlPlaneRouteView,
   type ControlPlaneSessionRefPayload,
+  type ControlPlaneReleasePayload,
   type ControlPlaneSetupCommandKind,
   type ControlPlaneSetupEvent,
   type ControlPlaneStatusResult,
@@ -285,6 +286,7 @@ import type {
 } from '../sandbox/sandbox-do.js';
 import type { ScopeGrantView } from '../sandbox/scope-view.js';
 import { diagnosticCause, logControlDiagnostic } from '../../sandbox-control/diagnostics.js';
+import { readSentryIdentity } from '../../sentry-identity.js';
 
 /** Where a committed message transition came from (legacy diagnostic field). */
 type ControlPlaneMessageSource = 'coordinator' | 'wrapper_outcome' | 'operation_result';
@@ -570,7 +572,7 @@ export type ControlPlaneSandboxPeer = SharedWorktreeChangesPeer & {
     payload: ControlPlaneCancelWorkspacePayload
   ): Promise<ControlPlaneCancelWorkspaceResult>;
   answer(payload: ControlPlaneAnswerPayload): Promise<ControlPlaneDispatchResult>;
-  release(payload: ControlPlaneSessionRefPayload): Promise<void>;
+  release(payload: ControlPlaneReleasePayload): Promise<void>;
   /** H4: the Sandbox DO returns the connected allocation fence for a bound handle. */
   getRuntimeCredentialProxyFence(input: {
     ownerId: string;
@@ -908,6 +910,17 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       resolveTarget: (sandboxId, scope) => this.previewTargetFor(sandboxId, scope),
     });
     this.initialized = ctx.blockConcurrencyWhile(() => this.initializeStorage());
+  }
+
+  [readSentryIdentity]() {
+    if (!this.metadata) return undefined;
+    const { userId, orgId, sessionId } = this.metadata.identity;
+    return {
+      userId,
+      orgId: orgId ?? '(personal)',
+      sessionId,
+      sandboxId: this.metadata.workspace?.sandboxId,
+    };
   }
 
   private async terminalRequest(
@@ -3332,9 +3345,16 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.enqueue(async () => {
       const peer = this.sandboxPeer();
       if (peer !== null) {
+        const standalone =
+          this.metadata !== null && this.metadata.workspace?.worktreeId === undefined;
         await withDORetry(
           () => peer,
-          current => current.release({ sessionId: this.sessionId }),
+          current =>
+            current.release(
+              standalone
+                ? { sessionId: this.sessionId, reason: 'standalone_session_deleted' }
+                : { sessionId: this.sessionId }
+            ),
           'release'
         );
       }

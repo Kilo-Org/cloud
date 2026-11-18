@@ -1561,7 +1561,14 @@
     "council": {
       "title": "Athbhreithniú comhairle",
       "subtitle": "Déanann roinnt speisialtóirí athbhreithniú ar gach iarratas tarraingthe, agus cuirtear a vótaí le chéile in aon chinneadh amháin.",
-      "unavailable": "Níl athbhreithniú comhairle ar fáil don eagraíocht seo.",
+      "unavailablePersonallyTitle": "Teastaíonn eagraíocht Enterprise",
+      "unavailablePersonally": "Níl athbhreithniú comhairle mar chuid de chuntas pearsanta.",
+      "unavailablePersonallyAction": "Cruthaigh eagraíocht",
+      "unavailablePersonallySwitchAction": "Athraigh eagraíocht",
+      "unavailableOrganizationTitle": "Níl athbhreithniú comhairle ar fáil faoi láthair",
+      "unavailableForOrganization": "Teastaíonn an plean Enterprise ó athbhreithniú comhairle le síntiús gníomhach nó le triail. Níl sé ag an eagraíocht seo faoi láthair.",
+      "unavailableForOrganizationNeutral": "Níl athbhreithniú comhairle ar fáil don eagraíocht seo faoi láthair. Bain triail eile as níos déanaí.",
+      "unavailableOnBitbucket": "Níl athbhreithniú comhairle ar fáil do stóir Bitbucket.",
       "noRepositories": "Níl aon stór roghnaithe fós. Roghnaigh stóir i socruithe na stór ar dtús.",
       "specialists": "Speisialtóirí",
       "labels": "Lipéid a spreagann athbhreithniú comhairle",
@@ -4916,6 +4923,7 @@
     "superseded": "Cuireadh nasc nua in ionad an naisc seo in áit eile, mar sin ní oibríonn sé a thuilleadh."
   },
   "sharedSession": {
+    "startedAt": "Tosaíodh ag {{time}}",
     "title": "Seisiún comhroinnte",
     "someone": "Duine éigin",
     "sharedBy": "Comhroinnte ag {{owner}}",

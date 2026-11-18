@@ -30,6 +30,7 @@ import {
   getVercelModelsFromDatabase,
   isValidOpenRouterModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { getOpenRouterAliasTarget } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
 import type { GatewayProviderOptions } from '@ai-sdk/gateway';
 import { getRuntimeGatewayRoutingConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-config';
@@ -142,7 +143,8 @@ export async function shouldRouteToVercel(
 /**
  * Whether the provider routing settings leave the model no OpenRouter provider but at least one
  * Vercel provider. OpenRouter cannot serve such a request, so Kilo's Vercel opt-out list does not
- * apply to it. Missing provider data on either gateway keeps the opt-out.
+ * apply to it. Missing provider data on either gateway, including an unresolvable latest alias,
+ * keeps the opt-out.
  */
 async function allowsOnlyVercelProviders(
   requestedModel: string,
@@ -154,7 +156,15 @@ async function allowsOnlyVercelProviders(
     getOpenRouterModelsMetadataFromDatabase(),
     mapModelIdToVercel(requestedModel),
   ]);
-  const openRouterModel = openRouterModels[requestedModel];
+  // OpenRouter serves a latest alias's target, including Kilo's pin, not the alias row, whose
+  // endpoints can be empty.
+  const openRouterModelId = requestedModel.startsWith('~')
+    ? getOpenRouterAliasTarget(openRouterModels, requestedModel)
+    : requestedModel;
+  const openRouterModel =
+    openRouterModelId !== undefined && Object.hasOwn(openRouterModels, openRouterModelId)
+      ? openRouterModels[openRouterModelId]
+      : undefined;
   if (!openRouterModel) return false;
 
   const onlyProviders = only && new Set(only.map(normalizeInferenceProviderId));

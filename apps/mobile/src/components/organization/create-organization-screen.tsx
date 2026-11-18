@@ -146,35 +146,33 @@ export function CreateOrganizationScreen() {
     [navigation, queryClient, router, stackSafeRouter, t, trpc]
   );
 
-  const createOrganization = useMutation(
-    {
-      // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-      mutationFn: (input: { name: string }) =>
-        trpcClient.organizations.create.mutate({ name: input.name, autoAddCreator: true }),
-      ...trpc.organizations.create.mutationOptions({
-        // Reachability is the create's outcome, not a precondition: the default
-        // `networkMode: 'online'` pauses the mutation while the connectivity
-        // manager reports the device offline, so the request is never sent and
-        // `isPending` never settles — the button keeps its spinner and the field
-        // stays disabled for as long as the outage lasts, with no failure
-        // surface. Attempting the request instead lets it fail through the normal
-        // path: `onError` releases the form and reports the failure, so the
-        // person can retry once the connection is back.
-        networkMode: 'always',
-        // The refresh that has to land before the selection moves runs after this
-        // callback returns. Awaiting it here would keep the button busy, and the
-        // field disabled, for as long as that refresh takes.
-        onSuccess: ({ organization }: { organization: { id: string } }) => {
-          void completeCreate(organization.id);
-        },
-        onError: (error: unknown) => {
-          submitLockedRef.current = false;
-          setSettling(false);
-          report(organizationErrorMessage(error), 'error');
-        },
-      }),
-    }
-  );
+  const createOrganization = useMutation({
+    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+    mutationFn: (input: { name: string }) =>
+      trpcClient.organizations.create.mutate({ name: input.name, autoAddCreator: true }),
+    ...trpc.organizations.create.mutationOptions({
+      // Reachability is the create's outcome, not a precondition: the default
+      // `networkMode: 'online'` pauses the mutation while the connectivity
+      // manager reports the device offline, so the request is never sent and
+      // `isPending` never settles — the button keeps its spinner and the field
+      // stays disabled for as long as the outage lasts, with no failure
+      // surface. Attempting the request instead lets it fail through the normal
+      // path: `onError` releases the form and reports the failure, so the
+      // person can retry once the connection is back.
+      networkMode: 'always',
+      // The refresh that has to land before the selection moves runs after this
+      // callback returns. Awaiting it here would keep the button busy, and the
+      // field disabled, for as long as that refresh takes.
+      onSuccess: ({ organization }: { organization: { id: string } }) => {
+        void completeCreate(organization.id);
+      },
+      onError: (error: unknown) => {
+        submitLockedRef.current = false;
+        setSettling(false);
+        report(organizationErrorMessage(error), 'error');
+      },
+    }),
+  });
 
   const submit = () => {
     if (createOrganization.isPending || submitLockedRef.current) {

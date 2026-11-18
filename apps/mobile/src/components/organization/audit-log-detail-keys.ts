@@ -57,7 +57,7 @@ export const MCP_TYPE_KEYS = {
   skill: 'organization.auditLog.detail.mcpType.skill',
 } as const;
 
-export const DETECTOR_ID_KEYS = {
+const DETECTOR_ID_KEYS = {
   injection_attack: 'organizationGuardrails.detector.promptInjection.label',
   policy_violation: 'organizationGuardrails.detector.policyViolation.label',
   pii: 'organizationGuardrails.detector.pii.label',
@@ -69,30 +69,30 @@ export const DETECTOR_ID_KEYS = {
   sponge_attack: 'organizationGuardrails.detector.spongeAttack.label',
 } as const;
 
-export const PII_ENTITY_KEYS = {
+const PII_ENTITY_KEYS = {
   pii: 'organizationGuardrails.pii.personalData.label',
   secrets: 'organizationGuardrails.pii.secrets.label',
   ip_address: 'organizationGuardrails.pii.ipAddress.label',
   url: 'organizationGuardrails.pii.url.label',
 } as const;
 
-export type GuardrailsInputDetails = Extract<
+type GuardrailsInputDetails = Extract<
   OrganizationAuditLogDetails,
   { kind: 'guardrails_input' }
 >;
 
-export type DetectorDetails = GuardrailsInputDetails['detectors'][number];
+type DetectorDetails = GuardrailsInputDetails['detectors'][number];
 
-export type PiiEntity = NonNullable<DetectorDetails['entities']>[number];
+type PiiEntity = NonNullable<DetectorDetails['entities']>[number];
 
 // The detector label map covers the input side; the output side reuses the same
 // ids where they overlap. An id the map does not name shows the raw id, the way
 // an unmatched key does elsewhere in this file.
-export function detectorLabel(t: TFunction, id: string): string {
+function detectorLabel(t: TFunction, id: string): string {
   return t(DETECTOR_ID_KEYS[id as keyof typeof DETECTOR_ID_KEYS]);
 }
 
-export function piiEntityLabel(t: TFunction, entity: PiiEntity): string {
+function piiEntityLabel(t: TFunction, entity: PiiEntity): string {
   return t(PII_ENTITY_KEYS[entity]);
 }
 
@@ -101,7 +101,7 @@ export function piiEntityLabel(t: TFunction, entity: PiiEntity): string {
  * language: "Policy violation (3 rules)". Disabled detectors are omitted — the
  * sentence describes what the save leaves running.
  */
-export function describeDetailDetector(t: TFunction, detector: DetectorDetails): string | null {
+function describeDetailDetector(t: TFunction, detector: DetectorDetails): string | null {
   if (!detector.enabled) {
     return null;
   }

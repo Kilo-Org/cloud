@@ -57,8 +57,7 @@ function formatAuditTime(createdAt: string): string {
   return `${day} · ${formatClockTime(date, i18n.language)}`;
 }
 
-/** Exported for the design gate's diagnostic fixture, which mounts the row alone. */
-export const AuditLogRow = memo(function AuditLogRow({
+const AuditLogRow = memo(function AuditLogRow({
   entry,
 }: Readonly<{ entry: OrgAuditLogEntry }>) {
   const { t } = useTranslation();

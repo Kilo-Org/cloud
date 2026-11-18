@@ -406,7 +406,9 @@ describe('CreateOrganizationScreen', () => {
   });
 
   it('reports a failure through the announced status line', async () => {
-    mocks.createMutate.mockRejectedValue(new Error('You already own the maximum number of organizations.'));
+    mocks.createMutate.mockRejectedValue(
+      new Error('You already own the maximum number of organizations.')
+    );
     const { renderer, unmount } = await mount();
 
     await type(renderer, 'Acme');
@@ -426,7 +428,9 @@ describe('CreateOrganizationScreen', () => {
   });
 
   it('announces a repeated identical failure as a new event', async () => {
-    mocks.createMutate.mockRejectedValue(new Error('You already own the maximum number of organizations.'));
+    mocks.createMutate.mockRejectedValue(
+      new Error('You already own the maximum number of organizations.')
+    );
     const { renderer, unmount } = await mount();
 
     await type(renderer, 'Acme');
@@ -442,9 +446,9 @@ describe('CreateOrganizationScreen', () => {
     });
 
     expect(announce).toHaveBeenCalledTimes(2);
-    const occurrences = renderer.root
-      .findAll(node => node.type === AccessibleStatus && node.props.message != null)
-      .length;
+    const occurrences = renderer.root.findAll(
+      node => node.type === AccessibleStatus && node.props.message != null
+    ).length;
     expect(occurrences).toBe(1);
     unmount();
   });

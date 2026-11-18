@@ -8,9 +8,6 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', 
     model === '~anthropic/latest' ? 'anthropic/claude-sonnet-4.6' : model
   ),
 }));
-jest.mock('@kilocode/web-shared/lib/auth/claude/feature-flag.server', () => ({
-  isClaudePlatformOAuthEnabled: jest.fn(),
-}));
 jest.mock('@kilocode/web-shared/lib/user/find-user-by-id', () => ({
   findUserById: jest.fn(),
 }));
@@ -20,7 +17,7 @@ import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/provide
 import { getGrantedClaudeBillingConnection } from './store';
 import { getClaudeOperatorToken, isClaudeOperatorConfigured } from './operator';
 import { buildClaudeBillingProvider, checkClaudeBilling } from './routing';
-import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
+import { ClaudeBillingPayerStateParseError } from './payer-state';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 
 const row: ClaudeBillingConnectionRow = {
@@ -52,7 +49,6 @@ beforeEach(() => {
   jest.mocked(getGrantedClaudeBillingConnection).mockReset().mockResolvedValue(row);
   jest.mocked(getClaudeOperatorToken).mockReset().mockResolvedValue('operator-token');
   jest.mocked(isClaudeOperatorConfigured).mockReset().mockReturnValue(true);
-  jest.mocked(isClaudePlatformOAuthEnabled).mockReset().mockResolvedValue(true);
   jest
     .mocked(findUserById)
     .mockReset()
@@ -75,7 +71,6 @@ function input(kind: 'messages' | 'chat_completions' = 'messages') {
     request: request(kind),
     requestedModel: '~anthropic/latest',
     userId: 'user',
-    requesterEmail: 'requester@kilocode.ai',
     organizationId: undefined,
   };
 }
@@ -206,30 +201,6 @@ describe('Claude customer-billed routing', () => {
     }
   );
 
-  it.each(['messages', 'chat_completions'] as const)(
-    'pauses a connected owner without switching payer when the flag is off (%s)',
-    async kind => {
-      jest.mocked(isClaudePlatformOAuthEnabled).mockResolvedValue(false);
-      expect(await checkClaudeBilling(input(kind))).toMatchObject({
-        kind: 'unavailable',
-        message: expect.stringContaining('not enabled'),
-      });
-      expect(getClaudeOperatorToken).not.toHaveBeenCalled();
-      expect(isClaudePlatformOAuthEnabled).toHaveBeenCalledWith('requester@kilocode.ai');
-      expect(
-        jest.mocked(getGrantedClaudeBillingConnection).mock.invocationCallOrder[0]
-      ).toBeLessThan(jest.mocked(isClaudePlatformOAuthEnabled).mock.invocationCallOrder[0] ?? 0);
-    }
-  );
-
-  it('preserves normal routing for an owner without a connection when the flag is off', async () => {
-    jest.mocked(isClaudePlatformOAuthEnabled).mockResolvedValue(false);
-    jest.mocked(getGrantedClaudeBillingConnection).mockResolvedValue(null);
-    expect(await checkClaudeBilling(input())).toBeNull();
-    expect(getClaudeOperatorToken).not.toHaveBeenCalled();
-    expect(isClaudePlatformOAuthEnabled).not.toHaveBeenCalled();
-  });
-
   it('does not serve an organization request from a personal connection', async () => {
     jest
       .mocked(getGrantedClaudeBillingConnection)
@@ -243,14 +214,10 @@ describe('Claude customer-billed routing', () => {
     expect(getClaudeOperatorToken).not.toHaveBeenCalled();
   });
 
-  it.each([
-    ['a member request', 'member@kilocode.ai'],
-    ['a service run', 'code-review-bot@kilocode.local'],
-  ])('bills the organization connection for %s', async (_label, requesterEmail) => {
+  it('bills the organization connection whatever the requester', async () => {
     organizationOnly();
     const result = await checkClaudeBilling({
       ...input(),
-      requesterEmail,
       organizationId: ORGANIZATION_ID,
     });
     expect(result?.kind).toBe('provider');
@@ -263,25 +230,14 @@ describe('Claude customer-billed routing', () => {
     expect(result.provider.claudeBillingOwner).toEqual(organizationOwner());
   });
 
-  it('gates the organization connection on the person who linked it', async () => {
+  it('checks the organization connection connector before serving it', async () => {
     organizationOnly();
     const result = await checkClaudeBilling({
       ...input(),
-      requesterEmail: 'member@kilocode.ai',
       organizationId: ORGANIZATION_ID,
     });
     expect(result?.kind).toBe('provider');
     expect(findUserById).toHaveBeenCalledWith('connector', expect.anything());
-    expect(isClaudePlatformOAuthEnabled).toHaveBeenCalledWith('connector@kilocode.ai');
-  });
-
-  it('fails an organization request whose connector is no longer eligible', async () => {
-    organizationOnly();
-    jest.mocked(isClaudePlatformOAuthEnabled).mockResolvedValue(false);
-    expect(await checkClaudeBilling({ ...input(), organizationId: ORGANIZATION_ID })).toMatchObject(
-      { kind: 'unavailable' }
-    );
-    expect(getClaudeOperatorToken).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -311,7 +267,6 @@ describe('Claude customer-billed routing', () => {
 
       const result = await checkClaudeBilling({
         ...input(),
-        requesterEmail: 'member@kilocode.ai',
         organizationId: ORGANIZATION_ID,
       });
 
@@ -320,12 +275,11 @@ describe('Claude customer-billed routing', () => {
         message: expect.stringContaining('is no longer available'),
       });
       expect(getGrantedClaudeBillingConnection).toHaveBeenCalledTimes(1);
-      expect(isClaudePlatformOAuthEnabled).not.toHaveBeenCalled();
       expect(getClaudeOperatorToken).not.toHaveBeenCalled();
     }
   );
 
-  it('keeps the requester fallback when the row records no connector', async () => {
+  it('keeps serving an organization connection that records no connector', async () => {
     jest
       .mocked(getGrantedClaudeBillingConnection)
       .mockImplementation(async owner =>
@@ -336,7 +290,6 @@ describe('Claude customer-billed routing', () => {
       { kind: 'provider' }
     );
     expect(findUserById).not.toHaveBeenCalled();
-    expect(isClaudePlatformOAuthEnabled).toHaveBeenCalledWith('requester@kilocode.ai');
   });
 
   it('serves a personal connection even when the recorded connector is gone', async () => {
@@ -367,27 +320,6 @@ describe('Claude customer-billed routing', () => {
     expect(getClaudeOperatorToken).not.toHaveBeenCalled();
   });
 
-  it('refuses a connected personal payer when the authenticated requester email is absent', async () => {
-    expect(await checkClaudeBilling({ ...input(), requesterEmail: null })).toMatchObject({
-      kind: 'unavailable',
-    });
-    expect(getGrantedClaudeBillingConnection).toHaveBeenCalled();
-    expect(isClaudePlatformOAuthEnabled).not.toHaveBeenCalled();
-    expect(getClaudeOperatorToken).not.toHaveBeenCalled();
-  });
-
-  it('bills an organization connection for a requester whose own email is absent', async () => {
-    organizationOnly();
-    expect(
-      await checkClaudeBilling({
-        ...input(),
-        requesterEmail: null,
-        organizationId: ORGANIZATION_ID,
-      })
-    ).toMatchObject({ kind: 'provider' });
-    expect(isClaudePlatformOAuthEnabled).toHaveBeenCalledWith('connector@kilocode.ai');
-  });
-
   it('does not authorize an organization request without an authenticated requester', async () => {
     expect(
       await checkClaudeBilling({
@@ -396,7 +328,6 @@ describe('Claude customer-billed routing', () => {
         organizationId: 'organization',
       })
     ).toMatchObject({ kind: 'unavailable' });
-    expect(isClaudePlatformOAuthEnabled).not.toHaveBeenCalled();
     expect(getClaudeOperatorToken).not.toHaveBeenCalled();
   });
 
@@ -419,6 +350,18 @@ describe('Claude customer-billed routing', () => {
     expect(await checkClaudeBilling(input())).toMatchObject({
       kind: 'unavailable',
       retryable: true,
+    });
+    expect(getClaudeOperatorToken).not.toHaveBeenCalled();
+  });
+
+  it('does not mark a payer reply that violates its contract as retryable', async () => {
+    jest
+      .mocked(getGrantedClaudeBillingConnection)
+      .mockRejectedValueOnce(new ClaudeBillingPayerStateParseError());
+    expect(await checkClaudeBilling(input())).toEqual({
+      kind: 'unavailable',
+      message:
+        'Your Claude link cannot be checked right now. This usually clears after a short wait, and an owner or admin can check the link at any time.',
     });
     expect(getClaudeOperatorToken).not.toHaveBeenCalled();
   });

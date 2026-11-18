@@ -26,6 +26,7 @@
     "creditHistory": "Kreditelőzmények",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Mégse",
     "done": "Kész",
     "retry": "Újrapróbálkozás",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "Változtatások",
     "organizationTrialEnded": "A szervezet próbaidőszaka lejárt, és nincs aktív csomagja. A szervezet tulajdonosa frissítheti a számlázást a kilo.ai oldalon, majd próbálja újra.",
-    "privateRepositoryA11y": "{{name}}, magán adattár"
+    "privateRepositoryA11y": "{{name}}, magán adattár",
+    "legalDocumentEnglishOnly": "Ez a dokumentum csak angol nyelven érhető el."
   },
   "language": {
     "restarting": "Újraindítás a nyelv beállításához",
@@ -481,7 +483,14 @@
       "viewReceipt": "Visszaigazolás megtekintése"
     },
     "changelog": "Újdonságok",
-    "changelogVersionPending": "E verzió újdonságai a következő frissítéssel érkeznek."
+    "changelogVersionPending": "A(z) {{version}} verzió újdonságai a következő frissítéssel érkeznek.",
+    "changelogGroupNew": "Újdonságok",
+    "changelogFixesIn": "Javítások és fejlesztések a következő területeken: {{areas}}.",
+    "changelogFixesPolish": "Javítások és fejlesztések az egész alkalmazásban.",
+    "changelogAreas": {
+      "signIn": "Bejelentkezés",
+      "profileOrganizations": "Profil és szervezetek"
+    }
   },
   "preferences": {
     "general": "Általános",
@@ -1354,7 +1363,8 @@
       "managedOnWeb": "Ennek a szervezetnek a Bitbucket-kapcsolata a weben, számítógépről kezelhető.",
       "description": "Hozz létre egy hozzáférési tokent a munkaterülethez a szükséges jogosultságokkal, és illeszd be alább.",
       "scopes": "Fiók: olvasás · Kódtárak: olvasás/írás · PR-ek: olvasás · Webhookok: olvasás/írás.",
-      "tokenPlaceholder": "Munkaterület-hozzáférési token"
+      "tokenPlaceholder": "Munkaterület-hozzáférési token",
+      "tokenRefused": "A Bitbucket nem fogadta el ezt a munkaterület-hozzáférési tokent. Ellenőrizd, hogy rendelkezik-e a fenti jogosultságokkal, majd próbáld újra."
     },
     "scopeList": {
       "personalStillAvailable": "A személyes kódtárak alább továbbra is elérhetők.",
@@ -1465,7 +1475,8 @@
       "repositoryLine": "Kódellenőrzések: {{reviews}} · Találatok: {{findings}}",
       "empty": "Még nincs statisztikával rendelkező kódellenőrzés",
       "emptyDescription": "A statisztika a befejezett kódellenőrzéseket rögzíti, amíg be van kapcsolva a szervezetnél.",
-      "off": "A statisztika ki van kapcsolva ennél a szervezetnél.",
+      "offTitle": "A statisztika ki van kapcsolva a {{platform}} platformhoz",
+      "offDescription": "Kapcsold be a statisztikát a szervezeti beállításokban a weben, hogy rögzítsd a befejezett kódellenőrzéseket.",
       "couldNotLoad": "Nem sikerült betölteni a statisztikát"
     },
     "council": {
@@ -3325,6 +3336,7 @@
       "manageOnWeb": "Számlázási beállítások a weben",
       "changePlan": "Csomag módosítása",
       "buySeats": "Férőhelyek vásárlása",
+      "managedOnWeb": "A csomag, a férőhelyek és az automatikus feltöltés kezelése a weben történik.",
       "setupAutoTopUp": "Automatikus feltöltés beállítása",
       "manageAutoTopUp": "Automatikus feltöltés kezelése",
       "opensOnWeb": "A weben nyílik meg"
@@ -3473,12 +3485,10 @@
       "requestLogs": "Kérésnaplók"
     },
     "requestLogs": {
-      "hint": "Az időablak vége előtti egy óra kérései, a legújabbak elöl.",
       "older": "Korábbi óra",
       "newer": "Későbbi óra",
       "truncated": "Ebben az órában több kérés van, mint amennyi a listán látható.",
       "emptyTitle": "Nincsenek kérések",
-      "emptyDescription": "Ebben az órában nem volt gateway-kérés.",
       "loadError": "Nem sikerült betölteni a kérésnaplókat.",
       "permissionDenied": "A kérésnaplókat csak a szervezet tulajdonosa, adminisztrátora vagy számlázási felelőse olvashatja.",
       "tokens": "{{input}} be · {{output}} ki",
@@ -4469,7 +4479,6 @@
     "dismiss": "Jelentés elvetése",
     "offline": "Offline · mentett jelentés",
     "cached": "Mentett jelentés · frissítés nem érhető el",
-    "window": "{{start}} – {{end}}",
     "summary": "AI-összefoglaló",
     "summaryPending": "Az AI-összefoglaló készül. Elkészülte után itt jelenik meg.",
     "summaryUnavailable": "Az AI-összefoglaló nem érhető el. A strukturált jelentés továbbra is elérhető.",
@@ -4588,6 +4597,7 @@
       "title": "Triggerek és webhookok",
       "subtitle": "Automatizálja a Cloud Agent futtatásait webhookhívásból vagy ütemezésből.",
       "new": "Új trigger",
+      "create": "Hozzon létre triggert",
       "emptyTitle": "Még nincsenek triggerek",
       "emptyDescription": "Hozzon létre egy triggert, amely webhookhívásból vagy ütemezés szerint indít Cloud Agent futtatást.",
       "loadFailedTitle": "Nem sikerült betölteni a triggereket",

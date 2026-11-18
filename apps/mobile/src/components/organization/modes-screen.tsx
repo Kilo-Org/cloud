@@ -114,7 +114,9 @@ export function OrganizationModesScreen() {
             title={mode.name}
             meta={mode.slug}
             description={mode.config.description}
-            accessibilityLabel={mode.name}
+            // Names can repeat; the slug is the row's unique fact, so a reader
+            // hears it too instead of two identical rows.
+            accessibilityLabel={[mode.name, mode.slug].join(', ')}
             onPress={() => {
               openModeForm(mode.id);
             }}
@@ -144,6 +146,8 @@ export function OrganizationModesScreen() {
         className="flex-1"
         contentContainerClassName="gap-4 pb-8 pt-4"
         showsVerticalScrollIndicator={false}
+        // The design gate's proof readiness marker for this route.
+        testID="organization-modes-list"
       >
         {body}
       </TabScreenScrollView>

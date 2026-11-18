@@ -26,6 +26,7 @@
     "creditHistory": "Kredituen historia",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Utzi",
     "done": "Eginda",
     "retry": "Saiatu berriro",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "Aldaketak",
     "organizationTrialEnded": "Erakundearen probaldia amaitu da eta ez du plan aktiborik. Erakundearen jabe batek fakturazioa egunera dezake kilo.ai-n, eta gero berriro saiatu.",
-    "privateRepositoryA11y": "{{name}}, biltegi pribatua"
+    "privateRepositoryA11y": "{{name}}, biltegi pribatua",
+    "legalDocumentEnglishOnly": "Dokumentu hau ingelesez bakarrik dago eskuragarri."
   },
   "language": {
     "restarting": "Hizkuntza aplikatzeko berrabiarazten",
@@ -481,7 +483,14 @@
       "viewReceipt": "Ikusi agiria"
     },
     "changelog": "Berritasunak",
-    "changelogVersionPending": "Bertsio honen oharrak aplikazioaren hurrengo eguneratzearekin iritsiko dira."
+    "changelogVersionPending": "{{version}} bertsioaren oharrak aplikazioaren hurrengo eguneratzearekin iritsiko dira.",
+    "changelogGroupNew": "Berrikuntzak",
+    "changelogFixesIn": "Zuzenketak eta hobekuntzak atal hauetan: {{areas}}.",
+    "changelogFixesPolish": "Zuzenketak eta hobekuntzak aplikazio osoan.",
+    "changelogAreas": {
+      "signIn": "Saioa hastea",
+      "profileOrganizations": "Profila eta erakundeak"
+    }
   },
   "preferences": {
     "general": "Orokorra",
@@ -1354,7 +1363,8 @@
       "managedOnWeb": "Erakunde honen Bitbucket konexioa webean kudeatzen da, ordenagailu batetik.",
       "description": "Sortu lan-eremurako sarbide-token bat beharrezko baimenekin eta itsatsi behean.",
       "scopes": "Kontua: irakurtzea · Biltegiak: irakurtzea/idaztea · Bateratze-eskaerak: irakurtzea · Webhook-ak: irakurtzea/idaztea",
-      "tokenPlaceholder": "Lan-eremurako sarbide-tokena"
+      "tokenPlaceholder": "Lan-eremurako sarbide-tokena",
+      "tokenRefused": "Bitbucketek ez du lan-eremurako sarbide-token hau onartu. Egiaztatu goiko baimenak dituela, eta saiatu berriro."
     },
     "scopeList": {
       "personalStillAvailable": "Biltegi pertsonalak behean daude eskuragarri oraindik.",
@@ -1465,7 +1475,8 @@
       "repositoryLine": "Berrikuspenak: {{reviews}} · Aurkikuntzak: {{findings}}",
       "empty": "Oraindik ez dago analitikadun berrikuspenik",
       "emptyDescription": "Analitikak amaitutako berrikuspenak erregistratzen ditu erakundean gaituta dagoen bitartean.",
-      "off": "Analitika desgaituta dago erakunde honetan.",
+      "offTitle": "{{platform}} plataformarako analitika desgaituta dago",
+      "offDescription": "Gaitu analitika erakundearen webean dauden ezarpenetan, amaitutako berrikuspenak erregistratzeko.",
       "couldNotLoad": "Ezin izan da analitika kargatu"
     },
     "council": {
@@ -3325,6 +3336,7 @@
       "manageOnWeb": "Fakturazio-ezarpenak webean",
       "changePlan": "Aldatu plana",
       "buySeats": "Erosi lizentziak",
+      "managedOnWeb": "Plana, lizentziak eta birkarga automatikoa webean kudeatzen dira.",
       "setupAutoTopUp": "Konfiguratu birkarga automatikoa",
       "manageAutoTopUp": "Kudeatu birkarga automatikoa",
       "opensOnWeb": "Webean irekitzen da"
@@ -3473,12 +3485,10 @@
       "requestLogs": "Eskaeren erregistroak"
     },
     "requestLogs": {
-      "hint": "Leihoa amaitu aurreko orduko eskaerak, berrienak lehenik.",
       "older": "Aurreko ordua",
       "newer": "Hurrengo ordua",
       "truncated": "Ordu honetan zerrendak erakusten dituenak baino eskaera gehiago daude.",
       "emptyTitle": "Ez dago eskaerarik",
-      "emptyDescription": "Ordu honetan ez dago atebideko eskaerarik.",
       "loadError": "Ezin izan dira eskaeren erregistroak kargatu.",
       "permissionDenied": "Erakunde baten jabeak, administratzaileak edo fakturazio-kudeatzaileak soilik irakur ditzake haren eskaeren erregistroak.",
       "tokens": "{{input}} sarrera · {{output}} irteera",
@@ -4469,7 +4479,6 @@
     "dismiss": "Baztertu txostena",
     "offline": "Lineaz kanpo · gordetako txostena",
     "cached": "Gordetako txostena · ezin da freskatu",
-    "window": "{{start}} – {{end}}",
     "summary": "AI laburpena",
     "summaryPending": "AI laburpena prestatzen ari da. Prest dagoenean hemen erantsiko da.",
     "summaryUnavailable": "AI laburpena ez dago erabilgarri. Txosten egituratua erabilgarri dago oraindik.",
@@ -4588,6 +4597,7 @@
       "title": "Abiarazleak eta webhookak",
       "subtitle": "Automatizatu Cloud Agent exekuzioak webhook dei batetik edo ordutegi baten arabera.",
       "new": "Abiarazle berria",
+      "create": "Sortu abiarazlea",
       "emptyTitle": "Oraindik ez dago abiarazlerik",
       "emptyDescription": "Sortu abiarazle bat Cloud Agent exekuzio bat hasteko webhook dei batetik edo ordutegi baten arabera.",
       "loadFailedTitle": "Ezin izan dira abiarazleak kargatu",

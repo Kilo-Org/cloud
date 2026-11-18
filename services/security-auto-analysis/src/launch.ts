@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { z } from 'zod';
 import type { WorkerDb } from '@kilocode/db/client';
 import { deriveCallbackToken } from '@kilocode/worker-utils';
+import { resolveRuntimeEnvironment } from '@kilocode/worker-utils/runtime-authorization-contract';
 import { buildSecurityFindingAnalysisInput } from '@kilocode/worker-utils/security-remediation-policy';
 import {
   clearAnalysisStatus,
@@ -204,7 +205,7 @@ export async function startSecurityAnalysis(
   );
 
   try {
-    const environment = params.env.ENVIRONMENT === 'production' ? 'production' : 'development';
+    const environment = resolveRuntimeEnvironment(params.env.ENVIRONMENT);
     const [controlToken, triageToken] = await Promise.all([
       generateControlToken(
         params.actorUser,

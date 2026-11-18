@@ -26,6 +26,7 @@
     "creditHistory": "Kredithistorik",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Avbryt",
     "done": "Klar",
     "retry": "Försök igen",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "Ändringar",
     "organizationTrialEnded": "Organisationens provperiod har löpt ut och den har ingen aktiv plan. En organisationsägare kan uppdatera faktureringen på kilo.ai och sedan försöka igen.",
-    "privateRepositoryA11y": "{{name}}, privat kodarkiv"
+    "privateRepositoryA11y": "{{name}}, privat kodarkiv",
+    "legalDocumentEnglishOnly": "Det här dokumentet finns endast på engelska."
   },
   "language": {
     "restarting": "Startar om för att byta språk",
@@ -481,7 +483,14 @@
       "viewReceipt": "Visa kvitto"
     },
     "changelog": "Nyheter",
-    "changelogVersionPending": "Nyheter för denna version kommer med nästa appuppdatering."
+    "changelogVersionPending": "Nyheter för version {{version}} kommer med nästa appuppdatering.",
+    "changelogGroupNew": "Nytt",
+    "changelogFixesIn": "Korrigeringar och förbättringar i {{areas}}.",
+    "changelogFixesPolish": "Korrigeringar och förbättringar i hela appen.",
+    "changelogAreas": {
+      "signIn": "Inloggning",
+      "profileOrganizations": "Profil och organisationer"
+    }
   },
   "preferences": {
     "general": "Allmänt",
@@ -1354,7 +1363,8 @@
       "managedOnWeb": "Organisationens Bitbucket-anslutning hanteras på webben från en dator.",
       "description": "Skapa en åtkomsttoken för arbetsytan med de behörigheter som krävs och klistra in den nedan.",
       "scopes": "Behörigheter som krävs: läsa kontouppgifter, läsa och skriva i kodarkiv, läsa pull-begäranden samt läsa och skriva webbhookar.",
-      "tokenPlaceholder": "Åtkomsttoken för arbetsytan"
+      "tokenPlaceholder": "Åtkomsttoken för arbetsytan",
+      "tokenRefused": "Bitbucket accepterade inte den här åtkomsttoken för arbetsytan. Kontrollera att den har behörigheterna ovan och försök igen."
     },
     "scopeList": {
       "personalStillAvailable": "Personliga kodarkiv är fortfarande tillgängliga nedan.",
@@ -1465,7 +1475,8 @@
       "repositoryLine": "Granskningar: {{reviews}} · Fynd: {{findings}}",
       "empty": "Inga granskningar med statistik än",
       "emptyDescription": "Statistiken registrerar slutförda granskningar så länge den är aktiverad för organisationen.",
-      "off": "Statistiken är avstängd för denna organisation.",
+      "offTitle": "Statistiken är avstängd för {{platform}}",
+      "offDescription": "Aktivera den i organisationsinställningarna på webben för att registrera slutförda granskningar.",
       "couldNotLoad": "Det gick inte att läsa in statistiken"
     },
     "council": {
@@ -3325,6 +3336,7 @@
       "manageOnWeb": "Faktureringsinställningar på webben",
       "changePlan": "Byt plan",
       "buySeats": "Köp platser",
+      "managedOnWeb": "Planen, platserna och den automatiska påfyllningen hanteras på webben.",
       "setupAutoTopUp": "Konfigurera automatisk påfyllning",
       "manageAutoTopUp": "Hantera automatisk påfyllning",
       "opensOnWeb": "Öppnas på webben"
@@ -3473,12 +3485,10 @@
       "requestLogs": "Förfrågningsloggar"
     },
     "requestLogs": {
-      "hint": "Förfrågningar från timmen före fönstrets sluttid, nyaste först.",
       "older": "Tidigare timme",
       "newer": "Senare timme",
       "truncated": "Den här timmen har fler förfrågningar än listan visar.",
       "emptyTitle": "Inga förfrågningar",
-      "emptyDescription": "Den här timmen har inga gateway-förfrågningar.",
       "loadError": "Det gick inte att läsa in förfrågningsloggarna.",
       "permissionDenied": "Endast en ägare, administratör eller faktureringsansvarig i organisationen kan läsa dess förfrågningsloggar.",
       "tokens": "{{input}} in · {{output}} ut",
@@ -4469,7 +4479,6 @@
     "dismiss": "Avskriv rapport",
     "offline": "Offline · sparad rapport",
     "cached": "Sparad rapport · kan inte uppdateras",
-    "window": "{{start}} – {{end}}",
     "summary": "AI-sammanfattning",
     "summaryPending": "AI-sammanfattningen pågår. Den bifogas här när den är klar.",
     "summaryUnavailable": "AI-sammanfattningen är inte tillgänglig. Din strukturerade rapport finns fortfarande.",
@@ -4588,6 +4597,7 @@
       "title": "Utlösare och webhooks",
       "subtitle": "Automatisera Cloud Agent-körningar från ett webhookanrop eller enligt ett schema.",
       "new": "Ny utlösare",
+      "create": "Skapa utlösare",
       "emptyTitle": "Inga utlösare än",
       "emptyDescription": "Skapa en utlösare för att starta en Cloud Agent-körning från ett webhookanrop eller enligt ett schema.",
       "loadFailedTitle": "Det gick inte att läsa in utlösare",

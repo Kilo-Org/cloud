@@ -111,6 +111,7 @@ function modernContext(
   organizationId?: string
 ): SessionRegistrationContext {
   ctx.env.NEXTAUTH_SECRET = 'registration-test-secret';
+  ctx.env.ENVIRONMENT = 'development';
   ctx.authToken = jwt.sign(
     {
       kiloUserId: ctx.userId,
@@ -7898,6 +7899,8 @@ describe('createSessionWithLedger clone reconciliation', () => {
         connectionString: ctx.env.HYPERDRIVE.connectionString,
         resourceKind: 'cloud-agent-next',
         resourceId: SANDBOX_SESSION_ID,
+        environment: 'development',
+        onAdmissionRejected: expect.any(Function),
         ...(organizationId ? { organizationId } : {}),
         onBindingRejected: expect.any(Function),
       });

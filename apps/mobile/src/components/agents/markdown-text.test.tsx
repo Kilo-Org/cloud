@@ -154,6 +154,7 @@ function codeFences(renderer: TestRenderer.ReactTestRenderer): CodeFenceProps[] 
 
 type EnrichedHostProps = {
   markdown: string;
+  markdownStyle: { paragraph: { lineHeight: number }; list: { lineHeight: number } };
   onLinkPress: (event: { url: string }) => void;
   onLinkLongPress?: (event: { url: string }) => void;
   onImagePress: (event: { url: string; altText: string }) => void;
@@ -1141,5 +1142,17 @@ describe('splitMarkdownHtmlIncremental', () => {
     for (const document of documents) {
       expect(firstDivergence(document), document).toBe('');
     }
+  });
+});
+
+describe('MarkdownText body line height', () => {
+  it('uses the 24 dp body line height', async () => {
+    const renderer = await mount(
+      <MarkdownText value="See [#10334](https://github.com/Kilo-Org/cloud/pull/10334)" />
+    );
+    const { paragraph, list } = enrichedProps(renderer).markdownStyle;
+
+    expect(paragraph.lineHeight).toBe(24);
+    expect(list.lineHeight).toBe(24);
   });
 });

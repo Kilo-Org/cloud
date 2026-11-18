@@ -3,7 +3,11 @@ import { z } from 'zod';
 import { createWebMcpToolCall } from './agent-conversation';
 import { KILO_BROWSER_TOOL_PREFIX } from './browser-tool-contract';
 import { pressKeyChord } from './browser-tool-interact-actions';
-import type { BrowserToolDialog, BrowserToolResolvedTarget } from './browser-tool-session';
+import type {
+  BrowserToolDialog,
+  BrowserToolResolvedTarget,
+  BrowserToolViewportState,
+} from './browser-tool-session';
 import { listInspectableTabsWithTabsApi } from './tab-debugger';
 import type {
   BrowserTabInfo,
@@ -102,14 +106,20 @@ export interface BrowserToolPageActionSession {
   ) => Promise<Record<string, unknown> | undefined>;
   readonly takeDialog: () => BrowserToolDialog | undefined;
   readonly takeFileChooser?: () => BrowserToolFileChooser | undefined;
+  /**
+   * The tab's viewport identity. Every caller view of a tab shares the tab
+   * session's object, so a resize override belongs to the tab. A session
+   * without it (a fake) is its own viewport.
+   */
+  readonly viewportState?: BrowserToolViewportState | undefined;
 }
 
 /** `chrome.tabs` plus the create/remove calls the browser_tabs actions need. */
 export interface BrowserToolPageTabsApi extends BrowserTabsApi {
-  readonly create?: (properties: {
-    readonly url?: string;
-  }) => Promise<BrowserTabInfo> | BrowserTabInfo;
-  readonly remove?: (tabId: number) => Promise<void> | void;
+  readonly create?:
+    | ((properties: { readonly url?: string }) => Promise<BrowserTabInfo> | BrowserTabInfo)
+    | undefined;
+  readonly remove?: ((tabId: number) => Promise<void> | void) | undefined;
 }
 
 export interface BrowserToolPageActionOptions {
@@ -585,8 +595,15 @@ const runCodeUnsafe = async (
   }
 };
 
-/** Sessions a resize already overrode, so a later resize clears the old override first. */
-const resizedSessions = new WeakSet<BrowserToolPageActionSession>();
+/**
+ * Viewports a resize already overrode, so a later resize clears the old
+ * override first. The key is the tab's shared viewport identity, so a resize
+ * from one caller view and the tab's own session agree.
+ */
+const resizedViewports = new WeakSet<object>();
+
+const viewportKeyOf = (session: BrowserToolPageActionSession): object =>
+  session.viewportState ?? session;
 
 const runNavigate = async (
   session: BrowserToolPageActionSession,
@@ -648,7 +665,9 @@ const runResize = async (
     return fail('browser_resize needs positive finite width and height.');
   }
 
-  if (resizedSessions.has(session)) {
+  const viewportKey = viewportKeyOf(session);
+
+  if (resizedViewports.has(viewportKey)) {
     await session.send('Emulation.clearDeviceMetricsOverride');
   }
 
@@ -658,7 +677,7 @@ const runResize = async (
     mobile: false,
     width,
   });
-  resizedSessions.add(session);
+  resizedViewports.add(viewportKey);
 
   return done({ height, width });
 };
@@ -1035,18 +1054,24 @@ export const runPageBrowserTool = async (
 };
 
 /**
- * Clears the device-metrics override a resize applied to this session. The
- * wiring calls it when it disposes a session so a resized tab returns to its
+ * Clears the device-metrics override a resize applied to this tab. The wiring
+ * calls it when it disposes a tab's session so a resized tab returns to its
  * natural viewport.
  */
 export const clearBrowserToolResize = async (
   session: BrowserToolPageActionSession | undefined
 ): Promise<void> => {
-  if (session === undefined || !resizedSessions.has(session)) {
+  if (session === undefined) {
     return;
   }
 
-  resizedSessions.delete(session);
+  const viewportKey = viewportKeyOf(session);
+
+  if (!resizedViewports.has(viewportKey)) {
+    return;
+  }
+
+  resizedViewports.delete(viewportKey);
 
   try {
     await session.send('Emulation.clearDeviceMetricsOverride');

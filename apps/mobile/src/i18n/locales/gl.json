@@ -26,6 +26,7 @@
     "creditHistory": "Historial de créditos",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Cancelar",
     "done": "Feito",
     "retry": "Tentar de novo",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "Cambios",
     "organizationTrialEnded": "O período de proba da organización rematou e non ten ningún plan activo. Un propietario da organización pode actualizar a facturación en kilo.ai e despois tentalo de novo.",
-    "privateRepositoryA11y": "{{name}}, repositorio privado"
+    "privateRepositoryA11y": "{{name}}, repositorio privado",
+    "legalDocumentEnglishOnly": "Este documento só está dispoñible en inglés."
   },
   "language": {
     "restarting": "Reiniciando para aplicar o idioma",
@@ -481,7 +483,14 @@
       "viewReceipt": "Ver xustificante"
     },
     "changelog": "Novidades",
-    "changelogVersionPending": "As notas desta versión chegarán coa próxima actualización."
+    "changelogVersionPending": "As notas da versión {{version}} chegarán coa próxima actualización da aplicación.",
+    "changelogGroupNew": "Novidades",
+    "changelogFixesIn": "Correccións e melloras en {{areas}}.",
+    "changelogFixesPolish": "Correccións e melloras en toda a aplicación.",
+    "changelogAreas": {
+      "signIn": "Inicio de sesión",
+      "profileOrganizations": "Perfil e organizacións"
+    }
   },
   "preferences": {
     "general": "Xeral",
@@ -1354,7 +1363,8 @@
       "managedOnWeb": "A conexión de Bitbucket desta organización xestiónase na web desde un ordenador.",
       "description": "Crea un token de acceso ao espazo de traballo cos ámbitos requiridos e pégao aquí embaixo.",
       "scopes": "Conta: lectura · Repositorios: lectura/escritura · Solicitudes de cambios: lectura · Webhooks: lectura/escritura",
-      "tokenPlaceholder": "Token de acceso ao espazo de traballo"
+      "tokenPlaceholder": "Token de acceso ao espazo de traballo",
+      "tokenRefused": "Bitbucket non aceptou este token do espazo de traballo. Comproba que ten os ámbitos indicados arriba e téntao de novo."
     },
     "scopeList": {
       "personalStillAvailable": "Os repositorios persoais seguen dispoñibles máis abaixo.",
@@ -1465,7 +1475,8 @@
       "repositoryLine": "Revisións: {{reviews}} · Achados: {{findings}}",
       "empty": "Aínda non hai revisións con analítica",
       "emptyDescription": "A analítica rexistra as revisións completadas mentres estea activada para a organización.",
-      "off": "A analítica está desactivada para esta organización.",
+      "offTitle": "A analítica está desactivada para {{platform}}",
+      "offDescription": "Actívaa na configuración da organización na web para rexistrar as revisións completadas.",
       "couldNotLoad": "Non se puido cargar a analítica"
     },
     "council": {
@@ -3325,6 +3336,7 @@
       "manageOnWeb": "Configuración da facturación na web",
       "changePlan": "Cambiar plan",
       "buySeats": "Mercar prazas",
+      "managedOnWeb": "O plan, as prazas e a recarga automática xestiónanse na web.",
       "setupAutoTopUp": "Configurar recarga automática",
       "manageAutoTopUp": "Xestionar a recarga automática",
       "opensOnWeb": "Ábrese na web"
@@ -3473,12 +3485,10 @@
       "requestLogs": "Rexistros de solicitudes"
     },
     "requestLogs": {
-      "hint": "Solicitudes da hora previa ao fin do intervalo, primeiro as máis recentes.",
       "older": "Hora anterior",
       "newer": "Hora seguinte",
       "truncated": "Esta hora ten máis solicitudes das que mostra a lista.",
       "emptyTitle": "Non hai solicitudes",
-      "emptyDescription": "Nesta hora non hai solicitudes á pasarela.",
       "loadError": "Non se puideron cargar os rexistros de solicitudes.",
       "permissionDenied": "Só un propietario, administrador ou xestor de facturación da organización pode ler os seus rexistros de solicitudes.",
       "tokens": "{{input}} de entrada · {{output}} de saída",
@@ -4469,7 +4479,6 @@
     "dismiss": "Descartar o informe",
     "offline": "Sen conexión · informe gardado",
     "cached": "Informe gardado · non se pode actualizar",
-    "window": "{{start}} – {{end}}",
     "summary": "Resumo con IA",
     "summaryPending": "O resumo con IA está en curso. Engadirase aquí cando estea listo.",
     "summaryUnavailable": "Resumo con IA non dispoñible. O teu informe estruturado segue dispoñible.",
@@ -4588,6 +4597,7 @@
       "title": "Disparadores e webhooks",
       "subtitle": "Automatiza execucións de Cloud Agent a partir dunha chamada de webhook ou dunha programación.",
       "new": "Novo disparador",
+      "create": "Crear disparador",
       "emptyTitle": "Aínda non hai disparadores",
       "emptyDescription": "Crea un disparador para iniciar unha execución de Cloud Agent a partir dunha chamada de webhook ou segundo unha programación.",
       "loadFailedTitle": "Non se puideron cargar os disparadores",

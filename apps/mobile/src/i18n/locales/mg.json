@@ -26,6 +26,7 @@
     "creditHistory": "Tantaran'ny kredita",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Foano",
     "done": "Vita",
     "retry": "Andramo indray",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "Fiovana",
     "organizationTrialEnded": "Lasa ny fe-potoana fanandramana ho an'ny fikambanana ary tsy manana drafitra mavitrika izy. Ny tompon'ny fikambanana dia afaka manavao ny faktiora ao amin'ny kilo.ai, ary hanandrana indray.",
-    "privateRepositoryA11y": "{{name}}, tahirin-kaody manokana"
+    "privateRepositoryA11y": "{{name}}, tahirin-kaody manokana",
+    "legalDocumentEnglishOnly": "Ity antontan-taratasy ity dia tsy misy afa-tsy amin'ny teny anglisy."
   },
   "language": {
     "restarting": "Manomboka indray mba hampiharana ny fiteny",
@@ -481,7 +483,14 @@
       "viewReceipt": "Jereo ny porofo"
     },
     "changelog": "Ny vaovao",
-    "changelogVersionPending": "Ny naotin'ity kinova ity dia ho avy amin'ny fanavaozana manaraka."
+    "changelogVersionPending": "Ny naotin'ny kinova {{version}} dia ho avy amin'ny fanavaozana manaraka.",
+    "changelogGroupNew": "Vaovao",
+    "changelogFixesIn": "Fanitsiana sy fanatsarana amin'ireto sehatra ireto: {{areas}}.",
+    "changelogFixesPolish": "Fanitsiana sy fanatsarana manerana ny fampiharana.",
+    "changelogAreas": {
+      "signIn": "Fidirana",
+      "profileOrganizations": "Mombamomba sy fikambanana"
+    }
   },
   "preferences": {
     "general": "Ankapobeny",
@@ -1354,7 +1363,8 @@
       "managedOnWeb": "Ny fifandraisana Bitbucket an'ity fikambanana ity dia tantanana amin'ny tranonkala, avy amin'ny solosaina.",
       "description": "Mamoròna mari-pidirana ho an'ny sehatra fiasana, miaraka amin'ny alalana ilaina, ary apetaho eto ambany.",
       "scopes": "Kaonty: mamaky · Tahirin-kaody: mamaky/manoratra · PR: mamaky · Rohy fampandrenesana: mamaky/manoratra",
-      "tokenPlaceholder": "Mari-pidirana ho an'ny sehatra fiasana"
+      "tokenPlaceholder": "Mari-pidirana ho an'ny sehatra fiasana",
+      "tokenRefused": "Tsy nanaiky io mari-pidirana ho an'ny sehatra fiasana io i Bitbucket. Hamarinio fa manana ny alalana etsy ambony izy, dia andramo indray."
     },
     "scopeList": {
       "personalStillAvailable": "Mbola azo ampiasaina eto ambany ny tahirin-kaody manokana.",
@@ -1465,7 +1475,8 @@
       "repositoryLine": "Fandinihana: {{reviews}} · Olana hita: {{findings}}",
       "empty": "Tsy mbola misy fandinihana misy antontan'isa",
       "emptyDescription": "Mirakitra ny fandinihana vita ny antontan'isa rehefa velona ho an'ny fikambanana izy.",
-      "off": "Maty ny antontan'isa ho an'ity fikambanana ity.",
+      "offTitle": "Maty ny antontan'isa ho an'i {{platform}}",
+      "offDescription": "Alefaso ny antontan'isa ao amin'ny fikirakiran'ny fikambanana amin'ny tranonkala mba hirakitra ny fandinihana vita.",
       "couldNotLoad": "Tsy afaka nampiditra ny antontan'isa"
     },
     "council": {
@@ -3325,6 +3336,7 @@
       "manageOnWeb": "Fikirakiran'ny faktiora amin'ny tranonkala",
       "changePlan": "Ovao ny drafitra",
       "buySeats": "Mividiana toerana",
+      "managedOnWeb": "Tantanina amin'ny tranonkala ny drafitra, ny toerana ary ny famenoana ho azy.",
       "setupAutoTopUp": "Alamino ny famenoana ho azy",
       "manageAutoTopUp": "Tantano ny famenoana ho azy",
       "opensOnWeb": "Misokatra ao amin'ny tranonkala"
@@ -3473,12 +3485,10 @@
       "requestLogs": "Rakitry ny fangatahana"
     },
     "requestLogs": {
-      "hint": "Fangatahana nandritra ny ora iray talohan'ny fiafaran'ny fe-potoana, ny vaovao indrindra aloha.",
       "older": "Ora teo aloha",
       "newer": "Ora manaraka",
       "truncated": "Mihoatra noho izay aseho ao amin'ny lisitra ny fangatahana tamin'ity ora ity.",
       "emptyTitle": "Tsy misy fangatahana",
-      "emptyDescription": "Tsy nisy fangatahana tamin'ny vavahady nandritra ity ora ity.",
       "loadError": "Tsy afaka nampiditra ny rakitry ny fangatahana.",
       "permissionDenied": "Ny tompon'ny fikambanana, ny mpitantana na ny mpitantana ny faktiora ihany no afaka mamaky ny rakitry ny fangatahana.",
       "tokens": "{{input}} miditra · {{output}} mivoaka",
@@ -4469,7 +4479,6 @@
     "dismiss": "Esory ny tatitra",
     "offline": "Tsy misy tambajotra · tatitra voatahiry",
     "cached": "Tatitra voatahiry · tsy azo havaozina",
-    "window": "{{start}} – {{end}}",
     "summary": "Famintinana AI",
     "summaryPending": "Eo am-panomanana ny famintinana AI. Hiseho eto izy rehefa vita.",
     "summaryUnavailable": "Tsy misy ny famintinana AI. Mbola azo jerena ny tatitra voalamina.",
@@ -4588,6 +4597,7 @@
       "title": "Fanentanana sy fiantsoana",
       "subtitle": "Ataovy ho azy ny fanatanterahana Cloud Agent avy amin'ny fiantsoana na fandaharam-potoana.",
       "new": "Fanentanana vaovao",
+      "create": "Mamorona fanentanana",
       "emptyTitle": "Mbola tsy misy fanentanana",
       "emptyDescription": "Mamorona fanentanana hanombohana fanatanterahana Cloud Agent avy amin'ny fiantsoana na araka ny fandaharam-potoana.",
       "loadFailedTitle": "Tsy afaka nampiditra ny fanentanana",

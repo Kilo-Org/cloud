@@ -75,8 +75,10 @@ export const CLOUD_AGENT_DISPATCH_HEALTH_SECRET = getEnvVariable(
 export const USAGE_INGEST_URL = getEnvVariable('USAGE_INGEST_URL');
 export const USAGE_INGEST_PUBLISH_SECRET = getEnvVariable('USAGE_INGEST_PUBLISH_SECRET');
 
-// Shared secret with the MCP catalog CI job
-// (.github/workflows/kilo-mcp-catalog.yml). It authenticates only the mint in
+// Shared secret with the internal token-mint callers: the MCP catalog CI job
+// (.github/workflows/kilo-mcp-catalog.yml) and the kilo-app changelog workflows
+// (.github/workflows/kilo-app-release.yml and
+// kilo-app-changelog-history.yml). It authenticates only the mint in
 // app/api/internal/mcp-catalog/token; it is never accepted as a Kilo credential.
 export const MCP_CATALOG_TOKEN_SECRET = getEnvVariable('MCP_CATALOG_TOKEN_SECRET');
 // Shared secret with internal-bot workloads (bouncer watch, auto-routing

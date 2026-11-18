@@ -210,6 +210,7 @@ vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }
 
 vi.mock('@/components/ui/directional-icons', () => ({
   DirectionalChevronRight: 'DirectionalChevronRight',
+  DirectionalLogs: 'DirectionalLogs',
 }));
 
 // Every icon the hub composes, including the web-settings rows' own set: the
@@ -223,6 +224,7 @@ vi.mock('@/components/ui/icons', () => ({
   KeyRound: 'KeyRound',
   LineChart: 'LineChart',
   Lock: 'Lock',
+  Logs: 'Logs',
   Mail: 'Mail',
   Pencil: 'Pencil',
   Plug: 'Plug',
@@ -232,6 +234,7 @@ vi.mock('@/components/ui/icons', () => ({
   Shield: 'Shield',
   SlidersHorizontal: 'SlidersHorizontal',
   Users: 'Users',
+  UsersRound: 'UsersRound',
   Wallet: 'Wallet',
 }));
 
@@ -350,6 +353,22 @@ describe('Organization hub card', () => {
     // Left-to-right isolate (U+2066) and pop-directional-isolate (U+2069): the
     // pair reads 1 of 5 in either interface direction.
     expect(seats?.props.value).toBe('\u20661 / 5\u2069');
+    unmount();
+  });
+
+  it('holds a brand-new seat-enforcing organization at the used count, without a total', async () => {
+    // A new organization is created with the enforcement switch on and no
+    // seats bought, so its total is 0 and the pair would read `1 / 0` —
+    // a row that reads as over capacity on creation day.
+    boundary.requireSeats = true;
+    boundary.seatCount = { used: 1, total: 0 };
+
+    const { renderer, unmount } = await renderHub();
+
+    const seats = renderer.root
+      .findAllByType('KvRow')
+      .find(node => node.props.label === i18n.t('organization.hub.organizationSeats'));
+    expect(seats?.props.value).toBe('1');
     unmount();
   });
 
@@ -1083,6 +1102,9 @@ describe('Organization hub settings-on-the-web group', () => {
       (row.props.onPress as () => void)();
     });
     expect(routerPush).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/organization/request-logs');
+    // The row draws the screen's own glyph through the direction-aware wrapper,
+    // so the card's request-logs icon mirrors with the empty state in RTL.
+    expect(row.props.icon).toBe('DirectionalLogs');
     expect(openExternalUrlMock).not.toHaveBeenCalled();
     unmount();
   });

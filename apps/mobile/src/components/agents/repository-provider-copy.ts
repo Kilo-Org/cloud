@@ -109,10 +109,11 @@ export function connectCardOffer(
     if (needsReconnect) {
       // The workspace is connected but cannot list: the step is a fresh
       // selection or credentials, so the reconnect sentence applies. Both notes
-      // carry Bitbucket's own provider-neutral copy, so a GitLab reword cannot
-      // change this card; neither note has a header to explain which connect
-      // step is left, and the compact row states the provider name above it,
-      // since that sentence's only subject is a pronoun.
+      // carry the one provider-neutral reconnect sentence the GitLab surfaces
+      // share, so the two providers cannot drift apart; neither note has a
+      // header to explain which connect step is left, and the compact row
+      // states the provider name above it, since that sentence's only subject
+      // is a pronoun.
       return {
         offersAction: false,
         noteKey: 'prReview.connect.reconnectAdminOnlyDescription',

@@ -59,7 +59,7 @@ Admin pages ask for a passkey when `ADMIN_STEP_UP_ENABLED=true`. Exporting the v
 
 Run Playwright headless. Open a visible browser window only when the user asks for one.
 
-Organization request log details show provider routing only when the `R2_AI_PROVIDER_METADATA_*` variables in `.env.local` are set; there is no local emulator.
+Organization request log details show provider routing only when `R2_ACCOUNT_ID` and the `R2_AI_PROVIDER_METADATA_*` variables in `.env.local` are set; there is no local emulator.
 
 ## Service management
 

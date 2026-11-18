@@ -12,6 +12,7 @@ import {
 import type { ProbeClient, ProbeSample } from './cdp';
 import type { ElementRef, Finding, RuleId } from './findings';
 import { enterTouchMode } from './input-mode';
+import { checkDevLogOverlay } from './log-source-filter';
 import { envMismatches, isRtlLanguage, mirrorReference, type CellConfig } from './matrix';
 import type { Rgba } from './pixels';
 import { checkMirror, checkScreen, checkShift, normalize } from './rules';
@@ -287,11 +288,26 @@ export async function waitForApp(
   const deadline = clock.now() + timeoutMs;
   let last: ProbeDump | undefined;
   let lastError: unknown;
+  let filterInstalled = false;
   for (;;) {
     try {
       // A probe that has just lost its page waits for it; this wait's own
       // budget caps that, so an absent app still fails within the declared time.
       if (await probe.ready(Math.max(0, deadline - clock.now()))) {
+        // Every readiness wait is a fresh app runtime after a reload and the same
+        // runtime after a cell's Activity recreation. The filter is idempotent,
+        // so installing here covers both without the caller tracking reloads. A
+        // filter that cannot install leaves the app running; the screen rule
+        // reports any warning that then paints.
+        const install = probe.installLogSourceFilter;
+        if (!filterInstalled && install !== undefined) {
+          try {
+            await install();
+            filterInstalled = true;
+          } catch {
+            // Retried on the next pass, inside this wait's own budget.
+          }
+        }
         last = await probe.dump(Math.max(0, deadline - clock.now()));
         if (accept(last)) return last;
       }
@@ -306,6 +322,41 @@ export async function waitForApp(
   if (lastError instanceof InfraError) throw lastError;
   const reason = lastError === undefined ? 'ready() stayed false' : String(lastError);
   throw new InfraError(`Design gate probe not ready within ${timeoutMs} ms: ${reason}`);
+}
+
+/**
+ * The run log states how much of React's not-yet-mounted warning the gate
+ * muted, and where the warning came from: a clean matrix is then evidence of
+ * the source filter rather than unexplained silence.
+ */
+async function reportLogSourceFilter(
+  probe: ProbeClient,
+  log: (line: string) => void
+): Promise<void> {
+  try {
+    const stats = await probe.logSourceFilterStats?.();
+    if (stats === null || stats === undefined) {
+      log('design-gate: log source filter not installed in the app runtime');
+      return;
+    }
+    if (stats.dismissed > 0) {
+      log(
+        `design-gate: closed ${stats.dismissed} styling-engine not-yet-mounted log(s) painted before the filter installed`
+      );
+    }
+    if (stats.suppressed > 0) {
+      log(
+        `design-gate: muted ${stats.suppressed} styling-engine not-yet-mounted log(s) (react-native-css useNativeCss/styleEffect)`
+      );
+    }
+    if (stats.forwardedGuard > 0) {
+      log(
+        `design-gate: ${stats.forwardedGuard} not-yet-mounted log(s) came from app code and were kept`
+      );
+    }
+  } catch (error) {
+    log(`design-gate: log source filter stats unavailable: ${String(error)}`);
+  }
 }
 
 export function rootRef(dump: ProbeDump): ElementRef {
@@ -331,6 +382,7 @@ export function screenFindings(args: {
     alignment === undefined || alignment.status === 'bracketed' ? args.image : undefined;
   const findings: Finding[] = [];
   if (args.sampled?.settled !== false) findings.push(...checkScreen(args.tree, image));
+  findings.push(...checkDevLogOverlay(args.tree));
   if (alignment !== undefined && alignment.status !== 'bracketed') {
     findings.push({
       rule: 'capture-alignment',
@@ -1090,6 +1142,7 @@ export async function runMatrix(
       }
     }
     beforeRestore(outcome);
+    await reportLogSourceFilter(ctx.probe, ctx.log);
   } finally {
     unregisterCleanup?.();
     restoreErrors = await restoreState();

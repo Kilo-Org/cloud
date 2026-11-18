@@ -20,7 +20,7 @@ import { OrganizationBoundary } from '@/components/organization/organization-bou
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { IconButton } from '@/components/ui/icon-button';
-import { RowGroup, RowGroupItem } from '@/components/ui/row-group';
+import { RowGroup, RowGroupItem, rowGroupPosition } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { SectionHeader } from '@/components/ui/section-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
@@ -173,13 +173,8 @@ export function OrganizationMembersScreen() {
   // rows after a section header start the run, and the last row of the group
   // closes it. The group is a card, so it keeps the 14pt page gutter inside the
   // full-bleed list rather than running to the screen edge.
-  const rowPosition = (index: number, last: boolean) => {
-    const isFirst = index === 0 || items[index - 1]?.kind === 'section';
-    if (last) {
-      return isFirst ? 'only' : 'last';
-    }
-    return isFirst ? 'first' : 'middle';
-  };
+  const positionOf = (index: number, last: boolean) =>
+    rowGroupPosition({ first: index === 0 || items[index - 1]?.kind === 'section', last });
 
   const renderItem = ({ item, index }: { item: MembersListItem; index: number }) => {
     switch (item.kind) {
@@ -191,7 +186,7 @@ export function OrganizationMembersScreen() {
       }
       case 'member': {
         return (
-          <RowGroupItem position={rowPosition(index, item.last)} className="mx-4">
+          <RowGroupItem position={positionOf(index, item.last)} className="mx-4">
             <MemberRow
               member={item.member}
               canManage={
@@ -213,7 +208,7 @@ export function OrganizationMembersScreen() {
       }
       case 'invite': {
         return (
-          <RowGroupItem position={rowPosition(index, item.last)} className="mx-4">
+          <RowGroupItem position={positionOf(index, item.last)} className="mx-4">
             <InvitedMemberRow
               invite={item.invite}
               canManage={canManageMembers && (item.invite.role !== 'owner' || canManageOwners)}

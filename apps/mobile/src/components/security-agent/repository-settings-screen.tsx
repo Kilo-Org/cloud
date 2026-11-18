@@ -23,7 +23,7 @@ import { QueryError } from '@/components/query-error';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { RadioGroup } from '@/components/ui/radio-group';
-import { RowGroup, RowGroupItem } from '@/components/ui/row-group';
+import { RowGroup, RowGroupItem, rowGroupPosition } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
@@ -50,17 +50,6 @@ type RepositoryRow = NonNullable<ReturnType<typeof useSecurityAgentRepositories>
 // only the tab-bar band and the safe-area side insets; the page gutter lives on
 // the rows and the header, whose row primitives draw their own `px-4`.
 const listStyle = { flex: 1 } satisfies ViewStyle;
-
-/** Where a grouped cell sits in its section, for its rounded ends. */
-function rowPosition(index: number, count: number): 'only' | 'first' | 'middle' | 'last' {
-  if (count <= 1) {
-    return 'only';
-  }
-  if (index === 0) {
-    return 'first';
-  }
-  return index === count - 1 ? 'last' : 'middle';
-}
 
 function RepositorySettingsSkeleton() {
   const { t } = useTranslation();
@@ -172,7 +161,13 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
       // The picker is one grouped card inside the full-bleed list, so each
       // virtualized cell draws its own rounded end, surface and separator and
       // the page gutter lives here rather than on the list.
-      <RowGroupItem position={rowPosition(index, repositoryCount)} className="mx-4">
+      <RowGroupItem
+        position={rowGroupPosition({
+          first: index === 0,
+          last: index === repositoryCount - 1,
+        })}
+        className="mx-4"
+      >
         <RepoToggleRow
           repo={item}
           selected={selectedIdSet.has(item.id)}

@@ -17,6 +17,26 @@ const GROUPED_SURFACE_CLASS = {
   last: 'rounded-b-xl',
 } as const;
 
+/** Where a grouped cell sits in its group, for its rounded ends and separator. */
+export type RowGroupPosition = 'only' | 'first' | 'middle' | 'last';
+
+/**
+ * The {@link RowGroupPosition} of a cell from the two facts a virtualized list
+ * already knows about it: whether it opens its group and whether it closes it.
+ */
+export function rowGroupPosition({
+  first,
+  last,
+}: {
+  first: boolean;
+  last: boolean;
+}): RowGroupPosition {
+  if (first) {
+    return last ? 'only' : 'first';
+  }
+  return last ? 'last' : 'middle';
+}
+
 type RowGroupProps = {
   /**
    * The rows lead with a 30pt icon tile, so every separator starts after it
@@ -64,7 +84,7 @@ type RowGroupItemProps = {
    * to round the top, `middle` for any row between, `last` to round the bottom.
    * Each cell draws its own end, so a recycled list keeps the grouped look.
    */
-  position: 'only' | 'first' | 'middle' | 'last';
+  position: RowGroupPosition;
   /** The row leads with a 30pt tile, so its separator starts after it. */
   leadingTile?: boolean;
   className?: string;

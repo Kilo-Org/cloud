@@ -9,7 +9,7 @@ import { FilterChip } from '@/components/ui/filter-chip';
 import { Input } from '@/components/ui/input';
 import { SearchX } from '@/components/ui/icons';
 import { PreferenceRow } from '@/components/ui/preference-row';
-import { RowGroupItem } from '@/components/ui/row-group';
+import { RowGroupItem, rowGroupPosition } from '@/components/ui/row-group';
 import { Text } from '@/components/ui/text';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import {
@@ -23,19 +23,6 @@ import {
 } from '@/lib/organization/model-access';
 
 const listStyle = { flex: 1 } satisfies ViewStyle;
-
-/** Where a grouped cell sits in its section, for its rounded ends. */
-type GroupPosition = 'only' | 'first' | 'middle' | 'last';
-
-function groupPosition(index: number, count: number): GroupPosition {
-  if (count <= 1) {
-    return 'only';
-  }
-  if (index === 0) {
-    return 'first';
-  }
-  return index === count - 1 ? 'last' : 'middle';
-}
 
 /** The search field and filter row both lists carry above their rows. */
 function ListHeader({
@@ -101,7 +88,9 @@ export function ProviderAllowList({
 
   const renderItem = useCallback(
     ({ item, index }: ListRenderItemInfo<string>) => (
-      <RowGroupItem position={groupPosition(index, shown.length)}>
+      <RowGroupItem
+        position={rowGroupPosition({ first: index === 0, last: index === shown.length - 1 })}
+      >
         <PreferenceRow
           title={item}
           value={draft.providerAllowList.includes(item)}
@@ -193,7 +182,9 @@ export function ModelDenyList({
 
   const renderItem = useCallback(
     ({ item, index }: ListRenderItemInfo<DenyListModel>) => (
-      <RowGroupItem position={groupPosition(index, shown.length)}>
+      <RowGroupItem
+        position={rowGroupPosition({ first: index === 0, last: index === shown.length - 1 })}
+      >
         <PreferenceRow
           title={item.name}
           subtitle={item.id}

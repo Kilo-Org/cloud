@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { UsageRecordRequestSchema } from './index';
+import { UsageRecordRequestSchema, UsageRecordResponseSchema } from './index';
 
 function validCore() {
   return {
@@ -194,5 +194,58 @@ describe('UsageRecordRequestSchema', () => {
     const request = validRequest();
     const roundTripped: unknown = JSON.parse(JSON.stringify(request));
     expect(UsageRecordRequestSchema.safeParse(roundTripped).success).toBe(true);
+  });
+
+  // `organization_id` follows the `organizations.id` column contract: every
+  // stored id passes, so a stored organization whose id is column-shaped but
+  // not RFC-versioned must not be rejected here.
+  test('accepts a column-shaped organization_id that is not an RFC UUID', () => {
+    const request = validRequest();
+    request.core.organization_id = '4f4f4f4f-4f4f-4f4f-4f4f-4f4f4f4f4f4f';
+    expect(UsageRecordRequestSchema.safeParse(request).success).toBe(true);
+  });
+
+  test('rejects a string that is not an 8-4-4-4-12 GUID as organization_id', () => {
+    const request = validRequest();
+    request.core.organization_id = 'org-456';
+    expect(UsageRecordRequestSchema.safeParse(request).success).toBe(false);
+  });
+});
+
+function validResponse() {
+  return {
+    status: 'recorded',
+    result: {
+      usageId: '3f2504e0-4f89-41d3-9a0c-0305e82c3301',
+      // A DB read-back shape stays a plain string: see packages/db/AGENTS.md
+      // "Timestamp boundaries".
+      createdAt: '2026-08-05T10:11:12.945Z',
+      newMicrodollarsUsed: 42,
+    },
+  };
+}
+
+describe('UsageRecordResponseSchema', () => {
+  test('accepts a recorded writer reply', () => {
+    expect(UsageRecordResponseSchema.parse(validResponse())).toEqual(validResponse());
+  });
+
+  test('accepts a not_recorded reply with a null result', () => {
+    expect(UsageRecordResponseSchema.parse({ status: 'not_recorded', result: null })).toEqual({
+      status: 'not_recorded',
+      result: null,
+    });
+  });
+
+  test('rejects a non-UUID usageId in the result', () => {
+    const response = validResponse();
+    response.result.usageId = 'usage-1';
+    expect(UsageRecordResponseSchema.safeParse(response).success).toBe(false);
+  });
+
+  test('accepts a DB-shaped createdAt string', () => {
+    const response = validResponse();
+    response.result.createdAt = '2026-04-29 01:16:12.945+00';
+    expect(UsageRecordResponseSchema.safeParse(response).success).toBe(true);
   });
 });

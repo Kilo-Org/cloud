@@ -3337,6 +3337,8 @@
         "policyText": "poliitika tekst",
         "groupCreated": "Loodi grupp {{name}}",
         "groupUpdated": "Uuendati gruppi {{name}}",
+        "groupUpdatedMembers_one": "Uuendati gruppi {{name}}, millel on {{count}} liige",
+        "groupUpdatedMembers_other": "Uuendati gruppi {{name}}, millel on {{count}} liiget",
         "groupDeleted": "Kustutati grupp {{name}}",
         "groupPolicySet": "Määrati grupile {{name}} poliitika {{policy}}",
         "groupPolicyRemoved": "Eemaldati grupilt {{name}} poliitika {{policy}}",
@@ -3430,6 +3432,7 @@
           "skill": "oskus"
         },
         "mcpGuardrailAdded": "Lisati {{type}} {{name}}",
+        "mcpGuardrailApproved": "Kinnitati {{type}} {{name}}",
         "mcpGuardrailUpdated": "Uuendati {{type}} {{name}}",
         "mcpGuardrailEnabled": "Lubati {{type}} {{name}}",
         "mcpGuardrailDisabled": "Keelati {{type}} {{name}}",

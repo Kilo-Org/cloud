@@ -3337,6 +3337,8 @@
         "policyText": "የፖሊሲ ጽሑፍ",
         "groupCreated": "ቡድን {{name}} ተፈጥሯል",
         "groupUpdated": "ቡድን {{name}} ተዘምኗል",
+        "groupUpdatedMembers_one": "ቡድን {{name}} ከ{{count}} አባል ጋር ተዘምኗል",
+        "groupUpdatedMembers_other": "ቡድን {{name}} ከ{{count}} አባላት ጋር ተዘምኗል",
         "groupDeleted": "ቡድን {{name}} ተሰርዟል",
         "groupPolicySet": "ለቡድን {{name}} የ{{policy}} ፖሊሲ ተቀናብሯል",
         "groupPolicyRemoved": "ከቡድን {{name}} የ{{policy}} ፖሊሲ ተወግዷል",
@@ -3430,6 +3432,7 @@
           "skill": "ክህሎት"
         },
         "mcpGuardrailAdded": "{{type}} {{name}} ተጨምሯል",
+        "mcpGuardrailApproved": "{{type}} {{name}} ተፈቅዷል",
         "mcpGuardrailUpdated": "{{type}} {{name}} ተዘምኗል",
         "mcpGuardrailEnabled": "{{type}} {{name}} ነቅቷል",
         "mcpGuardrailDisabled": "{{type}} {{name}} ተሰናክሏል",

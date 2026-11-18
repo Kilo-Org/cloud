@@ -3337,6 +3337,8 @@
         "policyText": "teksto ng patakaran",
         "groupCreated": "Nagawa ang grupong {{name}}",
         "groupUpdated": "Na-update ang grupong {{name}}",
+        "groupUpdatedMembers_one": "Na-update ang grupong {{name}} na may {{count}} miyembro",
+        "groupUpdatedMembers_other": "Na-update ang grupong {{name}} na may {{count}} miyembro",
         "groupDeleted": "Na-delete ang grupong {{name}}",
         "groupPolicySet": "Itinakda ang {{policy}} na patakaran para sa grupong {{name}}",
         "groupPolicyRemoved": "Inalis ang {{policy}} na patakaran mula sa grupong {{name}}",
@@ -3430,6 +3432,7 @@
           "skill": "skill"
         },
         "mcpGuardrailAdded": "Idinagdag ang {{type}} {{name}}",
+        "mcpGuardrailApproved": "Inaprubahan ang {{type}} {{name}}",
         "mcpGuardrailUpdated": "Na-update ang {{type}} {{name}}",
         "mcpGuardrailEnabled": "Naka-enable ang {{type}} {{name}}",
         "mcpGuardrailDisabled": "Naka-disable ang {{type}} {{name}}",

@@ -3337,6 +3337,8 @@
         "policyText": "käytännön teksti",
         "groupCreated": "Luotu ryhmä {{name}}",
         "groupUpdated": "Päivitetty ryhmä {{name}}",
+        "groupUpdatedMembers_one": "Päivitetty ryhmä {{name}}, jossa on {{count}} jäsen",
+        "groupUpdatedMembers_other": "Päivitetty ryhmä {{name}}, jossa on {{count}} jäsentä",
         "groupDeleted": "Poistettu ryhmä {{name}}",
         "groupPolicySet": "Asetettu {{policy}}-käytäntö ryhmälle {{name}}",
         "groupPolicyRemoved": "Poistettu {{policy}}-käytäntö ryhmältä {{name}}",
@@ -3430,6 +3432,7 @@
           "skill": "taito"
         },
         "mcpGuardrailAdded": "Lisätty {{type}} {{name}}",
+        "mcpGuardrailApproved": "Hyväksytty {{type}} {{name}}",
         "mcpGuardrailUpdated": "Päivitetty {{type}} {{name}}",
         "mcpGuardrailEnabled": "Otettu käyttöön {{type}} {{name}}",
         "mcpGuardrailDisabled": "Poistettu käytöstä {{type}} {{name}}",

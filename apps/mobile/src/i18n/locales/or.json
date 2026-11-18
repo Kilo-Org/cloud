@@ -3337,6 +3337,8 @@
         "policyText": "ପଲିସି ଟେକ୍ସଟ୍",
         "groupCreated": "ଗୋଷ୍ଠୀ {{name}} ସୃଷ୍ଟି କରାଗଲା",
         "groupUpdated": "ଗୋଷ୍ଠୀ {{name}} ଅପଡେଟ୍ କରାଗଲା",
+        "groupUpdatedMembers_one": "ଗୋଷ୍ଠୀ {{name}} {{count}} ସଦସ୍ୟ ସହିତ ଅପଡେଟ୍ କରାଗଲା",
+        "groupUpdatedMembers_other": "ଗୋଷ୍ଠୀ {{name}} {{count}} ସଦସ୍ୟ ସହିତ ଅପଡେଟ୍ କରାଗଲା",
         "groupDeleted": "ଗୋଷ୍ଠୀ {{name}} ଡିଲିଟ୍ କରାଗଲା",
         "groupPolicySet": "ଗୋଷ୍ଠୀ {{name}} ପାଇଁ {{policy}} ପଲିସି ସେଟ୍ କରାଗଲା",
         "groupPolicyRemoved": "ଗୋଷ୍ଠୀ {{name}} ରୁ {{policy}} ପଲିସି ହଟାଗଲା",
@@ -3430,6 +3432,7 @@
           "skill": "ସ୍କିଲ୍"
         },
         "mcpGuardrailAdded": "{{type}} {{name}} ଯୋଡାଗଲା",
+        "mcpGuardrailApproved": "{{type}} {{name}} ଅନୁମୋଦିତ କରାଗଲା",
         "mcpGuardrailUpdated": "{{type}} {{name}} ଅପଡେଟ୍ କରାଗଲା",
         "mcpGuardrailEnabled": "{{type}} {{name}} ସକ୍ରିୟ କରାଗଲା",
         "mcpGuardrailDisabled": "{{type}} {{name}} ନିଷ୍କ୍ରିୟ କରାଗଲା",

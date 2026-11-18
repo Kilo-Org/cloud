@@ -3337,6 +3337,8 @@
         "policyText": "ਨੀਤੀ ਟੈਕਸਟ",
         "groupCreated": "ਸਮੂਹ {{name}} ਬਣਾਇਆ",
         "groupUpdated": "ਸਮੂਹ {{name}} ਅੱਪਡੇਟ ਕੀਤਾ",
+        "groupUpdatedMembers_one": "ਸਮੂਹ {{name}} ਨੂੰ {{count}} ਮੈਂਬਰ ਨਾਲ ਅੱਪਡੇਟ ਕੀਤਾ",
+        "groupUpdatedMembers_other": "ਸਮੂਹ {{name}} ਨੂੰ {{count}} ਮੈਂਬਰ ਨਾਲ ਅੱਪਡੇਟ ਕੀਤਾ",
         "groupDeleted": "ਸਮੂਹ {{name}} ਮਿਟਾਇਆ",
         "groupPolicySet": "ਸਮੂਹ {{name}} ਲਈ {{policy}} ਨੀਤੀ ਸੈੱਟ ਕੀਤੀ",
         "groupPolicyRemoved": "ਸਮੂਹ {{name}} ਤੋਂ {{policy}} ਨੀਤੀ ਹਟਾਈ",
@@ -3430,6 +3432,7 @@
           "skill": "ਹੁਨਰ"
         },
         "mcpGuardrailAdded": "{{type}} {{name}} ਸ਼ਾਮਲ ਕੀਤਾ",
+        "mcpGuardrailApproved": "{{type}} {{name}} ਮਨਜ਼ੂਰ ਕੀਤਾ",
         "mcpGuardrailUpdated": "{{type}} {{name}} ਅੱਪਡੇਟ ਕੀਤਾ",
         "mcpGuardrailEnabled": "{{type}} {{name}} ਚਾਲੂ ਕੀਤਾ",
         "mcpGuardrailDisabled": "{{type}} {{name}} ਬੰਦ ਕੀਤਾ",

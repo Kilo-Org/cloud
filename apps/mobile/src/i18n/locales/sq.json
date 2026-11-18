@@ -3337,6 +3337,8 @@
         "policyText": "teksti i politikës",
         "groupCreated": "Krijoi grupin {{name}}",
         "groupUpdated": "Përditësoi grupin {{name}}",
+        "groupUpdatedMembers_one": "Përditësoi grupin {{name}} me {{count}} anëtar",
+        "groupUpdatedMembers_other": "Përditësoi grupin {{name}} me {{count}} anëtarë",
         "groupDeleted": "Fshiu grupin {{name}}",
         "groupPolicySet": "Caktoi politikën {{policy}} për grupin {{name}}",
         "groupPolicyRemoved": "Hoqi politikën {{policy}} nga grupi {{name}}",
@@ -3430,6 +3432,7 @@
           "skill": "aftësi"
         },
         "mcpGuardrailAdded": "Shtoi {{type}} {{name}}",
+        "mcpGuardrailApproved": "Miratoi {{type}} {{name}}",
         "mcpGuardrailUpdated": "Përditësoi {{type}} {{name}}",
         "mcpGuardrailEnabled": "Aktivizoi {{type}} {{name}}",
         "mcpGuardrailDisabled": "Çaktivizoi {{type}} {{name}}",

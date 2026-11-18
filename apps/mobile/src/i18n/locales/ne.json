@@ -3337,6 +3337,8 @@
         "policyText": "नीति पाठ",
         "groupCreated": "समूह {{name}} सिर्जना गरियो",
         "groupUpdated": "समूह {{name}} अद्यावधिक गरियो",
+        "groupUpdatedMembers_one": "समूह {{name}} लाई {{count}} सदस्य सहित अद्यावधिक गरियो",
+        "groupUpdatedMembers_other": "समूह {{name}} लाई {{count}} सदस्यहरू सहित अद्यावधिक गरियो",
         "groupDeleted": "समूह {{name}} मेटाइयो",
         "groupPolicySet": "समूह {{name}} का लागि {{policy}} नीति सेट गरियो",
         "groupPolicyRemoved": "समूह {{name}} बाट {{policy}} नीति हटाइयो",
@@ -3430,6 +3432,7 @@
           "skill": "सीप"
         },
         "mcpGuardrailAdded": "{{type}} {{name}} थपियो",
+        "mcpGuardrailApproved": "{{type}} {{name}} स्वीकृत गरियो",
         "mcpGuardrailUpdated": "{{type}} {{name}} अद्यावधिक गरियो",
         "mcpGuardrailEnabled": "{{type}} {{name}} सक्षम गरियो",
         "mcpGuardrailDisabled": "{{type}} {{name}} अक्षम गरियो",

@@ -3329,6 +3329,8 @@
         "policyText": "ilke metni",
         "groupCreated": "{{name}} grubu oluşturuldu",
         "groupUpdated": "{{name}} grubu güncellendi",
+        "groupUpdatedMembers_one": "{{name}} grubu {{count}} üye ile güncellendi",
+        "groupUpdatedMembers_other": "{{name}} grubu {{count}} üye ile güncellendi",
         "groupDeleted": "{{name}} grubu silindi",
         "groupPolicySet": "{{name}} grubu için {{policy}} ilkesi ayarlandı",
         "groupPolicyRemoved": "{{name}} grubundan {{policy}} ilkesi kaldırıldı",
@@ -3422,6 +3424,7 @@
           "skill": "beceri"
         },
         "mcpGuardrailAdded": "{{type}} {{name}} eklendi",
+        "mcpGuardrailApproved": "{{type}} {{name}} onaylandı",
         "mcpGuardrailUpdated": "{{type}} {{name}} güncellendi",
         "mcpGuardrailEnabled": "{{type}} {{name}} etkinleştirildi",
         "mcpGuardrailDisabled": "{{type}} {{name}} devre dışı bırakıldı",

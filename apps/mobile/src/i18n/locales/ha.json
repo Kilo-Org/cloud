@@ -3337,6 +3337,8 @@
         "policyText": "rubutun manufa",
         "groupCreated": "An ƙirƙiri ƙungiyar {{name}}",
         "groupUpdated": "An sabunta ƙungiyar {{name}}",
+        "groupUpdatedMembers_one": "An sabunta ƙungiyar {{name}} da memba {{count}}",
+        "groupUpdatedMembers_other": "An sabunta ƙungiyar {{name}} da membobi {{count}}",
         "groupDeleted": "An share ƙungiyar {{name}}",
         "groupPolicySet": "An saita manufar {{policy}} don ƙungiyar {{name}}",
         "groupPolicyRemoved": "An cire manufar {{policy}} daga ƙungiyar {{name}}",
@@ -3430,6 +3432,7 @@
           "skill": "ƙwarewa"
         },
         "mcpGuardrailAdded": "An ƙara {{type}} {{name}}",
+        "mcpGuardrailApproved": "An amince da {{type}} {{name}}",
         "mcpGuardrailUpdated": "An sabunta {{type}} {{name}}",
         "mcpGuardrailEnabled": "An kunna {{type}} {{name}}",
         "mcpGuardrailDisabled": "An kashe {{type}} {{name}}",

@@ -3395,6 +3395,9 @@
         "policyText": "politikas teksts",
         "groupCreated": "Izveidota grupa {{name}}",
         "groupUpdated": "Atjaunināta grupa {{name}}",
+        "groupUpdatedMembers_zero": "Atjaunināta grupa {{name}} ar {{count}} dalībniekiem",
+        "groupUpdatedMembers_one": "Atjaunināta grupa {{name}} ar {{count}} dalībnieku",
+        "groupUpdatedMembers_other": "Atjaunināta grupa {{name}} ar {{count}} dalībniekiem",
         "groupDeleted": "Dzēsta grupa {{name}}",
         "groupPolicySet": "Grupai {{name}} iestatīta {{policy}} politika",
         "groupPolicyRemoved": "Noņemta {{policy}} politika no grupas {{name}}",
@@ -3488,6 +3491,7 @@
           "skill": "prasme"
         },
         "mcpGuardrailAdded": "Pievienots: {{type}} {{name}}",
+        "mcpGuardrailApproved": "Apstiprināts: {{type}} {{name}}",
         "mcpGuardrailUpdated": "Atjaunināts: {{type}} {{name}}",
         "mcpGuardrailEnabled": "Iespējots: {{type}} {{name}}",
         "mcpGuardrailDisabled": "Atspējots: {{type}} {{name}}",

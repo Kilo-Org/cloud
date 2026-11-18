@@ -3337,6 +3337,8 @@
         "policyText": "քաղաքականության տեքստ",
         "groupCreated": "Ստեղծվել է {{name}} խումբը",
         "groupUpdated": "Թարմացվել է {{name}} խումբը",
+        "groupUpdatedMembers_one": "Թարմացվել է {{name}} խումբը՝ {{count}} անդամով",
+        "groupUpdatedMembers_other": "Թարմացվել է {{name}} խումբը՝ {{count}} անդամով",
         "groupDeleted": "Ջնջվել է {{name}} խումբը",
         "groupPolicySet": "{{name}} խմբի համար սահմանվել է {{policy}} քաղաքականություն",
         "groupPolicyRemoved": "{{name}} խմբից հեռացվել է {{policy}} քաղաքականությունը",
@@ -3430,6 +3432,7 @@
           "skill": "հմտություն"
         },
         "mcpGuardrailAdded": "Ավելացվել է {{type}} {{name}}",
+        "mcpGuardrailApproved": "Հաստատվել է {{type}} {{name}}",
         "mcpGuardrailUpdated": "Թարմացվել է {{type}} {{name}}",
         "mcpGuardrailEnabled": "Միացվել է {{type}} {{name}}",
         "mcpGuardrailDisabled": "Անջատվել է {{type}} {{name}}",

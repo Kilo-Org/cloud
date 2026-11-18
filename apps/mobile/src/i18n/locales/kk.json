@@ -3337,6 +3337,8 @@
         "policyText": "саясат мәтіні",
         "groupCreated": "{{name}} тобы құрылды",
         "groupUpdated": "{{name}} тобы жаңартылды",
+        "groupUpdatedMembers_one": "{{name}} тобы {{count}} мүшемен жаңартылды",
+        "groupUpdatedMembers_other": "{{name}} тобы {{count}} мүшемен жаңартылды",
         "groupDeleted": "{{name}} тобы жойылды",
         "groupPolicySet": "{{name}} тобы үшін {{policy}} саясаты орнатылды",
         "groupPolicyRemoved": "{{name}} тобынан {{policy}} саясаты алынып тасталды",
@@ -3430,6 +3432,7 @@
           "skill": "дағды"
         },
         "mcpGuardrailAdded": "{{type}} {{name}} қосылды",
+        "mcpGuardrailApproved": "{{type}} {{name}} бекітілді",
         "mcpGuardrailUpdated": "{{type}} {{name}} жаңартылды",
         "mcpGuardrailEnabled": "{{type}} {{name}} қосылды",
         "mcpGuardrailDisabled": "{{type}} {{name}} өшірілді",

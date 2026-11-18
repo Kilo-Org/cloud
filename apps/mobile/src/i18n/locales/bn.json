@@ -3337,6 +3337,8 @@
         "policyText": "পলিসি টেক্সট",
         "groupCreated": "গ্রুপ {{name}} তৈরি করা হয়েছে",
         "groupUpdated": "গ্রুপ {{name}} আপডেট করা হয়েছে",
+        "groupUpdatedMembers_one": "গ্রুপ {{name}} {{count}} জন সদস্য সহ আপডেট করা হয়েছে",
+        "groupUpdatedMembers_other": "গ্রুপ {{name}} {{count}} জন সদস্য সহ আপডেট করা হয়েছে",
         "groupDeleted": "গ্রুপ {{name}} মুছে ফেলা হয়েছে",
         "groupPolicySet": "গ্রুপ {{name}}-এর জন্য {{policy}} পলিসি নির্ধারণ করা হয়েছে",
         "groupPolicyRemoved": "গ্রুপ {{name}} থেকে {{policy}} পলিসি সরানো হয়েছে",
@@ -3430,6 +3432,7 @@
           "skill": "স্কিল"
         },
         "mcpGuardrailAdded": "{{type}} {{name}} যোগ করা হয়েছে",
+        "mcpGuardrailApproved": "{{type}} {{name}} অনুমোদন করা হয়েছে",
         "mcpGuardrailUpdated": "{{type}} {{name}} আপডেট করা হয়েছে",
         "mcpGuardrailEnabled": "{{type}} {{name}} সক্রিয় করা হয়েছে",
         "mcpGuardrailDisabled": "{{type}} {{name}} নিষ্ক্রিয় করা হয়েছে",

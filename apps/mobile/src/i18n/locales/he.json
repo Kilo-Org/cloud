@@ -3387,6 +3387,9 @@
         "policyText": "טקסט מדיניות",
         "groupCreated": "נוצרה הקבוצה {{name}}",
         "groupUpdated": "עודכנה הקבוצה {{name}}",
+        "groupUpdatedMembers_one": "עודכנה הקבוצה {{name}} עם {{count}} חבר",
+        "groupUpdatedMembers_two": "עודכנה הקבוצה {{name}} עם {{count}} חברים",
+        "groupUpdatedMembers_other": "עודכנה הקבוצה {{name}} עם {{count}} חברים",
         "groupDeleted": "נמחקה הקבוצה {{name}}",
         "groupPolicySet": "הוגדרה מדיניות {{policy}} עבור הקבוצה {{name}}",
         "groupPolicyRemoved": "הוסרה מדיניות {{policy}} מהקבוצה {{name}}",
@@ -3480,6 +3483,7 @@
           "skill": "מיומנות"
         },
         "mcpGuardrailAdded": "הוספת {{type}} {{name}}",
+        "mcpGuardrailApproved": "אישור {{type}} {{name}}",
         "mcpGuardrailUpdated": "עדכון {{type}} {{name}}",
         "mcpGuardrailEnabled": "הפעלת {{type}} {{name}}",
         "mcpGuardrailDisabled": "השבתת {{type}} {{name}}",

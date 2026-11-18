@@ -2,7 +2,7 @@ import { type TFunction } from 'i18next';
 
 import { type OrganizationAuditLogDetails } from '@kilocode/db/schema-types';
 
-import { formatNumber } from '@/lib/format';
+import { formatPrefixedMoney } from '@/lib/format';
 import { i18n } from '@/i18n';
 
 // The catalog keys the audit detail builder reads, one complete literal per
@@ -25,6 +25,7 @@ export const POLICY_TYPE_KEYS = {
 export const PLATFORM_KEYS = {
   github: 'common.github',
   gitlab: 'common.gitlab',
+  bitbucket: 'agentChat.repoPicker.platformBitbucket',
   linear: 'agentChat.sessionFilter.platformLinear',
   slack: 'agentChat.sessionFilter.platformSlack',
   discord: 'profile.providerDiscord',
@@ -76,10 +77,7 @@ const PII_ENTITY_KEYS = {
   url: 'organizationGuardrails.pii.url.label',
 } as const;
 
-type GuardrailsInputDetails = Extract<
-  OrganizationAuditLogDetails,
-  { kind: 'guardrails_input' }
->;
+type GuardrailsInputDetails = Extract<OrganizationAuditLogDetails, { kind: 'guardrails_input' }>;
 
 type DetectorDetails = GuardrailsInputDetails['detectors'][number];
 
@@ -159,10 +157,7 @@ export function stateLabel(t: TFunction, enabled: boolean): string {
   );
 }
 
-/** The reader's own currency rendering of an integer cent amount. */
+/** The app's one money shape for an integer cent amount: the symbol leads the number. */
 export function formatDollarsFromCents(cents: number): string {
-  return formatNumber(cents / 100, i18n.language, {
-    style: 'currency',
-    currency: 'USD',
-  });
+  return formatPrefixedMoney(cents / 100, i18n.language);
 }

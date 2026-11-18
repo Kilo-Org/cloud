@@ -3337,6 +3337,8 @@
         "policyText": "ຂໍ້ຄວາມນະໂຍບາຍ",
         "groupCreated": "ສ້າງກຸ່ມ {{name}}",
         "groupUpdated": "ອັບເດດກຸ່ມ {{name}}",
+        "groupUpdatedMembers_one": "ອັບເດດກຸ່ມ {{name}} ດ້ວຍສະມາຊິກ {{count}} ຄົນ",
+        "groupUpdatedMembers_other": "ອັບເດດກຸ່ມ {{name}} ດ້ວຍສະມາຊິກ {{count}} ຄົນ",
         "groupDeleted": "ລຶບກຸ່ມ {{name}}",
         "groupPolicySet": "ຕັ້ງນະໂຍບາຍ {{policy}} ສຳລັບກຸ່ມ {{name}}",
         "groupPolicyRemoved": "ລຶບນະໂຍບາຍ {{policy}} ອອກຈາກກຸ່ມ {{name}}",
@@ -3430,6 +3432,7 @@
           "skill": "ທັກສະ"
         },
         "mcpGuardrailAdded": "ເພີ່ມ {{type}} {{name}}",
+        "mcpGuardrailApproved": "ອະນຸມັດ {{type}} {{name}}",
         "mcpGuardrailUpdated": "ອັບເດດ {{type}} {{name}}",
         "mcpGuardrailEnabled": "ເປີດໃຊ້ {{type}} {{name}}",
         "mcpGuardrailDisabled": "ປິດໃຊ້ {{type}} {{name}}",

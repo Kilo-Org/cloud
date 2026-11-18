@@ -3329,6 +3329,8 @@
         "policyText": "teks kebijakan",
         "groupCreated": "Membuat grup {{name}}",
         "groupUpdated": "Memperbarui grup {{name}}",
+        "groupUpdatedMembers_one": "Memperbarui grup {{name}} dengan {{count}} anggota",
+        "groupUpdatedMembers_other": "Memperbarui grup {{name}} dengan {{count}} anggota",
         "groupDeleted": "Menghapus grup {{name}}",
         "groupPolicySet": "Menetapkan kebijakan {{policy}} untuk grup {{name}}",
         "groupPolicyRemoved": "Menghapus kebijakan {{policy}} dari grup {{name}}",
@@ -3422,6 +3424,7 @@
           "skill": "keterampilan"
         },
         "mcpGuardrailAdded": "Menambahkan {{type}} {{name}}",
+        "mcpGuardrailApproved": "Menyetujui {{type}} {{name}}",
         "mcpGuardrailUpdated": "Memperbarui {{type}} {{name}}",
         "mcpGuardrailEnabled": "Mengaktifkan {{type}} {{name}}",
         "mcpGuardrailDisabled": "Menonaktifkan {{type}} {{name}}",

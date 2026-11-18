@@ -3337,6 +3337,8 @@
         "policyText": "متن سیاست",
         "groupCreated": "گروه {{name}} ایجاد شد",
         "groupUpdated": "گروه {{name}} به‌روزرسانی شد",
+        "groupUpdatedMembers_one": "گروه {{name}} با {{count}} عضو به‌روزرسانی شد",
+        "groupUpdatedMembers_other": "گروه {{name}} با {{count}} عضو به‌روزرسانی شد",
         "groupDeleted": "گروه {{name}} حذف شد",
         "groupPolicySet": "سیاست {{policy}} برای گروه {{name}} تنظیم شد",
         "groupPolicyRemoved": "سیاست {{policy}} از گروه {{name}} حذف شد",
@@ -3430,6 +3432,7 @@
           "skill": "مهارت"
         },
         "mcpGuardrailAdded": "{{type}} {{name}} افزوده شد",
+        "mcpGuardrailApproved": "{{type}} {{name}} تأیید شد",
         "mcpGuardrailUpdated": "{{type}} {{name}} به‌روزرسانی شد",
         "mcpGuardrailEnabled": "{{type}} {{name}} فعال شد",
         "mcpGuardrailDisabled": "{{type}} {{name}} غیرفعال شد",

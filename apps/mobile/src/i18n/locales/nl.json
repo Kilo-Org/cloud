@@ -3329,6 +3329,8 @@
         "policyText": "beleidstekst",
         "groupCreated": "Groep {{name}} aangemaakt",
         "groupUpdated": "Groep {{name}} bijgewerkt",
+        "groupUpdatedMembers_one": "Groep {{name}} bijgewerkt met {{count}} leden",
+        "groupUpdatedMembers_other": "Groep {{name}} bijgewerkt met {{count}} leden",
         "groupDeleted": "Groep {{name}} verwijderd",
         "groupPolicySet": "{{policy}}-beleid ingesteld voor groep {{name}}",
         "groupPolicyRemoved": "{{policy}}-beleid verwijderd uit groep {{name}}",
@@ -3422,6 +3424,7 @@
           "skill": "skill"
         },
         "mcpGuardrailAdded": "{{type}} {{name}} toegevoegd",
+        "mcpGuardrailApproved": "{{type}} {{name}} goedgekeurd",
         "mcpGuardrailUpdated": "{{type}} {{name}} bijgewerkt",
         "mcpGuardrailEnabled": "{{type}} {{name}} ingeschakeld",
         "mcpGuardrailDisabled": "{{type}} {{name}} uitgeschakeld",

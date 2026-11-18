@@ -443,7 +443,6 @@ describe('organization guardrails router', () => {
           enabled: true,
           action: 'block',
           policyText: true,
-          rulesCount: 0,
         },
         { id: 'toxicity', enabled: false },
         { id: 'nsfw', enabled: false },

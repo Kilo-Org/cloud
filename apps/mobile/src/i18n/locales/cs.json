@@ -3453,6 +3453,10 @@
         "policyText": "text zásady",
         "groupCreated": "Vytvořena skupina {{name}}",
         "groupUpdated": "Aktualizována skupina {{name}}",
+        "groupUpdatedMembers_one": "Aktualizována skupina {{name}} s {{count}} členem",
+        "groupUpdatedMembers_few": "Aktualizována skupina {{name}} s {{count}} členy",
+        "groupUpdatedMembers_many": "Aktualizována skupina {{name}} s {{count}} členy",
+        "groupUpdatedMembers_other": "Aktualizována skupina {{name}} s {{count}} členy",
         "groupDeleted": "Smazána skupina {{name}}",
         "groupPolicySet": "Pro skupinu {{name}} nastavena zásada: {{policy}}",
         "groupPolicyRemoved": "Pro skupinu {{name}} odebrána zásada: {{policy}}",
@@ -3546,6 +3550,7 @@
           "skill": "dovednost"
         },
         "mcpGuardrailAdded": "Přidáno: {{type}} {{name}}",
+        "mcpGuardrailApproved": "Schváleno: {{type}} {{name}}",
         "mcpGuardrailUpdated": "Aktualizováno: {{type}} {{name}}",
         "mcpGuardrailEnabled": "Zapnuto: {{type}} {{name}}",
         "mcpGuardrailDisabled": "Vypnuto: {{type}} {{name}}",

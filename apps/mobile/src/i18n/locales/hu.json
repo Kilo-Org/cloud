@@ -3337,6 +3337,8 @@
         "policyText": "szabályzatszöveg",
         "groupCreated": "A(z) {{name}} csoport létrehozva",
         "groupUpdated": "A(z) {{name}} csoport frissítve",
+        "groupUpdatedMembers_one": "A(z) {{name}} csoport frissítve {{count}} taggal",
+        "groupUpdatedMembers_other": "A(z) {{name}} csoport frissítve {{count}} taggal",
         "groupDeleted": "A(z) {{name}} csoport törölve",
         "groupPolicySet": "{{policy}} szabályzat beállítva a(z) {{name}} csoport számára",
         "groupPolicyRemoved": "{{policy}} szabályzat eltávolítva a(z) {{name}} csoportból",
@@ -3430,6 +3432,7 @@
           "skill": "készség"
         },
         "mcpGuardrailAdded": "{{type}} hozzáadva: {{name}}",
+        "mcpGuardrailApproved": "{{type}} jóváhagyva: {{name}}",
         "mcpGuardrailUpdated": "{{type}} frissítve: {{name}}",
         "mcpGuardrailEnabled": "{{type}} engedélyezve: {{name}}",
         "mcpGuardrailDisabled": "{{type}} letiltva: {{name}}",

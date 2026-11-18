@@ -3337,6 +3337,8 @@
         "policyText": "မူဝါဒ စာသား",
         "groupCreated": "အဖွဲ့ {{name}} ကို ဖန်တီးခဲ့သည်",
         "groupUpdated": "အဖွဲ့ {{name}} ကို မွမ်းမံခဲ့သည်",
+        "groupUpdatedMembers_one": "အဖွဲ့ {{name}} ကို အဖွဲ့ဝင် {{count}} ဦး ဖြင့် မွမ်းမံခဲ့သည်",
+        "groupUpdatedMembers_other": "အဖွဲ့ {{name}} ကို အဖွဲ့ဝင် {{count}} ဦး ဖြင့် မွမ်းမံခဲ့သည်",
         "groupDeleted": "အဖွဲ့ {{name}} ကို ဖျက်ခဲ့သည်",
         "groupPolicySet": "အဖွဲ့ {{name}} အတွက် {{policy}} မူဝါဒ သတ်မှတ်ခဲ့သည်",
         "groupPolicyRemoved": "အဖွဲ့ {{name}} မှ {{policy}} မူဝါဒ ဖယ်ရှားခဲ့သည်",
@@ -3430,6 +3432,7 @@
           "skill": "ကျွမ်းကျင်မှု"
         },
         "mcpGuardrailAdded": "{{type}} {{name}} ထည့်သွင်းခဲ့သည်",
+        "mcpGuardrailApproved": "\"{{type}} {{name}} အတည်ပြုခဲ့သည်\"",
         "mcpGuardrailUpdated": "{{type}} {{name}} မွမ်းမံခဲ့သည်",
         "mcpGuardrailEnabled": "{{type}} {{name}} ဖွင့်ခဲ့သည်",
         "mcpGuardrailDisabled": "{{type}} {{name}} ပိတ်ခဲ့သည်",

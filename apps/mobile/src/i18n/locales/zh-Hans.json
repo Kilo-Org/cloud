@@ -3329,6 +3329,8 @@
         "policyText": "策略文本",
         "groupCreated": "已创建组 {{name}}",
         "groupUpdated": "已更新组 {{name}}",
+        "groupUpdatedMembers_one": "已更新组 {{name}}，包含 {{count}} 个成员",
+        "groupUpdatedMembers_other": "已更新组 {{name}}，包含 {{count}} 个成员",
         "groupDeleted": "已删除组 {{name}}",
         "groupPolicySet": "已为组 {{name}} 设置 {{policy}} 策略",
         "groupPolicyRemoved": "已从组 {{name}} 移除 {{policy}} 策略",
@@ -3422,6 +3424,7 @@
           "skill": "技能"
         },
         "mcpGuardrailAdded": "已添加{{type}} {{name}}",
+        "mcpGuardrailApproved": "已批准{{type}} {{name}}",
         "mcpGuardrailUpdated": "已更新{{type}} {{name}}",
         "mcpGuardrailEnabled": "已启用{{type}} {{name}}",
         "mcpGuardrailDisabled": "已禁用{{type}} {{name}}",

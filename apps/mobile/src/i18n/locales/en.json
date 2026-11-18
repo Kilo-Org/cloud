@@ -3422,6 +3422,8 @@
         "rulesCount_other": "{{count}} rules",
         "groupCreated": "Created group {{name}}",
         "groupUpdated": "Updated group {{name}}",
+        "groupUpdatedMembers_one": "Updated group {{name}} with {{count}} member",
+        "groupUpdatedMembers_other": "Updated group {{name}} with {{count}} members",
         "groupDeleted": "Deleted group {{name}}",
         "groupMembersSet_one": "Set {{count}} member for group {{name}}",
         "groupMembersSet_other": "Set {{count}} members for group {{name}}",
@@ -3524,6 +3526,7 @@
           "skill": "skill"
         },
         "mcpGuardrailAdded": "Added {{type}} {{name}}",
+        "mcpGuardrailApproved": "Approved {{type}} {{name}}",
         "mcpGuardrailUpdated": "Updated {{type}} {{name}}",
         "mcpGuardrailEnabled": "Enabled {{type}} {{name}}",
         "mcpGuardrailDisabled": "Disabled {{type}} {{name}}",

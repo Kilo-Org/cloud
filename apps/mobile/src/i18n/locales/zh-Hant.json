@@ -3329,6 +3329,8 @@
         "policyText": "政策文字",
         "groupCreated": "已建立群組 {{name}}",
         "groupUpdated": "已更新群組 {{name}}",
+        "groupUpdatedMembers_one": "已更新群組 {{name}}，現有 {{count}} 位成員",
+        "groupUpdatedMembers_other": "已更新群組 {{name}}，現有 {{count}} 位成員",
         "groupDeleted": "已刪除群組 {{name}}",
         "groupPolicySet": "已為群組 {{name}} 設定{{policy}}政策",
         "groupPolicyRemoved": "已從群組 {{name}} 移除{{policy}}政策",
@@ -3422,6 +3424,7 @@
           "skill": "技能"
         },
         "mcpGuardrailAdded": "已新增{{type}} {{name}}",
+        "mcpGuardrailApproved": "已核准{{type}} {{name}}",
         "mcpGuardrailUpdated": "已更新{{type}} {{name}}",
         "mcpGuardrailEnabled": "已啟用{{type}} {{name}}",
         "mcpGuardrailDisabled": "已停用{{type}} {{name}}",

@@ -3337,6 +3337,8 @@
         "policyText": "નીતિ ટેક્સ્ટ",
         "groupCreated": "જૂથ {{name}} બનાવ્યું",
         "groupUpdated": "જૂથ {{name}} અપડેટ કર્યું",
+        "groupUpdatedMembers_one": "જૂથ {{name}} {{count}} સભ્યો સાથે અપડેટ કર્યું",
+        "groupUpdatedMembers_other": "જૂથ {{name}} {{count}} સભ્યો સાથે અપડેટ કર્યું",
         "groupDeleted": "જૂથ {{name}} કાઢી નાખ્યું",
         "groupPolicySet": "જૂથ {{name}} માટે {{policy}} નીતિ સેટ કરી",
         "groupPolicyRemoved": "જૂથ {{name}} માંથી {{policy}} નીતિ દૂર કરી",
@@ -3430,6 +3432,7 @@
           "skill": "કૌશલ્ય"
         },
         "mcpGuardrailAdded": "{{type}} {{name}} ઉમેર્યું",
+        "mcpGuardrailApproved": "{{type}} {{name}} મંજૂર કર્યું",
         "mcpGuardrailUpdated": "{{type}} {{name}} અપડેટ કર્યું",
         "mcpGuardrailEnabled": "{{type}} {{name}} સક્ષમ કર્યું",
         "mcpGuardrailDisabled": "{{type}} {{name}} નિષ્ક્રિય કર્યું",

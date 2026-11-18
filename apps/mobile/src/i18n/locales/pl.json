@@ -3445,6 +3445,10 @@
         "policyText": "treść polityki",
         "groupCreated": "Utworzono grupę {{name}}",
         "groupUpdated": "Zaktualizowano grupę {{name}}",
+        "groupUpdatedMembers_one": "Zaktualizowano grupę {{name}} z {{count}} członkiem",
+        "groupUpdatedMembers_few": "Zaktualizowano grupę {{name}} z {{count}} członkami",
+        "groupUpdatedMembers_many": "Zaktualizowano grupę {{name}} z {{count}} członkami",
+        "groupUpdatedMembers_other": "Zaktualizowano grupę {{name}} z {{count}} członkami",
         "groupDeleted": "Usunięto grupę {{name}}",
         "groupPolicySet": "Ustawiono politykę {{policy}} dla grupy {{name}}",
         "groupPolicyRemoved": "Usunięto politykę {{policy}} z grupy {{name}}",
@@ -3538,6 +3542,7 @@
           "skill": "umiejętność"
         },
         "mcpGuardrailAdded": "Dodano {{type}} {{name}}",
+        "mcpGuardrailApproved": "Zatwierdzono {{type}} {{name}}",
         "mcpGuardrailUpdated": "Zaktualizowano {{type}} {{name}}",
         "mcpGuardrailEnabled": "Włączono {{type}} {{name}}",
         "mcpGuardrailDisabled": "Wyłączono {{type}} {{name}}",

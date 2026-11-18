@@ -3337,6 +3337,8 @@
         "policyText": "អត្ថបទគោលនយោបាយ",
         "groupCreated": "បានបង្កើតក្រុម {{name}}",
         "groupUpdated": "បានធ្វើបច្ចុប្បន្នភាពក្រុម {{name}}",
+        "groupUpdatedMembers_one": "បានធ្វើបច្ចុប្បន្នភាពក្រុម {{name}} ជាមួយសមាជិក {{count}} នាក់",
+        "groupUpdatedMembers_other": "បានធ្វើបច្ចុប្បន្នភាពក្រុម {{name}} ជាមួយសមាជិក {{count}} នាក់",
         "groupDeleted": "បានលុបក្រុម {{name}}",
         "groupPolicySet": "បានកំណត់គោលនយោបាយ {{policy}} សម្រាប់ក្រុម {{name}}",
         "groupPolicyRemoved": "បានដកគោលនយោបាយ {{policy}} ចេញពីក្រុម {{name}}",
@@ -3430,6 +3432,7 @@
           "skill": "ជំនាញ"
         },
         "mcpGuardrailAdded": "បានបន្ថែម {{type}} {{name}}",
+        "mcpGuardrailApproved": "បានអនុម័ត {{type}} {{name}}",
         "mcpGuardrailUpdated": "បានធ្វើបច្ចុប្បន្នភាព {{type}} {{name}}",
         "mcpGuardrailEnabled": "បានបើក {{type}} {{name}}",
         "mcpGuardrailDisabled": "បានបិទ {{type}} {{name}}",

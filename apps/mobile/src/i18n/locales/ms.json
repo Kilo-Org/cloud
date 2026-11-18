@@ -3337,6 +3337,8 @@
         "policyText": "teks dasar",
         "groupCreated": "Kumpulan {{name}} dicipta",
         "groupUpdated": "Kumpulan {{name}} dikemas kini",
+        "groupUpdatedMembers_one": "Kumpulan {{name}} dikemas kini dengan {{count}} ahli",
+        "groupUpdatedMembers_other": "Kumpulan {{name}} dikemas kini dengan {{count}} ahli",
         "groupDeleted": "Kumpulan {{name}} dipadamkan",
         "groupPolicySet": "Dasar {{policy}} ditetapkan untuk kumpulan {{name}}",
         "groupPolicyRemoved": "Dasar {{policy}} dialih keluar daripada kumpulan {{name}}",
@@ -3430,6 +3432,7 @@
           "skill": "kemahiran"
         },
         "mcpGuardrailAdded": "{{type}} {{name}} ditambah",
+        "mcpGuardrailApproved": "{{type}} {{name}} diluluskan",
         "mcpGuardrailUpdated": "{{type}} {{name}} dikemas kini",
         "mcpGuardrailEnabled": "{{type}} {{name}} didayakan",
         "mcpGuardrailDisabled": "{{type}} {{name}} dinyahdayakan",

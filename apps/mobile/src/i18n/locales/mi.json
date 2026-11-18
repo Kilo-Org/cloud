@@ -3337,6 +3337,8 @@
         "policyText": "kuputuhi kaupapa",
         "groupCreated": "I hanga te rōpū {{name}}",
         "groupUpdated": "I whakahou te rōpū {{name}}",
+        "groupUpdatedMembers_one": "I whakahou te rōpū {{name}} me {{count}} mema",
+        "groupUpdatedMembers_other": "I whakahou te rōpū {{name}} me {{count}} mema",
         "groupDeleted": "I muku te rōpū {{name}}",
         "groupPolicySet": "I tautuhia te kaupapa {{policy}} mō te rōpū {{name}}",
         "groupPolicyRemoved": "I tangohia te kaupapa {{policy}} i te rōpū {{name}}",
@@ -3430,6 +3432,7 @@
           "skill": "pūkenga"
         },
         "mcpGuardrailAdded": "I tāpiri {{type}} {{name}}",
+        "mcpGuardrailApproved": "I whakaae {{type}} {{name}}",
         "mcpGuardrailUpdated": "I whakahou {{type}} {{name}}",
         "mcpGuardrailEnabled": "I whakahohe {{type}} {{name}}",
         "mcpGuardrailDisabled": "I whakaweto {{type}} {{name}}",

@@ -3453,6 +3453,10 @@
         "policyText": "politikos tekstas",
         "groupCreated": "Sukurta grupė {{name}}",
         "groupUpdated": "Atnaujinta grupė {{name}}",
+        "groupUpdatedMembers_one": "Atnaujinta grupė {{name}} su {{count}} nariu",
+        "groupUpdatedMembers_few": "Atnaujinta grupė {{name}} su {{count}} nariais",
+        "groupUpdatedMembers_many": "Atnaujinta grupė {{name}} su {{count}} nariais",
+        "groupUpdatedMembers_other": "Atnaujinta grupė {{name}} su {{count}} nariais",
         "groupDeleted": "Ištrinta grupė {{name}}",
         "groupPolicySet": "Grupei {{name}} nustatyta politika: {{policy}}",
         "groupPolicyRemoved": "Iš grupės {{name}} pašalinta politika: {{policy}}",
@@ -3546,6 +3550,7 @@
           "skill": "įgūdis"
         },
         "mcpGuardrailAdded": "Pridėta: {{type}} {{name}}",
+        "mcpGuardrailApproved": "Patvirtinta: {{type}} {{name}}",
         "mcpGuardrailUpdated": "Atnaujinta: {{type}} {{name}}",
         "mcpGuardrailEnabled": "Įjungta: {{type}} {{name}}",
         "mcpGuardrailDisabled": "Išjungta: {{type}} {{name}}",

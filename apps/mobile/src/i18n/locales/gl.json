@@ -3337,6 +3337,8 @@
         "policyText": "texto da política",
         "groupCreated": "Creouse o grupo {{name}}",
         "groupUpdated": "Actualizouse o grupo {{name}}",
+        "groupUpdatedMembers_one": "Actualizouse o grupo {{name}} con {{count}} membro",
+        "groupUpdatedMembers_other": "Actualizouse o grupo {{name}} con {{count}} membros",
         "groupDeleted": "Eliminouse o grupo {{name}}",
         "groupPolicySet": "Estableceuse a política {{policy}} para o grupo {{name}}",
         "groupPolicyRemoved": "Eliminouse a política {{policy}} do grupo {{name}}",
@@ -3430,6 +3432,7 @@
           "skill": "habilidade"
         },
         "mcpGuardrailAdded": "Engadiuse {{type}}: {{name}}",
+        "mcpGuardrailApproved": "Aprobouse {{type}}: {{name}}",
         "mcpGuardrailUpdated": "Actualizouse {{type}}: {{name}}",
         "mcpGuardrailEnabled": "Activouse {{type}}: {{name}}",
         "mcpGuardrailDisabled": "Desactivouse {{type}}: {{name}}",

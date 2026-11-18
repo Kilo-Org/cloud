@@ -3337,6 +3337,8 @@
         "policyText": "ederede amụma",
         "groupCreated": "Emepụtara otu {{name}}",
         "groupUpdated": "Emegharịrị otu {{name}}",
+        "groupUpdatedMembers_one": "Emegharịrị otu {{name}} na ndị otu {{count}}",
+        "groupUpdatedMembers_other": "Emegharịrị otu {{name}} na ndị otu {{count}}",
         "groupDeleted": "Ehichapụrụ otu {{name}}",
         "groupPolicySet": "Edobere amụma {{policy}} maka otu {{name}}",
         "groupPolicyRemoved": "Wepụrụ amụma {{policy}} n'otu {{name}}",
@@ -3430,6 +3432,7 @@
           "skill": "nka"
         },
         "mcpGuardrailAdded": "Agbakwunyere {{type}} {{name}}",
+        "mcpGuardrailApproved": "Akwadoro {{type}} {{name}}",
         "mcpGuardrailUpdated": "Emegharịrị {{type}} {{name}}",
         "mcpGuardrailEnabled": "Agbanyere {{type}} {{name}}",
         "mcpGuardrailDisabled": "Agbanyụrụ {{type}} {{name}}",

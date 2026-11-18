@@ -3337,6 +3337,8 @@
         "policyText": "barruu imaammataa",
         "groupCreated": "Gareen {{name}} uumame",
         "groupUpdated": "Gareen {{name}} haaromfame",
+        "groupUpdatedMembers_one": "Gareen {{name}} miseensa {{count}} waliin haaromfame",
+        "groupUpdatedMembers_other": "Gareen {{name}} miseensota {{count}} waliin haaromfame",
         "groupDeleted": "Gareen {{name}} haqame",
         "groupPolicySet": "Imaammata {{policy}} garee {{name}}f qindeeffame",
         "groupPolicyRemoved": "Imaammata {{policy}} garee {{name}} irraa haqame",
@@ -3430,6 +3432,7 @@
           "skill": "dandeettii"
         },
         "mcpGuardrailAdded": "{{type}} {{name}} dabalame",
+        "mcpGuardrailApproved": "{{type}} {{name}} mirkanaa'e",
         "mcpGuardrailUpdated": "{{type}} {{name}} haaromfame",
         "mcpGuardrailEnabled": "{{type}} {{name}} dandeessifame",
         "mcpGuardrailDisabled": "{{type}} {{name}} dhaabame",

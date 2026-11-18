@@ -3329,6 +3329,8 @@
         "policyText": "नीति पाठ",
         "groupCreated": "समूह {{name}} बनाया गया",
         "groupUpdated": "समूह {{name}} अपडेट किया गया",
+        "groupUpdatedMembers_one": "समूह {{name}} को {{count}} सदस्य के साथ अपडेट किया गया",
+        "groupUpdatedMembers_other": "समूह {{name}} को {{count}} सदस्यों के साथ अपडेट किया गया",
         "groupDeleted": "समूह {{name}} हटाया गया",
         "groupPolicySet": "समूह {{name}} के लिए {{policy}} नीति सेट की",
         "groupPolicyRemoved": "समूह {{name}} से {{policy}} नीति हटाई",
@@ -3422,6 +3424,7 @@
           "skill": "स्किल"
         },
         "mcpGuardrailAdded": "{{type}} {{name}} जोड़ा",
+        "mcpGuardrailApproved": "{{type}} {{name}} स्वीकृत किया",
         "mcpGuardrailUpdated": "{{type}} {{name}} अपडेट किया",
         "mcpGuardrailEnabled": "{{type}} {{name}} सक्षम किया",
         "mcpGuardrailDisabled": "{{type}} {{name}} अक्षम किया",

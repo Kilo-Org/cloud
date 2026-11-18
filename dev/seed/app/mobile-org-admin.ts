@@ -246,6 +246,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         actor_name: row.actor_name,
         action: row.action,
         message: row.message,
+        ...(row.details !== undefined && { details: row.details }),
       })
       .onConflictDoNothing();
   }

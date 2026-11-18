@@ -3337,6 +3337,8 @@
         "policyText": "धोरण मजकूर",
         "groupCreated": "गट {{name}} तयार केला",
         "groupUpdated": "गट {{name}} अद्ययावत केला",
+        "groupUpdatedMembers_one": "गट {{name}} {{count}} सदस्यासह अद्ययावत केला",
+        "groupUpdatedMembers_other": "गट {{name}} {{count}} सदस्यांसह अद्ययावत केला",
         "groupDeleted": "गट {{name}} हटवला",
         "groupPolicySet": "गट {{name}} साठी {{policy}} धोरण सेट केले",
         "groupPolicyRemoved": "गट {{name}} मधून {{policy}} धोरण काढले",
@@ -3430,6 +3432,7 @@
           "skill": "कौशल्य"
         },
         "mcpGuardrailAdded": "{{type}} {{name}} जोडले",
+        "mcpGuardrailApproved": "{{type}} {{name}} मंजूर केले",
         "mcpGuardrailUpdated": "{{type}} {{name}} अद्ययावत केले",
         "mcpGuardrailEnabled": "{{type}} {{name}} सक्षम केले",
         "mcpGuardrailDisabled": "{{type}} {{name}} अक्षम केले",

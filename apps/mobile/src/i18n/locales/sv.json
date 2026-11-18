@@ -3337,6 +3337,8 @@
         "policyText": "policytext",
         "groupCreated": "Skapade gruppen {{name}}",
         "groupUpdated": "Uppdaterade gruppen {{name}}",
+        "groupUpdatedMembers_one": "Uppdaterade gruppen {{name}} med {{count}} medlem",
+        "groupUpdatedMembers_other": "Uppdaterade gruppen {{name}} med {{count}} medlemmar",
         "groupDeleted": "Tog bort gruppen {{name}}",
         "groupPolicySet": "Angav policyn {{policy}} för gruppen {{name}}",
         "groupPolicyRemoved": "Tog bort policyn {{policy}} från gruppen {{name}}",
@@ -3430,6 +3432,7 @@
           "skill": "skill"
         },
         "mcpGuardrailAdded": "Lade till {{type}} {{name}}",
+        "mcpGuardrailApproved": "Godkände {{type}} {{name}}",
         "mcpGuardrailUpdated": "Uppdaterade {{type}} {{name}}",
         "mcpGuardrailEnabled": "Aktiverade {{type}} {{name}}",
         "mcpGuardrailDisabled": "Inaktiverade {{type}} {{name}}",

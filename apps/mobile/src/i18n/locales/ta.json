@@ -3337,6 +3337,8 @@
         "policyText": "கொள்கை உரை",
         "groupCreated": "குழு {{name}} உருவாக்கப்பட்டது",
         "groupUpdated": "குழு {{name}} புதுப்பிக்கப்பட்டது",
+        "groupUpdatedMembers_one": "குழு {{name}} {{count}} உறுப்பினருடன் புதுப்பிக்கப்பட்டது",
+        "groupUpdatedMembers_other": "குழு {{name}} {{count}} உறுப்பினர்களுடன் புதுப்பிக்கப்பட்டது",
         "groupDeleted": "குழு {{name}} நீக்கப்பட்டது",
         "groupPolicySet": "குழு {{name}}க்கு {{policy}} கொள்கை அமைக்கப்பட்டது",
         "groupPolicyRemoved": "குழு {{name}}இலிருந்து {{policy}} கொள்கை அகற்றப்பட்டது",
@@ -3430,6 +3432,7 @@
           "skill": "திறன்"
         },
         "mcpGuardrailAdded": "{{type}} {{name}} சேர்க்கப்பட்டது",
+        "mcpGuardrailApproved": "{{type}} {{name}} அங்கீகரிக்கப்பட்டது",
         "mcpGuardrailUpdated": "{{type}} {{name}} புதுப்பிக்கப்பட்டது",
         "mcpGuardrailEnabled": "{{type}} {{name}} இயக்கப்பட்டது",
         "mcpGuardrailDisabled": "{{type}} {{name}} முடக்கப்பட்டது",

@@ -3337,6 +3337,8 @@
         "policyText": "lahatsoratra politika",
         "groupCreated": "Noforonina ny vondrona {{name}}",
         "groupUpdated": "Nohavaozina ny vondrona {{name}}",
+        "groupUpdatedMembers_one": "Nohavaozina ny vondrona {{name}} miaraka amin'ny {{count}} mpikambana",
+        "groupUpdatedMembers_other": "Nohavaozina ny vondrona {{name}} miaraka amin'ny {{count}} mpikambana",
         "groupDeleted": "Voafafa ny vondrona {{name}}",
         "groupPolicySet": "Napetraka ny politika {{policy}} ho an'ny vondrona {{name}}",
         "groupPolicyRemoved": "Nesorina ny politika {{policy}} tamin'ny vondrona {{name}}",
@@ -3430,6 +3432,7 @@
           "skill": "fahaizana"
         },
         "mcpGuardrailAdded": "Nampidirina {{type}} {{name}}",
+        "mcpGuardrailApproved": "Nekena {{type}} {{name}}",
         "mcpGuardrailUpdated": "Nohavaozina {{type}} {{name}}",
         "mcpGuardrailEnabled": "Nampavitrika {{type}} {{name}}",
         "mcpGuardrailDisabled": "Natsahatra {{type}} {{name}}",

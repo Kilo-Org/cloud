@@ -3395,6 +3395,9 @@
         "policyText": "textul politicii",
         "groupCreated": "Grup creat: {{name}}",
         "groupUpdated": "Grup actualizat: {{name}}",
+        "groupUpdatedMembers_one": "Grup actualizat: {{name}} cu {{count}} membru",
+        "groupUpdatedMembers_few": "Grup actualizat: {{name}} cu {{count}} membri",
+        "groupUpdatedMembers_other": "Grup actualizat: {{name}} cu {{count}} membri",
         "groupDeleted": "Grup șters: {{name}}",
         "groupPolicySet": "Setată politica {{policy}} pentru grupul {{name}}",
         "groupPolicyRemoved": "Eliminată politica {{policy}} din grupul {{name}}",
@@ -3488,6 +3491,7 @@
           "skill": "abilitate"
         },
         "mcpGuardrailAdded": "Adăugare {{type}}: {{name}}",
+        "mcpGuardrailApproved": "Aprobare {{type}}: {{name}}",
         "mcpGuardrailUpdated": "Actualizare {{type}}: {{name}}",
         "mcpGuardrailEnabled": "Activare {{type}}: {{name}}",
         "mcpGuardrailDisabled": "Dezactivare {{type}}: {{name}}",

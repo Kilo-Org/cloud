@@ -3337,6 +3337,8 @@
         "policyText": "პოლიტიკის ტექსტი",
         "groupCreated": "შეიქმნა ჯგუფი {{name}}",
         "groupUpdated": "განახლდა ჯგუფი {{name}}",
+        "groupUpdatedMembers_one": "განახლდა ჯგუფი {{name}} {{count}} წევრით",
+        "groupUpdatedMembers_other": "განახლდა ჯგუფი {{name}} {{count}} წევრით",
         "groupDeleted": "წაიშალა ჯგუფი {{name}}",
         "groupPolicySet": "ჯგუფისთვის {{name}} დაყენდა {{policy}} პოლიტიკა",
         "groupPolicyRemoved": "ჯგუფიდან {{name}} წაიშალა {{policy}} პოლიტიკა",
@@ -3430,6 +3432,7 @@
           "skill": "უნარი"
         },
         "mcpGuardrailAdded": "დაემატა {{type}} {{name}}",
+        "mcpGuardrailApproved": "დამტკიცდა {{type}} {{name}}",
         "mcpGuardrailUpdated": "განახლდა {{type}} {{name}}",
         "mcpGuardrailEnabled": "ჩაირთო {{type}} {{name}}",
         "mcpGuardrailDisabled": "გამოირთო {{type}} {{name}}",

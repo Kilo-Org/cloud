@@ -3329,6 +3329,8 @@
         "policyText": "văn bản chính sách",
         "groupCreated": "Đã tạo nhóm {{name}}",
         "groupUpdated": "Đã cập nhật nhóm {{name}}",
+        "groupUpdatedMembers_one": "Đã cập nhật nhóm {{name}} với {{count}} thành viên",
+        "groupUpdatedMembers_other": "Đã cập nhật nhóm {{name}} với {{count}} thành viên",
         "groupDeleted": "Đã xóa nhóm {{name}}",
         "groupPolicySet": "Đã đặt chính sách {{policy}} cho nhóm {{name}}",
         "groupPolicyRemoved": "Đã xóa chính sách {{policy}} khỏi nhóm {{name}}",
@@ -3422,6 +3424,7 @@
           "skill": "kỹ năng"
         },
         "mcpGuardrailAdded": "Đã thêm {{type}} {{name}}",
+        "mcpGuardrailApproved": "Đã phê duyệt {{type}} {{name}}",
         "mcpGuardrailUpdated": "Đã cập nhật {{type}} {{name}}",
         "mcpGuardrailEnabled": "Đã bật {{type}} {{name}}",
         "mcpGuardrailDisabled": "Đã tắt {{type}} {{name}}",

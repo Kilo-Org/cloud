@@ -165,7 +165,7 @@ function describeDetectorDetails<Id extends string>(
     }),
     ...(detector.topic !== undefined && { topicsCount: detector.topic.length }),
     ...(detector.format !== undefined && { policyText: detector.format === 'policy_text' }),
-    ...(detector.format !== undefined && { rulesCount: detector.rules?.length ?? 0 }),
+    ...(detector.format === 'rules' && { rulesCount: detector.rules?.length ?? 0 }),
   };
 }
 

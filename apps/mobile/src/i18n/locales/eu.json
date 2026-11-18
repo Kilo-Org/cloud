@@ -3337,6 +3337,8 @@
         "policyText": "politikaren testua",
         "groupCreated": "{{name}} taldea sortu da",
         "groupUpdated": "{{name}} taldea eguneratu da",
+        "groupUpdatedMembers_one": "{{name}} taldea {{count}} kidearekin eguneratu da",
+        "groupUpdatedMembers_other": "{{name}} taldea {{count}} kideekin eguneratu da",
         "groupDeleted": "{{name}} taldea ezabatu da",
         "groupPolicySet": "{{name}} talderako {{policy}} politika ezarri da",
         "groupPolicyRemoved": "{{name}} taldetik {{policy}} politika kendu da",
@@ -3430,6 +3432,7 @@
           "skill": "trebetasuna"
         },
         "mcpGuardrailAdded": "{{type}} {{name}} gehitu da",
+        "mcpGuardrailApproved": "{{type}} {{name}} onartu da",
         "mcpGuardrailUpdated": "{{type}} {{name}} eguneratu da",
         "mcpGuardrailEnabled": "{{type}} {{name}} gaitu da",
         "mcpGuardrailDisabled": "{{type}} {{name}} desgaitu da",

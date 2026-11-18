@@ -3337,6 +3337,8 @@
         "policyText": "maandishi ya sera",
         "groupCreated": "Kikundi {{name}} kimeundwa",
         "groupUpdated": "Kikundi {{name}} kimesasishwa",
+        "groupUpdatedMembers_one": "Kikundi {{name}} kimesasishwa na mwanachama {{count}}",
+        "groupUpdatedMembers_other": "Kikundi {{name}} kimesasishwa na wanachama {{count}}",
         "groupDeleted": "Kikundi {{name}} kimefutwa",
         "groupPolicySet": "Sera ya {{policy}} imewekwa kwa kikundi {{name}}",
         "groupPolicyRemoved": "Sera ya {{policy}} imeondolewa kwa kikundi {{name}}",
@@ -3430,6 +3432,7 @@
           "skill": "ujuzi"
         },
         "mcpGuardrailAdded": "Imeongezwa {{type}} {{name}}",
+        "mcpGuardrailApproved": "Imeidhinishwa {{type}} {{name}}",
         "mcpGuardrailUpdated": "Imesasishwa {{type}} {{name}}",
         "mcpGuardrailEnabled": "Imewezeshwa {{type}} {{name}}",
         "mcpGuardrailDisabled": "Imezimwa {{type}} {{name}}",

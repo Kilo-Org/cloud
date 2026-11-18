@@ -3337,6 +3337,8 @@
         "policyText": "policytekst",
         "groupCreated": "Opprettet gruppen {{name}}",
         "groupUpdated": "Oppdaterte gruppen {{name}}",
+        "groupUpdatedMembers_one": "Oppdaterte gruppen {{name}} med {{count}} medlem",
+        "groupUpdatedMembers_other": "Oppdaterte gruppen {{name}} med {{count}} medlemmer",
         "groupDeleted": "Slettet gruppen {{name}}",
         "groupPolicySet": "Anga {{policy}}-policy for gruppen {{name}}",
         "groupPolicyRemoved": "Fjernet {{policy}}-policy fra gruppen {{name}}",
@@ -3430,6 +3432,7 @@
           "skill": "skill"
         },
         "mcpGuardrailAdded": "La til {{type}} {{name}}",
+        "mcpGuardrailApproved": "Godkjente {{type}} {{name}}",
         "mcpGuardrailUpdated": "Oppdaterte {{type}} {{name}}",
         "mcpGuardrailEnabled": "Aktiverte {{type}} {{name}}",
         "mcpGuardrailDisabled": "Deaktiverte {{type}} {{name}}",

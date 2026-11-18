@@ -3337,6 +3337,8 @@
         "policyText": "текст на политиката",
         "groupCreated": "Создадена група {{name}}",
         "groupUpdated": "Ажурирана група {{name}}",
+        "groupUpdatedMembers_one": "Ажурирана група {{name}} со {{count}} член",
+        "groupUpdatedMembers_other": "Ажурирана група {{name}} со {{count}} членови",
         "groupDeleted": "Избришана група {{name}}",
         "groupPolicySet": "Поставена политика {{policy}} за групата {{name}}",
         "groupPolicyRemoved": "Отстранета политика {{policy}} од групата {{name}}",
@@ -3430,6 +3432,7 @@
           "skill": "вештина"
         },
         "mcpGuardrailAdded": "Додаден {{type}} {{name}}",
+        "mcpGuardrailApproved": "Одобрен {{type}} {{name}}",
         "mcpGuardrailUpdated": "Ажуриран {{type}} {{name}}",
         "mcpGuardrailEnabled": "Овозможен {{type}} {{name}}",
         "mcpGuardrailDisabled": "Оневозможен {{type}} {{name}}",

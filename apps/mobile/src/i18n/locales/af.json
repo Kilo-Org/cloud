@@ -3337,6 +3337,8 @@
         "policyText": "beleidsteks",
         "groupCreated": "Groep {{name}} geskep",
         "groupUpdated": "Groep {{name}} opgedateer",
+        "groupUpdatedMembers_one": "Groep {{name}} opgedateer met {{count}} lid",
+        "groupUpdatedMembers_other": "Groep {{name}} opgedateer met {{count}} lede",
         "groupDeleted": "Groep {{name}} geskrap",
         "groupPolicySet": "{{policy}}-beleid vir groep {{name}} gestel",
         "groupPolicyRemoved": "{{policy}}-beleid van groep {{name}} verwyder",
@@ -3430,6 +3432,7 @@
           "skill": "vaardigheid"
         },
         "mcpGuardrailAdded": "{{type}} {{name}} bygevoeg",
+        "mcpGuardrailApproved": "{{type}} {{name}} goedgekeur",
         "mcpGuardrailUpdated": "{{type}} {{name}} opgedateer",
         "mcpGuardrailEnabled": "{{type}} {{name}} geaktiveer",
         "mcpGuardrailDisabled": "{{type}} {{name}} gedeaktiveer",

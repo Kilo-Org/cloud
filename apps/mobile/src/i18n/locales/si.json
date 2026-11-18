@@ -3337,6 +3337,8 @@
         "policyText": "ප්‍රතිපත්ති පෙළ",
         "groupCreated": "{{name}} කණ්ඩායම සාදන ලදි",
         "groupUpdated": "{{name}} කණ්ඩායම යාවත්කාලීන කරන ලදි",
+        "groupUpdatedMembers_one": "{{name}} කණ්ඩායම සාමාජිකයන් {{count}}ක් සමඟ යාවත්කාලීන කරන ලදි",
+        "groupUpdatedMembers_other": "{{name}} කණ්ඩායම සාමාජිකයන් {{count}}ක් සමඟ යාවත්කාලීන කරන ලදි",
         "groupDeleted": "{{name}} කණ්ඩායම මකා දමන ලදි",
         "groupPolicySet": "{{name}} කණ්ඩායම සඳහා {{policy}} ප්‍රතිපත්තිය සකසන ලදි",
         "groupPolicyRemoved": "{{name}} කණ්ඩායමෙන් {{policy}} ප්‍රතිපත්තිය ඉවත් කරන ලදි",
@@ -3430,6 +3432,7 @@
           "skill": "කුසලතාව"
         },
         "mcpGuardrailAdded": "{{type}} {{name}} එක් කරන ලදි",
+        "mcpGuardrailApproved": "{{type}} {{name}} අනුමත කරන ලදි",
         "mcpGuardrailUpdated": "{{type}} {{name}} යාවත්කාලීන කරන ලදි",
         "mcpGuardrailEnabled": "{{type}} {{name}} සක්‍රීය කරන ලදි",
         "mcpGuardrailDisabled": "{{type}} {{name}} අක්‍රීය කරන ලදි",

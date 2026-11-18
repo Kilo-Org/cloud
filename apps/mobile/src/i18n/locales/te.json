@@ -3337,6 +3337,8 @@
         "policyText": "పాలసీ వచనం",
         "groupCreated": "గ్రూప్ {{name}} సృష్టించబడింది",
         "groupUpdated": "గ్రూప్ {{name}} నవీకరించబడింది",
+        "groupUpdatedMembers_one": "గ్రూప్ {{name}} {{count}} సభ్యుడితో నవీకరించబడింది",
+        "groupUpdatedMembers_other": "గ్రూప్ {{name}} {{count}} సభ్యులతో నవీకరించబడింది",
         "groupDeleted": "గ్రూప్ {{name}} తొలగించబడింది",
         "groupPolicySet": "గ్రూప్ {{name}}కు {{policy}} పాలసీ సెట్ చేయబడింది",
         "groupPolicyRemoved": "గ్రూప్ {{name}} నుండి {{policy}} పాలసీ తొలగించబడింది",
@@ -3430,6 +3432,7 @@
           "skill": "స్కిల్"
         },
         "mcpGuardrailAdded": "{{type}} {{name}} జోడించబడింది",
+        "mcpGuardrailApproved": "{{type}} {{name}} ఆమోదించబడింది",
         "mcpGuardrailUpdated": "{{type}} {{name}} నవీకరించబడింది",
         "mcpGuardrailEnabled": "{{type}} {{name}} ప్రారంభించబడింది",
         "mcpGuardrailDisabled": "{{type}} {{name}} నిష్క్రియం చేయబడింది",

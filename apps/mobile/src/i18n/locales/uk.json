@@ -3445,6 +3445,10 @@
         "policyText": "текст політики",
         "groupCreated": "Створено групу {{name}}",
         "groupUpdated": "Оновлено групу {{name}}",
+        "groupUpdatedMembers_one": "Оновлено групу {{name}} з {{count}} учасником",
+        "groupUpdatedMembers_few": "Оновлено групу {{name}} з {{count}} учасниками",
+        "groupUpdatedMembers_many": "Оновлено групу {{name}} з {{count}} учасниками",
+        "groupUpdatedMembers_other": "Оновлено групу {{name}} з {{count}} учасниками",
         "groupDeleted": "Видалено групу {{name}}",
         "groupPolicySet": "Установлено політику {{policy}} для групи {{name}}",
         "groupPolicyRemoved": "Вилучено політику {{policy}} з групи {{name}}",
@@ -3538,6 +3542,7 @@
           "skill": "навичка"
         },
         "mcpGuardrailAdded": "Додано {{type}} {{name}}",
+        "mcpGuardrailApproved": "Затверджено {{type}} {{name}}",
         "mcpGuardrailUpdated": "Оновлено {{type}} {{name}}",
         "mcpGuardrailEnabled": "Увімкнено {{type}} {{name}}",
         "mcpGuardrailDisabled": "Вимкнено {{type}} {{name}}",

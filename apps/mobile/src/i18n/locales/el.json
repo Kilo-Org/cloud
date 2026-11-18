@@ -3337,6 +3337,8 @@
         "policyText": "κείμενο πολιτικής",
         "groupCreated": "Δημιουργήθηκε η ομάδα {{name}}",
         "groupUpdated": "Ενημερώθηκε η ομάδα {{name}}",
+        "groupUpdatedMembers_one": "Ενημερώθηκε η ομάδα {{name}} με {{count}} μέλος",
+        "groupUpdatedMembers_other": "Ενημερώθηκε η ομάδα {{name}} με {{count}} μέλη",
         "groupDeleted": "Διαγράφηκε η ομάδα {{name}}",
         "groupPolicySet": "Ορίστηκε πολιτική {{policy}} για την ομάδα {{name}}",
         "groupPolicyRemoved": "Αφαιρέθηκε η πολιτική {{policy}} από την ομάδα {{name}}",
@@ -3430,6 +3432,7 @@
           "skill": "δεξιότητα"
         },
         "mcpGuardrailAdded": "Προστέθηκε {{type}} {{name}}",
+        "mcpGuardrailApproved": "Εγκρίθηκε {{type}} {{name}}",
         "mcpGuardrailUpdated": "Ενημερώθηκε {{type}} {{name}}",
         "mcpGuardrailEnabled": "Ενεργοποιήθηκε {{type}} {{name}}",
         "mcpGuardrailDisabled": "Απενεργοποιήθηκε {{type}} {{name}}",

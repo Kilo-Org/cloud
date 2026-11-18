@@ -3337,6 +3337,8 @@
         "policyText": "umbhalo wenqubomgomo",
         "groupCreated": "Iqembu {{name}} lidalwe",
         "groupUpdated": "Iqembu {{name}} libuyekeziwe",
+        "groupUpdatedMembers_one": "Iqembu {{name}} libuyekeziwe ngamalungu angu-{{count}}",
+        "groupUpdatedMembers_other": "Iqembu {{name}} libuyekeziwe ngamalungu angu-{{count}}",
         "groupDeleted": "Iqembu {{name}} lisusiwe",
         "groupPolicySet": "Kusethwe inqubomgomo yohlobo {{policy}} yeqembu {{name}}",
         "groupPolicyRemoved": "Kususiwe inqubomgomo yohlobo {{policy}} eqenjini {{name}}",
@@ -3430,6 +3432,7 @@
           "skill": "ikhono"
         },
         "mcpGuardrailAdded": "Kungezwe {{type}} {{name}}",
+        "mcpGuardrailApproved": "Kuvunyiwe {{type}} {{name}}",
         "mcpGuardrailUpdated": "Kubuyekeziwe {{type}} {{name}}",
         "mcpGuardrailEnabled": "Kwenziwe kusebenze {{type}} {{name}}",
         "mcpGuardrailDisabled": "Kwenziwe kungasebenzi {{type}} {{name}}",

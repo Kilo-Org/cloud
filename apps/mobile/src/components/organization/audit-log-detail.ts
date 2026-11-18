@@ -61,7 +61,12 @@ export function auditLogDetailFor(t: TFunction, details: unknown): string | null
       return t('organization.auditLog.detail.groupCreated', { name: d.name });
     }
     case 'group_updated': {
-      return t('organization.auditLog.detail.groupUpdated', { name: d.name });
+      return d.membersCount != null
+        ? t('organization.auditLog.detail.groupUpdatedMembers', {
+            name: d.name,
+            count: d.membersCount,
+          })
+        : t('organization.auditLog.detail.groupUpdated', { name: d.name });
     }
     case 'group_deleted': {
       return t('organization.auditLog.detail.groupDeleted', { name: d.name });
@@ -191,19 +196,22 @@ export function auditLogDetailFor(t: TFunction, details: unknown): string | null
       const style = d.style ?? t('organization.auditLog.detail.reviewStyleUnknown');
       return d.webhooksCreated != null
         ? t('organization.auditLog.detail.reviewConfigChangedWebhooks', {
-            platform: d.platform,
+            platform: t(PLATFORM_KEYS[d.platform]),
             style,
             created: d.webhooksCreated,
             deleted: d.webhooksDeleted ?? 0,
           })
-        : t('organization.auditLog.detail.reviewConfigChanged', { platform: d.platform, style });
+        : t('organization.auditLog.detail.reviewConfigChanged', {
+            platform: t(PLATFORM_KEYS[d.platform]),
+            style,
+          });
     }
     case 'review_agent_toggled': {
       return t(
         d.enabled
           ? 'organization.auditLog.detail.reviewAgentEnabled'
           : 'organization.auditLog.detail.reviewAgentDisabled',
-        { platform: d.platform }
+        { platform: t(PLATFORM_KEYS[d.platform]) }
       );
     }
     case 'gitlab_webhook_secret_rotated': {
@@ -353,10 +361,15 @@ export function auditLogDetailFor(t: TFunction, details: unknown): string | null
       });
     }
     case 'mcp_guardrail_added': {
-      return t('organization.auditLog.detail.mcpGuardrailAdded', {
-        name: d.name,
-        type: t(MCP_TYPE_KEYS[d.type]),
-      });
+      return t(
+        d.verb === 'approved'
+          ? 'organization.auditLog.detail.mcpGuardrailApproved'
+          : 'organization.auditLog.detail.mcpGuardrailAdded',
+        {
+          name: d.name,
+          type: t(MCP_TYPE_KEYS[d.type]),
+        }
+      );
     }
     case 'mcp_guardrail_updated': {
       return t('organization.auditLog.detail.mcpGuardrailUpdated', {

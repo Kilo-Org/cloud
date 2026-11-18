@@ -3337,6 +3337,8 @@
         "policyText": "бодлогын текст",
         "groupCreated": "{{name}} бүлэг үүсгэв",
         "groupUpdated": "{{name}} бүлгийг шинэчлэв",
+        "groupUpdatedMembers_one": "{{name}} бүлгийг {{count}} гишүүнтэй шинэчлэв",
+        "groupUpdatedMembers_other": "{{name}} бүлгийг {{count}} гишүүнтэй шинэчлэв",
         "groupDeleted": "{{name}} бүлгийг устгав",
         "groupPolicySet": "{{name}} бүлэгт {{policy}} бодлого томилов",
         "groupPolicyRemoved": "{{name}} бүлгээс {{policy}} бодлогыг хасав",
@@ -3430,6 +3432,7 @@
           "skill": "ур чадвар"
         },
         "mcpGuardrailAdded": "{{type}} {{name}}-г нэмэв",
+        "mcpGuardrailApproved": "{{type}} {{name}}-г зөвшөөрөв",
         "mcpGuardrailUpdated": "{{type}} {{name}}-г шинэчлэв",
         "mcpGuardrailEnabled": "{{type}} {{name}}-г идэвхжүүлэв",
         "mcpGuardrailDisabled": "{{type}} {{name}}-г идэвхгүй болгов",

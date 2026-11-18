@@ -3445,6 +3445,10 @@
         "policyText": "текст политики",
         "groupCreated": "Создана группа {{name}}",
         "groupUpdated": "Обновлена группа {{name}}",
+        "groupUpdatedMembers_one": "Обновлена группа {{name}} с {{count}} участником",
+        "groupUpdatedMembers_few": "Обновлена группа {{name}} с {{count}} участниками",
+        "groupUpdatedMembers_many": "Обновлена группа {{name}} с {{count}} участниками",
+        "groupUpdatedMembers_other": "Обновлена группа {{name}} с {{count}} участниками",
         "groupDeleted": "Удалена группа {{name}}",
         "groupPolicySet": "Установлена политика {{policy}} для группы {{name}}",
         "groupPolicyRemoved": "Удалена политика {{policy}} из группы {{name}}",
@@ -3538,6 +3542,7 @@
           "skill": "навык"
         },
         "mcpGuardrailAdded": "Добавлен {{type}} {{name}}",
+        "mcpGuardrailApproved": "Одобрен {{type}} {{name}}",
         "mcpGuardrailUpdated": "Обновлён {{type}} {{name}}",
         "mcpGuardrailEnabled": "Включён {{type}} {{name}}",
         "mcpGuardrailDisabled": "Отключён {{type}} {{name}}",

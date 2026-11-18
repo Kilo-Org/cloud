@@ -3337,6 +3337,8 @@
         "policyText": "پالیسی کا متن",
         "groupCreated": "گروپ {{name}} بنایا گیا",
         "groupUpdated": "گروپ {{name}} اپ ڈیٹ کیا گیا",
+        "groupUpdatedMembers_one": "گروپ {{name}} کو {{count}} رکن کے ساتھ اپ ڈیٹ کیا گیا",
+        "groupUpdatedMembers_other": "گروپ {{name}} کو {{count}} اراکین کے ساتھ اپ ڈیٹ کیا گیا",
         "groupDeleted": "گروپ {{name}} حذف کیا گیا",
         "groupPolicySet": "گروپ {{name}} کے لیے {{policy}} پالیسی مقرر کی گئی",
         "groupPolicyRemoved": "گروپ {{name}} سے {{policy}} پالیسی ہٹا دی گئی",
@@ -3430,6 +3432,7 @@
           "skill": "اسکل"
         },
         "mcpGuardrailAdded": "{{type}} {{name}} شامل کیا گیا",
+        "mcpGuardrailApproved": "{{type}} {{name}} منظور کیا گیا",
         "mcpGuardrailUpdated": "{{type}} {{name}} اپ ڈیٹ کیا گیا",
         "mcpGuardrailEnabled": "{{type}} {{name}} فعال کیا گیا",
         "mcpGuardrailDisabled": "{{type}} {{name}} غیر فعال کیا گیا",

@@ -3337,6 +3337,8 @@
         "policyText": "siyasət mətni",
         "groupCreated": "{{name}} qrupu yaradıldı",
         "groupUpdated": "{{name}} qrupu yeniləndi",
+        "groupUpdatedMembers_one": "{{name}} qrupu {{count}} üzvlə yeniləndi",
+        "groupUpdatedMembers_other": "{{name}} qrupu {{count}} üzvlə yeniləndi",
         "groupDeleted": "{{name}} qrupu silindi",
         "groupPolicySet": "{{name}} qrupu üçün {{policy}} siyasəti təyin edildi",
         "groupPolicyRemoved": "{{name}} qrupundan {{policy}} siyasəti silindi",
@@ -3430,6 +3432,7 @@
           "skill": "bacarıq"
         },
         "mcpGuardrailAdded": "{{type}} {{name}} əlavə edildi",
+        "mcpGuardrailApproved": "{{type}} {{name}} təsdiqləndi",
         "mcpGuardrailUpdated": "{{type}} {{name}} yeniləndi",
         "mcpGuardrailEnabled": "{{type}} {{name}} aktivləşdirildi",
         "mcpGuardrailDisabled": "{{type}} {{name}} deaktivləşdirildi",

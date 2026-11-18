@@ -122,11 +122,16 @@ async function writeOrganizationConnectAudit(input: {
     actor_name: input.actorName,
     organization_id: input.organizationId,
     message: organizationConnectAuditMessage(input),
-    details: {
-      kind: 'bitbucket_workspace_changed',
-      workspaceSlug: input.workspace ? input.workspace.slug : 'selection pending',
-      verb: 'connected',
-    },
+    // `workspaceSlug` is a stable identifier the mobile client renders
+    // verbatim; a pending-selection row has no workspace yet, so it carries no
+    // details rather than prose standing in for one.
+    ...(input.workspace && {
+      details: {
+        kind: 'bitbucket_workspace_changed',
+        workspaceSlug: input.workspace.slug,
+        verb: 'connected',
+      },
+    }),
   });
 }
 

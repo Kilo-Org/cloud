@@ -3337,6 +3337,8 @@
         "policyText": "ನೀತಿ ಪಠ್ಯ",
         "groupCreated": "ಗುಂಪು {{name}} ರಚಿಸಲಾಗಿದೆ",
         "groupUpdated": "ಗುಂಪು {{name}} ನವೀಕರಿಸಲಾಗಿದೆ",
+        "groupUpdatedMembers_one": "ಗುಂಪು {{name}} ಅನ್ನು {{count}} ಸದಸ್ಯರೊಂದಿಗೆ ನವೀಕರಿಸಲಾಗಿದೆ",
+        "groupUpdatedMembers_other": "ಗುಂಪು {{name}} ಅನ್ನು {{count}} ಸದಸ್ಯರೊಂದಿಗೆ ನವೀಕರಿಸಲಾಗಿದೆ",
         "groupDeleted": "ಗುಂಪು {{name}} ಅಳಿಸಲಾಗಿದೆ",
         "groupPolicySet": "ಗುಂಪು {{name}} ಗಾಗಿ {{policy}} ನೀತಿಯನ್ನು ಹೊಂದಿಸಲಾಗಿದೆ",
         "groupPolicyRemoved": "ಗುಂಪು {{name}} ನಿಂದ {{policy}} ನೀತಿಯನ್ನು ತೆಗೆದುಹಾಕಲಾಗಿದೆ",
@@ -3430,6 +3432,7 @@
           "skill": "ಕೌಶಲ"
         },
         "mcpGuardrailAdded": "{{type}} {{name}} ಸೇರಿಸಲಾಗಿದೆ",
+        "mcpGuardrailApproved": "{{type}} {{name}} ಅನುಮೋದಿಸಲಾಗಿದೆ",
         "mcpGuardrailUpdated": "{{type}} {{name}} ನವೀಕರಿಸಲಾಗಿದೆ",
         "mcpGuardrailEnabled": "{{type}} {{name}} ಸಕ್ರಿಯಗೊಳಿಸಲಾಗಿದೆ",
         "mcpGuardrailDisabled": "{{type}} {{name}} ನಿಷ್ಕ್ರಿಯಗೊಳಿಸಲಾಗಿದೆ",

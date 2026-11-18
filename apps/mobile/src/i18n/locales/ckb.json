@@ -3337,6 +3337,8 @@
         "policyText": "دەقی سیاسەت",
         "groupCreated": "گروپی {{name}} دروستکرا",
         "groupUpdated": "گروپی {{name}} نوێکرایەوە",
+        "groupUpdatedMembers_one": "گروپی {{name}} بە {{count}} ئەندام نوێکرایەوە",
+        "groupUpdatedMembers_other": "گروپی {{name}} بە {{count}} ئەندام نوێکرایەوە",
         "groupDeleted": "گروپی {{name}} سڕایەوە",
         "groupPolicySet": "سیاسەتی {{policy}} بۆ گروپی {{name}} دانرا",
         "groupPolicyRemoved": "سیاسەتی {{policy}} لە گروپی {{name}} لابردرا",
@@ -3430,6 +3432,7 @@
           "skill": "لێهاتوویی"
         },
         "mcpGuardrailAdded": "{{type}} {{name}} زیادکرا",
+        "mcpGuardrailApproved": "{{type}} {{name}} پەسەندکرا",
         "mcpGuardrailUpdated": "{{type}} {{name}} نوێکرایەوە",
         "mcpGuardrailEnabled": "{{type}} {{name}} چالاککرا",
         "mcpGuardrailDisabled": "{{type}} {{name}} ناچالاککرا",

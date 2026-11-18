@@ -3337,6 +3337,8 @@
         "policyText": "stefnutexti",
         "groupCreated": "Hópur {{name}} búinn til",
         "groupUpdated": "Hópur {{name}} uppfærður",
+        "groupUpdatedMembers_one": "Hópur {{name}} uppfærður með {{count}} meðlim",
+        "groupUpdatedMembers_other": "Hópur {{name}} uppfærður með {{count}} meðlimum",
         "groupDeleted": "Hópur {{name}} eyddur",
         "groupPolicySet": "Stillti stefnu ({{policy}}) fyrir hóp {{name}}",
         "groupPolicyRemoved": "Fjarlægði stefnu ({{policy}}) úr hópi {{name}}",
@@ -3430,6 +3432,7 @@
           "skill": "færni"
         },
         "mcpGuardrailAdded": "Bætti við {{type}}: {{name}}",
+        "mcpGuardrailApproved": "Samþykkti {{type}}: {{name}}",
         "mcpGuardrailUpdated": "Uppfærði {{type}}: {{name}}",
         "mcpGuardrailEnabled": "Virkjaði {{type}}: {{name}}",
         "mcpGuardrailDisabled": "Afvirkjaði {{type}}: {{name}}",

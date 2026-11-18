@@ -3453,6 +3453,10 @@
         "policyText": "besedilo pravilnika",
         "groupCreated": "Ustvarjena skupina {{name}}",
         "groupUpdated": "Posodobljena skupina {{name}}",
+        "groupUpdatedMembers_one": "Posodobljena skupina {{name}} z {{count}} članom",
+        "groupUpdatedMembers_two": "Posodobljena skupina {{name}} s {{count}} člani",
+        "groupUpdatedMembers_few": "Posodobljena skupina {{name}} s {{count}} člani",
+        "groupUpdatedMembers_other": "Posodobljena skupina {{name}} s {{count}} člani",
         "groupDeleted": "Izbrisana skupina {{name}}",
         "groupPolicySet": "Nastavljen pravilnik {{policy}} za skupino {{name}}",
         "groupPolicyRemoved": "Odstranjen pravilnik {{policy}} iz skupine {{name}}",
@@ -3546,6 +3550,7 @@
           "skill": "veščina"
         },
         "mcpGuardrailAdded": "Dodano {{type}} {{name}}",
+        "mcpGuardrailApproved": "Odobreno {{type}} {{name}}",
         "mcpGuardrailUpdated": "Posodobljeno {{type}} {{name}}",
         "mcpGuardrailEnabled": "Omogočeno {{type}} {{name}}",
         "mcpGuardrailDisabled": "Onemogočeno {{type}} {{name}}",

@@ -3329,6 +3329,8 @@
         "policyText": "ポリシーテキスト",
         "groupCreated": "グループ {{name}} を作成しました",
         "groupUpdated": "グループ {{name}} を更新しました",
+        "groupUpdatedMembers_one": "グループ {{name}} をメンバー {{count}} 名で更新しました",
+        "groupUpdatedMembers_other": "グループ {{name}} をメンバー {{count}} 名で更新しました",
         "groupDeleted": "グループ {{name}} を削除しました",
         "groupPolicySet": "グループ {{name}} の{{policy}}ポリシーを設定しました",
         "groupPolicyRemoved": "グループ {{name}} から{{policy}}ポリシーを削除しました",
@@ -3422,6 +3424,7 @@
           "skill": "スキル"
         },
         "mcpGuardrailAdded": "{{type}} {{name}} を追加しました",
+        "mcpGuardrailApproved": "{{type}} {{name}} を承認しました",
         "mcpGuardrailUpdated": "{{type}} {{name}} を更新しました",
         "mcpGuardrailEnabled": "{{type}} {{name}} を有効にしました",
         "mcpGuardrailDisabled": "{{type}} {{name}} を無効にしました",

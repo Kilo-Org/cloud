@@ -3337,6 +3337,8 @@
         "policyText": "നയ വാചകം",
         "groupCreated": "{{name}} ഗ്രൂപ്പ് സൃഷ്ടിച്ചു",
         "groupUpdated": "{{name}} ഗ്രൂപ്പ് പുതുക്കി",
+        "groupUpdatedMembers_one": "{{name}} ഗ്രൂപ്പ് {{count}} അംഗവുമായി പുതുക്കി",
+        "groupUpdatedMembers_other": "{{name}} ഗ്രൂപ്പ് {{count}} അംഗങ്ങളുമായി പുതുക്കി",
         "groupDeleted": "{{name}} ഗ്രൂപ്പ് ഇല്ലാതാക്കി",
         "groupPolicySet": "{{name}} ഗ്രൂപ്പിനായി {{policy}} നയം സജ്ജമാക്കി",
         "groupPolicyRemoved": "{{name}} ഗ്രൂപ്പിൽ നിന്ന് {{policy}} നയം നീക്കി",
@@ -3430,6 +3432,7 @@
           "skill": "സ്കിൽ"
         },
         "mcpGuardrailAdded": "{{type}} {{name}} ചേർത്തു",
+        "mcpGuardrailApproved": "{{type}} {{name}} അംഗീകരിച്ചു",
         "mcpGuardrailUpdated": "{{type}} {{name}} പുതുക്കി",
         "mcpGuardrailEnabled": "{{type}} {{name}} പ്രവർത്തനക്ഷമമാക്കി",
         "mcpGuardrailDisabled": "{{type}} {{name}} പ്രവർത്തനരഹിതമാക്കി",

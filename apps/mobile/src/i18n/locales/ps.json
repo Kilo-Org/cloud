@@ -3337,6 +3337,8 @@
         "policyText": "د پالیسۍ متن",
         "groupCreated": "ګروپ {{name}} جوړ شو",
         "groupUpdated": "ګروپ {{name}} تازه شو",
+        "groupUpdatedMembers_one": "ګروپ {{name}} د {{count}} غړي سره تازه شو",
+        "groupUpdatedMembers_other": "ګروپ {{name}} د {{count}} غړو سره تازه شو",
         "groupDeleted": "ګروپ {{name}} ړنګ شو",
         "groupPolicySet": "د ګروپ {{name}} لپاره {{policy}} پالیسي وټاکل شوه",
         "groupPolicyRemoved": "د ګروپ {{name}} څخه {{policy}} پالیسي لرې شوه",
@@ -3430,6 +3432,7 @@
           "skill": "مهارت"
         },
         "mcpGuardrailAdded": "{{type}} {{name}} اضافه شو",
+        "mcpGuardrailApproved": "{{type}} {{name}} منظور شو",
         "mcpGuardrailUpdated": "{{type}} {{name}} تازه شو",
         "mcpGuardrailEnabled": "{{type}} {{name}} فعال شو",
         "mcpGuardrailDisabled": "{{type}} {{name}} غیر فعال شو",

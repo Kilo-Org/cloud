@@ -3337,6 +3337,8 @@
         "policyText": "tèks politik",
         "groupCreated": "Kreye gwoup {{name}}",
         "groupUpdated": "Mete gwoup {{name}} ajou",
+        "groupUpdatedMembers_one": "Mete gwoup {{name}} ajou ak {{count}} manm",
+        "groupUpdatedMembers_other": "Mete gwoup {{name}} ajou ak {{count}} manm",
         "groupDeleted": "Efase gwoup {{name}}",
         "groupPolicySet": "Mete politik {{policy}} pou gwoup {{name}}",
         "groupPolicyRemoved": "Retire politik {{policy}} nan gwoup {{name}}",
@@ -3430,6 +3432,7 @@
           "skill": "konpetans"
         },
         "mcpGuardrailAdded": "Ajoute {{type}} {{name}}",
+        "mcpGuardrailApproved": "Apwouve {{type}} {{name}}",
         "mcpGuardrailUpdated": "Mete {{type}} {{name}} ajou",
         "mcpGuardrailEnabled": "Aktive {{type}} {{name}}",
         "mcpGuardrailDisabled": "Dezaktive {{type}} {{name}}",

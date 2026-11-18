@@ -3337,6 +3337,8 @@
         "policyText": "ọ̀rọ̀ ìlànà",
         "groupCreated": "Ti ṣẹ̀dá ẹgbẹ́ {{name}}",
         "groupUpdated": "Ti ṣe àtúnṣe ẹgbẹ́ {{name}}",
+        "groupUpdatedMembers_one": "Ti ṣe àtúnṣe ẹgbẹ́ {{name}} pẹ̀lú ọmọ ẹgbẹ́ {{count}}",
+        "groupUpdatedMembers_other": "Ti ṣe àtúnṣe ẹgbẹ́ {{name}} pẹ̀lú àwọn ọmọ ẹgbẹ́ {{count}}",
         "groupDeleted": "Ti yọ ẹgbẹ́ {{name}} kuro",
         "groupPolicySet": "Ti ṣeto ìlànà {{policy}} fún ẹgbẹ́ {{name}}",
         "groupPolicyRemoved": "Ti yọ ìlànà {{policy}} kuro nínú ẹgbẹ́ {{name}}",
@@ -3430,6 +3432,7 @@
           "skill": "ọgbọ́n"
         },
         "mcpGuardrailAdded": "Ti fi {{type}} {{name}} kún",
+        "mcpGuardrailApproved": "Ti fọwọ́ sí {{type}} {{name}}",
         "mcpGuardrailUpdated": "Ti ṣe àtúnṣe {{type}} {{name}}",
         "mcpGuardrailEnabled": "Ti mú {{type}} {{name}} ṣiṣẹ́",
         "mcpGuardrailDisabled": "Ti pa {{type}} {{name}}",

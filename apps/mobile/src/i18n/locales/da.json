@@ -3337,6 +3337,8 @@
         "policyText": "politiktekst",
         "groupCreated": "Oprettede gruppen {{name}}",
         "groupUpdated": "Opdaterede gruppen {{name}}",
+        "groupUpdatedMembers_one": "Opdaterede gruppen {{name}} med {{count}} medlem",
+        "groupUpdatedMembers_other": "Opdaterede gruppen {{name}} med {{count}} medlemmer",
         "groupDeleted": "Slettede gruppen {{name}}",
         "groupPolicySet": "Angav politikken {{policy}} for gruppen {{name}}",
         "groupPolicyRemoved": "Fjernede politikken {{policy}} fra gruppen {{name}}",
@@ -3430,6 +3432,7 @@
           "skill": "færdighed"
         },
         "mcpGuardrailAdded": "Tilføjede {{type}} {{name}}",
+        "mcpGuardrailApproved": "Godkendte {{type}} {{name}}",
         "mcpGuardrailUpdated": "Opdaterede {{type}} {{name}}",
         "mcpGuardrailEnabled": "Aktiverede {{type}} {{name}}",
         "mcpGuardrailDisabled": "Deaktiverede {{type}} {{name}}",

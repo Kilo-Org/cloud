@@ -3337,6 +3337,8 @@
         "policyText": "ข้อความนโยบาย",
         "groupCreated": "สร้างกลุ่ม {{name}}",
         "groupUpdated": "อัปเดตกลุ่ม {{name}}",
+        "groupUpdatedMembers_one": "อัปเดตกลุ่ม {{name}} ให้มีสมาชิก {{count}} คน",
+        "groupUpdatedMembers_other": "อัปเดตกลุ่ม {{name}} ให้มีสมาชิก {{count}} คน",
         "groupDeleted": "ลบกลุ่ม {{name}}",
         "groupPolicySet": "ตั้งนโยบาย {{policy}} สำหรับกลุ่ม {{name}}",
         "groupPolicyRemoved": "ลบนโยบาย {{policy}} ออกจากกลุ่ม {{name}}",
@@ -3430,6 +3432,7 @@
           "skill": "ทักษะ"
         },
         "mcpGuardrailAdded": "เพิ่ม {{type}} {{name}}",
+        "mcpGuardrailApproved": "อนุมัติ {{type}} {{name}}",
         "mcpGuardrailUpdated": "อัปเดต {{type}} {{name}}",
         "mcpGuardrailEnabled": "เปิดใช้งาน {{type}} {{name}}",
         "mcpGuardrailDisabled": "ปิดใช้งาน {{type}} {{name}}",

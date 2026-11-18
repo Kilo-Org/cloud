@@ -131,6 +131,7 @@ describe('Cloud Agent spawn authority', () => {
     seal.mockResolvedValue('private-child-authorization-seal');
   });
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.useRealTimers();
   });
 
@@ -437,6 +438,7 @@ describe('Cloud Agent spawn authority', () => {
     ['organization', { organizationId: 'other-org' }],
     ['authorization', { authorizationId: '12345678-1234-4234-8234-123456789abd' }],
     ['expiry', { expiresAt: Math.floor(now.getTime() / 1000) }],
+    ['scope exceeding the delegation', { expiresAt: scope.expiresAt + 1 }],
   ])('rejects mismatched %s before minting', (_name, changes) => {
     const { metadata, authorization } = fixture();
     expect(() =>
@@ -635,13 +637,57 @@ describe('Cloud Agent spawn authority', () => {
     expect(() => validateScopedWorkerPreparation(scope, { ...launch, ...metadata })).toThrow();
   });
 
-  it('never reissues an expired or revoked parent authorization', async () => {
+  it.each([
+    { state: 'active', time: scope.expiresAt * 1000, reason: 'delegation_expired' },
+    { state: 'revoked', time: now.getTime(), reason: 'stored_authorization_revoked' },
+  ] as const)('skips MCP grant issuance for $reason', async ({ state, time, reason }) => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     const { context, authorization } = fixture();
-    vi.setSystemTime(now.getTime() + 24 * 3600_000);
-    await expect(issueCloudAgentMcpGrant(context)).rejects.toThrow('parent authority denied');
-    vi.setSystemTime(now);
-    authorization.state = 'revoked';
+    vi.setSystemTime(time);
+    authorization.state = state;
+
+    await expect(issueCloudAgentMcpGrant(context)).resolves.toBeUndefined();
+    expect(renew).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId: parentSessionId, stage: 'mcp_grant', reason })
+    );
+  });
+
+  it.each([
+    ['owner', { userId: 'other-user' }],
+    ['organization', { organizationId: 'other-org' }],
+    ['resource session', { resourceId: childSessionId }],
+  ] as const)(
+    'throws for a mismatched parent %s even when the delegation is unavailable',
+    async (_name, mismatch) => {
+      const { context, authorization } = fixture();
+      Object.assign(authorization, mismatch);
+      await expect(issueCloudAgentMcpGrant(context)).rejects.toThrow('parent authority denied');
+      vi.setSystemTime(scope.expiresAt * 1000);
+      await expect(issueCloudAgentMcpGrant(context)).rejects.toThrow('parent authority denied');
+      vi.setSystemTime(now);
+      authorization.state = 'revoked';
+      await expect(issueCloudAgentMcpGrant(context)).rejects.toThrow('parent authority denied');
+      expect(renew).not.toHaveBeenCalled();
+    }
+  );
+
+  it('still rejects an expired scope when the delegation has a fraction of a second left', async () => {
+    const { context, authorization } = fixture();
+    authorization.delegationExpiresAt = new Date(now.getTime() + 500).toISOString();
+
     await expect(issueCloudAgentMcpGrant(context)).rejects.toThrow('parent authority denied');
     expect(renew).not.toHaveBeenCalled();
+  });
+
+  it('rejects an authorization replaced during grant minting', async () => {
+    const { context, authorization } = fixture();
+    context.authorization.mockResolvedValueOnce(authorization).mockResolvedValueOnce({
+      ...authorization,
+      id: '12345678-1234-4234-8234-123456789abd',
+    });
+
+    await expect(issueCloudAgentMcpGrant(context)).rejects.toThrow('parent authority denied');
+    expect(renew).toHaveBeenCalledTimes(1);
   });
 });

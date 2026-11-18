@@ -570,13 +570,21 @@ export const sensitiveTargetsOf = (
   return targets;
 };
 
-const sensitiveFieldPresencePayloadSchema = z.object({ present: z.boolean().optional() });
+const sensitiveFieldPresencePayloadSchema = z.object({
+  closed: z.boolean().optional(),
+  present: z.boolean().optional(),
+});
 
 /**
  * Whether a frame holds any field the sensitive gate protects. `browser_evaluate`
  * and `browser_run_code_unsafe` run model-authored script, which can read and
  * write every field a page script can reach, so their classification is the page
  * itself rather than a target element (the CLI #16285 aligns).
+ *
+ * Page script also reaches into **open** shadow roots, so the walk recurses
+ * through them. A custom element without an open root may still hold a closed
+ * one that no probe can read; that is reported as `closed` and the gate treats
+ * it as sensitive rather than absent.
  */
 export const SENSITIVE_FIELD_PRESENCE_PROBE_EXPRESSION = `(() => {
   var kindOf = function (input) {
@@ -592,17 +600,30 @@ export const SENSITIVE_FIELD_PRESENCE_PROBE_EXPRESSION = `(() => {
     if (/(^|[-_])(cc|card)([-_]|$)/.test(name) || name === 'cardnumber') { return 'payment'; }
     return null;
   };
-  var inputs = document.querySelectorAll('input, textarea, select');
-  for (var index = 0; index < inputs.length; index += 1) {
-    if (kindOf(inputs[index]) !== null) { return JSON.stringify({ present: true }); }
-  }
-  return JSON.stringify({ present: false });
+  var found = { closed: false, present: false };
+  var scan = function (root) {
+    var inputs = root.querySelectorAll('input, textarea, select');
+    for (var index = 0; index < inputs.length; index += 1) {
+      if (kindOf(inputs[index]) !== null) { found.present = true; return; }
+    }
+    var elements = root.querySelectorAll('*');
+    for (var index = 0; index < elements.length; index += 1) {
+      var element = elements[index];
+      var shadow = element.shadowRoot;
+      if (shadow !== null) { scan(shadow); if (found.present) { return; } continue; }
+      // A hyphenated tag is a custom element: with no open root it may hold a closed one.
+      if (String(element.tagName).indexOf('-') !== -1) { found.closed = true; }
+    }
+  };
+  scan(document);
+  return JSON.stringify(found);
 })()`;
 
 /**
  * `present` when the frame holds a password, one-time-code or payment field,
- * `absent` only when a fully parsed probe said so, and `unknown` when the frame
- * could not be inspected — which the gate treats as sensitive.
+ * `absent` only when a fully parsed probe said so and no closed shadow root
+ * could hide one, and `unknown` when the frame could not be inspected — which
+ * the gate treats as sensitive.
  */
 export const readFrameSensitiveFields = async (
   session: Pick<BrowserToolPageSession, 'send'>,
@@ -619,7 +640,11 @@ export const readFrameSensitiveFields = async (
     return 'unknown';
   }
 
-  return payload.present === true ? 'present' : 'absent';
+  if (payload.present === true) {
+    return 'present';
+  }
+
+  return payload.closed === true ? 'unknown' : 'absent';
 };
 
 /**

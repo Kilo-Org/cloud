@@ -75,11 +75,16 @@ export const createLocalAgentDispatcher = ({
 
         await ownedBy(controllerId, input.data.sessionHandle);
 
+        // The runtime ends first: dropping the row before a failed close would strand a live group.
+        // Its lease and refs would have no owner left for Stop all or disconnect to sweep.
+        await bridge.closeSession({
+          controllerId,
+          sessionHandle: input.data.sessionHandle,
+        });
+
         if (!(await registry.closeSession(controllerId, input.data.sessionHandle))) {
           throw invalidParams('Unknown session handle.');
         }
-
-        await bridge.closeSession({ controllerId, sessionHandle: input.data.sessionHandle });
 
         return {};
       }

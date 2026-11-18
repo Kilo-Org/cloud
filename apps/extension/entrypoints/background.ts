@@ -158,6 +158,11 @@ export const getBrowserRuntime = ({
           tabGroups: createBrowserTabGroupController({
             api: {
               ...(tabsApi.group === undefined ? {} : { group: tabsApi.group.bind(tabsApi) }),
+              tabGroupOf: async tabId => {
+                const tab = await tabsApi.get?.(tabId);
+
+                return tab?.groupId;
+              },
               tabQuery: query => tabsApi.query(query),
               ...(tabGroupsApi.update === undefined
                 ? {}

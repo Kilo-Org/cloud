@@ -45,6 +45,8 @@ export interface BrowserTabGroupsApi {
   /** `tabGroups.update`: the only way to set a title or collapsed state. */
   readonly update?: (groupId: number, props: BrowserTabGroupUpdate) => MaybeAsync<void>;
   readonly get?: (groupId: number) => MaybeAsync<BrowserTabGroupInfo | undefined>;
+  /** `tabs.get(tabId).groupId`: the live group a tab is in, `-1` or undefined when ungrouped. */
+  readonly tabGroupOf?: (tabId: number) => MaybeAsync<number | undefined>;
   /** `tabs.query`: resolves the active tab when a share names none. */
   readonly tabQuery?: (query: BrowserTabQuery) => MaybeAsync<readonly BrowserActiveTabInfo[]>;
 }
@@ -147,11 +149,38 @@ export const createBrowserTabGroupController = ({
     );
     return parsed.success ? parsed.data : undefined;
   };
-  const updateGroup = async (groupId: number, props: BrowserTabGroupUpdate): Promise<void> => {
+  const updateGroup = async (groupId: number, props: BrowserTabGroupUpdate): Promise<boolean> => {
     const { update } = api;
-    if (update !== undefined) {
-      await attempt(() => update(groupId, props));
+    if (update === undefined) {
+      return false;
     }
+    try {
+      await update(groupId, props);
+      return true;
+    } catch (error) {
+      console.warn('Browser tab group call failed:', error);
+      return false;
+    }
+  };
+
+  /**
+   * The group a session's tabs are in right now. The recorded id is preferred,
+   * but a group id can be missing (the first grouping never reported one) or
+   * stale (Chrome recreated the group), and the tabs always know the truth.
+   */
+  const liveGroupId = async (session: SessionState): Promise<number | undefined> => {
+    const { tabGroupOf } = api;
+    if (session.groupId !== undefined || tabGroupOf === undefined) {
+      return session.groupId;
+    }
+    for (const tabId of session.tabs) {
+      // eslint-disable-next-line no-await-in-loop -- one tab lookup per tab, in order
+      const groupId = await attempt(() => tabGroupOf(tabId));
+      if (groupId !== undefined && groupId >= 0) {
+        return groupId;
+      }
+    }
+    return undefined;
   };
   const activeTabId = async (): Promise<number | undefined> => {
     const { tabQuery } = api;
@@ -184,13 +213,25 @@ export const createBrowserTabGroupController = ({
     clock = now === undefined ? clock + 1 : Math.max(clock + 1, now());
     session.ended = true;
     session.endedAt = clock;
-    if (session.groupId !== undefined) {
-      // The group outlives the session; its tab ids stay targetable only after adoption.
-      await updateGroup(session.groupId, {
-        collapsed: true,
-        color: BROWSER_TAB_GROUP_COLOR,
-        title: browserTabGroupEndedTitle(),
-      });
+    const props = {
+      collapsed: true,
+      color: BROWSER_TAB_GROUP_COLOR,
+      title: browserTabGroupEndedTitle(),
+    } as const;
+    const groupId = await liveGroupId(session);
+    if (groupId === undefined) {
+      return;
+    }
+    // The group outlives the session; its tab ids stay targetable only after adoption.
+    session.groupId = groupId;
+    if (await updateGroup(groupId, props)) {
+      return;
+    }
+    // A recorded id that no longer updates is stale: retry once with the group the tab is actually in.
+    const recovered = await liveGroupId({ ...session, groupId: undefined });
+    if (recovered !== undefined && recovered !== groupId) {
+      session.groupId = recovered;
+      await updateGroup(recovered, props);
     }
   };
 

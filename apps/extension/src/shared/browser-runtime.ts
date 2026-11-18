@@ -34,7 +34,7 @@ import type { BrowserToolDispatchOptions } from './browser-tool-dispatch';
 import { createBrowserToolSession } from './browser-tool-session';
 import type { BrowserToolSession, BrowserToolTabsApi } from './browser-tool-session';
 import type { TabLeaseHolder, TabLeaseRegistry } from './browser-tab-leases';
-import { getInspectableTab } from './tab-debugger';
+import { getInspectableTab, isInspectablePageUrl } from './tab-debugger';
 import type {
   BrowserScriptingApi,
   BrowserTabsApi,
@@ -97,6 +97,20 @@ export interface BrowserEvalRunInput {
   readonly timeoutMs?: number;
 }
 
+/** One tab a session opens for itself, after the gate allowed the call that needed it. */
+export interface BrowserSessionTabInput {
+  readonly sessionHandle: string;
+  /** The page the tool asked for; absent opens `about:blank` for a navigate to land on. */
+  readonly url?: string | undefined;
+}
+
+export interface BrowserSessionTabResult {
+  readonly groupId?: number | undefined;
+  readonly tabId: number;
+  readonly title: string;
+  readonly url: string;
+}
+
 export interface BrowserRuntimeDeps {
   readonly debuggerApi: ChromeDebuggerApi | undefined;
   readonly leases: TabLeaseRegistry;
@@ -148,8 +162,18 @@ export interface BrowserRuntime {
   readonly listSessions: () => BrowserTabGroupSessionSummary[];
   /** Creates the session's group `Kilo · <title>` (or tracks tabs without one). */
   readonly openSession: (input: BrowserOpenSessionInput) => Promise<BrowserTabGroupOpenResult>;
+  /**
+   * A session's own tab: created inactive in the last focused window and put in
+   * its group, so an agent never takes the tab the user is looking at. Undefined
+   * when this browser cannot create tabs.
+   */
+  readonly openSessionTab: (
+    input: BrowserSessionTabInput
+  ) => Promise<BrowserSessionTabResult | undefined>;
   /** Ends the caller's tab leases. Its refs survive, so the next turn can click by an earlier ref. */
   readonly releaseCaller: (caller: BrowserCaller) => number;
+  /** Drops this caller's lease on one tab only: one finished call must not free its session's other tabs. */
+  readonly releaseTab: (input: { readonly caller: BrowserCaller; readonly tabId: number }) => void;
   readonly runTool: (input: BrowserToolRunInput) => Promise<BrowserToolRunOutcome>;
   /** Moves the active tab (or the named one) into the session's group (`/browser share`). */
   readonly shareActiveTab: (input: BrowserShareTabInput) => Promise<BrowserShareTabResult>;
@@ -623,6 +647,70 @@ export const createBrowserRuntime = ({
     }
   };
 
+  /**
+   * The url a just-created tab actually shows. Chrome commits a navigation a
+   * moment after `tabs.create` resolves, and a tab without an http(s) url is not
+   * inspectable, so the first tool call would be refused if it ran too early.
+   * Bounded: a tab that never commits keeps the url it was asked for.
+   */
+  const committedUrl = async (tabId: number, requested: string | undefined): Promise<string> => {
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      // eslint-disable-next-line no-await-in-loop -- the commit is asynchronous; one short read per attempt
+      const tab = await tabsApi.get?.(tabId);
+
+      if (isInspectablePageUrl(tab?.url)) {
+        return tab.url;
+      }
+
+      if (attempt < 19) {
+        const { promise, resolve } = Promise.withResolvers<void>();
+
+        setTimeout(resolve, 100);
+        // eslint-disable-next-line no-await-in-loop -- see above
+        await promise;
+      }
+    }
+
+    return requested ?? 'about:blank';
+  };
+
+  /**
+   * Opens the session's own tab: inactive, in the last focused window, and in
+   * the session's `Kilo · <title>` group. The user's current tab keeps focus,
+   * which is the whole point of an agent never taking a tab it did not make.
+   */
+  const openSessionTab = async ({
+    sessionHandle,
+    url,
+  }: BrowserSessionTabInput): Promise<BrowserSessionTabResult | undefined> => {
+    const create = tabsApi.create?.bind(tabsApi);
+
+    if (create === undefined) {
+      return undefined;
+    }
+
+    const [active] = await tabsApi.query({ active: true, lastFocusedWindow: true });
+    const created = await create({
+      active: false,
+      ...(url === undefined ? {} : { url }),
+      ...(active?.windowId === undefined ? {} : { windowId: active.windowId }),
+    });
+
+    if (created.id === undefined) {
+      return undefined;
+    }
+
+    // Sharing the tab is what titles and colours the group; the tab is not activated by it.
+    const shared = await groups.shareActiveTab({ sessionHandle, tabId: created.id });
+
+    return {
+      tabId: created.id,
+      title: created.title ?? '',
+      url: await committedUrl(created.id, created.url ?? url),
+      ...(shared.groupId === undefined ? {} : { groupId: shared.groupId }),
+    };
+  };
+
   return {
     adoptEnded: input => groups.adoptEnded(input),
     claimTab,
@@ -635,8 +723,12 @@ export const createBrowserRuntime = ({
     listSessions: () => groups.listSessions(),
     noteTabCreated,
     openSession: input => groups.openSession(input),
+    openSessionTab,
     // Turn end: the lease goes, the caller's refs stay. Playwright-like, a ref from an earlier snapshot keeps resolving for as long as the caller and the tab session live.
     releaseCaller: caller => leases.releaseCaller(caller),
+    releaseTab: ({ caller, tabId }) => {
+      leases.release(tabId, caller);
+    },
     runTool,
     shareActiveTab: input => groups.shareActiveTab(input),
   };

@@ -227,6 +227,14 @@ const imageOf = (
   return parsed.success ? parsed.data : undefined;
 };
 
+/** One RPC answer's MCP tool result, parsed: the assertions read `content`/`isError` from it. */
+export const toolResultOf = (message: Record<string, unknown> | undefined) =>
+  toolResultSchema.parse(message?.['result']);
+
+/** The text content of a tool-result answer. */
+export const toolTextOf = (message: Record<string, unknown> | undefined): string =>
+  textOf(toolResultOf(message).content);
+
 const responseOf = (message: Record<string, unknown>): LocalAgentToolResponse => {
   if (message['error'] !== undefined) {
     const error = z

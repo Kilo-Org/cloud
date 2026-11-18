@@ -371,6 +371,40 @@ export interface AgentPreflightInput {
 }
 
 /**
+ * The navigate grant a `browser_tabs { action: "new" }` needs for the page it
+ * opens, checked before any tab exists (a session's first tab is opened by the
+ * bridge, so the gate cannot see a tab to resolve it against).
+ */
+export const tabsNewDestinationItem = (
+  args: Record<string, unknown>,
+  authorized: readonly BrowserGrant[]
+): BrowserPermissionItem | undefined => {
+  const destination = navigationOrigin(args);
+
+  return argumentString(args, 'action') === 'new' &&
+    destination !== undefined &&
+    !isOriginGranted(authorized, 'navigate', destination)
+    ? { class: 'navigate', origin: destination }
+    : undefined;
+};
+
+/**
+ * The navigate grant a `browser_navigate` needs for its destination, checked
+ * before any tab exists: a session's first navigation opens its own tab at that
+ * URL, so there is no tab to resolve the origin against yet.
+ */
+export const navigateDestinationItem = (
+  args: Record<string, unknown>,
+  authorized: readonly BrowserGrant[]
+): BrowserPermissionItem | undefined => {
+  const destination = navigationOrigin(args);
+
+  return destination !== undefined && !isOriginGranted(authorized, 'navigate', destination)
+    ? { class: 'navigate', origin: destination }
+    : undefined;
+};
+
+/**
  * The pre-action check: the needed class origin is granted, and an act call
  * that would be sensitive carries a token bound to this tab, tool, element
  * and argument set.
@@ -383,16 +417,10 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
   // `browser_tabs` is one tool over four actions: list filters per tab and select/close are checked by the handler against the group and `act`; only `new` navigates, so it needs the destination's `navigate` grant here.
   if (input.toolName === 'browser_tabs') {
     const destination = navigationOrigin(input.args);
+    const missing = tabsNewDestinationItem(input.args, input.authorized);
 
-    if (
-      argumentString(input.args, 'action') === 'new' &&
-      destination !== undefined &&
-      !isOriginGranted(input.authorized, 'navigate', destination)
-    ) {
-      return {
-        failure: { items: [{ class: 'navigate', origin: destination }], kind: 'needs_permission' },
-        ok: false,
-      };
+    if (missing !== undefined) {
+      return { failure: { items: [missing], kind: 'needs_permission' }, ok: false };
     }
 
     return { class: 'act', ok: true, origin: destination ?? mainOrigin, targetOriginFrame: false };

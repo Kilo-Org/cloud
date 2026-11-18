@@ -1,3 +1,4 @@
+/* eslint-disable vitest/no-conditional-in-test -- a fake group/update store branches on the id it is given */
 /* eslint-disable max-lines -- One suite walks the session/group state machine end to end; splitting it would scatter the transitions. */
 /* eslint-disable require-await, unicorn/no-useless-undefined, vitest/max-expects, vitest/prefer-mock-return-shorthand -- fakes must return promises like the browser API, and one test body checks one state-machine transition end to end */
 import { describe, expect, it, vi } from 'vitest';
@@ -277,6 +278,57 @@ describe('browser tab groups', () => {
     // Its own group is its reach; the ended one is left for a session that has none.
     expect(controller.tabsForSession('b')).toStrictEqual([32]);
     expect(controller.tabsForSession('a')).toStrictEqual([]);
+  });
+
+  it('ends the group a tab is actually in when no group id was recorded', async () => {
+    const update = createUpdateMock();
+    const tabGroupOf = vi.fn(async () => 77);
+    const controller = createBrowserTabGroupController({ api: { tabGroupOf, update } });
+
+    await controller.openSession({ controllerId: 'c1', sessionHandle: 'a', title: 'Alpha' });
+    await controller.shareActiveTab({ sessionHandle: 'a', tabId: 31 });
+
+    // No group: the tab id is recorded, the group id is not.
+    expect(controller.listSessions()[0]?.groupId).toBeUndefined();
+
+    await controller.closeSession({ sessionHandle: 'a' });
+
+    // The tab knows its group, so the ended state still lands.
+    expect(tabGroupOf).toHaveBeenCalledWith(31);
+    expect(update).toHaveBeenCalledWith(77, {
+      collapsed: true,
+      color: 'grey',
+      title: 'Kilo · ended',
+    });
+  });
+
+  it('retries with the live group when the recorded id is stale', async () => {
+    const update = createUpdateMock();
+    let failRecordedId = false;
+
+    update.mockImplementation(async (groupId: number) => {
+      if (failRecordedId && groupId === 1) {
+        throw new Error('No group with id: 1');
+      }
+    });
+    const controller = createBrowserTabGroupController({
+      api: { group: async () => 1, tabGroupOf: async () => 9, update },
+    });
+
+    await controller.openSession({ controllerId: 'c1', sessionHandle: 'a', title: 'Alpha' });
+    await controller.shareActiveTab({ sessionHandle: 'a', tabId: 31 });
+    expect(controller.listSessions()[0]?.groupId).toBe(1);
+
+    // Chrome recreated the group: the recorded id no longer updates, the tab's live one does.
+    failRecordedId = true;
+    await controller.closeSession({ sessionHandle: 'a' });
+
+    expect(update).toHaveBeenCalledWith(9, {
+      collapsed: true,
+      color: 'grey',
+      title: 'Kilo · ended',
+    });
+    expect(controller.listSessions()[0]?.groupId).toBe(9);
   });
 
   it('creates an empty active session when nothing has ended', async () => {

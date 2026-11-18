@@ -1,5 +1,5 @@
 /* eslint-disable eslint/max-statements, max-lines, max-lines-per-function, max-expects, require-await, typescript/require-await, typescript-eslint/consistent-type-definitions -- one fake runtime serves every protocol branch, and its recorders read as one table */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { AGENT_TAB_OUTSIDE_GROUP_ERROR } from '../browser-agent-checks';
 import { TAB_BUSY_ERROR, TAB_TAKEN_ERROR } from '../browser-caller';
@@ -18,8 +18,11 @@ const SECOND_HANDLE = '99999999-8888-4777-8666-555555555555';
 type FakeRuntime = {
   readonly closed: string[];
   readonly disposed: string[];
+  readonly disposedTabs: number[];
   readonly opened: { controllerId: string; sessionHandle: string; title: string }[];
+  readonly ownTabs: { sessionHandle: string; url?: string | undefined }[];
   readonly released: string[];
+  readonly releasedTabs: { caller: string; tabId: number }[];
   readonly run: BrowserToolRunInput[];
   readonly runtime: LocalAgentBrowserRuntime;
   readonly sessions: Map<string, { ended: boolean; tabs: number[] }>;
@@ -39,7 +42,10 @@ const createFakeRuntime = (
   const closed: string[] = [];
   const disposed: string[] = [];
   const released: string[] = [];
+  const releasedTabs: { caller: string; tabId: number }[] = [];
   const run: BrowserToolRunInput[] = [];
+  const ownTabs: { sessionHandle: string; url?: string | undefined }[] = [];
+  const disposedTabs: number[] = [];
 
   const summaries = (): BrowserTabGroupSessionSummary[] =>
     [...sessions.entries()].map(([sessionHandle, session]) => ({
@@ -82,6 +88,13 @@ const createFakeRuntime = (
 
       return 1;
     },
+    disposeTab: async (tabId: number) => {
+      disposedTabs.push(tabId);
+
+      for (const session of sessions.values()) {
+        session.tabs = session.tabs.filter(id => id !== tabId);
+      }
+    },
     listSessions: () => summaries(),
     openSession: async input => {
       // Like the controller: reopening a handle revives it with the tabs it already had.
@@ -92,10 +105,27 @@ const createFakeRuntime = (
 
       return {};
     },
+    openSessionTab: async input => {
+      ownTabs.push(input);
+
+      const tabId = 77;
+
+      sessions.get(input.sessionHandle)?.tabs.push(tabId);
+
+      return {
+        groupId: 42,
+        tabId,
+        title: '',
+        url: input.url ?? 'about:blank',
+      };
+    },
     releaseCaller: (caller: BrowserCaller) => {
       released.push(callerKey(caller));
 
       return 1;
+    },
+    releaseTab: ({ caller, tabId }) => {
+      releasedTabs.push({ caller: callerKey(caller), tabId });
     },
     runTool: async input => {
       run.push(input);
@@ -113,7 +143,18 @@ const createFakeRuntime = (
     },
   };
 
-  return { closed, disposed, opened, released, run, runtime, sessions };
+  return {
+    closed,
+    disposed,
+    disposedTabs,
+    opened,
+    ownTabs,
+    released,
+    releasedTabs,
+    run,
+    runtime,
+    sessions,
+  };
 };
 
 const openAndShare = async (bridge: LocalAgentBrowserBridge, sessionHandle = HANDLE) => {
@@ -141,6 +182,13 @@ const rejectionOf = async (
     return parsed.success ? parsed.data : undefined;
   }
 };
+
+const navigateParams = (sessionHandle = HANDLE) => ({
+  arguments: { url: 'https://app.example.com/next' },
+  authorized: [{ class: 'navigate', origin: 'https://app.example.com' }],
+  name: 'browser_navigate',
+  sessionHandle,
+});
 
 const snapshotParams = (sessionHandle = HANDLE) => ({
   arguments: {},
@@ -173,8 +221,9 @@ describe('local agent browser bridge', () => {
       authorized: [{ class: 'read', origin: 'https://app.example.com' }],
     });
     expect(result).toStrictEqual({ content: [{ text: 'ok', type: 'text' }] });
-    // Turn end: the next caller must not queue behind this call's lease.
-    expect(fake.released).toStrictEqual([`${CONTROLLER}:${HANDLE}`]);
+    // Turn end: only this call's tab is released, so the session's other tabs keep their leases.
+    expect(fake.releasedTabs).toStrictEqual([{ caller: `${CONTROLLER}:${HANDLE}`, tabId: 5 }]);
+    expect(fake.released).toStrictEqual([]);
   });
 
   it('prefers the browser\u2019s active tab when the session owns it', async () => {
@@ -205,16 +254,130 @@ describe('local agent browser bridge', () => {
     expect(fake.run[0]?.tabId).toBe(8);
   });
 
-  it('refuses a call for a session with no tab', async () => {
+  it('blocks a tool that cannot start a tab when the session has none', async () => {
     const fake = createFakeRuntime();
     const bridge = createRuntimeBrowserBridge({ runtime: () => fake.runtime });
 
     await bridge.openSession({ controllerId: CONTROLLER, sessionHandle: HANDLE, title: 'Work' });
 
-    await expect(bridge.callTool(CONTROLLER, snapshotParams())).rejects.toMatchObject({
-      code: LOCAL_AGENT_ERROR_CODES.blocked,
-    });
+    const blocked = await rejectionOf(bridge.callTool(CONTROLLER, snapshotParams()));
+
+    expect(blocked).toMatchObject({ code: LOCAL_AGENT_ERROR_CODES.blocked });
+    expect(blocked?.message).toBe('This session has no tab yet. Navigate to a page first.');
     expect(fake.run).toStrictEqual([]);
+    expect(fake.ownTabs).toStrictEqual([]);
+  });
+
+  it('opens one inactive tab for a navigate on an empty session and keeps the user\u2019s tab', async () => {
+    const fake = createFakeRuntime();
+    const activeTabId = vi.fn(async () => 5);
+    const bridge = createRuntimeBrowserBridge({ activeTabId, runtime: () => fake.runtime });
+
+    await bridge.openSession({ controllerId: CONTROLLER, sessionHandle: HANDLE, title: 'Work' });
+
+    const result = await bridge.callTool(CONTROLLER, navigateParams());
+
+    // The tab loads the target itself: `about:blank` is not an inspectable tab, so it could never navigate.
+    expect(fake.ownTabs).toStrictEqual([
+      { sessionHandle: HANDLE, url: 'https://app.example.com/next' },
+    ]);
+    expect(fake.run).toHaveLength(1);
+    expect(fake.run[0]).toMatchObject({
+      caller: { sessionHandle: HANDLE },
+      tabId: 77,
+      toolName: 'browser_navigate',
+    });
+    expect(result).toStrictEqual({ content: [{ text: 'ok', type: 'text' }] });
+    // A tab the agent opens for itself is not a share: the user's active tab is never even read.
+    expect(activeTabId).not.toHaveBeenCalled();
+    expect(fake.disposedTabs).toStrictEqual([]);
+  });
+
+  it('opens no tab at all when the navigate is refused', async () => {
+    const fake = createFakeRuntime();
+    const bridge = createRuntimeBrowserBridge({ runtime: () => fake.runtime });
+
+    await bridge.openSession({ controllerId: CONTROLLER, sessionHandle: HANDLE, title: 'Work' });
+
+    await expect(
+      bridge.callTool(CONTROLLER, {
+        ...navigateParams(),
+        authorized: [{ class: 'read', origin: 'https://app.example.com' }],
+      })
+    ).rejects.toMatchObject({
+      code: LOCAL_AGENT_ERROR_CODES.needsPermission,
+      data: { items: [{ class: 'navigate', origin: 'https://app.example.com' }] },
+    });
+    // The gate decides before any tab exists, so a refusal leaves nothing behind.
+    expect(fake.ownTabs).toStrictEqual([]);
+    expect(fake.run).toStrictEqual([]);
+  });
+
+  it('refuses a first navigate with no URL rather than opening a blank tab', async () => {
+    const fake = createFakeRuntime();
+    const bridge = createRuntimeBrowserBridge({ runtime: () => fake.runtime });
+
+    await bridge.openSession({ controllerId: CONTROLLER, sessionHandle: HANDLE, title: 'Work' });
+
+    const blocked = await rejectionOf(
+      bridge.callTool(CONTROLLER, { ...navigateParams(), arguments: {} })
+    );
+
+    expect(blocked).toMatchObject({ code: LOCAL_AGENT_ERROR_CODES.blocked });
+    expect(fake.ownTabs).toStrictEqual([]);
+  });
+
+  it('opens the tab browser_tabs new asks for on an empty session', async () => {
+    const fake = createFakeRuntime();
+    const bridge = createRuntimeBrowserBridge({ runtime: () => fake.runtime });
+
+    await bridge.openSession({ controllerId: CONTROLLER, sessionHandle: HANDLE, title: 'Work' });
+
+    const result = await bridge.callTool(CONTROLLER, {
+      arguments: { action: 'new', url: 'https://app.example.com/start' },
+      authorized: [{ class: 'navigate', origin: 'https://app.example.com' }],
+      name: 'browser_tabs',
+      sessionHandle: HANDLE,
+    });
+
+    expect(fake.ownTabs).toStrictEqual([
+      { sessionHandle: HANDLE, url: 'https://app.example.com/start' },
+    ]);
+    // The tab is the tool's result; no page-action tab is created on top of it.
+    expect(fake.run).toStrictEqual([]);
+    expect(result).toStrictEqual({
+      content: [
+        {
+          text: JSON.stringify({
+            selected: true,
+            tabId: 77,
+            title: '',
+            url: 'https://app.example.com/start',
+          }),
+          type: 'text',
+        },
+      ],
+    });
+  });
+
+  it('refuses browser_tabs new without a navigate grant and opens nothing', async () => {
+    const fake = createFakeRuntime();
+    const bridge = createRuntimeBrowserBridge({ runtime: () => fake.runtime });
+
+    await bridge.openSession({ controllerId: CONTROLLER, sessionHandle: HANDLE, title: 'Work' });
+
+    await expect(
+      bridge.callTool(CONTROLLER, {
+        arguments: { action: 'new', url: 'https://pay.example.com/checkout' },
+        authorized: [],
+        name: 'browser_tabs',
+        sessionHandle: HANDLE,
+      })
+    ).rejects.toMatchObject({
+      code: LOCAL_AGENT_ERROR_CODES.needsPermission,
+      data: { items: [{ class: 'navigate', origin: 'https://pay.example.com' }] },
+    });
+    expect(fake.ownTabs).toStrictEqual([]);
   });
 
   it('refuses a session handle that was never opened', async () => {
@@ -438,6 +601,50 @@ describe('local agent browser bridge', () => {
     await expect(bridge.callTool(CONTROLLER, snapshotParams())).rejects.toMatchObject({
       code: LOCAL_AGENT_ERROR_CODES.userStopped,
     });
+  });
+
+  it('forgets a stopped handle after its time to live', async () => {
+    let clock = 1000;
+    const fake = createFakeRuntime();
+    const bridge = createRuntimeBrowserBridge({ now: () => clock, runtime: () => fake.runtime });
+
+    await openAndShare(bridge);
+    await bridge.closeSession({ controllerId: CONTROLLER, sessionHandle: HANDLE });
+
+    clock += 9 * 60_000;
+    // Within ten minutes a late call still learns why it stopped.
+    await expect(bridge.callTool(CONTROLLER, snapshotParams())).rejects.toMatchObject({
+      code: LOCAL_AGENT_ERROR_CODES.userStopped,
+    });
+
+    clock += 2 * 60_000;
+    await expect(bridge.callTool(CONTROLLER, snapshotParams())).rejects.toMatchObject({
+      code: LOCAL_AGENT_ERROR_CODES.blocked,
+    });
+  });
+
+  it('keeps the stopped-handle memory bounded', async () => {
+    const fake = createFakeRuntime();
+    const bridge = createRuntimeBrowserBridge({ runtime: () => fake.runtime });
+    const handles = Array.from(
+      { length: 300 },
+      (_unused, index) => `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`
+    );
+
+    for (const sessionHandle of handles) {
+      // eslint-disable-next-line no-await-in-loop -- one session lifecycle per handle, in order
+      await bridge.openSession({ controllerId: CONTROLLER, sessionHandle, title: 'Work' });
+      // eslint-disable-next-line no-await-in-loop -- see above
+      await bridge.closeSession({ controllerId: CONTROLLER, sessionHandle });
+    }
+
+    // The oldest handle was evicted; the newest still answers for its own stop.
+    await expect(bridge.callTool(CONTROLLER, snapshotParams(handles[0]))).rejects.toMatchObject({
+      code: LOCAL_AGENT_ERROR_CODES.blocked,
+    });
+    await expect(bridge.callTool(CONTROLLER, snapshotParams(handles.at(-1)))).rejects.toMatchObject(
+      { code: LOCAL_AGENT_ERROR_CODES.userStopped }
+    );
   });
 
   it('reports user_stopped for a call Stop all ended while it ran', async () => {

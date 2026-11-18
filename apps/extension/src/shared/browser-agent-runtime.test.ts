@@ -1,5 +1,7 @@
+/* eslint-disable vitest/no-conditional-in-test -- the fake CDP and tabs API answer per method and per tab id */
 /* eslint-disable max-lines, require-await -- the suite drives one fake CDP session and one fake tab-group API through every agent tool path, whose fakes are async by contract. */
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import { createBrowserTabGroupController } from './browser-tab-groups';
 import type { BrowserTabGroupController } from './browser-tab-groups';
 import { createTabLeaseRegistry } from './browser-tab-leases';
@@ -729,6 +731,81 @@ describe('agent browser calls', () => {
       kind: 'result',
       result: { error: AGENT_TAB_OUTSIDE_GROUP_ERROR, ok: false },
     });
+  });
+
+  it('opens a session tab inactive in the last focused window and groups it', async () => {
+    const created: Record<string, unknown>[] = [];
+    const updates: { readonly groupId: number; readonly props: Record<string, unknown> }[] = [];
+    const controller = createBrowserTabGroupController({
+      api: {
+        group: async () => 42,
+        tabQuery: async () => [{ active: true, id: TAB_ID, windowId: 1 }],
+        update: async (groupId, props) => {
+          updates.push({ groupId, props });
+        },
+      },
+    });
+    const runtime = createBrowserRuntime({
+      debuggerApi: createFakeCdp().api,
+      leases: createTabLeaseRegistry({}),
+      scriptingApi: undefined,
+      tabGroups: controller,
+      tabsApi: {
+        create: async properties => {
+          created.push({ ...properties });
+
+          return { id: 88, title: '', url: properties.url ?? 'about:blank', windowId: 1 };
+        },
+        get: async tabId => {
+          if (tabId !== 88) {
+            return { id: TAB_ID, title: 'Example', url: MAIN_ORIGIN };
+          }
+
+          const url = z.string().safeParse(created[0]?.['url']);
+
+          return { id: 88, title: '', url: url.success ? url.data : '', windowId: 1 };
+        },
+        query: async () => [
+          { active: true, id: TAB_ID, title: 'Example', url: MAIN_ORIGIN, windowId: 1 },
+        ],
+      },
+    });
+
+    await runtime.openSession({
+      controllerId: 'controller-1',
+      sessionHandle: 'session-1',
+      title: 'Work',
+    });
+
+    await expect(
+      runtime.openSessionTab({ sessionHandle: 'session-1', url: `${MAIN_ORIGIN}/start` })
+    ).resolves.toStrictEqual({
+      groupId: 42,
+      tabId: 88,
+      title: '',
+      url: `${MAIN_ORIGIN}/start`,
+    });
+
+    // Inactive, in the window the user is looking at: the agent never takes the foreground tab.
+    expect(created).toStrictEqual([{ active: false, url: `${MAIN_ORIGIN}/start`, windowId: 1 }]);
+    expect(controller.tabsForSession('session-1')).toStrictEqual([88]);
+    expect(controller.listSessions()[0]?.groupId).toBe(42);
+    expect(updates).toContainEqual({
+      groupId: 42,
+      props: { color: 'grey', title: 'Kilo · Work' },
+    });
+  });
+
+  it('reports no session tab when the browser cannot create tabs', async () => {
+    const { runtime } = await createHarness({ share: false });
+
+    await runtime.openSession({
+      controllerId: 'controller-1',
+      sessionHandle: 'session-1',
+      title: 'Work',
+    });
+
+    await expect(runtime.openSessionTab({ sessionHandle: 'session-1' })).resolves.toBeUndefined();
   });
 
   it('keeps a session to its own tab group', async () => {

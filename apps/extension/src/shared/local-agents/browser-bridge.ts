@@ -8,6 +8,7 @@ import {
 } from '../browser-agent-checks';
 import type { BrowserCaller } from '../browser-caller';
 import { TAB_BUSY_ERROR, TAB_TAKEN_ERROR } from '../browser-caller';
+import { navigateDestinationItem, tabsNewDestinationItem } from '../browser-agent-gate';
 import type { BrowserRuntime } from '../browser-runtime';
 import { BROWSER_TOOL_CONTRACT } from '../browser-tool-contract';
 import { boundBrowserToolText } from '../browser-tool-snapshot';
@@ -29,9 +30,12 @@ export type LocalAgentBrowserRuntime = Pick<
   | 'adoptEnded'
   | 'closeSession'
   | 'disposeCaller'
+  | 'disposeTab'
   | 'listSessions'
   | 'openSession'
+  | 'openSessionTab'
   | 'releaseCaller'
+  | 'releaseTab'
   | 'runTool'
   | 'shareActiveTab'
 >;
@@ -104,8 +108,14 @@ const screenshotSchema = z.object({
 
 const base64DataUrlSchema = z.string().regex(/^data:[^,]*;base64,/u);
 
-const NO_TAB_ERROR =
-  'The agent session has no tab yet. Open one, or share the active tab with /browser share.';
+const argumentStringSchema = z.string().min(1);
+
+const NO_TAB_ERROR = 'This session has no tab yet. Navigate to a page first.';
+const NO_DESTINATION_ERROR =
+  'A navigate needs an http(s) URL to open this session\u2019s first tab.';
+/** Enough recently stopped handles to answer a CLI that raced its own revoke, and nothing more. */
+const ENDED_SESSION_LIMIT = 256;
+const ENDED_SESSION_TTL_MS = 10 * 60_000;
 const NO_ACTIVE_TAB_ERROR = 'The browser has no active tab to share.';
 const SESSION_NOT_OPEN_ERROR = 'This agent session is not open.';
 const SESSION_STOPPED_ERROR = 'The user stopped this agent session.';
@@ -164,6 +174,7 @@ const contentOf = (result: Extract<EvalTabResult, { readonly ok: true }>): JsonR
 
 export const createRuntimeBrowserBridge = ({
   activeTabId,
+  now,
   runtime,
 }: {
   /**
@@ -171,14 +182,52 @@ export const createRuntimeBrowserBridge = ({
    * when it belongs to the group, so `browser_tabs select` reads back naturally.
    */
   readonly activeTabId?: (() => Promise<number | undefined>) | undefined;
+  /** The clock the stopped-handle memory expires against; defaults to `Date.now`. */
+  readonly now?: (() => number) | undefined;
   /**
    * Resolved per call: the service worker builds the runtime on the first agent
    * request instead of on every boot.
    */
   readonly runtime: () => LocalAgentBrowserRuntime;
 }): LocalAgentBrowserBridge => {
-  /* Sessions the user, a switch-off or a disconnect ended: a late call is `user_stopped`, not a page effect. */
-  const ended = new Set<string>();
+  const clock = now ?? (() => Date.now());
+  /**
+   * Sessions the user, a switch-off or a disconnect ended: a late call is
+   * `user_stopped`, not a page effect. Bounded by age and size — handles are
+   * never reused, so nothing else would ever reclaim them.
+   */
+  const ended = new Map<string, number>();
+
+  const pruneEnded = (): void => {
+    const expiredBefore = clock() - ENDED_SESSION_TTL_MS;
+
+    for (const [handle, stoppedAt] of ended) {
+      if (stoppedAt < expiredBefore) {
+        ended.delete(handle);
+      }
+    }
+
+    while (ended.size > ENDED_SESSION_LIMIT) {
+      const oldest = ended.keys().next().value;
+
+      if (oldest === undefined) {
+        return;
+      }
+
+      ended.delete(oldest);
+    }
+  };
+
+  const markEnded = (sessionHandle: string): void => {
+    ended.set(sessionHandle, clock());
+    pruneEnded();
+  };
+
+  const isEnded = (sessionHandle: string): boolean => {
+    pruneEnded();
+
+    return ended.has(sessionHandle);
+  };
 
   const liveSession = (sessionHandle: string) =>
     runtime()
@@ -190,7 +239,7 @@ export const createRuntimeBrowserBridge = ({
       return;
     }
 
-    throw ended.has(sessionHandle)
+    throw isEnded(sessionHandle)
       ? new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.userStopped, SESSION_STOPPED_ERROR)
       : new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.blocked, SESSION_NOT_OPEN_ERROR);
   };
@@ -199,6 +248,12 @@ export const createRuntimeBrowserBridge = ({
   const targetTab = async (sessionHandle: string): Promise<number | undefined> => {
     const session = liveSession(sessionHandle);
     const tabs = session?.tabs ?? [];
+
+    // A session with no tab reads nothing: its first tab is one it opens for itself, never the user's.
+    if (tabs.length === 0) {
+      return undefined;
+    }
+
     const active = activeTabId === undefined ? undefined : await activeTabId();
 
     if (active !== undefined && tabs.includes(active)) {
@@ -209,10 +264,173 @@ export const createRuntimeBrowserBridge = ({
   };
 
   const closeOne = async (input: LocalAgentBrowserSessionRef): Promise<void> => {
-    ended.add(input.sessionHandle);
+    markEnded(input.sessionHandle);
     await runtime().closeSession({ sessionHandle: input.sessionHandle });
     // The lease and the caller's refs go with the session; the ended group keeps its tabs.
     runtime().disposeCaller(sessionCaller(input));
+  };
+
+  /** One tool call on a tab the session already has, mapped onto results and protocol errors. */
+  const runOnTab = async (
+    parsed: z.infer<typeof toolCallSchema>,
+    input: LocalAgentBrowserSessionRef,
+    tabId: number
+  ): Promise<JsonRpcResult> => {
+    const caller = sessionCaller(input);
+    const outcome = await runtime()
+      .runTool({
+        agent: {
+          authorized: parsed.authorized,
+          ...(parsed.sensitive === undefined ? {} : { sensitive: parsed.sensitive }),
+        },
+        arguments: parsed.arguments,
+        caller,
+        tabId,
+        toolName: parsed.name,
+      })
+      // Turn end: this call's lease goes, its refs stay, and the session's other tabs keep theirs.
+      .finally(() => {
+        runtime().releaseTab({ caller, tabId });
+      });
+
+    // Stop all may have ended the session while the call ran: its page effects are not reported as a live result.
+    if (ended.has(input.sessionHandle)) {
+      throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.userStopped, SESSION_STOPPED_ERROR);
+    }
+
+    if (outcome.kind === 'needs_permission') {
+      throw new LocalAgentRpcError(
+        LOCAL_AGENT_ERROR_CODES.needsPermission,
+        NEEDS_PERMISSION_ERROR,
+        {
+          items: outcome.items,
+          ...(outcome.stepToken === undefined ? {} : { stepToken: outcome.stepToken }),
+          // The page already ran: the CLI asks a human and must not replay the call.
+          ...(outcome.afterAction === true ? { afterAction: true } : {}),
+        }
+      );
+    }
+
+    if (outcome.kind === 'origin_changed') {
+      throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.originChanged, ORIGIN_CHANGED_ERROR, {
+        from: outcome.from,
+        to: outcome.to,
+      });
+    }
+
+    if (outcome.kind === 'needs_take_over') {
+      // An agent never takes a tab; a held tab is a `tab_busy` after the wait.
+      throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.tabBusy, TAB_BUSY_ERROR);
+    }
+
+    if (outcome.result.ok) {
+      const content = contentOf(outcome.result);
+
+      return outcome.withheldFrames === undefined
+        ? content
+        : { ...content, _meta: { withheldFrames: [...outcome.withheldFrames] } };
+    }
+
+    // Retryable and refusal states carry their own protocol code so the CLI can act on them.
+    switch (outcome.result.error) {
+      case TAB_BUSY_ERROR: {
+        throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.tabBusy, outcome.result.error);
+      }
+      case TAB_TAKEN_ERROR: {
+        throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.tabTaken, outcome.result.error);
+      }
+      case AGENT_TAB_OUTSIDE_GROUP_ERROR: {
+        throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.blocked, outcome.result.error);
+      }
+      default: {
+        return {
+          content: [{ text: boundBrowserToolText(outcome.result.error), type: 'text' }],
+          isError: true,
+        };
+      }
+    }
+  };
+
+  /**
+   * The first call of a session with no tab. `browser_navigate` opens its own
+   * tab on `about:blank` and then runs through the gate; `browser_tabs new`
+   * opens the tab it was asked for directly. Everything else is refused.
+   */
+  const callOnOwnTab = async (
+    parsed: z.infer<typeof toolCallSchema>,
+    input: LocalAgentBrowserSessionRef
+  ): Promise<JsonRpcResult> => {
+    if (parsed.name === 'browser_tabs') {
+      const action = argumentStringSchema.safeParse(parsed.arguments['action']);
+
+      if (!action.success || action.data !== 'new') {
+        throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.blocked, NO_TAB_ERROR);
+      }
+
+      // The page tools gate `new` on the destination origin; with no tab to gate on, that check runs here.
+      const missing = tabsNewDestinationItem(parsed.arguments, parsed.authorized);
+
+      if (missing !== undefined) {
+        throw new LocalAgentRpcError(
+          LOCAL_AGENT_ERROR_CODES.needsPermission,
+          NEEDS_PERMISSION_ERROR,
+          { items: [missing] }
+        );
+      }
+
+      const url = argumentStringSchema.safeParse(parsed.arguments['url']);
+      const opened = await runtime().openSessionTab({
+        sessionHandle: input.sessionHandle,
+        ...(url.success ? { url: url.data } : {}),
+      });
+
+      if (opened === undefined) {
+        throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.blocked, NO_TAB_ERROR);
+      }
+
+      // The same payload `browser_tabs new` returns from the page path.
+      return textContent(
+        JSON.stringify({
+          selected: true,
+          tabId: opened.tabId,
+          title: opened.title,
+          url: opened.url,
+        })
+      );
+    }
+
+    if (parsed.name !== 'browser_navigate') {
+      throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.blocked, NO_TAB_ERROR);
+    }
+
+    const url = argumentStringSchema.safeParse(parsed.arguments['url']);
+
+    if (!url.success) {
+      throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.blocked, NO_DESTINATION_ERROR);
+    }
+
+    // The gate's navigate check runs first: a refused navigation must not leave a tab behind.
+    const missing = navigateDestinationItem(parsed.arguments, parsed.authorized);
+
+    if (missing !== undefined) {
+      throw new LocalAgentRpcError(
+        LOCAL_AGENT_ERROR_CODES.needsPermission,
+        NEEDS_PERMISSION_ERROR,
+        { items: [missing] }
+      );
+    }
+
+    // The tab loads the page itself: `about:blank` is not an inspectable tab, so a navigate could never run on it.
+    const opened = await runtime().openSessionTab({
+      sessionHandle: input.sessionHandle,
+      url: url.data,
+    });
+
+    if (opened === undefined) {
+      throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.blocked, NO_TAB_ERROR);
+    }
+
+    return runOnTab(parsed, input, opened.tabId);
   };
 
   return {
@@ -233,90 +451,16 @@ export const createRuntimeBrowserBridge = ({
         );
       }
 
-      const { sessionHandle } = parsed.data;
-      const input = { controllerId, sessionHandle };
+      const input = { controllerId, sessionHandle: parsed.data.sessionHandle };
 
-      assertLive(sessionHandle);
+      assertLive(input.sessionHandle);
 
-      const tabId = await targetTab(sessionHandle);
+      const existing = await targetTab(input.sessionHandle);
 
-      if (tabId === undefined) {
-        throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.blocked, NO_TAB_ERROR);
-      }
-
-      const caller = sessionCaller(input);
-      const outcome = await runtime()
-        .runTool({
-          agent: {
-            authorized: parsed.data.authorized,
-            ...(parsed.data.sensitive === undefined ? {} : { sensitive: parsed.data.sensitive }),
-          },
-          arguments: parsed.data.arguments,
-          caller,
-          tabId,
-          toolName: parsed.data.name,
-        })
-        // Turn end: the next call re-takes the tab, so the user and the panel are never locked out between calls.
-        .finally(() => {
-          runtime().releaseCaller(caller);
-        });
-
-      // Stop all may have ended the session while the call ran: its page effects are not reported as a live result.
-      if (ended.has(sessionHandle)) {
-        throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.userStopped, SESSION_STOPPED_ERROR);
-      }
-
-      if (outcome.kind === 'needs_permission') {
-        throw new LocalAgentRpcError(
-          LOCAL_AGENT_ERROR_CODES.needsPermission,
-          NEEDS_PERMISSION_ERROR,
-          {
-            items: outcome.items,
-            ...(outcome.stepToken === undefined ? {} : { stepToken: outcome.stepToken }),
-            // The page already ran: the CLI asks a human and must not replay the call.
-            ...(outcome.afterAction === true ? { afterAction: true } : {}),
-          }
-        );
-      }
-
-      if (outcome.kind === 'origin_changed') {
-        throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.originChanged, ORIGIN_CHANGED_ERROR, {
-          from: outcome.from,
-          to: outcome.to,
-        });
-      }
-
-      if (outcome.kind === 'needs_take_over') {
-        // An agent never takes a tab; a held tab is a `tab_busy` after the wait.
-        throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.tabBusy, TAB_BUSY_ERROR);
-      }
-
-      if (outcome.result.ok) {
-        const content = contentOf(outcome.result);
-
-        return outcome.withheldFrames === undefined
-          ? content
-          : { ...content, _meta: { withheldFrames: [...outcome.withheldFrames] } };
-      }
-
-      // Retryable and refusal states carry their own protocol code so the CLI can act on them.
-      switch (outcome.result.error) {
-        case TAB_BUSY_ERROR: {
-          throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.tabBusy, outcome.result.error);
-        }
-        case TAB_TAKEN_ERROR: {
-          throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.tabTaken, outcome.result.error);
-        }
-        case AGENT_TAB_OUTSIDE_GROUP_ERROR: {
-          throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.blocked, outcome.result.error);
-        }
-        default: {
-          return {
-            content: [{ text: boundBrowserToolText(outcome.result.error), type: 'text' }],
-            isError: true,
-          };
-        }
-      }
+      // An agent gets its own tab rather than taking the user's; only the two tools that can start one do.
+      return existing === undefined
+        ? callOnOwnTab(parsed.data, input)
+        : runOnTab(parsed.data, input, existing);
     },
 
     closeSession: closeOne,

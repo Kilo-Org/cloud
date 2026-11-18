@@ -171,6 +171,24 @@ describe('local agent dispatcher', () => {
     ).rejects.toMatchObject({ code: -32_602 });
   });
 
+  it('keeps the session row when the runtime cannot close it', async () => {
+    const { dispatcher, fake, registry } = await createHarness();
+    const sessionHandle = await openSession(dispatcher);
+
+    fake.closeSession.mockRejectedValueOnce(new Error('runtime down'));
+
+    await expect(dispatcher.handle(CONTROLLER, 'session.close', { sessionHandle })).rejects.toThrow(
+      'runtime down'
+    );
+    // The row is the only handle Stop all and disconnect have: it must survive a failed close.
+    await expect(registry.listConnectedAgents()).resolves.toHaveLength(1);
+
+    await expect(
+      dispatcher.handle(CONTROLLER, 'session.close', { sessionHandle })
+    ).resolves.toStrictEqual({});
+    await expect(registry.listConnectedAgents()).resolves.toStrictEqual([]);
+  });
+
   it('routes adopt and share to the bridge for an owned session', async () => {
     const { dispatcher, fake } = await createHarness();
     const sessionHandle = await openSession(dispatcher);

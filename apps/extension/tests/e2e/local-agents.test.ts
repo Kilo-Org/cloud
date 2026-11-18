@@ -1,5 +1,6 @@
 /* eslint-disable import/no-nodejs-modules, max-lines, vitest/no-conditional-in-test, typescript-eslint/consistent-type-definitions -- the harness writes a temp profile, and frame predicates mirror the wire protocol */
 import { expect, test } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { rm } from 'node:fs/promises';
 import { z } from 'zod';
 import { launchExtensionContext, readExtensionLocalStorage } from './extension-context-fixture';
@@ -14,6 +15,8 @@ import {
   pairAndHandshake,
   rpcOfMethod,
   sendAgentRpc,
+  toolResultOf,
+  toolTextOf,
 } from './local-agents-fixture';
 
 /*
@@ -52,6 +55,12 @@ const listTabs = async (
 
   return tabRowsSchema.parse(JSON.parse(listed.text));
 };
+
+/** Every open tab with its url and focus state, read from the extension page. */
+const listOpenTabs = (sidePanel: Page): Promise<unknown> =>
+  sidePanel.evaluate(
+    "chrome.tabs.query({}).then(tabs => tabs.map(tab => ({ active: tab.active === true, id: tab.id, url: tab.url || '' })))"
+  );
 
 test('local agents pair over loopback, list the session, and Stop all revokes it', async () => {
   test.setTimeout(60_000);
@@ -238,7 +247,7 @@ test('an agent session drives its tab through the runtime and Stop all ends it',
   }
 });
 
-test('a session is refused before a tab is shared into its group', async () => {
+test('a session gets its own tab from the first navigate, without touching the user\u2019s', async () => {
   test.setTimeout(60_000);
   const hub = await startFakeHub();
   const { context, extensionId, userDataDir } = await launchExtensionContext();
@@ -260,19 +269,83 @@ test('a session is refused before a tab is shared into its group', async () => {
       cliVersion: '1.4.0',
       cwd: '/Users/igor/Projects/kilo-bridge-e2e',
       sessionId: 'session-e2e',
-      title: 'No tab yet',
+      title: 'Own tab session',
     });
     const { sessionHandle } = z.object({ sessionHandle: z.string() }).parse(opened.result);
+    const origin = `http://127.0.0.1:${String(hub.port)}`;
 
-    // Nothing shared: there is no group to reach, so the call is refused rather than run on a guess.
-    const answered = await sendAgentRpc(hub, controllerId, 2, 'tools.call', {
+    // Nothing is shared: the agent opens its own tab instead of taking the one the user is on.
+    const before = z
+      .array(z.object({ active: z.boolean(), id: z.number(), url: z.string() }))
+      .parse(await listOpenTabs(sidePanel));
+
+    const navigated = await sendAgentRpc(hub, controllerId, 2, 'tools.call', {
+      arguments: { url: hub.pageUrl },
+      authorized: [
+        { class: 'navigate', origin },
+        { class: 'read', origin },
+      ],
+      name: 'browser_navigate',
+      sessionHandle,
+    });
+
+    expect(navigated.error).toBeUndefined();
+    expect(toolResultOf(navigated).isError).toBeUndefined();
+
+    const snapshot = await sendAgentRpc(hub, controllerId, 3, 'tools.call', {
       arguments: {},
-      authorized: [],
+      authorized: [{ class: 'read', origin }],
       name: 'browser_snapshot',
       sessionHandle,
     });
 
-    expect(z.object({ code: z.number() }).parse(answered.error).code).toBe(-32_011);
+    expect(toolTextOf(snapshot)).toContain('Bridge page');
+
+    const after = z
+      .array(z.object({ active: z.boolean(), id: z.number(), url: z.string() }))
+      .parse(await listOpenTabs(sidePanel));
+    const created = after.filter(tab => !before.some(previous => previous.id === tab.id));
+
+    // Exactly one tab, on the page the agent navigated to, and it never took focus.
+    expect(created).toHaveLength(1);
+    expect(created[0]?.url).toBe(hub.pageUrl);
+    expect(created[0]?.active).toBe(false);
+    // The user's tab is still the active one.
+    expect(after.find(tab => tab.active)?.id).toBe(before.find(tab => tab.active)?.id);
+
+    // The new tab lives in the session's titled group (D9/D12).
+    await expect
+      .poll(
+        () =>
+          sidePanel.evaluate(
+            'chrome.tabGroups.query({}).then(groups => groups.map(group => ({ title: group.title, collapsed: group.collapsed })))'
+          ),
+        { timeout: 10_000 }
+      )
+      .toContainEqual({ collapsed: false, title: 'Kilo · Own tab session' });
+
+    const groupId = z
+      .number()
+      .parse(
+        await sidePanel.evaluate(
+          "chrome.tabGroups.query({}).then(groups => groups.find(group => group.title === 'Kilo · Own tab session')?.id ?? 0)"
+        )
+      );
+
+    expect(groupId).toBeGreaterThan(0);
+
+    // Stop all ends the session, and the group ends with it: read back through the API the UI would use.
+    await sidePanel.getByRole('button', { name: 'Stop all' }).click();
+    await expect.poll(() => rpcOfMethod(hub, 'session.revoked'), { timeout: 10_000 }).toBeDefined();
+    await expect
+      .poll(
+        () =>
+          sidePanel.evaluate(
+            `chrome.tabGroups.get(${String(groupId)}).then(group => ({ collapsed: group.collapsed, color: group.color, title: group.title }))`
+          ),
+        { timeout: 10_000 }
+      )
+      .toStrictEqual({ collapsed: true, color: 'grey', title: 'Kilo · ended' });
   } finally {
     await context.close();
     await hub.close();

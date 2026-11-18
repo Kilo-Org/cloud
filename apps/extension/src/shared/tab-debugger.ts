@@ -88,6 +88,8 @@ export interface ChromeDebuggerApi {
 
 export interface BrowserTabInfo {
   readonly active?: boolean;
+  /** `chrome.tabGroups` id the tab is in; `-1` (or absent) when ungrouped. */
+  readonly groupId?: number;
   readonly id?: number;
   readonly title?: string;
   readonly url?: string;

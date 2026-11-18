@@ -222,7 +222,11 @@ export type BrowserToolCallResult =
  */
 export interface BrowserToolTabsApi {
   readonly create?:
-    | ((properties: { readonly url?: string }) => Promise<BrowserTabInfo> | BrowserTabInfo)
+    | ((properties: {
+        readonly active?: boolean;
+        readonly url?: string;
+        readonly windowId?: number;
+      }) => Promise<BrowserTabInfo> | BrowserTabInfo)
     | undefined;
   readonly remove?: ((tabId: number) => Promise<void> | void) | undefined;
 }

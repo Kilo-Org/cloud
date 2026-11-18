@@ -311,6 +311,26 @@ describe('browser runtime', () => {
     expect(debugger_.commands()).toHaveLength(commandsAfterTakeOver);
   });
 
+  it('releases only the call\u2019s tab lease, not the session\u2019s other tabs', async () => {
+    const { leases, runtime } = await createHarness();
+    const agentCaller = agent('session-1');
+    const secondTabId = 8;
+
+    // Two tabs in one session: a finished call on the first must leave the second held.
+    await runtime.shareActiveTab({ sessionHandle: 'session-1', tabId: secondTabId });
+    await leases.acquire(secondTabId, agentCaller);
+
+    await expect(evaluateToolCall(runtime, agentCaller)).resolves.toMatchObject({
+      kind: 'result',
+      result: { ok: true },
+    });
+
+    runtime.releaseTab({ caller: agentCaller, tabId: TAB_ID });
+
+    expect(leases.holder(TAB_ID)).toBeUndefined();
+    expect(leases.holder(secondTabId)?.caller).toStrictEqual(agentCaller);
+  });
+
   it('hands a conversation lease to the workflow run that claims its tab', async () => {
     const { leases, runtime } = await createHarness();
     const panelCaller = panel('conversation-a');

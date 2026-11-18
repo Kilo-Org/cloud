@@ -96,7 +96,7 @@ class MemoryStorage {
       .filter(key => key.startsWith(options.prefix ?? ''))
       .filter(key => options.startAfter === undefined || key > options.startAfter)
       .sort()
-      .slice(0, options.limit ?? Number.MAX_SAFE_INTEGER);
+      .slice(0, options.limit ?? 1000);
     return new Map(keys.map(key => [key, structuredClone(this.values.get(key))]));
   }
 }
@@ -355,14 +355,26 @@ describe('workspace authority revocation', () => {
   });
 
   it('ends every authority once the workspace is deleted, without adopting again', async () => {
-    const { workspace, exportSeed } = fixture();
+    const { workspace, exportSeed, storage } = fixture();
     const issued = await workspace.issueMcpGrant(binding);
     await workspace.markDeleted();
     await expect(workspace.describe()).resolves.toMatchObject({ state: 'deleted' });
     await expect(workspace.issueMcpGrant(binding)).resolves.toBeUndefined();
     await expect(workspace.assertAuthority(scopeOf(issued?.token))).rejects.toThrow();
-    await expect(workspace.listChildren({ limit: 5 })).resolves.toEqual({ sessions: [] });
+    await storage.put(`child:${childSessionId}`, { createdAt: Date.now() });
+    await expect(workspace.listChildren({ limit: 5 })).rejects.toThrow('denied');
     expect(exportSeed).toHaveBeenCalledTimes(1);
+  });
+
+  it('deletes registry entries beyond the storage list limit', async () => {
+    const { workspace, storage } = fixture();
+    for (let i = 0; i < 1001; i += 1) {
+      await storage.put(`child:workspace_00000000-0000-4000-8000-${String(i).padStart(12, '0')}`, {
+        createdAt: Date.now(),
+      });
+    }
+    await workspace.markDeleted();
+    expect(await storage.list({ prefix: 'child:' })).toEqual(new Map());
   });
 });
 

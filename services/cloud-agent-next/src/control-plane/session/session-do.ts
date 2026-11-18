@@ -3184,8 +3184,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   async deleteSession(): Promise<void> {
     await this.initialized;
     if (this.registration === null) return;
-    await this.settleWorkspaceAuthorityBeforeDelete();
     await this.enqueue(async () => {
+      if (this.registration === null) return;
       const peer = this.sandboxPeer();
       if (peer !== null) {
         const standalone =
@@ -3201,6 +3201,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           'release'
         );
       }
+      await this.settleWorkspaceAuthorityBeforeDelete();
       await this.tearDownSession();
     });
   }
@@ -3309,7 +3310,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     if (metadata?.allowSubagentSessions !== true || !isWorkspaceAnchorMetadata(metadata)) return;
     const ownerId = metadata.identity.userId;
     const workspaceSessionId = metadata.identity.sessionId;
-    // A failure aborts before the wipe, so the deletion stays retryable.
     if (metadata.workspace?.worktreeId === undefined) {
       await withDORetry(
         () => getWorkspaceStub(this.env, ownerId, workspaceSessionId),

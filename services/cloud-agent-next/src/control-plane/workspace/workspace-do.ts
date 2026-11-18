@@ -280,7 +280,7 @@ export class CloudAgentWorkspaceDO extends DurableObject<Env> {
 
   async listChildren(input: unknown): Promise<WorkspaceChildPage> {
     const page = childListSchema.parse(input);
-    await this.record();
+    if ((await this.record()) === undefined) throw denied();
     const entries = await this.ctx.storage.list<unknown>({
       prefix: CHILD_PREFIX,
       ...(page.cursor === undefined
@@ -317,13 +317,11 @@ export class CloudAgentWorkspaceDO extends DurableObject<Env> {
    */
   async markDeleted(): Promise<void> {
     await this.ctx.storage.put(DELETED_KEY, { deletedAt: Date.now() });
-    const keys = [
-      ...(await this.ctx.storage.list({ prefix: CHILD_PREFIX })).keys(),
-      RECORD_KEY,
-      UNADOPTABLE_UNTIL_KEY,
-    ];
-    for (let index = 0; index < keys.length; index += 128) {
-      await this.ctx.storage.delete(keys.slice(index, index + 128));
+    await this.ctx.storage.delete([RECORD_KEY, UNADOPTABLE_UNTIL_KEY]);
+    for (;;) {
+      const batch = await this.ctx.storage.list({ prefix: CHILD_PREFIX, limit: 128 });
+      if (batch.size === 0) break;
+      await this.ctx.storage.delete([...batch.keys()]);
     }
   }
 

@@ -266,6 +266,33 @@ describe('workspace authority lifecycle', () => {
     await expect(workspaceStub(root).describe()).resolves.toMatchObject({ state: 'deleted' });
   });
 
+  it('keeps standalone authority when sandbox release fails and ends it on retry', async () => {
+    const root = workspaceSessionId();
+    const rootStub = await registerChat({
+      sessionId: root,
+      allowSubagentSessions: true,
+      authorization: authorization(root),
+    });
+    const workspace = workspaceStub(root);
+    await expect(workspace.describe()).resolves.toMatchObject({ state: 'active' });
+    await runInDurableObject(rootStub, async instance => {
+      const peer = new FakeSandboxPeer();
+      peer.release = async () => {
+        throw new Error('sandbox release failed');
+      };
+      instance.sandboxPeerFor = () => peer;
+      await expect(instance.deleteSession()).rejects.toThrow('sandbox release failed');
+    });
+    expect(await rootStub.getSession()).not.toEqual({ type: 'session-not-found' });
+    await expect(workspace.describe()).resolves.toMatchObject({ state: 'active' });
+
+    await runInDurableObject(rootStub, instance => {
+      instance.sandboxPeerFor = () => new FakeSandboxPeer();
+    });
+    await rootStub.deleteSession();
+    await expect(workspace.describe()).resolves.toMatchObject({ state: 'deleted' });
+  });
+
   it('prunes a deleted direct child from the workspace registry', async () => {
     const root = workspaceSessionId();
     await registerChat({

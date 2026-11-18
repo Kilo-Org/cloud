@@ -1,8 +1,8 @@
 diff --git a/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt b/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt
-index 7bb48f44c5415f7c6b914934db90705825bfea13..5218efeede71bc1a5855ca8b1c98f64cc782e0be 100644
+index 7bb48f44c5415f7c6b914934db90705825bfea13..0492125a61245e4494b517d32216db0eec901598 100644
 --- a/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt
 +++ b/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt
-@@ -50,6 +50,41 @@ import kotlin.math.ceil
+@@ -50,6 +50,42 @@ import kotlin.math.ceil
  object MeasurementStore {
    private const val TAG = "MeasurementStore"
  
@@ -30,12 +30,13 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..5218efeede71bc1a5855ca8b1c98f64c
 +      val c = text[i]
 +      if (Character.isHighSurrogate(c) || Character.isLowSurrogate(c)) return true
 +      val code = c.code
-+      // Anything past Latin Extended-B needs fallback (emoji, symbols, CJK,
-+      // Arabic, Devanagari, punctuation like dashes and quotes used by
-+      // fallback fonts). Latin letters and ASCII punctuation stay on the fast
-+      // path. The combining-mark and variation-selector cases from the
-+      // previous check are all >= 0x300, so the range covers them too.
-+      if (code >= 0x2C0) return true
++      // Anything past Latin Extended-B (U+024F) needs fallback (emoji,
++      // symbols, IPA extensions, combining marks, CJK, Arabic, Devanagari,
++      // punctuation like dashes and quotes used by fallback fonts). Latin
++      // letters and ASCII punctuation stay on the fast path. The
++      // combining-mark and variation-selector cases are all >= 0x300, so the
++      // range covers them too.
++      if (code >= 0x250) return true
 +      i++
 +    }
 +    return false
@@ -44,7 +45,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..5218efeede71bc1a5855ca8b1c98f64c
    private data class PaintParams(
      val typeface: Typeface,
      val fontSize: Float,
-@@ -57,6 +92,7 @@ object MeasurementStore {
+@@ -57,6 +93,7 @@ object MeasurementStore {
  
    private data class MeasurementParams(
      val cachedWidth: Float,
@@ -52,7 +53,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..5218efeede71bc1a5855ca8b1c98f64c
      val cachedSize: Long,
      val spannable: CharSequence?,
      val paintParams: PaintParams,
-@@ -120,7 +156,9 @@ object MeasurementStore {
+@@ -120,7 +157,9 @@ object MeasurementStore {
      val existingHash = cached?.markdownHash ?: 0
      val paintParams = PaintParams(paint.typeface ?: Typeface.DEFAULT, paint.textSize)
  
@@ -63,7 +64,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..5218efeede71bc1a5855ca8b1c98f64c
      if (trailingMarginBottomPx > 0f) {
        newSize =
          YogaMeasureOutput.make(
-@@ -128,7 +166,7 @@ object MeasurementStore {
+@@ -128,7 +167,7 @@ object MeasurementStore {
            YogaMeasureOutput.getHeight(newSize) + PixelUtil.toDIPFromPixel(trailingMarginBottomPx),
          )
      }
@@ -72,7 +73,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..5218efeede71bc1a5855ca8b1c98f64c
      return oldSize != newSize
    }
  
-@@ -177,7 +215,8 @@ object MeasurementStore {
+@@ -177,7 +216,8 @@ object MeasurementStore {
        }
      }
  
@@ -82,7 +83,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..5218efeede71bc1a5855ca8b1c98f64c
  
      // Honor the Yoga width contract. When the parent assigns an exact width
      // (flex child, alignItems: stretch, explicit width / width: "100%"), fill it
-@@ -273,6 +312,7 @@ object MeasurementStore {
+@@ -273,6 +313,7 @@ object MeasurementStore {
      context: Context,
      id: Int?,
      width: Float,
@@ -90,7 +91,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..5218efeede71bc1a5855ca8b1c98f64c
      props: ReadableMap?,
      splitTableSegments: Boolean,
    ): Long {
-@@ -282,22 +322,22 @@ object MeasurementStore {
+@@ -282,22 +323,22 @@ object MeasurementStore {
  
      // Split measurement always goes through the full measure path (no spannable caching)
      if (splitTableSegments) {
@@ -121,7 +122,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..5218efeede71bc1a5855ca8b1c98f64c
        return newSize
      }
  
-@@ -368,6 +408,7 @@ object MeasurementStore {
+@@ -368,6 +409,7 @@ object MeasurementStore {
      context: Context,
      id: Int?,
      width: Float,
@@ -129,7 +130,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..5218efeede71bc1a5855ca8b1c98f64c
      props: ReadableMap?,
      allowFontScaling: Boolean,
      fontScale: Float,
-@@ -408,7 +449,7 @@ object MeasurementStore {
+@@ -408,7 +450,7 @@ object MeasurementStore {
        )
      spannable?.replaceMathSpansWithPlaceholders(context)
      val textToMeasure = spannable ?: markdown
@@ -138,7 +139,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..5218efeede71bc1a5855ca8b1c98f64c
  
      // 3. Calculate Margin
      val allowTrailingMargin = props.getBooleanOrDefault("allowTrailingMargin", false)
-@@ -425,7 +466,8 @@ object MeasurementStore {
+@@ -425,7 +467,8 @@ object MeasurementStore {
      val adjustedSize = YogaMeasureOutput.make(currentWidth, currentHeight + marginBottom)
  
      if (id != null) {
@@ -148,7 +149,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..5218efeede71bc1a5855ca8b1c98f64c
      }
  
      return adjustedSize
-@@ -435,6 +477,7 @@ object MeasurementStore {
+@@ -435,6 +478,7 @@ object MeasurementStore {
      context: Context,
      id: Int?,
      width: Float,
@@ -156,7 +157,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..5218efeede71bc1a5855ca8b1c98f64c
      props: ReadableMap?,
      allowFontScaling: Boolean,
      fontScale: Float,
-@@ -543,10 +586,41 @@ object MeasurementStore {
+@@ -543,10 +587,41 @@ object MeasurementStore {
              segment.styledText.replaceMathSpansWithPlaceholders(context)
  
              val layout = createStaticLayout(segment.styledText, fontSize, widthPx, id)
@@ -200,7 +201,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..5218efeede71bc1a5855ca8b1c98f64c
  
              if (includeBottomMargin) {
                totalHeightPx += segment.lastElementMarginBottom
-@@ -605,12 +679,12 @@ object MeasurementStore {
+@@ -605,12 +680,12 @@ object MeasurementStore {
        val result = YogaMeasureOutput.make(measuredWidthDip, totalHeightDip)
  
        if (id != null) {
@@ -215,7 +216,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..5218efeede71bc1a5855ca8b1c98f64c
      }
    }
  
-@@ -698,6 +772,7 @@ object MeasurementStore {
+@@ -698,6 +773,7 @@ object MeasurementStore {
  
    private fun measure(
      maxWidth: Float,
@@ -223,7 +224,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..5218efeede71bc1a5855ca8b1c98f64c
      text: CharSequence?,
      paintParams: PaintParams,
      viewId: Int?,
-@@ -705,11 +780,12 @@ object MeasurementStore {
+@@ -705,11 +781,12 @@ object MeasurementStore {
      measurePaint.reset()
      measurePaint.typeface = paintParams.typeface
      measurePaint.textSize = paintParams.fontSize
@@ -237,7 +238,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..5218efeede71bc1a5855ca8b1c98f64c
      text: CharSequence?,
      paint: TextPaint,
      viewId: Int?,
-@@ -737,17 +813,66 @@ object MeasurementStore {
+@@ -737,17 +814,66 @@ object MeasurementStore {
  
      val layout = builder.build()
      val visibleLineCount = visibleLineCount(layout, viewId)
@@ -306,7 +307,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..5218efeede71bc1a5855ca8b1c98f64c
    // Applies the per-view numberOfLines / ellipsizeMode clamp to a builder, matching
    // RN's TextLayoutManager.buildLayout: only when a line limit is set.
    private fun applyLineLimit(
-@@ -816,6 +941,7 @@ object MeasurementStore {
+@@ -816,6 +942,7 @@ object MeasurementStore {
     */
    private fun measureWithLayout(
      maxWidth: Float,
@@ -314,7 +315,7 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..5218efeede71bc1a5855ca8b1c98f64c
      text: CharSequence?,
      paint: TextPaint,
      viewId: Int?,
-@@ -847,10 +973,30 @@ object MeasurementStore {
+@@ -847,10 +974,30 @@ object MeasurementStore {
        (0 until visibleLineCount)
          .maxOfOrNull { layout.getLineWidth(it) } ?: 0f
  

@@ -411,6 +411,32 @@ describe('browser_take_screenshot', () => {
     expect(inputs[0]?.scale).toBe(2);
   });
 
+  it('renders a device-scale element capture for a panel caller too', async () => {
+    const { commands, session } = createSession({
+      boxes: { 12: { content: [10, 20, 110, 20, 110, 70, 10, 70], height: 50, width: 100 } },
+      layoutMetrics: {
+        cssLayoutViewport: { clientWidth: 400 },
+        layoutViewport: { clientWidth: 800 },
+      },
+    });
+
+    // The side panel and a workflow run have no agent scope, and still asked for device pixels.
+    await runReadBrowserTool(
+      'browser_take_screenshot',
+      { scale: 'device', target: 'e12' },
+      session
+    );
+
+    expect(commands).toContainEqual({
+      method: 'Page.captureScreenshot',
+      params: {
+        clip: { height: 50, scale: 2, width: 100, x: 10, y: 20 },
+        format: 'png',
+        fromSurface: true,
+      },
+    });
+  });
+
   it('reports the masked image as PNG whatever the capture type was', async () => {
     const iframeRect = { content: [40, 120, 440, 120, 440, 320, 40, 320], height: 200, width: 400 };
     const { session } = createSession({

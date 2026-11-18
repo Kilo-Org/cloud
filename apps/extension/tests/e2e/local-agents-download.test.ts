@@ -116,10 +116,13 @@ test('a guarded click cancels the download, and the approved retry keeps it', as
     expect(items).toStrictEqual([{ class: 'sensitive', origin, reason: 'downloading a file' }]);
     expect(fixture.hits()).toBeGreaterThan(0);
 
-    // The file the click started was cancelled: nothing reached the downloads directory.
+    // The response was aborted before it became a download: no file, and no download announced at all.
     await expect.poll(() => readdir(downloadsPath), { timeout: 15_000 }).toStrictEqual([]);
-    // A cancelled download may still be announced to a CDP observer; none of them produced a file.
-    expect(downloads.filter(download => download.failure() === null)).toHaveLength(0);
+    expect(downloads).toStrictEqual([]);
+    // Any outcome Playwright did report is awaited: a `null` failure means a file landed.
+    const failures = await Promise.all(downloads.map(download => download.failure()));
+
+    expect(failures.filter(failure => failure === null)).toStrictEqual([]);
 
     // 2. The human approved: the identical call with the token runs with the guard off once.
     const approved = await session.callTool(

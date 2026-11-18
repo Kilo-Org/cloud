@@ -134,8 +134,8 @@ export const getBrowserRuntime = ({
   tabsApi,
 }: {
   readonly debuggerApi: ChromeDebuggerApi | undefined;
-  /** `chrome.downloads`: the guard that cancels a download an unapproved call started. */
-  readonly downloadsApi?: BrowserDownloadsApi | undefined;
+  /** `chrome.downloads`, resolved per call: the optional permission can change while the worker lives. */
+  readonly downloadsApi?: (() => BrowserDownloadsApi | undefined) | undefined;
   readonly scriptingApi: BrowserScriptingApi | undefined;
   /** Absent on Firefox or without the `tabGroups` permission: sessions track their tabs by id. */
   readonly tabGroupsApi?: BrowserTabGroupsApi | undefined;
@@ -259,7 +259,7 @@ export const handleTabDebuggerRequest = async ({
   tabsApi,
 }: {
   debuggerApi: ChromeDebuggerApi | undefined;
-  downloadsApi?: BrowserDownloadsApi | undefined;
+  downloadsApi?: (() => BrowserDownloadsApi | undefined) | undefined;
   request: TabDebuggerRequest;
   scriptingApi: BrowserScriptingApi | undefined;
   tabGroupsApi?: BrowserTabGroupsApi | undefined;
@@ -580,7 +580,7 @@ export default defineBackground(() => {
             runtime: () =>
               getBrowserRuntime({
                 debuggerApi,
-                downloadsApi: chromeApi?.downloads,
+                downloadsApi: () => chromeApi?.downloads,
                 scriptingApi,
                 tabGroupsApi,
                 tabsApi,
@@ -620,7 +620,7 @@ export default defineBackground(() => {
     void (async (): Promise<void> => {
       const response = await handleTabDebuggerRequest({
         debuggerApi: chromeApi.debugger,
-        ...(chromeApi.downloads === undefined ? {} : { downloadsApi: chromeApi.downloads }),
+        downloadsApi: () => chromeApi.downloads,
         request: message,
         scriptingApi: chromeApi.scripting,
         tabGroupsApi: chromeApi.tabGroups,

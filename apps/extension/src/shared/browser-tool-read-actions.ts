@@ -946,9 +946,9 @@ const browserTakeScreenshotHandler: BrowserReadActionHandler = async (arguments_
       : await readElementClip(deps.session, target, {
           failClosedOnGeometryError: deps.agentScope !== undefined,
         });
-  // The mask needs the tab's scroll position and scale, and a device-pixel element capture needs the scale too: one read serves both.
-  const geometry =
-    deps.agentScope === undefined ? undefined : await readAgentScreenshotGeometry(deps.session);
+  // The mask needs the tab's scroll position and scale, and a device-pixel element capture needs the scale too — for every caller, not only an agent: one read serves both.
+  const needsGeometry = deps.agentScope !== undefined || (clip !== undefined && scale === 'device');
+  const geometry = needsGeometry ? await readAgentScreenshotGeometry(deps.session) : undefined;
   // A device-pixel element capture renders the clip at the tab's device pixel ratio; the mask boxes move with it.
   const clipScale = clip !== undefined && scale === 'device' ? (geometry?.scale ?? 1) : 1;
 

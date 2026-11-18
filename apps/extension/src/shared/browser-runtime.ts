@@ -5,6 +5,7 @@ import {
   canStartDownload,
   createStepTokenStore,
   DOWNLOAD_PERMISSION_MISSING_ERROR,
+  isScriptTool,
   hashBrowserToolArguments,
   NEEDS_PERMISSION_ERROR,
   ORIGIN_CHANGED_ERROR,
@@ -124,14 +125,22 @@ export interface BrowserSessionTabResult {
 
 /** One download the browser created, as `chrome.downloads.onCreated` reports it. */
 export interface BrowserDownloadItem {
+  readonly finalUrl?: string;
   readonly id: number;
+  /** The page that started it; the only attribution a browser without `tabId` offers. */
+  readonly referrer?: string;
+  readonly tabId?: number;
+  readonly url?: string;
 }
 
 /** The slice of `chrome.downloads` the agent's download guard uses. */
 export interface BrowserDownloadsApi {
   readonly cancel: (downloadId: number) => Promise<void>;
-  /** Drops the item from the downloads shelf; cancelling already deletes the file. */
-  readonly erase?: ((query: { readonly id: number }) => Promise<void>) | undefined;
+  /** Drops the item from the shelf; `removeFile` also deletes a file `cancel` was too late to stop. */
+  readonly erase?: (query: {
+    readonly id: number;
+    readonly removeFile?: boolean;
+  }) => Promise<void> | undefined;
   readonly onCreated: {
     readonly addListener: (listener: (item: BrowserDownloadItem) => void) => void;
     readonly removeListener: (listener: (item: BrowserDownloadItem) => void) => void;
@@ -140,8 +149,12 @@ export interface BrowserDownloadsApi {
 
 export interface BrowserRuntimeDeps {
   readonly debuggerApi: ChromeDebuggerApi | undefined;
-  /** `chrome.downloads`: the guard that cancels an unapproved download's file. */
-  readonly downloadsApi?: BrowserDownloadsApi | undefined;
+  /**
+   * `chrome.downloads`, resolved per call: the optional permission can be
+   * granted or revoked while this worker lives, so it is read at call time
+   * rather than captured when the runtime was built.
+   */
+  readonly downloadsApi?: (() => BrowserDownloadsApi | undefined) | undefined;
   readonly leases: TabLeaseRegistry;
   /** The clock sensitive step tokens expire against; defaults to `Date.now`. */
   readonly now?: (() => number) | undefined;
@@ -229,21 +242,24 @@ const DOWNLOAD_GUARD_SETTLE_MS = 120;
  * intercept, so the caller can refuse instead.
  */
 const FETCH_PAUSED_METHOD = 'Fetch.requestPaused';
+const ATTACHED_TO_TARGET_METHOD = 'Target.attachedToTarget';
 const ATTACHMENT_DISPOSITION = /attachment/iu;
 
-/** One response the tab paused at its response stage. */
+/** One response a tab or one of its out-of-process frames paused at its response stage. */
 const fetchPausedSchema = z.object({
   requestId: z.string(),
   responseHeaders: z.array(z.object({ name: z.string(), value: z.string().optional() })).optional(),
 });
+const attachedToTargetSchema = z.object({ sessionId: z.string() });
 
 /** Releases a paused response untouched; if the stage refuses it, `Fetch.disable` releases it. */
 const releasePausedResponse = async (
   session: BrowserToolSession,
-  requestId: string
+  requestId: string,
+  sessionId: string | undefined
 ): Promise<void> => {
   try {
-    await session.send('Fetch.continueResponse', { requestId });
+    await session.send('Fetch.continueResponse', { requestId }, sessionId);
 
     return;
   } catch {
@@ -251,7 +267,7 @@ const releasePausedResponse = async (
   }
 
   try {
-    await session.send('Fetch.continueRequest', { requestId });
+    await session.send('Fetch.continueRequest', { requestId }, sessionId);
   } catch {
     // Disabling interception at the end of the call resumes whatever is left.
   }
@@ -260,24 +276,141 @@ const releasePausedResponse = async (
 /** Drops a paused response, so the navigation ends without a download and no file exists. */
 const abortPausedResponse = async (
   session: BrowserToolSession,
-  requestId: string
+  requestId: string,
+  sessionId: string | undefined
 ): Promise<void> => {
   try {
-    await session.send('Fetch.failRequest', { errorReason: 'Aborted', requestId });
+    await session.send('Fetch.failRequest', { errorReason: 'Aborted', requestId }, sessionId);
   } catch {
     // A response that already left the interceptor started no file this guard could stop.
   }
 };
 
+/** One guard a call runs: `settle` reports how many of the call's own downloads it stopped. */
+interface DownloadGuard {
+  readonly settle: () => Promise<number>;
+}
+
+/** `origin` + `pathname`: the page identity a download's referrer is compared against. */
+const pageOf = (url: string | undefined): string | undefined => {
+  try {
+    const parsed = new URL(url ?? '');
+
+    return `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    return undefined;
+  }
+};
+
+/** The tab a guard attributes a download to: its id and the page url a referrer is compared with. */
+const guardTabOf = async (
+  tabsApi: BrowserRuntimeDeps['tabsApi'],
+  tabId: number
+): Promise<{ readonly tabId: number; readonly url: string }> => {
+  const tab = await tabsApi.get?.(tabId);
+
+  return { tabId, url: tab?.url ?? '' };
+};
+
+/**
+ * Whether this call started the download. Only a download the browser ties to
+ * the tab (its `tabId`) or to this page (its referrer) is the call's own; a
+ * download with neither is the user's and is left alone, because cancelling
+ * someone else's file is worse than missing one.
+ */
+const startedByThisTab = (
+  item: BrowserDownloadItem,
+  tab: { readonly tabId: number; readonly url: string }
+): boolean => {
+  if (item.tabId !== undefined) {
+    return item.tabId === tab.tabId;
+  }
+
+  const referrer = pageOf(item.referrer);
+  const page = pageOf(tab.url);
+
+  return referrer !== undefined && page !== undefined && referrer === page;
+};
+
+/**
+ * Stops one download of this call and reports whether a file was really
+ * removed: `cancel` is too late once the item completed, so `erase` with
+ * `removeFile` deletes that file, and a guard that removed nothing reports
+ * nothing rather than claiming a cancel it did not do.
+ */
+const discardDownload = async (api: BrowserDownloadsApi, downloadId: number): Promise<boolean> => {
+  let cancelled = false;
+
+  try {
+    await api.cancel(downloadId);
+    cancelled = true;
+  } catch {
+    // The download finished before the cancel reached it; the erase below deletes the file.
+  }
+
+  try {
+    await api.erase?.({ id: downloadId, removeFile: true });
+
+    return true;
+  } catch {
+    return cancelled;
+  }
+};
+
+/**
+ * The guard for a browser without the optional `downloads` permission. Neither
+ * the tab nor its out-of-process frames can refuse a download themselves —
+ * chrome.debugger blocks the download domain — but each can intercept the
+ * response that would become one: a navigation whose response carries
+ * `Content-Disposition: attachment` is aborted before its body is delivered,
+ * so no file is ever created. Every other response is continued, so an
+ * ordinary click pays one round trip. `undefined` when nothing could be armed,
+ * so the caller can refuse instead.
+ */
 const armFetchGuard = async (
   session: BrowserToolSession,
   debuggerApi: ChromeDebuggerApi | undefined,
   tabId: number
-): Promise<{ readonly settle: () => Promise<number> } | undefined> => {
+): Promise<DownloadGuard | undefined> => {
   const aborted: string[] = [];
   const firstDownload = Promise.withResolvers<void>();
+  const enabledSessions = new Set<string>();
+  const patterns = [{ requestStage: 'Response', resourceType: 'Document', urlPattern: '*' }];
+
+  const enableIn = async (sessionId?: string): Promise<boolean> => {
+    const key = sessionId ?? '';
+
+    if (enabledSessions.has(key)) {
+      return true;
+    }
+
+    try {
+      await session.send('Fetch.enable', { patterns }, sessionId);
+      enabledSessions.add(key);
+
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   const listener: ChromeDebuggerEventListener = (source, method, params) => {
-    if (method !== FETCH_PAUSED_METHOD || (source.tabId !== undefined && source.tabId !== tabId)) {
+    if (source.tabId !== undefined && source.tabId !== tabId) {
+      return;
+    }
+
+    // An out-of-process frame the tab attaches during the call gets the same guard.
+    if (method === ATTACHED_TO_TARGET_METHOD) {
+      const attached = attachedToTargetSchema.safeParse(params ?? {});
+
+      if (attached.success) {
+        void enableIn(attached.data.sessionId);
+      }
+
+      return;
+    }
+
+    if (method !== FETCH_PAUSED_METHOD) {
       return;
     }
 
@@ -295,50 +428,85 @@ const armFetchGuard = async (
     );
 
     if (!attachment) {
-      void releasePausedResponse(session, requestId);
+      void releasePausedResponse(session, requestId, source.sessionId);
 
       return;
     }
 
     aborted.push(requestId);
     firstDownload.resolve();
-    void abortPausedResponse(session, requestId);
+    void abortPausedResponse(session, requestId, source.sessionId);
   };
 
-  try {
-    await session.send('Fetch.enable', {
-      patterns: [{ requestStage: 'Response', resourceType: 'Document', urlPattern: '*' }],
-    });
-  } catch {
+  debuggerApi?.onEvent.addListener(listener);
+
+  // The tab's own session first, then every out-of-process frame it already attached.
+  const armed = await enableIn();
+
+  const children: ReadonlyMap<string, { readonly sessionId: string }> =
+    session.childFrames?.() ?? new Map();
+  await Promise.all([...children.values()].map(child => enableIn(child.sessionId)));
+
+  if (!armed) {
+    debuggerApi?.onEvent.removeListener(listener);
+
     return undefined;
   }
-
-  debuggerApi?.onEvent.addListener(listener);
 
   return {
     settle: async () => {
       await Promise.race([firstDownload.promise, after(DOWNLOAD_GUARD_SETTLE_MS)]);
       debuggerApi?.onEvent.removeListener(listener);
-      // Disabling resumes every request this call left paused.
-      try {
-        await session.send('Fetch.disable');
-      } catch {
-        // The target is gone; nothing is left paused.
-      }
+
+      // Disabling resumes every request a session left paused.
+      await Promise.all(
+        [...enabledSessions].map(async key => {
+          try {
+            await session.send('Fetch.disable', undefined, key === '' ? undefined : key);
+          } catch {
+            // The frame detached; its requests went with it.
+          }
+        })
+      );
+      enabledSessions.clear();
 
       return aborted.length;
     },
   };
 };
 
-/** Cancels one download and drops it from the shelf; a completion race changes nothing, the file is gone. */
-const discardDownload = async (api: BrowserDownloadsApi, downloadId: number): Promise<void> => {
-  try {
-    await api.cancel(downloadId);
-    await api.erase?.({ id: downloadId });
-  } catch {
-    // The download finished or vanished first; there is no file left to protect.
-  }
+/**
+ * The guard that uses the optional `downloads` permission: the browser names a
+ * download when it creates it — before the call's own command returns — and the
+ * call's own item is cancelled and its file deleted.
+ */
+const armDownloadGuard = (
+  api: BrowserDownloadsApi,
+  tab: { readonly tabId: number; readonly url: string }
+): DownloadGuard => {
+  const discards: Promise<boolean>[] = [];
+  const firstDownload = Promise.withResolvers<void>();
+  const listener = (item: BrowserDownloadItem): void => {
+    // Another tab's download, or the user's own: not this call's business.
+    if (!startedByThisTab(item, tab)) {
+      return;
+    }
+
+    discards.push(discardDownload(api, item.id));
+    firstDownload.resolve();
+  };
+
+  api.onCreated.addListener(listener);
+
+  return {
+    settle: async () => {
+      await Promise.race([firstDownload.promise, after(DOWNLOAD_GUARD_SETTLE_MS)]);
+      api.onCreated.removeListener(listener);
+      const outcomes = await Promise.all(discards);
+
+      return outcomes.filter(Boolean).length;
+    },
+  };
 };
 
 const after = (milliseconds: number): Promise<void> => {
@@ -563,48 +731,19 @@ export const createBrowserRuntime = ({
   };
 
   /**
-   * Cancels the downloads one guarded `act` call starts, through `chrome.downloads`:
-   * the browser names a download when it creates it — before the call's own
-   * command returns — so cancelling deletes a file that never had approval.
-   * The listener is armed for the call and disarmed after a bounded settle; a
-   * download the browser creates later than that is outside the window.
+   * The guard one guarded call runs: the download stream when the optional
+   * permission is granted at call time, response interception when it is not,
+   * and `undefined` when neither can run — the caller then refuses the call
+   * rather than run it unguarded.
    */
-  const armDownloadGuard = () => {
-    const api = downloadsApi;
-    const created: number[] = [];
-    const firstDownload = Promise.withResolvers<void>();
-    const listener = (item: { readonly id: number }): void => {
-      created.push(item.id);
-      firstDownload.resolve();
-
-      // A file this call was not approved to start is deleted before anyone can read it.
-      if (api !== undefined) {
-        void discardDownload(api, item.id);
-      }
-    };
-
-    api?.onCreated.addListener(listener);
-
-    return {
-      settle: async () => {
-        if (api !== undefined) {
-          await Promise.race([firstDownload.promise, after(DOWNLOAD_GUARD_SETTLE_MS)]);
-          api.onCreated.removeListener(listener);
-        }
-
-        return created.length;
-      },
-    };
-  };
-
-  /** The guard one guarded call runs: the download stream when the optional permission is granted, response interception when it is not. */
   const armGuard = (
     session: BrowserToolSession,
-    tabId: number
-  ): Promise<{ readonly settle: () => Promise<number> } | undefined> =>
-    downloadsApi === undefined
-      ? armFetchGuard(session, debuggerApi, tabId)
-      : Promise.resolve(armDownloadGuard());
+    tab: { readonly tabId: number; readonly url: string },
+    api: BrowserDownloadsApi | undefined
+  ): Promise<DownloadGuard | undefined> =>
+    api === undefined
+      ? armFetchGuard(session, debuggerApi, tab.tabId)
+      : Promise.resolve(armDownloadGuard(api, tab));
 
   // Tabs whose flattened frame auto-attach is on, so out-of-process iframes are reachable for scoping.
   const autoAttachedTabs = new Set<number>();
@@ -804,7 +943,16 @@ export const createBrowserRuntime = ({
           !downloadApproved;
 
         // The optional `downloads` permission gives the browser's own stream; without it the tab intercepts the response that would become a file.
-        const downloadGuard = guardDownloads ? await armGuard(session, tabId) : undefined;
+        const guardTab = guardDownloads ? await guardTabOf(tabsApi, tabId) : undefined;
+        // Read the optional permission at call time: it can be granted or revoked while this worker lives.
+        const guardApi = guardTab === undefined ? undefined : downloadsApi?.();
+        // A `blob:`/`data:` download issues no request, so only the download stream can see one; without it the two tools that author page code fail closed.
+        const scriptNeedsApi =
+          guardTab !== undefined && guardApi === undefined && isScriptTool(toolName);
+        const downloadGuard =
+          guardTab === undefined || scriptNeedsApi
+            ? undefined
+            : await armGuard(session, guardTab, guardApi);
 
         // Neither guard can run: no file may be started, so the call is refused instead of run unguarded.
         if (guardDownloads && downloadGuard === undefined) {
@@ -819,6 +967,7 @@ export const createBrowserRuntime = ({
         }
 
         let result: EvalTabResult | null = null;
+        let guardedDownloads = 0;
 
         try {
           const call = runKiloBrowserTool({
@@ -866,18 +1015,16 @@ export const createBrowserRuntime = ({
 
           result = await Promise.race([call, takenAway.then(() => null)]);
         } finally {
+          // Every exit — a result, a take-over, a throw — disarms the guard, so no listener or interception outlives the call.
           if (guardDownloads) {
             await setDownloadBehavior(session, 'default');
           }
-        }
 
-        // A taken-over call drops its late result: the page belongs to the panel now.
-        if (taken) {
-          return { kind: 'result', result: { error: TAB_TAKEN_ERROR, ok: false } };
+          if (downloadGuard !== undefined) {
+            // A download the guard saw: the browser named it before the guard stopped and deleted its file.
+            guardedDownloads = await downloadGuard.settle();
+          }
         }
-
-        // A download the guard saw: the browser named it through `chrome.downloads` before cancelling it.
-        const guardedDownloads = downloadGuard === undefined ? 0 : await downloadGuard.settle();
 
         // A taken-over call drops its late result: the page belongs to the panel now.
         if (taken) {

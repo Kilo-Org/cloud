@@ -6,7 +6,11 @@ import { createBrowserTabGroupController } from './browser-tab-groups';
 import type { BrowserTabGroupController } from './browser-tab-groups';
 import { createTabLeaseRegistry } from './browser-tab-leases';
 import { createBrowserRuntime } from './browser-runtime';
-import type { BrowserDownloadsApi, BrowserToolRunOutcome } from './browser-runtime';
+import type {
+  BrowserDownloadItem,
+  BrowserDownloadsApi,
+  BrowserToolRunOutcome,
+} from './browser-runtime';
 import {
   AGENT_TAB_OUTSIDE_GROUP_ERROR,
   DOWNLOAD_PERMISSION_MISSING_ERROR,
@@ -73,6 +77,8 @@ interface FakeCdp {
   readonly downloadsDenied: () => number;
   readonly downloadsRestored: () => number;
   readonly emit: (method: string, params: Record<string, unknown>) => void;
+  /** One event from a child (out-of-process frame) session, the way chrome.debugger reports it. */
+  readonly emitFrom: (method: string, params: Record<string, unknown>, sessionId: string) => void;
   readonly setHandlers: (handlers: Record<string, CdpHandler>) => void;
   readonly setFrameUrl: (url: string) => void;
   readonly setProbe: (probe: Record<string, unknown>) => void;
@@ -279,6 +285,11 @@ const createFakeCdp = (): FakeCdp => {
         listener({ tabId: TAB_ID }, method, params);
       }
     },
+    emitFrom: (method, params, sessionId) => {
+      for (const listener of eventListeners) {
+        listener({ sessionId, tabId: TAB_ID }, method, params);
+      }
+    },
     setFrameUrl: url => {
       mainUrl = url;
     },
@@ -300,17 +311,21 @@ const createTabsApi = (): BrowserTabsApi => {
   };
 };
 
-/** `chrome.downloads` as the runtime sees it: the single `onCreated` stream and the cancel that deletes the file. */
-const createFakeDownloads = () => {
-  const listeners: ((item: { readonly id: number }) => void)[] = [];
+/** `chrome.downloads` as the runtime sees it: the single `onCreated` stream and the erase that deletes the file. */
+const createFakeDownloads = (options: { readonly cancelRejects?: boolean } = {}) => {
+  const listeners: ((item: BrowserDownloadItem) => void)[] = [];
   const cancelled: number[] = [];
-  const erased: number[] = [];
+  const erased: { readonly id: number; readonly removeFile?: boolean }[] = [];
   const api: BrowserDownloadsApi = {
     cancel: async downloadId => {
       cancelled.push(downloadId);
+
+      if (options.cancelRejects === true) {
+        throw new Error('complete');
+      }
     },
     erase: async query => {
-      erased.push(query.id);
+      erased.push(query);
     },
     onCreated: {
       addListener: listener => {
@@ -329,9 +344,9 @@ const createFakeDownloads = () => {
   return {
     api,
     cancelled,
-    emit: (downloadId: number) => {
+    emit: (item: BrowserDownloadItem) => {
       for (const listener of listeners) {
-        listener({ id: downloadId });
+        listener(item);
       }
     },
     erased,
@@ -342,19 +357,22 @@ const createFakeDownloads = () => {
 const createHarness = async (
   options: {
     readonly downloadsApi?: BrowserDownloadsApi | undefined;
+    readonly downloadsResolver?: () => BrowserDownloadsApi | undefined;
     readonly share?: boolean;
     readonly tabGroups?: BrowserTabGroupController;
+    readonly tabsApi?: BrowserTabsApi;
   } = {}
 ) => {
   const cdp = createFakeCdp();
   const leases = createTabLeaseRegistry({});
   const runtime = createBrowserRuntime({
     debuggerApi: cdp.api,
-    ...(options.downloadsApi === undefined ? {} : { downloadsApi: options.downloadsApi }),
+    ...(options.downloadsResolver === undefined ? {} : { downloadsApi: options.downloadsResolver }),
+    ...(options.downloadsApi === undefined ? {} : { downloadsApi: () => options.downloadsApi }),
     leases,
     scriptingApi: undefined,
     ...(options.tabGroups === undefined ? {} : { tabGroups: options.tabGroups }),
-    tabsApi: createTabsApi(),
+    tabsApi: options.tabsApi ?? createTabsApi(),
   });
 
   // D9: an agent reaches only its session's group, so session-1 owns the tab unless a case says otherwise.
@@ -604,7 +622,7 @@ describe('agent browser calls', () => {
         // A click is a press and a release; the browser names the download once, while the command is still in flight.
         if (emitting) {
           emitting = false;
-          downloads.emit(41);
+          downloads.emit({ id: 41, tabId: TAB_ID });
         }
 
         return {};
@@ -627,10 +645,10 @@ describe('agent browser calls', () => {
       items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.download }],
       kind: 'needs_permission',
     });
-    // The unapproved file is deleted, and the listener does not outlive the call.
+    // The unapproved file is deleted — cancelled, then erased with its file — and the listener does not outlive the call.
     expect([downloads.cancelled, downloads.erased, downloads.live()]).toStrictEqual([
       [41],
-      [41],
+      [{ id: 41, removeFile: true }],
       0,
     ]);
 
@@ -768,6 +786,228 @@ describe('agent browser calls', () => {
 
     expect(replay).toMatchObject({ afterAction: true, kind: 'needs_permission' });
     expect(cdp.downloadsDenied()).toBe(2);
+  });
+
+  it('leaves a download another tab or the user started alone', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+    let emitting = true;
+
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': () => {
+        if (emitting) {
+          emitting = false;
+          // The user's own download in another tab: another tab id and another referrer.
+          downloads.emit({ id: 77, referrer: `${MAIN_ORIGIN}/elsewhere`, tabId: TAB_ID + 1 });
+          downloads.emit({ id: 78, referrer: `${MAIN_ORIGIN}/other-page` });
+        }
+
+        return {};
+      },
+    });
+
+    const outcome = await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant] },
+      arguments: { target: '#pay' },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_click',
+    });
+
+    // Nothing was cancelled and nothing was refused: the call started no download of its own.
+    expect(outcome.kind).toBe('result');
+    expect([downloads.cancelled, downloads.erased]).toStrictEqual([[], []]);
+  });
+
+  it('cancels the download whose referrer is this tab\u2019s page', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+    let emitting = true;
+
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': () => {
+        if (emitting) {
+          emitting = false;
+          downloads.emit({ id: 42, referrer: `${MAIN_ORIGIN}/dashboard` });
+        }
+
+        return {};
+      },
+    });
+
+    const outcome = await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant] },
+      arguments: { target: '#pay' },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_click',
+    });
+
+    expect(outcome).toMatchObject({ afterAction: true, kind: 'needs_permission' });
+    expect(downloads.cancelled).toStrictEqual([42]);
+  });
+
+  it('deletes the file of a download that completed before the cancel', async () => {
+    const downloads = createFakeDownloads({ cancelRejects: true });
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+    let emitting = true;
+
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': () => {
+        if (emitting) {
+          emitting = false;
+          downloads.emit({ id: 43, tabId: TAB_ID });
+        }
+
+        return {};
+      },
+    });
+
+    const outcome = await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant] },
+      arguments: { target: '#pay' },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_click',
+    });
+
+    // `cancel` lost the race, so the erase removes the file; the call still reports the real stop.
+    expect(downloads.erased).toStrictEqual([{ id: 43, removeFile: true }]);
+    expect(outcome).toMatchObject({ afterAction: true, kind: 'needs_permission' });
+  });
+
+  it('does not claim a cancel it could not perform', async () => {
+    const downloads = createFakeDownloads({ cancelRejects: true });
+    const api: BrowserDownloadsApi = {
+      ...downloads.api,
+      erase: async () => {
+        throw new Error('erase refused');
+      },
+    };
+    const { cdp, runtime } = await createHarness({ downloadsApi: api });
+    let emitting = true;
+
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': () => {
+        if (emitting) {
+          emitting = false;
+          downloads.emit({ id: 44, tabId: TAB_ID });
+        }
+
+        return {};
+      },
+    });
+
+    const outcome = await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant] },
+      arguments: { target: '#pay' },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_click',
+    });
+
+    // Neither stop worked, so the call reports its own result rather than a cancel that did not happen.
+    expect(outcome.kind).toBe('result');
+  });
+
+  it('disarms the guard when the tool fails', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': () => {
+        throw new Error('dispatch failed');
+      },
+    });
+
+    const outcome = await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant] },
+      arguments: { target: '#pay' },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_click',
+    });
+
+    // The dispatch refused the command and the call reported it; the guard still came off.
+    expect(outcome).toMatchObject({ kind: 'result', result: { ok: false } });
+    expect(downloads.live()).toBe(0);
+  });
+
+  it('aborts an attachment a paused out-of-process frame reports', async () => {
+    const { cdp, runtime } = await createHarness();
+    let emitting = true;
+
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': () => {
+        if (emitting) {
+          emitting = false;
+          // The frame's own session is the one that paused the response.
+          cdp.emitFrom(
+            'Fetch.requestPaused',
+            {
+              requestId: 'frame-1',
+              resourceType: 'Document',
+              responseHeaders: [
+                { name: 'content-disposition', value: 'attachment; filename="f.txt"' },
+              ],
+            },
+            'frame-session-1'
+          );
+        }
+
+        return {};
+      },
+    });
+
+    const outcome = await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant] },
+      arguments: { target: '#pay' },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_click',
+    });
+
+    expect(outcome).toMatchObject({ afterAction: true, kind: 'needs_permission' });
+    // The abort went to the frame's session, not the tab's.
+    expect(cdp.commands()).toContain('Fetch.failRequest');
+  });
+
+  it('reads the downloads permission on every call, so a grant after construction counts', async () => {
+    const downloads = createFakeDownloads();
+    const holder: { api?: BrowserDownloadsApi } = {};
+
+    const { cdp, runtime } = await createHarness({ downloadsResolver: () => holder.api });
+    let emitting = true;
+
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': () => {
+        if (emitting) {
+          emitting = false;
+          downloads.emit({ id: 45, tabId: TAB_ID });
+        }
+
+        return {};
+      },
+    });
+
+    const click = () =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+
+    // Before the grant the guard is the response interception: the download stream saw nothing.
+    await click();
+    expect(downloads.cancelled).toStrictEqual([]);
+
+    // The user grants the optional permission while the worker keeps running: the next call uses it.
+    holder.api = downloads.api;
+    emitting = true;
+    await click();
+    expect(downloads.cancelled).toStrictEqual([45]);
   });
 
   it('does not let one session\u2019s download token approve another session\u2019s call', async () => {

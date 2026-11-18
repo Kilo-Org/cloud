@@ -13,7 +13,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { Section } from '@/components/ui/section';
 import { SectionHeaderSkeleton } from '@/components/ui/section-header-skeleton';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
-import { ROW_TARGET_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import {
   DashboardSections,
   DashboardSectionsSkeleton,

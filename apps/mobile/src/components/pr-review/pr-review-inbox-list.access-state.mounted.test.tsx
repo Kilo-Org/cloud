@@ -142,7 +142,7 @@ function accessError(renderer: TestRenderer.ReactTestRenderer) {
 }
 
 type ActionElement = {
-  props: { accessibilityLabel?: unknown; onPress?: unknown };
+  props: { label?: unknown; onPress?: unknown };
 };
 
 function isActionElement(value: unknown): value is ActionElement {

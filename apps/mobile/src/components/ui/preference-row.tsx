@@ -72,7 +72,7 @@ export function PreferenceRow({
   // own muted pair there (`mutedSoft` track, `primaryDisabled` fill); iOS fades
   // the control itself.
   const switchColors =
-    isDark || disabled === true
+    isDark || disabled
       ? undefined
       : {
           thumbColor: colors.primaryForeground,

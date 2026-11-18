@@ -8,8 +8,8 @@ import {
   queries,
   resetBillingQueries,
   seatsReadout,
-  SUBSCRIPTIONS_URL,
   subscriptionReadout,
+  SUBSCRIPTIONS_URL,
   texts,
 } from './billing-screen.test-helpers';
 import { beforeEach, describe, expect, it } from 'vitest';

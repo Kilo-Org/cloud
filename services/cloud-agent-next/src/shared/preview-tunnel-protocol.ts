@@ -56,7 +56,6 @@ export const PREVIEW_TUNNEL_CLOSE = {
 
 /** HTTP stream ids are below this; WebSocket stream ids are at or above it. */
 export const PREVIEW_TUNNEL_WS_ID_BASE = 0x8000_0000;
-export const PREVIEW_TUNNEL_MAX_STREAM_ID = 0xffff_ffff;
 
 export function isPreviewTunnelWebSocketId(stream: number): boolean {
   return stream >= PREVIEW_TUNNEL_WS_ID_BASE;

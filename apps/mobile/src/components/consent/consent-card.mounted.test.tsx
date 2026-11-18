@@ -16,6 +16,7 @@ const mockedReadConsent = vi.hoisted(() => vi.fn());
 const mockedSetOptionalConsent = vi.hoisted(() => vi.fn());
 const mockedRevokeConsent = vi.hoisted(() => vi.fn());
 const mockedSignOut = vi.hoisted(() => vi.fn());
+const mockedConfirmRequest = vi.hoisted(() => vi.fn());
 const currentUserId = vi.hoisted(() => ({ value: 'test-user-1' as string | undefined }));
 
 vi.mock('@/lib/consent', () => ({
@@ -60,15 +61,21 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/dialog', () => ({
-  // The real confirm presents a native sheet, which the string-typed test tree
-  // cannot host. Run the confirm handler directly: the tests here own the
-  // card's behaviour after the decision, not the sheet's.
-  useConfirmDialog: () => ({
-    confirm: (request: { onConfirm: () => void }) => {
-      request.onConfirm();
-    },
-    dialog: null,
-  }),
+  // The real confirm presents a native sheet, which the string-typed test
+  // tree cannot host. The mock records the request instead: tests assert the
+  // card asked for the confirm and run `onConfirm` themselves, so the
+  // behaviour after the decision stays covered while the sheet itself is not
+  // (it is a native surface).
+  useConfirmDialog: () => {
+    const request = { current: null as { onConfirm: () => void } | null };
+    return {
+      confirm: (next: { onConfirm: () => void }) => {
+        mockedConfirmRequest(next);
+        request.current = next;
+      },
+      dialog: 'ConfirmDialog',
+    };
+  },
 }));
 vi.mock('@/lib/config', () => ({
   WEB_BASE_URL: 'https://kilo.ai',
@@ -486,7 +493,19 @@ describe('ConsentCard', () => {
     );
     const decline = findButton(renderer.root, i18n.t('consent.decline'));
     await act(async () => {
+      await Promise.resolve();
       (decline.props.onPress as () => void)();
+    });
+    await act(flush);
+    // The card asked for the destructive confirm (a native sheet on device,
+    // recorded by the mock here): the latest request's handler runs.
+    expect(mockedConfirmRequest).toHaveBeenCalledTimes(1);
+    const request = mockedConfirmRequest.mock.calls[0]?.[0] as
+      | { onConfirm: () => void }
+      | undefined;
+    await act(async () => {
+      await Promise.resolve();
+      request?.onConfirm();
     });
     await act(flush);
     expect(texts(renderer.root)).toContain('Could not sign out. Please try again.');
@@ -530,6 +549,7 @@ describe('ConsentCard', () => {
     const btn = findButton(renderer.root, 'Accept and continue');
     expect(btn.props.disabled).toBeFalsy();
     await act(async () => {
+      await Promise.resolve();
       (btn.props.onPress as () => void)();
     });
     await act(flush);
@@ -552,6 +572,7 @@ describe('ConsentCard', () => {
 
     mockedReadConsent.mockReturnValueOnce(second.promise);
     await act(async () => {
+      await Promise.resolve();
       (findButton(renderer.root, i18n.t('common.retry')).props.onPress as () => void)();
     });
     expect(mockedReadConsent).toHaveBeenCalledTimes(2);
@@ -646,6 +667,7 @@ describe('ConsentCard', () => {
     // past the disabled flag must not write the default over a stored decline
     // the read has not answered.
     await act(async () => {
+      await Promise.resolve();
       (findButton(renderer.root, 'Accept and continue').props.onPress as () => void)();
     });
     await act(flush);
@@ -659,6 +681,7 @@ describe('ConsentCard', () => {
     await act(flush);
     const btn = findButton(renderer.root, 'Accept and continue');
     await act(async () => {
+      await Promise.resolve();
       (btn.props.onPress as () => void)();
     });
     expect(mockedAcceptConsent).toHaveBeenCalledWith('test-user-1', true);

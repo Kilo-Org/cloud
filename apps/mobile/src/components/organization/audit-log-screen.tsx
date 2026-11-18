@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, View, type ViewStyle } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
+import { auditLogDetailFor } from '@/components/organization/audit-log-detail';
 import { auditActionLabel } from '@/components/organization/audit-log-action-label';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { canViewOrgAuditLog } from '@/components/organization/organization-settings-rows';
@@ -62,11 +63,14 @@ const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAu
   const time = formatAuditTime(entry.created_at);
   const meta = actor ? `${actor} · ${time}` : time;
   const eventName = auditActionLabel(t, entry.action);
-  // The server's message for the creation action is "Organization <name>
-  // created", which only restates the event name already shown above it. Every
-  // row of this log belongs to this organization, so the row shows neither that
-  // English sentence nor a name a later rename would change.
-  const showsDetail = entry.action !== 'organization.created';
+  // The detail is built from the row's structured `details`, in the reader's
+  // language. The server's English `message` never renders: the server writes
+  // it for the web audit page and operators reading raw rows, and even a row
+  // whose message IS the reader's language would speak in the writer's
+  // sentence, not the app's. The creation action's detail only restates the
+  // event name, so — as before — no row shows it.
+  const detail = auditLogDetailFor(t, entry.details);
+  const showsDetail = entry.action !== 'organization.created' && detail != null;
   const metaLine =
     meta.length === 0 ? null : (
       <Text className="text-xs text-muted-foreground" numberOfLines={1}>
@@ -81,9 +85,9 @@ const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAu
       </View>
     );
   }
-  // The message runs past two lines for most events, and nothing else in the
+  // The detail runs past two lines for most events, and nothing else in the
   // app carries it, so the row itself is the detail view: it starts clamped and
-  // a press shows the whole sentence. The row cannot know whether the message
+  // a press shows the whole sentence. The row cannot know whether the detail
   // fits two lines without measuring it — a clamped text reports only the lines
   // it drew — so every event row offers the disclosure, and the reader who
   // needs nothing more loses nothing by ignoring it.
@@ -95,7 +99,7 @@ const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAu
       accessibilityRole="button"
       // The clamp is visual only: a reader hears the whole event whether or not
       // the row is open.
-      accessibilityLabel={[eventName, entry.message, meta].filter(Boolean).join('. ')}
+      accessibilityLabel={[eventName, detail, meta].filter(Boolean).join('. ')}
       accessibilityState={{ expanded }}
       className="gap-1 rounded-lg bg-secondary p-3 active:opacity-70"
     >
@@ -108,7 +112,7 @@ const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAu
         <Text className="min-w-0 flex-1 text-sm font-medium text-foreground">{eventName}</Text>
       </View>
       <Text className="text-xs text-muted-foreground" numberOfLines={expanded ? undefined : 2}>
-        {entry.message}
+        {detail}
       </Text>
       {metaLine}
     </Pressable>

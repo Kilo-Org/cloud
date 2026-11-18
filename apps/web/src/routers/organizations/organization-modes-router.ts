@@ -289,6 +289,7 @@ export const organizationModesRouter = createTRPCRouter({
           actor_id: ctx.user.id,
           actor_name: ctx.user.google_user_name,
           message: `Created mode "${name}" with slug "${slug}": ${JSON.stringify(config)}${routeAuditMessage ? `, ${routeAuditMessage}` : ''}`,
+          details: { kind: 'mode_created', name, slug },
           organization_id: organizationId,
           tx,
         });
@@ -558,7 +559,7 @@ export const organizationModesRouter = createTRPCRouter({
               actor_id: ctx.user.id,
               actor_name: ctx.user.google_user_name,
               message: `Deleted mode "${lockedMode.name}" (slug: "${lockedMode.slug}")${routeAuditChanges.length > 0 ? `, ${routeAuditChanges.join(', ')}` : ''}`,
-
+              details: { kind: 'mode_deleted', name: lockedMode.name, slug: lockedMode.slug },
               organization_id: lockedMode.organization_id,
               tx,
             });

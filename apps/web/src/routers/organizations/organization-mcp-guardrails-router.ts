@@ -361,6 +361,12 @@ async function createGuardrail(params: {
       action: 'organization.guardrail.add',
       ...auditEntry(params.ctx, params.organizationId),
       message: `${params.auditVerb} ${describeGuardrail(created)}`,
+      details: {
+        kind: 'mcp_guardrail_added',
+        name: created.name,
+        type: created.type,
+        verb: params.auditVerb === 'Added' ? 'added' : 'approved',
+      },
       tx,
     });
     return serializeGuardrail(created);
@@ -447,6 +453,19 @@ export const organizationMcpGuardrailsRouter = createTRPCRouter({
             input.type === 'mcp'
               ? `Set MCP server enforcement to ${input.enforcement}`
               : `Set skill guardrails to ${input.enabled ? 'enabled' : 'disabled'}, scan before use ${input.scanBeforeUse ? 'on' : 'off'}`,
+          details:
+            input.type === 'mcp'
+              ? {
+                  kind: 'guardrails_enforcement_changed',
+                  target: input.type,
+                  enforcement: input.enforcement,
+                }
+              : {
+                  kind: 'guardrails_enforcement_changed',
+                  target: input.type,
+                  enabled: input.enabled,
+                  scanBeforeUse: input.scanBeforeUse,
+                },
           tx,
         });
       });
@@ -616,6 +635,11 @@ export const organizationMcpGuardrailsRouter = createTRPCRouter({
             action: 'organization.guardrail.update',
             ...auditEntry(ctx, input.organizationId),
             message: `Updated ${describeGuardrail(row)}`,
+            details: {
+              kind: 'mcp_guardrail_updated',
+              name: row.name,
+              type: row.type,
+            },
             tx,
           });
           return row;
@@ -647,6 +671,12 @@ export const organizationMcpGuardrailsRouter = createTRPCRouter({
         action: 'organization.guardrail.update',
         ...auditEntry(ctx, input.organizationId),
         message: `${input.status === 'enabled' ? 'Enabled' : 'Disabled'} ${describeGuardrail(updated)}`,
+        details: {
+          kind: 'mcp_guardrail_status_changed',
+          name: updated.name,
+          type: updated.type,
+          enabled: input.status === 'enabled',
+        },
       });
       return serializeGuardrail(updated);
     }),
@@ -800,6 +830,11 @@ export const organizationMcpGuardrailsRouter = createTRPCRouter({
           action: 'organization.guardrail.remove',
           ...auditEntry(ctx, input.organizationId),
           message: `Removed ${describeGuardrail(guardrail)}`,
+          details: {
+            kind: 'mcp_guardrail_removed',
+            name: guardrail.name,
+            type: guardrail.type,
+          },
           tx,
         });
       });

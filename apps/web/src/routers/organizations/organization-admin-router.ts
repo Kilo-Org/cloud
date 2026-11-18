@@ -1186,6 +1186,11 @@ export const organizationAdminRouter = createTRPCRouter({
         actor_email: ctx.user.google_user_email,
         actor_id: ctx.user.id,
         message: `Added ${existingUser.google_user_email} as ${role}`,
+        details: {
+          kind: 'member_added',
+          email: existingUser.google_user_email,
+          role,
+        },
       });
     }
 

@@ -476,6 +476,11 @@ export const githubAppsRouter = createTRPCRouter({
           message: input.integrationId
             ? `Updated GitHub App installation ${input.integrationId} model to ${input.modelSlug}`
             : `Updated GitHub App integration model to ${input.modelSlug}`,
+          details: {
+            kind: 'github_installation_changed',
+            verb: 'model_changed',
+            modelSlug: input.modelSlug,
+          },
         });
       }
 
@@ -546,6 +551,7 @@ export const githubAppsRouter = createTRPCRouter({
           actor_email: ctx.user.google_user_email,
           actor_name: ctx.user.google_user_name,
           message: `Uninstalled Kilo GitHub App installation ${input.integrationId}`,
+          details: { kind: 'github_installation_changed', verb: 'uninstalled' },
         });
       }
 
@@ -623,6 +629,7 @@ export const githubAppsRouter = createTRPCRouter({
           actor_email: ctx.user.google_user_email,
           actor_name: ctx.user.google_user_name,
           message: 'Cancelled pending GitHub App installation request',
+          details: { kind: 'github_installation_changed', verb: 'cancel_pending' },
         });
       }
 
@@ -712,6 +719,7 @@ export const githubAppsRouter = createTRPCRouter({
           actor_email: ctx.user.google_user_email,
           actor_name: ctx.user.google_user_name,
           message: `Refreshed GitHub App installation ${integration.id}`,
+          details: { kind: 'github_installation_changed', verb: 'refreshed' },
         });
       }
 

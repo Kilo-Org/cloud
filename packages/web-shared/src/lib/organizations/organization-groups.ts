@@ -447,6 +447,7 @@ export async function createOrganizationGroup(params: {
         action: 'organization.group.create',
         ...actorAudit(params.actor),
         message: `Created group "${group.name}" (${group.id})`,
+        details: { kind: 'group_created', name: group.name },
         organization_id: params.organizationId,
         tx,
       });
@@ -493,6 +494,7 @@ export async function updateOrganizationGroupMetadata(params: {
         action: 'organization.group.update',
         ...actorAudit(params.actor),
         message: `Updated group "${existing.name}" (${existing.id})`,
+        details: { kind: 'group_updated', name: existing.name },
         organization_id: params.organizationId,
         tx,
       });
@@ -542,6 +544,11 @@ export async function updateOrganizationGroupDetails(params: {
         action: 'organization.group.update',
         ...actorAudit(params.actor),
         message: `Updated group "${existing.name}" (${existing.id}) with ${userIds.length} members`,
+        details: {
+          kind: 'group_updated',
+          name: existing.name,
+          membersCount: userIds.length,
+        },
         organization_id: params.organizationId,
         tx,
       });
@@ -582,6 +589,11 @@ export async function setOrganizationGroupPolicy(params: {
         action: 'organization.group.policy.set',
         ...actorAudit(params.actor),
         message: `Set ${params.policy.type} policy for group "${group.name}" (${group.id})`,
+        details: {
+          kind: 'group_policy_set',
+          group: { id: group.id, name: group.name },
+          policyType: params.policy.type,
+        },
         organization_id: params.organizationId,
         tx,
       });
@@ -619,6 +631,11 @@ export async function removeOrganizationGroupPolicy(params: {
         action: 'organization.group.policy.remove',
         ...actorAudit(params.actor),
         message: `Removed ${params.policyType} policy from group "${group.name}" (${group.id})`,
+        details: {
+          kind: 'group_policy_removed',
+          group: { id: group.id, name: group.name },
+          policyType: params.policyType,
+        },
         organization_id: params.organizationId,
         tx,
       });
@@ -651,6 +668,11 @@ export async function setOrganizationGroupMembers(params: {
         action: 'organization.group.members.set',
         ...actorAudit(params.actor),
         message: `Set ${userIds.length} members for group "${group.name}" (${group.id})`,
+        details: {
+          kind: 'group_members_set',
+          name: group.name,
+          membersCount: userIds.length,
+        },
         organization_id: params.organizationId,
         tx,
       });
@@ -694,6 +716,7 @@ export async function setOrganizationMemberGroups(params: {
         action: 'organization.group.member_groups.set',
         ...actorAudit(params.actor),
         message: `Set ${groupIds.length} groups for organization member ${params.userId}`,
+        details: { kind: 'group_member_groups_set', groupsCount: groupIds.length },
         organization_id: params.organizationId,
         tx,
       });
@@ -741,6 +764,10 @@ async function releaseEnkryptInputGuardrailGroup(
     action: 'organization.settings.change',
     ...actorAudit(actor),
     message: `Updated AI guardrails: input guardrails now apply to all members because group "${group.name}" (${group.id}) was deleted`,
+    details: {
+      kind: 'guardrails_scope_all',
+      group: { id: group.id, name: group.name },
+    },
     organization_id: organizationId,
     tx,
   });
@@ -769,6 +796,7 @@ export async function deleteOrganizationGroup(params: {
         action: 'organization.group.delete',
         ...actorAudit(params.actor),
         message: `Deleted group "${group.name}" (${group.id})`,
+        details: { kind: 'group_deleted', name: group.name },
         organization_id: params.organizationId,
         tx,
       });
@@ -795,6 +823,7 @@ export async function setDefaultOrganizationGroupPolicy(params: {
         action: 'organization.group.default_policy.set',
         ...actorAudit(params.actor),
         message: `Set default ${params.policy.type} group policy`,
+        details: { kind: 'group_default_policy_set', policyType: params.policy.type },
         organization_id: params.organizationId,
         tx,
       });
@@ -823,6 +852,7 @@ export async function removeDefaultOrganizationGroupPolicy(params: {
         action: 'organization.group.default_policy.remove',
         ...actorAudit(params.actor),
         message: `Removed default ${params.policyType} group policy`,
+        details: { kind: 'group_default_policy_removed', policyType: params.policyType },
         organization_id: params.organizationId,
         tx,
       });

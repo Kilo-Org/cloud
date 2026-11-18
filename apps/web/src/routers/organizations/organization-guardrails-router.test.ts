@@ -429,6 +429,44 @@ describe('organization guardrails router', () => {
     );
     expect(auditLog.message).not.toContain('Phoenix');
     expect(auditLog.message).not.toContain('customer records');
+    expect(auditLog.details).toEqual({
+      kind: 'guardrails_input',
+      enabled: true,
+      group: null,
+      detectors: [
+        { id: 'injection_attack', enabled: true, action: 'block' },
+        { id: 'pii', enabled: false, action: 'log' },
+        { id: 'keyword_detector', enabled: false, action: 'block', keywordsCount: 0 },
+        { id: 'topic_detector', enabled: false, topicsCount: 0 },
+        {
+          id: 'policy_violation',
+          enabled: true,
+          action: 'block',
+          policyText: true,
+          rulesCount: 0,
+        },
+        { id: 'toxicity', enabled: false },
+        { id: 'nsfw', enabled: false },
+        { id: 'bias', enabled: false, action: 'log' },
+        { id: 'sponge_attack', enabled: false },
+      ],
+      outputEnabled: false,
+      outputDetectors: [
+        { id: 'pii', enabled: false, action: 'block' },
+        { id: 'keyword_detector', enabled: false, action: 'block', keywordsCount: 0 },
+        { id: 'topic_detector', enabled: false, action: 'block', topicsCount: 0 },
+        {
+          id: 'policy_violation',
+          enabled: false,
+          action: 'block',
+          policyText: false,
+          rulesCount: 0,
+        },
+        { id: 'toxicity', enabled: false, action: 'block' },
+        { id: 'nsfw', enabled: false, action: 'block' },
+        { id: 'bias', enabled: false, action: 'block' },
+      ],
+    });
   });
 
   it('strips the retired tool result setting when an older page sends it off', async () => {

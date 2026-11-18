@@ -208,12 +208,23 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       message: `Invitation sent to ${memberEmail}`,
       actor_email: ownerEmail,
       actor_name: 'Org admin lab owner',
+      details: {
+        kind: 'member_invited' as const,
+        email: memberEmail,
+        role: 'member' as const,
+      },
     },
     {
       action: 'organization.member.change_role' as const,
       message: `${adminEmail} was made an admin`,
       actor_email: ownerEmail,
       actor_name: 'Org admin lab owner',
+      details: {
+        kind: 'member_role_changed' as const,
+        email: adminEmail,
+        fromRole: 'member' as const,
+        toRole: 'admin' as const,
+      },
     },
     // A message that runs past the audit row's two clamped lines, so the
     // mobile screen's disclosure has a row that actually needs it.

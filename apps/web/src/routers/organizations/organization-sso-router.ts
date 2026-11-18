@@ -94,6 +94,10 @@ async function releaseSsoDomain(
     actor_id: actor.id,
     actor_name: actor.google_user_name,
     message: `Cleared SSO domain ${locked.ssoDomain}`,
+    details: {
+      kind: 'sso_domain_removed',
+      domain: locked.ssoDomain,
+    },
     organization_id: organizationId,
     tx,
   });
@@ -296,6 +300,10 @@ export const organizationSsoRouter = createTRPCRouter({
         actor_id: opts.ctx.user.id,
         actor_name: opts.ctx.user.google_user_name,
         message: `Set SSO domain to ${ssoDomain}`,
+        details: {
+          kind: 'sso_domain_set',
+          domain: ssoDomain,
+        },
         organization_id: organizationId,
         tx,
       });

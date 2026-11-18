@@ -1177,6 +1177,10 @@ export async function acceptOrganizationInvite(
         actor_id: userId,
         actor_name: null,
         message: `${invitation.email} accepted an invitation`,
+        details: {
+          kind: 'accept_invite',
+          email: invitation.email,
+        },
         organization_id: organization.id,
         tx,
       });

@@ -458,6 +458,7 @@ export const byokRouter = createTRPCRouter({
             actor_id: ctx.user.id,
             actor_name: ctx.user.google_user_name,
             message: 'Updated BYOK key priorities',
+            details: { kind: 'byok_priorities_reordered' },
             organization_id: organizationId,
             tx,
           });
@@ -540,6 +541,7 @@ export const byokRouter = createTRPCRouter({
           actor_id: ctx.user.id,
           actor_name: ctx.user.google_user_name,
           message: `Added BYOK key for provider: ${provider_id}`,
+          details: { kind: 'byok_key_changed', providerId: provider_id, verb: 'added' },
           organization_id: organizationId,
         });
       }
@@ -624,6 +626,11 @@ export const byokRouter = createTRPCRouter({
           actor_id: ctx.user.id,
           actor_name: ctx.user.google_user_name,
           message: `Updated BYOK key for provider: ${existingKey.provider_id}`,
+          details: {
+            kind: 'byok_key_changed',
+            providerId: existingKey.provider_id,
+            verb: 'updated',
+          },
           organization_id: existingKey.organization_id,
         });
       }
@@ -691,6 +698,11 @@ export const byokRouter = createTRPCRouter({
           actor_id: ctx.user.id,
           actor_name: ctx.user.google_user_name,
           message: `${is_enabled ? 'Enabled' : 'Disabled'} BYOK key for provider: ${existingKey.provider_id}`,
+          details: {
+            kind: 'byok_key_changed',
+            providerId: existingKey.provider_id,
+            verb: is_enabled ? 'enabled' : 'disabled',
+          },
           organization_id: existingKey.organization_id,
         });
       }
@@ -749,6 +761,11 @@ export const byokRouter = createTRPCRouter({
           actor_id: ctx.user.id,
           actor_name: ctx.user.google_user_name,
           message: `${serve_catalog_models ? 'Enabled' : 'Disabled'} Kilo catalog model IDs for BYOK key for provider: ${existingKey.provider_id}`,
+          details: {
+            kind: 'byok_key_changed',
+            providerId: existingKey.provider_id,
+            verb: serve_catalog_models ? 'catalog_enabled' : 'catalog_disabled',
+          },
           organization_id: existingKey.organization_id,
         });
       }
@@ -977,6 +994,11 @@ export const byokRouter = createTRPCRouter({
           actor_id: ctx.user.id,
           actor_name: ctx.user.google_user_name,
           message: `Deleted BYOK key for provider: ${existingKey.provider_id}`,
+          details: {
+            kind: 'byok_key_changed',
+            providerId: existingKey.provider_id,
+            verb: 'removed',
+          },
           organization_id: existingKey.organization_id,
         });
       }

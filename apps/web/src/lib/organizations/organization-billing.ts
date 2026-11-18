@@ -461,6 +461,11 @@ export async function processTopupForOrganization(
       actor_name: user?.google_user_name || 'unknown',
       organization_id: organization.id,
       message: `Purchased $${(amountInCents / 100).toFixed(2)} credit via ${config.type}`,
+      details: {
+        kind: 'credits_purchased',
+        amountCents: amountInCents,
+        methodType: config.type,
+      },
       tx,
     });
 

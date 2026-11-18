@@ -17,6 +17,7 @@ import {
 import { listAvailableModelsProcedure } from '@kilocode/web-shared/routers/organizations/organization-available-models-procedure';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
+import type { OrganizationAuditLogDetails } from '@kilocode/db/schema-types';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import { KILO_ORGANIZATION_ID } from '@kilocode/web-shared/lib/organizations/constants';
 import { createAllowPredicateFromRestrictions } from '@kilocode/web-shared/lib/model-allow.server';
@@ -100,6 +101,43 @@ function createAccessListsDiffMessage(
   }
 
   return changes.length > 0 ? changes.join('; ') : 'Updated access lists';
+}
+
+/**
+ * The same facts `createAccessListsDiffMessage` summarizes, as the audit row's structured
+ * details: what each list gained or lost. Empty when a list was never set or nothing changed.
+ */
+function createAccessListsDetails(
+  oldSettings: OrganizationSettings | undefined,
+  newSettings: OrganizationSettings
+): OrganizationAuditLogDetails {
+  const old = oldSettings || {};
+  const listChanged = <T>(a: readonly T[] | undefined, b: readonly T[] | undefined) =>
+    a !== b && JSON.stringify(a ?? []) !== JSON.stringify(b ?? []);
+  const added = <T>(before: readonly T[] | undefined, after: readonly T[] | undefined) => {
+    const oldSet = new Set((before || []) as T[]);
+    return ((after || []) as T[]).filter(item => !oldSet.has(item));
+  };
+  const removed = <T>(before: readonly T[] | undefined, after: readonly T[] | undefined) =>
+    added(after, before);
+
+  const deniedModelsChanged = listChanged(old.model_deny_list, newSettings.model_deny_list);
+  const providersChanged = listChanged(old.provider_allow_list, newSettings.provider_allow_list);
+  return {
+    kind: 'access_lists_changed',
+    ...(deniedModelsChanged
+      ? {
+          deniedModels: added(old.model_deny_list, newSettings.model_deny_list),
+          allowedModels: removed(old.model_deny_list, newSettings.model_deny_list),
+        }
+      : {}),
+    ...(providersChanged
+      ? {
+          allowedProviders: added(old.provider_allow_list, newSettings.provider_allow_list),
+          disallowedProviders: removed(old.provider_allow_list, newSettings.provider_allow_list),
+        }
+      : {}),
+  };
 }
 
 /**
@@ -486,12 +524,24 @@ export const organizationsSettingsRouter = createTRPCRouter({
           },
           tx
         );
+        const openRouterDisabledChanged =
+          !!previousSettings.disable_openrouter !== !!settings.disable_openrouter;
+        const regionChanged =
+          (previousSettings.data_region ?? null) !== (settings.data_region ?? null);
         await createAuditLog({
           action: 'organization.settings.change',
           actor_email: ctx.user.google_user_email,
           actor_id: ctx.user.id,
           actor_name: ctx.user.google_user_name,
           message: createGatewaySettingsDiffMessage(previousSettings, settings),
+          details: {
+            kind: 'gateway_settings_changed',
+            changed: openRouterDisabledChanged || regionChanged,
+            ...(openRouterDisabledChanged
+              ? { openRouterDisabled: !!settings.disable_openrouter }
+              : {}),
+            ...(regionChanged ? { region: settings.data_region ?? null } : {}),
+          },
           organization_id: organizationId,
           tx,
         });
@@ -563,6 +613,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
           actor_id: ctx.user.id,
           actor_name: ctx.user.google_user_name,
           message: createAccessListsDiffMessage(previousSettings, settings),
+          details: createAccessListsDetails(previousSettings, settings),
           organization_id: organizationId,
           tx,
         });
@@ -633,6 +684,21 @@ export const organizationsSettingsRouter = createTRPCRouter({
           actor_id: ctx.user.id,
           actor_name: ctx.user.google_user_name,
           message: createDefaultModelDiffMessage(previousSettings, settings),
+          details: {
+            kind: 'default_model_changed',
+            verb:
+              previousSettings?.default_model === settings.default_model
+                ? 'no_change'
+                : previousSettings?.default_model && settings.default_model
+                  ? 'changed'
+                  : settings.default_model
+                    ? 'set'
+                    : 'removed',
+            ...(previousSettings?.default_model
+              ? { oldModel: previousSettings.default_model }
+              : {}),
+            ...(settings.default_model ? { newModel: settings.default_model } : {}),
+          },
           organization_id: organizationId,
           tx,
         });
@@ -699,6 +765,12 @@ export const organizationsSettingsRouter = createTRPCRouter({
               previousRoute === undefined
                 ? `Set Organization Auto route for mode "${mode_slug}" to "${validatedModelId}"`
                 : `Updated Organization Auto route for mode "${mode_slug}": "${previousRoute}" → "${validatedModelId}"`,
+            details: {
+              kind: 'auto_route_set',
+              modeSlug: mode_slug,
+              previousRoute: previousRoute ?? null,
+              newRoute: validatedModelId as string,
+            },
             organization_id: organizationId,
             tx,
           });
@@ -753,6 +825,11 @@ export const organizationsSettingsRouter = createTRPCRouter({
             actor_id: ctx.user.id,
             actor_name: ctx.user.google_user_name,
             message: `Cleared Organization Auto route for mode "${mode_slug}" (was "${removedRoute}")`,
+            details: {
+              kind: 'auto_route_cleared',
+              modeSlug: mode_slug,
+              previousRoute: removedRoute,
+            },
             organization_id: organizationId,
             tx,
           });
@@ -876,6 +953,20 @@ export const organizationsSettingsRouter = createTRPCRouter({
                   : previousDefaultModel === ORG_AUTO_MODEL.id
                     ? 'Disabled Organization Auto and reset organization default model to global default.'
                     : 'Reset organization default model to global default.',
+            details: {
+              kind: 'default_behavior_changed',
+              behavior:
+                behavior === 'auto'
+                  ? 'organization_auto'
+                  : behavior === 'specific'
+                    ? 'specific_model'
+                    : previousDefaultModel === ORG_AUTO_MODEL.id
+                      ? 'disabled_auto'
+                      : 'reset_to_global',
+              ...(behavior === 'specific' && settings.default_model
+                ? { model: settings.default_model }
+                : {}),
+            },
             organization_id: organizationId,
             tx,
           });
@@ -918,6 +1009,15 @@ export const organizationsSettingsRouter = createTRPCRouter({
             actor_id: ctx.user.id,
             actor_name: ctx.user.google_user_name,
             message: createDataCollectionMessage(dataCollection),
+            details: {
+              kind: 'data_collection_changed',
+              value:
+                dataCollection === 'allow'
+                  ? 'allowed'
+                  : dataCollection === 'deny'
+                    ? 'denied'
+                    : 'follow_extension_setting',
+            },
             organization_id: organizationId,
             tx,
           });
@@ -974,6 +1074,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
             actor_id: ctx.user.id,
             actor_name: ctx.user.google_user_name,
             message: `Projects UI: ${projects_ui_enabled ? 'enabled' : 'disabled'}`,
+            details: { kind: 'projects_ui_changed', enabled: projects_ui_enabled },
             organization_id: organizationId,
             tx,
           });
@@ -1037,6 +1138,16 @@ export const organizationsSettingsRouter = createTRPCRouter({
             message: enabled
               ? `Minimum balance alert: enabled (threshold: $${minimum_balance}, emails: ${minimum_balance_alert_email?.join(', ')})`
               : 'Minimum balance alert: disabled',
+            details: {
+              kind: 'minimum_balance_alert_changed',
+              enabled,
+              ...(enabled && minimum_balance !== undefined
+                ? { thresholdCents: Math.round(minimum_balance * 100) }
+                : {}),
+              ...(enabled && minimum_balance_alert_email
+                ? { alertEmails: minimum_balance_alert_email }
+                : {}),
+            },
             organization_id: organizationId,
             tx,
           });
@@ -1091,6 +1202,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
           actor_id: ctx.user.id,
           actor_name: ctx.user.google_user_name,
           message: enabled ? 'Recommendations digest: enabled' : 'Recommendations digest: disabled',
+          details: { kind: 'recommendations_digest_changed', enabled },
           organization_id: organizationId,
         });
       }
@@ -1152,6 +1264,11 @@ export const organizationsSettingsRouter = createTRPCRouter({
             actor_id: ctx.user.id,
             actor_name: ctx.user.google_user_name,
             message: createBrowserControlMessage(nextPolicy),
+            details: {
+              kind: 'browser_control_changed',
+              mode: nextPolicy.browserControl,
+              origins: nextPolicy.browserAllowedOrigins,
+            },
             organization_id: organizationId,
             tx,
           });

@@ -122,6 +122,11 @@ async function writeOrganizationConnectAudit(input: {
     actor_name: input.actorName,
     organization_id: input.organizationId,
     message: organizationConnectAuditMessage(input),
+    details: {
+      kind: 'bitbucket_workspace_changed',
+      workspaceSlug: input.workspace ? input.workspace.slug : 'selection pending',
+      verb: 'connected',
+    },
   });
 }
 

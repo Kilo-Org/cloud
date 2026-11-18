@@ -5,6 +5,10 @@ import {
   organizationBillingProcedure,
 } from '@kilocode/web-shared/routers/organizations/utils';
 import { organization_audit_logs } from '@kilocode/db/schema';
+import {
+  OrganizationAuditLogDetailsSchema,
+  type OrganizationAuditLogDetails,
+} from '@kilocode/db/schema-types';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { and, eq, lt, gt, desc, asc, count, min, max, ilike, gte, lte, inArray } from 'drizzle-orm';
 import { AuditLogAction } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
@@ -32,6 +36,7 @@ type AuditLogWithPagination = {
   actor_email: string | null;
   actor_name: string | null;
   message: string;
+  details: OrganizationAuditLogDetails | null;
   created_at: string;
 };
 
@@ -78,7 +83,10 @@ export const organizationAuditLogRouter = createTRPCRouter({
         ? asc(organization_audit_logs.created_at) // When going back (previous page), fetch oldest first
         : desc(organization_audit_logs.created_at); // Default and next page, fetch newest first
 
-      // Fetch one extra record to determine if there are more pages
+      // Fetch one extra record to determine if there are more pages. `details`
+      // is read back through a parse-audit (`safeParse`): a row written by an
+      // older server with a since-changed shape must not fail the whole read —
+      // it degrades to no detail line (`null`), the same as no details at all.
       const logs = await db
         .select({
           id: organization_audit_logs.id,
@@ -87,6 +95,7 @@ export const organizationAuditLogRouter = createTRPCRouter({
           actor_email: organization_audit_logs.actor_email,
           actor_name: organization_audit_logs.actor_name,
           message: organization_audit_logs.message,
+          details: organization_audit_logs.details,
           created_at: organization_audit_logs.created_at,
         })
         .from(organization_audit_logs)
@@ -106,6 +115,10 @@ export const organizationAuditLogRouter = createTRPCRouter({
       // Staff actor details follow the caller's platform permission.
       const callerReadsStaffActors = await canCallerReadStaffAuditActors(ctx.user.id);
       const maskedLogs = maskKiloAdminActors(resultLogs, callerReadsStaffActors);
+      const parsedLogs: AuditLogWithPagination[] = maskedLogs.map(log => {
+        const parsed = OrganizationAuditLogDetailsSchema.safeParse(log.details);
+        return parsed.success ? log : { ...log, details: null };
+      });
 
       // Determine pagination flags
       const hasNext = hasMore; // Has older events
@@ -113,14 +126,14 @@ export const organizationAuditLogRouter = createTRPCRouter({
 
       // Get boundary timestamps for pagination (convert to ISO 8601 format)
       const oldestTimestamp =
-        maskedLogs.length > 0
-          ? new Date(maskedLogs[maskedLogs.length - 1].created_at).toISOString()
+        parsedLogs.length > 0
+          ? new Date(parsedLogs[parsedLogs.length - 1].created_at).toISOString()
           : null;
       const newestTimestamp =
-        maskedLogs.length > 0 ? new Date(maskedLogs[0].created_at).toISOString() : null;
+        parsedLogs.length > 0 ? new Date(parsedLogs[0].created_at).toISOString() : null;
 
       const response: AuditLogsResponse = {
-        logs: maskedLogs,
+        logs: parsedLogs,
         hasNext,
         hasPrevious,
         oldestTimestamp,

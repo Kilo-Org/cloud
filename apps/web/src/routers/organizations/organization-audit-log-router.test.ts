@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from '@jest/globals';
 import { organization_audit_logs, organization_memberships } from '@kilocode/db/schema';
+import { eq } from 'drizzle-orm';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -142,5 +143,40 @@ describe('organizations.auditLog.list actor details follow the account permissio
 
     expect(actors['staff change']).toEqual(MASKED_ACTOR);
     expect(actors['customer change']).toEqual(CUSTOMER_ACTOR);
+  });
+
+  it('returns recognized details and reads a malformed details row as none', async () => {
+    const organization = await seedOrganizationWithAuditEntries();
+    const reader = await insertTestUser({ google_user_email: 'details-reader@example.test' });
+    await addBillingManager(organization.id, reader.id);
+
+    await db
+      .update(organization_audit_logs)
+      .set({ details: { kind: 'member_invited', email: 'someone@example.test', role: 'member' } })
+      .where(eq(organization_audit_logs.message, 'customer change'));
+    // A row the server stored before the union changed shape: the read drops it rather than
+    // failing the whole page read.
+    await db
+      .update(organization_audit_logs)
+      .set({ details: { kind: 'retired_kind', other: true } as never })
+      .where(eq(organization_audit_logs.message, 'customer change'));
+
+    const caller = await createCallerForUser(reader.id);
+    const { logs } = await caller.organizations.auditLogs.list({
+      organizationId: organization.id,
+    });
+
+    expect(logs.every(log => log.details === null)).toBe(true);
+    // A second row still carries recognized details and the read returns them parsed.
+    await db
+      .update(organization_audit_logs)
+      .set({ details: { kind: 'member_invited', email: 'someone@example.test', role: 'member' } })
+      .where(eq(organization_audit_logs.message, 'staff change'));
+    const reread = await caller.organizations.auditLogs.list({ organizationId: organization.id });
+    expect(reread.logs.find(log => log.message === 'staff change')?.details).toEqual({
+      kind: 'member_invited',
+      email: 'someone@example.test',
+      role: 'member',
+    });
   });
 });

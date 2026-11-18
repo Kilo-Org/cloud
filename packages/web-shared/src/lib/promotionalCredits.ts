@@ -360,6 +360,11 @@ async function executeGrant({
       actor_name: user.google_user_name,
       organization_id: organization_id,
       message: `Granted $${amount_usd} promotional credit: ${description}`,
+      details: {
+        kind: 'promo_credit_granted',
+        amountCents: Math.round(amount_usd * 100),
+        description: description ?? '',
+      },
       tx: dbOrTx,
     });
   }

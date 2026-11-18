@@ -89,6 +89,7 @@ export const slackRouter = createTRPCRouter({
         actor_email: ctx.user.google_user_email,
         actor_name: ctx.user.google_user_name,
         message: 'Disconnected Slack integration',
+        details: { kind: 'integration_disconnected', platform: 'slack' },
       });
     }
 
@@ -133,6 +134,11 @@ export const slackRouter = createTRPCRouter({
           actor_email: ctx.user.google_user_email,
           actor_name: ctx.user.google_user_name,
           message: `Updated Slack integration model to ${input.modelSlug}`,
+          details: {
+            kind: 'integration_model_changed',
+            platform: 'slack',
+            modelSlug: input.modelSlug,
+          },
         });
       }
 

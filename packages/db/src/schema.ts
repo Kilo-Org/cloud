@@ -184,6 +184,7 @@ import type {
   OpenRouterModel,
   StripeSubscriptionStatus,
   ContributorChampionTier,
+  OrganizationAuditLogDetails,
 } from './schema-types';
 import type { AbuseClassification, GatewayApiKind } from '@kilocode/usage-contracts';
 import type { AnyPgColumn as DrizzleAnyPgColumn } from 'drizzle-orm/pg-core';
@@ -4366,6 +4367,7 @@ export const organization_audit_logs = pgTable(
     actor_name: text(),
     organization_id: uuid().notNull(),
     message: text().notNull(),
+    details: jsonb().$type<OrganizationAuditLogDetails | null>(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [

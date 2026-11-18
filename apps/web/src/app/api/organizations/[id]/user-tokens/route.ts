@@ -101,6 +101,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         actor_email: user.google_user_email,
         actor_id: user.id,
         message: `Resource token generated for organization ${organization.name}`,
+        details: {
+          kind: 'token_generated',
+          organizationName: organization.name,
+          tokenKind: 'resource',
+        },
       });
       await recordTokenMint(user, organizationId, request.headers, resource, {
         tokenKind: 'resource',
@@ -138,6 +143,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     actor_email: user.google_user_email,
     actor_id: user.id,
     message: `User token generated for organization ${organization.name}`,
+    details: {
+      kind: 'token_generated',
+      organizationName: organization.name,
+      tokenKind: 'user',
+    },
   });
   await recordTokenMint(user, organizationId, request.headers, undefined, {
     tokenKind: 'legacy',

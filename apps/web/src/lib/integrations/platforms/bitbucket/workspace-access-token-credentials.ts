@@ -209,6 +209,11 @@ async function writeAudit(input: {
     actor_name: input.actor.name,
     organization_id: input.organizationId,
     message: auditMessage(input),
+    details: {
+      kind: 'bitbucket_workspace_changed',
+      workspaceSlug: input.workspaceSlug,
+      verb: input.action,
+    },
   });
 }
 

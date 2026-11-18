@@ -289,6 +289,12 @@ export const organizationsMembersRouter = createTRPCRouter({
           actor_id: user.id,
           actor_name: user.google_user_name,
           message: `Changed role for user ${updatedUserEmail} from ${targetMember.role} to ${role}`,
+          details: {
+            kind: 'member_role_changed',
+            email: updatedUserEmail,
+            fromRole: targetMember.role,
+            toRole: role,
+          },
           organization_id: organizationId,
           tx,
         });
@@ -558,6 +564,10 @@ export const organizationsMembersRouter = createTRPCRouter({
         actor_id: user.id,
         actor_name: user.google_user_name,
         message: `Removed user ${removedUser?.google_user_email || 'unknown'}`,
+        details: {
+          kind: 'member_removed',
+          email: removedUser?.google_user_email || 'unknown',
+        },
         organization_id: organizationId,
       });
 
@@ -639,6 +649,11 @@ export const organizationsMembersRouter = createTRPCRouter({
             actor_id: user.id,
             actor_name: user.google_user_name,
             message: `Invited ${email} as ${role}`,
+            details: {
+              kind: 'member_invited',
+              email,
+              role,
+            },
             organization_id: organization.id,
             tx,
           });
@@ -779,6 +794,10 @@ export const organizationsMembersRouter = createTRPCRouter({
           actor_id: ctx.user.id,
           actor_name: ctx.user.google_user_name,
           message: `Revoked invitation for ${invitation.email}`,
+          details: {
+            kind: 'revoke_invite',
+            email: invitation.email,
+          },
           organization_id: organizationId,
           tx,
         });

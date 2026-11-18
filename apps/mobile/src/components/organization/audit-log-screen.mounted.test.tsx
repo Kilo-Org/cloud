@@ -195,24 +195,50 @@ function entries(count: number, action = 'organization.settings.change') {
     actor_email: 'owner@example.com',
     actor_name: 'Owner',
     message: `Audit event ${index}`,
+    details: null,
     created_at: '2026-01-01T00:00:00.000Z',
   }));
 }
 
-// A message that runs well past the clamped two lines: the sentence a role
-// change writes, long enough that the collapsed row must clip it.
-const LONG_MESSAGE =
-  'ada@example.com was made a billing manager for the quarterly close; the invite that followed adds them to the seats purchase that renews next month, and the invoice for those seats now bills the organization instead of the personal account it started on';
+// The localized detail a guardrails-save row builds from its structured
+// details: the sentence comes from the catalog, never from the server's stored
+// message, and at real configurations it runs past the two-line clamp.
+const LONG_TEMPLATE_DETAIL =
+  'Updated AI guardrails: enabled; applies to group Acme; detectors: Prompt injection, PII and secrets (Log only, Secrets), Banned keywords (Log only, 7 keywords), Topics (Log only, 2 topics), Policy violation (3 rules); output guardrails: enabled; output detectors: none';
 
-/** The one audit event whose message needs the row's disclosure. */
+/** The one audit event whose details need the row's disclosure. */
 function longEntry() {
   return {
     id: 'audit-long',
-    action: 'organization.member.change_role',
+    action: 'organization.settings.change',
     actor_id: 'user-1',
     actor_email: 'owner@example.com',
     actor_name: 'Owner',
-    message: LONG_MESSAGE,
+    message: 'The server never shows this sentence.',
+    details: {
+      kind: 'guardrails_input' as const,
+      enabled: true,
+      group: { id: 'g-1', name: 'Acme' },
+      detectors: [
+        { id: 'injection_attack' as const, enabled: true, action: 'block' as const },
+        {
+          id: 'pii' as const,
+          enabled: true,
+          action: 'log' as const,
+          entities: ['secrets' as const],
+        },
+        {
+          id: 'keyword_detector' as const,
+          enabled: true,
+          action: 'log' as const,
+          keywordsCount: 7,
+        },
+        { id: 'topic_detector' as const, enabled: true, action: 'log' as const, topicsCount: 2 },
+        { id: 'policy_violation' as const, enabled: true, action: 'block' as const, rulesCount: 3 },
+      ],
+      outputEnabled: true,
+      outputDetectors: [],
+    },
     created_at: '2026-01-01T00:00:00.000Z',
   };
 }
@@ -260,13 +286,14 @@ function handlerOf(node: ReactTestInstance, name: 'onPress' | 'onRetry'): Handle
   return typeof handler === 'function' ? (handler as Handler) : undefined;
 }
 
-/** The row's message line, found by its opening words in either state. */
+/** The row's detail line, found by its opening words in either state. */
 function messageLine(renderer: ReactTestRenderer) {
   return renderer.root
     .findAllByType('Text')
     .find(
       node =>
-        typeof node.props.children === 'string' && node.props.children.includes('billing manager')
+        typeof node.props.children === 'string' &&
+        node.props.children.includes('Updated AI guardrails')
     );
 }
 
@@ -350,8 +377,10 @@ describe('OrganizationAuditLogScreen', () => {
       .findAllByType('Text')
       .map(node => node.props.children)
       .filter(child => typeof child === 'string');
+    // A row without structured details shows the localized event name, actor,
+    // and time — never the stored English server sentence.
     for (const index of [0, 1, 2]) {
-      expect(messages).toContain(`Audit event ${index}`);
+      expect(messages).not.toContain(`Audit event ${index}`);
     }
     // The row names the event in the reader's language, never the wire action.
     expect(messages).toContain('Settings changed');
@@ -407,16 +436,16 @@ describe('OrganizationAuditLogScreen', () => {
     pageHook.entries = [longEntry()];
     const { renderer, unmount } = await mount();
 
-    expect(LONG_MESSAGE.length).toBeGreaterThan(200);
+    expect(LONG_TEMPLATE_DETAIL.length).toBeGreaterThan(200);
     // The node holds the whole sentence even while the layout clips it: the
     // bound is a layout prop, not a truncation of the copy.
-    expect(messageLine(renderer)?.props.children).toBe(LONG_MESSAGE);
+    expect(messageLine(renderer)?.props.children).toBe(LONG_TEMPLATE_DETAIL);
     expect(messageLine(renderer)?.props.numberOfLines).toBe(2);
 
     await pressDisclosure(renderer);
     // The same text node stays; the press drops the bound rather than swapping
     // in a second, fuller copy.
-    expect(messageLine(renderer)?.props.children).toBe(LONG_MESSAGE);
+    expect(messageLine(renderer)?.props.children).toBe(LONG_TEMPLATE_DETAIL);
     expect(messageLine(renderer)?.props.numberOfLines).not.toBe(2);
 
     await pressDisclosure(renderer);
@@ -433,7 +462,7 @@ describe('OrganizationAuditLogScreen', () => {
     const closed = pressables.find(node => disclosureState(node) === false);
     expect(closed?.props.accessibilityRole).toBe('button');
     // The clamp is visual only: a reader reaches the whole sentence unopened.
-    expect(closed?.props.accessibilityLabel).toContain(LONG_MESSAGE);
+    expect(closed?.props.accessibilityLabel).toContain(LONG_TEMPLATE_DETAIL);
 
     await pressDisclosure(renderer);
     const open = renderer.root
@@ -441,7 +470,7 @@ describe('OrganizationAuditLogScreen', () => {
       .find(node => disclosureState(node) === true);
     expect(open).toBeDefined();
     expect(open?.props.accessibilityRole).toBe('button');
-    expect(open?.props.accessibilityLabel).toContain(LONG_MESSAGE);
+    expect(open?.props.accessibilityLabel).toContain(LONG_TEMPLATE_DETAIL);
     unmount();
   });
 
@@ -454,8 +483,50 @@ describe('OrganizationAuditLogScreen', () => {
       .map(node => node.props.children)
       .filter(child => typeof child === 'string');
     expect(messages).toContain('Audit event');
-    expect(messages).toContain('Audit event 0');
+    // The generic event name replaces both the wire identifier and the server
+    // sentence a reader cannot parse.
+    expect(messages).not.toContain('Audit event 0');
     expect(messages.some(text => text.includes('organization.future.action'))).toBe(false);
+    unmount();
+  });
+
+  it('shows no detail line for a row without structured details, and never the raw server message', async () => {
+    pageHook.entries = [
+      {
+        id: 'audit-prose',
+        action: 'organization.member.change_role',
+        actor_id: 'user-1',
+        actor_email: 'owner@example.com',
+        actor_name: 'Owner',
+        message: 'Changed role for ada@example.com from member to admin',
+        details: null,
+        created_at: '2026-01-01T00:00:00.000Z',
+      },
+    ];
+    const { renderer, unmount } = await mount();
+
+    const messages = renderer.root
+      .findAllByType('Text')
+      .map(node => node.props.children)
+      .filter(child => typeof child === 'string');
+    expect(messages).toContain('Member role changed');
+    // The English server sentence stays server-facing: an old row or a prose-only writer
+    // renders the event name, actor, and time only.
+    expect(messages).not.toContain('Changed role for ada@example.com from member to admin');
+    expect(renderer.root.findAllByType('Pressable')).toHaveLength(0);
+    unmount();
+  });
+
+  it('builds the detail line from the row details, not the stored message', async () => {
+    pageHook.entries = [longEntry()];
+    const { renderer, unmount } = await mount();
+
+    const messages = renderer.root
+      .findAllByType('Text')
+      .map(node => node.props.children)
+      .filter(child => typeof child === 'string');
+    expect(messages).toContain(LONG_TEMPLATE_DETAIL);
+    expect(messages).not.toContain('The server never shows this sentence.');
     unmount();
   });
 
@@ -469,7 +540,7 @@ describe('OrganizationAuditLogScreen', () => {
       .findAllByType('Text')
       .map(node => node.props.children)
       .filter(child => typeof child === 'string');
-    expect(messages).toContain('Audit event 0');
+    expect(messages).toContain('Settings changed');
 
     const retry = renderer.root
       .findAllByType('Button')

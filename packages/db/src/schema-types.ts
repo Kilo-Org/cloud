@@ -1078,6 +1078,8 @@ export type ContributorChampionTier =
 
 // --- Organization types ---
 
+export const ORGANIZATION_ROLES = ['owner', 'admin', 'member', 'billing_manager'] as const;
+
 export type OrganizationRole = 'owner' | 'admin' | 'member' | 'billing_manager';
 
 export const OrganizationPlanSchema = z.enum(['teams', 'enterprise']);
@@ -1692,6 +1694,8 @@ export const MAX_ORGANIZATION_GROUP_ASSIGNMENTS = 1_000;
 // (`apps/web/src/lib/organizations/group-policies`) so this package stays
 // focused on database concerns. These structural types exist only to type the
 // `jsonb` columns in `schema.ts`; the app-side schemas assert compatibility.
+export const ORGANIZATION_GROUP_POLICY_TYPES = ['model_access'] as const;
+
 export type OrganizationGroupPolicyType = 'model_access';
 
 export type OrganizationGroupModelAccessPolicy = {
@@ -1883,6 +1887,293 @@ export const AuditLogAction = z.enum([
   'organization.guardrail.update',
   'organization.guardrail.remove',
 ]);
+
+// --- OrganizationAuditLogDetails ---
+
+/**
+ * Structured facts an audit log entry carries alongside its English `message` prose: names,
+ * emails, roles, counts, amounts, booleans. The mobile app renders them as sentences in the
+ * reader's language, so they hold stable identifiers and numbers only — no prose, no sentence
+ * fragments. `message` stays authoritative for the web audit page.
+ *
+ * Keys are the action values whose messages carry facts. Rows written before this column
+ * existed, and actions whose message has nothing a reader needs beyond the actor columns, have
+ * `details` null; a client that receives an unrecognized `kind` (a server newer than the client)
+ * or a value that fails validation renders no detail line rather than prose.
+ */
+export const OrganizationAuditLogDetailsSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('guardrails_input'),
+    enabled: z.boolean(),
+    /** `null` applies to every member; otherwise the group the input guardrail is limited to. */
+    group: z.object({ id: z.string(), name: z.string() }).nullable(),
+    detectors: z.array(
+      z.strictObject({
+        id: z.enum(ENKRYPT_DETECTOR_IDS),
+        enabled: z.boolean(),
+        /** Missing reads as `block` on detectors saved before the choice existed. */
+        action: EnkryptReviseDetectorActionSchema.optional(),
+        entities: z.array(EnkryptPiiEntitySchema).optional(),
+        keywordsCount: z.number().int().nonnegative().optional(),
+        topicsCount: z.number().int().nonnegative().optional(),
+        policyText: z.boolean().optional(),
+        rulesCount: z.number().int().nonnegative().optional(),
+      })
+    ),
+    outputEnabled: z.boolean(),
+    outputDetectors: z.array(
+      z.strictObject({
+        id: z.enum(ENKRYPT_OUTPUT_DETECTOR_IDS),
+        enabled: z.boolean(),
+        action: EnkryptReviseDetectorActionSchema.optional(),
+        entities: z.array(EnkryptPiiEntitySchema).optional(),
+        keywordsCount: z.number().int().nonnegative().optional(),
+        topicsCount: z.number().int().nonnegative().optional(),
+        policyText: z.boolean().optional(),
+        rulesCount: z.number().int().nonnegative().optional(),
+      })
+    ),
+  }),
+  z.object({
+    kind: z.literal('guardrails_scope_all'),
+    group: z.object({ id: z.string(), name: z.string() }),
+  }),
+  z.object({ kind: z.literal('group_created'), name: z.string() }),
+  z.object({
+    kind: z.literal('group_updated'),
+    name: z.string(),
+    membersCount: z.number().int().optional(),
+  }),
+  z.object({ kind: z.literal('group_deleted'), name: z.string() }),
+  z.object({
+    kind: z.literal('group_members_set'),
+    name: z.string(),
+    membersCount: z.number().int(),
+  }),
+  z.object({ kind: z.literal('group_member_groups_set'), groupsCount: z.number().int() }),
+  z.object({
+    kind: z.literal('group_policy_set'),
+    group: z.object({ id: z.string(), name: z.string() }),
+    policyType: z.enum(ORGANIZATION_GROUP_POLICY_TYPES),
+  }),
+  z.object({
+    kind: z.literal('group_policy_removed'),
+    group: z.object({ id: z.string(), name: z.string() }),
+    policyType: z.enum(ORGANIZATION_GROUP_POLICY_TYPES),
+  }),
+  z.object({
+    kind: z.literal('group_default_policy_set'),
+    policyType: z.enum(ORGANIZATION_GROUP_POLICY_TYPES),
+  }),
+  z.object({
+    kind: z.literal('group_default_policy_removed'),
+    policyType: z.enum(ORGANIZATION_GROUP_POLICY_TYPES),
+  }),
+  z.object({
+    kind: z.literal('member_invited'),
+    email: z.string(),
+    role: z.enum(ORGANIZATION_ROLES),
+  }),
+  z.object({
+    kind: z.literal('member_role_changed'),
+    email: z.string(),
+    fromRole: z.enum(ORGANIZATION_ROLES),
+    toRole: z.enum(ORGANIZATION_ROLES),
+  }),
+  z.object({ kind: z.literal('member_removed'), email: z.string() }),
+  z.object({
+    kind: z.literal('member_added'),
+    email: z.string(),
+    role: z.enum(ORGANIZATION_ROLES),
+  }),
+  z.object({
+    kind: z.literal('parent_member_added'),
+    email: z.string(),
+    parentOrganizationName: z.string(),
+  }),
+  z.object({
+    kind: z.literal('parent_member_removed'),
+    email: z.string(),
+    parentOrganizationName: z.string(),
+  }),
+  z.object({ kind: z.literal('accept_invite'), email: z.string() }),
+  z.object({ kind: z.literal('revoke_invite'), email: z.string() }),
+  z.object({ kind: z.literal('organization_created'), name: z.string() }),
+  z.object({
+    kind: z.literal('organization_renamed'),
+    oldName: z.string(),
+    newName: z.string(),
+  }),
+  z.object({ kind: z.literal('mode_created'), name: z.string(), slug: z.string() }),
+  z.object({ kind: z.literal('mode_deleted'), name: z.string(), slug: z.string() }),
+  z.object({
+    kind: z.literal('funds_distributed'),
+    amountMicrodollars: z.number().int().nonnegative(),
+    childCount: z.number().int().nonnegative(),
+  }),
+  z.object({
+    kind: z.literal('funds_received'),
+    amountMicrodollars: z.number().int().nonnegative(),
+    parentOrganizationName: z.string(),
+  }),
+  z.object({
+    kind: z.literal('credits_purchased'),
+    amountCents: z.number().int().nonnegative(),
+    methodType: z.string(),
+  }),
+  z.object({
+    kind: z.literal('promo_credit_granted'),
+    amountCents: z.number().int().nonnegative(),
+    description: z.string(),
+  }),
+  z.object({
+    kind: z.literal('sso_domain_set'),
+    domain: z.string(),
+    source: z.string().optional(),
+  }),
+  z.object({ kind: z.literal('sso_domain_removed'), domain: z.string() }),
+  z.object({ kind: z.literal('sso_logged_in') }),
+  z.object({
+    kind: z.literal('byok_key_changed'),
+    providerId: z.string(),
+    verb: z.enum([
+      'added',
+      'removed',
+      'enabled',
+      'disabled',
+      'catalog_enabled',
+      'catalog_disabled',
+      'updated',
+    ]),
+  }),
+  z.object({ kind: z.literal('byok_priorities_reordered') }),
+  z.object({
+    kind: z.literal('integration_model_changed'),
+    platform: z.enum(['github', 'gitlab', 'linear', 'slack', 'discord']),
+    modelSlug: z.string(),
+  }),
+  z.object({
+    kind: z.literal('integration_disconnected'),
+    platform: z.enum(['github', 'gitlab', 'linear', 'slack', 'discord']),
+  }),
+  z.object({
+    kind: z.literal('github_installation_changed'),
+    verb: z.enum(['model_changed', 'uninstalled', 'refreshed', 'cancel_pending']),
+    modelSlug: z.string().optional(),
+  }),
+  z.object({
+    kind: z.literal('review_config_changed'),
+    platform: z.string(),
+    style: z.string().optional(),
+    webhooksCreated: z.number().int().optional(),
+    webhooksDeleted: z.number().int().optional(),
+  }),
+  z.object({
+    kind: z.literal('review_agent_toggled'),
+    platform: z.string(),
+    enabled: z.boolean(),
+  }),
+  z.object({
+    kind: z.literal('gitlab_webhook_secret_rotated'),
+    webhooksUpdated: z.number().int().optional(),
+    errorsCount: z.number().int().optional(),
+  }),
+  z.object({ kind: z.literal('bitbucket_review_requested'), pullRequestUrl: z.string() }),
+  z.object({
+    kind: z.literal('token_generated'),
+    organizationName: z.string(),
+    tokenKind: z.enum(['user', 'resource']),
+  }),
+  z.object({ kind: z.literal('webhook_trigger_updated'), triggerId: z.string() }),
+  z.object({
+    kind: z.literal('gateway_settings_changed'),
+    openRouterDisabled: z.boolean().optional(),
+    region: OrganizationDataRegionSchema.nullable().optional(),
+    changed: z.boolean(),
+  }),
+  z.object({
+    kind: z.literal('access_lists_changed'),
+    allowedModels: z.array(z.string()).optional(),
+    deniedModels: z.array(z.string()).optional(),
+    allowedProviders: z.array(z.string()).optional(),
+    disallowedProviders: z.array(z.string()).optional(),
+  }),
+  z.object({
+    kind: z.literal('default_model_changed'),
+    verb: z.enum(['set', 'changed', 'removed', 'no_change']),
+    oldModel: z.string().optional(),
+    newModel: z.string().optional(),
+  }),
+  z.object({
+    kind: z.literal('auto_route_set'),
+    modeSlug: z.string(),
+    previousRoute: z.string().nullable(),
+    newRoute: z.string(),
+  }),
+  z.object({
+    kind: z.literal('auto_route_cleared'),
+    modeSlug: z.string(),
+    previousRoute: z.string(),
+  }),
+  z.object({
+    kind: z.literal('default_behavior_changed'),
+    behavior: z.enum(['organization_auto', 'specific_model', 'disabled_auto', 'reset_to_global']),
+    model: z.string().optional(),
+  }),
+  z.object({
+    kind: z.literal('data_collection_changed'),
+    value: z.enum(['allowed', 'denied', 'follow_extension_setting']),
+  }),
+  z.object({ kind: z.literal('projects_ui_changed'), enabled: z.boolean() }),
+  z.object({
+    kind: z.literal('minimum_balance_alert_changed'),
+    enabled: z.boolean(),
+    thresholdCents: z.number().int().optional(),
+    alertEmails: z.array(z.string()).optional(),
+  }),
+  z.object({ kind: z.literal('recommendations_digest_changed'), enabled: z.boolean() }),
+  z.object({
+    kind: z.literal('browser_control_changed'),
+    mode: z.string(),
+    origins: z.array(z.string()).optional(),
+  }),
+  z.object({
+    kind: z.literal('mcp_guardrail_added'),
+    name: z.string(),
+    type: z.enum(ORGANIZATION_GUARDRAIL_TYPES),
+    verb: z.enum(['added', 'approved']),
+  }),
+  z.object({
+    kind: z.literal('mcp_guardrail_updated'),
+    name: z.string(),
+    type: z.enum(ORGANIZATION_GUARDRAIL_TYPES),
+  }),
+  z.object({
+    kind: z.literal('mcp_guardrail_status_changed'),
+    name: z.string(),
+    type: z.enum(ORGANIZATION_GUARDRAIL_TYPES),
+    enabled: z.boolean(),
+  }),
+  z.object({
+    kind: z.literal('mcp_guardrail_removed'),
+    name: z.string(),
+    type: z.enum(ORGANIZATION_GUARDRAIL_TYPES),
+  }),
+  z.object({
+    kind: z.literal('guardrails_enforcement_changed'),
+    target: z.enum(['mcp', 'skill']),
+    enforcement: z.string().optional(),
+    enabled: z.boolean().optional(),
+    scanBeforeUse: z.boolean().optional(),
+  }),
+  z.object({
+    kind: z.literal('bitbucket_workspace_changed'),
+    workspaceSlug: z.string(),
+    verb: z.enum(['connected', 'rotated', 'disconnected']),
+  }),
+]);
+
+export type OrganizationAuditLogDetails = z.infer<typeof OrganizationAuditLogDetailsSchema>;
 
 // --- EncryptedData ---
 

@@ -1,12 +1,15 @@
 import {
   ENKRYPT_DETECTOR_IDS,
   ENKRYPT_OUTPUT_DETECTOR_IDS,
+  ENKRYPT_PII_ENTITIES,
+  ENKRYPT_REVISE_DETECTOR_ACTIONS,
   EnkryptInputDetectorsSchema,
   EnkryptInputDetectorsUpdateSchema,
   EnkryptInputGuardrailSettingsSchema,
   EnkryptOutputDetectorsSchema,
   EnkryptOutputDetectorsUpdateSchema,
   EnkryptOutputGuardrailSettingsSchema,
+  type EnkryptPiiEntity,
   type OrganizationSettings,
 } from '@kilocode/db/schema-types';
 import { organization_groups } from '@kilocode/db/schema';
@@ -98,6 +101,9 @@ type DescribedDetector = {
   rules?: unknown[];
 };
 
+/** Where a detector defines one, its chosen behavior when Enkrypt's verdict fires. */
+type EnkryptReviseDetectorAction = (typeof ENKRYPT_REVISE_DETECTOR_ACTIONS)[number];
+
 function describeDetectors<Id extends string>(
   ids: readonly Id[],
   detectors: Record<Id, DescribedDetector>
@@ -118,6 +124,49 @@ function describeDetectors<Id extends string>(
     return [details.length > 0 ? `${id} (${details.join(', ')})` : id];
   });
   return summaries.join(', ') || 'none';
+}
+
+/**
+ * Audit-log details for one detector: the facts `describeDetectors` summarizes, without keywords,
+ * topics, or policy text. `action` is present only where a detector defines one; `pii`
+ * additionally names the entities it scans when enabled.
+ */
+export type AuditDetectorDetails<Id extends string = string> = {
+  id: Id;
+  enabled: boolean;
+  action?: EnkryptReviseDetectorAction;
+  entities?: EnkryptPiiEntity[];
+  keywordsCount?: number;
+  topicsCount?: number;
+  policyText?: boolean;
+  rulesCount?: number;
+};
+
+const ENKRYPT_PII_ENTITY_VALUES: ReadonlySet<string> = new Set(ENKRYPT_PII_ENTITIES);
+
+function piiEntities(values: readonly string[]): EnkryptPiiEntity[] {
+  return values.filter((value): value is EnkryptPiiEntity => ENKRYPT_PII_ENTITY_VALUES.has(value));
+}
+
+function describeDetectorDetails<Id extends string>(
+  id: Id,
+  detector: DescribedDetector
+): AuditDetectorDetails<Id> {
+  return {
+    id,
+    enabled: detector.enabled,
+    ...(detector.action !== undefined && {
+      action: ENKRYPT_REVISE_DETECTOR_ACTIONS.find(action => action === detector.action),
+    }),
+    ...(detector.enabled &&
+      detector.entities !== undefined && { entities: piiEntities(detector.entities) }),
+    ...(detector.banned_keywords !== undefined && {
+      keywordsCount: detector.banned_keywords.length,
+    }),
+    ...(detector.topic !== undefined && { topicsCount: detector.topic.length }),
+    ...(detector.format !== undefined && { policyText: detector.format === 'policy_text' }),
+    ...(detector.format !== undefined && { rulesCount: detector.rules?.length ?? 0 }),
+  };
 }
 
 /**
@@ -302,6 +351,18 @@ export const organizationGuardrailsRouter = createTRPCRouter({
           actor_id: ctx.user.id,
           actor_name: ctx.user.google_user_name,
           message: describeGuardrailsConfig(config, group),
+          details: {
+            kind: 'guardrails_input',
+            enabled: config.enabled,
+            group: group ? { id: group.id, name: group.name } : null,
+            detectors: ENKRYPT_DETECTOR_IDS.map(id =>
+              describeDetectorDetails(id, enforcedEnkryptInputDetectors(config.detectors)[id])
+            ),
+            outputEnabled: config.output.enabled,
+            outputDetectors: ENKRYPT_OUTPUT_DETECTOR_IDS.map(id =>
+              describeDetectorDetails(id, config.output.detectors[id])
+            ),
+          },
           organization_id: organizationId,
           tx,
         });

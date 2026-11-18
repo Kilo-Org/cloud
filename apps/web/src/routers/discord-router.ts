@@ -55,6 +55,7 @@ export const discordRouter = createTRPCRouter({
         actor_email: ctx.user.google_user_email,
         actor_name: ctx.user.google_user_name,
         message: 'Disconnected Discord integration',
+        details: { kind: 'integration_disconnected', platform: 'discord' },
       });
     }
 
@@ -90,6 +91,11 @@ export const discordRouter = createTRPCRouter({
           actor_email: ctx.user.google_user_email,
           actor_name: ctx.user.google_user_name,
           message: `Updated Discord integration model to ${input.modelSlug}`,
+          details: {
+            kind: 'integration_model_changed',
+            platform: 'discord',
+            modelSlug: input.modelSlug,
+          },
         });
       }
 

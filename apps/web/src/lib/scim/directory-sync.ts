@@ -238,6 +238,11 @@ async function captureDirectoryDomain(
         actor_id: null,
         actor_name: null,
         message: `Set SSO domain to ${domain} from WorkOS directory sync`,
+        details: {
+          kind: 'sso_domain_set',
+          domain,
+          source: 'workos directory sync',
+        },
         organization_id: organizationId,
         tx,
       });

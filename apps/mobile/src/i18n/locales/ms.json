@@ -4710,6 +4710,7 @@
     "superseded": "Pautan ini telah diganti di tempat lain, jadi pautan ini tidak lagi berfungsi."
   },
   "sharedSession": {
+    "startedAt": "Dimulakan pada {{time}}",
     "title": "Sesi dikongsi",
     "someone": "Seseorang",
     "sharedBy": "Dikongsi oleh {{owner}}",
@@ -4865,6 +4866,8 @@
     "modelsDescription": "Matikan model untuk menyekatnya bagi setiap ahli. Model daripada pembekal yang dibenarkan dihidupkan secara lalai.",
     "modelsDeniedOnly": "Ditolak sahaja",
     "modelsEmpty": "Tiada model sepadan dengan carian ini.",
+    "modelsDeniedEmpty": "Tiada model ditolak.",
+    "modelsDeniedSearchEmpty": "Tiada model yang ditolak sepadan dengan carian ini.",
     "providersDescription": "Matikan pembekal untuk menghentikan Kilo daripada menghalakan permintaan kepadanya bagi organisasi ini.",
     "providersNeedCatalog": "Suis pembekal kekal baca sahaja sehingga katalog model penuh dimuatkan. Ketik Cuba lagi di atas untuk mengeditnya.",
     "providersEmpty": "Tiada pembekal sepadan dengan carian ini.",

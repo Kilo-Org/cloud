@@ -4852,6 +4852,7 @@
     "superseded": "Ta povezava je bila zamenjana drugje, zato ne deluje več."
   },
   "sharedSession": {
+    "startedAt": "Začeto ob {{time}}",
     "title": "Deljena seja",
     "someone": "Nekdo",
     "sharedBy": "Deli: {{owner}}",
@@ -5007,6 +5008,8 @@
     "modelsDescription": "Izklopite model, da ga blokirate za vse člane. Modeli dovoljenih ponudnikov so privzeto vklopljeni.",
     "modelsDeniedOnly": "Samo zavrnjeni",
     "modelsEmpty": "Noben model ne ustreza temu iskanju.",
+    "modelsDeniedEmpty": "Noben model ni zavrnjen.",
+    "modelsDeniedSearchEmpty": "Noben zavrnjen model ne ustreza temu iskanju.",
     "providersDescription": "Izklopite ponudnika, da Kilo za to organizacijo preneha usmerjati vanj.",
     "providersNeedCatalog": "Stikala ponudnikov ostanejo samo za branje, dokler se ne naloži celoten katalog modelov. Če jih želite urejati, zgoraj tapnite Poskusi znova.",
     "providersEmpty": "Noben ponudnik ne ustreza temu iskanju.",

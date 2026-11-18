@@ -4710,6 +4710,7 @@
     "superseded": "此連結已在其他裝置上被取代，因此已失效。"
   },
   "sharedSession": {
+    "startedAt": "開始於 {{time}}",
     "title": "已分享的工作階段",
     "someone": "某位使用者",
     "sharedBy": "由 {{owner}} 分享",
@@ -4865,6 +4866,8 @@
     "modelsDescription": "關閉模型即可對所有成員封鎖該模型。來自允許供應商的模型預設為開啟。",
     "modelsDeniedOnly": "僅顯示已拒絕",
     "modelsEmpty": "沒有符合此搜尋的模型。",
+    "modelsDeniedEmpty": "沒有已拒絕的模型。",
+    "modelsDeniedSearchEmpty": "沒有已拒絕的模型符合此搜尋。",
     "providersDescription": "關閉供應商即可停止 Kilo 為此組織將請求路由至該供應商。",
     "providersNeedCatalog": "在完整模型目錄載入完成前，供應商開關為唯讀狀態。點一下上方的再試一次即可編輯。",
     "providersEmpty": "沒有符合此搜尋的供應商。",

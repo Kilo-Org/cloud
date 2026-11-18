@@ -474,8 +474,9 @@ repository.
    the workspace, and MUST remain listable and downloadable after the sandbox
    stops. Only the session's owner, or an authorized organization member, MUST
    be able to list, download, or delete them. Deleting a file MUST remove it for
-   the user immediately; a running sandbox MAY keep its local copy. Files MUST
-   expire from the view 14 days after their last change. A replacement sandbox
+   the user immediately; a running sandbox MAY keep its local copy. Saved files
+   MUST remain available until their workspace or standalone session is deleted.
+   Deleting a sibling chat MUST NOT remove shared files. A replacement sandbox
    MUST NOT restore artifacts except from a workspace tail snapshot; outside
    that coverage, saved files remain available from cloud storage but the
    sandbox's `/artifacts` folder MAY be empty.
@@ -860,7 +861,7 @@ The following use SHOULD and are not enforced today:
   remain listable and downloadable after the sandbox stops.
 - Access is owner-only, or for an authorized organization member. Deleting a
   file removes it for the user even when a running sandbox still holds a copy.
-- Saved files expire from the view 14 days after their last change. A
+- Saved files follow the workspace or standalone session lifecycle. A
   replacement sandbox restores them only from a workspace tail snapshot.
 
 ### 2026-11-04 -- Environment start commands

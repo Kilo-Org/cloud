@@ -4710,6 +4710,7 @@
     "superseded": "Esta ligazón foi substituída desde outro dispositivo, polo que xa non funciona."
   },
   "sharedSession": {
+    "startedAt": "Iniciada ás {{time}}",
     "title": "Sesión compartida",
     "someone": "Alguén",
     "sharedBy": "Compartida por {{owner}}",
@@ -4865,6 +4866,8 @@
     "modelsDescription": "Desactiva un modelo para bloquealo para todos os membros. Os modelos dos provedores permitidos comezan activados.",
     "modelsDeniedOnly": "Só denegados",
     "modelsEmpty": "Ningún modelo coincide con esta busca.",
+    "modelsDeniedEmpty": "Ningún modelo está denegado.",
+    "modelsDeniedSearchEmpty": "Ningún modelo denegado coincide con esta busca.",
     "providersDescription": "Desactiva un provedor para impedir que Kilo encamiñe solicitudes cara a el para esta organización.",
     "providersNeedCatalog": "Os interruptores dos provedores permanecen en modo só lectura ata que se cargue o catálogo completo de modelos. Toca en Tentar de novo arriba para editalos.",
     "providersEmpty": "Ningún provedor coincide con esta busca.",

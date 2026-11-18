@@ -4710,6 +4710,7 @@
     "superseded": "このリンクは別のデバイスで置き換えられたため、使用できなくなりました。"
   },
   "sharedSession": {
+    "startedAt": "{{time}} に開始",
     "title": "共有セッション",
     "someone": "不明なユーザー",
     "sharedBy": "共有者：{{owner}}",
@@ -4865,6 +4866,8 @@
     "modelsDescription": "モデルをオフにすると、すべてのメンバーに対してそのモデルをブロックします。許可されたプロバイダーのモデルはオンで開始します。",
     "modelsDeniedOnly": "拒否のみ",
     "modelsEmpty": "この検索に一致するモデルはありません。",
+    "modelsDeniedEmpty": "拒否されたモデルはありません。",
+    "modelsDeniedSearchEmpty": "この検索に一致する拒否されたモデルはありません。",
     "providersDescription": "プロバイダーをオフにすると、この組織でKiloがそのプロバイダーへルーティングするのを停止します。",
     "providersNeedCatalog": "モデルカタログ全体が読み込まれるまで、プロバイダーのスイッチは読み取り専用です。編集するには、上の再試行をタップしてください。",
     "providersEmpty": "この検索に一致するプロバイダーはありません。",

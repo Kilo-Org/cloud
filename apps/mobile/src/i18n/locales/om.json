@@ -4710,6 +4710,7 @@
     "superseded": "Liinkiin kun bakka biraatti bakka buufameera, kanaaf kana booda hin hojjetu."
   },
   "sharedSession": {
+    "startedAt": "Yeroo {{time}} jalqabame",
     "title": "Seshinii qoodame",
     "someone": "Nama tokko",
     "sharedBy": "Kan qoode {{owner}}",
@@ -4865,6 +4866,8 @@
     "modelsDescription": "Moodela dhaabi miseensa hundaaf dhorkuuf. Moodeloonni dhiyeessitoota hayyamaman irraa dhufan banamaniin eegalu.",
     "modelsDeniedOnly": "Kan dhorkaman qofa",
     "modelsEmpty": "Moodelaan barbaacha kanaaf hin jiru.",
+    "modelsDeniedEmpty": "Moodelaan dhorkaman hin jiru.",
+    "modelsDeniedSearchEmpty": "Moodelaan dhorkaman barbaacha kanaaf hin jiru.",
     "providersDescription": "Dhiyeessaa dhaabi dhaabbata kanaaf Kilo gara isaa akka hin geessineef.",
     "providersNeedCatalog": "Furtuuwwan dhiyeessaa hanga kaataalogiin moodeelaa guutuun fe'amutti dubbisuuf qofa ta'anii turu. Isaan gulaaluuf Irra deebi'ii yaali armaan olii tuqi.",
     "providersEmpty": "Dhiyeessaan barbaacha kanaaf hin jiru.",

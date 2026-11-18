@@ -339,7 +339,7 @@ const config: ExpoConfig = {
           // over RCTComponentViewFactory.mm would never compile into the app.
           // The Expo Podfile maps this to ENV['RCT_USE_PREBUILT_RNCORE'] = '0'
           // (KILO-APP-6H; react/react-native#58299).
-          // Compile the registration and mounting guards in patches/react-native@0.88.0.patch.
+          // Compile the registration and mounting guards in patches/react-native@0.88.1.patch.
           buildReactNativeFromSource: true,
           // GoogleSignIn is a Swift static lib that imports GoogleUtilities/RecaptchaInterop
           // (pulled transitively alongside expo-iap's AppCheckCore); those pods don't define

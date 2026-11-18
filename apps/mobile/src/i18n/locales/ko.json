@@ -4710,6 +4710,7 @@
     "superseded": "다른 기기에서 이 링크가 교체되어 더 이상 작동하지 않습니다."
   },
   "sharedSession": {
+    "startedAt": "{{time}}에 시작됨",
     "title": "공유된 세션",
     "someone": "알 수 없는 사용자",
     "sharedBy": "공유자: {{owner}}",
@@ -4865,6 +4866,8 @@
     "modelsDescription": "모델을 끄면 모든 구성원에 대해 해당 모델이 차단됩니다. 허용된 공급자의 모델은 켜진 상태로 시작합니다.",
     "modelsDeniedOnly": "거부된 항목만",
     "modelsEmpty": "이 검색과 일치하는 모델이 없습니다.",
+    "modelsDeniedEmpty": "거부된 모델이 없습니다.",
+    "modelsDeniedSearchEmpty": "이 검색과 일치하는 거부된 모델이 없습니다.",
     "providersDescription": "공급자를 끄면 이 조직에서 Kilo가 해당 공급자로 라우팅하지 않습니다.",
     "providersNeedCatalog": "전체 모델 카탈로그가 로드될 때까지 공급자 스위치는 읽기 전용입니다. 편집하려면 위에서 다시 시도를 누르세요.",
     "providersEmpty": "이 검색과 일치하는 공급자가 없습니다.",

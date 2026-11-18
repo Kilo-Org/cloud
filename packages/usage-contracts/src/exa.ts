@@ -46,14 +46,16 @@ export const EXA_MAX_COST_MICRODOLLARS_PER_CALL = 100_000_000;
  * unchanged. `occurredAt` is strict ISO 8601: a PostgreSQL timestamptz read
  * back from the database is not, see `packages/db/AGENTS.md`.
  *
- * `organizationId` is the payer when non-null and uses the same strict UUID
- * check as request authentication; personal usage sends `null`, never omits it.
- * Unknown keys are rejected so an LLM usage record cannot be mistaken for one.
+ * `organizationId` is the payer when non-null; personal usage sends `null`,
+ * never omits it. Unknown keys are rejected so an LLM usage record cannot be
+ * mistaken for one.
  */
 export const ExaUsageRecordSchema = z.strictObject({
   id: z.uuid(),
   occurredAt: z.iso.datetime({ offset: true }),
   userId: z.string().min(1),
+  // Deliberately stricter than `KiloOrganizationIdSchema`: the payer mirrors the
+  // authenticated organization of the request, which uses the strict UUID check.
   organizationId: z.uuid().nullable(),
   path: z.enum(EXA_ALLOWED_PATHS),
   costMicrodollars: z.number().int().positive().safe().max(EXA_MAX_COST_MICRODOLLARS_PER_CALL),

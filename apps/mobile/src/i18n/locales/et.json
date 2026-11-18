@@ -4710,6 +4710,7 @@
     "superseded": "See link asendati mujal, mistõttu see enam ei tööta."
   },
   "sharedSession": {
+    "startedAt": "Alustatud kell {{time}}",
     "title": "Jagatud seanss",
     "someone": "Keegi",
     "sharedBy": "Jagas {{owner}}",
@@ -4865,6 +4866,8 @@
     "modelsDescription": "Lülita mudel välja, et blokeerida see kõigi liikmete jaoks. Lubatud teenusepakkujate mudelid on algselt sisse lülitatud.",
     "modelsDeniedOnly": "Ainult keelatud",
     "modelsEmpty": "Sellele otsingule ei vasta ükski mudel.",
+    "modelsDeniedEmpty": "Ükski mudel pole keelatud.",
+    "modelsDeniedSearchEmpty": "Sellele otsingule ei vasta ükski keelatud mudel.",
     "providersDescription": "Lülita teenusepakkuja välja, et Kilo ei suunaks selle organisatsiooni päringuid sellele.",
     "providersNeedCatalog": "Teenusepakkujate lülitid on kirjutuskaitstud, kuni kogu mudelikataloog on laaditud. Nende muutmiseks puuduta ülal nuppu Proovi uuesti.",
     "providersEmpty": "Sellele otsingule ei vasta ükski teenusepakkuja.",

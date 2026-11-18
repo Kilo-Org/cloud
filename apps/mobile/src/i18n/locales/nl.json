@@ -4710,6 +4710,7 @@
     "superseded": "Deze link is elders vervangen en werkt daarom niet meer."
   },
   "sharedSession": {
+    "startedAt": "Gestart om {{time}}",
     "title": "Gedeelde sessie",
     "someone": "Iemand",
     "sharedBy": "Gedeeld door {{owner}}",
@@ -4865,6 +4866,8 @@
     "modelsDescription": "Schakel een model uit om het voor elk lid te blokkeren. Modellen van toegestane aanbieders staan standaard aan.",
     "modelsDeniedOnly": "Alleen geweigerd",
     "modelsEmpty": "Geen modellen komen overeen met deze zoekopdracht.",
+    "modelsDeniedEmpty": "Geen model is geweigerd.",
+    "modelsDeniedSearchEmpty": "Geen geweigerd model komt overeen met deze zoekopdracht.",
     "providersDescription": "Schakel een aanbieder uit om te voorkomen dat Kilo voor deze organisatie naar die aanbieder routeert.",
     "providersNeedCatalog": "De schakelaars voor aanbieders blijven alleen-lezen totdat de volledige modelcatalogus is geladen. Tik hierboven op Opnieuw proberen om ze te bewerken.",
     "providersEmpty": "Geen aanbieders komen overeen met deze zoekopdracht.",

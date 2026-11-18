@@ -4710,6 +4710,7 @@
     "superseded": "此链接已在其他设备上被替换，现已失效。"
   },
   "sharedSession": {
+    "startedAt": "开始于 {{time}}",
     "title": "已分享的会话",
     "someone": "某人",
     "sharedBy": "由{{owner}}分享",
@@ -4865,6 +4866,8 @@
     "modelsDescription": "关闭某个模型即可为所有成员阻止该模型。来自已允许提供商的模型初始为开启。",
     "modelsDeniedOnly": "仅显示已拒绝",
     "modelsEmpty": "没有匹配此搜索的模型。",
+    "modelsDeniedEmpty": "没有已拒绝的模型。",
+    "modelsDeniedSearchEmpty": "没有匹配此搜索的已拒绝模型。",
     "providersDescription": "关闭某个提供商即可阻止 Kilo 为此组织路由到该提供商。",
     "providersNeedCatalog": "在完整模型目录加载完成前，提供商开关为只读状态。点按上方的重试即可编辑。",
     "providersEmpty": "没有匹配此搜索的提供商。",

@@ -4710,6 +4710,7 @@
     "superseded": "Tautan ini telah diganti dari perangkat lain, sehingga tidak lagi berfungsi."
   },
   "sharedSession": {
+    "startedAt": "Dimulai pukul {{time}}",
     "title": "Sesi yang dibagikan",
     "someone": "Seseorang",
     "sharedBy": "Dibagikan oleh {{owner}}",
@@ -4865,6 +4866,8 @@
     "modelsDescription": "Nonaktifkan model untuk memblokirnya bagi setiap anggota. Model dari penyedia yang diizinkan aktif secara bawaan.",
     "modelsDeniedOnly": "Hanya yang ditolak",
     "modelsEmpty": "Tidak ada model yang cocok dengan pencarian ini.",
+    "modelsDeniedEmpty": "Tidak ada model yang ditolak.",
+    "modelsDeniedSearchEmpty": "Tidak ada model yang ditolak yang cocok dengan pencarian ini.",
     "providersDescription": "Nonaktifkan penyedia untuk menghentikan Kilo merutekan ke penyedia itu untuk organisasi ini.",
     "providersNeedCatalog": "Sakelar penyedia tetap hanya-baca hingga katalog model lengkap dimuat. Coba lagi di atas untuk mengeditnya.",
     "providersEmpty": "Tidak ada penyedia yang cocok dengan pencarian ini.",

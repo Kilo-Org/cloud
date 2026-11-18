@@ -4710,6 +4710,7 @@
     "superseded": "Yo te ranplase lyen sa a yon lòt kote, kidonk li pa mache ankò."
   },
   "sharedSession": {
+    "startedAt": "Kòmanse a {{time}}",
     "title": "Sesyon pataje",
     "someone": "Yon moun",
     "sharedBy": "Pataje pa {{owner}}",
@@ -4865,6 +4866,8 @@
     "modelsDescription": "Dezaktive yon modèl pou bloke l pou tout manm yo. Modèl ki soti nan founisè otorize yo aktive pa defo.",
     "modelsDeniedOnly": "Refize sèlman",
     "modelsEmpty": "Pa gen modèl ki koresponn ak rechèch sa a.",
+    "modelsDeniedEmpty": "Pa gen modèl ki refize.",
+    "modelsDeniedSearchEmpty": "Pa gen modèl refize ki koresponn ak rechèch sa a.",
     "providersDescription": "Dezaktive yon founisè pou anpeche Kilo dirije demann yo vin jwenn li pou òganizasyon sa a.",
     "providersNeedCatalog": "Entèriptè founisè yo rete an lekti sèlman jiskaske katalòg konplè modèl yo fin chaje. Eseye ankò anwo a pou w ka modifye yo.",
     "providersEmpty": "Pa gen founisè ki koresponn ak rechèch sa a.",

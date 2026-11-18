@@ -4710,6 +4710,7 @@
     "superseded": "Dette link blev erstattet et andet sted, så det virker ikke længere."
   },
   "sharedSession": {
+    "startedAt": "Startet kl. {{time}}",
     "title": "Delt session",
     "someone": "Nogen",
     "sharedBy": "Delt af {{owner}}",
@@ -4865,6 +4866,8 @@
     "modelsDescription": "Slå en model fra for at blokere den for alle medlemmer. Modeller fra tilladte udbydere er slået til fra start.",
     "modelsDeniedOnly": "Kun afviste",
     "modelsEmpty": "Ingen modeller matcher denne søgning.",
+    "modelsDeniedEmpty": "Ingen model er afvist.",
+    "modelsDeniedSearchEmpty": "Ingen afvist model matcher denne søgning.",
     "providersDescription": "Slå en udbyder fra for at forhindre, at Kilo dirigerer anmodninger til den for denne organisation.",
     "providersNeedCatalog": "Udbyderkontakterne er skrivebeskyttede, indtil hele modelkataloget er indlæst. Tryk på Prøv igen ovenfor for at redigere dem.",
     "providersEmpty": "Ingen udbydere matcher denne søgning.",

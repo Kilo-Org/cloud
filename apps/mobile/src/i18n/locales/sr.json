@@ -4781,6 +4781,7 @@
     "superseded": "Ovaj link je zamenjen na drugom mestu, pa više ne radi."
   },
   "sharedSession": {
+    "startedAt": "Započeto u {{time}}",
     "title": "Deljena sesija",
     "someone": "Neko",
     "sharedBy": "Podelio/la {{owner}}",
@@ -4936,6 +4937,8 @@
     "modelsDescription": "Isključite model da biste ga blokirali za svakog člana. Modeli dozvoljenih pružalaca su na početku uključeni.",
     "modelsDeniedOnly": "Samo zabranjeni",
     "modelsEmpty": "Nijedan model ne odgovara ovoj pretrazi.",
+    "modelsDeniedEmpty": "Nijedan model nije zabranjen.",
+    "modelsDeniedSearchEmpty": "Nijedan zabranjeni model ne odgovara ovoj pretrazi.",
     "providersDescription": "Isključite pružaoca da Kilo za ovu organizaciju prestane da usmerava na njega.",
     "providersNeedCatalog": "Prekidači pružalaca ostaju samo za čitanje dok se ne učita ceo katalog modela. Da biste ih menjali, dodirnite Pokušaj ponovo iznad.",
     "providersEmpty": "Nijedan pružalac ne odgovara ovoj pretrazi.",

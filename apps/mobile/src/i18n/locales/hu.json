@@ -4710,6 +4710,7 @@
     "superseded": "Ezt a linket máshol lecserélték, ezért már nem működik."
   },
   "sharedSession": {
+    "startedAt": "Indítva: {{time}}",
     "title": "Megosztott munkamenet",
     "someone": "Valaki",
     "sharedBy": "Megosztotta: {{owner}}",
@@ -4865,6 +4866,8 @@
     "modelsDescription": "Kapcsoljon ki egy modellt, hogy az minden tag számára le legyen tiltva. Az engedélyezett szolgáltatóktól származó modellek bekapcsolva indulnak.",
     "modelsDeniedOnly": "Csak letiltottak",
     "modelsEmpty": "Nincs a keresésnek megfelelő modell.",
+    "modelsDeniedEmpty": "Nincs letiltott modell.",
+    "modelsDeniedSearchEmpty": "Nincs a keresésnek megfelelő letiltott modell.",
     "providersDescription": "Kapcsoljon ki egy szolgáltatót, hogy a Kilo ne irányítson hozzá kéréseket ennél a szervezetnél.",
     "providersNeedCatalog": "A szolgáltatók kapcsolói csak olvashatók maradnak, amíg a teljes modellkatalógus be nem töltődik. A szerkesztésükhöz koppintson fent az Újrapróbálkozás gombra.",
     "providersEmpty": "Nincs a keresésnek megfelelő szolgáltató.",

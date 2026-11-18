@@ -4710,6 +4710,7 @@
     "superseded": "Esteka hau beste nonbait ordeztu da, beraz, jada ez du funtzionatzen."
   },
   "sharedSession": {
+    "startedAt": "Hasiera: {{time}}",
     "title": "Partekatutako saioa",
     "someone": "Norbait",
     "sharedBy": "Partekatzailea: {{owner}}",
@@ -4865,6 +4866,8 @@
     "modelsDescription": "Desaktibatu eredu bat kide guztientzat blokeatzeko. Baimendutako hornitzaileen ereduak aktibatuta daude hasieran.",
     "modelsDeniedOnly": "Ukatutakoak soilik",
     "modelsEmpty": "Ez dago bilaketa honekin bat datorren eredurik.",
+    "modelsDeniedEmpty": "Ez dago ukatutako eredurik.",
+    "modelsDeniedSearchEmpty": "Ez dago bilaketa honekin bat datorren ukatutako eredurik.",
     "providersDescription": "Desaktibatu hornitzaile bat, Kilok erakunde honen eskaerak harengana bidera ez ditzan.",
     "providersNeedCatalog": "Hornitzaileen etengailuak irakurtzeko soilik egongo dira ereduen katalogo osoa kargatu arte. Editatzeko, sakatu goiko Saiatu berriro.",
     "providersEmpty": "Ez dago bilaketa honekin bat datorren hornitzailerik.",

@@ -4852,6 +4852,7 @@
     "superseded": "Ten link został zastąpiony na innym urządzeniu, więc już nie działa."
   },
   "sharedSession": {
+    "startedAt": "Rozpoczęto o {{time}}",
     "title": "Udostępniona sesja",
     "someone": "Ktoś",
     "sharedBy": "Udostępnione przez: {{owner}}",
@@ -5007,6 +5008,8 @@
     "modelsDescription": "Wyłącz model, aby zablokować go dla wszystkich członków. Modele od dozwolonych dostawców są domyślnie włączone.",
     "modelsDeniedOnly": "Tylko zablokowane",
     "modelsEmpty": "Żadne modele nie pasują do tego wyszukiwania.",
+    "modelsDeniedEmpty": "Żaden model nie jest zablokowany.",
+    "modelsDeniedSearchEmpty": "Żaden zablokowany model nie pasuje do tego wyszukiwania.",
     "providersDescription": "Wyłącz dostawcę, aby Kilo przestało kierować do niego żądania w tej organizacji.",
     "providersNeedCatalog": "Przełączniki dostawców pozostają tylko do odczytu, dopóki nie wczyta się pełny katalog modeli. Aby je edytować, dotknij przycisku Spróbuj ponownie powyżej.",
     "providersEmpty": "Żaden dostawca nie pasuje do tego wyszukiwania.",

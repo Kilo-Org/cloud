@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one overview screen: identity, the usage counts and every configuration section share one data layer and one scroll body */
 import { useQueryClient } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
 import { lazy, Suspense, useEffect, useState } from 'react';

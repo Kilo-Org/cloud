@@ -213,8 +213,8 @@ export function CreditPurchaseScreen() {
     ? [
         ...new Set(
           products
-            .map(pack => getStoreCreditExpiryMessageKey(pack.backend, storefront) ?? undefined)
-            .filter((key): key is string => key !== undefined)
+            .map(pack => getStoreCreditExpiryMessageKey(pack.backend, storefront))
+            .filter((key): key is NonNullable<typeof key> => key !== undefined)
         ),
       ].map(key => t(key))
     : [];
@@ -516,7 +516,7 @@ export function CreditPurchaseScreen() {
                       <ConfigureRow
                         icon={Wallet}
                         title={packLabel}
-                        subtitle={stateLabel}
+                        subtitle={stateLabel ?? undefined}
                         // One line under the title, capped by the row frame:
                         // the state phrase never wraps into a second line, so
                         // no row changes height when a purchase or the store

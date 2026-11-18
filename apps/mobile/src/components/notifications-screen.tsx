@@ -245,7 +245,6 @@ function CategoryRow({
   isPending,
   onChange,
 }: CategoryRowProps) {
-  const colors = useThemeColors();
   const { t } = useTranslation();
   const Icon = meta.icon;
   // Display the optimistic value while a mutation is in flight; otherwise

@@ -9,7 +9,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
  * One control of a reorderable item's action line. The icon is the control's
  * only ink, so `label` is its whole accessible name.
  */
-export type ReorderableItemAction = Readonly<{
+type ReorderableItemAction = Readonly<{
   label: string;
   /** The item's place in the list, which a name cannot carry. */
   hint?: string;

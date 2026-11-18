@@ -99,6 +99,7 @@ export function BalanceBlock({
     </View>
   );
 
+  const stackedAction = action == null ? null : <View className="items-end">{action}</View>;
   return (
     // The card takes no touch itself, so the account picker's hit slop above it
     // (the Credits header row) still reaches into the card's top padding; its
@@ -112,7 +113,7 @@ export function BalanceBlock({
         </View>
         {!stacked && visibilityControl}
       </Animated.View>
-      {stacked ? action == null ? null : <View className="items-end">{action}</View> : action}
+      {stacked ? stackedAction : action}
     </Card>
   );
 }

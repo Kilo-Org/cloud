@@ -184,6 +184,9 @@ export function RepoBindingsScreen({
   // the Add action, and a member's state says why it has none instead of a
   // second sentence under the copy.
   const emptySurface = isEmpty && !isAdding;
+  // A read-only viewer is told the rule instead of an action the screen withholds.
+  const readOnlyDescription =
+    profilePermission === 'read-only' ? t('profiles.organizationRoleRequired') : undefined;
 
   return (
     <View className="flex-1 bg-background">
@@ -194,13 +197,7 @@ export function RepoBindingsScreen({
           title={t('profiles.repoBindings.empty')}
           // The empty state must not name an action the screen withholds: a
           // member cannot add a default, so its state names the role instead.
-          description={
-            canManage
-              ? t('profiles.repoBindings.emptyDescription')
-              : profilePermission === 'read-only'
-                ? t('profiles.organizationRoleRequired')
-                : undefined
-          }
+          description={canManage ? t('profiles.repoBindings.emptyDescription') : readOnlyDescription}
           action={
             canManage ? (
               <StateAction

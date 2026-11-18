@@ -299,7 +299,7 @@ export function PasskeysScreen() {
           // what keeps the field and the controls under it above the keyboard.
           automaticallyAdjustKeyboardInsets
         >
-          {panelOpen && (
+          {management.verification.state.phase !== 'closed' && (
             <PasskeyVerificationPanel
               state={management.verification.state}
               onChoosePasskey={management.verification.handleChoosePasskey}

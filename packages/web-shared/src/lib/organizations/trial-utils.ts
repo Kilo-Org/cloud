@@ -12,6 +12,7 @@ export {
 export type {
   OrganizationEntitlementBypassReason,
   OrganizationEntitlementClassification,
+  OrganizationTrialDisplayStatus,
 } from '@kilocode/organization-entitlement';
 
 export function isStatusReadOnly(status: OrganizationTrialDisplayStatus): boolean {

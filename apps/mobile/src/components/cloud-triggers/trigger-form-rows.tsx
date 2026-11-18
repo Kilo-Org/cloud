@@ -49,7 +49,7 @@ export function TriggerSelectRow({
         onPress={onPress}
         className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 active:opacity-70')}
       >
-        {/* The label names the field in every state; the value and the chevron carry the disabled cue. */}
+        {/* The label names the field in every state; the muted value carries the disabled cue. */}
         <Text className="shrink-0 text-sm font-medium text-foreground">{label}</Text>
         <Text
           numberOfLines={1}

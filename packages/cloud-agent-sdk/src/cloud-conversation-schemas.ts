@@ -9,13 +9,14 @@ import {
   customerBillingFailureSchema,
 } from '@kilocode/session-ingest-contracts';
 import { preparationStepSchema } from './preparation-step';
-import { readKilo2Messages } from './kilo2-source-messages';
+import { hasUnresolvedKilo2Assets, readKilo2Messages } from './kilo2-source-messages';
 import type {
   CloudAgentSessionId,
   CloudSessionSnapshotPage,
   MessageInfo,
   Part,
   SessionGoal,
+  SessionSnapshot,
 } from './types';
 
 export const cloudAgentSessionIdSchema = z.custom<CloudAgentSessionId>(
@@ -325,7 +326,22 @@ export const cloudSessionMessagesPageSchema = cloudSessionMessagesPageWireSchema
           omittedItemCount++;
           continue;
         }
-        const display = readKilo2Messages(native.source.session, [parsed.data])[0];
+        // An attachment without an authorized URL has no display; omit only
+        // this message and keep the rest of the page, as the live source does.
+        // A compaction reference is not a file position, so it resolves anyway.
+        // The per-message guard keeps any projection failure from failing the
+        // whole page; the omitted-item count is the visible signal.
+        let display: SessionSnapshot['messages'][number] | undefined;
+        if (hasUnresolvedKilo2Assets(parsed.data)) {
+          display = undefined;
+        } else {
+          try {
+            display = readKilo2Messages(native.source.session, [parsed.data])[0];
+          } catch (error) {
+            console.error(`[ConversationSource] Native message ${parsed.data.id} omitted:`, error);
+            display = undefined;
+          }
+        }
         if (!display) {
           // A compaction still in progress is shown once it completes; any
           // other message the projection cannot show is an omitted item.

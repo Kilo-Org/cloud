@@ -26,6 +26,7 @@
     "creditHistory": "Krediitide ajalugu",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Tühista",
     "done": "Valmis",
     "retry": "Proovi uuesti",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "Muudatused",
     "organizationTrialEnded": "Organisatsiooni prooviperiood on lõppenud ja sellel pole aktiivset paketti. Organisatsiooni omanik saab arveldust kilo.ai keskkonnas uuendada ja seejärel uuesti proovida.",
-    "privateRepositoryA11y": "{{name}}, privaatne repositoorium"
+    "privateRepositoryA11y": "{{name}}, privaatne repositoorium",
+    "legalDocumentEnglishOnly": "See dokument on saadaval ainult inglise keeles."
   },
   "language": {
     "restarting": "Keele vahetamiseks taaskäivitatakse rakendus",
@@ -481,7 +483,14 @@
       "viewReceipt": "Vaata kinnitust"
     },
     "changelog": "Mis on uut",
-    "changelogVersionPending": "Selle versiooni märkmed saabuvad rakenduse järgmise uuendusega."
+    "changelogVersionPending": "Versiooni {{version}} märkmed saabuvad rakenduse järgmise uuendusega.",
+    "changelogGroupNew": "Uut",
+    "changelogFixesIn": "Parandused ja täiustused järgmistes osades: {{areas}}.",
+    "changelogFixesPolish": "Parandused ja täiustused kogu rakenduses.",
+    "changelogAreas": {
+      "signIn": "Sisselogimine",
+      "profileOrganizations": "Profiil ja organisatsioonid"
+    }
   },
   "preferences": {
     "general": "Üldine",
@@ -1354,7 +1363,8 @@
       "managedOnWeb": "Selle organisatsiooni Bitbucketi ühendust hallatakse arvutis veebi kaudu.",
       "description": "Loo nõutavate õigustega tööruumi juurdepääsutunnus ja kleebi see allolevale väljale.",
       "scopes": "Konto: lugemine · Hoidlad: lugemine/kirjutamine · Tõmbetaotlused: lugemine · Veebihaagid: lugemine/kirjutamine",
-      "tokenPlaceholder": "Tööruumi juurdepääsutunnus"
+      "tokenPlaceholder": "Tööruumi juurdepääsutunnus",
+      "tokenRefused": "Bitbucket ei võtnud seda tööruumi juurdepääsutunnust vastu. Kontrolli, et sellel oleksid ülaltoodud õigused, ja proovi seejärel uuesti."
     },
     "scopeList": {
       "personalStillAvailable": "Isiklikud hoidlad on allpool siiski saadaval.",
@@ -1465,7 +1475,8 @@
       "repositoryLine": "Ülevaatused: {{reviews}} · Leiud: {{findings}}",
       "empty": "Analüütikaga ülevaatusi veel pole",
       "emptyDescription": "Analüütika salvestab lõpetatud ülevaatused, kui see on organisatsioonis lubatud.",
-      "off": "Analüütika on selles organisatsioonis välja lülitatud.",
+      "offTitle": "Analüütika on platvormil {{platform}} välja lülitatud",
+      "offDescription": "Lülita see sisse organisatsiooni seadetes veebis, et salvestada lõpetatud ülevaatused.",
       "couldNotLoad": "Analüütikat ei õnnestunud laadida"
     },
     "council": {
@@ -3325,6 +3336,7 @@
       "manageOnWeb": "Arvelduse seaded veebis",
       "changePlan": "Muuda plaani",
       "buySeats": "Osta kasutajakohti",
+      "managedOnWeb": "Plaani, kasutajakohti ja automaatset täiendamist hallatakse veebis.",
       "setupAutoTopUp": "Seadista automaatne täiendamine",
       "manageAutoTopUp": "Halda automaatset täiendamist",
       "opensOnWeb": "Avaneb veebis"
@@ -3473,12 +3485,10 @@
       "requestLogs": "Päringulogid"
     },
     "requestLogs": {
-      "hint": "Akna lõpule eelnenud tunni päringud, uusimad eespool.",
       "older": "Varasem tund",
       "newer": "Hilisem tund",
       "truncated": "Selles tunnis on rohkem päringuid, kui loendis kuvatakse.",
       "emptyTitle": "Päringuid pole",
-      "emptyDescription": "Selles tunnis pole lüüsipäringuid.",
       "loadError": "Päringulogide laadimine ebaõnnestus.",
       "permissionDenied": "Päringulogisid saavad lugeda ainult organisatsiooni omanik, administraator või arvelduse haldur.",
       "tokens": "{{input}} sisse · {{output}} välja",
@@ -4282,8 +4292,7 @@
       "repoValue": "Hoidla: {{name}}",
       "profileValue": "Profiil: {{name}}",
       "profileUnavailable": "See profiil pole enam saadaval. Vali mõni teine.",
-      "pickerEmptyDescriptionOrganization": "Loo organisatsiooniprofiil keskkonnamuutujate, häälestuskäskude ja oskuste taaskasutamiseks seansside jooksul.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Organisatsiooni omanik või administraator saab organisatsiooniprofiili luua."
+      "pickerEmptyDescriptionOrganization": "Loo organisatsiooniprofiil keskkonnamuutujate, häälestuskäskude ja oskuste taaskasutamiseks seansside jooksul."
     },
     "variablesDeleteFailed": "Muutujat ei õnnestunud kustutada",
     "deleteVariable": "Kustuta muutuja {{key}}",
@@ -4469,7 +4478,6 @@
     "dismiss": "Jäta ülevaade kõrvale",
     "offline": "Võrguühenduseta · salvestatud ülevaade",
     "cached": "Salvestatud ülevaade · värskendamine pole saadaval",
-    "window": "{{start}} – {{end}}",
     "summary": "AI kokkuvõte",
     "summaryPending": "AI kokkuvõtet koostatakse. See lisatakse siia, kui on valmis.",
     "summaryUnavailable": "AI kokkuvõte pole saadaval. Struktureeritud ülevaade on endiselt saadaval.",
@@ -4588,6 +4596,7 @@
       "title": "Päästikud ja veebihaagid",
       "subtitle": "Automatiseeri Cloud Agent käivitused veebihaagi kutse või ajakava kaudu.",
       "new": "Uus päästik",
+      "create": "Loo päästik",
       "emptyTitle": "Päästikuid veel pole",
       "emptyDescription": "Loo päästik, et alustada Cloud Agent käivitust veebihaagi kutse või ajakava alusel.",
       "loadFailedTitle": "Päästikute laadimine ebaõnnestus",
@@ -4641,6 +4650,8 @@
       "created": "Päästik loodud",
       "saved": "Päästik salvestatud",
       "statusArrived": "Saabunud",
+      "defaultPromptWebhook": "Kirjelda selle veebihaagi päringu keha:\n\n{{body}}",
+      "defaultPromptScheduled": "Käivita ajastatud ülesanne. Käivitatud kell {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Sisesta nimi.",
         "nameTooShort": "Kasuta vähemalt 8 tähemärki.",

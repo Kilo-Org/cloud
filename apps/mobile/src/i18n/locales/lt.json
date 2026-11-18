@@ -26,6 +26,7 @@
     "creditHistory": "Kreditų istorija",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Atšaukti",
     "done": "Baigti",
     "retry": "Bandyti dar kartą",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "Pakeitimai",
     "organizationTrialEnded": "Organizacijos bandomasis laikotarpis baigėsi ir ji neturi aktyvaus plano. Organizacijos savininkas gali atnaujinti atsiskaitymo duomenis adresu kilo.ai, tada bandykite dar kartą.",
-    "privateRepositoryA11y": "{{name}}, privati saugykla"
+    "privateRepositoryA11y": "{{name}}, privati saugykla",
+    "legalDocumentEnglishOnly": "Šis dokumentas prieinamas tik anglų kalba."
   },
   "language": {
     "restarting": "Paleidžiama iš naujo, kad būtų pakeista kalba",
@@ -481,7 +483,14 @@
       "viewReceipt": "Peržiūrėti patvirtinimą"
     },
     "changelog": "Kas naujo",
-    "changelogVersionPending": "Šios versijos pastabos pasirodys su kitu programėlės atnaujinimu."
+    "changelogVersionPending": "{{version}} versijos pastabos pasirodys su kitu programėlės atnaujinimu.",
+    "changelogGroupNew": "Nauja",
+    "changelogFixesIn": "Pataisymai ir patobulinimai šiose srityse: {{areas}}.",
+    "changelogFixesPolish": "Pataisymai ir patobulinimai visoje programėlėje.",
+    "changelogAreas": {
+      "signIn": "Prisijungimas",
+      "profileOrganizations": "Profilis ir organizacijos"
+    }
   },
   "preferences": {
     "general": "Bendra",
@@ -1400,7 +1409,8 @@
       "managedOnWeb": "Šios organizacijos Bitbucket ryšys valdomas žiniatinklyje naudojant kompiuterį.",
       "description": "Sukurk darbo srities prieigos raktą su reikiamomis teisėmis ir įklijuok jį žemiau.",
       "scopes": "Paskyra: skaityti · Saugyklos: skaityti / rašyti · Pakeitimų užklausos: skaityti · Webhook: skaityti / rašyti",
-      "tokenPlaceholder": "Darbo srities prieigos raktas"
+      "tokenPlaceholder": "Darbo srities prieigos raktas",
+      "tokenRefused": "Bitbucket nepriėmė šio darbo srities prieigos rakto. Patikrink, ar jis turi aukščiau nurodytas teises, tada bandyk dar kartą."
     },
     "scopeList": {
       "personalStillAvailable": "Asmenines saugyklas vis dar gali pasiekti žemiau.",
@@ -1513,7 +1523,8 @@
       "repositoryLine": "Peržiūros: {{reviews}} · Radiniai: {{findings}}",
       "empty": "Dar nėra peržiūrų su analitika",
       "emptyDescription": "Analitika fiksuoja užbaigtas peržiūras, kol ji įjungta organizacijai.",
-      "off": "Šiai organizacijai analitika išjungta.",
+      "offTitle": "Analitika išjungta platformai {{platform}}",
+      "offDescription": "Įjunk ją organizacijos nustatymuose žiniatinklyje, kad fiksuotų užbaigtas peržiūras.",
       "couldNotLoad": "Nepavyko įkelti analitikos"
     },
     "council": {
@@ -3439,6 +3450,7 @@
       "manageOnWeb": "Atsiskaitymo nustatymai žiniatinklyje",
       "changePlan": "Keisti planą",
       "buySeats": "Pirkti vietų",
+      "managedOnWeb": "Planas, vietos ir automatinis papildymas valdomi žiniatinklyje.",
       "setupAutoTopUp": "Nustatyti automatinį papildymą",
       "manageAutoTopUp": "Tvarkyti automatinį papildymą",
       "opensOnWeb": "Atidaroma žiniatinklyje"
@@ -3587,12 +3599,10 @@
       "requestLogs": "Užklausų žurnalai"
     },
     "requestLogs": {
-      "hint": "Užklausos per valandą iki lango pabaigos, naujausios pirmos.",
       "older": "Ankstesnė valanda",
       "newer": "Vėlesnė valanda",
       "truncated": "Šią valandą užklausų buvo daugiau, nei rodoma sąraše.",
       "emptyTitle": "Užklausų nėra",
-      "emptyDescription": "Šią valandą šliuzo užklausų nebuvo.",
       "loadError": "Nepavyko įkelti užklausų žurnalų.",
       "permissionDenied": "Organizacijos užklausų žurnalus gali skaityti tik jos savininkas, administratorius arba atsiskaitymų valdytojas.",
       "tokens": "Įvestis {{input}} · išvestis {{output}}",
@@ -4414,8 +4424,7 @@
       "repoValue": "Saugykla: {{name}}",
       "profileValue": "Profilis: {{name}}",
       "profileUnavailable": "Šis profilis nebepasiekiamas. Pasirinkite kitą.",
-      "pickerEmptyDescriptionOrganization": "Sukurkite organizacijos profilį, kad seansų metu pakartotinai naudotumėte aplinkos kintamuosius, sąrankos komandas ir įgūdžius.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Organizacijos savininkas arba administratorius gali sukurti organizacijos profilį."
+      "pickerEmptyDescriptionOrganization": "Sukurkite organizacijos profilį, kad seansų metu pakartotinai naudotumėte aplinkos kintamuosius, sąrankos komandas ir įgūdžius."
     },
     "variablesDeleteFailed": "Nepavyko ištrinti kintamojo",
     "deleteVariable": "Ištrinti kintamąjį {{key}}",
@@ -4609,7 +4618,6 @@
     "dismiss": "Atmesti suvestinę",
     "offline": "Neprisijungta · išsaugota suvestinė",
     "cached": "Išsaugota suvestinė · atnaujinti negalima",
-    "window": "{{start}} – {{end}}",
     "summary": "AI santrauka",
     "summaryPending": "AI santrauka rengiama. Kai bus paruošta, ji atsiras čia.",
     "summaryUnavailable": "AI santrauka nepasiekiama. Struktūruota suvestinė vis dar prieinama.",
@@ -4728,6 +4736,7 @@
       "title": "Trigeriai ir žiniatinklio kabliukai",
       "subtitle": "Automatizuokite Cloud Agent paleidimus pagal žiniatinklio kabliuko iškvietimą arba grafiką.",
       "new": "Naujas trigeris",
+      "create": "Sukurti trigerį",
       "emptyTitle": "Trigerių dar nėra",
       "emptyDescription": "Sukurkite trigerį, kad Cloud Agent būtų paleistas pagal žiniatinklio kabliuko iškvietimą arba pagal grafiką.",
       "loadFailedTitle": "Nepavyko įkelti trigerių",
@@ -4781,6 +4790,8 @@
       "created": "Trigeris sukurtas",
       "saved": "Trigeris išsaugotas",
       "statusArrived": "Gauta",
+      "defaultPromptWebhook": "Aprašykite šio žiniatinklio kabliuko užklausos turinį:\n\n{{body}}",
+      "defaultPromptScheduled": "Paleiskite suplanuotą užduotį. Paleidimo laikas: {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Įveskite pavadinimą.",
         "nameTooShort": "Naudokite bent 8 simbolius.",

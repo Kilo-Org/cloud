@@ -26,6 +26,7 @@
     "creditHistory": "Inneignarferill",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Hætta við",
     "done": "Lokið",
     "retry": "Reyna aftur",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "Breytingar",
     "organizationTrialEnded": "Próftímabili fyrirtækisins er lokið og það er ekki með virka áætlun. Eigandi fyrirtækis getur uppfært greiðsluupplýsingar á kilo.ai og reynir síðan aftur.",
-    "privateRepositoryA11y": "{{name}}, einkakóðasafn"
+    "privateRepositoryA11y": "{{name}}, einkakóðasafn",
+    "legalDocumentEnglishOnly": "Þetta skjal er aðeins tiltækt á ensku."
   },
   "language": {
     "restarting": "Endurræsi til að virkja valið tungumál",
@@ -481,7 +483,14 @@
       "viewReceipt": "Skoða kvittun"
     },
     "changelog": "Nýjungar",
-    "changelogVersionPending": "Upplýsingar um þessa útgáfu berast með næstu uppfærslu forritsins."
+    "changelogVersionPending": "Upplýsingar um útgáfu {{version}} berast með næstu uppfærslu forritsins.",
+    "changelogGroupNew": "Nýtt",
+    "changelogFixesIn": "Lagfæringar og endurbætur á eftirfarandi sviðum: {{areas}}.",
+    "changelogFixesPolish": "Lagfæringar og endurbætur í öllu forritinu.",
+    "changelogAreas": {
+      "signIn": "Innskráning",
+      "profileOrganizations": "Prófíll og stofnanir"
+    }
   },
   "preferences": {
     "general": "Almennt",
@@ -1354,7 +1363,8 @@
       "managedOnWeb": "Bitbucket-tengingu þessarar stofnunar er stjórnað á vefnum í tölvu.",
       "description": "Búðu til aðgangstóka fyrir vinnusvæðið með tilskildum heimildum og límdu hann hér fyrir neðan.",
       "scopes": "Reikningur: lestur · Geymslur: lestur/skrift · Samrunabeiðnir: lestur · Vefkrækjur: lestur/skrift",
-      "tokenPlaceholder": "Aðgangstóki vinnusvæðis"
+      "tokenPlaceholder": "Aðgangstóki vinnusvæðis",
+      "tokenRefused": "Bitbucket tók ekki við þessum aðgangstóka vinnusvæðis. Athugaðu að hann hafi heimildirnar hér fyrir ofan og reyndu svo aftur."
     },
     "scopeList": {
       "personalStillAvailable": "Persónulegar geymslur eru enn tiltækar hér fyrir neðan.",
@@ -1465,7 +1475,8 @@
       "repositoryLine": "Yfirferðir: {{reviews}} · Frávik: {{findings}}",
       "empty": "Engar yfirferðir með tölfræði ennþá",
       "emptyDescription": "Tölfræðin skráir yfirferðir sem klárast meðan hún er virk fyrir fyrirtækið.",
-      "off": "Tölfræðin er óvirk fyrir þetta fyrirtæki.",
+      "offTitle": "Tölfræðin er óvirk fyrir {{platform}}",
+      "offDescription": "Kveiktu á henni í stillingum félags á vefnum til að skrá yfirferðir sem klárast.",
       "couldNotLoad": "Tókst ekki að sækja tölfræðina"
     },
     "council": {
@@ -3325,6 +3336,7 @@
       "manageOnWeb": "Greiðslustillingar á vefnum",
       "changePlan": "Breyta áætlun",
       "buySeats": "Kaupa notendasæti",
+      "managedOnWeb": "Áætluninni, notendasætum og sjálfvirkri áfyllingu er stjórnað á vefnum.",
       "setupAutoTopUp": "Setja upp sjálfvirka áfyllingu",
       "manageAutoTopUp": "Stjórna sjálfvirkri áfyllingu",
       "opensOnWeb": "Opnast á vefnum"
@@ -3473,12 +3485,10 @@
       "requestLogs": "Beiðnaskrár"
     },
     "requestLogs": {
-      "hint": "Beiðnir frá klukkustundinni fyrir lok tímabilsins, nýjustu fyrst.",
       "older": "Fyrri klukkustund",
       "newer": "Næsta klukkustund",
       "truncated": "Fleiri beiðnir eru á þessari klukkustund en listinn sýnir.",
       "emptyTitle": "Engar beiðnir",
-      "emptyDescription": "Engar gáttarbeiðnir voru á þessari klukkustund.",
       "loadError": "Ekki tókst að sækja beiðnaskrár.",
       "permissionDenied": "Aðeins eigandi, stjórnandi eða greiðslustjóri félags getur lesið beiðnaskrár þess.",
       "tokens": "{{input}} inn · {{output}} út",
@@ -4282,8 +4292,7 @@
       "repoValue": "Geymsla: {{name}}",
       "profileValue": "Prófíl: {{name}}",
       "profileUnavailable": "Þessi prófíll er ekki lengur tiltækur. Veldu annan.",
-      "pickerEmptyDescriptionOrganization": "Búðu til stofnunarprófíl til að endurnýta umhverfisbreytur, uppsetningarskipanir og færni yfir lotur.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Eigandi stofnunar eða stjórnandi getur búið til stofnunarprófíl."
+      "pickerEmptyDescriptionOrganization": "Búðu til stofnunarprófíl til að endurnýta umhverfisbreytur, uppsetningarskipanir og færni yfir lotur."
     },
     "variablesDeleteFailed": "Ekki tókst að eyða breytunni",
     "deleteVariable": "Eyða breytu {{key}}",
@@ -4469,7 +4478,6 @@
     "dismiss": "Vísa yfirliti frá",
     "offline": "Ótengt · vistað yfirlit",
     "cached": "Vistað yfirlit · ekki hægt að uppfæra",
-    "window": "{{start}} – {{end}}",
     "summary": "AI samantekt",
     "summaryPending": "AI samantekt er í vinnslu. Hún birtist hér þegar hún er tilbúin.",
     "summaryUnavailable": "AI samantekt er ekki tiltæk. Skipulagt yfirlit þitt er enn tiltækt.",
@@ -4588,6 +4596,7 @@
       "title": "Kveikjur og vefkrókar",
       "subtitle": "Gera keyrslur Cloud Agent sjálfvirkar úr vefkrókarkalli eða á áætlun.",
       "new": "Ný kveikja",
+      "create": "Búðu til kveikju",
       "emptyTitle": "Engar kveikjur ennþá",
       "emptyDescription": "Búðu til kveikju til að hefja keyrslu Cloud Agent úr vefkrókarkalli eða á áætlun.",
       "loadFailedTitle": "Gat ekki hlaðið kveikjum",
@@ -4641,6 +4650,8 @@
       "created": "Kveikja búin til",
       "saved": "Kveikja vistuð",
       "statusArrived": "Borist",
+      "defaultPromptWebhook": "Lýstu meginmáli þessarar vefkrókabeiðni:\n\n{{body}}",
+      "defaultPromptScheduled": "Keyrðu tímasettu verkefnið. Kveikt á {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Sláðu inn heiti.",
         "nameTooShort": "Notaðu að minnsta kosti 8 stafi.",

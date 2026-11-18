@@ -38,6 +38,8 @@ type MarkdownEnrichedProps = {
 
 const CODE_FONT = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
 
+const BODY_LINE_HEIGHT = 24;
+
 function enrichedStyle(palette: MarkdownPalette, isRtl: boolean): MarkdownStyle {
   const { textColor, mutedTextColor, codeBackground, borderColor } = palette;
   const half = palette.codeTokenScheme === 'onLight' ? 'light' : 'dark';
@@ -67,7 +69,7 @@ function enrichedStyle(palette: MarkdownPalette, isRtl: boolean): MarkdownStyle 
     paragraph: {
       color: textColor,
       fontSize: 16,
-      lineHeight: 24,
+      lineHeight: BODY_LINE_HEIGHT,
       marginTop: 0,
       marginBottom: 4,
       ...blockTextAlign,
@@ -126,7 +128,7 @@ function enrichedStyle(palette: MarkdownPalette, isRtl: boolean): MarkdownStyle 
     list: {
       color: textColor,
       fontSize: 16,
-      lineHeight: 24,
+      lineHeight: BODY_LINE_HEIGHT,
       markerColor: textColor,
       bulletColor: textColor,
     },

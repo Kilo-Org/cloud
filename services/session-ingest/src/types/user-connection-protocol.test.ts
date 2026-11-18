@@ -800,6 +800,36 @@ describe('WebInboundMessageSchema', () => {
 });
 
 describe('SessionEventPayloadSchema', () => {
+  it('parses workspace updates without a session ID', () => {
+    const event = {
+      type: 'workspace.updated',
+      data: { worktreeId: 'worktree_11111111-1111-4111-8111-111111111111' },
+    };
+    expect(SessionEventPayloadSchema.parse(event)).toEqual(event);
+    expect(SessionEventPayloadSchema.safeParse({ ...event, data: {} }).success).toBe(false);
+  });
+
+  it.each([undefined, null, 'worktree_11111111-1111-4111-8111-111111111111'])(
+    'accepts deletion events with worktree ID %s',
+    worktreeId => {
+      const data = {
+        source: 'v2',
+        sessionId: validSessionId,
+        parentSessionId: null,
+        organizationId: null,
+        gitUrl: null,
+        gitBranch: null,
+        createdOnPlatform: 'web',
+        deletedAt: '2026-01-01T00:00:02.000Z',
+        ...(worktreeId === undefined ? {} : { worktreeId }),
+      };
+      expect(SessionEventPayloadSchema.parse({ type: 'session.deleted', data })).toEqual({
+        type: 'session.deleted',
+        data,
+      });
+    }
+  );
+
   const session = {
     source: 'v2',
     sessionId: validSessionId,

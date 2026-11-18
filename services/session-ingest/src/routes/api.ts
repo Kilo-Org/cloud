@@ -3,9 +3,15 @@ import { bodyLimit } from 'hono/body-limit';
 import { z } from 'zod';
 import { sql, eq, and, inArray, isNull } from 'drizzle-orm';
 import { getWorkerDb } from '@kilocode/db/client';
-import { cli_sessions_v2, organization_memberships, organizations } from '@kilocode/db/schema';
+import {
+  cli_sessions_v2,
+  cloud_agent_worktrees,
+  organization_memberships,
+  organizations,
+} from '@kilocode/db/schema';
 import {
   DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
+  cloudAgentWorktreeIdSchema,
   getSessionMessagesSchema,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
   MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH,
@@ -55,7 +61,10 @@ import { clearSessionLocalState } from '../services/session-local-state';
 import {
   lockAndAssertWorkspaceRootSurvives,
   HostedWorkspaceSessionDeleteError,
+  removeWorkspaceSessionTabs,
+  lockSessionWorkspaces,
 } from '../services/hosted-workspace-session';
+import { WorkspaceUpdateIdsSchema } from '../types/user-connection-protocol';
 
 export type ApiContext = {
   Bindings: Env;
@@ -114,6 +123,7 @@ function notifySessionDeleted(
   row: Pick<
     SessionDeleteRow,
     | 'session_id'
+    | 'cloud_agent_worktree_id'
     | 'parent_session_id'
     | 'organization_id'
     | 'git_url'
@@ -127,6 +137,7 @@ function notifySessionDeleted(
     data: {
       source: 'v2',
       sessionId: row.session_id,
+      worktreeId: row.cloud_agent_worktree_id,
       parentSessionId: row.parent_session_id,
       organizationId: row.organization_id,
       gitUrl: row.git_url,
@@ -166,6 +177,7 @@ async function deleteOwnedLeafSession(
   let outcome: 'deleted' | 'gone' | 'not_leaf';
   try {
     outcome = await db.transaction(async (tx): Promise<'deleted' | 'gone' | 'not_leaf'> => {
+      await lockSessionWorkspaces(tx, kiloUserId, [existing]);
       if (existing.cloud_agent_session_scope_id) {
         await tx
           .select({ sessionId: cli_sessions_v2.session_id })
@@ -218,6 +230,7 @@ async function deleteOwnedLeafSession(
             eq(cli_sessions_v2.kilo_user_id, kiloUserId)
           )
         );
+      await removeWorkspaceSessionTabs(tx, kiloUserId, existing);
       return 'deleted';
     });
   } catch (error) {
@@ -246,6 +259,69 @@ const createSessionSchema = z.object({
 });
 
 const ingestVersionSchema = z.coerce.number().int().nonnegative().catch(0);
+
+async function notifyWorkspaceUpdates(
+  c: Context<ApiContext>,
+  organizationId: string | null,
+  worktreeIds: readonly string[]
+) {
+  if (worktreeIds.length === 0) return c.json({ delivered: 0 }, 200);
+  const kiloUserId = c.get('user_id');
+  const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
+  const workspaces = await db
+    .select({ worktreeId: cloud_agent_worktrees.worktree_id })
+    .from(cloud_agent_worktrees)
+    .leftJoin(
+      organization_memberships,
+      organizationMembershipJoinCondition(kiloUserId, cloud_agent_worktrees.organization_id)
+    )
+    .leftJoin(organizations, activeOrganizationJoinCondition(cloud_agent_worktrees.organization_id))
+    .leftJoin(parentOrganizationsTable, parentOrganizationJoinCondition())
+    .leftJoin(
+      parentOrganizationMembershipsTable,
+      parentOrganizationMembershipJoinCondition(kiloUserId)
+    )
+    .where(
+      and(
+        inArray(cloud_agent_worktrees.worktree_id, worktreeIds),
+        eq(cloud_agent_worktrees.kilo_user_id, kiloUserId),
+        organizationId === null
+          ? isNull(cloud_agent_worktrees.organization_id)
+          : eq(cloud_agent_worktrees.organization_id, organizationId),
+        personalOrInheritedOrganizationCondition(cloud_agent_worktrees.organization_id)
+      )
+    );
+  if (new Set(workspaces.map(workspace => workspace.worktreeId)).size !== worktreeIds.length) {
+    return c.json({ success: false, error: 'workspace_not_found' }, 404);
+  }
+
+  const result = await withDORetry(
+    () => getUserConnectionDO(c.env, { kiloUserId }),
+    stub => stub.notifyWorkspaceUpdates(worktreeIds),
+    'UserConnectionDO.notifyWorkspaceUpdates'
+  );
+  return c.json({ delivered: result.delivered }, 200);
+}
+
+const workspaceNotifyScopeSchema = z.object({ organizationId: z.uuid().nullable() });
+
+api.post('/workspaces/notify', bodyLimit({ maxSize: 16 * 1024 }), async c => {
+  const body = workspaceNotifyScopeSchema
+    .extend({ worktreeIds: WorkspaceUpdateIdsSchema })
+    .safeParse(await c.req.json().catch(() => null));
+  if (!body.success) return c.json({ success: false, error: 'Invalid body' }, 400);
+  return notifyWorkspaceUpdates(c, body.data.organizationId, body.data.worktreeIds);
+});
+
+api.post('/workspaces/:worktreeId/notify', bodyLimit({ maxSize: 1024 }), async c => {
+  const parsed = cloudAgentWorktreeIdSchema.safeParse(c.req.param('worktreeId'));
+  if (!parsed.success) {
+    return c.json({ success: false, error: 'Invalid worktreeId' }, 400);
+  }
+  const body = workspaceNotifyScopeSchema.safeParse(await c.req.json().catch(() => null));
+  if (!body.success) return c.json({ success: false, error: 'Invalid body' }, 400);
+  return notifyWorkspaceUpdates(c, body.data.organizationId, [parsed.data]);
+});
 
 api.post('/session', zodJsonValidator(createSessionSchema), async c => {
   const body = c.req.valid('json');
@@ -497,6 +573,10 @@ api.delete('/session/:sessionId', async c => {
 
   try {
     await db.transaction(async tx => {
+      await lockSessionWorkspaces(tx, kiloUserId, deletedRows);
+      for (const row of deletedRows) {
+        await removeWorkspaceSessionTabs(tx, kiloUserId, row);
+      }
       if (deletionTarget) {
         await lockAndAssertWorkspaceRootSurvives(tx, {
           kiloUserId,

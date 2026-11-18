@@ -74,6 +74,9 @@ function worktree(values: Partial<CloudAgentWorktree> = {}): CloudAgentWorktree 
     runtime_locations: [location],
     deletion_manifest: null,
     deleted_session_ids: [],
+    closed_session_ids: [],
+    tab_order: [],
+    last_activity_at: null,
     ...values,
   };
 }
@@ -647,6 +650,7 @@ describe('durable worktree deletion journal', () => {
           data: {
             source: 'v2',
             sessionId: row.sessionId,
+            worktreeId,
             parentSessionId: row.parentSessionId,
             organizationId: scope,
             gitUrl: row.gitUrl,
@@ -675,7 +679,13 @@ describe('durable worktree deletion journal', () => {
         success: true,
         deletedSessionIds: [kiloId(0), kiloId(1), kiloId(2), kiloId(3), kiloId(99)],
       });
-      expect(f.notifications).toHaveLength(4);
+      expect(f.notifications).toHaveLength(6);
+      expect(f.notifications.filter(row => row.event.type === 'workspace.updated')).toEqual(
+        Array.from({ length: 2 }, () => ({
+          kiloUserId: userId,
+          event: { type: 'workspace.updated', data: { worktreeId } },
+        }))
+      );
       expect(f.notifications).toEqual(expect.arrayContaining(expectedEvents));
       expect(f.pendingNotifications).toHaveLength(4);
       const firstNotification = f.events.indexOf('notifySessionEvent');
@@ -690,7 +700,7 @@ describe('durable worktree deletion journal', () => {
       await expect(
         completeWorktreeDeletion(env, scopedParams, f.executionContext)
       ).resolves.toEqual(result);
-      expect(f.notifications).toHaveLength(4);
+      expect(f.notifications).toHaveLength(6);
       expect(f.pendingNotifications).toHaveLength(4);
     }
   );
@@ -712,7 +722,7 @@ describe('durable worktree deletion journal', () => {
     await completeWorktreeDeletion(env, params, f.executionContext);
     await Promise.all(f.pendingNotifications);
     expect(f.members).toEqual([]);
-    expect(f.notifications).toHaveLength(3);
+    expect(f.notifications).toHaveLength(5);
   });
 
   it('publishes deletion events after content commit so a tombstone failure cannot lose them', async () => {
@@ -734,7 +744,7 @@ describe('durable worktree deletion journal', () => {
         deletion_manifest: manifest,
         runtime_locations: [location],
       });
-      expect(f.notifications).toHaveLength(1);
+      expect(f.notifications).toHaveLength(2);
 
       f.failCommit();
       await expect(completeWorktreeDeletion(env, params, f.executionContext)).resolves.toEqual({
@@ -742,7 +752,7 @@ describe('durable worktree deletion journal', () => {
         deletedSessionIds: [kiloId(0)],
       });
       await Promise.all(f.pendingNotifications);
-      expect(f.notifications).toHaveLength(1);
+      expect(f.notifications).toHaveLength(2);
       expect(f.worktrees[0].deletion_completed_at).not.toBeNull();
       expect(f.worktrees[0].deletion_manifest).toBeNull();
     } finally {
@@ -1958,12 +1968,14 @@ describe('deleteWorktreeContent', () => {
 
     expect(f.members).toEqual([]);
     expect(f.cleared).toEqual(new Set(sessionIds));
-    expect(f.notifications).toHaveLength(3);
+    expect(f.notifications).toHaveLength(5);
     expect(f.worktrees[0]).toMatchObject({
       deletion_completed_at: null,
       deletion_manifest: manifest,
       runtime_locations: [location],
       deleted_session_ids: sessionIds,
+      closed_session_ids: [],
+      tab_order: [],
     });
   });
 
@@ -1976,7 +1988,7 @@ describe('deleteWorktreeContent', () => {
     await Promise.all(f.pendingNotifications);
 
     expect(second).toEqual(first);
-    expect(f.notifications).toHaveLength(1);
+    expect(f.notifications).toHaveLength(2);
     expect(f.worktrees[0].deletion_completed_at).toBeNull();
     expect(f.worktrees[0].deletion_manifest).not.toBeNull();
   });
@@ -1992,7 +2004,7 @@ describe('deleteWorktreeContent', () => {
     );
     await Promise.all(f.pendingNotifications);
 
-    expect(f.notifications).toHaveLength(1);
+    expect(f.notifications).toHaveLength(2);
     expect(f.worktrees[0]).toMatchObject({
       name: null,
       runtime_locations: [],

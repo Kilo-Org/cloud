@@ -13,6 +13,7 @@ type SessionTransaction = Parameters<Parameters<WorkerDb['transaction']>[0]>[0];
 
 type SessionDeleteRow = {
   session_id: string;
+  cloud_agent_worktree_id: string | null;
   parent_session_id: string | null;
   organization_id: string | null;
   git_url: string | null;
@@ -38,6 +39,49 @@ export class HostedWorkspaceSessionDeleteError extends Error {
     this.name = 'HostedWorkspaceSessionDeleteError';
     this.code = code;
   }
+}
+
+export async function lockSessionWorkspaces(
+  tx: SessionTransaction,
+  kiloUserId: string,
+  rows: readonly Pick<SessionDeleteRow, 'cloud_agent_worktree_id'>[]
+): Promise<void> {
+  const worktreeIds = rows.flatMap(row =>
+    row.cloud_agent_worktree_id == null ? [] : [row.cloud_agent_worktree_id]
+  );
+  if (worktreeIds.length === 0) return;
+  await tx
+    .select({ worktreeId: cloud_agent_worktrees.worktree_id })
+    .from(cloud_agent_worktrees)
+    .where(
+      and(
+        inArray(cloud_agent_worktrees.worktree_id, [...new Set(worktreeIds)]),
+        eq(cloud_agent_worktrees.kilo_user_id, kiloUserId)
+      )
+    )
+    .orderBy(asc(cloud_agent_worktrees.worktree_id))
+    .for('update');
+}
+
+export async function removeWorkspaceSessionTabs(
+  tx: SessionTransaction,
+  kiloUserId: string,
+  row: Pick<SessionDeleteRow, 'session_id' | 'cloud_agent_worktree_id'>
+): Promise<void> {
+  if (row.cloud_agent_worktree_id == null) return;
+  await tx
+    .update(cloud_agent_worktrees)
+    .set({
+      closed_session_ids: sql`array_remove(${cloud_agent_worktrees.closed_session_ids}, ${row.session_id})`,
+      tab_order: sql`array_remove(${cloud_agent_worktrees.tab_order}, ${row.session_id})`,
+    })
+    .where(
+      and(
+        eq(cloud_agent_worktrees.worktree_id, row.cloud_agent_worktree_id),
+        eq(cloud_agent_worktrees.kilo_user_id, kiloUserId),
+        sql`${row.session_id} = ANY(${cloud_agent_worktrees.closed_session_ids} || ${cloud_agent_worktrees.tab_order})`
+      )
+    );
 }
 
 /**
@@ -206,6 +250,7 @@ export async function deleteHostedWorkspaceSessionRows(
       .select({
         session_id: cli_sessions_v2.session_id,
         parent_session_id: cli_sessions_v2.parent_session_id,
+        cloud_agent_worktree_id: cli_sessions_v2.cloud_agent_worktree_id,
         organization_id: cli_sessions_v2.organization_id,
         git_url: cli_sessions_v2.git_url,
         git_branch: cli_sessions_v2.git_branch,
@@ -219,6 +264,9 @@ export async function deleteHostedWorkspaceSessionRows(
         )
       );
 
+    for (const deletedRow of rows) {
+      await removeWorkspaceSessionTabs(tx, params.kiloUserId, deletedRow);
+    }
     for (const sessionId of orderedSessionIds) {
       await tx
         .delete(cli_sessions_v2)

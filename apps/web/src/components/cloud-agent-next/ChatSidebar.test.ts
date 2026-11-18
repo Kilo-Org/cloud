@@ -3,6 +3,13 @@ import { createRoot, type Root } from 'react-dom/client';
 import { createRequire } from 'node:module';
 import type { StoredSession } from './types';
 import type { WorkspaceFolder } from '@/lib/cloud-agent/workspace-folders';
+import {
+  aggregateWorkspaceActivity,
+  workspaceDestination,
+} from '@/lib/cloud-agent/workspace-activity';
+import { workspaceSummaryFixture } from './hooks/workspace-summary-test-fixtures';
+import type { SidebarWorktreeGroup } from './hooks/sidebar-session-model';
+import { groupSidebarWorkspaces, workspaceSummaryChats } from './hooks/sidebar-workspace-model';
 
 Object.assign(globalThis, { React });
 
@@ -283,8 +290,113 @@ function activeSession(
   };
 }
 
+let previousFixture:
+  | {
+      sessions: StoredSession[];
+      details: ChatSidebarProps['worktreeDetails'];
+      groups: ChatSidebarProps['workspaceGroups'];
+      folders: WorkspaceFolder[] | undefined;
+      result: SidebarWorktreeGroup[];
+    }
+  | undefined;
+
 function baseProps(overrides: Partial<ChatSidebarProps> = {}): ChatSidebarProps {
-  return { sessions: [], ...overrides };
+  const props = { sessions: [], ...overrides };
+  const folders = props.workspaceFolders?.folders;
+  if (
+    previousFixture?.sessions === props.sessions &&
+    previousFixture.details === props.worktreeDetails &&
+    previousFixture.groups === props.workspaceGroups &&
+    previousFixture.folders === folders
+  )
+    return { ...props, workspaceGroups: previousFixture.result };
+  const grouped = new Map<string, StoredSession[]>();
+  for (const session of props.sessions) {
+    if (session.worktreeId)
+      grouped.set(session.worktreeId, [...(grouped.get(session.worktreeId) ?? []), session]);
+  }
+  const groups =
+    props.workspaceGroups ??
+    [...grouped].map(([worktreeId, sessions]): SidebarWorktreeGroup => ({
+      type: 'worktree',
+      worktreeId,
+      sessions,
+      latestSession: [...sessions].sort(
+        (a, b) =>
+          Date.parse(b.lastActivityAt ?? b.createdAt) - Date.parse(a.lastActivityAt ?? a.createdAt)
+      )[0],
+      details: props.worktreeDetails?.[worktreeId],
+    }));
+  const enrich = (group: SidebarWorktreeGroup): SidebarWorktreeGroup => {
+    if (group.summary) return group;
+    const sessions = [
+      ...new Map(
+        [...(group.details?.sessions ?? []), ...group.sessions].map(session => [
+          session.sessionId,
+          session,
+        ])
+      ).values(),
+    ] as StoredSession[];
+    const latest = group.latestSession;
+    const status = aggregateWorkspaceActivity(
+      sessions.map(session => ({
+        ...session,
+        sessionStatus: session.sessionStatus ?? null,
+        sessionStatusUpdatedAt: session.sessionStatusUpdatedAt ?? null,
+        latestRunFailureKind: session.latestRunFailureKind ?? null,
+        latestRunTerminalAt: session.latestRunTerminalAt ?? null,
+        createdAt: session.createdAt ?? latest.createdAt,
+        lastActivityAt: session.lastActivityAt ?? null,
+        updatedAt: session.updatedAt,
+      }))
+    );
+    const pr = group.details?.prSession?.associatedPr ?? latest.associatedPr;
+    const summary = workspaceSummaryFixture({
+      worktreeId: group.worktreeId,
+      name: group.details?.name ?? null,
+      defaultTitle: group.details?.defaultTitle ?? null,
+      createdAt: group.details?.createdAt ?? latest.createdAt,
+      lastActivityAt: latest.lastActivityAt ?? latest.createdAt,
+      status,
+      sessionStatus: status.sessionStatus,
+      latestOpenSessionId: latest.sessionId,
+      folderId:
+        group.details?.folderId ??
+        folders?.find(folder => folder.worktreeIds.includes(group.worktreeId))?.id ??
+        null,
+      pr: pr
+        ? {
+            ...pr,
+            baseRef: pr.baseRef ?? null,
+            stackNumber: pr.stackNumber ?? null,
+            stackPosition: pr.stackPosition ?? null,
+            stackSize: pr.stackSize ?? null,
+          }
+        : null,
+    });
+    return { ...group, summary, stackLayers: group.stackLayers?.map(enrich) };
+  };
+  const result = groups.map(enrich).map(group => {
+    if (groups.some(original => original.summary === group.summary)) return group;
+    const row = (member: SidebarWorktreeGroup) => ({
+      folderId: member.summary?.folderId ?? null,
+      prState: member.summary?.pr?.state ?? null,
+      status: member.summary?.sessionStatus ?? null,
+    });
+    const destination = workspaceDestination(
+      { root: row(group), layers: (group.stackLayers ?? []).map(row) },
+      folders ?? []
+    );
+    return { ...group, summary: group.summary ? { ...group.summary, destination } : undefined };
+  });
+  previousFixture = {
+    sessions: props.sessions,
+    details: props.worktreeDetails,
+    groups: props.workspaceGroups,
+    folders,
+    result,
+  };
+  return { ...props, workspaceGroups: result };
 }
 
 describe('ChatSidebar row rendering', () => {
@@ -325,6 +437,112 @@ describe('ChatSidebar row rendering', () => {
     expect(dom.container.textContent).not.toContain('No sessions yet');
     renderSidebar({ isLoading: false });
     expect(dom.container.textContent).toContain('No sessions yet');
+  });
+
+  it.each(['manual', 'smart'] as const)(
+    'keeps a %s destination visible when its folder section is unavailable',
+    kind => {
+      const summary = workspaceSummaryFixture({
+        destination:
+          kind === 'manual'
+            ? { kind: 'manual', folderId: 'synthetic-folder' }
+            : { kind: 'smart', preset: 'in_review' },
+      });
+      const groups = groupSidebarWorkspaces([], {}, [summary]);
+      renderSidebar({ workspaceGroups: groups });
+      expect(
+        dom.container.querySelector('[data-folder-drop="ungrouped"] [data-worktree-id]')
+      ).not.toBeNull();
+      expect(groups[0].summary?.destination).toEqual(summary.destination);
+    }
+  );
+
+  it('shows a workspace load error with a working retry action', () => {
+    const retry = jest.fn();
+    renderSidebar({ workspaceError: true, onRetryWorkspaces: retry });
+    const alert = [...dom.container.querySelectorAll('[role="alert"]')].find(node =>
+      node.textContent?.includes('Could not load workspaces.')
+    );
+    expect(alert).toBeDefined();
+    act(() => alert?.querySelector<HTMLButtonElement>('button')?.click());
+    expect(retry).toHaveBeenCalledTimes(1);
+    expect(dom.container.textContent).not.toContain('No sessions yet');
+  });
+
+  it('loads additional workspace search pages without replacing existing rows', () => {
+    const more = jest.fn();
+    const groups = groupSidebarWorkspaces([], {}, [workspaceSummaryFixture()]);
+    renderSidebar({
+      workspaceGroups: groups,
+      searchQuery: 'Workspace',
+      hasMoreWorkspaces: true,
+      onLoadMoreWorkspaces: more,
+      isSearching: true,
+    });
+    expect(dom.container.querySelector('[aria-label="Loading sessions"]')).toBeNull();
+    expect(dom.container.querySelector('[data-worktree-id]')).not.toBeNull();
+    const button = [...dom.container.querySelectorAll('button')].find(
+      node => node.textContent === 'Load more workspaces'
+    );
+    act(() => button?.click());
+    expect(more).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps older matching workspace chats in search, without repeating the workspace navigation target', () => {
+    const initial = workspaceSummaryFixture();
+    const summary = {
+      ...initial,
+      openChats: [
+        { ...initial.openChats[0], title: 'Latest matching chat' },
+        { ...initial.openChats[0], sessionId: 'ses_older', title: 'Older matching chat' },
+      ],
+    };
+    renderSidebar({
+      workspaceGroups: groupSidebarWorkspaces([], {}, [summary]),
+      sessions: workspaceSummaryChats(summary),
+      searchQuery: 'matching',
+    });
+    expect(dom.container.querySelector('[title="Latest matching chat"]')).toBeNull();
+    expect(dom.container.querySelector('[title="Older matching chat"]')).not.toBeNull();
+  });
+
+  it('advances a running workspace only on the 60-second activity step', () => {
+    const initial = workspaceSummaryFixture();
+    const base = Date.parse(initial.createdAt);
+    const running = workspaceSummaryFixture({
+      sessionStatus: 'busy',
+      status: { ...initial.status, kind: 'running', sessionStatus: 'busy' },
+      lastActivityAt: new Date(base + 59_000).toISOString(),
+    });
+    const idle = workspaceSummaryFixture({
+      worktreeId: 'worktree_22222222-2222-4222-8222-222222222222',
+      lastActivityAt: new Date(base + 30_000).toISOString(),
+    });
+    const order = () =>
+      [...dom.container.querySelectorAll('[data-worktree-id]')].map(node =>
+        node.getAttribute('data-worktree-id')
+      );
+    renderSidebar({
+      workspaceGroups: groupSidebarWorkspaces([], {}, [running, idle]),
+      workspaceOrder: 'activity',
+    });
+    expect(order()).toEqual([idle.worktreeId, running.worktreeId]);
+    renderSidebar({
+      workspaceGroups: groupSidebarWorkspaces([], {}, [
+        { ...running, lastActivityAt: new Date(base + 59_999).toISOString() },
+        idle,
+      ]),
+      workspaceOrder: 'activity',
+    });
+    expect(order()).toEqual([idle.worktreeId, running.worktreeId]);
+    renderSidebar({
+      workspaceGroups: groupSidebarWorkspaces([], {}, [
+        { ...running, lastActivityAt: new Date(base + 60_000).toISOString() },
+        idle,
+      ]),
+      workspaceOrder: 'activity',
+    });
+    expect(order()).toEqual([running.worktreeId, idle.worktreeId]);
   });
 
   it('rerenders only the two affected workspace rows when selection changes', () => {
@@ -439,7 +657,7 @@ describe('ChatSidebar row rendering', () => {
     expect(row?.querySelector('[role="tooltip"]')?.textContent).toBe(session.repository);
   });
 
-  it('lets the owner choose which chat a worktree opens, newest first', () => {
+  it('opens the latest open chat named by the workspace summary', () => {
     const older = makeSession(2, { worktreeId: 'worktree_choice' });
     const newer = makeSession(1, { worktreeId: 'worktree_choice' });
     const onOpenSession = jest.fn();
@@ -460,10 +678,7 @@ describe('ChatSidebar row rendering', () => {
         ?.click()
     );
 
-    expect(onOpenWorktree).toHaveBeenCalledWith('worktree_choice', [
-      newer.sessionId,
-      older.sessionId,
-    ]);
+    expect(onOpenWorktree).toHaveBeenCalledWith('worktree_choice', newer.sessionId);
     expect(onOpenSession).not.toHaveBeenCalled();
     expect(onMobileSheetOpenChange).toHaveBeenCalledWith(false);
   });
@@ -1567,7 +1782,7 @@ describe('ChatSidebar phase 4 drag ordering', () => {
   }
 
   it.each(['manual', 'created', 'activity'] as const)(
-    'limits Ungrouped to recent activity with %s ordering',
+    'preserves server-selected Ungrouped rows with %s ordering',
     workspaceOrder => {
       jest.useFakeTimers({ now: new Date(2026, 10, 9, 12) });
       try {
@@ -1586,9 +1801,9 @@ describe('ChatSidebar phase 4 drag ordering', () => {
         });
         renderSidebar({ workspaceGroups: [old, recent, beforeCutoff], workspaceOrder });
 
-        expect(dom.container.querySelector('[data-worktree-id="worktree_drag_0"]')).toBeNull();
+        expect(dom.container.querySelector('[data-worktree-id="worktree_drag_0"]')).not.toBeNull();
         expect(dom.container.querySelector('[data-worktree-id="worktree_drag_1"]')).not.toBeNull();
-        expect(dom.container.querySelector('[data-worktree-id="worktree_drag_2"]')).toBeNull();
+        expect(dom.container.querySelector('[data-worktree-id="worktree_drag_2"]')).not.toBeNull();
       } finally {
         jest.useRealTimers();
       }
@@ -1625,17 +1840,15 @@ describe('ChatSidebar phase 4 drag ordering', () => {
     ).toBeNull();
   });
 
-  it('shows a searchable empty state when all ungrouped workspaces have aged out', () => {
+  it('keeps old server-selected workspaces visible without a client age limit', () => {
     renderSidebar({
       workspaceGroups: [phase4Group(0, null, { createdAt: new Date(2026, 0, 1).toISOString() })],
     });
-    expect(dom.container.querySelector('[data-worktree-id]')).toBeNull();
-    expect(dom.container.textContent).toContain(
-      'No recent sessions. Use search to find older sessions.'
-    );
+    expect(dom.container.querySelector('[data-worktree-id]')).not.toBeNull();
+    expect(dom.container.textContent).toContain('Workspaces');
   });
 
-  it('interleaves recent workspaces and standalone sessions under shared date headings', () => {
+  it('keeps workspaces and sessions separate in activity order', () => {
     jest.useFakeTimers({ now: new Date(2026, 10, 9, 12) });
     try {
       const yesterday = phase4Group(0, null, {
@@ -1659,19 +1872,17 @@ describe('ChatSidebar phase 4 drag ordering', () => {
       const sections = Array.from(ungrouped?.children ?? []).filter(element =>
         element.querySelector('[data-worktree-id], [title^="Prompt"]')
       );
+      expect(sections).toHaveLength(2);
       expect(sections.map(section => section.firstElementChild?.textContent)).toEqual([
         'Today',
-        'Yesterday',
         'Friday',
-        'Thursday',
       ]);
-      expect(
-        sections.map(section =>
-          Array.from(section.querySelectorAll('[data-worktree-id], [title^="Prompt"]')).map(
-            row => row.getAttribute('title') ?? row.querySelector('button span')?.textContent
-          )
-        )
-      ).toEqual([[today.prompt, 'Workspace 4'], ['Workspace 0'], [friday.prompt], ['Workspace 1']]);
+      expect(ungrouped?.textContent?.indexOf('Workspace 1')).toBeLessThan(
+        ungrouped?.textContent?.indexOf('Sessions') ?? 0
+      );
+      expect(sections.every(section => section.querySelector('[data-worktree-id]') === null)).toBe(
+        true
+      );
     } finally {
       jest.useRealTimers();
     }
@@ -1686,7 +1897,7 @@ describe('ChatSidebar phase 4 drag ordering', () => {
     });
     expect(dom.container.querySelector('[data-worktree-id="worktree_drag_0"]')).not.toBeNull();
     const ungrouped = dom.container.querySelector('[data-folder-drop="ungrouped"]');
-    expect(ungrouped?.textContent).toContain('Today');
+    expect(ungrouped?.textContent).toContain('Workspaces');
     expect(ungrouped?.textContent).not.toContain('Older');
   });
 
@@ -1786,7 +1997,7 @@ describe('ChatSidebar phase 4 drag ordering', () => {
     });
 
     const rows = dom.container.querySelectorAll<HTMLElement>('[data-worktree-id]');
-    expect(rows).toHaveLength(2);
+    expect(rows).toHaveLength(3);
     const sourceTitle = rows[0]?.querySelector('button span');
     if (!rows[0] || !rows[1] || !sourceTitle) throw new Error('Rows missing');
 
@@ -1812,7 +2023,7 @@ describe('ChatSidebar phase 4 drag ordering', () => {
     });
 
     const rows = dom.container.querySelectorAll<HTMLElement>('[data-worktree-id]');
-    expect(rows).toHaveLength(2);
+    expect(rows).toHaveLength(3);
     const sourceTitle = rows[0]?.querySelector('button span');
     if (!rows[0] || !rows[1] || !sourceTitle) throw new Error('Rows missing');
 
@@ -1992,31 +2203,67 @@ describe('ChatSidebar phase 4 drag ordering', () => {
     ).toEqual([groups[1].worktreeId, groups[0].worktreeId]);
   });
 
-  it.each([false, true])(
-    'explains an empty smart folder when workspace truncation is %s',
-    workspaceRowsTruncated => {
+  it('explains an empty smart folder', () => {
+    const folders = workspaceFolders();
+    folders.folders = [
+      {
+        ...manualFolder([]),
+        name: 'Done',
+        kind: 'smart',
+        smartPreset: 'done',
+      },
+    ];
+    renderSidebar({ workspaceGroups: [], workspaceFolders: folders });
+    const section = dom.container.querySelector('[aria-label="Folder Done"]');
+    expect(section?.textContent).toContain(
+      'No matching workspaces. Workspaces appear here automatically.'
+    );
+    expect(section?.textContent).not.toContain('Drop workspaces here');
+    expect(section?.textContent).not.toContain('Sort workspaces');
+  });
+
+  it.each(['', 'matching workspace'])(
+    'reports the ungrouped cap only outside search (query: %s)',
+    searchQuery => {
+      const groups = Array.from({ length: 50 }, (_, index) => phase4Group(index, null));
+      renderSidebar({
+        workspaceGroups: groups,
+        destinationTotals: { ungrouped: 63 },
+        searchQuery,
+      });
+      expect(workspaceIds()).toHaveLength(50);
+      const notice = 'Showing 50 of 63 ungrouped workspaces. Use search to find more.';
+      if (searchQuery) expect(dom.container.textContent).not.toContain(notice);
+      else expect(dom.container.textContent).toContain(notice);
+    }
+  );
+
+  it.each(['manual', 'in_review', 'done'] as const)(
+    'shows the server total for a capped %s folder',
+    destination => {
       const folders = workspaceFolders();
-      folders.folders = [
-        {
-          ...manualFolder([]),
-          name: 'Done',
-          kind: 'smart',
-          smartPreset: 'done',
-        },
-      ];
-      renderSidebar({ workspaceGroups: [], workspaceFolders: folders, workspaceRowsTruncated });
-      const section = dom.container.querySelector('[aria-label="Folder Done"]');
-      expect(section?.textContent).toContain(
-        workspaceRowsTruncated
-          ? 'Workspace list limited to 200. Use search to find matching workspaces.'
-          : 'No matching workspaces. Workspaces appear here automatically.'
+      const group = phase4Group(0, 'a1');
+      const folder: WorkspaceFolder = {
+        ...manualFolder([group]),
+        kind: destination === 'manual' ? 'manual' : 'smart',
+        smartPreset: destination === 'manual' ? null : destination,
+      };
+      folders.folders = [folder];
+      group.summary = workspaceSummaryFixture({
+        worktreeId: group.worktreeId,
+        destination:
+          destination === 'manual'
+            ? { kind: 'manual', folderId: folder.id }
+            : { kind: 'smart', preset: destination },
+      });
+      renderSidebar({
+        workspaceGroups: [group],
+        workspaceFolders: folders,
+        destinationTotals: { [folder.smartPreset ?? folder.id]: 731 },
+      });
+      expect(dom.container.querySelector('[data-folder-id]')?.textContent).toContain(
+        'Showing 500 of 731 workspaces. Use search to find more.'
       );
-      if (workspaceRowsTruncated) {
-        expect(section?.textContent).not.toContain('No matching workspaces');
-        expect(section?.textContent).not.toContain('Workspaces appear here automatically.');
-      }
-      expect(section?.textContent).not.toContain('Drop workspaces here');
-      expect(section?.textContent).not.toContain('Sort workspaces');
     }
   );
 

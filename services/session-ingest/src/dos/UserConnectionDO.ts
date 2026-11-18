@@ -23,6 +23,7 @@ import {
   SessionStatusSchema,
   type WebInboundMessage,
   WebOutboundMessageSchema,
+  WorkspaceUpdateIdsSchema,
 } from '../types/user-connection-protocol';
 
 type HeartbeatSession = {
@@ -2560,14 +2561,31 @@ export class UserConnectionDO extends DurableObject<Env> {
       }
     }
 
+    return this.broadcastWebMessages([msg, ...rootStatusEvents]);
+  }
+
+  async notifyWorkspaceUpdates(worktreeIds: readonly string[]): Promise<{ delivered: number }> {
+    const ids = WorkspaceUpdateIdsSchema.parse(worktreeIds);
+    if (ids.length === 0) return { delivered: 0 };
+    this.ensureState();
+    return this.broadcastWebMessages(
+      ids.map(worktreeId => ({
+        type: 'system',
+        event: 'workspace.updated',
+        data: { worktreeId },
+      }))
+    );
+  }
+
+  private broadcastWebMessages(events: readonly WebInboundMessage[]): { delivered: number } {
     let delivered = 0;
-    const messages = [msg, ...rootStatusEvents].map(message => JSON.stringify(message));
+    const messages = events.map(message => JSON.stringify(message));
     for (const ws of this.activeWebSockets()) {
       try {
         for (const json of messages) ws.send(json);
         delivered++;
       } catch (err) {
-        console.warn('notifySessionEvent: skipping failed web socket:', err);
+        console.warn('broadcastWebMessages: skipping failed web socket:', err);
       }
     }
     return { delivered };

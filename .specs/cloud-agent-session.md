@@ -494,6 +494,22 @@ repository.
    permission activity across all its chats. Its timestamp and overflow menu
    MUST share the session-row action slot. Associated pull-request information
    MUST use the existing session indicator and refresh behavior.
+   The server MUST calculate workspace activity and sidebar destination.
+   Activity priority MUST be question or permission, running or retry, latest-chat
+   failure or unexpected interruption, then idle. A failure MUST NOT outrank
+   running work. Only the most recently active chat MAY supply a failure.
+   Any newer chat status, including idle, MUST hide an older failure. This rule
+   intentionally replaces the previous idle-status failure retention behavior.
+   Busy or retry status MUST become stale after three hours. Queued or accepted
+   runs MUST NOT imply activity; they MAY keep summary polling active.
+   Workspaces and standalone sessions MUST appear in separate sidebar sections.
+   A stack MUST count as one workspace for visibility limits. The sidebar MUST
+   include all **Needs you** workspaces, at most 500 per manual folder, at most
+   500 **In review** workspaces, and at most 500 **Done** workspaces.
+   Ungrouped visibility MUST include the 50 stacks with the newest activity
+   across their layers. Folder limits MUST select the newest activity before
+   applying user ordering. A capped folder MUST show its full workspace total.
+   Search MUST find workspaces outside these visibility limits.
 2. Each open chat in the selected worktree MUST appear as a distinct tab in the
    main chat header. Each tab MUST reflect its chat's live title, status, and
    progress, with only an **X** close action and no overflow menu. Double-clicking
@@ -534,9 +550,15 @@ repository.
    retain their current behavior. Worktree grouping MUST NOT change
    native-mobile chat behavior.
 10. Closing a chat tab MUST NOT delete its saved session, discard its transcript,
-    or stop its running work. Closed-tab preferences and tab order MUST survive
-    refresh and remain scoped to the current user and personal or organization
-    context. A closed chat MUST reopen only when the user opens that chat
+    or stop its running work. Closed-tab preferences and tab order MUST persist
+    on the workspace, survive refresh, and sync across windows, browsers, and
+    devices. They MUST remain scoped to the current user and personal or
+    organization context. Concurrent tab changes MUST preserve unrelated changes.
+    The initial server-rendered summary MUST include tab state, so closed tabs
+    MUST NOT appear open before hydration. A browser MUST import its legacy local
+    tab preferences once and delete the local key only after successful import.
+    Existing server preferences MUST take precedence over imported preferences.
+    A closed chat MUST reopen only when the user opens that chat
     itself, for example from the Sessions list or its own link. Selecting its
     worktree, closing it while the app is still switching to it, going back
     from the closed tab, refreshing or restoring a window, or another window
@@ -544,9 +566,13 @@ repository.
     showing a chat closed elsewhere MUST move to an open chat or the worktree.
 11. The selected worktree MUST offer a **Sessions** list inside the split control's
     chevron menu, containing only closed chats and excluding already-open tabs.
-    Most recently closed chats MUST appear first, including after refresh;
+    Most recently closed chats MUST appear first, including after refresh or
+    opening another browser or device;
     session creation or activity timestamps MUST NOT determine this order.
-    Selecting a closed chat MUST reopen it and remove it from that list. Closing
+    Selecting a closed chat MUST reopen it and remove it from that list across
+    windows and devices. Deleting a chat MUST remove it from closed tabs and tab
+    order. Tab changes for a locally pending chat MUST wait for confirmed workspace
+    membership before persistence. Closing
     the last chat MUST retain the selected worktree and access to its saved
     sessions and new-chat action; existing terminal tabs MUST remain usable.
 12. The user MUST be able to rename a worktree independently of its chats.

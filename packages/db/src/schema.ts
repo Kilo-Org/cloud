@@ -6683,6 +6683,15 @@ export const cloud_agent_worktrees = pgTable(
     git_branch: text(),
     sidebar_position: text(),
     name: text(),
+    closed_session_ids: text()
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    tab_order: text()
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    last_activity_at: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -6702,6 +6711,10 @@ export const cloud_agent_worktrees = pgTable(
   },
   table => [
     index('IDX_cloud_agent_worktrees_owner_scope').on(table.kilo_user_id, table.organization_id),
+    index('IDX_cloud_agent_worktrees_owner_activity')
+      .on(table.kilo_user_id, table.organization_id, table.last_activity_at.desc())
+      .where(sql`${table.deletion_started_at} IS NULL AND ${table.deletion_completed_at} IS NULL`)
+      .concurrently(),
     index('IDX_cloud_agent_worktrees_folder_id')
       .on(table.folder_id)
       .where(isNotNull(table.folder_id)),
@@ -6828,6 +6841,23 @@ export const cli_sessions_v2 = pgTable(
       .on(table.kilo_user_id, table.cloud_agent_worktree_id, table.updated_at)
       .concurrently()
       .where(isNotNull(table.cloud_agent_worktree_id)),
+    index('IDX_cli_sessions_v2_workspace_activity')
+      .on(
+        table.kilo_user_id,
+        table.cloud_agent_worktree_id,
+        sql`coalesce(${table.last_activity_at}, ${table.created_at}) DESC`,
+        table.session_id.desc()
+      )
+      .where(
+        sql`${table.parent_session_id} IS NULL AND ${table.cloud_agent_worktree_id} IS NOT NULL`
+      )
+      .concurrently(),
+    index('IDX_cli_sessions_v2_workspace_active')
+      .on(table.kilo_user_id, table.cloud_agent_worktree_id)
+      .where(
+        sql`${table.parent_session_id} IS NULL AND ${table.status} IN ('question', 'permission', 'busy', 'retry')`
+      )
+      .concurrently(),
     // Supports session lookups by repository and branch.
     index('cli_sessions_v2_git_url_branch_idx').on(table.git_url, table.git_branch),
     // Supports the webhook verified-link gate, which updates sessions by
@@ -7302,6 +7332,21 @@ export const cloud_agent_session_runs = pgTable(
       table.cloud_agent_session_id,
       table.queued_at
     ),
+    index('IDX_cloud_agent_session_runs_latest')
+      .on(
+        table.cloud_agent_session_id,
+        sql`${table.queued_at} DESC NULLS LAST`,
+        table.message_id.desc()
+      )
+      .concurrently(),
+    index('IDX_cloud_agent_session_runs_open')
+      .on(
+        table.cloud_agent_session_id,
+        sql`${table.queued_at} DESC NULLS LAST`,
+        table.message_id.desc()
+      )
+      .where(sql`${table.status} IN ('queued', 'accepted')`)
+      .concurrently(),
     index('IDX_cloud_agent_session_runs_queued_at').on(table.queued_at),
     index('IDX_cloud_agent_session_runs_terminal_at').on(table.terminal_at),
     index('IDX_cloud_agent_session_runs_status_terminal').on(table.status, table.terminal_at),

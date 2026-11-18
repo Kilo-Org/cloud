@@ -1583,6 +1583,22 @@ describe('createUserWebConnection', () => {
     client.destroy();
   });
 
+  it('routes workspace events to typed listeners and rejects missing workspace IDs', () => {
+    const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken: () => 'token' });
+    const workspaceUpdated = jest.fn();
+    client.onSessionEvent('workspace.updated', workspaceUpdated);
+    client.connect();
+    open();
+
+    const data = { worktreeId: 'worktree_11111111-1111-4111-8111-111111111111' };
+    inbound({ type: 'system', event: 'workspace.updated', data });
+    inbound({ type: 'system', event: 'workspace.updated', data: {} });
+
+    expect(workspaceUpdated).toHaveBeenCalledTimes(1);
+    expect(workspaceUpdated).toHaveBeenCalledWith(data);
+    client.destroy();
+  });
+
   it('routes semantic session events to typed listeners', () => {
     const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken: () => 'token' });
     const created = jest.fn();

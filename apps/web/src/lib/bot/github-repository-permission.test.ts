@@ -265,9 +265,9 @@ describe('authorizeGitHubRepository', () => {
 
     // The second attempt happens only after the timer advances past the delay.
     // The first flush lets the first attempt's awaited promises settle.
-    await jest.advanceTimersByTimeAsync(0);
-    expect(fetchPermission).toHaveBeenCalledTimes(1);
     try {
+      await jest.advanceTimersByTimeAsync(0);
+      expect(fetchPermission).toHaveBeenCalledTimes(1);
       await jest.advanceTimersByTimeAsync(499);
       expect(fetchPermission).toHaveBeenCalledTimes(1);
       await jest.advanceTimersByTimeAsync(1);

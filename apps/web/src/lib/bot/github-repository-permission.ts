@@ -18,7 +18,9 @@ export const GITHUB_REPOSITORY_PERMISSION_CACHE_TTL_MS = 5 * 60_000;
 /**
  * Pause before the single retry of a thrown permission lookup. A transient
  * DNS or 5xx failure retried within milliseconds usually fails again; a short
- * pause gives it a chance to clear. Tests pass 0 to keep them fast.
+ * pause gives it a chance to clear. Callers can pass `retryDelayMs: 0` to
+ * skip the pause; the tests that exercise the retry either pass 0 or drive
+ * the timer with fake timers.
  */
 const DEFAULT_LOOKUP_RETRY_DELAY_MS = 500;
 

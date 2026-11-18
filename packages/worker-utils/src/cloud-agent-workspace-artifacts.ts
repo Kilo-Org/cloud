@@ -2,7 +2,6 @@ import { z } from 'zod';
 
 export const WORKSPACE_ARTIFACT_MAX_FILES = 1_000;
 export const WORKSPACE_ARTIFACT_MAX_PATH_BYTES = 1_024;
-export const WORKSPACE_ARTIFACT_RETENTION_MS = 14 * 24 * 60 * 60 * 1_000;
 
 export const workspaceArtifactRevisionSchema = z
   .number()

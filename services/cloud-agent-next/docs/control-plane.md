@@ -809,12 +809,12 @@ monotonic revision.
 
 `object_key` is `<sandboxId>/<uuid>` in the private `WORKSPACE_ARTIFACTS_BUCKET`. Each upload
 uses a new key. An object carries `contentType` and `customMetadata: { sandboxId, sha256 }`.
-A replaced, deleted or expired object becomes an orphan row in the same transaction as the index
+A replaced or deleted object becomes an orphan row in the same transaction as the index
 change; a rejected upload leaves its reservation's orphan row for the alarm. A KV record
 `workspace_artifact_reservation:<objectKey>` holds `{ sandboxId, expiresAt, sizeBytes }`.
 
-**Reservation lifecycle.** `reserveWorkspaceArtifactUpload` validates the path and size, prunes
-expired entries, checks file and byte quotas and bounds queued orphan records, then returns a new object
+**Reservation lifecycle.** `reserveWorkspaceArtifactUpload` validates the path and size,
+checks file and byte quotas and bounds queued orphan records, then returns a new object
 key. It inserts the orphan row and writes a reservation with a 10-minute TTL
 (`WORKSPACE_ARTIFACT_RESERVATION_TTL_MS`). Expired reservations still count until the sweep removes
 their orphan rows. An unexpired reservation is an upload in flight that already holds bucket
@@ -834,15 +834,13 @@ the in-flight slot and leaves the orphan row for the sweep.
 - `deleteWorkspaceArtifact` and `deleteWorkspaceArtifactForUser` require `expectedHash` and return
   `deleted`, `absent` or `hash_mismatch`. Only a match queues the object and increments the
   revision. The user path has no wrapper-liveness check and works offline.
-- Workspace deletion and exclusive handoff call `clear()`, which queues every entry, removes the
-  index rows and lets the same alarm sweep the objects.
+- Exclusive workspace deletion and standalone session deletion call `clear()`, which queues every
+  entry, removes the index rows and lets the same alarm sweep the objects.
 
-**Storage and expiry.** Entries expire `WORKSPACE_ARTIFACT_RETENTION_MS` (14 days) after
-`updated_at`. Every index access (`list`, `get`, `reserve`, `commit`, `delete`) prunes expired
-rows inside its transaction, queues their objects and increments the revision when it removes
-one. Listing, download URLs and quota counting therefore ignore expired entries. An operator
-lifecycle rule deletes the bytes 15 days after upload; a new key on every update keeps the two
-ages aligned. Limits are 50 MiB per file, 500 MiB and 1,000 files per workspace, 1,024 path bytes
+**Storage lifetime.** Saved artifacts survive sandbox stops and individual chat deletions in a
+workspace. There is no upload-age expiry or automatic Cloud Agent session expiry. The old 15-day
+R2 object expiration rule must be removed separately from deployment. Limits are 50 MiB per file,
+500 MiB and 1,000 files per workspace, 1,024 path bytes
 and 16 segments. Dot segments, `node_modules`, `__pycache__` and `venv` are excluded.
 
 **Change notification.** After a real revision change, the Sandbox DO dispatcher enqueues
@@ -1524,8 +1522,8 @@ never prepare, start or wake a sandbox. Access failures are `FORBIDDEN`, or
 `SERVICE_UNAVAILABLE` when the access lookup fails. Missing session metadata or a missing
 artifact is `NOT_FOUND`; a missing download configuration is `PRECONDITION_FAILED`.
 
-- `listWorkspaceArtifacts` returns `{ revision, entries }`; entries carry `contentHash`,
-  `updatedAt` and `expiresAt`.
+- `listWorkspaceArtifacts` returns `{ revision, entries }`; entries carry `contentHash` and
+  `updatedAt`.
 - `getWorkspaceArtifactDownloadUrl` signs a presigned R2 GET for 300 s with an attachment
   disposition, using the read-only key scoped to the artifacts bucket. HTML, XML and SVG are
   forced to `application/octet-stream`.

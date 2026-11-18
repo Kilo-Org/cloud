@@ -61,6 +61,7 @@ const PIDFILE_SUFFIX = '.pid.json';
 const KILO_STARTUP_OUTPUT_LIMIT = 65_536;
 /** Stop a replaced runtime within this bound; the wrapper's own cleanup budget. */
 const KILO_STOP_TIMEOUT_MS = 30_000;
+const KILO2_SERVE_SETTLE_MS = 5_000;
 /** Watchdog granularity: six checks per silence window detects the 30 s rule promptly. */
 const SILENCE_CHECKS_PER_WINDOW = 6;
 /**
@@ -1002,6 +1003,8 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
       throw error;
     }
     clearTimeout(deadline);
+    if (runtimeHarness().kind === 'kilo2')
+      await new Promise(resolve => setTimeout(resolve, KILO2_SERVE_SETTLE_MS));
     if (phase === 'stopped') {
       await spawned.stop(scheduler.now() + KILO_STOP_TIMEOUT_MS);
       throw new Error('Kilo runtime is shutting down');

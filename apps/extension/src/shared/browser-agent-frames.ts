@@ -182,10 +182,15 @@ export const withheldFramesOf = (
  * The withheld line a snapshot shows in place of a frame's subtree. Rendered
  * by hand because the shared renderer only emits roles with a name or a ref.
  */
-export const withheldFrameLine = (origin: string, depth: number): AgentSnapshotLine => ({
+export const withheldFrameLine = (
+  origin: string,
+  depth: number,
+  ref?: string
+): AgentSnapshotLine => ({
   attributes: `[origin withheld: ${origin}]`,
   depth,
   name: '',
+  ...(ref === undefined ? {} : { ref }),
   role: 'iframe',
 });
 
@@ -307,11 +312,13 @@ export const buildScopedSnapshot = (input: ScopedSnapshotInput): ScopedSnapshot 
         backendNodeId === undefined
           ? undefined
           : input.ownerFrameByBackendNodeId.get(backendNodeId);
+      const withheldOrigin =
+        ownerFrameId === undefined ? undefined : input.withheld.get(ownerFrameId);
       const interactive = INTERACTIVE_ROLES.has(role);
       const textRole = TEXT_ROLES.has(role);
       const ignored = node.ignored === true;
 
-      if (!ignored) {
+      if (!ignored && withheldOrigin === undefined) {
         if (textRole) {
           if (name !== '' && (node.childIds ?? []).length === 0) {
             lines.push({ depth: atDepth, name, role: '', textLeaf: true });
@@ -337,14 +344,20 @@ export const buildScopedSnapshot = (input: ScopedSnapshotInput): ScopedSnapshot 
         return;
       }
 
-      if (ownerFrameId !== undefined) {
-        const withheldOrigin = input.withheld.get(ownerFrameId);
+      if (withheldOrigin !== undefined) {
+        // A withheld frame's owner element is all the agent may see of it: one line carrying a ref (so the frame can be targeted for `read:<origin>`) and the withheld origin, with no child node and no document content. Rendered like the Playwright backend's `- iframe [ref=eN] [origin withheld: <origin>]`.
+        const emittedRef = backendNodeId === undefined ? undefined : `e${String(backendNodeId)}`;
 
-        if (withheldOrigin !== undefined) {
-          lines.push(withheldFrameLine(withheldOrigin, atDepth + 1));
-          return;
+        if (emittedRef !== undefined && backendNodeId !== undefined) {
+          refs.push({ backendNodeId, ref: emittedRef });
         }
 
+        lines.push(withheldFrameLine(withheldOrigin, atDepth, emittedRef));
+
+        return;
+      }
+
+      if (ownerFrameId !== undefined) {
         const readableTree = input.readableTrees.get(ownerFrameId);
 
         if (readableTree !== undefined) {
@@ -424,6 +437,59 @@ export const readFrameOwners = async (
   return owners;
 };
 
+/**
+ * The child frame whose owner element is this node. `DOM.describeNode` reports
+ * an iframe element as living in its parent's document, so a target that is the
+ * iframe itself is mapped to the frame it hosts through `DOM.getFrameOwner`.
+ */
+export const frameWithOwnerNode = async (
+  session: Pick<BrowserToolPageSession, 'send'>,
+  frames: readonly BrowserAgentFrame[],
+  backendNodeId: number
+): Promise<BrowserAgentFrame | undefined> => {
+  const children = frames.filter(frame => frame.parentId !== undefined);
+
+  if (children.length === 0) {
+    return undefined;
+  }
+
+  const owners = await readFrameOwners(
+    session,
+    children.map(frame => frame.id)
+  );
+
+  return children.find(frame => owners.get(frame.id) === backendNodeId);
+};
+
+/** Every frame below `rootId`, document order, excluding the root itself. */
+const descendantFramesOf = (
+  frames: readonly BrowserAgentFrame[],
+  rootId: string
+): readonly BrowserAgentFrame[] => {
+  const childrenByParent = new Map<string, BrowserAgentFrame[]>();
+
+  for (const frame of frames) {
+    if (frame.parentId !== undefined) {
+      const siblings = childrenByParent.get(frame.parentId) ?? [];
+
+      siblings.push(frame);
+      childrenByParent.set(frame.parentId, siblings);
+    }
+  }
+
+  const descendants: BrowserAgentFrame[] = [];
+  const visit = (parentId: string): void => {
+    for (const child of childrenByParent.get(parentId) ?? []) {
+      descendants.push(child);
+      visit(child.id);
+    }
+  };
+
+  visit(rootId);
+
+  return descendants;
+};
+
 export interface AgentSnapshotCapture {
   readonly lines: readonly AgentSnapshotLine[];
   readonly refs: readonly BrowserToolRefEntry[];
@@ -459,12 +525,14 @@ export const renderAgentSnapshotLine = renderLine;
 /**
  * Captures the agent's scoped snapshot: the tab's frames are read from CDP,
  * frames without a `read` grant are withheld, and every readable frame's tree
- * is spliced into the main frame's tree at its iframe node.
+ * is spliced into the root frame's tree at its iframe node. The root is the
+ * tab's main frame unless `rootFrameId` names a frame the caller targeted (a
+ * granted iframe), whose document then becomes the snapshot.
  */
 export const captureAgentAriaSnapshot = async (
   session: Pick<BrowserToolPageSession, 'send'>,
   scope: AgentReadScope,
-  options: { readonly depth?: number | undefined } = {}
+  options: { readonly depth?: number | undefined; readonly rootFrameId?: string | undefined } = {}
 ): Promise<AgentSnapshotCapture> => {
   const frames = await readAgentFrameTree(session);
 
@@ -479,9 +547,12 @@ export const captureAgentAriaSnapshot = async (
     };
   }
 
-  const main = mainFrameOf(frames);
+  const root =
+    options.rootFrameId === undefined
+      ? mainFrameOf(frames)
+      : frames.find(frame => frame.id === options.rootFrameId);
 
-  if (main === undefined) {
+  if (root === undefined) {
     return {
       lines: [],
       readableFrameIds: [],
@@ -494,11 +565,23 @@ export const captureAgentAriaSnapshot = async (
 
   const withheld = withheldFramesOf(frames, scope.readableOrigins);
   const withheldByFrameId = new Map(withheld.map(frame => [frame.frameId, frame.origin]));
-  const readableTreeFrames = frames.filter(
-    frame => frame.parentId !== undefined && !withheldByFrameId.has(frame.id)
-  );
 
-  const topNodes = await readFrameAxTree(session, main.id);
+  if (withheldByFrameId.has(root.id)) {
+    // Fail closed: a root the caller may not read is not read at all.
+    return {
+      lines: [],
+      readableFrameIds: [],
+      refs: [],
+      text: '(no accessibility nodes)',
+      truncated: false,
+      withheldFrames: withheld.map(frame => frame.origin),
+    };
+  }
+
+  const descendants = descendantFramesOf(frames, root.id);
+  const readableTreeFrames = descendants.filter(frame => !withheldByFrameId.has(frame.id));
+
+  const topNodes = await readFrameAxTree(session, root.id);
   const readableTrees = new Map<string, readonly AxNode[]>();
 
   for (const frame of readableTreeFrames) {
@@ -508,7 +591,7 @@ export const captureAgentAriaSnapshot = async (
 
   const owners = await readFrameOwners(
     session,
-    frames.filter(frame => frame.parentId !== undefined).map(frame => frame.id)
+    descendants.map(frame => frame.id)
   );
   const ownerFrameByBackendNodeId = new Map<number, string>();
 
@@ -533,7 +616,7 @@ export const captureAgentAriaSnapshot = async (
 
   return {
     lines: snapshot.lines,
-    readableFrameIds: [main.id, ...readableTreeFrames.map(frame => frame.id)],
+    readableFrameIds: [root.id, ...readableTreeFrames.map(frame => frame.id)],
     refs: snapshot.refs,
     text,
     truncated: snapshot.truncated,
@@ -750,10 +833,13 @@ export const captureAgentSnapshotView = async (
   options: {
     readonly depth?: number | undefined;
     readonly mergeRefs?: boolean;
+    /** The frame a targeted snapshot starts from; defaults to the tab's main frame. */
+    readonly rootFrameId?: string | undefined;
   } = {}
 ): Promise<AgentSnapshotView> => {
   const capture = await captureAgentAriaSnapshot(session, scope, {
     depth: options.depth,
+    ...(options.rootFrameId === undefined ? {} : { rootFrameId: options.rootFrameId }),
   });
   const hiddenText = new Set<string>();
   const sensitiveValues = new Set<string>();

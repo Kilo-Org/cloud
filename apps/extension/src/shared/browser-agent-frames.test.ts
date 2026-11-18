@@ -6,6 +6,7 @@ import {
   captureAgentSnapshotView,
   filterAgentConsoleMessages,
   filterAgentNetworkRequests,
+  frameWithOwnerNode,
   readAgentFrameTree,
   readAgentScreenshotGeometry,
   readSensitiveFieldBoxes,
@@ -162,10 +163,53 @@ describe('scoped snapshot', () => {
       readableOrigins: ['https://app.example.com'],
     });
 
-    expect(capture.text).toContain('- iframe [origin withheld: https://pay.example.com]');
+    expect(capture.text).toContain('- iframe [ref=e10] [origin withheld: https://pay.example.com]');
     expect(capture.text).toContain('- button "Submit" [ref=e2]');
     expect(capture.text).not.toContain('marker-42');
     expect(capture.text).not.toContain('leaked inner text');
+    expect(capture.withheldFrames).toStrictEqual(['https://pay.example.com']);
+  });
+
+  it('maps an iframe owner node to the frame it hosts', async () => {
+    const session = createFakeSession({
+      ...snapshotHandlers(CHILD_TREE),
+      'DOM.getFrameOwner': () => ({ backendNodeId: 10 }),
+    });
+
+    await expect(frameWithOwnerNode(session, FRAMES, 10)).resolves.toStrictEqual(FRAMES[1]);
+    await expect(frameWithOwnerNode(session, FRAMES, 2)).resolves.toBeUndefined();
+  });
+
+  it('renders a targeted, granted frame’s own document', async () => {
+    const session = createFakeSession({
+      ...snapshotHandlers(CHILD_TREE),
+      'DOM.getFrameOwner': () => ({ backendNodeId: 10 }),
+    });
+
+    const capture = await captureAgentAriaSnapshot(
+      session,
+      { readableOrigins: ['https://app.example.com', 'https://pay.example.com'] },
+      { rootFrameId: 'f1' }
+    );
+
+    expect(capture.text).toContain('- text: card marker-42');
+    expect(capture.text).not.toContain('Submit');
+    expect(capture.withheldFrames).toStrictEqual([]);
+  });
+
+  it('fails closed when the targeted frame itself is withheld', async () => {
+    const session = createFakeSession({
+      ...snapshotHandlers(CHILD_TREE),
+      'DOM.getFrameOwner': () => ({ backendNodeId: 10 }),
+    });
+
+    const capture = await captureAgentAriaSnapshot(
+      session,
+      { readableOrigins: ['https://app.example.com'] },
+      { rootFrameId: 'f1' }
+    );
+
+    expect(capture.text).toBe('(no accessibility nodes)');
     expect(capture.withheldFrames).toStrictEqual(['https://pay.example.com']);
   });
 
@@ -229,8 +273,10 @@ describe('scoped snapshot', () => {
 
     expect(snapshot.lines).toStrictEqual([
       { depth: 1, name: 'Submit', ref: 'e2', role: 'button' },
-      withheldFrameLine('https://pay.example.com', 2),
+      withheldFrameLine('https://pay.example.com', 1, 'e10'),
     ]);
+    // The owner's ref is registered, so a targeted snapshot can resolve it.
+    expect(snapshot.refs).toContainEqual({ backendNodeId: 10, ref: 'e10' });
   });
 });
 

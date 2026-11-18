@@ -18,7 +18,7 @@ import type {
   BrowserPermissionItem,
   StepTokenBinding,
 } from './browser-agent-checks';
-import { mainFrameOf, readAgentFrameTree } from './browser-agent-frames';
+import { frameWithOwnerNode, mainFrameOf, readAgentFrameTree } from './browser-agent-frames';
 import type { BrowserAgentFrame } from './browser-agent-frames';
 import {
   classifyFocusedElement,
@@ -67,7 +67,14 @@ export type AgentPreflight =
     };
 
 const describeNodeSchema = z.object({
-  node: z.object({ frameId: z.string().optional() }).optional(),
+  node: z
+    .object({
+      backendDOMNodeId: z.number().optional(),
+      frameId: z.string().optional(),
+      localName: z.string().optional(),
+      nodeName: z.string().optional(),
+    })
+    .optional(),
 });
 
 const argumentTextSchema = z.string().min(1);
@@ -189,7 +196,24 @@ const targetFrameOf = async (
   }
 
   const parsed = describeNodeSchema.safeParse(response);
-  const frameId = parsed.success ? parsed.data.node?.frameId : undefined;
+  const node = parsed.success ? parsed.data.node : undefined;
+
+  if (node !== undefined) {
+    // An iframe belongs to its parent's document, so `frameId` names the parent: the target's real frame is the one the element hosts, and a read or act on that ref needs that frame's origin (how a withheld frame is targeted for its read grant).
+    const nodeName = (node.nodeName ?? node.localName ?? '').toUpperCase();
+    const ownerBackendNodeId =
+      node.backendDOMNodeId ?? (resolved.kind === 'ref' ? resolved.backendNodeId : undefined);
+
+    if ((nodeName === 'FRAME' || nodeName === 'IFRAME') && ownerBackendNodeId !== undefined) {
+      const hosted = await frameWithOwnerNode(session, frames, ownerBackendNodeId);
+
+      if (hosted !== undefined) {
+        return { frame: true, origin: hosted.origin };
+      }
+    }
+  }
+
+  const frameId = node?.frameId;
 
   if (frameId === undefined) {
     return { frame: true, origin: OPAQUE_ORIGIN };

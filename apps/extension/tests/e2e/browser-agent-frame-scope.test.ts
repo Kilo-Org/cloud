@@ -28,6 +28,10 @@ const originOf = (url: string): string => {
   return `${parsed.protocol}//${parsed.host}`;
 };
 
+/** The ref the snapshot gave the withheld iframe line, or '' when it carried none. */
+const withheldRefOf = (snapshotText: string): string =>
+  /- iframe \[ref=(e\d+)\] \[origin withheld: /u.exec(snapshotText)?.[1] ?? '';
+
 /** The tool result the assertions read; a protocol refusal is a test failure here. */
 const resultOf = (
   response: LocalAgentToolResponse
@@ -149,6 +153,33 @@ test.describe('agent frame scoping', () => {
       expect(scoped.text).not.toContain(MARKER);
       expect(scoped.withheldFrames).toEqual([innerOrigin]);
 
+      // The withheld iframe carries a ref, like the Playwright backend's `- iframe [ref=eN] [origin withheld: ...]`.
+      const withheldRef = withheldRefOf(scoped.text);
+
+      expect(withheldRef).toMatch(/^e\d+$/u);
+
+      // Targeting that ref addresses the hosted frame: the ref alone must not release it.
+      const targetedRefused = await session.callTool('browser_snapshot', { target: withheldRef }, [
+        { class: 'read', origin: outerOrigin },
+      ]);
+
+      expect(targetedRefused).toMatchObject({
+        code: -32_010,
+        items: [{ class: 'read', frame: true, origin: innerOrigin }],
+        kind: 'error',
+      });
+
+      const bothGrants = [
+        { class: 'read', origin: outerOrigin },
+        { class: 'read', origin: innerOrigin },
+      ];
+      const targeted = resultOf(
+        await session.callTool('browser_snapshot', { target: withheldRef }, bothGrants)
+      );
+
+      expect(targeted.text).toContain(MARKER);
+      expect(targeted.text).not.toContain('origin withheld');
+
       const found = resultOf(
         await session.callTool('browser_find', { text: MARKER }, [
           { class: 'read', origin: outerOrigin },
@@ -180,10 +211,6 @@ test.describe('agent frame scoping', () => {
       expect(outsidePixel.slice(0, 3)).not.toEqual([0, 0, 0]);
 
       // Granting the frame's origin releases the content, and only then.
-      const bothGrants = [
-        { class: 'read', origin: outerOrigin },
-        { class: 'read', origin: innerOrigin },
-      ];
       const granted = resultOf(await session.callTool('browser_snapshot', {}, bothGrants));
 
       expect(granted.text).toContain(MARKER);

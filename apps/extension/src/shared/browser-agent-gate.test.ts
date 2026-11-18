@@ -76,6 +76,8 @@ const createSession = (
     readonly ambiguousSelectors?: Record<string, number>;
     readonly selectors?: Record<string, { readonly frameId: string; readonly nodeId: number }>;
     readonly targetFrameId?: string;
+    /** The node name `DOM.describeNode` reports for a ref target (e.g. `IFRAME`). */
+    readonly targetNodeName?: string;
   } = {}
 ): FakeGateSession => {
   let describeObjectCalls = 0;
@@ -111,7 +113,12 @@ const createSession = (
           ? (options.frameIdForBackendNode?.(backendNodeId) ?? options.targetFrameId ?? 'main')
           : (options.targetFrameId ?? 'main');
 
-      return { node: { frameId } };
+      return {
+        node: {
+          frameId,
+          ...(options.targetNodeName === undefined ? {} : { nodeName: options.targetNodeName }),
+        },
+      };
     },
     'DOM.getDocument': () => ({ root: { nodeId: 1 } }),
     'DOM.getFrameOwner': params => {
@@ -313,6 +320,54 @@ describe('origin grants', () => {
       args: { target: 'e12' },
       authorized: grants.filter(grant => grant.origin === 'https://app.example.com'),
       session: createSession({ targetFrameId: 'f1' }),
+      toolName: 'browser_click',
+    });
+
+    expect(failureOf(result)).toStrictEqual({
+      items: [{ class: 'act', frame: true, origin: 'https://pay.example.com' }],
+      kind: 'needs_permission',
+    });
+  });
+
+  it('asks for the read grant of the frame a targeted iframe ref hosts', async () => {
+    const result = await run({
+      args: { target: 'e12' },
+      authorized: [{ class: 'read', origin: 'https://app.example.com' }],
+      session: createSession({
+        nestedFrames: [
+          {
+            frameId: 'f1',
+            ownerBackendNodeId: 12,
+            securityOrigin: 'https://pay.example.com',
+            url: FRAME_URL,
+          },
+        ],
+        targetNodeName: 'IFRAME',
+      }),
+      toolName: 'browser_snapshot',
+    });
+
+    expect(failureOf(result)).toStrictEqual({
+      items: [{ class: 'read', frame: true, origin: 'https://pay.example.com' }],
+      kind: 'needs_permission',
+    });
+  });
+
+  it('still requires act on the hosted frame for an action on its iframe ref', async () => {
+    const result = await run({
+      args: { target: 'e12' },
+      authorized: [{ class: 'act', origin: 'https://app.example.com' }],
+      session: createSession({
+        nestedFrames: [
+          {
+            frameId: 'f1',
+            ownerBackendNodeId: 12,
+            securityOrigin: 'https://pay.example.com',
+            url: FRAME_URL,
+          },
+        ],
+        targetNodeName: 'IFRAME',
+      }),
       toolName: 'browser_click',
     });
 

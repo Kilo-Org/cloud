@@ -38,8 +38,10 @@ const SAMPLE_TREE: BrowserAriaNode[] = [
 const createSession = ({
   attachError,
   axNodes = SAMPLE_TREE,
+  axNodesByFrame,
   boxes = {},
   consoleMessages = [],
+  frameOwnerBackendNodeId = 99,
   frameTree,
   layoutMetrics,
   layoutMetricsError = false,
@@ -52,8 +54,10 @@ const createSession = ({
 }: {
   attachError?: Error;
   axNodes?: BrowserAriaNode[];
+  axNodesByFrame?: Record<string, BrowserAriaNode[]>;
   boxes?: Record<number, { content: number[]; height: number; width: number }>;
   consoleMessages?: BrowserConsoleMessage[];
+  frameOwnerBackendNodeId?: number;
   frameTree?: Record<string, unknown>;
   layoutMetrics?: Record<string, unknown>;
   layoutMetricsError?: boolean;
@@ -86,7 +90,12 @@ const createSession = ({
       commands.push({ method, params });
 
       if (method === 'Accessibility.getFullAXTree') {
-        return { nodes: axNodes };
+        const frameId = params?.['frameId'];
+
+        return {
+          nodes:
+            (typeof frameId === 'string' ? axNodesByFrame?.[frameId] : undefined) ?? axNodes,
+        };
       }
 
       if (method === 'DOM.getBoxModel') {
@@ -114,7 +123,7 @@ const createSession = ({
       }
 
       if (method === 'DOM.getFrameOwner') {
-        return { backendNodeId: 99 };
+        return { backendNodeId: frameOwnerBackendNodeId };
       }
 
       if (method === 'Network.getResponseBody') {
@@ -210,6 +219,52 @@ describe('browser_snapshot', () => {
 
     expect(result.ok).toBe(false);
     expect(result).toMatchObject({ error: expect.stringContaining('cannot be inspected') });
+  });
+
+  it('reads a granted iframe through its own document when the call targets its ref', async () => {
+    const { session } = createSession({
+      axNodesByFrame: {
+        child: [
+          axNode({ childIds: ['2'], nodeId: '1', role: 'RootWebArea' }),
+          axNode({
+            backendDOMNodeId: 21,
+            name: 'card marker-42',
+            nodeId: '2',
+            role: 'StaticText',
+          }),
+        ],
+      },
+      frameOwnerBackendNodeId: 12,
+      frameTree: {
+        frameTree: {
+          childFrames: [
+            {
+              frame: {
+                id: 'child',
+                parentId: 'main',
+                securityOrigin: 'https://pay.example.com',
+                url: 'https://pay.example.com/widget',
+              },
+            },
+          ],
+          frame: {
+            id: 'main',
+            securityOrigin: 'https://app.example.com',
+            url: 'https://app.example.com/dashboard',
+          },
+        },
+      },
+    });
+
+    const result = await runReadBrowserTool('browser_snapshot', { target: 'e12' }, session, {
+      agentScope: { readableOrigins: ['https://app.example.com', 'https://pay.example.com'] },
+    });
+
+    expect(result.ok).toBe(true);
+    const text = result.ok ? String(result.value) : '';
+
+    expect(text).toContain('card marker-42');
+    expect(text).not.toContain('Submit');
   });
 });
 

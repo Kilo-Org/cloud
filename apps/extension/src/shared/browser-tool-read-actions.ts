@@ -10,6 +10,7 @@ import {
   readPageText,
   readPageTimeOrigin,
   renderBrowserAriaSnapshotLine,
+  resolveTargetBackendNodeId,
 } from './browser-tool-snapshot';
 import type {
   BrowserAriaSnapshotCapture,
@@ -25,6 +26,7 @@ import {
   captureAgentSnapshotView,
   filterAgentConsoleMessages,
   filterAgentNetworkRequests,
+  frameWithOwnerNode,
   readAgentFrameTree,
   readAgentScreenshotGeometry,
   readSensitiveFieldBoxes,
@@ -576,7 +578,28 @@ const renderFindSnippet = (lines: readonly BrowserAriaSnapshotLine[], index: num
     .join('\n')}`;
 };
 
-const captureScopedSnapshot = (
+/**
+ * The frame a `browser_snapshot` target addresses, when the target is an
+ * iframe element. `DOM.describeNode` puts that element in its parent's
+ * document, so the hosted frame comes from `DOM.getFrameOwner`. Any other
+ * target (or one that no longer resolves) keeps the whole-page snapshot.
+ */
+const snapshotRootFrameId = async (
+  deps: BrowserReadActionDeps,
+  target: string
+): Promise<string | undefined> => {
+  try {
+    const backendNodeId = await resolveTargetBackendNodeId(deps.session, target);
+    const frames = await readAgentFrameTree(deps.session);
+    const frame = await frameWithOwnerNode(deps.session, frames, backendNodeId);
+
+    return frame?.id;
+  } catch {
+    return undefined;
+  }
+};
+
+const captureScopedSnapshot = async (
   deps: BrowserReadActionDeps,
   options: BrowserSnapshotArguments
 ): Promise<BrowserAriaSnapshotCapture> => {
@@ -584,9 +607,14 @@ const captureScopedSnapshot = (
     return captureBrowserAriaSnapshot(deps.session, options);
   }
 
+  const target = options.target ?? '';
+  // A granted iframe is read through its own frame document; an untargeted call keeps the whole tab.
+  const rootFrameId = target === '' ? undefined : await snapshotRootFrameId(deps, target);
+
   return captureAgentSnapshotView(deps.session, deps.agentScope, {
     ...(options.depth === undefined ? {} : { depth: options.depth }),
-    mergeRefs: options.target !== undefined && options.target !== '',
+    mergeRefs: target !== '',
+    ...(rootFrameId === undefined ? {} : { rootFrameId }),
   });
 };
 

@@ -31,7 +31,15 @@ async function errorMessage(result: Promise<unknown>) {
     return error instanceof Error ? error.message : String(error);
   }
 }
-function apiFor(jobs: unknown[], parentID = 'ses_root'): Kilo2Api {
+function apiFor(
+  jobs: unknown[],
+  parentID = 'ses_root',
+  shells: unknown[] = jobs.flatMap(job =>
+    job && typeof job === 'object' && 'shellID' in job
+      ? [{ id: job.shellID, status: 'running' }]
+      : []
+  )
+): Kilo2Api {
   return {
     request: async () => {
       throw new Error('Unexpected session enumeration');
@@ -45,6 +53,11 @@ function apiFor(jobs: unknown[], parentID = 'ses_root'): Kilo2Api {
           status: 'running',
         });
         return jobs;
+      }
+      if (path.startsWith('/api/shell?')) {
+        const query = new URL(path, 'http://localhost').searchParams;
+        expect(query.get('location[directory]')).toBe('/workspace/app');
+        return shells;
       }
       if (path.startsWith('/api/form?'))
         return [{ id: 'form_child', sessionID: 'ses_child', title: 'Choose', fields: [] }];
@@ -79,6 +92,22 @@ test('reads the pinned inventory, includes descendant work and excludes sibling 
   expect(result.jobs).toEqual([shell, agent]);
   expect(result.waits).toEqual([{ sessionID: 'ses_child', kind: 'question' }]);
   expect(result.sessions.map(session => session.id)).toEqual(['ses_root', 'ses_child']);
+});
+
+test('only reports shell jobs that still have a running shell in the current runtime', async () => {
+  const live = { ...shell, id: 'job_live', shellID: 'sh_live' };
+  const exited = { ...shell, id: 'job_exited', shellID: 'sh_exited' };
+  const result = await readKilo2BackgroundActivity(
+    apiFor([shell, live, exited, agent], 'ses_root', [
+      { id: live.shellID, status: 'running' },
+      { id: exited.shellID, status: 'exited' },
+      { id: 'sh_unrelated', status: 'running' },
+    ]),
+    'ses_root',
+    '/workspace/app',
+    new AbortController().signal
+  );
+  expect(result.jobs).toEqual([live, agent]);
 });
 
 test('drops sibling inventory even if the native filter returns it', async () => {

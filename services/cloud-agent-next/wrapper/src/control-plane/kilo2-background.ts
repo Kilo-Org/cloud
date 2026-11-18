@@ -4,9 +4,10 @@ import {
   backgroundActivityInventorySchema,
 } from '../../../src/shared/background-activity.js';
 import type { Kilo2Api } from './kilo2-api.js';
-import { createKilo2Reads } from './kilo2-reads.js';
+import { createKilo2Reads, kilo2LocationQuery } from './kilo2-reads.js';
 
 const LIMIT = 256;
+const shellListSchema = z.array(z.object({ id: z.string(), status: z.string() }));
 
 export async function readKilo2BackgroundActivity(
   api: Kilo2Api,
@@ -26,8 +27,16 @@ export async function readKilo2BackgroundActivity(
     .parse(raw)
     .flatMap(entry => {
       const job = backgroundJobSchema.safeParse(entry);
-      return job.success ? [job.data] : [];
+      return job.success && job.data.status === 'running' ? [job.data] : [];
     });
+  const liveShells = new Set(
+    readable.some(job => job.kind === 'shell')
+      ? shellListSchema
+          .parse(await api.data(`/api/shell?${kilo2LocationQuery(directory)}`, { signal }))
+          .filter(shell => shell.status === 'running')
+          .map(shell => shell.id)
+      : []
+  );
   const sessions = new Map<string, Awaited<ReturnType<typeof session>>>();
   const root = await session(sessionID, signal);
   if (root.location.directory !== directory)
@@ -50,6 +59,7 @@ export async function readKilo2BackgroundActivity(
   const jobs = [];
   for (const job of readable) {
     if (jobs.length >= LIMIT) break;
+    if (job.kind === 'shell' && !liveShells.has(job.shellID)) continue;
     if (!(await owns(job.sessionID))) continue;
     if (
       job.kind === 'subagent' &&

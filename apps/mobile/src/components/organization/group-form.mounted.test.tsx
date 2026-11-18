@@ -330,10 +330,7 @@ describe('GroupForm leave after a members save', () => {
   it('returns to the Groups list over the stale create form beneath', async () => {
     // The stack the first save left when the retire of the create form was
     // dropped: the edit form sits above a prefilled New-group form.
-    listThenForm(
-      { key: 'form-new', name: 'group-form' },
-      { key: 'form-edit', name: 'group-form' }
-    );
+    listThenForm({ key: 'form-new', name: 'group-form' }, { key: 'form-edit', name: 'group-form' });
     const { renderer, unmountOnce } = await mountForm(storedGroup());
     members.data = {
       members: [{ id: 'user-1', name: 'Amira', email: 'amira@example.com', status: 'active' }],
@@ -347,7 +344,12 @@ describe('GroupForm leave after a members save', () => {
 
     expect(mutations.updateDetails.mutate).toHaveBeenCalledOnce();
     expect(mutations.updateDetails.mutate).toHaveBeenCalledWith(
-      { groupId: 'group-1', name: 'Workshop', description: 'The workshop group', userIds: ['user-1'] },
+      {
+        groupId: 'group-1',
+        name: 'Workshop',
+        description: 'The workshop group',
+        userIds: ['user-1'],
+      },
       expect.anything()
     );
     settleSave(mutations.updateDetails);
@@ -445,10 +447,7 @@ describe('GroupForm leave after a members save', () => {
 
 describe('GroupForm delete path', () => {
   it('returns to the Groups list after the removal lands', async () => {
-    listThenForm(
-      { key: 'form-new', name: 'group-form' },
-      { key: 'form-edit', name: 'group-form' }
-    );
+    listThenForm({ key: 'form-new', name: 'group-form' }, { key: 'form-edit', name: 'group-form' });
     const { renderer, unmountOnce } = await mountForm(storedGroup());
     await pressDelete(renderer.root);
 

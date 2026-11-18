@@ -8,9 +8,10 @@ import {
   type PreviewClaims,
   type PreviewEntryClaims,
 } from '../auth.js';
-import type {
-  PreviewProviderCoordinates,
-  ResolvedPreviewTarget,
+import {
+  withPreviewTransport,
+  type PreviewProviderCoordinates,
+  type ResolvedPreviewTarget,
 } from '../control-plane/sandbox/preview-target.js';
 import { requireCurrentSessionAccess, projectSessionAccessHttpError } from '../session-access.js';
 import { consumeStreamTicketNonce } from '../persistence/StreamTicketNonceDO.js';
@@ -197,6 +198,14 @@ function isForbiddenAccessError(error: unknown): boolean {
 }
 
 async function resolveClaimsTarget(
+  claims: PreviewEntryClaims | PreviewClaims,
+  env: Env,
+  deps: PreviewRouteDeps
+): Promise<ResolvedPreviewTarget> {
+  return withPreviewTransport(await resolveStoredTarget(claims, env, deps));
+}
+
+async function resolveStoredTarget(
   claims: PreviewEntryClaims | PreviewClaims,
   env: Env,
   deps: PreviewRouteDeps

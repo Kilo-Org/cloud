@@ -1143,3 +1143,14 @@ describe('preview through the wrapper tunnel', () => {
     expect(fetchUpstream).not.toHaveBeenCalled();
   });
 });
+
+describe('preview target from a Sandbox DO on the previous release', () => {
+  it('sends Containers coordinates without a transport to the Containers upstream', async () => {
+    const { transport: _transport, ...legacy } = FENCE;
+    const target = { status: 'ok', coordinates: legacy } as unknown as ResolvedPreviewTarget;
+    const { deps, fetchUpstream } = fixture({ target });
+    const response = await handlePreviewRequest(proxyRequest(sessionToken(FENCE)), env, deps);
+    expect(response.status).toBe(200);
+    expect(coordinatesOf(fetchUpstream)).toEqual(FENCE);
+  });
+});

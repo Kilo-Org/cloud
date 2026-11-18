@@ -55,6 +55,25 @@ export type PreviewTargetResult =
 
 export type ResolvedPreviewTarget = { status: 'ineligible' } | PreviewTargetResult;
 
+/**
+ * A Sandbox DO still on the release before preview transports returns
+ * Containers coordinates without `transport`. Treat them as the private path
+ * so a deploy does not fail open previews. Remove after that release retires.
+ */
+export function withPreviewTransport(target: ResolvedPreviewTarget): ResolvedPreviewTarget {
+  if (target.status !== 'ok') return target;
+  // Typed as received: the previous release omits `transport`.
+  const coordinates: Partial<Pick<PreviewProviderCoordinates, 'transport'>> &
+    Omit<PreviewProviderCoordinates, 'transport'> = target.coordinates;
+  if (coordinates.transport !== undefined || coordinates.provider !== 'cloudflare-containers') {
+    return target;
+  }
+  return {
+    status: 'ok',
+    coordinates: { ...coordinates, transport: 'durable-object', provider: 'cloudflare-containers' },
+  };
+}
+
 export type PreviewTargetSnapshot = {
   allocationKind: AllocationKind;
   allocationId: string | null;

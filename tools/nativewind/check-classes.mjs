@@ -366,11 +366,17 @@ export function checkRules(relative, program, text, lineOf) {
   for (const { start, raw } of stringChunks(program, text)) {
     for (const rule of rules()) {
       for (const match of raw.matchAll(rule.pattern)) {
-        problems.push(`${relative}:${lineOf(start + match.index)}: "${match[0]}" ${rule.advice}`);
+        problems.push({
+          offset: start + match.index,
+          problem: `${relative}:${lineOf(start + match.index)}: "${match[0]}" ${rule.advice}`,
+        });
       }
     }
   }
-  return problems;
+  // One chunk can match several rules, so emission is sorted by offset after
+  // collection: the chunk-major walk alone does not order matches inside a
+  // chunk, and the docstring promises source order.
+  return problems.sort((left, right) => left.offset - right.offset).map(entry => entry.problem);
 }
 
 /**

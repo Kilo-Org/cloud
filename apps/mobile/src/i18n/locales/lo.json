@@ -1442,9 +1442,11 @@
     "council": {
       "title": "ການກວດສອບໂດຍຄະນະ",
       "subtitle": "ຜູ້ຊ່ຽວຊານຫຼາຍຄົນກວດສອບແຕ່ລະຄຳຂໍລວມໂຄ້ດ ແລະ ຄະແນນສຽງຂອງພວກເຂົາລວມເປັນການຕັດສິນດຽວ.",
+      "unavailablePersonallyTitle": "ຕ້ອງການອົງກອນ Enterprise",
       "unavailablePersonally": "ການກວດສອບໂດຍຄະນະບໍ່ແມ່ນສ່ວນໜຶ່ງຂອງບັນຊີສ່ວນຕົວ. ມັນຕ້ອງການອົງກອນ Enterprise.",
       "unavailablePersonallyAction": "ສ້າງອົງກອນ",
       "unavailablePersonallySwitchAction": "ປ່ຽນອົງກອນ",
+      "unavailableOrganizationTitle": "Council review ບໍ່ມີໃຫ້ບໍລິການ",
       "unavailableForOrganization": "ການກວດສອບໂດຍຄະນະຕ້ອງການແຜນ Enterprise ທີ່ມີການສະໝັກ ຫຼື ການທົດລອງທີ່ຍັງໃຊ້ງານຢູ່. ອົງກອນນີ້ບໍ່ມີສິ່ງນີ້ໃນຕອນນີ້.",
       "unavailableForOrganizationNeutral": "ການກວດສອບໂດຍຄະນະບໍ່ມີໃຫ້ສຳລັບອົງກອນນີ້ໃນຕອນນີ້. ກະລຸນາລອງໃໝ່ພາຍຫຼັງ.",
       "unavailableOnBitbucket": "ການກວດສອບໂດຍຄະນະບໍ່ມີສຳລັບຄັງໂຄ້ດ Bitbucket.",

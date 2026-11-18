@@ -1538,9 +1538,11 @@
     "council": {
       "title": "Adolygiad cyngor",
       "subtitle": "Mae sawl arbenigwr yn adolygu pob cais tynnu, ac mae eu pleidleisiau'n cyfuno'n un penderfyniad.",
+      "unavailablePersonallyTitle": "Angen sefydliad Enterprise",
       "unavailablePersonally": "Nid yw adolygiad cyngor yn rhan o gyfrif personol. Mae angen sefydliad Enterprise arno.",
       "unavailablePersonallyAction": "Creu sefydliad",
       "unavailablePersonallySwitchAction": "Newid sefydliad",
+      "unavailableOrganizationTitle": "Nid yw Council review ar gael",
       "unavailableForOrganization": "Mae angen y cynllun Enterprise gyda thanysgrifiad gweithredol neu dreial ar gyfer adolygiad cyngor. Nid oes gan y sefydliad hwn ef ar hyn o bryd.",
       "unavailableForOrganizationNeutral": "Nid yw adolygiad cyngor ar gael i'r sefydliad hwn ar hyn o bryd. Ceisiwch eto yn nes ymlaen.",
       "unavailableOnBitbucket": "Nid yw adolygiad cyngor ar gael ar gyfer ystorfeydd Bitbucket.",

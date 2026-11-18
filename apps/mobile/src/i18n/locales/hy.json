@@ -1442,9 +1442,11 @@
     "council": {
       "title": "Խորհրդի ստուգում",
       "subtitle": "Մի քանի մասնագետ ստուգում է յուրաքանչյուր PR, և նրանց ձայները միավորվում են մեկ որոշման մեջ։",
+      "unavailablePersonallyTitle": "Անհրաժեշտ է Enterprise կազմակերպություն",
       "unavailablePersonally": "Խորհրդի ստուգումը անձնական հաշվի մաս չէ։ Անհրաժեշտ է Enterprise կազմակերպություն։",
       "unavailablePersonallyAction": "Ստեղծել կազմակերպություն",
       "unavailablePersonallySwitchAction": "Փոխել կազմակերպությունը",
+      "unavailableOrganizationTitle": "Council review-ն անհասանելի է",
       "unavailableForOrganization": "Խորհրդի ստուգման համար անհրաժեշտ է Enterprise փաթեթը՝ գործող բաժանորդագրությամբ կամ փորձաշրջանով։ Այս կազմակերպությունը դա հիմա չունի։",
       "unavailableForOrganizationNeutral": "Խորհրդի ստուգումը հասանելի չէ այս կազմակերպությանը հիմա։ Փորձեք կրկին ավելի ուշ։",
       "unavailableOnBitbucket": "Խորհրդի ստուգումը հասանելի չէ Bitbucket պահոցների համար։",

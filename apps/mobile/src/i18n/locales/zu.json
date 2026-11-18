@@ -1442,9 +1442,11 @@
     "council": {
       "title": "Ukuhlola komkhandlu",
       "subtitle": "Ochwepheshe abaningi bahlola i-PR ngayinye, futhi amavoti abo ahlangana abe yisinqumo esisodwa.",
+      "unavailablePersonallyTitle": "Kudingeka inhlangano ye-Enterprise",
       "unavailablePersonally": "Ukuhlola komkhandlu akuyingxenye ye-akhawunti yomuntu siqu. Idinga inhlangano ye-Enterprise.",
       "unavailablePersonallyAction": "Dala inhlangano",
       "unavailablePersonallySwitchAction": "Shintsha inhlangano",
+      "unavailableOrganizationTitle": "I-Council review ayitholakali",
       "unavailableForOrganization": "Ukuhlola komkhandlu kudinga uhlelo lwe-Enterprise olunesibondelo noma isikhathi sokuhlola esisebenzayo. Le nhlangano ayinakho okwamanje.",
       "unavailableForOrganizationNeutral": "Ukuhlola komkhandlu akutholakali kule nhlangano okwamanje. Zama futhi kamuva.",
       "unavailableOnBitbucket": "Ukuhlola komkhandlu akutholakali kuzinqolobane ze-Bitbucket.",

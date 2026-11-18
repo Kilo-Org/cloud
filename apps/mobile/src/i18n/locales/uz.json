@@ -1442,9 +1442,11 @@
     "council": {
       "title": "Kengash koʻrib chiqishi",
       "subtitle": "Bir nechta mutaxassis har bir PRni koʻrib chiqadi va ularning ovozlari bitta qarorga birlashadi.",
+      "unavailablePersonallyTitle": "Enterprise tashkiloti talab qilinadi",
       "unavailablePersonally": "Kengash koʻrib chiqishi shaxsiy hisobning bir qismi emas. Buning uchun Enterprise tashkilot kerak.",
       "unavailablePersonallyAction": "Tashkilot yaratish",
       "unavailablePersonallySwitchAction": "Tashkilotni almashtirish",
+      "unavailableOrganizationTitle": "Council review mavjud emas",
       "unavailableForOrganization": "Kengash koʻrib chiqishi faol obuna yoki sinov muddati bor Enterprise tarifini talab qiladi. Bu tashkilotda hozir bu mavjud emas.",
       "unavailableForOrganizationNeutral": "Kengash koʻrib chiqishi bu tashkilotda hozir mavjud emas. Keyinroq qayta urinib koʻring.",
       "unavailableOnBitbucket": "Kengash koʻrib chiqishi Bitbucket repozitoriyalari uchun mavjud emas.",

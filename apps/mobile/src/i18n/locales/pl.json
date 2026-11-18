@@ -901,9 +901,11 @@
     "council": {
       "title": "Przegląd rady",
       "subtitle": "Każdy pull request przegląda kilku specjalistów, a ich głosy łączą się w jedną decyzję.",
+      "unavailablePersonallyTitle": "Wymaga organizacji Enterprise",
       "unavailablePersonally": "Przegląd rady nie jest częścią konta osobistego. Wymaga organizacji Enterprise.",
       "unavailablePersonallyAction": "Utwórz organizację",
       "unavailablePersonallySwitchAction": "Przełącz organizację",
+      "unavailableOrganizationTitle": "Council review jest niedostępny",
       "unavailableForOrganization": "Przegląd rady wymaga planu Enterprise z aktywną subskrypcją lub okresem próbnym. Ta organizacja obecnie go nie ma.",
       "unavailableForOrganizationNeutral": "Przegląd rady nie jest obecnie dostępny dla tej organizacji. Spróbuj ponownie później.",
       "unavailableOnBitbucket": "Przegląd rady nie jest dostępny dla repozytoriów Bitbucket.",

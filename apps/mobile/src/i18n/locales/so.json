@@ -1442,9 +1442,11 @@
     "council": {
       "title": "Dib-u-eegista golaha",
       "subtitle": "Takhasusleyaal badan ayaa dib u eega PR kasta, codadkoodana waxay isu yimaadaan hal go'aan.",
+      "unavailablePersonallyTitle": "Waxay u baahan tahay hay'ad Enterprise",
       "unavailablePersonally": "Dib-u-eegista golaha qayb ka mid ah maaha akoon shaqsiyeed. Waxay u baahan tahay urur Enterprise.",
       "unavailablePersonallyAction": "Samee urur",
       "unavailablePersonallySwitchAction": "Beddel hay'ad",
+      "unavailableOrganizationTitle": "Council review lama heli karo",
       "unavailableForOrganization": "Dib-u-eegista golaha waxay u baahan tahay qorshaha Enterprise oo leh rukunka firfircoon ama muddada tijaabada. Ururkaan hadda ma laha.",
       "unavailableForOrganizationNeutral": "Dib-u-eegista golaha looma heli karo ururkaan hadda. Mar dambe isku day.",
       "unavailableOnBitbucket": "Dib-u-eegista golaha lama heli karo kaydka Bitbucket.",

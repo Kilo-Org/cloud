@@ -1442,9 +1442,11 @@
     "council": {
       "title": "Ráðsyfirferð",
       "subtitle": "Nokkrir sérfræðingar fara yfir hverja samrunabeiðni og atkvæði þeirra sameinast í eina ákvörðun.",
+      "unavailablePersonallyTitle": "Þarf Enterprise stofnun",
       "unavailablePersonally": "Ráðsyfirferð er ekki hluti af persónulegum reikningi. Hún þarf Enterprise-félag.",
       "unavailablePersonallyAction": "Stofna félag",
       "unavailablePersonallySwitchAction": "Skipta um stofnun",
+      "unavailableOrganizationTitle": "Council review er ekki í boði",
       "unavailableForOrganization": "Ráðsyfirferð þarf Enterprise-áætlun með virkri áskrift eða virku próftímabili. Þetta félag hefur hana ekki núna.",
       "unavailableForOrganizationNeutral": "Ráðsyfirferð er ekki í boði fyrir þetta félag eins og er. Reyndu aftur síðar.",
       "unavailableOnBitbucket": "Ráðsyfirferð er ekki í boði fyrir Bitbucket-geymslur.",

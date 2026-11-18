@@ -1466,9 +1466,11 @@
     "council": {
       "title": "Revisão do conselho",
       "subtitle": "Vários especialistas revêm cada pedido de integração e os votos deles combinam-se numa única decisão.",
+      "unavailablePersonallyTitle": "Precisa de uma organização Enterprise",
       "unavailablePersonally": "A revisão do conselho não faz parte de uma conta pessoal. Precisa de uma organização Enterprise.",
       "unavailablePersonallyAction": "Criar organização",
       "unavailablePersonallySwitchAction": "Trocar de organização",
+      "unavailableOrganizationTitle": "Council review não está disponível",
       "unavailableForOrganization": "A revisão do conselho precisa do plano Enterprise com uma subscrição ou um período de teste ativos. Esta organização não o tem neste momento.",
       "unavailableForOrganizationNeutral": "A revisão do conselho não está disponível para esta organização neste momento. Tente novamente mais tarde.",
       "unavailableOnBitbucket": "A revisão do conselho não está disponível para repositórios Bitbucket.",

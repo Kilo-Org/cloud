@@ -1,8 +1,8 @@
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
 
-import { CenteredState } from '@/components/centered-state';
+import { EmptyState } from '@/components/empty-state';
+import { Building2 } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
@@ -41,10 +41,11 @@ function personalActionKey(hasMemberships: boolean): string {
 }
 
 /**
- * The settled refusal's body: the sentence the scope's reason can claim, and —
- * on the personal scope — the one step that changes the answer. A reader with
- * memberships switches to the organization that may unlock council; one
- * without creates the organization whose trial grants it.
+ * The settled refusal's body: the standard `EmptyState` — a short title above
+ * the reason sentence at body size — and, on the personal scope, the one step
+ * that changes the answer. A reader with memberships switches to the
+ * organization that may unlock council; one without creates the organization
+ * whose trial grants it.
  */
 export function CouncilRefusalScreen({
   scope,
@@ -67,12 +68,16 @@ export function CouncilRefusalScreen({
   // while "Switch organization" names one only a member can take.
   const actionKey = personalActionKey(hasMemberships);
   return (
-    <CenteredState contentContainerClassName="px-6">
-      <View className="items-center gap-4">
-        <Text className="text-center text-xs text-muted-foreground">
-          {t(unavailableCopyKey(scope, platformSupportsCouncil, refusalReason))}
-        </Text>
-        {personal ? (
+    <EmptyState
+      icon={Building2}
+      title={t(
+        personal
+          ? 'codeReviewer.council.unavailablePersonallyTitle'
+          : 'codeReviewer.council.unavailableOrganizationTitle'
+      )}
+      description={t(unavailableCopyKey(scope, platformSupportsCouncil, refusalReason))}
+      action={
+        personal ? (
           <Button
             className={STATE_ACTION_CLASS}
             onPress={() => {
@@ -89,8 +94,8 @@ export function CouncilRefusalScreen({
           >
             <Text>{t(actionKey)}</Text>
           </Button>
-        ) : null}
-      </View>
-    </CenteredState>
+        ) : undefined
+      }
+    />
   );
 }

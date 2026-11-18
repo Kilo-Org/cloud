@@ -1442,9 +1442,11 @@
     "council": {
       "title": "Şura yoxlaması",
       "subtitle": "Hər pull request-i bir neçə mütəxəssis yoxlayır və onların səsləri vahid qərarda birləşir.",
+      "unavailablePersonallyTitle": "Enterprise təşkilatı tələb olunur",
       "unavailablePersonally": "Şura yoxlaması şəxsi hesabın bir hissəsi deyil. Ona Enterprise təşkilatı lazımdır.",
       "unavailablePersonallyAction": "Təşkilat yarat",
       "unavailablePersonallySwitchAction": "Təşkilatı dəyişdir",
+      "unavailableOrganizationTitle": "Council review mövcud deyil",
       "unavailableForOrganization": "Şura yoxlaması aktiv abunəlik və ya sınaq dövrü olan Enterprise plan tələb edir. Bu təşkilatda hazırda bu yoxdur.",
       "unavailableForOrganizationNeutral": "Şura yoxlaması hazırda bu təşkilat üçün mövcud deyil. Daha sonra yenidən cəhd edin.",
       "unavailableOnBitbucket": "Şura yoxlaması Bitbucket repozitoriyaları üçün əlçatan deyil.",

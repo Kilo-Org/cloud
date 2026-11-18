@@ -1442,9 +1442,11 @@
     "council": {
       "title": "Neuvostokatselmointi",
       "subtitle": "Useampi asiantuntija katselmoi jokaisen vetopyynnön, ja heidän äänensä yhdistetään yhdeksi päätökseksi.",
+      "unavailablePersonallyTitle": "Vaatii Enterprise-organisaation",
       "unavailablePersonally": "Neuvostokatselmointi ei sisälly henkilökohtaiseen tiliin. Se vaatii Enterprise-organisaation.",
       "unavailablePersonallyAction": "Luo organisaatio",
       "unavailablePersonallySwitchAction": "Vaihda organisaatio",
+      "unavailableOrganizationTitle": "Council review ei ole saatavilla",
       "unavailableForOrganization": "Neuvostokatselmointi vaatii Enterprise-tilauksen, jossa on aktiivinen tilaus tai kokeilujakso. Tällä organisaatiolla ei ole sitä juuri nyt.",
       "unavailableForOrganizationNeutral": "Neuvostokatselmointi ei ole saatavilla tälle organisaatiolle juuri nyt. Yritä uudelleen myöhemmin.",
       "unavailableOnBitbucket": "Neuvostokatselmointi ei ole käytettävissä Bitbucket-koodivarastoille.",

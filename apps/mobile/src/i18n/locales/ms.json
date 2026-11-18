@@ -1442,9 +1442,11 @@
     "council": {
       "title": "Semakan panel",
       "subtitle": "Beberapa pakar menyemak setiap permintaan penarikan, dan undian mereka digabungkan menjadi satu keputusan.",
+      "unavailablePersonallyTitle": "Memerlukan organisasi Enterprise",
       "unavailablePersonally": "Semakan panel bukan sebahagian daripada akaun peribadi. Ia memerlukan organisasi Enterprise.",
       "unavailablePersonallyAction": "Cipta organisasi",
       "unavailablePersonallySwitchAction": "Tukar organisasi",
+      "unavailableOrganizationTitle": "Council review tidak tersedia",
       "unavailableForOrganization": "Semakan panel memerlukan pelan Enterprise dengan langganan atau percubaan yang aktif. Organisasi ini tidak memilikinya sekarang.",
       "unavailableForOrganizationNeutral": "Semakan panel tidak tersedia untuk organisasi ini sekarang. Cuba lagi kemudian.",
       "unavailableOnBitbucket": "Semakan panel tidak tersedia untuk repositori Bitbucket.",

@@ -903,9 +903,11 @@
     "council": {
       "title": "مراجعة المجلس",
       "subtitle": "يراجع عدة متخصصين كل طلب دمج، وتُجمع أصواتهم في قرار واحد.",
+      "unavailablePersonallyTitle": "يتطلب مؤسسة Enterprise",
       "unavailablePersonally": "مراجعة المجلس ليست جزءًا من الحساب الشخصي. إنها تحتاج إلى مؤسسة Enterprise.",
       "unavailablePersonallyAction": "إنشاء مؤسسة",
       "unavailablePersonallySwitchAction": "تبديل المؤسسة",
+      "unavailableOrganizationTitle": "Council review غير متاح",
       "unavailableForOrganization": "تحتاج مراجعة المجلس إلى خطة Enterprise مع اشتراك نشط أو فترة تجريبية. هذه المؤسسة لا تمتلكها الآن.",
       "unavailableForOrganizationNeutral": "مراجعة المجلس غير متاحة لهذه المؤسسة الآن. حاول مرة أخرى لاحقًا.",
       "unavailableOnBitbucket": "مراجعة المجلس غير متاحة لمستودعات Bitbucket.",

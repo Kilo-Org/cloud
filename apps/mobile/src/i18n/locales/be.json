@@ -1490,9 +1490,11 @@
     "council": {
       "title": "Калегіяльная праверка",
       "subtitle": "Некалькі спецыялістаў правяраюць кожны пул-рэквест, а іх галасы аб'ядноўваюцца ў адно рашэнне.",
+      "unavailablePersonallyTitle": "Патрабуецца арганізацыя Enterprise",
       "unavailablePersonally": "Калегіяльная праверка не ўваходзіць у склад асабістага акаўнта. Для яе патрэбная арганізацыя Enterprise.",
       "unavailablePersonallyAction": "Стварыць арганізацыю",
       "unavailablePersonallySwitchAction": "Пераключыць арганізацыю",
+      "unavailableOrganizationTitle": "Council review недаступны",
       "unavailableForOrganization": "Калегіяльная праверка патрабуе план Enterprise з актыўнай падпіскай або пробным перыядам. Зараз у гэтай арганізацыі яго няма.",
       "unavailableForOrganizationNeutral": "Калегіяльная праверка зараз недаступная для гэтай арганізацыі. Паспрабуйце пазней.",
       "unavailableOnBitbucket": "Калегіяльная праверка недаступная для рэпазіторыяў Bitbucket.",

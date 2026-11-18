@@ -1442,9 +1442,11 @@
     "council": {
       "title": "საბჭოს შემოწმება",
       "subtitle": "რამდენიმე სპეციალისტი ამოწმებს ყოველ PR-ს და მათი ხმები ერთ გადაწყვეტილებად იკრიბება.",
+      "unavailablePersonallyTitle": "საჭიროა Enterprise ორგანიზაცია",
       "unavailablePersonally": "საბჭოს შემოწმება არ არის პირადი ანგარიშის ნაწილი. საჭიროებს Enterprise ორგანიზაციას.",
       "unavailablePersonallyAction": "ორგანიზაციის შექმნა",
       "unavailablePersonallySwitchAction": "ორგანიზაციის შეცვლა",
+      "unavailableOrganizationTitle": "Council review მიუწვდომელია",
       "unavailableForOrganization": "საბჭოს შემოწმებას სჭირდება Enterprise გეგმა აქტიური გამოწერით ან საცდელი პერიოდით. ამ ორგანიზაციას ეს ახლა არ აქვს.",
       "unavailableForOrganizationNeutral": "საბჭოს შემოწმება ამ ორგანიზაციისთვის ახლა მიუწვდომელია. სცადეთ მოგვიანებით.",
       "unavailableOnBitbucket": "საბჭოს შემოწმება მიუწვდომელია Bitbucket რეპოზიტორებისთვის.",

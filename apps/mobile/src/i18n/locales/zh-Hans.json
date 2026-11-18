@@ -899,9 +899,11 @@
     "council": {
       "title": "评审团审查",
       "subtitle": "多位专家分别审查每个拉取请求，他们的投票汇总为一个决定。",
+      "unavailablePersonallyTitle": "需要 Enterprise 组织",
       "unavailablePersonally": "评审团审查不包含在个人账户中。它需要 Enterprise 组织。",
       "unavailablePersonallyAction": "创建组织",
       "unavailablePersonallySwitchAction": "切换组织",
+      "unavailableOrganizationTitle": "Council review 不可用",
       "unavailableForOrganization": "评审团审查需要具备生效订阅或试用期的企业套餐。此组织目前不具备此项。",
       "unavailableForOrganizationNeutral": "此组织目前无法使用评审团审查。请稍后再试。",
       "unavailableOnBitbucket": "评审团审查不适用于 Bitbucket 仓库。",

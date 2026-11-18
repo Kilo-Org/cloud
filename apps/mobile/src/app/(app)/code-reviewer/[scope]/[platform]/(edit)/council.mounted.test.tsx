@@ -153,10 +153,22 @@ vi.mock('@/components/code-reviewer/reviewer-error-screen', () => ({
   ReviewerErrorScreen: 'ReviewerErrorScreen',
 }));
 vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'InvalidRouteState' }));
-vi.mock('@/components/centered-state', () => ({
-  CenteredState: (props: { children?: ReactNode }) =>
-    createElement('CenteredState', null, props.children),
+vi.mock('@/components/empty-state', () => ({
+  // The real state wraps its title and description in `Text` nodes; the mock
+  // mirrors that, so the suite's rendered-text assertions read both.
+  EmptyState: (props: { title?: string; description?: string; action?: ReactNode }) =>
+    createElement(
+      'EmptyState',
+      null,
+      props.title === undefined ? null : createElement('Text', null, props.title),
+      props.description === undefined ? null : createElement('Text', null, props.description),
+      props.action ?? null
+    ),
 }));
+// The state's icon comes from the lucide barrel, whose ESM entry the loader
+// cannot parse (see the activity-indicator stub below); the suite never
+// asserts the glyph, so it is a stub like the indicator.
+vi.mock('@/components/ui/icons', () => ({ Building2: 'Building2' }));
 vi.mock('@/components/security-agent/settings-toggle-row', () => ({
   ToggleRow: (props: ToggleProps) => {
     state.toggleProps.push(props);
@@ -271,6 +283,7 @@ describe('council route gate', () => {
     await act(() => undefined);
 
     const texts = renderedTexts(renderer);
+    expect(texts).toContain('Needs an Enterprise organization');
     expect(texts).toContain(
       'Council review is not part of a personal account. It needs an Enterprise organization.'
     );
@@ -301,6 +314,7 @@ describe('council route gate', () => {
     await act(() => undefined);
 
     const texts = renderedTexts(renderer);
+    expect(texts).toContain('Needs an Enterprise organization');
     expect(texts).toContain(
       'Council review is not part of a personal account. It needs an Enterprise organization.'
     );

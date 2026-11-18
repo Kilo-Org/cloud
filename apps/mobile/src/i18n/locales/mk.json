@@ -1442,9 +1442,11 @@
     "council": {
       "title": "Советен преглед",
       "subtitle": "Секој PR го прегледуваат неколку специјалисти, а нивните гласови се спојуваат во една одлука.",
+      "unavailablePersonallyTitle": "Потребна е Enterprise организација",
       "unavailablePersonally": "Советниот преглед не е дел од лична сметка. Потребна е Enterprise организација.",
       "unavailablePersonallyAction": "Креирај организација",
       "unavailablePersonallySwitchAction": "Префрли организација",
+      "unavailableOrganizationTitle": "Council review не е достапно",
       "unavailableForOrganization": "Советниот преглед бара Enterprise план со активна претплата или пробен период. Оваа организација во моментов го нема.",
       "unavailableForOrganizationNeutral": "Советниот преглед не е достапен за оваа организација во моментов. Обидете се повторно подоцна.",
       "unavailableOnBitbucket": "Советниот преглед не е достапен за Bitbucket складишта.",

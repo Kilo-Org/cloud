@@ -1490,9 +1490,11 @@
     "council": {
       "title": "Kontrola rady",
       "subtitle": "Každý pull request kontroluje niekoľko špecialistov a ich hlasy sa spájajú do jedného rozhodnutia.",
+      "unavailablePersonallyTitle": "Potrebuje organizáciu Enterprise",
       "unavailablePersonally": "Kontrola rady nie je súčasťou osobného účtu. Vyžaduje organizáciu Enterprise.",
       "unavailablePersonallyAction": "Vytvoriť organizáciu",
       "unavailablePersonallySwitchAction": "Prepnúť organizáciu",
+      "unavailableOrganizationTitle": "Council review nie je dostupné",
       "unavailableForOrganization": "Kontrola rady vyžaduje plán Enterprise s aktívnym predplatným alebo skúšobnou lehotou. Táto organizácia ho momentálne nemá.",
       "unavailableForOrganizationNeutral": "Kontrola rady nie je pre túto organizáciu momentálne dostupná. Skúste to znova neskôr.",
       "unavailableOnBitbucket": "Kontrola rady nie je dostupná pre repozitáre Bitbucket.",

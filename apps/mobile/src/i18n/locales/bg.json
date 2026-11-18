@@ -1442,9 +1442,11 @@
     "council": {
       "title": "Преглед от съвет",
       "subtitle": "Няколко специалисти преглеждат всяка заявка за сливане и гласовете им се обединяват в едно решение.",
+      "unavailablePersonallyTitle": "Необходима е Enterprise организация",
       "unavailablePersonally": "Прегледът от съвет не е част от личен акаунт. Нужен е Enterprise организация.",
       "unavailablePersonallyAction": "Създай организация",
       "unavailablePersonallySwitchAction": "Превключване на организация",
+      "unavailableOrganizationTitle": "Council review не е наличен",
       "unavailableForOrganization": "Прегледът от съвет изисква план Enterprise с активен абонамент или пробен период. Тази организация не разполага с него в момента.",
       "unavailableForOrganizationNeutral": "Прегледът от съвет не е наличен за тази организация в момента. Опитайте отново по-късно.",
       "unavailableOnBitbucket": "Прегледът от съвет не е наличен за хранилища в Bitbucket.",

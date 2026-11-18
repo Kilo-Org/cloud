@@ -147,24 +147,25 @@ interface PlayIntegrityConfig {
 }
 
 function getPlayIntegrityConfig(): PlayIntegrityConfig | null {
-  const projectNumber = GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER;
-  const serviceAccountKey = GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY;
-
   const expectedCertDigests = parseCertDigestAllowlist();
-  if (
-    !projectNumber ||
-    !serviceAccountKey ||
-    !GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME ||
-    expectedCertDigests.length === 0
-  ) {
+  if (isCredentialConfigMissing() || expectedCertDigests.length === 0) {
     return null;
   }
 
   return {
-    serviceAccountKey,
+    serviceAccountKey: GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY,
     expectedPackageName: GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME,
     expectedCertDigests,
   };
+}
+
+/** True when a credential input the verifier cannot work without is absent. */
+function isCredentialConfigMissing(): boolean {
+  return (
+    !GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER ||
+    !GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY ||
+    !GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME
+  );
 }
 
 /** The configured signing-certificate digests, or an empty list when unset. */
@@ -193,13 +194,15 @@ export async function verifyPlayIntegrity(
   const config = getPlayIntegrityConfig();
 
   if (!config) {
-    if (parseCertDigestAllowlist().length === 0) {
-      captureMessage('play_integrity_cert_digest_allowlist_missing');
-      throw new Error('Google Play Integrity certificate allowlist not configured');
+    // Report the credential inputs first: they are what the verifier cannot
+    // work without, so a coincident allowlist gap must not hide them.
+    if (isCredentialConfigMissing()) {
+      captureMessage('google_play_integrity_missing_credentials');
+      // Fail-closed: missing credentials in production means we cannot verify.
+      throw new Error('Google Play Integrity credentials not configured');
     }
-    captureMessage('google_play_integrity_missing_credentials');
-    // Fail-closed: missing credentials in production means we cannot verify.
-    throw new Error('Google Play Integrity credentials not configured');
+    captureMessage('play_integrity_cert_digest_allowlist_missing');
+    throw new Error('Google Play Integrity certificate allowlist not configured');
   }
 
   // Decode and verify the integrity token
@@ -310,6 +313,9 @@ export async function verifyPlayIntegrity(
   // ── Device integrity: must contain MEETS_DEVICE_INTEGRITY in the array ──
   const deviceVerdicts = payload.deviceIntegrity?.deviceRecognitionVerdict;
   if (!deviceVerdicts || !Array.isArray(deviceVerdicts) || deviceVerdicts.length === 0) {
+    // Same refusal reason as an array without the required label: the verdict
+    // did not establish device integrity, so both count on one metric.
+    countAdmissionCondition('play_integrity_device_verdict_insufficient');
     return { ok: false, error: 'DEVICE_NOT_RECOGNIZED' };
   }
 

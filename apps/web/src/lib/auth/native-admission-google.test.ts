@@ -108,6 +108,10 @@ describe('verifyPlayIntegrity without credentials', () => {
     'reports and throws on a %s certificate-digest allowlist',
     async allowlist => {
       Object.assign(mockConfig, configured);
+      // The reordered fault branch reports the credential inputs first, so the
+      // allowlist cases need their credential inputs present. The value never
+      // reaches the access-token flow: a null config throws before it runs.
+      mockConfig.GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY = 'unused-in-config-check';
       if (allowlist === undefined) {
         delete (mockConfig as Record<string, unknown>).GOOGLE_PLAY_INTEGRITY_CERT_DIGESTS;
       } else {
@@ -123,6 +127,21 @@ describe('verifyPlayIntegrity without credentials', () => {
       expect(aggregateLines()).toStrictEqual([]);
     }
   );
+
+  test('names the credential gap when it coincides with an allowlist gap', async () => {
+    Object.assign(mockConfig, configured);
+    mockConfig.GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY = '';
+    mockConfig.GOOGLE_PLAY_INTEGRITY_CERT_DIGESTS = '';
+    mockCaptureMessage.mockClear();
+
+    await expect(verifyPlayIntegrity('fake-token', 'fake-challenge')).rejects.toThrow(
+      'Google Play Integrity credentials not configured'
+    );
+    expect(mockCaptureMessage).toHaveBeenCalledWith('google_play_integrity_missing_credentials');
+    expect(mockCaptureMessage).not.toHaveBeenCalledWith(
+      'play_integrity_cert_digest_allowlist_missing'
+    );
+  });
 });
 
 // ── Decode endpoint resource path ─────────────────────────────────────────
@@ -151,6 +170,9 @@ describe('verifyPlayIntegrity decode endpoint', () => {
     mockFetch.mockReset();
     resetAccessTokenCacheForTests();
     resetAdmissionCountersForTests();
+    // A preceding test pins the clock at a flush instant; this describe's
+    // refusal tests count from 6_000_000, so repin before every test.
+    now.mockReturnValue(6_000_000);
     mockWarnExceptInTest.mockClear();
     mockCaptureMessage.mockClear();
   });
@@ -346,6 +368,25 @@ describe('verifyPlayIntegrity decode endpoint', () => {
     expect(aggregateLines().filter(line => line.metric.startsWith('play_integrity'))).toHaveLength(
       2
     );
+  });
+
+  test('counts a verdict whose device-integrity array is absent or empty', async () => {
+    // Empty deviceRecognitionVerdict array: refused before the label lookup.
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ access_token: 'test-access-token' }),
+    });
+    mockFetch.mockResolvedValueOnce(verdictWithDeviceVerdicts([]));
+
+    const result = await verifyPlayIntegrity('test-integrity-token', 'challenge-value');
+    expect(result).toEqual({ ok: false, error: 'DEVICE_NOT_RECOGNIZED' });
+    expect(mockCaptureMessage).not.toHaveBeenCalled();
+
+    now.mockReturnValue(6_061_000);
+    countAdmissionCondition('native_admission_missing');
+    const lines = metricLines('play_integrity_device_verdict_insufficient');
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ count: 1 });
   });
 });
 

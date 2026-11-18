@@ -1095,6 +1095,8 @@ describe('persistAttestedKey', () => {
         publicKey: 'base64pubkey',
       })
     ).rejects.toThrow(KeyCollisionError);
+    // The route that catches the collision is the single reporting point.
+    expect(mockCaptureMessage).not.toHaveBeenCalled();
   });
 
   test('refreshes last_used_at on assertion without rewriting the sign count', async () => {

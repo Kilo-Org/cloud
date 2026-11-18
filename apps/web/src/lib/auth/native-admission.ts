@@ -14,7 +14,6 @@ import {
 import { verifyPlayIntegrity } from './native-admission-google';
 import { checkFirewallRateLimit } from './firewall-rate-limit';
 import { countAdmissionCondition, rollAdmissionWindowIfNeeded } from './native-admission-telemetry';
-import { captureMessage } from '@sentry/nextjs';
 
 // ── Expected-condition telemetry ───────────────────────────────────────────
 
@@ -436,7 +435,9 @@ export async function persistAttestedKey(
     });
 
     if (!inserted || inserted.kilo_user_id !== userId) {
-      captureMessage('native_attested_key_cross_user_collision');
+      // The caller reports the refusal: every route that persists a key counts
+      // native_attested_key_cross_user_collision when it catches this error, so
+      // reporting here as well would emit both a count and a per-event message.
       throw new KeyCollisionError();
     }
   } else if (verification.signCount !== undefined) {

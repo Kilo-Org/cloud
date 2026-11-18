@@ -121,9 +121,7 @@ describe('BitbucketSetupRecovery', () => {
     // `connected: false` with no integration leaves one repair: connect.
     const connect = buttons(renderer);
     expect(connect).toHaveLength(1);
-    expect(connect[0]?.findByType('TextMock').props.children).toBe(
-      'Connect Bitbucket'
-    );
+    expect(connect[0]?.findByType('TextMock').props.children).toBe('Connect Bitbucket');
 
     const target = connect[0];
     if (!target) {

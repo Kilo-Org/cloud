@@ -241,6 +241,11 @@ function describeKilo(step: RequestLogRoutingStep): string {
   return `Paid with Kilo credits and routed through ${gateway}.`;
 }
 
+/** A partner route failed over to Kilo's gateway route, which Kilo also pays for. */
+export function isPartnerFailover(attempts: readonly { provider_type?: string }[]): boolean {
+  return attempts[0]?.provider_type === 'partner';
+}
+
 export function inferenceProviderNames(providers: string[]): string {
   return listOf(providers.map(provider => normalizePublicInferenceProvider(provider).name));
 }

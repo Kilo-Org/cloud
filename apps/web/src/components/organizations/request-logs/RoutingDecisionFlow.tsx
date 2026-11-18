@@ -19,6 +19,7 @@ import {
   inferenceProviderNames,
   rejectedResultLabel,
   type StepTone,
+  isPartnerFailover,
 } from './routing-labels';
 
 const TONE_ICONS: Record<StepTone, typeof CircleCheck> = {
@@ -166,6 +167,13 @@ function failoverStopLabels(stopReason: string | undefined): { title: string; de
 }
 
 function FailoverNote({ attempts }: { attempts: RequestLogByokFailoverAttempt[] }) {
+  if (isPartnerFailover(attempts)) {
+    return (
+      <p className="text-muted-foreground text-xs">
+        The partner provider failed before this attempt. See Partner fallback.
+      </p>
+    );
+  }
   const failed = attempts.filter(attempt => attempt.outcome !== 'served').length;
   return (
     <p className="text-muted-foreground text-xs">
@@ -205,11 +213,16 @@ function ResultNode({ routing }: { routing: RequestLogRoutingDetails }) {
   }
   if (finalAttempt?.outcome === 'failed') {
     const stopped = failoverStopLabels(finalAttempt.stop_reason);
+    const partnerFailed = isPartnerFailover(attempts);
     return (
       <FlowNode tone="rejected" icon={Flag} isLast>
-        <span className="text-sm font-medium">{stopped.title}</span>
+        <span className="text-sm font-medium">
+          {partnerFailed ? 'The partner provider and the Kilo gateway both failed' : stopped.title}
+        </span>
         <p className="text-muted-foreground text-xs">
-          {stopped.detail} Kilo credits were not used. See BYOK failover.
+          {partnerFailed
+            ? "The gateway's error was returned. See Partner fallback."
+            : `${stopped.detail} Kilo credits were not used. See BYOK failover.`}
         </p>
       </FlowNode>
     );

@@ -147,35 +147,14 @@ export function SessionChangesScreen({ sessionId }: Readonly<{ sessionId: string
   // same line, so the title never moves — and dropped only when a read settled
   // successfully without a capture time: the title then centres alone instead of
   // keeping a line no label fills.
-  const eyebrow = useMemo<HeaderEyebrow>(() => {
-    if (asOf !== undefined) {
-      return { kind: 'ready', text: asOf };
-    }
-    if (sessionQuery.isPending || sessionQuery.isError) {
-      return { kind: 'reserved' };
-    }
-    if (cloudAgentSessionId !== null) {
-      return changesQuery.isPending || changesQuery.isError
-        ? { kind: 'reserved' }
-        : { kind: 'none' };
-    }
-    if (readOnly) {
-      return legacyDiffQuery.isPending || legacyDiffQuery.isError
-        ? { kind: 'reserved' }
-        : { kind: 'none' };
-    }
-    return { kind: 'none' };
-  }, [
-    asOf,
-    sessionQuery.isPending,
-    sessionQuery.isError,
-    cloudAgentSessionId,
-    changesQuery.isPending,
-    changesQuery.isError,
-    readOnly,
-    legacyDiffQuery.isPending,
-    legacyDiffQuery.isError,
-  ]);
+  const captureReadSettled =
+    cloudAgentSessionId !== null ? changesQuery.isSuccess : !readOnly || legacyDiffQuery.isSuccess;
+  let eyebrow: HeaderEyebrow = { kind: 'none' };
+  if (asOf !== undefined) {
+    eyebrow = { kind: 'ready', text: asOf };
+  } else if (!sessionQuery.isSuccess || !captureReadSettled) {
+    eyebrow = { kind: 'reserved' };
+  }
 
   return (
     <View className="flex-1 bg-background" testID="session-changes-screen">

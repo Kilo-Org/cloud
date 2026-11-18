@@ -130,3 +130,13 @@ export function maxEndpointPricing(
   }
   return result;
 }
+
+/** Which price of an endpoint to show: the likely short-context one, or the highest it can charge. */
+export type PricingMode = 'shortContext' | 'worstCase';
+
+export function getEndpointPricing(
+  pricing: EndpointPricing | undefined,
+  mode: PricingMode
+): EndpointPricing | undefined {
+  return mode === 'worstCase' ? getWorstCaseModelPricing(pricing) : getModelDisplayPricing(pricing);
+}

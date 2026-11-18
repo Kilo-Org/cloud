@@ -292,7 +292,7 @@ async function briefingPriceRates(
                   endpointsMetadata,
                   preferredProviderOrderConfig,
                   vercelPricing,
-                  true
+                  'worstCase'
                 )
           )
         ),

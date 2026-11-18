@@ -98,7 +98,13 @@ function pickerRequestPrice(
     model.id,
     extra
       ? model.pricing
-      : pickerModelPricing(model, models, preferredProviderOrderConfig, vercelPricingMetadata, true)
+      : pickerModelPricing(
+          model,
+          models,
+          preferredProviderOrderConfig,
+          vercelPricingMetadata,
+          'worstCase'
+        )
   );
   return applyTieredPricingRates(
     modelId,

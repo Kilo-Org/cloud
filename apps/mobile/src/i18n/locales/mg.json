@@ -1468,8 +1468,10 @@
       "empty": "Tsy mbola misy fandinihana misy antontan'isa",
       "emptyDescription": "Mirakitra ny fandinihana vita ny antontan'isa rehefa velona ho an'ny fikambanana izy.",
       "offTitle": "Maty ny antontan'isa ho an'i {{platform}}",
-      "offDescription": "Alefaso ny antontan'isa ao amin'ny fikirakiran'ny fikambanana amin'ny tranonkala mba hirakitra ny fandinihana vita.",
-      "couldNotLoad": "Tsy afaka nampiditra ny antontan'isa"
+      "offDescription": "Ny andraikitra momba ny faktiora ao amin'ny fikambanana (tompony, mpitantana ary mpitantana ny faktiora) no afaka mamelona ny antontan'isa ao amin'ny fandrindrana ny fikambanana eo amin'ny tranonkala, mba hirakitra ny fandinihana vita.",
+      "couldNotLoad": "Tsy afaka nampiditra ny antontan'isa",
+      "trackedReviewsCaption": "Ny fandinihana vita nifarana tao anatin'io vanim-potoana io rehefa velona ny antontan'isa. Ny fandinihana mandeha sy ny fandinihana tsy nahomby dia tsy isaina mihitsy.",
+      "trackedReviewsUncounted": "{{count}} amin'ny {{total}} fandinihana vitan'ny fikambanana no tsy isaina: tsy voarakitra ny antontan'isany."
     },
     "council": {
       "title": "Fandinihan'ny filankevitra",

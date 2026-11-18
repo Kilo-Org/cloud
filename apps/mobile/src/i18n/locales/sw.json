@@ -1468,8 +1468,10 @@
       "empty": "Hakuna ukaguzi wenye takwimu bado",
       "emptyDescription": "Takwimu hurekodi ukaguzi uliokamilika wakati imewashwa kwa shirika.",
       "offTitle": "Takwimu zimezimwa kwa {{platform}}",
-      "offDescription": "Ziwashe takwimu katika mipangilio ya shirika kwenye wavuti ili kurekodi ukaguzi uliokamilika.",
-      "couldNotLoad": "Imeshindwa kupakia takwimu"
+      "offDescription": "Majukumu ya bili ya shirika — wamiliki, wasimamizi na mameneja wa bili — yanaweza kuwasha takwimu katika mipangilio ya shirika kwenye wavuti ili kurekodi ukaguzi uliokamilika.",
+      "couldNotLoad": "Imeshindwa kupakia takwimu",
+      "trackedReviewsCaption": "Ukaguzi uliokamilika ulioisha katika kipindi hiki wakati takwimu zilikuwa zimewashwa. Ukaguzi unaoendelea na ulioshindikana hauhesabiwi kamwe.",
+      "trackedReviewsUncounted": "{{count}} kati ya ukaguzi {{total}} uliokamilika wa shirika hauhesabiwi: matokeo yake hayakurekodiwa."
     },
     "council": {
       "title": "Ukaguzi wa baraza",

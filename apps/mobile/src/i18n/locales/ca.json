@@ -1492,8 +1492,10 @@
       "empty": "Encara no hi ha revisions amb analítica",
       "emptyDescription": "L'analítica registra les revisions completades mentre està activada per a l'organització.",
       "offTitle": "L'analítica està desactivada per a {{platform}}",
-      "offDescription": "Activa-la a la configuració de l'organització al web per registrar les revisions completades.",
-      "couldNotLoad": "No s'ha pogut carregar l'analítica"
+      "offDescription": "Els rols de facturació de l'organització poden activar l'analítica a la configuració de l'organització al web per registrar les revisions completades.",
+      "couldNotLoad": "No s'ha pogut carregar l'analítica",
+      "trackedReviewsCaption": "Revisions completades que han finalitzat durant aquest període amb l'analítica activada. Les revisions en curs i fallades no es compten mai.",
+      "trackedReviewsUncounted": "{{count}} de les {{total}} revisions finalitzades de l'organització no es compten: el seu resultat no s'ha registrat."
     },
     "council": {
       "title": "Revisió en consell",

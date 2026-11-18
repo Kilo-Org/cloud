@@ -893,8 +893,10 @@
       "empty": "Nessuna revisione con statistiche",
       "emptyDescription": "Le statistiche registrano le revisioni completate mentre sono attive per l'organizzazione.",
       "offTitle": "Le statistiche sono disattivate per {{platform}}",
-      "offDescription": "Attivale nelle impostazioni dell'organizzazione sul web per registrare le revisioni completate.",
-      "couldNotLoad": "Impossibile caricare le statistiche"
+      "offDescription": "I ruoli di fatturazione dell'organizzazione (proprietari, amministratori e gestori della fatturazione) possono attivare le statistiche nelle impostazioni dell'organizzazione sul web per registrare le revisioni completate.",
+      "couldNotLoad": "Impossibile caricare le statistiche",
+      "trackedReviewsCaption": "Revisioni completate che si sono concluse in questo periodo con le statistiche attive. Le revisioni in corso e non riuscite non vengono mai conteggiate.",
+      "trackedReviewsUncounted": "{{count}} delle {{total}} revisioni terminate dell'organizzazione non vengono conteggiate: il loro risultato non è stato registrato."
     },
     "council": {
       "title": "Revisione del gruppo di revisori",

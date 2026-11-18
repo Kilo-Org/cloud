@@ -1516,8 +1516,10 @@
       "empty": "Še ni pregledov z analitiko",
       "emptyDescription": "Analitika beleži dokončane preglede, dokler je omogočena za organizacijo.",
       "offTitle": "Analitika je za {{platform}} izklopljena",
-      "offDescription": "Vklopi jo v nastavitvah organizacije na spletu, da beleži dokončane preglede.",
-      "couldNotLoad": "Analitike ni bilo mogoče naložiti"
+      "offDescription": "Lastniki, skrbniki in upravitelji obračunavanja v organizaciji lahko vklopijo analitiko v nastavitvah organizacije na spletu, da se beležijo dokončani pregledi.",
+      "couldNotLoad": "Analitike ni bilo mogoče naložiti",
+      "trackedReviewsCaption": "Dokončani pregledi, ki so se zaključili v tem obdobju z vklopljeno analitiko. Pregledi v teku in neuspešni pregledi se nikoli ne štejejo.",
+      "trackedReviewsUncounted": "{{count}} od {{total}} dokončanih pregledov, ki jih ima organizacija, ni preštetih: njihov rezultat ni bil zajet."
     },
     "council": {
       "title": "Kolegijski pregled",

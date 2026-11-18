@@ -1516,8 +1516,10 @@
       "empty": "Zatiaľ žiadne kontroly s analytikou",
       "emptyDescription": "Analytika zaznamenáva dokončené kontroly, kým je pre organizáciu zapnutá.",
       "offTitle": "Analytika je pre {{platform}} vypnutá",
-      "offDescription": "Zapnite ju v nastaveniach organizácie na webe, aby zaznamenávala dokončené kontroly.",
-      "couldNotLoad": "Analytiku sa nepodarilo načítať"
+      "offDescription": "Fakturačné roly organizácie – vlastníci, správcovia a manažéri fakturácie – môžu zapnúť analytiku v nastaveniach organizácie na webe, aby sa zaznamenávali dokončené kontroly.",
+      "couldNotLoad": "Analytiku sa nepodarilo načítať",
+      "trackedReviewsCaption": "Dokončené kontroly, ktoré sa skončili v tomto období so zapnutou analytikou. Prebiehajúce a neúspešné kontroly sa nikdy nezapočítavajú.",
+      "trackedReviewsUncounted": "{{count}} z {{total}} dokončených kontrol, ktoré má organizácia, nie je započítaných: ich výsledok nebol zachytený."
     },
     "council": {
       "title": "Kontrola rady",

@@ -1468,8 +1468,10 @@
       "empty": "Még nincs statisztikával rendelkező kódellenőrzés",
       "emptyDescription": "A statisztika a befejezett kódellenőrzéseket rögzíti, amíg be van kapcsolva a szervezetnél.",
       "offTitle": "A statisztika ki van kapcsolva a {{platform}} platformhoz",
-      "offDescription": "Kapcsold be a statisztikát a szervezeti beállításokban a weben, hogy rögzítsd a befejezett kódellenőrzéseket.",
-      "couldNotLoad": "Nem sikerült betölteni a statisztikát"
+      "offDescription": "A szervezetben számlázási szerepkörrel rendelkezők a szervezet webes beállításaiban kapcsolhatják be a statisztikát, amely a befejezett kódellenőrzéseket rögzíti.",
+      "couldNotLoad": "Nem sikerült betölteni a statisztikát",
+      "trackedReviewsCaption": "Azok a befejezett kódellenőrzések, amelyek ebben az időszakban, bekapcsolt statisztika mellett fejeződtek be. A futó és sikertelen kódellenőrzések soha nem kerülnek beszámításra.",
+      "trackedReviewsUncounted": "A szervezet {{total}} befejezett kódellenőrzéséből {{count}} nincs beszámítva: az eredményük nem lett rögzítve."
     },
     "council": {
       "title": "Tanácsellenőrzés",

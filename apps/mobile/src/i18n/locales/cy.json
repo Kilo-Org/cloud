@@ -1564,8 +1564,10 @@
       "empty": "Dim adolygiadau â dadansoddeg eto",
       "emptyDescription": "Mae dadansoddeg yn cofnodi adolygiadau a gwblhawyd tra bo'r nodwedd wedi'i galluogi ar gyfer y sefydliad.",
       "offTitle": "Mae dadansoddeg wedi'i diffodd ar gyfer {{platform}}",
-      "offDescription": "Trowch hi ymlaen yng ngosodiadau'r sefydliad ar y we i gofnodi adolygiadau a gwblhawyd.",
-      "couldNotLoad": "Methwyd llwytho'r dadansoddeg"
+      "offDescription": "Gall rolau bilio'r sefydliad droi'r dadansoddeg ymlaen yng ngosodiadau'r sefydliad ar y we i gofnodi adolygiadau a gwblhawyd.",
+      "couldNotLoad": "Methwyd llwytho'r dadansoddeg",
+      "trackedReviewsCaption": "Adolygiadau a gwblhawyd yn y cyfnod hwn gyda'r dadansoddeg wedi'i troi ymlaen. Ni chyfrir adolygiadau sy'n rhedeg neu wedi methu erioed.",
+      "trackedReviewsUncounted": "Mae {{count}} o'r {{total}} adolygiadau a gwblhawyd sydd gan y sefydliad heb eu cyfri: ni gafodd eu canlyniadau eu cofnodi."
     },
     "council": {
       "title": "Adolygiad cyngor",

@@ -925,8 +925,10 @@
       "empty": "Nog geen reviews met statistieken",
       "emptyDescription": "Statistieken leggen afgeronde reviews vast zolang ze voor de organisatie zijn ingeschakeld.",
       "offTitle": "Statistieken staan uit voor {{platform}}",
-      "offDescription": "Schakel de statistieken in bij de organisatie-instellingen op het web om afgeronde reviews vast te leggen.",
-      "couldNotLoad": "Kan statistieken niet laden"
+      "offDescription": "De facturatierollen van de organisatie (eigenaren, beheerders en facturatiemanagers) kunnen statistieken inschakelen in de organisatie-instellingen op het web om afgeronde reviews vast te leggen.",
+      "couldNotLoad": "Kan statistieken niet laden",
+      "trackedReviewsCaption": "Reviews die in deze periode zijn afgerond terwijl statistieken waren ingeschakeld. Lopende en mislukte reviews worden nooit meegeteld.",
+      "trackedReviewsUncounted": "{{count}} van de {{total}} afgeronde reviews die de organisatie heeft, worden niet meegeteld: hun resultaat is niet vastgelegd."
     },
     "council": {
       "title": "Panelbeoordeling",

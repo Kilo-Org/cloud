@@ -1468,8 +1468,10 @@
       "empty": "Kāore anō he arotake whai tātaritanga",
       "emptyDescription": "Ka tuhia e ngā tātaritanga ngā arotake kua oti i te wā e whakahohea ana mō te rōpū.",
       "offTitle": "Kua weto ngā tātaritanga mō {{platform}}",
-      "offDescription": "Whakahohea ngā tātaritanga i ngā tautuhinga rōpū i te ipurangi ki te tuhi i ngā arotake kua oti.",
-      "couldNotLoad": "Kāore i taea te uta i ngā tātaritanga"
+      "offDescription": "Ka taea e ngā tūranga utu o te rōpū (arā, ngā kaipupuri, ngā kaiwhakahaere me ngā kaiwhakahaere utu) te whakahohe i ngā tātaritanga i te tautohutohu o te rōpū i te tukatuku, kia tuhia ai ngā arotake kua oti.",
+      "couldNotLoad": "Kāore i taea te uta i ngā tātaritanga",
+      "trackedReviewsCaption": "Ngā arotake kua oti i roto i tēnei wā i te wā e whakahohea ana te tātaritanga. Kāore ngā arotake e haere ana, me ērā kua taka, e tatauhia rawa.",
+      "trackedReviewsUncounted": "{{count}} o te {{total}} arotake kua oti o te rōpū kāore e tatauhia: kāore te hua o ērā i hopukia."
     },
     "council": {
       "title": "Arotake kaunihera",

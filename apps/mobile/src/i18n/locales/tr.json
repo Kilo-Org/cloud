@@ -925,8 +925,10 @@
       "empty": "Henüz istatistiği olan inceleme yok",
       "emptyDescription": "İstatistikler, kuruluş için etkin olduğu sürece tamamlanan incelemeleri kaydeder.",
       "offTitle": "{{platform}} için istatistikler kapalı",
-      "offDescription": "Tamamlanan incelemeleri kaydetmek için Web'deki kuruluş ayarlarında istatistikleri aç.",
-      "couldNotLoad": "İstatistikler yüklenemedi"
+      "offDescription": "Kuruluşun faturalama rollerine sahip kişiler (sahipler, yöneticiler ve faturalama yöneticileri), tamamlanan incelemeleri kaydetmek için istatistikleri web'deki kuruluş ayarlarından açabilir.",
+      "couldNotLoad": "İstatistikler yüklenemedi",
+      "trackedReviewsCaption": "Bu dönemde istatistikler açıkken tamamlanan incelemeler. Devam eden ve başarısız olan incelemeler hiçbir zaman sayılmaz.",
+      "trackedReviewsUncounted": "Kuruluşun tamamlanan {{total}} incelemesinden {{count}} tanesi sayılmadı: sonuçları kaydedilmedi."
     },
     "council": {
       "title": "Konsey incelemesi",

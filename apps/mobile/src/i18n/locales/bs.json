@@ -1492,8 +1492,10 @@
       "empty": "Još nema pregleda s analitikom",
       "emptyDescription": "Analitika bilježi završene preglede dok je uključena za organizaciju.",
       "offTitle": "Analitika je isključena za {{platform}}",
-      "offDescription": "Uključi je u postavkama organizacije na webu da bilježi završene preglede.",
-      "couldNotLoad": "Učitavanje analitike nije uspjelo"
+      "offDescription": "Uloge za naplatu u organizaciji mogu uključiti analitiku u postavkama organizacije na webu da bilježi završene preglede.",
+      "couldNotLoad": "Učitavanje analitike nije uspjelo",
+      "trackedReviewsCaption": "Završeni pregledi koji su okončani u ovom periodu dok je analitika bila uključena. Pregledi u toku i neuspjeli pregledi nikada se ne računaju.",
+      "trackedReviewsUncounted": "{{count}} od {{total}} završenih pregleda koje organizacija ima nije uračunato: njihov rezultat nije zabilježen."
     },
     "council": {
       "title": "Pregled vijeća",

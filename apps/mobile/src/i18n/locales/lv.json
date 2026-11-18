@@ -1492,8 +1492,10 @@
       "empty": "Vēl nav pārskatīšanu ar analītiku",
       "emptyDescription": "Analītika reģistrē pabeigtas pārskatīšanas, kamēr tā ir iespējota organizācijai.",
       "offTitle": "{{platform}} platformā analītika ir izslēgta",
-      "offDescription": "Ieslēdz to organizācijas iestatījumos tīmeklī, lai reģistrētu pabeigtas pārskatīšanas.",
-      "couldNotLoad": "Neizdevās ielādēt analītiku"
+      "offDescription": "Organizācijas norēķinu lomas (īpašnieki, administratori un norēķinu pārvaldnieki) var ieslēgt analītiku organizācijas iestatījumos tīmeklī, lai reģistrētu pabeigtas pārskatīšanas.",
+      "couldNotLoad": "Neizdevās ielādēt analītiku",
+      "trackedReviewsCaption": "Pabeigtas pārskatīšanas, kas noslēgušās šajā periodā, kamēr analītika bija ieslēgta. Notiekošās un neveiksmīgās pārskatīšanas nekad netiek ieskaitītas.",
+      "trackedReviewsUncounted": "{{count}} no {{total}} organizācijas pabeigtajām pārskatīšanām netiek ieskaitītas: to rezultāts netika reģistrēts."
     },
     "council": {
       "title": "Padomes pārskatīšana",

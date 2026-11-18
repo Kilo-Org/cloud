@@ -925,8 +925,10 @@
       "empty": "아직 분석 데이터가 있는 리뷰가 없습니다",
       "emptyDescription": "분석은 조직에서 이 기능이 켜져 있는 동안 완료된 리뷰를 기록합니다.",
       "offTitle": "{{platform}}의 분석이 꺼져 있습니다",
-      "offDescription": "완료된 리뷰를 기록하려면 웹의 조직 설정에서 분석을 활성화하세요.",
-      "couldNotLoad": "분석을 불러오지 못했습니다"
+      "offDescription": "소유자, 관리자, 결제 관리자 등 조직의 결제 권한이 있는 역할은 웹의 조직 설정에서 분석을 켤 수 있으며, 이때 완료된 리뷰가 기록됩니다.",
+      "couldNotLoad": "분석을 불러오지 못했습니다",
+      "trackedReviewsCaption": "이 기간 동안 분석이 켜진 상태에서 완료된 리뷰입니다. 실행 중이거나 실패한 리뷰는 계산에 포함되지 않습니다.",
+      "trackedReviewsUncounted": "조직의 완료된 리뷰 {{total}}개 중 {{count}}개는 결과가 캡처되지 않아 계산에 포함되지 않습니다."
     },
     "council": {
       "title": "협의체 리뷰",

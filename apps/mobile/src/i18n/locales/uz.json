@@ -1468,8 +1468,10 @@
       "empty": "Statistikasi bor koʻrib chiqishlar hozircha yoʻq",
       "emptyDescription": "Statistika tashkilot uchun yoqilgan boʻlsa, tugallangan koʻrib chiqishlarni qayd etadi.",
       "offTitle": "{{platform}} uchun statistika oʻchirilgan",
-      "offDescription": "Tugallangan koʻrib chiqishlarni qayd etish uchun veb-saytdagi tashkilot sozlamalarida statistikani yoqing.",
-      "couldNotLoad": "Statistikani yuklab boʻlmadi"
+      "offDescription": "Tashkilotning billing rollari — egalar, administratorlar va billing menejerlari — tugallangan koʻrib chiqishlarni qayd etish uchun statistikani vebdagi tashkilot sozlamalarida yoqishi mumkin.",
+      "couldNotLoad": "Statistikani yuklab boʻlmadi",
+      "trackedReviewsCaption": "Bu davrda statistika yoqilgan holda tugallangan koʻrib chiqishlar. Jarayondagi va muvaffaqiyatsiz yakunlangan koʻrib chiqishlar hech qachon hisobga olinmaydi.",
+      "trackedReviewsUncounted": "Tashkilotdagi {{total}} ta tugallangan koʻrib chiqishning {{count}} tasi hisobga olinmagan: ularning natijasi qayd etilmagan."
     },
     "council": {
       "title": "Kengash koʻrib chiqishi",

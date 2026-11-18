@@ -1468,8 +1468,10 @@
       "empty": "Kò sí àtúnyẹ̀wò pẹ̀lú ìṣirò",
       "emptyDescription": "Ìṣirò ń gbasilẹ̀ àwọn àtúnyẹ̀wò tó parí nígbà tí ó bá ṣí fún àjọ.",
       "offTitle": "Ìṣirò ti pa fún {{platform}}",
-      "offDescription": "Mú Ìṣirò ṣiṣẹ́ nínú ààtò àjọ lórí wẹ́ẹ̀bù láti gbasilẹ̀ àwọn àtúnyẹ̀wò tó parí.",
-      "couldNotLoad": "A kò lè gbé ìṣirò wọlé"
+      "offDescription": "Àwọn ipò owó-ìnáwó àjọ (àwọn olóhun, àwọn alákòóso àti àwọn olùdarí ìnáwó) lè ṣí ìṣirò sílẹ̀ nínú àwọn ètò àjọ lórí ayélujára láti gbasilẹ̀ àwọn àtúnyẹ̀wò tó parí.",
+      "couldNotLoad": "A kò lè gbé ìṣirò wọlé",
+      "trackedReviewsCaption": "Àwọn àtúnyẹ̀wò tó parí ní àkókò yìí nígbà tí ìṣirò ti ṣí sílẹ̀. A kì í tọpinpin àwọn àtúnyẹ̀wò tí ó ń ṣiṣẹ́ lọ́wọ́ báyìí àti àwọn tí ó kùnà rárá.",
+      "trackedReviewsUncounted": "{{count}} nínú {{total}} àwọn àtúnyẹ̀wò tó parí tí àjọ ní kì í ṣe tọpinpin: àbájá wọn kò tíì gbasilẹ̀."
     },
     "council": {
       "title": "Àtúnyẹ̀wò ìgbìmọ̀",

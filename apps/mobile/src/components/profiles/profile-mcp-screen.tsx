@@ -75,6 +75,9 @@ export function ProfileMcpScreen({
   const canManage = permission === 'allowed';
   const servers = profileQuery.data ?? NO_MCP_SERVERS;
   const rows = mcpServerRows(servers);
+  // The type only tells rows apart in a list that holds both kinds; a list of
+  // one kind says it once for the whole group instead of on every row.
+  const mixedTypes = servers.some(server => server.type !== servers[0]?.type);
   // The server counts every row this profile holds and the list returns every
   // row unfiltered, so the loaded length is the count the cap compares.
   const atServerCap = servers.length >= MAX_PROFILE_MCP_SERVERS;
@@ -193,6 +196,7 @@ export function ProfileMcpScreen({
                 server={server}
                 summary={row.summary}
                 secretCount={row.secretCount}
+                showType={mixedTypes}
                 onToggle={
                   canManage
                     ? guardRowPress(enabled => {

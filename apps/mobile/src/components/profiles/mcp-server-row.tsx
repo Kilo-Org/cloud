@@ -16,6 +16,12 @@ type McpServerRowProps = Readonly<{
   server: McpServerSource;
   summary: string;
   secretCount: number;
+  /**
+   * The list holds both local and remote servers, so the type tells rows apart.
+   * When every row is the same type it repeats what the whole list already
+   * says, and the row leaves it out.
+   */
+  showType: boolean;
   onToggle?: (enabled: boolean) => void;
   onEdit?: () => void;
   onDelete?: () => void;
@@ -26,15 +32,18 @@ type McpServerRowProps = Readonly<{
  * it, the command/URL summary, the enabled switch and the edit/delete controls.
  * The name owns its line, so it is ellipsized only when it alone is wider than the
  * row; the type and the count are metadata and never take the room a short name
- * needs. The name is painted only and hidden from assistive technology, so the
- * switch's label stays the only element a screen reader matches by the server's
- * name; the type, summary and key count keep their own stops because they say what
- * the name does not. It lives in a `RowGroup`, which draws the separator.
+ * needs. The summary is a value, so it keeps both of its ends and ellipsizes in
+ * the middle — a URL or a command is told apart by its tail. The name is painted
+ * only and hidden from assistive technology, so the switch's label stays the only
+ * element a screen reader matches by the server's name; the summary and key count
+ * keep their own stops because they say what the name does not. It lives in a
+ * `RowGroup`, which draws the separator.
  */
 export function McpServerRowView({
   server,
   summary,
   secretCount,
+  showType,
   onToggle,
   onEdit,
   onDelete,
@@ -52,22 +61,29 @@ export function McpServerRowView({
         <Text variant="mono" numberOfLines={1} {...HIDDEN_LABEL_PROPS} className="min-w-0 shrink">
           {server.name}
         </Text>
-        <View className="flex-row items-center gap-2">
-          <Text variant="caption">{typeLabel}</Text>
-          {secretLabel === null ? null : (
-            <View className="flex-row items-center gap-0.5">
-              <Lock size={12} color={colors.mutedForeground} />
-              {/* The count sits beside a lock glyph and a bare number reads as
-                  nothing, so the line carries the plural wording as its name
-                  while the row keeps the compact digit on screen. */}
-              <Text variant="caption" accessibilityLabel={secretLabel}>
-                {secretCount}
-              </Text>
-            </View>
-          )}
-        </View>
+        {showType || secretLabel !== null ? (
+          <View className="flex-row items-center gap-2">
+            {showType ? <Text variant="caption">{typeLabel}</Text> : null}
+            {secretLabel === null ? null : (
+              <View className="flex-row items-center gap-0.5">
+                <Lock size={12} color={colors.mutedForeground} />
+                {/* The count sits beside a lock glyph and a bare number reads as
+                    nothing, so the line carries the plural wording as its name
+                    while the row keeps the compact digit on screen. */}
+                <Text variant="caption" accessibilityLabel={secretLabel}>
+                  {secretCount}
+                </Text>
+              </View>
+            )}
+          </View>
+        ) : null}
         {summary.length > 0 ? (
-          <Text variant="mono" className="text-xs text-muted-foreground" numberOfLines={1}>
+          <Text
+            variant="mono"
+            className="text-xs text-muted-foreground"
+            numberOfLines={1}
+            ellipsizeMode="middle"
+          >
             {summary}
           </Text>
         ) : null}

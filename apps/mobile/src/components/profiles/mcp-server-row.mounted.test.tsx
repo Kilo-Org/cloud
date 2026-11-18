@@ -58,13 +58,14 @@ function renderRow(element: ReactElement) {
   return renderer.root;
 }
 
-function row(overrides: { readOnly?: boolean } = {}) {
+function row(overrides: { readOnly?: boolean; showType?: boolean } = {}) {
   const readOnly = overrides.readOnly === true;
   return (
     <McpServerRowView
       server={server}
       summary="https://mcp.example.com/docs"
       secretCount={2}
+      showType={overrides.showType ?? true}
       onToggle={readOnly ? undefined : () => undefined}
       onEdit={readOnly ? undefined : () => undefined}
       onDelete={readOnly ? undefined : () => undefined}
@@ -100,6 +101,12 @@ describe('<McpServerRowView>', () => {
     expect(announced).toContain('Remote');
     expect(announced).toContain('https://mcp.example.com/docs');
 
+    // A URL is told apart by its tail, so the value ellipsizes in the middle.
+    const summary = root
+      .findAllByType(TEXT)
+      .find(node => node.props.children === 'https://mcp.example.com/docs');
+    expect(summary?.props.ellipsizeMode).toBe('middle');
+
     const buttons = root.findAllByType(PRESSABLE).map(node => node.props.accessibilityLabel);
     expect(buttons).toEqual(['Edit MCP server docs-search', 'Delete MCP server docs-search']);
   });
@@ -121,6 +128,25 @@ describe('<McpServerRowView>', () => {
     expect(lines.map(line => line.findAllByType(TEXT).map(node => node.props.children))).toEqual([
       [server.name],
       ['Remote', 2],
+      ['https://mcp.example.com/docs'],
+    ]);
+  });
+
+  it('leaves the type out when the whole list is one kind, and keeps the key count', () => {
+    const root = renderRow(row({ showType: false }));
+
+    const nameLine = root.findAllByType(TEXT).find(node => node.props.children === server.name);
+    const body = nameLine?.parent ?? null;
+    if (nameLine === undefined || body === null) {
+      throw new Error('Missing the server name line');
+    }
+    const lines = body.children.filter(
+      (child): child is ReactTestInstance => typeof child !== 'string'
+    );
+
+    expect(lines.map(line => line.findAllByType(TEXT).map(node => node.props.children))).toEqual([
+      [server.name],
+      [2],
       ['https://mcp.example.com/docs'],
     ]);
   });

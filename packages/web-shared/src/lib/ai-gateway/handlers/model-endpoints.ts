@@ -41,11 +41,12 @@ export async function handleModelEndpointsRequest(
   const aliasTargetId = getOpenRouterAliasTarget(models, modelId);
   const servingModel = (aliasTargetId && models[aliasTargetId]) || storedModel;
   const vercelModel = getVercelModelForPricing(vercel, servingModel.id);
+  const { reasoning: _reasoning, ...modelMetadata } = storedModel;
 
   return NextResponse.json(
     {
       data: {
-        ...storedModel,
+        ...modelMetadata,
         endpoints: servingModel.endpoints.map(endpoint => {
           const pricing = getProviderDisplayPricing(endpoint.tag, endpoint.pricing, vercelModel);
           return pricing ? { ...endpoint, pricing } : endpoint;

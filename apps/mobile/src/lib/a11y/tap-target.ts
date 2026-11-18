@@ -61,6 +61,15 @@ export const STATE_ACTION_CLASS = 'min-h-[48px]';
 export const ROW_TARGET_CLASS = 'min-h-[48px]';
 
 /**
+ * The frame a tab entry renders on its own pressable node. A tab sized by its
+ * label is only as wide as the word: the Agents/To-dos switch measured 25pt in
+ * RTL and 40pt in English, under the design target on the horizontal axis even
+ * though the row floor held the vertical one. The floor is applied on both
+ * axes, so a short label in any locale still offers a 48pt target.
+ */
+export const TAB_TARGET_CLASS = 'min-h-[48px] min-w-[48px]';
+
+/**
  * The frame a stacked form gives its pickers — Account, Run on, Repository and
  * the branch row under them. One field shape for the whole column, so a form
  * never shows two trigger heights side by side.

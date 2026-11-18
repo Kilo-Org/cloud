@@ -91,17 +91,19 @@ export function toMistralChatCompletionsBody(body: object, extraFields: readonly
 }
 
 function reasoningTextOf(message: Record<string, unknown>): string {
-  if (Array.isArray(message.reasoning_details)) {
-    return message.reasoning_details
-      .map(detail =>
-        isRecord(detail) &&
-        detail.type === ReasoningDetailType.Text &&
-        typeof detail.text === 'string'
-          ? detail.text
-          : ''
-      )
-      .join('');
-  }
+  const detailsText = Array.isArray(message.reasoning_details)
+    ? message.reasoning_details
+        .map(detail =>
+          isRecord(detail) &&
+          detail.type === ReasoningDetailType.Text &&
+          typeof detail.text === 'string'
+            ? detail.text
+            : ''
+        )
+        .join('')
+    : '';
+  if (detailsText) return detailsText;
+  // Details without text, such as only summaries, fall back to the legacy reasoning strings.
   for (const field of ['reasoning_content', 'reasoning']) {
     const value = message[field];
     if (typeof value === 'string') return value;

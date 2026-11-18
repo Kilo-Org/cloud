@@ -152,6 +152,27 @@ describe('applyMistralThinkingRequestTransform', () => {
     ]);
   });
 
+  it.each([
+    ['empty reasoning_details', []],
+    ['summary-only reasoning_details', [{ type: 'reasoning.summary', summary: 'a summary' }]],
+  ])('falls back to reasoning_content for %s', (_name, reasoningDetails) => {
+    const request = chatRequest([
+      {
+        role: 'assistant',
+        content: 'answer',
+        reasoning_details: reasoningDetails,
+        reasoning_content: 'from content',
+      },
+    ]);
+
+    applyMistralThinkingRequestTransform(request);
+
+    expect(messagesOf(request)[0]?.content).toEqual([
+      thinkingChunk('from content'),
+      { type: 'text', text: 'answer' },
+    ]);
+  });
+
   it('leaves assistant and non-assistant messages without reasoning untouched', () => {
     const request = chatRequest([
       { role: 'user', content: 'hello', reasoning_content: 'ignored on user messages' },
@@ -256,7 +277,11 @@ describe('mapMistralThinkingToReasoningDetails', () => {
   it('moves thinking out of a non-streaming message content list', () => {
     const message: Record<string, unknown> = {
       role: 'assistant',
-      content: [thinkingChunk('step one '), thinkingChunk('step two'), { type: 'text', text: 'Hi' }],
+      content: [
+        thinkingChunk('step one '),
+        thinkingChunk('step two'),
+        { type: 'text', text: 'Hi' },
+      ],
     };
 
     mapMistralThinkingToReasoningDetails(message);

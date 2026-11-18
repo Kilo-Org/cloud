@@ -225,6 +225,37 @@ describe('remediation Worker call sites', () => {
     );
     logged.mockRestore();
   });
+
+  it.each(callSites)(
+    'maps a Worker 401 on $name onto the not-configured sentence',
+    async ({ submit }) => {
+      // A 401/403 is the Worker rejecting the server's own credentials: the
+      // same deployment misconfiguration as an unset URL or secret, so the
+      // device gets the service-not-configured copy, not the rejection line.
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: () => Promise.resolve({ error: 'Unauthorized' }),
+      });
+      const logged = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      const error: TRPCError = await submit().then(
+        () => {
+          throw new Error('expected a rejection');
+        },
+        (e: unknown) => e as TRPCError
+      );
+      expect(error).toBeInstanceOf(TRPCError);
+      expect(error.code).toBe('PRECONDITION_FAILED');
+      expect(error.message).toBe('Security service is not configured');
+      expect(error.message).not.toContain('Unauthorized');
+      expect(logged).toHaveBeenCalledWith(
+        'Security remediation Worker rejected the request',
+        expect.objectContaining({ status: 401, notes: expect.stringContaining('Unauthorized') })
+      );
+      logged.mockRestore();
+    }
+  );
 });
 
 describe('remediation Worker call sites env configuration', () => {

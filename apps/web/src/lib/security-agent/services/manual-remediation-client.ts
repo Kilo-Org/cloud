@@ -9,6 +9,10 @@ import {
   type SecurityRemediationAdmissionRejectionReason,
 } from '@kilocode/worker-utils/security-remediation-policy';
 import { z } from 'zod';
+import {
+  SECURITY_REMEDIATION_REJECTED_MESSAGE,
+  SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE,
+} from '@kilocode/app-shared/security-agent';
 import { postSecurityWorkerJson } from './security-worker-request';
 
 type RemediationOwner =
@@ -76,20 +80,18 @@ type ApplyAutoRemediationResponse = {
   error?: string;
 };
 
-// Mirrored by the mobile security mutation classifier: a stable non-retryable
-// code, not the generic 500 the classifier treats as retryable transport.
-const CONFIG_ERROR_MESSAGE = 'Security service is not configured';
-
-// Stable sentence for a definitive Worker rejection: it never echoes the
-// Worker's error body and never varies with the status, which is what lets the
-// mobile ledger map it onto localized copy (security-agent-ledger.ts).
-const REMEDIATION_REJECTED_MESSAGE = 'Security remediation service request was rejected';
-
 /**
  * Logs a definitive non-5xx Worker rejection before it becomes the stable
  * client error: the status is what separates an internal-secret mismatch (401)
  * or a request-schema drift (400) from a policy rejection (409) once the body
  * is no longer echoed. The Worker's `error` body is notes-only and length-capped.
+ *
+ * Rejection classes at the throw sites: an auth/config rejection (401/403)
+ * means the deployment is misconfigured, so the client gets the
+ * service-not-configured sentence (`SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE`).
+ * Any other rejection keeps the remediation-rejection sentence. Both go out as
+ * `PRECONDITION_FAILED`; the sentences are shared with the mobile ledger
+ * (stable-error-messages).
  */
 function logDefinitiveRejection(route: string, status: number, body: unknown): void {
   let notes: string | null = null;
@@ -106,9 +108,28 @@ function logDefinitiveRejection(route: string, status: number, body: unknown): v
   });
 }
 
+/**
+ * The stable error for a definitive non-5xx Worker rejection: a 401/403 is the
+ * Worker refusing the server's own credentials, i.e. the same misconfiguration
+ * as an unset URL or secret, so it reuses the not-configured sentence. Every
+ * other rejection keeps the remediation-rejection sentence.
+ */
+function definitiveRejectionError(status: number): TRPCError {
+  const authRejection = status === 401 || status === 403;
+  return new TRPCError({
+    code: 'PRECONDITION_FAILED',
+    message: authRejection
+      ? SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE
+      : SECURITY_REMEDIATION_REJECTED_MESSAGE,
+  });
+}
+
 function requireWorkerConfig() {
   if (!SECURITY_AUTO_ANALYSIS_WORKER_URL || !INTERNAL_API_SECRET) {
-    throw new TRPCError({ code: 'PRECONDITION_FAILED', message: CONFIG_ERROR_MESSAGE });
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE,
+    });
   }
 }
 
@@ -150,7 +171,7 @@ export async function submitManualRemediationStart(
       throw ambiguousTransportError(`Remediation request failed with ${response.status}`);
     }
     logDefinitiveRejection('remediation/start', response.status, body);
-    throw new TRPCError({ code: 'PRECONDITION_FAILED', message: REMEDIATION_REJECTED_MESSAGE });
+    throw definitiveRejectionError(response.status);
   }
   if (!parsedBody.success || !parsedBody.data.admitted) {
     // Admitted, but without a readable attempt the outcome cannot be recorded,
@@ -186,7 +207,7 @@ export async function submitRemediationCancellation(
       throw ambiguousTransportError(`Remediation cancellation failed with ${response.status}`);
     }
     logDefinitiveRejection('remediation/cancel', response.status, body);
-    throw new TRPCError({ code: 'PRECONDITION_FAILED', message: REMEDIATION_REJECTED_MESSAGE });
+    throw definitiveRejectionError(response.status);
   }
   if (workerBody?.success !== true || !workerBody.status) {
     throw ambiguousTransportError('Security remediation Worker returned an unexpected response');
@@ -215,7 +236,7 @@ export async function submitApplyAutoRemediation(
       throw ambiguousTransportError(`Apply auto-remediation failed with ${response.status}`);
     }
     logDefinitiveRejection('apply-auto-remediation', response.status, body);
-    throw new TRPCError({ code: 'PRECONDITION_FAILED', message: REMEDIATION_REJECTED_MESSAGE });
+    throw definitiveRejectionError(response.status);
   }
   if (
     workerBody?.success !== true ||

@@ -4,6 +4,7 @@ import {
   INTERNAL_API_SECRET,
   SECURITY_SYNC_WORKER_URL,
 } from '@kilocode/web-shared/lib/config.server';
+import { SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE } from '@kilocode/app-shared/security-agent';
 import { postSecurityWorkerJson } from './security-worker-request';
 
 export type AcceptedSecurityWorkerCommand = {
@@ -23,9 +24,8 @@ type SecurityWorkerResponse = {
 };
 
 // Mirrored by the mobile security mutation classifier: a stable non-retryable
-// code, not the generic 500 the classifier treats as retryable transport.
-const CONFIG_ERROR_MESSAGE = 'Security service is not configured';
-
+// code, not the generic 500 the classifier treats as retryable transport. The
+// sentence itself is shared with the mobile ledger (stable-error-messages).
 /**
  * Posts a security-sync Worker command and classifies the outcome for the
  * operation ledger: `BAD_GATEWAY` is ambiguous transport (the Worker may still
@@ -44,7 +44,10 @@ export async function postSecurityWorkerCommand(params: {
   body: Record<string, unknown>;
 }): Promise<AcceptedSecurityWorkerCommand> {
   if (!SECURITY_SYNC_WORKER_URL || !INTERNAL_API_SECRET) {
-    throw new TRPCError({ code: 'PRECONDITION_FAILED', message: CONFIG_ERROR_MESSAGE });
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE,
+    });
   }
   // Bounded, and `BAD_GATEWAY` on a stalled or non-JSON response (see
   // `postSecurityWorkerJson`): a gateway HTML body and a Worker that never

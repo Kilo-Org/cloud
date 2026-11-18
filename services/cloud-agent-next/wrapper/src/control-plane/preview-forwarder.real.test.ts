@@ -250,7 +250,18 @@ describe('preview forwarder HTTP', () => {
   });
 
   it('carries a 64 MiB upload and a 64 MiB download', async () => {
-    const upload = await response({
+    // The head deadline covers the upload, so the short shared deadline fails on a loaded runner.
+    const bulkForwarder = createPreviewForwarder({
+      refusedPorts: () => [RESERVED_PORT],
+      headTimeoutMs: 20_000,
+      socketTimeoutMs: 300,
+    });
+    const bulkResponse = async (request: PreviewHttpRequest): Promise<Response> => {
+      const result = await bulkForwarder.fetch(request);
+      if (!result.ok) throw new Error(`forward failed: ${result.reason}`);
+      return result.value;
+    };
+    const upload = await bulkResponse({
       ...get(portOf(ipv4), '/upload'),
       method: 'POST',
       body: new Response(new Uint8Array(BIG_BYTES)).body,
@@ -259,7 +270,7 @@ describe('preview forwarder HTTP', () => {
     await upload.arrayBuffer();
     expect(lastSeen?.bodyBytes).toBe(BIG_BYTES);
 
-    const download = await response(get(portOf(ipv4), '/big'));
+    const download = await bulkResponse(get(portOf(ipv4), '/big'));
     expect((await download.arrayBuffer()).byteLength).toBe(BIG_BYTES);
   }, 30_000);
 });

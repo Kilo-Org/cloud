@@ -54,8 +54,10 @@ export function getPeakPricing(pricing: EndpointPricing): EndpointPricing {
 }
 
 /**
- * The highest price at any time of day for any prompt length: like {@link getPeakPricing}, but also
- * the higher of each long-context override. Spending safeguards must use this price.
+ * The highest price at any time of day, including OpenRouter's long-context overrides: like
+ * {@link getPeakPricing}, but also the higher of each long-context override. Spending safeguards
+ * must use this price. Vercel's tiered long-context prices are not stored (the schema drops
+ * `*_tiers`), so only its first-tier price counts here.
  */
 export function getWorstCasePeakPricing(pricing: EndpointPricing): EndpointPricing {
   return peakPricing(pricing, true);
@@ -100,7 +102,7 @@ export function getModelDisplayPricing(
   return undoPricingDiscount(getPeakPricing(pricing));
 }
 
-/** The highest price an endpoint can charge, for any prompt length, without a discount. */
+/** The highest stored price an endpoint can charge, long-context overrides included, without a discount. */
 export function getWorstCaseModelPricing(
   pricing: EndpointPricing | undefined
 ): EndpointPricing | undefined {

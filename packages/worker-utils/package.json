@@ -72,6 +72,7 @@
     "./vercel-execution-region": "./src/vercel-execution-region.ts",
     "./organization-membership": "./src/organization-membership.ts",
     "./webhook-body-validation": "./src/webhook-body-validation.ts",
+    "./webhook-trigger-target": "./src/webhook-trigger-target.ts",
     "./organization-usage": "./src/organization-usage.ts",
     "./organization-consumption": "./src/organization-consumption.ts",
     "./runtime-model-diagnostics": "./src/runtime-model-diagnostics.ts"

@@ -56,7 +56,7 @@ function isTriageConfidence(value: unknown): value is TriageConfidence {
 /**
  * Whether a triage confidence level meets the configured auto-dismiss threshold.
  * 'low' accepts every confidence, 'medium' rejects 'low', 'high' accepts only 'high'.
- * An unknown threshold or confidence never meets the threshold.
+ * An unknown threshold never meets the threshold.
  */
 function meetsAutoDismissConfidenceThreshold(
   threshold: SecurityAgentConfig['auto_dismiss_confidence_threshold'],

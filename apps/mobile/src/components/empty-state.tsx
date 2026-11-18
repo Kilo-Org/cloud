@@ -4,6 +4,7 @@ import { type ScrollViewProps, View } from 'react-native';
 
 import { CenteredState } from '@/components/centered-state';
 import { useShortCenteredBand } from '@/components/centered-state-band';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
@@ -185,6 +186,7 @@ type StateActionProps = {
   /** The action's cue: `Plus` creates, `RotateCcw` retries, `ArrowLeft` goes back. */
   icon: StateActionIcon;
   onPress: () => void;
+  /** The action is running: only the leading icon becomes a spinner and presses are ignored. */
   loading?: boolean;
   disabled?: boolean;
   testID?: string;
@@ -200,6 +202,12 @@ type StateActionProps = {
  * the shared 48pt state-action floor. Callers own nothing visual — the slot
  * above owns the gap, and this component owns the style — so no state can
  * invent a full-width, outlined or shadowed way out.
+ *
+ * `loading` is a busy state, not a different face of the control: the label and
+ * its strength never change while the request runs, only the leading icon
+ * becomes a spinner, so a retry stays readable as "the same action, working"
+ * instead of collapsing to a ring. The button announces the wait and ignores
+ * presses until it clears — the one place busyness admits a press.
  */
 export function StateAction({
   label,
@@ -213,18 +221,29 @@ export function StateAction({
 }: Readonly<StateActionProps>) {
   const colors = useThemeColors();
   const mutedDisabledInk = useMutedDisabledInk();
+  const busy = Boolean(loading);
+  const markColor = disabled === true ? mutedDisabledInk : colors.primaryForeground;
   return (
     <Button
       size="sm"
       className={STATE_ACTION_CLASS}
-      loading={loading}
       disabled={disabled}
       testID={testID}
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityHint={accessibilityHint}
-      onPress={onPress}
+      accessibilityState={{ busy }}
+      onPress={() => {
+        if (busy) {
+          return;
+        }
+        onPress();
+      }}
     >
-      <Icon size={16} color={disabled === true ? mutedDisabledInk : colors.primaryForeground} />
+      {busy ? (
+        <ActivityIndicator size={16} color={markColor} accessible={false} />
+      ) : (
+        <Icon size={16} color={markColor} />
+      )}
       <Text>{label}</Text>
     </Button>
   );

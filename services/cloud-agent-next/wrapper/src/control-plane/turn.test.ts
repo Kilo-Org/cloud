@@ -3876,6 +3876,7 @@ describe('GitHub review publication recovery', () => {
 
   it.each([
     [{ type: 'provider.quota', message: 'Request failed', status: 402 }, 'insufficient_credits'],
+    [{ type: 'provider.quota', message: 'Request failed', status: 402.5 }, 'insufficient_credits'],
     [{ type: 'provider.rate-limit', message: 'Request failed' }, 'rate_limited'],
     [{ type: 'provider.future-error', message: 'Request failed' }, 'unknown'],
   ] as const)(

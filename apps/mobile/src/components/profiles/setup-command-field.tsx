@@ -88,11 +88,16 @@ export function SetupCommandField({
   const showsCounter = !disabled && remaining > 0 && remaining <= COMMAND_COUNTER_VISIBLE_REMAINING;
   const showsBound = !disabled && remaining <= 0;
   // A shell command is code: mono, on its own left edge, whatever the interface
-  // direction. The mono family ships no right-to-left glyphs, so a localized
-  // placeholder in that script keeps the interface font (the rule `Text` uses);
-  // the command a person types is Latin either way.
+  // direction. The mono family ships no right-to-left glyphs, so only the empty
+  // field's localized placeholder in that script keeps the interface font (the
+  // rule `Text` uses). A field holding a command keeps mono: the value is Latin
+  // code either way, and dropping the family for good left the command in the
+  // proportional face after the first keystroke.
   const placeholder = t('profiles.commandPlaceholder');
-  const monoClass = hasRtlScript(placeholder) ? withoutMonoFamily('font-mono') : 'font-mono';
+  const monoClass =
+    command.length === 0 && hasRtlScript(placeholder)
+      ? withoutMonoFamily('font-mono')
+      : 'font-mono';
 
   return (
     <View className="gap-1.5">

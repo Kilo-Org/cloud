@@ -3056,7 +3056,6 @@
   },
   "home": {
     "couldNotLoadSessions": "No s'han pogut carregar les sessions.",
-    "couldNotLoadActiveSessions": "No s'han pogut carregar les sessions actives.",
     "agentSessions": "En curs ara",
     "newCodingTask": "Nova tasca de programació",
     "newTaskFromPicture": "Nova tasca a partir d'una imatge",

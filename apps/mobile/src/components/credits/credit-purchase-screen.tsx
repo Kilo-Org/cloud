@@ -8,12 +8,12 @@ import { Pressable, useWindowDimensions, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { DetailScreenScrollView } from '@/components/detail-screen';
+import { StateAction } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ConfigureRow } from '@/components/ui/configure-row';
-import { Wallet } from '@/components/ui/icons';
+import { RotateCcw, Wallet } from '@/components/ui/icons';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { ScreenFooter } from '@/components/ui/screen-footer';
@@ -386,18 +386,14 @@ export function CreditPurchaseScreen() {
               <Card>
                 <Text variant="heading">{t('queryError.serverTitle')}</Text>
                 <Text variant="muted">{t('organization.boundary.loadErrorMessage')}</Text>
-                <Button
-                  accessibilityLabel={t('common.tryAgain')}
-                  accessibilityState={{ busy: isRetryingIdentity, disabled: isRetryingIdentity }}
-                  className="self-start"
-                  disabled={isRetryingIdentity}
+                <StateAction
+                  label={t('common.tryAgain')}
+                  icon={RotateCcw}
+                  loading={isRetryingIdentity}
                   onPress={() => {
                     void retryIdentity();
                   }}
-                  variant="outline"
-                >
-                  <Text>{t('common.tryAgain')}</Text>
-                </Button>
+                />
               </Card>
             )}
 
@@ -409,18 +405,14 @@ export function CreditPurchaseScreen() {
                 <Text variant="muted" numberOfLines={3}>
                   {t(storeBannerBodyKey)}
                 </Text>
-                <Button
-                  accessibilityLabel={t('common.tryAgain')}
-                  accessibilityState={{ busy: isRefetching, disabled: isRefetching }}
-                  className="self-start"
-                  disabled={isRefetching}
+                <StateAction
+                  label={t('common.tryAgain')}
+                  icon={RotateCcw}
+                  loading={isRefetching}
                   onPress={() => {
                     void refetch();
                   }}
-                  variant="outline"
-                >
-                  <Text>{t('common.tryAgain')}</Text>
-                </Button>
+                />
               </Card>
             )}
 

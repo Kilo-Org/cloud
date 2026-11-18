@@ -3001,7 +3001,6 @@
   },
   "home": {
     "couldNotLoadSessions": "ಸೆಷನ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
-    "couldNotLoadActiveSessions": "ಸಕ್ರಿಯ ಸೆಷನ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
     "agentSessions": "ಈಗ ಚಾಲನೆಯಲ್ಲಿರುವವು",
     "newCodingTask": "ಹೊಸ ಕೋಡಿಂಗ್ ಕಾರ್ಯ",
     "newTaskFromPicture": "ಚಿತ್ರದಿಂದ ಹೊಸ ಕಾರ್ಯ",

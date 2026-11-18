@@ -2522,7 +2522,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Nie udało się wczytać sesji.",
-    "couldNotLoadActiveSessions": "Nie udało się wczytać aktywnych sesji.",
     "agentSessions": "Teraz aktywne",
     "newCodingTask": "Nowe zadanie programistyczne",
     "newTaskFromPicture": "Nowe zadanie ze zdjęcia",

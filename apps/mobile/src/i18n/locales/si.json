@@ -3001,7 +3001,6 @@
   },
   "home": {
     "couldNotLoadSessions": "සැසි පූරණය කළ නොහැකි විය.",
-    "couldNotLoadActiveSessions": "සක්‍රීය සැසි පූරණය කළ නොහැකි විය.",
     "agentSessions": "දැන් ක්‍රියාත්මකයි",
     "newCodingTask": "නව කේතීකරණ කාර්යය",
     "newTaskFromPicture": "පින්තූරයකින් නව කාර්යය",

@@ -3056,7 +3056,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Nije moguće učitati sesije.",
-    "couldNotLoadActiveSessions": "Nije moguće učitati aktivne sesije.",
     "agentSessions": "Trenutno aktivno",
     "newCodingTask": "Novi zadatak za programiranje",
     "newTaskFromPicture": "Novi zadatak sa slike",

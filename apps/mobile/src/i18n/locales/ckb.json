@@ -3001,7 +3001,6 @@
   },
   "home": {
     "couldNotLoadSessions": "نەتوانرا دانیشتنەکان بار بکرێن.",
-    "couldNotLoadActiveSessions": "نەتوانرا دانیشتنە چالاکەکان بار بکرێن.",
     "agentSessions": "ئێستا چالاکن",
     "newCodingTask": "ئەرکی نوێی کۆدنووسین",
     "newTaskFromPicture": "ئەرکی نوێ لە وێنەوە",

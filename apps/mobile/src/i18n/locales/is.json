@@ -3001,7 +3001,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Ekki tókst að sækja lotur.",
-    "couldNotLoadActiveSessions": "Ekki tókst að sækja virkar lotur.",
     "agentSessions": "Í gangi núna",
     "newCodingTask": "Nýtt forritunarverkefni",
     "newTaskFromPicture": "Nýtt verkefni úr mynd",

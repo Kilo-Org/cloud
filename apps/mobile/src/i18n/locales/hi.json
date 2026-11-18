@@ -2458,7 +2458,6 @@
   },
   "home": {
     "couldNotLoadSessions": "सत्र लोड नहीं हो सके।",
-    "couldNotLoadActiveSessions": "सक्रिय सत्र लोड नहीं हो सके।",
     "agentSessions": "अभी जारी",
     "newCodingTask": "नया कोडिंग कार्य",
     "newTaskFromPicture": "तस्वीर से नया कार्य",

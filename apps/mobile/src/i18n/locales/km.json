@@ -3001,7 +3001,6 @@
   },
   "home": {
     "couldNotLoadSessions": "មិនអាចផ្ទុកវគ្គបានទេ។",
-    "couldNotLoadActiveSessions": "មិនអាចផ្ទុកវគ្គកំពុងដំណើរការបានទេ។",
     "agentSessions": "កំពុងដំណើរការ",
     "newCodingTask": "កិច្ចការសរសេរកូដថ្មី",
     "newTaskFromPicture": "កិច្ចការថ្មីពីរូបភាព",

@@ -2458,7 +2458,6 @@
   },
   "home": {
     "couldNotLoadSessions": "De sessies konden niet worden geladen.",
-    "couldNotLoadActiveSessions": "De actieve sessies konden niet worden geladen.",
     "agentSessions": "Nu actief",
     "newCodingTask": "Nieuwe programmeertaak",
     "newTaskFromPicture": "Nieuwe taak vanaf een afbeelding",

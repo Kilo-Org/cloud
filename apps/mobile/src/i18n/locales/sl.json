@@ -3111,7 +3111,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Sej ni bilo mogoče naložiti.",
-    "couldNotLoadActiveSessions": "Aktivnih sej ni bilo mogoče naložiti.",
     "agentSessions": "Trenutno aktivno",
     "newCodingTask": "Nova programska naloga",
     "newTaskFromPicture": "Nova naloga iz slike",

@@ -3001,7 +3001,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Nuk u ngarkuan sesionet.",
-    "couldNotLoadActiveSessions": "Nuk u ngarkuan sesionet aktive.",
     "agentSessions": "Aktive tani",
     "newCodingTask": "Detyrë e re kodimi",
     "newTaskFromPicture": "Detyrë e re nga një imazh",

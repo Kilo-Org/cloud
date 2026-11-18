@@ -2458,7 +2458,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Oturumlar yüklenemedi.",
-    "couldNotLoadActiveSessions": "Etkin oturumlar yüklenemedi.",
     "agentSessions": "Şu anda etkin",
     "newCodingTask": "Yeni kodlama görevi",
     "newTaskFromPicture": "Resimden yeni görev",

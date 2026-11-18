@@ -3001,7 +3001,6 @@
   },
   "home": {
     "couldNotLoadSessions": "സെഷനുകൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
-    "couldNotLoadActiveSessions": "സജീവ സെഷനുകൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
     "agentSessions": "ഇപ്പോൾ പ്രവർത്തിക്കുന്നവ",
     "newCodingTask": "പുതിയ കോഡിംഗ് ജോലി",
     "newTaskFromPicture": "ചിത്രത്തിൽ നിന്ന് പുതിയ ജോലി",

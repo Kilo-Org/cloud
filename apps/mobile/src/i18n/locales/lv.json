@@ -3056,7 +3056,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Neizdevās ielādēt sesijas.",
-    "couldNotLoadActiveSessions": "Neizdevās ielādēt aktīvās sesijas.",
     "agentSessions": "Pašlaik aktīvs",
     "newCodingTask": "Jauns programmēšanas uzdevums",
     "newTaskFromPicture": "Jauns uzdevums no attēla",

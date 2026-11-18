@@ -3001,7 +3001,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Не успеа вчитувањето на сесиите.",
-    "couldNotLoadActiveSessions": "Не успеа вчитувањето на активните сесии.",
     "agentSessions": "Активни сега",
     "newCodingTask": "Нова задача за кодирање",
     "newTaskFromPicture": "Нова задача од слика",

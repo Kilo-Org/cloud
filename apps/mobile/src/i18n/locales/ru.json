@@ -2522,7 +2522,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Не удалось загрузить сеансы.",
-    "couldNotLoadActiveSessions": "Не удалось загрузить активные сеансы.",
     "agentSessions": "Сейчас выполняются",
     "newCodingTask": "Новая задача по разработке",
     "newTaskFromPicture": "Новая задача из изображения",

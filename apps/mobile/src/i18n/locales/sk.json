@@ -3111,7 +3111,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Relácie sa nepodarilo načítať.",
-    "couldNotLoadActiveSessions": "Aktívne relácie sa nepodarilo načítať.",
     "agentSessions": "Práve prebieha",
     "newCodingTask": "Nová programovacia úloha",
     "newTaskFromPicture": "Nová úloha z obrázka",

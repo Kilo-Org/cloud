@@ -86,6 +86,10 @@ type QueryErrorProps = {
   /** Who draws the page gutter; see `EmptyState`. A `center` error defaults to
    *  the gutter, a `top`/`static` one to none. */
   inset?: 'gutter' | 'none';
+  /** The short form, for a failure that sits inside a section or a form rather
+   *  than owning the surface: no icon bubble, tighter block gaps, and no top
+   *  pin air. The title keeps the error cue through its tint. See `EmptyState`. */
+  compact?: boolean;
   refreshControl?: ScrollViewProps['refreshControl'];
 };
 
@@ -104,6 +108,7 @@ export function QueryError({
   descriptionClassName,
   placement = 'center',
   inset,
+  compact,
   refreshControl,
 }: Readonly<QueryErrorProps>) {
   const { t } = useTranslation();
@@ -131,6 +136,7 @@ export function QueryError({
       className={className}
       placement={placement}
       inset={inset}
+      compact={compact}
       refreshControl={refreshControl}
       iconContainerClassName="rounded-full bg-muted p-4"
       iconColor={colors.destructive}

@@ -3001,7 +3001,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Не успяхме да заредим сесиите.",
-    "couldNotLoadActiveSessions": "Не успяхме да заредим активните сесии.",
     "agentSessions": "Активни сега",
     "newCodingTask": "Нова задача за програмиране",
     "newTaskFromPicture": "Нова задача от снимка",

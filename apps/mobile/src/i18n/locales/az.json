@@ -3001,7 +3001,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Sessiyaları yükləmək mümkün olmadı.",
-    "couldNotLoadActiveSessions": "Aktiv sessiyaları yükləmək mümkün olmadı.",
     "agentSessions": "Hazırda aktiv",
     "newCodingTask": "Yeni kodlaşdırma tapşırığı",
     "newTaskFromPicture": "Şəkildən yeni tapşırıq",

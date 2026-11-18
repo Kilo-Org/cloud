@@ -3001,7 +3001,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Kunne ikke laste inn øktene.",
-    "couldNotLoadActiveSessions": "Kunne ikke laste inn aktive økter.",
     "agentSessions": "Pågår nå",
     "newCodingTask": "Ny kodeoppgave",
     "newTaskFromPicture": "Ny oppgave fra et bilde",

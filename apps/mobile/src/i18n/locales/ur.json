@@ -3001,7 +3001,6 @@
   },
   "home": {
     "couldNotLoadSessions": "سیشنز لوڈ نہیں ہو سکے۔",
-    "couldNotLoadActiveSessions": "فعال سیشنز لوڈ نہیں ہو سکے۔",
     "agentSessions": "ابھی جاری",
     "newCodingTask": "کوڈنگ کا نیا کام",
     "newTaskFromPicture": "تصویر سے نیا کام",

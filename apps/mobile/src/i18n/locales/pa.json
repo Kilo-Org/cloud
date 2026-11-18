@@ -3001,7 +3001,6 @@
   },
   "home": {
     "couldNotLoadSessions": "ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ।",
-    "couldNotLoadActiveSessions": "ਸਰਗਰਮ ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ।",
     "agentSessions": "ਹੁਣ ਚੱਲ ਰਹੇ",
     "newCodingTask": "ਨਵਾਂ ਕੋਡਿੰਗ ਕੰਮ",
     "newTaskFromPicture": "ਤਸਵੀਰ ਤੋਂ ਨਵਾਂ ਕੰਮ",

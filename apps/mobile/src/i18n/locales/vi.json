@@ -2458,7 +2458,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Không thể tải danh sách phiên.",
-    "couldNotLoadActiveSessions": "Không thể tải các phiên đang hoạt động.",
     "agentSessions": "Đang hoạt động",
     "newCodingTask": "Tác vụ lập trình mới",
     "newTaskFromPicture": "Tác vụ mới từ hình ảnh",

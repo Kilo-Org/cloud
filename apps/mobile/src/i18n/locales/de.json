@@ -2458,7 +2458,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Die Sitzungen konnten nicht geladen werden.",
-    "couldNotLoadActiveSessions": "Die aktiven Sitzungen konnten nicht geladen werden.",
     "agentSessions": "Jetzt aktiv",
     "newCodingTask": "Neue Programmieraufgabe",
     "newTaskFromPicture": "Neue Aufgabe aus einem Bild",

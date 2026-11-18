@@ -459,7 +459,9 @@ export function checkCompilerStillDropsThese() {
       'backgroundColor'
     );
   } catch (error) {
-    problems.push(compilerPinFailure('the color-mix over an @theme inline variable fixture', error));
+    problems.push(
+      compilerPinFailure('the color-mix over an @theme inline variable fixture', error)
+    );
     return problems;
   }
   if (!defersTo(themeOpacity, 'colorMix')) {

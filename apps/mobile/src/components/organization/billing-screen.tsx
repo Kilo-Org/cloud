@@ -10,11 +10,12 @@ import {
   getScheduledSeatChange,
   seatCountReadout,
 } from '@/components/organization/billing-model';
-import { ExternalBillingLink } from '@/components/organization/external-billing-link';
+import { BillingWebSettings } from '@/components/organization/billing-web-settings';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { getOrgKiloPassRowState } from '@/components/organization/org-kilo-pass-row-state';
 import { OrganizationPlanRefusal } from '@/components/organization/plan-refusal';
 import { PermissionDenied } from '@/components/organization/permission-denied';
+import { SectionLabel } from '@/components/organization/section-label';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
@@ -82,14 +83,6 @@ function BillingCardError({
   );
 }
 
-function SectionLabel({ children }: Readonly<{ children: ReactNode }>) {
-  return (
-    <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-      {children}
-    </Text>
-  );
-}
-
 type OrganizationBillingScreenProps = Readonly<{
   /** Explicit org id from the route's `?org=`, replacing the persisted selection for this render. */
   organizationIdOverride?: string;
@@ -101,8 +94,8 @@ type OrganizationBillingScreenProps = Readonly<{
  *
  * Nothing here changes a plan. Buying seats, changing the plan and setting up
  * auto top-up exist only on the web, so those controls lead there — a link only
- * on an iOS build in the US storefront, plain text everywhere else, the rule
- * `useCanLinkExternalPurchase` owns.
+ * on an iOS build in the US storefront, a statement of where the setting lives
+ * everywhere else, the rule `useCanLinkExternalPurchase` owns.
  */
 export function OrganizationBillingScreen({
   organizationIdOverride,
@@ -341,22 +334,12 @@ export function OrganizationBillingScreen({
           </View>
         )}
 
-        <View className="gap-2">
-          <SectionLabel>{t('organization.billing.manageOnWeb')}</SectionLabel>
-          <View className="gap-3 rounded-lg bg-secondary p-3">
-            {changePlanOnBanner ? null : (
-              <ExternalBillingLink url={subscriptionsUrl} label={changePlanLabel} />
-            )}
-            <ExternalBillingLink
-              url={`${subscriptionsUrl}/seats`}
-              label={t('organization.billing.buySeats')}
-            />
-            <ExternalBillingLink
-              url={organizationBillingUrl(organizationId)}
-              label={getAutoTopUpLinkLabel(autoTopUp.data?.enabled)}
-            />
-          </View>
-        </View>
+        <BillingWebSettings
+          subscriptionsUrl={subscriptionsUrl}
+          planLabel={changePlanOnBanner ? null : changePlanLabel}
+          autoTopUpUrl={organizationBillingUrl(organizationId)}
+          autoTopUpLabel={getAutoTopUpLinkLabel(autoTopUp.data?.enabled)}
+        />
       </TabScreenScrollView>
     </View>
   );

@@ -26,6 +26,7 @@
     "creditHistory": "Kredītu vēsture",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Atcelt",
     "done": "Gatavs",
     "retry": "Mēģināt vēlreiz",
@@ -483,7 +484,14 @@
       "viewReceipt": "Skatīt apstiprinājumu"
     },
     "changelog": "Kas jauns",
-    "changelogVersionPending": "Šīs versijas piezīmes pienāks ar nākamo atjauninājumu."
+    "changelogVersionPending": "Versijas {{version}} piezīmes pienāks ar nākamo atjauninājumu.",
+    "changelogGroupNew": "Jaunumi",
+    "changelogFixesIn": "Labojumi un uzlabojumi šajās jomās: {{areas}}.",
+    "changelogFixesPolish": "Labojumi un uzlabojumi visā lietotnē.",
+    "changelogAreas": {
+      "signIn": "Pierakstīšanās",
+      "profileOrganizations": "Profils un organizācijas"
+    }
   },
   "preferences": {
     "general": "Vispārīgi",
@@ -3386,6 +3394,7 @@
       "manageOnWeb": "Norēķinu iestatījumi tīmeklī",
       "changePlan": "Mainīt plānu",
       "buySeats": "Pirkt vietas",
+      "managedOnWeb": "Plāns, vietas un automātiskā papildināšana tiek pārvaldīti tīmeklī.",
       "setupAutoTopUp": "Iestatīt automātisko papildināšanu",
       "manageAutoTopUp": "Pārvaldi automātisko papildināšanu",
       "opensOnWeb": "Tiek atvērts tīmeklī"
@@ -3534,12 +3543,10 @@
       "requestLogs": "Pieprasījumu žurnāli"
     },
     "requestLogs": {
-      "hint": "Pieprasījumi stundā līdz laika loga beigām, jaunākie vispirms.",
       "older": "Iepriekšējā stunda",
       "newer": "Nākamā stunda",
       "truncated": "Šajā stundā ir vairāk pieprasījumu, nekā parādīts sarakstā.",
       "emptyTitle": "Nav pieprasījumu",
-      "emptyDescription": "Šajā stundā nav vārtejas pieprasījumu.",
       "loadError": "Neizdevās ielādēt pieprasījumu žurnālus.",
       "permissionDenied": "Organizācijas pieprasījumu žurnālus var skatīt tikai tās īpašnieks, administrators vai norēķinu pārvaldnieks.",
       "tokens": "{{input}} ievade · {{output}} izvade",
@@ -4543,7 +4550,6 @@
     "dismiss": "Noraidīt atskaiti",
     "offline": "Bezsaistē · saglabāta atskaite",
     "cached": "Saglabāta atskaite · atsvaidzināšana nav pieejama",
-    "window": "{{start}} – {{end}}",
     "summary": "AI kopsavilkums",
     "summaryPending": "AI kopsavilkums tiek veidots. Tas parādīsies šeit, kad būs gatavs.",
     "summaryUnavailable": "AI kopsavilkums nav pieejams. Jūsu strukturētā atskaite joprojām ir pieejama.",
@@ -4662,6 +4668,7 @@
       "title": "Trigeri un tīmekļa āķi",
       "subtitle": "Automatizējiet Cloud Agent palaišanu ar tīmekļa āķa izsaukumu vai pēc grafika.",
       "new": "Jauns trigeris",
+      "create": "Izveidot trigeri",
       "emptyTitle": "Vēl nav trigeru",
       "emptyDescription": "Izveidojiet trigeri, lai sāktu Cloud Agent palaišanu ar tīmekļa āķa izsaukumu vai pēc grafika.",
       "loadFailedTitle": "Neizdevās ielādēt trigerus",

@@ -26,6 +26,7 @@
     "creditHistory": "Sejarah kredit",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Batal",
     "done": "Selesai",
     "retry": "Cuba lagi",
@@ -483,7 +484,14 @@
       "viewReceipt": "Lihat resit"
     },
     "changelog": "Yang baharu",
-    "changelogVersionPending": "Nota versi ini akan tiba bersama kemas kini apl seterusnya."
+    "changelogVersionPending": "Nota untuk versi {{version}} akan tiba bersama kemas kini apl seterusnya.",
+    "changelogGroupNew": "Baharu",
+    "changelogFixesIn": "Pembetulan dan penambahbaikan dalam {{areas}}.",
+    "changelogFixesPolish": "Pembetulan dan penambahbaikan di seluruh aplikasi.",
+    "changelogAreas": {
+      "signIn": "Log masuk",
+      "profileOrganizations": "Profil dan organisasi"
+    }
   },
   "preferences": {
     "general": "Umum",
@@ -3329,6 +3337,7 @@
       "manageOnWeb": "Tetapan pengebilan di web",
       "changePlan": "Tukar pelan",
       "buySeats": "Beli slot pengguna",
+      "managedOnWeb": "Pelan, slot pengguna dan tambah nilai automatik diurus di web.",
       "setupAutoTopUp": "Sediakan tambah nilai automatik",
       "manageAutoTopUp": "Urus tambah nilai automatik",
       "opensOnWeb": "Dibuka di web"
@@ -3477,12 +3486,10 @@
       "requestLogs": "Log permintaan"
     },
     "requestLogs": {
-      "hint": "Permintaan dalam sejam sebelum julat masa berakhir, terkini dahulu.",
       "older": "Jam sebelumnya",
       "newer": "Jam berikutnya",
       "truncated": "Jam ini ada lebih banyak permintaan daripada yang dipaparkan.",
       "emptyTitle": "Tiada permintaan",
-      "emptyDescription": "Tiada permintaan get laluan dalam jam ini.",
       "loadError": "Tidak dapat memuatkan log permintaan.",
       "permissionDenied": "Hanya pemilik, pentadbir atau pengurus pengebilan organisasi boleh membaca log permintaannya.",
       "tokens": "{{input}} masuk · {{output}} keluar",
@@ -4473,7 +4480,6 @@
     "dismiss": "Ketepikan laporan",
     "offline": "Luar talian · laporan disimpan",
     "cached": "Laporan disimpan · muat semula tidak tersedia",
-    "window": "{{start}} – {{end}}",
     "summary": "Ringkasan AI",
     "summaryPending": "Ringkasan AI sedang diproses. Ia akan dilampirkan di sini apabila sedia.",
     "summaryUnavailable": "Ringkasan AI tidak tersedia. Laporan berstruktur anda masih tersedia.",
@@ -4592,6 +4598,7 @@
       "title": "Pencetus & webhook",
       "subtitle": "Automatkan larian Cloud Agent daripada panggilan webhook atau jadual.",
       "new": "Pencetus baharu",
+      "create": "Cipta pencetus",
       "emptyTitle": "Belum ada pencetus",
       "emptyDescription": "Cipta pencetus untuk memulakan larian Cloud Agent daripada panggilan webhook atau pada jadual.",
       "loadFailedTitle": "Tidak dapat memuatkan pencetus",

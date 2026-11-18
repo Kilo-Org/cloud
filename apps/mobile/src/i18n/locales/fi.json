@@ -26,6 +26,7 @@
     "creditHistory": "Krediittihistoria",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Peruuta",
     "done": "Valmis",
     "retry": "Yritä uudelleen",
@@ -483,7 +484,14 @@
       "viewReceipt": "Näytä kuitti"
     },
     "changelog": "Mitä uutta",
-    "changelogVersionPending": "Tämän version julkaisutiedot tulevat seuraavan päivityksen mukana."
+    "changelogVersionPending": "Version {{version}} julkaisutiedot tulevat sovelluksen seuraavan päivityksen mukana.",
+    "changelogGroupNew": "Uutta",
+    "changelogFixesIn": "Korjauksia ja parannuksia seuraaviin osioihin: {{areas}}.",
+    "changelogFixesPolish": "Korjauksia ja parannuksia koko sovellukseen.",
+    "changelogAreas": {
+      "signIn": "Kirjautuminen",
+      "profileOrganizations": "Profiili ja organisaatiot"
+    }
   },
   "preferences": {
     "general": "Yleiset",
@@ -3329,6 +3337,7 @@
       "manageOnWeb": "Laskutusasetukset verkossa",
       "changePlan": "Vaihda pakettia",
       "buySeats": "Osta käyttäjäpaikkoja",
+      "managedOnWeb": "Pakettia, käyttäjäpaikkoja ja automaattista täydennystä hallitaan verkossa.",
       "setupAutoTopUp": "Ota automaattinen täydennys käyttöön",
       "manageAutoTopUp": "Hallinnoi automaattista täydennystä",
       "opensOnWeb": "Avautuu verkossa"
@@ -3477,12 +3486,10 @@
       "requestLogs": "Pyyntölokit"
     },
     "requestLogs": {
-      "hint": "Aikaikkunan päättymistä edeltävän tunnin pyynnöt, uusimmat ensin.",
       "older": "Edellinen tunti",
       "newer": "Seuraava tunti",
       "truncated": "Tällä tunnilla on enemmän pyyntöjä kuin luettelossa näytetään.",
       "emptyTitle": "Ei pyyntöjä",
-      "emptyDescription": "Tällä tunnilla ei ole yhdyskäytäväpyyntöjä.",
       "loadError": "Pyyntölokien lataaminen epäonnistui.",
       "permissionDenied": "Vain organisaation omistaja, ylläpitäjä tai laskutusvastaava voi lukea organisaation pyyntölokeja.",
       "tokens": "{{input}} sisään · {{output}} ulos",
@@ -4473,7 +4480,6 @@
     "dismiss": "Sivuuta katsaus",
     "offline": "Offline · tallennettu katsaus",
     "cached": "Tallennettu katsaus · päivitys ei käytettävissä",
-    "window": "{{start}} – {{end}}",
     "summary": "AI-yhteenveto",
     "summaryPending": "AI-yhteenvetoa luodaan. Se liitetään tähän, kun se on valmis.",
     "summaryUnavailable": "AI-yhteenveto ei ole saatavilla. Jäsennelty katsauksesi on edelleen käytettävissä.",
@@ -4592,6 +4598,7 @@
       "title": "Liipaisimet ja verkkokoukut",
       "subtitle": "Automatisoi Cloud Agent -ajot verkkokoukun kutsusta tai aikataulusta.",
       "new": "Uusi liipaisin",
+      "create": "Luo liipaisin",
       "emptyTitle": "Ei liipaisimia vielä",
       "emptyDescription": "Luo liipaisin, joka käynnistää Cloud Agent -ajon verkkokoukun kutsusta tai aikataulusta.",
       "loadFailedTitle": "Liipaisimien lataus epäonnistui",

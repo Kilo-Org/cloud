@@ -26,6 +26,7 @@
     "creditHistory": "Cronologia crediti",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Annulla",
     "done": "Fatto",
     "retry": "Riprova",
@@ -483,7 +484,14 @@
       "viewReceipt": "Visualizza ricevuta"
     },
     "changelog": "Novità",
-    "changelogVersionPending": "Le note di questa versione arriveranno con il prossimo aggiornamento dell'app."
+    "changelogVersionPending": "Le note della versione {{version}} arriveranno con il prossimo aggiornamento dell'app.",
+    "changelogGroupNew": "Novità",
+    "changelogFixesIn": "Correzioni e miglioramenti in {{areas}}.",
+    "changelogFixesPolish": "Correzioni e miglioramenti in tutta l'app.",
+    "changelogAreas": {
+      "signIn": "Accesso",
+      "profileOrganizations": "Profilo e organizzazioni"
+    }
   },
   "notifications": {
     "channel": {
@@ -3378,6 +3386,7 @@
       "manageOnWeb": "Impostazioni di fatturazione sul web",
       "changePlan": "Cambia piano",
       "buySeats": "Acquista posti",
+      "managedOnWeb": "Il piano, i posti e la ricarica automatica sono gestiti sul web.",
       "setupAutoTopUp": "Configura la ricarica automatica",
       "manageAutoTopUp": "Gestisci la ricarica automatica",
       "opensOnWeb": "Si apre sul web"
@@ -3539,12 +3548,10 @@
       "requestLogs": "Registri delle richieste"
     },
     "requestLogs": {
-      "hint": "Richieste dell'ora precedente la fine dell'intervallo, dalle più recenti.",
       "older": "Ora precedente",
       "newer": "Ora successiva",
       "truncated": "In quest'ora ci sono più richieste di quelle mostrate.",
       "emptyTitle": "Nessuna richiesta",
-      "emptyDescription": "Nessuna richiesta al gateway in quest'ora.",
       "loadError": "Impossibile caricare i registri delle richieste.",
       "permissionDenied": "Solo un proprietario, un amministratore o un responsabile della fatturazione dell'organizzazione può consultare i registri delle richieste.",
       "tokens": "{{input}} input · {{output}} output",
@@ -4543,7 +4550,6 @@
     "dismiss": "Ignora il briefing",
     "offline": "Offline · briefing salvato",
     "cached": "Report salvato · aggiornamento non disponibile",
-    "window": "{{start}} – {{end}}",
     "summary": "Riepilogo AI",
     "summaryPending": "Riepilogo AI in corso. Verrà allegato qui quando pronto.",
     "summaryUnavailable": "Riepilogo AI non disponibile. Il report strutturato è comunque disponibile.",
@@ -4662,6 +4668,7 @@
       "title": "Attivatori e webhook",
       "subtitle": "Automatizza le esecuzioni di Cloud Agent da una chiamata webhook o da una pianificazione.",
       "new": "Nuovo attivatore",
+      "create": "Crea attivatore",
       "emptyTitle": "Nessun attivatore per ora",
       "emptyDescription": "Crea un attivatore per avviare un'esecuzione di Cloud Agent da una chiamata webhook o in base a una pianificazione.",
       "loadFailedTitle": "Impossibile caricare gli attivatori",

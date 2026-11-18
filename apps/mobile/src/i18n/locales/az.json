@@ -26,6 +26,7 @@
     "creditHistory": "Kredit tarixçəsi",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Ləğv et",
     "done": "Hazır",
     "retry": "Yenidən cəhd et",
@@ -483,7 +484,14 @@
       "viewReceipt": "Qəbzə bax"
     },
     "changelog": "Yeniliklər",
-    "changelogVersionPending": "Bu versiyanın qeydləri tətbiqin növbəti yeniləməsi ilə gələcək."
+    "changelogVersionPending": "{{version}} versiyasının qeydləri tətbiqin növbəti yeniləməsi ilə gələcək.",
+    "changelogGroupNew": "Yeni",
+    "changelogFixesIn": "{{areas}} bölmələrində düzəlişlər və təkmilləşdirmələr.",
+    "changelogFixesPolish": "Bütün tətbiqdə düzəlişlər və təkmilləşdirmələr.",
+    "changelogAreas": {
+      "signIn": "Giriş",
+      "profileOrganizations": "Profil və təşkilatlar"
+    }
   },
   "preferences": {
     "general": "Ümumi",
@@ -3329,6 +3337,7 @@
       "manageOnWeb": "Vebdə ödənişlər ayarları",
       "changePlan": "Planı dəyiş",
       "buySeats": "İstifadəçi yerləri al",
+      "managedOnWeb": "Plan, istifadəçi yerləri və avtomatik artırma vebdə idarə olunur.",
       "setupAutoTopUp": "Avtomatik artırmanı qur",
       "manageAutoTopUp": "Avtomatik artırmanı idarə et",
       "opensOnWeb": "Vebdə açılır"
@@ -3477,12 +3486,10 @@
       "requestLogs": "Sorğu jurnalları"
     },
     "requestLogs": {
-      "hint": "Pəncərə bitənədək son bir saatın sorğuları, ən yeniləri əvvəldə.",
       "older": "Əvvəlki saat",
       "newer": "Sonrakı saat",
       "truncated": "Bu saatda siyahıda göstəriləndən daha çox sorğu var.",
       "emptyTitle": "Sorğu yoxdur",
-      "emptyDescription": "Bu saatda şlüz sorğusu yoxdur.",
       "loadError": "Sorğu jurnallarını yükləmək mümkün olmadı.",
       "permissionDenied": "Sorğu jurnallarını yalnız təşkilatın sahibi, administratoru və ya ödəniş meneceri oxuya bilər.",
       "tokens": "{{input}} giriş · {{output}} çıxış",
@@ -4473,7 +4480,6 @@
     "dismiss": "Hesabatı rədd et",
     "offline": "Oflayn · saxlanmış hesabat",
     "cached": "Saxlanmış hesabat · yeniləmə mümkün deyil",
-    "window": "{{start}} – {{end}}",
     "summary": "AI xülasəsi",
     "summaryPending": "AI xülasəsi hazırlanır. Hazır olanda bura əlavə ediləcək.",
     "summaryUnavailable": "AI xülasəsi əlçatan deyil. Strukturlu hesabatınız hələ də mövcuddur.",
@@ -4592,6 +4598,7 @@
       "title": "Tətikləyicilər və vebhuklar",
       "subtitle": "Cloud Agent icralarını vebhuk çağırışı və ya cədvəl vasitəsilə avtomatlaşdırın.",
       "new": "Yeni tətikləyici",
+      "create": "Tətikləyici yaradın",
       "emptyTitle": "Hələ tətikləyici yoxdur",
       "emptyDescription": "Cloud Agent icrasını vebhuk çağırışı və ya cədvəl üzrə başlatmaq üçün tətikləyici yaradın.",
       "loadFailedTitle": "Tətikləyicilər yüklənə bilmədi",

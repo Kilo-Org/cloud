@@ -26,6 +26,7 @@
     "creditHistory": "Povijest kredita",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Odustani",
     "done": "Gotovo",
     "retry": "Pokušaj ponovno",
@@ -483,7 +484,14 @@
       "viewReceipt": "Prikaži potvrdu"
     },
     "changelog": "Novosti",
-    "changelogVersionPending": "Novosti ove verzije stižu s idućim ažuriranjem aplikacije."
+    "changelogVersionPending": "Novosti verzije {{version}} stižu s idućim ažuriranjem aplikacije.",
+    "changelogGroupNew": "Novo",
+    "changelogFixesIn": "Ispravci i poboljšanja u područjima: {{areas}}.",
+    "changelogFixesPolish": "Ispravci i poboljšanja u cijeloj aplikaciji.",
+    "changelogAreas": {
+      "signIn": "Prijava",
+      "profileOrganizations": "Profil i organizacije"
+    }
   },
   "preferences": {
     "general": "Općenito",
@@ -3386,6 +3394,7 @@
       "manageOnWeb": "Postavke naplate na webu",
       "changePlan": "Promijeni plan",
       "buySeats": "Kupi korisnička mjesta",
+      "managedOnWeb": "Planom, korisničkim mjestima i automatskom nadoplatom upravlja se na webu.",
       "setupAutoTopUp": "Postavi automatsku nadoplatu",
       "manageAutoTopUp": "Upravljaj automatskom nadoplatom",
       "opensOnWeb": "Otvara se na webu"
@@ -3534,12 +3543,10 @@
       "requestLogs": "Zapisnici zahtjeva"
     },
     "requestLogs": {
-      "hint": "Zahtjevi iz sata prije kraja razdoblja, najnoviji prvi.",
       "older": "Prethodni sat",
       "newer": "Sljedeći sat",
       "truncated": "U ovom satu ima više zahtjeva nego što je prikazano.",
       "emptyTitle": "Nema zahtjeva",
-      "emptyDescription": "U ovom satu nema zahtjeva prema pristupniku.",
       "loadError": "Učitavanje zapisnika zahtjeva nije uspjelo.",
       "permissionDenied": "Zapisnike zahtjeva organizacije mogu čitati samo vlasnik, administrator ili upravitelj naplate.",
       "tokens": "ulaz: {{input}} · izlaz: {{output}}",
@@ -4543,7 +4550,6 @@
     "dismiss": "Odbaci izvješće",
     "offline": "Izvan mreže · spremljeno izvješće",
     "cached": "Spremljeno izvješće · osvježavanje nije dostupno",
-    "window": "{{start}} – {{end}}",
     "summary": "AI sažetak",
     "summaryPending": "AI sažetak je u izradi. Pojavit će se ovdje kad bude spreman.",
     "summaryUnavailable": "AI sažetak nije dostupan. Strukturirano izvješće i dalje je dostupno.",
@@ -4662,6 +4668,7 @@
       "title": "Okidači i webhookovi",
       "subtitle": "Automatizirajte pokretanja Cloud Agent iz webhook poziva ili po rasporedu.",
       "new": "Novi okidač",
+      "create": "Stvorite okidač",
       "emptyTitle": "Još nema okidača",
       "emptyDescription": "Stvorite okidač za pokretanje Cloud Agent iz webhook poziva ili po rasporedu.",
       "loadFailedTitle": "Nije moguće učitati okidače",

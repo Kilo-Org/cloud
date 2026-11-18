@@ -14,7 +14,6 @@
     "dismiss": "Dismiss brief",
     "offline": "Offline · saved brief",
     "cached": "Saved report · refresh unavailable",
-    "window": "{{start}} – {{end}}",
     "summary": "AI summary",
     "summaryPending": "AI summary is in progress. It will attach here when ready.",
     "summaryUnavailable": "AI summary unavailable. Your structured report is still available.",
@@ -93,6 +92,7 @@
     "creditHistory": "Credit history",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Cancel",
     "done": "Done",
     "retry": "Retry",
@@ -550,7 +550,14 @@
       "viewReceipt": "View receipt"
     },
     "changelog": "What's New",
-    "changelogVersionPending": "The notes for this version arrive with the next app update."
+    "changelogGroupNew": "New",
+    "changelogFixesIn": "Fixes and improvements in {{areas}}.",
+    "changelogFixesPolish": "Bug fixes and polish.",
+    "changelogAreas": {
+      "signIn": "Sign-in",
+      "profileOrganizations": "Profile and organizations"
+    },
+    "changelogVersionPending": "The notes for {{version}} arrive with the next app update."
   },
   "preferences": {
     "biometricUnlock": "Unlock with biometrics",
@@ -3409,6 +3416,7 @@
       "manageOnWeb": "Billing settings on the web",
       "changePlan": "Change plan",
       "buySeats": "Buy seats",
+      "managedOnWeb": "The plan, seats and auto top-up are managed on the web.",
       "setupAutoTopUp": "Set up auto top-up",
       "manageAutoTopUp": "Manage auto top-up",
       "opensOnWeb": "Opens on the web"
@@ -3557,12 +3565,10 @@
       "requestLogs": "Request logs"
     },
     "requestLogs": {
-      "hint": "Requests from the hour before the window ends, newest first.",
       "older": "Older hour",
       "newer": "Newer hour",
       "truncated": "This hour has more requests than the list shows.",
       "emptyTitle": "No requests",
-      "emptyDescription": "This hour has no gateway requests.",
       "loadError": "Couldn't load request logs.",
       "permissionDenied": "Only an organization owner, admin or billing manager can read its request logs.",
       "tokens": "{{input}} in · {{output}} out",
@@ -4592,6 +4598,7 @@
       "title": "Triggers & webhooks",
       "subtitle": "Automate Cloud Agent runs from a webhook call or a schedule.",
       "new": "New trigger",
+      "create": "Create trigger",
       "emptyTitle": "No triggers yet",
       "emptyDescription": "Create a trigger to start a Cloud Agent run from a webhook call or on a schedule.",
       "loadFailedTitle": "Couldn't load triggers",

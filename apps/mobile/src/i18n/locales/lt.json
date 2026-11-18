@@ -26,6 +26,7 @@
     "creditHistory": "Kreditų istorija",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Atšaukti",
     "done": "Baigti",
     "retry": "Bandyti dar kartą",
@@ -483,7 +484,14 @@
       "viewReceipt": "Peržiūrėti patvirtinimą"
     },
     "changelog": "Kas naujo",
-    "changelogVersionPending": "Šios versijos pastabos pasirodys su kitu programėlės atnaujinimu."
+    "changelogVersionPending": "{{version}} versijos pastabos pasirodys su kitu programėlės atnaujinimu.",
+    "changelogGroupNew": "Nauja",
+    "changelogFixesIn": "Pataisymai ir patobulinimai šiose srityse: {{areas}}.",
+    "changelogFixesPolish": "Pataisymai ir patobulinimai visoje programėlėje.",
+    "changelogAreas": {
+      "signIn": "Prisijungimas",
+      "profileOrganizations": "Profilis ir organizacijos"
+    }
   },
   "preferences": {
     "general": "Bendra",
@@ -3443,6 +3451,7 @@
       "manageOnWeb": "Atsiskaitymo nustatymai žiniatinklyje",
       "changePlan": "Keisti planą",
       "buySeats": "Pirkti vietų",
+      "managedOnWeb": "Planas, vietos ir automatinis papildymas valdomi žiniatinklyje.",
       "setupAutoTopUp": "Nustatyti automatinį papildymą",
       "manageAutoTopUp": "Tvarkyti automatinį papildymą",
       "opensOnWeb": "Atidaroma žiniatinklyje"
@@ -3591,12 +3600,10 @@
       "requestLogs": "Užklausų žurnalai"
     },
     "requestLogs": {
-      "hint": "Užklausos per valandą iki lango pabaigos, naujausios pirmos.",
       "older": "Ankstesnė valanda",
       "newer": "Vėlesnė valanda",
       "truncated": "Šią valandą užklausų buvo daugiau, nei rodoma sąraše.",
       "emptyTitle": "Užklausų nėra",
-      "emptyDescription": "Šią valandą šliuzo užklausų nebuvo.",
       "loadError": "Nepavyko įkelti užklausų žurnalų.",
       "permissionDenied": "Organizacijos užklausų žurnalus gali skaityti tik jos savininkas, administratorius arba atsiskaitymų valdytojas.",
       "tokens": "Įvestis {{input}} · išvestis {{output}}",
@@ -4613,7 +4620,6 @@
     "dismiss": "Atmesti suvestinę",
     "offline": "Neprisijungta · išsaugota suvestinė",
     "cached": "Išsaugota suvestinė · atnaujinti negalima",
-    "window": "{{start}} – {{end}}",
     "summary": "AI santrauka",
     "summaryPending": "AI santrauka rengiama. Kai bus paruošta, ji atsiras čia.",
     "summaryUnavailable": "AI santrauka nepasiekiama. Struktūruota suvestinė vis dar prieinama.",
@@ -4732,6 +4738,7 @@
       "title": "Trigeriai ir žiniatinklio kabliukai",
       "subtitle": "Automatizuokite Cloud Agent paleidimus pagal žiniatinklio kabliuko iškvietimą arba grafiką.",
       "new": "Naujas trigeris",
+      "create": "Sukurti trigerį",
       "emptyTitle": "Trigerių dar nėra",
       "emptyDescription": "Sukurkite trigerį, kad Cloud Agent būtų paleistas pagal žiniatinklio kabliuko iškvietimą arba pagal grafiką.",
       "loadFailedTitle": "Nepavyko įkelti trigerių",

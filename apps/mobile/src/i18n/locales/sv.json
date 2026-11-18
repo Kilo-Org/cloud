@@ -26,6 +26,7 @@
     "creditHistory": "Kredithistorik",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Avbryt",
     "done": "Klar",
     "retry": "Försök igen",
@@ -483,7 +484,14 @@
       "viewReceipt": "Visa kvitto"
     },
     "changelog": "Nyheter",
-    "changelogVersionPending": "Nyheter för denna version kommer med nästa appuppdatering."
+    "changelogVersionPending": "Nyheter för version {{version}} kommer med nästa appuppdatering.",
+    "changelogGroupNew": "Nytt",
+    "changelogFixesIn": "Korrigeringar och förbättringar i {{areas}}.",
+    "changelogFixesPolish": "Korrigeringar och förbättringar i hela appen.",
+    "changelogAreas": {
+      "signIn": "Inloggning",
+      "profileOrganizations": "Profil och organisationer"
+    }
   },
   "preferences": {
     "general": "Allmänt",
@@ -3329,6 +3337,7 @@
       "manageOnWeb": "Faktureringsinställningar på webben",
       "changePlan": "Byt plan",
       "buySeats": "Köp platser",
+      "managedOnWeb": "Planen, platserna och den automatiska påfyllningen hanteras på webben.",
       "setupAutoTopUp": "Konfigurera automatisk påfyllning",
       "manageAutoTopUp": "Hantera automatisk påfyllning",
       "opensOnWeb": "Öppnas på webben"
@@ -3477,12 +3486,10 @@
       "requestLogs": "Förfrågningsloggar"
     },
     "requestLogs": {
-      "hint": "Förfrågningar från timmen före fönstrets sluttid, nyaste först.",
       "older": "Tidigare timme",
       "newer": "Senare timme",
       "truncated": "Den här timmen har fler förfrågningar än listan visar.",
       "emptyTitle": "Inga förfrågningar",
-      "emptyDescription": "Den här timmen har inga gateway-förfrågningar.",
       "loadError": "Det gick inte att läsa in förfrågningsloggarna.",
       "permissionDenied": "Endast en ägare, administratör eller faktureringsansvarig i organisationen kan läsa dess förfrågningsloggar.",
       "tokens": "{{input}} in · {{output}} ut",
@@ -4473,7 +4480,6 @@
     "dismiss": "Avskriv rapport",
     "offline": "Offline · sparad rapport",
     "cached": "Sparad rapport · kan inte uppdateras",
-    "window": "{{start}} – {{end}}",
     "summary": "AI-sammanfattning",
     "summaryPending": "AI-sammanfattningen pågår. Den bifogas här när den är klar.",
     "summaryUnavailable": "AI-sammanfattningen är inte tillgänglig. Din strukturerade rapport finns fortfarande.",
@@ -4592,6 +4598,7 @@
       "title": "Utlösare och webhooks",
       "subtitle": "Automatisera Cloud Agent-körningar från ett webhookanrop eller enligt ett schema.",
       "new": "Ny utlösare",
+      "create": "Skapa utlösare",
       "emptyTitle": "Inga utlösare än",
       "emptyDescription": "Skapa en utlösare för att starta en Cloud Agent-körning från ett webhookanrop eller enligt ett schema.",
       "loadFailedTitle": "Det gick inte att läsa in utlösare",

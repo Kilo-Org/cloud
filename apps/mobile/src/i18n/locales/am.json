@@ -26,6 +26,7 @@
     "creditHistory": "የክሬዲት ታሪክ",
     "sentenceJoiner": "። ",
     "listJoiner": "፣ ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "ተው",
     "done": "ጨርስ",
     "retry": "እንደገና ሞክር",
@@ -483,7 +484,14 @@
       "viewReceipt": "ደረሰኙን ይመልከቱ"
     },
     "changelog": "አዲስ ነገር",
-    "changelogVersionPending": "የዚህ ስሪት ማስታወሻዎች ከሚቀጥለው የመተግበሪያ ዝማኔ ጋር ይመጣሉ።"
+    "changelogVersionPending": "የስሪት {{version}} ማስታወሻዎች ከሚቀጥለው የመተግበሪያ ዝማኔ ጋር ይመጣሉ።",
+    "changelogGroupNew": "አዲስ",
+    "changelogFixesIn": "በእነዚህ ክፍሎች ጥገናዎች እና ማሻሻያዎች ተደርገዋል፦ {{areas}}።",
+    "changelogFixesPolish": "በመተግበሪያው ውስጥ በሙሉ ጥገናዎች እና ማሻሻያዎች ተደርገዋል።",
+    "changelogAreas": {
+      "signIn": "መግቢያ",
+      "profileOrganizations": "መገለጫ እና ድርጅቶች"
+    }
   },
   "preferences": {
     "general": "አጠቃላይ",
@@ -3329,6 +3337,7 @@
       "manageOnWeb": "የክፍያ ቅንብሮች በድር ላይ",
       "changePlan": "ዕቅድ ይቀይሩ",
       "buySeats": "የተጠቃሚ ፈቃዶችን ይግዙ",
+      "managedOnWeb": "ዕቅዱ፣ የተጠቃሚ ፈቃዶች እና ራስ-ሰር መሙላት የሚተዳደሩት በድር ላይ ነው።",
       "setupAutoTopUp": "ራስ-ሰር መሙላትን ያዋቅሩ",
       "manageAutoTopUp": "ራስ-ሰር መሙላትን አስተዳድር",
       "opensOnWeb": "በድር ላይ ይከፈታል"
@@ -3477,12 +3486,10 @@
       "requestLogs": "የጥያቄ መዝገቦች"
     },
     "requestLogs": {
-      "hint": "መስኮቱ ከማብቃቱ በፊት ባለው አንድ ሰዓት ውስጥ የተደረጉ ጥያቄዎች፣ አዲሶቹ በመጀመሪያ።",
       "older": "ቀዳሚ ሰዓት",
       "newer": "ቀጣይ ሰዓት",
       "truncated": "በዚህ ሰዓት ዝርዝሩ ከሚያሳየው በላይ ጥያቄዎች አሉ።",
       "emptyTitle": "ምንም ጥያቄዎች የሉም",
-      "emptyDescription": "በዚህ ሰዓት ውስጥ ምንም የጌትዌይ ጥያቄዎች የሉም።",
       "loadError": "የጥያቄ መዝገቦችን መጫን አልተቻለም።",
       "permissionDenied": "የጥያቄ መዝገቦቹን ማንበብ የሚችሉት የድርጅቱ ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ ብቻ ናቸው።",
       "tokens": "{{input}} ግብዓት · {{output}} ውጤት",
@@ -4473,7 +4480,6 @@
     "dismiss": "ሪፖርቱን አስወግድ",
     "offline": "ከመስመር ውጭ · የተቀመጠ ሪፖርት",
     "cached": "የተቀመጠ ሪፖርት · ማደስ አይቻልም",
-    "window": "{{start}} – {{end}}",
     "summary": "AI ማጠቃለያ",
     "summaryPending": "AI ማጠቃለያ በሂደት ላይ ነው። ሲዘጋጅ እዚህ ይያያዛል።",
     "summaryUnavailable": "AI ማጠቃለያ አይገኝም። የተዋቀረ ሪፖርትዎ አሁንም ይገኛል።",
@@ -4592,6 +4598,7 @@
       "title": "ቀስቅሴዎች እና ዌብሁኮች",
       "subtitle": "የCloud Agent ሩጫዎችን ከዌብሁክ ጥሪ ወይም ከመርሐ ግብር በራስ-ሰር ያድርጉ።",
       "new": "አዲስ ቀስቅሴ",
+      "create": "ቀስቅሴ ፍጠር",
       "emptyTitle": "እስካሁን ቀስቅሴዎች የሉም",
       "emptyDescription": "የCloud Agent ሩጫን ከዌብሁክ ጥሪ ወይም በመርሐ ግብር ለመጀመር ቀስቅሴ ይፍጠሩ።",
       "loadFailedTitle": "ቀስቅሴዎችን መጫን አልተቻለም",

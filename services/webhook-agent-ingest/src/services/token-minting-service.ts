@@ -1,6 +1,7 @@
 import { signKiloToken } from '@kilocode/worker-utils';
 import { signModernKiloToken } from '@kilocode/worker-utils/kilo-token-policy';
 import { CLOUD_AGENT_NEXT_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { resolveRuntimeEnvironment } from '@kilocode/worker-utils/runtime-authorization-contract';
 import {
   getWorkerDb,
   findUserForToken,
@@ -198,7 +199,7 @@ export class TokenMintingService {
         pepper: payload.apiTokenPepper,
         secret: jwtSecret,
         expiresInSeconds: 60 * 60,
-        env: this.env.ENVIRONMENT === 'production' ? 'production' : 'development',
+        env: resolveRuntimeEnvironment(this.env.ENVIRONMENT),
         audience: CLOUD_AGENT_NEXT_AUDIENCE,
         tokenPurpose: 'internal-service',
         credentialExchange: false,
@@ -222,7 +223,7 @@ export class TokenMintingService {
       pepper: payload.apiTokenPepper,
       secret: jwtSecret,
       expiresInSeconds: 60 * 60,
-      env: this.env.ENVIRONMENT === 'production' ? 'production' : 'development',
+      env: resolveRuntimeEnvironment(this.env.ENVIRONMENT),
       extra: {
         botId: payload.botId,
         internalApiUse: payload.internalApiUse,

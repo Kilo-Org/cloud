@@ -26,6 +26,7 @@
     "creditHistory": "Taariikhda kiredit-ka",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Jooji",
     "done": "Dhammaystiran",
     "retry": "Mar kale isku day",
@@ -483,7 +484,14 @@
       "viewReceipt": "Eeg rasiidka"
     },
     "changelog": "Waxyaabaha cusub",
-    "changelogVersionPending": "Qoraallada noocan waxay la yimaadaan cusboonaysiinta xigta."
+    "changelogVersionPending": "Qoraallada nooca {{version}} waxay la yimaadaan cusboonaysiinta xigta.",
+    "changelogGroupNew": "Cusub",
+    "changelogFixesIn": "Hagaajinno iyo horumarin lagu sameeyay {{areas}}.",
+    "changelogFixesPolish": "Hagaajinno iyo horumarin lagu sameeyay barnaamijka oo dhan.",
+    "changelogAreas": {
+      "signIn": "Gelitaanka",
+      "profileOrganizations": "Xogta shakhsiga iyo ururada"
+    }
   },
   "preferences": {
     "general": "Guud",
@@ -3329,6 +3337,7 @@
       "manageOnWeb": "Dejinta biilasha ee shabakadda",
       "changePlan": "Beddel qorshaha",
       "buySeats": "Iibso boosas",
+      "managedOnWeb": "Qorshaha, boosaska iyo ku-shubidda tooska ah waxaa lagu maamulaa shabakadda.",
       "setupAutoTopUp": "Deji ku-shubid toos ah",
       "manageAutoTopUp": "Maaree ku-shubid toos ah",
       "opensOnWeb": "Waxay ku furmaysaa webka"
@@ -3477,12 +3486,10 @@
       "requestLogs": "Diiwaannada codsiyada"
     },
     "requestLogs": {
-      "hint": "Codsiyadii saacadda ka horreysay dhammaadka muddada, kuwa ugu cusub ayaa ugu horreeya.",
       "older": "Saacaddii hore",
       "newer": "Saacadda xigta",
       "truncated": "Saacaddan waxay leedahay codsiyo ka badan inta liisku muujinayo.",
       "emptyTitle": "Ma jiraan codsiyo",
-      "emptyDescription": "Saacaddan ma jiraan codsiyo gateway.",
       "loadError": "Lama soo rari karin diiwaannada codsiyada.",
       "permissionDenied": "Kaliya milkiilaha ururka, maamulaha ama maareeyaha biilasha ayaa akhrin kara diiwaannada codsiyada ururka.",
       "tokens": "{{input}} gal · {{output}} bax",
@@ -4473,7 +4480,6 @@
     "dismiss": "Iska dhaaf warbixinta",
     "offline": "Khadka ka maqan · warbixin la kaydiyay",
     "cached": "Warbixin la kaydiyay · cusboonaysiin lama heli karo",
-    "window": "{{start}} – {{end}}",
     "summary": "Soo koobid AI",
     "summaryPending": "Soo koobidda AI waa socotaa. Halkan ayay ku soo xirmi doontaa marka ay diyaar noqoto.",
     "summaryUnavailable": "Soo koobidda AI lama heli karo. Warbixintaada habaysan weli waa la heli karaa.",
@@ -4592,6 +4598,7 @@
       "title": "Kiciyeyaal iyo wicitaanno web",
       "subtitle": "Otomaatig u samee socodka Cloud Agent ee ka imanaya wicitaan web ama jadwal.",
       "new": "Kiciye cusub",
+      "create": "Samee kiciye",
       "emptyTitle": "Weli kiciyeyaal ma jiraan",
       "emptyDescription": "Samee kiciye si aad u bilowdo socodka Cloud Agent ee ka imanaya wicitaan web ama jadwal.",
       "loadFailedTitle": "Kiciyeyaal lama soo shubi karin",

@@ -26,6 +26,7 @@
     "creditHistory": "Istorija kredita",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Otkaži",
     "done": "Gotovo",
     "retry": "Pokušaj ponovo",
@@ -483,7 +484,14 @@
       "viewReceipt": "Prikaži potvrdu"
     },
     "changelog": "Šta je novo",
-    "changelogVersionPending": "Beleške za ovu verziju stižu sa sledećim ažuriranjem."
+    "changelogVersionPending": "Beleške za verziju {{version}} stižu sa sledećim ažuriranjem aplikacije.",
+    "changelogGroupNew": "Novo",
+    "changelogFixesIn": "Ispravke i poboljšanja u sledećim oblastima: {{areas}}.",
+    "changelogFixesPolish": "Ispravke i poboljšanja u celoj aplikaciji.",
+    "changelogAreas": {
+      "signIn": "Prijavljivanje",
+      "profileOrganizations": "Profil i organizacije"
+    }
   },
   "preferences": {
     "general": "Opšte",
@@ -3386,6 +3394,7 @@
       "manageOnWeb": "Podešavanja naplate na vebu",
       "changePlan": "Promeni plan",
       "buySeats": "Kupi mesta",
+      "managedOnWeb": "Planom, mestima i automatskom dopunom se upravlja na vebu.",
       "setupAutoTopUp": "Podesi automatsku dopunu",
       "manageAutoTopUp": "Upravljaj automatskom dopunom",
       "opensOnWeb": "Otvara se na vebu"
@@ -3534,12 +3543,10 @@
       "requestLogs": "Dnevnici zahteva"
     },
     "requestLogs": {
-      "hint": "Zahtevi iz sata pre kraja intervala, počev od najnovijih.",
       "older": "Prethodni sat",
       "newer": "Sledeći sat",
       "truncated": "U ovom satu ima više zahteva nego što lista prikazuje.",
       "emptyTitle": "Nema zahteva",
-      "emptyDescription": "U ovom satu nema zahteva preko gateway-a.",
       "loadError": "Učitavanje dnevnika zahteva nije uspelo.",
       "permissionDenied": "Dnevnike zahteva organizacije mogu da čitaju samo njen vlasnik, administrator ili menadžer za naplatu.",
       "tokens": "{{input}} ulaz · {{output}} izlaz",
@@ -4543,7 +4550,6 @@
     "dismiss": "Odbaci izveštaj",
     "offline": "Van mreže · sačuvan izveštaj",
     "cached": "Sačuvan izveštaj · osvežavanje nije dostupno",
-    "window": "{{start}} – {{end}}",
     "summary": "AI rezime",
     "summaryPending": "AI rezime je u izradi. Pojaviće se ovde kada bude spreman.",
     "summaryUnavailable": "AI rezime nije dostupan. Strukturisan izveštaj je i dalje dostupan.",
@@ -4662,6 +4668,7 @@
       "title": "Okidači i vebhukovi",
       "subtitle": "Automatizujte pokretanja Cloud Agent-a pomoću vebhuk poziva ili po rasporedu.",
       "new": "Novi okidač",
+      "create": "Napravite okidač",
       "emptyTitle": "Još nema okidača",
       "emptyDescription": "Napravite okidač da biste započeli pokretanje Cloud Agent-a preko vebhuk poziva ili po rasporedu.",
       "loadFailedTitle": "Učitavanje okidača nije uspelo",

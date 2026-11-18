@@ -18,6 +18,7 @@ import {
   type OpenAiChatGptStoredConnection,
 } from './store';
 import { isOpenAiModelServed } from './served-models';
+import { OPENAI_CHATGPT_PROVIDER_ID } from './provider-id';
 import { OPENAI_CHATGPT_API_KEY_ENV, OPENAI_CHATGPT_API_URL } from './upstream';
 
 /**
@@ -25,11 +26,6 @@ import { OPENAI_CHATGPT_API_KEY_ENV, OPENAI_CHATGPT_API_URL } from './upstream';
  * has an enabled connection, an eligible OpenAI model is served by api.openai.com
  * on the delegated token instead of a managed gateway.
  */
-
-/** The delegated upstream URL, shared with the served-model lookup. */
-export { OPENAI_CHATGPT_API_URL };
-
-export { OPENAI_CHATGPT_API_KEY_ENV };
 
 /**
  * The delegated access token travels in its own upstream header. `extraHeaders`
@@ -185,21 +181,6 @@ function openAiChatGptOwnerCandidates(input: OpenAiChatGptRoutingInput): OpenAiC
     owners.push({ kiloUserId: input.userId, organizationId: input.organizationId ?? null });
   }
   return owners;
-}
-
-/**
- * An enabled, readable ChatGPT connection makes a delegated OpenAI model
- * eligible. The partner project key is deliberately not part of this check: a
- * missing deployment credential must not hide the person's connection state.
- * The delegated-token flow is accepted only by `POST /v1/responses`: a
- * `chat/completions` request for the same model keeps its current route, and
- * declaring `chat_completions` support here would make the gateway answer the
- * person with an api-kind error instead of their existing provider.
- */
-export async function isOpenAiChatGptEligible(input: OpenAiChatGptRoutingInput): Promise<boolean> {
-  const [owner] = openAiChatGptOwnerCandidates(input);
-  if (!owner) return false;
-  return (await eligibleUpstreamModelForOwner(input, owner)) !== null;
 }
 
 /**
@@ -396,8 +377,8 @@ export function buildOpenAiChatGptProvider(
   if (apiKey.trim().length === 0) return null;
 
   return {
-    type: 'openai-chatgpt',
-    inferenceProviderId: 'openai-chatgpt',
+    type: OPENAI_CHATGPT_PROVIDER_ID,
+    inferenceProviderId: OPENAI_CHATGPT_PROVIDER_ID,
     ...(owner ? { chatGptOwner: owner } : {}),
     apiUrl: OPENAI_CHATGPT_API_URL,
     apiUrlOverrides: {},

@@ -26,6 +26,7 @@
     "creditHistory": "Historial de créditos",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Cancelar",
     "done": "Feito",
     "retry": "Tentar de novo",
@@ -483,7 +484,14 @@
       "viewReceipt": "Ver xustificante"
     },
     "changelog": "Novidades",
-    "changelogVersionPending": "As notas desta versión chegarán coa próxima actualización."
+    "changelogVersionPending": "As notas da versión {{version}} chegarán coa próxima actualización da aplicación.",
+    "changelogGroupNew": "Novidades",
+    "changelogFixesIn": "Correccións e melloras en {{areas}}.",
+    "changelogFixesPolish": "Correccións e melloras en toda a aplicación.",
+    "changelogAreas": {
+      "signIn": "Inicio de sesión",
+      "profileOrganizations": "Perfil e organizacións"
+    }
   },
   "preferences": {
     "general": "Xeral",
@@ -3329,6 +3337,7 @@
       "manageOnWeb": "Configuración da facturación na web",
       "changePlan": "Cambiar plan",
       "buySeats": "Mercar prazas",
+      "managedOnWeb": "O plan, as prazas e a recarga automática xestiónanse na web.",
       "setupAutoTopUp": "Configurar recarga automática",
       "manageAutoTopUp": "Xestionar a recarga automática",
       "opensOnWeb": "Ábrese na web"
@@ -3477,12 +3486,10 @@
       "requestLogs": "Rexistros de solicitudes"
     },
     "requestLogs": {
-      "hint": "Solicitudes da hora previa ao fin do intervalo, primeiro as máis recentes.",
       "older": "Hora anterior",
       "newer": "Hora seguinte",
       "truncated": "Esta hora ten máis solicitudes das que mostra a lista.",
       "emptyTitle": "Non hai solicitudes",
-      "emptyDescription": "Nesta hora non hai solicitudes á pasarela.",
       "loadError": "Non se puideron cargar os rexistros de solicitudes.",
       "permissionDenied": "Só un propietario, administrador ou xestor de facturación da organización pode ler os seus rexistros de solicitudes.",
       "tokens": "{{input}} de entrada · {{output}} de saída",
@@ -4473,7 +4480,6 @@
     "dismiss": "Descartar o informe",
     "offline": "Sen conexión · informe gardado",
     "cached": "Informe gardado · non se pode actualizar",
-    "window": "{{start}} – {{end}}",
     "summary": "Resumo con IA",
     "summaryPending": "O resumo con IA está en curso. Engadirase aquí cando estea listo.",
     "summaryUnavailable": "Resumo con IA non dispoñible. O teu informe estruturado segue dispoñible.",
@@ -4592,6 +4598,7 @@
       "title": "Disparadores e webhooks",
       "subtitle": "Automatiza execucións de Cloud Agent a partir dunha chamada de webhook ou dunha programación.",
       "new": "Novo disparador",
+      "create": "Crear disparador",
       "emptyTitle": "Aínda non hai disparadores",
       "emptyDescription": "Crea un disparador para iniciar unha execución de Cloud Agent a partir dunha chamada de webhook ou segundo unha programación.",
       "loadFailedTitle": "Non se puideron cargar os disparadores",

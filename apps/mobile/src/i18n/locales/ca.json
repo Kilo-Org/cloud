@@ -26,6 +26,7 @@
     "creditHistory": "Historial de crèdits",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Cancel·la",
     "done": "Fet",
     "retry": "Torna-ho a provar",
@@ -483,7 +484,14 @@
       "viewReceipt": "Mostra el comprovant"
     },
     "changelog": "Novetats",
-    "changelogVersionPending": "Les notes d'aquesta versió arribaran amb la propera actualització de l'app."
+    "changelogVersionPending": "Les notes de la versió {{version}} arribaran amb la propera actualització de l'app.",
+    "changelogGroupNew": "Novetats",
+    "changelogFixesIn": "Correccions i millores a {{areas}}.",
+    "changelogFixesPolish": "Correccions i millores a tota l'aplicació.",
+    "changelogAreas": {
+      "signIn": "Inici de sessió",
+      "profileOrganizations": "Perfil i organitzacions"
+    }
   },
   "preferences": {
     "general": "General",
@@ -3386,6 +3394,7 @@
       "manageOnWeb": "Configuració de la facturació al web",
       "changePlan": "Canvia el pla",
       "buySeats": "Compra llicències",
+      "managedOnWeb": "El pla, les llicències i la recàrrega automàtica es gestionen al web.",
       "setupAutoTopUp": "Configura la recàrrega automàtica",
       "manageAutoTopUp": "Gestiona la recàrrega automàtica",
       "opensOnWeb": "S'obre al web"
@@ -3534,12 +3543,10 @@
       "requestLogs": "Registres de sol·licituds"
     },
     "requestLogs": {
-      "hint": "Sol·licituds de l'hora que acaba al final de la finestra, les més recents primer.",
       "older": "Hora anterior",
       "newer": "Hora següent",
       "truncated": "Aquesta hora té més sol·licituds de les que mostra la llista.",
       "emptyTitle": "No hi ha sol·licituds",
-      "emptyDescription": "En aquesta hora no hi ha cap sol·licitud a la passarel·la.",
       "loadError": "No s'han pogut carregar els registres de sol·licituds.",
       "permissionDenied": "Només un propietari, administrador o gestor de facturació d'una organització pot consultar-ne els registres de sol·licituds.",
       "tokens": "{{input}} d'entrada · {{output}} de sortida",
@@ -4543,7 +4550,6 @@
     "dismiss": "Descarta l'informe",
     "offline": "Sense connexió · informe desat",
     "cached": "Informe desat · no es pot actualitzar",
-    "window": "{{start}} – {{end}}",
     "summary": "Resum d'IA",
     "summaryPending": "El resum d'IA està en curs. S'adjuntarà aquí quan estigui llest.",
     "summaryUnavailable": "El resum d'IA no està disponible. L'informe estructurat continua disponible.",
@@ -4662,6 +4668,7 @@
       "title": "Disparadors i ganxos web",
       "subtitle": "Automatitza execucions del Cloud Agent a partir d'una crida de ganxo web o d'una programació.",
       "new": "Disparador nou",
+      "create": "Crea disparador",
       "emptyTitle": "Encara no hi ha disparadors",
       "emptyDescription": "Crea un disparador per iniciar una execució del Cloud Agent a partir d'una crida de ganxo web o segons una programació.",
       "loadFailedTitle": "No s'han pogut carregar els disparadors",

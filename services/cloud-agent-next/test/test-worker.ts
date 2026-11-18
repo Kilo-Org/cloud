@@ -79,6 +79,7 @@ export { EnvironmentBuild } from '../src/environment-build/environment-build-do.
 export { SandboxContainers } from '../src/sandbox-containers/SandboxContainers.js';
 export { PreviewPortTestDO } from './integration/helpers/preview-port-test-do.js';
 export {
+  SentryBillingAdmissionContainer,
   SentrySessionProbe,
   SentryLegacySessionProbe,
   SentrySandboxControlProbe,

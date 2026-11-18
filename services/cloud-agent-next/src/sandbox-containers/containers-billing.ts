@@ -310,7 +310,7 @@ export class ContainersBilling {
     return this.lifecycle.getBillingRuntimeStatus(this.billingIdentity);
   }
 
-  ensureBillingAdmission(input: unknown) {
+  ensureBillingAdmission(input: unknown): Promise<SandboxBillingAdmissionResult> {
     return this.lifecycle.ensureBillingAdmission(this.billingIdentity, input);
   }
 

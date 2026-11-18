@@ -7,7 +7,11 @@ import {
 } from 'cloudflare:test';
 import type { ErrorEvent } from '@sentry/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { SentryDurableObjectProbe } from './helpers/sentry-durable-object.js';
+import { containerLimitError } from '../../src/container-limit-test-helpers.js';
+import type {
+  SentryBillingAdmissionContainer,
+  SentryDurableObjectProbe,
+} from './helpers/sentry-durable-object.js';
 import { waitFor } from './wait-for.js';
 
 type ProbeNamespace = DurableObjectNamespace<SentryDurableObjectProbe>;
@@ -16,7 +20,16 @@ const probes = env as typeof env & {
   SENTRY_LEGACY_SESSION_PROBE: ProbeNamespace;
   SENTRY_SANDBOX_CONTROL_PROBE: ProbeNamespace;
   SENTRY_SANDBOX_CONTAINER_PROBE: ProbeNamespace;
+  SENTRY_BILLING_ADMISSION_CONTAINER: DurableObjectNamespace<SentryBillingAdmissionContainer>;
   SENTRY_DISABLED_PROBE: ProbeNamespace;
+};
+
+const billingInput = {
+  sandboxId: 'ses-0123456789abcdef',
+  subject: { type: 'user', id: 'test-user' },
+  actor: { type: 'user', id: 'test-user' },
+  sessionId: 'workspace_test',
+  metadata: { origin: 'cloud-agent' },
 };
 
 let events: ErrorEvent[];
@@ -55,6 +68,36 @@ async function captured(count: number): Promise<void> {
 }
 
 describe('Cloud Agent Durable Object real SDK boundaries', () => {
+  it('returns a container limit rejection across RPC without sending it to Sentry', async () => {
+    const stub = probes.SENTRY_BILLING_ADMISSION_CONTAINER.getByName(billingInput.sandboxId);
+    await expect(stub.ensureBillingAdmission(billingInput, 'standard-4')).resolves.toEqual({
+      success: false,
+      code: 'container_limit_reached',
+      message: containerLimitError('user', 3).message,
+    });
+    await runInDurableObject(stub, () => undefined);
+    expect(transport).not.toHaveBeenCalled();
+  });
+
+  it('still captures unexpected billing admission faults', async () => {
+    const stub = probes.SENTRY_BILLING_ADMISSION_CONTAINER.getByName(billingInput.sandboxId);
+    await runInDurableObject(stub, (_instance, ctx) =>
+      ctx.storage.put('container-usage:budget-block:v1', {})
+    );
+    await expect(
+      async () => await stub.ensureBillingAdmission(billingInput, 'standard-4')
+    ).rejects.toThrow('ZodError');
+    await captured(1);
+    expect(events[0]?.contexts?.cloud_agent).toEqual({
+      component: 'sandbox-container',
+      sandboxId: billingInput.sandboxId,
+    });
+    expect(events[0]?.exception?.values?.[0]?.mechanism).toEqual({
+      type: 'auto.faas.cloudflare.durable_object',
+      handled: false,
+    });
+  });
+
   it.each([
     [
       'SENTRY_SESSION_PROBE',

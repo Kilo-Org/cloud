@@ -17,10 +17,6 @@ import {
 import { z } from 'zod';
 import { logger } from './logger.js';
 import {
-  ContainerCapacityUnavailableError,
-  getContainerCapacityFailureReason,
-} from './container-concurrency.js';
-import {
   assertSandboxBillingAllocation,
   billingCapacityForSandboxClass,
   parseSandboxBillingInput,
@@ -272,8 +268,6 @@ export class MeteredBillingLifecycle {
         if (isDefiniteAdmissionRejection(error)) {
           await clearBillingContext(this.host.storage);
         }
-        // Callers recognize a container limit from the thrown error, as for a refused start.
-        if (getContainerCapacityFailureReason(error)) throw error;
         return billingAdmissionFailureFromError(error);
       }
       await this.host.storage.put(START_ACK_GENERATION_STORAGE_KEY, context.generation);
@@ -751,15 +745,9 @@ export class MeteredBillingLifecycle {
    * an SDK request that wakes a stopped container. A start that is already
    * admitted returns without a meter call.
    */
-  async admitBeforeStart(identity: BillingIdentity): Promise<void> {
+  async admitBeforeStart(identity: BillingIdentity): Promise<SandboxBillingAdmissionResult> {
     const input = await this.getPendingAttribution();
-    if (!input) return;
-    const admission = await this.ensureBillingAdmission(identity, input);
-    if (admission.success) return;
-    if (admission.code === 'insufficient_credits') {
-      throw new ContainerUsageAdmissionError(admission.code, admission.message, admission);
-    }
-    throw new ContainerCapacityUnavailableError();
+    return input ? this.ensureBillingAdmission(identity, input) : { success: true };
   }
 
   private async getPendingAttribution(): Promise<SandboxBillingInput | undefined> {

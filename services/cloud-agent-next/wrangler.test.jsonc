@@ -45,6 +45,10 @@
       { "class_name": "SentryLegacySessionProbe", "name": "SENTRY_LEGACY_SESSION_PROBE" },
       { "class_name": "SentrySandboxControlProbe", "name": "SENTRY_SANDBOX_CONTROL_PROBE" },
       { "class_name": "SentrySandboxContainerProbe", "name": "SENTRY_SANDBOX_CONTAINER_PROBE" },
+      {
+        "class_name": "SentryBillingAdmissionContainer",
+        "name": "SENTRY_BILLING_ADMISSION_CONTAINER",
+      },
       { "class_name": "SentryDisabledProbe", "name": "SENTRY_DISABLED_PROBE" },
     ],
   },
@@ -83,6 +87,7 @@
         "SentryLegacySessionProbe",
         "SentrySandboxControlProbe",
         "SentrySandboxContainerProbe",
+        "SentryBillingAdmissionContainer",
         "SentryDisabledProbe",
       ],
       "tag": "sentry-probes",

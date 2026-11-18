@@ -1476,8 +1476,12 @@
       "empty": "Babu bitoci masu nazari tukuna",
       "emptyDescription": "Nazari yana adana bitocin da aka kammala yayin da aka kunna shi ga ƙungiyar.",
       "offTitle": "An kashe nazari ga {{platform}}",
-      "offDescription": "Kunna ta a cikin saitunan ƙungiya a yanar gizo don nazari ya adana bitocin da aka kammala.",
-      "couldNotLoad": "An kasa loda nazari"
+      "offDescription": "Matsayuna na biyan kuɗi a ƙungiyar (masu mallaka, masu gudanarwa da manajojin biyan kuɗi) za su iya kunna nazari a saitunan ƙungiyar a yanar gizo domin a adana bitocin da aka kammala.",
+      "couldNotLoad": "An kasa loda nazari",
+      "trackedReviewsCaption": "Bitocin da aka kammala waɗanda suka ƙare a cikin wannan lokacin, yayin da aka kunna nazari. Ba a taɓa ƙidaya bitocin da ke gudana ko waɗanda suka kasa ba.",
+      "trackedReviewsUncounted": "Ba a ƙidaya ba: {{displayCount}} daga cikin {{displayTotal}} bitocin da aka kammala waɗanda ƙungiyar ke da su, ba a adana sakamakonsu ba.",
+      "trackedReviewsUncounted_one": "Ba a ƙidaya ba: {{displayCount}} daga cikin {{displayTotal}} bitocin da aka kammala waɗanda ƙungiyar ke da su, ba a adana sakamakonsu ba.",
+      "trackedReviewsUncounted_other": "Ba a ƙidaya ba: {{displayCount}} daga cikin {{displayTotal}} bitocin da aka kammala waɗanda ƙungiyar ke da su, ba a adana sakamakonsu ba."
     },
     "council": {
       "title": "Bitar majalisa",

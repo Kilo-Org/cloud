@@ -1524,8 +1524,14 @@
       "empty": "Zatím žádné kontroly s analytikou",
       "emptyDescription": "Analytika zaznamenává dokončené kontroly, pokud je pro organizaci zapnutá.",
       "offTitle": "Analytika je pro {{platform}} vypnutá",
-      "offDescription": "Zapněte analytiku v nastavení organizace na webu, aby zaznamenávala dokončené kontroly.",
-      "couldNotLoad": "Analytiku se nepodařilo načíst"
+      "offDescription": "Organizační role pro fakturaci mohou zapnout analytiku v nastavení organizace na webu, aby se zaznamenávaly dokončené kontroly.",
+      "couldNotLoad": "Analytiku se nepodařilo načíst",
+      "trackedReviewsCaption": "Dokončené kontroly, které v tomto období skončily se zapnutou analytikou. Probíhající a neúspěšné kontroly se nikdy nepočítají.",
+      "trackedReviewsUncounted": "Nezapočítáno: {{displayCount}} z {{displayTotal}} dokončených kontrol organizace, jejichž výsledek nebyl zachycen.",
+      "trackedReviewsUncounted_few": "Nezapočítáno: {{displayCount}} z {{displayTotal}} dokončených kontrol organizace, jejichž výsledek nebyl zachycen.",
+      "trackedReviewsUncounted_many": "Nezapočítáno: {{displayCount}} z {{displayTotal}} dokončených kontrol organizace, jejichž výsledek nebyl zachycen.",
+      "trackedReviewsUncounted_one": "Nezapočítáno: {{displayCount}} z {{displayTotal}} dokončených kontrol organizace, jejichž výsledek nebyl zachycen.",
+      "trackedReviewsUncounted_other": "Nezapočítáno: {{displayCount}} z {{displayTotal}} dokončených kontrol organizace, jejichž výsledek nebyl zachycen."
     },
     "council": {
       "title": "Kontrola radou",

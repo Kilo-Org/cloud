@@ -1476,8 +1476,12 @@
       "empty": "Akukho kuhlolwa okunezibalo okwamanje",
       "emptyDescription": "Izibalo ziqopha ukuhlolwa okuqediwe ngenkathi zivuliwe enhlanganweni.",
       "offTitle": "Izibalo ze-{{platform}} zivaliwe",
-      "offDescription": "Zivule izibalo kuzilungiselelo zenhlangano kuwebhu ukuqopha ukuhlolwa okuqediwe.",
-      "couldNotLoad": "Ayikwazanga ukulayisha izibalo"
+      "offDescription": "Izindima zokukhokha zenhlangano (abanikazi, abaphathi kanye nabaphathi bezimali) zingavula izibalo ezilungiselelweni zenhlangano kuwebhu ukuze kuqophwe ukuhlolwa okuqediwe.",
+      "couldNotLoad": "Ayikwazanga ukulayisha izibalo",
+      "trackedReviewsCaption": "Ukuhlolwa okuqediwe ngesikhathi sesi sikhathi ngenkathi izibalo zivuliwe. Ukuhlolwa okuqhubekayo nokuwehlulekile akubalwa unaphakade.",
+      "trackedReviewsUncounted": "{{displayCount}} kwe-{{displayTotal}} zokuhlolwa okuqediwe enhlanganweni azibaliwa: isiphumo sawo asiqophwanga.",
+      "trackedReviewsUncounted_one": "{{displayCount}} kwe-{{displayTotal}} zokuhlolwa okuqediwe enhlanganweni azibaliwa: isiphumo sawo asiqophwanga.",
+      "trackedReviewsUncounted_other": "{{displayCount}} kwe-{{displayTotal}} zokuhlolwa okuqediwe enhlanganweni azibaliwa: isiphumo sawo asiqophwanga."
     },
     "council": {
       "title": "Ukuhlola komkhandlu",

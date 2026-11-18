@@ -1476,8 +1476,12 @@
       "empty": "Analitikası olan yoxlama hələ yoxdur",
       "emptyDescription": "Analitika təşkilat üçün aktiv olduğu müddətdə tamamlanmış yoxlamaları qeydə alır.",
       "offTitle": "{{platform}} üçün analitika deaktivdir",
-      "offDescription": "Tamamlanmış yoxlamaları qeydə almaq üçün analitikanı vebdə təşkilat ayarlarında aktivləşdir.",
-      "couldNotLoad": "Analitikanı yükləmək mümkün olmadı"
+      "offDescription": "Təşkilatın ödəniş rolları analitikanı vebdəki tənzimləmələrdə aktivləşdirib tamamlanmış yoxlamaları qeydə ala bilər.",
+      "couldNotLoad": "Analitikanı yükləmək mümkün olmadı",
+      "trackedReviewsCaption": "Bu dövrdə analitika aktiv olduğu halda tamamlanmış yoxlamalar. Davam edən və uğursuz yoxlamalar heç vaxt hesaba alınmır.",
+      "trackedReviewsUncounted": "Hesaba alınmır: təşkilatın {{displayTotal}} tamamlanmış yoxlamasından {{displayCount}} ədədinin nəticəsi qeyd olunmayıb.",
+      "trackedReviewsUncounted_one": "Hesaba alınmır: təşkilatın {{displayTotal}} tamamlanmış yoxlamasından {{displayCount}} ədədinin nəticəsi qeyd olunmayıb.",
+      "trackedReviewsUncounted_other": "Hesaba alınmır: təşkilatın {{displayTotal}} tamamlanmış yoxlamasından {{displayCount}} ədədinin nəticəsi qeyd olunmayıb."
     },
     "council": {
       "title": "Şura yoxlaması",

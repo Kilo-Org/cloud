@@ -1548,8 +1548,15 @@
       "empty": "Għad m'hemmx reviżjonijiet bi statistika",
       "emptyDescription": "L-istatistika tirrekordja reviżjonijiet kompluti sakemm tkun attiva għall-organizzazzjoni.",
       "offTitle": "L-istatistika hija mitfija għal {{platform}}",
-      "offDescription": "Attivaha fis-settjar tal-organizzazzjoni fuq il-web biex tirrekordja reviżjonijiet kompluti.",
-      "couldNotLoad": "L-istatistika ma setgħetx tiġi mgħobbija"
+      "offDescription": "Ir-rwoli tal-fatturazzjoni tal-organizzazzjoni jistgħu jixgħlu l-istatistika fil-settings tal-organizzazzjoni fuq il-web biex jirrekordjaw reviżjonijiet kompluti.",
+      "couldNotLoad": "L-istatistika ma setgħetx tiġi mgħobbija",
+      "trackedReviewsCaption": "Reviżjonijiet kompluti li spiċċaw f'dan il-perjodu meta l-istatistika kienet mixgħula. Reviżjonijiet li għadhom għaddejjin u dawk li tfallu qatt ma jingħaddu.",
+      "trackedReviewsUncounted": "Ma jingħaddux: {{displayCount}} mill-{{displayTotal}} reviżjonijiet kompluti tal-organizzazzjoni, ir-riżultat tagħhom ma ġiex rekordjat.",
+      "trackedReviewsUncounted_few": "Ma jingħaddux: {{displayCount}} mill-{{displayTotal}} reviżjonijiet kompluti tal-organizzazzjoni, ir-riżultat tagħhom ma ġiex rekordjat.",
+      "trackedReviewsUncounted_many": "Ma jingħaddux: {{displayCount}} mill-{{displayTotal}} reviżjonijiet kompluti tal-organizzazzjoni, ir-riżultat tagħhom ma ġiex rekordjat.",
+      "trackedReviewsUncounted_one": "Ma jingħaddux: {{displayCount}} mill-{{displayTotal}} reviżjonijiet kompluti tal-organizzazzjoni, ir-riżultat tagħhom ma ġiex rekordjat.",
+      "trackedReviewsUncounted_other": "Ma jingħaddux: {{displayCount}} mill-{{displayTotal}} reviżjonijiet kompluti tal-organizzazzjoni, ir-riżultat tagħhom ma ġiex rekordjat.",
+      "trackedReviewsUncounted_two": "Ma jingħaddux: {{displayCount}} mill-{{displayTotal}} reviżjonijiet kompluti tal-organizzazzjoni, ir-riżultat tagħhom ma ġiex rekordjat."
     },
     "council": {
       "title": "Reviżjoni tal-kunsill",

@@ -1476,8 +1476,12 @@
       "empty": "Engar yfirferðir með tölfræði ennþá",
       "emptyDescription": "Tölfræðin skráir yfirferðir sem klárast meðan hún er virk fyrir fyrirtækið.",
       "offTitle": "Tölfræðin er óvirk fyrir {{platform}}",
-      "offDescription": "Kveiktu á henni í stillingum félags á vefnum til að skrá yfirferðir sem klárast.",
-      "couldNotLoad": "Tókst ekki að sækja tölfræðina"
+      "offDescription": "Eigendur, stjórnendur og rekningastjórar fyrirtækisins geta kveikt á tölfræðinni í stillingum fyrirtækisins á vefnum til að skrá yfirferðir sem klárast.",
+      "couldNotLoad": "Tókst ekki að sækja tölfræðina",
+      "trackedReviewsCaption": "Yfirferðir sem klárast á þessu tímabili, meðan tölfræðin er virk. Yfirferðir í gangi eða misheppnaðar teljast aldrei.",
+      "trackedReviewsUncounted": "Ekki taldar: {{displayCount}} af {{displayTotal}} yfirferðum fyrirtækisins sem hafa klárast, niðurstöðan þeirra ekki skráð.",
+      "trackedReviewsUncounted_one": "Ekki taldar: {{displayCount}} af {{displayTotal}} yfirferðum fyrirtækisins sem hafa klárast, niðurstöðan þeirra ekki skráð.",
+      "trackedReviewsUncounted_other": "Ekki taldar: {{displayCount}} af {{displayTotal}} yfirferðum fyrirtækisins sem hafa klárast, niðurstöðan þeirra ekki skráð."
     },
     "council": {
       "title": "Ráðsyfirferð",

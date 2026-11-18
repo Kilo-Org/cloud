@@ -1476,8 +1476,12 @@
       "empty": "Ei vielä analytiikkaa sisältäviä katselmointeja",
       "emptyDescription": "Analytiikka tallentaa valmiit katselmoinnit, kun se on käytössä organisaatiossa.",
       "offTitle": "Analytiikka ei ole käytössä alustalla {{platform}}",
-      "offDescription": "Ota se käyttöön organisaation asetuksissa verkossa, jotta analytiikka tallentaa valmiit katselmoinnit.",
-      "couldNotLoad": "Analytiikan lataaminen epäonnistui"
+      "offDescription": "Organisaation laskutusroolit voivat ottaa analytiikan käyttöön asetuksissa verkossa, jotta analytiikka tallentaa valmiit katselmoinnit.",
+      "couldNotLoad": "Analytiikan lataaminen epäonnistui",
+      "trackedReviewsCaption": "Valmiit katselmoinnit, jotka valmistuivat tällä jaksolla analytiikan ollessa käytössä. Käynnissä olevia ja epäonnistuneita katselmointeja ei koskaan lasketa.",
+      "trackedReviewsUncounted": "Laskematta: {{displayCount}} / {{displayTotal}} organisaation valmiista katselmoinneista ilman tallennettua tulosta.",
+      "trackedReviewsUncounted_one": "Laskematta: {{displayCount}} / {{displayTotal}} organisaation valmiista katselmoinneista ilman tallennettua tulosta.",
+      "trackedReviewsUncounted_other": "Laskematta: {{displayCount}} / {{displayTotal}} organisaation valmiista katselmoinneista ilman tallennettua tulosta."
     },
     "council": {
       "title": "Neuvostokatselmointi",

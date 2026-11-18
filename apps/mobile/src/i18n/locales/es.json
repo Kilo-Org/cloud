@@ -934,8 +934,13 @@
       "empty": "Aún no hay revisiones con analíticas",
       "emptyDescription": "Las analíticas registran las revisiones completadas mientras estén activadas para la organización.",
       "offTitle": "Las analíticas están desactivadas para {{platform}}",
-      "offDescription": "Actívalas en los ajustes de la organización en la web para registrar las revisiones completadas.",
-      "couldNotLoad": "No se pudieron cargar las analíticas"
+      "offDescription": "Los roles de facturación de la organización (propietarios, administradores y gestores de facturación) pueden activar las analíticas en los ajustes de la organización en la web para registrar las revisiones completadas.",
+      "couldNotLoad": "No se pudieron cargar las analíticas",
+      "trackedReviewsCaption": "Revisiones completadas que finalizaron en este periodo con las analíticas activadas. Las revisiones en curso y fallidas nunca se cuentan.",
+      "trackedReviewsUncounted": "Sin contar: {{displayCount}} de las {{displayTotal}} revisiones finalizadas de la organización sin resultado capturado.",
+      "trackedReviewsUncounted_many": "Sin contar: {{displayCount}} de las {{displayTotal}} revisiones finalizadas de la organización sin resultado capturado.",
+      "trackedReviewsUncounted_one": "Sin contar: {{displayCount}} de las {{displayTotal}} revisiones finalizadas de la organización sin resultado capturado.",
+      "trackedReviewsUncounted_other": "Sin contar: {{displayCount}} de las {{displayTotal}} revisiones finalizadas de la organización sin resultado capturado."
     },
     "council": {
       "title": "Revisión por consejo",

@@ -1476,8 +1476,12 @@
       "empty": "Enweghị nyocha nwere ọnụọgụgụ nyocha",
       "emptyDescription": "Ọnụọgụgụ nyocha na-edekọ nyocha ndị gụchara mgbe agbanyere ya maka nzukọ.",
       "offTitle": "Agbanyụrụ ọnụọgụgụ nyocha maka {{platform}}",
-      "offDescription": "Gbanye ya na ntọala òtù na weebụ ka ọ dekọọ nyocha ndị gụchara.",
-      "couldNotLoad": "Enweghị ike ibudata ọnụọgụgụ nyocha"
+      "offDescription": "Ndị nọ n'ọrụ ụgwọ nke nzukọ (ndị nwe ya, ndị nchịkwa na ndị njikwa ụgwọ) nwere ike ịgbanye ọnụọgụgụ nyocha n'ime ntọala nzukọ dị na weebụ iji dekọ nyocha ndị gụchara.",
+      "couldNotLoad": "Enweghị ike ibudata ọnụọgụgụ nyocha",
+      "trackedReviewsCaption": "Nyocha ndị gụchara n'oge a mgbe agbanyere ọnụọgụgụ nyocha. Ọ dịghị mgbe a na-agụta nyocha ndị na-agba ma ọ bụ ndị dara.",
+      "trackedReviewsUncounted": "Agụtaghị ọnụ: {{displayCount}} n’ime {{displayTotal}} nyocha ndị gụchara nke nzukọ, e jideghị mmasị ha.",
+      "trackedReviewsUncounted_one": "Agụtaghị ọnụ: {{displayCount}} n’ime {{displayTotal}} nyocha ndị gụchara nke nzukọ, e jideghị mmasị ha.",
+      "trackedReviewsUncounted_other": "Agụtaghị ọnụ: {{displayCount}} n’ime {{displayTotal}} nyocha ndị gụchara nke nzukọ, e jideghị mmasị ha."
     },
     "council": {
       "title": "Nyocha otu ndị nyocha",

@@ -1476,8 +1476,12 @@
       "empty": "Inga granskningar med statistik än",
       "emptyDescription": "Statistiken registrerar slutförda granskningar så länge den är aktiverad för organisationen.",
       "offTitle": "Statistiken är avstängd för {{platform}}",
-      "offDescription": "Aktivera den i organisationsinställningarna på webben för att registrera slutförda granskningar.",
-      "couldNotLoad": "Det gick inte att läsa in statistiken"
+      "offDescription": "Organisationens faktureringsroller (ägare, administratörer och fakturahanterare) kan aktivera statistiken i organisationens inställningar på webben för att registrera slutförda granskningar.",
+      "couldNotLoad": "Det gick inte att läsa in statistiken",
+      "trackedReviewsCaption": "Slutförda granskningar som avslutades under den här perioden medan statistiken var aktiverad. Pågående och misslyckade granskningar räknas aldrig.",
+      "trackedReviewsUncounted": "Räknas inte: {{displayCount}} av organisationens {{displayTotal}} avslutade granskningar utan registrerat resultat.",
+      "trackedReviewsUncounted_one": "Räknas inte: {{displayCount}} av organisationens {{displayTotal}} avslutade granskningar utan registrerat resultat.",
+      "trackedReviewsUncounted_other": "Räknas inte: {{displayCount}} av organisationens {{displayTotal}} avslutade granskningar utan registrerat resultat."
     },
     "council": {
       "title": "Rådsgranskning",

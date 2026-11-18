@@ -937,8 +937,16 @@
       "empty": "لا توجد مراجعات بتحليلات بعد",
       "emptyDescription": "تسجّل التحليلات المراجعات المكتملة ما دامت مفعّلة للمؤسسة.",
       "offTitle": "التحليلات متوقفة لمنصة {{platform}}",
-      "offDescription": "فعّلها في إعدادات المؤسسة على الويب لتسجّل المراجعات المكتملة.",
-      "couldNotLoad": "تعذّر تحميل التحليلات"
+      "offDescription": "يمكن لأصحاب أدوار الفوترة في المؤسسة تفعيل التحليلات في إعدادات المؤسسة على الويب لتسجّل المراجعات المكتملة.",
+      "couldNotLoad": "تعذّر تحميل التحليلات",
+      "trackedReviewsCaption": "المراجعات المكتملة التي انتهت خلال هذه الفترة والتحليلات مفعّلة. لا تُحتسب المراجعات الجارية والفاشلة أبدًا.",
+      "trackedReviewsUncounted": "غير محتسبة: {{displayCount}} من أصل {{displayTotal}} من المراجعات المكتملة لدى المؤسسة لم تُحسب نتيجتها.",
+      "trackedReviewsUncounted_few": "غير محتسبة: {{displayCount}} من أصل {{displayTotal}} من المراجعات المكتملة لدى المؤسسة لم تُحسب نتيجتها.",
+      "trackedReviewsUncounted_many": "غير محتسبة: {{displayCount}} من أصل {{displayTotal}} من المراجعات المكتملة لدى المؤسسة لم تُحسب نتيجتها.",
+      "trackedReviewsUncounted_one": "غير محتسبة: {{displayCount}} من أصل {{displayTotal}} من المراجعات المكتملة لدى المؤسسة لم تُحسب نتيجتها.",
+      "trackedReviewsUncounted_other": "غير محتسبة: {{displayCount}} من أصل {{displayTotal}} من المراجعات المكتملة لدى المؤسسة لم تُحسب نتيجتها.",
+      "trackedReviewsUncounted_two": "غير محتسبة: {{displayCount}} من أصل {{displayTotal}} من المراجعات المكتملة لدى المؤسسة لم تُحسب نتيجتها.",
+      "trackedReviewsUncounted_zero": "غير محتسبة: {{displayCount}} من أصل {{displayTotal}} من المراجعات المكتملة لدى المؤسسة لم تُحسب نتيجتها."
     },
     "council": {
       "title": "مراجعة المجلس",

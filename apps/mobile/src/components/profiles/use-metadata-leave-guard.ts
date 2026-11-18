@@ -5,10 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { isLeaveAction } from '@/lib/navigation/leave-actions';
 import { clearAcceptedBack } from '@/lib/navigation/leave-settle';
-import {
-  useNavigationFocusRead,
-  useNavigationQueueSettled,
-} from '@/lib/navigation/route-focus';
+import { useNavigationFocusRead, useNavigationQueueSettled } from '@/lib/navigation/route-focus';
 
 export type MetadataLeaveGuard = Readonly<{
   /** Wire this to the metadata form's `onDirtyChange`. */

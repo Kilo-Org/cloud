@@ -18,6 +18,15 @@ jest.mock('@/lib/auth/native-admission', () => ({
   requireAdmissionPayload: jest.fn(),
   verifyAdmissionAsync: jest.fn(),
 }));
+jest.mock('@sentry/nextjs', () => ({
+  captureMessage: jest.fn(),
+}));
+
+/**
+ * The admission aggregate flushes on wall-clock window boundaries, so refusal
+ * tests pin the clock and force a flush at a later instant.
+ */
+const now = jest.spyOn(Date, 'now');
 
 import { POST } from './route';
 import {
@@ -37,6 +46,7 @@ import {
   resetAdmissionCountersForTests,
 } from '@/lib/auth/native-admission';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { captureMessage } from '@sentry/nextjs';
 import type { User } from '@kilocode/db/schema';
 
 const mockGetUserFromBearer = jest.mocked(getUserFromBearerForCredentialExchange);
@@ -46,6 +56,7 @@ const mockCreateDeviceSessionWithAttestedKey = jest.mocked(createDeviceSessionWi
 const mockIssueSessionCredentials = jest.mocked(issueSessionCredentials);
 const mockRequireAdmissionPayload = jest.mocked(requireAdmissionPayload);
 const mockVerifyAdmissionAsync = jest.mocked(verifyAdmissionAsync);
+const mockCaptureMessage = jest.mocked(captureMessage);
 
 const fakeUser = { id: 'user-1', api_token_pepper: 'pepper' } as User;
 
@@ -76,6 +87,7 @@ describe('POST /api/auth/native/exchange', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    now.mockReturnValue(6_000_000);
     resetAdmissionCountersForTests();
     mockCreateDeviceSessionWithAttestedKey.mockReset();
     mockRequireAdmissionPayload.mockReturnValue({
@@ -252,10 +264,11 @@ describe('POST /api/auth/native/exchange', () => {
     expect(mockCreateDeviceSessionWithAttestedKey).not.toHaveBeenCalled();
     expect(mockCreateDeviceSession).not.toHaveBeenCalled();
     expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+    expect(mockCaptureMessage).toHaveBeenCalledWith('native_attested_key_ownership_mismatch');
     // The ownership mismatch is an expected refusal: it is counted.
-    jest.spyOn(Date, 'now').mockReturnValue(1_000_000);
-    countAdmissionCondition('native_admission_missing');
-    jest.spyOn(Date, 'now').mockReturnValue(1_061_000);
+    // The refusal lands in the pinned window; the next counted condition
+    // closes it with this refusal as one count on the metric's line.
+    now.mockReturnValue(6_121_000);
     countAdmissionCondition('native_admission_missing');
     expect(
       aggregateLines().filter(line => line.metric === 'native_admission_refused')

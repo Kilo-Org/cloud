@@ -6,7 +6,7 @@ import type { SecurityFindingAnalysis } from '@kilocode/db/schema-types';
 import { SecurityAuditLogActorType } from '@kilocode/db/schema-types';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { autoDismissEligibleFindings, countEligibleForAutoDismiss } from './auto-dismiss-service';
 
 const mockDismissDependabotAlert = jest.fn();
@@ -241,17 +241,37 @@ describe('auto-dismiss eligibility', () => {
   it('dismisses a backlog larger than one read page with real keyset paging', async () => {
     const user = await insertTestUser();
     await enableAutoDismissFor(user.id);
+    // Threshold 'high' makes the medium-confidence seeded row an in-page skip
+    // (the SQL candidate condition still fetches it), which makes a dropped id
+    // cursor observable as repeated skips.
+    await db
+      .update(agent_configs)
+      .set({ config: { auto_dismiss_enabled: true, auto_dismiss_confidence_threshold: 'high' } })
+      .where(
+        and(
+          eq(agent_configs.owned_by_user_id, user.id),
+          eq(agent_configs.agent_type, 'security_scan')
+        )
+      );
 
-    // One full read page plus a short tail proves the loop keeps advancing the
-    // id cursor instead of re-reading the same open candidates forever.
-    const total = 103;
-    await db.insert(security_findings).values(
-      Array.from({ length: total }, (_, index) =>
+    // 102 eligible rows span one full read page plus a tail. An ineligible
+    // finding inside the first page makes a dropped id cursor observable: a
+    // correct cursor skips it once, while a dropped cursor re-reads it (it is
+    // still open) on every page and the skip count grows.
+    const eligibleCount = 102;
+    await db.insert(security_findings).values([
+      ...Array.from({ length: eligibleCount }, (_, index) =>
         finding(user.id, `bulk-page-${String(index).padStart(3, '0')}`, {
           analysis: triageAnalysis({ confidence: 'high', needsSandboxReasoning: 'Unreachable' }),
         })
-      )
-    );
+      ),
+      finding(user.id, 'bulk-page-ineligible', {
+        // The SQL candidate condition keeps this row (suggestedAction is
+        // 'dismiss'); the configured confidence threshold rejects it inside
+        // the page. Its per-page re-reads make a dropped id cursor observable.
+        analysis: triageAnalysis({ confidence: 'medium' }),
+      }),
+    ]);
 
     await expect(
       autoDismissEligibleFindings(
@@ -263,21 +283,25 @@ describe('auto-dismiss eligibility', () => {
           name: 'Owner Example',
         }
       )
-    ).resolves.toEqual({ dismissed: total, skipped: 0, errors: 0 });
+    ).resolves.toEqual({ dismissed: eligibleCount, skipped: 1, errors: 0 });
 
     const statuses = await statusesBySourceId(user.id);
     const pageStatuses = Object.entries(statuses).filter(([sourceId]) =>
       sourceId.startsWith('bulk-page-')
     );
-    expect(pageStatuses).toHaveLength(total);
-    expect(pageStatuses.every(([, status]) => status === 'ignored')).toBe(true);
+    expect(pageStatuses).toHaveLength(eligibleCount + 1);
+    expect(
+      pageStatuses.every(([sourceId, status]) =>
+        sourceId === 'bulk-page-ineligible' ? status === 'open' : status === 'ignored'
+      )
+    ).toBe(true);
 
     await expect(countEligibleForAutoDismiss({ userId: user.id }, user.id)).resolves.toEqual({
-      eligible: 0,
-      byConfidence: { high: 0, medium: 0, low: 0 },
+      eligible: 1,
+      byConfidence: { high: 0, medium: 1, low: 0 },
     });
-    // The sweep stops when the final read page is short: a second run finds no
-    // remaining candidates.
+    // The sweep stops when the final read page is short: a second run dismisses
+    // nothing new and re-skips only the medium-confidence row.
     await expect(
       autoDismissEligibleFindings(
         { userId: user.id },
@@ -288,7 +312,7 @@ describe('auto-dismiss eligibility', () => {
           name: 'Owner Example',
         }
       )
-    ).resolves.toEqual({ dismissed: 0, skipped: 0, errors: 0 });
+    ).resolves.toEqual({ dismissed: 0, skipped: 1, errors: 0 });
     expect(mockDismissDependabotAlert).not.toHaveBeenCalled();
   });
 });

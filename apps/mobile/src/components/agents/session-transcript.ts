@@ -180,6 +180,10 @@ export function mergeSessionTranscript(
   // even warm reuse. Drop no-op completed attempts so "Environment prepared"
   // surfaces only for genuine cold starts. Running and failed attempts are
   // always kept: live progress may still arrive, and failures must stay visible.
+  //
+  // The server sends the newest attempts with the first history page, which
+  // holds only the latest turn. A completed attempt whose trigger message is not
+  // loaded therefore belongs to an older turn: see the trailing loop below.
   const visibleAttempts = preparationAttempts.filter(
     attempt => !isNoOpCompletedPreparationAttempt(attempt)
   );
@@ -221,8 +225,13 @@ export function mergeSessionTranscript(
       items.push(memoizedPreparationItem(attempt));
     }
   }
+  // An orphan attempt has no loaded row to sit under, so it trails the
+  // transcript. Only a running or failed one belongs there: live progress for a
+  // just-sent prompt and a failure that must stay visible. A completed orphan
+  // belongs to an older turn (the first page holds only the latest), and
+  // emitting it would stack stale completed rows below the newest reply.
   for (const attempt of visibleAttempts) {
-    if (!messageIds.has(attempt.triggerMessageId)) {
+    if (!messageIds.has(attempt.triggerMessageId) && attempt.status !== 'completed') {
       items.push(memoizedPreparationItem(attempt));
     }
   }

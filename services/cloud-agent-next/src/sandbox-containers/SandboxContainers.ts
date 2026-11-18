@@ -8,6 +8,7 @@ import { getBillingContext } from '@kilocode/container-usage';
 import { withTimeout } from '@kilocode/worker-utils';
 import { DurableObject } from 'cloudflare:workers';
 import { containerCapacityEnforced } from '../container-concurrency.js';
+import type { SandboxBillingAdmissionResult } from '../container-usage-context.js';
 import { billingHeartbeatSeconds } from '../container-usage.js';
 import { resolveControlPlaneTimers } from '../shared/control-plane-timers.js';
 import { logger } from '../logger.js';
@@ -799,12 +800,15 @@ export class SandboxContainers extends DurableObject<Env> {
     await billing.configureBilling(input);
   }
 
-  async ensureBillingAdmission(input: unknown, instance?: ContainerInstanceSize) {
+  async ensureBillingAdmission(
+    input: unknown,
+    instance?: ContainerInstanceSize
+  ): Promise<SandboxBillingAdmissionResult> {
     const prepared = await this.prepareBillingConfiguration(instance);
     if ('refusal' in prepared) {
       return {
-        success: false as const,
-        code: 'meter_unavailable' as const,
+        success: false,
+        code: 'meter_unavailable',
         message: prepared.refusal.message,
       };
     }

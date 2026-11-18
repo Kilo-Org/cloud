@@ -118,6 +118,7 @@ describe('authorizeGitHubRepository', () => {
       repository: 'acme/unreachable',
       actorLogin: 'octocat',
       fetchPermission,
+      retryDelayMs: 0,
     });
 
     expect(result.allowed).toBe(false);

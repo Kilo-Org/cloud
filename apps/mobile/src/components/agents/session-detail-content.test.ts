@@ -300,6 +300,7 @@ vi.mock('@/components/agents/session-follow-button', () => ({ SessionFollowButto
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 vi.mock('@/components/ui/icons', () => ({
   AlertCircle: 'AlertCircle',
+  ArrowLeft: 'ArrowLeft',
   Bot: 'Bot',
   ChevronDown: 'ChevronDown',
   ChevronUp: 'ChevronUp',
@@ -330,10 +331,33 @@ vi.mock('@/components/empty-state', () => ({
   StateAction: 'StateAction',
 }));
 // The state's action slot is what these tests press, so the stub forwards it
-// the way the shared state renders it.
-vi.mock('@/components/query-error', () => ({
-  QueryError: ({ action }: { action?: ReactNode }) => action ?? null,
-}));
+// the way the shared state renders it: an explicit `action` wins, and a bare
+// `onRetry` becomes the retry `StateAction` the real card builds. `vi.mock`
+// hoists this factory above the file's imports, so it loads React and the
+// catalogs itself instead of closing over them.
+vi.mock('@/components/query-error', async () => {
+  const react = await import('react');
+  const catalogs = await import('@/i18n');
+  return {
+    QueryError: ({
+      action,
+      onRetry,
+      isRetrying,
+    }: {
+      action?: ReactNode;
+      onRetry?: () => void;
+      isRetrying?: boolean;
+    }) =>
+      action ??
+      (onRetry
+        ? react.createElement('StateAction', {
+            label: catalogs.i18n.t('common.retry'),
+            loading: isRetrying,
+            onPress: onRetry,
+          })
+        : null),
+  };
+});
 vi.mock('@/components/rename-modal', () => ({ RenameModal: 'RenameModal' }));
 // The goal-removal confirm renders through this surface; the stub keeps the
 // destructive variant out of this suite's react-native stub while still letting

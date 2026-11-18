@@ -112,7 +112,8 @@ export function OptionList<T extends string, TSaveResult>({
                 variant="outline"
                 size="sm"
                 className={cn(STATE_ACTION_CLASS, 'mt-3 self-start')}
-                loading={retryInFlight}
+                disabled={retryInFlight}
+                accessibilityState={{ busy: retryInFlight }}
                 accessibilityLabel={t('common.retry')}
                 onPress={() => {
                   void handleSelect(failure.option);

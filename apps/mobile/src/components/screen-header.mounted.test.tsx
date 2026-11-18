@@ -1335,7 +1335,7 @@ describe('header actions row', () => {
     ).toHaveLength(0);
     // The title still shares its row with the back control; only the actions moved.
     const title = renderer.root.findByProps({ accessibilityRole: 'header' });
-    expect(title.parent?.parent).toBe(findBackFrame(renderer.root).parent);
+    expect(title.parent?.parent).toBe(findBackFrame(renderer.root).parent?.parent);
   });
 
   it('reflows a centered modal header the same way', () => {

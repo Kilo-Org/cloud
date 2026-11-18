@@ -57,6 +57,7 @@ const focusEffect = vi.hoisted(() => vi.fn());
 vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
+  ActivityIndicator: 'ActivityIndicator',
   I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
   // The header reads the window to decide whether its actions share the title

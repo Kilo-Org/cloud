@@ -219,6 +219,11 @@ function Button({
   ...props
 }: ButtonProps) {
   const colors = useThemeColors();
+  // The announced busy state: `loading` wins when it is set, otherwise the
+  // caller's own declaration stands (a control that spins its own glyph opts
+  // out of the loading layout). Busyness alone does not refuse input — the
+  // caller that owns the request decides that, as `StateAction` does.
+  const busy = loading ?? accessibilityState?.busy;
   const isDisabled = Boolean(disabled) || Boolean(loading);
   const isPrimary = (variant ?? 'default') === 'default';
   // A default-variant fill is a saturated brand colour with a contrasting ink
@@ -228,13 +233,18 @@ function Button({
   // A disabled (not busy) primary instead takes a muted fill that still
   // contrasts with the ink label, so the label stays legible. A busy primary
   // keeps the brand fill and its spinner so it still reads as working.
-  const isMutedDisabled = isDisabled && !loading && isPrimary;
+  //
+  // A control that announces busy keeps that enabled face even when it also
+  // refuses presses: the spinner (or the caller's own busy glyph) is its state
+  // signal, and dimming it would read as unavailable instead of working.
+  const isFaceDisabled = isDisabled && busy !== true;
+  const isMutedDisabled = isFaceDisabled && !loading && isPrimary;
   // Dimming is a disabled signal, and a busy control has nothing visible to
   // signal with: the label is already transparent and the spinner sits alone in
   // the slot. Halving the control's opacity then halves the indicator too, which
   // leaves an icon-only button looking empty on a dark surface. Keep the busy
   // control at full strength in both themes.
-  const isDimmed = isDisabled && !isPrimary && !loading;
+  const isDimmed = isFaceDisabled && !isPrimary && !loading;
   // On Android, a node's accessible name is only rewritten while the incoming
   // state still carries `busy`. A loading button therefore keeps announcing its
   // busy state after the request settles unless its label prop holds a real
@@ -320,10 +330,7 @@ function Button({
         accessibilityState={{
           ...accessibilityState,
           disabled: isDisabled,
-          // A caller that shows its own busy response (for example an icon that
-          // spins while the same glyph stays drawn) declares `busy` without
-          // opting into the loading layout; `loading` still wins when it is set.
-          busy: loading ?? accessibilityState?.busy,
+          busy,
         }}
         hitSlop={hitSlop ?? (size === 'sm' ? COMPACT_BUTTON_HIT_SLOP : undefined)}
         {...props}

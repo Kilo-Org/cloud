@@ -206,8 +206,8 @@ type StateActionProps = {
  * `loading` is a busy state, not a different face of the control: the label and
  * its strength never change while the request runs, only the leading icon
  * becomes a spinner, so a retry stays readable as "the same action, working"
- * instead of collapsing to a ring. The button announces the wait and ignores
- * presses until it clears — the one place busyness admits a press.
+ * instead of collapsing to a ring. The button announces the wait, reports
+ * itself disabled, and refuses presses until it clears.
  */
 export function StateAction({
   label,
@@ -227,7 +227,7 @@ export function StateAction({
     <Button
       size="sm"
       className={STATE_ACTION_CLASS}
-      disabled={disabled}
+      disabled={Boolean(disabled) || busy}
       testID={testID}
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityHint={accessibilityHint}

@@ -101,6 +101,7 @@ vi.mock('react-native', () => ({
   Platform: mockedPlatform,
   Pressable: 'Pressable',
   View: 'View',
+  ActivityIndicator: 'ActivityIndicator',
   useColorScheme: () => 'light',
   useWindowDimensions: () => ({
     width: 411,

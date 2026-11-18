@@ -705,14 +705,14 @@ export function ScreenHeader({
       {eyebrowSlot ? (
         <View className="flex-row items-center gap-1">
           {backControlSpacer}
-          <View className="min-w-0 grow">{eyebrowSlot}</View>
+          <View className="min-w-0 flex-1">{eyebrowSlot}</View>
         </View>
       ) : null}
       {titleRow}
       {subtitleSlot ? (
         <View className="flex-row items-center gap-1">
           {backControlSpacer}
-          <View className="min-w-0 grow">{subtitleSlot}</View>
+          <View className="min-w-0 flex-1">{subtitleSlot}</View>
         </View>
       ) : null}
     </View>

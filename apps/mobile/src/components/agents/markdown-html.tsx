@@ -278,24 +278,27 @@ export type MarkdownHtmlSplit = {
  * The source text the splitter should segment, plus how it connects to the
  * previous publish. Without `snapshot` or `previous` the whole `value` is
  * segmented. With `snapshot` the value is the same source shape as that
- * snapshot's value. With `previous` and `appended` the value extends exactly
- * the previous publish's raw value by `appended`, so only that appended
- * region is folded through `previous.convert`. With `previous` and
- * `wholeConverted` the publish declined that reuse: `wholeConverted` is the
- * conversion of the whole raw value, and the previous snapshot still verifies
- * the head.
+ * snapshot's value. With `previous` the publish must say how the new source
+ * connects: `appended` extends the previous raw value by that region and only
+ * it is folded through `previous.convert`, or `wholeConverted` replaces the
+ * previous converted source with a conversion of the whole raw value while
+ * the previous snapshot still verifies the head. A publish that sets
+ * `previous` without either field would silently drop its `value`, so the
+ * union forbids it.
  *
  * The intersection keeps the discriminant open for call sites that build the
- * object in one expression; the function narrows with `'previous' in input`.
+ * object in one expression; the function narrows with `previous !== undefined`.
  */
-export type MarkdownHtmlIncrementalInput = {
-  value: string;
-} & Partial<{
-  previous: MarkdownHtmlIncrementalConverted;
-  appended: string;
-  snapshot: MarkdownHtmlSnapshot;
-  wholeConverted: string;
-}>;
+export type MarkdownHtmlIncrementalInput =
+  | { value: string; previous?: undefined; snapshot?: MarkdownHtmlSnapshot }
+  | ({
+      value: string;
+      previous: MarkdownHtmlIncrementalConverted;
+      snapshot?: undefined;
+    } & (
+      | { appended: string; wholeConverted?: undefined }
+      | { appended?: undefined; wholeConverted: string }
+    ));
 
 /**
  * What the previous publish turned into segments, kept so the next publish can
@@ -471,8 +474,7 @@ export function splitMarkdownHtmlIncremental(
     // converted source joined with the appended region's conversion; a
     // declined publish passes the whole converted value, which replaces the
     // previous source entirely.
-    const effective =
-      input.wholeConverted ?? previous.convert(input.appended ?? '', previous.tail.value);
+    const effective = input.wholeConverted ?? previous.convert(input.appended, previous.tail.value);
     return splitFromSnapshot(effective, previous.tail);
   }
   return splitFromSnapshot(input.value, input.snapshot);

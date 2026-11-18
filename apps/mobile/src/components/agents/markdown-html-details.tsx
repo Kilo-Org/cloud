@@ -21,14 +21,16 @@ import { cn } from '@/lib/utils';
 export const HtmlDetails: CustomBlockRenderer = function HtmlDetails({ tnode, style }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(tnode.attributes.open !== undefined);
-  const [expandedNode, setExpandedNode] = useState(tnode);
+  const [expandedOpen, setExpandedOpen] = useState(tnode.attributes.open !== undefined);
   // A streaming publish can swap the node while this component instance stays
-  // mounted, so the collapsed state must be re-read from the attribute that
-  // arrives with it. Both updates are unconditional in render, so React
-  // re-renders once with the new node and stops.
-  if (expandedNode !== tnode) {
-    setExpandedNode(tnode);
-    setExpanded(tnode.attributes.open !== undefined);
+  // mounted, and the `open` attribute can arrive in that later publish. The
+  // state re-reads the attribute only when its presence changes: a reader's
+  // own expansion of a details element without the attribute survives every
+  // publish of the same segment, because an absent `open` never resets state.
+  const open = tnode.attributes.open !== undefined;
+  if (expandedOpen !== open) {
+    setExpandedOpen(open);
+    setExpanded(open);
   }
   const summary = tnode.children.find(child => child.tagName === 'summary');
   const body = tnode.children.filter(child => child !== summary);

@@ -23,6 +23,25 @@ import { getPalette, type MarkdownPalette, type MarkdownVariant } from './markdo
 import { markdownHtmlSplitCache } from './markdown-parse-cache';
 
 /**
+ * The splitter input one publish passes: the extends-previous record's shape
+ * picks the reuse form, and a declined or absent record re-converts the whole
+ * value beside the previous snapshot so the head reuse still applies.
+ */
+function incrementalInput(
+  value: string,
+  record: TailRecord | null,
+  prior: MarkdownHtmlIncrementalConverted | undefined
+): MarkdownHtmlIncrementalInput {
+  if (record !== null && prior !== undefined && record.appended !== undefined) {
+    return { value, previous: prior, appended: record.appended };
+  }
+  if (record !== null && prior !== undefined && record.wholeConverted !== undefined) {
+    return { value, previous: prior, wholeConverted: record.wholeConverted };
+  }
+  return { value: convertHtmlToMarkdown(value), snapshot: prior?.tail };
+}
+
+/**
  * The offset where the raw value's final blank-line run begins, or null when
  * the value does not end with one. A blank line ends every open block: a
  * paragraph (including any inline tag it holds, which the conversion closed at
@@ -169,15 +188,7 @@ export function MarkdownText({
     // an inline tag the new end closes) falls back to converting the whole
     // value.
     const record = extendsPreviousRaw(value, prior);
-    const input: MarkdownHtmlIncrementalInput =
-      record !== null
-        ? {
-            value,
-            previous: prior,
-            appended: record.appended,
-            wholeConverted: record.wholeConverted,
-          }
-        : { value: convertHtmlToMarkdown(value), snapshot: prior?.tail };
+    const input = incrementalInput(value, record, prior);
     const result = splitMarkdownHtmlIncremental(input);
     markdownHtmlSplitCache.set(value, result);
     previousRef.current = {

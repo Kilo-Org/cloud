@@ -220,8 +220,11 @@ export function parseMarkdownHtml(value: string, masks: readonly MaskRange[]): H
       // Past the bound the element's tags are dropped and its content flows
       // inline into the parent, the same treatment an unclosed tag gets at
       // the end of a message, so nesting past the bound reads as the text it
-      // holds instead of the markup it names.
+      // holds instead of the markup it names. `pushText` above already
+      // emitted the text before the tag, so the copy starts at `end`, not at
+      // the stale `textStart`.
       if (open[3] !== '/' && !VOID_TAGS.has(name)) {
+        textStart = start;
         pushText(end);
         textStart = end;
       }

@@ -20,7 +20,11 @@ import { getSecurityAgentConfig } from '../db/security-config';
 import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
 import { dismissDependabotAlert } from '../github/dependabot-api';
 import type { Owner } from '@/lib/code-reviews/core';
-import type { SecurityFindingAnalysis, SecurityReviewOwner } from '../core/types';
+import type {
+  SecurityAgentConfig,
+  SecurityFindingAnalysis,
+  SecurityReviewOwner,
+} from '../core/types';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import {
   SecurityAuditLogAction,
@@ -47,6 +51,27 @@ type TriageConfidence = (typeof TRIAGE_CONFIDENCES)[number];
 
 function isTriageConfidence(value: unknown): value is TriageConfidence {
   return TRIAGE_CONFIDENCES.includes(value as TriageConfidence);
+}
+
+/**
+ * Whether a triage confidence level meets the configured auto-dismiss threshold.
+ * 'low' accepts every confidence, 'medium' rejects 'low', 'high' accepts only 'high'.
+ * An unknown threshold or confidence never meets the threshold.
+ */
+function meetsAutoDismissConfidenceThreshold(
+  threshold: SecurityAgentConfig['auto_dismiss_confidence_threshold'],
+  confidence: TriageConfidence
+): boolean {
+  switch (threshold) {
+    case 'low':
+      return true;
+    case 'medium':
+      return confidence !== 'low';
+    case 'high':
+      return confidence === 'high';
+    default:
+      return false;
+  }
 }
 
 /**
@@ -350,12 +375,7 @@ export async function maybeAutoDismissAnalysis(options: {
   if (triage?.needsSandboxAnalysis === false && triage.suggestedAction === 'dismiss') {
     const threshold = config.auto_dismiss_confidence_threshold ?? 'high';
 
-    const meetsThreshold =
-      threshold === 'low' ||
-      (threshold === 'medium' && triage.confidence !== 'low') ||
-      (threshold === 'high' && triage.confidence === 'high');
-
-    if (meetsThreshold) {
+    if (meetsAutoDismissConfidenceThreshold(threshold, triage.confidence)) {
       const dismissedFinding = await dismissFindingWithAuditEvent(findingId, {
         owner,
         reason: 'not_used',
@@ -454,11 +474,7 @@ export async function autoDismissEligibleFindings(
           return;
         }
 
-        if (threshold === 'high' && triage.confidence !== 'high') {
-          skipped++;
-          return;
-        }
-        if (threshold === 'medium' && triage.confidence === 'low') {
+        if (!meetsAutoDismissConfidenceThreshold(threshold, triage.confidence)) {
           skipped++;
           return;
         }

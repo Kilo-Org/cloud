@@ -341,7 +341,7 @@ async function reportLogSourceFilter(
     }
     if (stats.dismissed > 0) {
       log(
-        `design-gate: closed ${stats.dismissed} styling-engine not-yet-mounted log(s) painted before the filter installed`
+        `design-gate: closed ${stats.dismissed} styling-engine not-yet-mounted toast(s) LogBox was holding`
       );
     }
     if (stats.suppressed > 0) {
@@ -382,7 +382,7 @@ export function screenFindings(args: {
     alignment === undefined || alignment.status === 'bracketed' ? args.image : undefined;
   const findings: Finding[] = [];
   if (args.sampled?.settled !== false) findings.push(...checkScreen(args.tree, image));
-  findings.push(...checkDevLogOverlay(args.tree));
+  findings.push(...checkDevLogOverlay(args.dump));
   if (alignment !== undefined && alignment.status !== 'bracketed') {
     findings.push({
       rule: 'capture-alignment',
@@ -651,6 +651,11 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
   // correct capture look like two different screens. A screen that never holds
   // still keeps its mismatch instead of becoming a pass.
   const waitForQuiet = async (): Promise<boolean> => {
+    try {
+      await ctx.probe.dismissEngineLogs?.();
+    } catch {
+      // The next readiness wait retries inside its own budget.
+    }
     const held = await waitForStableLayout(
       ctx.probe,
       ctx.clock,

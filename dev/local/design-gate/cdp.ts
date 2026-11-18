@@ -1,7 +1,11 @@
 import { setTimeout as delay } from 'node:timers/promises';
 
 import { InfraError } from './capture';
-import { logSourceFilterExpression, logSourceFilterStatsExpression } from './log-source-filter';
+import {
+  logSourceFilterDismissExpression,
+  logSourceFilterExpression,
+  logSourceFilterStatsExpression,
+} from './log-source-filter';
 import { scopeToFocusedRoute } from './route-scope';
 import { parseDump, type ProbeDump } from './tree';
 
@@ -81,6 +85,12 @@ export type ProbeClient = {
    * readiness wait installs it.
    */
   installLogSourceFilter?: () => Promise<void>;
+  /**
+   * Closes the engine's warnings LogBox holds now, after an install and before a
+   * capture, and answers how many it closed; 0 when the runtime holds no filter
+   * state yet.
+   */
+  dismissEngineLogs?: () => Promise<number>;
   /** The filter's counters, or `null` when no runtime ever installed it. */
   logSourceFilterStats?: () => Promise<{
     suppressed: number;
@@ -491,6 +501,10 @@ export function createProbeClient(options: ProbeClientOptions): ProbeClient {
     },
     installLogSourceFilter: async () => {
       await call(logSourceFilterExpression());
+    },
+    dismissEngineLogs: async () => {
+      const closed = await call(logSourceFilterDismissExpression());
+      return typeof closed === 'number' ? closed : 0;
     },
     logSourceFilterStats: async () => {
       const stats = record(await call(logSourceFilterStatsExpression()));

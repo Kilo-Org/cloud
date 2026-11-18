@@ -98,7 +98,10 @@ export function TriggerForm({
   const [repositoryPickerOpen, setRepositoryPickerOpen] = useState(false);
   const [agentSheet, setAgentSheet] = useState<TriggerAgentSheet>(null);
   return (
-    <View className="gap-6">
+    // One 16dp row gap for every field break, inside the sections and between
+    // them; the hairlines' -my-2 keeps their 0.5dp line from doubling the
+    // section break to 48.5dp.
+    <View className="gap-4">
       <TriggerFormBasics
         mode={mode}
         organizationId={organizationId}
@@ -108,7 +111,7 @@ export function TriggerForm({
         repositoryPickerOpen={repositoryPickerOpen}
         onRepositoryPickerOpenChange={setRepositoryPickerOpen}
       />
-      <View className="h-[0.5px] bg-hair-soft" />
+      <View className="-my-2 h-[0.5px] bg-hair-soft" />
       <TriggerFormAgent
         organizationId={organizationId}
         draft={draft}
@@ -117,7 +120,7 @@ export function TriggerForm({
         openSheet={agentSheet}
         onOpenSheetChange={setAgentSheet}
       />
-      <View className="h-[0.5px] bg-hair-soft" />
+      <View className="-my-2 h-[0.5px] bg-hair-soft" />
       <TriggerFormBehaviour
         mode={mode}
         organizationId={organizationId}

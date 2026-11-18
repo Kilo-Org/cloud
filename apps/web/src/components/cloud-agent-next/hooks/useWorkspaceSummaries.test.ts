@@ -260,6 +260,7 @@ it('restarts closed tab paging without a cursor after CONFLICT and uses the fres
   const worktreeId = cloudAgentWorktreeIdSchema.parse(workspace.worktreeId);
   const closedInput = { organizationId: null, worktreeId, tabState: 'closed', limit: 20 };
   const oldChat = { ...workspaceChatFixture({ sessionId: 'ses_old' }), tabClosed: true };
+  const olderChat = { ...workspaceChatFixture({ sessionId: 'ses_older' }), tabClosed: true };
   const newestChat = { ...workspaceChatFixture({ sessionId: 'ses_newest' }), tabClosed: true };
   const staleCursor = {
     createdAt: oldChat.createdAt,
@@ -271,6 +272,8 @@ it('restarts closed tab paging without a cursor after CONFLICT and uses the fres
     sessionId: newestChat.sessionId,
     tabOrderVersion: 'b'.repeat(32),
   };
+  const staleThirdPageCursor = { ...staleCursor, sessionId: olderChat.sessionId };
+  const freshThirdPageCursor = { ...freshCursor, sessionId: oldChat.sessionId };
   const conflict = TRPCClientError.from({
     error: {
       message: 'Workspace tabs changed',
@@ -281,9 +284,11 @@ it('restarts closed tab paging without a cursor after CONFLICT and uses the fres
   mockChats
     .mockResolvedValueOnce({ chats: [], nextCursor: null })
     .mockResolvedValueOnce({ chats: [oldChat], nextCursor: staleCursor })
+    .mockResolvedValueOnce({ chats: [olderChat], nextCursor: staleThirdPageCursor })
     .mockRejectedValueOnce(conflict)
     .mockResolvedValueOnce({ chats: [newestChat], nextCursor: freshCursor })
-    .mockResolvedValueOnce({ chats: [oldChat], nextCursor: null });
+    .mockResolvedValueOnce({ chats: [oldChat], nextCursor: freshThirdPageCursor })
+    .mockResolvedValueOnce({ chats: [olderChat], nextCursor: null });
 
   let result: ReturnType<typeof useWorkspaceChats> | undefined;
   const cleanup = await mount(client, function Probe() {
@@ -304,19 +309,29 @@ it('restarts closed tab paging without a cursor after CONFLICT and uses the fres
     await act(async () => result?.closedPages.loadMore());
     await settle();
     expect(mockChats).toHaveBeenNthCalledWith(3, { ...closedInput, cursor: staleCursor });
+    expect(result?.closedChats.map(chat => chat.sessionId)).toEqual(['ses_old', 'ses_older']);
+
+    await act(async () => result?.closedPages.loadMore());
+    await settle();
+    expect(mockChats).toHaveBeenNthCalledWith(4, { ...closedInput, cursor: staleThirdPageCursor });
     expect(result?.closedPages.error).toBe(true);
 
     await act(async () => result?.closedPages.loadMore());
     await settle();
-    expect(mockChats).toHaveBeenNthCalledWith(4, { ...closedInput, cursor: undefined });
+    expect(mockChats).toHaveBeenNthCalledWith(5, { ...closedInput, cursor: undefined });
+    expect(mockChats).toHaveBeenNthCalledWith(6, { ...closedInput, cursor: freshCursor });
     expect(result?.closedPages.error).toBe(false);
-    expect(result?.closedChats.map(chat => chat.sessionId)).toEqual(['ses_newest']);
+    expect(result?.closedChats.map(chat => chat.sessionId)).toEqual(['ses_newest', 'ses_old']);
 
     await act(async () => result?.closedPages.loadMore());
     await settle();
-    expect(mockChats).toHaveBeenNthCalledWith(5, { ...closedInput, cursor: freshCursor });
-    expect(mockChats).toHaveBeenCalledTimes(5);
-    expect(result?.closedChats.map(chat => chat.sessionId)).toEqual(['ses_newest', 'ses_old']);
+    expect(mockChats).toHaveBeenNthCalledWith(7, { ...closedInput, cursor: freshThirdPageCursor });
+    expect(mockChats).toHaveBeenCalledTimes(7);
+    expect(result?.closedChats.map(chat => chat.sessionId)).toEqual([
+      'ses_newest',
+      'ses_old',
+      'ses_older',
+    ]);
     expect(result?.closedPages.hasMore).toBe(false);
   } finally {
     await cleanup();

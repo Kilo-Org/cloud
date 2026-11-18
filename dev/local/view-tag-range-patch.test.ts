@@ -5,7 +5,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 // React's renderer ships as a compiled bundle with the view-tag counter inline,
-// so the app cannot seed it from its own code. `patches/react-native@0.88.0.patch`
+// so the app cannot seed it from its own code. `patches/react-native@0.88.1.patch`
 // makes every JavaScript instance start that counter from the range it claims
 // (apps/mobile/src/lib/view-tag-range.ts). A dependency bump that renames the
 // counter would still apply the patch elsewhere and silently restore the shared

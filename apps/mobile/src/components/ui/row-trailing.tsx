@@ -8,24 +8,27 @@ import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import {
   COMPACT_CONTROL_BOX_CLASS,
-  COMPACT_CONTROL_BOX_DP,
   COMPACT_CONTROL_HIT_SLOP,
   textActionTargetClass,
+  TOUCH_TARGET_OVERHANG_DP,
 } from '@/lib/a11y/tap-target';
 import { selectionHaptic } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
 
 /**
- * The box a row's `Switch` paints. The native control carries `TOUCH_TARGET_DP`
- * as its own `minHeight` (see `switch.tsx`), so hosting it made the control, not
- * `ROW_FRAME_CLASS`, set the row's height: a one-line switch row measured 65.1pt
- * beside the 54.1pt of a two-line chevron row in the 2026-11-18 gate dump. The
- * row hands the switch the shared compact box instead, and `hitSlop` carries its
- * touch region to 48pt without growing the row.
+ * The vertical margin a row's `Switch` cancels. The native control keeps
+ * `TOUCH_TARGET_DP` on its own node (see `switch.tsx`), because a control-size
+ * audit reads that node's rect and `hitSlop` does not lift a smaller box.
+ * Hosting it without this margin made the control, not `ROW_FRAME_CLASS`, set
+ * the row's height: a one-line switch row measured 65.1pt beside the 54.1pt of
+ * a two-line chevron row in the 2026-11-18 gate dump. The negative margin is
+ * `(TOUCH_TARGET_DP - COMPACT_CONTROL_BOX_DP) / 2` a side, so the node
+ * contributes the compact box to layout and overlaps the row's own 10.5pt
+ * vertical padding, which keeps every touch inside the row's bounds (Android
+ * drops a touch outside a parent view).
  */
 const SWITCH_BOX_STYLE = {
-  minHeight: COMPACT_CONTROL_BOX_DP,
-  minWidth: COMPACT_CONTROL_BOX_DP,
+  marginVertical: -TOUCH_TARGET_OVERHANG_DP,
 } as const;
 
 /**
@@ -104,7 +107,6 @@ export function renderRowTrailing(trailing: RowTrailingSpec | undefined): ReactN
         thumbColor: trailing.thumbColor,
         trackColor: trailing.trackColor,
         style: SWITCH_BOX_STYLE,
-        hitSlop: COMPACT_CONTROL_HIT_SLOP,
       };
       return <Switch {...props} />;
     }

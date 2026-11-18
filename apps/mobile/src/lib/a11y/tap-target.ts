@@ -193,6 +193,18 @@ export const COMPACT_CONTROL_BOX_CLASS = 'h-[32px] w-[32px] items-center justify
 export const COMPACT_CONTROL_BOX_DP = 32;
 
 /**
+ * The vertical margin a full {@link TOUCH_TARGET_DP} control cancels per side
+ * when it is hosted in a {@link COMPACT_CONTROL_BOX_DP} row:
+ * `(44 - 32) / 2 = 6`. A control-size audit reads the control's own node rect,
+ * so `hitSlop` cannot lift a compact box and the node itself must render the
+ * target; the negative margin then keeps the node from setting the row's
+ * height, contributing the compact box instead. A row must pad by at least this
+ * much vertically (`ROW_FRAME_CLASS` pads 10.5) so the overhang stays inside the
+ * row's bounds, because Android drops a touch outside a parent view.
+ */
+export const TOUCH_TARGET_OVERHANG_DP = (TOUCH_TARGET_DP - COMPACT_CONTROL_BOX_DP) / 2;
+
+/**
  * Per-side `hitSlop` for {@link COMPACT_CONTROL_BOX_CLASS}, so the touch region
  * is 32 + 16 = 48pt. 48, not 44: Android lays a target out in whole physical
  * pixels, and a 44dp box at density 420 measured 43.81dp in the run behind

@@ -68,10 +68,15 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
  * The control draws at the platform's own size — about 46.5x27dp on Android,
  * 51x31pt on iOS — which is under `DESIGN.md:364`'s 44pt touch target, and the
  * audit reads the control's own node rect, so a caller's row or `hitSlop` does
- * not lift it. Every caller gets the target here instead: the node renders at
- * least {@link TOUCH_TARGET_DP} on both axes and a caller's `style` is applied
- * last, so a row grows to the control it hosts rather than the control
- * shrinking to the row.
+ * not lift it. Every caller gets the target here: the node renders at least
+ * {@link TOUCH_TARGET_DP} on both axes, and a caller never shrinks it with a
+ * smaller `style` box. A row that must keep its compact height cancels the
+ * excess instead: a negative vertical margin of
+ * {@link TOUCH_TARGET_OVERHANG_DP} a side makes the node contribute a
+ * {@link COMPACT_CONTROL_BOX_DP} box to layout, and the row's own vertical
+ * padding of at least that margin keeps the node inside the row's bounds
+ * (Android delivers a touch only inside a parent view). `row-trailing.tsx`
+ * holds the one switch host that does this.
  */
 export function Switch({
   disabled,

@@ -261,9 +261,7 @@ export function PasskeysScreen() {
       />
       {hoistedState ? (
         <>
-          {bodyNotice === null ? null : (
-            <View className={SCREEN_GUTTER_CLASS}>{bodyNotice}</View>
-          )}
+          {bodyNotice === null ? null : <View className={SCREEN_GUTTER_CLASS}>{bodyNotice}</View>}
           {body}
         </>
       ) : (

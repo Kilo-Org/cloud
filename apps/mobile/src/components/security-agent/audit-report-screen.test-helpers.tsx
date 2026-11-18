@@ -27,7 +27,7 @@ const hoisted = vi.hoisted(() => ({
 
 export const personalQueryOptions = hoisted.personalQueryOptions;
 export const orgQueryOptions = hoisted.orgQueryOptions;
-export const useQuery = hoisted.useQuery;
+const useQuery = hoisted.useQuery;
 
 vi.mock('react-native', () => ({
   View: 'View',
@@ -55,7 +55,7 @@ vi.mock('@/lib/format', () => ({
   formatNumber: String,
 }));
 vi.mock('@/lib/utils', () => ({
-  capitalize: (value: string) => value.charAt(0).toUpperCase() + value.slice(1),
+  capitalize: (value: string) => value.charAt(0).toLocaleUpperCase() + value.slice(1),
   cn: (...values: unknown[]) => values.filter(Boolean).join(' '),
   parseTimestamp: (value: unknown) => value,
 }));
@@ -178,7 +178,7 @@ export function findByType(root: I, type: string): I[] {
   return root.findAll(n => typeof n.type === 'string' && (n.type as string) === type);
 }
 
-export function isInstance(child: I | string): child is I {
+function isInstance(child: I | string): child is I {
   return typeof child !== 'string';
 }
 

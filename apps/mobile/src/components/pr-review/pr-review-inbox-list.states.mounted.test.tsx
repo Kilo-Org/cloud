@@ -4,7 +4,7 @@
 
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { inboxState, insetsState, makeItem, mountInboxList } from './pr-review-inbox-list.test-helpers';
+import { inboxState, insetsState, mountInboxList } from './pr-review-inbox-list.test-helpers';
 
 describe('PrReviewInboxList states', () => {
   beforeEach(() => {

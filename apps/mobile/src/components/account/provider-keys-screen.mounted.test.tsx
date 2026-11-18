@@ -94,8 +94,11 @@ vi.mock('@/components/ui/icons', () => ({ KeyRound: 'KeyRound', Plus: 'Plus' }))
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/icon-button', () => ({
-  IconButton: (props: { accessibilityLabel?: string; onPress?: () => void; children?: ReactNode }) =>
-    createElement('IconButton', props, props.children),
+  IconButton: (props: {
+    accessibilityLabel?: string;
+    onPress?: () => void;
+    children?: ReactNode;
+  }) => createElement('IconButton', props, props.children),
 }));
 vi.mock('@/components/ui/switch', () => ({ Switch: 'Switch' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));

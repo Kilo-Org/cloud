@@ -408,7 +408,7 @@ describe('HomeScreen composition', () => {
       state.live.terminalError = failure;
       await renderHome();
       expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: 'org-1', enabled: true });
-      expect(text()).toContain("Could not load active sessions");
+      expect(text()).toContain('Could not load active sessions');
       expect(typeof action('Retry').props.onPress).toBe('function');
       expect(hasLoadedCard()).toBe(retained);
       expect(nodes('NewTaskButton')).toHaveLength(1);
@@ -474,7 +474,7 @@ describe('Home live presentation', () => {
       ).toBe(false);
     }
     expect(text().includes('Nothing running right now')).toBe(Boolean(test.empty));
-    expect(text().includes("Could not load active sessions")).toBe(Boolean(test.error));
+    expect(text().includes('Could not load active sessions')).toBe(Boolean(test.error));
     expect(text().includes('Updating')).toBe(Boolean(test.updating));
     expect(text().includes('Loading…')).toBe(Boolean(test.skeleton));
     expect(hasLoadedCard()).toBe(Boolean(test.rows));
@@ -577,16 +577,16 @@ describe('Home live presentation', () => {
     expect(action('Retry').props.disabled).toBe(true);
     expect(action('Retry').props.accessibilityState).toMatchObject({ busy: true, disabled: true });
     expect(state.refetch).toHaveBeenCalledTimes(1);
-    expect(text()).toContain("Could not load active sessions");
+    expect(text()).toContain('Could not load active sessions');
     await act(async () => {
       pending.resolve(false);
       await pending.promise;
     });
     expect(action('Retry').props.disabled).toBe(false);
-    expect(text()).toContain("Could not load active sessions");
+    expect(text()).toContain('Could not load active sessions');
     expect(newestTitleNode()).toBe(original);
     expect(
-      state.announcements.filter(message => message === "Could not load active sessions")
+      state.announcements.filter(message => message === 'Could not load active sessions')
     ).toHaveLength(1);
     expect(state.announcements.filter(message => message === 'Connection lost')).toHaveLength(1);
 
@@ -601,7 +601,7 @@ describe('Home live presentation', () => {
       await Promise.resolve();
     });
     await renderHome();
-    expect(text()).not.toContain("Could not load active sessions");
+    expect(text()).not.toContain('Could not load active sessions');
     expect(text()).toContain('Connection lost');
 
     state.socketRetry.mockImplementation(() => {

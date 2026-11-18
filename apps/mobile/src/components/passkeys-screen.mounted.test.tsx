@@ -90,7 +90,8 @@ describe('PasskeysScreen', () => {
     const header = first(view, 'ScreenHeader');
     expect(
       header.findAll(
-        node => String(node.type) === 'Pressable' && node.props.accessibilityLabel === 'Add a passkey'
+        node =>
+          String(node.type) === 'Pressable' && node.props.accessibilityLabel === 'Add a passkey'
       )
     ).toHaveLength(1);
     const addInsideScroll = first(view, 'ScrollView').findAll(

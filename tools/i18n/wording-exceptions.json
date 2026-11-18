@@ -11,14 +11,7 @@
     "starting",
     "token"
   ],
-  "am": [
-    "github connection expired",
-    "log only",
-    "none",
-    "off",
-    "open",
-    "open pull request"
-  ],
+  "am": ["github connection expired", "log only", "none", "off", "open", "open pull request"],
   "ar": [
     "admin",
     "commit",
@@ -573,14 +566,7 @@
     "superseded",
     "tokens"
   ],
-  "id": [
-    "disabled",
-    "enabled",
-    "log only",
-    "open",
-    "open pull request",
-    "remediation blocked"
-  ],
+  "id": ["disabled", "enabled", "log only", "open", "open pull request", "remediation blocked"],
   "ig": [
     "analysis failed",
     "billing manager",

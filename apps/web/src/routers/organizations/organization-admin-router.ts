@@ -273,6 +273,20 @@ const GrantCreditInputSchema = z
         path: ['description'],
       });
     }
+    // Negative grants and paid credits store no admin expiry, so their supplied
+    // expiry_date has no effect and is not validated here.
+    if (
+      data.amount_usd > 0 &&
+      data.creditKind !== 'paid' &&
+      data.expiry_date &&
+      new Date(data.expiry_date).getTime() <= Date.now()
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Expiry date must be in the future',
+        path: ['expiry_date'],
+      });
+    }
   });
 
 const GrantCreditOutputSchema = z.object({

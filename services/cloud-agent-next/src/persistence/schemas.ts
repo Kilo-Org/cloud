@@ -4,11 +4,13 @@ import {
   RuntimeSkillsSchema,
   RuntimeAgentsSchema,
   RuntimeBuiltinAgentsSchema,
+  RuntimeModelContextLimitsSchema,
   RuntimeKiloCommandsSchema,
   RuntimeInstructionsSchema,
 } from '../shared/runtime-profile.js';
 export * from '../shared/runtime-profile.js';
 import * as z from 'zod';
+import { webSearchProviderSchema } from '../shared/web-search-provider.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
 import { AgentVariantSchema, Limits } from '../schema.js';
 import { isValidSandboxId } from '../sandbox-id.js';
@@ -250,6 +252,9 @@ const SharedSessionProfileFields = {
   runtimeSkills: RuntimeSkillsSchema.optional(),
   runtimeAgents: RuntimeAgentsSchema.optional(),
   builtinAgents: RuntimeBuiltinAgentsSchema.optional(),
+  modelContextLimits: RuntimeModelContextLimitsSchema.optional(),
+  webSearchDisabled: z.literal(true).optional(),
+  webSearchProvider: webSearchProviderSchema.optional(),
 };
 
 export const SessionProfileBundleSchema = z.object({

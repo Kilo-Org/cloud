@@ -26,6 +26,7 @@
     "creditHistory": "Istorija kredita",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Otkaži",
     "done": "Gotovo",
     "retry": "Pokušaj ponovo",
@@ -482,7 +483,14 @@
       "viewReceipt": "Prikaži potvrdu"
     },
     "changelog": "Šta je novo",
-    "changelogVersionPending": "Beleške za ovu verziju stižu sa sledećim ažuriranjem."
+    "changelogVersionPending": "Beleške za verziju {{version}} stižu sa sledećim ažuriranjem aplikacije.",
+    "changelogGroupNew": "Novo",
+    "changelogFixesIn": "Ispravke i poboljšanja u sledećim oblastima: {{areas}}.",
+    "changelogFixesPolish": "Ispravke i poboljšanja u celoj aplikaciji.",
+    "changelogAreas": {
+      "signIn": "Prijavljivanje",
+      "profileOrganizations": "Profil i organizacije"
+    }
   },
   "preferences": {
     "general": "Opšte",
@@ -1492,13 +1500,25 @@
       "empty": "Još nema pregleda sa analitikom",
       "emptyDescription": "Analitika beleži završene preglede dok je uključena za organizaciju.",
       "offTitle": "Analitika je isključena za {{platform}}",
-      "offDescription": "Uključi je u podešavanjima organizacije na vebu da beleži završene preglede.",
-      "couldNotLoad": "Nije moguće učitati analitiku"
+      "offDescription": "Vlasnici, administratori i menadžeri naplate mogu da uključe analitiku u podešavanjima organizacije na vebu kako bi beležila završene preglede.",
+      "couldNotLoad": "Nije moguće učitati analitiku",
+      "trackedReviewsCaption": "Završeni pregledi koji su okončani u ovom periodu dok je analitika bila uključena. Pregledi u toku i neuspešni pregledi se nikada ne računaju.",
+      "trackedReviewsUncounted": "Nije uračunato: {{displayCount}} od {{displayTotal}} završenih pregleda koje organizacija ima, njihov rezultat nije bio sačuvan.",
+      "trackedReviewsUncounted_few": "Nije uračunato: {{displayCount}} od {{displayTotal}} završenih pregleda koje organizacija ima, njihov rezultat nije bio sačuvan.",
+      "trackedReviewsUncounted_one": "Nije uračunato: {{displayCount}} od {{displayTotal}} završenih pregleda koje organizacija ima, njihov rezultat nije bio sačuvan.",
+      "trackedReviewsUncounted_other": "Nije uračunato: {{displayCount}} od {{displayTotal}} završenih pregleda koje organizacija ima, njihov rezultat nije bio sačuvan."
     },
     "council": {
       "title": "Pregled veća",
       "subtitle": "Nekoliko stručnjaka pregleda svaki pull request, a njihovi glasovi se spajaju u jednu odluku.",
-      "unavailable": "Pregled veća nije dostupan za ovu organizaciju.",
+      "unavailablePersonallyTitle": "Potrebna je Enterprise organizacija",
+      "unavailablePersonally": "Pregled veća nije deo ličnog naloga.",
+      "unavailablePersonallyAction": "Napravi organizaciju",
+      "unavailablePersonallySwitchAction": "Promeni organizaciju",
+      "unavailableOrganizationTitle": "Pregled veća trenutno nije dostupan",
+      "unavailableForOrganization": "Pregled veća zahteva Enterprise plan sa aktivnom pretplatom ili probnim periodom. Ova organizacija ga trenutno ne poseduje.",
+      "unavailableForOrganizationNeutral": "Pregled veća trenutno nije dostupan za ovu organizaciju. Pokušajte ponovo kasnije.",
+      "unavailableOnBitbucket": "Pregled veća nije dostupan za Bitbucket repozitorijume.",
       "noRepositories": "Još nije izabran nijedan repozitorijum. Najpre izaberi repozitorijume u podešavanjima repozitorijuma.",
       "specialists": "Stručnjaci",
       "labels": "Oznake koje pokreću pregled veća",
@@ -3182,7 +3202,6 @@
     "completingPurchase": "Završavanje kupovine",
     "subscriptionLoading": "Učitavanje pretplate na Kilo Pass",
     "retryHint": "Ponovo učitava stanje pretplate na Kilo Pass.",
-    "cardAccessibility": "{{title}} — {{description}}. {{actionLabel}}",
     "endedOn": "Završeno {{date}}",
     "notAvailableInApp": "Kilo Pass nije dostupan u aplikaciji.",
     "statusActive": "Aktivan",
@@ -3530,6 +3549,7 @@
       "manageOnWeb": "Podešavanja naplate na vebu",
       "changePlan": "Promeni plan",
       "buySeats": "Kupi mesta",
+      "managedOnWeb": "Planom, mestima i automatskom dopunom se upravlja na vebu.",
       "setupAutoTopUp": "Podesi automatsku dopunu",
       "manageAutoTopUp": "Upravljaj automatskom dopunom",
       "opensOnWeb": "Otvara se na vebu"
@@ -3678,12 +3698,10 @@
       "requestLogs": "Dnevnici zahteva"
     },
     "requestLogs": {
-      "hint": "Zahtevi iz sata pre kraja intervala, počev od najnovijih.",
       "older": "Prethodni sat",
       "newer": "Sledeći sat",
       "truncated": "U ovom satu ima više zahteva nego što lista prikazuje.",
       "emptyTitle": "Nema zahteva",
-      "emptyDescription": "U ovom satu nema zahteva preko gateway-a.",
       "loadError": "Učitavanje dnevnika zahteva nije uspelo.",
       "permissionDenied": "Dnevnike zahteva organizacije mogu da čitaju samo njen vlasnik, administrator ili menadžer za naplatu.",
       "tokens": "{{input}} ulaz · {{output}} izlaz",
@@ -4496,8 +4514,7 @@
       "repoValue": "Spremište: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Ovaj profil više nije dostupan. Izaberi drugi.",
-      "pickerEmptyDescriptionOrganization": "Napravite profil organizacije da biste ponovo koristili promenljive okruženja, komande za podešavanje i veštine u svim sesijama.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Vlasnik ili administrator organizacije može da napravi profil organizacije."
+      "pickerEmptyDescriptionOrganization": "Napravite profil organizacije da biste ponovo koristili promenljive okruženja, komande za podešavanje i veštine u svim sesijama."
     },
     "variablesDeleteFailed": "Nije moguće izbrisati promenljivu",
     "deleteVariable": "Obriši promenljivu {{key}}",
@@ -4687,7 +4704,6 @@
     "dismiss": "Odbaci izveštaj",
     "offline": "Van mreže · sačuvan izveštaj",
     "cached": "Sačuvan izveštaj · osvežavanje nije dostupno",
-    "window": "{{start}} – {{end}}",
     "summary": "AI rezime",
     "summaryPending": "AI rezime je u izradi. Pojaviće se ovde kada bude spreman.",
     "summaryUnavailable": "AI rezime nije dostupan. Strukturisan izveštaj je i dalje dostupan.",
@@ -4806,6 +4822,7 @@
       "title": "Okidači i vebhukovi",
       "subtitle": "Automatizujte pokretanja Cloud Agent-a pomoću vebhuk poziva ili po rasporedu.",
       "new": "Novi okidač",
+      "create": "Napravite okidač",
       "emptyTitle": "Još nema okidača",
       "emptyDescription": "Napravite okidač da biste započeli pokretanje Cloud Agent-a preko vebhuk poziva ili po rasporedu.",
       "loadFailedTitle": "Učitavanje okidača nije uspelo",
@@ -4859,6 +4876,8 @@
       "created": "Okidač je napravljen",
       "saved": "Okidač je sačuvan",
       "statusArrived": "Stiglo",
+      "defaultPromptWebhook": "Opiši telo zahteva ovog vebhuka:\n\n{{body}}",
+      "defaultPromptScheduled": "Pokreni zakazani zadatak. Pokrenuto u {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Unesite naziv.",
         "nameTooShort": "Koristite najmanje 8 znakova.",
@@ -4907,6 +4926,7 @@
     "superseded": "Ovaj link je zamenjen na drugom mestu, pa više ne radi."
   },
   "sharedSession": {
+    "startedAt": "Započeto u {{time}}",
     "title": "Deljena sesija",
     "someone": "Neko",
     "sharedBy": "Podelio/la {{owner}}",
@@ -5065,6 +5085,8 @@
     "modelsDescription": "Isključite model da biste ga blokirali za svakog člana. Modeli dozvoljenih pružalaca su na početku uključeni.",
     "modelsDeniedOnly": "Samo zabranjeni",
     "modelsEmpty": "Nijedan model ne odgovara ovoj pretrazi.",
+    "modelsDeniedEmpty": "Nijedan model nije zabranjen.",
+    "modelsDeniedSearchEmpty": "Nijedan zabranjeni model ne odgovara ovoj pretrazi.",
     "providersDescription": "Isključite pružaoca da Kilo za ovu organizaciju prestane da usmerava na njega.",
     "providersNeedCatalog": "Prekidači pružalaca ostaju samo za čitanje dok se ne učita ceo katalog modela. Da biste ih menjali, dodirnite Pokušaj ponovo iznad.",
     "providersEmpty": "Nijedan pružalac ne odgovara ovoj pretrazi.",

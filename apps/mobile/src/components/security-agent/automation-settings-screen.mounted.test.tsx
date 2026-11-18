@@ -72,6 +72,9 @@ vi.mock('@/lib/hooks/use-settings-back-guard', () => ({
     dialog: null,
   }),
 }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => 'online',
+}));
 vi.mock('@/components/security-agent/settings-pill-group', () => ({
   PillGroup: (props: { label: string; accessibilityLabel?: string }) => {
     pillGroups.groups.push(props);

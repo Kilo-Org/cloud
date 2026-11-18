@@ -19,7 +19,25 @@ import {
   formatSystemEnvironment,
   getInitialInspectableTabId,
   getSelectedInspectableTabId,
+  runOwesTabLease,
 } from './agent-chat-panel';
+
+describe('turn-end tab lease release', () => {
+  it('releases the lease for the current run', () => {
+    expect(runOwesTabLease({ currentRunToken: 4, runToken: 4 })).toBe(true);
+  });
+
+  it('releases the lease for a run whose conversation was closed, deleted or stopped', () => {
+    // A closed turn has no run state left (abortConversationRun deleted it).
+    // It must still free the tab.
+    expect(runOwesTabLease({ currentRunToken: undefined, runToken: 4 })).toBe(true);
+  });
+
+  it('keeps the lease for a run a newer turn of the same conversation replaced', () => {
+    // Same caller key: the newer run releases it at its own turn end.
+    expect(runOwesTabLease({ currentRunToken: 5, runToken: 4 })).toBe(false);
+  });
+});
 
 describe('selected tab context formatting', () => {
   it('redacts URL query and hash data and escapes page-controlled title text', () => {

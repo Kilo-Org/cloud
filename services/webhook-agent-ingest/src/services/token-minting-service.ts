@@ -1,6 +1,7 @@
 import { signKiloToken } from '@kilocode/worker-utils';
 import { signModernKiloToken } from '@kilocode/worker-utils/kilo-token-policy';
 import { CLOUD_AGENT_NEXT_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { resolveRuntimeEnvironment } from '@kilocode/worker-utils/runtime-authorization-contract';
 import {
   getWorkerDb,
   findUserForToken,
@@ -36,6 +37,7 @@ type MintTokenResult = {
 const WEBHOOK_BOT_ID = 'webhook-bot';
 
 export class CreatorExecutionAuthorizationError extends Error {}
+export class PersonalExecutionAuthorizationError extends Error {}
 
 export function getTokenMintingService(env: TokenMintingEnv): TokenMintingService {
   return new TokenMintingService(env);
@@ -113,11 +115,11 @@ export class TokenMintingService {
       const user = await findUserForToken(db, params.userId);
 
       if (!user) {
-        throw new Error(`User not found: ${params.userId}`);
+        throw new PersonalExecutionAuthorizationError(`User not found: ${params.userId}`);
       }
 
       if (user.blocked_at || user.blocked_reason) {
-        throw new Error('User is blocked');
+        throw new PersonalExecutionAuthorizationError('User is blocked');
       }
 
       const token = await this.signToken({
@@ -198,7 +200,7 @@ export class TokenMintingService {
         pepper: payload.apiTokenPepper,
         secret: jwtSecret,
         expiresInSeconds: 60 * 60,
-        env: this.env.ENVIRONMENT === 'production' ? 'production' : 'development',
+        env: resolveRuntimeEnvironment(this.env.ENVIRONMENT),
         audience: CLOUD_AGENT_NEXT_AUDIENCE,
         tokenPurpose: 'internal-service',
         credentialExchange: false,
@@ -222,7 +224,7 @@ export class TokenMintingService {
       pepper: payload.apiTokenPepper,
       secret: jwtSecret,
       expiresInSeconds: 60 * 60,
-      env: this.env.ENVIRONMENT === 'production' ? 'production' : 'development',
+      env: resolveRuntimeEnvironment(this.env.ENVIRONMENT),
       extra: {
         botId: payload.botId,
         internalApiUse: payload.internalApiUse,

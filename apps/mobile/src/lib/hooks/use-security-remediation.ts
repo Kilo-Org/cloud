@@ -184,7 +184,7 @@ export function useCancelSecurityRemediation(scope: string) {
       ) {
         queryClient.setQueryData(context.analysisQueryKey, context.previous);
       }
-      toast.error(error.message);
+      toast.error(localizedSecurityMarkerMessage(error) ?? error.message);
     },
     onSuccess: result => {
       // 'cancellation_requested' means the attempt was already running and

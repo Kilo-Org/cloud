@@ -2,6 +2,8 @@ import { describe, expect, it } from '@jest/globals';
 import {
   getModelDisplayPricing,
   getPeakPricing,
+  getWorstCaseModelPricing,
+  getWorstCasePeakPricing,
   maxEndpointPricing,
   undoPricingDiscount,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/display-pricing';
@@ -75,6 +77,36 @@ describe('getModelDisplayPricing', () => {
   it('returns undefined when there is no pricing', () => {
     expect(getModelDisplayPricing(undefined)).toBeUndefined();
   });
+
+  it('ignores a long-context override', () => {
+    expect(
+      getModelDisplayPricing({
+        prompt: '0.000008',
+        completion: '0.00004',
+        overrides: [{ min_prompt_tokens: 272000, prompt: '0.000016', completion: '0.00006' }],
+      })
+    ).toEqual({ prompt: '0.000008', completion: '0.00004' });
+  });
+});
+
+describe('getWorstCaseModelPricing', () => {
+  const pricing = {
+    prompt: '0.000008',
+    completion: '0.00004',
+    discount: 0.5,
+    overrides: [{ min_prompt_tokens: 272000, prompt: '0.000016', completion: '0.00006' }],
+  };
+
+  it('includes the long-context override and undoes the discount', () => {
+    expect(getWorstCaseModelPricing(pricing)).toEqual({
+      prompt: '0.000032000000',
+      completion: '0.000120000000',
+    });
+  });
+
+  it('returns undefined when there is no pricing', () => {
+    expect(getWorstCaseModelPricing(undefined)).toBeUndefined();
+  });
 });
 
 describe('getPeakPricing', () => {
@@ -129,6 +161,70 @@ describe('getPeakPricing', () => {
   it('leaves pricing without time-of-day prices untouched', () => {
     const pricing = { prompt: '0.000001', completion: '0.000002' };
     expect(getPeakPricing(pricing)).toBe(pricing);
+  });
+
+  it('ignores long-context overrides but keeps time-of-day windows', () => {
+    expect(
+      getPeakPricing({
+        prompt: '0.000008',
+        completion: '0.00004',
+        overrides: [
+          { utc_start: 0, utc_end: 1400, prompt: '0.00001', completion: '0.00005' },
+          { utc_start: 1400, utc_end: 0, prompt: '0.000008', completion: '0.00004' },
+          { min_prompt_tokens: 272000, prompt: '0.000016', completion: '0.00006' },
+          {
+            utc_start: 0,
+            utc_end: 1400,
+            min_prompt_tokens: 272000,
+            prompt: '0.00002',
+            completion: '0.00008',
+          },
+        ],
+      })
+    ).toEqual({ prompt: '0.00001', completion: '0.00005' });
+  });
+
+  it('treats a zero prompt-token threshold as a time-of-day window', () => {
+    expect(
+      getPeakPricing({
+        prompt: '0.000001',
+        completion: '0.000002',
+        overrides: [{ min_prompt_tokens: 0, prompt: '0.000002', completion: '0.000004' }],
+      })
+    ).toEqual({ prompt: '0.000002', completion: '0.000004' });
+  });
+
+  it('applies the Vercel peak multiplier to the first-tier price only', () => {
+    const pricing = {
+      prompt: '0.000001',
+      completion: '0.000002',
+      prompt_tiers: [
+        { min: 0, price: '0.000001' },
+        { min: 200000, price: '0.000005' },
+      ],
+      peak_pricing: { multiplier: 2 },
+    };
+    expect(getPeakPricing(pricing)).toMatchObject({
+      prompt: '0.000002000000',
+      completion: '0.000004000000',
+    });
+  });
+
+  it('combines a long-context override with the Vercel multiplier only in the worst case', () => {
+    const pricing = {
+      prompt: '0.000001',
+      completion: '0.000002',
+      overrides: [{ min_prompt_tokens: 200000, prompt: '0.000003', completion: '0.000006' }],
+      peak_pricing: { multiplier: 2 },
+    };
+    expect(getPeakPricing(pricing)).toEqual({
+      prompt: '0.000002000000',
+      completion: '0.000004000000',
+    });
+    expect(getWorstCasePeakPricing(pricing)).toEqual({
+      prompt: '0.000006000000',
+      completion: '0.000012000000',
+    });
   });
 });
 

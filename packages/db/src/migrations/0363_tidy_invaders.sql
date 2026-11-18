@@ -1,1 +1,0 @@
-ALTER TABLE "organization_audit_logs" ADD COLUMN "details" jsonb;

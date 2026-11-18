@@ -23,7 +23,7 @@ import type * as Sentry from '@sentry/nextjs';
 import { captureException } from '@sentry/nextjs';
 import { describe, expect, it, beforeEach } from '@jest/globals';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
-import { blacklisted_domains, kilocode_users } from '@kilocode/db';
+import { blacklisted_domains, blacklisted_domains_settings, kilocode_users } from '@kilocode/db';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
 import { count, eq, inArray, sql } from 'drizzle-orm';
@@ -31,6 +31,8 @@ import { createCallerForUser } from '@/routers/test-utils';
 import { computeBlacklistStats } from '@/lib/abuse/blacklist-domain-stats';
 import { isDomainOnBlacklist } from './blacklist-domains-router';
 import { backfillBlockBlacklistedDomainsBatch } from '@/lib/abuse/block-blacklisted-domains';
+import { anonymizeCloudUserData } from '@/lib/user';
+import { createDeletionInProgressBlockedReason } from '@kilocode/db/user-soft-delete';
 import {
   BLACKLIST_DOMAINS_SETTINGS_REDIS_KEY,
   LEGACY_BLACKLIST_DOMAINS_REDIS_KEY,
@@ -56,6 +58,8 @@ const redisValues = new Map<string, string>();
 
 const saveFailureMessage =
   'Blacklist save failed. Reload the list before retrying; the signup TLDs may have been saved.';
+const preWriteFailureMessage =
+  'Blacklist save failed before the signup TLDs were saved. Reload the list before retrying.';
 const conflictMessage = 'Blacklist changed. Reload the complete list before saving.';
 const unusedVersion = '0'.repeat(64);
 
@@ -88,6 +92,15 @@ function storedSettings(): unknown {
   return JSON.parse(redisValues.get(BLACKLIST_DOMAINS_SETTINGS_REDIS_KEY) ?? 'null');
 }
 
+function settingsFields(settings: StoredSettings): StoredSettings {
+  return {
+    blocked_signup_tlds: settings.blocked_signup_tlds,
+    updated_at: settings.updated_at,
+    updated_by: settings.updated_by,
+    updated_by_email: settings.updated_by_email,
+  };
+}
+
 async function insertBlacklistedDomains(domains: string[]): Promise<void> {
   await db.insert(blacklisted_domains).values(domains.map(domain => ({ domain })));
 }
@@ -95,6 +108,14 @@ async function insertBlacklistedDomains(domains: string[]): Promise<void> {
 async function tableDomains(): Promise<string[]> {
   const rows = await db.select().from(blacklisted_domains).orderBy(blacklisted_domains.domain);
   return rows.map(row => row.domain);
+}
+
+async function tableSettings() {
+  const rows = await db.select().from(blacklisted_domains_settings);
+  return rows.map(({ updated_at, ...settings }) => ({
+    ...settings,
+    updated_at: new Date(updated_at).toISOString(),
+  }));
 }
 
 // Polls pg_locks until one transaction holds the blacklist lock and another waits for it.
@@ -109,6 +130,22 @@ async function waitForBlockedLock(waitingMode: 'ShareLock' | 'ExclusiveLock'): P
     const held = rows.some(row => row.mode === 'ExclusiveLock' && row.granted);
     const waiting = rows.some(row => row.mode === waitingMode && !row.granted);
     if (held && waiting) return true;
+  }
+  return false;
+}
+
+// Wait for a specific transaction to block or be blocked, without relying on timing alone.
+async function waitForTransactionLock(pid: number, role: 'blocker' | 'waiter'): Promise<boolean> {
+  const condition =
+    role === 'blocker'
+      ? sql`${pid} = ANY(pg_blocking_pids(pid))`
+      : sql`pid = ${pid} AND cardinality(pg_blocking_pids(pid)) > 0`;
+  const deadline = Date.now() + 5000;
+  while (Date.now() < deadline) {
+    const { rows } = await db.execute<{ blocked: boolean }>(sql`
+      SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE ${condition}) AS blocked
+    `);
+    if (rows[0]?.blocked) return true;
   }
   return false;
 }
@@ -613,6 +650,232 @@ describe('admin.blacklistDomains.set', () => {
     expect([...redisValues.keys()]).toEqual([BLACKLIST_DOMAINS_SETTINGS_REDIS_KEY]);
   });
 
+  it('mirrors normalized settings and editor metadata on repeated saves, including an empty list', async () => {
+    const caller = await createCallerForUser(admin.id);
+    const initial = await caller.admin.blacklistDomains.get();
+    expect(await tableSettings()).toEqual([]);
+
+    const first = await caller.admin.blacklistDomains.set({
+      domains: ['example.com'],
+      blocked_tlds: [' .ASIA ', 'shop', 'asia'],
+      expected_version: initial.version,
+    });
+    expect(first.blocked_signup_tlds).toEqual(['asia', 'shop']);
+    expect(await tableSettings()).toEqual([{ id: 1, ...settingsFields(first) }]);
+    expect(storedSettings()).toEqual(settingsFields(first));
+
+    const secondAdmin = await insertTestUser({
+      google_user_email: 'second-admin@admin.example.com',
+      is_admin: true,
+    });
+    const secondCaller = await createCallerForUser(secondAdmin.id);
+    const loaded = await secondCaller.admin.blacklistDomains.get();
+    const second = await secondCaller.admin.blacklistDomains.set({
+      domains: ['example.com'],
+      blocked_tlds: [],
+      expected_version: loaded.version,
+    });
+    expect(second.blocked_signup_tlds).toEqual([]);
+    expect(second.updated_by).toBe(secondAdmin.id);
+    expect(second.updated_by_email).toBe(secondAdmin.google_user_email);
+    expect(await tableSettings()).toEqual([{ id: 1, ...settingsFields(second) }]);
+    expect(storedSettings()).toEqual(settingsFields(second));
+
+    const afterEmpty = await secondCaller.admin.blacklistDomains.get();
+    const third = await secondCaller.admin.blacklistDomains.set({
+      domains: ['example.com'],
+      expected_version: afterEmpty.version,
+    });
+    expect(third.blocked_signup_tlds).toEqual([]);
+    expect(await tableSettings()).toEqual([{ id: 1, ...settingsFields(third) }]);
+    expect(storedSettings()).toEqual(settingsFields(third));
+  });
+
+  it('rejects a save after deletion wins the actor lock without restoring editor PII', async () => {
+    const previousRaw = storeSettings(previousSettings);
+    await insertBlacklistedDomains(['previous.example']);
+    await db.insert(blacklisted_domains_settings).values({
+      blocked_signup_tlds: ['asia'],
+      updated_at: '2026-01-01T00:00:00.000Z',
+      updated_by: admin.id,
+      updated_by_email: admin.google_user_email,
+    });
+    const caller = await createCallerForUser(admin.id);
+    const { version } = await caller.admin.blacklistDomains.get();
+    const deletionReady = Promise.withResolvers<number>();
+    const releaseDeletion = Promise.withResolvers<void>();
+    const deletion = db.transaction(async tx => {
+      const { rows } = await tx.execute<{ pid: number }>(sql`SELECT pg_backend_pid() AS pid`);
+      if (!rows[0]) throw new Error('Missing deletion transaction PID');
+      await anonymizeCloudUserData(tx, admin.id);
+      deletionReady.resolve(rows[0].pid);
+      await releaseDeletion.promise;
+    });
+    const operations: Promise<unknown>[] = [deletion];
+    try {
+      const deletionPid = await Promise.race([
+        deletionReady.promise,
+        deletion.then(() => {
+          throw new Error('Deletion finished without holding its transaction open');
+        }),
+      ]);
+      const save = caller.admin.blacklistDomains.set({
+        domains: ['new.example'],
+        blocked_tlds: [],
+        expected_version: version,
+      });
+      operations.push(save);
+      const saveResult = save.then(
+        () => null,
+        (error: unknown) => error
+      );
+      expect(await waitForTransactionLock(deletionPid, 'blocker')).toBe(true);
+      releaseDeletion.resolve();
+      await deletion;
+      expect(await saveResult).toMatchObject({
+        code: 'FORBIDDEN',
+        message: 'Blacklist editor account is deleted or being deleted.',
+      });
+
+      expect(await tableDomains()).toEqual(['previous.example']);
+      expect(await tableSettings()).toEqual([
+        {
+          id: 1,
+          blocked_signup_tlds: ['asia'],
+          updated_at: previousSettings.updated_at,
+          updated_by: null,
+          updated_by_email: null,
+        },
+      ]);
+      expect(redisValues.get(BLACKLIST_DOMAINS_SETTINGS_REDIS_KEY)).toBe(previousRaw);
+      expect(mockedRedisSet).not.toHaveBeenCalled();
+      expect(mockedRedisDel).not.toHaveBeenCalled();
+      expect(mockedBackfill).not.toHaveBeenCalled();
+    } finally {
+      releaseDeletion.resolve();
+      await Promise.allSettled(operations);
+    }
+  }, 30000);
+
+  it('reports an actor lock timeout before saving and allows a retry after the lock clears', async () => {
+    const previousRaw = storeSettings(previousSettings);
+    const caller = await createCallerForUser(admin.id);
+    const { version } = await caller.admin.blacklistDomains.get();
+    const lockReady = Promise.withResolvers<number>();
+    const releaseLock = Promise.withResolvers<void>();
+    const blocker = db.transaction(async tx => {
+      const { rows } = await tx.execute<{ pid: number }>(sql`SELECT pg_backend_pid() AS pid`);
+      if (!rows[0]) throw new Error('Missing blocking transaction PID');
+      await tx.select().from(kilocode_users).where(eq(kilocode_users.id, admin.id)).for('update');
+      lockReady.resolve(rows[0].pid);
+      await releaseLock.promise;
+    });
+    const operations: Promise<unknown>[] = [blocker];
+    try {
+      const blockerPid = await Promise.race([
+        lockReady.promise,
+        blocker.then(() => {
+          throw new Error('Blocker finished without holding the actor lock');
+        }),
+      ]);
+      const input = { domains: [], blocked_tlds: [], expected_version: version };
+      const save = caller.admin.blacklistDomains.set(input);
+      operations.push(save);
+      const failure = expect(save).rejects.toMatchObject({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: preWriteFailureMessage,
+      });
+      expect(await waitForTransactionLock(blockerPid, 'blocker')).toBe(true);
+      await failure;
+      expect(redisValues.get(BLACKLIST_DOMAINS_SETTINGS_REDIS_KEY)).toBe(previousRaw);
+      expect(await tableSettings()).toEqual([]);
+      expect(mockedRedisSet).not.toHaveBeenCalled();
+
+      releaseLock.resolve();
+      await blocker;
+      await expect(caller.admin.blacklistDomains.set(input)).resolves.toMatchObject({
+        blocked_signup_tlds: [],
+      });
+    } finally {
+      releaseLock.resolve();
+      await Promise.allSettled(operations);
+    }
+  }, 30000);
+
+  it('holds the actor lock until a winning save commits, then deletion scrubs its editor', async () => {
+    storeSettings(previousSettings);
+    const caller = await createCallerForUser(admin.id);
+    const { version } = await caller.admin.blacklistDomains.get();
+    const writingRedis = Promise.withResolvers<void>();
+    const releaseRedis = Promise.withResolvers<void>();
+    mockedRedisSet.mockImplementationOnce(async (key: string, value: unknown) => {
+      writingRedis.resolve();
+      await releaseRedis.promise;
+      redisValues.set(key, String(value));
+      return 'OK';
+    });
+    const save = caller.admin.blacklistDomains.set({
+      domains: [],
+      blocked_tlds: ['shop'],
+      expected_version: version,
+    });
+    const operations: Promise<unknown>[] = [save];
+    try {
+      await Promise.race([
+        writingRedis.promise,
+        save.then(() => {
+          throw new Error('Save finished without reaching Redis');
+        }),
+      ]);
+      const deletionStarted = Promise.withResolvers<number>();
+      const deletion = db.transaction(async tx => {
+        const { rows } = await tx.execute<{ pid: number }>(sql`SELECT pg_backend_pid() AS pid`);
+        if (!rows[0]) throw new Error('Missing deletion transaction PID');
+        deletionStarted.resolve(rows[0].pid);
+        await anonymizeCloudUserData(tx, admin.id);
+      });
+      operations.push(deletion);
+      const deletionPid = await Promise.race([
+        deletionStarted.promise,
+        deletion.then(() => {
+          throw new Error('Deletion finished without starting its transaction');
+        }),
+      ]);
+      expect(await waitForTransactionLock(deletionPid, 'waiter')).toBe(true);
+      releaseRedis.resolve();
+      const saved = await save;
+      await deletion;
+
+      expect(storedSettings()).toEqual(settingsFields(saved));
+      expect(await tableSettings()).toEqual([
+        { id: 1, ...settingsFields(saved), updated_by: null, updated_by_email: null },
+      ]);
+      expect(mockedRedisSet).toHaveBeenCalledTimes(1);
+    } finally {
+      releaseRedis.resolve();
+      await Promise.allSettled(operations);
+    }
+  }, 30000);
+
+  it('rejects a previously authorized editor whose deletion is in progress', async () => {
+    const caller = await createCallerForUser(admin.id);
+    const { version } = await caller.admin.blacklistDomains.get();
+    const legacyRaw = JSON.stringify(previousSettings);
+    storeLegacyBlob(legacyRaw);
+    await db
+      .update(kilocode_users)
+      .set({ blocked_reason: createDeletionInProgressBlockedReason() })
+      .where(eq(kilocode_users.id, admin.id));
+
+    await expect(
+      caller.admin.blacklistDomains.set({ domains: [], expected_version: version })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(await tableSettings()).toEqual([]);
+    expect(redisValues.has(BLACKLIST_DOMAINS_SETTINGS_REDIS_KEY)).toBe(false);
+    expect(redisValues.get(LEGACY_BLACKLIST_DOMAINS_REDIS_KEY)).toBe(legacyRaw);
+    expect(mockedRedisSet).not.toHaveBeenCalled();
+  });
+
   it('deletes both legacy keys with one DEL after the save commits', async () => {
     storeSettings(previousSettings);
     storeLegacyBlob(JSON.stringify(previousSettings));
@@ -814,7 +1077,7 @@ describe('admin.blacklistDomains.set', () => {
         domains: ['mailinator.com'],
         expected_version: unusedVersion,
       })
-    ).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR', message: saveFailureMessage });
+    ).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR', message: preWriteFailureMessage });
 
     expect(await tableDomains()).toEqual(['previous.example']);
     expect(mockedBackfill).not.toHaveBeenCalled();
@@ -871,6 +1134,13 @@ describe('admin.blacklistDomains.set', () => {
     const previousRaw = storeSettings(previousSettings);
     storeLegacyBlob(previousRaw);
     await insertBlacklistedDomains(['previous.example']);
+    await db.insert(blacklisted_domains_settings).values({
+      blocked_signup_tlds: ['asia'],
+      updated_at: '2026-01-01T00:00:00.000Z',
+      updated_by: 'previous-admin',
+      updated_by_email: 'previous-admin@example.com',
+    });
+    const previousMirror = await tableSettings();
     const caller = await createCallerForUser(admin.id);
     const { version } = await caller.admin.blacklistDomains.get();
     mockedRedisSet.mockRejectedValue(new Error('redis write failed'));
@@ -887,12 +1157,55 @@ describe('admin.blacklistDomains.set', () => {
     });
 
     expect(await tableDomains()).toEqual(['previous.example']);
+    expect(await tableSettings()).toEqual(previousMirror);
     expect(redisValues.get(BLACKLIST_DOMAINS_SETTINGS_REDIS_KEY)).toBe(previousRaw);
     expect(mockedRedisSet).toHaveBeenCalledTimes(1);
     expect(mockedRedisDel).not.toHaveBeenCalled();
     expect(redisValues.get(LEGACY_BLACKLIST_DOMAINS_REDIS_KEY)).toBe(previousRaw);
     expect(mockedBackfill).not.toHaveBeenCalled();
     await expect(caller.admin.blacklistDomains.get()).resolves.toMatchObject({ version });
+  });
+
+  it('rolls back domains and skips the final Redis write if the settings mirror fails', async () => {
+    const previousRaw = storeSettings(previousSettings);
+    await insertBlacklistedDomains(['previous.example']);
+    const caller = await createCallerForUser(admin.id);
+    const { version } = await caller.admin.blacklistDomains.get();
+    await db.execute(sql`
+      CREATE FUNCTION public.fail_blacklist_settings_mirror() RETURNS trigger AS $$
+      BEGIN
+        RAISE EXCEPTION 'forced settings mirror failure';
+      END;
+      $$ LANGUAGE plpgsql;
+      CREATE TRIGGER fail_blacklist_settings_mirror
+        BEFORE INSERT OR UPDATE ON public.blacklisted_domains_settings
+        FOR EACH ROW EXECUTE FUNCTION public.fail_blacklist_settings_mirror();
+    `);
+    try {
+      await expect(
+        caller.admin.blacklistDomains.set({
+          domains: ['new.example'],
+          blocked_tlds: [],
+          expected_version: version,
+        })
+      ).rejects.toMatchObject({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: preWriteFailureMessage,
+        cause: { cause: { message: 'forced settings mirror failure' } },
+      });
+
+      expect(await tableDomains()).toEqual(['previous.example']);
+      expect(await tableSettings()).toEqual([]);
+      expect(redisValues.get(BLACKLIST_DOMAINS_SETTINGS_REDIS_KEY)).toBe(previousRaw);
+      expect(mockedRedisSet).not.toHaveBeenCalled();
+      expect(mockedRedisDel).not.toHaveBeenCalled();
+      expect(mockedBackfill).not.toHaveBeenCalled();
+    } finally {
+      await db.execute(sql`
+        DROP TRIGGER fail_blacklist_settings_mirror ON public.blacklisted_domains_settings;
+        DROP FUNCTION public.fail_blacklist_settings_mirror();
+      `);
+    }
   });
 
   it('leaves the table and settings intact on a second-batch failure and backfills new domains on retry', async () => {
@@ -927,7 +1240,7 @@ describe('admin.blacklistDomains.set', () => {
     try {
       await expect(caller.admin.blacklistDomains.set(input)).rejects.toMatchObject({
         code: 'INTERNAL_SERVER_ERROR',
-        message: saveFailureMessage,
+        message: preWriteFailureMessage,
         cause: { cause: { message: 'forced second blacklist batch failure' } },
       });
 
@@ -1091,6 +1404,7 @@ describe('admin.blacklistDomains.set', () => {
     // empty field that would silently re-allow every TLD.
     expect(result.blocked_signup_tlds).toEqual(['shop', 'top']);
     expect(storedSettings()).toMatchObject({ blocked_signup_tlds: ['shop', 'top'] });
+    expect(await tableSettings()).toEqual([{ id: 1, ...settingsFields(result) }]);
   });
 });
 
@@ -1140,6 +1454,31 @@ describe('admin.blacklistDomains.get', () => {
     expect(afterTableEdit.domains).toEqual(['mailinator.com', 'spam.org']);
     expect(afterTableEdit.version).not.toBe(first.version);
     expect(afterSettingsEdit.version).not.toBe(afterTableEdit.version);
+  });
+
+  it('uses Redis settings and versioning even when the Postgres mirror differs', async () => {
+    storeSettings(previousSettings);
+    const caller = await createCallerForUser(admin.id);
+    const original = await caller.admin.blacklistDomains.get();
+
+    await db.insert(blacklisted_domains_settings).values({
+      blocked_signup_tlds: [],
+      updated_at: '2026-02-01T00:00:00.000Z',
+      updated_by: 'different-admin',
+      updated_by_email: 'different-admin@example.com',
+    });
+    const afterMirrorEdit = await caller.admin.blacklistDomains.get();
+
+    expect(afterMirrorEdit).toEqual(original);
+    expect(afterMirrorEdit).toMatchObject(previousSettings);
+    expect(mockedRedisSet).not.toHaveBeenCalled();
+
+    const saved = await caller.admin.blacklistDomains.set({
+      domains: [],
+      expected_version: original.version,
+    });
+    expect(saved.blocked_signup_tlds).toEqual(['asia']);
+    expect(await tableSettings()).toEqual([{ id: 1, ...settingsFields(saved) }]);
   });
 
   it('migrates legacy settings once and ignores the legacy domain list', async () => {
@@ -1230,7 +1569,7 @@ describe('admin.blacklistDomains.get', () => {
           domains: ['mailinator.com'],
           expected_version: unusedVersion,
         })
-      ).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR', message: saveFailureMessage });
+      ).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR', message: preWriteFailureMessage });
 
       expect(await tableDomains()).toEqual(['previous.example']);
       expect(redisValues.get(BLACKLIST_DOMAINS_SETTINGS_REDIS_KEY)).toBe(raw);

@@ -11,6 +11,14 @@ import { describe, expect, it } from 'vitest';
 const layoutPath = fileURLToPath(new URL('../app/_layout.tsx', import.meta.url));
 const layoutSource = readFileSync(layoutPath, 'utf8');
 
+// The startup language preparation (channel rename, category re-registration,
+// return navigation) lives in the extracted hook since the startup-once fix;
+// contracts over that section read its source.
+const languagePreparationPath = fileURLToPath(
+  new URL('hooks/use-language-startup-preparation.ts', import.meta.url)
+);
+const languagePreparationSource = readFileSync(languagePreparationPath, 'utf8');
+
 const FORBIDDEN_IDENTIFIERS = [
   'createUserWebConnection',
   'EventServiceClient',
@@ -95,15 +103,22 @@ describe('root layout startup order (text contract)', () => {
   // channel rename — or every non-English user keeps English Approve / Reply
   // buttons for the whole session.
   it('re-registers the needs-input categories next to the language-apply channel rename', () => {
-    const codeSource = stripComments(layoutSource);
+    const codeSource = stripComments(languagePreparationSource);
     const pair =
       /void renameAndroidNotificationChannels\(\);\s*void registerNeedsInputCategories\(\);/.exec(
         codeSource
       );
     expect(
       pair,
-      '_layout.tsx must re-register the needs-input categories right after renameAndroidNotificationChannels in prepareLanguage'
+      'use-language-startup-preparation.ts must re-register the needs-input categories right after renameAndroidNotificationChannels in prepareLanguage'
     ).not.toBe(null);
+    // The language preparation itself must still stay wired into the layout.
+    expect(
+      stripComments(layoutSource).includes(
+        'useLanguageStartupPreparation({\n    navigationReady,\n    setLanguageReady,\n  })'
+      ),
+      '_layout.tsx must keep the startup language preparation wired through the hook'
+    ).toBe(true);
   });
 
   it.each(FORBIDDEN_IDENTIFIERS)('does not reference %s', identifier => {

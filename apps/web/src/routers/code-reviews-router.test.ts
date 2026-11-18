@@ -97,6 +97,8 @@ import { generateBotUserId } from '@/lib/bot-users/types';
 import { BitbucketCodeReviewWebhookConfigurationError } from '@/lib/integrations/platforms/bitbucket/code-review-webhooks';
 import { updateCheckRun } from '@/lib/integrations/platforms/github/adapter';
 import { createCallerForUser } from '@/routers/test-utils';
+import { createOrEnableAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
+import { createDefaultCodeReviewConfig } from '@/lib/code-reviews/core/default-config';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
@@ -2002,6 +2004,112 @@ describe('review agent config REVIEW.md setting', () => {
     });
 
     expect(config?.is_enabled).toBe(false);
+  });
+
+  it('creates an enabled personal config when enabling with no stored config', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    // No pre-existing agent_configs row: enabling must create one. The toggle
+    // used to update zero rows, report success, and leave the switch enabled
+    // locally, so the next save stored the row as disabled.
+    const result = await caller.personalReviewAgent.toggleReviewAgent({
+      platform: 'github',
+      isEnabled: true,
+    });
+
+    expect(result).toEqual({ success: true, isEnabled: true });
+    const config = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.platform, 'github'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+
+    expect(config?.is_enabled).toBe(true);
+    expect(config?.config).toEqual(
+      expect.objectContaining({
+        review_style: 'balanced',
+        repository_selection_mode: 'all',
+        disable_review_md: true,
+        review_guideline_source_repositories: [],
+      })
+    );
+  });
+
+  it('keeps a saved config when a first enable conflicts with an existing row', async () => {
+    await db.insert(agent_configs).values({
+      owned_by_user_id: testUser.id,
+      agent_type: 'code_review',
+      platform: 'github',
+      config: { review_style: 'strict', model_slug: 'saved-model' },
+      is_enabled: false,
+      created_by: testUser.id,
+    });
+
+    // Simulate the insert branch of a first enable whose earlier read saw no row.
+    await createOrEnableAgentConfigForOwner({
+      owner: { type: 'user', id: testUser.id },
+      agentType: 'code_review',
+      platform: 'github',
+      createdBy: testUser.id,
+      config: createDefaultCodeReviewConfig(),
+    });
+
+    const config = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.platform, 'github'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+
+    expect(config?.is_enabled).toBe(true);
+    expect(config?.config).toEqual(
+      expect.objectContaining({ review_style: 'strict', model_slug: 'saved-model' })
+    );
+  });
+
+  it('stores the selected repository mode when a personal GitLab agent is enabled for the first time', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    await caller.personalReviewAgent.toggleReviewAgent({ platform: 'gitlab', isEnabled: true });
+
+    const config = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.platform, 'gitlab'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+
+    expect(config?.is_enabled).toBe(true);
+    expect(config?.config).toEqual(
+      expect.objectContaining({
+        repository_selection_mode: 'selected',
+        selected_repository_ids: [],
+      })
+    );
+  });
+
+  it('does not create a personal config when disabling with no stored config', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    const result = await caller.personalReviewAgent.toggleReviewAgent({
+      platform: 'github',
+      isEnabled: false,
+    });
+
+    expect(result).toEqual({ success: true, isEnabled: false });
+    const config = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.platform, 'github'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+
+    expect(config).toBeUndefined();
   });
 
   it('preserves personal review feature settings during a full config save', async () => {

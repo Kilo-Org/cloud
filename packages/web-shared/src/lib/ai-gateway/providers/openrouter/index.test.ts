@@ -46,6 +46,8 @@ import { getPreferredProviderOrderConfig } from '@kilocode/web-shared/lib/ai-gat
 import { EMPTY_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
 import { EMPTY_PREFERRED_PROVIDER_ORDER_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order';
 import type { CustomPricing } from '@kilocode/db/schema-types';
+import type * as LatestAliasTargetsModule from '@kilocode/web-shared/lib/ai-gateway/providers/latest-alias-targets';
+import { getLatestAliasTargets } from '@kilocode/web-shared/lib/ai-gateway/providers/latest-alias-targets';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-pricing-config', () => ({
   ...jest.requireActual<typeof CustomPricingConfigModule>(
@@ -71,6 +73,13 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/unavailable-models', () => {
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn(() => Promise.resolve({})),
   getVercelModelsMetadataFromDatabase: jest.fn(() => Promise.resolve({})),
+}));
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/latest-alias-targets', () => ({
+  ...jest.requireActual<typeof LatestAliasTargetsModule>(
+    '@kilocode/web-shared/lib/ai-gateway/providers/latest-alias-targets'
+  ),
+  getLatestAliasTargets: jest.fn(() => Promise.resolve(new Map())),
 }));
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel', () => ({
@@ -683,11 +692,35 @@ describe('alias pricing', () => {
     expect(model(alias.id)).toMatchObject({
       id: alias.id,
       name: alias.name,
-      description: alias.description,
+      description: `${alias.description}\n\nThis alias currently points to ${target.name} (\`${target.id}\`).`,
       context_length: alias.context_length,
       alias_target: target.id,
       pricing: preferredRoutePricing,
     });
+  });
+
+  it('names the pending target of an alias and roughly when it switches', async () => {
+    jest.mocked(getLatestAliasTargets).mockResolvedValueOnce(
+      new Map([
+        [
+          alias.id,
+          {
+            alias: alias.id,
+            target: target.id,
+            pending: {
+              target: 'vendor/family-0202',
+              effective_at: new Date(Date.now() + 3 * 60 * 60 * 1000 + 60_000).toISOString(),
+            },
+          },
+        ],
+      ])
+    );
+
+    const model = await getCatalog();
+
+    expect(model(alias.id)?.description).toBe(
+      `${alias.description}\n\nThis alias currently points to ${target.name} (\`${target.id}\`). It will switch to \`vendor/family-0202\` in approximately 3 hours.`
+    );
   });
 
   it("shows the target's custom price on the alias without the target's discount label", async () => {

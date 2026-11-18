@@ -26,6 +26,7 @@
     "creditHistory": "ક્રેડિટ ઇતિહાસ",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "રદ કરો",
     "done": "પૂર્ણ",
     "retry": "ફરી પ્રયાસ કરો",
@@ -482,7 +483,14 @@
       "viewReceipt": "રસીદ જુઓ"
     },
     "changelog": "નવું શું છે",
-    "changelogVersionPending": "આ સંસ્કરણની નોંધો આગામી ઍપ અપડેટ સાથે આવશે."
+    "changelogVersionPending": "{{version}} સંસ્કરણની નોંધો આગામી ઍપ અપડેટ સાથે આવશે.",
+    "changelogGroupNew": "નવું",
+    "changelogFixesIn": "{{areas}} માં ભૂલ સુધારા અને સુધારણાઓ.",
+    "changelogFixesPolish": "સમગ્ર એપમાં ભૂલ સુધારા અને સુધારણાઓ.",
+    "changelogAreas": {
+      "signIn": "સાઇન-ઇન",
+      "profileOrganizations": "પ્રોફાઇલ અને સંસ્થાઓ"
+    }
   },
   "preferences": {
     "general": "સામાન્ય",
@@ -1468,13 +1476,24 @@
       "empty": "હજી એનાલિટિક્સવાળી કોઈ સમીક્ષા નથી",
       "emptyDescription": "સંસ્થા માટે એનાલિટિક્સ ચાલુ હોય ત્યારે તે પૂર્ણ થયેલી સમીક્ષાઓ નોંધે છે.",
       "offTitle": "{{platform}} માટે એનાલિટિક્સ બંધ છે",
-      "offDescription": "પૂર્ણ થયેલી સમીક્ષાઓ નોંધવા માટે વેબ પર સંસ્થાના સેટિંગ્સમાં એનાલિટિક્સ ચાલુ કરો.",
-      "couldNotLoad": "એનાલિટિક્સ લોડ કરી શકાયું નથી"
+      "offDescription": "સંસ્થાની બિલિંગ ભૂમિકાઓ (માલિકો, એડમિન અને બિલિંગ મેનેજર) વેબ પરની સંસ્થાની સેટિંગ્સમાં એનાલિટિક્સ ચાલુ કરી શકે છે જેથી પૂર્ણ થયેલી સમીક્ષાઓ નોંધવામાં આવે.",
+      "couldNotLoad": "એનાલિટિક્સ લોડ કરી શકાયું નથી",
+      "trackedReviewsCaption": "આ સમયગાળામાં એનાલિટિક્સ ચાલુ હોય ત્યારે પૂર્ણ થયેલી સમીક્ષાઓ. ચાલી રહેલી અને નિષ્ફળ થયેલી સમીક્ષાઓ ક્યારેય ગણવામાં આવતી નથી.",
+      "trackedReviewsUncounted": "ગણવામાં આવતી નથી: સંસ્થા પાસેની પૂર્ણ થયેલી {{displayTotal}} સમીક્ષાઓમાંથી {{displayCount}} સમીક્ષાઓનું પરિણામ કૅપ્ચર થયું ન હતું.",
+      "trackedReviewsUncounted_one": "ગણવામાં આવતી નથી: સંસ્થા પાસેની પૂર્ણ થયેલી {{displayTotal}} સમીક્ષાઓમાંથી {{displayCount}} સમીક્ષાઓનું પરિણામ કૅપ્ચર થયું ન હતું.",
+      "trackedReviewsUncounted_other": "ગણવામાં આવતી નથી: સંસ્થા પાસેની પૂર્ણ થયેલી {{displayTotal}} સમીક્ષાઓમાંથી {{displayCount}} સમીક્ષાઓનું પરિણામ કૅપ્ચર થયું ન હતું."
     },
     "council": {
       "title": "કાઉન્સિલ સમીક્ષા",
       "subtitle": "દરેક પુલ રિક્વેસ્ટની સમીક્ષા ઘણા નિષ્ણાતો કરે છે, અને તેમના મત મળીને એક નિર્ણય બને છે.",
-      "unavailable": "આ સંસ્થા માટે કાઉન્સિલ સમીક્ષા ઉપલબ્ધ નથી.",
+      "unavailablePersonallyTitle": "એન્ટરપ્રાઇઝ સંસ્થાની જરૂર છે",
+      "unavailablePersonally": "કાઉન્સિલ સમીક્ષા વ્યક્તિગત ખાતાનો ભાગ નથી.",
+      "unavailablePersonallyAction": "સંસ્થા બનાવો",
+      "unavailablePersonallySwitchAction": "સંસ્થા બદલો",
+      "unavailableOrganizationTitle": "કાઉન્સિલ સમીક્ષા ઉપલબ્ધ નથી",
+      "unavailableForOrganization": "કાઉન્સિલ સમીક્ષા માટે સક્રિય સબ્સ્ક્રિપ્શન અથવા ટ્રાયલ સાથેનો Enterprise પ્લાન જરૂરી છે. આ સંસ્થા પાસે હાલમાં તે નથી.",
+      "unavailableForOrganizationNeutral": "કાઉન્સિલ સમીક્ષા હાલમાં આ સંસ્થા માટે ઉપલબ્ધ નથી. પછી ફરી પ્રયાસ કરો.",
+      "unavailableOnBitbucket": "કાઉન્સિલ સમીક્ષા Bitbucket રિપોઝિટરી માટે ઉપલબ્ધ નથી.",
       "noRepositories": "હજી કોઈ રિપોઝિટરી પસંદ કરી નથી. પહેલાં રિપોઝિટરી સેટિંગ્સમાં રિપોઝિટરીઓ પસંદ કરો.",
       "specialists": "નિષ્ણાતો",
       "labels": "કાઉન્સિલ સમીક્ષા શરૂ કરતાં લેબલ્સ",
@@ -3125,7 +3144,6 @@
     "completingPurchase": "ખરીદી પૂર્ણ થઈ રહી છે",
     "subscriptionLoading": "Kilo Pass નું સબસ્ક્રિપ્શન લોડ થઈ રહ્યું છે",
     "retryHint": "Kilo Pass ની સ્થિતિ ફરી મેળવવાનો પ્રયાસ કરે છે.",
-    "cardAccessibility": "{{title}}: {{description}}. {{actionLabel}}",
     "endedOn": "{{date}}ના રોજ સમાપ્ત થયું",
     "notAvailableInApp": "Kilo Pass એપમાં ઉપલબ્ધ નથી.",
     "statusActive": "સક્રિય",
@@ -3467,6 +3485,7 @@
       "manageOnWeb": "વેબ પર બિલિંગ સેટિંગ્સ",
       "changePlan": "પ્લાન બદલો",
       "buySeats": "સીટો ખરીદો",
+      "managedOnWeb": "પ્લાન, સીટો અને ઑટો ટોપ-અપનું સંચાલન વેબ પર થાય છે.",
       "setupAutoTopUp": "ઑટો ટોપ-અપ સેટ કરો",
       "manageAutoTopUp": "ઑટો ટોપ-અપ મેનેજ કરો",
       "opensOnWeb": "વેબ પર ખુલે છે"
@@ -3615,12 +3634,10 @@
       "requestLogs": "રિક્વેસ્ટ લૉગ"
     },
     "requestLogs": {
-      "hint": "વિન્ડો પૂરી થાય તે પહેલાંના કલાકની રિક્વેસ્ટ, સૌથી નવી પહેલાં.",
       "older": "પહેલાંનો કલાક",
       "newer": "પછીનો કલાક",
       "truncated": "આ કલાકમાં સૂચિમાં બતાવેલી કરતાં વધુ રિક્વેસ્ટ છે.",
       "emptyTitle": "કોઈ રિક્વેસ્ટ નથી",
-      "emptyDescription": "આ કલાકમાં કોઈ ગેટવે રિક્વેસ્ટ નથી.",
       "loadError": "રિક્વેસ્ટ લૉગ લોડ કરી શકાયા નહીં.",
       "permissionDenied": "સંસ્થાના રિક્વેસ્ટ લૉગ ફક્ત તેના માલિક, એડમિન અથવા બિલિંગ મેનેજર જ જોઈ શકે છે.",
       "tokens": "{{input}} ઇનપુટ · {{output}} આઉટપુટ",
@@ -4424,8 +4441,7 @@
       "repoValue": "રિપોઝિટરી: {{name}}",
       "profileValue": "પ્રોફાઇલ: {{name}}",
       "profileUnavailable": "આ પ્રોફાઇલ હવે ઉપલબ્ધ નથી. બીજી પસંદ કરો.",
-      "pickerEmptyDescriptionOrganization": "સમગ્ર સત્રોમાં પર્યાવરણ ચલો, સેટઅપ આદેશ અને કૌશલ્યોનો ફરીથી ઉપયોગ કરવા માટે સંસ્થા પ્રોફાઇલ બનાવો.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "સંસ્થા માલિક અથવા એડમિન સંસ્થા પ્રોફાઇલ બનાવી શકે છે."
+      "pickerEmptyDescriptionOrganization": "સમગ્ર સત્રોમાં પર્યાવરણ ચલો, સેટઅપ આદેશ અને કૌશલ્યોનો ફરીથી ઉપયોગ કરવા માટે સંસ્થા પ્રોફાઇલ બનાવો."
     },
     "variablesDeleteFailed": "ચલ કાઢી શકાયું નથી",
     "deleteVariable": "ચલ {{key}} કાઢી નાખો",
@@ -4611,7 +4627,6 @@
     "dismiss": "રિપોર્ટ ખારિજ કરો",
     "offline": "ઑફલાઇન · સાચવેલ રિપોર્ટ",
     "cached": "સાચવેલ રિપોર્ટ · રિફ્રેશ ઉપલબ્ધ નથી",
-    "window": "{{start}} – {{end}}",
     "summary": "AI સારાંશ",
     "summaryPending": "AI સારાંશ તૈયાર થઈ રહ્યો છે. તૈયાર થયે અહીં જોડાશે.",
     "summaryUnavailable": "AI સારાંશ ઉપલબ્ધ નથી. તમારો માળખાગત રિપોર્ટ હજુ ઉપલબ્ધ છે.",
@@ -4730,6 +4745,7 @@
       "title": "ટ્રિગર્સ અને વેબહૂક્સ",
       "subtitle": "વેબહૂક કૉલ અથવા શેડ્યૂલમાંથી Cloud Agent રન્સને ઑટોમેટ કરો।",
       "new": "નવું ટ્રિગર",
+      "create": "ટ્રિગર બનાવો",
       "emptyTitle": "હજી કોઈ ટ્રિગર નથી",
       "emptyDescription": "વેબહૂક કૉલથી અથવા શેડ્યૂલ પર Cloud Agent રન શરૂ કરવા માટે ટ્રિગર બનાવો।",
       "loadFailedTitle": "ટ્રિગર્સ લોડ કરી શકાયા નથી",
@@ -4783,6 +4799,8 @@
       "created": "ટ્રિગર બન્યો",
       "saved": "ટ્રિગર સાચવ્યો",
       "statusArrived": "આવ્યું",
+      "defaultPromptWebhook": "આ વેબહૂક વિનંતીની બોડીનું વર્ણન કરો:\n\n{{body}}",
+      "defaultPromptScheduled": "નિર્ધારિત કાર્ય ચલાવો. રન {{scheduledTime}} પર શરૂ થયું.",
       "problems": {
         "nameRequired": "નામ દાખલ કરો।",
         "nameTooShort": "ઓછામાં ઓછા 8 અક્ષરો વાપરો।",
@@ -4831,6 +4849,7 @@
     "superseded": "આ લિંક અન્યત્ર બદલવામાં આવી છે, તેથી તે હવે કામ કરતી નથી."
   },
   "sharedSession": {
+    "startedAt": "શરૂ થયું {{time}} વાગ્યે",
     "title": "શેર કરેલું સત્ર",
     "someone": "કોઈક",
     "sharedBy": "{{owner}} દ્વારા શેર કરેલું",
@@ -4989,6 +5008,8 @@
     "modelsDescription": "દરેક સભ્ય માટે મોડેલને બ્લોક કરવા તેને બંધ કરો. મંજૂર પ્રદાતાઓના મોડેલો ચાલુ સ્થિતિમાં શરૂ થાય છે.",
     "modelsDeniedOnly": "ફક્ત નકારેલા",
     "modelsEmpty": "આ શોધ સાથે કોઈ મોડેલ મેળ ખાતું નથી.",
+    "modelsDeniedEmpty": "કોઈ મોડેલ નકારેલો નથી.",
+    "modelsDeniedSearchEmpty": "આ શોધ સાથે કોઈ નકારેલો મોડેલ મેળ ખાતું નથી.",
     "providersDescription": "આ સંસ્થા માટે Kilo તેના તરફ રૂટ કરવાનું બંધ કરવા પ્રદાતાને બંધ કરો.",
     "providersNeedCatalog": "સંપૂર્ણ મૉડલ કૅટલૉગ લોડ ન થાય ત્યાં સુધી પ્રદાતા સ્વિચ ફક્ત વાંચવા માટે રહે છે. તેમને સંપાદિત કરવા ઉપર ફરી પ્રયાસ કરો.",
     "providersEmpty": "આ શોધ સાથે કોઈ પ્રદાતા મેળ ખાતા નથી.",

@@ -61,10 +61,10 @@ export const PENDING_PURGE_BATCHES_PER_RUN = 10;
 
 /**
  * Newest refresh-token hashes kept per grant. The provider accepts the current
- * and the immediately previous refresh token, so eight rotations is the margin
- * that keeps both of them — and only a bounded number of older hashes — for
- * the whole session. Without the bound a month of rotations per client would
- * grow this single global DO forever.
+ * and the immediately previous refresh token, so those two rows are always
+ * kept; eight rotations is the margin that retains them plus a bounded number
+ * of older hashes for the whole session. Without the bound a month of rotations
+ * per client would grow this single global DO forever.
  */
 const REFRESH_HISTORY_KEEP_PER_GRANT = 8;
 
@@ -760,18 +760,26 @@ export class KiloMcpOAuthStore
         )
       )
       .get();
-    return row ? { userId: row.user_id, grantId: row.grant_id, current: row.current } : null;
+    return row
+      ? {
+          userId: row.user_id,
+          grantId: row.grant_id,
+          current: row.current,
+          previous: row.previous,
+        }
+      : null;
   }
 
   async rememberRefreshToken(
     hash: string,
     parts: RefreshTokenParts,
-    expiresAt: string
+    expiresAt: string,
+    presentedHash: string | null
   ): Promise<void> {
     this.ctx.storage.transactionSync(() => {
       this.db
         .update(oauthRefreshTokenHistory)
-        .set({ current: false })
+        .set({ current: false, previous: false })
         .where(
           and(
             eq(oauthRefreshTokenHistory.user_id, parts.userId),
@@ -779,6 +787,22 @@ export class KiloMcpOAuthStore
           )
         )
         .run();
+      // The provider accepts the token it rotated away from once more. Keep it
+      // as the grant's previous token, with a fresh expiry so pruning ranks it
+      // beside the token just issued rather than as an old row.
+      if (presentedHash !== null) {
+        this.db
+          .update(oauthRefreshTokenHistory)
+          .set({ previous: true, expires_at: expiresAt })
+          .where(
+            and(
+              eq(oauthRefreshTokenHistory.token_hash, presentedHash),
+              eq(oauthRefreshTokenHistory.user_id, parts.userId),
+              eq(oauthRefreshTokenHistory.grant_id, parts.grantId)
+            )
+          )
+          .run();
+      }
       this.db
         .insert(oauthRefreshTokenHistory)
         .values({
@@ -786,22 +810,22 @@ export class KiloMcpOAuthStore
           user_id: parts.userId,
           grant_id: parts.grantId,
           current: true,
+          previous: false,
           expires_at: expiresAt,
         })
         .onConflictDoUpdate({
           target: oauthRefreshTokenHistory.token_hash,
-          set: { current: true, expires_at: expiresAt },
+          set: { current: true, previous: false, expires_at: expiresAt },
         })
         .run();
-      // Every write uses `now + REFRESH_HISTORY_TTL_MS` and the DO's token
-      // queue serializes rotations, so ordering by `expires_at` ranks by write
-      // time; `rowid` breaks a tie between two writes in the same millisecond
-      // by insertion order, which `expires_at` alone cannot, and a LIMIT over
-      // that tie could otherwise keep older rows and drop the newest ones.
-      // Together they put the row just inserted — and with it the provider's
-      // only other accepted token, the previous one — inside the kept set.
-      // `notInArray` is never empty: the kept set always contains the row
-      // inserted a moment earlier.
+      // Every write uses `now + REFRESH_HISTORY_TTL_MS`, so ordering by
+      // `expires_at` ranks by write time; `rowid` breaks a tie between two
+      // writes in the same millisecond by insertion order, which `expires_at`
+      // alone cannot, and a LIMIT over that tie could otherwise keep older rows
+      // and drop the newest ones. The current and previous rows are added to
+      // the kept set explicitly: the provider accepts them, so the guard must
+      // never forget them. `notInArray` is never empty: the kept set always
+      // contains the row inserted a moment earlier.
       const kept = this.db
         .select({ token_hash: oauthRefreshTokenHistory.token_hash })
         .from(oauthRefreshTokenHistory)
@@ -815,6 +839,7 @@ export class KiloMcpOAuthStore
         .limit(REFRESH_HISTORY_KEEP_PER_GRANT)
         .all()
         .map(row => row.token_hash);
+      if (presentedHash !== null && !kept.includes(presentedHash)) kept.push(presentedHash);
       this.db
         .delete(oauthRefreshTokenHistory)
         .where(

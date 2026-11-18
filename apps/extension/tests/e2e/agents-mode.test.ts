@@ -764,31 +764,66 @@ test.skip('Agents session transcript opens pinned to the bottom', async () => {
   }
 });
 
-test('Agents offline pill waits out the connect grace period', async () => {
-  const { cleanup, getSidePanel } = await setupAgentsTest({ ingestSilent: true });
-  try {
-    const sidePanel = await getSidePanel();
+/*
+ * The pill's grace is `OFFLINE_PILL_GRACE_MS` in agents-session-list.tsx and is a page timer that
+ * the view arms when it mounts. The test installs a fake clock before the panel's first load (a
+ * timer armed under a real clock cannot be driven), asserts the exact window the view recorded,
+ * and then jumps to one millisecond either side of the deadline.
+ */
+const OFFLINE_PILL_GRACE_MS = 5000;
+const OFFLINE_PILL_DUE_AT = 'data-offline-grace-due-at';
+const OFFLINE_PILL_STARTED_AT = 'data-offline-grace-started-at';
 
-    // The mocked ingest socket never completes the connected handshake. The
-    // Grace clock starts when the Agents view dials, not when this test gets
-    // To observe it: navigating switches the mode and mounts the list, so the
-    // Clock must precede the switch. An assertion anchored after the switch
-    // Loses every millisecond setup spends, and a loaded runner fails it.
+test('Agents offline pill waits out the connect grace period', async () => {
+  const { cleanup, context, extensionId } = await setupAgentsTest({ ingestSilent: true });
+  try {
+    /*
+     * The Agents view mounts during page load, so the clock has to be installed before the first
+     * navigation or its grace `setTimeout` is a real timer. Time still flows after `install`, so
+     * the panel boots normally.
+     */
+    const sidePanel = await context.newPage();
+    await sidePanel.clock.install();
+    await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+    await seedExtensionAuth(sidePanel);
+    await sidePanel.reload();
+    await expect(sidePanel.getByLabel('Settings')).toBeVisible({ timeout: 15_000 });
+    await sidePanel.getByRole('tab', { name: 'Agents' }).click();
+
+    const dueAtMarker = sidePanel.locator(`[${OFFLINE_PILL_DUE_AT}]`);
+    await expect(dueAtMarker).toHaveCount(1, { timeout: 15_000 });
+
+    const grace = await sidePanel.evaluate(
+      ({ dueAtAttribute, startedAtAttribute }) => {
+        const node = document.querySelector(`[${dueAtAttribute}]`);
+
+        return {
+          dueAt: Number(node?.getAttribute(dueAtAttribute)),
+          now: Date.now(),
+          startedAt: Number(node?.getAttribute(startedAtAttribute)),
+        };
+      },
+      { dueAtAttribute: OFFLINE_PILL_DUE_AT, startedAtAttribute: OFFLINE_PILL_STARTED_AT }
+    );
+
+    // The grace duration itself, from the two instants the view recorded when it armed the timer.
+    expect(grace.dueAt - grace.startedAt).toBe(OFFLINE_PILL_GRACE_MS);
+
     const offlinePill = sidePanel.getByText('Offline');
     await expect(offlinePill).toBeHidden();
-    const startedAt = Date.now();
-    await navigateToAgentsMode(sidePanel);
-    // Sample across the first 3s — one check could miss an immediate render.
-    const samples = await Promise.all(
-      [0, 500, 1000, 1500, 2000, 2500, 3000].map(async delayMs => {
-        await sidePanel.waitForTimeout(delayMs);
-        return offlinePill.isVisible().catch(() => false);
-      })
-    );
-    expect(samples).not.toContain(true);
-    await expect(offlinePill).toBeVisible({ timeout: 15_000 });
-    // It appeared only after the grace period, never before.
-    expect(Date.now() - startedAt).toBeGreaterThanOrEqual(4500);
+
+    /*
+     * Jump with `pauseAt`, which sets the page clock to an exact instant and fires only the timers
+     * due by then; `runFor` is paced by real time and measured an overshoot of ~14 ms. The first
+     * jump also freezes the clock, so the view has no chance to arm a second window.
+     */
+    // One millisecond before the recorded deadline the pill must still be absent.
+    await sidePanel.clock.pauseAt(grace.dueAt - 1);
+    await expect(offlinePill).toBeHidden();
+
+    // One millisecond past it the timer has fired and the pill is rendered.
+    await sidePanel.clock.pauseAt(grace.dueAt + 1);
+    await expect(offlinePill).toBeVisible();
   } finally {
     await cleanup();
   }

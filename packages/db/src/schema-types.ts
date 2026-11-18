@@ -2878,8 +2878,13 @@ export type SecurityFindingAnalysis = {
 /**
  * Time-of-day prices. OpenRouter lists the prices of each UTC window in `overrides`; Vercel AI
  * Gateway multiplies its token prices by `peak_pricing.multiplier` during peak windows.
+ *
+ * An `overrides` entry with `min_prompt_tokens` is not a time-of-day window: it applies to requests
+ * whose prompt exceeds that many tokens (a long-context surcharge). Vercel's `*_tiers` fields are
+ * not part of this schema; the base price fields are their first (short-context) tier.
  */
 export const PriceOverrideSchema = z.looseObject({
+  min_prompt_tokens: z.number().optional().catch(undefined),
   prompt: z.string().optional().catch(undefined),
   completion: z.string().optional().catch(undefined),
   input_cache_read: z.string().optional().catch(undefined),
@@ -3572,6 +3577,38 @@ export const VercelModelIdOverridesConfigSchema = z.object({
 });
 
 export type VercelModelIdOverridesConfig = z.infer<typeof VercelModelIdOverridesConfigSchema>;
+
+export const LatestAliasTargetSchema = z.object({
+  alias: z.string().startsWith('~'),
+  target: z.string().min(1),
+  /** A newer target the alias switches to once `effective_at` passes. */
+  pending: z
+    .object({
+      target: z.string().min(1),
+      effective_at: z.iso.datetime(),
+    })
+    .optional(),
+});
+
+export type LatestAliasTarget = z.infer<typeof LatestAliasTargetSchema>;
+
+export const LatestAliasTargetsConfigSchema = z.object({
+  aliases: z.array(LatestAliasTargetSchema).superRefine((aliases, ctx) => {
+    const seen = new Set<string>();
+    for (const [index, { alias }] of aliases.entries()) {
+      if (seen.has(alias)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `Duplicate alias "${alias}"`,
+          path: [index, 'alias'],
+        });
+      }
+      seen.add(alias);
+    }
+  }),
+});
+
+export type LatestAliasTargetsConfig = z.infer<typeof LatestAliasTargetsConfigSchema>;
 
 export const PREFERRED_PROVIDER_ORDER_MAX_RULES = 200;
 export const PREFERRED_PROVIDER_ORDER_MAX_PROVIDERS = 20;

@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
-import { ScreenHeader } from '@/components/screen-header';
+import { type HeaderEyebrow, ScreenHeader } from '@/components/screen-header';
 import { FindingAnalysisPanel } from '@/components/security-agent/finding-analysis-panel';
 import { FindingDetailsPanel } from '@/components/security-agent/finding-details-panel';
 import { FindingRemediationPanel } from '@/components/security-agent/finding-remediation-panel';
@@ -14,6 +14,7 @@ import { PanelErrorBoundary } from '@/components/security-agent/panel-error-boun
 import { SecurityCommandRetryCard } from '@/components/security-agent/security-command-retry-card';
 import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
 import { Button } from '@/components/ui/button';
+import { eyebrowHeaderProps } from '@/components/ui/eyebrow-placeholder';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -66,7 +67,10 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   const { t } = useTranslation();
   const [tab, setTab] = useState<FindingTab>('details');
   const findingQuery = useSecurityFinding(scope, findingId);
-  const analysisQuery = useSecurityAnalysis(scope, findingId);
+  // The analysis query polls while a run is active, and only the analysis and
+  // remediation panels read it — the details tab never does.
+  const analysisActive = tab === 'analysis' || tab === 'remediation';
+  const analysisQuery = useSecurityAnalysis(scope, findingId, analysisActive);
   // Bumped once the boundary's recovery refetch settles, so the boundary
   // remounts with clean state over the recovered payload. Bumping it in the
   // same tick would mount the fresh boundary against the still-cached
@@ -154,30 +158,21 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   }, [loadFailed, findingId]);
   const showLoadFailure = !findingQuery.data && (loadFailed || failedFindingId === findingId);
 
-  // The not-found and load-failure states share a header without an eyebrow
-  // line. Neither ever gains a repository, so the title belongs on the back
-  // control's row, centred on the chevron, rather than half a line below it
-  // above a gap no label ever fills.
+  // The not-found, load-failure and loading states share one header with its
+  // eyebrow line reserved. The payload draws the finding's repository on that
+  // line, and neither a not-found nor a failed read can be known before the
+  // first paint — the first frame is always the loading one — so dropping the
+  // line afterwards would pull the title up out of the position the loading
+  // frame gave it. Only a read that is still running paints the placeholder
+  // bar: a terminal answer, and a failure the retry surface holds, keep the
+  // same line blank so nothing pulses on a finishable screen.
+  const pendingEyebrow: HeaderEyebrow =
+    findingQuery.isFetching && !notFound ? { kind: 'loading' } : { kind: 'held' };
   const pendingHeader = (
     <ScreenHeader
       className="px-6"
       title={t('securityAgent.findingDetail.title')}
-      showBackButton
-      onBack={handleBack}
-    />
-  );
-
-  // Loading does gain the repository: the loaded header draws it on an eyebrow
-  // line above the title. The row centres the heading column against the back
-  // control, so that line moves the title down by half its height — 7.6 dp
-  // measured on the Android emulator — in the frame the payload lands. Reserving
-  // the line here puts the title where the payload will leave it, so it holds
-  // still from the first paint instead of being pushed down later.
-  const loadingHeader = (
-    <ScreenHeader
-      className="px-6"
-      title={t('securityAgent.findingDetail.title')}
-      reserveEyebrow
+      {...eyebrowHeaderProps(pendingEyebrow)}
       showBackButton
       onBack={handleBack}
     />
@@ -212,7 +207,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   if (findingQuery.isLoading || !findingQuery.data) {
     return (
       <View className="flex-1 bg-background">
-        {loadingHeader}
+        {pendingHeader}
         <View className="flex-1 gap-3 px-6 pt-4">
           <Skeleton className="h-6 w-2/3 rounded" />
           <Skeleton className="h-4 w-1/3 rounded" />

@@ -139,6 +139,7 @@ export type SdkStatusMessageCode =
   | 'not-authorized'
   | 'service-unavailable'
   | 'previous-task-in-progress'
+  | 'workspace-deleting'
   | 'service-temporarily-unavailable'
   | 'generic-error'
   | 'connection-lost'

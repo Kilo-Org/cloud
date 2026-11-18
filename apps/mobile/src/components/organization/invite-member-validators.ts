@@ -13,10 +13,14 @@ import { readTrpcErrorField } from '@/lib/trpc-error';
  */
 const EMAIL_SCHEMA = z.email().max(254);
 
+/** The reserve set for `FormField`'s `reserveErrorMessages`: every message the email rule can show. */
+export function inviteEmailErrorMessages(): readonly [invalid: string] {
+  return [i18n.t('organization.inviteMember.emailError')];
+}
+
 export function inviteEmailError(value: string): string | null {
-  return EMAIL_SCHEMA.safeParse(value.trim()).success
-    ? null
-    : i18n.t('organization.inviteMember.emailError');
+  const [invalid] = inviteEmailErrorMessages();
+  return EMAIL_SCHEMA.safeParse(value.trim()).success ? null : invalid;
 }
 
 /** Where a failed invite belongs and what it says, both localized. */

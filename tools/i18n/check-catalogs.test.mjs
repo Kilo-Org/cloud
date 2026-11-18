@@ -499,6 +499,42 @@ test('rejects an empty translated value', () => {
   assert.match(found.join('\n'), /mobile\/ru: "agents\.title" is empty/);
 });
 
+test('accepts a bare-space sentence joiner in the markless Thai catalog', () => {
+  // Thai closes no sentence with a mark, so its joiner is the space it
+  // separates sentences with; the empty-value rule must not read it as
+  // untranslated.
+  const found = run({
+    language: 'th',
+    english: { common: { sentenceJoiner: '. ' }, agents: ENGLISH.agents },
+    translated: { common: { sentenceJoiner: ' ' }, agents: TRANSLATED.agents },
+    source: `${SOURCE}\nt('common.sentenceJoiner');`,
+  });
+  assert.deepEqual(found, []);
+});
+
+test('rejects a whitespace-only sentence joiner in a catalog that closes sentences', () => {
+  // A catalog whose copy carries sentence marks must name one in its joiner;
+  // a blanked joiner would silently join sentences with nothing.
+  const found = run({
+    english: { common: { sentenceJoiner: '. ' }, agents: ENGLISH.agents },
+    translated: { common: { sentenceJoiner: ' ' }, agents: TRANSLATED.agents },
+    source: `${SOURCE}\nt('common.sentenceJoiner');`,
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(found.join('\n'), /mobile\/ru: "common\.sentenceJoiner" is empty/);
+});
+
+test('rejects an empty sentence joiner in the markless Thai catalog', () => {
+  const found = run({
+    language: 'th',
+    english: { common: { sentenceJoiner: '. ' }, agents: ENGLISH.agents },
+    translated: { common: { sentenceJoiner: '' }, agents: TRANSLATED.agents },
+    source: `${SOURCE}\nt('common.sentenceJoiner');`,
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(found.join('\n'), /mobile\/th: "common\.sentenceJoiner" is empty/);
+});
+
 test('rejects a trailing space that English does not carry', () => {
   const found = run({
     translated: { agents: { ...TRANSLATED.agents, title: 'Localized agents ' } },
@@ -1917,6 +1953,41 @@ test('reports a broken catalog through the command and exits non-zero', () => {
   assert.equal(result.status, 1);
   assert.match(result.stderr, /mobile\/ru: missing key "agents\.title"/);
   assert.match(result.stderr, /check-catalogs: \d+ problem\(s\)/);
+});
+
+test('reports a directory named like a catalog through the command and skips it', () => {
+  // `catalogTags` counts only regular files, and the membership rule names the
+  // directory itself, so the run prints one line and exits 1 instead of
+  // reading the directory as a catalog (a stack trace) or passing silently.
+  const root = cliFixture({
+    ...standardFiles(),
+    'apps/mobile/src/i18n/locales/xx.json/keep.txt': '',
+  });
+  const result = cli(root);
+  assert.equal(result.status, 1);
+  assert.match(
+    result.stderr,
+    /mobile: catalog "xx\.json" is not a regular file; remove it or make it a catalog/
+  );
+  assert.doesNotMatch(result.stderr, /EISDIR|mobile\/xx/);
+  assert.match(result.stderr, /check-catalogs: \d+ problem\(s\)/);
+});
+
+test('reports a locale file the filesystem refuses through the command', () => {
+  // The read sits inside the same handling as the JSON.parse it feeds: one
+  // problem line here instead of an uncaught ENOENT ending the audit. The
+  // unreadable entry is English's own: `checkCatalogs` reads it through
+  // `parseCatalog` unconditionally, whatever the tag set says.
+  const root = cliFixture(standardFiles());
+  rmSync(join(root, 'apps/mobile/src/i18n/locales/en.json'));
+  symlinkSync(
+    join(root, 'missing-locale-target'),
+    join(root, 'apps/mobile/src/i18n/locales/en.json')
+  );
+  const result = cli(root);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /mobile\/en: cannot audit catalog: ENOENT/);
+  assert.doesNotMatch(result.stderr, /Error:|at /);
 });
 
 // The descriptor policy guard keeps a misconfigured catalog from throwing: the

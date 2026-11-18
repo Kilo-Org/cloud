@@ -1,6 +1,6 @@
 import * as z from 'zod';
 
-import { GatewayApiKindSchema } from './schema-types';
+import { GatewayApiKindSchema, KiloOrganizationIdSchema } from './schema-types';
 
 /**
  * The enabled detectors cost at most 53 credits per call (`injection_attack` caps at 50), so a
@@ -43,13 +43,14 @@ const EnkryptApiKindSchema = GatewayApiKindSchema.extract([
  * Wire contract for the Enkrypt usage record endpoint:
  *
  * `id` and `occurredAt` are fixed once per Enkrypt call and are the writer's idempotency key, so
- * every resend must reuse them. `organizationId` accepts any GUID rather than only RFC UUIDs, so
- * existing organizations are never rejected; do not tighten it without checking stored ids.
+ * every resend must reuse them. `organizationId` follows the `organizations.id` column contract:
+ * every stored id is accepted, and the check matches the column's shape rather than a stricter
+ * form, so a stored organization keeps working across releases.
  */
 export const EnkryptUsageWriteSchema = z.strictObject({
   id: z.uuid(),
   occurredAt: z.iso.datetime({ offset: true }),
-  organizationId: z.guid(),
+  organizationId: KiloOrganizationIdSchema,
   kiloUserId: z.string().min(1),
   sessionId: z.string().nullable(),
   microdollarUsageId: z.uuid().optional(),

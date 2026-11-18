@@ -10179,6 +10179,17 @@
     ],
     "searchBlob": "cloudAgentSettings.getBuiltinAgents Get the current user's personal built-in agent settings, including disabled modes and per-agent model overrides. cloudagentsettings getbuiltinagents"
   },
+  "cloudAgentSettings.getModelContextLimits": {
+    "path": "cloudAgentSettings.getModelContextLimits",
+    "kind": "query",
+    "summary": "Get the current user's personal Cloud Agent context caps, as a map from gateway model IDs to token counts.",
+    "inputSchema": {},
+    "tags": [
+      "cloudagentsettings",
+      "getmodelcontextlimits"
+    ],
+    "searchBlob": "cloudAgentSettings.getModelContextLimits Get the current user's personal Cloud Agent context caps, as a map from gateway model IDs to token counts. cloudagentsettings getmodelcontextlimits"
+  },
   "cloudAgentSettings.getWorkspaceOrder": {
     "path": "cloudAgentSettings.getWorkspaceOrder",
     "kind": "query",
@@ -10332,6 +10343,39 @@
       "allocation"
     ],
     "searchBlob": "cloudAgentSettings.setContextAllocation Set or clear the default sandbox allocation used for Cloud Agent context, for the current user or their organization. cloudagentsettings setcontextallocation organizationid allocation organizationId allocation"
+  },
+  "cloudAgentSettings.setModelContextLimits": {
+    "path": "cloudAgentSettings.setModelContextLimits",
+    "kind": "mutation",
+    "summary": "Replace the current user's personal Cloud Agent context caps for new workspaces. Pass gateway model IDs mapped to token counts, or an empty map to clear all caps.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "limits": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 1000,
+            "maximum": 10000000
+          }
+        }
+      },
+      "required": [
+        "limits"
+      ]
+    },
+    "tags": [
+      "cloudagentsettings",
+      "setmodelcontextlimits",
+      "limits"
+    ],
+    "searchBlob": "cloudAgentSettings.setModelContextLimits Replace the current user's personal Cloud Agent context caps for new workspaces. Pass gateway model IDs mapped to token counts, or an empty map to clear all caps. cloudagentsettings setmodelcontextlimits limits limits"
   },
   "cloudAgentSettings.setRepositorySettings": {
     "path": "cloudAgentSettings.setRepositorySettings",
@@ -39452,8 +39496,13 @@
           "type": "string",
           "enum": [
             "cloud_agent",
+            "cloud_agent_chat",
             "kiloclaw_chat"
           ]
+        },
+        "cloudAgentSessionId": {
+          "type": "string",
+          "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         },
         "kiloclawInstanceId": {
           "type": "string",
@@ -39581,6 +39630,7 @@
       "organizationid",
       "runascreator",
       "targettype",
+      "cloudagentsessionid",
       "kiloclawinstanceid",
       "githubrepo",
       "mode",
@@ -39598,7 +39648,7 @@
       "cronexpression",
       "crontimezone"
     ],
-    "searchBlob": "webhookTriggers.create Create a new webhook or scheduled trigger that runs a Cloud Agent or KiloClaw Chat on an incoming request or cron schedule. Use this to set up an automation that fires when a GitHub event or webhook arrives. webhooktriggers create triggerid organizationid runascreator targettype kiloclawinstanceid githubrepo mode model variant sandboxallocation environmentid profileid bodyschema prompttemplate autocommit condenseoncomplete webhookauth activationmode cronexpression crontimezone triggerId organizationId runAsCreator targetType kiloclawInstanceId githubRepo mode model variant sandboxAllocation environmentId profileId bodySchema promptTemplate autoCommit condenseOnComplete webhookAuth activationMode cronExpression cronTimezone"
+    "searchBlob": "webhookTriggers.create Create a new webhook or scheduled trigger that runs a Cloud Agent or KiloClaw Chat on an incoming request or cron schedule. Use this to set up an automation that fires when a GitHub event or webhook arrives. webhooktriggers create triggerid organizationid runascreator targettype cloudagentsessionid kiloclawinstanceid githubrepo mode model variant sandboxallocation environmentid profileid bodyschema prompttemplate autocommit condenseoncomplete webhookauth activationmode cronexpression crontimezone triggerId organizationId runAsCreator targetType cloudAgentSessionId kiloclawInstanceId githubRepo mode model variant sandboxAllocation environmentId profileId bodySchema promptTemplate autoCommit condenseOnComplete webhookAuth activationMode cronExpression cronTimezone"
   },
   "webhookTriggers.delete": {
     "path": "webhookTriggers.delete",
@@ -39754,6 +39804,7 @@
           "type": "string",
           "enum": [
             "cloud_agent",
+            "cloud_agent_chat",
             "kiloclaw_chat"
           ]
         },
@@ -39778,6 +39829,28 @@
       "witheditability"
     ],
     "searchBlob": "webhookTriggers.list List webhook triggers owned by the current user or organization, with optional filtering by target type or activation mode, including their inbound webhook URLs. webhooktriggers list organizationid targettype activationmode witheditability organizationId targetType activationMode withEditability"
+  },
+  "webhookTriggers.listChatTargets": {
+    "path": "webhookTriggers.listChatTargets",
+    "kind": "query",
+    "summary": "List the chats and Cloud Agent sessions a user can pick as the target of a webhook trigger, optionally scoped to one organization; returns recent chats with titles and workspace names.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      }
+    },
+    "tags": [
+      "webhooktriggers",
+      "listchattargets",
+      "organizationid"
+    ],
+    "searchBlob": "webhookTriggers.listChatTargets List the chats and Cloud Agent sessions a user can pick as the target of a webhook trigger, optionally scoped to one organization; returns recent chats with titles and workspace names. webhooktriggers listchattargets organizationid organizationId"
   },
   "webhookTriggers.listRequests": {
     "path": "webhookTriggers.listRequests",
@@ -39836,6 +39909,9 @@
           "type": "string",
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "cloudAgentSessionId": {
+          "not": {}
         },
         "mode": {
           "type": "string",
@@ -39975,6 +40051,7 @@
       "update",
       "triggerid",
       "organizationid",
+      "cloudagentsessionid",
       "mode",
       "model",
       "variant",
@@ -39990,7 +40067,7 @@
       "cronexpression",
       "crontimezone"
     ],
-    "searchBlob": "webhookTriggers.update Update an existing trigger's settings, such as its model, prompt template, profile, active state, webhook authentication, or cron schedule. Use this to change or disable a trigger. webhooktriggers update triggerid organizationid mode model variant sandboxallocation environmentid prompttemplate profileid bodyschema autocommit condenseoncomplete isactive webhookauth cronexpression crontimezone triggerId organizationId mode model variant sandboxAllocation environmentId promptTemplate profileId bodySchema autoCommit condenseOnComplete isActive webhookAuth cronExpression cronTimezone"
+    "searchBlob": "webhookTriggers.update Update an existing trigger's settings, such as its model, prompt template, profile, active state, webhook authentication, or cron schedule. Use this to change or disable a trigger. webhooktriggers update triggerid organizationid cloudagentsessionid mode model variant sandboxallocation environmentid prompttemplate profileid bodyschema autocommit condenseoncomplete isactive webhookauth cronexpression crontimezone triggerId organizationId cloudAgentSessionId mode model variant sandboxAllocation environmentId promptTemplate profileId bodySchema autoCommit condenseOnComplete isActive webhookAuth cronExpression cronTimezone"
   },
   "workspaceFolders.create": {
     "path": "workspaceFolders.create",

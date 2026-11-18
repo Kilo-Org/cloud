@@ -17,6 +17,7 @@ import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { DirectUserByokInferenceProviderIdSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isUpstreamUrlPolicyEnforced } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-url-policy';
 
 const publicIdSchema = z.string().trim().min(1, 'public_id is required');
 
@@ -28,6 +29,17 @@ function badRequest(message: string): never {
 function assertPricingMatchesPublicId(publicId: string, definition: CustomLlmDefinition) {
   if (isFreeModel(publicId) && definition.pricing) {
     badRequest(`public_id "${publicId}" is a free model id, so pricing must not be set`);
+  }
+}
+
+/**
+ * The gateway refuses non-HTTPS upstreams wherever its URL policy applies, so
+ * such a definition is refused at save time instead of failing every request.
+ */
+function assertBaseUrlUsesHttps(definition: CustomLlmDefinition) {
+  if (!isUpstreamUrlPolicyEnforced()) return;
+  if (new URL(definition.base_url).protocol !== 'https:') {
+    badRequest('base_url must use https');
   }
 }
 
@@ -102,6 +114,7 @@ export const adminCustomLlmRouter = createTRPCRouter({
 
   upsert: adminProcedure.input(UpsertCustomLlmSchema).mutation(async ({ input }) => {
     assertPricingMatchesPublicId(input.public_id, input.definition);
+    assertBaseUrlUsesHttps(input.definition);
     const existing = await db.query.custom_llm2.findFirst({
       where: eq(custom_llm2.public_id, input.public_id),
     });

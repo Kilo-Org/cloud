@@ -26,6 +26,7 @@
     "creditHistory": "Ìtàn kírẹ́dítì",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Fagilé",
     "done": "Ó ti tán",
     "retry": "Tún gbìyànjú",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "Àwọn àyípadà",
     "organizationTrialEnded": "Àkókò ìdánwò àjọ náà ti parí, kò sì ní ètò tó ń ṣiṣẹ́. Ẹnìkan tí ó ni àjọ lè ṣe àtúnṣe ìsanwó ní kilo.ai, kí ó sì tún gbìyànjú.",
-    "privateRepositoryA11y": "{{name}}, ibi ìpamọ́ kòòdù ikọkọ"
+    "privateRepositoryA11y": "{{name}}, ibi ìpamọ́ kòòdù ikọkọ",
+    "legalDocumentEnglishOnly": "Ìwé yìí wà ní Èdè Gẹ̀ẹ́sì nìkan."
   },
   "language": {
     "restarting": "A ń tún bẹ̀rẹ̀ láti lo èdè tí o yàn",
@@ -481,7 +483,14 @@
       "viewReceipt": "Wo ìwé ẹ̀rí"
     },
     "changelog": "Àwọn ohun tuntun",
-    "changelogVersionPending": "Àkọsílẹ̀ ẹ̀yà yìí yóò dé pẹ̀lú ìmúdójúìwọ̀n áàpù tó kàn."
+    "changelogVersionPending": "Àkọsílẹ̀ ẹ̀yà {{version}} yóò dé pẹ̀lú ìmúdójúìwọ̀n áàpù tó kàn.",
+    "changelogGroupNew": "Tuntun",
+    "changelogFixesIn": "Àtúnṣe àti ìlọsíwájú nínú {{areas}}.",
+    "changelogFixesPolish": "Àtúnṣe àti ìlọsíwájú jákèjádò áàpù.",
+    "changelogAreas": {
+      "signIn": "Wíwọlé",
+      "profileOrganizations": "Àkọsílẹ̀ ara ẹni àti àwọn àjọ"
+    }
   },
   "preferences": {
     "general": "Gbogbogbo",
@@ -1354,7 +1363,8 @@
       "managedOnWeb": "A ń ṣàkóso ìsopọ̀ Bitbucket àjọ yìí lórí wẹ́ẹ̀bù láti orí kọ̀ǹpútà.",
       "description": "Ṣẹ̀dá àmi ìwọlé àyè iṣẹ́ pẹ̀lú àwọn àṣẹ tó yẹ, kí o sì lẹ̀ ẹ́ mọ́ nísàlẹ̀.",
       "scopes": "Àkọọ́lẹ̀: kíkà · Àwọn ibi ìpamọ́: kíkà/kíkọ · Àwọn ìbéèrè àkópọ̀: kíkà · Àwọn ìfitónilétí wẹ́bù: kíkà/kíkọ",
-      "tokenPlaceholder": "Àmi ìwọlé àyè iṣẹ́"
+      "tokenPlaceholder": "Àmi ìwọlé àyè iṣẹ́",
+      "tokenRefused": "Bitbucket kò gba àmi ìwọlé àyè iṣẹ́ yìí. Ṣàyẹ̀wò pé ó ní àwọn àkọọ́lẹ̀ tó wà lókè, kí o sì tún gbìyànjú lẹ́ẹ̀kan sí i."
     },
     "scopeList": {
       "personalStillAvailable": "Àwọn ibi ìpamọ́ ara ẹni ṣì wà nísàlẹ̀.",
@@ -1465,13 +1475,25 @@
       "repositoryLine": "Àtúnyẹ̀wò: {{reviews}} · Àbùkù: {{findings}}",
       "empty": "Kò sí àtúnyẹ̀wò pẹ̀lú ìṣirò",
       "emptyDescription": "Ìṣirò ń gbasilẹ̀ àwọn àtúnyẹ̀wò tó parí nígbà tí ó bá ṣí fún àjọ.",
-      "off": "Ìṣirò ti pa fún àjọ yìí.",
-      "couldNotLoad": "A kò lè gbé ìṣirò wọlé"
+      "offTitle": "Ìṣirò ti pa fún {{platform}}",
+      "offDescription": "Àwọn ipò owó-ìnáwó àjọ (àwọn olóhun, àwọn alákòóso àti àwọn olùdarí ìnáwó) lè ṣí ìṣirò sílẹ̀ nínú àwọn ètò àjọ lórí ayélujára láti gbasilẹ̀ àwọn àtúnyẹ̀wò tó parí.",
+      "couldNotLoad": "A kò lè gbé ìṣirò wọlé",
+      "trackedReviewsCaption": "Àwọn àtúnyẹ̀wò tó parí ní àkókò yìí nígbà tí ìṣirò ti ṣí sílẹ̀. A kì í tọpinpin àwọn àtúnyẹ̀wò tí ó ń ṣiṣẹ́ lọ́wọ́ báyìí àti àwọn tí ó kùnà rárá.",
+      "trackedReviewsUncounted": "Kì í ṣe tọpinpin: {{displayCount}} nínú {{displayTotal}} àtúnyẹ̀wò tó parí tí àjọ ní, àbájá wọn kò tíì gbasilẹ̀.",
+      "trackedReviewsUncounted_one": "Kì í ṣe tọpinpin: {{displayCount}} nínú {{displayTotal}} àtúnyẹ̀wò tó parí tí àjọ ní, àbájá wọn kò tíì gbasilẹ̀.",
+      "trackedReviewsUncounted_other": "Kì í ṣe tọpinpin: {{displayCount}} nínú {{displayTotal}} àtúnyẹ̀wò tó parí tí àjọ ní, àbájá wọn kò tíì gbasilẹ̀."
     },
     "council": {
       "title": "Àtúnyẹ̀wò ìgbìmọ̀",
       "subtitle": "Ọ̀pọ̀ àwọn akọ́ṣẹ́mọṣọ́ ń ṣàyẹ̀wò PR kọ̀ọ̀kan, àwọn ìdìbò wọn sì dàpọ̀ di ìpinnu kan.",
-      "unavailable": "Àtúnyẹ̀wò ìgbìmọ̀ kò sí fún àjọ yìí.",
+      "unavailablePersonallyTitle": "Nílò àjọ Enterprise kan",
+      "unavailablePersonally": "Àtúnyẹ̀wò ìgbìmọ̀ kì í ṣe apákan àkántì ẹ̀dá.",
+      "unavailablePersonallyAction": "Dá àjọ sílẹ̀",
+      "unavailablePersonallySwitchAction": "Yí àjọ padà",
+      "unavailableOrganizationTitle": "Àtúnyẹ̀wò ìgbìmọ̀ kò sí",
+      "unavailableForOrganization": "Àtúnyẹ̀wò ìgbìmọ̀ fẹ́r̀ẹ́ ètò Enterprise tó ní ìforúkọsílẹ̀ tó ń ṣiṣẹ́ tàbí àsìkò ìdánwò. Àjọ yìí kò ní i ní báyìí.",
+      "unavailableForOrganizationNeutral": "Àtúnyẹ̀wò ìgbìmọ̀ kò sí fún àjọ yìí ní báyìí. Gbìyànjú lẹ́ẹ̀kan sí i lẹ́yìn.",
+      "unavailableOnBitbucket": "Àtúnyẹ̀wò ìgbìmọ̀ kò sí fún àwọn ibi ìpamọ́ Bitbucket.",
       "noRepositories": "A kò tíì yan ibi ìpamọ́ kankan. Kọ́kọ́ yan àwọn ibi ìpamọ́ nínú àwọn ètò ibi ìpamọ́.",
       "specialists": "Àwọn akọ́ṣẹ́mọṣọ́",
       "labels": "Àwọn àmì tó ń mú àtúnyẹ̀wò ìgbìmọ̀ ṣiṣẹ́",
@@ -3122,7 +3144,6 @@
     "completingPurchase": "A ń parí rírà",
     "subscriptionLoading": "A ń gbé ìforúkọsílẹ̀ Kilo Pass wọlé",
     "retryHint": "Ó tún ń gbìyànjú láti gba ipò Kilo Pass.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Ó ti parí ní {{date}}",
     "notAvailableInApp": "Kilo Pass kò sí nínú áàpù.",
     "statusActive": "Ń ṣiṣẹ́",
@@ -3325,6 +3346,7 @@
       "manageOnWeb": "Àtúnṣe ìsanwó lórí wẹ́ẹ̀bù",
       "changePlan": "Yí ètò padà",
       "buySeats": "Ra ààyè",
+      "managedOnWeb": "A ń ṣàkóso ètò náà, àwọn ààyè àti ìfikún owó aládàáṣe lórí wẹ́ẹ̀bù.",
       "setupAutoTopUp": "Ṣètò ìfikún owó aládàáṣe",
       "manageAutoTopUp": "Ṣàkóso ìfikún owó aládàáṣe",
       "opensOnWeb": "Yóò ṣí lórí wẹ́ẹ̀bù"
@@ -3473,12 +3495,10 @@
       "requestLogs": "Àwọn àkọsílẹ̀ ìbéèrè"
     },
     "requestLogs": {
-      "hint": "Àwọn ìbéèrè inú wákàtí kan kí àkókò yìí tó parí, tuntun jùlọ lákọ̀ọ́kọ́.",
       "older": "Wákàtí tó ṣáájú",
       "newer": "Wákàtí tó tẹ̀lé",
       "truncated": "Wákàtí yìí ní ìbéèrè ju èyí tí àtòjọ fi hàn lọ.",
       "emptyTitle": "Kò sí ìbéèrè",
-      "emptyDescription": "Kò sí ìbéèrè sí ẹnu-ọ̀nà AI nínú wákàtí yìí.",
       "loadError": "A kò lè gbé àwọn àkọsílẹ̀ ìbéèrè wọlé.",
       "permissionDenied": "Olùní àjọ, alábòójútó tàbí olùṣàkóso ìsanwó nìkan ló lè ka àkọsílẹ̀ ìbéèrè rẹ̀.",
       "tokens": "{{input}} wọlé · {{output}} jáde",
@@ -4282,8 +4302,7 @@
       "repoValue": "Ibi ipamọ: {{name}}",
       "profileValue": "Profaili: {{name}}",
       "profileUnavailable": "Profaili yìí kò sí mọ́. Yan òmíràn.",
-      "pickerEmptyDescriptionOrganization": "Ṣẹda profaili ajọ kan lati tun lo awọn oniyipada ayika, awọn pipaṣẹ iṣeto, ati awọn ọgbọn kọja awọn akoko.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Olukilani ajọ tabi olùṣàkoso ajọ le ṣẹda profaili ajọ kan."
+      "pickerEmptyDescriptionOrganization": "Ṣẹda profaili ajọ kan lati tun lo awọn oniyipada ayika, awọn pipaṣẹ iṣeto, ati awọn ọgbọn kọja awọn akoko."
     },
     "variablesDeleteFailed": "Ko le paarẹ oniyipada",
     "deleteVariable": "Pa oniyipada {{key}} rẹ́",
@@ -4469,7 +4488,6 @@
     "dismiss": "Yọ ìròyìn kúrò",
     "offline": "Kò sí lórí ayélujára · ìròyìn tí a fipamọ́",
     "cached": "Ìròyìn tí a fipamọ́ · kò ṣeé sọ di tuntun",
-    "window": "{{start}} – {{end}}",
     "summary": "Àkópọ̀ AI",
     "summaryPending": "Àkópọ̀ AI ń lọ lọ́wọ́. Yóò so mọ́ ibí nígbà tó bá ṣetán.",
     "summaryUnavailable": "Àkópọ̀ AI kò sí. Ìròyìn onílànà rẹ ṣì wà.",
@@ -4588,6 +4606,7 @@
       "title": "Àwọn ìmúṣiṣẹ́ àti àwọn wẹ́ẹ̀bùhóòkù",
       "subtitle": "Ṣe àdáṣe àwọn ìṣiṣẹ́ Cloud Agent láti ìpè wẹ́ẹ̀bùhóòkù tàbí ìtòlẹ́sẹẹsẹ.",
       "new": "Ìmúṣiṣẹ́ tuntun",
+      "create": "Ṣẹ̀dá ìmúṣiṣẹ́",
       "emptyTitle": "Kò sí ìmúṣiṣẹ́ kankan síbẹ̀",
       "emptyDescription": "Ṣẹ̀dá ìmúṣiṣẹ́ kan láti bẹ̀rẹ̀ ìṣiṣẹ́ Cloud Agent láti ìpè wẹ́ẹ̀bùhóòkù tàbí ní ìtòlẹ́sẹẹsẹ.",
       "loadFailedTitle": "A kò lè gbé àwọn ìmúṣiṣẹ́ wọlé",
@@ -4641,6 +4660,8 @@
       "created": "A ti ṣẹ̀dá ìmúṣiṣẹ́",
       "saved": "A ti fi ìmúṣiṣẹ́ pamọ́",
       "statusArrived": "Ó ti dé",
+      "defaultPromptWebhook": "Ṣàpèjúwe ara ìbéèrè wẹ́ẹ̀bùhóòkù yìí:\n\n{{body}}",
+      "defaultPromptScheduled": "Ṣe iṣẹ́ àtòjọ náà. A mú un ṣiṣẹ́ ní {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Tẹ orúkọ kan.",
         "nameTooShort": "Lo ó kéré tó 8 lẹ́tà.",
@@ -4689,6 +4710,7 @@
     "superseded": "A ti rọ́pò ìjápọ̀ yìí ní ibòmíràn, nítorí náà kò ṣiṣẹ́ mọ́."
   },
   "sharedSession": {
+    "startedAt": "Bẹ̀rẹ̀ ní {{time}}",
     "title": "Ìgbà iṣẹ́ tí a pín",
     "someone": "Ẹnìkan",
     "sharedBy": "{{owner}} ló pín in",

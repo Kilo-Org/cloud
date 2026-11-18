@@ -202,7 +202,7 @@ Usage-accounting transport is selected from deployment labels alone: staging wit
 - `OPENAI_DISCOVERY_URL` - Optional override for the OpenAI OpenID Connect discovery document; defaults to the production issuer's document. [SERVER]
 - `OPENAI_TOKEN_ENDPOINT` - Optional override for the OpenAI token endpoint; defaults to the production issuer's endpoint. [SERVER]
 - `OPENAI_CHATGPT_API_URL` - Optional override for the base URL that token-sharing requests use with a "Sign in with ChatGPT" connection; defaults to `https://api.openai.com/v1`. Set it wherever `OPENAI_DISCOVERY_URL`/`OPENAI_TOKEN_ENDPOINT` are overridden, so delegated inference stays in the same environment as the token issuer. [SERVER]
-- `CLAUDE_SIGN_IN_CLIENT_ID` - Client ID of the "Sign in with Claude" OAuth app in the Claude Console. Register `<APP_URL>/api/auth/callback/claude` as its redirect URI. The Claude provider is registered only when this value is set. The person-targeted PostHog release toggle `claude-platform-oauth` controls sign-in, account linking, Linked billing with Claude Platform, and customer-billed inference. [SERVER]
+- `CLAUDE_SIGN_IN_CLIENT_ID` - Client ID of the "Sign in with Claude" OAuth app in the Claude Console. Register `<APP_URL>/api/auth/callback/claude` as its redirect URI. The Claude provider is registered only when this value is set. Sign-in and account-link controls follow the configured provider list; email discovery excludes Claude when this value is absent. [SERVER]
 - `CLAUDE_SIGN_IN_ASSERTION_AUDIENCE` - The audience that the sign-in app's **Client authentication** tab shows; the `aud` of its client assertions. [SERVER]
 - `CLAUDE_FEDERATION_ISSUER` - The issuer URL of Kilo's federation issuer registered with Anthropic (inline JWKS); the `iss` of every Kilo-signed Claude JWT. [SERVER]
 - `CLAUDE_FEDERATION_SUBJECT` - The `sub` of every Kilo-signed Claude JWT; must match the subject pattern of the OAuth apps and the federation rule. [SERVER]
@@ -217,24 +217,14 @@ Usage-accounting transport is selected from deployment labels alone: staging wit
 - `CLAUDE_OPERATOR_WORKSPACE_ID` - Optional; needed only when the operator federation rule covers more than one workspace. [SERVER]
 - `CLAUDE_OPERATOR_TOKEN_AUDIENCE` - The audience the operator federation rule expects on the identity JWT Kilo signs. [SERVER]
 
-The `claude-platform-oauth` release toggle defaults to off and requires the boolean value `true`, including in development.
-The employee rollout targets person property `email` ending in `@kilocode.ai`, at 100% of that audience only.
-Every server evaluation supplies `personProperties.email`; results are not globally cached or shared between people.
-Sign-in checks the validated provider email only when `email_verified` is boolean `true`.
-Account linking and billing approval routes also check the authenticated person's current database email.
+Claude sign-in, account linking, and Linked billing with Claude Platform require their app and operator credentials.
+There is no separate release toggle: the provider is offered only when `CLAUDE_SIGN_IN_CLIENT_ID` is set.
+Anthropic's ID token need not carry `email_verified`; sign-in still refuses a token that states the address is unverified, and only a `true` claim auto-links an existing account by email.
 Explicit Claude account links require a matching pending link and a current browser session, including its revocation check.
 They bind the verified provider subject, not the provider email, and preserve the initiating browser session.
 An explicit link does not require an email-verification claim and cannot create an account or link accounts by email.
-Gateway requests check the authenticated requester's database email, including organization-scoped requests, after the authoritative payer lookup.
-Missing email or failed evaluation denies access; there is no development bypass.
 Claude authentication refusals log a fixed reason and allowlisted claim names, never identity values or tokens.
-Anonymous visitors can discover Claude through the existing email-first flow without an identified browser PostHog person.
 The submitted discovery email controls offered methods only; ordinary sign-in independently authorizes the verified provider email.
-The shared server PostHog client deliberately returns no flags outside production, so enabled local server paths require test fixtures.
-Use the focused Claude tests for enabled server behavior and browser-only SDK overrides for UI checks.
-Browser overrides do not bypass the server gate. Do not enable the live rollout for local testing.
-When disabled, linked owners cannot use customer-billed inference; requests fail explicitly rather than switch payer.
-Existing link status and removal stay available, while new links and linking again remain hidden and refused.
 
 Customer-billed Claude requests require a current link check. Frankfurt reads the authoritative link directly.
 The US gateway delegates this check to the web application with `INTERNAL_API_SECRET`.
@@ -631,7 +621,7 @@ Abrupt OOM/SIGKILL failures and synthetic session failure events are not capture
 - `WORKSPACE_SNAPSHOT_IDS` - Comma-separated user or organization IDs enrolled in private registered Cloud Agent workspace tail capture and restore, independent of environment snapshots. Matching either enables the feature; `*` enrolls everyone, and empty or unset is off. Only native Cloudflare Containers dedicated to one registered workspace are eligible. Sibling sessions share one snapshot; standalone sessions are excluded. Capture uses aggregate workspace activity after one minute. Snapshots may contain workspace secrets. The production Wrangler default is `*`; the dev default is empty. [SERVER]
 - `WORKSPACE_ARTIFACTS_BUCKET` - Private R2 binding for synchronized workspace artifacts. Production uses `cloud-agent-workspace-artifacts`; dev uses `cloud-agent-workspace-artifacts-dev`. Objects are keyed `<sandboxId>/<uuid>` and are never served publicly. [SERVER]
 - `WORKSPACE_ARTIFACTS_BUCKET_NAME` - Name of the artifacts bucket used as the S3 bucket in presigned download URLs. Must match the `WORKSPACE_ARTIFACTS_BUCKET` binding. Presigned downloads reuse the attachments read-only S3 key (`R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID` / `R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY`); the operator must add the artifacts bucket to that token's read scope. [SERVER]
-  - Operator lifecycle requirement: the artifacts bucket must have an R2 lifecycle rule that deletes objects 15 days after upload. Artifact index entries expire and are pruned 14 days after their last update (`WORKSPACE_ARTIFACT_RETENTION_MS`); every update writes a new object key, so the extra day covers commit latency and clock skew. Deploy does not create or update this rule; an operator applies it before the wrapper that uploads artifacts is released, and extends the attachments read-only token to the artifacts bucket at the same time. Withhold artifact downloads until the lifecycle rule exists.
+  - Do not ship lifecycle retention until there is durable artifact cleanup for pending runtime deletions and account erasure. Pending deletions can fail before the Sandbox DO queues cleanup, and account erasure bypasses that DO. Both paths can leave index rows and R2 objects behind. Once cleanup is in place, remove the old 15-day R2 expiration rule from both artifact buckets before deploying. Deployment does not change bucket rules. An upload-age rule deletes files from live workspaces and leaves their index entries behind.
 - `PREVIEW_HOST_SUFFIX` - Hostname suffix the Cloud Agent Next Worker dispatches preview hosts under; a preview host is `p<port>-<workspace-uuid-hex>.<suffix>`. Unset or empty disables preview dispatch and the `/preview/open` hop, and the web app hides the preview button (it reads availability from the Worker's `getPreviewOptions`). The web app needs no preview setting. Production `wrangler.jsonc` sets `cloud-agent.kiloapps.ai`. `services/cloud-agent-next/.dev.vars.example` sets `localhost`. [SERVER]
 - `E2E_MODEL_VALIDATION_BASE_URL` - E2E-only base URL for Cloud Agent Next model validation. Only the deployed e2e Worker config sets it (`test/e2e/deploy/render-e2e-worker-config.mjs`), to point validation at the fake-LLM catalogue. It is honoured only when its origin equals the origin of `KILO_OPENROUTER_BASE`; otherwise validation uses `KILOCODE_BACKEND_BASE_URL`. Unset in production. [SERVER]
 - `BYOC_VERCEL_IDS` - Comma-separated user or organization IDs enrolled in customer-paid Vercel compute. Empty is off; `*` enrolls both personal accounts and organizations. An enrolled owner fails closed when its ready credential is absent. [SERVER]

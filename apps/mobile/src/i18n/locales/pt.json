@@ -26,6 +26,7 @@
     "creditHistory": "Histórico de créditos",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Cancelar",
     "done": "Concluir",
     "retry": "Tentar novamente",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "Alterações",
     "organizationTrialEnded": "O período de teste da organização terminou e esta não tem um plano ativo. O proprietário da organização pode atualizar a faturação em kilo.ai e, em seguida, tentar novamente.",
-    "privateRepositoryA11y": "{{name}}, repositório privado"
+    "privateRepositoryA11y": "{{name}}, repositório privado",
+    "legalDocumentEnglishOnly": "Este documento está disponível apenas em inglês."
   },
   "language": {
     "restarting": "A reiniciar para aplicar o idioma",
@@ -481,7 +483,14 @@
       "viewReceipt": "Ver comprovativo"
     },
     "changelog": "Novidades",
-    "changelogVersionPending": "As notas desta versão vêm na próxima atualização da app."
+    "changelogVersionPending": "As notas da versão {{version}} vêm na próxima atualização da app.",
+    "changelogGroupNew": "Novidades",
+    "changelogFixesIn": "Correções e melhorias em {{areas}}.",
+    "changelogFixesPolish": "Correções e melhorias em toda a aplicação.",
+    "changelogAreas": {
+      "signIn": "Início de sessão",
+      "profileOrganizations": "Perfil e organizações"
+    }
   },
   "preferences": {
     "general": "Geral",
@@ -1377,7 +1386,8 @@
       "managedOnWeb": "A ligação ao Bitbucket desta organização é gerida na Web, a partir de um computador.",
       "description": "Cria um token de acesso ao espaço de trabalho com as permissões necessárias e cola-o abaixo.",
       "scopes": "Conta: leitura · Repositórios: leitura/escrita · Pedidos de integração: leitura · Webhooks: leitura/escrita",
-      "tokenPlaceholder": "Token de acesso ao espaço de trabalho"
+      "tokenPlaceholder": "Token de acesso ao espaço de trabalho",
+      "tokenRefused": "O Bitbucket não aceitou este token de acesso ao espaço de trabalho. Verifica se tem as permissões acima e tenta novamente."
     },
     "scopeList": {
       "personalStillAvailable": "Os repositórios pessoais ainda estão disponíveis abaixo.",
@@ -1489,13 +1499,26 @@
       "repositoryLine": "Revisões: {{reviews}} · Ocorrências: {{findings}}",
       "empty": "Ainda não há revisões com estatísticas",
       "emptyDescription": "As estatísticas registam revisões concluídas enquanto estão ativadas para a organização.",
-      "off": "As estatísticas estão desativadas para esta organização.",
-      "couldNotLoad": "Não foi possível carregar as estatísticas"
+      "offTitle": "As estatísticas estão desativadas para {{platform}}",
+      "offDescription": "As funções de faturação da organização (proprietários, administradores e gestores de faturação) podem ativar as estatísticas nas definições da organização na Web para registar revisões concluídas.",
+      "couldNotLoad": "Não foi possível carregar as estatísticas",
+      "trackedReviewsCaption": "Revisões concluídas que terminaram neste período com as estatísticas ativadas. As revisões em execução e as falhadas nunca são contadas.",
+      "trackedReviewsUncounted": "Não contadas: {{displayCount}} das {{displayTotal}} revisões concluídas da organização sem resultado capturado.",
+      "trackedReviewsUncounted_many": "Não contadas: {{displayCount}} das {{displayTotal}} revisões concluídas da organização sem resultado capturado.",
+      "trackedReviewsUncounted_one": "Não contadas: {{displayCount}} das {{displayTotal}} revisões concluídas da organização sem resultado capturado.",
+      "trackedReviewsUncounted_other": "Não contadas: {{displayCount}} das {{displayTotal}} revisões concluídas da organização sem resultado capturado."
     },
     "council": {
       "title": "Revisão do conselho",
       "subtitle": "Vários especialistas revêm cada pedido de integração e os votos deles combinam-se numa única decisão.",
-      "unavailable": "A revisão do conselho não está disponível para esta organização.",
+      "unavailablePersonallyTitle": "Precisa de uma organização Enterprise",
+      "unavailablePersonally": "A revisão do conselho não faz parte de uma conta pessoal.",
+      "unavailablePersonallyAction": "Criar organização",
+      "unavailablePersonallySwitchAction": "Trocar de organização",
+      "unavailableOrganizationTitle": "Revisão do conselho não está disponível",
+      "unavailableForOrganization": "A revisão do conselho precisa do plano Enterprise com uma subscrição ou um período de teste ativos. Esta organização não o tem neste momento.",
+      "unavailableForOrganizationNeutral": "A revisão do conselho não está disponível para esta organização neste momento. Tente novamente mais tarde.",
+      "unavailableOnBitbucket": "A revisão do conselho não está disponível para repositórios Bitbucket.",
       "noRepositories": "Ainda não há repositórios selecionados. Escolhe primeiro repositórios nas definições de repositórios.",
       "specialists": "Especialistas",
       "labels": "Etiquetas que ativam a revisão do conselho",
@@ -3185,7 +3208,6 @@
     "completingPurchase": "A concluir a compra",
     "subscriptionLoading": "A carregar a subscrição do Kilo Pass",
     "retryHint": "Tenta obter novamente o estado do Kilo Pass.",
-    "cardAccessibility": "{{title}}: {{description}}. {{actionLabel}}",
     "endedOn": "Terminado em {{date}}",
     "notAvailableInApp": "O Kilo Pass não está disponível na app.",
     "statusActive": "Ativo",
@@ -3388,6 +3410,7 @@
       "manageOnWeb": "Definições de faturação na Web",
       "changePlan": "Alterar plano",
       "buySeats": "Comprar lugares",
+      "managedOnWeb": "O plano, os lugares e o carregamento automático são geridos na Web.",
       "setupAutoTopUp": "Configurar carregamento automático",
       "manageAutoTopUp": "Gerir carregamento automático",
       "opensOnWeb": "Abre na web"
@@ -3536,12 +3559,10 @@
       "requestLogs": "Registos de pedidos"
     },
     "requestLogs": {
-      "hint": "Pedidos da hora anterior ao fim do intervalo, mais recentes primeiro.",
       "older": "Hora anterior",
       "newer": "Hora seguinte",
       "truncated": "Esta hora tem mais pedidos do que os apresentados na lista.",
       "emptyTitle": "Sem pedidos",
-      "emptyDescription": "Não há pedidos ao gateway nesta hora.",
       "loadError": "Não foi possível carregar os registos de pedidos.",
       "permissionDenied": "Só um proprietário, administrador ou gestor de faturação de uma organização pode consultar os respetivos registos de pedidos.",
       "tokens": "{{input}} de entrada · {{output}} de saída",
@@ -4354,8 +4375,7 @@
       "repoValue": "Repositório: {{name}}",
       "profileValue": "Perfil: {{name}}",
       "profileUnavailable": "Este perfil já não está disponível. Escolha outro.",
-      "pickerEmptyDescriptionOrganization": "Crie um perfil de organização para reutilizar variáveis de ambiente, comandos de configuração e competências entre sessões.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Um proprietário ou administrador da organização pode criar um perfil de organização."
+      "pickerEmptyDescriptionOrganization": "Crie um perfil de organização para reutilizar variáveis de ambiente, comandos de configuração e competências entre sessões."
     },
     "variablesDeleteFailed": "Não foi possível eliminar a variável",
     "deleteVariable": "Eliminar a variável {{key}}",
@@ -4545,7 +4565,6 @@
     "dismiss": "Ignorar relatório",
     "offline": "Offline · relatório guardado",
     "cached": "Relatório guardado · atualização indisponível",
-    "window": "{{start}} – {{end}}",
     "summary": "Resumo de IA",
     "summaryPending": "Resumo de IA em curso. Será anexado aqui quando estiver pronto.",
     "summaryUnavailable": "Resumo de IA indisponível. O seu relatório estruturado continua disponível.",
@@ -4664,6 +4683,7 @@
       "title": "Acionadores e webhooks",
       "subtitle": "Automatize execuções do Cloud Agent a partir de uma chamada de webhook ou de uma programação.",
       "new": "Novo acionador",
+      "create": "Criar acionador",
       "emptyTitle": "Ainda não há acionadores",
       "emptyDescription": "Crie um acionador para iniciar uma execução do Cloud Agent a partir de uma chamada de webhook ou segundo uma programação.",
       "loadFailedTitle": "Não foi possível carregar os acionadores",
@@ -4717,6 +4737,8 @@
       "created": "Acionador criado",
       "saved": "Acionador guardado",
       "statusArrived": "Recebido",
+      "defaultPromptWebhook": "Descreve o corpo do pedido desta chamada de webhook:\n\n{{body}}",
+      "defaultPromptScheduled": "Executa a tarefa agendada. Acionada às {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Introduza um nome.",
         "nameTooShort": "Utilize pelo menos 8 caracteres.",
@@ -4765,6 +4787,7 @@
     "superseded": "Este link foi substituído noutro dispositivo, por isso deixou de funcionar."
   },
   "sharedSession": {
+    "startedAt": "Iniciada às {{time}}",
     "title": "Sessão partilhada",
     "someone": "Alguém",
     "sharedBy": "Partilhada por {{owner}}",

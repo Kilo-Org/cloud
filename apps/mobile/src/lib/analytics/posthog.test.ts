@@ -90,12 +90,6 @@ function readCustomAppProperties(): (
   return fn as (properties: Record<string, unknown>) => Record<string, unknown>;
 }
 
-async function loadInitPostHog() {
-  vi.resetModules();
-  const module = await import('./posthog');
-  return module.initPostHog;
-}
-
 // oxlint-disable-next-line require-await -- async required by promise-function-async
 async function loadModule() {
   vi.resetModules();
@@ -122,7 +116,7 @@ describe('initPostHog device_form_factor', () => {
     'maps deviceType $deviceType to device_form_factor $expected',
     async ({ deviceType, expected }) => {
       hoisted.device.deviceType = deviceType;
-      const initPostHog = await loadInitPostHog();
+      const { initPostHog } = await loadModule();
       initPostHog();
 
       const customAppProperties = readCustomAppProperties();
@@ -135,7 +129,7 @@ describe('initPostHog device_form_factor', () => {
 
   it('registers platform: mobile once', async () => {
     hoisted.device.deviceType = 1;
-    const initPostHog = await loadInitPostHog();
+    const { initPostHog } = await loadModule();
     initPostHog();
 
     expect(hoisted.client.register).toHaveBeenCalledTimes(1);
@@ -144,7 +138,7 @@ describe('initPostHog device_form_factor', () => {
 
   it('constructs PostHog only once when init is called twice', async () => {
     hoisted.device.deviceType = 1;
-    const initPostHog = await loadInitPostHog();
+    const { initPostHog } = await loadModule();
     const posthogModule = await import('posthog-react-native');
     const PostHog = posthogModule.default;
 
@@ -155,7 +149,7 @@ describe('initPostHog device_form_factor', () => {
   });
 
   it('passes customStorage to PostHog', async () => {
-    const initPostHog = await loadInitPostHog();
+    const { initPostHog } = await loadModule();
     initPostHog();
 
     expect(hoisted.holder.options?.customStorage).toBe(hoisted.storage.posthogCustomStorage);
@@ -173,7 +167,7 @@ describe('initPostHog gate', () => {
 
   it('returns early when no account decision exists', async () => {
     hoisted.controller.allowsMandatory.mockReturnValue(false);
-    const initPostHog = await loadInitPostHog();
+    const { initPostHog } = await loadModule();
     initPostHog();
 
     const posthogModule = await import('posthog-react-native');
@@ -182,7 +176,7 @@ describe('initPostHog gate', () => {
 
   it('initializes when optional consent is true', async () => {
     hoisted.controller.allowsOptional.mockReturnValue(true);
-    const initPostHog = await loadInitPostHog();
+    const { initPostHog } = await loadModule();
     initPostHog();
 
     const posthogModule = await import('posthog-react-native');
@@ -194,7 +188,7 @@ describe('initPostHog gate', () => {
     // account, but every switch that would send analytics on its own is off and
     // the SDK starts opted out, so capture is dropped.
     hoisted.controller.allowsOptional.mockReturnValue(false);
-    const initPostHog = await loadInitPostHog();
+    const { initPostHog } = await loadModule();
     initPostHog();
 
     const posthogModule = await import('posthog-react-native');
@@ -212,7 +206,7 @@ describe('initPostHog gate', () => {
 
   it('keeps capture on when optional consent is given', async () => {
     hoisted.controller.allowsOptional.mockReturnValue(true);
-    const initPostHog = await loadInitPostHog();
+    const { initPostHog } = await loadModule();
     initPostHog();
 
     expect(hoisted.holder.options).toMatchObject({
@@ -230,7 +224,7 @@ describe('initPostHog gate', () => {
     hoisted.controller.allowsOptional.mockReturnValue(true);
     vi.stubGlobal('__DEV__', true);
     try {
-      const initPostHog = await loadInitPostHog();
+      const { initPostHog } = await loadModule();
       initPostHog();
 
       const posthogModule = await import('posthog-react-native');
@@ -247,7 +241,7 @@ describe('initPostHog gate', () => {
     vi.stubGlobal('__DEV__', true);
     process.env.EXPO_PUBLIC_POSTHOG_DEV_HOST = 'http://10.0.2.2:8123';
     try {
-      const initPostHog = await loadInitPostHog();
+      const { initPostHog } = await loadModule();
       initPostHog();
 
       const posthogModule = await import('posthog-react-native');
@@ -606,7 +600,7 @@ describe('initPostHog constructor options', () => {
   });
 
   it('passes disableGeoip: true to the constructor', async () => {
-    const initPostHog = await loadInitPostHog();
+    const { initPostHog } = await loadModule();
     initPostHog();
 
     expect(hoisted.holder.options?.disableGeoip).toBe(true);

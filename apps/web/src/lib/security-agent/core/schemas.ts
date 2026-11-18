@@ -17,6 +17,7 @@ export const DismissReasonSchema = z.enum([
   'inaccurate',
   'not_used',
 ]);
+export type DismissReason = z.infer<typeof DismissReasonSchema>;
 
 export const RepositorySelectionModeSchema = z.enum(['all', 'selected']);
 export const AutoDismissConfidenceThresholdSchema = z.enum(['high', 'medium', 'low']);

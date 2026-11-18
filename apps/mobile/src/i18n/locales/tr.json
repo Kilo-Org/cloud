@@ -26,6 +26,7 @@
     "creditHistory": "Kredi geçmişi",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "İptal",
     "done": "Bitti",
     "retry": "Tekrar dene",
@@ -175,7 +176,8 @@
     "durationHourShort": "sa",
     "changes": "Değişiklikler",
     "organizationTrialEnded": "Kuruluşun deneme süresi sona erdi ve etkin bir planı yok. Kuruluş sahibi kilo.ai adresinden faturalandırmayı güncelleyip ardından tekrar deneyebilir.",
-    "privateRepositoryA11y": "{{name}}, özel depo"
+    "privateRepositoryA11y": "{{name}}, özel depo",
+    "legalDocumentEnglishOnly": "Bu belge yalnızca İngilizce olarak mevcuttur."
   },
   "language": {
     "restarting": "Dil değişikliğini uygulamak için yeniden başlatılıyor",
@@ -481,7 +483,14 @@
       "viewReceipt": "Alındıyı görüntüle"
     },
     "changelog": "Yenilikler",
-    "changelogVersionPending": "Bu sürümün notları sonraki uygulama güncellemesiyle gelir."
+    "changelogVersionPending": "{{version}} sürümünün notları sonraki uygulama güncellemesiyle gelir.",
+    "changelogGroupNew": "Yeni",
+    "changelogFixesIn": "Şu alanlarda düzeltmeler ve iyileştirmeler: {{areas}}.",
+    "changelogFixesPolish": "Uygulama genelinde düzeltmeler ve iyileştirmeler.",
+    "changelogAreas": {
+      "signIn": "Oturum açma",
+      "profileOrganizations": "Profil ve kuruluşlar"
+    }
   },
   "preferences": {
     "general": "Genel",
@@ -676,7 +685,8 @@
       "managedOnWeb": "Bu kuruluşun Bitbucket bağlantısı bir bilgisayardan web üzerinden yönetilir.",
       "description": "Gerekli izinlere sahip bir çalışma alanı erişim belirteci oluştur ve aşağıya yapıştır.",
       "scopes": "İzinler: Hesap okuma · Depo okuma/yazma · Çekme isteği okuma · Webhook okuma/yazma.",
-      "tokenPlaceholder": "Çalışma alanı erişim belirteci"
+      "tokenPlaceholder": "Çalışma alanı erişim belirteci",
+      "tokenRefused": "Bitbucket bu çalışma alanı erişim belirtecini kabul etmedi. Yukarıdaki izinlere sahip olduğunu kontrol et ve yeniden dene."
     },
     "followReviewMd": "REVIEW.md yönergelerine uy",
     "followReviewMdSubtitle": "Her deponun REVIEW.md dosyasındaki talimatlara uy",
@@ -922,13 +932,25 @@
       "repositoryLine": "İncelemeler: {{reviews}} · Bulgular: {{findings}}",
       "empty": "Henüz istatistiği olan inceleme yok",
       "emptyDescription": "İstatistikler, kuruluş için etkin olduğu sürece tamamlanan incelemeleri kaydeder.",
-      "off": "Bu kuruluş için istatistikler kapalı.",
-      "couldNotLoad": "İstatistikler yüklenemedi"
+      "offTitle": "{{platform}} için istatistikler kapalı",
+      "offDescription": "Kuruluşun faturalama rollerine sahip kişiler (sahipler, yöneticiler ve faturalama yöneticileri), tamamlanan incelemeleri kaydetmek için istatistikleri web'deki kuruluş ayarlarından açabilir.",
+      "couldNotLoad": "İstatistikler yüklenemedi",
+      "trackedReviewsCaption": "Bu dönemde istatistikler açıkken tamamlanan incelemeler. Devam eden ve başarısız olan incelemeler hiçbir zaman sayılmaz.",
+      "trackedReviewsUncounted": "Sayılmadı: kuruluşun tamamlanan {{displayTotal}} incelemesinden {{displayCount}} tanesinin sonucu kaydedilmedi.",
+      "trackedReviewsUncounted_one": "Sayılmadı: kuruluşun tamamlanan {{displayTotal}} incelemesinden {{displayCount}} tanesinin sonucu kaydedilmedi.",
+      "trackedReviewsUncounted_other": "Sayılmadı: kuruluşun tamamlanan {{displayTotal}} incelemesinden {{displayCount}} tanesinin sonucu kaydedilmedi."
     },
     "council": {
       "title": "Konsey incelemesi",
       "subtitle": "Birkaç uzman her çekme isteğini inceler ve oyları tek bir kararda birleşir.",
-      "unavailable": "Konsey incelemesi bu kuruluş için kullanılamıyor.",
+      "unavailablePersonallyTitle": "Enterprise kuruluşu gerekli",
+      "unavailablePersonally": "Konsey incelemesi kişisel hesabın bir parçası değildir.",
+      "unavailablePersonallyAction": "Kuruluş oluştur",
+      "unavailablePersonallySwitchAction": "Kuruluş değiştir",
+      "unavailableOrganizationTitle": "Konsey incelemesi şu anda mevcut değil",
+      "unavailableForOrganization": "Konsey incelemesi, etkin bir abonelik veya deneme süresi olan Enterprise planını gerektirir. Bu kuruluşta şu anda mevcut değil.",
+      "unavailableForOrganizationNeutral": "Konsey incelemesi şu anda bu kuruluş için mevcut değil. Daha sonra tekrar deneyin.",
+      "unavailableOnBitbucket": "Konsey incelemesi Bitbucket depoları için kullanılamıyor.",
       "noRepositories": "Henüz depo seçilmedi. Önce depo ayarlarından depo seç.",
       "specialists": "Uzmanlar",
       "labels": "Konsey incelemesini tetikleyen etiketler",
@@ -2579,7 +2601,6 @@
     "completingPurchase": "Satın alma tamamlanıyor",
     "subscriptionLoading": "Kilo Pass aboneliği yükleniyor",
     "retryHint": "Kilo Pass durumunu almayı tekrar dener.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "{{date}} tarihinde sona erdi",
     "notAvailableInApp": "Kilo Pass uygulamada kullanılamıyor.",
     "statusActive": "Aktif",
@@ -3317,6 +3338,7 @@
       "manageOnWeb": "Web'deki faturalandırma ayarları",
       "changePlan": "Planı değiştir",
       "buySeats": "Lisans satın al",
+      "managedOnWeb": "Plan, lisanslar ve otomatik yükleme web'de yönetilir.",
       "setupAutoTopUp": "Otomatik yüklemeyi ayarla",
       "manageAutoTopUp": "Otomatik yüklemeyi yönet",
       "opensOnWeb": "Web'de açılır"
@@ -3478,12 +3500,10 @@
       "requestLogs": "İstek günlükleri"
     },
     "requestLogs": {
-      "hint": "Pencerenin bitişinden önceki bir saatteki istekler, en yeniden eskiye.",
       "older": "Önceki saat",
       "newer": "Sonraki saat",
       "truncated": "Bu saatte listede gösterilenden daha fazla istek var.",
       "emptyTitle": "İstek yok",
-      "emptyDescription": "Bu saatte ağ geçidi isteği yok.",
       "loadError": "İstek günlükleri yüklenemedi.",
       "permissionDenied": "İstek günlüklerini yalnızca kuruluşun sahibi, yöneticisi veya faturalandırma yöneticisi görüntüleyebilir.",
       "tokens": "{{input}} giriş · {{output}} çıkış",
@@ -4282,8 +4302,7 @@
       "repoValue": "Depo: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Bu profil artık kullanılamıyor. Başka bir profil seçin.",
-      "pickerEmptyDescriptionOrganization": "Oturumlar arasında ortam değişkenlerini, kurulum komutlarını ve becerileri yeniden kullanmak için bir kuruluş profili oluşturun.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Kuruluş sahibi veya yöneticisi bir kuruluş profili oluşturabilir."
+      "pickerEmptyDescriptionOrganization": "Oturumlar arasında ortam değişkenlerini, kurulum komutlarını ve becerileri yeniden kullanmak için bir kuruluş profili oluşturun."
     },
     "variablesDeleteFailed": "Değişken silinemedi",
     "deleteVariable": "{{key}} değişkenini sil",
@@ -4469,7 +4488,6 @@
     "dismiss": "Raporu yok say",
     "offline": "Çevrimdışı · kayıtlı rapor",
     "cached": "Kayıtlı rapor · yenileme kullanılamıyor",
-    "window": "{{start}} – {{end}}",
     "summary": "AI özeti",
     "summaryPending": "AI özeti hazırlanıyor. Hazır olduğunda buraya eklenecek.",
     "summaryUnavailable": "AI özeti kullanılamıyor. Yapılandırılmış raporunuz hâlâ mevcut.",
@@ -4588,6 +4606,7 @@
       "title": "Tetikleyiciler ve web kancaları",
       "subtitle": "Cloud Agent çalıştırmalarını web kancası çağrısıyla veya zamanlamayla otomatikleştirin.",
       "new": "Yeni tetikleyici",
+      "create": "Tetikleyici oluştur",
       "emptyTitle": "Henüz tetikleyici yok",
       "emptyDescription": "Bir web kancası çağrısıyla veya bir zamanlamayla Cloud Agent çalıştırması başlatmak için bir tetikleyici oluşturun.",
       "loadFailedTitle": "Tetikleyiciler yüklenemedi",
@@ -4641,6 +4660,8 @@
       "created": "Tetikleyici oluşturuldu",
       "saved": "Tetikleyici kaydedildi",
       "statusArrived": "Ulaştı",
+      "defaultPromptWebhook": "Bu web kancası isteğinin gövdesini açıklayın:\n\n{{body}}",
+      "defaultPromptScheduled": "Zamanlanmış görevi çalıştırın. {{scheduledTime}} zamanında tetiklendi.",
       "problems": {
         "nameRequired": "Bir ad girin.",
         "nameTooShort": "En az 8 karakter kullanın.",
@@ -4689,6 +4710,7 @@
     "superseded": "Bu bağlantı başka bir cihazdan yenisiyle değiştirildiği için artık çalışmıyor."
   },
   "sharedSession": {
+    "startedAt": "{{time}}'de başladı",
     "title": "Paylaşılan oturum",
     "someone": "Biri",
     "sharedBy": "Paylaşan: {{owner}}",

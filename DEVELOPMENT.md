@@ -280,6 +280,7 @@ pnpm web:env set WATCHWOOD_SHADOW_ENABLED
 
 Set the enabled value to exact `true`, then redeploy.
 The browser receives only the organization and a server-generated signup identity.
+The browser SDK collects its token over IPv4 (`force_ipv4`), so the token IP matches the client IP that the server reports.
 The server sends the token and trusted client IP to OpenAI, without email or phone signals.
 Production assessments require Vercel's trusted client-IP header.
 Production without Vercel skips assessment rather than trusting caller-supplied forwarding headers.

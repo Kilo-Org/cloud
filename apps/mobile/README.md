@@ -305,7 +305,7 @@ their default resource classes. The production builder requires a paid EAS plan.
 - Home widgets keep a 16pt band on all four sides, including the updating placeholder.
 - Check the medium placeholder on a 164pt-tall card: its header, bars and footer must fit within 132pt or SwiftUI centres the overflow into the padding.
 - Arabic Live Activity direction comes from `homeWidgetLocale` in the shared app group, not the simulator language.
-- The Live Activity direction override is native code in `patches/expo-widgets@58.0.17.patch`. Rebuild the iOS extension after changing the patch; restarting Metro alone leaves the installed extension unchanged.
+- The Live Activity direction override is native code in `patches/expo-widgets@58.0.28.patch`. Rebuild the iOS extension after changing the patch; restarting Metro alone leaves the installed extension unchanged.
 - After switching the app language, reopen the development client on Metro before applying a fixture and capturing widgets.
 
 #### Responsive layout checks

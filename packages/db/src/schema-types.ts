@@ -3414,6 +3414,38 @@ export const VercelModelIdOverridesConfigSchema = z.object({
 
 export type VercelModelIdOverridesConfig = z.infer<typeof VercelModelIdOverridesConfigSchema>;
 
+export const LatestAliasTargetSchema = z.object({
+  alias: z.string().startsWith('~'),
+  target: z.string().min(1),
+  /** A newer target the alias switches to once `effective_at` passes. */
+  pending: z
+    .object({
+      target: z.string().min(1),
+      effective_at: z.iso.datetime(),
+    })
+    .optional(),
+});
+
+export type LatestAliasTarget = z.infer<typeof LatestAliasTargetSchema>;
+
+export const LatestAliasTargetsConfigSchema = z.object({
+  aliases: z.array(LatestAliasTargetSchema).superRefine((aliases, ctx) => {
+    const seen = new Set<string>();
+    for (const [index, { alias }] of aliases.entries()) {
+      if (seen.has(alias)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `Duplicate alias "${alias}"`,
+          path: [index, 'alias'],
+        });
+      }
+      seen.add(alias);
+    }
+  }),
+});
+
+export type LatestAliasTargetsConfig = z.infer<typeof LatestAliasTargetsConfigSchema>;
+
 export const PREFERRED_PROVIDER_ORDER_MAX_RULES = 200;
 export const PREFERRED_PROVIDER_ORDER_MAX_PROVIDERS = 20;
 

@@ -37,8 +37,17 @@ import { logAutoModelChangesForAllOrgs } from '@/lib/organizations/auto-model-ch
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import {
   VercelModelIdOverridesConfigSchema,
+  type LatestAliasTarget,
   type VercelModelIdOverride,
 } from '@kilocode/db/schema-types';
+import {
+  applyLatestAliasTargets,
+  getLatestAliasTargets,
+  latestAliasTargetsConfig,
+  readLatestAliasTargets,
+  updateLatestAliasTargets,
+  type LatestAliasTargets,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/latest-alias-targets';
 import { recordSyncCompleted } from '@/lib/providers/openrouter/sync-providers-stale-alert';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import {
@@ -312,8 +321,8 @@ async function syncProviders(params: {
   }
 
   // Sort providers by name
-  const sortedProviders = (await injectDirectByokProviders(allProviders)).sort((a, b) =>
-    a.name.localeCompare(b.name)
+  const sortedProviders = (await injectDirectByokProviders(allProviders, openRouterModels)).sort(
+    (a, b) => a.name.localeCompare(b.name)
   );
 
   // Calculate total models across all providers
@@ -355,6 +364,40 @@ async function storeVercelModelIdOverrides(overrides: VercelModelIdOverride[]) {
     .onConflictDoUpdate({
       target: ai_gateway_config.id,
       set: { vercel_model_id_overrides: value },
+    });
+}
+
+/** Read from the primary, since the stored targets carry pending switches across runs. */
+async function generateLatestAliasTargets(
+  openRouterModels: GatewayModelMap,
+  openRouterCatalogModels: readonly CatalogModel[]
+): Promise<LatestAliasTarget[] | null> {
+  try {
+    return updateLatestAliasTargets({
+      previous: await readLatestAliasTargets(db),
+      models: openRouterModels,
+      createdAtMs: new Map(
+        openRouterCatalogModels
+          .filter(model => model.created > 0)
+          .map(model => [model.id, model.created * 1000])
+      ),
+      nowMs: Date.now(),
+    });
+  } catch (err) {
+    console.error('[sync-providers] generating latest alias targets failed', err);
+    captureException(err, { tags: { component: 'sync-providers-latest-alias-targets' } });
+    return null;
+  }
+}
+
+async function storeLatestAliasTargets(entries: LatestAliasTarget[]) {
+  const value = latestAliasTargetsConfig(entries);
+  await db
+    .insert(ai_gateway_config)
+    .values({ id: 1, latest_alias_targets: value })
+    .onConflictDoUpdate({
+      target: ai_gateway_config.id,
+      set: { latest_alias_targets: value },
     });
 }
 
@@ -436,9 +479,17 @@ export async function syncAndStoreProviders() {
       )
     : await getVercelModelIdOverrides();
 
+  const generatedLatestAliasTargets = await generateLatestAliasTargets(
+    openRouterModels,
+    openRouterCatalog.data
+  );
+  const latestAliasTargets: LatestAliasTargets = generatedLatestAliasTargets
+    ? new Map(generatedLatestAliasTargets.map(entry => [entry.alias, entry]))
+    : await getLatestAliasTargets();
+
   const providers = await syncProviders({
     providers: openrouterProviders,
-    openRouterModels,
+    openRouterModels: applyLatestAliasTargets(openRouterModels, latestAliasTargets),
     openRouterCatalogModels: openRouterCatalog.data,
     vercelModels,
     vercelModelIdOverrides,
@@ -455,6 +506,9 @@ export async function syncAndStoreProviders() {
 
   if (generatedVercelModelIdOverrides) {
     await storeVercelModelIdOverrides(generatedVercelModelIdOverrides);
+  }
+  if (generatedLatestAliasTargets) {
+    await storeLatestAliasTargets(generatedLatestAliasTargets);
   }
 
   const result = await applySnapshotChangesAndAudit({ providers });

@@ -33,8 +33,10 @@ import { cn } from '@/lib/utils';
 import { BuiltinAgentsSection } from './BuiltinAgentsSection';
 import { DefaultSandboxSection } from './DefaultSandboxSection';
 import { EnvironmentsSection } from './EnvironmentsSection';
+import { ModelContextLimitsSection } from './ModelContextLimitsSection';
 import { RepositoryOverridesSection } from './RepositoryOverridesSection';
 import { SidebarSettingsSection } from './SidebarSettingsSection';
+import { SoundPreferencesSection } from './SoundPreferencesSection';
 import { TranscriptPreferencesSection } from './TranscriptPreferencesSection';
 import { VercelComputeSettings } from './VercelComputeSettings';
 
@@ -262,8 +264,12 @@ function CloudAgentSettings({
               </Badge>
             </div>
             <TranscriptPreferencesSection />
+            <SoundPreferencesSection />
             {settings ? (
-              <BuiltinAgentsSection organizationId={organizationId} settings={settings} />
+              <>
+                <BuiltinAgentsSection organizationId={organizationId} settings={settings} />
+                <ModelContextLimitsSection organizationId={organizationId} settings={settings} />
+              </>
             ) : settingsQuery.isError ? (
               <LoadError onRetry={() => void settingsQuery.refetch()} />
             ) : (

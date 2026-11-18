@@ -7,16 +7,22 @@
 // event name for an action this build does not know; the created-organization
 // row drops its detail line, because the server's message there only restates
 // that event name in English.
+// A pull refreshes the read in place through the shared `useManualRefresh`.
+// One control serves the empty state and the paged list; the first-page error
+// branch carries none.
 // The query layer is mocked so each state is driven directly through the screen
 // JSX, the same way the credit-activity suite does it.
 
-import { createElement } from 'react';
+import { createElement, type ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 import '@/i18n';
+// The screen reaches this adapter through `use-manual-refresh`; importing the
+// mocked module here is how the test reads its spy.
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { OrganizationAuditLogScreen } from './audit-log-screen';
 
 const pageQuery = {
@@ -66,10 +72,19 @@ vi.mock('@/lib/hooks/use-org-billing-queries', () => ({
   }),
 }));
 
+// The pull control reaches the reduced-motion policy, which loads expo-battery;
+// the list's states are what this suite drives, not the gesture's indicator.
+vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
+
+// The failed refresh announces through this adapter, and the real module pulls
+// native deps; the spy records the screen's announcement instead.
+vi.mock('@/lib/a11y/announcing-toast', () => ({ announcingToast: { error: vi.fn() } }));
+
 // `vi.mock` factories are hoisted above this file's imports, so they import
 // `createElement` themselves rather than closing over the top-level import.
-// The list is a native FlatList in production; here it renders the rows and the
-// footer element it was given, so the suite can read and press them.
+// The list is a native FlatList in production; here it forwards every prop to
+// the host element — the suite reads the list's own `refreshControl` — and it
+// renders the rows and the footer element it was given.
 vi.mock('@shopify/flash-list', async () => {
   const { createElement: h, Fragment: fragment } = await import('react');
   return {
@@ -80,7 +95,7 @@ vi.mock('@shopify/flash-list', async () => {
     }) =>
       h(
         'FlashList',
-        null,
+        props as Record<string, unknown>,
         props.data.map((item, index) =>
           h(fragment, { key: index }, props.renderItem({ item, index }) as never)
         ),
@@ -102,6 +117,7 @@ vi.mock('@/components/ui/icons', () => ({
   KeyRound: 'KeyRound',
   LineChart: 'LineChart',
   Lock: 'Lock',
+  Logs: 'Logs',
   Mail: 'Mail',
   Plug: 'Plug',
   ScrollText: 'ScrollText',
@@ -109,6 +125,7 @@ vi.mock('@/components/ui/icons', () => ({
   Shield: 'Shield',
   SlidersHorizontal: 'SlidersHorizontal',
   Users: 'Users',
+  UsersRound: 'UsersRound',
   Wallet: 'Wallet',
 }));
 
@@ -214,6 +231,8 @@ beforeEach(() => {
   pageQuery.isFetchingNextPage = false;
   pageQuery.data = { pages: [], pageParams: [] };
   pageQuery.refetch.mockClear();
+  // The pull reads the settled result, so the spy resolves one by default.
+  pageQuery.refetch.mockResolvedValue({ isError: false });
   pageQuery.fetchNextPage.mockClear();
   pageHook.entries = [];
   pageHook.hasMore = false;
@@ -224,6 +243,18 @@ beforeEach(() => {
 });
 
 type Handler = () => void;
+
+/** Props a pull-to-refresh control carries. */
+type PullControl = ReactElement<{ refreshing: boolean; onRefresh: () => void }>;
+
+/** The pull gesture a pull-to-refresh surface carries; a missing one fails the test. */
+function pullControl(host: ReactTestInstance): PullControl {
+  const control = host.props.refreshControl as PullControl | undefined;
+  if (!control) {
+    throw new Error(`${String(host.type)} rendered no pull control`);
+  }
+  return control;
+}
 
 /** The element's callback, narrowed out of the renderer's untyped props. */
 function handlerOf(node: ReactTestInstance, name: 'onPress' | 'onRetry'): Handler | undefined {
@@ -452,6 +483,89 @@ describe('OrganizationAuditLogScreen', () => {
       }
     });
     expect(pageQuery.fetchNextPage).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+});
+
+describe('OrganizationAuditLogScreen pull to refresh', () => {
+  it('puts the pull on the empty state and refetches from it', async () => {
+    // The read settled with no rows, so the empty state is the only surface to
+    // pull; the refetch spy resolves the settled result beforeEach set up.
+    const { renderer, unmount } = await mount();
+
+    const [empty] = renderer.root.findAllByType('EmptyState');
+    if (!empty) {
+      throw new Error('the empty state did not render');
+    }
+    const control = pullControl(empty);
+    expect(control.type).toBe('RefreshControl');
+    expect(control.props.refreshing).toBe(false);
+    // The gesture is not in flight, so nothing spins until the pull starts.
+    expect(pageQuery.refetch).not.toHaveBeenCalled();
+
+    await act(async () => {
+      control.props.onRefresh();
+      await Promise.resolve();
+    });
+    expect(pageQuery.refetch).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('hands the same control to the list when rows are present', async () => {
+    pageHook.entries = entries(2);
+    pageHook.hasMore = true;
+    const { renderer, unmount } = await mount();
+
+    const [list] = renderer.root.findAllByType('FlashList');
+    if (!list) {
+      throw new Error('the rows were not handed to the list');
+    }
+    const control = pullControl(list);
+    expect(control.type).toBe('RefreshControl');
+
+    await act(async () => {
+      control.props.onRefresh();
+      await Promise.resolve();
+    });
+    expect(pageQuery.refetch).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('keeps the rows and announces the failure when the pull fails', async () => {
+    // The settled result keeps the rows on screen; only the refetch's own
+    // verdict fails, so the pull announces instead of replacing the list.
+    pageHook.entries = entries(2);
+    pageHook.hasMore = true;
+    pageQuery.isError = false;
+    pageQuery.refetch.mockResolvedValue({ isError: true });
+    const { renderer, unmount } = await mount();
+
+    const [list] = renderer.root.findAllByType('FlashList');
+    if (!list) {
+      throw new Error('the rows were not handed to the list');
+    }
+    expect(renderer.root.findAllByType('QueryError')).toHaveLength(0);
+    const control = pullControl(list);
+    await act(async () => {
+      control.props.onRefresh();
+      await Promise.resolve();
+    });
+
+    expect(renderer.root.findAllByType('FlashList')).toHaveLength(1);
+    expect(renderer.root.findAllByType('QueryError')).toHaveLength(0);
+    expect(announcingToast.error).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('offers no pull while the first page has failed', async () => {
+    // The list never painted, so the branch renders the retry alone; the
+    // gesture element must not exist anywhere in the tree.
+    pageQuery.isError = true;
+    pageQuery.data = { pages: [], pageParams: [] };
+    const { renderer, unmount } = await mount();
+
+    expect(renderer.root.findAllByType('QueryError')).toHaveLength(1);
+    expect(renderer.root.findAllByType('RefreshControl')).toHaveLength(0);
     unmount();
   });
 });

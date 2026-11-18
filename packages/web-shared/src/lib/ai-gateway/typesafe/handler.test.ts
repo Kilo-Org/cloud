@@ -869,7 +869,7 @@ describe('handleSystemOneRequest', () => {
     { model: OTHER_SYSTEM_ONE_MODEL, policyModel: OTHER_SYSTEM_ONE_MODEL, isFree: true },
     { model: SYSTEM_ONE_ALIAS, policyModel: TYPESAFE_MODEL, isFree: false },
   ])(
-    'forwards OpenRouter System One model $model unchanged',
+    'forwards OpenRouter System One model $model as the model it resolves to',
     async ({ model, policyModel, isFree }) => {
       setAuth('org-123');
 
@@ -881,7 +881,7 @@ describe('handleSystemOneRequest', () => {
         model: model === SYSTEM_ONE_ALIAS ? TYPESAFE_MODEL : model,
         usage: { cost: isFree ? 0 : 0.000124 },
       });
-      expect(upstreamRequest().body.model).toBe(model);
+      expect(upstreamRequest().body.model).toBe(policyModel);
       expect(resolveOrganizationMemberModelDecision).toHaveBeenCalledWith(
         expect.objectContaining({ modelId: policyModel })
       );
@@ -1723,7 +1723,7 @@ describe('handleSystemOneRequest', () => {
   it('returns a URL policy refusal without sending or recording', async () => {
     const refusal = NextResponse.json({ error_type: 'upstream_url_rejected' }, { status: 503 });
     jest.mocked(isUpstreamUrlPolicyEnforced).mockReturnValue(true);
-    jest.mocked(rejectDisallowedUpstreamUrls).mockResolvedValue(refusal);
+    jest.mocked(rejectDisallowedUpstreamUrls).mockResolvedValue({ rejected: refusal });
 
     const response = await handleSystemOneRequest(makeRequest());
 

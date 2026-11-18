@@ -13,11 +13,11 @@ import {
   SESSION_INGEST_USER_DELETION_AUDIENCE,
   USER_DATA_EXPORT_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { KILO_TOKEN_VERSION, kiloTokenPayload } from '@kilocode/worker-utils/kilo-token';
 import {
   buildModernKiloTokenPayload,
   isKiloResourceAudienceAllowed,
 } from '@kilocode/worker-utils/kilo-token-policy';
-import { kiloTokenPayload } from '@kilocode/worker-utils/kilo-token';
 import { CloudAgentNextRuntimeAuthorizationClaimSchema } from '@kilocode/worker-utils/runtime-proxy-attestation';
 import {
   isCloudAgentAuthorityHttpPathAllowed,
@@ -36,7 +36,11 @@ import {
 
 export { BITBUCKET_REPOSITORY_LIST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 
-export const JWT_TOKEN_VERSION = 3;
+/**
+ * @deprecated Use `KILO_TOKEN_VERSION`. One test file outside this change holds
+ * the only remaining caller, so the name stays until that file moves.
+ */
+export { KILO_TOKEN_VERSION as JWT_TOKEN_VERSION } from '@kilocode/worker-utils/kilo-token';
 
 const jwtSigningAlgorithm = 'HS256';
 
@@ -95,7 +99,7 @@ export function generateInternalServiceToken(
   return jwt.sign(
     {
       kiloUserId: userId,
-      version: JWT_TOKEN_VERSION,
+      version: KILO_TOKEN_VERSION,
       ...(options?.organizationId ? { organizationId: options.organizationId } : {}),
     },
     NEXTAUTH_SECRET,
@@ -160,7 +164,7 @@ export function generateApiToken(
       env: process.env.NODE_ENV,
       kiloUserId: id,
       apiTokenPepper: api_token_pepper,
-      version: JWT_TOKEN_VERSION,
+      version: KILO_TOKEN_VERSION,
       ...extraPayload,
     },
     NEXTAUTH_SECRET,
@@ -183,7 +187,7 @@ export function generateOrganizationApiToken(
       env: process.env.NODE_ENV,
       kiloUserId: user.id,
       apiTokenPepper: user.api_token_pepper,
-      version: JWT_TOKEN_VERSION,
+      version: KILO_TOKEN_VERSION,
       organizationId,
       organizationRole,
     },
@@ -331,7 +335,7 @@ export function validateAuthorizationHeader(
     };
   }
 
-  if (payload.version !== JWT_TOKEN_VERSION) {
+  if (payload.version !== KILO_TOKEN_VERSION) {
     warnExceptInTest(`Token version outdated (${traceability_logging_id}):`, {
       version: payload.version,
       kiloUserId: payload.kiloUserId,
@@ -395,6 +399,16 @@ export function generateCloudAgentToken(user: User) {
   return generateApiToken(user, { tokenSource: 'cloud-agent' });
 }
 
+/**
+ * Refuse to mint a token while the current pepper is the empty string. A `null`
+ * pepper means the account has no pepper, and stays accepted.
+ */
+function assertMintablePepper(pepper: string | null, message: string): void {
+  if (pepper !== null && !pepper) {
+    throw new Error(message);
+  }
+}
+
 export function generateCloudAgentWorkflowToken(
   user: User,
   options: {
@@ -418,17 +432,19 @@ export function generateCloudAgentWorkflowToken(
       { expiresIn: options.expiresIn }
     );
   }
-  if (user.api_token_pepper !== null && !user.api_token_pepper) {
-    throw new Error('Workflow control tokens require a current user pepper');
-  }
+  assertMintablePepper(
+    user.api_token_pepper,
+    'Workflow control tokens require a current user pepper'
+  );
   const expiresIn = Math.min(options.expiresIn, 60 * 60);
   if (expiresIn <= 0) {
     throw new Error('Workflow control token expiry must be positive');
   }
   const authorizationUser = options.authorizationUser ?? user;
-  if (authorizationUser.api_token_pepper !== null && !authorizationUser.api_token_pepper) {
-    throw new Error('Workflow control tokens require a current authorization pepper');
-  }
+  assertMintablePepper(
+    authorizationUser.api_token_pepper,
+    'Workflow control tokens require a current authorization pepper'
+  );
   const issuedAt = Math.floor(Date.now() / 1000);
   const payload = buildModernKiloTokenPayload({
     userId: user.id,
@@ -481,9 +497,10 @@ export function generateWorkflowGatewayToken(
       { expiresIn }
     );
   }
-  if (user.api_token_pepper !== null && !user.api_token_pepper) {
-    throw new Error('Workflow gateway tokens require a current user pepper');
-  }
+  assertMintablePepper(
+    user.api_token_pepper,
+    'Workflow gateway tokens require a current user pepper'
+  );
   const issuedAt = Math.floor(Date.now() / 1000);
   const payload = buildModernKiloTokenPayload({
     userId: user.id,

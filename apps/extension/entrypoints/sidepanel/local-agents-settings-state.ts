@@ -1,0 +1,91 @@
+/* eslint-disable typescript-eslint/consistent-type-definitions -- AGENTS.md prefers type over interface */
+import type { LocalAgentConnectedAgent } from '@/src/shared/local-agents/registry';
+import type { LocalAgentEndpointStatus } from '@/src/shared/local-agents/status';
+
+/*
+ * Presentation state for the "Local agents" settings section. Kept pure so the
+ * empty-state priority is testable without a browser: a missing native host is
+ * only worth its setup hint while nothing is actually connected.
+ */
+
+export type LocalAgentsEmptyState =
+  | 'none'
+  | 'connected'
+  | 'host_missing_not_installed'
+  | 'host_missing_permission'
+  | 'waiting';
+
+export type LocalAgentsControllerGroup = {
+  controllerId: string;
+  transport: LocalAgentConnectedAgent['transport'];
+  agents: LocalAgentConnectedAgent[];
+};
+
+export type LocalAgentsSettingsView = {
+  controllerGroups: LocalAgentsControllerGroup[];
+  emptyState: LocalAgentsEmptyState;
+  enabled: boolean | undefined;
+};
+
+export const groupAgentsByController = (
+  agents: LocalAgentConnectedAgent[]
+): LocalAgentsControllerGroup[] => {
+  const groups = new Map<string, LocalAgentsControllerGroup>();
+
+  for (const agent of agents) {
+    const existing = groups.get(agent.controllerId);
+
+    if (existing === undefined) {
+      groups.set(agent.controllerId, {
+        agents: [agent],
+        controllerId: agent.controllerId,
+        transport: agent.transport,
+      });
+    } else {
+      existing.agents.push(agent);
+    }
+  }
+
+  return [...groups.values()];
+};
+
+export const deriveLocalAgentsSettingsView = ({
+  agents,
+  enabled,
+  status,
+}: {
+  agents: LocalAgentConnectedAgent[];
+  enabled: boolean | undefined;
+  status: LocalAgentEndpointStatus[];
+}): LocalAgentsSettingsView => {
+  const controllerGroups = groupAgentsByController(agents);
+
+  if (enabled !== true) {
+    return { controllerGroups, emptyState: 'none', enabled };
+  }
+
+  if (controllerGroups.length > 0) {
+    return { controllerGroups, emptyState: 'none', enabled };
+  }
+
+  // A live connection outranks a failed native endpoint.
+  if (status.some(endpoint => endpoint.state.kind === 'connected')) {
+    return { controllerGroups, emptyState: 'connected', enabled };
+  }
+
+  const hostMissing = new Set(
+    status.flatMap(endpoint =>
+      endpoint.state.kind === 'host_missing' ? [endpoint.state.reason] : []
+    )
+  );
+
+  if (hostMissing.has('not_installed')) {
+    return { controllerGroups, emptyState: 'host_missing_not_installed', enabled };
+  }
+
+  if (hostMissing.has('permission_denied')) {
+    return { controllerGroups, emptyState: 'host_missing_permission', enabled };
+  }
+
+  return { controllerGroups, emptyState: 'waiting', enabled };
+};

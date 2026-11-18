@@ -64,6 +64,108 @@ const credential = {
   expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
 };
 
+describe('Kilo v2 harness permission replies', () => {
+  const permission = {
+    id: 'permission_pending',
+    sessionID: 'ses_permission_child',
+    action: 'edit',
+    resources: ['src/example.ts'],
+  };
+  const input = {
+    directory,
+    reply: { action: 'permission', permissionId: permission.id, response: 'reject' },
+  } as const;
+
+  it.each([
+    { status: 204, accepted: true },
+    { status: 404, accepted: false },
+  ])('resolves a permission reply with HTTP $status to $accepted', async ({ status, accepted }) => {
+    const { url, requests } = startStub((request, _url, requests) =>
+      request.method === 'GET'
+        ? Response.json({ data: requests.length === 1 ? [permission] : [] })
+        : new Response(null, { status })
+    );
+
+    expect(await createHarness(url).answer(input)).toBe(accepted);
+    expect(requests.map(request => [request.method, request.pathname, request.body])).toEqual([
+      ['GET', '/api/permission/request', undefined],
+      [
+        'POST',
+        `/api/session/${permission.sessionID}/permission/${permission.id}/reply`,
+        { decision: 'reject' },
+      ],
+      ...(status === 404 ? [['GET', '/api/permission/request', undefined]] : []),
+    ]);
+    expect(requests[0]?.directory).toBe(directory);
+    if (status === 404) expect(requests[2]?.directory).toBe(directory);
+  });
+
+  it('throws on a reply HTTP 404 when the permission is still pending', async () => {
+    const { url, requests } = startStub(request =>
+      request.method === 'GET'
+        ? Response.json({ data: [permission] })
+        : new Response(null, { status: 404 })
+    );
+
+    const error: unknown = await createHarness(url)
+      .answer(input)
+      .catch(cause => cause);
+    expect(error).toBeInstanceOf(Error);
+    expect(error).toMatchObject({ status: 404 });
+    expect(requests.map(request => request.method)).toEqual(['GET', 'POST', 'GET']);
+  });
+
+  it.each([404, 503])('throws when the confirming pending lookup returns HTTP %s', async status => {
+    const { url, requests } = startStub((_request, _url, requests) =>
+      requests.length === 1
+        ? Response.json({ data: [permission] })
+        : new Response(null, { status: requests.length === 2 ? 404 : status })
+    );
+
+    const error: unknown = await createHarness(url)
+      .answer(input)
+      .catch(cause => cause);
+    expect(error).toBeInstanceOf(Error);
+    expect(error).toMatchObject({ status });
+    expect(requests.map(request => request.method)).toEqual(['GET', 'POST', 'GET']);
+  });
+
+  it('returns false without posting when the permission is no longer pending', async () => {
+    const { url, requests } = startStub(() =>
+      Response.json({ data: [{ ...permission, id: 'permission_other' }] })
+    );
+
+    expect(await createHarness(url).answer(input)).toBe(false);
+    expect(requests.map(request => [request.method, request.pathname])).toEqual([
+      ['GET', '/api/permission/request'],
+    ]);
+  });
+
+  it.each([403, 503])('throws on a permission reply with HTTP %s', async status => {
+    const { url } = startStub(request =>
+      request.method === 'GET'
+        ? Response.json({ data: [permission] })
+        : new Response(null, { status })
+    );
+
+    const error: unknown = await createHarness(url)
+      .answer(input)
+      .catch(cause => cause);
+    expect(error).toBeInstanceOf(Error);
+    expect(String(error)).toContain(`HTTP ${status}`);
+  });
+
+  it('does not treat a pending lookup HTTP 404 as a resolved permission', async () => {
+    const { url } = startStub(() => new Response(null, { status: 404 }));
+
+    const error: unknown = await createHarness(url)
+      .answer(input)
+      .catch(cause => cause);
+    expect(error).toBeInstanceOf(Error);
+    expect(String(error)).toContain('HTTP 404');
+  });
+});
+
 describe('Kilo v2 harness commit messages', () => {
   it('uses the native commit-message RPC in the target repository with server authorization', async () => {
     const message = 'fix: preserve descriptive commit messages';

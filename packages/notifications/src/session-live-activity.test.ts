@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { buildHomeWidgetDetails, HOME_WIDGET_TITLE_LIMIT } from '@kilocode/app-shared/home-widget';
+import { GLANCEABLE_TITLE_LIMIT } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { buildHomeWidgetDetails } from '@kilocode/app-shared/home-widget';
 
 import { LIVE_ACTIVITY_RELEVANCE } from './push-presentation';
 import {
@@ -32,14 +33,14 @@ describe('sessionLiveActivityTitle', () => {
 
   it('caps the title on a character boundary', () => {
     const family = '👨‍👩‍👧';
-    expect(sessionLiveActivityTitle(`${'x'.repeat(HOME_WIDGET_TITLE_LIMIT - 8)}${family}`)).toBe(
-      `${'x'.repeat(HOME_WIDGET_TITLE_LIMIT - 8)}${family}`
+    expect(sessionLiveActivityTitle(`${'x'.repeat(GLANCEABLE_TITLE_LIMIT - 8)}${family}`)).toBe(
+      `${'x'.repeat(GLANCEABLE_TITLE_LIMIT - 8)}${family}`
     );
-    expect(sessionLiveActivityTitle(`${'x'.repeat(HOME_WIDGET_TITLE_LIMIT - 7)}${family}`)).toBe(
-      'x'.repeat(HOME_WIDGET_TITLE_LIMIT - 7)
+    expect(sessionLiveActivityTitle(`${'x'.repeat(GLANCEABLE_TITLE_LIMIT - 7)}${family}`)).toBe(
+      'x'.repeat(GLANCEABLE_TITLE_LIMIT - 7)
     );
-    expect(sessionLiveActivityTitle(`${'x'.repeat(HOME_WIDGET_TITLE_LIMIT - 2)}🇷🇸`)).toBe(
-      'x'.repeat(HOME_WIDGET_TITLE_LIMIT - 2)
+    expect(sessionLiveActivityTitle(`${'x'.repeat(GLANCEABLE_TITLE_LIMIT - 2)}🇷🇸`)).toBe(
+      'x'.repeat(GLANCEABLE_TITLE_LIMIT - 2)
     );
   });
 
@@ -57,8 +58,8 @@ describe('sessionLiveActivityTitle', () => {
       buildHomeWidgetDetails([{ status: 'permission', title: stored }]).waitingAgents[0]?.title
     ).toBe('Deploy the fix');
     // They also must not charge the title cap, or the cut hides text that draws.
-    const capped = `${'a'.repeat(HOME_WIDGET_TITLE_LIMIT - 6)}\u2061\u2062\u2063\u2064bcdef`;
-    const visible = `${'a'.repeat(HOME_WIDGET_TITLE_LIMIT - 6)}bcdef`;
+    const capped = `${'a'.repeat(GLANCEABLE_TITLE_LIMIT - 6)}\u2061\u2062\u2063\u2064bcdef`;
+    const visible = `${'a'.repeat(GLANCEABLE_TITLE_LIMIT - 6)}bcdef`;
     expect(sessionLiveActivityTitle(capped)).toBe(visible);
     expect(
       buildHomeWidgetDetails([{ status: 'permission', title: capped }]).waitingAgents[0]?.title
@@ -73,8 +74,8 @@ describe('sessionLiveActivityTitle', () => {
     expect(sessionLiveActivityTitle(`${placeholder} about the deploy`)).toBe(
       `${placeholder} about the deploy`
     );
-    const long = `${placeholder} ${'x'.repeat(HOME_WIDGET_TITLE_LIMIT)}`;
-    expect(sessionLiveActivityTitle(long)).toBe(long.slice(0, HOME_WIDGET_TITLE_LIMIT));
+    const long = `${placeholder} ${'x'.repeat(GLANCEABLE_TITLE_LIMIT)}`;
+    expect(sessionLiveActivityTitle(long)).toBe(long.slice(0, GLANCEABLE_TITLE_LIMIT));
   });
 });
 
@@ -358,6 +359,18 @@ describe('buildSessionLiveActivityContentState', () => {
         options
       )
     ).toMatchObject({ statusKind: 'running', scheduledAt: null });
+  });
+
+  it('reads a serialized absent fact like an omitted one', () => {
+    // The shared row type accepts an explicit null where a producer
+    // serializes an absent value; the shared reader treats null, absent and
+    // unparseable as one outcome, so both shapes build the same card state.
+    const omitted = buildSessionLiveActivityContentState({ id: 's', status: 'scheduled' }, options);
+    const serialized = buildSessionLiveActivityContentState(
+      { id: 's', status: 'scheduled', statusUpdatedAt: null, scheduledAt: null, title: null },
+      options
+    );
+    expect(serialized).toEqual(omitted);
   });
 
   it('reads a stored time like the Home widget, even where Date.parse cannot', () => {

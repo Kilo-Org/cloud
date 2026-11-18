@@ -26,6 +26,7 @@
     "creditHistory": "क्रेडिट इतिहास",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "रद्द करा",
     "done": "झाले",
     "retry": "पुन्हा प्रयत्न करा",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "बदल",
     "organizationTrialEnded": "संस्थेची चाचणी संपली आहे आणि तिच्याकडे कोणतीही सक्रिय योजना नाही. संस्थेचा मालक kilo.ai वर बिलिंग अपडेट करू शकतो, त्यानंतर पुन्हा प्रयत्न करा.",
-    "privateRepositoryA11y": "{{name}}, खाजगी रेपॉजिटरी"
+    "privateRepositoryA11y": "{{name}}, खाजगी रेपॉजिटरी",
+    "legalDocumentEnglishOnly": "हा दस्तऐवज फक्त इंग्रजीत उपलब्ध आहे."
   },
   "language": {
     "restarting": "निवडलेली भाषा लागू करण्यासाठी पुन्हा सुरू होत आहे",
@@ -481,7 +483,14 @@
       "viewReceipt": "पावती पहा"
     },
     "changelog": "नवीन बदल",
-    "changelogVersionPending": "या आवृत्तीच्या नोंदी पुढील ॲप अपडेटसोबत येतील."
+    "changelogVersionPending": "{{version}} आवृत्तीच्या नोंदी पुढील ॲप अपडेटसोबत येतील.",
+    "changelogGroupNew": "नवीन",
+    "changelogFixesIn": "{{areas}} मध्ये दुरुस्त्या आणि सुधारणा.",
+    "changelogFixesPolish": "संपूर्ण अ‍ॅपमध्ये दुरुस्त्या आणि सुधारणा.",
+    "changelogAreas": {
+      "signIn": "साइन इन",
+      "profileOrganizations": "प्रोफाइल आणि संस्था"
+    }
   },
   "preferences": {
     "general": "सामान्य",
@@ -1354,7 +1363,8 @@
       "managedOnWeb": "या संस्थेचे Bitbucket कनेक्शन संगणकावरून वेबवर व्यवस्थापित केले जाते.",
       "description": "आवश्यक परवानग्यांसह वर्कस्पेसचे प्रवेश टोकन तयार करा आणि ते खाली पेस्ट करा.",
       "scopes": "खाते: वाचन · रिपॉझिटरी: वाचन/लेखन · पुल रिक्वेस्ट: वाचन · वेबहूक: वाचन/लेखन",
-      "tokenPlaceholder": "वर्कस्पेसचे प्रवेश टोकन"
+      "tokenPlaceholder": "वर्कस्पेसचे प्रवेश टोकन",
+      "tokenRefused": "Bitbucket ने हे वर्कस्पेस टोकन स्वीकारले नाही. त्यात वरील परवानग्या आहेत का ते तपासा आणि नंतर पुन्हा प्रयत्न करा."
     },
     "scopeList": {
       "personalStillAvailable": "वैयक्तिक रिपॉझिटरी खाली अजूनही उपलब्ध आहेत.",
@@ -1465,13 +1475,25 @@
       "repositoryLine": "पुनरावलोकने: {{reviews}} · निष्कर्ष: {{findings}}",
       "empty": "अद्याप अ‍ॅनालिटिक्ससह पुनरावलोकने नाहीत",
       "emptyDescription": "संस्थेसाठी अ‍ॅनालिटिक्स सुरू असताना ते पूर्ण झालेली पुनरावलोकने नोंदवते.",
-      "off": "या संस्थेसाठी अ‍ॅनालिटिक्स बंद आहे.",
-      "couldNotLoad": "अ‍ॅनालिटिक्स लोड करता आले नाही"
+      "offTitle": "{{platform}} साठी अ‍ॅनालिटिक्स बंद आहे",
+      "offDescription": "संस्थेचे मालक, प्रशासक आणि बिलिंग व्यवस्थापक वेबवरील संस्था सेटिंग्जमध्ये अ‍ॅनालिटिक्स सुरू करून पूर्ण झालेली पुनरावलोकने नोंदवू शकतात.",
+      "couldNotLoad": "अ‍ॅनालिटिक्स लोड करता आले नाही",
+      "trackedReviewsCaption": "अ‍ॅनालिटिक्स सुरू असताना या कालावधीत पूर्ण झालेली पुनरावलोकने. चालू आणि अयशस्वी पुनरावलोकने कधीही गणली जात नाहीत.",
+      "trackedReviewsUncounted": "गणली जात नाहीत: संस्थेकडील पूर्ण झालेल्या {{displayTotal}} पुनरावलोकनांपैकी {{displayCount}} पुनरावलोकनांचा निकाल कॅप्चर केला गेला नाही.",
+      "trackedReviewsUncounted_one": "गणली जात नाहीत: संस्थेकडील पूर्ण झालेल्या {{displayTotal}} पुनरावलोकनांपैकी {{displayCount}} पुनरावलोकनांचा निकाल कॅप्चर केला गेला नाही.",
+      "trackedReviewsUncounted_other": "गणली जात नाहीत: संस्थेकडील पूर्ण झालेल्या {{displayTotal}} पुनरावलोकनांपैकी {{displayCount}} पुनरावलोकनांचा निकाल कॅप्चर केला गेला नाही."
     },
     "council": {
       "title": "पुनरावलोकन मंडळ",
       "subtitle": "अनेक तज्ज्ञ प्रत्येक पुल रिक्वेस्टचे पुनरावलोकन करतात आणि त्यांची मते एका निर्णयात एकत्र येतात.",
-      "unavailable": "या संस्थेसाठी पुनरावलोकन मंडळ उपलब्ध नाही.",
+      "unavailablePersonallyTitle": "Enterprise संस्था आवश्यक आहे",
+      "unavailablePersonally": "पुनरावलोकन मंडळ हे वैयक्तिक खात्याचा भाग नाही.",
+      "unavailablePersonallyAction": "संस्था तयार करा",
+      "unavailablePersonallySwitchAction": "संस्था बदला",
+      "unavailableOrganizationTitle": "पुनरावलोकन मंडळ सध्या उपलब्ध नाही",
+      "unavailableForOrganization": "पुनरावलोकन मंडळासाठी सक्रिय सदस्यता किंवा चाचणी असलेला Enterprise प्लॅन आवश्यक आहे. या संस्थेकडे सध्या तो नाही.",
+      "unavailableForOrganizationNeutral": "पुनरावलोकन मंडळ या संस्थेसाठी सध्या उपलब्ध नाही. कृपया नंतर पुन्हा प्रयत्न करा.",
+      "unavailableOnBitbucket": "पुनरावलोकन मंडळ Bitbucket रिपॉझिटरीसाठी उपलब्ध नाही.",
       "noRepositories": "अद्याप कोणत्याही रिपॉझिटरी निवडल्या नाहीत. प्रथम रिपॉझिटरी सेटिंग्जमध्ये रिपॉझिटरी निवडा.",
       "specialists": "तज्ज्ञ",
       "labels": "पुनरावलोकन मंडळ सुरू करणारी लेबले",
@@ -3122,7 +3144,6 @@
     "completingPurchase": "खरेदी पूर्ण करत आहे",
     "subscriptionLoading": "Kilo Pass चे सदस्यत्व लोड होत आहे",
     "retryHint": "Kilo Pass ची स्थिती पुन्हा मिळवण्याचा प्रयत्न करते.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "संपले {{date}}",
     "notAvailableInApp": "Kilo Pass ॲपमध्ये उपलब्ध नाही।",
     "statusActive": "सक्रिय",
@@ -3325,6 +3346,7 @@
       "manageOnWeb": "वेबवरील बिलिंग सेटिंग्ज",
       "changePlan": "प्लॅन बदला",
       "buySeats": "जागा खरेदी करा",
+      "managedOnWeb": "प्लॅन, जागा आणि ऑटो टॉप-अप वेबवर व्यवस्थापित केले जातात.",
       "setupAutoTopUp": "ऑटो टॉप-अप सेट करा",
       "manageAutoTopUp": "ऑटो टॉप-अप व्यवस्थापित करा",
       "opensOnWeb": "वेबवर उघडते"
@@ -3473,12 +3495,10 @@
       "requestLogs": "विनंती लॉग"
     },
     "requestLogs": {
-      "hint": "कालावधी संपण्यापूर्वीच्या तासातील विनंत्या, सर्वात नवीन आधी.",
       "older": "मागील तास",
       "newer": "पुढील तास",
       "truncated": "या तासात यादीत दाखवलेल्यापेक्षा जास्त विनंत्या आहेत.",
       "emptyTitle": "कोणत्याही विनंत्या नाहीत",
-      "emptyDescription": "या तासात कोणत्याही गेटवे विनंत्या नाहीत.",
       "loadError": "विनंती लॉग लोड करता आले नाहीत.",
       "permissionDenied": "संस्थेचा मालक, अ‍ॅडमिन किंवा बिलिंग व्यवस्थापकच तिचे विनंती लॉग पाहू शकतो.",
       "tokens": "{{input}} इनपुट · {{output}} आउटपुट",
@@ -4282,8 +4302,7 @@
       "repoValue": "रेपॉजिटरी: {{name}}",
       "profileValue": "प्रोफाइल: {{name}}",
       "profileUnavailable": "हे प्रोफाइल आता उपलब्ध नाही. दुसरे निवडा.",
-      "pickerEmptyDescriptionOrganization": "संपूर्ण सत्रांमध्ये पर्यावरण व्हेरिएबल्स, सेटअप कमांड आणि कौशल्ये पुन्हा वापरण्यासाठी संस्था प्रोफाइल तयार करा.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "संस्था मालक किंवा प्रशासक संस्था प्रोफाइल तयार करू शकतो."
+      "pickerEmptyDescriptionOrganization": "संपूर्ण सत्रांमध्ये पर्यावरण व्हेरिएबल्स, सेटअप कमांड आणि कौशल्ये पुन्हा वापरण्यासाठी संस्था प्रोफाइल तयार करा."
     },
     "variablesDeleteFailed": "व्हेरिएबल हटवता आले नाही",
     "deleteVariable": "व्हेरिएबल {{key}} हटवा",
@@ -4469,7 +4488,6 @@
     "dismiss": "आढाव्याकडे दुर्लक्ष करा",
     "offline": "ऑफलाइन · जतन केलेला आढावा",
     "cached": "जतन केलेला अहवाल · रिफ्रेश उपलब्ध नाही",
-    "window": "{{start}} – {{end}}",
     "summary": "AI सारांश",
     "summaryPending": "AI सारांश तयार होत आहे. तयार झाल्यावर तो येथे जोडला जाईल.",
     "summaryUnavailable": "AI सारांश उपलब्ध नाही. तुमचा संरचित अहवाल अजूनही उपलब्ध आहे.",
@@ -4588,6 +4606,7 @@
       "title": "ट्रिगर आणि वेबहूक",
       "subtitle": "वेबहूक कॉल किंवा वेळापत्रकावरून Cloud Agent रन स्वयंचलित करा.",
       "new": "नवीन ट्रिगर",
+      "create": "ट्रिगर तयार करा",
       "emptyTitle": "अजून ट्रिगर नाहीत",
       "emptyDescription": "वेबहूक कॉल किंवा वेळापत्रकावरून Cloud Agent रन सुरू करण्यासाठी ट्रिगर तयार करा.",
       "loadFailedTitle": "ट्रिगर लोड करता आले नाहीत",
@@ -4641,6 +4660,8 @@
       "created": "ट्रिगर तयार झाला",
       "saved": "ट्रिगर जतन झाला",
       "statusArrived": "आले",
+      "defaultPromptWebhook": "या वेबहूक विनंतीच्या बॉडीचे वर्णन करा:\n\n{{body}}",
+      "defaultPromptScheduled": "शेड्यूल केलेले कार्य चालवा. {{scheduledTime}} वेळी ट्रिगर झाले.",
       "problems": {
         "nameRequired": "नाव प्रविष्ट करा.",
         "nameTooShort": "कमीत कमी 8 अक्षरे वापरा.",
@@ -4689,6 +4710,7 @@
     "superseded": "ही लिंक इतरत्र बदलण्यात आली आहे, त्यामुळे ती आता काम करत नाही."
   },
   "sharedSession": {
+    "startedAt": "{{time}} वाजता सुरू झाले",
     "title": "शेअर केलेले सत्र",
     "someone": "कोणीतरी",
     "sharedBy": "{{owner}} द्वारे शेअर केले",

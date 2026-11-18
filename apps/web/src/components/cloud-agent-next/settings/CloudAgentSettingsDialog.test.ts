@@ -20,6 +20,7 @@ jest.mock('@/hooks/useVercelComputeEnrollment', () => ({
 jest.mock('@/hooks/useCloudAgentSettings', () => ({
   useCloudAgentSettings: () => mockUseCloudAgentSettings(),
   useSetBuiltinAgentsMutation: () => ({ isPending: false, mutate: jest.fn() }),
+  useSetModelContextLimitsMutation: () => ({ isPending: false, mutate: jest.fn() }),
 }));
 
 jest.mock('@/hooks/use-mobile', () => ({ useIsMobile: () => false }));
@@ -35,6 +36,9 @@ jest.mock('@/components/shared/ModelCombobox', () => ({
 jest.mock('@/components/shared/VariantCombobox', () => ({ VariantCombobox: () => null }));
 
 jest.mock('@kilocode/cloud-agent-profile', () => ({
+  MAX_MODEL_CONTEXT_LIMITS: 50,
+  MAX_MODEL_CONTEXT_TOKENS: 10_000_000,
+  MIN_MODEL_CONTEXT_TOKENS: 1_000,
   CLOUD_AGENT_BUILTIN_AGENTS: [
     {
       slug: 'code',
@@ -178,7 +182,7 @@ const { CloudAgentSettingsDialog } = require('./CloudAgentSettingsDialog') as {
 };
 
 function settings(canManage: boolean): CloudAgentSettingsData {
-  return { canManage, builtinAgents: {} } as CloudAgentSettingsData;
+  return { canManage, builtinAgents: {}, modelContextLimits: {} } as CloudAgentSettingsData;
 }
 
 function queryResult(result: { data?: CloudAgentSettingsData; isError?: boolean }) {
@@ -195,9 +199,14 @@ function section(headingId: string): Element {
   return element;
 }
 
-function personalSwitch(): HTMLButtonElement {
-  const element = domDocument.querySelector<HTMLButtonElement>('[role="switch"]');
-  if (!element) throw new Error('Missing personal preference switch');
+function personalSwitch(label = 'Collapse tool calls'): HTMLButtonElement {
+  const field = Array.from(domDocument.querySelectorAll('label')).find(
+    element => element.textContent === label
+  );
+  const element = domDocument.querySelector<HTMLButtonElement>(
+    `[role="switch"][id="${field?.getAttribute('for')}"]`
+  );
+  if (!element) throw new Error(`Missing personal preference switch: ${label}`);
   return element;
 }
 
@@ -424,13 +433,19 @@ describe('CloudAgentSettingsDialog scope grouping', () => {
     expect(organizationSection.textContent).toContain('Repository overrides');
     expect(organizationSection.textContent).not.toContain('Collapse tool calls');
     expect(organizationSection.textContent).not.toContain('Background models');
+    expect(organizationSection.textContent).not.toContain('Model context limits');
     expect(organizationSection.closest('[role="tabpanel"]')?.getAttribute('data-state')).toBe(
       'active'
     );
 
     selectTab('Preferences');
 
-    expect(badgeTexts()).toEqual(['Organization workspace', 'Only you', 'This browser']);
+    expect(badgeTexts()).toEqual([
+      'Organization workspace',
+      'Only you',
+      'This browser',
+      'This browser',
+    ]);
     expect(domDocument.querySelector('#session-defaults-heading')).toBeNull();
 
     const personalSection = section('personal-preferences-heading');
@@ -439,6 +454,7 @@ describe('CloudAgentSettingsDialog scope grouping', () => {
     expect(personalText).toContain('Collapse tool calls');
     expect(personalText).toContain('Modes');
     expect(personalText).toContain('Background models');
+    expect(personalText).toContain('Model context limits');
     expect(personalText).not.toContain('Default sandbox');
     expect(personalText).not.toContain('Repository overrides');
     expect(personalText.indexOf('Display')).toBeLessThan(personalText.indexOf('Modes'));
@@ -491,6 +507,26 @@ describe('CloudAgentSettingsDialog scope grouping', () => {
     expect(localStorageStub.getItem('cloud-agent:collapse-tools')).toBe('true');
   });
 
+  it('defaults completion sound to off and preserves an explicit opt-in', () => {
+    mockUseCloudAgentSettings.mockReturnValue(queryResult({ data: settings(false) }));
+    act(() => {
+      root.render(
+        createElement(CloudAgentSettingsDialog, {
+          open: true,
+          onOpenChange: jest.fn(),
+        })
+      );
+    });
+    selectTab('Preferences');
+    const sound = personalSwitch('Completion sound');
+    expect(sound.getAttribute('aria-checked')).toBe('false');
+    act(() => sound.click());
+    expect(localStorageStub.getItem('kilo-sound-notifications-enabled')).toBe('true');
+    selectTab('General');
+    selectTab('Preferences');
+    expect(personalSwitch('Completion sound').getAttribute('aria-checked')).toBe('true');
+  });
+
   it('scopes session defaults copy to the personal workspace', () => {
     mockUseCloudAgentSettings.mockReturnValue(queryResult({ data: settings(true) }));
     renderDialog();
@@ -509,7 +545,12 @@ describe('CloudAgentSettingsDialog scope grouping', () => {
     expect(navText).toEqual(['Workspace', 'You']);
 
     selectTab('Preferences');
-    expect(badgeTexts()).toEqual(['Personal workspace', 'Only you', 'This browser']);
+    expect(badgeTexts()).toEqual([
+      'Personal workspace',
+      'Only you',
+      'This browser',
+      'This browser',
+    ]);
   });
 
   it('keeps the personal preference control available while settings load', () => {

@@ -474,6 +474,11 @@ function Dashboard({
           const allGroupIds = resolveGroupTransitiveDeps([groupId]);
           const allNeeded = resolveGroups(allGroupIds);
           const toStart = allNeeded.filter(name => !runningServices.has(name));
+          // The command typed into the pane is built from the selection, and a
+          // later restart or recreate rebuilds it from the same one, so a start
+          // has to pass it: `serviceCommand` only adds the Snowflake mock's CA
+          // export to the web app when the mock is in the selection.
+          const selection = [...new Set([...runningServices, ...allNeeded])];
 
           const gatedStarts: string[] = [];
           const immediateStarts: string[] = [];
@@ -499,7 +504,7 @@ function Dashboard({
           const startedNow: string[] = [];
           for (const name of immediateStarts) {
             try {
-              startServiceInTmux(sessionName, name);
+              startServiceInTmux(sessionName, name, undefined, selection);
               startedNow.push(name);
             } catch {
               // tmux command failed
@@ -568,7 +573,7 @@ function Dashboard({
               continue;
             }
             try {
-              startServiceInTmux(sessionName, name);
+              startServiceInTmux(sessionName, name, undefined, selection);
               startedAfterCapture.push(name);
             } catch {
               // tmux command failed
@@ -748,7 +753,10 @@ function Dashboard({
       if (!item || item.kind !== 'service') return;
       if (!runningServices.has(item.name)) return;
       if (item.name !== 'cloud-agent-public-tunnels') {
-        void restartServiceInTmux(sessionName, item.name);
+        // A restart rebuilds the command from the selection (a recreate does
+        // too), so it travels with the running set: without it the web app
+        // loses the Snowflake mock's CA export.
+        void restartServiceInTmux(sessionName, item.name, undefined, [...runningServices]);
         return;
       }
       if (reloadingWorker.current) return;

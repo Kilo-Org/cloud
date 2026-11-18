@@ -26,6 +26,7 @@
     "creditHistory": "Historial de crèdits",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Cancel·la",
     "done": "Fet",
     "retry": "Torna-ho a provar",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "Canvis",
     "organizationTrialEnded": "El període de prova de l'organització ha finalitzat i no té cap pla actiu. El propietari de l'organització pot actualitzar la facturació a kilo.ai i tornar-ho a provar.",
-    "privateRepositoryA11y": "{{name}}, repositori privat"
+    "privateRepositoryA11y": "{{name}}, repositori privat",
+    "legalDocumentEnglishOnly": "Aquest document només està disponible en anglès."
   },
   "language": {
     "restarting": "S'està reiniciant per aplicar l'idioma",
@@ -481,7 +483,14 @@
       "viewReceipt": "Mostra el comprovant"
     },
     "changelog": "Novetats",
-    "changelogVersionPending": "Les notes d'aquesta versió arribaran amb la propera actualització de l'app."
+    "changelogVersionPending": "Les notes de la versió {{version}} arribaran amb la propera actualització de l'app.",
+    "changelogGroupNew": "Novetats",
+    "changelogFixesIn": "Correccions i millores a {{areas}}.",
+    "changelogFixesPolish": "Correccions i millores a tota l'aplicació.",
+    "changelogAreas": {
+      "signIn": "Inici de sessió",
+      "profileOrganizations": "Perfil i organitzacions"
+    }
   },
   "preferences": {
     "general": "General",
@@ -1377,7 +1386,8 @@
       "managedOnWeb": "La connexió de Bitbucket d'aquesta organització es gestiona al web des d'un ordinador.",
       "description": "Crea un testimoni d'accés a l'espai de treball amb els permisos necessaris i enganxa'l a continuació.",
       "scopes": "Compte: lectura · Repositoris: lectura/escriptura · Sol·licituds d'integració: lectura · Webhooks: lectura/escriptura.",
-      "tokenPlaceholder": "Testimoni d'accés a l'espai de treball"
+      "tokenPlaceholder": "Testimoni d'accés a l'espai de treball",
+      "tokenRefused": "Bitbucket no ha acceptat aquest testimoni d'accés a l'espai de treball. Comprova que tingui els permisos indicats a dalt i torna-ho a provar."
     },
     "scopeList": {
       "personalStillAvailable": "Els repositoris personals encara estan disponibles a continuació.",
@@ -1489,13 +1499,26 @@
       "repositoryLine": "Revisions: {{reviews}} · Troballes: {{findings}}",
       "empty": "Encara no hi ha revisions amb analítica",
       "emptyDescription": "L'analítica registra les revisions completades mentre està activada per a l'organització.",
-      "off": "L'analítica està desactivada per a aquesta organització.",
-      "couldNotLoad": "No s'ha pogut carregar l'analítica"
+      "offTitle": "L'analítica està desactivada per a {{platform}}",
+      "offDescription": "Els rols de facturació de l'organització poden activar l'analítica a la configuració de l'organització al web per registrar les revisions completades.",
+      "couldNotLoad": "No s'ha pogut carregar l'analítica",
+      "trackedReviewsCaption": "Revisions completades que han finalitzat durant aquest període amb l'analítica activada. Les revisions en curs i fallades no es compten mai.",
+      "trackedReviewsUncounted": "Sense comptar: {{displayCount}} de les {{displayTotal}} revisions finalitzades de l’organització sense el seu resultat registrat.",
+      "trackedReviewsUncounted_many": "Sense comptar: {{displayCount}} de les {{displayTotal}} revisions finalitzades de l’organització sense el seu resultat registrat.",
+      "trackedReviewsUncounted_one": "Sense comptar: {{displayCount}} de les {{displayTotal}} revisions finalitzades de l’organització sense el seu resultat registrat.",
+      "trackedReviewsUncounted_other": "Sense comptar: {{displayCount}} de les {{displayTotal}} revisions finalitzades de l’organització sense el seu resultat registrat."
     },
     "council": {
       "title": "Revisió en consell",
       "subtitle": "Diversos especialistes revisen cada pull request i els seus vots es combinen en una sola decisió.",
-      "unavailable": "La revisió en consell no està disponible per a aquesta organització.",
+      "unavailablePersonallyTitle": "Necessita una organització Enterprise",
+      "unavailablePersonally": "La revisió en consell no forma part d'un compte d'ús personal.",
+      "unavailablePersonallyAction": "Crea una organització",
+      "unavailablePersonallySwitchAction": "Canvia d'organització",
+      "unavailableOrganizationTitle": "La revisió en consell no està disponible",
+      "unavailableForOrganization": "La revisió en consell necessita el pla Enterprise amb una subscripció o un període de prova actiu. Aquesta organització no en disposa ara mateix.",
+      "unavailableForOrganizationNeutral": "La revisió en consell no està disponible per a aquesta organització ara mateix. Torna-ho a provar més tard.",
+      "unavailableOnBitbucket": "La revisió en consell no està disponible per als repositoris de Bitbucket.",
       "noRepositories": "Encara no hi ha cap repositori seleccionat. Primer tria'n a la configuració de repositoris.",
       "specialists": "Especialistes",
       "labels": "Etiquetes que activen la revisió en consell",
@@ -3179,7 +3202,6 @@
     "completingPurchase": "S'està completant la compra",
     "subscriptionLoading": "S'està carregant la subscripció de Kilo Pass",
     "retryHint": "Torna a consultar l'estat de Kilo Pass.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Finalitzat el {{date}}",
     "notAvailableInApp": "Kilo Pass no està disponible a l'aplicació.",
     "statusActive": "Actiu",
@@ -3382,6 +3404,7 @@
       "manageOnWeb": "Configuració de la facturació al web",
       "changePlan": "Canvia el pla",
       "buySeats": "Compra llicències",
+      "managedOnWeb": "El pla, les llicències i la recàrrega automàtica es gestionen al web.",
       "setupAutoTopUp": "Configura la recàrrega automàtica",
       "manageAutoTopUp": "Gestiona la recàrrega automàtica",
       "opensOnWeb": "S'obre al web"
@@ -3530,12 +3553,10 @@
       "requestLogs": "Registres de sol·licituds"
     },
     "requestLogs": {
-      "hint": "Sol·licituds de l'hora que acaba al final de la finestra, les més recents primer.",
       "older": "Hora anterior",
       "newer": "Hora següent",
       "truncated": "Aquesta hora té més sol·licituds de les que mostra la llista.",
       "emptyTitle": "No hi ha sol·licituds",
-      "emptyDescription": "En aquesta hora no hi ha cap sol·licitud a la passarel·la.",
       "loadError": "No s'han pogut carregar els registres de sol·licituds.",
       "permissionDenied": "Només un propietari, administrador o gestor de facturació d'una organització pot consultar-ne els registres de sol·licituds.",
       "tokens": "{{input}} d'entrada · {{output}} de sortida",
@@ -4348,8 +4369,7 @@
       "repoValue": "Repositori: {{name}}",
       "profileValue": "Perfil: {{name}}",
       "profileUnavailable": "Aquest perfil ja no està disponible. Tria'n un altre.",
-      "pickerEmptyDescriptionOrganization": "Creeu un perfil d'organització per reutilitzar variables d'entorn, ordres de configuració i habilitats entre sessions.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Un propietari o administrador de l'organització pot crear un perfil d'organització."
+      "pickerEmptyDescriptionOrganization": "Creeu un perfil d'organització per reutilitzar variables d'entorn, ordres de configuració i habilitats entre sessions."
     },
     "variablesDeleteFailed": "No s'ha pogut suprimir la variable",
     "deleteVariable": "Elimina la variable {{key}}",
@@ -4539,7 +4559,6 @@
     "dismiss": "Descarta l'informe",
     "offline": "Sense connexió · informe desat",
     "cached": "Informe desat · no es pot actualitzar",
-    "window": "{{start}} – {{end}}",
     "summary": "Resum d'IA",
     "summaryPending": "El resum d'IA està en curs. S'adjuntarà aquí quan estigui llest.",
     "summaryUnavailable": "El resum d'IA no està disponible. L'informe estructurat continua disponible.",
@@ -4658,6 +4677,7 @@
       "title": "Disparadors i ganxos web",
       "subtitle": "Automatitza execucions del Cloud Agent a partir d'una crida de ganxo web o d'una programació.",
       "new": "Disparador nou",
+      "create": "Crea disparador",
       "emptyTitle": "Encara no hi ha disparadors",
       "emptyDescription": "Crea un disparador per iniciar una execució del Cloud Agent a partir d'una crida de ganxo web o segons una programació.",
       "loadFailedTitle": "No s'han pogut carregar els disparadors",
@@ -4711,6 +4731,8 @@
       "created": "Disparador creat",
       "saved": "Disparador desat",
       "statusArrived": "Arribat",
+      "defaultPromptWebhook": "Descriu el cos d'aquesta sol·licitud de ganxo web:\n\n{{body}}",
+      "defaultPromptScheduled": "Executa la tasca programada. Activat a {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Introdueix un nom.",
         "nameTooShort": "Utilitza almenys 8 caràcters.",
@@ -4759,6 +4781,7 @@
     "superseded": "Aquest enllaç s'ha substituït des d'un altre dispositiu i ja no funciona."
   },
   "sharedSession": {
+    "startedAt": "Iniciat a les {{time}}",
     "title": "Sessió compartida",
     "someone": "Algú",
     "sharedBy": "Compartida per {{owner}}",

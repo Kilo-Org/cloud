@@ -788,6 +788,90 @@ describe('adminCustomLlmRouter', () => {
     });
   });
 
+  describe('base_url scheme', () => {
+    const credentials = { type: 'api_key', api_key: 'sk-secret' } as const;
+    const httpDefinition: CustomLlmDefinition = {
+      ...validDefinition,
+      base_url: 'http://upstream.example.com/v1',
+    };
+    const originalNodeEnv = process.env.NODE_ENV;
+    const setNodeEnv = (value: string | undefined) => {
+      const env: Record<string, string | undefined> = process.env;
+      if (value === undefined) delete env.NODE_ENV;
+      else env.NODE_ENV = value;
+    };
+
+    afterEach(() => {
+      setNodeEnv(originalNodeEnv);
+    });
+
+    it('rejects a non-https base_url when the URL policy is enforced', async () => {
+      setNodeEnv('production');
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(
+        caller.admin.customLlm.upsert({
+          public_id: 'kilo-internal/http-model',
+          definition: httpDefinition,
+          credentials,
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('base_url must use https'),
+      });
+      const rows = await db
+        .select()
+        .from(custom_llm2)
+        .where(eq(custom_llm2.public_id, 'kilo-internal/http-model'));
+      expect(rows).toEqual([]);
+    });
+
+    it('rejects changing an existing definition to a non-https base_url when enforced', async () => {
+      const caller = await createCallerForUser(admin.id);
+      const publicId = 'kilo-internal/http-update-model';
+      await caller.admin.customLlm.upsert({
+        public_id: publicId,
+        definition: validDefinition,
+        credentials,
+      });
+
+      setNodeEnv('production');
+
+      await expect(
+        caller.admin.customLlm.upsert({ public_id: publicId, definition: httpDefinition })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('base_url must use https'),
+      });
+    });
+
+    it('accepts an https base_url when the URL policy is enforced', async () => {
+      setNodeEnv('production');
+      const caller = await createCallerForUser(admin.id);
+
+      const result = await caller.admin.customLlm.upsert({
+        public_id: 'kilo-internal/https-model',
+        definition: validDefinition,
+        credentials,
+      });
+
+      expect(result.definition.base_url).toBe(validDefinition.base_url);
+    });
+
+    it('accepts a non-https base_url in the test environment', async () => {
+      setNodeEnv('test');
+      const caller = await createCallerForUser(admin.id);
+
+      const result = await caller.admin.customLlm.upsert({
+        public_id: 'kilo-internal/http-model-test-env',
+        definition: httpDefinition,
+        credentials,
+      });
+
+      expect(result.definition.base_url).toBe(httpDefinition.base_url);
+    });
+  });
+
   describe('delete', () => {
     it('deletes a custom LLM by public_id', async () => {
       const caller = await createCallerForUser(admin.id);

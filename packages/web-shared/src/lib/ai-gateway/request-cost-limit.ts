@@ -354,6 +354,7 @@ export async function enforceRequestCostLimit(
     if (
       aliasTarget &&
       parsed.data.model !== model &&
+      parsed.data.model !== aliasTarget &&
       parsed.data.model !==
         mapResolvedModelIdToVercel(aliasTarget, await getVercelModelIdOverrides())
     )

@@ -15,8 +15,10 @@ type FormFieldProps = Omit<TextInputProps, 'value'> &
     /**
      * The gap between the field's label row and its input. The default
      * `gap-1.5` keeps the ordinary compact block; a screen whose row controls
-     * hover over the label line passes `COMMAND_ROW_FIELD_GAP_CLASS` so the
-     * controls' 46 dp touch band ends above the input's edge.
+     * hover over the label line passes `COMMAND_ROW_FIELD_GAP_CLASS`. The
+     * class lands on a wrapper around the label row and the input only — the
+     * block root keeps `gap-1.5`, so a shown error or reserved message below
+     * the input keeps the ordinary spacing.
      */
     gapClassName?: string;
     /** Reserve the tallest localized message, including wrapping and font scaling. The
@@ -114,66 +116,72 @@ function FormField({
   }, []);
 
   return (
-    <View className={gapClassName} onLayout={containerOnLayout}>
-      <FormFieldLabel label={label} />
-      <Input
-        ref={instance => {
-          nativeInput.current = instance;
-          if (ref == null) {
-            return;
-          }
-          if ('current' in ref) {
-            ref.current = instance;
-          } else {
-            ref(instance);
-          }
-        }}
-        {...props}
-        defaultValue={defaultValue}
-        editable={!disabled}
-        // A field's content follows the interface direction, not the script of
-        // its own value, so an email address stays on the same side as its
-        // label in an RTL catalog. `Input` applies the alignment; the caller's
-        // own style passes through untouched.
-        style={style}
-        accessibilityLabel={formFieldA11y({ label, required, error: displayedError })}
-        accessibilityState={{ disabled }}
-        onChangeText={value => {
-          valueRef.current = value;
-          onChangeText?.(value);
-          if (validate && (validationError || (validateWhileTyping && value.trim() !== ''))) {
-            setValidationError(validate(value));
-          }
-        }}
-        onFocus={event => {
-          onFocus?.(event);
-          setHasFocused(true);
-        }}
-        onBlur={event => {
-          onBlur?.(event);
-          if (validate) {
-            setValidationError(validate(valueRef.current));
-          }
-        }}
-        className={cn(
-          // The box (min-h-[44px] pl-3 pr-3 leading-[normal]) lives in
-          // `@/components/ui/input`, so every single-line field shares it and
-          // the class cannot be copied back wrong. No vertical padding: iOS
-          // insets the already-centered text rect by it, drawing the value and
-          // the placeholder below the middle (apps/mobile/AGENTS.md).
-          'rounded-md border border-input bg-background text-sm text-foreground',
-          // DESIGN.md's input recipe fills the field with `border.inputBg` (4 %
-          // white) over the canvas. `bg-background` is the canvas itself, so in
-          // dark the field had no surface of its own and only the border color
-          // separated it from the page. Light keeps the canvas fill, where the
-          // 45 % ink `--input` border already carries the field.
-          'dark:bg-[#FFFFFF0A]',
-          'focus:border-ring',
-          displayedError && 'border-destructive',
-          disabled && 'opacity-50',
-          className
-        )}
-      />
+    <View className="gap-1.5" onLayout={containerOnLayout}>
+      {/* The caller's gap lands only on the label-to-input pair, via a wrapper
+          around those two siblings: the block root keeps its compact `gap-1.5`
+          so a shown error or reserved message below the input keeps the
+          ordinary spacing whatever the controls above the input need. */}
+      <View className={gapClassName}>
+        <FormFieldLabel label={label} />
+        <Input
+          ref={instance => {
+            nativeInput.current = instance;
+            if (ref == null) {
+              return;
+            }
+            if ('current' in ref) {
+              ref.current = instance;
+            } else {
+              ref(instance);
+            }
+          }}
+          {...props}
+          defaultValue={defaultValue}
+          editable={!disabled}
+          // A field's content follows the interface direction, not the script of
+          // its own value, so an email address stays on the same side as its
+          // label in an RTL catalog. `Input` applies the alignment; the caller's
+          // own style passes through untouched.
+          style={style}
+          accessibilityLabel={formFieldA11y({ label, required, error: displayedError })}
+          accessibilityState={{ disabled }}
+          onChangeText={value => {
+            valueRef.current = value;
+            onChangeText?.(value);
+            if (validate && (validationError || (validateWhileTyping && value.trim() !== ''))) {
+              setValidationError(validate(value));
+            }
+          }}
+          onFocus={event => {
+            onFocus?.(event);
+            setHasFocused(true);
+          }}
+          onBlur={event => {
+            onBlur?.(event);
+            if (validate) {
+              setValidationError(validate(valueRef.current));
+            }
+          }}
+          className={cn(
+            // The box (min-h-[44px] pl-3 pr-3 leading-[normal]) lives in
+            // `@/components/ui/input`, so every single-line field shares it and
+            // the class cannot be copied back wrong. No vertical padding: iOS
+            // insets the already-centered text rect by it, drawing the value and
+            // the placeholder below the middle (apps/mobile/AGENTS.md).
+            'rounded-md border border-input bg-background text-sm text-foreground',
+            // DESIGN.md's input recipe fills the field with `border.inputBg` (4 %
+            // white) over the canvas. `bg-background` is the canvas itself, so in
+            // dark the field had no surface of its own and only the border color
+            // separated it from the page. Light keeps the canvas fill, where the
+            // 45 % ink `--input` border already carries the field.
+            'dark:bg-[#FFFFFF0A]',
+            'focus:border-ring',
+            displayedError && 'border-destructive',
+            disabled && 'opacity-50',
+            className
+          )}
+        />
+      </View>
       {reserveErrorMessages?.length && (alwaysReserve || hasFocused || displayedError) ? (
         <View>
           {/* Full-width overlapping copies reserve the maximum height in native layout,

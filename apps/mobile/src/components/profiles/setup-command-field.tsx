@@ -18,12 +18,12 @@ type SetupCommandFieldProps = Readonly<{
   label: string;
   /**
    * The gap between the label row and the field. Undefined keeps the ordinary
-   * compact block (`gap-1.5` inside `FormField`); a card that renders row
-   * controls over the label line passes `COMMAND_ROW_FIELD_GAP_CLASS`, which
-   * lands on `FormField`'s root where the label row and the `Input` are
-   * siblings — the pair the controls' 46 dp touch band has to clear. The
-   * block's own root keeps `gap-1.5`, so the counter and at-limit line below
-   * the field keep the ordinary spacing.
+   * compact block (`gap-1.5`); a card that renders row controls over the label
+   * line passes `COMMAND_ROW_FIELD_GAP_CLASS`, which lands on a wrapper around
+   * the label row and the field/value box only — the pair the controls' 46 dp
+   * touch band has to clear. The block root and anything below the field (an
+   * error or reserved message, the counter, the at-limit line) keep the
+   * ordinary compact spacing.
    */
   gapClassName?: string;
   /** The viewer cannot manage this row: render the command as read-only text. */
@@ -69,16 +69,21 @@ export function SetupCommandField({
 
   if (readOnly) {
     return (
-      <View className={gapClassName ?? 'gap-1.5'}>
-        <FormFieldLabel label={label} />
-        <View className="min-h-[44px] justify-center rounded-md border border-input bg-background px-3 py-2.5 dark:bg-[#FFFFFF0A]">
-          <SelectableText
-            accessibilityLabel={label}
-            accessibilityHint={accessibilityHint}
-            className="text-sm leading-[1.25rem] text-foreground"
-          >
-            {command}
-          </SelectableText>
+      // The caller's gap lands only on the label-to-value pair, via the same
+      // wrapper the editable branch uses; the block root keeps its compact
+      // `gap-1.5`.
+      <View className="gap-1.5">
+        <View className={gapClassName ?? 'gap-1.5'}>
+          <FormFieldLabel label={label} />
+          <View className="min-h-[44px] justify-center rounded-md border border-input bg-background px-3 py-2.5 dark:bg-[#FFFFFF0A]">
+            <SelectableText
+              accessibilityLabel={label}
+              accessibilityHint={accessibilityHint}
+              className="text-sm leading-[1.25rem] text-foreground"
+            >
+              {command}
+            </SelectableText>
+          </View>
         </View>
       </View>
     );

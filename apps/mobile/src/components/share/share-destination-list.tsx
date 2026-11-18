@@ -1,5 +1,5 @@
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
-import { Search, Share2, Terminal, X } from '@/components/ui/icons';
+import { Search, Share2, Terminal } from '@/components/ui/icons';
 import { type ReactNode, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SessionListSectionHeader } from '@/components/agents/session-list-section-header';
 import { StoredSessionRow } from '@/components/agents/session-row';
 import { CenteredState } from '@/components/centered-state';
-import { EmptyState, StateAction } from '@/components/empty-state';
+import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { ConfigureRow } from '@/components/ui/configure-row';
@@ -33,8 +33,6 @@ type ShareDestinationListProps = {
   destinations: readonly ShareDestinationRow[];
   onSelect: (row: ShareDestinationRow) => void;
   onRetry: () => void;
-  /** The stale share's only way out: close the sheet and drop its staged id. */
-  onDismiss: () => void;
   instances: readonly ShareCliSpawnRow[];
   spawningConnectionId: string | null;
   instanceRowsDisabled: boolean;
@@ -139,7 +137,6 @@ export function ShareDestinationList({
   destinations,
   onSelect,
   onRetry,
-  onDismiss,
   instances,
   spawningConnectionId,
   instanceRowsDisabled,
@@ -203,13 +200,14 @@ export function ShareDestinationList({
   let body: ReactNode = null;
 
   if (state.kind === 'stale-share') {
+    // The sheet's header already closes it, so the state repeats no Close
+    // action of its own.
     body = (
       <EmptyState
         className="bg-background"
         icon={Share2}
         title={t('share.staleTitle')}
         description={state.message}
-        action={<StateAction label={t('common.close')} icon={X} onPress={onDismiss} />}
       />
     );
   } else if (state.kind === 'non-retryable-classification') {

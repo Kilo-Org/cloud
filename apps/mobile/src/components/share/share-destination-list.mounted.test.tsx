@@ -106,7 +106,6 @@ async function mount(
   const onRetry = vi.fn<() => void>();
   const onSelect = vi.fn<(row: ShareDestinationRow) => void>();
   const onSpawnInstance = vi.fn<(row: ShareCliSpawnRow) => void>();
-  const onDismiss = vi.fn<() => void>();
   const mounted = await renderWithProviders(
     createElement(ShareDestinationList, {
       headerContent: createElement('Header'),
@@ -118,11 +117,10 @@ async function mount(
       destinationsDisabled: false,
       onRetry,
       onSelect,
-      onDismiss,
       onSpawnInstance,
     })
   );
-  return { ...mounted, onDismiss };
+  return mounted;
 }
 
 describe('ShareDestinationList surface states', () => {
@@ -152,8 +150,8 @@ describe('ShareDestinationList surface states', () => {
     unmount();
   });
 
-  it('renders the stale share as the shared empty state with a way out', async () => {
-    const { renderer, unmount, onDismiss } = await mount(
+  it('renders the stale share as the shared empty state without a second close', async () => {
+    const { renderer, unmount } = await mount(
       {
         kind: 'stale-share',
         message: 'Unavailable share',
@@ -171,13 +169,8 @@ describe('ShareDestinationList surface states', () => {
       title: 'Share unavailable',
       description: 'Unavailable share',
     });
-    const action = emptyState.props.action as { props: { onPress: () => void } };
-    // `StateAction` owns the accessible name: it announces its visible label.
-    expect(action.props).toMatchObject({ label: 'Close' });
-    act(() => {
-      action.props.onPress();
-    });
-    expect(onDismiss).toHaveBeenCalledTimes(1);
+    // The sheet header owns the close control, so the state carries no action.
+    expect(emptyState.props.action).toBeUndefined();
     unmount();
   });
 

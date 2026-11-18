@@ -570,6 +570,58 @@ export const sensitiveTargetsOf = (
   return targets;
 };
 
+const sensitiveFieldPresencePayloadSchema = z.object({ present: z.boolean().optional() });
+
+/**
+ * Whether a frame holds any field the sensitive gate protects. `browser_evaluate`
+ * and `browser_run_code_unsafe` run model-authored script, which can read and
+ * write every field a page script can reach, so their classification is the page
+ * itself rather than a target element (the CLI #16285 aligns).
+ */
+export const SENSITIVE_FIELD_PRESENCE_PROBE_EXPRESSION = `(() => {
+  var kindOf = function (input) {
+    var type = String(input.type || '').toLowerCase();
+    if (type === 'password') { return 'password'; }
+    var autocomplete = String(input.getAttribute('autocomplete') || '').toLowerCase().split(/\\s+/);
+    for (var index = 0; index < autocomplete.length; index += 1) {
+      var token = autocomplete[index];
+      if (token === 'one-time-code') { return 'one-time-code'; }
+      if (token.indexOf('cc-') === 0) { return 'payment'; }
+    }
+    var name = String(input.getAttribute('name') || '').toLowerCase();
+    if (/(^|[-_])(cc|card)([-_]|$)/.test(name) || name === 'cardnumber') { return 'payment'; }
+    return null;
+  };
+  var inputs = document.querySelectorAll('input, textarea, select');
+  for (var index = 0; index < inputs.length; index += 1) {
+    if (kindOf(inputs[index]) !== null) { return JSON.stringify({ present: true }); }
+  }
+  return JSON.stringify({ present: false });
+})()`;
+
+/**
+ * `present` when the frame holds a password, one-time-code or payment field,
+ * `absent` only when a fully parsed probe said so, and `unknown` when the frame
+ * could not be inspected — which the gate treats as sensitive.
+ */
+export const readFrameSensitiveFields = async (
+  session: Pick<BrowserToolPageSession, 'send'>,
+  frameId: string
+): Promise<'absent' | 'present' | 'unknown'> => {
+  const payload = await readProbePayload({
+    expression: SENSITIVE_FIELD_PRESENCE_PROBE_EXPRESSION,
+    frameId,
+    schema: sensitiveFieldPresencePayloadSchema,
+    session,
+  });
+
+  if (payload === undefined) {
+    return 'unknown';
+  }
+
+  return payload.present === true ? 'present' : 'absent';
+};
+
 /**
  * The visible boxes of password, one-time-code and payment fields, in the
  * frame's viewport coordinates. The read path translates them into the

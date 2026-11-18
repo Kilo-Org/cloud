@@ -6,6 +6,7 @@ import { createTabLeaseRegistry } from './browser-tab-leases';
 import { createBrowserRuntime } from './browser-runtime';
 import type { BrowserToolRunOutcome } from './browser-runtime';
 import {
+  AGENT_TAB_OUTSIDE_GROUP_ERROR,
   NEEDS_PERMISSION_ERROR,
   ORIGIN_CHANGED_ERROR,
   SENSITIVE_REASON,
@@ -215,6 +216,11 @@ const createFakeCdp = (): FakeCdp => {
           return { result: { value: JSON.stringify({ hidden: [], values: [] }) } };
         }
 
+        // The script tools' page probe: this page holds no protected field.
+        if (expression.includes('present')) {
+          return { result: { value: JSON.stringify({ present: false }) } };
+        }
+
         return { result: { value: 1 } };
       }
       default: {
@@ -291,16 +297,31 @@ const createTabsApi = (): BrowserTabsApi => {
   };
 };
 
-const createHarness = (tabGroups?: BrowserTabGroupController) => {
+const createHarness = async (
+  options: {
+    readonly share?: boolean;
+    readonly tabGroups?: BrowserTabGroupController;
+  } = {}
+) => {
   const cdp = createFakeCdp();
   const leases = createTabLeaseRegistry({});
   const runtime = createBrowserRuntime({
     debuggerApi: cdp.api,
     leases,
     scriptingApi: undefined,
-    tabGroups,
+    ...(options.tabGroups === undefined ? {} : { tabGroups: options.tabGroups }),
     tabsApi: createTabsApi(),
   });
+
+  // D9: an agent reaches only its session's group, so session-1 owns the tab unless a case says otherwise.
+  if (options.share !== false) {
+    await runtime.openSession({
+      controllerId: 'controller-1',
+      sessionHandle: 'session-1',
+      title: 'Work',
+    });
+    await runtime.shareActiveTab({ sessionHandle: 'session-1', tabId: TAB_ID });
+  }
 
   return { cdp, leases, runtime };
 };
@@ -349,7 +370,7 @@ const actGrant = { class: 'act' as const, origin: MAIN_ORIGIN };
 
 describe('agent browser calls', () => {
   it('refuses a read the CLI did not approve, before any page work', async () => {
-    const { cdp, runtime } = createHarness();
+    const { cdp, runtime } = await createHarness();
 
     const outcome = await runtime.runTool({
       agent: { authorized: [] },
@@ -368,7 +389,7 @@ describe('agent browser calls', () => {
   });
 
   it('withholds an iframe origin from the snapshot and reports it', async () => {
-    const { runtime } = createHarness();
+    const { runtime } = await createHarness();
 
     const outcome = await runtime.runTool({
       agent: { authorized: [readGrant] },
@@ -389,7 +410,7 @@ describe('agent browser calls', () => {
   });
 
   it('splices the iframe in once its origin is approved and still drops its withheld console entries', async () => {
-    const { cdp, runtime } = createHarness();
+    const { cdp, runtime } = await createHarness();
     const authorized = [readGrant, { class: 'read' as const, origin: FRAME_ORIGIN }];
 
     const outcome = await runtime.runTool({
@@ -424,7 +445,7 @@ describe('agent browser calls', () => {
   });
 
   it('reports origin_changed when a navigation redirects to another origin', async () => {
-    const { cdp, runtime } = createHarness();
+    const { cdp, runtime } = await createHarness();
     const destination = 'https://other.example.com';
 
     cdp.setFrameUrl('https://accounts.example.org/login');
@@ -448,7 +469,7 @@ describe('agent browser calls', () => {
   });
 
   it('needs a step token for a password field and accepts the retry that carries it', async () => {
-    const { cdp, runtime } = createHarness();
+    const { cdp, runtime } = await createHarness();
 
     cdp.setProbe({ fields: [{ kind: 'password' }], paymentFormSubmit: false });
 
@@ -493,7 +514,7 @@ describe('agent browser calls', () => {
   });
 
   it('cancels a download an unapproved act call started and asks for a step token', async () => {
-    const { cdp, runtime } = createHarness();
+    const { cdp, runtime } = await createHarness();
 
     cdp.setHandlers({
       'Input.dispatchMouseEvent': () => {
@@ -528,7 +549,7 @@ describe('agent browser calls', () => {
   });
 
   it('runs a download call unguarded once with the approval token, then burns it', async () => {
-    const { cdp, runtime } = createHarness();
+    const { cdp, runtime } = await createHarness();
 
     cdp.setHandlers({
       'Input.dispatchMouseEvent': () => {
@@ -566,7 +587,7 @@ describe('agent browser calls', () => {
   });
 
   it('does not refuse an act call for a download an earlier call started', async () => {
-    const { cdp, runtime } = createHarness();
+    const { cdp, runtime } = await createHarness();
 
     cdp.setHandlers({
       'Page.navigate': () => {
@@ -602,9 +623,53 @@ describe('agent browser calls', () => {
     expect(click.kind).toBe('result');
   });
 
+  it('refuses an agent call before any session opened a group', async () => {
+    const { runtime } = await createHarness({ share: false });
+
+    // There is nothing to compare against only when no session exists; that is no exemption (D9).
+    await expect(
+      runtime.runTool({
+        agent: { authorized: [readGrant] },
+        arguments: {},
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_snapshot',
+      })
+    ).resolves.toStrictEqual({
+      kind: 'result',
+      result: { error: AGENT_TAB_OUTSIDE_GROUP_ERROR, ok: false },
+    });
+
+    // Another session's group is not this session's reach either.
+    await runtime.openSession({
+      controllerId: 'controller-2',
+      sessionHandle: 'session-2',
+      title: 'Other',
+    });
+    await runtime.shareActiveTab({ sessionHandle: 'session-2', tabId: TAB_ID });
+    await runtime.openSession({
+      controllerId: 'controller-1',
+      sessionHandle: 'session-1',
+      title: 'Work',
+    });
+
+    await expect(
+      runtime.runTool({
+        agent: { authorized: [readGrant] },
+        arguments: {},
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_snapshot',
+      })
+    ).resolves.toStrictEqual({
+      kind: 'result',
+      result: { error: AGENT_TAB_OUTSIDE_GROUP_ERROR, ok: false },
+    });
+  });
+
   it('keeps a session to its own tab group', async () => {
     const { controller } = createGroups();
-    const { runtime } = createHarness(controller);
+    const { runtime } = await createHarness({ share: false, tabGroups: controller });
 
     await runtime.openSession({
       controllerId: 'controller-1',
@@ -641,7 +706,7 @@ describe('agent browser calls', () => {
 
   it('adds a tab opened from a session tab to that session', async () => {
     const { controller } = createGroups();
-    const { runtime } = createHarness(controller);
+    const { runtime } = await createHarness({ share: false, tabGroups: controller });
 
     await runtime.openSession({
       controllerId: 'controller-1',
@@ -668,7 +733,7 @@ describe('agent browser calls', () => {
         },
       },
     });
-    const { runtime } = createHarness(controller);
+    const { runtime } = await createHarness({ share: false, tabGroups: controller });
 
     await runtime.openSession({
       controllerId: 'controller-1',
@@ -690,7 +755,7 @@ describe('agent browser calls', () => {
 
   it('ends the group as `Kilo · ended` and stops targeting its tabs', async () => {
     const { controller, updates } = createGroups();
-    const { runtime } = createHarness(controller);
+    const { runtime } = await createHarness({ share: false, tabGroups: controller });
 
     await runtime.openSession({
       controllerId: 'controller-1',
@@ -722,7 +787,7 @@ describe('agent browser calls', () => {
   });
 
   it('drops console entries whose source is a withheld frame origin', async () => {
-    const { cdp, runtime } = createHarness();
+    const { cdp, runtime } = await createHarness();
 
     // The tab's session subscribes to the debugger events on its first call.
     await runtime.runTool({
@@ -766,7 +831,7 @@ describe('agent browser calls', () => {
   });
 
   it('runs browser_evaluate through the tab debugger, never an extension-privileged context', async () => {
-    const { cdp, runtime } = createHarness();
+    const { cdp, runtime } = await createHarness();
 
     const outcome = await runtime.runTool({
       agent: { authorized: [readGrant, actGrant] },
@@ -790,7 +855,7 @@ describe('agent browser calls', () => {
   });
 
   it('keeps the panel caller unfiltered: its snapshot includes the iframe content', async () => {
-    const { runtime } = createHarness();
+    const { runtime } = await createHarness();
 
     const outcome = await runtime.runTool({
       arguments: {},

@@ -148,7 +148,7 @@ const createFakeTabsApi = (): BrowserTabsApi => {
   };
 };
 
-const createHarness = () => {
+const createHarness = async () => {
   const debugger_ = createFakeDebugger();
   const leases = createTabLeaseRegistry({});
   const runtime = createBrowserRuntime({
@@ -157,6 +157,14 @@ const createHarness = () => {
     scriptingApi: undefined,
     tabsApi: createFakeTabsApi(),
   });
+
+  // D9: an agent reaches only its session's group, so the suite's session owns the tab from the start.
+  await runtime.openSession({
+    controllerId: 'controller-1',
+    sessionHandle: 'session-1',
+    title: 'Work',
+  });
+  await runtime.shareActiveTab({ sessionHandle: 'session-1', tabId: TAB_ID });
 
   return { debugger_, leases, runtime };
 };
@@ -174,7 +182,7 @@ const evaluateToolCall = (runtime: BrowserRuntime, caller: BrowserCaller) =>
 
 describe('browser runtime', () => {
   it("shares the tab's one attachment between a workflow eval and a panel tool call", async () => {
-    const { debugger_, runtime } = createHarness();
+    const { debugger_, runtime } = await createHarness();
 
     await expect(
       runtime.evalInTab({ caller: workflow('run-1'), code: 'return 1;', tabId: TAB_ID })
@@ -196,7 +204,7 @@ describe('browser runtime', () => {
 
   it('ends an agent wait for a held tab with tab_busy after the agent window', async () => {
     vi.useFakeTimers();
-    const { leases, runtime } = createHarness();
+    const { leases, runtime } = await createHarness();
     const owner = panel('conversation-a');
 
     await leases.acquire(TAB_ID, owner);
@@ -221,7 +229,7 @@ describe('browser runtime', () => {
   });
 
   it('lets the panel take over an agent call, which ends with tab_taken and drops its late result', async () => {
-    const { debugger_, leases, runtime } = createHarness();
+    const { debugger_, leases, runtime } = await createHarness();
     const agentCaller = agent('session-1');
     const panelCaller = panel('conversation-a');
 
@@ -260,7 +268,7 @@ describe('browser runtime', () => {
   });
 
   it('stops a taken call from sending the page commands that follow the one in flight', async () => {
-    const { debugger_, runtime } = createHarness();
+    const { debugger_, runtime } = await createHarness();
     const agentCaller = agent('session-1');
 
     // A navigate sends Page.navigate and then reads the page identity.
@@ -304,7 +312,7 @@ describe('browser runtime', () => {
   });
 
   it('hands a conversation lease to the workflow run that claims its tab', async () => {
-    const { leases, runtime } = createHarness();
+    const { leases, runtime } = await createHarness();
     const panelCaller = panel('conversation-a');
     const run = workflow('run-1');
 
@@ -319,7 +327,7 @@ describe('browser runtime', () => {
 
   it('ignores a handover from a caller that is not a panel', async () => {
     vi.useFakeTimers();
-    const { leases, runtime } = createHarness();
+    const { leases, runtime } = await createHarness();
     const agentCaller = agent('session-1');
 
     await leases.acquire(TAB_ID, agentCaller);
@@ -336,7 +344,7 @@ describe('browser runtime', () => {
 
   it('refuses a run claim on a tab another caller holds, after the wait window', async () => {
     vi.useFakeTimers();
-    const { leases, runtime } = createHarness();
+    const { leases, runtime } = await createHarness();
 
     await leases.acquire(TAB_ID, panel('conversation-b'));
 
@@ -350,7 +358,7 @@ describe('browser runtime', () => {
   });
 
   it('releases the tab lease and its attachment when the tab closes', async () => {
-    const { debugger_, leases, runtime } = createHarness();
+    const { debugger_, leases, runtime } = await createHarness();
 
     await evaluateToolCall(runtime, panel('conversation-a'));
     expect(leases.holder(TAB_ID)?.caller).toStrictEqual(panel('conversation-a'));

@@ -82,6 +82,36 @@ describe('controller registry', () => {
     await expect(registry.listControllers()).resolves.toHaveLength(1);
   });
 
+  it('names the controller that owns a session handle', async () => {
+    const { registry } = createRegistry();
+
+    await registry.registerController({ controllerId: CONTROLLER_ID, transport: 'native' });
+    await registry.registerController({
+      controllerId: SECOND_CONTROLLER_ID,
+      transport: 'loopback',
+    });
+    const first = await registry.openSession(CONTROLLER_ID, {
+      cliVersion: '1',
+      cwd: '/tmp',
+      sessionId: 's',
+      title: 't',
+    });
+    const second = await registry.openSession(SECOND_CONTROLLER_ID, {
+      cliVersion: '1',
+      cwd: '/tmp',
+      sessionId: 's2',
+      title: 't2',
+    });
+
+    await expect(registry.sessionOwner(first.sessionHandle)).resolves.toBe(CONTROLLER_ID);
+    await expect(registry.sessionOwner(second.sessionHandle)).resolves.toBe(
+      SECOND_CONTROLLER_ID
+    );
+    await expect(registry.sessionOwner('99999999-8888-4777-8666-555555555555')).resolves.toBe(
+      undefined
+    );
+  });
+
   it('refuses session.open for a controller that never announced itself', async () => {
     const { registry } = createRegistry();
 

@@ -5,6 +5,7 @@ import {
   hashBrowserToolArguments,
   isOAuthConsentUrl,
   isOriginGranted,
+  isScriptTool,
   isUploadTool,
   SENSITIVE_REASON,
   toBrowserOrigin,
@@ -22,6 +23,7 @@ import type { BrowserAgentFrame } from './browser-agent-frames';
 import {
   classifyFocusedElement,
   classifyTargetElement,
+  readFrameSensitiveFields,
   sensitiveTargetsOf,
 } from './browser-agent-probes';
 import type { BrowserToolPageSession } from './browser-tool-snapshot';
@@ -244,11 +246,13 @@ const navigationOrigin = (args: Record<string, unknown>): string | undefined => 
 
 /**
  * Classifies one act call as a sensitive step: a file upload, an OAuth consent
- * page, typing into or submitting a password/one-time-code/payment field. A
- * download that the call starts is classified after it ran, by the runtime.
+ * page, typing into or submitting a password/one-time-code/payment field, or a
+ * script call on a page whose script can reach such a field. A download that the
+ * call starts is classified after it ran, by the runtime.
  */
 const sensitiveStepFor = async (input: {
   readonly args: Record<string, unknown>;
+  readonly authorized: readonly BrowserGrant[];
   readonly frames: readonly BrowserAgentFrame[];
   readonly origin: string;
   readonly pageUrl: string | undefined;
@@ -261,6 +265,32 @@ const sensitiveStepFor = async (input: {
 
   if (isOAuthConsentUrl(input.pageUrl)) {
     return { origin: input.origin, reason: SENSITIVE_REASON.oauthConsent };
+  }
+
+  if (isScriptTool(input.toolName)) {
+    // Model-authored code reaches every field a page script can reach: the tab's
+    // own origin, and any frame the extension may read. One probe per such frame.
+    const mainOrigin = mainFrameOf(input.frames)?.origin;
+    const reachable = input.frames.filter(
+      frame =>
+        frame.origin === mainOrigin || isOriginGranted(input.authorized, 'read', frame.origin)
+    );
+
+    for (const frame of reachable) {
+      // eslint-disable-next-line no-await-in-loop -- one frame probe per round trip, in frame-tree order
+      const verdict = await readFrameSensitiveFields(input.session, frame.id);
+
+      if (verdict === 'present') {
+        return { origin: input.origin, reason: SENSITIVE_REASON.script };
+      }
+
+      // A frame that cannot be inspected may hold the field the script wants.
+      if (verdict === 'unknown') {
+        return { origin: input.origin, reason: SENSITIVE_REASON.scriptUnverified };
+      }
+    }
+
+    return undefined;
   }
 
   const targets = sensitiveTargetsOf(input.toolName, input.args);
@@ -430,6 +460,7 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
   const pageUrl = await pageUrlFor(input.session, targetFrame);
   const sensitive = await sensitiveStepFor({
     args: input.args,
+    authorized: input.authorized,
     frames,
     origin,
     pageUrl,

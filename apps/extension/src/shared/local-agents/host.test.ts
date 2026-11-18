@@ -178,6 +178,15 @@ const createHarness = () => {
     },
     remove: removeTab,
   };
+  const bridge = {
+    adopt: vi.fn(async () => ({})),
+    callTool: vi.fn(async () => ({ content: [] })),
+    closeSession: vi.fn(async () => {}),
+    endSessions: vi.fn(async () => {}),
+    listTools: vi.fn(async () => ({ contractSha: 'a'.repeat(64), tools: [] })),
+    openSession: vi.fn(async () => {}),
+    shareActiveTab: vi.fn(async () => ({ tabId: 5 })),
+  };
   const hostOptions = {
     availability: {
       hasDebugger: false,
@@ -185,6 +194,7 @@ const createHarness = () => {
       hasTabGroups: false,
       hasWebRequest: false,
     },
+    bridge,
     createSocket,
     fetch: (_url: string, init: { body: string }) => {
       const token = z.object({ t: z.string() }).parse(JSON.parse(init.body)).t;
@@ -217,6 +227,7 @@ const createHarness = () => {
 
   return {
     alarms,
+    bridge,
     commands,
     hostOptions,
     listeners,
@@ -375,6 +386,14 @@ describe('local agents host over a loopback endpoint', () => {
       reason: 'switch_off',
       sessionHandle,
     });
+    expect(harness.bridge.openSession).toHaveBeenCalledWith({
+      controllerId: CONTROLLER_ID,
+      sessionHandle,
+      title: 'Fix the tests',
+    });
+    expect(harness.bridge.endSessions).toHaveBeenCalledWith([
+      { controllerId: CONTROLLER_ID, sessionHandle },
+    ]);
     expect(socket.closed).toBeGreaterThan(0);
     await expect(loadLocalAgentConnectedAgents(harness.storage)).resolves.toStrictEqual([]);
     await expect(loadLocalAgentStatus(harness.storage)).resolves.toStrictEqual([]);
@@ -450,6 +469,10 @@ describe('local agents host over a loopback endpoint', () => {
       reason: 'user_stop',
       sessionHandle,
     });
+    // Stop all ends the runtime session too: group grey, leases released.
+    expect(harness.bridge.endSessions).toHaveBeenCalledWith([
+      { controllerId: CONTROLLER_ID, sessionHandle },
+    ]);
     await expect(loadLocalAgentConnectedAgents(harness.storage)).resolves.toStrictEqual([]);
     host.stop();
   });

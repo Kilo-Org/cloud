@@ -2,6 +2,7 @@
 import { z } from 'zod';
 import { createWebMcpToolCall } from './agent-conversation';
 import {
+  AGENT_TAB_OUTSIDE_GROUP_ERROR,
   ambiguousSelectorError,
   originPatternMatches,
   toBrowserOrigin,
@@ -808,8 +809,6 @@ const closeTab = async (
 };
 
 const WITHHELD_TAB_URL = '[origin withheld]';
-const TAB_GROUP_BLOCKED_ERROR =
-  'This tab is not in the agent session\u2019s tab group (blocked). Share it first or pick a tab in the group.';
 
 const grantsOrigin = (origins: readonly string[], url: string | undefined): boolean => {
   const origin = toBrowserOrigin(url);
@@ -901,7 +900,7 @@ const runTabs = async (
       }
 
       if (options.agentAccess !== undefined && !tabActable(options.agentAccess, tab)) {
-        return fail(TAB_GROUP_BLOCKED_ERROR);
+        return fail(AGENT_TAB_OUTSIDE_GROUP_ERROR);
       }
 
       tabId = tab.id;
@@ -934,7 +933,7 @@ const runTabs = async (
     }
 
     if (options.agentAccess !== undefined && !tabActable(options.agentAccess, tab)) {
-      return fail(TAB_GROUP_BLOCKED_ERROR);
+      return fail(AGENT_TAB_OUTSIDE_GROUP_ERROR);
     }
 
     const update = options.tabsApi?.update?.bind(options.tabsApi);

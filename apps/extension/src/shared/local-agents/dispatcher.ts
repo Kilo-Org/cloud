@@ -1,19 +1,16 @@
 /* eslint-disable typescript-eslint/consistent-type-definitions -- AGENTS.md prefers type over interface */
 import { z } from 'zod';
+import type { LocalAgentBrowserBridge } from './browser-bridge';
 import { LocalAgentRpcError, LOCAL_AGENT_ERROR_CODES } from './jsonrpc';
 import type { JsonRpcParams, JsonRpcResult } from './jsonrpc';
 import type { LocalAgentControllerRegistry } from './registry';
 
 /*
- * Method dispatch for protocol v1. The browser runtime implements `tools.*`
- * later; everything except session bookkeeping already answers with the error
- * the CLI turns into its setup hint, so no caller hangs.
+ * Method dispatch for protocol v1. Session bookkeeping lives in the registry
+ * (the panel's connected-agents list); everything that touches a tab, a lease
+ * or the agent gate goes through the browser bridge, so one session handle
+ * reaches exactly the tabs its own session group holds.
  */
-
-export type LocalAgentBrowserTools = {
-  list(): Promise<JsonRpcResult>;
-  call(params: JsonRpcParams): Promise<JsonRpcResult>;
-};
 
 export type LocalAgentDispatcher = {
   handle(controllerId: string, method: string, params: JsonRpcParams): Promise<JsonRpcResult>;
@@ -26,91 +23,108 @@ const sessionOpenSchema = z.object({
   title: z.string(),
 });
 
-const sessionCloseSchema = z.object({ sessionHandle: z.uuid() });
+const sessionHandleSchema = z.object({ sessionHandle: z.uuid() });
 
-/**
- * Injected by the background wiring until the browser runtime replaces it:
- * `tools.list` and `tools.call` report `browser_unavailable`, which is the
- * signal for the CLI's one-time "extension connected" notice.
- */
-const unavailableBrowser = () =>
-  new LocalAgentRpcError(
-    LOCAL_AGENT_ERROR_CODES.browserUnavailable,
-    'The browser is not available right now.'
-  );
-
-export const createUnavailableBrowserTools = (): LocalAgentBrowserTools => ({
-  call: (): Promise<JsonRpcResult> => {
-    throw unavailableBrowser();
-  },
-  list: (): Promise<JsonRpcResult> => {
-    throw unavailableBrowser();
-  },
-});
-
-const unavailable = (): never => {
-  throw unavailableBrowser();
-};
+const invalidParams = (message: string): LocalAgentRpcError =>
+  new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.invalidParams, message);
 
 export const createLocalAgentDispatcher = ({
+  bridge,
   registry,
-  tools,
 }: {
+  bridge: LocalAgentBrowserBridge;
   registry: LocalAgentControllerRegistry;
-  tools: LocalAgentBrowserTools;
-}): LocalAgentDispatcher => ({
-  handle: async (controllerId, method, params) => {
-    if (method === 'session.open') {
-      const input = sessionOpenSchema.safeParse(params);
+}): LocalAgentDispatcher => {
+  /** A session handle is usable only by the controller that opened it. */
+  const ownedBy = async (controllerId: string, sessionHandle: string): Promise<void> => {
+    if ((await registry.sessionOwner(sessionHandle)) !== controllerId) {
+      throw invalidParams('Unknown session handle.');
+    }
+  };
 
-      if (!input.success) {
+  return {
+    handle: async (controllerId, method, params) => {
+      if (method === 'session.open') {
+        const input = sessionOpenSchema.safeParse(params);
+
+        if (!input.success) {
+          throw invalidParams('Invalid session.open parameters.');
+        }
+
+        const { sessionHandle } = await registry.openSession(controllerId, input.data);
+
+        try {
+          await bridge.openSession({ controllerId, sessionHandle, title: input.data.title });
+        } catch (error) {
+          // No half-open session in the panel's list when the browser cannot take one.
+          await registry.closeSession(controllerId, sessionHandle);
+          throw error;
+        }
+
+        return { sessionHandle };
+      }
+
+      if (method === 'session.close') {
+        const input = sessionHandleSchema.safeParse(params);
+
+        if (!input.success) {
+          throw invalidParams('Invalid session.close parameters.');
+        }
+
+        await ownedBy(controllerId, input.data.sessionHandle);
+
+        if (!(await registry.closeSession(controllerId, input.data.sessionHandle))) {
+          throw invalidParams('Unknown session handle.');
+        }
+
+        await bridge.closeSession({ controllerId, sessionHandle: input.data.sessionHandle });
+
+        return {};
+      }
+
+      if (method === 'session.adopt' || method === 'session.shareActiveTab') {
+        const input = sessionHandleSchema.safeParse(params);
+
+        if (!input.success) {
+          throw invalidParams(`Invalid ${method} parameters.`);
+        }
+
+        const ref = { controllerId, sessionHandle: input.data.sessionHandle };
+
+        await ownedBy(controllerId, ref.sessionHandle);
+
+        return method === 'session.adopt' ? bridge.adopt(ref) : bridge.shareActiveTab(ref);
+      }
+
+      if (method === 'tools.list') {
+        return bridge.listTools();
+      }
+
+      if (method === 'tools.call') {
+        const input = z.object({ sessionHandle: z.string().min(1) }).safeParse(params);
+
+        if (!input.success) {
+          throw invalidParams('Invalid tools.call parameters.');
+        }
+
+        await ownedBy(controllerId, input.data.sessionHandle);
+
+        return bridge.callTool(controllerId, params);
+      }
+
+      if (
+        method === 'upload.begin' ||
+        method === 'upload.chunk' ||
+        method === 'upload.end'
+      ) {
+        // The extension's browser_file_upload uses the page's own file chooser; the hub upload path is not served.
         throw new LocalAgentRpcError(
-          LOCAL_AGENT_ERROR_CODES.invalidParams,
-          'Invalid session.open parameters.'
+          LOCAL_AGENT_ERROR_CODES.unsupportedInBrowser,
+          'File upload transfer is not supported by this browser.'
         );
       }
 
-      return registry.openSession(controllerId, input.data);
-    }
-
-    if (method === 'session.close') {
-      const input = sessionCloseSchema.safeParse(params);
-
-      if (!input.success) {
-        throw new LocalAgentRpcError(
-          LOCAL_AGENT_ERROR_CODES.invalidParams,
-          'Invalid session.close parameters.'
-        );
-      }
-
-      if (!(await registry.closeSession(controllerId, input.data.sessionHandle))) {
-        throw new LocalAgentRpcError(
-          LOCAL_AGENT_ERROR_CODES.invalidParams,
-          'Unknown session handle.'
-        );
-      }
-
-      return {};
-    }
-
-    if (method === 'tools.list') {
-      return tools.list();
-    }
-
-    if (method === 'tools.call') {
-      return tools.call(params);
-    }
-
-    if (
-      method === 'session.adopt' ||
-      method === 'session.shareActiveTab' ||
-      method === 'upload.begin' ||
-      method === 'upload.chunk' ||
-      method === 'upload.end'
-    ) {
-      return unavailable();
-    }
-
-    throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.methodNotFound, 'Unknown method.');
-  },
-});
+      throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.methodNotFound, 'Unknown method.');
+    },
+  };
+};

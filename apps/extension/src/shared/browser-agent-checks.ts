@@ -167,6 +167,17 @@ export interface BrowserOriginChanged {
 /** The tool error text a refused call carries when the bridge is not in the loop (E2E, panel). */
 export const NEEDS_PERMISSION_ERROR =
   'The browser action needs permission for this origin. Nothing was changed.';
+
+/**
+ * The D9 refusal: an agent reached for a tab outside its session's group. The
+ * bridge maps it onto `blocked` (-32011); the message names the fix.
+ */
+export const AGENT_TAB_OUTSIDE_GROUP_ERROR =
+  'This tab is not in the agent session\u2019s tab group (blocked). Share it first or pick a tab in the group.';
+
+/** The two tools that run model-authored page code (D11: they need the `act` grant). */
+export const isScriptTool = (toolName: string): boolean =>
+  toolName === 'browser_evaluate' || toolName === 'browser_run_code_unsafe';
 /** A CSS selector that names more than one element: a call that cannot run must not ask for permission. */
 export const ambiguousSelectorError = (matches: number): string =>
   `The selector matches ${String(matches)} elements. Use a snapshot ref or a selector that matches one element.`;
@@ -183,6 +194,8 @@ export const SENSITIVE_REASON = {
   oneTimeCode: 'typing a one-time code',
   password: 'typing a password',
   paymentField: 'typing into a payment field',
+  script: 'a page script can reach a sensitive field',
+  scriptUnverified: 'a page script could reach a field that could not be inspected',
   unknownField: 'typing into a field that could not be inspected',
 } as const;
 

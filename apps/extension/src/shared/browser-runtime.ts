@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- One runtime owns the serial chain, leases, tab groups and the agent gate; splitting it would scatter the per-tab ordering contract. */
 import {
+  AGENT_TAB_OUTSIDE_GROUP_ERROR,
   createStepTokenStore,
   hashBrowserToolArguments,
   NEEDS_PERMISSION_ERROR,
@@ -338,20 +339,9 @@ export const createBrowserRuntime = ({
     toolName,
   }: BrowserToolRunInput): Promise<BrowserToolRunOutcome> => {
     // An agent reaches only its own session's tabs; the group is the boundary (D9).
-    if (
-      caller.kind === 'agent' &&
-      // Until a transport opens its first session no group exists to compare against, so the D9 boundary applies as soon as one is known.
-      groups.listSessions().length > 0 &&
-      !groups.isTabAllowed(caller.sessionHandle, tabId)
-    ) {
-      return {
-        kind: 'result',
-        result: {
-          error:
-            'This tab is not in the agent session\u2019s tab group (blocked). Share it first or pick a tab in the group.',
-          ok: false,
-        },
-      };
+    // A session with nothing shared yet is refused too: no group means no reach.
+    if (caller.kind === 'agent' && !groups.isTabAllowed(caller.sessionHandle, tabId)) {
+      return { kind: 'result', result: { error: AGENT_TAB_OUTSIDE_GROUP_ERROR, ok: false } };
     }
 
     const lease = await leases.acquire(tabId, caller, {

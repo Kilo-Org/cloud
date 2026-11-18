@@ -58,6 +58,7 @@ const createSession = (
     readonly describeNodeFails?: boolean;
     readonly focusedNodeName?: string;
     readonly forbidQuerySelectorAll?: boolean;
+    readonly fieldProbeFailureFrames?: readonly string[];
     readonly frameOwnerFailsFor?: readonly string[];
     readonly nestedPathBackendIds?: readonly number[];
     readonly nestedFrames?: readonly {
@@ -69,6 +70,7 @@ const createSession = (
     }[];
     readonly frameIdForBackendNode?: (backendNodeId: number) => string;
     readonly mainUrl?: string;
+    readonly presentFieldFrames?: readonly string[];
     readonly probe?: Record<string, unknown>;
     readonly probeByObject?: Record<string, Record<string, unknown>>;
     readonly ambiguousSelectors?: Record<string, number>;
@@ -77,6 +79,9 @@ const createSession = (
   } = {}
 ): FakeGateSession => {
   let describeObjectCalls = 0;
+  // One isolated world per frame, so the field-presence probe can tell the frames apart.
+  const worlds = new Map<number, string>();
+  let nextContextId = 9;
 
   const handlers: Record<string, CdpHandler> = {
     'DOM.describeNode': params => {
@@ -134,7 +139,15 @@ const createSession = (
 
       return { object: { objectId: `obj-${String(id)}` } };
     },
-    'Page.createIsolatedWorld': () => ({ executionContextId: 9 }),
+    'Page.createIsolatedWorld': params => {
+      const frameId = typeof params?.['frameId'] === 'string' ? params['frameId'] : 'main';
+      const executionContextId = nextContextId;
+
+      nextContextId += 1;
+      worlds.set(executionContextId, frameId);
+
+      return { executionContextId };
+    },
     'Page.getFrameTree': () => {
       const nested = options.nestedFrames;
 
@@ -181,7 +194,27 @@ const createSession = (
         },
       };
     },
-    'Runtime.evaluate': () => ({ result: { objectId: 'obj-focused' } }),
+    'Runtime.evaluate': params => {
+      const expression = typeof params?.['expression'] === 'string' ? params['expression'] : '';
+
+      if (!expression.includes('present')) {
+        return { result: { objectId: 'obj-focused' } };
+      }
+
+      const contextId = params?.['contextId'];
+      const frameId = typeof contextId === 'number' ? (worlds.get(contextId) ?? 'main') : 'main';
+
+      if (options.fieldProbeFailureFrames?.includes(frameId) === true) {
+        // No value: the probe could not run in this frame.
+        return { result: {} };
+      }
+
+      return {
+        result: {
+          value: JSON.stringify({ present: options.presentFieldFrames?.includes(frameId) === true }),
+        },
+      };
+    },
   };
 
   return {
@@ -881,5 +914,85 @@ describe('sensitive steps', () => {
     });
 
     expect(result.ok).toBe(true);
+  });
+});
+
+describe('script calls', () => {
+  it('refuses browser_evaluate when a readable frame holds a protected field', async () => {
+    const result = await run({
+      session: createSession({ presentFieldFrames: ['main'] }),
+      toolName: 'browser_evaluate',
+    });
+
+    expect(failureOf(result)).toStrictEqual({
+      items: [
+        { class: 'sensitive', origin: 'https://app.example.com', reason: SENSITIVE_REASON.script },
+      ],
+      kind: 'needs_permission',
+    });
+    expect(sensitiveReasonOf(result)).toBe(SENSITIVE_REASON.script);
+  });
+
+  it('runs browser_evaluate when no readable frame holds a protected field', async () => {
+    const result = await run({ toolName: 'browser_evaluate' });
+
+    expect(result).toMatchObject({ class: 'act', ok: true });
+  });
+
+  it('classifies a readable cross-origin frame that holds a card field', async () => {
+    const result = await run({
+      session: createSession({ presentFieldFrames: ['f1'] }),
+      toolName: 'browser_run_code_unsafe',
+    });
+
+    expect(sensitiveReasonOf(result)).toBe(SENSITIVE_REASON.script);
+  });
+
+  it('ignores a frame the CLI may not read', async () => {
+    const result = await run({
+      authorized: [
+        { class: 'act', origin: 'https://app.example.com' },
+        { class: 'read', origin: 'https://app.example.com' },
+      ],
+      session: createSession({ presentFieldFrames: ['f1'] }),
+      toolName: 'browser_evaluate',
+    });
+
+    expect(result).toMatchObject({ ok: true });
+  });
+
+  it('fails closed when a readable frame cannot be inspected', async () => {
+    const result = await run({
+      session: createSession({ fieldProbeFailureFrames: ['main'] }),
+      toolName: 'browser_evaluate',
+    });
+
+    expect(sensitiveReasonOf(result)).toBe(SENSITIVE_REASON.scriptUnverified);
+  });
+
+  it('allows the retry that carries the token bound to the script call', async () => {
+    const tokens = createStepTokenStore({ now: () => 1000, random: () => 'token-s' });
+    const args = { function: '() => document.body.innerText' };
+    const token = tokens.issue({
+      argumentHash: hashBrowserToolArguments(args),
+      origin: 'https://app.example.com',
+      reason: SENSITIVE_REASON.script,
+      tabId: 7,
+      toolName: 'browser_evaluate',
+    });
+    const session = createSession({ presentFieldFrames: ['main'] });
+    const result = await run(
+      { args, session, stepTokens: [token], toolName: 'browser_evaluate' },
+      tokens
+    );
+
+    expect(result).toMatchObject({ ok: true, sensitiveToken: token });
+
+    const replay = await run(
+      { args, session, stepTokens: [token], toolName: 'browser_evaluate' },
+      tokens
+    );
+
+    expect(replay.ok).toBe(false);
   });
 });

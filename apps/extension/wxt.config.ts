@@ -46,7 +46,7 @@ export default defineConfig({
     permissions:
       browser === 'firefox'
         ? ['alarms', 'contextMenus', 'identity', 'scripting', 'storage', 'tabs']
-        : ['alarms', 'contextMenus', 'debugger', 'identity', 'scripting', 'storage'],
+        : ['alarms', 'contextMenus', 'debugger', 'identity', 'scripting', 'storage', 'tabGroups'],
   }),
   modules: ['@wxt-dev/module-react'],
   vite: () => ({

@@ -24,6 +24,8 @@ export type FakeHub = {
   connected: boolean;
   frames: FakeHubFrame[];
   origin: string | undefined;
+  /** A plain HTML page the agent can navigate to; same loopback host as the pairing URL. */
+  pageUrl: string;
   pairingUrl(hubId: string, token: string): string;
   port: number;
   send(frame: FakeHubFrame): void;
@@ -51,6 +53,21 @@ type PairingState = {
   token: string | null;
   wsUrl: string;
 };
+
+const PAIRING_PAGE_HTML =
+  '<!doctype html><html><body>Pairing in progress…</body></html>';
+
+/** A plain page for the agent to navigate to and snapshot; no script, no secrets. */
+const AGENT_PAGE_HTML = `<!doctype html>
+<html>
+  <head><title>Bridge page</title></head>
+  <body>
+    <h1>Bridge page</h1>
+    <p>The agent reached this page through the extension runtime.</p>
+    <a href="/next">Next</a>
+    <button type="button">Go</button>
+  </body>
+</html>`;
 
 const startServer = async (state: PairingState): Promise<Server> => {
   const handleRequest = async (request: IncomingMessage, response: ServerResponse) => {
@@ -125,7 +142,15 @@ const startServer = async (state: PairingState): Promise<Server> => {
 
     if (url.pathname.startsWith('/__kilo_browser_pair')) {
       response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-      response.end('<!doctype html><html><body>Pairing in progress…</body></html>');
+      response.end(PAIRING_PAGE_HTML);
+
+      return;
+    }
+
+    // The page the agent drives: same loopback host, no credentials, no script.
+    if (url.pathname === '/page') {
+      response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      response.end(AGENT_PAGE_HTML);
 
       return;
     }
@@ -157,6 +182,7 @@ export const startFakeHub = async (): Promise<FakeHub> => {
     connected: false,
     frames: [],
     origin: undefined,
+    pageUrl: `http://127.0.0.1:${port}/page`,
     setAllowedOrigin: () => {
       /* Rebound to the live state below. */
     },

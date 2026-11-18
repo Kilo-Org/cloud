@@ -11,8 +11,9 @@ import type { LocalAgentPanelCommand } from './commands';
 import { createLocalAgentConnection } from './connection';
 import type { LocalAgentConnection, LocalAgentEndpoint } from './connection';
 import type { LocalAgentConnectionState } from './connection-state';
-import { createLocalAgentDispatcher, createUnavailableBrowserTools } from './dispatcher';
-import type { LocalAgentBrowserTools } from './dispatcher';
+import { createLocalAgentDispatcher } from './dispatcher';
+import type { LocalAgentBrowserBridge } from './browser-bridge';
+import { createUnavailableBrowserBridge } from './browser-bridge';
 import { loadLocalAgentEndpoints, saveLocalAgentEndpoint } from './endpoints';
 import { createLocalAgentHello } from './environment';
 import type { LocalAgentApiAvailability } from './environment';
@@ -102,6 +103,8 @@ export type LocalAgentCommandsApi = {
 export type LocalAgentsHostApis = {
   alarms?: LocalAgentAlarmsApi;
   availability: LocalAgentApiAvailability;
+  /** The browser runtime side of the protocol; absent means every tool call reports `browser_unavailable`. */
+  bridge?: LocalAgentBrowserBridge;
   commands?: LocalAgentCommandsApi;
   createId?: () => string;
   createSocket?: LoopbackSocketConnect;
@@ -111,7 +114,6 @@ export type LocalAgentsHostApis = {
   storage: LocalAgentStorageArea;
   tabs?: LocalAgentTabsApi;
   timers?: LocalAgentTimers;
-  tools?: LocalAgentBrowserTools;
   userAgent: string;
   watch?: LocalAgentStorageWatch;
 };
@@ -224,10 +226,8 @@ export const startLocalAgentsHost = (
   const connectSocket = options.createSocket ?? connectLoopbackSocket;
   const fetchImpl: LocalAgentFetch = options.fetch ?? ((url, init) => globalThis.fetch(url, init));
   const registry = createLocalAgentControllerRegistry({ createHandle: createId, now, storage });
-  const dispatcher = createLocalAgentDispatcher({
-    registry,
-    tools: options.tools ?? createUnavailableBrowserTools(),
-  });
+  const bridge = options.bridge ?? createUnavailableBrowserBridge();
+  const dispatcher = createLocalAgentDispatcher({ bridge, registry });
   const hello = createLocalAgentHello({
     availability,
     extensionVersion: runtime?.getManifest?.().version,
@@ -348,7 +348,15 @@ export const startLocalAgentsHost = (
     await Promise.all(
       controllerIds.map(async controllerId => {
         controllerConnections.delete(controllerId);
-        await registry.removeController(controllerId);
+        const removed = await registry.removeController(controllerId);
+
+        // A dropped connection's sessions cannot resume: their groups end like a Stop all.
+        await bridge.endSessions(
+          (removed?.sessions ?? []).map(session => ({
+            controllerId,
+            sessionHandle: session.sessionHandle,
+          }))
+        );
       })
     );
 
@@ -406,6 +414,9 @@ export const startLocalAgentsHost = (
   const revokeAll = async (reason: 'switch_off' | 'user_stop'): Promise<void> => {
     const revoked = await registry.takeAllSessions();
 
+    // Every stopped session ends in the runtime too: its group turns grey (D12) and its leases are released.
+    await bridge.endSessions(revoked);
+
     for (const { controllerId, sessionHandle } of revoked) {
       controllerConnections
         .get(controllerId)
@@ -420,6 +431,12 @@ export const startLocalAgentsHost = (
     const connection = controllerConnections.get(controllerId);
 
     controllerConnections.delete(controllerId);
+    await bridge.endSessions(
+      (removed?.sessions ?? []).map(session => ({
+        controllerId,
+        sessionHandle: session.sessionHandle,
+      }))
+    );
 
     for (const session of removed?.sessions ?? []) {
       connection?.send(

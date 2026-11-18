@@ -71,6 +71,8 @@ export type LocalAgentControllerRegistry = {
     input: LocalAgentSessionInput
   ): Promise<{ sessionHandle: string }>;
   closeSession(controllerId: string, sessionHandle: string): Promise<boolean>;
+  /** The controller that opened a session; undefined when no row holds that handle. */
+  sessionOwner(sessionHandle: string): Promise<string | undefined>;
   /** Removes every session (and its controller) and reports what was revoked. */
   takeAllSessions(): Promise<{ controllerId: string; sessionHandle: string }[]>;
 };
@@ -235,6 +237,15 @@ export const createLocalAgentControllerRegistry = ({
         await writeControllers([]);
 
         return revoked;
+      }),
+
+    sessionOwner: sessionHandle =>
+      runExclusive(async () => {
+        const controllers = await readControllers();
+
+        return controllers.find(controller =>
+          controller.sessions.some(session => session.sessionHandle === sessionHandle)
+        )?.controllerId;
       }),
   };
 };

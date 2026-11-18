@@ -7,11 +7,14 @@ import type { WebMcpToolCallEvent } from '@/src/shared/agent-conversation';
 import type { BrowserToolDispatchOptions } from '@/src/shared/browser-tool-dispatch';
 import { createBrowserRuntime } from '@/src/shared/browser-runtime';
 import type { BrowserRuntime } from '@/src/shared/browser-runtime';
+import { createBrowserTabGroupController } from '@/src/shared/browser-tab-groups';
+import type { BrowserTabGroupsApi } from '@/src/shared/browser-tab-groups';
 import {
   createStorageSessionLeasePersistence,
   createTabLeaseRegistry,
 } from '@/src/shared/browser-tab-leases';
-import { startLocalAgentsHost } from '@/src/shared/local-agents/host';
+import { createRuntimeBrowserBridge } from '@/src/shared/local-agents/browser-bridge';
+import { readLocalAgentsHostApis, startLocalAgentsHost } from '@/src/shared/local-agents/host';
 import {
   ADD_TO_MEMORY_MENU_ID,
   enableActionClickSidePanel,
@@ -120,14 +123,20 @@ const browserRuntimes = new WeakMap<BrowserTabsApi, BrowserRuntime>();
 // One onRemoved listener per tabs API, wired lazily on the first message; the WeakSet keeps a second registration a no-op.
 const runtimeCleanupWiredTabsApis = new WeakSet<BrowserTabsApi>();
 
-const getBrowserRuntime = ({
+/** `chrome.tabs.group` is the one tab-group call that lives on the tabs API; the rest are `chrome.tabGroups`. */
+type NativeTabsApi = BrowserTabsApi & Pick<BrowserTabGroupsApi, 'group'>;
+
+export const getBrowserRuntime = ({
   debuggerApi,
   scriptingApi,
+  tabGroupsApi,
   tabsApi,
 }: {
   readonly debuggerApi: ChromeDebuggerApi | undefined;
   readonly scriptingApi: BrowserScriptingApi | undefined;
-  readonly tabsApi: BrowserTabsApi;
+  /** Absent on Firefox or without the `tabGroups` permission: sessions track their tabs by id. */
+  readonly tabGroupsApi?: BrowserTabGroupsApi | undefined;
+  readonly tabsApi: NativeTabsApi;
 }): BrowserRuntime => {
   const existing = browserRuntimes.get(tabsApi);
 
@@ -141,6 +150,26 @@ const getBrowserRuntime = ({
       persistence: createStorageSessionLeasePersistence(storage),
     }),
     scriptingApi,
+    // Every session gets its group `Kilo · <title>`; an ended one collapses, greys and stays adoptable (D12).
+    ...(tabGroupsApi === undefined
+      ? {}
+      : {
+          tabGroups: createBrowserTabGroupController({
+            api: {
+              ...(tabGroupsApi.group === undefined
+                ? {}
+                : { group: tabGroupsApi.group.bind(tabGroupsApi) }),
+              tabQuery: async query => tabsApi.query(query),
+              ...(tabGroupsApi.update === undefined
+                ? {}
+                : {
+                    update: async (groupId, props) => {
+                      await tabGroupsApi.update?.(groupId, props);
+                    },
+                  }),
+            },
+          }),
+        }),
     tabsApi,
   });
 
@@ -217,13 +246,19 @@ export const handleTabDebuggerRequest = async ({
   debuggerApi,
   request,
   scriptingApi,
+  tabGroupsApi,
   tabsApi,
 }: {
   debuggerApi: ChromeDebuggerApi | undefined;
   request: TabDebuggerRequest;
   scriptingApi: BrowserScriptingApi | undefined;
-  tabsApi: BrowserTabsApi | undefined;
+  tabGroupsApi?: BrowserTabGroupsApi | undefined;
+  tabsApi: NativeTabsApi | undefined;
 }): Promise<TabDebuggerResponse> => {
+  // One runtime per tabs API, and the same tab-group surface for the panel and the agent bridge.
+  const runtimeFor = (tabs: NativeTabsApi): BrowserRuntime =>
+    getBrowserRuntime({ debuggerApi, scriptingApi, tabGroupsApi, tabsApi: tabs });
+
   try {
     if (request.type === LIST_INSPECTABLE_TABS_MESSAGE) {
       if (debuggerApi) {
@@ -317,7 +352,7 @@ export const handleTabDebuggerRequest = async ({
         return { error: 'Tab evaluation API is unavailable.', ok: false };
       }
 
-      const runtime = getBrowserRuntime({ debuggerApi, scriptingApi, tabsApi });
+      const runtime = runtimeFor(tabsApi);
 
       return {
         ok: true,
@@ -336,7 +371,7 @@ export const handleTabDebuggerRequest = async ({
         return { error: 'Tab lease API is unavailable.', ok: false };
       }
 
-      const runtime = getBrowserRuntime({ debuggerApi, scriptingApi, tabsApi });
+      const runtime = runtimeFor(tabsApi);
 
       return {
         granted: await runtime.claimTab({
@@ -350,14 +385,7 @@ export const handleTabDebuggerRequest = async ({
     }
 
     if (request.type === RELEASE_BROWSER_CALLER_MESSAGE) {
-      const runtime =
-        tabsApi === undefined
-          ? undefined
-          : getBrowserRuntime({
-              debuggerApi,
-              scriptingApi,
-              tabsApi,
-            });
+      const runtime = tabsApi === undefined ? undefined : runtimeFor(tabsApi);
 
       return {
         ok: true,
@@ -367,14 +395,7 @@ export const handleTabDebuggerRequest = async ({
     }
 
     if (request.type === DISPOSE_BROWSER_CALLER_MESSAGE) {
-      const runtime =
-        tabsApi === undefined
-          ? undefined
-          : getBrowserRuntime({
-              debuggerApi,
-              scriptingApi,
-              tabsApi,
-            });
+      const runtime = tabsApi === undefined ? undefined : runtimeFor(tabsApi);
 
       return {
         ok: true,
@@ -388,7 +409,7 @@ export const handleTabDebuggerRequest = async ({
         return { error: 'Browser tool API is unavailable.', ok: false };
       }
 
-      const runtime = getBrowserRuntime({ debuggerApi, scriptingApi, tabsApi });
+      const runtime = runtimeFor(tabsApi);
       const outcome = await runtime.runTool({
         ...(request.agent === undefined ? {} : { agent: request.agent }),
         arguments: request.arguments,
@@ -502,9 +523,6 @@ const handleAddToMemoryClick = (
 };
 
 export default defineBackground(() => {
-  // Local agents register every listener here so one service-worker wake serves either feature.
-  startLocalAgentsHost();
-
   const chromeApi = (
     globalThis as typeof globalThis & {
       chrome?: {
@@ -514,7 +532,8 @@ export default defineBackground(() => {
         scripting?: BrowserScriptingApi;
         sidePanel?: Parameters<typeof enableActionClickSidePanel>[0] & NativeSidePanelOpenApi;
         sidebarAction?: NativeSidebarActionApi;
-        tabs?: BrowserTabsApi;
+        tabGroups?: BrowserTabGroupsApi;
+        tabs?: NativeTabsApi;
       };
     }
   ).chrome;
@@ -529,6 +548,29 @@ export default defineBackground(() => {
       };
     }
   ).browser;
+
+  // Local agents register every listener here so one service-worker wake serves either feature.
+  // The bridge resolves the runtime lazily: a CLI session opens it, not every worker boot.
+  const tabsApi = chromeApi?.tabs;
+  const debuggerApi = chromeApi?.debugger;
+  const scriptingApi = chromeApi?.scripting;
+  const tabGroupsApi = chromeApi?.tabGroups;
+  startLocalAgentsHost({
+    ...readLocalAgentsHostApis(),
+    ...(tabsApi === undefined
+      ? {}
+      : {
+          bridge: createRuntimeBrowserBridge({
+            activeTabId: async () => {
+              const tabs = await tabsApi.query({ active: true, lastFocusedWindow: true });
+
+              return tabs[0]?.id;
+            },
+            runtime: () =>
+              getBrowserRuntime({ debuggerApi, scriptingApi, tabGroupsApi, tabsApi }),
+          }),
+        }),
+  });
 
   const menusApi: NativeContextMenusApi | undefined =
     browserGlobal?.contextMenus ?? chromeApi?.contextMenus;
@@ -563,6 +605,7 @@ export default defineBackground(() => {
         debuggerApi: chromeApi.debugger,
         request: message,
         scriptingApi: chromeApi.scripting,
+        tabGroupsApi: chromeApi.tabGroups,
         tabsApi: chromeApi.tabs,
       });
       sendResponse(response);

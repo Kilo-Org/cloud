@@ -213,6 +213,11 @@ export const createBrowserTabGroupController = ({
     return session.groupId;
   };
 
+  /**
+   * `/browser adopt`: the newest ended group becomes the calling session's group.
+   * The ended handle is retired so the adopted tabs are the new session's reach
+   * (D9), and a session that already owns tabs keeps them instead.
+   */
   const adoptEnded = async ({
     sessionHandle,
   }: BrowserSessionRef): Promise<BrowserTabGroupOpenResult> => {
@@ -222,10 +227,17 @@ export const createBrowserTabGroupController = ({
         best === undefined || (session.endedAt ?? 0) > (best.endedAt ?? 0) ? session : best,
       ended[0]
     );
-    if (adopted === undefined) {
+    const existing = sessions.get(sessionHandle);
+
+    if (adopted === undefined || (existing !== undefined && existing.tabs.length > 0)) {
       ensureSession(sessionHandle);
       return {};
     }
+
+    // The group outlives its session's handle: re-key it to the caller, or the caller could not reach a single tab in it.
+    sessions.delete(adopted.sessionHandle);
+    adopted.sessionHandle = sessionHandle;
+    sessions.set(sessionHandle, adopted);
     adopted.ended = false;
     delete adopted.endedAt;
     if (adopted.groupId === undefined) {

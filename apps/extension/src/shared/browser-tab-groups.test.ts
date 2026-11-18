@@ -252,12 +252,31 @@ describe('browser tab groups', () => {
     });
 
     expect(update).toHaveBeenCalledWith(2, { collapsed: false, title: 'Kilo · Beta' });
-    expect(controller.tabsForSession('b')).toStrictEqual([32]);
-    expect(controller.isTabAllowed('b', 32)).toBe(true);
-    expect(controller.sessionForTab(32)).toBe('b');
+    // The adopted group is the caller's now: `c` reaches its tabs and the ended handle is retired.
+    expect(controller.tabsForSession('c')).toStrictEqual([32]);
+    expect(controller.isTabAllowed('c', 32)).toBe(true);
+    expect(controller.sessionForTab(32)).toBe('c');
+    expect(controller.tabsForSession('b')).toStrictEqual([]);
     // Alpha stays ended and untargetable.
     expect(controller.tabsForSession('a')).toStrictEqual([]);
     expect(controller.listSessions().map(session => session.ended)).toStrictEqual([true, false]);
+  });
+
+  it('keeps a session that already owns tabs instead of adopting an ended group', async () => {
+    let nextGroupId = 1;
+    const group = vi.fn(async (_options: { readonly tabIds: number[] }) => nextGroupId++);
+    const controller = createBrowserTabGroupController({ api: { group } });
+    await controller.openSession({ controllerId: 'c1', sessionHandle: 'a', title: 'Alpha' });
+    await controller.openSession({ controllerId: 'c1', sessionHandle: 'b', title: 'Beta' });
+    await controller.shareActiveTab({ sessionHandle: 'a', tabId: 31 });
+    await controller.shareActiveTab({ sessionHandle: 'b', tabId: 32 });
+    await controller.closeSession({ sessionHandle: 'a' });
+
+    await expect(controller.adoptEnded({ sessionHandle: 'b' })).resolves.toStrictEqual({});
+
+    // Its own group is its reach; the ended one is left for a session that has none.
+    expect(controller.tabsForSession('b')).toStrictEqual([32]);
+    expect(controller.tabsForSession('a')).toStrictEqual([]);
   });
 
   it('creates an empty active session when nothing has ended', async () => {

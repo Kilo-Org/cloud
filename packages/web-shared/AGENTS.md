@@ -96,6 +96,8 @@ Deliberate limitations until users ask:
 - Embeddings and System One use Vercel only when `mapModelIdToVercel` maps the id to a
   Vercel model of that type; Vercel-only models are unsupported.
 - Transcriptions are OpenRouter-only.
+- Image-only models (no text output) are OpenRouter-only because Vercel's chat APIs reject image
+  models, so they are unavailable while a region is set or OpenRouter is off.
 
 ## Autocomplete routes
 

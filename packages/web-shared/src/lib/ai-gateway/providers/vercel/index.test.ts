@@ -302,6 +302,10 @@ describe('shouldRouteToVercel', () => {
       optOut?: boolean;
       /** The model's stored OpenRouter endpoint tags, or null when OpenRouter does not list it. */
       openRouterEndpointTags?: string[] | null;
+      /** Replaces the stored OpenRouter models derived from `openRouterEndpointTags`. */
+      openRouterModels?: Record<string, { endpoints: { tag?: string }[]; aliasTarget?: string }>;
+      /** The Vercel model ids Vercel serves; defaults to `model`. */
+      vercelModelIds?: string[];
       vercelInferenceProviders?: string[] | null;
     } = {}
   ) {
@@ -309,8 +313,20 @@ describe('shouldRouteToVercel', () => {
       model = 'anthropic/claude-sonnet-4.5',
       optOut = false,
       openRouterEndpointTags = ['anthropic'],
+      openRouterModels: storedOpenRouterModels,
+      vercelModelIds = [model],
       vercelInferenceProviders = ['anthropic'],
     } = options;
+    const openRouterModels = storedOpenRouterModels
+      ? Object.fromEntries(
+          Object.entries(storedOpenRouterModels).map(([id, { endpoints, aliasTarget }]) => [
+            id,
+            { id, endpoints, ...(aliasTarget && { alias_target: { slug: aliasTarget } }) },
+          ])
+        )
+      : openRouterEndpointTags
+        ? { [model]: { id: model, endpoints: openRouterEndpointTags.map(tag => ({ tag })) } }
+        : {};
     jest.resetModules();
     jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/routing-config', () => ({
       getRuntimeGatewayRoutingConfig: jest.fn(async () => ({
@@ -318,12 +334,11 @@ describe('shouldRouteToVercel', () => {
       })),
     }));
     jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
-      getVercelModelsFromDatabase: jest.fn(async () => new Set([model])),
+      getVercelModelsFromDatabase: jest.fn(async () => new Set(vercelModelIds)),
       getCachedVercelInferenceProviderIdsForModel: jest.fn(async () => vercelInferenceProviders),
-      getOpenRouterModelsMetadataFromDatabase: jest.fn(async () =>
-        openRouterEndpointTags
-          ? { [model]: { id: model, endpoints: openRouterEndpointTags.map(tag => ({ tag })) } }
-          : {}
+      getOpenRouterModelsMetadataFromDatabase: jest.fn(async () => openRouterModels),
+      resolveOpenRouterModelAlias: jest.fn(
+        async (modelId: string) => storedOpenRouterModels?.[modelId]?.aliasTarget ?? modelId
       ),
     }));
     return (await import('@kilocode/web-shared/lib/ai-gateway/providers/vercel'))
@@ -453,6 +468,61 @@ describe('shouldRouteToVercel', () => {
           only: ['telnyx'],
         }))
       ).resolves.toBe(false);
+    });
+  });
+
+  describe('with a latest alias opted out of Vercel routing', () => {
+    const alias = '~vendor/model-latest';
+    const target = 'vendor/model-2';
+    const routing = { requestedModel: alias, boundedSpending: false };
+
+    function loadForAlias(options: { targetEndpointTags?: string[] | null; optOut?: boolean }) {
+      const { targetEndpointTags = ['vendor'], optOut = true } = options;
+      return loadShouldRouteToVercel({
+        model: alias,
+        optOut,
+        // OpenRouter lists the alias itself without endpoints; its target carries them.
+        openRouterModels: {
+          [alias]: { endpoints: [], aliasTarget: target },
+          ...(targetEndpointTags && {
+            [target]: { endpoints: targetEndpointTags.map(tag => ({ tag })) },
+          }),
+        },
+        vercelModelIds: [target],
+        vercelInferenceProviders: ['vendor', 'telnyx'],
+      });
+    }
+
+    it('stays on OpenRouter when its target serves a provider `only` allows', async () => {
+      const shouldRouteToVercel = await loadForAlias({});
+
+      await expect(shouldRouteToVercel(routing, async () => ({ only: ['vendor'] }))).resolves.toBe(
+        false
+      );
+    });
+
+    it('routes to Vercel when the alias is not opted out', async () => {
+      const shouldRouteToVercel = await loadForAlias({ optOut: false });
+
+      await expect(shouldRouteToVercel(routing, async () => ({ only: ['vendor'] }))).resolves.toBe(
+        true
+      );
+    });
+
+    it('routes to Vercel when only Vercel serves the providers `only` allows', async () => {
+      const shouldRouteToVercel = await loadForAlias({});
+
+      await expect(shouldRouteToVercel(routing, async () => ({ only: ['telnyx'] }))).resolves.toBe(
+        true
+      );
+    });
+
+    it('stays on OpenRouter when the metadata of its target is missing', async () => {
+      const shouldRouteToVercel = await loadForAlias({ targetEndpointTags: null });
+
+      await expect(shouldRouteToVercel(routing, async () => ({ only: ['telnyx'] }))).resolves.toBe(
+        false
+      );
     });
   });
 

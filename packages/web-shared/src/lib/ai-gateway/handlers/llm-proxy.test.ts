@@ -2228,8 +2228,9 @@ describe('POST /api/v1/chat/completions request handling', () => {
         userByok: [{ decryptedAPIKey: 'key', providerId: 'vercel-ai-gateway' }],
       },
       'a catalog-mode endpoint': {
-        provider: { ...provider, type: 'byok-endpoint', byokEndpointName: 'Acme' },
+        provider: { ...provider, type: 'direct-byok', directByokKeyLabel: 'Acme endpoint' },
         userByok: [{ decryptedAPIKey: 'key', providerId: 'endpoint-a1b2c3d4e5' }],
+        directByokPolicyTarget: { kind: 'organization-endpoint' },
       },
       'no BYOK key': { provider, userByok: null },
     };
@@ -2387,9 +2388,9 @@ describe('POST /api/v1/chat/completions request handling', () => {
 
       expect(response.status).toBe(200);
       expect(mockedUpstreamRequest).toHaveBeenCalled();
-      const isByokEndpointModelAllowed =
-        mockedGetProvider.mock.calls[0]?.[0].isByokEndpointModelAllowed;
-      expect(await isByokEndpointModelAllowed?.()).toBe(true);
+      const isDirectByokProviderAllowed =
+        mockedGetProvider.mock.calls[0]?.[0].isDirectByokProviderAllowed;
+      expect(await isDirectByokProviderAllowed?.({ kind: 'organization-endpoint' })).toBe(true);
     });
 
     it.each([
@@ -2406,9 +2407,9 @@ describe('POST /api/v1/chat/completions request handling', () => {
         expect(response.status).toBe(404);
         expect(await response.json()).toMatchObject({ error_type: 'model_not_allowed' });
         expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-        const isByokEndpointModelAllowed =
-          mockedGetProvider.mock.calls[0]?.[0].isByokEndpointModelAllowed;
-        expect(await isByokEndpointModelAllowed?.()).toBe(false);
+        const isDirectByokProviderAllowed =
+          mockedGetProvider.mock.calls[0]?.[0].isDirectByokProviderAllowed;
+        expect(await isDirectByokProviderAllowed?.({ kind: 'organization-endpoint' })).toBe(false);
       }
     );
 
@@ -3747,8 +3748,8 @@ describe('kilo-auto/efficient classifier billing', () => {
 
   it('rejects a bespoke endpoint id whose endpoint serves catalog ids, naming the catalog id', async () => {
     mockedGetProvider.mockResolvedValue({
-      kind: 'byok-endpoint-catalog-only',
-      endpointName: 'Acme',
+      kind: 'direct-byok-catalog-only',
+      keyLabel: 'Acme endpoint',
       catalogModelId: 'moonshotai/kimi-k2.6',
     });
 
@@ -3771,8 +3772,8 @@ describe('kilo-auto/efficient classifier billing', () => {
       providerResult({
         provider: {
           ...provider,
-          type: 'byok-endpoint',
-          byokEndpointName: 'Acme',
+          type: 'direct-byok',
+          directByokKeyLabel: 'Acme endpoint',
           supportedChatApis: ['messages'],
         },
         userByok: [{ decryptedAPIKey: 'key', providerId: 'endpoint-a1b2c3d4e5' }],

@@ -73,7 +73,6 @@ const mockEnabledKeys = jest.fn(async (_db: unknown, _owner: unknown): Promise<M
 const mockEndpointCatalogModelIds = jest.fn(
   async (_keys: readonly MockByokKey[]): Promise<ReadonlySet<string>> => new Set()
 );
-const mockEndpointModels = jest.fn((_keys: readonly MockByokKey[]): OpenRouterModel[] => []);
 /** Replica snapshot loads a test expects; anything else fails the test teardown. */
 let expectedReplicaLoads = 0;
 const mockCatalogModelIds = new Set(['provider/allowed']);
@@ -155,7 +154,6 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok-endpoint/models', () => ({
   getByokEndpointCatalogModelIds: mockEndpointCatalogModelIds,
-  getByokEndpointModels: mockEndpointModels,
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing', () => ({
   tagOpenAiChatGptByokModels: mockTagChatGpt,
@@ -690,7 +688,11 @@ describe('organization model producer publication', () => {
       'provider/ungranted-catalog',
     ]);
     mockEndpointCatalogModelIds.mockResolvedValueOnce(endpointCatalogModelIds);
-    mockEndpointModels.mockReturnValueOnce([catalogModel('endpoint-aaaaaaaaaa/my-model')]);
+    // Direct BYOK model lists include the organization's endpoint models.
+    mockByok.mockResolvedValueOnce([
+      catalogModel('morph-byok/private'),
+      catalogModel('endpoint-aaaaaaaaaa/my-model'),
+    ]);
     mockCatalog = {
       ...mockCatalog,
       data: [
@@ -712,7 +714,6 @@ describe('organization model producer publication', () => {
       'kilo-internal/private',
     ]);
     expect(mockEndpointCatalogModelIds).toHaveBeenCalledWith(keys);
-    expect(mockEndpointModels).toHaveBeenCalledWith(keys);
     expect(mockCatalogAvailability).toHaveBeenCalledWith(
       expect.any(Array),
       endpointCatalogModelIds

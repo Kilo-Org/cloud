@@ -3,8 +3,7 @@ import type { GetProviderInput } from '@kilocode/web-shared/lib/ai-gateway/provi
 type RoutingPolicyHook =
   | 'getRoutingProviderConfig'
   | 'getAllowedProviders'
-  | 'isDirectByokProviderAllowed'
-  | 'isByokEndpointModelAllowed';
+  | 'isDirectByokProviderAllowed';
 
 /**
  * A `getProvider` input for an owner without an organization policy, unless the test overrides a
@@ -18,7 +17,6 @@ export function getProviderInput(
     getRoutingProviderConfig: async () => input.request.body.provider,
     getAllowedProviders: async () => undefined,
     isDirectByokProviderAllowed: async () => true,
-    isByokEndpointModelAllowed: async () => true,
     ...input,
   };
 }

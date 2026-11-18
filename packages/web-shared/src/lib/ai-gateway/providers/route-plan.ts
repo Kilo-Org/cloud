@@ -17,7 +17,9 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { createByokRouteRank } from '@kilocode/web-shared/lib/ai-gateway/byok/route-order';
 import {
+  directByokProviderForKey,
   findDirectByokCatalogModels,
+  getByokEndpointProviders,
   getDirectByokModel,
   getDirectByokModelChatApis,
   getDirectByokPolicyTarget,
@@ -34,29 +36,58 @@ import {
   type CustomLlm,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import { isByokEndpointCatalogModelCandidate } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint/catalog';
+import { isByokServableCatalogModelId } from '@kilocode/web-shared/lib/ai-gateway/byok/servable-catalog-model';
 import {
-  getByokEndpointModelApiKinds,
-  isByokEndpointProviderId,
   parseByokEndpointModelId,
   type ByokEndpointProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
-import type { ByokEndpointDefinition, ByokEndpointModel } from '@kilocode/db/schema-types';
 
 export type RequestedModel =
   /** A custom LLM owns its id, so no key or Kilo route applies. */
   | { kind: 'custom-llm'; customLlm: CustomLlm }
-  /** An endpoint model id such as `endpoint-a1b2c3d4e5/...`, served only by that endpoint. */
-  | { kind: 'byok-endpoint-model'; providerId: ByokEndpointProviderId; modelId: string }
-  /** A provider model id such as `synthetic/...`, served only by that provider's key. */
+  /**
+   * A provider model id such as `synthetic/...`, served only by that provider's key, or an
+   * organization endpoint's model id such as `endpoint-a1b2c3d4e5/...`.
+   */
   | { kind: 'direct-byok-model'; provider: DirectByokProvider; model: DirectByokModel }
+  /**
+   * An endpoint model id that names no listed model of an enabled endpoint of the owner. Only its
+   * endpoint may serve it, so no other route applies.
+   */
+  | {
+      kind: 'unavailable-endpoint-model';
+      providerId: ByokEndpointProviderId;
+      reason: 'no-key' | 'disabled' | 'unknown-model';
+    }
   | { kind: 'catalog' };
 
-export async function classifyRequestedModel(requestedModel: string): Promise<RequestedModel> {
+async function classifyEndpointModel(
+  requestedModel: string,
+  providerId: ByokEndpointProviderId,
+  loadKeys: (() => Promise<readonly ByokKeyState[]>) | null
+): Promise<RequestedModel> {
+  const key = loadKeys && (await loadKeys()).find(candidate => candidate.providerId === providerId);
+  const provider = key && directByokProviderForKey(key);
+  if (!key || !provider)
+    return { kind: 'unavailable-endpoint-model', providerId, reason: 'no-key' };
+  if (!key.isEnabled) return { kind: 'unavailable-endpoint-model', providerId, reason: 'disabled' };
+  const { model } = await getDirectByokModel(requestedModel, [provider]);
+  return model
+    ? { kind: 'direct-byok-model', provider, model }
+    : { kind: 'unavailable-endpoint-model', providerId, reason: 'unknown-model' };
+}
+
+/** `loadKeys` loads the owner's keys, as for `RoutePlanInputs`; only endpoint model ids need them. */
+export async function classifyRequestedModel(
+  requestedModel: string,
+  loadKeys: (() => Promise<readonly ByokKeyState[]>) | null
+): Promise<RequestedModel> {
   const customLlm = await findCustomLlm(requestedModel);
   if (customLlm) return { kind: 'custom-llm', customLlm };
-  const endpointModel = parseByokEndpointModelId(requestedModel);
-  if (endpointModel) return { kind: 'byok-endpoint-model', ...endpointModel };
+  const endpointModelId = parseByokEndpointModelId(requestedModel);
+  if (endpointModelId) {
+    return classifyEndpointModel(requestedModel, endpointModelId.providerId, loadKeys);
+  }
   const { provider, model } = await getDirectByokModel(requestedModel);
   if (provider && model) return { kind: 'direct-byok-model', provider, model };
   return { kind: 'catalog' };
@@ -91,23 +122,7 @@ export type GatewayByokPlanStep = KeyPlanStepBase & {
   decision: 'disabled' | GatewayKeyDecision;
 };
 
-/** A catalog-mode endpoint that lists the requested catalog id among its models. */
-export type EndpointByokPlanStep = KeyPlanStepBase & {
-  route: 'endpoint-byok';
-  providerId: ByokEndpointProviderId;
-  endpoint: ByokEndpointDefinition;
-  model: ByokEndpointModel;
-  decision: 'serves' | 'unsupported-api-kind' | 'disabled';
-};
-
-export type KeyPlanStep =
-  | EndpointByokPlanStep
-  | DirectByokPlanStep
-  | VercelByokPlanStep
-  | GatewayByokPlanStep;
-
-/** A key that serves the model, but not over the request's API kind. */
-export type UnsupportedApiKindPlanStep = DirectByokPlanStep | EndpointByokPlanStep;
+export type KeyPlanStep = DirectByokPlanStep | VercelByokPlanStep | GatewayByokPlanStep;
 
 /**
  * The routes `getProvider` tries for a catalog id, in order; the first that serves takes the
@@ -119,7 +134,7 @@ export type RoutePlanStep =
   | { route: 'chatgpt' }
   | { route: 'ignored-key-fallback'; step: VercelByokPlanStep }
   /** No key serves, but a catalog-mode key serves the model over another API kind. */
-  | { route: 'unsupported-api-kind'; step: UnsupportedApiKindPlanStep }
+  | { route: 'unsupported-api-kind'; step: DirectByokPlanStep }
   | { route: 'kilo' };
 
 /** The policy and request inputs mirror `GetProviderInput`. */
@@ -132,7 +147,6 @@ export type RoutePlanInputs = {
    */
   loadKeys: (() => Promise<readonly ByokKeyState[]>) | null;
   isDirectByokProviderAllowed: (target: DirectByokPolicyTarget) => Promise<boolean>;
-  isByokEndpointModelAllowed: () => Promise<boolean>;
   getAllowedProviders: () => Promise<ReadonlySet<string> | undefined>;
   getRoutingProviderConfig: () => Promise<OpenRouterProviderConfig | undefined>;
   /** `getRequestIgnoredVercelProviderIds` of the request. */
@@ -183,13 +197,14 @@ export async function getAllowedGatewayRoutedByokProviders(
   return allowed;
 }
 
-/** The catalog-mode providers that serve the model and the organization policy admits. */
+/** The catalog models among `catalogModels` whose provider the organization policy admits. */
 async function getAllowedDirectByokCatalogModels(
-  inputs: RoutePlanInputs
+  inputs: RoutePlanInputs,
+  catalogModels: readonly DirectByokCatalogModel[]
 ): Promise<DirectByokCatalogModel[]> {
   const allowed: DirectByokCatalogModel[] = [];
   const excludedProviderIds: string[] = [];
-  for (const catalogModel of await findDirectByokCatalogModels(inputs.requestedModel)) {
+  for (const catalogModel of catalogModels) {
     if (
       await inputs.isDirectByokProviderAllowed(getDirectByokPolicyTarget(catalogModel.provider))
     ) {
@@ -212,51 +227,6 @@ function decideDirectByokKey(
   return getDirectByokModelChatApis(provider, model).includes(apiKind)
     ? 'serves'
     : 'unsupported-api-kind';
-}
-
-function decideEndpointKey(
-  key: ByokKeyState,
-  endpoint: ByokEndpointDefinition,
-  model: ByokEndpointModel,
-  apiKind: GatewayChatApiKind
-): EndpointByokPlanStep['decision'] {
-  if (!key.isEnabled) return 'disabled';
-  return getByokEndpointModelApiKinds(endpoint, model).includes(apiKind)
-    ? 'serves'
-    : 'unsupported-api-kind';
-}
-
-/**
- * The catalog-mode endpoints whose models include the requested id. The organization configured
- * these upstreams itself, so only its model policy applies, never its provider allow-lists.
- */
-async function planEndpointKeySteps(
-  inputs: RoutePlanInputs,
-  keys: readonly ByokKeyState[],
-  rank: (providerId: string) => number
-): Promise<EndpointByokPlanStep[]> {
-  const steps = keys.flatMap<EndpointByokPlanStep>(key => {
-    const { endpoint } = key;
-    if (!endpoint || !key.serveCatalogModels || !isByokEndpointProviderId(key.providerId)) {
-      return [];
-    }
-    const model = endpoint.models.find(candidate => candidate.id === inputs.requestedModel);
-    if (!model) return [];
-    return [
-      {
-        route: 'endpoint-byok',
-        key,
-        routeOrder: rank(key.providerId),
-        providerId: key.providerId,
-        endpoint,
-        model,
-        decision: decideEndpointKey(key, endpoint, model, inputs.apiKind),
-      },
-    ];
-  });
-  if (steps.length === 0 || (await inputs.isByokEndpointModelAllowed())) return steps;
-  inputs.onExcludedByPolicy?.(steps.map(step => step.providerId));
-  return [];
 }
 
 type GatewayKeyDecision = 'serves' | 'model-unavailable' | 'provider-settings';
@@ -288,22 +258,37 @@ function createGatewayKeyDecider(
 async function planKeySteps(inputs: RoutePlanInputs): Promise<KeyPlanStep[]> {
   if (!inputs.loadKeys) return [];
   const { requestedModel, apiKind } = inputs;
-  const catalogModels = await getAllowedDirectByokCatalogModels(inputs);
+  const staticCatalogModels = await getAllowedDirectByokCatalogModels(
+    inputs,
+    await findDirectByokCatalogModels(requestedModel)
+  );
   const gatewayRoutedProviders = await getAllowedGatewayRoutedByokProviders(requestedModel, {
     includeGatewayKeys: true,
     getAllowedProviders: inputs.getAllowedProviders,
     onExcludedByPolicy: inputs.onExcludedByPolicy,
   });
-  const endpointCandidate = await isByokEndpointCatalogModelCandidate(requestedModel);
-  if (catalogModels.length === 0 && gatewayRoutedProviders.length === 0 && !endpointCandidate) {
+  // The owner's endpoints are only known from its keys, which a servable catalog id may need.
+  if (
+    staticCatalogModels.length === 0 &&
+    gatewayRoutedProviders.length === 0 &&
+    !(await isByokServableCatalogModelId(requestedModel))
+  ) {
     return [];
   }
 
   const keys = await inputs.loadKeys();
   const rank = createByokRouteRank(keys);
-  const steps: KeyPlanStep[] = endpointCandidate
-    ? await planEndpointKeySteps(inputs, keys, rank)
-    : [];
+  const endpointProviders = getByokEndpointProviders(keys);
+  const catalogModels = [
+    ...staticCatalogModels,
+    ...(endpointProviders.length > 0
+      ? await getAllowedDirectByokCatalogModels(
+          inputs,
+          await findDirectByokCatalogModels(requestedModel, endpointProviders)
+        )
+      : []),
+  ];
+  const steps: KeyPlanStep[] = [];
   for (const catalogModel of catalogModels) {
     const key = keys.find(candidate => candidate.providerId === catalogModel.provider.id);
     if (!key) continue;
@@ -344,10 +329,7 @@ async function planKeySteps(inputs: RoutePlanInputs): Promise<KeyPlanStep[]> {
 
 export function isKeyPlanStep(step: RoutePlanStep): step is KeyPlanStep {
   return (
-    step.route === 'endpoint-byok' ||
-    step.route === 'direct-byok' ||
-    step.route === 'vercel-byok' ||
-    step.route === 'gateway-byok'
+    step.route === 'direct-byok' || step.route === 'vercel-byok' || step.route === 'gateway-byok'
   );
 }
 
@@ -380,9 +362,8 @@ export async function planRoutes(inputs: RoutePlanInputs): Promise<RoutePlanStep
   const unsupported = keySteps.some(step => step.decision === 'serves')
     ? undefined
     : keySteps.find(
-        (step): step is UnsupportedApiKindPlanStep =>
-          (step.route === 'direct-byok' || step.route === 'endpoint-byok') &&
-          step.decision === 'unsupported-api-kind'
+        (step): step is DirectByokPlanStep =>
+          step.route === 'direct-byok' && step.decision === 'unsupported-api-kind'
       );
   if (unsupported) steps.push({ route: 'unsupported-api-kind', step: unsupported });
 

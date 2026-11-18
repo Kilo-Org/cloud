@@ -29,7 +29,6 @@ import {
   chatGptReconnectResponse,
   claudeBillingReconnectResponse,
   claudeBillingUnavailableResponse,
-  byokEndpointCatalogOnlyMessage,
   directByokCatalogOnlyMessage,
   directByokCatalogOnlyResponse,
   efficientPoolBlockedResponse,
@@ -217,7 +216,6 @@ export async function resolveProviderAndPolicy(
     getAllowedProviders: async () =>
       isAnonymous ? undefined : (await getAccessCheck()).allowedProviders,
     isDirectByokProviderAllowed: isDirectByokServingAllowed,
-    isByokEndpointModelAllowed: () => isDirectByokServingAllowed({ kind: 'organization-endpoint' }),
     kiloIgnoredProviders: getIgnoredProviders(model, isNonTrialEnterprise),
     openRouterDisabled: organizationGatewaySettings.openRouterDisabled,
     onDecision: decision => input.providerMetadataCapture?.captureRoutingDecision(decision),
@@ -245,20 +243,6 @@ export async function resolveProviderAndPolicy(
   ) {
     // Same response as an unknown model id, so callers cannot probe for custom LLMs or endpoints.
     return reject(unknownModelResponse(model));
-  }
-  if (getProviderResult.kind === 'byok-endpoint-catalog-only') {
-    const message = byokEndpointCatalogOnlyMessage({
-      model,
-      endpointName: getProviderResult.endpointName,
-      catalogModelId: getProviderResult.catalogModelId,
-    });
-    return reject(
-      orgAutoRouteTarget
-        ? organizationAutoConfigurationResponse(
-            `Organization Auto route target '${orgAutoRouteTarget}' is unavailable: ${message}`
-          )
-        : directByokCatalogOnlyResponse(message)
-    );
   }
   if (getProviderResult.kind === 'direct-byok-catalog-only') {
     // Falling through to the managed gateway would fail later with a misleading unknown-model error.
@@ -314,8 +298,7 @@ export async function resolveProviderAndPolicy(
       return apiKindNotSupportedResponse(
         request.kind,
         route.provider.supportedChatApis,
-        route.provider.directByokKeyLabel,
-        route.provider.byokEndpointName
+        route.provider.directByokKeyLabel
       );
     }
 
@@ -348,17 +331,10 @@ export async function resolveProviderAndPolicy(
       groupProvidersAllowed,
     } = await getAccessCheck();
 
-    if (route.provider.type === 'byok-endpoint') {
-      // The organization configured the endpoint itself, so its provider allow-lists do not apply.
-      // Routing already skips endpoints the model policy rejects.
-      if (!(await isDirectByokServingAllowed({ kind: 'organization-endpoint' }))) {
-        return poolRouted ? efficientPoolBlockedResponse() : modelNotAllowedResponse();
-      }
-      return null;
-    }
     if (route.provider.type === 'direct-byok') {
       // A catalog-mode direct BYOK key is the request's only route, so the policy is checked
-      // against the key's provider alone. Routing already skips keys it rejects.
+      // against its target alone: the key's provider, or for the organization's own endpoint, only
+      // the model policy. Routing already skips keys it rejects.
       if (
         !route.directByokPolicyTarget ||
         !(await isDirectByokServingAllowed(route.directByokPolicyTarget))

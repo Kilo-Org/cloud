@@ -21,6 +21,7 @@ import {
 import { DIRECT_BYOK_PROVIDERS_META } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import { API_KIND_LABELS, isApiKind, type ApiKind } from '@/lib/api-kind-labels';
 import { byokKeyLabel } from '@/lib/byok/provider-names';
+import { isByokEndpointProviderId } from '@kilocode/db/schema-types';
 import { cn } from '@/lib/utils';
 
 type ByokRoutingPreview = inferRouterOutputs<RootRouter>['byok']['previewRouting'];
@@ -38,6 +39,12 @@ function formatApiKinds(apiKinds: readonly ApiKind[]) {
 }
 
 type StepDescription = { title: string; detail: string };
+
+/** A provider key, or an organization's endpoint, which is named by its own name. */
+function keyTitle(providerId: string, getProviderName: (providerId: string) => string) {
+  const name = getProviderName(providerId);
+  return isByokEndpointProviderId(providerId) ? `${name} endpoint` : byokKeyLabel([name]);
+}
 
 export function describeRouteStep(
   step: RouteStep,
@@ -57,38 +64,24 @@ function describeStepReason(
 ): StepDescription {
   switch (step.route) {
     case 'direct-byok': {
-      const title = byokKeyLabel([getProviderName(step.providerId)]);
+      const isEndpoint = isByokEndpointProviderId(step.providerId);
+      const title = keyTitle(step.providerId, getProviderName);
+      const holder = isEndpoint ? 'endpoint' : 'key';
       switch (step.reason) {
         case 'serves':
           return { title, detail: 'Serves this model with Kilo catalog model IDs.' };
         case 'unsupported-api-kind':
           return {
             title,
-            detail: `Skipped: the provider serves this model over ${formatApiKinds(step.supportedApiKinds)} only.`,
+            detail: `Skipped: the ${isEndpoint ? 'endpoint' : 'provider'} serves this model over ${formatApiKinds(step.supportedApiKinds)} only.`,
           };
         case 'disabled':
-          return { title, detail: 'Skipped: the key is disabled.' };
+          return { title, detail: `Skipped: the ${holder} is disabled.` };
         case 'not-catalog-mode':
           return {
             title,
-            detail:
-              'Skipped: the key uses provider model IDs. Turn on Kilo catalog model IDs to use it for this model.',
+            detail: `Skipped: the ${holder} uses ${isEndpoint ? 'its own' : 'provider'} model IDs. Turn on Kilo catalog model IDs to use it for this model.`,
           };
-      }
-      break;
-    }
-    case 'endpoint-byok': {
-      const title = `${getProviderName(step.providerId)} endpoint`;
-      switch (step.reason) {
-        case 'serves':
-          return { title, detail: 'Serves this model with Kilo catalog model IDs.' };
-        case 'unsupported-api-kind':
-          return {
-            title,
-            detail: `Skipped: the endpoint serves this model over ${formatApiKinds(step.supportedApiKinds)} only.`,
-          };
-        case 'disabled':
-          return { title, detail: 'Skipped: the endpoint is disabled.' };
       }
       break;
     }
@@ -121,7 +114,7 @@ function describeStepReason(
     case 'unsupported-api-kind':
       return {
         title: 'Request fails',
-        detail: `The ${byokKeyLabel([getProviderName(step.providerId)])} serves this model over ${formatApiKinds(step.supportedApiKinds)} only. Requests for a model your keys serve never fall back to Kilo credits.`,
+        detail: `The ${keyTitle(step.providerId, getProviderName)} serves this model over ${formatApiKinds(step.supportedApiKinds)} only. Requests for a model your keys serve never fall back to Kilo credits.`,
       };
     case 'kilo':
       return {

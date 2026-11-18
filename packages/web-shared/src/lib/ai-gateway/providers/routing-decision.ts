@@ -98,6 +98,19 @@ const RoutingDecisionStepSchema = z.union([
     reason: z.literal('catalog-only'),
     catalog_model_id: z.string().nullable(),
   }),
+  /** An organization endpoint's model id, which no other route serves, that its endpoint cannot serve. */
+  z.object({
+    step: z.literal('direct-byok-model'),
+    outcome: z.literal('rejected'),
+    provider_id: z.string(),
+    reason: z.enum([
+      'no-organization',
+      'no-key',
+      'disabled',
+      'unknown-model',
+      'invalid-credentials',
+    ]),
+  }),
   /** Listed only for an endpoint model id, which no other route serves. */
   z.object({
     step: z.literal('byok-endpoint-model'),

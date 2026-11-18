@@ -44,7 +44,7 @@ function resolveRouting(
 }
 
 export function buildDirectProvider(
-  type: 'custom' | 'custom-public' | 'byok-endpoint',
+  type: 'custom' | 'custom-public',
   supportedChatApis: ReadonlyArray<GatewayChatApiKind>,
   upstream: CustomLlmApiConfig,
   auth: DirectUpstreamAuth

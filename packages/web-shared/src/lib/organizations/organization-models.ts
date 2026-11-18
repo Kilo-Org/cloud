@@ -24,10 +24,7 @@ import {
   getEnabledByokProviders,
   hasInferenceProviderUserByokForModel,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
-import {
-  getByokEndpointCatalogModelIds,
-  getByokEndpointModels,
-} from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint/models';
+import { getByokEndpointCatalogModelIds } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint/models';
 import { appendLocalFakeDeterministicCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
 import { tagOpenAiChatGptByokModels } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
 import { tagClaudeBillingByokModels } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/byok-models';
@@ -116,7 +113,6 @@ export async function getAvailableModelsForOrganization(
   }
 
   availableModels.push(...(await getDirectByokModelsForOrganization(organizationId)));
-  availableModels.push(...getByokEndpointModels(byokKeys));
   availableModels.push(
     ...(await listAvailableCustomLlms(organizationId, context.groupIds, countryCode))
   );

@@ -52,7 +52,12 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel', () => ({
   canRouteToVercel: jest.fn(async () => false),
   shouldRouteToVercel: jest.fn(async () => false),
+  isValidVercelModelId: jest.fn(async () => false),
 }));
+
+const actualDirectByok = jest.requireActual<typeof directByokModule>(
+  '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok'
+);
 
 const CATALOG_MODEL = 'moonshotai/kimi-k2.6';
 const ENDPOINT_ID = 'endpoint-a1b2c3d4e5';
@@ -122,7 +127,7 @@ async function route(
   user: User,
   organizationId: string | undefined,
   model: string,
-  options: { apiKind?: GatewayChatApiKind; isByokEndpointModelAllowed?: boolean } = {}
+  options: { apiKind?: GatewayChatApiKind; endpointModelAllowed?: boolean } = {}
 ) {
   let decision: ProviderRoutingDecision | undefined;
   const result = await getProvider(
@@ -131,7 +136,8 @@ async function route(
       request: request(model, options.apiKind),
       user,
       organizationId,
-      isByokEndpointModelAllowed: async () => options.isByokEndpointModelAllowed ?? true,
+      isDirectByokProviderAllowed: async target =>
+        target.kind !== 'organization-endpoint' || (options.endpointModelAllowed ?? true),
       onDecision: recorded => {
         decision = recorded;
       },
@@ -142,13 +148,18 @@ async function route(
 }
 
 function endpointSteps(decision: ProviderRoutingDecision) {
-  return decision.steps.filter(step => step.step === 'byok-endpoint-model');
+  return decision.steps.filter(step => step.step === 'direct-byok-model');
 }
 
 useFakeByokKms();
 
 beforeEach(() => {
-  jest.mocked(findDirectByokCatalogModels).mockResolvedValue([]);
+  // No provider of `DIRECT_BYOK_PROVIDERS` serves the catalog id; the owner's endpoints may.
+  jest
+    .mocked(findDirectByokCatalogModels)
+    .mockImplementation(async (catalogModelId, providers) =>
+      providers ? actualDirectByok.findDirectByokCatalogModels(catalogModelId, providers) : []
+    );
   jest.mocked(getModelInferenceUserByokProviders).mockResolvedValue([]);
   jest.mocked(getModelGatewayUserByokProviders).mockResolvedValue(['openrouter']);
   jest.mocked(isValidOpenRouterModelId).mockImplementation(async id => id === CATALOG_MODEL);
@@ -167,7 +178,7 @@ describe('getProvider for an endpoint model id', () => {
     const served = await onlyRoute(result);
     expect(served).toMatchObject({
       provider: {
-        type: 'byok-endpoint',
+        type: 'direct-byok',
         apiUrl: 'https://llm.acme.example/v1',
         apiKey: 'endpoint-secret',
         inferenceProviderId: ENDPOINT_ID,
@@ -177,12 +188,12 @@ describe('getProvider for an endpoint model id', () => {
       bypassAccessCheck: true,
     });
     expect(endpointSteps(decision)).toEqual([
-      { step: 'byok-endpoint-model', outcome: 'selected', provider_id: ENDPOINT_ID },
+      { step: 'direct-byok-model', outcome: 'selected', provider_id: ENDPOINT_ID },
     ]);
     expect(decision.result).toMatchObject({
       kind: 'provider',
-      route: 'byok-endpoint-model',
-      provider_type: 'byok-endpoint',
+      route: 'direct-byok-model',
+      provider_type: 'direct-byok',
       payer: 'owner-byok-key',
     });
   });
@@ -248,7 +259,7 @@ describe('getProvider for an endpoint model id', () => {
     expect(result).toEqual({ kind: 'byok-endpoint-unavailable' });
     expect(endpointSteps(decision)).toEqual([
       {
-        step: 'byok-endpoint-model',
+        step: 'direct-byok-model',
         outcome: 'rejected',
         provider_id: ENDPOINT_ID,
         reason: testCase.reason,
@@ -267,18 +278,18 @@ describe('getProvider for an endpoint model id', () => {
     const bespoke = await route(user, organizationId, `${ENDPOINT_ID}/acme/coder`);
 
     expect(catalog.result).toEqual({
-      kind: 'byok-endpoint-catalog-only',
-      endpointName: 'Acme',
+      kind: 'direct-byok-catalog-only',
+      keyLabel: 'Acme endpoint',
       catalogModelId: CATALOG_MODEL,
     });
     expect(bespoke.result).toEqual({
-      kind: 'byok-endpoint-catalog-only',
-      endpointName: 'Acme',
+      kind: 'direct-byok-catalog-only',
+      keyLabel: 'Acme endpoint',
       catalogModelId: null,
     });
     expect(endpointSteps(catalog.decision)).toEqual([
       {
-        step: 'byok-endpoint-model',
+        step: 'direct-byok-model',
         outcome: 'rejected',
         provider_id: ENDPOINT_ID,
         reason: 'catalog-only',
@@ -301,14 +312,14 @@ describe('getProvider for a catalog id an endpoint serves in catalog mode', () =
     expectProviderResult(result);
     expect(result.routes).toHaveLength(2);
     expect(await result.routes[0]()).toMatchObject({
-      provider: { type: 'byok-endpoint', inferenceProviderId: ENDPOINT_ID },
+      provider: { type: 'direct-byok', inferenceProviderId: ENDPOINT_ID },
       userByok: [{ providerId: ENDPOINT_ID }],
       bypassAccessCheck: false,
     });
     expect(await result.routes[1]?.()).toMatchObject({ userByok: [{ providerId: 'openrouter' }] });
     expect(decision.byok_candidates).toEqual([
       expect.objectContaining({
-        route: 'endpoint-byok',
+        route: 'direct-byok',
         provider_id: ENDPOINT_ID,
         default_rank: -1,
         outcome: 'selected',
@@ -337,7 +348,7 @@ describe('getProvider for a catalog id an endpoint serves in catalog mode', () =
     ]);
 
     const { result, decision } = await route(user, organizationId, CATALOG_MODEL, {
-      isByokEndpointModelAllowed: false,
+      endpointModelAllowed: false,
     });
 
     expect(await onlyRoute(result)).toMatchObject({ userByok: [{ providerId: 'openrouter' }] });
@@ -376,7 +387,7 @@ describe('getProvider for a catalog id an endpoint serves in catalog mode', () =
     });
 
     expect(await onlyRoute(result)).toMatchObject({
-      provider: { type: 'byok-endpoint', supportedChatApis: ['chat_completions'] },
+      provider: { type: 'direct-byok', supportedChatApis: ['chat_completions'] },
       userByok: [{ providerId: ENDPOINT_ID }],
     });
     expect(decision.steps).toContainEqual({
@@ -421,7 +432,7 @@ describe('previewByokRouting with endpoints', () => {
     expect(preview).toMatchObject({ kind: 'routes' });
     if (preview.kind !== 'routes') throw new Error('expected routes');
     expect(preview.steps[0]).toEqual({
-      route: 'endpoint-byok',
+      route: 'direct-byok',
       outcome,
       providerId: ENDPOINT_ID,
       reason,

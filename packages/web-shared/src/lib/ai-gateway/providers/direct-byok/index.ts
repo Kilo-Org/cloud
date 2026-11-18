@@ -26,6 +26,8 @@ import { getAiSdkProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/
 import { getFallbackReasoningOptions } from '@kilocode/web-shared/lib/ai-gateway/providers/reasoning-options';
 import { toByokListedModel } from '@kilocode/web-shared/lib/ai-gateway/providers/byok-listed-model';
 import { signBedrockRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/aws-bedrock-signing';
+import { isByokEndpointProviderId } from '@kilocode/db/schema-types';
+import { createByokEndpointDirectProvider } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint/direct-provider';
 
 /**
  * The provider slug that organization provider allow-lists use for a direct BYOK provider: its
@@ -140,20 +142,45 @@ export function findDirectByokProvider(providerId: string): DirectByokProvider |
   return providers.find(provider => provider.id === providerId);
 }
 
-/** The direct BYOK provider that serves the requests of `key`, when it is a direct BYOK key. */
-export function directByokProviderForKey(
-  key: Pick<EnabledByokProvider, 'providerId'>
-): DirectByokProvider | undefined {
+type DirectByokKey = Pick<EnabledByokProvider, 'providerId' | 'endpoint'>;
+
+/**
+ * The direct BYOK provider that serves the requests of `key`, when it is a direct BYOK key: a
+ * provider of `DIRECT_BYOK_PROVIDERS`, or the organization's endpoint the key defines.
+ */
+export function directByokProviderForKey(key: DirectByokKey): DirectByokProvider | undefined {
+  if (key.endpoint && isByokEndpointProviderId(key.providerId)) {
+    return createByokEndpointDirectProvider(key.providerId, key.endpoint);
+  }
   return findDirectByokProvider(key.providerId);
 }
 
-/** The direct BYOK providers of `keys`, in `DIRECT_BYOK_PROVIDERS` order. */
+/** The organization endpoints among `keys`, in key order. */
+export function getByokEndpointProviders(keys: ReadonlyArray<DirectByokKey>): DirectByokProvider[] {
+  return keys.flatMap(key => (key.endpoint ? (directByokProviderForKey(key) ?? []) : []));
+}
+
+/**
+ * The direct BYOK providers of `keys`: providers of `DIRECT_BYOK_PROVIDERS` in that order, then
+ * the organization endpoints in key order.
+ */
 export function directByokProvidersForKeys(
-  keys: ReadonlyArray<Pick<EnabledByokProvider, 'providerId'>>
+  keys: ReadonlyArray<DirectByokKey>
 ): DirectByokProvider[] {
-  return DIRECT_BYOK_PROVIDERS.filter(provider =>
-    keys.some(key => directByokProviderForKey(key) === provider)
-  );
+  return [
+    ...DIRECT_BYOK_PROVIDERS.filter(provider => keys.some(key => key.providerId === provider.id)),
+    ...getByokEndpointProviders(keys),
+  ];
+}
+
+/**
+ * Every provider whose model ids the owner of `keys` can request: every provider of
+ * `DIRECT_BYOK_PROVIDERS`, and the owner's endpoints, whose ids only their owner can use.
+ */
+export function directByokProvidersVisibleTo(
+  keys: ReadonlyArray<DirectByokKey>
+): DirectByokProvider[] {
+  return [...DIRECT_BYOK_PROVIDERS, ...getByokEndpointProviders(keys)];
 }
 
 /**

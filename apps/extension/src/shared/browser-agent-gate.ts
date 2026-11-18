@@ -6,7 +6,6 @@ import {
   isOriginGranted,
   isUploadTool,
   SENSITIVE_REASON,
-  sensitiveReasonForField,
   toBrowserOrigin,
   toolGrantClass,
 } from './browser-agent-checks';
@@ -15,15 +14,13 @@ import type {
   BrowserNeedsPermission,
   BrowserOriginChanged,
   BrowserPermissionItem,
-  BrowserSensitiveProbe,
   StepTokenBinding,
 } from './browser-agent-checks';
 import { mainFrameOf, readAgentFrameTree } from './browser-agent-frames';
 import type { BrowserAgentFrame } from './browser-agent-frames';
 import {
-  readFocusedElementObject,
-  readSensitiveProbeForObject,
-  readSensitiveProbeForTarget,
+  classifyFocusedElement,
+  classifyTargetElement,
   sensitiveTargetsOf,
 } from './browser-agent-probes';
 import type { BrowserToolPageSession } from './browser-tool-snapshot';
@@ -165,14 +162,6 @@ const targetFrameOf = async (
     : { frame: frame.parentId !== undefined, origin: frame.origin };
 };
 
-const nodeDescriptionSchema = z.object({
-  node: z
-    .object({
-      backendNodeId: z.number().optional(),
-      nodeName: z.string().optional(),
-    })
-    .optional(),
-});
 const frameOwnerSchema = z.object({ backendNodeId: z.number().optional() });
 
 /** One frame's owner backendNodeId, or undefined when the frame's owner cannot be read. */
@@ -215,16 +204,6 @@ const navigationOrigin = (args: Record<string, unknown>): string | undefined => 
   return url === undefined ? undefined : toBrowserOrigin(url);
 };
 
-const firstReasonOf = (probe: BrowserSensitiveProbe): string | undefined => {
-  if (probe.paymentFormSubmit) {
-    return SENSITIVE_REASON.cardFormSubmit;
-  }
-
-  const [field] = probe.fields;
-
-  return field === undefined ? undefined : sensitiveReasonForField(field.kind);
-};
-
 /**
  * Classifies one act call as a sensitive step: a file upload, an OAuth consent
  * page, typing into or submitting a password/one-time-code/payment field. A
@@ -249,53 +228,42 @@ const sensitiveStepFor = async (input: {
   const targets = sensitiveTargetsOf(input.toolName, input.args);
 
   if (input.toolName === 'browser_press_key' && targets.length === 0) {
-    // A press without an element types into whatever the page has focused; the object handle comes from the same read, so it cannot be redirected later.
-    const objectId = await readFocusedElementObject(input.session);
+    // A press without an element types into whatever the page has focused.
+    const verdict = await classifyFocusedElement(input.session);
 
-    if (objectId === undefined) {
+    if (verdict.kind === 'plain') {
+      return undefined;
+    }
+
+    if (verdict.kind === 'unknown') {
       return { origin: input.origin, reason: SENSITIVE_REASON.unknownField };
     }
 
-    const described = nodeDescriptionSchema.safeParse(
-      await input.session.send('DOM.describeNode', { objectId })
+    if (verdict.frameBackendNodeId === undefined) {
+      return { origin: input.origin, reason: verdict.reason };
+    }
+
+    // A frame the page cannot read is sensitive by itself; label it with its origin.
+    const frameOrigin = await frameOriginForOwner(
+      input.session,
+      input.frames,
+      verdict.frameBackendNodeId
     );
-    const nodeName = described.success ? described.data.node?.nodeName?.toUpperCase() : undefined;
 
-    if (nodeName === 'IFRAME' || nodeName === 'FRAME') {
-      // Typing into a frame the page cannot read is assumed sensitive.
-      const backendNodeId = described.success ? described.data.node?.backendNodeId : undefined;
-      const frameOrigin =
-        backendNodeId === undefined
-          ? OPAQUE_ORIGIN
-          : await frameOriginForOwner(input.session, input.frames, backendNodeId);
-
-      return { origin: frameOrigin, reason: `typing into a field inside ${frameOrigin}` };
-    }
-
-    const focused = await readSensitiveProbeForObject(input.session, objectId);
-
-    if (focused === undefined) {
-      return { origin: input.origin, reason: SENSITIVE_REASON.unknownField };
-    }
-
-    const reason = firstReasonOf(focused);
-
-    return reason === undefined ? undefined : { origin: input.origin, reason };
+    return { origin: frameOrigin, reason: `typing into a field inside ${frameOrigin}` };
   }
 
   for (const target of targets) {
     // eslint-disable-next-line no-await-in-loop -- one probe per targeted element, in argument order
-    const probe = await readSensitiveProbeForTarget(input.session, target);
+    const verdict = await classifyTargetElement(input.session, target);
 
-    if (probe === undefined) {
-      // A target that cannot be resolved or classified is assumed sensitive.
-      return { element: target, origin: input.origin, reason: SENSITIVE_REASON.unknownField };
+    if (verdict.kind === 'sensitive') {
+      return { element: target, origin: input.origin, reason: verdict.reason };
     }
 
-    const reason = firstReasonOf(probe);
-
-    if (reason !== undefined) {
-      return { element: target, origin: input.origin, reason };
+    if (verdict.kind === 'unknown') {
+      // A target that cannot be resolved or classified is assumed sensitive.
+      return { element: target, origin: input.origin, reason: SENSITIVE_REASON.unknownField };
     }
   }
 

@@ -1,6 +1,7 @@
 /* eslint-disable max-lines -- The probe expressions are page-side source strings; splitting them from the parsers that read them hurts review. */
 import { z } from 'zod';
-import type { BrowserSensitiveProbe } from './browser-agent-checks';
+import { SENSITIVE_REASON, sensitiveReasonForField } from './browser-agent-checks';
+import type { BrowserSensitiveField } from './browser-agent-checks';
 import type { BrowserToolPageSession } from './browser-tool-snapshot';
 
 /**
@@ -303,69 +304,111 @@ const resolveObjectSchema = z.object({
 });
 
 const sensitiveProbePayloadSchema = z.object({
-  fields: z.array(z.object({ kind: z.enum(['one-time-code', 'password', 'payment']) })).optional(),
-  paymentFormSubmit: z.boolean().optional(),
+  fields: z.array(z.object({ kind: z.enum(['one-time-code', 'password', 'payment']) })),
+  paymentFormSubmit: z.boolean(),
 });
 
-const decodeSensitiveProbe = (value: unknown): BrowserSensitiveProbe => {
+/** A field the probe positively identified as one of the sensitive kinds. */
+type SensitiveFieldKind = BrowserSensitiveField['kind'];
+
+/**
+ * The one sensitive-step classification. `plain` is only returned for a fully
+ * parsed, schema-valid probe that positively says the element is an ordinary
+ * field; every other outcome is `unknown` and its caller treats it as sensitive.
+ */
+export type SensitiveVerdict =
+  | { readonly kind: 'plain' }
+  | {
+      readonly kind: 'sensitive';
+      /** Set when the sensitive element is a frame the page cannot read. */
+      readonly frameBackendNodeId?: number | undefined;
+      readonly reason: string;
+    }
+  | { readonly kind: 'unknown'; readonly cause: string };
+
+const classifyField = (kind: SensitiveFieldKind): SensitiveVerdict => ({
+  kind: 'sensitive',
+  reason: sensitiveReasonForField(kind),
+});
+
+/** Classifies one probe payload; anything not fully understood is unknown. */
+export const classifyProbeValue = (value: unknown): SensitiveVerdict => {
   const raw = probeJsonSchema.safeParse(value);
 
   if (!raw.success) {
-    return { fields: [], paymentFormSubmit: false };
+    return { cause: 'the probe returned no text', kind: 'unknown' };
   }
 
-  const payload = sensitiveProbePayloadSchema.safeParse(JSON.parse(raw.data));
+  let parsed: unknown = undefined;
+
+  try {
+    parsed = JSON.parse(raw.data);
+  } catch {
+    return { cause: 'the probe returned malformed JSON', kind: 'unknown' };
+  }
+
+  const payload = sensitiveProbePayloadSchema.safeParse(parsed);
 
   if (!payload.success) {
-    return { fields: [], paymentFormSubmit: false };
+    return { cause: 'the probe payload did not match its schema', kind: 'unknown' };
   }
 
-  return {
-    fields: payload.data.fields ?? [],
-    paymentFormSubmit: payload.data.paymentFormSubmit === true,
-  };
+  if (payload.data.paymentFormSubmit) {
+    return { kind: 'sensitive', reason: SENSITIVE_REASON.cardFormSubmit };
+  }
+
+  const [field] = payload.data.fields ?? [];
+
+  if (field === undefined) {
+    return { kind: 'plain' };
+  }
+
+  return classifyField(field.kind);
 };
 
-/**
- * The probe's verdict on the focused element: `browser_press_key` without a
- * target still types into whatever the page has focused.
- */
-/** Classifies an element already held as a remote object; undefined when the probe cannot run. */
-export const readSensitiveProbeForObject = async (
+/** Classifies an element held as a remote object; a failed call is unknown. */
+const classifyObject = async (
   session: ProbeSession,
   objectId: string
-): Promise<BrowserSensitiveProbe | undefined> => {
+): Promise<SensitiveVerdict> => {
   try {
-    const probe = await session.send('Runtime.callFunctionOn', {
-      functionDeclaration: SENSITIVE_TARGET_PROBE_FUNCTION,
-      objectId,
-      returnByValue: true,
-    });
-    const response = runtimeEvaluateSchema.safeParse(probe);
+    const response = runtimeEvaluateSchema.safeParse(
+      await session.send('Runtime.callFunctionOn', {
+        functionDeclaration: SENSITIVE_TARGET_PROBE_FUNCTION,
+        objectId,
+        returnByValue: true,
+      })
+    );
 
-    return response.success ? decodeSensitiveProbe(response.data.result?.value) : undefined;
+    return response.success
+      ? classifyProbeValue(response.data.result?.value)
+      : { cause: 'the probe call returned no value', kind: 'unknown' };
   } catch {
-    return undefined;
+    return { cause: 'the probe call failed', kind: 'unknown' };
   }
 };
 
+const focusedNodeSchema = z.object({
+  backendNodeId: z.number().optional(),
+  nodeName: z.string().optional(),
+});
+const focusedDescriptionSchema = z.object({ node: focusedNodeSchema.optional() });
+
 /**
- * The focused element's remote object, read in the main frame's isolated world.
- * The walk follows same-origin documents; it stops at the first iframe it cannot
- * read and returns that iframe element, so the caller identifies the frame from
- * the object handle instead of a page-supplied index. `undefined` when the read
- * itself failed, which the caller treats as sensitive.
+ * Reads and classifies the focused element: `browser_press_key` without a target
+ * still types into whatever the page has focused. The object handle comes from
+ * the same isolated-world read, so a page mutating its DOM cannot redirect it; a
+ * frame the page cannot read is sensitive by itself, and any missing or unknown
+ * shape is unknown (sensitive), never plain.
  */
-export const readFocusedElementObject = async (
-  session: ProbeSession
-): Promise<string | undefined> => {
+export const classifyFocusedElement = async (session: ProbeSession): Promise<SensitiveVerdict> => {
   try {
     const frameId = await mainFrameId(session);
     const contextId =
       frameId === undefined ? undefined : await frameExecutionContext(session, frameId);
 
     if (contextId === undefined) {
-      return undefined;
+      return { cause: 'the main frame has no isolated world', kind: 'unknown' };
     }
 
     const expression = `(() => {
@@ -383,41 +426,67 @@ export const readFocusedElementObject = async (
     const evaluated = evaluatedObjectSchema.safeParse(
       await session.send('Runtime.evaluate', { contextId, expression, returnByValue: false })
     );
+    const objectId = evaluated.success ? evaluated.data.result?.objectId : undefined;
 
-    return evaluated.success ? evaluated.data.result?.objectId : undefined;
+    if (objectId === undefined) {
+      return { cause: 'the focused element could not be read', kind: 'unknown' };
+    }
+
+    const described = focusedDescriptionSchema.safeParse(
+      await session.send('DOM.describeNode', { objectId })
+    );
+    const node = described.success ? described.data.node : undefined;
+
+    if (node?.nodeName === undefined) {
+      return { cause: 'the focused node has no name', kind: 'unknown' };
+    }
+
+    const nodeName = node.nodeName.toUpperCase();
+
+    if (nodeName === 'IFRAME' || nodeName === 'FRAME') {
+      if (node.backendNodeId === undefined) {
+        return { cause: 'the focused frame has no owner node', kind: 'unknown' };
+      }
+
+      return {
+        frameBackendNodeId: node.backendNodeId,
+        kind: 'sensitive',
+        reason: 'typing into a field inside a frame the page cannot read',
+      };
+    }
+
+    return await classifyObject(session, objectId);
   } catch {
-    return undefined;
+    return { cause: 'the focused element could not be inspected', kind: 'unknown' };
   }
 };
 
 /**
- * Reads the sensitive state of one target element. `undefined` means the probe
- * could not resolve or classify the target; callers must treat that as a
- * sensitive step (fail closed), never as "not sensitive".
+ * Classifies one target element. It resolves and probes inside the frame's
+ * isolated world, so page script cannot shadow `type`/`getAttribute`; any
+ * failure is unknown (sensitive), never plain.
  */
-export const readSensitiveProbeForTarget = async (
+export const classifyTargetElement = async (
   session: ProbeSession,
-  target: string | undefined
-): Promise<BrowserSensitiveProbe | undefined> => {
-  if (target === undefined || target === '') {
-    return { fields: [], paymentFormSubmit: false };
-  }
-
+  target: string
+): Promise<SensitiveVerdict> => {
   try {
     const resolved = await session.resolveTarget(target);
 
     if (resolved === undefined) {
-      return undefined;
+      return { cause: 'the target did not resolve', kind: 'unknown' };
     }
 
-    // Resolve the node inside the frame's isolated world: page script can shadow
-    // `type`/`getAttribute`, so the probe must not run in the main world.
     const frameId = await targetFrameId(session, resolved);
-    const executionContextId =
-      frameId === undefined ? undefined : await frameExecutionContext(session, frameId);
 
-    if (frameId === undefined || executionContextId === undefined) {
-      return undefined;
+    if (frameId === undefined) {
+      return { cause: 'the target frame could not be read', kind: 'unknown' };
+    }
+
+    const executionContextId = await frameExecutionContext(session, frameId);
+
+    if (executionContextId === undefined) {
+      return { cause: 'the target frame has no isolated world', kind: 'unknown' };
     }
 
     const resolvedNode = resolveObjectSchema.safeParse(
@@ -431,35 +500,12 @@ export const readSensitiveProbeForTarget = async (
     const objectId = resolvedNode.success ? resolvedNode.data.object?.objectId : undefined;
 
     if (objectId === undefined) {
-      return undefined;
+      return { cause: 'the target could not be resolved to an object', kind: 'unknown' };
     }
 
-    const probe = await session.send('Runtime.callFunctionOn', {
-      functionDeclaration: SENSITIVE_TARGET_PROBE_FUNCTION,
-      objectId,
-      returnByValue: true,
-    });
-    const response = runtimeEvaluateSchema.safeParse(probe);
-    const raw = probeJsonSchema.safeParse(
-      response.success ? response.data.result?.value : undefined
-    );
-
-    if (!raw.success) {
-      return undefined;
-    }
-
-    const payload = sensitiveProbePayloadSchema.safeParse(JSON.parse(raw.data));
-
-    if (!payload.success) {
-      return undefined;
-    }
-
-    return {
-      fields: payload.data.fields ?? [],
-      paymentFormSubmit: payload.data.paymentFormSubmit === true,
-    };
+    return await classifyObject(session, objectId);
   } catch {
-    return undefined;
+    return { cause: 'the target could not be inspected', kind: 'unknown' };
   }
 };
 

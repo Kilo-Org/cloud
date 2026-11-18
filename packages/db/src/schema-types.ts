@@ -2587,8 +2587,13 @@ export type SecurityFindingAnalysis = {
 /**
  * Time-of-day prices. OpenRouter lists the prices of each UTC window in `overrides`; Vercel AI
  * Gateway multiplies its token prices by `peak_pricing.multiplier` during peak windows.
+ *
+ * An `overrides` entry with `min_prompt_tokens` is not a time-of-day window: it applies to requests
+ * whose prompt exceeds that many tokens (a long-context surcharge). Vercel's `*_tiers` fields are
+ * not part of this schema; the base price fields are their first (short-context) tier.
  */
 export const PriceOverrideSchema = z.looseObject({
+  min_prompt_tokens: z.number().optional().catch(undefined),
   prompt: z.string().optional().catch(undefined),
   completion: z.string().optional().catch(undefined),
   input_cache_read: z.string().optional().catch(undefined),
